@@ -1,3 +1,4 @@
+import { i18n } from "@lingui/core";
 import { useQuery } from "@tanstack/react-query";
 import { Badge } from "@maipai/ui/src/dashboard/components/ui/badge";
 import { AsyncState } from "@maipai/ui/src/primitives/AsyncState";
@@ -42,9 +43,9 @@ function skillRow(skill: SkillRow, minor: boolean) {
         {skill.offer_label ? (
           <Badge variant="outline">{skill.offer_label}</Badge>
         ) : skill.used_in_chat ? (
-          <Badge variant="secondary">Used in chat</Badge>
+          <Badge variant="secondary">{i18n._({ id: "Used in chat", message: "Used in chat" })}</Badge>
         ) : (
-          <Badge variant="outline">{minor ? "Not used in your chats" : "Not used in chat yet"}</Badge>
+          <Badge variant="outline">{minor ? i18n._({ id: "Not used in your chats", message: "Not used in your chats" }) : i18n._({ id: "Not used in chat yet", message: "Not used in chat yet" })}</Badge>
         )}
       </ItemActions>
     </Item>
@@ -57,27 +58,27 @@ export function ChatSkillsSection({ person }: { person: Roster }) {
   const skillsQuery = useQuery({ queryKey: ["skills"], queryFn: () => api.skills(), enabled: !isChild });
   if (isChild) return null;
   if (skillsQuery.isLoading || skillsQuery.isError) return <AsyncState data={skillsQuery.data} error={skillsQuery.isError} isFetching={skillsQuery.isFetching} onRetry={() => void skillsQuery.refetch()} errorMessage="Could not load skills." loadingLabel="Loading skills">{() => null}</AsyncState>;
-  if (skillsQuery.isError) return <p role="alert" className="text-destructive text-sm">Could not load skills. Try again in a moment.</p>;
+  if (skillsQuery.isError) return <p role="alert" className="text-destructive text-sm">{i18n._({ id: "Could not load skills. Try again in a moment.", message: "Could not load skills. Try again in a moment." })}</p>;
 
   const skills = skillsQuery.data ?? [];
   const included = skills.filter((skill) => skill.origin === "bundled").sort(bySkillOrder);
   const added = skills.filter((skill) => skill.origin === "store").sort(bySkillOrder);
   return (
     <>
-      <h3 className="text-sm font-medium">Included</h3>
-      <ItemGroup aria-label="Included skills">{included.map((skill) => skillRow(skill, minor))}</ItemGroup>
-      <h3 className="text-sm font-medium">Added to this home</h3>
+      <h3 className="text-sm font-medium">{i18n._({ id: "Included", message: "Included" })}</h3>
+      <ItemGroup aria-label={i18n._({ id: "Included skills", message: "Included skills" })}>{included.map((skill) => skillRow(skill, minor))}</ItemGroup>
+      <h3 className="text-sm font-medium">{i18n._({ id: "Added to this home", message: "Added to this home" })}</h3>
       {added.length > 0 ? (
-        <ItemGroup aria-label="Skills added to this home">{added.map((skill) => skillRow(skill, minor))}</ItemGroup>
+        <ItemGroup aria-label={i18n._({ id: "Skills added to this home", message: "Skills added to this home" })}>{added.map((skill) => skillRow(skill, minor))}</ItemGroup>
       ) : (
         <Empty data-skills="added-empty">
           <EmptyHeader>
             <EmptyMedia variant="icon">
               <AddedIcon />
             </EmptyMedia>
-            <EmptyTitle>No skills added yet</EmptyTitle>
+            <EmptyTitle>{i18n._({ id: "No skills added yet", message: "No skills added yet" })}</EmptyTitle>
             <EmptyDescription>
-              Skills added from the MaiPai Catalog will show up here. Adding them from here, and writing your own, is not built yet.
+              {i18n._({ id: "Skills added from the MaiPai Catalog will show up here. Adding them from here, and writing your own, is not built yet.", message: "Skills added from the MaiPai Catalog will show up here. Adding them from here, and writing your own, is not built yet." })}
             </EmptyDescription>
           </EmptyHeader>
         </Empty>

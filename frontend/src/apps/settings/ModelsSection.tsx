@@ -1,3 +1,4 @@
+import { i18n } from "@lingui/core";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { JobProgress } from "@maipai/ui/src/elements/job-progress";
 import { Progress } from "@maipai/ui/src/primitives/Progress";
@@ -79,7 +80,7 @@ export function ModelsSection() {
       <div className="flex flex-col gap-4">
         {error ? <p className="text-base text-destructive">{error}</p> : null}
         {hardware === null ? (
-          <Progress mode="spinner" label="Checking this computer" />
+          <Progress mode="spinner" label={i18n._({ id: "Checking this computer", message: "Checking this computer" })} />
         ) : (
           <div className="flex flex-col gap-4">
             <p className="text-base text-muted-foreground">{describeHardware(hardware)}</p>
@@ -94,8 +95,8 @@ export function ModelsSection() {
             <ChatModelChoices fits={chatFits} selectedModelId={selectedModelId} installedIds={installedIds} downloading={downloads.some((job) => isVisibleModelDownload(job) && (job.state === "queued" || job.state === "running" || job.state === "paused" || job.state === "stalled"))} onChanged={load} />
             <CheckModelCard onChecked={(name, response) => setChecked((items) => [{ name, response }, ...items.filter((item) => item.name !== name)].slice(0, 3))} />
             {recommended ? <ModelComparison recommended={{ name: recommended.model.label, response: recommendedFit.response?.plan ? recommendedFit.response : null }} checked={checked} hardware={hardware} /> : null}
-            <PlannedRoleCard title="Image generation" fits={imageFits} />
-            <PlannedRoleCard title="Video generation" fits={videoFits} />
+            <PlannedRoleCard title={i18n._({ id: "Image generation", message: "Image generation" })} fits={imageFits} />
+            <PlannedRoleCard title={i18n._({ id: "Video generation", message: "Video generation" })} fits={videoFits} />
           </div>
         )}
       </div>
@@ -133,30 +134,30 @@ function ChatModelCard({
   const [showDetails, setShowDetails] = useState(false);
   const CheckIcon = getIcon("check");
   const ChevronIcon = getIcon("chevron-down");
-  if (fits === null) return <RoleCardShell title="Chat"><Progress mode="spinner" label="Checking the MaiPai Stack" /></RoleCardShell>;
+  if (fits === null) return <RoleCardShell title={i18n._({ id: "Chat", message: "Chat" })}><Progress mode="spinner" label={i18n._({ id: "Checking the MaiPai Stack", message: "Checking the MaiPai Stack" })} /></RoleCardShell>;
   const primary = fits.find((f) => f.model.id === selectedModelId) ?? fits.find((f) => f.model.implemented) ?? null;
   const readyPlan = fitPlan.state === "ready" ? fitPlan.response?.plan : null;
   const fitDetails = readyPlan ? describeFitPlan(readyPlan) : null;
   return (
-    <RoleCardShell title="Chat">
+    <RoleCardShell title={i18n._({ id: "Chat", message: "Chat" })}>
       <div className="flex flex-col gap-2">
         <div className="flex items-center justify-between gap-2">
           <span className="text-base font-medium">{stackName ?? "No chat model selected in the MaiPai Stack"}</span>
           {stackState === "ready" || stackState === "loaded" ? (
             <span className="flex items-center gap-1 text-base text-primary">
-              <CheckIcon className="h-4 w-4" aria-hidden /> {stackState === "ready" ? "Ready" : "Loaded"}
+              <CheckIcon className="h-4 w-4" aria-hidden /> {stackState === "ready" ? i18n._({ id: "Ready", message: "Ready" }) : i18n._({ id: "Loaded", message: "Loaded" })}
             </span>
           ) : <span className="text-base text-muted-foreground">{stackState}</span>}
         </div>
         {primary ? <FitLine fitPlan={fitPlan} legacyWarning={!primary.fits} /> : null}
-        <Disclosure open={showDetails} onToggle={() => setShowDetails((v) => !v)} label="Details" icon={ChevronIcon}>
+        <Disclosure open={showDetails} onToggle={() => setShowDetails((v) => !v)} label={i18n._({ id: "Details", message: "Details" })} icon={ChevronIcon}>
           <div className="flex flex-col gap-1 pt-1">
-            <p className="text-base text-muted-foreground">Chat runs through the MaiPai Stack.</p>
+            <p className="text-base text-muted-foreground">{i18n._({ id: "Chat runs through the MaiPai Stack.", message: "Chat runs through the MaiPai Stack." })}</p>
             {primary ? fitDetails ? <>
-              <SpecSheet title="Fit details" rows={fitDetails.rows.map(({ label, value }) => ({ label, value }))} visibleCount={fitDetails.rows.length} />
+              <SpecSheet title={i18n._({ id: "Fit details", message: "Fit details" })} rows={fitDetails.rows.map(({ label, value }) => ({ label, value }))} visibleCount={fitDetails.rows.length} />
               {fitDetails.rows.filter((row) => row.source).map((row) => <FitSource key={row.label} row={row} />)}
               {fitDetails.remedy ? <RecommendationCard state="idle" question="What would help?">{fitDetails.remedy}</RecommendationCard> : null}
-            </> : <p className="text-base text-muted-foreground">Uses about {formatBytes(primary.requiredBytes)} of memory.</p> : <p className="text-base text-muted-foreground">The Stack has not reported a chat model.</p>}
+            </> : <p className="text-base text-muted-foreground">{i18n._({ id: "Uses about {formatBytes} of memory.", message: "Uses about {formatBytes} of memory.", values: { formatBytes: formatBytes(primary.requiredBytes) } })}</p> : <p className="text-base text-muted-foreground">{i18n._({ id: "The Stack has not reported a chat model.", message: "The Stack has not reported a chat model." })}</p>}
           </div>
         </Disclosure>
       </div>
@@ -167,17 +168,17 @@ function ChatModelCard({
 
 function FitLine({ fitPlan, legacyWarning }: { fitPlan: ReturnType<typeof useFitPlan>; legacyWarning: boolean }) {
   const { state, response } = fitPlan;
-  if (state === "loading") return <Progress mode="spinner" label="Checking this computer" />;
+  if (state === "loading") return <Progress mode="spinner" label={i18n._({ id: "Checking this computer", message: "Checking this computer" })} />;
   if (state === "ready" && response && response.plan !== null) {
     return <FitResult headline={response.wording.headline} detail={response.wording.detail} verdict={response.wording.verdict} />;
   }
   if (!legacyWarning) return null;
   const AlertIcon = getIcon("alert-triangle");
-  return <p className="flex items-start gap-1.5 text-base text-muted-foreground"><AlertIcon className="mt-0.5 h-4 w-4 shrink-0" aria-hidden /> This may run slowly on this computer.</p>;
+  return <p className="flex items-start gap-1.5 text-base text-muted-foreground"><AlertIcon className="mt-0.5 h-4 w-4 shrink-0" aria-hidden /> {i18n._({ id: "This may run slowly on this computer.", message: "This may run slowly on this computer." })}</p>;
 }
 
 function FitResult({ headline, detail, verdict, sizedModel }: { headline: string; detail: string; verdict: "yes" | "slow" | "no" | "unknown"; sizedModel?: string | null }) {
-  return <div className="flex flex-col items-start gap-1"><FitVerdictBadge verdict={verdict} /><p className="text-base text-muted-foreground">{headline}</p><p className="text-base text-muted-foreground">{detail}</p>{sizedModel ? <p className="text-base text-muted-foreground">Sized from {sizedModel}.</p> : null}</div>;
+  return <div className="flex flex-col items-start gap-1"><FitVerdictBadge verdict={verdict} /><p className="text-base text-muted-foreground">{headline}</p><p className="text-base text-muted-foreground">{detail}</p>{sizedModel ? <p className="text-base text-muted-foreground">{i18n._({ id: "Sized from {sizedModel}.", message: "Sized from {sizedModel}.", values: { sizedModel } })}</p> : null}</div>;
 }
 
 function FitVerdictBadge({ verdict }: { verdict: "yes" | "slow" | "no" | "unknown" }) {
@@ -219,16 +220,16 @@ function CheckModelCard({ onChecked }: { onChecked: (name: string, response: Fit
   }
 
   return (
-    <RoleCardShell title="Check a model">
-      <p className="mb-3 text-base text-muted-foreground">Paste a Hugging Face link to see if a model will run on this computer before you download it.</p>
+    <RoleCardShell title={i18n._({ id: "Check a model", message: "Check a model" })}>
+      <p className="mb-3 text-base text-muted-foreground">{i18n._({ id: "Paste a Hugging Face link to see if a model will run on this computer before you download it.", message: "Paste a Hugging Face link to see if a model will run on this computer before you download it." })}</p>
       <form className="flex flex-col items-start gap-3 sm:flex-row" onSubmit={(event) => { event.preventDefault(); void check(); }}>
-        <Input value={value} onChange={(event) => setValue(event.target.value)} aria-label="Hugging Face model link" />
-        <Button type="submit" disabled={busy}>{busy ? "Checking…" : "Check"}</Button>
+        <Input value={value} onChange={(event) => setValue(event.target.value)} aria-label={i18n._({ id: "Hugging Face model link", message: "Hugging Face model link" })} />
+        <Button type="submit" disabled={busy}>{busy ? i18n._({ id: "Checking…", message: "Checking…" }) : i18n._({ id: "Check", message: "Check" })}</Button>
       </form>
       {error ? <p className="mt-2 text-base text-muted-foreground">{error}</p> : null}
-      {busy ? <div className="mt-2"><Progress mode="spinner" label="Checking this computer" /></div> : null}
-      {response ? <div className="mt-2"><FitResult headline={response.wording.headline} detail={response.wording.detail} verdict={response.wording.verdict} sizedModel={response.plan && typeof response.plan.model === "string" && response.plan.model.length > 0 ? response.plan.model : null} />{response.plan && fitDetails ? <Disclosure open={showPlan} onToggle={() => setShowPlan((open) => !open)} label="How this was worked out" icon={getIcon("chevron-down")}>
-        <SpecSheet title="Fit details" rows={fitDetails.rows.map(({ label, value }) => ({ label, value }))} visibleCount={fitDetails.rows.length} />
+      {busy ? <div className="mt-2"><Progress mode="spinner" label={i18n._({ id: "Checking this computer", message: "Checking this computer" })} /></div> : null}
+      {response ? <div className="mt-2"><FitResult headline={response.wording.headline} detail={response.wording.detail} verdict={response.wording.verdict} sizedModel={response.plan && typeof response.plan.model === "string" && response.plan.model.length > 0 ? response.plan.model : null} />{response.plan && fitDetails ? <Disclosure open={showPlan} onToggle={() => setShowPlan((open) => !open)} label={i18n._({ id: "How this was worked out", message: "How this was worked out" })} icon={getIcon("chevron-down")}>
+        <SpecSheet title={i18n._({ id: "Fit details", message: "Fit details" })} rows={fitDetails.rows.map(({ label, value }) => ({ label, value }))} visibleCount={fitDetails.rows.length} />
         {fitDetails.rows.filter((row) => row.source).map((row) => <FitSource key={row.label} row={row} />)}
         {fitDetails.remedy ? <RecommendationCard state="idle" question="What would help?">{fitDetails.remedy}</RecommendationCard> : null}
       </Disclosure> : null}</div> : null}
@@ -274,10 +275,10 @@ function ModelComparison({ recommended, checked, hardware }: { recommended: { na
   }
   return (
     <>
-      <h2 className="text-base font-medium">Compare</h2>
+      <h2 className="text-base font-medium">{i18n._({ id: "Compare", message: "Compare" })}</h2>
       <ComparisonCard traitLabels={["Memory it needs"]} options={options} />
-      <Button type="button" variant="secondary" onClick={() => void copySummary()}>{copied ? "Copied" : "Copy summary"}</Button>
-      {copyFailed ? <div className="flex flex-col gap-2"><p className="text-base text-muted-foreground">Could not copy. Select the text below instead.</p><Textarea aria-label="Summary to copy" readOnly rows={Math.min(12, summary.split("\n").length)} value={summary} /></div> : null}
+      <Button type="button" variant="secondary" onClick={() => void copySummary()}>{copied ? i18n._({ id: "Copied", message: "Copied" }) : i18n._({ id: "Copy summary", message: "Copy summary" })}</Button>
+      {copyFailed ? <div className="flex flex-col gap-2"><p className="text-base text-muted-foreground">{i18n._({ id: "Could not copy. Select the text below instead.", message: "Could not copy. Select the text below instead." })}</p><Textarea aria-label={i18n._({ id: "Summary to copy", message: "Summary to copy" })} readOnly rows={Math.min(12, summary.split("\n").length)} value={summary} /></div> : null}
     </>
   );
 }
@@ -292,13 +293,13 @@ function ComputerMemory({ response }: { response: ComputerMemoryResponse }) {
   const { memory } = response;
   const percent = memory.usableGb > 0 ? (memory.usedGb / memory.usableGb) * 100 : 0;
   return (
-    <RoleCardShell title="Memory right now">
+    <RoleCardShell title={i18n._({ id: "Memory right now", message: "Memory right now" })}>
       <div className="flex flex-col gap-2">
-        <div className="flex items-center gap-3"><IconTile icon="cpu" hue="--hue-blue" /><p className="text-lg font-medium tabular-nums">{memory.usedGb} GB in use of {memory.usableGb} GB</p></div>
+        <div className="flex items-center gap-3"><IconTile icon="cpu" hue="--hue-blue" /><p className="text-lg font-medium tabular-nums">{i18n._({ id: "{usedGb} GB in use of {usableGb} GB", message: "{usedGb} GB in use of {usableGb} GB", values: { usedGb: memory.usedGb, usableGb: memory.usableGb } })}</p></div>
         <p className="text-base text-muted-foreground">{memory.pressureText}</p>
-        <Progress mode="determinate" value={percent} label="Memory used" />
-        {memory.loaded.length ? <SpecSheet title="Models using memory" rows={memory.loaded.map((item) => ({ label: item.label, value: `${item.gb} GB` }))} visibleCount={memory.loaded.length} /> : <p className="text-base text-muted-foreground">{memory.homeOwnedRoles.length ? "The Stack has nothing loaded." : "Nothing is loaded right now."}</p>}
-        {memory.homeOwnedRoles.length ? <p className="text-sm text-muted-foreground">This counts only what the Stack has loaded. Home&apos;s own engines still run: {describeHomeOwnedRoles(memory.homeOwnedRoles)}.</p> : null}
+        <Progress mode="determinate" value={percent} label={i18n._({ id: "Memory used", message: "Memory used" })} />
+        {memory.loaded.length ? <SpecSheet title={i18n._({ id: "Models using memory", message: "Models using memory" })} rows={memory.loaded.map((item) => ({ label: item.label, value: `${item.gb} GB` }))} visibleCount={memory.loaded.length} /> : <p className="text-base text-muted-foreground">{memory.homeOwnedRoles.length ? i18n._({ id: "The Stack has nothing loaded.", message: "The Stack has nothing loaded." }) : i18n._({ id: "Nothing is loaded right now.", message: "Nothing is loaded right now." })}</p>}
+        {memory.homeOwnedRoles.length ? <p className="text-sm text-muted-foreground">{i18n._({ id: "This counts only what the Stack has loaded. Home's own engines still run: {describeHomeOwnedRoles}.", message: "This counts only what the Stack has loaded. Home's own engines still run: {describeHomeOwnedRoles}.", values: { describeHomeOwnedRoles: describeHomeOwnedRoles(memory.homeOwnedRoles) } })}</p> : null}
       </div>
     </RoleCardShell>
   );
@@ -340,8 +341,8 @@ function ChatModelChoices({ fits, selectedModelId, installedIds, downloading, on
   }
 
   return (
-    <RoleCardShell title="Chat models">
-      <p className="mb-3 text-base text-muted-foreground">Pick which model answers chat. The household keeps working while a new one downloads, and your choice stays after a restart.</p>
+    <RoleCardShell title={i18n._({ id: "Chat models", message: "Chat models" })}>
+      <p className="mb-3 text-base text-muted-foreground">{i18n._({ id: "Pick which model answers chat. The household keeps working while a new one downloads, and your choice stays after a restart.", message: "Pick which model answers chat. The household keeps working while a new one downloads, and your choice stays after a restart." })}</p>
       <ul className="flex flex-col gap-3">
         {choices.map((fit) => {
           const model = fit.model;
@@ -353,12 +354,12 @@ function ChatModelChoices({ fits, selectedModelId, installedIds, downloading, on
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <span className="flex flex-wrap items-center gap-2">
                   <span className="text-base font-medium">{model.label}</span>
-                  {model.tags?.includes("uncensored") ? <Badge variant="outline" tone="warning">Uncensored</Badge> : null}
+                  {model.tags?.includes("uncensored") ? <Badge variant="outline" tone="warning">{i18n._({ id: "Uncensored", message: "Uncensored" })}</Badge> : null}
                 </span>
-                {inUse ? <Badge variant="secondary" tone="success">In use</Badge> : installed ? (
-                  <Button type="button" disabled={busy || downloading} onClick={() => void choose(fit)}>Use this model</Button>
+                {inUse ? <Badge variant="secondary" tone="success">{i18n._({ id: "In use", message: "In use" })}</Badge> : installed ? (
+                  <Button type="button" disabled={busy || downloading} onClick={() => void choose(fit)}>{i18n._({ id: "Use this model", message: "Use this model" })}</Button>
                 ) : (
-                  <Button type="button" variant="outline" disabled={busy || downloading} onClick={() => void choose(fit)}>Download ({formatBytes(model.download!.approx_bytes)})</Button>
+                  <Button type="button" variant="outline" disabled={busy || downloading} onClick={() => void choose(fit)}>{i18n._({ id: "Download ({formatBytes})", message: "Download ({formatBytes})", values: { formatBytes: formatBytes(model.download!.approx_bytes) } })}</Button>
                 )}
               </div>
               <ul className="list-disc pl-5 text-base text-muted-foreground">
@@ -379,7 +380,7 @@ function PlannedRoleCard({ title, fits }: { title: string; fits: ModelFit[] | nu
   if (fits === null || fits.length === 0) return null;
   return (
     <RoleCardShell title={title}>
-      <p className="text-base text-muted-foreground">Not available on this computer yet.</p>
+      <p className="text-base text-muted-foreground">{i18n._({ id: "Not available on this computer yet.", message: "Not available on this computer yet." })}</p>
     </RoleCardShell>
   );
 }

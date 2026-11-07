@@ -1,6 +1,7 @@
 // VIDEO-LORA-08 (settings-media 5.3, video-loras 15.1 and 15.4): the one confirm panel before a style is downloaded. Picture, name (editable), source link, size,
 // what it is made for, the licence line (a checkbox when the licence is not an open one), and "Is this style for adults only?". The pre-set follows the source's
 // own check: safe says No, adult and unknown say Yes. All ages from an adult hit asks for a fresh passcode first. A style the household already has is "already added, open it".
+import { i18n } from "@lingui/core";
 import { useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Alert, AlertDescription } from "@maipai/ui/src/ui/alert";
@@ -73,74 +74,74 @@ export function StyleConfirm({ hit, person, revealed, onClose, onInstalled, onOp
       <Dialog open onOpenChange={(next) => { if (!next) onClose(); }}>
         <DialogContent variant="flow" aria-describedby="style-confirm-desc" onInteractOutside={(event) => event.preventDefault()}>
           <DialogHeader>
-            <DialogTitle size="xl">Add this style</DialogTitle>
-            <DialogDescription id="style-confirm-desc">Check what it is, then download it. It starts for admins only.</DialogDescription>
+            <DialogTitle size="xl">{i18n._({ id: "Add this style", message: "Add this style" })}</DialogTitle>
+            <DialogDescription id="style-confirm-desc">{i18n._({ id: "Check what it is, then download it. It starts for admins only.", message: "Check what it is, then download it. It starts for admins only." })}</DialogDescription>
           </DialogHeader>
           <DialogBody columns="two">
             <div className="flex flex-col gap-4">
               <div className="aspect-video w-full overflow-hidden rounded-xl bg-muted"><StylePicture path={hit.preview} proof={revealed} /></div>
               <div className="flex flex-col gap-2">
-                <Label htmlFor="style-name">Name</Label>
+                <Label htmlFor="style-name">{i18n._({ id: "Name", message: "Name" })}</Label>
                 <Input id="style-name" value={name} maxLength={80} onChange={(e) => setName(e.target.value)} disabled={busy} />
               </div>
               <p className="text-sm text-muted-foreground">{hit.line}</p>
-              {hit.page_url ? <a className="text-sm underline" href={hit.page_url} target="_blank" rel="noreferrer">Open its page on {hit.site === "civitai" ? "Civitai" : "Hugging Face"}</a> : null}
-              {hit.also_on.length ? <p className="text-sm text-muted-foreground">Also on {hit.also_on.join(" and ")}.</p> : null}
+              {hit.page_url ? <a className="text-sm underline" href={hit.page_url} target="_blank" rel="noreferrer">{i18n._({ id: "Open its page on {value}", message: "Open its page on {value}", values: { value: hit.site === "civitai" ? i18n._({ id: "Civitai", message: "Civitai" }) : i18n._({ id: "Hugging Face", message: "Hugging Face" }) } })}</a> : null}
+              {hit.also_on.length ? <p className="text-sm text-muted-foreground">{i18n._({ id: "Also on {join}.", message: "Also on {join}.", values: { join: hit.also_on.join(" and ") } })}</p> : null}
             </div>
             <div className="flex flex-col gap-5">
-              <DialogSection title="Made for">
-                <p className="text-sm">{needsBase ? (hit.base_unstated ? `${hit.reason ?? ""}.` : "Home could not tell what this style was made for.") : `${hit.base_label}. ${sizeWords(hit.bytes ?? 0)}.`}</p>
+              <DialogSection title={i18n._({ id: "Made for", message: "Made for" })}>
+                <p className="text-sm">{needsBase ? (hit.base_unstated ? `${hit.reason ?? ""}.` : i18n._({ id: "Home could not tell what this style was made for.", message: "Home could not tell what this style was made for." })) : `${hit.base_label}. ${sizeWords(hit.bytes ?? 0)}.`}</p>
                 {needsBase ? (
                   <div className="flex flex-col gap-2">
-                    <Label htmlFor="style-base">What was this style made for?</Label>
+                    <Label htmlFor="style-base">{i18n._({ id: "What was this style made for?", message: "What was this style made for?" })}</Label>
                     <Select value={base} onValueChange={(v) => setBase(v as "ltx-2.5" | "wan2.2-ti2v-5b")}>
-                      <SelectTrigger id="style-base"><SelectValue placeholder="Pick one" /></SelectTrigger>
-                      <SelectContent><SelectItem value="ltx-2.5">LTX-2.5</SelectItem><SelectItem value="wan2.2-ti2v-5b">Wan</SelectItem></SelectContent>
+                      <SelectTrigger id="style-base"><SelectValue placeholder={i18n._({ id: "Pick one", message: "Pick one" })} /></SelectTrigger>
+                      <SelectContent><SelectItem value="ltx-2.5">{i18n._({ id: "LTX-2.5", message: "LTX-2.5" })}</SelectItem><SelectItem value="wan2.2-ti2v-5b">{i18n._({ id: "Wan", message: "Wan" })}</SelectItem></SelectContent>
                     </Select>
                   </div>
                 ) : null}
                 {hit.site === "civitai" ? (
                   <div className="flex flex-col gap-2">
-                    <Label htmlFor="style-kind">Kind</Label>
+                    <Label htmlFor="style-kind">{i18n._({ id: "Kind", message: "Kind" })}</Label>
                     <Select value={kind} onValueChange={(v) => setKind(v as "style" | "character")}>
                       <SelectTrigger id="style-kind"><SelectValue /></SelectTrigger>
-                      <SelectContent><SelectItem value="style">Style</SelectItem><SelectItem value="character">Character</SelectItem></SelectContent>
+                      <SelectContent><SelectItem value="style">{i18n._({ id: "Style", message: "Style" })}</SelectItem><SelectItem value="character">{i18n._({ id: "Character", message: "Character" })}</SelectItem></SelectContent>
                     </Select>
                   </div>
                 ) : null}
               </DialogSection>
-              <DialogSection title="Licence">
+              <DialogSection title={i18n._({ id: "Licence", message: "Licence" })}>
                 <p className="text-sm">{LICENCE_LINE[hit.licence.class]}</p>
                 {open ? null : (
                   <div className="flex items-start gap-2">
                     <Checkbox id="style-read" checked={read} onCheckedChange={(v) => setRead(v === true)} disabled={busy} />
-                    <Label htmlFor="style-read" className="leading-snug">I have read the licence and it lets us use this style at home</Label>
+                    <Label htmlFor="style-read" className="leading-snug">{i18n._({ id: "I have read the licence and it lets us use this style at home", message: "I have read the licence and it lets us use this style at home" })}</Label>
                   </div>
                 )}
               </DialogSection>
-              <DialogSection title="Is this style for adults only?">
-                <RadioGroup value={adultsOnly} onValueChange={(v) => setAdultsOnly(v as "yes" | "no")} aria-label="Is this style for adults only?">
-                  <div className="flex items-center gap-2"><RadioGroupItem value="yes" id="style-adult-yes" /><Label htmlFor="style-adult-yes">Yes, adults only</Label></div>
-                  <div className="flex items-center gap-2"><RadioGroupItem value="no" id="style-adult-no" /><Label htmlFor="style-adult-no">No, all ages</Label></div>
+              <DialogSection title={i18n._({ id: "Is this style for adults only?", message: "Is this style for adults only?" })}>
+                <RadioGroup value={adultsOnly} onValueChange={(v) => setAdultsOnly(v as "yes" | "no")} aria-label={i18n._({ id: "Is this style for adults only?", message: "Is this style for adults only?" })}>
+                  <div className="flex items-center gap-2"><RadioGroupItem value="yes" id="style-adult-yes" /><Label htmlFor="style-adult-yes">{i18n._({ id: "Yes, adults only", message: "Yes, adults only" })}</Label></div>
+                  <div className="flex items-center gap-2"><RadioGroupItem value="no" id="style-adult-no" /><Label htmlFor="style-adult-no">{i18n._({ id: "No, all ages", message: "No, all ages" })}</Label></div>
                 </RadioGroup>
-                <p className="text-sm text-muted-foreground">{SOURCE_LINE[hit.adult_check]} {adultsOnly === "no" && hit.adult_check === "adult" ? "Choosing all ages asks for your passcode again." : null}</p>
+                <p className="text-sm text-muted-foreground">{SOURCE_LINE[hit.adult_check]} {adultsOnly === "no" && hit.adult_check === "adult" ? i18n._({ id: "Choosing all ages asks for your passcode again.", message: "Choosing all ages asks for your passcode again." }) : null}</p>
               </DialogSection>
               {hit.installed ? (
-                <Alert><AlertDescription><span className="flex flex-wrap items-center gap-3">You already have this as {hit.installed.name}.<Button type="button" variant="outline" size="sm" onClick={() => onOpenInstalled(hit.installed!.id)}>Open it</Button></span></AlertDescription></Alert>
+                <Alert><AlertDescription><span className="flex flex-wrap items-center gap-3">{i18n._({ id: "You already have this as {name}.", message: "You already have this as {name}.", values: { name: hit.installed.name } })}<Button type="button" variant="outline" size="sm" onClick={() => onOpenInstalled(hit.installed!.id)}>{i18n._({ id: "Open it", message: "Open it" })}</Button></span></AlertDescription></Alert>
               ) : blocked ? <Alert><AlertDescription>{blocked}.</AlertDescription></Alert> : null}
               {duplicate ? (
-                <Alert><AlertDescription><span className="flex flex-wrap items-center gap-3">{duplicate.line}<Button type="button" variant="outline" size="sm" onClick={() => onOpenInstalled(duplicate.id)}>Open it</Button></span></AlertDescription></Alert>
+                <Alert><AlertDescription><span className="flex flex-wrap items-center gap-3">{duplicate.line}<Button type="button" variant="outline" size="sm" onClick={() => onOpenInstalled(duplicate.id)}>{i18n._({ id: "Open it", message: "Open it" })}</Button></span></AlertDescription></Alert>
               ) : null}
               {changed ? (
-                <Alert><AlertDescription><span className="flex flex-wrap items-center gap-3">The source changed this file since you installed it.<Button type="button" variant="outline" size="sm" disabled={busy} onClick={() => void install(undefined, true).catch(() => undefined)}>Install as a separate style</Button></span></AlertDescription></Alert>
+                <Alert><AlertDescription><span className="flex flex-wrap items-center gap-3">{i18n._({ id: "The source changed this file since you installed it.", message: "The source changed this file since you installed it." })}<Button type="button" variant="outline" size="sm" disabled={busy} onClick={() => void install(undefined, true).catch(() => undefined)}>{i18n._({ id: "Install as a separate style", message: "Install as a separate style" })}</Button></span></AlertDescription></Alert>
               ) : null}
               {error ? <p role="alert" className="text-sm text-destructive">{error}</p> : null}
               <div className="flex flex-col gap-2">
                 <div className="flex flex-wrap gap-2">
-                  <Button type="button" disabled={!canInstall} onClick={start}>{busy ? "Starting the download…" : "Install style"}</Button>
-                  <Button type="button" variant="outline" onClick={onClose}>Cancel</Button>
+                  <Button type="button" disabled={!canInstall} onClick={start}>{busy ? i18n._({ id: "Starting the download…", message: "Starting the download…" }) : i18n._({ id: "Install style", message: "Install style" })}</Button>
+                  <Button type="button" variant="outline" onClick={onClose}>{i18n._({ id: "Cancel", message: "Cancel" })}</Button>
                 </div>
-                <p className="text-sm text-muted-foreground">It starts for admins only. You choose who else can use it after you try it.</p>
+                <p className="text-sm text-muted-foreground">{i18n._({ id: "It starts for admins only. You choose who else can use it after you try it.", message: "It starts for admins only. You choose who else can use it after you try it." })}</p>
               </div>
             </div>
           </DialogBody>

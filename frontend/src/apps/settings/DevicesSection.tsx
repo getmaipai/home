@@ -1,3 +1,4 @@
+import { i18n } from "@lingui/core";
 import { useEffect, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Section } from "@maipai/ui/src/primitives/Section";
@@ -83,7 +84,7 @@ export function DevicesSection({ search = "" }: { search?: string }) {
     <>
       {actionError ? <Alert variant="destructive"><AlertDescription>{actionError}</AlertDescription></Alert> : null}
 
-      <Section heading="Devices">
+      <Section heading={i18n._({ id: "Devices", message: "Devices" })}>
         <AsyncState
           data={devicesQuery.data}
           error={devicesQuery.isError}
@@ -96,20 +97,18 @@ export function DevicesSection({ search = "" }: { search?: string }) {
             const allDevices = allRows.filter((d) => matchesSearch(`${d.name} ${d.kind} ${d.area ?? ""}`));
             const devices = allDevices.filter((d) => d.kind !== "robot");
             return devices.length === 0 ? (
-              <EmptyState icon="inbox" text="No devices paired to your profile yet." />
+              <EmptyState icon="inbox" text={i18n._({ id: "No devices paired to your profile yet.", message: "No devices paired to your profile yet." })} />
             ) : (
               <div className="flex flex-col gap-4">
               <List
                 items={devices}
                 getKey={(d) => d.id}
-                label="Devices"
+                label={i18n._({ id: "Devices", message: "Devices" })}
                 renderItem={(d) => {
                   const isConfirming = confirming?.kind === "device" && confirming.id === d.id;
                   if (isConfirming) {
                     return (
-                      <p className="text-base font-medium">
-                        Remove {d.name}? It will need to be paired again to reconnect.
-                      </p>
+                      <p className="text-base font-medium">{i18n._({ id: "Remove {name}? It will need to be paired again to reconnect.", message: "Remove {name}? It will need to be paired again to reconnect.", values: { name: d.name } })}</p>
                     );
                   }
                   return (
@@ -120,12 +119,12 @@ export function DevicesSection({ search = "" }: { search?: string }) {
                       </div>
                       <span className="text-sm text-muted-foreground">
                         {d.area ? `${d.area} · ` : ""}
-                        {d.lastSeenAt ? `last seen ${whenText(d.lastSeenAt)}` : "never connected"}
+                        {d.lastSeenAt ? `last seen ${whenText(d.lastSeenAt)}` : i18n._({ id: "never connected", message: "never connected" })}
                       </span>
                       {d.kind === "tv" || d.kind === "pod" ? null : (
                         <Label htmlFor={`offline-${d.id}`}>
                           <Switch id={`offline-${d.id}`} checked={d.offlineScope?.includes("offline.records") ?? false} disabled={busy} onCheckedChange={(checked) => void setOffline(d, checked)} />
-                          Can keep copies on this device
+                          {i18n._({ id: "Can keep copies on this device", message: "Can keep copies on this device" })}
                         </Label>
                       )}
                     </div>
@@ -135,10 +134,10 @@ export function DevicesSection({ search = "" }: { search?: string }) {
                   confirming?.kind === "device" && confirming.id === d.id ? (
                     <div className="flex gap-2">
                       <Button variant="destructive" onClick={handleRevoke} disabled={busy}>
-                        {busy ? "Working…" : "Yes, remove it"}
+                        {busy ? i18n._({ id: "Working…", message: "Working…" }) : i18n._({ id: "Yes, remove it", message: "Yes, remove it" })}
                       </Button>
                       <Button variant="ghost" onClick={() => setConfirming(null)}>
-                        Keep it
+                        {i18n._({ id: "Keep it", message: "Keep it" })}
                       </Button>
                     </div>
                   ) : (
@@ -147,7 +146,7 @@ export function DevicesSection({ search = "" }: { search?: string }) {
                       aria-label={`Remove ${d.name}`}
                       onClick={() => setConfirming({ kind: "device", id: d.id, label: d.name })}
                     >
-                      Remove
+                      {i18n._({ id: "Remove", message: "Remove" })}
                     </Button>
                   )
                 }
@@ -158,20 +157,20 @@ export function DevicesSection({ search = "" }: { search?: string }) {
         </AsyncState>
       </Section>
 
-      <Section heading="Copies in this browser">
-        <p>Saved files on the hub still work when the internet is down. Copies here let this browser open kept items when it cannot reach the hub.</p>
+      <Section heading={i18n._({ id: "Copies in this browser", message: "Copies in this browser" })}>
+        <p>{i18n._({ id: "Saved files on the hub still work when the internet is down. Copies here let this browser open kept items when it cannot reach the hub.", message: "Saved files on the hub still work when the internet is down. Copies here let this browser open kept items when it cannot reach the hub." })}</p>
         <AsyncState data={keptQuery.data} error={keptQuery.isError} isFetching={keptQuery.isFetching} onRetry={() => keptQuery.refetch()} errorMessage="Copies could not be listed. Try again." loadingLabel="Loading copies">
-          {(rows) => { const items = rows.filter((item) => matchesSearch(`${item.title} ${item.kind}`)).sort((a, b) => a.kind.localeCompare(b.kind) || a.title.localeCompare(b.title)); return items.length ? <List items={items} getKey={(item) => `${item.kind}:${item.id}`} label="Offline copies" renderItem={(item) => <span>{item.title} <Badge variant="secondary">{item.kind === "media" ? "Media" : item.kind.replaceAll("_", " ")}</Badge></span>} /> : <EmptyState icon="inbox" text="No copies kept in this browser." />; }}
+          {(rows) => { const items = rows.filter((item) => matchesSearch(`${item.title} ${item.kind}`)).sort((a, b) => a.kind.localeCompare(b.kind) || a.title.localeCompare(b.title)); return items.length ? <List items={items} getKey={(item) => `${item.kind}:${item.id}`} label={i18n._({ id: "Offline copies", message: "Offline copies" })} renderItem={(item) => <span>{item.title} <Badge variant="secondary">{item.kind === "media" ? i18n._({ id: "Media", message: "Media" }) : item.kind.replaceAll("_", " ")}</Badge></span>} /> : <EmptyState icon="inbox" text={i18n._({ id: "No copies kept in this browser.", message: "No copies kept in this browser." })} />; }}
         </AsyncState>
         <Button variant="destructive" disabled={busy} onClick={async () => {
           setBusy(true);
           try { await removeAllOfflineMedia(); await keptQuery.refetch(); }
           catch { setActionError("Offline copies could not be removed. Try again in this browser."); }
           finally { setBusy(false); }
-        }}>Remove all offline copies</Button>
+        }}>{i18n._({ id: "Remove all offline copies", message: "Remove all offline copies" })}</Button>
       </Section>
 
-      <Section heading="Signed-in sessions">
+      <Section heading={i18n._({ id: "Signed-in sessions", message: "Signed-in sessions" })}>
         <AsyncState
           data={sessionsQuery.data}
           error={sessionsQuery.isError}
@@ -182,30 +181,26 @@ export function DevicesSection({ search = "" }: { search?: string }) {
         >
           {(allRows) => { const rows = allRows.filter((row) => matchesSearch(row.userAgent ?? "Unknown browser")); return (
             rows.length === 0 ? (
-              <EmptyState icon="inbox" text="No active sessions." />
+              <EmptyState icon="inbox" text={i18n._({ id: "No active sessions.", message: "No active sessions." })} />
             ) : (
               <List
                 items={rows}
                 getKey={(s) => s.id}
-                label="Sessions"
+                label={i18n._({ id: "Sessions", message: "Sessions" })}
                 renderItem={(s) => {
                   const isConfirming = confirming?.kind === "session" && confirming.id === s.id;
                   if (isConfirming) {
                     return (
-                      <p className="text-base font-medium">
-                        Sign out {confirming.label}? It will need to sign in again.
-                      </p>
+                      <p className="text-base font-medium">{i18n._({ id: "Sign out {label}? It will need to sign in again.", message: "Sign out {label}? It will need to sign in again.", values: { label: confirming.label } })}</p>
                     );
                   }
                   return (
                     <div className="flex min-w-0 flex-1 flex-col gap-1 py-1">
                       <div className="flex items-center gap-2">
-                        {s.isCurrent ? <Badge>This device</Badge> : null}
+                        {s.isCurrent ? <Badge>{i18n._({ id: "This device", message: "This device" })}</Badge> : null}
                         <span className="truncate text-base">{s.userAgent ?? "Unknown browser"}</span>
                       </div>
-                      <span className="text-sm text-muted-foreground">
-                        Signed in {whenText(s.createdAt)} · expires {whenText(s.expiresAt)}
-                      </span>
+                      <span className="text-sm text-muted-foreground">{i18n._({ id: "Signed in {whenText} · expires {whenText2}", message: "Signed in {whenText} · expires {whenText2}", values: { whenText: whenText(s.createdAt), whenText2: whenText(s.expiresAt) } })}</span>
                     </div>
                   );
                 }}
@@ -220,10 +215,10 @@ export function DevicesSection({ search = "" }: { search?: string }) {
                     return (
                       <div className="flex gap-2">
                         <Button variant="destructive" onClick={handleRevoke} disabled={busy}>
-                          {busy ? "Working…" : "Yes, sign it out"}
+                          {busy ? i18n._({ id: "Working…", message: "Working…" }) : i18n._({ id: "Yes, sign it out", message: "Yes, sign it out" })}
                         </Button>
                         <Button variant="ghost" onClick={() => setConfirming(null)}>
-                          Keep it
+                          {i18n._({ id: "Keep it", message: "Keep it" })}
                         </Button>
                       </div>
                     );
@@ -234,7 +229,7 @@ export function DevicesSection({ search = "" }: { search?: string }) {
                       aria-label={`Sign out ${s.userAgent ?? "that session"}`}
                       onClick={() => setConfirming({ kind: "session", id: s.id, label: s.userAgent ?? "that session" })}
                     >
-                      Sign out
+                      {i18n._({ id: "Sign out", message: "Sign out" })}
                     </Button>
                   );
                 }}

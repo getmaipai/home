@@ -1,3 +1,4 @@
+import { i18n } from "@lingui/core";
 import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { Alert, AlertDescription } from "@maipai/ui/src/ui/alert";
@@ -50,28 +51,28 @@ export function RobotCompanionChoices({ deviceId }: { deviceId: string }) {
   }
 
   return (
-    <Section heading="Companion and controls">
+    <Section heading={i18n._({ id: "Companion and controls", message: "Companion and controls" })}>
       {!info ? (error ? <Alert variant="destructive"><AlertDescription>{error}</AlertDescription></Alert> : null) : <FieldGroup>
         <Field>
-          <FieldLabel htmlFor={`robot-controls-${deviceId}`}>Controls</FieldLabel>
-          <Select aria-label="Controls" value={info.controls} options={[...CONTROLS]} getLabel={(value) => CONTROLS_LABEL[value] ?? value} disabled={busy} onValueChange={(value) => void save("robot.controls", value)} />
+          <FieldLabel htmlFor={`robot-controls-${deviceId}`}>{i18n._({ id: "Controls", message: "Controls" })}</FieldLabel>
+          <Select aria-label={i18n._({ id: "Controls", message: "Controls" })} value={info.controls} options={[...CONTROLS]} getLabel={(value) => CONTROLS_LABEL[value] ?? value} disabled={busy} onValueChange={(value) => void save("robot.controls", value)} />
           <FieldDescription>{CONTROLS_NOTE[info.controls]}</FieldDescription>
         </Field>
         <Field>
-          <FieldLabel htmlFor={`robot-companion-${deviceId}`}>Companion</FieldLabel>
+          <FieldLabel htmlFor={`robot-companion-${deviceId}`}>{i18n._({ id: "Companion", message: "Companion" })}</FieldLabel>
           <Select
-            aria-label="Companion"
+            aria-label={i18n._({ id: "Companion", message: "Companion" })}
             value={info.companion_id || NONE}
             options={[NONE, ...info.companions.map((companion) => companion.id)]}
             getLabel={(value) => value === NONE ? "None (child controls)" : (() => { const companion = info.companions.find((entry) => entry.id === value); return companion ? (companion.audience === "all" ? companion.name : `${companion.name} (${companion.audience} only)`) : value; })()}
             disabled={busy}
             onValueChange={(value) => void save("robot.companion.id", value === NONE ? "" : value)}
           />
-          <FieldDescription>The companion sets how this robot talks. The controls above set which protections apply. Who is speaking does not change either. A teen or adult companion is listed only when the controls allow it.</FieldDescription>
+          <FieldDescription>{i18n._({ id: "The companion sets how this robot talks. The controls above set which protections apply. Who is speaking does not change either. A teen or adult companion is listed only when the controls allow it.", message: "The companion sets how this robot talks. The controls above set which protections apply. Who is speaking does not change either. A teen or adult companion is listed only when the controls allow it." })}</FieldDescription>
         </Field>
         <FieldDescription>{speakingLine(info.speaking, voices)}</FieldDescription>
         {!info.home_location_set ? (
-          <Alert><AlertDescription>The weather needs a Home location. <Link to="/settings/household?tab=general">Set it in Settings, Home, General.</Link></AlertDescription></Alert>
+          <Alert><AlertDescription>{i18n._({ id: "The weather needs a Home location.", message: "The weather needs a Home location." })} <Link to="/settings/household?tab=general">{i18n._({ id: "Set it in Settings, Home, General.", message: "Set it in Settings, Home, General." })}</Link></AlertDescription></Alert>
         ) : null}
         {error ? <Alert variant="destructive"><AlertDescription>{error}</AlertDescription></Alert> : null}
       </FieldGroup>}

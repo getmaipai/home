@@ -1,3 +1,4 @@
+import { i18n } from "@lingui/core";
 import { useState } from "react";
 import { Badge } from "@maipai/ui/src/ui/badge";
 import { Button } from "@maipai/ui/src/ui/button";
@@ -30,13 +31,13 @@ export function RobotSelfTests({ device }: { device: DeviceInfo }) {
   }
   return (
     <div data-testid="robot-self-tests">
-      <p className="text-base font-medium">Test this robot</p>
+      <p className="text-base font-medium">{i18n._({ id: "Test this robot", message: "Test this robot" })}</p>
       <div className="mt-2 flex flex-wrap gap-2">
         {robotSelfTestPartsFor(device).map((part) => {
           const result = selfTests[part];
           return <div key={part}>
-            <Button variant="outline" disabled={unreachable || selfTestBusy !== null} onClick={() => void runSelfTest(part)}>{selfTestBusy === part ? "Testing…" : LABELS[part]}</Button>
-            {result && "ok" in result ? <p className="mt-1 text-sm"><Badge variant={result.ok ? "secondary" : "destructive"}>{result.ok ? "Passed" : "Failed"}</Badge> {result.detail} ({result.took_ms} ms)</p> : null}
+            <Button variant="outline" disabled={unreachable || selfTestBusy !== null} onClick={() => void runSelfTest(part)}>{selfTestBusy === part ? i18n._({ id: "Testing…", message: "Testing…" }) : LABELS[part]}</Button>
+            {result && "ok" in result ? <p className="mt-1 text-sm"><Badge variant={result.ok ? "secondary" : "destructive"}>{result.ok ? i18n._({ id: "Passed", message: "Passed" }) : i18n._({ id: "Failed", message: "Failed" })}</Badge>{" "}{i18n._({ id: "{detail} ({took_ms} ms)", message: "{detail} ({took_ms} ms)", values: { detail: result.detail, took_ms: result.took_ms } })}</p> : null}
             {result && "kind" in result && result.kind === "offline" ? <p className="mt-1 text-sm text-muted-foreground">{result.message}</p> : null}
             {result && "kind" in result && (result.kind === "timeout" || result.kind === "error") ? <Alert variant="destructive"><AlertDescription>{result.message}</AlertDescription></Alert> : null}
           </div>;

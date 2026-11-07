@@ -1,3 +1,4 @@
+import { i18n } from "@lingui/core";
 import { useState } from "react";
 import { useQueries, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Section } from "@maipai/ui/src/primitives/Section";
@@ -70,7 +71,7 @@ export function RobotPasswordRow({
         <span className="truncate text-base font-medium">{device.name}</span>
         {statusQuery.data ? (
           <Badge variant={rotated ? "secondary" : "destructive"}>
-          {rotated ? "Set" : "Not set"}
+          {rotated ? i18n._({ id: "Set", message: "Set" }) : i18n._({ id: "Not set", message: "Not set" })}
           </Badge>
         ) : null}
       </div>
@@ -78,7 +79,7 @@ export function RobotPasswordRow({
       {open ? (
         <div className="flex max-w-sm flex-col gap-2">
           <Input
-            placeholder="Robot's LAN address"
+            placeholder={i18n._({ id: "Robot's LAN address", message: "Robot's LAN address" })}
             value={host}
             onChange={(e) => setHost(e.target.value)}
             disabled={submitting}
@@ -94,7 +95,7 @@ export function RobotPasswordRow({
             // this same host, before ever needing what's typed here -
             // left blank on a re-pair or a plain re-rotation, only
             // required for a genuinely new or factory-reset unit.
-            placeholder="Current password (leave blank to try the last one used)"
+            placeholder={i18n._({ id: "Current password (leave blank to try the last one used)", message: "Current password (leave blank to try the last one used)" })}
             value={currentPassword}
             onChange={(e) => setCurrentPassword(e.target.value)}
             disabled={submitting}
@@ -102,10 +103,10 @@ export function RobotPasswordRow({
           {error ? <p className="text-sm text-destructive">{error}</p> : null}
           <div className="flex gap-2">
             <Button onClick={handleRotate} disabled={submitting || !host.trim()}>
-              {submitting ? "Rotating…" : "Rotate"}
+              {submitting ? i18n._({ id: "Rotating…", message: "Rotating…" }) : i18n._({ id: "Rotate", message: "Rotate" })}
             </Button>
             <Button variant="ghost" onClick={() => setOpen(false)} disabled={submitting}>
-              Cancel
+              {i18n._({ id: "Cancel", message: "Cancel" })}
             </Button>
           </div>
         </div>
@@ -126,7 +127,7 @@ export function RobotPasswordSection() {
   if (robots.length === 0) return null;
 
   return (
-    <Section heading="Robot password">
+    <Section heading={i18n._({ id: "Robot password", message: "Robot password" })}>
       <AsyncState
         data={robots}
         error={devicesQuery.isError}
@@ -147,5 +148,5 @@ function PasswordDialogRow({ devices }: { devices: DeviceInfo[] }) {
   const statusQueries = useQueries({ queries: devices.map((device) => ({ queryKey: ["robot-password-status", device.id], queryFn: () => api.robotPasswordStatus(device.id) })) });
   const notSet = statusQueries.some((query) => query.data?.rotated === false);
   const ready = statusQueries.every((query) => query.data !== undefined);
-  return <><ItemGroup variant="card" aria-label="Robot password"><Item size="setting"><ItemContent><ItemTitle>Robot password</ItemTitle></ItemContent><Badge variant={notSet ? "destructive" : "secondary"}>{ready ? (notSet ? "Not set" : "Set") : "Checking"}</Badge><Button size="lg" variant="outline" onClick={() => setOpen(true)}>Change</Button></Item></ItemGroup><Dialog open={open} onOpenChange={setOpen}><DialogContent><DialogHeader><DialogTitle>Change robot password</DialogTitle><DialogDescription>Use the password printed in the robot's setup guide.</DialogDescription></DialogHeader>{devices.length > 1 ? <Select value={selected} onValueChange={setSelected}><SelectTrigger aria-label="Robot"><SelectValue /></SelectTrigger><SelectContent>{devices.map((robot) => <SelectItem key={robot.id} value={robot.id}>{robot.name}</SelectItem>)}</SelectContent></Select> : null}<RobotPasswordRow key={selected} device={devices.find((robot) => robot.id === selected) ?? devices[0]!} defaultOpen /></DialogContent></Dialog></>;
+  return <><ItemGroup variant="card" aria-label={i18n._({ id: "Robot password", message: "Robot password" })}><Item size="setting"><ItemContent><ItemTitle>{i18n._({ id: "Robot password", message: "Robot password" })}</ItemTitle></ItemContent><Badge variant={notSet ? "destructive" : "secondary"}>{ready ? (notSet ? i18n._({ id: "Not set", message: "Not set" }) : i18n._({ id: "Set", message: "Set" })) : i18n._({ id: "Checking", message: "Checking" })}</Badge><Button size="lg" variant="outline" onClick={() => setOpen(true)}>{i18n._({ id: "Change", message: "Change" })}</Button></Item></ItemGroup><Dialog open={open} onOpenChange={setOpen}><DialogContent><DialogHeader><DialogTitle>{i18n._({ id: "Change robot password", message: "Change robot password" })}</DialogTitle><DialogDescription>{i18n._({ id: "Use the password printed in the robot's setup guide.", message: "Use the password printed in the robot's setup guide." })}</DialogDescription></DialogHeader>{devices.length > 1 ? <Select value={selected} onValueChange={setSelected}><SelectTrigger aria-label={i18n._({ id: "Robot", message: "Robot" })}><SelectValue /></SelectTrigger><SelectContent>{devices.map((robot) => <SelectItem key={robot.id} value={robot.id}>{robot.name}</SelectItem>)}</SelectContent></Select> : null}<RobotPasswordRow key={selected} device={devices.find((robot) => robot.id === selected) ?? devices[0]!} defaultOpen /></DialogContent></Dialog></>;
 }

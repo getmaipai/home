@@ -2,6 +2,7 @@
 // switch, the model, the options as plain switches and Who can use it. These per-category Boost and Max switches live only here (RULES.md S4).
 // Kit Elements as shipped (rule 9); the page renders the kit Dialog around this content. A save writes the slot records at once; it does not
 // join the page's staged Apply, because a level is a rule about who may use what, not a model to download.
+import { i18n } from "@lingui/core";
 import { useState } from "react";
 import { Button } from "@maipai/ui/src/ui/button";
 import { DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@maipai/ui/src/ui/dialog";
@@ -61,8 +62,8 @@ export function AiSlotChoices({ row, initial, picks, copy, saving, error, onClos
     <>
       <DialogHeader>
         <p className="text-base font-medium uppercase tracking-wide text-muted-foreground">{row.title}</p>
-        <DialogTitle>{only ? TIER_TITLE[only] : "Levels"}</DialogTitle>
-        <DialogDescription>{only ? TIER_PROMISE[only] : "Choose which levels exist, the model each one uses and who can use it."} Nothing is deleted or cancelled by turning a level off.</DialogDescription>
+        <DialogTitle>{only ? TIER_TITLE[only] : i18n._({ id: "Levels", message: "Levels" })}</DialogTitle>
+        <DialogDescription>{i18n._({ id: "{value} Nothing is deleted or cancelled by turning a level off.", message: "{value} Nothing is deleted or cancelled by turning a level off.", values: { value: only ? TIER_PROMISE[only] : i18n._({ id: "Choose which levels exist, the model each one uses and who can use it.", message: "Choose which levels exist, the model each one uses and who can use it." }) } })}</DialogDescription>
       </DialogHeader>
       {configurableTiers(row.job).filter((tier) => !only || tier === only).map((tier) => {
         const draft = drafts[tier];
@@ -126,7 +127,7 @@ export function AiSlotChoices({ row, initial, picks, copy, saving, error, onClos
                 })}
                 {whoChoices(tier).length > 1 ? (
                   <>
-                  <p className="text-base font-medium">Who can use it</p>
+                  <p className="text-base font-medium">{i18n._({ id: "Who can use it", message: "Who can use it" })}</p>
                   <RadioGroup value={draft.who} onValueChange={(who) => change(tier, { ...draft, who: who as SlotWho })} aria-label={`Who can use ${TIER_TITLE[tier]}`}>
                     {whoChoices(tier).map((who) => (
                       <FieldLabel key={who} htmlFor={`ai-slot-${tier}-who-${who}`}>
@@ -147,8 +148,8 @@ export function AiSlotChoices({ row, initial, picks, copy, saving, error, onClos
       {notes.length > 0 ? <Alert data-testid="ai-slot-consequences"><AlertDescription>{notes.map((line) => <p key={line}>{line}</p>)}</AlertDescription></Alert> : null}
       {error ? <Alert variant="destructive"><AlertDescription>{error}</AlertDescription></Alert> : null}
       <DialogFooter>
-        <Button type="button" variant="outline" onClick={onClose}>{only ? "Back" : (copy.cancel ?? "Cancel")}</Button>
-        <Button type="button" disabled={saving} onClick={() => onSave(drafts)}>{saving ? "Saving…" : (copy.save_choice ?? "Save")}</Button>
+        <Button type="button" variant="outline" onClick={onClose}>{only ? i18n._({ id: "Back", message: "Back" }) : (copy.cancel ?? "Cancel")}</Button>
+        <Button type="button" disabled={saving} onClick={() => onSave(drafts)}>{saving ? i18n._({ id: "Saving…", message: "Saving…" }) : (copy.save_choice ?? "Save")}</Button>
       </DialogFooter>
     </>
   );

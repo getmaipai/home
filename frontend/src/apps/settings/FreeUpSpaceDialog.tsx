@@ -1,6 +1,7 @@
 // AIMODELS-CLEAN-01: "Free up space" on the AI and models page. Lists the parts nothing uses now, with plain names, sizes and a
 // reason, and removes only the ones the person ticks, after one confirm. Never automatic. The server re-checks each id at
 // removal time and says what it kept (the in-use guard is the one the Stack already has). Model names do not appear here.
+import { i18n } from "@lingui/core";
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Alert, AlertDescription, AlertTitle } from "@maipai/ui/src/ui/alert";
@@ -55,29 +56,29 @@ export function FreeUpSpaceDialog({ open, onOpenChange, onChanged }: FreeUpSpace
       <Dialog open={open} onOpenChange={close}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Free up space</DialogTitle>
+            <DialogTitle>{i18n._({ id: "Free up space", message: "Free up space" })}</DialogTitle>
             <DialogDescription>
-              {query.isLoading ? "Looking for parts nothing uses." : items.length > 0 ? `You can free ${sizeGb(total)}. Nothing is removed until you pick it and confirm.` : "Nothing to clean up."}
+              {query.isLoading ? i18n._({ id: "Looking for parts nothing uses.", message: "Looking for parts nothing uses." }) : items.length > 0 ? `You can free ${sizeGb(total)}. Nothing is removed until you pick it and confirm.` : i18n._({ id: "Nothing to clean up.", message: "Nothing to clean up." })}
             </DialogDescription>
           </DialogHeader>
-          {query.isLoading ? <Skeleton aria-label="Loading" /> : null}
-          {query.isError ? <Alert variant="destructive"><AlertTitle>The list did not load</AlertTitle><AlertDescription>{messageOf(query.error, "Check that Home is running, then open Free up space again.")}</AlertDescription></Alert> : null}
-          {remove.isError ? <Alert variant="destructive"><AlertTitle>That did not work</AlertTitle><AlertDescription>{messageOf(remove.error, "Check that the engine is running, then try again.")}</AlertDescription></Alert> : null}
+          {query.isLoading ? <Skeleton aria-label={i18n._({ id: "Loading", message: "Loading" })} /> : null}
+          {query.isError ? <Alert variant="destructive"><AlertTitle>{i18n._({ id: "The list did not load", message: "The list did not load" })}</AlertTitle><AlertDescription>{messageOf(query.error, "Check that Home is running, then open Free up space again.")}</AlertDescription></Alert> : null}
+          {remove.isError ? <Alert variant="destructive"><AlertTitle>{i18n._({ id: "That did not work", message: "That did not work" })}</AlertTitle><AlertDescription>{messageOf(remove.error, "Check that the engine is running, then try again.")}</AlertDescription></Alert> : null}
           {result ? (
             <Alert>
-              <AlertTitle>{result.freed_bytes > 0 ? `Freed ${sizeGb(result.freed_bytes)}.` : "Nothing was removed."}</AlertTitle>
+              <AlertTitle>{result.freed_bytes > 0 ? `Freed ${sizeGb(result.freed_bytes)}.` : i18n._({ id: "Nothing was removed.", message: "Nothing was removed." })}</AlertTitle>
               <AlertDescription>
-                {result.kept > 0 ? `${result.kept} kept because ${result.kept === 1 ? "it is" : "they are"} in use. ` : ""}
+                {result.kept > 0 ? `${result.kept} kept because ${result.kept === 1 ? i18n._({ id: "it is", message: "it is" }) : i18n._({ id: "they are", message: "they are" })} in use. ` : ""}
                 {result.failed > 0 ? `${result.failed} did not finish. Try again. ` : ""}
                 {keptNames.join(" ")}
               </AlertDescription>
             </Alert>
           ) : null}
-          {!query.isLoading && !query.isError && items.length === 0 && !result ? <p className="text-sm text-muted-foreground">Everything installed is in use.</p> : null}
+          {!query.isLoading && !query.isError && items.length === 0 && !result ? <p className="text-sm text-muted-foreground">{i18n._({ id: "Everything installed is in use.", message: "Everything installed is in use." })}</p> : null}
           {items.length > 0 ? (
             <>
-              <Button type="button" variant="outline" onClick={() => setPicked(allPicked ? new Set() : new Set(items.map((item) => item.id)))}>{allPicked ? "Clear all" : "Select all"}</Button>
-              <ItemGroup variant="card" aria-label="Parts nothing uses">
+              <Button type="button" variant="outline" onClick={() => setPicked(allPicked ? new Set() : new Set(items.map((item) => item.id)))}>{allPicked ? i18n._({ id: "Clear all", message: "Clear all" }) : i18n._({ id: "Select all", message: "Select all" })}</Button>
+              <ItemGroup variant="card" aria-label={i18n._({ id: "Parts nothing uses", message: "Parts nothing uses" })}>
                 {items.map((item) => (
                   <Item key={item.id} data-testid={`unused-${item.id}`}>
                     <ItemActions>
@@ -93,10 +94,10 @@ export function FreeUpSpaceDialog({ open, onOpenChange, onChanged }: FreeUpSpace
             </>
           ) : null}
           <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => close(false)}>Close</Button>
+            <Button type="button" variant="outline" onClick={() => close(false)}>{i18n._({ id: "Close", message: "Close" })}</Button>
             {items.length > 0 ? (
               <Button type="button" onClick={() => setConfirm(true)} disabled={chosen.length === 0 || remove.isPending}>
-                {chosen.length === 0 ? "Pick what to remove" : `Remove ${chosen.length} and free ${sizeGb(chosenBytes)}`}
+                {chosen.length === 0 ? i18n._({ id: "Pick what to remove", message: "Pick what to remove" }) : `Remove ${chosen.length} and free ${sizeGb(chosenBytes)}`}
               </Button>
             ) : null}
           </DialogFooter>
@@ -105,15 +106,12 @@ export function FreeUpSpaceDialog({ open, onOpenChange, onChanged }: FreeUpSpace
       <AlertDialog open={confirm} onOpenChange={setConfirm}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Remove {joinNames(chosen.map((item) => item.name))}?</AlertDialogTitle>
-            <AlertDialogDescription>
-              You can get {chosen.length === 1 ? "it" : "them"} back later. It is a download of the same size, {joinNames(chosen.map((item) => sizeGb(item.bytes)))}, and your settings stay.
-              {" "}Backups are not affected: they hold your family's data and settings, and models are not part of them.
-            </AlertDialogDescription>
+            <AlertDialogTitle>{i18n._({ id: "Remove {joinNames}?", message: "Remove {joinNames}?", values: { joinNames: joinNames(chosen.map((item) => item.name)) } })}</AlertDialogTitle>
+            <AlertDialogDescription>{i18n._({ id: "You can get {value} back later. It is a download of the same size, {joinNames}, and your settings stay. Backups are not affected: they hold your family's data and settings, and models are not part of them.", message: "You can get {value} back later. It is a download of the same size, {joinNames}, and your settings stay. Backups are not affected: they hold your family's data and settings, and models are not part of them.", values: { value: chosen.length === 1 ? i18n._({ id: "it", message: "it" }) : i18n._({ id: "them", message: "them" }), joinNames: joinNames(chosen.map((item) => sizeGb(item.bytes))) } })}</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Keep them</AlertDialogCancel>
-            <AlertDialogAction onClick={() => { setConfirm(false); remove.mutate(chosen.map((item) => item.id)); }}>Remove</AlertDialogAction>
+            <AlertDialogCancel>{i18n._({ id: "Keep them", message: "Keep them" })}</AlertDialogCancel>
+            <AlertDialogAction onClick={() => { setConfirm(false); remove.mutate(chosen.map((item) => item.id)); }}>{i18n._({ id: "Remove", message: "Remove" })}</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

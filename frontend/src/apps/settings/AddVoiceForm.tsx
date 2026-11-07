@@ -1,3 +1,4 @@
+import { i18n } from "@lingui/core";
 import { useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Progress } from "@maipai/ui/src/primitives/Progress";
@@ -38,18 +39,18 @@ export function AddVoiceForm({ onCancel, onMade, onBusyChange, canTune = true, m
   }
 
   return <form id="add-voice-form" onSubmit={(event) => void submit(event)} className="flex flex-col gap-4">
-    <div className={FIELD}><label htmlFor="add-voice-name" className="text-base">Name</label><Input id="add-voice-name" maxLength={60} value={name} onChange={(event) => setName(event.target.value)} disabled={busy} /></div>
-    <div className={FIELD}><label htmlFor="add-voice-recording" className="text-base">Recording</label><Input id="add-voice-recording" type="file" accept=".wav,.mp3,.flac,audio/wav,audio/mpeg,audio/flac" onChange={(event) => setClip(event.target.files?.[0])} disabled={busy} /></div>
+    <div className={FIELD}><label htmlFor="add-voice-name" className="text-base">{i18n._({ id: "Name", message: "Name" })}</label><Input id="add-voice-name" maxLength={60} value={name} onChange={(event) => setName(event.target.value)} disabled={busy} /></div>
+    <div className={FIELD}><label htmlFor="add-voice-recording" className="text-base">{i18n._({ id: "Recording", message: "Recording" })}</label><Input id="add-voice-recording" type="file" accept=".wav,.mp3,.flac,audio/wav,audio/mpeg,audio/flac" onChange={(event) => setClip(event.target.files?.[0])} disabled={busy} /></div>
     {canTune ? <>
-    <div className={FIELD}><label htmlFor="add-voice-liveliness" className="text-base">Liveliness (optional)</label><Input id="add-voice-liveliness" type="number" min={0.1} max={2} step={0.05} placeholder="Engine default" value={temperature} onChange={(event) => setTemperature(event.target.value)} disabled={busy} /><p className={HELP}>0.1 to 2. Higher is livelier and also raises the pitch.</p></div>
-    <div className={FIELD}><label htmlFor="add-voice-pitch" className="text-base">Pitch (optional)</label><Input id="add-voice-pitch" type="number" min={-12} max={12} step={0.5} placeholder="0" value={pitch} onChange={(event) => setPitch(event.target.value)} disabled={busy} /><p className={HELP}>Semitones, -12 to 12. A negative number lowers the voice.</p></div>
+    <div className={FIELD}><label htmlFor="add-voice-liveliness" className="text-base">{i18n._({ id: "Liveliness (optional)", message: "Liveliness (optional)" })}</label><Input id="add-voice-liveliness" type="number" min={0.1} max={2} step={0.05} placeholder={i18n._({ id: "Engine default", message: "Engine default" })} value={temperature} onChange={(event) => setTemperature(event.target.value)} disabled={busy} /><p className={HELP}>{i18n._({ id: "0.1 to 2. Higher is livelier and also raises the pitch.", message: "0.1 to 2. Higher is livelier and also raises the pitch." })}</p></div>
+    <div className={FIELD}><label htmlFor="add-voice-pitch" className="text-base">{i18n._({ id: "Pitch (optional)", message: "Pitch (optional)" })}</label><Input id="add-voice-pitch" type="number" min={-12} max={12} step={0.5} placeholder="0" value={pitch} onChange={(event) => setPitch(event.target.value)} disabled={busy} /><p className={HELP}>{i18n._({ id: "Semitones, -12 to 12. A negative number lowers the voice.", message: "Semitones, -12 to 12. A negative number lowers the voice." })}</p></div>
     </> : null}
-    <p className={HELP}>{minor ? "Only use your own voice, or the voice of someone who said yes." : "You are responsible for having the right to use this voice."}</p>
+    <p className={HELP}>{minor ? i18n._({ id: "Only use your own voice, or the voice of someone who said yes.", message: "Only use your own voice, or the voice of someone who said yes." }) : i18n._({ id: "You are responsible for having the right to use this voice.", message: "You are responsible for having the right to use this voice." })}</p>
     {error ? <p role="alert" className="text-base text-destructive">{error}</p> : null}
-    {busy ? <div className="flex items-center gap-3"><Progress mode="spinner" label="Making the voice" /><p className={HELP}>Making the voice. This can take up to a minute the first time.</p></div> : null}
+    {busy ? <div className="flex items-center gap-3"><Progress mode="spinner" label={i18n._({ id: "Making the voice", message: "Making the voice" })} /><p className={HELP}>{i18n._({ id: "Making the voice. This can take up to a minute the first time.", message: "Making the voice. This can take up to a minute the first time." })}</p></div> : null}
     <div className="flex justify-end gap-2">
-      <Button type="button" variant="outline" onClick={onCancel} disabled={busy}>Cancel</Button>
-      <Button type="submit" disabled={!name.trim() || !clip || busy}>Make voice</Button>
+      <Button type="button" variant="outline" onClick={onCancel} disabled={busy}>{i18n._({ id: "Cancel", message: "Cancel" })}</Button>
+      <Button type="submit" disabled={!name.trim() || !clip || busy}>{i18n._({ id: "Make voice", message: "Make voice" })}</Button>
     </div>
   </form>;
 }

@@ -2,6 +2,7 @@
 // device" and "staged" banners, the Memory and Storage bars with their after-apply projection, seven rows, and the footer.
 // Choices are staged in the page and written only by Apply. All words are the spec card's `copy` (rule S5); progress rides
 // InstallStrip (rule S6); kit Elements as shipped (rule 9). Variants the kit lacks are listed in the design note.
+import { i18n } from "@lingui/core";
 import { useMemo, useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { Alert, AlertDescription, AlertTitle } from "@maipai/ui/src/ui/alert";
@@ -133,8 +134,8 @@ export function AiGlance({ card }: SettingsViewProps) {
     onError: (e) => { setStep(null); setError(messageOf(e, "Could not apply the changes. Check that the engine is running, then try again.")); refresh(); void settings.refetch(); },
   });
 
-  if (query.isLoading) return <RouteSkeleton label="Loading your AI setup" />;
-  if (query.isError || !data) return <section><Alert variant="destructive"><AlertTitle>The page did not load</AlertTitle><AlertDescription>{messageOf(query.error, "Check that Home is running, then reload this page.")}</AlertDescription></Alert></section>;
+  if (query.isLoading) return <RouteSkeleton label={i18n._({ id: "Loading your AI setup", message: "Loading your AI setup" })} />;
+  if (query.isError || !data) return <section><Alert variant="destructive"><AlertTitle>{i18n._({ id: "The page did not load", message: "The page did not load" })}</AlertTitle><AlertDescription>{messageOf(query.error, "Check that Home is running, then reload this page.")}</AlertDescription></Alert></section>;
 
   const totalRam = (hardware.data?.totalRamGb ?? 0) * GB;
   const installed = data.installed_bytes;
@@ -165,7 +166,7 @@ export function AiGlance({ card }: SettingsViewProps) {
         </div>
         {missing.length > 0 ? <Button type="button" disabled={download.isPending || data.stack === "unreachable"} onClick={() => download.mutate(missing)}>{fill(copy.download_missing ?? "", { count: missing.length })}</Button> : null}
       </header>
-      {data.stack === "unreachable" ? <p className="text-sm text-muted-foreground">The AI is waiting for its helper to start. The Status page shows what is happening.</p> : null}
+      {data.stack === "unreachable" ? <p className="text-sm text-muted-foreground">{i18n._({ id: "The AI is waiting for its helper to start. The Status page shows what is happening.", message: "The AI is waiting for its helper to start. The Status page shows what is happening." })}</p> : null}
       {missing.length > 0 ? (
         <Alert variant="warning" data-testid="ai-missing">
           <AlertTitle>{fill(copy.missing_title ?? "", { count: missing.length })}</AlertTitle>
@@ -194,11 +195,11 @@ export function AiGlance({ card }: SettingsViewProps) {
       {maxWindow.data && (maxWindow.data.open || maxWindow.data.profile || (maxWindow.data.closed_apps?.length ?? 0) > 0) ? (
         <div className="flex flex-wrap items-center justify-between gap-3 text-base" role="status" data-testid="max-window-line">
           <div className="space-y-1">
-            {maxWindow.data.open ? <p>{maxWindow.data.line}{maxWindow.data.minutes_left !== null ? ` About ${maxWindow.data.minutes_left} ${maxWindow.data.minutes_left === 1 ? "minute" : "minutes"} left.` : ""}</p> : null}
+            {maxWindow.data.open ? <p>{maxWindow.data.line}{maxWindow.data.minutes_left !== null ? ` About ${maxWindow.data.minutes_left} ${maxWindow.data.minutes_left === 1 ? i18n._({ id: "minute", message: "minute" }) : i18n._({ id: "minutes", message: "minutes" })} left.` : ""}</p> : null}
             {maxWindow.data.profile ? <p data-testid="profile-line">{maxWindow.data.profile}</p> : null}
             {(maxWindow.data.closed_apps ?? []).map((line) => <p key={line} className="text-muted-foreground" data-testid="closed-apps-line">{line}</p>)}
           </div>
-          {maxWindow.data.open ? <Button type="button" variant="outline" disabled={stopWindow.isPending} onClick={() => stopWindow.mutate()}>Stop the Max job</Button> : null}
+          {maxWindow.data.open ? <Button type="button" variant="outline" disabled={stopWindow.isPending} onClick={() => stopWindow.mutate()}>{i18n._({ id: "Stop the Max job", message: "Stop the Max job" })}</Button> : null}
         </div>
       ) : null}
 
@@ -221,7 +222,7 @@ export function AiGlance({ card }: SettingsViewProps) {
       <Dialog open={levels !== null} onOpenChange={(open) => { if (!open) { setLevels(null); setLevelTier(null); } }}>
         <DialogContent scroll="viewport">{levels && levelTier === null ? <AiJobSummary key={`${levels.job}-summary`} row={levels} drafts={slotDrafts(levels)} picks={tierPicks.data ?? null} copy={copy} onClose={() => setLevels(null)} onEdit={(tier) => { if (tier === "standard") { setLevels(null); setEditing(levels); } else setLevelTier(tier); }} /> : null}{levels && levelTier !== null ? <AiSlotChoices key={`${levels.job}-${levelTier}`} only={levelTier} row={levels} initial={slotDrafts(levels)} picks={tierPicks.data ?? null} copy={copy} saving={saveLevels.isPending} error={levelsError} onClose={() => setLevelTier(null)} onSave={(drafts) => saveLevels.mutate({ row: levels, drafts })} /> : null}</DialogContent>
       </Dialog>
-      <StagedApplyBar testId="ai-action-bar" stagedTestId="ai-staged" notices={error ? <Alert variant="destructive"><AlertTitle>That did not work</AlertTitle><AlertDescription>{error}</AlertDescription></Alert> : null} staged={stagedCount > 0} title={fill(copy.staged ?? "", { count: stagedCount })} step={step} applying={apply.isPending} applyLabel={copy.apply ?? "Apply"} discardLabel={copy.discard ?? "Discard"} onApply={() => apply.mutate()} onDiscard={() => setStaged({})} />
+      <StagedApplyBar testId="ai-action-bar" stagedTestId="ai-staged" notices={error ? <Alert variant="destructive"><AlertTitle>{i18n._({ id: "That did not work", message: "That did not work" })}</AlertTitle><AlertDescription>{error}</AlertDescription></Alert> : null} staged={stagedCount > 0} title={fill(copy.staged ?? "", { count: stagedCount })} step={step} applying={apply.isPending} applyLabel={copy.apply ?? "Apply"} discardLabel={copy.discard ?? "Discard"} onApply={() => apply.mutate()} onDiscard={() => setStaged({})} />
       <AlertDialog open={resetting !== null} onOpenChange={(open) => { if (!open) setResetting(null); }}>
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -259,7 +260,7 @@ function glanceRow({ row, copy, onSwitch, onEdit, onReset, onDownload }: { row: 
         <ItemTitle>
           {row.title}
           {row.offered ? <Badge tone={row.badge === "recommended" ? "success" : undefined} variant={row.badge === "disabled" ? "secondary" : "default"}>{copy[row.badge]}</Badge> : null}
-          {row.offered && row.shown?.id === "chat.uncensored" ? <Badge variant="outline" tone="warning">Uncensored</Badge> : null}
+          {row.offered && row.shown?.id === "chat.uncensored" ? <Badge variant="outline" tone="warning">{i18n._({ id: "Uncensored", message: "Uncensored" })}</Badge> : null}
         </ItemTitle>
         <ItemDescription clamp={false}>{model && row.offered ? `${model.label}. ` : ""}{line}</ItemDescription>
         {model && row.offered ? <ItemDescription clamp={false}>{model.details.map((part) => part.name).join(", ")}</ItemDescription> : null}

@@ -2,6 +2,7 @@
 // Installed and Source filters, Sort, Previous / numbered / Next paging (the cursor of each visited page is kept), a one-line reason on every tile, and ONE lock tile for every
 // adult or unknown hit (the hub sends no title, picture or id for them; nothing here ever blurs). "Show adult results" exists only while unlocked and is off at each visit.
 // A tile opens the confirm panel; a pasted Hugging Face link opens it directly. The hub makes every outbound request; this dialog only talks to Home.
+import { i18n } from "@lingui/core";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Badge } from "@maipai/ui/src/ui/badge";
@@ -96,11 +97,11 @@ export function StyleBrowser({ person, civitaiOn, onClose, onInstalled, onOpenSt
 
   const filters = (
     <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
-      <Pick id="style-filter-type" label="Type" value={kind} onChange={(v) => setKind(v as typeof kind)} options={[["any", "Any"], ["style", "Style"], ["character", "Character"]]} />
-      <Pick id="style-filter-base" wide label="Made for" value={base} onChange={(v) => setBase(v as typeof base)} options={[["default", "LTX-2.5 and Wan"], ["ltx-2.5", "LTX-2.5"], ["wan", "Wan"], ["all", "All"]]} />
-      <Pick id="style-filter-installed" label="Installed" value={installed} onChange={(v) => setInstalled(v as typeof installed)} options={[["any", "Any"], ["not_installed", "Not installed"], ["installed", "Installed"]]} />
-      <Pick id="style-filter-source" label="Source" value={source} onChange={(v) => setSource(v as BrowseSource)} options={[["huggingface", "Hugging Face"], ["civitai", civitaiOn ? "Civitai" : "Civitai (off)", !civitaiOn], ["both", "Both", !civitaiOn]]} />
-      <Pick id="style-filter-sort" label="Sort" value={sort} onChange={(v) => setSort(v as typeof sort)} options={[["downloads", "Most downloaded"], ["rating", "Top rated"], ["newest", "Newest"]]} />
+      <Pick id="style-filter-type" label={i18n._({ id: "Type", message: "Type" })} value={kind} onChange={(v) => setKind(v as typeof kind)} options={[["any", "Any"], ["style", "Style"], ["character", "Character"]]} />
+      <Pick id="style-filter-base" wide label={i18n._({ id: "Made for", message: "Made for" })} value={base} onChange={(v) => setBase(v as typeof base)} options={[["default", "LTX-2.5 and Wan"], ["ltx-2.5", "LTX-2.5"], ["wan", "Wan"], ["all", "All"]]} />
+      <Pick id="style-filter-installed" label={i18n._({ id: "Installed", message: "Installed" })} value={installed} onChange={(v) => setInstalled(v as typeof installed)} options={[["any", "Any"], ["not_installed", "Not installed"], ["installed", "Installed"]]} />
+      <Pick id="style-filter-source" label={i18n._({ id: "Source", message: "Source" })} value={source} onChange={(v) => setSource(v as BrowseSource)} options={[["huggingface", "Hugging Face"], ["civitai", civitaiOn ? "Civitai" : "Civitai (off)", !civitaiOn], ["both", "Both", !civitaiOn]]} />
+      <Pick id="style-filter-sort" label={i18n._({ id: "Sort", message: "Sort" })} value={sort} onChange={(v) => setSort(v as typeof sort)} options={[["downloads", "Most downloaded"], ["rating", "Top rated"], ["newest", "Newest"]]} />
     </div>
   );
 
@@ -109,30 +110,30 @@ export function StyleBrowser({ person, civitaiOn, onClose, onInstalled, onOpenSt
       <Dialog open onOpenChange={(next) => { if (!next) onClose(); }}>
         <DialogContent variant="flow" size="xl" aria-describedby="style-browse-desc" onInteractOutside={(event) => event.preventDefault()}>
           <DialogHeader>
-            <DialogTitle size="xl">Browse styles</DialogTitle>
-            <DialogDescription id="style-browse-desc">Home searches for you. Nothing is downloaded until you press Install style.</DialogDescription>
+            <DialogTitle size="xl">{i18n._({ id: "Browse styles", message: "Browse styles" })}</DialogTitle>
+            <DialogDescription id="style-browse-desc">{i18n._({ id: "Home searches for you. Nothing is downloaded until you press Install style.", message: "Home searches for you. Nothing is downloaded until you press Install style." })}</DialogDescription>
           </DialogHeader>
           <div className="flex flex-col gap-4">
             <div className="flex flex-col gap-2">
-              <Label htmlFor="style-search">Search styles, or paste a Hugging Face link</Label>
-              <Input id="style-search" type="search" value={typed} onChange={(e) => setTyped(e.target.value)} placeholder="old film, clay, anime" />
+              <Label htmlFor="style-search">{i18n._({ id: "Search styles, or paste a Hugging Face link", message: "Search styles, or paste a Hugging Face link" })}</Label>
+              <Input id="style-search" type="search" value={typed} onChange={(e) => setTyped(e.target.value)} placeholder={i18n._({ id: "old film, clay, anime", message: "old film, clay, anime" })} />
             </div>
             {filters}
             {lock.unlocked ? (
               <div className="flex items-center gap-3">
-                <Switch id="style-adult-results" checked={adult} onCheckedChange={setAdult} aria-label="Show adult results" />
-                <Label htmlFor="style-adult-results">Show adult results</Label>
+                <Switch id="style-adult-results" checked={adult} onCheckedChange={setAdult} aria-label={i18n._({ id: "Show adult results", message: "Show adult results" })} />
+                <Label htmlFor="style-adult-results">{i18n._({ id: "Show adult results", message: "Show adult results" })}</Label>
               </div>
             ) : null}
             {results.data?.notes.map((note) => <p key={note} className="text-sm text-muted-foreground">{note}</p>)}
             {linkError ? <p role="alert" className="text-sm text-destructive">{linkError}</p> : null}
             {link ? null : results.isError && !results.data ? (
-              <div role="alert" className="flex flex-col items-start gap-2 text-sm"><p className="text-destructive">{browseProblem(results.error)}</p><Button type="button" variant="outline" size="sm" onClick={() => void results.refetch()}>Try again</Button></div>
+              <div role="alert" className="flex flex-col items-start gap-2 text-sm"><p className="text-destructive">{browseProblem(results.error)}</p><Button type="button" variant="outline" size="sm" onClick={() => void results.refetch()}>{i18n._({ id: "Try again", message: "Try again" })}</Button></div>
             ) : (
               <AsyncState data={results.data} error={false} isFetching={results.isFetching} onRetry={() => void results.refetch()} loadingLabel="Searching for styles" errorMessage="">
-                {() => empty ? <p className="text-sm text-muted-foreground">No styles match. Try fewer words.</p> : (
+                {() => empty ? <p className="text-sm text-muted-foreground">{i18n._({ id: "No styles match. Try fewer words.", message: "No styles match. Try fewer words." })}</p> : (
                   <MediaShelf<Tile>
-                    label="Styles from the source" items={tiles} variant="plain" layout="grid" aspect="wide" density="compact"
+                    label={i18n._({ id: "Styles from the source", message: "Styles from the source" })} items={tiles} variant="plain" layout="grid" aspect="wide" density="compact"
                     getKey={(tile) => (isLockedTile(tile) ? "locked" : tile.key)} isLocked={isLockedTile} onUnlock={() => lock.requestUnlock()}
                     getLabel={(tile) => (isLockedTile(tile) ? "Locked items" : tile.title)}
                     onSelect={(tile) => { if (isLockedTile(tile)) return; if (alreadyHave(tile)) onOpenStyle(tile.installed?.id ?? null); else setPicked(tile); }}
@@ -142,8 +143,8 @@ export function StyleBrowser({ person, civitaiOn, onClose, onInstalled, onOpenSt
                       <span className="flex min-w-0 flex-col gap-0.5">
                         <span className="truncate text-sm font-semibold">{tile.title}</span>
                         {tile.creator ? <span className="truncate text-sm text-muted-foreground">{tile.creator}</span> : null}
-                        <span className="text-sm text-muted-foreground">{alreadyHave(tile) ? (tile.installed ? `Already added as ${tile.installed.name}. Press to open it.` : "You already have this style. Press to open it.") : tile.reason ?? tile.line}</span>
-                        {tile.also_on.length ? <span className="text-sm text-muted-foreground">Also on {tile.also_on.join(" and ")}</span> : null}
+                        <span className="text-sm text-muted-foreground">{alreadyHave(tile) ? (tile.installed ? `Already added as ${tile.installed.name}. Press to open it.` : i18n._({ id: "You already have this style. Press to open it.", message: "You already have this style. Press to open it." })) : tile.reason ?? tile.line}</span>
+                        {tile.also_on.length ? <span className="text-sm text-muted-foreground">{i18n._({ id: "Also on {join}", message: "Also on {join}", values: { join: tile.also_on.join(" and ") } })}</span> : null}
                       </span>
                     ))}
                   />
@@ -151,10 +152,10 @@ export function StyleBrowser({ person, civitaiOn, onClose, onInstalled, onOpenSt
               </AsyncState>
             )}
             {link ? null : (
-              <nav aria-label="Pages of results" className="flex flex-wrap items-center gap-2">
-                <Button type="button" variant="outline" size="sm" disabled={page === 0} onClick={() => setPage((n) => Math.max(0, n - 1))}>Previous</Button>
+              <nav aria-label={i18n._({ id: "Pages of results", message: "Pages of results" })} className="flex flex-wrap items-center gap-2">
+                <Button type="button" variant="outline" size="sm" disabled={page === 0} onClick={() => setPage((n) => Math.max(0, n - 1))}>{i18n._({ id: "Previous", message: "Previous" })}</Button>
                 {cursors.map((_, index) => <Button key={index} type="button" variant={index === page ? "default" : "ghost"} size="sm" aria-current={index === page ? "page" : undefined} onClick={() => setPage(index)}>{index + 1}</Button>)}
-                <Button type="button" variant="outline" size="sm" disabled={!hasMore} onClick={() => setPage((n) => n + 1)}>Next</Button>
+                <Button type="button" variant="outline" size="sm" disabled={!hasMore} onClick={() => setPage((n) => n + 1)}>{i18n._({ id: "Next", message: "Next" })}</Button>
               </nav>
             )}
           </div>

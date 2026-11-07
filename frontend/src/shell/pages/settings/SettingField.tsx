@@ -1,3 +1,4 @@
+import { i18n } from "@lingui/core";
 import { useEffect, useState, type ReactNode } from "react";
 import type { MergedSetting } from "@maipai/ui/src/settings/groupSettings";
 import type { ResolvedSetting } from "@/lib/api";
@@ -116,14 +117,14 @@ export function SettingField({ setting, onChange, onReset, disabled, selfPersonI
 
   let control: ReactNode;
   if (resolved.secret && SECRETS_WITH_DEDICATED_FLOWS.has(def.key)) {
-    control = <span className="text-sm text-muted-foreground">{resolved.isSet ? "Set" : "Not set"}</span>;
+    control = <span className="text-sm text-muted-foreground">{resolved.isSet ? i18n._({ id: "Set", message: "Set" }) : i18n._({ id: "Not set", message: "Not set" })}</span>;
   } else if (resolved.secret) {
     control = secretEditing ? (
       <div className="flex flex-col gap-2">
         <div className="w-64 max-w-full">
           <Input
             type="password"
-            placeholder="Paste the new value"
+            placeholder={i18n._({ id: "Paste the new value", message: "Paste the new value" })}
             value={secretDraft}
             disabled={secretSaving}
             onChange={(e) => setSecretDraft(e.target.value)}
@@ -133,7 +134,7 @@ export function SettingField({ setting, onChange, onReset, disabled, selfPersonI
         </div>
         <div className="flex gap-2">
           <Button type="button" disabled={secretSaving || !secretDraft} onClick={commitSecret}>
-            {secretSaving ? "Saving…" : "Save"}
+            {secretSaving ? i18n._({ id: "Saving…", message: "Saving…" }) : i18n._({ id: "Save", message: "Save" })}
           </Button>
           <Button
             type="button"
@@ -144,15 +145,15 @@ export function SettingField({ setting, onChange, onReset, disabled, selfPersonI
               setSecretEditing(false);
             }}
           >
-            Cancel
+            {i18n._({ id: "Cancel", message: "Cancel" })}
           </Button>
         </div>
       </div>
     ) : (
       <div className="flex items-center gap-3">
-        <span className="text-sm text-muted-foreground">{resolved.isSet ? "Set" : "Not set"}</span>
+        <span className="text-sm text-muted-foreground">{resolved.isSet ? i18n._({ id: "Set", message: "Set" }) : i18n._({ id: "Not set", message: "Not set" })}</span>
         <Button type="button" variant="outline" disabled={disabled} onClick={() => setSecretEditing(true)}>
-          {resolved.isSet ? "Change" : "Set"}
+          {resolved.isSet ? i18n._({ id: "Change", message: "Change" }) : i18n._({ id: "Set", message: "Set" })}
         </Button>
       </div>
     );
@@ -206,7 +207,7 @@ export function SettingField({ setting, onChange, onReset, disabled, selfPersonI
       </div>
     );
   } else if (def.selector === "time") {
-    control = <div className="flex items-center gap-2"><div className="w-40 max-w-full shrink-0"><Input type="time" value={String(resolved.value ?? "")} disabled={disabled} onChange={(e) => void onChange(e.target.value)} aria-label={def.key} /></div>{resolved.value == null && <><span className="text-sm text-muted-foreground">Inheriting household hours</span><Button type="button" variant="link" onClick={onReset} disabled={disabled}>Use household hours</Button></>}</div>;
+    control = <div className="flex items-center gap-2"><div className="w-40 max-w-full shrink-0"><Input type="time" value={String(resolved.value ?? "")} disabled={disabled} onChange={(e) => void onChange(e.target.value)} aria-label={def.key} /></div>{resolved.value == null && <><span className="text-sm text-muted-foreground">{i18n._({ id: "Inheriting household hours", message: "Inheriting household hours" })}</span><Button type="button" variant="link" onClick={onReset} disabled={disabled}>{i18n._({ id: "Use household hours", message: "Use household hours" })}</Button></>}</div>;
   } else if (def.selector === "text") {
     control = (
       <div className="w-64 max-w-full">
@@ -236,21 +237,21 @@ export function SettingField({ setting, onChange, onReset, disabled, selfPersonI
   } else if (def.selector === "location") {
     control = <LocationSetting def={def} value={resolved.value} onChange={onChange} disabled={disabled} />;
   } else {
-    control = <span className="text-sm text-muted-foreground">Not supported in this hub version yet.</span>;
+    control = <span className="text-sm text-muted-foreground">{i18n._({ id: "Not supported in this hub version yet.", message: "Not supported in this hub version yet." })}</span>;
   }
 
   return (
     <>
     <div className="flex flex-col items-start gap-2 py-3 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
       <div className="flex min-w-0 flex-col gap-0.5">
-        {def.key === "companions.allowed" ? <span className="flex min-h-12 items-center text-sm">{def.label}</span> : <span className="text-sm">{def.key === "storage.household.cap_bytes" ? "Household storage cap" : def.label}</span>}
+        {def.key === "companions.allowed" ? <span className="flex min-h-12 items-center text-sm">{def.label}</span> : <span className="text-sm">{def.key === "storage.household.cap_bytes" ? i18n._({ id: "Household storage cap", message: "Household storage cap" }) : def.label}</span>}
         {def.key === "storage.household.cap_bytes" && typeof resolved.value === "number" ? <ItemDescription clamp={false}>{formatBytes(resolved.value)}</ItemDescription> : null}
         {resolved.does ? <ItemDescription clamp={false}>{resolved.does}</ItemDescription> : null}
         {resolved.state ? <ItemDescription clamp={false}>{resolved.state}</ItemDescription> : null}
         {resolved.reason ? <ItemDescription clamp={false}>{resolved.reason}</ItemDescription> : null}
         {canReset ? (
           <Button type="button" variant="link" onClick={onReset} disabled={disabled}>
-            Reset to default
+            {i18n._({ id: "Reset to default", message: "Reset to default" })}
           </Button>
         ) : null}
       </div>
@@ -260,11 +261,11 @@ export function SettingField({ setting, onChange, onReset, disabled, selfPersonI
       <AlertDialogContent>
         <AlertDialogHeader>
           <AlertDialogTitle>{def.label}</AlertDialogTitle>
-          <AlertDialogDescription>The person may have grown attached to their AI companions. Turn them off with care. Their companion and personality data will be kept.</AlertDialogDescription>
+          <AlertDialogDescription>{i18n._({ id: "The person may have grown attached to their AI companions. Turn them off with care. Their companion and personality data will be kept.", message: "The person may have grown attached to their AI companions. Turn them off with care. Their companion and personality data will be kept." })}</AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
-          <AlertDialogCancel>Cancel</AlertDialogCancel>
-          <AlertDialogAction variant="destructive" onClick={() => { void onChange(false); }}>Turn off</AlertDialogAction>
+          <AlertDialogCancel>{i18n._({ id: "Cancel", message: "Cancel" })}</AlertDialogCancel>
+          <AlertDialogAction variant="destructive" onClick={() => { void onChange(false); }}>{i18n._({ id: "Turn off", message: "Turn off" })}</AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>

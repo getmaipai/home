@@ -1,3 +1,4 @@
+import { i18n } from "@lingui/core";
 import { useEffect, useState } from "react";
 import { Button } from "@maipai/ui/src/ui/button";
 import { readMicDevicePreference, writeMicDevicePreference } from "@/lib/voice/micDevicePreference";
@@ -62,8 +63,8 @@ export function MicrophoneSection() {
   if (devices.length < 2) return null;
   return (
     <div className="flex flex-col gap-2 border-t border-border pt-3">
-      <h3 className="text-base font-medium">Microphone</h3>
-      <p className="text-base text-muted-foreground">The microphone choice is remembered on this device only.</p>
+      <h3 className="text-base font-medium">{i18n._({ id: "Microphone", message: "Microphone" })}</h3>
+      <p className="text-base text-muted-foreground">{i18n._({ id: "The microphone choice is remembered on this device only.", message: "The microphone choice is remembered on this device only." })}</p>
       <ul className="flex flex-col divide-y divide-[var(--border)]">
         {devices.map((device, index) => {
           const active = selected === device.deviceId;
@@ -78,7 +79,7 @@ export function MicrophoneSection() {
                   setSelected(device.deviceId);
                 }}
               >
-                {active ? "In use" : "Use this microphone"}
+                {active ? i18n._({ id: "In use", message: "In use" }) : i18n._({ id: "Use this microphone", message: "Use this microphone" })}
               </Button>
             </li>
           );

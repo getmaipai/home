@@ -1,3 +1,4 @@
+import { i18n } from "@lingui/core";
 import { useEffect, useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { AsyncState } from "@maipai/ui/src/primitives/AsyncState";
@@ -88,16 +89,16 @@ export function VoiceManagerSection() {
 
   return <section className="flex flex-col gap-4">
     <div className="flex items-start justify-between gap-4">
-      <p className="min-w-0 flex-1 text-base text-muted-foreground">Every voice Home can speak with. Home's default voice is used by anyone, and any robot, with no voice of their own.</p>
-      <div className="shrink-0"><Button type="button" onClick={() => { setNotice(null); setAdding(true); }}>Add voice</Button></div>
+      <p className="min-w-0 flex-1 text-base text-muted-foreground">{i18n._({ id: "Every voice Home can speak with. Home's default voice is used by anyone, and any robot, with no voice of their own.", message: "Every voice Home can speak with. Home's default voice is used by anyone, and any robot, with no voice of their own." })}</p>
+      <div className="shrink-0"><Button type="button" onClick={() => { setNotice(null); setAdding(true); }}>{i18n._({ id: "Add voice", message: "Add voice" })}</Button></div>
     </div>
     {notice ? <p role="status" className="text-base text-primary">{notice}</p> : null}
     {error ? <p role="alert" className="text-base text-destructive">{error}</p> : null}
     {preview.error ? <p role="alert" className="text-base text-destructive">{preview.error}</p> : null}
-    {failed ? <p role="alert" className="text-base">Home can't reach its voice service. Check Repairs, then come back. <Button type="button" variant="outline" onClick={retry}>Try again</Button></p>
+    {failed ? <p role="alert" className="text-base">{i18n._({ id: "Home can't reach its voice service. Check Repairs, then come back.", message: "Home can't reach its voice service. Check Repairs, then come back." })} <Button type="button" variant="outline" onClick={retry}>{i18n._({ id: "Try again", message: "Try again" })}</Button></p>
       : <AsyncState data={voicesQuery.data && madeQuery.data && homeQuery.data ? voices : undefined} isFetching={voicesQuery.isFetching || madeQuery.isFetching || homeQuery.isFetching} onRetry={retry} loadingLabel="Loading voices">
-        {(list) => list.length === 0 ? <p className="text-base text-muted-foreground">Voices are still getting ready. This takes a minute after setup.</p> : <div className="flex flex-col">
-          <div className={`hidden gap-3 border-b border-border pb-2 xl:grid ${COLUMNS} ${MUTED}`}><span>Voice</span><span>Source</span><span>Gender</span><span>Language</span><span className="text-right">Actions</span></div>
+        {(list) => list.length === 0 ? <p className="text-base text-muted-foreground">{i18n._({ id: "Voices are still getting ready. This takes a minute after setup.", message: "Voices are still getting ready. This takes a minute after setup." })}</p> : <div className="flex flex-col">
+          <div className={`hidden gap-3 border-b border-border pb-2 xl:grid ${COLUMNS} ${MUTED}`}><span>{i18n._({ id: "Voice", message: "Voice" })}</span><span>{i18n._({ id: "Source", message: "Source" })}</span><span>{i18n._({ id: "Gender", message: "Gender" })}</span><span>{i18n._({ id: "Language", message: "Language" })}</span><span className="text-right">{i18n._({ id: "Actions", message: "Actions" })}</span></div>
           <ul className="flex flex-col divide-y divide-[var(--border)]">{list.map((voice) => {
             const custom = voice.source === "cloned";
             const home = isHomeDefault(voice, homeDefault);
@@ -106,18 +107,18 @@ export function VoiceManagerSection() {
             const detail = [custom ? "Custom" : "Built in", GENDER[voice.gender], languageName(voice.language)].join(" · ");
             return <li key={voice.id} className={`grid items-center gap-x-3 gap-y-2 py-3 ${COLUMNS}`}>
               <div className="flex min-w-0 flex-col gap-0.5">
-                <div className="flex flex-wrap items-center gap-2"><span className="truncate text-base font-medium">{voiceDisplayName(voice)}</span>{home ? <Badge variant="secondary">Home's default</Badge> : null}</div>
-                <span className={MUTED}>{record ? `Made by ${record.creatorName}${record.temperature !== undefined ? ` · Liveliness ${record.temperature}` : ""}${record.pitchSemitones ? ` · Pitch ${record.pitchSemitones > 0 ? "+" : ""}${record.pitchSemitones}` : ""}` : isEngineVoice(voice) ? "The voice built into Home's speech engine." : "Comes with Home."}</span>
+                <div className="flex flex-wrap items-center gap-2"><span className="truncate text-base font-medium">{voiceDisplayName(voice)}</span>{home ? <Badge variant="secondary">{i18n._({ id: "Home's default", message: "Home's default" })}</Badge> : null}</div>
+                <span className={MUTED}>{record ? `Made by ${record.creatorName}${record.temperature !== undefined ? ` · Liveliness ${record.temperature}` : ""}${record.pitchSemitones ? ` · Pitch ${record.pitchSemitones > 0 ? "+" : ""}${record.pitchSemitones}` : ""}` : isEngineVoice(voice) ? i18n._({ id: "The voice built into Home's speech engine.", message: "The voice built into Home's speech engine." }) : i18n._({ id: "Comes with Home.", message: "Comes with Home." })}</span>
                 <span className={`${MUTED} xl:hidden`}>{detail}</span>
               </div>
-              <span className="hidden text-base xl:block">{custom ? "Custom" : "Built in"}</span>
+              <span className="hidden text-base xl:block">{custom ? i18n._({ id: "Custom", message: "Custom" }) : i18n._({ id: "Built in", message: "Built in" })}</span>
               <span className="hidden text-base xl:block">{GENDER[voice.gender]}</span>
               <span className="hidden text-base xl:block">{languageName(voice.language)}</span>
               <div className="flex flex-wrap gap-2 xl:justify-end">
-                <Button type="button" variant="outline" onClick={() => testing ? voicePreviewPlayer.stop() : void voicePreviewPlayer.start(voice.id)}>{testing && !preview.busy ? "Stop" : "Test"}</Button>
-                {home ? null : <Button type="button" variant="outline" disabled={busyId === voice.id} onClick={() => void setDefault(voice)}>Set as default</Button>}
-                {custom ? <Button type="button" variant="outline" disabled={busyId === voice.id} onClick={() => { setNewName(record?.label ?? voiceDisplayName(voice)); setRenaming(voice); }}>Rename</Button> : null}
-                {custom ? <Button type="button" variant="outline" disabled={busyId === voice.id} onClick={() => setRemoving(voice)}>Delete</Button> : null}
+                <Button type="button" variant="outline" onClick={() => testing ? voicePreviewPlayer.stop() : void voicePreviewPlayer.start(voice.id)}>{testing && !preview.busy ? i18n._({ id: "Stop", message: "Stop" }) : i18n._({ id: "Test", message: "Test" })}</Button>
+                {home ? null : <Button type="button" variant="outline" disabled={busyId === voice.id} onClick={() => void setDefault(voice)}>{i18n._({ id: "Set as default", message: "Set as default" })}</Button>}
+                {custom ? <Button type="button" variant="outline" disabled={busyId === voice.id} onClick={() => { setNewName(record?.label ?? voiceDisplayName(voice)); setRenaming(voice); }}>{i18n._({ id: "Rename", message: "Rename" })}</Button> : null}
+                {custom ? <Button type="button" variant="outline" disabled={busyId === voice.id} onClick={() => setRemoving(voice)}>{i18n._({ id: "Delete", message: "Delete" })}</Button> : null}
               </div>
             </li>;
           })}</ul>
@@ -126,8 +127,8 @@ export function VoiceManagerSection() {
     <Dialog open={adding} onOpenChange={(open) => { if (!addBusy) setAdding(open); }}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Add a voice</DialogTitle>
-          <DialogDescription>Make a voice from a WAV, MP3 or FLAC recording of 6 to 30 seconds. Everyone in the home can pick it, and so can a robot.</DialogDescription>
+          <DialogTitle>{i18n._({ id: "Add a voice", message: "Add a voice" })}</DialogTitle>
+          <DialogDescription>{i18n._({ id: "Make a voice from a WAV, MP3 or FLAC recording of 6 to 30 seconds. Everyone in the home can pick it, and so can a robot.", message: "Make a voice from a WAV, MP3 or FLAC recording of 6 to 30 seconds. Everyone in the home can pick it, and so can a robot." })}</DialogDescription>
         </DialogHeader>
         <AddVoiceForm onBusyChange={setAddBusy} onCancel={() => setAdding(false)} onMade={(name) => { setAdding(false); setNotice(`${name} is ready. Test it here, then pick it for a person or a robot.`); }} />
       </DialogContent>
@@ -135,14 +136,14 @@ export function VoiceManagerSection() {
     <Dialog open={renaming !== null} onOpenChange={(open) => { if (!open) setRenaming(null); }}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Rename {renaming ? voiceDisplayName(renaming) : "this voice"}</DialogTitle>
-          <DialogDescription>Only the name changes. The recording stays the same, and everyone and every robot using this voice keeps it.</DialogDescription>
+          <DialogTitle>{i18n._({ id: "Rename {value}", message: "Rename {value}", values: { value: renaming ? voiceDisplayName(renaming) : i18n._({ id: "this voice", message: "this voice" }) } })}</DialogTitle>
+          <DialogDescription>{i18n._({ id: "Only the name changes. The recording stays the same, and everyone and every robot using this voice keeps it.", message: "Only the name changes. The recording stays the same, and everyone and every robot using this voice keeps it." })}</DialogDescription>
         </DialogHeader>
         <form className="flex flex-col gap-3" onSubmit={(event) => { event.preventDefault(); if (renaming && newName.trim()) void rename(renaming, newName); }}>
-          <Input aria-label="Voice name" value={newName} maxLength={40} onChange={(event) => setNewName(event.target.value)} />
+          <Input aria-label={i18n._({ id: "Voice name", message: "Voice name" })} value={newName} maxLength={40} onChange={(event) => setNewName(event.target.value)} />
           <div className="flex justify-end gap-2">
-            <Button type="button" variant="outline" onClick={() => setRenaming(null)}>Cancel</Button>
-            <Button type="submit" disabled={!newName.trim()}>Save name</Button>
+            <Button type="button" variant="outline" onClick={() => setRenaming(null)}>{i18n._({ id: "Cancel", message: "Cancel" })}</Button>
+            <Button type="submit" disabled={!newName.trim()}>{i18n._({ id: "Save name", message: "Save name" })}</Button>
           </div>
         </form>
       </DialogContent>
@@ -150,12 +151,12 @@ export function VoiceManagerSection() {
     <AlertDialog open={removing !== null} onOpenChange={(open) => { if (!open) setRemoving(null); }}>
       <AlertDialogContent>
         <AlertDialogHeader>
-          <AlertDialogTitle>Delete {removing ? voiceDisplayName(removing) : "this voice"}?</AlertDialogTitle>
-          <AlertDialogDescription>Anyone, and any robot, using it goes back to Home's default voice. The recording is deleted from Home.</AlertDialogDescription>
+          <AlertDialogTitle>{i18n._({ id: "Delete {value}?", message: "Delete {value}?", values: { value: removing ? voiceDisplayName(removing) : i18n._({ id: "this voice", message: "this voice" }) } })}</AlertDialogTitle>
+          <AlertDialogDescription>{i18n._({ id: "Anyone, and any robot, using it goes back to Home's default voice. The recording is deleted from Home.", message: "Anyone, and any robot, using it goes back to Home's default voice. The recording is deleted from Home." })}</AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
-          <AlertDialogCancel>Cancel</AlertDialogCancel>
-          <AlertDialogAction variant="destructive" onClick={() => removing && void remove(removing)}>Delete voice</AlertDialogAction>
+          <AlertDialogCancel>{i18n._({ id: "Cancel", message: "Cancel" })}</AlertDialogCancel>
+          <AlertDialogAction variant="destructive" onClick={() => removing && void remove(removing)}>{i18n._({ id: "Delete voice", message: "Delete voice" })}</AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>

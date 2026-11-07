@@ -1,3 +1,4 @@
+import { i18n } from "@lingui/core";
 import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Section } from "@maipai/ui/src/primitives/Section";
@@ -221,7 +222,7 @@ export function UsersSection({ person }: UsersSectionProps) {
         loadingLabel="Loading household"
       >
         {(loadedRoster) => (
-        <Section heading="Users">
+        <Section heading={i18n._({ id: "Users", message: "Users" })}>
           {companionKey ? <Field>
             <FieldLabel htmlFor="household-companions-allowed"><Switch size="md" id="household-companions-allowed" checked={Boolean(householdCompanionsAllowed)} disabled={companionsSaving} onCheckedChange={(checked) => setHouseholdCompanionsAllowed(checked === true)} />{companionKey.label}</FieldLabel>
             <FieldDescription>{companionKey.help}</FieldDescription>
@@ -234,33 +235,29 @@ export function UsersSection({ person }: UsersSectionProps) {
                   disabled={selectMode.count === 0}
                   onClick={() => setConfirmingDelete("batch")}
                 >
-                  Remove selected
+                  {i18n._({ id: "Remove selected", message: "Remove selected" })}
                 </Button>
               </BatchBar>
             ) : (
-              <SelectModeToggle label="Select people" onClick={selectMode.enter} />
+              <SelectModeToggle label={i18n._({ id: "Select people", message: "Select people" })} onClick={selectMode.enter} />
             )
           ) : null}
 
           {confirmingDelete === "batch" ? (
             <div className="flex flex-col gap-2 rounded-[var(--radius)] border border-destructive p-3">
-              <p className="text-base font-medium">
-                Remove {selectMode.count} {selectMode.count === 1 ? "person" : "people"} from your household?
+              <p className="text-base font-medium">{i18n._({ id: "Remove {count} {value} from your household?", message: "Remove {count} {value} from your household?", values: { count: selectMode.count, value: selectMode.count === 1 ? i18n._({ id: "person", message: "person" }) : i18n._({ id: "people", message: "people" }) } })}</p>
+              <p className="text-base text-muted-foreground">
+                {i18n._({ id: "Everything MaiPai remembers about them, every conversation they had, their settings and any voice they recorded will be deleted. So will any files only they could see; files they shared stay with the household. To save someone's files first, remove them one at a time. This cannot be undone.", message: "Everything MaiPai remembers about them, every conversation they had, their settings and any voice they recorded will be deleted. So will any files only they could see; files they shared stay with the household. To save someone's files first, remove them one at a time. This cannot be undone." })}
               </p>
               <p className="text-base text-muted-foreground">
-                Everything MaiPai remembers about them, every conversation they had, their settings and any voice
-                they recorded will be deleted. So will any files only they could see; files they shared stay with
-                the household. To save someone&apos;s files first, remove them one at a time. This cannot be undone.
-              </p>
-              <p className="text-base text-muted-foreground">
-                Older backups still hold their data for up to three months, until those backups age out. Restoring a whole older backup would bring them back. The hub&apos;s logs still mention them, without anything they said, for 7 days.
+                {i18n._({ id: "Older backups still hold their data for up to three months, until those backups age out. Restoring a whole older backup would bring them back. The hub's logs still mention them, without anything they said, for 7 days.", message: "Older backups still hold their data for up to three months, until those backups age out. Restoring a whole older backup would bring them back. The hub's logs still mention them, without anything they said, for 7 days." })}
               </p>
               <div className="flex flex-wrap gap-2">
                 <Button variant="destructive" onClick={handleDeleteSelected} disabled={busy}>
-                  {busy ? "Removing…" : `Yes, remove ${selectMode.count}`}
+                  {busy ? i18n._({ id: "Removing…", message: "Removing…" }) : `Yes, remove ${selectMode.count}`}
                 </Button>
                 <Button variant="secondary" onClick={() => setConfirmingDelete(null)}>
-                  Keep them
+                  {i18n._({ id: "Keep them", message: "Keep them" })}
                 </Button>
               </div>
             </div>
@@ -269,7 +266,7 @@ export function UsersSection({ person }: UsersSectionProps) {
           <List
             items={loadedRoster}
             getKey={(p) => p.id}
-            label="Household"
+            label={i18n._({ id: "Household", message: "Household" })}
             renderItem={(p) => {
               if (editingId === p.id) {
                 return (
@@ -301,7 +298,7 @@ export function UsersSection({ person }: UsersSectionProps) {
                         onCheckedChange={(checked) => setEditSessionLockRequired(checked === true)}
                         aria-label={`Require session lock for ${p.display_name}`}
                       />
-                      Require PIN lock
+                      {i18n._({ id: "Require PIN lock", message: "Require PIN lock" })}
                     </span>
                     {editSessionLockRequired ? (
                       <div className="w-20 shrink-0">
@@ -321,13 +318,10 @@ export function UsersSection({ person }: UsersSectionProps) {
               if (confirmingDelete === p.id) {
                 return (
                   <div className="flex min-w-0 flex-1 flex-col gap-2 py-1">
-                    <p className="text-base font-medium">Remove {p.display_name} from your household?</p>
+                    <p className="text-base font-medium">{i18n._({ id: "Remove {display_name} from your household?", message: "Remove {display_name} from your household?", values: { display_name: p.display_name } })}</p>
+                    <p className="text-base text-muted-foreground">{i18n._({ id: "Everything MaiPai remembers about {display_name}, every conversation they had, their settings and any voice they recorded will be deleted. This cannot be undone.", message: "Everything MaiPai remembers about {display_name}, every conversation they had, their settings and any voice they recorded will be deleted. This cannot be undone.", values: { display_name: p.display_name } })}</p>
                     <p className="text-base text-muted-foreground">
-                      Everything MaiPai remembers about {p.display_name}, every conversation they had, their
-                      settings and any voice they recorded will be deleted. This cannot be undone.
-                    </p>
-                    <p className="text-base text-muted-foreground">
-                      Older backups still hold their data for up to three months, until those backups age out. Restoring a whole older backup would bring them back. The hub&apos;s logs still mention them, without anything they said, for 7 days.
+                      {i18n._({ id: "Older backups still hold their data for up to three months, until those backups age out. Restoring a whole older backup would bring them back. The hub's logs still mention them, without anything they said, for 7 days.", message: "Older backups still hold their data for up to three months, until those backups age out. Restoring a whole older backup would bring them back. The hub's logs still mention them, without anything they said, for 7 days." })}
                     </p>
                     <DeletionFilesNote name={p.display_name} preview={previewQuery.data} failed={previewQuery.isError} />
                   </div>
@@ -365,10 +359,10 @@ export function UsersSection({ person }: UsersSectionProps) {
                 return (
                   <div className="flex gap-2">
                     <Button onClick={() => handleSaveEdit(p.id)} disabled={busy}>
-                      Save
+                      {i18n._({ id: "Save", message: "Save" })}
                     </Button>
                     <Button variant="ghost" onClick={() => setEditingId(null)}>
-                      Cancel
+                      {i18n._({ id: "Cancel", message: "Cancel" })}
                     </Button>
                   </div>
                 );
@@ -383,10 +377,10 @@ export function UsersSection({ person }: UsersSectionProps) {
                       // delete waits for the preview that offers it.
                       disabled={busy || previewQuery.isPending}
                     >
-                      {busy ? "Removing…" : "Yes, remove"}
+                      {busy ? i18n._({ id: "Removing…", message: "Removing…" }) : i18n._({ id: "Yes, remove", message: "Yes, remove" })}
                     </Button>
                     <Button variant="ghost" onClick={() => setConfirmingDelete(null)}>
-                      Keep them
+                      {i18n._({ id: "Keep them", message: "Keep them" })}
                     </Button>
                   </div>
                 );
@@ -409,7 +403,7 @@ export function UsersSection({ person }: UsersSectionProps) {
                         setEditSessionLockTimeoutMinutes(p.sessionLockTimeoutMinutes);
                       }}
                     >
-                      Edit
+                      {i18n._({ id: "Edit", message: "Edit" })}
                     </Button>
                   ) : null}
                   {mayDelete ? (
@@ -418,7 +412,7 @@ export function UsersSection({ person }: UsersSectionProps) {
                       aria-label={`Remove ${p.display_name}`}
                       onClick={() => setConfirmingDelete(p.id)}
                     >
-                      Remove
+                      {i18n._({ id: "Remove", message: "Remove" })}
                     </Button>
                   ) : null}
                 </div>
@@ -441,15 +435,15 @@ export function UsersSection({ person }: UsersSectionProps) {
         />
       ) : null}
 
-      <Section heading="Add someone">
+      <Section heading={i18n._({ id: "Add someone", message: "Add someone" })}>
         <NewPersonForm actorRole={actorRole} onSubmit={handleAdd} submitLabel="Add to household" busy={submitting} error={formError} extra={companionKey ? <Field>
           <FieldLabel htmlFor="new-person-companions-allowed"><Checkbox id="new-person-companions-allowed" checked={newPersonCompanionsAllowed ?? Boolean(householdCompanionsAllowed)} disabled={submitting} onCheckedChange={(checked) => { if (checked === true) setNewPersonCompanionsAllowed(true); else setCompanionsConfirm("new-person"); }} />{companionKey.label}</FieldLabel>
           <FieldDescription>{companionKey.help}</FieldDescription>
         </Field> : null} />
         <AlertDialog open={companionsConfirm !== null} onOpenChange={(open) => { if (!open) setCompanionsConfirm(null); }}>
           <AlertDialogContent>
-            <AlertDialogHeader><AlertDialogTitle>{companionKey?.label}</AlertDialogTitle><AlertDialogDescription>The person may have grown attached to their AI companions. Turn them off with care. Their companion and personality data will be kept.</AlertDialogDescription></AlertDialogHeader>
-            <AlertDialogFooter><AlertDialogCancel>Cancel</AlertDialogCancel><AlertDialogAction variant="destructive" onClick={() => { void confirmCompanionsOff(); }}>Turn off</AlertDialogAction></AlertDialogFooter>
+            <AlertDialogHeader><AlertDialogTitle>{companionKey?.label}</AlertDialogTitle><AlertDialogDescription>{i18n._({ id: "The person may have grown attached to their AI companions. Turn them off with care. Their companion and personality data will be kept.", message: "The person may have grown attached to their AI companions. Turn them off with care. Their companion and personality data will be kept." })}</AlertDialogDescription></AlertDialogHeader>
+            <AlertDialogFooter><AlertDialogCancel>{i18n._({ id: "Cancel", message: "Cancel" })}</AlertDialogCancel><AlertDialogAction variant="destructive" onClick={() => { void confirmCompanionsOff(); }}>{i18n._({ id: "Turn off", message: "Turn off" })}</AlertDialogAction></AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
       </Section>
@@ -464,9 +458,7 @@ export function UsersSection({ person }: UsersSectionProps) {
 function DeletionFilesNote({ name, preview, failed }: { name: string; preview: PersonDeletionPreview | undefined; failed: boolean }) {
   if (failed) {
     return (
-      <p className="text-base text-destructive">
-        Could not check {name}&apos;s files. Their files will be deleted with them unless someone else can see them.
-      </p>
+      <p className="text-base text-destructive">{i18n._({ id: "Could not check {name}'s files. Their files will be deleted with them unless someone else can see them.", message: "Could not check {name}'s files. Their files will be deleted with them unless someone else can see them.", values: { name } })}</p>
     );
   }
   if (!preview) return null;
@@ -476,21 +468,14 @@ function DeletionFilesNote({ name, preview, failed }: { name: string; preview: P
   return (
     <div className="flex flex-col gap-2">
       {purged.files > 0 ? (
-        <p className="text-base text-muted-foreground">
-          {files(purged.files)} only {name} could see will be deleted too.{" "}
-          {preview.export.url ? "Download them first if you want to keep them." : `Only ${name} can download their own files, so ask them to save anything they want to keep before you remove them.`}
-        </p>
+        <p className="text-base text-muted-foreground">{i18n._({ id: "{files} only {name} could see will be deleted too. {value}", message: "{files} only {name} could see will be deleted too. {value}", values: { files: files(purged.files), name, value: preview.export.url ? i18n._({ id: "Download them first if you want to keep them.", message: "Download them first if you want to keep them." }) : `Only ${name} can download their own files, so ask them to save anything they want to keep before you remove them.` } })}</p>
       ) : null}
       {keptForHousehold.files > 0 ? (
-        <p className="text-base text-muted-foreground">
-          {files(keptForHousehold.files)} other people can still see will stay, kept by the household.
-        </p>
+        <p className="text-base text-muted-foreground">{i18n._({ id: "{files} other people can still see will stay, kept by the household.", message: "{files} other people can still see will stay, kept by the household.", values: { files: files(keptForHousehold.files) } })}</p>
       ) : null}
       {purged.files > 0 && preview.export.url ? (
         <Button asChild variant="secondary" className="self-start">
-          <a href={preview.export.url} download>
-            Download {name}&apos;s files
-          </a>
+          <a href={preview.export.url} download>{i18n._({ id: "Download {name}'s files", message: "Download {name}'s files", values: { name } })}</a>
         </Button>
       ) : null}
     </div>

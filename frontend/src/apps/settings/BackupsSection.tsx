@@ -1,3 +1,4 @@
+import { i18n } from "@lingui/core";
 import { useCallback, useEffect, useState } from "react";
 import { Section } from "@maipai/ui/src/primitives/Section";
 import { EmptyState } from "@maipai/ui/src/primitives/EmptyState";
@@ -79,16 +80,16 @@ function EmergencyBackupKeyRow() {
 
   return (
     <div>
-      <p className="text-base font-medium">Save your backup key</p>
+      <p className="text-base font-medium">{i18n._({ id: "Save your backup key", message: "Save your backup key" })}</p>
       {savedAt ? (
-        <p className="text-base text-muted-foreground">Saved on {whenText(savedAt)}</p>
+        <p className="text-base text-muted-foreground">{i18n._({ id: "Saved on {whenText}", message: "Saved on {whenText}", values: { whenText: whenText(savedAt) } })}</p>
       ) : (
-        <p className="text-base text-muted-foreground">If this computer breaks, this file brings your Home back on a new one. Keep it somewhere other than this computer.</p>
+        <p className="text-base text-muted-foreground">{i18n._({ id: "If this computer breaks, this file brings your Home back on a new one. Keep it somewhere other than this computer.", message: "If this computer breaks, this file brings your Home back on a new one. Keep it somewhere other than this computer." })}</p>
       )}
       {error ? <p className="text-base text-destructive">{error}</p> : null}
       <div className="flex flex-wrap gap-2">
-        <Button variant="secondary" onClick={download} disabled={busy}>Download</Button>
-        <Button variant="secondary" onClick={print} disabled={busy}>Print</Button>
+        <Button variant="secondary" onClick={download} disabled={busy}>{i18n._({ id: "Download", message: "Download" })}</Button>
+        <Button variant="secondary" onClick={print} disabled={busy}>{i18n._({ id: "Print", message: "Print" })}</Button>
       </div>
     </div>
   );
@@ -202,17 +203,13 @@ export function BackupsSection({ person, headed = true }: BackupsSectionProps) {
 
       {pending ? (
         <div className="flex flex-col gap-2 rounded-[var(--radius)] border border-primary p-3">
-          <p className="text-base font-medium">Ready to restore</p>
+          <p className="text-base font-medium">{i18n._({ id: "Ready to restore", message: "Ready to restore" })}</p>
           <p className="text-base text-muted-foreground">
             {/* The backup's own date, not `stagedAt`. Naming a backup by
                 the minute someone pressed the button tells a parent
                 nothing about which point in time they are going back to,
                 which is the only thing they actually need to know here.
-                Caught by looking at the real banner in a browser. */}
-            The backup from {backupDate(pending.filename)} will replace everything in MaiPai Home the next time it
-            starts. Nothing has changed yet. Restart MaiPai Home to finish
-            {canRestore ? ", or cancel to leave things as they are" : ""}.
-          </p>
+                Caught by looking at the real banner in a browser. */}{i18n._({ id: "The backup from {backupDate} will replace everything in MaiPai Home the next time it starts. Nothing has changed yet. Restart MaiPai Home to finish{value}.", message: "The backup from {backupDate} will replace everything in MaiPai Home the next time it starts. Nothing has changed yet. Restart MaiPai Home to finish{value}.", values: { backupDate: backupDate(pending.filename), value: canRestore ? i18n._({ id: ", or cancel to leave things as they are", message: ", or cancel to leave things as they are" }) : "" } })}</p>
           {/* An admin is told, but only the owner may cancel: staging and
               cancelling are owner-only on the backend (routes/backups.ts),
               while reading the pending state is owner-or-admin because
@@ -221,7 +218,7 @@ export function BackupsSection({ person, headed = true }: BackupsSectionProps) {
           {canRestore ? (
             <div className="flex">
               <Button variant="secondary" onClick={handleCancel}>
-                Cancel restore
+                {i18n._({ id: "Cancel restore", message: "Cancel restore" })}
               </Button>
             </div>
           ) : null}
@@ -229,19 +226,17 @@ export function BackupsSection({ person, headed = true }: BackupsSectionProps) {
       ) : null}
 
       {backups === null ? (
-        <Progress mode="spinner" label="Loading backups" />
+        <Progress mode="spinner" label={i18n._({ id: "Loading backups", message: "Loading backups" })} />
       ) : backups.length === 0 ? (
-        <EmptyState icon="inbox" text="No backups yet." />
+        <EmptyState icon="inbox" text={i18n._({ id: "No backups yet.", message: "No backups yet." })} />
       ) : (
         <div className="flex flex-col divide-y divide-[var(--border)]">
           {backups.map((b) =>
             confirming === b.filename ? (
               <div key={b.filename} className="flex flex-col gap-2 py-3">
-                <p className="text-base font-medium">Restore the backup from {whenText(b.createdAt)}?</p>
+                <p className="text-base font-medium">{i18n._({ id: "Restore the backup from {whenText}?", message: "Restore the backup from {whenText}?", values: { whenText: whenText(b.createdAt) } })}</p>
                 <p className="text-base text-muted-foreground">
-                  Everyone in your household, everything MaiPai remembers, and every conversation will go back to
-                  how they were then. Anything added since will be gone. This takes effect the next time MaiPai
-                  Home starts.
+                  {i18n._({ id: "Everyone in your household, everything MaiPai remembers, and every conversation will go back to how they were then. Anything added since will be gone. This takes effect the next time MaiPai Home starts.", message: "Everyone in your household, everything MaiPai remembers, and every conversation will go back to how they were then. Anything added since will be gone. This takes effect the next time MaiPai Home starts." })}
                 </p>
                 <div className="flex flex-wrap gap-2">
                   <Button
@@ -249,10 +244,10 @@ export function BackupsSection({ person, headed = true }: BackupsSectionProps) {
                     onClick={() => handleRestore(b.filename)}
                     disabled={busyFilename === b.filename}
                   >
-                    {busyFilename === b.filename ? "Getting it ready…" : "Yes, restore this backup"}
+                    {busyFilename === b.filename ? i18n._({ id: "Getting it ready…", message: "Getting it ready…" }) : i18n._({ id: "Yes, restore this backup", message: "Yes, restore this backup" })}
                   </Button>
                   <Button variant="secondary" onClick={() => setConfirming(null)}>
-                    Keep things as they are
+                    {i18n._({ id: "Keep things as they are", message: "Keep things as they are" })}
                   </Button>
                 </div>
               </div>
@@ -267,7 +262,7 @@ export function BackupsSection({ person, headed = true }: BackupsSectionProps) {
                       onClick={() => setConfirming(b.filename)}
                       aria-label={`Restore the backup from ${whenText(b.createdAt)}`}
                     >
-                      Restore
+                      {i18n._({ id: "Restore", message: "Restore" })}
                     </Button>
                   ) : null}
                 </div>
@@ -279,7 +274,7 @@ export function BackupsSection({ person, headed = true }: BackupsSectionProps) {
 
       <div className="flex">
         <Button variant="secondary" onClick={handleRunBackup} disabled={running}>
-          {running ? "Backing up…" : "Back up now"}
+          {running ? i18n._({ id: "Backing up…", message: "Backing up…" }) : i18n._({ id: "Back up now", message: "Back up now" })}
         </Button>
       </div>
     </Section>

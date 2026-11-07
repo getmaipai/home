@@ -1,3 +1,4 @@
+import { i18n } from "@lingui/core";
 import { useEffect, useState, type FormEvent } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { AsyncState } from "@maipai/ui/src/primitives/AsyncState";
@@ -148,8 +149,7 @@ export function AddRobotSection({ onClose }: { onClose?: () => void } = {}) {
   return (
     <div>
       <p className="text-base text-muted-foreground">
-        Turn on the robot near your Wi-Fi. It will speak a six-digit code (or show it on its
-        own settings page) - type that code below to pair it.
+        {i18n._({ id: "Turn on the robot near your Wi-Fi. It will speak a six-digit code (or show it on its own settings page) - type that code below to pair it.", message: "Turn on the robot near your Wi-Fi. It will speak a six-digit code (or show it on its own settings page) - type that code below to pair it." })}
       </p>
 
       <AsyncState
@@ -164,7 +164,7 @@ export function AddRobotSection({ onClose }: { onClose?: () => void } = {}) {
           robots.length === 0 ? (
             <EmptyState
               icon="search"
-              text="No robot found on your network yet."
+              text={i18n._({ id: "No robot found on your network yet.", message: "No robot found on your network yet." })}
               actionLabel="Search again"
               onAction={() => discoveryQuery.refetch()}
             />
@@ -172,7 +172,7 @@ export function AddRobotSection({ onClose }: { onClose?: () => void } = {}) {
             <List
               items={robots}
               getKey={(r) => `${r.host}:${r.port}`}
-              label="Robots found on your network"
+              label={i18n._({ id: "Robots found on your network", message: "Robots found on your network" })}
               renderItem={(r) => (
                 <div className="flex min-w-0 flex-1 flex-col gap-1 py-1">
                   <span className="truncate text-base font-medium">{r.name}</span>
@@ -190,7 +190,7 @@ export function AddRobotSection({ onClose }: { onClose?: () => void } = {}) {
       {!awaitingRobot ? (
         <form onSubmit={handleSubmit} className="flex max-w-sm flex-col gap-3">
           <Input
-            placeholder="Six-digit code"
+            placeholder={i18n._({ id: "Six-digit code", message: "Six-digit code" })}
             value={code}
             onChange={(e) => setCode(e.target.value)}
             disabled={submitting}
@@ -199,7 +199,7 @@ export function AddRobotSection({ onClose }: { onClose?: () => void } = {}) {
           />
           {needsTotp ? (
             <Input
-              placeholder="Your current 2FA code"
+              placeholder={i18n._({ id: "Your current 2FA code", message: "Your current 2FA code" })}
               value={totpToken}
               onChange={(e) => setTotpToken(e.target.value)}
               disabled={submitting}
@@ -209,11 +209,11 @@ export function AddRobotSection({ onClose }: { onClose?: () => void } = {}) {
           ) : null}
           {error ? <p className="text-base text-destructive">{error}</p> : null}
           {rotationDone ? (
-            <div className="flex flex-col gap-2"><p className="text-base text-primary">Paired and its password is rotated - it's ready to use.</p>{onClose ? <Button onClick={onClose}>Done</Button> : null}</div>
+            <div className="flex flex-col gap-2"><p className="text-base text-primary">{i18n._({ id: "Paired and its password is rotated - it's ready to use.", message: "Paired and its password is rotated - it's ready to use." })}</p>{onClose ? <Button onClick={onClose}>{i18n._({ id: "Done", message: "Done" })}</Button> : null}</div>
           ) : null}
           <div className="flex">
             <Button type="submit" disabled={submitting}>
-              {submitting ? "Pairing…" : "Pair"}
+              {submitting ? i18n._({ id: "Pairing…", message: "Pairing…" }) : i18n._({ id: "Pair", message: "Pair" })}
             </Button>
           </div>
         </form>
@@ -222,20 +222,19 @@ export function AddRobotSection({ onClose }: { onClose?: () => void } = {}) {
           {noVendorLogin ? (
             <>
               <p className="text-base text-primary">
-                Approved and paired. No vendor password to change. It's ready to use.
+                {i18n._({ id: "Approved and paired. No vendor password to change. It's ready to use.", message: "Approved and paired. No vendor password to change. It's ready to use." })}
               </p>
               <div className="flex">
-                {onClose ? <Button onClick={onClose}>Done</Button> : null}
+                {onClose ? <Button onClick={onClose}>{i18n._({ id: "Done", message: "Done" })}</Button> : null}
                 <Button variant="outline" onClick={startOver}>
-                  Pair another robot
+                  {i18n._({ id: "Pair another robot", message: "Pair another robot" })}
                 </Button>
               </div>
             </>
           ) : (
             <>
               <p className="text-base text-primary">
-                Approved and paired. It still has the vendor's published default password - rotate
-                it now to finish adding it.
+                {i18n._({ id: "Approved and paired. It still has the vendor's published default password - rotate it now to finish adding it.", message: "Approved and paired. It still has the vendor's published default password - rotate it now to finish adding it." })}
               </p>
               <RobotPasswordRow device={newRobot} defaultOpen onRotated={() => setRotationDone(true)} />
             </>
@@ -244,39 +243,37 @@ export function AddRobotSection({ onClose }: { onClose?: () => void } = {}) {
       ) : robotsQuery.isError ? (
         <div className="flex max-w-sm flex-col gap-2">
           <p className="text-base text-destructive">
-            Approved, but checking whether it finished pairing failed. It may still be paired -
-            check the robot list below, or try again.
+            {i18n._({ id: "Approved, but checking whether it finished pairing failed. It may still be paired - check the robot list below, or try again.", message: "Approved, but checking whether it finished pairing failed. It may still be paired - check the robot list below, or try again." })}
           </p>
           <div className="flex gap-2">
             <Button variant="outline" onClick={() => robotsQuery.refetch()}>
-              Check again
+              {i18n._({ id: "Check again", message: "Check again" })}
             </Button>
             <Button variant="ghost" onClick={startOver}>
-              Start over
+              {i18n._({ id: "Start over", message: "Start over" })}
             </Button>
           </div>
         </div>
       ) : presumedExpired ? (
         <div className="flex max-w-sm flex-col items-start gap-2">
           <p className="text-base text-destructive">
-            The robot hasn't finished pairing and the code has likely expired. Turn the robot's
-            Wi-Fi setup back on so it speaks a fresh code, then try again.
+            {i18n._({ id: "The robot hasn't finished pairing and the code has likely expired. Turn the robot's Wi-Fi setup back on so it speaks a fresh code, then try again.", message: "The robot hasn't finished pairing and the code has likely expired. Turn the robot's Wi-Fi setup back on so it speaks a fresh code, then try again." })}
           </p>
           <Button variant="outline" onClick={startOver}>
-            Start over
+            {i18n._({ id: "Start over", message: "Start over" })}
           </Button>
         </div>
       ) : (
         <div className="flex max-w-sm flex-col items-start gap-2">
           <p className="text-base text-muted-foreground">
-            Approved. Waiting for the robot to finish pairing on its own end…
+            {i18n._({ id: "Approved. Waiting for the robot to finish pairing on its own end…", message: "Approved. Waiting for the robot to finish pairing on its own end…" })}
           </p>
           <Button variant="ghost" onClick={startOver}>
-            Start over
+            {i18n._({ id: "Start over", message: "Start over" })}
           </Button>
         </div>
       )}
-      {onClose ? <div className="flex justify-end"><Button variant="outline" onClick={onClose} disabled={submitting}>Cancel</Button></div> : null}
+      {onClose ? <div className="flex justify-end"><Button variant="outline" onClick={onClose} disabled={submitting}>{i18n._({ id: "Cancel", message: "Cancel" })}</Button></div> : null}
     </div>
   );
 }

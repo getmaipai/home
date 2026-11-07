@@ -1,6 +1,7 @@
 // READER-14: Settings, Offline data (view `home.reference_library`). One row per source (Wikipedia is one row) with a switch, or a
 // version picker when the source comes in several sizes, and Minimum, Moderate and Full as one parent choice that sets the rows. Choices are staged in the page and written only by Apply, with the same
 // storage bar and action bar as AI and models (AiGlance).
+import { i18n } from "@lingui/core";
 import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@maipai/ui/src/dashboard/components/ui/alert-dialog";
@@ -156,7 +157,7 @@ export function ReferenceLibrarySettings() {
   const jobAction = useMutation({
     mutationFn: ({ job, action }: { job: ReferenceJob; action: "pause" | "resume" | "cancel" }) => api.referenceJob(job.id, action),
     onSuccess: () => client.invalidateQueries({ queryKey: ["reference-state"] }),
-    onError: () => setError("Home could not change this download. Check the Home connection, then try again."),
+    onError: () => setError(i18n._({ id: "Home could not change this download. Check the Home connection, then try again.", message: "Home could not change this download. Check the Home connection, then try again." })),
   });
 
   const drive = useQuery({ queryKey: ["reference-disk"], queryFn: api.referenceDisk, refetchInterval: () => state.data?.jobs.length ? 5000 : false });
@@ -177,32 +178,32 @@ export function ReferenceLibrarySettings() {
 
   return (
     <section className="flex flex-col gap-4" data-testid="offline-data">
-      <p className="text-base text-muted-foreground">Books that live on this Home, like Wikipedia and health information. Each one downloads once, then works with no internet. Children and teens only see the books made for them.</p>
-      {loadFailed ? <Alert variant="destructive"><AlertTitle>The page did not load</AlertTitle><AlertDescription>Home could not load the offline books. Check that Home is running, then reload this page.</AlertDescription></Alert> : null}
+      <p className="text-base text-muted-foreground">{i18n._({ id: "Books that live on this Home, like Wikipedia and health information. Each one downloads once, then works with no internet. Children and teens only see the books made for them.", message: "Books that live on this Home, like Wikipedia and health information. Each one downloads once, then works with no internet. Children and teens only see the books made for them." })}</p>
+      {loadFailed ? <Alert variant="destructive"><AlertTitle>{i18n._({ id: "The page did not load", message: "The page did not load" })}</AlertTitle><AlertDescription>{i18n._({ id: "Home could not load the offline books. Check that Home is running, then reload this page.", message: "Home could not load the offline books. Check that Home is running, then reload this page." })}</AlertDescription></Alert> : null}
 
       <ItemGroup variant="card">
         <Item>
           <ItemContent>
-            <ItemTitle>Disk space</ItemTitle>
+            <ItemTitle>{i18n._({ id: "Disk space", message: "Disk space" })}</ItemTitle>
             <StorageBar segments={segments} capacityBytes={capacity} formatBytes={sizeGb} />
-            <ItemDescription clamp={false}>{total !== null ? `${sizeGb(total)} drive` : "This computer"}{free !== null ? ` · ${sizeGb(free)} free` : ""} · {sizeGb(installedBytes)} of offline books.</ItemDescription>
-            {stagedCount > 0 ? <ItemDescription clamp={false}>After applying: {sizeGb(installedBytes + addBytes - freedBytes)} of books ({signed(addBytes - freedBytes)}){free !== null ? `, ${sizeGb(Math.max(0, free - addBytes + freedBytes))} free` : ""}.</ItemDescription> : null}
+            <ItemDescription clamp={false}>{i18n._({ id: "{value}{value2} · {sizeGb} of offline books.", message: "{value}{value2} · {sizeGb} of offline books.", values: { value: total !== null ? `${sizeGb(total)} drive` : i18n._({ id: "This computer", message: "This computer" }), value2: free !== null ? ` · ${sizeGb(free)} free` : "", sizeGb: sizeGb(installedBytes) } })}</ItemDescription>
+            {stagedCount > 0 ? <ItemDescription clamp={false}>{i18n._({ id: "After applying: {sizeGb} of books ({signed}){value}.", message: "After applying: {sizeGb} of books ({signed}){value}.", values: { sizeGb: sizeGb(installedBytes + addBytes - freedBytes), signed: signed(addBytes - freedBytes), value: free !== null ? `, ${sizeGb(Math.max(0, free - addBytes + freedBytes))} free` : "" } })}</ItemDescription> : null}
           </ItemContent>
         </Item>
       </ItemGroup>
 
-      <section aria-label="Library size" className="flex flex-col gap-2">
-        <h2 className="text-lg font-semibold">How much to keep</h2>
+      <section aria-label={i18n._({ id: "Library size", message: "Library size" })} className="flex flex-col gap-2">
+        <h2 className="text-lg font-semibold">{i18n._({ id: "How much to keep", message: "How much to keep" })}</h2>
         <div className="flex flex-wrap items-center gap-2">
-          <ToggleGroup type="single" variant="chip" wrap value={activePreset ?? ""} onValueChange={(next) => { if (next) choosePreset(next); }} aria-label="Library size">
+          <ToggleGroup type="single" variant="chip" wrap value={activePreset ?? ""} onValueChange={(next) => { if (next) choosePreset(next); }} aria-label={i18n._({ id: "Library size", message: "Library size" })}>
             {presets.map((preset) => <ToggleGroupItem key={preset.id} value={preset.id}>{preset.label}</ToggleGroupItem>)}
           </ToggleGroup>
-          {activePreset === undefined && sets.length > 0 ? <Badge variant="secondary">Custom</Badge> : null}
+          {activePreset === undefined && sets.length > 0 ? <Badge variant="secondary">{i18n._({ id: "Custom", message: "Custom" })}</Badge> : null}
         </div>
         <p className="text-base text-muted-foreground">{presets.find((preset) => preset.id === activePreset)?.copy ?? "Your own mix. Pick Minimum, Moderate or Full to start from a ready-made set, then switch single books on or off below."}</p>
       </section>
 
-      {catalog.isLoading || state.isLoading ? <RouteSkeleton label="Loading offline books" /> : null}
+      {catalog.isLoading || state.isLoading ? <RouteSkeleton label={i18n._({ id: "Loading offline books", message: "Loading offline books" })} /> : null}
       {sourceRows(sets).map((group) => (
         <section key={group.topic} aria-label={group.topic} className="flex flex-col gap-2">
           <h2 className="text-lg font-semibold">{group.topic}</h2>
@@ -215,11 +216,11 @@ export function ReferenceLibrarySettings() {
       <StagedApplyBar
         testId="offline-action-bar" stagedTestId="offline-staged"
         notices={<>
-          {error ? <Alert variant="destructive"><AlertTitle>That did not work</AlertTitle><AlertDescription>{error}</AlertDescription></Alert> : null}
-          {planFailed ? <Alert variant="destructive"><AlertTitle>Home could not check the drive space</AlertTitle><AlertDescription>Check that Home is running and online, then switch a book off and on again to retry.</AlertDescription></Alert> : null}
-          {refusal ? <Alert variant="warning"><AlertTitle>There is not enough room</AlertTitle><AlertDescription>{refusal}</AlertDescription></Alert> : null}
+          {error ? <Alert variant="destructive"><AlertTitle>{i18n._({ id: "That did not work", message: "That did not work" })}</AlertTitle><AlertDescription>{error}</AlertDescription></Alert> : null}
+          {planFailed ? <Alert variant="destructive"><AlertTitle>{i18n._({ id: "Home could not check the drive space", message: "Home could not check the drive space" })}</AlertTitle><AlertDescription>{i18n._({ id: "Check that Home is running and online, then switch a book off and on again to retry.", message: "Check that Home is running and online, then switch a book off and on again to retry." })}</AlertDescription></Alert> : null}
+          {refusal ? <Alert variant="warning"><AlertTitle>{i18n._({ id: "There is not enough room", message: "There is not enough room" })}</AlertTitle><AlertDescription>{refusal}</AlertDescription></Alert> : null}
         </>}
-        staged={stagedCount > 0} title={stagedCount === 1 ? "1 change is waiting" : `${stagedCount} changes are waiting`}
+        staged={stagedCount > 0} title={stagedCount === 1 ? i18n._({ id: "1 change is waiting", message: "1 change is waiting" }) : `${stagedCount} changes are waiting`}
         summary={<p className="text-base">{additions.length > 0 ? `${additions.length} to download (${sizeGb(addBytes)}${plan.data ? `, ${duration(plan.data.estimatedSeconds)}` : ""}). ` : ""}{removals.length > 0 ? `${removals.length} to remove (frees ${sizeGb(freedBytes)}).` : ""}</p>}
         step={step} applying={apply.isPending} applyDisabled={Boolean(refusal) || (additions.length > 0 && plan.isPending) || planFailed}
         applyLabel="Apply" discardLabel="Discard" onApply={() => removals.length > 0 ? setConfirmRemove(true) : apply.mutate()} onDiscard={() => setStaged({})}
@@ -228,12 +229,12 @@ export function ReferenceLibrarySettings() {
       <AlertDialog open={confirmRemove} onOpenChange={setConfirmRemove}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>{removals.length === 1 ? `Remove ${removals[0] ? titleOf(removals[0]) : "this book"}?` : `Remove ${removals.length} books?`}</AlertDialogTitle>
-            <AlertDialogDescription>{sizeGb(freedBytes)} will be freed. {kidsLose.length > 0 ? "Children and teens may lose access to " + kidsLose.map((set) => titleOf(set)).join(", ") + "." : "No book for children or teens is removed."} You can download them again later.</AlertDialogDescription>
+            <AlertDialogTitle>{removals.length === 1 ? `Remove ${removals[0] ? titleOf(removals[0]) : i18n._({ id: "this book", message: "this book" })}?` : `Remove ${removals.length} books?`}</AlertDialogTitle>
+            <AlertDialogDescription>{i18n._({ id: "{sizeGb} will be freed. {value} You can download them again later.", message: "{sizeGb} will be freed. {value} You can download them again later.", values: { sizeGb: sizeGb(freedBytes), value: kidsLose.length > 0 ? "Children and teens may lose access to " + kidsLose.map((set) => titleOf(set)).join(", ") + "." : i18n._({ id: "No book for children or teens is removed.", message: "No book for children or teens is removed." }) } })}</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction variant="destructive" onClick={() => { setConfirmRemove(false); apply.mutate(); }}>Remove and apply</AlertDialogAction>
+            <AlertDialogCancel>{i18n._({ id: "Cancel", message: "Cancel" })}</AlertDialogCancel>
+            <AlertDialogAction variant="destructive" onClick={() => { setConfirmRemove(false); apply.mutate(); }}>{i18n._({ id: "Remove and apply", message: "Remove and apply" })}</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
@@ -259,16 +260,16 @@ function rowOf({ row, wanted, installed, jobFor, rates, onChoose, onJob }: { row
       <ItemContent>
         <ItemTitle>
           {row.label}
-          {forKids ? <Badge variant="secondary">For children</Badge> : null}
-          {pending ? <Badge variant="outline">{wanted ? "Will download" : "Will remove"}</Badge> : null}
+          {forKids ? <Badge variant="secondary">{i18n._({ id: "For children", message: "For children" })}</Badge> : null}
+          {pending ? <Badge variant="outline">{wanted ? i18n._({ id: "Will download", message: "Will download" }) : i18n._({ id: "Will remove", message: "Will remove" })}</Badge> : null}
         </ItemTitle>
         <ItemDescription clamp={false}>{SOURCE_BLURB[row.source]}</ItemDescription>
-        <ItemDescription clamp={false}>{multi ? (current ? `${versionLabel(current)} · ${sizeGb(current.sizeBytes)}` : "Off") : sizeGb(shown.sizeBytes)} · Snapshot {shown.snapshotDate ?? "date not listed"} · {status}{shown.message ? ` · ${shown.message}` : ""}</ItemDescription>
+        <ItemDescription clamp={false}>{i18n._({ id: "{value} · Snapshot {value2} · {status}{value3}", message: "{value} · Snapshot {value2} · {status}{value3}", values: { value: multi ? (current ? `${versionLabel(current)} · ${sizeGb(current.sizeBytes)}` : i18n._({ id: "Off", message: "Off" })) : sizeGb(shown.sizeBytes), value2: shown.snapshotDate ?? "date not listed", status, value3: shown.message ? ` · ${shown.message}` : "" } })}</ItemDescription>
         {job && download ? (
           <>
             <JobProgress {...downloadProgress(download)} variant="full" cancelLabel={`Cancel the ${row.label} download`} onCancel={() => onJob(job, "cancel")} {...(job.state === "paused" ? { onResume: () => onJob(job, "resume") } : {})} />
-            {job.state === "downloading" ? <div><Button type="button" variant="outline" size="sm" onClick={() => onJob(job, "pause")}>Pause</Button></div> : null}
-            {job.state === "waiting_window" ? <div><Button type="button" variant="outline" size="sm" onClick={() => onJob(job, "resume")}>Start now</Button></div> : null}
+            {job.state === "downloading" ? <div><Button type="button" variant="outline" size="sm" onClick={() => onJob(job, "pause")}>{i18n._({ id: "Pause", message: "Pause" })}</Button></div> : null}
+            {job.state === "waiting_window" ? <div><Button type="button" variant="outline" size="sm" onClick={() => onJob(job, "resume")}>{i18n._({ id: "Start now", message: "Start now" })}</Button></div> : null}
           </>
         ) : null}
       </ItemContent>
@@ -277,11 +278,11 @@ function rowOf({ row, wanted, installed, jobFor, rates, onChoose, onJob }: { row
           <Select value={wanted ?? "off"} disabled={blocked} onValueChange={(value) => onChoose(value === "off" ? null : value)}>
             <SelectTrigger aria-label={`${row.label} version`}><SelectValue /></SelectTrigger>
             <SelectContent>
-              <SelectItem value="off">Off</SelectItem>
+              <SelectItem value="off">{i18n._({ id: "Off", message: "Off" })}</SelectItem>
               {row.versions.map((set) => <SelectItem key={set.id} value={set.id}>{versionLabel(set)} · {sizeGb(set.sizeBytes)}</SelectItem>)}
             </SelectContent>
           </Select>
-        ) : <Switch checked={wanted !== null} disabled={blocked} onCheckedChange={(on) => onChoose(on ? row.versions[0]!.id : null)} aria-label={`${row.label}: ${wanted ? "on" : "off"}`} />}
+        ) : <Switch checked={wanted !== null} disabled={blocked} onCheckedChange={(on) => onChoose(on ? row.versions[0]!.id : null)} aria-label={`${row.label}: ${wanted ? i18n._({ id: "on", message: "on" }) : i18n._({ id: "off", message: "off" })}`} />}
       </ItemActions>
     </Item>
   );

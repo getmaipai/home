@@ -1,6 +1,7 @@
 // MODEL-ADD-01 S4: add a chat model from a pasted Hugging Face link, inside the Chat row's "Choose a model" dialog (owner and
 // admin only, like the page). Paste, read (nothing downloads yet), see name, licence, size and fit, then "Download and use".
 // Kit Elements as shipped (rule 9). The words come from the card's `copy` in the spec.
+import { i18n } from "@lingui/core";
 import { useState } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { Alert, AlertDescription, AlertTitle } from "@maipai/ui/src/ui/alert";
@@ -27,7 +28,7 @@ export function AddChatModel({ copy, onAdded }: { copy: Record<string, string>; 
       <p className="text-sm text-muted-foreground">{copy.add_model_note}</p>
       <Input
         aria-label={copy.add_model_title}
-        placeholder="https://huggingface.co/owner/repo"
+        placeholder={i18n._({ id: "https://huggingface.co/owner/repo", message: "https://huggingface.co/owner/repo" })}
         value={link}
         onChange={(event) => { setLink(event.target.value); setFound(null); inspect.reset(); add.reset(); }}
       />

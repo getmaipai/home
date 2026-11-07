@@ -1,3 +1,4 @@
+import { i18n } from "@lingui/core";
 import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Section } from "@maipai/ui/src/primitives/Section";
@@ -40,13 +41,13 @@ export function SiteBlocksSection({ roster }: SiteBlocksSectionProps) {
   }
 
   return (
-    <Section heading="Blocked sites by person">
+    <Section heading={i18n._({ id: "Blocked sites by person", message: "Blocked sites by person" })}>
       <Select
         value={chosen.id}
         onValueChange={(v) => setPickedId(v)}
         options={roster.map((p) => p.id)}
         getLabel={(v) => roster.find((p) => p.id === v)?.display_name ?? v}
-        aria-label="Person"
+        aria-label={i18n._({ id: "Person", message: "Person" })}
       />
       {error ? <p className="text-base text-destructive">{error}</p> : null}
       <AsyncState

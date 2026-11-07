@@ -1,3 +1,4 @@
+import { i18n } from "@lingui/core";
 import { useEffect, useState } from "react";
 import { Section } from "@maipai/ui/src/primitives/Section";
 import { Progress } from "@maipai/ui/src/primitives/Progress";
@@ -23,45 +24,45 @@ export function RoutingStatsSection() {
   }, []);
 
   return (
-    <Section heading="Plugin routing">
+    <Section heading={i18n._({ id: "Plugin routing", message: "Plugin routing" })}>
       <p className="text-base text-muted-foreground">
-        How often a chat message matches a plugin directly versus falling through to the model.
+        {i18n._({ id: "How often a chat message matches a plugin directly versus falling through to the model.", message: "How often a chat message matches a plugin directly versus falling through to the model." })}
       </p>
       {error ? (
         <p className="text-base text-destructive">{error}</p>
       ) : stats === null ? (
-        <Progress mode="spinner" label="Loading routing stats" />
+        <Progress mode="spinner" label={i18n._({ id: "Loading routing stats", message: "Loading routing stats" })} />
       ) : stats.total === 0 ? (
-        <EmptyState icon="inbox" text="No chat turns yet." />
+        <EmptyState icon="inbox" text={i18n._({ id: "No chat turns yet.", message: "No chat turns yet." })} />
       ) : (
         <div className="flex flex-col gap-3">
           <div className="flex items-center justify-between text-base">
-            <span>Fall-through rate</span>
+            <span>{i18n._({ id: "Fall-through rate", message: "Fall-through rate" })}</span>
             <span className="text-muted-foreground">
               {stats.fallthroughRate === null ? "—" : `${Math.round(stats.fallthroughRate * 100)}%`}
             </span>
           </div>
           <div className="flex items-center justify-between text-base">
-            <span>Matched a plugin</span>
+            <span>{i18n._({ id: "Matched a plugin", message: "Matched a plugin" })}</span>
             <span className="text-muted-foreground">{stats.plugin}</span>
           </div>
           <div className="flex items-center justify-between text-base">
-            <span>Matched a command</span>
+            <span>{i18n._({ id: "Matched a command", message: "Matched a command" })}</span>
             <span className="text-muted-foreground">{stats.command}</span>
           </div>
           <div className="flex items-center justify-between text-base">
-            <span>Answered by the model</span>
+            <span>{i18n._({ id: "Answered by the model", message: "Answered by the model" })}</span>
             <span className="text-muted-foreground">{stats.model}</span>
           </div>
           {stats.pluginError > 0 ? (
             <div className="flex items-center justify-between text-base">
-              <span>Matched a plugin but failed to run</span>
+              <span>{i18n._({ id: "Matched a plugin but failed to run", message: "Matched a plugin but failed to run" })}</span>
               <span className="text-muted-foreground">{stats.pluginError}</span>
             </div>
           ) : null}
           {stats.commandError > 0 ? (
             <div className="flex items-center justify-between text-base">
-              <span>Matched a command but failed to run</span>
+              <span>{i18n._({ id: "Matched a command but failed to run", message: "Matched a command but failed to run" })}</span>
               <span className="text-muted-foreground">{stats.commandError}</span>
             </div>
           ) : null}

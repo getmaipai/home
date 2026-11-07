@@ -1,3 +1,4 @@
+import { i18n } from "@lingui/core";
 import { useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Input } from "@maipai/ui/src/dashboard/components/ui/input";
@@ -60,13 +61,13 @@ export function SignInSecretSection({ person, onPersonChange }: { person: Roster
   return <div className="flex flex-col gap-4">
       <p className="text-sm text-muted-foreground">{status}</p>
       <Tabs value={kind} onValueChange={(value) => { setKind(value as SecretKind); setNext(""); setAgain(""); setError(""); setSuccess(""); }}>
-        <TabsList aria-label="Sign-in method"><TabsTrigger value="pin">PIN</TabsTrigger><TabsTrigger value="password">Password</TabsTrigger></TabsList>
+        <TabsList aria-label={i18n._({ id: "Sign-in method", message: "Sign-in method" })}><TabsTrigger value="pin">{i18n._({ id: "PIN", message: "PIN" })}</TabsTrigger><TabsTrigger value="password">{i18n._({ id: "Password", message: "Password" })}</TabsTrigger></TabsList>
       </Tabs>
       {hasSecret ? field("current-secret", "Current PIN or password", current, setCurrent, true) : null}
       {field("new-secret", `New ${isPin ? "PIN" : "password"}`, next, setNext)}
       {field("confirm-secret", "Type it again", again, setAgain)}
       {error ? <p role="alert" className="text-sm text-destructive">{error}</p> : null}
       {success ? <p role="status" className="text-sm text-muted-foreground">{success}</p> : null}
-      <Button type="button" disabled={!canSave} onClick={() => void save()}>{saving ? "Saving…" : hasSecret ? `Change ${isPin ? "PIN" : "password"}` : `Set a ${isPin ? "PIN" : "password"}`}</Button>
+      <Button type="button" disabled={!canSave} onClick={() => void save()}>{saving ? i18n._({ id: "Saving…", message: "Saving…" }) : hasSecret ? `Change ${isPin ? i18n._({ id: "PIN", message: "PIN" }) : i18n._({ id: "password", message: "password" })}` : `Set a ${isPin ? i18n._({ id: "PIN", message: "PIN" }) : i18n._({ id: "password", message: "password" })}`}</Button>
   </div>;
 }

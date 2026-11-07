@@ -1,3 +1,4 @@
+import { i18n } from "@lingui/core";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { AsyncState } from "@maipai/ui/src/primitives/AsyncState";
 import { EmptyState } from "@maipai/ui/src/primitives/EmptyState";
@@ -22,7 +23,7 @@ export function RobotCards({ person }: { person: Roster }) {
   const refresh = () => void queryClient.invalidateQueries({ queryKey: familyBotsQueryKey(person) });
   return (
     <AsyncState data={query.data} error={query.isError} isFetching={query.isFetching} onRetry={() => query.refetch()} errorMessage={errorLine(query.error, "Could not load the robots.")} loadingLabel="Loading robots">
-      {(rows: DeviceInfo[]) => rows.length === 0 ? <EmptyState icon="inbox" text="No robots yet. An admin adds one in Settings, Home, Devices." /> : (
+      {(rows: DeviceInfo[]) => rows.length === 0 ? <EmptyState icon="inbox" text={i18n._({ id: "No robots yet. An admin adds one in Settings, Home, Devices.", message: "No robots yet. An admin adds one in Settings, Home, Devices." })} /> : (
         <div className="flex flex-col gap-4">
           {rows.map((robot) => (
             <Card key={robot.id} data-testid="robot-card">

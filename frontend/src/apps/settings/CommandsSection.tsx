@@ -1,3 +1,4 @@
+import { i18n } from "@lingui/core";
 import { useEffect, useState, type FormEvent } from "react";
 import { api, isOwnerOrAdminRole, type Roster, type CommandRow, type CommandAction } from "@/lib/api";
 import { Section } from "@maipai/ui/src/primitives/Section";
@@ -98,16 +99,15 @@ export function CommandsSection({ person, management = false }: CommandsSectionP
   }
 
   return (
-    <Section heading={management ? "Household commands" : "Commands"}>
+    <Section heading={management ? i18n._({ id: "Household commands", message: "Household commands" }) : i18n._({ id: "Commands", message: "Commands" })}>
       <p className="text-base text-muted-foreground">
-        Teach MaiPai a phrase of your own - "when I say X, do Y." A command always fires on an exact phrase, never a
-        guess.
+        {i18n._({ id: "Teach MaiPai a phrase of your own - \"when I say X, do Y.\" A command always fires on an exact phrase, never a guess.", message: "Teach MaiPai a phrase of your own - \"when I say X, do Y.\" A command always fires on an exact phrase, never a guess." })}
       </p>
       {management && loadError ? (
         <div className="flex flex-col items-start gap-2">
           <p className="text-base text-destructive">{loadError}</p>
           <Button variant="secondary" onClick={load}>
-            Try again
+            {i18n._({ id: "Try again", message: "Try again" })}
           </Button>
         </div>
       ) : (
@@ -117,7 +117,7 @@ export function CommandsSection({ person, management = false }: CommandsSectionP
               <Input
                 value={trigger}
                 onChange={(e) => setTrigger(e.target.value)}
-                placeholder='Trigger phrase, e.g. "movie night"'
+                placeholder={i18n._({ id: "Trigger phrase, e.g. \"movie night\"", message: "Trigger phrase, e.g. \"movie night\"" })}
                 disabled={creating}
                 required
               />
@@ -126,28 +126,28 @@ export function CommandsSection({ person, management = false }: CommandsSectionP
                 onValueChange={setMinRole}
                 options={[...ROLE_LADDER]}
                 getLabel={(v) => ROLE_LABELS[v as keyof typeof ROLE_LABELS]}
-                aria-label="Who can trigger this command"
+                aria-label={i18n._({ id: "Who can trigger this command", message: "Who can trigger this command" })}
               />
               <Select
                 value={actionKind}
                 onValueChange={(v) => setActionKind(v as ActionKind)}
                 options={["reply", "home_call_service"]}
                 getLabel={(v) => ACTION_LABELS[v as ActionKind]}
-                aria-label="What this command does"
+                aria-label={i18n._({ id: "What this command does", message: "What this command does" })}
               />
               {actionKind === "reply" ? (
                 <>
                   <Input
                     value={replyText}
                     onChange={(e) => setReplyText(e.target.value)}
-                    placeholder="What MaiPai says back"
+                    placeholder={i18n._({ id: "What MaiPai says back", message: "What MaiPai says back" })}
                     disabled={creating}
                     required
                   />
                   <Input
                     value={replySpeech}
                     onChange={(e) => setReplySpeech(e.target.value)}
-                    placeholder="Spoken version, if different (optional)"
+                    placeholder={i18n._({ id: "Spoken version, if different (optional)", message: "Spoken version, if different (optional)" })}
                     disabled={creating}
                   />
                 </>
@@ -156,21 +156,21 @@ export function CommandsSection({ person, management = false }: CommandsSectionP
                   <Input
                     value={domain}
                     onChange={(e) => setDomain(e.target.value)}
-                    placeholder="Home Assistant domain, e.g. light"
+                    placeholder={i18n._({ id: "Home Assistant domain, e.g. light", message: "Home Assistant domain, e.g. light" })}
                     disabled={creating}
                     required
                   />
                   <Input
                     value={service}
                     onChange={(e) => setService(e.target.value)}
-                    placeholder="Service, e.g. turn_off"
+                    placeholder={i18n._({ id: "Service, e.g. turn_off", message: "Service, e.g. turn_off" })}
                     disabled={creating}
                     required
                   />
                   <Input
                     value={entityId}
                     onChange={(e) => setEntityId(e.target.value)}
-                    placeholder="Entity id, e.g. light.living_room"
+                    placeholder={i18n._({ id: "Entity id, e.g. light.living_room", message: "Entity id, e.g. light.living_room" })}
                     disabled={creating}
                     required
                   />
@@ -179,27 +179,25 @@ export function CommandsSection({ person, management = false }: CommandsSectionP
               {createError ? <p className="text-base text-destructive">{createError}</p> : null}
               <div className="flex">
                 <Button type="submit" disabled={creating}>
-                  {creating ? "Creating…" : "Create command"}
+                  {creating ? i18n._({ id: "Creating…", message: "Creating…" }) : i18n._({ id: "Create command", message: "Create command" })}
                 </Button>
               </div>
             </form>
           ) : null}
           {actionError ? <p className="text-base text-destructive">{actionError}</p> : null}
           {management && commands === null ? null : management && commands?.length === 0 ? (
-            <EmptyState icon="inbox" text="No commands yet." />
+            <EmptyState icon="inbox" text={i18n._({ id: "No commands yet.", message: "No commands yet." })} />
           ) : management && commands ? (
             <ul className="flex flex-col divide-y divide-[var(--border)]">
               {commands.map((c) => (
                 <li key={c.id} className="flex items-center justify-between gap-3 py-2">
                   <div className="flex flex-col">
                     <span className="text-base">"{c.trigger}"</span>
-                    <span className="text-base text-muted-foreground">
-                      {summarize(c.action)} - {ROLE_LABELS[c.minRole as keyof typeof ROLE_LABELS] ?? c.minRole} or higher
-                    </span>
+                    <span className="text-base text-muted-foreground">{i18n._({ id: "{summarize} - {value} or higher", message: "{summarize} - {value} or higher", values: { summarize: summarize(c.action), value: ROLE_LABELS[c.minRole as keyof typeof ROLE_LABELS] ?? c.minRole } })}</span>
                   </div>
                   {isOwnerOrAdminRole(person.role) || c.creatorId === person.id ? (
                     <Button variant="secondary" disabled={pendingId === c.id} onClick={() => deleteCommand(c.id)}>
-                      {pendingId === c.id ? "Deleting…" : "Delete"}
+                      {pendingId === c.id ? i18n._({ id: "Deleting…", message: "Deleting…" }) : i18n._({ id: "Delete", message: "Delete" })}
                     </Button>
                   ) : null}
                 </li>

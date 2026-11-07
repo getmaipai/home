@@ -1,4 +1,5 @@
 // MEM-SPACE-04 / TIER-PRIO-02: Customize, the one home of the priorities panel and the profile table (making-space note section 5 item 5). Every field states its effect first; a change here makes the page read Custom.
+import { i18n } from "@lingui/core";
 import { useState } from "react";
 import { Button } from "@maipai/ui/src/ui/button";
 import { Input } from "@maipai/ui/src/ui/input";
@@ -35,7 +36,7 @@ function NumberRow({ id, value, write, onError, unit = "seconds" }: { id: string
 
 export function PerformanceCustomize({ value, write }: { value: Value; write: Write }) {
   const [error, setError] = useState<string | null>(null);
-  const save = (changes: Record<string, unknown>) => { setError(null); write(changes).catch(() => setError("Home could not save that change. Check your connection and try again.")); };
+  const save = (changes: Record<string, unknown>) => { setError(null); write(changes).catch(() => setError(i18n._({ id: "Home could not save that change. Check your connection and try again.", message: "Home could not save that change. Check your connection and try again." }))); };
   // Chat and voice stay first and cannot move; the list holds the other categories.
   const order = parseList(value("resources.priority")).filter((id) => id !== "chat");
   const move = (index: number, by: -1 | 1) => { const next = [...order]; const target = index + by; if (target < 0 || target >= next.length) return; [next[index], next[target]] = [next[target]!, next[index]!]; save({ "resources.priority": JSON.stringify(["chat", ...next]) }); };
@@ -43,23 +44,23 @@ export function PerformanceCustomize({ value, write }: { value: Value; write: Wr
   const setCell = (row: string, category: Category | "tools", cell: Cell) => save({ "resources.profiles": JSON.stringify({ ...profiles, [row]: { ...profiles[row], [category]: cell } }) });
   const columns: (Category | "tools")[] = [...CATEGORIES, "tools"];
   return (
-    <div data-testid="performance-customize" role="group" aria-label="Customize">
+    <div data-testid="performance-customize" role="group" aria-label={i18n._({ id: "Customize", message: "Customize" })}>
       {error ? <p role="alert">{error}</p> : null}
-      <section aria-label="Order of importance">
+      <section aria-label={i18n._({ id: "Order of importance", message: "Order of importance" })}>
         <ItemGroup variant="card">
-          <Item size="setting"><ItemContent><ItemTitle>{specKey("resources.priority").label}</ItemTitle><ItemDescription clamp={false}>Chat and voice always go first. When two big jobs want the same room, the one higher here goes first.</ItemDescription></ItemContent></Item>
+          <Item size="setting"><ItemContent><ItemTitle>{specKey("resources.priority").label}</ItemTitle><ItemDescription clamp={false}>{i18n._({ id: "Chat and voice always go first. When two big jobs want the same room, the one higher here goes first.", message: "Chat and voice always go first. When two big jobs want the same room, the one higher here goes first." })}</ItemDescription></ItemContent></Item>
           {order.map((id, index) => (
             <Item key={id} size="setting">
               <ItemContent><ItemTitle>{CATEGORY_WORDS[id as Category] ?? id}</ItemTitle></ItemContent>
               <ItemActions>
-                <Button variant="outline" aria-label={`Move ${CATEGORY_WORDS[id as Category] ?? id} up`} disabled={index === 0} onClick={() => move(index, -1)}>Up</Button>
-                <Button variant="outline" aria-label={`Move ${CATEGORY_WORDS[id as Category] ?? id} down`} disabled={index === order.length - 1} onClick={() => move(index, 1)}>Down</Button>
+                <Button variant="outline" aria-label={`Move ${CATEGORY_WORDS[id as Category] ?? id} up`} disabled={index === 0} onClick={() => move(index, -1)}>{i18n._({ id: "Up", message: "Up" })}</Button>
+                <Button variant="outline" aria-label={`Move ${CATEGORY_WORDS[id as Category] ?? id} down`} disabled={index === order.length - 1} onClick={() => move(index, 1)}>{i18n._({ id: "Down", message: "Down" })}</Button>
               </ItemActions>
             </Item>
           ))}
         </ItemGroup>
       </section>
-      <section aria-label="Timing">
+      <section aria-label={i18n._({ id: "Timing", message: "Timing" })}>
         <ItemGroup variant="card">
           <NumberRow id="resources.quiet_seconds" value={value} write={write} onError={setError} />
           <NumberRow id="resources.quiet_max_wait" value={value} write={write} onError={setError} />
@@ -68,14 +69,14 @@ export function PerformanceCustomize({ value, write }: { value: Value; write: Wr
             <ItemActions>
               <Select value={String(value("resources.quiet_timeout"))} onValueChange={(next) => save({ "resources.quiet_timeout": next })}>
                 <SelectTrigger aria-label={specKey("resources.quiet_timeout").label}><SelectValue /></SelectTrigger>
-                <SelectContent>{(specKey("resources.quiet_timeout").range?.options ?? []).map((option) => <SelectItem key={option} value={option}>{option === "proceed" ? "Go ahead" : "Keep waiting"}</SelectItem>)}</SelectContent>
+                <SelectContent>{(specKey("resources.quiet_timeout").range?.options ?? []).map((option) => <SelectItem key={option} value={option}>{option === "proceed" ? i18n._({ id: "Go ahead", message: "Go ahead" }) : i18n._({ id: "Keep waiting", message: "Keep waiting" })}</SelectItem>)}</SelectContent>
               </Select>
             </ItemActions>
           </Item>
           <NumberRow id="resources.cooldown_seconds" value={value} write={write} onError={setError} />
         </ItemGroup>
       </section>
-      <section aria-label="Queue">
+      <section aria-label={i18n._({ id: "Queue", message: "Queue" })}>
         <ItemGroup variant="card">
           <NumberRow id="resources.max_concurrent_per_person" value={value} write={write} onError={setError} unit="jobs" />
           {QUEUE_KINDS.map((kind) => <NumberRow key={kind} id={`resources.max_wait_before_aging.${kind}`} value={value} write={write} onError={setError} unit="minutes" />)}
@@ -90,7 +91,7 @@ export function PerformanceCustomize({ value, write }: { value: Value; write: Wr
           })}
         </ItemGroup>
       </section>
-      <section aria-label="Lower without asking">
+      <section aria-label={i18n._({ id: "Lower without asking", message: "Lower without asking" })}>
         <ItemGroup variant="card">
           {CATEGORIES.map((category) => {
             const id = `resources.lower_without_asking.${category}`;
@@ -105,10 +106,10 @@ export function PerformanceCustomize({ value, write }: { value: Value; write: Wr
       </section>
       <section aria-label={specKey("resources.profiles").label}>
         <ItemGroup variant="card">
-          <Item size="setting"><ItemContent><ItemTitle>{specKey("resources.profiles").label}</ItemTitle><ItemDescription clamp={false}>Each row is a big job. Each column says what that category does while the job runs. Chat is never paused, only made simpler.</ItemDescription></ItemContent></Item>
+          <Item size="setting"><ItemContent><ItemTitle>{specKey("resources.profiles").label}</ItemTitle><ItemDescription clamp={false}>{i18n._({ id: "Each row is a big job. Each column says what that category does while the job runs. Chat is never paused, only made simpler.", message: "Each row is a big job. Each column says what that category does while the job runs. Chat is never paused, only made simpler." })}</ItemDescription></ItemContent></Item>
         </ItemGroup>
         <Table data-testid="profile-table">
-          <TableHeader><TableRow><TableHead>While this runs</TableHead>{columns.map((column) => <TableHead key={column}>{CATEGORY_WORDS[column]}</TableHead>)}</TableRow></TableHeader>
+          <TableHeader><TableRow><TableHead>{i18n._({ id: "While this runs", message: "While this runs" })}</TableHead>{columns.map((column) => <TableHead key={column}>{CATEGORY_WORDS[column]}</TableHead>)}</TableRow></TableHeader>
           <TableBody>
             {Object.entries(profiles).map(([row, cells]) => (
               <TableRow key={row}>

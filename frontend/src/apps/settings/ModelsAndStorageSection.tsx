@@ -4,6 +4,7 @@
 // bar (rule S6: one job's progress lives on its own card) and the same job feeds the install strip above. A
 // failure is the Stack's Repairs item with Try again; this page shows the sentence and the same Try again.
 // Kit primitives only (rule 9b).
+import { i18n } from "@lingui/core";
 import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Alert, AlertDescription, AlertTitle } from "@maipai/ui/src/ui/alert";
@@ -87,10 +88,10 @@ function Row({ row, refresh, setError }: { row: ComponentRow; refresh: () => voi
         </ItemContent>
         <ItemActions>
           {!installed && row.state !== "installing" ? (
-            <Button type="button" onClick={() => (needsLicence ? setLicenceOpen(true) : void install())} disabled={busy || !row.can_install} aria-label={`${row.state === "failed" ? "Try again: " : "Install "}${row.label}`}>{row.state === "failed" ? "Try again" : "Install"}</Button>
+            <Button type="button" onClick={() => (needsLicence ? setLicenceOpen(true) : void install())} disabled={busy || !row.can_install} aria-label={`${row.state === "failed" ? i18n._({ id: "Try again: ", message: "Try again: " }) : i18n._({ id: "Install ", message: "Install " })}${row.label}`}>{row.state === "failed" ? i18n._({ id: "Try again", message: "Try again" }) : i18n._({ id: "Install", message: "Install" })}</Button>
           ) : null}
           {installed ? (
-            <Button type="button" variant="outline" onClick={() => setConfirm(true)} disabled={busy || !row.can_uninstall} aria-label={`Uninstall ${row.label}`}>Uninstall</Button>
+            <Button type="button" variant="outline" onClick={() => setConfirm(true)} disabled={busy || !row.can_uninstall} aria-label={`Uninstall ${row.label}`}>{i18n._({ id: "Uninstall", message: "Uninstall" })}</Button>
           ) : null}
         </ItemActions>
       </Item>
@@ -98,16 +99,16 @@ function Row({ row, refresh, setError }: { row: ComponentRow; refresh: () => voi
         <AlertDialog open={licenceOpen} onOpenChange={setLicenceOpen}>
           <AlertDialogContent>
             <AlertDialogHeader>
-              <AlertDialogTitle>Before you get {row.label}</AlertDialogTitle>
-              <AlertDialogDescription>It comes with its maker's licence ({row.licence.name}). Read these points, then accept to start the {sizeWords(row.download_bytes || row.full_bytes)} download. You only need to accept once for this computer.</AlertDialogDescription>
+              <AlertDialogTitle>{i18n._({ id: "Before you get {label}", message: "Before you get {label}", values: { label: row.label } })}</AlertDialogTitle>
+              <AlertDialogDescription>{i18n._({ id: "It comes with its maker's licence ({name}). Read these points, then accept to start the {sizeWords} download. You only need to accept once for this computer.", message: "It comes with its maker's licence ({name}). Read these points, then accept to start the {sizeWords} download. You only need to accept once for this computer.", values: { name: row.licence.name, sizeWords: sizeWords(row.download_bytes || row.full_bytes) } })}</AlertDialogDescription>
             </AlertDialogHeader>
             <div className="flex max-h-72 flex-col gap-3 overflow-y-auto text-sm">
               <ul className="flex list-disc flex-col gap-2 pl-5">{row.licence.summary.map((line) => <li key={line}>{line}</li>)}</ul>
-              <p>The full licence: <span className="font-mono break-all">{row.licence.url}</span></p>
+              <p>{i18n._({ id: "The full licence:", message: "The full licence:" })} <span className="font-mono break-all">{row.licence.url}</span></p>
             </div>
             <AlertDialogFooter>
-              <AlertDialogCancel>Not now</AlertDialogCancel>
-              <AlertDialogAction onClick={() => { setLicenceOpen(false); void install(row.licence!.id); }}>I accept, get it</AlertDialogAction>
+              <AlertDialogCancel>{i18n._({ id: "Not now", message: "Not now" })}</AlertDialogCancel>
+              <AlertDialogAction onClick={() => { setLicenceOpen(false); void install(row.licence!.id); }}>{i18n._({ id: "I accept, get it", message: "I accept, get it" })}</AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
@@ -115,12 +116,12 @@ function Row({ row, refresh, setError }: { row: ComponentRow; refresh: () => voi
       <AlertDialog open={confirm} onOpenChange={setConfirm}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Uninstall {row.label}?</AlertDialogTitle>
-            <AlertDialogDescription>This frees {sizeWords(row.size_bytes ?? 0)}. You can install it again later.</AlertDialogDescription>
+            <AlertDialogTitle>{i18n._({ id: "Uninstall {label}?", message: "Uninstall {label}?", values: { label: row.label } })}</AlertDialogTitle>
+            <AlertDialogDescription>{i18n._({ id: "This frees {sizeWords}. You can install it again later.", message: "This frees {sizeWords}. You can install it again later.", values: { sizeWords: sizeWords(row.size_bytes ?? 0) } })}</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Keep it</AlertDialogCancel>
-            <AlertDialogAction onClick={() => void uninstall()}>Uninstall</AlertDialogAction>
+            <AlertDialogCancel>{i18n._({ id: "Keep it", message: "Keep it" })}</AlertDialogCancel>
+            <AlertDialogAction onClick={() => void uninstall()}>{i18n._({ id: "Uninstall", message: "Uninstall" })}</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
@@ -146,31 +147,31 @@ function LicencePrompt({ refresh, setError, installing }: { refresh: () => void;
     try { await componentsApi.installExtras(); done(); } catch (e) { setError(messageOf(e, "Home couldn't start the extras. Check that the engine is running, then try again.")); } finally { setBusy(false); }
   }
   if (data.needs_prompt) return (
-    <section aria-label="Licences" data-testid="licence-prompt">
+    <section aria-label={i18n._({ id: "Licences", message: "Licences" })} data-testid="licence-prompt">
     <Alert>
-      <AlertTitle>Accept the licences for the AI models Home installs</AlertTitle>
+      <AlertTitle>{i18n._({ id: "Accept the licences for the AI models Home installs", message: "Accept the licences for the AI models Home installs" })}</AlertTitle>
       <AlertDescription>
-        <p>Accept once, and Home installs any of them without asking again.</p>
-        <Button type="button" onClick={() => setOpen(true)} disabled={busy}>See the licences</Button>
+        <p>{i18n._({ id: "Accept once, and Home installs any of them without asking again.", message: "Accept once, and Home installs any of them without asking again." })}</p>
+        <Button type="button" onClick={() => setOpen(true)} disabled={busy}>{i18n._({ id: "See the licences", message: "See the licences" })}</Button>
       </AlertDescription>
       <AlertDialog open={open} onOpenChange={setOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Licences of the AI models Home installs</AlertDialogTitle>
-            <AlertDialogDescription>These are the licences that come with parts Home installs for you. Accepting covers all of them.</AlertDialogDescription>
+            <AlertDialogTitle>{i18n._({ id: "Licences of the AI models Home installs", message: "Licences of the AI models Home installs" })}</AlertDialogTitle>
+            <AlertDialogDescription>{i18n._({ id: "These are the licences that come with parts Home installs for you. Accepting covers all of them.", message: "These are the licences that come with parts Home installs for you. Accepting covers all of them." })}</AlertDialogDescription>
           </AlertDialogHeader>
           <div className="flex max-h-72 flex-col gap-4 overflow-y-auto text-sm">
             {data.licences.map((licence) => (
               <div key={licence.id} className="flex flex-col gap-1">
                 <p className="font-medium">{licence.label}: {licence.name}</p>
                 <ul className="flex list-disc flex-col gap-1 pl-5">{licence.summary.map((line) => <li key={line}>{line}</li>)}</ul>
-                <p>The full licence: <span className="font-mono break-all">{licence.url}</span></p>
+                <p>{i18n._({ id: "The full licence:", message: "The full licence:" })} <span className="font-mono break-all">{licence.url}</span></p>
               </div>
             ))}
           </div>
           <AlertDialogFooter>
-            <AlertDialogCancel>Not now</AlertDialogCancel>
-            <AlertDialogAction onClick={() => void accept()}>Accept</AlertDialogAction>
+            <AlertDialogCancel>{i18n._({ id: "Not now", message: "Not now" })}</AlertDialogCancel>
+            <AlertDialogAction onClick={() => void accept()}>{i18n._({ id: "Accept", message: "Accept" })}</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
@@ -178,12 +179,12 @@ function LicencePrompt({ refresh, setError, installing }: { refresh: () => void;
     </section>
   );
   if (data.extras && !installing) return (
-    <section aria-label="Recommended extras" data-testid="licence-extras">
+    <section aria-label={i18n._({ id: "Recommended extras", message: "Recommended extras" })} data-testid="licence-extras">
     <Alert>
-      <AlertTitle>Recommended extras are not installed</AlertTitle>
+      <AlertTitle>{i18n._({ id: "Recommended extras are not installed", message: "Recommended extras are not installed" })}</AlertTitle>
       <AlertDescription>
-        <p>{data.extras.labels.join(", ")}. The licences are accepted. Progress shows on the install strip.</p>
-        <Button type="button" onClick={() => void installExtras()} disabled={busy}>Install the recommended extras ({data.extras.size})</Button>
+        <p>{i18n._({ id: "{join}. The licences are accepted. Progress shows on the install strip.", message: "{join}. The licences are accepted. Progress shows on the install strip.", values: { join: data.extras.labels.join(", ") } })}</p>
+        <Button type="button" onClick={() => void installExtras()} disabled={busy}>{i18n._({ id: "Install the recommended extras ({size})", message: "Install the recommended extras ({size})", values: { size: data.extras.size } })}</Button>
       </AlertDescription>
     </Alert>
     </section>
@@ -202,16 +203,14 @@ export function ModelsAndStorageSection() {
   const data = query.data;
   return (
     <section aria-labelledby="models-storage-heading" className="flex flex-col gap-3">
-      <h2 id="models-storage-heading" className="text-lg font-semibold">Models and storage</h2>
+      <h2 id="models-storage-heading" className="text-lg font-semibold">{i18n._({ id: "Models and storage", message: "Models and storage" })}</h2>
       {data ? (
-        <p className="text-sm text-muted-foreground">
-          {sizeWords(data.installed_bytes)} of AI on this computer{data.free_disk_bytes !== null ? `, ${sizeWords(data.free_disk_bytes)} free` : ""}. Add or remove parts here. Everything stays on this computer.
-        </p>
+        <p className="text-sm text-muted-foreground">{i18n._({ id: "{sizeWords} of AI on this computer{value}. Add or remove parts here. Everything stays on this computer.", message: "{sizeWords} of AI on this computer{value}. Add or remove parts here. Everything stays on this computer.", values: { sizeWords: sizeWords(data.installed_bytes), value: data.free_disk_bytes !== null ? `, ${sizeWords(data.free_disk_bytes)} free` : "" } })}</p>
       ) : null}
       <LicencePrompt refresh={refresh} setError={setError} installing={!!data?.components?.some((row) => row.state === "installing")} />
-      {query.isError ? <Alert variant="destructive"><AlertTitle>The list did not load</AlertTitle><AlertDescription>{messageOf(query.error, "Check that Home is running, then reload this page.")}</AlertDescription></Alert> : null}
-      {data?.stack === "unreachable" ? <p className="text-sm text-muted-foreground">The AI is waiting for its helper to start. The Status page shows what is happening.</p> : null}
-      {error ? <Alert variant="destructive"><AlertTitle>That did not work</AlertTitle><AlertDescription>{error}</AlertDescription></Alert> : null}
+      {query.isError ? <Alert variant="destructive"><AlertTitle>{i18n._({ id: "The list did not load", message: "The list did not load" })}</AlertTitle><AlertDescription>{messageOf(query.error, "Check that Home is running, then reload this page.")}</AlertDescription></Alert> : null}
+      {data?.stack === "unreachable" ? <p className="text-sm text-muted-foreground">{i18n._({ id: "The AI is waiting for its helper to start. The Status page shows what is happening.", message: "The AI is waiting for its helper to start. The Status page shows what is happening." })}</p> : null}
+      {error ? <Alert variant="destructive"><AlertTitle>{i18n._({ id: "That did not work", message: "That did not work" })}</AlertTitle><AlertDescription>{error}</AlertDescription></Alert> : null}
       {data?.stack === "ok" ? GROUPS.map((group) => {
         const rows = (data.components ?? []).filter((row) => row.group === group.id);
         // VIDEO-SETTINGS-05: styles are listed only on Settings, Pictures, videos and music, tab Styles (one list). Any style file the Stack reports has no group here.

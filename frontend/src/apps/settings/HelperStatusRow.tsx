@@ -1,4 +1,5 @@
 // MEM-SPACE-08 / RULES S6: the Mac app helper's state as a plain status row, never a hidden control. Shown by the Close apps card and the setup wizard question while the helper is not installed.
+import { i18n } from "@lingui/core";
 import { useState } from "react";
 import { Alert, AlertDescription } from "@maipai/ui/src/ui/alert";
 import { Button } from "@maipai/ui/src/ui/button";
@@ -23,10 +24,10 @@ export function HelperStatusRow({ canInstall, install, onInstalled }: { canInsta
     <div data-testid="helper-status" className="flex flex-col gap-2">
       <Item size="setting" role="status">
         <ItemContent>
-          <ItemTitle>Helper not installed</ItemTitle>
-          <ItemDescription clamp={false}>{canInstall ? "Install it so Home can see and close apps when a big job needs room. It runs only for you on this Mac, is built here, and sends nothing anywhere. Close apps stays Off until you turn it on." : NOT_MAC}</ItemDescription>
+          <ItemTitle>{i18n._({ id: "Helper not installed", message: "Helper not installed" })}</ItemTitle>
+          <ItemDescription clamp={false}>{canInstall ? i18n._({ id: "Install it so Home can see and close apps when a big job needs room. It runs only for you on this Mac, is built here, and sends nothing anywhere. Close apps stays Off until you turn it on.", message: "Install it so Home can see and close apps when a big job needs room. It runs only for you on this Mac, is built here, and sends nothing anywhere. Close apps stays Off until you turn it on." }) : NOT_MAC}</ItemDescription>
         </ItemContent>
-        {canInstall ? <ItemActions><Button type="button" variant="outline" disabled={busy} onClick={() => void run()}>{busy ? "Installing, this can take a minute or two" : "Install helper"}</Button></ItemActions> : null}
+        {canInstall ? <ItemActions><Button type="button" variant="outline" disabled={busy} onClick={() => void run()}>{busy ? i18n._({ id: "Installing, this can take a minute or two", message: "Installing, this can take a minute or two" }) : i18n._({ id: "Install helper", message: "Install helper" })}</Button></ItemActions> : null}
       </Item>
       {problem ? <Alert variant="destructive"><AlertDescription>{problem}</AlertDescription></Alert> : null}
     </div>

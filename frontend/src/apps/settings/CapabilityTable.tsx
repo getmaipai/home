@@ -1,4 +1,5 @@
 // MEM-SPACE-05/06: one capability table, drawn from the Stack's fits_ever; the wizard and Settings > Performance both use it, so there is no second copy.
+import { i18n } from "@lingui/core";
 import { useQuery } from "@tanstack/react-query";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@maipai/ui/src/ui/table";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@maipai/ui/src/dashboard/components/ui/card";
@@ -23,7 +24,7 @@ export function CapabilityTable({ path, framed = false }: { path: string; framed
   if (!data?.available || data.rows.length === 0) return null;
   const table = (
     <Table data-testid="capability-table">
-      <TableHeader><TableRow><TableHead>Kind of job</TableHead>{TIERS.map(([, label]) => <TableHead key={label}>{label}</TableHead>)}</TableRow></TableHeader>
+      <TableHeader><TableRow><TableHead>{i18n._({ id: "Kind of job", message: "Kind of job" })}</TableHead>{TIERS.map(([, label]) => <TableHead key={label}>{label}</TableHead>)}</TableRow></TableHeader>
       <TableBody>
         {data.rows.map((row) => (
           <TableRow key={row.category}>
@@ -38,7 +39,7 @@ export function CapabilityTable({ path, framed = false }: { path: string; framed
   return (
     <section data-testid="capabilities">
       <Card>
-        <CardHeader><CardTitle>What this computer can do</CardTitle><CardDescription>Which of Standard, Boost and Max this computer can ever run for each kind of job.</CardDescription></CardHeader>
+        <CardHeader><CardTitle>{i18n._({ id: "What this computer can do", message: "What this computer can do" })}</CardTitle><CardDescription>{i18n._({ id: "Which of Standard, Boost and Max this computer can ever run for each kind of job.", message: "Which of Standard, Boost and Max this computer can ever run for each kind of job." })}</CardDescription></CardHeader>
         <CardContent>{table}</CardContent>
       </Card>
     </section>

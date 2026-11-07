@@ -1,6 +1,7 @@
 // The one gear of a job on AI and models: a summary of its levels. Each level shows the model it uses and whether that is the recommended
 // pick or a custom one; selecting a level opens just that level to edit (Standard opens the model chooser, the others the single-level editor).
 // Kit Elements as shipped (rule 9); the page renders the kit Dialog around this content. Jobs without levels never open this.
+import { i18n } from "@lingui/core";
 import { Badge } from "@maipai/ui/src/ui/badge";
 import { DialogDescription, DialogHeader, DialogTitle, DialogFooter } from "@maipai/ui/src/ui/dialog";
 import { Button } from "@maipai/ui/src/ui/button";
@@ -77,7 +78,7 @@ export function AiJobSummary({ row, drafts, picks, copy, onEdit, onClose }: AiJo
               <ItemDescription clamp={false}>{LEVEL_LINE[level.tier]}</ItemDescription>
             </ItemContent>
             <ItemActions>
-              <Button type="button" variant="ghost" size="sm" aria-label={`Edit ${LEVEL_TITLE[level.tier]}: ${row.title}`} onClick={() => onEdit(level.tier)}>Edit<Next /></Button>
+              <Button type="button" variant="ghost" size="sm" aria-label={`Edit ${LEVEL_TITLE[level.tier]}: ${row.title}`} onClick={() => onEdit(level.tier)}>{i18n._({ id: "Edit", message: "Edit" })}<Next /></Button>
             </ItemActions>
           </Item>
         ))}

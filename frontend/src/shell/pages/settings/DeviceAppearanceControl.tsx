@@ -1,3 +1,4 @@
+import { i18n } from "@lingui/core";
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import type { SettingsKey } from "@maipai/spec/gen/ts/settings-key.js";
@@ -17,23 +18,23 @@ export function DeviceAppearanceControl() {
   const declaration = registry.data?.find((item) => item.key === "ui.appearance");
   const options = ((declaration?.range as { options?: string[] } | undefined)?.options ?? []).filter(isAppearance);
   return (
-    <section aria-label="On this device only" className="flex flex-col gap-3">
-      <h2 className="text-sm font-medium">On this device only</h2>
+    <section aria-label={i18n._({ id: "On this device only", message: "On this device only" })} className="flex flex-col gap-3">
+      <h2 className="text-sm font-medium">{i18n._({ id: "On this device only", message: "On this device only" })}</h2>
       <ItemGroup variant="card">
         <Item size="setting">
           <ItemContent>
-            <ItemTitle>Look on this device</ItemTitle>
-            <ItemDescription>Choose a look for this browser. It does not change your personal setting.</ItemDescription>
+            <ItemTitle>{i18n._({ id: "Look on this device", message: "Look on this device" })}</ItemTitle>
+            <ItemDescription>{i18n._({ id: "Choose a look for this browser. It does not change your personal setting.", message: "Choose a look for this browser. It does not change your personal setting." })}</ItemDescription>
           </ItemContent>
           <ItemActions>
             <Select value={value ?? "inherit"} onValueChange={(next) => { const appearance = next === "inherit" ? null : isAppearance(next) ? next : null; setValue(appearance); writeDeviceAppearancePreference(appearance); }}>
-              <SelectTrigger size="row" aria-label="On this device only"><SelectValue /></SelectTrigger>
+              <SelectTrigger size="row" aria-label={i18n._({ id: "On this device only", message: "On this device only" })}><SelectValue /></SelectTrigger>
               <SelectContent>
-                <SelectItem value="inherit">Same as the household</SelectItem>
+                <SelectItem value="inherit">{i18n._({ id: "Same as the household", message: "Same as the household" })}</SelectItem>
                 {options.map((option) => <SelectItem key={option} value={option}>{option[0]!.toUpperCase() + option.slice(1)}</SelectItem>)}
               </SelectContent>
             </Select>
-            <Button type="button" variant="secondary" size="row" aria-label="Reset device appearance" onClick={() => { setValue(null); writeDeviceAppearancePreference(null); }}>Reset</Button>
+            <Button type="button" variant="secondary" size="row" aria-label={i18n._({ id: "Reset device appearance", message: "Reset device appearance" })} onClick={() => { setValue(null); writeDeviceAppearancePreference(null); }}>{i18n._({ id: "Reset", message: "Reset" })}</Button>
           </ItemActions>
         </Item>
       </ItemGroup>

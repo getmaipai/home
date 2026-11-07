@@ -1,3 +1,4 @@
+import { i18n } from "@lingui/core";
 import { useEffect, useState, type FormEvent } from "react";
 import { Section } from "@maipai/ui/src/primitives/Section";
 import { DestructiveConfirm } from "@maipai/ui/src/primitives/DestructiveConfirm";
@@ -80,35 +81,34 @@ export function HuggingFaceTokenSection() {
   }
 
   return (
-    <Section heading="Hugging Face token (for voice cloning)">
+    <Section heading={i18n._({ id: "Hugging Face token (for voice cloning)", message: "Hugging Face token (for voice cloning)" })}>
       <p className="text-base text-muted-foreground">
-        Needed by the Stack to clone a voice from a recording. Create a
-        read token at huggingface.co/settings/tokens and paste it below.
+        {i18n._({ id: "Needed by the Stack to clone a voice from a recording. Create a read token at huggingface.co/settings/tokens and paste it below.", message: "Needed by the Stack to clone a voice from a recording. Create a read token at huggingface.co/settings/tokens and paste it below." })}
       </p>
       {loadError ? <p className="text-base text-destructive">{loadError}</p> : null}
       {isSet !== null ? (
         <p className="text-base text-muted-foreground">
-          {isSet ? "A token is connected." : "No token connected yet."}
+          {isSet ? i18n._({ id: "A token is connected.", message: "A token is connected." }) : i18n._({ id: "No token connected yet.", message: "No token connected yet." })}
         </p>
       ) : null}
       <form onSubmit={handleSubmit} className="flex max-w-sm flex-col gap-3">
         <Input
           type="password"
-          placeholder="hf_..."
+          placeholder={i18n._({ id: "hf_...", message: "hf_..." })}
           value={token}
           onChange={(e) => setToken(e.target.value)}
           disabled={submitting}
           required
         />
         {error ? <p className="text-base text-destructive">{error}</p> : null}
-        {success ? <p className="text-base text-primary">Saved.</p> : null}
+        {success ? <p className="text-base text-primary">{i18n._({ id: "Saved.", message: "Saved." })}</p> : null}
         <div className="flex gap-2">
           <Button type="submit" disabled={submitting}>
-            {submitting ? "Saving…" : "Save"}
+            {submitting ? i18n._({ id: "Saving…", message: "Saving…" }) : i18n._({ id: "Save", message: "Save" })}
           </Button>
         </div>
       </form>
-      {isSet ? confirmRemove ? <DestructiveConfirm message="Remove the connected Hugging Face token?" detail="Voice cloning will no longer be able to use this token." confirmLabel="Remove token" busyLabel="Removing…" busy={submitting} onConfirm={() => void handleRemove()} onCancel={() => setConfirmRemove(false)} /> : <Button type="button" variant="destructive" disabled={submitting} onClick={() => setConfirmRemove(true)}>Remove</Button> : null}
+      {isSet ? confirmRemove ? <DestructiveConfirm message={i18n._({ id: "Remove the connected Hugging Face token?", message: "Remove the connected Hugging Face token?" })} detail="Voice cloning will no longer be able to use this token." confirmLabel="Remove token" busyLabel="Removing…" busy={submitting} onConfirm={() => void handleRemove()} onCancel={() => setConfirmRemove(false)} /> : <Button type="button" variant="destructive" disabled={submitting} onClick={() => setConfirmRemove(true)}>{i18n._({ id: "Remove", message: "Remove" })}</Button> : null}
     </Section>
   );
 }

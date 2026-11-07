@@ -2,6 +2,7 @@
 // plain Adult label after the unlock, ONE kit lock row for every adult-only or unknown style (no name, count or size until the person's own passcode), the Browse styles
 // and Add from a file buttons, a download's progress (the kit JobProgress, never a name), where styles come from (Hugging Face, Civitai off by default, the two
 // credentials write-only) and Recently removed. The server redacts; this view only draws what it is sent. Words come from the spec card's copy (rule S5).
+import { i18n } from "@lingui/core";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useLocation, useNavigate } from "react-router-dom";
@@ -72,7 +73,7 @@ export function StylesTab({ person, card, children }: { person: Roster; card?: S
 
   return (
     <div className="flex min-w-0 flex-col gap-8" data-testid="styles-tab">
-      <section aria-label="Styles" className="flex flex-col gap-4">
+      <section aria-label={i18n._({ id: "Styles", message: "Styles" })} className="flex flex-col gap-4">
         {card?.description ? <p className="text-sm text-muted-foreground">{card.description}</p> : null}
         <div className="flex flex-wrap gap-2">
           <Button type="button" onClick={() => setBrowsing(true)}>{copy.browse_button}</Button>
@@ -84,7 +85,7 @@ export function StylesTab({ person, card, children }: { person: Roster; card?: S
           {(data) => (
             <>
               {data.items.length === 0 && !data.locked ? <p className="text-sm text-muted-foreground">{copy.empty}</p> : (
-                <ItemGroup variant="card" aria-label="Styles in the library">
+                <ItemGroup variant="card" aria-label={i18n._({ id: "Styles in the library", message: "Styles in the library" })}>
                   {data.items.map((row) => <StyleListRow key={row.id} row={row} onWho={(who) => void setWho(row, who)} onEdit={() => setEditing(row.id)} />)}
                   {data.locked ? <LockedSettingRow /> : null}
                 </ItemGroup>
@@ -116,16 +117,16 @@ function StyleListRow({ row, onWho, onEdit }: { row: StyleRow; onWho: (who: Styl
     <Item>
       <div aria-hidden="true" className="size-14 shrink-0 overflow-hidden rounded-lg bg-muted"><StylePicture path={filePath(row.preview_file_id)} proof={adult} /></div>
       <ItemContent>
-        <ItemTitle>{row.name} {adult ? <Badge variant="destructive">Adults only</Badge> : null}</ItemTitle>
+        <ItemTitle>{row.name} {adult ? <Badge variant="destructive">{i18n._({ id: "Adults only", message: "Adults only" })}</Badge> : null}</ItemTitle>
         <ItemDescription clamp={false}>{whatItIs(row)} · {sizeWords(row.file.bytes)}</ItemDescription>
-        <ItemDescription clamp={false}>{row.needs_confirmation ? "Open it to read the licence first. " : ""}{adultCheckLine(row.adult_check)}</ItemDescription>
+        <ItemDescription clamp={false}>{row.needs_confirmation ? i18n._({ id: "Open it to read the licence first. ", message: "Open it to read the licence first. " }) : ""}{adultCheckLine(row.adult_check)}</ItemDescription>
       </ItemContent>
       <ItemActions>
         <Select value={row.availability.who} onValueChange={(v) => onWho(v as StyleWho)}>
           <SelectTrigger aria-label={`Who can use ${row.name}`}><SelectValue /></SelectTrigger>
-          <SelectContent><SelectItem value="admins">Only admins</SelectItem><SelectItem value="adults">All adults</SelectItem><SelectItem value="people">Chosen people</SelectItem></SelectContent>
+          <SelectContent><SelectItem value="admins">{i18n._({ id: "Only admins", message: "Only admins" })}</SelectItem><SelectItem value="adults">{i18n._({ id: "All adults", message: "All adults" })}</SelectItem><SelectItem value="people">{i18n._({ id: "Chosen people", message: "Chosen people" })}</SelectItem></SelectContent>
         </Select>
-        <Button type="button" variant="outline" onClick={onEdit}>Edit</Button>
+        <Button type="button" variant="outline" onClick={onEdit}>{i18n._({ id: "Edit", message: "Edit" })}</Button>
       </ItemActions>
     </Item>
     </>
@@ -154,8 +155,8 @@ function SecretRow({ label, savedLine, emptyLine, placeholder, saved, onSave, on
         {showField ? (
           <form className="flex max-w-md gap-2" onSubmit={(e) => { e.preventDefault(); if (value.trim()) void run(() => onSave(value.trim()), "Home could not save that. Check it, then try again."); }}>
             <Input type="password" autoComplete="off" aria-label={label} placeholder={placeholder} value={value} onChange={(e) => setValue(e.target.value)} disabled={busy} />
-            <Button type="submit" disabled={busy || !value.trim()}>Save</Button>
-            {saved ? <Button type="button" variant="ghost" onClick={() => { setEditing(false); setValue(""); }}>Cancel</Button> : null}
+            <Button type="submit" disabled={busy || !value.trim()}>{i18n._({ id: "Save", message: "Save" })}</Button>
+            {saved ? <Button type="button" variant="ghost" onClick={() => { setEditing(false); setValue(""); }}>{i18n._({ id: "Cancel", message: "Cancel" })}</Button> : null}
           </form>
         ) : null}
         {error ? <p role="alert" className="text-sm text-destructive">{error}</p> : null}
@@ -185,16 +186,16 @@ function SourcesSection({ copy, state, onChanged }: { copy: ReturnType<typeof st
     <section aria-label={copy.sources_title} className="flex flex-col gap-3">
       <h2 className="text-sm font-medium">{copy.sources_title}</h2>
       <ItemGroup variant="card" aria-label={copy.sources_title}>
-        <Item><ItemContent><ItemTitle>Hugging Face</ItemTitle><ItemDescription clamp={false}>{copy.huggingface_note}</ItemDescription></ItemContent></Item>
-        <SecretRow label="Hugging Face token" saved={state?.huggingface?.token_saved === true} placeholder="hf_..." copy={{ replace: copy.civitai_key_replace, remove: copy.civitai_key_remove }}
+        <Item><ItemContent><ItemTitle>{i18n._({ id: "Hugging Face", message: "Hugging Face" })}</ItemTitle><ItemDescription clamp={false}>{copy.huggingface_note}</ItemDescription></ItemContent></Item>
+        <SecretRow label={i18n._({ id: "Hugging Face token", message: "Hugging Face token" })} saved={state?.huggingface?.token_saved === true} placeholder={i18n._({ id: "hf_...", message: "hf_..." })} copy={{ replace: copy.civitai_key_replace, remove: copy.civitai_key_remove }}
           emptyLine="Optional. Paste a read token. Home keeps it private and never shows it again." savedLine="A token is saved. Home keeps it private and never shows it again."
           onSave={(v) => after(stylesApi.saveHuggingFaceToken(v))} onRemove={() => after(stylesApi.removeHuggingFaceToken())} />
         <Item>
-          <ItemContent><ItemTitle>Civitai</ItemTitle><ItemDescription clamp={false}>{civitai ? "On. This computer contacts civitai.com when you search or install." : copy.civitai_off_note}</ItemDescription>{error ? <p role="alert" className="text-sm text-destructive">{error}</p> : null}</ItemContent>
-          <ItemActions><Switch checked={civitai} aria-label="Civitai" disabled={state === null} onCheckedChange={(on) => { if (on) setNotice(true); else void turn(false); }} /></ItemActions>
+          <ItemContent><ItemTitle>{i18n._({ id: "Civitai", message: "Civitai" })}</ItemTitle><ItemDescription clamp={false}>{civitai ? i18n._({ id: "On. This computer contacts civitai.com when you search or install.", message: "On. This computer contacts civitai.com when you search or install." }) : copy.civitai_off_note}</ItemDescription>{error ? <p role="alert" className="text-sm text-destructive">{error}</p> : null}</ItemContent>
+          <ItemActions><Switch checked={civitai} aria-label={i18n._({ id: "Civitai", message: "Civitai" })} disabled={state === null} onCheckedChange={(on) => { if (on) setNotice(true); else void turn(false); }} /></ItemActions>
         </Item>
         {civitai ? (
-          <SecretRow label="Civitai key" saved={state?.civitai?.key_saved === true} placeholder="Paste your Civitai key" copy={{ replace: copy.civitai_key_replace, remove: copy.civitai_key_remove }}
+          <SecretRow label={i18n._({ id: "Civitai key", message: "Civitai key" })} saved={state?.civitai?.key_saved === true} placeholder={i18n._({ id: "Paste your Civitai key", message: "Paste your Civitai key" })} copy={{ replace: copy.civitai_key_replace, remove: copy.civitai_key_remove }}
             emptyLine="Some downloads need a free Civitai key. Home keeps it private and never shows it again." savedLine="A key is saved. Home keeps it private and never shows it again."
             onSave={(v) => after(stylesApi.saveCivitaiKey(v))} onRemove={() => after(stylesApi.removeCivitaiKey())} />
         ) : null}

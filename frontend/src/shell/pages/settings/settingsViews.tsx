@@ -59,7 +59,7 @@ function AccountProfile({ person, onPersonChange }: SettingsViewProps) {
   return (
     <>
       <Card>
-        <CardHeader><CardTitle>Profile</CardTitle></CardHeader>
+        <CardHeader><CardTitle>{i18n._({ id: "Profile", message: "Profile" })}</CardTitle></CardHeader>
         <CardContent>
           <ProfileForm person={person} canEdit layout="page" onSaved={async (_saved: PersonRosterEntry) => { await Promise.all([queryClient.invalidateQueries({ queryKey: ["people"] }), onPersonChange()]); }} />
         </CardContent>
@@ -69,10 +69,10 @@ function AccountProfile({ person, onPersonChange }: SettingsViewProps) {
         <CardContent><SettingsRenderer scope="person" scopeValue={`person:${person.id}`} only={["person.profile"]} includeKeys={["person.locale"]} plainRows /></CardContent>
       </Card>
       <Card>
-        <CardHeader><CardTitle>PIN or password</CardTitle></CardHeader>
+        <CardHeader><CardTitle>{i18n._({ id: "PIN or password", message: "PIN or password" })}</CardTitle></CardHeader>
         <CardContent><SignInSecretSection person={person} onPersonChange={onPersonChange} /></CardContent>
       </Card>
-      {(person.role === "owner" || person.role === "admin") ? <Card><CardHeader><CardTitle>Two-step sign-in</CardTitle></CardHeader><CardContent><TwoStepSignInSection person={person} /></CardContent></Card> : null}
+      {(person.role === "owner" || person.role === "admin") ? <Card><CardHeader><CardTitle>{i18n._({ id: "Two-step sign-in", message: "Two-step sign-in" })}</CardTitle></CardHeader><CardContent><TwoStepSignInSection person={person} /></CardContent></Card> : null}
       <AwaySessionsSection />
       <DevicesSection />
       {canViewFaceEnrollment(person, person) ? <Card><VoiceEnrollmentBody profile={person} viewer={person} /></Card> : null}
@@ -114,7 +114,7 @@ function HomeDevicesAdminSettings({ person, detailId, tab }: SettingsViewProps) 
   const [params, setParams] = useSearchParams();
   const addOpen = params.get("addRobot") === "1";
   const setAddOpen = (open: boolean) => setParams((previous) => { const next = new URLSearchParams(previous); if (open) next.set("addRobot", "1"); else next.delete("addRobot"); return next; });
-  return tab === "integrations" ? null : capabilities.includes("robots.enabled") ? <>{detailId ? <HouseholdRobotsSection detailId={detailId} tab={tab} /> : <><HouseholdRobotsSection /><Dialog open={addOpen} onOpenChange={setAddOpen}><DialogContent scroll="viewport"><DialogHeader><DialogTitle>Add a robot</DialogTitle><DialogDescription>Pair a robot with this home.</DialogDescription></DialogHeader><AddRobotSection onClose={() => setAddOpen(false)} /><StackChanInstallDialog /></DialogContent></Dialog><RobotPasswordSection /></>}</> : null;
+  return tab === "integrations" ? null : capabilities.includes("robots.enabled") ? <>{detailId ? <HouseholdRobotsSection detailId={detailId} tab={tab} /> : <><HouseholdRobotsSection /><Dialog open={addOpen} onOpenChange={setAddOpen}><DialogContent scroll="viewport"><DialogHeader><DialogTitle>{i18n._({ id: "Add a robot", message: "Add a robot" })}</DialogTitle><DialogDescription>{i18n._({ id: "Pair a robot with this home.", message: "Pair a robot with this home." })}</DialogDescription></DialogHeader><AddRobotSection onClose={() => setAddOpen(false)} /><StackChanInstallDialog /></DialogContent></Dialog><RobotPasswordSection /></>}</> : null;
 }
 function HomeRoutingStatsSettings() { return <RoutingStatsSection />; }
 
@@ -148,14 +148,14 @@ export const SETTINGS_VIEWS: Record<string, ComponentType<SettingsViewProps>> = 
 function AppPinSettings({ person, to }: { person: SettingsViewProps["person"]; to: string }) {
   const { isPinned, togglePin, isLoading, isSaving } = usePinnedApps(person.id);
   return (
-    <section aria-label="Sidebar" className="flex flex-col gap-3">
+    <section aria-label={i18n._({ id: "Sidebar", message: "Sidebar" })} className="flex flex-col gap-3">
       <ItemGroup variant="card">
       <Item size="setting">
         <ItemContent>
-          <ItemTitle>Show in the sidebar</ItemTitle>
-          <ItemDescription>Keep this app in the sidebar so it is one tap away.</ItemDescription>
+          <ItemTitle>{i18n._({ id: "Show in the sidebar", message: "Show in the sidebar" })}</ItemTitle>
+          <ItemDescription>{i18n._({ id: "Keep this app in the sidebar so it is one tap away.", message: "Keep this app in the sidebar so it is one tap away." })}</ItemDescription>
         </ItemContent>
-        <ItemActions><Switch size="md" aria-label="Show in the sidebar" checked={isPinned(to)} disabled={isLoading || isSaving} onCheckedChange={() => togglePin(to)} /></ItemActions>
+        <ItemActions><Switch size="md" aria-label={i18n._({ id: "Show in the sidebar", message: "Show in the sidebar" })} checked={isPinned(to)} disabled={isLoading || isSaving} onCheckedChange={() => togglePin(to)} /></ItemActions>
       </Item>
       </ItemGroup>
     </section>

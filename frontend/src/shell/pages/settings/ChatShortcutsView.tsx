@@ -1,3 +1,4 @@
+import { i18n } from "@lingui/core";
 import { Fragment } from "react";
 import { Item, ItemActions, ItemContent, ItemGroup, ItemSeparator, ItemTitle } from "@maipai/ui/src/dashboard/components/ui/item";
 import { CHAT_SHORTCUTS } from "@/shell/pages/chatShortcuts";
@@ -7,7 +8,7 @@ import { CHAT_SHORTCUTS } from "@/shell/pages/chatShortcuts";
  * from too), one kit Item per shortcut. */
 export function ChatShortcutsView() {
   return (
-    <section aria-label="Keyboard shortcuts">
+    <section aria-label={i18n._({ id: "Keyboard shortcuts", message: "Keyboard shortcuts" })}>
     <ItemGroup variant="card">
       {CHAT_SHORTCUTS.map(([label, shortcut], index) => (
         <Fragment key={label}>

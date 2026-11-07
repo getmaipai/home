@@ -1,4 +1,5 @@
 // MEM-SPACE-09: Close apps for big jobs. A two-way switch, an Always close list and a Never close list, each with a picker, a starter list and (Always) a Reopen when done switch per app. Every change states its effect first (auto-close-apps note section 5).
+import { i18n } from "@lingui/core";
 import { useState } from "react";
 import { Button } from "@maipai/ui/src/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@maipai/ui/src/ui/select";
@@ -27,7 +28,7 @@ function AppList({ kind, value, write, names, candidates, starter }: { kind: "al
   const nameOf = (id: string) => names.get(id) ?? id;
   const save = async (changes: Record<string, unknown>, sentence: string) => {
     setError(null);
-    try { await write(changes); setEffect(sentence); } catch { setError("Home could not save that change. Check your connection and try again."); }
+    try { await write(changes); setEffect(sentence); } catch { setError(i18n._({ id: "Home could not save that change. Check your connection and try again.", message: "Home could not save that change. Check your connection and try again." })); }
   };
   const add = (id: string) => {
     const name = nameOf(id);
@@ -44,24 +45,24 @@ function AppList({ kind, value, write, names, candidates, starter }: { kind: "al
           <ItemContent><ItemTitle>{title}</ItemTitle><ItemDescription clamp={false}>{blurb}</ItemDescription></ItemContent>
         </Item>
         <div className="flex flex-wrap gap-2 px-4 pb-3">
-            {starterToAdd.length > 0 ? <Button variant="outline" onClick={() => save({ [LIST_KEYS[kind]]: JSON.stringify([...list, ...starterToAdd.map((app) => app.bundleId)]) }, kind === "always" ? "The starter apps will be closed when a big job needs room. Review the list, then turn Automatic on." : "The starter apps will always stay open.")}>Use the starter list</Button> : null}
+            {starterToAdd.length > 0 ? <Button variant="outline" onClick={() => save({ [LIST_KEYS[kind]]: JSON.stringify([...list, ...starterToAdd.map((app) => app.bundleId)]) }, kind === "always" ? "The starter apps will be closed when a big job needs room. Review the list, then turn Automatic on." : "The starter apps will always stay open.")}>{i18n._({ id: "Use the starter list", message: "Use the starter list" })}</Button> : null}
             {addable.length > 0 ? (
               <Select value="" onValueChange={(id) => { if (id) void add(id); }}>
-                <SelectTrigger aria-label={`Add an app to ${title}`}><SelectValue placeholder="Add an app" /></SelectTrigger>
+                <SelectTrigger aria-label={`Add an app to ${title}`}><SelectValue placeholder={i18n._({ id: "Add an app", message: "Add an app" })} /></SelectTrigger>
                 <SelectContent>{addable.map((app) => <SelectItem key={app.bundleId} value={app.bundleId}>{app.name}</SelectItem>)}</SelectContent>
               </Select>
             ) : null}
         </div>
-        {list.length === 0 ? <Item size="setting"><ItemContent><ItemDescription clamp={false}>{kind === "always" ? "No apps yet, so Home closes nothing." : "No apps added. The built-in protected apps are never closed either way."}</ItemDescription></ItemContent></Item> : null}
+        {list.length === 0 ? <Item size="setting"><ItemContent><ItemDescription clamp={false}>{kind === "always" ? i18n._({ id: "No apps yet, so Home closes nothing.", message: "No apps yet, so Home closes nothing." }) : i18n._({ id: "No apps added. The built-in protected apps are never closed either way.", message: "No apps added. The built-in protected apps are never closed either way." })}</ItemDescription></ItemContent></Item> : null}
         {list.map((id) => (
           <Item key={id} size="setting">
             <ItemContent>
               <ItemTitle>{nameOf(id)}</ItemTitle>
-              {kind === "always" && other.includes(id) ? <ItemDescription clamp={false}>This app is also on the Never close list, so it stays open.</ItemDescription> : null}
+              {kind === "always" && other.includes(id) ? <ItemDescription clamp={false}>{i18n._({ id: "This app is also on the Never close list, so it stays open.", message: "This app is also on the Never close list, so it stays open." })}</ItemDescription> : null}
             </ItemContent>
             <ItemActions>
               {kind === "always" ? <Switch aria-label={`Reopen ${nameOf(id)} when done`} checked={!noReopen.includes(id)} onCheckedChange={(on) => void save({ [NO_REOPEN]: JSON.stringify(on ? noReopen.filter((x) => x !== id) : [...noReopen, id]) }, on ? `${nameOf(id)} will reopen when the job is done.` : `${nameOf(id)} will stay closed when the job is done.`)} /> : null}
-              <Button variant="outline" aria-label={`Remove ${nameOf(id)}`} onClick={() => void save({ [LIST_KEYS[kind]]: JSON.stringify(list.filter((x) => x !== id)) }, kind === "always" ? `${nameOf(id)} will no longer be closed.` : `${nameOf(id)} can be closed again if it is on the Always close list.`)}>Remove</Button>
+              <Button variant="outline" aria-label={`Remove ${nameOf(id)}`} onClick={() => void save({ [LIST_KEYS[kind]]: JSON.stringify(list.filter((x) => x !== id)) }, kind === "always" ? `${nameOf(id)} will no longer be closed.` : `${nameOf(id)} can be closed again if it is on the Always close list.`)}>{i18n._({ id: "Remove", message: "Remove" })}</Button>
             </ItemActions>
           </Item>
         ))}
@@ -82,18 +83,18 @@ export function CloseAppsSettings({ value, write }: { value: Value; write: Write
   const candidates: StarterApp[] = running.data?.installed ? running.data.apps.map((app) => ({ bundleId: app.bundleId, name: app.name })) : [...STARTER_ALWAYS, ...STARTER_NEVER];
   const [error, setError] = useState<string | null>(null);
   return (
-    <section aria-label="Close apps for big jobs" data-testid="close-apps-card"><Card>
+    <section aria-label={i18n._({ id: "Close apps for big jobs", message: "Close apps for big jobs" })} data-testid="close-apps-card"><Card>
       <CardHeader>
-        <CardTitle>Close apps for big jobs</CardTitle>
+        <CardTitle>{i18n._({ id: "Close apps for big jobs", message: "Close apps for big jobs" })}</CardTitle>
         <CardDescription>{specKey(MODE).help}</CardDescription>
       </CardHeader>
       <CardContent>
-        <RadioGroup value={mode} onValueChange={(next) => { setError(null); write({ [MODE]: next }).catch(() => setError("Home could not save that change. Check your connection and try again.")); }}>
+        <RadioGroup value={mode} onValueChange={(next) => { setError(null); write({ [MODE]: next }).catch(() => setError(i18n._({ id: "Home could not save that change. Check your connection and try again.", message: "Home could not save that change. Check your connection and try again." }))); }}>
           <ItemGroup variant="card">
             {(["off", "automatic"] as const).map((id) => (
               <Item key={id} size="setting">
-                <ItemContent><ItemTitle>{id === "off" ? "Off" : "Automatic"}</ItemTitle><ItemDescription clamp={false}>{options[id]}</ItemDescription></ItemContent>
-                <ItemActions><RadioGroupItem value={id} aria-label={id === "off" ? "Off" : "Automatic"} /></ItemActions>
+                <ItemContent><ItemTitle>{id === "off" ? i18n._({ id: "Off", message: "Off" }) : i18n._({ id: "Automatic", message: "Automatic" })}</ItemTitle><ItemDescription clamp={false}>{options[id]}</ItemDescription></ItemContent>
+                <ItemActions><RadioGroupItem value={id} aria-label={id === "off" ? i18n._({ id: "Off", message: "Off" }) : i18n._({ id: "Automatic", message: "Automatic" })} /></ItemActions>
               </Item>
             ))}
           </ItemGroup>

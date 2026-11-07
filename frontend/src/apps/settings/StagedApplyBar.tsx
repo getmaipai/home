@@ -1,5 +1,6 @@
 // The one Apply bar for settings pages that stage choices first (AI and models, Offline data): pinned to the bottom of the
 // screen, with any notices above the staged-changes card. A page passes its own words and what Apply does.
+import { i18n } from "@lingui/core";
 import type { ReactNode } from "react";
 import { Alert, AlertDescription, AlertTitle } from "@maipai/ui/src/ui/alert";
 import { Button } from "@maipai/ui/src/ui/button";
@@ -36,7 +37,7 @@ export function StagedApplyBar({ notices, staged, title, summary, step, applying
             {applying && step ? <p className="text-base">{step}</p> : null}
             <div className="flex gap-2">
               <Button type="button" variant="outline" size="sm" disabled={applying} onClick={onDiscard}>{discardLabel}</Button>
-              <Button type="button" size="sm" disabled={applying || Boolean(applyDisabled)} onClick={onApply}>{applying ? "Applying…" : applyLabel}</Button>
+              <Button type="button" size="sm" disabled={applying || Boolean(applyDisabled)} onClick={onApply}>{applying ? i18n._({ id: "Applying…", message: "Applying…" }) : applyLabel}</Button>
             </div>
           </AlertDescription>
         </Alert>

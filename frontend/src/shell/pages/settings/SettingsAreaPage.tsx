@@ -1,3 +1,4 @@
+import { i18n } from "@lingui/core";
 import { Fragment, useEffect, useMemo, type ReactNode } from "react";
 import { useHeaderExtra } from "@maipai/ui/src/dashboard/layouts/full/vertical/header/HeaderExtraContext";
 import { PageHeaderTitle } from "@/shell/pageHeaderTitle";
@@ -62,7 +63,7 @@ export function SettingsAreaPage({ person, onPersonChange }: { person: Roster; o
     ? central
     : homeArea ?? packageArea;
   // A package's area is known only once the app list has answered: wait for it, never bounce to Account first.
-  if (!area && !ready) return <Progress mode="spinner" label="Loading settings" />;
+  if (!area && !ready) return <Progress mode="spinner" label={i18n._({ id: "Loading settings", message: "Loading settings" })} />;
   if (!area) return <Navigate to={settingsPath("profile")} replace />;
   const routeViewer = { ...baseViewer(person), role: person.role === "owner" ? "admin" as const : person.role as SettingsViewer["role"] };
   if (!areaAllows(area, routeViewer)) {
@@ -70,9 +71,9 @@ export function SettingsAreaPage({ person, onPersonChange }: { person: Roster; o
       <>
         <Empty>
           <EmptyHeader>
-            <EmptyDescription>Only a parent or admin can change these settings. Ask the person who set up Home.</EmptyDescription>
+            <EmptyDescription>{i18n._({ id: "Only a parent or admin can change these settings. Ask the person who set up Home.", message: "Only a parent or admin can change these settings. Ask the person who set up Home." })}</EmptyDescription>
           </EmptyHeader>
-          <Button variant="link" nativeButton={false} role="link" render={<Link to={settingsPath("profile")} />}>Open your settings</Button>
+          <Button variant="link" nativeButton={false} role="link" render={<Link to={settingsPath("profile")} />}>{i18n._({ id: "Open your settings", message: "Open your settings" })}</Button>
         </Empty>
       </>
     );
@@ -82,8 +83,8 @@ export function SettingsAreaPage({ person, onPersonChange }: { person: Roster; o
   if (requestedSection?.scope === "household" && person.role !== "owner" && person.role !== "admin") return (
     <>
       <Empty>
-        <EmptyHeader><EmptyDescription>Only a parent or admin can change these settings. Ask the person who set up Home.</EmptyDescription></EmptyHeader>
-        <Button variant="link" nativeButton={false} role="link" render={<Link to={settingsPath("profile")} />}>Open your settings</Button>
+        <EmptyHeader><EmptyDescription>{i18n._({ id: "Only a parent or admin can change these settings. Ask the person who set up Home.", message: "Only a parent or admin can change these settings. Ask the person who set up Home." })}</EmptyDescription></EmptyHeader>
+        <Button variant="link" nativeButton={false} role="link" render={<Link to={settingsPath("profile")} />}>{i18n._({ id: "Open your settings", message: "Open your settings" })}</Button>
       </Empty>
     </>
   );
@@ -175,7 +176,7 @@ function SettingsAreaBody({ area, packageAreas, person, onPersonChange, packageA
     return () => window.removeEventListener("keydown", onKey);
   }, [query, setParams]);
 
-  if (!registry || !ready) return <Progress mode="spinner" label="Loading settings" />;
+  if (!registry || !ready) return <Progress mode="spinner" label={i18n._({ id: "Loading settings", message: "Loading settings" })} />;
 
   // No section named: a desktop opens the first one; a phone shows the column.
   if (!sectionId && desktop && first) return <Navigate to={pagePath(first.id)} replace />;
@@ -212,7 +213,7 @@ function SettingsAreaBody({ area, packageAreas, person, onPersonChange, packageA
       ? (
         <Empty>
           <EmptyHeader>
-            <EmptyDescription>No settings match that search.</EmptyDescription>
+            <EmptyDescription>{i18n._({ id: "No settings match that search.", message: "No settings match that search." })}</EmptyDescription>
           </EmptyHeader>
         </Empty>
       )
@@ -257,11 +258,11 @@ function SettingsAreaBody({ area, packageAreas, person, onPersonChange, packageA
     content = <>
       <Card>
         <CardHeader>
-          <CardTitle>Finish setting up</CardTitle>
+          <CardTitle>{i18n._({ id: "Finish setting up", message: "Finish setting up" })}</CardTitle>
           <CardDescription>{setupChecklistCountLine(checklistOpenCount)}.</CardDescription>
         </CardHeader>
         <CardContent>
-          <ItemGroup variant="card" aria-label="Finish setting up">
+          <ItemGroup variant="card" aria-label={i18n._({ id: "Finish setting up", message: "Finish setting up" })}>
             {checklistItems.map((item, index) => <Fragment key={item.id}>
               {index > 0 ? <ItemSeparator variant="inset" /> : null}
               <Item>
@@ -270,15 +271,15 @@ function SettingsAreaBody({ area, packageAreas, person, onPersonChange, packageA
                   <ItemDescription clamp={false}>{item.reason}</ItemDescription>
                 </ItemContent>
                 <ItemFooter>
-                  {item.done ? <Badge variant="secondary">Done</Badge> : <>
+                  {item.done ? <Badge variant="secondary">{i18n._({ id: "Done", message: "Done" })}</Badge> : <>
                     <Button aria-label={`Open ${item.title}`} variant="outline" size="row" nativeButton={false} role="link" render={<Link to={item.open.href} state={item.id === "away-access" ? { from: `${location.pathname}${location.search}${location.hash}` } : undefined} />}>{item.open.label}</Button>
-                    <Button variant="ghost" size="row" disabled={setupChecklist.dismiss.isPending} onClick={() => setupChecklist.dismiss.mutate(item.id)}>Not now</Button>
+                    <Button variant="ghost" size="row" disabled={setupChecklist.dismiss.isPending} onClick={() => setupChecklist.dismiss.mutate(item.id)}>{i18n._({ id: "Not now", message: "Not now" })}</Button>
                   </>}
                 </ItemFooter>
               </Item>
             </Fragment>)}
           </ItemGroup>
-          {setupChecklist.dismiss.isError ? <p role="alert" className="text-sm text-destructive">Could not hide this item. Try again.</p> : null}
+          {setupChecklist.dismiss.isError ? <p role="alert" className="text-sm text-destructive">{i18n._({ id: "Could not hide this item. Try again.", message: "Could not hide this item. Try again." })}</p> : null}
         </CardContent>
       </Card>
       {content}
@@ -288,7 +289,7 @@ function SettingsAreaBody({ area, packageAreas, person, onPersonChange, packageA
   return (
     <SettingsShell
       layout={desktop ? "docked" : "default"}
-      backLink={<SettingsBackLink title="Settings" reach={active?.scope === "household" ? "Applies to everyone at home" : "Only you"} />}
+      backLink={<SettingsBackLink title={i18n._({ id: "Settings", message: "Settings" })} reach={active?.scope === "household" ? "Applies to everyone at home" : "Only you"} />}
       labels={{ columnTitle: "Settings" }}
       trail={[{ label: area.title, href: packageArea && area.id !== "clock" ? `/settings/${area.id}` : settingsPath() }, ...(active ? [{ label: active.label, href: detailId ? pagePath(active.id, tab) : undefined }] : []), ...(detailId ? [{ label: detailName ?? active?.label ?? detailId }] : [])]}
       contentAs="section"

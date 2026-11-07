@@ -1,6 +1,7 @@
 // SEARXNG-SET-05: Settings > Home > Search > Web search. One plain page for owners and admins: what web search uses right
 // now, the SearXNG address (Test, then Save), the source switches, and the DuckDuckGo choice for teens and children.
 // The Test result is the same component the setup screen uses.
+import { i18n } from "@lingui/core";
 import { useEffect, useState, type ReactNode } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { getIcon } from "@maipai/ui/src/icons";
@@ -79,40 +80,40 @@ export function WebSearchSettings({ load = api.searchWeb, test = (url) => api.se
     finally { setBusy(null); }
   }
 
-  if (state.isError) return <section aria-label="Web search"><Alert variant="destructive"><ErrorIcon /><AlertDescription>Home could not read the web search settings. Reload the page, and check that Home is running.</AlertDescription></Alert></section>;
+  if (state.isError) return <section aria-label={i18n._({ id: "Web search", message: "Web search" })}><Alert variant="destructive"><ErrorIcon /><AlertDescription>{i18n._({ id: "Home could not read the web search settings. Reload the page, and check that Home is running.", message: "Home could not read the web search settings. Reload the page, and check that Home is running." })}</AlertDescription></Alert></section>;
   if (!data) return null;
 
   const clearing = empty && saved !== "";
   const only = data.sources.length === 1 ? data.sources[0] : null;
   return (
-    <section aria-label="Web search" className="flex flex-col gap-6">
-      <h2 className="text-lg font-semibold text-foreground">Web search</h2>
+    <section aria-label={i18n._({ id: "Web search", message: "Web search" })} className="flex flex-col gap-6">
+      <h2 className="text-lg font-semibold text-foreground">{i18n._({ id: "Web search", message: "Web search" })}</h2>
       <p role="status" data-testid="web-search-status" className="text-base text-foreground">{webSearchStatusLine(data)}</p>
-      <p className="text-base text-muted-foreground">SearXNG is a search service you run yourself. It is private, keeps no record of who asked, and searches many sites at once.</p>
+      <p className="text-base text-muted-foreground">{i18n._({ id: "SearXNG is a search service you run yourself. It is private, keeps no record of who asked, and searches many sites at once.", message: "SearXNG is a search service you run yourself. It is private, keeps no record of who asked, and searches many sites at once." })}</p>
       <Field>
-        <FieldLabel htmlFor="searxng-address">SearXNG address</FieldLabel>
-        <Input id="searxng-address" type="url" inputMode="url" autoComplete="off" placeholder="http://searx.local:8888" value={text} onChange={(event) => type(event.target.value)} />
+        <FieldLabel htmlFor="searxng-address">{i18n._({ id: "SearXNG address", message: "SearXNG address" })}</FieldLabel>
+        <Input id="searxng-address" type="url" inputMode="url" autoComplete="off" placeholder={i18n._({ id: "http://searx.local:8888", message: "http://searx.local:8888" })} value={text} onChange={(event) => type(event.target.value)} />
       </Field>
       {error ? <Alert variant="destructive"><ErrorIcon /><AlertDescription>{error}</AlertDescription></Alert> : null}
       {result && !changedAfterTest ? <Alert variant={SEARCH_RESULT_VARIANT[result.level]} role="status" data-level={result.level}><SearchResultIcon level={result.level} /><AlertDescription><SearchTestResultBody result={result} /></AlertDescription></Alert> : null}
-      {changedAfterTest ? <p role="status" className="text-base text-muted-foreground">You changed the address. Test it again, or clear it.</p> : null}
-      {!result && !empty && !unchanged && !error ? <p className="text-base text-muted-foreground">Press Test to check this address. Save turns on once it works.</p> : null}
+      {changedAfterTest ? <p role="status" className="text-base text-muted-foreground">{i18n._({ id: "You changed the address. Test it again, or clear it.", message: "You changed the address. Test it again, or clear it." })}</p> : null}
+      {!result && !empty && !unchanged && !error ? <p className="text-base text-muted-foreground">{i18n._({ id: "Press Test to check this address. Save turns on once it works.", message: "Press Test to check this address. Save turns on once it works." })}</p> : null}
       <div className="flex flex-wrap gap-2">
-        <Button type="button" variant="secondary" size="lg" disabled={empty || busy !== null} onClick={() => void runTest()}>{result && !changedAfterTest ? (result.canUse ? "Test again" : "Try again") : "Test"}</Button>
-        <Button type="button" size="lg" disabled={!canSave} onClick={() => (clearing ? setConfirmClear(true) : void runSave())}>{clearing ? "Remove SearXNG" : "Save"}</Button>
+        <Button type="button" variant="secondary" size="lg" disabled={empty || busy !== null} onClick={() => void runTest()}>{result && !changedAfterTest ? (result.canUse ? i18n._({ id: "Test again", message: "Test again" }) : i18n._({ id: "Try again", message: "Try again" })) : i18n._({ id: "Test", message: "Test" })}</Button>
+        <Button type="button" size="lg" disabled={!canSave} onClick={() => (clearing ? setConfirmClear(true) : void runSave())}>{clearing ? i18n._({ id: "Remove SearXNG", message: "Remove SearXNG" }) : i18n._({ id: "Save", message: "Save" })}</Button>
       </div>
       {data.ddgsReady ? (
-        <ItemGroup variant="card" aria-label="Search sources">
+        <ItemGroup variant="card" aria-label={i18n._({ id: "Search sources", message: "Search sources" })}>
           <Item size="setting">
-            <ItemContent><ItemTitle>SearXNG</ItemTitle></ItemContent>
-            <ItemActions><Switch size="md" aria-label="Use SearXNG" checked={data.sources.includes("searxng")} disabled={busy !== null || only === "searxng"} onCheckedChange={(on) => void toggle("searxng", on)} /></ItemActions>
+            <ItemContent><ItemTitle>{i18n._({ id: "SearXNG", message: "SearXNG" })}</ItemTitle></ItemContent>
+            <ItemActions><Switch size="md" aria-label={i18n._({ id: "Use SearXNG", message: "Use SearXNG" })} checked={data.sources.includes("searxng")} disabled={busy !== null || only === "searxng"} onCheckedChange={(on) => void toggle("searxng", on)} /></ItemActions>
           </Item>
           <Item size="setting">
             <ItemContent>
-              <ItemTitle>DuckDuckGo</ItemTitle>
-              <ItemDescription>Adults only.</ItemDescription>
+              <ItemTitle>{i18n._({ id: "DuckDuckGo", message: "DuckDuckGo" })}</ItemTitle>
+              <ItemDescription>{i18n._({ id: "Adults only.", message: "Adults only." })}</ItemDescription>
             </ItemContent>
-            <ItemActions><Switch size="md" aria-label="Use DuckDuckGo" checked={data.sources.includes("ddgs")} disabled={busy !== null || only === "ddgs"} onCheckedChange={(on) => void toggle("ddgs", on)} /></ItemActions>
+            <ItemActions><Switch size="md" aria-label={i18n._({ id: "Use DuckDuckGo", message: "Use DuckDuckGo" })} checked={data.sources.includes("ddgs")} disabled={busy !== null || only === "ddgs"} onCheckedChange={(on) => void toggle("ddgs", on)} /></ItemActions>
           </Item>
         </ItemGroup>
       ) : null}
@@ -120,12 +121,12 @@ export function WebSearchSettings({ load = api.searchWeb, test = (url) => api.se
       <AlertDialog open={confirmClear} onOpenChange={setConfirmClear}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Remove SearXNG?</AlertDialogTitle>
-            <AlertDialogDescription>{data.ddgsReady && data.sources.includes("ddgs") ? "Home will use DuckDuckGo for adults and the Library only for teens and children." : "Home will use the Library only until you add a SearXNG address."}</AlertDialogDescription>
+            <AlertDialogTitle>{i18n._({ id: "Remove SearXNG?", message: "Remove SearXNG?" })}</AlertDialogTitle>
+            <AlertDialogDescription>{data.ddgsReady && data.sources.includes("ddgs") ? i18n._({ id: "Home will use DuckDuckGo for adults and the Library only for teens and children.", message: "Home will use DuckDuckGo for adults and the Library only for teens and children." }) : i18n._({ id: "Home will use the Library only until you add a SearXNG address.", message: "Home will use the Library only until you add a SearXNG address." })}</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Keep it</AlertDialogCancel>
-            <AlertDialogAction onClick={() => void runSave()}>Remove SearXNG</AlertDialogAction>
+            <AlertDialogCancel>{i18n._({ id: "Keep it", message: "Keep it" })}</AlertDialogCancel>
+            <AlertDialogAction onClick={() => void runSave()}>{i18n._({ id: "Remove SearXNG", message: "Remove SearXNG" })}</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

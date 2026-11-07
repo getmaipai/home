@@ -1,3 +1,4 @@
+import { i18n } from "@lingui/core";
 import { useEffect, useRef, useState } from "react";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@maipai/ui/src/ui/dialog";
 import { Button } from "@maipai/ui/src/ui/button";
@@ -105,41 +106,41 @@ export function StackChanInstallDialog({ updateOf, install = installStackChan, r
 
   return (
     <>
-      {showButton ? <Button onClick={openDialog}>{updating ? "Update firmware" : "Add a StackChan"}</Button> : null}
+      {showButton ? <Button onClick={openDialog}>{updating ? i18n._({ id: "Update firmware", message: "Update firmware" }) : i18n._({ id: "Add a StackChan", message: "Add a StackChan" })}</Button> : null}
       <Dialog open={open} onOpenChange={(next) => { if (!working) setOpen(next); }}>
         <DialogContent scroll="viewport">
           <DialogHeader>
-            <DialogTitle>{updating ? "Update firmware" : "Add a StackChan"}</DialogTitle>
+            <DialogTitle>{updating ? i18n._({ id: "Update firmware", message: "Update firmware" }) : i18n._({ id: "Add a StackChan", message: "Add a StackChan" })}</DialogTitle>
             <DialogDescription>
-              {updateDone ? "The firmware is written. If the StackChan has not restarted within 10 seconds, unplug its USB cable and plug it back in (the reset from this page does not restart every unit). It then reconnects within a minute, with its name, Wi-Fi and pairing unchanged." : !installFinished ? "You need Chrome or Edge on a computer, Home opened at its https address, and the StackChan plugged into this computer with a USB-C data cable." : online ? "Your StackChan is online and ready." : "On a phone, join the robot's Wi-Fi hotspot and choose your home Wi-Fi. Home never asks for the Wi-Fi password."}
+              {updateDone ? i18n._({ id: "The firmware is written. If the StackChan has not restarted within 10 seconds, unplug its USB cable and plug it back in (the reset from this page does not restart every unit). It then reconnects within a minute, with its name, Wi-Fi and pairing unchanged.", message: "The firmware is written. If the StackChan has not restarted within 10 seconds, unplug its USB cable and plug it back in (the reset from this page does not restart every unit). It then reconnects within a minute, with its name, Wi-Fi and pairing unchanged." }) : !installFinished ? i18n._({ id: "You need Chrome or Edge on a computer, Home opened at its https address, and the StackChan plugged into this computer with a USB-C data cable.", message: "You need Chrome or Edge on a computer, Home opened at its https address, and the StackChan plugged into this computer with a USB-C data cable." }) : online ? i18n._({ id: "Your StackChan is online and ready.", message: "Your StackChan is online and ready." }) : i18n._({ id: "On a phone, join the robot's Wi-Fi hotspot and choose your home Wi-Fi. Home never asks for the Wi-Fi password.", message: "On a phone, join the robot's Wi-Fi hotspot and choose your home Wi-Fi. Home never asks for the Wi-Fi password." })}
             </DialogDescription>
           </DialogHeader>
           {message ? <Alert variant="destructive"><AlertDescription>{message}</AlertDescription></Alert> : null}
-          {stalledInBackup && !working ? <p>The backup did not work with this computer or cable. Press Start over, unplug and replug the StackChan, then choose Install without a backup. The firmware now on it will be replaced and cannot be restored from Home.</p> : null}
+          {stalledInBackup && !working ? <p>{i18n._({ id: "The backup did not work with this computer or cable. Press Start over, unplug and replug the StackChan, then choose Install without a backup. The firmware now on it will be replaced and cannot be restored from Home.", message: "The backup did not work with this computer or cable. Press Start over, unplug and replug the StackChan, then choose Install without a backup. The firmware now on it will be replaced and cannot be restored from Home." })}</p> : null}
           {choosing && updating ? <>
             <p>{PORT_HELP}</p>
-            <p><strong>Update firmware.</strong> Writes the newest MaiPai firmware, about 1 to 2 minutes. The StackChan keeps its name, Wi-Fi and pairing, so you do not set up its Wi-Fi again.</p>
+            <p><strong>{i18n._({ id: "Update firmware.", message: "Update firmware." })}</strong> {i18n._({ id: "Writes the newest MaiPai firmware, about 1 to 2 minutes. The StackChan keeps its name, Wi-Fi and pairing, so you do not set up its Wi-Fi again.", message: "Writes the newest MaiPai firmware, about 1 to 2 minutes. The StackChan keeps its name, Wi-Fi and pairing, so you do not set up its Wi-Fi again." })}</p>
           </> : null}
           {choosing && !updating ? <>
             <p>{PORT_HELP}</p>
-            <p><strong>Back up first, then install.</strong> Saves the StackChan's whole memory, then installs. About 6 minutes longer.</p>
-            <p><strong>Install without a backup.</strong> Faster, about 1 to 2 minutes. The firmware now on the StackChan is replaced and cannot be restored from Home.</p>
+            <p><strong>{i18n._({ id: "Back up first, then install.", message: "Back up first, then install." })}</strong> {i18n._({ id: "Saves the StackChan's whole memory, then installs. About 6 minutes longer.", message: "Saves the StackChan's whole memory, then installs. About 6 minutes longer." })}</p>
+            <p><strong>{i18n._({ id: "Install without a backup.", message: "Install without a backup." })}</strong> {i18n._({ id: "Faster, about 1 to 2 minutes. The firmware now on the StackChan is replaced and cannot be restored from Home.", message: "Faster, about 1 to 2 minutes. The firmware now on the StackChan is replaced and cannot be restored from Home." })}</p>
           </> : null}
           {working ? <><p>{stage ?? "Preparing"}</p><JobProgress {...downloadProgress({ title: "StackChan", state: "running", status: stage ?? "Preparing", percent: progress })} variant="full" />{stageNote ? <p>{stageNote}</p> : null}</> : null}
-          {installFinished && deviceId && !online && !onlineFailed ? <p>On a phone, join the robot's Wi-Fi hotspot and choose your home Wi-Fi. Home never asks for the Wi-Fi password.</p> : null}
+          {installFinished && deviceId && !online && !onlineFailed ? <p>{i18n._({ id: "On a phone, join the robot's Wi-Fi hotspot and choose your home Wi-Fi. Home never asks for the Wi-Fi password.", message: "On a phone, join the robot's Wi-Fi hotspot and choose your home Wi-Fi. Home never asks for the Wi-Fi password." })}</p> : null}
           {onlineFailed ? <Alert variant="destructive"><AlertDescription>{ONLINE_MESSAGE}</AlertDescription></Alert> : null}
-          {online ? <p>The robot is online.</p> : null}
-          {lines.length > 0 ? <details><summary>Show details</summary><pre className="max-h-48 overflow-auto whitespace-pre-wrap text-base">{lines.join("\n")}</pre></details> : null}
+          {online ? <p>{i18n._({ id: "The robot is online.", message: "The robot is online." })}</p> : null}
+          {lines.length > 0 ? <details><summary>{i18n._({ id: "Show details", message: "Show details" })}</summary><pre className="max-h-48 overflow-auto whitespace-pre-wrap text-base">{lines.join("\n")}</pre></details> : null}
           <DialogFooter>
-            {stalledInBackup && !working ? <Button onClick={startOver}>Start over</Button> : null}
-            {canStop ? <Button variant="outline" onClick={stopInstall}>Stop</Button> : null}
-            {onlineFailed ? <Button onClick={retryOnline}>Retry</Button> : null}
-            {choosing && updating ? <Button onClick={() => void startInstall(true)}>Update firmware</Button> : null}
-            {choosing && !updating ? <Button variant="outline" onClick={() => void startInstall(true)}>Install without a backup</Button> : null}
-            {choosing && !updating ? <Button onClick={() => void startInstall(false)}>Back up first, then install</Button> : null}
-            {updateDone && !working ? <Button onClick={() => setOpen(false)}>Done</Button> : null}
-            {message === BROWSER_MESSAGE && !working ? <Button onClick={openDialog}>Try again</Button> : null}
-            {deviceId && !working && (!installFinished || online || onlineFailed || message) ? <Button onClick={() => setOpen(false)}>{online ? "Done" : "Close"}</Button> : null}
+            {stalledInBackup && !working ? <Button onClick={startOver}>{i18n._({ id: "Start over", message: "Start over" })}</Button> : null}
+            {canStop ? <Button variant="outline" onClick={stopInstall}>{i18n._({ id: "Stop", message: "Stop" })}</Button> : null}
+            {onlineFailed ? <Button onClick={retryOnline}>{i18n._({ id: "Retry", message: "Retry" })}</Button> : null}
+            {choosing && updating ? <Button onClick={() => void startInstall(true)}>{i18n._({ id: "Update firmware", message: "Update firmware" })}</Button> : null}
+            {choosing && !updating ? <Button variant="outline" onClick={() => void startInstall(true)}>{i18n._({ id: "Install without a backup", message: "Install without a backup" })}</Button> : null}
+            {choosing && !updating ? <Button onClick={() => void startInstall(false)}>{i18n._({ id: "Back up first, then install", message: "Back up first, then install" })}</Button> : null}
+            {updateDone && !working ? <Button onClick={() => setOpen(false)}>{i18n._({ id: "Done", message: "Done" })}</Button> : null}
+            {message === BROWSER_MESSAGE && !working ? <Button onClick={openDialog}>{i18n._({ id: "Try again", message: "Try again" })}</Button> : null}
+            {deviceId && !working && (!installFinished || online || onlineFailed || message) ? <Button onClick={() => setOpen(false)}>{online ? i18n._({ id: "Done", message: "Done" }) : i18n._({ id: "Close", message: "Close" })}</Button> : null}
           </DialogFooter>
         </DialogContent>
       </Dialog>

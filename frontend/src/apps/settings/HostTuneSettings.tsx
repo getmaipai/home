@@ -1,4 +1,5 @@
 // MEM-SPACE-13: the host-tune list under Settings > Performance, owner only. The same detect, apply and revert routes the setup wizard's "Tune this computer" step uses; no second way to write the markers.
+import { i18n } from "@lingui/core";
 import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@maipai/ui/src/ui/button";
@@ -31,8 +32,8 @@ export function HostTuneSettings() {
     <section data-testid="host-tune-settings">
       <Card>
         <CardHeader>
-          <CardTitle>Tune this computer</CardTitle>
-          <CardDescription>Changes that help the AI run well on this computer. Each one can be put back.</CardDescription>
+          <CardTitle>{i18n._({ id: "Tune this computer", message: "Tune this computer" })}</CardTitle>
+          <CardDescription>{i18n._({ id: "Changes that help the AI run well on this computer. Each one can be put back.", message: "Changes that help the AI run well on this computer. Each one can be put back." })}</CardDescription>
         </CardHeader>
         <CardContent>
           {error ? <p role="alert">{error}</p> : null}
@@ -43,12 +44,12 @@ export function HostTuneSettings() {
                 <Item key={item.id} size="setting" data-testid="host-tune-item">
                   <ItemContent>
                     <ItemTitle>{item.title}</ItemTitle>
-                    <ItemDescription clamp={false}>{done ? `On. ${item.proposed}.` : item.state === "unknown" ? "Home can't tell what this is set to, so it leaves it alone." : `Now: ${item.current}. After: ${item.proposed}.`}</ItemDescription>
+                    <ItemDescription clamp={false}>{done ? `On. ${item.proposed}.` : item.state === "unknown" ? i18n._({ id: "Home can't tell what this is set to, so it leaves it alone.", message: "Home can't tell what this is set to, so it leaves it alone." }) : `Now: ${item.current}. After: ${item.proposed}.`}</ItemDescription>
                   </ItemContent>
                   <ItemActions>
                     {item.state === "applied" || (item.state === "ok" && item.mode === "auto")
-                      ? <Button type="button" variant="outline" disabled={busyId !== null} onClick={() => void run(item, "revert")}>{busyId === item.id ? "Reverting" : "Revert"}</Button>
-                      : item.state === "needs" ? <Button type="button" disabled={busyId !== null} onClick={() => void run(item, "apply")}>{busyId === item.id ? "Applying" : "Apply"}</Button> : null}
+                      ? <Button type="button" variant="outline" disabled={busyId !== null} onClick={() => void run(item, "revert")}>{busyId === item.id ? i18n._({ id: "Reverting", message: "Reverting" }) : i18n._({ id: "Revert", message: "Revert" })}</Button>
+                      : item.state === "needs" ? <Button type="button" disabled={busyId !== null} onClick={() => void run(item, "apply")}>{busyId === item.id ? i18n._({ id: "Applying", message: "Applying" }) : i18n._({ id: "Apply", message: "Apply" })}</Button> : null}
                   </ItemActions>
                 </Item>
               );

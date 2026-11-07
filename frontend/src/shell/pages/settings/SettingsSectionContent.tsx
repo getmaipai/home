@@ -1,3 +1,4 @@
+import { i18n } from "@lingui/core";
 import { useState, type ComponentProps, type ReactNode } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -103,7 +104,7 @@ function keysCard(card: Card, viewer: SettingsViewer, props: SectionContentProps
     includeExpert: props.section.id === "advanced" && props.tab === "network",
   };
   const renderer = group === "profile.ease" ? <EaseCardRenderer viewingSelf={viewer.selfId === props.person.id} {...rendererProps} /> : props.section.id === "clock" ? <ClockCardRenderer {...rendererProps} /> : <SettingsRenderer {...rendererProps} />;
-  if (props.section.id === "advanced" && props.tab === "network") return <>{renderer}{group === "household.network" && (viewer.role === "owner" || viewer.role === "admin") ? <Button asChild variant="outline"><Link to="/setup/away" state={{ from: returnPath }}>Set up away access</Link></Button> : null}</>;
+  if (props.section.id === "advanced" && props.tab === "network") return <>{renderer}{group === "household.network" && (viewer.role === "owner" || viewer.role === "admin") ? <Button asChild variant="outline"><Link to="/setup/away" state={{ from: returnPath }}>{i18n._({ id: "Set up away access", message: "Set up away access" })}</Link></Button> : null}</>;
   if (!card.collapsed) return renderer;
   const focused = props.focusKey !== undefined && props.registry.some((k) => k.key === props.focusKey && k.lives_in === group && k.scope === scope);
   return (
@@ -155,7 +156,7 @@ export function SettingsSectionContent(props: SectionContentProps) {
         if (card.view) return <SettingsView key={`${card.scope}:${card.group ?? card.label}`} view={card.view} card={card} {...viewProps} />;
         if (card.links) return <SettingsLinks key={card.label} label={card.label} links={card.links.map((link) => ({ label: link.label, href: resolveHref(link.href, viewer) }))} />;
         return <div key={`${card.scope}:${card.group}`}>
-          {incognito && drawsPlaces ? <p className="text-sm text-muted-foreground">Incognito is on, so places cannot be added or renamed until you turn it off.</p> : null}
+          {incognito && drawsPlaces ? <p className="text-sm text-muted-foreground">{i18n._({ id: "Incognito is on, so places cannot be added or renamed until you turn it off.", message: "Incognito is on, so places cannot be added or renamed until you turn it off." })}</p> : null}
 {keysCard(card, viewer, props, returnPath, places)}</div>;
       })}
       {section.trail_view && (section.view_tab === undefined || section.view_tab === props.tab) ? <SettingsView view={section.trail_view} {...viewProps} /> : null}

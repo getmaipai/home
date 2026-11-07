@@ -1,3 +1,4 @@
+import { i18n } from "@lingui/core";
 import { useEffect, useRef, useState } from "react";
 import { Badge } from "@maipai/ui/src/ui/badge";
 import { Button } from "@maipai/ui/src/ui/button";
@@ -185,12 +186,12 @@ export function RobotBody({
         <CardDescription>{[device.area ?? "Robot", device.ownerName ? `Belongs to ${device.ownerName}` : null].filter(Boolean).join(" · ")}</CardDescription>
         <CardAction>
           <Badge variant={unreachable ? "destructive" : "secondary"}>{status}</Badge>
-          <Badge variant="secondary">Paired</Badge>
+          <Badge variant="secondary">{i18n._({ id: "Paired", message: "Paired" })}</Badge>
         </CardAction>
       </CardHeader>
       <CardContent>
         {featureCapabilities.length > 0 ? (
-          <div className="mb-4 flex flex-wrap gap-2" aria-label="Robot capabilities">
+          <div className="mb-4 flex flex-wrap gap-2" aria-label={i18n._({ id: "Robot capabilities", message: "Robot capabilities" })}>
             {featureCapabilities.map((capability) => (
               <Badge key={capability} variant="outline">
                 {robotCapabilityLabel(capability)}
@@ -199,46 +200,40 @@ export function RobotBody({
           </div>
         ) : null}
         {state === null ? (
-          <p className="text-base text-muted-foreground">
-            {device.name} has not reported in yet. It shows up here once it is switched on and connected.
-          </p>
+          <p className="text-base text-muted-foreground">{i18n._({ id: "{name} has not reported in yet. It shows up here once it is switched on and connected.", message: "{name} has not reported in yet. It shows up here once it is switched on and connected.", values: { name: device.name } })}</p>
         ) : (
           <dl className="flex flex-col gap-3">
             {unreachable ? (
-              <Row label="Last heard from">{state.unreachableSince ? whenText(state.unreachableSince) : "Unknown"}</Row>
+              <Row label={i18n._({ id: "Last heard from", message: "Last heard from" })}>{state.unreachableSince ? whenText(state.unreachableSince) : i18n._({ id: "Unknown", message: "Unknown" })}</Row>
             ) : null}
-            {admin && device.ipAddress ? <Row label="IP address">{device.ipAddress}</Row> : null}
-            <Row label="Microphone">{state.muted ? "Muted" : "On"}</Row>
-            <Row label="Tracking">{state.tracking ? "On" : "Off"}</Row>
-            {motion === "held" ? <p className="text-sm font-medium">Being carried</p> : null}
+            {admin && device.ipAddress ? <Row label={i18n._({ id: "IP address", message: "IP address" })}>{device.ipAddress}</Row> : null}
+            <Row label={i18n._({ id: "Microphone", message: "Microphone" })}>{state.muted ? i18n._({ id: "Muted", message: "Muted" }) : i18n._({ id: "On", message: "On" })}</Row>
+            <Row label={i18n._({ id: "Tracking", message: "Tracking" })}>{state.tracking ? i18n._({ id: "On", message: "On" }) : i18n._({ id: "Off", message: "Off" })}</Row>
+            {motion === "held" ? <p className="text-sm font-medium">{i18n._({ id: "Being carried", message: "Being carried" })}</p> : null}
             {putDownChanged ? (
               <p className="text-sm text-muted-foreground">
                 {device.area ? `${device.name} was moved: is it still in ${device.area}?` : `${device.name} was moved.`}
               </p>
             ) : null}
-            <Row label="Battery">{batteryText(state)}</Row>
+            <Row label={i18n._({ id: "Battery", message: "Battery" })}>{batteryText(state)}</Row>
             {battery !== null && battery !== undefined ? (
-              <Progress value={Math.round(battery * 100)} aria-label="Battery level" />
+              <Progress value={Math.round(battery * 100)} aria-label={i18n._({ id: "Battery level", message: "Battery level" })} />
             ) : null}
-            {bodyHealthText(state) ? <Row label="Body health">{bodyHealthText(state)}</Row> : null}
-            <Row label="MaiPai version">{state.app_version ?? "Unknown"}</Row>
-            <Row label="Body software">{state.daemon_version ?? "Unknown"}</Row>
+            {bodyHealthText(state) ? <Row label={i18n._({ id: "Body health", message: "Body health" })}>{bodyHealthText(state)}</Row> : null}
+            <Row label={i18n._({ id: "MaiPai version", message: "MaiPai version" })}>{state.app_version ?? "Unknown"}</Row>
+            <Row label={i18n._({ id: "Body software", message: "Body software" })}>{state.daemon_version ?? "Unknown"}</Row>
           </dl>
         )}
         {rebootOffer.length > 0 ? (
           <div className="mt-4 flex flex-col gap-2" data-testid="motor-reboot-offer">
-            <p className="text-base font-medium">
-              Restart {device.name}'s {rebootOffer.join(", ")} {rebootOffer.length === 1 ? "motor" : "motors"}?
-            </p>
-            <p className="text-sm text-muted-foreground">
-              {rebootOffer.length === 1 ? "That motor" : "Those motors"} stopped working and the robot could not recover on its own. Restarting moves {rebootOffer.length === 1 ? "it" : "them"}, so keep hands clear of the head first.
-            </p>
+            <p className="text-base font-medium">{i18n._({ id: "Restart {name}'s {join} {value}?", message: "Restart {name}'s {join} {value}?", values: { name: device.name, join: rebootOffer.join(", "), value: rebootOffer.length === 1 ? i18n._({ id: "motor", message: "motor" }) : i18n._({ id: "motors", message: "motors" }) } })}</p>
+            <p className="text-sm text-muted-foreground">{i18n._({ id: "{value} stopped working and the robot could not recover on its own. Restarting moves {value2}, so keep hands clear of the head first.", message: "{value} stopped working and the robot could not recover on its own. Restarting moves {value2}, so keep hands clear of the head first.", values: { value: rebootOffer.length === 1 ? i18n._({ id: "That motor", message: "That motor" }) : i18n._({ id: "Those motors", message: "Those motors" }), value2: rebootOffer.length === 1 ? i18n._({ id: "it", message: "it" }) : i18n._({ id: "them", message: "them" }) } })}</p>
             <div className="flex flex-wrap gap-2">
               <Button disabled={rebootBusy} onClick={() => void answerReboot("yes")}>
-                Yes, restart it
+                {i18n._({ id: "Yes, restart it", message: "Yes, restart it" })}
               </Button>
               <Button variant="ghost" disabled={rebootBusy} onClick={() => void answerReboot("no")}>
-                No, leave it
+                {i18n._({ id: "No, leave it", message: "No, leave it" })}
               </Button>
             </div>
             {rebootError ? <p role="alert" className="text-base text-destructive">{rebootError}</p> : null}
@@ -249,7 +244,7 @@ export function RobotBody({
             <Image.Root size="full">
               <Image.Preview src={liveView.stream} alt={`Live view from ${device.name}'s camera`} />
             </Image.Root>
-            <p className="mt-2 text-sm text-muted-foreground">Live view stops by itself after 10 minutes. Nothing is recorded.</p>
+            <p className="mt-2 text-sm text-muted-foreground">{i18n._({ id: "Live view stops by itself after 10 minutes. Nothing is recorded.", message: "Live view stops by itself after 10 minutes. Nothing is recorded." })}</p>
           </div>
         ) : null}
         {liveError ? <p role="alert" className="mt-4 text-base text-destructive">{liveError}</p> : null}
@@ -267,15 +262,15 @@ export function RobotBody({
           {state !== null && mayControl ? (
             <>
               {askedMuted !== null && !muteError ? (
-                <p className="mr-auto text-sm text-muted-foreground">Asked {device.name} to {askedMuted ? "mute" : "unmute"}, waiting for it.</p>
+                <p className="mr-auto text-sm text-muted-foreground">{i18n._({ id: "Asked {name} to {value}, waiting for it.", message: "Asked {name} to {value}, waiting for it.", values: { name: device.name, value: askedMuted ? i18n._({ id: "mute", message: "mute" }) : i18n._({ id: "unmute", message: "unmute" }) } })}</p>
               ) : null}
               {liveView ? (
                 <Button variant="outline" onClick={stopLive}>
-                  Stop live view
+                  {i18n._({ id: "Stop live view", message: "Stop live view" })}
                 </Button>
               ) : (
                 <Button variant="outline" disabled={busy || unreachable || liveStarting} onClick={() => void startLive()}>
-                  {liveStarting ? "Opening…" : "Live view"}
+                  {liveStarting ? i18n._({ id: "Opening…", message: "Opening…" }) : i18n._({ id: "Live view", message: "Live view" })}
                 </Button>
               )}
               <Button
@@ -283,7 +278,7 @@ export function RobotBody({
                 disabled={busy || unreachable || askedMuted !== null || (state.muted && !mayUnmute)}
                 onClick={() => void askMute(!state.muted)}
               >
-                {state.muted ? "Unmute microphone" : "Mute microphone"}
+                {state.muted ? i18n._({ id: "Unmute microphone", message: "Unmute microphone" }) : i18n._({ id: "Mute microphone", message: "Mute microphone" })}
               </Button>
             </>
           ) : null}

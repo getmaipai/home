@@ -1,5 +1,6 @@
 // AIMODELS-GLANCE-2026-10-26: the "Choose a model" dialog opened by a row's gear. Radio cards for the job's models plus Disable;
 // Save choice only stages (the page holds the staging until Apply). Kit Elements as shipped (rule 9); the words are the spec's.
+import { i18n } from "@lingui/core";
 import { useState } from "react";
 import { Badge } from "@maipai/ui/src/ui/badge";
 import { Button } from "@maipai/ui/src/ui/button";
@@ -43,7 +44,7 @@ export function AiModelChoices({ row, copy, onClose, onSave, onAdded }: AiModelC
                       {option.label}
                       {option.recommended ? <Badge tone="success">{copy.recommended}</Badge> : null}
                       {option.id.startsWith("chat.added.") ? <Badge variant="outline" tone="warning">{copy.not_tested}</Badge> : null}
-                      {option.id === "chat.uncensored" ? <Badge variant="outline" tone="warning">Uncensored</Badge> : null}
+                      {option.id === "chat.uncensored" ? <Badge variant="outline" tone="warning">{i18n._({ id: "Uncensored", message: "Uncensored" })}</Badge> : null}
                     </FieldTitle>
                     <FieldDescription>{option.description}</FieldDescription>
                     <FieldDescription>

@@ -1,3 +1,4 @@
+import { i18n } from "@lingui/core";
 import { useEffect, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -161,11 +162,11 @@ export function SettingsRenderer({ scope, scopeValue, only, includeKeys, titleOv
       <AlertDialog open={removal !== null} onOpenChange={(open) => { if (!open) setRemoval(null); }}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Turn this feature off?</AlertDialogTitle>
+            <AlertDialogTitle>{i18n._({ id: "Turn this feature off?", message: "Turn this feature off?" })}</AlertDialogTitle>
             <AlertDialogDescription>{removal?.message}</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogCancel>{i18n._({ id: "Cancel", message: "Cancel" })}</AlertDialogCancel>
             <AlertDialogAction onClick={async () => {
               if (!removal) return;
               const pending = removal;
@@ -175,7 +176,7 @@ export function SettingsRenderer({ scope, scopeValue, only, includeKeys, titleOv
               try { replaceValue(await api.setSetting(scopeValue, pending.key, pending.value, true)); }
               catch (e) { setWriteError(errorLine(e, "Could not save that change.")); }
               finally { setPendingKey(null); }
-            }}>Confirm</AlertDialogAction>
+            }}>{i18n._({ id: "Confirm", message: "Confirm" })}</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
@@ -204,7 +205,7 @@ export function SettingsRenderer({ scope, scopeValue, only, includeKeys, titleOv
             return includeKeys ? { ...group, basic: basic.filter((item) => includeKeys.includes(item.def.key)), advanced: advanced.filter((item) => includeKeys.includes(item.def.key)) } : { ...group, basic, advanced };
           }).filter((group) => group.basic.length + group.advanced.length > 0);
           return groups.length === 0 ? (
-            <EmptyState icon="inbox" text="No settings yet." />
+            <EmptyState icon="inbox" text={i18n._({ id: "No settings yet.", message: "No settings yet." })} />
           ) : (
             <>
               {groups.map((group) => plainRows ? (
@@ -238,9 +239,7 @@ export function SettingsRenderer({ scope, scopeValue, only, includeKeys, titleOv
                             type="button"
                             variant="link"
                             onClick={() => setAdvancedOpen((prev) => ({ ...prev, [group.id]: true }))}
-                          >
-                            Show {group.advanced.length} advanced settings
-                          </Button>
+                          >{i18n._({ id: "Show {length} advanced settings", message: "Show {length} advanced settings", values: { length: group.advanced.length } })}</Button>
                         </div>
                       ) : (
                         <div className="flex flex-col divide-y divide-border border-t border-border pt-1">

@@ -1,3 +1,4 @@
+import { i18n } from "@lingui/core";
 import { useEffect, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Section } from "@maipai/ui/src/primitives/Section";
@@ -61,7 +62,7 @@ function CopyLine({ label, text }: { label: string; text: string }) {
           void navigator.clipboard?.writeText(text).then(() => setCopied(true), () => setCopied(false));
         }}
       >
-        {copied ? "Copied" : "Copy"}
+        {copied ? i18n._({ id: "Copied", message: "Copied" }) : i18n._({ id: "Copy", message: "Copy" })}
       </Button>
     </div>
   );
@@ -201,38 +202,38 @@ export function EngineLinkCredentialSection() {
   if (status.isLoading || status.isError || !status.data) return null;
   const origin = typeof window === "undefined" ? "" : window.location.origin;
   return (
-    <Section heading="Engine computer link">
-      <p className="text-base text-muted-foreground">Key: {status.data.paired ? "Present" : "Not paired"}</p>
-      <Button variant="outline" onClick={begin}>Pair engine computer</Button>
-      {status.data.paired ? <div className="flex flex-col items-start gap-2"><p className="text-sm text-muted-foreground">Before revoking, run <code>maipai-engine unpair</code> on the engine computer.</p><Button variant="destructive" disabled={busy} onClick={() => setConfirmRevoke(true)}>Revoke link key</Button></div> : null}
-      {confirmRevoke ? <DestructiveConfirm message="Revoke this engine link key?" detail="The engine computer will need to be paired again." confirmLabel="Revoke key" busyLabel="Revoking" busy={revokeAction.busy} onConfirm={() => void revokeAction.run()} onCancel={() => setConfirmRevoke(false)} /> : null}
+    <Section heading={i18n._({ id: "Engine computer link", message: "Engine computer link" })}>
+      <p className="text-base text-muted-foreground">{i18n._({ id: "Key: {value}", message: "Key: {value}", values: { value: status.data.paired ? i18n._({ id: "Present", message: "Present" }) : i18n._({ id: "Not paired", message: "Not paired" }) } })}</p>
+      <Button variant="outline" onClick={begin}>{i18n._({ id: "Pair engine computer", message: "Pair engine computer" })}</Button>
+      {status.data.paired ? <div className="flex flex-col items-start gap-2"><p className="text-sm text-muted-foreground">{i18n._({ id: "Before revoking, run", message: "Before revoking, run" })} <code>{i18n._({ id: "maipai-engine unpair", message: "maipai-engine unpair" })}</code> {i18n._({ id: "on the engine computer.", message: "on the engine computer." })}</p><Button variant="destructive" disabled={busy} onClick={() => setConfirmRevoke(true)}>{i18n._({ id: "Revoke link key", message: "Revoke link key" })}</Button></div> : null}
+      {confirmRevoke ? <DestructiveConfirm message={i18n._({ id: "Revoke this engine link key?", message: "Revoke this engine link key?" })} detail="The engine computer will need to be paired again." confirmLabel="Revoke key" busyLabel="Revoking" busy={revokeAction.busy} onConfirm={() => void revokeAction.run()} onCancel={() => setConfirmRevoke(false)} /> : null}
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Pair engine computer</DialogTitle>
-            <DialogDescription>Step {step + 1} of {STEPS.length}: {STEPS[step]}</DialogDescription>
+            <DialogTitle>{i18n._({ id: "Pair engine computer", message: "Pair engine computer" })}</DialogTitle>
+            <DialogDescription>{i18n._({ id: "Step {value} of {length}: {STEPS}", message: "Step {value} of {length}: {STEPS}", values: { value: step + 1, length: STEPS.length, STEPS: STEPS[step] } })}</DialogDescription>
           </DialogHeader>
           <div className="flex flex-col gap-3">
             {step === 0 ? (
               <>
-                <p className="text-base">Pairing connects Home to a second computer in your home that runs the AI engines. Choose where the engine runs.</p>
-                <Label htmlFor="pair-where">Where the engine runs</Label>
+                <p className="text-base">{i18n._({ id: "Pairing connects Home to a second computer in your home that runs the AI engines. Choose where the engine runs.", message: "Pairing connects Home to a second computer in your home that runs the AI engines. Choose where the engine runs." })}</p>
+                <Label htmlFor="pair-where">{i18n._({ id: "Where the engine runs", message: "Where the engine runs" })}</Label>
                 <Select value={where} onValueChange={(value) => { if (value) setWhere(value); }} items={[{ value: "this_computer", label: "This computer" }, { value: "another_computer", label: "Another computer" }]}>
-                  <SelectTrigger id="pair-where" aria-label="Where the engine runs"><SelectValue /></SelectTrigger>
+                  <SelectTrigger id="pair-where" aria-label={i18n._({ id: "Where the engine runs", message: "Where the engine runs" })}><SelectValue /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="this_computer">This computer</SelectItem>
-                    <SelectItem value="another_computer">Another computer</SelectItem>
+                    <SelectItem value="this_computer">{i18n._({ id: "This computer", message: "This computer" })}</SelectItem>
+                    <SelectItem value="another_computer">{i18n._({ id: "Another computer", message: "Another computer" })}</SelectItem>
                   </SelectContent>
                 </Select>
               </>
             ) : null}
             {step === 1 ? (
               <>
-                <p className="text-base">Enter the engine computer's name or its home network address, and the port Home uses to reach it securely.</p>
-                <Label htmlFor="pair-host">Engine computer name or address</Label>
+                <p className="text-base">{i18n._({ id: "Enter the engine computer's name or its home network address, and the port Home uses to reach it securely.", message: "Enter the engine computer's name or its home network address, and the port Home uses to reach it securely." })}</p>
+                <Label htmlFor="pair-host">{i18n._({ id: "Engine computer name or address", message: "Engine computer name or address" })}</Label>
                 <Input id="pair-host" value={host} onChange={(event) => setHost(event.target.value)} disabled={busy} autoComplete="off" spellCheck={false} aria-invalid={problems.host ? true : undefined} aria-describedby="pair-host-problem" />
                 <p id="pair-host-problem" className="text-sm text-destructive">{host !== "" ? problems.host : null}</p>
-                <Label htmlFor="pair-port">Secure connection port</Label>
+                <Label htmlFor="pair-port">{i18n._({ id: "Secure connection port", message: "Secure connection port" })}</Label>
                 <Input id="pair-port" value={port} onChange={(event) => setPort(event.target.value)} disabled={busy} inputMode="numeric" autoComplete="off" aria-invalid={problems.port ? true : undefined} aria-describedby="pair-port-problem" />
                 <p id="pair-port-problem" className="text-sm text-destructive">{problems.port}</p>
               </>
@@ -240,42 +241,42 @@ export function EngineLinkCredentialSection() {
             {step === 2 ? (
               pairing ? (
                 <>
-                  <p className="text-base">On the engine computer, open a terminal and run this one command. Copy it with the button.</p>
-                  <CopyLine label="Pairing command" text={pairCommand(origin, pairing.code)} />
-                  <p className="text-sm text-muted-foreground">One-time code: <code>{groupCode(pairing.code)}</code>. It works once and expires at {new Date(pairing.expires_at).toLocaleTimeString()}. The command prints a check code. Keep it for the next step.</p>
+                  <p className="text-base">{i18n._({ id: "On the engine computer, open a terminal and run this one command. Copy it with the button.", message: "On the engine computer, open a terminal and run this one command. Copy it with the button." })}</p>
+                  <CopyLine label={i18n._({ id: "Pairing command", message: "Pairing command" })} text={pairCommand(origin, pairing.code)} />
+                  <p className="text-sm text-muted-foreground">{i18n._({ id: "One-time code:", message: "One-time code:" })} <code>{groupCode(pairing.code)}</code>{i18n._({ id: ". It works once and expires at {toLocaleTimeString}. The command prints a check code. Keep it for the next step.", message: ". It works once and expires at {toLocaleTimeString}. The command prints a check code. Keep it for the next step.", values: { toLocaleTimeString: new Date(pairing.expires_at).toLocaleTimeString() } })}</p>
                 </>
               ) : (
-                <Button variant="outline" disabled={busy} onClick={() => void run(async () => setPairing(await api.issueEngineLinkPairing()))}>Get a one-time code</Button>
+                <Button variant="outline" disabled={busy} onClick={() => void run(async () => setPairing(await api.issueEngineLinkPairing()))}>{i18n._({ id: "Get a one-time code", message: "Get a one-time code" })}</Button>
               )
             ) : null}
             {step === 3 ? (
               <>
-                <p className="text-base">Select Check the engine computer. Home reads its security key. Then type the check code the engine computer printed.</p>
-                <Button variant="outline" disabled={busy} onClick={() => void checkComputer()}>Check the engine computer</Button>
+                <p className="text-base">{i18n._({ id: "Select Check the engine computer. Home reads its security key. Then type the check code the engine computer printed.", message: "Select Check the engine computer. Home reads its security key. Then type the check code the engine computer printed." })}</p>
+                <Button variant="outline" disabled={busy} onClick={() => void checkComputer()}>{i18n._({ id: "Check the engine computer", message: "Check the engine computer" })}</Button>
                 {scanned ? (
                   <form className="flex flex-col items-start gap-2" onSubmit={(event) => { event.preventDefault(); void pin(); }}>
-                    <Label htmlFor="pair-check-code">Check code from the engine computer</Label>
-                    <Input id="pair-check-code" placeholder="Check code" value={typedCode} onChange={(event) => setTypedCode(event.target.value)} disabled={busy} autoComplete="off" autoCapitalize="characters" spellCheck={false} maxLength={32} />
-                    <Button type="submit" disabled={busy || !typedCode.trim()}>Pin this computer</Button>
+                    <Label htmlFor="pair-check-code">{i18n._({ id: "Check code from the engine computer", message: "Check code from the engine computer" })}</Label>
+                    <Input id="pair-check-code" placeholder={i18n._({ id: "Check code", message: "Check code" })} value={typedCode} onChange={(event) => setTypedCode(event.target.value)} disabled={busy} autoComplete="off" autoCapitalize="characters" spellCheck={false} maxLength={32} />
+                    <Button type="submit" disabled={busy || !typedCode.trim()}>{i18n._({ id: "Pin this computer", message: "Pin this computer" })}</Button>
                   </form>
                 ) : null}
               </>
             ) : null}
             {step === 4 ? (
               <>
-                <p className="text-base">Paired. Home now trusts this engine computer.</p>
+                <p className="text-base">{i18n._({ id: "Paired. Home now trusts this engine computer.", message: "Paired. Home now trusts this engine computer." })}</p>
                 {hops ? hops.map((hop) => (
-                  <p key={hop.id} className="text-sm">{hop.pass ? "PASS" : "FAIL"} hop {hop.id}{hop.detail ? `: ${hop.detail}` : ""}{hop.pass ? "" : `. To fix: ${hop.fix}`}</p>
-                )) : error ? <><Button type="button" variant="outline" disabled={busy} onClick={() => { setError(null); setHops(null); void run(checkConnection); }}>Retry</Button></> : <RouteSkeleton label="Checking the connection" />}
+                  <p key={hop.id} className="text-sm">{i18n._({ id: "{value} hop {id}{value2}{value3}", message: "{value} hop {id}{value2}{value3}", values: { value: hop.pass ? i18n._({ id: "PASS", message: "PASS" }) : i18n._({ id: "FAIL", message: "FAIL" }), id: hop.id, value2: hop.detail ? `: ${hop.detail}` : "", value3: hop.pass ? "" : `. To fix: ${hop.fix}` } })}</p>
+                )) : error ? <><Button type="button" variant="outline" disabled={busy} onClick={() => { setError(null); setHops(null); void run(checkConnection); }}>{i18n._({ id: "Retry", message: "Retry" })}</Button></> : <RouteSkeleton label={i18n._({ id: "Checking the connection", message: "Checking the connection" })} />}
               </>
             ) : null}
             {error ? <p role="alert" className="text-sm text-destructive">{error}</p> : null}
           </div>
           <DialogFooter>
-            {step > 0 && step < 4 ? <Button type="button" variant="ghost" disabled={busy} onClick={back}>Back</Button> : null}
-            {step < 2 ? <Button type="button" disabled={busy || (step === 1 && (problems.host !== null || problems.port !== null))} onClick={() => void next()}>Next</Button> : null}
-            {step === 2 ? <Button type="button" disabled={busy || !pairing} onClick={() => void next()}>Next</Button> : null}
-            {step === 4 ? <Button type="button" onClick={() => setOpen(false)}>Close</Button> : null}
+            {step > 0 && step < 4 ? <Button type="button" variant="ghost" disabled={busy} onClick={back}>{i18n._({ id: "Back", message: "Back" })}</Button> : null}
+            {step < 2 ? <Button type="button" disabled={busy || (step === 1 && (problems.host !== null || problems.port !== null))} onClick={() => void next()}>{i18n._({ id: "Next", message: "Next" })}</Button> : null}
+            {step === 2 ? <Button type="button" disabled={busy || !pairing} onClick={() => void next()}>{i18n._({ id: "Next", message: "Next" })}</Button> : null}
+            {step === 4 ? <Button type="button" onClick={() => setOpen(false)}>{i18n._({ id: "Close", message: "Close" })}</Button> : null}
           </DialogFooter>
         </DialogContent>
       </Dialog>
