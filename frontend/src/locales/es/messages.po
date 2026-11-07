@@ -15705,6 +15705,11 @@ msgid "Made for"
 msgstr "Hecho para"
 
 #. js-lingui-explicit-id
+#: src/apps/settings/styles/stylesShared.tsx:48
+msgid "Made for an older video model, tested on the newer one"
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/apps/settings/styles/stylesShared.tsx:49
 msgid "Made for the engine behind children's videos, so Home cannot use it"
 msgstr ""
@@ -22032,9 +22037,7 @@ msgid "Resume coding?"
 msgstr "¿Reanudar código?"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/styles/StyleEditor.tsx:109
 #: src/apps/settings/styles/stylesApi.ts:77
-#: src/apps/settings/styles/stylesShared.tsx:48
 #, needs-review
 msgid "Retired video model, no longer available"
 msgstr "Modelo de video retirado, ya no disponible"
