@@ -57653,8 +57653,8 @@
           }
         },
         "responses": {
-          "201": {
-            "description": "The new translated caption track",
+          "202": {
+            "description": "The running translation job",
             "content": {
               "application/json": {
                 "schema": {
@@ -57712,9 +57712,41 @@
                 }
               }
             }
+          }
+        }
+      }
+    },
+    "/api/transcript-translations/{job}": {
+      "get": {
+        "tags": [
+          "Transcripts"
+        ],
+        "summary": "Progress of a caption translation and the new track when done",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 64
+            },
+            "required": true,
+            "name": "job",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Translation state, progress 0 to 1, track when done",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "nullable": true
+                }
+              }
+            }
           },
-          "422": {
-            "description": "Held back by the age filter",
+          "401": {
+            "description": "Not signed in",
             "content": {
               "application/json": {
                 "schema": {
@@ -57723,8 +57755,8 @@
               }
             }
           },
-          "502": {
-            "description": "The language model could not translate",
+          "404": {
+            "description": "Translation not found",
             "content": {
               "application/json": {
                 "schema": {

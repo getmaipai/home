@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-11-07T00:54:16.601Z",
-  "kitTag": "ui-v0.5.506",
+  "generatedAt": "2026-11-07T13:53:18.510Z",
+  "kitTag": "ui-v0.5.518",
   "items": [
     {
       "file": "ActivityCardsShowcase.tsx",
@@ -1942,6 +1942,38 @@
       "verdict": "wire-now",
       "verdictReason": "Two-pane weather forecast page Element (ui-v0.5.315); Home's weather app page draws it.",
       "implemented": true
+    },
+    {
+      "file": "weather-lightning.ts",
+      "name": "weather-lightning",
+      "group": "weather",
+      "verdict": "support",
+      "verdictReason": "The lightning flash timing the weather sky reads; Home draws it through weather-sky, never on its own.",
+      "implemented": false
+    },
+    {
+      "file": "weather-scene-running.ts",
+      "name": "weather-scene-running",
+      "group": "weather",
+      "verdict": "support",
+      "verdictReason": "The running state of the weather scene animation that weather-sky draws; support code, not a Home surface.",
+      "implemented": false
+    },
+    {
+      "file": "weather-scene.json",
+      "name": "weather-scene",
+      "group": "weather",
+      "verdict": "support",
+      "verdictReason": "The weather scene's data table (sky layers per condition) that weather-sky reads; not a Home surface.",
+      "implemented": false
+    },
+    {
+      "file": "weather-scene.ts",
+      "name": "weather-scene",
+      "group": "weather",
+      "verdict": "support",
+      "verdictReason": "The weather scene's layer logic that weather-sky draws; support code, not a Home surface.",
+      "implemented": false
     },
     {
       "file": "weather-sky.tsx",
