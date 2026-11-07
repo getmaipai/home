@@ -806,7 +806,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/pictures/keyframes.ts` | ensureKeyframeHelper, __setKeyframesForTests, __resetKeyframeHelperForTests, keyframeCount, extractKeyframes |
 | `backend/src/lib/pictures/lane.ts` | laneOf, KIDS_KEY, KID_ENABLED_KEY, KIDS_DAILY_PICTURES_KEY, KIDS_DAILY_VIDEOS_KEY, DEFAULT_KIDS_DAILY_PICTURES |
 | `backend/src/lib/pictures/laneGate.ts` | CHILD_SAFETY_SCHEMA, CHILD_SAFETY_SYSTEM_PROMPT, MIN_CHILD_CONFIDENCE, parseChildSafety, childSafetyOk, __setChildSafetyRunnerForTests |
-| `backend/src/lib/pictures/likeness/edit.ts` | LIKENESS, LINES, realDeps, runLikenessEdit, hasProtectableFace, asStackPic |
+| `backend/src/lib/pictures/likeness/edit.ts` | LIKENESS, LINES, whenFree, realDeps, runLikenessEdit, hasProtectableFace |
 | `backend/src/lib/pictures/likeness/faces.ts` | detectFaces, embedFace, faceCosine |
 | `backend/src/lib/pictures/likeness/guard.ts` | ssimGray, faceUntouched, matchFaces, coverage, ringDiff, smallFace |
 | `backend/src/lib/pictures/likeness/masks.ts` | grayMask, encodeMask, morphology, union, subtract, invert |
