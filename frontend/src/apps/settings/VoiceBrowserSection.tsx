@@ -1,4 +1,5 @@
-import { Trans } from "@lingui/react";
+import { i18n } from "@lingui/core";
+import "@/i18n";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { AsyncState } from "@maipai/ui/src/primitives/AsyncState";
@@ -84,11 +85,11 @@ export function VoiceBrowserSection({ person }: { person: Roster }) {
   const downloading = testBusy && voices.find((voice) => voice.id === previewId)?.onDisk === false;
   return <>
     {/* AUDIT-UI-01: the same label-and-description row every other settings page uses, so each dropdown says what it is. */}
-    {isGuardian && targets.length > 1 ? <Item><ItemContent><ItemTitle><Trans id="Whose voice" message="Whose voice" /></ItemTitle><ItemDescription clamp={false}><Trans id="Pick a person to see or change their voice." message="Pick a person to see or change their voice." /></ItemDescription></ItemContent><ItemActions><Select aria-label="Choose a voice for" value={target.id} options={targets.map((entry) => entry.id)} getLabel={(id) => id === person.id ? "You" : targets.find((entry) => entry.id === id)?.display_name ?? id} onValueChange={(id) => { voicePreviewPlayer.stop(); setTargetId(id); setSaved(false); setSaveError(null); }} /></ItemActions></Item> : null}
+    {isGuardian && targets.length > 1 ? <Item><ItemContent><ItemTitle>{i18n._({ id: "Whose voice", message: "Whose voice" })}</ItemTitle><ItemDescription clamp={false}>{i18n._({ id: "Pick a person to see or change their voice.", message: "Pick a person to see or change their voice." })}</ItemDescription></ItemContent><ItemActions><Select aria-label="Choose a voice for" value={target.id} options={targets.map((entry) => entry.id)} getLabel={(id) => id === person.id ? "You" : targets.find((entry) => entry.id === id)?.display_name ?? id} onValueChange={(id) => { voicePreviewPlayer.stop(); setTargetId(id); setSaved(false); setSaveError(null); }} /></ItemActions></Item> : null}
     {target.role === "child" ? <p>Ask a parent to choose your voice.</p> : null}
     {settingReason && target.id === person.id ? <p className="text-sm text-muted-foreground">{settingReason}</p> : null}
     {choices.notice || (migrated?.target === target.id && migrated.line) ? <p role="status" className="text-sm text-muted-foreground">{choices.notice ?? migrated?.line}</p> : null}
-    <Item><ItemContent><ItemTitle>Choose a voice for {who}</ItemTitle><ItemDescription clamp={false}><Trans id="The voice Home speaks with when it talks to {who}." message="The voice Home speaks with when it talks to {who}." values={{ who }} /></ItemDescription></ItemContent><ItemActions>
+    <Item><ItemContent><ItemTitle>Choose a voice for {who}</ItemTitle><ItemDescription clamp={false}>{i18n._({ id: "The voice Home speaks with when it talks to {who}.", message: "The voice Home speaks with when it talks to {who}.", values: { who } })}</ItemDescription></ItemContent><ItemActions>
     {failed ? <><p role="alert">Home can't reach its voice service. Check Repairs, then come back. <Button type="button" variant="outline" onClick={retry}>Try again</Button></p><Button type="button" variant="outline" disabled>Test</Button></> : <AsyncState data={voicesQuery.data && registryQuery.data && valuesQuery.data ? voices : undefined} isFetching={voicesQuery.isFetching || registryQuery.isFetching || valuesQuery.isFetching || (isGuardian && rosterQuery.isFetching)} onRetry={retry} loadingLabel="Loading voices">
       {(list) => list.length === 0 ? <><p>Voices are still getting ready. This takes a minute after setup.</p><Button type="button" variant="outline" disabled>Test</Button></> : <>
         <Select aria-label={`Voice for ${who}`} value={selectedId} options={choices.options.map((option) => option.id)} getLabel={(id) => choices.options.find((option) => option.id === id)?.label ?? id} disabled={!canChoose || saving} onValueChange={(id) => { const option = choices.options.find((entry) => entry.id === id); if (option && option.id !== selectedId) void choose(option.value); }} />
