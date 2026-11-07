@@ -7,7 +7,7 @@ import { Button } from "@maipai/ui/src/ui/button";
 import { Input } from "@maipai/ui/src/ui/input";
 import { Label } from "@maipai/ui/src/ui/label";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@maipai/ui/src/ui/dialog";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@maipai/ui/src/dashboard/components/ui/select";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@maipai/ui/src/ui/select";
 import { ApiError, api } from "@/lib/api";
 import { DestructiveConfirm } from "@maipai/ui/src/primitives/DestructiveConfirm";
 import { errorLine } from "@/lib/hubReachability";
@@ -227,7 +227,7 @@ export function EngineLinkCredentialSection() {
               <>
                 <p className="text-base">{i18n._({ id: "Pairing connects Home to a second computer in your home that runs the AI engines. Choose where the engine runs.", message: "Pairing connects Home to a second computer in your home that runs the AI engines. Choose where the engine runs." })}</p>
                 <Label htmlFor="pair-where">{i18n._({ id: "Where the engine runs", message: "Where the engine runs" })}</Label>
-                <Select value={where} onValueChange={(value) => { if (value) setWhere(value); }} items={[{ value: "this_computer", label: i18n._({ id: "This computer", message: "This computer" }) }, { value: "another_computer", label: i18n._({ id: "Another computer", message: "Another computer" }) }]}>
+                <Select value={where} onValueChange={(value) => { if (value) setWhere(value); }}>
                   <SelectTrigger id="pair-where" aria-label={i18n._({ id: "Where the engine runs", message: "Where the engine runs" })}><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="this_computer">{i18n._({ id: "This computer", message: "This computer" })}</SelectItem>

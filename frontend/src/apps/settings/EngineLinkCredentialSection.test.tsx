@@ -67,8 +67,11 @@ async function withHub(options: Options, body: (view: ReturnType<typeof mount>, 
 const stepLine = (n: number, title: string) => `Step ${n} of 5: ${title}`;
 const click = async (element: HTMLElement) => { await act(async () => { fireEvent.click(element); }); };
 
+// A person opens the select with a press (the kit select reacts to pointer-down, not click).
+const press = async (element: HTMLElement) => { await act(async () => { fireEvent.pointerDown(element, { button: 0, ctrlKey: false, pointerType: "mouse" }); fireEvent.click(element); }); };
+
 async function chooseAnotherComputer(view: ReturnType<typeof mount>) {
-  await click(view.getByRole("combobox", { name: "Where the engine runs" }));
+  await press(view.getByRole("combobox", { name: "Where the engine runs" }));
   const option = await view.findByRole("option", { name: "Another computer" });
   await act(async () => { fireEvent.pointerDown(option); fireEvent.pointerUp(option); fireEvent.click(option); });
 }
@@ -121,6 +124,21 @@ describe("the pairing wizard (ENGINES-AI-01)", () => {
       expect(view.getByRole("heading", { name: "Pair engine computer" })).toBeTruthy();
       expect(view.getByRole("combobox", { name: "Where the engine runs" }).textContent).toContain("This computer");
       expect(view.queryByRole("button", { name: "Back" })).toBeNull();
+    });
+  });
+
+  // #306: the select inside the dialog was the Base UI dashboard select, whose popup portals outside the Radix dialog's
+  // focus scope and pointer-events lock, so it never opened. The dialog must use the Radix kit select like every other dialog.
+  test("the Where the engine runs select opens inside the dialog and lists both places (#306)", async () => {
+    await withHub({}, async (view) => {
+      await openWizard(view);
+      const trigger = view.getByRole("combobox", { name: "Where the engine runs" });
+      await press(trigger);
+      expect(trigger.getAttribute("aria-expanded")).toBe("true");
+      expect(trigger.hasAttribute("data-popup-open")).toBe(false);
+      expect(await view.findByRole("option", { name: "This computer" })).toBeTruthy();
+      expect(await view.findByRole("option", { name: "Another computer" })).toBeTruthy();
+      expect(document.querySelector('[data-slot="select-content"][data-state="open"]')).not.toBeNull();
     });
   });
 
