@@ -47,6 +47,7 @@ import { serveBytes } from "@/lib/media/serve";
 import { adultStylesAllowed } from "@/lib/pictures/policy";
 import { refusalLineOf, runEditVideo } from "@/lib/videos/editTool";
 import { editRefusal } from "@/lib/videos/editGate";
+import { startSpatialSound } from "@/lib/videos/spatialStart";
 import { editVideoArgs, type RunEditVideoInput } from "@/lib/videos/editTool";
 
 export const videosRoutes = apiRouter();
@@ -528,21 +529,10 @@ const spatialRoute = createRoute({
 });
 videosRoutes.openapi(spatialRoute, async (c) => {
   const actor = c.get("person");
-  const audience = videoRouteAudience(actor);
-  // The one edit gate, before anything is read: a child or teen gets the edit line, whatever clip they name.
-  const gate = editRefusal(audience, "");
-  if (gate) return c.json({ error: gate.line, code: gate.kind === "denied" ? gate.why : "minor" }, gate.kind === "denied" ? 403 : 422) as never;
-  const source = getVideoJobFor(actor, c.req.valid("param").id) ?? getVideoJobByFileFor(actor, c.req.valid("param").id);
-  if (!source || source.state !== "done") return c.json({ error: "That video isn't available any more. Ask for it again.", code: "not_found" }, 404) as never;
-  if (videoJobLockState(actor, source) !== "open") return c.json({ error: LOCKED_START_LINE, code: "locked", locked: true }, 423) as never;
   const asked = (await c.req.json().catch(() => ({}))) as { surround?: unknown; side?: unknown };
-  const state = { actor, surface: "chat", conversationId: source.conversationId, turnId: source.turnId, temporary: source.temporary, planBasis: { surfaceClass: "written" }, context: [], utterance: "", persona: null, crisis: false } as unknown as RunEditVideoInput["state"];
-  const outcome = await runEditVideo({ state, args: { clip: source.id, change: "spatial_sound", ...(asked.surround === true ? { surround: true } : {}), ...(asked.side === "left" || asked.side === "right" ? { side: asked.side } : {}) }, callId: "route-spatial-sound", spoken: false });
-  const id = (outcome.result?.data as { videoJobId?: string } | undefined)?.videoJobId;
-  if (!id) return c.json({ error: refusalLineOf(outcome) ?? "I couldn't change the sound of that video. Try again.", code: String((outcome.result?.data as { refused?: string } | undefined)?.refused ?? "spatial_failed") }, 422) as never;
-  const started = getVideoJobFor(actor, id);
-  if (!started) return c.json({ error: "That video isn't available any more.", code: "not_found" }, 404) as never;
-  return c.json(videoCardOrLocked(actor, started, true, await readyFlags(actor)), 200);
+  const started = await startSpatialSound(actor, c.req.valid("param").id, asked);
+  if (!started.ok) return c.json({ error: started.error, code: started.code, ...(started.locked ? { locked: true } : {}) }, started.status) as never;
+  return c.json(videoCardOrLocked(actor, started.job, true, await readyFlags(actor)), 200);
 });
 
 // ---------------------------------------------------------------- settings page: the household's video LoRA library

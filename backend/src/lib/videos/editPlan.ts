@@ -196,9 +196,26 @@ export const SPATIAL_UNCHANGED_LINES: Record<string, string> = {
   already_spatial: "This clip's sound already moves with the picture, so it is unchanged.",
 };
 
-/** The one muted line kept with a spatial clip: the Stack's own lines when it sent them, else the plain line for what happened. */
-export function spatialNote(input: { applied?: boolean; reason?: string | null; notes?: readonly string[]; surround: boolean }): string {
-  if (input.notes && input.notes.length > 0) return input.notes.join(" ").slice(0, 400);
+/** What `spatial.sources` names that is an effect rather than speech (Stack spatialSound.ts). */
+const SPATIAL_EFFECT_SOURCES = new Set(["walker", "vehicle", "impact", "side"]);
+const HEADPHONES = "Wear headphones to hear it.";
+const EFFECTS_LEAD = "Sound effects now come from";
+
+/** SPATIAL-REACH: the Stack's lines, cleaned. What moved comes first (its headphones sentence said once, at the end of the group), then the 5.1 line, then the quiet-rear
+ * line. The effects line is kept only when `sources` names an effect source (left out by an older Stack: kept as sent). */
+function cleanSpatialLines(notes: readonly string[], sources: readonly string[] | undefined): string {
+  const effectsHeard = !sources || sources.some((source) => SPATIAL_EFFECT_SOURCES.has(source));
+  const rank = (line: string): number => (line.endsWith(HEADPHONES) ? (line.startsWith(EFFECTS_LEAD) ? 0.5 : 0) : line.includes("5.1 file") ? 2 : line.includes("back speakers") ? 3 : 1);
+  const kept = [...new Set(notes.map((line) => line.trim()).filter((line) => line !== ""))].filter((line) => effectsHeard || !line.startsWith(EFFECTS_LEAD));
+  const ordered = kept.map((line, i) => ({ line, i, r: rank(line) })).sort((a, b) => a.r - b.r || a.i - b.i);
+  const moved = ordered.filter((entry) => entry.r < 1).map((entry) => entry.line.slice(0, -HEADPHONES.length).trim());
+  const rest = ordered.filter((entry) => entry.r >= 1).map((entry) => entry.line);
+  return [...(moved.length > 0 ? [`${moved.join(" ")} ${HEADPHONES}`] : []), ...rest].join(" ");
+}
+
+/** The one muted line kept with a spatial clip: the Stack's own lines when it sent them (cleaned), else the plain line for what happened. */
+export function spatialNote(input: { applied?: boolean; reason?: string | null; notes?: readonly string[]; sources?: readonly string[]; surround: boolean }): string {
+  if (input.notes && input.notes.length > 0) return cleanSpatialLines(input.notes, input.sources).slice(0, 400);
   if (input.applied === false) return SPATIAL_UNCHANGED_LINES[input.reason ?? ""] ?? "The sound is unchanged.";
   return input.surround ? `${SPATIAL_STEREO_LINE} ${SPATIAL_SURROUND_LINE}` : SPATIAL_STEREO_LINE;
 }

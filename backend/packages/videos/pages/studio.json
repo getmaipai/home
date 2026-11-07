@@ -146,6 +146,23 @@
         },
         "actions": [
           {
+            "label": "Spatial sound",
+            "action": {
+              "call": {
+                "target": "/api/plugins/videos/actions/spatial-sound",
+                "method": "POST",
+                "args": {
+                  "id": "{id}"
+                },
+                "then": {
+                  "navigate": {
+                    "to": "/apps/videos/create"
+                  }
+                }
+              }
+            }
+          },
+          {
             "label": "Open in My clips",
             "action": {
               "navigate": {

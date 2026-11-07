@@ -58,7 +58,7 @@ export type StackEditResult =
       /** SPATIAL-04: the 5.1 file a `spatial_sound` step with `surround` wrote beside the stereo clip (the stereo clip is `bytes`). */
       surround?: Uint8Array;
       /** SPATIAL-04: what a `spatial_sound` step reported: whether it moved the sound, why not, and the Stack's own plain lines (cleaned). */
-      spatial?: { applied: boolean; reason: string | null; notes: string[] } }
+      spatial?: { applied: boolean; reason: string | null; notes: string[]; sources?: string[] } }
   | { ok: false; code: "unavailable" | "remote" | "failed" | "timeout" | "cancelled" | "unreadable"; line: string };
 
 export const EDIT_UNAVAILABLE_LINE = "I couldn't change that video. The video editor isn't ready. Try again in a few minutes.";
@@ -168,7 +168,7 @@ export async function runStackEdit(request: StackEditRequest): Promise<StackEdit
     // SPATIAL-04: the 5.1 sibling of a `spatial_sound` step (`files[]`, role surround_5_1), read from this job's own folder only, and the Stack's plain lines.
     const spatialStep = request.ops.some((op) => op.op === "spatial_sound");
     let surround: Uint8Array | undefined;
-    let spatialReport: { applied: boolean; reason: string | null; notes: string[] } | undefined;
+    let spatialReport: { applied: boolean; reason: string | null; notes: string[]; sources?: string[] } | undefined;
     if (spatialStep) {
       const listed = Array.isArray((result as { files?: unknown }).files) ? (result as { files: unknown[] }).files : [];
       const sibling = listed.find((entry): entry is { path: string } => !!entry && typeof entry === "object" && (entry as { role?: unknown }).role === "surround_5_1" && typeof (entry as { path?: unknown }).path === "string");
@@ -179,11 +179,11 @@ export async function runStackEdit(request: StackEditRequest): Promise<StackEdit
         if (siblingSize === 0 || siblingSize > MAX_RESULT_BYTES) return { ok: false, code: "unreadable", line: EDIT_MISSING_LINE };
         surround = new Uint8Array(readFileSync(siblingPath));
       }
-      const spatial = (result as { spatial?: { applied?: unknown; reason?: unknown; note?: unknown; notes?: unknown } }).spatial;
+      const spatial = (result as { spatial?: { applied?: unknown; reason?: unknown; note?: unknown; notes?: unknown; sources?: unknown } }).spatial;
       // `notes` is the list of lines; `note` is the same lines as one (shown only when the list is empty).
       const listedNotes = Array.isArray(spatial?.notes) ? spatial.notes : [];
       const lines = (listedNotes.length > 0 ? listedNotes : spatial?.note !== undefined ? [spatial.note] : []).map(plainStackLine).filter((line): line is string => line !== null);
-      spatialReport = { applied: spatial?.applied !== false, reason: typeof spatial?.reason === "string" ? spatial.reason : null, notes: [...new Set(lines)] };
+      spatialReport = { applied: spatial?.applied !== false, reason: typeof spatial?.reason === "string" ? spatial.reason : null, notes: [...new Set(lines)], ...(Array.isArray(spatial?.sources) ? { sources: spatial.sources.filter((entry): entry is string => typeof entry === "string") } : {}) };
     }
     return { ok: true, ...(surround ? { surround } : {}), ...(spatialReport ? { spatial: spatialReport } : {}), bytes: new Uint8Array(readFileSync(path)), seconds: num(result.duration_s), width: num(result.width), height: num(result.height), audio: typeof result.audio_codec === "string" && result.audio_codec.length > 0, ms: num(result.elapsed_ms) ?? 0 };
   } catch {

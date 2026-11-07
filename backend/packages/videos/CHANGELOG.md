@@ -4,6 +4,8 @@ All notable changes to the Videos package, in [Keep a Changelog](https://keepach
 
 ## [Unreleased]
 
+- SPATIAL-REACH: Spatial sound is on every clip in the Create feed and on the Studio's export card, not only on chat videos. It opens the same edit (adults only), and the new clip shows in the Create feed. A spatial clip's note reads in order: what moved (the headphones sentence once), the 5.1 line, then the quiet back speakers.
+
 ## [0.3.0] - 2026-11-02
 
 - VIDEO-STUDIO-07: a Studio page between Create and My clips. Open a clip you made, cut it, put other clips of yours next to it with a cut or a crossfade, lay a voice line you type or a song of yours under it, set the levels and fades, then Export as a new clip. The old clip stays. Open in Studio is on every clip in the Create feed and on My clips tiles. Adults only.

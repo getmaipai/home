@@ -28,7 +28,7 @@ export interface FakeEditStack {
   durationS: number;
   transcribedText: string;
   /** SPATIAL-04: what a finished `spatial_sound` step reports (the Stack's `spatial` object). Null leaves the result without one. */
-  spatial?: { applied: boolean; reason: string | null; note: string | null; notes: string[]; rear_quiet?: boolean } | null;
+  spatial?: { applied: boolean; reason: string | null; note: string | null; notes: string[]; sources?: string[]; rear_quiet?: boolean } | null;
   /** SPATIAL-04: when set with `failWith`, the failed job also carries `failure: { code, detail }` as the Stack's new job shape does. */
   failureCode?: string | null;
   restore(): void;

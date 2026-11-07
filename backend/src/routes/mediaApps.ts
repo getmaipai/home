@@ -23,6 +23,7 @@ import { mediaBandOf } from "@/lib/media/band";
 import { getHouseholdSettingValue } from "@/lib/settings";
 import { anotherTakeFor, bodyOfVideoJob, makeAudienceOf, makeVideoFor, readMakeBody } from "@/lib/videos/make";
 import { makeItMaxBody } from "@/lib/videos/editTool";
+import { startSpatialSound } from "@/lib/videos/spatialStart";
 import { studioAdd } from "@/lib/videos/studio";
 import { startStudioExport } from "@/lib/videos/studioExport";
 import { setFavoriteFile } from "@/lib/videos/favorites";
@@ -225,6 +226,18 @@ export function createMediaAppRoutes(appId: MediaAppId) {
     if (!max.ok) return c.json({ error: max.line, code: max.why }, max.why === "max_not_ready" ? 503 : 422);
     const made = await makeVideoFor(person, make, { audience });
     return made.ok ? c.json({ ok: true as const, id: made.job.id, state: made.job.state, notice: made.notice }, 200) : c.json({ error: made.error, code: made.code }, made.status);
+  });
+
+  // SPATIAL-REACH: Spatial sound on a finished Create clip. The same start as the chat card's menu route (startSpatialSound): the edit gate (adults only), the
+  // person's own open clip, the no-sound line and the finished-clip check are written once, there. The new clip is an edit row of the same feed.
+  routes.post("/actions/spatial-sound", requireAuth, async (c, next) => {
+    const person = c.get("person");
+    if (appId !== "videos") return next();
+    if (!appRouteAllowed(person, appId, "actions", "spatial-sound")) return next();
+    const body = await jsonBody(c);
+    const started = await startSpatialSound(person, typeof body.id === "string" ? body.id : "", { surround: body.surround === true || body.surround === "true", side: body.side });
+    if (!started.ok) return c.json({ error: started.error, code: started.code, ...(started.locked ? { locked: true } : {}) }, started.status as never);
+    return c.json({ ok: true as const, id: started.job.id, state: started.job.state }, 200);
   });
 
   // VIDEO-UI-06: the Favorite heart (the feed's player and My clips' tiles). `id` is the clip's job (the feed) or its Library file (My clips); a clip the person

@@ -37,7 +37,7 @@ The existing edit gate, unchanged. `editRefusal` (`lib/videos/editGate.ts`) give
 - `side` is an optional `"left"` or `"right"` on `edit_video` with `change: "spatial_sound"`. It forces the sound to that side and is passed to the Stack op unchanged (`spatialOps(surround, side)`). Any other value, or `side` with another change, is refused with a plain line. The menu route takes `{ side? }` beside `surround`. No menu entry or screen uses it yet.
 - A clip whose sound already moves with the picture comes back with reason `already_spatial` and is a success, like the other unchanged reasons. `SPATIAL_UNCHANGED_LINES` holds the same line as the Stack: "This clip's sound already moves with the picture, so it is unchanged."
 - The Stack can also move effects (footsteps, a passing vehicle). Then its `note` is "Sound effects now come from the side of the picture where they happen. Wear headphones to hear it." Home keeps the Stack's lines first, so that line reaches the card as sent and Home adds no line of its own.
-- `spatial.sources` names what moved: `speech`, `walker`, `vehicle`, `impact`, `side`. Home does not read it; the note carries what a person needs.
+- `spatial.sources` names what moved: `speech`, `walker`, `vehicle`, `impact`, `side`. Home reads it (SPATIAL-REACH) only to decide whether the effects line may show: the stored note keeps the effects line only when `sources` holds an effect source (a Stack that sends no `sources` keeps its lines as sent).
 - Child and teen still get `EDIT_MINOR_LINE`; the gate is unchanged.
 
 ## Failures
@@ -47,3 +47,12 @@ The Stack's codes `no_audio`, `bad_input`, `model_missing`, `no_memory`, `speech
 ## The menu
 
 `VideoToolRender` passes two `actionItems` to the kit `VideoPlayer` when the card says `can_edit` (an adult): "Spatial sound" and "Spatial sound with 5.1 file". Both are in the More menu. `disabledReason` carries the hint: no sound in the clip, or the video row's not-ready line from `useMakingAvailability`. No class, no wrapper (RULES rule 9).
+
+## Where it is offered (SPATIAL-REACH)
+
+- Chat video card: the kit `VideoPlayer` `actionItems` above ("Spatial sound" and "Spatial sound with 5.1 file").
+- Videos > Create feed and the Studio export card: the page documents (`packages/videos/pages/create.json`, `studio.json`) list a "Spatial sound" action. Page actions may call only `/api/plugins/videos/...`, so they call `POST /api/plugins/videos/actions/spatial-sound` (`routes/mediaApps.ts`). That route and the chat card's route both call `startSpatialSound` (`lib/videos/spatialStart.ts`): the edit gate (adults only, `EDIT_MINOR_LINE` otherwise), the person's own open clip, the no-sound line. The new clip is an edit row of the Create feed (the Studio card then opens the Create page). Not covered: the "with 5.1 file" entry on these two surfaces (the kit schema allows four feed actions and two Studio export actions, and both are used up), a per-clip disabled hint for a clip with no sound (the route answers with the plain line instead), and the Watch and My clips tiles (they are not `VideoPlayer`s).
+
+## The note
+
+`spatialNote` (`lib/videos/editPlan.ts`) puts the Stack's lines in order: what moved (speech line, then effects line, with "Wear headphones to hear it." said once at the end), the 5.1 line, the quiet-rear line.

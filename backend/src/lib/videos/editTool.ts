@@ -656,7 +656,7 @@ async function editFinishedClips(input: RunEditVideoInput, value: EditArgs, acto
     const made = await runStackEdit({ inputs: files, ops: ops!, name: value.change === "remove_background" && background === "transparent" ? "edited.webm" : "edited.mp4", signal, onProgress });
     if (!made.ok) return { ok: false, line: made.line };
     // SPATIAL-04: the 5.1 file (if asked) and the one muted line, from the Stack's own words.
-    const spatial = value.change === "spatial_sound" ? { ...(made.surround ? { surround: made.surround } : {}), note: spatialNote({ applied: made.spatial?.applied, reason: made.spatial?.reason ?? null, notes: made.spatial?.notes, surround: value.surround === true }) } : {};
+    const spatial = value.change === "spatial_sound" ? { ...(made.surround ? { surround: made.surround } : {}), note: spatialNote({ applied: made.spatial?.applied, reason: made.spatial?.reason ?? null, notes: made.spatial?.notes, sources: made.spatial?.sources, surround: value.surround === true }) } : {};
     return { ok: true, clip: { video: made.bytes, seconds: made.seconds, width: made.width, height: made.height, audio: made.audio, ms: made.ms, ...spatial } };
   };
   const mark = newItemMark(marks, false);

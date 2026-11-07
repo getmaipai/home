@@ -91,6 +91,42 @@ describe("the plan", () => {
   });
 });
 
+describe("SPATIAL-REACH: the card note reads clean", () => {
+  const speech = "Sound now follows who is talking on screen. Wear headphones to hear it.";
+  const effects = "Sound effects now come from the side of the picture where they happen. Wear headphones to hear it.";
+  const five = "The 5.1 file plays on a surround system or an Apple TV. Other players play it as stereo.";
+  const rear = "This clip's sound had little width, so the back speakers stay quiet.";
+  test("moved sound first, with the headphones sentence once, then the 5.1 line, then the quiet-rear line", () => {
+    expect(spatialNote({ applied: true, reason: null, notes: [speech, effects, five, rear], sources: ["speech", "walker"], surround: true }))
+      .toBe("Sound now follows who is talking on screen. Sound effects now come from the side of the picture where they happen. Wear headphones to hear it. " + five + " " + rear);
+    // Order does not depend on how the Stack listed them.
+    expect(spatialNote({ applied: true, reason: null, notes: [rear, five, effects, speech], sources: ["speech", "vehicle"], surround: true }))
+      .toBe("Sound now follows who is talking on screen. Sound effects now come from the side of the picture where they happen. Wear headphones to hear it. " + five + " " + rear);
+  });
+  test("a speech-only result drops the effects line, whatever the Stack listed", () => {
+    expect(spatialNote({ applied: true, reason: null, notes: [speech, effects, five], sources: ["speech"], surround: true })).toBe(speech + " " + five);
+  });
+  test("an effects-only result keeps the effects line and says the headphones sentence once", () => {
+    expect(spatialNote({ applied: true, reason: null, notes: [effects], sources: ["impact"], surround: false })).toBe(effects);
+  });
+  test("a Stack that sends no sources keeps its lines (older Stack), deduped and ordered", () => {
+    expect(spatialNote({ applied: true, reason: null, notes: [speech, effects], surround: false })).toBe("Sound now follows who is talking on screen. Sound effects now come from the side of the picture where they happen. Wear headphones to hear it.");
+  });
+  test("an unchanged result still reads as before", () => {
+    expect(spatialNote({ applied: false, reason: "centered", notes: ["The speaker stands in the middle of the picture, so the sound is unchanged stereo."], sources: [], surround: false })).toBe("The speaker stands in the middle of the picture, so the sound is unchanged stereo.");
+  });
+  test("the stored note of a real run carries the clean text, read from the Stack's spatial.sources", async () => {
+    const owner = person("owner");
+    const { state } = await makeClip(owner);
+    stack.spatial = { applied: true, reason: null, note: speech, notes: [speech, effects, five, rear], sources: ["speech"], rear_quiet: true };
+    const next = await finished(owner, await edit(state, { clip: "latest", change: "spatial_sound", surround: true }));
+    expect(next.request.edit?.note).toBe(speech + " " + five + " " + rear);
+    stack.spatial = { applied: true, reason: null, note: speech, notes: [speech, effects, five, rear], sources: ["speech", "side"], rear_quiet: true };
+    const again = await finished(owner, await edit(state, { clip: "latest", change: "spatial_sound", surround: true }));
+    expect(again.request.edit?.note).toBe("Sound now follows who is talking on screen. Sound effects now come from the side of the picture where they happen. Wear headphones to hear it. " + five + " " + rear);
+  });
+});
+
 describe("edit_video spatial_sound", () => {
   test("stereo: one op goes to the Stack, the result is a new linked clip with the Stack's line as its note, and the old clip is kept", async () => {
     const owner = person("owner");
@@ -305,6 +341,83 @@ describe("the menu route", () => {
   test("another person's clip is not found", async () => {
     const { other, jobId } = await adultWithClip();
     expect((await other.client.post(`/api/videos/jobs/${jobId}/spatial-sound`, {})).status).toBe(404);
+    expect(stack.jobs).toHaveLength(0);
+  });
+});
+
+describe("SPATIAL-REACH: the Create page action", () => {
+  const ACTION = "/api/plugins/videos/actions/spatial-sound";
+  async function createClip() {
+    const fixture = await household();
+    const me = fixture.row("Marlow");
+    const made = await runGenerateVideo({ state: chatState(me), args: { prompt: "A paper boat floats down a rainy street, soft evening light" }, callId: "make", spoken: false });
+    const id = (made.result?.data as { videoJobId: string }).videoJobId;
+    await until(() => getVideoJobFor(me, id)?.state === "done");
+    // A clip made on the Create page has no chat behind it.
+    const { videoJobs } = await import("@/db/schema");
+    db.update(videoJobs).set({ conversationId: null }).where(eq(videoJobs.id, id)).run();
+    return { ...fixture, me, jobId: id };
+  }
+  const feed = async (client: { post: (path: string, body: unknown) => Promise<Response> }) => (await (await client.post("/api/plugins/videos/data/recipes", { scope: "feed" })).json()) as Array<{ id: string; status: string }>;
+
+  test("the Create feed offers Spatial sound beside its other actions, within the kit's four", async () => {
+    const { readFileSync } = await import("node:fs");
+    const page = JSON.parse(readFileSync(new URL("../packages/videos/pages/create.json", import.meta.url), "utf8")) as unknown;
+    const found: Array<{ label: string; starts?: string; action: { call?: { target: string; args: Record<string, string> } } }> = [];
+    const walk = (node: unknown): void => { if (Array.isArray(node)) node.forEach(walk); else if (node && typeof node === "object") { const record = node as Record<string, unknown>; if (record.type === "result_feed") found.push(...(record.actions as typeof found)); Object.values(record).forEach(walk); } };
+    walk(page);
+    expect(found.length).toBeLessThanOrEqual(4);
+    const entry = found.find((a) => a.action.call?.target === ACTION)!;
+    expect(entry.label).toBe("Spatial sound");
+    expect(entry.starts).toBe("video");
+    expect(entry.action.call!.args).toEqual({ id: "{id}" });
+  });
+
+  test("the Studio's export card offers it too, and then opens the Create page where the new clip shows", async () => {
+    const { readFileSync } = await import("node:fs");
+    const page = JSON.parse(readFileSync(new URL("../packages/videos/pages/studio.json", import.meta.url), "utf8")) as unknown;
+    const found: Array<{ label: string; action: { call?: { target: string; then?: { navigate: { to: string } } } } }> = [];
+    const walk = (node: unknown): void => { if (Array.isArray(node)) node.forEach(walk); else if (node && typeof node === "object") { const record = node as Record<string, unknown>; if (record.export_result) found.push(...((record.export_result as { actions: typeof found }).actions)); Object.values(record).forEach(walk); } };
+    walk(page);
+    expect(found.length).toBeLessThanOrEqual(2);
+    const entry = found.find((a) => a.action.call?.target === ACTION)!;
+    expect(entry.label).toBe("Spatial sound");
+    expect(entry.action.call!.then).toEqual({ navigate: { to: "/apps/videos/create" } });
+  });
+
+  test("an adult starts it on a Create clip; the new clip is a row of the same feed, and surround makes the 5.1 file", async () => {
+    const { adult, me, jobId } = await createClip();
+    const res = await adult.client.post(ACTION, { id: jobId, surround: true });
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { ok: boolean; id: string };
+    expect(body.ok).toBe(true);
+    expect(body.id).not.toBe(jobId);
+    await until(() => getVideoJobFor(me, body.id)?.state === "done");
+    expect(getVideoJobFor(me, body.id)!.files).toHaveLength(2);
+    expect((await feed(adult.client)).map((row) => row.id)).toContain(body.id);
+    expect(stack.jobs.at(-1)!.input.ops).toEqual([{ op: "spatial_sound", surround: true }]);
+  });
+
+  test("a clip with no sound, someone else's clip and a made-up id each get the plain line and start nothing", async () => {
+    const { adult, other, me, jobId } = await createClip();
+    expect((await other.client.post(ACTION, { id: jobId })).status).toBe(404);
+    expect((await adult.client.post(ACTION, { id: "nope" })).status).toBe(404);
+    const job = getVideoJobFor(me, jobId)!;
+    const { videoJobs } = await import("@/db/schema");
+    db.update(videoJobs).set({ files: JSON.stringify(job.files.map((file) => ({ ...file, audio: false }))) }).where(eq(videoJobs.id, jobId)).run();
+    const res = await adult.client.post(ACTION, { id: jobId });
+    expect(res.status).toBe(422);
+    expect(((await res.json()) as { error: string }).error).toBe(SPATIAL_NO_SOUND_LINE);
+    expect(stack.jobs).toHaveLength(0);
+  });
+
+  test("a teen and a child never start it; the edit line is the gate's, no job starts", async () => {
+    const { teen, child, jobId } = await createClip();
+    for (const minor of [teen, child]) {
+      const res = await minor.client.post(ACTION, { id: jobId });
+      expect([404, 422]).toContain(res.status);
+      if (res.status === 422) expect(await res.json()).toEqual({ error: EDIT_MINOR_LINE, code: "minor" });
+    }
     expect(stack.jobs).toHaveLength(0);
   });
 });

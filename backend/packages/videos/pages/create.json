@@ -286,6 +286,20 @@
                   }
                 },
                 {
+                  "label": "Spatial sound",
+                  "icon": "headphones",
+                  "starts": "video",
+                  "action": {
+                    "call": {
+                      "target": "/api/plugins/videos/actions/spatial-sound",
+                      "method": "POST",
+                      "args": {
+                        "id": "{id}"
+                      }
+                    }
+                  }
+                },
+                {
                   "label": "Open in Studio",
                   "icon": "audio-waveform",
                   "action": {
