@@ -4,7 +4,7 @@
 // The prompt itself is built by `buildPromptPlan` (promptPlan.ts), the clip's adult-only mark by `usesAdultOnlyStyle` (adultStyle.ts, read again at job start).
 import { unlockedFor } from "@/lib/adultLock";
 import { speakerAgeBand } from "@/lib/ageBand";
-import { loraAccess } from "@/lib/loras/access";
+import { isUnofferedOldBase, loraAccess } from "@/lib/loras/access";
 import { listLoraRecords } from "@/lib/loras/store";
 import { matchVideoAdapter, loraSurfaceOf, videoAdaptersFor, type VideoAdapter } from "./adapters";
 import type { VideoAudience } from "./policy";
@@ -43,7 +43,7 @@ export async function resolveStyles(input: { audience: VideoAudience; ids?: read
   if (ids.length === 0 && names.length === 0) return { ok: true, adapters: [], unmatched: [] };
   const available = await videoAdaptersFor(audience, { includeLocked: true });
   const surface = loraSurfaceOf(audience);
-  const retired = listLoraRecords().filter((lora) => lora.media === "video" && lora.base_model === "ltx-2.3" && lora.removed_at === null && loraAccess(audience.actor, lora, surface) !== "hidden");
+  const retired = listLoraRecords().filter((lora) => lora.media === "video" && isUnofferedOldBase(lora) && lora.removed_at === null && loraAccess(audience.actor, lora, surface) !== "hidden");
   const adapters: VideoAdapter[] = [];
   const unmatched: string[] = [];
   const add = (adapter: VideoAdapter): void => { if (!adapters.some((a) => a.id === adapter.id)) adapters.push(adapter); };
@@ -75,7 +75,7 @@ export function listableStyleNames(audience: VideoAudience, limit = 12): string[
   if (audience.spoken || surface !== "own_written" || speakerAgeBand(audience.actor, new Date()) !== "adult") return [];
   const names: string[] = [];
   for (const lora of listLoraRecords()) {
-    if (lora.media !== "video" || lora.removed_at !== null || lora.audience !== "all-ages" || lora.base_model === "unknown" || lora.compatible_with.length === 0) continue;
+    if (lora.media !== "video" || lora.removed_at !== null || lora.audience !== "all-ages" || lora.base_model === "unknown" || lora.compatible_with.length === 0 || isUnofferedOldBase(lora)) continue;
     if (loraAccess(audience.actor, lora, surface) !== "open") continue;
     const name = lora.name.trim();
     if (name !== "" && name.length <= 24) names.push(name);

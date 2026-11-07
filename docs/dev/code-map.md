@@ -616,7 +616,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/localStackService.ts` | installRoot, stackDataDir, stopLocalStackService, startLocalStackService, __setStackServiceRunnerForTests |
 | `backend/src/lib/locale.ts` | resolveLocale, resolveLocaleFromValues, householdLocale, isSafeAutoTranslation |
 | `backend/src/lib/log.ts` | appendLogLine, installConsoleFileMirror, installFatalErrorHandlers |
-| `backend/src/lib/loras/access.ts` | isAdult, availableTo, loraAccess, loraUsable, readLoras, readLora |
+| `backend/src/lib/loras/access.ts` | isAdult, availableTo, loraAccess, runsOnBases, runsOn, isUnofferedOldBase |
 | `backend/src/lib/loras/admin.ts` | NOT_ADMIN_LINE, NOT_HERE_LINE, NOT_CONFIRMED_LINE, TRASH_DAYS, patchLora, confirmLora |
 | `backend/src/lib/loras/adultCheck.ts` | CIVITAI_ADULT_LEVEL, classifyCivitai, classifyHuggingFace, cleanTriggerWords |
 | `backend/src/lib/loras/baseFamilies.ts` | BASE_FAMILIES, ALL_BASE_IDS, BROWSE_BASES, installableBaseIds, mediaOfBase, setInstalledBasesProvider |

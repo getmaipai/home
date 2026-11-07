@@ -25,6 +25,8 @@ export interface FakeVideoStack {
   refusalsAfterCancel: number;
   memoryRefusals: number;
   refuseSubmit: { status: number; code: string; error: string } | null;
+  /** LTXD-18B: `lora_warnings` the fake Stack returns with a started clip. */
+  loraWarnings?: Array<{ id: string; code: string; message: string }>;
   /** Submits the fake refused with no_memory (MEM-RETRY-01). */
   refused?: number;
   /** GENPREVIEW-01: when set, running polls carry the stage, ETA and a preview (the first-frame preview shows from the second running poll). */
@@ -92,7 +94,7 @@ export function installFakeVideoStack(options: { pollsToFinish?: number } = {}):
       if (fake.refuseSubmit) return json({ error: fake.refuseSubmit.error, code: fake.refuseSubmit.code }, fake.refuseSubmit.status);
       const job: FakeVideoJob = { id: `vjob-${fake.jobs.length + 1}`, body, polls: 0, state: "queued", deleted: false };
       fake.jobs.push(job);
-      return json({ created: 1, job: job.id, data: [] }, 202);
+      return json({ created: 1, job: job.id, data: [], ...(fake.loraWarnings ? { lora_warnings: fake.loraWarnings } : {}) }, 202);
     }
     if (method === "POST" && path === "/v1/videos/messages") {
       fake.converted.push(decodeURIComponent(new Headers(init?.headers).get("x-title") ?? ""));

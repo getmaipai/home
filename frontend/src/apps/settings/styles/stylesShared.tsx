@@ -41,11 +41,11 @@ export const messageOf = (error: unknown, fallback: string): string => (errorLin
 export const sizeWords = (bytes: number): string => (bytes > 0 ? formatBytes(bytes) : i18n._({ id: "Size unknown", message: "Size unknown" }));
 
 /** "Style, Videos, Works at Standard, Boost and Max" and its siblings (settings-media 4.4). */
-export function whatItIs(row: Pick<StyleRow, "kind" | "base_model">): string {
+export function whatItIs(row: Pick<StyleRow, "kind" | "base_model"> & { base_note?: string | null }): string {
   const kind = row.kind === "character" ? i18n._({ id: "Character", message: "Character" }) : row.kind === "motion" ? i18n._({ id: "Motion", message: "Motion" }) : i18n._({ id: "Style", message: "Style" });
   const base: Record<BaseModelId, string> = {
     "ltx-2.5": i18n._({ id: "Works at Standard, Boost and Max", message: "Works at Standard, Boost and Max" }),
-    "ltx-2.3": i18n._({ id: "Retired video model, no longer available", message: "Retired video model, no longer available" }),
+    "ltx-2.3": row.base_note ?? i18n._({ id: "Made for an older video model, tested on the newer one", message: "Made for an older video model, tested on the newer one" }),
     "wan2.2-ti2v-5b": i18n._({ id: "Made for the engine behind children's videos, so Home cannot use it", message: "Made for the engine behind children's videos, so Home cannot use it" }),
     unknown: i18n._({ id: "Waiting for an admin to say what it is made for", message: "Waiting for an admin to say what it is made for" }),
   };

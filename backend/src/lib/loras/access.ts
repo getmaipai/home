@@ -41,9 +41,32 @@ export function loraAccess(person: PersonRow, lora: Lora, surface: LoraSurface =
   return lockState({ ownerPersonId: person.id, madeAudience: "adult-only", lock: "on" }, person, proof);
 }
 
-/** A LoRA a clip may be made with now: live, and its base known (an unknown base blocks use until an admin sets it). */
+/**
+ * LTXD-18B (docs/design/ltx-desktop-features-2026-11-06.md): the bases a style runs on. An `ltx-2.3` file whose bench result is `tested` also runs on `ltx-2.5`
+ * (the Stack runs it there with a warning); an untested or `no_effect` 2.3 file is not offered, so it runs on nothing here.
+ */
+export function runsOnBases(lora: Lora): string[] {
+  if (lora.base_model !== "ltx-2.3") return lora.compatible_with;
+  return lora.tested_on_25 === "tested" ? [...new Set([...lora.compatible_with, "ltx-2.5"])] : [];
+}
+export const runsOn = (lora: Lora, base: string): boolean => runsOnBases(lora).includes(base);
+
+/** True for a 2.3 file the picker, the chat tool and suggestions do not offer: untested, or the bench found it does nothing. Shown in the admin library only. */
+export const isUnofferedOldBase = (lora: Lora): boolean => lora.base_model === "ltx-2.3" && lora.tested_on_25 !== "tested";
+
+/** The one plain line the admin library shows under an old-base style that is not offered. Null for any other style. */
+export function untestedLine(lora: Lora): string | null {
+  if (lora.base_model !== "ltx-2.3") return null;
+  if (lora.tested_on_25 === "tested") return null;
+  return lora.tested_on_25 === "no_effect" ? "Made for an older video model. A test clip on the newer one showed no change, so it is not used." : "Made for an older video model. It is untested on the newer one, so it is not offered yet.";
+}
+
+/**
+ * A LoRA a clip may be made with now: live, its base known (an unknown base blocks use until an admin sets it), and offered by default: made for LTX-2.5, or an
+ * LTX-2.3 file the bench marked `tested` on 2.5 (LTXD-18B). This is the one offer rule: the picker, the chat tool and suggestions all read it.
+ */
 export function loraUsable(lora: Lora): boolean {
-  return lora.removed_at === null && lora.base_model !== "unknown" && lora.base_model !== "ltx-2.3" && lora.compatible_with.length > 0;
+  return lora.removed_at === null && lora.base_model !== "unknown" && !isUnofferedOldBase(lora) && lora.compatible_with.length > 0;
 }
 
 export interface LoraList { items: Lora[]; /** One tile: some LoRAs are locked for this person. Never a count. */ locked: boolean }

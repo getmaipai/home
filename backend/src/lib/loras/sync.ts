@@ -76,6 +76,7 @@ export function recordFromStack(stack: StackVideoLora, pref: { enabled: boolean;
     file: { sha256: sha, bytes: Math.min(4_294_967_296, Math.max(1, Math.floor(stack.bytes || 1))), rank: Number.isInteger(stack.rank) && (stack.rank as number) >= 1 ? (stack.rank as number) : null, modules: [], format: "safetensors" },
     base_model: base,
     compatible_with: base === "unknown" ? [] : [base],
+    ...(base === "ltx-2.3" ? { tested_on_25: stack.tested_on_25 ?? null, untested_on_25: stack.untested_on_25 ?? stack.tested_on_25 == null } : {}),
     trigger_words: cleanWords(stack.trigger_words ?? []),
     trigger_position: "start",
     positive_addins: [], negative_addins: [], avoid_as_positive: [],
@@ -123,6 +124,14 @@ async function run(): Promise<void> {
     const current = getLoraRecord(s.id) ?? have;
     if (/^[a-f0-9]{64}$/.test(sha) && (sha !== current.file.sha256 || s.bytes !== current.file.bytes)) {
       try { saveLora({ ...current, file: { ...current.file, sha256: sha, bytes: Math.min(4_294_967_296, Math.max(1, Math.floor(s.bytes || 1))) } }, "migration"); } catch { /* keep the old facts */ }
+    }
+    // LTXD-18B: the bench mark is the Stack's fact (set there, read here), so a changed mark replaces the record's copy.
+    if (current.base_model === "ltx-2.3") {
+      const mark = s.tested_on_25 ?? null;
+      const untested = s.untested_on_25 ?? mark === null;
+      if ((current.tested_on_25 ?? null) !== mark || (current.untested_on_25 ?? false) !== untested) {
+        try { saveLora({ ...(getLoraRecord(s.id) ?? current), tested_on_25: mark, untested_on_25: untested }, "migration"); } catch { /* keep the old mark */ }
+      }
     }
     // The Stack's own classification is the second lock, written by Home: a record that is adult-only is never all-ages there.
     if (have.audience === "adult-only" && s.classification === "all-ages") await updateVideoLora(s.id, { classification: "adult-only" }).catch(() => undefined);

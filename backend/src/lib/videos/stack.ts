@@ -127,7 +127,13 @@ export interface StackVideoLora {
   trigger_words: string[];
   added_by?: string | null;
   added_at: string;
+  /** LTXD-18B: the bench result of an `ltx-2.3` file on `ltx-2.5` (null: not tested), and the Stack's derived "would run untested". Absent on an older Stack. */
+  tested_on_25?: "tested" | "no_effect" | null;
+  untested_on_25?: boolean;
 }
+
+/** LTXD-18B: a plain note the Stack returns with a clip that uses an `ltx-2.3` style on `ltx-2.5` (codes `untested_on_25`, `tested_on_25`). */
+export interface StackLoraWarning { id: string; code: string; message: string }
 
 export interface VideoBody {
   prompt: string;
@@ -179,13 +185,14 @@ function failure(res: Response): Promise<never> {
 }
 
 /** Starts a clip and returns the job id at once (`timeout_ms` 1: the Stack answers 202 with the job; a clip takes over two minutes). */
-export async function submitVideo(body: VideoBody): Promise<{ job: string; done: StackClip[] | null }> {
+export async function submitVideo(body: VideoBody): Promise<{ job: string; done: StackClip[] | null; warnings: StackLoraWarning[] }> {
   const res = await request("/v1/videos/generations", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body), timeoutMs: 60_000 });
   if (res.status === 202 || res.status === 200) {
     forgetMediaRefusal("video");
-    const parsed = await res.json() as { job?: string; data?: StackClip[] };
+    const parsed = await res.json() as { job?: string; data?: StackClip[]; lora_warnings?: unknown };
     if (!parsed.job) throw new StackVideoError(502, "bad_reply", "That did not work. Try again.");
-    return { job: parsed.job, done: res.status === 200 && Array.isArray(parsed.data) && parsed.data.length > 0 ? parsed.data : null };
+    const warnings = Array.isArray(parsed.lora_warnings) ? parsed.lora_warnings.filter((w): w is StackLoraWarning => !!w && typeof (w as StackLoraWarning).message === "string" && (w as StackLoraWarning).message !== "").map((w) => ({ id: String(w.id), code: String(w.code), message: w.message })) : [];
+    return { warnings, job: parsed.job, done: res.status === 200 && Array.isArray(parsed.data) && parsed.data.length > 0 ? parsed.data : null };
   }
   return failure(res);
 }

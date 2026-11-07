@@ -258,14 +258,23 @@ describe("the browser", () => {
 });
 
 describe("the editor", () => {
-  test("a retired saved style says why and cannot be enabled or picked for a clip", async () => {
-    const retired = row({ base_model: "ltx-2.3", usable: true });
+  test("an untested older-model style says so in the existing muted line and cannot be enabled or picked for a clip", async () => {
+    const retired = row({ base_model: "ltx-2.3", usable: false, base_note: "Made for an older video model. It is untested on the newer one, so it is not offered yet." });
     const restore = stub({ list: mock(async () => ({ items: [retired], locked: false })) as never });
     const view = renderWithQueryClient(<Page><StyleEditor row={retired} person={person} onClose={() => undefined} onChanged={() => undefined} /></Page>);
-    expect((await view.findAllByText("Retired video model, no longer available")).length).toBeGreaterThan(0);
+    expect((await view.findAllByText("Made for an older video model. It is untested on the newer one, so it is not offered yet.")).length).toBeGreaterThan(0);
     expect(view.getByRole("button", { name: "Try this style" })).toBeDisabled();
     expect(view.getByRole("radiogroup", { name: "Who can use this style" })).toHaveAttribute("aria-disabled", "true");
     expect(view.queryByRole("option", { name: "LTX-2.3" })).toBeNull();
+    restore();
+  });
+
+  test("a tested older-model style can be tried and shows no untested line", async () => {
+    const tested = row({ base_model: "ltx-2.3", usable: true, base_note: null, tested_on_25: "tested" });
+    const restore = stub({ list: mock(async () => ({ items: [tested], locked: false })) as never });
+    const view = renderWithQueryClient(<Page><StyleEditor row={tested} person={person} onClose={() => undefined} onChanged={() => undefined} /></Page>);
+    expect(await view.findByRole("button", { name: "Try this style" })).toBeEnabled();
+    expect(view.queryByText(/untested on the newer one/)).toBeNull();
     restore();
   });
 

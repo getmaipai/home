@@ -196,7 +196,11 @@ async function releaseVideo(job: VideoJob): Promise<void> {
     if (slotted) { job.request.quality = slotted.quality; if (slotted.body.seconds !== undefined) job.request.seconds = slotted.body.seconds; if (slotted.tier === "standard") delete (job.request as { tier?: unknown }).tier; }
     const submitted = await submitVideo({ ...(slotted?.body ?? base), timeout_ms: 1 });
     if (job.state !== "queued") { void cancelOrDeleteVideo(submitted.job); return; }
-    job.stackJob = submitted.job; liveJobs.set(job.id, job); persistVideoJob(job);
+    job.stackJob = submitted.job;
+    // LTXD-18B: the Stack's own words about an old-base style ride the clip's existing muted line (`create.note`, read by the card, the feed and the make reply); no new status surface.
+    const warned = [...new Set(submitted.warnings.map((w) => w.message.trim()).filter(Boolean))].join(" ");
+    if (warned) job.request.create = { ...(job.request.create ?? {}), note: [job.request.create?.note, warned].filter(Boolean).join(" ") };
+    liveJobs.set(job.id, job); persistVideoJob(job);
     void ensureKeyframeHelper();
     const actor = db.select().from(people).where(eq(people.id, job.personId)).get();
     if (actor) void watch(job, actor as PersonRow, submitted.done);
