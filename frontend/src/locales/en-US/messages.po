@@ -15105,102 +15105,102 @@ msgstr "The microphone writes a transcript in the talk box. Use Call for a live 
 #. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:312
 msgid "setting.engines.chat.tier.boost.help"
-msgstr "The model and options that fill the Boost level of chat. A JSON object {model, options}; model is a catalog id, recommended, or off. Normally set from the AI and models page."
+msgstr "The model and options that fill the Boost level of chat. A JSON object '{'model, options'}'; model is a catalog id, recommended, or off. Normally set from the AI and models page."
 
 #. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:351
 msgid "setting.engines.music.tier.boost.help"
-msgstr "The model and options that fill the Boost level of music. A JSON object {model, options}; model is a catalog id, recommended, or off. Normally set from the AI and models page."
+msgstr "The model and options that fill the Boost level of music. A JSON object '{'model, options'}'; model is a catalog id, recommended, or off. Normally set from the AI and models page."
 
 #. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:333
 msgid "setting.engines.image.tier.boost.help"
-msgstr "The model and options that fill the Boost level of pictures. A JSON object {model, options}; model is a catalog id, recommended, or off. Normally set from the AI and models page."
+msgstr "The model and options that fill the Boost level of pictures. A JSON object '{'model, options'}'; model is a catalog id, recommended, or off. Normally set from the AI and models page."
 
 #. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:425
 msgid "setting.engines.video.tier.boost.help"
-msgstr "The model and options that fill the Boost level of video. A JSON object {model, options}; model is a catalog id, recommended, or off. Normally set from the AI and models page."
+msgstr "The model and options that fill the Boost level of video. A JSON object '{'model, options'}'; model is a catalog id, recommended, or off. Normally set from the AI and models page."
 
 #. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:407
 msgid "setting.engines.tts.tier.boost.help"
-msgstr "The model and options that fill the Boost level of voice. A JSON object {model, options}; model is a catalog id, recommended, or off. Normally set from the AI and models page."
+msgstr "The model and options that fill the Boost level of voice. A JSON object '{'model, options'}'; model is a catalog id, recommended, or off. Normally set from the AI and models page."
 
 #. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:315
 msgid "setting.engines.chat.tier.max.help"
-msgstr "The model and options that fill the Max level of chat. A JSON object {model, options}; model is a catalog id, recommended, or off. Normally set from the AI and models page."
+msgstr "The model and options that fill the Max level of chat. A JSON object '{'model, options'}'; model is a catalog id, recommended, or off. Normally set from the AI and models page."
 
 #. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:354
 msgid "setting.engines.music.tier.max.help"
-msgstr "The model and options that fill the Max level of music. A JSON object {model, options}; model is a catalog id, recommended, or off. Normally set from the AI and models page."
+msgstr "The model and options that fill the Max level of music. A JSON object '{'model, options'}'; model is a catalog id, recommended, or off. Normally set from the AI and models page."
 
 #. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:336
 msgid "setting.engines.image.tier.max.help"
-msgstr "The model and options that fill the Max level of pictures. A JSON object {model, options}; model is a catalog id, recommended, or off. Normally set from the AI and models page."
+msgstr "The model and options that fill the Max level of pictures. A JSON object '{'model, options'}'; model is a catalog id, recommended, or off. Normally set from the AI and models page."
 
 #. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:428
 msgid "setting.engines.video.tier.max.help"
-msgstr "The model and options that fill the Max level of video. A JSON object {model, options}; model is a catalog id, recommended, or off. Normally set from the AI and models page."
+msgstr "The model and options that fill the Max level of video. A JSON object '{'model, options'}'; model is a catalog id, recommended, or off. Normally set from the AI and models page."
 
 #. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:410
 msgid "setting.engines.tts.tier.max.help"
-msgstr "The model and options that fill the Max level of voice. A JSON object {model, options}; model is a catalog id, recommended, or off. Normally set from the AI and models page."
+msgstr "The model and options that fill the Max level of voice. A JSON object '{'model, options'}'; model is a catalog id, recommended, or off. Normally set from the AI and models page."
 
 #. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:318
 msgid "setting.engines.chat.tier.reduced.help"
-msgstr "The model and options that fill the Reduced level of chat. A JSON object {model, options}; model is a catalog id, recommended, or off. Normally set from the AI and models page."
+msgstr "The model and options that fill the Reduced level of chat. A JSON object '{'model, options'}'; model is a catalog id, recommended, or off. Normally set from the AI and models page."
 
 #. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:357
 msgid "setting.engines.music.tier.reduced.help"
-msgstr "The model and options that fill the Reduced level of music. A JSON object {model, options}; model is a catalog id, recommended, or off. Normally set from the AI and models page."
+msgstr "The model and options that fill the Reduced level of music. A JSON object '{'model, options'}'; model is a catalog id, recommended, or off. Normally set from the AI and models page."
 
 #. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:339
 msgid "setting.engines.image.tier.reduced.help"
-msgstr "The model and options that fill the Reduced level of pictures. A JSON object {model, options}; model is a catalog id, recommended, or off. Normally set from the AI and models page."
+msgstr "The model and options that fill the Reduced level of pictures. A JSON object '{'model, options'}'; model is a catalog id, recommended, or off. Normally set from the AI and models page."
 
 #. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:431
 msgid "setting.engines.video.tier.reduced.help"
-msgstr "The model and options that fill the Reduced level of video. A JSON object {model, options}; model is a catalog id, recommended, or off. Normally set from the AI and models page."
+msgstr "The model and options that fill the Reduced level of video. A JSON object '{'model, options'}'; model is a catalog id, recommended, or off. Normally set from the AI and models page."
 
 #. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:413
 msgid "setting.engines.tts.tier.reduced.help"
-msgstr "The model and options that fill the Reduced level of voice. A JSON object {model, options}; model is a catalog id, recommended, or off. Normally set from the AI and models page."
+msgstr "The model and options that fill the Reduced level of voice. A JSON object '{'model, options'}'; model is a catalog id, recommended, or off. Normally set from the AI and models page."
 
 #. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:321
 msgid "setting.engines.chat.tier.standard.help"
-msgstr "The model and options that fill the Standard level of chat. A JSON object {model, options}; model is a catalog id, recommended, or off. Normally set from the AI and models page."
+msgstr "The model and options that fill the Standard level of chat. A JSON object '{'model, options'}'; model is a catalog id, recommended, or off. Normally set from the AI and models page."
 
 #. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:360
 msgid "setting.engines.music.tier.standard.help"
-msgstr "The model and options that fill the Standard level of music. A JSON object {model, options}; model is a catalog id, recommended, or off. Normally set from the AI and models page."
+msgstr "The model and options that fill the Standard level of music. A JSON object '{'model, options'}'; model is a catalog id, recommended, or off. Normally set from the AI and models page."
 
 #. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:342
 msgid "setting.engines.image.tier.standard.help"
-msgstr "The model and options that fill the Standard level of pictures. A JSON object {model, options}; model is a catalog id, recommended, or off. Normally set from the AI and models page."
+msgstr "The model and options that fill the Standard level of pictures. A JSON object '{'model, options'}'; model is a catalog id, recommended, or off. Normally set from the AI and models page."
 
 #. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:434
 msgid "setting.engines.video.tier.standard.help"
-msgstr "The model and options that fill the Standard level of video. A JSON object {model, options}; model is a catalog id, recommended, or off. Normally set from the AI and models page."
+msgstr "The model and options that fill the Standard level of video. A JSON object '{'model, options'}'; model is a catalog id, recommended, or off. Normally set from the AI and models page."
 
 #. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:416
 msgid "setting.engines.tts.tier.standard.help"
-msgstr "The model and options that fill the Standard level of voice. A JSON object {model, options}; model is a catalog id, recommended, or off. Normally set from the AI and models page."
+msgstr "The model and options that fill the Standard level of voice. A JSON object '{'model, options'}'; model is a catalog id, recommended, or off. Normally set from the AI and models page."
 
 #. js-lingui-explicit-id
 #: src/apps/settings/ModelsSection.tsx:323
