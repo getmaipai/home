@@ -133,7 +133,7 @@ export interface StackAlignData { words: StackAlignWord[]; aligned_words: number
 export interface StackAlignJob { state: MusicState; code?: string | null; data?: StackAlignData | null }
 export interface StackBeatsData { tempo_bpm: number; meter: 3 | 4; beats: number[]; downbeats: number[]; sections: Array<{ start_s: number; end_s: number; label: string }>; confidence: number; downbeat_confidence: number; duration_s: number; engine: "librosa" }
 export interface StackBeatsJob { state: MusicState; code?: string | null; data?: StackBeatsData | null }
-export interface StackBeatsStatus { available: boolean; state: string; ready?: boolean }
+export interface StackBeatsStatus { available: boolean; state: string; ready?: boolean; installed?: boolean }
 const beatCache = new Map<string, StackBeatsData>();
 function beatsData(value: unknown): StackBeatsData | null {
   if (!value || typeof value !== "object") return null;
@@ -175,8 +175,9 @@ export async function analyzeBeats(source: string, sha: string, opts: { pollMs?:
     return data;
   } finally { await deleteBeats(job); }
 }
+/** The beats worker starts on demand and exits when idle (Stack state "needs-setup" with installed:true), so installed counts as ready. */
 export async function beatsReady(): Promise<boolean> {
-  try { const b = await (await checked(await request("/stack/v1/beats", {}, 5_000))).json() as { beats?: StackBeatsStatus }; return b.beats?.available === true && b.beats.ready === true; } catch { return false; }
+  try { const b = await (await checked(await request("/stack/v1/beats", {}, 5_000))).json() as { beats?: StackBeatsStatus }; return b.beats?.available === true && (b.beats.ready === true || b.beats.installed === true); } catch { return false; }
 }
 /** MUSIC-GEN-20c: align only this stretch of the song (seconds from its start); the reply's times stay on the song's own clock. */
 export interface AlignWindow { from_s: number; to_s: number }
