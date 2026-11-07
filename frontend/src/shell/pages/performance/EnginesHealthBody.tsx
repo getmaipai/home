@@ -51,7 +51,7 @@ export function EnginesHealthBody({ engines }: { engines: PerformanceEngines }) 
           see the live roster
         </Link>
       </p>
-      <DataTable {...model} toolbar={model.rows.length >= 10 ? <DataTableControls model={model} /> : undefined} caption="Recent engine issues" getRowId={(row) => `${row.issue}-${row.since}`} />
+      <DataTable {...model.tableProps} toolbar={model.rows.length >= 10 ? <DataTableControls model={model} /> : undefined} caption="Recent engine issues" getRowId={(row) => `${row.issue}-${row.since}`} />
     </>
   );
 }

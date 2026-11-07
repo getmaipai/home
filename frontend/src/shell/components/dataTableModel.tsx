@@ -65,11 +65,15 @@ export function useDataTableModel<Row extends Record<string, unknown>>(
     URL.revokeObjectURL(url);
   };
 
+  const onSortChange = (nextSort: DataTableSort | null) => { setSort(nextSort); setPageIndex(0); };
+
   return {
+    /** The props the DataTable itself takes. Spread this, never the whole model: `availablePageSizes` and `downloadCsv` reached the DOM (AUDIT-UI-01). */
+    tableProps: { columns, rows, sort, onSortChange, emptyLabel },
     columns,
     rows,
     sort,
-    onSortChange: (nextSort: DataTableSort | null) => { setSort(nextSort); setPageIndex(0); },
+    onSortChange,
     emptyLabel,
     filter,
     setFilter,

@@ -134,7 +134,7 @@ export function RepairsPage({ person }: { person: Roster }) {
         >
           {(issues: Issue[]) => (
             <DataTable
-              {...model}
+              {...model.tableProps}
               caption="Repair issues"
               getRowId={(row) => row.id}
               toolbar={model.rows.length >= 10 ? <div className="flex w-full flex-col gap-3">
