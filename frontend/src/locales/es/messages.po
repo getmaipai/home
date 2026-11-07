@@ -2909,11 +2909,6 @@ msgid "area.Alerts"
 msgstr "Alertas"
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1269
-msgid "setting.synths.real_people.option_label.all"
-msgstr ""
-
-#. js-lingui-explicit-id
 #: src/apps/settings/styles/StyleBrowser.tsx:101
 #: src/shell/pages/CompanionsPage.tsx:140
 #: src/shell/reader/SearchResults.tsx:40
@@ -2924,6 +2919,11 @@ msgstr "Todos"
 #. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:986
 msgid "setting.robot.initiative.tiers_spoken.option_label.all"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/lib/settingCopy.generated.ts:1269
+msgid "setting.synths.real_people.option_label.all"
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -3589,16 +3589,16 @@ msgid "Articles picked at random from the Wikipedia on this computer."
 msgstr "Artículos elegidos al azar de la Wikipedia en este equipo."
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1268
-msgid "setting.synths.real_people.option_label.ask"
-msgstr ""
-
-#. js-lingui-explicit-id
 #: src/shell/pages/dashboard/AskBox.tsx:69
 #: src/shell/pages/dashboard/AskBox.tsx:73
 #, needs-review
 msgid "Ask"
 msgstr "Pregunta"
+
+#. js-lingui-explicit-id
+#: src/lib/settingCopy.generated.ts:1268
+msgid "setting.synths.real_people.option_label.ask"
+msgstr ""
 
 #. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:1295
@@ -18664,11 +18664,6 @@ msgid "off"
 msgstr "desactivado"
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1267
-msgid "setting.synths.real_people.option_label.off"
-msgstr ""
-
-#. js-lingui-explicit-id
 #: src/apps/clock/AlarmRecordRow.tsx:50
 #: src/apps/settings/AiJobSummary.tsx:38
 #: src/apps/settings/AiJobSummary.tsx:74
@@ -18791,6 +18786,11 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:1175
 msgid "setting.search.web.teen_mode.option_label.off"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/lib/settingCopy.generated.ts:1267
+msgid "setting.synths.real_people.option_label.off"
 msgstr ""
 
 #. js-lingui-explicit-id
