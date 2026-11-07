@@ -21,6 +21,7 @@ import { fetchTryingEachAddress } from "@/lib/addressFallback";
 import { assertNotPrivateHost, SsrfBlockedError, type DnsLookup, type PinnedRequest } from "@maipai/core/src/ssrfGuard";
 import { cacheDir } from "@/lib/paths";
 import { HOME_USER_AGENT } from "@/lib/outbound";
+import { readBodyLimited } from "@/lib/net/readBody";
 import { tryConsume } from "@/lib/rateLimiter";
 import { getHouseholdSettingValue } from "@/lib/settings";
 import { NEWS_IMAGES_KEY, NEWS_IMAGE_CACHE_MB_DEFAULT, NEWS_IMAGE_CACHE_MB_KEY, NEWS_IMAGE_CACHE_MB_MIN } from "@/settings/newsKeys";
@@ -117,25 +118,6 @@ const clock = (): number => (deps.now ?? Date.now)();
 
 // ---- The one fetch -------------------------------------------------------------------------
 
-async function readLimited(response: Response, limit: number, signal: AbortSignal): Promise<Uint8Array | null> {
-  const reader = response.body?.getReader();
-  if (!reader) return null;
-  const chunks: Uint8Array[] = [];
-  let size = 0;
-  for (;;) {
-    if (signal.aborted) { await reader.cancel().catch(() => undefined); return null; }
-    const { done, value } = await reader.read();
-    if (done) break;
-    size += value.byteLength;
-    if (size > limit) { await reader.cancel().catch(() => undefined); return null; }
-    chunks.push(value);
-  }
-  const bytes = new Uint8Array(size);
-  let offset = 0;
-  for (const chunk of chunks) { bytes.set(chunk, offset); offset += chunk.byteLength; }
-  return bytes;
-}
-
 /** A person looking at a screen asks a host for several pictures at once, as their own browser would (VIEW_PARALLEL); the idle
  * prefetch keeps to one at a time on its own lane, so it never queues a screen behind it and a screen never queues it. */
 type Lane = "view" | "prefetch";
@@ -226,7 +208,7 @@ async function downloadOnce(imageUrl: string, band: AgeBand, lane: Lane = "view"
       if (!ACCEPTED_TYPES.has(type)) { await response.body?.cancel().catch(() => undefined); pictureFailed("picture_failed_type", family); return null; }
       const declared = Number(response.headers.get("content-length"));
       if (Number.isFinite(declared) && declared > MAX_BYTES) { await response.body?.cancel().catch(() => undefined); bumpNewsCounter("picture_too_big"); return null; }
-      const bytes = await readLimited(response, MAX_BYTES, controller.signal);
+      const bytes = await readBodyLimited(response, { limit: MAX_BYTES, signal: controller.signal });
       if (!bytes) { bumpNewsCounter("picture_too_big"); return null; }
       return bytes;
     } catch (error) {

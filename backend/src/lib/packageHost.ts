@@ -147,6 +147,7 @@ export const __getQuietUntilForTests = (host: string) => packageQuietUntil.get(h
 const FETCH_TIMEOUT_MS = 10_000;
 const FETCH_MAX_RESPONSE_BYTES = 2_000_000;
 import { HOME_USER_AGENT } from "@/lib/outbound";
+import { readBodyLimited } from "@/lib/net/readBody";
 export function resolveDataSourceProvenance(manifest: PackageManifest, requestUrl: string): { source: string | null; attribution: string | null } {
   let hostname: string;
   try {
@@ -297,27 +298,10 @@ function hasHeaderCaseInsensitive(headers: Record<string, string>, name: string)
 // so the read itself aborts the moment the limit is crossed, before the
 // rest of the body ever arrives.
 async function readBodyWithLimit(response: Response, url: string): Promise<string> {
-  const reader = response.body?.getReader();
-  if (!reader) return "";
-  const chunks: Uint8Array[] = [];
-  let totalBytes = 0;
-  for (;;) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    totalBytes += value.byteLength;
-    if (totalBytes > FETCH_MAX_RESPONSE_BYTES) {
-      await reader.cancel();
-      throw new HostError("network_unreachable", `${errorUrlLabel(url)}'s response exceeded the ${FETCH_MAX_RESPONSE_BYTES}-byte limit`);
-    }
-    chunks.push(value);
-  }
-  const combined = new Uint8Array(totalBytes);
-  let offset = 0;
-  for (const chunk of chunks) {
-    combined.set(chunk, offset);
-    offset += chunk.byteLength;
-  }
-  return new TextDecoder().decode(combined);
+  if (!response.body) return "";
+  const bytes = await readBodyLimited(response, { limit: FETCH_MAX_RESPONSE_BYTES });
+  if (!bytes) throw new HostError("network_unreachable", `${errorUrlLabel(url)}'s response exceeded the ${FETCH_MAX_RESPONSE_BYTES}-byte limit`);
+  return new TextDecoder().decode(bytes);
 }
 
 // A real, live-verified reliability gap found building the `define`

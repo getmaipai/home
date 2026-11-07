@@ -13,6 +13,7 @@ import type { Subprocess } from "bun";
 import { FileObject as FileRecordSchema } from "@/lib/fileRecordObject";
 import { readAttachment } from "@/lib/attachments";
 import type { PersonRow } from "@/types";
+import { readStreamLimited } from "@/lib/net/readBody";
 
 export const MAX_DOCUMENT_BYTES = 50 * 1024 * 1024;
 export const MAX_EXTRACTED_TEXT_BYTES = 2 * 1024 * 1024;
@@ -61,27 +62,9 @@ function isSupportedDocument(mediaType: string): boolean {
 }
 
 async function readLimited(stream: ReadableStream<Uint8Array>, maxBytes: number): Promise<Uint8Array> {
-  const reader = stream.getReader();
-  const chunks: Uint8Array[] = [];
-  let total = 0;
-  try {
-    while (true) {
-      const next = await reader.read();
-      if (next.done) break;
-      total += next.value.byteLength;
-      if (total > maxBytes) throw new Error("parser output exceeded its limit");
-      chunks.push(next.value);
-    }
-  } finally {
-    reader.releaseLock();
-  }
-  const result = new Uint8Array(total);
-  let offset = 0;
-  for (const chunk of chunks) {
-    result.set(chunk, offset);
-    offset += chunk.byteLength;
-  }
-  return result;
+  const bytes = await readStreamLimited(stream, { limit: maxBytes });
+  if (!bytes) throw new Error("parser output exceeded its limit");
+  return bytes;
 }
 
 async function runProcess(process: Subprocess, input: Uint8Array): Promise<string> {

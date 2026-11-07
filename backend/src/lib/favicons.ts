@@ -11,6 +11,7 @@ import { resolve, join } from "node:path";
 import sharp from "sharp";
 import { dataDir, ensureDataDir } from "@/lib/paths";
 import { fetchTryingEachAddress } from "@/lib/addressFallback";
+import { readBodyLimited } from "@/lib/net/readBody";
 import { assertNotPrivateHost, SsrfBlockedError, type DnsLookup } from "@maipai/core/src/ssrfGuard";
 
 export const faviconsDir = resolve(dataDir, "favicons");
@@ -223,37 +224,6 @@ function filePath(host: string, ext: string): string {
 
 export type FaviconFetchFn = (url: string, init: { signal: AbortSignal }) => Promise<Response>;
 
-/** Reads `response`'s body capped at `maxBytes`: aborts and returns null
- * the moment the cap is crossed, the same streamed-and-counted shape
- * `packageHost.ts`'s own `readBodyWithLimit` uses for text, kept
- * separate here because this one has to stay binary-safe for an image. */
-async function readCapped(response: Response, maxBytes: number, truncate = false): Promise<Uint8Array | null> {
-  const reader = response.body?.getReader();
-  if (!reader) return null;
-  const chunks: Uint8Array[] = [];
-  let total = 0;
-  for (;;) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    total += value.byteLength;
-    if (total > maxBytes) {
-      await reader.cancel();
-      if (!truncate) return null;
-      chunks.push(value.subarray(0, value.byteLength - (total - maxBytes)));
-      total = maxBytes;
-      break;
-    }
-    chunks.push(value);
-  }
-  const combined = new Uint8Array(total);
-  let offset = 0;
-  for (const chunk of chunks) {
-    combined.set(chunk, offset);
-    offset += chunk.byteLength;
-  }
-  return combined;
-}
-
 /** `found`: a real icon. `confirmed_absent`: at least one candidate gave
  * a definitive, content-based answer (a 404/410, a non-image content
  * type, a body confirmed too large) - the site genuinely has none,
@@ -296,8 +266,8 @@ export async function fetchFaviconBytes(host: string, fetchFn?: FaviconFetchFn, 
       }
       const contentType = (response.headers.get("content-type") ?? "").split(";")[0]!.trim().toLowerCase();
       if (!contentType.startsWith("image/")) { sawDefiniteAnswer = true; return null; }
-      const bytes = await readCapped(response, MAX_ICON_BYTES);
-      // readCapped returns null only for its own deliberate size-cap decision (a definitive fact); a dropped connection throws.
+      const bytes = await readBodyLimited(response, { limit: MAX_ICON_BYTES });
+      // readBodyLimited returns null only for its own deliberate size-cap decision (a definitive fact); a dropped connection throws.
       if (!bytes) { sawDefiniteAnswer = true; return null; }
       // A 1x1 placeholder or a file sharp cannot read is not an icon: try the next address (a card tile and the source row both need a real one).
       if (!(await isUsableIcon(bytes))) { sawDefiniteAnswer = true; return null; }
@@ -315,7 +285,7 @@ export async function fetchFaviconBytes(host: string, fetchFn?: FaviconFetchFn, 
       const response = await get(`https://${host}/`, controller.signal, 6);
       if (!response.ok || !(response.headers.get("content-type") ?? "").toLowerCase().includes("html")) return [];
       // A big home page (Deadline's is 800 KB) declares its icons in the head: read the first part, never give up on the whole page.
-      const bytes = await readCapped(response, MAX_HOMEPAGE_BYTES, true);
+      const bytes = await readBodyLimited(response, { limit: MAX_HOMEPAGE_BYTES, truncate: true });
       return bytes ? iconLinksOf(new TextDecoder().decode(bytes), `https://${host}/`) : [];
     } catch { return []; } finally { clearTimeout(timer); }
   };

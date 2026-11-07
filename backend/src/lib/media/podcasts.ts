@@ -12,7 +12,8 @@ import { nextHlc } from "@/lib/hlc";
 import { newMediaItemId, newMediaSourceId } from "@/lib/id";
 import { checkFeedAddress } from "@/lib/shelf/feedAddresses";
 import { createFeed, deleteFeed, findFeedByUrl, getFeed, listFeeds, MIN_POLL_INTERVAL_S, type FeedRecord } from "@/lib/shelf/feedStore";
-import { guardedGet, pollFeed, RateLimited, RedirectLimitError, readBytesLimited, type PollDeps } from "@/lib/shelf/shelfPoller";
+import { readBodyLimited } from "@/lib/net/readBody";
+import { guardedGet, pollFeed, RateLimited, RedirectLimitError, type PollDeps } from "@/lib/shelf/shelfPoller";
 import { SsrfBlockedError } from "@maipai/core/src/ssrfGuard";
 import { getStackClient } from "@/lib/stackEngine";
 import type { StackJob } from "@maipai/spec/stack/ts/stack-job.js";
@@ -370,7 +371,7 @@ async function fetchShowArt(source: MediaSource, imageUrl: string, deps: PollDep
     if (response.status !== 200) { await response.body?.cancel().catch(() => undefined); return null; }
     const type = (response.headers.get("content-type") ?? "").split(";")[0]!.trim().toLowerCase();
     if (!/^image\/(jpeg|png|webp|gif)$/.test(type)) { await response.body?.cancel().catch(() => undefined); return null; }
-    const bytes = await readBytesLimited(response, MAX_ART_BYTES);
+    const bytes = await readBodyLimited(response, { limit: MAX_ART_BYTES });
     const owner = personById(source.owner_person_id);
     if (!bytes || !owner || !liveSourceById(source.id)) return null;
     const stored = createFetchedFile(owner, { mediaType: type, bytes, mediaSourceId: source.id, note: "podcast:art" });
@@ -518,7 +519,7 @@ export async function getPodcastTranscript(actor: PersonRow, itemId: string, dep
       try {
     const response = await guardedGet(publisherUrl, deps, Date.now, controller.signal, { maxRedirects: 5, accept: "text/vtt, application/json, application/xml, text/plain;q=0.9, */*;q=0.5", bucket: TRANSCRIPT_RATE });
         if (response.status === 200) {
-          const bytes = await readBytesLimited(response, TRANSCRIPT_MAX_BYTES);
+          const bytes = await readBodyLimited(response, { limit: TRANSCRIPT_MAX_BYTES });
           if (bytes) {
             const parsed = parseTranscriptDocument(new TextDecoder().decode(bytes), response.headers.get("content-type") ?? "");
             return { ok: true, value: { transcript: storeTranscript(actor, row, parsed) } };

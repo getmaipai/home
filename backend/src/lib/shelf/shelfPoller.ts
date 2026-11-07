@@ -36,6 +36,7 @@ import { topicsHintFor } from "./shelfFeeds";
 import { ingestPodcastFeed, podcastFeedIsWanted, podcastPollIntervalS, queuePodcastAutoRules, sourceRowForFeed } from "@/lib/media/podcasts";
 
 import { HOME_USER_AGENT } from "@/lib/outbound";
+import { readBodyLimited } from "@/lib/net/readBody";
 export const MAX_BACKOFF_S = 86_400;
 export const MAX_FEEDS_PER_TICK = 24;
 /** Feeds one host may be asked for in one tick: they go one at a time, a minute apart (the host bucket), so a tick stays under its 15 minutes. */
@@ -85,21 +86,8 @@ function charsetOf(contentType: string | null): string {
 }
 
 async function readLimited(response: Response, limit: number): Promise<string | null> {
-  const reader = response.body?.getReader();
-  if (!reader) return null;
-  const chunks: Uint8Array[] = [];
-  let size = 0;
-  while (true) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    size += value.byteLength;
-    if (size > limit) { await reader.cancel(); return null; }
-    chunks.push(value);
-  }
-  const bytes = new Uint8Array(size);
-  let offset = 0;
-  for (const chunk of chunks) { bytes.set(chunk, offset); offset += chunk.byteLength; }
-  return new TextDecoder(charsetOf(response.headers.get("content-type")) as "utf-8").decode(bytes);
+  const bytes = await readBodyLimited(response, { limit });
+  return bytes && new TextDecoder(charsetOf(response.headers.get("content-type")) as "utf-8").decode(bytes);
 }
 
 async function validateHop(url: URL, dns: DnsLookup | undefined): Promise<void> {
@@ -157,27 +145,6 @@ function request(feed: FeedRecord, deps: PollDeps, now: () => number, signal: Ab
     accept: "application/atom+xml, application/rss+xml, application/xml;q=0.9, text/xml;q=0.8, application/feed+json;q=0.8",
     conditional: { etag: feed.etag, lastModified: feed.last_modified },
   });
-}
-
-/** The bytes of a response up to `limit` (null when it is longer); streamed, so a long download is never held twice. */
-export async function readBytesLimited(response: Response, limit: number): Promise<Uint8Array | null> {
-  const declared = Number(response.headers.get("content-length"));
-  if (Number.isFinite(declared) && declared > limit) { await response.body?.cancel().catch(() => undefined); return null; }
-  const reader = response.body?.getReader();
-  if (!reader) return null;
-  const chunks: Uint8Array[] = [];
-  let size = 0;
-  while (true) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    size += value.byteLength;
-    if (size > limit) { await reader.cancel(); return null; }
-    chunks.push(value);
-  }
-  const bytes = new Uint8Array(size);
-  let offset = 0;
-  for (const chunk of chunks) { bytes.set(chunk, offset); offset += chunk.byteLength; }
-  return bytes;
 }
 
 interface Entry { url: string; title: string; summary: string; published: string | null; image?: string }
@@ -352,8 +319,7 @@ export async function pollFeed(feed: FeedRecord, deps: PollDeps = {}): Promise<P
     }
     const podcast = feed.purpose === "podcast";
     const limit = podcast ? MAX_PODCAST_FEED_BYTES : MAX_BYTES;
-    const declared = Number(response.headers.get("content-length"));
-    const body = Number.isFinite(declared) && declared > limit ? null : await readLimited(response, limit);
+    const body = await readLimited(response, limit);
     if (body === null) { bumpShelfCounter("poll_failed"); return fail(null); }
     try {
       if (podcast) await ingestPodcastFeed(feed, body, deps, now());

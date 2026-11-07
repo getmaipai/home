@@ -4,6 +4,7 @@ import { filterAnswerImages, type QualityResult, type ValidatedAnswerImage } fro
 import { warmGeometry } from "@/lib/imageSimilarity";
 import { ANSWER_IMAGES_MAX_CANDIDATES } from "./gallery";
 import { HOME_USER_AGENT } from "@/lib/outbound";
+import { readBodyLimited } from "@/lib/net/readBody";
 import { kiwixBaseUrl } from "@/lib/kiwixSidecar";
 
 const MAX_BYTES = 8 * 1024 * 1024;
@@ -72,25 +73,6 @@ async function validateUrl(url: URL, dns?: DnsLookup): Promise<void> {
   await assertNotPrivateHost(url.hostname, dns ?? testDnsLookup ?? undefined);
 }
 
-async function readLimited(response: Response, limit: number, signal: AbortSignal): Promise<Uint8Array | null> {
-  const reader = response.body?.getReader();
-  if (!reader) return null;
-  const chunks: Uint8Array[] = [];
-  let size = 0;
-  while (true) {
-    if (signal.aborted) { await reader.cancel(); return null; }
-    const { done, value } = await reader.read();
-    if (done) break;
-    size += value.byteLength;
-    if (size > limit) { await reader.cancel(); return null; }
-    chunks.push(value);
-  }
-  const bytes = new Uint8Array(size);
-  let offset = 0;
-  for (const chunk of chunks) { bytes.set(chunk, offset); offset += chunk.byteLength; }
-  return bytes;
-}
-
 /** The platform's own fetch, captured at load. Only when the call would use
  * it does the pinned guardedFetch (which resolves and connects itself) take
  * over; any other fetcher, injected or swapped in, is validated per hop. */
@@ -122,7 +104,7 @@ async function fetchLibrary(library: { book: string; imagePath: string }, source
     if (!new Set(["image/jpeg", "image/png", "image/webp", "image/avif"]).has(contentType)) return null;
     const declaredLength = Number(response.headers.get("content-length"));
     if (Number.isFinite(declaredLength) && declaredLength > MAX_BYTES) { dropped.size_limit = (dropped.size_limit ?? 0) + 1; return null; }
-    const bytes = await readLimited(response, MAX_BYTES, controller.signal);
+    const bytes = await readBodyLimited(response, { limit: MAX_BYTES, signal: controller.signal });
     if (!bytes) {
       if (!timedOut) dropped.size_limit = (dropped.size_limit ?? 0) + 1;
       return null;
@@ -189,7 +171,7 @@ async function fetchOne(source: AnswerImageSource, options: Options, deadline: n
       if (!new Set(["image/jpeg", "image/png", "image/webp", "image/avif"]).has(contentType)) return null;
       const declaredLength = Number(response.headers.get("content-length"));
       if (Number.isFinite(declaredLength) && declaredLength > MAX_BYTES) { dropped.size_limit = (dropped.size_limit ?? 0) + 1; return null; }
-      const bytes = await readLimited(response, MAX_BYTES, controller.signal);
+      const bytes = await readBodyLimited(response, { limit: MAX_BYTES, signal: controller.signal });
       if (!bytes) {
         if (timedOut && attempt === 0 && now() < deadline) continue;
         if (!timedOut) dropped.size_limit = (dropped.size_limit ?? 0) + 1;
