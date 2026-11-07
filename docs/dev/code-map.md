@@ -691,7 +691,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/mediaOps/chatSchema.ts` | editPictureSpec, generateImageSchema |
 | `backend/src/lib/mediaOps/ids.ts` | BACKGROUND_REMOVAL_OP |
 | `backend/src/lib/mediaOps/registry.ts` | registerMediaOp, registeredMediaOps, listMediaOps, runMediaOp, getMediaOpJob, runPictureEdit |
-| `backend/src/lib/mediaProductions.ts` | canSeeProduction, listMediaProductions, getMediaProduction, setShowState, createMediaProduction, updateMediaProduction |
+| `backend/src/lib/mediaProductions.ts` | registerCastSynthGate, canSeeProduction, listMediaProductions, getMediaProduction, setShowState, createMediaProduction |
 | `backend/src/lib/mediaSubjectSheet.ts` | sheetPromptFor, makeSubjectSheet |
 | `backend/src/lib/mediaSubjects.ts` | isSheetReference, canUseSubject, listMediaSubjects, getMediaSubject, createMediaSubject, updateMediaSubject |
 | `backend/src/lib/memory.ts` | registerCompanionReadGate, validAt, EVENT_GRACE_DAYS, eventWithinGrace, isPrivilegedRecordKind, isPrivilegedRecord |

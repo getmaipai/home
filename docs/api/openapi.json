@@ -64435,6 +64435,17 @@
                                   "type": "string",
                                   "maxLength": 2000,
                                   "default": ""
+                                },
+                                "synth_id": {
+                                  "type": "string",
+                                  "nullable": true,
+                                  "default": null
+                                },
+                                "part": {
+                                  "type": "string",
+                                  "nullable": true,
+                                  "maxLength": 40,
+                                  "default": null
                                 }
                               },
                               "required": [
@@ -64560,6 +64571,214 @@
                               "type": "string"
                             }
                           },
+                          "show": {
+                            "anyOf": [
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "format_id": {
+                                    "type": "string",
+                                    "enum": [
+                                      "news_briefing",
+                                      "kids_news",
+                                      "round_table",
+                                      "debate",
+                                      "review",
+                                      "discussion",
+                                      "dj_links",
+                                      "narration",
+                                      "announcer"
+                                    ]
+                                  },
+                                  "audience": {
+                                    "type": "string",
+                                    "enum": [
+                                      "all",
+                                      "teen",
+                                      "adult"
+                                    ]
+                                  },
+                                  "household_facts": {
+                                    "type": "boolean"
+                                  },
+                                  "sources": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "object",
+                                      "properties": {
+                                        "kind": {
+                                          "type": "string",
+                                          "enum": [
+                                            "news",
+                                            "weather",
+                                            "household",
+                                            "documents",
+                                            "media_item",
+                                            "bookmarks"
+                                          ]
+                                        },
+                                        "topics": {
+                                          "type": "array",
+                                          "items": {
+                                            "type": "string",
+                                            "maxLength": 60
+                                          }
+                                        },
+                                        "file_ids": {
+                                          "type": "array",
+                                          "items": {
+                                            "type": "string",
+                                            "pattern": "^file-[a-z0-9]{6,}$"
+                                          }
+                                        },
+                                        "media_item_id": {
+                                          "anyOf": [
+                                            {
+                                              "type": "string"
+                                            },
+                                            {
+                                              "nullable": true
+                                            }
+                                          ]
+                                        }
+                                      },
+                                      "required": [
+                                        "kind",
+                                        "topics",
+                                        "file_ids",
+                                        "media_item_id"
+                                      ],
+                                      "additionalProperties": false
+                                    }
+                                  },
+                                  "schedule": {
+                                    "anyOf": [
+                                      {
+                                        "type": "object",
+                                        "properties": {
+                                          "every": {
+                                            "type": "string",
+                                            "enum": [
+                                              "1d",
+                                              "7d"
+                                            ]
+                                          },
+                                          "at": {
+                                            "type": "string",
+                                            "pattern": "^([01][0-9]|2[0-3]):[0-5][0-9]$"
+                                          },
+                                          "days": {
+                                            "type": "array",
+                                            "items": {
+                                              "type": "integer",
+                                              "minimum": 0,
+                                              "maximum": 6
+                                            }
+                                          }
+                                        },
+                                        "required": [
+                                          "every",
+                                          "at",
+                                          "days"
+                                        ],
+                                        "additionalProperties": false
+                                      },
+                                      {
+                                        "nullable": true
+                                      }
+                                    ]
+                                  },
+                                  "length_s": {
+                                    "type": "integer",
+                                    "minimum": 60,
+                                    "maximum": 1800
+                                  },
+                                  "state": {
+                                    "anyOf": [
+                                      {
+                                        "type": "object",
+                                        "properties": {
+                                          "episode_id": {
+                                            "type": "string"
+                                          },
+                                          "stage": {
+                                            "type": "string",
+                                            "enum": [
+                                              "brief",
+                                              "outline",
+                                              "script",
+                                              "check",
+                                              "voices",
+                                              "mix",
+                                              "keep",
+                                              "done",
+                                              "failed"
+                                            ]
+                                          },
+                                          "reason": {
+                                            "anyOf": [
+                                              {
+                                                "type": "string"
+                                              },
+                                              {
+                                                "nullable": true
+                                              }
+                                            ]
+                                          },
+                                          "started_at": {
+                                            "type": "string",
+                                            "format": "date-time"
+                                          },
+                                          "last_make_ms": {
+                                            "anyOf": [
+                                              {
+                                                "type": "integer"
+                                              },
+                                              {
+                                                "nullable": true
+                                              }
+                                            ]
+                                          }
+                                        },
+                                        "required": [
+                                          "last_make_ms"
+                                        ],
+                                        "additionalProperties": false
+                                      },
+                                      {
+                                        "nullable": true
+                                      }
+                                    ]
+                                  },
+                                  "stand_in_synth_id": {
+                                    "anyOf": [
+                                      {
+                                        "type": "string"
+                                      },
+                                      {
+                                        "nullable": true
+                                      }
+                                    ]
+                                  }
+                                },
+                                "required": [
+                                  "format_id",
+                                  "audience",
+                                  "household_facts",
+                                  "sources",
+                                  "schedule",
+                                  "length_s",
+                                  "state",
+                                  "stand_in_synth_id"
+                                ],
+                                "additionalProperties": false
+                              },
+                              {
+                                "nullable": true
+                              }
+                            ],
+                            "default": null
+                          },
                           "provenance": {
                             "type": "string"
                           },
@@ -64665,6 +64884,17 @@
                           "type": "string",
                           "maxLength": 2000,
                           "default": ""
+                        },
+                        "synth_id": {
+                          "type": "string",
+                          "nullable": true,
+                          "default": null
+                        },
+                        "part": {
+                          "type": "string",
+                          "nullable": true,
+                          "maxLength": 40,
+                          "default": null
                         }
                       },
                       "required": [
@@ -64789,6 +65019,214 @@
                     "items": {
                       "type": "string"
                     }
+                  },
+                  "show": {
+                    "anyOf": [
+                      {
+                        "type": "object",
+                        "properties": {
+                          "format_id": {
+                            "type": "string",
+                            "enum": [
+                              "news_briefing",
+                              "kids_news",
+                              "round_table",
+                              "debate",
+                              "review",
+                              "discussion",
+                              "dj_links",
+                              "narration",
+                              "announcer"
+                            ]
+                          },
+                          "audience": {
+                            "type": "string",
+                            "enum": [
+                              "all",
+                              "teen",
+                              "adult"
+                            ]
+                          },
+                          "household_facts": {
+                            "type": "boolean"
+                          },
+                          "sources": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "kind": {
+                                  "type": "string",
+                                  "enum": [
+                                    "news",
+                                    "weather",
+                                    "household",
+                                    "documents",
+                                    "media_item",
+                                    "bookmarks"
+                                  ]
+                                },
+                                "topics": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "string",
+                                    "maxLength": 60
+                                  }
+                                },
+                                "file_ids": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "string",
+                                    "pattern": "^file-[a-z0-9]{6,}$"
+                                  }
+                                },
+                                "media_item_id": {
+                                  "anyOf": [
+                                    {
+                                      "type": "string"
+                                    },
+                                    {
+                                      "nullable": true
+                                    }
+                                  ]
+                                }
+                              },
+                              "required": [
+                                "kind",
+                                "topics",
+                                "file_ids",
+                                "media_item_id"
+                              ],
+                              "additionalProperties": false
+                            }
+                          },
+                          "schedule": {
+                            "anyOf": [
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "every": {
+                                    "type": "string",
+                                    "enum": [
+                                      "1d",
+                                      "7d"
+                                    ]
+                                  },
+                                  "at": {
+                                    "type": "string",
+                                    "pattern": "^([01][0-9]|2[0-3]):[0-5][0-9]$"
+                                  },
+                                  "days": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "integer",
+                                      "minimum": 0,
+                                      "maximum": 6
+                                    }
+                                  }
+                                },
+                                "required": [
+                                  "every",
+                                  "at",
+                                  "days"
+                                ],
+                                "additionalProperties": false
+                              },
+                              {
+                                "nullable": true
+                              }
+                            ]
+                          },
+                          "length_s": {
+                            "type": "integer",
+                            "minimum": 60,
+                            "maximum": 1800
+                          },
+                          "state": {
+                            "anyOf": [
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "episode_id": {
+                                    "type": "string"
+                                  },
+                                  "stage": {
+                                    "type": "string",
+                                    "enum": [
+                                      "brief",
+                                      "outline",
+                                      "script",
+                                      "check",
+                                      "voices",
+                                      "mix",
+                                      "keep",
+                                      "done",
+                                      "failed"
+                                    ]
+                                  },
+                                  "reason": {
+                                    "anyOf": [
+                                      {
+                                        "type": "string"
+                                      },
+                                      {
+                                        "nullable": true
+                                      }
+                                    ]
+                                  },
+                                  "started_at": {
+                                    "type": "string",
+                                    "format": "date-time"
+                                  },
+                                  "last_make_ms": {
+                                    "anyOf": [
+                                      {
+                                        "type": "integer"
+                                      },
+                                      {
+                                        "nullable": true
+                                      }
+                                    ]
+                                  }
+                                },
+                                "required": [
+                                  "last_make_ms"
+                                ],
+                                "additionalProperties": false
+                              },
+                              {
+                                "nullable": true
+                              }
+                            ]
+                          },
+                          "stand_in_synth_id": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "nullable": true
+                              }
+                            ]
+                          }
+                        },
+                        "required": [
+                          "format_id",
+                          "audience",
+                          "household_facts",
+                          "sources",
+                          "schedule",
+                          "length_s",
+                          "state",
+                          "stand_in_synth_id"
+                        ],
+                        "additionalProperties": false
+                      },
+                      {
+                        "nullable": true
+                      }
+                    ],
+                    "default": null
                   }
                 },
                 "required": [
@@ -64854,6 +65292,17 @@
                             "type": "string",
                             "maxLength": 2000,
                             "default": ""
+                          },
+                          "synth_id": {
+                            "type": "string",
+                            "nullable": true,
+                            "default": null
+                          },
+                          "part": {
+                            "type": "string",
+                            "nullable": true,
+                            "maxLength": 40,
+                            "default": null
                           }
                         },
                         "required": [
@@ -64978,6 +65427,214 @@
                       "items": {
                         "type": "string"
                       }
+                    },
+                    "show": {
+                      "anyOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "format_id": {
+                              "type": "string",
+                              "enum": [
+                                "news_briefing",
+                                "kids_news",
+                                "round_table",
+                                "debate",
+                                "review",
+                                "discussion",
+                                "dj_links",
+                                "narration",
+                                "announcer"
+                              ]
+                            },
+                            "audience": {
+                              "type": "string",
+                              "enum": [
+                                "all",
+                                "teen",
+                                "adult"
+                              ]
+                            },
+                            "household_facts": {
+                              "type": "boolean"
+                            },
+                            "sources": {
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "properties": {
+                                  "kind": {
+                                    "type": "string",
+                                    "enum": [
+                                      "news",
+                                      "weather",
+                                      "household",
+                                      "documents",
+                                      "media_item",
+                                      "bookmarks"
+                                    ]
+                                  },
+                                  "topics": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "string",
+                                      "maxLength": 60
+                                    }
+                                  },
+                                  "file_ids": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "string",
+                                      "pattern": "^file-[a-z0-9]{6,}$"
+                                    }
+                                  },
+                                  "media_item_id": {
+                                    "anyOf": [
+                                      {
+                                        "type": "string"
+                                      },
+                                      {
+                                        "nullable": true
+                                      }
+                                    ]
+                                  }
+                                },
+                                "required": [
+                                  "kind",
+                                  "topics",
+                                  "file_ids",
+                                  "media_item_id"
+                                ],
+                                "additionalProperties": false
+                              }
+                            },
+                            "schedule": {
+                              "anyOf": [
+                                {
+                                  "type": "object",
+                                  "properties": {
+                                    "every": {
+                                      "type": "string",
+                                      "enum": [
+                                        "1d",
+                                        "7d"
+                                      ]
+                                    },
+                                    "at": {
+                                      "type": "string",
+                                      "pattern": "^([01][0-9]|2[0-3]):[0-5][0-9]$"
+                                    },
+                                    "days": {
+                                      "type": "array",
+                                      "items": {
+                                        "type": "integer",
+                                        "minimum": 0,
+                                        "maximum": 6
+                                      }
+                                    }
+                                  },
+                                  "required": [
+                                    "every",
+                                    "at",
+                                    "days"
+                                  ],
+                                  "additionalProperties": false
+                                },
+                                {
+                                  "nullable": true
+                                }
+                              ]
+                            },
+                            "length_s": {
+                              "type": "integer",
+                              "minimum": 60,
+                              "maximum": 1800
+                            },
+                            "state": {
+                              "anyOf": [
+                                {
+                                  "type": "object",
+                                  "properties": {
+                                    "episode_id": {
+                                      "type": "string"
+                                    },
+                                    "stage": {
+                                      "type": "string",
+                                      "enum": [
+                                        "brief",
+                                        "outline",
+                                        "script",
+                                        "check",
+                                        "voices",
+                                        "mix",
+                                        "keep",
+                                        "done",
+                                        "failed"
+                                      ]
+                                    },
+                                    "reason": {
+                                      "anyOf": [
+                                        {
+                                          "type": "string"
+                                        },
+                                        {
+                                          "nullable": true
+                                        }
+                                      ]
+                                    },
+                                    "started_at": {
+                                      "type": "string",
+                                      "format": "date-time"
+                                    },
+                                    "last_make_ms": {
+                                      "anyOf": [
+                                        {
+                                          "type": "integer"
+                                        },
+                                        {
+                                          "nullable": true
+                                        }
+                                      ]
+                                    }
+                                  },
+                                  "required": [
+                                    "last_make_ms"
+                                  ],
+                                  "additionalProperties": false
+                                },
+                                {
+                                  "nullable": true
+                                }
+                              ]
+                            },
+                            "stand_in_synth_id": {
+                              "anyOf": [
+                                {
+                                  "type": "string"
+                                },
+                                {
+                                  "nullable": true
+                                }
+                              ]
+                            }
+                          },
+                          "required": [
+                            "format_id",
+                            "audience",
+                            "household_facts",
+                            "sources",
+                            "schedule",
+                            "length_s",
+                            "state",
+                            "stand_in_synth_id"
+                          ],
+                          "additionalProperties": false
+                        },
+                        {
+                          "nullable": true
+                        }
+                      ],
+                      "default": null
                     },
                     "provenance": {
                       "type": "string"
@@ -65123,6 +65780,17 @@
                             "type": "string",
                             "maxLength": 2000,
                             "default": ""
+                          },
+                          "synth_id": {
+                            "type": "string",
+                            "nullable": true,
+                            "default": null
+                          },
+                          "part": {
+                            "type": "string",
+                            "nullable": true,
+                            "maxLength": 40,
+                            "default": null
                           }
                         },
                         "required": [
@@ -65248,6 +65916,214 @@
                         "type": "string"
                       }
                     },
+                    "show": {
+                      "anyOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "format_id": {
+                              "type": "string",
+                              "enum": [
+                                "news_briefing",
+                                "kids_news",
+                                "round_table",
+                                "debate",
+                                "review",
+                                "discussion",
+                                "dj_links",
+                                "narration",
+                                "announcer"
+                              ]
+                            },
+                            "audience": {
+                              "type": "string",
+                              "enum": [
+                                "all",
+                                "teen",
+                                "adult"
+                              ]
+                            },
+                            "household_facts": {
+                              "type": "boolean"
+                            },
+                            "sources": {
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "properties": {
+                                  "kind": {
+                                    "type": "string",
+                                    "enum": [
+                                      "news",
+                                      "weather",
+                                      "household",
+                                      "documents",
+                                      "media_item",
+                                      "bookmarks"
+                                    ]
+                                  },
+                                  "topics": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "string",
+                                      "maxLength": 60
+                                    }
+                                  },
+                                  "file_ids": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "string",
+                                      "pattern": "^file-[a-z0-9]{6,}$"
+                                    }
+                                  },
+                                  "media_item_id": {
+                                    "anyOf": [
+                                      {
+                                        "type": "string"
+                                      },
+                                      {
+                                        "nullable": true
+                                      }
+                                    ]
+                                  }
+                                },
+                                "required": [
+                                  "kind",
+                                  "topics",
+                                  "file_ids",
+                                  "media_item_id"
+                                ],
+                                "additionalProperties": false
+                              }
+                            },
+                            "schedule": {
+                              "anyOf": [
+                                {
+                                  "type": "object",
+                                  "properties": {
+                                    "every": {
+                                      "type": "string",
+                                      "enum": [
+                                        "1d",
+                                        "7d"
+                                      ]
+                                    },
+                                    "at": {
+                                      "type": "string",
+                                      "pattern": "^([01][0-9]|2[0-3]):[0-5][0-9]$"
+                                    },
+                                    "days": {
+                                      "type": "array",
+                                      "items": {
+                                        "type": "integer",
+                                        "minimum": 0,
+                                        "maximum": 6
+                                      }
+                                    }
+                                  },
+                                  "required": [
+                                    "every",
+                                    "at",
+                                    "days"
+                                  ],
+                                  "additionalProperties": false
+                                },
+                                {
+                                  "nullable": true
+                                }
+                              ]
+                            },
+                            "length_s": {
+                              "type": "integer",
+                              "minimum": 60,
+                              "maximum": 1800
+                            },
+                            "state": {
+                              "anyOf": [
+                                {
+                                  "type": "object",
+                                  "properties": {
+                                    "episode_id": {
+                                      "type": "string"
+                                    },
+                                    "stage": {
+                                      "type": "string",
+                                      "enum": [
+                                        "brief",
+                                        "outline",
+                                        "script",
+                                        "check",
+                                        "voices",
+                                        "mix",
+                                        "keep",
+                                        "done",
+                                        "failed"
+                                      ]
+                                    },
+                                    "reason": {
+                                      "anyOf": [
+                                        {
+                                          "type": "string"
+                                        },
+                                        {
+                                          "nullable": true
+                                        }
+                                      ]
+                                    },
+                                    "started_at": {
+                                      "type": "string",
+                                      "format": "date-time"
+                                    },
+                                    "last_make_ms": {
+                                      "anyOf": [
+                                        {
+                                          "type": "integer"
+                                        },
+                                        {
+                                          "nullable": true
+                                        }
+                                      ]
+                                    }
+                                  },
+                                  "required": [
+                                    "last_make_ms"
+                                  ],
+                                  "additionalProperties": false
+                                },
+                                {
+                                  "nullable": true
+                                }
+                              ]
+                            },
+                            "stand_in_synth_id": {
+                              "anyOf": [
+                                {
+                                  "type": "string"
+                                },
+                                {
+                                  "nullable": true
+                                }
+                              ]
+                            }
+                          },
+                          "required": [
+                            "format_id",
+                            "audience",
+                            "household_facts",
+                            "sources",
+                            "schedule",
+                            "length_s",
+                            "state",
+                            "stand_in_synth_id"
+                          ],
+                          "additionalProperties": false
+                        },
+                        {
+                          "nullable": true
+                        }
+                      ],
+                      "default": null
+                    },
                     "provenance": {
                       "type": "string"
                     },
@@ -65369,6 +66245,17 @@
                           "type": "string",
                           "maxLength": 2000,
                           "default": ""
+                        },
+                        "synth_id": {
+                          "type": "string",
+                          "nullable": true,
+                          "default": null
+                        },
+                        "part": {
+                          "type": "string",
+                          "nullable": true,
+                          "maxLength": 40,
+                          "default": null
                         }
                       },
                       "required": [
@@ -65493,6 +66380,214 @@
                     "items": {
                       "type": "string"
                     }
+                  },
+                  "show": {
+                    "anyOf": [
+                      {
+                        "type": "object",
+                        "properties": {
+                          "format_id": {
+                            "type": "string",
+                            "enum": [
+                              "news_briefing",
+                              "kids_news",
+                              "round_table",
+                              "debate",
+                              "review",
+                              "discussion",
+                              "dj_links",
+                              "narration",
+                              "announcer"
+                            ]
+                          },
+                          "audience": {
+                            "type": "string",
+                            "enum": [
+                              "all",
+                              "teen",
+                              "adult"
+                            ]
+                          },
+                          "household_facts": {
+                            "type": "boolean"
+                          },
+                          "sources": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "kind": {
+                                  "type": "string",
+                                  "enum": [
+                                    "news",
+                                    "weather",
+                                    "household",
+                                    "documents",
+                                    "media_item",
+                                    "bookmarks"
+                                  ]
+                                },
+                                "topics": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "string",
+                                    "maxLength": 60
+                                  }
+                                },
+                                "file_ids": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "string",
+                                    "pattern": "^file-[a-z0-9]{6,}$"
+                                  }
+                                },
+                                "media_item_id": {
+                                  "anyOf": [
+                                    {
+                                      "type": "string"
+                                    },
+                                    {
+                                      "nullable": true
+                                    }
+                                  ]
+                                }
+                              },
+                              "required": [
+                                "kind",
+                                "topics",
+                                "file_ids",
+                                "media_item_id"
+                              ],
+                              "additionalProperties": false
+                            }
+                          },
+                          "schedule": {
+                            "anyOf": [
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "every": {
+                                    "type": "string",
+                                    "enum": [
+                                      "1d",
+                                      "7d"
+                                    ]
+                                  },
+                                  "at": {
+                                    "type": "string",
+                                    "pattern": "^([01][0-9]|2[0-3]):[0-5][0-9]$"
+                                  },
+                                  "days": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "integer",
+                                      "minimum": 0,
+                                      "maximum": 6
+                                    }
+                                  }
+                                },
+                                "required": [
+                                  "every",
+                                  "at",
+                                  "days"
+                                ],
+                                "additionalProperties": false
+                              },
+                              {
+                                "nullable": true
+                              }
+                            ]
+                          },
+                          "length_s": {
+                            "type": "integer",
+                            "minimum": 60,
+                            "maximum": 1800
+                          },
+                          "state": {
+                            "anyOf": [
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "episode_id": {
+                                    "type": "string"
+                                  },
+                                  "stage": {
+                                    "type": "string",
+                                    "enum": [
+                                      "brief",
+                                      "outline",
+                                      "script",
+                                      "check",
+                                      "voices",
+                                      "mix",
+                                      "keep",
+                                      "done",
+                                      "failed"
+                                    ]
+                                  },
+                                  "reason": {
+                                    "anyOf": [
+                                      {
+                                        "type": "string"
+                                      },
+                                      {
+                                        "nullable": true
+                                      }
+                                    ]
+                                  },
+                                  "started_at": {
+                                    "type": "string",
+                                    "format": "date-time"
+                                  },
+                                  "last_make_ms": {
+                                    "anyOf": [
+                                      {
+                                        "type": "integer"
+                                      },
+                                      {
+                                        "nullable": true
+                                      }
+                                    ]
+                                  }
+                                },
+                                "required": [
+                                  "last_make_ms"
+                                ],
+                                "additionalProperties": false
+                              },
+                              {
+                                "nullable": true
+                              }
+                            ]
+                          },
+                          "stand_in_synth_id": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "nullable": true
+                              }
+                            ]
+                          }
+                        },
+                        "required": [
+                          "format_id",
+                          "audience",
+                          "household_facts",
+                          "sources",
+                          "schedule",
+                          "length_s",
+                          "state",
+                          "stand_in_synth_id"
+                        ],
+                        "additionalProperties": false
+                      },
+                      {
+                        "nullable": true
+                      }
+                    ],
+                    "default": null
                   }
                 }
               }
@@ -65555,6 +66650,17 @@
                             "type": "string",
                             "maxLength": 2000,
                             "default": ""
+                          },
+                          "synth_id": {
+                            "type": "string",
+                            "nullable": true,
+                            "default": null
+                          },
+                          "part": {
+                            "type": "string",
+                            "nullable": true,
+                            "maxLength": 40,
+                            "default": null
                           }
                         },
                         "required": [
@@ -65679,6 +66785,214 @@
                       "items": {
                         "type": "string"
                       }
+                    },
+                    "show": {
+                      "anyOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "format_id": {
+                              "type": "string",
+                              "enum": [
+                                "news_briefing",
+                                "kids_news",
+                                "round_table",
+                                "debate",
+                                "review",
+                                "discussion",
+                                "dj_links",
+                                "narration",
+                                "announcer"
+                              ]
+                            },
+                            "audience": {
+                              "type": "string",
+                              "enum": [
+                                "all",
+                                "teen",
+                                "adult"
+                              ]
+                            },
+                            "household_facts": {
+                              "type": "boolean"
+                            },
+                            "sources": {
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "properties": {
+                                  "kind": {
+                                    "type": "string",
+                                    "enum": [
+                                      "news",
+                                      "weather",
+                                      "household",
+                                      "documents",
+                                      "media_item",
+                                      "bookmarks"
+                                    ]
+                                  },
+                                  "topics": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "string",
+                                      "maxLength": 60
+                                    }
+                                  },
+                                  "file_ids": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "string",
+                                      "pattern": "^file-[a-z0-9]{6,}$"
+                                    }
+                                  },
+                                  "media_item_id": {
+                                    "anyOf": [
+                                      {
+                                        "type": "string"
+                                      },
+                                      {
+                                        "nullable": true
+                                      }
+                                    ]
+                                  }
+                                },
+                                "required": [
+                                  "kind",
+                                  "topics",
+                                  "file_ids",
+                                  "media_item_id"
+                                ],
+                                "additionalProperties": false
+                              }
+                            },
+                            "schedule": {
+                              "anyOf": [
+                                {
+                                  "type": "object",
+                                  "properties": {
+                                    "every": {
+                                      "type": "string",
+                                      "enum": [
+                                        "1d",
+                                        "7d"
+                                      ]
+                                    },
+                                    "at": {
+                                      "type": "string",
+                                      "pattern": "^([01][0-9]|2[0-3]):[0-5][0-9]$"
+                                    },
+                                    "days": {
+                                      "type": "array",
+                                      "items": {
+                                        "type": "integer",
+                                        "minimum": 0,
+                                        "maximum": 6
+                                      }
+                                    }
+                                  },
+                                  "required": [
+                                    "every",
+                                    "at",
+                                    "days"
+                                  ],
+                                  "additionalProperties": false
+                                },
+                                {
+                                  "nullable": true
+                                }
+                              ]
+                            },
+                            "length_s": {
+                              "type": "integer",
+                              "minimum": 60,
+                              "maximum": 1800
+                            },
+                            "state": {
+                              "anyOf": [
+                                {
+                                  "type": "object",
+                                  "properties": {
+                                    "episode_id": {
+                                      "type": "string"
+                                    },
+                                    "stage": {
+                                      "type": "string",
+                                      "enum": [
+                                        "brief",
+                                        "outline",
+                                        "script",
+                                        "check",
+                                        "voices",
+                                        "mix",
+                                        "keep",
+                                        "done",
+                                        "failed"
+                                      ]
+                                    },
+                                    "reason": {
+                                      "anyOf": [
+                                        {
+                                          "type": "string"
+                                        },
+                                        {
+                                          "nullable": true
+                                        }
+                                      ]
+                                    },
+                                    "started_at": {
+                                      "type": "string",
+                                      "format": "date-time"
+                                    },
+                                    "last_make_ms": {
+                                      "anyOf": [
+                                        {
+                                          "type": "integer"
+                                        },
+                                        {
+                                          "nullable": true
+                                        }
+                                      ]
+                                    }
+                                  },
+                                  "required": [
+                                    "last_make_ms"
+                                  ],
+                                  "additionalProperties": false
+                                },
+                                {
+                                  "nullable": true
+                                }
+                              ]
+                            },
+                            "stand_in_synth_id": {
+                              "anyOf": [
+                                {
+                                  "type": "string"
+                                },
+                                {
+                                  "nullable": true
+                                }
+                              ]
+                            }
+                          },
+                          "required": [
+                            "format_id",
+                            "audience",
+                            "household_facts",
+                            "sources",
+                            "schedule",
+                            "length_s",
+                            "state",
+                            "stand_in_synth_id"
+                          ],
+                          "additionalProperties": false
+                        },
+                        {
+                          "nullable": true
+                        }
+                      ],
+                      "default": null
                     },
                     "provenance": {
                       "type": "string"
@@ -65888,6 +67202,17 @@
                             "type": "string",
                             "maxLength": 2000,
                             "default": ""
+                          },
+                          "synth_id": {
+                            "type": "string",
+                            "nullable": true,
+                            "default": null
+                          },
+                          "part": {
+                            "type": "string",
+                            "nullable": true,
+                            "maxLength": 40,
+                            "default": null
                           }
                         },
                         "required": [
@@ -66012,6 +67337,214 @@
                       "items": {
                         "type": "string"
                       }
+                    },
+                    "show": {
+                      "anyOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "format_id": {
+                              "type": "string",
+                              "enum": [
+                                "news_briefing",
+                                "kids_news",
+                                "round_table",
+                                "debate",
+                                "review",
+                                "discussion",
+                                "dj_links",
+                                "narration",
+                                "announcer"
+                              ]
+                            },
+                            "audience": {
+                              "type": "string",
+                              "enum": [
+                                "all",
+                                "teen",
+                                "adult"
+                              ]
+                            },
+                            "household_facts": {
+                              "type": "boolean"
+                            },
+                            "sources": {
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "properties": {
+                                  "kind": {
+                                    "type": "string",
+                                    "enum": [
+                                      "news",
+                                      "weather",
+                                      "household",
+                                      "documents",
+                                      "media_item",
+                                      "bookmarks"
+                                    ]
+                                  },
+                                  "topics": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "string",
+                                      "maxLength": 60
+                                    }
+                                  },
+                                  "file_ids": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "string",
+                                      "pattern": "^file-[a-z0-9]{6,}$"
+                                    }
+                                  },
+                                  "media_item_id": {
+                                    "anyOf": [
+                                      {
+                                        "type": "string"
+                                      },
+                                      {
+                                        "nullable": true
+                                      }
+                                    ]
+                                  }
+                                },
+                                "required": [
+                                  "kind",
+                                  "topics",
+                                  "file_ids",
+                                  "media_item_id"
+                                ],
+                                "additionalProperties": false
+                              }
+                            },
+                            "schedule": {
+                              "anyOf": [
+                                {
+                                  "type": "object",
+                                  "properties": {
+                                    "every": {
+                                      "type": "string",
+                                      "enum": [
+                                        "1d",
+                                        "7d"
+                                      ]
+                                    },
+                                    "at": {
+                                      "type": "string",
+                                      "pattern": "^([01][0-9]|2[0-3]):[0-5][0-9]$"
+                                    },
+                                    "days": {
+                                      "type": "array",
+                                      "items": {
+                                        "type": "integer",
+                                        "minimum": 0,
+                                        "maximum": 6
+                                      }
+                                    }
+                                  },
+                                  "required": [
+                                    "every",
+                                    "at",
+                                    "days"
+                                  ],
+                                  "additionalProperties": false
+                                },
+                                {
+                                  "nullable": true
+                                }
+                              ]
+                            },
+                            "length_s": {
+                              "type": "integer",
+                              "minimum": 60,
+                              "maximum": 1800
+                            },
+                            "state": {
+                              "anyOf": [
+                                {
+                                  "type": "object",
+                                  "properties": {
+                                    "episode_id": {
+                                      "type": "string"
+                                    },
+                                    "stage": {
+                                      "type": "string",
+                                      "enum": [
+                                        "brief",
+                                        "outline",
+                                        "script",
+                                        "check",
+                                        "voices",
+                                        "mix",
+                                        "keep",
+                                        "done",
+                                        "failed"
+                                      ]
+                                    },
+                                    "reason": {
+                                      "anyOf": [
+                                        {
+                                          "type": "string"
+                                        },
+                                        {
+                                          "nullable": true
+                                        }
+                                      ]
+                                    },
+                                    "started_at": {
+                                      "type": "string",
+                                      "format": "date-time"
+                                    },
+                                    "last_make_ms": {
+                                      "anyOf": [
+                                        {
+                                          "type": "integer"
+                                        },
+                                        {
+                                          "nullable": true
+                                        }
+                                      ]
+                                    }
+                                  },
+                                  "required": [
+                                    "last_make_ms"
+                                  ],
+                                  "additionalProperties": false
+                                },
+                                {
+                                  "nullable": true
+                                }
+                              ]
+                            },
+                            "stand_in_synth_id": {
+                              "anyOf": [
+                                {
+                                  "type": "string"
+                                },
+                                {
+                                  "nullable": true
+                                }
+                              ]
+                            }
+                          },
+                          "required": [
+                            "format_id",
+                            "audience",
+                            "household_facts",
+                            "sources",
+                            "schedule",
+                            "length_s",
+                            "state",
+                            "stand_in_synth_id"
+                          ],
+                          "additionalProperties": false
+                        },
+                        {
+                          "nullable": true
+                        }
+                      ],
+                      "default": null
                     },
                     "provenance": {
                       "type": "string"
@@ -66212,6 +67745,17 @@
                         "type": "string",
                         "maxLength": 2000,
                         "default": ""
+                      },
+                      "synth_id": {
+                        "type": "string",
+                        "nullable": true,
+                        "default": null
+                      },
+                      "part": {
+                        "type": "string",
+                        "nullable": true,
+                        "maxLength": 40,
+                        "default": null
                       }
                     },
                     "required": [
@@ -66284,6 +67828,17 @@
                             "type": "string",
                             "maxLength": 2000,
                             "default": ""
+                          },
+                          "synth_id": {
+                            "type": "string",
+                            "nullable": true,
+                            "default": null
+                          },
+                          "part": {
+                            "type": "string",
+                            "nullable": true,
+                            "maxLength": 40,
+                            "default": null
                           }
                         },
                         "required": [
@@ -66408,6 +67963,214 @@
                       "items": {
                         "type": "string"
                       }
+                    },
+                    "show": {
+                      "anyOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "format_id": {
+                              "type": "string",
+                              "enum": [
+                                "news_briefing",
+                                "kids_news",
+                                "round_table",
+                                "debate",
+                                "review",
+                                "discussion",
+                                "dj_links",
+                                "narration",
+                                "announcer"
+                              ]
+                            },
+                            "audience": {
+                              "type": "string",
+                              "enum": [
+                                "all",
+                                "teen",
+                                "adult"
+                              ]
+                            },
+                            "household_facts": {
+                              "type": "boolean"
+                            },
+                            "sources": {
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "properties": {
+                                  "kind": {
+                                    "type": "string",
+                                    "enum": [
+                                      "news",
+                                      "weather",
+                                      "household",
+                                      "documents",
+                                      "media_item",
+                                      "bookmarks"
+                                    ]
+                                  },
+                                  "topics": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "string",
+                                      "maxLength": 60
+                                    }
+                                  },
+                                  "file_ids": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "string",
+                                      "pattern": "^file-[a-z0-9]{6,}$"
+                                    }
+                                  },
+                                  "media_item_id": {
+                                    "anyOf": [
+                                      {
+                                        "type": "string"
+                                      },
+                                      {
+                                        "nullable": true
+                                      }
+                                    ]
+                                  }
+                                },
+                                "required": [
+                                  "kind",
+                                  "topics",
+                                  "file_ids",
+                                  "media_item_id"
+                                ],
+                                "additionalProperties": false
+                              }
+                            },
+                            "schedule": {
+                              "anyOf": [
+                                {
+                                  "type": "object",
+                                  "properties": {
+                                    "every": {
+                                      "type": "string",
+                                      "enum": [
+                                        "1d",
+                                        "7d"
+                                      ]
+                                    },
+                                    "at": {
+                                      "type": "string",
+                                      "pattern": "^([01][0-9]|2[0-3]):[0-5][0-9]$"
+                                    },
+                                    "days": {
+                                      "type": "array",
+                                      "items": {
+                                        "type": "integer",
+                                        "minimum": 0,
+                                        "maximum": 6
+                                      }
+                                    }
+                                  },
+                                  "required": [
+                                    "every",
+                                    "at",
+                                    "days"
+                                  ],
+                                  "additionalProperties": false
+                                },
+                                {
+                                  "nullable": true
+                                }
+                              ]
+                            },
+                            "length_s": {
+                              "type": "integer",
+                              "minimum": 60,
+                              "maximum": 1800
+                            },
+                            "state": {
+                              "anyOf": [
+                                {
+                                  "type": "object",
+                                  "properties": {
+                                    "episode_id": {
+                                      "type": "string"
+                                    },
+                                    "stage": {
+                                      "type": "string",
+                                      "enum": [
+                                        "brief",
+                                        "outline",
+                                        "script",
+                                        "check",
+                                        "voices",
+                                        "mix",
+                                        "keep",
+                                        "done",
+                                        "failed"
+                                      ]
+                                    },
+                                    "reason": {
+                                      "anyOf": [
+                                        {
+                                          "type": "string"
+                                        },
+                                        {
+                                          "nullable": true
+                                        }
+                                      ]
+                                    },
+                                    "started_at": {
+                                      "type": "string",
+                                      "format": "date-time"
+                                    },
+                                    "last_make_ms": {
+                                      "anyOf": [
+                                        {
+                                          "type": "integer"
+                                        },
+                                        {
+                                          "nullable": true
+                                        }
+                                      ]
+                                    }
+                                  },
+                                  "required": [
+                                    "last_make_ms"
+                                  ],
+                                  "additionalProperties": false
+                                },
+                                {
+                                  "nullable": true
+                                }
+                              ]
+                            },
+                            "stand_in_synth_id": {
+                              "anyOf": [
+                                {
+                                  "type": "string"
+                                },
+                                {
+                                  "nullable": true
+                                }
+                              ]
+                            }
+                          },
+                          "required": [
+                            "format_id",
+                            "audience",
+                            "household_facts",
+                            "sources",
+                            "schedule",
+                            "length_s",
+                            "state",
+                            "stand_in_synth_id"
+                          ],
+                          "additionalProperties": false
+                        },
+                        {
+                          "nullable": true
+                        }
+                      ],
+                      "default": null
                     },
                     "provenance": {
                       "type": "string"
@@ -66651,6 +68414,17 @@
                             "type": "string",
                             "maxLength": 2000,
                             "default": ""
+                          },
+                          "synth_id": {
+                            "type": "string",
+                            "nullable": true,
+                            "default": null
+                          },
+                          "part": {
+                            "type": "string",
+                            "nullable": true,
+                            "maxLength": 40,
+                            "default": null
                           }
                         },
                         "required": [
@@ -66775,6 +68549,214 @@
                       "items": {
                         "type": "string"
                       }
+                    },
+                    "show": {
+                      "anyOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "format_id": {
+                              "type": "string",
+                              "enum": [
+                                "news_briefing",
+                                "kids_news",
+                                "round_table",
+                                "debate",
+                                "review",
+                                "discussion",
+                                "dj_links",
+                                "narration",
+                                "announcer"
+                              ]
+                            },
+                            "audience": {
+                              "type": "string",
+                              "enum": [
+                                "all",
+                                "teen",
+                                "adult"
+                              ]
+                            },
+                            "household_facts": {
+                              "type": "boolean"
+                            },
+                            "sources": {
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "properties": {
+                                  "kind": {
+                                    "type": "string",
+                                    "enum": [
+                                      "news",
+                                      "weather",
+                                      "household",
+                                      "documents",
+                                      "media_item",
+                                      "bookmarks"
+                                    ]
+                                  },
+                                  "topics": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "string",
+                                      "maxLength": 60
+                                    }
+                                  },
+                                  "file_ids": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "string",
+                                      "pattern": "^file-[a-z0-9]{6,}$"
+                                    }
+                                  },
+                                  "media_item_id": {
+                                    "anyOf": [
+                                      {
+                                        "type": "string"
+                                      },
+                                      {
+                                        "nullable": true
+                                      }
+                                    ]
+                                  }
+                                },
+                                "required": [
+                                  "kind",
+                                  "topics",
+                                  "file_ids",
+                                  "media_item_id"
+                                ],
+                                "additionalProperties": false
+                              }
+                            },
+                            "schedule": {
+                              "anyOf": [
+                                {
+                                  "type": "object",
+                                  "properties": {
+                                    "every": {
+                                      "type": "string",
+                                      "enum": [
+                                        "1d",
+                                        "7d"
+                                      ]
+                                    },
+                                    "at": {
+                                      "type": "string",
+                                      "pattern": "^([01][0-9]|2[0-3]):[0-5][0-9]$"
+                                    },
+                                    "days": {
+                                      "type": "array",
+                                      "items": {
+                                        "type": "integer",
+                                        "minimum": 0,
+                                        "maximum": 6
+                                      }
+                                    }
+                                  },
+                                  "required": [
+                                    "every",
+                                    "at",
+                                    "days"
+                                  ],
+                                  "additionalProperties": false
+                                },
+                                {
+                                  "nullable": true
+                                }
+                              ]
+                            },
+                            "length_s": {
+                              "type": "integer",
+                              "minimum": 60,
+                              "maximum": 1800
+                            },
+                            "state": {
+                              "anyOf": [
+                                {
+                                  "type": "object",
+                                  "properties": {
+                                    "episode_id": {
+                                      "type": "string"
+                                    },
+                                    "stage": {
+                                      "type": "string",
+                                      "enum": [
+                                        "brief",
+                                        "outline",
+                                        "script",
+                                        "check",
+                                        "voices",
+                                        "mix",
+                                        "keep",
+                                        "done",
+                                        "failed"
+                                      ]
+                                    },
+                                    "reason": {
+                                      "anyOf": [
+                                        {
+                                          "type": "string"
+                                        },
+                                        {
+                                          "nullable": true
+                                        }
+                                      ]
+                                    },
+                                    "started_at": {
+                                      "type": "string",
+                                      "format": "date-time"
+                                    },
+                                    "last_make_ms": {
+                                      "anyOf": [
+                                        {
+                                          "type": "integer"
+                                        },
+                                        {
+                                          "nullable": true
+                                        }
+                                      ]
+                                    }
+                                  },
+                                  "required": [
+                                    "last_make_ms"
+                                  ],
+                                  "additionalProperties": false
+                                },
+                                {
+                                  "nullable": true
+                                }
+                              ]
+                            },
+                            "stand_in_synth_id": {
+                              "anyOf": [
+                                {
+                                  "type": "string"
+                                },
+                                {
+                                  "nullable": true
+                                }
+                              ]
+                            }
+                          },
+                          "required": [
+                            "format_id",
+                            "audience",
+                            "household_facts",
+                            "sources",
+                            "schedule",
+                            "length_s",
+                            "state",
+                            "stand_in_synth_id"
+                          ],
+                          "additionalProperties": false
+                        },
+                        {
+                          "nullable": true
+                        }
+                      ],
+                      "default": null
                     },
                     "provenance": {
                       "type": "string"
