@@ -357,21 +357,51 @@ describe("VISION-02c: no face recognition on the picture path", () => {
     }
     return null;
   }
-  test("the picture modules never reach face recognition, a face embedding or a biometric print", () => {
-    const start = ["lib/chatPictures.ts", "lib/turnMachine/nodes/context.ts", "lib/turnMachine/messages.ts", "lib/llm.ts", "lib/tokenCount.ts"].map((path) => join(SRC, path));
+  const START = ["lib/chatPictures.ts", "lib/turnMachine/nodes/context.ts", "lib/turnMachine/messages.ts", "lib/llm.ts", "lib/tokenCount.ts"].map((path) => join(SRC, path));
+  /** Every module the picture path reaches by static import, minus the ones in `skip`. */
+  function reached(skip: Set<string>): string[] {
     const seen = new Set<string>();
-    const queue = [...start];
+    const queue = [...START];
     while (queue.length > 0) {
       const file = queue.pop()!;
-      if (seen.has(file)) continue;
+      if (seen.has(file) || skip.has(file)) continue;
       seen.add(file);
       for (const spec of imports(file)) {
         const next = resolveImport(file, spec);
         if (next) queue.push(next);
       }
     }
-    const reached = [...seen].map((file) => file.slice(SRC.length + 1));
-    expect(reached.filter((file) => /face|biometric/i.test(file) && !/surface/i.test(file))).toEqual([]);
+    return [...seen].map((file) => file.slice(SRC.length + 1));
+  }
+  const faceish = (files: string[]) => files.filter((file) => /face|biometric/i.test(file) && !/surface/i.test(file));
+  // LIKENESS-01 A (architect APPROVED 2026-11-07, record VISION-02C-LIKENESS): the likeness edit tool keeps a person's
+  // face the same across an edit with an in-memory face check that is never stored, never matched to a person, never
+  // given to the model and never offered in the child lane. These are the only face modules the picture path may reach.
+  const LIKENESS_EDIT = join(SRC, "lib/pictures/likeness/edit.ts");
+  const ALLOWED_FACE = new Set([
+    "lib/pictures/likeness/faces.ts",
+    "lib/faceModelPins.ts",
+    "n/faceDetect.ts",
+    "n/faceAlign.ts",
+    "n/faceEmbed.ts",
+  ]);
+
+  test("the chat picture path reaches face code only through the likeness edit tool, and never a biometric print", () => {
+    const all = reached(new Set());
+    expect(faceish(all).filter((file) => !ALLOWED_FACE.has(file))).toEqual([]);
+    expect(all.filter((file) => /biometricPrints/.test(file))).toEqual([]);
     expect(readdirSync(join(SRC, "lib")).some((name) => /^face/i.test(name))).toBe(true);
+  });
+
+  test("without the likeness edit tool the picture path reaches no face recognition, face embedding or biometric print at all", () => {
+    expect(faceish(reached(new Set([LIKENESS_EDIT])))).toEqual([]);
+  });
+
+  test("the likeness code keeps no record: it imports no database, no person store and no biometric print", () => {
+    const dir = join(SRC, "lib/pictures/likeness");
+    for (const name of readdirSync(dir).filter((file) => file.endsWith(".ts") && !file.endsWith(".test.ts"))) {
+      const specs = imports(join(dir, name));
+      expect(specs.filter((spec) => /(^|\/)(db|biometricPrints|people|faceEnrollment|personLifecycle)(\/|$)/.test(spec))).toEqual([]);
+    }
   });
 });
