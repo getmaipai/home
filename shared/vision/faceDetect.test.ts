@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { decodeYunetOutputs } from "@/lib/vision/faceDetect";
+import { decodeYunetOutputs } from "./faceDetect";
 
 function tensors(paddedWidth = 32): Record<string, Float32Array> {
   const result: Record<string, Float32Array> = {};

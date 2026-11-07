@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { alignCrop, CROP_SIZE, similarityTransform } from "@/lib/vision/faceAlign";
+import { alignCrop, CROP_SIZE, similarityTransform } from "./faceAlign";
 
 const template: [number, number][] = [
   [38.2946, 51.6963],

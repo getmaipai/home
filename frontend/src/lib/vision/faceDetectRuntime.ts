@@ -1,5 +1,5 @@
 import { tensorFor, type OnnxInferenceSession } from "@/lib/onnx/session-runtime";
-import { decodeYunetOutputs, type DetectedFace } from "@/lib/vision/faceDetect";
+import { decodeYunetOutputs, type DetectedFace } from "../../../../shared/vision/faceDetect";
 
 export function padToStride(
   frameRgba: Uint8ClampedArray,
