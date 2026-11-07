@@ -103,7 +103,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `frontend/src/apps/chat/composerVoiceControls.tsx` | useVoiceCallReady, ComposerVoiceControls |
 | `frontend/src/apps/chat/liveVoiceSession.tsx` | WAKE_SESSION_IDLE_CLOSE_MS, BARGE_IN_ARM_DELAY_MS, DUPLEX_PAUSE_AFTER_MS, DUPLEX_FALSE_INTERRUPTION_MS, DUPLEX_CONFIRM_MS, REACTION_MIN_WORDS |
 | `frontend/src/apps/chat/pictureAdultMark.tsx` | usePictureAdultMark |
-| `frontend/src/apps/chat/videoAdultMark.tsx` | unmarkExplainer, UNMARK_EXPLAINER, useVideoAdultMark |
+| `frontend/src/apps/chat/videoAdultMark.tsx` | useVideoAdultMark |
 | `frontend/src/apps/chat/voiceSessionContext.tsx` | VoiceSessionProvider, useVoiceSession |
 | `frontend/src/apps/clock/AlarmDays.tsx` | AlarmDays |
 | `frontend/src/apps/clock/AlarmEditor.tsx` | AlarmEditor |
@@ -189,7 +189,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `frontend/src/apps/setup/SetupReviewPage.tsx` | SetupReviewPage |
 | `frontend/src/apps/setup/SetupWizard.tsx` | checksTitle, checksErrorMessage, checksSummary, renderSetupReviewScreen, SetupWizard |
 | `frontend/src/apps/setup/StorageStep.tsx` | placementLine, StorageStep |
-| `frontend/src/apps/setup/WebSearchStep.tsx` | webSearchFailure, WebSearchStep |
+| `frontend/src/apps/setup/WebSearchStep.tsx` | WebSearchStep |
 | `frontend/src/lib/media/micGate.tsx` | useMicGate, micDeviceSteps, micFixSteps, micHelp |
 | `frontend/src/shell/AdultLockHost.tsx` | unlockRequest, sendLock, AdultLockController, useAdultLockProps |
 | `frontend/src/shell/AlarmRinger.tsx` | AlarmRinger |
