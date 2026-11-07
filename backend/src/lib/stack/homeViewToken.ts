@@ -56,7 +56,6 @@ export function storeRemoteViewToken(token: string): boolean {
   return true;
 }
 export function removeRemoteViewToken(): void { rmSync(remoteTokenPath, { force: true }); cached = null; }
-export function hasRemoteViewToken(): boolean { return readRemoteViewToken() !== null; }
 
 function readLocalFile(): string | null {
   try {

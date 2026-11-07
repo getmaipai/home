@@ -80,8 +80,3 @@ export async function sampleEngineStats(): Promise<void> {
 export function getEngineStatsSamples(): EngineStatsSample[] {
   return samples;
 }
-
-/** Test-only: the ring buffer is module state. */
-export function __clearEngineStatsForTests(): void {
-  samples.length = 0;
-}

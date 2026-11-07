@@ -511,7 +511,6 @@ export async function saveUploadedVersion(actor: PersonRow, conversationId: stri
 // ---------------------------------------------------------------- Comment: a change in words (IMGGEN-EDITOR-01)
 
 export interface CommentRegion { x: number; y: number; width: number; height: number }
-export const COMMENT_NOT_READY_LINE = COMMENT_NOT_SET_UP;
 
 function clamp01(value: number): number { return Math.min(1, Math.max(0, Number.isFinite(value) ? value : 0)); }
 

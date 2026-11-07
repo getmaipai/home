@@ -388,12 +388,6 @@ function deriveChatAvailability(kind: EngineHealth["kind"], alive: boolean | nul
   return { availability: "ready", reason: null };
 }
 
-export function chatAvailabilityState(): ChatAvailabilityState {
-  if (process.env.MAIPAI_LLAMA_SERVER_URL) return { availability: "ready", reason: null };
-  if (!isStackRoleEnabled("chat")) return { availability: "unavailable", reason: "not_installed" };
-  return { availability: "ready", reason: null };
-}
-
 /** Null unless the engine is genuinely fully installed - both the binary
  * itself AND the ENGINE_READY_MARKER modelDownloadJobs.ts only writes
  * after every archive (main plus extras) has extracted. Checking the

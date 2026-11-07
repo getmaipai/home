@@ -5,8 +5,6 @@ import { getStackClient } from "@/lib/stackEngine";
 
 const RETRY_PAUSE_MS = 4000;
 let retryPauseMs = RETRY_PAUSE_MS;
-export function __setPeopleRetryPauseForTests(ms: number): void { retryPauseMs = Math.max(0, ms); }
-
 async function runWithRetry<T>(signal: AbortSignal | undefined, operation: () => Promise<T>): Promise<T> {
   for (let attempt = 0; ; attempt += 1) {
     try { return await operation(); }

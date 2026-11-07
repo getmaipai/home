@@ -128,7 +128,6 @@ export const BEATS_NOT_READY_LINE = "I can't cut to the beat right now. Beat ana
 export const MUSIC_BED_FAILED_LINE = "I couldn't make the music for that video. The video was not changed. Try again in a minute.";
 export const MUSIC_NOT_READY_LINE = "Home can't make music right now, so I can't add any to the video. Try again in a minute, or pick one of your songs.";
 export const BEATS_FAILED_LINE = "I couldn't find the beat in that song. Try another song with a clearer rhythm.";
-export const BEATS_NOT_FOUND_LINE = "I couldn't find a steady beat in that song. Try a song with a clearer rhythm.";
 export const NO_VOICE_LINE = "I don't know that voice. Pick one from your home's voices, or leave the voice out to use yours.";
 export const SPEECH_FAILED_LINE = "I couldn't change that video. Home can't speak right now, so the line was not added. Try again in a minute.";
 export const CROSSFADE_NOT_SUPPORTED_LINE = "Crossfades are not available yet. I can join the videos with a straight cut now. Ask me to do that if you like.";

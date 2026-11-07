@@ -47,20 +47,6 @@ export function hostGuardStatusView(status: HostGuardStatus | null, installed: b
     : { state: "off", title: "This Mac's self-check", text: "The Mac's self-check is not installed. Ask an admin to check Settings." };
 }
 
-/** A no-status-file view is distinct from a disabled installed guard when
- * the daemon directory itself is absent. */
-export function readHostGuardView(): HostGuardView {
-  if (process.platform !== "darwin") return { state: "off", title: "This Mac's self-check", text: "This Mac does not use the host self-check." };
-  const status = readHostGuardStatus();
-  if (status) return hostGuardView(status);
-  try {
-    readFileSync(join(hostGuardStateDir(), "last-reboot.txt"), "utf8");
-    return { state: "stale", title: "This Mac's self-check", text: "The self-check has not reported recently. The guard will check again when it runs." };
-  } catch {
-    return { state: "off", title: "This Mac's self-check", text: "The Mac's self-check is not installed. Ask an admin to check Settings." };
-  }
-}
-
 export function hostGuardInstalled(): boolean {
   if (process.platform !== "darwin") return false;
   try { readFileSync(join(hostGuardStateDir(), "config.json"), "utf8"); return true; } catch { return false; }

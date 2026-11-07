@@ -32,8 +32,6 @@ export const EDIT_ALBUM_TOOL_ID = "edit_album";
 
 export const ALBUM_NOT_HERE_LINE = "No album was made. Tell the person this needs an adult on their own screen. Offer to describe an album in words instead.";
 export const ALBUM_MODEL_LINE = "No album was made, because the writing model did not answer. Tell the person to try again in a minute.";
-export const ALBUM_GONE_LINE = "That album is not here any more. Tell the person it may have been discarded.";
-
 export interface AlbumDraft { title: string; blurb: string; look: string; cover_prompt: string; sound: string; genres: string[]; tracks: string[]; first_lyrics: string }
 
 const ALBUM_SCHEMA = {

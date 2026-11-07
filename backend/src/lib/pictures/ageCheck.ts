@@ -382,8 +382,6 @@ export async function checkImages(images: readonly Uint8Array[], kind: CheckedKi
 
 export type InputScreen = { ok: true } | { ok: false; code: "input_minor_cue" | "input_minor_sexual" | "input_unchecked"; line: string };
 
-/** The line when words about a child come with a photo to change. Fixed wording; it names no term. */
-export const INPUT_MINOR_CUE_LINE = "I can't change a photo into a picture of a child. Describe a new picture from scratch instead.";
 export const INPUT_MINOR_SEXUAL_LINE = "I can't change that photo. A photo that may show a child is never changed that way.";
 
 /**

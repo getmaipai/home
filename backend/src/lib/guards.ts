@@ -1730,9 +1730,6 @@ const REPLACEMENT_FOR: Record<GuardReason, readonly string[]> = {
   self_assertion: MALFORMED,
 };
 
-
-export function bannedPhraseRetryNote(phrase: string): string { return `Never say "${phrase}". Answer without it.`; }
-
 function containsBannedPhrase(sentence: string, phrases: readonly string[]): boolean {
   return phrases.some((phrase) => new RegExp(`\\b${phrase.replace(/[.*+?^${}()|[\\]\\]/g, "\\$&")}\\b`, "i").test(sentence));
 }

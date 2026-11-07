@@ -11,8 +11,6 @@ import { existsSync, statSync } from "node:fs";
 import { db } from "@/db";
 import { backupTargets } from "@/db/schema";
 
-export type BackupTargetRow = typeof backupTargets.$inferSelect;
-
 const SMB_TARGET_ID = "smb";
 
 export interface SmbTargetConfig {

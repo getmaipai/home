@@ -453,9 +453,6 @@ export function listValues(actor: PersonRow, scope: string, onlyKey?: string): S
  * Caller is responsible for scope/key/authorization checks; this only
  * validates the value against the key's selector and persists it. */
 const householdWriteListeners: Array<(key: string, value: unknown) => void> = [];
-/** Runs after every stored household value, so a legacy key can keep its replacement in step until the legacy key retires (tierSlotMigration.ts). */
-export function onHouseholdWrite(listener: (key: string, value: unknown) => void): void { householdWriteListeners.push(listener); }
-
 function writeValue(
   scope: string,
   keyDef: SettingsKey,

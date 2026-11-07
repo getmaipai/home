@@ -349,9 +349,6 @@ export async function installStackLora(media: Media, body: StackLoraInstallBody)
   return { job: parsed.job };
 }
 
-/** Existing callers stay on the video route with the same request body. */
-export const installVideoLora = (body: StackLoraInstallBody): Promise<{ job: string }> => installStackLora("video", body);
-
 export interface StackInstallJob { state: string; percent: number | null; completedBytes: number | null; totalBytes: number | null; status: string | null; reason: string | null; result: unknown }
 export async function getStackInstallJob(job: string): Promise<StackInstallJob | null> {
   const res = await request(`/stack/v1/jobs/${encodeURIComponent(job)}`, { method: "GET", timeoutMs: 8_000 });

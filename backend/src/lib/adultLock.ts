@@ -275,10 +275,6 @@ export function withMark(provenance: string, change: { lock: "on" | "off"; raise
 /** What a locked item is drawn as: one flag the tile needs, never a title, description, picture, tag, count, date, id or owner. */
 export function lockedView(making = false): { locked: true; making: boolean } { return { locked: true, making }; }
 
-/** The fixed words for a locked item in a notification, push, alert or the Making now line. */
-export const LOCKED_READY_LINE = "A locked item is ready";
-export const LOCKED_MAKING_LINE = "Something locked is being made";
-
 /** The lock state of a stored Library file (by id) for a viewer. A missing file is "open": the caller's own "not found" answer applies. */
 export function fileLockState(actor: PersonRow, fileId: string, proof: AdultProof = requestProof()): LockResult {
   const row = db.select({ owner: attachments.ownerPersonId, provenance: attachments.provenance }).from(attachments).where(eq(attachments.id, fileId)).get();

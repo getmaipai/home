@@ -1,7 +1,7 @@
 import type { Role } from "@/middleware/auth";
 import { approverFor } from "@/lib/gate/decide";
 import { normalizeGrantTarget } from "@/lib/grants";
-import type { HouseEntity, SensitiveClass } from "./registry";
+import type { HouseEntity } from "./registry";
 
 export type HouseBand = "child" | "teen" | "adult";
 export type HouseLevel = "see" | "control" | "confirm";
@@ -60,5 +60,3 @@ export function visibleEntities({ actor, permissions, entities, level }: {
 }): HouseEntity[] {
   return entities.filter((entity) => houseAccess({ actor, permissions, entity, level }).allowed);
 }
-
-export type HouseSensitiveClass = SensitiveClass;

@@ -25,8 +25,6 @@ export type ApprovalRow = typeof approvals.$inferSelect;
 // Extend this list (and summarizeApproval() below) when a package actually needs
 // a new kind of ask.
 const KNOWN_KINDS = ["install_package", "browse_url"] as const;
-export type ApprovalKind = (typeof KNOWN_KINDS)[number];
-
 export interface ApprovalView {
   id: string;
   kind: string;

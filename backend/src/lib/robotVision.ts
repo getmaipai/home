@@ -25,9 +25,6 @@ export const MIN_FRAME_INTERVAL_MS = 4_000;
 /** ROBOT-VISION-BUSY-01: the background look is the lowest priority (chat, then pictures, then video, then the rest), so it is rare. */
 export const SCENE_FRAME_INTERVAL_MS = 30_000;
 export const MAX_FRAME_BYTES = 512 * 1024;
-/** What an on-demand look may reuse: a description younger than this answers "what do you see" without a new picture. */
-export const FRESH_ENOUGH_MS = 12_000;
-
 export function robotVisionMode(deviceId: string): RobotVisionMode {
   const value = getDeviceSettingValue(deviceId, ROBOT_VISION_KEY);
   return value === "on_demand" || value === "none" ? value : "continual";

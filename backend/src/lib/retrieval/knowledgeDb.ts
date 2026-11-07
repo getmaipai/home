@@ -95,8 +95,3 @@ export function sharedKnowledgeDb(): KnowledgeDb | null {
     return null;
   }
 }
-
-export function __resetSharedKnowledgeDbForTests(): void {
-  shared?.close();
-  shared = null;
-}

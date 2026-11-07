@@ -7,10 +7,6 @@ import { SettingsKey } from "@maipai/spec/gen/ts/settings-key.js";
 // Kept as a stable key name while old stored values remain readable.
 export const CHAT_MODEL_SETTING_KEY = "chat.model_id" as const;
 
-// One setting points Home at its required local Stack. An empty value
-// means the Stack is not configured and chat is unavailable.
-export const STACK_URL_SETTING_KEY = "engines.stack.url" as const;
-
 export const AI_SETTINGS_KEYS: SettingsKey[] = [
   SettingsKey.parse({
     key: "chat.model_id",

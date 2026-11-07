@@ -4,8 +4,6 @@
 import type { Lora } from "@/lib/loras/store";
 
 export type AdultCheck = NonNullable<Lora["adult_check"]>;
-export type AdultState = AdultCheck["state"];
-
 /** Civitai `nsfwLevel` values (from memory and the public image-rating scale, to be re-checked against a live response): 1 PG, 2 PG-13, 4 R, 8 X, 16 XXX. A model level is a bit mask
  * (the reference shows 31), so any value of 4 or more contains an adult bit. */
 export const CIVITAI_ADULT_LEVEL = 4;
@@ -49,9 +47,6 @@ export function classifyHuggingFace(tags: unknown, now = new Date().toISOString(
   const adult = Array.isArray(tags) && tags.includes("not-for-all-audiences");
   return adult ? { state: "adult", basis: "source_tag", flag: true, levels_seen: 0, adult_levels: 0, checked_at: now } : { state: "unknown", basis: "none", flag: null, levels_seen: 0, adult_levels: 0, checked_at: now };
 }
-
-/** Absent evidence reads as unknown. */
-export const NO_EVIDENCE = (now = new Date().toISOString()): AdultCheck => ({ state: "unknown", basis: "none", flag: null, levels_seen: 0, adult_levels: 0, checked_at: now });
 
 /** Trigger words as an admin would want them (Loki Doki loraTokens lesson): strip `<lora:name:weight>` syntax, split comma and newline dumps, drop control characters,
  * dedupe case-insensitively, cap length and count. */

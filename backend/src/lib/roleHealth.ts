@@ -11,7 +11,6 @@ import type { ChatRoleContext } from "@maipai/spec/stack/ts/role-context.js";
 export type HealthRole = "chat" | "embed" | "background" | "voice" | MakingRole;
 /** ENGINE-STATUS-MEDIA-01: picture and video making, read the same way so a control can be disabled before a person presses it. */
 export type MakingRole = "image" | "video";
-export const MAKING_ROLES: readonly MakingRole[] = ["image", "video"];
 /** THIN-1C (fixes part of getmaipai/home#203): `detail`, present only
  * when the Stack itself refused the role (a 503 with its reason), is
  * that reason in the household's wording - the same line the chat reply

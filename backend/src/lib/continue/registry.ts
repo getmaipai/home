@@ -31,10 +31,6 @@ export function registerContinueProvider(name: string, provider: ContinueProvide
   providers.set(name, provider);
 }
 
-export function __clearContinueProvidersForTests(): void {
-  providers.clear();
-}
-
 export function continueRows(actor: PersonRow, limit: number = CONTINUE_BUDGET): ContinueRow[] {
   if (actor.role === "guest" || limit <= 0) return [];
   const rows: ContinueRow[] = [];

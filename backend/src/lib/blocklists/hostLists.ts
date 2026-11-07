@@ -195,11 +195,6 @@ function hitMask(index: HostIndex, host: string): number {
   return bits;
 }
 
-/** Bench seam: one probe walk against the current table, no policy, no custom entries. */
-export function __hostMaskForBench(host: string): number {
-  return hitMask(prepareHostIndex(), host);
-}
-
 export const CUSTOM_DENY = "custom-deny";
 
 /** True when a band has anything to check: an enabled list or a custom entry. */

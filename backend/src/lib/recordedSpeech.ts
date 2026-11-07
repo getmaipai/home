@@ -3,7 +3,6 @@
 import { createStackHttp } from "@/lib/stack/http";
 
 export type RecordedSpeechStatus = { available?: boolean; ready?: boolean; installed?: boolean; engine?: string; version?: string; models?: Array<{ id?: string; revision?: string; installed?: boolean }> };
-export type RecordedSpeechJob = { job: string; data?: { url?: string; content_type?: string } | null };
 const WAIT_MS = 30_000;
 const POLL_MS = 1_000;
 const MAX_QUEUE_MS = 60_000;

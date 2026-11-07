@@ -118,8 +118,6 @@ export type StackImageEditReply = { kind: "done"; job: string; item: StackImageE
 export type CodingWirePath = "/v1/messages" | "/v1/messages/count_tokens" | "/v1/responses" | "/v1/chat/completions";
 /** The coding role's one served model as `GET /v1/models?role=coding` lists it. */
 export interface StackCodingModels { object: "list"; data: Array<{ id: string; role?: string; context_length?: number; thinking_budget_ceiling?: number }> }
-/** `GET /stack/v1/roles` coding entry: only what the gateway reads. */
-export interface StackCodingStatus { state?: string; slots?: number | null; slots_busy?: number }
 /** TIER-WIRE-02: how the Stack answered a Reduced chat request. `waiting` is a chat turn in flight (try again at the next turn boundary); `unsupported` is a Stack without the route. */
 /** TIER-STATUS-01: the governor's own Max window as GET /stack/v1/memory reports it. Absent on a Stack older than the field. */
 export interface StackMaxWindow { state: "none" | "draining" | "open"; owner: string | null; since: string | null }

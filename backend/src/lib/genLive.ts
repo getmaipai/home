@@ -30,7 +30,6 @@ const MAX_LIVE = 200;
 
 export function getLive(id: string): LiveProgress | null { return live.get(id) ?? null; }
 export function clearLive(id: string): void { live.delete(id); }
-export function __clearLiveForTests(): void { live.clear(); }
 
 /** The version number in the engine's `preview_url` (`?v=3`), or 0 when there is none. */
 export function previewVersionOf(url: string | null | undefined): number {

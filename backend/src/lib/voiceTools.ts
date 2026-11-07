@@ -42,8 +42,3 @@ export async function runChangeVoiceTool(actor: PersonRow, raw: Record<string, u
   const result = await changeVoice(actor, { file_id: row.id, voice: parsed.data.voice });
   return result.ok ? success(callId, CHANGE_VOICE_TOOL_ID, { voice: parsed.data.voice }, result.file_id, "The changed voice file") : failed(callId, CHANGE_VOICE_TOOL_ID, { voice: parsed.data.voice }, result.line);
 }
-
-/** Generic package outcome persistence records args; never pass the spoken script into this stub. */
-export function voiceToolRecordedArgs(tool: string, raw: Record<string, unknown>): Record<string, unknown> {
-  return tool === VOICEOVER_TOOL_ID ? { voice: raw.voice } : { voice: raw.voice };
-}

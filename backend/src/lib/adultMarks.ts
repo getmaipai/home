@@ -29,8 +29,6 @@ export const NOT_FOUND_LINE = "That item is not here.";
 export const NOT_READY_LINE = "Wait until it is made, then try again.";
 export const TEMPORARY_LINE = "A video made in a temporary chat is not saved, so it cannot be marked.";
 export const NOT_MARKED_LINE = "This item is not locked.";
-export const ALREADY_LOCKED_LINE = "This item is already locked.";
-
 /** The plain words of an item's state, for the person who may see it (the item's menu). */
 export const STATE_LINES = {
   locked: "Marked NSFW and locked. It opens only with your passcode, and people under 18 never see it.",

@@ -515,8 +515,6 @@ export interface TurnAskField {
   placeholder?: string; min?: number; max?: number; max_length?: 500; options?: string[];
 }
 export interface TurnAsk { turn_id: string; prompt: string; fields: TurnAskField[]; expires_at: string }
-/** POST /api/turn or /api/turn/stream body member; submitted values stay request-local. */
-export interface AskAnswerRequest { ask_answer: { turn_id: string; values: Record<string, string | number | boolean | null> } }
 
 export interface TurnLatency { stt_ms: number | null; first_token_ms: number | null; tts_ttfa_ms: number | null; e2e_ms: number | null }
 
@@ -735,18 +733,6 @@ export type ModelJobStatus =
   | "ready"
   | "failed"
   | "none";
-
-export interface ModelJob {
-  modelId: string;
-  status: ModelJobStatus;
-  phase: string;
-  completedBytes: number;
-  totalBytes: number;
-  error: string | null;
-  postLoadCheck: { estimatedBytes: number; actualBytes: number | null; driftPct: number | null } | null;
-  createdAt?: string;
-  updatedAt?: string;
-}
 
 // Mirrors llmSupervisor.ts's EngineStatus/BackendKind and
 // engineStats.ts's EngineStatsSample (hand-copied, same reason as

@@ -62,7 +62,6 @@ async function compileHelper(): Promise<string | null> {
 /** Test seam: replaces the whole extraction. */
 let forTests: ((mp4: Uint8Array, seconds: number | null) => Promise<Uint8Array[] | null>) | null = null;
 export function __setKeyframesForTests(fn: typeof forTests): void { forTests = fn; }
-export function __resetKeyframeHelperForTests(): void { helperPromise = null; helperFailedAt = 0; }
 
 async function run(cmd: string[], deadlineMs: number): Promise<number> {
   const child = Bun.spawn(atBackgroundPriority(cmd), { stdout: "ignore", stderr: "ignore" });

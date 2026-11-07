@@ -10,11 +10,6 @@ async function result(classId: "models" | "records", path: string, opts: { model
   return { status: "red", message: space.text, fix: space.fix };
 }
 
-/** Setup Checks row 4: free space is sourced from the placement check. */
-export function checkModelDisk(path = classDir("models"), models?: readonly string[]): Promise<PlacementDiskCheckResult> {
-  return result("models", path, { models });
-}
-
 /** Setup Checks row 7: the hub's records volume is checked by the same placement rules. */
 export function checkHubDisk(path = classDir("records")): Promise<PlacementDiskCheckResult> {
   return result("records", path);

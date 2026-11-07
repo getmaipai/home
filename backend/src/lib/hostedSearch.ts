@@ -14,9 +14,6 @@ import type { Role } from "@/middleware/auth";
 import { effectiveMode } from "@/lib/retrieval/sourceMode";
 
 export const HOSTED_SEARCH_KEY_SETTING = "search.brave_api_key";
-/** What the status and privacy pages name: who gets the query. */
-export const HOSTED_SEARCH_PROVIDER_NAME = "Brave Search";
-
 const DEFAULT_ENDPOINT = "https://api.search.brave.com/res/v1/web/search";
 const TIMEOUT_MS = 8000;
 const ROW_CAP = 8;

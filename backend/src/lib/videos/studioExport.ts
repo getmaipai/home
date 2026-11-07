@@ -16,8 +16,6 @@ import { getStudioVoice, VOICE_REF_PREFIX } from "./studioVoices";
 import type { PersonRow } from "@/types";
 
 export const STUDIO_VOICE_GONE_LINE = "A voice line is gone (it is kept for two hours). Add it again, then export.";
-export const STUDIO_EXPORT_LINE = "I couldn't change that video.";
-
 export type StudioExportResult = { ok: true; job: VideoJob } | { ok: false; status: 403 | 404 | 409 | 422; line: string; code: string };
 const no = (status: 403 | 404 | 409 | 422, code: string, line: string): StudioExportResult => ({ ok: false, status, code, line });
 

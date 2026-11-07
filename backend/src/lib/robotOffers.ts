@@ -24,7 +24,6 @@ export const OFFER_BACKOFF_AFTER_IGNORED = 2;
 export const DEFAULT_OFFER_TTL_MS = 10 * 60_000;
 const HOUR_MS = 60 * 60_000;
 
-export type OfferState = "queued" | "sent" | "snoozed" | "accepted" | "declined" | "expired";
 export type OfferRow = typeof robotOffers.$inferSelect;
 
 export type OfferHold =

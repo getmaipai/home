@@ -103,8 +103,6 @@ export function clearShotArtifacts(ownerPersonId: string, productionId: string, 
   }) })) }));
   if (found) persist(row, { episodes, finished_cut_file_ids: [] });
 }
-export function updateProductionCast(actor:PersonRow,id:string,cast:CastRole[]) { return updateMediaProduction(actor,id,{cast}); }
-export function updateProductionScript(actor:PersonRow,id:string,episodes:Episode[]) { return updateMediaProduction(actor,id,{episodes}); }
 export function applyCastOperation(actor:PersonRow,id:string,operation:{op:"add"|"replace"|"remove";subject_id:string;entry?:CastRole}):Production|null {
   const production=getMediaProduction(actor,id); if(!production||production.owner_person_id!==actor.id)return null;
   const cast=[...production.cast],index=cast.findIndex((entry)=>entry.subject_id===operation.subject_id);

@@ -117,8 +117,6 @@ function dayOf(now = new Date()): string {
 }
 
 export type KidKind = "picture" | "video" | "edit" | "photo";
-export type KidOutcome = "asked" | "made" | "withheld";
-
 /** What a child asked for today, from the stored ledger (`kid_usage`): every ask counts, failed and held-back ones too, and a deleted chat or a restart gives nothing back. */
 function usedToday(personId: string, kinds: readonly KidKind[], now: Date): number {
   const rows = db.select({ units: kidUsage.units, kind: kidUsage.kind }).from(kidUsage).where(and(eq(kidUsage.personId, personId), eq(kidUsage.day, dayOf(now)))).all();

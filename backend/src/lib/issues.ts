@@ -134,7 +134,6 @@ export function __resetReminderTimersForTests(): void {
   reminderTimingOverride = undefined;
   maintenanceNowOverride = undefined;
 }
-export function __setMaintenanceNowForTests(now: () => Date): void { maintenanceNowOverride = now; }
 
 function findRow(source: string, key: string): IssueRow | undefined {
   return db.select().from(issues).where(and(eq(issues.source, source), eq(issues.key, key))).get();

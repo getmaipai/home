@@ -116,9 +116,6 @@ async function write(input: { lanFetch: AutomationFetch; token: string; id: stri
 }
 
 export const createAutomation = write;
-/** The config API replaces the stored automation with the same id. */
-export const updateAutomation = write;
-
 /** An id that is already gone counts as deleted. */
 export async function deleteAutomation(input: { lanFetch: AutomationFetch; token: string; id: string }): Promise<AutomationResult> {
   if (!AUTOMATION_ID.test(input.id)) return { ok: false, kind: "refused" };

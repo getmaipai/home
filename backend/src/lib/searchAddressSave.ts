@@ -12,8 +12,6 @@ export const SEARXNG_URL_KEY = "search.searxng_url";
 // stands for the same address for a few minutes; Save then skips the second probe.
 let searchTestPassed: { url: string; at: number } | null = null;
 const SEARCH_TEST_VALID_MS = 5 * 60_000;
-export function __resetSearchTestPassedForTests(): void { searchTestPassed = null; }
-
 export type SearchAddressOutcome =
   | { kind: "refused"; error: string; next?: string }
   | { kind: "tested"; result: SearchTestSummary }

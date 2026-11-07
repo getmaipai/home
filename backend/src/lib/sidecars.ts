@@ -110,11 +110,6 @@ export function blockedPortReason(port: number): { pid: number; command: string;
   return holder ? { pid: holder.pid, command: holder.command, at: holder.at } : undefined;
 }
 
-export function blockedPortDetails(port: number): { pid: number; command: string; age: string } | undefined {
-  const holder = blockedPorts.get(port);
-  return holder ? { pid: holder.pid, command: holder.command, age: ageLabel(holder.startedAtMs) } : undefined;
-}
-
 /** Kill a permission-blocked holder only if its process identity still
  * matches the exact command and start time observed during the port scan. */
 export function stopBlockedPortHolder(port: number): { pid: number; command: string } {
@@ -179,10 +174,6 @@ export function __blockPortForTests(port: number, pid: number): void {
  * retries write after their backoff budget is exhausted. */
 export function __failEngineForTests(role: string): void {
   respawnState[role] = "gave_up";
-}
-
-export function __restartEngineForTests(role: string): void {
-  respawnState[role] = "pending";
 }
 
 /** Test-only: clears both the on-disk ownership record and the

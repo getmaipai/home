@@ -38,8 +38,6 @@ import { newChatFolderId } from "@/lib/id";
 import { evaluateSafety } from "@/lib/safety";
 import type { PersonRow } from "@/types";
 
-export type ChatFolderRecord = ChatFolder;
-
 export type FolderAccess = "manage" | "edit" | "use";
 
 /** The one response shape of every /api/chat-folders route: the spec record

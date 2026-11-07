@@ -68,8 +68,6 @@ export function isStackConfigured(): boolean {
 }
 
 export type StackRole = "chat" | "embeddings" | "stt" | "tts";
-export const STACK_ROLES: readonly StackRole[] = ["chat", "embeddings", "stt", "tts"];
-
 export function isStackRoleEnabled(_role: StackRole): boolean {
   return isStackConfigured();
 }

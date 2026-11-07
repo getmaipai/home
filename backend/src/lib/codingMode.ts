@@ -9,11 +9,8 @@ import { nextHlc } from "@/lib/hlc";
 import { codingClientLater } from "@/lib/setupState";
 import { chatLeaseHeld } from "@/lib/chatLease";
 import { resolveIssue } from "@/lib/issues";
-import reasonVocab from "@maipai/spec/vocab/coding-mode-readiness-reasons.json" with { type: "json" };
 
 const anchors = ["Turn on coding", "Choose a coding engine", "Add the model files", "Check your computer", "Make room in memory", "Test the coding model", "Connect a coding app", "Check coding speed"];
-const reasonCopy: Record<string, string> = reasonVocab as Record<string, string>;
-export function codingModeReason(key: string): string { return reasonCopy[key] ?? "Home could not reach the AI engine."; }
 export async function codingModeReadiness(): Promise<Readiness> {
   const base: Array<{ id: string; state: "done" | "can_do" | "manual"; reason_key: string; doc_anchor: string }> = [];
   const add = (id: string, okay: boolean, falseState: "can_do" | "manual", ix: number) => base.push({ id, state: okay ? "done" : falseState, reason_key: id, doc_anchor: anchors[ix]! });

@@ -48,8 +48,6 @@ export const MEDIA_APPS = {
 } as const;
 export type MediaAppId = keyof typeof MEDIA_APPS;
 export const MEDIA_APP_IDS = Object.keys(MEDIA_APPS) as MediaAppId[];
-export const isMediaAppId = (id: string): id is MediaAppId => Object.prototype.hasOwnProperty.call(MEDIA_APPS, id);
-
 /** The shelf and billboard row every data id returns (the fields the page documents name). */
 /** The standing collection an app's "later" list is: Watch later for the video apps, the queue for Podcasts (and the other audio apps). */
 export const laterKindOf = (appId: MediaAppId): "watch_later" | "queue" => (appId === "podcasts" || appId === "music" || appId === "books" ? "queue" : "watch_later");

@@ -1150,9 +1150,6 @@ function recordEngineHealth(asked: readonly string[] | null | undefined, value: 
   }
 }
 
-/** Until when an engine is benched (a suspended engine); 0 when it is not. */
-export function engineBenchedUntil(name: string): number { return searxngBenchedUntil.get(name) ?? 0; }
-
 /** `host.integration.call("searxng", "search", { query })`'s real
  * implementation - SearXNG's own `/search?q=...&format=json` (its
  * documented JSON output format, opt-in in a household's own

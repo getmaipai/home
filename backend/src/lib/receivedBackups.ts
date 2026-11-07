@@ -7,7 +7,7 @@
 // never listed alongside, decrypted with, or restorable through this
 // hub's own `local`/`smb` backups.
 import { eq } from "drizzle-orm";
-import { existsSync, mkdirSync, writeFileSync, unlinkSync, statSync, rmSync } from "node:fs";
+import { existsSync, mkdirSync, writeFileSync, statSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { db } from "@/db";
 import { receivedBackups } from "@/db/schema";
@@ -65,19 +65,6 @@ export function listReceivedBackups(deviceId?: string): ReceivedBackupInfo[] {
     .all()
     .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
   return rows.map(toInfo);
-}
-
-/** Retention is the sending device's own responsibility (it knows its
- * own daily/weekly/monthly scheme the same way this hub's `local` target
- * does for itself) - this hub just deletes whatever archive a device
- * explicitly names for removal, the mirror image of storeReceivedBackup(). */
-export function deleteReceivedBackup(deviceId: string, id: string): boolean {
-  const row = db.select().from(receivedBackups).where(eq(receivedBackups.id, id)).get();
-  if (!row || row.deviceId !== deviceId) return false;
-  const path = join(deviceDir(deviceId), row.filename);
-  if (existsSync(path)) unlinkSync(path);
-  db.delete(receivedBackups).where(eq(receivedBackups.id, id)).run();
-  return true;
 }
 
 /** Test/ops visibility only: confirms a stored row's file is really on

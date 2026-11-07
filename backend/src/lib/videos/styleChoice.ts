@@ -13,8 +13,6 @@ import { MAX_STYLES, STYLE_STRENGTHS, type StyleStrength } from "@/lib/loras/pro
 export const STYLE_GONE_LINE = "That style is no longer available. Choose another style, or make the video without one.";
 export const STYLE_MIXED_LEVELS_LINE = "These styles were made for different kinds of video, so they can't be used together here. Pick styles made for the same kind, or make the video without one.";
 export const STYLE_NOT_AT_LEVEL_LINE = "That style isn't made for this level. Pick another level, or make the video without the style.";
-export const STYLES_NEED_MAX_LINE = "Styles are for Max for now. Choose Max, or make the video without a style.";
-
 export type StyleResolution =
   | { ok: true; adapters: VideoAdapter[]; /** Names that matched none (or two) of the person's styles: the clip is made without them and the model says so. */ unmatched: string[] }
   | { ok: false; locked: true } | { ok: false; locked?: false; line: string; code: string };

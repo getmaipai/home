@@ -4,12 +4,10 @@
 // person may use right now, so the model never gets an id it must not use, and `allVideoAdapters` (no filtering) is for internal lookups of a LoRA's own
 // facts (never a route's answer).
 import { loraAccess, loraUsable, type LoraSurface } from "@/lib/loras/access";
-import { deleteLoraRecord, listLoraRecords, getLoraRecord, type Lora } from "@/lib/loras/store";
+import { deleteLoraRecord, listLoraRecords, type Lora } from "@/lib/loras/store";
 import { dropLoraSyncCache, syncLoras } from "@/lib/loras/sync";
 import { videosAllowed, type VideoAudience } from "./policy";
 import type { StackVideoLora } from "./stack";
-
-export type VideoAdapterAudience = "all-ages" | "adult-only";
 
 export interface VideoAdapter extends StackVideoLora {
   /** An admin marked it usable beyond admins (`availability.who` is adults or people), and it is not in the trash. */
@@ -64,13 +62,6 @@ export function forgetVideoAdapter(id: string): void {
   dropLoraSyncCache();
 }
 
-/** One LoRA by id if this person may use it now, else null (a hidden, locked, removed or unknown one all answer the same). */
-export async function videoAdapterFor(audience: VideoAudience, id: string): Promise<VideoAdapter | null> {
-  await syncLoras();
-  const lora = getLoraRecord(id);
-  return lora && lora.media === "video" && loraUsable(lora) && loraAccess(audience.actor, lora, loraSurfaceOf(audience)) === "open" ? adapterOfLora(lora) : null;
-}
-
 function norm(text: string): string {
   return text.toLowerCase().normalize("NFKD").replace(/[̀-ͯ]/g, "").replace(/[^a-z0-9]+/g, " ").trim();
 }
@@ -83,12 +74,4 @@ export function matchVideoAdapter(adapters: readonly VideoAdapter[], named: stri
   if (exact.length === 1) return exact[0]!;
   const loose = adapters.filter((a) => norm(a.name).includes(wanted) || wanted.includes(norm(a.name)) || a.trigger_words.some((t) => norm(t) === wanted));
   return loose.length === 1 ? loose[0]! : null;
-}
-
-/** The prompt with the LoRA's trigger words added by Home, not by the model reading wording. */
-export function withVideoTriggerWords(prompt: string, adapter: VideoAdapter | null): string {
-  if (!adapter || adapter.trigger_words.length === 0) return prompt;
-  const lower = prompt.toLowerCase();
-  const missing = adapter.trigger_words.filter((word) => !lower.includes(word.toLowerCase()));
-  return missing.length === 0 ? prompt : `${prompt.trim()}, ${missing.join(", ")}`;
 }

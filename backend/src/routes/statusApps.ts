@@ -50,8 +50,6 @@ export const appsRoute = createRoute({ method: "get", path: "/apps", tags: ["Sta
   middleware: [requireAuth] as const,
   responses: { 200: { content: { "application/json": { schema: ResponseSchema } }, description: "App health and ninety daily uptime buckets with minutes by state. Needs are visible to owners and admins." }, ...errorResponses({ 401: "Not signed in" }) } });
 
-export type StatusAppsRoute = typeof appsRoute;
-
 statusAppsRoutes.openapi(appsRoute, async (c) => {
   const person = c.get("person");
   const showNeeds = person.role === "owner" || person.role === "admin";

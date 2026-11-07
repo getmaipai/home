@@ -203,8 +203,3 @@ export async function startKiwixSidecar(): Promise<void> {
     console.error(`[kiwix] failed to start: ${err instanceof Error ? err.message : String(err)}`);
   }
 }
-
-// Re-exported for tests only that want to prove the wrapping-directory
-// assumption in ensureKiwixInstalled()'s own comment without touching
-// the network.
-export const __internal = { installDir, binName };

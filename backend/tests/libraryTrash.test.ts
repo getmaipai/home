@@ -7,7 +7,6 @@ import { attachments, conversationTurns, fileContents, fileReferences, people, p
 import { attachmentFilePath, createAttachment, deleteAttachmentsForTurns } from "@/lib/attachments";
 import { referenceDrift, referenceKinds } from "@/lib/fileContent";
 import { purgeExpiredFiles } from "@/lib/libraryTrash";
-import { generatedLibraryReport } from "@/lib/libraryGenerated";
 import { createShare } from "@/lib/shares";
 import { purgeExpired } from "@/lib/trash/registry";
 import "@/lib/trash/providers";
@@ -265,10 +264,6 @@ describe("generated items outlive their chats (LIBRARY-REVAMP-02)", () => {
     expect(referenceKinds(sha("generated boat"))).toEqual({ owner: 1 });
     expect(existsSync(attachmentFilePath(boat.storage_path))).toBe(true);
     expect((await library(h.sage)).items.map((i) => i.id)).toEqual([boat.id]);
-    const report = generatedLibraryReport();
-    expect(report.generated).toEqual({ items: 1, bytes: "generated boat".length });
-    expect(report.followingStorageRules.items).toBe(1);
-    expect(report.tiedToChat.items).toBe(0);
   });
   test("the job that names a generated picture survives its chat so the Library keeps the prompt", async () => {
     const h = await household();

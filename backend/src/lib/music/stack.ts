@@ -45,7 +45,6 @@ const stack = createStackHttp({
 });
 export function musicStackConfigured(): boolean { return stack.hasTestFetch() || !!getStackUrl(); }
 export const __setMusicFetchForTests = stack.__setFetchForTests;
-export const __setStemsFetchForTests = __setMusicFetchForTests;
 function request(path: string, init: RequestInit = {}, timeoutMs = 15_000): Promise<Response> { return stack.request(path, { ...init, timeoutMs }); }
 async function checked(res: Response): Promise<Response> {
   if (res.ok) return res;
@@ -115,12 +114,6 @@ export async function deleteVoiceConvertJob(job: string): Promise<void> {
   try { await (await request(`/v1/audio/voice-convert/${encodeURIComponent(job)}`, { method: "DELETE" })).arrayBuffer(); } catch { /* Stack retention is the fallback */ }
 }
 export async function fetchConverted(url: string): Promise<Uint8Array> { return fetchStem(url); }
-export async function voiceConvertStatus(): Promise<StackVoiceConvertStatus | null> {
-  try { const body = await (await checked(await request("/stack/v1/voice-convert", {}, 5_000))).json() as { voice_convert?: StackVoiceConvertStatus };
-    return body.voice_convert ?? null;
-  } catch { return null; }
-}
-export function voiceConvertReady(status: StackVoiceConvertStatus | null): boolean { return !!status?.available && status.ready === true; }
 
 /** MUSIC-GEN-20b: per-word lyric timing (`POST /v1/audio/align`). Lyrics and source bytes travel only in bodies; errors carry a code and counts, never words. */
 export interface StackAlignWord { t: number; end: number; text: string }

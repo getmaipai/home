@@ -8,8 +8,6 @@ import type { AgeBand } from "@/lib/ageBand";
 import { currentBlockViewer } from "@/lib/blocklists/blockViewer";
 import { resolveUnion } from "@/lib/settingsLayers";
 
-export type BlocklistRow = Blocklists["lists"][number];
-
 export const BLOCKLIST_POLICY: Blocklists = Blocklists.parse(blocklistsPolicy);
 
 /** The settings key that holds a band's checked lists. */

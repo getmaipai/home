@@ -61,8 +61,6 @@ export const BROWSE_BASES: Readonly<Record<Media, readonly BrowseBase[]>> = {
   video: ROWS.filter((r) => r.media === "video" && r.installable).map((r) => r.browse),
   picture: ROWS.filter((r) => r.media === "picture").map((r) => r.browse),
 };
-/** The bases an install may name when the source does not say (every installable one; the tuple form is for zod). */
-export const INSTALLABLE_BASE_IDS = installableBaseIds("video") as [BaseId, ...BaseId[]];
 /** The table's installable bases for one media kind. */
 export function installableBaseIds(media: Media): AnyBaseId[] {
   return ROWS.filter((r) => r.media === media && r.installable).map((r) => r.id);
@@ -122,12 +120,8 @@ export function wantedBaseIds(browse: "default" | "all" | BrowseBase, media: Med
   return ROWS.filter((r) => r.media === media && r.browse === browse).map((r) => r.id);
 }
 
-/** The base a browse value names, e.g. "wan" is Wan's id. */
-export const baseOfBrowse = (browse: BrowseBase): AnyBaseId => ROWS.find((r) => r.browse === browse)!.id;
-
 /** Plain words for a base id ("an unknown base" for anything else). */
 export const baseWords = (id: string): string => rowOf(id)?.words ?? "an unknown base";
-export const baseShort = (id: string): string => rowOf(id)?.short ?? "an unknown base";
 /** The family names the household can install for, as "LTX" or "LTX or Wan". Used in the not-supported sentence. */
 export function supportedFamilyWords(media: Media = "video"): string {
   const supported = supportedBaseIds(media);

@@ -8,7 +8,6 @@ import { isOwnerOrAdmin } from "@/lib/access";
 import { canStopJob, createJob, listJobsForViewerLive } from "@/lib/jobs";
 import { trigger } from "@/lib/notifications";
 import { getStackClient, isStackConfigured } from "@/lib/stackEngine";
-import type { AppEnv } from "@/types";
 
 export const jobsRoutes = apiRouter();
 const HomeJobSchema = z.object({
@@ -70,5 +69,3 @@ jobsRoutes.openapi(stopRoute, async (c) => {
   if (actor.id !== row.startedBy && row.forPerson) await trigger("jobs.admin_stopped", {}, { personId: row.forPerson });
   return c.json({ ok: true as const }, 200);
 });
-
-export type JobsEnv = AppEnv;

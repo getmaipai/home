@@ -147,7 +147,6 @@ export async function ensureTailscaleCert(): Promise<TsCert> {
 }
 
 export function setTailscaleRenewalActive(active: boolean): void { renewalActive = active; }
-export function isTailscaleRenewalActive(): boolean { return renewalActive; }
 export function syncTailscaleRenewalSetting(): void {
   const enabled = getHouseholdSettingValue("network.tailnet_access") === true;
   renewalActive = enabled;

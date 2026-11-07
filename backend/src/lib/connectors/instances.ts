@@ -9,8 +9,6 @@ import { getHouseholdSettingValue } from "@/lib/settings";
 
 export type ConnectorType = "home_assistant" | "uptime_kuma" | "gitea" | "immich" | "unifi" | "plex";
 export const DEFAULT_INSTANCE = "default";
-export const INSTANCE_SLUG = /^[a-z0-9][a-z0-9-]{0,30}$/;
-
 /** What callers see of an instance. It never carries the secret: `credentialRef` names where the credentials center keeps it. */
 export type ConnectorInstance = {
   type: ConnectorType;

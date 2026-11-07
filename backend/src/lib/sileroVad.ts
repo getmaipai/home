@@ -64,14 +64,6 @@ export async function getSileroStream(): Promise<SileroVadStream | null> {
   }
 }
 
-/** Test-only: clears the cached session so the next getSileroStream()
- * call re-resolves from scratch - the model path may point at a
- * different (or now-missing) file between test cases. */
-export function __resetSileroVadForTests(): void {
-  sessionPromise = null;
-  loadFailed = false;
-}
-
 export class SileroVadStream {
   private session: InferenceSession;
   private pending: Float32Array[] = [];

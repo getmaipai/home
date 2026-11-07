@@ -101,7 +101,6 @@ export type Outcome<T> = { ok: true; value: T } | { ok: false; status: 400 | 403
 let routeDeps: PollDeps = {};
 /** Tests point the route-triggered poll, Save and the art fetch at a localhost fixture; production uses the real guarded fetch. */
 export function __setPodcastFetchDepsForTests(deps: PollDeps): void { routeDeps = deps; }
-export const podcastFetchDeps = (): PollDeps => routeDeps;
 
 // ---- parsing ----------------------------------------------------------------------------------------------------------------------
 

@@ -24,7 +24,6 @@ export function registerMediaOp<T extends MediaOp>(op: T): T {
 export function registeredMediaOps(): readonly MediaOp[] {
  return [...ops.values()];
 }
-export function mediaOpSchema(id: string): MediaOp | undefined { return ops.get(id); }
 
 function bandAllowed(actor: PersonRow, min: MediaOp["minBand"]): boolean {
  if (actor.role === "guest") return false;

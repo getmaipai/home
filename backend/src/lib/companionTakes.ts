@@ -19,15 +19,12 @@ import type { CompanionTake } from "@/lib/companionStates";
 
 export const TAKE_RUN_BUSY_LINE = "A clip is already being made for this companion. Wait for it or stop it.";
 export const TAKE_QUICK_NOT_READY_LINE = "Making a character's clips needs the standard video model. An admin can install it in Settings, Pictures and videos.";
-export const TAKE_RUN_NOT_FOUND_LINE = "That clip run could not be found. Start it again.";
 export const TAKE_RUN_TIMEOUT_LINE = "The video took too long. Try again.";
 export const TAKE_RETRY_WAIT_MS = 60_000;
 /** How often Home asks the engine about a running video job (a quick clip takes about 70 seconds; the old two second wait added up to two seconds per take). */
 export const TAKE_POLL_MS = 500;
 export const TAKE_NEGATIVE_PROMPT = "different character, changed colours, changed face, extra limbs, text, watermark, camera movement, background change, shadows";
 export const TAKE_NO_REST_LINE = "Choose and approve a starting picture first.";
-export const TAKE_NEEDS_KEYFRAME_LINE = "Make the picture for this animation first.";
-
 export type TakeRunState = "queued" | "running" | "done" | "failed" | "cancelled";
 export interface TakeRun {
   id: string; companionId: string; personId: string; states: string[];
