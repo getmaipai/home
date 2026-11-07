@@ -7,7 +7,7 @@
 // live against DB rows rather than depending on that weekly script
 // having run), and the Stack client - the same shape lib/dashboard.ts's
 // getDashboard() already takes for GET /api/dashboard.
-import { and, desc, gte, isNotNull } from "drizzle-orm";
+import { and, desc, gte, isNotNull, sql } from "drizzle-orm";
 import { sqlite, db } from "@/db";
 import { conversationTurns, entities, pendingEmbeddings, pendingMemoryWork } from "@/db/schema";
 import { listActivePeople } from "@/lib/access";
@@ -175,14 +175,13 @@ function layersPanel(days: number, rows: readonly { createdAt: string; stats: Tu
 
 function queuesPanel(): PerformanceQueues {
   const judge = judgeQueueStats();
-  const embeddingPending = db.select({ memoryId: pendingEmbeddings.memoryId }).from(pendingEmbeddings).all().length;
-  const ingestionRows = db.select({ reason: pendingMemoryWork.reason }).from(pendingMemoryWork).all();
-  const byReason = new Map<string, number>();
-  for (const row of ingestionRows) byReason.set(row.reason, (byReason.get(row.reason) ?? 0) + 1);
+  // AUDIT-PERF-01: counts in SQL, never the rows.
+  const embeddingPending = db.select({ n: sql<number>`count(*)` }).from(pendingEmbeddings).get()?.n ?? 0;
+  const byReason = db.select({ reason: pendingMemoryWork.reason, n: sql<number>`count(*)` }).from(pendingMemoryWork).groupBy(pendingMemoryWork.reason).all();
   return {
     judge: { pending: judge.pending, oldest_created_at: judge.oldestCreatedAt },
     embedding: { pending: embeddingPending },
-    ingestion: { pending: ingestionRows.length, by_reason: [...byReason.entries()].map(([reason, count]) => ({ reason, count })) },
+    ingestion: { pending: byReason.reduce((sum, row) => sum + row.n, 0), by_reason: byReason.map((row) => ({ reason: row.reason, count: row.n })) },
   };
 }
 

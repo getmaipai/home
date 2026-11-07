@@ -1,7 +1,7 @@
 import { desc, eq } from "drizzle-orm";
 import { StatusEvent, type StatusEvent as StatusEventRecord } from "@maipai/spec/gen/ts/status-event.js";
 import type { StatusComponent } from "@maipai/spec/gen/ts/status-component.js";
-import { db } from "@/db";
+import { db, sqlite } from "@/db";
 import { statusEvents, statusHeartbeat } from "@/db/schema";
 import { collectHealth, type HealthSnapshot } from "@/lib/healthSnapshot";
 import { activeMaintenanceComponents } from "@/lib/statusBoard";
@@ -247,13 +247,12 @@ export async function recordBootGap(now: Date = new Date()): Promise<void> {
 export function pruneStatusEvents(now: Date = new Date()): void {
   try {
     const cutoff = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000).toISOString();
-    const oldRows = db.select().from(statusEvents).all();
-    const candidates = oldRows.filter((row) => row.at < cutoff).sort((a, b) => b.at.localeCompare(a.at));
-    const keep = new Set<string>();
-    for (const row of candidates) {
-      if (!keep.has(row.component)) keep.add(row.component);
-      else db.delete(statusEvents).where(eq(statusEvents.id, row.id)).run();
-    }
+    // AUDIT-PERF-01: one DELETE; per component the newest event older than the window stays as the state at the window edge.
+    sqlite.query(
+      `DELETE FROM status_events WHERE at < ?1 AND id NOT IN (
+         SELECT id FROM status_events AS newest WHERE at < ?1 AND NOT EXISTS (
+           SELECT 1 FROM status_events AS later WHERE later.component = newest.component AND later.at < ?1 AND (later.at > newest.at OR (later.at = newest.at AND later.id > newest.id))))`,
+    ).run(cutoff);
   } catch (err) {
     console.error(`[status-history] prune failed: ${(err as Error).message}`);
   }

@@ -158,3 +158,22 @@ describe("GET /api/performance", () => {
     expect(bodyTooBig.turns.window_days).toBe(90);
   });
 });
+
+describe("queue counts come from SQL (AUDIT-PERF-01)", () => {
+  test("pending judge turns, embeddings and ingestion work are counted, grouped by reason", async () => {
+    const { client, row } = await owner();
+    insertTurn(row.id, "2026-01-01T00:00:00.000Z", null);
+    insertTurn(row.id, "2026-01-02T00:00:00.000Z", null);
+    const { sqlite } = await import("@/db");
+    sqlite.exec("PRAGMA foreign_keys = OFF");
+    try {
+      sqlite.query("INSERT INTO pending_memory_work (memory_id, reason, queued_at) VALUES ('m1','embed_failed','t'),('m2','embed_failed','t'),('m3','dedupe_failed','t')").run();
+      sqlite.query("INSERT INTO pending_embeddings (memory_id, queued_at) VALUES ('m1','t'),('m2','t')").run();
+    } finally { sqlite.exec("PRAGMA foreign_keys = ON"); }
+    const body = (await (await client.get("/api/performance")).json()) as Record<string, any>;
+    expect(body.queues.judge).toEqual({ pending: 2, oldest_created_at: "2026-01-01T00:00:00.000Z" });
+    expect(body.queues.embedding.pending).toBe(2);
+    expect(body.queues.ingestion.pending).toBe(3);
+    expect([...body.queues.ingestion.by_reason].sort((a: any, b: any) => a.reason.localeCompare(b.reason))).toEqual([{ reason: "dedupe_failed", count: 1 }, { reason: "embed_failed", count: 2 }]);
+  });
+});

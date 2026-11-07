@@ -186,6 +186,21 @@ describe("boot gaps and pruning", () => {
     pruneStatusEvents(now);
     expect(db.select().from(statusEvents).all().map((row) => row.id).sort()).toEqual(["sev-chat-edge", "sev-chat-new", "sev-hub-edge"]);
   });
+
+  test("pruning with equal timestamps keeps exactly one pre-cutoff row per component, and recent and other rows stay (AUDIT-PERF-01)", () => {
+    const now = new Date("2026-09-30T12:00:00.000Z");
+    const cutoff = now.getTime() - 90 * 24 * 60 * 60 * 1000;
+    const add = (id: string, component: StatusComponent, at: number) => db.insert(statusEvents).values({ id, component, state: "operational", at: new Date(at).toISOString(), source: "sample", detail: null, hlc: `${at}:0:${id}` }).run();
+    add("a", "chat", cutoff - 1_000);
+    add("b", "chat", cutoff - 1_000);
+    add("c", "chat", cutoff - 1_000);
+    add("d", "hub", cutoff - 9_000);
+    add("e", "hub", cutoff + 5);
+    pruneStatusEvents(now);
+    const left = db.select().from(statusEvents).all();
+    expect(left.filter((row) => row.component === "chat")).toHaveLength(1);
+    expect(left.filter((row) => row.component === "hub").map((row) => row.id).sort()).toEqual(["d", "e"]);
+  });
 });
 
 test("fresh database migration creates the two status tables", () => {

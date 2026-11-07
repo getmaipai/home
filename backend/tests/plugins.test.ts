@@ -1,3 +1,4 @@
+import { invalidateManifestStats } from "@/lib/manifestStat";
 import { describe, expect, test, beforeEach, afterEach, spyOn } from "bun:test";
 import { readFileSync, readdirSync, mkdirSync, writeFileSync, utimesSync, rmSync } from "node:fs";
 import { join } from "node:path";
@@ -832,6 +833,10 @@ describe("loadManifestOnly: a manifest that fails validation is warned about onc
       writeFileSync(MANIFEST_PATH, JSON.stringify({ id: "broken-pkg", still_not_a_real_field: true }));
       utimesSync(MANIFEST_PATH, new Date(Date.now() + 60_000), new Date(Date.now() + 60_000));
 
+      // AUDIT-PERF-01: the file stat is kept for 5 s; an install, rollback or removal drops it, and so does this.
+      expect(loadManifestOnly("broken-pkg").ok).toBe(false);
+      expect(warnSpy.mock.calls.length).toBe(1);
+      invalidateManifestStats();
       const third = loadManifestOnly("broken-pkg");
       expect(third.ok).toBe(false);
       expect(warnSpy.mock.calls.length).toBe(2);

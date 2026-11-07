@@ -21,6 +21,7 @@ import { installRefusal } from "@/lib/capabilities";
 import { PackageManifest } from "@maipai/spec/gen/ts/manifest.js";
 import { appPackageProblems } from "@/lib/apps";
 import { killLiveProcessForInstallChange } from "@/lib/denoHost";
+import { invalidateManifestStats } from "@/lib/manifestStat";
 import {
   fetchRawIndex,
   verifyIndex,
@@ -319,7 +320,8 @@ async function installLocked(opts: InstallOptions): Promise<InstallResult> {
   // the smoke check below so that check (the first real caller after
   // install) lazily respawns fresh against the version just installed,
   // never a stale handle to the one before it.
-  await killLiveProcessForInstallChange(opts.id);
+  invalidateManifestStats();
+    await killLiveProcessForInstallChange(opts.id);
 
   const smoke = await runSmoke(opts.id);
   return {
@@ -361,6 +363,7 @@ export async function rollback(id: string): Promise<StoreResult<{ version: strin
     // The now-active version's own files just changed under whatever
     // sandbox process might still be running the OLD one - see
     // killLiveProcessForInstallChange()'s own doc comment.
+    invalidateManifestStats();
     await killLiveProcessForInstallChange(id);
 
     return { ok: true, value: { version: active.previousVersion } };
@@ -391,6 +394,7 @@ export async function uninstall(id: string): Promise<StoreResult<true>> {
     // The files a live sandbox process might be running just disappeared
     // (or the package fell back to its bundled copy) - see
     // killLiveProcessForInstallChange()'s own doc comment.
+    invalidateManifestStats();
     await killLiveProcessForInstallChange(id);
     return { ok: true, value: true };
   });
