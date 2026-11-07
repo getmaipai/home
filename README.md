@@ -37,7 +37,7 @@ Your chats, people and memories stay in your house. Home goes online for downloa
 
 ## Coming soon
 
-Not shipped yet: a faster chat engine (oMLX) for 64 GB and 128 GB Macs, maps, two-step sign-in and the Go app.
+Not shipped yet: a faster chat engine (oMLX) for 64 GB and 128 GB Macs, maps and the Go app.
 
 ## The privacy promise
 
