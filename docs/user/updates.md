@@ -12,7 +12,7 @@ Owners and admins can see what is up to date and what has a newer version.
 1. Open **Settings**, then **Backups, storage and updates**.
 2. Open the **Maintenance** tab and choose **Updates**.
 
-Each row shows the part's name, the version you have, the newest version, when Home last looked, and a status. The status says **Update available** or **Up to date**. The list can include MaiPai Home itself, the AI engine parts, models, offline books and your robots.
+Each row shows the part's name, your version, the newest version, when Home last looked, and a status. The status says **Update available** or **Up to date**. The list can include Home itself, the AI engine parts, models, offline books and your robots.
 
 Home looks for new versions by itself each day.
 
@@ -21,7 +21,7 @@ Home looks for new versions by itself each day.
 1. Find the engine row that says **Update available**.
 2. Open its **More actions** menu and choose **Apply**.
 
-Home swaps in the new build and checks that it works. If the swap fails, Home goes back by itself and shows a message.
+Home swaps in the new build and checks it. If that fails, Home goes back by itself and shows a message.
 
 ## Go back to the old version
 

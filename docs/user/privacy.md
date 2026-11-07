@@ -80,4 +80,4 @@ News uses the feeds the household chose. It sends no follows, saves, searches or
 
 ## Online radio and podcast directories
 
-When an adult searches for a radio station, Home sends the search words and your home's internet address to a public station directory. When an adult searches for a podcast to add, Home sends the search words to Apple's public podcast directory. Both are on by default. An admin can turn either off in **Settings**, **Pictures, videos and music**, **Music** (radio) or the podcast card, and then no directory search leaves the house. Stations and shows you already follow still play. See [Radio](radio.md) and [Podcasts](podcasts.md).
+An adult can search for a radio station or a podcast. Home sends the search words to a public directory. For radio, the directory also sees your home's internet address. For podcasts, the directory is Apple's. Both searches are on by default. An admin can turn each one off in **Settings**, **Pictures, videos and music**. Then no directory search leaves the house. Stations and shows you already follow still play. See [Radio](radio.md) and [Podcasts](podcasts.md).
