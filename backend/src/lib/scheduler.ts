@@ -31,7 +31,7 @@ import { fireHubDeviceTask } from "@/lib/schedules/executor";
 import { reconcileAllInstances } from "@/lib/schedules/reconcile";
 import { sweepLiveViews } from "@/lib/liveView";
 import { dispatchRobotOffers, sweepRobotOffers } from "@/lib/robotOffers";
-import { eq, and, lte, isNull, inArray, notInArray } from "drizzle-orm";
+import { eq, and, lt, lte, isNull, inArray, notInArray, like, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { scheduledJobs, people, jobs } from "@/db/schema";
 import { alarms } from "@/db/schema";
@@ -247,6 +247,29 @@ export function ensureCoreJob(job: string, when: string): void {
 
 export type JobRow = typeof scheduledJobs.$inferSelect;
 
+/** AUDIT-PERF-01: how long a finished one-shot scheduled job (and its activity row) is kept. Repeating jobs are never pruned. */
+export const SCHEDULE_PRUNE_DAYS = 30;
+/** Delete finished one-shot `scheduled_jobs` rows older than 30 days with their `schedule:<id>` activity rows, and any such activity
+ * row left without a scheduled job. Repeating jobs, pending and failed jobs, and recent rows stay. Returns how many of each went. */
+export function pruneFinishedSchedules(now: Date = new Date()): { scheduled: number; activity: number } {
+  const cutoff = new Date(now.getTime() - SCHEDULE_PRUNE_DAYS * 86_400_000).toISOString();
+  const old = db.select({ id: scheduledJobs.id }).from(scheduledJobs)
+    .where(and(eq(scheduledJobs.status, "done"), eq(scheduledJobs.recurring, false), lt(scheduledJobs.lastRunAt, cutoff))).all();
+  let activity = 0;
+  for (let i = 0; i < old.length; i += 200) {
+    const ids = old.slice(i, i + 200).map((row) => row.id);
+    activity += db.delete(jobs).where(and(inArray(jobs.id, ids.map((id) => `schedule:${id}`)), eq(jobs.state, "done"))).returning({ id: jobs.id }).all().length;
+    db.delete(scheduledJobs).where(inArray(scheduledJobs.id, ids)).run();
+  }
+  activity += db.delete(jobs).where(and(
+    like(jobs.id, "schedule:%"),
+    eq(jobs.state, "done"),
+    lt(jobs.updatedAt, cutoff),
+    sql`substr(${jobs.id}, 10) NOT IN (SELECT id FROM scheduled_jobs)`,
+  )).returning({ id: jobs.id }).all().length;
+  return { scheduled: old.length, activity };
+}
+
 /** Owner/admin see every job; anyone else sees only their own. */
 export function listJobs(actor: PersonRow): JobRow[] {
   if (isOwnerOrAdmin(actor)) return db.select().from(scheduledJobs).all();
@@ -290,15 +313,28 @@ export function cancelJob(actor: PersonRow, id: string): SchedulerOpResult<true>
 // WHAT about - every pre-existing handler ignores the parameter it
 // wasn't written to take, a safe widen (TS structurally allows a
 // fewer-parameter function wherever a more-parameter one is expected).
-type CoreJobHandler = (row: JobRow) => void | Promise<void>;
+type CoreJobHandler = (row: JobRow) => void | Promise<void | CoreJobIdle>;
+
+/** AUDIT-PERF-01: a handler of a QUIET_CORE_JOBS job returns this when its tick found nothing to do; the run then writes no `jobs`
+ * activity row. Such a job also writes no "running" row up front, so a tick that does work records one finished row. */
+export type CoreJobIdle = { idle: true };
+const IDLE: CoreJobIdle = { idle: true };
+const QUIET_CORE_JOBS = new Set(["notifications.deliver_held", "robot.offers.tick", "memory.embedding_retry", "memory.judge", "news.full_text.prefetch", "stack.image_jobs"]);
+export function isQuietCoreJob(job: string): boolean { return QUIET_CORE_JOBS.has(job); }
 
 const CORE_JOBS: Record<string, CoreJobHandler> = {
-  "notifications.deliver_held": async () => { await deliverHeldNotifications(); },
+  "notifications.deliver_held": async () => { return (await deliverHeldNotifications()) === 0 ? IDLE : undefined; },
   // INITIATIVE-01: send the queued robot offers whose gates pass, after closing the expired ones into the centre (so a backoff sees them).
-  "robot.offers.tick": async () => { await sweepRobotOffers(); dispatchRobotOffers(); sweepLiveViews(); },
+  "robot.offers.tick": async () => {
+    const closed = await sweepRobotOffers();
+    const dispatched = dispatchRobotOffers();
+    const views = sweepLiveViews();
+    return closed.length === 0 && dispatched.sent.length === 0 && views.length === 0 ? IDLE : undefined;
+  },
   "memory.maintenance": () => {
     runMaintenance();
   },
+  "scheduler.prune": () => { pruneFinishedSchedules(); },
   "conversation.retention": () => {
     runRetention();
   },
@@ -339,10 +375,15 @@ const CORE_JOBS: Record<string, CoreJobHandler> = {
     const sweep = await sweepStackStorage();
     console.log(sweep.ok ? `[stack-updates] storage sweep removed ${sweep.value.removed.length} blob(s)` : `[stack-updates] storage sweep failed: ${sweep.error}`);
   },
-  "stack.image_jobs": async () => { await pollActiveStackImageJobs(); await reconcileLoraInstalls(); },
+  "stack.image_jobs": async () => {
+    const polled = await pollActiveStackImageJobs();
+    const reconciled = await reconcileLoraInstalls();
+    return polled === 0 && reconciled === 0 ? IDLE : undefined;
+  },
   "memory.embedding_retry": async () => {
-    await drainPendingEmbeddings();
-    await embedPendingEpisodes();
+    const drained = await drainPendingEmbeddings();
+    const episodes = await embedPendingEpisodes();
+    return drained.embedded === 0 && drained.stillPending === 0 && episodes === 0 ? IDLE : undefined;
   },
   // Step 6: the memory judge's own batch tick and the weekly consolidate
   // sweep (lib/memoryJudge.ts). Both real LLM-touching core jobs, unlike
@@ -351,7 +392,8 @@ const CORE_JOBS: Record<string, CoreJobHandler> = {
   // up, never a stuck scheduler (runDueJobsUnguarded's own in-flight
   // guard already serializes overlapping ticks).
   "memory.judge": async () => {
-    await runJudgeBatch();
+    const batch = await runJudgeBatch();
+    return batch.processed === 0 ? IDLE : undefined;
   },
   "memory.consolidate": async () => {
     await runConsolidation();
@@ -359,7 +401,11 @@ const CORE_JOBS: Record<string, CoreJobHandler> = {
   // KS-05: the news shelf. A poll tick that fetches only what is due and only
   // while the house is quiet (lib/shelf/shelfPoller.ts), and a daily prune
   // to the household's retention (news.retention_days).
-  "news.full_text.prefetch": async () => { await prefetchNewsText(); await prefetchNewsPictures(); },
+  "news.full_text.prefetch": async () => {
+    const texts = await prefetchNewsText();
+    const pictures = await prefetchNewsPictures();
+    return texts === 0 && pictures === 0 ? IDLE : undefined;
+  },
   "news.shelf.summaries": async () => { await runNewsSummaryTick(); },
   "news.shelf.poll": async () => {
     await runShelfTick();
@@ -597,16 +643,22 @@ async function runDueJobsUnguarded(
     const issueKey = row.kind === "core" ? row.job : `${row.packageId}:${row.job}`;
     let error: string | null = null;
     const activityId = `schedule:${row.id}`;
-    const priorActivity = db.select({ id: jobs.id }).from(jobs).where(eq(jobs.id, activityId)).get();
-    if (priorActivity) updateJob(activityId, { state: "running", progress: { phase: "running" }, errorKind: null, raw: null });
-    else createJob({ id: activityId, kind: row.kind === "core" && row.job === "backup.run" ? "backup" : "routine", startedBy: row.personId ?? "system", forPerson: row.personId, title: row.job, state: "running", progress: { phase: "running" }, conversationId: null, resultRef: null, waitingReason: null, errorKind: null, raw: null, provenance: { producer: "scheduler", sourceId: row.id } });
+    const quiet = row.kind === "core" && QUIET_CORE_JOBS.has(row.job);
+    let idle = false;
+    const writeActivity = (state: "running" | "done" | "failed", phase: string, failed: boolean) => {
+      const priorActivity = db.select({ id: jobs.id }).from(jobs).where(eq(jobs.id, activityId)).get();
+      if (priorActivity) updateJob(activityId, { state, progress: { phase }, errorKind: failed ? "failed" : null, raw: null });
+      else createJob({ id: activityId, kind: row.kind === "core" && row.job === "backup.run" ? "backup" : "routine", startedBy: row.personId ?? "system", forPerson: row.personId, title: row.job, state, progress: { phase }, conversationId: null, resultRef: null, waitingReason: null, errorKind: failed ? "failed" : null, raw: null, provenance: { producer: "scheduler", sourceId: row.id } });
+    };
+    if (!quiet) writeActivity("running", "running", false);
     const busyName = row.kind === "core" ? row.job : `scheduler:${row.packageId}:${row.job}`;
     markBusy(busyName);
     try {
       if (row.kind === "core") {
         const handler = extraCoreJobs[row.job] ?? CORE_JOBS[row.job];
         if (!handler) throw new Error(`no core job registered for ${row.job}`);
-        await withJobTimeout(Promise.resolve(handler(row)), jobTimeoutMs, row.job);
+        const outcome = await withJobTimeout(Promise.resolve(handler(row)), jobTimeoutMs, row.job);
+        idle = quiet && (outcome as CoreJobIdle | void)?.idle === true;
       } else {
         if (!row.personId) throw new Error(`plugin job ${row.id} has no personId`);
         const actor = db.select().from(people).where(and(eq(people.id, row.personId), isNull(people.deletedAt))).get();
@@ -682,7 +734,7 @@ async function runDueJobsUnguarded(
         .where(eq(scheduledJobs.id, row.id))
         .run();
       }
-    updateJob(activityId, { state: error ? "failed" : "done", progress: { phase: error ? "failed" : "complete" }, errorKind: error ? "failed" : null, raw: null });
+    if (!(quiet && idle && !error)) writeActivity(error ? "failed" : "done", error ? "failed" : "complete", !!error);
   }
   return { ran, errors };
 }

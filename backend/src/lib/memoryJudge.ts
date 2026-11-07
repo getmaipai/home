@@ -2051,8 +2051,11 @@ export async function runJudgeBatch(): Promise<JudgeBatchResult> {
     factsWritten += result.factsWritten;
   }
 
-  const stats = judgeQueueStats();
-  console.log(`[memory.judge] processed=${processed} pending=${stats.pending} oldest_age_s=${stats.oldestCreatedAt ? Math.round((Date.now() - new Date(stats.oldestCreatedAt).getTime()) / 1000) : null}`);
+  // AUDIT-PERF-01: a tick with nothing to judge logs nothing (it ran every minute).
+  if (processed > 0) {
+    const stats = judgeQueueStats();
+    console.log(`[memory.judge] processed=${processed} pending=${stats.pending} oldest_age_s=${stats.oldestCreatedAt ? Math.round((Date.now() - new Date(stats.oldestCreatedAt).getTime()) / 1000) : null}`);
+  }
 
   return { processed, factsWritten };
 }

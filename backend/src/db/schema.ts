@@ -692,6 +692,9 @@ export const conversationTurns = sqliteTable(
     // this, that scan is a full table scan of every turn the household
     // has ever had, not just the still-unjudged ones.
     index("conversation_turns_judge_status_idx").on(table.source, table.judgeStatus),
+    // AUDIT-PERF-01: the history reads filter by conversation and status and order by time; the retention and dashboard scans go by time alone.
+    index("conversation_turns_conv_status_created_idx").on(table.conversationId, table.status, table.createdAt),
+    index("conversation_turns_created_idx").on(table.createdAt),
     // list()/listConversationTurns()/exportPerson() (conversationHistory.ts)
     // and lib/dashboard.ts's own recentActivity()/turnsPerDay() all filter
     // by person_id - a code review on the dashboard item (2026-09-21)
@@ -932,7 +935,7 @@ export const jobs = sqliteTable("jobs", {
   provenance: text("provenance").notNull(),
   createdAt: text("created_at").notNull(),
   updatedAt: text("updated_at").notNull(),
-});
+}, (table) => [index("jobs_state_kind_idx").on(table.state, table.kind)]);
 
 // PROJECT-RUN-01 (docs/plans/harness-turns-and-projects-2026-09-26.md, "The
 // project record and the runner"): a durable row per background project a
@@ -1040,7 +1043,7 @@ export const scheduledJobs = sqliteTable("scheduled_jobs", {
   createdAt: text("created_at").notNull(),
   lastRunAt: text("last_run_at"),
   lastError: text("last_error"),
-});
+}, (table) => [index("scheduled_jobs_status_next_run_idx").on(table.status, table.nextRunAt)]);
 
 // The `command` primitive (2026-09-05, the third "Naming: skill, plugin,
 // command, connector" item): "when I say X, do Y," authored by a
@@ -1302,7 +1305,7 @@ export const deviceCommands = sqliteTable("device_commands", {
   issuedAt: text("issued_at").notNull(),
   deliveredAt: text("delivered_at"),
   ackedAt: text("acked_at"),
-});
+}, (table) => [index("device_commands_device_delivered_idx").on(table.deviceId, table.deliveredAt)]);
 
 // INITIATIVE-01: the robot-offer queue. The record shape is the spec's
 // RobotOffer (id, person_id, tier, text, expires_at, provenance, hlc); the

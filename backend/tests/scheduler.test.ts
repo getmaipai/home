@@ -5,7 +5,7 @@ import { __resetThrottleForTests } from "@/lib/secretThrottle";
 import { parseWhen, scheduleJob, scheduleCoreJob, ensureCoreJob, listJobs, cancelJob, runDueJobs, runTimeCriticalJobs, sortDueJobsForPriority } from "@/lib/scheduler";
 import { runPlugin, registerAllPackageNotificationTypes } from "@/lib/plugins";
 import { db } from "@/db";
-import { people, scheduledJobs, pendingEmbeddings, memoryEmbeddings, alarms } from "@/db/schema";
+import { jobs, people, scheduledJobs, pendingEmbeddings, memoryEmbeddings, alarms } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { remember } from "@/lib/memory";
 import { listPending } from "@/lib/notifications";
@@ -590,5 +590,73 @@ describe("HTTP: GET/POST /api/scheduler", () => {
     await adultClient.post("/api/auth/verify-secret", { personId: adult.id, secret: "0000" });
     const res = await adultClient.post("/api/scheduler/run-due", {});
     expect(res.status).toBe(403);
+  });
+});
+
+describe("quiet core jobs (AUDIT-PERF-01)", () => {
+  const makeDue = () => db.update(scheduledJobs).set({ nextRunAt: new Date(0).toISOString() }).run();
+  test("a quiet job that reports nothing to do writes no jobs activity row", async () => {
+    ensureCoreJob("memory.judge", "every:1m");
+    makeDue();
+    const result = await runDueJobs(runPlugin, new Date(), { "memory.judge": async () => ({ idle: true as const }) });
+    expect(result.ran).toBe(1);
+    expect(db.select().from(jobs).all().filter((row) => row.title === "memory.judge")).toHaveLength(0);
+    expect(new Date(db.select().from(scheduledJobs).where(eq(scheduledJobs.job, "memory.judge")).get()!.nextRunAt).getTime()).toBeGreaterThan(Date.now());
+  });
+
+  test("a quiet job that did work records one finished row, reused by the next work tick", async () => {
+    ensureCoreJob("memory.judge", "every:1m");
+    makeDue();
+    await runDueJobs(runPlugin, new Date(), { "memory.judge": async () => undefined });
+    const rows = () => db.select().from(jobs).all().filter((row) => row.title === "memory.judge");
+    expect(rows()).toHaveLength(1);
+    expect(rows()[0]!.state).toBe("done");
+    makeDue();
+    await runDueJobs(runPlugin, new Date(), { "memory.judge": async () => undefined });
+    expect(rows()).toHaveLength(1);
+  });
+
+  test("a failing quiet job still records its failure, and a job outside the quiet set keeps its row when idle", async () => {
+    ensureCoreJob("memory.judge", "every:1m");
+    ensureCoreJob("memory.maintenance", "every:1d");
+    makeDue();
+    const result = await runDueJobs(runPlugin, new Date(), { "memory.judge": async () => { throw new Error("boom"); }, "memory.maintenance": async () => ({ idle: true as const }) });
+    expect(result.errors).toBe(1);
+    const all = db.select().from(jobs).all();
+    expect(all.find((row) => row.title === "memory.judge")?.state).toBe("failed");
+    expect(all.find((row) => row.title === "memory.maintenance")?.state).toBe("done");
+  });
+});
+
+describe("pruneFinishedSchedules (AUDIT-PERF-01)", () => {
+  const day = 86_400_000;
+  const at = (daysAgo: number) => new Date(Date.now() - daysAgo * day).toISOString();
+  const add = (id: string, fields: Partial<typeof scheduledJobs.$inferInsert>) => db.insert(scheduledJobs).values({ id, kind: "core", packageId: "core", job: "reminders.fire", inputs: "{}", when: "x", recurring: false, nextRunAt: at(60), status: "done", createdAt: at(61), lastRunAt: at(60), ...fields }).run();
+  const activity = (id: string, updatedDaysAgo: number) => db.insert(jobs).values({ id: `schedule:${id}`, kind: "routine", startedBy: "system", title: "t", state: "done", provenance: "{}", createdAt: at(updatedDaysAgo), updatedAt: at(updatedDaysAgo) }).run();
+
+  test("deletes old done one-shots with their activity rows, and keeps repeating, pending, failed and recent rows", async () => {
+    const { pruneFinishedSchedules } = await import("@/lib/scheduler");
+    add("old-one", {}); activity("old-one", 60);
+    add("old-repeat", { recurring: true, status: "pending" }); activity("old-repeat", 60);
+    add("old-failed", { status: "failed" });
+    add("recent-one", { lastRunAt: at(5) }); activity("recent-one", 5);
+    activity("orphan-old", 90);
+    activity("orphan-recent", 3);
+    const result = pruneFinishedSchedules();
+    expect(result).toEqual({ scheduled: 1, activity: 2 });
+    const left = db.select({ id: scheduledJobs.id }).from(scheduledJobs).all().map((row) => row.id).sort();
+    expect(left).toEqual(["old-failed", "old-repeat", "recent-one"]);
+    const kept = db.select({ id: jobs.id }).from(jobs).all().map((row) => row.id).sort();
+    expect(kept).toEqual(["schedule:old-repeat", "schedule:orphan-recent", "schedule:recent-one"]);
+  });
+});
+
+describe("hot-path indexes (AUDIT-PERF-01)", () => {
+  test("the five indexes exist and the due-job query uses one", async () => {
+    const { sqlite } = await import("@/db");
+    const names = (sqlite.query("SELECT name FROM sqlite_master WHERE type = 'index'").all() as Array<{ name: string }>).map((row) => row.name);
+    for (const name of ["scheduled_jobs_status_next_run_idx", "device_commands_device_delivered_idx", "jobs_state_kind_idx", "conversation_turns_conv_status_created_idx", "conversation_turns_created_idx"]) expect(names).toContain(name);
+    const plan = (sqlite.query("EXPLAIN QUERY PLAN SELECT * FROM scheduled_jobs WHERE status = 'pending' AND next_run_at <= 'z'").all() as Array<{ detail: string }>).map((row) => row.detail).join(" ");
+    expect(plan).toContain("scheduled_jobs_status_next_run_idx");
   });
 });
