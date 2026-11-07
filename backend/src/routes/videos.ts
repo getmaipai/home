@@ -5,6 +5,7 @@
 // surface are refused here exactly as in the tool.
 import { answerableFitAsk } from "@/lib/jobs/householdQueue";
 import { phaseLabel } from "@/lib/videos/phaseLabel";
+import { MIX_LEVEL_IDS } from "@/lib/videos/editPlan";
 import { createRoute, z } from "@hono/zod-openapi";
 import { apiRouter, errorResponses } from "@/lib/openapi";
 import { requireAuth, requireRole } from "@/middleware/auth";
@@ -505,6 +506,29 @@ videosRoutes.openapi(cutToBeatRoute, async (c) => {
   const job = getVideoJobFor(actor, id);
   if (!job) return c.json({ error: "That video is not available any more.", code: "not_found" }, 404) as never;
   return c.json(videoCardOrLocked(actor, job, true, await readyFlags(actor)) as never, 200);
+});
+
+const addMusicRoute = createRoute({
+  method: "post", path: "/add-music", tags: ["Videos"], summary: "Lay a song, or new music made for it, under a video", middleware: [requireAuth] as const,
+  request: { body: { content: { "application/json": { schema: z.object({ conversation_id: z.string().min(1).max(80).optional(), clip: z.string().trim().min(1).max(80),
+    track: z.string().trim().min(1).max(80).optional(), make_music: z.string().trim().min(3).max(600).optional(), level: z.enum(MIX_LEVEL_IDS).optional() })
+    .refine((body) => Boolean(body.track) !== Boolean(body.make_music), { message: "Pick a song or describe new music, not both." }) } } } },
+  responses: { 200: { content: { "application/json": { schema: z.object({ conversation_id: z.string(), video_job_id: z.string().nullable(), music_job_id: z.string().nullable() }) } }, description: "The edit, or the music that is made first." }, ...refusals },
+});
+videosRoutes.openapi(addMusicRoute, async (c) => {
+  const actor = c.get("person"); const body = c.req.valid("json"); const audience = videoRouteAudience(actor);
+  if (videoDenial(audience)) return c.json({ error: videoDenial(audience), code: "not_allowed" }, 403) as never;
+  if (laneOf(audience) !== "adult") return c.json({ error: "This edit is for adults on their own screen.", code: "minor" }, 422) as never;
+  const job = getVideoJobFor(actor, body.clip) ?? getVideoJobByFileFor(actor, body.clip);
+  if (!job) return c.json({ error: "That video isn't available any more. Ask for it again.", code: "not_found" }, 404) as never;
+  const conversationId = body.conversation_id ?? job.conversationId;
+  const turnId = conversationId ? db.select({ id: conversationTurns.id }).from(conversationTurns).where(and(eq(conversationTurns.personId, actor.id), eq(conversationTurns.conversationId, conversationId))).orderBy(conversationTurns.createdAt).get()?.id ?? null : null;
+  if (!conversationId || !turnId) return c.json({ error: "Open the chat with your video and try again.", code: "no_chat" }, 422) as never;
+  const state = { actor, surface: "chat", conversationId, turnId, temporary: false, planBasis: { surfaceClass: "written" }, context: [], utterance: "", persona: null, crisis: false } as unknown as RunEditVideoInput["state"];
+  const outcome = await runEditVideo({ state, args: { clip: job.id, change: "mix", sound: "music", track: body.track, make_music: body.make_music, level: body.level }, callId: "route-add-music", spoken: false });
+  const data = outcome.result?.data as { videoJobId?: string; musicJobId?: string; refused?: string } | undefined;
+  if (!data?.videoJobId && !data?.musicJobId) return c.json({ error: outcome.result?.reply?.text ?? "I couldn't add music to that video.", code: String(data?.refused ?? "add_music_failed") }, 422) as never;
+  return c.json({ conversation_id: conversationId, video_job_id: data.videoJobId ?? null, music_job_id: data.musicJobId ?? null }, 200);
 });
 
 // ---------------------------------------------------------------- settings page: the household's video LoRA library

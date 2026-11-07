@@ -41,6 +41,9 @@ import { getMediaProduction, listMediaProductions, updateMediaProduction } from 
 import { getMediaSubject } from "@/lib/mediaSubjects";
 import { createHash } from "node:crypto";
 import { analyzeBeats, beatsReady } from "@/lib/music/stack";
+import { startMusicBed, whenMusicDone } from "@/lib/videos/musicBed";
+import { musicAudienceOf, musicRefusalFor } from "@/lib/music/tool";
+import { musicEngineStatus, musicStatusReady } from "@/lib/music/ready";
 import { planBeatCut } from "./beatCut";
 
 export const EDIT_VIDEO_TOOL_ID = "edit_video";
@@ -84,6 +87,8 @@ export const editVideoArgs = z.object({
   line: z.string().trim().min(1).max(600).optional(),
   voice: z.string().trim().min(1).max(80).optional(),
   track: z.string().trim().min(1).max(80).optional(),
+  /** AUDIO-PARITY-01 P2: for mix with music, instead of a track: describe the music to make; Home makes an instrumental the length of the video and lays it under it. */
+  make_music: z.string().trim().min(3).max(600).optional(),
   level: z.enum(MIX_LEVEL_IDS).optional(),
   start_s: z.number().min(0).max(600).optional(),
   aspect: z.enum(VIDEO_ASPECTS).optional(),
@@ -115,6 +120,8 @@ export const JOIN_CLIPS_LINE = `Tell me ${MIN_JOIN_CLIPS} to ${MAX_JOIN_CLIPS} o
 export const MIX_SOUND_LINE = "Tell me what to put over the video: a line to say in a voice, or one of your songs.";
 export const NO_TRACK_LINE = "I can't find that song. Pick one of your own songs or sound files, or ask for a voice line instead.";
 export const BEATS_NOT_READY_LINE = "I can't cut to the beat right now. Beat analysis isn't ready on this computer. Try again later.";
+export const MUSIC_BED_FAILED_LINE = "I couldn't make the music for that video. The video was not changed. Try again in a minute.";
+export const MUSIC_NOT_READY_LINE = "Home can't make music right now, so I can't add any to the video. Try again in a minute, or pick one of your songs.";
 export const BEATS_FAILED_LINE = "I couldn't find the beat in that song. Try another song with a clearer rhythm.";
 export const BEATS_NOT_FOUND_LINE = "I couldn't find a steady beat in that song. Try a song with a clearer rhythm.";
 export const NO_VOICE_LINE = "I don't know that voice. Pick one from your home's voices, or leave the voice out to use yours.";
@@ -597,6 +604,22 @@ async function editFinishedClips(input: RunEditVideoInput, value: EditArgs, acto
       inputs = [clipFiles[0]!]; // the spoken line joins in the run, so the answer does not wait for the speech
       ops = mixOps(value.level ?? DEFAULT_VOICE_LEVEL, start, true);
       describe = "your line laid over it";
+    } else if (value.sound === "music" && value.make_music && !value.track) {
+      const refusal = musicRefusalFor(musicAudienceOf({ ...state, surface: state.surface ?? "chat" } as never, false), { description: value.make_music });
+      if (refusal) return refused(callId, args, refusal.line, refusal.why);
+      const engine = await musicEngineStatus();
+      if (!musicStatusReady(engine)) return refused(callId, args, MUSIC_NOT_READY_LINE, "music_not_ready");
+      if (temporary || !state.conversationId || !state.turnId) return refused(callId, args, MUSIC_NOT_READY_LINE, "music_not_ready");
+      if (activeVideoJobsFor(actor) > 0) return refused(callId, args, "You already have a video being made. Wait for it to finish, or stop it first.", "already_making");
+      const limits = engine!.limits;
+      const bedSeconds = Math.min(limits.max_seconds, Math.max(limits.min_seconds, Math.ceil((seconds ?? first.request.seconds) - start)));
+      let musicId: string;
+      try { musicId = await startMusicBed({ actor, conversationId: state.conversationId, turnId: state.turnId, companionId: state.persona?.id ?? null, temporary, description: value.make_music, seconds: bedSeconds, maxSeconds: limits.max_seconds }); }
+      catch { return refused(callId, args, MUSIC_BED_FAILED_LINE, "music_failed"); }
+      // The song is made first; when it is done the same mix runs with it as the track (the one media.edit path), so every gate is checked again then.
+      const again = { ...args, clip: first.id, make_music: undefined, track: musicId };
+      whenMusicDone(actor, musicId, async (ok) => { if (ok) await runEditVideo({ state, args: again, callId: `${callId}-bed`, spoken: false }); });
+      return outcomeOf({ callId, packageId, status: "succeeded", via: "tool_call", args, durationMs: 0, result: { reply: { text: "The music is being made first, then it goes under the video as a new version and the first one is kept. Tell the person it is on its way; do not say it is ready." }, data: { musicJobId: musicId }, actions: [] } });
     } else if (value.sound === "music") {
       if (!value.track) return refused(callId, args, MIX_SOUND_LINE, "nothing_to_mix");
       const track = ownTrackFile(actor, value.track, temporary, state.conversationId);

@@ -4,6 +4,7 @@
 
 ### Added
 
+- `mix` with `make_music` makes an instrumental the length of the video and lays it under the video (Add music to a clip).
 - `remove_background` cuts out the main subject with a color, blur or transparent background, for clips up to a minute and 1920 pixels wide.
 
 - `upscale` makes a clip sharper and twice as big, for clips up to a minute and under 2048 pixels wide.

@@ -15,6 +15,8 @@ import { getIcon } from "@maipai/ui/src/icons";
 import { api, type LibraryItem, type Roster } from "@/lib/api";
 import { musicApi, type MusicCard } from "@/lib/musicApi";
 import { useCutToBeatDialog } from "./CutToBeatDialog";
+import { NEW_MUSIC, useAddMusicDialog, type MusicLevel } from "./AddMusicDialog";
+import { Input as KitInput } from "@maipai/ui/src/ui/input";
 import { Checkbox as KitCheckbox } from "@maipai/ui/src/ui/checkbox";
 import { Label as KitLabel } from "@maipai/ui/src/ui/label";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@maipai/ui/src/ui/dialog";
@@ -58,6 +60,8 @@ function Details({ item, me, actions }: { item: LibraryItem; me: Roster; actions
   const [splitting, setSplitting] = useState(false);
   const [cutOpen, setCutOpen] = useState(false);
   const cut = useCutToBeatDialog({ open: cutOpen, onOpenChange: setCutOpen, me, seed: item.kind === "audio" ? { trackId: item.id } : { clipId: item.id } });
+  const [musicOpen, setMusicOpen] = useState(false);
+  const addMusic = useAddMusicDialog({ open: musicOpen, onOpenChange: setMusicOpen, me, clipId: item.id });
   const kept = item.retention === "kept";
   const row = (label: string, value: ReactNode) => <div><dt className="text-muted-foreground">{label}</dt><dd>{value}</dd></div>;
   const origin = libraryOrigin(item, record.data?.origin);
@@ -89,10 +93,17 @@ function Details({ item, me, actions }: { item: LibraryItem; me: Roster; actions
           {!kept ? <Button type="button" variant="secondary" onClick={() => actions.keep(item)}>Keep</Button> : null}
           {isAdultRole(me) && item.kind === "audio" && !record.data?.music ? <Button type="button" variant="secondary" disabled={splitting} onClick={() => { setSplitting(true); void musicApi.stemsFromFile(item.id).then((card) => { if (card.conversation_id) navigate(`/chat?conversation=${encodeURIComponent(card.conversation_id)}`); }).catch((error: unknown) => toast.error(error instanceof Error ? error.message : "The stems could not be made. Try again in a minute.")).finally(() => setSplitting(false)); }}>Split into stems</Button> : null}
           {isAdultRole(me) && (item.kind === "audio" || item.kind === "video") ? <Button type="button" variant="secondary" onClick={() => setCutOpen(true)}>Cut to the beat</Button> : null}
+          {isAdultRole(me) && item.kind === "video" && item.origin === "made" && item.chat_id ? <Button type="button" variant="secondary" onClick={() => setMusicOpen(true)}>Add music</Button> : null}
           {isAdultRole(me) && item.kind === "image" && item.audience === "adult-only" ? <Button type="button" variant="secondary" onClick={() => actions.recheck(item)}>Mark all-ages</Button> : null}
         </div>
       ) : null}
       {mine && isAdultRole(me) && item.kind === "audio" ? <p className="text-sm text-muted-foreground">Cuts your videos on the beat of this song. Everything stays on this home server.</p> : null}
+      <Dialog open={musicOpen} onOpenChange={setMusicOpen}><DialogContent><DialogHeader><DialogTitle>Add music</DialogTitle></DialogHeader>
+        <div className="flex flex-col gap-2"><KitLabel htmlFor="music-choice">Music</KitLabel><Select value={addMusic.choice} onValueChange={(value) => addMusic.setChoice(value ?? NEW_MUSIC)}><SelectTrigger id="music-choice"><SelectValue /></SelectTrigger><SelectContent><SelectItem value={NEW_MUSIC}>Make new music for this video</SelectItem>{addMusic.songs.map((song) => <SelectItem key={song.id} value={song.id}>{song.name}</SelectItem>)}</SelectContent></Select></div>
+        {addMusic.choice === NEW_MUSIC ? <div className="flex flex-col gap-2"><KitLabel htmlFor="music-description">What should it sound like?</KitLabel><KitInput id="music-description" value={addMusic.description} placeholder="Soft piano, slow and warm" maxLength={600} onChange={(event) => addMusic.setDescription(event.target.value)} /><p className="text-sm text-muted-foreground">Home makes music about as long as the video, then puts it under the video as a new version. Your first video is kept.</p></div> : null}
+        <div className="flex flex-col gap-2"><KitLabel htmlFor="music-level">How loud</KitLabel><Select value={addMusic.level} onValueChange={(value) => addMusic.setLevel((value ?? "soft") as MusicLevel)}><SelectTrigger id="music-level"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="quiet">Quiet</SelectItem><SelectItem value="soft">Soft</SelectItem><SelectItem value="balanced">Balanced</SelectItem><SelectItem value="loud">Loud</SelectItem></SelectContent></Select></div>
+        <DialogFooter><Button type="button" disabled={addMusic.busy || !addMusic.ready} onClick={() => void addMusic.submit()}>Add the music</Button></DialogFooter>
+      </DialogContent></Dialog>
       <Dialog open={cutOpen} onOpenChange={setCutOpen}><DialogContent><DialogHeader><DialogTitle>Cut to the beat</DialogTitle></DialogHeader>
         {cut.seededSong ? <div className="flex flex-col gap-2"><p className="text-sm text-muted-foreground">{cut.clips.length === 0 ? "You have no finished videos to cut yet. Make a video in chat first, then come back." : "Choose up to six videos, in the order you pick them."}</p>{cut.clips.map((clip) => { const index = cut.picked.indexOf(clip.id); const id = `cut-video-${clip.id}`; return <div key={clip.id} className="flex items-center gap-2"><KitCheckbox id={id} checked={index >= 0} disabled={index < 0 && cut.picked.length >= 6} onCheckedChange={(value) => cut.toggle(clip.id, value === true)} /><KitLabel htmlFor={id}>{index >= 0 ? `${index + 1}. ` : ""}{clip.name}</KitLabel></div>; })}</div> : <div className="flex flex-col gap-2"><KitLabel htmlFor="cut-song">Song</KitLabel><Select value={cut.track} onValueChange={(value) => cut.setTrack(value ?? "")}><SelectTrigger id="cut-song"><SelectValue placeholder="Choose a song" /></SelectTrigger><SelectContent>{cut.tracks.map((track) => <SelectItem key={track.id} value={track.id}>{track.name}</SelectItem>)}</SelectContent></Select></div>}
         <div className="flex flex-col gap-2"><KitLabel htmlFor="cut-beats">Cut every</KitLabel><Select value={cut.beats} onValueChange={(value) => cut.setBeats(value ?? "4")}><SelectTrigger id="cut-beats"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="1">1 beat</SelectItem><SelectItem value="2">2 beats</SelectItem><SelectItem value="4">4 beats (one bar)</SelectItem><SelectItem value="8">8 beats</SelectItem></SelectContent></Select></div>

@@ -56,4 +56,5 @@ export const videosApi = {
   adultMark: (id: string, body: { action: "clear" | "mark"; ticket?: string }) => requestJson<{ made_audience: "all-ages" | "adult-only"; lock: "on" | "off" }>(`/api/videos/jobs/${encodeURIComponent(id)}/adult-mark`, json(body)),
   animate: (input: { conversation_id: string; turn_id: string; file_id?: string; prompt?: string }) => requestJson<VideoCard>("/api/videos/animate", json(input)),
   cutToBeat: (input: { clips: string[]; track: string; beats_per_cut?: 1 | 2 | 4 | 8; length_s?: 15 | 30 | 60; conversation_id?: string }) => requestJson<VideoCard>("/api/videos/cut-to-beat", json(input)),
+  addMusic: (input: { clip: string; track?: string; make_music?: string; level?: "quiet" | "soft" | "balanced" | "loud" | "very_loud"; conversation_id?: string }) => requestJson<{ conversation_id: string; video_job_id: string | null; music_job_id: string | null }>("/api/videos/add-music", json(input)),
 };
