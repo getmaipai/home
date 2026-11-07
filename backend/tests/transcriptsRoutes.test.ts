@@ -4,6 +4,7 @@ import { OpenAPIHono } from "@hono/zod-openapi";
 import { db } from "@/db";
 import { mediaItems, mediaSources, people, sessions } from "@/db/schema";
 import { nextHlc } from "@/lib/hlc";
+import { __resetBurnJobsForTests, __setBurnRunnerForTests } from "@/lib/transcripts/burnIn";
 import { __setTranslationCompleterForTests } from "@/lib/transcripts/captionTranslate";
 import { __setTranscriptStackClientForTests } from "@/lib/transcripts/stack";
 import { transcriptRoutes } from "@/routes/transcripts";
@@ -406,5 +407,43 @@ describe("regenerate range", () => {
       const after = await (await req(`/transcripts/${record.id}/caption-tracks`, token)).json() as unknown[];
       expect(after.length).toBe(2);
     } finally { __setTranslationCompleterForTests(null); }
+  });
+
+  test("burn-in burns a video into a new file; a missing file or failed edit says what to do", async () => {
+    const token = person("person-sage0001", "adult");
+    item("person-sage0001");
+    const record = await (await req("/library/media-caption01/transcript", token, "POST", {})).json() as { id: string };
+    const track = await (await req(`/transcripts/${record.id}/caption-tracks`, token, "POST")).json() as { id: string };
+    const start = () => req(`/transcripts/${record.id}/caption-tracks/${track.id}/burn-in`, token, "POST", { position: "top" });
+    const waitDone = async (jobId: string) => {
+      for (let i = 0; i < 100; i += 1) {
+        const state = await (await req(`/transcript-burn-ins/${jobId}`, token)).json() as { state: string; file_id?: string; error?: string };
+        if (state.state !== "running") return state;
+        await new Promise((resolve) => setTimeout(resolve, 20));
+      }
+      throw new Error("burn-in did not finish");
+    };
+    let seen: Array<{ op: string; position?: string; lines?: Array<{ text: string }> }> = [];
+    __resetBurnJobsForTests();
+    __setBurnRunnerForTests(async (request) => { seen = request.ops as typeof seen; return { ok: true, bytes: new Uint8Array([1, 2, 3, 4]), seconds: 1, width: 2, height: 2, audio: false, ms: 1 }; });
+    const file = "/tmp/sample.mp4";
+    try {
+      expect((await start()).status).toBe(404);
+      expect(seen.length).toBe(0);
+      await Bun.write(file, new Uint8Array([9, 9, 9, 9]));
+      const started = await start();
+      expect(started.status).toBe(202);
+      const done = await waitDone((await started.json() as { id: string }).id);
+      expect(done.state).toBe("done");
+      expect(done.file_id).toBeTruthy();
+      expect(seen[0]).toMatchObject({ op: "captions", position: "top" });
+      expect(seen[0]!.lines![0]!.text).toContain("Sage speaks");
+
+      __setBurnRunnerForTests(async () => ({ ok: false, code: "failed", line: "I couldn't change that video. The edit did not finish. Try again, or change what you asked for." }));
+      const failed = await waitDone((await (await start()).json() as { id: string }).id);
+      expect(failed).toMatchObject({ state: "failed", error: expect.stringContaining("Try again") });
+      expect((await req(`/transcript-burn-ins/nope`, token)).status).toBe(404);
+      expect((await req(`/transcripts/${record.id}/caption-tracks/nope/burn-in`, token, "POST", {})).status).toBe(404);
+    } finally { __setBurnRunnerForTests(null); await Bun.file(file).delete().catch(() => undefined); }
   });
 });

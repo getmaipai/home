@@ -5,11 +5,13 @@ import type { Transcript } from "@maipai/spec/gen/ts/transcript.js";
 import { Button } from "@maipai/ui/src/ui/button";
 import { Label } from "@maipai/ui/src/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@maipai/ui/src/ui/select";
+import { ApiError } from "@/lib/api";
 import { transcriptApi, type CaptionTrackSummary } from "@/lib/transcriptApi";
 
 const LOAD_FAILED = "Caption tracks could not be loaded. Check that Home is ready, then reopen this tab.";
 const MAKE_FAILED = "The caption track could not be made. Check that Home is ready, then try again.";
 const TRANSLATE_FAILED = "The captions could not be translated. Check that the language model is running, then try again.";
+const BURN_FAILED = "The captions could not be burned in. Check that the video editor is ready, then try again.";
 const REFRESH_FAILED = "The caption track could not be refreshed. Check that Home is ready, then try again.";
 
 // "und" is the transcript's own marker for a language nobody named; people see words, not codes.
@@ -38,6 +40,24 @@ export function CaptionTracks({ transcript }: { transcript: Transcript }) {
     transcriptApi.translationLanguages().then((found) => { if (current) setLanguages(found); }).catch(() => undefined);
     return () => { current = false; };
   }, []);
+
+  const burn = async (track: CaptionTrackSummary) => {
+    setBusy(true);
+    setMessage("Burning captions into a copy of the video…");
+    try {
+      let job = await transcriptApi.startBurnIn(transcript.id, track.id, "bottom");
+      while (job.state === "running") {
+        await new Promise((resolve) => setTimeout(resolve, 1000));
+        job = await transcriptApi.burnJob(job.id);
+        setMessage(`Burning captions into a copy of the video… ${Math.round(job.progress * 100)}%`);
+      }
+      setMessage(job.state === "done" ? "Done. The video with captions is a new file in your Library." : job.error ?? BURN_FAILED);
+    } catch (error) {
+      setMessage(error instanceof ApiError && [400, 404, 413].includes(error.status) ? error.message : BURN_FAILED);
+    } finally {
+      setBusy(false);
+    }
+  };
 
   const original = tracks.find((track) => !track.translated);
 
@@ -93,6 +113,16 @@ export function CaptionTracks({ transcript }: { transcript: Transcript }) {
               </a>
             </Button>
           ))}
+          <Button
+            type="button"
+            variant="secondary"
+            size="sm"
+            aria-label={`Burn ${languageName(track.language, languages)} captions into video`}
+            disabled={busy}
+            onClick={() => void burn(track)}
+          >
+            Burn into video
+          </Button>
           {track.needs_refreshing && !track.translated ? (
             <Button
               type="button"

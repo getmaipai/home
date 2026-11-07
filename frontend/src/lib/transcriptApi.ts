@@ -27,6 +27,8 @@ export type CaptionTrackSummary = {
   translated: boolean;
 };
 
+export type BurnJob = { id: string; state: "running" | "done" | "failed"; progress: number; file_id?: string; error?: string };
+
 export type FindReplaceOptions = { find: string; replace: string; match_case: boolean; whole_word: boolean };
 export type FindReplaceMatch = { segment_id: string; start: number; before: string; after: string; count: number };
 export type FindReplacePreview = { matches: FindReplaceMatch[]; total_lines: number; total_matches: number; more: boolean };
@@ -88,6 +90,9 @@ export const transcriptApi = {
   translationLanguages: () => requestJson<Array<{ code: string; name: string }>>("/api/transcript-languages"),
   translateCaptionTrack: (id: string, track: string, language: string) =>
     post<CaptionTrackSummary>(`${transcriptPath(id)}/caption-tracks/${encodeURIComponent(track)}/translate`, { language }),
+  startBurnIn: (id: string, track: string, position: "bottom" | "middle" | "top") =>
+    post<BurnJob>(`${transcriptPath(id)}/caption-tracks/${encodeURIComponent(track)}/burn-in`, { position }),
+  burnJob: (job: string) => requestJson<BurnJob>(`/api/transcript-burn-ins/${encodeURIComponent(job)}`),
   /** The lines a find and replace would change. Nothing is changed. */
   previewFindReplace: (id: string, options: FindReplaceOptions) =>
     post<FindReplacePreview>(`${transcriptPath(id)}/find-replace/preview`, options),

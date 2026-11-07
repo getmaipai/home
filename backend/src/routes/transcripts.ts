@@ -8,6 +8,7 @@ import { importTranscript } from "@/lib/transcripts/import";
 import { buildCues } from "@/lib/transcripts/cues";
 import { writeSrt, writeVtt, writeText, writeMarkdown, writeJson } from "@/lib/transcripts/writers";
 import { translateCaptionTrack, TRANSLATION_LANGUAGES } from "@/lib/transcripts/captionTranslate";
+import { burnJob, startBurnIn } from "@/lib/transcripts/burnIn";
 import { captionTrackCues, createCaptionTrack, listCaptionTracks, refreshCaptionTrack } from "@/lib/transcripts/captions";
 import { applyFindReplace, previewFindReplace } from "@/lib/transcripts/findReplace";
 import { transcribeJob } from "@/lib/transcripts/stack";
@@ -105,6 +106,25 @@ transcriptRoutes.openapi(createRoute({
     const { id, track } = c.req.valid("param");
     return c.json(await translateCaptionTrack(c.get("person"), id, track, c.req.valid("json").language), 201);
   } catch (e) { return handle(e, c); }
+});
+
+transcriptRoutes.openapi(createRoute({
+  method: "post", path: "/transcripts/{id}/caption-tracks/{track}/burn-in", tags: ["Transcripts"], summary: "Start burning a caption track into a copy of the video",
+  middleware: [requireAuth] as const, request: { params: trackParam, body: { content: { "application/json": { schema: z.object({ position: z.enum(["bottom", "middle", "top"]).default("bottom") }) } } } },
+  responses: { 202: jsonAnswer("The running burn-in job"), ...errorResponses({ 400: "Audio only or no captions", 401: "Not signed in", 403: "Transcripts are available to teens and adults", 404: "Transcript, caption track or video unavailable", 413: "Too many captions" }) },
+}), async (c) => {
+  try {
+    const { id, track } = c.req.valid("param");
+    return c.json(await startBurnIn(c.get("person"), id, track, c.req.valid("json").position), 202);
+  } catch (e) { return handle(e, c); }
+});
+
+transcriptRoutes.openapi(createRoute({
+  method: "get", path: "/transcript-burn-ins/{job}", tags: ["Transcripts"], summary: "Progress of a caption burn-in and the new file when done",
+  middleware: [requireAuth] as const, request: { params: z.object({ job: z.string().min(1).max(64) }) },
+  responses: { 200: jsonAnswer("Burn-in state, progress 0 to 1, file_id when done"), ...errorResponses({ 401: "Not signed in", 404: "Burn-in not found" }) },
+}), (c) => {
+  try { return c.json(burnJob(c.get("person"), c.req.valid("param").job), 200); } catch (e) { return handle(e, c); }
 });
 
 transcriptRoutes.openapi(createRoute({

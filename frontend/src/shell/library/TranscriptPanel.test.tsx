@@ -1,3 +1,4 @@
+import { ApiError } from "@/lib/api";
 import { afterEach, beforeEach, describe, expect, spyOn, test } from "bun:test";
 import { cleanup, fireEvent, render, waitFor } from "@testing-library/react";
 import type { Transcript } from "@maipai/spec/gen/ts/transcript.js";
@@ -362,6 +363,28 @@ describe("Library transcript workspace: translated captions", () => {
     fireEvent.click(await view.findByRole("button", { name: "Translate" }));
     await waitFor(() => expect(view.container.textContent).toContain("The captions could not be translated. Check that the language model is running, then try again."));
     expect(view.container.textContent).not.toContain("private raw detail");
+  });
+});
+
+describe("Library transcript workspace: burn-in", () => {
+  const track = { id: "cap-1", language: "en", based_on_revision: 1, needs_refreshing: false, cue_count: 2, translated: false };
+
+  test("Burn into video starts the job and says when the new file is ready", async () => {
+    stub(spyOn(transcriptApi, "captionTracks").mockResolvedValue([track]));
+    const start = stub(spyOn(transcriptApi, "startBurnIn").mockResolvedValue({ id: "job-1", state: "running", progress: 0 }));
+    stub(spyOn(transcriptApi, "burnJob").mockResolvedValue({ id: "job-1", state: "done", progress: 1, file_id: "file-9" }));
+    const view = await readyView("export");
+    fireEvent.click(await view.findByRole("button", { name: "Burn en captions into video" }));
+    await waitFor(() => expect(view.container.textContent).toContain("Done. The video with captions is a new file in your Library."), { timeout: 4000 });
+    expect(start).toHaveBeenCalledWith("tx-1", "cap-1", "bottom");
+  });
+
+  test("an audio-only file says what to do, using the server's sentence", async () => {
+    stub(spyOn(transcriptApi, "captionTracks").mockResolvedValue([track]));
+    stub(spyOn(transcriptApi, "startBurnIn").mockRejectedValue(new ApiError("Burn-in needs a video. This item is audio only, so download the captions instead.", 400)));
+    const view = await readyView("export");
+    fireEvent.click(await view.findByRole("button", { name: "Burn en captions into video" }));
+    expect(await view.findByText(/Burn-in needs a video/)).toBeTruthy();
   });
 });
 
