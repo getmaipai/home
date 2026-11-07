@@ -17,8 +17,9 @@ import { MusicWorkspace, SongGallery, studioAddress, stemsAddress, remixAddress 
 import type { MusicCard } from "@/lib/musicApi";
 import { MusicStudioView } from "./MusicStudioView";
 import { request } from "@/lib/api";
-import { bandImageSrc, useBandCard } from "@/apps/chat/useBandCard";
-import { joinBandAndStudio, musicRefOf, useMusicCard, type MusicCardKind } from "@/apps/chat/useMusicCard";
+import { bandImageSrc } from "@/apps/chat/useBandCard";
+import { musicRefOf, type MusicCardKind } from "@/apps/chat/useMusicCard";
+import { useMusicBlock } from "@/apps/chat/useMusicBlock";
 
 export const STUDIO_PAGE_IDS = ["create", "make-song", "make-band", "make-album", "make-style", "creations", "edit", "studio", "stems", "remix"] as const;
 export const isStudioPage = (packageId: string, pageId: string): boolean => packageId === "music" && (STUDIO_PAGE_IDS as readonly string[]).includes(pageId);
@@ -165,14 +166,13 @@ function EditPage({ kind, id }: { kind: Kind; id: string }) {
   const [confirmingDiscard, setConfirmingDiscard] = useState(false);
   const card = useQuery({ queryKey: ["music-card", kind, id], queryFn: () => request<{ block: { props: Record<string, unknown> } }>(`/api/music/${COLLECTION[kind]}/${encodeURIComponent(id)}/card`), staleTime: 0 });
   const block = useMemo(() => ({ kind, provenance: `${PRODUCER[kind]}:${id}:-:-`, props: card.data?.block.props ?? {} }), [kind, id, card.data]);
-  const band = useBandCard(block);
-  const studio = useMusicCard(block);
-  const onAction = joinBandAndStudio(band.onAction, studio.onAction) ?? (() => undefined);
-  const gone = band.gone || studio.gone;
+  const music = useMusicBlock(block);
+  const onAction = music.onAction ?? (() => undefined);
+  const gone = music.gone;
   if (gone) return <EmptyState icon="music" text={`That ${NOUN[kind]} is gone. Your songs are still in your library.`} actionLabel="My creations" onAction={() => navigate("/apps/music/creations")} />;
   if (card.isError) return <EmptyState icon="music" text={`That ${NOUN[kind]} is not here. It may have been discarded.`} actionLabel="My creations" onAction={() => navigate("/apps/music/creations")} />;
   if (!card.data) return <p role="status" className="text-muted-foreground px-4 text-sm lg:px-0">Opening your {NOUN[kind]}</p>;
-  const props = { ...(studio.props ?? band.props ?? card.data.block.props) };
+  const props = { ...(music.props ?? card.data.block.props) };
   // A new picture or cover is made by a chat turn, so these buttons open chat with the ask and the object link (one object per turn).
   const PICTURE_ASK: Record<string, string> = { remake_portrait: "Draw a new picture of this band.", remake_logo: "Draw a new logo for this band.", remake_cover: "Make a new cover for this album." };
   const act = (action: string, detail?: Record<string, unknown>) => {

@@ -1,23 +1,9 @@
 import { describe, expect, test } from "bun:test";
-import { bandImageSrc, bandRefOf, settleStale, withBandPictures } from "./useBandCard";
+import { bandImageSrc, settleStale, withBandPictures } from "./useBandCard";
 
 // MUSIC-LIKE-01: the pieces around the kit's Band card. The hub names files in hex; the card's buttons find the band from `provenance`.
 
 const hex = (text: string) => Array.from(new TextEncoder().encode(text), (b) => b.toString(16).padStart(2, "0")).join("");
-
-describe("bandRefOf", () => {
-  test("reads the band, conversation and turn from the provenance", () => {
-    expect(bandRefOf("make_band:mband-abc123:conv-1x:turn-2y")).toEqual({ bandId: "mband-abc123", conversationId: "conv-1x", turnId: "turn-2y" });
-  });
-  test("a dash means no conversation or turn", () => {
-    expect(bandRefOf("make_band:mband-abc123:-:-")).toEqual({ bandId: "mband-abc123", conversationId: null, turnId: null });
-  });
-  test("another producer or a bad band id is not ours", () => {
-    expect(bandRefOf("make_song:mband-abc123:-:-")).toBeNull();
-    expect(bandRefOf("make_band:../etc:-:-")).toBeNull();
-    expect(bandRefOf("")).toBeNull();
-  });
-});
 
 describe("bandImageSrc", () => {
   test("a hub picture reference becomes the file's thumbnail address", () => {

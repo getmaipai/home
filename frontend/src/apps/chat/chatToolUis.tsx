@@ -789,7 +789,7 @@ function videoHint(item: { quality?: "quick" | "detailed"; clip: { has_sound?: b
 const MUSIC_POLL_MS = 1_000;
 const MUSIC_SETTLED = new Set(["done", "failed", "cancelled"]);
 
-function useMusicCard(id: string | undefined) {
+function useSongJobCard(id: string | undefined) {
   return useQuery({
     queryKey: ["music", id],
     queryFn: ({ signal }) => musicApi.card(id!, signal),
@@ -799,7 +799,7 @@ function useMusicCard(id: string | undefined) {
 }
 
 export const MusicToolRender: ToolCallMessagePartComponent<Record<string, never>, { id: string }> = ({ result }) => {
-  const query = useMusicCard(result?.id);
+  const query = useSongJobCard(result?.id);
   const navigate = useNavigate();
   const me = useContext(WakeWordPersonContext);
   const card = query.data ?? { id: result?.id ?? "", task: "text2music", state: "queued" as const, stage: null, stage_label: "", stages: [{ id: "queued", label: "Queued" }, { id: "model", label: "Loading" }, { id: "planning", label: "Planning" }, { id: "making", label: "Making" }, { id: "mixing", label: "Mixing" }, { id: "finishing", label: "Finishing" }], stage_index: 0, progress: 0, eta_seconds: null, position: null, error_line: null, cover_url: null, cover_versions: [], cover_pending: false, versions: [], current_id: null, length: "full" as const, quality: "quick" as const, boost_offered: false, cut: null, max_seconds: null, title: null, description: null, lyrics: null, timed_lyrics: null, duration_s: null, started_at: 0 };

@@ -13,6 +13,9 @@ describe("musicRefOf", () => {
     expect(musicRefOf("album", "make_band:malbum-abc123:-:-")).toBeNull();
     expect(musicRefOf("album", "make_album:../x:-:-")).toBeNull();
     expect(musicRefOf("track", "make_album:malbum-abc123:-:-")).toBeNull();
+    expect(musicRefOf("band", "make_song:mband-abc123:-:-")).toBeNull();
+    expect(musicRefOf("band", "make_band:../etc:-:-")).toBeNull();
+    expect(musicRefOf("band", "")).toBeNull();
   });
 });
 

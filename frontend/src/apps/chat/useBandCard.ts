@@ -8,16 +8,10 @@ import { useNavigate } from "react-router-dom";
 import { useToast } from "@maipai/ui/src/primitives/Toast";
 import { request } from "@/lib/api";
 import { likeThisMessage } from "@/shell/pages/MusicLikeThisPage";
+import { musicRefOf } from "@/apps/chat/useMusicCard";
 
 type Band = { id: string; portrait_file_id?: string | null; logo_file_id?: string | null };
 type Done = { action: string; done: string; seed_media_id?: string | null };
-
-/** `make_band:<band>:<conversation>:<turn>` to its parts; anything else is not a band card of ours. */
-export function bandRefOf(provenance: string): { bandId: string; conversationId: string | null; turnId: string | null } | null {
-  const [kind, bandId, conversationId, turnId] = provenance.split(":");
-  if (kind !== "make_band" || !bandId || !/^mband-[a-z0-9]+$/.test(bandId)) return null;
-  return { bandId, conversationId: conversationId && conversationId !== "-" ? conversationId : null, turnId: turnId && turnId !== "-" ? turnId : null };
-}
 
 /** The hub's picture reference carries the file id in hex (`hubimg-<hex>`); the file's own address serves the picture. */
 export function bandImageSrc(src: string): string {
@@ -60,8 +54,8 @@ const POLL_MAX = 100;
 export function useBandCard(block: { kind: string; provenance?: string; props: unknown }): { props: Record<string, unknown> | null; onAction: ((blockId: string, action: string) => void) | null; gone: boolean } {
   const navigate = useNavigate();
   const { push } = useToast();
-  const ref = block.kind === "band" ? bandRefOf(block.provenance ?? "") : null;
-  const bandId = ref?.bandId ?? "";
+  const ref = block.kind === "band" ? musicRefOf("band", block.provenance ?? "") : null;
+  const bandId = ref?.id ?? "";
   const conversationId = ref?.conversationId ?? null; const turnId = ref?.turnId ?? null;
   const [band, setBand] = useState<Band | null>(null);
   const [gone, setGone] = useState(false);
