@@ -300,6 +300,21 @@
                   }
                 },
                 {
+                  "label": "Spatial sound with 5.1 file",
+                  "icon": "headphones",
+                  "starts": "video",
+                  "action": {
+                    "call": {
+                      "target": "/api/plugins/videos/actions/spatial-sound",
+                      "method": "POST",
+                      "args": {
+                        "id": "{id}",
+                        "surround": true
+                      }
+                    }
+                  }
+                },
+                {
                   "label": "Open in Studio",
                   "icon": "audio-waveform",
                   "action": {

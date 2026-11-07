@@ -360,29 +360,37 @@ describe("SPATIAL-REACH: the Create page action", () => {
   }
   const feed = async (client: { post: (path: string, body: unknown) => Promise<Response> }) => (await (await client.post("/api/plugins/videos/data/recipes", { scope: "feed" })).json()) as Array<{ id: string; status: string }>;
 
-  test("the Create feed offers Spatial sound beside its other actions, within the kit's four", async () => {
+  test("the Create feed offers Spatial sound and Spatial sound with 5.1 file beside its other actions, within the kit's five", async () => {
     const { readFileSync } = await import("node:fs");
     const page = JSON.parse(readFileSync(new URL("../packages/videos/pages/create.json", import.meta.url), "utf8")) as unknown;
     const found: Array<{ label: string; starts?: string; action: { call?: { target: string; args: Record<string, string> } } }> = [];
     const walk = (node: unknown): void => { if (Array.isArray(node)) node.forEach(walk); else if (node && typeof node === "object") { const record = node as Record<string, unknown>; if (record.type === "result_feed") found.push(...(record.actions as typeof found)); Object.values(record).forEach(walk); } };
     walk(page);
-    expect(found.length).toBeLessThanOrEqual(4);
-    const entry = found.find((a) => a.action.call?.target === ACTION)!;
-    expect(entry.label).toBe("Spatial sound");
+    expect(found.length).toBeLessThanOrEqual(5);
+    const entry = found.find((a) => a.label === "Spatial sound")!;
+    expect(entry.action.call!.target).toBe(ACTION);
     expect(entry.starts).toBe("video");
     expect(entry.action.call!.args).toEqual({ id: "{id}" });
+    const surround = found.find((a) => a.label === "Spatial sound with 5.1 file")!;
+    expect(surround.action.call!.target).toBe(ACTION);
+    expect(surround.starts).toBe("video");
+    expect(surround.action.call!.args).toEqual({ id: "{id}", surround: true });
   });
 
   test("the Studio's export card offers it too, and then opens the Create page where the new clip shows", async () => {
     const { readFileSync } = await import("node:fs");
     const page = JSON.parse(readFileSync(new URL("../packages/videos/pages/studio.json", import.meta.url), "utf8")) as unknown;
-    const found: Array<{ label: string; action: { call?: { target: string; then?: { navigate: { to: string } } } } }> = [];
+    const found: Array<{ label: string; action: { call?: { target: string; args?: Record<string, unknown>; then?: { navigate: { to: string } } } } }> = [];
     const walk = (node: unknown): void => { if (Array.isArray(node)) node.forEach(walk); else if (node && typeof node === "object") { const record = node as Record<string, unknown>; if (record.export_result) found.push(...((record.export_result as { actions: typeof found }).actions)); Object.values(record).forEach(walk); } };
     walk(page);
-    expect(found.length).toBeLessThanOrEqual(2);
-    const entry = found.find((a) => a.action.call?.target === ACTION)!;
-    expect(entry.label).toBe("Spatial sound");
+    expect(found.length).toBeLessThanOrEqual(3);
+    const entry = found.find((a) => a.label === "Spatial sound")!;
+    expect(entry.action.call!.target).toBe(ACTION);
     expect(entry.action.call!.then).toEqual({ navigate: { to: "/apps/videos/create" } });
+    const surround = found.find((a) => a.label === "Spatial sound with 5.1 file")!;
+    expect(surround.action.call!.target).toBe(ACTION);
+    expect(surround.action.call!.args).toEqual({ id: "{id}", surround: true });
+    expect(surround.action.call!.then).toEqual({ navigate: { to: "/apps/videos/create" } });
   });
 
   test("an adult starts it on a Create clip; the new clip is a row of the same feed, and surround makes the 5.1 file", async () => {
