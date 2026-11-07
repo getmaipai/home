@@ -55,7 +55,7 @@ Children cannot change their own voice. An owner or admin opens the page, uses *
 
 Everyone in the home can make a voice, children and teens too. On the **Voices** page press **Make a voice from a recording**, type a name, and choose a WAV, MP3 or FLAC recording that is 6 to 30 seconds long. Home makes the voice and plays it once to check it. Then it shows up in the voice list for everyone in the home. Only use your own voice, or the voice of someone who said yes. A guest cannot make a voice.
 
-A parent or admin can see every voice made in the home, who made it, and can listen to it and delete it: open **Home settings**, then **Voices**, and use **Test** or **Delete**. This is only about voices. A teen's other settings stay private. A child's voice for chat is still picked by a parent, so after a child makes a voice, a parent can pick it for them. An owner or admin can also set liveliness and pitch when making a voice; everyone else gets the normal sound.
+A parent or admin can see every voice made in the home, who made it, and can listen to it and delete it: open **Settings**, then **Voice**, then the **Voices** tab, and use **Test** or **Delete**. This is only about voices. A teen's other settings stay private. A child's voice for chat is still picked by a parent, so after a child makes a voice, a parent can pick it for them. An owner or admin can also set liveliness and pitch when making a voice; everyone else gets the normal sound.
 
 If the page says "Voices are still getting ready", wait a minute. After setup the voice engine needs a short time to start. If it says "Home can't reach its voice service", open **Repairs**, then come back and press **Try again**. See [Talking to Home](voice.md) for natural speech sounds and microphone help.
 
