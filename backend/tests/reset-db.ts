@@ -21,6 +21,7 @@ import { __resetPackageQuietWindowsForTests } from "@/lib/packageHost";
 import { __resetRateLimiterForTests } from "@/lib/rateLimiter";
 import { forgetAlbumCovers } from "@/lib/media/albumCoverStore";
 import { __forgetStackOutagesForTests } from "@/lib/stackEngine";
+import { isolateQueueProvidersForTests } from "@/lib/jobs/householdQueue";
 import {
   people,
   alarms,
@@ -320,6 +321,8 @@ export function resetDb(): void {
   __resetPackageQuietWindowsForTests();
   __resetRateLimiterForTests();
   __forgetStackOutagesForTests();
+  // The queue keeps the last entries it saw (module state); a test that removed its provider without a final release left a running Max job there, which made later files see an open Max window.
+  isolateQueueProvidersForTests()();
   // ROUTE-02: the ordinary tool set is read from routing stats once per
   // installed set (boot); a fresh database is a fresh boot.
   __resetOutputNotificationsForTests(); // CHAT-02: once-per-turn notification keys
