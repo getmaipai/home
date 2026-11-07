@@ -1,3 +1,4 @@
+import { i18n } from "@lingui/core";
 import { getIcon } from "@maipai/ui/src/icons";
 import { Alert, AlertDescription } from "@maipai/ui/src/ui/alert";
 import type { PlanDiskView } from "@/lib/api";
@@ -22,11 +23,11 @@ export function PlanDiskSummary({ disk, selected }: { disk: PlanDiskView; select
   const Icon = verdict.state === "red" ? BadIcon : verdict.state === "amber" ? WarnIcon : OkIcon;
   return (
     <div className="flex flex-col gap-3" data-testid="plan-disk">
-      <p className="flex items-baseline justify-between gap-3 font-medium"><span>Total on disk</span><span className="tabular-nums">{sizeGb(totals.installed_bytes)}</span></p>
-      <p className="text-muted-foreground">Free space needed while it installs: about {needGb(verdict.requiredBytes)} GB (the total, 20 percent more, and room to unpack). Free space on this computer: {free === null ? "unknown" : `${freeGb(free)} GB`}.</p>
+      <p className="flex items-baseline justify-between gap-3 font-medium"><span>{i18n._({ id: "Total on disk", message: "Total on disk" })}</span><span className="tabular-nums">{sizeGb(totals.installed_bytes)}</span></p>
+      <p className="text-muted-foreground">{i18n._({ id: "Free space needed while it installs: about {needGb} GB (the total, 20 percent more, and room to unpack). Free space on this computer: {free}.", message: "Free space needed while it installs: about {needGb} GB (the total, 20 percent more, and room to unpack). Free space on this computer: {free}.", values: { needGb: needGb(verdict.requiredBytes), free: free === null ? i18n._({ id: "unknown", message: "unknown" }) : `${freeGb(free)} GB` } })}</p>
       <Alert variant={verdict.state === "red" ? "destructive" : verdict.state === "amber" ? "warning" : "default"} data-check-state={verdict.state}>
         <Icon aria-hidden />
-        <AlertDescription>{verdict.text}{verdict.state === "red" && rows.some((row) => row.selectable && selected.has(row.id)) ? " You can also turn off an extra above." : ""}</AlertDescription>
+        <AlertDescription>{verdict.text}{verdict.state === "red" && rows.some((row) => row.selectable && selected.has(row.id)) ? i18n._({ id: " You can also turn off an extra above.", message: " You can also turn off an extra above." }) : ""}</AlertDescription>
       </Alert>
     </div>
   );

@@ -1,3 +1,4 @@
+import { i18n } from "@lingui/core";
 import { getIcon } from "@maipai/ui/src/icons";
 import { useEffect, useState } from "react";
 import { Button } from "@maipai/ui/src/ui/button";
@@ -16,24 +17,24 @@ const CheckIcon = getIcon("check");
 export interface StorageChoice { models?: string; records?: string }
 type FolderClass = "models" | "records";
 
-const PICKER_ERROR = "Home couldn't open that folder. Go up a level or pick another folder, then try again.";
-const COPY: Record<FolderClass, { title: string; about: string; pickerTitle: string }> = {
-  models: { title: "AI models", about: "Home saves your pick, but for now downloads the AI models to its default folder.", pickerTitle: "Choose the AI models folder" },
-  records: { title: "Home's data", about: "Your family's chats, people and memories. Small, usually well under 5 GB.", pickerTitle: "Choose Home's data folder" },
-};
+const pickerFailed = () => i18n._({ id: "Home couldn't open that folder. Go up a level or pick another folder, then try again.", message: "Home couldn't open that folder. Go up a level or pick another folder, then try again." });
+const folderCopy = (): Record<FolderClass, { title: string; about: string; pickerTitle: string }> => ({
+  models: { title: i18n._({ id: "AI models", message: "AI models" }), about: i18n._({ id: "Home saves your pick, but for now downloads the AI models to its default folder.", message: "Home saves your pick, but for now downloads the AI models to its default folder." }), pickerTitle: i18n._({ id: "Choose the AI models folder", message: "Choose the AI models folder" }) },
+  records: { title: i18n._({ id: "Home's data", message: "Home's data" }), about: i18n._({ id: "Your family's chats, people and memories. Small, usually well under 5 GB.", message: "Your family's chats, people and memories. Small, usually well under 5 GB." }), pickerTitle: i18n._({ id: "Choose Home's data folder", message: "Choose Home's data folder" }) },
+});
 const PICKER_COPY = (title: string): FolderPickerCopy => ({
   title,
-  upLabel: "Up one level",
-  chooseLabel: "Use this folder",
-  newFolderLabel: "New folder",
-  newFolderNameLabel: "Name for the new folder",
-  createLabel: "Create folder",
-  cancelLabel: "Cancel",
-  emptyText: "There are no folders in here. Use this folder, or make a new one.",
-  errorText: PICKER_ERROR,
-  retryLabel: "Try again",
-  loadingLabel: "Loading folders",
-  freeSpaceLabel: (formatted) => `${formatted} free on this drive`,
+  upLabel: i18n._({ id: "Up one level", message: "Up one level" }),
+  chooseLabel: i18n._({ id: "Use this folder", message: "Use this folder" }),
+  newFolderLabel: i18n._({ id: "New folder", message: "New folder" }),
+  newFolderNameLabel: i18n._({ id: "Name for the new folder", message: "Name for the new folder" }),
+  createLabel: i18n._({ id: "Create folder", message: "Create folder" }),
+  cancelLabel: i18n._({ id: "Cancel", message: "Cancel" }),
+  emptyText: i18n._({ id: "There are no folders in here. Use this folder, or make a new one.", message: "There are no folders in here. Use this folder, or make a new one." }),
+  errorText: pickerFailed(),
+  retryLabel: i18n._({ id: "Try again", message: "Try again" }),
+  loadingLabel: i18n._({ id: "Loading folders", message: "Loading folders" }),
+  freeSpaceLabel: (formatted) => i18n._({ id: "{formatted} free on this drive", message: "{formatted} free on this drive", values: { formatted } }),
 });
 
 /** Placement rows as the sentences shown to the owner. */
@@ -86,7 +87,7 @@ export function StorageStep({ split, value, onChange }: {
     setCheckError(null);
     void api.setupStorageCheck({ ...layout, split }).then(
       (result) => { if (active) setRows(result.rows); },
-      (reason) => { if (active) { setRows(null); setCheckError(errorLine(reason, "Home couldn't check that folder. Choose it again, or keep the default folder.")); } },
+      (reason) => { if (active) { setRows(null); setCheckError(errorLine(reason, i18n._({ id: "Home couldn't check that folder. Choose it again, or keep the default folder.", message: "Home couldn't check that folder. Choose it again, or keep the default folder." }))); } },
     ).finally(() => { if (active) setChecking(false); });
     return () => { active = false; };
     // The layout is read through its key so an equal object does not re-run the check.
@@ -105,7 +106,7 @@ export function StorageStep({ split, value, onChange }: {
       setListing(next);
       setLastPath(next.path);
     } catch (reason) {
-      setPickerError(errorLine(reason, PICKER_ERROR));
+      setPickerError(errorLine(reason, pickerFailed()));
     } finally { setLoading(false); }
   }
 
@@ -141,16 +142,16 @@ export function StorageStep({ split, value, onChange }: {
       setListing(next);
       setLastPath(next.path);
     } catch (reason) {
-      setPickerError(errorLine(reason, PICKER_ERROR));
+      setPickerError(errorLine(reason, pickerFailed()));
     } finally { setLoading(false); }
   }
 
   const problems = rows ?? [];
   return (
     <div className="flex flex-col gap-4">
-      {split ? <p className="text-base text-muted-foreground md:text-lg">The AI models folder is set on your other computer.</p> : null}
+      {split ? <p className="text-base text-muted-foreground md:text-lg">{i18n._({ id: "The AI models folder is set on your other computer.", message: "The AI models folder is set on your other computer." })}</p> : null}
       {kinds.map((which) => {
-        const copy = COPY[which];
+        const copy = folderCopy()[which];
         const path = layout[which];
         const own = problems.filter((row) => row.class === which);
         const state = own.some((row) => row.kind === "refusal") ? "invalid" : checking || rows === null || checkError ? undefined : "valid";
@@ -158,12 +159,12 @@ export function StorageStep({ split, value, onChange }: {
           <Card key={which} state={state}>
             <CardHeader>
               <h2 className="text-2xl font-semibold md:text-3xl">{copy.title}</h2>
-              <p className="text-base text-muted-foreground md:text-lg">{copy.about}{which === "models" && defaults?.models_need_bytes ? ` Plan for about ${needGb(defaults.models_need_bytes)} GB free there.` : ""}</p>
+              <p className="text-base text-muted-foreground md:text-lg">{copy.about}{which === "models" && defaults?.models_need_bytes ? i18n._({ id: " Plan for about {needGb} GB free there.", message: " Plan for about {needGb} GB free there.", values: { needGb: needGb(defaults.models_need_bytes) } }) : ""}</p>
             </CardHeader>
             <CardContent>
-              <p className="break-all text-base md:text-lg">{path ?? defaults?.[which] ?? "Default folder"}</p>
+              <p className="break-all text-base md:text-lg">{path ?? defaults?.[which] ?? i18n._({ id: "Default folder", message: "Default folder" })}</p>
               {windowOpen === which ? (
-                <p role="status" className="pt-3 text-base text-muted-foreground md:text-lg">Choose a folder in the window that just opened.</p>
+                <p role="status" className="pt-3 text-base text-muted-foreground md:text-lg">{i18n._({ id: "Choose a folder in the window that just opened.", message: "Choose a folder in the window that just opened." })}</p>
               ) : picking === which ? (
                 <FolderPicker
                   listing={listing ? { path: listing.path, parent: listing.parent, freeBytes: listing.freeBytes, rows: listing.folders.map((folder) => ({ name: folder.name, path: folder.path, writable: true })) } : undefined}
@@ -179,32 +180,32 @@ export function StorageStep({ split, value, onChange }: {
                 />
               ) : (
                 <div className="flex flex-wrap gap-2 pt-3">
-                  <Button type="button" variant="secondary" size="lg" disabled={picking !== null} onClick={() => void startPicking(which)}>{path ? "Choose a different folder" : "Choose a folder"}</Button>
-                  {path ? <Button type="button" variant="ghost" size="lg" disabled={picking !== null} onClick={() => onChange({ ...value, [which]: undefined }, true)}>Keep the default</Button> : null}
+                  <Button type="button" variant="secondary" size="lg" disabled={picking !== null} onClick={() => void startPicking(which)}>{path ? i18n._({ id: "Choose a different folder", message: "Choose a different folder" }) : i18n._({ id: "Choose a folder", message: "Choose a folder" })}</Button>
+                  {path ? <Button type="button" variant="ghost" size="lg" disabled={picking !== null} onClick={() => onChange({ ...value, [which]: undefined }, true)}>{i18n._({ id: "Keep the default", message: "Keep the default" })}</Button> : null}
                 </div>
               )}
               {nativeRefusal?.which === which ? <div className="pt-3"><Alert variant="destructive"><AlertDescription>{nativeRefusal.text}</AlertDescription></Alert></div> : null}
               {picking === which && pickerError ? <Alert variant="destructive"><ErrorIcon /><AlertDescription>{pickerError}</AlertDescription></Alert> : null}
-              {picking === which && listing && !listing.writable ? <p className="text-base text-muted-foreground md:text-lg">Home can't save files in this folder. Go up and pick a folder you own, or make a new one here.</p> : null}
-              {picking === which && windowOpen !== which ? <Button type="button" variant="ghost" size="lg" onClick={() => setPicking(null)}>Cancel</Button> : null}
+              {picking === which && listing && !listing.writable ? <p className="text-base text-muted-foreground md:text-lg">{i18n._({ id: "Home can't save files in this folder. Go up and pick a folder you own, or make a new one here.", message: "Home can't save files in this folder. Go up and pick a folder you own, or make a new one here." })}</p> : null}
+              {picking === which && windowOpen !== which ? <Button type="button" variant="ghost" size="lg" onClick={() => setPicking(null)}>{i18n._({ id: "Cancel", message: "Cancel" })}</Button> : null}
               {picking !== which ? own.map((row) => (
                 <div key={row.id} className="pt-3">
                   <Alert variant={row.kind === "refusal" ? "destructive" : "warning"}>
-                    <AlertTitle>{row.kind === "refusal" ? "Home can't use this folder" : "Worth knowing"}</AlertTitle>
+                    <AlertTitle>{row.kind === "refusal" ? i18n._({ id: "Home can't use this folder", message: "Home can't use this folder" }) : i18n._({ id: "Worth knowing", message: "Worth knowing" })}</AlertTitle>
                     <AlertDescription>{placementLine(row)}</AlertDescription>
                   </Alert>
                 </div>
               )) : null}
-              {picking !== which && state === "valid" && own.length === 0 ? <p role="status" className="flex items-center gap-2 pt-3 text-base font-medium text-[color:var(--hue-teal)]"><CheckIcon aria-hidden className="size-5" />Home can use this folder.</p> : null}
+              {picking !== which && state === "valid" && own.length === 0 ? <p role="status" className="flex items-center gap-2 pt-3 text-base font-medium text-[color:var(--hue-teal)]"><CheckIcon aria-hidden className="size-5" />{i18n._({ id: "Home can use this folder.", message: "Home can use this folder." })}</p> : null}
             </CardContent>
           </Card>
         );
       })}
-      {checking ? <RouteSkeleton label="Checking that Home can use your choice" /> : null}
-      {checkError ? <Alert variant="destructive"><AlertTitle>Home couldn't check your choice</AlertTitle><AlertDescription>{checkError}</AlertDescription></Alert> : null}
+      {checking ? <RouteSkeleton label={i18n._({ id: "Checking that Home can use your choice", message: "Checking that Home can use your choice" })} /> : null}
+      {checkError ? <Alert variant="destructive"><AlertTitle>{i18n._({ id: "Home couldn't check your choice", message: "Home couldn't check your choice" })}</AlertTitle><AlertDescription>{checkError}</AlertDescription></Alert> : null}
       {problems.filter((row) => !kinds.includes(row.class as FolderClass)).map((row) => (
         <Alert key={`${row.class}-${row.id}`} variant={row.kind === "refusal" ? "destructive" : "warning"}>
-          <AlertTitle>{row.kind === "refusal" ? "Home can't use this folder" : "Worth knowing"}</AlertTitle>
+          <AlertTitle>{row.kind === "refusal" ? i18n._({ id: "Home can't use this folder", message: "Home can't use this folder" }) : i18n._({ id: "Worth knowing", message: "Worth knowing" })}</AlertTitle>
           <AlertDescription>{placementLine(row)}</AlertDescription>
         </Alert>
       ))}

@@ -1,3 +1,4 @@
+import { i18n } from "@lingui/core";
 import type { ComingUpItem } from "@/lib/api";
 import type { List as ListRecord } from "@maipai/spec/gen/ts/list.js";
 import { ComingUpRow } from "./ComingUpRow";
@@ -11,10 +12,10 @@ export function SmartListView({ view, items, onChanged }: {
   items: SmartItem[];
   onChanged: () => void;
 }) {
-  const title = view.kind === "today" ? "Today" : "Scheduled";
+  const title = view.kind === "today" ? i18n._({ id: "Today", message: "Today" }) : i18n._({ id: "Scheduled", message: "Scheduled" });
   return <section className="flex min-h-0 min-w-0 flex-1 flex-col">
     <header className="border-b px-4 py-4">
-      <p className="m-0 text-base tracking-wider text-muted-foreground">SMART LIST</p>
+      <p className="m-0 text-base tracking-wider text-muted-foreground">{i18n._({ id: "SMART LIST", message: "SMART LIST" })}</p>
       <h1 className="m-0 text-3xl font-semibold">{title}</h1>
     </header>
     <ul className="m-0 list-none overflow-y-auto p-4">

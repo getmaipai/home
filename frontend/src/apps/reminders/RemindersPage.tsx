@@ -1,3 +1,4 @@
+import { i18n } from "@lingui/core";
 import { useEffect, useMemo, useState, useContext } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import type { List as ListRecord } from "@maipai/spec/gen/ts/list.js";
@@ -22,7 +23,7 @@ const COMING_QUERY_KEY = ["household-coming-up"];
 export { RemindersIcon };
 
 function RemindersHeaderAction() {
-  return <><Button type="button" variant="ghost" size="icon-lg" aria-label="Create list" onClick={() => window.dispatchEvent(new Event("maipai:reminders-add-list"))}>+</Button></>;
+  return <><Button type="button" variant="ghost" size="icon-lg" aria-label={i18n._({ id: "Create list", message: "Create list" })} onClick={() => window.dispatchEvent(new Event("maipai:reminders-add-list"))}>+</Button></>;
 }
 
 function orderLists(input: ListRecord[]): ListRecord[] {
@@ -71,7 +72,7 @@ export function RemindersPage() {
     const jobsToShow = view.kind === "today" ? todayJobs : jobs;
     const itemsToShow = view.kind === "today" ? todayItems : dueItems;
     return [
-      ...jobsToShow.map((item) => ({ id: item.id, label: "Reminder", text: item.text, at: item.at })),
+      ...jobsToShow.map((item) => ({ id: item.id, label: i18n._({ id: "Reminder", message: "Reminder" }), text: item.text, at: item.at })),
       ...itemsToShow.map(({ list, item }) => ({ id: item.id, label: labelFor(list), text: item.text, at: item.due_at!, list })),
     ].sort((a, b) => Date.parse(a.at) - Date.parse(b.at));
   }, [dueItems, jobs, todayItems, todayJobs, view.kind]);
@@ -170,15 +171,15 @@ export function RemindersPage() {
     <AlertDialog open={confirmDelete} onOpenChange={setConfirmDelete}>
       <AlertDialogContent>
         <AlertDialogHeader>
-          <AlertDialogTitle>Delete {selected ? labelFor(selected) : "list"}?</AlertDialogTitle>
-          <AlertDialogDescription>Its {selected?.items.length ?? 0} items go too.</AlertDialogDescription>
+          <AlertDialogTitle>{i18n._({ id: "Delete {name}?", message: "Delete {name}?", values: { name: selected ? labelFor(selected) : i18n._({ id: "list", message: "list" }) } })}</AlertDialogTitle>
+          <AlertDialogDescription>{i18n._({ id: "{count, plural, one {Its # item goes too.} other {Its # items go too.}}", message: "{count, plural, one {Its # item goes too.} other {Its # items go too.}}", values: { count: selected?.items.length ?? 0 } })}</AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
-          <AlertDialogCancel>Cancel</AlertDialogCancel>
-          <Button type="button" variant="destructive" disabled={action.busy} onClick={deleteSelected}>Delete list</Button>
+          <AlertDialogCancel>{i18n._({ id: "Cancel", message: "Cancel" })}</AlertDialogCancel>
+          <Button type="button" variant="destructive" disabled={action.busy} onClick={deleteSelected}>{i18n._({ id: "Delete list", message: "Delete list" })}</Button>
         </AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>
-    {listsQuery.isError || comingQuery.isError ? <div role="alert" className="p-4 text-destructive"><p>Could not load reminders. Check your connection and try again.</p>{listsQuery.isError ? <Button variant="outline" onClick={() => void listsQuery.refetch()}>Retry</Button> : null}{comingQuery.isError ? <Button variant="outline" onClick={() => void comingQuery.refetch()}>Retry</Button> : null}</div> : null}
+    {listsQuery.isError || comingQuery.isError ? <div role="alert" className="p-4 text-destructive"><p>{i18n._({ id: "Could not load reminders. Check your connection and try again.", message: "Could not load reminders. Check your connection and try again." })}</p>{listsQuery.isError ? <Button variant="outline" onClick={() => void listsQuery.refetch()}>{i18n._({ id: "Retry", message: "Retry" })}</Button> : null}{comingQuery.isError ? <Button variant="outline" onClick={() => void comingQuery.refetch()}>{i18n._({ id: "Retry", message: "Retry" })}</Button> : null}</div> : null}
   </div>;
 }

@@ -1,3 +1,4 @@
+import { i18n } from "@lingui/core";
 import { useEffect, useRef, useState } from "react";
 import { Button } from "@maipai/ui/src/ui/button";
 
@@ -56,21 +57,21 @@ export function StopwatchTab() {
   }
 
   return (
-    <section aria-label="Stopwatch" className="grid justify-items-center gap-6 py-10">
+    <section aria-label={i18n._({ id: "Stopwatch", message: "Stopwatch" })} className="grid justify-items-center gap-6 py-10">
       <output aria-live="off" className="text-6xl tabular-nums">{formatElapsed(elapsed)}</output>
-      <p className="sr-only" aria-live="polite">{running ? "Stopwatch running" : `Stopped at ${formatElapsed(elapsed)}`}</p>
+      <p className="sr-only" aria-live="polite">{running ? i18n._({ id: "Stopwatch running", message: "Stopwatch running" }) : i18n._({ id: "Stopped at {formatElapsed}", message: "Stopped at {formatElapsed}", values: { formatElapsed: formatElapsed(elapsed) } })}</p>
       <div className="flex flex-wrap justify-center gap-3">
         {running ? <>
-          <Button type="button" variant="outline" onClick={recordLap}>Lap</Button>
-          <Button type="button" onClick={stop}>Stop</Button>
+          <Button type="button" variant="outline" onClick={recordLap}>{i18n._({ id: "Lap", message: "Lap" })}</Button>
+          <Button type="button" onClick={stop}>{i18n._({ id: "Stop", message: "Stop" })}</Button>
         </> : <>
-          <Button type="button" onClick={start}>{elapsed ? "Resume" : "Start"}</Button>
-          <Button type="button" variant="outline" onClick={reset}>Reset</Button>
+          <Button type="button" onClick={start}>{elapsed ? i18n._({ id: "Resume", message: "Resume" }) : i18n._({ id: "Start", message: "Start" })}</Button>
+          <Button type="button" variant="outline" onClick={reset}>{i18n._({ id: "Reset", message: "Reset" })}</Button>
         </>}
       </div>
-      {laps.length ? <ol aria-label="Stopwatch laps" className="m-0 w-full max-w-xl list-none p-0">
+      {laps.length ? <ol aria-label={i18n._({ id: "Stopwatch laps", message: "Stopwatch laps" })} className="m-0 w-full max-w-xl list-none p-0">
         {laps.map((lap) => <li key={lap.number} className="flex justify-between border-b py-3">
-          <span>Lap {lap.number}</span>
+          <span>{i18n._({ id: "Lap {number}", message: "Lap {number}", values: { number: lap.number } })}</span>
           <span className="tabular-nums">{formatElapsed(lap.split)}</span>
           <span className="tabular-nums">{formatElapsed(lap.total)}</span>
         </li>)}

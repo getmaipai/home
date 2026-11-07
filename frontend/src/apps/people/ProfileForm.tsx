@@ -1,3 +1,4 @@
+import { i18n } from "@lingui/core";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import type { Person } from "@maipai/spec/gen/ts/person.js";
 import { Button } from "@maipai/ui/src/dashboard/components/ui/button";
@@ -65,7 +66,7 @@ export function ProfileForm({ person, canEdit, onSaved, onCancel, layout = "dial
 
   useEffect(() => {
     if (layout !== "page" || !hasUnsavedChanges) return;
-    const unregister = registerRouteLeaveGuard(() => window.confirm("Leave without saving?"));
+    const unregister = registerRouteLeaveGuard(() => window.confirm(i18n._({ id: "Leave without saving?", message: "Leave without saving?" })));
     const handleClick = (event: MouseEvent) => {
       if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
       const target = event.target;
@@ -76,7 +77,7 @@ export function ProfileForm({ person, canEdit, onSaved, onCancel, layout = "dial
       const currentHref = window.location.origin === "null" ? "http://localhost/" : window.location.href;
       const destination = new URL(href, currentHref);
       if (destination.href === currentHref) return;
-      if (!window.confirm("Leave without saving?")) {
+      if (!window.confirm(i18n._({ id: "Leave without saving?", message: "Leave without saving?" }))) {
         event.preventDefault();
         event.stopImmediatePropagation();
         return;
@@ -92,7 +93,7 @@ export function ProfileForm({ person, canEdit, onSaved, onCancel, layout = "dial
         lastHistoryIndex.current = currentIndex;
         return;
       }
-      if (!window.confirm("Leave without saving?")) {
+      if (!window.confirm(i18n._({ id: "Leave without saving?", message: "Leave without saving?" }))) {
         event.stopImmediatePropagation();
         const delta = lastHistoryIndex.current - currentIndex;
         if (delta !== 0) {
@@ -152,7 +153,7 @@ export function ProfileForm({ person, canEdit, onSaved, onCancel, layout = "dial
       setSaved(true);
       if (layout === "dialog") onCancel?.();
     } catch (err) {
-      setError(errorLine(err, "Could not save those changes. Check your connection and try again."));
+      setError(errorLine(err, i18n._({ id: "Could not save those changes. Check your connection and try again.", message: "Could not save those changes. Check your connection and try again." })));
     } finally {
       setSubmitting(false);
     }
@@ -160,38 +161,38 @@ export function ProfileForm({ person, canEdit, onSaved, onCancel, layout = "dial
 
   return (
     <form onSubmit={handleSave} className="flex flex-col gap-4">
-      {layout === "page" && hasUnsavedChanges ? <p role="status">Unsaved changes.</p> : null}
-      {saved ? <p role="status">Saved.</p> : null}
+      {layout === "page" && hasUnsavedChanges ? <p role="status">{i18n._({ id: "Unsaved changes.", message: "Unsaved changes." })}</p> : null}
+      {saved ? <p role="status">{i18n._({ id: "Saved.", message: "Saved." })}</p> : null}
       <div className="flex flex-col gap-2">
-        <Label htmlFor="profile-display-name">Name</Label>
+        <Label htmlFor="profile-display-name">{i18n._({ id: "Name", message: "Name" })}</Label>
         <Input id="profile-display-name" value={displayName} onChange={(event) => updateDraft(() => setDisplayName(event.target.value))} disabled={!canEdit || submitting} />
-        {!canEdit ? <p className="text-sm text-muted-foreground">Ask an admin to change this.</p> : null}
+        {!canEdit ? <p className="text-sm text-muted-foreground">{i18n._({ id: "Ask an admin to change this.", message: "Ask an admin to change this." })}</p> : null}
       </div>
       <div className="flex flex-col gap-2">
-        <Label htmlFor="profile-bio">Bio</Label>
-        <Textarea id="profile-bio" value={bio} onChange={(event) => updateDraft(() => setBio(event.target.value))} maxLength={160} placeholder="A line about you" disabled={!canEdit || submitting} aria-invalid={bioTooLong} />
+        <Label htmlFor="profile-bio">{i18n._({ id: "Bio", message: "Bio" })}</Label>
+        <Textarea id="profile-bio" value={bio} onChange={(event) => updateDraft(() => setBio(event.target.value))} maxLength={160} placeholder={i18n._({ id: "A line about you", message: "A line about you" })} disabled={!canEdit || submitting} aria-invalid={bioTooLong} />
         <p className="text-sm text-muted-foreground">{bio.length}/160</p>
-        {bioTooLong ? <p className="text-sm text-destructive">Bio must be 160 characters or less.</p> : null}
-        {!canEdit ? <p className="text-sm text-muted-foreground">Ask an admin to change this.</p> : null}
+        {bioTooLong ? <p className="text-sm text-destructive">{i18n._({ id: "Bio must be 160 characters or less.", message: "Bio must be 160 characters or less." })}</p> : null}
+        {!canEdit ? <p className="text-sm text-muted-foreground">{i18n._({ id: "Ask an admin to change this.", message: "Ask an admin to change this." })}</p> : null}
       </div>
       <div className="flex flex-col gap-2">
-        <Label>Accent color</Label>
+        <Label>{i18n._({ id: "Accent color", message: "Accent color" })}</Label>
         <Select value={accent} onValueChange={(value) => { if (value !== null) updateDraft(() => setAccent(value)); }} disabled={!canEdit || submitting}>
-          <SelectTrigger aria-label="Accent color"><SelectValue>{ACCENT_SELECT_LABELS[accent] ?? accent}</SelectValue></SelectTrigger>
+          <SelectTrigger aria-label={i18n._({ id: "Accent color", message: "Accent color" })}><SelectValue>{ACCENT_SELECT_LABELS[accent] ?? accent}</SelectValue></SelectTrigger>
           <SelectContent>{[...ACCENT_SELECT_OPTIONS].map((value) => <SelectItem key={value} value={value}>{ACCENT_SELECT_LABELS[value] ?? value}</SelectItem>)}</SelectContent>
         </Select>
-        {!canEdit ? <p className="text-sm text-muted-foreground">Ask an admin to change this.</p> : null}
+        {!canEdit ? <p className="text-sm text-muted-foreground">{i18n._({ id: "Ask an admin to change this.", message: "Ask an admin to change this." })}</p> : null}
       </div>
       {error ? <p role="alert" className="text-sm text-destructive">{error}</p> : null}
       {canEdit ? layout === "dialog" ? (
         <DialogFooter>
-          <Button type="submit" disabled={!canSave}>{submitting ? "Saving…" : "Save"}</Button>
-          <Button type="button" variant="ghost" onClick={onCancel} disabled={submitting}>Cancel</Button>
+          <Button type="submit" disabled={!canSave}>{submitting ? i18n._({ id: "Saving…", message: "Saving…" }) : i18n._({ id: "Save", message: "Save" })}</Button>
+          <Button type="button" variant="ghost" onClick={onCancel} disabled={submitting}>{i18n._({ id: "Cancel", message: "Cancel" })}</Button>
         </DialogFooter>
       ) : (
         <div className="flex justify-end gap-2">
-          <Button type="submit" disabled={!canSave}>{submitting ? "Saving…" : "Save"}</Button>
-          {onCancel ? <Button type="button" variant="ghost" onClick={onCancel} disabled={submitting}>Cancel</Button> : null}
+          <Button type="submit" disabled={!canSave}>{submitting ? i18n._({ id: "Saving…", message: "Saving…" }) : i18n._({ id: "Save", message: "Save" })}</Button>
+          {onCancel ? <Button type="button" variant="ghost" onClick={onCancel} disabled={submitting}>{i18n._({ id: "Cancel", message: "Cancel" })}</Button> : null}
         </div>
       ) : null}
     </form>

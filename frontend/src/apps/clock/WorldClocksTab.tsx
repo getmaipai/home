@@ -1,3 +1,5 @@
+import { activeLocale } from "@/lib/activeLocale";
+import { i18n } from "@lingui/core";
 import { useEffect, useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@maipai/ui/src/ui/button";
@@ -23,13 +25,19 @@ function zoneOffsetMinutes(zone: string, date: Date) {
 
 function offsetText(zone: string, homeZone: string, date: Date) {
   const difference = zoneOffsetMinutes(zone, date) - zoneOffsetMinutes(homeZone, date);
-  if (!difference) return "same time";
+  if (!difference) return i18n._({ id: "same time", message: "same time" });
   const hours = Math.floor(Math.abs(difference) / 60);
   const minutes = Math.abs(difference) % 60;
-  const amount = hours
-    ? `${hours} ${hours === 1 ? "hour" : "hours"}${minutes ? ` ${minutes} minutes` : ""}`
-    : `${minutes} minutes`;
-  return `${amount} ${difference > 0 ? "ahead of you" : "behind"}`;
+  const ahead = difference > 0;
+  if (hours && minutes) return ahead
+    ? i18n._({ id: "{hours, plural, one {# hour} other {# hours}} {minutes} minutes ahead of you", message: "{hours, plural, one {# hour} other {# hours}} {minutes} minutes ahead of you", values: { hours, minutes } })
+    : i18n._({ id: "{hours, plural, one {# hour} other {# hours}} {minutes} minutes behind", message: "{hours, plural, one {# hour} other {# hours}} {minutes} minutes behind", values: { hours, minutes } });
+  if (hours) return ahead
+    ? i18n._({ id: "{hours, plural, one {# hour} other {# hours}} ahead of you", message: "{hours, plural, one {# hour} other {# hours}} ahead of you", values: { hours } })
+    : i18n._({ id: "{hours, plural, one {# hour} other {# hours}} behind", message: "{hours, plural, one {# hour} other {# hours}} behind", values: { hours } });
+  return ahead
+    ? i18n._({ id: "{minutes, plural, one {# minute} other {# minutes}} ahead of you", message: "{minutes, plural, one {# minute} other {# minutes}} ahead of you", values: { minutes } })
+    : i18n._({ id: "{minutes, plural, one {# minute} other {# minutes}} behind", message: "{minutes, plural, one {# minute} other {# minutes}} behind", values: { minutes } });
 }
 
 function dayMarker(zone: string, homeZone: string, date: Date) {
@@ -40,15 +48,15 @@ function dayMarker(zone: string, homeZone: string, date: Date) {
     day: "2-digit",
   }).format(date);
   const difference = (Date.parse(`${localDay(zone)}T00:00:00Z`) - Date.parse(`${localDay(homeZone)}T00:00:00Z`)) / 86_400_000;
-  if (difference > 0) return "Tomorrow";
-  if (difference < 0) return "Yesterday";
-  return "Today";
+  if (difference > 0) return i18n._({ id: "Tomorrow", message: "Tomorrow" });
+  if (difference < 0) return i18n._({ id: "Yesterday", message: "Yesterday" });
+  return i18n._({ id: "Today", message: "Today" });
 }
 
 function localClock(place: ClockPlace, now: number, homeZone: string) {
   const date = new Date(now);
-  const time = new Intl.DateTimeFormat(undefined, { timeZone: place.zone, hour: "numeric", minute: "2-digit" }).format(date);
-  const dateText = new Intl.DateTimeFormat(undefined, { timeZone: place.zone, weekday: "long", month: "long", day: "numeric" }).format(date);
+  const time = new Intl.DateTimeFormat(activeLocale(), { timeZone: place.zone, hour: "numeric", minute: "2-digit" }).format(date);
+  const dateText = new Intl.DateTimeFormat(activeLocale(), { timeZone: place.zone, weekday: "long", month: "long", day: "numeric" }).format(date);
   const hour = Number(new Intl.DateTimeFormat("en-US", { timeZone: place.zone, hour: "numeric", hourCycle: "h23" }).format(date));
   return { time, dateText, day: dayMarker(place.zone, homeZone, date), offset: offsetText(place.zone, homeZone, date), daytime: hour >= 6 && hour < 18 };
 }
@@ -64,7 +72,7 @@ export function WorldClocksTab({ homeZone: providedZone, enabled = true }: { hom
   const homeZone = providedZone || Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
   const saved = useMemo(() => query.data ?? [], [query.data]);
   const places: ClockPlace[] = useMemo(() => [
-    { id: "home", name: "Home", country: "", zone: homeZone, position: -1, isHome: true },
+    { id: "home", name: i18n._({ id: "Home", message: "Home" }), country: "", zone: homeZone, position: -1, isHome: true },
     ...saved.map((place) => ({ ...place, isHome: false })),
   ], [homeZone, saved]);
 
@@ -108,7 +116,7 @@ export function WorldClocksTab({ homeZone: providedZone, enabled = true }: { hom
       setOpen(false);
       await refreshPlaces();
     } catch (error) {
-      setLimitMessage(error instanceof Error ? error.message : "You can save up to 12 places.");
+      setLimitMessage(error instanceof Error ? error.message : i18n._({ id: "You can save up to 12 places.", message: "You can save up to 12 places." }));
     }
   }
 
@@ -125,11 +133,11 @@ export function WorldClocksTab({ homeZone: providedZone, enabled = true }: { hom
   if (!enabled) return null;
 
   return (
-    <section aria-label="World clocks" className="py-2">
-      {query.isError ? <p role="alert">Could not load world clocks.</p> : null}
+    <section aria-label={i18n._({ id: "World clocks", message: "World clocks" })} className="py-2">
+      {query.isError ? <p role="alert">{i18n._({ id: "Could not load world clocks.", message: "Could not load world clocks." })}</p> : null}
       {places.length === 1 ? <div className="py-10 text-center">
-        <EmptyState icon="clock" text="No places yet" actionLabel="Add a world clock" onAction={() => window.dispatchEvent(new Event(CLOCK_ADD_EVENT))} />
-        <span className="text-muted-foreground">Keep your favorite places close.</span>
+        <EmptyState icon="clock" text={i18n._({ id: "No places yet", message: "No places yet" })} actionLabel={i18n._({ id: "Add a world clock", message: "Add a world clock" })} onAction={() => window.dispatchEvent(new Event(CLOCK_ADD_EVENT))} />
+        <span className="text-muted-foreground">{i18n._({ id: "Keep your favorite places close.", message: "Keep your favorite places close." })}</span>
       </div> : <ul className="m-0 list-none p-0">
         {places.map((place) => {
           const clock = localClock(place, now, homeZone);
@@ -141,12 +149,12 @@ export function WorldClocksTab({ homeZone: providedZone, enabled = true }: { hom
             </div>
             <div className="text-right">
               <time className="block text-3xl tabular-nums">{clock.time}</time>
-              <span className="text-sm text-muted-foreground">{clock.dateText} · <span aria-label={clock.daytime ? "Daytime" : "Nighttime"}>{clock.daytime ? "☀" : "☾"}</span></span>
+              <span className="text-sm text-muted-foreground">{clock.dateText} · <span aria-label={clock.daytime ? i18n._({ id: "Daytime", message: "Daytime" }) : i18n._({ id: "Nighttime", message: "Nighttime" })}>{clock.daytime ? "☀" : "☾"}</span></span>
             </div>
             {!place.isHome ? <div className="flex gap-1">
-              <Button type="button" variant="ghost" aria-label={`Move ${place.name} up`} onClick={() => void movePlace(place, -1)}>↑</Button>
-              <Button type="button" variant="ghost" aria-label={`Move ${place.name} down`} onClick={() => void movePlace(place, 1)}>↓</Button>
-              <Button type="button" variant="ghost" aria-label={`Remove ${place.name}`} onClick={() => void api.deleteWorldPlace(place.id).then(refreshPlaces)}>Remove</Button>
+              <Button type="button" variant="ghost" aria-label={i18n._({ id: "Move {name} up", message: "Move {name} up", values: { name: place.name } })} onClick={() => void movePlace(place, -1)}>↑</Button>
+              <Button type="button" variant="ghost" aria-label={i18n._({ id: "Move {name} down", message: "Move {name} down", values: { name: place.name } })} onClick={() => void movePlace(place, 1)}>↓</Button>
+              <Button type="button" variant="ghost" aria-label={i18n._({ id: "Remove {name}", message: "Remove {name}", values: { name: place.name } })} onClick={() => void api.deleteWorldPlace(place.id).then(refreshPlaces)}>{i18n._({ id: "Remove", message: "Remove" })}</Button>
             </div> : null}
           </li>;
         })}
@@ -154,12 +162,12 @@ export function WorldClocksTab({ homeZone: providedZone, enabled = true }: { hom
       <Sheet open={open} onOpenChange={setOpen}>
         <SheetContent side="right">
           <SheetHeader>
-            <SheetTitle>Add a place</SheetTitle>
-            <SheetDescription>Search offline city data for a time zone.</SheetDescription>
+            <SheetTitle>{i18n._({ id: "Add a place", message: "Add a place" })}</SheetTitle>
+            <SheetDescription>{i18n._({ id: "Search offline city data for a time zone.", message: "Search offline city data for a time zone." })}</SheetDescription>
           </SheetHeader>
           <div className="grid gap-3 px-4">
-            <Label htmlFor="world-search">City</Label>
-            <Input id="world-search" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search cities" />
+            <Label htmlFor="world-search">{i18n._({ id: "City", message: "City" })}</Label>
+            <Input id="world-search" value={search} onChange={(event) => setSearch(event.target.value)} placeholder={i18n._({ id: "Search cities", message: "Search cities" })} />
             {limitMessage ? <p role="alert">{limitMessage}</p> : null}
             <ul className="m-0 list-none p-0">
               {results.map((place) => <li key={`${place.name}-${place.zone}`}>

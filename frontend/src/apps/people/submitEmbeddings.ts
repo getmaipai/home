@@ -1,3 +1,4 @@
+import { i18n } from "@lingui/core";
 // FACE-02: the enrollment flow's submit step, pulled out of
 // FaceEnrollmentPage.tsx as its own pure function so the cancel race is
 // unit-testable without mounting the camera/ONNX flow
@@ -42,6 +43,6 @@ export async function submitEnrollment(
     // after the await settles, the only point this function can tell
     // "threw because the request was aborted" from "threw for a real reason".
     if (signal.aborted) return;
-    onResult({ status: "error", message: err instanceof Error ? err.message : "Could not save the enrollment." });
+    onResult({ status: "error", message: err instanceof Error ? err.message : i18n._({ id: "Could not save the enrollment.", message: "Could not save the enrollment." }) });
   }
 }

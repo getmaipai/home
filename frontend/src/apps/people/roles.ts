@@ -1,16 +1,18 @@
+import { i18n } from "@lingui/core";
 import type { Person } from "@maipai/spec/gen/ts/person.js";
 import { isOwnerOrAdminRole, type Role } from "@/lib/api";
 import { ROLE_REQUIRES_CREDENTIAL } from "../../../../shared/personCredentialRoles";
 
 type Accent = NonNullable<Person["accent"]>;
 
+// Getters, so each label is translated when it is read (at render), not once at import.
 export const ROLE_LABELS: Record<Role, string> = {
-  owner: "Owner",
-  admin: "Admin",
-  adult: "Adult",
-  teen: "Teen",
-  child: "Child",
-  guest: "Guest",
+  get owner() { return i18n._({ id: "Owner", message: "Owner" }); },
+  get admin() { return i18n._({ id: "Admin", message: "Admin" }); },
+  get adult() { return i18n._({ id: "Adult", message: "Adult" }); },
+  get teen() { return i18n._({ id: "Teen", message: "Teen" }); },
+  get child() { return i18n._({ id: "Child", message: "Child" }); },
+  get guest() { return i18n._({ id: "Guest", message: "Guest" }); },
 };
 
 // Mirrors backend/src/middleware/auth.ts's ROLE_LADDER and
@@ -114,12 +116,12 @@ export const ACCENT_RING_CLASS: Record<Accent, string> = {
 };
 
 export const ACCENT_LABELS: Record<Accent, string> = {
-  blue: "Blue",
-  violet: "Violet",
-  teal: "Teal",
-  orange: "Orange",
-  pink: "Pink",
-  red: "Red",
+  get blue() { return i18n._({ id: "Blue", message: "Blue" }); },
+  get violet() { return i18n._({ id: "Violet", message: "Violet" }); },
+  get teal() { return i18n._({ id: "Teal", message: "Teal" }); },
+  get orange() { return i18n._({ id: "Orange", message: "Orange" }); },
+  get pink() { return i18n._({ id: "Pink", message: "Pink" }); },
+  get red() { return i18n._({ id: "Red", message: "Red" }); },
 };
 
 /** `Select` (the primitives wrapper) refuses "" as a real option value
@@ -129,7 +131,15 @@ export const ACCENT_LABELS: Record<Accent, string> = {
  * passed to the API or the swatch maps above. */
 export const NO_ACCENT = "none" as const;
 export const ACCENT_SELECT_OPTIONS: readonly string[] = [NO_ACCENT, ...(Object.keys(ACCENT_LABELS) as Accent[])];
-export const ACCENT_SELECT_LABELS: Record<string, string> = { [NO_ACCENT]: "No accent", ...ACCENT_LABELS };
+export const ACCENT_SELECT_LABELS: Record<string, string> = {
+  get [NO_ACCENT]() { return i18n._({ id: "No accent", message: "No accent" }); },
+  get blue() { return ACCENT_LABELS.blue; },
+  get violet() { return ACCENT_LABELS.violet; },
+  get teal() { return ACCENT_LABELS.teal; },
+  get orange() { return ACCENT_LABELS.orange; },
+  get pink() { return ACCENT_LABELS.pink; },
+  get red() { return ACCENT_LABELS.red; },
+};
 
 /** Mirrors backend/src/lib/access.ts's canAccessPerson (ruling 2026-09-30): you reach your own
  * data, and an owner or admin also reaches a CHILD's, never a teen's or another adult's. */

@@ -1,3 +1,5 @@
+import { activeLocale } from "@/lib/activeLocale";
+import { i18n } from "@lingui/core";
 import type { List as ListRecord } from "@maipai/spec/gen/ts/list.js";
 
 export const LIST_ICONS = ["cart", "check", "sparkle", "briefcase", "home", "heart", "book", "star", "gift", "plane", "leaf", "sun"] as const;
@@ -11,7 +13,7 @@ export function iconFor(list: ListRecord): ListIcon {
 }
 
 export function labelFor(list: ListRecord): string {
-  if (list.kind === "shopping") return "Shopping";
+  if (list.kind === "shopping") return i18n._({ id: "Shopping", message: "Shopping" });
   if (list.kind === "todo") return "To-do";
   return list.title;
 }
@@ -21,5 +23,5 @@ export function itemCount(list: ListRecord): number {
 }
 
 export function dueLabel(value: string): string {
-  return new Intl.DateTimeFormat(undefined, { weekday: "short", hour: "numeric", minute: "2-digit" }).format(new Date(value));
+  return new Intl.DateTimeFormat(activeLocale(), { weekday: "short", hour: "numeric", minute: "2-digit" }).format(new Date(value));
 }

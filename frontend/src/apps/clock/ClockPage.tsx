@@ -1,3 +1,4 @@
+import { i18n } from "@lingui/core";
 import { useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Tabs, TabsList, TabsTrigger } from "@maipai/ui/src/ui/tabs";
@@ -11,10 +12,10 @@ import { api, type ComingUpItem } from "@/lib/api";
 
 const taglines: Record<ClockTab, string> = {
   // AUDIT-UI-01: a hint, not an empty state (each tab draws its own "No alarms" line, so the page said "no alarms" twice).
-  alarms: "Add an alarm with the plus button.",
-  timers: "Add a timer with the plus button.",
-  "world-clocks": "Add a world clock with the plus button.",
-  stopwatch: "Every moment, counted.",
+  get alarms() { return i18n._({ id: "Add an alarm with the plus button.", message: "Add an alarm with the plus button." }); },
+  get timers() { return i18n._({ id: "Add a timer with the plus button.", message: "Add a timer with the plus button." }); },
+  get "world-clocks"() { return i18n._({ id: "Add a world clock with the plus button.", message: "Add a world clock with the plus button." }); },
+  get stopwatch() { return i18n._({ id: "Every moment, counted.", message: "Every moment, counted." }); },
 };
 
 function ActiveTab({ tab, comingUp }: { tab: ClockTab; comingUp: ComingUpItem[] }) {
@@ -36,12 +37,12 @@ export function ClockPage() {
 
   const tabBar = (
     <Tabs value={tab} onValueChange={(value) => setTab(value as ClockTab)}>
-      <nav aria-label="Clock sections" className={isPhone ? undefined : "px-4 py-3"}>
+      <nav aria-label={i18n._({ id: "Clock sections", message: "Clock sections" })} className={isPhone ? undefined : "px-4 py-3"}>
         <TabsList variant={isPhone ? "bottom" : "default"} position={isPhone ? "sticky" : undefined}>
-          <TabsTrigger value="alarms" onClick={() => setTab("alarms")}>Alarms</TabsTrigger>
-          <TabsTrigger value="timers" onClick={() => setTab("timers")}>Timers</TabsTrigger>
-          <TabsTrigger value="world-clocks" onClick={() => setTab("world-clocks")}>World clocks</TabsTrigger>
-          <TabsTrigger value="stopwatch" onClick={() => setTab("stopwatch")}>Stopwatch</TabsTrigger>
+          <TabsTrigger value="alarms" onClick={() => setTab("alarms")}>{i18n._({ id: "Alarms", message: "Alarms" })}</TabsTrigger>
+          <TabsTrigger value="timers" onClick={() => setTab("timers")}>{i18n._({ id: "Timers", message: "Timers" })}</TabsTrigger>
+          <TabsTrigger value="world-clocks" onClick={() => setTab("world-clocks")}>{i18n._({ id: "World clocks", message: "World clocks" })}</TabsTrigger>
+          <TabsTrigger value="stopwatch" onClick={() => setTab("stopwatch")}>{i18n._({ id: "Stopwatch", message: "Stopwatch" })}</TabsTrigger>
         </TabsList>
       </nav>
     </Tabs>

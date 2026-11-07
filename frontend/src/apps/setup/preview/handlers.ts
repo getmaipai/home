@@ -14,6 +14,12 @@ export function handlersFor(scenario: Scenario) {
     http.get("*/api/jobs", () => HttpResponse.json(scenario.progress ? [{ id: "preview-download", kind: "model_download", state: scenario.progress.state, title: "Starter model download", progress: { completedBytes: Math.round(10_000_000_000 * scenario.progress.percent / 100), totalBytes: 10_000_000_000, bytesPerSecond: scenario.progress.bytesPerSecond, percent: scenario.progress.percent }, actions: [] }] : [])),
     http.get("*/api/setup/install", () => HttpResponse.json({ state: "idle", chatReady: false, complete: false, percent: 0, completedBytes: 0, totalBytes: 0, bytesPerSecond: null, etaSeconds: null, problem: null, items: [] })),
     http.post("*/api/setup/checks/run", () => HttpResponse.json({ rows: scenario.checks.map((row) => row.action === "allow_tailnet" && allowedTailnet ? { ...row, state: "green", text: "Allowed." } : row), state, searchCandidate: chosenSearch ? null : scenario.searchCandidate })),
+    http.post("*/api/setup/licences/accept", () => HttpResponse.json({ accepted: true })),
+    http.get("*/api/setup/host-tune", () => HttpResponse.json({ supported: true, items: [
+      { id: "lowpower", title: "Keep this computer awake", why: "Sleep pauses downloads and answers.", mode: "auto", state: "needs", current: "Can sleep", proposed: "Stays awake" },
+      { id: "charger", title: "Plug this computer in", why: "It runs slower on battery.", mode: "advice", state: "needs", current: "On battery", proposed: "Use the charger." },
+    ] })),
+    http.post("*/api/setup/host-tune/apply", async ({ request }) => { const body = await request.json() as { id?: string }; return HttpResponse.json({ item: { id: body.id ?? "lowpower", title: "Keep this computer awake", why: "Sleep pauses downloads and answers.", mode: "auto", state: "applied", current: "Can sleep", proposed: "Stays awake" } }); }),
     http.post("*/api/setup/checks/allow-tailnet", () => { allowedTailnet = true; return HttpResponse.json({ enabled: true }); }),
     http.post("*/api/setup/search/use-candidate", () => { chosenSearch = true; return HttpResponse.json({ saved: true }); }),
     http.post("*/api/setup/:step", async ({ params, request }) => {

@@ -1,3 +1,4 @@
+import { i18n } from "@lingui/core";
 import { useState, type ReactNode } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { List } from "@maipai/ui/src/primitives/List";
@@ -28,7 +29,7 @@ function downloadJson(filenameStem: string, data: unknown): void {
 }
 
 function subtitleFor(m: MemoryRecord): string {
-  return `${m.category} · ${m.scope}${m.pinned ? " · Pinned" : ""}`;
+  return `${m.category} · ${m.scope}${m.pinned ? i18n._({ id: " · Pinned", message: " · Pinned" }) : ""}`;
 }
 
 /** The row list both memory views share: a memory's text/subtitle, an
@@ -38,9 +39,9 @@ function subtitleFor(m: MemoryRecord): string {
  * and what "clear all" means for each differ), the same "kit owns the
  * bar, the page owns the wording" split BatchBar.tsx documents. */
 const AUDIENCE_LABELS: Record<"child_ok" | "teen_ok" | "adult_only", string> = {
-  child_ok: "Everyone",
-  teen_ok: "Teens and adults",
-  adult_only: "Adults only",
+  get child_ok() { return i18n._({ id: "Everyone", message: "Everyone" }); },
+  get teen_ok() { return i18n._({ id: "Teens and adults", message: "Teens and adults" }); },
+  get adult_only() { return i18n._({ id: "Adults only", message: "Adults only" }); },
 };
 
 function MemoryRows({
@@ -80,20 +81,20 @@ function MemoryRows({
     <List
       items={records}
       getKey={(m) => m.id}
-      label="Memories"
+      label={i18n._({ id: "Memories", message: "Memories" })}
       renderItem={(m) => (
         <div className="flex min-w-0 flex-1 items-center gap-3">
           {selectMode ? (
             <Checkbox
               checked={selected.has(m.id)}
               onCheckedChange={() => onToggle(m.id)}
-              aria-label={`Select ${m.text}`}
+              aria-label={i18n._({ id: "Select {text}", message: "Select {text}", values: { text: m.text } })}
               className="shrink-0"
             />
           ) : null}
           <div className="flex min-w-0 flex-col">
             <span className="truncate text-base">{m.text}</span>
-            <span className="text-sm text-muted-foreground">{subtitle(m)}{m.scope === "household" ? ` · ${m.created_by ? `Added by ${people.find((p) => p.id === m.created_by)?.display_name ?? "someone"}` : "Added before authors were kept"}` : ""}</span>
+            <span className="text-sm text-muted-foreground">{subtitle(m)}{m.scope === "household" ? ` · ${m.created_by ? i18n._({ id: "Added by {name}", message: "Added by {name}", values: { name: people.find((p) => p.id === m.created_by)?.display_name ?? i18n._({ id: "someone", message: "someone" }) } }) : i18n._({ id: "Added before authors were kept", message: "Added before authors were kept" })}` : ""}</span>
           </div>
         </div>
       )}
@@ -109,13 +110,13 @@ function MemoryRows({
                     options={["child_ok", "teen_ok", "adult_only"]}
                     getLabel={(v) => AUDIENCE_LABELS[v as "child_ok" | "teen_ok" | "adult_only"]}
                     disabled={audienceId === m.id}
-                    aria-label={`Who may hear this`}
+                    aria-label={i18n._({ id: "Who may hear this", message: "Who may hear this" })}
                   />
                 ) : null}
                 <Button
                   variant="ghost"
                   size="icon"
-                  aria-label={`Archive "${m.text}"`}
+                  aria-label={i18n._({ id: "Archive \"{text}\"", message: "Archive \"{text}\"", values: { text: m.text } })}
                   disabled={archivingId === m.id}
                   onClick={() => onArchive(m.id)}
                 >
@@ -137,7 +138,7 @@ function MemoryGroups({ records, children }: { records: MemoryRecord[]; children
   const byRobot = new Map<string, { name: string; rows: MemoryRecord[] }>();
   for (const m of records) {
     if (!m.device_id) continue;
-    const group = byRobot.get(m.device_id) ?? { name: m.device_name ?? "Robot", rows: [] };
+    const group = byRobot.get(m.device_id) ?? { name: m.device_name ?? i18n._({ id: "Robot", message: "Robot" }), rows: [] };
     group.rows.push(m);
     byRobot.set(m.device_id, group);
   }
@@ -180,7 +181,7 @@ export function OtherPersonMemories({ personId, personName }: { personId: string
       const records = await api.exportPersonMemories(personId);
       downloadJson(`${personName}-memories`, records);
     } catch (err) {
-      setActionError(errorLine(err, "Could not export those memories. Check your connection and try again."));
+      setActionError(errorLine(err, i18n._({ id: "Could not export those memories. Check your connection and try again.", message: "Could not export those memories. Check your connection and try again." })));
     } finally {
       setBusy(false);
     }
@@ -194,7 +195,7 @@ export function OtherPersonMemories({ personId, personName }: { personId: string
       setConfirmingForget(false);
       await query.refetch();
     } catch (err) {
-      setActionError(errorLine(err, "Could not forget those memories. Check your connection and try again."));
+      setActionError(errorLine(err, i18n._({ id: "Could not forget those memories. Check your connection and try again.", message: "Could not forget those memories. Check your connection and try again." })));
     } finally {
       setBusy(false);
     }
@@ -207,7 +208,7 @@ export function OtherPersonMemories({ personId, personName }: { personId: string
       await api.archiveMemory(id);
       await query.refetch();
     } catch (err) {
-      setActionError(errorLine(err, "Could not archive that memory. Check your connection and try again."));
+      setActionError(errorLine(err, i18n._({ id: "Could not archive that memory. Check your connection and try again.", message: "Could not archive that memory. Check your connection and try again." })));
     } finally {
       setArchivingId(null);
     }
@@ -218,20 +219,16 @@ export function OtherPersonMemories({ personId, personName }: { personId: string
       {actionError ? <p className="text-base text-destructive">{actionError}</p> : null}
 
       <div className="flex min-w-0 flex-col gap-2 sm:flex-row sm:flex-wrap">
-        <div className="w-full sm:w-auto"><Button size="row" variant="secondary" onClick={handleExport} disabled={busy}>
-          Export {personName}'s memories
-        </Button></div>
-        <div className="w-full sm:w-auto"><Button size="row" variant="ghost" onClick={() => setConfirmingForget(true)} disabled={busy}>
-          Forget everything about {personName}
-        </Button></div>
+        <div className="w-full sm:w-auto"><Button size="row" variant="secondary" onClick={handleExport} disabled={busy}>{i18n._({ id: "Export {personName}'s memories", message: "Export {personName}'s memories", values: { personName } })}</Button></div>
+        <div className="w-full sm:w-auto"><Button size="row" variant="ghost" onClick={() => setConfirmingForget(true)} disabled={busy}>{i18n._({ id: "Forget everything about {personName}", message: "Forget everything about {personName}", values: { personName } })}</Button></div>
       </div>
 
       {confirmingForget ? (
         <DestructiveConfirm
-          message={`Forget everything MaiPai remembers about ${personName}?`}
-          detail="This cannot be undone."
-          confirmLabel="Yes, forget everything"
-          busyLabel="Forgetting…"
+          message={i18n._({ id: "Forget everything MaiPai remembers about {personName}?", message: "Forget everything MaiPai remembers about {personName}?", values: { personName } })}
+          detail={i18n._({ id: "This cannot be undone.", message: "This cannot be undone." })}
+          confirmLabel={i18n._({ id: "Yes, forget everything", message: "Yes, forget everything" })}
+          busyLabel={i18n._({ id: "Forgetting…", message: "Forgetting…" })}
           busy={busy}
           onConfirm={handleForget}
           onCancel={() => setConfirmingForget(false)}
@@ -243,11 +240,11 @@ export function OtherPersonMemories({ personId, personName }: { personId: string
         error={query.isError}
         isFetching={query.isFetching}
         onRetry={() => query.refetch()}
-        errorMessage="Could not load those memories."
+        errorMessage={i18n._({ id: "Could not load those memories.", message: "Could not load those memories." })}
         isEmpty={(rows) => rows.length === 0}
         emptyIcon="brain"
-        emptyText={`Nothing remembered about ${personName} yet.`}
-        loadingLabel="Loading memories"
+        emptyText={i18n._({ id: "Nothing remembered about {personName} yet.", message: "Nothing remembered about {personName} yet.", values: { personName } })}
+        loadingLabel={i18n._({ id: "Loading memories", message: "Loading memories" })}
       >
         {(records) => (
           <MemoryGroups records={records}>
@@ -317,7 +314,7 @@ export function OwnMemories({ filterIds, actorIsAdult }: { filterIds: Set<string
       await api.setAudience(id, value);
       await queryClient.invalidateQueries({ queryKey: ["memory-list", ME] });
     } catch (err) {
-      setActionError(errorLine(err, "Could not change who may hear that memory. Check your connection and try again."));
+      setActionError(errorLine(err, i18n._({ id: "Could not change who may hear that memory. Check your connection and try again.", message: "Could not change who may hear that memory. Check your connection and try again." })));
     } finally {
       setAudienceId(null);
     }
@@ -338,12 +335,12 @@ export function OwnMemories({ filterIds, actorIsAdult }: { filterIds: Set<string
       // say so, or a parent is left thinking everything selected is gone.
       const refused = outcomes.filter((o) => !o.deleted);
       if (refused.length > 0) {
-        setActionError(`${refused.length} of ${ids.length} could not be forgotten: ${refused[0]?.reason ?? "not allowed"}`);
+        setActionError(i18n._({ id: "{count} of {total} could not be forgotten: {reason}", message: "{count} of {total} could not be forgotten: {reason}", values: { count: refused.length, total: ids.length, reason: refused[0]?.reason ?? i18n._({ id: "not allowed", message: "not allowed" }) } }));
       }
       leaveSelectMode();
       await queryClient.invalidateQueries({ queryKey: ["memory-list", ME] });
     } catch (err) {
-      setActionError(errorLine(err, "Could not forget those memories. Check your connection and try again."));
+      setActionError(errorLine(err, i18n._({ id: "Could not forget those memories. Check your connection and try again.", message: "Could not forget those memories. Check your connection and try again." })));
     } finally {
       setBusy(false);
     }
@@ -356,7 +353,7 @@ export function OwnMemories({ filterIds, actorIsAdult }: { filterIds: Set<string
       await api.archiveMemory(id);
       await queryClient.invalidateQueries({ queryKey: ["memory-list", ME] });
     } catch (err) {
-      setActionError(errorLine(err, "Could not archive that memory. Check your connection and try again."));
+      setActionError(errorLine(err, i18n._({ id: "Could not archive that memory. Check your connection and try again.", message: "Could not archive that memory. Check your connection and try again." })));
     } finally {
       setArchivingId(null);
     }
@@ -371,15 +368,15 @@ export function OwnMemories({ filterIds, actorIsAdult }: { filterIds: Set<string
           {selectMode.active ? (
             <BatchBar count={selectMode.count} onExit={leaveSelectMode}>
               <Button variant="destructive" disabled={selectMode.count === 0} onClick={() => setConfirmingForget("batch")}>
-                Forget selected
+                {i18n._({ id: "Forget selected", message: "Forget selected" })}
               </Button>
             </BatchBar>
           ) : (
-            <SelectModeToggle label="Select memories" onClick={selectMode.enter} />
+            <SelectModeToggle label={i18n._({ id: "Select memories", message: "Select memories" })} onClick={selectMode.enter} />
           )}
           {!selectMode.active ? (
             <Button size="row" variant="ghost" disabled={all.length === 0} onClick={() => setConfirmingForget("clear")}>
-              Clear all
+              {i18n._({ id: "Clear all", message: "Clear all" })}
             </Button>
           ) : null}
         </div>
@@ -387,25 +384,25 @@ export function OwnMemories({ filterIds, actorIsAdult }: { filterIds: Set<string
 
       {confirmingForget === "batch" ? (
         <DestructiveConfirm
-          message={`Forget ${selectMode.count} ${selectMode.count === 1 ? "memory" : "memories"}? This cannot be undone.`}
-          confirmLabel={`Yes, forget ${selectMode.count}`}
-          busyLabel="Forgetting…"
+          message={i18n._({ id: "{count, plural, one {Forget # memory? This cannot be undone.} other {Forget # memories? This cannot be undone.}}", message: "{count, plural, one {Forget # memory? This cannot be undone.} other {Forget # memories? This cannot be undone.}}", values: { count: selectMode.count } })}
+          confirmLabel={i18n._({ id: "Yes, forget {count}", message: "Yes, forget {count}", values: { count: selectMode.count } })}
+          busyLabel={i18n._({ id: "Forgetting…", message: "Forgetting…" })}
           busy={busy}
           onConfirm={() => forgetIds([...selectMode.selected])}
           onCancel={() => setConfirmingForget(null)}
-          cancelLabel="Keep them"
+          cancelLabel={i18n._({ id: "Keep them", message: "Keep them" })}
         />
       ) : null}
 
       {confirmingForget === "clear" ? (
         <DestructiveConfirm
-          message={`Forget every one of your ${all.length} ${all.length === 1 ? "memory" : "memories"}? This cannot be undone.`}
-          confirmLabel="Yes, forget all"
-          busyLabel="Forgetting…"
+          message={i18n._({ id: "{count, plural, one {Forget your memory? This cannot be undone.} other {Forget every one of your # memories? This cannot be undone.}}", message: "{count, plural, one {Forget your memory? This cannot be undone.} other {Forget every one of your # memories? This cannot be undone.}}", values: { count: all.length } })}
+          confirmLabel={i18n._({ id: "Yes, forget all", message: "Yes, forget all" })}
+          busyLabel={i18n._({ id: "Forgetting…", message: "Forgetting…" })}
           busy={busy}
           onConfirm={() => forgetIds(all.map((m) => m.id))}
           onCancel={() => setConfirmingForget(null)}
-          cancelLabel="Keep them"
+          cancelLabel={i18n._({ id: "Keep them", message: "Keep them" })}
         />
       ) : null}
 
@@ -414,11 +411,11 @@ export function OwnMemories({ filterIds, actorIsAdult }: { filterIds: Set<string
         error={query.isError}
         isFetching={query.isFetching}
         onRetry={() => query.refetch()}
-        errorMessage="Could not load your memories."
+        errorMessage={i18n._({ id: "Could not load your memories.", message: "Could not load your memories." })}
         isEmpty={() => records.length === 0}
         emptyIcon="brain"
-        emptyText="Nothing remembered yet."
-        loadingLabel="Loading memories"
+        emptyText={i18n._({ id: "Nothing remembered yet.", message: "Nothing remembered yet." })}
+        loadingLabel={i18n._({ id: "Loading memories", message: "Loading memories" })}
       >
         {() => (
           <MemoryGroups records={records}>

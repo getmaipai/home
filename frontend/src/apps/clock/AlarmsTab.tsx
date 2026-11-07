@@ -1,3 +1,5 @@
+import { activeLocale } from "@/lib/activeLocale";
+import { i18n } from "@lingui/core";
 import { useEffect, useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useBreakpoint } from "@maipai/ui/src/hooks/useBreakpoint";
@@ -17,14 +19,14 @@ function untilText(at: string, now: number) {
   const minutes = Math.max(0, Math.floor((Date.parse(at) - now) / 60_000));
   const hours = Math.floor(minutes / 60);
   const remainder = minutes % 60;
-  return hours ? `${hours} h ${remainder} min` : `${remainder} min`;
+  return hours ? i18n._({ id: "{hours} h {remainder} min", message: "{hours} h {remainder} min", values: { hours, remainder } }) : i18n._({ id: "{remainder} min", message: "{remainder} min", values: { remainder } });
 }
 
 function nextLabel(at: string, now: number) {
   const date = new Date(at);
-  const day = new Intl.DateTimeFormat(undefined, { weekday: "short" }).format(date);
-  const time = new Intl.DateTimeFormat(undefined, { hour: "numeric", minute: "2-digit" }).format(date);
-  return `Next: ${day} ${time}, in ${untilText(at, now)}`;
+  const day = new Intl.DateTimeFormat(activeLocale(), { weekday: "short" }).format(date);
+  const time = new Intl.DateTimeFormat(activeLocale(), { hour: "numeric", minute: "2-digit" }).format(date);
+  return i18n._({ id: "Next: {day} {time}, in {untilText}", message: "Next: {day} {time}, in {untilText}", values: { day, time, untilText: untilText(at, now) } });
 }
 
 export function AlarmsTab() {
@@ -64,12 +66,12 @@ export function AlarmsTab() {
   }
 
   return (
-    <section aria-label="Alarms">
-      {query.isError ? <div role="alert" className="py-4 text-destructive"><p>Could not load the clock. Check your connection and try again.</p><Button variant="outline" onClick={() => void query.refetch()}>Retry</Button></div> : null}
-      {alarmQuery.isError ? <div role="alert" className="py-4 text-destructive"><p>Could not load alarms. Check your connection and try again.</p><Button variant="outline" onClick={() => void alarmQuery.refetch()}>Retry</Button></div> : null}
+    <section aria-label={i18n._({ id: "Alarms", message: "Alarms" })}>
+      {query.isError ? <div role="alert" className="py-4 text-destructive"><p>{i18n._({ id: "Could not load the clock. Check your connection and try again.", message: "Could not load the clock. Check your connection and try again." })}</p><Button variant="outline" onClick={() => void query.refetch()}>{i18n._({ id: "Retry", message: "Retry" })}</Button></div> : null}
+      {alarmQuery.isError ? <div role="alert" className="py-4 text-destructive"><p>{i18n._({ id: "Could not load alarms. Check your connection and try again.", message: "Could not load alarms. Check your connection and try again." })}</p><Button variant="outline" onClick={() => void alarmQuery.refetch()}>{i18n._({ id: "Retry", message: "Retry" })}</Button></div> : null}
       {nextAlarmAt ? <p className="m-0 py-4 text-sm text-muted-foreground">{nextLabel(nextAlarmAt, now)}</p> : null}
       {records.length === 0 && alarms.length === 0 && !query.isLoading && !alarmQuery.isLoading && !query.isError && !alarmQuery.isError
-        ? <p className="py-4 text-muted-foreground">No alarms</p>
+        ? <p className="py-4 text-muted-foreground">{i18n._({ id: "No alarms", message: "No alarms" })}</p>
         : null}
       <ul className="m-0 list-none p-0">
         {records.map((alarm) => <AlarmRecordRow

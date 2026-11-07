@@ -1,3 +1,4 @@
+import { i18n } from "@lingui/core";
 import { useState, type FormEvent } from "react";
 import { Button } from "@maipai/ui/src/ui/button";
 import { Input } from "@maipai/ui/src/ui/input";
@@ -27,17 +28,17 @@ export function CreateListSheet({ open, onOpenChange, onCreate, isPhone }: {
 
   return <><Sheet open={open} onOpenChange={onOpenChange}>
     <SheetContent side={isPhone ? "bottom" : "right"}>
-      <SheetHeader><SheetTitle>Create a list</SheetTitle><SheetDescription>Give your list a name and an icon.</SheetDescription></SheetHeader>
+      <SheetHeader><SheetTitle>{i18n._({ id: "Create a list", message: "Create a list" })}</SheetTitle><SheetDescription>{i18n._({ id: "Give your list a name and an icon.", message: "Give your list a name and an icon." })}</SheetDescription></SheetHeader>
       <form className="grid gap-4 p-4" onSubmit={(event) => void submit(event)}>
-        <div className="grid gap-2"><Label htmlFor="new-list-name">Name</Label><Input id="new-list-name" value={name} onChange={(event) => setName(event.target.value)} /></div>
+        <div className="grid gap-2"><Label htmlFor="new-list-name">{i18n._({ id: "Name", message: "Name" })}</Label><Input id="new-list-name" value={name} onChange={(event) => setName(event.target.value)} /></div>
         <fieldset className="grid grid-cols-4 gap-2">
-          <legend className="mb-2">Icon</legend>
+          <legend className="mb-2">{i18n._({ id: "Icon", message: "Icon" })}</legend>
           {LIST_ICONS.map((name) => {
             const Icon = getIcon(name === "cart" ? "box" : name === "sparkle" ? "sparkles" : name);
             return <Toggle key={name} pressed={icon === name} aria-label={name} onPressedChange={(pressed) => { if (pressed) setIcon(name); }}><Icon aria-hidden /></Toggle>;
           })}
         </fieldset>
-        <Button type="submit" disabled={!name.trim()}>Create list</Button>
+        <Button type="submit" disabled={!name.trim()}>{i18n._({ id: "Create list", message: "Create list" })}</Button>
       </form>
     </SheetContent>
   </Sheet></>;

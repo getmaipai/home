@@ -1,3 +1,4 @@
+import { i18n } from "@lingui/core";
 import type { ReactNode } from "react";
 import { getIcon } from "@maipai/ui/src/icons";
 import { Card } from "@maipai/ui/src/dashboard/components/ui/card";
@@ -27,7 +28,7 @@ export function CheckGrid<T extends CheckGridRow>({ rows, split, renderAction }:
         <div className="flex flex-col items-center gap-2 px-3 text-center">
           <Icon aria-hidden className={`size-8 ${tone}`} />
           <span className="text-base font-medium md:text-lg">{row.title}</span>
-          <span className="sr-only">{row.state === "green" ? "Ready" : row.state === "amber" ? "Worth a look" : "Needs fixing"}</span>
+          <span className="sr-only">{row.state === "green" ? i18n._({ id: "Ready", message: "Ready" }) : row.state === "amber" ? i18n._({ id: "Worth a look", message: "Worth a look" }) : i18n._({ id: "Needs fixing", message: "Needs fixing" })}</span>
           {row.state !== "green" ? <p className="text-sm text-muted-foreground md:text-base">{row.text}</p> : null}
           {renderAction?.(row)}
         </div>
@@ -42,5 +43,5 @@ export function CheckGrid<T extends CheckGridRow>({ rows, split, renderAction }:
   ) : null;
   const ai = shown.filter((row) => AI_SERVER.has(row.id));
   const home = shown.filter((row) => !AI_SERVER.has(row.id));
-  return <div className="flex flex-col gap-5">{section("Home computer", home)}{section("AI server", ai)}</div>;
+  return <div className="flex flex-col gap-5">{section(i18n._({ id: "Home computer", message: "Home computer" }), home)}{section(i18n._({ id: "AI server", message: "AI server" }), ai)}</div>;
 }

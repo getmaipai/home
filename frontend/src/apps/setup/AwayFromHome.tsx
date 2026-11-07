@@ -1,3 +1,4 @@
+import { i18n } from "@lingui/core";
 import { useEffect, useRef, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { Alert, AlertDescription, AlertTitle } from "@maipai/ui/src/dashboard/components/ui/alert";
@@ -8,12 +9,12 @@ import { QrCode } from "@maipai/ui/src/ui/qr-code";
 import { api, type SignedInPerson, type TailscaleStatus } from "@/lib/api";
 import { errorLine } from "@/lib/hubReachability";
 
-const STEPS: WizardStep[] = [
-  { id: "device", title: "Install and sign in" },
-  { id: "secure", title: "Turn on secure addresses" },
-  { id: "phone", title: "Scan the code" },
+const steps = (): WizardStep[] => [
+  { id: "device", title: i18n._({ id: "Install and sign in", message: "Install and sign in" }) },
+  { id: "secure", title: i18n._({ id: "Turn on secure addresses", message: "Turn on secure addresses" }) },
+  { id: "phone", title: i18n._({ id: "Scan the code", message: "Scan the code" }) },
 ];
-type StepId = (typeof STEPS)[number]["id"];
+type StepId = "device" | "secure" | "phone";
 type RouteState = { from?: string };
 
 function firstUnfinishedStep(status: TailscaleStatus): StepId {
@@ -47,7 +48,7 @@ export function AwayFromHome({ operator }: { operator: SignedInPerson | null }) 
       setStatus(next);
       setError(null);
     }).catch((reason) => {
-      if (active) setError(`${errorLine(reason, "Home couldn't check Tailscale.")} Check your connection and try again.`);
+      if (active) setError(i18n._({ id: "{errorLine} Check your connection and try again.", message: "{errorLine} Check your connection and try again.", values: { errorLine: errorLine(reason, "Home couldn't check Tailscale.") } }));
     }).finally(() => { pollPending.current = false; });
     };
     poll();
@@ -65,25 +66,25 @@ export function AwayFromHome({ operator }: { operator: SignedInPerson | null }) 
   if (!isOwnerOrAdmin(operator)) {
     return (
       <main>
-        <h1>Set up away access</h1>
+        <h1>{i18n._({ id: "Set up away access", message: "Set up away access" })}</h1>
         {operator ? (
           <>
-            <p>Only the owner or an admin can set up away access.</p>
-            <p>Ask one of them to finish this setup for your Home.</p>
+            <p>{i18n._({ id: "Only the owner or an admin can set up away access.", message: "Only the owner or an admin can set up away access." })}</p>
+            <p>{i18n._({ id: "Ask one of them to finish this setup for your Home.", message: "Ask one of them to finish this setup for your Home." })}</p>
           </>
         ) : (
           <>
-            <p>Sign in to MaiPai Home to continue.</p>
-            <p>Only the owner or an admin can set up away access.</p>
+            <p>{i18n._({ id: "Sign in to MaiPai Home to continue.", message: "Sign in to MaiPai Home to continue." })}</p>
+            <p>{i18n._({ id: "Only the owner or an admin can set up away access.", message: "Only the owner or an admin can set up away access." })}</p>
           </>
         )}
-        <Button asChild variant="link"><Link to="/">Go to Home</Link></Button>
+        <Button asChild variant="link"><Link to="/">{i18n._({ id: "Go to Home", message: "Go to Home" })}</Link></Button>
       </main>
     );
   }
 
   const currentStepId = stepOverride ?? (status ? firstUnfinishedStep(status) : "device");
-  const currentIndex = STEPS.findIndex((step) => step.id === currentStepId);
+  const currentIndex = steps().findIndex((step) => step.id === currentStepId);
   const readyForHomeAccess = Boolean(status?.installed && status.signedIn && status.httpsEnabled);
   const address = enabledAddress?.url ?? status?.url;
   const qrPayload = enabledAddress?.qrPayload ?? address;
@@ -97,16 +98,16 @@ export function AwayFromHome({ operator }: { operator: SignedInPerson | null }) 
       setStatus((current) => current ? { ...current, enabled: true, url: result.url } : current);
       setStepOverride("phone");
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : "Home couldn't turn on away access. Try again.");
+      setError(reason instanceof Error ? reason.message : i18n._({ id: "Home couldn't turn on away access. Try again.", message: "Home couldn't turn on away access. Try again." }));
     } finally {
       setBusy(false);
     }
   }
 
   const descriptions: Record<StepId, string> = {
-    device: "Tailscale lets your family reach Home from their other devices when they are away.",
-    secure: "Turn on Tailscale's secure DNS addresses, then connect this Home to your tailnet.",
-    phone: "Install Tailscale on your phone, sign in to the same account, then scan this code.",
+    device: i18n._({ id: "Tailscale lets your family reach Home from their other devices when they are away.", message: "Tailscale lets your family reach Home from their other devices when they are away." }),
+    secure: i18n._({ id: "Turn on Tailscale's secure DNS addresses, then connect this Home to your tailnet.", message: "Turn on Tailscale's secure DNS addresses, then connect this Home to your tailnet." }),
+    phone: i18n._({ id: "Install Tailscale on your phone, sign in to the same account, then scan this code.", message: "Install Tailscale on your phone, sign in to the same account, then scan this code." }),
   };
 
   let body;
@@ -115,18 +116,18 @@ export function AwayFromHome({ operator }: { operator: SignedInPerson | null }) 
       <FieldGroup>
         <Field orientation="horizontal">
           <FieldContent>
-            <FieldTitle>Install Tailscale on this computer</FieldTitle>
-            <FieldDescription>{status?.installed ? "Ready" : "Install the Tailscale app to continue."}</FieldDescription>
+            <FieldTitle>{i18n._({ id: "Install Tailscale on this computer", message: "Install Tailscale on this computer" })}</FieldTitle>
+            <FieldDescription>{status?.installed ? i18n._({ id: "Ready", message: "Ready" }) : i18n._({ id: "Install the Tailscale app to continue.", message: "Install the Tailscale app to continue." })}</FieldDescription>
           </FieldContent>
-          {!status?.installed ? <Button asChild variant="outline"><a href="https://tailscale.com/download" target="_blank" rel="noreferrer">Get Tailscale</a></Button> : null}
+          {!status?.installed ? <Button asChild variant="outline"><a href="https://tailscale.com/download" target="_blank" rel="noreferrer">{i18n._({ id: "Get Tailscale", message: "Get Tailscale" })}</a></Button> : null}
         </Field>
         <Field orientation="horizontal">
           <FieldContent>
-            <FieldTitle>Sign in to Tailscale</FieldTitle>
-            <FieldDescription>{status?.signedIn ? "Ready" : "Use the account your family's phones and tablets will use."}</FieldDescription>
+            <FieldTitle>{i18n._({ id: "Sign in to Tailscale", message: "Sign in to Tailscale" })}</FieldTitle>
+            <FieldDescription>{status?.signedIn ? i18n._({ id: "Ready", message: "Ready" }) : i18n._({ id: "Use the account your family's phones and tablets will use.", message: "Use the account your family's phones and tablets will use." })}</FieldDescription>
           </FieldContent>
         </Field>
-        {status && status.installed && !status.signedIn ? <Alert><AlertTitle>Waiting for sign-in</AlertTitle><AlertDescription>Open Tailscale on this computer and sign in. Home will check again automatically.</AlertDescription></Alert> : null}
+        {status && status.installed && !status.signedIn ? <Alert><AlertTitle>{i18n._({ id: "Waiting for sign-in", message: "Waiting for sign-in" })}</AlertTitle><AlertDescription>{i18n._({ id: "Open Tailscale on this computer and sign in. Home will check again automatically.", message: "Open Tailscale on this computer and sign in. Home will check again automatically." })}</AlertDescription></Alert> : null}
       </FieldGroup>
     );
   } else if (currentStepId === "secure") {
@@ -134,45 +135,45 @@ export function AwayFromHome({ operator }: { operator: SignedInPerson | null }) 
       <FieldGroup>
         <Field orientation="horizontal">
           <FieldContent>
-            <FieldTitle>Secure DNS addresses</FieldTitle>
-            <FieldDescription>{status?.httpsEnabled ? "Ready" : "Turn on HTTPS certificates in Tailscale's DNS settings."}</FieldDescription>
+            <FieldTitle>{i18n._({ id: "Secure DNS addresses", message: "Secure DNS addresses" })}</FieldTitle>
+            <FieldDescription>{status?.httpsEnabled ? i18n._({ id: "Ready", message: "Ready" }) : i18n._({ id: "Turn on HTTPS certificates in Tailscale's DNS settings.", message: "Turn on HTTPS certificates in Tailscale's DNS settings." })}</FieldDescription>
           </FieldContent>
-          {!status?.httpsEnabled ? <Button asChild variant="outline"><a href="https://login.tailscale.com/admin/dns" target="_blank" rel="noreferrer">Open DNS settings</a></Button> : null}
+          {!status?.httpsEnabled ? <Button asChild variant="outline"><a href="https://login.tailscale.com/admin/dns" target="_blank" rel="noreferrer">{i18n._({ id: "Open DNS settings", message: "Open DNS settings" })}</a></Button> : null}
         </Field>
         <Alert>
-          <AlertTitle>About your address</AlertTitle>
-          <AlertDescription>Turning this on publishes this computer's Tailscale name in public certificate logs. Choose a plain computer name, not a family name. This setup uses Tailscale DNS and HTTPS certificates; Headscale is not supported.</AlertDescription>
+          <AlertTitle>{i18n._({ id: "About your address", message: "About your address" })}</AlertTitle>
+          <AlertDescription>{i18n._({ id: "Turning this on publishes this computer's Tailscale name in public certificate logs. Choose a plain computer name, not a family name. This setup uses Tailscale DNS and HTTPS certificates; Headscale is not supported.", message: "Turning this on publishes this computer's Tailscale name in public certificate logs. Choose a plain computer name, not a family name. This setup uses Tailscale DNS and HTTPS certificates; Headscale is not supported." })}</AlertDescription>
         </Alert>
-        {readyForHomeAccess && !status?.enabled ? <p>Home is ready to turn on its secure address.</p> : null}
+        {readyForHomeAccess && !status?.enabled ? <p>{i18n._({ id: "Home is ready to turn on its secure address.", message: "Home is ready to turn on its secure address." })}</p> : null}
       </FieldGroup>
     );
   } else {
     body = address && qrPayload ? (
       <FieldGroup>
         <Field>
-          <FieldTitle>Your Home address</FieldTitle>
+          <FieldTitle>{i18n._({ id: "Your Home address", message: "Your Home address" })}</FieldTitle>
           <FieldDescription><a href={address}>{address}</a></FieldDescription>
         </Field>
-        <QrCode value={qrPayload} size={192} label="QR code for your Home address away from home" />
+        <QrCode value={qrPayload} size={192} label={i18n._({ id: "QR code for your Home address away from home", message: "QR code for your Home address away from home" })} />
       </FieldGroup>
     ) : (
-      <Alert variant="destructive"><AlertTitle>Home address unavailable</AlertTitle><AlertDescription>Home could not find its secure address. Refresh the status and try again.</AlertDescription></Alert>
+      <Alert variant="destructive"><AlertTitle>{i18n._({ id: "Home address unavailable", message: "Home address unavailable" })}</AlertTitle><AlertDescription>{i18n._({ id: "Home could not find its secure address. Refresh the status and try again.", message: "Home could not find its secure address. Refresh the status and try again." })}</AlertDescription></Alert>
     );
   }
 
   return (
     <Wizard
-      steps={STEPS}
+      steps={steps()}
       currentStepId={currentStepId}
       completedCount={currentIndex}
       onJumpTo={(id) => setStepOverride(id as StepId)}
       layout="default"
-      heading={currentStepId === "device" ? "Install Tailscale and sign in" : currentStepId === "secure" ? "Turn on secure addresses" : "Scan the code on your phone"}
+      heading={currentStepId === "device" ? i18n._({ id: "Install Tailscale and sign in", message: "Install Tailscale and sign in" }) : currentStepId === "secure" ? i18n._({ id: "Turn on secure addresses", message: "Turn on secure addresses" }) : i18n._({ id: "Scan the code on your phone", message: "Scan the code on your phone" })}
       description={descriptions[currentStepId]}
-      progress={{ current: currentIndex + 1, total: STEPS.length }}
+      progress={{ current: currentIndex + 1, total: steps().length }}
       stickyFooter
-      banner={<Button type="button" variant="ghost" onClick={close}>Close</Button>}
-      onBack={currentIndex > 0 ? () => setStepOverride(STEPS[currentIndex - 1]!.id) : undefined}
+      banner={<Button type="button" variant="ghost" onClick={close}>{i18n._({ id: "Close", message: "Close" })}</Button>}
+      onBack={currentIndex > 0 ? () => setStepOverride(steps()[currentIndex - 1]!.id as StepId) : undefined}
       onNext={() => {
         if (currentStepId === "device") setStepOverride("secure");
         else if (currentStepId === "secure") {
@@ -181,12 +182,12 @@ export function AwayFromHome({ operator }: { operator: SignedInPerson | null }) 
         }
         else close();
       }}
-      nextLabel={currentStepId === "secure" && !status?.enabled ? "Turn on away access" : currentStepId === "phone" ? "Done" : "Continue"}
+      nextLabel={currentStepId === "secure" && !status?.enabled ? i18n._({ id: "Turn on away access", message: "Turn on away access" }) : currentStepId === "phone" ? i18n._({ id: "Done", message: "Done" }) : i18n._({ id: "Continue", message: "Continue" })}
       nextDisabled={currentStepId === "device" ? !status?.installed || !status.signedIn : currentStepId === "secure" ? !readyForHomeAccess : !address}
       busy={busy || status === null}
     >
       {body}
-      {error ? <Alert variant="destructive"><AlertTitle>Could not check or update Tailscale</AlertTitle><AlertDescription>{error}</AlertDescription></Alert> : null}
+      {error ? <Alert variant="destructive"><AlertTitle>{i18n._({ id: "Could not check or update Tailscale", message: "Could not check or update Tailscale" })}</AlertTitle><AlertDescription>{error}</AlertDescription></Alert> : null}
     </Wizard>
   );
 }

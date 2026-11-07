@@ -1,3 +1,4 @@
+import { i18n } from "@lingui/core";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode, type RefObject } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
@@ -61,8 +62,14 @@ const RING_CLASS: Record<CaptureRing, string> = {
   none: "border-border",
 };
 
-function capitalize(value: string): string {
-  return value.charAt(0).toUpperCase() + value.slice(1);
+function poseTitle(pose: Pose): string {
+  switch (pose) {
+    case "frontal": return i18n._({ id: "Frontal", message: "Frontal" });
+    case "left": return i18n._({ id: "Left", message: "Left" });
+    case "right": return i18n._({ id: "Right", message: "Right" });
+    case "up": return i18n._({ id: "Up", message: "Up" });
+    case "down": return i18n._({ id: "Down", message: "Down" });
+  }
 }
 
 function CenteredPage({ children }: { children: ReactNode }) {
@@ -84,7 +91,7 @@ function CenteredMessage({
   title,
   body,
   backTo,
-  backLabel = "Back",
+  backLabel = i18n._({ id: "Back", message: "Back" }),
   onRetry,
 }: {
   title: string;
@@ -100,7 +107,7 @@ function CenteredMessage({
       <div className="flex gap-2">
         {onRetry ? (
           <Button type="button" variant="outline" onClick={onRetry}>
-            Try again
+            {i18n._({ id: "Try again", message: "Try again" })}
           </Button>
         ) : null}
         <Button asChild variant="ghost">
@@ -232,17 +239,17 @@ export function FaceEnrollmentPage({ operator }: { operator: Roster }) {
   });
 
   if (!id) {
-    return <CenteredMessage title="No one to enroll" body="That link is missing a person to enroll." backTo="/people" backLabel="Back to Family" />;
+    return <CenteredMessage title={i18n._({ id: "No one to enroll", message: "No one to enroll" })} body={i18n._({ id: "That link is missing a person to enroll.", message: "That link is missing a person to enroll." })} backTo="/people" backLabel={i18n._({ id: "Back to Family", message: "Back to Family" })} />;
   }
   if (viewingSelf) {
     return <FaceEnrollmentGate operator={operator} target={operator} />;
   }
-  if (rosterQuery.isLoading) return <CenteredSpinner label="Loading profile…" />;
+  if (rosterQuery.isLoading) return <CenteredSpinner label={i18n._({ id: "Loading profile…", message: "Loading profile…" })} />;
   if (rosterQuery.isError) {
     return (
       <CenteredMessage
-        title="Could not load the household"
-        body="Try again, or go back and start from their profile."
+        title={i18n._({ id: "Could not load the household", message: "Could not load the household" })}
+        body={i18n._({ id: "Try again, or go back and start from their profile.", message: "Try again, or go back and start from their profile." })}
         backTo={`/people/${id}`}
         onRetry={() => rosterQuery.refetch()}
       />
@@ -250,7 +257,7 @@ export function FaceEnrollmentPage({ operator }: { operator: Roster }) {
   }
   const target = rosterQuery.data?.find((person) => person.id === id);
   if (!target) {
-    return <CenteredMessage title="No one in this household has that profile" body="" backTo="/people" backLabel="Back to Family" />;
+    return <CenteredMessage title={i18n._({ id: "No one in this household has that profile", message: "No one in this household has that profile" })} body="" backTo="/people" backLabel={i18n._({ id: "Back to Family", message: "Back to Family" })} />;
   }
   return <FaceEnrollmentGate operator={operator} target={target} />;
 }
@@ -260,15 +267,15 @@ function FaceEnrollmentGate({ operator, target }: { operator: Roster; target: Pr
   if (!canEnrollFace(operator, target)) {
     const body =
       target.role === "child" && operator.id === target.id
-        ? "A child can't enroll themself for face recognition. Ask an owner or admin to run this for you."
-        : `Only an owner or admin can enroll ${target.display_name} for face recognition.`;
-    return <CenteredMessage title="Not allowed" body={body} backTo={`/people/${target.id}`} />;
+        ? i18n._({ id: "A child can't enroll themself for face recognition. Ask an owner or admin to run this for you.", message: "A child can't enroll themself for face recognition. Ask an owner or admin to run this for you." })
+        : i18n._({ id: "Only an owner or admin can enroll {display_name} for face recognition.", message: "Only an owner or admin can enroll {display_name} for face recognition.", values: { display_name: target.display_name } });
+    return <CenteredMessage title={i18n._({ id: "Not allowed", message: "Not allowed" })} body={body} backTo={`/people/${target.id}`} />;
   }
   return <FaceEnrollmentFlow operator={operator} target={target} onDone={() => navigate(`/people/${target.id}`)} />;
 }
 
 function FaceEnrollmentFlow({ operator, target, onDone }: { operator: Roster; target: ProfileEntry; onDone: () => void }) {
-  useTabItem("Enroll person");
+  useTabItem(i18n._({ id: "Enroll person", message: "Enroll person" }));
 
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -592,7 +599,7 @@ function FaceEnrollmentFlow({ operator, target, onDone }: { operator: Roster; ta
   }
 
   const steps: WizardStep[] = useMemo(
-    () => [...POSES.map((pose) => ({ id: pose, title: capitalize(pose) })), { id: "done", title: "Done" }],
+    () => [...POSES.map((pose) => ({ id: pose, title: poseTitle(pose) })), { id: "done", title: i18n._({ id: "Done", message: "Done" }) }],
     [],
   );
 
@@ -620,8 +627,8 @@ function FaceEnrollmentFlow({ operator, target, onDone }: { operator: Roster; ta
       onJumpTo={() => {}}
       onNext={doneAndSaved ? onDone : () => {}}
       nextDisabled={!doneAndSaved}
-      nextLabel={doneAndSaved ? "Back to profile" : currentStepId === "done" ? "Saving…" : "Advances automatically"}
-      skipLabel={doneAndSaved ? undefined : "Cancel enrollment"}
+      nextLabel={doneAndSaved ? i18n._({ id: "Back to profile", message: "Back to profile" }) : currentStepId === "done" ? i18n._({ id: "Saving…", message: "Saving…" }) : i18n._({ id: "Advances automatically", message: "Advances automatically" })}
+      skipLabel={doneAndSaved ? undefined : i18n._({ id: "Cancel enrollment", message: "Cancel enrollment" })}
       onSkip={doneAndSaved ? undefined : cancelEnrollment}
     >
       {currentStepId === "done" ? (
@@ -666,20 +673,20 @@ function CaptureContent({
 }) {
   const status =
     cameraState === "denied"
-      ? { icon: "camera" as const, title: "Camera access is off", body: "MaiPai needs your camera to guide face enrollment. Turn on camera access for this site in your browser's settings, then try again.", onAction: onRetryCamera }
+      ? { icon: "camera" as const, title: i18n._({ id: "Camera access is off", message: "Camera access is off" }), body: i18n._({ id: "MaiPai needs your camera to guide face enrollment. Turn on camera access for this site in your browser's settings, then try again.", message: "MaiPai needs your camera to guide face enrollment. Turn on camera access for this site in your browser's settings, then try again." }), onAction: onRetryCamera }
       : cameraState === "unavailable"
-        ? { icon: "camera" as const, title: "No camera found", body: "Plug in a camera, or try this from a device that has one.", onAction: onRetryCamera }
+        ? { icon: "camera" as const, title: i18n._({ id: "No camera found", message: "No camera found" }), body: i18n._({ id: "Plug in a camera, or try this from a device that has one.", message: "Plug in a camera, or try this from a device that has one." }), onAction: onRetryCamera }
         : cameraState === "error"
-          ? { icon: "alert-triangle" as const, title: "Could not start the camera", body: "Something went wrong opening the camera. Try again.", onAction: onRetryCamera }
+          ? { icon: "alert-triangle" as const, title: i18n._({ id: "Could not start the camera", message: "Could not start the camera" }), body: i18n._({ id: "Something went wrong opening the camera. Try again.", message: "Something went wrong opening the camera. Try again." }), onAction: onRetryCamera }
           : modelsState === "error"
-            ? { icon: "alert-triangle" as const, title: "Could not load the face models", body: "MaiPai couldn't get what it needs for face recognition. Check the connection and try again.", onAction: onRetryModels }
+            ? { icon: "alert-triangle" as const, title: i18n._({ id: "Could not load the face models", message: "Could not load the face models" }), body: i18n._({ id: "MaiPai couldn't get what it needs for face recognition. Check the connection and try again.", message: "MaiPai couldn't get what it needs for face recognition. Check the connection and try again." }), onAction: onRetryModels }
             : null;
   if (status) {
     return (
       <div className="mx-auto w-full max-w-md">
         <Card>
           <CardContent>
-            <StatusBody icon={status.icon} title={status.title} body={status.body} actionLabel="Try again" onAction={status.onAction} />
+            <StatusBody icon={status.icon} title={status.title} body={status.body} actionLabel={i18n._({ id: "Try again", message: "Try again" })} onAction={status.onAction} />
           </CardContent>
         </Card>
       </div>
@@ -714,7 +721,7 @@ function CaptureContent({
         ) : null}
         {settingUp ? (
           <div className="absolute inset-0 flex items-center justify-center bg-black/60">
-            <Progress mode="spinner" label="Getting the camera and face models ready…" />
+            <Progress mode="spinner" label={i18n._({ id: "Getting the camera and face models ready…", message: "Getting the camera and face models ready…" })} />
           </div>
         ) : null}
       </div>
@@ -729,7 +736,7 @@ function CaptureContent({
         </>
       ) : null}
       <div className="w-full">
-        <Progress mode="determinate" value={coveragePct} label="Enrollment progress" />
+        <Progress mode="determinate" value={coveragePct} label={i18n._({ id: "Enrollment progress", message: "Enrollment progress" })} />
       </div>
     </div>
   );
@@ -751,7 +758,7 @@ function CompletionContent({
   if (total === 0 || pending) {
     return (
       <div className="flex flex-col items-center gap-3 py-8">
-        <Progress mode="spinner" label={`Saving ${total || "your"} face sample${total === 1 ? "" : "s"}…`} />
+        <Progress mode="spinner" label={total ? i18n._({ id: "{count, plural, one {Saving # face sample…} other {Saving # face samples…}}", message: "{count, plural, one {Saving # face sample…} other {Saving # face samples…}}", values: { count: total } }) : i18n._({ id: "Saving your face samples…", message: "Saving your face samples…" })} />
       </div>
     );
   }
@@ -761,20 +768,18 @@ function CompletionContent({
     return (
       <div className="flex flex-col items-center gap-3 py-8 text-center">
         <CheckIcon className="h-10 w-10 text-primary" aria-hidden />
-        <p className="text-lg font-medium">
-          {total} face sample{total === 1 ? "" : "s"} saved.
-        </p>
-        <p className="text-base text-muted-foreground">{target.display_name} is now enrolled for face recognition.</p>
+        <p className="text-lg font-medium">{i18n._({ id: "{count, plural, one {# face sample saved.} other {# face samples saved.}}", message: "{count, plural, one {# face sample saved.} other {# face samples saved.}}", values: { count: total } })}</p>
+        <p className="text-base text-muted-foreground">{i18n._({ id: "{display_name} is now enrolled for face recognition.", message: "{display_name} is now enrolled for face recognition.", values: { display_name: target.display_name } })}</p>
       </div>
     );
   }
 
   return (
     <div className="flex flex-col items-center gap-3 py-8 text-center">
-      <p className="text-lg font-medium">The face samples could not be saved.</p>
-      <p className="text-base text-destructive">Nothing was changed: any earlier enrollment is still in place.</p>
+      <p className="text-lg font-medium">{i18n._({ id: "The face samples could not be saved.", message: "The face samples could not be saved." })}</p>
+      <p className="text-base text-destructive">{i18n._({ id: "Nothing was changed: any earlier enrollment is still in place.", message: "Nothing was changed: any earlier enrollment is still in place." })}</p>
       <Button type="button" variant="outline" onClick={onRetryFailed}>
-        Try saving again
+        {i18n._({ id: "Try saving again", message: "Try saving again" })}
       </Button>
     </div>
   );

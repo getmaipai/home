@@ -1,3 +1,4 @@
+import { i18n } from "@lingui/core";
 import { useEffect, useState } from "react";
 import { Alert, AlertDescription } from "@maipai/ui/src/ui/alert";
 import { Button } from "@maipai/ui/src/ui/button";
@@ -22,25 +23,25 @@ export function SetupPreviewBar({ currentScreen, onJump }: { currentScreen: numb
     const scenario = scenarioList.find((item) => item.id === id);
     if (scenario) window.__setupPreviewWorker?.use(...handlersFor(scenario));
   };
-  return <aside aria-label="Setup preview controls">
-    <Alert><AlertDescription>Preview. Nothing is downloaded, installed or saved.</AlertDescription></Alert>
+  return <aside aria-label={i18n._({ id: "Setup preview controls", message: "Setup preview controls" })}>
+    <Alert><AlertDescription>{i18n._({ id: "Preview. Nothing is downloaded, installed or saved.", message: "Preview. Nothing is downloaded, installed or saved." })}</AlertDescription></Alert>
     <div className="flex flex-wrap items-center gap-3">
-      <div className="flex items-center gap-2"><Label htmlFor="setup-preview-scenario">Scenario</Label>
+      <div className="flex items-center gap-2"><Label htmlFor="setup-preview-scenario">{i18n._({ id: "Scenario", message: "Scenario" })}</Label>
       <Select value={selectedScenario} onValueChange={choose}>
         <SelectTrigger id="setup-preview-scenario"><SelectValue /></SelectTrigger>
         <SelectContent>{scenarioList.map((scenario) => <SelectItem key={scenario.id} value={scenario.id}>{scenario.label}</SelectItem>)}</SelectContent>
       </Select></div>
-      <div className="flex items-center gap-2"><Label htmlFor="setup-preview-screen">Jump to screen</Label>
+      <div className="flex items-center gap-2"><Label htmlFor="setup-preview-screen">{i18n._({ id: "Jump to screen", message: "Jump to screen" })}</Label>
       <Select value={String(currentScreen)} onValueChange={(value) => onJump(Number(value) - 1)}>
-        <SelectTrigger id="setup-preview-screen"><SelectValue placeholder="Jump to screen" /></SelectTrigger>
+        <SelectTrigger id="setup-preview-screen"><SelectValue placeholder={i18n._({ id: "Jump to screen", message: "Jump to screen" })} /></SelectTrigger>
         <SelectContent>{Array.from({ length: 10 }, (_, index) => <SelectItem key={index + 1} value={String(index + 1)}>{index + 1}</SelectItem>)}</SelectContent>
       </Select></div>
-      <div className="flex items-center gap-2"><Label>Speed</Label>
+      <div className="flex items-center gap-2"><Label>{i18n._({ id: "Speed", message: "Speed" })}</Label>
       <ToggleGroup type="single" value={speed} onValueChange={(value) => { if (value) { setSpeed(value); window.__setupPreviewWorker?.use(...handlersFor({ ...scenarioList.find((item) => item.id === selectedScenario)!, progress: scenarioList.find((item) => item.id === selectedScenario)?.progress ? { ...scenarioList.find((item) => item.id === selectedScenario)!.progress!, bytesPerSecond: 6_250_000 * Number(value) } : undefined })); } }}>
         {["1", "10", "60"].map((value) => <ToggleGroupItem key={value} value={value}>{value}x</ToggleGroupItem>)}
       </ToggleGroup></div>
-      <div className="flex items-center gap-2"><Button type="button" variant="outline" onClick={() => window.location.reload()}>Restart</Button>
-      {currentScreen === 6 ? <Button type="button" variant={pretendTailnetDone ? "secondary" : "outline"} onClick={() => setPretendTailnetDone(true)}>Pretend the next Tailscale step is done</Button> : null}
+      <div className="flex items-center gap-2"><Button type="button" variant="outline" onClick={() => window.location.reload()}>{i18n._({ id: "Restart", message: "Restart" })}</Button>
+      {currentScreen === 6 ? <Button type="button" variant={pretendTailnetDone ? "secondary" : "outline"} onClick={() => setPretendTailnetDone(true)}>{i18n._({ id: "Pretend the next Tailscale step is done", message: "Pretend the next Tailscale step is done" })}</Button> : null}
       </div>
     </div>
   </aside>;

@@ -1,3 +1,5 @@
+import { activeLocale } from "@/lib/activeLocale";
+import { i18n } from "@lingui/core";
 import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Page } from "@maipai/ui/src/primitives/Page";
@@ -21,7 +23,7 @@ export const NotificationsIcon = getIcon("bell");
 const THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000;
 
 function whenText(iso: string): string {
-  return new Date(iso).toLocaleString();
+  return new Date(iso).toLocaleString(activeLocale());
 }
 
 // "The thirty-day history page" (session E step 5). GET /api/notifications
@@ -75,7 +77,7 @@ export function NotificationsPage() {
       await api.dismissNotification(id);
       await invalidate();
     } catch (err) {
-      setActionError(errorLine(err, "Could not dismiss that notification."));
+      setActionError(errorLine(err, i18n._({ id: "Could not dismiss that notification.", message: "Could not dismiss that notification." })));
     } finally {
       setBusy(false);
     }
@@ -87,12 +89,12 @@ export function NotificationsPage() {
     try {
       const result = await api.dismissNotifications({ ids });
       if (result.count < ids.length) {
-        setActionError(`${result.count} of ${ids.length} could be cleared - the rest were already gone.`);
+        setActionError(i18n._({ id: "{count} of {total} could be cleared - the rest were already gone.", message: "{count} of {total} could be cleared - the rest were already gone.", values: { count: result.count, total: ids.length } }));
       }
       selectMode.exit();
       await invalidate();
     } catch (err) {
-      setActionError(errorLine(err, "Could not clear those notifications."));
+      setActionError(errorLine(err, i18n._({ id: "Could not clear those notifications.", message: "Could not clear those notifications." })));
       // A review caught this catch block leaving the on-screen list
       // unrefetched on a failed call, unlike every other path here -
       // the list can silently drift from server state (a partial
@@ -105,7 +107,7 @@ export function NotificationsPage() {
   }
 
   return (
-    <Page title="Notifications" hideTitle>
+    <Page title={i18n._({ id: "Notifications", message: "Notifications" })} hideTitle>
       {/* eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex -- a keyboard-scrollable region, not a widget (DetailPane.tsx's own precedent). */}
       <div tabIndex={0} className={cn("flex flex-1 flex-col gap-4 overflow-y-auto p-4", FOCUS_RING)}>
         {actionError ? <p className="text-base text-destructive">{actionError}</p> : null}
@@ -115,8 +117,8 @@ export function NotificationsPage() {
           error={query.isError}
           isFetching={query.isFetching}
           onRetry={() => query.refetch()}
-          errorMessage="Could not load your notification history."
-          loadingLabel="Loading notifications"
+          errorMessage={i18n._({ id: "Could not load your notification history.", message: "Could not load your notification history." })}
+          loadingLabel={i18n._({ id: "Loading notifications", message: "Loading notifications" })}
         >
           {() => {
             // Re-derived from the CURRENT pendingIds every render instead
@@ -127,12 +129,12 @@ export function NotificationsPage() {
             const selectedPending = [...selectMode.selected];
             const allPendingSelected = pendingIds.length > 0 && selectMode.count === pendingIds.length;
             if (recent.length === 0) {
-              return <EmptyState icon="bell" text="Nothing in the last 30 days." />;
+              return <EmptyState icon="bell" text={i18n._({ id: "Nothing in the last 30 days.", message: "Nothing in the last 30 days." })} />;
             }
             return (
               <>
                 <div className="flex flex-wrap items-center justify-between gap-2">
-                  <h2 className="text-sm font-medium text-muted-foreground">Last 30 days</h2>
+                  <h2 className="text-sm font-medium text-muted-foreground">{i18n._({ id: "Last 30 days", message: "Last 30 days" })}</h2>
                   {selectMode.active ? (
                     // Never gated on pending.length - a review caught
                     // the earlier `selectMode && pending.length > 0`
@@ -145,15 +147,15 @@ export function NotificationsPage() {
                     // whether anything is left to act on.
                     <BatchBar count={selectedPending.length} onExit={selectMode.exit}>
                       <Button variant="ghost" disabled={selectedPending.length === 0 || busy} onClick={() => dismissMany(selectedPending)}>
-                        Dismiss selected
+                        {i18n._({ id: "Dismiss selected", message: "Dismiss selected" })}
                       </Button>
                     </BatchBar>
                   ) : (
                     <div className="flex items-center gap-2">
-                      {pending.length > 0 ? <SelectModeToggle label="Select" onClick={selectMode.enter} /> : null}
+                      {pending.length > 0 ? <SelectModeToggle label={i18n._({ id: "Select", message: "Select" })} onClick={selectMode.enter} /> : null}
                       {pending.length > 0 ? (
                         <Button variant="ghost" onClick={() => dismissMany(pendingIds)} disabled={busy}>
-                          Clear all
+                          {i18n._({ id: "Clear all", message: "Clear all" })}
                         </Button>
                       ) : null}
                     </div>
@@ -164,34 +166,34 @@ export function NotificationsPage() {
                     <Checkbox
                       checked={allPendingSelected ? true : selectedPending.length > 0 ? "indeterminate" : false}
                       onCheckedChange={() => (allPendingSelected ? selectMode.clear() : selectMode.selectAll())}
-                      aria-label="Select all"
+                      aria-label={i18n._({ id: "Select all", message: "Select all" })}
                       id="notifications-select-all"
                     />
-                    <label htmlFor="notifications-select-all">Select all</label>
+                    <label htmlFor="notifications-select-all">{i18n._({ id: "Select all", message: "Select all" })}</label>
                   </div>
                 ) : null}
                 <List
                   items={recent}
                   getKey={(n) => n.id}
-                  label="Notification history"
+                  label={i18n._({ id: "Notification history", message: "Notification history" })}
                   renderItem={(n) => (
                     <div className="flex min-w-0 flex-1 items-start gap-3 py-1">
                       {selectMode.active && !n.dismissedAt ? (
                         <Checkbox
                           checked={selectMode.isSelected(n.id)}
                           onCheckedChange={() => selectMode.toggle(n.id)}
-                          aria-label={`Select ${n.text}`}
+                          aria-label={i18n._({ id: "Select {text}", message: "Select {text}", values: { text: n.text } })}
                           className="shrink-0"
                         />
                       ) : null}
                       <div className="flex min-w-0 flex-1 flex-col gap-1">
                         <div className="flex items-center gap-2">
                           {n.dismissedAt ? (
-                            <Badge variant="secondary">Dismissed</Badge>
+                            <Badge variant="secondary">{i18n._({ id: "Dismissed", message: "Dismissed" })}</Badge>
                           ) : n.readAt ? (
-                            <Badge variant="outline">Read</Badge>
+                            <Badge variant="outline">{i18n._({ id: "Read", message: "Read" })}</Badge>
                           ) : (
-                            <Badge>New</Badge>
+                            <Badge>{i18n._({ id: "New", message: "New" })}</Badge>
                           )}
                           <span className="text-base">{n.text}</span>
                         </div>
@@ -206,11 +208,11 @@ export function NotificationsPage() {
                           n.dismissedAt ? null : (
                             <Button
                               variant="ghost"
-                              aria-label={`Dismiss ${n.text}`}
+                              aria-label={i18n._({ id: "Dismiss {text}", message: "Dismiss {text}", values: { text: n.text } })}
                               onClick={() => handleDismiss(n.id)}
                               disabled={busy}
                             >
-                              Dismiss
+                              {i18n._({ id: "Dismiss", message: "Dismiss" })}
                             </Button>
                           )
                   }

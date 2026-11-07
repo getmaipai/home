@@ -1,3 +1,4 @@
+import { i18n } from "@lingui/core";
 import { useEffect, useMemo, useState } from "react";
 import { getIcon } from "@maipai/ui/src/icons";
 import { Alert, AlertDescription } from "@maipai/ui/src/ui/alert";
@@ -39,7 +40,7 @@ export interface PlanStepProps {
 
 /** Page B: say what this computer can run, ask for graphics memory only when
  * it cannot be read, then start the downloads and go on at once. */
-export function PlanStep({ onInstalled, onReady, readPlan = api.setupPlan, start = api.setupInstall, readInstall = api.setupInstallStatus, retryEngine = api.setupEngineInstall, actionLabel = "Install and continue" }: PlanStepProps) {
+export function PlanStep({ onInstalled, onReady, readPlan = api.setupPlan, start = api.setupInstall, readInstall = api.setupInstallStatus, retryEngine = api.setupEngineInstall, actionLabel = i18n._({ id: "Install and continue", message: "Install and continue" }) }: PlanStepProps) {
   const [vram, setVram] = useState<number | undefined>();
   const [read, setRead] = useState<PlanRead | null>(null);
   const wording = read?.wording ?? null;
@@ -112,19 +113,19 @@ export function PlanStep({ onInstalled, onReady, readPlan = api.setupPlan, start
     try {
       const result = await (disk ? start(vram, [...selected], owed.map((licence) => licence.id), settingsFor(jobs, picks)) : start(vram));
       const models = typeof result === "object" && result !== null && "models" in result && typeof result.models === "number" ? result.models : null;
-      setNotice(models === 0 ? "Nothing to download: everything you ticked is already installed." : "Download started. Watch it in the bar at the top of this page; you can keep using Home while it finishes.");
+      setNotice(models === 0 ? i18n._({ id: "Nothing to download: everything you ticked is already installed.", message: "Nothing to download: everything you ticked is already installed." }) : i18n._({ id: "Download started. Watch it in the bar at the top of this page; you can keep using Home while it finishes.", message: "Download started. Watch it in the bar at the top of this page; you can keep using Home while it finishes." }));
       onInstalled();
     }
     catch (reason) {
       const next = reason instanceof ApiError ? reason.next : undefined;
-      setError(reason instanceof Error ? [reason.message, next].filter(Boolean).join(" ") : "Home couldn't start the download. Press Install again.");
+      setError(reason instanceof Error ? [reason.message, next].filter(Boolean).join(" ") : i18n._({ id: "Home couldn't start the download. Press Install again.", message: "Home couldn't start the download. Press Install again." }));
     } finally { setBusy(false); }
   }
 
-  if (failed && engine?.state === "installing_engine") return <><Card><CardContent><p>Home is setting up the AI engine on this computer. Now: {engine.stageLabel ?? "starting"}. This page continues by itself when it is ready.</p></CardContent></Card></>;
-  if (failed && engine?.state === "engine_failed") return <><Card><CardContent><Alert variant="destructive"><ErrorIcon /><AlertDescription>{engine.problem ?? "Setting up the AI engine stopped."}</AlertDescription></Alert><Button type="button" variant="secondary" onClick={() => { void retryEngine().catch(() => {}).then(() => setAttempt((n) => n + 1)); }}>Try again</Button></CardContent></Card></>;
-  if (failed) return <><Card><CardContent><Alert variant="destructive"><ErrorIcon /><AlertDescription>Home couldn't reach the AI engine to build a plan. Wait a minute, then press Check again.</AlertDescription></Alert><Button type="button" variant="secondary" onClick={() => setAttempt((n) => n + 1)}>Check again</Button></CardContent></Card></>;
-  if (!wording) return <><Card><CardContent><p>Looking at this computer…</p></CardContent></Card></>;
+  if (failed && engine?.state === "installing_engine") return <><Card><CardContent><p>{i18n._({ id: "Home is setting up the AI engine on this computer. Now: {stage}. This page continues by itself when it is ready.", message: "Home is setting up the AI engine on this computer. Now: {stage}. This page continues by itself when it is ready.", values: { stage: engine.stageLabel ?? i18n._({ id: "starting", message: "starting" }) } })}</p></CardContent></Card></>;
+  if (failed && engine?.state === "engine_failed") return <><Card><CardContent><Alert variant="destructive"><ErrorIcon /><AlertDescription>{engine.problem ?? i18n._({ id: "Setting up the AI engine stopped.", message: "Setting up the AI engine stopped." })}</AlertDescription></Alert><Button type="button" variant="secondary" onClick={() => { void retryEngine().catch(() => {}).then(() => setAttempt((n) => n + 1)); }}>{i18n._({ id: "Try again", message: "Try again" })}</Button></CardContent></Card></>;
+  if (failed) return <><Card><CardContent><Alert variant="destructive"><ErrorIcon /><AlertDescription>{i18n._({ id: "Home couldn't reach the AI engine to build a plan. Wait a minute, then press Check again.", message: "Home couldn't reach the AI engine to build a plan. Wait a minute, then press Check again." })}</AlertDescription></Alert><Button type="button" variant="secondary" onClick={() => setAttempt((n) => n + 1)}>{i18n._({ id: "Check again", message: "Check again" })}</Button></CardContent></Card></>;
+  if (!wording) return <><Card><CardContent><p>{i18n._({ id: "Looking at this computer…", message: "Looking at this computer…" })}</p></CardContent></Card></>;
 
   return (
     <>
@@ -133,15 +134,15 @@ export function PlanStep({ onInstalled, onReady, readPlan = api.setupPlan, start
         <h3 className="text-lg font-semibold">{wording.headline}</h3>
         <p className="text-muted-foreground">{wording.detail}</p>
         {wording.needsMemoryAnswer ? (
-          <RadioGroup value={vram ? String(vram) : ""} onValueChange={(value) => setVram(Number(value))} aria-label="Total graphics memory">
+          <RadioGroup value={vram ? String(vram) : ""} onValueChange={(value) => setVram(Number(value))} aria-label={i18n._({ id: "Total graphics memory", message: "Total graphics memory" })}>
             {VRAM_CHOICES.map((gb) => (
-              <Field key={gb} orientation="horizontal"><RadioGroupItem value={String(gb)} id={`vram-${gb}`} /><FieldContent><FieldLabel htmlFor={`vram-${gb}`}>{gb} GB</FieldLabel></FieldContent></Field>
+              <Field key={gb} orientation="horizontal"><RadioGroupItem value={String(gb)} id={`vram-${gb}`} /><FieldContent><FieldLabel htmlFor={`vram-${gb}`}>{i18n._({ id: "{gb} GB", message: "{gb} GB", values: { gb } })}</FieldLabel></FieldContent></Field>
             ))}
           </RadioGroup>
         ) : null}
         {wording.gets.length ? <ul className="list-disc space-y-1 pl-5">{wording.gets.map((line) => <li key={line}>{line}</li>)}</ul> : null}
         {disk ? <>
-          {jobs.length > 0 ? <ItemGroup variant="card" role="group" aria-label="What gets installed">{jobs.map((job) => jobItem(job, picks, (pick) => setPicks((current) => ({ ...current, [job.job]: pick })), disk.source === "stack", cannotRun.has(job.job) && !job.required ? (cannotWhy[job.job] ?? "This computer can't run this, so nothing is downloaded for it.") : null))}</ItemGroup> : null}
+          {jobs.length > 0 ? <ItemGroup variant="card" role="group" aria-label={i18n._({ id: "What gets installed", message: "What gets installed" })}>{jobs.map((job) => jobItem(job, picks, (pick) => setPicks((current) => ({ ...current, [job.job]: pick })), disk.source === "stack", cannotRun.has(job.job) && !job.required ? (cannotWhy[job.job] ?? i18n._({ id: "This computer can't run this, so nothing is downloaded for it.", message: "This computer can't run this, so nothing is downloaded for it." })) : null))}</ItemGroup> : null}
           <PlanDiskSummary disk={disk} selected={selected} />
         </> : (
           <>
@@ -152,21 +153,21 @@ export function PlanStep({ onInstalled, onReady, readPlan = api.setupPlan, start
         {owed.map((licence) => (
           <Alert key={licence.id} data-testid="plan-licence">
             <AlertDescription>
-              <span className="block font-medium">Before it downloads: the maker's licence ({licence.name})</span>
+              <span className="block font-medium">{i18n._({ id: "Before it downloads: the maker's licence ({name})", message: "Before it downloads: the maker's licence ({name})", values: { name: licence.name } })}</span>
               <ul className="list-disc space-y-1 pl-5">{licence.summary.map((line) => <li key={line}>{line}</li>)}</ul>
-              <span className="block break-all">The full licence: {licence.url}</span>
-              <Field orientation="horizontal"><Checkbox id={`licence-${licence.id}`} checked={accepted.has(licence.id)} onCheckedChange={(value) => setAccepted((current) => { const next = new Set(current); if (value === true) next.add(licence.id); else next.delete(licence.id); return next; })} /><FieldContent><FieldLabel htmlFor={`licence-${licence.id}`}>I have read it and I accept it</FieldLabel></FieldContent></Field>
-              <span className="block text-muted-foreground">Not for you? Choose the Standard level, or turn Videos off, above and nothing of it downloads.</span>
+              <span className="block break-all">{i18n._({ id: "The full licence: {url}", message: "The full licence: {url}", values: { url: licence.url } })}</span>
+              <Field orientation="horizontal"><Checkbox id={`licence-${licence.id}`} checked={accepted.has(licence.id)} onCheckedChange={(value) => setAccepted((current) => { const next = new Set(current); if (value === true) next.add(licence.id); else next.delete(licence.id); return next; })} /><FieldContent><FieldLabel htmlFor={`licence-${licence.id}`}>{i18n._({ id: "I have read it and I accept it", message: "I have read it and I accept it" })}</FieldLabel></FieldContent></Field>
+              <span className="block text-muted-foreground">{i18n._({ id: "Not for you? Choose the Standard level, or turn Videos off, above and nothing of it downloads.", message: "Not for you? Choose the Standard level, or turn Videos off, above and nothing of it downloads." })}</span>
             </AlertDescription>
           </Alert>
         ))}
         {known.map((licence) => (
-          <p key={licence.id} className="text-muted-foreground" data-testid="plan-licence-info">{licence.name} comes with this part. You accepted its licence at the start; the terms are in Models and storage.</p>
+          <p key={licence.id} className="text-muted-foreground" data-testid="plan-licence-info">{i18n._({ id: "{name} comes with this part. You accepted its licence at the start; the terms are in Models and storage.", message: "{name} comes with this part. You accepted its licence at the start; the terms are in Models and storage.", values: { name: licence.name } })}</p>
         ))}
         {error ? <Alert variant="destructive"><ErrorIcon /><AlertDescription>{error}</AlertDescription></Alert> : null}
-        {canRecheck ? <Button type="button" variant="secondary" onClick={() => { setRead(null); setAttempt((n) => n + 1); }}>Check again</Button> : null}
+        {canRecheck ? <Button type="button" variant="secondary" onClick={() => { setRead(null); setAttempt((n) => n + 1); }}>{i18n._({ id: "Check again", message: "Check again" })}</Button> : null}
         {canInstall ? <Button type="button" size="lg" disabled={busy || unaccepted} onClick={() => void install()}>{actionLabel}</Button> : null}
-        {canInstall && unaccepted ? <p className="text-muted-foreground" data-testid="plan-accept-hint">The button is waiting for you to accept the maker's licence above. Accept it, or untick that row, to go on.</p> : null}
+        {canInstall && unaccepted ? <p className="text-muted-foreground" data-testid="plan-accept-hint">{i18n._({ id: "The button is waiting for you to accept the maker's licence above. Accept it, or untick that row, to go on.", message: "The button is waiting for you to accept the maker's licence above. Accept it, or untick that row, to go on." })}</p> : null}
         {notice ? <p role="status">{notice}</p> : null}
         </div>
       </CardContent>
@@ -181,7 +182,7 @@ function jobItem(job: SetupJob, picks: Picks, onPick: (pick: { on: boolean; choi
   const pick = picks[job.job];
   const chosen = job.options.find((option) => option.id === pick?.choiceId) ?? job.options[0]!;
   const on = pick?.on ?? false;
-  const size = (option: SetupJob["options"][number]) => (missingOnly && option.state === "installed" ? "Installed" : sizeGb(option.installedBytes));
+  const size = (option: SetupJob["options"][number]) => (missingOnly && option.state === "installed" ? i18n._({ id: "Installed", message: "Installed" }) : sizeGb(option.installedBytes));
   return (
     <Item key={job.job} data-testid={`plan-job-${job.job}`}>
       <ItemMedia variant="icon"><Icon /></ItemMedia>
@@ -189,7 +190,7 @@ function jobItem(job: SetupJob, picks: Picks, onPick: (pick: { on: boolean; choi
         <ItemTitle>{job.title}</ItemTitle>
         <ItemDescription clamp={false}>{cannot ? cannot : on ? `${chosen.label}. ${chosen.description}` : job.summary}</ItemDescription>
         {job.options.length > 1 && on ? (
-          <RadioGroup value={chosen.id} onValueChange={(value) => onPick({ on: true, choiceId: value })} aria-label={`${job.title}: which one`}>
+          <RadioGroup value={chosen.id} onValueChange={(value) => onPick({ on: true, choiceId: value })} aria-label={i18n._({ id: "{title}: which one", message: "{title}: which one", values: { title: job.title } })}>
             {job.options.map((option) => (
               <Field key={option.id} orientation="horizontal"><RadioGroupItem value={option.id} id={`choice-${option.id}`} disabled={option.blockedReason !== null && option.state !== "installed"} /><FieldContent><FieldLabel htmlFor={`choice-${option.id}`}>{option.label}</FieldLabel><FieldDescription>{option.blockedReason ?? `${option.description} ${size(option)}.`}</FieldDescription></FieldContent></Field>
             ))}
@@ -198,7 +199,7 @@ function jobItem(job: SetupJob, picks: Picks, onPick: (pick: { on: boolean; choi
       </ItemContent>
       <ItemActions>
         {on ? <span className="text-base text-muted-foreground">{size(chosen)}</span> : null}
-        <Switch checked={on} disabled={job.required || cannot !== null} onCheckedChange={(next) => onPick({ on: next, choiceId: chosen.id })} aria-label={`${job.title}: ${on ? "on" : "off"}`} />
+        <Switch checked={on} disabled={job.required || cannot !== null} onCheckedChange={(next) => onPick({ on: next, choiceId: chosen.id })} aria-label={`${job.title}: ${on ? i18n._({ id: "on", message: "on" }) : i18n._({ id: "off", message: "off" })}`} />
       </ItemActions>
     </Item>
   );

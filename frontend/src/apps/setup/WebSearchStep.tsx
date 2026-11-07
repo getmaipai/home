@@ -1,3 +1,4 @@
+import { i18n } from "@lingui/core";
 import { useEffect, useRef, type MutableRefObject } from "react";
 import { getIcon } from "@maipai/ui/src/icons";
 import { Alert, AlertDescription } from "@maipai/ui/src/ui/alert";
@@ -11,7 +12,7 @@ import { useSearchAddress, webSearchFailure } from "@/apps/settings/useSearchAdd
 
 const ErrorIcon = getIcon("alert-triangle");
 
-const SKIP_FAILED = "Home couldn't turn on DuckDuckGo search. Press Skip for now again to go on, or set up web search later in Settings.";
+const skipFailedCopy = () => i18n._({ id: "Home couldn't turn on DuckDuckGo search. Press Skip for now again to go on, or set up web search later in Settings.", message: "Home couldn't turn on DuckDuckGo search. Press Skip for now again to go on, or set up web search later in Settings." });
 
 
 export interface WebSearchStepProps {
@@ -48,7 +49,7 @@ export function WebSearchStep({ candidate = null, onFinished, continueRef, test 
     if (skipFailed.current) { onFinished(); return; }
     setBusy("skip"); setError(null);
     try { await skip(); onFinished(); }
-    catch { skipFailed.current = true; setError(SKIP_FAILED); setBusy(null); }
+    catch { skipFailed.current = true; setError(skipFailedCopy()); setBusy(null); }
   }
   useEffect(() => {
     if (!continueRef) return;
@@ -60,19 +61,19 @@ export function WebSearchStep({ candidate = null, onFinished, continueRef, test 
 
   return (
     <div className="flex flex-col gap-4">
-      <p className="text-base text-muted-foreground md:text-lg">SearXNG is a search service you run yourself. It searches many sites at once and keeps no record of who asked.</p>
+      <p className="text-base text-muted-foreground md:text-lg">{i18n._({ id: "SearXNG is a search service you run yourself. It searches many sites at once and keeps no record of who asked.", message: "SearXNG is a search service you run yourself. It searches many sites at once and keeps no record of who asked." })}</p>
       <Field>
-        <FieldLabel htmlFor="searxng-address">SearXNG address{candidate && address === candidate ? " (found on this computer)" : ""}</FieldLabel>
-        <Input id="searxng-address" type="url" inputMode="url" autoComplete="off" placeholder="http://searx.local:8888" value={address} onChange={(event) => type(event.target.value)} />
+        <FieldLabel htmlFor="searxng-address">{candidate && address === candidate ? i18n._({ id: "SearXNG address (found on this computer)", message: "SearXNG address (found on this computer)" }) : i18n._({ id: "SearXNG address", message: "SearXNG address" })}</FieldLabel>
+        <Input id="searxng-address" type="url" inputMode="url" autoComplete="off" placeholder={i18n._({ id: "http://searx.local:8888", message: "http://searx.local:8888" })} value={address} onChange={(event) => type(event.target.value)} />
       </Field>
       {error ? <Alert variant="destructive"><ErrorIcon /><AlertDescription>{error}</AlertDescription></Alert> : null}
       {result && !changedAfterTest ? <Alert variant={SEARCH_RESULT_VARIANT[result.level]} role="status" data-level={result.level}><SearchResultIcon level={result.level} /><AlertDescription><SearchTestResultBody result={result} /></AlertDescription></Alert> : null}
-      {changedAfterTest ? <p role="status" className="text-base text-muted-foreground md:text-lg">You changed the address. Test it again, or clear it to skip.</p> : null}
-      {!result && !empty && !error ? <p className="text-base text-muted-foreground md:text-lg">Press Test to check this address. Continue turns on once it works.</p> : null}
+      {changedAfterTest ? <p role="status" className="text-base text-muted-foreground md:text-lg">{i18n._({ id: "You changed the address. Test it again, or clear it to skip.", message: "You changed the address. Test it again, or clear it to skip." })}</p> : null}
+      {!result && !empty && !error ? <p className="text-base text-muted-foreground md:text-lg">{i18n._({ id: "Press Test to check this address. Continue turns on once it works.", message: "Press Test to check this address. Continue turns on once it works." })}</p> : null}
       <div className="flex flex-wrap gap-2">
-        <Button type="button" variant="secondary" size="lg" disabled={empty || busy !== null} onClick={() => void runTest()}>{result && !changedAfterTest ? (result.canUse ? "Test again" : "Try again") : "Test"}</Button>
+        <Button type="button" variant="secondary" size="lg" disabled={empty || busy !== null} onClick={() => void runTest()}>{result && !changedAfterTest ? (result.canUse ? i18n._({ id: "Test again", message: "Test again" }) : i18n._({ id: "Try again", message: "Try again" })) : i18n._({ id: "Test", message: "Test" })}</Button>
       </div>
-      <p className="text-base text-muted-foreground md:text-lg">To skip SearXNG, leave the address empty and press Continue. That turns on DuckDuckGo search for adults. Until SearXNG is set up, teens and children use the Library only. You can allow DuckDuckGo for them in Settings, Web search.</p>
+      <p className="text-base text-muted-foreground md:text-lg">{i18n._({ id: "To skip SearXNG, leave the address empty and press Continue. That turns on DuckDuckGo search for adults. Until SearXNG is set up, teens and children use the Library only. You can allow DuckDuckGo for them in Settings, Web search.", message: "To skip SearXNG, leave the address empty and press Continue. That turns on DuckDuckGo search for adults. Until SearXNG is set up, teens and children use the Library only. You can allow DuckDuckGo for them in Settings, Web search." })}</p>
     </div>
   );
 }

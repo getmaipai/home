@@ -1,3 +1,4 @@
+import { i18n } from "@lingui/core";
 import { useEffect, useState } from "react";
 import { getIcon } from "@maipai/ui/src/icons";
 import { Alert, AlertDescription } from "@maipai/ui/src/ui/alert";
@@ -36,7 +37,7 @@ export function SetupReviewPage() {
       setEngine(current); setOriginalEngine(current); setRows(values.checks);
     }, (reason) => {
       if (reason instanceof ApiError && reason.status === 403) navigate("/", { replace: true });
-      else setError("Home couldn't load these setup choices. Refresh this page and try again.");
+      else setError(i18n._({ id: "Home couldn't load these setup choices. Refresh this page and try again.", message: "Home couldn't load these setup choices. Refresh this page and try again." }));
     });
   }, [navigate]);
 
@@ -46,21 +47,21 @@ export function SetupReviewPage() {
       if (engine !== originalEngine) await api.setSetting("household", "engines.stack.where", engine);
       navigate("/repairs", { replace: true });
     } catch (reason) {
-      setError(errorLine(reason, "Home couldn't save this choice. Check the engine link in Home settings, then try again."));
+      setError(errorLine(reason, i18n._({ id: "Home couldn't save this choice. Check the engine link in Home settings, then try again.", message: "Home couldn't save this choice. Check the engine link in Home settings, then try again." })));
     } finally { setBusy(false); }
   }
 
   return <div>
     <Card>
-      <CardHeader><CardTitle>Setup review</CardTitle></CardHeader>
+      <CardHeader><CardTitle>{i18n._({ id: "Setup review", message: "Setup review" })}</CardTitle></CardHeader>
       <CardContent>
-        <p>Review your computers, files, checks, and plan.</p>
+        <p>{i18n._({ id: "Review your computers, files, checks, and plan.", message: "Review your computers, files, checks, and plan." })}</p>
         {renderSetupReviewScreen({ screen, engine, onEngineChange: setEngine, readOnly: screen === "storage", checkRows: rows, checkError, onRetryChecks: () => void refreshChecks() })}
         {error ? <Alert variant="destructive"><ErrorIcon /><AlertDescription>{error}</AlertDescription></Alert> : null}
         <div className="flex flex-wrap items-center gap-2">
-          <Button type="button" variant="secondary" disabled={screenIndex === 0 || busy} onClick={() => setScreenIndex((index) => index - 1)}>Back</Button>
-          {screenIndex < REVIEW_SCREENS.length - 1 ? <Button type="button" disabled={busy} onClick={() => setScreenIndex((index) => index + 1)}>Continue</Button> : <Button type="button" disabled={busy} onClick={() => void finish()}>{busy ? "Saving" : "Done"}</Button>}
-          <Button type="button" variant="link" disabled={busy} onClick={() => navigate("/repairs")}>Cancel</Button>
+          <Button type="button" variant="secondary" disabled={screenIndex === 0 || busy} onClick={() => setScreenIndex((index) => index - 1)}>{i18n._({ id: "Back", message: "Back" })}</Button>
+          {screenIndex < REVIEW_SCREENS.length - 1 ? <Button type="button" disabled={busy} onClick={() => setScreenIndex((index) => index + 1)}>{i18n._({ id: "Continue", message: "Continue" })}</Button> : <Button type="button" disabled={busy} onClick={() => void finish()}>{busy ? i18n._({ id: "Saving", message: "Saving" }) : i18n._({ id: "Done", message: "Done" })}</Button>}
+          <Button type="button" variant="link" disabled={busy} onClick={() => navigate("/repairs")}>{i18n._({ id: "Cancel", message: "Cancel" })}</Button>
         </div>
       </CardContent>
     </Card>

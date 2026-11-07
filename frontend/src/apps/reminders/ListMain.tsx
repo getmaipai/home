@@ -1,3 +1,5 @@
+import { activeLocale } from "@/lib/activeLocale";
+import { i18n } from "@lingui/core";
 import { useState, type FormEvent } from "react";
 import type { List as ListRecord } from "@maipai/spec/gen/ts/list.js";
 import { Button } from "@maipai/ui/src/ui/button";
@@ -26,8 +28,8 @@ export function ListMain({ list, isPhone, canManage, onBack, onAdd, onToggle, on
   const openItems = list.items.filter((item) => !item.done);
   const doneItems = list.items.filter((item) => item.done);
   const EmptyIcon = getIcon("sparkles");
-  const tagline = list.kind === "shopping" ? "A few things to pick up" : list.kind === "todo" ? "What needs doing" : "Your own list";
-  const date = new Intl.DateTimeFormat(undefined, { weekday: "long", month: "long", day: "numeric" }).format(new Date());
+  const tagline = list.kind === "shopping" ? i18n._({ id: "A few things to pick up", message: "A few things to pick up" }) : list.kind === "todo" ? i18n._({ id: "What needs doing", message: "What needs doing" }) : i18n._({ id: "Your own list", message: "Your own list" });
+  const date = new Intl.DateTimeFormat(activeLocale(), { weekday: "long", month: "long", day: "numeric" }).format(new Date());
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -41,19 +43,19 @@ export function ListMain({ list, isPhone, canManage, onBack, onAdd, onToggle, on
   return <section className="flex min-h-0 min-w-0 flex-1 flex-col">
     <header className="grid grid-cols-[1fr_auto] items-end gap-3 border-b px-4 py-4">
       <div>
-        <p className="m-0 text-base font-medium tracking-wider text-muted-foreground">YOUR LIST</p>
+        <p className="m-0 text-base font-medium tracking-wider text-muted-foreground">{i18n._({ id: "YOUR LIST", message: "YOUR LIST" })}</p>
         <h1 className="m-0 text-3xl font-semibold">{labelFor(list)}</h1>
         <p className="m-0 text-muted-foreground">{tagline}</p>
       </div>
       <p className="m-0 text-sm text-muted-foreground">{date}</p>
-      {isPhone ? <Button variant="ghost" onClick={onBack}>Lists</Button> : null}
+      {isPhone ? <Button variant="ghost" onClick={onBack}>{i18n._({ id: "Lists", message: "Lists" })}</Button> : null}
       {canManage ? <ListMenu title={list.title} onRename={onRename} onChangeIcon={onChangeIcon} onDelete={onDelete} /> : null}
     </header>
     <section className="min-h-0 flex-1 overflow-y-auto px-4" aria-label={labelFor(list)}>
       {openItems.length === 0 && doneItems.length === 0 ? <div className="flex h-full flex-col items-center justify-center gap-3 text-center">
         <span className="rounded-2xl bg-primary/10 p-5"><EmptyIcon aria-hidden className="size-9 text-primary" /></span>
-        <EmptyState icon="inbox" text="Nothing on the list yet" />
-        <p className="m-0 text-muted-foreground">Add the first thing and we'll keep it here for you.</p>
+        <EmptyState icon="inbox" text={i18n._({ id: "Nothing on the list yet", message: "Nothing on the list yet" })} />
+        <p className="m-0 text-muted-foreground">{i18n._({ id: "Add the first thing and we'll keep it here for you.", message: "Add the first thing and we'll keep it here for you." })}</p>
       </div> : <ul className="m-0 list-none p-0">
         {openItems.map((item) => <li key={item.id} className="flex min-h-12 items-center gap-3 border-b py-2">
           <Checkbox checked={false} onCheckedChange={(checked) => void onToggle(item.id, checked === true)} aria-label={item.text} />
@@ -62,17 +64,17 @@ export function ListMain({ list, isPhone, canManage, onBack, onAdd, onToggle, on
         </li>)}
       </ul>}
       {doneItems.length ? <>
-        <Button variant="ghost" onClick={() => setShowDone((value) => !value)} aria-expanded={showDone}>{showDone ? "Hide done" : `Done (${doneItems.length})`}</Button>
+        <Button variant="ghost" onClick={() => setShowDone((value) => !value)} aria-expanded={showDone}>{showDone ? i18n._({ id: "Hide done", message: "Hide done" }) : i18n._({ id: "Done ({count})", message: "Done ({count})", values: { count: doneItems.length } })}</Button>
         {showDone ? <ul className="m-0 list-none p-0">{doneItems.map((item) => <li key={item.id} data-done="true" className="flex min-h-12 items-center gap-3 border-b py-2 text-muted-foreground">
           <Checkbox checked onCheckedChange={(checked) => void onToggle(item.id, checked === true)} aria-label={item.text} />
           <span className="line-through">{item.text}</span>
         </li>)}</ul> : null}
-        <Button variant="ghost" onClick={() => void onClearDone()}>Clear done</Button>
+        <Button variant="ghost" onClick={() => void onClearDone()}>{i18n._({ id: "Clear done", message: "Clear done" })}</Button>
       </> : null}
     </section>
     <form className="mt-auto flex items-center gap-2 border-t p-4" onSubmit={(event) => void submit(event)}>
-      <Input aria-label="Add an item" placeholder="Add an item" value={text} onChange={(event) => setText(event.target.value)} />
-      <Button type="submit" disabled={!text.trim()}>Add</Button>
+      <Input aria-label={i18n._({ id: "Add an item", message: "Add an item" })} placeholder={i18n._({ id: "Add an item", message: "Add an item" })} value={text} onChange={(event) => setText(event.target.value)} />
+      <Button type="submit" disabled={!text.trim()}>{i18n._({ id: "Add", message: "Add" })}</Button>
     </form>
   </section>;
 }

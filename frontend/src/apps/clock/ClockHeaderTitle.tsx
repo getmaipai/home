@@ -1,3 +1,4 @@
+import { i18n } from "@lingui/core";
 import { useEffect, useState } from "react";
 import { Button } from "@maipai/ui/src/ui/button";
 import { getIcon } from "@maipai/ui/src/icons";
@@ -16,10 +17,10 @@ export function ClockHeaderAdd() {
   }, []);
   if (tab === "stopwatch") return null;
   const addLabel = tab === "alarms"
-    ? "Add alarm"
+    ? i18n._({ id: "Add alarm", message: "Add alarm" })
     : tab === "timers"
-      ? "Add quick timer"
-      : "Add world clock";
+      ? i18n._({ id: "Add quick timer", message: "Add quick timer" })
+      : i18n._({ id: "Add world clock", message: "Add world clock" });
   const addAction = tab === "alarms" ? openClockAlarmEditor : openClockAdd;
 
   return (

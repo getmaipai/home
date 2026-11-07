@@ -1,3 +1,4 @@
+import { i18n } from "@lingui/core";
 import { useState, type FormEvent } from "react";
 import { Button } from "@maipai/ui/src/ui/button";
 import { Input } from "@maipai/ui/src/ui/input";
@@ -30,25 +31,25 @@ export function ListMenu({ title, onRename, onChangeIcon, onDelete }: {
 
   return <>
     <DropdownMenu>
-      <DropdownMenuTrigger asChild><Button variant="ghost" aria-label="List options">•••</Button></DropdownMenuTrigger>
+      <DropdownMenuTrigger asChild><Button variant="ghost" aria-label={i18n._({ id: "List options", message: "List options" })}>•••</Button></DropdownMenuTrigger>
       <DropdownMenuContent align="end">
-        <DropdownMenuItem onSelect={openRename}>Rename</DropdownMenuItem>
-        <DropdownMenuItem onSelect={() => setIconOpen(true)}>Change icon</DropdownMenuItem>
-        <DropdownMenuItem onSelect={onDelete}>Delete</DropdownMenuItem>
+        <DropdownMenuItem onSelect={openRename}>{i18n._({ id: "Rename", message: "Rename" })}</DropdownMenuItem>
+        <DropdownMenuItem onSelect={() => setIconOpen(true)}>{i18n._({ id: "Change icon", message: "Change icon" })}</DropdownMenuItem>
+        <DropdownMenuItem onSelect={onDelete}>{i18n._({ id: "Delete", message: "Delete" })}</DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
     <Dialog open={renameOpen} onOpenChange={setRenameOpen}>
       <DialogContent>
-        <DialogHeader><DialogTitle>Rename list</DialogTitle><DialogDescription>Choose a name for this list.</DialogDescription></DialogHeader>
+        <DialogHeader><DialogTitle>{i18n._({ id: "Rename list", message: "Rename list" })}</DialogTitle><DialogDescription>{i18n._({ id: "Choose a name for this list.", message: "Choose a name for this list." })}</DialogDescription></DialogHeader>
         <form className="grid gap-4" onSubmit={(event) => void saveRename(event)}>
-          <div className="grid gap-2"><Label htmlFor="rename-list">Name</Label><Input id="rename-list" value={name} onChange={(event) => setName(event.target.value)} /></div>
-          <DialogFooter><Button type="submit" disabled={!name.trim()}>Save</Button></DialogFooter>
+          <div className="grid gap-2"><Label htmlFor="rename-list">{i18n._({ id: "Name", message: "Name" })}</Label><Input id="rename-list" value={name} onChange={(event) => setName(event.target.value)} /></div>
+          <DialogFooter><Button type="submit" disabled={!name.trim()}>{i18n._({ id: "Save", message: "Save" })}</Button></DialogFooter>
         </form>
       </DialogContent>
     </Dialog>
     <Dialog open={iconOpen} onOpenChange={setIconOpen}>
       <DialogContent>
-        <DialogHeader><DialogTitle>Change icon</DialogTitle><DialogDescription>Choose an icon for {title}.</DialogDescription></DialogHeader>
+        <DialogHeader><DialogTitle>{i18n._({ id: "Change icon", message: "Change icon" })}</DialogTitle><DialogDescription>{i18n._({ id: "Choose an icon for {title}.", message: "Choose an icon for {title}.", values: { title } })}</DialogDescription></DialogHeader>
         <div className="grid grid-cols-4 gap-2">
           {LIST_ICONS.map((icon) => {
             const Icon = getIcon(icon === "cart" ? "box" : icon === "sparkle" ? "sparkles" : icon);
