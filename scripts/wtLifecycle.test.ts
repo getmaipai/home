@@ -49,7 +49,7 @@ describe.skipIf(!hasNode)("wt.sh worktree lifecycle (needs node installed)", () 
 
   test("tier classifies explicit paths and the branch diff", () => {
     expect(run(["tier", "README.md", "docs/guide.md"]).stdout.trim()).toBe("T0");
-    expect(run(["tier", "backend/src/auth/session.ts"]).stdout.trim()).toBe("T2");
+    expect(run(["tier", "backend/src/lib/session.ts"]).stdout.trim()).toBe("T2");
     expect(run(["tier", "backend/src/other.ts"]).stdout.trim()).toBe("T1");
     const started = run(["start", "tier"]);
     const path = started.stdout.trim();
