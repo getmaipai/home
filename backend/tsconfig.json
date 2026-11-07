@@ -16,6 +16,7 @@
     "tsBuildInfoFile": "./node_modules/.cache/tsc.tsbuildinfo",
     "baseUrl": ".",
     "paths": {
+      "@/kit/*": ["../frontend/node_modules/@maipai/ui/src/*"],
       "@/*": ["src/*"]
     }
   },

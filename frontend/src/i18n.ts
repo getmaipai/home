@@ -1,8 +1,9 @@
 import { i18n, type I18n } from "@lingui/core";
+import { loadKitCatalog } from "@maipai/ui/src/i18n";
 import { messages as messagesEnUS } from "@/locales/en-US/messages.po";
 import { fallbackChain, SUPPORTED_LOCALES, type SupportedLocale } from "@/supportedLocales";
 
-i18n.load("en-US", messagesEnUS);
+i18n.load("en-US", { ...messagesEnUS });
 i18n.activate("en-US");
 
 export type CatalogLoader = () => Promise<{ messages: Parameters<I18n["load"]>[1] }>;
@@ -39,6 +40,9 @@ export async function activateLocale(
         target.load(id, merged);
       }
     }
+    // After Home's own entries: a mode locale's merged Home table must not stand over the kit's text. The kit's ids start with "ui.", so
+    // they never collide with Home's; a failed kit load leaves the kit in English and never fails Home's activation (loadKitCatalog does not throw).
+    for (const id of chain) await loadKitCatalog(id, target);
     target.activate(mode ? `${base}-x-${mode}` : base);
   } catch (error) {
     console.error("[i18n] catalog load failed; using en-US", error);

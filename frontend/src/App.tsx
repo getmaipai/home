@@ -74,7 +74,7 @@ export function PersonLocale({ person, children }: { person: SignedInPerson | nu
   return <div className="flex h-screen items-center justify-center"><Progress mode="spinner" label={i18n._({ id: "Loading MaiPai Home", message: "Loading MaiPai Home" })} /></div>;
 }
 
-function LocaleKey({ children }: { children: ReactNode }) {
+export function LocaleKey({ children }: { children: ReactNode }) {
   const { i18n: active } = useLingui();
   return <Fragment key={active.locale}>{children}</Fragment>;
 }
