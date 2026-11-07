@@ -74,7 +74,7 @@ export function SignInPage({ onSignedIn }: { onSignedIn: () => void }) {
       <div className="w-full max-w-md">
       <Card>
         <div className="mx-auto w-fit">
-          <FullLogo />
+          <FullLogo full />
         </div>
         <CardContent>
           <div className="flex flex-col gap-4">

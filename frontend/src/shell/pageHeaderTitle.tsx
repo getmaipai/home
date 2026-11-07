@@ -43,6 +43,7 @@ import { NotificationsIcon } from "@/apps/notifications/NotificationsPage";
 import { RemindersIcon } from "@/apps/reminders/remindersIcon";
 import { StatusIcon } from "@/shell/pages/StatusPage";
 import { ClockHeaderAdd } from "@/apps/clock/ClockHeaderTitle";
+import { HeaderTitle as KitHeaderTitle } from "@maipai/ui/src/dashboard/layouts/full/vertical/header/HeaderTitle";
 
 interface PageHeaderEntry {
   icon: Icon;
@@ -124,16 +125,10 @@ export function headerEntryFor(pathname: string, apps: readonly AppEntry[] = APP
   return found ? { ...found, label: translatedLabel(found.label) } : undefined;
 }
 
-/** The icon and name, drawn once. `hideInTopRow` marks it for the phone layouts where a page places its own top row. */
+/** The icon and name, drawn once, by the kit's `HeaderTitle` (a long or translated name wraps to two lines and shrinks on a phone).
+ * `hideInTopRow` marks it for the phone layouts where a page places its own top row. */
 export function HeaderTitle({ entry, hideInTopRow = false, heading = false }: { entry: PageHeaderEntry; hideInTopRow?: boolean; heading?: boolean }) {
-  const EntryIcon = entry.icon;
-  const Name = heading ? "h1" : "span";
-  return (
-    <div className={`flex min-w-0 flex-1 items-center gap-3 px-2${heading ? " max-sm:px-0" : ""}`} {...(hideInTopRow ? { "data-top-row-hide": "" } : {})}>
-      <EntryIcon aria-hidden className={`text-muted-foreground size-6 shrink-0${heading ? " max-sm:hidden" : ""}`} />
-      <Name data-slot="header-title" className={`min-w-0 flex-1 truncate text-xl font-semibold${heading ? " max-sm:text-base" : ""}`}>{entry.label}</Name>
-    </div>
-  );
+  return <KitHeaderTitle icon={entry.icon} label={entry.label} heading={heading} hideInTopRow={hideInTopRow} />;
 }
 
 /** Mounted through `useHeaderExtra(PageHeaderTitle)` by every page and app: a stable module-level reference (the hook's own

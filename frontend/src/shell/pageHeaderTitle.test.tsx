@@ -81,6 +81,14 @@ describe("PageHeaderTitle", () => {
     expect(headerEntryFor("/apps/other", apps)).toBeUndefined();
   });
 
+  test("the title is the kit's wrapping HeaderTitle, never a single-line truncation (\"Recordator...\" at 360 and 402 px)", () => {
+    const view = renderAt("/reminders");
+    const title = view.container.querySelector("[data-slot=header-title]") as HTMLElement;
+    expect(title.className).toContain("line-clamp-2");
+    expect(title.className).not.toMatch(/(^|\s)truncate(\s|$)/);
+    expect(title.className).toContain("max-sm:text-base");
+  });
+
   test("a path in neither table renders nothing rather than crashing", () => {
     const view = renderAt("/some-future-page-nobody-mapped-yet");
     expect(view.container).toBeEmptyDOMElement();
