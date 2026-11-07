@@ -112,6 +112,16 @@ test("activity returns own task details and needs-you agrees with companion wait
   expect(card?.waiting_count).toBe(1);
 });
 
+test("a companion card carries the time of its latest activity beside the title (AUDIT-UI-01: the page fed the title to a time formatter)", async () => {
+  const person = addPerson("activity-time", "adult");
+  db.insert(jobs).values({ id: "time-task", kind: "ask", startedBy: "activity-time", forPerson: "activity-time", title: "Choose an option", state: "waiting", progress: null, waitingReason: "Choose one", resultRef: null, conversationId: null, companionId: "rivet", errorKind: null, raw: null, provenance: "{}", createdAt: now, updatedAt: now }).run();
+  const rivet = (await (await request("companions", person)).json() as { companions: Array<{ id: string; latest_activity: string | null; latest_activity_at: string | null }> }).companions.find((row) => row.id === "rivet");
+  expect(rivet?.latest_activity).toBe("Choose an option");
+  expect(rivet?.latest_activity_at).toBe(now);
+  const idle = (await (await request("companions", person)).json() as { companions: Array<{ id: string; latest_activity_at: string | null }> }).companions.find((row) => row.id !== "rivet");
+  expect(idle?.latest_activity_at).toBeNull();
+});
+
 describe("companion look styles", () => {
   test("lists styles by age band before companion id routes and preserves look read styles", async () => {
     const adult = addPerson("look-styles-adult", "adult"), teen = addPerson("look-styles-teen", "teen"), child = addPerson("look-styles-child", "child");

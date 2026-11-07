@@ -68,7 +68,7 @@ export const companionsRoutes = apiRouter();
 const Type = z.enum(["child", "teen", "adult"]);
 const Card = z.object({
   id: z.string(), name: z.string(), type: Type, type_label: z.string(), tagline: z.string(), who_can_use: z.string(),
-  dials: z.array(z.object({ label: z.string(), value: z.string() })), voice: z.string(), is_default: z.boolean(), is_household: z.boolean(), portrait: z.string().nullable(), status: z.string(), chats: z.number(), can_edit: z.boolean(), can_copy: z.boolean(), task_count: z.number(), chat_count: z.number(), working_count: z.number(), waiting_count: z.number(), latest_activity: z.string().nullable(),
+  dials: z.array(z.object({ label: z.string(), value: z.string() })), voice: z.string(), is_default: z.boolean(), is_household: z.boolean(), portrait: z.string().nullable(), status: z.string(), chats: z.number(), can_edit: z.boolean(), can_copy: z.boolean(), task_count: z.number(), chat_count: z.number(), working_count: z.number(), waiting_count: z.number(), latest_activity: z.string().nullable(), latest_activity_at: z.string().nullable().describe("The ISO time of the latest task or chat on this companion; latest_activity is its title."),
 });
 const Detail = Card.extend({
   about: z.string(), pronouns: z.string().nullable(), interests: z.array(z.string()), examples: z.array(z.string()),
@@ -89,7 +89,7 @@ function companionCounts(personId: string, companionId: string) {
   const active = homeJobs.filter((row) => (row.state === "running" || row.state === "queued") && !row.waitingReason).length + projectRows.filter((row) => row.state === "running").length + mediaJobs.filter((row) => row.state === "running" || row.state === "queued").length;
   const waiting = homeJobs.filter((row) => needsYou(row.state, row.waitingReason)).length + projectRows.filter((row) => row.state === "waiting").length + mediaJobs.filter((row) => needsYou(row.state, null)).length;
   const latest = [...tasks.map((row) => ({ title: row.title, at: row.at })), ...chats.map((row) => ({ title: row.title || "Chat", at: row.updatedAt }))].sort((a, b) => Date.parse(b.at) - Date.parse(a.at))[0];
-  return { task_count: tasks.length, chat_count: chats.length, working_count: active, waiting_count: waiting, latest_activity: latest?.title ?? null };
+  return { task_count: tasks.length, chat_count: chats.length, working_count: active, waiting_count: waiting, latest_activity: latest?.title ?? null, latest_activity_at: latest && Number.isFinite(Date.parse(latest.at)) ? latest.at : null };
 }
 
 function needsYou(state: string, waitingReason: string | null): boolean {

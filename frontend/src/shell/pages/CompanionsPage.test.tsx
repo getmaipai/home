@@ -55,11 +55,13 @@ test("directory cards show status, meta, actions and the new companion link", as
 test("directory own-job and latest-activity meta lines render, and search filters name and tagline", async () => {
   api.companions = async () => ({ allowed: true, can_create: false, can_discover: true, default_id: "", companions: [
     card({ id: "busy", name: "Busy", working_count: 2, waiting_count: 1 }),
-    card({ id: "recent", name: "Recent", latest_activity: "2026-10-27T12:00:00Z", chat_count: 3 }),
+    card({ id: "recent", name: "Recent", latest_activity: "What day is it", latest_activity_at: "2026-10-27T12:00:00Z", chat_count: 3 }),
   ], discover: [card({ id: "finder", name: "Finder", tagline: "A patient research guide" })], robots: null });
   const view = open("/companions");
   await view.findByText("2 working · 1 waiting on you");
   expect(view.getByText(/Last active .* · 3 chats/)).toBeTruthy();
+  // AUDIT-UI-01: a title is never fed to the time formatter ("Last active undefined NaN NaN").
+  expect(view.queryByText(/undefined|NaN/)).toBeNull();
   fireEvent.change(view.getByRole("searchbox", { name: "Search companions" }), { target: { value: "patient" } });
   expect(view.queryByRole("heading", { name: "Busy" })).toBeNull();
   const discover = view.getByRole("tab", { name: "Discover" });
