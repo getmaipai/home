@@ -17,28 +17,27 @@ Your chats, people and memories stay in your house. Home goes online for downloa
 
 - **Private chat with memory.** Talk to an AI that runs on your own computer. It remembers what matters, shows its sources, and lets you see, fix or forget any memory.
 - **Reads your pictures.** Attach a photo and ask about it. This needs a computer with 32 GB of memory or more.
-- **Makes pictures and short videos.** Adults can ask for a picture, make variations, and add styles (LoRAs). Videos are up to 5 seconds and need a Mac with 128 GB of memory. Everything is made on your computer.
-- **Edits pictures.** The Edit button opens an editor with Remove background, Erase, Upscale, Resize, Markup, and Comment (describe a change in words).
-- **Natural voice.** Talk and listen. Home speaks with Chatterbox Turbo on bigger computers, and can add small laughs and sighs. An owner or admin can turn that off.
+- **Makes and edits pictures.** Ask for a picture, make variations, add styles. The editor has Remove background, Erase, Upscale, Resize, Markup and Comment (describe a change in words). Children and teens get a safer picture lane.
+- **Makes short videos and films.** Start from words or a picture, then trim, join and add voice lines and songs in the Studio. This needs a Mac with 128 GB of memory.
+- **Music and songs.** Play your music library, tune in online radio, make songs and albums, split a song into stems, remix, and follow the lyrics in the player.
+- **Videos, shows, books and podcasts.** Watch your saved videos, shows and films, read books and listen to audiobooks, and follow podcasts. Each picks up where you stopped.
+- **News and Weather.** Read stories from the news shelf you choose. Weather has your places, Fahrenheit or Celsius, and a weather card in chat.
+- **Library.** One place for every picture, video, song and document, with sharing and a trash you can restore from.
+- **Natural voice.** Talk and listen, or wake Home with a word. Home speaks with Chatterbox Turbo on bigger computers.
 - **Web search.** Home searches with DuckDuckGo, or with your own SearXNG. Teens and children use your own SearXNG unless a grown-up allows more.
-- **Weather.** A Weather app and a weather card in chat, with your places and your choice of Fahrenheit or Celsius.
-- **Music and songs.** Browse your music library, make songs in chat, and follow the lyrics in the player.
-- **News.** Read stories from the same news shelf Home uses for headline questions.
-- **Companions.** Choose how chat sounds, make a companion, or ask another companion with an @mention.
-- **Coding mode.** Give an adult a local coding workspace with personal keys.
-- **Phone layout.** Apps use a bottom section bar and share the top bar with Home.
-- **Pictures, videos and songs share a household queue.** Home shows each job's place in line while it waits.
-- **Answer choices.** Adults can tap a choice below a question instead of typing it.
-- **A Home page** with an ask box, a Today row, and Getting started steps.
-- **Apps as packages.** A package can be an app with its own pages and settings. Weather is the first.
+- **Reminders, lists, alarms and timers.** Ask in chat or use the Reminders and Clock apps.
+- **House.** With Home Assistant connected, see your rooms and ask Home to control lights and locks.
+- **Companions.** Browse, add, copy or make a companion, pick one for each chat, or @mention another for one question.
+- **Max chat.** An admin, or an adult an admin allows, can use one large model for hard chat and coding work.
 - **A real household.** One profile per person. Children are restricted by default, teens get more privacy, and the safety gates cannot be switched off.
-- **Sign-in with passcode boxes.** One box per digit, a lockout after repeated wrong tries.
-- **Backups and updates** you start yourself.
+- **Sign-in with passcode boxes.** One box per digit, a lockout after repeated wrong tries, and a lock screen after you step away.
+- **Backups, updates and repairs** you start yourself, with a way to go back.
+- **Phone layout.** Apps use a bottom section bar and share the top bar with Home.
 - **A one-line installer** for a Mac. It opens the setup wizard in your browser, and Home works in Chrome and Safari.
 
 ## Coming soon
 
-Not shipped yet: a faster chat engine (oMLX) for 64 GB and 128 GB Macs, pictures and videos for children and teens, videos, podcasts, maps and the Go app.
+Not shipped yet: a faster chat engine (oMLX) for 64 GB and 128 GB Macs, maps, two-step sign-in and the Go app.
 
 ## The privacy promise
 
