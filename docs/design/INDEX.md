@@ -65,6 +65,7 @@ and a proposed design; otherwise the household IP gets blocked.
 | [tier-families-and-options-2026-10-30.md](tier-families-and-options-2026-10-30.md) | proposed, not decided, not built | TIER-FAMILY-2026-10-30 |
 | [wake-word-ux-2026-10-27.md](wake-word-ux-2026-10-27.md) | owner ruling (RULES.md S2) | WAKEUX-01 |
 | [weather-advice-port-2026-10-27.md](weather-advice-port-2026-10-27.md) | port review; rebuild decisions in note | weather port slices |
+| [weather-scene-v2-2026-11-06.md](weather-scene-v2-2026-11-06.md) | new 2026-11-06, no code (Fable design spec) | WEATHER-SCENE-01 to -07 |
 | [child-safety-text-2026-10-19.md](child-safety-text-2026-10-19.md) | built (S1 to S3); owner-approved 2026-10-19 | CSAM-TEXT-01 |
 | [content-policy-2026-10-18.md](content-policy-2026-10-18.md) | approved by the architect 2026-10-27; NAT-03 built (certainty bands, "agreeing web sources" = at least 2 distinct hosts), other slices not built | CONTENT-POLICY-01 to -05; LIKENESS-SIMPLIFY-01 |
 | [companion-speech-style-2026-10-25.md](companion-speech-style-2026-10-25.md) | proposed, design only; architect ruling in `data-scratch/architect/SPEECH-STYLE-2026-10-25.verdict` | SPEECH-STYLE-01 to -05 |
