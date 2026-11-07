@@ -194,3 +194,33 @@ lightning gaps within 6 to 18 s, the 3-flashes-in-1-s cap, and cleanup on unmoun
 | The day test in `weather-forecast-page.tsx` (`minutes >= sunrise && minutes < sunset`) | The one phase function in `weather-scene.ts` (principle 1: it replaces the test, it does not sit beside it). |
 | The light and dark sky token variants (`--weather-{cls}-{day\|night}-{from\|to}` in the three tokens.css blocks) | The new `--weather-*` palette tokens in the same three blocks (section 2). |
 | The 2026-10-16 owner call (`docs/plans/weather-card-and-app-2026-10-16.md`) "animation is modern CSS plus tokens; gradients from tokens (light and dark)" | Kept, not superseded: colours stay tokens in all three blocks; only the binary two-stop shape changes. |
+
+## 10. As built and revised (2026-11-07)
+
+The scene shipped as `commons` ui-v0.5.507 to 0.5.518 (slices 1 to 6, the data pass-through of -07, and two picture polish passes). What
+changed against the text above, so the note stays true:
+
+- **Sun and moon.** The conic corona with spokes is gone (owner feedback 2026-11-07: a rotating thin spoke read as a white streak on sunny
+  cards). The corona is a soft radial glow that breathes. The moon is always the real `MoonDisc`; with no `moon` prop its phase is computed from
+  the date (synodic month and a reference new moon in `weather-scene.json`). Stars fade with `--wx-night` instead of showing at full strength at dusk
+  and dawn. The sun disc is 56 px (64 px at twilight) after the art review; halos 140 px and 300 px.
+- **Clouds.** Silhouettes are mask-image puffs with soft rims and no blur, in three depth layers, opacities near .96, mid .74, far .42, with a
+  shaded `::after` body, a rim light and an offset shadow. The flat shelf is `clip-path: inset(...)` driven by a per-shape `--shelf`, not a mask
+  composite (the browser reduced the composite list to "add" and every cloud became a slab: ui-v0.5.517 is broken, use 0.5.518). Puff tables are the
+  authored ones, scaled to fit the element box with a 4 percent margin.
+- **Sky.** Caps raised to top .50, mid .56, bottom .58 (proved against white ink by the contrast test, which now composes the real gradient, the
+  `to top right` text scrim, the horizon layers and the variant-conditional flat scrim for every class, phase, variant and theme block). The flat
+  scrim applies only on `compact` and `lite`; the vignette starts at 62 percent. Dusk and dawn use lavender over salmon, with a horizon glow layer that
+  exists only near twilight and a pale day horizon. Clear and partly-cloudy day mid and bottom stops were lowered slightly to keep 4.5:1.
+- **Precipitation.** Rain has near, mid and far drop classes (visible streaks with a bright head, -4 degree tilt, -10 heavy); snow sizes are 2 to 11 px
+  with soft pendulum flakes, hard discs, a haze layer and a softer pile. Wrappers are always sized (`inset: 0`); a test guards every `*-field`.
+- **Lightning.** `scheduleStrike` with injectable timers, doubles at least 1000 ms apart, three authored bolts, sheet and cloud-light overlays, thunder
+  jolt on full and wide, no scheduling under reduced motion; a still frame (bolt A at .7, sheet .25) via `data-reduced`.
+- **Orchestration.** `useSceneRunning` (one IntersectionObserver plus visibilitychange), a 500 ms cross-fade between condition groups, the scoped
+  reduced-motion exception, per-variant animation budgets (a test counts them), `paused` deprecated for `variant="lite"`.
+- **Data.** The weather answer block carries optional `sunrise`, `sunset` and `wind_speed` (spec 0.1.335); the weather package fills them only when
+  valid; the kit passes them to the sky.
+- **Lessons recorded.** bun and happy-dom do not parse CSS: three real defects (a comma before a `color-mix` percentage, an unsized wrapper, a
+  `mask-composite` list) passed every test and were found only by looking at the picture in a browser. Judge each slice as a picture, and keep text tests for
+  CSS shapes that have bitten once.
+
