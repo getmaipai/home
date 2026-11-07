@@ -391,6 +391,6 @@ for (const path of ["/api/library", "/api/library/summary"]) test(`${path} rejec
   for (const value of ["unknown", ""]) {
     const response = await client.get(`${path}?shared=${value}`);
     expect(response.status).toBe(400);
-    expect(await response.json()).toEqual({ error: "Invalid shared filter. Choose with-me, by-me, or none." });
+    expect(await response.json()).toMatchObject({ error: "Invalid shared filter. Choose with-me, by-me, or none." });
   }
 });

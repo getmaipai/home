@@ -12,9 +12,13 @@ export { ErrorSchema, errorResponses, idParamSchema, PaginationQuerySchema, pagi
 export function apiRouter() {
   return new OpenAPIHono<AppEnv>({ defaultHook: (result, c) => {
     if (!result.success) {
+      // A route's own sentence ("Invalid shared filter. Choose with-me, by-me, or none.") already names the field and stays
+      // as written; only zod's generic defaults ("Required", "Invalid input: expected string, received undefined", "Too small")
+      // get the field name in front, so a person can tell which field is wrong.
+      const generic = /^(Required\b|Invalid (input|option|string|number|date|email|url|uuid|literal|enum value)\b|Expected |Too (small|big)\b|Unrecognized key|String must|Number must)/;
       const message = result.error.issues.map((issue) => {
         const path = issue.path.filter((part) => part !== "body").join(".");
-        return path ? `${path}: ${issue.message}` : issue.message;
+        return path && generic.test(issue.message) ? `${path}: ${issue.message}` : issue.message;
       }).join("; ");
       return c.json({ error: message, next: "Check the fields named and send it again." }, 400);
     }
