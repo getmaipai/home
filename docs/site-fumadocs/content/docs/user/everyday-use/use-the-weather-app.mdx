@@ -11,7 +11,7 @@ Type "what's the weather" or "will it rain in Seattle tomorrow". Home answers wi
 
 ## Open the Weather app
 
-Open **Weather** from the apps list, from the search box in the header, or from your favorites. The page shows one big weather card with an animated sky, today's high and low, and an hourly strip.
+Open **Weather** from the apps list, from the search box in the header, or from your favorites. The page shows a large **Weather** title and settings gear above one big weather card with an animated sky, today's high and low, and an hourly strip.
 
 Above the card is a place picker. The choices, in order:
 
@@ -19,14 +19,11 @@ Above the card is a place picker. The choices, in order:
 2. **Your home**, shown as the place name and "(home)". This is the household's home place.
 3. **Your own saved places.**
 
-## If Weather shows a message
-
-Read the message above the buttons. It tells you what to try:
+Weather never shows an empty page. It says why, and gives you the next step:
 
 - **No place chosen.** The page says "Choose a place" and offers **Add a place** and **Use my location**. **Add a place** opens the Weather settings. **Use my location** asks your browser for where you are. If the browser says no, the page tells you how to allow it. In Safari, choose **Safari**, **Settings**, **Websites**, **Location**, set this site to **Allow**, then press the button again.
 - **Weather is not reachable.** Home could not reach Open-Meteo. Check that this computer is online, then press **Try again**.
 - **Weather is slow to answer.** The weather service did not reply in time. Press **Try again** in a moment.
-- **The weather is not available right now.** Try again, or choose another place in the picker.
 
 If you have saved places but no home and no location, Home shows your first saved place. You do not need to share your location to see the weather.
 
@@ -44,7 +41,7 @@ Each person has their own list and unit. A child sees their own list. In an Inco
 
 The first time an owner or admin opens Home, it asks where home is. Press **Use my location** to let the browser tell Home (this works on `localhost` or an `https` address), or type a city. Home looks it up in a list that is built in, so no outside service learns your city at this step. It asks you to confirm, like "Chicago, Illinois?", and then saves it. A teen or child sees "Ask a grown-up to set the home location". A city and state works. ZIP codes do not work yet.
 
-You can change the home place later in **Settings**, **Home settings**, **General**.
+You can change the home place later in **Settings**, **Household and people**, **General**, under **Home location**.
 
 ## What leaves your house
 
@@ -61,3 +58,8 @@ Weather asks one outside service, Open-Meteo, a free public weather service. It 
 | Chat says it has no place | You named none and have no default | Name a place, or set a default place in the Weather settings |
 | Wrong unit | The unit is per person | Change **Temperature unit** in the Weather settings |
 | A city is not found | Home looks up cities in a built-in list. ZIP codes do not work yet | Type the city and state |
+
+## Ask a robot about the weather
+
+A robot does not know who is talking, so it answers with the household's home place, never one person's saved place. Anyone can ask a robot, a child too, and a child gets the same forecast with the spot rounded to about 10 km. If the robot says it does not know where you are, an owner or admin sets the home place in **Settings**, **Household and people**, **General**.
+

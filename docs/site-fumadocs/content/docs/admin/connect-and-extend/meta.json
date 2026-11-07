@@ -5,6 +5,7 @@
     "remote-access",
     "notifications-and-telegram",
     "packages",
-    "commands"
+    "commands",
+    "max-chat"
   ]
 }

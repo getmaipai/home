@@ -241,12 +241,6 @@
         "privacy"
       ]
     },
-    "user/start-here/install-upgrade-uninstall": {
-      "areas": [
-        "install",
-        "updates"
-      ]
-    },
     "user/start-here/your-first-minutes": {
       "areas": [
         "setup",
@@ -587,6 +581,88 @@
     "developers/reference/design-rules": {
       "covers": [
         "docs/design/RULES.md"
+      ]
+    },
+    "user/media-and-more/music-and-radio": {
+      "covers": [
+        "backend/packages/music/**",
+        "frontend/src/shell/pages/Music*.tsx"
+      ]
+    },
+    "user/media-and-more/podcasts": {
+      "covers": [
+        "backend/packages/podcasts/**"
+      ]
+    },
+    "user/media-and-more/watch-videos": {
+      "covers": [
+        "backend/packages/videos/**"
+      ]
+    },
+    "user/media-and-more/shows-and-films": {
+      "covers": [
+        "backend/packages/shows/**"
+      ]
+    },
+    "user/media-and-more/books": {
+      "covers": [
+        "backend/packages/books/**"
+      ]
+    },
+    "user/media-and-more/news": {
+      "covers": [
+        "backend/packages/news/**",
+        "backend/src/routes/newsRoutes.ts"
+      ]
+    },
+    "user/media-and-more/library-and-trash": {
+      "covers": [
+        "frontend/src/shell/library/**",
+        "frontend/src/shell/pages/FilesPage.tsx",
+        "frontend/src/shell/pages/TrashPage.tsx",
+        "backend/src/routes/library.ts",
+        "backend/src/routes/trash.ts",
+        "backend/src/routes/files.ts"
+      ]
+    },
+    "user/media-and-more/clock-and-reminders": {
+      "covers": [
+        "frontend/src/apps/clock/**",
+        "frontend/src/apps/reminders/**"
+      ]
+    },
+    "user/media-and-more/house": {
+      "covers": [
+        "backend/packages/house/**",
+        "frontend/src/shell/pages/HousePage.tsx",
+        "backend/src/routes/house.ts"
+      ]
+    },
+    "user/media-and-more/companions": {
+      "covers": [
+        "frontend/src/shell/pages/CompanionsPage.tsx",
+        "frontend/src/shell/pages/companionFlow/**",
+        "backend/src/routes/companions.ts"
+      ]
+    },
+    "admin/look-after-it/storage": {
+      "areas": [
+        "storage"
+      ]
+    },
+    "admin/look-after-it/repairs": {
+      "areas": [
+        "trace-repairs"
+      ]
+    },
+    "admin/look-after-it/status": {
+      "areas": [
+        "trace-repairs"
+      ]
+    },
+    "admin/connect-and-extend/max-chat": {
+      "covers": [
+        "backend/src/routes/stackCoding.ts"
       ]
     },
     "keeping-docs-current": {

@@ -3,6 +3,9 @@
   "pages": [
     "backups-and-restore",
     "updates-and-rollback",
+    "storage",
+    "repairs",
+    "status",
     "privacy-audit",
     "troubleshooting-and-support-report",
     "devices-and-sessions",
