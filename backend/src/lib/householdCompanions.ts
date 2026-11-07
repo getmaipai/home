@@ -1,13 +1,16 @@
-import { existsSync, mkdirSync, readFileSync, readdirSync, renameSync, rmSync, writeFileSync } from "node:fs";
+import { cpSync, existsSync, mkdirSync, readFileSync, readdirSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { PackageManifest, type PackageManifest as Manifest } from "@maipai/spec/gen/ts/manifest.js";
 import { dataDir } from "@/lib/paths";
 import { listPackageIds, loadManifestOnly } from "@/lib/plugins";
 import { deleteLook } from "@/lib/companionLook";
+import type { Synth } from "@maipai/spec/gen/ts/synth.js";
+import { nextHlc } from "@/lib/hlc";
 
 function root(): string { return join(process.env.MAIPAI_DATA_DIR || dataDir, "companions"); }
 type Companion = NonNullable<Manifest["companion"]>;
 export type CompanionAuthor = { display_name: string; person_id?: string };
+export type CompanionCopyOptions = { keepAudience?: boolean; keepStatus?: boolean; copyLook?: boolean; synth?: Partial<Synth> };
 const ID_PATTERN = /^hc-[a-z0-9]+(?:-[a-z0-9]+)*$/;
 function validId(id: string): boolean { return ID_PATTERN.test(id) && id.length <= 40; }
 function folder(id: string): string | null { return validId(id) ? join(root(), id) : null; }
@@ -71,15 +74,34 @@ function slug(name: string): string { return name.toLowerCase().replace(/[^a-z0-
 
 export function getHouseholdCompanion(id: string): Manifest | null { return read(id); }
 export function householdCompanionAuthorId(id: string): string | null {
+  const manifest = read(id); if (!manifest) return null;
+  if (manifest.synth?.owner_person_id) return manifest.synth.owner_person_id;
   const dir = folder(id); if (!dir) return null;
-  try { const value = JSON.parse(readFileSync(join(dir, "owner.json"), "utf8")) as { person_id?: unknown }; return typeof value.person_id === "string" ? value.person_id : null; }
-  catch { return null; }
+  try {
+    const value = JSON.parse(readFileSync(join(dir, "owner.json"), "utf8")) as { person_id?: unknown };
+    if (typeof value.person_id !== "string") return null;
+    const now = new Date().toISOString();
+    const migrated = write({ ...manifest, synth: { based_on: { kind: "none", person_id: null, name: null, refresh: "7d", minor: false }, life: { enabled: true, seed: "" }, subject_id: null, pins: { dials: [], examples: [] }, phrase_sources: {}, forked_from: null, private_to: null, owner_person_id: value.person_id, provenance: "migration:owner-json", created_at: now, updated_at: now, hlc: nextHlc() } });
+    if (migrated.ok) rmSync(join(dir, "owner.json"), { force: true });
+    return value.person_id;
+  } catch { return null; }
+}
+export function migrateOwnerJsonAll(): number {
+  let migrated = 0;
+  for (const id of listHouseholdCompanionIds()) {
+    const dir = folder(id);
+    if (!dir || !existsSync(join(dir, "owner.json"))) continue;
+    const before = read(id)?.synth?.owner_person_id;
+    if (before) { rmSync(join(dir, "owner.json"), { force: true }); continue; }
+    if (householdCompanionAuthorId(id)) migrated++;
+  }
+  return migrated;
 }
 export function listHouseholdCompanionIds(): string[] {
   try { return readdirSync(root(), { withFileTypes: true }).filter((entry) => entry.isDirectory() && validId(entry.name) && read(entry.name)).map((entry) => entry.name).sort(); }
   catch { return []; }
 }
-export function createHouseholdCompanion(input: Companion, author: CompanionAuthor, startingAudience: "adult" | "teen" = "adult"): WriteResult {
+export function createHouseholdCompanion(input: Companion, author: CompanionAuthor, startingAudience: "adult" | "teen" | "all" = "adult", options: { synth?: Partial<Synth>; companion?: Partial<Companion> } = {}): WriteResult {
   const name = typeof input?.display_name === "string" ? input.display_name.trim() : "";
   if (!name) return { ok: false, error: "Name can't be empty. Add a few words.", fields: { name: "Name can't be empty. Add a few words." } };
   const clean: Record<string, unknown> = {};
@@ -93,13 +115,11 @@ export function createHouseholdCompanion(input: Companion, author: CompanionAuth
   const occupied = new Set([...listPackageIds(), ...listHouseholdCompanionIds()]);
   let id = base, suffix = 2;
   while (occupied.has(id)) { const tail = `-${suffix++}`; id = `${base.slice(0, 40 - tail.length).replace(/-+$/g, "")}${tail}`; }
-  const companion = Object.assign({ formality: "neutral", complexity: "standard", engagement: "balanced", filler_density: "light" }, clean, { display_name: name, audience: startingAudience, status: "draft" });
-  const manifest = { id, version: "0.1.0", kind: "companion", category: "Fun", display: name, description: typeof clean.tagline === "string" ? clean.tagline : "A companion made at home.", author: author.display_name, license: "AGPL-3.0", homepage: "https://github.com/getmaipai/home", companion, incognito: "unaffected", requires: [], optional: [], platforms: ["home", "bot"], min_role: "adult", consequential: false, offline: "full", config: [], notifications: [], backup: "exclude", background: false, contributes: {}, min_app: "0.1.0", tier: 0, quality_scale: "bronze", channel: "stable" } as unknown as Manifest;
+  const companion = Object.assign({ formality: "neutral", complexity: "standard", engagement: "balanced", filler_density: "light" }, clean, options.companion, { display_name: name, audience: startingAudience, status: options.companion?.status ?? "draft" });
+  const now = new Date().toISOString();
+  const synth = author.person_id ? { based_on: { kind: "none" as const, person_id: null, name: null, refresh: "7d" as const, minor: false }, life: { enabled: true, seed: "" }, subject_id: null, pins: { dials: [], examples: [] }, phrase_sources: {}, forked_from: null, private_to: null, owner_person_id: author.person_id, provenance: "home:companion", created_at: now, updated_at: now, hlc: nextHlc(), ...options.synth } : undefined;
+  const manifest = { id, version: "0.1.0", kind: "companion", category: "Fun", display: name, description: typeof clean.tagline === "string" ? clean.tagline : "A companion made at home.", author: author.display_name, license: "AGPL-3.0", homepage: "https://github.com/getmaipai/home", companion, ...(synth ? { synth } : {}), incognito: "unaffected", requires: [], optional: [], platforms: ["home", "bot"], min_role: "adult", consequential: false, offline: "full", config: [], notifications: [], backup: "exclude", background: false, contributes: {}, min_app: "0.1.0", tier: 0, quality_scale: "bronze", channel: "stable" } as unknown as Manifest;
   const result = write(manifest);
-  if (result.ok && author.person_id) {
-    const dir = folder(result.value.id)!;
-    writeFileSync(join(dir, "owner.json"), `${JSON.stringify({ person_id: author.person_id })}\n`, { flag: "wx" });
-  }
   return result;
 }
 export function updateHouseholdCompanion(id: string, patch: Partial<Companion>): WriteResult {
@@ -107,6 +127,10 @@ export function updateHouseholdCompanion(id: string, patch: Partial<Companion>):
   const allowed = ["display_name", "pronouns", "tagline", "backstory", "interests", "formality", "complexity", "engagement", "filler_density", "clock_style", "hedging", "social", "behavior", "examples", "examples_child", "examples_teen", "examples_adult", "voice_id", "look_prompt"] as const;
   const fields = Object.fromEntries(allowed.filter((key) => Object.hasOwn(patch, key)).map((key) => [key, patch[key]]));
   return write({ ...current, companion: { ...current.companion, ...fields } });
+}
+export function updateHouseholdCompanionSynth(id: string, synth: NonNullable<Manifest["synth"]>, companion?: Companion): WriteResult {
+  const current = read(id); if (!current?.companion) return { ok: false, error: "That household companion could not be found." };
+  return write({ ...current, companion: companion ?? current.companion, synth });
 }
 /** Save the screen-three fields while preserving identity data and status until appearance checks pass. */
 export function saveHouseholdCompanionPersonality(id: string, patch: Partial<Companion>): WriteResult {
@@ -118,16 +142,26 @@ export function deleteHouseholdCompanion(id: string): boolean {
   const dir = folder(id); if (!dir || !read(id)) return false;
   try { deleteLook(id); rmSync(dir, { recursive: true, force: true }); return true; } catch { return false; }
 }
-export function copyBundledCompanion(bundledId: string, author: CompanionAuthor): { ok: true; value: Manifest } | { ok: false; error: string } {
+export function copyBundledCompanion(bundledId: string, author: CompanionAuthor, options: CompanionCopyOptions = {}): { ok: true; value: Manifest } | { ok: false; error: string } {
   const loaded = loadManifestOnly(bundledId);
   if (!loaded.ok || loaded.value.kind !== "companion" || !loaded.value.companion) return { ok: false, error: "That bundled companion could not be found." };
   const source = loaded.value.companion;
-  return createHouseholdCompanion({ ...source, display_name: `${source.display_name} (copy)`, audience: "adult", status: "draft", review: undefined }, author);
+  return copyCompanion(source, author, options);
 }
-export function copyHouseholdCompanion(sourceId: string, author: CompanionAuthor): { ok: true; value: Manifest } | { ok: false; error: string } {
-  const source = read(sourceId)?.companion;
-  if (!source) return { ok: false, error: "That household companion could not be found." };
-  return createHouseholdCompanion({ ...source, display_name: `${source.display_name} (copy)`, audience: "adult", status: "draft", review: undefined }, author);
+export function copyHouseholdCompanion(sourceId: string, author: CompanionAuthor, options: CompanionCopyOptions = {}): { ok: true; value: Manifest } | { ok: false; error: string } {
+  const manifest = read(sourceId);
+  if (!manifest?.companion) return { ok: false, error: "That household companion could not be found." };
+  return copyCompanion(manifest.companion, author, options, sourceId);
+}
+function copyCompanion(source: Companion, author: CompanionAuthor, options: CompanionCopyOptions, sourceId?: string) {
+  const now = new Date().toISOString();
+  const synth = options.synth ? { ...options.synth, created_at: now, updated_at: now, hlc: nextHlc(), owner_person_id: author.person_id ?? options.synth.owner_person_id, provenance: options.synth.provenance ?? "home:companion-copy" } : undefined;
+  const result = createHouseholdCompanion({ ...source, display_name: options.synth?.forked_from ? source.display_name : `${source.display_name} (copy)`, audience: options.keepAudience ? source.audience : "adult", status: options.keepStatus ? source.status : "draft", review: options.keepAudience ? source.review : undefined }, author, options.keepAudience ? source.audience ?? "adult" : "adult", { synth, companion: { status: options.keepStatus ? source.status : "draft", audience: options.keepAudience ? source.audience : "adult" } });
+  if (result.ok && options.copyLook && sourceId) {
+    const from = folder(sourceId), to = folder(result.value.id);
+    if (from && to && existsSync(join(from, "look"))) cpSync(join(from, "look"), join(to, "look"), { recursive: true, errorOnExist: false, force: true });
+  }
+  return result;
 }
 /** Moves a companion's audience while keeping its all-ages review on record: used only to hold a companion at a stricter audience until its art can be checked, and to put it back. An admin's own change goes through setHouseholdCompanionAudience. */
 export function holdHouseholdCompanionAudience(id: string, audience: "adult" | "teen" | "all"): WriteResult {

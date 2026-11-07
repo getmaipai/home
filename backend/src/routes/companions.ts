@@ -38,6 +38,9 @@ import { activeTakeRun, cancelTakeRun, companionHasTakeRun, publicTakeRun, start
 import { clipPromptPack, picturePromptPack } from "@/lib/companionPromptPack";
 import { portraitPath, readRetainedPortrait, retainCompanionPortrait } from "@/lib/companionPortrait";
 import { checkFinishedAssets, type FinishedAsset } from "@/lib/pictures/finishedCheck";
+import { forkSynth, getSynth, shareFork, synthById, maySeeSynth } from "@/lib/synths";
+import { activeBeats, rememberBeat } from "@/lib/talent/life";
+import { forgetByIds, list as listMemory } from "@/lib/memory";
 import { checkCompanionArt, collectLiveAssets } from "@/lib/companionArtCheck";
 import { extractKeyframes } from "@/lib/pictures/keyframes";
 import { routeAudience } from "@/lib/pictures/audience";
@@ -113,7 +116,7 @@ companionsRoutes.openapi(listRoute, (c) => {
   const person = c.get("person");
   const admin = isOwnerOrAdmin(person);
   const decorate = (card: ReturnType<typeof listCompanionCards>[number]) => ({ ...card, ...companionCounts(person.id, card.id), can_edit: card.is_household && mayEdit(person, card.id), can_copy: canCreateCompanion(person, admin) });
-  return c.json({ allowed: companionAreaOn(person), can_create: canCreateCompanion(person, admin), can_discover: speakerAgeBand(person, new Date()) !== "child", default_id: currentCompanionId(person), companions: listCompanionCards(person, admin).map(decorate), discover: discoverCompanionCards(person).map(decorate), robots: admin ? robotAssignments() : null }, 200);
+  return c.json({ allowed: companionAreaOn(person), can_create: canCreateCompanion(person, admin), can_discover: speakerAgeBand(person, new Date()) !== "child", default_id: currentCompanionId(person), companions: listCompanionCards(person, admin).filter((card) => !!getSynth(person, card.id)).map(decorate), discover: discoverCompanionCards(person).map(decorate), robots: admin ? robotAssignments() : null }, 200);
 });
 
 const setMembershipRoute = (action: "add" | "remove") => {
@@ -225,6 +228,8 @@ const detailRoute = createRoute({
 companionsRoutes.openapi(detailRoute, (c) => {
   const person = c.get("person");
   const id = c.req.valid("param").id, found = PERSONAS.find((candidate) => candidate.id === id);
+  const synth = synthById(id);
+  if (synth && !maySeeSynth(person, synth)) return c.json({ error: "No such companion" }, 404);
   const persona = found && mayUseCompanion(person, found) ? found : found ? null : draftPersonaFor(person, id, isOwnerOrAdmin(person));
   if (!persona) return c.json({ error: "No such companion" }, 404);
   const detail = companionDetail(person, persona, isOwnerOrAdmin(person));
@@ -247,6 +252,50 @@ companionsRoutes.openapi(activityRoute, (c) => {
   const ownChats = db.select().from(conversations).where(and(eq(conversations.personId, person.id), eq(conversations.companionId, id))).all().filter((row) => row.status !== "deleted").map((row) => ({ id: row.id, kind: "chat", title: row.title || "Conversation", state: "done", created_at: row.createdAt, updated_at: row.updatedAt, conversation_id: row.id, placement: row.placement as "chat" | "side", waiting_reason: null, progress: null, result_ref: null, needs_you: false }));
   const activity = [...ownJobs, ...ownProjects, ...ownPictures, ...ownVideos, ...ownSongs, ...ownChats].sort((a, b) => Date.parse(b.updated_at) - Date.parse(a.updated_at)).slice(0, 50);
   return c.json({ activity }, 200);
+});
+
+const lifeBeat = z.object({ id: z.string(), text: z.string(), at: z.string(), valid_from: z.string().nullable(), valid_to: z.string().nullable(), source: z.string() });
+const lifeRoute = createRoute({ method: "get", path: "/{id}/life", tags: ["Companions"], summary: "Read a synth's life", middleware: [requireAuth] as const,
+  request: { params: idParamSchema("id", "moss") },
+  responses: { 200: { content: { "application/json": { schema: z.object({ beats: z.array(lifeBeat) }) } }, description: "Life beats the signed-in person may read, newest first." }, ...errorResponses({ 401: "Not signed in", 404: "That synth is not here anymore." }) },
+});
+companionsRoutes.openapi(lifeRoute, (c) => {
+  const actor = c.get("person"), id = c.req.valid("param").id, synth = getSynth(actor, id);
+  if (!synth) return c.json({ error: "That synth is not here anymore." }, 404);
+  const beats = activeBeats(id, actor).sort((a, b) => b.created_at.localeCompare(a.created_at)).map((beat) => ({ id: beat.id, text: beat.text, at: beat.valid_from ?? beat.created_at, valid_from: beat.valid_from, valid_to: beat.valid_to, source: beat.source }));
+  return c.json({ beats }, 200);
+});
+
+const lifeBody = z.object({ text: z.string().min(1).max(200), date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).refine((value) => {
+  const [year, month, day] = value.split("-").map(Number), date = new Date(`${value}T00:00:00.000Z`);
+  return date.getUTCFullYear() === year && date.getUTCMonth() + 1 === month && date.getUTCDate() === day;
+}, "Enter a real date in YYYY-MM-DD format.") });
+const addLifeRoute = createRoute({ method: "post", path: "/{id}/life", tags: ["Companions"], summary: "Add a beat to a synth's life", middleware: [requireAuth] as const,
+  request: { params: idParamSchema("id", "moss"), body: { content: { "application/json": { schema: lifeBody } } } },
+  responses: { 200: { content: { "application/json": { schema: z.object({ beat: lifeBeat }) } }, description: "Saved the life beat." }, 400: { content: { "application/json": { schema: z.object({ error: z.string() }) } }, description: "The date is invalid. Enter a real date in YYYY-MM-DD format." }, 403: { content: { "application/json": { schema: z.object({ error: z.string() }) } }, description: "Only the maker or an admin may edit the life." }, 422: { content: { "application/json": { schema: z.object({ error: z.string() }) } }, description: "The beat does not meet the synth's audience floor." }, ...errorResponses({ 401: "Not signed in", 404: "That synth is not here anymore." }) },
+});
+companionsRoutes.openapi(addLifeRoute, (c) => {
+  const actor = c.get("person"), id = c.req.valid("param").id, synth = getSynth(actor, id);
+  if (!synth) return c.json({ error: "That synth is not here anymore." }, 404);
+  if (synth.owner_person_id !== actor.id && !isOwnerOrAdmin(actor)) return c.json({ error: "Only the synth's maker or an admin can change its life." }, 403);
+  const body = c.req.valid("json"), result = rememberBeat(id, actor, { text: body.text, category: "event", tier: "durable", source: "talent.life", valid_from: body.date });
+  if (!result.ok) return c.json({ error: result.error }, result.status === 422 ? 422 : result.status === 404 ? 404 : result.status === 400 ? 400 : 403);
+  const beat = result.value;
+  return c.json({ beat: { id: beat.id, text: beat.text, at: beat.valid_from ?? beat.created_at, valid_from: beat.valid_from, valid_to: beat.valid_to, source: beat.source } }, 200);
+});
+
+const deleteLifeRoute = createRoute({ method: "delete", path: "/{id}/life/{recordId}", tags: ["Companions"], summary: "Forget a synth life beat", middleware: [requireAuth] as const,
+  request: { params: z.object({ id: z.string().min(1).max(80), recordId: z.string().min(1).max(120) }) },
+  responses: { 200: { content: { "application/json": { schema: z.object({ deleted: z.boolean() }) } }, description: "Forgot the life beat." }, 403: { content: { "application/json": { schema: z.object({ error: z.string() }) } }, description: "Only the maker or an admin may edit the life." }, ...errorResponses({ 401: "Not signed in", 404: "That synth is not here anymore." }) },
+});
+companionsRoutes.openapi(deleteLifeRoute, (c) => {
+  const actor = c.get("person"), { id, recordId } = c.req.valid("param"), synth = getSynth(actor, id);
+  if (!synth) return c.json({ error: "That synth is not here anymore." }, 404);
+  if (synth.owner_person_id !== actor.id && !isOwnerOrAdmin(actor)) return c.json({ error: "Only the synth's maker or an admin can change its life." }, 403);
+  const record = listMemory(actor, { scope: "companion", companionId: id, includeSuperseded: true }).find((beat) => beat.id === recordId);
+  if (!record) return c.json({ error: "That synth is not here anymore." }, 404);
+  const result = forgetByIds(actor, [recordId])[0];
+  return result?.deleted ? c.json({ deleted: true }, 200) : c.json({ error: result?.reason ?? "The life beat could not be forgotten. Check the beat and try again." }, 403);
 });
 
 const defaultRoute = createRoute({
@@ -796,6 +845,22 @@ companionsRoutes.openapi(copyRoute, (c) => {
   const result = getHouseholdCompanion(id) ? copyHouseholdCompanion(id, author) : copyBundledCompanion(id, author);
   if (!result.ok) return c.json({ error: result.error }, 404);
   reloadPersonas(); return c.json({ id: result.value.id }, 201);
+});
+
+const forkSynthRoute = createRoute({ method: "post", path: "/{id}/fork", tags: ["Companions"], summary: "Make a synth your private companion", middleware: [requireAuth] as const,
+  request: { params: idPath }, responses: { 201: { content: { "application/json": { schema: z.object({ id: z.string() }) } }, description: "Private companion fork created." }, ...errorResponses({ 400: "The synth copy could not be created", 403: "This companion cannot be used", 404: "No synth you can use" }) } });
+companionsRoutes.openapi(forkSynthRoute, (c) => {
+  const result = forkSynth(c.get("person"), c.req.valid("param").id);
+  if (!result.ok) return c.json({ error: result.error }, result.status ?? 400);
+  reloadPersonas(); return c.json({ id: result.value.id }, 201);
+});
+
+const shareForkRoute = createRoute({ method: "post", path: "/{id}/share", tags: ["Companions"], summary: "Share a private synth fork with the household", middleware: [requireAuth] as const,
+  request: { params: idPath }, responses: { 200: { content: { "application/json": { schema: z.object({ id: z.string() }) } }, description: "Fork shared with the household." }, ...errorResponses({ 400: "Only a private fork can be shared", 403: "Only the fork owner or a manager of a minor owner can share it", 404: "No such fork" }) } });
+companionsRoutes.openapi(shareForkRoute, (c) => {
+  const result = shareFork(c.get("person"), c.req.valid("param").id);
+  if (!result.ok) return c.json({ error: result.error }, result.status ?? 400);
+  reloadPersonas(); return c.json({ id: result.value.id }, 200);
 });
 
 const editRoute = createRoute({ method: "get", path: "/{id}/edit", tags: ["Companions"], summary: "Read an editable household companion", middleware: [requireAuth] as const,

@@ -532,7 +532,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/house/tool.ts` | safeHouseAction, HOUSE_ACTIONS, normalizeHouseArgs, houseToolSpec, visibleInstances, visibleHouseEntities |
 | `backend/src/lib/house/undoRunner.ts` | undoDataIsSafe, houseUndoRunner |
 | `backend/src/lib/householdCa.ts` | onLeafRenewed, __notifyLeafRenewedForTests, __clearLeafRenewedListenersForTests, ensureHouseholdCa, registerRenewFixHandler, ensureHouseholdLeaf |
-| `backend/src/lib/householdCompanions.ts` | householdCompanionFolder, getHouseholdCompanion, householdCompanionAuthorId, listHouseholdCompanionIds, createHouseholdCompanion, updateHouseholdCompanion |
+| `backend/src/lib/householdCompanions.ts` | householdCompanionFolder, getHouseholdCompanion, householdCompanionAuthorId, migrateOwnerJsonAll, listHouseholdCompanionIds, createHouseholdCompanion |
 | `backend/src/lib/householdVoiceCheck.ts` | HOUSEHOLD_PREVIEW_SENTENCE, renderHouseholdVoice, cacheHouseholdPreview, dropHouseholdPreview, householdPreviewAudio |
 | `backend/src/lib/httpCachePolicy.ts` | backoffSeconds, parseRetryAfter, maxAgeSeconds, effectiveTtlSeconds |
 | `backend/src/lib/hubEndpoints.ts` | normalizeEndpointUrl, guessEndpointKind, detectLanIps, listManagedEndpoints, listHubEndpoints, nextEndpointPriority |
@@ -694,7 +694,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/mediaProductions.ts` | canSeeProduction, listMediaProductions, getMediaProduction, createMediaProduction, updateMediaProduction, setShotClip |
 | `backend/src/lib/mediaSubjectSheet.ts` | sheetPromptFor, makeSubjectSheet |
 | `backend/src/lib/mediaSubjects.ts` | isSheetReference, canUseSubject, listMediaSubjects, getMediaSubject, createMediaSubject, updateMediaSubject |
-| `backend/src/lib/memory.ts` | validAt, EVENT_GRACE_DAYS, eventWithinGrace, isPrivilegedRecordKind, isPrivilegedRecord, remember |
+| `backend/src/lib/memory.ts` | registerCompanionReadGate, validAt, EVENT_GRACE_DAYS, eventWithinGrace, isPrivilegedRecordKind, isPrivilegedRecord |
 | `backend/src/lib/memoryContentPolicy.ts` | CREDENTIAL_SAFE_MESSAGE, CREDENTIAL_REDACTION, detectCredential, hasDeclaredCredentialField, redactCredentials |
 | `backend/src/lib/memoryFraming.ts` | MEMORY_SECTION_HEADER, MEMORY_TRUST_REMINDER, NOTHING_STORED_LINE |
 | `backend/src/lib/memoryId.ts` | newMemoryRecordId |
@@ -1029,10 +1029,12 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/supportedLocales.ts` | SUPPORTED_LOCALES, isSupportedLocale |
 | `backend/src/lib/surfaceClass.ts` | surfaceClassOf, isWrittenAdultTurn, promptSurfaceClassFor |
 | `backend/src/lib/sweepAbandonedDrafts.ts` | sweepAbandonedDrafts |
+| `backend/src/lib/synths.ts` | synthById, synthPersona, synthFloor, ownerActor, maySeeSynth, getSynth |
 | `backend/src/lib/systemFold.ts` | FOLDED_NOTE_LABEL, foldedBlock, foldLateSystemMessages |
 | `backend/src/lib/tailnetNode.ts` | whoisViaSocket, selfLoginViaSocket, __setSelfLoginForTests, __setWhoisForTests, tailnetServeAllows |
 | `backend/src/lib/tailscale.ts` | isTailscaleRequest, interpretTailscaleStatusJson, getTailscaleStatus, getTailscaleLeafForServer, ensureTailscaleCert, setTailscaleRenewalActive |
 | `backend/src/lib/tailscaleTls.ts` | onTsLeafRenewed, notifyTsLeafRenewed |
+| `backend/src/lib/talent/life.ts` | LIFE_SOURCE, ORIGIN_SCHEMA, TICK_SCHEMA, ORIGIN_PROMPT, TICK_PROMPT, __setTalentLifeCompleterForTests |
 | `backend/src/lib/telegramChannel.ts` | telegramConfigured, __setTelegramTimeoutMsForTests, sendTelegramMessage |
 | `backend/src/lib/text.ts` | wordsOf, collapseSpaces, ownWordsQuery, tokenize, isBarePronoun |
 | `backend/src/lib/threadOfferFloor.ts` | threadOfferFloor |

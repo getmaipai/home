@@ -169,6 +169,7 @@ export const memoryRecords = sqliteTable("memory_records", {
   status: text("status").notNull(),
   scope: text("scope").notNull(),
   person: text("person").references(() => people.id),
+  companionId: text("companion_id"),
   // Step 3a: the entity this record is about (entities.id), when the
   // judge or a person could name one; null otherwise.
   subjectId: text("subject_id"),
@@ -208,7 +209,7 @@ export const memoryRecords = sqliteTable("memory_records", {
   deletedAt: text("deleted_at"),
   deviceId: text("device_id").references(() => devices.id, { onDelete: "cascade" }),
   createdBy: text("created_by").references(() => people.id, { onDelete: "set null" }),
-}, (table) => [index("memory_records_status_scope_person_idx").on(table.status, table.scope, table.person), index("memory_records_device_id_idx").on(table.deviceId)]);
+}, (table) => [index("memory_records_status_scope_person_idx").on(table.status, table.scope, table.person), index("memory_records_device_id_idx").on(table.deviceId), index("memory_records_companion_idx").on(table.companionId, table.status).where(sql`${table.companionId} IS NOT NULL`)]);
 // PERF-4 (code review, 2026-09-06): recall() and similarByVector() both
 // filter on status (always) plus scope/person (often) before ever
 // touching a vector - without this, every recall was a full table scan
