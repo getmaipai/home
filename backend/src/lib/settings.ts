@@ -9,7 +9,7 @@ import { checkFeedAddressBox } from "@/lib/shelf/feedAddresses";
 import { eq, and, isNull, like } from "drizzle-orm";
 import { db } from "@/db";
 import { settingsValues, people, entities } from "@/db/schema";
-import { getRegistry, getRegistryKey, registerStoredHouseholdReader } from "@/lib/settingsRegistry";
+import { getRegistry, getRegistryKey, isRetiredKey, registerStoredHouseholdReader } from "@/lib/settingsRegistry";
 import { calledAdminForOwnSettings } from "@/lib/relationships";
 import { nextHlc, compareHlc, seedHlc } from "@/lib/hlc";
 import { isOwnerOrAdmin, canAccessPerson, getPersonRole } from "@/lib/access";
@@ -436,6 +436,7 @@ export function listValues(actor: PersonRow, scope: string, onlyKey?: string): S
     // where the general People settings page canAccessPerson() permits a
     // guardian to inspect other settings for a child.
     .filter((k) => !(parsed.kind === "person" && parsed.id !== actor.id && k.selector === "location"))
+    .filter((k) => !isRetiredKey(k))
     .map((k) => {
       const row = storedByKey.get(k.key);
       if (parsed.kind === "person" && parsed.id && isLayeredScalar(k)) {

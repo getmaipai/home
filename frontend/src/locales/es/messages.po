@@ -121,12 +121,6 @@ msgid "setting.chat.kv_cache_override.help"
 msgstr "\"Auto\" cuantiza la caché de conversación para caber más contexto en la misma memoria, con un pequeño coste de calidad. \"Full\" usa precisión completa: es más preciso, pero usa aproximadamente el doble de memoria para el mismo tamaño de contexto."
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:84
-#, needs-review
-msgid "setting.chat.search_assist.help"
-msgstr "\"Off\" es el interruptor de apagado: nada se puntúa. \"Shadow\" (el predeterminado) solo cuenta, como número, cuántas veces se necesitó una búsqueda web, y no cambia ninguna respuesta. \"Rescue\" aún no está activo; por ahora se comporta como shadow. A los niños y adolescentes nunca se les puntúa."
-
-#. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:390
 #, needs-review
 msgid "setting.engines.stack.where.help"
@@ -9170,6 +9164,12 @@ msgstr "Aviso de almacenamiento de documentos (%)"
 #, needs-review
 msgid "Does not repeat"
 msgstr "No se repite"
+
+#. js-lingui-explicit-id
+#: src/lib/settingCopy.generated.ts:481
+#, needs-review
+msgid "setting.generation.people_prompts.does"
+msgstr "Ahora no hace nada y se conserva solo para que un valor guardado se siga leyendo."
 
 #. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:1327
@@ -18920,30 +18920,6 @@ msgid "setting.engines.stack.remote.allow_tailnet.help"
 msgstr "Desactivado, Home llega al equipo motor solo desde dentro de tu red doméstica. Activado, Home también puede llegar a través de tu tailnet privada cuando estás fuera. Actívalo solo si has unido ambos equipos a tu tailnet tú mismo. Solo un administrador puede cambiar esto. Se muestra solo mientras el motor funciona en otro equipo."
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:384
-#, needs-review
-msgid "setting.engines.stack.use_embeddings.help"
-msgstr "Desactivado, el propio motor de Home hace esto. Actívalo solo después de que Stack haya demostrado funcionar para ello."
-
-#. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:386
-#, needs-review
-msgid "setting.engines.stack.use_stt.help"
-msgstr "Desactivado, el propio motor de Home hace esto. Actívalo solo después de que Stack haya demostrado funcionar para ello."
-
-#. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:388
-#, needs-review
-msgid "setting.engines.stack.use_tts.help"
-msgstr "Desactivado, el propio motor de Home hace esto. Actívalo solo después de que Stack haya demostrado funcionar para ello."
-
-#. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:382
-#, needs-review
-msgid "setting.engines.stack.use_chat.help"
-msgstr "Desactivado, el propio motor de Home hace esto. Actívalo solo después de que Stack haya demostrado funcionar para ello. El juez de memoria y el trabajador en segundo plano siguen este interruptor porque comparten el modelo del chat."
-
-#. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:399
 #, needs-review
 msgid "setting.engines.stt.choice.option.off"
@@ -22218,6 +22194,36 @@ msgstr "¿Reanudar código?"
 #, needs-review
 msgid "Retired video model, no longer available"
 msgstr "Modelo de video retirado, ya no disponible"
+
+#. js-lingui-explicit-id
+#: src/lib/settingCopy.generated.ts:480
+#, needs-review
+msgid "setting.generation.people_prompts.help"
+msgstr "Retirado. Home no hace preguntas adicionales sobre personas en imágenes y videos, así que este interruptor no hace nada. Las reglas de seguridad para niños y personas reales nunca se desactivan."
+
+#. js-lingui-explicit-id
+#: src/lib/settingCopy.generated.ts:382
+#, needs-review
+msgid "setting.engines.stack.use_chat.help"
+msgstr "Retirado. El MaiPai Stack ahora decide qué motor hace cada tarea, así que este interruptor no hace nada. La clave se conserva para que un valor guardado se siga leyendo y una escritura siga funcionando."
+
+#. js-lingui-explicit-id
+#: src/lib/settingCopy.generated.ts:384
+#, needs-review
+msgid "setting.engines.stack.use_embeddings.help"
+msgstr "Retirado. El MaiPai Stack ahora decide qué motor hace cada tarea, así que este interruptor no hace nada. La clave se conserva para que un valor guardado se siga leyendo y una escritura siga funcionando."
+
+#. js-lingui-explicit-id
+#: src/lib/settingCopy.generated.ts:386
+#, needs-review
+msgid "setting.engines.stack.use_stt.help"
+msgstr "Retirado. El MaiPai Stack ahora decide qué motor hace cada tarea, así que este interruptor no hace nada. La clave se conserva para que un valor guardado se siga leyendo y una escritura siga funcionando."
+
+#. js-lingui-explicit-id
+#: src/lib/settingCopy.generated.ts:388
+#, needs-review
+msgid "setting.engines.stack.use_tts.help"
+msgstr "Retirado. El MaiPai Stack ahora decide qué motor hace cada tarea, así que este interruptor no hace nada. La clave se conserva para que un valor guardado se siga leyendo y una escritura siga funcionando."
 
 #. js-lingui-explicit-id
 #: src/apps/clock/AlarmsTab.tsx:70
@@ -27079,6 +27085,12 @@ msgid "setting.engines.tts.tier.standard.help"
 msgstr "El modelo y las opciones que completan el nivel Standard de la voz. Un objeto JSON '{'model, options'}'; model es un id de catálogo, recommended o off. Normalmente se configura desde la página de IA y modelos."
 
 #. js-lingui-explicit-id
+#: src/lib/settingCopy.generated.ts:84
+#, needs-review
+msgid "setting.chat.search_assist.help"
+msgstr "El modelo decide cuándo buscar en la web; este ajuste solo elige si Home además cuenta las búsquedas omitidas que parecían necesarias (Shadow, el predeterminado), las compensa (Rescue) o no hace ninguna de las dos cosas (Off)."
+
+#. js-lingui-explicit-id
 #: src/apps/settings/ModelsSection.tsx:323
 #, needs-review
 msgid "The model did not start. Your previous model is still the one answering."
@@ -28783,12 +28795,6 @@ msgid "setting.generation.music.enabled.does"
 msgstr "Activa o desactiva la creación de canciones para los adultos de aquí."
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:481
-#, needs-review
-msgid "setting.generation.people_prompts.does"
-msgstr "Activa o desactiva las preguntas adicionales y advertencias sobre personas en imágenes y videos."
-
-#. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:462
 #, needs-review
 msgid "setting.generation.kids.does"
@@ -30411,12 +30417,6 @@ msgstr "Cuando MaiPai llega a internet, va directo desde tu casa, no a través d
 #, needs-review
 msgid "setting.generation.picture_detailed.enabled.help"
 msgstr "Si está desactivado, el chat crea todas las imágenes como Rápidas, incluso si alguien pide Detalladas. Desactivarlo no elimina el modelo."
-
-#. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:480
-#, needs-review
-msgid "setting.generation.people_prompts.help"
-msgstr "Si está desactivado, Home crea lo que pides sin preguntas ni avisos extra. Las reglas de seguridad para niños y personas reales nunca se desactivan."
 
 #. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:916

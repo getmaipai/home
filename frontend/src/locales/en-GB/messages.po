@@ -105,11 +105,6 @@ msgid "setting.chat.kv_cache_override.help"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:84
-msgid "setting.chat.search_assist.help"
-msgstr ""
-
-#. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:390
 msgid "setting.engines.stack.where.help"
 msgstr ""
@@ -7837,6 +7832,11 @@ msgstr ""
 #: src/shell/pages/status/StatusBoard.tsx:108
 #: src/shell/pages/status/StatusBoard.tsx:108
 msgid "Does not repeat"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/lib/settingCopy.generated.ts:481
+msgid "setting.generation.people_prompts.does"
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -16165,26 +16165,6 @@ msgid "setting.engines.stack.remote.allow_tailnet.help"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:384
-msgid "setting.engines.stack.use_embeddings.help"
-msgstr ""
-
-#. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:386
-msgid "setting.engines.stack.use_stt.help"
-msgstr ""
-
-#. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:388
-msgid "setting.engines.stack.use_tts.help"
-msgstr ""
-
-#. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:382
-msgid "setting.engines.stack.use_chat.help"
-msgstr ""
-
-#. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:399
 msgid "setting.engines.stt.choice.option.off"
 msgstr ""
@@ -18973,6 +18953,31 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/apps/settings/styles/stylesApi.ts:77
 msgid "Retired video model, no longer available"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/lib/settingCopy.generated.ts:480
+msgid "setting.generation.people_prompts.help"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/lib/settingCopy.generated.ts:382
+msgid "setting.engines.stack.use_chat.help"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/lib/settingCopy.generated.ts:384
+msgid "setting.engines.stack.use_embeddings.help"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/lib/settingCopy.generated.ts:386
+msgid "setting.engines.stack.use_stt.help"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/lib/settingCopy.generated.ts:388
+msgid "setting.engines.stack.use_tts.help"
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -23166,6 +23171,11 @@ msgid "setting.engines.tts.tier.standard.help"
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/lib/settingCopy.generated.ts:84
+msgid "setting.chat.search_assist.help"
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/apps/settings/ModelsSection.tsx:323
 msgid "The model did not start. Your previous model is still the one answering."
 msgstr ""
@@ -24628,11 +24638,6 @@ msgid "setting.generation.music.enabled.does"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:481
-msgid "setting.generation.people_prompts.does"
-msgstr ""
-
-#. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:462
 msgid "setting.generation.kids.does"
 msgstr ""
@@ -26009,11 +26014,6 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:483
 msgid "setting.generation.picture_detailed.enabled.help"
-msgstr ""
-
-#. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:480
-msgid "setting.generation.people_prompts.help"
 msgstr ""
 
 #. js-lingui-explicit-id

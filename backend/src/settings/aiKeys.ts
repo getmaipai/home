@@ -122,7 +122,7 @@ export const AI_SETTINGS_KEYS: SettingsKey[] = [
     range: { options: ["off", "shadow", "rescue"] },
     default: "shadow",
     label: "Help the chat remember to search the web",
-    help: "\"Off\" is the kill switch: nothing is scored. \"Shadow\" (the default) only counts, as a number, how often a web search looked needed, and changes no reply. \"Rescue\" is not active yet; for now it behaves like shadow. Children and teens are never scored.",
+    help: "The model decides when to search the web; this setting only chooses whether Home also counts the searches it skipped that looked needed (Shadow, the default), makes up for them (Rescue), or does neither (Off).",
     level: "advanced",
     lives_in: "household.ai_advanced",
     honoured_by: ["home"],

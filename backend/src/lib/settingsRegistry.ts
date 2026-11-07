@@ -179,6 +179,10 @@ function noteMinorDdgsWhenUnconfigured(key: SettingsKey): SettingsKey {
   return { ...key, help: `${MINOR_DDGS_UNSET_NOTE} ${key.help}`, copy: key.copy ? { ...key.copy, does: `${MINOR_DDGS_UNSET_NOTE} ${key.copy.does}` } : key.copy };
 }
 
+/** A key whose spec group ends in `_retired` (parked in not_placed, AUDIT-DEAD-01): nothing reads it, no screen draws it.
+ * It stays registered and writable so a stored value reads and a write answers 200, but a settings list leaves it out. */
+export const isRetiredKey = (key: SettingsKey): boolean => key.lives_in.endsWith("_retired");
+
 export function getRegistryKey(key: string): SettingsKey | undefined {
   return getRegistry().find((k) => k.key === key);
 }

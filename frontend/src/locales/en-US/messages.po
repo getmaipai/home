@@ -105,11 +105,6 @@ msgid "setting.chat.kv_cache_override.help"
 msgstr "\"Auto\" quantizes the conversation cache to fit more context in the same memory, with a small quality tradeoff. \"Full\" uses full precision: more accurate, uses roughly twice the memory for the same context size."
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:84
-msgid "setting.chat.search_assist.help"
-msgstr "\"Off\" is the kill switch: nothing is scored. \"Shadow\" (the default) only counts, as a number, how often a web search looked needed, and changes no reply. \"Rescue\" is not active yet; for now it behaves like shadow. Children and teens are never scored."
-
-#. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:390
 msgid "setting.engines.stack.where.help"
 msgstr "\"This computer\" runs the engine on the machine Home is installed on. \"Another computer\" runs it on a different computer in your home that you reach over your network. Only an admin can change this."
@@ -7837,6 +7832,11 @@ msgstr "Documents storage warning (%)"
 #: src/shell/pages/status/StatusBoard.tsx:108
 msgid "Does not repeat"
 msgstr "Does not repeat"
+
+#. js-lingui-explicit-id
+#: src/lib/settingCopy.generated.ts:481
+msgid "setting.generation.people_prompts.does"
+msgstr "Turns the extra questions and warnings about people in pictures and videos on or off."
 
 #. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:1327
@@ -16174,26 +16174,6 @@ msgid "setting.engines.stack.remote.allow_tailnet.help"
 msgstr "Off, Home reaches the engine computer only from inside your home network. On, Home may also reach it through your private tailnet when you are away. Turn it on only if you have joined both computers to your tailnet yourself. Only an admin can change this. Shown only while the engine runs on another computer."
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:384
-msgid "setting.engines.stack.use_embeddings.help"
-msgstr "Off, Home's own engine does this. Turn on only after the Stack has been proven for it."
-
-#. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:386
-msgid "setting.engines.stack.use_stt.help"
-msgstr "Off, Home's own engine does this. Turn on only after the Stack has been proven for it."
-
-#. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:388
-msgid "setting.engines.stack.use_tts.help"
-msgstr "Off, Home's own engine does this. Turn on only after the Stack has been proven for it."
-
-#. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:382
-msgid "setting.engines.stack.use_chat.help"
-msgstr "Off, Home's own engine does this. Turn on only after the Stack has been proven for it. The memory judge and background worker follow this switch because they share chat's model."
-
-#. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:399
 msgid "setting.engines.stt.choice.option.off"
 msgstr "Off: Home will not listen to speech."
@@ -18983,6 +18963,31 @@ msgstr "Resume coding?"
 #: src/apps/settings/styles/stylesApi.ts:77
 msgid "Retired video model, no longer available"
 msgstr "Retired video model, no longer available"
+
+#. js-lingui-explicit-id
+#: src/lib/settingCopy.generated.ts:480
+msgid "setting.generation.people_prompts.help"
+msgstr "When off, Home makes what you ask for without extra questions or warnings. Safety rules for children and for real people never turn off."
+
+#. js-lingui-explicit-id
+#: src/lib/settingCopy.generated.ts:382
+msgid "setting.engines.stack.use_chat.help"
+msgstr "Off, Home's own engine does this. Turn on only after the Stack has been proven for it. The memory judge and background worker follow this switch because they share chat's model."
+
+#. js-lingui-explicit-id
+#: src/lib/settingCopy.generated.ts:384
+msgid "setting.engines.stack.use_embeddings.help"
+msgstr "Off, Home's own engine does this. Turn on only after the Stack has been proven for it."
+
+#. js-lingui-explicit-id
+#: src/lib/settingCopy.generated.ts:386
+msgid "setting.engines.stack.use_stt.help"
+msgstr "Off, Home's own engine does this. Turn on only after the Stack has been proven for it."
+
+#. js-lingui-explicit-id
+#: src/lib/settingCopy.generated.ts:388
+msgid "setting.engines.stack.use_tts.help"
+msgstr "Off, Home's own engine does this. Turn on only after the Stack has been proven for it."
 
 #. js-lingui-explicit-id
 #: src/apps/clock/AlarmsTab.tsx:70
@@ -23175,6 +23180,11 @@ msgid "setting.engines.tts.tier.standard.help"
 msgstr "The model and options that fill the Standard level of voice. A JSON object '{'model, options'}'; model is a catalog id, recommended, or off. Normally set from the AI and models page."
 
 #. js-lingui-explicit-id
+#: src/lib/settingCopy.generated.ts:84
+msgid "setting.chat.search_assist.help"
+msgstr "\"Off\" is the kill switch: nothing is scored. \"Shadow\" (the default) only counts, as a number, how often a web search looked needed, and changes no reply. \"Rescue\" is not active yet; for now it behaves like shadow. Children and teens are never scored."
+
+#. js-lingui-explicit-id
 #: src/apps/settings/ModelsSection.tsx:323
 msgid "The model did not start. Your previous model is still the one answering."
 msgstr "The model did not start. Your previous model is still the one answering."
@@ -24637,11 +24647,6 @@ msgid "setting.generation.music.enabled.does"
 msgstr "Turns song making on or off for the grown-ups here."
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:481
-msgid "setting.generation.people_prompts.does"
-msgstr "Turns the extra questions and warnings about people in pictures and videos on or off."
-
-#. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:462
 msgid "setting.generation.kids.does"
 msgstr "Turns the safe cartoon picture and video maker on or off for the home."
@@ -26019,11 +26024,6 @@ msgstr "When MaiPai does reach the internet, it goes straight there from your ho
 #: src/lib/settingCopy.generated.ts:483
 msgid "setting.generation.picture_detailed.enabled.help"
 msgstr "When off, chat makes every picture Quick, even when someone asks for Detailed. Turning it off does not remove the model."
-
-#. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:480
-msgid "setting.generation.people_prompts.help"
-msgstr "When off, Home makes what you ask for without extra questions or warnings. Safety rules for children and for real people never turn off."
 
 #. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:916
