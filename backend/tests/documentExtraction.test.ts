@@ -102,23 +102,40 @@ describe("local document extraction", () => {
       expect(mediaType).toBe("image/png");
       return "recognized text";
     });
-    expect(runRapidOcr(image, "image/png")).toEqual({ ok: true, text: "recognized text" });
+    expect(await runRapidOcr(image, "image/png")).toEqual({ ok: true, text: "recognized text" });
     expect(received ?? new Uint8Array()).toEqual(image);
 
     const actor = await owner();
     const host = createHost(actor, manifest(["ocr"]));
-    expect(host.ocr.read({ bytes: image, media_type: "image/png" })).toBe("recognized text");
-    expect(() => createHost(actor, manifest()).ocr.read({ bytes: image, media_type: "image/png" })).toThrow(HostError);
+    expect(await host.ocr.read({ bytes: image, media_type: "image/png" })).toBe("recognized text");
+    await expect(createHost(actor, manifest()).ocr.read({ bytes: image, media_type: "image/png" })).rejects.toBeInstanceOf(HostError);
   });
 
-  test("OCR failure becomes a typed capability result and never includes raw bytes", () => {
+  test("OCR failure becomes a typed capability result and never includes raw bytes", async () => {
     const secret = "secret scan bytes";
     __setRapidOcrRunnerForTests(() => {
       throw new Error("runner stopped");
     });
-    const result = runRapidOcr(new TextEncoder().encode(secret), "image/png");
+    const result = await runRapidOcr(new TextEncoder().encode(secret), "image/png");
     expect(result).toEqual({ ok: false, code: "internal_error", error: "OCR failed: runner stopped" });
     expect(JSON.stringify(result)).not.toContain(secret);
     expect(FileRecordSchema.shape.media_type.safeParse("image/png").success).toBe(true);
+  });
+
+  test("the real OCR process runs without blocking the event loop (AUDIT-PERF-01)", async () => {
+    __setRapidOcrRunnerForTests(null);
+    const before = process.env.MAIPAI_RAPIDOCR_COMMAND;
+    process.env.MAIPAI_RAPIDOCR_COMMAND = JSON.stringify(["/bin/sh", "-c", "cat >/dev/null; sleep 0.4; echo scanned"]);
+    let ticks = 0;
+    const timer = setInterval(() => { ticks++; }, 20);
+    try {
+      const result = await runRapidOcr(new TextEncoder().encode("scan"), "image/png");
+      expect(result).toEqual({ ok: true, text: "scanned" });
+      // A blocking spawnSync would let no timer fire during the 400 ms wait.
+      expect(ticks).toBeGreaterThanOrEqual(5);
+    } finally {
+      clearInterval(timer);
+      if (before === undefined) delete process.env.MAIPAI_RAPIDOCR_COMMAND; else process.env.MAIPAI_RAPIDOCR_COMMAND = before;
+    }
   });
 });
