@@ -11,14 +11,14 @@ import { robotCredentials } from "@/db/schema";
 import type { Device } from "@/lib/devices";
 import { encryptSecret, decryptSecret } from "@/lib/secrets";
 
-export function storeRobotCredential(deviceId: string, host: string, sshUsername: string, password: string): void {
+export function storeRobotCredential(deviceId: string, host: string, sshUsername: string, password: string, sshHostKey: string | null = null): void {
   const now = new Date().toISOString();
   const passwordEncrypted = encryptSecret(password);
   db.insert(robotCredentials)
-    .values({ deviceId, host, sshUsername, passwordEncrypted, rotatedAt: now })
+    .values({ deviceId, host, sshHostKey, sshUsername, passwordEncrypted, rotatedAt: now })
     .onConflictDoUpdate({
       target: robotCredentials.deviceId,
-      set: { host, sshUsername, passwordEncrypted, rotatedAt: now },
+      set: { host, sshHostKey, sshUsername, passwordEncrypted, rotatedAt: now },
     })
     .run();
 }
@@ -27,27 +27,20 @@ export interface RobotCredential {
   sshUsername: string;
   password: string;
   rotatedAt: string;
+  sshHostKey: string | null;
 }
 
 export function getRobotCredential(deviceId: string): RobotCredential | null {
   const row = db.select().from(robotCredentials).where(eq(robotCredentials.deviceId, deviceId)).get();
   if (!row) return null;
-  return { sshUsername: row.sshUsername, password: decryptSecret(row.passwordEncrypted), rotatedAt: row.rotatedAt };
+  return { sshUsername: row.sshUsername, password: decryptSecret(row.passwordEncrypted), rotatedAt: row.rotatedAt, sshHostKey: row.sshHostKey };
 }
 
-/** A code review (2026-09-27) found re-pairing a revoked-and-rediscovered
- * robot could never complete: its rotated password lived only under the
- * old, now-deleted device row, orphaned the moment that row was gone, so
- * the new pairing's own rotation demanded a vendor default that no
- * longer opened the unit. `host` is the practical "same physical unit"
- * signal available today (schema.ts's own comment has the rest of the
- * reasoning); the most recently rotated credential at that address is
- * what a fresh pairing tries before ever asking the admin for the
- * default. */
-export function getMostRecentRobotCredentialForHost(host: string): RobotCredential | null {
-  const row = db.select().from(robotCredentials).where(eq(robotCredentials.host, host)).orderBy(desc(robotCredentials.rotatedAt)).get();
+/** Finds a surviving credential only by the robot's verified SSH key. */
+export function getRobotCredentialForHostKey(sshHostKey: string): RobotCredential | null {
+  const row = db.select().from(robotCredentials).where(eq(robotCredentials.sshHostKey, sshHostKey)).orderBy(desc(robotCredentials.rotatedAt)).get();
   if (!row) return null;
-  return { sshUsername: row.sshUsername, password: decryptSecret(row.passwordEncrypted), rotatedAt: row.rotatedAt };
+  return { sshUsername: row.sshUsername, password: decryptSecret(row.passwordEncrypted), rotatedAt: row.rotatedAt, sshHostKey: row.sshHostKey };
 }
 
 export function hasRotatedRobotCredential(deviceId: string): boolean {

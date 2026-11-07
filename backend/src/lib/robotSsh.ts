@@ -10,6 +10,7 @@
 // lib/secrets.ts's own encrypted-at-rest treatment. Never logs either
 // password.
 import { randomBytes } from "node:crypto";
+import { createHash } from "node:crypto";
 import { Client } from "ssh2";
 
 export interface RotateRobotPasswordOptions {
@@ -21,9 +22,26 @@ export interface RotateRobotPasswordOptions {
   chpasswdCommand?: string;
   connectTimeoutMs?: number;
   execTimeoutMs?: number;
+  onHostKey: (fingerprint: string) => boolean;
 }
 
 export class RobotPasswordRotationError extends Error {}
+
+function sha256Fingerprint(hexDigest: string): string {
+  return `SHA256:${Buffer.from(hexDigest, "hex").toString("base64").replace(/=+$/, "")}`;
+}
+
+/** Read the robot identity before choosing any stored password. Returning false
+ * from hostVerifier ends the handshake before SSH user authentication. */
+export async function readRobotHostKey(opts: Pick<RotateRobotPasswordOptions, "host" | "port" | "username" | "connectTimeoutMs">): Promise<string> {
+  const conn = new Client();
+  return await new Promise<string>((resolve, reject) => {
+    let fingerprint: string | null = null;
+    conn.on("error", (err: Error) => fingerprint ? resolve(fingerprint) : reject(err));
+    conn.on("close", () => fingerprint ? resolve(fingerprint) : reject(new RobotPasswordRotationError("Could not read the robot SSH host key")));
+    conn.connect({ host: opts.host, port: opts.port ?? 22, username: opts.username, readyTimeout: opts.connectTimeoutMs ?? 10_000, hostHash: "sha256", hostVerifier: (digest: string) => { fingerprint = sha256Fingerprint(digest); return false; } });
+  });
+}
 
 // `@types/ssh2`'s declared ClientChannel 'close' signature is `() => void`,
 // but the installed ssh2@1.17.0 runtime (lib/utils.js, ChannelCloseFilter)
@@ -81,6 +99,8 @@ export async function rotateRobotPassword(opts: RotateRobotPasswordOptions): Pro
           username: opts.username,
           password: opts.currentPassword,
           readyTimeout: opts.connectTimeoutMs ?? 10_000,
+          hostHash: "sha256",
+          hostVerifier: (digest: string) => opts.onHostKey(sha256Fingerprint(digest)),
         });
     });
 

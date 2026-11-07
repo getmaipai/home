@@ -247,6 +247,26 @@ describe("verify-secret and lockout", () => {
     expect(locked.status).toBe(429);
   });
 
+  test("a per-address sign-in lock does not lock the same profile from another address", async () => {
+    const { person } = await setUpOwner(new TestClient());
+    for (let i = 0; i < 5; i++) {
+      const a = new TestClient("192.0.2.10");
+      expect((await a.post("/api/auth/verify-secret", { personId: person.id, secret: "wrong" })).status).toBe(401);
+    }
+    const b = new TestClient("192.0.2.11");
+    expect((await b.post("/api/auth/verify-secret", { personId: person.id, secret: "correcthorse" })).status).toBe(200);
+  });
+
+  test("distributed sign-in guesses lock the profile at 25 attempts", async () => {
+    const { person } = await setUpOwner(new TestClient());
+    for (let i = 1; i <= 25; i++) {
+      const client = new TestClient(`198.51.100.${i}`);
+      expect((await client.post("/api/auth/verify-secret", { personId: person.id, secret: "wrong" })).status).toBe(401);
+    }
+    const nextAddress = new TestClient("203.0.113.40");
+    expect((await nextAddress.post("/api/auth/verify-secret", { personId: person.id, secret: "correcthorse" })).status).toBe(429);
+  });
+
   // Step 6: TOTP delays the session, it never replaces the PIN check -
   // /verify-secret's own lockout/attempts logic runs identically either
   // way; only the final "issue a session" step changes.
@@ -312,7 +332,7 @@ describe("logout", () => {
     await setUpOwner(client);
     const res = await client.post("/api/auth/logout", undefined, {
       origin: "https://evil.example",
-      host: "hub.local",
+      host: "localhost",
     });
     expect(res.status).toBe(403);
     // the session must survive the blocked attempt
@@ -382,7 +402,7 @@ describe("forwarded-header trust (only behind TRUST_PROXY)", () => {
     await setUpOwner(client);
     const res = await client.post("/api/auth/logout", undefined, {
       origin: "https://evil.example",
-      host: "hub.local",
+      host: "localhost",
       "x-forwarded-host": "evil.example",
     });
     expect(res.status).toBe(403);

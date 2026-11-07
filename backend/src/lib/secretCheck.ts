@@ -5,14 +5,13 @@
 // Returns a plain result rather than a Response: each caller builds its own c.json(...) from the body and status, keeping full type safety against
 // that route's own createRoute() schema.
 import { verifySecret } from "@/lib/secret";
-import { recordFailedAttempt, LOCKOUT_THRESHOLD, type LockoutPurpose } from "@/lib/credentialLockout";
+import { recordFailedAttempt, LOCKOUT_THRESHOLD, checkSigninAddress, failSigninAddress, resetSigninAddress, type LockoutPurpose } from "@/lib/credentialLockout";
 import { throttleFail, throttleReset } from "@/lib/secretThrottle";
 
 export type SecretCheckFailure = { ok: false; status: 401 | 429; body: { error: string; retryAfter?: number; attemptsLeft?: number } };
 
-/** Adult-lock guesses in flight, by person: the lockout counts a failure only after the slow hash check ends, so a burst of parallel guesses would all pass
- * the lockout check first. One guess per person at a time closes that (a second one answers as locked out for a second). Sign-in is unchanged. */
-const unlockInFlight = new Set<string>();
+/** Serialize slow proofs per purpose and profile, closing the gap between lockout read and failed-attempt write. */
+const proofInFlight = new Set<string>();
 
 export async function verifyAgainstRecord(
   ip: string,
@@ -22,28 +21,31 @@ export async function verifyAgainstRecord(
   wrongSecretMessage: string,
   purpose: LockoutPurpose = "signin",
 ): Promise<{ ok: true } | SecretCheckFailure> {
+  const address = purpose === "signin" ? checkSigninAddress(ip, personId) : null;
+  if (address?.blocked) return { ok: false, status: 429, body: { error: "Too many attempts", retryAfter: address.retryAfter } };
   if (record.lockedUntil && new Date(record.lockedUntil).getTime() > Date.now()) {
     const retryAfter = Math.ceil((new Date(record.lockedUntil).getTime() - Date.now()) / 1000);
     return { ok: false, status: 429, body: { error: "Too many attempts", retryAfter } };
   }
 
-  if (purpose === "adult_unlock") {
-    if (unlockInFlight.has(personId)) return { ok: false, status: 429, body: { error: "Too many attempts", retryAfter: 1 } };
-    unlockInFlight.add(personId);
-  }
+  const flightKey = `${purpose}:${personId}`;
+  if (proofInFlight.has(flightKey)) return { ok: false, status: 429, body: { error: "Too many attempts", retryAfter: 1 } };
+  proofInFlight.add(flightKey);
   let valid: boolean;
-  try { valid = await verifySecret(providedSecret, record.secretHash); } finally { unlockInFlight.delete(personId); }
+  try { valid = await verifySecret(providedSecret, record.secretHash); } finally { proofInFlight.delete(flightKey); }
   if (!valid) {
     throttleFail(ip);
     // Atomic re-read-and-increment (lib/credentialLockout.ts): concurrent requests for one profile must not undercount real attempts.
     const { failedAttempts } = recordFailedAttempt(personId, purpose);
+    const attemptsLeft = purpose === "signin" ? failSigninAddress(ip, personId) : Math.max(0, LOCKOUT_THRESHOLD - failedAttempts);
     return {
       ok: false,
       status: 401,
-      body: { error: wrongSecretMessage, attemptsLeft: Math.max(0, LOCKOUT_THRESHOLD - failedAttempts) },
+      body: { error: wrongSecretMessage, attemptsLeft },
     };
   }
 
   throttleReset(ip);
+  if (purpose === "signin") resetSigninAddress(ip, personId);
   return { ok: true };
 }

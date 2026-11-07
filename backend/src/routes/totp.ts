@@ -11,7 +11,7 @@ import { beginEnrollment, verifyEnrollment, verifyTotp, isTotpEnabled, disableTo
 import { consumePendingLogin, getPendingLoginPerson } from "@/lib/pendingLogin";
 import { issueSession, sessionSignInSource } from "@/lib/session";
 import { getClientIp, throttleCheck, throttleFail, throttleReset } from "@/lib/secretThrottle";
-import { recordFailedAttempt, clearFailedAttempts, ensureCredentialRowExists, currentLockout, LOCKOUT_THRESHOLD } from "@/lib/credentialLockout";
+import { recordFailedAttempt, clearFailedAttempts, ensureCredentialRowExists, currentLockout, checkSigninAddress, failSigninAddress, resetSigninAddress } from "@/lib/credentialLockout";
 import { db } from "@/db";
 import { people } from "@/db/schema";
 
@@ -59,6 +59,8 @@ totpRoutes.openapi(challengeRoute, (c) => {
   const ip = getClientIp(c);
   const throttled = throttleCheck(ip);
   if (throttled.blocked) return c.json({ error: "Too many attempts", retryAfter: throttled.retryAfter }, 429);
+  const addressLockout = checkSigninAddress(ip, personId);
+  if (addressLockout.blocked) return c.json({ error: "Too many attempts", retryAfter: addressLockout.retryAfter }, 429);
   const lockout = currentLockout(personId);
   if (lockout?.lockedUntil && new Date(lockout.lockedUntil).getTime() > Date.now()) {
     const retryAfter = Math.ceil((new Date(lockout.lockedUntil).getTime() - Date.now()) / 1000);
@@ -69,9 +71,10 @@ totpRoutes.openapi(challengeRoute, (c) => {
     throttleFail(ip);
     ensureCredentialRowExists(personId);
     const { failedAttempts } = recordFailedAttempt(personId);
-    return c.json({ error: "That code didn't match.", attemptsLeft: Math.max(0, LOCKOUT_THRESHOLD - failedAttempts) }, 401);
+    return c.json({ error: "That code didn't match.", attemptsLeft: failSigninAddress(ip, personId) }, 401);
   }
   throttleReset(ip);
+  resetSigninAddress(ip, personId);
   clearFailedAttempts(personId);
   consumePendingLogin(pendingToken);
   issueSession(c, personId, sessionSignInSource(c));

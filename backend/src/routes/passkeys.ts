@@ -14,7 +14,7 @@ import { eq, and, isNull } from "drizzle-orm";
 import { issueSession, sessionSignInSource } from "@/lib/session";
 import { getClientIp, throttleCheck, throttleFail, throttleReset } from "@/lib/secretThrottle";
 import { tryConsume } from "@/lib/rateLimiter";
-import { recordFailedAttempt, clearFailedAttempts, ensureCredentialRowExists, currentLockout, LOCKOUT_THRESHOLD } from "@/lib/credentialLockout";
+import { recordFailedAttempt, clearFailedAttempts, ensureCredentialRowExists, currentLockout, checkSigninAddress, failSigninAddress, resetSigninAddress } from "@/lib/credentialLockout";
 import { registrationOptions, verifyRegistration, authenticationOptions, verifyAuthentication, listPasskeys, deletePasskey } from "@/lib/passkeys";
 import { isTotpEnabled } from "@/lib/totp";
 import { issuePendingLogin } from "@/lib/pendingLogin";
@@ -183,6 +183,8 @@ passkeysRoutes.openapi(authVerifyRoute, async (c) => {
   const ip = getClientIp(c);
   const throttled = throttleCheck(ip);
   if (throttled.blocked) return c.json({ error: "Too many attempts", retryAfter: throttled.retryAfter }, 429);
+  const addressLockout = checkSigninAddress(ip, personId);
+  if (addressLockout.blocked) return c.json({ error: "Too many attempts", retryAfter: addressLockout.retryAfter }, 429);
   const lockout = currentLockout(personId);
   if (lockout?.lockedUntil && new Date(lockout.lockedUntil).getTime() > Date.now()) {
     const retryAfter = Math.ceil((new Date(lockout.lockedUntil).getTime() - Date.now()) / 1000);
@@ -194,10 +196,11 @@ passkeysRoutes.openapi(authVerifyRoute, async (c) => {
     throttleFail(ip);
     ensureCredentialRowExists(personId);
     const { failedAttempts } = recordFailedAttempt(personId);
-    return c.json({ error: result.error ?? "Could not verify this passkey.", attemptsLeft: Math.max(0, LOCKOUT_THRESHOLD - failedAttempts) }, 401);
+    return c.json({ error: result.error ?? "Could not verify this passkey.", attemptsLeft: failSigninAddress(ip, personId) }, 401);
   }
 
   throttleReset(ip);
+  resetSigninAddress(ip, personId);
   clearFailedAttempts(personId);
 
   if (isTotpEnabled(personId)) return c.json({ success: true as const, totpRequired: true, pendingToken: issuePendingLogin(personId) }, 200);

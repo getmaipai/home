@@ -7,6 +7,10 @@ import {
   ensureCredentialRowExists,
   currentLockout,
   LOCKOUT_THRESHOLD,
+  PROFILE_SIGNIN_LOCKOUT_THRESHOLD,
+  checkSigninAddress,
+  failSigninAddress,
+  __resetSigninAddressForTests,
 } from "@/lib/credentialLockout";
 import { newPersonId } from "@/lib/id";
 import { db } from "@/db";
@@ -31,7 +35,7 @@ function insertPerson(): string {
   return personId;
 }
 
-beforeEach(() => resetDb());
+beforeEach(() => { resetDb(); __resetSigninAddressForTests(); });
 
 describe("lockout backoff", () => {
   // No "stays at zero below the threshold" case: lockoutDurationMs's only
@@ -68,7 +72,7 @@ describe("recordFailedAttempt (atomic counter)", () => {
     expect(first.failedAttempts).toBe(4);
     const second = recordFailedAttempt(personId);
     expect(second.failedAttempts).toBe(5);
-    expect(second.lockedUntil).not.toBeNull();
+    expect(second.lockedUntil).toBeNull();
   });
 
   // Step 6: a passkey-only person has a personCredentials row with a
@@ -104,10 +108,29 @@ describe("clearFailedAttempts()", () => {
   test("resets both the counter and the lockout timestamp", () => {
     const personId = insertPerson();
     ensureCredentialRowExists(personId);
-    for (let i = 0; i < LOCKOUT_THRESHOLD; i++) recordFailedAttempt(personId);
+    for (let i = 0; i < PROFILE_SIGNIN_LOCKOUT_THRESHOLD; i++) recordFailedAttempt(personId);
     expect(currentLockout(personId)?.lockedUntil).not.toBeNull();
 
     clearFailedAttempts(personId);
     expect(currentLockout(personId)).toEqual({ failedAttempts: 0, lockedUntil: null });
+  });
+});
+
+describe("sign-in lockout budgets", () => {
+  test("five failures lock one address/profile pair while another address stays open", () => {
+    for (let i = 0; i < LOCKOUT_THRESHOLD; i++) failSigninAddress("192.0.2.1", "public-profile");
+    expect(checkSigninAddress("192.0.2.1", "public-profile").blocked).toBe(true);
+    expect(checkSigninAddress("192.0.2.2", "public-profile").blocked).toBe(false);
+  });
+
+  test("the profile lock threshold is 25 and adult unlock remains five", () => {
+    expect(PROFILE_SIGNIN_LOCKOUT_THRESHOLD).toBe(25);
+    const personId = insertPerson();
+    ensureCredentialRowExists(personId);
+    for (let i = 0; i < PROFILE_SIGNIN_LOCKOUT_THRESHOLD - 1; i++) recordFailedAttempt(personId, "signin");
+    expect(recordFailedAttempt(personId, "signin").lockedUntil).not.toBeNull();
+    clearFailedAttempts(personId, "signin");
+    for (let i = 0; i < LOCKOUT_THRESHOLD - 1; i++) recordFailedAttempt(personId, "adult_unlock");
+    expect(recordFailedAttempt(personId, "adult_unlock").lockedUntil).not.toBeNull();
   });
 });

@@ -1,6 +1,8 @@
 import { describe, expect, test, beforeEach } from "bun:test";
 import { TestClient } from "./client";
 import { resetDb } from "./reset-db";
+import { addManagedEndpoint } from "@/lib/hubEndpoints";
+import { __resetHostCheckForTests } from "@/middleware/hostCheck";
 
 beforeEach(() => resetDb());
 
@@ -36,6 +38,8 @@ describe("GET /api/auth/sessions", () => {
 
 describe("GET /api/auth/sessions/away", () => {
   test("an admin asking for another person's away sessions is refused", async () => {
+    addManagedEndpoint("Away Home", "https://home.ts.net");
+    __resetHostCheckForTests();
     const admin = new TestClient();
     const setup = await admin.post("/api/auth/setup", { displayName: "Sage", secret: "correcthorse" });
     const { person } = await setup.json() as { person: { id: string } };

@@ -33,6 +33,7 @@ describe("rotateRobotPassword()", () => {
         port: sshd.port,
         username: "pollen",
         currentPassword: "reachy-default",
+        onHostKey: () => true,
       });
 
       expect(newPassword).toMatch(/^[A-Za-z0-9_-]+$/);
@@ -61,6 +62,7 @@ describe("rotateRobotPassword()", () => {
           port: sshd.port,
           username: "pollen",
           currentPassword: "wrong-password",
+          onHostKey: () => true,
           connectTimeoutMs: 3000,
         }),
       ).rejects.toThrow();
@@ -83,6 +85,7 @@ describe("rotateRobotPassword()", () => {
           port: sshd.port,
           username: "pollen",
           currentPassword: "reachy-default",
+        onHostKey: () => true,
         }),
       ).rejects.toThrow(RobotPasswordRotationError);
     } finally {
@@ -105,6 +108,7 @@ describe("rotateRobotPassword()", () => {
         port: sshd.port,
         username: "pollen",
         currentPassword: "reachy-default",
+        onHostKey: () => true,
       });
       expect(logged.some((line) => line.includes(newPassword))).toBe(false);
     } finally {

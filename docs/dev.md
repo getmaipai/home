@@ -2384,6 +2384,9 @@ set. Full architecture: platform plan chapters 1, 3, and 4.
       - Per-profile lockout (5 failed attempts, then 30s/2m/10m/1h
         exponential backoff) plus a global per-IP throttle, so one host
         can't brute-force every profile in parallel.
+      - 2026-11-06 AUDIT-SIGNIN-01: sign-in now locks an address/profile pair
+        at 5 failures and a profile globally at 25; adult unlock remains 5
+        per profile.
       - Sessions: `HttpOnly`/`SameSite=Strict` cookies, `Secure` set
         automatically when the request arrived over HTTPS, a 10s in-memory
         resolution cache keyed by token hash (never a raw token), and a

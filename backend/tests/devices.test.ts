@@ -1,7 +1,7 @@
 import { describe, expect, test, beforeEach } from "bun:test";
 import { TestClient } from "./client";
 import { resetDb } from "./reset-db";
-import { startFakeSshd } from "./fixtures/fakeSshd";
+import { startFakeSshd, generateFakeSshHostKey } from "./fixtures/fakeSshd";
 import { issueDeviceToken } from "@/lib/deviceTokens";
 import { hasRotatedRobotCredential, getRobotCredential, storeRobotCredential } from "@/lib/robotCredentials";
 import { db } from "@/db";
@@ -475,6 +475,7 @@ describe("POST /api/devices/:id/rotate-robot-password", () => {
 
       expect(hasRotatedRobotCredential(deviceId)).toBe(true);
       const stored = getRobotCredential(deviceId)!;
+      expect(stored.sshHostKey).toMatch(/^SHA256:[A-Za-z0-9+/]+$/);
       expect(receivedStdin).toBe(`pollen:${stored.password}`);
       // The response body never carries the password itself.
       expect(JSON.stringify(body)).not.toContain(stored.password);
@@ -509,7 +510,9 @@ describe("POST /api/devices/:id/rotate-robot-password", () => {
   test("'Rotate again' needs no password typed - the server tries the device's own stored credential first", async () => {
     const { client, personId } = await owner();
     const { deviceId } = issueDeviceToken(personId, "robot", "Reachy Mini");
+    const hostKey = generateFakeSshHostKey();
     const firstSshd = await startFakeSshd({
+      hostKey,
       username: "pollen",
       password: "reachy-default",
       onCommand: () => ({ code: 0 }),
@@ -530,13 +533,14 @@ describe("POST /api/devices/:id/rotate-robot-password", () => {
     // a second fake sshd stands in for the same unit, now only accepting
     // that password, never the original vendor default again.
     const secondSshd = await startFakeSshd({
+      hostKey,
       username: "pollen",
       password: firstRotated,
       onCommand: () => ({ code: 0 }),
     });
     try {
       const res = await client.post(`/api/devices/${deviceId}/rotate-robot-password`, {
-        host: "127.0.0.1",
+        host: "localhost",
         port: secondSshd.port,
         sshUsername: "pollen",
         // No currentPassword at all.
@@ -548,7 +552,7 @@ describe("POST /api/devices/:id/rotate-robot-password", () => {
     }
   });
 
-  test("re-pairing a revoked robot at the same host succeeds with no password typed, using the credential its predecessor left behind", async () => {
+  test("re-pairing a revoked robot at a new address succeeds with no password typed when its SSH key matches", async () => {
     // ROBOT-DEVICE-01's own bug (a code review, 2026-09-27): revoke a
     // rotated robot and re-pair the same physical unit, and the new
     // device row's own rotation used to demand the vendor default, which
@@ -557,7 +561,9 @@ describe("POST /api/devices/:id/rotate-robot-password", () => {
     // acceptance test.
     const { client, personId } = await owner();
     const { deviceId: firstDeviceId } = issueDeviceToken(personId, "robot", "Reachy Mini");
+    const hostKey = generateFakeSshHostKey();
     const firstSshd = await startFakeSshd({
+      hostKey,
       username: "pollen",
       password: "reachy-default",
       onCommand: () => ({ code: 0 }),
@@ -583,13 +589,14 @@ describe("POST /api/devices/:id/rotate-robot-password", () => {
     expect(hasRotatedRobotCredential(secondDeviceId)).toBe(false);
 
     const secondSshd = await startFakeSshd({
+      hostKey,
       username: "pollen",
       password: rotatedPassword,
       onCommand: () => ({ code: 0 }),
     });
     try {
       const res = await client.post(`/api/devices/${secondDeviceId}/rotate-robot-password`, {
-        host: "127.0.0.1",
+        host: "localhost",
         port: secondSshd.port,
         sshUsername: "pollen",
         // No currentPassword: the admin doesn't know the last rotation's
@@ -600,6 +607,24 @@ describe("POST /api/devices/:id/rotate-robot-password", () => {
     } finally {
       await secondSshd.close();
     }
+  });
+
+  test("a different SSH key at the old address never receives the saved password", async () => {
+    const { client, personId } = await owner();
+    const { deviceId } = issueDeviceToken(personId, "robot", "Reachy Mini");
+    const key = generateFakeSshHostKey();
+    const first = await startFakeSshd({ hostKey: key, username: "pollen", password: "reachy-default", onCommand: () => ({ code: 0 }) });
+    try {
+      await client.post(`/api/devices/${deviceId}/rotate-robot-password`, { host: "127.0.0.1", port: first.port, sshUsername: "pollen", currentPassword: "reachy-default" });
+    } finally { await first.close(); }
+
+    let attempts = 0;
+    const other = await startFakeSshd({ username: "pollen", password: getRobotCredential(deviceId)!.password, onCommand: () => ({ code: 0 }), onPasswordAttempt: () => { attempts += 1; } });
+    try {
+      const response = await client.post(`/api/devices/${deviceId}/rotate-robot-password`, { host: "127.0.0.1", port: other.port, sshUsername: "pollen" });
+      expect(response.status).toBe(400);
+      expect(attempts).toBe(0);
+    } finally { await other.close(); }
   });
 
   test("a non-admin adult is refused: rotating credentials is a household admin action", async () => {

@@ -886,7 +886,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/robotCheckin.ts` | ROBOT_CHECKIN_ONLINE_MS, recordRobotCheckin, getRobotCheckin, getRobotUnitOnlineAt, forgetRobotCheckin |
 | `backend/src/lib/robotClips.ts` | buildRobotClips, clipTextPassesFloor, robotClipBundlePath, robotClipBundleExists, readRobotClipBundle, robotClipAssetForDevice |
 | `backend/src/lib/robotCompanion.ts` | ROBOT_CONTROLS_KEY, ROBOT_COMPANION_KEY, companionAudienceOf, companionFloor, companionInfo, allCompanions |
-| `backend/src/lib/robotCredentials.ts` | storeRobotCredential, getRobotCredential, getMostRecentRobotCredentialForHost, hasRotatedRobotCredential, robotNeedsPasswordRotation |
+| `backend/src/lib/robotCredentials.ts` | storeRobotCredential, getRobotCredential, getRobotCredentialForHostKey, hasRotatedRobotCredential, robotNeedsPasswordRotation |
 | `backend/src/lib/robotDiscovery.ts` | discoverRobots |
 | `backend/src/lib/robotHost.ts` | __setRobotHostReleaseForTests, robotHostRelease, robotHostRunningVersion, __resetRobotHostsForTests, getRobotHostRecord, updateRobotHostRecord |
 | `backend/src/lib/robotOffers.ts` | OFFER_SNOOZE_MS, OFFER_BACKOFF_MS, OFFER_BACKOFF_AFTER_IGNORED, DEFAULT_OFFER_TTL_MS, createRobotOffer, personMayBeAddressed |

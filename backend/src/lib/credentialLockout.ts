@@ -17,11 +17,47 @@ import { sqlite } from "@/db";
 import { db } from "@/db";
 import { personCredentials } from "@/db/schema";
 import { eq } from "drizzle-orm";
+import { createThrottle } from "@maipai/core/src/secretThrottle";
 
 // Exponential backoff once a profile crosses the failed-attempt
 // threshold: 30s, 2m, 10m, 1h. 4.1: "Rate limits and lockouts apply to
 // PIN, password and passkey ceremonies alike."
 export const LOCKOUT_THRESHOLD = 5;
+export const PROFILE_SIGNIN_LOCKOUT_THRESHOLD = 25;
+const signinAddressThrottle = createThrottle({ maxFails: LOCKOUT_THRESHOLD, windowMs: 30_000 });
+const signinAddressFailures = new Map<string, number>();
+const signinAddressLockedUntil = new Map<string, number>();
+const MAX_SIGNIN_ADDRESS_BUCKETS = 5_000;
+
+export function checkSigninAddress(ip: string, personId: string): { blocked: boolean; retryAfter: number; attemptsLeft: number } {
+  const key = `signin:${personId}:${ip}`;
+  const lockedUntil = signinAddressLockedUntil.get(key) ?? 0;
+  if (lockedUntil > Date.now()) return { blocked: true, retryAfter: Math.ceil((lockedUntil - Date.now()) / 1000), attemptsLeft: Math.max(0, LOCKOUT_THRESHOLD - (signinAddressFailures.get(key) ?? 0)) };
+  const checked = signinAddressThrottle.check(key);
+  return { ...checked, attemptsLeft: Math.max(0, LOCKOUT_THRESHOLD - (signinAddressFailures.get(key) ?? 0)) };
+}
+
+export function failSigninAddress(ip: string, personId: string): number {
+  const key = `signin:${personId}:${ip}`;
+  if (!signinAddressFailures.has(key) && signinAddressFailures.size >= MAX_SIGNIN_ADDRESS_BUCKETS) {
+    const oldest = signinAddressFailures.keys().next().value;
+    if (oldest) { signinAddressFailures.delete(oldest); signinAddressLockedUntil.delete(oldest); }
+  }
+  const attempts = (signinAddressFailures.get(key) ?? 0) + 1;
+  signinAddressFailures.set(key, attempts);
+  signinAddressThrottle.fail(key);
+  if (attempts >= LOCKOUT_THRESHOLD) signinAddressLockedUntil.set(key, Date.now() + lockoutDurationMs(attempts, LOCKOUT_THRESHOLD));
+  return Math.max(0, LOCKOUT_THRESHOLD - attempts);
+}
+
+export function resetSigninAddress(ip: string, personId: string): void {
+  const key = `signin:${personId}:${ip}`;
+  signinAddressFailures.delete(key);
+  signinAddressLockedUntil.delete(key);
+  signinAddressThrottle.reset(key);
+}
+
+export function __resetSigninAddressForTests(): void { signinAddressFailures.clear(); signinAddressLockedUntil.clear(); signinAddressThrottle.__resetForTests(); }
 
 // Contract: only meaningful for failedAttempts >= LOCKOUT_THRESHOLD (the
 // only way a caller reaches it). A code review (2026-09-04) found a
@@ -31,9 +67,9 @@ export const LOCKOUT_THRESHOLD = 5;
 // Removed rather than kept "for safety": a clamp that hides an
 // out-of-contract call is worse than letting it throw, per the org
 // testing standard ("a test asserts behavior a person cares about").
-export function lockoutDurationMs(failedAttempts: number): number {
+export function lockoutDurationMs(failedAttempts: number, threshold = LOCKOUT_THRESHOLD): number {
   const backoffs = [30_000, 120_000, 600_000, 3_600_000];
-  const index = Math.min(failedAttempts - LOCKOUT_THRESHOLD, backoffs.length - 1);
+  const index = Math.min(failedAttempts - threshold, backoffs.length - 1);
   return backoffs[index] ?? 3_600_000;
 }
 
@@ -94,9 +130,10 @@ export const recordFailedAttempt = sqlite.transaction((personId: string, purpose
     .query(`SELECT ${countColumn} AS n FROM person_credentials WHERE person_id = ?`)
     .get(personId) as { n: number } | undefined;
   const failedAttempts = (row?.n ?? 0) + 1;
+  const threshold = purpose === "adult_unlock" ? LOCKOUT_THRESHOLD : PROFILE_SIGNIN_LOCKOUT_THRESHOLD;
   const lockedUntil =
-    failedAttempts >= LOCKOUT_THRESHOLD
-      ? new Date(Date.now() + lockoutDurationMs(failedAttempts)).toISOString()
+    failedAttempts >= threshold
+    ? new Date(Date.now() + lockoutDurationMs(failedAttempts, threshold)).toISOString()
       : null;
   sqlite
     .query(

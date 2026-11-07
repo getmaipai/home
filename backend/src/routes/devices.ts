@@ -20,8 +20,8 @@ import { forgetRobotSocketAddress, getDeviceState, getPendingMotorRebootOffer, g
 import { speakerAgeBand } from "@/lib/ageBand";
 import { RobotState } from "@maipai/spec/gen/ts/robot-state.js";
 import { discoverRobots } from "@/lib/robotDiscovery";
-import { rotateRobotPassword, RobotPasswordRotationError } from "@/lib/robotSsh";
-import { storeRobotCredential, hasRotatedRobotCredential, getRobotCredential, getMostRecentRobotCredentialForHost } from "@/lib/robotCredentials";
+import { rotateRobotPassword, readRobotHostKey } from "@/lib/robotSsh";
+import { storeRobotCredential, hasRotatedRobotCredential, getRobotCredential, getRobotCredentialForHostKey } from "@/lib/robotCredentials";
 import { ensureRobotAssets, isRobotAssetAvailable, readVerifiedRobotAsset, robotAssetById, ROBOT_ASSETS } from "@/lib/robotAssets";
 import { readRobotClipBundle, readVerifiedRobotClipAsset, robotClipAssetForDevice, robotClipBundleExists } from "@/lib/robotClips";
 import { closeDeviceCommandChannel, deviceCommandWebSocket, issueDeviceCommand } from "@/lib/deviceCommands";
@@ -689,7 +689,7 @@ const rotatePasswordRoute = createRoute({
               .string()
               .min(1)
               .optional()
-              .openapi({ description: "The vendor's own published default - never stored. Optional once this device or another at the same host has a rotated password on file; that one is tried first." }),
+              .openapi({ description: "The vendor's own published default - never stored. Optional when this robot's SSH host key has a rotated password on file." }),
           }),
         },
       },
@@ -727,34 +727,27 @@ devicesRoutes.openapi(rotatePasswordRoute, async (c) => {
   // password is a deliberate signal - it goes first. Stored credentials
   // exist only to let "Rotate again" and a same-unit re-pair need no
   // typing at all, so they're the fallback, never a guess ahead of one.
-  const candidates: string[] = [];
-  if (currentPassword) candidates.push(currentPassword);
-  const ownCredential = getRobotCredential(device.id);
-  if (ownCredential && !candidates.includes(ownCredential.password)) candidates.push(ownCredential.password);
-  const hostCredential = getMostRecentRobotCredentialForHost(host);
-  if (hostCredential && !candidates.includes(hostCredential.password)) candidates.push(hostCredential.password);
-
-  if (candidates.length === 0) {
-    return c.json({ error: "The robot's current password is required the first time it's rotated." }, 400);
-  }
-
   let newPassword: string | undefined;
-  let lastError: unknown;
-  for (const candidate of candidates) {
+  let sshHostKey = "";
+  if (currentPassword) {
     try {
-      ({ newPassword } = await rotateRobotPassword({ host, port, username: sshUsername, currentPassword: candidate }));
-      break;
-    } catch (err) {
-      lastError = err;
+      ({ newPassword } = await rotateRobotPassword({ host, port, username: sshUsername, currentPassword, onHostKey: (fingerprint) => { sshHostKey = fingerprint; return true; } }));
+    } catch { /* a typed password is first; a matching saved credential may still open this same keyed unit */ }
+  }
+  if (!newPassword) {
+    if (!sshHostKey) sshHostKey = await readRobotHostKey({ host, port, username: sshUsername }).catch(() => "");
+    const own = getRobotCredential(device.id);
+    const saved = sshHostKey && own?.sshHostKey === sshHostKey && own.sshHostKey !== null ? own : sshHostKey ? getRobotCredentialForHostKey(sshHostKey) : null;
+    if (saved?.sshHostKey === sshHostKey && sshHostKey) {
+      try {
+        ({ newPassword } = await rotateRobotPassword({ host, port, username: sshUsername, currentPassword: saved.password, onHostKey: (fingerprint) => fingerprint === sshHostKey }));
+      } catch { /* handled by the truthful sign-in guidance below */ }
     }
   }
-  if (newPassword === undefined) {
-    const message = lastError instanceof RobotPasswordRotationError ? lastError.message : "Could not connect or change the password";
-    return c.json({ error: message }, 400);
-  }
+  if (!newPassword || !sshHostKey) return c.json({ error: "Home could not sign in to the robot. Reset it to its vendor default password, then try again with that password." }, 400);
 
   try {
-    storeRobotCredential(device.id, host, sshUsername, newPassword);
+    storeRobotCredential(device.id, host, sshUsername, newPassword!, sshHostKey!);
   } catch (err) {
     // The robot's password already changed at this point - only the write
     // to our own store failed. Never log the password itself; the admin

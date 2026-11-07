@@ -35,8 +35,16 @@ function hasForwardingHeader(headers: Headers): boolean {
   return false;
 }
 
+export function parseHostName(host: string | undefined): string | null {
+  if (!host) return null;
+  const value = host.trim().toLowerCase();
+  if (value.startsWith("[")) return value.match(/^\[([^\]]+)\](?::\d+)?$/)?.[1] ?? null;
+  const colon = value.lastIndexOf(":");
+  return colon >= 0 && /^\d+$/.test(value.slice(colon + 1)) ? value.slice(0, colon) : value;
+}
+
 export function isLocalHost(host: string | undefined): boolean {
-  return !!host && /^(?:localhost|127\.0\.0\.1|\[::1\])(?::\d+)?$/i.test(host);
+  return ["localhost", "127.0.0.1", "::1"].includes(parseHostName(host) ?? "");
 }
 
 export function isLoopbackPeer(c: Context): boolean {

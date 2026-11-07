@@ -83,11 +83,20 @@ function sweep(): void {
 // is meant to be requested a handful of times per real device setup,
 // never in a tight loop, regardless of which address it comes from.
 const CODE_RATE_LIMIT = { capacity: 20, refillPerSecond: 0.2 };
+const GLOBAL_RATE_LIMIT = { capacity: 200, refillPerSecond: 2 };
+const POLL_RATE_LIMIT = { capacity: 60, refillPerSecond: 1 };
+const POLL_GLOBAL_RATE_LIMIT = { capacity: 600, refillPerSecond: 10 };
+
+function consumeAddressBudget(kind: "create" | "poll", ip: string): boolean {
+  const perAddress = kind === "create" ? CODE_RATE_LIMIT : POLL_RATE_LIMIT;
+  const global = kind === "create" ? GLOBAL_RATE_LIMIT : POLL_GLOBAL_RATE_LIMIT;
+  return tryConsume(`quick-connect:${kind}:${ip}`, perAddress) && tryConsume(`quick-connect:${kind}:global`, global);
+}
 
 /** Start a login: the caller shows this code and polls with its own
  * poll_token until approved. Returns null if the rate limit is hit. */
-export function createQuickConnect(label: string, kind: DeviceKind, capabilities: string[] = [], existingDeviceId?: string, autoApprovedPersonId?: string): QuickConnectRequest | null {
-  if (!tryConsume("quick-connect:create", CODE_RATE_LIMIT)) return null;
+export function createQuickConnect(ip: string, label: string, kind: DeviceKind, capabilities: string[] = [], existingDeviceId?: string, autoApprovedPersonId?: string): QuickConnectRequest | null {
+  if (!consumeAddressBudget("create", ip)) return null;
   sweep();
   let code = newCode();
   while (requestsByCode.has(code)) code = newCode();
@@ -134,8 +143,8 @@ export function approveQuickConnect(code: string, personId: string): boolean {
 
 /** The waiting device polls with its poll_token, exactly once claiming
  * the approval. Null for unknown/expired/not-yet-approved/already-claimed. */
-export function consumeQuickConnect(pollToken: string): { personId: string; kind: DeviceKind; label: string; capabilities: string[]; existingDeviceId?: string } | null {
-  if (!tryConsume("quick-connect:poll", CODE_RATE_LIMIT)) return null;
+export function consumeQuickConnect(pollToken: string, ip: string): { rateLimited: true } | { personId: string; kind: DeviceKind; label: string; capabilities: string[]; existingDeviceId?: string } | null {
+  if (!consumeAddressBudget("poll", ip)) return { rateLimited: true };
   const req = getByPollToken(pollToken);
   if (!req || !req.approvedPersonId || req.consumed) return null;
   req.consumed = true;

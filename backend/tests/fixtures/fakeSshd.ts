@@ -12,6 +12,9 @@ export interface FakeSshdOptions {
   password: string;
   /** The exact command the client is expected to exec; anything else is refused. */
   command?: string;
+  /** Reuse this key when two test listeners represent one physical robot. */
+  hostKey?: { private: string; public: string };
+  onPasswordAttempt?: (username: string, password: string) => void;
   /** Called with the exact stdin the client sent; returns the exit code and any stderr. */
   onCommand: (stdin: string) => { code: number; stderr?: string };
 }
@@ -38,13 +41,14 @@ export function generateFakeSshHostKey(): { private: string; public: string } {
 }
 
 export async function startFakeSshd(opts: FakeSshdOptions): Promise<FakeSshd> {
-  const hostKey = generateFakeSshHostKey();
+  const hostKey = opts.hostKey ?? generateFakeSshHostKey();
   const expectedCommand = opts.command ?? "sudo chpasswd";
 
   const server = new Server({ hostKeys: [hostKey.private] }, (client) => {
     client
       .on("authentication", (ctx) => {
         if (ctx.method !== "password") return ctx.reject(["password"]);
+        opts.onPasswordAttempt?.(ctx.username, ctx.password);
         if (!safeEqual(ctx.username, opts.username) || !safeEqual(ctx.password, opts.password)) {
           return ctx.reject(["password"]);
         }

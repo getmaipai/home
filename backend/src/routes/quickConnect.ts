@@ -14,6 +14,7 @@ import { people } from "@/db/schema";
 import { renderClipBundle } from "@/lib/robotClips";
 import { robotsEnabled, ROBOTS_OFF_MESSAGE } from "@/lib/robots";
 import { matchHostedRobotSecret, consumeHostedRobotSecret } from "@/lib/robotHost";
+import { getClientIp } from "@/lib/secretThrottle";
 
 export const quickConnectRoutes = apiRouter();
 
@@ -65,7 +66,7 @@ quickConnectRoutes.openapi(createRouteDef, (c) => {
     return c.json({ error: ROBOTS_OFF_MESSAGE }, 403);
   }
   const matched = matchHostedRobotSecret({ kind, pairingSecret: pairing_secret });
-  const req = createQuickConnect(label, kind, capabilities, matched?.existingDeviceId, matched?.personId);
+  const req = createQuickConnect(getClientIp(c), label, kind, capabilities, matched?.existingDeviceId, matched?.personId);
   if (!req) return c.json({ error: "Too many Quick Connect requests right now. Wait a moment and try again." }, 429);
   if (matched) consumeHostedRobotSecret(matched.existingDeviceId);
   return c.json({ code: req.code, poll_token: req.pollToken }, 200);
@@ -92,11 +93,13 @@ const pollRoute = createRoute({
       },
       description: "\"pending\" while waiting, \"approved\" exactly once (a session cookie is also set for this address, except for a robot device - see the handler), \"expired\" for an unknown or timed-out poll_token.",
     },
+    ...errorResponses({ 429: "Too many checks. Wait a moment." }),
   },
 });
 quickConnectRoutes.openapi(pollRoute, (c) => {
   const { poll_token } = c.req.valid("query");
-  const approved = consumeQuickConnect(poll_token);
+  const approved = consumeQuickConnect(poll_token, getClientIp(c));
+  if (approved && "rateLimited" in approved) return c.json({ error: "Too many checks. Wait a moment.", retryAfter: 1 }, 429);
   // No TOTP check here by design: approveRoute below already required a
   // current code from the approver when they have TOTP enabled, before
   // this ever became consumable. This just redeems that already-2FA'd
