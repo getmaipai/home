@@ -80,7 +80,10 @@ export const THINKING_ON_MAX_TOKENS = RESIDENT_BUDGET.reply_ceiling_tokens + RES
 // never a silently shorter tool list: "five-tool block present" is the
 // ruling's own literal test condition, not "up to five."
 function productionTools(): ToolSpec[] {
-  const tools = RESIDENT_BUDGET.tools_offered
+  // PROJECT-TOOL-REFUSAL-01: start_project is offered only while a project type is registered, so the offered set is
+  // resolved when the stages are built, not at import (a test registers its fixture type first).
+  const offered = resolveTurnBudget(RESIDENT_MODEL_ID).tools_offered;
+  const tools = offered
     .slice()
     .sort()
     .map((id) => {
@@ -89,8 +92,8 @@ function productionTools(): ToolSpec[] {
       if (!loaded.ok) throw new Error(`productionTools(): manifest for "${id}" failed to load (${loaded.status} ${loaded.error}) - the tool block would be silently short of the ruling's "five-tool block present"`);
       return { id, description: loaded.value.description, args: loaded.value.args };
     });
-  if (tools.length !== RESIDENT_BUDGET.tools_offered.length) {
-    throw new Error(`productionTools(): expected ${RESIDENT_BUDGET.tools_offered.length} tools, built ${tools.length}`);
+  if (tools.length !== offered.length) {
+    throw new Error(`productionTools(): expected ${offered.length} tools, built ${tools.length}`);
   }
   return tools;
 }

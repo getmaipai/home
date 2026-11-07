@@ -2,7 +2,9 @@
 // (no live call, no setup.ts import-time guard), tested directly
 // against DEFAULT_PERSONA, mirroring parityBisect3Stages.test.ts's own
 // style.
-import { describe, expect, test } from "bun:test";
+import { afterAll, beforeAll, describe, expect, test } from "bun:test";
+import { registerFixtureProjectType } from "./projectTypeFixture";
+import { __resetProjectTypesForTests } from "@/lib/projects/projectTypes";
 import {
   DEFAULT_PERSONA,
   FORMALITY_FRAGMENT_WRITTEN,
@@ -154,6 +156,10 @@ describe("parity-bisect4-stages: buildStages4()", () => {
     expect(armF.opts.max_tokens).toBe(THINKING_ON_MAX_TOKENS);
     expect(THINKING_ON_MAX_TOKENS).toBeGreaterThan(0);
   });
+
+  // PROJECT-TOOL-REFUSAL-01: start_project is offered only while a project type is registered.
+  beforeAll(() => registerFixtureProjectType());
+  afterAll(() => __resetProjectTypesForTests());
 
   test("arms e and f carry the real, ordinary-turn tool block (Fable's own ruling: 'five-tool block present', grown to nine by SIGNAL-02's math/convert/almanac-time/almanac-date, then ten by PROJECT-START-01's start_project) - every other arm and the floor carry none", () => {
     const stages = buildStages4(DEFAULT_PERSONA);
