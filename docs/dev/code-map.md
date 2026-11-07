@@ -304,6 +304,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `frontend/src/shell/pages/performance/LayersBody.tsx` | LayersBody |
 | `frontend/src/shell/pages/performance/QueuesBody.tsx` | QueuesBody |
 | `frontend/src/shell/pages/performance/RoutesBody.tsx` | RoutesBody |
+| `frontend/src/shell/pages/performance/ToolsOfferedBody.tsx` | ToolsOfferedBody |
 | `frontend/src/shell/pages/performance/TurnsByEngineBody.tsx` | TurnsByEngineBody |
 | `frontend/src/shell/pages/performance/TurnsChartBody.tsx` | TurnsChartBody |
 | `frontend/src/shell/pages/settings/ChatShortcutsView.tsx` | ChatShortcutsView |
