@@ -78972,6 +78972,57 @@
                   },
                   "look_prompt": {
                     "type": "string"
+                  },
+                  "based_on": {
+                    "type": "object",
+                    "properties": {
+                      "kind": {
+                        "type": "string",
+                        "enum": [
+                          "none",
+                          "household_member",
+                          "real_person"
+                        ]
+                      },
+                      "person_id": {
+                        "type": "string",
+                        "nullable": true
+                      },
+                      "name": {
+                        "type": "string",
+                        "nullable": true,
+                        "maxLength": 120
+                      },
+                      "refresh": {
+                        "type": "string",
+                        "enum": [
+                          "1d",
+                          "7d"
+                        ],
+                        "default": "7d"
+                      },
+                      "minor": {
+                        "type": "boolean",
+                        "default": false
+                      }
+                    },
+                    "required": [
+                      "kind"
+                    ]
+                  },
+                  "life": {
+                    "type": "object",
+                    "properties": {
+                      "enabled": {
+                        "type": "boolean",
+                        "default": true
+                      },
+                      "seed": {
+                        "type": "string",
+                        "maxLength": 500,
+                        "default": ""
+                      }
+                    }
                   }
                 }
               }
@@ -78980,7 +79031,7 @@
         },
         "responses": {
           "201": {
-            "description": "Draft created.",
+            "description": "Draft or synth created.",
             "content": {
               "application/json": {
                 "schema": {
@@ -78988,6 +79039,9 @@
                   "properties": {
                     "id": {
                       "type": "string"
+                    },
+                    "researching": {
+                      "type": "boolean"
                     }
                   },
                   "required": [
@@ -79033,6 +79087,16 @@
           },
           "403": {
             "description": "Only adults can make a companion.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "A requested synth source could not be found.",
             "content": {
               "application/json": {
                 "schema": {
@@ -79749,6 +79813,9 @@
                         "people",
                         "robots"
                       ]
+                    },
+                    "researching": {
+                      "type": "boolean"
                     }
                   },
                   "required": [
@@ -79780,7 +79847,8 @@
                     "voice_value",
                     "voice_is_own",
                     "voice_setting",
-                    "used_by"
+                    "used_by",
+                    "researching"
                   ]
                 }
               }
@@ -80460,6 +80528,88 @@
                   "required": [
                     "error"
                   ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/companions/{id}/research": {
+      "post": {
+        "tags": [
+          "Companions"
+        ],
+        "summary": "Refresh a synth's public history",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "moss"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Research result.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "facts": {
+                      "type": "number"
+                    },
+                    "views": {
+                      "type": "number"
+                    },
+                    "style": {
+                      "type": "boolean"
+                    },
+                    "skipped": {
+                      "type": "string",
+                      "nullable": true
+                    }
+                  },
+                  "required": [
+                    "facts",
+                    "views",
+                    "style",
+                    "skipped"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Only the owner or an admin can refresh a synth's history.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "That synth could not be found. Check its ID and try again.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
                 }
               }
             }
