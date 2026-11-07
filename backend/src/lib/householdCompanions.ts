@@ -12,6 +12,8 @@ type Companion = NonNullable<Manifest["companion"]>;
 export type CompanionAuthor = { display_name: string; person_id?: string };
 export type CompanionCopyOptions = { keepAudience?: boolean; keepStatus?: boolean; copyLook?: boolean; synth?: Partial<Synth> };
 const ID_PATTERN = /^hc-[a-z0-9]+(?:-[a-z0-9]+)*$/;
+/** spec/schemas/synth.schema.json owner_person_id (the shape lib/id.ts makes). */
+const SPEC_PERSON_ID = /^person-[a-z0-9]{6,}$/;
 function validId(id: string): boolean { return ID_PATTERN.test(id) && id.length <= 40; }
 function folder(id: string): string | null { return validId(id) ? join(root(), id) : null; }
 /** The on-disk directory for a valid household companion. Bundled companions have no such directory. */
@@ -80,6 +82,7 @@ export function householdCompanionAuthorId(id: string): string | null {
   try {
     const value = JSON.parse(readFileSync(join(dir, "owner.json"), "utf8")) as { person_id?: unknown };
     if (typeof value.person_id !== "string") return null;
+    if (!SPEC_PERSON_ID.test(value.person_id)) return value.person_id;
     const now = new Date().toISOString();
     const migrated = write({ ...manifest, synth: { based_on: { kind: "none", person_id: null, name: null, refresh: "7d", minor: false }, life: { enabled: true, seed: "" }, subject_id: null, pins: { dials: [], examples: [] }, phrase_sources: {}, forked_from: null, private_to: null, owner_person_id: value.person_id, provenance: "migration:owner-json", created_at: now, updated_at: now, hlc: nextHlc() } });
     if (migrated.ok) rmSync(join(dir, "owner.json"), { force: true });
@@ -117,9 +120,16 @@ export function createHouseholdCompanion(input: Companion, author: CompanionAuth
   while (occupied.has(id)) { const tail = `-${suffix++}`; id = `${base.slice(0, 40 - tail.length).replace(/-+$/g, "")}${tail}`; }
   const companion = Object.assign({ formality: "neutral", complexity: "standard", engagement: "balanced", filler_density: "light" }, clean, options.companion, { display_name: name, audience: startingAudience, status: options.companion?.status ?? "draft" });
   const now = new Date().toISOString();
-  const synth = author.person_id ? { based_on: { kind: "none" as const, person_id: null, name: null, refresh: "7d" as const, minor: false }, life: { enabled: true, seed: "" }, subject_id: null, pins: { dials: [], examples: [] }, phrase_sources: {}, forked_from: null, private_to: null, owner_person_id: author.person_id, provenance: "home:companion", created_at: now, updated_at: now, hlc: nextHlc(), ...options.synth } : undefined;
+  // The synth block carries the owner only for a spec-shaped person id (every real one is, see lib/id.ts);
+  // a legacy or test-only id keeps the older owner.json beside the manifest so the author is never lost.
+  const specPersonId = typeof author.person_id === "string" && SPEC_PERSON_ID.test(author.person_id);
+  const synth = specPersonId ? { based_on: { kind: "none" as const, person_id: null, name: null, refresh: "7d" as const, minor: false }, life: { enabled: true, seed: "" }, subject_id: null, pins: { dials: [], examples: [] }, phrase_sources: {}, forked_from: null, private_to: null, owner_person_id: author.person_id, provenance: "home:companion", created_at: now, updated_at: now, hlc: nextHlc(), ...options.synth } : undefined;
   const manifest = { id, version: "0.1.0", kind: "companion", category: "Fun", display: name, description: typeof clean.tagline === "string" ? clean.tagline : "A companion made at home.", author: author.display_name, license: "AGPL-3.0", homepage: "https://github.com/getmaipai/home", companion, ...(synth ? { synth } : {}), incognito: "unaffected", requires: [], optional: [], platforms: ["home", "bot"], min_role: "adult", consequential: false, offline: "full", config: [], notifications: [], backup: "exclude", background: false, contributes: {}, min_app: "0.1.0", tier: 0, quality_scale: "bronze", channel: "stable" } as unknown as Manifest;
   const result = write(manifest);
+  if (result.ok && author.person_id && !synth) {
+    const dir = folder(result.value.id)!;
+    writeFileSync(join(dir, "owner.json"), `${JSON.stringify({ person_id: author.person_id })}\n`, { flag: "wx" });
+  }
   return result;
 }
 export function updateHouseholdCompanion(id: string, patch: Partial<Companion>): WriteResult {
