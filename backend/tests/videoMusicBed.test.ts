@@ -77,7 +77,7 @@ describe("add-music route", () => {
     const ok = await client.post("/api/videos/add-music", { clip: made.job.files[0]!.id, make_music: "soft piano" });
     expect(ok.status).toBe(200);
     const body = await ok.json() as { conversation_id: string; music_job_id: string | null };
-    expect(body.conversation_id).toBe(made.job.conversationId); expect(body.music_job_id).toBeTruthy();
+    expect(body.conversation_id).toBe(made.job.conversationId!); expect(body.music_job_id).toBeTruthy();
     expect((await client.post("/api/videos/add-music", { clip: made.job.id })).status).toBe(400);
     expect((await client.post("/api/videos/add-music", { clip: made.job.id, make_music: "soft piano", track: "x" })).status).toBe(400);
     await until(() => fakeEdit.jobs.length === 1, 6000);
