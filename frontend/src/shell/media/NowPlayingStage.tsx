@@ -1,3 +1,4 @@
+import { i18n } from "@lingui/core";
 // MEDIA-VIZ-01: the full-screen Now playing stage for the media host's audio: the cover (or one of the audio-reactive scenes ported from
 // the pre-rebuild hub) over a soft blur of the cover, with the title, a seek bar and the transport. It drives the host's element
 // directly, so closing it never restarts anything. The stage always uses the dark theme's tokens (the visualizers draw light colors on
@@ -75,13 +76,13 @@ export function NowPlayingStage({ media, onClose }: { media: HoistedMedia; onClo
     <div ref={root} role="dialog" aria-modal="true" aria-label={`Now playing: ${media.title}`} data-testid="now-playing-stage" className="dark fixed inset-0 z-[60] flex flex-col overflow-hidden bg-background text-foreground">
       {media.poster ? <img src={media.poster} alt="" aria-hidden="true" className="pointer-events-none absolute inset-0 size-full scale-125 object-cover opacity-25 blur-3xl" /> : null}
       <div className="relative z-10 flex items-center gap-2 p-4">
-        <div className="flex min-w-0 flex-1 flex-wrap gap-1" role="group" aria-label="What is on stage">
-          <Button size="sm" variant={showScene ? "ghost" : "secondary"} aria-pressed={!showScene} onClick={() => choose("art")}>Cover</Button>
+        <div className="flex min-w-0 flex-1 flex-wrap gap-1" role="group" aria-label={i18n._({ id: "What is on stage", message: "What is on stage" })}>
+          <Button size="sm" variant={showScene ? "ghost" : "secondary"} aria-pressed={!showScene} onClick={() => choose("art")}>{i18n._({ id: "Cover", message: "Cover" })}</Button>
           {VISUALIZERS.map((v) => (
             <Button key={v.id} size="sm" variant={showScene && v.id === variant ? "secondary" : "ghost"} aria-pressed={showScene && v.id === variant} onClick={() => choose(v.id)}>{v.label}</Button>
           ))}
         </div>
-        <Button variant="ghost" size="icon" aria-label="Close Now playing" onClick={onClose}><CloseIcon aria-hidden="true" /></Button>
+        <Button variant="ghost" size="icon" aria-label={i18n._({ id: "Close Now playing", message: "Close Now playing" })} onClick={onClose}><CloseIcon aria-hidden="true" /></Button>
       </div>
       <div className="relative z-10 flex min-h-0 flex-1 items-center justify-center">
         {showScene ? (
@@ -99,13 +100,13 @@ export function NowPlayingStage({ media, onClose }: { media: HoistedMedia; onClo
         </div>
         <div className="mx-auto flex w-full max-w-3xl items-center gap-3 text-base tabular-nums text-muted-foreground">
           <span>{clock(position)}</span>
-          <Slider aria-label="Seek" min={0} max={Math.max(duration, 1)} step={1} value={[Math.min(position, Math.max(duration, 1))]} disabled={duration <= 0} onValueChange={(value) => { const next = Array.isArray(value) ? value[0] : value; if (typeof next === "number") { el.currentTime = next; setPosition(next); } }} />
+          <Slider aria-label={i18n._({ id: "Seek", message: "Seek" })} min={0} max={Math.max(duration, 1)} step={1} value={[Math.min(position, Math.max(duration, 1))]} disabled={duration <= 0} onValueChange={(value) => { const next = Array.isArray(value) ? value[0] : value; if (typeof next === "number") { el.currentTime = next; setPosition(next); } }} />
           <span>{clock(duration)}</span>
         </div>
         <div className="mx-auto flex items-center gap-4">
-          <Button variant="ghost" size="icon" aria-label="Back 10 seconds" onClick={() => { el.currentTime = Math.max(0, el.currentTime - 10); }}><BackIcon aria-hidden="true" /></Button>
+          <Button variant="ghost" size="icon" aria-label={i18n._({ id: "Back 10 seconds", message: "Back 10 seconds" })} onClick={() => { el.currentTime = Math.max(0, el.currentTime - 10); }}><BackIcon aria-hidden="true" /></Button>
           <Button size="icon" aria-label={playing ? "Pause" : "Play"} onClick={toggle} style={{ background: accent }}>{playing ? <PauseIcon aria-hidden="true" /> : <PlayIcon aria-hidden="true" />}</Button>
-          <Button variant="ghost" size="icon" aria-label="Forward 30 seconds" onClick={() => { el.currentTime = Math.min(Number.isFinite(el.duration) ? el.duration : el.currentTime + 30, el.currentTime + 30); }}><ForwardIcon aria-hidden="true" /></Button>
+          <Button variant="ghost" size="icon" aria-label={i18n._({ id: "Forward 30 seconds", message: "Forward 30 seconds" })} onClick={() => { el.currentTime = Math.min(Number.isFinite(el.duration) ? el.duration : el.currentTime + 30, el.currentTime + 30); }}><ForwardIcon aria-hidden="true" /></Button>
         </div>
       </div>
     </div>,

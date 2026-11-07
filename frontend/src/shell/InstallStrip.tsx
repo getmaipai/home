@@ -1,3 +1,4 @@
+import { i18n } from "@lingui/core";
 import { useState, type ReactNode } from "react";
 import { Link } from "react-router-dom";
 import { JobProgress } from "@maipai/ui/src/elements/job-progress";
@@ -91,7 +92,7 @@ export function InstallStrip({ detailsHref = "/settings/ai?tab=overview", read: 
         <div className="flex items-center gap-2">
           <span className="min-w-0 flex-1 truncate">{failed ? (problem ?? title) : title}</span>
           {showPercent ? <span className="shrink-0 tabular-nums">{Math.round(status.percent)}%</span> : null}
-          {failed ? <Button type="button" variant="link" size="sm" onClick={onRetry}>Try again</Button> : null}
+          {failed ? <Button type="button" variant="link" size="sm" onClick={onRetry}>{i18n._({ id: "Try again", message: "Try again" })}</Button> : null}
         </div>
         {failed ? null : <Progress mode="determinate" value={engineStep ? ((ENGINE_STAGE_INDEX[status.stage ?? "preflight"] ?? 0) + 1) / 4 * 100 : status.percent} label={`${title} progress`} />}
         {retryError ? <p role="alert">{retryError}</p> : null}
@@ -117,7 +118,7 @@ export function InstallStrip({ detailsHref = "/settings/ai?tab=overview", read: 
       />
       {problem ? <p role="alert">{problem}</p> : null}
       {retryError ? <p role="alert">{retryError}</p> : null}
-      {detailsHref ? <Link to={detailsHref} className="text-sm underline">Details</Link> : null}
+      {detailsHref ? <Link to={detailsHref} className="text-sm underline">{i18n._({ id: "Details", message: "Details" })}</Link> : null}
     </>
   );
 }

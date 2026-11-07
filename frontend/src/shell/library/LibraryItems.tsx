@@ -1,3 +1,4 @@
+import { i18n } from "@lingui/core";
 // The items of one section, drawn as the kit's tile grid or as the kit's table. Both open the same per-item menu.
 import { useMemo, type ReactElement } from "react";
 import { FileGrid } from "@maipai/ui/src/primitives/FileGrid";
@@ -28,13 +29,13 @@ export function itemMenu(item: LibraryItem, me: Roster, actions: ItemActions) {
   const mine = item.owner.id === me.id;
   return (
     <DropdownMenuContent align="end">
-      <DropdownMenuItem onSelect={() => actions.open(item)}>Open</DropdownMenuItem>
-      <DropdownMenuItem asChild><a href={api.fileContentUrl(item.id)} download={item.name}>Download</a></DropdownMenuItem>
-      {mine && canShareFiles(me) ? <DropdownMenuItem onSelect={() => actions.share(item)}>Share</DropdownMenuItem> : null}
-      {mine ? <DropdownMenuItem onSelect={() => actions.rename(item)}>Rename</DropdownMenuItem> : null}
-      {mine && item.retention !== "kept" ? <DropdownMenuItem onSelect={() => actions.keep(item)}>Keep</DropdownMenuItem> : null}
-      {mine && isAdultRole(me) && item.kind === "image" && item.audience === "adult-only" ? <DropdownMenuItem onSelect={() => actions.recheck(item)}>Mark all-ages</DropdownMenuItem> : null}
-      {mine ? <><DropdownMenuSeparator /><DropdownMenuItem variant="destructive" onSelect={() => actions.trash(item)}>Delete</DropdownMenuItem></> : null}
+      <DropdownMenuItem onSelect={() => actions.open(item)}>{i18n._({ id: "Open", message: "Open" })}</DropdownMenuItem>
+      <DropdownMenuItem asChild><a href={api.fileContentUrl(item.id)} download={item.name}>{i18n._({ id: "Download", message: "Download" })}</a></DropdownMenuItem>
+      {mine && canShareFiles(me) ? <DropdownMenuItem onSelect={() => actions.share(item)}>{i18n._({ id: "Share", message: "Share" })}</DropdownMenuItem> : null}
+      {mine ? <DropdownMenuItem onSelect={() => actions.rename(item)}>{i18n._({ id: "Rename", message: "Rename" })}</DropdownMenuItem> : null}
+      {mine && item.retention !== "kept" ? <DropdownMenuItem onSelect={() => actions.keep(item)}>{i18n._({ id: "Keep", message: "Keep" })}</DropdownMenuItem> : null}
+      {mine && isAdultRole(me) && item.kind === "image" && item.audience === "adult-only" ? <DropdownMenuItem onSelect={() => actions.recheck(item)}>{i18n._({ id: "Mark all-ages", message: "Mark all-ages" })}</DropdownMenuItem> : null}
+      {mine ? <><DropdownMenuSeparator /><DropdownMenuItem variant="destructive" onSelect={() => actions.trash(item)}>{i18n._({ id: "Delete", message: "Delete" })}</DropdownMenuItem></> : null}
     </DropdownMenuContent>
   );
 }
@@ -96,7 +97,7 @@ export function LibraryItems({ items, me, layout, phone, selectedIds, onSelectio
       <>
       <FileGrid
         items={tiles}
-        label="Library files"
+        label={i18n._({ id: "Library files", message: "Library files" })}
         selectedIds={selectedIds}
         onSelectionChange={onSelectionChange}
         selectionMode={selectionMode}
@@ -135,7 +136,7 @@ export function LibraryItems({ items, me, layout, phone, selectedIds, onSelectio
     <DataTable
       rows={items}
       columns={columns}
-      caption="Library files"
+      caption={i18n._({ id: "Library files", message: "Library files" })}
       getRowId={(item) => item.id}
       getRowLabel={(item) => item.name}
       selectedIds={selectedIds}

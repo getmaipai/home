@@ -1,3 +1,4 @@
+import { i18n } from "@lingui/core";
 // Upload cards: one JobProgress per file, up to three at once. A failure shows the hub's plain sentence and a Try again.
 import { Fragment, useCallback, useRef, useState } from "react";
 import { JobProgress } from "@maipai/ui/src/elements/job-progress";
@@ -68,11 +69,11 @@ export function UploadTray({ cards, onCancel, onRetry, onDismiss }: { cards: rea
             variant="compact"
             cancelLabel={`Cancel adding ${card.file.name}`}
             onCancel={() => onCancel(card.key)}
-            doneLabel="Added"
+            doneLabel={i18n._({ id: "Added", message: "Added" })}
             {...(card.state === "failed" ? { outcome: { status: "failed" as const, summary: card.error ?? "" } } : {})}
           />
-          {card.state === "failed" ? <div className="flex gap-2"><Button type="button" variant="secondary" onClick={() => onRetry(card.key)}>Try again</Button><Button type="button" variant="ghost" onClick={() => onDismiss(card.key)}>Dismiss</Button></div> : null}
-          {card.state === "done" ? <div><Button type="button" variant="ghost" onClick={() => onDismiss(card.key)}>Dismiss</Button></div> : null}
+          {card.state === "failed" ? <div className="flex gap-2"><Button type="button" variant="secondary" onClick={() => onRetry(card.key)}>{i18n._({ id: "Try again", message: "Try again" })}</Button><Button type="button" variant="ghost" onClick={() => onDismiss(card.key)}>{i18n._({ id: "Dismiss", message: "Dismiss" })}</Button></div> : null}
+          {card.state === "done" ? <div><Button type="button" variant="ghost" onClick={() => onDismiss(card.key)}>{i18n._({ id: "Dismiss", message: "Dismiss" })}</Button></div> : null}
         </Fragment>
       ))}
     </>

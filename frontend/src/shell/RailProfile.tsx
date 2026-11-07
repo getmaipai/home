@@ -1,3 +1,4 @@
+import { i18n } from "@lingui/core";
 import { useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
@@ -38,7 +39,7 @@ export function RailProfile({
   const problem = summary.level === "degraded" || summary.level === "offline";
   const status = child && problem
     ? undefined
-    : { label: summary.level === "online" ? "Good" : summary.text, level: summary.level, href: "/status" };
+    : { label: summary.level === "online" ? i18n._({ id: "Good", message: "Good" }) : summary.text, level: summary.level, href: "/status" };
 
   return (
     <RailProfileMenu
@@ -57,7 +58,7 @@ export function RailProfile({
         api.logout().then(() => {
           queryClient.clear();
           onSignedOut();
-        }, () => toast.error("Could not log out. Try again."));
+        }, () => toast.error(i18n._({ id: "Could not log out. Try again.", message: "Could not log out. Try again." })));
       }}
     >
       <NotificationBell anchored open={notificationsOpen} onOpenChange={setNotificationsOpen} />

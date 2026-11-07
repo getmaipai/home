@@ -1,11 +1,12 @@
+import { i18n } from "@lingui/core";
 import type { StatusAppNeed, StatusAppState } from "@/lib/api";
 import type { StatusApp } from "@/lib/api";
 
 export function appStatusPresentation(state: StatusAppState): { status: "online" | "degraded" | "offline"; label: string } {
-  if (state === "operational") return { status: "online", label: "Working" };
-  if (state === "down") return { status: "offline", label: "Not working" };
-  if (state === "waiting_for_internet") return { status: "degraded", label: "Waiting for internet" };
-  return { status: "degraded", label: "Degraded" };
+  if (state === "operational") return { status: "online", label: i18n._({ id: "Working", message: "Working" }) };
+  if (state === "down") return { status: "offline", label: i18n._({ id: "Not working", message: "Not working" }) };
+  if (state === "waiting_for_internet") return { status: "degraded", label: i18n._({ id: "Waiting for internet", message: "Waiting for internet" }) };
+  return { status: "degraded", label: i18n._({ id: "Degraded", message: "Degraded" }) };
 }
 
 export function appStatusToSidebar(state: StatusAppState): "amber" | "red" | null {
@@ -33,7 +34,7 @@ export function sidebarItemStatus(apps: readonly StatusApp[], item: { name: stri
 
 export function statusAppsSummary(apps: readonly { id?: string; name: string; state: StatusAppState; reason: string | null; paused?: boolean }[]) {
   const affected = apps.filter((app) => app.state !== "operational");
-  if (!affected.length) return { level: "online" as const, text: "All good", problems: [], message: "Everything is running." };
+  if (!affected.length) return { level: "online" as const, text: i18n._({ id: "All good", message: "All good" }), problems: [], message: i18n._({ id: "Everything is running.", message: "Everything is running." }) };
   const level = affected.some((app) => app.state === "down") ? "offline" as const : "degraded" as const;
   const messages = affected.map((app) => app.reason).filter((reason): reason is string => Boolean(reason));
   const names = affected.map((app) => app.name);

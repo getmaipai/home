@@ -1,3 +1,4 @@
+import { i18n } from "@lingui/core";
 // MEDIA-VIZ-02/03: what the Music play page adds beside the kit Player (which stays untouched, RULES rule 9), ported from the
 // pre-rebuild hub's Now Playing page: the cover's colors and a soft blurred cover over the whole page with the visualizer moving
 // behind everything, a row of controls (Minimize, visualizer scene, sleep timer, repeat, volume, Full screen), and the same Now
@@ -54,17 +55,17 @@ export function MusicVisualizerSection({ id }: { id: string }) {
         <div className="absolute inset-0 opacity-20 dark:opacity-25" style={{ background: `linear-gradient(135deg, ${palette.corners[0]}, ${palette.corners[1]} 40%, ${palette.corners[2]} 70%, ${palette.corners[3]})` }} />
         {vizOn ? <AudioVisualizer variant={variant} mode="full" getAnalyser={getAnalyser} palette={palette} active={playing} progress={progress} opacity={0.4} className="absolute inset-0 size-full" /> : null}
       </div>
-      <section aria-label="Player options" data-testid="music-visualizer-section" className="relative z-10 flex w-full flex-wrap items-center gap-1 py-2">
+      <section aria-label={i18n._({ id: "Player options", message: "Player options" })} data-testid="music-visualizer-section" className="relative z-10 flex w-full flex-wrap items-center gap-1 py-2">
         <MinimizeButton appHome="/apps/music" />
         <VisualizerMenu withLabel />
         <SleepMenu withLabel />
-        <Button size="sm" variant={loop ? "secondary" : "ghost"} aria-pressed={loop} onClick={toggleLoop}>Repeat</Button>
+        <Button size="sm" variant={loop ? "secondary" : "ghost"} aria-pressed={loop} onClick={toggleLoop}>{i18n._({ id: "Repeat", message: "Repeat" })}</Button>
         <span className="flex items-center gap-2 px-2">
           <MuteIcon aria-hidden="true" className="size-4 text-muted-foreground" />
-          <div className="w-24"><Slider aria-label="Volume" min={0} max={1} step={0.01} value={[volume]} onValueChange={(value) => { const next = Array.isArray(value) ? value[0] : value; if (typeof next === "number") mine.el.volume = next; }} /></div>
+          <div className="w-24"><Slider aria-label={i18n._({ id: "Volume", message: "Volume" })} min={0} max={1} step={0.01} value={[volume]} onValueChange={(value) => { const next = Array.isArray(value) ? value[0] : value; if (typeof next === "number") mine.el.volume = next; }} /></div>
         </span>
         <span aria-hidden="true" className="flex-1" />
-        <Button size="sm" variant="ghost" aria-label="Full screen visualizer" onClick={() => setStage(true)}><FullIcon aria-hidden="true" />Full screen</Button>
+        <Button size="sm" variant="ghost" aria-label={i18n._({ id: "Full screen visualizer", message: "Full screen visualizer" })} onClick={() => setStage(true)}><FullIcon aria-hidden="true" />{i18n._({ id: "Full screen", message: "Full screen" })}</Button>
         {stage ? <NowPlayingStage media={mine} onClose={closeStage} /> : null}
       </section>
     </>

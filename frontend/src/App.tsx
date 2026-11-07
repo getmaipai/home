@@ -1,7 +1,7 @@
-import { Suspense, useEffect, useState } from "react";
+import { Fragment, Suspense, useEffect, useState, type ReactNode } from "react";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes as RouterRoutes, Route, Navigate, useLocation } from "react-router-dom";
-import { I18nProvider } from "@lingui/react";
+import { I18nProvider, useLingui } from "@lingui/react";
 import { i18n } from "@/i18n";
 import { createQueryClient } from "@/lib/queryClient";
 import { aliasTarget } from "@/shell/pages/settings/settingsRedirects";
@@ -63,6 +63,19 @@ function AliasRedirect({ path, person }: { path: string; person: SignedInPerson 
 
 // The root route is the migrated shell. Setup stays separate because it
 // must remain addressable before a household profile exists.
+/** Strings read through the global `i18n._`, so a language switch remounts the tree below once (the URL, the session lock and server data
+ * stay; local screen state resets) and every string on the screen updates without a reload. */
+/** Activates the person's language (the signed-out page's, before one is known). It needs the query client, so it sits inside the provider. */
+function PersonLocale({ person }: { person: SignedInPerson | null | undefined }) {
+  usePersonLocale(person, !__SETUP_PREVIEW__);
+  return null;
+}
+
+function LocaleKey({ children }: { children: ReactNode }) {
+  const { i18n: active } = useLingui();
+  return <Fragment key={active.locale}>{children}</Fragment>;
+}
+
 export function App() {
   const [person, setPerson] = useState<SignedInPerson | null | undefined>(undefined);
   const [mediaOwnerId, setMediaOwnerId] = useState<string | null>(null);
@@ -93,7 +106,6 @@ export function App() {
     else loadPerson();
   }, []);
 
-  usePersonLocale(person, !__SETUP_PREVIEW__);
 
   // Kept media copies belong to the signed-in person: tell the worker who that is (null while signed out or expired, so
   // nothing is served), then drop any copy the hub says is gone or changed, now and whenever the browser is back online.
@@ -119,10 +131,11 @@ export function App() {
     <ErrorBoundary>
       <I18nProvider i18n={i18n}>
         <QueryClientProvider client={queryClient}>
+          <PersonLocale person={person} />
           <ToastProvider>
             <TooltipProvider>
               <SessionLockGate person={person ?? null}>
-                <ThemeProvider storageKey={__SETUP_PREVIEW__ ? "setup-preview-theme" : "vite-ui-theme"}><BrowserRouter>
+                <LocaleKey><ThemeProvider storageKey={__SETUP_PREVIEW__ ? "setup-preview-theme" : "vite-ui-theme"}><BrowserRouter>
                   <RouterRoutes>
                     <Route
                       path="/setup"
@@ -137,7 +150,7 @@ export function App() {
                       element={
                         person === undefined ? (
                           <div className="flex h-screen items-center justify-center">
-                            <Progress mode="spinner" label="Loading MaiPai Home" />
+                            <Progress mode="spinner" label={i18n._({ id: "Loading MaiPai Home", message: "Loading MaiPai Home" })} />
                           </div>
                         ) : (
                           <Suspense fallback={<RouteSkeleton />}>
@@ -151,7 +164,7 @@ export function App() {
                       element={
                         person === undefined ? (
                           <div className="flex h-screen items-center justify-center">
-                            <Progress mode="spinner" label="Loading MaiPai Home" />
+                            <Progress mode="spinner" label={i18n._({ id: "Loading MaiPai Home", message: "Loading MaiPai Home" })} />
                           </div>
                         ) : person === null ? (
                           <Navigate to="/sign-in" replace />
@@ -177,7 +190,7 @@ export function App() {
                       element={
                         person === undefined ? (
                           <div className="flex h-screen items-center justify-center">
-                            <Progress mode="spinner" label="Loading MaiPai Home" />
+                            <Progress mode="spinner" label={i18n._({ id: "Loading MaiPai Home", message: "Loading MaiPai Home" })} />
                           </div>
                         ) : (
                           <Suspense fallback={<RouteSkeleton />}>
@@ -187,7 +200,7 @@ export function App() {
                       }
                     />
                   </RouterRoutes>
-                </BrowserRouter></ThemeProvider>
+                </BrowserRouter></ThemeProvider></LocaleKey>
               </SessionLockGate>
             </TooltipProvider>
           </ToastProvider>

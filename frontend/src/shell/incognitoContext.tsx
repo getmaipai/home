@@ -1,3 +1,4 @@
+import { i18n } from "@lingui/core";
 import { useCallback, useEffect, useState, createContext, useContext, type ReactNode } from "react";
 import { Button } from "@maipai/ui/src/dashboard/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@maipai/ui/src/dashboard/components/ui/dialog";
@@ -54,13 +55,12 @@ export function IncognitoProvider({ children }: { children: ReactNode }) {
       <Dialog open={explanationOpen} onOpenChange={(open) => (open ? setExplanationOpen(true) : closeExplanation())}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>What Incognito does</DialogTitle>
+            <DialogTitle>{i18n._({ id: "What Incognito does", message: "What Incognito does" })}</DialogTitle>
             <DialogDescription>
-              Incognito turns off memory and personalization across MaiPai. What you do while it is on stays out of your history and is forgotten when you turn it off.
-            </DialogDescription>
+              {i18n._({ id: "Incognito turns off memory and personalization across MaiPai. What you do while it is on stays out of your history and is forgotten when you turn it off.", message: "Incognito turns off memory and personalization across MaiPai. What you do while it is on stays out of your history and is forgotten when you turn it off." })}</DialogDescription>
           </DialogHeader>
           <DialogFooter>
-            <Button type="button" onClick={closeExplanation}>Got it</Button>
+            <Button type="button" onClick={closeExplanation}>{i18n._({ id: "Got it", message: "Got it" })}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

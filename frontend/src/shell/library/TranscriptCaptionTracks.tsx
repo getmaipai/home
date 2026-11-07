@@ -1,3 +1,4 @@
+import { i18n } from "@lingui/core";
 // The caption tracks of a transcript, on the Export tab: which are up to date and which need refreshing.
 import { useEffect, useState } from "react";
 import type { Transcript } from "@maipai/spec/gen/ts/transcript.js";
@@ -42,7 +43,7 @@ export function CaptionTracks({ transcript }: { transcript: Transcript }) {
 
   const run = async (work: () => Promise<void>, failure: string) => {
     setBusy(true);
-    setMessage("Working…");
+    setMessage(i18n._({ id: "Working…", message: "Working…" }));
     try {
       await work();
     } catch {
@@ -56,14 +57,14 @@ export function CaptionTracks({ transcript }: { transcript: Transcript }) {
     run(async () => {
       const made = await transcriptApi.makeCaptionTrack(transcript.id);
       setTracks((old) => [...old, made]);
-      setMessage("Caption track made.");
+      setMessage(i18n._({ id: "Caption track made.", message: "Caption track made." }));
     }, MAKE_FAILED);
 
   const refresh = (track: CaptionTrackSummary) =>
     run(async () => {
       const updated = await transcriptApi.refreshCaptionTrack(transcript.id, track.id);
       setTracks((old) => old.map((entry) => (entry.id === track.id ? updated : entry)));
-      setMessage("Caption track refreshed. Captions you fixed by hand were kept.");
+      setMessage(i18n._({ id: "Caption track refreshed. Captions you fixed by hand were kept.", message: "Caption track refreshed. Captions you fixed by hand were kept." }));
     }, REFRESH_FAILED);
 
   const translate = () =>
@@ -75,12 +76,12 @@ export function CaptionTracks({ transcript }: { transcript: Transcript }) {
     }, TRANSLATE_FAILED);
 
   return (
-    <section aria-label="Caption tracks" className="flex flex-col gap-2">
-      <h3 className="text-sm font-semibold">Caption tracks</h3>
+    <section aria-label={i18n._({ id: "Caption tracks", message: "Caption tracks" })} className="flex flex-col gap-2">
+      <h3 className="text-sm font-semibold">{i18n._({ id: "Caption tracks", message: "Caption tracks" })}</h3>
       {tracks.map((track) => (
         <div key={track.id} className="flex flex-wrap items-center gap-2 text-sm">
           <span>{languageName(track.language, languages)}</span>
-          <span>{track.translated ? "Translated" : track.needs_refreshing ? "Needs refreshing" : "Up to date"}</span>
+          <span>{track.translated ? i18n._({ id: "Translated", message: "Translated" }) : track.needs_refreshing ? "Needs refreshing" : "Up to date"}</span>
           {(["srt", "vtt"] as const).map((format) => (
             <Button key={format} asChild variant="secondary" size="sm">
               <a
@@ -101,20 +102,18 @@ export function CaptionTracks({ transcript }: { transcript: Transcript }) {
               disabled={busy}
               onClick={() => void refresh(track)}
             >
-              Refresh
-            </Button>
+              {i18n._({ id: "Refresh", message: "Refresh" })}</Button>
           ) : null}
         </div>
       ))}
       <div>
         <Button type="button" variant="secondary" disabled={busy} onClick={() => void make()}>
-          Make caption track
-        </Button>
+          {i18n._({ id: "Make caption track", message: "Make caption track" })}</Button>
       </div>
       {original && languages.length > 0 ? (
         <div className="flex flex-wrap items-end gap-2">
           <div className="flex flex-col gap-2">
-            <Label htmlFor="translate-language">Translate captions to</Label>
+            <Label htmlFor="translate-language">{i18n._({ id: "Translate captions to", message: "Translate captions to" })}</Label>
             <Select value={target} onValueChange={(value) => setTarget(value ?? "es")}>
               <SelectTrigger id="translate-language"><SelectValue /></SelectTrigger>
               <SelectContent>
@@ -125,8 +124,7 @@ export function CaptionTracks({ transcript }: { transcript: Transcript }) {
             </Select>
           </div>
           <Button type="button" variant="secondary" disabled={busy} onClick={() => void translate()}>
-            Translate
-          </Button>
+            {i18n._({ id: "Translate", message: "Translate" })}</Button>
         </div>
       ) : null}
       <p role="status" className="text-sm text-muted-foreground">

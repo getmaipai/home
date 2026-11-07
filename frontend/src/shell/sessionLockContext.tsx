@@ -1,3 +1,4 @@
+import { i18n } from "@lingui/core";
 import { createContext, useContext, useState, type CSSProperties, type FormEvent } from "react";
 import { Avatar } from "@maipai/ui/src/primitives/Avatar";
 import { Card, CardContent } from "@maipai/ui/src/dashboard/components/ui/card";
@@ -74,7 +75,7 @@ export function SessionLockGate({ person, children }: { person: SignedInPerson |
                 <div className="flex flex-col items-center gap-4">
                   <Avatar name={person.display_name} className="size-16 text-xl" />
                   <h1 className="text-lg font-semibold">{person.display_name}</h1>
-                  <p className="text-sm text-muted-foreground">Locked after inactivity. {pinDigits !== null ? `Enter your ${pinDigits}-digit passcode to continue.` : "Enter your PIN or password to continue."}</p>
+                  <p className="text-sm text-muted-foreground">{i18n._({ id: "Locked after inactivity.", message: "Locked after inactivity." })} {pinDigits !== null ? i18n._({ id: "Enter your {digits}-digit passcode to continue.", message: "Enter your {digits}-digit passcode to continue.", values: { digits: pinDigits } }) : i18n._({ id: "Enter your PIN or password to continue.", message: "Enter your PIN or password to continue." })}</p>
                   <form onSubmit={handleUnlock} className="flex w-full flex-col gap-4">
                     {pinDigits !== null ? (
                       <div className="flex flex-col items-center gap-3">
@@ -94,8 +95,7 @@ export function SessionLockGate({ person, children }: { person: SignedInPerson |
                     ) : (
                       <div className="w-full space-y-1.5">
                         <Label htmlFor="lock-secret" className="text-sm font-normal text-muted-foreground">
-                          PIN or password
-                        </Label>
+                          {i18n._({ id: "PIN or password", message: "PIN or password" })}</Label>
                         <Input
                           key={attemptState.attempt}
                           id="lock-secret"
@@ -126,7 +126,7 @@ export function SessionLockGate({ person, children }: { person: SignedInPerson |
                     ) : null}
                     {pinDigits === null ? (
                       <Button type="submit" size="lg" disabled={busy || attemptState.locked}>
-                        {busy ? "Unlocking…" : "Unlock"}
+                        {busy ? i18n._({ id: "Unlocking…", message: "Unlocking…" }) : i18n._({ id: "Unlock", message: "Unlock" })}
                       </Button>
                     ) : null}
                     {accountDigits !== null ? (
@@ -138,7 +138,7 @@ export function SessionLockGate({ person, children }: { person: SignedInPerson |
                           setSecret("");
                         }}
                       >
-                        {wantsPassword ? "Use a PIN instead" : "Use a password instead"}
+                        {wantsPassword ? i18n._({ id: "Use a PIN instead", message: "Use a PIN instead" }) : i18n._({ id: "Use a password instead", message: "Use a password instead" })}
                       </Button>
                     ) : null}
                   </form>

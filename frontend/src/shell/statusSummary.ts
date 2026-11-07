@@ -1,3 +1,4 @@
+import { i18n } from "@lingui/core";
 import type { HealthStatus } from "@/lib/api";
 import { chatAvailability } from "@/apps/chat/chatAvailability";
 import { ENGINE_ROWS } from "@/shell/pages/status/StatusComponents";
@@ -14,7 +15,7 @@ const SIDECAR_LABELS: Record<string, string> = {
 };
 
 export function statusSummary(health: HealthStatus | undefined, underMaintenance: string[] = []): StatusSummary {
-  if (!health) return underMaintenance.length ? { level: "maintenance", text: "Maintenance", problems: [] } : { level: "online", text: "All good", problems: [] };
+  if (!health) return underMaintenance.length ? { level: "maintenance", text: i18n._({ id: "Maintenance", message: "Maintenance" }), problems: [] } : { level: "online", text: i18n._({ id: "All good", message: "All good" }), problems: [] };
 
   let level: StatusSummary["level"] = "online";
   const problems: string[] = [];
@@ -41,6 +42,6 @@ export function statusSummary(health: HealthStatus | undefined, underMaintenance
   }
 
   if (level === "online" && underMaintenance.length > 0) level = "maintenance";
-  const text = level === "online" ? "All good" : level === "degraded" ? "Degraded" : level === "maintenance" ? "Maintenance" : "Something is down";
+  const text = level === "online" ? i18n._({ id: "All good", message: "All good" }) : level === "degraded" ? i18n._({ id: "Degraded", message: "Degraded" }) : level === "maintenance" ? i18n._({ id: "Maintenance", message: "Maintenance" }) : i18n._({ id: "Something is down", message: "Something is down" });
   return { level, text, problems };
 }

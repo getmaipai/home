@@ -1,3 +1,4 @@
+import { i18n } from "@lingui/core";
 // MEDIA-VIZ-03: the scene menu on the mini bar and the Music page: None, then each scene. One app-wide choice (AudioVisualizer's prefs),
 // the pre-rebuild hub's visualizer menu. Its icon is the equalizer bars: the waveform is the voice icon in chat.
 import { Button } from "@maipai/ui/src/dashboard/components/ui/button";
@@ -14,12 +15,12 @@ export function VisualizerMenu({ withLabel = false }: { withLabel?: boolean }) {
     <span className="inline-flex">
     <DropdownMenu>
       <DropdownMenuTrigger render={
-        <Button type="button" variant="ghost" size={withLabel ? "sm" : "icon"} aria-label={`Visualizer: ${current}`} title={`Visualizer: ${current}`}>
-          <SceneIcon aria-hidden="true" />{withLabel ? <span>Visualizer: {current}</span> : null}
+        <Button type="button" variant="ghost" size={withLabel ? "sm" : "icon"} aria-label={i18n._({ id: "Visualizer: {name}", message: "Visualizer: {name}", values: { name: current } })} title={i18n._({ id: "Visualizer: {name}", message: "Visualizer: {name}", values: { name: current } })}>
+          <SceneIcon aria-hidden="true" />{withLabel ? <span>{i18n._({ id: "Visualizer: {name}", message: "Visualizer: {name}", values: { name: current } })}</span> : null}
         </Button>
       } />
       <DropdownMenuContent align="end">
-        <DropdownMenuItem onClick={() => setVisualizerEnabled(false)}>{!enabled ? "✓ " : ""}None</DropdownMenuItem>
+        <DropdownMenuItem onClick={() => setVisualizerEnabled(false)}>{!enabled ? "✓ " : ""}{i18n._({ id: "None", message: "None" })}</DropdownMenuItem>
         {VISUALIZERS.map((v) => (
           <DropdownMenuItem key={v.id} onClick={() => { setVisualizerPref(v.id); setVisualizerEnabled(true); }}>{enabled && v.id === variant ? "✓ " : ""}{v.label}</DropdownMenuItem>
         ))}

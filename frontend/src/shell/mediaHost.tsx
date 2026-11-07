@@ -1,3 +1,4 @@
+import { i18n } from "@lingui/core";
 // MEDIA-VIDEOS-01: what the schema `play` action means in Home. A package page never plays anything itself: it hands an item to the
 // host (kit `MediaHostContext`), and this provider opens the owning app's play page. Also `/media/<id>` (the Pick up shelf's link):
 // resolved to the owning app from the item's kind.
@@ -315,8 +316,8 @@ export function MediaHostProvider({ children, personId, ageBand }: { children: R
           <Dialog open onOpenChange={(open) => { if (!open) { pick.resolve(null); setPick(null); } }}>
             <DialogContent scroll="viewport">
               <DialogHeader>
-                <DialogTitle>{pick.kind === "video" ? "Choose a clip" : pick.kind === "audio" ? "Add a voice or music" : "Choose a picture"}</DialogTitle>
-                <DialogDescription>{pick.kind === "video" ? "Pick one of your own clips to put after this one." : pick.kind === "audio" ? "Type a line for Home to say, or pick one of your songs." : "The video starts from this picture. Choose one from your Library or add a new one."}</DialogDescription>
+                <DialogTitle>{pick.kind === "video" ? i18n._({ id: "Choose a clip", message: "Choose a clip" }) : pick.kind === "audio" ? "Add a voice or music" : "Choose a picture"}</DialogTitle>
+                <DialogDescription>{pick.kind === "video" ? i18n._({ id: "Pick one of your own clips to put after this one.", message: "Pick one of your own clips to put after this one." }) : pick.kind === "audio" ? "Type a line for Home to say, or pick one of your songs." : "The video starts from this picture. Choose one from your Library or add a new one."}</DialogDescription>
               </DialogHeader>
               {pick.kind === "video" || pick.kind === "audio"
                 ? <StudioPickerBody kind={pick.kind} start={pick.start} personId={personId} onDone={(picked) => { pick.resolve(picked); setPick(null); }} />

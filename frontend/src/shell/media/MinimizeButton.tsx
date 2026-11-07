@@ -1,3 +1,4 @@
+import { i18n } from "@lingui/core";
 // MEDIA-VIZ-03: "Minimize" on a play page (Now playing, Watch): leave the page and keep playing in the global mini player, as the
 // pre-rebuild hub's minimize button did. The media host already holds the element, so going back is all it takes; with no page to go
 // back to (a link opened in a new tab) it goes to the app's own home.
@@ -17,9 +18,8 @@ export function MinimizeButton({ appHome }: { appHome: string }) {
   const MinimizeIcon = getIcon("minimize");
   return (
     <span className="inline-flex">
-    <Button type="button" variant="ghost" size="sm" aria-label="Minimize to the mini player" title="Minimize: keep playing in the mini player" onClick={() => { if (cameFromWithinTheApp()) navigate(-1); else navigate(appHome); }}>
-      <MinimizeIcon aria-hidden="true" />Minimize
-    </Button>
+    <Button type="button" variant="ghost" size="sm" aria-label={i18n._({ id: "Minimize to the mini player", message: "Minimize to the mini player" })} title={i18n._({ id: "Minimize: keep playing in the mini player", message: "Minimize: keep playing in the mini player" })} onClick={() => { if (cameFromWithinTheApp()) navigate(-1); else navigate(appHome); }}>
+      <MinimizeIcon aria-hidden="true" />{i18n._({ id: "Minimize", message: "Minimize" })}</Button>
     </span>
   );
 }

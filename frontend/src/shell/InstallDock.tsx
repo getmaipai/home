@@ -1,3 +1,4 @@
+import { i18n } from "@lingui/core";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { Progress } from "@maipai/ui/src/primitives/Progress";
@@ -51,7 +52,7 @@ export function buildDock(status: InstallStatusView | null, jobs: readonly HomeJ
     const label = status.stageLabel ?? "Setting up your AI";
     active.push({ key: "engine", words: { verb: "Setting up", what: "your AI", benefit: "Home needs its AI engine before it can chat." }, label, state: "running", completedBytes: 0, totalBytes: 0, bytesPerSecond: null });
   } else if (status.state === "engine_failed") {
-    failed.push({ key: "engine", words: { verb: "Setting up", what: "your AI", benefit: "Home needs its AI engine before it can chat." }, label: "Setting up your AI", state: "failed", completedBytes: 0, totalBytes: 0, bytesPerSecond: null, reason: status.problem });
+    failed.push({ key: "engine", words: { verb: "Setting up", what: "your AI", benefit: "Home needs its AI engine before it can chat." }, label: i18n._({ id: "Setting up your AI", message: "Setting up your AI" }), state: "failed", completedBytes: 0, totalBytes: 0, bytesPerSecond: null, reason: status.problem });
   }
   for (const item of Array.isArray(status.items) ? status.items : []) {
     if (item.state === "done" || item.state === "cancelled") continue;
@@ -170,7 +171,7 @@ export function InstallDock({ admin, read: readProp, readJobs: readJobsProp, ret
     <>
       <span className="flex items-start gap-2 text-sm text-foreground">
         <span className="min-w-0 flex-1 line-clamp-2 break-words">{title}</span>
-        {extra > 0 ? <span className="shrink-0 text-muted-foreground">+{extra} more</span> : null}
+        {extra > 0 ? <span className="shrink-0 text-muted-foreground">{i18n._({ id: "+{count} more", message: "+{count} more", values: { count: extra } })}</span> : null}
         {!onlyFailed && bar !== null ? <span className="shrink-0 tabular-nums text-muted-foreground">{bar}%</span> : null}
         {admin ? <ChevronDown aria-hidden className={`mt-0.5 size-4 shrink-0 text-muted-foreground transition-transform motion-reduce:transition-none ${open ? "" : "rotate-180"}`} /> : null}
       </span>
@@ -182,7 +183,7 @@ export function InstallDock({ admin, read: readProp, readJobs: readJobsProp, ret
     <>
       {announcer}
       <section
-        aria-label="Installs in progress"
+        aria-label={i18n._({ id: "Installs in progress", message: "Installs in progress" })}
         data-testid="install-dock"
         style={side}
         className="pointer-events-none fixed bottom-0 z-40 flex justify-center px-4 pb-[max(0.75rem,env(safe-area-inset-bottom))]"
@@ -200,8 +201,8 @@ export function InstallDock({ admin, read: readProp, readJobs: readJobsProp, ret
                       <p className="text-sm">{failureLine(item)}</p>
                       <p className="text-sm text-muted-foreground">{item.reason ?? model.problem ?? "Try again; the part already downloaded is kept."}</p>
                       <div className="flex items-center gap-3">
-                        <Button type="button" variant="outline" size="sm" onClick={onRetry}>Try again</Button>
-                        <Link to={repairsHref} className="text-sm underline">Repairs</Link>
+                        <Button type="button" variant="outline" size="sm" onClick={onRetry}>{i18n._({ id: "Try again", message: "Try again" })}</Button>
+                        <Link to={repairsHref} className="text-sm underline">{i18n._({ id: "Repairs", message: "Repairs" })}</Link>
                       </div>
                     </div>
                   ))}

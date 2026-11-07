@@ -1,3 +1,4 @@
+import { i18n } from "@lingui/core";
 // The Transcript panel of the Library viewer: make a transcript, search it, edit it and export it.
 // Children never see it (the hub refuses them too).
 import { useEffect, useMemo, useState, type ReactNode } from "react";
@@ -110,9 +111,9 @@ function useRevisions(transcript: Transcript | null): Array<{ n: number }> {
 function StartView({ busy, failed, onStart }: { busy: boolean; failed: boolean; onStart: () => void }) {
   return (
     <>
-      <h2 className="text-lg font-semibold">Transcript</h2>
+      <h2 className="text-lg font-semibold">{i18n._({ id: "Transcript", message: "Transcript" })}</h2>
       <Button type="button" disabled={busy} onClick={onStart}>
-        {busy ? "Making transcript…" : "Make transcript"}
+        {busy ? i18n._({ id: "Making transcript…", message: "Making transcript…" }) : i18n._({ id: "Make transcript", message: "Make transcript" })}
       </Button>
       {failed ? (
         <p role="status" className="text-sm text-muted-foreground">
@@ -134,10 +135,10 @@ function SearchTab({ lines, currentTime, onSeek }: TabProps) {
   return (
     <>
       <Input
-        aria-label="Search transcript"
+        aria-label={i18n._({ id: "Search transcript", message: "Search transcript" })}
         value={search}
         onChange={(event) => setSearch(event.target.value)}
-        placeholder="Search lines"
+        placeholder={i18n._({ id: "Search lines", message: "Search lines" })}
       />
       <LyricsList
         lines={matches}
@@ -284,8 +285,7 @@ function EditTab({ transcript, lines, currentTime, onSeek, revisions, onChange }
             );
           })}
           <Button type="button" variant="ghost" size="sm" aria-label={name} onClick={() => pick(segment?.id, line.t)}>
-            Edit
-          </Button>
+            {i18n._({ id: "Edit", message: "Edit" })}</Button>
         </span>
       );
     }
@@ -330,8 +330,7 @@ function EditTab({ transcript, lines, currentTime, onSeek, revisions, onChange }
             onChange={(event) => void assignSpeaker(segmentId, event.target.value)}
           >
             <option value="" disabled>
-              Choose a speaker
-            </option>
+              {i18n._({ id: "Choose a speaker", message: "Choose a speaker" })}</option>
             {transcript.speakers.map((speaker) => (
               <option key={speaker.id} value={speaker.id}>
                 {speaker.label}
@@ -350,12 +349,12 @@ function EditTab({ transcript, lines, currentTime, onSeek, revisions, onChange }
       </p>
       {transcript.speakers.length > 0 ? (
         <select
-          aria-label="Filter by speaker"
+          aria-label={i18n._({ id: "Filter by speaker", message: "Filter by speaker" })}
           className={SELECT_CLASS}
           value={filter}
           onChange={(event) => setFilter(event.target.value)}
         >
-          <option value={ALL_SPEAKERS}>All speakers</option>
+          <option value={ALL_SPEAKERS}>{i18n._({ id: "All speakers", message: "All speakers" })}</option>
           {transcript.speakers.map((speaker) => (
             <option key={speaker.id} value={speaker.id}>
               {speaker.label}
@@ -371,8 +370,8 @@ function EditTab({ transcript, lines, currentTime, onSeek, revisions, onChange }
         renderLine={renderLine}
       />
       <FindReplace transcript={transcript} onChange={onChange} />
-      <section aria-label="Speakers" className="flex flex-col gap-2">
-        <h3 className="text-sm font-semibold">Speakers</h3>
+      <section aria-label={i18n._({ id: "Speakers", message: "Speakers" })} className="flex flex-col gap-2">
+        <h3 className="text-sm font-semibold">{i18n._({ id: "Speakers", message: "Speakers" })}</h3>
         {transcript.speakers.map((speaker) => {
           const draft = renames[speaker.id] ?? speaker.label;
           return (
@@ -393,36 +392,32 @@ function EditTab({ transcript, lines, currentTime, onSeek, revisions, onChange }
                   )
                 }
               >
-                Rename
-              </Button>
+                {i18n._({ id: "Rename", message: "Rename" })}</Button>
             </div>
           );
         })}
         <div className="flex gap-2">
           <Input
-            aria-label="New speaker name"
+            aria-label={i18n._({ id: "New speaker name", message: "New speaker name" })}
             value={newName}
-            placeholder="Speaker name"
+            placeholder={i18n._({ id: "Speaker name", message: "Speaker name" })}
             onChange={(event) => setNewName(event.target.value)}
           />
           <Button type="button" variant="secondary" disabled={!newName.trim()} onClick={() => void addSpeaker()}>
-            Add speaker
-          </Button>
+            {i18n._({ id: "Add speaker", message: "Add speaker" })}</Button>
         </div>
       </section>
-      <section aria-label="Redo with the speech engine" className="flex flex-col gap-2">
-        <h3 className="text-sm font-semibold">Redo with the speech engine</h3>
+      <section aria-label={i18n._({ id: "Redo with the speech engine", message: "Redo with the speech engine" })} className="flex flex-col gap-2">
+        <h3 className="text-sm font-semibold">{i18n._({ id: "Redo with the speech engine", message: "Redo with the speech engine" })}</h3>
         <div className="flex flex-wrap gap-2">
           <Button type="button" variant="secondary" disabled={rework.busy} onClick={() => void detectSpeakers()}>
-            Detect speakers
-          </Button>
+            {i18n._({ id: "Detect speakers", message: "Detect speakers" })}</Button>
         </div>
         <div className="flex flex-wrap items-end gap-2">
-          <Input aria-label="From" placeholder="From 0:00" value={rangeFrom} onChange={(event) => setRangeFrom(event.target.value)} />
-          <Input aria-label="To" placeholder="To 0:30" value={rangeTo} onChange={(event) => setRangeTo(event.target.value)} />
+          <Input aria-label={i18n._({ id: "From", message: "From" })} placeholder={i18n._({ id: "From 0:00", message: "From 0:00" })} value={rangeFrom} onChange={(event) => setRangeFrom(event.target.value)} />
+          <Input aria-label={i18n._({ id: "To", message: "To" })} placeholder={i18n._({ id: "To 0:30", message: "To 0:30" })} value={rangeTo} onChange={(event) => setRangeTo(event.target.value)} />
           <Button type="button" variant="secondary" disabled={rework.busy || !rangeFrom.trim() || !rangeTo.trim()} onClick={() => void redoRange()}>
-            Redo
-          </Button>
+            {i18n._({ id: "Redo", message: "Redo" })}</Button>
         </div>
         <p role="status" className="text-sm text-muted-foreground">
           {rework.message}
@@ -430,8 +425,7 @@ function EditTab({ transcript, lines, currentTime, onSeek, revisions, onChange }
       </section>
       <div className="flex flex-wrap gap-2">
         <Button type="button" variant="secondary" onClick={() => void change(() => transcriptApi.undo(transcript.id))}>
-          Undo
-        </Button>
+          {i18n._({ id: "Undo", message: "Undo" })}</Button>
         {revisions.map((revision) => (
           <Button
             key={revision.n}
@@ -440,7 +434,7 @@ function EditTab({ transcript, lines, currentTime, onSeek, revisions, onChange }
             aria-label={`Restore revision ${revision.n}`}
             onClick={() => void change(() => transcriptApi.restore(transcript.id, revision.n))}
           >
-            Restore {revision.n}
+            {i18n._({ id: "Restore {n}", message: "Restore {n}", values: { n: revision.n } })}
           </Button>
         ))}
       </div>
@@ -475,16 +469,15 @@ function ExportTab({ transcript, item, onChange }: { transcript: Transcript; ite
         {DOWNLOADS.map(([format, label]) => (
           <Button key={format} asChild variant="secondary">
             <a href={transcriptApi.exportUrl(transcript.id, format)} download={`transcript.${format}`}>
-              Download {label}
+              {i18n._({ id: "Download {format}", message: "Download {format}", values: { format: label } })}
             </a>
           </Button>
         ))}
       </div>
       <CaptionTracks transcript={transcript} />
       <label className="flex flex-col gap-2 text-sm">
-        Import SRT, VTT or text
-        <input
-          aria-label="Import transcript file"
+        {i18n._({ id: "Import SRT, VTT or text", message: "Import SRT, VTT or text" })}<input
+          aria-label={i18n._({ id: "Import transcript file", message: "Import transcript file" })}
           type="file"
           accept=".srt,.vtt,.txt"
           disabled={busy}
@@ -554,12 +547,12 @@ export function useTranscriptWorkspace({ item, me, onSeek, currentTime, initialT
   const shared = { lines, currentTime, onSeek };
   return (
     <>
-      <h2 className="text-lg font-semibold">Transcript</h2>
+      <h2 className="text-lg font-semibold">{i18n._({ id: "Transcript", message: "Transcript" })}</h2>
       <Tabs value={tab} onValueChange={setTab}>
-        <TabsList aria-label="Transcript tools">
-          <TabsTrigger value="search">Search</TabsTrigger>
-          <TabsTrigger value="edit">Edit</TabsTrigger>
-          <TabsTrigger value="export">Export</TabsTrigger>
+        <TabsList aria-label={i18n._({ id: "Transcript tools", message: "Transcript tools" })}>
+          <TabsTrigger value="search">{i18n._({ id: "Search", message: "Search" })}</TabsTrigger>
+          <TabsTrigger value="edit">{i18n._({ id: "Edit", message: "Edit" })}</TabsTrigger>
+          <TabsTrigger value="export">{i18n._({ id: "Export", message: "Export" })}</TabsTrigger>
         </TabsList>
         <TabsContent value="search">
           <SearchTab {...shared} />

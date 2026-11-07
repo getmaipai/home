@@ -1,3 +1,4 @@
+import { i18n } from "@lingui/core";
 // Find and replace on the Edit tab: preview the lines that would change, pick which, apply as one undoable change.
 import { useState } from "react";
 import type { Transcript } from "@maipai/spec/gen/ts/transcript.js";
@@ -41,7 +42,7 @@ export function FindReplace({ transcript, onChange }: { transcript: Transcript; 
       return;
     }
     setBusy(true);
-    setMessage("Working…");
+    setMessage(i18n._({ id: "Working…", message: "Working…" }));
     try {
       const found = await transcriptApi.previewFindReplace(transcript.id, options());
       setPreview(found);
@@ -56,7 +57,7 @@ export function FindReplace({ transcript, onChange }: { transcript: Transcript; 
 
   const apply = async () => {
     setBusy(true);
-    setMessage("Working…");
+    setMessage(i18n._({ id: "Working…", message: "Working…" }));
     try {
       const result = await transcriptApi.applyFindReplace(transcript.id, options(), chosen.map((match) => match.segment_id));
       onChange(result.transcript);
@@ -82,13 +83,13 @@ export function FindReplace({ transcript, onChange }: { transcript: Transcript; 
     });
 
   return (
-    <section aria-label="Find and replace" className="flex flex-col gap-2">
-      <h3 className="text-sm font-semibold">Find and replace</h3>
+    <section aria-label={i18n._({ id: "Find and replace", message: "Find and replace" })} className="flex flex-col gap-2">
+      <h3 className="text-sm font-semibold">{i18n._({ id: "Find and replace", message: "Find and replace" })}</h3>
       <div className="flex flex-wrap items-end gap-2">
-        <Input aria-label="Find" placeholder="Find" value={find} onChange={(event) => edited(() => setFind(event.target.value))} />
+        <Input aria-label={i18n._({ id: "Find", message: "Find" })} placeholder={i18n._({ id: "Find", message: "Find" })} value={find} onChange={(event) => edited(() => setFind(event.target.value))} />
         <Input
-          aria-label="Replace with"
-          placeholder="Replace with"
+          aria-label={i18n._({ id: "Replace with", message: "Replace with" })}
+          placeholder={i18n._({ id: "Replace with", message: "Replace with" })}
           value={replace}
           onChange={(event) => edited(() => setReplace(event.target.value))}
         />
@@ -96,21 +97,19 @@ export function FindReplace({ transcript, onChange }: { transcript: Transcript; 
       <div className="flex flex-wrap items-center gap-4">
         <div className="flex items-center gap-2">
           <Checkbox id="find-match-case" checked={matchCase} onCheckedChange={(value) => edited(() => setMatchCase(value === true))} />
-          <Label htmlFor="find-match-case">Match case</Label>
+          <Label htmlFor="find-match-case">{i18n._({ id: "Match case", message: "Match case" })}</Label>
         </div>
         <div className="flex items-center gap-2">
           <Checkbox id="find-whole-word" checked={wholeWord} onCheckedChange={(value) => edited(() => setWholeWord(value === true))} />
-          <Label htmlFor="find-whole-word">Whole word</Label>
+          <Label htmlFor="find-whole-word">{i18n._({ id: "Whole word", message: "Whole word" })}</Label>
         </div>
         <Button type="button" variant="secondary" disabled={busy} onClick={() => void runPreview()}>
-          Preview
-        </Button>
+          {i18n._({ id: "Preview", message: "Preview" })}</Button>
         <Button type="button" disabled={busy || chosen.length === 0} onClick={() => void apply()}>
-          Apply
-        </Button>
+          {i18n._({ id: "Apply", message: "Apply" })}</Button>
       </div>
       {preview && preview.matches.length > 0 ? (
-        <ul aria-label="Lines that would change" className="flex flex-col gap-2">
+        <ul aria-label={i18n._({ id: "Lines that would change", message: "Lines that would change" })} className="flex flex-col gap-2">
           {preview.matches.map((match) => (
             <li key={match.segment_id} className="flex items-start gap-2 text-sm">
               <Checkbox
@@ -120,8 +119,8 @@ export function FindReplace({ transcript, onChange }: { transcript: Transcript; 
                 onCheckedChange={(value) => toggle(match.segment_id, value === true)}
               />
               <Label htmlFor={`find-line-${match.segment_id}`}>
-                <span className="text-muted-foreground">{clock(match.start)} before: {match.before}</span>{" "}
-                <span>after: {match.after}</span>
+                <span className="text-muted-foreground">{i18n._({ id: "{time} before: {text}", message: "{time} before: {text}", values: { time: clock(match.start), text: match.before } })}</span>{" "}
+                <span>{i18n._({ id: "after: {text}", message: "after: {text}", values: { text: match.after } })}</span>
               </Label>
             </li>
           ))}
@@ -129,8 +128,7 @@ export function FindReplace({ transcript, onChange }: { transcript: Transcript; 
       ) : null}
       {preview?.more ? (
         <p className="text-sm text-muted-foreground">
-          Showing the first {preview.matches.length} of {preview.total_lines} lines. Apply replaces only the lines listed, so run it again for the rest.
-        </p>
+          {i18n._({ id: "Showing the first {shown} of {total} lines. Apply replaces only the lines listed, so run it again for the rest.", message: "Showing the first {shown} of {total} lines. Apply replaces only the lines listed, so run it again for the rest.", values: { shown: preview.matches.length, total: preview.total_lines } })}</p>
       ) : null}
       <p role="status" className="text-sm text-muted-foreground">
         {message}

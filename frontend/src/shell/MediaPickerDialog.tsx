@@ -1,3 +1,4 @@
+import { i18n } from "@lingui/core";
 // VIDEO-CREATE-02 (U3): the body of the host's media picker behind `MediaHost.pickMedia`. A `prompt_bar` reference slot (the Make page's Picture slot) opens
 // it; it lists the person's own Library pictures (uploads and pictures made here, newest first) and takes a new upload through the Library's
 // own upload route, then hands back the chosen Library file id and a thumbnail. Closing it hands back null.
@@ -33,7 +34,7 @@ export function MediaPickerBody({ kind, personId, onDone }: { kind: PickKind; pe
   });
   const upload = async (file: File | undefined) => {
     if (!file) return;
-    if (!PICTURE_TYPES.split(",").includes(file.type)) { setError("Choose a PNG, JPEG or WebP picture."); return; }
+    if (!PICTURE_TYPES.split(",").includes(file.type)) { setError(i18n._({ id: "Choose a PNG, JPEG or WebP picture.", message: "Choose a PNG, JPEG or WebP picture." })); return; }
     setBusy(true);
     setError(null);
     try {
@@ -49,12 +50,12 @@ export function MediaPickerBody({ kind, personId, onDone }: { kind: PickKind; pe
     <div className="flex min-w-0 flex-col gap-3">
         <div className="flex flex-wrap items-center gap-2">
           <input ref={input} type="file" accept={PICTURE_TYPES} hidden data-testid="media-picker-file" onChange={(event) => { void upload(event.target.files?.[0]); event.target.value = ""; }} />
-          <Button type="button" variant="secondary" disabled={busy} onClick={() => input.current?.click()}>{busy ? "Adding" : "Add a picture"}</Button>
+          <Button type="button" variant="secondary" disabled={busy} onClick={() => input.current?.click()}>{busy ? i18n._({ id: "Adding", message: "Adding" }) : i18n._({ id: "Add a picture", message: "Add a picture" })}</Button>
           {error ? <p role="alert" className="text-sm text-destructive">{error}</p> : null}
         </div>
-        <AsyncState data={pictures.data} error={pictures.isError} isFetching={pictures.isFetching} onRetry={() => void pictures.refetch()} errorMessage="Your pictures did not load. Close this and try again." loadingLabel="Loading your pictures">
-          {(rows) => rows.length === 0 ? <p className="text-sm text-muted-foreground">You have no pictures in your Library yet. Add one above.</p> : (
-            <ul className="grid grid-cols-3 gap-2 sm:grid-cols-4" aria-label="Your pictures">
+        <AsyncState data={pictures.data} error={pictures.isError} isFetching={pictures.isFetching} onRetry={() => void pictures.refetch()} errorMessage={i18n._({ id: "Your pictures did not load. Close this and try again.", message: "Your pictures did not load. Close this and try again." })} loadingLabel={i18n._({ id: "Loading your pictures", message: "Loading your pictures" })}>
+          {(rows) => rows.length === 0 ? <p className="text-sm text-muted-foreground">{i18n._({ id: "You have no pictures in your Library yet. Add one above.", message: "You have no pictures in your Library yet. Add one above." })}</p> : (
+            <ul className="grid grid-cols-3 gap-2 sm:grid-cols-4" aria-label={i18n._({ id: "Your pictures", message: "Your pictures" })}>
               {rows.map((item) => (
                 <li key={item.id}>
                   <button type="button" className="block aspect-square w-full overflow-hidden rounded-md border border-border focus-visible:ring-2 focus-visible:ring-ring" aria-label={`Use ${item.name}`} onClick={() => onDone({ id: item.id, thumb: item.thumb_url })}>
@@ -85,21 +86,21 @@ export function StudioPickerBody({ kind, start, personId, onDone }: { kind: Stud
   return (
     <div className="flex min-w-0 flex-col gap-3">
       {kind === "audio" ? (
-        <div className="flex gap-2" role="group" aria-label="What to add">
-          <Button type="button" variant={side === "voice" ? "default" : "secondary"} aria-pressed={side === "voice"} onClick={() => setSide("voice")}>Say a line</Button>
-          <Button type="button" variant={side === "music" ? "default" : "secondary"} aria-pressed={side === "music"} onClick={() => setSide("music")}>Your songs</Button>
+        <div className="flex gap-2" role="group" aria-label={i18n._({ id: "What to add", message: "What to add" })}>
+          <Button type="button" variant={side === "voice" ? "default" : "secondary"} aria-pressed={side === "voice"} onClick={() => setSide("voice")}>{i18n._({ id: "Say a line", message: "Say a line" })}</Button>
+          <Button type="button" variant={side === "music" ? "default" : "secondary"} aria-pressed={side === "music"} onClick={() => setSide("music")}>{i18n._({ id: "Your songs", message: "Your songs" })}</Button>
         </div>
       ) : null}
       {kind === "audio" && side === "voice" ? (
         <div className="flex flex-col gap-2">
-          <Textarea aria-label="The line to say" value={line} maxLength={SAY_MAX_LENGTH} showCount placeholder="Type what the voice should say." onChange={(event) => setLine(event.target.value)} />
-          <div><Button type="button" disabled={line.trim().length === 0} onClick={() => onDone({ id: `${SAY_PREFIX}${line.trim()}` })}>Add this line</Button></div>
+          <Textarea aria-label={i18n._({ id: "The line to say", message: "The line to say" })} value={line} maxLength={SAY_MAX_LENGTH} showCount placeholder={i18n._({ id: "Type what the voice should say.", message: "Type what the voice should say." })} onChange={(event) => setLine(event.target.value)} />
+          <div><Button type="button" disabled={line.trim().length === 0} onClick={() => onDone({ id: `${SAY_PREFIX}${line.trim()}` })}>{i18n._({ id: "Add this line", message: "Add this line" })}</Button></div>
         </div>
       ) : (
         <>
-          <AsyncState data={library.data} error={library.isError} isFetching={library.isFetching} onRetry={() => void library.refetch()} errorMessage={`Your ${noun} did not load. Close this and try again.`} loadingLabel={`Loading your ${noun}`}>
-            {() => items.length === 0 ? <p className="text-sm text-muted-foreground">{kind === "video" ? "You have no clips yet. Make one on the Create page." : "You have no songs in your Library yet. Make one in Music."}</p> : (
-              <ul className="grid grid-cols-2 gap-2 sm:grid-cols-3" aria-label={`Your ${noun}`}>
+          <AsyncState data={library.data} error={library.isError} isFetching={library.isFetching} onRetry={() => void library.refetch()} errorMessage={i18n._({ id: "Your {noun} did not load. Close this and try again.", message: "Your {noun} did not load. Close this and try again.", values: { noun } })} loadingLabel={i18n._({ id: "Loading your {noun}", message: "Loading your {noun}", values: { noun } })}>
+            {() => items.length === 0 ? <p className="text-sm text-muted-foreground">{kind === "video" ? i18n._({ id: "You have no clips yet. Make one on the Create page.", message: "You have no clips yet. Make one on the Create page." }) : i18n._({ id: "You have no songs in your Library yet. Make one in Music.", message: "You have no songs in your Library yet. Make one in Music." })}</p> : (
+              <ul className="grid grid-cols-2 gap-2 sm:grid-cols-3" aria-label={i18n._({ id: "Your {noun}", message: "Your {noun}", values: { noun } })}>
                 {items.map((item) => (
                   <li key={item.id}>
                     <button type="button" className="block w-full overflow-hidden rounded-md border border-border text-left focus-visible:ring-2 focus-visible:ring-ring" aria-label={`Use ${item.name}`} onClick={() => onDone({ id: item.id, thumb: item.thumb_url })}>

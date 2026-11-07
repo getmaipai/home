@@ -1,3 +1,4 @@
+import { i18n } from "@lingui/core";
 // MEDIA-VIZ-01: the one mini player for all media (music, videos, podcasts, books), pinned to the bottom of everything right of the rail
 // on every page, not only inside a media app. It shows what the media host holds once the person has started it, except on the page that
 // is playing that same item. Audio gets a soft audio-reactive strip and a Now playing stage; video gets Picture in picture and Full screen.
@@ -110,29 +111,28 @@ export function GlobalMiniPlayer() {
               {waiting.loading ? (
                 <span role="status" data-testid="mini-loading" className="flex items-center gap-2 pe-2 text-base text-muted-foreground">
                   <Spinner aria-hidden="true" role="presentation" />
-                  {waiting.phase === "buffering" ? "Buffering" : "Connecting"}
+                  {waiting.phase === "buffering" ? i18n._({ id: "Buffering", message: "Buffering" }) : i18n._({ id: "Connecting", message: "Connecting" })}
                 </span>
               ) : null}
               {waiting.failed ? (
                 <span role="alert" data-testid="mini-start-failed" className="flex items-center gap-2 pe-2 text-base text-destructive">
-                  This station did not start. Check your connection, then press Retry.
-                  <Button variant="secondary" size="sm" onClick={() => dock.retry?.()}>Retry</Button>
+                  {i18n._({ id: "This station did not start. Check your connection, then press Retry.", message: "This station did not start. Check your connection, then press Retry." })}<Button variant="secondary" size="sm" onClick={() => dock.retry?.()}>{i18n._({ id: "Retry", message: "Retry" })}</Button>
                 </span>
               ) : null}
               {!live && duration > 0 && Number.isFinite(duration) ? (
                 <span className="flex items-center gap-2 pe-2 text-base tabular-nums text-muted-foreground" data-testid="mini-time">
                   <span>{clock(position)}</span>
                   <div className="w-28 lg:w-40">
-                    <Slider aria-label="Seek" min={0} max={duration} step={1} value={[Math.min(position, duration)]} onValueChange={(value) => { const next = Array.isArray(value) ? value[0] : value; if (typeof next === "number") el.currentTime = next; }} />
+                    <Slider aria-label={i18n._({ id: "Seek", message: "Seek" })} min={0} max={duration} step={1} value={[Math.min(position, duration)]} onValueChange={(value) => { const next = Array.isArray(value) ? value[0] : value; if (typeof next === "number") el.currentTime = next; }} />
                   </div>
                   <span>{clock(duration)}</span>
                 </span>
               ) : null}
               {isAudio ? <VisualizerMenu /> : null}
               {isAudio ? <SleepMenu /> : null}
-              {isAudio ? <Button variant="ghost" size="icon" aria-label="Full screen visualizer" onClick={() => setStage(true)}><FullIcon aria-hidden="true" /></Button> : null}
-              {pictureInPicture ? <Button variant="ghost" size="icon" aria-label="Picture in picture" onClick={() => void withVideoShown(el, () => (el as HTMLVideoElement).requestPictureInPicture(), "leavepictureinpicture")}><PipIcon aria-hidden="true" /></Button> : null}
-              {held.kind === "video" ? <Button variant="ghost" size="icon" aria-label="Full screen" onClick={() => void withVideoShown(el, () => el.requestFullscreen(), "fullscreenchange")}><FullIcon aria-hidden="true" /></Button> : null}
+              {isAudio ? <Button variant="ghost" size="icon" aria-label={i18n._({ id: "Full screen visualizer", message: "Full screen visualizer" })} onClick={() => setStage(true)}><FullIcon aria-hidden="true" /></Button> : null}
+              {pictureInPicture ? <Button variant="ghost" size="icon" aria-label={i18n._({ id: "Picture in picture", message: "Picture in picture" })} onClick={() => void withVideoShown(el, () => (el as HTMLVideoElement).requestPictureInPicture(), "leavepictureinpicture")}><PipIcon aria-hidden="true" /></Button> : null}
+              {held.kind === "video" ? <Button variant="ghost" size="icon" aria-label={i18n._({ id: "Full screen", message: "Full screen" })} onClick={() => void withVideoShown(el, () => el.requestFullscreen(), "fullscreenchange")}><FullIcon aria-hidden="true" /></Button> : null}
               <Button variant="ghost" size="icon" aria-label={`Close the player: ${held.title}`} onClick={dock.clear}><CloseIcon aria-hidden="true" /></Button>
             </>
           }

@@ -14,25 +14,1536 @@ msgstr ""
 "Plural-Forms: \n"
 
 #. js-lingui-explicit-id
+#: src/shell/library/LibraryTrash.tsx:23
+msgid "{count, plural, one {Delete # file forever?} other {Delete # files forever?}}"
+msgstr "{count, plural, one {Delete # file forever?} other {Delete # files forever?}}"
+
+#. js-lingui-explicit-id
+#: src/shell/AlarmRinger.tsx:46
+msgid "{count} alarms"
+msgstr "{count} alarms"
+
+#. js-lingui-explicit-id
+#: src/shell/InstallDockRow.tsx:25
+msgid "{done} of {total}"
+msgstr "{done} of {total}"
+
+#. js-lingui-explicit-id
+#: src/shell/routeHeader.ts:23
+msgid "{greeting}. Here is your household today."
+msgstr "{greeting}. Here is your household today."
+
+#. js-lingui-explicit-id
+#: src/shell/AmbientCompanionPane.tsx:320
+msgid "{name} companion pane"
+msgstr "{name} companion pane"
+
+#. js-lingui-explicit-id
+#: src/shell/AmbientCompanionPane.tsx:313
+msgid "{name} conversations"
+msgstr "{name} conversations"
+
+#. js-lingui-explicit-id
+#: src/shell/VoiceStage.tsx:10
+msgid "{name} is connecting"
+msgstr "{name} is connecting"
+
+#. js-lingui-explicit-id
+#: src/shell/VoiceStage.tsx:11
+msgid "{name} is listening"
+msgstr "{name} is listening"
+
+#. js-lingui-explicit-id
+#: src/shell/VoiceStage.tsx:13
+msgid "{name} is speaking"
+msgstr "{name} is speaking"
+
+#. js-lingui-explicit-id
+#: src/shell/VoiceStage.tsx:12
+msgid "{name} is thinking"
+msgstr "{name} is thinking"
+
+#. js-lingui-explicit-id
+#: src/shell/AmbientCompanionPane.tsx:171
+msgid "{name} speaks with {voice}"
+msgstr "{name} speaks with {voice}"
+
+#. js-lingui-explicit-id
+#: src/shell/library/TranscriptFindReplace.tsx:122
+msgid "{time} before: {text}"
+msgstr "{time} before: {text}"
+
+#. js-lingui-explicit-id
+#: src/shell/InstallDock.tsx:174
+msgid "+{count} more"
+msgstr "+{count} more"
+
+#. js-lingui-explicit-id
+#: src/shell/library/LibraryViewer.tsx:110
+msgid "1 beat"
+msgstr "1 beat"
+
+#. js-lingui-explicit-id
+#: src/shell/library/LibraryViewer.tsx:111
+msgid "15 seconds"
+msgstr "15 seconds"
+
+#. js-lingui-explicit-id
+#: src/shell/library/LibraryViewer.tsx:110
+msgid "2 beats"
+msgstr "2 beats"
+
+#. js-lingui-explicit-id
+#: src/shell/library/LibraryViewer.tsx:111
+msgid "30 seconds"
+msgstr "30 seconds"
+
+#. js-lingui-explicit-id
+#: src/shell/library/LibraryViewer.tsx:110
+msgid "4 beats (one bar)"
+msgstr "4 beats (one bar)"
+
+#. js-lingui-explicit-id
+#: src/shell/library/LibraryViewer.tsx:111
+msgid "60 seconds"
+msgstr "60 seconds"
+
+#. js-lingui-explicit-id
+#: src/shell/library/LibraryViewer.tsx:110
+msgid "8 beats"
+msgstr "8 beats"
+
+#. js-lingui-explicit-id
+#: src/shell/pages/PersonProfilePage.tsx:74
+msgid "A teen&rsquo;s profile is private, even from an admin. Go back to Family to open someone else."
+msgstr "A teen&rsquo;s profile is private, even from an admin. Go back to Family to open someone else."
+
+#. js-lingui-explicit-id
+#: src/shell/components/DataTableRowActions.tsx:28
+msgid "Actions"
+msgstr "Actions"
+
+#. js-lingui-explicit-id
+#: src/shell/MediaPickerDialog.tsx:53
+msgid "Add a picture"
+msgstr "Add a picture"
+
+#. js-lingui-explicit-id
+#: src/shell/library/LibraryViewer.tsx:97
+#: src/shell/library/LibraryViewer.tsx:102
+msgid "Add music"
+msgstr "Add music"
+
+#. js-lingui-explicit-id
+#: src/shell/library/TranscriptPanel.tsx:407
+msgid "Add speaker"
+msgstr "Add speaker"
+
+#. js-lingui-explicit-id
+#: src/shell/library/LibraryViewer.tsx:106
+msgid "Add the music"
+msgstr "Add the music"
+
+#. js-lingui-explicit-id
+#: src/shell/MediaPickerDialog.tsx:97
+msgid "Add this line"
+msgstr "Add this line"
+
+#. js-lingui-explicit-id
+#: src/shell/library/LibraryUploads.tsx:72
+msgid "Added"
+msgstr "Added"
+
+#. js-lingui-explicit-id
+#: src/shell/MediaPickerDialog.tsx:53
+msgid "Adding"
+msgstr "Adding"
+
+#. js-lingui-explicit-id
+#: src/shell/library/TranscriptFindReplace.tsx:123
+msgid "after: {text}"
+msgstr "after: {text}"
+
+#. js-lingui-explicit-id
+#: src/shell/AlarmRinger.tsx:49
+msgid "Alarm"
+msgstr "Alarm"
+
+#. js-lingui-explicit-id
+#: src/shell/AlarmRinger.tsx:199
+msgid "Alarms"
+msgstr "Alarms"
+
+#. js-lingui-explicit-id
+#: src/shell/coreLabels.ts:29
+msgid "Alarms, timers and things to remember."
+msgstr "Alarms, timers and things to remember."
+
+#. js-lingui-explicit-id
+#: src/shell/reader/SearchResults.tsx:39
+msgid "All"
+msgstr "All"
+
+#. js-lingui-explicit-id
+#: src/shell/pageHeaderTitle.tsx:109
+#: src/shell/phoneMenuLinks.tsx:13
+msgid "All apps"
+msgstr "All apps"
+
+#. js-lingui-explicit-id
+#: src/shell/statusApps.ts:37
+#: src/shell/statusSummary.ts:18
+#: src/shell/statusSummary.ts:45
+msgid "All good"
+msgstr "All good"
+
+#. js-lingui-explicit-id
+#: src/shell/library/TranscriptPanel.tsx:357
+msgid "All speakers"
+msgstr "All speakers"
+
+#. js-lingui-explicit-id
+#: src/shell/AmbientCompanionPane.tsx:173
+msgid "Appearance"
+msgstr "Appearance"
+
+#. js-lingui-explicit-id
+#: src/shell/library/TranscriptFindReplace.tsx:109
+msgid "Apply"
+msgstr "Apply"
+
+#. js-lingui-explicit-id
+#: src/shell/phoneMenuLinks.tsx:31
+msgid "Apps"
+msgstr "Apps"
+
+#. js-lingui-explicit-id
+#: src/shell/coreLabels.ts:25
+msgid "Ask, think, and talk things through."
+msgstr "Ask, think, and talk things through."
+
+#. js-lingui-explicit-id
+#: src/shell/pages/SignInPage.tsx:185
+msgid "Back"
+msgstr "Back"
+
+#. js-lingui-explicit-id
+#: src/shell/media/NowPlayingStage.tsx:107
+msgid "Back 10 seconds"
+msgstr "Back 10 seconds"
+
+#. js-lingui-explicit-id
+#: src/shell/pages/PersonProfilePage.tsx:66
+#: src/shell/pages/PersonProfilePage.tsx:75
+msgid "Back to Family"
+msgstr "Back to Family"
+
+#. js-lingui-explicit-id
+#: src/shell/pageHeaderTitle.tsx:99
+#: src/shell/Routes.tsx:152
+msgid "Backups"
+msgstr "Backups"
+
+#. js-lingui-explicit-id
+#: src/shell/library/LibraryViewer.tsx:105
+msgid "Balanced"
+msgstr "Balanced"
+
+#. js-lingui-explicit-id
+#: src/shell/AmbientCompanionPane.tsx:173
+msgid "Bot options"
+msgstr "Bot options"
+
+#. js-lingui-explicit-id
+#: src/shell/AmbientCompanionPane.tsx:172
+msgid "Bots"
+msgstr "Bots"
+
+#. js-lingui-explicit-id
+#: src/shell/GlobalMiniPlayer.tsx:114
+msgid "Buffering"
+msgstr "Buffering"
+
+#. js-lingui-explicit-id
+#: src/shell/components/DataTableRowActions.tsx:53
+msgid "Cancel"
+msgstr "Cancel"
+
+#. js-lingui-explicit-id
+#: src/shell/library/TranscriptCaptionTracks.tsx:60
+msgid "Caption track made."
+msgstr "Caption track made."
+
+#. js-lingui-explicit-id
+#: src/shell/library/TranscriptCaptionTracks.tsx:67
+msgid "Caption track refreshed. Captions you fixed by hand were kept."
+msgstr "Caption track refreshed. Captions you fixed by hand were kept."
+
+#. js-lingui-explicit-id
+#: src/shell/library/TranscriptCaptionTracks.tsx:79
+#: src/shell/library/TranscriptCaptionTracks.tsx:80
+msgid "Caption tracks"
+msgstr "Caption tracks"
+
+#. js-lingui-explicit-id
+#: src/shell/AmbientCompanionPane.tsx:308
+#: src/shell/coreLabels.ts:8
+#: src/shell/pageHeaderTitle.tsx:91
+msgid "Chat"
+msgstr "Chat"
+
+#. js-lingui-explicit-id
+#: src/shell/Routes.tsx:155
+msgid "Chat showcase"
+msgstr "Chat showcase"
+
+#. js-lingui-explicit-id
+#: src/shell/mediaHost.tsx:319
+msgid "Choose a clip"
+msgstr "Choose a clip"
+
+#. js-lingui-explicit-id
+#: src/shell/MediaPickerDialog.tsx:37
+msgid "Choose a PNG, JPEG or WebP picture."
+msgstr "Choose a PNG, JPEG or WebP picture."
+
+#. js-lingui-explicit-id
+#: src/shell/library/LibraryViewer.tsx:109
+msgid "Choose a song"
+msgstr "Choose a song"
+
+#. js-lingui-explicit-id
+#: src/shell/library/TranscriptPanel.tsx:333
+msgid "Choose a speaker"
+msgstr "Choose a speaker"
+
+#. js-lingui-explicit-id
+#: src/shell/AmbientCompanionPane.tsx:172
+msgid "Choose companion"
+msgstr "Choose companion"
+
+#. js-lingui-explicit-id
+#: src/shell/library/LibraryViewer.tsx:109
+msgid "Choose up to six videos, in the order you pick them."
+msgstr "Choose up to six videos, in the order you pick them."
+
+#. js-lingui-explicit-id
+#: src/shell/coreLabels.ts:17
+#: src/shell/pageHeaderTitle.tsx:106
+msgid "Clock"
+msgstr "Clock"
+
+#. js-lingui-explicit-id
+#: src/shell/AmbientCompanionPane.tsx:254
+msgid "Close"
+msgstr "Close"
+
+#. js-lingui-explicit-id
+#: src/shell/media/NowPlayingStage.tsx:85
+msgid "Close Now playing"
+msgstr "Close Now playing"
+
+#. js-lingui-explicit-id
+#: src/shell/pageHeaderTitle.tsx:101
+#: src/shell/Routes.tsx:153
+msgid "Commands"
+msgstr "Commands"
+
+#. js-lingui-explicit-id
+#: src/shell/AmbientCompanionPane.tsx:173
+msgid "Companion options"
+msgstr "Companion options"
+
+#. js-lingui-explicit-id
+#: src/shell/AmbientCompanionPane.tsx:172
+msgid "Companion or bot"
+msgstr "Companion or bot"
+
+#. js-lingui-explicit-id
+#: src/shell/AmbientCompanionPane.tsx:170
+msgid "Companion settings"
+msgstr "Companion settings"
+
+#. js-lingui-explicit-id
+#: src/shell/AmbientCompanionPane.tsx:172
+#: src/shell/coreLabels.ts:15
+#: src/shell/phoneMenuLinks.tsx:14
+msgid "Companions"
+msgstr "Companions"
+
+#. js-lingui-explicit-id
+#: src/shell/components/DataTableRowActions.tsx:57
+msgid "Confirm"
+msgstr "Confirm"
+
+#. js-lingui-explicit-id
+#: src/shell/GlobalMiniPlayer.tsx:114
+msgid "Connecting"
+msgstr "Connecting"
+
+#. js-lingui-explicit-id
+#: src/shell/AmbientCompanionPane.tsx:254
+msgid "Continue"
+msgstr "Continue"
+
+#. js-lingui-explicit-id
+#: src/shell/AmbientCompanionPane.tsx:320
+#: src/shell/AmbientCompanionPane.tsx:320
+msgid "Continue in Chat"
+msgstr "Continue in Chat"
+
+#. js-lingui-explicit-id
+#: src/shell/AmbientCompanionPane.tsx:254
+msgid "Conversation with {name}"
+msgstr "Conversation with {name}"
+
+#. js-lingui-explicit-id
+#: src/shell/AmbientCompanionPane.tsx:307
+msgid "Conversations"
+msgstr "Conversations"
+
+#. js-lingui-explicit-id
+#: src/shell/AmbientCompanionPane.tsx:166
+msgid "Could not change the companion. Check your connection and try again."
+msgstr "Could not change the companion. Check your connection and try again."
+
+#. js-lingui-explicit-id
+#: src/shell/AmbientCompanionPane.tsx:291
+msgid "Could not continue this side chat. Try again."
+msgstr "Could not continue this side chat. Try again."
+
+#. js-lingui-explicit-id
+#: src/shell/Routes.tsx:361
+msgid "Could not discard Incognito chats. Try again."
+msgstr "Could not discard Incognito chats. Try again."
+
+#. js-lingui-explicit-id
+#: src/shell/AmbientCompanionPane.tsx:313
+msgid "Could not load conversations. Check your connection and try again."
+msgstr "Could not load conversations. Check your connection and try again."
+
+#. js-lingui-explicit-id
+#: src/shell/pages/PersonProfilePage.tsx:57
+msgid "Could not load the household."
+msgstr "Could not load the household."
+
+#. js-lingui-explicit-id
+#: src/shell/reader/ReaderArticle.tsx:75
+msgid "Could not load this article."
+msgstr "Could not load this article."
+
+#. js-lingui-explicit-id
+#: src/shell/pages/PersonProfilePage.tsx:150
+msgid "Could not load what's been shared."
+msgstr "Could not load what's been shared."
+
+#. js-lingui-explicit-id
+#: src/shell/RailProfile.tsx:61
+msgid "Could not log out. Try again."
+msgstr "Could not log out. Try again."
+
+#. js-lingui-explicit-id
+#: src/shell/AmbientCompanionPane.tsx:319
+msgid "Could not open that conversation. Check your connection and try again."
+msgstr "Could not open that conversation. Check your connection and try again."
+
+#. js-lingui-explicit-id
+#: src/shell/AmbientCompanionPane.tsx:296
+#: src/shell/Routes.tsx:302
+msgid "Could not reach {name}. Try again."
+msgstr "Could not reach {name}. Try again."
+
+#. js-lingui-explicit-id
+#: src/shell/reader/SearchResults.tsx:44
+msgid "Could not search right now."
+msgstr "Could not search right now."
+
+#. js-lingui-explicit-id
+#: src/shell/media/NowPlayingStage.tsx:80
+msgid "Cover"
+msgstr "Cover"
+
+#. js-lingui-explicit-id
+#: src/shell/library/LibraryViewer.tsx:110
+msgid "Cut every"
+msgstr "Cut every"
+
+#. js-lingui-explicit-id
+#: src/shell/library/LibraryViewer.tsx:96
+#: src/shell/library/LibraryViewer.tsx:108
+msgid "Cut to the beat"
+msgstr "Cut to the beat"
+
+#. js-lingui-explicit-id
+#: src/shell/library/LibraryViewer.tsx:101
+msgid "Cuts your videos on the beat of this song. Everything stays on this home server."
+msgstr "Cuts your videos on the beat of this song. Everything stays on this home server."
+
+#. js-lingui-explicit-id
+#: src/shell/pages/PersonProfilePage.tsx:120
+msgid "Daily time limits for {name}."
+msgstr "Daily time limits for {name}."
+
+#. js-lingui-explicit-id
+#: src/shell/statusApps.ts:9
+#: src/shell/statusSummary.ts:45
+msgid "Degraded"
+msgstr "Degraded"
+
+#. js-lingui-explicit-id
+#: src/shell/library/LibraryItems.tsx:38
+#: src/shell/library/LibraryViewer.tsx:158
+#: src/shell/library/LibraryViewer.tsx:158
+msgid "Delete"
+msgstr "Delete"
+
+#. js-lingui-explicit-id
+#: src/shell/library/LibraryTrash.tsx:25
+#: src/shell/library/LibraryTrash.tsx:44
+msgid "Delete forever"
+msgstr "Delete forever"
+
+#. js-lingui-explicit-id
+#: src/shell/library/LibraryTrash.tsx:23
+msgid "Delete this file forever?"
+msgstr "Delete this file forever?"
+
+#. js-lingui-explicit-id
+#: src/shell/library/LibraryTrash.tsx:26
+msgid "Deleting"
+msgstr "Deleting"
+
+#. js-lingui-explicit-id
+#: src/shell/components/SearchTestResultBody.tsx:23
+#: src/shell/InstallStrip.tsx:121
+msgid "Details"
+msgstr "Details"
+
+#. js-lingui-explicit-id
+#: src/shell/library/TranscriptPanel.tsx:414
+msgid "Detect speakers"
+msgstr "Detect speakers"
+
+#. js-lingui-explicit-id
+#: src/shell/library/LibraryUploads.tsx:75
+#: src/shell/library/LibraryUploads.tsx:76
+#: src/shell/NotificationBell.tsx:248
+msgid "Dismiss"
+msgstr "Dismiss"
+
+#. js-lingui-explicit-id
+#: src/shell/NotificationBell.tsx:233
+msgid "Dismiss all"
+msgstr "Dismiss all"
+
+#. js-lingui-explicit-id
+#: src/shell/NotificationBell.tsx:233
+msgid "Dismissing…"
+msgstr "Dismissing…"
+
+#. js-lingui-explicit-id
+#: src/shell/AlarmRinger.tsx:59
+msgid "Done"
+msgstr "Done"
+
+#. js-lingui-explicit-id
+#: src/shell/library/LibraryItems.tsx:33
+#: src/shell/library/LibraryViewer.tsx:157
+#: src/shell/library/LibraryViewer.tsx:157
+msgid "Download"
+msgstr "Download"
+
+#. js-lingui-explicit-id
+#: src/shell/library/TranscriptPanel.tsx:472
+msgid "Download {format}"
+msgstr "Download {format}"
+
+#. js-lingui-explicit-id
+#: src/shell/components/DataTableControls.tsx:29
+msgid "Download CSV"
+msgstr "Download CSV"
+
+#. js-lingui-explicit-id
+#: src/shell/components/DataTableControls.tsx:29
+msgid "Download table as CSV"
+msgstr "Download table as CSV"
+
+#. js-lingui-explicit-id
+#: src/shell/library/TranscriptPanel.tsx:288
+#: src/shell/library/TranscriptPanel.tsx:554
+#: src/shell/pages/PersonProfilePage.tsx:178
+msgid "Edit"
+msgstr "Edit"
+
+#. js-lingui-explicit-id
+#: src/shell/pages/PersonProfilePage.tsx:91
+msgid "Edit {name}’s profile"
+msgstr "Edit {name}’s profile"
+
+#. js-lingui-explicit-id
+#: src/shell/library/LibraryViewer.tsx:114
+msgid "Edit in its chat"
+msgstr "Edit in its chat"
+
+#. js-lingui-explicit-id
+#: src/shell/pages/PersonProfilePage.tsx:178
+msgid "Edit profile"
+msgstr "Edit profile"
+
+#. js-lingui-explicit-id
+#: src/shell/library/LibraryTrash.tsx:19
+msgid "Empty Trash"
+msgstr "Empty Trash"
+
+#. js-lingui-explicit-id
+#: src/shell/AmbientCompanionPane.tsx:251
+msgid "End call"
+msgstr "End call"
+
+#. js-lingui-explicit-id
+#: src/shell/AmbientCompanionPane.tsx:251
+msgid "End the call"
+msgstr "End the call"
+
+#. js-lingui-explicit-id
+#: src/shell/pages/SignInPage.tsx:139
+msgid "Enter your {digits}-digit passcode"
+msgstr "Enter your {digits}-digit passcode"
+
+#. js-lingui-explicit-id
+#: src/shell/sessionLockContext.tsx:78
+msgid "Enter your {digits}-digit passcode to continue."
+msgstr "Enter your {digits}-digit passcode to continue."
+
+#. js-lingui-explicit-id
+#: src/shell/pages/SignInPage.tsx:103
+msgid "Enter your 6-digit code"
+msgstr "Enter your 6-digit code"
+
+#. js-lingui-explicit-id
+#: src/shell/sessionLockContext.tsx:78
+msgid "Enter your PIN or password to continue."
+msgstr "Enter your PIN or password to continue."
+
+#. js-lingui-explicit-id
+#: src/shell/coreLabels.ts:28
+msgid "Everyone who shares your home."
+msgstr "Everyone who shares your home."
+
+#. js-lingui-explicit-id
+#: src/shell/statusApps.ts:37
+msgid "Everything is running."
+msgstr "Everything is running."
+
+#. js-lingui-explicit-id
+#: src/shell/library/TranscriptPanel.tsx:555
+msgid "Export"
+msgstr "Export"
+
+#. js-lingui-explicit-id
+#: src/shell/coreLabels.ts:9
+#: src/shell/pageHeaderTitle.tsx:92
+msgid "Family"
+msgstr "Family"
+
+#. js-lingui-explicit-id
+#: src/shell/library/LibraryTrash.tsx:33
+msgid "Files in Trash"
+msgstr "Files in Trash"
+
+#. js-lingui-explicit-id
+#: src/shell/library/TranscriptPanel.tsx:352
+msgid "Filter by speaker"
+msgstr "Filter by speaker"
+
+#. js-lingui-explicit-id
+#: src/shell/reader/SearchResults.tsx:38
+msgid "Filter results by book"
+msgstr "Filter results by book"
+
+#. js-lingui-explicit-id
+#: src/shell/library/TranscriptFindReplace.tsx:89
+#: src/shell/library/TranscriptFindReplace.tsx:89
+msgid "Find"
+msgstr "Find"
+
+#. js-lingui-explicit-id
+#: src/shell/library/TranscriptFindReplace.tsx:86
+#: src/shell/library/TranscriptFindReplace.tsx:87
+msgid "Find and replace"
+msgstr "Find and replace"
+
+#. js-lingui-explicit-id
+#: src/shell/routeHeader.ts:24
+msgid "Find anything across your household."
+msgstr "Find anything across your household."
+
+#. js-lingui-explicit-id
+#: src/shell/AmbientCompanionPane.tsx:254
+#: src/shell/Routes.tsx:302
+msgid "Find me"
+msgstr "Find me"
+
+#. js-lingui-explicit-id
+#: src/shell/media/NowPlayingStage.tsx:109
+msgid "Forward 30 seconds"
+msgstr "Forward 30 seconds"
+
+#. js-lingui-explicit-id
+#: src/shell/library/TranscriptPanel.tsx:417
+msgid "From"
+msgstr "From"
+
+#. js-lingui-explicit-id
+#: src/shell/library/TranscriptPanel.tsx:417
+msgid "From 0:00"
+msgstr "From 0:00"
+
+#. js-lingui-explicit-id
+#: src/shell/GlobalMiniPlayer.tsx:135
+#: src/shell/media/MusicVisualizerSection.tsx:68
+msgid "Full screen"
+msgstr "Full screen"
+
+#. js-lingui-explicit-id
+#: src/shell/GlobalMiniPlayer.tsx:133
+#: src/shell/media/MusicVisualizerSection.tsx:68
+msgid "Full screen visualizer"
+msgstr "Full screen visualizer"
+
+#. js-lingui-explicit-id
+#: src/shell/RailProfile.tsx:42
+msgid "Good"
+msgstr "Good"
+
+#. js-lingui-explicit-id
+#: src/shell/incognitoContext.tsx:63
+msgid "Got it"
+msgstr "Got it"
+
+#. js-lingui-explicit-id
+#: src/shell/library/LibraryTrash.tsx:41
+msgid "Held until you delete it"
+msgstr "Held until you delete it"
+
+#. js-lingui-explicit-id
+#: src/shell/components/SearchTestResultBody.tsx:23
+msgid "Hide details"
+msgstr "Hide details"
+
+#. js-lingui-explicit-id
+#: src/shell/AmbientCompanionPane.tsx:313
+msgid "History"
+msgstr "History"
+
+#. js-lingui-explicit-id
+#: src/shell/coreLabels.ts:7
+#: src/shell/pageHeaderTitle.tsx:90
+#: src/shell/routeHeader.ts:23
+#: src/shell/Routes.tsx:421
+msgid "Home"
+msgstr "Home"
+
+#. js-lingui-explicit-id
+#: src/shell/library/LibraryStorage.tsx:15
+msgid "Home could not read your storage. Reload the page to try again."
+msgstr "Home could not read your storage. Reload the page to try again."
+
+#. js-lingui-explicit-id
+#: src/shell/pageHeaderTitle.tsx:158
+msgid "Home layout"
+msgstr "Home layout"
+
+#. js-lingui-explicit-id
+#: src/shell/library/LibraryViewer.tsx:104
+msgid "Home makes music about as long as the video, then puts it under the video as a new version. Your first video is kept."
+msgstr "Home makes music about as long as the video, then puts it under the video as a new version. Your first video is kept."
+
+#. js-lingui-explicit-id
+#: src/shell/coreLabels.ts:10
+#: src/shell/pageHeaderTitle.tsx:107
+msgid "House"
+msgstr "House"
+
+#. js-lingui-explicit-id
+#: src/shell/library/LibraryViewer.tsx:105
+msgid "How loud"
+msgstr "How loud"
+
+#. js-lingui-explicit-id
+#: src/shell/pages/PersonProfilePage.tsx:130
+msgid "How MaiPai answers {name} about sensitive subjects. Only you and other admins can change these."
+msgstr "How MaiPai answers {name} about sensitive subjects. Only you and other admins can change these."
+
+#. js-lingui-explicit-id
+#: src/shell/library/LibraryStorage.tsx:27
+msgid "Identical files count once."
+msgstr "Identical files count once."
+
+#. js-lingui-explicit-id
+#: src/shell/library/TranscriptPanel.tsx:479
+msgid "Import SRT, VTT or text"
+msgstr "Import SRT, VTT or text"
+
+#. js-lingui-explicit-id
+#: src/shell/library/TranscriptPanel.tsx:480
+msgid "Import transcript file"
+msgstr "Import transcript file"
+
+#. js-lingui-explicit-id
+#: src/shell/incognitoContext.tsx:60
+msgid "Incognito turns off memory and personalization across MaiPai. What you do while it is on stays out of your history and is forgotten when you turn it off."
+msgstr "Incognito turns off memory and personalization across MaiPai. What you do while it is on stays out of your history and is forgotten when you turn it off."
+
+#. js-lingui-explicit-id
+#: src/shell/InstallDock.tsx:186
+msgid "Installs in progress"
+msgstr "Installs in progress"
+
+#. js-lingui-explicit-id
+#: src/shell/library/LibraryViewer.tsx:114
+msgid "Its chat was deleted, so it cannot be edited here."
+msgstr "Its chat was deleted, so it cannot be edited here."
+
+#. js-lingui-explicit-id
+#: src/shell/library/LibraryItems.tsx:36
+#: src/shell/library/LibraryViewer.tsx:94
+msgid "Keep"
+msgstr "Keep"
+
+#. js-lingui-explicit-id
+#: src/shell/library/LibraryTrash.tsx:28
+msgid "Keep them"
+msgstr "Keep them"
+
+#. js-lingui-explicit-id
+#: src/shell/pages/settings/settingsViews.tsx:68
+msgid "Language"
+msgstr "Language"
+
+#. js-lingui-explicit-id
+#: src/shell/library/LibraryViewer.tsx:111
+msgid "Length"
+msgstr "Length"
+
+#. js-lingui-explicit-id
+#: src/shell/library/LibraryItems.tsx:100
+#: src/shell/library/LibraryItems.tsx:139
+msgid "Library files"
+msgstr "Library files"
+
+#. js-lingui-explicit-id
+#: src/shell/pages/PersonProfilePage.tsx:108
+msgid "Limits"
+msgstr "Limits"
+
+#. js-lingui-explicit-id
+#: src/shell/library/TranscriptFindReplace.tsx:112
+msgid "Lines that would change"
+msgstr "Lines that would change"
+
+#. js-lingui-explicit-id
+#: src/shell/AmbientCompanionPane.tsx:313
+msgid "Loading conversations"
+msgstr "Loading conversations"
+
+#. js-lingui-explicit-id
+#: src/shell/pages/SignInPage.tsx:87
+msgid "Loading household"
+msgstr "Loading household"
+
+#. js-lingui-explicit-id
+#: src/App.tsx:153
+#: src/App.tsx:167
+#: src/App.tsx:193
+msgid "Loading MaiPai Home"
+msgstr "Loading MaiPai Home"
+
+#. js-lingui-explicit-id
+#: src/shell/pages/PersonProfilePage.tsx:58
+msgid "Loading profile"
+msgstr "Loading profile"
+
+#. js-lingui-explicit-id
+#: src/shell/pages/PersonProfilePage.tsx:150
+msgid "Loading shared media"
+msgstr "Loading shared media"
+
+#. js-lingui-explicit-id
 #: src/shell/pages/PackageAppPage.tsx:291
 msgid "Loading weather"
 msgstr "Loading weather"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/VoiceBrowserSection.tsx:87
+#: src/shell/MediaPickerDialog.tsx:101
+msgid "Loading your {noun}"
+msgstr "Loading your {noun}"
+
+#. js-lingui-explicit-id
+#: src/shell/MediaPickerDialog.tsx:56
+msgid "Loading your pictures"
+msgstr "Loading your pictures"
+
+#. js-lingui-explicit-id
+#: src/shell/AdultLockHost.tsx:94
+msgid "Lock now"
+msgstr "Lock now"
+
+#. js-lingui-explicit-id
+#: src/shell/sessionLockContext.tsx:78
+msgid "Locked after inactivity."
+msgstr "Locked after inactivity."
+
+#. js-lingui-explicit-id
+#: src/shell/library/LibraryViewer.tsx:105
+msgid "Loud"
+msgstr "Loud"
+
+#. js-lingui-explicit-id
+#: src/shell/StatusIndicator.tsx:29
+#: src/shell/statusSummary.ts:18
+#: src/shell/statusSummary.ts:45
+msgid "Maintenance"
+msgstr "Maintenance"
+
+#. js-lingui-explicit-id
+#: src/shell/routeHeader.ts:50
+msgid "MaiPai Home"
+msgstr "MaiPai Home"
+
+#. js-lingui-explicit-id
+#: src/shell/library/TranscriptCaptionTracks.tsx:111
+msgid "Make caption track"
+msgstr "Make caption track"
+
+#. js-lingui-explicit-id
+#: src/shell/coreLabels.ts:33
+msgid "Make MaiPai feel like yours."
+msgstr "Make MaiPai feel like yours."
+
+#. js-lingui-explicit-id
+#: src/shell/library/LibraryViewer.tsx:103
+msgid "Make new music for this video"
+msgstr "Make new music for this video"
+
+#. js-lingui-explicit-id
+#: src/shell/library/LibraryViewer.tsx:112
+msgid "Make the cut"
+msgstr "Make the cut"
+
+#. js-lingui-explicit-id
+#: src/shell/library/TranscriptPanel.tsx:116
+msgid "Make transcript"
+msgstr "Make transcript"
+
+#. js-lingui-explicit-id
+#: src/shell/library/TranscriptPanel.tsx:116
+msgid "Making transcript…"
+msgstr "Making transcript…"
+
+#. js-lingui-explicit-id
+#: src/shell/library/LibraryItems.tsx:37
+#: src/shell/library/LibraryViewer.tsx:98
+msgid "Mark all-ages"
+msgstr "Mark all-ages"
+
+#. js-lingui-explicit-id
+#: src/shell/library/TranscriptFindReplace.tsx:100
+msgid "Match case"
+msgstr "Match case"
+
+#. js-lingui-explicit-id
+#: src/shell/pageHeaderTitle.tsx:108
+#: src/shell/Routes.tsx:421
+msgid "Media"
+msgstr "Media"
+
+#. js-lingui-explicit-id
+#: src/shell/coreLabels.ts:27
+msgid "Meet the companions and pick how your assistant sounds."
+msgstr "Meet the companions and pick how your assistant sounds."
+
+#. js-lingui-explicit-id
+#: src/shell/coreLabels.ts:14
+msgid "Memories"
+msgstr "Memories"
+
+#. js-lingui-explicit-id
+#: src/shell/AmbientCompanionPane.tsx:254
+msgid "Microphone help"
+msgstr "Microphone help"
+
+#. js-lingui-explicit-id
+#: src/shell/media/MinimizeButton.tsx:22
+msgid "Minimize"
+msgstr "Minimize"
+
+#. js-lingui-explicit-id
+#: src/shell/media/MinimizeButton.tsx:21
+msgid "Minimize to the mini player"
+msgstr "Minimize to the mini player"
+
+#. js-lingui-explicit-id
+#: src/shell/media/MinimizeButton.tsx:21
+msgid "Minimize: keep playing in the mini player"
+msgstr "Minimize: keep playing in the mini player"
+
+#. js-lingui-explicit-id
+#: src/shell/AlarmRinger.tsx:54
+msgid "Missed at {time}"
+msgstr "Missed at {time}"
+
+#. js-lingui-explicit-id
+#: src/shell/AlarmRinger.tsx:63
+#: src/shell/phoneMenuLinks.tsx:18
+msgid "More"
+msgstr "More"
+
+#. js-lingui-explicit-id
+#: src/shell/components/DataTableRowActions.tsx:26
+msgid "More actions"
+msgstr "More actions"
+
+#. js-lingui-explicit-id
+#: src/shell/AlarmRinger.tsx:63
+msgid "More snooze options"
+msgstr "More snooze options"
+
+#. js-lingui-explicit-id
+#: src/shell/library/LibraryViewer.tsx:103
+msgid "Music"
+msgstr "Music"
+
+#. js-lingui-explicit-id
+#: src/shell/AmbientCompanionPane.tsx:251
+#: src/shell/AmbientCompanionPane.tsx:251
+msgid "Mute microphone"
+msgstr "Mute microphone"
+
+#. js-lingui-explicit-id
+#: src/shell/AmbientCompanionPane.tsx:320
+#: src/shell/AmbientCompanionPane.tsx:320
+msgid "New conversation"
+msgstr "New conversation"
+
+#. js-lingui-explicit-id
+#: src/shell/library/TranscriptPanel.tsx:401
+msgid "New speaker name"
+msgstr "New speaker name"
+
+#. js-lingui-explicit-id
+#: src/shell/components/DataTableControls.tsx:34
+msgid "Next"
+msgstr "Next"
+
+#. js-lingui-explicit-id
+#: src/shell/AmbientCompanionPane.tsx:313
+msgid "No conversations with {name} yet."
+msgstr "No conversations with {name} yet."
+
+#. js-lingui-explicit-id
+#: src/shell/pages/PersonProfilePage.tsx:65
+msgid "No one in this household has that profile."
+msgstr "No one in this household has that profile."
+
+#. js-lingui-explicit-id
+#: src/shell/media/VisualizerMenu.tsx:23
+msgid "None"
+msgstr "None"
+
+#. js-lingui-explicit-id
+#: src/shell/statusApps.ts:7
+msgid "Not working"
+msgstr "Not working"
+
+#. js-lingui-explicit-id
+#: src/shell/NotificationBell.tsx:222
+msgid "Nothing pending."
+msgstr "Nothing pending."
+
+#. js-lingui-explicit-id
+#: src/shell/pages/PersonProfilePage.tsx:156
+#: src/shell/pages/PersonProfilePage.tsx:156
+msgid "Nothing shared yet."
+msgstr "Nothing shared yet."
+
+#. js-lingui-explicit-id
+#: src/shell/NotificationBell.tsx:200
+#: src/shell/NotificationBell.tsx:215
+#: src/shell/pageHeaderTitle.tsx:104
+#: src/shell/routeHeader.ts:25
+msgid "Notifications"
+msgstr "Notifications"
+
+#. js-lingui-explicit-id
+#: src/shell/NotificationBell.tsx:200
+msgid "Notifications ({count} pending)"
+msgstr "Notifications ({count} pending)"
+
+#. js-lingui-explicit-id
+#: src/shell/AmbientCompanionPane.tsx:251
+msgid "On a call with {name}"
+msgstr "On a call with {name}"
+
+#. js-lingui-explicit-id
+#: src/shell/AmbientCompanionPane.tsx:311
+#: src/shell/library/LibraryItems.tsx:32
+msgid "Open"
+msgstr "Open"
+
+#. js-lingui-explicit-id
+#: src/shell/pages/PersonProfilePage.tsx:107
+msgid "Overview"
+msgstr "Overview"
+
+#. js-lingui-explicit-id
+#: src/shell/components/DataTableControls.tsx:36
+msgid "Page {page} of {pages}"
+msgstr "Page {page} of {pages}"
+
+#. js-lingui-explicit-id
+#: src/shell/pages/SignInPage.tsx:109
+msgid "Password"
+msgstr "Password"
+
+#. js-lingui-explicit-id
+#: src/shell/pageHeaderTitle.tsx:96
+#: src/shell/Routes.tsx:148
+msgid "Performance"
+msgstr "Performance"
+
+#. js-lingui-explicit-id
+#: src/apps/settings/VoiceBrowserSection.tsx:88
 msgid "Pick a person to see or change their voice."
 msgstr "Pick a person to see or change their voice."
 
 #. js-lingui-explicit-id
+#: src/shell/mediaHost.tsx:320
+msgid "Pick one of your own clips to put after this one."
+msgstr "Pick one of your own clips to put after this one."
+
+#. js-lingui-explicit-id
+#: src/shell/GlobalMiniPlayer.tsx:134
+msgid "Picture in picture"
+msgstr "Picture in picture"
+
+#. js-lingui-explicit-id
+#: src/shell/pages/PersonProfilePage.tsx:123
+msgid "Pictures and videos can be made in chat."
+msgstr "Pictures and videos can be made in chat."
+
+#. js-lingui-explicit-id
+#: src/shell/sessionLockContext.tsx:98
+msgid "PIN or password"
+msgstr "PIN or password"
+
+#. js-lingui-explicit-id
+#: src/shell/media/MusicVisualizerSection.tsx:58
+msgid "Player options"
+msgstr "Player options"
+
+#. js-lingui-explicit-id
+#: src/shell/AmbientCompanionPane.tsx:173
+msgid "Presence"
+msgstr "Presence"
+
+#. js-lingui-explicit-id
+#: src/shell/library/TranscriptFindReplace.tsx:107
+msgid "Preview"
+msgstr "Preview"
+
+#. js-lingui-explicit-id
+#: src/shell/components/DataTableControls.tsx:33
+msgid "Previous"
+msgstr "Previous"
+
+#. js-lingui-explicit-id
+#: src/shell/coreLabels.ts:12
+#: src/shell/pageHeaderTitle.tsx:102
+msgid "Privacy"
+msgstr "Privacy"
+
+#. js-lingui-explicit-id
+#: src/shell/pages/PersonProfilePage.tsx:51
+msgid "Profile"
+msgstr "Profile"
+
+#. js-lingui-explicit-id
+#: src/shell/library/LibraryViewer.tsx:105
+msgid "Quiet"
+msgstr "Quiet"
+
+#. js-lingui-explicit-id
+#: src/shell/AmbientCompanionPane.tsx:314
+msgid "Read aloud is unavailable because voice output is not ready. Check Voice settings and try again."
+msgstr "Read aloud is unavailable because voice output is not ready. Check Voice settings and try again."
+
+#. js-lingui-explicit-id
+#: src/shell/AmbientCompanionPane.tsx:316
+#: src/shell/AmbientCompanionPane.tsx:316
+msgid "Read replies aloud"
+msgstr "Read replies aloud"
+
+#. js-lingui-explicit-id
+#: src/shell/coreLabels.ts:31
+msgid "Read Wikipedia from your own library, no internet needed."
+msgstr "Read Wikipedia from your own library, no internet needed."
+
+#. js-lingui-explicit-id
+#: src/shell/library/TranscriptPanel.tsx:420
+msgid "Redo"
+msgstr "Redo"
+
+#. js-lingui-explicit-id
+#: src/shell/library/TranscriptPanel.tsx:410
+#: src/shell/library/TranscriptPanel.tsx:411
+msgid "Redo with the speech engine"
+msgstr "Redo with the speech engine"
+
+#. js-lingui-explicit-id
+#: src/shell/coreLabels.ts:11
+#: src/shell/pageHeaderTitle.tsx:110
+msgid "Reference"
+msgstr "Reference"
+
+#. js-lingui-explicit-id
+#: src/shell/reader/SearchResults.tsx:47
+msgid "Reference search results"
+msgstr "Reference search results"
+
+#. js-lingui-explicit-id
+#: src/shell/library/TranscriptCaptionTracks.tsx:105
+msgid "Refresh"
+msgstr "Refresh"
+
+#. js-lingui-explicit-id
+#: src/shell/reader/SearchResults.tsx:57
+#: src/shell/reader/SearchResults.tsx:58
+msgid "Related searches"
+msgstr "Related searches"
+
+#. js-lingui-explicit-id
+#: src/shell/coreLabels.ts:16
+#: src/shell/pageHeaderTitle.tsx:105
+msgid "Reminders"
+msgstr "Reminders"
+
+#. js-lingui-explicit-id
+#: src/shell/library/LibraryItems.tsx:35
+#: src/shell/library/LibraryViewer.tsx:93
+#: src/shell/library/TranscriptPanel.tsx:395
+msgid "Rename"
+msgstr "Rename"
+
+#. js-lingui-explicit-id
+#: src/shell/InstallDock.tsx:205
+#: src/shell/pageHeaderTitle.tsx:98
+#: src/shell/Routes.tsx:150
+msgid "Repairs"
+msgstr "Repairs"
+
+#. js-lingui-explicit-id
+#: src/shell/media/MusicVisualizerSection.tsx:62
+msgid "Repeat"
+msgstr "Repeat"
+
+#. js-lingui-explicit-id
+#: src/shell/library/TranscriptFindReplace.tsx:91
+#: src/shell/library/TranscriptFindReplace.tsx:92
+msgid "Replace with"
+msgstr "Replace with"
+
+#. js-lingui-explicit-id
+#: src/shell/library/LibraryTrash.tsx:43
+msgid "Restore"
+msgstr "Restore"
+
+#. js-lingui-explicit-id
+#: src/shell/library/TranscriptPanel.tsx:437
+msgid "Restore {n}"
+msgstr "Restore {n}"
+
+#. js-lingui-explicit-id
+#: src/shell/GlobalMiniPlayer.tsx:119
+msgid "Retry"
+msgstr "Retry"
+
+#. js-lingui-explicit-id
+#: src/shell/AlarmRinger.tsx:198
+#: src/shell/AlarmRinger.tsx:203
+msgid "Ringing alarms"
+msgstr "Ringing alarms"
+
+#. js-lingui-explicit-id
+#: src/shell/AmbientCompanionPane.tsx:173
+msgid "Robot settings"
+msgstr "Robot settings"
+
+#. js-lingui-explicit-id
+#: src/shell/components/DataTableControls.tsx:38
+msgid "Rows per page:"
+msgstr "Rows per page:"
+
+#. js-lingui-explicit-id
+#: src/shell/MediaPickerDialog.tsx:90
+msgid "Say a line"
+msgstr "Say a line"
+
+#. js-lingui-explicit-id
 #: src/i18n.test.tsx:40
+#: src/shell/library/TranscriptPanel.tsx:553
+#: src/shell/routeHeader.ts:24
 #: src/shell/usePersonLocale.test.tsx:43
 msgid "Search"
 msgstr "Search"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/VoiceBrowserSection.tsx:91
+#: src/shell/library/TranscriptPanel.tsx:141
+msgid "Search lines"
+msgstr "Search lines"
+
+#. js-lingui-explicit-id
+#: src/shell/reader/SearchResults.tsx:32
+msgid "Search results"
+msgstr "Search results"
+
+#. js-lingui-explicit-id
+#: src/shell/reader/SearchResults.tsx:34
+msgid "Search results for “{query}”"
+msgstr "Search results for “{query}”"
+
+#. js-lingui-explicit-id
+#: src/shell/components/DataTableControls.tsx:28
+msgid "Search rows…"
+msgstr "Search rows…"
+
+#. js-lingui-explicit-id
+#: src/shell/components/DataTableControls.tsx:28
+msgid "Search table rows"
+msgstr "Search table rows"
+
+#. js-lingui-explicit-id
+#: src/shell/library/TranscriptPanel.tsx:138
+msgid "Search transcript"
+msgstr "Search transcript"
+
+#. js-lingui-explicit-id
+#: src/shell/reader/SearchResults.tsx:43
+msgid "Searching…"
+msgstr "Searching…"
+
+#. js-lingui-explicit-id
+#: src/shell/GlobalMiniPlayer.tsx:126
+#: src/shell/media/NowPlayingStage.tsx:103
+msgid "Seek"
+msgstr "Seek"
+
+#. js-lingui-explicit-id
+#: src/shell/library/LibraryViewer.tsx:156
+#: src/shell/library/LibraryViewer.tsx:156
+msgid "Send"
+msgstr "Send"
+
+#. js-lingui-explicit-id
+#: src/shell/InstallDock.tsx:55
+msgid "Setting up your AI"
+msgstr "Setting up your AI"
+
+#. js-lingui-explicit-id
+#: src/shell/AmbientCompanionPane.tsx:316
+#: src/shell/coreLabels.ts:13
+#: src/shell/pageHeaderTitle.tsx:93
+#: src/shell/Routes.tsx:421
+msgid "Settings"
+msgstr "Settings"
+
+#. js-lingui-explicit-id
+#: src/shell/library/LibraryItems.tsx:34
+#: src/shell/library/LibraryViewer.tsx:155
+#: src/shell/library/LibraryViewer.tsx:155
+msgid "Share"
+msgstr "Share"
+
+#. js-lingui-explicit-id
+#: src/shell/pages/PersonProfilePage.tsx:149
+msgid "Shared"
+msgstr "Shared"
+
+#. js-lingui-explicit-id
+#: src/shell/Routes.tsx:337
+msgid "Show me around"
+msgstr "Show me around"
+
+#. js-lingui-explicit-id
+#: src/shell/library/TranscriptFindReplace.tsx:131
+msgid "Showing the first {shown} of {total} lines. Apply replaces only the lines listed, so run it again for the rest."
+msgstr "Showing the first {shown} of {total} lines. Apply replaces only the lines listed, so run it again for the rest."
+
+#. js-lingui-explicit-id
+#: src/shell/AmbientCompanionPane.tsx:308
+msgid "Side chat"
+msgstr "Side chat"
+
+#. js-lingui-explicit-id
+#: src/shell/pages/SignInPage.tsx:161
+msgid "Signing in…"
+msgstr "Signing in…"
+
+#. js-lingui-explicit-id
+#: src/shell/media/SleepMenu.tsx:19
+#: src/shell/media/SleepMenu.tsx:19
+#: src/shell/media/SleepMenu.tsx:20
+msgid "Sleep timer"
+msgstr "Sleep timer"
+
+#. js-lingui-explicit-id
+#: src/shell/media/SleepMenu.tsx:19
+msgid "Sleep timer is on"
+msgstr "Sleep timer is on"
+
+#. js-lingui-explicit-id
+#: src/shell/media/SleepMenu.tsx:20
+msgid "Sleep timer on"
+msgstr "Sleep timer on"
+
+#. js-lingui-explicit-id
+#: src/shell/AlarmRinger.tsx:61
+msgid "Snooze {minutes} minutes"
+msgstr "Snooze {minutes} minutes"
+
+#. js-lingui-explicit-id
+#: src/shell/library/LibraryViewer.tsx:105
+msgid "Soft"
+msgstr "Soft"
+
+#. js-lingui-explicit-id
+#: src/shell/library/LibraryViewer.tsx:104
+msgid "Soft piano, slow and warm"
+msgstr "Soft piano, slow and warm"
+
+#. js-lingui-explicit-id
+#: src/shell/pages/PersonProfilePage.tsx:132
+msgid "Some things never change for {name}. Feelings and safety always get care first and a trusted grown-up. Bullying, secrets and sharing where they live are never helped. On religion and politics, MaiPai takes no side. In danger, MaiPai points to a grown-up and the emergency number."
+msgstr "Some things never change for {name}. Feelings and safety always get care first and a trusted grown-up. Bullying, secrets and sharing where they live are never helped. On religion and politics, MaiPai takes no side. In danger, MaiPai points to a grown-up and the emergency number."
+
+#. js-lingui-explicit-id
+#: src/shell/statusSummary.ts:45
+msgid "Something is down"
+msgstr "Something is down"
+
+#. js-lingui-explicit-id
+#: src/shell/library/LibraryViewer.tsx:109
+msgid "Song"
+msgstr "Song"
+
+#. js-lingui-explicit-id
+#: src/shell/library/TranscriptPanel.tsx:403
+msgid "Speaker name"
+msgstr "Speaker name"
+
+#. js-lingui-explicit-id
+#: src/shell/library/TranscriptPanel.tsx:373
+#: src/shell/library/TranscriptPanel.tsx:374
+msgid "Speakers"
+msgstr "Speakers"
+
+#. js-lingui-explicit-id
+#: src/shell/library/LibraryViewer.tsx:95
+msgid "Split into stems"
+msgstr "Split into stems"
+
+#. js-lingui-explicit-id
+#: src/shell/pageHeaderTitle.tsx:95
+#: src/shell/Routes.tsx:151
+msgid "Status"
+msgstr "Status"
+
+#. js-lingui-explicit-id
+#: src/shell/media/SleepMenu.tsx:10
+msgid "Stop after this one"
+msgstr "Stop after this one"
+
+#. js-lingui-explicit-id
+#: src/shell/media/SleepMenu.tsx:10
+msgid "Stop in {minutes} minutes"
+msgstr "Stop in {minutes} minutes"
+
+#. js-lingui-explicit-id
+#: src/shell/library/LibraryStorage.tsx:24
+#: src/shell/pageHeaderTitle.tsx:94
+#: src/shell/Routes.tsx:147
+msgid "Storage"
+msgstr "Storage"
+
+#. js-lingui-explicit-id
+#: src/shell/reader/SearchBox.tsx:38
+msgid "Suggested articles"
+msgstr "Suggested articles"
+
+#. js-lingui-explicit-id
+#: src/shell/AmbientCompanionPane.tsx:319
+msgid "Talk"
+msgstr "Talk"
+
+#. js-lingui-explicit-id
+#: src/shell/AmbientCompanionPane.tsx:252
+msgid "Talk to {name}..."
+msgstr "Talk to {name}..."
+
+#. js-lingui-explicit-id
+#: src/shell/AlarmRinger.tsx:57
+msgid "Tap to turn the sound on"
+msgstr "Tap to turn the sound on"
+
+#. js-lingui-explicit-id
+#: src/shell/coreLabels.ts:26
+msgid "The details you want MaiPai to remember."
+msgstr "The details you want MaiPai to remember."
+
+#. js-lingui-explicit-id
+#: src/shell/MediaPickerDialog.tsx:96
+msgid "The line to say"
+msgstr "The line to say"
+
+#. js-lingui-explicit-id
+#: src/shell/AmbientCompanionPane.tsx:252
+msgid "The microphone writes a transcript in the talk box. Use Call for a live voice conversation."
+msgstr "The microphone writes a transcript in the talk box. Use Call for a live voice conversation."
+
+#. js-lingui-explicit-id
+#: src/shell/coreLabels.ts:30
+msgid "The time, alarms and timers."
+msgstr "The time, alarms and timers."
+
+#. js-lingui-explicit-id
+#: src/apps/settings/VoiceBrowserSection.tsx:92
 msgid "The voice Home speaks with when it talks to {who}."
 msgstr "The voice Home speaks with when it talks to {who}."
+
+#. js-lingui-explicit-id
+#: src/shell/reader/ReaderArticle.tsx:74
+msgid "This article is not available."
+msgstr "This article is not available."
+
+#. js-lingui-explicit-id
+#: src/shell/library/LibraryTrash.tsx:24
+msgid "This cannot be undone. The file is gone from the Library; a copy that a chat still shows stays in that chat."
+msgstr "This cannot be undone. The file is gone from the Library; a copy that a chat still shows stays in that chat."
+
+#. js-lingui-explicit-id
+#: src/shell/GlobalMiniPlayer.tsx:119
+msgid "This station did not start. Check your connection, then press Retry."
+msgstr "This station did not start. Check your connection, then press Retry."
+
+#. js-lingui-explicit-id
+#: src/shell/library/TranscriptPanel.tsx:418
+msgid "To"
+msgstr "To"
+
+#. js-lingui-explicit-id
+#: src/shell/library/TranscriptPanel.tsx:418
+msgid "To 0:30"
+msgstr "To 0:30"
 
 #. js-lingui-explicit-id
 #: src/i18n.chain.test.tsx:96
@@ -41,6 +1552,270 @@ msgid "Today"
 msgstr "Today"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/VoiceBrowserSection.tsx:87
+#: src/shell/pages/PersonProfilePage.tsx:109
+msgid "Topics"
+msgstr "Topics"
+
+#. js-lingui-explicit-id
+#: src/shell/library/LibraryViewer.tsx:154
+#: src/shell/library/LibraryViewer.tsx:154
+#: src/shell/library/TranscriptPanel.tsx:114
+#: src/shell/library/TranscriptPanel.tsx:550
+msgid "Transcript"
+msgstr "Transcript"
+
+#. js-lingui-explicit-id
+#: src/shell/library/TranscriptPanel.tsx:552
+msgid "Transcript tools"
+msgstr "Transcript tools"
+
+#. js-lingui-explicit-id
+#: src/shell/library/TranscriptCaptionTracks.tsx:127
+msgid "Translate"
+msgstr "Translate"
+
+#. js-lingui-explicit-id
+#: src/shell/library/TranscriptCaptionTracks.tsx:116
+msgid "Translate captions to"
+msgstr "Translate captions to"
+
+#. js-lingui-explicit-id
+#: src/shell/library/TranscriptCaptionTracks.tsx:84
+msgid "Translated"
+msgstr "Translated"
+
+#. js-lingui-explicit-id
+#: src/shell/library/LibraryTrash.tsx:18
+msgid "Trash holds these files for 30 days. Restore brings back a file and its sharing."
+msgstr "Trash holds these files for 30 days. Restore brings back a file and its sharing."
+
+#. js-lingui-explicit-id
+#: src/shell/library/LibraryTrash.tsx:13
+msgid "Trash is empty. Files you delete wait here for 30 days, then they are gone."
+msgstr "Trash is empty. Files you delete wait here for 30 days, then they are gone."
+
+#. js-lingui-explicit-id
+#: src/shell/AmbientCompanionPane.tsx:254
+#: src/shell/InstallDock.tsx:204
+#: src/shell/InstallStrip.tsx:95
+#: src/shell/library/LibraryUploads.tsx:75
+msgid "Try again"
+msgstr "Try again"
+
+#. js-lingui-explicit-id
+#: src/shell/media/SleepMenu.tsx:25
+msgid "Turn off the timer"
+msgstr "Turn off the timer"
+
+#. js-lingui-explicit-id
+#: src/shell/Routes.tsx:164
+msgid "Turn trace"
+msgstr "Turn trace"
+
+#. js-lingui-explicit-id
+#: src/shell/MediaPickerDialog.tsx:96
+msgid "Type what the voice should say."
+msgstr "Type what the voice should say."
+
+#. js-lingui-explicit-id
+#: src/shell/coreLabels.ts:32
+msgid "Understand and control what you share."
+msgstr "Understand and control what you share."
+
+#. js-lingui-explicit-id
+#: src/shell/library/TranscriptPanel.tsx:428
+msgid "Undo"
+msgstr "Undo"
+
+#. js-lingui-explicit-id
+#: src/shell/sessionLockContext.tsx:129
+msgid "Unlock"
+msgstr "Unlock"
+
+#. js-lingui-explicit-id
+#: src/shell/sessionLockContext.tsx:129
+msgid "Unlocking…"
+msgstr "Unlocking…"
+
+#. js-lingui-explicit-id
+#: src/shell/pageHeaderTitle.tsx:97
+#: src/shell/Routes.tsx:149
+msgid "Updates"
+msgstr "Updates"
+
+#. js-lingui-explicit-id
+#: src/shell/pages/SignInPage.tsx:173
+#: src/shell/sessionLockContext.tsx:141
+msgid "Use a password instead"
+msgstr "Use a password instead"
+
+#. js-lingui-explicit-id
+#: src/shell/pages/SignInPage.tsx:173
+#: src/shell/sessionLockContext.tsx:141
+msgid "Use a PIN instead"
+msgstr "Use a PIN instead"
+
+#. js-lingui-explicit-id
+#: src/shell/pageHeaderTitle.tsx:103
+#: src/shell/Routes.tsx:154
+msgid "Users"
+msgstr "Users"
+
+#. js-lingui-explicit-id
+#: src/shell/pages/SignInPage.tsx:157
+msgid "Using a password? Tap \"Use a password instead\"."
+msgstr "Using a password? Tap \"Use a password instead\"."
+
+#. js-lingui-explicit-id
+#: src/shell/NotificationBell.tsx:259
+msgid "View history"
+msgstr "View history"
+
+#. js-lingui-explicit-id
+#: src/shell/media/VisualizerMenu.tsx:18
+#: src/shell/media/VisualizerMenu.tsx:18
+#: src/shell/media/VisualizerMenu.tsx:19
+msgid "Visualizer: {name}"
+msgstr "Visualizer: {name}"
+
+#. js-lingui-explicit-id
+#: src/shell/AmbientCompanionPane.tsx:173
+msgid "Voice"
+msgstr "Voice"
+
+#. js-lingui-explicit-id
+#: src/shell/useSideChat.tsx:57
+msgid "Voice input needs a one-time download that hasn't finished on this hub yet."
+msgstr "Voice input needs a one-time download that hasn't finished on this hub yet."
+
+#. js-lingui-explicit-id
+#: src/shell/pageHeaderTitle.tsx:100
+msgid "Voices"
+msgstr "Voices"
+
+#. js-lingui-explicit-id
+#: src/shell/media/MusicVisualizerSection.tsx:65
+msgid "Volume"
+msgstr "Volume"
+
+#. js-lingui-explicit-id
+#: src/shell/statusApps.ts:8
+msgid "Waiting for internet"
+msgstr "Waiting for internet"
+
+#. js-lingui-explicit-id
+#: src/shell/incognitoContext.tsx:58
+msgid "What Incognito does"
+msgstr "What Incognito does"
+
+#. js-lingui-explicit-id
+#: src/shell/media/NowPlayingStage.tsx:79
+msgid "What is on stage"
+msgstr "What is on stage"
+
+#. js-lingui-explicit-id
+#: src/shell/routeHeader.ts:25
+msgid "What MaiPai has told you."
+msgstr "What MaiPai has told you."
+
+#. js-lingui-explicit-id
+#: src/shell/library/LibraryViewer.tsx:104
+msgid "What should it sound like?"
+msgstr "What should it sound like?"
+
+#. js-lingui-explicit-id
+#: src/shell/MediaPickerDialog.tsx:89
+msgid "What to add"
+msgstr "What to add"
+
+#. js-lingui-explicit-id
+#: src/shell/library/TranscriptFindReplace.tsx:104
+msgid "Whole word"
+msgstr "Whole word"
+
+#. js-lingui-explicit-id
+#: src/apps/settings/VoiceBrowserSection.tsx:88
 msgid "Whose voice"
 msgstr "Whose voice"
+
+#. js-lingui-explicit-id
+#: src/shell/coreLabels.ts:18
+msgid "Wikipedia"
+msgstr "Wikipedia"
+
+#. js-lingui-explicit-id
+#: src/shell/statusApps.ts:6
+msgid "Working"
+msgstr "Working"
+
+#. js-lingui-explicit-id
+#: src/shell/library/TranscriptCaptionTracks.tsx:46
+#: src/shell/library/TranscriptFindReplace.tsx:45
+#: src/shell/library/TranscriptFindReplace.tsx:60
+msgid "Working…"
+msgstr "Working…"
+
+#. js-lingui-explicit-id
+#: src/shell/pages/PersonProfilePage.tsx:73
+msgid "You cannot open this profile."
+msgstr "You cannot open this profile."
+
+#. js-lingui-explicit-id
+#: src/shell/MediaPickerDialog.tsx:102
+msgid "You have no clips yet. Make one on the Create page."
+msgstr "You have no clips yet. Make one on the Create page."
+
+#. js-lingui-explicit-id
+#: src/shell/library/LibraryViewer.tsx:109
+msgid "You have no finished videos to cut yet. Make a video in chat first, then come back."
+msgstr "You have no finished videos to cut yet. Make a video in chat first, then come back."
+
+#. js-lingui-explicit-id
+#: src/shell/MediaPickerDialog.tsx:57
+msgid "You have no pictures in your Library yet. Add one above."
+msgstr "You have no pictures in your Library yet. Add one above."
+
+#. js-lingui-explicit-id
+#: src/shell/MediaPickerDialog.tsx:102
+msgid "You have no songs in your Library yet. Make one in Music."
+msgstr "You have no songs in your Library yet. Make one in Music."
+
+#. js-lingui-explicit-id
+#: src/shell/MediaPickerDialog.tsx:103
+msgid "Your {noun}"
+msgstr "Your {noun}"
+
+#. js-lingui-explicit-id
+#: src/shell/MediaPickerDialog.tsx:101
+msgid "Your {noun} did not load. Close this and try again."
+msgstr "Your {noun} did not load. Close this and try again."
+
+#. js-lingui-explicit-id
+#: src/shell/VoiceStage.tsx:26
+msgid "Your companion"
+msgstr "Your companion"
+
+#. js-lingui-explicit-id
+#: src/shell/MediaPickerDialog.tsx:58
+msgid "Your pictures"
+msgstr "Your pictures"
+
+#. js-lingui-explicit-id
+#: src/shell/MediaPickerDialog.tsx:56
+msgid "Your pictures did not load. Close this and try again."
+msgstr "Your pictures did not load. Close this and try again."
+
+#. js-lingui-explicit-id
+#: src/shell/MediaPickerDialog.tsx:91
+msgid "Your songs"
+msgstr "Your songs"
+
+#. js-lingui-explicit-id
+#: src/shell/library/LibraryStorage.tsx:28
+msgid "Your storage is almost full. Ask a grown-up if you need more room."
+msgstr "Your storage is almost full. Ask a grown-up if you need more room."
+
+#. js-lingui-explicit-id
+#: src/shell/library/LibraryStorage.tsx:28
+msgid "Your storage is almost full. Delete some files, or raise the limit in Settings, Storage."
+msgstr "Your storage is almost full. Delete some files, or raise the limit in Settings, Storage."

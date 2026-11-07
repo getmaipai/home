@@ -1,3 +1,4 @@
+import { i18n } from "@lingui/core";
 import { useState } from "react";
 import { getIcon } from "@maipai/ui/src/icons";
 import { Button } from "@maipai/ui/src/ui/button";
@@ -19,7 +20,7 @@ export function SearchTestResultBody({ result }: { result: SearchTestResultData 
       <p>{result.verdict}</p>
       <p className="font-medium text-foreground">{result.recommendation}</p>
       <Collapsible open={detailsOpen} onOpenChange={setDetailsOpen}>
-        <CollapsibleTrigger asChild><Button type="button" variant="link" size="sm">{detailsOpen ? "Hide details" : "Details"}</Button></CollapsibleTrigger>
+        <CollapsibleTrigger asChild><Button type="button" variant="link" size="sm">{detailsOpen ? i18n._({ id: "Hide details", message: "Hide details" }) : i18n._({ id: "Details", message: "Details" })}</Button></CollapsibleTrigger>
         <CollapsibleContent>
           <ul className="mt-2 flex flex-col gap-1">
             {result.details.map((row) => <li key={row.id}><span className="font-medium text-foreground">{row.title}: {SEARCH_ROW_STATE_WORD[row.state]}.</span> {row.detail}{row.fix ? ` ${row.fix}` : ""}</li>)}

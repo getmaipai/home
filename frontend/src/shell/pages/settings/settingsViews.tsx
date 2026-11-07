@@ -1,3 +1,5 @@
+import { i18n } from "@lingui/core";
+import { SettingsRenderer } from "@/shell/pages/settings/SettingsRenderer";
 import { Switch } from "@maipai/ui/src/dashboard/components/ui/switch";
 import { Item, ItemActions, ItemContent, ItemDescription, ItemGroup, ItemTitle } from "@maipai/ui/src/dashboard/components/ui/item";
 import { usePinnedApps } from "@/shell/usePinnedApps";
@@ -61,6 +63,10 @@ function AccountProfile({ person, onPersonChange }: SettingsViewProps) {
         <CardContent>
           <ProfileForm person={person} canEdit layout="page" onSaved={async (_saved: PersonRosterEntry) => { await Promise.all([queryClient.invalidateQueries({ queryKey: ["people"] }), onPersonChange()]); }} />
         </CardContent>
+      </Card>
+      <Card>
+        <CardHeader><CardTitle>{i18n._({ id: "Language", message: "Language" })}</CardTitle></CardHeader>
+        <CardContent><SettingsRenderer scope="person" scopeValue={`person:${person.id}`} only={["person.profile"]} includeKeys={["person.locale"]} plainRows /></CardContent>
       </Card>
       <Card>
         <CardHeader><CardTitle>PIN or password</CardTitle></CardHeader>

@@ -1,3 +1,4 @@
+import { i18n } from "@lingui/core";
 import { useState, type CSSProperties } from "react";
 import { Navigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
@@ -83,7 +84,7 @@ export function SignInPage({ onSignedIn }: { onSignedIn: () => void }) {
             isFetching={profilesQuery.isFetching}
             onRetry={() => profilesQuery.refetch()}
             errorMessage={errorLine(profilesQuery.error)}
-            loadingLabel="Loading household"
+            loadingLabel={i18n._({ id: "Loading household", message: "Loading household" })}
           >
             {(profiles: Roster[]) =>
               // A fresh install has nobody to sign in as - /setup owns
@@ -99,14 +100,13 @@ export function SignInPage({ onSignedIn }: { onSignedIn: () => void }) {
                   </div>
                   {pendingToken ? (
                     <div className="space-y-1.5">
-                      <Label htmlFor="totp-code">Enter your 6-digit code</Label>
+                      <Label htmlFor="totp-code">{i18n._({ id: "Enter your 6-digit code", message: "Enter your 6-digit code" })}</Label>
                       <Input id="totp-code" inputMode="numeric" autoComplete="one-time-code" maxLength={6} value={totpCode} onChange={(e) => setTotpCode(e.target.value.replace(/\D/g, "").slice(0, 6))} disabled={busy} required />
                     </div>
                   ) : passcodeDigits === null ? (
                     <div className="space-y-1.5">
                       <Label htmlFor="secret" className="text-sm font-normal text-muted-foreground">
-                        Password
-                      </Label>
+                        {i18n._({ id: "Password", message: "Password" })}</Label>
                       <Input
                         key={attempt}
                         id="secret"
@@ -136,7 +136,7 @@ export function SignInPage({ onSignedIn }: { onSignedIn: () => void }) {
                     </div>
                   ) : (
                     <div className="flex flex-col items-center gap-3">
-                      <p className="text-sm text-muted-foreground">Enter your {passcodeDigits}-digit passcode</p>
+                      <p className="text-sm text-muted-foreground">{i18n._({ id: "Enter your {digits}-digit passcode", message: "Enter your {digits}-digit passcode", values: { digits: passcodeDigits } })}</p>
                       {/* key={attempt}: a wrong code remounts the boxes empty, focus on the first box, red with a shake. */}
                       <PasscodeInput
                         key={attempt}
@@ -154,11 +154,11 @@ export function SignInPage({ onSignedIn }: { onSignedIn: () => void }) {
                   )}
                   {secretError ? <Alert variant="destructive"><AlertDescription>{secretError}</AlertDescription></Alert> : null}
                   {secretError && !pendingToken && !usePassword && !locked ? (
-                    <p className="text-center text-sm text-muted-foreground">Using a password? Tap "Use a password instead".</p>
+                    <p className="text-center text-sm text-muted-foreground">{i18n._({ id: "Using a password? Tap \"Use a password instead\".", message: "Using a password? Tap \"Use a password instead\"." })}</p>
                   ) : null}
                   {pendingToken || usePassword ? (
                     <Button type="submit" size="lg" disabled={busy || locked}>
-                      {busy ? "Signing in…" : pendingToken ? "Continue" : "Sign in"}
+                      {busy ? i18n._({ id: "Signing in…", message: "Signing in…" }) : pendingToken ? "Continue" : "Sign in"}
                     </Button>
                   ) : null}
                   {!pendingToken && pinDigits !== null ? (
@@ -170,7 +170,7 @@ export function SignInPage({ onSignedIn }: { onSignedIn: () => void }) {
                         setSecret("");
                       }}
                     >
-                      {usePassword ? "Use a PIN instead" : "Use a password instead"}
+                      {usePassword ? i18n._({ id: "Use a PIN instead", message: "Use a PIN instead" }) : i18n._({ id: "Use a password instead", message: "Use a password instead" })}
                     </Button>
                   ) : null}
                     <Button
@@ -182,8 +182,7 @@ export function SignInPage({ onSignedIn }: { onSignedIn: () => void }) {
                       backToPicker();
                     }}
                   >
-                    Back
-                  </Button>
+                    {i18n._({ id: "Back", message: "Back" })}</Button>
                 </form>
               ) : (
                 <div className="flex flex-col items-center gap-4">

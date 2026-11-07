@@ -1,3 +1,4 @@
+import { i18n } from "@lingui/core";
 import { useQuery } from "@tanstack/react-query";
 import { HeaderSearchOptionsContext } from "@maipai/ui/src/dashboard/layouts/full/vertical/header/HeaderSearch";
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
@@ -142,17 +143,17 @@ const HousePage = lazyNamed(() => import("@/shell/pages/HousePage"), "HousePage"
 // this, not live) - a true sibling route means only one of the two
 // is ever mounted for a given `//*` path, so each owns the slot
 // cleanly for its own lifetime, the same pattern chat already proves.
-const PAGE_ONLY_TITLES: Record<string, string> = {
-  "/storage": "Storage",
-  "/performance": "Performance",
-  "/updates": "Updates",
-  "/repairs": "Repairs",
-  "/status": "Status",
-  "/backups": "Backups",
-  "/commands": "Commands",
-  "/users": "Users",
-  "/dev/ui": "Chat showcase",
-};
+const pageOnlyTitles = (): Record<string, string> => ({
+  "/storage": i18n._({ id: "Storage", message: "Storage" }),
+  "/performance": i18n._({ id: "Performance", message: "Performance" }),
+  "/updates": i18n._({ id: "Updates", message: "Updates" }),
+  "/repairs": i18n._({ id: "Repairs", message: "Repairs" }),
+  "/status": i18n._({ id: "Status", message: "Status" }),
+  "/backups": i18n._({ id: "Backups", message: "Backups" }),
+  "/commands": i18n._({ id: "Commands", message: "Commands" }),
+  "/users": i18n._({ id: "Users", message: "Users" }),
+  "/dev/ui": i18n._({ id: "Chat showcase", message: "Chat showcase" }),
+});
 
 function PageHeaderLayout() {
   const { pathname } = useLocation();
@@ -160,7 +161,7 @@ function PageHeaderLayout() {
   // Issue 187: a page in the app catalog takes its title from there (one definition); only pages outside the catalog name themselves here.
   const path = pathname.replace(/\/$/, "") || "/";
   // A turn trace has one page per turn id, so its title is matched by prefix; without it the page has no level-1 heading (AUDIT-FE-STATES-01 dropped the page's own).
-  const title = PAGE_ONLY_TITLES[path] ?? (path.startsWith("/trace/") ? "Turn trace" : routeTitle(path));
+  const title = pageOnlyTitles()[path] ?? (path.startsWith("/trace/") ? i18n._({ id: "Turn trace", message: "Turn trace" }) : routeTitle(path));
   return (
     <>
       {title ? <h1 className="sr-only">{title}</h1> : null}
@@ -298,7 +299,7 @@ function RoutesWithIncognito({ person, onPersonChange, onSignedOut, appCatalog }
     onAsk={(text) => {
       paneControlRef.current?.ask(text);
     }}
-    action={ambient.action ? <Button type="button" onClick={ambient.action.onClick}>{ambient.action.label}</Button> : ambient.kind === "bot" ? <Button type="button" onClick={() => { void api.findRobot(ambient.device.id).then(() => toast.success(ambient.online ? `${ambient.name} is chirping` : `Queued for when ${ambient.name} is back`)).catch(() => toast.error(`Could not reach ${ambient.name}. Try again.`)); }}>Find me</Button> : undefined}
+    action={ambient.action ? <Button type="button" onClick={ambient.action.onClick}>{ambient.action.label}</Button> : ambient.kind === "bot" ? <Button type="button" onClick={() => { void api.findRobot(ambient.device.id).then(() => toast.success(ambient.online ? `${ambient.name} is chirping` : `Queued for when ${ambient.name} is back`)).catch(() => toast.error(i18n._({ id: "Could not reach {name}. Try again.", message: "Could not reach {name}. Try again.", values: { name: ambient.name } }))); }}>{i18n._({ id: "Find me", message: "Find me" })}</Button> : undefined}
     listeningLine={wakeIndicator?.listening}
     onTurnOff={wakeIndicator?.onTurnOff}
     open={lastLine ? previewOpen : coarse ? (wakeIndicator ? true : previewOpen) : undefined}
@@ -333,7 +334,7 @@ function RoutesWithIncognito({ person, onPersonChange, onSignedOut, appCatalog }
   const activeTour = tourRunner.active;
   const helpEntries = tourRunner.availableTours.length
     ? {
-        label: "Show me around",
+        label: i18n._({ id: "Show me around", message: "Show me around" }),
         items: tourRunner.availableTours.map(({ packageId, tour }) => ({
           label: tour.title,
           onSelect: () => { tourRunner.replay(packageId, tour.id); },
@@ -357,7 +358,7 @@ function RoutesWithIncognito({ person, onPersonChange, onSignedOut, appCatalog }
       // once more so its list cannot retain stale Incognito rows.
       void discardIncognitoThreads().then(() => {
         window.dispatchEvent(new Event(INCOGNITO_DISCARDED_EVENT));
-      }).catch(() => toast.error("Could not discard Incognito chats. Try again."));
+      }).catch(() => toast.error(i18n._({ id: "Could not discard Incognito chats. Try again.", message: "Could not discard Incognito chats. Try again." })));
     }
   };
 
@@ -417,7 +418,7 @@ function RoutesWithIncognito({ person, onPersonChange, onSignedOut, appCatalog }
             Notifications, System status, Incognito, Settings, Help and Log
             out. Pages draw their own slim title bar; chat draws its own
             beside the history column. */}
-        <Route element={<HeaderSearchOptionsContext.Provider value={headerSearchOptions}><FullLayout rail topRight={paneState.open ? undefined : ambientTopRight} topRightBand fallbackTitle={location.pathname.startsWith("/settings") ? "Settings" : appName ?? (location.pathname === "/" ? "Home" : undefined)} rightPane={ambientRightPane} mobileSections={<>{drawerSections}<div className="mt-3 border-t border-border pt-3"><PhoneMenuLinks /></div></>} activeAppHref={selectedAppHref} railApps={railApps(appCatalog, pinnedRoutes)} railCoreDestinations={[{ name: "Media", url: "/media", icon: "cast" }]} onRailAppPinChange={(url) => togglePin(url)} railAllAppsHref={ALL_APPS_PATH} settingsHref="/settings" headerSearchRemote={(query) => searchWithCoreApps(query, appCatalog)} railTourId="shell.rail" railItemTourId={(item) => item.name === "Chat" ? "rail.chat" : undefined} incognitoTourId="shell.incognito" railProfile={<RailProfile person={person} incognito={incognito} onIncognitoChange={onIncognitoChange} onSignedOut={onSignedOut} helpEntries={helpEntries} />} sidebarItemStatus={(item) => sidebarItemStatus(statusAppsQuery.data ?? [], item)} /></HeaderSearchOptionsContext.Provider>}>
+        <Route element={<HeaderSearchOptionsContext.Provider value={headerSearchOptions}><FullLayout rail topRight={paneState.open ? undefined : ambientTopRight} topRightBand fallbackTitle={location.pathname.startsWith("/settings") ? i18n._({ id: "Settings", message: "Settings" }) : appName ?? (location.pathname === "/" ? i18n._({ id: "Home", message: "Home" }) : undefined)} rightPane={ambientRightPane} mobileSections={<>{drawerSections}<div className="mt-3 border-t border-border pt-3"><PhoneMenuLinks /></div></>} activeAppHref={selectedAppHref} railApps={railApps(appCatalog, pinnedRoutes)} railCoreDestinations={[{ name: i18n._({ id: "Media", message: "Media" }), url: "/media", icon: "cast" }]} onRailAppPinChange={(url) => togglePin(url)} railAllAppsHref={ALL_APPS_PATH} settingsHref="/settings" headerSearchRemote={(query) => searchWithCoreApps(query, appCatalog)} railTourId="shell.rail" railItemTourId={(item) => item.url === "/chat" ? "rail.chat" : undefined} incognitoTourId="shell.incognito" railProfile={<RailProfile person={person} incognito={incognito} onIncognitoChange={onIncognitoChange} onSignedOut={onSignedOut} helpEntries={helpEntries} />} sidebarItemStatus={(item) => sidebarItemStatus(statusAppsQuery.data ?? [], item)} /></HeaderSearchOptionsContext.Provider>}>
           <Route path="chat" element={<ChatPage person={person} />} />
           <Route path="chat/projects" element={<ProjectsPage person={person} />} />
           <Route path="chat/projects/:id" element={<ChatPage person={person} />} />

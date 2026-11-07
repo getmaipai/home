@@ -1,3 +1,4 @@
+import { i18n } from "@lingui/core";
 import { useEffect, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import * as RadixPopover from "@radix-ui/react-popover";
@@ -165,7 +166,7 @@ export function NotificationBell({ anchored = false, open: controlledOpen, onOpe
     onSettled: invalidateBothCaches,
   });
 
-  // Lane 15 (Jesse's ask from live use): "Dismiss all" for the pending
+  // Lane 15 (Jesse's ask from live use): i18n._({ id: "Dismiss all", message: "Dismiss all" }) for the pending
   // list here - same optimistic-then-reconcile shape as the single
   // dismiss above, `{ all: true }` since this popover only ever shows
   // what's currently pending (no 30-day window the way the history page
@@ -196,7 +197,7 @@ export function NotificationBell({ anchored = false, open: controlledOpen, onOpe
     >
       {anchored ? <RadixPopover.Anchor className="pointer-events-none absolute inset-0" /> : (
         <RadixPopover.Trigger asChild>
-          <Button variant="ghost" aria-label={`Notifications${items.length > 0 ? ` (${items.length} pending)` : ""}`}>
+          <Button variant="ghost" aria-label={items.length > 0 ? i18n._({ id: "Notifications ({count} pending)", message: "Notifications ({count} pending)", values: { count: items.length } }) : i18n._({ id: "Notifications", message: "Notifications" })}>
             <BellIcon className="h-5 w-5" aria-hidden />
             {items.length > 0 ? (
               // RULE9-WRAPDIV-01: the count is the kit Badge as it ships,
@@ -211,14 +212,14 @@ export function NotificationBell({ anchored = false, open: controlledOpen, onOpe
       )}
       <RadixPopover.Portal>
         <RadixPopover.Content
-          aria-label="Notifications"
+          aria-label={i18n._({ id: "Notifications", message: "Notifications" })}
           side={anchored ? "right" : "bottom"}
           align="end"
           sideOffset={8}
           className="z-40 w-80 max-w-[calc(100vw-2rem)] rounded-lg border border-border bg-card p-2 text-card-foreground shadow-lg"
         >
           {items.length === 0 ? (
-            <p className="px-2 py-3 text-base text-muted-foreground">Nothing pending.</p>
+            <p className="px-2 py-3 text-base text-muted-foreground">{i18n._({ id: "Nothing pending.", message: "Nothing pending." })}</p>
           ) : (
             <div className="flex flex-col divide-y divide-border">
               <div className="flex items-center justify-end px-2 pb-1">
@@ -229,7 +230,7 @@ export function NotificationBell({ anchored = false, open: controlledOpen, onOpe
                   disabled={dismissAllMutation.isPending}
                   className="text-sm text-muted-foreground"
                 >
-                  {dismissAllMutation.isPending ? "Dismissing…" : "Dismiss all"}
+                  {dismissAllMutation.isPending ? i18n._({ id: "Dismissing…", message: "Dismissing…" }) : i18n._({ id: "Dismiss all", message: "Dismiss all" })}
                 </Button>
               </div>
               {items.map((n) => (
@@ -244,8 +245,7 @@ export function NotificationBell({ anchored = false, open: controlledOpen, onOpe
                     onClick={() => dismissMutation.mutate(n.id)}
                     className="shrink-0 text-sm text-muted-foreground"
                   >
-                    Dismiss
-                  </Button>
+                    {i18n._({ id: "Dismiss", message: "Dismiss" })}</Button>
                 </div>
               ))}
             </div>
@@ -256,8 +256,7 @@ export function NotificationBell({ anchored = false, open: controlledOpen, onOpe
               those at all. */}
           <div className="border-t border-border pt-1">
             <Link to="/notifications" className="block px-2 py-2 text-sm text-primary underline" onClick={() => setOpen(false)}>
-              View history
-            </Link>
+              {i18n._({ id: "View history", message: "View history" })}</Link>
           </div>
         </RadixPopover.Content>
       </RadixPopover.Portal>

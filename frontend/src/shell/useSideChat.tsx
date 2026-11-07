@@ -1,3 +1,4 @@
+import { i18n } from "@lingui/core";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useLocalRuntime } from "@assistant-ui/react";
 import { useQuery } from "@tanstack/react-query";
@@ -53,7 +54,7 @@ export function useSideChat(person: Roster, companionId: string, incognito: bool
     createSocket: createSttSocket,
     turnSchedulerRef,
     sttInstalled: () => sttInstalled,
-    onNotInstalled: () => toast.error("Voice input needs a one-time download that hasn't finished on this hub yet.", { id: "stt-not-installed" }),
+    onNotInstalled: () => toast.error(i18n._({ id: "Voice input needs a one-time download that hasn't finished on this hub yet.", message: "Voice input needs a one-time download that hasn't finished on this hub yet." }), { id: "stt-not-installed" }),
     onFinalReady: () => { pendingSpokenRef.current = true; },
   }), [pendingSpokenRef, sttInstalled, turnSchedulerRef]);
   const speech = useMemo(() => createChatSpeechAdapter(), []);

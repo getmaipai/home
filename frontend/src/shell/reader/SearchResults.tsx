@@ -1,3 +1,4 @@
+import { i18n } from "@lingui/core";
 import { useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { ArticleCard } from "./ArticleCard";
@@ -28,22 +29,22 @@ export function SearchResults({ q, book, books, routeFor, onBook, onSearch }: Se
   const topPath = hits[0]?.path;
   const relatedTitles = (related.data ?? []).filter((item) => item.path !== topPath && item.title.toLowerCase() !== q.toLowerCase()).slice(0, RELATED_MAX);
   return (
-    <section aria-label="Search results" className="flex min-w-0 flex-col gap-4">
+    <section aria-label={i18n._({ id: "Search results", message: "Search results" })} className="flex min-w-0 flex-col gap-4">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
-        <h2 className="text-xl font-semibold">Search results for “{q}”</h2>
+        <h2 className="text-xl font-semibold">{i18n._({ id: "Search results for “{query}”", message: "Search results for “{query}”", values: { query: q } })}</h2>
         {results.data ? <p className="text-muted-foreground text-sm">{total > hits.length ? `About ${total.toLocaleString()} results` : `${hits.length.toLocaleString()} ${hits.length === 1 ? "result" : "results"}`}</p> : null}
       </div>
       {books.length > 1 ? (
-        <div role="group" aria-label="Filter results by book" className="flex flex-wrap gap-2">
-          <Chip selected={book === undefined} onClick={() => onBook(undefined)}>All</Chip>
+        <div role="group" aria-label={i18n._({ id: "Filter results by book", message: "Filter results by book" })} className="flex flex-wrap gap-2">
+          <Chip selected={book === undefined} onClick={() => onBook(undefined)}>{i18n._({ id: "All", message: "All" })}</Chip>
           {books.map((item) => <Chip key={item.id} selected={book === item.id} onClick={() => onBook(item.id)}>{item.source_label}</Chip>)}
         </div>
       ) : null}
-      {results.isPending ? <p role="status">Searching…</p> : null}
-      {results.isError ? <p role="alert">Could not search right now.</p> : null}
+      {results.isPending ? <p role="status">{i18n._({ id: "Searching…", message: "Searching…" })}</p> : null}
+      {results.isError ? <p role="alert">{i18n._({ id: "Could not search right now.", message: "Could not search right now." })}</p> : null}
       {results.data ? (
         <List
-          label="Reference search results"
+          label={i18n._({ id: "Reference search results", message: "Reference search results" })}
           items={hits}
           getKey={(hit) => `${hit.book}:${hit.path}`}
           getLabel={(hit) => hit.title}
@@ -53,8 +54,8 @@ export function SearchResults({ q, book, books, routeFor, onBook, onSearch }: Se
         />
       ) : null}
       {relatedTitles.length ? (
-        <div className="flex flex-wrap items-center gap-2" role="group" aria-label="Related searches">
-          <span className="text-muted-foreground text-sm font-semibold">Related searches</span>
+        <div className="flex flex-wrap items-center gap-2" role="group" aria-label={i18n._({ id: "Related searches", message: "Related searches" })}>
+          <span className="text-muted-foreground text-sm font-semibold">{i18n._({ id: "Related searches", message: "Related searches" })}</span>
           {relatedTitles.map((item) => <Chip key={`${item.book}:${item.path}`} onClick={() => onSearch(item.title)}>{item.title}</Chip>)}
         </div>
       ) : null}

@@ -1,3 +1,4 @@
+import { i18n } from "@lingui/core";
 // ADULT-LOCK-03b and -05: the shell's host for the kit's `AdultLockProvider` (docs/design/video-loras-2026-11-02.md sections 3.3 to 3.4 and 3.9,
 // docs/dev/adult-lock.md "Frontend"). The kit draws the lock tile, the dialog and the live region; this file is only what the host owes it:
 // the real `/api/adult-lock/unlock` call, the proof held in memory (lib/adultLock.ts), the relock clocks, the playback guards, and a refetch of
@@ -90,8 +91,7 @@ export function AdultLockController() {
     <div className="fixed right-4 bottom-4 z-40 max-md:bottom-20">
       <Button type="button" variant="secondary" size="sm" onClick={() => relock()}>
         <LockIcon aria-hidden />
-        Lock now
-      </Button>
+        {i18n._({ id: "Lock now", message: "Lock now" })}</Button>
     </div>
   ) : null;
 }

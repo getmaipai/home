@@ -27,7 +27,7 @@ try {
   rmSync(scratch, { recursive: true, force: true });
 }
 
-const placeholders = (value: string) => [...value.matchAll(/\{\s*\w+|<\/?\d+\/?>/g)].map((match) => match[0].replace(/\s+/g, "")).sort();
+const placeholders = (value: string) => [...value.matchAll(/\{\s*\w+(?=\s*[,}])|<\/?\d+\/?>/g)].map((match) => match[0].replace(/\s+/g, "")).sort();
 for (const locale of SUPPORTED_LOCALES) {
   const text = readFileSync(`src/locales/${locale}/messages.po`, "utf8");
   if (!text.includes(`"Language: ${locale}\\n"`)) fail(`src/locales/${locale}/messages.po has no Language: ${locale} header.`);

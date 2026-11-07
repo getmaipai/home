@@ -1,3 +1,4 @@
+import { i18n } from "@lingui/core";
 import { Fragment, useState } from "react";
 import { getIcon } from "@maipai/ui/src/icons";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@maipai/ui/src/dashboard/components/ui/alert-dialog";
@@ -22,9 +23,9 @@ export function DataTableRowActions({ actions }: { actions: readonly DataTableAc
     <>
       <DropdownMenu>
         <DropdownMenuTrigger render={
-          <Button type="button" variant="ghost" size="row" aria-label="More actions">
+          <Button type="button" variant="ghost" size="row" aria-label={i18n._({ id: "More actions", message: "More actions" })}>
             <MoreHorizontal aria-hidden="true" className="size-4" />
-            <span>Actions</span>
+            <span>{i18n._({ id: "Actions", message: "Actions" })}</span>
           </Button>
         } />
         <DropdownMenuContent align="end">
@@ -49,11 +50,11 @@ export function DataTableRowActions({ actions }: { actions: readonly DataTableAc
             <AlertDialogDescription>{pending?.confirmLabel ?? `Are you sure you want to ${pending?.label.toLocaleLowerCase()} this item?`}</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogCancel>{i18n._({ id: "Cancel", message: "Cancel" })}</AlertDialogCancel>
             <AlertDialogAction variant="destructive" onClick={async () => {
               if (pending) await pending.onClick();
               setPending(null);
-            }}>Confirm</AlertDialogAction>
+            }}>{i18n._({ id: "Confirm", message: "Confirm" })}</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

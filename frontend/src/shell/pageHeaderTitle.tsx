@@ -1,4 +1,5 @@
 "use client";
+import { i18n } from "@lingui/core";
 
 // CHAT-HEADER-02: the header's left slot (CHAT-HEADER-01's
 // `HeaderExtraLeft`) shows the current app's icon before its title on
@@ -25,6 +26,7 @@ import { settingsPath } from "@/shell/pages/settings/settingsAreas";
 import { getIcon } from "@maipai/ui/src/icons";
 import { isActiveNavPath } from "@maipai/ui/src/nav";
 import { APP_CATALOG, type AppEntry } from "@/shell/appCatalog";
+import { localizeCore } from "@/shell/coreLabels";
 import { useAppCatalog } from "@/shell/useAppCatalog";
 import type { Icon } from "@maipai/ui/src/icons";
 import SidebarContent from "@maipai/ui/src/dashboard/layouts/full/vertical/sidebar/sidebaritems";
@@ -82,16 +84,44 @@ const CORE_ENTRIES: Record<string, PageHeaderEntry> = {
   "/reference": { icon: getIcon("book"), label: "Reference" },
 };
 
+/** The page names in this file are data; the active language's text for each is read when a header draws. */
+function translatedLabel(label: string): string {
+  const names: Record<string, string> = {
+    "Home": i18n._({ id: "Home", message: "Home" }),
+    "Chat": i18n._({ id: "Chat", message: "Chat" }),
+    "Family": i18n._({ id: "Family", message: "Family" }),
+    "Settings": i18n._({ id: "Settings", message: "Settings" }),
+    "Storage": i18n._({ id: "Storage", message: "Storage" }),
+    "Status": i18n._({ id: "Status", message: "Status" }),
+    "Performance": i18n._({ id: "Performance", message: "Performance" }),
+    "Updates": i18n._({ id: "Updates", message: "Updates" }),
+    "Repairs": i18n._({ id: "Repairs", message: "Repairs" }),
+    "Backups": i18n._({ id: "Backups", message: "Backups" }),
+    "Voices": i18n._({ id: "Voices", message: "Voices" }),
+    "Commands": i18n._({ id: "Commands", message: "Commands" }),
+    "Privacy": i18n._({ id: "Privacy", message: "Privacy" }),
+    "Users": i18n._({ id: "Users", message: "Users" }),
+    "Notifications": i18n._({ id: "Notifications", message: "Notifications" }),
+    "Reminders": i18n._({ id: "Reminders", message: "Reminders" }),
+    "Clock": i18n._({ id: "Clock", message: "Clock" }),
+    "House": i18n._({ id: "House", message: "House" }),
+    "Media": i18n._({ id: "Media", message: "Media" }),
+    "All apps": i18n._({ id: "All apps", message: "All apps" }),
+    "Reference": i18n._({ id: "Reference", message: "Reference" }),
+  };
+  return names[label] ?? label;
+}
+
 /** The one answer to "which icon and name does this route's header show": the app or page the route belongs to, by the longest
  * matching path, so a page inside an app (News search, a Videos watch page, a person's profile) reads as that app. Every page and
  * app header draws this and nothing else: the title never comes from the page itself, and the page's body never repeats it. */
 export function headerEntryFor(pathname: string, apps: readonly AppEntry[] = APP_CATALOG): PageHeaderEntry | undefined {
   const path = pathname.replace(/\/$/, "") || "/";
   const fromCatalog = [...apps].filter((app) => app.to !== "/").sort((a, b) => b.to.length - a.to.length).find((app) => isActiveNavPath(path, app.to));
-  if (fromCatalog) return { icon: getIcon(fromCatalog.icon), label: fromCatalog.label };
+  if (fromCatalog) return { icon: getIcon(fromCatalog.icon), label: localizeCore(fromCatalog).label };
   const known = [...Object.keys(CORE_ENTRIES), ...Object.keys(MANAGE_PAGE_ENTRIES), ...sidebarEntries.keys()].filter((to) => to !== "/").sort((a, b) => b.length - a.length).find((to) => isActiveNavPath(path, to));
-  if (known) return CORE_ENTRIES[known] ?? MANAGE_PAGE_ENTRIES[known] ?? sidebarEntries.get(known);
-  return path === "/" ? sidebarEntries.get("/") : undefined;
+  const found = known ? CORE_ENTRIES[known] ?? MANAGE_PAGE_ENTRIES[known] ?? sidebarEntries.get(known) : path === "/" ? sidebarEntries.get("/") : undefined;
+  return found ? { ...found, label: translatedLabel(found.label) } : undefined;
 }
 
 /** The icon and name, drawn once. `hideInTopRow` marks it for the phone layouts where a page places its own top row. */
@@ -125,5 +155,5 @@ export function PageHeaderActions() {
   const navigate = useNavigate();
   const person = useContext(WakeWordPersonContext);
   if (pathname !== "/" || !person || person.role === "guest") return null;
-  return <><Button type="button" variant="ghost" size="icon" aria-label="Home layout" onClick={() => navigate(settingsPath("appearance", "appearance", "ui.home_layout"))}><GearIcon aria-hidden="true" /></Button></>;
+  return <><Button type="button" variant="ghost" size="icon" aria-label={i18n._({ id: "Home layout", message: "Home layout" })} onClick={() => navigate(settingsPath("appearance", "appearance", "ui.home_layout"))}><GearIcon aria-hidden="true" /></Button></>;
 }

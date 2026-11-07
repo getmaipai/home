@@ -8,6 +8,6 @@ import { readFileSync } from "node:fs";
 const routes = readFileSync(new URL("./Routes.tsx", import.meta.url), "utf8");
 
 test("the Media rail destination uses the cast icon, not the Videos app's film icon", () => {
-  expect(routes).toContain('name: "Media", url: "/media", icon: "cast"');
+  expect(routes).toContain('name: i18n._({ id: "Media", message: "Media" }), url: "/media", icon: "cast"');
   expect(routes).not.toContain('icon: "film" }]}');
 });

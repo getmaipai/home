@@ -30,7 +30,7 @@ export function planBatches(entries: PoEntry[], limit = MAX_BATCH_ENTRIES): Arra
   return batches;
 }
 
-const tokens = (value: string): string[] => [...(value.match(/\{\s*\w+|<\/?\d+\/?>/g) ?? [])].map((token) => token.replace(/\s+/g, "")).sort();
+const tokens = (value: string): string[] => [...(value.match(/\{\s*\w+(?=\s*[,}])|<\/?\d+\/?>/g) ?? [])].map((token) => token.replace(/\s+/g, "")).sort();
 
 /** Null when the translation is acceptable, else the reason it is not. */
 export function validateTranslation(source: string, msgstr: string): string | null {

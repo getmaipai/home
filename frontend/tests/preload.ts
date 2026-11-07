@@ -69,6 +69,10 @@ plugin({
   },
 });
 
+// I18N-F1: components read strings through the global `i18n._`, so every test starts with en-US loaded and active, the same
+// state the app has once `@/i18n` is imported. (A test that switches language restores en-US afterwards.)
+await import("../src/i18n");
+
 // getmaipai/home#218: one bun process runs every test file of a shard, so a
 // component a test left mounted keeps polling and fetching, and those requests
 // land on the next file's global fetch mock (EnginesPage.test.tsx counted 4

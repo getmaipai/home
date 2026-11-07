@@ -1,3 +1,4 @@
+import { i18n } from "@lingui/core";
 import { useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -47,31 +48,31 @@ export function PersonProfilePage({ person, onPersonChange }: { person: Roster; 
 
   return (
     <div className="mx-auto flex min-h-0 w-full max-w-3xl flex-1 flex-col gap-4 overflow-y-auto p-4">
-      <CardHeader><CardTitle>Profile</CardTitle></CardHeader>
+      <CardHeader><CardTitle>{i18n._({ id: "Profile", message: "Profile" })}</CardTitle></CardHeader>
       <AsyncState
         data={rosterQuery.data}
         error={rosterQuery.isError}
         isFetching={rosterQuery.isFetching}
         onRetry={() => rosterQuery.refetch()}
-        errorMessage="Could not load the household."
-        loadingLabel="Loading profile"
+        errorMessage={i18n._({ id: "Could not load the household.", message: "Could not load the household." })}
+        loadingLabel={i18n._({ id: "Loading profile", message: "Loading profile" })}
       >
         {(roster) => {
           const profile = viewingSelf ? person : roster.find((entry) => entry.id === id);
           if (!profile) {
             return (
               <div className="flex flex-col items-center gap-2 py-12 text-center">
-                <p className="text-base font-medium">No one in this household has that profile.</p>
-                <Link to="/people" className="text-primary underline">Back to Family</Link>
+                <p className="text-base font-medium">{i18n._({ id: "No one in this household has that profile.", message: "No one in this household has that profile." })}</p>
+                <Link to="/people" className="text-primary underline">{i18n._({ id: "Back to Family", message: "Back to Family" })}</Link>
               </div>
             );
           }
           if (!viewingSelf && isProfileClosedTo(person, profile)) {
             return (
               <div className="flex flex-col items-center gap-2 py-12 text-center">
-                <p className="text-base font-medium">You cannot open this profile.</p>
-                <p className="text-sm text-muted-foreground">A teen&rsquo;s profile is private, even from an admin. Go back to Family to open someone else.</p>
-                <Link to="/people" className="text-primary underline">Back to Family</Link>
+                <p className="text-base font-medium">{i18n._({ id: "You cannot open this profile.", message: "You cannot open this profile." })}</p>
+                <p className="text-sm text-muted-foreground">{i18n._({ id: "A teen&rsquo;s profile is private, even from an admin. Go back to Family to open someone else.", message: "A teen&rsquo;s profile is private, even from an admin. Go back to Family to open someone else." })}</p>
+                <Link to="/people" className="text-primary underline">{i18n._({ id: "Back to Family", message: "Back to Family" })}</Link>
               </div>
             );
           }
@@ -87,7 +88,7 @@ export function PersonProfilePage({ person, onPersonChange }: { person: Roster; 
               {canEdit && !viewingSelf ? (
                 <Dialog open={editOpen} onOpenChange={setEditOpen}>
                   <DialogContent>
-                    <DialogHeader><DialogTitle>Edit {profile.display_name}&rsquo;s profile</DialogTitle></DialogHeader>
+                    <DialogHeader><DialogTitle>{i18n._({ id: "Edit {name}’s profile", message: "Edit {name}’s profile", values: { name: profile.display_name } })}</DialogTitle></DialogHeader>
                     <ProfileForm
                       key={`${profile.id}-${editOpen}`}
                       person={profile}
@@ -103,9 +104,9 @@ export function PersonProfilePage({ person, onPersonChange }: { person: Roster; 
               ) : null}
               <Tabs value={activeTab} onValueChange={onTabChange}>
                 <TabsList>
-                  <TabsTrigger value="overview">Overview</TabsTrigger>
-                  {showLimits ? <TabsTrigger value="limits">Limits</TabsTrigger> : null}
-                  {showLimits ? <TabsTrigger value="topics">Topics</TabsTrigger> : null}
+                  <TabsTrigger value="overview">{i18n._({ id: "Overview", message: "Overview" })}</TabsTrigger>
+                  {showLimits ? <TabsTrigger value="limits">{i18n._({ id: "Limits", message: "Limits" })}</TabsTrigger> : null}
+                  {showLimits ? <TabsTrigger value="topics">{i18n._({ id: "Topics", message: "Topics" })}</TabsTrigger> : null}
                 </TabsList>
                 <TabsContent value="overview">
                   <div className="flex flex-col gap-4 py-2">
@@ -116,19 +117,19 @@ export function PersonProfilePage({ person, onPersonChange }: { person: Roster; 
                 {showLimits ? (
                   <TabsContent value="limits">
                     <div className="flex flex-col gap-4 py-2">
-                      <p className="text-sm text-muted-foreground">Daily time limits for {profile.display_name}.</p>
+                      <p className="text-sm text-muted-foreground">{i18n._({ id: "Daily time limits for {name}.", message: "Daily time limits for {name}.", values: { name: profile.display_name } })}</p>
                       <SettingsRenderer scope="person" scopeValue={`person:${profile.id}`} only={PERSON_LIMIT_GROUP_IDS} titleOverrides={{ "person.storage": "Storage" }} />
                       {/* The per-child cartoon switch (KIDS-CREATE-01): a guardian finds it here, on the child's own page, next to the other limits. The home switch and the daily limits are in Home settings, Pictures and videos. */}
-                      {viewingSelf && profile.age_band !== "child" ? <p className="text-sm text-muted-foreground">Pictures and videos can be made in chat.</p> : <SettingsRenderer scope="person" scopeValue={`person:${profile.id}`} only={PERSON_KID_PICTURES_GROUP_IDS} includeKeys={PERSON_KID_PICTURES_KEYS} titleOverrides={{ "person.likeness": "Pictures and videos" }} />}
+                      {viewingSelf && profile.age_band !== "child" ? <p className="text-sm text-muted-foreground">{i18n._({ id: "Pictures and videos can be made in chat.", message: "Pictures and videos can be made in chat." })}</p> : <SettingsRenderer scope="person" scopeValue={`person:${profile.id}`} only={PERSON_KID_PICTURES_GROUP_IDS} includeKeys={PERSON_KID_PICTURES_KEYS} titleOverrides={{ "person.likeness": "Pictures and videos" }} />}
                     </div>
                   </TabsContent>
                 ) : null}
                 {showLimits ? (
                   <TabsContent value="topics">
                     <div className="flex flex-col gap-4 py-2">
-                      <p className="text-sm text-muted-foreground">How MaiPai answers {profile.display_name} about sensitive subjects. Only you and other admins can change these.</p>
+                      <p className="text-sm text-muted-foreground">{i18n._({ id: "How MaiPai answers {name} about sensitive subjects. Only you and other admins can change these.", message: "How MaiPai answers {name} about sensitive subjects. Only you and other admins can change these.", values: { name: profile.display_name } })}</p>
                       <SettingsRenderer scope="person" scopeValue={`person:${profile.id}`} only={PERSON_TOPIC_GROUP_IDS} titleOverrides={{ "person.topics": "Sensitive subjects" }} />
-                      <p className="text-sm text-muted-foreground">Some things never change for {profile.display_name}. Feelings and safety always get care first and a trusted grown-up. Bullying, secrets and sharing where they live are never helped. On religion and politics, MaiPai takes no side. In danger, MaiPai points to a grown-up and the emergency number.</p>
+                      <p className="text-sm text-muted-foreground">{i18n._({ id: "Some things never change for {name}. Feelings and safety always get care first and a trusted grown-up. Bullying, secrets and sharing where they live are never helped. On religion and politics, MaiPai takes no side. In danger, MaiPai points to a grown-up and the emergency number.", message: "Some things never change for {name}. Feelings and safety always get care first and a trusted grown-up. Bullying, secrets and sharing where they live are never helped. On religion and politics, MaiPai takes no side. In danger, MaiPai points to a grown-up and the emergency number.", values: { name: profile.display_name } })}</p>
                     </div>
                   </TabsContent>
                 ) : null}
@@ -145,14 +146,14 @@ function SharedMediaSection({ profile }: { profile: ProfileEntry }) {
   const query = useQuery<VisibleFile[]>({ queryKey: ["files", "person", profile.id], queryFn: () => api.files(profile.id) });
   return (
     <div className="flex flex-col gap-2">
-      <h2 className="text-sm font-medium text-muted-foreground">Shared</h2>
-      <AsyncState data={query.data} error={query.isError} isFetching={query.isFetching} onRetry={() => query.refetch()} errorMessage="Could not load what's been shared." loadingLabel="Loading shared media">
+      <h2 className="text-sm font-medium text-muted-foreground">{i18n._({ id: "Shared", message: "Shared" })}</h2>
+      <AsyncState data={query.data} error={query.isError} isFetching={query.isFetching} onRetry={() => query.refetch()} errorMessage={i18n._({ id: "Could not load what's been shared.", message: "Could not load what's been shared." })} loadingLabel={i18n._({ id: "Loading shared media", message: "Loading shared media" })}>
         {(files) => {
           const items: MediaGridItem[] = files
             .filter(({ shared }) => shared)
             .filter(({ file }) => file.kind === "image" || file.kind === "video")
             .map(({ file }) => ({ id: file.id, thumbnailUrl: api.fileContentUrl(file.id), mediaType: file.kind as "image" | "video", altText: file.kind === "video" ? `A video ${profile.display_name} shared` : `A photo ${profile.display_name} shared` }));
-          return items.length === 0 ? <EmptyState icon="inbox" text="Nothing shared yet." /> : <MediaGrid items={items} emptyMessage="Nothing shared yet." />;
+          return items.length === 0 ? <EmptyState icon="inbox" text={i18n._({ id: "Nothing shared yet.", message: "Nothing shared yet." })} /> : <MediaGrid items={items} emptyMessage={i18n._({ id: "Nothing shared yet.", message: "Nothing shared yet." })} />;
         }}
       </AsyncState>
     </div>
@@ -174,7 +175,7 @@ function ProfileHeaderBody({ profile, viewer, viewingSelf, canEdit, onEdit }: { 
         {profile.bio ? <p className="text-base text-muted-foreground">{profile.bio}</p> : null}
       </div>
       <div className="flex basis-full flex-row items-center justify-end gap-4 sm:w-auto sm:basis-auto sm:flex-col sm:items-end sm:gap-2">
-        {showSelfEdit && canEdit ? <Link to="/settings/profile?tab=profile" className="min-h-12 content-center text-sm text-primary underline">Edit profile</Link> : canEdit ? <Button variant="outline" size="row" onClick={onEdit}><PencilIcon className="size-4" aria-hidden />Edit</Button> : null}
+        {showSelfEdit && canEdit ? <Link to="/settings/profile?tab=profile" className="min-h-12 content-center text-sm text-primary underline">{i18n._({ id: "Edit profile", message: "Edit profile" })}</Link> : canEdit ? <Button variant="outline" size="row" onClick={onEdit}><PencilIcon className="size-4" aria-hidden />{i18n._({ id: "Edit", message: "Edit" })}</Button> : null}
       </div>
     </div>
   );

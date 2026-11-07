@@ -1,3 +1,4 @@
+import { i18n } from "@lingui/core";
 import { JobProgress } from "@maipai/ui/src/elements/job-progress";
 import { Progress } from "@maipai/ui/src/primitives/Progress";
 import { modelDownloadProgress } from "@/lib/modelDownloadProgress";
@@ -21,7 +22,7 @@ export function InstallDockRow({ item, stop }: { item: DockItem; stop: (id: stri
       ) : (
         <>
           <p className="text-sm">{item.label}</p>
-          {item.totalBytes > 0 ? <p className="text-sm text-muted-foreground tabular-nums">{plainSize(item.completedBytes)} of {plainSize(item.totalBytes)}</p> : null}
+          {item.totalBytes > 0 ? <p className="text-sm text-muted-foreground tabular-nums">{i18n._({ id: "{done} of {total}", message: "{done} of {total}", values: { done: plainSize(item.completedBytes), total: plainSize(item.totalBytes) } })}</p> : null}
           {item.totalBytes > 0 ? <Progress mode="determinate" value={(item.completedBytes / item.totalBytes) * 100} label={`${item.label} progress`} /> : null}
         </>
       )}

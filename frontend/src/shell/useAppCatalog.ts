@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { api, type AppRow } from "@/lib/api";
 import { mergeAppCatalog, type AppEntry } from "@/shell/appCatalog";
 import { useIncognitoContext } from "@/shell/incognitoContext";
+import { localizeCore } from "@/shell/coreLabels";
 
 /** The package apps this person may open (`GET /api/apps`), one query shared by the search, the favorites and every
  * app page. Install, uninstall, update and role changes invalidate `["apps"]`; it also refetches on window focus. A
@@ -20,5 +21,5 @@ export function useAppsQuery() {
 export function useAppCatalog(): AppEntry[] {
   const { on: incognito } = useIncognitoContext();
   const rows = useAppRows();
-  return mergeAppCatalog(rows, incognito);
+  return mergeAppCatalog(rows, incognito).map(localizeCore);
 }

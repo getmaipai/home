@@ -1,3 +1,4 @@
+import { i18n } from "@lingui/core";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@maipai/ui/src/ui/button";
@@ -42,24 +43,24 @@ function AlarmRows({ items, settings, blocked, reducedMotion, busy, onUnlock, on
   const Bell = getIcon("bell");
   const options = useMemo(() => SNOOZE_OPTIONS, []);
   return <div className="flex flex-col gap-3">
-    {items.length > 1 ? <p className="m-0 text-sm font-medium">{items.length} alarms</p> : null}
+    {items.length > 1 ? <p className="m-0 text-sm font-medium">{i18n._({ id: "{count} alarms", message: "{count} alarms", values: { count: items.length } })}</p> : null}
     {items.map((item) => {
       const missed = Date.now() - Date.parse(item.createdAt) > RECENT_MS;
-      return <section key={item.id} className="flex flex-col gap-3 border-b border-border pb-3 last:border-0 last:pb-0" aria-label="Alarm">
+      return <section key={item.id} className="flex flex-col gap-3 border-b border-border pb-3 last:border-0 last:pb-0" aria-label={i18n._({ id: "Alarm", message: "Alarm" })}>
         <div className="flex items-center gap-3">
           {!missed ? <Bell size={44} aria-hidden className={reducedMotion ? undefined : styles.alarmRingerSwing} /> : null}
           <div className="min-w-0 flex-1">
             <p className="m-0 font-medium">{lineFor(item)}</p>
-            {missed ? <p className="m-0 text-sm text-muted-foreground">Missed at {formattedTime(item.createdAt)}</p> : <time className="text-sm text-muted-foreground" dateTime={item.createdAt}>{formattedTime(item.createdAt)}</time>}
+            {missed ? <p className="m-0 text-sm text-muted-foreground">{i18n._({ id: "Missed at {time}", message: "Missed at {time}", values: { time: formattedTime(item.createdAt) } })}</p> : <time className="text-sm text-muted-foreground" dateTime={item.createdAt}>{formattedTime(item.createdAt)}</time>}
           </div>
         </div>
-        {!missed && blocked && settings.sound !== "none" ? <Button variant="link" onClick={onUnlock}>Tap to turn the sound on</Button> : null}
+        {!missed && blocked && settings.sound !== "none" ? <Button variant="link" onClick={onUnlock}>{i18n._({ id: "Tap to turn the sound on", message: "Tap to turn the sound on" })}</Button> : null}
         <div className="flex flex-wrap items-center gap-2">
-          <Button variant="secondary" disabled={busy} onClick={() => onDone(item)}>Done</Button>
+          <Button variant="secondary" disabled={busy} onClick={() => onDone(item)}>{i18n._({ id: "Done", message: "Done" })}</Button>
           {item.subjectJobId ? <>
-            <Button variant="outline" disabled={busy} onClick={() => onSnooze(item, { minutes: settings.snoozeMinutes })}>Snooze {settings.snoozeMinutes} minutes</Button>
+            <Button variant="outline" disabled={busy} onClick={() => onSnooze(item, { minutes: settings.snoozeMinutes })}>{i18n._({ id: "Snooze {minutes} minutes", message: "Snooze {minutes} minutes", values: { minutes: settings.snoozeMinutes } })}</Button>
             <DropdownMenu>
-            <DropdownMenuTrigger asChild><Button variant="ghost" aria-label="More snooze options">More</Button></DropdownMenuTrigger>
+            <DropdownMenuTrigger asChild><Button variant="ghost" aria-label={i18n._({ id: "More snooze options", message: "More snooze options" })}>{i18n._({ id: "More", message: "More" })}</Button></DropdownMenuTrigger>
             <DropdownMenuContent align="end">
               {options.map((option) => <DropdownMenuItem key={option.label} onSelect={() => onSnooze(item, option.input)}>{option.label}</DropdownMenuItem>)}
             </DropdownMenuContent>
@@ -194,12 +195,12 @@ export function AlarmRinger({ person }: { person: Roster | null }) {
   const content = <AlarmRows items={visibleRows} settings={settings} blocked={blocked} reducedMotion={reducedMotion} busy={action.busy} onUnlock={unlock} onDone={done} onSnooze={snooze} />;
   return <>
     {phone ? <Sheet open onOpenChange={(next) => { if (!next) hideAll(); }}>
-      <SheetContent side="top" aria-label="Ringing alarms">
-        <SheetHeader><SheetTitle>Alarms</SheetTitle></SheetHeader><div className="px-4 pb-4">{content}</div>
+      <SheetContent side="top" aria-label={i18n._({ id: "Ringing alarms", message: "Ringing alarms" })}>
+        <SheetHeader><SheetTitle>{i18n._({ id: "Alarms", message: "Alarms" })}</SheetTitle></SheetHeader><div className="px-4 pb-4">{content}</div>
       </SheetContent>
     </Sheet> : <Popover open onOpenChange={(next) => { if (!next) hideAll(); }}>
       <PopoverAnchor style={{ position: "fixed", right: 20, top: 56 }} />
-      <PopoverContent align="end" side="bottom" width="auto" aria-label="Ringing alarms">
+      <PopoverContent align="end" side="bottom" width="auto" aria-label={i18n._({ id: "Ringing alarms", message: "Ringing alarms" })}>
         {content}
       </PopoverContent>
     </Popover>}

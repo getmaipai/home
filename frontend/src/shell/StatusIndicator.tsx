@@ -1,3 +1,4 @@
+import { i18n } from "@lingui/core";
 import { useQuery } from "@tanstack/react-query";
 import { Status, StatusIndicator as StatusDot } from "@maipai/ui/src/ui/status";
 import { Link } from "react-router-dom";
@@ -25,7 +26,7 @@ export function useStatusSummary() {
   const appsQuery = useStatusApps();
   const appsSummary = statusAppsSummary(Array.isArray(appsQuery.data) ? appsQuery.data : []);
   const summary = appsSummary.level === "online" && underMaintenance.length > 0
-    ? { ...appsSummary, level: "maintenance" as const, text: "Maintenance" }
+    ? { ...appsSummary, level: "maintenance" as const, text: i18n._({ id: "Maintenance", message: "Maintenance" }) }
     : appsSummary;
   const title = appsSummary.level === "online" ? summary.text : appsSummary.message;
   return { summary, title };

@@ -1,3 +1,4 @@
+import { i18n } from "@lingui/core";
 import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -70,8 +71,8 @@ export function ReaderArticle({ book, path, routeFor, appName, canDiscuss, onApp
   const available: ArticleAction[] = discussable ? [...ARTICLE_ACTIONS, "discuss"] : ARTICLE_ACTIONS;
   if (query.isPending) return <ArticleSkeleton />;
   if (query.isError) {
-    if (query.error instanceof ApiError && query.error.status === 404) return <>{unavailable ?? <p role="status">This article is not available.</p>}</>;
-    return <p role="alert">Could not load this article.</p>;
+    if (query.error instanceof ApiError && query.error.status === 404) return <>{unavailable ?? <p role="status">{i18n._({ id: "This article is not available.", message: "This article is not available." })}</p>}</>;
+    return <p role="alert">{i18n._({ id: "Could not load this article.", message: "Could not load this article." })}</p>;
   }
   const article = query.data;
   return (
