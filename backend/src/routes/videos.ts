@@ -523,7 +523,7 @@ videosRoutes.openapi(addMusicRoute, async (c) => {
 // on the Create page, is a new Library clip. An adult-only source gives an adult-only result.
 const spatialRoute = createRoute({
   method: "post", path: "/jobs/{id}/spatial-sound", tags: ["Videos"], summary: "Make the sound of a clip follow who is talking on screen (and, if asked, a 5.1 file); adults on their own screen only", middleware: [requireAuth] as const,
-  request: { params: idParams, body: { required: false, content: { "application/json": { schema: z.object({ surround: z.boolean().optional().describe("Also make a 5.1 file, a second file of the new clip.") }) } } } },
+  request: { params: idParams, body: { required: false, content: { "application/json": { schema: z.object({ surround: z.boolean().optional().describe("Also make a 5.1 file, a second file of the new clip."), side: z.enum(["left", "right"]).optional().describe("Force the sound to one side of the picture; left out, the Stack decides.") }) } } } },
   responses: { 200: { content: { "application/json": { schema: CardOrLocked } }, description: "The card with the new clip being made (or the lock tile)." }, ...refusals },
 });
 videosRoutes.openapi(spatialRoute, async (c) => {
@@ -535,9 +535,9 @@ videosRoutes.openapi(spatialRoute, async (c) => {
   const source = getVideoJobFor(actor, c.req.valid("param").id) ?? getVideoJobByFileFor(actor, c.req.valid("param").id);
   if (!source || source.state !== "done") return c.json({ error: "That video isn't available any more. Ask for it again.", code: "not_found" }, 404) as never;
   if (videoJobLockState(actor, source) !== "open") return c.json({ error: LOCKED_START_LINE, code: "locked", locked: true }, 423) as never;
-  const asked = (await c.req.json().catch(() => ({}))) as { surround?: unknown };
+  const asked = (await c.req.json().catch(() => ({}))) as { surround?: unknown; side?: unknown };
   const state = { actor, surface: "chat", conversationId: source.conversationId, turnId: source.turnId, temporary: source.temporary, planBasis: { surfaceClass: "written" }, context: [], utterance: "", persona: null, crisis: false } as unknown as RunEditVideoInput["state"];
-  const outcome = await runEditVideo({ state, args: { clip: source.id, change: "spatial_sound", ...(asked.surround === true ? { surround: true } : {}) }, callId: "route-spatial-sound", spoken: false });
+  const outcome = await runEditVideo({ state, args: { clip: source.id, change: "spatial_sound", ...(asked.surround === true ? { surround: true } : {}), ...(asked.side === "left" || asked.side === "right" ? { side: asked.side } : {}) }, callId: "route-spatial-sound", spoken: false });
   const id = (outcome.result?.data as { videoJobId?: string } | undefined)?.videoJobId;
   if (!id) return c.json({ error: refusalLineOf(outcome) ?? "I couldn't change the sound of that video. Try again.", code: String((outcome.result?.data as { refused?: string } | undefined)?.refused ?? "spatial_failed") }, 422) as never;
   const started = getVideoJobFor(actor, id);

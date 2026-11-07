@@ -16,7 +16,7 @@ import { __resetAdultLockForTests } from "@/lib/adultLock";
 import { getVideoJobFor, readVideoFile, type VideoJob } from "@/lib/videos/jobs";
 import { EDIT_MINOR_LINE } from "@/lib/videos/editGate";
 import { SPATIAL_NO_SOUND_LINE, runEditVideo } from "@/lib/videos/editTool";
-import { spatialOps } from "@/lib/videos/editPlan";
+import { spatialOps, spatialNote, SPATIAL_UNCHANGED_LINES } from "@/lib/videos/editPlan";
 import { SPATIAL_FAILURE_COPY } from "@/lib/failureCopy";
 import { __setVideoStatusForTests, readyVideoStatusForTests } from "@/lib/videos/ready";
 import { __resetVideoAdapterCacheForTests } from "@/lib/videos/adapters";
@@ -75,6 +75,19 @@ describe("the plan", () => {
   test("the step is the Stack's spatial_sound op, with surround only when asked", () => {
     expect(spatialOps(false)).toEqual([{ op: "spatial_sound" }]);
     expect(spatialOps(true)).toEqual([{ op: "spatial_sound", surround: true }]);
+  });
+
+  test("SPATIAL-07: side is passed to the Stack op only when given", () => {
+    expect(spatialOps(false, "left")).toEqual([{ op: "spatial_sound", side: "left" }]);
+    expect(spatialOps(true, "right")).toEqual([{ op: "spatial_sound", surround: true, side: "right" }]);
+  });
+
+  test("SPATIAL-07: already_spatial has the Stack's line as a fallback, and the Stack's own note wins", () => {
+    const line = "This clip's sound already moves with the picture, so it is unchanged.";
+    expect(SPATIAL_UNCHANGED_LINES.already_spatial).toBe(line);
+    expect(spatialNote({ applied: false, reason: "already_spatial", surround: false })).toBe(line);
+    const effects = "Sound effects now come from the side of the picture where they happen. Wear headphones to hear it.";
+    expect(spatialNote({ applied: true, reason: null, notes: [effects], surround: false })).toBe(effects);
   });
 });
 
@@ -207,6 +220,27 @@ describe("edit_video spatial_sound", () => {
     }
   });
 
+  test("SPATIAL-07: side reaches the Stack, the Stack's effects line is kept as the note, and already_spatial reads plain", async () => {
+    const owner = person("owner");
+    const { state } = await makeClip(owner);
+    const effects = "Sound effects now come from the side of the picture where they happen. Wear headphones to hear it.";
+    stack.spatial = { applied: true, reason: null, note: effects, notes: [effects] };
+    const next = await finished(owner, await edit(state, { clip: "latest", change: "spatial_sound", side: "left" }));
+    expect(stack.jobs.at(-1)!.input.ops).toEqual([{ op: "spatial_sound", side: "left" }]);
+    expect(next.request.edit?.note).toBe(effects);
+    stack.spatial = { applied: false, reason: "already_spatial", note: null, notes: [] };
+    const again = await finished(owner, await edit(chatState(owner, state.conversationId!), { clip: "latest", change: "spatial_sound" }));
+    expect(again.request.edit?.note).toBe("This clip's sound already moves with the picture, so it is unchanged.");
+  });
+
+  test("SPATIAL-07: side takes only left or right, and only with spatial sound", async () => {
+    const owner = person("owner");
+    const { state } = await makeClip(owner);
+    expect((await edit(state, { clip: "latest", change: "spatial_sound", side: "middle" })).status).toBe("failed");
+    expect((await edit(state, { clip: "latest", change: "trim", from_s: 0, to_s: 1, side: "left" })).status).toBe("failed");
+    expect(stack.jobs).toHaveLength(0);
+  });
+
   test("a child and a teen get the edit line from the chat tool, and no job starts", async () => {
     for (const role of ["child", "teen"]) {
       const minor = person(role, `${role}spatial`);
@@ -245,6 +279,16 @@ describe("the menu route", () => {
     await until(() => getVideoJobFor(me, edited.id)?.state === "done");
     expect(getVideoJobFor(me, edited.id)!.files).toHaveLength(2);
     expect(stack.jobs.at(-1)!.input.ops).toEqual([{ op: "spatial_sound", surround: true }]);
+  });
+
+  test("SPATIAL-07: the menu route passes side on; a bad side is refused", async () => {
+    const { adult, me, jobId } = await adultWithClip();
+    const res = await adult.client.post(`/api/videos/jobs/${jobId}/spatial-sound`, { side: "right" });
+    expect(res.status).toBe(200);
+    const edited = ((await res.json()) as { items: Array<{ id: string; kind: string }> }).items.find((item) => item.kind === "edit")!;
+    await until(() => getVideoJobFor(me, edited.id)?.state === "done");
+    expect(stack.jobs.at(-1)!.input.ops).toEqual([{ op: "spatial_sound", side: "right" }]);
+    expect((await adult.client.post(`/api/videos/jobs/${jobId}/spatial-sound`, { side: "up" })).status).toBe(400);
   });
 
   test("a clip with no sound is refused with the plain line", async () => {

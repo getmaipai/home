@@ -180,9 +180,9 @@ export function fadeOps(inS: number, outS: number): EditOp[] {
   return inS > 0 || outS > 0 ? [{ op: "fade", in_s: Math.max(0, inS), out_s: Math.max(0, outS) }] : [];
 }
 
-/** SPATIAL-04: the Stack's `spatial_sound` step. `surround: true` also writes the 5.1 file and must be the last (here, the only) step. */
-export function spatialOps(surround: boolean): EditOp[] {
-  return [{ op: "spatial_sound", ...(surround ? { surround: true } : {}) }];
+/** SPATIAL-04: the Stack's `spatial_sound` step. `surround: true` also writes the 5.1 file and must be the last (here, the only) step. SPATIAL-07: `side` forces the sound to one side (an override only). */
+export function spatialOps(surround: boolean, side?: "left" | "right"): EditOp[] {
+  return [{ op: "spatial_sound", ...(surround ? { surround: true } : {}), ...(side ? { side } : {}) }];
 }
 
 /** SPATIAL-04: the plain lines under a spatial clip when the Stack sent none of its own (docs/design/spatial-sound-2026-11-06.md, section 4). */
@@ -193,6 +193,7 @@ export const SPATIAL_UNCHANGED_LINES: Record<string, string> = {
   no_speech: "Nobody speaks in this clip, so the sound is unchanged.",
   several_people: "Several people are on screen and Home could not tell who talks, so the sound is unchanged.",
   centered: "The speaker stands in the middle, so the sound is unchanged.",
+  already_spatial: "This clip's sound already moves with the picture, so it is unchanged.",
 };
 
 /** The one muted line kept with a spatial clip: the Stack's own lines when it sent them, else the plain line for what happened. */

@@ -32,6 +32,14 @@ The existing edit gate, unchanged. `editRefusal` (`lib/videos/editGate.ts`) give
 - Both files go through the same finished-clip check before either is stored. If either is withheld, the job fails and nothing is kept.
 - Unchanged stereo is a success. The Stack copies the sound and says why (`no_person`, `no_speech`, `several_people`, `centered`). Home keeps the Stack's `spatial.notes` as `request.edit.note`; the card shows it as its muted notice (the kit `notice` prop). There is no new status UI.
 
+## Side, effects and already-spatial clips (SPATIAL-07)
+
+- `side` is an optional `"left"` or `"right"` on `edit_video` with `change: "spatial_sound"`. It forces the sound to that side and is passed to the Stack op unchanged (`spatialOps(surround, side)`). Any other value, or `side` with another change, is refused with a plain line. The menu route takes `{ side? }` beside `surround`. No menu entry or screen uses it yet.
+- A clip whose sound already moves with the picture comes back with reason `already_spatial` and is a success, like the other unchanged reasons. `SPATIAL_UNCHANGED_LINES` holds the same line as the Stack: "This clip's sound already moves with the picture, so it is unchanged."
+- The Stack can also move effects (footsteps, a passing vehicle). Then its `note` is "Sound effects now come from the side of the picture where they happen. Wear headphones to hear it." Home keeps the Stack's lines first, so that line reaches the card as sent and Home adds no line of its own.
+- `spatial.sources` names what moved: `speech`, `walker`, `vehicle`, `impact`, `side`. Home does not read it; the note carries what a person needs.
+- Child and teen still get `EDIT_MINOR_LINE`; the gate is unchanged.
+
 ## Failures
 
 The Stack's codes `no_audio`, `bad_input`, `model_missing`, `no_memory`, `speech_unavailable` and `spatial_failed` each have one line in `SPATIAL_FAILURE_COPY`, shown after "I couldn't change that video." The Stack's own text is never shown. Home reads the code from `failure.code` of the job when the pinned Stack contract carries it, so the lines apply once the pin moves. Until then a failed job shows the Stack's own plain `reason` when it names no path, else the general edit line.

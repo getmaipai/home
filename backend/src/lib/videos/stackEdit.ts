@@ -47,7 +47,7 @@ export type EditOp =
   | { op: "upscale"; factor: 2 }
   | { op: "cutout"; background: "black" | "white" | "green" | "blur" | "transparent" | `#${string}`; feather_px?: number; subject?: { frame?: number; box?: [number, number, number, number]; point?: { x: number; y: number } } }
   /** SPATIAL-04 (Stack 67481c2): move the clip's own dialog toward the side of the screen where the speaker stands; `surround: true` also writes a 5.1 E-AC-3 file, and must be the last step. */
-  | { op: "spatial_sound"; surround?: boolean }
+  | { op: "spatial_sound"; surround?: boolean; side?: "left" | "right" }
   | { op: "captions"; lines: Array<{ from_s: number; to_s: number; text: string }>; position: "bottom" | "middle" | "top" };
 
 /** One file the Stack reads: its bytes and the extension it is staged with (the Stack looks at the content, not the name). */

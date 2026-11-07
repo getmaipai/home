@@ -57,6 +57,8 @@ export const editVideoArgs = z.object({
   background: z.string().optional(),
   /** SPATIAL-04: with `spatial_sound`, also make a 5.1 file (a second file of the new clip). */
   surround: z.boolean().optional(),
+  /** SPATIAL-07: with `spatial_sound`, force the sound to one side of the picture (an override; left out, the Stack decides). */
+  side: z.enum(["left", "right"]).optional(),
   effect: z.enum(["speed_ramp", "reverse", "freeze", "loop", "fps_boost", "flip", "rotate", "sharpen", "denoise", "pip", "kenburns", "ripple"]).optional(),
   amount: z.number().min(0).max(1.5).optional(), deblock: z.boolean().optional(), times: z.number().int().min(2).max(6).optional(), fps: z.union([z.literal(30), z.literal(48), z.literal(60)]).optional(),
   direction: z.enum(["horizontal", "vertical"]).optional(), degrees: z.union([z.literal(90), z.literal(180), z.literal(270)]).optional(), from_factor: z.number().min(0.25).max(4).optional(), to_factor: z.number().min(0.25).max(4).optional(),
@@ -108,8 +110,11 @@ export const editVideoArgs = z.object({
 }).superRefine((value, ctx) => {
   if (value.change === "film") { if (!value.production) ctx.addIssue({ code: "custom", path: ["production"], message: "A production is required" }); }
   else if (!value.clip) ctx.addIssue({ code: "custom", path: ["clip"], message: "A video is required" });
-  if (value.change === "spatial_sound") { for (const key of Object.keys(value)) if (!["clip", "change", "surround"].includes(key)) ctx.addIssue({ code: "custom", path: [key], message: "Spatial sound takes only a clip and surround." }); }
-  else if (value.surround !== undefined) ctx.addIssue({ code: "custom", path: ["surround"], message: "Surround is only for spatial sound." });
+  if (value.change === "spatial_sound") { for (const key of Object.keys(value)) if (!["clip", "change", "surround", "side"].includes(key)) ctx.addIssue({ code: "custom", path: [key], message: "Spatial sound takes only a clip, surround and side." }); }
+  else {
+    if (value.surround !== undefined) ctx.addIssue({ code: "custom", path: ["surround"], message: "Surround is only for spatial sound." });
+    if (value.side !== undefined) ctx.addIssue({ code: "custom", path: ["side"], message: "Side is only for spatial sound." });
+  }
   if (value.change === "upscale") for (const key of Object.keys(value)) if (key !== "clip" && key !== "change") ctx.addIssue({ code: "custom", path: [key], message: "Upscale takes only a clip." });
   if (value.change === "remove_background") for (const key of Object.keys(value)) if (!["clip", "change", "background"].includes(key)) ctx.addIssue({ code: "custom", path: [key], message: "Background removal takes only a clip and background." });
 });
@@ -492,7 +497,7 @@ async function editFinishedClips(input: RunEditVideoInput, value: EditArgs, acto
   } else if (value.change === "spatial_sound") {
     // SPATIAL-04: a clip with no sound of its own has nothing to place; the Stack would refuse it, so the answer is the same plain line without a job.
     if (first.files[0]?.audio !== true) return refused(callId, args, SPATIAL_NO_SOUND_LINE, "no_audio");
-    inputs = [clipFiles[0]!]; ops = spatialOps(value.surround === true); describe = value.surround === true ? "sound that follows who is talking, with a 5.1 file" : "sound that follows who is talking";
+    inputs = [clipFiles[0]!]; ops = spatialOps(value.surround === true, value.side); describe = value.surround === true ? "sound that follows who is talking, with a 5.1 file" : "sound that follows who is talking";
   } else if (value.change === "remove_background") {
     inputs = [clipFiles[0]!]; ops = cutoutOps(background as import("./editPlan").CutoutBackground); describe = "background removed";
   } else if (value.change === "trim") {

@@ -70830,6 +70830,14 @@
                   "surround": {
                     "type": "boolean",
                     "description": "Also make a 5.1 file, a second file of the new clip."
+                  },
+                  "side": {
+                    "type": "string",
+                    "enum": [
+                      "left",
+                      "right"
+                    ],
+                    "description": "Force the sound to one side of the picture; left out, the Stack decides."
                   }
                 }
               }
