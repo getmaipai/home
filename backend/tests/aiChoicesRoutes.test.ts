@@ -292,7 +292,7 @@ describe("set everything to recommended", () => {
     expect(householdQuickModel()).toBe("ernie");
     expect(installs()).toContain(idOf("video"));
     expect(installs()).not.toContain(idOf("pictures-ernie"));
-    expect(installs()).not.toContain(idOf("video-detailed"));
+    expect(installs()).not.toContain(idOf("video-ltx25"));
     expect(deletes()).toEqual([]);
   });
 
@@ -321,7 +321,7 @@ describe("set everything to recommended", () => {
 });
 
 describe("free up space", () => {
-  const withUnused = () => { writeChoiceSetting("engines.image.tier.boost", false); components = everything(["pictures-ernie", "pictures-zimage", "video", "video-detailed"]); };
+  const withUnused = () => { writeChoiceSetting("engines.image.tier.boost", false); components = everything(["pictures-ernie", "pictures-zimage", "video", "video-ltx25"]); };
 
   test("GET /api/ai/unused lists unused parts largest first by plain name", async () => {
     const { client } = await owner();
@@ -335,7 +335,7 @@ describe("free up space", () => {
   test("removes unused ids one at a time and reports freed bytes", async () => {
     const { client } = await owner();
     withUnused();
-    const res = await client.post("/api/ai/cleanup", { ids: [idOf("pictures-zimage"), idOf("video-detailed")] });
+    const res = await client.post("/api/ai/cleanup", { ids: [idOf("pictures-zimage"), idOf("video-ltx25")] });
     const body = await res.json() as { results: Array<{ id: string; status: string }>; freed_bytes: number; kept: number; failed: number };
     expect(body.results.map((entry) => entry.status)).toEqual(["removed", "removed"]);
     expect(body.freed_bytes).toBeGreaterThan(0);
@@ -358,7 +358,7 @@ describe("free up space", () => {
     const { client } = await owner();
     withUnused();
     failDelete.add(idOf("pictures-zimage"));
-    const body = await (await client.post("/api/ai/cleanup", { ids: [idOf("pictures-zimage"), idOf("video-detailed")] })).json() as { results: Array<{ status: string; message: string }>; failed: number };
+    const body = await (await client.post("/api/ai/cleanup", { ids: [idOf("pictures-zimage"), idOf("video-ltx25")] })).json() as { results: Array<{ status: string; message: string }>; failed: number };
     expect(body.results.map((entry) => entry.status)).toEqual(["failed", "removed"]);
     expect(body.results[0]!.message).toMatch(/could not remove/);
     expect(body.failed).toBe(1);

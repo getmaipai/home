@@ -28,8 +28,8 @@ function ltxStack(acceptedAt: string | null) {
   const installs: Array<{ id: string; accepted_licence?: string }> = [];
   const fetchStub = (async (url: string | URL | Request, init?: RequestInit) => {
     const path = new URL(String(url)).pathname;
-    if (init?.method === "POST" && path.endsWith("/install")) { installs.push({ id: path.split("/").slice(-2)[0]!, ...JSON.parse(String(init.body ?? "{}")) }); return Response.json({ job: "j1", component: "ltx-2-3-distilled-mlx" }, { status: 202 }); }
-    return Response.json({ tier: "p128", free_disk_bytes: 1e13, disk_margin_bytes: 0, installed_bytes: 0, components: [{ id: "ltx-2-3-distilled-mlx", licence: { ...LICENCE, accepted_at: acceptedAt } }] });
+    if (init?.method === "POST" && path.endsWith("/install")) { installs.push({ id: path.split("/").slice(-2)[0]!, ...JSON.parse(String(init.body ?? "{}")) }); return Response.json({ job: "j1", component: "ltx-2-5-q8-distilled-mlx" }, { status: 202 }); }
+    return Response.json({ tier: "p128", free_disk_bytes: 1e13, disk_margin_bytes: 0, installed_bytes: 0, components: [{ id: "ltx-2-5-q8-distilled-mlx", licence: { ...LICENCE, accepted_at: acceptedAt } }] });
   }) as unknown as typeof fetch;
   return { fetch: fetchStub, installs };
 }
@@ -68,9 +68,9 @@ describe("install with a choice of components", () => {
   });
 
   test("Detailed video is optional and off by default; picking it needs its licence accepted before anything starts", async () => {
-    expect(disk.rows.find((row) => row.id === "video-detailed")).toMatchObject({ need: "optional" });
-    expect(disk.default_selected).not.toContain("video-detailed");
-    const picked = [...disk.default_selected, "video-detailed"];
+    expect(disk.rows.find((row) => row.id === "video-ltx25")).toMatchObject({ need: "optional" });
+    expect(disk.default_selected).not.toContain("video-ltx25");
+    const picked = [...disk.default_selected, "video-ltx25"];
     const pulls: string[] = [];
     __setStackClientForTests(stackWith(10 ** 13, pulls));
     const stack = ltxStack(null);
@@ -99,10 +99,10 @@ describe("install with a choice of components", () => {
     const refusing = (async (url: string | URL | Request, init?: RequestInit) => {
       const path = new URL(String(url)).pathname;
       if (init?.method === "POST" && path.endsWith("/install")) return Response.json({ error: "There is not enough room on the engine's disk for Detailed video. Free 40 GB, then try again.", code: "no_room" }, { status: 409 });
-      return Response.json({ tier: "p128", free_disk_bytes: 1e13, disk_margin_bytes: 0, installed_bytes: 0, components: [{ id: "ltx-2-3-distilled-mlx", licence: { ...LICENCE, accepted_at: null } }] });
+      return Response.json({ tier: "p128", free_disk_bytes: 1e13, disk_margin_bytes: 0, installed_bytes: 0, components: [{ id: "ltx-2-5-q8-distilled-mlx", licence: { ...LICENCE, accepted_at: null } }] });
     }) as unknown as typeof fetch;
     __setComponentsFetchForTests(refusing);
-    const result = await beginInstall(undefined, false, ["video-detailed"], [LICENCE.id]);
+    const result = await beginInstall(undefined, false, ["video-ltx25"], [LICENCE.id]);
     expect(result.ok).toBe(false);
     if (!result.ok) { expect(result.error).toMatch(/not enough room on the engine's disk/); expect(result.next).toMatch(/press the button again/); }
     await settle();
@@ -117,9 +117,9 @@ describe("install with a choice of components", () => {
     expect((await beginInstall(undefined, false)).ok).toBe(true);
     await settle();
     expect(stack.installs).toEqual([]);
-    expect(getInstallSelection()).not.toContain("video-detailed");
+    expect(getInstallSelection()).not.toContain("video-ltx25");
     // An explicit admin choice of it (with the accept) is the only way in.
-    expect((await beginInstall(undefined, false, ["video-detailed"], [LICENCE.id])).ok).toBe(true);
+    expect((await beginInstall(undefined, false, ["video-ltx25"], [LICENCE.id])).ok).toBe(true);
     await settle();
     expect(stack.installs.length).toBe(1);
   });

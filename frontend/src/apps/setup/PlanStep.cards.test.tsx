@@ -114,7 +114,7 @@ describe("the plan step's job cards", () => {
     expect(within(view.getByTestId("plan-job-pictures")).getByText("Installed")).toBeTruthy();
   });
 
-  const licence = { row_id: "video-detailed", component: "ltx-2-5-distilled-mlx", id: "video-community-license", name: "Video model licence", url: "https://example.com/licence", summary: ["It is free for a person or a business that earns under $10 million a year.", "The markings the model puts in a clip are never removed."], accepted_at: null };
+  const licence = { row_id: "video-ltx25", component: "ltx-2-5-distilled-mlx", id: "video-community-license", name: "Video model licence", url: "https://example.com/licence", summary: ["It is free for a person or a business that earns under $10 million a year.", "The markings the model puts in a clip are never removed."], accepted_at: null };
   const pickDetailed = (view: ReturnType<typeof render>) => fireEvent.click(view.getByRole("radio", { name: /Detailed videos/ }));
 
   test("choosing Detailed videos shows the licence plainly and Install waits for the accept", async () => {
@@ -132,7 +132,7 @@ describe("the plan step's job cards", () => {
     fireEvent.click(install);
     await waitFor(() => expect(start).toHaveBeenCalledTimes(1));
     const call = start.mock.calls[0] as unknown[];
-    expect(call[1]).toContain("video-detailed");
+    expect(call[1]).toContain("video-ltx25");
     expect(call[1]).not.toContain("video");
     expect(call[2]).toEqual([licence.id]);
     expect(call[3]).toMatchObject({ "generation.video_tier": "boost" });
@@ -164,7 +164,7 @@ describe("the plan step's job cards", () => {
     fireEvent.click(view.getByRole("button", { name: "Install and continue" }));
     await waitFor(() => expect(start).toHaveBeenCalledTimes(1));
     const call = start.mock.calls[0] as unknown[];
-    expect(call[1]).not.toContain("video-detailed");
+    expect(call[1]).not.toContain("video-ltx25");
     expect(call[2]).toEqual([]);
   });
 

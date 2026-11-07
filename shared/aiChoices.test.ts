@@ -169,7 +169,7 @@ test("a chosen but not installed Detailed reads Chosen, not ready and notReady",
   const plan = planOf([
     row("home", { kind: "home", need: "required", installed: true, installed_bytes: 2 * GIB, download_bytes: 0, peak_temp_bytes: 0 }),
     row("video", { need: "recommended", installed: true, download_bytes: 24 * GIB, installed_bytes: 24 * GIB, peak_temp_bytes: 4 * GIB, engines: ["engine:video"] }),
-    row("video-detailed", { need: "optional", download_bytes: 74 * GIB, installed_bytes: 60 * GIB, peak_temp_bytes: 14 * GIB }),
+    row("video-ltx25", { need: "optional", download_bytes: 74 * GIB, installed_bytes: 60 * GIB, peak_temp_bytes: 14 * GIB }),
     row("engine:video", { kind: "engine", need: "required", installed: true, download_bytes: 0, installed_bytes: 1 * GIB, peak_temp_bytes: 0 }),
   ]);
   const card = buildAiCards({ copy, plan, components: null, settings: { ...SETTINGS, videoQuality: "detailed" }, freeBytes: null }).cards.find((c) => c.id === "videos")!;
@@ -237,12 +237,12 @@ test("action: current none, installed-not-current use, missing get, installed sw
   const plan = planOf([
     row("home", { kind: "home", need: "required", installed: true, download_bytes: 0, installed_bytes: 2 * GIB, peak_temp_bytes: 0 }),
     row("video", { need: "recommended", download_bytes: 24 * GIB, installed_bytes: 24 * GIB, peak_temp_bytes: 4 * GIB }),
-    row("video-detailed", { need: "optional", download_bytes: 74 * GIB, installed_bytes: 60 * GIB, peak_temp_bytes: 14 * GIB }),
+    row("video-ltx25", { need: "optional", download_bytes: 74 * GIB, installed_bytes: 60 * GIB, peak_temp_bytes: 14 * GIB }),
     row("coding", { need: "recommended", download_bytes: 20 * GIB, installed_bytes: 20 * GIB, peak_temp_bytes: 2 * GIB }),
     row("voice", { need: "required", installed: true, download_bytes: GIB, installed_bytes: GIB, peak_temp_bytes: 0 }),
   ]);
   const components = [
-    component({ id: "video-detailed", state: "installed" }),
+    component({ id: "video-ltx25", state: "installed" }),
     component({ id: "coding", state: "installed" }),
   ];
   const { cards } = buildAiCards({ copy, plan, components, settings: { ...SETTINGS, videoQuality: "quick" }, freeBytes: null });
@@ -259,7 +259,7 @@ test("alwaysOn excludes the chat model and Klein, counts each engine once", () =
   for (const tier of TIERS_LIST) {
     const plan = TIERS[tier];
     const { alwaysOn } = buildAiCards({ copy, plan, components: null, settings: SETTINGS, freeBytes: null });
-    for (const excluded of ["chat", "pictures", "pictures-ernie", "pictures-zimage", "video", "video-detailed", "coding", "music", "voice-better", "chat-mlx", "reads-pictures", "image-tools", "tool-look"]) {
+    for (const excluded of ["chat", "pictures", "pictures-ernie", "pictures-zimage", "video", "video-ltx25", "coding", "music", "voice-better", "chat-mlx", "reads-pictures", "image-tools", "tool-look"]) {
       expect(alwaysOn.rowIds).not.toContain(excluded);
     }
     for (const expected of ["home", "stt", "voice", "embed", "search"]) {
@@ -285,7 +285,7 @@ test("recommendedPlan changes Detailed to Quick, lists changes, never removes, s
     row("pictures", { need: "required", selectable: false, download_bytes: 16 * GIB, installed_bytes: 16 * GIB, peak_temp_bytes: 1 * GIB }),
     row("pictures-ernie", { need: "recommended", download_bytes: 24 * GIB, installed_bytes: 24 * GIB, peak_temp_bytes: 2 * GIB, engines: ["engine:pictures"] }),
     row("video", { need: "recommended", download_bytes: 24 * GIB, installed_bytes: 24 * GIB, peak_temp_bytes: 4 * GIB, engines: ["engine:video"] }),
-    row("video-detailed", { need: "optional", installed: true, download_bytes: 74 * GIB, installed_bytes: 60 * GIB, peak_temp_bytes: 14 * GIB }),
+    row("video-ltx25", { need: "optional", installed: true, download_bytes: 74 * GIB, installed_bytes: 60 * GIB, peak_temp_bytes: 14 * GIB }),
     row("music", { need: "optional", download_bytes: 11 * GIB, installed_bytes: 11 * GIB, peak_temp_bytes: 1 * GIB }),
     row("coding", { need: "recommended", download_bytes: 30 * GIB, installed_bytes: 30 * GIB, peak_temp_bytes: 2 * GIB }),
     row("engine:pictures", { kind: "engine", need: "required", download_bytes: 1 * GIB, installed_bytes: 1 * GIB, peak_temp_bytes: 0 }),
@@ -306,8 +306,8 @@ test("recommendedPlan changes Detailed to Quick, lists changes, never removes, s
   expect(result.text).toContain("room for 3 of the 4");
   expect(result.text).toContain("Coding helper");
   expect(result.text).toContain("will be skipped");
-  expect(result.installRowIds).not.toContain("video-detailed");
-  expect(result.skipped.map((item) => item.rowId)).not.toContain("video-detailed");
+  expect(result.installRowIds).not.toContain("video-ltx25");
+  expect(result.skipped.map((item) => item.rowId)).not.toContain("video-ltx25");
 
   const donePlan = planOf(base.map((candidate) => ({ ...candidate, installed: true })));
   const done = recommendedPlan({ copy, plan: donePlan, components: null, settings: SETTINGS, freeBytes: 90 * GIB });

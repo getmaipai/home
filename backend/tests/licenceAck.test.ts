@@ -28,8 +28,8 @@ function ltxStack(licence = LTX) {
   const installs: Array<{ id: string; accepted_licence?: string; accepted_by?: string }> = [];
   const fetchStub = (async (url: string | URL | Request, init?: RequestInit) => {
     const path = new URL(String(url)).pathname;
-    if (init?.method === "POST" && path.endsWith("/install")) { installs.push({ id: path.split("/").slice(-2)[0]!, ...JSON.parse(String(init.body ?? "{}")) }); return Response.json({ job: "j1", component: "ltx-2-3-distilled-mlx" }, { status: 202 }); }
-    return Response.json({ tier: "p128", free_disk_bytes: 1e13, disk_margin_bytes: 0, installed_bytes: 0, components: [{ id: "ltx-2-3-distilled-mlx", label: "Video: Detailed (LTX-2.3)", summary: "x", group: "video", kind: "model", state: "notInstalled", size_bytes: null, download_bytes: 1, full_bytes: 1, required_free_bytes: 1, plan_need: "recommended", requirement: "optional", requirement_reason: null, last_used_at: null, used_by: [], depends_on: [], job: null, percent: null, failure: null, can_install: true, install_block: null, can_uninstall: false, uninstall_block: null, licence }] });
+    if (init?.method === "POST" && path.endsWith("/install")) { installs.push({ id: path.split("/").slice(-2)[0]!, ...JSON.parse(String(init.body ?? "{}")) }); return Response.json({ job: "j1", component: "ltx-2-5-q8-distilled-mlx" }, { status: 202 }); }
+    return Response.json({ tier: "p128", free_disk_bytes: 1e13, disk_margin_bytes: 0, installed_bytes: 0, components: [{ id: "ltx-2-5-q8-distilled-mlx", label: "Video: Detailed (LTX-2.3)", summary: "x", group: "video", kind: "model", state: "notInstalled", size_bytes: null, download_bytes: 1, full_bytes: 1, required_free_bytes: 1, plan_need: "recommended", requirement: "optional", requirement_reason: null, last_used_at: null, used_by: [], depends_on: [], job: null, percent: null, failure: null, can_install: true, install_block: null, can_uninstall: false, uninstall_block: null, licence }] });
   }) as unknown as typeof fetch;
   return { fetch: fetchStub, installs };
 }
@@ -54,16 +54,16 @@ describe("the wizard's acknowledgement", () => {
     expect(Date.parse(early.at)).toBeGreaterThan(0);
     expect((await new TestClient().post("/api/setup/install", {})).status).toBe(202);
     await settle();
-    expect(readLicenceAck()).toMatchObject({ component_ids: ["ltx-2-3-distilled-mlx"], licence_ids: [LTX.id] });
+    expect(readLicenceAck()).toMatchObject({ component_ids: ["ltx-2-5-q8-distilled-mlx"], licence_ids: [LTX.id] });
     expect(db.select().from(settingsValues).where(eq(settingsValues.key, "_licences.accepted")).all().length).toBe(1);
   });
 
   test("a covered licence installs with no individual accept, and the Stack still gets the notice id", async () => {
     const stack = ltxStack(); __setComponentsFetchForTests(stack.fetch);
     await new TestClient().post("/api/setup/licences/accept", {});
-    expect((await new TestClient().post("/api/setup/install", { components: ["video-detailed"] })).status).toBe(202);
+    expect((await new TestClient().post("/api/setup/install", { components: ["video-ltx25"] })).status).toBe(202);
     await settle();
-    expect(stack.installs).toEqual([{ id: "ltx-2-3-distilled-mlx", accepted_licence: LTX.id }]);
+    expect(stack.installs).toEqual([{ id: "ltx-2-5-q8-distilled-mlx", accepted_licence: LTX.id }]);
   });
 
   test("the setup plan lists the licence as covered, information only", async () => {
@@ -75,7 +75,7 @@ describe("the wizard's acknowledgement", () => {
 
   test("no acknowledgement keeps the per-item flow: the install asks for the accept", async () => {
     const stack = ltxStack(); __setComponentsFetchForTests(stack.fetch);
-    const refused = await new TestClient().post("/api/setup/install", { components: ["video-detailed"] });
+    const refused = await new TestClient().post("/api/setup/install", { components: ["video-ltx25"] });
     expect(refused.status).toBe(409);
     expect((await refused.json() as { error: string }).error).toMatch(/needs your accept/);
     expect(stack.installs).toEqual([]);
@@ -83,16 +83,16 @@ describe("the wizard's acknowledgement", () => {
 
   test("a licence the record does not list asks once; a record at an older terms version covers nothing", async () => {
     const stack = ltxStack({ ...LTX, id: "ltx-3-new-licence" }); __setComponentsFetchForTests(stack.fetch);
-    rawRecord({ item_id: "internet", by: "person-1", at: "2026-10-18T00:00:00.000Z", terms_version: LICENCE_TERMS_VERSION, component_ids: ["ltx-2-3-distilled-mlx"], licence_ids: [LTX.id] });
-    const refused = await beginInstall(undefined, true, ["video-detailed"]);
+    rawRecord({ item_id: "internet", by: "person-1", at: "2026-10-18T00:00:00.000Z", terms_version: LICENCE_TERMS_VERSION, component_ids: ["ltx-2-5-q8-distilled-mlx"], licence_ids: [LTX.id] });
+    const refused = await beginInstall(undefined, true, ["video-ltx25"]);
     expect(refused.ok).toBe(false);
     expect(stack.installs).toEqual([]);
-    expect((await beginInstall(undefined, true, ["video-detailed"], ["ltx-3-new-licence"])).ok).toBe(true);
+    expect((await beginInstall(undefined, true, ["video-ltx25"], ["ltx-3-new-licence"])).ok).toBe(true);
     db.delete(settingsValues).where(eq(settingsValues.key, "_licences.accepted")).run();
     __setComponentsFetchForTests(ltxStack().fetch);
     rawRecord({ item_id: "internet", by: "person-1", at: "2026-01-01T00:00:00.000Z", terms_version: "2026-01-01", component_ids: [], licence_ids: [LTX.id] });
     expect(currentLicenceAck()).toBeNull();
-    expect((await beginInstall(undefined, true, ["video-detailed"])).ok).toBe(false);
+    expect((await beginInstall(undefined, true, ["video-ltx25"])).ok).toBe(false);
   });
 });
 
@@ -119,7 +119,7 @@ describe("an install that never saw the wizard wording", () => {
     await settle();
     expect(stack.installs).toEqual([]);
     expect((await client.post("/api/install/licences/accept", {})).status).toBe(200);
-    expect(readLicenceAck()).toMatchObject({ by: actor.id, licence_ids: [LTX.id], component_ids: ["ltx-2-3-distilled-mlx"] });
+    expect(readLicenceAck()).toMatchObject({ by: actor.id, licence_ids: [LTX.id], component_ids: ["ltx-2-5-q8-distilled-mlx"] });
     await settle();
     expect(stack.installs).toEqual([]);
     const after = await licenceOverview();
@@ -127,7 +127,7 @@ describe("an install that never saw the wizard wording", () => {
     const again = await (await client.get("/api/repairs")).json() as Array<{ key: string }>;
     expect(again.filter((issue) => issue.key === "licences.accept").length).toBe(0);
     // Detailed video is optional (AIMODELS-DATA-01), so it is no longer one of the recommended extras and the extras button never asks for its licence.
-    expect((await (await client.get("/api/install/licences")).json() as { extras: { ids: string[] } | null }).extras?.ids).not.toContain("video-detailed");
+    expect((await (await client.get("/api/install/licences")).json() as { extras: { ids: string[] } | null }).extras?.ids).not.toContain("video-ltx25");
     expect((await client.post("/api/install/licences/install-extras", {})).status).toBe(202);
     await settle();
     expect(stack.installs).toEqual([]);
@@ -140,7 +140,7 @@ describe("an install that never saw the wizard wording", () => {
     const list = await (await client.get("/api/components")).json() as { components: Array<{ licence: { covered: boolean } }> };
     expect(list.components[0]!.licence.covered).toBe(false);
     await client.post("/api/install/licences/accept", {});
-    expect((await client.post("/api/components/ltx-2-3-distilled-mlx/install", {})).status).toBe(202);
+    expect((await client.post("/api/components/ltx-2-5-q8-distilled-mlx/install", {})).status).toBe(202);
     expect(stack.installs.at(-1)).toMatchObject({ accepted_licence: LTX.id });
   });
 

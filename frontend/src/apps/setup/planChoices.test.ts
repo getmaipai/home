@@ -33,7 +33,7 @@ describe("setup jobs", () => {
     const picks = defaultPicks(jobs, plan);
     expect([...selectedRows(jobs, plan, { ...picks, videos: { on: false, choiceId: "videos.quick" } })]).not.toContain("video");
     const detailed = selectedRows(jobs, plan, { ...picks, videos: { on: true, choiceId: "videos.detailed" } });
-    expect(detailed.has("video-detailed")).toBe(true);
+    expect(detailed.has("video-ltx25")).toBe(true);
     expect(detailed.has("video")).toBe(false);
   });
 

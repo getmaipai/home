@@ -153,7 +153,7 @@ describe("Models and storage", () => {
   });
 
   test("after the accept the extras are one explicit button with the size, never started by themselves", async () => {
-    licenceData = { stack: "ok", terms_version: "v", acknowledged: { by: "p", at: "t", terms_version: "v" }, needs_prompt: false, licences: [], extras: { ids: ["video-detailed"], labels: ["Detailed videos"], bytes: 74e9, size: "74 GB" } };
+    licenceData = { stack: "ok", terms_version: "v", acknowledged: { by: "p", at: "t", terms_version: "v" }, needs_prompt: false, licences: [], extras: { ids: ["video-ltx25"], labels: ["Detailed videos"], bytes: 74e9, size: "74 GB" } };
     const v = mount(overview([]));
     expect(componentsApi.installExtras).not.toHaveBeenCalled();
     fireEvent.click(await v.findByRole("button", { name: "Install the recommended extras (74 GB)" }));

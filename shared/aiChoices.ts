@@ -58,7 +58,7 @@ const CARDS: Array<{ id: AiJobId; rows: string[] }> = [
   { id: "chat", rows: ["chat", "chat-mlx", "reads-pictures"] },
   { id: "pictures", rows: ["pictures", "pictures-ernie", "image-tools", "tool-look"] },
   { id: "picturesdetailed", rows: ["pictures-zimage"] },
-  { id: "videos", rows: ["video", "video-detailed"] },
+  { id: "videos", rows: ["video", "video-ltx25"] },
   { id: "music", rows: ["music", "voice-convert"] },
   { id: "stems", rows: ["stems", "stems-ft", "stems-6s"] },
   { id: "voice", rows: ["voice", "voice-better", "recorded-speech"] },
@@ -294,10 +294,10 @@ export function buildAiCards(input: AiChoicesInput): AiChoicesResult {
       }
       case "videos": {
         const hasQuick = has("video");
-        const hasDetailed = has("video-detailed");
+        const hasDetailed = has("video-ltx25");
         const preferDetailed = settings.videoQuality === "detailed" && hasDetailed;
         if (hasQuick) specs.push({ id: "videos.quick", job: "videos", kind: "radio", row: rows.get("video")!, current: !preferDetailed, recommended: true, setting: { key: "generation.video_tier", value: "standard" } });
-        if (hasDetailed) specs.push({ id: "videos.detailed", job: "videos", kind: "radio", row: rows.get("video-detailed")!, current: preferDetailed, recommended: !hasQuick, setting: { key: "generation.video_tier", value: "boost" } });
+        if (hasDetailed) specs.push({ id: "videos.detailed", job: "videos", kind: "radio", row: rows.get("video-ltx25")!, current: preferDetailed, recommended: !hasQuick, setting: { key: "generation.video_tier", value: "boost" } });
         break;
       }
       case "music": {

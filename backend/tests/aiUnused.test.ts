@@ -175,7 +175,7 @@ test("totalBytes is the sum, and nothing is listed when nothing is unused", () =
   const p = plan([
     { id: "pictures-ernie", need: "recommended", model_ids: ["ernie-m"] },
     { id: "pictures-zimage", model_ids: ["zimage-m"] },
-    { id: "video-detailed", model_ids: ["ltx-m"] },
+    { id: "video-ltx25", model_ids: ["ltx-m"] },
   ]);
   const result = findUnused(unusedInput(p, [
     part({ id: "ernie-m", size_bytes: 100 }),
@@ -216,12 +216,12 @@ test("real p128 plan with everything installed and Quick chosen: Detailed pictur
   const input = unusedInput(p, components, { pictureQuickModel: "ernie", pictureDetailedEnabled: false, videoQuality: "quick", musicEnabled: true });
   const result = findUnused(input);
   const zimage = p.rows.find((row) => row.id === "pictures-zimage")!;
-  const ltx = p.rows.find((row) => row.id === "video-detailed")!;
+  const ltx = p.rows.find((row) => row.id === "video-ltx25")!;
   const klein = p.rows.find((row) => row.id === "pictures")!;
-  const extras = ["music-boost", "music-max", "video-ltx25", "video-ltx25-max", "pictures-qwen", "align"].map((id) => p.rows.find((row) => row.id === id)!);
+  const extras = ["music-boost", "music-max", "video-ltx25-max", "video-mask", "pictures-qwen", "align"].map((id) => p.rows.find((row) => row.id === id)!);
   const expectedIds = [...zimage.model_ids, ...ltx.model_ids, ...extras.flatMap((row) => row.model_ids)];
   expect(result.items.map((item) => item.id).sort()).toEqual([...expectedIds].sort());
-  // Music Boost and Max, LTX-2.5 and Best pictures (Qwen-Image, the Max pictures row), and the lyric timing aid are offered by no card yet and are unused too; with no group on these test parts they carry the generic name.
+  // Music Boost and Max, the Max LTX-2.5 video row, subject masks and Best pictures (Qwen-Image, the Max pictures row), and the lyric timing aid are offered by no card yet and are unused too; with no group on these test parts they carry the generic name.
   const named = result.items.filter((item) => !extras.some((row) => row.model_ids.includes(item.id)));
   expect(named.every((item) => item.name === "Detailed pictures" || item.name === "Boost videos")).toBe(true);
   expect(named.every((item) => item.reason === "You turned Detailed pictures off and no saved style needs this." || item.reason === "You use Standard videos and no saved style needs this.")).toBe(true);
