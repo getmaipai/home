@@ -368,6 +368,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/answerImages/select.ts` | __setAnswerImageDepsForTests, mergeDepicts, selectAnswerImages |
 | `backend/src/lib/answerImages/turn.ts` | SHOW_IMAGES_TOOL_ID, ANSWER_IMAGES_BUDGET_MS, ANSWER_IMAGES_LIBRARY_BUDGET_MS, SHOW_IMAGES_MAX_SUBJECTS, showImagesNames, showImagesResultLine |
 | `backend/src/lib/answerImages/wikimedia.ts` | wikimediaFetchJson, entityId, claimText, kindScore, wikimediaLiveBlocked, resolveWikimediaSubject |
+| `backend/src/lib/apiErrorCopy.ts` | API_ERROR_LINES, apiError |
 | `backend/src/lib/apiKeys.ts` | API_KEY_REFUSAL, CreateApiKeyInput, keyOriginOf, constantTimeHashEqual, codeAdmission, mayHoldDiagnoseKey |
 | `backend/src/lib/appHelperClient.ts` | helperSocketPath, listHelperApps, askHelper, quitHelperApp, reopenHelperApp |
 | `backend/src/lib/appHelperInstall.ts` | helperScriptPath, canInstallHelper, installHelper |

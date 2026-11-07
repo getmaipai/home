@@ -920,7 +920,7 @@ msgid "{value}Ends {dateText}. Last used {dateText2}. Ends in …{hint}"
 msgstr "{value}Termina el {dateText}. Último uso: {dateText2}. Termina en… {hint}"
 
 #. js-lingui-explicit-id
-#: src/shell/InstallDock.tsx:174
+#: src/shell/InstallDock.tsx:175
 #, needs-review
 msgid "+{count} more"
 msgstr "+{count} más"
@@ -1459,7 +1459,7 @@ msgid "Add a phrase"
 msgstr "Añadir una frase"
 
 #. js-lingui-explicit-id
-#: src/shell/MediaPickerDialog.tsx:53
+#: src/shell/MediaPickerDialog.tsx:54
 #, needs-review
 msgid "Add a picture"
 msgstr "Añade una imagen"
@@ -1546,7 +1546,7 @@ msgid "Add the music"
 msgstr "Añadir la música"
 
 #. js-lingui-explicit-id
-#: src/shell/MediaPickerDialog.tsx:97
+#: src/shell/MediaPickerDialog.tsx:98
 #, needs-review
 msgid "Add this line"
 msgstr "Añade esta línea"
@@ -1588,7 +1588,7 @@ msgid "Added to this home"
 msgstr "Añadido a este hogar"
 
 #. js-lingui-explicit-id
-#: src/shell/MediaPickerDialog.tsx:53
+#: src/shell/MediaPickerDialog.tsx:54
 #, needs-review
 msgid "Adding"
 msgstr "Añadiendo"
@@ -2466,6 +2466,11 @@ msgstr "Preguntar"
 #, needs-review
 msgid "Ask a parent to choose your voice."
 msgstr "Pídele a un adulto que elija tu voz."
+
+#. js-lingui-explicit-id
+#: ../backend/src/lib/apiErrorCopy.ts:43
+msgid "api.minor.guest_stay_ask_adult"
+msgstr ""
 
 #. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:1389
@@ -3907,6 +3912,12 @@ msgid "Check the engine computer"
 msgstr "Comprobar el equipo del motor"
 
 #. js-lingui-explicit-id
+#: ../backend/src/lib/apiErrorCopy.ts:53
+#, needs-review
+msgid "api.next.invalid_input"
+msgstr "Revisa los campos marcados y envía de nuevo."
+
+#. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:1154
 #, needs-review
 msgid "setting.search.wayback_fallback.help"
@@ -3923,6 +3934,12 @@ msgstr "Revisa qué es y luego descárgalo. Al inicio, solo lo ven los administr
 #, needs-review
 msgid "setting.status.internet_probe.enabled.label"
 msgstr "Comprobar si internet está accesible"
+
+#. js-lingui-explicit-id
+#: src/lib/useHubMutation.ts:16
+#, needs-review
+msgid "Check your connection and try again."
+msgstr "Revisa tu conexión e inténtalo de nuevo."
 
 #. js-lingui-explicit-id
 #: src/apps/settings/RobotPasswordSection.tsx:151
@@ -4036,6 +4053,12 @@ msgid "Choose a clip"
 msgstr "Elige un clip"
 
 #. js-lingui-explicit-id
+#: ../backend/src/lib/apiErrorCopy.ts:35
+#, needs-review
+msgid "api.error.companion_choose"
+msgstr "Elige una compañía de la lista."
+
+#. js-lingui-explicit-id
 #: src/shell/pages/status/StatusBoard.tsx:110
 #, needs-review
 msgid "Choose a date"
@@ -4048,7 +4071,7 @@ msgid "Choose a look for this browser. It does not change your personal setting.
 msgstr "Elige un aspecto para este navegador. No cambia tu configuración personal."
 
 #. js-lingui-explicit-id
-#: src/shell/MediaPickerDialog.tsx:37
+#: src/shell/MediaPickerDialog.tsx:38
 #, needs-review
 msgid "Choose a PNG, JPEG or WebP picture."
 msgstr "Elige una imagen en PNG, JPEG o WebP."
@@ -4677,6 +4700,12 @@ msgid "Coding is waiting for its helper to start. The Status page shows what is 
 msgstr "Coding espera a que su asistente inicie. La página de estado muestra lo que sucede."
 
 #. js-lingui-explicit-id
+#: ../backend/src/lib/apiErrorCopy.ts:34
+#, needs-review
+msgid "api.error.coding_mode_is_max"
+msgstr "El modo Coding ahora es Max chat. Elige Max en un chat o conecta una app de coding, y Home cargará el modelo grande por ti."
+
+#. js-lingui-explicit-id
 #: src/apps/settings/CodingSettings.tsx:53
 #, needs-review
 msgid "Coding mode is on. One large model answers chat, search and coding. Pictures, videos and songs wait until you switch back to Normal."
@@ -5118,6 +5147,18 @@ msgid "Could not change the pause setting."
 msgstr "No se pudo cambiar la configuración de pausa."
 
 #. js-lingui-explicit-id
+#: src/lib/hubMutationVerbs.ts:6
+#, needs-review
+msgid "Could not change the timer."
+msgstr "No se pudo cambiar el temporizador."
+
+#. js-lingui-explicit-id
+#: src/lib/hubMutationVerbs.ts:7
+#, needs-review
+msgid "Could not change this chat's companion."
+msgstr "No se pudo cambiar la compañía de este chat."
+
+#. js-lingui-explicit-id
 #: src/apps/settings/UsersSection.tsx:461
 #, needs-review
 msgid "Could not check {name}'s files. Their files will be deleted with them unless someone else can see them."
@@ -5146,6 +5187,12 @@ msgstr "No pudimos revisar la verificación en dos pasos. Revisa tu conexión e 
 #, needs-review
 msgid "Could not clear the note."
 msgstr "No se pudo borrar la nota."
+
+#. js-lingui-explicit-id
+#: src/lib/hubMutationVerbs.ts:8
+#, needs-review
+msgid "Could not complete engine setup."
+msgstr "No se pudo completar la configuración del motor."
 
 #. js-lingui-explicit-id
 #: src/shell/AmbientCompanionPane.tsx:292
@@ -5191,6 +5238,18 @@ msgstr "No se pudo eliminar ese comando."
 #, needs-review
 msgid "Could not delete that project. Try again."
 msgstr "No se pudo borrar ese proyecto. Inténtalo de nuevo."
+
+#. js-lingui-explicit-id
+#: src/lib/hubMutationVerbs.ts:9
+#, needs-review
+msgid "Could not delete the alarm."
+msgstr "No se pudo eliminar la alarma."
+
+#. js-lingui-explicit-id
+#: src/lib/hubMutationVerbs.ts:10
+#, needs-review
+msgid "Could not delete the quick timer."
+msgstr "No se pudo eliminar el temporizador rápido."
 
 #. js-lingui-explicit-id
 #: src/shell/pages/ChatPage.tsx:930
@@ -5569,6 +5628,12 @@ msgid "Could not revoke that."
 msgstr "No se pudo revocar eso."
 
 #. js-lingui-explicit-id
+#: src/lib/hubMutationVerbs.ts:11
+#, needs-review
+msgid "Could not revoke the link key."
+msgstr "No se pudo revocar la clave de enlace."
+
+#. js-lingui-explicit-id
 #: src/apps/settings/CodingSettings.tsx:233
 #, needs-review
 msgid "Could not revoke this key."
@@ -5590,6 +5655,12 @@ msgstr ""
 #, needs-review
 msgid "Could not run a backup."
 msgstr "No se pudo ejecutar una copia de seguridad."
+
+#. js-lingui-explicit-id
+#: src/lib/hubMutationVerbs.ts:12
+#, needs-review
+msgid "Could not save access."
+msgstr "No se pudo guardar el acceso."
 
 #. js-lingui-explicit-id
 #: src/apps/settings/VoiceManagerSection.tsx:65
@@ -5636,10 +5707,22 @@ msgid "Could not save the AI companions setting."
 msgstr "No se pudo guardar la configuración de las compañías de IA."
 
 #. js-lingui-explicit-id
+#: src/lib/hubMutationVerbs.ts:13
+#, needs-review
+msgid "Could not save the alarm."
+msgstr "No se pudo guardar la alarma."
+
+#. js-lingui-explicit-id
 #: src/apps/settings/AiGlance.tsx:101
 #, needs-review
 msgid "Could not save the levels. Check that Home is running, then try again."
 msgstr "No se pudieron guardar los niveles. Comprueba que Home está en ejecución e inténtalo de nuevo."
+
+#. js-lingui-explicit-id
+#: src/lib/hubMutationVerbs.ts:14
+#, needs-review
+msgid "Could not save the quick timer."
+msgstr "No se pudo guardar el temporizador rápido."
 
 #. js-lingui-explicit-id
 #: src/shell/pages/ChatPage.tsx:320
@@ -5670,6 +5753,12 @@ msgstr "No se pudo guardar esto. Revisa tu conexión e inténtalo de nuevo."
 #, needs-review
 msgid "Could not save those changes."
 msgstr "No se pudieron guardar esos cambios."
+
+#. js-lingui-explicit-id
+#: src/lib/hubMutationVerbs.ts:15
+#, needs-review
+msgid "Could not save your appearance."
+msgstr "No se pudo guardar tu apariencia."
 
 #. js-lingui-explicit-id
 #: src/shell/pages/status/StatusBoard.tsx:87
@@ -5703,6 +5792,12 @@ msgstr ""
 #, needs-review
 msgid "Could not sign out that device."
 msgstr "No se pudo cerrar la sesión en ese dispositivo."
+
+#. js-lingui-explicit-id
+#: src/lib/hubMutationVerbs.ts:16
+#, needs-review
+msgid "Could not skip the next alarm."
+msgstr "No se pudo saltar la próxima alarma."
 
 #. js-lingui-explicit-id
 #: src/shell/pages/status/StatusComponents.tsx:107
@@ -5758,12 +5853,36 @@ msgid "Could not test that part. Reload the page and try again."
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/lib/hubMutationVerbs.ts:17
+#, needs-review
+msgid "Could not test the connection."
+msgstr "No se pudo probar la conexión."
+
+#. js-lingui-explicit-id
+#: src/lib/hubMutationVerbs.ts:18
+#, needs-review
+msgid "Could not update reminders."
+msgstr "No se pudieron actualizar los recordatorios."
+
+#. js-lingui-explicit-id
 #: src/apps/chat/chatProjects.tsx:103
 #: src/shell/pages/ChatPage.tsx:1206
 #: src/shell/pages/ChatPage.tsx:1216
 #, needs-review
 msgid "Could not update that project. Try again."
 msgstr "No se pudo actualizar ese proyecto. Inténtalo de nuevo."
+
+#. js-lingui-explicit-id
+#: src/lib/hubMutationVerbs.ts:19
+#, needs-review
+msgid "Could not update the alarm."
+msgstr "No se pudo actualizar la alarma."
+
+#. js-lingui-explicit-id
+#: src/lib/hubMutationVerbs.ts:20
+#, needs-review
+msgid "Could not update the reminder."
+msgstr "No se pudo actualizar el recordatorio."
 
 #. js-lingui-explicit-id
 #: src/shell/pages/UpdatesPage.tsx:185
@@ -6291,7 +6410,7 @@ msgstr "Imágenes detalladas"
 #: src/apps/settings/ModelsSection.tsx:153
 #: src/apps/settings/styles/StyleEditor.tsx:152
 #: src/shell/components/SearchTestResultBody.tsx:23
-#: src/shell/InstallStrip.tsx:121
+#: src/shell/InstallStrip.tsx:122
 #, needs-review
 msgid "Details"
 msgstr "Detalles"
@@ -8465,6 +8584,18 @@ msgid "setting.resources.close_apps.mode.option.automatic"
 msgstr "Home cierra solo las apps de tu lista Siempre cerrar y luego las vuelve a abrir."
 
 #. js-lingui-explicit-id
+#: ../backend/src/lib/apiErrorCopy.ts:46
+#, needs-review
+msgid "api.error.house_controls_off"
+msgstr "Los controles de Home están apagados para este hogar. Cambia la configuración de House control para continuar."
+
+#. js-lingui-explicit-id
+#: ../backend/src/lib/apiErrorCopy.ts:45
+#, needs-review
+msgid "api.error.house_controls_unavailable"
+msgstr "Los controles de Home no están disponibles para este altavoz. Inicia sesión como miembro del hogar."
+
+#. js-lingui-explicit-id
 #: src/apps/settings/HostTuneSettings.tsx:27
 #, needs-review
 msgid "Home could not change that setting. Try again."
@@ -8717,6 +8848,12 @@ msgstr "Home no pudo iniciar los extras. Comprueba que el motor está activo e i
 #, needs-review
 msgid "Home downloads these parts to this computer. Home does not install a coding app."
 msgstr "Home descarga estas partes a esta computadora. Home no instala una aplicación de código."
+
+#. js-lingui-explicit-id
+#: ../backend/src/lib/apiErrorCopy.ts:50
+#, needs-review
+msgid "api.error.internal"
+msgstr "Home tuvo un problema inesperado."
 
 #. js-lingui-explicit-id
 #: src/apps/settings/CodingSettings.tsx:228
@@ -9774,7 +9911,7 @@ msgid "Installing, this can take a minute or two"
 msgstr "Instalando, esto puede tomar un minuto o dos"
 
 #. js-lingui-explicit-id
-#: src/shell/InstallDock.tsx:186
+#: src/shell/InstallDock.tsx:187
 #, needs-review
 msgid "Installs in progress"
 msgstr "Instalaciones en curso"
@@ -11323,7 +11460,7 @@ msgid "Loading weather"
 msgstr "Cargando el clima"
 
 #. js-lingui-explicit-id
-#: src/shell/MediaPickerDialog.tsx:101
+#: src/shell/MediaPickerDialog.tsx:102
 #, needs-review
 msgid "Loading your {noun}"
 msgstr "Cargando tu {noun}"
@@ -11341,7 +11478,7 @@ msgid "Loading your keys"
 msgstr "Cargando tus claves"
 
 #. js-lingui-explicit-id
-#: src/shell/MediaPickerDialog.tsx:56
+#: src/shell/MediaPickerDialog.tsx:57
 #, needs-review
 msgid "Loading your pictures"
 msgstr "Cargando tus fotos"
@@ -13049,6 +13186,12 @@ msgid "No one in this household has that profile."
 msgstr "Nadie en este hogar tiene ese perfil."
 
 #. js-lingui-explicit-id
+#: ../backend/src/lib/apiErrorCopy.ts:14
+#, needs-review
+msgid "api.error.no_secret_set"
+msgstr "No hay PIN ni contraseña establecida para este perfil"
+
+#. js-lingui-explicit-id
 #: src/shell/pages/status/statusHistoryFormat.ts:40
 #, needs-review
 msgid "No problems"
@@ -13161,6 +13304,42 @@ msgstr "Aún no hay estilos. Explora los estilos para encontrar uno o añade uno
 #, needs-review
 msgid "No successful probe yet"
 msgstr "Aún no hay sondas exitosas"
+
+#. js-lingui-explicit-id
+#: ../backend/src/lib/apiErrorCopy.ts:40
+#, needs-review
+msgid "api.error.coding_key_gone"
+msgstr "No existe esa clave de coding. Recarga la lista e inténtalo de nuevo."
+
+#. js-lingui-explicit-id
+#: ../backend/src/lib/apiErrorCopy.ts:38
+#, needs-review
+msgid "api.error.setting_key_gone"
+msgstr "No existe esa clave. Recarga la lista e inténtalo de nuevo."
+
+#. js-lingui-explicit-id
+#: ../backend/src/lib/apiErrorCopy.ts:25
+#, needs-review
+msgid "api.error.no_such_passkey"
+msgstr "No existe esa passkey"
+
+#. js-lingui-explicit-id
+#: ../backend/src/lib/apiErrorCopy.ts:39
+#, needs-review
+msgid "api.error.setting_person_gone"
+msgstr "No existe esa persona. Recarga la lista de personas e inténtalo de nuevo."
+
+#. js-lingui-explicit-id
+#: ../backend/src/lib/apiErrorCopy.ts:24
+#, needs-review
+msgid "api.error.no_such_profile"
+msgstr "No existe ese perfil"
+
+#. js-lingui-explicit-id
+#: ../backend/src/lib/apiErrorCopy.ts:27
+#, needs-review
+msgid "api.error.no_such_session"
+msgstr "No existe esa sesión"
 
 #. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:608
@@ -14120,6 +14299,7 @@ msgstr "Un momento. Vuelvo pronto."
 
 #. js-lingui-explicit-id
 #: src/apps/chat/chatModelAdapter.ts:955
+#: src/lib/hubReachability.ts:12
 #, needs-review
 msgid "One moment. Home will be back in about a minute."
 msgstr "Un momento. Home volverá en un minuto."
@@ -15456,6 +15636,12 @@ msgid "area.Profile and sign-in"
 msgstr "Perfil e inicio de sesión"
 
 #. js-lingui-explicit-id
+#: ../backend/src/lib/apiErrorCopy.ts:12
+#, needs-review
+msgid "api.error.profile_not_found"
+msgstr "Perfil no encontrado"
+
+#. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:193
 #, needs-review
 msgid "setting.companions.ambient_bot.help"
@@ -16077,7 +16263,7 @@ msgid "Repair issues"
 msgstr "Problemas de reparación"
 
 #. js-lingui-explicit-id
-#: src/shell/InstallDock.tsx:205
+#: src/shell/InstallDock.tsx:206
 #: src/shell/pageHeaderTitle.tsx:98
 #: src/shell/pages/RepairsPage.tsx:59
 #: src/shell/Routes.tsx:152
@@ -16690,6 +16876,12 @@ msgid "Roles"
 msgstr "Roles"
 
 #. js-lingui-explicit-id
+#: ../backend/src/lib/apiErrorCopy.ts:44
+#, needs-review
+msgid "api.error.house_rooms_unavailable"
+msgstr "Las habitaciones no están disponibles para este altavoz. Inicia sesión como miembro del hogar."
+
+#. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:276
 #, needs-review
 msgid "setting.ease.spacing.option_label.roomy"
@@ -16982,7 +17174,7 @@ msgid "Saving…"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/MediaPickerDialog.tsx:90
+#: src/shell/MediaPickerDialog.tsx:91
 #, needs-review
 msgid "Say a line"
 msgstr "Di una línea"
@@ -17686,7 +17878,7 @@ msgid "Setting up {title}…"
 msgstr "Configurando {title}…"
 
 #. js-lingui-explicit-id
-#: src/shell/InstallDock.tsx:55
+#: src/shell/InstallDock.tsx:56
 #, needs-review
 msgid "Setting up your AI"
 msgstr "Configurando tu IA"
@@ -18747,6 +18939,12 @@ msgid "Start over"
 msgstr ""
 
 #. js-lingui-explicit-id
+#: ../backend/src/lib/apiErrorCopy.ts:16
+#, needs-review
+msgid "api.error.totp_restart_sign_in"
+msgstr "Vuelve a iniciar sesión con tu PIN o passkey."
+
+#. js-lingui-explicit-id
 #: ../backend/src/lib/failureCopy.ts:353
 #, needs-review
 msgid "failure.advice.stopped.next_step"
@@ -19410,10 +19608,34 @@ msgid "setting.ease.contrast.option.more"
 msgstr "El texto destaca mucho."
 
 #. js-lingui-explicit-id
+#: ../backend/src/lib/apiErrorCopy.ts:41
+#, needs-review
+msgid "api.error.backup_unreadable"
+msgstr "Esa copia de seguridad no se pudo leer. Prueba con otra."
+
+#. js-lingui-explicit-id
 #: src/apps/settings/TwoStepSignInSection.tsx:38
 #, needs-review
 msgid "That code did not work. Check it and try again."
 msgstr "Ese código no funcionó. Revísalo e inténtalo de nuevo."
+
+#. js-lingui-explicit-id
+#: ../backend/src/lib/apiErrorCopy.ts:17
+#, needs-review
+msgid "api.error.totp_code_mismatch"
+msgstr "Ese código no coincide."
+
+#. js-lingui-explicit-id
+#: ../backend/src/lib/apiErrorCopy.ts:18
+#, needs-review
+msgid "api.error.totp_enroll_mismatch"
+msgstr "Ese código no coincide. Revisa la hora de tu app de autenticación e inténtalo de nuevo."
+
+#. js-lingui-explicit-id
+#: ../backend/src/lib/apiErrorCopy.ts:37
+#, needs-review
+msgid "api.error.companion_unavailable"
+msgstr "Esa compañía no está disponible para ti. Elige otra de la lista."
 
 #. js-lingui-explicit-id
 #: src/apps/settings/AwaySessionsSection.tsx:51
@@ -19472,6 +19694,11 @@ msgid "failure.stopped.adult"
 msgstr "Esa respuesta no terminó. Envíala de nuevo en un momento."
 
 #. js-lingui-explicit-id
+#: ../backend/src/lib/apiErrorCopy.ts:36
+msgid "api.error.companion_robot_unavailable"
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/apps/settings/DevicesSection.tsx:229
 #: src/apps/settings/DevicesSection.tsx:230
 #, needs-review
@@ -19494,6 +19721,12 @@ msgstr ""
 #, needs-review
 msgid "failure.slow.adult"
 msgstr "Tardó demasiado. Envíalo de nuevo."
+
+#. js-lingui-explicit-id
+#: ../backend/src/lib/apiErrorCopy.ts:33
+#, needs-review
+msgid "api.error.voice_not_on_hub"
+msgstr "Esa voz no está en este hub. Elige una de la lista."
 
 #. js-lingui-explicit-id
 #: ../backend/src/lib/failureCopy.ts:133
@@ -19856,7 +20089,7 @@ msgid "The last mode change did not finish: {reason}"
 msgstr "El último cambio de modo no terminó: {reason}"
 
 #. js-lingui-explicit-id
-#: src/shell/MediaPickerDialog.tsx:96
+#: src/shell/MediaPickerDialog.tsx:97
 #, needs-review
 msgid "The line to say"
 msgstr "La línea para decir"
@@ -20125,6 +20358,11 @@ msgstr "La respuesta falló y el motor no dijo por qué."
 #, needs-review
 msgid "failure.advice.context_too_large.cause"
 msgstr "La solicitud era demasiado grande para la ventana de contexto del motor de chat."
+
+#. js-lingui-explicit-id
+#: ../backend/src/lib/apiErrorCopy.ts:31
+msgid "api.error.robot_no_answer"
+msgstr ""
 
 #. js-lingui-explicit-id
 #: src/apps/settings/StackChanInstallDialog.tsx:14
@@ -20627,6 +20865,18 @@ msgid "This is the only key. The tool lines below use this same key."
 msgstr "Esta es la única clave. Las líneas de herramienta de abajo usan esta misma clave."
 
 #. js-lingui-explicit-id
+#: ../backend/src/lib/apiErrorCopy.ts:28
+#, needs-review
+msgid "api.error.trash_restore_missing"
+msgstr "No se puede restaurar este elemento desde la papelera. Actualiza la papelera e inténtalo de nuevo."
+
+#. js-lingui-explicit-id
+#: ../backend/src/lib/apiErrorCopy.ts:29
+#, needs-review
+msgid "api.error.trash_item_missing"
+msgstr "Este elemento no está disponible en la papelera. Actualiza la papelera e inténtalo de nuevo."
+
+#. js-lingui-explicit-id
 #: src/apps/settings/CodingSettings.tsx:231
 #, needs-review
 msgid "This key is shown once."
@@ -20663,6 +20913,12 @@ msgid "setting.storage.person_quota_gb.label"
 msgstr "Cuota de almacenamiento de esta persona (GB)"
 
 #. js-lingui-explicit-id
+#: ../backend/src/lib/apiErrorCopy.ts:13
+#, needs-review
+msgid "api.error.profile_needs_secret"
+msgstr "Este perfil necesita su PIN, contraseña o passkey"
+
+#. js-lingui-explicit-id
 #: src/shell/pages/TrashPage.tsx:63
 #, needs-review
 msgid "This removes the item from Home for good. You cannot undo this."
@@ -20683,6 +20939,16 @@ msgstr "Esto reemplaza la nota que todos pueden ver ahora."
 #. js-lingui-explicit-id
 #: src/apps/settings/HouseholdRobotsSection.tsx:189
 msgid "This revokes its enrollment code and deletes its saved firmware backup."
+msgstr ""
+
+#. js-lingui-explicit-id
+#: ../backend/src/lib/apiErrorCopy.ts:32
+msgid "api.error.robot_part_unreported"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: ../backend/src/lib/apiErrorCopy.ts:30
+msgid "api.error.robot_offline"
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -20829,6 +21095,18 @@ msgstr "Mañana, {range}"
 #, needs-review
 msgid "Tonight"
 msgstr "Esta noche"
+
+#. js-lingui-explicit-id
+#: ../backend/src/lib/apiErrorCopy.ts:15
+#, needs-review
+msgid "api.error.attempts_locked"
+msgstr "Demasiados intentos"
+
+#. js-lingui-explicit-id
+#: ../backend/src/lib/apiErrorCopy.ts:23
+#, needs-review
+msgid "api.error.passkey_rate_limited"
+msgstr "Demasiadas solicitudes. Espera un momento e inténtalo de nuevo."
 
 #. js-lingui-explicit-id
 #: src/apps/settings/SignInSecretSection.tsx:50
@@ -21027,8 +21305,8 @@ msgstr "Frase de activación, p. ej. \"noche de cine\""
 #: src/apps/settings/VoiceBrowserSection.tsx:93
 #: src/apps/settings/VoiceManagerSection.tsx:98
 #: src/shell/AmbientCompanionPane.tsx:255
-#: src/shell/InstallDock.tsx:204
-#: src/shell/InstallStrip.tsx:95
+#: src/shell/InstallDock.tsx:205
+#: src/shell/InstallStrip.tsx:96
 #: src/shell/library/LibraryUploads.tsx:75
 #: src/shell/pages/settings/WebSearchSettings.tsx:103
 #, needs-review
@@ -21046,6 +21324,12 @@ msgstr "Inténtalo de nuevo: {label}"
 #, needs-review
 msgid "Try again."
 msgstr "Intenta de nuevo."
+
+#. js-lingui-explicit-id
+#: ../backend/src/lib/apiErrorCopy.ts:51
+#, needs-review
+msgid "api.next.internal"
+msgstr "Inténtalo de nuevo. Si sigue pasando, abre Reparaciones."
 
 #. js-lingui-explicit-id
 #: ../backend/src/lib/failureCopy.ts:368
@@ -21088,6 +21372,12 @@ msgstr "Activa o desactiva Boost o Max por trabajo en la página de IA y modelos
 #, needs-review
 msgid "Turn coding on"
 msgstr "Activar código"
+
+#. js-lingui-explicit-id
+#: ../backend/src/lib/apiErrorCopy.ts:21
+#, needs-review
+msgid "api.next.totp_already_on"
+msgstr "Apágalo primero con un código y luego configúralo de nuevo."
 
 #. js-lingui-explicit-id
 #: src/apps/settings/TwoStepSignInSection.tsx:52
@@ -21285,6 +21575,12 @@ msgid "Two-step sign-in"
 msgstr "Inicio de sesión en dos pasos"
 
 #. js-lingui-explicit-id
+#: ../backend/src/lib/apiErrorCopy.ts:20
+#, needs-review
+msgid "api.error.totp_already_on"
+msgstr "La verificación en dos pasos ya está activada."
+
+#. js-lingui-explicit-id
 #: src/apps/settings/TwoStepSignInSection.tsx:52
 #, needs-review
 msgid "Two-step sign-in is on."
@@ -21309,7 +21605,7 @@ msgid "Type it again"
 msgstr "Escríbelo otra vez"
 
 #. js-lingui-explicit-id
-#: src/shell/MediaPickerDialog.tsx:96
+#: src/shell/MediaPickerDialog.tsx:97
 #, needs-review
 msgid "Type what the voice should say."
 msgstr "Escribe lo que debe decir la voz."
@@ -22492,7 +22788,7 @@ msgid "What this computer can do"
 msgstr "Lo que este ordenador puede hacer"
 
 #. js-lingui-explicit-id
-#: src/shell/MediaPickerDialog.tsx:89
+#: src/shell/MediaPickerDialog.tsx:90
 #, needs-review
 msgid "What to add"
 msgstr "Qué añadir"
@@ -23094,6 +23390,18 @@ msgid "You can get {value} back later. It is a download of the same size, {joinN
 msgstr "Puedes recuperar {value} más tarde. Es una descarga del mismo tamaño, {joinNames}, y tus ajustes se mantienen. Las copias de seguridad no se ven afectadas: contienen los datos y ajustes de tu familia, y los modelos no forman parte de ellas."
 
 #. js-lingui-explicit-id
+#: ../backend/src/lib/apiErrorCopy.ts:26
+#, needs-review
+msgid "api.error.sessions_own_only"
+msgstr "Solo puedes ver tus propias sesiones."
+
+#. js-lingui-explicit-id
+#: ../backend/src/lib/apiErrorCopy.ts:42
+#, needs-review
+msgid "api.error.cannot_disable_self"
+msgstr "No puedes desactivar tu propio perfil"
+
+#. js-lingui-explicit-id
 #: src/apps/settings/CodingSettings.tsx:222
 #, needs-review
 msgid "You cannot make a new key with your current Coding access."
@@ -23117,7 +23425,7 @@ msgid "you chose"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/MediaPickerDialog.tsx:102
+#: src/shell/MediaPickerDialog.tsx:103
 #, needs-review
 msgid "You have no clips yet. Make one on the Create page."
 msgstr "No tienes clips todavía. Crea uno en la página Crear."
@@ -23135,7 +23443,7 @@ msgid "You have no finished videos to cut yet. Make a video in chat first, then 
 msgstr "Aún no tienes videos terminados para cortar. Crea un video en el chat primero. Luego vuelve."
 
 #. js-lingui-explicit-id
-#: src/shell/MediaPickerDialog.tsx:57
+#: src/shell/MediaPickerDialog.tsx:58
 #, needs-review
 msgid "You have no pictures in your Library yet. Add one above."
 msgstr "No tienes imágenes en tu Biblioteca todavía. Añade una arriba."
@@ -23147,7 +23455,7 @@ msgid "You have no PIN or password yet."
 msgstr "Aún no tienes PIN ni contraseña."
 
 #. js-lingui-explicit-id
-#: src/shell/MediaPickerDialog.tsx:102
+#: src/shell/MediaPickerDialog.tsx:103
 #, needs-review
 msgid "You have no songs in your Library yet. Make one in Music."
 msgstr "No tienes canciones en tu Biblioteca todavía. Crea una en Música."
@@ -23189,13 +23497,13 @@ msgid "setting.notifications.browser.enabled.help"
 msgstr "Verás una notificación emergente cuando MaiPai necesite atención, mientras MaiPai está abierto. No te llegará cuando MaiPai esté cerrado."
 
 #. js-lingui-explicit-id
-#: src/shell/MediaPickerDialog.tsx:103
+#: src/shell/MediaPickerDialog.tsx:104
 #, needs-review
 msgid "Your {noun}"
 msgstr "Tu {noun}"
 
 #. js-lingui-explicit-id
-#: src/shell/MediaPickerDialog.tsx:101
+#: src/shell/MediaPickerDialog.tsx:102
 #, needs-review
 msgid "Your {noun} did not load. Close this and try again."
 msgstr "Tu {noun} no se cargó. Cierra esto e inténtalo de nuevo."
@@ -23327,13 +23635,13 @@ msgid "your pick"
 msgstr "tu elección"
 
 #. js-lingui-explicit-id
-#: src/shell/MediaPickerDialog.tsx:58
+#: src/shell/MediaPickerDialog.tsx:59
 #, needs-review
 msgid "Your pictures"
 msgstr "Tus imágenes"
 
 #. js-lingui-explicit-id
-#: src/shell/MediaPickerDialog.tsx:56
+#: src/shell/MediaPickerDialog.tsx:57
 #, needs-review
 msgid "Your pictures did not load. Close this and try again."
 msgstr "Tus imágenes no se cargaron. Cierra esto e inténtalo de nuevo."
@@ -23363,7 +23671,7 @@ msgid "Your song"
 msgstr "Tu canción"
 
 #. js-lingui-explicit-id
-#: src/shell/MediaPickerDialog.tsx:91
+#: src/shell/MediaPickerDialog.tsx:92
 #, needs-review
 msgid "Your songs"
 msgstr "Tus canciones"

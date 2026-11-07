@@ -9,6 +9,7 @@ import { api, ApiError, type HomeJobView, type InstallStatusView } from "@/lib/a
 import { InstallDockRow } from "@/shell/InstallDockRow";
 import { installActive, useInstallStatus, useJobs } from "@/lib/useInstallStatus";
 import { installLabel, installWords, speedLine, timeLeft, type InstallWords } from "@/shell/installWords";
+import { localizedApiMessage, localizedApiNext } from "@/lib/apiErrorLines";
 
 const ChevronDown = getIcon("chevron-down");
 
@@ -151,7 +152,7 @@ export function InstallDock({ admin, read: readProp, readJobs: readJobsProp, ret
   const onRetry = () => {
     setRetryError(null);
     retry().catch((reason: unknown) => {
-      const words = reason instanceof ApiError ? [reason.message, reason.next].filter(Boolean).join(" ") : "";
+      const words = reason instanceof ApiError ? [localizedApiMessage(reason), localizedApiNext(reason)].filter(Boolean).join(" ") : "";
       setRetryError(words || "Home couldn't restart the install. Check that this computer is online, then press Try again.");
     });
   };

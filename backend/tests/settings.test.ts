@@ -53,7 +53,7 @@ describe("PUT /api/settings robot.voice.id", () => {
       expect(fullId.status).toBe(200);
       const unknown = await owner.put("/api/settings", { scope: `device:${deviceId}`, key: "robot.voice.id", value: "not-installed" });
       expect(unknown.status).toBe(400);
-      expect(await unknown.json()).toEqual({ error: "That voice is not on this hub. Choose one from the list." });
+      expect(await unknown.json()).toEqual({ error: "That voice is not on this hub. Choose one from the list.", code: "voice_not_on_hub" });
     } finally {
       fixture.client.voices = originalVoices;
       fixture.stop();

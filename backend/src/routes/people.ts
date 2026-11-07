@@ -19,6 +19,7 @@ import { Person } from "@maipai/spec/gen/ts/person.js";
 import { setValue, getSettingValueForPerson, SESSION_LOCK_REQUIRED_KEY, SESSION_LOCK_TIMEOUT_KEY } from "@/lib/settings";
 import { isOwnerOrAdmin, canAccessPerson } from "@/lib/access";
 import { exportPersonFiles, personFilesFate } from "@/lib/storage/personFiles";
+import { apiError } from "@/lib/apiErrorCopy";
 
 export const peopleRoutes = apiRouter();
 
@@ -301,12 +302,12 @@ peopleRoutes.openapi(patchRoute, async (c) => {
   // deleting or demoting your own profile already refuses - blocked for
   // the same reason.
   if (body.enabled === false && actor.id === id) {
-    return c.json({ error: "you cannot disable your own profile" }, 403);
+    return c.json(apiError("cannot_disable_self"), 403);
   }
 
   const guestExpiresAt = body.guestExpiresAt !== undefined ? body.guestExpiresAt : target.guestExpiresAt;
   if (actor.id === target.id && actor.role === "guest" && body.guestExpiresAt !== undefined) {
-    return c.json({ error: "Ask an adult in the household to change how long you stay." }, 403);
+    return c.json(apiError("guest_stay_ask_adult"), 403);
   }
   const guestProblem = guestExpiryProblem(nextRole, guestExpiresAt);
   if (guestProblem) return c.json({ error: guestProblem }, 400);

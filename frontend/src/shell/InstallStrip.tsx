@@ -6,6 +6,7 @@ import { Progress } from "@maipai/ui/src/primitives/Progress";
 import { Button } from "@maipai/ui/src/ui/button";
 import { api, ApiError, type InstallStatusView } from "@/lib/api";
 import { useInstallStatus } from "@/lib/useInstallStatus";
+import { localizedApiMessage, localizedApiNext } from "@/lib/apiErrorLines";
 
 // The engine install comes first (fetch, build, start), then the models.
 const STAGES = [
@@ -80,7 +81,7 @@ export function InstallStrip({ detailsHref = "/settings/ai?tab=overview", read: 
   const onRetry = () => {
     setRetryError(null);
     retry().catch((reason: unknown) => {
-      const words = reason instanceof ApiError ? [reason.message, reason.next].filter(Boolean).join(" ") : "";
+      const words = reason instanceof ApiError ? [localizedApiMessage(reason), localizedApiNext(reason)].filter(Boolean).join(" ") : "";
       setRetryError(words || "Home couldn't restart the install. Check that this computer is online, then press Try again.");
     });
   };

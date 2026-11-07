@@ -51,6 +51,7 @@ import { robotCompanionOf } from "@/lib/robotCompanion";
 import { resolvePersona as resolvePersonaRecord } from "@/lib/persona";
 import type { AppEnv, PersonRow } from "@/types";
 import type { Surface } from "@/lib/turnShared";
+import { apiError } from "@/lib/apiErrorCopy";
 
 export const conversationsRoutes = apiRouter();
 
@@ -194,14 +195,14 @@ conversationsRoutes.openapi(createConversationRoute, (c) => {
   if (mode && !mode.success) return c.json({ error: "invalid conversation mode" }, 400);
   if (body.carry_from !== undefined && body.carry_from !== null && typeof body.carry_from !== "string") return c.json({ error: "carry_from must be a conversation id" }, 400);
   if (body.folder_id !== undefined && body.folder_id !== null && typeof body.folder_id !== "string") return c.json({ error: "folder_id must be a project id" }, 400);
-  if (body.companion_id !== undefined && body.companion_id !== null && typeof body.companion_id !== "string") return c.json({ error: "Choose a companion from the list." }, 400);
+  if (body.companion_id !== undefined && body.companion_id !== null && typeof body.companion_id !== "string") return c.json(apiError("companion_choose"), 400);
   if (body.device_id !== undefined) {
     const device = getDeviceById(body.device_id);
     const assigned = device?.kind === "robot" ? robotCompanionOf(device.id) : null;
-    if (body.placement !== "side" || body.surface && body.surface !== "chat" || !assigned || !mayUseCompanion(actor, resolvePersonaRecord(assigned.id))) return c.json({ error: "That robot is not available for this side chat." }, 403);
+    if (body.placement !== "side" || body.surface && body.surface !== "chat" || !assigned || !mayUseCompanion(actor, resolvePersonaRecord(assigned.id))) return c.json(apiError("companion_robot_unavailable"), 403);
     if (body.companion_id !== assigned.id) return c.json({ error: "That is not this robot's companion." }, 400);
   }
-  if (typeof body.companion_id === "string" && (resolvePersona(body.companion_id).id !== body.companion_id || !mayUseCompanion(actor, resolvePersona(body.companion_id)))) return c.json({ error: "That companion is not available to you. Choose another from the list." }, 403);
+  if (typeof body.companion_id === "string" && (resolvePersona(body.companion_id).id !== body.companion_id || !mayUseCompanion(actor, resolvePersona(body.companion_id)))) return c.json(apiError("companion_unavailable"), 403);
   // THIN-3G: carry_from seeds the new chat with that chat's summary.
   // PROJECTS-01a: folder_id starts the chat inside one of the person's projects.
   const result = createConversation(actor, { surface: body.surface, placement: body.placement, companionId: body.companion_id, mode: mode?.data, carryFrom: (body.carry_from as string | null | undefined) ?? null, folderId: (body.folder_id as string | null | undefined) ?? null, deviceId: body.device_id ?? null });
@@ -551,8 +552,8 @@ conversationsRoutes.openapi(patchConversationRoute, (c) => {
   const id = c.req.valid("param").id;
   if (Object.hasOwn(body, "companion_id")) {
     const picked = body.companion_id;
-    if (picked !== null && typeof picked !== "string") return c.json({ error: "Choose a companion from the list." }, 400);
-    if (picked !== null && (resolvePersona(picked).id !== picked || !mayUseCompanion(actor, resolvePersona(picked)))) return c.json({ error: "That companion is not available to you. Choose another from the list." }, 403);
+    if (picked !== null && typeof picked !== "string") return c.json(apiError("companion_choose"), 400);
+    if (picked !== null && (resolvePersona(picked).id !== picked || !mayUseCompanion(actor, resolvePersona(picked)))) return c.json(apiError("companion_unavailable"), 403);
   }
   if (Object.hasOwn(body, "folder_id") && body.folder_id !== null && typeof body.folder_id !== "string") return c.json({ error: "folder_id must be a project id or null" }, 400);
   if (body.archived !== undefined && typeof body.archived !== "boolean") return c.json({ error: "archived must be a boolean" }, 400);

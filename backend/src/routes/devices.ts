@@ -38,6 +38,7 @@ import { robotSelfTestPartsFor } from "@/wire";
 import { RobotSelfTestResult } from "@maipai/spec/gen/ts/robot-self-test-result.js";
 import { forgetRobotHost } from "@/lib/robotHost";
 import { getRobotCheckin, recordRobotCheckin, type RobotCheckin } from "@/lib/robotCheckin";
+import { apiError } from "@/lib/apiErrorCopy";
 
 export const devicesRoutes = apiRouter();
 
@@ -232,16 +233,16 @@ devicesRoutes.openapi(selfTestRoute, async (c) => {
   if (!device || (device.personId !== actor.id && actor.role !== "owner" && actor.role !== "admin")) return c.json({ error: "No such robot" }, 404);
   if (device.kind !== "robot") return c.json({ error: "No such robot" }, 404);
   const { part } = c.req.valid("json");
-  if (!robotSelfTestPartsFor(device).includes(part)) return c.json({ error: "This robot did not report that part." }, 400);
+  if (!robotSelfTestPartsFor(device).includes(part)) return c.json(apiError("robot_part_unreported"), 400);
   const state = getDeviceState(device.id);
   if (!state?.reachable) {
     const lastSeenAt = state?.unreachableSince ?? device.lastSeenAt;
     // The clock time is left to the page, which knows the viewer's time zone.
-    return c.json({ code: "robot_offline" as const, lastSeenAt, error: "This robot is offline. Check that it is on and on your Wi-Fi, then try again." }, 409);
+    return c.json(apiError("robot_offline", { lastSeenAt }), 409);
   }
   const run = startRobotSelfTest(device.id, part);
   const result = await run.result;
-  if (!result) return c.json({ code: "robot_no_answer" as const, error: "The robot did not answer the test. Restart it, then try again." }, 504);
+  if (!result) return c.json(apiError("robot_no_answer"), 504);
   return c.json(result, 200);
 });
 

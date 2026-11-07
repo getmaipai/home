@@ -31,6 +31,7 @@ import { validateDisplayName, validateSecret } from "@/lib/validation";
 import { getSettingValueForPerson, SESSION_LOCK_REQUIRED_KEY, SESSION_LOCK_TIMEOUT_KEY } from "@/lib/settings";
 import { setupLocalOnly } from "@/middleware/setupLocalOnly";
 import { householdLocale } from "@/lib/locale";
+import { apiError } from "@/lib/apiErrorCopy";
 
 export const auth = apiRouter();
 auth.use("/setup", setupLocalOnly);
@@ -186,7 +187,7 @@ auth.openapi(selectRoute, (c) => {
   const { personId } = c.req.valid("json");
 
   const person = db.select().from(people).where(eq(people.id, personId)).get();
-  if (!person || person.deletedAt || !person.enabled) return c.json({ error: "Profile not found" }, 404);
+  if (!person || person.deletedAt || !person.enabled) return c.json(apiError("profile_not_found"), 404);
 
   // Step 6: a passkey-only profile must be refused a bare-tap sign-in
   // exactly like a PIN/password one - requiresCredential() checks both
@@ -202,7 +203,7 @@ auth.openapi(selectRoute, (c) => {
   // refused a bare tap rather than silently getting the exact "no
   // credential at all" treatment this route exists to gate.
   if (requiresCredential(personId) || roleRequiresCredential(person.role)) {
-    return c.json({ error: "This profile needs its PIN, password, or passkey" }, 400);
+    return c.json(apiError("profile_needs_secret"), 400);
   }
 
   issueSession(c, personId, sessionSignInSource(c));
@@ -230,7 +231,7 @@ auth.openapi(verifySecretRoute, async (c) => {
   const ip = getClientIp(c);
   const throttled = throttleCheck(ip);
   if (throttled.blocked) {
-    return c.json({ error: "Too many attempts", retryAfter: throttled.retryAfter }, 429);
+    return c.json(apiError("attempts_locked", { retryAfter: throttled.retryAfter }), 429);
   }
 
   // A code review (2026-09-04) found this route never checked
@@ -239,7 +240,7 @@ auth.openapi(verifySecretRoute, async (c) => {
   // personLifecycle.ts soft-deletes people, so credentials for a deleted
   // profile must stop working here as well.
   const person = db.select().from(people).where(eq(people.id, personId)).get();
-  if (!person || person.deletedAt || !person.enabled) return c.json({ error: "Profile not found" }, 404);
+  if (!person || person.deletedAt || !person.enabled) return c.json(apiError("profile_not_found"), 404);
 
   const record = db
     .select()
@@ -249,7 +250,7 @@ auth.openapi(verifySecretRoute, async (c) => {
   // secretHash nullable as of step 6 (a passkey-only person's row holds
   // only their shared lockout counter) - null reads the same as "no row"
   // for THIS route's purposes, since there's no PIN/password to verify.
-  if (!record || record.secretHash === null) return c.json({ error: "No PIN or password set for this profile" }, 400);
+  if (!record || record.secretHash === null) return c.json(apiError("no_secret_set"), 400);
 
   const verified = await verifyAgainstRecord(ip, personId, { secretHash: record.secretHash, lockedUntil: record.lockedUntil }, secret, "Invalid PIN or password");
   if (!verified.ok) return c.json(verified.body, verified.status);
@@ -344,7 +345,7 @@ auth.openapi(changeSecretRoute, async (c) => {
     const ip = getClientIp(c);
     const throttled = throttleCheck(ip);
     if (throttled.blocked) {
-      return c.json({ error: "Too many attempts", retryAfter: throttled.retryAfter }, 429);
+      return c.json(apiError("attempts_locked", { retryAfter: throttled.retryAfter }), 429);
     }
 
     const verified = await verifyAgainstRecord(

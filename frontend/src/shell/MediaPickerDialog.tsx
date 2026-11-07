@@ -10,6 +10,7 @@ import { SafeImage } from "@maipai/ui/src/primitives/SafeImage";
 import { AsyncState } from "@maipai/ui/src/primitives/AsyncState";
 import { api, ApiError } from "@/lib/api";
 import { uploadLibraryFile } from "@/lib/libraryUpload";
+import { localizedApiMessage } from "@/lib/apiErrorLines";
 
 export interface PickedMedia { id: string; thumb?: string }
 export type PickKind = "picture" | "character" | "place";
@@ -42,7 +43,7 @@ export function MediaPickerBody({ kind, personId, onDone }: { kind: PickKind; pe
       void queryClient.invalidateQueries({ queryKey: ["media-picker"] });
       onDone({ id: added.id, thumb: thumbUrlFor(added.id) });
     } catch (caught) {
-      setError(caught instanceof ApiError && caught.message ? caught.message : "Home could not add that picture. Check your connection and try again.");
+      setError(caught instanceof ApiError && caught.message ? localizedApiMessage(caught) : "Home could not add that picture. Check your connection and try again.");
       setBusy(false);
     }
   };

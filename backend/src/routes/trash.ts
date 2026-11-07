@@ -4,6 +4,7 @@ import { requireAuth } from "@/middleware/auth";
 import { listTrash, trashProvider } from "@/lib/trash/registry";
 import "@/lib/trash/providers";
 import { trashedFileThumbnail } from "@/lib/fileThumbnails";
+import { apiError } from "@/lib/apiErrorCopy";
 
 export const trashRoutes = apiRouter();
 const Row = z.object({ kind: z.string(), id: z.string(), title: z.string(), deleted_at: z.string(), trash_until: z.string().nullable(), can_restore: z.boolean(), can_purge: z.boolean(), thumb_url: z.string().nullable().optional() });
@@ -21,11 +22,11 @@ const params = z.object({ kind: z.string(), id: z.string() });
 const responses = { 200: { content: { "application/json": { schema: z.object({ success: z.literal(true) }) } }, description: "Done." }, ...errorResponses({ 401: "Sign in and try again.", 404: "This item is not available in your trash. Refresh Trash and try again." }) };
 trashRoutes.openapi(createRoute({ method: "post", path: "/{kind}/{id}/restore", tags: ["Trash"], summary: "Restore a deleted record within its keep window", middleware: [requireAuth] as const, request: { params }, responses }), (c) => {
   const { kind, id } = c.req.valid("param");
-  if (!trashProvider(kind)?.restore(c.get("person"), id)) return c.json({ error: "This item cannot be restored from your trash. Refresh Trash and try again." }, 404);
+  if (!trashProvider(kind)?.restore(c.get("person"), id)) return c.json(apiError("trash_restore_missing"), 404);
   return c.json({ success: true as const }, 200);
 });
 trashRoutes.openapi(createRoute({ method: "delete", path: "/{kind}/{id}", tags: ["Trash"], summary: "Delete a trashed record forever", middleware: [requireAuth] as const, request: { params }, responses }), (c) => {
   const { kind, id } = c.req.valid("param");
-  if (!trashProvider(kind)?.purge(c.get("person"), id)) return c.json({ error: "This item is not available in your trash. Refresh Trash and try again." }, 404);
+  if (!trashProvider(kind)?.purge(c.get("person"), id)) return c.json(apiError("trash_item_missing"), 404);
   return c.json({ success: true as const }, 200);
 });

@@ -15,6 +15,7 @@ import { requireRoleOrGrant } from "@/middleware/auth";
 import { listActivePeople } from "@/lib/access";
 import type { HouseEntity } from "@/lib/house/registry";
 import type { PersonRow } from "@/types";
+import { apiError } from "@/lib/apiErrorCopy";
 
 export type HouseRoomsDeps = {
   loadRegistry: () => Promise<HouseRegistryResult>;
@@ -119,7 +120,7 @@ houseRoutes.openapi(effectiveRoute, async (c) => {
 });
 houseRoutes.openapi(roomsRoute, async (c) => {
   const d = deps(); const person = c.get("person"); const actor = actorOf(person);
-  if (inaccessible(actor)) return c.json({ error: "Rooms are unavailable for this speaker. Sign in as a household member." }, 403);
+  if (inaccessible(actor)) return c.json(apiError("house_rooms_unavailable"), 403);
   const connection = d.connection();
   if (!connection.ok && connection.reason === "not_set") return c.json({ rooms: [], status: "not_configured" }, 200);
   const registry = await d.loadRegistry();
@@ -151,8 +152,8 @@ const actRoute = createRoute({
 });
 houseRoutes.openapi(actRoute, async (c) => {
   const d = deps(); const person = c.get("person"); const actor = actorOf(person); const input = c.req.valid("json");
-  if (inaccessible(actor)) return c.json({ error: "Home controls are unavailable for this speaker. Sign in as a household member." }, 403);
-  if (d.mode() === "never") { d.audit({ personId: person.id, tool: HOUSE_TOOL_ID, action: input.action, decision: "never", band: actor.band }); return c.json({ error: "Home controls are turned off for this household. Change the House control setting to continue." }, 403); }
+  if (inaccessible(actor)) return c.json(apiError("house_controls_unavailable"), 403);
+  if (d.mode() === "never") { d.audit({ personId: person.id, tool: HOUSE_TOOL_ID, action: input.action, decision: "never", band: actor.band }); return c.json(apiError("house_controls_off"), 403); }
   const registry = await d.loadRegistry();
   if (!registry.ok) { const kind = registry.kind === "timeout" ? "timeout" as const : registry.kind === "refused" ? "refused" as const : "unreachable" as const; d.audit({ personId: person.id, tool: HOUSE_TOOL_ID, action: input.action, decision: "never", band: actor.band }); return c.json({ ok: false as const, kind }, 200); }
   const entity = registry.entities.find((item) => item.id === input.entity);

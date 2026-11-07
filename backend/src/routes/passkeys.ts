@@ -18,6 +18,7 @@ import { recordFailedAttempt, clearFailedAttempts, ensureCredentialRowExists, cu
 import { registrationOptions, verifyRegistration, authenticationOptions, verifyAuthentication, listPasskeys, deletePasskey } from "@/lib/passkeys";
 import { isTotpEnabled } from "@/lib/totp";
 import { issuePendingLogin } from "@/lib/pendingLogin";
+import { apiError } from "@/lib/apiErrorCopy";
 
 export const passkeysRoutes = apiRouter();
 
@@ -105,7 +106,7 @@ const deletePasskeyRoute = createRoute({
 passkeysRoutes.openapi(deletePasskeyRoute, (c) => {
   const actor = c.get("person");
   const { id } = c.req.valid("param");
-  if (!deletePasskey(id, actor.id)) return c.json({ error: "No such passkey" }, 404);
+  if (!deletePasskey(id, actor.id)) return c.json(apiError("no_such_passkey"), 404);
   return c.json({ success: true as const }, 200);
 });
 
@@ -138,11 +139,11 @@ const AUTH_OPTIONS_RATE_LIMIT = { capacity: 10, refillPerSecond: 0.5 };
 passkeysRoutes.openapi(authOptionsRoute, async (c) => {
   const { personId } = c.req.valid("json");
   if (!tryConsume(`passkey-auth-options:${personId}`, AUTH_OPTIONS_RATE_LIMIT)) {
-    return c.json({ error: "Too many requests. Wait a moment and try again." }, 429);
+    return c.json(apiError("passkey_rate_limited"), 429);
   }
 
   const person = db.select({ id: people.id, enabled: people.enabled }).from(people).where(and(eq(people.id, personId), isNull(people.deletedAt))).get();
-  if (!person || !person.enabled) return c.json({ error: "No such profile" }, 404);
+  if (!person || !person.enabled) return c.json(apiError("no_such_profile"), 404);
   const options = await authenticationOptions(personId);
   return c.json(options, 200);
 });
@@ -173,7 +174,7 @@ passkeysRoutes.openapi(authVerifyRoute, async (c) => {
   // personId threw an unhandled SqliteError (a 500) instead of the
   // intended 401/404. Checked first, before any lockout bookkeeping.
   const person = db.select({ id: people.id, enabled: people.enabled }).from(people).where(and(eq(people.id, personId), isNull(people.deletedAt))).get();
-  if (!person || !person.enabled) return c.json({ error: "No such profile" }, 404);
+  if (!person || !person.enabled) return c.json(apiError("no_such_profile"), 404);
 
   // The same shared lockout (lib/credentialLockout.ts) and per-IP
   // throttle a PIN/password ceremony uses (4.1: "rate limits and
@@ -182,13 +183,13 @@ passkeysRoutes.openapi(authVerifyRoute, async (c) => {
   // ordering /verify-secret already uses.
   const ip = getClientIp(c);
   const throttled = throttleCheck(ip);
-  if (throttled.blocked) return c.json({ error: "Too many attempts", retryAfter: throttled.retryAfter }, 429);
+  if (throttled.blocked) return c.json(apiError("attempts_locked", { retryAfter: throttled.retryAfter }), 429);
   const addressLockout = checkSigninAddress(ip, personId);
-  if (addressLockout.blocked) return c.json({ error: "Too many attempts", retryAfter: addressLockout.retryAfter }, 429);
+  if (addressLockout.blocked) return c.json(apiError("attempts_locked", { retryAfter: addressLockout.retryAfter }), 429);
   const lockout = currentLockout(personId);
   if (lockout?.lockedUntil && new Date(lockout.lockedUntil).getTime() > Date.now()) {
     const retryAfter = Math.ceil((new Date(lockout.lockedUntil).getTime() - Date.now()) / 1000);
-    return c.json({ error: "Too many attempts", retryAfter }, 429);
+    return c.json(apiError("attempts_locked", { retryAfter }), 429);
   }
 
   const result = await verifyAuthentication(personId, response as AuthenticationResponseJSON);

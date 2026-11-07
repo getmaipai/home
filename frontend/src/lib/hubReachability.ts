@@ -1,11 +1,15 @@
 import { useEffect } from "react";
+import { i18n } from "@lingui/core";
 import { ApiError } from "@/lib/api";
+import { localizedApiMessage } from "@/lib/apiErrorLines";
 
 /** CHAT-PAUSE-01: the one wording and the one wait for "the hub did not
  * answer", used wherever the app used to print "Could not reach the hub".
  * A hub restarts for a minute or two during an update, so the line says that
  * and what happens next. */
 export const HUB_DOWN_LINE = "One moment. Home will be back in about a minute.";
+/** HUB_DOWN_LINE in the person's language. */
+export const hubDownLine = (): string => i18n._({ id: "One moment. Home will be back in about a minute.", message: "One moment. Home will be back in about a minute." });
 
 /** The hub itself did not answer: the request never got a response (refused,
  * dropped, no network), or a proxy in front of it said so (502, 504, or a 503
@@ -18,9 +22,9 @@ export function isHubUnreachable(error: unknown): boolean {
 
 /** The one line to print for a failed request (AUDIT-DUP-FE-01): the hub's own words when it
  * answered, the restarting line when it did not. */
-export function errorLine(error: unknown, fallback = HUB_DOWN_LINE): string {
-  if (isHubUnreachable(error)) return HUB_DOWN_LINE;
-  return error instanceof ApiError ? error.message : fallback;
+export function errorLine(error: unknown, fallback = hubDownLine()): string {
+  if (isHubUnreachable(error)) return hubDownLine();
+  return error instanceof ApiError ? localizedApiMessage(error) : fallback;
 }
 
 /** Waits until the hub answers anything at all (a 401 is an answer), asking

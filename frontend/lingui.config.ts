@@ -14,8 +14,8 @@ export default defineConfig({
   catalogs: [
     {
       path: `${process.env.MAIPAI_I18N_CATALOGS ?? "<rootDir>/src/locales"}/{locale}/messages`,
-      // failureCopy.ts is the one table of server wording (design note section 9 step 1); its descriptors are marked /*i18n*/.
-      include: ["<rootDir>/src", "<rootDir>/../backend/src/lib/failureCopy.ts"],
+      // failureCopy.ts and apiErrorCopy.ts are the tables of server wording (design note section 9 steps 1 and 3); their descriptors are marked /*i18n*/.
+      include: ["<rootDir>/src", "<rootDir>/../backend/src/lib/failureCopy.ts", "<rootDir>/../backend/src/lib/apiErrorCopy.ts"],
     },
   ],
 });

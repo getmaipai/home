@@ -12,6 +12,7 @@ import { restorePersonFromBackup, PartialRestoreRefused } from "@/lib/partialRes
 import { db } from "@/db";
 import { createJob, updateJob } from "@/lib/jobs";
 import { devices as devicesTable } from "@/db/schema";
+import { apiError } from "@/lib/apiErrorCopy";
 
 export const backupsRoutes = apiRouter();
 
@@ -136,7 +137,7 @@ backupsRoutes.openapi(restoreRoute, async (c) => {
     // data directory for a filesystem failure.
     if (err instanceof RestoreRefused) return c.json({ error: err.message }, 400);
     console.error(`[restore] staging ${filename} failed:`, err);
-    return c.json({ error: "that backup could not be read. Try another one." }, 400);
+    return c.json(apiError("backup_unreadable"), 400);
   }
 });
 
@@ -337,6 +338,6 @@ backupsRoutes.openapi(partialRestoreRoute, async (c) => {
       return c.json({ error: err.message }, notFound ? 404 : 400);
     }
     console.error(`[restore] partial restore of ${personId} from ${filename} failed:`, err);
-    return c.json({ error: "that backup could not be read. Try another one." }, 400);
+    return c.json(apiError("backup_unreadable"), 400);
   }
 });

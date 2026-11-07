@@ -14,6 +14,7 @@ import { getClientIp, throttleCheck, throttleFail, throttleReset } from "@/lib/s
 import { recordFailedAttempt, clearFailedAttempts, ensureCredentialRowExists, currentLockout, checkSigninAddress, failSigninAddress, resetSigninAddress } from "@/lib/credentialLockout";
 import { db } from "@/db";
 import { people } from "@/db/schema";
+import { apiError } from "@/lib/apiErrorCopy";
 
 export const totpRoutes = apiRouter();
 
@@ -46,7 +47,7 @@ const challengeRoute = createRoute({
 totpRoutes.openapi(challengeRoute, (c) => {
   const { pendingToken, token } = c.req.valid("json");
   const personId = getPendingLoginPerson(pendingToken);
-  if (!personId) return c.json({ error: "Start signing in again with your PIN or passkey." }, 401);
+  if (!personId) return c.json(apiError("totp_restart_sign_in"), 401);
 
   // Step 7: this route only ever runs after a PIN/password or passkey
   // ceremony already returned totpRequired: true, but it is reachable on
@@ -54,24 +55,24 @@ totpRoutes.openapi(challengeRoute, (c) => {
   // success - a disabled or deleted person must not be able to finish
   // signing in here even if they somehow still hold a valid TOTP secret.
   const person = db.select({ enabled: people.enabled }).from(people).where(and(eq(people.id, personId), isNull(people.deletedAt))).get();
-  if (!person || !person.enabled) return c.json({ error: "That code didn't match." }, 401);
+  if (!person || !person.enabled) return c.json(apiError("totp_code_mismatch"), 401);
 
   const ip = getClientIp(c);
   const throttled = throttleCheck(ip);
-  if (throttled.blocked) return c.json({ error: "Too many attempts", retryAfter: throttled.retryAfter }, 429);
+  if (throttled.blocked) return c.json(apiError("attempts_locked", { retryAfter: throttled.retryAfter }), 429);
   const addressLockout = checkSigninAddress(ip, personId);
-  if (addressLockout.blocked) return c.json({ error: "Too many attempts", retryAfter: addressLockout.retryAfter }, 429);
+  if (addressLockout.blocked) return c.json(apiError("attempts_locked", { retryAfter: addressLockout.retryAfter }), 429);
   const lockout = currentLockout(personId);
   if (lockout?.lockedUntil && new Date(lockout.lockedUntil).getTime() > Date.now()) {
     const retryAfter = Math.ceil((new Date(lockout.lockedUntil).getTime() - Date.now()) / 1000);
-    return c.json({ error: "Too many attempts", retryAfter }, 429);
+    return c.json(apiError("attempts_locked", { retryAfter }), 429);
   }
 
   if (!verifyTotp(personId, token)) {
     throttleFail(ip);
     ensureCredentialRowExists(personId);
     const { failedAttempts } = recordFailedAttempt(personId);
-    return c.json({ error: "That code didn't match.", attemptsLeft: failSigninAddress(ip, personId) }, 401);
+    return c.json(apiError("totp_code_mismatch", { attemptsLeft: failSigninAddress(ip, personId) }), 401);
   }
   throttleReset(ip);
   resetSigninAddress(ip, personId);
@@ -97,7 +98,7 @@ const enrollRoute = createRoute({
 });
 totpRoutes.openapi(enrollRoute, (c) => {
   const actor = c.get("person");
-  if (isTotpEnabled(actor.id)) return c.json({ error: "Two-step sign-in is already on.", next: "Turn it off with a code first, then set it up again." }, 409);
+  if (isTotpEnabled(actor.id)) return c.json(apiError("totp_already_on"), 409);
   const { uri } = beginEnrollment(actor.id, actor.displayName);
   return c.json({ uri }, 200);
 });
@@ -117,7 +118,7 @@ const verifyRoute = createRoute({
 totpRoutes.openapi(verifyRoute, (c) => {
   const actor = c.get("person");
   const { token } = c.req.valid("json");
-  if (!verifyEnrollment(actor.id, token)) return c.json({ error: "That code didn't match. Check your authenticator app's time and try again." }, 400);
+  if (!verifyEnrollment(actor.id, token)) return c.json(apiError("totp_enroll_mismatch"), 400);
   return c.json({ success: true as const }, 200);
 });
 
@@ -153,14 +154,14 @@ totpRoutes.openapi(disableRoute, (c) => {
   const { token } = c.req.valid("json");
   const ip = getClientIp(c);
   const throttled = throttleCheck(ip);
-  if (throttled.blocked) return c.json({ error: "Too many attempts", retryAfter: throttled.retryAfter }, 429);
+  if (throttled.blocked) return c.json(apiError("attempts_locked", { retryAfter: throttled.retryAfter }), 429);
   const lockout = currentLockout(actor.id);
-  if (lockout?.lockedUntil && new Date(lockout.lockedUntil).getTime() > Date.now()) return c.json({ error: "Too many attempts", retryAfter: Math.ceil((new Date(lockout.lockedUntil).getTime() - Date.now()) / 1000) }, 429);
+  if (lockout?.lockedUntil && new Date(lockout.lockedUntil).getTime() > Date.now()) return c.json(apiError("attempts_locked", { retryAfter: Math.ceil((new Date(lockout.lockedUntil).getTime() - Date.now()) / 1000) }), 429);
   if (!verifyTotp(actor.id, token)) {
     throttleFail(ip);
     ensureCredentialRowExists(actor.id);
     recordFailedAttempt(actor.id);
-    return c.json({ error: "That code didn't match." }, 401);
+    return c.json(apiError("totp_code_mismatch"), 401);
   }
   throttleReset(ip);
   clearFailedAttempts(actor.id);

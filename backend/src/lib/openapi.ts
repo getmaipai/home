@@ -6,6 +6,7 @@
 import type { MiddlewareHandler } from "hono";
 import type { AppEnv } from "@/types";
 import { OpenAPIHono } from "@hono/zod-openapi";
+import { API_ERROR_LINES } from "@/lib/apiErrorCopy";
 
 export { ErrorSchema, errorResponses, idParamSchema, PaginationQuerySchema, paginatedResponseSchema } from "@maipai/core/src/openapi";
 
@@ -20,7 +21,7 @@ export function apiRouter() {
         const path = issue.path.filter((part) => part !== "body").join(".");
         return path && generic.test(issue.message) ? `${path}: ${issue.message}` : issue.message;
       }).join("; ");
-      return c.json({ error: message, next: "Check the fields named and send it again." }, 400);
+      return c.json({ error: message, next: API_ERROR_LINES.invalid_input.next.message, code: "invalid_input" as const }, 400);
     }
   } });
 }

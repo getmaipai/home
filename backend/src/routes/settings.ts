@@ -34,6 +34,7 @@ import { getStackClient } from "@/lib/stackEngine";
 import { StackError } from "@/lib/stack/errors";
 import { raiseIssue, resolveIssue } from "@/lib/issues";
 import { isHostGuardSetting, writeHostGuardTuning } from "@/lib/hostGuardTuning";
+import { apiError } from "@/lib/apiErrorCopy";
 
 export const settingsRoutes = apiRouter();
 
@@ -198,7 +199,7 @@ settingsRoutes.openapi(putRoute, async (c) => {
   const voiceScope = parseScope(body.scope);
   if (voiceDefinition?.range?.options_from === "voices.tts" && body.value !== voiceDefinition.default && voiceScope?.kind === voiceDefinition.scope && assertCanAccessScope(actor, voiceScope, "write").ok) {
     const available = await listPlayableVoices();
-    if (typeof body.value !== "string" || !isPlayableVoiceId(available, body.value)) return c.json({ error: "That voice is not on this hub. Choose one from the list." }, 400);
+    if (typeof body.value !== "string" || !isPlayableVoiceId(available, body.value)) return c.json(apiError("voice_not_on_hub"), 400);
   }
   // CAP-GATE-01: packages that require what is being turned off are named
   // first; nothing is saved or removed until the person confirms.
@@ -216,7 +217,7 @@ settingsRoutes.openapi(putRoute, async (c) => {
     const personaRefusal = personaWriteRefusal(body.scope, body.value);
     if (personaRefusal) return c.json({ error: personaRefusal }, 400);
   }
-  if (body.scope === "household" && body.key === "coding.home_mode") return c.json({ error: "Coding mode is now Max chat. Pick Max in a chat, or connect a coding app, and Home loads the big model for you." }, 400);
+  if (body.scope === "household" && body.key === "coding.home_mode") return c.json(apiError("coding_mode_is_max"), 400);
   const refusal = await applySettingSideEffects(body.scope, body.key, body.value, actor, true);
   if (refusal) return c.json({ error: refusal.error }, refusal.status);
   const result = await setValue(actor, body.scope, body.key, body.value);
@@ -390,7 +391,7 @@ settingsRoutes.openapi(createRoute({
     ...errorResponses({ 401: "Not signed in", 404: "No such key" }) },
 }), (c) => {
   const found = renameApiKey(c.get("person").id, c.req.valid("param").id, c.req.valid("json").name);
-  return found ? c.json({ success: true as const }, 200) : c.json({ error: "No such key. Reload the list and try again." }, 404);
+  return found ? c.json({ success: true as const }, 200) : c.json(apiError("setting_key_gone"), 404);
 });
 
 settingsRoutes.openapi(createRoute({
@@ -402,7 +403,7 @@ settingsRoutes.openapi(createRoute({
     ...errorResponses({ 401: "Not signed in", 404: "No such key" }) },
 }), (c) => {
   const found = revokeApiKey(c.get("person").id, c.req.valid("param").id);
-  return found ? c.json({ success: true as const }, 200) : c.json({ error: "No such key. Reload the list and try again." }, 404);
+  return found ? c.json({ success: true as const }, 200) : c.json(apiError("setting_key_gone"), 404);
 });
 
 settingsRoutes.openapi(createRoute({
@@ -414,7 +415,7 @@ settingsRoutes.openapi(createRoute({
     ...errorResponses({ 401: "Not signed in", 403: "Not allowed", 404: "No such person" }) },
 }), async (c) => {
   const target = db.select().from(people).where(eq(people.id, c.req.valid("param").personId)).get() as PersonRow | undefined;
-  if (!target || target.deletedAt) return c.json({ error: "No such person. Reload the people list and try again." }, 404);
+  if (!target || target.deletedAt) return c.json(apiError("setting_person_gone"), 404);
   await ensureCodingPiecesFresh();
   return c.json({ keys: listApiKeysForAdmin(target) }, 200);
 });
@@ -428,7 +429,7 @@ settingsRoutes.openapi(createRoute({
 }), (c) => {
   const { personId, id } = c.req.valid("param");
   const target = db.select().from(people).where(eq(people.id, personId)).get() as PersonRow | undefined;
-  if (!target || target.deletedAt || !listApiKeys(target).some((key) => key.id === id && key.scopes.includes("code"))) return c.json({ error: "No such coding key. Reload the list and try again." }, 404);
+  if (!target || target.deletedAt || !listApiKeys(target).some((key) => key.id === id && key.scopes.includes("code"))) return c.json(apiError("coding_key_gone"), 404);
   revokeApiKey(personId, id);
   return c.json({ success: true as const }, 200);
 });
@@ -442,7 +443,7 @@ settingsRoutes.openapi(createRoute({
 }), (c) => {
   const { personId } = c.req.valid("param");
   const target = db.select().from(people).where(eq(people.id, personId)).get() as PersonRow | undefined;
-  if (!target || target.deletedAt) return c.json({ error: "No such person. Reload the people list and try again." }, 404);
+  if (!target || target.deletedAt) return c.json(apiError("setting_person_gone"), 404);
   const ids = listApiKeys(target).filter((key) => key.scopes.includes("code") && key.status !== "revoked").map((key) => key.id);
   for (const id of ids) revokeApiKey(personId, id);
   return c.json({ revoked: ids.length }, 200);

@@ -13,6 +13,7 @@ import { db } from "@/db";
 import { sessions } from "@/db/schema";
 import { hashSessionToken } from "@/lib/session";
 import { invalidateSessionCacheForPerson } from "@/middleware/auth";
+import { apiError } from "@/lib/apiErrorCopy";
 
 export const authSessionsRoutes = apiRouter();
 
@@ -63,7 +64,7 @@ const awayListRoute = createRoute({
   },
 });
 authSessionsRoutes.openapi(awayListRoute, (c) => {
-  if (c.req.query("personId")) return c.json({ error: "You can only view your own sessions." }, 403);
+  if (c.req.query("personId")) return c.json(apiError("sessions_own_only"), 403);
   const actor = c.get("person");
   const currentToken = getCookie(c, "session");
   const currentHash = currentToken ? hashSessionToken(currentToken) : null;
@@ -97,7 +98,7 @@ authSessionsRoutes.openapi(deleteRoute, (c) => {
   const actor = c.get("person");
   const { id } = c.req.valid("param");
   const row = db.select({ id: sessions.id }).from(sessions).where(and(eq(sessions.id, id), eq(sessions.personId, actor.id))).get();
-  if (!row) return c.json({ error: "No such session" }, 404);
+  if (!row) return c.json(apiError("no_such_session"), 404);
   db.delete(sessions).where(eq(sessions.id, id)).run();
   // invalidateSessionCache() needs the raw token (it hashes internally),
   // which this route never has for an arbitrary session row - clearing

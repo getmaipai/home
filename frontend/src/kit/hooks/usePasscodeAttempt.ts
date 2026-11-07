@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { ApiError } from "@/lib/api";
+import { localizedApiMessage } from "@/lib/apiErrorLines";
 
 function clock(seconds: number): string {
   return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}`;
@@ -50,7 +51,7 @@ export function usePasscodeAttempt() {
       setAttempt((n) => n + 1);
       return true;
     }
-    setError(e instanceof ApiError && e.status !== 0 && e.status < 500 ? e.message : fallback);
+    setError(e instanceof ApiError && e.status !== 0 && e.status < 500 ? localizedApiMessage(e) : fallback);
     return false;
   }
 
