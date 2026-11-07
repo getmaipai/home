@@ -7,7 +7,7 @@ import { Conversation } from "@maipai/spec/gen/ts/conversation.js";
 import { ReplyFeedback } from "@maipai/spec/gen/ts/reply-feedback.js";
 import { TurnArtifact } from "@maipai/spec/gen/ts/turn-artifact.js";
 import { requireAuth } from "@/middleware/auth";
-import { db } from "@/db";
+import { db, sqlite } from "@/db";
 import { conversationTurns, replyFeedback } from "@/db/schema";
 import { and, eq } from "drizzle-orm";
 import { canAccessPerson } from "@/lib/access";
@@ -215,8 +215,9 @@ conversationsRoutes.openapi(createConversationRoute, (c) => {
 // a conversation id.
 conversationsRoutes.post("/batch-delete", requireAuth, async (c) => {
   const actor = c.get("person");
-  const body = (await c.req.json().catch(() => ({}))) as { ids?: string[] };
-  if (!Array.isArray(body.ids)) return c.json({ error: "ids is required" }, 400);
+  const parsed = z.object({ ids: z.array(z.string().min(1)).max(200) }).safeParse(await c.req.json().catch(() => ({})));
+  if (!parsed.success) return c.json({ error: "Send up to 200 conversation ids." }, 400);
+  const body = parsed.data;
   return c.json(batchDeleteConversations(actor, body.ids));
 });
 
@@ -548,45 +549,38 @@ conversationsRoutes.openapi(patchConversationRoute, (c) => {
   const actor = c.get("person");
   const body = (c.req.valid("json") ?? {}) as { title?: string | null; pinned?: boolean; archived?: boolean; mode?: Conversation["mode"]; settings?: unknown; folder_id?: unknown; companion_id?: unknown };
   const id = c.req.valid("param").id;
-  if (Object.hasOwn(body, "placement")) {
-    if (Object.keys(body).some((key) => key !== "placement")) return c.json({ error: "Send the placement change on its own, then make the other changes in a second request." }, 400);
-    const result = updateConversationPlacement(actor, id, (body as { placement?: unknown }).placement);
-    if (!result.ok) return c.json({ error: result.error }, result.status as 400 | 403 | 404);
-    return c.json(result.value, 200);
-  }
   if (Object.hasOwn(body, "companion_id")) {
     const picked = body.companion_id;
     if (picked !== null && typeof picked !== "string") return c.json({ error: "Choose a companion from the list." }, 400);
     if (picked !== null && (resolvePersona(picked).id !== picked || !mayUseCompanion(actor, resolvePersona(picked)))) return c.json({ error: "That companion is not available to you. Choose another from the list." }, 403);
-    const result = updateConversationCompanion(actor, id, picked);
-    if (!result.ok) return c.json({ error: result.error }, result.status as 400 | 403 | 404);
-    return c.json(result.value, 200);
   }
-  // PROJECTS-01a: move the chat into a project, or out of one with null.
-  if (Object.hasOwn(body, "folder_id")) {
-    const result = updateConversationFolder(actor, id, body.folder_id);
-    if (!result.ok) return c.json({ error: result.error }, result.status as 400 | 403 | 404);
-    return c.json(result.value, 200);
+  if (Object.hasOwn(body, "folder_id") && body.folder_id !== null && typeof body.folder_id !== "string") return c.json({ error: "folder_id must be a project id or null" }, 400);
+  if (body.archived !== undefined && typeof body.archived !== "boolean") return c.json({ error: "archived must be a boolean" }, 400);
+  const mode = body.mode === undefined ? undefined : Conversation.shape.mode.safeParse(body.mode);
+  if (mode && (!mode.success || mode.data === undefined)) return c.json({ error: "invalid conversation mode" }, 400);
+  if (Object.hasOwn(body, "settings") && (!body.settings || typeof body.settings !== "object" || Array.isArray(body.settings))) return c.json({ error: "settings must be an object" }, 400);
+  if (body.title !== undefined && body.title !== null && typeof body.title !== "string") return c.json({ error: "title must be text or null" }, 400);
+  if (body.pinned !== undefined && typeof body.pinned !== "boolean") return c.json({ error: "pinned must be a boolean" }, 400);
+  if (!Object.keys(body).some((key) => ["placement", "companion_id", "folder_id", "archived", "mode", "settings", "title", "pinned"].includes(key))) return c.json({ error: "Send at least one conversation field to change." }, 400);
+  let result: ConversationOpResult<Conversation> | undefined;
+  const tx = sqlite.transaction(() => {
+    const apply = (next: ConversationOpResult<Conversation>) => { if (!next.ok) throw next; result = next; };
+    if (Object.hasOwn(body, "placement")) apply(updateConversationPlacement(actor, id, (body as any).placement));
+    if (Object.hasOwn(body, "companion_id")) apply(updateConversationCompanion(actor, id, body.companion_id as string | null));
+    if (Object.hasOwn(body, "folder_id")) apply(updateConversationFolder(actor, id, body.folder_id as string | null));
+    if (body.archived !== undefined) apply(updateConversationArchived(actor, id, body.archived));
+    if (mode?.success && mode.data !== undefined) apply(updateConversationMode(actor, id, mode.data));
+    if (Object.hasOwn(body, "settings")) apply(updateConversationSettings(actor, id, body.settings));
+    if (Object.hasOwn(body, "title") || Object.hasOwn(body, "pinned")) apply(updateConversationTitle(actor, id, body.title, body.pinned));
+  });
+  try { tx(); } catch (error) {
+    if (error && typeof error === "object" && "ok" in error && (error as { ok?: unknown }).ok === false) {
+      const refusal = error as Extract<ConversationOpResult<Conversation>, { ok: false }>;
+      return c.json({ error: refusal.error }, refusal.status as 400 | 403 | 404);
+    }
+    throw error;
   }
-  if (body.archived !== undefined) {
-    const result = updateConversationArchived(actor, id, body.archived);
-    if (!result.ok) return c.json({ error: result.error }, result.status as 400 | 403 | 404);
-    return c.json(result.value, 200);
-  }
-  if (body.mode !== undefined) {
-    const mode = Conversation.shape.mode.safeParse(body.mode);
-    if (!mode.success || mode.data === undefined) return c.json({ error: "invalid conversation mode" }, 400);
-    const result = updateConversationMode(actor, id, mode.data);
-    if (!result.ok) return c.json({ error: result.error }, result.status as 400 | 403 | 404);
-    return c.json(result.value, 200);
-  }
-  if (Object.hasOwn(body, "settings")) {
-    const result = updateConversationSettings(actor, id, body.settings);
-    if (!result.ok) return c.json({ error: result.error }, result.status as 400 | 403 | 404);
-    return c.json(result.value, 200);
-  }
-  const result = updateConversationTitle(actor, id, body.title, body.pinned);
-  if (!result.ok) return c.json({ error: result.error }, result.status as 400 | 403 | 404);
+  if (!result?.ok) return c.json({ error: "Conversation could not be updated." }, 400);
   return c.json(result.value, 200);
 });
 

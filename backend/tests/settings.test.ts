@@ -1020,3 +1020,95 @@ describe("companions.preview_shells household setting", () => {
     expect((await childRead.json() as Array<{ key: string; value: unknown }>)[0]).toMatchObject({ key: "companions.preview_shells", value: false });
   });
 });
+
+import { spyOn } from "bun:test";
+import * as tailscaleModule from "@/lib/tailscale";
+import * as remoteStackSettings from "@/lib/remoteStackSettings";
+import * as deviceCommands from "@/lib/deviceCommands";
+import * as searchCheck from "@/lib/searchInstanceCheck";
+
+describe("settings side effects (AUDIT-ROUTES-01)", () => {
+  async function owner(): Promise<TestClient> {
+    const client = new TestClient();
+    await client.post("/api/auth/setup", { displayName: "Sage", secret: "correcthorse" });
+    return client;
+  }
+
+  test("enabling away access while Tailscale refuses answers 400, leaves the value false and never broadcasts", async () => {
+    const client = await owner();
+    const turnOn = spyOn(tailscaleModule, "turnOnTailscaleAccess").mockRejectedValue(new Error("tailscale is not logged in"));
+    const publish = spyOn(deviceCommands, "publishSettingsChanged").mockImplementation(() => {});
+    try {
+      const res = await client.request("/api/settings", { method: "PUT", body: { scope: "household", key: "network.tailnet_access", value: true } });
+      expect(res.status).toBe(400);
+      const body = (await res.json()) as { error: string };
+      expect(body.error).not.toContain("not logged in");
+      expect(getHouseholdSettingValue("network.tailnet_access")).toBe(false);
+      expect(publish).not.toHaveBeenCalled();
+    } finally { turnOn.mockRestore(); publish.mockRestore(); }
+  });
+
+  test("a non-admin cannot trigger the Tailscale check: setValue's 403 comes first", async () => {
+    const ownerClient = await owner();
+    const adult = (await (await ownerClient.post("/api/people", { displayName: "Marlow", role: "adult", secret: "0000" })).json()) as { id: string };
+    const adultClient = new TestClient();
+    await adultClient.post("/api/auth/verify-secret", { personId: adult.id, secret: "0000" });
+    const turnOn = spyOn(tailscaleModule, "turnOnTailscaleAccess").mockResolvedValue({} as never);
+    try {
+      const res = await adultClient.request("/api/settings", { method: "PUT", body: { scope: "household", key: "network.tailnet_access", value: true } });
+      expect(res.status).toBe(403);
+      expect(turnOn).not.toHaveBeenCalled();
+    } finally { turnOn.mockRestore(); }
+  });
+
+  test("a PUT broadcasts once and a household search url check runs once", async () => {
+    const client = await owner();
+    const publish = spyOn(deviceCommands, "publishSettingsChanged").mockImplementation(() => {});
+    const check = spyOn(searchCheck, "checkSearchInstance").mockResolvedValue(undefined as never);
+    try {
+      const res = await client.request("/api/settings", { method: "PUT", body: { scope: "household", key: "search.searxng_url", value: "http://127.0.0.1:8080" } });
+      expect(res.status).toBe(200);
+      expect(publish).toHaveBeenCalledTimes(1);
+      expect(check).toHaveBeenCalledTimes(1);
+    } finally { publish.mockRestore(); check.mockRestore(); }
+  });
+
+  test("a PUT of engines.stack.where runs applyEngineWhere exactly once", async () => {
+    const client = await owner();
+    const apply = spyOn(remoteStackSettings, "applyEngineWhere").mockResolvedValue(undefined);
+    const publish = spyOn(deviceCommands, "publishSettingsChanged").mockImplementation(() => {});
+    try {
+      const res = await client.request("/api/settings", { method: "PUT", body: { scope: "household", key: "engines.stack.where", value: "this_computer" } });
+      expect(res.status).toBe(200);
+      expect(apply).toHaveBeenCalledTimes(1);
+      expect(publish).toHaveBeenCalledTimes(1);
+    } finally { apply.mockRestore(); publish.mockRestore(); }
+  });
+
+  test("a reset of engines.stack.where runs applyEngineWhere and broadcasts once", async () => {
+    const client = await owner();
+    setHouseholdSettingValue("engines.stack.where", "another_computer");
+    const apply = spyOn(remoteStackSettings, "applyEngineWhere").mockResolvedValue(undefined);
+    const publish = spyOn(deviceCommands, "publishSettingsChanged").mockImplementation(() => {});
+    try {
+      const res = await client.request("/api/settings/reset", { method: "POST", body: { scope: "household", key: "engines.stack.where" } });
+      expect(res.status).toBe(200);
+      expect(apply).toHaveBeenCalledTimes(1);
+      expect(publish).toHaveBeenCalledTimes(1);
+    } finally { apply.mockRestore(); publish.mockRestore(); }
+  });
+
+  test("a refused PUT (invalid value) leaves the stored value unchanged and does not broadcast", async () => {
+    const client = await owner();
+    const before = getHouseholdSettingValue("engines.stack.where");
+    const publish = spyOn(deviceCommands, "publishSettingsChanged").mockImplementation(() => {});
+    const apply = spyOn(remoteStackSettings, "applyEngineWhere").mockResolvedValue(undefined);
+    try {
+      const res = await client.request("/api/settings", { method: "PUT", body: { scope: "household", key: "engines.stack.where", value: "the_moon" } });
+      expect(res.status).toBe(400);
+      expect(getHouseholdSettingValue("engines.stack.where")).toBe(before);
+      expect(publish).not.toHaveBeenCalled();
+      expect(apply).not.toHaveBeenCalled();
+    } finally { publish.mockRestore(); apply.mockRestore(); }
+  });
+});

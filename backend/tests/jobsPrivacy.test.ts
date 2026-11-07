@@ -32,3 +32,24 @@ describe("ACTIVITY-01b job visibility", () => {
     expect(view.progress).toEqual({ fraction: 0.4 });
   });
 });
+
+describe("POST /api/jobs/:id/stop with damaged provenance (AUDIT-ROUTES-01)", () => {
+  test("stops the job and records the stop even when the provenance column is not JSON", async () => {
+    const { TestClient } = await import("./client");
+    const { resetDb } = await import("./reset-db");
+    const { db } = await import("@/db");
+    const { jobs, people } = await import("@/db/schema");
+    const { eq } = await import("drizzle-orm");
+    resetDb();
+    const client = new TestClient();
+    await client.post("/api/auth/setup", { displayName: "Sage", secret: "correcthorse" });
+    const sage = db.select().from(people).where(eq(people.displayName, "Sage")).get()!;
+    const now = new Date().toISOString();
+    db.insert(jobs).values({ id: "job-bad-prov", kind: "research", startedBy: sage.id, forPerson: sage.id, title: "Look into it", state: "running", provenance: "{not json", createdAt: now, updatedAt: now }).run();
+    const res = await client.post("/api/jobs/job-bad-prov/stop");
+    expect(res.status).toBe(200);
+    const row = db.select().from(jobs).where(eq(jobs.id, "job-bad-prov")).get()!;
+    expect(row.state).toBe("cancelled");
+    expect(JSON.parse(row.provenance).actions[0].action).toBe("stop");
+  });
+});

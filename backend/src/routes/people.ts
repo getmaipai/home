@@ -1,6 +1,6 @@
 import { createRoute, z } from "@hono/zod-openapi";
 import { and, eq, isNull } from "drizzle-orm";
-import { db } from "@/db";
+import { db, sqlite } from "@/db";
 import { people, personCredentials } from "@/db/schema";
 import { hashSecret, secretDigitsOf } from "@/lib/secret";
 import { newPersonId } from "@/lib/id";
@@ -187,13 +187,11 @@ peopleRoutes.openapi(createRoute_, async (c) => {
     return c.json({ error: candidate.error.issues.map((i) => i.message).join("; ") }, 400);
   }
 
-  db.insert(people).values(personToDbValues(candidate.data)).run();
-
-  if (secret) {
-    db.insert(personCredentials)
-      .values({ personId: id, secretHash: await hashSecret(secret), secretDigits: secretDigitsOf(secret), failedAttempts: 0, createdAt: now, updatedAt: now })
-      .run();
-  }
+  const secretHash = secret ? await hashSecret(secret) : null;
+  sqlite.transaction(() => {
+    db.insert(people).values(personToDbValues(candidate.data)).run();
+    if (secretHash) db.insert(personCredentials).values({ personId: id, secretHash, secretDigits: secretDigitsOf(secret!), failedAttempts: 0, createdAt: now, updatedAt: now }).run();
+  })();
 
   return c.json(toRoster(db.select().from(people).where(eq(people.id, id)).get()!), 201);
 });
@@ -342,6 +340,21 @@ peopleRoutes.openapi(patchRoute, async (c) => {
   });
   if (!candidate.success) {
     return c.json({ error: candidate.error.issues.map((i) => i.message).join("; ") }, 400);
+  }
+
+  // Validate every settings-backed field before committing the profile so a
+  // settings refusal cannot leave the PATCH half applied.
+  if (rawBody.sessionLockRequired !== undefined) {
+    if (typeof rawBody.sessionLockRequired !== "boolean") return c.json({ error: "sessionLockRequired must be true or false" }, 400);
+    if (!isOwnerOrAdmin(actor)) return c.json({ error: "only owner or admin may change session lock settings" }, 403);
+    const targetRole = db.select({ role: people.role }).from(people).where(eq(people.id, id)).get()?.role;
+    if (actor.role !== "owner" && actor.id !== id && (targetRole === "owner" || targetRole === "admin")) return c.json({ error: "only owner or admin may change session lock settings" }, 403);
+  }
+  if (rawBody.sessionLockTimeoutMinutes !== undefined) {
+    if (!Number.isInteger(rawBody.sessionLockTimeoutMinutes) || (rawBody.sessionLockTimeoutMinutes as number) < 1 || (rawBody.sessionLockTimeoutMinutes as number) > 120) return c.json({ error: "sessionLockTimeoutMinutes must be between 1 and 120" }, 400);
+    if (!isOwnerOrAdmin(actor)) return c.json({ error: "only owner or admin may change session lock settings" }, 403);
+    const targetRole = db.select({ role: people.role }).from(people).where(eq(people.id, id)).get()?.role;
+    if (actor.role !== "owner" && actor.id !== id && (targetRole === "owner" || targetRole === "admin")) return c.json({ error: "only owner or admin may change session lock settings" }, 403);
   }
 
   // commitPersonUpdate (lib/personLifecycle.ts), not a plain db.update():

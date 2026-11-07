@@ -51,7 +51,12 @@ jobsRoutes.openapi(stopRoute, async (c) => {
   if (!row) return c.json({ error: "job not found" }, 404);
   if (!canStopJob(actor, row.forPerson, row.startedBy)) return c.json({ error: "cannot stop this job" }, 403);
   if (!["queued", "running", "paused", "waiting_for_you"].includes(row.state)) return c.json({ error: "job is not active" }, 409);
-  const provenance = JSON.parse(row.provenance) as Record<string, unknown>;
+  // A damaged provenance column must not make the job impossible to stop: read it as empty and record the stop on a fresh object.
+  let provenance: Record<string, unknown> = {};
+  try {
+    const parsed: unknown = JSON.parse(row.provenance);
+    if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) provenance = parsed as Record<string, unknown>;
+  } catch { /* keep the empty object */ }
   if (typeof provenance.stackJobId === "string" && isStackConfigured()) {
     try {
       const stopped = await getStackClient().cancelJob(provenance.stackJobId);

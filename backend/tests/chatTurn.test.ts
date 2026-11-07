@@ -933,6 +933,31 @@ describe("runTurnNextStream() output-safety gate (step 9)", () => {
     });
   });
 
+  test("AUDIT-ROUTES-01: an unexpected stream failure (even a non-Error throw) sends one fixed sentence, never the raw text, and finalize still runs for the streamed text", async () => {
+    const { childRow } = await ownerAndChild();
+
+    await withScriptedStream(SAFE_SENTENCE, async () => {
+      const result = await runTurnNextStream(childRow, "chat", "hi there");
+      if (!result.ok || result.kind !== "stream") throw new Error("setup failed");
+      const finalized: string[] = [];
+      const realFinalize = result.finalize;
+      const broken = {
+        ...result,
+        tokens: (async function* () { yield "Half an answer. "; throw "engine said /Users/example/secret.gguf exploded"; })(),
+        finalize: (text: string, ...rest: unknown[]) => { finalized.push(text); return (realFinalize as (t: string, ...r: unknown[]) => ReturnType<typeof realFinalize>)(text, ...rest); },
+      } as typeof result;
+
+      const events: TurnStreamEvent[] = [];
+      for await (const event of streamTurnEvents(broken, childRow.id)) events.push(event);
+
+      const errors = events.filter((e): e is Extract<TurnStreamEvent, { type: "error" }> => e.type === "error");
+      expect(errors).toHaveLength(1);
+      expect(errors[0]?.error).toBe("Something went wrong while writing that. Send it again, or check Repairs.");
+      expect(JSON.stringify(events)).not.toContain("/Users/example");
+      expect(finalized).toEqual(["Half an answer."]);
+    });
+  });
+
   test("the notification fires: an adult in the household sees a safety.flagged_turn alert for the child's cut turn", async () => {
     const { ownerRow, childRow } = await ownerAndChild();
 
@@ -2531,10 +2556,11 @@ describe("routes/turn.ts streamTurnEvents()", () => {
       },
     };
 
-    const events: Array<{ type: string; error?: string }> = [];
+    const events: Array<{ type: string; error?: string; code?: string }> = [];
     for await (const event of streamTurnEvents(result, "test-person")) events.push(event);
 
-    expect(events).toEqual([{ type: "error", error: "chat model unavailable: never even started" }]);
+    // AUDIT-ROUTES-01: an unclassified failure reaches the client as one fixed sentence, never the raw message.
+    expect(events).toEqual([{ type: "error", error: "Something went wrong while writing that. Send it again, or check Repairs.", code: "internal" }]);
     expect(finalizeCalls).toEqual([]);
   });
 

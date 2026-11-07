@@ -48,11 +48,13 @@ toursRoutes.post("/progress", requireAuth, async (c) => {
 
 toursRoutes.post("/missing-target", requireAuth, async (c) => {
   const body = await c.req.json().catch(() => null) as Record<string, unknown> | null;
-  if (!body || typeof body.package_id !== "string" || typeof body.tour_id !== "string" || typeof body.step_id !== "string") return c.json({ error: "invalid target counter" }, 400);
+  if (!body || typeof body.package_id !== "string" || !body.package_id || typeof body.tour_id !== "string" || !body.tour_id || typeof body.step_id !== "string" || !body.step_id || body.package_id.length > 120 || body.tour_id.length > 120 || body.step_id.length > 120) return c.json({ error: "invalid target counter" }, 400);
   const key = `${body.package_id}:${body.tour_id}:${body.step_id}`;
   const current = db.select().from(settingsValues).where(and(eq(settingsValues.scope, "household"), eq(settingsValues.key, missingKey))).get();
   let counts: Record<string, number> = {};
   try { counts = current ? JSON.parse(current.value) as Record<string, number> : {}; } catch { counts = {}; }
+  if (!counts || typeof counts !== "object" || Array.isArray(counts)) counts = {};
+  if (!Object.hasOwn(counts, key) && Object.keys(counts).length >= 500) delete counts[Object.keys(counts)[0]!];
   counts[key] = (counts[key] ?? 0) + 1;
   const at = new Date().toISOString();
   const hlc = nextHlc();

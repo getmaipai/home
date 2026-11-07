@@ -219,7 +219,8 @@ voiceRoutes.openapi(wakewordFileRoute, async (c) => {
   try {
     await ensureWakewordAssets();
   } catch (err) {
-    return c.json({ error: `wake-word asset unavailable: ${(err as Error).message}` }, 503);
+    console.error("[voice] wake-word asset preparation failed", err);
+    return c.json({ error: "Wake-word assets are unavailable. Try again later, or check Repairs." }, 503);
   }
 
     const bunFile = Bun.file(wakewordAssetPath(asset.file));
@@ -266,7 +267,8 @@ voiceRoutes.openapi(voiceCatalogRoute, async (c) => {
     const entries = await getVoiceCatalog();
     return c.json({ entries }, 200);
   } catch (err) {
-    return c.json({ error: `voice catalog unavailable: ${(err as Error).message}` }, 503);
+    console.error("[voice] catalog load failed", err);
+    return c.json({ error: "The voice catalog is unavailable. Try again later, or check Repairs." }, 503);
   }
 });
 
@@ -316,7 +318,8 @@ voiceRoutes.openapi(catalogSelectRoute, async (c) => {
   try {
     entries = await getVoiceCatalog();
   } catch (err) {
-    return c.json({ error: `voice catalog unavailable: ${(err as Error).message}` }, 503);
+    console.error("[voice] catalog selection failed", err);
+    return c.json({ error: "The voice catalog is unavailable. Try again later, or check Repairs." }, 503);
   }
   if (!isVoiceCatalogPath(entries, path)) {
     return c.json({ error: `not a real voice catalog entry: ${path}` }, 400);
@@ -364,28 +367,20 @@ voiceRoutes.openapi(hfTokenRoute, async (c) => {
     return c.json({ error: "token is required" }, 400);
   }
 
-  // The Stack owns the speech engine and its token. Keep the owner/admin
-  // gate explicit because this path writes directly to the Stack.
-  if (getStackUrl()) {
-    if (!isOwnerOrAdmin(actor)) {
-      return c.json({ error: "only owner or admin may change household settings" }, 403);
-    }
-    try {
-      await getStackClient().applySettings({ "stack.engines.tts.hf_token": token });
-    } catch (err) {
-      const failure = stackFailureResult(err, "tts");
-      return c.json({ error: failure.error }, failure.status);
-    }
-    return c.json(resolveForResponse(getRegistryKey("voice.hf_token")!, token, "user"), 200);
-  }
-
-  if (!isStackConfigured()) return c.json({ error: "the MaiPai Stack is required for text to speech" }, 503);
+  // The Stack owns the speech engine and its token. Check authority before
+  // probing the remote link so an unreachable engine reveals no state.
+  if (!isOwnerOrAdmin(actor)) return c.json({ error: "only owner or admin may change household settings" }, 403);
   try {
+    if (getStackUrl()) {
+      await getStackClient().applySettings({ "stack.engines.tts.hf_token": token });
+      return c.json(resolveForResponse(getRegistryKey("voice.hf_token")!, token, "user"), 200);
+    }
+    if (!isStackConfigured()) return c.json({ error: "the MaiPai Stack is required for text to speech" }, 503);
     await getStackClient().applySettings({ "stack.engines.tts.hf_token": token });
     return c.json(resolveForResponse(getRegistryKey("voice.hf_token")!, token, "user"), 200);
   } catch (err) {
     const failure = stackFailureResult(err, "tts");
-    return c.json({ error: failure.error }, failure.status);
+    return c.json({ error: failure.error, next: "Check the engine computer in Repairs, then save the token again." }, failure.status);
   }
 });
 
@@ -407,19 +402,17 @@ const hfTokenRemoveRoute = createRoute({
 
 voiceRoutes.openapi(hfTokenRemoveRoute, async (c) => {
   const actor = c.get("person");
-  if (getStackUrl()) {
-    if (!isOwnerOrAdmin(actor)) {
-      return c.json({ error: "only owner or admin may change household settings" }, 403);
-    }
-    try {
+  if (!isOwnerOrAdmin(actor)) return c.json({ error: "only owner or admin may change household settings" }, 403);
+  try {
+    if (getStackUrl()) {
       await getStackClient().applySettings({ "stack.engines.tts.hf_token": "" });
-    } catch (err) {
-      const failure = stackFailureResult(err, "tts");
-      return c.json({ error: failure.error }, failure.status);
+      return c.json(resolveForResponse(getRegistryKey("voice.hf_token")!, "", "default"), 200);
     }
-    return c.json(resolveForResponse(getRegistryKey("voice.hf_token")!, "", "default"), 200);
+    return c.json({ error: "the MaiPai Stack is required for text to speech" }, 503);
+  } catch (err) {
+    const failure = stackFailureResult(err, "tts");
+    return c.json({ error: failure.error, next: "Check the engine computer in Repairs, then save the token again." }, failure.status);
   }
-  return c.json({ error: "the MaiPai Stack is required for text to speech" }, 503);
 });
 
 // Voice cloning (2026-09-04, the follow-up to voice.hf_token): a real

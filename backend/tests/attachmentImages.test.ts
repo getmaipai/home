@@ -117,3 +117,20 @@ describe("chat image attachment route", () => {
     removeTemporaryChatImages(body.conversation_id);
   });
 });
+
+describe("chat image upload failures", () => {
+  test("an unsupported file gets the picture copy; an unexpected failure gets one fixed sentence, never library text", async () => {
+    const { client, actor } = await signedInOwner();
+    const conversation = resolveOrCreateConversation(actor, "chat");
+    if (!conversation.ok) throw new Error("no conversation");
+    const response = await upload(client, new Uint8Array([1, 2, 3, 4, 5, 6, 7, 8]), conversation.value.id, newConversationTurnId());
+    expect(response.status).toBe(400);
+    const body = (await response.json()) as { error: string };
+    expect(body.error).toBe("That file is not a supported picture.");
+    const png8 = await png();
+    const corrupt = png8.slice(0, 40);
+    const damaged = await upload(client, corrupt, conversation.value.id, newConversationTurnId());
+    expect(damaged.status).toBe(400);
+    expect(JSON.stringify(await damaged.json())).not.toMatch(/sharp|vips|libvips|stack|\/Users/i);
+  });
+});

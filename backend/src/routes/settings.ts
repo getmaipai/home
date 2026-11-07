@@ -37,6 +37,35 @@ import { isHostGuardSetting, writeHostGuardTuning } from "@/lib/hostGuardTuning"
 
 export const settingsRoutes = apiRouter();
 
+async function applySettingSideEffects(scope: string, key: string, value: unknown, actor: PersonRow, preflight = false): Promise<{ status: 400 | 409; error: string } | null> {
+  // Only a household owner or admin reaches the checks that touch the machine; anyone else falls through to setValue's own 403.
+  const mayCheck = preflight && scope === "household" && isOwnerOrAdminActor(actor);
+  if (mayCheck && key === "network.tailnet_access" && value === true) {
+    try { await turnOnTailscaleAccess(actor, true); }
+    catch { return { status: 400, error: "Could not enable away access. Check the connection and try again." }; }
+  }
+  if (mayCheck && isHostGuardSetting(key)) {
+    try { writeHostGuardTuning((candidate) => candidate === key ? value : getHouseholdSettingValue(candidate)); }
+    catch { return { status: 409, error: "Home could not update the Mac self-check settings. Check Repairs and try again." }; }
+  }
+  if (!preflight && scope === "household" && key === "home.robots.enabled" && value === false) {
+    await stopRobotHosts(); closeRobotDeviceCommandChannels(); closeRobotSttSockets();
+  }
+  if (!preflight) {
+    if (scope === "household" && key === "home.robots.enabled" && value === true) await startRobotHosts();
+    if (scope === "household" && key === "search.searxng_url") await checkSearchInstance({ force: true });
+    if (scope === "household" && key === "network.tailnet_access" && value !== true) setTailscaleRenewalActive(false);
+    if (scope === "household" && key === ENGINE_WHERE_KEY) await applyEngineWhere(value);
+    else if (scope === "household" && ["engines.stack.remote.host", "engines.stack.remote.ssh_port", "engines.stack.remote.local_port", "engines.stack.remote.allow_tailnet"].includes(key)) refreshConfiguredEngineLink();
+    publishSettingsChanged(scope, key, value);
+    if (scope === "household" && isCodingStackKey(key)) await pushCodingSettings([key]);
+    if (scope === "household" && ["home.base_url", "home.access_token"].includes(key)) refreshHomeAssistantEvents();
+    if (scope === "household" && key === "safety.alarm.sensors") refreshSafetyAlarmSensors();
+    if (scope === "household" && ["network.lan_exposure", "network.hub_port"].includes(key)) scheduleHubRestart();
+  }
+  return null;
+}
+
 function refreshRobotClips(deviceIds: string[]): void {
   for (const deviceId of deviceIds) {
     void renderClipBundle(deviceId).catch(() => {
@@ -188,43 +217,23 @@ settingsRoutes.openapi(putRoute, async (c) => {
     if (personaRefusal) return c.json({ error: personaRefusal }, 400);
   }
   if (body.scope === "household" && body.key === "coding.home_mode") return c.json({ error: "Coding mode is now Max chat. Pick Max in a chat, or connect a coding app, and Home loads the big model for you." }, 400);
+  const refusal = await applySettingSideEffects(body.scope, body.key, body.value, actor, true);
+  if (refusal) return c.json({ error: refusal.error }, refusal.status);
   const result = await setValue(actor, body.scope, body.key, body.value);
   if (!result.ok) {
     return result.status === 400 ? c.json({ error: result.error }, 400) : c.json({ error: result.error }, 403);
   }
   if (warning) await reconcileCapabilities();
-  if (body.scope === "household" && body.key === "home.robots.enabled" && body.value === false) {
-    await stopRobotHosts();
-    closeRobotDeviceCommandChannels();
-    closeRobotSttSockets();
-  }
-  if (body.scope === "household" && body.key === "home.robots.enabled" && body.value === true) await startRobotHosts();
-  if (body.scope === "household" && body.key === "search.searxng_url") await checkSearchInstance({ force: true });
-  if (body.scope === "household" && body.key === "network.tailnet_access") {
-    if (body.value === true) {
-      try { await turnOnTailscaleAccess(actor, true); }
-      catch (error) { return c.json({ error: error instanceof Error ? error.message : "Could not enable away access." }, 400); }
-    } else setTailscaleRenewalActive(false);
-  }
-  if (body.scope === "household" && body.key === ENGINE_WHERE_KEY) await applyEngineWhere(body.value);
-  else if (body.scope === "household" && ["engines.stack.remote.host", "engines.stack.remote.ssh_port", "engines.stack.remote.local_port", "engines.stack.remote.allow_tailnet"].includes(body.key)) refreshConfiguredEngineLink();
-  publishSettingsChanged(body.scope, body.key, result.value.value);
-  // CODE-STACK-01 H2: a coding setting the Stack reads goes to the Stack now; the answer to the save does not wait on it failing.
-  if (body.scope === "household" && isCodingStackKey(body.key)) await pushCodingSettings([body.key]);
+  // Repeat the shared effects with the committed value; the first pass was
+  // the refusal check and did not change persisted settings.
+  await applySettingSideEffects(body.scope, body.key, result.value.value, actor);
   const personScope = /^person:([a-z0-9-]+)$/.exec(body.scope);
   if (personScope && body.key === "tts.voice_id") refreshRobotClips(listRobotsPairedUnderPerson(personScope[1]!));
   const robotVoiceScope = /^device:([a-z0-9-]+)$/.exec(body.scope);
   if (robotVoiceScope && (body.key === "robot.voice.id" || body.key === ROBOT_CONTROLS_KEY || body.key === ROBOT_COMPANION_KEY)) refreshRobotClips([robotVoiceScope[1]!]);
-  if (body.scope === "household" && ["home.base_url", "home.access_token"].includes(body.key)) refreshHomeAssistantEvents();
   if (body.scope === "household" && body.key === "safety.alarm.sensors") {
-    refreshSafetyAlarmSensors();
     refreshRobotClips(listDevicesByKind("robot").map((device) => device.id));
   }
-  if (body.scope === "household" && isHostGuardSetting(body.key)) {
-    try { writeHostGuardTuning((key) => key === body.key ? result.value.value : getHouseholdSettingValue(key)); }
-    catch (error) { return c.json({ error: error instanceof Error ? error.message : "Home could not update the Mac self-check settings." }, 409); }
-  }
-  if (body.scope === "household" && ["network.lan_exposure", "network.hub_port"].includes(body.key)) scheduleHubRestart();
   return c.json(result.value, 200);
 });
 
@@ -267,27 +276,15 @@ settingsRoutes.openapi(resetRoute, async (c) => {
     const refusal = robotAssignmentRefusal(resetAssignScope[1]!, body.key, "child");
     if (refusal) return c.json({ error: refusal }, 400);
   }
+  const refusal = await applySettingSideEffects(body.scope, body.key, getRegistry().find((key) => key.key === body.key)?.default, actor, true);
+  if (refusal) return c.json({ error: refusal.error }, refusal.status);
   const result = resetValue(actor, body.scope, body.key);
   if (!result.ok) {
     return result.status === 400 ? c.json({ error: result.error }, 400) : c.json({ error: result.error }, 403);
   }
-  if (body.scope === "household" && body.key === "home.robots.enabled" && result.value.value === false) {
-    await stopRobotHosts();
-    closeRobotDeviceCommandChannels();
-    closeRobotSttSockets();
-  }
-  if (body.scope === "household" && body.key === "search.searxng_url") await checkSearchInstance({ force: true });
-  publishSettingsChanged(body.scope, body.key, result.value.value);
-  if (body.scope === "household" && isCodingStackKey(body.key)) await pushCodingSettings([body.key]);
+  await applySettingSideEffects(body.scope, body.key, result.value.value, actor);
   const resetRobotVoiceScope = /^device:([a-z0-9-]+)$/.exec(body.scope);
   if (resetRobotVoiceScope && (body.key === "robot.voice.id" || body.key === ROBOT_CONTROLS_KEY || body.key === ROBOT_COMPANION_KEY)) refreshRobotClips([resetRobotVoiceScope[1]!]);
-  if (body.scope === "household" && ["home.base_url", "home.access_token"].includes(body.key)) refreshHomeAssistantEvents();
-  if (body.scope === "household" && body.key === "safety.alarm.sensors") refreshSafetyAlarmSensors();
-  if (body.scope === "household" && isHostGuardSetting(body.key)) {
-    try { writeHostGuardTuning((key) => key === body.key ? result.value.value : getHouseholdSettingValue(key)); }
-    catch (error) { return c.json({ error: error instanceof Error ? error.message : "Home could not update the Mac self-check settings." }, 409); }
-  }
-  if (body.scope === "household" && ["network.lan_exposure", "network.hub_port"].includes(body.key)) scheduleHubRestart();
   return c.json({ ...result.value, success: true as const }, 200);
 });
 

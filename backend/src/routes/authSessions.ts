@@ -38,7 +38,7 @@ authSessionsRoutes.openapi(listRoute, (c) => {
   const actor = c.get("person");
   const currentToken = getCookie(c, "session");
   const currentHash = currentToken ? hashSessionToken(currentToken) : null;
-  const rows = db.select().from(sessions).where(eq(sessions.personId, actor.id)).all();
+  const rows = db.select().from(sessions).where(and(eq(sessions.personId, actor.id), gt(sessions.expiresAt, new Date().toISOString()))).all();
   return c.json(
     rows.map((r) => ({
       id: r.id,

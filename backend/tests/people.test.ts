@@ -1247,3 +1247,29 @@ describe("POST /api/people/:id/memorialize", () => {
     expect(res.status).toBe(403);
   });
 });
+
+describe("people writes that cannot half-apply (AUDIT-ROUTES-01)", () => {
+  test("POST /api/people leaves no person row when hashing the secret throws", async () => {
+    const { spyOn } = await import("bun:test");
+    const secretModule = await import("@/lib/secret");
+    const client = new TestClient();
+    await client.post("/api/auth/setup", { displayName: "Sage", secret: "correcthorse" });
+    const before = (sqlite.query("SELECT COUNT(*) AS n FROM people").get() as { n: number }).n;
+    const spy = spyOn(secretModule, "hashSecret").mockRejectedValue(new Error("hash exploded"));
+    try {
+      const res = await client.post("/api/people", { displayName: "Bramble", role: "adult", secret: "1234" });
+      expect(res.status).toBe(500);
+    } finally { spy.mockRestore(); }
+    expect((sqlite.query("SELECT COUNT(*) AS n FROM people").get() as { n: number }).n).toBe(before);
+    expect(sqlite.query("SELECT 1 FROM people WHERE display_name = 'Bramble'").get()).toBeNull();
+  });
+
+  test("PATCH refuses a bad session-lock value before the profile changes", async () => {
+    const client = new TestClient();
+    const setup = await client.post("/api/auth/setup", { displayName: "Sage", secret: "correcthorse" });
+    const { person } = (await setup.json()) as { person: { id: string } };
+    const res = await client.request(`/api/people/${person.id}`, { method: "PATCH", body: { displayName: "Renamed", sessionLockTimeoutMinutes: 5000 } });
+    expect(res.status).toBe(400);
+    expect((sqlite.query("SELECT display_name AS n FROM people WHERE id = ?").get(person.id) as { n: string }).n).toBe("Sage");
+  });
+});

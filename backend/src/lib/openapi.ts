@@ -5,12 +5,20 @@
 // existing call site keeps calling apiRouter() with no type argument.
 import type { MiddlewareHandler } from "hono";
 import type { AppEnv } from "@/types";
-import { apiRouter as apiRouterCore } from "@maipai/core/src/openapi";
+import { OpenAPIHono } from "@hono/zod-openapi";
 
 export { ErrorSchema, errorResponses, idParamSchema, PaginationQuerySchema, paginatedResponseSchema } from "@maipai/core/src/openapi";
 
 export function apiRouter() {
-  return apiRouterCore<AppEnv>();
+  return new OpenAPIHono<AppEnv>({ defaultHook: (result, c) => {
+    if (!result.success) {
+      const message = result.error.issues.map((issue) => {
+        const path = issue.path.filter((part) => part !== "body").join(".");
+        return path ? `${path}: ${issue.message}` : issue.message;
+      }).join("; ");
+      return c.json({ error: message, next: "Check the fields named and send it again." }, 400);
+    }
+  } });
 }
 
 /** Route middleware for a converted route whose plain-Hono version read the

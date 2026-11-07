@@ -89,3 +89,18 @@ describe("DELETE /api/auth/sessions/:id", () => {
     expect((await (await childClient.get("/api/auth/sessions")).json() as unknown[])).toHaveLength(1);
   });
 });
+
+describe("GET /api/auth/sessions hides expired rows (AUDIT-ROUTES-01)", () => {
+  test("an expired session row is not listed", async () => {
+    const { db } = await import("@/db");
+    const { sessions, people } = await import("@/db/schema");
+    const client = new TestClient();
+    await client.post("/api/auth/setup", { displayName: "Sage", secret: "correcthorse" });
+    const sage = db.select().from(people).get()!;
+    const past = new Date(Date.now() - 86_400_000).toISOString();
+    db.insert(sessions).values({ id: "sess-expired", personId: sage.id, tokenHash: "hash-expired", expiresAt: past, createdAt: past }).run();
+    const rows = (await (await client.get("/api/auth/sessions")).json()) as Array<{ id: string }>;
+    expect(rows.map((r) => r.id)).not.toContain("sess-expired");
+    expect(rows).toHaveLength(1);
+  });
+});

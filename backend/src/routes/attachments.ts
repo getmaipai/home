@@ -87,7 +87,11 @@ attachmentsRoutes.openapi(uploadRoute, async (c) => {
     }
     return c.json({ conversation_id: conversationId, turn_id: turnId, image: { id, name, width: cleaned.width, height: cleaned.height, media_type: cleaned.mediaType } }, 201);
   } catch (err) {
-    return c.json({ error: err instanceof Error ? err.message : "Could not process this picture." }, 400);
+    // imageUpload.ts throws this fixed copy on purpose; anything else is logged and gets one plain sentence.
+    const known = ["That file is not a supported picture.", "That picture could not be read.", "That picture is too large to process.", CHAT_IMAGE_REFUSAL];
+    if (err instanceof Error && known.includes(err.message)) return c.json({ error: err.message }, 400);
+    console.error("[attachments] image upload failed", err);
+    return c.json({ error: "Could not process this picture. Check the image and try again." }, 400);
   }
 });
 

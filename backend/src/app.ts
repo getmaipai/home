@@ -122,6 +122,7 @@ import { pageCsp } from "@/middleware/pageCsp";
 import { collectHealth } from "@/lib/healthSnapshot";
 import { slowRequestMiddleware } from "@/lib/perfWatch";
 import { hostCheck } from "@/middleware/hostCheck";
+import { HTTPException } from "hono/http-exception";
 
 // Session F, step 4: every route file converts to @hono/zod-openapi
 // through lib/openapi.ts's apiRouter() - app.ts's own top-level instance
@@ -132,6 +133,11 @@ import { hostCheck } from "@/middleware/hostCheck";
 // OpenAPIHono only adds the `.openapi()` method and the document
 // generation, it doesn't require every mounted router to use it.
 export const app = apiRouter();
+app.onError((error, c) => {
+  console.error(`[http] ${c.req.method} ${new URL(c.req.url).pathname}`, error);
+  if (error instanceof HTTPException) return c.json({ error: error.message }, error.status);
+  return c.json({ error: "Home hit a problem it did not expect.", next: "Try again. If it keeps happening, open Repairs.", code: "internal" }, 500);
+});
 app.use("*", hostCheck);
 app.use("*", slowRequestMiddleware);
 // ADULT-LOCK-02: the unlock proof header and session key of this request, for every producer of an adult-only item (lib/adultLock.ts).

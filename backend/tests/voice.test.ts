@@ -6,6 +6,8 @@ import { clonedVoiceUrl } from "@/lib/clonedVoices";
 import { resetDb } from "./reset-db";
 import { clonedVoicesDir } from "@/lib/paths";
 import { setHouseholdSettingValue } from "@/lib/settings";
+import { __setEngineLinkForTests } from "@/lib/stack/link";
+import { StackError } from "@/lib/stack/errors";
 import { __setStackClientForTests, __resetStackEngineForTests } from "@/lib/stackEngine";
 import { startStackFixture, offlineResponse, type StackFixture } from "./stackFixture";
 
@@ -49,7 +51,7 @@ describe("POST /api/voice/hf-token", () => {
       await adultClient.post("/api/auth/verify-secret", { personId: adult.id, secret: "0000" });
 
       const res = await adultClient.post("/api/voice/hf-token", { token: "hf_x" });
-      expect(res.status).toBe(503);
+      expect(res.status).toBe(403);
     } finally {
       unavailable.stop();
     }
@@ -79,6 +81,23 @@ describe("POST /api/voice/hf-token", () => {
       unavailable.stop();
     }
   });
+
+  test("a remote Stack link failure returns 503 with recovery advice", async () => {
+    const owner = await ownerClient();
+    setHouseholdSettingValue("engines.stack.where", "another_computer");
+    __setEngineLinkForTests({ assertReady() { throw new StackError("unreachable", "Stack link is unreachable"); }, stop() {}, pathInUse() { return null; } } as never);
+    try {
+      for (const path of ["/api/voice/hf-token", "/api/voice/hf-token/remove"]) {
+        const res = await owner.post(path, { token: "hf_realtoken123" });
+        expect(res.status).toBe(503);
+        const body = (await res.json()) as { error: string; next: string };
+        expect(body.next.length).toBeGreaterThan(10);
+        expect(body.error).not.toContain("link is unreachable");
+      }
+    } finally {
+      __setEngineLinkForTests(null);
+    }
+  });
 });
 
 describe("POST /api/voice/hf-token/remove", () => {
@@ -95,7 +114,7 @@ describe("POST /api/voice/hf-token/remove", () => {
     await adultClient.post("/api/auth/verify-secret", { personId: adult.id, secret: "0000" });
 
     const res = await adultClient.post("/api/voice/hf-token/remove");
-    expect(res.status).toBe(503);
+    expect(res.status).toBe(403);
   });
 
   test("requires the Stack to remove its token", async () => {
@@ -319,5 +338,24 @@ describe("household voice catalog routes", () => {
     }
     expect((await adminClient.post("/api/voice/catalog/select", { path: "en/example.wav" })).status).toBe(503);
     expect((await childClient.post("/api/voice/catalog/select", { path: "en/example.wav" })).status).toBe(403);
+  });
+});
+
+describe("voice routes never send raw error text", () => {
+  const previousCatalogUrl = process.env.MAIPAI_VOICE_CATALOG_URL;
+  afterEach(() => {
+    if (previousCatalogUrl === undefined) delete process.env.MAIPAI_VOICE_CATALOG_URL;
+    else process.env.MAIPAI_VOICE_CATALOG_URL = previousCatalogUrl;
+  });
+
+  test("an unreachable voice catalog answers a fixed 503 sentence without the fetch error", async () => {
+    process.env.MAIPAI_VOICE_CATALOG_URL = "http://127.0.0.1:1/unreachable";
+    const owner = await ownerClient();
+    const res = await owner.get("/api/voice/catalog");
+    expect(res.status).toBe(503);
+    const text = JSON.stringify(await res.json());
+    expect(text).toContain("voice catalog is unavailable");
+    expect(text).not.toContain("ECONNREFUSED");
+    expect(text).not.toContain("127.0.0.1");
   });
 });

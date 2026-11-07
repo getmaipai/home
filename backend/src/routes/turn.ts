@@ -920,7 +920,10 @@ export async function* streamTurnEvents(
     // crisis resources ride with it as a support block a client can draw.
     if (safetyRefusal) yield { type: "error", error: safetyRefusalLine(speakerBand, safetyRefusal.safety.categories), code: "safety_refused", ...(refused?.crisis_resources ? { crisis_resources: refused.crisis_resources, crisis_support: crisisSupportFor(refused.crisis_resources, speakerBand) } : {}) };
     else if (err instanceof StreamUnavailable) yield { type: "error", error: err.message, code: err.code, ...(err.detail ? { detail: err.detail } : {}) };
-    else yield { type: "error", error: (err as Error).message };
+    else {
+      console.error("[turn/stream] unexpected stream failure", err);
+      yield { type: "error", error: "Something went wrong while writing that. Send it again, or check Repairs.", code: "internal" };
+    }
     // Still finalize (and so still log) whatever text actually streamed
     // before the failure: a code review (2026-09-04) found this skipped
     // on the error path, so a reply that had already streamed several

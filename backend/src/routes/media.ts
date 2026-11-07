@@ -5,7 +5,7 @@ import { createRoute, z } from "@hono/zod-openapi";
 import type { Context } from "hono";
 import type { PersonRow } from "@/types";
 import { getCookie } from "hono/cookie";
-import { and, eq, isNull } from "drizzle-orm";
+import { and, eq, inArray, isNull } from "drizzle-orm";
 import { hashSessionToken } from "@/lib/session";
 import { db, sqlite } from "@/db";
 import { mediaItems, mediaSources, people } from "@/db/schema";
@@ -23,6 +23,7 @@ import { serveItemArtwork, serveItemBytes } from "@/lib/media/serve";
 import { artistPhotoFile } from "@/lib/media/artistProfiles";
 import { createRootSource, listSourcesFor, removeSource, ROOT_KINDS } from "@/lib/media/sources";
 import { itemFromRow, sourceFromRow } from "@/lib/media/model";
+import { allowedBandsFor, bandAllows, mediaBandOf } from "@/lib/media/band";
 import { madeFileFor } from "@/lib/media/appHost";
 import { MediaProgress } from "@maipai/spec/gen/ts/media-progress.js";
 import { MediaCollection } from "@maipai/spec/gen/ts/media-collection.js";
@@ -54,12 +55,24 @@ function sourceView(row: typeof mediaSources.$inferSelect, actor: PersonRow) {
   const source = sourceFromRow(row);
   if (isMediaAdmin(actor)) {
     const count = (sqlite.query("SELECT count(*) AS n FROM media_items WHERE source_id = ? AND deleted_at IS NULL").get(row.id) as { n: number }).n;
-    return { source, item_count: count, scanning: isScanning(row.id), last_scan: row.lastScanSummary ? (JSON.parse(row.lastScanSummary) as ScanSummary) : null };
+    return { source, item_count: count, scanning: isScanning(row.id), last_scan: safeScanSummary(row.lastScanSummary) };
   }
-  const ids = sqlite.query("SELECT id FROM media_items WHERE source_id = ? AND deleted_at IS NULL AND hidden = 0").all(row.id) as Array<{ id: string }>;
-  const readable = ids.filter(({ id }) => readableItem(actor, id) !== null).length;
+  // One query per source (callers already hold only sources this person may see). An adult reads every live, unhidden item the
+  // allowed bands cover, so SQL counts exactly what readableItem would. A minor's read also re-runs the word floor in bandAllows,
+  // which SQL cannot express: one SELECT of the band-eligible rows, filtered in memory, still a single query.
+  const bands = allowedBandsFor(actor);
+  const readable = mediaBandOf(actor) === "adult"
+    ? (sqlite.query(`SELECT count(*) AS n FROM media_items WHERE source_id = ? AND deleted_at IS NULL AND hidden = 0 AND band_ok IN (${bands.map(() => "?").join(",")})`).get(row.id, ...bands) as { n: number }).n
+    : db.select().from(mediaItems).where(and(eq(mediaItems.sourceId, row.id), isNull(mediaItems.deletedAt), eq(mediaItems.hidden, false), inArray(mediaItems.bandOk, bands))).all().filter((itemRow) => {
+      try { return bandAllows(actor, itemFromRow(itemRow)); } catch { return false; }
+    }).length;
   const shown = { ...source, root: source.root ? { ...source.root, path: "" } : null, archive: [], url: null, owner_person_id: null, provenance: "hub" };
   return { source: shown, item_count: readable, scanning: isScanning(row.id), last_scan: null };
+}
+
+function safeScanSummary(value: string | null): ScanSummary | null {
+  if (!value) return null;
+  try { return JSON.parse(value) as ScanSummary; } catch { return null; }
 }
 
 // ---- sources ----

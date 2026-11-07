@@ -107,3 +107,68 @@ test("a teen whose allowlist is on gets no feed item and no discovery rows throu
   expect((await teen.client.get("/api/media/items/media-feed000001")).status).toBe(404);
   expect((await teen.client.get("/api/media/items/media-feed000001/content")).status).toBe(404);
 });
+
+import { readableItem } from "@/lib/media/access";
+import { sqlite } from "@/db";
+
+test("AUDIT-ROUTES-01: a bad lastScanSummary does not break the admin sources list", async () => {
+  const { owner } = await setup();
+  db.update(mediaSources).set({ lastScanSummary: "{not json" }).where(eq(mediaSources.id, "msrc-library0001")).run();
+  const res = await owner.get("/api/media/sources");
+  expect(res.status).toBe(200);
+  const library = (await sources(owner)).find((view) => view.source.id === "msrc-library0001")!;
+  expect(library.last_scan).toBeNull();
+  expect(library.item_count).toBe(3);
+});
+
+test("AUDIT-ROUTES-01: the per-source count matches readableItem for a mix of visible, hidden, trashed and adult-only items", async () => {
+  const { owner, child } = await setup();
+  const now = new Date().toISOString();
+  const add = (id: string, bandOk: string, extra: Partial<typeof mediaItems.$inferInsert> = {}) =>
+    db.insert(mediaItems).values({ id, sourceId: "msrc-library0001", kind: "video", title: "Plain clip", locRootId: "msrc-library0001", locPath: `${id}.mp4`, mediaType: "video/mp4", playable: "original", size: 1, bandOk, addedAt: now, createdAt: now, hlc: "1:0:aaaaaa", provenance: "test", ...extra }).run();
+  add("media-hidden00001", "child", { hidden: true });
+  add("media-trashed0001", "child", { deletedAt: now });
+  add("media-teenonly001", "teen");
+  add("media-childok0002", "child");
+  const marlowRes = await owner.post("/api/people", { displayName: "marlow", role: "adult", secret: "0000" });
+  const marlowId = ((await marlowRes.json()) as { id: string }).id;
+  const marlow = new TestClient();
+  await marlow.post("/api/auth/verify-secret", { personId: marlowId, secret: "0000" });
+  const ids = (sqlite.query("SELECT id FROM media_items WHERE source_id = 'msrc-library0001'").all() as Array<{ id: string }>).map((r) => r.id);
+  for (const [who, actorId] of [[child.client, child.id], [marlow, marlowId]] as const) {
+    const actor = db.select().from(people).where(eq(people.id, actorId)).get()!;
+    const expected = ids.filter((id) => readableItem(actor, id) !== null).length;
+    const view = (await sources(who)).find((entry) => entry.source.id === "msrc-library0001")!;
+    expect(view.item_count).toBe(expected);
+  }
+});
+
+test("AUDIT-ROUTES-01: an adult's count over a 2,000-item source is one statement", async () => {
+  const { owner } = await setup();
+  const now = new Date().toISOString();
+  sqlite.transaction(() => {
+    for (let i = 0; i < 2000; i++) {
+      db.insert(mediaItems).values({ id: `media-bulk${String(i).padStart(6, "0")}`, sourceId: "msrc-feed00000001", kind: "video", title: `Clip ${i}`, locRootId: "msrc-feed00000001", locPath: `${i}.mp4`, mediaType: "video/mp4", playable: "original", size: 1, bandOk: "child", addedAt: now, createdAt: now, hlc: "1:0:aaaaaa", provenance: "test" }).run();
+    }
+  })();
+  const marlowRes = await owner.post("/api/people", { displayName: "marlow", role: "adult", secret: "0000" });
+  const marlowId = ((await marlowRes.json()) as { id: string }).id;
+  const marlow = new TestClient();
+  await marlow.post("/api/auth/verify-secret", { personId: marlowId, secret: "0000" });
+  const seen: string[] = [];
+  const realQuery = sqlite.query.bind(sqlite);
+  const realPrepare = sqlite.prepare.bind(sqlite);
+  (sqlite as unknown as { query: unknown }).query = (sql: string) => { seen.push(sql); return realQuery(sql); };
+  (sqlite as unknown as { prepare: unknown }).prepare = (sql: string) => { seen.push(sql); return realPrepare(sql); };
+  try {
+    const views = await sources(marlow);
+    const feed = views.find((view) => view.source.id === "msrc-feed00000001")!;
+    expect(feed.item_count).toBe(2001);
+  } finally {
+    (sqlite as unknown as { query: unknown }).query = realQuery;
+    (sqlite as unknown as { prepare: unknown }).prepare = realPrepare;
+  }
+  const itemStatements = seen.filter((sql) => /from\s+["`]?media_items/i.test(sql));
+  expect(itemStatements.length).toBeGreaterThan(0);
+  expect(itemStatements.length).toBeLessThanOrEqual(2); // one per source (library + feed), never one per item
+}, 60_000);
