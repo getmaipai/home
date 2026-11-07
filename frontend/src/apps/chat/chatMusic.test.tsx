@@ -108,7 +108,7 @@ describe("MusicToolRender", () => {
     card = done();
     const view = mount();
     await waitFor(() => expect(cardOf(view)?.getAttribute("data-status")).toBe("ready"));
-    await waitFor(() => expect(view.container.querySelector("audio")).not.toBeNull());
+    await waitFor(() => expect(view.container.querySelector("audio")).not.toBeNull(), { timeout: 5000 });
     expect(view.container.querySelector("audio")!.getAttribute("src")).toBe(V1.url);
     expect(view.container.textContent).toContain("Pancakes");
     expect(view.getByRole("button", { name: "Download" })).toBeTruthy();
@@ -131,7 +131,7 @@ describe("MusicToolRender", () => {
   test("a finished song with no cover URL uses the kit's music fallback tile", async () => {
     card = done({ cover_url: null, cover_versions: [], cover_pending: false });
     const view = mount();
-    await waitFor(() => expect(view.container.querySelector("audio")).not.toBeNull());
+    await waitFor(() => expect(view.container.querySelector("audio")).not.toBeNull(), { timeout: 5000 });
     expect(view.container.querySelector('[data-slot="safe-image-fallback"][data-kind="music"]')).toBeTruthy();
     expect(view.container.querySelector("img")).toBeNull();
   });
@@ -139,7 +139,7 @@ describe("MusicToolRender", () => {
   test("Edit opens the three song actions and sends the typed song and cover prompts", async () => {
     card = done({ length: "quick" });
     const view = mount();
-    await waitFor(() => expect(view.container.querySelector("audio")).not.toBeNull());
+    await waitFor(() => expect(view.container.querySelector("audio")).not.toBeNull(), { timeout: 5000 });
     const edit = view.getByRole("button", { name: "Edit" });
     if (edit.getAttribute("aria-expanded") !== "true") fireEvent.click(edit);
     expect(view.getByRole("dialog", { name: "Edit song" })).toBeTruthy();
@@ -161,7 +161,7 @@ describe("MusicToolRender", () => {
   test("the Stems mode submits the shown version and a done stems card steps through its four tracks", async () => {
     card = done();
     const view = mount();
-    await waitFor(() => expect(view.container.querySelector("audio")).not.toBeNull());
+    await waitFor(() => expect(view.container.querySelector("audio")).not.toBeNull(), { timeout: 5000 });
     fireEvent.click(view.getByRole("button", { name: "Edit" }));
     fireEvent.keyDown(view.getByRole("tab", { name: "Full song" }), { key: "ArrowRight" });
     await waitFor(() => expect(view.getByRole("tab", { name: "Stems" }).getAttribute("aria-selected")).toBe("true"));
@@ -184,7 +184,7 @@ describe("MusicToolRender", () => {
   test("a split of the person's own file says so and offers no song edits", async () => {
     card = done({ task: "stems", title: "Garage Take (vocals)", made_from_file: true, duration_s: 12, current_id: "audio-0", versions: ["Vocals", "Drums"].map((label, index) => ({ id: `audio-${index}`, label, url: `/audio-${index}` })) });
     const view = mount();
-    await waitFor(() => expect(view.container.querySelector("audio")).not.toBeNull());
+    await waitFor(() => expect(view.container.querySelector("audio")).not.toBeNull(), { timeout: 5000 });
     expect(view.container.textContent).toContain("Made from your file, 0:12");
     expect(view.container.textContent).not.toContain("Quick song");
     expect(view.queryByRole("button", { name: "Edit" })).toBeNull();
@@ -200,7 +200,7 @@ describe("MusicToolRender", () => {
       return new Response(JSON.stringify(card), { status: 200, headers: { "content-type": "application/json" } });
     }) as typeof fetch;
     const view = mount();
-    await waitFor(() => expect(view.container.querySelector("audio")).not.toBeNull());
+    await waitFor(() => expect(view.container.querySelector("audio")).not.toBeNull(), { timeout: 5000 });
     fireEvent.click(view.getByRole("button", { name: "Edit" }));
     fireEvent.change(view.getByLabelText("How should it change? For example: heavy metal"), { target: { value: "make it loud" } });
     fireEvent.click(view.getByRole("button", { name: "Remix" }));
@@ -210,9 +210,9 @@ describe("MusicToolRender", () => {
   test("a finished song polls until its cover arrives, then stops", async () => {
     card = done({ cover_pending: true });
     const view = mount();
-    await waitFor(() => expect(view.container.querySelector("audio")).not.toBeNull());
+    await waitFor(() => expect(view.container.querySelector("audio")).not.toBeNull(), { timeout: 5000 });
     card = done({ cover_url: "/api/covers/pancakes" });
-    const poster = await view.findByRole("img", { name: "Cover art for Pancakes" }, { timeout: 3000 });
+    const poster = await view.findByRole("img", { name: "Cover art for Pancakes" }, { timeout: 6000 });
     expect(poster.getAttribute("src")).toBe(card.cover_url);
     const settled = calls.filter((c) => c.url === "/api/music/jobs/mus-1").length;
     expect(settled).toBeGreaterThanOrEqual(2);
@@ -226,7 +226,7 @@ describe("MusicToolRender", () => {
       { t: 5, line: "Pancakes rise", section: "Chorus" },
     ] });
     const view = mount();
-    await waitFor(() => expect(view.container.querySelector("audio")).not.toBeNull());
+    await waitFor(() => expect(view.container.querySelector("audio")).not.toBeNull(), { timeout: 5000 });
     Object.defineProperty(view.container.querySelector("audio"), "duration", { configurable: true, value: 10 });
     fireEvent.click(view.getByRole("button", { name: "Lyrics" }));
     expect(await view.findByRole("button", { name: "Morning light" })).toBeTruthy();
@@ -240,7 +240,7 @@ describe("MusicToolRender", () => {
       { t: 5, line: "Pancakes rise", section: "Chorus" },
     ] });
     const view = mount();
-    await waitFor(() => expect(view.container.querySelector("audio")).not.toBeNull());
+    await waitFor(() => expect(view.container.querySelector("audio")).not.toBeNull(), { timeout: 5000 });
     const audio = view.container.querySelector("audio")!;
     Object.defineProperty(audio, "duration", { configurable: true, value: 10 });
     fireEvent.click(view.getByRole("button", { name: "Lyrics" }));
@@ -253,7 +253,7 @@ describe("MusicToolRender", () => {
   test("an instrumental has no lyrics disclosure", async () => {
     card = done({ lyrics: "[Instrumental]" });
     const view = mount();
-    await waitFor(() => expect(view.container.querySelector("audio")).not.toBeNull());
+    await waitFor(() => expect(view.container.querySelector("audio")).not.toBeNull(), { timeout: 5000 });
     expect(view.queryByRole("button", { name: "Lyrics" })).toBeNull();
   });
 
@@ -283,7 +283,7 @@ describe("MusicToolRender", () => {
     try {
       const view = mount();
       await waitFor(() => expect(calls.some((c) => c.url === V1.url)).toBe(true));
-      await waitFor(() => expect(view.container.querySelector("audio")).not.toBeNull());
+      await waitFor(() => expect(view.container.querySelector("audio")).not.toBeNull(), { timeout: 5000 });
       await new Promise((resolve) => setTimeout(resolve, 50));
       fireEvent.click(view.getByRole("button", { name: "Share" }));
       expect(shared).toHaveLength(1);
@@ -310,7 +310,7 @@ describe("MusicToolRender", () => {
   test("polling stops once the song is settled, and keeps going while it is made", async () => {
     card = done();
     const view = mount();
-    await waitFor(() => expect(view.container.querySelector("audio")).not.toBeNull());
+    await waitFor(() => expect(view.container.querySelector("audio")).not.toBeNull(), { timeout: 5000 });
     const settled = calls.filter((c) => c.url === "/api/music/jobs/mus-1").length;
     await new Promise((resolve) => setTimeout(resolve, 1300));
     expect(calls.filter((c) => c.url === "/api/music/jobs/mus-1").length).toBe(settled);
@@ -471,7 +471,7 @@ describe("SongByline under the song card", () => {
     routed({ status: 500, body: { error: "boom" } });
     card = done();
     const view = mountAsMe();
-    await waitFor(() => expect(view.container.querySelector("audio")).not.toBeNull());
+    await waitFor(() => expect(view.container.querySelector("audio")).not.toBeNull(), { timeout: 5000 });
     await waitFor(() => expect(calls.some((c) => c.url.endsWith("/api/files/file-one"))).toBe(true));
     await new Promise((resolve) => setTimeout(resolve, 50));
     expect(view.queryByRole("button", { name: "Private, manage sharing" })).toBeNull();

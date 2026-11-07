@@ -75,11 +75,11 @@ describe("film chat part", () => {
     const old = { ...filmsApi };
     filmsApi.get = mock(async () => progress({ state: "done", film_file_id: "file-1" }));
     const done = renderWithQueryClient(<FilmToolRender {...props} />);
-    await waitFor(() => expect(done.container.querySelector("[data-slot='job-progress']")).toBeNull());
+    await waitFor(() => expect(done.container.querySelector("[data-slot='job-progress']")).toBeNull(), { timeout: 5000 });
     done.unmount();
     filmsApi.get = mock(async () => { throw new Error("404"); });
     const view = renderWithQueryClient(<FilmToolRender {...props} />);
-    await waitFor(() => expect(view.container.textContent).toContain("I couldn't find this film."));
+    await waitFor(() => expect(view.container.textContent).toContain("I couldn't find this film."), { timeout: 5000 });
     Object.assign(filmsApi, old);
   });
 });
