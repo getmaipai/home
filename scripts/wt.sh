@@ -30,6 +30,8 @@ else
   trap 'rm -f "$shared"' EXIT
   git -C "$std" show origin/main:standards/bin/wt.sh > "$shared" 2>/dev/null || { echo "wt: .github has no standards/bin/wt.sh on origin/main; fetch it and retry." >&2; exit 1; }
 fi
+# AUDIT-VERIFY-01: the Codex sandbox has no Deno; backend/tests/denoGate.test.ts fails loudly elsewhere unless this is set.
+[[ "${1:-}" != run ]] || export MAIPAI_ALLOW_NO_DENO=1
 if [[ "${1:-}" != start ]]; then bash "$shared" "$@"; exit $?; fi
 
 # OUTBOX-01: a new worktree starts from the pipeline's main. The shared script branches from origin/main; when the lander has landed
