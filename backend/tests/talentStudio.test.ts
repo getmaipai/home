@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, test } from "bun:test";
 import { __setStackClientForTests, getStackClient } from "@/lib/stackEngine";
-import { layout, renderLines, speakableText, splitAtWord } from "@/lib/talent/studio";
+import { layout, mixEpisode, renderLines, speakableText, splitAtWord } from "@/lib/talent/studio";
 import type { StackClient } from "@/lib/stack/client";
 import type { Line, Script, CastMember } from "@/lib/talent/types";
 import type { ShowFormat } from "@maipai/spec/gen/ts/show-format.js";
@@ -22,17 +22,21 @@ const format = { gap_ms: 250, talk_over: "lively" } as ShowFormat;
 function stackFixture() {
   let next = 0;
   const results = new Map<string, unknown>();
+  const inputs: Array<{ kind: string; input: Record<string, unknown> }> = [];
   const client = {
-    submitJob: async ({ input }: { input: Record<string, unknown> }) => {
+    submitJob: async ({ kind, input }: { kind: string; input: Record<string, unknown> }) => {
       const id = `job-${++next}`;
-      const lines = input.lines as Array<{ id: string; text: string }>;
-      results.set(id, { lines: lines.map((row) => ({ id: row.id, path: `/tmp/${row.id}.wav`, duration_s: row.text.trim().split(/\s+/).length * 0.06, sha256: "hash" })) });
+      inputs.push({ kind, input });
+      if (kind === "media.tts") {
+        const lines = input.lines as Array<{ id: string; text: string }>;
+        results.set(id, { lines: lines.map((row) => ({ id: row.id, path: `/tmp/${row.id}.wav`, duration_s: row.text.trim().split(/\s+/).length * 0.06, sha256: "hash" })) });
+      } else results.set(id, { path: "/x/e.m4a", duration_s: 1 });
       return { id, state: "done", result: results.get(id), reason: null };
     },
     job: async (id: string) => ({ id, state: "done", result: results.get(id), reason: null }),
   } as unknown as StackClient;
   __setStackClientForTests(client);
-  return { client, count: () => next };
+  return { client, count: () => next, inputs };
 }
 
 describe("talent studio", () => {
@@ -101,5 +105,19 @@ describe("talent studio", () => {
     expect(fixture.count()).toBe(2);
     expect(rendered).toHaveLength(401);
     expect(getStackClient()).toBe(fixture.client);
+  });
+
+  test("uses Stack job folders for speech and mix output", async () => {
+    const fixture = stackFixture();
+    await renderLines(script([line("host", "hello there")]), cast, "/tmp/talent");
+    const ttsOutput = fixture.inputs.find((entry) => entry.kind === "media.tts")?.input.output as Record<string, unknown>;
+    expect(ttsOutput).toBeDefined();
+    expect("dir" in ttsOutput).toBe(false);
+
+    const mixed = await mixEpisode([], [], { intro: null, outro: null }, "/tmp/episode/e.m4a");
+    const mixOutput = fixture.inputs.find((entry) => entry.kind === "media.mix")?.input.output as Record<string, unknown>;
+    expect(mixed).toEqual({ path: "/x/e.m4a", duration_s: 1 });
+    expect(mixOutput).toMatchObject({ name: "e.m4a" });
+    expect("dir" in mixOutput).toBe(false);
   });
 });

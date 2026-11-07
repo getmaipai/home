@@ -86,11 +86,14 @@ describe("TALENT-04 shows", () => {
     const now = new Date("2026-11-07T12:00:00Z");
     await expect(makeEpisode(row, show.id, { now, complete: complete as never, stack })).rejects.toThrow("The scripted mix failure needs a retry.");
     expect(getMediaProduction(row, show.id)?.show?.state?.stage).toBe("mix");
+    expect(getMediaProduction(row, show.id)?.show?.state?.reason).toEqual(expect.any(String));
+    expect(getMediaProduction(row, show.id)?.show?.state?.reason).not.toBe("");
     const writerCallsBeforeResume = writerCalls;
     const result = await makeEpisode(row, show.id, { now, complete: complete as never, stack });
     const saved = getMediaProduction(row, show.id)!;
     const item = queryItems(row, "podcasts", { limit: 20 }).find((entry) => entry.id === result.item_id)!;
     expect(saved.show?.state?.stage).toBe("done");
+    expect(saved.show?.state?.reason).toBeNull();
     expect(writerCalls).toBe(writerCallsBeforeResume);
     expect(item.band_ok).toBe("teen");
     expect(item.chapters).toHaveLength(2);

@@ -64,7 +64,7 @@ talentRoutes.patch("/shows/:id", async (c) => {
 talentRoutes.post("/shows/:id/episodes", (c) => {
   const actor = c.get("person"), production = getShow(actor, c.req.param("id"));
   if (!production || production.owner_person_id !== actor.id) return c.json({ error: "That show is not available to you. Open one of your shows and try again." }, 404);
-  if (production.show?.state?.started_at && Date.now() - Date.parse(production.show.state.started_at) < 7_200_000 && production.show.state.stage !== "done") return c.json({ error: "An episode is being made right now. Wait for it to finish." }, 409);
+  if (production.show?.state?.started_at && Date.now() - Date.parse(production.show.state.started_at) < 7_200_000 && production.show.state.stage !== "done" && !production.show.state.reason) return c.json({ error: "An episode is being made right now. Wait for it to finish." }, 409);
   void makeEpisode(actor, production.id).catch(() => {});
   return c.json({ production_id: production.id, stage: production.show?.state?.stage ?? "brief" }, 202);
 });

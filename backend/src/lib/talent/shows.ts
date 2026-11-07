@@ -126,7 +126,7 @@ export function dueShows(now: Date): Array<{ production: Production; owner: Pers
 function cachePath(productionId: string, episodeId: string) { return join(dataDir, "talent", productionId, `${episodeId}.json`); }
 function writeCache(productionId: string, episodeId: string, value: unknown) { const path = cachePath(productionId, episodeId); mkdirSync(join(dataDir, "talent", productionId), { recursive: true }); writeFileSync(path, JSON.stringify(value)); }
 function readCache<T>(productionId: string, episodeId: string): T | null { try { return JSON.parse(readFileSync(cachePath(productionId, episodeId), "utf8")) as T; } catch { return null; } }
-function stage(production: Production, episodeId: string, name: NonNullable<Show["state"]>["stage"], now: Date, patch: Record<string, unknown> = {}) { setShowState(production.owner_person_id, production.id, { ...(production.show?.state ?? {}), episode_id: episodeId, stage: name, started_at: now.toISOString(), ...patch } as never); }
+function stage(production: Production, episodeId: string, name: NonNullable<Show["state"]>["stage"], now: Date, patch: Record<string, unknown> = {}) { setShowState(production.owner_person_id, production.id, { ...(production.show?.state ?? {}), episode_id: episodeId, stage: name, started_at: now.toISOString(), reason: null, ...patch } as never); }
 
 export async function makeEpisode(actor: PersonRow, productionId: string, opts: EpisodeOptions = {}): Promise<{ episode_id: string; item_id: string }> {
   const now = opts.now ?? new Date(), complete = opts.complete ?? completeBackground, stack = opts.stack ?? getStackClient(), started = Date.now();

@@ -64,7 +64,8 @@ export async function renderLines(script: Script, cast: CastMember[], outDir: st
     if (offset > 0) await waitForIdle(stack, signal);
     if (signal?.aborted) throw signal.reason ?? new Error("Line rendering was cancelled. Try again.");
     const batch = requests.slice(offset, offset + 400);
-    const submitted = await stack.submitJob({ kind: "media.tts", input: { lines: batch.map(({ id, text, voice_url }) => ({ id, text, voice_url })), output: { dir: outDir } } }, { signal });
+    // Let the Stack keep these files in its job folder; the returned paths are used directly.
+    const submitted = await stack.submitJob({ kind: "media.tts", input: { lines: batch.map(({ id, text, voice_url }) => ({ id, text, voice_url })), output: {} } }, { signal });
     let job = submitted;
     while (job.state !== "done" && job.state !== "failed" && job.state !== "cancelled") {
       if (signal?.aborted) { await stack.cancelJob(job.id); throw signal.reason ?? new Error("Line rendering was cancelled. Try again."); }
@@ -154,7 +155,9 @@ export async function mixEpisode(tracks: EditTrack[], chapters: Chapter[], sting
   if (stingers.intro) inputs.push({ path: stingers.intro, start_ms: 0, gain_db: 0, fade_in_ms: 0, fade_out_ms: 1500, end_ms: 6000 });
   const lastLineEnd = await Promise.all(tracks.map(async (track) => track.start_ms + Math.min(await durationOf(track.path), track.end_ms ?? Number.POSITIVE_INFINITY))).then((ends) => Math.max(0, ...ends));
   if (stingers.outro) inputs.push({ path: stingers.outro, start_ms: Math.max(0, lastLineEnd - 1000) + shift, gain_db: 0, fade_in_ms: 800, fade_out_ms: 0, end_ms: 6000 });
-  const submitted = await stack.submitJob({ kind: "media.mix", input: { tracks: inputs, duck: stingers.intro ? { under: duckUnder, by_db: 8 } : null, loudness_lufs: -16, output: { dir: outPath.slice(0, outPath.lastIndexOf("/")), name: `${outPath.split("/").at(-1)}` }, chapters } });
+  // Let the Stack keep the mix in its job folder; only the requested filename matters.
+  const name = outPath.split("/").at(-1)!;
+  const submitted = await stack.submitJob({ kind: "media.mix", input: { tracks: inputs, duck: stingers.intro ? { under: duckUnder, by_db: 8 } : null, loudness_lufs: -16, output: { name }, chapters } });
   let job = submitted;
   while (job.state !== "done" && job.state !== "failed" && job.state !== "cancelled") { await new Promise((resolve) => setTimeout(resolve, 2000)); job = await stack.job(job.id); }
   const result = jobResult(job, "The episode mix could not be completed.");
