@@ -168,6 +168,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `frontend/src/apps/settings/SiteBlocksSection.tsx` | SiteBlocksSection |
 | `frontend/src/apps/settings/StackChanInstallDialog.tsx` | StackChanInstallDialog |
 | `frontend/src/apps/settings/StagedApplyBar.tsx` | StagedApplyBar |
+| `frontend/src/apps/settings/TwoStepSignInSection.tsx` | TwoStepSignInSection |
 | `frontend/src/apps/settings/UsersSection.tsx` | UsersSection |
 | `frontend/src/apps/settings/VoiceBrowserSection.tsx` | VoiceBrowserSection |
 | `frontend/src/apps/settings/VoiceManagerSection.tsx` | VoiceManagerSection |
@@ -780,6 +781,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/partialRestore.ts` | PartialRestoreRefused, restorePersonFromBackup |
 | `backend/src/lib/passkeys.ts` | __resetPasskeyChallengesForTests, registrationOptions, verifyRegistration, authenticationOptions, verifyAuthentication, listPasskeys |
 | `backend/src/lib/paths.ts` | PACKAGES_DIR, isValidPackageId, repoRoot, defaultDataDir, dataDirIsExplicit, dataDir |
+| `backend/src/lib/pendingLogin.ts` | issuePendingLogin, consumePendingLogin, getPendingLoginPerson, __resetPendingLoginsForTests, __pendingLoginTtlForTests |
 | `backend/src/lib/perfWatch.ts` | markBusy, markIdle, getPerfSnapshot, slowRequestMiddleware, startPerfWatch, __resetPerfWatchForTests |
 | `backend/src/lib/performance.ts` | median, recentTurnStats, getPerformance |
 | `backend/src/lib/permissions.ts` | effectivePermissions |
