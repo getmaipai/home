@@ -10,6 +10,7 @@ day the hub arrives; the rest are for when you need them.
 
 - [Set up your hub](getting-started.md): walk through the one-time setup wizard, screen by screen.
 - [Sign in](sign-in.md): the passcode boxes, what happens after wrong tries, and how to get back in.
+- [Language](language.md): pick English or Spanish for yourself, see what the home's language does, and report a line that reads wrong.
 - [The Home screen](home.md): what you see when you open MaiPai, and how to use it.
 - [Chat and talking to MaiPai](chat.md): how to send a message, use voice input, and manage your conversations.
 - [Talking to Home](voice.md): allow the microphone, pick a voice, and turn natural speech sounds on or off.

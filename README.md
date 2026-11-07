@@ -18,7 +18,7 @@ Your chats, people and memories stay in your house. Home goes online for downloa
 - **Private chat with memory.** Talk to an AI that runs on your own computer. It remembers what matters, shows its sources, and lets you see, fix or forget any memory.
 - **Reads your pictures.** Attach a photo and ask about it. This needs a computer with 32 GB of memory or more.
 - **Makes and edits pictures.** Ask for a picture, make variations, add styles. The editor has Remove background, Erase, Upscale, Resize, Markup and Comment (describe a change in words). Children and teens get a safer picture lane.
-- **Makes short videos and films.** Start from words or a picture, then trim, join and add voice lines and songs in the Studio. This needs a Mac with 128 GB of memory.
+- **Makes short videos and films.** Start from words or a picture, then trim, join and add voice lines and songs in the Studio. Turn the words in a clip into captions you can fix and download. Adults-only clips stay behind a lock. This needs a Mac with 128 GB of memory.
 - **Music and songs.** Play your music library, tune in online radio, make songs and albums, split a song into stems, remix, and follow the lyrics in the player.
 - **Videos, shows, books and podcasts.** Watch your saved videos, shows and films, read books and listen to audiobooks, and follow podcasts. Each picks up where you stopped.
 - **News and Weather.** Read stories from the news shelf you choose. Weather has your places, Fahrenheit or Celsius, and a weather card in chat.
@@ -30,8 +30,9 @@ Your chats, people and memories stay in your house. Home goes online for downloa
 - **Companions.** Browse, add, copy or make a companion, pick one for each chat, or @mention another for one question.
 - **Max chat.** An admin, or an adult an admin allows, can use one large model for hard chat and coding work.
 - **A real household.** One profile per person. Children are restricted by default, teens get more privacy, and the safety gates cannot be switched off.
-- **Sign-in with passcode boxes.** One box per digit, a lockout after repeated wrong tries, and a lock screen after you step away.
-- **Backups, updates and repairs** you start yourself, with a way to go back.
+- **Your language.** Each person picks English (US or UK) or Spanish in their profile, and the home sets the default. Dates, units and notices follow it. The Spanish is written by your own AI, marked for review, and kept in English for children and teens until a grown-up has read it.
+- **Careful sign-in.** Passcode boxes, optional two-step codes tied to the first step, a lockout for one person on one device so a child's guesses cannot lock the owner out, a lock screen after you step away, and a check that Home is opened only by its own addresses.
+- **Backups, updates and repairs** you start yourself, with a way to go back. Errors say what went wrong and what to do next.
 - **Phone layout.** Apps use a bottom section bar and share the top bar with Home.
 - **A one-line installer** for a Mac. It opens the setup wizard in your browser, and Home works in Chrome and Safari.
 

@@ -7,7 +7,7 @@ Settings has one column of pages. The top group is **Yours**, for your own choic
 
 ## Your pages
 
-- **Profile and sign-in**: your name, face enrollment and voice print enrollment.
+- **Profile and sign-in**: your name, your **Language**, your PIN or password, two-step sign-in for owners and admins, face enrollment and voice print enrollment. See [Language](language.md) and [Sign in](sign-in.md).
 - **Look and ease**: the color scheme, light or dark, and ease of use. See [Ease of use](ease-of-use.md).
 - **Chat and AI**: how chat works for you, search, personality, AI companions and music. The tabs are **General**, **Personalization**, **Skills**, **Keyboard shortcuts** and **Coding**.
 - **Voice and robot**: your voice, the **Commands** card, the **Wake word** on this device, and your robot.
@@ -16,7 +16,7 @@ Settings has one column of pages. The top group is **Yours**, for your own choic
 
 ## The home pages
 
-- **Household and people**: the household's name and home place, and links to users and the Family page. See [People and parental controls](people.md).
+- **Household and people**: the household's name and home place, the home's **Language and region**, and links to users and the Family page. See [People and parental controls](people.md).
 - **Privacy and safety**: sensitive subjects with teen controls, and a link to what connects to the internet. See [Privacy](privacy.md).
 - **AI and models**: what runs on this computer, the models for each job, engines, **Performance** and **Coding**.
 - **Pictures, videos and music**: who can make them and at what level.
@@ -42,6 +42,10 @@ An owner or admin can open **Backups, storage and updates**, then **Storage**, t
 ## Choose how you look
 
 Open **Look and ease**. Pick the color scheme of the whole app. Neutral is the standard look. Navy is MaiPai's own blue-black set. The others are ready-made color sets (Stone, Zinc, Mauve, Olive, Mist, Taupe). Light and dark mode both follow the one you pick. A device choice of light, dark or system applies to this browser only and wins over your personal choice until you reset it.
+
+## Choose your language
+
+Open **Profile and sign-in** and find the **Language** card. Pick **English (United States)**, **English (United Kingdom)** or **Español**, or leave it on **Same as the home**. The screen changes at once. An owner or admin sets the home's language in **Household and people**, under **Language and region**. See [Language](language.md).
 
 ## Choose your voice
 

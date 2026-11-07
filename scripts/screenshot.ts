@@ -678,9 +678,15 @@ async function seedHousehold(): Promise<string> {
       });
       if (!response.ok) throw new Error(`seed ${key} failed: ${response.status}`);
     }
-    const health = await fetch(`${BASE_URL}/api/health`, { headers: { Cookie: `session=${sessionValue}` } });
-    if (!health.ok) throw new Error(`seed screenshot Stack health failed: ${health.status}`);
-    const healthBody = await health.json() as { engines?: { chat?: { availability?: string; reason?: string } } };
+    // The chat engine reports "restarting" for a moment after the stub starts (longer on a loaded machine): wait up to 60 s for ready.
+    let healthBody: { engines?: { chat?: { availability?: string; reason?: string } } } = {};
+    for (let attempt = 0; attempt < 30; attempt++) {
+      const health = await fetch(`${BASE_URL}/api/health`, { headers: { Cookie: `session=${sessionValue}` } });
+      if (!health.ok) throw new Error(`seed screenshot Stack health failed: ${health.status}`);
+      healthBody = await health.json() as typeof healthBody;
+      if (healthBody.engines?.chat?.availability === "ready") break;
+      await Bun.sleep(2000);
+    }
     if (healthBody.engines?.chat?.availability !== "ready") {
       throw new Error(`seed screenshot Stack is not ready: ${JSON.stringify(healthBody.engines?.chat ?? null)}`);
     }
@@ -9838,7 +9844,7 @@ async function captureNotificationsReview(browser: Browser, sessionValue: string
     const page = await context.newPage();
     await page.goto(`${BASE_URL}/`);
     // RAIL-01: the bell lives behind the rail avatar's profile menu.
-    await page.getByRole("button", { name: /Open profile menu for .*\(2 notifications/ }).click();
+    await page.getByRole("button", { name: /Open profile menu for .*\(\d+ notifications?/ }).click();
     await page.getByRole("menuitem", { name: /Notifications/ }).click();
     await page.getByRole("button", { name: "Dismiss all" }).waitFor();
     // A review caught this missing: this file's own header (2026-09-12,
@@ -10237,6 +10243,17 @@ async function captureDocsShots(browser: Browser, sessionValue: string): Promise
     await page.keyboard.type("0000");
     await page.getByText(/Using a password\? Tap/).waitFor({ timeout: 15000 });
   }, { signedIn: false });
+  // The picker has no words to translate, so the Spanish sign-in picture is the PIN step (the sign-in page uses the household language).
+  {
+    const set = await fetch(`${BASE_URL}/api/settings`, { method: "PUT", headers: { "Content-Type": "application/json", ...cookie }, body: JSON.stringify({ scope: "household", key: "household.locale", value: "es" }) });
+    console.log(`docs language seed (household es): ${set.status}`);
+    await shot("sign-in-es", desktop, "light", async (page) => {
+      await page.goto(`${BASE_URL}/sign-in`);
+      await page.getByRole("button", { name: "Quill" }).click();
+      await page.getByText(/Introduce tu código de \d+ dígitos/).waitFor({ timeout: 15000 });
+    }, { signedIn: false });
+    await fetch(`${BASE_URL}/api/settings`, { method: "PUT", headers: { "Content-Type": "application/json", ...cookie }, body: JSON.stringify({ scope: "household", key: "household.locale", value: "en-US" }) });
+  }
   if (pinPersonId) await fetch(`${BASE_URL}/api/people/${pinPersonId}`, { method: "DELETE", headers: cookie });
 
   // Chat: an empty first chat, and the delete menu on a saved chat.
@@ -10321,7 +10338,7 @@ async function captureDocsShots(browser: Browser, sessionValue: string): Promise
   }
   await shot("notifications", desktop, "light", async (page) => {
     await page.goto(`${BASE_URL}/`);
-    await page.getByRole("button", { name: /Open profile menu for .*\(2 notifications/ }).click();
+    await page.getByRole("button", { name: /Open profile menu for .*\(\d+ notifications?/ }).click();
     await page.getByRole("menuitem", { name: /Notifications/ }).click();
     await page.getByRole("button", { name: "Dismiss all" }).waitFor({ timeout: 15000 });
   });
@@ -10370,6 +10387,49 @@ async function captureDocsShots(browser: Browser, sessionValue: string): Promise
     await page.getByRole("heading", { level: 1 }).first().waitFor({ timeout: 15000 });
   });
 
+  // I18N-F1..F6 pictures (docs pass 2): the Language card, and Settings, the bell and the sign-in page in Spanish. Sage's own language
+  // and the household default are set through the settings API and put back after, so the pictures above stay English.
+  const putLocale = (scope: string, key: string, value: string) =>
+    fetch(`${BASE_URL}/api/settings`, { method: "PUT", headers: { "Content-Type": "application/json", ...cookie }, body: JSON.stringify({ scope, key, value }) });
+  const sageScope = sagePerson ? `person:${sagePerson}` : "";
+  const languageCard = async (page: import("playwright").Page, heading: RegExp) => {
+    await page.goto(`${BASE_URL}/settings/account/profile`);
+    await page.getByText(heading).first().waitFor({ timeout: 15000 });
+    await page.getByText(heading).first().scrollIntoViewIfNeeded();
+    await settleAnimations(page);
+  };
+  await shot("profile-language", desktop, "light", (page) => languageCard(page, /^Language$/));
+  if (sageScope) {
+    const picked = await putLocale(sageScope, "person.locale", "es");
+    console.log(`docs language seed (person es): ${picked.status}`);
+    await shot("profile-language-es", desktop, "light", (page) => languageCard(page, /^Idioma$/));
+    await shot("settings-es", desktop, "light", async (page) => {
+      await page.goto(`${BASE_URL}/settings/home/general`);
+      await page.getByRole("heading", { level: 1 }).first().waitFor({ timeout: 15000 });
+      await page.getByText(/Configuración|Ajustes/).first().waitFor({ timeout: 15000 });
+    });
+    // Two typed notices (a kind plus values), so the bell shows lines the catalogs translate; the two safety notices above stay English by design.
+    {
+      const db = new Database(join(DATA_DIR, "hub.db"));
+      const now = new Date().toISOString();
+      const typed: Array<[string, string, Record<string, string>]> = [
+        ["updates.available", "MaiPai Home 0.2.200 is available.", { version: "0.2.200" }],
+        ["model.download_ready", "Chat model finished downloading and is ready to use.", { modelName: "Chat model" }],
+      ];
+      typed.forEach(([typeId, text, values], index) => {
+        db.query('INSERT OR IGNORE INTO notification_deliveries (id, type_id, recipient_id, text, values_json, channels, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)')
+          .run(`notif-docs-es-${index}`, typeId, sagePerson ?? null, text, JSON.stringify(values), '["in_app"]', now);
+      });
+      db.close();
+    }
+    await shot("notifications-bell-es", desktop, "light", async (page) => {
+      await page.goto(`${BASE_URL}/`);
+      await page.getByRole("button", { name: /Open profile menu for .*\(\d+ (notifications?|notificaciones)/ }).click();
+      await page.getByRole("menuitem", { name: /Notifications|Notificaciones/ }).click();
+      await page.getByRole("button", { name: "Descartar todo" }).waitFor({ timeout: 15000 });
+    });
+    await putLocale(sageScope, "person.locale", "household");
+  }
   if (failures.length > 0) throw new Error(`docs shots failed:\n- ${failures.join("\n- ")}`);
 }
 

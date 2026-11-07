@@ -108,5 +108,30 @@
     "file": "docs-setup-wizard.png",
     "alt": "The first setup screen, Welcome to MaiPai Home, with a Set up my Home button",
     "caption": "Setup starts with a welcome and the Set up my Home button."
+  },
+  "profile-language": {
+    "file": "docs-profile-language.png",
+    "alt": "Settings, Profile and sign-in, with the Language card set to Use whatever the home uses",
+    "caption": "Pick your language in the Language card."
+  },
+  "profile-language-es": {
+    "file": "docs-profile-language-es.png",
+    "alt": "The Language card with Spanish picked and the page in Spanish",
+    "caption": "Pick Español and the page changes at once."
+  },
+  "settings-es": {
+    "file": "docs-settings-es.png",
+    "alt": "The Household and people settings page with menus and headings in Spanish",
+    "caption": "Settings in Spanish. Parts not yet translated show in English."
+  },
+  "notifications-bell-es": {
+    "file": "docs-notifications-bell-es.png",
+    "alt": "The bell's notice list on the Home screen in Spanish: two notices in Spanish, then two safety notices that stay in English",
+    "caption": "Notices show in the language you picked. Safety notices stay in English."
+  },
+  "sign-in-es": {
+    "file": "docs-sign-in-es.png",
+    "alt": "The sign-in passcode boxes with the prompt in Spanish",
+    "caption": "The sign-in page uses the home's language."
   }
 }

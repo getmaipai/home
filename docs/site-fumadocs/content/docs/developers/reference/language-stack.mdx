@@ -1,0 +1,24 @@
+---
+title: The language stack
+description: "Catalogs, the translation script, the lint, typed notifications and the API error table."
+---
+
+Home shows a person's language from Lingui `.po` catalogs under `frontend/src/locales/` (`en-US`, `en-GB`, `es`). The full page is `docs/dev/language-stack.md`; this is the map.
+
+| To do this | Run, from `frontend/` |
+|---|---|
+| Add new ids to every catalog | `bun run i18n:extract` |
+| Check catalogs, placeholders, protected lines and generated setting copy | `bun run i18n:check` |
+| Rebuild the generated setting copy after a settings change | `bun run i18n:settings` |
+| Turn hardcoded text in a file into `i18n._` calls | `bun run i18n:codemod -- <file.tsx>` |
+| Fill empty Spanish lines with the home's own AI | `bun scripts/translate-catalog.ts --locale es` |
+| Clear the review flag after a person read a line | `bun scripts/translate-catalog.ts --locale es --accept <id>` |
+| Stop new hardcoded text and stray `Intl` calls | `bun run lint:i18n` |
+
+- Write text with `i18n._({ id, message, values })`, never macros and never `<Trans>` in app code.
+- The model fills only lines that are not protected: child, teen, crisis, consent, refusal, spoken, robot and the search-is-down line are written by a person.
+- Dates, numbers, lists and units go through `frontend/src/lib/format.ts` only.
+- Server wording is data: `failureCopy.ts`, `notificationCopy.ts` and the 34-code `apiErrorCopy.ts` table. `i18nServer.ts` renders the channels with no client, such as Telegram.
+- The kit has its own catalogs and `loadKitCatalog`. Home loads them once its pin reaches `ui-v0.5.518`.
+
+Owner decisions and the slice plan are in `docs/design/i18n-2026-11-07.md`. The person's page is [Choose your language](/docs/user/everyday-use/choose-your-language).

@@ -51,6 +51,9 @@ MaiPai updates itself the next time you open it. If a page still looks old after
 
 - Double check your PIN or password. A PIN shows as one box per digit, and Home signs you in when the last box is full.
 - After 5 wrong tries the account locks, first for 30 seconds, then longer each time. A countdown shows. Wait for it to end, then try the right code. See [Sign in](sign-in.md).
+- The lock is only for you on that device. Other people can still sign in, and you can still sign in on another device.
+- If two-step sign-in is on, Home asks for the 6-digit code from your authenticator app after your PIN. A code is good for 30 seconds, so wait for a fresh one. If the code step says the sign-in expired, pick your name and start again.
+- If Home says "This address is not one Home answers to", you opened it by an address it does not use. Open Home by its own address. An owner or admin finds it in **Settings**, **Advanced**, **Network and access**.
 - Ask an owner or admin to check your account. They can do this under **Settings**, **Household and people**, **People**, then **Users**.
 - If you're signed in on another device that's misbehaving, open **Settings**, then **Profile and sign-in**. Under **Signed-in sessions**, choose **Sign out** next to that device.
 
@@ -58,6 +61,8 @@ MaiPai updates itself the next time you open it. If a page still looks old after
 
 - Check your internet connection to the hub itself. MaiPai still needs to reach your own server, even though nothing leaves your house.
 - Only an owner or admin can change some settings. If a field looks disabled, that's likely why.
+- If Home refuses a change, it says what went wrong and what to do, and the setting keeps its old value. Nothing is half saved. Fix what the message names, then try again.
+- Messages show in the language you picked. See [Language](language.md).
 
 ## Still stuck?
 

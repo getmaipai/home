@@ -11,6 +11,8 @@ Owners and admins receive an in-hub alert when a paired robot has been offline f
 
 Tap the bell in the header. It shows your recent alerts, and you stay on the page you're on. Tap **View history** for the full list. It goes back 30 days, and each line shows **New**, **Read** or **Dismissed**.
 
+Notices show in your own language. A notice is kept as a kind of notice plus its details, such as the name of a model, so Home writes it in the language you have now. See [Language](language.md). A notice that came in before this change may stay in English.
+
 - Tap **Dismiss** to remove one from the list.
 - Tap **Dismiss all** in the bell to clear everything at once. On the history page, tap **Select** to pick several and dismiss them together.
 
@@ -20,6 +22,8 @@ To also get notifications on your phone, set up Telegram:
 
 1. An owner or admin sets this up once for the household. Open **Settings**, then **Apps and devices**, then the **Integrations** tab, and find the **Telegram** card to add the bot token.
 2. After that, each person links their own Telegram chat. Open **Settings**, then **Notifications**, and find the **Telegram** card. Choose which alerts you want on Telegram.
+
+Telegram notices come in the language of the person who gets them. A grown-up and a child in the same house can each read their own. Telegram notices for children and teens stay in English for now.
 
 On the same **Notifications** page, **Alerts** lets you show alerts on this device and set quiet hours.
 

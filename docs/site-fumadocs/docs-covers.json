@@ -669,6 +669,40 @@
       "areas": [
         "dev-tooling"
       ]
+    },
+    "user/everyday-use/choose-your-language": {
+      "covers": [
+        "frontend/src/i18n.ts",
+        "frontend/src/locales/**",
+        "frontend/src/shell/usePersonLocale.ts",
+        "backend/src/lib/locale.ts",
+        "backend/src/lib/supportedLocales.ts"
+      ]
+    },
+    "admin/people-and-safety/language-and-translations": {
+      "covers": [
+        "frontend/src/i18n.ts",
+        "frontend/src/locales/**",
+        "frontend/src/shell/usePersonLocale.ts",
+        "backend/src/lib/locale.ts",
+        "backend/src/lib/supportedLocales.ts",
+        "frontend/scripts/translate-catalog.ts"
+      ]
+    },
+    "developers/reference/language-stack": {
+      "covers": [
+        "frontend/src/i18n.ts",
+        "frontend/src/locales/**",
+        "frontend/src/shell/usePersonLocale.ts",
+        "backend/src/lib/locale.ts",
+        "backend/src/lib/supportedLocales.ts",
+        "frontend/scripts/**",
+        "frontend/src/lib/format.ts",
+        "frontend/src/dev/i18n*",
+        "backend/src/lib/i18nServer.ts",
+        "backend/src/lib/apiErrorCopy.ts",
+        "backend/src/lib/notificationCopy*.ts"
+      ]
     }
   },
   "shots": {
@@ -782,6 +816,51 @@
     "notifications-history": {
       "areas": [
         "notifications"
+      ]
+    },
+    "profile-language": {
+      "covers": [
+        "frontend/src/i18n.ts",
+        "frontend/src/locales/**",
+        "frontend/src/shell/usePersonLocale.ts",
+        "backend/src/lib/locale.ts",
+        "backend/src/lib/supportedLocales.ts"
+      ]
+    },
+    "profile-language-es": {
+      "covers": [
+        "frontend/src/i18n.ts",
+        "frontend/src/locales/**",
+        "frontend/src/shell/usePersonLocale.ts",
+        "backend/src/lib/locale.ts",
+        "backend/src/lib/supportedLocales.ts"
+      ]
+    },
+    "settings-es": {
+      "covers": [
+        "frontend/src/i18n.ts",
+        "frontend/src/locales/**",
+        "frontend/src/shell/usePersonLocale.ts",
+        "backend/src/lib/locale.ts",
+        "backend/src/lib/supportedLocales.ts"
+      ]
+    },
+    "notifications-bell-es": {
+      "covers": [
+        "frontend/src/i18n.ts",
+        "frontend/src/locales/**",
+        "frontend/src/shell/usePersonLocale.ts",
+        "backend/src/lib/locale.ts",
+        "backend/src/lib/supportedLocales.ts"
+      ]
+    },
+    "sign-in-es": {
+      "covers": [
+        "frontend/src/i18n.ts",
+        "frontend/src/locales/**",
+        "frontend/src/shell/usePersonLocale.ts",
+        "backend/src/lib/locale.ts",
+        "backend/src/lib/supportedLocales.ts"
       ]
     }
   }

@@ -24,6 +24,13 @@ For everyone. Scope: person.
 Tabs: **Profile**.
 
 
+#### Profile > Language
+
+| Setting | Key | Default | Level | What it does |
+|---|---|---|---|---|
+| **Language** | `person.locale` | household | basic | The language Home uses for you: Same as the home, English (United States), English (United Kingdom) or Español. Spanish is translated by Home's own model and checked at home. |
+
+
 #### Profile > Face enrollment
 
 | Setting | Key | Default | Level | What it does |
@@ -241,7 +248,7 @@ Tabs: **General**, **People**.
 | **Conversation history retention** | `household.conversation_retention_days` | 90 | advanced | How long chat history is kept before it's deleted. A safety-flagged conversation involving a teen or child is always kept for at least 90 days regardless of this setting. |
 | **Family name** | `household.family_name` | empty | basic | Shown above your greeting on Home, e.g. "Willow" becomes "Willow Family." |
 | **Home location** | `household.home` | empty | basic | The household place used as the fallback for location-based answers. |
-| **Language and region** | `household.locale` | en-US | basic | Sets the household's date, time, and unit formatting. |
+| **Language and region** | `household.locale` | en-US | basic | Sets the household's date, time, and unit formatting. It is also the default language for people who never picked their own, and the language of the sign-in page. Choices: en-US, en-GB, es. |
 
 
 #### General > Internet check

@@ -22,7 +22,10 @@ Each app shows **Working**, **Degraded**, **Waiting for internet** or **Not work
 - **Engine computer** shows **Working**, **Connecting**, **Slow to answer**, **Reconnecting** or **Not reachable**. It appears when you use another computer for the AI.
 - **Health checks** shows the last test. Press **Run checks now** to test again.
 - **Parts** lists the parts behind the apps. A row is **Fine**, **Slow**, **Down** or **Maintenance**. Engine rows have **Stop** or **Start** and **Restart** buttons.
+- **This Mac's self-check** shows on a Mac. It says whether the Mac can look up its own account, start a service and run the graphics check. A line that says the check is failing means the Mac may restart itself. It also says when the check is only watching.
 - **Recent problems** lists what went wrong lately.
+
+On every page, the words follow the language each person picked. See [Language](language.md).
 
 ## Plan maintenance (owner or admin)
 

@@ -3,6 +3,7 @@
   "pages": [
     "api-reference",
     "design-rules",
+    "language-stack",
     "design-record"
   ]
 }

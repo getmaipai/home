@@ -1,0 +1,29 @@
+---
+title: Language and translations
+description: Set the home's language, and review or fix a translated line.
+---
+
+This page is for owners and admins.
+
+## 🌍 Set the home's language
+
+Open **Settings**, then **Household and people**. In the **Household** card, find **Language and region** and pick **en-US**, **en-GB** or **es**. It is the language people start with, and the language of the sign-in page. Everyone who never picked their own follows it. Changing it moves them all.
+
+Each person picks their own in **Settings**, **Profile and sign-in**, **Language**. Children and teens can pick too. It makes no content, so it is not an age setting, and a parent does not see it as a limit.
+
+## 🤖 Who wrote the Spanish
+
+Your home's own AI wrote it on this computer. Nothing was sent anywhere else. Every line it wrote is marked `needs-review` in the catalog until a person has read it. `en-GB` holds only the words that differ from US English.
+
+## 🔒 What stays in English until someone reviews it
+
+Lines for children and teens, safety and crisis messages, refusals and consent screens, fixed voice lines, robot speech and the search-is-down line. The AI never writes these. A person writes and approves them. Until then they show in English, even for a person who picked Spanish. Telegram notices for children and teens are English too.
+
+## ✏️ Fix a wrong line
+
+Someone tells you a line reads wrong. The fix is a change to the Spanish catalog file `frontend/src/locales/es/messages.po`, then a release. The steps are in the developer page [The language stack](/docs/developers/reference/language-stack). Settings has no screen for editing a translation yet.
+
+## 🙋 Something not working?
+
+- A screen is in English after someone picked Spanish: the line has no approved Spanish yet. Nothing is broken.
+- The sign-in page is in the wrong language: it uses **Language and region**, not a person's choice.
