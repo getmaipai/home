@@ -7,6 +7,7 @@ export type StackErrorKind =
   | "unknown" // 400: the request was bad
   | "cancelled" // 499: the job was cancelled
   | "timeout" // 504: the Stack stopped answering
+  | "stalled" // an opened stream stopped producing chunks
   | "unreachable" // the socket refused: the Stack is not running
   | "unexpected"; // anything else: carries status and body text
 

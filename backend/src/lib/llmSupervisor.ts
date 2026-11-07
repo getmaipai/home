@@ -144,6 +144,7 @@ const state = hotReloadState<LlmSupervisorState>("llmSupervisor", () => ({
 let blockedPortRetryTimer: ReturnType<typeof setInterval> | null = null;
 let blockedPortRetryMs = 30_000;
 let blockedPortRetryForTests: (() => Promise<void>) | null = null;
+let blockedPortRetryInFlight = false;
 
 function clearBlockedPortRetry(): void {
   if (blockedPortRetryTimer) clearInterval(blockedPortRetryTimer);
@@ -153,6 +154,8 @@ function clearBlockedPortRetry(): void {
 function startBlockedPortRetry(port = Number(process.env.MAIPAI_LLAMA_SERVER_PORT ?? 8788)): void {
   if (blockedPortRetryTimer) return;
   blockedPortRetryTimer = setInterval(() => {
+    if (blockedPortRetryInFlight) return;
+    blockedPortRetryInFlight = true;
     void (async () => {
       try {
         if (blockedPortRetryForTests) await blockedPortRetryForTests();
@@ -165,7 +168,7 @@ function startBlockedPortRetry(port = Number(process.env.MAIPAI_LLAMA_SERVER_POR
       }
       clearBlockedPortRetry();
       resolveIssue("chat-engine", "spawn");
-    })();
+    })().finally(() => { blockedPortRetryInFlight = false; });
   }, blockedPortRetryMs);
 }
 

@@ -26,6 +26,7 @@ import type { PersonRow } from "@/types";
 import { newEntityId } from "@/lib/id";
 import { assertCanWriteSelfService, isLayeredScalar, isSelfService, resolveLayeredScalar } from "@/lib/layeredScalar";
 import { LIVE_PERSONA_IDS } from "@/lib/personaIds";
+import { validTimeZone } from "@/lib/wallClock";
 
 const HOUSEHOLD_HOME_KEY = "household.home";
 const ROBOT_FIRMWARE_INSTALLED_KEY = "robot.firmware.installed";
@@ -177,7 +178,11 @@ function assertCanSetChildTopic(actor: PersonRow, targetId: string): SettingsOpR
   return { ok: true, value: true };
 }
 
-function validateSelectorValue(keyDef: SettingsKey, value: unknown): SettingsOpResult<true> {
+export function validateSelectorValue(keyDef: SettingsKey, value: unknown): SettingsOpResult<true> {
+  if (keyDef.key === "time.time_zone") {
+    if (!validTimeZone(value)) return { ok: false, status: 400, error: "That time zone is not one Home knows. Pick one from the list, like America/Chicago." };
+    return { ok: true, value: true };
+  }
   if (keyDef.key === "companions.enabled") {
     if (!Array.isArray(value) || value.some((id) => typeof id !== "string") || new Set(value).size !== value.length) return { ok: false, status: 400, error: "Choose a list of companion ids without duplicates." };
     return { ok: true, value: true };

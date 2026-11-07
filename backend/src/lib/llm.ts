@@ -728,6 +728,9 @@ export class StackStreamError extends Error {
  * `signal` still aborts on a client disconnect); a genuinely wedged
  * Stack stream is a gap to close in a follow-up, not silently patched
  * over here with an untested port of that machinery too. */
+export let STACK_STREAM_IDLE_TIMEOUT_MS = 120_000;
+export function __setStackStreamIdleTimeoutForTests(ms: number | null): void { STACK_STREAM_IDLE_TIMEOUT_MS = ms ?? 120_000; }
+
 async function* stackChatPieces(
   stream: ReadableStream<Uint8Array>,
   stats: ChatCompletionStreamStats,
@@ -746,6 +749,17 @@ async function* stackChatPieces(
   // tag is synthesized; a minor's request drops reasoning here, so it
   // never reaches a caller to be stored.
   const reader = stream.getReader();
+  let idleTimer: ReturnType<typeof setTimeout> | undefined;
+  let stalled = false;
+  const readChunk = async () => {
+    if (idleTimer) clearTimeout(idleTimer);
+    const pending = reader.read();
+    const timeout = new Promise<Awaited<ReturnType<typeof reader.read>>>((_, reject) => {
+      idleTimer = setTimeout(() => { stalled = true; reject(new StackError("stalled", "The chat stream stopped answering")); void reader.cancel().catch(() => undefined); }, STACK_STREAM_IDLE_TIMEOUT_MS);
+    });
+    try { return await Promise.race([pending, timeout]); }
+    finally { if (idleTimer) clearTimeout(idleTimer); }
+  };
   // Chat-template control tokens (`<|message|>`) are removed here, once, for text and reasoning alike.
   const textFilter = new ChatTemplateTokenFilter();
   const reasoningFilter = new ChatTemplateTokenFilter();
@@ -757,7 +771,23 @@ async function* stackChatPieces(
     if (textRest) out.push({ channel: "text", text: textRest });
     return out;
   };
-  for await (const line of readTextLines(reader)) {
+  const lines = (async function* (): AsyncGenerator<string> {
+    const decoder = new TextDecoder();
+    let buffer = "";
+    while (true) {
+      const part = await readChunk();
+      if (part.done) break;
+      buffer += decoder.decode(part.value, { stream: true });
+      let newline: number;
+      while ((newline = buffer.indexOf("\n")) >= 0) { const line = buffer.slice(0, newline).trim(); buffer = buffer.slice(newline + 1); if (line) yield line; }
+    }
+    buffer += decoder.decode();
+    if (buffer.trim()) yield buffer.trim();
+  })();
+  try { for (;;) {
+    const lineStep = await lines.next();
+    if (lineStep.done) break;
+    const line = lineStep.value;
     if (!line.startsWith("data:")) continue;
     const data = line.slice("data:".length).trim();
     if (data === "[DONE]") {
@@ -794,7 +824,7 @@ async function* stackChatPieces(
       if (fragment.function?.arguments) existing.args += fragment.function.arguments;
       toolCallsByIndex.set(fragment.index, existing);
     }
-  }
+  } } finally { if (idleTimer) clearTimeout(idleTimer); if (stalled) await reader.cancel().catch(() => undefined); }
   // CHAT-CALM-ERRORS-01b: a stream that closes with neither `[DONE]` nor a
   // finish reason was cut off (an engine that died mid-reply closes its
   // socket, and the reader sees a plain end), never a finished reply.
@@ -859,6 +889,7 @@ async function openStackPieces(
         } catch (inner) {
           if (yielded || retried || signal?.aborted || !isStackRestart(inner)) throw inner;
           retried = true;
+          await stream.cancel().catch(() => undefined);
           if (!(await waitForStackBack(signal))) throw inner;
           stream = (await openStream()).stream;
         }

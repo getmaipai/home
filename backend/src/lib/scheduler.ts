@@ -70,6 +70,7 @@ import { prefetchNewsPictures } from "@/lib/news/prefetchPictures";
 import { runShelfTick, pruneShelf } from "@/lib/shelf/shelfJobs";
 import { withTimeout } from "@maipai/core/src/withTimeout";
 import { markBusy, markIdle } from "@/lib/perfWatch";
+import { validTimeZone } from "@/lib/wallClock";
 import type { PluginOpResult } from "@/lib/plugins";
 import type { PluginResult } from "@maipai/spec/interpreters/ts/recipe-interpreter.js";
 import type { PersonRow } from "@/types";
@@ -440,14 +441,14 @@ const CORE_JOBS: Record<string, CoreJobHandler> = {
         if (!days.length) {
           db.update(alarms).set({ enabled: false, updatedAt: new Date().toISOString() }).where(eq(alarms.id, alarm.id)).run();
           db.update(scheduledJobs).set({ status: "done", lastRunAt: new Date().toISOString() }).where(eq(scheduledJobs.id, row.id)).run();
-        } else {
+        }
+        else {
           const zoneValue = getSettingValueForPerson(alarm.person, "time.time_zone");
-          const zone = typeof zoneValue === "string" && zoneValue ? zoneValue : Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
+          const zone = validTimeZone(zoneValue) ? zoneValue : Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
           const next = nextOccurrence({ time: alarm.time, days, zone, after: new Date(Math.max(Date.now(), Date.parse(row.nextRunAt))), skipUntil: alarm.skipUntil });
           if (next) db.update(scheduledJobs).set({ nextRunAt: next.toISOString(), when: next.toISOString(), status: "pending", lastRunAt: null }).where(eq(scheduledJobs.id, row.id)).run();
+          else db.update(scheduledJobs).set({ status: "done", lastRunAt: new Date().toISOString() }).where(eq(scheduledJobs.id, row.id)).run();
         }
-      } else if (alarmId) {
-        db.update(scheduledJobs).set({ status: "done", lastRunAt: new Date().toISOString() }).where(eq(scheduledJobs.id, row.id)).run();
       }
     }
   },
@@ -488,9 +489,10 @@ let criticalInFlight: Promise<{ ran: number; errors: number }> | null = null;
 export function runTimeCriticalJobs(
   runPluginFn: RunPluginFn,
   now: Date = new Date(),
+  extraCoreJobs: Record<string, CoreJobHandler> = {},
 ): Promise<{ ran: number; errors: number }> {
   if (criticalInFlight) return criticalInFlight;
-  criticalInFlight = runDueJobsUnguarded(runPluginFn, now, {}, JOB_TIMEOUT_MS, "critical").finally(() => {
+  criticalInFlight = runDueJobsUnguarded(runPluginFn, now, extraCoreJobs, JOB_TIMEOUT_MS, "critical").finally(() => {
     criticalInFlight = null;
   });
   return criticalInFlight;
@@ -543,7 +545,7 @@ export function runDueJobs(
   jobTimeoutMs: number = JOB_TIMEOUT_MS,
 ): Promise<{ ran: number; errors: number }> {
   // The time-critical lane starts first and is never held by the general one; a caller gets both lanes' totals.
-  const critical = runTimeCriticalJobs(runPluginFn, now);
+  const critical = runTimeCriticalJobs(runPluginFn, now, extraCoreJobs);
   if (!inFlight) {
     inFlight = runDueJobsUnguarded(runPluginFn, now, extraCoreJobs, jobTimeoutMs, "general").finally(() => {
       inFlight = null;
@@ -602,7 +604,7 @@ async function runDueJobsUnguarded(
     markBusy(busyName);
     try {
       if (row.kind === "core") {
-        const handler = CORE_JOBS[row.job] ?? extraCoreJobs[row.job];
+        const handler = extraCoreJobs[row.job] ?? CORE_JOBS[row.job];
         if (!handler) throw new Error(`no core job registered for ${row.job}`);
         await withJobTimeout(Promise.resolve(handler(row)), jobTimeoutMs, row.job);
       } else {
@@ -631,7 +633,25 @@ async function runDueJobsUnguarded(
     }
 
     const currentAfterHandler = db.select().from(scheduledJobs).where(eq(scheduledJobs.id, row.id)).get();
-    if (row.recurring) {
+    const isAlarm = row.job === "alarms.fire" && !!JSON.parse(row.inputs || "{}").alarmId;
+    if (isAlarm) {
+      const inputs = JSON.parse(row.inputs || "{}") as { alarmId?: string; attempts?: number };
+      const alarm = inputs.alarmId ? db.select().from(alarms).where(eq(alarms.id, inputs.alarmId)).get() : undefined;
+      if (error && alarm && !alarm.deletedAt && alarm.enabled) {
+        const attempts = (inputs.attempts ?? 0) + 1;
+        if (attempts >= 3) {
+          db.update(scheduledJobs).set({ inputs: JSON.stringify({ ...inputs, attempts }), status: "failed", lastRunAt: now.toISOString(), lastError: error }).where(eq(scheduledJobs.id, row.id)).run();
+          await trigger("alarm.due", { task: "Your alarm could not ring" }, { personId: alarm.person, repeatKey: `alarm-failed:${row.id}` });
+        } else {
+          const nextRunAt = new Date(Math.max(now.getTime(), Date.parse(row.nextRunAt)) + (JSON.parse(alarm.days).length ? 86_400_000 : 60_000));
+          db.update(scheduledJobs).set({ inputs: JSON.stringify({ ...inputs, attempts }), nextRunAt: nextRunAt.toISOString(), when: nextRunAt.toISOString(), status: "pending", lastRunAt: now.toISOString(), lastError: error }).where(eq(scheduledJobs.id, row.id)).run();
+        }
+      } else if (currentAfterHandler?.status === "pending") {
+        // The handler already chose the next wall-clock occurrence.
+      } else if (currentAfterHandler?.status !== "failed") {
+        db.update(scheduledJobs).set({ status: "done", lastRunAt: now.toISOString(), lastError: error }).where(eq(scheduledJobs.id, row.id)).run();
+      }
+    } else if (row.recurring) {
       // Advance from the job's own scheduled nextRunAt, not from `now`,
       // and land on the next slot at or after `now` in one step rather
       // than one interval at a time: a late tick (the process was down,

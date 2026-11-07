@@ -1,13 +1,14 @@
-import { afterEach, describe, expect, test, beforeEach, mock, setSystemTime } from "bun:test";
+import { afterEach, describe, expect, test, beforeEach, mock, setSystemTime, spyOn } from "bun:test";
 import { TestClient } from "./client";
 import { resetDb } from "./reset-db";
 import { __resetThrottleForTests } from "@/lib/secretThrottle";
 import { __resetRateLimiterForTests } from "@/lib/rateLimiter";
 import { setHouseholdSettingValue } from "@/lib/settings";
-import { trigger, listPending, listHistory, markRead, dismiss, dismissMany, deliverHeldNotifications } from "@/lib/notifications";
+import * as settingsLib from "@/lib/settings";
+import { quietHours, trigger, listPending, listHistory, markRead, dismiss, dismissMany, deliverHeldNotifications } from "@/lib/notifications";
 import { runTurnNext } from "@/lib/turnMachine/turnNext";
 import { db } from "@/db";
-import { deviceCommands, people } from "@/db/schema";
+import { deviceCommands, people, notificationHolds } from "@/db/schema";
 import { issueDeviceToken } from "@/lib/deviceTokens";
 import { registerPackageNotificationTypes } from "@/lib/notificationTypes";
 import { getNotificationType } from "@/lib/notificationTypes";
@@ -40,6 +41,40 @@ test("quiet hours hold time-sensitive alerts through an overnight window and rel
     setSystemTime(new Date(2026, 9, 6, 7, 0));
     await deliverHeldNotifications();
     expect(listPending(row).map((item) => item.text)).toContain("Quiet Model finished downloading and is ready to use.");
+  } finally { mock.restore(); }
+});
+
+test("quiet hours follow the person's time zone, not the hub's clock", async () => {
+  const { row } = await owner();
+  setHouseholdSettingValue("household.quiet_hours.from", "21:00");
+  setHouseholdSettingValue("household.quiet_hours.to", "07:00");
+  const real = settingsLib.getSettingValueForPerson;
+  const spy = spyOn(settingsLib, "getSettingValueForPerson").mockImplementation(((id: string, key: string) => key === "time.time_zone" ? "America/Chicago" : real(id, key)) as typeof real);
+  try {
+    // 05:30 UTC on 7 Nov is 23:30 the evening before in Chicago: quiet, ending 07:00 Chicago (13:00 UTC).
+    const night = quietHours(row, new Date("2026-11-07T05:30:00.000Z"));
+    expect(night.active).toBe(true);
+    expect(night.endAt.toISOString()).toBe("2026-11-07T13:00:00.000Z");
+    // 13:00 UTC is 07:00 Chicago: delivered. 20:00 UTC is 14:00 Chicago: not quiet.
+    expect(quietHours(row, new Date("2026-11-07T13:00:00.000Z")).active).toBe(false);
+    expect(quietHours(row, new Date("2026-11-07T20:00:00.000Z")).active).toBe(false);
+  } finally { spy.mockRestore(); }
+});
+
+test("held notification repeat keys dedupe and one malformed row does not stop later rows", async () => {
+  setSystemTime(new Date("2026-11-07T05:30:00.000Z"));
+  try {
+    const { row } = await owner();
+    setHouseholdSettingValue("household.quiet_hours.from", "21:00");
+    setHouseholdSettingValue("household.quiet_hours.to", "07:00");
+    await trigger("model.download_ready", { modelName: "Dedup" }, { personId: row.id, repeatKey: "same-event" });
+    await trigger("model.download_ready", { modelName: "Dedup" }, { personId: row.id, repeatKey: "same-event" });
+    const holds = db.select().from(notificationHolds).all();
+    expect(holds).toHaveLength(1);
+    db.insert(notificationHolds).values({ id: "broken-hold", typeId: "broken", recipientId: row.id, text: "bad", options: "{", deliverAfter: new Date(0).toISOString() }).run();
+    db.update(notificationHolds).set({ deliverAfter: new Date(0).toISOString() }).where(eq(notificationHolds.id, holds[0]!.id)).run();
+    await deliverHeldNotifications(new Date("2026-11-07T13:00:00.000Z"));
+    expect(listPending(row).filter((item) => item.text.includes("Dedup"))).toHaveLength(1);
   } finally { mock.restore(); }
 });
 

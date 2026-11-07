@@ -36,6 +36,9 @@ function record(over: Partial<OpeningRecord> = {}): OpeningRecord {
 }
 
 describe("conversationOpening gates", () => {
+  test("the greeting hour follows the person's time zone", () => {
+    expect(dayPartAt(new Date("2026-11-07T02:00:00.000Z"), "America/Chicago")).toBe("evening");
+  });
   test("buckets", () => {
     expect(dayPartAt(new Date(2026, 9, 28, 6))).toBe("morning");
     expect(dayPartAt(new Date(2026, 9, 28, 13))).toBe("afternoon");

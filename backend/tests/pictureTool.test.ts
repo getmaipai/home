@@ -19,7 +19,7 @@ import { db } from "@/db";
 import { getLoraRecord, saveLora } from "@/lib/loras/store";
 import { adaptersFor } from "@/lib/pictures/adapters";
 import { attachments, people as peopleTable } from "@/db/schema";
-import { cancelPictureJob, getPictureJob, startPictureJob, __setPicturePollMsForTests } from "@/lib/pictures/jobs";
+import { cancelPictureJob, getPictureJob, startPictureJob, __setPicturePollMsForTests, __setPictureTurnWaitForTests, PICTURE_FAILED_PREFIX } from "@/lib/pictures/jobs";
 import { deleteAttachmentsForTurns } from "@/lib/attachments";
 import { pictureJobs } from "@/db/schema";
 import { saveJob, type PictureJob } from "@/lib/pictures/jobStore";
@@ -45,6 +45,7 @@ beforeEach(() => {
   fake = installFakeImageStack();
 });
 afterEach(() => {
+  __setPictureTurnWaitForTests(null);
   __setTemplateMediaOpRunnerForTests(null);
   __setPictureToolLoraReaderForTests(null);
   fake.restore();
@@ -266,6 +267,17 @@ describe("IMGGEN-HOME-01: the call, the job and the stored picture", () => {
     });
   });
 
+  test("a local picture job keeps plain failure copy instead of raw error text", async () => {
+    const conversation = await import("@/lib/conversationHistory");
+    const conv = conversation.resolveOrCreateConversation(people.owner, "chat", undefined, {});
+    if (!conv.ok) throw new Error("no conversation");
+    const job = await startPictureJob({ actor: people.owner, conversationId: conv.value.id, turnId: null, temporary: true, kind: "generate", prompt: "local image", body: { prompt: "local image", audience: "adult" }, local: async () => { throw new Error("secret raw engine diagnostic"); } });
+    await until(() => getPictureJob(people.owner, job.id)?.state === "failed");
+    expect(getPictureJob(people.owner, job.id)?.error).not.toContain("secret raw engine diagnostic");
+    expect(getPictureJob(people.owner, job.id)?.error).toContain(PICTURE_FAILED_PREFIX);
+    expect(getPictureJob(people.owner, job.id)?.error).not.toContain("engine diagnostic");
+  });
+
   test("picture card waiting labels come from the shared copy table", () => {
     const base = { state: "queued", position: 3, phase: "queued", kind: "generate" } as PictureJob;
     expect(phaseLabel(base)).toBe(JOB_QUEUE_COPY.picture_line.adult.replace("N", "3"));
@@ -283,6 +295,43 @@ describe("IMGGEN-HOME-01: the call, the job and the stored picture", () => {
       expect(db.select().from(attachments).all()).toHaveLength(0);
       expect(getPictureJob(people.owner, value.picture!.id)!.files).toHaveLength(1);
     });
+  });
+
+  test("finished picture survives a turn that never reaches done and is listed in the Library", async () => {
+    __setPictureTurnWaitForTests(5);
+    const conversation = await import("@/lib/conversationHistory");
+    const conv = conversation.resolveOrCreateConversation(people.owner, "chat", undefined, {});
+    if (!conv.ok) throw new Error("no conversation");
+    const turnId = "turn-neverwritten1";
+    const job = await startPictureJob({ actor: people.owner, conversationId: conv.value.id, turnId, temporary: false, kind: "generate", prompt: "a paper boat", body: { prompt: "a paper boat", audience: "adult" } });
+    await until(() => getPictureJob(people.owner, job.id)?.state === "done");
+    const file = db.select().from(attachments).where(eq(attachments.id, getPictureJob(people.owner, job.id)!.files[0]!.id)).get()!;
+    expect(file.turnId).toBeNull();
+    expect(file.provenance).toContain("pendingTurnId");
+    const { listLibrary } = await import("@/lib/library");
+    expect(listLibrary(people.owner, {}).items.some((item) => item.id === file.id)).toBe(true);
+    // The turn's row, written later, picks the stored picture up.
+    conversation.logTurn(people.owner, "chat", "make a paper boat", { reply: { text: "Here it is." }, source: "plugin", plugin_id: "generate_image", routing: { tier: "tool", score: 1 }, safety: { flagged: false, categories: [], action: "allow", notify_parent: false, matched_signals: [], checked_at: new Date().toISOString() }, conversation_id: conv.value.id, turn_id: turnId });
+    const attached = db.select().from(attachments).where(eq(attachments.id, file.id)).get()!;
+    expect(attached.turnId).toBe(turnId);
+    expect(attached.conversationId).toBe(conv.value.id);
+  });
+
+  test("a reply that ends after a long wait still gets its picture attached to the turn", async () => {
+    __setPictureTurnWaitForTests(5_000);
+    __setPicturePollMsForTests(20);
+    const conversation = await import("@/lib/conversationHistory");
+    const conv = conversation.resolveOrCreateConversation(people.owner, "chat", undefined, {});
+    if (!conv.ok) throw new Error("no conversation");
+    const turnId = "turn-slowreply1";
+    const job = await startPictureJob({ actor: people.owner, conversationId: conv.value.id, turnId, temporary: false, kind: "generate", prompt: "a paper boat", body: { prompt: "a paper boat", audience: "adult" } });
+    await new Promise((resolve) => setTimeout(resolve, 1_200));
+    expect(getPictureJob(people.owner, job.id)?.state).not.toBe("done");
+    conversation.logTurn(people.owner, "chat", "make a paper boat", { reply: { text: "Here it is." }, source: "plugin", plugin_id: "generate_image", routing: { tier: "tool", score: 1 }, safety: { flagged: false, categories: [], action: "allow", notify_parent: false, matched_signals: [], checked_at: new Date().toISOString() }, conversation_id: conv.value.id, turn_id: turnId });
+    await until(() => getPictureJob(people.owner, job.id)?.state === "done" || getPictureJob(people.owner, job.id)?.state === "failed")
+    const file = db.select().from(attachments).where(eq(attachments.id, getPictureJob(people.owner, job.id)!.files[0]!.id)).get()!;
+    expect(file.turnId).toBe(turnId);
+    expect(file.provenance).not.toContain("pendingTurnId");
   });
 });
 

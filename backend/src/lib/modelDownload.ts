@@ -38,7 +38,10 @@ export interface DownloadOptions {
 // retriable rejection instead of an indefinite hang. Real llama.cpp/HF
 // release assets stream continuously, so 90s of total silence is already
 // generous, the same figure the legacy code calibrated.
-const STREAM_IDLE_TIMEOUT_MS = 90_000;
+let STREAM_IDLE_TIMEOUT_MS = 90_000;
+export function __setDownloadIdleTimeoutForTests(ms: number | null): void { STREAM_IDLE_TIMEOUT_MS = ms ?? 90_000; }
+let RETRY_DELAY_SCALE = 1;
+export function __setDownloadRetryDelayScaleForTests(scale: number | null): void { RETRY_DELAY_SCALE = scale ?? 1; }
 const MAX_ATTEMPTS = 6;
 const STALE_DOWNLOAD_AGE_MS = 7 * 24 * 60 * 60 * 1000;
 
@@ -87,7 +90,7 @@ export function sha256OfFile(filePath: string): Promise<string> {
 
 function fail(partPath: string, reason: string): never {
   try {
-    unlinkSync(partPath);
+    try { unlinkSync(partPath); } catch { /* already gone */ }
   } catch {
     // already gone
   }
@@ -143,7 +146,6 @@ async function downloadOnce(
       opts.onProgress?.({ completedBytes, totalBytes, status: "downloading" });
     }
   } catch (error) {
-    if (!(opts.signal?.aborted)) unlinkSync(partPath);
     throw error;
   } finally {
     if (opts.signal?.aborted) {
@@ -192,7 +194,7 @@ export async function downloadUrl(url: string, destPath: string, opts: DownloadO
       if (attempt >= MAX_ATTEMPTS) throw err;
       const message = (err as Error).message ?? String(err);
       if (/\b(404|403)\b/.test(message)) throw err; // not-found/auth: retrying can't help
-      const delaySec = Math.min(5 * 2 ** (attempt - 1), 60);
+      const delaySec = Math.min(5 * 2 ** (attempt - 1), 60) * RETRY_DELAY_SCALE;
       opts.onProgress?.({
         completedBytes: 0,
         totalBytes: opts.expectedBytes ?? 0,

@@ -37,6 +37,7 @@ import { getNotificationType, type NotificationChannel, type NotificationType } 
 import { issueDeviceCommand } from "@/lib/deviceCommands";
 import { trackBackgroundWork } from "@/lib/backgroundWork";
 import type { PersonRow } from "@/types";
+import { wallClockMinutes } from "@/lib/wallClock";
 
 function renderTemplate(template: string, vars: Record<string, string>): string {
   return template.replace(/\{(\w+)\}/g, (match, name: string) => vars[name] ?? match);
@@ -199,7 +200,8 @@ export async function trigger(typeId: string, vars: Record<string, string> = {},
     }
     const quiet = quietHours(recipient, now);
     if (quiet.active) {
-      db.insert(notificationHolds).values({ id: newNotificationId(), typeId: type.id, recipientId: recipient.id, text, options: JSON.stringify(opts), deliverAfter: quiet.endAt.toISOString() }).run();
+      const duplicateHold = opts.repeatKey && db.select().from(notificationHolds).where(and(eq(notificationHolds.typeId, type.id), eq(notificationHolds.recipientId, recipient.id))).all().some((h) => (JSON.parse(h.options) as TriggerOptions).repeatKey === opts.repeatKey);
+      if (!duplicateHold) db.insert(notificationHolds).values({ id: newNotificationId(), typeId: type.id, recipientId: recipient.id, text, options: JSON.stringify(opts), deliverAfter: quiet.endAt.toISOString() }).run();
       continue;
     }
     await deliver(type, recipient, text, opts, now);
@@ -225,11 +227,12 @@ export function quietHours(recipient: PersonRow, now: Date): { active: boolean; 
   const ownHours = ["adult", "teen"].includes(speakerAgeBand(recipient, now));
   const from = ownHours ? personFrom ?? householdFrom : householdFrom;
   const to = ownHours ? personTo ?? householdTo : householdTo;
-  const current = now.getHours() * 60 + now.getMinutes();
+  const zoneValue = getSettingValueForPerson(recipient.id, "time.time_zone");
+  const zone = typeof zoneValue === "string" ? zoneValue : undefined;
+  const current = wallClockMinutes(now, zone);
   const active = from === to ? true : from < to ? current >= from && current < to : current >= from || current < to;
-  const endAt = new Date(now);
-  endAt.setHours(Math.floor(to / 60), to % 60, 0, 0);
-  if (current >= to) endAt.setDate(endAt.getDate() + 1);
+  const minutesUntilEnd = (to - current + 1440) % 1440 || 1440;
+  const endAt = new Date(now.getTime() - (now.getSeconds() * 1000 + now.getMilliseconds()) + minutesUntilEnd * 60_000);
   return { active, endAt };
 }
 
@@ -280,14 +283,18 @@ async function deliver(type: NotificationType, recipient: PersonRow, text: strin
 export async function deliverHeldNotifications(now = new Date()): Promise<number> {
   const held = db.select().from(notificationHolds).where(lte(notificationHolds.deliverAfter, now.toISOString())).all();
   for (const row of held) {
+    try {
     const type = getNotificationType(row.typeId);
     const recipient = db.select().from(people).where(and(eq(people.id, row.recipientId), isNull(people.deletedAt))).get() as PersonRow | undefined;
     if (!recipient || !type) { db.delete(notificationHolds).where(eq(notificationHolds.id, row.id)).run(); continue; }
     const quiet = quietHours(recipient, now);
     if (type.level === "immediate" || !quiet.active) {
-      await deliver(type, recipient, row.text, JSON.parse(row.options) as TriggerOptions, now);
+      const opts = JSON.parse(row.options) as TriggerOptions;
+      const duplicate = opts.repeatKey && db.select({ id: notificationDeliveries.id }).from(notificationDeliveries).where(and(eq(notificationDeliveries.typeId, type.id), eq(notificationDeliveries.recipientId, recipient.id), eq(notificationDeliveries.repeatKey, opts.repeatKey))).get();
+      if (!duplicate) await deliver(type, recipient, row.text, opts, now);
       db.delete(notificationHolds).where(eq(notificationHolds.id, row.id)).run();
     } else db.update(notificationHolds).set({ deliverAfter: quiet.endAt.toISOString() }).where(eq(notificationHolds.id, row.id)).run();
+    } catch (error) { console.error(`[notifications] held delivery failed for ${row.id}: ${(error as Error).message}`); }
   }
   return held.length;
 }

@@ -4,7 +4,7 @@ import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, utimesSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { downloadUrl, sha256OfFile, sweepStaleDownloads } from "@/lib/modelDownload";
+import { downloadUrl, sha256OfFile, sweepStaleDownloads, __setDownloadIdleTimeoutForTests, __setDownloadRetryDelayScaleForTests } from "@/lib/modelDownload";
 import { enginesDir, modelsDir } from "@/lib/paths";
 
 const CONTENT = Buffer.from("x".repeat(50_000), "utf8");
@@ -101,6 +101,29 @@ describe("downloadUrl", () => {
     await downloadUrl(`${server.url}/flaky-once`, destPath, { expectedSha256: SHA256, expectedBytes: CONTENT.length });
     expect(readFileSync(destPath)).toEqual(CONTENT);
   }, 15_000);
+
+  test("keeps a stalled partial file and resumes it on retry", async () => {
+    const destPath = dest();
+    __setDownloadIdleTimeoutForTests(25);
+    __setDownloadRetryDelayScaleForTests(0);
+    let first = true;
+    let resumedAt = -1;
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = (async (input, init) => {
+      const range = new Headers(init?.headers).get("range");
+      if (first) {
+        first = false;
+        return new Response(new ReadableStream<Uint8Array>({ start(c) { c.enqueue(CONTENT.subarray(0, 20_000)); } }), { headers: { "content-length": String(CONTENT.length) } });
+      }
+      resumedAt = Number(/bytes=(\d+)/.exec(range ?? "")?.[1] ?? 0);
+      return new Response(CONTENT.subarray(resumedAt), { status: 206, headers: { "content-length": String(CONTENT.length - resumedAt), "content-range": `bytes ${resumedAt}-${CONTENT.length - 1}/${CONTENT.length}` } });
+    }) as typeof fetch;
+    try {
+      await downloadUrl("http://download.test/model", destPath, { expectedSha256: SHA256, expectedBytes: CONTENT.length });
+      expect(resumedAt).toBe(20_000);
+      expect(readFileSync(destPath)).toEqual(CONTENT);
+    } finally { globalThis.fetch = originalFetch; __setDownloadIdleTimeoutForTests(null); __setDownloadRetryDelayScaleForTests(null); }
+  }, 10_000);
 });
 
 describe("sha256OfFile", () => {

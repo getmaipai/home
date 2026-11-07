@@ -9,6 +9,10 @@ import { markOpenQuestionAsked, queueOpenQuestion } from "@/lib/conversationHist
 
 import { sanitizeForPrompt } from "@/lib/promptSanitize";
 import { threadOfferFloor } from "@/lib/threadOfferFloor";
+import { wallClockParts } from "@/lib/wallClock";
+import { getSettingValueForPerson } from "@/lib/settings";
+
+function personZone(id: string): string | undefined { const z = getSettingValueForPerson(id, "time.time_zone"); return typeof z === "string" ? z : undefined; }
 
 export type SinceLast = "same_day" | "few_days" | "few_weeks" | "months";
 export type DayPart = "morning" | "afternoon" | "evening" | "night";
@@ -38,6 +42,7 @@ export interface OpeningPerson {
   id: string;
   band: "child" | "teen" | "adult";
   pickUpThreads: boolean;
+  timeZone?: string;
 }
 
 /** The facts about this turn and the conversation, none of them read from the person's words. */
@@ -87,8 +92,8 @@ export const MOOD_WINDOW_DAYS = 7;
 const DAY_MS = 86_400_000;
 const MAX_SUBJECT_CHARS = 140;
 
-export function dayPartAt(now: Date): DayPart {
-  const h = now.getHours();
+export function dayPartAt(now: Date, zone?: string): DayPart {
+  const h = wallClockParts(now, zone).hour;
   if (h >= 5 && h < 12) return "morning";
   if (h >= 12 && h < 17) return "afternoon";
   if (h >= 17 && h < 22) return "evening";
@@ -161,7 +166,7 @@ export function conversationOpening(person: OpeningPerson, now: Date, turns: Ope
   if (!turns.firstTurn || !turns.noTask || turns.lastTurnAt === null) return null;
   const since = sinceLastAt(turns.lastTurnAt, now);
   if (since === null) return null;
-  const opening: ConversationOpening = { since_last: since, day_part: dayPartAt(now) };
+  const opening: ConversationOpening = { since_last: since, day_part: dayPartAt(now, person.timeZone ?? personZone(person.id)) };
   if (person.band === "child" || !person.pickUpThreads) return opening;
   let best: { thread: OpeningThread; at: number } | null = null;
   let mood: { mood: OpeningMood; at: number } | null = null;

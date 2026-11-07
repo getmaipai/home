@@ -1,9 +1,10 @@
-import { describe, expect, test, beforeEach } from "bun:test";
-import { getChatClient, restartChatBackend, stopChatBackend } from "@/lib/llmSupervisor";
+import { describe, expect, test, beforeEach, afterEach } from "bun:test";
+import { getChatClient, restartChatBackend, stopChatBackend, __setBlockedPortRetryForTests, __setBlockedPortRetryIntervalForTests, startBlockedPortRetryForTests, __resetLlmSupervisorForTests } from "@/lib/llmSupervisor";
 import { __setStackClientForTests, __resetStackEngineForTests, isStackConfigured } from "@/lib/stackEngine";
 import { useDefaultScriptedStack } from "./stackFixture";
 
 beforeEach(() => useDefaultScriptedStack());
+afterEach(() => __resetLlmSupervisorForTests());
 
 describe("Home chat engine is sealed", () => {
   test("getChatClient refuses to spawn or download a Home chat engine", async () => {
@@ -23,5 +24,16 @@ describe("Home chat engine is sealed", () => {
     __setStackClientForTests(null);
     expect(isStackConfigured()).toBe(false);
     await expect(getChatClient()).rejects.toThrow("Home runs chat through the MaiPai Stack.");
+  });
+
+  test("blocked-port retry ticks do not overlap an in-flight retry", async () => {
+    let calls = 0;
+    let release!: () => void;
+    __setBlockedPortRetryIntervalForTests(5);
+    __setBlockedPortRetryForTests(() => { calls++; return new Promise<void>((resolve) => { release = resolve; }); });
+    startBlockedPortRetryForTests();
+    await new Promise((resolve) => setTimeout(resolve, 30));
+    expect(calls).toBe(1);
+    release();
   });
 });

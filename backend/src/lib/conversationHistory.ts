@@ -441,6 +441,10 @@ const insertTurnAndBumpConversation = sqlite.transaction((row: ConversationTurnR
   const storedRow = { ...row, branchChosen, status: "done" as const };
   db.insert(conversationTurns).values(storedRow).onConflictDoUpdate({ target: conversationTurns.id, set: storedRow }).run();
   db.update(conversations).set({ updatedAt: row.createdAt, hlc: nextHlc() }).where(eq(conversations.id, conversationId)).run();
+  // AUDIT-LIB-01: a finished picture or clip that outran its turn was stored unattached with `pendingTurnId` in its provenance;
+  // the turn's row is the moment it can be attached, so nothing a person waited for is lost.
+  sqlite.prepare(`UPDATE attachments SET turn_id = ?, conversation_id = ?, retention = 'conversation' WHERE turn_id IS NULL AND conversation_id IS NULL AND deleted_at IS NULL AND provenance LIKE ?`)
+    .run(row.id, conversationId, `%"pendingTurnId":"${row.id.replace(/[%_"\\]/g, "")}"%`);
   return storedRow;
 });
 

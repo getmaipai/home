@@ -20,7 +20,7 @@ import { db } from "@/db";
 import { people as peopleTable } from "@/db/schema";
 import { stackAudienceFor, videoAdapterAudiencesFor, videoDenial, videosAllowed, refuseVideoPrompt, VIDEO_NOT_HERE_LINE, VIDEO_REFUSAL_LINE, type VideoAudience } from "@/lib/videos/policy";
 import { videoAdaptersFor } from "@/lib/videos/adapters";
-import { getVideoJobFor, startVideoJob } from "@/lib/videos/jobs";
+import { getVideoJobFor, startVideoJob, __setVideoTurnWaitForTests } from "@/lib/videos/jobs";
 import { __setVideoStatusForTests } from "@/lib/videos/ready";
 import type { ChatCompletionRequest } from "@maipai/spec/llm/ts/types.js";
 import type { TurnValue } from "@/wire";
@@ -351,6 +351,41 @@ describe("the routes", () => {
     await startVideoJob({ actor: owner.actor, conversationId: resolved.value.id, turnId: null, temporary: true, kind: "generate", prompt: "a paper boat", body });
     await expect(startVideoJob({ actor: owner.actor, conversationId: resolved.value.id, turnId: null, temporary: true, kind: "generate", prompt: "another", body })).rejects.toThrow("already have a video being made");
     expect(fake.submitted).toHaveLength(1);
+  });
+
+  test("simultaneous starts reserve the single video slot before awaiting style lookup", async () => {
+    fake.pollsToFinish = 1000;
+    const owner = await signedIn("Sage", "owner");
+    const conv = await import("@/lib/conversationHistory");
+    const resolved = conv.resolveOrCreateConversation(owner.actor, "chat", undefined, {});
+    if (!resolved.ok) throw new Error("no conversation");
+    const body = { prompt: "a paper boat", audience: "adult" as const };
+    const results = await Promise.allSettled([
+      startVideoJob({ actor: owner.actor, conversationId: resolved.value.id, turnId: null, temporary: true, kind: "generate", prompt: "first", body }),
+      startVideoJob({ actor: owner.actor, conversationId: resolved.value.id, turnId: null, temporary: true, kind: "generate", prompt: "second", body }),
+    ]);
+    expect(results.filter((result) => result.status === "fulfilled")).toHaveLength(1);
+    expect(fake.submitted).toHaveLength(1);
+  });
+
+  test("a finished clip whose turn row never appears is stored with pendingTurnId and attached by the next turn write", async () => {
+    __setVideoTurnWaitForTests(5);
+    try {
+      const owner = await signedIn("Sage", "owner");
+      const conv = await import("@/lib/conversationHistory");
+      const resolved = conv.resolveOrCreateConversation(owner.actor, "chat", undefined, {});
+      if (!resolved.ok) throw new Error("no conversation");
+      const turnId = "turn-clipnever1";
+      const job = await startVideoJob({ actor: owner.actor, conversationId: resolved.value.id, turnId, temporary: false, kind: "generate", prompt: "a paper boat", body: { prompt: "a paper boat", audience: "adult" } });
+      await until(() => getVideoJobFor(owner.actor, job.id)?.state === "done");
+      const { attachments } = await import("@/db/schema");
+      const fileId = getVideoJobFor(owner.actor, job.id)!.files[0]!.id;
+      const clip = db.select().from(attachments).where(eq(attachments.id, fileId)).get()!;
+      expect(clip.turnId).toBeNull();
+      expect(clip.provenance).toContain("pendingTurnId");
+      conv.logTurn(owner.actor, "chat", "make a video", { reply: { text: "On its way." }, source: "plugin", plugin_id: "generate_video", routing: { tier: "tool", score: 1 }, safety: { flagged: false, categories: [], action: "allow", notify_parent: false, matched_signals: [], checked_at: new Date().toISOString() }, conversation_id: resolved.value.id, turn_id: turnId });
+      expect(db.select().from(attachments).where(eq(attachments.id, fileId)).get()!.turnId).toBe(turnId);
+    } finally { __setVideoTurnWaitForTests(null); }
   });
 
   test("an unsatisfiable Range is a 416, never the whole file", async () => {

@@ -1,11 +1,11 @@
 // IMGGEN-HOME-01: a picture job from the person's side. The chat card polls Home (never the Stack); Home polls the
 // Stack, stores each finished picture as the person's own file (the Stack's bytes unchanged), and keeps one honest
 // line when something fails (rule 6: a failed picture never fails the answer). Where jobs live is jobStore.ts.
-import { eq, inArray } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 import sharp from "sharp";
 import { db } from "@/db";
 import { attachments, conversationTurns, people } from "@/db/schema";
-import { createAttachment, purgeFileRecord, removeFileBlobs, storeTemporaryChatImage } from "@/lib/attachments";
+import { createAttachment, purgeFileRecord, removeFileBlobs, storeFile, storeTemporaryChatImage } from "@/lib/attachments";
 import { newFileId, newPictureJobId } from "@/lib/id";
 import { loadSource, pictureUrl, saveVersion } from "@/lib/imageEdit";
 import type { PersonRow } from "@/types";
@@ -241,7 +241,7 @@ async function watchLocal(job: PictureJob, actor: PersonRow, run: NonNullable<St
   } catch (error) {
     if (!stopped(job)) {
       job.state = "failed";
-      job.error = `${PICTURE_FAILED_PREFIX} ${error instanceof Error && error.message ? error.message : "Something went wrong. Try again."}`.replace(`${PICTURE_FAILED_PREFIX} ${PICTURE_FAILED_PREFIX}`, PICTURE_FAILED_PREFIX);
+      job.error = plainFailure(error);
       job.files = [];
       try { savePictureJob(job); } catch { /* the job ends here either way */ }
     }
@@ -251,11 +251,14 @@ async function watchLocal(job: PictureJob, actor: PersonRow, run: NonNullable<St
   }
 }
 
+let TURN_END_WAIT_MS = 15 * 60_000;
+export function __setPictureTurnWaitForTests(ms: number | null): void { TURN_END_WAIT_MS = ms ?? 15 * 60_000; }
 async function waitForTurnRow(turnId: string, job: PictureJob): Promise<boolean> {
   // The turn's row is written when the reply ends; a fast picture can finish first.
-  for (let i = 0; i < 120 && !stopped(job); i += 1) {
-    if (db.select({ id: conversationTurns.id }).from(conversationTurns).where(eq(conversationTurns.id, turnId)).get()) return true;
-    await new Promise((resolve) => setTimeout(resolve, 500));
+  const deadline = Date.now() + TURN_END_WAIT_MS;
+  while (Date.now() < deadline && !stopped(job)) {
+    if (db.select({ id: conversationTurns.id }).from(conversationTurns).where(and(eq(conversationTurns.id, turnId), eq(conversationTurns.status, "done"))).get()) return true;
+    await new Promise((resolve) => setTimeout(resolve, Math.min(500, Math.max(1, deadline - Date.now()))));
   }
   return false;
 }
@@ -327,8 +330,10 @@ async function finish(job: PictureJob, actor: PersonRow, pics: StackPic[]): Prom
         files.push({ id, width, height, ...meta });
         continue;
       }
-      if (!job.turnId || !(await waitForTurnRow(job.turnId, job))) { if (stopped(job)) { discardStored(storedIds); return; } throw new Error("turn row never appeared"); }
-      const created = createAttachment(actor, { conversationId, turnId: job.turnId, mediaType: "image/png", bytes: raw, provenance: `picture-gen:${JSON.stringify({ v: 1, ...markFields(mark), job: job.id, index, ...meta, width, height, ...(job.request.subject_ids?.length ? { subjects: job.request.subject_ids } : {}) })}`, deduplicate: false, retention: "conversation" });
+      const turnExists = !!job.turnId && await waitForTurnRow(job.turnId, job);
+      if (stopped(job)) { discardStored(storedIds); return; }
+      const provenance = `picture-gen:${JSON.stringify({ v: 1, ...markFields(mark), job: job.id, index, ...meta, width, height, ...(!turnExists && job.turnId ? { pendingTurnId: job.turnId } : {}), ...(job.request.subject_ids?.length ? { subjects: job.request.subject_ids } : {}) })}`;
+      const created = turnExists ? createAttachment(actor, { conversationId, turnId: job.turnId!, mediaType: "image/png", bytes: raw, provenance, deduplicate: false, retention: "conversation" }) : storeFile(actor, { conversationId: null, turnId: null, mediaType: "image/png", bytes: raw, provenance, deduplicate: false, retention: "kept" });
       if (!created.ok) {
         fail(created.status === 403 ? `${PICTURE_FAILED_PREFIX} Your storage is full. Delete some files in Settings, Storage, then try again.` : `${PICTURE_FAILED_PREFIX} The picture couldn't be saved. Try again.`);
         return;

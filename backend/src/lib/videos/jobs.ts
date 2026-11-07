@@ -6,7 +6,7 @@
 import { and, desc, eq, inArray, like } from "drizzle-orm";
 import { db } from "@/db";
 import { attachments, conversationTurns, people, videoJobs } from "@/db/schema";
-import { createAttachment, getTemporaryChatImage, latestGeneratedTemporaryImage, readAttachment, readAttachmentForConversation, registerTemporaryMedia, storeFile } from "@/lib/attachments";
+import { createAttachment, getTemporaryChatImage, latestGeneratedTemporaryImage, readAttachment, readAttachmentForConversation, registerTemporaryMedia, storeFile, purgeFileRecord, removeFileBlobs } from "@/lib/attachments";
 import { newFileId, newVideoJobId } from "@/lib/id";
 import { nextHlc } from "@/lib/hlc";
 import { setShotClip } from "@/lib/mediaProductions";
@@ -140,6 +140,7 @@ const memory = new Map<string, VideoJob>();
 const watching = new Map<string, AbortController>();
 // The one object a watcher and a Stop both act on, so neither saves a stale copy over the other.
 const liveJobs = new Map<string, VideoJob>();
+const videoReservations = new Set<string>();
 
 type Row = typeof videoJobs.$inferSelect;
 function fromRow(row: Row): VideoJob {
@@ -439,11 +440,14 @@ export interface StartVideoInput {
 export async function startVideoJob(input: StartVideoInput): Promise<VideoJob> {
   // One clip at a time per person: a second one waits until the first is done or stopped, so no one can fill the Stack's line.
   if (activeVideoJobsFor(input.actor) > 0) throw new StackVideoError(429, "already_making", "You already have a video being made. Wait for it to finish, or stop it first.");
+  if (videoReservations.has(input.actor.id)) throw new StackVideoError(429, "already_making", "You already have a video being made. Wait for it to finish, or stop it first.");
+  videoReservations.add(input.actor.id);
   // Whoever calls, a teen or a child is on an allowed model (Quick, silent); only an adult's own choice reaches the engine.
   const model = videoModelForLane(laneOfPerson(input.actor), input.body.model);
   const now = new Date().toISOString();
   // ADULT-LOCK-02: a clip made with an adult-only style is a locked item from the start, before the Stack is called, so a clip being made is already a lock tile.
   // ADULT-LOCK-06: the mark is decided here, from the one table (newItemMark): an adult-only style locks it on; a source's flags (`input.adultOnly`, `input.adultLock`) carry over.
+  try {
   const adultStyle = await usesAdultOnlyStyle((input.body.loras ?? []).map((l) => l.id));
   // VIDEO-LORA-03: the LoRAs go to the Stack only as it reports it can use them on this model; otherwise the clip fails now, with a plain line, before anything is queued.
   const wired = await wireLoras(input.body.loras, model);
@@ -457,8 +461,10 @@ export async function startVideoJob(input: StartVideoInput): Promise<VideoJob> {
   };
   liveJobs.set(job.id, job);
   saveVideoJob(job);
+  videoReservations.delete(input.actor.id);
   void releaseHouseholdQueue();
   return job;
+  } catch (error) { videoReservations.delete(input.actor.id); throw error; }
 }
 
 // ---------------------------------------------------------------- watching
@@ -532,11 +538,14 @@ async function watch(job: VideoJob, actor: PersonRow, early: StackClip[] | null 
   }
 }
 
+let TURN_END_WAIT_MS = 15 * 60_000;
+export function __setVideoTurnWaitForTests(ms: number | null): void { TURN_END_WAIT_MS = ms ?? 15 * 60_000; }
 async function waitForTurnRow(turnId: string): Promise<boolean> {
   // The turn's row is written when the reply ends; the clip arrives minutes later, but a restart-resumed job can come sooner.
-  for (let i = 0; i < 120; i += 1) {
-    if (db.select({ id: conversationTurns.id }).from(conversationTurns).where(eq(conversationTurns.id, turnId)).get()) return true;
-    await new Promise((resolve) => setTimeout(resolve, 500));
+  const deadline = Date.now() + TURN_END_WAIT_MS;
+  while (Date.now() < deadline) {
+    if (db.select({ id: conversationTurns.id }).from(conversationTurns).where(and(eq(conversationTurns.id, turnId), eq(conversationTurns.status, "done"))).get()) return true;
+    await new Promise((resolve) => setTimeout(resolve, Math.min(500, Math.max(1, deadline - Date.now()))));
   }
   return false;
 }
@@ -615,18 +624,23 @@ async function settleClip(job: VideoJob, actor: PersonRow, video: Uint8Array, po
     }
   } else {
     const own = conversationId === null;
-    if (!own && (!job.turnId || !(await waitForTurnRow(job.turnId)))) throw new Error("turn row never appeared");
+    const turnExists = !own && !!job.turnId && await waitForTurnRow(job.turnId);
     if (signal.aborted) return;
-    const clipProvenance = `${writer}:${JSON.stringify({ v: 1, ...markNote, job: job.id, ...meta, ...(job.request.edit ? { from: job.request.edit.from, change: job.request.edit.change } : {}) })}`;
     const posterProvenance = `${CLIP_POSTER_NOTE}${JSON.stringify({ v: 1, ...markNote, job: job.id, width, height,  })}`;
-    const made = own
+    const clipProvenance = `${writer}:${JSON.stringify({ v: 1, ...markNote, job: job.id, ...meta, ...(!own && !turnExists && job.turnId ? { pendingTurnId: job.turnId } : {}), ...(job.request.edit ? { from: job.request.edit.from, change: job.request.edit.change } : {}) })}`;
+    const made = own || !turnExists
       ? storeFile(actor, { conversationId: null, turnId: null, mediaType, bytes: video, provenance: clipProvenance, deduplicate: false, retention: "kept", name: mediaType === "video/webm" ? "Edited video.webm" : undefined })
       : createAttachment(actor, { conversationId: conversationId!, turnId: job.turnId!, mediaType, bytes: video, provenance: clipProvenance, deduplicate: false, retention: "conversation", name: mediaType === "video/webm" ? "Edited video.webm" : undefined });
     if (!made.ok) { job.state = "failed"; job.error = saveFailureLine(made.status); saveVideoJob(job); return; }
-    const madePoster = own
+    const madePoster = own || !turnExists
       ? storeFile(actor, { conversationId: null, turnId: null, mediaType: "image/jpeg", bytes: poster, provenance: posterProvenance, deduplicate: false, retention: "kept" })
       : createAttachment(actor, { conversationId: conversationId!, turnId: job.turnId!, mediaType: "image/jpeg", bytes: poster, provenance: posterProvenance, deduplicate: false, retention: "conversation" });
-    if (!madePoster.ok) { job.state = "failed"; job.error = saveFailureLine(madePoster.status); saveVideoJob(job); return; }
+    if (!madePoster.ok) {
+      const clipRow = db.select().from(attachments).where(eq(attachments.id, made.value.id)).get();
+      const blob = clipRow ? purgeFileRecord(clipRow) : null;
+      if (blob) removeFileBlobs([blob]);
+      job.state = "failed"; job.error = saveFailureLine(madePoster.status); saveVideoJob(job); return;
+    }
     if (lock === "on") logAutoMark(made.value.id, actor.id);
     file = { id: made.value.id, poster_id: madePoster.value.id, width, height, seconds: meta.seconds, seed: meta.seed, model: meta.model, ms: meta.ms, bytes: video.byteLength, quality, audio: meta.audio };
     if (surround) {

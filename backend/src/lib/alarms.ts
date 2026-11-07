@@ -7,13 +7,14 @@ import { newJobId } from "@/lib/id";
 import { nextHlc } from "@/lib/hlc";
 import { nextOccurrence } from "@/lib/scheduler";
 import { getSettingValueForPerson } from "@/lib/settings";
+import { validTimeZone } from "@/lib/wallClock";
 import type { PersonRow } from "@/types";
 
 type Result<T> = { ok: true; value: T } | { ok: false; status: 400 | 404; error: string };
 type AlarmRow = typeof alarms.$inferSelect;
 function shape(row: AlarmRow): AlarmT { return Alarm.parse({ id: row.id, person: row.person, time: row.time, days: JSON.parse(row.days), label: row.label, tag: row.tag, enabled: row.enabled, skip_until: row.skipUntil, sound: row.sound, snooze_minutes: row.snoozeMinutes, source: row.source, created_at: row.createdAt, updated_at: row.updatedAt, deleted_at: row.deletedAt, hlc: row.hlc }); }
 function rowOf(a: AlarmT) { return { id: a.id, person: a.person, time: a.time, days: JSON.stringify(a.days), label: a.label, tag: a.tag, enabled: a.enabled, skipUntil: a.skip_until, sound: a.sound, snoozeMinutes: a.snooze_minutes, source: a.source, createdAt: a.created_at, updatedAt: a.updated_at, deletedAt: a.deleted_at, hlc: a.hlc }; }
-function zoneFor(person: string): string { const z = getSettingValueForPerson(person, "time.time_zone"); return typeof z === "string" && z ? z : Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC"; }
+function zoneFor(person: string): string { const z = getSettingValueForPerson(person, "time.time_zone"); return validTimeZone(z) ? z : Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC"; }
 function nextAt(a: AlarmT): string | null { return a.enabled ? nextOccurrence({ time: a.time, days: a.days, zone: zoneFor(a.person), after: new Date(), skipUntil: a.skip_until })?.toISOString() ?? null : null; }
 function owned(actor: Pick<PersonRow, "id">, id: string): AlarmRow | undefined { return db.select().from(alarms).where(and(eq(alarms.id, id), eq(alarms.person, actor.id), isNull(alarms.deletedAt))).get(); }
 

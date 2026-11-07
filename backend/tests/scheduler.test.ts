@@ -2,10 +2,10 @@ import { describe, expect, test, beforeEach, afterEach } from "bun:test";
 import { TestClient } from "./client";
 import { resetDb } from "./reset-db";
 import { __resetThrottleForTests } from "@/lib/secretThrottle";
-import { parseWhen, scheduleJob, scheduleCoreJob, ensureCoreJob, listJobs, cancelJob, runDueJobs, sortDueJobsForPriority } from "@/lib/scheduler";
+import { parseWhen, scheduleJob, scheduleCoreJob, ensureCoreJob, listJobs, cancelJob, runDueJobs, runTimeCriticalJobs, sortDueJobsForPriority } from "@/lib/scheduler";
 import { runPlugin, registerAllPackageNotificationTypes } from "@/lib/plugins";
 import { db } from "@/db";
-import { people, scheduledJobs, pendingEmbeddings, memoryEmbeddings } from "@/db/schema";
+import { people, scheduledJobs, pendingEmbeddings, memoryEmbeddings, alarms } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { remember } from "@/lib/memory";
 import { listPending } from "@/lib/notifications";
@@ -436,6 +436,46 @@ describe("reminders.fire and timers.fire (session-d-packages-and-store.md step 8
 
     const pending = listPending(ownerRow);
     expect(pending.some((n) => n.typeId === "timer.done" && n.text.includes("ten minutes"))).toBe(true);
+  });
+});
+
+describe("alarms.fire retry lifecycle", () => {
+  beforeEach(() => registerAllPackageNotificationTypes());
+  async function dueAlarm(days: number[]) {
+    const { row } = await owner();
+    const now = new Date().toISOString();
+    const alarmId = `alarm-test-${Math.random().toString(36).slice(2)}`;
+    db.insert(alarms).values({ id: alarmId, person: row.id, time: "07:00", days: JSON.stringify(days), label: "wake up", tag: "", enabled: true, skipUntil: null, sound: "default", snoozeMinutes: null, source: "hub", createdAt: now, updatedAt: now, deletedAt: null, hlc: "1:0:test" }).run();
+    const scheduled = scheduleCoreJob(row, "alarms.fire", new Date(Date.now() + 60_000).toISOString(), { task: "wake up", alarmId, attempts: 0 });
+    if (!scheduled.ok) throw new Error("setup failed");
+    db.update(scheduledJobs).set({ nextRunAt: new Date(0).toISOString() }).where(eq(scheduledJobs.id, scheduled.value.id)).run();
+    return { row, alarmId, id: scheduled.value.id };
+  }
+  test("a throwing alarm handler is delayed one interval and stops after three attempts", async () => {
+    const alarm = await dueAlarm([1]);
+    const broken = async () => { throw new Error("delivery failed"); };
+    for (let n = 1; n <= 3; n++) {
+      await runTimeCriticalJobs(runPlugin, new Date(), { "alarms.fire": broken });
+      const row = db.select().from(scheduledJobs).where(eq(scheduledJobs.id, alarm.id)).get()!;
+      if (n < 3) {
+        expect(row.status).toBe("pending");
+        expect(JSON.parse(row.inputs).attempts).toBe(n);
+        expect(Date.parse(row.nextRunAt)).toBeGreaterThan(Date.now());
+        db.update(scheduledJobs).set({ nextRunAt: new Date(0).toISOString() }).where(eq(scheduledJobs.id, alarm.id)).run();
+      } else expect(row.status).toBe("failed");
+    }
+  });
+  test("a repeating alarm whose next time is null is marked done, not left to re-fire", async () => {
+    const alarm = await dueAlarm([1]);
+    db.update(alarms).set({ skipUntil: "2100-01-01T00:00:00.000Z" }).where(eq(alarms.id, alarm.alarmId)).run();
+    await runTimeCriticalJobs(runPlugin);
+    expect(db.select().from(scheduledJobs).where(eq(scheduledJobs.id, alarm.id)).get()?.status).toBe("done");
+  });
+  test("a successful one-shot with no next occurrence is done", async () => {
+    const alarm = await dueAlarm([]);
+    await runTimeCriticalJobs(runPlugin);
+    expect(db.select().from(scheduledJobs).where(eq(scheduledJobs.id, alarm.id)).get()?.status).toBe("done");
+    expect(db.select().from(alarms).where(eq(alarms.id, alarm.alarmId)).get()?.enabled).toBe(false);
   });
 });
 

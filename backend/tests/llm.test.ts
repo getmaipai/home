@@ -5,7 +5,7 @@ import { __resetThrottleForTests } from "@/lib/secretThrottle";
 import { __resetLlmSupervisorForTests } from "@/lib/llmSupervisor";
 import * as llmSupervisor from "@/lib/llmSupervisor";
 import { __resetRateLimiterForTests } from "@/lib/rateLimiter";
-import { complete, startCompleteStream, embed, envelopeToolCall, PERSON_TURN_BUDGET, type ToolSpec, type ToolCall } from "@/lib/llm";
+import { complete, startCompleteStream, embed, envelopeToolCall, PERSON_TURN_BUDGET, type ToolSpec, type ToolCall, __setStackStreamIdleTimeoutForTests } from "@/lib/llm";
 import { clampMaxTokens } from "@/routes/llm";
 import type { ChatCompletionRequest } from "@maipai/spec/llm/ts/types.js";
 import { setHouseholdSettingValue } from "@/lib/settings";
@@ -24,6 +24,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  __setStackStreamIdleTimeoutForTests(null);
   __resetLlmSupervisorForTests();
   __resetStackEngineForTests();
   delete process.env.MAIPAI_LLAMA_SERVER_URL;
@@ -1056,6 +1057,18 @@ describe("lib/llm.ts routed through a configured Stack", () => {
     expect(text).toBe("hello");
     expect(started.stats.stopReason).toBe("stop");
   });
+
+  test("a Stack that stalls mid-reply ends the adult written stream with stopped-answering copy", async () => {
+    fixture = startStackFixture({
+      "POST /v1/chat/completions": async () => new Response(new ReadableStream<Uint8Array>({ start(controller) { const enc = new TextEncoder(); controller.enqueue(enc.encode('data: {"choices":[{"delta":{"content":"partial"},"finish_reason":null}]}\n\n')); setTimeout(() => controller.enqueue(enc.encode(": heartbeat\n\n")), 10); } }), { headers: { "content-type": "text/event-stream", ...IDENTITY_HEADERS } }),
+    });
+    configureStack();
+    __setStackStreamIdleTimeoutForTests(25);
+    const started = await startCompleteStream("chat", [{ role: "user", content: "continue" }]);
+    expect(started.ok).toBe(true);
+    if (!started.ok) return;
+    await expect((async () => { for await (const _piece of started.tokens) { /* consume */ } })()).rejects.toThrow(/stopped answering/);
+  }, 2_000);
 
   test("embed() answers through the Stack, sorted by the wire's own index", async () => {
     fixture = startStackFixture({
