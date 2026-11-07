@@ -1612,7 +1612,6 @@ msgstr ""
 
 #. js-lingui-explicit-id
 #: src/apps/settings/styles/StyleEditor.tsx:105
-#: src/apps/settings/styles/stylesShared.tsx:63
 #: src/apps/settings/styles/StylesTab.tsx:127
 #, needs-review
 msgid "All adults"
@@ -2342,7 +2341,7 @@ msgstr "Límite de almacenamiento de copias de seguridad (GB)"
 #. js-lingui-explicit-id
 #: src/apps/settings/BackupsSection.tsx:197
 #: src/shell/pageHeaderTitle.tsx:99
-#: src/shell/Routes.tsx:152
+#: src/shell/Routes.tsx:154
 #, needs-review
 msgid "Backups"
 msgstr "Copias de seguridad"
@@ -2952,7 +2951,7 @@ msgstr "Puedes guardar copias en este dispositivo"
 #: src/shell/pages/ChatPage.tsx:1681
 #: src/shell/pages/settings/SettingField.tsx:149
 #: src/shell/pages/settings/SettingField.tsx:268
-#: src/shell/pages/settings/SettingsRenderer.tsx:172
+#: src/shell/pages/settings/SettingsRenderer.tsx:169
 msgid "Cancel"
 msgstr ""
 
@@ -3322,7 +3321,7 @@ msgid "Chat settings"
 msgstr "Configuración del chat"
 
 #. js-lingui-explicit-id
-#: src/shell/Routes.tsx:155
+#: src/shell/Routes.tsx:157
 #, needs-review
 msgid "Chat showcase"
 msgstr "Demo de chat"
@@ -3923,7 +3922,6 @@ msgstr "Si eliges todas las edades, te pedirá tu código de nuevo."
 #. js-lingui-explicit-id
 #: src/apps/settings/styles/StyleEditor.tsx:105
 #: src/apps/settings/styles/StyleEditor.tsx:111
-#: src/apps/settings/styles/stylesShared.tsx:63
 #: src/apps/settings/styles/StylesTab.tsx:127
 #, needs-review
 msgid "Chosen people"
@@ -4180,7 +4178,7 @@ msgstr "Cómodo"
 #. js-lingui-explicit-id
 #: src/apps/settings/CommandsSection.tsx:99
 #: src/shell/pageHeaderTitle.tsx:101
-#: src/shell/Routes.tsx:153
+#: src/shell/Routes.tsx:155
 #, needs-review
 msgid "Commands"
 msgstr "Comandos"
@@ -4272,7 +4270,7 @@ msgstr ""
 #: src/apps/settings/TwoStepSignInSection.tsx:50
 #: src/shell/components/DataTableRowActions.tsx:57
 #: src/shell/pages/settings/HouseSettings.tsx:50
-#: src/shell/pages/settings/SettingsRenderer.tsx:182
+#: src/shell/pages/settings/SettingsRenderer.tsx:179
 #, needs-review
 msgid "Confirm"
 msgstr "Confirmar"
@@ -4595,7 +4593,7 @@ msgid "Could not delete this voice. Try again."
 msgstr "No se pudo eliminar esta voz. Inténtalo de nuevo."
 
 #. js-lingui-explicit-id
-#: src/shell/Routes.tsx:361
+#: src/shell/Routes.tsx:363
 #, needs-review
 msgid "Could not discard Incognito chats. Try again."
 msgstr "No se pudieron descartar los chats Incógnito. Inténtalo de nuevo."
@@ -4667,7 +4665,7 @@ msgid "Could not load routing stats."
 msgstr "No se pudieron cargar las estadísticas de enrutamiento."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/settings/SettingsRenderer.tsx:195
+#: src/shell/pages/settings/SettingsRenderer.tsx:192
 #, needs-review
 msgid "Could not load settings."
 msgstr "No se pudieron cargar los ajustes."
@@ -4820,7 +4818,7 @@ msgstr ""
 
 #. js-lingui-explicit-id
 #: src/shell/AmbientCompanionPane.tsx:297
-#: src/shell/Routes.tsx:302
+#: src/shell/Routes.tsx:304
 #, needs-review
 msgid "Could not reach {name}. Try again."
 msgstr "No se pudo contactar a {name}. Inténtalo de nuevo."
@@ -4927,8 +4925,8 @@ msgid "Could not save that answer. Try again."
 msgstr "No se pudo guardar esa respuesta. Inténtalo de nuevo."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/settings/SettingsRenderer.tsx:123
-#: src/shell/pages/settings/SettingsRenderer.tsx:180
+#: src/shell/pages/settings/SettingsRenderer.tsx:120
+#: src/shell/pages/settings/SettingsRenderer.tsx:177
 #, needs-review
 msgid "Could not save that change."
 msgstr "No se pudo guardar el cambio."
@@ -6619,7 +6617,7 @@ msgstr "Encuentra todo en tu hogar."
 
 #. js-lingui-explicit-id
 #: src/shell/AmbientCompanionPane.tsx:255
-#: src/shell/Routes.tsx:302
+#: src/shell/Routes.tsx:304
 #, needs-review
 msgid "Find me"
 msgstr "Encuéntrame"
@@ -7399,7 +7397,7 @@ msgstr "Guarda lo que algunos descargados piden antes de comenzar."
 #: src/shell/pageHeaderTitle.tsx:90
 #: src/shell/pages/settings/settingsBackLink.ts:55
 #: src/shell/routeHeader.ts:23
-#: src/shell/Routes.tsx:421
+#: src/shell/Routes.tsx:423
 #, needs-review
 msgid "Home"
 msgstr "Home"
@@ -10007,7 +10005,7 @@ msgstr "Cargando sesiones"
 #. js-lingui-explicit-id
 #: src/shell/pages/settings/SettingsAreaPage.tsx:66
 #: src/shell/pages/settings/SettingsAreaPage.tsx:179
-#: src/shell/pages/settings/SettingsRenderer.tsx:196
+#: src/shell/pages/settings/SettingsRenderer.tsx:193
 #, needs-review
 msgid "Loading settings"
 msgstr "Cargando ajustes"
@@ -10682,7 +10680,7 @@ msgstr "Velocidad máxima usada para actualizaciones automáticas de la bibliote
 #. js-lingui-explicit-id
 #: src/apps/settings/DevicesSection.tsx:163
 #: src/shell/pageHeaderTitle.tsx:108
-#: src/shell/Routes.tsx:421
+#: src/shell/Routes.tsx:423
 #, needs-review
 msgid "Media"
 msgstr "Medios"
@@ -11611,7 +11609,7 @@ msgid "No settings match that search."
 msgstr "Ningún ajuste coincide con esa búsqueda."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/settings/SettingsRenderer.tsx:216
+#: src/shell/pages/settings/SettingsRenderer.tsx:208
 #, needs-review
 msgid "No settings yet."
 msgstr "Aún no hay ajustes."
@@ -12540,7 +12538,6 @@ msgstr "Solo un padre o administrador puede cambiar estos ajustes. Pregunta a qu
 
 #. js-lingui-explicit-id
 #: src/apps/settings/styles/StyleEditor.tsx:105
-#: src/apps/settings/styles/stylesShared.tsx:63
 #: src/apps/settings/styles/StylesTab.tsx:127
 #, needs-review
 msgid "Only admins"
@@ -12965,7 +12962,7 @@ msgstr "Porcentaje del tamaño de texto normal. \"Predeterminado\" sigue tu elec
 
 #. js-lingui-explicit-id
 #: src/shell/pageHeaderTitle.tsx:96
-#: src/shell/Routes.tsx:148
+#: src/shell/Routes.tsx:150
 #, needs-review
 msgid "Performance"
 msgstr "Rendimiento"
@@ -14243,7 +14240,7 @@ msgstr "Reabre las aplicaciones que Home cerró cuando termina la tarea grande."
 #. js-lingui-explicit-id
 #: src/shell/InstallDock.tsx:205
 #: src/shell/pageHeaderTitle.tsx:98
-#: src/shell/Routes.tsx:150
+#: src/shell/Routes.tsx:152
 #, needs-review
 msgid "Repairs"
 msgstr "Reparaciones"
@@ -15587,7 +15584,7 @@ msgstr "Configurando tu IA"
 #: src/shell/coreLabels.ts:13
 #: src/shell/pageHeaderTitle.tsx:93
 #: src/shell/pages/settings/SettingsAreaPage.tsx:292
-#: src/shell/Routes.tsx:421
+#: src/shell/Routes.tsx:423
 #, needs-review
 msgid "Settings"
 msgstr "Ajustes"
@@ -15674,7 +15671,7 @@ msgid "setting.ease.reading_level.option.plain"
 msgstr "Frases más cortas y palabras cotidianas."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/settings/SettingsRenderer.tsx:250
+#: src/shell/pages/settings/SettingsRenderer.tsx:242
 #, needs-review
 msgid "Show {length} advanced settings"
 msgstr "Mostrar {length} ajustes avanzados"
@@ -15742,7 +15739,7 @@ msgid "Show in the sidebar"
 msgstr "Mostrar en la barra lateral"
 
 #. js-lingui-explicit-id
-#: src/shell/Routes.tsx:337
+#: src/shell/Routes.tsx:339
 #, needs-review
 msgid "Show me around"
 msgstr "Muéstrame por dónde"
@@ -16612,7 +16609,7 @@ msgstr "Iniciando tu IA..."
 #. js-lingui-explicit-id
 #: src/apps/settings/CodingSettings.tsx:224
 #: src/shell/pageHeaderTitle.tsx:95
-#: src/shell/Routes.tsx:151
+#: src/shell/Routes.tsx:153
 #, needs-review
 msgid "Status"
 msgstr "Estado"
@@ -16752,7 +16749,7 @@ msgstr "Detiene la codificación ahora. Reanuda para dejar que la gente codifiqu
 #. js-lingui-explicit-id
 #: src/shell/library/LibraryStorage.tsx:24
 #: src/shell/pageHeaderTitle.tsx:94
-#: src/shell/Routes.tsx:147
+#: src/shell/Routes.tsx:149
 #, needs-review
 msgid "Storage"
 msgstr "Almacenamiento"
@@ -18704,14 +18701,14 @@ msgid "setting.news.shelf.enabled.help"
 msgstr "Activa o desactiva el estante de noticias del hogar."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/settings/SettingsRenderer.tsx:168
+#: src/shell/pages/settings/SettingsRenderer.tsx:165
 #, needs-review
 msgid "Turn this feature off?"
 msgstr "¿Apagar esta función?"
 
 #. js-lingui-explicit-id
 #: src/apps/chat/chatThreadSlots.tsx:382
-#: src/shell/Routes.tsx:164
+#: src/shell/Routes.tsx:166
 #, needs-review
 msgid "Turn trace"
 msgstr "Trazado de turnos"
@@ -19016,7 +19013,7 @@ msgstr "Actualizar firmware."
 
 #. js-lingui-explicit-id
 #: src/shell/pageHeaderTitle.tsx:97
-#: src/shell/Routes.tsx:149
+#: src/shell/Routes.tsx:151
 #, needs-review
 msgid "Updates"
 msgstr "Actualizaciones"
@@ -19257,7 +19254,7 @@ msgstr "Usado ayer"
 #. js-lingui-explicit-id
 #: src/apps/settings/UsersSection.tsx:225
 #: src/shell/pageHeaderTitle.tsx:103
-#: src/shell/Routes.tsx:154
+#: src/shell/Routes.tsx:156
 #, needs-review
 msgid "Users"
 msgstr "Usuarios"

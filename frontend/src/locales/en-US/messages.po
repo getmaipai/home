@@ -1381,7 +1381,6 @@ msgstr "All"
 
 #. js-lingui-explicit-id
 #: src/apps/settings/styles/StyleEditor.tsx:105
-#: src/apps/settings/styles/stylesShared.tsx:63
 #: src/apps/settings/styles/StylesTab.tsx:127
 msgid "All adults"
 msgstr "All adults"
@@ -2013,7 +2012,7 @@ msgstr "Backup storage limit (GB)"
 #. js-lingui-explicit-id
 #: src/apps/settings/BackupsSection.tsx:197
 #: src/shell/pageHeaderTitle.tsx:99
-#: src/shell/Routes.tsx:152
+#: src/shell/Routes.tsx:154
 msgid "Backups"
 msgstr "Backups"
 
@@ -2549,7 +2548,7 @@ msgstr "Can keep copies on this device"
 #: src/shell/pages/ChatPage.tsx:1681
 #: src/shell/pages/settings/SettingField.tsx:149
 #: src/shell/pages/settings/SettingField.tsx:268
-#: src/shell/pages/settings/SettingsRenderer.tsx:172
+#: src/shell/pages/settings/SettingsRenderer.tsx:169
 msgid "Cancel"
 msgstr "Cancel"
 
@@ -2866,7 +2865,7 @@ msgid "Chat settings"
 msgstr "Chat settings"
 
 #. js-lingui-explicit-id
-#: src/shell/Routes.tsx:155
+#: src/shell/Routes.tsx:157
 msgid "Chat showcase"
 msgstr "Chat showcase"
 
@@ -3383,7 +3382,6 @@ msgstr "Choosing all ages asks for your passcode again."
 #. js-lingui-explicit-id
 #: src/apps/settings/styles/StyleEditor.tsx:105
 #: src/apps/settings/styles/StyleEditor.tsx:111
-#: src/apps/settings/styles/stylesShared.tsx:63
 #: src/apps/settings/styles/StylesTab.tsx:127
 msgid "Chosen people"
 msgstr "Chosen people"
@@ -3601,7 +3599,7 @@ msgstr "Comfortable"
 #. js-lingui-explicit-id
 #: src/apps/settings/CommandsSection.tsx:99
 #: src/shell/pageHeaderTitle.tsx:101
-#: src/shell/Routes.tsx:153
+#: src/shell/Routes.tsx:155
 msgid "Commands"
 msgstr "Commands"
 
@@ -3682,7 +3680,7 @@ msgstr "Computers, phones, the internet, software, artificial intelligence, gadg
 #: src/apps/settings/TwoStepSignInSection.tsx:50
 #: src/shell/components/DataTableRowActions.tsx:57
 #: src/shell/pages/settings/HouseSettings.tsx:50
-#: src/shell/pages/settings/SettingsRenderer.tsx:182
+#: src/shell/pages/settings/SettingsRenderer.tsx:179
 msgid "Confirm"
 msgstr "Confirm"
 
@@ -3957,7 +3955,7 @@ msgid "Could not delete this voice. Try again."
 msgstr "Could not delete this voice. Try again."
 
 #. js-lingui-explicit-id
-#: src/shell/Routes.tsx:361
+#: src/shell/Routes.tsx:363
 msgid "Could not discard Incognito chats. Try again."
 msgstr "Could not discard Incognito chats. Try again."
 
@@ -4017,7 +4015,7 @@ msgid "Could not load routing stats."
 msgstr "Could not load routing stats."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/settings/SettingsRenderer.tsx:195
+#: src/shell/pages/settings/SettingsRenderer.tsx:192
 msgid "Could not load settings."
 msgstr "Could not load settings."
 
@@ -4149,7 +4147,7 @@ msgstr "Could not open the live view of {name}. Check that it is switched on, th
 
 #. js-lingui-explicit-id
 #: src/shell/AmbientCompanionPane.tsx:297
-#: src/shell/Routes.tsx:302
+#: src/shell/Routes.tsx:304
 msgid "Could not reach {name}. Try again."
 msgstr "Could not reach {name}. Try again."
 
@@ -4239,8 +4237,8 @@ msgid "Could not save that answer. Try again."
 msgstr "Could not save that answer. Try again."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/settings/SettingsRenderer.tsx:123
-#: src/shell/pages/settings/SettingsRenderer.tsx:180
+#: src/shell/pages/settings/SettingsRenderer.tsx:120
+#: src/shell/pages/settings/SettingsRenderer.tsx:177
 msgid "Could not save that change."
 msgstr "Could not save that change."
 
@@ -5680,7 +5678,7 @@ msgstr "Find anything across your household."
 
 #. js-lingui-explicit-id
 #: src/shell/AmbientCompanionPane.tsx:255
-#: src/shell/Routes.tsx:302
+#: src/shell/Routes.tsx:304
 msgid "Find me"
 msgstr "Find me"
 
@@ -6346,7 +6344,7 @@ msgstr "Holds what some downloads ask for before they start."
 #: src/shell/pageHeaderTitle.tsx:90
 #: src/shell/pages/settings/settingsBackLink.ts:55
 #: src/shell/routeHeader.ts:23
-#: src/shell/Routes.tsx:421
+#: src/shell/Routes.tsx:423
 msgid "Home"
 msgstr "Home"
 
@@ -8587,7 +8585,7 @@ msgstr "Loading sessions"
 #. js-lingui-explicit-id
 #: src/shell/pages/settings/SettingsAreaPage.tsx:66
 #: src/shell/pages/settings/SettingsAreaPage.tsx:179
-#: src/shell/pages/settings/SettingsRenderer.tsx:196
+#: src/shell/pages/settings/SettingsRenderer.tsx:193
 msgid "Loading settings"
 msgstr "Loading settings"
 
@@ -9162,7 +9160,7 @@ msgstr "Maximum speed used for automatic reference library updates."
 #. js-lingui-explicit-id
 #: src/apps/settings/DevicesSection.tsx:163
 #: src/shell/pageHeaderTitle.tsx:108
-#: src/shell/Routes.tsx:421
+#: src/shell/Routes.tsx:423
 msgid "Media"
 msgstr "Media"
 
@@ -9961,7 +9959,7 @@ msgid "No settings match that search."
 msgstr "No settings match that search."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/settings/SettingsRenderer.tsx:216
+#: src/shell/pages/settings/SettingsRenderer.tsx:208
 msgid "No settings yet."
 msgstr "No settings yet."
 
@@ -10771,7 +10769,6 @@ msgstr "Only a parent or admin can change these settings. Ask the person who set
 
 #. js-lingui-explicit-id
 #: src/apps/settings/styles/StyleEditor.tsx:105
-#: src/apps/settings/styles/stylesShared.tsx:63
 #: src/apps/settings/styles/StylesTab.tsx:127
 msgid "Only admins"
 msgstr "Only admins"
@@ -11136,7 +11133,7 @@ msgstr "Percent of the normal text size. \"Preset\" follows your ease of use cho
 
 #. js-lingui-explicit-id
 #: src/shell/pageHeaderTitle.tsx:96
-#: src/shell/Routes.tsx:148
+#: src/shell/Routes.tsx:150
 msgid "Performance"
 msgstr "Performance"
 
@@ -12217,7 +12214,7 @@ msgstr "Reopens the apps Home closed after the big job finishes."
 #. js-lingui-explicit-id
 #: src/shell/InstallDock.tsx:205
 #: src/shell/pageHeaderTitle.tsx:98
-#: src/shell/Routes.tsx:150
+#: src/shell/Routes.tsx:152
 msgid "Repairs"
 msgstr "Repairs"
 
@@ -13393,7 +13390,7 @@ msgstr "Setting up your AI"
 #: src/shell/coreLabels.ts:13
 #: src/shell/pageHeaderTitle.tsx:93
 #: src/shell/pages/settings/SettingsAreaPage.tsx:292
-#: src/shell/Routes.tsx:421
+#: src/shell/Routes.tsx:423
 msgid "Settings"
 msgstr "Settings"
 
@@ -13466,7 +13463,7 @@ msgid "setting.ease.reading_level.option.plain"
 msgstr "Shorter sentences and everyday words."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/settings/SettingsRenderer.tsx:250
+#: src/shell/pages/settings/SettingsRenderer.tsx:242
 msgid "Show {length} advanced settings"
 msgstr "Show {length} advanced settings"
 
@@ -13523,7 +13520,7 @@ msgid "Show in the sidebar"
 msgstr "Show in the sidebar"
 
 #. js-lingui-explicit-id
-#: src/shell/Routes.tsx:337
+#: src/shell/Routes.tsx:339
 msgid "Show me around"
 msgstr "Show me around"
 
@@ -14275,7 +14272,7 @@ msgstr "Starting your AI…"
 #. js-lingui-explicit-id
 #: src/apps/settings/CodingSettings.tsx:224
 #: src/shell/pageHeaderTitle.tsx:95
-#: src/shell/Routes.tsx:151
+#: src/shell/Routes.tsx:153
 msgid "Status"
 msgstr "Status"
 
@@ -14395,7 +14392,7 @@ msgstr "Stops coding now. Resume to let people code again."
 #. js-lingui-explicit-id
 #: src/shell/library/LibraryStorage.tsx:24
 #: src/shell/pageHeaderTitle.tsx:94
-#: src/shell/Routes.tsx:147
+#: src/shell/Routes.tsx:149
 msgid "Storage"
 msgstr "Storage"
 
@@ -16069,13 +16066,13 @@ msgid "setting.news.shelf.enabled.help"
 msgstr "Turn the household news shelf on or off."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/settings/SettingsRenderer.tsx:168
+#: src/shell/pages/settings/SettingsRenderer.tsx:165
 msgid "Turn this feature off?"
 msgstr "Turn this feature off?"
 
 #. js-lingui-explicit-id
 #: src/apps/chat/chatThreadSlots.tsx:382
-#: src/shell/Routes.tsx:164
+#: src/shell/Routes.tsx:166
 msgid "Turn trace"
 msgstr "Turn trace"
 
@@ -16338,7 +16335,7 @@ msgstr "Update firmware."
 
 #. js-lingui-explicit-id
 #: src/shell/pageHeaderTitle.tsx:97
-#: src/shell/Routes.tsx:149
+#: src/shell/Routes.tsx:151
 msgid "Updates"
 msgstr "Updates"
 
@@ -16542,7 +16539,7 @@ msgstr "Used yesterday"
 #. js-lingui-explicit-id
 #: src/apps/settings/UsersSection.tsx:225
 #: src/shell/pageHeaderTitle.tsx:103
-#: src/shell/Routes.tsx:154
+#: src/shell/Routes.tsx:156
 msgid "Users"
 msgstr "Users"
 
