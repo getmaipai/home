@@ -7,7 +7,8 @@ import { applyOps, restoreRevision, undo } from "@/lib/transcripts/revisions";
 import { importTranscript } from "@/lib/transcripts/import";
 import { buildCues } from "@/lib/transcripts/cues";
 import { writeSrt, writeVtt, writeText, writeMarkdown, writeJson } from "@/lib/transcripts/writers";
-import { createCaptionTrack, listCaptionTracks, refreshCaptionTrack } from "@/lib/transcripts/captions";
+import { translateCaptionTrack, TRANSLATION_LANGUAGES } from "@/lib/transcripts/captionTranslate";
+import { captionTrackCues, createCaptionTrack, listCaptionTracks, refreshCaptionTrack } from "@/lib/transcripts/captions";
 import { applyFindReplace, previewFindReplace } from "@/lib/transcripts/findReplace";
 import { transcribeJob } from "@/lib/transcripts/stack";
 import { detectSpeakers, regenerateRange } from "@/lib/transcripts/rework";
@@ -37,7 +38,7 @@ transcriptRoutes.openapi(createRoute({method:"patch",path:"/transcripts/{id}",ta
 transcriptRoutes.openapi(createRoute({method:"get",path:"/transcripts/{id}/revisions",tags:["Transcripts"],summary:"List transcript revisions",middleware:[requireAuth] as const,request:{params:idParam},responses:{200:{description:"Append-only revision history",content:{"application/json":{schema:z.array(z.any())}}},...errorResponses({401:"Not signed in",404:"Transcript unavailable"})}}),c=>{try{return c.json(revisionsForTranscript(c.get("person"),c.req.valid("param").id),200);}catch(e){return handle(e,c);}});
 transcriptRoutes.openapi(createRoute({method:"post",path:"/transcripts/{id}/restore",tags:["Transcripts"],summary:"Restore a prior revision as a new revision",middleware:[requireAuth] as const,request:{params:idParam,body:{content:{"application/json":{schema:z.object({revision:z.number().int().positive()})}}}},responses:{200:{description:"Restored transcript",content:{"application/json":{schema:z.any()}}},...errorResponses({400:"Revision unavailable",401:"Not signed in",404:"Transcript unavailable"})}}),c=>{try{const {id}=c.req.valid("param");restoreRevision(c.get("person"),id,c.req.valid("json").revision,c.get("person").id);return c.json(getTranscript(c.get("person"),id),200);}catch(e){return handle(e,c);}});
 transcriptRoutes.openapi(createRoute({method:"post",path:"/transcripts/{id}/undo",tags:["Transcripts"],summary:"Undo by adding a new revision",middleware:[requireAuth] as const,request:{params:idParam},responses:{200:{description:"Transcript with an undo revision",content:{"application/json":{schema:z.any()}}},...errorResponses({400:"No earlier revision",401:"Not signed in",404:"Transcript unavailable"})}}),c=>{try{const {id}=c.req.valid("param");undo(c.get("person"),id,c.get("person").id);return c.json(getTranscript(c.get("person"),id),200);}catch(e){return handle(e,c);}});
-transcriptRoutes.openapi(createRoute({method:"get",path:"/transcripts/{id}/export",tags:["Transcripts"],summary:"Export transcript",middleware:[requireAuth] as const,request:{params:idParam,query:z.object({format:z.enum(["srt","vtt","txt","md","json"])})},responses:{200:{description:"Exported transcript text",content:{"text/plain":{schema:z.string()},"application/json":{schema:z.any()}}},...errorResponses({400:"Unknown export format",401:"Not signed in",404:"Transcript unavailable"})}}),c=>{try{const value=getTranscript(c.get("person"),c.req.valid("param").id),fmt=c.req.valid("query").format,cues=buildCues(value.segments),text=fmt==="srt"?writeSrt(cues):fmt==="vtt"?writeVtt(cues):fmt==="txt"?writeText(value):fmt==="md"?writeMarkdown(value):writeJson(value);return fmt==="json"?c.json(JSON.parse(text),200):c.text(text,200);}catch(e){return handle(e,c);}});
+transcriptRoutes.openapi(createRoute({method:"get",path:"/transcripts/{id}/export",tags:["Transcripts"],summary:"Export transcript",middleware:[requireAuth] as const,request:{params:idParam,query:z.object({format:z.enum(["srt","vtt","txt","md","json"]),track:z.string().optional()})},responses:{200:{description:"Exported transcript text",content:{"text/plain":{schema:z.string()},"application/json":{schema:z.any()}}},...errorResponses({400:"Unknown export format",401:"Not signed in",404:"Transcript or caption track unavailable"})}}),c=>{try{const value=getTranscript(c.get("person"),c.req.valid("param").id),fmt=c.req.valid("query").format,q=c.req.valid("query"),cues=q.track&&(fmt==="srt"||fmt==="vtt")?captionTrackCues(c.get("person"),c.req.valid("param").id,q.track):buildCues(value.segments),text=fmt==="srt"?writeSrt(cues):fmt==="vtt"?writeVtt(cues):fmt==="txt"?writeText(value):fmt==="md"?writeMarkdown(value):writeJson(value);return fmt==="json"?c.json(JSON.parse(text),200):c.text(text,200);}catch(e){return handle(e,c);}});
 transcriptRoutes.openapi(createRoute({method:"post",path:"/library/{item}/transcript/import",tags:["Transcripts"],summary:"Import a timed transcript",middleware:[requireAuth] as const,request:{params:itemParam,body:{content:{"application/json":{schema:z.object({format:z.enum(["srt","vtt","txt","text"]),text:z.string().max(2_000_000),language:z.string().optional()})}}}},responses:{201:{description:"Imported transcript",content:{"application/json":{schema:z.any()}}},...errorResponses({400:"Transcript file could not be read",401:"Not signed in",403:"Transcripts are available to teens and adults",404:"Library item unavailable"})}}),c=>{try{const b=c.req.valid("json");return c.json(importTranscript(c.get("person"),c.req.valid("param").item,b.text,b.format,b.language),201);}catch(e){return handle(e,c);}});
 
 const STACK_FAILED = "The Stack could not finish this. Check that the local Stack is ready, then try again.";
@@ -86,6 +87,23 @@ transcriptRoutes.openapi(createRoute({
   try {
     const { id, track } = c.req.valid("param");
     return c.json(refreshCaptionTrack(c.get("person"), id, track), 200);
+  } catch (e) { return handle(e, c); }
+});
+
+transcriptRoutes.openapi(createRoute({
+  method: "get", path: "/transcript-languages", tags: ["Transcripts"], summary: "Languages a caption track can be translated into",
+  middleware: [requireAuth] as const,
+  responses: { 200: jsonAnswer("Language codes and names"), ...errorResponses({ 401: "Not signed in" }) },
+}), (c) => c.json(Object.entries(TRANSLATION_LANGUAGES).map(([code, name]) => ({ code, name })), 200));
+
+transcriptRoutes.openapi(createRoute({
+  method: "post", path: "/transcripts/{id}/caption-tracks/{track}/translate", tags: ["Transcripts"], summary: "Translate a caption track into another language as its own track",
+  middleware: [requireAuth] as const, request: { params: trackParam, body: { content: { "application/json": { schema: z.object({ language: z.string().min(2).max(8) }) } } } },
+  responses: { 201: jsonAnswer("The new translated caption track"), ...errorResponses({ 400: "Unknown or same language", 401: "Not signed in", 403: "Transcripts are available to teens and adults", 404: "Transcript or caption track unavailable", 413: "Too many captions", 422: "Held back by the age filter", 502: "The language model could not translate" }) },
+}), async (c) => {
+  try {
+    const { id, track } = c.req.valid("param");
+    return c.json(await translateCaptionTrack(c.get("person"), id, track, c.req.valid("json").language), 201);
   } catch (e) { return handle(e, c); }
 });
 

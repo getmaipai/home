@@ -13,6 +13,7 @@ export type CaptionTrackSummary = {
   based_on_revision: number;
   needs_refreshing: boolean;
   cue_count: number;
+  translated: boolean;
 };
 
 type TrackRow = typeof captionTracks.$inferSelect;
@@ -24,6 +25,7 @@ function summarize(row: TrackRow, currentRevision: number): CaptionTrackSummary 
     based_on_revision: row.basedOnRevision,
     needs_refreshing: row.basedOnRevision < currentRevision,
     cue_count: (JSON.parse(row.cues) as unknown[]).length,
+    translated: (JSON.parse(row.provenance) as { source_kind?: string }).source_kind === "translated",
   };
 }
 
@@ -73,6 +75,9 @@ export function refreshedCues(segments: readonly Segment[], oldCues: readonly Cu
 
 export function refreshCaptionTrack(actor: PersonRow, transcriptId: string, trackId: string): CaptionTrackSummary {
   const row = trackRow(actor, transcriptId, trackId);
+  if ((JSON.parse(row.provenance) as { source_kind?: string }).source_kind === "translated") {
+    throw new TranscriptError("This track is a translation. Refresh the original track, then translate it again.", 409);
+  }
   const transcript = getTranscript(actor, transcriptId);
   const cues = refreshedCues(transcript.segments, JSON.parse(row.cues) as Cue[]);
   const updated = {
@@ -83,4 +88,9 @@ export function refreshCaptionTrack(actor: PersonRow, transcriptId: string, trac
   db.update(captionTracks).set(updated).where(eq(captionTracks.id, trackId)).run();
   console.info(JSON.stringify({ event: "transcript.captions_refreshed", cues: cues.length }));
   return summarize({ ...row, ...updated }, transcript.current_revision);
+}
+
+/** The stored cues of one track, so a translated or hand-fixed track exports as it is. */
+export function captionTrackCues(actor: PersonRow, transcriptId: string, trackId: string): Cue[] {
+  return JSON.parse(trackRow(actor, transcriptId, trackId).cues) as Cue[];
 }

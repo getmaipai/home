@@ -24,6 +24,7 @@ export type CaptionTrackSummary = {
   based_on_revision: number;
   needs_refreshing: boolean;
   cue_count: number;
+  translated: boolean;
 };
 
 export type FindReplaceOptions = { find: string; replace: string; match_case: boolean; whole_word: boolean };
@@ -84,11 +85,15 @@ export const transcriptApi = {
   makeCaptionTrack: (id: string) => post<CaptionTrackSummary>(`${transcriptPath(id)}/caption-tracks`),
   refreshCaptionTrack: (id: string, track: string) =>
     post<CaptionTrackSummary>(`${transcriptPath(id)}/caption-tracks/${encodeURIComponent(track)}/refresh`),
+  translationLanguages: () => requestJson<Array<{ code: string; name: string }>>("/api/transcript-languages"),
+  translateCaptionTrack: (id: string, track: string, language: string) =>
+    post<CaptionTrackSummary>(`${transcriptPath(id)}/caption-tracks/${encodeURIComponent(track)}/translate`, { language }),
   /** The lines a find and replace would change. Nothing is changed. */
   previewFindReplace: (id: string, options: FindReplaceOptions) =>
     post<FindReplacePreview>(`${transcriptPath(id)}/find-replace/preview`, options),
   /** Apply a find and replace as one revision, to the listed lines only when segmentIds is given. */
   applyFindReplace: (id: string, options: FindReplaceOptions, segmentIds: readonly string[]) =>
     post<FindReplaceResult>(`${transcriptPath(id)}/find-replace`, { ...options, segment_ids: segmentIds }),
-  exportUrl: (id: string, format: TranscriptFormat) => `${transcriptPath(id)}/export?format=${format}`,
+  exportUrl: (id: string, format: TranscriptFormat, track?: string) =>
+    `${transcriptPath(id)}/export?format=${format}${track ? `&track=${encodeURIComponent(track)}` : ""}`,
 };

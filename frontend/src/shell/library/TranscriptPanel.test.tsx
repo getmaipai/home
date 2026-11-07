@@ -301,7 +301,7 @@ describe("detect speakers and redo a range", () => {
 });
 
 describe("Library transcript workspace: caption tracks needing a refresh", () => {
-  const track = { id: "cap-1", language: "en", based_on_revision: 1, needs_refreshing: true, cue_count: 2 };
+  const track = { id: "cap-1", language: "en", based_on_revision: 1, needs_refreshing: true, cue_count: 2, translated: false };
 
   test("a stale track says Needs refreshing; Refresh runs once, is disabled meanwhile, then it is Up to date", async () => {
     stub(spyOn(transcriptApi, "captionTracks").mockResolvedValue([track]));
@@ -333,6 +333,34 @@ describe("Library transcript workspace: caption tracks needing a refresh", () =>
     const view = await readyView("export");
     fireEvent.click(await view.findByRole("button", { name: "Refresh en captions" }));
     await waitFor(() => expect(view.container.textContent).toContain("The caption track could not be refreshed. Check that Home is ready, then try again."));
+    expect(view.container.textContent).not.toContain("private raw detail");
+  });
+});
+
+describe("Library transcript workspace: translated captions", () => {
+  const original = { id: "cap-1", language: "en", based_on_revision: 1, needs_refreshing: false, cue_count: 2, translated: false };
+
+  test("Translate makes a separate track in the chosen language and labels it Translated", async () => {
+    stub(spyOn(transcriptApi, "captionTracks").mockResolvedValue([original]));
+    stub(spyOn(transcriptApi, "translationLanguages").mockResolvedValue([{ code: "en", name: "English" }, { code: "es", name: "Spanish" }]));
+    const translate = stub(
+      spyOn(transcriptApi, "translateCaptionTrack").mockResolvedValue({ ...original, id: "cap-2", language: "es", translated: true }),
+    );
+    const view = await readyView("export");
+    fireEvent.click(await view.findByRole("button", { name: "Translate" }));
+    expect(await view.findByText("Translated")).toBeTruthy();
+    expect(translate).toHaveBeenCalledWith("tx-1", "cap-1", "es");
+    expect(view.getAllByRole("status").some((node) => node.textContent?.startsWith("Translated to Spanish"))).toBe(true);
+    expect(view.queryByRole("button", { name: /Refresh Spanish/ })).toBeNull();
+  });
+
+  test("a failed translation says what to do and shows no raw detail", async () => {
+    stub(spyOn(transcriptApi, "captionTracks").mockResolvedValue([original]));
+    stub(spyOn(transcriptApi, "translationLanguages").mockResolvedValue([{ code: "es", name: "Spanish" }]));
+    stub(spyOn(transcriptApi, "translateCaptionTrack").mockRejectedValue(new Error("private raw detail")));
+    const view = await readyView("export");
+    fireEvent.click(await view.findByRole("button", { name: "Translate" }));
+    await waitFor(() => expect(view.container.textContent).toContain("The captions could not be translated. Check that the language model is running, then try again."));
     expect(view.container.textContent).not.toContain("private raw detail");
   });
 });

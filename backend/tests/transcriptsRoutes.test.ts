@@ -4,6 +4,7 @@ import { OpenAPIHono } from "@hono/zod-openapi";
 import { db } from "@/db";
 import { mediaItems, mediaSources, people, sessions } from "@/db/schema";
 import { nextHlc } from "@/lib/hlc";
+import { __setTranslationCompleterForTests } from "@/lib/transcripts/captionTranslate";
 import { __setTranscriptStackClientForTests } from "@/lib/transcripts/stack";
 import { transcriptRoutes } from "@/routes/transcripts";
 import { resetDb } from "./reset-db";
@@ -368,5 +369,42 @@ describe("regenerate range", () => {
     expect(await applied.json()).toMatchObject({ replaced_lines: 1, transcript: { current_revision: 3 } });
     const undone = await (await req(`/transcripts/${record.id}/undo`, token, "POST")).json() as { segments: Array<{ text: string }> };
     expect(undone.segments[0]?.text).toBe("Sage speaks clearly");
+  });
+
+  test("a caption track translates into its own track; bad answers and held-back text store nothing", async () => {
+    const token = person("person-sage0001", "adult");
+    item("person-sage0001");
+    const record = await (await req("/library/media-caption01/transcript", token, "POST", {})).json() as { id: string };
+    const track = await (await req(`/transcripts/${record.id}/caption-tracks`, token, "POST")).json() as { id: string; cue_count: number };
+    const path = `/transcripts/${record.id}/caption-tracks/${track.id}`;
+    try {
+      const langs = await (await req("/transcript-languages", token)).json() as Array<{ code: string }>;
+      expect(langs.some((l) => l.code === "es")).toBe(true);
+
+      __setTranslationCompleterForTests(async (messages) => {
+        const lines = JSON.parse(messages[1]!.content as string) as string[];
+        return { ok: true, text: JSON.stringify(lines.map((line) => `ES ${line}`)) };
+      });
+      const made = await req(`${path}/translate`, token, "POST", { language: "es" });
+      expect(made.status).toBe(201);
+      const spanish = await made.json() as { id: string; language: string; cue_count: number };
+      expect(spanish).toMatchObject({ language: "es", cue_count: track.cue_count });
+      const srt = await (await req(`${path.replace("/caption-tracks/" + track.id, "")}/export?format=srt&track=${spanish.id}`, token)).text();
+      expect(srt).toContain("ES ");
+      expect((await req(`${path.replace("/caption-tracks/" + track.id, "")}/export?format=srt&track=nope`, token)).status).toBe(404);
+      const refusedRefresh = await req(`/transcripts/${record.id}/caption-tracks/${spanish.id}/refresh`, token, "POST");
+      expect(refusedRefresh.status).toBe(409);
+
+      expect((await req(`${path}/translate`, token, "POST", { language: "xx" })).status).toBe(400);
+      expect((await req(`${path}/translate`, token, "POST", { language: "en" })).status).toBe(400);
+      expect((await req(`/transcripts/${record.id}/caption-tracks/nope/translate`, token, "POST", { language: "es" })).status).toBe(404);
+
+      __setTranslationCompleterForTests(async () => ({ ok: true, text: "[\"only one\", \"two\", \"three\", \"four\", \"five\", \"six\", \"seven\", \"eight\", \"nine\", \"ten\", \"eleven\", \"twelve\", \"x\", \"y\", \"z\", \"a\", \"b\", \"c\", \"d\", \"e\", \"f\"]" }));
+      const bad = await req(`${path}/translate`, token, "POST", { language: "fr" });
+      expect(bad.status).toBe(502);
+      expect((await bad.json() as { error: string }).error).toContain("try again");
+      const after = await (await req(`/transcripts/${record.id}/caption-tracks`, token)).json() as unknown[];
+      expect(after.length).toBe(2);
+    } finally { __setTranslationCompleterForTests(null); }
   });
 });

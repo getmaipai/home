@@ -33,4 +33,8 @@ Open **Edit** to change the words, rename the speakers, or fix a part.
 
 Open **Export**. Press **Download SRT**, **Download VTT**, **Download Text**, **Download Markdown** or **Download JSON**. SRT and VTT are caption files that other video players read. Under **Caption tracks**, **Make caption track** adds captions you can show over the video. You can also bring in your own SRT, VTT or text file with **Import SRT, VTT or text**.
 
+## Translate the captions
+
+Under **Caption tracks**, pick a language next to **Translate captions to** and press **Translate**. Your home's own language model makes a new caption track in that language. The first track stays as it is, and each language is its own track. If you fix the transcript later, refresh the first track and translate again. The words pass the same age filter as chat, and nothing is saved if any part is held back.
+
 Nothing leaves your home.
