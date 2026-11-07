@@ -87,13 +87,14 @@ export function VoiceBrowserSection({ person }: { person: Roster }) {
     {target.role === "child" ? <p>Ask a parent to choose your voice.</p> : null}
     {settingReason && target.id === person.id ? <p className="text-sm text-muted-foreground">{settingReason}</p> : null}
     {choices.notice || (migrated?.target === target.id && migrated.line) ? <p role="status" className="text-sm text-muted-foreground">{choices.notice ?? migrated?.line}</p> : null}
+    <Item><ItemContent><ItemTitle>Choose a voice for {who}</ItemTitle><ItemDescription clamp={false}>The voice Home speaks with when it talks to {who}.</ItemDescription></ItemContent><ItemActions>
     {failed ? <><p role="alert">Home can't reach its voice service. Check Repairs, then come back. <Button type="button" variant="outline" onClick={retry}>Try again</Button></p><Button type="button" variant="outline" disabled>Test</Button></> : <AsyncState data={voicesQuery.data && registryQuery.data && valuesQuery.data ? voices : undefined} isFetching={voicesQuery.isFetching || registryQuery.isFetching || valuesQuery.isFetching || (isGuardian && rosterQuery.isFetching)} onRetry={retry} loadingLabel="Loading voices">
-      {(list) => list.length === 0 ? <><p>Voices are still getting ready. This takes a minute after setup.</p><Button type="button" variant="outline" disabled>Test</Button></> : <Item><ItemContent><ItemTitle>Choose a voice for {who}</ItemTitle><ItemDescription clamp={false}>The voice Home speaks with when it talks to {who}.</ItemDescription></ItemContent><ItemActions>
+      {(list) => list.length === 0 ? <><p>Voices are still getting ready. This takes a minute after setup.</p><Button type="button" variant="outline" disabled>Test</Button></> : <>
         <Select aria-label={`Voice for ${who}`} value={selectedId} options={choices.options.map((option) => option.id)} getLabel={(id) => choices.options.find((option) => option.id === id)?.label ?? id} disabled={!canChoose || saving} onValueChange={(id) => { const option = choices.options.find((entry) => entry.id === id); if (option && option.id !== selectedId) void choose(option.value); }} />
         {testBusy ? <Progress mode="spinner" label="Preparing the voice test" /> : null}
         <Button type="button" variant="outline" disabled={previewId === null || testBusy} onClick={() => testing ? voicePreviewPlayer.stop() : previewId && void voicePreviewPlayer.start(previewId)}>{testing && !testBusy ? "Stop" : "Test"}</Button>
-      </ItemActions></Item>}
-    </AsyncState>}
+      </>}
+    </AsyncState>}</ItemActions></Item>
     {downloading ? <p role="status" className="text-sm text-muted-foreground">Downloading this voice, one moment.</p> : null}
     {preview.error ? <p role="alert">{preview.error}</p> : null}
     {saveError ? <p role="alert">{saveError}</p> : null}
