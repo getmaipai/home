@@ -456,7 +456,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/conversationHistory.ts` | shownPicturesIn, turnOwnerId, applyHeardPrefix, __temporaryReplyForTests, outcomesForConversation, packageLatencyFromRecentOutcomes |
 | `backend/src/lib/conversationOpening.ts` | THREAD_WINDOW_DAYS, MOOD_WINDOW_DAYS, dayPartAt, sinceLastAt, conversationOpening, renderConversationOpening |
 | `backend/src/lib/conversationTitle.ts` | DEFAULT_CHAT_TITLE, provisionalTitleFrom, ensureProvisionalTitle, refreshProvisionalTitle, cleanTitle, generateConversationTitle |
-| `backend/src/lib/credentialLockout.ts` | LOCKOUT_THRESHOLD, lockoutDurationMs, ensureCredentialRowExists, clearFailedAttempts, currentLockout, recordFailedAttempt |
+| `backend/src/lib/credentialLockout.ts` | LOCKOUT_THRESHOLD, PROFILE_SIGNIN_LOCKOUT_THRESHOLD, checkSigninAddress, failSigninAddress, resetSigninAddress, __resetSigninAddressForTests |
 | `backend/src/lib/dashboard.ts` | getDashboard |
 | `backend/src/lib/dataClasses.ts` | DATA_CLASSES, dataClassById |
 | `backend/src/lib/deliveryChoice.ts` | DELIVERY_DEADLINE_MS, parseDelivery, chooseDelivery, __setDeliveryRunnerForTests |
@@ -895,7 +895,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/robotSelfTest.ts` | ROBOT_SELF_TEST_PARTS, robotSelfTestPartsFor |
 | `backend/src/lib/robotSelfTestRuns.ts` | ROBOT_SELF_TEST_TIMEOUT_MS, ROBOT_SELF_TEST_RESULT_TTL_MS, startRobotSelfTest, acceptRobotSelfTestResult, pruneRobotSelfTests, __resetRobotSelfTestsForTests |
 | `backend/src/lib/robotSoftware.ts` | compareSemver, robotSoftwareStatus, getRobotSoftware |
-| `backend/src/lib/robotSsh.ts` | RobotPasswordRotationError, rotateRobotPassword |
+| `backend/src/lib/robotSsh.ts` | RobotPasswordRotationError, readRobotHostKey, rotateRobotPassword |
 | `backend/src/lib/robotVision.ts` | SCENE_TTL_MS, MIN_FRAME_INTERVAL_MS, SCENE_FRAME_INTERVAL_MS, MAX_FRAME_BYTES, FRESH_ENOUGH_MS, robotVisionMode |
 | `backend/src/lib/robots.ts` | ROBOTS_OFF_MESSAGE, robotsEnabled |
 | `backend/src/lib/robotsSwitchMigration.ts` | migrateRobotsSwitch |
