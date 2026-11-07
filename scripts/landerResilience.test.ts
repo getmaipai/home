@@ -119,15 +119,15 @@ describe("pipeline resilience", () => {
     env.MAIPAI_T2_CALLS_FILE = calls;
     env.MAIPAI_LAND_T2_CMD = "echo called >> \"$MAIPAI_T2_CALLS_FILE\"; if [[ -f T2_FAIL ]]; then echo 'fake T2 failure'; exit 1; fi";
     const safety = makeWorktree("safety_t2");
-    mkdirSync(join(safety, "backend/src/auth"), { recursive: true });
-    writeFileSync(join(safety, "backend/src/auth/x.ts"), "export {};\n");
+    mkdirSync(join(safety, "backend/src/db/migrations"), { recursive: true });
+    writeFileSync(join(safety, "backend/src/db/migrations/0999_x.sql"), "select 1;\n");
     writeFileSync(join(safety, "T2_FAIL"), "fail\n");
     commit(safety, "safety surface failure");
     expect(run("land.sh", ["--detach"], safety).status).toBe(0);
     expect(run("lander.sh", ["run-once"]).status).toBe(0);
     expect(readFileSync(calls, "utf8").trim()).toBe("called");
     expect(note("safety_t2").status).toBe("bounced");
-    expect(note("safety_t2").reason).toBe("safety-surface tests failed: backend/src/auth/x.ts");
+    expect(note("safety_t2").reason).toBe("safety-surface tests failed: backend/src/db/migrations/0999_x.sql");
 
     rmSync(calls, { force: true });
     const docs = makeWorktree("docs_only");
@@ -141,8 +141,8 @@ describe("pipeline resilience", () => {
 
     env.MAIPAI_LAND_T2_CMD = "echo called >> \"$MAIPAI_T2_CALLS_FILE\"";
     const passing = makeWorktree("safety_t2_pass");
-    mkdirSync(join(passing, "backend/src/auth"), { recursive: true });
-    writeFileSync(join(passing, "backend/src/auth/pass.ts"), "export {};\n");
+    mkdirSync(join(passing, "backend/src/db/migrations"), { recursive: true });
+    writeFileSync(join(passing, "backend/src/db/migrations/0998_pass.sql"), "select 1;\n");
     commit(passing, "safety surface passes");
     expect(run("land.sh", ["--detach"], passing).status).toBe(0);
     expect(run("lander.sh", ["run-once"]).status).toBe(0);

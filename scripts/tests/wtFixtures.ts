@@ -22,7 +22,8 @@ const script = process.env.MAIPAI_WT_SHARED || sharedFromOrigin();
 // wt.sh reads its session files with node, so a machine without node cannot run these tests; they skip with this reason.
 const hasNode = spawnSync("node", ["-v"], { stdio: "ignore" }).status === 0;
 const hasTmuxBin = spawnSync("tmux", ["-V"], { stdio: "ignore" }).status === 0;
-process.env.WT_T2_GLOBS ??= "backend/src/auth/* docs/design/RULES.md scripts/check.sh";
+// Always the fixture's own list: under `wt.sh check` the wrapper exports the repo's real globs, and `??=` would keep those.
+process.env.WT_T2_GLOBS = "backend/src/auth/* docs/design/RULES.md scripts/check.sh";
 const fixture = join(scratch, "home");
 const stateHome = join(scratch, "xdg-state");
 const bare = join(scratch, "origin.git");

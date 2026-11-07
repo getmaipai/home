@@ -21,7 +21,7 @@ test("stale lock takeover is exclusive between concurrent ships", async () => {
   const wait = (child: typeof a) => new Promise<{ code: number; err: string }>((resolve) => { let err = ""; child.stderr?.on("data", (chunk) => err += chunk.toString()); child.on("exit", (code) => resolve({ code: code ?? 1, err })); });
   try {
     const exits = await Promise.all([wait(a), wait(b)]); expect(exits.map((item) => item.code)).toEqual([0, 0]);
-    expect(exits.some((item) => item.err.includes("clearing stale ship lock."))).toBe(true);
+    expect(exits.some((item) => item.err.includes("clearing its lock"))).toBe(true);
     expect(readdirSync(root).filter((name) => name.startsWith("ship.lock.d.stale.")).length).toBe(0);
     expect(readFileSync(join(root, "owners"), "utf8").trim().split("\n")).toHaveLength(2);
   } catch (error) { throw error; }
