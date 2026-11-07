@@ -4,7 +4,7 @@
   "kind": "plugin",
   "category": "Home",
   "display": "House",
-  "description": "Restart Home Assistant devices and listed add-ons with the owner's confirmation.",
+  "description": "Find, control and schedule home devices and scenes you are allowed to use.",
   "offer": { "mode": "conditional", "gate": "houseAllowed", "bench_row": "house-tool", "priority": 4 },
   "author": "MaiPai",
   "license": "AGPL-3.0",

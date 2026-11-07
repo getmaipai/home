@@ -37,6 +37,14 @@ export function nextRunOf(row: TaskRow, after: Date): Date | null {
 export function queueHubRun(row: TaskRow, now: Date = new Date()): void {
   const next = nextRunOf(row, now);
   if (!next) return;
+  insertFireJob(row, next, now);
+}
+
+/** How long after its time a hub one-shot may still fire when earlier attempts were skipped as unknown. */
+export const ONCE_GRACE_MS = 30 * 60_000;
+const RETRY_MS = 5 * 60_000;
+
+function insertFireJob(row: TaskRow, next: Date, now: Date): void {
   db.insert(scheduledJobs).values({
     id: newJobId(), kind: "core", packageId: "core", job: HUB_FIRE_JOB, personId: row.person, inputs: JSON.stringify({ taskId: row.id }),
     when: next.toISOString(), recurring: false, nextRunAt: next.toISOString(), status: "pending", createdAt: now.toISOString(),
@@ -49,6 +57,15 @@ export function pauseTask(taskId: string, reason: "grant_revoked" | "scene_chang
 
 function inputOf(name: string, value: number | undefined): HouseActionInput { return { name, ...(value !== undefined ? { value } : {}) } as HouseActionInput; }
 
+/** A one-shot is done only once it has fired. A skipped run keeps it active and tries again in five minutes, until 30 minutes after its time; then it is done with no action. */
+function retryOnce(row: TaskRow, now: Date): void {
+  if (now.getTime() > Date.parse(row.onceAt!) + ONCE_GRACE_MS) markDone(row.id, now);
+  else insertFireJob(row, new Date(now.getTime() + RETRY_MS), now);
+}
+function markDone(taskId: string, now: Date): void {
+  db.update(scheduledTasks).set({ state: "done", updatedAt: now.toISOString(), hlc: nextHlc() }).where(eq(scheduledTasks.id, taskId)).run();
+}
+
 /** The core job handler. Never throws a message that names anything; a failure is recorded on the job row as plain text. */
 export async function fireHubDeviceTask(job: JobRow, deps: ExecutorDeps = {}): Promise<void> {
   const now = (deps.now ?? (() => new Date()))();
@@ -56,20 +73,25 @@ export async function fireHubDeviceTask(job: JobRow, deps: ExecutorDeps = {}): P
   const row = typeof taskId === "string" ? db.select().from(scheduledTasks).where(eq(scheduledTasks.id, taskId)).get() : undefined;
   if (!row || row.deletedAt !== null || row.state !== "active" || row.executor !== "hub") return;
 
-  // Queue the following run first, so a failed run never ends a repeating schedule.
-  if (row.onceAt !== null) db.update(scheduledTasks).set({ state: "done", updatedAt: now.toISOString(), hlc: nextHlc() }).where(eq(scheduledTasks.id, row.id)).run();
-  else queueHubRun(row, new Date(Math.max(now.getTime(), Date.parse(job.nextRunAt))));
+  // Queue the following run first, so a failed run never ends a repeating schedule. A one-shot is marked done only after it fires.
+  const once = row.onceAt !== null;
+  if (!once) queueHubRun(row, new Date(Math.max(now.getTime(), Date.parse(job.nextRunAt))));
+  if (once && now.getTime() > Date.parse(row.onceAt!) + ONCE_GRACE_MS) { markDone(row.id, now); return; }
 
   const person = db.select({ id: people.id, role: people.role, deletedAt: people.deletedAt, enabled: people.enabled }).from(people).where(eq(people.id, row.person)).get();
   const actor = person && person.deletedAt === null && person.enabled ? scheduleActor(person) : null;
   if (!actor) { pauseTask(row.id, "grant_revoked", now); return; }
   const what = JSON.parse(row.what) as { targets: string[]; action: string; value?: number };
   const registry = await (deps.loadRegistry ?? (() => loadScheduleRegistry(instancesOf(what.targets))))();
-  if (!registry.ok) throw new Error("Home Assistant did not answer, so a scheduled home action was skipped.");
+  if (!registry.ok) {
+    if (once) retryOnce(row, now);
+    throw new Error("Home Assistant did not answer, so a scheduled home action was skipped.");
+  }
   const checked = checkTargets({ actor, permissions: (deps.permissionsOf ?? effectivePermissions)(row.person), entities: registry.entities, targets: what.targets });
   // A target the registry could not show (a partial read, Home Assistant restarting) skips this run; only a real denial pauses.
   if (!checked.ok) {
     if (!isUnknownReason(checked.reason)) pauseTask(row.id, checked.reason === "scene_changed" ? "scene_changed" : "grant_revoked", now);
+    else if (once) retryOnce(row, now);
     return;
   }
 
@@ -82,5 +104,6 @@ export async function fireHubDeviceTask(job: JobRow, deps: ExecutorDeps = {}): P
     }))(entity, action);
     if (!result.ok) failed += 1;
   }
+  if (once) markDone(row.id, now);
   if (failed > 0) throw new Error("A scheduled home action could not reach every device.");
 }

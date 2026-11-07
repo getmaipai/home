@@ -522,6 +522,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/house/connection.ts` | houseLanFetch, houseInstanceLanFetch, houseAnyConnected |
 | `backend/src/lib/house/ids.ts` | HOUSE_TOOL_ID |
 | `backend/src/lib/house/registry.ts` | classify, fetchHouseRegistry |
+| `backend/src/lib/house/scheduleTool.ts` | SCHEDULE_ACTIONS, isScheduleAction, SCHEDULE_DO, whenShape, canUseSchedules, describeWhen |
 | `backend/src/lib/house/tool.ts` | safeHouseAction, HOUSE_ACTIONS, normalizeHouseArgs, houseToolSpec, visibleInstances, visibleHouseEntities |
 | `backend/src/lib/house/undoRunner.ts` | undoDataIsSafe, houseUndoRunner |
 | `backend/src/lib/householdCa.ts` | onLeafRenewed, __notifyLeafRenewedForTests, __clearLeafRenewedListenersForTests, ensureHouseholdCa, registerRenewFixHandler, ensureHouseholdLeaf |
@@ -902,7 +903,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/safetyAlarm.ts` | safetySensorMappings, refreshSafetyAlarmSensors, initSafetyAlarm, applyAlarmAction, applyRobotAlarmAction, listActiveSafetyAlarms |
 | `backend/src/lib/sayEvidence.ts` | sayFields |
 | `backend/src/lib/scheduler.ts` | parseWhen, nextOccurrence, scheduleJob, scheduleCoreJob, ensureCoreJob, listJobs |
-| `backend/src/lib/schedules/executor.ts` | HUB_FIRE_JOB, nextRunOf, queueHubRun, pauseTask, fireHubDeviceTask |
+| `backend/src/lib/schedules/executor.ts` | HUB_FIRE_JOB, nextRunOf, queueHubRun, ONCE_GRACE_MS, pauseTask, fireHubDeviceTask |
 | `backend/src/lib/schedules/guard.ts` | scheduleActor, parseTarget, schedulableDomain, isUnknownReason, checkTargets, loadScheduleRegistry |
 | `backend/src/lib/schedules/reconcile.ts` | reconcileSchedules, registerScheduleReconcile, hasActiveAutomationTasks, reconcileAllInstances, registerScheduleRecheck, __resetReconcileForTests |
 | `backend/src/lib/schedules/store.ts` | pendingAutomationIds, automationDeps, defaultZone, recordOf, wallClock, automationSpecOf |

@@ -238,6 +238,11 @@ describe("the hub's own connections", () => {
     expect(row?.what).toContain("no sensor state is sent to a third party");
     expect(row?.what).toContain("Home Assistant is told the command and nothing about who asked");
     expect(row?.retention).toContain("never a device name or who asked");
+    // SCHED-02: Home now creates automations there, in generic text, named only by an opaque code.
+    expect(row?.what).toContain("schedules a light or scene");
+    expect(row?.what).toContain("maipai_ plus a random code");
+    expect(row?.what).toContain("nothing about who asked");
+    expect(row?.retention).toContain("until the schedule is deleted in Home");
   });
 
   // PrivacyPage.tsx groups inbound rows under its own clearly-labeled

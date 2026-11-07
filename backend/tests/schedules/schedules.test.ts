@@ -614,3 +614,53 @@ describe("DELETE on lanFetch", () => {
     expect(ha.requests).toHaveLength(0);
   });
 });
+
+describe("a hub one-shot is done only after it fires", () => {
+  const AT = "2026-11-06T20:30:00.000Z";
+  async function hubOnce() {
+    ha.state.failWrites = true;
+    const made = await createPorch({ onceAt: AT, time: undefined, days: undefined });
+    if (!made.ok) throw new Error("setup");
+    ha.state.failWrites = false;
+    return { id: made.id, job: db.select().from(scheduledJobs).all().find((item) => item.job === "schedules.device.fire")! as JobRow };
+  }
+  const fireJobs = () => db.select().from(scheduledJobs).all().filter((item) => item.job === "schedules.device.fire");
+  const ok = async () => ({ ok: true as const, before: { state: "off", brightness: null, rgb: null, percentage: null, temperature: null }, after: { state: "on", brightness: null, rgb: null, percentage: null, temperature: null }, undo: null });
+
+  test("a run skipped because Home Assistant did not answer keeps it active and tries again", async () => {
+    const { id, job } = await hubOnce();
+    let message = "";
+    try { await fireHubDeviceTask(job, { ...deps({ now: () => new Date("2026-11-06T20:30:10.000Z") }), loadRegistry: async () => ({ ok: false, kind: "unreachable" }) }); } catch (error) { message = String(error); }
+    expect(message).not.toBe("");
+    expect(db.select().from(scheduledTasks).where(eq(scheduledTasks.id, id)).get()!.state).toBe("active");
+    expect(fireJobs()).toHaveLength(2);
+  });
+
+  test("a retry that finds the device then fires it and marks the task done", async () => {
+    const { id, job } = await hubOnce();
+    const performed: string[] = [];
+    await fireHubDeviceTask(job, { ...deps({ now: () => new Date("2026-11-06T20:36:00.000Z") }), perform: async (entity) => { performed.push(entity.id); return ok(); } });
+    expect(performed).toEqual(["light.porch"]);
+    expect(db.select().from(scheduledTasks).where(eq(scheduledTasks.id, id)).get()!.state).toBe("done");
+  });
+
+  test("an unknown target keeps it active inside the grace and ends it with no action after 30 minutes", async () => {
+    const { id, job } = await hubOnce();
+    entities = [HALL];
+    const performed: string[] = [];
+    const perform = async (entity: HouseEntity) => { performed.push(entity.id); return ok(); };
+    await fireHubDeviceTask(job, { ...deps({ now: () => new Date("2026-11-06T20:35:00.000Z") }), perform });
+    expect(db.select().from(scheduledTasks).where(eq(scheduledTasks.id, id)).get()!.state).toBe("active");
+    await fireHubDeviceTask(job, { ...deps({ now: () => new Date("2026-11-06T21:01:00.000Z") }), perform });
+    expect(db.select().from(scheduledTasks).where(eq(scheduledTasks.id, id)).get()!.state).toBe("done");
+    expect(performed).toEqual([]);
+  });
+
+  test("it is not marked done before the device action runs", async () => {
+    const { id, job } = await hubOnce();
+    let stateDuringRun = "";
+    await fireHubDeviceTask(job, { ...deps({ now: () => new Date("2026-11-06T20:31:00.000Z") }), perform: async () => { stateDuringRun = db.select().from(scheduledTasks).where(eq(scheduledTasks.id, id)).get()!.state; return ok(); } });
+    expect(stateDuringRun).toBe("active");
+    expect(db.select().from(scheduledTasks).where(eq(scheduledTasks.id, id)).get()!.state).toBe("done");
+  });
+});

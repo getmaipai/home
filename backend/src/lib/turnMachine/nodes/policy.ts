@@ -499,7 +499,7 @@ export const policyNode: Node<PolicyInput, PolicyOutput> = async (state, input) 
         const verb = action.replaceAll("_", " ");
         const named = planned.labels.slice(0, 3).join(", ");
         const more = planned.labels.length > 3 ? ` and ${planned.labels.length - 3} more` : "";
-        const prompt = `${verb.charAt(0).toUpperCase()}${verb.slice(1)} ${named}${more}?`;
+        const prompt = planned.prompt ?? `${verb.charAt(0).toUpperCase()}${verb.slice(1)} ${named}${more}?`;
         noteRefusal("confirm_needed");
         entries.push({ proposal, decision: { allow: false, reason: "confirm_needed", ask: { prompt, capabilities: [], consequential: true } } });
       } else entries.push({ proposal, decision: { allow: true } });

@@ -18,13 +18,15 @@ import type { HouseArea, HouseEntity, HouseKind } from "./registry";
 import { canRestartServer, houseAccess, visibleEntities, type EffectivePermission, type HouseActor, type HouseBand } from "./access";
 import { houseServiceCall, performHouseAction, performHouseServerAction, supportedActions, type HouseActionInput, type HouseActionName, type HouseActionResult, type HouseAddon, type HouseServerAction } from "./act";
 import { clearHouseRegistry } from "./cache";
+import { canUseSchedules, isScheduleAction, planSchedule, runScheduleAction, SCHEDULE_ACTIONS, SCHEDULE_DO, whenShape, type ScheduleArgs } from "./scheduleTool";
+import type { ScheduleDeps } from "@/lib/schedules/store";
 import { HOUSE_TOOL_ID } from "./ids";
 export { HOUSE_TOOL_ID } from "./ids";
 
 const kinds = ["light", "switch", "scene", "cover", "lock", "fan", "climate"] as const;
 /** Audit rows take the action name only from this closed list; anything else the model typed is just "invalid". */
 export function safeHouseAction(value: unknown): string { return typeof value === "string" && (HOUSE_ACTIONS as readonly string[]).includes(value) ? value : "invalid"; }
-export const HOUSE_ACTIONS = ["find", "turn_on", "turn_off", "set_brightness", "set_color", "set_speed", "open", "close", "lock", "unlock", "activate", "set_temperature", "restart_core", "restart_addon", "reboot_host"] as const;
+export const HOUSE_ACTIONS = ["find", "turn_on", "turn_off", "set_brightness", "set_color", "set_speed", "open", "close", "lock", "unlock", "activate", "set_temperature", "restart_core", "restart_addon", "reboot_host", ...SCHEDULE_ACTIONS] as const;
 /** Small models often send `target` (one object, or a JSON string of it) or put area, name and kind at the top level instead of a
  * `targets` list, or say "lights" for kind. This reshapes the MODEL'S OWN ARGUMENTS into the one shape; it never reads the person's words. */
 export function normalizeHouseArgs(raw: unknown): unknown {
@@ -60,6 +62,8 @@ export function normalizeHouseArgs(raw: unknown): unknown {
   if (input.value !== undefined) result.value = input.value;
   if (input.rgb !== undefined) result.rgb = input.rgb;
   if (input.addon !== undefined) result.addon = input.addon;
+  if (typeof input.do === "string") result.do = input.do;
+  if (input.when && typeof input.when === "object" && !Array.isArray(input.when)) result.when = input.when;
   if (typeof input.instance === "string" && input.instance.trim()) result.instance = input.instance.trim();
   return result;
 }
@@ -71,6 +75,8 @@ const argsShape = z.object({
   rgb: z.tuple([z.number().int().min(0).max(255), z.number().int().min(0).max(255), z.number().int().min(0).max(255)]).optional(),
   addon: z.string().min(1).max(128).optional(),
   instance: z.string().min(1).max(31).optional(),
+  do: z.enum(SCHEDULE_DO).optional(),
+  when: whenShape.optional(),
 }).strict();
 const argsSchema = z.preprocess(normalizeHouseArgs, argsShape);
 type HouseArgs = z.infer<typeof argsShape>;
@@ -80,6 +86,8 @@ export type HouseToolDeps = {
   perform?: (entity: HouseEntity, action: HouseActionInput) => Promise<HouseActionResult>;
   brakeMode?: () => BrakeMode;
   neverMode?: () => boolean;
+  /** SCHED-02: seams for the schedule actions (the Home Assistant connection, the zone). */
+  schedule?: ScheduleDeps;
   audit?: (input: { personId: string; tool: string; action: string; decision: string; band: string; count: number }) => void;
   undo?: (input: { personId: string; turnId?: string; tool: string; action: string; inverse: UndoInverse }, now?: Date) => { id: string; expiresAt: string };
   now?: () => Date;
@@ -118,13 +126,16 @@ export function houseToolSpec(ctx: { visible: HouseEntity[]; areas: HouseArea[];
   const areaIds = new Set(ctx.visible.flatMap((entity) => entity.area ? [entity.area] : []));
   const areaNames = [...new Set(ctx.areas.filter((area) => areaIds.has(area.id)).map((area) => area.name))].sort((a, b) => a.localeCompare(b)).slice(0, 40);
   const owner = canRestartServer(ctx.actor);
-  const actions = owner ? HOUSE_ACTIONS : HOUSE_ACTIONS.filter((action) => !action.startsWith("restart_") && action !== "reboot_host");
+  const schedules = canUseSchedules(ctx.actor);
+  const actions = HOUSE_ACTIONS.filter((action) => (owner || (!action.startsWith("restart_") && action !== "reboot_host")) && (schedules || !isScheduleAction(action)));
   // Rule 1: the argument exists only when this speaker can see more than one instance; with one it is implied.
   const instances = visibleInstances(ctx.visible);
   return {
     id: HOUSE_TOOL_ID,
-    description: "Find visible home devices and scenes or control devices you are allowed to use. Always pass targets, a list of {area, name, kind}, for example {\"action\":\"turn_on\",\"targets\":[{\"area\":\"Kitchen\",\"name\":\"Ceiling\"}]}. Use action find with an area to see what is there.",
-    args: { type: "object", required: ["action", "targets"], properties: {
+    description: "Find visible home devices and scenes or control devices you are allowed to use. Always pass targets, a list of {area, name, kind}, for example {\"action\":\"turn_on\",\"targets\":[{\"area\":\"Kitchen\",\"name\":\"Ceiling\"}]}. Use action find with an area to see what is there."
+      + (schedules ? " For a device or scene at a later time or on a repeat use action schedule with do (turn_on, turn_off, set_brightness or activate) and when ({time:\"HH:MM\", days:[1..7]} or {once_at:ISO time}); list_schedules shows the speaker's own; cancel_schedule takes targets. Reminders and timers use remind and timer." : ""),
+    args: { type: "object", required: schedules ? ["action"] : ["action", "targets"], properties: {
+      ...(schedules ? { do: { type: "string", enum: [...SCHEDULE_DO] }, when: { type: "object", properties: { time: { type: "string" }, days: { type: "array", items: { type: "integer", minimum: 1, maximum: 7 } }, once_at: { type: "string" } }, additionalProperties: false } } : {}),
       action: { type: "string", enum: actions },
       targets: { type: "array", maxItems: 25, items: { type: "object", properties: { area: { type: "string", ...(areaNames.length ? { enum: areaNames } : {}) }, name: { type: "string" }, kind: { type: "string", enum: kinds } }, additionalProperties: false } },
       ...(instances.length > 1 ? { instance: { type: "string", enum: instances.map((item) => item.instance), description: `Which home: ${instances.map((item) => `${item.instance} is ${item.label}`).join("; ")}. Leave out to search all of them.` } } : {}),
@@ -158,7 +169,7 @@ export function visibleHouseEntities({ actor, permissions, entities }: { actor: 
 
 export type HouseCallPlan =
   | { kind: "refuse"; reason: string; text: string; count: number; rejected?: boolean }
-  | { kind: "ask"; reason: string; action: string; count: number; kinds: string[]; labels: string[] }
+  | { kind: "ask"; reason: string; action: string; count: number; kinds: string[]; labels: string[]; prompt?: string }
   | { kind: "run"; input: HouseArgs; actor: HouseActor; permissions: EffectivePermission[]; registry: { ok: true; areas: HouseArea[]; entities: HouseEntity[] }; matches: HouseEntity[]; action: HouseActionInput; mode: BrakeMode; count: number };
 
 function canonicalActor(actor: PersonRow | HouseActor, bandIn: HouseBand): HouseActor {
@@ -168,7 +179,7 @@ function canonicalActor(actor: PersonRow | HouseActor, bandIn: HouseBand): House
 }
 
 /** Pure call-time access and brake decision shared by policy and execution. */
-export function planHouseCall({ actor, band, args, tainted = false, approved = false, registry, permissions, mode }: { actor: PersonRow | HouseActor; band: HouseBand; args: Record<string, unknown>; tainted?: boolean; approved?: boolean; registry: { ok: true; areas: HouseArea[]; entities: HouseEntity[] }; permissions: EffectivePermission[]; mode: BrakeMode }): HouseCallPlan {
+export function planHouseCall({ actor, band, args, tainted = false, approved = false, registry, permissions, mode, zone }: { actor: PersonRow | HouseActor; band: HouseBand; args: Record<string, unknown>; tainted?: boolean; approved?: boolean; registry: { ok: true; areas: HouseArea[]; entities: HouseEntity[] }; permissions: EffectivePermission[]; mode: BrakeMode; zone?: string }): HouseCallPlan {
   const parsed = argsSchema.safeParse(args);
   if (!parsed.success) return { kind: "refuse", reason: "invalid", text: "That home request was invalid. Name an area or device and try again.", count: 0 };
   const houseActor = canonicalActor(actor, band);
@@ -179,6 +190,12 @@ export function planHouseCall({ actor, band, args, tainted = false, approved = f
   // An instance argument narrows to that instance; one the speaker cannot see reads as nothing found there.
   const visible = input.instance === undefined ? allVisible : allVisible.filter((entity) => (entity.instance ?? "default") === input.instance);
   if (input.instance !== undefined && input.action !== "find" && !input.action.startsWith("restart_") && input.action !== "reboot_host" && visible.length === 0) return { kind: "refuse", reason: "missing", text: "I could not find a visible device matching that area or name.", count: 0 };
+  if (isScheduleAction(input.action)) {
+    const planned = planSchedule({ args: input as unknown as ScheduleArgs, actor: houseActor, registry, permissions, visible, approved, resolve: resolveTargets, label: houseLabel, ...(zone !== undefined ? { zone } : {}) });
+    if (planned.kind === "refuse") return { kind: "refuse", reason: planned.reason, text: planned.text, count: planned.count };
+    if (planned.kind === "ask") return { kind: "ask", reason: planned.reason, action: planned.action, count: planned.count, kinds: planned.kinds, labels: planned.labels, prompt: planned.prompt };
+    return { kind: "run", input, actor: houseActor, permissions: [...permissions], registry, matches: planned.matches, action: { name: "turn_on" }, mode, count: planned.count };
+  }
   if (input.action.startsWith("restart_") || input.action === "reboot_host") {
     if (!canRestartServer(houseActor)) return { kind: "refuse", reason: "server_owner_only", text: "That home action is unavailable for this speaker.", count: 0 };
     const action = input.action as HouseServerAction;
@@ -271,14 +288,14 @@ export async function runHouseTool({ actor, band: bandIn, args, callId, tainted 
   if (serverKind === "restart_addon" && !(await availableAddons(deps)).some((addon) => addon.id === args.addon)) return fail(callId, args, "Choose a Home Assistant add-on from the available list.", "failed", false, "bad_arguments");
   const permissions = (deps.permissionsOf ?? effectivePermissions)(personId);
   const mode = brakeModeOf((deps.brakeMode ?? (() => getHouseholdSettingValue("tools.house.mode")))());
-  const plan = planHouseCall({ actor, band: bandIn, args, tainted, registry, permissions, mode });
+  const plan = planHouseCall({ actor, band: bandIn, args, tainted, registry, permissions, mode, ...(deps.schedule?.zoneOf ? { zone: deps.schedule.zoneOf(personId) } : {}) });
   // A malformed call is a tool error, not an answer, so the reply cannot claim it worked.
   if (plan.kind === "refuse" && ["invalid", "missing", "ambiguous", "bulk", "unsupported"].includes(plan.reason)) return fail(callId, args, plan.text, "failed", false, plan.reason === "missing" ? "found_nothing" : "bad_arguments");
   if (plan.kind === "refuse") return plan.rejected ? outcomeOf({ callId, packageId: HOUSE_TOOL_ID, status: "rejected", via: "tool_call", args, durationMs: 0, reason: "unconfirmed", userMessage: plan.text } as Parameters<typeof outcomeOf>[0]) : reply(callId, args, plan.text);
   if (plan.kind === "ask" && !approved) {
     const homeLabel = typeof args.instance === "string" ? visibleInstances(registry.entities).find((home) => home.instance === args.instance)?.label : undefined;
     const inHome = homeLabel ? ` in the ${homeLabel} home` : "";
-    const copy = serverKind ? `This cannot be undone. Confirm ${serverKind === "restart_core" ? "restarting Home Assistant" : serverKind === "reboot_host" ? "rebooting the Home Assistant host" : `restarting the Home Assistant add-on ${String(args.addon)}`}${inHome}?` : `Please confirm ${plan.action.replaceAll("_", " ")} for ${plan.count} ${plan.count === 1 ? "device" : "devices"}.`;
+    const copy = plan.prompt ? plan.prompt : serverKind ? `This cannot be undone. Confirm ${serverKind === "restart_core" ? "restarting Home Assistant" : serverKind === "reboot_host" ? "rebooting the Home Assistant host" : `restarting the Home Assistant add-on ${String(args.addon)}`}${inHome}?` : `Please confirm ${plan.action.replaceAll("_", " ")} for ${plan.count} ${plan.count === 1 ? "device" : "devices"}.`;
     return outcomeOf({ callId, packageId: HOUSE_TOOL_ID, status: "rejected", via: "tool_call", args, durationMs: 0, reason: "blocked_by_confirmation", userMessage: copy, ...({ confirmNeeded: true } as object) } as Parameters<typeof outcomeOf>[0]);
   }
   if (approved && callId.startsWith("resumed:")) {
@@ -286,7 +303,7 @@ export async function runHouseTool({ actor, band: bandIn, args, callId, tainted 
     if (currentMode === "never") return outcomeOf({ callId, packageId: HOUSE_TOOL_ID, status: "rejected", via: "tool_call", args, durationMs: 0, reason: "unconfirmed", userMessage: "Home controls are turned off for this household." } as Parameters<typeof outcomeOf>[0]);
     const parsed = argsSchema.safeParse(args);
     if (!parsed.success) return reply(callId, args, "That home request was invalid. Name an area or device and try again.");
-    const retryPlan = planHouseCall({ actor, band: bandIn, args, tainted: false, approved: true, registry, permissions, mode });
+    const retryPlan = planHouseCall({ actor, band: bandIn, args, tainted: false, approved: true, registry, permissions, mode, ...(deps.schedule?.zoneOf ? { zone: deps.schedule.zoneOf(personId) } : {}) });
     if (retryPlan.kind === "refuse") return reply(callId, args, retryPlan.text);
     if (retryPlan.kind === "run" && (retryPlan.actor.band === "child" || retryPlan.actor.band === "teen")) {
       const requiresAdult = retryPlan.matches.some((entity) => !!entity.sensitive || entity.kind === "scene" && (entity.sceneMembers === null || entity.sceneMembers.some((id) => registry.entities.find((item) => item.id === id && (item.instance ?? "default") === (entity.instance ?? "default"))?.sensitive)));
@@ -317,6 +334,13 @@ async function executeHousePlan({ plan, actor, personId, args, callId, band, dep
     if (ok) { serverCooldowns.set(cooldownKey, nowMs); setStoredCooldown(cooldownKey, nowMs); clearHouseRegistry(); }
     (deps.audit ?? recordToolAudit)({ personId, tool: HOUSE_TOOL_ID, action, decision: ok ? "do" : "never", band, count: 1 });
     return ok ? reply(callId, args, "Restart sent; Home Assistant will be back in a minute") : fail(callId, args, failureCopy.unreachable!, "failed", false, "unavailable");
+  }
+  if (isScheduleAction(input.action)) {
+    const outcome = await runScheduleAction({ args: input as unknown as ScheduleArgs, actor: houseActor, role: String(houseActor.role), matches: plan.matches, registry, permissions: plan.permissions, ...(deps.schedule ? { deps: deps.schedule } : {}) });
+    // The audit row holds the action name and the result only; the recorded args are just the action.
+    (deps.audit ?? recordToolAudit)({ personId, tool: HOUSE_TOOL_ID, action: input.action, decision: outcome.ok ? "do" : "never", band, count: input.action === "schedule" ? plan.count : 1 });
+    const minimal = { action: input.action };
+    return outcome.ok ? reply(callId, minimal, outcome.text) : fail(callId, minimal, outcome.text, "failed", false, outcome.kind);
   }
   const mode = plan.mode;
   const permissions = plan.permissions;
