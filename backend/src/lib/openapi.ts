@@ -8,7 +8,9 @@ import type { Result } from "@/lib/result";
 import type { AppEnv } from "@/types";
 import { OpenAPIHono } from "@hono/zod-openapi";
 
-export { ErrorSchema, errorResponses, idParamSchema, PaginationQuerySchema, paginatedResponseSchema } from "@maipai/core/src/openapi";
+// AUDIT-DUP-ROUTES-01: PaginationQuerySchema and paginatedResponseSchema are no longer re-exported: nothing used them, and the five list routes differ by design
+// (media offset 1-200 default 50, library cursor 1-60 default 60, recall 1-20 default 5, continue its own budget, diagnose its own copy). Core still has them.
+export { ErrorSchema, errorResponses, idParamSchema } from "@maipai/core/src/openapi";
 
 export function apiRouter() {
   return new OpenAPIHono<AppEnv>({ defaultHook: (result, c) => {
