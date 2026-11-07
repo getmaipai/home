@@ -14,13 +14,13 @@ import type { PersonRow } from "@/types";
 import type { FailureAdviceDetail, GenerationFailureDetail, ToolFailureDetail, TurnErrorDetail, TurnGeneration, TurnStats, TurnStreamEvent, TurnValue } from "@/wire";
 import { FAILURE_ADVICE, TOOL_FAILURE_ADVICE, stackRefusalKind, type FailureKind } from "@/lib/failureCopy";
 import { classifyGenerationFailure } from "@/lib/generationFailure";
-import { isOwnerOrAdmin } from "@/lib/access";
+import { isOwnerOrAdminRole } from "@/wire";
 
 export type { ToolFailureDetail, GenerationFailureDetail, FailureAdviceDetail, TurnErrorDetail } from "@/wire";
 
 /** Whether this person may read raw error details: an owner or admin who is an adult. */
 export function canReadErrorDetail(actor: PersonRow): boolean {
-  return (isOwnerOrAdmin(actor)) && speakerAgeBand(actor, new Date()) === "adult";
+  return isOwnerOrAdminRole(actor.role) && speakerAgeBand(actor, new Date()) === "adult";
 }
 
 /** The raw error text a failed run kept (T5/R2 `detail`; older rows kept it in `userMessage`). */
