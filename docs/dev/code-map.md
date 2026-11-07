@@ -109,7 +109,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `frontend/src/apps/clock/AlarmEditor.tsx` | AlarmEditor |
 | `frontend/src/apps/clock/AlarmRecordRow.tsx` | alarmTime, AlarmRecordRow |
 | `frontend/src/apps/clock/AlarmsTab.tsx` | AlarmsTab |
-| `frontend/src/apps/clock/ClockHeaderAdd.tsx` | ClockHeaderAdd |
+| `frontend/src/apps/clock/ClockHeaderTitle.tsx` | ClockHeaderAdd |
 | `frontend/src/apps/clock/ClockPage.tsx` | ClockPage |
 | `frontend/src/apps/clock/StopwatchTab.tsx` | StopwatchTab |
 | `frontend/src/apps/clock/TimersTab.tsx` | TimersTab |
