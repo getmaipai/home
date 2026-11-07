@@ -29,6 +29,11 @@ msgid " · Loop"
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/apps/memory/PersonMemories.tsx:32
+msgid " · Pinned"
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/shell/pages/status/StatusComponents.tsx:152
 msgid " A reply being written right now will be cut off."
 msgstr ""
@@ -36,6 +41,16 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/apps/settings/aiTierSlots.ts:89
 msgid " Max is for admins and anyone an admin assigns."
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/setup/StorageStep.tsx:162
+msgid " Plan for about {needGb} GB free there."
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/setup/PlanDiskSummary.tsx:30
+msgid " You can also turn off an extra above."
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -100,8 +115,18 @@ msgid "setting.engines.stack.where.help"
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/apps/setup/HostTuneStep.tsx:18
+msgid "{_} {failureNext}"
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/shell/pages/HousePage.tsx:49
 msgid "{active} of {length} on"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/clock/TimersTab.tsx:116
+msgid "{activeLabel}, {displayTime} remaining"
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -112,6 +137,11 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/apps/settings/performanceModel.ts:60
 msgid "{category} at {tier}"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/setup/SetupWizard.tsx:147
+msgid "{checksErrorMessage} Refresh this page and try again."
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -155,6 +185,11 @@ msgid "{count, plural, one {# could not be restored: {reason}.} other {# could n
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/apps/people/FaceEnrollmentPage.tsx:771
+msgid "{count, plural, one {# face sample saved.} other {# face samples saved.}}"
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/apps/settings/UsersSection.tsx:471
 msgid "{count, plural, one {# file only {name} could see will be deleted too. Download it first if you want to keep it.} other {# files only {name} could see will be deleted too. Download them first if you want to keep them.}}"
 msgstr ""
@@ -195,8 +230,28 @@ msgid "{count, plural, one {# song} other {# songs}}"
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/apps/setup/HostTuneStep.tsx:138
+msgid "{count, plural, one {# thing to do yourself, if you like} other {# things to do yourself, if you like}}"
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/apps/chat/chatDeleteMedia.tsx:18
 msgid "{count, plural, one {# video} other {# videos}}"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/people/VoiceEnrollmentBody.tsx:75
+msgid "{count, plural, one {# voice sample saved} other {# voice samples saved}}"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/setup/SetupWizard.tsx:82
+msgid "{count, plural, one {1 thing needs fixing. Fix what is marked Needs fixing, then press Try again.} other {# things need fixing. Fix what is marked Needs fixing, then press Try again.}}"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/setup/SetupWizard.tsx:83
+msgid "{count, plural, one {1 thing to look at. You can continue, but it may not work.} other {# things to look at. You can continue, but those parts may not work.}}"
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -215,8 +270,28 @@ msgid "{count, plural, one {File restored} other {# files restored}}"
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/apps/memory/PersonMemories.tsx:387
+msgid "{count, plural, one {Forget # memory? This cannot be undone.} other {Forget # memories? This cannot be undone.}}"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/memory/PersonMemories.tsx:399
+msgid "{count, plural, one {Forget your memory? This cannot be undone.} other {Forget every one of your # memories? This cannot be undone.}}"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/reminders/RemindersPage.tsx:175
+msgid "{count, plural, one {Its # item goes too.} other {Its # items go too.}}"
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/apps/settings/UsersSection.tsx:248
 msgid "{count, plural, one {Remove # person from your household?} other {Remove # people from your household?}}"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/people/FaceEnrollmentPage.tsx:761
+msgid "{count, plural, one {Saving # face sample…} other {Saving # face samples…}}"
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -232,6 +307,16 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/shell/pages/FilesPage.tsx:172
 msgid "{count} files moved to Trash. Kept 30 days"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/notifications/NotificationsPage.tsx:92
+msgid "{count} of {total} could be cleared - the rest were already gone."
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/memory/PersonMemories.tsx:338
+msgid "{count} of {total} could not be forgotten: {reason}"
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -276,8 +361,18 @@ msgid "{detail}, otherwise fine."
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/apps/people/FaceEnrollmentPage.tsx:772
+msgid "{display_name} is now enrolled for face recognition."
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/shell/InstallDockRow.tsx:25
 msgid "{done} of {total}"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/setup/AwayFromHome.tsx:51
+msgid "{errorLine} Check your connection and try again."
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -286,11 +381,18 @@ msgid "{first}, and {second}"
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/apps/setup/StorageStep.tsx:37
+msgid "{formatted} free on this drive"
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/shell/pages/performance/DiskHardwareBody.tsx:31
 msgid "{free} free of {total}"
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/apps/setup/PlanStep.tsx:139
+#: src/apps/setup/SetupWizard.tsx:479
 #: src/shell/pages/performance/DiskHardwareBody.tsx:15
 msgid "{gb} GB"
 msgstr ""
@@ -303,6 +405,42 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/apps/settings/ModelsSection.tsx:253
 msgid "{headline} · Memory it needs: {need}"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/reminders/ComingUpRow.tsx:35
+#: src/apps/reminders/ComingUpRow.tsx:36
+msgid "{hourMinute} {dayPeriod}, once, {text}"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/clock/WorldClocksTab.tsx:33
+msgid "{hours, plural, one {# hour} other {# hours}} {minutes} minutes ahead of you"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/clock/WorldClocksTab.tsx:34
+msgid "{hours, plural, one {# hour} other {# hours}} {minutes} minutes behind"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/clock/WorldClocksTab.tsx:36
+msgid "{hours, plural, one {# hour} other {# hours}} ahead of you"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/clock/WorldClocksTab.tsx:37
+msgid "{hours, plural, one {# hour} other {# hours}} behind"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/clock/AlarmRecordRow.tsx:27
+msgid "{hours} h {minutes} min"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/clock/AlarmsTab.tsx:22
+msgid "{hours} h {remainder} min"
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -467,6 +605,27 @@ msgid "{minutes, plural, one {# minute ago} other {# minutes ago}}"
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/apps/clock/WorldClocksTab.tsx:39
+msgid "{minutes, plural, one {# minute} other {# minutes}} ahead of you"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/clock/WorldClocksTab.tsx:40
+msgid "{minutes, plural, one {# minute} other {# minutes}} behind"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/clock/AlarmRecordRow.tsx:27
+#: src/apps/clock/TimersTab.tsx:155
+msgid "{minutes} min"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/reminders/ComingUpRow.tsx:22
+msgid "{minutes}:{seconds} remaining"
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/apps/settings/RobotBody.tsx:42
 msgid "{motors} switched off after a failed recovery"
 msgstr ""
@@ -517,6 +676,11 @@ msgid "{name} can be closed again if it is on the Always close list."
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/apps/setup/PlanStep.tsx:165
+msgid "{name} comes with this part. You accepted its licence at the start; the terms are in Models and storage."
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/shell/AmbientCompanionPane.tsx:321
 msgid "{name} companion pane"
 msgstr ""
@@ -529,6 +693,11 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/apps/settings/HouseholdRobotsSection.tsx:134
 msgid "{name} could not be forgotten. Check the connection and try again."
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/home/greeting.ts:17
+msgid "{name} Family"
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -811,6 +980,11 @@ msgid "{problem} Select Retry, or open Engines and AI and select Check the conne
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/apps/clock/AlarmsTab.tsx:22
+msgid "{remainder} min"
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/apps/settings/EngineLinkCredentialSection.tsx:57
 msgid "{result} hop {id}"
 msgstr ""
@@ -918,8 +1092,18 @@ msgid "{summarize} - {value} or higher"
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/apps/clock/TimersTab.tsx:134
+msgid "{text}, {displayTime} remaining"
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/apps/settings/AiGlance.tsx:254
 msgid "{text}: {percent}%"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/setup/SetupWizard.tsx:492
+msgid "{thingsLeftLine}. You'll find them in Home settings."
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -930,6 +1114,16 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/apps/settings/AiSlotDialog.tsx:79
 msgid "{tier}: {state}"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/clock/AlarmRecordRow.tsx:38
+msgid "{time} {period}, {repeat}, {label}"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/clock/AlarmRecordRow.tsx:46
+msgid "{time} {period}, {repeat}, {label}, {state}"
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -970,6 +1164,11 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/shell/pages/status/StatusBoard.tsx:70
 msgid "{title} will be marked as cancelled."
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/setup/PlanStep.tsx:193
+msgid "{title}: which one"
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -1040,6 +1239,11 @@ msgid "+{count} more"
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/apps/clock/TimersTab.tsx:125
+msgid "+1 min"
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:59
 msgid "setting.chat.context_size_override.help"
 msgstr ""
@@ -1088,6 +1292,11 @@ msgid "1 year"
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/apps/setup/SetupWizard.tsx:485
+msgid "1. Install OpenCode on your computer"
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:8
 msgid "setting.alarms.snooze_minutes.option_label.10"
 msgstr ""
@@ -1125,6 +1334,11 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/shell/library/LibraryViewer.tsx:110
 msgid "2 beats"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/setup/SetupWizard.tsx:485
+msgid "2. Install Claude Code on your computer"
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -1196,6 +1410,11 @@ msgid "setting.ease.preset.help"
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/apps/people/FaceEnrollmentPage.tsx:270
+msgid "A child can't enroll themself for face recognition. Ask an owner or admin to run this for you."
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:944
 msgid "setting.robot.face.color.option.sky"
 msgstr ""
@@ -1221,6 +1440,11 @@ msgid "A dreamy indie pop song about new beginnings, with warm guitar and an upb
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/apps/setup/HostTuneStep.tsx:92
+msgid "A few quick changes help the AI run well. All are optional."
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:488
 msgid "setting.generation.picture_quality.option.quick"
 msgstr ""
@@ -1228,6 +1452,11 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/shell/pages/PrivacyPage.tsx:82
 msgid "A few things reach the internet, because you asked them to. Every one is listed below, in full. If it is not on this list, it does not happen."
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/reminders/ListMain.tsx:31
+msgid "A few things to pick up"
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -1318,6 +1547,16 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:946
 msgid "setting.robot.face.color.option.lavender"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/people/ProfileForm.tsx:173
+msgid "A line about you"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/setup/SetupWizard.tsx:123
+msgid "A little care goes a long way"
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -1469,6 +1708,17 @@ msgid "About {name}"
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/apps/setup/AwayFromHome.tsx:144
+msgid "About your address"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/people/ProfileForm.tsx:179
+#: src/apps/people/ProfileForm.tsx:181
+msgid "Accent color"
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/apps/settings/ModelsAndStorageSection.tsx:174
 msgid "Accept"
 msgstr ""
@@ -1515,6 +1765,7 @@ msgstr ""
 #: src/apps/chat/composerAddMenu.tsx:295
 #: src/apps/chat/composerAddMenu.tsx:306
 #: src/apps/chat/composerAddMenu.tsx:315
+#: src/apps/reminders/ListMain.tsx:77
 #: src/shell/pages/CompanionsPage.tsx:144
 msgid "Add"
 msgstr ""
@@ -1540,6 +1791,11 @@ msgid "Add a picture"
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/apps/clock/WorldClocksTab.tsx:165
+msgid "Add a place"
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/apps/settings/HouseholdRobotsSection.tsx:65
 #: src/shell/pages/settings/settingsViews.tsx:117
 msgid "Add a robot"
@@ -1554,6 +1810,11 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/shell/pages/MakeSongPage.tsx:148
 msgid "Add a style"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/clock/ClockPage.tsx:16
+msgid "Add a timer with the plus button."
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -1573,6 +1834,26 @@ msgid "Add a word"
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/apps/clock/WorldClocksTab.tsx:139
+msgid "Add a world clock"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/clock/ClockPage.tsx:17
+msgid "Add a world clock with the plus button."
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/clock/ClockHeaderTitle.tsx:20
+msgid "Add alarm"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/clock/ClockPage.tsx:15
+msgid "Add an alarm with the plus button."
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/apps/settings/CloseAppsSettings.tsx:51
 msgid "Add an app"
 msgstr ""
@@ -1580,6 +1861,12 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/apps/settings/CloseAppsSettings.tsx:51
 msgid "Add an app to {title}"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/reminders/ListMain.tsx:76
+#: src/apps/reminders/ListMain.tsx:76
+msgid "Add an item"
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -1600,6 +1887,12 @@ msgid "Add one audio file under 40 MB: mp3, m4a, wav, aac, ogg or flac."
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/apps/clock/ClockHeaderTitle.tsx:22
+#: src/apps/clock/TimersTab.tsx:174
+msgid "Add quick timer"
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/apps/settings/UsersSection.tsx:438
 msgid "Add someone"
 msgstr ""
@@ -1612,6 +1905,11 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/apps/settings/styles/StyleAddFile.tsx:67
 msgid "Add style"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/reminders/ListMain.tsx:58
+msgid "Add the first thing and we'll keep it here for you."
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -1650,8 +1948,23 @@ msgid "Add voice"
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/apps/clock/ClockHeaderTitle.tsx:23
+msgid "Add world clock"
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/shell/library/LibraryUploads.tsx:72
 msgid "Added"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/memory/PersonMemories.tsx:97
+msgid "Added before authors were kept"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/memory/PersonMemories.tsx:97
+msgid "Added by {name}"
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -1680,6 +1993,7 @@ msgid "Adding your song…"
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/apps/people/NewPersonForm.tsx:141
 #: src/apps/settings/styles/StyleAddFile.tsx:67
 msgid "Adding…"
 msgstr ""
@@ -1720,6 +2034,12 @@ msgid "setting.news.feeds.teen.does"
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/apps/people/NewPersonForm.tsx:114
+#: src/apps/people/roles.ts:11
+msgid "Admin"
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:990
 msgid "setting.robot.live_view.who.help"
 msgstr ""
@@ -1732,6 +2052,11 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:939
 msgid "setting.robot.controls.option_label.adult"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/people/roles.ts:12
+msgid "Adult"
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -1845,6 +2170,7 @@ msgid "Adults follow the household default. Teens and children need an admin gra
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/apps/memory/PersonMemories.tsx:44
 #: src/apps/settings/styles/StyleEditor.tsx:114
 #: src/apps/settings/styles/StyleEditor.tsx:116
 #: src/apps/settings/styles/StylesTab.tsx:120
@@ -1868,6 +2194,11 @@ msgid "area.Advanced"
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/apps/people/FaceEnrollmentPage.tsx:630
+msgid "Advances automatically"
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/shell/pages/status/StatusBanner.tsx:26
 msgid "Affected parts"
 msgstr ""
@@ -1883,6 +2214,11 @@ msgid "setting.resources.cooldown_seconds.help"
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/apps/setup/SetupWizard.tsx:146
+msgid "After setup, choose and download AI models in Home settings."
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/shell/library/TranscriptFindReplace.tsx:123
 msgid "after: {text}"
 msgstr ""
@@ -1895,6 +2231,11 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:1456
 msgid "area.AI and models"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/setup/SetupWizard.tsx:121
+msgid "AI can be wrong or say the wrong thing"
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -1918,11 +2259,22 @@ msgid "area.AI developer settings"
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/apps/setup/StorageStep.tsx:22
+msgid "AI models"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/setup/CheckGrid.tsx:46
+msgid "AI server"
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:1459
 msgid "area.AI settings"
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/apps/clock/AlarmRecordRow.tsx:33
 #: src/shell/AlarmRinger.tsx:49
 msgid "Alarm"
 msgstr ""
@@ -1943,6 +2295,8 @@ msgid "setting.safety.alarm.volume.help"
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/apps/clock/AlarmsTab.tsx:69
+#: src/apps/clock/ClockPage.tsx:42
 #: src/shell/AlarmRinger.tsx:199
 msgid "Alarms"
 msgstr ""
@@ -2032,6 +2386,16 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/shell/library/TranscriptPanel.tsx:357
 msgid "All speakers"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/people/VoiceEnrollmentBody.tsx:62
+msgid "All voice samples deleted."
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/setup/SetupWizard.tsx:464
+msgid "Allow"
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -2125,6 +2489,12 @@ msgid "Already added as {name}. Press to open it."
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/apps/setup/HostTuneStep.tsx:130
+#: src/apps/setup/HostTuneStep.tsx:156
+msgid "Already set."
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/apps/settings/styles/StyleEditor.tsx:124
 msgid "Also add"
 msgstr ""
@@ -2189,6 +2559,11 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:1005
 msgid "setting.robot.vision.option_label.continual"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/clock/AlarmRecordRow.tsx:21
+msgid "AM"
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -2288,6 +2663,11 @@ msgid "Answered by the model"
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/apps/setup/SetupWizard.tsx:121
+msgid "Answers can be inaccurate, offensive, or harmful. They are not medical, legal, or professional advice, and you are responsible for how you use them."
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:1316
 msgid "setting.topics.teen.bodies.option.informative"
 msgstr ""
@@ -2310,6 +2690,11 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/shell/pages/status/StatusComponents.tsx:25
 msgid "Answers your conversations."
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/setup/SetupWizard.tsx:483
+msgid "ANTHROPIC_BASE_URL={codingHome}/code/v1 ANTHROPIC_API_KEY=maipai_key_...{hint} claude"
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -2379,6 +2764,11 @@ msgid "Appearance published."
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/apps/setup/HostTuneStep.tsx:156
+msgid "Applied."
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:1446
 msgid "setting.reason.household_admin.admin.line"
 msgstr ""
@@ -2387,13 +2777,21 @@ msgstr ""
 #: src/apps/settings/AiGlance.tsx:225
 #: src/apps/settings/HostTuneSettings.tsx:52
 #: src/apps/settings/ReferenceLibrarySettings.tsx:231
+#: src/apps/setup/HostTuneStep.tsx:128
 #: src/shell/library/TranscriptFindReplace.tsx:109
 #: src/shell/pages/UpdatesPage.tsx:159
 msgid "Apply"
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/apps/setup/HostTuneStep.tsx:112
+msgid "Apply recommended"
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/apps/settings/HostTuneSettings.tsx:52
+#: src/apps/setup/HostTuneStep.tsx:112
+#: src/apps/setup/HostTuneStep.tsx:128
 msgid "Applying"
 msgstr ""
 
@@ -2451,6 +2849,11 @@ msgid "setting.resources.close_apps.never.label"
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/apps/setup/CloseAppsStep.tsx:79
+msgid "Apps that would be closed: {apps}."
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:852
 msgid "setting.resources.close_apps.no_reopen.label"
 msgstr ""
@@ -2459,6 +2862,11 @@ msgstr ""
 #: src/apps/chat/chatHeaderBar.tsx:221
 #: src/apps/chat/chatHeaderBar.tsx:310
 msgid "Archive"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/memory/PersonMemories.tsx:119
+msgid "Archive \"{text}\""
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -2509,6 +2917,18 @@ msgid "Ask a parent to choose your voice."
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/apps/people/ProfileForm.tsx:169
+#: src/apps/people/ProfileForm.tsx:176
+#: src/apps/people/ProfileForm.tsx:184
+msgid "Ask an admin to change this."
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/people/FaceEnrollmentBody.tsx:33
+msgid "Ask an admin to set this up."
+msgstr ""
+
+#. js-lingui-explicit-id
 #: ../backend/src/lib/apiErrorCopy.ts:43
 msgid "api.minor.guest_stay_ask_adult"
 msgstr ""
@@ -2526,6 +2946,11 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:479
 msgid "setting.generation.people_prompts.label"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/setup/AwayFromHome.tsx:73
+msgid "Ask one of them to finish this setup for your Home."
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -2590,6 +3015,11 @@ msgid "Attack"
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/apps/library/appPresentation.ts:18
+msgid "Attention"
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/shell/pages/status/StatusBanner.tsx:22
 msgid "Attention needed"
 msgstr ""
@@ -2647,6 +3077,8 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/apps/settings/CloseAppsSettings.tsx:96
 #: src/apps/settings/CloseAppsSettings.tsx:97
+#: src/apps/setup/CloseAppsStep.tsx:74
+#: src/apps/setup/CloseAppsStep.tsx:74
 msgid "Automatic"
 msgstr ""
 
@@ -2697,8 +3129,10 @@ msgid "setting.tts.voice_id.option_label.azelma"
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/apps/people/FaceEnrollmentPage.tsx:94
 #: src/apps/settings/AiSlotDialog.tsx:151
 #: src/apps/settings/EngineLinkCredentialSection.tsx:284
+#: src/apps/setup/SetupReviewPage.tsx:62
 #: src/shell/pages/companionFlow/AnimateStep.tsx:152
 #: src/shell/pages/companionFlow/CustomizeStep.tsx:149
 #: src/shell/pages/settings/settingsBackLink.ts:51
@@ -2718,6 +3152,8 @@ msgid "Back to draft"
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/apps/people/FaceEnrollmentPage.tsx:242
+#: src/apps/people/FaceEnrollmentPage.tsx:260
 #: src/shell/pages/PersonProfilePage.tsx:66
 #: src/shell/pages/PersonProfilePage.tsx:75
 msgid "Back to Family"
@@ -2726,6 +3162,11 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/shell/pages/MusicStudioPages.tsx:188
 msgid "Back to My creations"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/people/FaceEnrollmentPage.tsx:630
+msgid "Back to profile"
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -2813,6 +3254,7 @@ msgstr ""
 
 #. js-lingui-explicit-id
 #: src/apps/settings/PerformanceSettings.tsx:19
+#: src/apps/setup/PerformanceStep.tsx:11
 #: src/shell/library/LibraryViewer.tsx:105
 msgid "Balanced"
 msgstr ""
@@ -2820,6 +3262,11 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:893
 msgid "setting.resources.preset.option_label.balanced"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/setup/SetupWizard.tsx:97
+msgid "Balanced is a good start. You can change it any time."
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -2870,6 +3317,11 @@ msgid "Battery level"
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/apps/setup/PlanStep.tsx:156
+msgid "Before it downloads: the maker's licence ({name})"
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/apps/settings/EngineLinkCredentialSection.tsx:216
 msgid "Before revoking, run maipai-engine unpair on the engine computer."
 msgstr ""
@@ -2882,6 +3334,11 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/apps/settings/ModelsAndStorageSection.tsx:102
 msgid "Before you get {label}"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/setup/SetupWizard.tsx:57
+msgid "Before you start"
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -2902,6 +3359,11 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:14
 msgid "setting.alarms.sound.option_label.bell"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/clock/AlarmEditor.tsx:98
+msgid "Bell"
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -2936,6 +3398,7 @@ msgstr ""
 
 #. js-lingui-explicit-id
 #: src/apps/settings/PerformanceSettings.tsx:19
+#: src/apps/setup/PerformanceStep.tsx:11
 msgid "Big jobs first"
 msgstr ""
 
@@ -2982,6 +3445,16 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:1362
 msgid "setting.tts.voice_id.option_label.bill_boerst"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/people/ProfileForm.tsx:172
+msgid "Bio"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/people/ProfileForm.tsx:175
+msgid "Bio must be 160 characters or less."
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -3130,6 +3603,11 @@ msgid "setting.search.blocklists.teen.option.blp-drugs"
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/apps/people/roles.ts:119
+msgid "Blue"
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:1276
 msgid "setting.topics.bodies.label"
 msgstr ""
@@ -3181,6 +3659,11 @@ msgstr ""
 #: src/apps/settings/PerformanceCustomize.tsx:15
 #: src/apps/settings/performanceModel.ts:55
 msgid "Boost"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/setup/SetupWizard.tsx:458
+msgid "Boost and Max downloads are offered only where this computer can run them. While a big job runs, chat may get simpler."
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -3369,6 +3852,11 @@ msgid "Camera"
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/apps/people/FaceEnrollmentPage.tsx:676
+msgid "Camera access is off"
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:1007
 msgid "setting.robot.vision.option_label.none"
 msgstr ""
@@ -3390,6 +3878,9 @@ msgstr ""
 
 #. js-lingui-explicit-id
 #: src/apps/chat/chatThreadSlots.tsx:270
+#: src/apps/people/ProfileForm.tsx:190
+#: src/apps/people/ProfileForm.tsx:195
+#: src/apps/reminders/RemindersPage.tsx:178
 #: src/apps/settings/AddRobotSection.tsx:276
 #: src/apps/settings/AddVoiceForm.tsx:52
 #: src/apps/settings/AiSlotDialog.tsx:151
@@ -3406,6 +3897,9 @@ msgstr ""
 #: src/apps/settings/UsersSection.tsx:446
 #: src/apps/settings/VoiceManagerSection.tsx:145
 #: src/apps/settings/VoiceManagerSection.tsx:158
+#: src/apps/setup/SetupReviewPage.tsx:64
+#: src/apps/setup/StorageStep.tsx:32
+#: src/apps/setup/StorageStep.tsx:190
 #: src/shell/components/DataTableRowActions.tsx:53
 #: src/shell/pages/ChatPage.tsx:1665
 #: src/shell/pages/ChatPage.tsx:1681
@@ -3421,6 +3915,11 @@ msgstr ""
 #: src/shell/pages/TrashPage.tsx:63
 #: src/shell/pages/UpdatesPage.tsx:199
 msgid "Cancel"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/people/FaceEnrollmentPage.tsx:631
+msgid "Cancel enrollment"
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -3567,6 +4066,12 @@ msgid "Change a few settings"
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/apps/reminders/ListMenu.tsx:37
+#: src/apps/reminders/ListMenu.tsx:52
+msgid "Change icon"
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/apps/settings/SignInSecretSection.tsx:73
 msgid "Change password"
 msgstr ""
@@ -3610,6 +4115,11 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/shell/pages/MusicVoiceCreate.tsx:105
 msgid "Changed voice"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/setup/HostTuneStep.tsx:124
+msgid "Changed. Now: {proposed}."
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -3758,6 +4268,7 @@ msgstr ""
 
 #. js-lingui-explicit-id
 #: src/apps/settings/PerformanceSettings.tsx:19
+#: src/apps/setup/PerformanceStep.tsx:11
 msgid "Chat first"
 msgstr ""
 
@@ -3882,6 +4393,8 @@ msgstr ""
 
 #. js-lingui-explicit-id
 #: src/apps/settings/AddRobotSection.tsx:250
+#: src/apps/setup/PlanStep.tsx:127
+#: src/apps/setup/PlanStep.tsx:168
 msgid "Check again"
 msgstr ""
 
@@ -3985,6 +4498,11 @@ msgid "Checking connection…"
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/apps/setup/StorageStep.tsx:204
+msgid "Checking that Home can use your choice"
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/apps/settings/EngineLinkCredentialSection.tsx:278
 msgid "Checking the connection"
 msgstr ""
@@ -4004,6 +4522,16 @@ msgstr ""
 #: src/apps/settings/ModelsSection.tsx:171
 #: src/apps/settings/ModelsSection.tsx:230
 msgid "Checking this computer"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/setup/SetupWizard.tsx:61
+msgid "Checking your computer"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/setup/SetupWizard.tsx:73
+msgid "Checking your computers"
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -4037,8 +4565,18 @@ msgid "setting.robot.controls.option_label.child"
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/apps/people/roles.ts:14
+msgid "Child"
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/apps/settings/RobotCompanionChoices.tsx:14
 msgid "Child controls"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/setup/SetupWizard.tsx:124
+msgid "Child profiles start restricted, and parents choose what they can reach. No protection is perfect, so stay involved."
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -4064,6 +4602,11 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:15
 msgid "setting.alarms.sound.option_label.chime"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/clock/AlarmEditor.tsx:98
+msgid "Chime"
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -4093,13 +4636,38 @@ msgid "Choose a date"
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/apps/setup/StorageStep.tsx:183
+msgid "Choose a different folder"
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/shell/pages/MusicVoiceCreate.tsx:92
 msgid "Choose a file first."
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/apps/setup/StorageStep.tsx:183
+msgid "Choose a folder"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/setup/StorageStep.tsx:167
+msgid "Choose a folder in the window that just opened."
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/shell/pages/settings/DeviceAppearanceControl.tsx:27
 msgid "Choose a look for this browser. It does not change your personal setting."
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/clock/TimersTab.tsx:175
+msgid "Choose a name and duration."
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/reminders/ListMenu.tsx:43
+msgid "Choose a name for this list."
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -4170,6 +4738,11 @@ msgid "Choose an end date on or after the first maintenance date."
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/apps/reminders/ListMenu.tsx:52
+msgid "Choose an icon for {title}."
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/shell/pages/status/StatusBoard.tsx:96
 msgid "Choose at least one day for the weekly schedule."
 msgstr ""
@@ -4187,6 +4760,11 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/shell/pages/FilesPage.tsx:351
 msgid "Choose files to add"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/setup/StorageStep.tsx:23
+msgid "Choose Home's data folder"
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -4227,6 +4805,16 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:563
 msgid "setting.host.guard.mode.help"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/setup/SetupWizard.tsx:89
+msgid "Choose one computer, or add a bigger one for the AI."
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/setup/StorageStep.tsx:22
+msgid "Choose the AI models folder"
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -4315,6 +4903,16 @@ msgid "setting.reference.download.when.help"
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/apps/clock/AlarmEditor.tsx:73
+msgid "Choose when this alarm rings."
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/setup/SetupWizard.tsx:59
+msgid "Choose where to store data"
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:1262
 msgid "setting.tools.lists.mode.help"
 msgstr ""
@@ -4337,6 +4935,11 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:795
 msgid "setting.person.voice_print.enrollment.help"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/setup/SetupWizard.tsx:96
+msgid "Choose whether to set up Coding on this computer."
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -4502,6 +5105,11 @@ msgid "Chosen people"
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/apps/clock/WorldClocksTab.tsx:169
+msgid "City"
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/apps/settings/styles/StyleBrowser.tsx:103
 #: src/apps/settings/styles/StyleConfirm.tsx:88
 #: src/apps/settings/styles/StylesTab.tsx:194
@@ -4530,6 +5138,11 @@ msgid "Civitai key"
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/apps/setup/SetupWizard.tsx:483
+msgid "Claude Code · same key"
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/shell/pages/status/StatusBoard.tsx:43
 #: src/shell/pages/UiShowcasePage.tsx:97
 msgid "Clear"
@@ -4541,6 +5154,8 @@ msgid "Clear {name}"
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/apps/memory/PersonMemories.tsx:379
+#: src/apps/notifications/NotificationsPage.tsx:158
 #: src/apps/settings/FreeUpSpaceDialog.tsx:80
 #: src/shell/pages/StoragePage.tsx:203
 #: src/shell/pages/StoragePage.tsx:213
@@ -4555,6 +5170,11 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/shell/pages/StoragePage.tsx:208
 msgid "Clear all saved online data?"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/reminders/ListMain.tsx:72
+msgid "Clear done"
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -4605,9 +5225,15 @@ msgid "area.Clock"
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/apps/clock/ClockPage.tsx:40
+msgid "Clock sections"
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/apps/settings/EngineLinkCredentialSection.tsx:287
 #: src/apps/settings/FreeUpSpaceDialog.tsx:97
 #: src/apps/settings/StackChanInstallDialog.tsx:152
+#: src/apps/setup/AwayFromHome.tsx:175
 #: src/shell/AmbientCompanionPane.tsx:255
 #: src/shell/pages/ChatPage.tsx:1707
 #: src/shell/pages/MusicWorkspacePage.tsx:162
@@ -4624,6 +5250,7 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/apps/settings/CloseAppsSettings.tsx:86
 #: src/apps/settings/CloseAppsSettings.tsx:88
+#: src/apps/setup/SetupWizard.tsx:67
 msgid "Close apps for big jobs"
 msgstr ""
 
@@ -4664,6 +5291,11 @@ msgid "Coding app"
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/apps/setup/SetupWizard.tsx:485
+msgid "Coding apps you install"
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:91
 msgid "setting.coding.api.away.label"
 msgstr ""
@@ -4694,6 +5326,11 @@ msgid "Coding is waiting for its helper to start. The Status page shows what is 
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/apps/setup/SetupWizard.tsx:478
+msgid "Coding mode gives most of this computer's memory to one big coding model, which also answers chat, and pictures, videos and songs wait while it is on."
+msgstr ""
+
+#. js-lingui-explicit-id
 #: ../backend/src/lib/apiErrorCopy.ts:34
 msgid "api.error.coding_mode_is_max"
 msgstr ""
@@ -4721,6 +5358,16 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/apps/settings/CodingSettings.tsx:161
 msgid "Coding needs these pieces."
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/setup/SetupWizard.tsx:65
+msgid "Coding on this Home"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/setup/SetupWizard.tsx:479
+msgid "Coding parts to install"
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -4791,6 +5438,7 @@ msgid "setting.news.default_topics.teen.option.business"
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/apps/library/appPresentation.ts:9
 #: src/apps/settings/RobotCompanionChoices.tsx:62
 #: src/apps/settings/RobotCompanionChoices.tsx:64
 #: src/shell/pages/CompanionsPage.tsx:172
@@ -4886,6 +5534,11 @@ msgid "Confirm"
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/apps/people/NewPersonForm.tsx:128
+msgid "Confirm passcode"
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/shell/pages/UpdatesPage.tsx:195
 msgid "Confirm rollback."
 msgstr ""
@@ -4925,6 +5578,10 @@ msgid "Connection"
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/apps/setup/AwayFromHome.tsx:185
+#: src/apps/setup/CloseAppsStep.tsx:64
+#: src/apps/setup/SetupReviewPage.tsx:63
+#: src/apps/setup/SetupWizard.tsx:502
 #: src/shell/AmbientCompanionPane.tsx:255
 #: src/shell/pages/companionFlow/AnimateStep.tsx:153
 #: src/shell/pages/CompanionsPage.tsx:135
@@ -5018,6 +5675,7 @@ msgstr ""
 #: src/apps/settings/CodingSettings.tsx:231
 #: src/apps/settings/EngineLinkCredentialSection.tsx:73
 #: src/apps/settings/ModelsSection.tsx:280
+#: src/apps/setup/SetupWizard.tsx:483
 msgid "Copied"
 msgstr ""
 
@@ -5035,6 +5693,7 @@ msgstr ""
 #: src/apps/settings/CodingSettings.tsx:231
 #: src/apps/settings/CodingSettings.tsx:231
 #: src/apps/settings/EngineLinkCredentialSection.tsx:73
+#: src/apps/setup/SetupWizard.tsx:483
 msgid "Copy"
 msgstr ""
 
@@ -5042,6 +5701,11 @@ msgstr ""
 #: src/shell/pages/ChatPage.tsx:1706
 #: src/shell/pages/TurnErrorDetails.tsx:94
 msgid "Copy details"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/setup/SetupWizard.tsx:483
+msgid "Copy is not available in this browser. Select the key and copy it."
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -5095,6 +5759,12 @@ msgid "Could not approve that code."
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/apps/memory/PersonMemories.tsx:211
+#: src/apps/memory/PersonMemories.tsx:356
+msgid "Could not archive that memory. Check your connection and try again."
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/apps/chat/chatThreadListAdapter.ts:183
 msgid "Could not archive this chat. Try again."
 msgstr ""
@@ -5145,8 +5815,18 @@ msgid "Could not change this companion's status. Check your connection and try a
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/apps/memory/PersonMemories.tsx:317
+msgid "Could not change who may hear that memory. Check your connection and try again."
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/apps/settings/UsersSection.tsx:461
 msgid "Could not check {name}'s files. Their files will be deleted with them unless someone else can see them."
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/setup/AwayFromHome.tsx:190
+msgid "Could not check or update Tailscale"
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -5167,6 +5847,11 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/shell/pages/status/StatusBoard.tsx:37
 msgid "Could not clear the note."
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/notifications/NotificationsPage.tsx:97
+msgid "Could not clear those notifications."
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -5224,6 +5909,11 @@ msgid "Could not delete the quick timer."
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/apps/people/VoiceEnrollmentBody.tsx:63
+msgid "Could not delete the voice sample."
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/shell/pages/ChatPage.tsx:930
 msgid "Could not delete this chat. Try again."
 msgstr ""
@@ -5244,13 +5934,29 @@ msgid "Could not discard Incognito chats. Try again."
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/apps/notifications/NotificationsPage.tsx:80
+msgid "Could not dismiss that notification."
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/shell/pages/RepairsPage.tsx:89
 msgid "Could not dismiss that repair."
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/apps/memory/PersonMemories.tsx:184
+msgid "Could not export those memories. Check your connection and try again."
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/shell/pages/RepairsPage.tsx:73
 msgid "Could not fix that repair."
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/memory/PersonMemories.tsx:198
+#: src/apps/memory/PersonMemories.tsx:343
+msgid "Could not forget those memories. Check your connection and try again."
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -5271,6 +5977,11 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/shell/pages/CompanionsPage.tsx:283
 msgid "Could not load activity. Check your connection and try again."
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/clock/AlarmsTab.tsx:71
+msgid "Could not load alarms. Check your connection and try again."
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -5339,6 +6050,16 @@ msgid "Could not load projects. Try again."
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/apps/clock/TimersTab.tsx:148
+msgid "Could not load quick timers. Check your connection and try again."
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/reminders/RemindersPage.tsx:183
+msgid "Could not load reminders. Check your connection and try again."
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/shell/pages/RepairsPage.tsx:128
 msgid "Could not load repairs."
 msgstr ""
@@ -5351,6 +6072,11 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/shell/pages/settings/SettingsRenderer.tsx:192
 msgid "Could not load settings."
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/people/FaceEnrollmentBody.tsx:29
+msgid "Could not load setup status."
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -5374,6 +6100,11 @@ msgid "Could not load tasks. Check your connection and try again."
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/apps/clock/AlarmsTab.tsx:70
+msgid "Could not load the clock. Check your connection and try again."
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/shell/pages/CompanionsPage.tsx:115
 msgid "Could not load the companions. Check your connection and try again."
 msgstr ""
@@ -5381,6 +6112,16 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/apps/settings/HuggingFaceTokenSection.tsx:43
 msgid "Could not load the current status."
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/people/FaceEnrollmentPage.tsx:682
+msgid "Could not load the face models"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/people/FaceEnrollmentPage.tsx:251
+msgid "Could not load the household"
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -5446,6 +6187,11 @@ msgid "Could not load this robot's companion. Check the connection and try again
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/apps/memory/PersonMemories.tsx:243
+msgid "Could not load those memories."
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/shell/pages/dashboard/TodaySection.tsx:49
 msgid "Could not load Today. Refresh Home to try again."
 msgstr ""
@@ -5456,8 +6202,18 @@ msgid "Could not load updates."
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/apps/people/VoiceEnrollmentBody.tsx:73
+msgid "Could not load voice samples."
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/shell/pages/PersonProfilePage.tsx:150
 msgid "Could not load what's been shared."
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/clock/WorldClocksTab.tsx:137
+msgid "Could not load world clocks."
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -5488,6 +6244,16 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/shell/pages/dashboard/HomeShelves.tsx:54
 msgid "Could not load your library. Refresh Home to try again."
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/memory/PersonMemories.tsx:414
+msgid "Could not load your memories."
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/notifications/NotificationsPage.tsx:120
+msgid "Could not load your notification history."
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -5723,6 +6489,11 @@ msgid "Could not save the alarm."
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/apps/people/submitEmbeddings.ts:46
+msgid "Could not save the enrollment."
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/apps/settings/AiGlance.tsx:101
 msgid "Could not save the levels. Check that Home is running, then try again."
 msgstr ""
@@ -5745,6 +6516,11 @@ msgid "Could not save this robot. Check the connection and try again."
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/apps/people/VoiceEnrollmentBody.tsx:48
+msgid "Could not save this sample."
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/shell/pages/CompanionsPage.tsx:356
 msgid "Could not save this voice. Check your connection and try again."
 msgstr ""
@@ -5763,6 +6539,11 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/apps/settings/UsersSection.tsx:170
 msgid "Could not save those changes."
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/people/ProfileForm.tsx:156
+msgid "Could not save those changes. Check your connection and try again."
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -5838,6 +6619,11 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/apps/settings/TwoStepSignInSection.tsx:28
 msgid "Could not start setup. Try again."
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/people/FaceEnrollmentPage.tsx:680
+msgid "Could not start the camera"
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -5971,6 +6757,11 @@ msgid "Create a companion"
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/apps/reminders/CreateListSheet.tsx:31
+msgid "Create a list"
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/shell/pages/companionFlow/CompanionFlowDialog.tsx:14
 msgid "Create Character"
 msgstr ""
@@ -5981,9 +6772,32 @@ msgid "Create command"
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/apps/setup/StorageStep.tsx:31
+msgid "Create folder"
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/apps/settings/CodingSettings.tsx:222
 #: src/apps/settings/CodingSettings.tsx:230
 msgid "Create key"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/reminders/CreateListSheet.tsx:41
+#: src/apps/reminders/ListColumn.tsx:21
+#: src/apps/reminders/RemindersPage.tsx:26
+msgid "Create list"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/setup/SetupWizard.tsx:482
+msgid "Create my key"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/setup/SetupWizard.tsx:472
+#: src/apps/setup/SetupWizard.tsx:502
+msgid "Create owner account"
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -5992,8 +6806,23 @@ msgid "Create song"
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/apps/setup/SetupWizard.tsx:95
+msgid "Create the account that manages this Home."
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/setup/SetupWizard.tsx:64
+msgid "Create your owner account"
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/apps/settings/CodingSettings.tsx:224
 msgid "Created"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/setup/SetupWizard.tsx:482
+msgid "Creating"
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -6181,6 +7010,11 @@ msgid "setting.storage.library.trash_days.label"
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/apps/clock/WorldClocksTab.tsx:152
+msgid "Daytime"
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:487
 msgid "setting.generation.picture_quality.does"
 msgstr ""
@@ -6241,6 +7075,17 @@ msgid "setting.tts.voice_id.option_label.default"
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/apps/clock/AlarmEditor.tsx:98
+#: src/apps/clock/AlarmEditor.tsx:107
+msgid "Default"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/setup/StorageStep.tsx:165
+msgid "Default folder"
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:1252
 msgid "setting.storage.person.default_cap_bytes.label"
 msgstr ""
@@ -6265,6 +7110,10 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/apps/chat/chatHeaderBar.tsx:222
 #: src/apps/chat/chatHeaderBar.tsx:313
+#: src/apps/clock/AlarmEditor.tsx:115
+#: src/apps/clock/TimersTab.tsx:165
+#: src/apps/people/VoiceEnrollmentBody.tsx:76
+#: src/apps/reminders/ListMenu.tsx:38
 #: src/apps/settings/CommandsSection.tsx:197
 #: src/apps/settings/VoiceManagerSection.tsx:121
 #: src/shell/library/LibraryItems.tsx:38
@@ -6283,6 +7132,8 @@ msgid "Delete ‘{name}’?"
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/apps/clock/TimersTab.tsx:184
+#: src/apps/reminders/RemindersPage.tsx:174
 #: src/shell/pages/CompanionsPage.tsx:153
 msgid "Delete {name}?"
 msgstr ""
@@ -6290,6 +7141,16 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/apps/settings/VoiceManagerSection.tsx:154
 msgid "Delete {value}?"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/clock/AlarmEditor.tsx:119
+msgid "Delete alarm"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/people/VoiceEnrollmentBody.tsx:77
+msgid "Delete all samples"
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -6311,6 +7172,11 @@ msgid "Delete forever?"
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/apps/reminders/RemindersPage.tsx:179
+msgid "Delete list"
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/apps/settings/styles/stylesShared.tsx:31
 msgid "Delete now"
 msgstr ""
@@ -6319,6 +7185,11 @@ msgstr ""
 #: src/shell/pages/MusicWorkspacePage.tsx:179
 #: src/shell/pages/MusicWorkspacePage.tsx:181
 msgid "Delete song"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/clock/AlarmEditor.tsx:119
+msgid "Delete this alarm?"
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -6332,11 +7203,18 @@ msgid "Delete this file forever?"
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/apps/clock/TimersTab.tsx:184
+msgid "Delete timer"
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/apps/settings/VoiceManagerSection.tsx:159
 msgid "Delete voice"
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/apps/clock/AlarmEditor.tsx:119
+#: src/apps/clock/TimersTab.tsx:184
 #: src/shell/library/LibraryTrash.tsx:26
 #: src/shell/pages/MusicStudioPages.tsx:194
 #: src/shell/pages/MusicWorkspacePage.tsx:181
@@ -6549,6 +7427,11 @@ msgid "setting.alarms.sound.option_label.digital"
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/apps/clock/AlarmEditor.tsx:98
+msgid "Digital"
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:310
 msgid "setting.engines.chat.choice.does"
 msgstr ""
@@ -6642,6 +7525,7 @@ msgstr ""
 
 #. js-lingui-explicit-id
 #: src/apps/chat/chatThreadSlots.tsx:182
+#: src/apps/notifications/NotificationsPage.tsx:215
 #: src/shell/library/LibraryUploads.tsx:75
 #: src/shell/library/LibraryUploads.tsx:76
 #: src/shell/NotificationBell.tsx:248
@@ -6655,8 +7539,23 @@ msgid "Dismiss \"{title}\"?"
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/apps/notifications/NotificationsPage.tsx:211
+msgid "Dismiss {text}"
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/shell/NotificationBell.tsx:233
 msgid "Dismiss all"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/notifications/NotificationsPage.tsx:150
+msgid "Dismiss selected"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/notifications/NotificationsPage.tsx:192
+msgid "Dismissed"
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -6717,6 +7616,9 @@ msgid "setting.notifications.file_shared.muted_senders.label"
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/apps/people/FaceEnrollmentPage.tsx:602
+#: src/apps/reminders/ComingUpRow.tsx:43
+#: src/apps/reminders/ComingUpRow.tsx:58
 #: src/apps/settings/AddRobotSection.tsx:212
 #: src/apps/settings/AddRobotSection.tsx:228
 #: src/apps/settings/AiJobSummary.tsx:86
@@ -6724,6 +7626,8 @@ msgstr ""
 #: src/apps/settings/EngineLinkCredentialSection.tsx:21
 #: src/apps/settings/StackChanInstallDialog.tsx:150
 #: src/apps/settings/StackChanInstallDialog.tsx:152
+#: src/apps/setup/AwayFromHome.tsx:185
+#: src/apps/setup/SetupReviewPage.tsx:63
 #: src/shell/AlarmRinger.tsx:59
 #: src/shell/pages/companionFlow/KeyframeEditor.tsx:96
 #: src/shell/pages/settings/SettingsAreaPage.tsx:274
@@ -6732,6 +7636,12 @@ msgid "Done"
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/apps/reminders/ListMain.tsx:67
+msgid "Done ({count})"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/people/FaceEnrollmentPage.tsx:71
 #: src/apps/settings/PerformanceCustomize.tsx:58
 #: src/shell/pages/status/StatusComponents.tsx:67
 msgid "Down"
@@ -6750,6 +7660,7 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/apps/chat/chatToolUis.tsx:106
 #: src/apps/settings/BackupsSection.tsx:91
+#: src/apps/setup/SetupWizard.tsx:491
 #: src/shell/library/LibraryItems.tsx:33
 #: src/shell/library/LibraryViewer.tsx:157
 #: src/shell/library/LibraryViewer.tsx:157
@@ -6791,6 +7702,11 @@ msgid "Download original"
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/apps/setup/PlanStep.tsx:116
+msgid "Download started. Watch it in the bar at the top of this page; you can keep using Home while it finishes."
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/shell/components/DataTableControls.tsx:29
 #: src/shell/pages/RepairsPage.tsx:139
 #: src/shell/pages/useDataTableControls.tsx:104
@@ -6800,6 +7716,11 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:1492
 msgid "area.Download Wikipedia, health and other offline books"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/setup/SetupWizard.tsx:491
+msgid "Download your backup key to continue."
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -6976,6 +7897,11 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/shell/pages/PersonProfilePage.tsx:91
 msgid "Edit {name}’s profile"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/clock/AlarmEditor.tsx:72
+msgid "Edit alarm"
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -7156,6 +8082,21 @@ msgid "setting.person.locale.option.en-US"
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/apps/people/FaceEnrollmentBody.tsx:33
+msgid "Enroll"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/people/FaceEnrollmentPage.tsx:278
+msgid "Enroll person"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/people/FaceEnrollmentPage.tsx:739
+msgid "Enrollment progress"
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:1376
 msgid "setting.ui.enrollment_sounds.label"
 msgstr ""
@@ -7163,6 +8104,11 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/apps/settings/TwoStepSignInSection.tsx:52
 msgid "Enter a code to turn it off"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/people/NewPersonForm.tsx:120
+msgid "Enter a PIN or password"
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -7292,8 +8238,18 @@ msgid "Every child protection applies, whichever companion is chosen."
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/apps/clock/AlarmRecordRow.tsx:11
+msgid "Every day"
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/shell/pages/MusicStudioPages.tsx:194
 msgid "Every earlier version is kept, so it can be brought back."
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/clock/ClockPage.tsx:18
+msgid "Every moment, counted."
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -7327,6 +8283,7 @@ msgid "Everyday use. Home keeps working normally."
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/apps/memory/PersonMemories.tsx:42
 #: src/shell/pages/CompanionAudienceDialog.tsx:52
 msgid "Everyone"
 msgstr ""
@@ -7380,6 +8337,11 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/shell/pages/status/StatusBanner.tsx:16
 msgid "Everything is running. Up for {uptime}."
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/setup/SetupWizard.tsx:84
+msgid "Everything looks ready."
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -7452,6 +8414,11 @@ msgid "Export"
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/apps/memory/PersonMemories.tsx:222
+msgid "Export {personName}'s memories"
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/shell/pages/MusicWorkspacePage.tsx:133
 msgid "Extend"
 msgstr ""
@@ -7499,6 +8466,11 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:1497
 msgid "area.Face enrollment"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/people/FaceEnrollmentBody.tsx:26
+msgid "Face recognition"
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -7726,6 +8698,11 @@ msgid "Fingerprint"
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/apps/setup/SetupWizard.tsx:486
+msgid "Finish"
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/shell/pages/settings/SettingsAreaPage.tsx:261
 #: src/shell/pages/settings/SettingsAreaPage.tsx:265
 msgid "Finish setting up"
@@ -7899,9 +8876,31 @@ msgid "Forget {name}?"
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/apps/memory/PersonMemories.tsx:223
+msgid "Forget everything about {personName}"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/memory/PersonMemories.tsx:228
+msgid "Forget everything MaiPai remembers about {personName}?"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/memory/PersonMemories.tsx:371
+msgid "Forget selected"
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/apps/settings/HouseholdRobotsSection.tsx:189
 #: src/apps/settings/HouseholdRobotsSection.tsx:189
 msgid "Forget this robot"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/memory/PersonMemories.tsx:231
+#: src/apps/memory/PersonMemories.tsx:389
+#: src/apps/memory/PersonMemories.tsx:401
+msgid "Forgetting…"
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -7965,6 +8964,11 @@ msgid "setting.storage.library.videos.mode.option_label.until_storage_threshold"
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/apps/setup/PlanDiskSummary.tsx:27
+msgid "Free space needed while it installs: about {needGb} GB (the total, 20 percent more, and room to unpack). Free space on this computer: {free}."
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/apps/settings/ReferenceLibrarySettings.tsx:51
 msgid "Free textbooks and manuals."
 msgstr ""
@@ -8008,6 +9012,11 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/shell/library/TranscriptPanel.tsx:417
 msgid "From 0:00"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/people/FaceEnrollmentPage.tsx:67
+msgid "Frontal"
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -8157,6 +9166,17 @@ msgid "setting.alarms.sound.option_label.gentle"
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/apps/clock/AlarmEditor.tsx:98
+msgid "Gentle"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/clock/AlarmEditor.tsx:98
+#: src/apps/clock/AlarmRecordRow.tsx:34
+msgid "Gentle wake"
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:1283
 msgid "setting.topics.bodies.option_label.redirect"
 msgstr ""
@@ -8192,6 +9212,11 @@ msgid "Get a one-time code"
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/apps/setup/AwayFromHome.tsx:122
+msgid "Get Tailscale"
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/apps/settings/BackupsSection.tsx:247
 msgid "Getting it ready…"
 msgstr ""
@@ -8215,6 +9240,11 @@ msgstr ""
 #: src/shell/pages/dashboard/GettingStarted.tsx:24
 #: src/shell/pages/dashboard/GettingStarted.tsx:26
 msgid "Getting started"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/people/FaceEnrollmentPage.tsx:724
+msgid "Getting the camera and face models ready…"
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -8265,6 +9295,11 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/shell/pages/companionFlow/CompanionFlowDialog.tsx:16
 msgid "Give your companion a voice, personality, and history"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/reminders/CreateListSheet.tsx:31
+msgid "Give your list a name and an icon."
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -8334,6 +9369,7 @@ msgid "Go to Create Character"
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/apps/setup/AwayFromHome.tsx:81
 #: src/shell/pages/NotFoundPage.tsx:14
 msgid "Go to Home"
 msgstr ""
@@ -8351,6 +9387,21 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/shell/RailProfile.tsx:42
 msgid "Good"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/home/greeting.ts:23
+msgid "Good afternoon, {displayName}"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/home/greeting.ts:24
+msgid "Good evening, {displayName}"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/home/greeting.ts:22
+msgid "Good morning, {displayName}"
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -8381,6 +9432,11 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/shell/pages/ChatPage.tsx:1603
 msgid "Guard:"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/people/roles.ts:15
+msgid "Guest"
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -8501,6 +9557,11 @@ msgid "Hide details"
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/apps/reminders/ListMain.tsx:67
+msgid "Hide done"
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:1092
 msgid "setting.search.hosts.adult.deny.does"
 msgstr ""
@@ -8541,6 +9602,7 @@ msgid "setting.generation.styles.civitai_key.does"
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/apps/clock/WorldClocksTab.tsx:75
 #: src/shell/coreLabels.ts:7
 #: src/shell/pageHeaderTitle.tsx:90
 #: src/shell/pages/DashboardPage.tsx:25
@@ -8554,6 +9616,16 @@ msgid "Home"
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/apps/setup/AwayFromHome.tsx:160
+msgid "Home address unavailable"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/setup/SetupWizard.tsx:483
+msgid "Home address: {codingHome}/code/v1"
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/apps/settings/CodingSettings.tsx:228
 msgid "Home address: {home}/code/v1. Get the model name from GET /code/v1/models. Only use tools you trust with your key."
 msgstr ""
@@ -8561,6 +9633,11 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/apps/settings/styles/StyleEditor.tsx:123
 msgid "Home adds these to the person's words when they pick this style."
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/setup/SetupWizard.tsx:144
+msgid "Home and AI both run on this computer."
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -8604,6 +9681,26 @@ msgid "setting.home.base_url.label"
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/apps/setup/HostTuneStep.tsx:100
+msgid "Home can do these for you."
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/setup/CloseAppsStep.tsx:70
+msgid "Home can quit apps like Safari when a big job needs room, and open them again afterwards. An app with unsaved work stays open."
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/setup/CloseAppsStep.tsx:54
+msgid "Home can quit apps like Safari when a big job needs room, and open them again afterwards. That needs a small helper on this Mac."
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/setup/StorageStep.tsx:199
+msgid "Home can use this folder."
+msgstr ""
+
+#. js-lingui-explicit-id
 #: ../backend/src/lib/failureCopy.ts:26
 msgid "failure.voice.listening_engine.adultNoRepairs"
 msgstr ""
@@ -8621,13 +9718,33 @@ msgid "Home can't reach its voice service. Check Repairs, then come back."
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/apps/setup/SetupWizard.tsx:271
+#: src/apps/setup/SetupWizard.tsx:449
+#: src/apps/setup/SetupWizard.tsx:449
+msgid "Home can't read its setup progress. Refresh this page. If it keeps happening, restart MaiPai Home on this computer or run the installer again."
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/setup/StorageStep.tsx:189
+msgid "Home can't save files in this folder. Go up and pick a folder you own, or make a new one here."
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/shell/pages/MusicVoiceCreate.tsx:30
 msgid "Home can't speak right now. Try again in a minute."
 msgstr ""
 
 #. js-lingui-explicit-id
 #: src/apps/settings/HostTuneSettings.tsx:47
+#: src/apps/setup/HostTuneStep.tsx:131
+#: src/apps/setup/HostTuneStep.tsx:157
 msgid "Home can't tell what this is set to, so it leaves it alone."
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/setup/StorageStep.tsx:194
+#: src/apps/setup/StorageStep.tsx:208
+msgid "Home can't use this folder"
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -8646,8 +9763,18 @@ msgid "Home checked your computers and updated Health."
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/apps/setup/CloseAppsStep.tsx:74
+msgid "Home closes only the apps listed below, and only when a big job needs room."
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:846
 msgid "setting.resources.close_apps.mode.option.automatic"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/setup/CheckGrid.tsx:46
+msgid "Home computer"
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -8714,8 +9841,18 @@ msgid "Home could not clear the saved copies. Check that Home is running and try
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/apps/setup/CloseAppsStep.tsx:28
+msgid "Home could not close a test app, so Close apps stays Off. You can try again later under Settings, then AI and models, then Performance."
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/apps/settings/styles/StyleEditor.tsx:102
 msgid "Home could not confirm that. Try again."
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/setup/SetupWizard.tsx:223
+msgid "Home could not create your key. Try again."
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -8729,6 +9866,11 @@ msgid "Home could not do that. Check that Home is running, then try again."
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/apps/setup/AwayFromHome.tsx:160
+msgid "Home could not find its secure address. Refresh the status and try again."
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/apps/settings/FreeUpMemory.tsx:27
 msgid "Home could not free memory just now. Try again in a moment."
 msgstr ""
@@ -8736,6 +9878,11 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/apps/settings/HelperStatusRow.tsx:10
 msgid "Home could not install the helper. Press Install helper to try again."
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/setup/SetupWizard.tsx:476
+msgid "Home could not load coding setup. Refresh this page and try again."
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -8821,6 +9968,7 @@ msgstr ""
 
 #. js-lingui-explicit-id
 #: src/apps/settings/CodingSettings.tsx:89
+#: src/apps/setup/SetupWizard.tsx:217
 msgid "Home could not run the coding test. Try again."
 msgstr ""
 
@@ -8831,6 +9979,11 @@ msgstr ""
 #: src/apps/settings/PerformanceCustomize.tsx:40
 #: src/apps/settings/PerformanceSettings.tsx:29
 msgid "Home could not save that change. Check your connection and try again."
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/setup/PerformanceStep.tsx:21
+msgid "Home could not save that choice. Check your connection and try again; you can also change it later under Settings, then AI and models, then Performance."
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -8846,6 +9999,11 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/apps/settings/styles/StyleEditor.tsx:50
 msgid "Home could not save that. Check the Home connection, then try again."
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/setup/SetupWizard.tsx:211
+msgid "Home could not save this choice. Try again."
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -8875,13 +10033,59 @@ msgid "Home could not update coding mode. Try again."
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/apps/setup/SetupWizard.tsx:431
+msgid "Home couldn't allow Tailscale for the engine link. Sign in as an owner or admin, then try again."
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/setup/HostTuneStep.tsx:18
+msgid "Home couldn't change that setting."
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/setup/StorageStep.tsx:90
+msgid "Home couldn't check that folder. Choose it again, or keep the default folder."
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/setup/SetupWizard.tsx:75
+msgid "Home couldn't check these computers."
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/setup/SetupWizard.tsx:76
+msgid "Home couldn't check this computer."
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/setup/StorageStep.tsx:205
+msgid "Home couldn't check your choice"
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/shell/pages/RepairsPage.tsx:105
 msgid "Home couldn't check your computers. Check the engine connection, then try again."
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/apps/setup/SetupReviewPage.tsx:40
+msgid "Home couldn't load these setup choices. Refresh this page and try again."
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/setup/SetupWizard.tsx:492
+msgid "Home couldn't make the certificate for your other devices. Phones and tablets can still use Home from this computer's address for now. Open Home settings, Repairs to fix it."
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/apps/settings/BackupsSection.tsx:18
+#: src/apps/setup/SetupWizard.tsx:491
 msgid "Home couldn't make your backup key. Press Download again. If it fails again, Home will show a fix under Home settings, Repairs."
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/setup/StorageStep.tsx:20
+msgid "Home couldn't open that folder. Go up a level or pick another folder, then try again."
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -8890,8 +10094,48 @@ msgid "Home couldn't reach that address. Check it and that the search service is
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/apps/setup/PlanStep.tsx:127
+msgid "Home couldn't reach the AI engine to build a plan. Wait a minute, then press Check again."
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/setup/HostTuneStep.tsx:67
+msgid "Home couldn't read this computer"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/setup/HostTuneStep.tsx:13
+msgid "Home couldn't read this computer's tuning options. Press Try again, or skip this step. Home works without it."
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/setup/SetupWizard.tsx:491
+msgid "Home couldn't save that choice. Try again. If it fails again, Home will show a fix under Home settings, Repairs."
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/setup/SetupReviewPage.tsx:50
+msgid "Home couldn't save this choice. Check the engine link in Home settings, then try again."
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/setup/SetupWizard.tsx:350
+msgid "Home couldn't save this step. Try again."
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/apps/settings/ModelsAndStorageSection.tsx:143
 msgid "Home couldn't save your accept. Check that the engine is running, then press Accept again."
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/setup/SetupWizard.tsx:408
+msgid "Home couldn't save your account. Check the name and PIN, then press Create owner account again."
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/setup/SetupWizard.tsx:380
+msgid "Home couldn't save your acknowledgement. Press I understand again."
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -8905,13 +10149,43 @@ msgid "failure.voice.speaking_failed.adultNoRepairs"
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/apps/setup/PlanStep.tsx:121
+msgid "Home couldn't start the download. Press Install again."
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/apps/settings/ModelsAndStorageSection.tsx:147
 msgid "Home couldn't start the extras. Check that the engine is running, then try again."
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/apps/setup/AwayFromHome.tsx:101
+msgid "Home couldn't turn on away access. Try again."
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/setup/WebSearchStep.tsx:15
+msgid "Home couldn't turn on DuckDuckGo search. Press Skip for now again to go on, or set up web search later in Settings."
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/setup/SetupWizard.tsx:122
+msgid "Home does not censor content in code. The AI model decides what it will answer or create, including pictures, videos, songs, and companion media. Home still applies account access, age and surface availability, and technical limits."
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/apps/settings/CodingSettings.tsx:159
 msgid "Home downloads these parts to this computer. Home does not install a coding app."
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/setup/SetupWizard.tsx:126
+msgid "Home fetches downloads, updates, and searches you ask for the way you would. Some sites limit, block, or disallow automated visits, so now and then a site may not work."
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/setup/SetupWizard.tsx:126
+msgid "Home goes online for you"
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -8931,6 +10205,22 @@ msgid "Home installs no coding tool."
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/apps/setup/SetupWizard.tsx:350
+#: src/apps/setup/SetupWizard.tsx:408
+msgid "Home is already set up. Sign in instead."
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/setup/SetupWizard.tsx:88
+msgid "Home is built to protect your family and your data. Like any AI or online tool, it works best when you know a few things."
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/setup/SetupWizard.tsx:92
+msgid "Home is checking that everything is ready."
+msgstr ""
+
+#. js-lingui-explicit-id
 #: ../backend/src/lib/failureCopy.ts:204
 msgid "failure.composer.mode_change.more"
 msgstr ""
@@ -8938,6 +10228,16 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/apps/settings/CodingSettings.tsx:133
 msgid "Home is loading the large model, checking it, and switching back. This takes a few minutes. You can leave this page."
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/setup/AwayFromHome.tsx:147
+msgid "Home is ready to turn on its secure address."
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/setup/PlanStep.tsx:125
+msgid "Home is setting up the AI engine on this computer. Now: {stage}. This page continues by itself when it is ready."
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -9001,8 +10301,18 @@ msgid "setting.resources.close_apps.mode.option.off"
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/apps/setup/CloseAppsStep.tsx:73
+msgid "Home never closes an app. You can change this later in Settings."
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/apps/settings/CloseAppsSettings.tsx:40
 msgid "Home never quits these, even if they are also on the Always close list."
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/setup/SetupWizard.tsx:99
+msgid "Home only downloads what fits here."
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -9013,6 +10323,16 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:109
 msgid "setting.coding.engine.option.auto"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/setup/SetupWizard.tsx:144
+msgid "Home runs on this computer. The AI runs on a bigger, more powerful computer on your network. You pair it on the last screen of setup."
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/setup/StorageStep.tsx:22
+msgid "Home saves your pick, but for now downloads the AI models to its default folder."
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -9036,6 +10356,11 @@ msgid "Home stays up, but other big jobs wait their turn."
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/apps/setup/SetupWizard.tsx:145
+msgid "Home uses its ready-to-use default folder."
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/shell/pages/settings/SettingsSectionContent.tsx:50
 msgid "Home will restart after this is saved. {reach} Continue?"
 msgstr ""
@@ -9051,8 +10376,18 @@ msgid "Home will use DuckDuckGo for adults and the Library only for teens and ch
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/apps/setup/SetupWizard.tsx:145
+msgid "Home will use its default folder for AI models."
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/shell/pages/settings/WebSearchSettings.tsx:126
 msgid "Home will use the Library only until you add a SearXNG address."
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/setup/StorageStep.tsx:23
+msgid "Home's data"
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -9162,6 +10497,8 @@ msgstr ""
 
 #. js-lingui-explicit-id
 #: src/apps/settings/CodingSettings.tsx:136
+#: src/apps/setup/SetupWizard.tsx:485
+#: src/apps/setup/SetupWizard.tsx:485
 msgid "How"
 msgstr ""
 
@@ -9381,6 +10718,16 @@ msgid "setting.ease.reading_level.help"
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/apps/setup/SetupWizard.tsx:58
+msgid "How should Home run?"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/setup/SetupWizard.tsx:66
+msgid "How should Home share this computer?"
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/apps/chat/MusicCardView.tsx:79
 #: src/apps/chat/MusicCardView.tsx:79
 msgid "How should it change? For example: heavy metal"
@@ -9412,6 +10759,7 @@ msgid "How this was worked out"
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/apps/setup/WebSearchStep.tsx:67
 #: src/shell/pages/settings/WebSearchSettings.tsx:96
 msgid "http://searx.local:8888"
 msgstr ""
@@ -9583,6 +10931,11 @@ msgid "I have copied it"
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/apps/setup/PlanStep.tsx:159
+msgid "I have read it and I accept it"
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/apps/settings/styles/StyleAddFile.tsx:55
 #: src/apps/settings/styles/StyleConfirm.tsx:118
 msgid "I have read the licence and it lets us use this style at home"
@@ -9614,6 +10967,11 @@ msgid "failure.composer.memory.child"
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/apps/setup/SetupWizard.tsx:502
+msgid "I understand"
+msgstr ""
+
+#. js-lingui-explicit-id
 #: ../backend/src/lib/failureCopy.ts:201
 msgid "failure.composer.not_installed.child"
 msgstr ""
@@ -9639,6 +10997,11 @@ msgid "failure.composer.starting.child"
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/apps/reminders/CreateListSheet.tsx:35
+msgid "Icon"
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/shell/library/LibraryStorage.tsx:27
 msgid "Identical files count once."
 msgstr ""
@@ -9661,6 +11024,11 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/apps/settings/BackupsSection.tsx:87
 msgid "If this computer breaks, this file brings your Home back on a new one. Keep it somewhere other than this computer."
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/setup/SetupWizard.tsx:491
+msgid "If this computer breaks, this key restores your Home on a new one."
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -9793,6 +11161,16 @@ msgid "Install {label}"
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/apps/setup/PlanStep.tsx:43
+msgid "Install and continue"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/setup/AwayFromHome.tsx:13
+msgid "Install and sign in"
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/apps/settings/styles/StyleConfirm.tsx:136
 msgid "Install as a separate style"
 msgstr ""
@@ -9813,6 +11191,21 @@ msgid "Install style"
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/apps/setup/AwayFromHome.tsx:171
+msgid "Install Tailscale and sign in"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/setup/AwayFromHome.tsx:119
+msgid "Install Tailscale on this computer"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/setup/AwayFromHome.tsx:110
+msgid "Install Tailscale on your phone, sign in to the same account, then scan this code."
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/apps/settings/ModelsAndStorageSection.tsx:187
 msgid "Install the recommended extras ({size})"
 msgstr ""
@@ -9820,6 +11213,11 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:586
 msgid "setting.install.recommended_auto_on_upgrade.label"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/setup/AwayFromHome.tsx:120
+msgid "Install the Tailscale app to continue."
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -9838,6 +11236,8 @@ msgstr ""
 #: src/apps/settings/ReferenceLibrarySettings.tsx:261
 #: src/apps/settings/styles/StyleBrowser.tsx:102
 #: src/apps/settings/styles/StyleBrowser.tsx:102
+#: src/apps/setup/PlanStep.tsx:185
+#: src/apps/setup/SetupWizard.tsx:479
 #: src/shell/pages/EnginesPage.tsx:31
 #: src/shell/pages/UpdatesPage.tsx:50
 msgid "Installed"
@@ -9870,6 +11270,10 @@ msgstr ""
 #: src/apps/settings/CodingSettings.tsx:162
 #: src/apps/settings/CodingSettings.tsx:163
 #: src/apps/settings/ModelsAndStorageSection.tsx:41
+#: src/apps/setup/SetupWizard.tsx:479
+#: src/apps/setup/SetupWizard.tsx:479
+#: src/apps/setup/SetupWizard.tsx:481
+#: src/apps/setup/SetupWizard.tsx:481
 msgid "Installing"
 msgstr ""
 
@@ -9985,6 +11389,11 @@ msgid "It comes with its maker's licence ({name}). Read these points, then accep
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/apps/setup/SetupWizard.tsx:125
+msgid "It is easy to feel close to a chatbot or companion, so keep real relationships first and talk with children about it. In Home settings, under Users, you can turn off AI companions for one person or for the household."
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/shell/pages/FilesPage.tsx:379
 msgid "It is shared with everyone in the home."
 msgstr ""
@@ -10078,6 +11487,12 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:1368
 msgid "setting.tts.voice_id.option_label.juergen"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/setup/preview/SetupPreviewBar.tsx:34
+#: src/apps/setup/preview/SetupPreviewBar.tsx:36
+msgid "Jump to screen"
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -10181,6 +11596,21 @@ msgid "setting.health.keep_warm.label"
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/apps/setup/StorageStep.tsx:184
+msgid "Keep the default"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/setup/SetupWizard.tsx:90
+msgid "Keep the defaults or pick your own."
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/reminders/ListColumn.tsx:45
+msgid "Keep the little things somewhere safe, so you can stay with the moment."
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:1290
 msgid "setting.topics.family_stories.option_label.keep"
 msgstr ""
@@ -10191,6 +11621,8 @@ msgid "Keep the voice"
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/apps/memory/PersonMemories.tsx:393
+#: src/apps/memory/PersonMemories.tsx:405
 #: src/apps/settings/FreeUpSpaceDialog.tsx:113
 #: src/apps/settings/UsersSection.tsx:260
 #: src/apps/settings/UsersSection.tsx:383
@@ -10276,6 +11708,11 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:122
 msgid "setting.coding.keep_warm_minutes.label"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/clock/WorldClocksTab.tsx:140
+msgid "Keep your favorite places close."
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -10386,6 +11823,11 @@ msgid "area.Kids"
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/apps/setup/SetupWizard.tsx:124
+msgid "Kids may still see things they shouldn't"
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:708
 msgid "setting.news.lists.child.option_label.feeds-children"
 msgstr ""
@@ -10420,6 +11862,12 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:65
 msgid "setting.chat.kv_cache_override.label"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/clock/AlarmEditor.tsx:85
+#: src/apps/clock/AlarmEditor.tsx:86
+msgid "Label"
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -10465,6 +11913,16 @@ msgid "Language unavailable"
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/apps/clock/StopwatchTab.tsx:65
+msgid "Lap"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/clock/StopwatchTab.tsx:74
+msgid "Lap {number}"
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:239
 msgid "setting.ease.preset.option_label.large"
 msgstr ""
@@ -10477,6 +11935,11 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:291
 msgid "setting.ease.text_size.option.140"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/notifications/NotificationsPage.tsx:137
+msgid "Last 30 days"
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -10611,8 +12074,20 @@ msgid "setting.person.quiet_hours.to.help"
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/apps/people/ProfileForm.tsx:69
+#: src/apps/people/ProfileForm.tsx:80
+#: src/apps/people/ProfileForm.tsx:96
+msgid "Leave without saving?"
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:599
 msgid "setting.media.budget.exempt_bedtime_audio.does"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/people/FaceEnrollmentPage.tsx:68
+msgid "Left"
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -11011,8 +12486,18 @@ msgid "Lines that would change"
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/apps/reminders/RemindersPage.tsx:174
+msgid "list"
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:1261
 msgid "setting.tools.lists.mode.label"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/reminders/ListMenu.tsx:34
+msgid "List options"
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -11034,6 +12519,12 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:1184
 msgid "setting.stack.engines.stt.smart_turn.does"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/reminders/ListColumn.tsx:20
+#: src/apps/reminders/ListMain.tsx:51
+msgid "Lists"
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -11194,6 +12685,12 @@ msgid "Loading Coding access"
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/apps/setup/SetupWizard.tsx:476
+#: src/apps/setup/SetupWizard.tsx:476
+msgid "Loading coding setup"
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/apps/settings/CodingSettings.tsx:160
 msgid "Loading Coding setup"
 msgstr ""
@@ -11230,6 +12727,11 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/shell/pages/EnginesPage.tsx:175
 msgid "Loading engines"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/setup/StorageStep.tsx:36
+msgid "Loading folders"
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -11277,8 +12779,19 @@ msgid "Loading Media"
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/apps/memory/PersonMemories.tsx:247
+#: src/apps/memory/PersonMemories.tsx:418
+msgid "Loading memories"
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/shell/pages/FilesPage.tsx:323
 msgid "Loading more files"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/notifications/NotificationsPage.tsx:121
+msgid "Loading notifications"
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -11299,6 +12812,11 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/shell/pages/PersonProfilePage.tsx:58
 msgid "Loading profile"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/people/FaceEnrollmentPage.tsx:247
+msgid "Loading profile…"
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -11343,6 +12861,11 @@ msgstr ""
 #: src/shell/pages/settings/SettingsAreaPage.tsx:179
 #: src/shell/pages/settings/SettingsRenderer.tsx:193
 msgid "Loading settings"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/people/FaceEnrollmentBody.tsx:29
+msgid "Loading setup status"
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -11394,6 +12917,11 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/shell/pages/UpdatesPage.tsx:140
 msgid "Loading updates"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/people/VoiceEnrollmentBody.tsx:73
+msgid "Loading voice samples"
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -11543,6 +13071,16 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/shell/pages/DashboardPage.tsx:46
 msgid "Looking after your hub"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/setup/HostTuneStep.tsx:72
+msgid "Looking at this computer."
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/setup/PlanStep.tsx:128
+msgid "Looking at this computer…"
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -11709,6 +13247,17 @@ msgid "area.Maintenance"
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/apps/people/VoiceEnrollmentBody.tsx:69
+msgid "MaiPai can use numbers derived from your voice to recognize you. Your recordings are not kept."
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/people/FaceEnrollmentPage.tsx:682
+msgid "MaiPai couldn't get what it needs for face recognition. Check the connection and try again."
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/setup/SetupWizard.tsx:502
 #: src/shell/routeHeader.ts:50
 msgid "MaiPai Home"
 msgstr ""
@@ -11724,6 +13273,16 @@ msgid "MaiPai Home emergency backup key\n"
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/apps/setup/SetupWizard.tsx:313
+msgid "MaiPai Home emergency kit\n"
+"Home: {hubName}\n"
+"Home id: {hubInstanceId}\n"
+"Backup key: {backupKeyHex}\n"
+"Created: {generatedAt}\n"
+""
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/apps/privacy/privacyCopy.ts:14
 msgid "MaiPai Home itself"
 msgstr ""
@@ -11734,8 +13293,18 @@ msgid "MaiPai is checking on it."
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/apps/people/FaceEnrollmentPage.tsx:676
+msgid "MaiPai needs your camera to guide face enrollment. Turn on camera access for this site in your browser's settings, then try again."
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:379
 msgid "setting.engines.stack.url.label"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/people/FaceEnrollmentBody.tsx:26
+msgid "MaiPai uses this to recognise you when you are in front of the camera. It stays on your home hub."
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -12273,6 +13842,7 @@ msgid "Meet the companions and pick how your assistant sounds."
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/apps/memory/PersonMemories.tsx:84
 #: src/shell/coreLabels.ts:14
 msgid "Memories"
 msgstr ""
@@ -12351,6 +13921,11 @@ msgid "Microphone {number}"
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/apps/people/VoiceEnrollmentBody.tsx:52
+msgid "Microphone access is unavailable. Check your browser permission and try again."
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/shell/AmbientCompanionPane.tsx:255
 #: src/shell/pages/ChatPage.tsx:1694
 msgid "Microphone help"
@@ -12400,6 +13975,11 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/apps/settings/PerformanceCustomize.tsx:16
 msgid "minutes"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/clock/TimersTab.tsx:179
+msgid "Minutes"
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -12505,6 +14085,7 @@ msgstr ""
 
 #. js-lingui-explicit-id
 #: src/apps/chat/chatToolUis.tsx:100
+#: src/apps/clock/TimersTab.tsx:161
 #: src/apps/settings/styles/StyleEditor.tsx:126
 #: src/shell/AlarmRinger.tsx:63
 #: src/shell/pages/dashboard/TodaySection.tsx:108
@@ -12537,6 +14118,11 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:204
 msgid "setting.ease.contrast.help"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/clock/TimersTab.tsx:161
+msgid "More options for {name}"
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -12591,11 +14177,13 @@ msgid "Move {count} files to Trash?"
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/apps/clock/WorldClocksTab.tsx:156
 #: src/apps/settings/PerformanceCustomize.tsx:58
 msgid "Move {name} down"
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/apps/clock/WorldClocksTab.tsx:155
 #: src/apps/settings/PerformanceCustomize.tsx:57
 msgid "Move {name} up"
 msgstr ""
@@ -12712,6 +14300,11 @@ msgid "Muted"
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/apps/setup/SetupWizard.tsx:222
+msgid "My coding tool"
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/shell/pages/MusicStudioPages.tsx:174
 #: src/shell/pages/MusicStudioPages.tsx:175
 msgid "My creations"
@@ -12728,6 +14321,12 @@ msgid "setting.news.my_mix.label"
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/apps/clock/TimersTab.tsx:178
+#: src/apps/people/NewPersonForm.tsx:98
+#: src/apps/people/NewPersonForm.tsx:99
+#: src/apps/people/ProfileForm.tsx:167
+#: src/apps/reminders/CreateListSheet.tsx:33
+#: src/apps/reminders/ListMenu.tsx:45
 #: src/apps/settings/AddVoiceForm.tsx:42
 #: src/apps/settings/AssistantKeysSettings.tsx:81
 #: src/apps/settings/CodingSettings.tsx:224
@@ -12746,6 +14345,11 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/apps/settings/UsersSection.tsx:278
 msgid "Name for {name}"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/setup/StorageStep.tsx:30
+msgid "Name for the new folder"
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -12830,9 +14434,15 @@ msgstr ""
 
 #. js-lingui-explicit-id
 #: src/apps/settings/CodingSettings.tsx:162
+#: src/apps/setup/SetupWizard.tsx:479
 #: src/shell/pages/status/StatusApps.tsx:47
 #: src/shell/pages/status/StatusComponents.tsx:150
 msgid "Needs attention"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/setup/CheckGrid.tsx:31
+msgid "Needs fixing"
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -12945,6 +14555,16 @@ msgid "setting.topics.family_stories.option.keep"
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/apps/notifications/NotificationsPage.tsx:196
+msgid "New"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/clock/AlarmEditor.tsx:72
+msgid "New alarm"
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/apps/settings/CodingSettings.tsx:231
 msgid "New Coding key"
 msgstr ""
@@ -12963,6 +14583,11 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/shell/pages/MusicWorkspacePage.tsx:176
 msgid "New cover art"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/setup/StorageStep.tsx:29
+msgid "New folder"
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -13091,13 +14716,28 @@ msgid "Next"
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/apps/clock/AlarmsTab.tsx:29
+msgid "Next: {day} {time}, in {untilText}"
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:991
 msgid "setting.robot.night.mode.label"
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/apps/clock/WorldClocksTab.tsx:152
+msgid "Nighttime"
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/apps/settings/CapabilityTable.tsx:18
 msgid "No"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/people/roles.ts:135
+msgid "No accent"
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -13108,6 +14748,11 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/shell/pages/CompanionsPage.tsx:283
 msgid "No activity for {name} yet."
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/clock/AlarmsTab.tsx:74
+msgid "No alarms"
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -13148,6 +14793,11 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/apps/settings/ReferenceLibrarySettings.tsx:238
 msgid "No book for children or teens is removed."
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/people/FaceEnrollmentPage.tsx:678
+msgid "No camera found"
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -13284,13 +14934,28 @@ msgid "No one else in the household."
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/apps/people/FaceEnrollmentPage.tsx:260
+msgid "No one in this household has that profile"
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/shell/pages/PersonProfilePage.tsx:65
 msgid "No one in this household has that profile."
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/apps/people/FaceEnrollmentPage.tsx:242
+msgid "No one to enroll"
+msgstr ""
+
+#. js-lingui-explicit-id
 #: ../backend/src/lib/apiErrorCopy.ts:14
 msgid "api.error.no_secret_set"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/clock/WorldClocksTab.tsx:139
+msgid "No places yet"
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -13523,6 +15188,8 @@ msgid "Node"
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/apps/clock/AlarmEditor.tsx:98
+#: src/apps/clock/AlarmRecordRow.tsx:34
 #: src/shell/media/VisualizerMenu.tsx:23
 #: src/shell/pages/settings/HouseSettings.tsx:49
 #: src/shell/pages/settings/HouseSettings.tsx:50
@@ -13560,6 +15227,11 @@ msgid "Normal"
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/apps/setup/SetupWizard.tsx:477
+msgid "Normal keeps chat and pictures running as usual."
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/apps/settings/CodingSettings.tsx:54
 msgid "Normal mode is on. Chat, pictures, videos and songs run as usual."
 msgstr ""
@@ -13575,8 +15247,14 @@ msgid "setting.ease.text_size.option.100"
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/apps/memory/PersonMemories.tsx:338
 #: src/apps/settings/UsersSection.tsx:201
 msgid "not allowed"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/people/FaceEnrollmentPage.tsx:272
+msgid "Not allowed"
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -13606,10 +15284,16 @@ msgid "Not for this computer"
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/apps/setup/PlanStep.tsx:160
+msgid "Not for you? Choose the Standard level, or turn Videos off, above and nothing of it downloads."
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/apps/settings/CodingSettings.tsx:162
 #: src/apps/settings/ModelsAndStorageSection.tsx:47
 #: src/apps/settings/ReferenceLibrarySettings.tsx:261
 #: src/apps/settings/styles/StyleBrowser.tsx:102
+#: src/apps/setup/SetupWizard.tsx:479
 #: src/shell/pages/EnginesPage.tsx:30
 msgid "Not installed"
 msgstr ""
@@ -13624,6 +15308,11 @@ msgstr ""
 #: src/apps/settings/ModelsAndStorageSection.tsx:110
 #: src/apps/settings/ModelsAndStorageSection.tsx:173
 #: src/apps/settings/styles/stylesShared.tsx:24
+#: src/apps/setup/CloseAppsStep.tsx:56
+#: src/apps/setup/CloseAppsStep.tsx:73
+#: src/apps/setup/CloseAppsStep.tsx:73
+#: src/apps/setup/SetupWizard.tsx:481
+#: src/apps/setup/SetupWizard.tsx:481
 #: src/shell/pages/settings/SettingsAreaPage.tsx:276
 msgid "Not now"
 msgstr ""
@@ -13677,6 +15366,11 @@ msgstr ""
 #: src/shell/pages/settings/SettingField.tsx:121
 #: src/shell/pages/settings/SettingField.tsx:155
 msgid "Not set"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/people/FaceEnrollmentBody.tsx:32
+msgid "Not set up yet"
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -13772,6 +15466,11 @@ msgid "Nothing in {label} yet."
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/apps/notifications/NotificationsPage.tsx:132
+msgid "Nothing in the last 30 days."
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/shell/pages/CompanionAudienceDialog.tsx:15
 msgid "Nothing in the pictures or the personality would scare or confuse a young child."
 msgstr ""
@@ -13797,8 +15496,23 @@ msgid "Nothing needs you right now."
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/apps/reminders/ListMain.tsx:57
+msgid "Nothing on the list yet"
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/shell/NotificationBell.tsx:222
 msgid "Nothing pending."
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/memory/PersonMemories.tsx:246
+msgid "Nothing remembered about {personName} yet."
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/memory/PersonMemories.tsx:417
+msgid "Nothing remembered yet."
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -13818,9 +15532,19 @@ msgid "Nothing to clean up."
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/apps/setup/PlanStep.tsx:116
+msgid "Nothing to download: everything you ticked is already installed."
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/shell/pages/WikipediaPage.tsx:81
 #: src/shell/pages/WikipediaPage.tsx:123
 msgid "Nothing to suggest right now. Try a search."
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/people/FaceEnrollmentPage.tsx:780
+msgid "Nothing was changed: any earlier enrollment is still in place."
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -13839,6 +15563,12 @@ msgid "Nothing your family says is used to train anything."
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/apps/notifications/NotificationsPage.tsx:178
+msgid "Notification history"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/notifications/NotificationsPage.tsx:110
 #: src/shell/NotificationBell.tsx:200
 #: src/shell/NotificationBell.tsx:215
 #: src/shell/pageHeaderTitle.tsx:104
@@ -13879,6 +15609,8 @@ msgstr ""
 
 #. js-lingui-explicit-id
 #: src/apps/settings/HostTuneSettings.tsx:47
+#: src/apps/setup/HostTuneStep.tsx:124
+#: src/apps/setup/HostTuneStep.tsx:158
 msgid "Now: {current}. After: {proposed}."
 msgstr ""
 
@@ -13888,11 +15620,14 @@ msgid "setting.person.robot.topics.option_label.nudges"
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/apps/clock/AlarmRecordRow.tsx:46
 #: src/apps/settings/aiTierSlots.ts:83
+#: src/apps/setup/PlanStep.tsx:202
 msgid "off"
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/apps/clock/AlarmRecordRow.tsx:50
 #: src/apps/settings/AiJobSummary.tsx:38
 #: src/apps/settings/AiJobSummary.tsx:74
 #: src/apps/settings/AiSlotDialog.tsx:79
@@ -14192,6 +15927,12 @@ msgid "setting.ui.look.option_label.olive"
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/apps/clock/AlarmRecordRow.tsx:46
+#: src/apps/setup/PlanStep.tsx:202
+msgid "on"
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:63
 msgid "setting.chat.flash_attention_override.option_label.on"
 msgstr ""
@@ -14293,6 +16034,21 @@ msgid "On. This computer contacts civitai.com when you search or install."
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/apps/clock/AlarmRecordRow.tsx:10
+msgid "Once"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/clock/AlarmRecordRow.tsx:10
+msgid "Once · {day}"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/reminders/ComingUpRow.tsx:38
+msgid "Once · {weekday}"
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:1188
 msgid "setting.status.internet_probe.enabled.help"
 msgstr ""
@@ -14305,6 +16061,11 @@ msgstr ""
 #. js-lingui-explicit-id
 #: ../backend/src/lib/failureCopy.ts:426
 msgid "failure.ask_form.invalid"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/setup/SetupWizard.tsx:144
+msgid "One computer"
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -14425,6 +16186,11 @@ msgid "Only admins"
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/apps/people/FaceEnrollmentPage.tsx:271
+msgid "Only an owner or admin can enroll {display_name} for face recognition."
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/shell/pages/EnginesPage.tsx:147
 msgid "Only an owner or admin can manage engines."
 msgstr ""
@@ -14452,6 +16218,12 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/apps/settings/VoiceManagerSection.tsx:140
 msgid "Only the name changes. The recording stays the same, and everyone and every robot using this voice keeps it."
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/setup/AwayFromHome.tsx:72
+#: src/apps/setup/AwayFromHome.tsx:78
+msgid "Only the owner or an admin can set up away access."
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -14496,6 +16268,11 @@ msgstr ""
 #: src/shell/pages/MusicStudioView.tsx:160
 #: src/shell/pages/MusicStudioView.tsx:161
 msgid "Open Create"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/setup/AwayFromHome.tsx:141
+msgid "Open DNS settings"
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -14548,6 +16325,11 @@ msgid "Open licence. It lets a household use the style at home."
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/apps/setup/SetupWizard.tsx:502
+msgid "Open my Home"
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/shell/pages/WikipediaPage.tsx:171
 msgid "Open Offline data"
 msgstr ""
@@ -14593,6 +16375,11 @@ msgid "setting.news.reader_open.label"
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/apps/setup/AwayFromHome.tsx:130
+msgid "Open Tailscale on this computer and sign in. Home will check again automatically."
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:1404
 msgid "setting.ui.reasoning_open.help"
 msgstr ""
@@ -14606,6 +16393,26 @@ msgstr ""
 #: src/shell/pages/settings/SettingsAreaPage.tsx:76
 #: src/shell/pages/settings/SettingsAreaPage.tsx:87
 msgid "Open your settings"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/setup/SetupWizard.tsx:483
+msgid "OPENAI_BASE_URL={codingHome}/code/v1 OPENAI_API_KEY=maipai_key_...{hint} MODEL=$(curl -s {codingHome}/code/v1/models | jq -r '.data[0].id')"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/setup/SetupWizard.tsx:483
+msgid "OPENAI_BASE_URL={codingHome}/code/v1 OPENAI_API_KEY=maipai_key_...{hint} opencode"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/setup/SetupWizard.tsx:483
+msgid "OpenAI-compatible · same key"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/setup/SetupWizard.tsx:483
+msgid "OpenCode · same key"
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -14649,6 +16456,11 @@ msgid "Optional"
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/apps/setup/SetupWizard.tsx:98
+msgid "Optional. Not now is fine."
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:76
 msgid "setting.chat.paused_message.help"
 msgstr ""
@@ -14664,8 +16476,19 @@ msgid "setting.search.brave_api_key.help"
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/apps/setup/SetupWizard.tsx:91
+#: src/apps/setup/SetupWizard.tsx:94
+msgid "Optional. Skip it any time."
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/apps/settings/TwoStepSignInSection.tsx:47
 msgid "Or enter this setup link in your app:"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/people/roles.ts:122
+msgid "Orange"
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -14691,6 +16514,11 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/apps/settings/AiGlance.tsx:150
 msgid "Other apps"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/clock/TimersTab.tsx:128
+msgid "Other running timers"
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -14731,6 +16559,11 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:1527
 msgid "area.Overview"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/people/roles.ts:10
+msgid "Owner"
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -14783,6 +16616,11 @@ msgstr ""
 #: src/apps/settings/EngineLinkCredentialSection.tsx:215
 #: src/apps/settings/EngineLinkCredentialSection.tsx:221
 msgid "Pair engine computer"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/setup/SetupWizard.tsx:492
+msgid "Pair the computer that runs the AI. You can also do this later in Home settings, Engines and AI."
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -14866,6 +16704,11 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/shell/pages/EnginesPage.tsx:159
 msgid "PASS hop {id}: {detail}"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/people/NewPersonForm.tsx:136
+msgid "Passcodes match"
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -14956,6 +16799,11 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:1528
 msgid "area.People"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/setup/SetupWizard.tsx:125
+msgid "People can grow attached to AI"
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -15378,14 +17226,25 @@ msgid "PIN"
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/apps/people/NewPersonForm.tsx:121
 #: src/shell/pages/settings/settingsViews.tsx:72
 #: src/shell/sessionLockContext.tsx:98
 msgid "PIN or password"
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/apps/people/NewPersonForm.tsx:119
+msgid "PIN or password (required for {role})"
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/apps/settings/EngineLinkCredentialSection.tsx:268
 msgid "Pin this computer"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/people/roles.ts:123
+msgid "Pink"
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -15485,13 +17344,28 @@ msgid "setting.audio.speed.video.does"
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/apps/people/FaceEnrollmentPage.tsx:678
+msgid "Plug in a camera, or try this from a device that has one."
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/apps/settings/RobotBody.tsx:34
 msgid "Plugged in"
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/apps/library/appPresentation.ts:8
+msgid "Plugin"
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/apps/settings/RoutingStatsSection.tsx:27
 msgid "Plugin routing"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/clock/AlarmRecordRow.tsx:21
+msgid "PM"
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -15627,8 +17501,18 @@ msgid "setting.ease.word_help.help"
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/apps/setup/WebSearchStep.tsx:72
+msgid "Press Test to check this address. Continue turns on once it works."
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/shell/pages/settings/WebSearchSettings.tsx:101
 msgid "Press Test to check this address. Save turns on once it works."
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/setup/preview/SetupPreviewBar.tsx:44
+msgid "Pretend the next Tailscale step is done"
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -15647,6 +17531,11 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:200
 msgid "setting.companions.preview_shells.label"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/setup/preview/SetupPreviewBar.tsx:27
+msgid "Preview. Nothing is downloaded, installed or saved."
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -15765,6 +17654,11 @@ msgid "setting.resources.strict.video.does"
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/apps/setup/AwayFromHome.tsx:157
+msgid "QR code for your Home address away from home"
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/apps/chat/chatToolUis.tsx:770
 #: src/apps/chat/MusicCardView.tsx:82
 msgid "Quality"
@@ -15843,6 +17737,11 @@ msgid "Quick song"
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/apps/clock/TimersTab.tsx:147
+msgid "Quick timers"
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/shell/library/LibraryViewer.tsx:105
 msgid "Quiet"
 msgstr ""
@@ -15894,8 +17793,18 @@ msgid "Ratio"
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/apps/people/FaceEnrollmentBody.tsx:33
+msgid "Re-enroll"
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:368
 msgid "setting.engines.stack.remote.allow_tailnet.label"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/notifications/NotificationsPage.tsx:194
+msgid "Read"
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -15952,9 +17861,15 @@ msgid "Reading the details…"
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/apps/library/appPresentation.ts:18
 #: src/apps/settings/CodingSettings.tsx:131
 #: src/apps/settings/ModelsSection.tsx:148
 #: src/apps/settings/RobotBody.tsx:17
+#: src/apps/setup/AwayFromHome.tsx:120
+#: src/apps/setup/AwayFromHome.tsx:127
+#: src/apps/setup/AwayFromHome.tsx:139
+#: src/apps/setup/CheckGrid.tsx:31
+#: src/apps/setup/SetupWizard.tsx:479
 #: src/shell/pages/companionFlow/AnimateStep.tsx:29
 #: src/shell/pages/CompanionsPage.tsx:221
 #: src/shell/pages/EnginesPage.tsx:33
@@ -16003,6 +17918,7 @@ msgstr ""
 
 #. js-lingui-explicit-id
 #: src/apps/settings/AiJobSummary.tsx:74
+#: src/apps/setup/HostTuneStep.tsx:99
 msgid "Recommended"
 msgstr ""
 
@@ -16028,8 +17944,23 @@ msgid "Reconnecting"
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/apps/people/VoiceEnrollmentBody.tsx:72
+msgid "Record a few short samples. Say a number or read a sentence in your usual voice. Recording is used to make the voice print, then discarded. The server checks that the person being enrolled can consent. A child cannot consent for themself. A teen must consent for themself. Guests cannot enroll."
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/people/VoiceEnrollmentBody.tsx:80
+msgid "Record a sample"
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/apps/settings/AddVoiceForm.tsx:43
 msgid "Recording"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/people/roles.ts:124
+msgid "Red"
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -16111,8 +18042,18 @@ msgid "Remembers and organizes what matters."
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/apps/reminders/RemindersPage.tsx:75
+msgid "Reminder"
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:1266
 msgid "setting.tools.remind.mode.label"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/reminders/ListColumn.tsx:18
+msgid "Reminder lists"
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -16146,6 +18087,7 @@ msgid "Remix this song"
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/apps/clock/WorldClocksTab.tsx:157
 #: src/apps/settings/CloseAppsSettings.tsx:65
 #: src/apps/settings/CodingSettings.tsx:163
 #: src/apps/settings/CodingSettings.tsx:166
@@ -16194,6 +18136,7 @@ msgid "Remove {label}?"
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/apps/clock/WorldClocksTab.tsx:157
 #: src/apps/settings/CloseAppsSettings.tsx:65
 #: src/apps/settings/DevicesSection.tsx:146
 #: src/apps/settings/UsersSection.tsx:412
@@ -16299,6 +18242,8 @@ msgstr ""
 #: src/apps/chat/chatHeaderBar.tsx:219
 #: src/apps/chat/chatHeaderBar.tsx:251
 #: src/apps/chat/chatHeaderBar.tsx:301
+#: src/apps/clock/TimersTab.tsx:164
+#: src/apps/reminders/ListMenu.tsx:36
 #: src/apps/settings/CodingSettings.tsx:224
 #: src/apps/settings/VoiceManagerSection.tsx:120
 #: src/shell/library/LibraryItems.tsx:35
@@ -16325,6 +18270,16 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/apps/settings/CodingSettings.tsx:232
 msgid "Rename key"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/reminders/ListMenu.tsx:43
+msgid "Rename list"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/clock/TimersTab.tsx:174
+msgid "Rename quick timer"
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -16367,6 +18322,7 @@ msgid "area.Repairs"
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/apps/clock/AlarmEditor.tsx:81
 #: src/shell/media/MusicVisualizerSection.tsx:62
 #: src/shell/pages/status/StatusBoard.tsx:108
 msgid "Repeat"
@@ -16479,10 +18435,18 @@ msgid "setting.news.default_topics.teen.option.science"
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/apps/clock/StopwatchTab.tsx:69
+#: src/apps/clock/TimersTab.tsx:126
+#: src/apps/clock/TimersTab.tsx:138
 #: src/shell/pages/MusicStudioView.tsx:234
 #: src/shell/pages/MusicStudioView.tsx:244
 #: src/shell/pages/settings/DeviceAppearanceControl.tsx:37
 msgid "Reset"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/clock/TimersTab.tsx:138
+msgid "Reset {text}"
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -16501,6 +18465,7 @@ msgid "Resolved {date}"
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/apps/setup/preview/SetupPreviewBar.tsx:43
 #: src/shell/pages/EnginesPage.tsx:236
 #: src/shell/pages/status/StatusComponents.tsx:128
 #: src/shell/pages/status/StatusComponents.tsx:152
@@ -16563,6 +18528,11 @@ msgid "Restore the backup from {whenText}?"
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/apps/setup/SetupWizard.tsx:453
+msgid "Restoring a backup? Finish setup, then open Backups."
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:450
 msgid "setting.generation.adult_adapters.option_label.restricted"
 msgstr ""
@@ -16580,6 +18550,11 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/shell/pages/MicTestPage.tsx:50
 msgid "Results copied."
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/clock/StopwatchTab.tsx:68
+msgid "Resume"
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -16601,6 +18576,11 @@ msgid "Retired video model, no longer available"
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/apps/clock/AlarmsTab.tsx:70
+#: src/apps/clock/AlarmsTab.tsx:71
+#: src/apps/clock/TimersTab.tsx:148
+#: src/apps/reminders/RemindersPage.tsx:183
+#: src/apps/reminders/RemindersPage.tsx:183
 #: src/apps/settings/EngineLinkCredentialSection.tsx:278
 #: src/apps/settings/StackChanInstallDialog.tsx:146
 #: src/shell/GlobalMiniPlayer.tsx:119
@@ -16657,11 +18637,13 @@ msgstr ""
 
 #. js-lingui-explicit-id
 #: src/apps/settings/HostTuneSettings.tsx:51
+#: src/apps/setup/HostTuneStep.tsx:127
 msgid "Revert"
 msgstr ""
 
 #. js-lingui-explicit-id
 #: src/apps/settings/HostTuneSettings.tsx:51
+#: src/apps/setup/HostTuneStep.tsx:127
 msgid "Reverting"
 msgstr ""
 
@@ -16678,6 +18660,16 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/shell/pages/MusicRemix.tsx:51
 msgid "Review the remix"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/setup/SetupWizard.tsx:93
+msgid "Review the steps Home will complete."
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/setup/SetupReviewPage.tsx:58
+msgid "Review your computers, files, checks, and plan."
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -16721,14 +18713,29 @@ msgid "setting.companion.voice.lively_teen.label"
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/apps/people/FaceEnrollmentPage.tsx:69
+msgid "Right"
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/shell/AlarmRinger.tsx:198
 #: src/shell/AlarmRinger.tsx:203
 msgid "Ringing alarms"
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/apps/clock/AlarmRecordRow.tsx:50
+msgid "Rings in {untilText}"
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:17
 msgid "setting.alarms.sound.option_label.rise"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/clock/AlarmEditor.tsx:98
+msgid "Rise"
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -16747,6 +18754,7 @@ msgid "area.Robot"
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/apps/memory/PersonMemories.tsx:141
 #: src/apps/settings/DevicesSection.tsx:22
 #: src/apps/settings/HouseholdRobotsSection.tsx:142
 #: src/apps/settings/RobotBody.tsx:186
@@ -16922,6 +18930,8 @@ msgid "Robots: {list}."
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/apps/people/NewPersonForm.tsx:105
+#: src/apps/people/NewPersonForm.tsx:106
 #: src/shell/pages/EnginesPage.tsx:45
 #: src/shell/pages/StoragePage.tsx:154
 msgid "Role"
@@ -17020,6 +19030,7 @@ msgstr ""
 
 #. js-lingui-explicit-id
 #: src/apps/settings/CodingSettings.tsx:138
+#: src/apps/setup/SetupWizard.tsx:482
 msgid "Run the test"
 msgstr ""
 
@@ -17033,6 +19044,7 @@ msgstr ""
 #: src/apps/settings/CodingSettings.tsx:131
 #: src/apps/settings/CodingSettings.tsx:138
 #: src/apps/settings/CodingSettings.tsx:138
+#: src/apps/setup/SetupWizard.tsx:482
 #: src/shell/pages/CompanionsPage.tsx:286
 #: src/shell/pages/status/StatusComponents.tsx:38
 #: src/shell/pages/status/StatusComponents.tsx:48
@@ -17082,6 +19094,16 @@ msgid "Same as the household"
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/apps/clock/WorldClocksTab.tsx:28
+msgid "same time"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/people/VoiceEnrollmentBody.tsx:76
+msgid "Sample {number}"
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:149
 msgid "setting.coding.person.sandbox_size.label"
 msgstr ""
@@ -17097,6 +19119,11 @@ msgid "Sat"
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/apps/clock/AlarmEditor.tsx:112
+#: src/apps/clock/TimersTab.tsx:180
+#: src/apps/people/ProfileForm.tsx:189
+#: src/apps/people/ProfileForm.tsx:194
+#: src/apps/reminders/ListMenu.tsx:46
 #: src/apps/settings/AiSlotDialog.tsx:152
 #: src/apps/settings/CodingSettings.tsx:232
 #: src/apps/settings/HuggingFaceTokenSection.tsx:107
@@ -17134,7 +19161,13 @@ msgid "Save name and area"
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/apps/setup/SetupWizard.tsx:100
+msgid "Save this key somewhere other than this computer."
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/apps/settings/BackupsSection.tsx:83
+#: src/apps/setup/SetupWizard.tsx:69
 msgid "Save your backup key"
 msgstr ""
 
@@ -17188,6 +19221,7 @@ msgid "Saved place"
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/apps/people/ProfileForm.tsx:165
 #: src/apps/settings/HuggingFaceTokenSection.tsx:104
 #: src/apps/settings/styles/StyleEditor.tsx:47
 #: src/apps/settings/VoiceBrowserSection.tsx:103
@@ -17205,12 +19239,28 @@ msgid "Saves the StackChan's whole memory, then installs. About 6 minutes longer
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/apps/setup/SetupReviewPage.tsx:63
+#: src/apps/setup/SetupWizard.tsx:481
 #: src/shell/pages/CompanionAudienceDialog.tsx:64
 #: src/shell/pages/companionFlow/CustomizeStep.tsx:140
 msgid "Saving"
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/apps/people/VoiceEnrollmentBody.tsx:80
+msgid "Saving sample…"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/people/FaceEnrollmentPage.tsx:761
+msgid "Saving your face samples…"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/clock/TimersTab.tsx:180
+#: src/apps/people/FaceEnrollmentPage.tsx:630
+#: src/apps/people/ProfileForm.tsx:189
+#: src/apps/people/ProfileForm.tsx:194
 #: src/apps/settings/AiSlotDialog.tsx:152
 #: src/apps/settings/HouseholdRobotsSection.tsx:188
 #: src/apps/settings/HuggingFaceTokenSection.tsx:107
@@ -17311,8 +19361,23 @@ msgid "setting.search.blocklists.teen.option_label.blp-scam"
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/apps/setup/AwayFromHome.tsx:15
+msgid "Scan the code"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/setup/AwayFromHome.tsx:171
+msgid "Scan the code on your phone"
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/apps/settings/TwoStepSignInSection.tsx:45
 msgid "Scan this code with an authenticator app, then enter the 6-digit code it shows."
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/setup/preview/SetupPreviewBar.tsx:29
+msgid "Scenario"
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -17334,6 +19399,8 @@ msgid "Schedule maintenance"
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/apps/reminders/ListColumn.tsx:28
+#: src/apps/reminders/SmartListView.tsx:15
 #: src/shell/pages/status/StatusBoard.tsx:25
 msgid "Scheduled"
 msgstr ""
@@ -17436,6 +19503,11 @@ msgid "Search articles"
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/apps/clock/WorldClocksTab.tsx:170
+msgid "Search cities"
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/shell/pages/CompanionsPage.tsx:131
 #: src/shell/pages/CompanionsPage.tsx:131
 msgid "Search companions"
@@ -17464,6 +19536,11 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/shell/library/TranscriptPanel.tsx:141
 msgid "Search lines"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/clock/WorldClocksTab.tsx:166
+msgid "Search offline city data for a time zone."
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -17585,8 +19662,14 @@ msgid "setting.search.web_sources.option_label.searxng"
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/apps/setup/WebSearchStep.tsx:66
 #: src/shell/pages/settings/WebSearchSettings.tsx:95
 msgid "SearXNG address"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/setup/WebSearchStep.tsx:66
+msgid "SearXNG address (found on this computer)"
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -17607,6 +19690,11 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/shell/pages/settings/WebSearchSettings.tsx:93
 msgid "SearXNG is a search service you run yourself. It is private, keeps no record of who asked, and searches many sites at once."
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/setup/WebSearchStep.tsx:64
+msgid "SearXNG is a search service you run yourself. It searches many sites at once and keeps no record of who asked."
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -17632,6 +19720,11 @@ msgid "Secure connection port"
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/apps/setup/AwayFromHome.tsx:138
+msgid "Secure DNS addresses"
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/shell/pages/settings/HouseSettings.tsx:49
 #: src/shell/pages/settings/HouseSettings.tsx:50
 msgid "See"
@@ -17654,6 +19747,7 @@ msgid "Seek"
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/apps/notifications/NotificationsPage.tsx:155
 #: src/shell/pages/FilesPage.tsx:371
 msgid "Select"
 msgstr ""
@@ -17664,6 +19758,24 @@ msgid "Select {name}"
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/apps/clock/TimersTab.tsx:152
+msgid "Select {name}, {minutes} min"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/memory/PersonMemories.tsx:91
+#: src/apps/notifications/NotificationsPage.tsx:185
+msgid "Select {text}"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/clock/TimersTab.tsx:133
+msgid "Select {text}, {displayTime} remaining"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/notifications/NotificationsPage.tsx:169
+#: src/apps/notifications/NotificationsPage.tsx:172
 #: src/apps/settings/FreeUpSpaceDialog.tsx:80
 msgid "Select all"
 msgstr ""
@@ -17676,6 +19788,11 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/apps/settings/EngineLinkCredentialSection.tsx:262
 msgid "Select Check the engine computer. Home reads its security key. Then type the check code the engine computer printed."
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/memory/PersonMemories.tsx:375
+msgid "Select memories"
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -17794,8 +19911,14 @@ msgid "Set it in Settings, Home, General."
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/apps/setup/AwayFromHome.tsx:69
 #: src/shell/pages/settings/SettingsSectionContent.tsx:107
 msgid "Set up away access"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/setup/SetupWizard.tsx:481
+msgid "Set up coding"
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -17806,6 +19929,21 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/shell/pages/performance/EnginesHealthBody.tsx:44
 msgid "Set up MaiPai Stack to run your own engines and see their health history here."
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/setup/SetupWizard.tsx:502
+msgid "Set up my Home"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/people/FaceEnrollmentBody.tsx:32
+msgid "Set up on {date}"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/setup/SetupWizard.tsx:481
+msgid "Set up standard coding"
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -17939,6 +20077,11 @@ msgid "Setting up {title}…"
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/apps/setup/PlanStep.tsx:126
+msgid "Setting up the AI engine stopped."
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/shell/InstallDock.tsx:56
 msgid "Setting up your AI"
 msgstr ""
@@ -17976,7 +20119,23 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/apps/settings/CodingSettings.tsx:228
 #: src/apps/settings/CodingSettings.tsx:231
+#: src/apps/setup/SetupWizard.tsx:483
 msgid "Setup lines for your tool"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/setup/preview/SetupPreviewBar.tsx:26
+msgid "Setup preview controls"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/setup/SetupWizard.tsx:449
+msgid "Setup progress unavailable"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/setup/SetupReviewPage.tsx:56
+msgid "Setup review"
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -18019,6 +20178,7 @@ msgid "setting.ui.home_layout.option_label.shelves"
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/apps/reminders/reminderTypes.ts:16
 #: src/shell/pages/CompanionsPage.tsx:140
 msgid "Shopping"
 msgstr ""
@@ -18254,6 +20414,16 @@ msgid "Sidebar"
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/apps/setup/AwayFromHome.tsx:77
+msgid "Sign in to MaiPai Home to continue."
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/setup/AwayFromHome.tsx:126
+msgid "Sign in to Tailscale"
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/apps/settings/AwaySessionsSection.tsx:47
 #: src/apps/settings/DevicesSection.tsx:232
 msgid "Sign out"
@@ -18400,6 +20570,7 @@ msgstr ""
 
 #. js-lingui-explicit-id
 #: src/apps/settings/CodingSettings.tsx:28
+#: src/apps/setup/SetupWizard.tsx:479
 msgid "Size not reported"
 msgstr ""
 
@@ -18416,6 +20587,11 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/apps/settings/ModelsSection.tsx:181
 msgid "Sized from {sizedModel}."
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/library/appPresentation.ts:10
+msgid "Skill"
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -18441,6 +20617,23 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/shell/pages/MicTestPage.tsx:11
 msgid "SKIP"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/clock/AlarmEditor.tsx:114
+msgid "Skip next"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/setup/HostTuneStep.tsx:68
+#: src/apps/setup/HostTuneStep.tsx:77
+#: src/apps/setup/HostTuneStep.tsx:150
+msgid "Skip this step"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/clock/AlarmEditor.tsx:118
+msgid "Skipping the next one"
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -18541,8 +20734,21 @@ msgid "setting.tools.house.mode.label"
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/apps/reminders/SmartListView.tsx:18
+msgid "SMART LIST"
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/shell/pages/ReferencePage.tsx:52
 msgid "Snapshot {date} · {count, plural, one {# article} other {# articles}}"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/clock/AlarmEditor.tsx:103
+#: src/apps/clock/AlarmEditor.tsx:105
+#: src/apps/reminders/ComingUpRow.tsx:45
+#: src/apps/reminders/ComingUpRow.tsx:60
+msgid "Snooze"
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -18611,6 +20817,7 @@ msgid "Some things never change for {name}. Feelings and safety always get care 
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/apps/memory/PersonMemories.tsx:97
 #: src/apps/settings/UsersSection.tsx:200
 msgid "someone"
 msgstr ""
@@ -18630,6 +20837,11 @@ msgstr ""
 #: src/shell/pages/WikipediaPage.tsx:118
 #: src/shell/pages/WikipediaPage.tsx:120
 msgid "Something to read"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/people/FaceEnrollmentPage.tsx:680
+msgid "Something went wrong opening the camera. Try again."
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -18700,6 +20912,8 @@ msgid "Sort by"
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/apps/clock/AlarmEditor.tsx:94
+#: src/apps/clock/AlarmEditor.tsx:96
 #: src/shell/pages/MusicWorkspacePage.tsx:35
 msgid "Sound"
 msgstr ""
@@ -18787,6 +21001,11 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/apps/settings/capabilityLabels.ts:14
 msgid "Speaks through Home"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/setup/preview/SetupPreviewBar.tsx:39
+msgid "Speed"
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -19017,6 +21236,8 @@ msgid "Standard: {model}"
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/apps/clock/StopwatchTab.tsx:68
+#: src/apps/clock/TimersTab.tsx:124
 #: src/shell/pages/EnginesPage.tsx:235
 #: src/shell/pages/status/StatusComponents.tsx:128
 msgid "Start"
@@ -19073,11 +21294,14 @@ msgid "Starter style"
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/apps/setup/PlanStep.tsx:125
 #: src/shell/pages/MusicWorkspacePage.tsx:166
 msgid "starting"
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/apps/setup/SetupWizard.tsx:481
+#: src/apps/setup/SetupWizard.tsx:481
 #: src/shell/pages/MusicRemix.tsx:39
 #: src/shell/pages/MusicWorkspacePage.tsx:101
 #: src/shell/pages/MusicWorkspacePage.tsx:235
@@ -19229,6 +21453,7 @@ msgid "setting.ui.look.option_label.stone"
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/apps/clock/StopwatchTab.tsx:66
 #: src/apps/settings/StackChanInstallDialog.tsx:145
 #: src/apps/settings/VoiceBrowserSection.tsx:97
 #: src/apps/settings/VoiceManagerSection.tsx:118
@@ -19275,6 +21500,11 @@ msgid "Stop live view"
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/apps/people/VoiceEnrollmentBody.tsx:80
+msgid "Stop recording"
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/apps/settings/AiGlance.tsx:202
 msgid "Stop the Max job"
 msgstr ""
@@ -19291,6 +21521,11 @@ msgstr ""
 #: src/shell/pages/status/StatusComponents.tsx:43
 #: src/shell/pages/status/StatusComponents.tsx:113
 msgid "Stopped"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/clock/StopwatchTab.tsx:62
+msgid "Stopped at {formatElapsed}"
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -19316,6 +21551,22 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:129
 msgid "setting.coding.paused.help"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/clock/ClockPage.tsx:45
+#: src/apps/clock/StopwatchTab.tsx:60
+msgid "Stopwatch"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/clock/StopwatchTab.tsx:72
+msgid "Stopwatch laps"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/clock/StopwatchTab.tsx:62
+msgid "Stopwatch running"
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -19504,6 +21755,17 @@ msgid "setting.ui.appearance.option_label.system"
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/apps/clock/AlarmEditor.tsx:89
+#: src/apps/clock/AlarmEditor.tsx:90
+msgid "Tag"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/setup/AwayFromHome.tsx:108
+msgid "Tailscale lets your family reach Home from their other devices when they are away."
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/shell/AmbientCompanionPane.tsx:320
 msgid "Talk"
 msgstr ""
@@ -19541,6 +21803,11 @@ msgid "Teach MaiPai a phrase of your own - \"when I say X, do Y.\" A command alw
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/apps/people/roles.ts:121
+msgid "Teal"
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:649
 msgid "setting.news.default_topics.adult.option_label.technology"
 msgstr ""
@@ -19553,6 +21820,11 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:938
 msgid "setting.robot.controls.option_label.teen"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/people/roles.ts:13
+msgid "Teen"
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -19571,6 +21843,7 @@ msgid "area.Teens"
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/apps/memory/PersonMemories.tsx:43
 #: src/shell/pages/CompanionAudienceDialog.tsx:51
 msgid "Teens and adults"
 msgstr ""
@@ -19720,11 +21993,13 @@ msgstr ""
 #: src/apps/settings/VoiceBrowserSection.tsx:94
 #: src/apps/settings/VoiceBrowserSection.tsx:97
 #: src/apps/settings/VoiceManagerSection.tsx:118
+#: src/apps/setup/WebSearchStep.tsx:74
 #: src/shell/pages/settings/WebSearchSettings.tsx:103
 msgid "Test"
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/apps/setup/WebSearchStep.tsx:74
 #: src/shell/pages/settings/WebSearchSettings.tsx:103
 msgid "Test again"
 msgstr ""
@@ -19742,6 +22017,11 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/apps/settings/RobotSelfTests.tsx:34
 msgid "Test this robot"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/setup/CloseAppsStep.tsx:80
+msgid "Testing"
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -19819,6 +22099,11 @@ msgid "That did not work"
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/apps/setup/HostTuneStep.tsx:94
+msgid "That didn't work"
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/shell/pages/EnginesPage.tsx:128
 #: src/shell/pages/UpdatesPage.tsx:93
 msgid "That didn't work."
@@ -19832,6 +22117,11 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/shell/pages/FilesPage.tsx:181
 msgid "That file is not yours to delete. Ask the person who added it."
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/people/FaceEnrollmentPage.tsx:242
+msgid "That link is missing a person to enroll."
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -19932,6 +22222,11 @@ msgid "setting.home.base_url.help"
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/apps/setup/SetupWizard.tsx:122
+msgid "The AI decides what it will make"
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/apps/chat/useChatAvailability.ts:144
 msgid "The AI is installing. Chat works after."
 msgstr ""
@@ -19965,6 +22260,11 @@ msgstr ""
 #. js-lingui-explicit-id
 #: ../backend/src/lib/failureCopy.ts:200
 msgid "failure.composer.not_installed.teen"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/setup/StorageStep.tsx:152
+msgid "The AI models folder is set on your other computer."
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -20010,6 +22310,11 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/apps/settings/AiJobSummary.tsx:19
 msgid "The best this computer can do. It takes the computer while it runs."
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/setup/PlanStep.tsx:170
+msgid "The button is waiting for you to accept the maker's licence above. Accept it, or untick that row, to go on."
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -20148,6 +22453,11 @@ msgid "The English Wikipedia."
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/apps/people/FaceEnrollmentPage.tsx:779
+msgid "The face samples could not be saved."
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/apps/settings/StackChanInstallDialog.tsx:124
 msgid "The firmware is written. If the StackChan has not restarted within 10 seconds, unplug its USB cable and plug it back in (the reset from this page does not restart every unit). It then reconnects within a minute, with its name, Wi-Fi and pairing unchanged."
 msgstr ""
@@ -20164,6 +22474,11 @@ msgid "The full licence:"
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/apps/setup/PlanStep.tsx:158
+msgid "The full licence: {url}"
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:565
 msgid "setting.host.guard.mode.option.off"
 msgstr ""
@@ -20171,6 +22486,11 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:566
 msgid "setting.host.guard.mode.option.dry"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/setup/CloseAppsStep.tsx:63
+msgid "The helper is installed. No everyday apps are open right now, so there is nothing to close. You can turn on Close apps later in Settings, under AI and models, then Performance."
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -20407,6 +22727,11 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/apps/settings/BackupsSection.tsx:137
 msgid "the one you chose"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/people/NewPersonForm.tsx:116
+msgid "The owner is always an admin."
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -20660,6 +22985,11 @@ msgid "setting.companion.voice.tutor.label"
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/apps/people/NewPersonForm.tsx:39
+msgid "The two passcodes are different. Type the same passcode in both boxes."
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:207
 msgid "setting.ease.contrast.option.standard"
 msgstr ""
@@ -20786,6 +23116,11 @@ msgid "them"
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/apps/setup/StorageStep.tsx:33
+msgid "There are no folders in here. Use this folder, or make a new one."
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/shell/pages/PrivacyPage.tsx:102
 msgid "There is no MaiPai account, and no MaiPai server between your hub and anything else."
 msgstr ""
@@ -20877,6 +23212,11 @@ msgid "This browser cannot show system alerts."
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/apps/memory/PersonMemories.tsx:229
+msgid "This cannot be undone."
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/shell/library/LibraryTrash.tsx:24
 msgid "This cannot be undone. The file is gone from the Library; a copy that a chat still shows stays in that chat."
 msgstr ""
@@ -20929,6 +23269,11 @@ msgid "setting.engines.stack.where.option_label.this_computer"
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/apps/setup/PlanStep.tsx:145
+msgid "This computer can't run this, so nothing is downloaded for it."
+msgstr ""
+
+#. js-lingui-explicit-id
 #: ../backend/src/lib/failureCopy.ts:50
 msgid "failure.voice.microphone_missing.adult"
 msgstr ""
@@ -20941,6 +23286,16 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/shell/pages/MusicStudioView.tsx:34
 msgid "This computer has no stem model installed, so the song cannot be split. An admin can add one in Settings. The full song still plays here."
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/setup/HostTuneStep.tsx:76
+msgid "This computer needs no changes."
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/setup/SetupWizard.tsx:481
+msgid "This computer needs to be a Mac with 128 GB of memory for Coding mode. You can still use the standard coding setup."
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -21031,6 +23386,11 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/shell/pages/status/StatusComponents.tsx:132
 msgid "This part cannot reach the engine computer: {value}"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/people/NewPersonForm.tsx:125
+msgid "This person will use it to sign in."
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -21170,8 +23530,19 @@ msgid "Tile size"
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/apps/clock/AlarmEditor.tsx:77
+#: src/apps/clock/AlarmEditor.tsx:78
+msgid "Time"
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/apps/settings/ReferenceLibrarySettings.tsx:27
 msgid "Time estimate unavailable"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/reminders/ComingUpRow.tsx:22
+msgid "Time remaining"
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -21180,8 +23551,19 @@ msgid "failure.tool.timed_out.verb"
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/apps/clock/TimersTab.tsx:58
+msgid "Timer"
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:1271
 msgid "setting.tools.timer.mode.label"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/clock/ClockPage.tsx:43
+#: src/apps/clock/TimersTab.tsx:109
+msgid "Timers"
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -21212,6 +23594,19 @@ msgid "To 0:30"
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/apps/setup/SetupWizard.tsx:479
+msgid "To install"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/setup/WebSearchStep.tsx:76
+msgid "To skip SearXNG, leave the address empty and press Continue. That turns on DuckDuckGo search for adults. Until SearXNG is set up, teens and children use the Library only. You can allow DuckDuckGo for them in Settings, Web search."
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/clock/WorldClocksTab.tsx:53
+#: src/apps/reminders/ListColumn.tsx:25
+#: src/apps/reminders/SmartListView.tsx:15
 #: src/i18n.chain.test.tsx:96
 #: src/i18n.test.tsx:53
 #: src/shell/pages/CompanionsPage.tsx:259
@@ -21233,6 +23628,11 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/shell/pages/performance/TurnsByEngineBody.tsx:38
 msgid "Tokens/s"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/clock/WorldClocksTab.tsx:51
+msgid "Tomorrow"
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -21310,6 +23710,21 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:660
 msgid "setting.news.default_topics.teen.label"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/setup/PlanStep.tsx:137
+msgid "Total graphics memory"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/setup/PlanDiskSummary.tsx:26
+msgid "Total on disk"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/setup/SetupWizard.tsx:480
+msgid "Total: {gb} GB"
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -21433,12 +23848,20 @@ msgid "Trigger phrase, e.g. \"movie night\""
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/apps/people/FaceEnrollmentPage.tsx:110
+#: src/apps/people/FaceEnrollmentPage.tsx:689
 #: src/apps/settings/CommandsSection.tsx:107
 #: src/apps/settings/ModelsAndStorageSection.tsx:91
 #: src/apps/settings/StackChanInstallDialog.tsx:151
 #: src/apps/settings/styles/StyleBrowser.tsx:131
 #: src/apps/settings/VoiceBrowserSection.tsx:93
 #: src/apps/settings/VoiceManagerSection.tsx:98
+#: src/apps/setup/HostTuneStep.tsx:68
+#: src/apps/setup/PlanStep.tsx:126
+#: src/apps/setup/SetupWizard.tsx:449
+#: src/apps/setup/SetupWizard.tsx:502
+#: src/apps/setup/StorageStep.tsx:35
+#: src/apps/setup/WebSearchStep.tsx:74
 #: src/shell/AmbientCompanionPane.tsx:255
 #: src/shell/InstallDock.tsx:205
 #: src/shell/InstallStrip.tsx:96
@@ -21447,6 +23870,16 @@ msgstr ""
 #: src/shell/pages/FilesPage.tsx:301
 #: src/shell/pages/settings/WebSearchSettings.tsx:103
 msgid "Try again"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/people/FaceEnrollmentPage.tsx:252
+msgid "Try again, or go back and start from their profile."
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/setup/HostTuneStep.tsx:12
+msgid "Try again, or skip this step. Home works without it."
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -21470,6 +23903,11 @@ msgid "failure.tool.found_nothing.next_step"
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/apps/people/FaceEnrollmentPage.tsx:782
+msgid "Try saving again"
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/apps/settings/styles/StyleEditor.tsx:96
 msgid "Try this style"
 msgstr ""
@@ -21486,6 +23924,7 @@ msgstr ""
 
 #. js-lingui-explicit-id
 #: src/apps/settings/HostTuneSettings.tsx:35
+#: src/apps/setup/SetupWizard.tsx:60
 msgid "Tune this computer"
 msgstr ""
 
@@ -21528,13 +23967,44 @@ msgid "Turn on"
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/apps/setup/CloseAppsStep.tsx:80
+msgid "Turn on Automatic"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/setup/AwayFromHome.tsx:185
+msgid "Turn on away access"
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/apps/settings/styles/stylesShared.tsx:21
 msgid "Turn on Civitai?"
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/apps/setup/AwayFromHome.tsx:139
+msgid "Turn on HTTPS certificates in Tailscale's DNS settings."
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/setup/AwayFromHome.tsx:14
+#: src/apps/setup/AwayFromHome.tsx:171
+msgid "Turn on secure addresses"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/setup/AwayFromHome.tsx:109
+msgid "Turn on Tailscale's secure DNS addresses, then connect this Home to your tailnet."
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/apps/settings/AddRobotSection.tsx:152
 msgid "Turn on the robot near your Wi-Fi. It will speak a six-digit code (or show it on its own settings page) - type that code below to pair it."
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/setup/SetupWizard.tsx:63
+msgid "Turn on web search"
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -21576,6 +24046,11 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/apps/settings/AiGlance.tsx:113
 msgid "Turning off {title}…"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/setup/AwayFromHome.tsx:145
+msgid "Turning this on publishes this computer's Tailscale name in public certificate logs. Choose a plain computer name, not a family name. This setup uses Tailscale DNS and HTTPS certificates; Headscale is not supported."
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -21672,6 +24147,11 @@ msgid "TV"
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/apps/setup/SetupWizard.tsx:144
+msgid "Two computers"
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/shell/pages/settings/settingsViews.tsx:75
 msgid "Two-step sign-in"
 msgstr ""
@@ -21697,6 +24177,16 @@ msgid "setting.music.lyrics_translate.help"
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/apps/people/NewPersonForm.tsx:36
+msgid "Type a name for this person."
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/people/NewPersonForm.tsx:37
+msgid "Type a PIN or password for this person so they can sign in."
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/shell/pages/MakeSongPage.tsx:144
 msgid "Type a style and press Enter. Words only, never lyrics."
 msgstr ""
@@ -21707,6 +24197,7 @@ msgid "Type a style, for example paper cut-out"
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/apps/people/NewPersonForm.tsx:129
 #: src/apps/settings/SignInSecretSection.tsx:70
 msgid "Type it again"
 msgstr ""
@@ -21778,6 +24269,11 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/apps/settings/ModelsAndStorageSection.tsx:119
 msgid "Uninstall {label}?"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/setup/PlanDiskSummary.tsx:27
+msgid "unknown"
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -21854,6 +24350,11 @@ msgid "Unpin"
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/apps/people/ProfileForm.tsx:164
+msgid "Unsaved changes."
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/shell/pages/status/StatusBanner.tsx:19
 msgid "Until {time}"
 msgstr ""
@@ -21890,8 +24391,14 @@ msgid "Untitled style"
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/apps/people/FaceEnrollmentPage.tsx:70
 #: src/apps/settings/PerformanceCustomize.tsx:57
 msgid "Up"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/setup/StorageStep.tsx:27
+msgid "Up one level"
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -21986,6 +24493,16 @@ msgid "Use"
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/apps/people/NewPersonForm.tsx:38
+msgid "Use 4 to 128 characters for the PIN or password."
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/setup/SetupWizard.tsx:130
+msgid "Use 4 to 128 characters for your PIN or password, then press Create owner account again."
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:964
 msgid "setting.robot.greetings.mode.help"
 msgstr ""
@@ -22040,6 +24557,11 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:110
 msgid "setting.coding.engine.option.splash"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/setup/AwayFromHome.tsx:127
+msgid "Use the account your family's phones and tablets will use."
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -22115,6 +24637,11 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/apps/settings/CloseAppsSettings.tsx:48
 msgid "Use the starter list"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/setup/StorageStep.tsx:28
+msgid "Use this folder"
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -22393,6 +24920,11 @@ msgid "setting.topics.violence.label"
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/apps/people/roles.ts:120
+msgid "Violet"
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:436
 msgid "setting.engines.vision.choice.label"
 msgstr ""
@@ -22519,6 +25051,21 @@ msgid "area.Voice print enrollment"
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/apps/people/VoiceEnrollmentBody.tsx:69
+msgid "Voice recognition"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/people/VoiceEnrollmentBody.tsx:62
+msgid "Voice sample deleted."
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/people/VoiceEnrollmentBody.tsx:47
+msgid "Voice sample saved."
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/shell/pages/companionFlow/CustomizeStep.tsx:108
 msgid "Voice source"
 msgstr ""
@@ -22612,6 +25159,11 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/shell/pages/TrashPage.tsx:58
 msgid "Waiting for removal"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/setup/AwayFromHome.tsx:130
+msgid "Waiting for sign-in"
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -22788,9 +25340,24 @@ msgid "Wed"
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/apps/clock/AlarmRecordRow.tsx:12
+msgid "Weekdays"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/clock/AlarmRecordRow.tsx:13
+msgid "Weekends"
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/shell/pages/status/StatusBoard.tsx:108
 #: src/shell/pages/status/StatusBoard.tsx:108
 msgid "Weekly"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/setup/SetupWizard.tsx:56
+msgid "Welcome to MaiPai Home"
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -22811,6 +25378,11 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:1582
 msgid "area.What connects to the internet"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/setup/PlanStep.tsx:145
+msgid "What gets installed"
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -22854,6 +25426,11 @@ msgid "What MaiPai says back"
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/apps/reminders/ListMain.tsx:31
+msgid "What needs doing"
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/shell/library/LibraryViewer.tsx:104
 msgid "What should it sound like?"
 msgstr ""
@@ -22865,6 +25442,7 @@ msgstr ""
 
 #. js-lingui-explicit-id
 #: src/apps/settings/CapabilityTable.tsx:42
+#: src/apps/setup/SetupWizard.tsx:68
 msgid "What this computer can do"
 msgstr ""
 
@@ -23014,6 +25592,11 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:1112
 msgid "setting.search.page_text_cleaning.help"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/setup/SetupWizard.tsx:123
+msgid "When you make or share something with Home, please respect other people and their privacy. Make sure you have permission to use someone’s image, video, or voice, and the rights to any material you include. Be mindful of copyright and consent, follow the law, and use what you create kindly—don’t use it to bully, tease, embarrass, or hurt someone."
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -23196,6 +25779,11 @@ msgid "Who is your companion? Describe their history, experiences, interests, oc
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/apps/memory/PersonMemories.tsx:113
+msgid "Who may hear this"
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/shell/pages/CompanionsPage.tsx:309
 msgid "Who uses it"
 msgstr ""
@@ -23331,6 +25919,23 @@ msgid "setting.news.default_topics.teen.option_label.world"
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/apps/clock/ClockPage.tsx:44
+#: src/apps/clock/WorldClocksTab.tsx:136
+msgid "World clocks"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/setup/CheckGrid.tsx:31
+msgid "Worth a look"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/setup/StorageStep.tsx:194
+#: src/apps/setup/StorageStep.tsx:208
+msgid "Worth knowing"
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/shell/pages/status/StatusBoard.tsx:124
 msgid "Write a note first."
 msgstr ""
@@ -23388,6 +25993,21 @@ msgid "Yes, cancel install"
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/apps/memory/PersonMemories.tsx:388
+msgid "Yes, forget {count}"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/memory/PersonMemories.tsx:400
+msgid "Yes, forget all"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/memory/PersonMemories.tsx:230
+msgid "Yes, forget everything"
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/apps/settings/HouseholdRobotsSection.tsx:189
 msgid "Yes, forget it"
 msgstr ""
@@ -23423,6 +26043,7 @@ msgid "Yes, sign it out"
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/apps/clock/WorldClocksTab.tsx:52
 #: src/shell/pages/CompanionsPage.tsx:260
 msgid "Yesterday"
 msgstr ""
@@ -23448,6 +26069,11 @@ msgid "You already have this style. Press to open it."
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/apps/setup/SetupWizard.tsx:126
+msgid "You also accept the licences of the AI models and tools Home installs for you. Each is listed with its terms on the Plan page and in Models and storage."
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/apps/settings/AddVoiceForm.tsx:48
 msgid "You are responsible for having the right to use this voice."
 msgstr ""
@@ -23468,6 +26094,16 @@ msgid "api.error.sessions_own_only"
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/apps/clock/WorldClocksTab.tsx:119
+msgid "You can save up to 12 places."
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/setup/SetupWizard.tsx:492
+msgid "You can talk with Home as soon as you open it. Start a chat, add people, or choose apps whenever you're ready. If the AI is still downloading, chat starts answering when the first model finishes. To have Home greet you by face, turn it on in your profile; face data stays on this computer."
+msgstr ""
+
+#. js-lingui-explicit-id
 #: ../backend/src/lib/apiErrorCopy.ts:42
 msgid "api.error.cannot_disable_self"
 msgstr ""
@@ -23480,6 +26116,11 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/shell/pages/PersonProfilePage.tsx:73
 msgid "You cannot open this profile."
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/setup/WebSearchStep.tsx:71
+msgid "You changed the address. Test it again, or clear it to skip."
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -23523,6 +26164,11 @@ msgid "You have no songs in your Library yet. Make one in Music."
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/apps/setup/SetupWizard.tsx:128
+msgid "You manage this Home, its people, files, and backups. Nobody can remove the owner."
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/apps/settings/StackChanInstallDialog.tsx:124
 msgid "You need Chrome or Edge on a computer, Home opened at its https address, and the StackChan plugged into this computer with a USB-C data cable."
 msgstr ""
@@ -23553,6 +26199,11 @@ msgid "setting.notifications.browser.enabled.help"
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/apps/setup/SetupWizard.tsx:70
+msgid "You're all set"
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/shell/MediaPickerDialog.tsx:104
 msgid "Your {noun}"
 msgstr ""
@@ -23560,6 +26211,11 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/shell/MediaPickerDialog.tsx:102
 msgid "Your {noun} did not load. Close this and try again."
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/setup/SetupWizard.tsx:49
+msgid "Your AI"
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -23586,6 +26242,11 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/shell/pages/ChatPage.tsx:1465
 msgid "Your chats will show up here."
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/setup/SetupWizard.tsx:453
+msgid "Your chats, people, and memories stay on your computers. Home goes online only for downloads, updates, and searches you ask for."
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -23649,13 +26310,48 @@ msgid "Your family"
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/apps/setup/StorageStep.tsx:23
+msgid "Your family's chats, people and memories. Small, usually well under 5 GB."
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/setup/SetupWizard.tsx:87
+msgid "Your family's private AI, in your own home."
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/setup/SetupWizard.tsx:48
+msgid "Your Home"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/setup/AwayFromHome.tsx:154
+msgid "Your Home address"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/setup/SetupWizard.tsx:101
+msgid "Your Home is ready to use."
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/apps/settings/CodingSettings.tsx:231
 msgid "Your key is ready"
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/apps/setup/SetupWizard.tsx:483
+msgid "Your key. Save it now; Home will show it only once."
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/shell/pages/ReferencePage.tsx:52
 msgid "Your library"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/reminders/ListMain.tsx:46
+msgid "YOUR LIST"
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -23671,6 +26367,11 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/shell/pages/MusicWorkspacePage.tsx:166
 msgid "Your new version is waiting, number {position} in line"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/reminders/ListMain.tsx:31
+msgid "Your own list"
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -23727,6 +26428,11 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/apps/settings/SignInSecretSection.tsx:39
 msgid "Your PIN is set."
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/setup/SetupWizard.tsx:62
+msgid "Your setup plan"
 msgstr ""
 
 #. js-lingui-explicit-id
