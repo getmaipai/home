@@ -56,15 +56,28 @@ function validateOutline(raw: Outline, brief: Brief): Outline | null {
   const title = checkText(raw.title, brief.audience) ? raw.title : `Episode ${brief.date}`;
   return { ...raw, title, segments: raw.segments.map((segment, index) => ({ ...segment, goal: checkText(segment.goal, brief.audience) ? segment.goal : `Segment ${index + 1}` })) };
 }
+function rescaleOutline(raw: Outline, brief: Brief): Outline | null {
+  const length = brief.show.show?.length_s ?? brief.format.length_s.default, total = raw.segments.reduce((sum, segment) => sum + segment.seconds, 0);
+  if (total <= 0) return null;
+  const segments = raw.segments.map((segment) => ({ ...segment, seconds: Math.min(600, Math.max(8, Math.round(segment.seconds * length / total))) }));
+  const drift = length - segments.reduce((sum, segment) => sum + segment.seconds, 0);
+  const longest = segments.reduce((best, segment, index) => (segment.seconds > segments[best]!.seconds ? index : best), 0);
+  segments[longest]!.seconds = Math.min(600, Math.max(8, segments[longest]!.seconds + drift));
+  return { ...raw, segments };
+}
 export async function writeOutline(brief: Brief, complete: Complete = completeBackground): Promise<Outline> {
   const messages: LlmMessage[] = [{ role: "system", content: OUTLINE_PROMPT }, { role: "user", content: `Brief JSON:\n${promptBrief(brief)}` }];
   const repair = `The segment seconds did not add up to within ten percent of ${brief.show.show?.length_s ?? brief.format.length_s.default} seconds. Return a corrected outline whose segment seconds add up within that range.`;
+  let lastParsed: Outline | null = null;
   for (let attempt = 0; attempt < 2; attempt++) {
     const reply = await completeSafely(complete, messages, options(OutlineSchema, "talent_outline", true));
     const raw = reply.ok ? parse(reply.text, OutlineSchema) : null;
-    if (raw) { const valid = validateOutline(raw, brief); if (valid) return valid; }
+    if (raw) { lastParsed = raw; const valid = validateOutline(raw, brief); if (valid) return valid; }
     messages.push({ role: "assistant", content: reply.ok ? reply.text : "" }, { role: "user", content: repair });
   }
+  // The model is poor at adding up seconds (seen live 2026-11-07: both tries missed the range). A well-formed outline whose
+  // seconds are only off is rescaled to the requested length, which is the same plan at the right size, never a failed episode.
+  if (lastParsed) { const rescaled = rescaleOutline(lastParsed, brief); const valid = rescaled && validateOutline(rescaled, brief); if (valid) return valid; }
   throw new TalentWriteError("The outline could not be written. Try a shorter show or fewer topics.");
 }
 export async function writeSegment(brief: Brief, outline: Outline, index: number, complete: Complete = completeBackground, previous: Line[] = []): Promise<Line[]> {

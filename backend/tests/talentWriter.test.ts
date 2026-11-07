@@ -62,9 +62,13 @@ describe("TALENT-02 formats and writer", () => {
     await expect(writeOutline(brief, repaired as never)).resolves.toMatchObject({ segments: expect.any(Array) });
     expect(calls).toBe(2);
     calls = 0;
+    // Two tries that both miss the range are rescaled to the requested length (300 s) instead of failing the episode.
     const stillBad = async () => ({ ok: true as const, text: JSON.stringify(++calls === 1 ? outline([250, 250]) : outline([250, 250])) });
-    await expect(writeOutline(brief, stillBad as never)).rejects.toBeInstanceOf(TalentWriteError);
+    const scaled = await writeOutline(brief, stillBad as never);
     expect(calls).toBe(2);
+    expect(scaled.segments.reduce((sum, segment) => sum + segment.seconds, 0)).toBe(300);
+    // Text that is not an outline at all is still a plain failure.
+    await expect(writeOutline(brief, (async () => ({ ok: true as const, text: "not json" })) as never)).rejects.toBeInstanceOf(TalentWriteError);
   });
 
   test("validates segment lines against LineSchema", async () => {
