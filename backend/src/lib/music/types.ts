@@ -19,6 +19,8 @@ export interface MusicRequest {
   band?: { id: string; name: string };
   /** MUSIC-STUDIO-ALBUM: a track of a made album. The song saved from this job is listed on the album (lib/music/album.ts syncAlbumTracks). */
   album?: { id: string };
+  /** MUSIC-ADDMUSIC-RESTART-01: an Add music mix waiting on this instrumental. Kept in the stored request so a restart can still start the mix. */
+  pendingMix?: { args: Record<string, unknown>; conversationId: string; turnId: string };
 }
 export interface MusicJob {
   id: string; personId: string; conversationId: string | null; turnId: string | null; companionId?: string | null; task: MusicTask; request: MusicRequest;

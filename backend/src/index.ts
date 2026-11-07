@@ -266,6 +266,8 @@ resumePictureJobs();
 resumeVideoJobs();
 try { (await import("@/lib/videos/stackEdit")).sweepStaleEditFolders(); } catch { /* maintenance sweep is disposable */ }
 resumeMusicJobs();
+// MUSIC-ADDMUSIC-RESTART-01: an Add music mix that was waiting on a song when Home went down.
+void import("@/lib/videos/editTool").then((m) => m.resumePendingMixes());
 migratePendingAsksThroughGate();
 // KS-MODE-01: a stored search.wikipedia_fallback becomes the source-mode override, once.
 migrateWikipediaFallbackToSourceMode();

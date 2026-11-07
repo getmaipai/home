@@ -55,6 +55,8 @@ If you have more than one microphone, the page also has a **Microphone** choice,
 
 Children cannot change their own voice. An owner or admin opens the page, uses **Choose a voice for**, and picks the child. Teens and adults choose their own.
 
+A saved voice works in a temporary chat too. Home saves nothing new when it speaks.
+
 ### Make a voice from a recording
 
 Everyone in the home can make a voice, children and teens too. On the **Voices** page press **Make a voice from a recording**, type a name, and choose a WAV, MP3 or FLAC recording that is 6 to 30 seconds long. Home makes the voice and plays it once to check it. Then it shows up in the voice list for everyone in the home. Only use your own voice, or the voice of someone who said yes. A guest cannot make a voice.

@@ -83,3 +83,38 @@ describe("add-music route", () => {
     await until(() => fakeEdit.jobs.length === 1, 6000);
   });
 });
+
+describe("add music survives a restart (MUSIC-ADDMUSIC-RESTART-01)", () => {
+  test("a song that finishes while the waiting is gone still gets its mix when Home starts again, once", async () => {
+    const { resumePendingMixes } = await import("@/lib/videos/editTool");
+    __setMusicBedPollMsForTests(1_000_000); // the in-process waiter never fires: this is the state after a restart
+    fakeMusic = installFakeMusicStack();
+    const a = actor(); const made = await makeClip(a);
+    const result = await runEditVideo({ state: made.state, args: { clip: "latest", change: "mix", sound: "music", make_music: "warm lo-fi piano bed" }, callId: "bed", spoken: false });
+    const id = (result.result?.data as { musicJobId: string }).musicJobId;
+    expect(getMusicJobFor(a, id)?.request.pendingMix).toBeTruthy();
+    await until(() => getMusicJobFor(a, id)?.state === "done", 6000);
+    expect(fakeEdit.jobs).toHaveLength(0);
+    __setMusicBedPollMsForTests(20);
+    resumePendingMixes();
+    await until(() => fakeEdit.jobs.length === 1, 6000);
+    expect(fakeEdit.jobs[0]!.input.inputs).toHaveLength(2);
+    expect(getMusicJobFor(a, id)?.request.pendingMix).toBeUndefined();
+    resumePendingMixes(); await new Promise((r) => setTimeout(r, 200));
+    expect(fakeEdit.jobs).toHaveLength(1);
+  });
+  test("a failed song clears the waiting mix and starts nothing", async () => {
+    const { resumePendingMixes } = await import("@/lib/videos/editTool");
+    __setMusicBedPollMsForTests(1_000_000);
+    fakeMusic = installFakeMusicStack(); fakeMusic.fail = { code: "failed", error: "no" };
+    const a = actor(); const made = await makeClip(a);
+    const result = await runEditVideo({ state: made.state, args: { clip: "latest", change: "mix", sound: "music", make_music: "warm lo-fi piano bed" }, callId: "bed", spoken: false });
+    const id = (result.result?.data as { musicJobId: string }).musicJobId;
+    await until(() => getMusicJobFor(a, id)?.state === "failed", 6000);
+    __setMusicBedPollMsForTests(20);
+    resumePendingMixes();
+    await until(() => getMusicJobFor(a, id)?.request.pendingMix === undefined, 6000);
+    await new Promise((r) => setTimeout(r, 200));
+    expect(fakeEdit.jobs).toHaveLength(0);
+  });
+});

@@ -19,9 +19,10 @@ import { screenInputImage, viewerOf } from "@/lib/pictures/ageCheck";
 import { videoEngineStatus, videoMaxNotReadyReason } from "./ready";
 import { MINOR_MAKE_LINE, bodyOfVideoJob, makeVideoFor, type MakeVideoBody } from "./make";
 import { laneOf } from "@/lib/pictures/lane";
-import { eq } from "drizzle-orm";
+import { eq, like } from "drizzle-orm";
 import { db } from "@/db";
-import { attachments } from "@/db/schema";
+import { attachments, musicJobs, people } from "@/db/schema";
+import type { MusicRequest } from "@/lib/music/types";
 import { attachmentFilePath } from "@/lib/attachments";
 import { existsSync } from "node:fs";
 import { isRemoteStackSelected } from "@/lib/stackEngine";
@@ -42,7 +43,7 @@ import { getMediaProduction, listMediaProductions, updateMediaProduction } from 
 import { getMediaSubject } from "@/lib/mediaSubjects";
 import { createHash } from "node:crypto";
 import { analyzeBeats, beatsReady } from "@/lib/music/stack";
-import { startMusicBed, whenMusicDone } from "@/lib/videos/musicBed";
+import { setPendingMix, startMusicBed, takePendingMix, whenMusicDone } from "@/lib/videos/musicBed";
 import { musicAudienceOf, musicRefusalFor } from "@/lib/music/tool";
 import { musicEngineStatus, musicStatusReady } from "@/lib/music/ready";
 import { planBeatCut } from "./beatCut";
@@ -632,7 +633,8 @@ async function editFinishedClips(input: RunEditVideoInput, value: EditArgs, acto
       catch { return refused(callId, args, MUSIC_BED_FAILED_LINE, "music_failed"); }
       // The song is made first; when it is done the same mix runs with it as the track (the one media.edit path), so every gate is checked again then.
       const again = { ...args, clip: first.id, make_music: undefined, track: musicId };
-      whenMusicDone(actor, musicId, async (ok) => { if (ok) await runEditVideo({ state, args: again, callId: `${callId}-bed`, spoken: false }); });
+      setPendingMix(actor, musicId, { args: again, conversationId: state.conversationId, turnId: state.turnId });
+      mixWhenSongDone(actor, musicId, state, again, `${callId}-bed`);
       return outcomeOf({ callId, packageId, status: "succeeded", via: "tool_call", args, durationMs: 0, result: { reply: { text: "The music is being made first, then it goes under the video as a new version and the first one is kept. Tell the person it is on its way; do not say it is ready." }, data: { musicJobId: musicId }, actions: [] } });
     } else if (value.sound === "music") {
       if (!value.track) return refused(callId, args, MIX_SOUND_LINE, "nothing_to_mix");
@@ -670,6 +672,29 @@ async function editFinishedClips(input: RunEditVideoInput, value: EditArgs, acto
       actions: [],
     },
   });
+}
+
+/** When the song is finished the waiting mix starts (once); a failed song clears it. The mix is stored on the song, see resumePendingMixes. */
+function mixWhenSongDone(actor: PersonRow, musicId: string, state: GenerateVideoState, args: Record<string, unknown>, callId: string): void {
+  whenMusicDone(actor, musicId, async (ok) => {
+    if (!takePendingMix(actor, musicId) || !ok) return;
+    await runEditVideo({ state, args, callId, spoken: false });
+  });
+}
+
+/** MUSIC-ADDMUSIC-RESTART-01: called once at boot, after the music jobs resume. A song that finished while Home was down starts its mix now,
+ * a song that failed or was stopped drops it, and one still being made is waited on as before. */
+export function resumePendingMixes(): void {
+  const rows = db.select().from(musicJobs).where(like(musicJobs.request, "%pendingMix%")).all();
+  for (const row of rows) {
+    let mix: MusicRequest["pendingMix"];
+    try { mix = (JSON.parse(row.request) as MusicRequest).pendingMix; } catch { continue; }
+    if (!mix) continue;
+    const person = db.select().from(people).where(eq(people.id, row.personId)).get() as PersonRow | undefined;
+    if (!person) continue;
+    const state = { actor: person, surface: "chat", conversationId: mix.conversationId, turnId: mix.turnId, temporary: false, planBasis: { surfaceClass: "written" }, context: [], utterance: "", persona: null, crisis: false } as unknown as GenerateVideoState;
+    mixWhenSongDone(person, row.id, state, mix.args, `resume-${row.id}-bed`);
+  }
 }
 
 /** The refusal line of an `edit_video` outcome, without the words the model is told before it (for a route that answers the person directly). */

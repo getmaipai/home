@@ -3,6 +3,7 @@
 // household queue ranks a running video job above music, so an edit that waited on its own song would block it until the wait timed out.
 import type { PersonRow } from "@/types";
 import { getMusicJobFor, startMusicJob } from "@/lib/music/jobs";
+import { saveMusicJob } from "@/lib/music/store";
 import { musicBody } from "@/lib/music/stack";
 import type { MusicRequest } from "@/lib/music/types";
 
@@ -33,4 +34,21 @@ export function whenMusicDone(actor: PersonRow, id: string, done: (ok: boolean) 
     setTimeout(tick, pollMs);
   };
   setTimeout(tick, pollMs);
+}
+
+/** Records the mix that waits on this song in the song's stored request, so it survives a restart. */
+export function setPendingMix(actor: PersonRow, id: string, mix: NonNullable<MusicRequest["pendingMix"]>): void {
+  const job = getMusicJobFor(actor, id);
+  if (!job) return;
+  job.request.pendingMix = mix;
+  saveMusicJob(job);
+}
+
+/** Takes the waiting mix off the song. Returns true only for the caller that took it, so a mix starts once. */
+export function takePendingMix(actor: PersonRow, id: string): boolean {
+  const job = getMusicJobFor(actor, id);
+  if (!job?.request.pendingMix) return false;
+  delete job.request.pendingMix;
+  saveMusicJob(job);
+  return true;
 }
