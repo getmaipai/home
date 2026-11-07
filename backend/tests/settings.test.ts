@@ -993,6 +993,22 @@ describe("secret: true settings keys are encrypted at rest", () => {
 });
 
 
+describe("locale keys can be read alone (I18N-F0, usePersonLocale)", () => {
+  test("a child reads household.locale and their own person.locale with ?key=, and an unknown key is still refused", async () => {
+    const { owner, childClient: child, childId } = await ownerAndChild();
+    expect((await owner.put("/api/settings", { scope: "household", key: "household.locale", value: "es" })).status).toBe(200);
+    const household = await child.get("/api/settings?scope=household&key=household.locale");
+    expect(household.status).toBe(200);
+    const rows = (await household.json()) as Array<{ key: string; value: unknown }>;
+    expect(rows.map((r) => r.key)).toEqual(["household.locale"]);
+    expect(rows[0]!.value).toBe("es");
+    const person = await child.get(`/api/settings?scope=person:${childId}&key=person.locale`);
+    expect(person.status).toBe(200);
+    expect(((await person.json()) as Array<{ key: string }>).map((r) => r.key)).toEqual(["person.locale"]);
+    expect((await child.get("/api/settings?scope=household&key=household.family_name")).status).toBe(400);
+  });
+});
+
 describe("companions.preview_shells household setting", () => {
   test("owner writes it, teen and child writes are refused, and a child can read it", async () => {
     const owner = new TestClient();

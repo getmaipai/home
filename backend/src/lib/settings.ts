@@ -402,6 +402,10 @@ function responseContext(viewer: PersonRow, subject: PersonRow, scopeKind: Parse
   return { viewer, subject, adminName };
 }
 
+/** Keys a reader may ask for alone (`?key=`) under the scope's ordinary read rule. The locale pair is read by
+ * `usePersonLocale` on every sign-in (I18N-F0); without it the person's language never activated on a real hub. */
+const PLAIN_KEY_FILTERS = new Set(["companions.preview_shells", "person.locale", "household.locale"]);
+
 /** Every registered key whose scope kind matches, each resolved to its
  * stored value or the registry default (4.6: a setting always has a
  * value, even before anyone customizes it). */
@@ -409,7 +413,7 @@ export function listValues(actor: PersonRow, scope: string, onlyKey?: string): S
   const parsed = parseScope(scope);
   if (!parsed) return { ok: false, status: 400, error: `invalid scope: ${scope}` };
   const companionsOnly = onlyKey === COMPANIONS_ALLOWED_KEY;
-  if (onlyKey && !companionsOnly && onlyKey !== "companions.preview_shells") return { ok: false, status: 400, error: `unsupported settings key filter: ${onlyKey}` };
+  if (onlyKey && !companionsOnly && !PLAIN_KEY_FILTERS.has(onlyKey)) return { ok: false, status: 400, error: `unsupported settings key filter: ${onlyKey}` };
   const adultWakewordRead = parsed.kind === "device" && actor.role === "adult"
     && getRegistry().some((keyDef) => keyDef.key === WAKEWORD_SETTING_KEY);
   const auth = companionsOnly
