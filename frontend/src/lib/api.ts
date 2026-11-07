@@ -1131,6 +1131,7 @@ export const api = {
       body: JSON.stringify({ currentSecret, newSecret }),
     }),
   me: () => request<SignedInPerson>("/api/auth/me"),
+  locale: () => request<{ locale: string }>("/api/auth/locale"),
   logout: () => request<{ success: true }>("/api/auth/logout", { method: "POST" }),
   // Session E step 6: "sessions and devices with revoke" - both scoped
   // to the caller's own profile (devices.ts's own comment: "not a

@@ -612,6 +612,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/llmSampling.ts` | chatSamplingOf |
 | `backend/src/lib/llmSupervisor.ts` | __setBlockedPortRetryForTests, __setBlockedPortRetryIntervalForTests, startBlockedPortRetryForTests, setWarmupPrompt, sweepOrphanEngineProcesses, reportChatBackendUnreachable |
 | `backend/src/lib/localStackService.ts` | HOME_STACK_PORT, installRoot, stackDataDir, stopLocalStackService, startLocalStackService, __setStackServiceRunnerForTests |
+| `backend/src/lib/locale.ts` | resolveLocale, resolveLocaleFromValues, householdLocale, isSafeAutoTranslation |
 | `backend/src/lib/log.ts` | appendLogLine, installConsoleFileMirror, installFatalErrorHandlers |
 | `backend/src/lib/loras/access.ts` | isAdult, availableTo, loraAccess, loraUsable, readLoras, readLora |
 | `backend/src/lib/loras/admin.ts` | NOT_ADMIN_LINE, NOT_HERE_LINE, NOT_CONFIRMED_LINE, TRASH_DAYS, patchLora, confirmLora |
@@ -1016,6 +1017,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/styleLock.ts` | pictureStyleAccess, styleOfComponent, styleAccessResolver, componentStyleAccess |
 | `backend/src/lib/subjects.ts` | findEntityByName, ensureSubjectEntity, findSubjectByName, ensurePersonEntity, RELATION_PHRASES, writeRelation |
 | `backend/src/lib/summaryRefresh.ts` | scheduleSummaryRefresh, __setSummaryRefreshDelayForTests, __clearPendingSummaryRefreshesForTests |
+| `backend/src/lib/supportedLocales.ts` | SUPPORTED_LOCALES, isSupportedLocale |
 | `backend/src/lib/surfaceClass.ts` | surfaceClassOf, isWrittenAdultTurn, promptSurfaceClassFor |
 | `backend/src/lib/sweepAbandonedDrafts.ts` | sweepAbandonedDrafts |
 | `backend/src/lib/systemFold.ts` | FOLDED_NOTE_LABEL, foldedBlock, foldLateSystemMessages |

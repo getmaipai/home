@@ -1,0 +1,31 @@
+{
+  "dialect": "Neutral international Spanish, informal tu; no vosotros or regional slang.",
+  "MaiPai": {
+    "es": "MaiPai"
+  },
+  "Home": {
+    "es": "Home"
+  },
+  "Stack": {
+    "es": "Stack"
+  },
+  "Companion": {
+    "es": "compañía"
+  },
+  "Household": {
+    "es": "hogar"
+  },
+  "Repairs": {
+    "es": "Reparaciones"
+  },
+  "Library": {
+    "es": "Biblioteca"
+  },
+  "style": [
+    "Plain words, short sentences, the dad test.",
+    "Every error line says what went wrong, then what to do.",
+    "No em dashes. No exclamation points.",
+    "Keep every {placeholder}, ICU plural and numbered tag exactly as written.",
+    "Brand and product names stay as they are."
+  ]
+}

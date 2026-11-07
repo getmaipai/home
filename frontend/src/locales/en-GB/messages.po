@@ -14,12 +14,13 @@ msgstr ""
 "Plural-Forms: \n"
 
 #. js-lingui-explicit-id
-#: src/shell/Shell.tsx:139
-#: src/shell/Shell.tsx:142
+#: src/i18n.test.tsx:40
+#: src/shell/usePersonLocale.test.tsx:43
 msgid "Search"
 msgstr "Search"
 
 #. js-lingui-explicit-id
-#: src/apps/home/HomePage.tsx:186
+#: src/i18n.chain.test.tsx:96
+#: src/i18n.test.tsx:53
 msgid "Today"
 msgstr "Today"

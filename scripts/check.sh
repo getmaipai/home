@@ -563,6 +563,10 @@ NODE
 
   preflight_stage "pre: UI rules and shrinking baselines"
   (cd frontend && env -u MAIPAI_SKIP_UI_RULES bun run lint:ui-rules >/dev/null)
+  preflight_stage "pre: i18n lint, catalogs and safety review flags"
+  (cd frontend && bun run lint:i18n >/dev/null)
+  # Catalogs current, placeholders intact, no needs-review flag on child, teen, crisis, consent, refusal, spoken, robot or SEARCH-DOWN-EMPTY-01 copy.
+  (cd frontend && bun run i18n:check >/dev/null)
 
   # The typechecks are independent, so they run at once (about 170 s serial, the longest one alone in parallel).
   local -a tc_args=()

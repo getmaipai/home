@@ -2,6 +2,7 @@ import { describe, expect, test, afterEach } from "bun:test";
 import { render, cleanup } from "@testing-library/react";
 import { setupI18n } from "@lingui/core";
 import { I18nProvider, Trans } from "@lingui/react";
+import { fallbackChain } from "@/supportedLocales";
 
 afterEach(cleanup);
 
@@ -45,5 +46,12 @@ describe("i18n runtime API (no macros)", () => {
   test("i18n._() returns real translated text", () => {
     const inst = makeI18n();
     expect(inst._("Search")).toBe("Search");
+  });
+
+  test("an untranslated Spanish id falls back to the English source", () => {
+    const inst = setupI18n({ locale: "es", messages: { es: { Search: "Buscar" }, "en-US": { Today: "Today" } } });
+    const { getByText } = render(<I18nProvider i18n={inst}><Trans id="Today" message="Today" /></I18nProvider>);
+    expect(getByText("Today")).toBeTruthy();
+    expect(fallbackChain("es")).toEqual(["es", "en-US"]);
   });
 });

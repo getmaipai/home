@@ -48,6 +48,27 @@ plugin({
   },
 });
 
+// I18N-F0: `.po` catalogs compile on import in Vite (@lingui/vite-plugin, fallbackLocales applied). Bun has no such loader,
+// so tests get the same compile: the catalog's translations plus its fallback chain, as an ES module exporting `messages`.
+plugin({
+  name: "lingui-po",
+  setup(build) {
+    build.onLoad({ filter: /\.po$/ }, async (args) => {
+      const { createRequire } = await import("node:module");
+      const requireFromCli = createRequire(createRequire(import.meta.url).resolve("@lingui/cli"));
+      const { makeConfig } = requireFromCli("@lingui/conf");
+      const { getCatalogForFile, createCompiledCatalog } = await import("@lingui/cli/api");
+      const { default: linguiConfig } = await import("../lingui.config");
+      const config = makeConfig({ ...linguiConfig, rootDir: new URL("..", import.meta.url).pathname }, { skipValidation: true });
+      const found = getCatalogForFile((await import("node:path")).relative(config.rootDir, args.path), await (await import("@lingui/cli/api")).getCatalogs(config));
+      if (!found) throw new Error(`No Lingui catalog matches ${args.path}`);
+      const { messages } = await found.catalog.getTranslations(found.locale, { fallbackLocales: config.fallbackLocales, sourceLocale: config.sourceLocale });
+      const { source } = createCompiledCatalog(found.locale, messages, { namespace: "es" });
+      return { contents: source, loader: "js" };
+    });
+  },
+});
+
 // getmaipai/home#218: one bun process runs every test file of a shard, so a
 // component a test left mounted keeps polling and fetching, and those requests
 // land on the next file's global fetch mock (EnginesPage.test.tsx counted 4

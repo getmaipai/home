@@ -7,7 +7,7 @@ import { createQueryClient } from "@/lib/queryClient";
 import { retiredManagePageTarget } from "@/shell/pages/settings/settingsRedirects";
 import { settingsPath } from "@/shell/pages/settings/settingsAreas";
 import type { SignedInPerson } from "@/lib/api";
-import { useHouseholdLocale } from "@/shell/useHouseholdLocale";
+import { usePersonLocale } from "@/shell/usePersonLocale";
 import { Progress } from "@maipai/ui/src/primitives/Progress";
 import { lazyNamed } from "@/shell/lazyNamed";
 import { RouteSkeleton } from "@maipai/ui/src/primitives/RouteSkeleton";
@@ -104,7 +104,7 @@ export function App() {
     else loadPerson();
   }, []);
 
-  useHouseholdLocale(!__SETUP_PREVIEW__ && person != null);
+  usePersonLocale(person, !__SETUP_PREVIEW__);
 
   // Kept media copies belong to the signed-in person: tell the worker who that is (null while signed out or expired, so
   // nothing is served), then drop any copy the hub says is gone or changed, now and whenever the browser is back online.

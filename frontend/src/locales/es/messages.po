@@ -1,0 +1,24 @@
+msgid ""
+msgstr ""
+"Content-Type: text/plain; charset=utf-8\n"
+"Language: es\n"
+"Project-Id-Version: \n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: \n"
+"PO-Revision-Date: \n"
+"Last-Translator: \n"
+"Language-Team: \n"
+"Content-Transfer-Encoding: \n"
+"Plural-Forms: \n"
+
+#. js-lingui-explicit-id
+#: src/i18n.test.tsx:40
+#: src/shell/usePersonLocale.test.tsx:43
+msgid "Search"
+msgstr "Buscar"
+
+#. js-lingui-explicit-id
+#: src/i18n.chain.test.tsx:96
+#: src/i18n.test.tsx:53
+msgid "Today"
+msgstr "Hoy"

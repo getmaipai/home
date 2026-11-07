@@ -21,6 +21,18 @@ async function setUpOwner(client: TestClient, displayName = "Sage", secret = "co
 }
 
 describe("setup (first-run owner creation)", () => {
+  test("public locale route returns only the household locale and defaults to en-US", async () => {
+    const client = new TestClient();
+    const before = await client.get("/api/auth/locale");
+    expect(before.status).toBe(200);
+    expect(await before.json()).toEqual({ locale: "en-US" });
+    const { person } = await setUpOwner(client);
+    const after = await client.get("/api/auth/locale");
+    expect(after.status).toBe(200);
+    expect(await after.json()).toEqual({ locale: "en-US" });
+    expect(person.role).toBe("owner");
+  });
+
   test("creates the owner and signs them in", async () => {
     const client = new TestClient();
     const { person } = await setUpOwner(client);

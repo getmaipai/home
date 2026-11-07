@@ -30,9 +30,13 @@ import { toRoster, parsePersonCandidate, personToDbValues } from "@/lib/personSh
 import { validateDisplayName, validateSecret } from "@/lib/validation";
 import { getSettingValueForPerson, SESSION_LOCK_REQUIRED_KEY, SESSION_LOCK_TIMEOUT_KEY } from "@/lib/settings";
 import { setupLocalOnly } from "@/middleware/setupLocalOnly";
+import { householdLocale } from "@/lib/locale";
 
 export const auth = apiRouter();
 auth.use("/setup", setupLocalOnly);
+
+const localeRoute = createRoute({ method: "get", path: "/locale", tags: ["Auth"], summary: "The sign-in language", responses: { 200: { content: { "application/json": { schema: z.object({ locale: z.string() }) } }, description: "Household language or en-US." } } });
+auth.openapi(localeRoute, (c) => c.json({ locale: householdLocale() }, 200));
 
 const RosterSchema = Person.omit({ birthdate: true }).extend({ hasSecret: z.boolean(), pinDigits: z.number().int().nullable(), hasPasskeys: z.boolean(), age_band: z.enum(["child", "teen", "adult"]) });
 

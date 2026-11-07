@@ -16,5 +16,6 @@
   "tools.timer.mode",
   "tools.house.mode",
   "tools.lists.mode",
-  "tools.assist.widened"
+  "tools.assist.widened",
+  "person.locale"
 ]
