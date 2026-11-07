@@ -4,7 +4,7 @@ import type { Context } from "hono";
 import { allowedSources, queryItems, readableIn } from "@/lib/media/appHost";
 import { correctedStamp, getProgress, writeProgress } from "@/lib/media/progress";
 import { coerceNumber } from "@/lib/media/appHost";
-import { queuePodcastAutoRules, exportOpml, getPodcastTranscript, importOpml, pollPodcastNow, saveEpisode, searchPodcastTranscripts, subscribePodcast, unsaveEpisode, unsubscribePodcast, updatePodcastSource } from "@/lib/media/podcasts";
+import { queuePodcastAutoRules, exportOpml, getPodcastTranscript, importOpml, pollPodcastNow, saveEpisode, subscribePodcast, unsaveEpisode, unsubscribePodcast, updatePodcastSource } from "@/lib/media/podcasts";
 import { jsonBody } from "@/lib/validation";
 import { gateMediaApp } from "@/middleware/mediaAppGate";
 import { apiRouter, refuseWith } from "@/lib/openapi";
@@ -85,7 +85,7 @@ export async function podcastShowEpisodeRows(person: PersonRow, id: string): Pro
 
 export function podcastRoutes() {
   const routes = apiRouter();
-  gateMediaApp(routes, "podcasts", ["/data/directory", "/preview/*", "/transcript/*", "/transcripts/*", "/save", "/bookmark", "/snips", "/subscribe", "/unsubscribe", "/source", "/filters", "/filters/*", "/opml/*", "/directory/*"]);
+  gateMediaApp(routes, "podcasts", ["/data/directory", "/preview/*", "/transcript/*", "/save", "/bookmark", "/snips", "/subscribe", "/unsubscribe", "/source", "/filters", "/filters/*", "/opml/*", "/directory/*"]);
 
   routes.post("/data/directory", requireAuth, async (c, next) => {
     const person = c.get("person");
@@ -126,12 +126,6 @@ const lookupPreferringV4: DnsLookup = async (hostname) => {
     const person = c.get("person");
     const result = await getPodcastTranscript(person, c.req.param("media_id"));
     return result.ok ? c.json({ ok: true as const, ...result.value }, 200) : refuseWith(c, result);
-  });
-
-  routes.get("/transcripts/search", requireAuth, async (c, next) => {
-    const person = c.get("person");
-    const query = (c.req.query("q") ?? "").trim().slice(0, 120);
-    return c.json({ ok: true as const, hits: searchPodcastTranscripts(person, query) }, 200);
   });
 
   routes.post("/save", requireAuth, async (c, next) => {

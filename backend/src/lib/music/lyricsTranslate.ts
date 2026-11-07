@@ -5,7 +5,6 @@ import { musicLyricTranslations } from "@/db/schema";
 import { nextHlc } from "@/lib/hlc";
 import { complete } from "@/lib/llm";
 import type { PersonRow } from "@/types";
-import { readableItem } from "@/lib/media/access";
 import { trips } from "@/lib/media/band";
 import { getPersonSettingValue } from "@/lib/settings";
 
@@ -61,12 +60,6 @@ export async function fillTranslation(mediaId: string, language: string, lines: 
 export function translationLanguage(person: PersonRow): string {
   const value = getPersonSettingValue(person, "music.lyrics_translate");
   return typeof value === "string" ? value.trim() : "";
-}
-
-export function readableLyrics(person: PersonRow, mediaId: string): string[] | null {
-  const item = readableItem(person, mediaId);
-  const lyrics = item?.lyrics;
-  return item?.kind === "track" && lyrics?.timed?.length ? lyrics.timed.map((line: { line: string }) => line.line) : null;
 }
 
 export function cachedMadeTranslation(mediaId: string, language: string, lines: string[]): (string | null)[] | null {
