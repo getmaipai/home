@@ -303,8 +303,9 @@ export function validateSelectorValue(keyDef: SettingsKey, value: unknown): Sett
     case "media":
       // No Home Assistant entity/area concept and no media library exist
       // yet (both later integrations/features); loose string validation
-      // only, a documented gap until those land.
-      if (typeof value !== "string") return { ok: false, status: 400, error: "expected a string" };
+      // only, a documented gap until those land. A list of ids is a valid
+      // entity value too (safety.alarm.sensors, synths.real_people_allowed).
+      if (typeof value !== "string" && !(Array.isArray(value) && value.every((entry) => typeof entry === "string"))) return { ok: false, status: 400, error: "expected a string or a list of ids" };
       break;
     case "location": {
       const multiple = range?.multiple === true;
