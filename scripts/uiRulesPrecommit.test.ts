@@ -38,6 +38,9 @@ beforeAll(() => {
   cpSync(join(REPO, "frontend/package.json"), join(dir, "frontend/package.json"));
   cpSync(join(REPO, "frontend/bunfig.toml"), join(dir, "frontend/bunfig.toml"));
   cpSync(join(REPO, "frontend/tests"), join(dir, "frontend/tests"), { recursive: true });
+  // I18N-F1: the test preload imports `../src/i18n`, which reads the `.po` catalogs through `@/` (tsconfig paths) and lingui's config.
+  for (const f of ["frontend/tsconfig.json", "frontend/lingui.config.ts", "frontend/src/i18n.ts", "frontend/src/supportedLocales.ts"]) cpSync(join(REPO, f), join(dir, f));
+  cpSync(join(REPO, "frontend/src/locales"), join(dir, "frontend/src/locales"), { recursive: true });
   cpSync(join(REPO, "scripts/ui-rules-precommit.sh"), join(dir, "scripts/ui-rules-precommit.sh"));
   symlinkSync(join(REPO, "node_modules"), join(dir, "node_modules"));
   symlinkSync(join(REPO, "frontend/node_modules"), join(dir, "frontend/node_modules"));

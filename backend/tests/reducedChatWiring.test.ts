@@ -4,7 +4,7 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { createStackClient } from "@/lib/stack/client";
 import { __setStackClientForTests } from "@/lib/stackEngine";
-import { collectHealth } from "@/lib/healthSnapshot";
+import { collectHealth, __resetChatPauseTrackingForTests } from "@/lib/healthSnapshot";
 import { __setRoleHealthForTests } from "@/lib/roleHealth";
 import { reducedChatState, resetReducedTruthForTests, setReducedChat } from "@/lib/reducedChat";
 import { noteChatInFlight, registerQueueProvider, releaseHouseholdQueue, resetActivePlanForTests, isolateQueueProvidersForTests, resetChatActivityForTests, resetDownshiftForTests, resetFitMemoryForTests, resetTierStateForTests, setBudgetReader, activeProfileLine, type QueueJob } from "@/lib/jobs/householdQueue";
@@ -56,7 +56,8 @@ function maxJob(id: string): { job: QueueJob; remove: () => void } {
   const remove = registerQueueProvider(() => [{ job, save: () => undefined, applyFit: () => undefined, release: async () => { job.state = "running"; job.remainingSeconds = 600; } }]);
   return { job, remove };
 }
-const chatNotice = async () => (await collectHealth()).engines.chat;
+// AUDIT-PERF-01 caches the snapshot for 2 s; this test reads the line right after each Stack change, so it drops the cache first.
+const chatNotice = async () => { __resetChatPauseTrackingForTests(); return (await collectHealth()).engines.chat; };
 
 describe("Reduced chat reaches the Stack", () => {
   test("a Max job asks the Stack to enter, the line shows from the Stack's truth, and at the turn boundary the Stack is asked to leave", async () => {
