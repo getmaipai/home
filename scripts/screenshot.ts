@@ -2519,6 +2519,8 @@ async function captureFitVerdictCard(browser: Browser, sessionValue: string, vie
       });
     });
     await page.goto(`${BASE_URL}/settings/home/ai`);
+    // The chat model card lives on AI and models > Advanced now (it was the whole Engines and AI page).
+    await page.getByRole("tab", { name: "Advanced" }).click();
     if (state === "compare") {
       const links = [
         "https://huggingface.co/example-org/example-model-GGUF/resolve/main/example-model-Q4_K_M.gguf",
@@ -10216,24 +10218,31 @@ async function captureDocsShots(browser: Browser, sessionValue: string): Promise
     await page.goto(`${BASE_URL}/sign-in`);
     await page.getByRole("button", { name: "Sage" }).waitFor({ timeout: 15000 });
   }, { signedIn: false });
+  // A PIN person for the two PIN pictures (Sage signs in with a password); removed again after.
+  const pinSeed = await fetch(`${BASE_URL}/api/people`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...cookie },
+    body: JSON.stringify({ displayName: "Quill", role: "adult", secret: "2468" }),
+  });
+  const pinPersonId = pinSeed.ok ? ((await pinSeed.json()) as { id?: string }).id : undefined;
   await shot("sign-in-pin", desktop, "light", async (page) => {
     await page.goto(`${BASE_URL}/sign-in`);
-    await page.getByRole("button", { name: "Sage" }).click();
-    await page.getByText("Enter your PIN").waitFor({ timeout: 15000 });
+    await page.getByRole("button", { name: "Quill" }).click();
+    await page.getByText(/Enter your \d+-digit passcode/).waitFor({ timeout: 15000 });
   }, { signedIn: false });
   await shot("sign-in-wrong-pin", desktop, "light", async (page) => {
     await page.goto(`${BASE_URL}/sign-in`);
-    await page.getByRole("button", { name: "Sage" }).click();
-    await page.getByText("Enter your PIN").waitFor({ timeout: 15000 });
+    await page.getByRole("button", { name: "Quill" }).click();
+    await page.getByText(/Enter your \d+-digit passcode/).waitFor({ timeout: 15000 });
     await page.keyboard.type("0000");
-    await page.getByText(/Use a password instead/).first().waitFor({ timeout: 15000 });
-    await page.getByText(/Sign in with a password\?/).waitFor({ timeout: 15000 });
+    await page.getByText(/Using a password\? Tap/).waitFor({ timeout: 15000 });
   }, { signedIn: false });
+  if (pinPersonId) await fetch(`${BASE_URL}/api/people/${pinPersonId}`, { method: "DELETE", headers: cookie });
 
   // Chat: an empty first chat, and the delete menu on a saved chat.
   await fetch(`${BASE_URL}/api/conversations/clear`, { method: "POST", headers: { "Content-Type": "application/json", ...cookie }, body: "{}" });
   await shot("chat-empty", desktop, "light", async (page) => {
-    await ready(page, "/chat", /How can I help/);
+    await ready(page, "/chat", /New chat/);
   });
   {
     const db = new Database(join(DATA_DIR, "hub.db"));
@@ -10266,16 +10275,15 @@ async function captureDocsShots(browser: Browser, sessionValue: string): Promise
     await page.getByRole("tab", { name: "Topics" }).click();
     await settleAnimations(page);
   });
-  await shot("profile-memories", desktop, "light", async (page) => {
-    await ready(page, "/people", "Sage");
-    await page.getByText("Sage", { exact: true }).first().click();
-    await page.getByRole("tab", { name: "Memories" }).click();
-    await page.getByText(/tea with honey/).waitFor({ timeout: 10000 });
-  });
+  // Memories live in Settings > Your data and apps > Data and privacy (the profile has no Memories tab any more).
+  const openMyMemories = async (page: import("playwright").Page) => {
+    await page.goto(`${BASE_URL}/settings`);
+    await page.getByRole("link", { name: "Your data and apps" }).first().click();
+    await page.getByText(/tea with honey/).waitFor({ timeout: 15000 });
+  };
+  await shot("profile-memories", desktop, "light", openMyMemories);
   await shot("forget-confirm", desktop, "light", async (page) => {
-    await ready(page, "/people", "Sage");
-    await page.getByText("Sage", { exact: true }).first().click();
-    await page.getByRole("tab", { name: "Memories" }).click();
+    await openMyMemories(page);
     await page.getByRole("button", { name: "Clear all" }).click();
     await page.getByRole("alertdialog").or(page.getByRole("dialog")).first().waitFor({ timeout: 10000 });
   });
@@ -10322,7 +10330,9 @@ async function captureDocsShots(browser: Browser, sessionValue: string): Promise
     await page.getByRole("button", { name: "Select" }).waitFor({ timeout: 15000 });
   });
   await shot("settings-engines", desktop, "light", async (page) => {
-    await ready(page, "/settings/home/ai", /Engines and AI/);
+    await ready(page, "/settings/home/ai", /AI and models/);
+    await page.getByRole("tab", { name: "Engines" }).click();
+    await settleAnimations(page);
   });
   await shot("engines-another-computer", desktop, "light", async (page) => {
     await ready(page, "/settings/home/ai", /Engine computer link/);
@@ -10342,6 +10352,8 @@ async function captureDocsShots(browser: Browser, sessionValue: string): Promise
     await page.getByText(/\.tar|MB|KB|bytes/i).first().waitFor({ timeout: 30000 });
   });
   await shot("repairs-fix", desktop, "light", async (page) => {
+    // Only the seeded search-helper row: the throwaway backend has no Stack, voice or satellite, and those rows would read as real faults.
+    { const db = new Database(join(DATA_DIR, "hub.db")); db.query("DELETE FROM issues WHERE id != 'issue-docsrepair1'").run(); db.close(); }
     await ready(page, "/repairs", "The search helper stopped");
     await page.getByText("Restart the search helper").first().waitFor({ timeout: 10000 });
   });
