@@ -39,7 +39,7 @@ export type ExtractionResult =
   | { ok: false; status: 400 | 403 | 404 | 413 | 500; error: string };
 
 type TextRunner = (bytes: Uint8Array, mediaType: string) => Promise<string> | string;
-type OcrRunner = (bytes: Uint8Array, mediaType: string) => string;
+type OcrRunner = (bytes: Uint8Array, mediaType: string) => Promise<string> | string;
 
 let tikaRunnerForTests: TextRunner | null = null;
 let rapidOcrRunnerForTests: OcrRunner | null = null;
@@ -126,22 +126,19 @@ function configuredCommand(envName: string): string[] {
   return command;
 }
 
-function runRapidOcrProcess(bytes: Uint8Array): string {
+async function runRapidOcrProcess(bytes: Uint8Array): Promise<string> {
   // The local RapidOCR adapter's contract is bytes on stdin and UTF-8 text
   // on stdout. The command is administrator-configured, never derived from
   // attachment content, and this process is not given a URL or a network
   // input. A production install pins the command to its RapidOCR runner.
-  const process = Bun.spawnSync(atBackgroundPriority(configuredCommand(RAPIDOCR_COMMAND_ENV)), {
-    stdin: bytes,
+  // AUDIT-PERF-01: async like the Tika path, so up to 15 s of OCR never blocks the event loop.
+  const process = Bun.spawn(atBackgroundPriority(configuredCommand(RAPIDOCR_COMMAND_ENV)), {
+    stdin: "pipe",
     stdout: "pipe",
     stderr: "pipe",
     env: {},
-    timeout: LOCAL_PARSER_TIMEOUT_MS,
   });
-  if (!process.success) throw new Error(`local OCR exited with ${process.signalCode ?? `code ${process.exitCode}`}`);
-  const output = process.stdout;
-  if (!(output instanceof Uint8Array) || output.byteLength > MAX_EXTRACTED_TEXT_BYTES) throw new Error("OCR output exceeded its limit");
-  return new TextDecoder().decode(output);
+  return runProcess(process, bytes);
 }
 
 function pagesFromTikaText(text: string): DocumentPage[] {
@@ -176,12 +173,12 @@ export type OcrResult =
   | { ok: false; code: "invalid_input" | "capability_missing" | "internal_error"; error: string };
 
 /** Run the local RapidOCR boundary for a scan, never a document parser. */
-export function runRapidOcr(bytes: Uint8Array, mediaType: string): OcrResult {
+export async function runRapidOcr(bytes: Uint8Array, mediaType: string): Promise<OcrResult> {
   const normalized = normalizeMediaType(mediaType);
   if (!normalized || !normalized.startsWith("image/")) return { ok: false, code: "invalid_input", error: "OCR needs an image input" };
   if (bytes.byteLength > MAX_DOCUMENT_BYTES) return { ok: false, code: "invalid_input", error: "image is too large for OCR" };
   try {
-    const text = (rapidOcrRunnerForTests ?? runRapidOcrProcess)(bytes, normalized);
+    const text = await (rapidOcrRunnerForTests ?? runRapidOcrProcess)(bytes, normalized);
     if (text.length > MAX_EXTRACTED_TEXT_BYTES) return { ok: false, code: "internal_error", error: "OCR output exceeded its limit" };
     return { ok: true, text: text.trim() };
   } catch (err) {

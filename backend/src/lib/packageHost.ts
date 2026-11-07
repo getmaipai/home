@@ -2897,12 +2897,12 @@ export function createHost(actor: PersonRow, manifest: PackageManifest, secrets:
       },
     },
     ocr: {
-      read(image: unknown): string {
+      async read(image: unknown): Promise<string> {
         requirePermission("ocr");
         const input = image as { bytes?: unknown; media_type?: unknown };
         const bytes = input instanceof Uint8Array ? input : input?.bytes instanceof Uint8Array ? input.bytes : null;
         if (!bytes || typeof input?.media_type !== "string") throw new HostError("invalid_input", "host.ocr.read needs image bytes and media_type");
-        const result = runRapidOcr(bytes, input.media_type);
+        const result = await runRapidOcr(bytes, input.media_type);
         if (!result.ok) throw new HostError(result.code, result.error);
         return result.text;
       },
