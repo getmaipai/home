@@ -1,0 +1,3 @@
+// Bun Snapshot v1, https://bun.sh/docs/test/snapshots
+
+exports[`an English adult, and a locale the Spanish table does not cover (en-GB), get null so the stored English text is spoken as before 1`] = `"Alarm: gym at seven thirty A M"`;
