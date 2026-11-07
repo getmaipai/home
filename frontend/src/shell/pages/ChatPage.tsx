@@ -227,7 +227,7 @@ function useChatRuntime(person: Roster, closeSheet: () => void, temporaryNext: b
   const isOwnerOrAdmin = isOwnerOrAdminRole(person.role);
   const enginesQuery = useQuery<EnginesOverview>({ queryKey: ["engines"], queryFn: () => api.engines(), enabled: isOwnerOrAdmin });
   const chatModelsQuery = useQuery<ChatModelsResponse>({ queryKey: ["chatModels"], queryFn: () => api.chatModels(), enabled: isAdultBand && !isOwnerOrAdmin });
-  const photoSettingsQuery = useQuery({ queryKey: ["settingsValues", `person:${person.id}`], queryFn: () => api.settingsValues(`person:${person.id}`) });
+  const photoSettingsQuery = useQuery({ queryKey: ["settings-values", `person:${person.id}`], queryFn: () => api.settingsValues(`person:${person.id}`) });
   const photoSettings = Array.isArray(photoSettingsQuery.data) ? photoSettingsQuery.data : [];
   const photoSetting = photoSettings.find((setting) => setting.key === "chat.photo_uploads");
   // Only an explicit, loaded value turns this on: nothing is sent while the setting is still loading.
@@ -818,7 +818,7 @@ function ChatHeaderDataBridge({ autoReadReplies, setAutoReadReplies, ttsAvailabl
   const aui = useAui();
   const queryClient = useQueryClient();
   const companionList = useQuery({ queryKey: ["companions"], queryFn: api.companions });
-  const personSettings = useQuery({ queryKey: ["settingsValues", `person:${person.id}`], queryFn: () => api.settingsValues(`person:${person.id}`) });
+  const personSettings = useQuery({ queryKey: ["settings-values", `person:${person.id}`], queryFn: () => api.settingsValues(`person:${person.id}`) });
   const conversation = useQuery({ queryKey: ["conversation", conversationId], queryFn: () => api.conversation(conversationId!), enabled: Boolean(conversationId) });
   const companionMutation = useHubMutation({ verb: "change this chat's companion", mutationFn: async (perform: () => Promise<void>) => perform() });
   // Memoized: the header data hook re-sends on a changed reference, and a fresh array per render would loop.
@@ -865,7 +865,7 @@ function ChatHeaderDataBridge({ autoReadReplies, setAutoReadReplies, ttsAvailabl
           if (companionId === null) { toast.error("A new chat always uses one of your companions. Choose a companion to switch."); return; }
           await api.setSetting(`person:${person.id}`, "persona.active_id", companionId);
           await Promise.all([
-            queryClient.invalidateQueries({ queryKey: ["settingsValues", `person:${person.id}`] }),
+            queryClient.invalidateQueries({ queryKey: ["settings-values", `person:${person.id}`] }),
             queryClient.invalidateQueries({ queryKey: ["companion-avatar"] }),
           ]);
           return;
@@ -1077,7 +1077,7 @@ function ProjectResultReload() {
 function ChatAmbientRing({ isSpeaking, voiceListening, wakeListening, person, conversationId }: { isSpeaking: boolean; voiceListening: boolean; wakeListening: boolean; person: Roster; conversationId?: string }) {
   const messages = useAuiState((state) => state.thread.messages);
   const companionList = useQuery({ queryKey: ["companions"], queryFn: api.companions });
-  const personSettings = useQuery({ queryKey: ["settingsValues", `person:${person.id}`], queryFn: () => api.settingsValues(`person:${person.id}`) });
+  const personSettings = useQuery({ queryKey: ["settings-values", `person:${person.id}`], queryFn: () => api.settingsValues(`person:${person.id}`) });
   const conversation = useQuery({ queryKey: ["conversation", conversationId], queryFn: () => api.conversation(conversationId!), enabled: Boolean(conversationId) });
   const pickedId = Array.isArray(personSettings.data) ? personSettings.data.find((setting) => setting.key === "persona.active_id")?.value : undefined;
   const ambientId = (typeof pickedId === "string" && companionList.data?.companions?.some(({ id }) => id === pickedId) ? pickedId : undefined) ?? companionList.data?.default_id ?? null;

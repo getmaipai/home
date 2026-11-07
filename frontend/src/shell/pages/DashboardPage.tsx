@@ -1,3 +1,4 @@
+import { useSharedReads } from "@/lib/sharedReads";
 import { useQuery } from "@tanstack/react-query";
 
 import { Link } from "react-router-dom";
@@ -24,8 +25,9 @@ export function DashboardPage({ person }: { person: Roster }) {
   const admin = isOwnerOrAdminRole(person.role);
   const { on: incognito } = useIncognitoContext();
   const widgets = useQuery({ queryKey: ["home-widgets"], queryFn: api.homeWidgets, retry: false });
+  const reads = useSharedReads();
   const settingKey = ["settings", "person", person.id, "ui.home_layout"] as const;
-  const layoutSetting = useQuery({ queryKey: settingKey, queryFn: async () => (await api.settingsValues(`person:${person.id}`)).find((row) => row.key === "ui.home_layout"), retry: false,
+  const layoutSetting = useQuery({ queryKey: settingKey, queryFn: async () => (await reads.settingsValues(`person:${person.id}`)).find((row) => row.key === "ui.home_layout"), retry: false,
     // Coming back from Settings must show the layout just chosen, not the copy cached up to a minute ago.
     staleTime: 0, refetchOnMount: "always" });
   const rawLayout = layoutSetting.data?.value;

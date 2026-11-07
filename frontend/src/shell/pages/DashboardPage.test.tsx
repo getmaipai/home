@@ -128,6 +128,8 @@ describe("DashboardPage (Home)", () => {
     await first.findByTestId("home-today-card");
     first.unmount();
     board.restore();
+    // The Settings write refreshes the person's shared settings read (SettingsRenderer sets it; a test with no write invalidates it).
+    await queryClient.invalidateQueries({ queryKey: ["settings-values"] });
     const ask = mockFetch({ layout: "ask", home: { hero: null, cards: [widget("a", "Weather")], more: [] }, widgets: [widget("a", "Weather")], widgetData: { a: data("Row a") } });
     try {
       const second = render(tree());

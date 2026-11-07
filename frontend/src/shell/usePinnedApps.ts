@@ -1,6 +1,7 @@
 import { useMemo } from "react";
 import { useIsMutating, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
+import { useSharedReads } from "@/lib/sharedReads";
 import { defaultPinnedRoutes } from "@/shell/appCatalog";
 import { useAppRows } from "@/shell/useAppCatalog";
 
@@ -35,11 +36,12 @@ export function usePinnedApps(personId: string): {
   error: string | null;
 } {
   const queryClient = useQueryClient();
+  const reads = useSharedReads();
 
   const query = useQuery({
     queryKey: queryKey(personId),
     queryFn: async () => {
-      const values = await api.settingsValues(`person:${personId}`);
+      const values = await reads.settingsValues(`person:${personId}`);
       const row = values.find((v) => v.key === "ui.pinned_apps");
       return row?.source === "user" ? parsePinned(row.value) : null;
     },
@@ -64,7 +66,11 @@ export function usePinnedApps(personId: string): {
     onError: (_err, _next, context) => {
       if (context) queryClient.setQueryData(queryKey(personId), context.previous ?? null);
     },
-    onSettled: () => queryClient.invalidateQueries({ queryKey: queryKey(personId) }),
+    // The write changed the person's settings: the shared read (`lib/sharedReads.ts`) is stale too, so the refetch below asks the hub.
+    onSettled: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["settings-values", `person:${personId}`] });
+      await queryClient.invalidateQueries({ queryKey: queryKey(personId) });
+    },
   });
 
   const rows = useAppRows();

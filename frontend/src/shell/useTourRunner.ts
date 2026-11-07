@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useLocation } from "react-router-dom";
 import type { Tour as ManifestTour } from "@maipai/spec/gen/ts/tour.js";
+import { useSharedReads } from "@/lib/sharedReads";
 import { api, type InstalledPackage, type Roster, type TourProgressRecord } from "@/lib/api";
 
 export interface ActiveTour {
@@ -69,6 +70,7 @@ function isBusy() {
 
 export function useTourRunner(person: Roster) {
   const { pathname } = useLocation();
+  const reads = useSharedReads();
   const [active, setActive] = useState<ActiveTour | null>(null);
   const [tourListing, setTourListing] = useState<{ page: string; tours: AvailableTour[] }>({ page: "", tours: [] });
   const sequence = useRef(0);
@@ -93,14 +95,14 @@ export function useTourRunner(person: Roster) {
         return;
       }
       const lastStep = stepId ?? selected.tour.steps[0]?.id ?? "unknown";
-      void api.saveTourProgress({ tour_id: selected.tour.id, package_id: selected.packageId, version: selected.tour.version, status, step_reached: lastStep }).catch(() => {});
+      void api.saveTourProgress({ tour_id: selected.tour.id, package_id: selected.packageId, version: selected.tour.version, status, step_reached: lastStep }).then(() => reads.toursProgressSaved()).catch(() => {});
       selected = null;
       setActive(null);
     };
     const onPageHide = () => finish("dismissed");
     window.addEventListener("pagehide", onPageHide);
 
-    void Promise.all([api.plugins(), api.tourProgress(), api.settingsValues(`person:${person.id}`)]).then(([packages, records, settings]) => {
+    void Promise.all([reads.plugins(), reads.toursProgress(), reads.settingsValues(`person:${person.id}`)]).then(([packages, records, settings]) => {
       if (cancelled || currentSequence !== sequence.current) return;
       const role = person.role;
       const age = person.age_band ?? "adult";
@@ -160,7 +162,7 @@ export function useTourRunner(person: Roster) {
       if (timeout) clearTimeout(timeout);
       if (selected) finish("dismissed");
     };
-  }, [key, person.age_band, person.id, person.role, pathname]);
+  }, [key, person.age_band, person.id, person.role, pathname, reads]);
 
   return {
     active,

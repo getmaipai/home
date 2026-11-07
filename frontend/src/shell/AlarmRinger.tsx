@@ -13,7 +13,6 @@ import { useHubMutation } from "@/lib/useHubMutation";
 import styles from "@/shell/alarmRinger.module.css";
 
 const RECENT_MS = 2 * 60_000;
-const ALARM_SETTING_KEYS = ["alarms.sound", "alarms.volume", "alarms.snooze_minutes"] as const;
 type AlarmDelivery = NotificationDeliveryView & { subjectJobId?: string | null };
 
 function formattedTime(value: string) {
@@ -76,7 +75,7 @@ export function AlarmRinger({ person }: { person: Roster | null }) {
   const query = useNotificationsQuery();
   const queryClient = useQueryClient();
   const scope = person ? `person:${person.id}` : "";
-  const settingQuery = useQuery({ queryKey: ["settings-values", scope, ALARM_SETTING_KEYS], queryFn: () => api.settingsValues(scope), enabled: Boolean(person) });
+  const settingQuery = useQuery({ queryKey: ["settings-values", scope], queryFn: () => api.settingsValues(scope), enabled: Boolean(person) });
   const seenIds = useRef<Set<string> | null>(null);
   const arrivedIds = useRef<Set<string>>(new Set());
   const playback = useRef<AlarmPlayback | null>(null);

@@ -1,3 +1,4 @@
+import { useSharedReads } from "@/lib/sharedReads";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { Progress } from "@maipai/ui/src/primitives/Progress";
@@ -110,7 +111,7 @@ function useAnchorBox(active: boolean): { left: number; right: number } | null {
 /** The one install line, pinned to the bottom of the page: what is installing, why it matters and how far
  * along. People who can act on it (owner, admin) open it like an accordion for each install's size, speed,
  * files, Cancel and Try again; everyone else sees the same line, not expandable. */
-export function InstallDock({ admin, read = api.installStatus, readJobs = api.jobs, retry = api.installRetry, stop = api.stopJob, repairsHref = "/repairs" }: {
+export function InstallDock({ admin, read: readProp, readJobs: readJobsProp, retry = api.installRetry, stop = api.stopJob, repairsHref = "/repairs" }: {
   admin: boolean;
   read?: () => Promise<InstallStatusView>;
   readJobs?: () => Promise<HomeJobView[]>;
@@ -118,6 +119,10 @@ export function InstallDock({ admin, read = api.installStatus, readJobs = api.jo
   stop?: (id: string) => Promise<unknown>;
   repairsHref?: string;
 }) {
+  // AUDIT-UI-01: the default reads go through the shared query client, so the strip, the Ask box and the activity line share one request.
+  const reads = useSharedReads();
+  const read = readProp ?? reads.installStatus;
+  const readJobs = readJobsProp ?? reads.jobs;
   const [status, setStatus] = useState<InstallStatusView | null>(null);
   const [jobs, setJobs] = useState<HomeJobView[]>([]);
   const [open, setOpen] = useState(false);

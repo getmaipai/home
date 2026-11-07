@@ -1,3 +1,4 @@
+import { useSharedReads } from "@/lib/sharedReads";
 import { useEffect, useState, type ReactNode } from "react";
 import { Link } from "react-router-dom";
 import { JobProgress } from "@maipai/ui/src/elements/job-progress";
@@ -22,7 +23,7 @@ export function installTitle(status: Pick<InstallStatusView, "state" | "stageLab
 /** One line of install progress: the AI engine installing, then the AI models downloading in the
  * background. It hides itself when nothing is installing or everything
  * has landed. Polls fast while moving, slowly otherwise. */
-export function InstallStrip({ detailsHref = "/settings/ai?tab=overview", read = api.installStatus, retry = api.installRetry, compact = false, frame }: {
+export function InstallStrip({ detailsHref = "/settings/ai?tab=overview", read: readProp, retry = api.installRetry, compact = false, frame }: {
   /** Wraps the compact line in a container that exists only while there is something to show (no empty box when idle). */
   frame?: (line: ReactNode) => ReactNode;
   /** One line (what is installing, percent, a thin bar) for the wizard, instead of the full panel. */
@@ -33,6 +34,8 @@ export function InstallStrip({ detailsHref = "/settings/ai?tab=overview", read =
   /** What the strip's Try again does. Setup before the owner exists restarts the install through the setup route. */
   retry?: () => Promise<unknown>;
 }) {
+  const reads = useSharedReads();
+  const read = readProp ?? reads.installStatus;
   const [status, setStatus] = useState<InstallStatusView | null>(null);
   const [retryError, setRetryError] = useState<string | null>(null);
 

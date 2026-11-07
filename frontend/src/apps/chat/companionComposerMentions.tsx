@@ -11,7 +11,7 @@ export function CompanionComposerMentions({ children }: { children: ReactNode })
   const person = useContext(WakeWordPersonContext);
   const conversationId = useContext(DraftConversationContext);
   const shells = useCompanionShells();
-  const settings = useQuery({ queryKey: ["settingsValues", `person:${person?.id ?? ""}`], queryFn: () => api.settingsValues(`person:${person!.id}`), enabled: Boolean(person?.id), retry: false });
+  const settings = useQuery({ queryKey: ["settings-values", `person:${person?.id ?? ""}`], queryFn: () => api.settingsValues(`person:${person!.id}`), enabled: Boolean(person?.id), retry: false });
   const currentConversation = useQuery({ queryKey: ["conversation", conversationId], queryFn: () => api.conversation(conversationId!), enabled: Boolean(conversationId), retry: false });
   const companions = useQuery({ queryKey: ["companions"], queryFn: api.companions, retry: false });
   const selected = (Array.isArray(settings.data) ? settings.data : []).find((entry) => entry.key === "persona.active_id")?.value;

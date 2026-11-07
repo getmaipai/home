@@ -10,7 +10,7 @@ export function useAmbientCompanion(person: Roster) {
   const { pathname } = useLocation();
   const navigate = useNavigate();
   const scope = `person:${person.id}`;
-  const settings = useQuery({ queryKey: ["settingsValues", scope], queryFn: () => api.settingsValues(scope) });
+  const settings = useQuery({ queryKey: ["settings-values", scope], queryFn: () => api.settingsValues(scope) });
   const values = Array.isArray(settings.data) ? settings.data : [];
   const valueOf = (key: string) => values.find((setting) => setting.key === key)?.value;
   const settingsResolved = settings.isSuccess || settings.isError;

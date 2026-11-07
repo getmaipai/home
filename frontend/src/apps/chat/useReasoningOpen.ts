@@ -1,6 +1,7 @@
 import { useEffect } from "react";
 import { create } from "zustand";
 import { api, type Roster } from "@/lib/api";
+import { useSharedReads } from "@/lib/sharedReads";
 
 // `ui.reasoning_open` (person scope, backend/src/settings/uiKeys.ts): whether
 // a finished reply's reasoning is shown expanded. Default collapsed. One
@@ -23,10 +24,11 @@ export function useReasoningOpen(person: Pick<Roster, "id"> | null): [boolean, (
   const id = person?.id ?? "";
   const open = useStore((s) => s.byPersonId[id] ?? false);
   const setStore = useStore((s) => s.set);
+  const reads = useSharedReads();
   useEffect(() => {
     if (!id || fetched.has(id)) return;
     fetched.add(id);
-    api
+    reads
       .settingsValues(`person:${id}`)
       .then((values) => {
         const found = values.find((v) => v.key === "ui.reasoning_open");
@@ -35,7 +37,7 @@ export function useReasoningOpen(person: Pick<Roster, "id"> | null): [boolean, (
       .catch(() => {
         fetched.delete(id);
       });
-  }, [id, setStore]);
+  }, [id, setStore, reads]);
   const setOpen = (next: boolean) => {
     setStore(id, next);
     if (id) api.setSetting(`person:${id}`, "ui.reasoning_open", next).catch(() => {});

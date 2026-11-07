@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { api } from "@/lib/api";
 import { useHubMutation } from "@/lib/useHubMutation";
+import { useSharedReads } from "@/lib/sharedReads";
 
 export type Appearance = "system" | "light" | "dark";
 
@@ -40,13 +41,14 @@ export function useAppearance(personId: string): {
   setAppearance: (value: Appearance) => void;
 } {
   const [appearance, setAppearanceState] = useState<Appearance>("system");
+  const reads = useSharedReads();
   const touched = useRef({ personId, value: false });
   const save = useHubMutation({ verb: "save your appearance", mutationFn: (value: Appearance) => api.setSetting(`person:${personId}`, "ui.appearance", value) });
 
   useEffect(() => {
     let cancelled = false;
     if (touched.current.personId !== personId) { touched.current.personId = personId; touched.current.value = false; setAppearanceState("system"); }
-    api
+    reads
       .settingsValues(`person:${personId}`)
       .then((values) => {
         if (cancelled || touched.current.value) return;
@@ -60,7 +62,7 @@ export function useAppearance(personId: string): {
         // blocking the shell from rendering over a settings fetch.
       });
     return () => { cancelled = true; };
-  }, [personId]);
+  }, [personId, reads]);
 
   useEffect(() => {
     applyAppearance(appearance);

@@ -160,7 +160,7 @@ function CompanionSettings({ person, companionId, bot, onChoose }: { person: Ros
         await api.setSetting(scope, "persona.active_id", value);
         await api.setSetting(scope, "companions.ambient_bot", "");
       }
-      await Promise.all([queryClient.invalidateQueries({ queryKey: ["settingsValues", scope] }), queryClient.invalidateQueries({ queryKey: ["companion-avatar"] }), queryClient.invalidateQueries({ queryKey: ["devices", "robots"] })]);
+      await Promise.all([queryClient.invalidateQueries({ queryKey: ["settings-values", scope] }), queryClient.invalidateQueries({ queryKey: ["companion-avatar"] }), queryClient.invalidateQueries({ queryKey: ["devices", "robots"] })]);
       onChoose?.(value);
     } catch { toast.error("Could not change the companion. Check your connection and try again."); }
   };
