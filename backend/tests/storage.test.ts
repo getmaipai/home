@@ -57,13 +57,16 @@ describe("storageSummary()", () => {
   });
 
   test("counts downloaded vision models in the vision_models area", () => {
+    // Other tests in the same run may have fetched real face models into this data dir, so measure the growth, not the total,
+    // and remove only the fixture (never the models another test downloaded).
     mkdirSync(visionDir, { recursive: true });
+    const before = storageSummary().areas.find((entry) => entry.area === "vision_models")?.bytes ?? 0;
     writeFileSync(join(visionDir, "fixture.onnx"), "model-bytes");
     try {
       const area = storageSummary().areas.find((entry) => entry.area === "vision_models");
-      expect(area?.bytes).toBe(Buffer.byteLength("model-bytes"));
+      expect((area?.bytes ?? 0) - before).toBe(Buffer.byteLength("model-bytes"));
     } finally {
-      rmSync(visionDir, { recursive: true, force: true });
+      rmSync(join(visionDir, "fixture.onnx"), { force: true });
     }
   });
 });
