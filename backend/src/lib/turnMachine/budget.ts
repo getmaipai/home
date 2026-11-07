@@ -193,6 +193,9 @@ export function toolOfferLabel(manifest: { kind?: string; args?: unknown; offer?
   return null;
 }
 
+/** TOOL-OFFER-VOICEOVER-01: past the cap, after `change_voice` and the shrink orders below, these independent tools give way (in this order) so `voiceover` stays. */
+const VOICEOVER_SWAP_ORDER = ["make_sound", "show_images", "edit_picture"];
+
 /** Derives the one live offer set used by turns, token counting, warmup,
  * and the Customize page. Installed manifests and the virtual registry
  * are the only sources; disabled or smoke-failed packages are excluded,
@@ -225,8 +228,11 @@ export function withTurnToolGates(budget: TurnBudget, answerImagesOk: boolean, p
     if (offerOverridesForTests.has(tool.id) || offerPassesGate(tool.offer, answerImagesOk, picturesOk, videosOk, musicOk, musicEditOk, itemRefOk, musicBandOk, videoEditOk, musicObject, writingFormatOk, editPictureOk, voiceoverOk, filmOk, houseOk, uptimeOk)) candidates.set(tool.id, { id: tool.id, priority: tool.offer.priority ?? 1000 });
   }
 
-  // AUDIO-PARITY-01 V1/V2: the two voice tools are the newest and give way first, before any other set, so no existing worst case changes.
-  for (const id of ["voiceover", "change_voice"]) { if (candidates.size <= cap) break; candidates.delete(id); }
+  // AUDIO-PARITY-01 V1/V2: `change_voice` is the newest tool and gives way first, before any other set. TOOL-OFFER-VOICEOVER-01: `voiceover` keeps its
+  // place whenever the gate offered it; the tools in VOICEOVER_SWAP_ORDER (independent of the music and video sets) give way after the other shrinks
+  // if the set is still over the cap. The person's wording never decides this (rule 1): the old VOICEOVER_INTENT swap kept `voiceover` only for a
+  // message that matched a pattern. Without `voiceover` in the set, nothing here changes any existing worst case.
+  if (candidates.size > cap) candidates.delete("change_voice");
   // VIDEO-CHAT-01: the video set (at most four tools) keeps its place; when the total would pass the cap, the music set shrinks first.
   if (candidates.size > cap && (candidates.has("edit_video") || candidates.has("make_film"))) {
     for (const id of MUSIC_SHRINK_ORDER) { if (candidates.size <= cap) break; candidates.delete(id); }
@@ -236,6 +242,11 @@ export function withTurnToolGates(budget: TurnBudget, answerImagesOk: boolean, p
     if (candidates.size <= cap) break;
     if (id === "edit_music" && !(candidates.has("edit_band") || candidates.has("edit_album") || candidates.has("edit_song_style"))) continue;
     candidates.delete(id);
+  }
+  if (candidates.has("voiceover")) {
+    for (const id of VOICEOVER_SWAP_ORDER) { if (candidates.size <= cap) break; candidates.delete(id); }
+    // A model whose cap leaves no room even then (a small cap) gives up the newest tool rather than fail the turn: the old order, kept.
+    if (candidates.size > cap) candidates.delete("voiceover");
   }
   const ordered = [...candidates.values()].sort((a, b) => a.priority - b.priority || a.id.localeCompare(b.id));
   if (ordered.length > cap) {

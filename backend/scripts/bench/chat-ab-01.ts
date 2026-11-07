@@ -139,6 +139,9 @@ interface RunRecord {
     source: string | null;
     pluginId: string | null;
     outcomes: string[];
+    /** TOOL-OFFER-VOICEOVER-01: the tool ids the first engine request offered and every tool the model called, for the offer rows. */
+    toolsOffered?: string[];
+    toolsCalled?: string[];
     ttftNote: string;
     firstRoundCalls?: string[];
     retryCalls?: string[];
@@ -575,6 +578,8 @@ async function runPipeline(id: string, prompts: string[]): Promise<{ turns: Omit
         source: score.observed.source,
         pluginId: score.observed.pluginId,
         outcomes: (score.observed.outcomes ?? []).map((o) => o.packageId),
+        toolsOffered: requests[0]?.tools ?? [],
+        toolsCalled: requests.flatMap((r) => r.toolCalls.map((call) => call.name)),
         ttftNote: "first delta of the turn's first stored generation; on a searched turn that may be the tool-call generation, not the final text",
       },
     };
@@ -663,6 +668,7 @@ async function environment(): Promise<Record<string, unknown>> {
     thinking: "off in all arms (arms A and A2 send enable_thinking=false; the pipeline sends thinking off)",
     arms: { A: `no system prompt, no sampling fields, max_tokens ${MAX_TOKENS}, stream`, A2: "A plus benchChatSampling()", C: "the child bench person on the default turn path, chat surface, streamed", S: "the owner on the default turn path, chat surface with the spoken flag, streamed; first word is the first answer delta", B: "runConversation() through a loopback stand-in for the Stack that forwards to the same engine, adult owner, chat surface, memory judge off (no background engine), real SearXNG through a pass-through tee, Wikipedia fallback at its default (on)" },
     seeds: "none sent by any arm; the engine and the pipeline sample with their own random seeds, so the two runs of an item differ",
+    voiceReady: process.env.MAIPAI_AB_VOICE_READY === "1" ? "forced ready (TOOL-OFFER-VOICEOVER-01)" : "as the Stack reports",
     searchTee: "all arm B searches paced at least 30 s apart; stops at the first rate-limit or block signal",
   };
 }
@@ -670,6 +676,8 @@ async function environment(): Promise<Record<string, unknown>> {
 async function main(): Promise<void> {
   await startBench();
   setHouseholdSettingValue("chat.model_id", process.env.MAIPAI_REPLAY_MODEL_ID ?? "qwen3-8b-instruct-q4-k-m");
+  // TOOL-OFFER-VOICEOVER-01: MAIPAI_AB_VOICE_READY=1 makes the voice engine read as ready, so arm B's adult written turn is offered the voice tools.
+  if (process.env.MAIPAI_AB_VOICE_READY === "1") (await import("@/lib/roleHealth")).__setRoleHealthForTests({ voice: { availability: "ready", reason: null } });
   // RECENCY-02: MAIPAI_AB_HOME names a household home place, created and set before the run, for weather with no place named.
   if (process.env.MAIPAI_AB_HOME) {
     const { createEntity } = await import("@/lib/entities");

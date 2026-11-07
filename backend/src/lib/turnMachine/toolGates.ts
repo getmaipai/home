@@ -91,9 +91,6 @@ export interface TurnToolGateResult {
   houseContext?: { visible: HouseEntity[]; areas: HouseArea[] };
 }
 
-/** A plain ask for a spoken recording. */
-export const VOICEOVER_INTENT = /voice[- ]?over|narrat|read (?:this|it|that|these)[^.]{0,20}aloud|read aloud|record(?:ing)? (?:me|myself|a voice|this|my voice)|say (?:this|these|it)[^.]{0,20}(?:out loud|as a recording)|spoken (?:recording|message)/i;
-
 /** Calculates the conditional offers for a real turn and for its cache warm-up. */
 export async function budgetWithTurnToolGates(input: TurnToolGateInput): Promise<TurnToolGateResult> {
   const audience = { actor: input.actor, band: input.band, surface: input.surface, surfaceClass: input.surfaceClass, spoken: input.spoken };
@@ -174,12 +171,9 @@ export async function budgetWithTurnToolGates(input: TurnToolGateInput): Promise
     } else { warmHouseRegistries(); houseOk = false; }
   } else houseOk = false;
   const uptimeOk = safeGate(() => uptimeAllowed({ actor: input.actor, band: input.band, surface: input.surface, surfaceClass: input.surfaceClass, spoken: input.spoken, bare: input.bare }));
-  let gated = withTurnToolGates(input.budget, answerImagesOk, picturesOk, videosOk, musicOk, musicEditOk, itemRefOk, musicBandOk, videoEditOk, musicObject, writingFormatOk, editPictureOk, voiceoverOk, filmOk, houseOk, uptimeOk);
-  // AUDIO-PARITY-01: with everything on, the 16-tool cap drops the newest tools first, so voiceover never reached the model. When the message plainly asks for a spoken recording, swap it in for the least related tool.
-  if (voiceoverOk && gated.tools_offered.length > 0 && !gated.tools_offered.includes("voiceover") && VOICEOVER_INTENT.test(input.text)) {
-    const swap = ["make_sound", "generate_music", "show_images", "edit_picture", "edit_video", "make_film", "generate_video"].find((id) => gated.tools_offered.includes(id));
-    if (swap) gated = { ...gated, tools_offered: [...gated.tools_offered.filter((id) => id !== swap), "voiceover"] };
-  }
+  // TOOL-OFFER-VOICEOVER-01: `voiceover` is offered by structure alone (an adult, written, non-guest turn with the voice engine ready); the
+  // person's wording is never read (rule 1). budget.ts keeps it past the sixteen-tool cap.
+  const gated = withTurnToolGates(input.budget, answerImagesOk, picturesOk, videosOk, musicOk, musicEditOk, itemRefOk, musicBandOk, videoEditOk, musicObject, writingFormatOk, editPictureOk, voiceoverOk, filmOk, houseOk, uptimeOk);
   return {
     budget: gated,
     writingFormatOk,

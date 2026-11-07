@@ -1,0 +1,29 @@
+{
+ "items": [
+  {
+   "id": "vo1-narrator",
+   "category": "knowledge",
+   "prompt": "Read this out loud as a narrator, in a calm warm voice: The lighthouse keeper climbed the stairs one last time, and the sea went quiet."
+  },
+  {
+   "id": "vo2-clip",
+   "category": "knowledge",
+   "prompt": "Make a voice-over for my clip maipai://music/track/clip0001 that says: Welcome to Nova's birthday, everyone."
+  },
+  {
+   "id": "vo3-announce",
+   "category": "knowledge",
+   "prompt": "Can you record me an announcement in a friendly voice that says the pizza is here, come to the kitchen?"
+  },
+  {
+   "id": "vo4-narrate",
+   "category": "knowledge",
+   "prompt": "I need someone to narrate my short poem so I can save it as an audio file: Roses fade but rivers run, and I will wait for the sun."
+  },
+  {
+   "id": "vo5-neg-write",
+   "category": "knowledge",
+   "prompt": "Write a short script for a school announcement about the book fair."
+  }
+ ]
+}
