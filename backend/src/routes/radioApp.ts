@@ -1,4 +1,4 @@
-// RADIO-02 / RADIO-04: the Radio routes under /api/plugins/music/radio. The directory (popular, search) is a network lookup that only
+// RADIO-02 / RADIO-04: the Radio routes under /api/plugins/music/radio. The directory (search) is a network lookup that only
 // an adult, or a teen, may start, and only while the household switch is on; a child plays what a parent saved and nothing else.
 // A minor's search words pass the household-name check before they leave the home (PRIVACY.md); a teen is never shown a station
 // tagged as adult content. Saved stations are `media-source` records of kind station (lib/media/radio.ts).
@@ -94,20 +94,12 @@ export function radioAddressDeps(): StreamDeps { return streamDeps; }
 
 export function radioRoutes() {
   const routes = apiRouter();
-  gateMediaApp(routes, "music", ["/popular", "/search", "/stations", "/stations/*", "/recordings/*", "/stream/*", "/preview", "/preview/*", "/hls/*", "/now/*"]);
+  gateMediaApp(routes, "music", ["/search", "/stations", "/stations/*", "/recordings/*", "/stream/*", "/preview", "/preview/*", "/hls/*", "/now/*"]);
 
   const gate = (c: Context) => {
     const person = c.get("person");
     return { person, allowed: radioDirectoryAllowed({ band: mediaBandOf(person) }, getHouseholdSettingValue("radio.directory.enabled") === true) };
   };
-
-  routes.get("/popular", requireAuth, async (c, next) => {
-    const { person, allowed } = gate(c);
-    if (!allowed) return c.json({ error: NOT_ON }, 403);
-    const result = await findStations({ kind: "popular" });
-    if (result.ok) rememberPreviewStations("household", result.stations);
-    return result.ok ? c.json({ ok: true as const, stations: directoryRowsFor(person, result.stations) }, 200) : refuseWith(c, result);
-  });
 
   routes.get("/search", requireAuth, async (c, next) => {
     const { person, allowed } = gate(c);

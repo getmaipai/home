@@ -1,8 +1,8 @@
-// PODCAST-PORT-01: the directory routes. Off until the household switch is on, adults, teens only with their own switch, never a child,
+// PODCAST-PORT-01: the directory lookups and the Find shows rows. Off until the household switch is on, adults, teens only with their own switch, never a child,
 // a teen's search words are checked first, and the privacy table lists the hosts only while the switch is on.
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { __resetRateLimiterForTests } from "@/lib/rateLimiter";
-import { __resetDirectoryForTests } from "@/lib/media/podcastDirectory";
+import { __resetDirectoryForTests, directoryAllowed, searchDirectory, topShows } from "@/lib/media/podcastDirectory";
 import { __resetPodcastPreviewForTests, __setPodcastFetchDepsForTests } from "@/lib/media/podcasts";
 import { checkAppPackage } from "@maipai/spec/ui/app-check.js";
 import { PackageManifest } from "@maipai/spec/gen/ts/manifest.js";
@@ -11,7 +11,7 @@ import Ajv2020 from "ajv/dist/2020.js";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { privacyConnections } from "@/lib/privacy";
-import { setHouseholdSettingValue } from "@/lib/settings";
+import { getHouseholdSettingValue, setHouseholdSettingValue } from "@/lib/settings";
 import { child, owner, teen } from "./support/testAuth";
 import { resetDb } from "./reset-db";
 
@@ -42,53 +42,57 @@ const on = (teens = false) => {
   setHouseholdSettingValue("podcasts.directory.teens", teens);
 };
 
-describe("the podcast directory routes", () => {
-  test("switch off: nobody may search and nothing leaves the home", async () => {
+describe("the podcast directory lookups", () => {
+  const allowed = (band: "adult" | "teen" | "child") => directoryAllowed({ band }, { enabled: getHouseholdSettingValue("podcasts.directory.enabled") === true, teens: getHouseholdSettingValue("podcasts.directory.teens") === true });
+
+  test("switch off: nobody may search, and the Find shows rows make no request", async () => {
+    expect(["adult", "teen", "child"].map((band) => allowed(band as "adult"))).toEqual([false, false, false]);
     const { client } = await owner();
-    const response = await client.get("/api/plugins/podcasts/directory/search?q=cabin");
-    expect(response.status).toBe(403);
-    expect(((await response.json()) as { error: string }).error).toContain("not turned on");
+    expect(await (await client.post("/api/plugins/podcasts/data/directory", { q: "cabin" })).json()).toEqual([]);
     expect(urls).toEqual([]);
   });
 
   test("an adult searches once the switch is on", async () => {
     on();
-    const { client } = await owner();
-    const response = await client.get("/api/plugins/podcasts/directory/search?q=cabin");
-    expect(response.status).toBe(200);
-    expect(((await response.json()) as { shows: Array<{ title: string }> }).shows.map((show) => show.title)).toEqual(["Cabin Radio"]);
+    expect(allowed("adult")).toBe(true);
+    const result = await searchDirectory("cabin");
+    expect(result.ok && result.shows.map((show) => show.title)).toEqual(["Cabin Radio"]);
     expect(urls.length).toBe(1);
   });
 
-  test("a teen needs the teen switch too", async () => {
+  test("a teen needs the teen switch too", () => {
     on(false);
-    const { client } = await owner();
-    const teenClient = await teen(client);
-    expect((await teenClient.get("/api/plugins/podcasts/directory/search?q=cabin")).status).toBe(403);
+    expect(allowed("teen")).toBe(false);
     on(true);
-    expect((await teenClient.get("/api/plugins/podcasts/directory/search?q=cabin")).status).toBe(200);
+    expect(allowed("teen")).toBe(true);
   });
 
   test("a child never reaches it, whatever the switches say", async () => {
     on(true);
+    expect(allowed("child")).toBe(false);
     const { client } = await owner();
     const { client: childClient } = await child(client);
-    expect((await childClient.get("/api/plugins/podcasts/directory/search?q=cabin")).status).toBe(403);
-    expect((await childClient.get("/api/plugins/podcasts/directory/top")).status).toBe(403);
+    expect(await (await childClient.post("/api/plugins/podcasts/data/directory", { scope: "top" })).json()).toEqual([]);
+    expect(urls).toEqual([]);
+  });
+
+  test("a teen's search words are checked before they leave the home", async () => {
+    on(true);
+    const { client } = await owner();
+    const teenClient = await teen(client);
+    const rows = await (await teenClient.post("/api/plugins/podcasts/data/directory", { q: "Sage" })).json();
+    expect(rows).toEqual([]);
     expect(urls).toEqual([]);
   });
 
   test("the top list answers an adult", async () => {
     on();
-    const { client } = await owner();
-    const response = await client.get("/api/plugins/podcasts/directory/top");
-    expect([200, 502]).toContain(response.status);
+    const result = await topShows();
+    expect(result.ok || result.status === 502).toBe(true);
     expect(urls.some((url) => url.includes("marketingtools.apple.com"))).toBe(true);
   });
 
   test("the privacy table lists the directory only while the switch is on", async () => {
-    const { client } = await owner();
-    void client;
     expect(privacyConnections().some((row) => row.id === "platform:podcast-directory")).toBe(false);
     on();
     const row = privacyConnections().find((item) => item.id === "platform:podcast-directory");
@@ -147,7 +151,7 @@ describe("podcast show details", () => {
       feedCalls++;
       return new Response(feed, { status: 200, headers: { "content-type": "application/rss+xml" } });
     }) as typeof fetch });
-    await client.get("/api/plugins/podcasts/directory/search?q=cabin");
+    await searchDirectory("cabin");
     const url = "https://feeds.example.com/cabin.xml";
     const first = await client.post("/api/plugins/podcasts/data/directory", { scope: "show", id: url });
     expect(first.status).toBe(200);

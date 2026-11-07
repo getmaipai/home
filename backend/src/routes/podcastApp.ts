@@ -4,7 +4,7 @@ import type { Context } from "hono";
 import { allowedSources, queryItems, readableIn } from "@/lib/media/appHost";
 import { correctedStamp, getProgress, writeProgress } from "@/lib/media/progress";
 import { coerceNumber } from "@/lib/media/appHost";
-import { queuePodcastAutoRules, exportOpml, getPodcastTranscript, importOpml, pollPodcastNow, saveEpisode, subscribePodcast, unsaveEpisode, unsubscribePodcast, updatePodcastSource } from "@/lib/media/podcasts";
+import { queuePodcastAutoRules, getPodcastTranscript, pollPodcastNow, saveEpisode, subscribePodcast, unsaveEpisode, updatePodcastSource } from "@/lib/media/podcasts";
 import { jsonBody } from "@/lib/validation";
 import { gateMediaApp } from "@/middleware/mediaAppGate";
 import { apiRouter, refuseWith } from "@/lib/openapi";
@@ -12,7 +12,7 @@ import { requireAuth } from "@/middleware/auth";
 import type { PersonRow } from "@/types";
 import { mediaBandOf } from "@/lib/media/band";
 import { getHouseholdSettingValue } from "@/lib/settings";
-import { MINOR_QUERY_PERSONAL_NOTE, minorQueryHit } from "@/lib/retrieval/minorQueryCheck";
+import { minorQueryHit } from "@/lib/retrieval/minorQueryCheck";
 import { deleteCollection, resolveCollection } from "@/lib/media/collections";
 import { personFilters, saveFilter, viewOf } from "@/lib/media/podcastFilters";
 import { artProxyAddress, directoryAllowed, fetchDirectoryArt, searchDirectory, topShows, directoryShowForFeed } from "@/lib/media/podcastDirectory";
@@ -85,7 +85,7 @@ export async function podcastShowEpisodeRows(person: PersonRow, id: string): Pro
 
 export function podcastRoutes() {
   const routes = apiRouter();
-  gateMediaApp(routes, "podcasts", ["/data/directory", "/preview/*", "/transcript/*", "/save", "/bookmark", "/snips", "/subscribe", "/unsubscribe", "/source", "/filters", "/filters/*", "/opml/*", "/directory/*"]);
+  gateMediaApp(routes, "podcasts", ["/data/directory", "/preview/*", "/transcript/*", "/save", "/bookmark", "/snips", "/subscribe", "/source", "/filters", "/filters/*", "/directory/*"]);
 
   routes.post("/data/directory", requireAuth, async (c, next) => {
     const person = c.get("person");
@@ -200,13 +200,6 @@ const lookupPreferringV4: DnsLookup = async (hostname) => {
     return c.json({ ok: true as const, source_id: result.value.source.id, label: "Added to Shows" }, 200);
   });
 
-  routes.post("/unsubscribe", requireAuth, async (c, next) => {
-    const person = c.get("person");
-    const body = await jsonBody(c);
-    const result = unsubscribePodcast(person, typeof body.source_id === "string" ? body.source_id : "");
-    return result.ok ? c.json({ ok: true as const }, 200) : refuseWith(c, result);
-  });
-
   routes.post("/source", requireAuth, async (c, next) => {
     const person = c.get("person");
     const body = await jsonBody(c);
@@ -246,45 +239,9 @@ const lookupPreferringV4: DnsLookup = async (hostname) => {
     return c.json({ ok: true as const, label: "Filter deleted" }, 200);
   });
 
-  routes.post("/opml/import", requireAuth, async (c, next) => {
-    const person = c.get("person");
-    const body = await jsonBody(c);
-    const result = importOpml(person, typeof body.opml === "string" ? body.opml : "");
-    if (!result.ok) return refuseWith(c, result);
-    // createFeed marks every imported feed due. The normal tick takes at most ten.
-    return c.json({ ok: true as const, added: result.value.added, already: result.value.already, skipped: result.value.skipped }, 200);
-  });
-
-  routes.get("/opml/export", requireAuth, async (c, next) => {
-    const person = c.get("person");
-    if (!isOwnerOrAdmin(person)) return c.json({ error: "Only an admin can export the show list." }, 403);
-    return new Response(exportOpml(), { status: 200, headers: { "content-type": "text/x-opml; charset=utf-8", "content-disposition": 'attachment; filename="podcasts.opml"', "cache-control": "no-store" } });
-  });
-
-  // PODCAST-PORT-01: finding new shows. Off until the household switch is on; adults, teens only with their own switch, never a child.
-  // A minor's search words pass the household-name check before they leave the home (PRIVACY.md).
-  const directoryGate = (c: Context) => {
-    const person = c.get("person");
-    const band = mediaBandOf(person);
-    const allowed = directoryAllowed({ band }, { enabled: getHouseholdSettingValue("podcasts.directory.enabled") === true, teens: getHouseholdSettingValue("podcasts.directory.teens") === true });
-    return { person, band, allowed };
-  };
-  const NOT_ON = "Finding new podcasts is not turned on for you. Ask the person who runs this home.";
-
-  routes.get("/directory/search", requireAuth, async (c, next) => {
-    const { band, allowed } = directoryGate(c);
-    if (!allowed) return c.json({ error: NOT_ON }, 403);
-    const q = (c.req.query("q") ?? "").trim();
-    if (minorQueryHit(q, band)) return c.json({ ok: true as const, shows: [], note: MINOR_QUERY_PERSONAL_NOTE }, 200);
-    const result = await searchDirectory(q);
-    return result.ok ? c.json({ ok: true as const, shows: result.shows }, 200) : refuseWith(c, result);
-  });
-
-  routes.get("/directory/top", requireAuth, async (c, next) => {
-    if (!directoryGate(c).allowed) return c.json({ error: NOT_ON }, 403);
-    const result = await topShows();
-    return result.ok ? c.json({ ok: true as const, shows: result.shows }, 200) : refuseWith(c, result);
-  });
+  // PODCAST-PORT-01: finding new shows. Adults, teens only with their own switch, never a child; the search itself runs through the
+  // Find shows rows (`/data/directory`), which apply the same gate and the minor's household-name check (PRIVACY.md).
+  const directoryOn = (c: Context): boolean => directoryAllowed({ band: mediaBandOf(c.get("person")) }, { enabled: getHouseholdSettingValue("podcasts.directory.enabled") === true, teens: getHouseholdSettingValue("podcasts.directory.teens") === true });
 
   routes.post("/directory/add", requireAuth, async (c, next) => {
     const body = await jsonBody(c);
@@ -295,7 +252,7 @@ const lookupPreferringV4: DnsLookup = async (hostname) => {
   });
 
   routes.get("/directory/art", requireAuth, async (c, next) => {
-    if (!directoryGate(c).allowed) return c.body(null, 403);
+    if (!directoryOn(c)) return c.body(null, 403);
     const art = await fetchDirectoryArt(c.req.query("u") ?? "");
     if (!art) return c.body(null, 404);
     return new Response(art.bytes, { status: 200, headers: { "content-type": art.type, "cache-control": "private, max-age=86400", "x-content-type-options": "nosniff", "content-security-policy": "default-src 'none'", "cross-origin-resource-policy": "same-origin" } });

@@ -41,17 +41,14 @@ const BASE = "/api/plugins/music/radio";
 describe("the radio directory routes", () => {
   test("switch off: every band is refused and nothing leaves the home", async () => {
     const { client } = await owner();
-    expect((await client.get(`${BASE}/popular`)).status).toBe(403);
     expect((await client.get(`${BASE}/search?q=cabin`)).status).toBe(403);
     expect(urls).toEqual([]);
   });
 
-  test("an adult sees popular and search rows, adult-tagged ones included", async () => {
+  test("an adult sees search rows, adult-tagged ones included", async () => {
     on();
     const { client } = await owner();
-    const popular = await client.get(`${BASE}/popular`);
-    expect(popular.status).toBe(200);
-    expect(await names(popular)).toEqual(["Cabin FM", "Night Heat", "Hill HLS"]);
+    expect(await names(await client.get(`${BASE}/search?q=heat`))).toEqual(["Cabin FM", "Night Heat", "Hill HLS"]);
     expect(await names(await client.get(`${BASE}/search?q=cabin&country=us&tag=jazz`))).toContain("Cabin FM");
     expect(urls.some((url) => url.includes("countrycode=US") && url.includes("tag=jazz"))).toBe(true);
   });
@@ -60,10 +57,9 @@ describe("the radio directory routes", () => {
     on();
     const { client } = await owner();
     const teenClient = await teen(client);
-    const response = await teenClient.get(`${BASE}/popular`);
+    const response = await teenClient.get(`${BASE}/search?q=heat`);
     expect(response.status).toBe(200);
     expect(await names(response)).toEqual(["Cabin FM", "Hill HLS"]);
-    expect(await names(await teenClient.get(`${BASE}/search?q=heat`))).not.toContain("Night Heat");
   });
 
   test("a teen's search words are checked before they leave the home", async () => {
@@ -82,7 +78,6 @@ describe("the radio directory routes", () => {
     on();
     const { client } = await owner();
     const { client: childClient } = await child(client);
-    expect((await childClient.get(`${BASE}/popular`)).status).toBe(403);
     expect((await childClient.get(`${BASE}/search?q=cabin`)).status).toBe(403);
     expect((await childClient.post(`${BASE}/stations`, { from: "directory", name: "Cabin FM", url: ROWS[0]!.url_resolved })).status).toBe(403);
     expect(urls).toEqual([]);
@@ -98,7 +93,7 @@ describe("saved stations", () => {
     const { station } = (await added.json()) as { station: { id: string; name: string } };
     const list = (await (await client.get(`${BASE}/stations`)).json()) as { stations: Row[] };
     expect(list.stations.map((row) => row.name)).toEqual(["Cabin FM"]);
-    const popular = ((await (await client.get(`${BASE}/popular`)).json()) as { stations: Row[] }).stations;
+    const popular = ((await (await client.get(`${BASE}/search?q=cabin`)).json()) as { stations: Row[] }).stations;
     expect(popular.find((row) => row.name === "Cabin FM")?.added).toBe(true);
     expect(popular.find((row) => row.name === "Hill HLS")?.added).toBe(false);
     expect((await client.post(`${BASE}/stations`, { name: "Again", url: ROWS[0]!.url_resolved })).status).toBe(409);

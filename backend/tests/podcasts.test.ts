@@ -12,7 +12,7 @@ import { resetDb } from "./reset-db";
 import { __resetRateLimiterForTests } from "@/lib/rateLimiter";
 import { __resetProgressForTests, flushProgress } from "@/lib/media/progress";
 import { removeItem } from "@/lib/media/items";
-import { __setPodcastFetchDepsForTests, __setPodcastSummaryCompleterForTests, __resetPodcastSummaryForTests, podcastSummaryFor, applyAutoRules, queuePodcastAutoRules, drainPodcastAutoRules, saveEpisode, chaptersFromNotes, parsePodcastFeed, plainNotes } from "@/lib/media/podcasts";
+import { __setPodcastFetchDepsForTests, exportOpml, importOpml, unsubscribePodcast, __setPodcastSummaryCompleterForTests, __resetPodcastSummaryForTests, podcastSummaryFor, applyAutoRules, queuePodcastAutoRules, drainPodcastAutoRules, saveEpisode, chaptersFromNotes, parsePodcastFeed, plainNotes } from "@/lib/media/podcasts";
 import { getFeed, listFeeds, updateFeed } from "@/lib/shelf/feedStore";
 import { privacyConnections } from "@/lib/privacy";
 import { pollFeed, type PollDeps } from "@/lib/shelf/shelfPoller";
@@ -121,6 +121,9 @@ async function setup() {
 
 /** The stored person row the transcript helpers take (the sign-in object is only a client). */
 const personRow = (id: string) => db.select().from(people).where(eq(people.id, id)).get() as never;
+/** The household owner's stored row: the actor for the lib-level show removal and OPML calls (their routes were retired, AUDIT-DEAD-02). */
+const ownerRow = () => db.select().from(people).where(eq(people.role, "owner")).get() as never;
+const unsubscribe = (sourceId: string) => unsubscribePodcast(ownerRow(), sourceId);
 
 describe("parsing", () => {
   test("a feed becomes a show and episodes, newest first, with explicit, duration and chapters from the notes", () => {
@@ -435,14 +438,18 @@ describe("the one poller reads a podcast feed", () => {
     const lan = await owner.post("/api/plugins/podcasts/subscribe", { url: "https://192.168.1.20/feed.xml" });
     expect(lan.status).toBe(400);
     expect(((await lan.json()) as { error: string }).error).toMatch(/home network/);
-    expect((await adult.client.post("/api/plugins/podcasts/unsubscribe", { source_id: "msrc-nothing01" })).status).toBe(403);
+    const refused = unsubscribePodcast(personRow(adult.id), "msrc-nothing01");
+    expect(refused.ok).toBe(false);
+    expect(refused.ok ? 0 : refused.status).toBe(403);
+    const missing = unsubscribe("msrc-nothing01");
+    expect(missing.ok ? 0 : missing.status).toBe(404);
   });
 
   test("removing a show stops its polling and hides its episodes", async () => {
     const { owner, adult, data, subscribe, poll } = await setup();
     const { sourceId, feedId } = await subscribe();
     await poll(feedId);
-    expect((await owner.post("/api/plugins/podcasts/unsubscribe", { source_id: sourceId })).status).toBe(200);
+    expect(unsubscribe(sourceId).ok).toBe(true);
     expect(getFeed(feedId)).toBeNull();
     expect(await data<unknown[]>(adult.client, "episodes")).toEqual([]);
   });
@@ -465,32 +472,33 @@ describe("the privacy page", () => {
     expect(row.when).toMatch(/keep rules/i);
     expect(row.what).toMatch(/picture.*hosts|hosts.*picture/);
     expect(row.what).toMatch(/redirect/);
-    await owner.post("/api/plugins/podcasts/unsubscribe", { source_id: sourceId });
+    unsubscribe(sourceId);
     expect(privacyConnections().some((candidate) => candidate.id === "platform:podcast-feeds")).toBe(false);
   });
 });
 
 describe("OPML", () => {
   test("export then import round-trips the show list; bad and repeated addresses are reported, not fatal", async () => {
-    const { owner, subscribe } = await setup();
+    const { subscribe } = await setup();
     await subscribe();
-    const exported = await owner.get("/api/plugins/podcasts/opml/export");
-    expect(exported.status).toBe(200);
-    const opml = await exported.text();
+    const opml = exportOpml();
     expect(opml).toContain(`xmlUrl="${HOST}/feed.xml"`);
     expect(opml).not.toMatch(/person-|media-/);
     // The same file again: already there.
-    expect(await (await owner.post("/api/plugins/podcasts/opml/import", { opml })).json()).toMatchObject({ added: 0, already: 1 });
+    const again = importOpml(ownerRow(), opml);
+    expect(again.ok && again.value).toMatchObject({ added: 0, already: 1 });
     // After removing the show, the file brings it back, and a plain-http line is skipped with its reason.
     const sourceId = db.select().from(mediaSources).all().find((row) => row.kind === "feed")!.id;
-    await owner.post("/api/plugins/podcasts/unsubscribe", { source_id: sourceId });
+    unsubscribe(sourceId);
     const mixed = opml.replace("</body>", '<outline type="rss" text="Plain" xmlUrl="http://plain.example.com/f.xml"/></body>');
-    const result = (await (await owner.post("/api/plugins/podcasts/opml/import", { opml: mixed })).json()) as { added: number; skipped: Array<{ reason: string }> };
-    expect(result.added).toBe(1);
-    expect(result.skipped).toHaveLength(1);
-    expect(result.skipped[0]!.reason).toMatch(/https/);
+    const result = importOpml(ownerRow(), mixed);
+    if (!result.ok) throw new Error(result.error);
+    expect(result.value.added).toBe(1);
+    expect(result.value.skipped).toHaveLength(1);
+    expect(result.value.skipped[0]!.reason).toMatch(/https/);
     expect(db.select().from(mediaSources).all().filter((row) => row.kind === "feed" && !row.deletedAt)).toHaveLength(1);
-    expect((await owner.post("/api/plugins/podcasts/opml/import", { opml: "not xml at all" })).status).toBe(400);
+    const notXml = importOpml(ownerRow(), "not xml at all");
+    expect(notXml.ok ? 0 : notXml.status).toBe(400);
   });
 });
 
@@ -524,7 +532,7 @@ describe("Podcasts review regressions", () => {
     expect((await adult.client.get(`/api/media/items/${id}/artwork`)).status).toBe(200);
     db.update(mediaSources).set({ visibleTo: JSON.stringify([child.id]) }).where(eq(mediaSources.id, sourceId)).run();
     expect((await adult.client.get(`/api/media/items/${id}/content`)).status).toBe(404);
-    await owner.post("/api/plugins/podcasts/unsubscribe", { source_id: sourceId });
+    unsubscribe(sourceId);
     expect((await child.client.get(`/api/files/${file.id}/content`)).status).toBe(404);
   });
 
@@ -590,7 +598,8 @@ describe("Podcasts review regressions", () => {
     let requests = 0;
     __setPodcastFetchDepsForTests({ ...deps, fetch: (async () => { requests++; return new Response("offline", { status: 503 }); }) as unknown as typeof fetch });
     const opml = `<opml version="2.0"><head/><body>${Array.from({ length: 200 }, (_, i) => `<outline type="rss" xmlUrl="https://pod${i}.example.com/feed.xml"/>`).join("")}</body></opml>`;
-    expect(await (await owner.post("/api/plugins/podcasts/opml/import", { opml })).json()).toMatchObject({ added: 200 });
+    const imported = importOpml(ownerRow(), opml);
+    expect(imported.ok && imported.value).toMatchObject({ added: 200 });
     expect(requests).toBe(0);
     expect(listFeeds("podcast")).toHaveLength(200);
     expect(listFeeds("podcast").every((feed) => Date.parse(feed.next_poll_at) <= Date.now())).toBe(true);
@@ -787,9 +796,9 @@ describe("Podcasts review regressions", () => {
     const art = db.select().from(attachments).all().find((row) => row.provenance === "podcast:art")!;
     const secondId = await subscribeAgainHidden(owner);
     db.insert(mediaItems).values({ ...episode, id: newMediaItemId(), sourceId: secondId }).run();
-    await owner.post("/api/plugins/podcasts/unsubscribe", { source_id: sourceId });
+    unsubscribe(sourceId);
     expect(existsSync(attachmentFilePath(art.storagePath))).toBe(true);
-    await owner.post("/api/plugins/podcasts/unsubscribe", { source_id: secondId });
+    unsubscribe(secondId);
     expect(existsSync(attachmentFilePath(art.storagePath))).toBe(false);
     expect(db.select().from(attachments).where(eq(attachments.id, art.id)).get()).toBeUndefined();
   });
@@ -801,7 +810,7 @@ describe("Podcasts review regressions", () => {
     await owner.post("/api/plugins/podcasts/save", { media_id: await idOf("Question 2") });
     const art = db.select().from(attachments).all().find((row) => row.provenance === "podcast:art")!;
     const copy = db.select().from(attachments).all().find((row) => row.provenance === "podcast:manual")!;
-    await owner.post("/api/plugins/podcasts/unsubscribe", { source_id: sourceId });
+    unsubscribe(sourceId);
     expect(db.select().from(attachments).where(eq(attachments.id, art.id)).get()).toBeUndefined();
     expect(existsSync(attachmentFilePath(art.storagePath))).toBe(false);
     expect(db.select().from(attachments).where(eq(attachments.id, copy.id)).get()).toBeDefined();

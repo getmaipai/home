@@ -291,10 +291,12 @@ episode files remain private.
 nothing). `lib/media/podcastApp.ts` registers `shows`, `episodes` (newest first, `channel` filters by show), `saved`, `bookmarks` and the
 item fields `saved`, `queued`, `speed`, `skip_intro_s`, `skip_outro_s` (a first listen starts at `skip_intro_s`; `saveProgress` treats
 `position >= duration - skip_outro_s` as finished and sends `completed`). `routes/podcastApp.ts` adds under `/api/plugins/podcasts`:
-`queue` (toggle), `save` (`on: false` removes the copy), `bookmark` (`media-progress.marks`), and for an adult admin `subscribe`,
-`unsubscribe`, `source` (speed, skip seconds, `auto`, `paused`, `visible_to`), `opml/import` (`{ opml }`) and `GET opml/export`.
-OPML uses feedsmith's reader and writer; the export holds feed addresses only. Import does not poll each new show: the new feeds are
-already due for the normal tick (at most ten per tick). News settings sync skips addresses already owned by Podcasts and reports a
+`queue` (toggle), `save` (`on: false` removes the copy), `bookmark` (`media-progress.marks`), and for an adult admin `subscribe` and
+`source` (speed, skip seconds, `auto`, `paused`, `visible_to`). The routes `unsubscribe`, `opml/import`, `opml/export`,
+`directory/search` and `directory/top` were removed (AUDIT-DEAD-02): no client called them. Their behaviour stays in `lib/media/podcasts.ts`
+(`unsubscribePodcast`, `importOpml`, `exportOpml`) and `lib/media/podcastDirectory.ts` (`searchDirectory`, `topShows`), tested there, for the
+page that wires them. OPML uses feedsmith's reader and writer; the export holds feed addresses only. Import does not poll each new show:
+the new feeds are already due for the normal tick (at most ten per tick). News settings sync skips addresses already owned by Podcasts and reports a
 closed typed event without an address or record identifier; a sync failure is isolated so due podcast polling continues.
 
 **Package** `backend/packages/podcasts` (pages index, shows, episodes, queue, saved, play; the first tab reads "Listen now", `homeLabelOf` in
@@ -312,8 +314,8 @@ Focused verification without servers or real network: `cd backend && bun test --
 This lane uses a disposable data directory under the worktree, fake Stack responses, fake feed responses, and rejects server starts
 and uninjected fetch calls. The normal test lane uses its usual preload.
 
-**Not built, and why.** Adding a show and importing OPML have no form on a package page (no text input node), so they are API only, as media
-sources are. Per-show speed is stored and listed but the audio session applies the person's own podcast speed (a session override needs the
+**Not built, and why.** Adding a show has no form on a package page (no text input node), so it is API only, as media
+sources are; OPML import and export and removing a show have no route at all until a page needs them. Per-show speed is stored and listed but the audio session applies the person's own podcast speed (a session override needs the
 shell to stop writing the show's speed back as the person's). Transcripts, persons and `podcast:chapters` JSON files have no field on
 `media-item` and would need another request per episode. The list tiles are the kit's 160 px vertical rows (the mockup's compact rows with
 a Play and a Save button each need a kit size and a row actions slot). Directory search is later by the design.
