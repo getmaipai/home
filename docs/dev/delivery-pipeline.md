@@ -96,7 +96,7 @@ All under `<main checkout>/data-scratch/` (git-ignored), unless noted.
 | `watch/reds/<sha>.md` | A red note: failing files, culprit commit, last 60 lines of output. |
 | `watch/flake-issues.json`, `watcher.log`, `watcher.pid` | Files already reported as repeat flakes; the log; the pid. |
 | `ship/shipped.jsonl`, `ship/<time>-<sha7>.log` | Every ship and its result; the promote helper's output. |
-| `ship/ship.lock.d/` | The ship lock (`pid`, `what`): one ship at a time. A second `ship.sh` waits up to `MAIPAI_SHIP_LOCK_WAIT` seconds (900), clears a lock whose pid is gone, then re-reads the live tag and does nothing when the live hub already includes its commit. Before stopping anything it waits up to `MAIPAI_SHIP_QUIET_WAIT` seconds (180) for running engine jobs (`/stack/v1/jobs`), then installs anyway and says what it interrupted. |
+| `ship/ship.lock.d/` | The ship lock (`pid`, `what`): one ship at a time. A second `ship.sh` waits up to `MAIPAI_SHIP_LOCK_WAIT` seconds (900), atomically renames and removes a stale lock whose pid is gone; a pid-less lock older than 120 seconds is stale too. It then re-reads the live tag and does nothing when the live hub already includes its commit. Before stopping anything it waits up to `MAIPAI_SHIP_QUIET_WAIT` seconds (180) for running engine jobs (`/stack/v1/jobs`), then installs anyway and says what it interrupted. |
 | `pipeline-bin/lander.sh`, `watcher.sh` | The copies of the two scripts the daemons actually run (section 8). |
 | Outside the repo | warm checkouts `../home-lander` and `../home-watcher`; `/usr/local/maipai-home-src.git` (root-owned mirror); `/usr/local/libexec/maipai-promote` and its sudoers line; `~/Library/LaunchAgents/com.maipai.lander.plist` and `.watcher.plist`. |
 
@@ -121,12 +121,12 @@ All under `<main checkout>/data-scratch/` (git-ignored), unless noted.
 
 1. Fetch; the branch on origin must be at the requested sha, else bounce.
 2. Rebase onto `origin/main`. A conflict bounces with the conflicting files named; the session rebases in its own worktree and lands again.
-3. Reinstall dependencies in `backend` and `frontend` when their `node_modules` was not installed from the `package.json` and `bun.lock` now in the tree (install stamp, see "Dependencies in the warm checkouts").
+3. Reinstall dependencies in `backend` and `frontend` when their `node_modules` was not installed from the package files in the tree (install stamp, see "Dependencies in the warm checkouts"). Each stamp hashes that workspace's `package.json` plus the workspace root `package.json` and `bun.lock`, so root overrides and lock changes trigger reinstall.
 4. Run the generators (settings registry, API docs, elements adoption, code map). Changes are committed as `Generated: ...` by the lander, so sessions never commit them.
    The generators import backend code that opens `<dataDir>/hub.db` and refuses a schema newer than the build, so each landing runs them with a private `MAIPAI_DATA_DIR` (`.gen-settings.XXXXXX/data` under the lander data directory, mode 0700, next to the scratch `MAIPAI_COMMONS_DIR`). The warm checkout's own `data/hub.db` is never opened: on 2026-11-02 a branch carrying schema 111 stamped it and every later landing at 110 bounced with `SchemaTooNewError`. The scratch directory is removed on success and on a bounce; any `.gen-settings.*` older than a day (a killed lander) is swept at the start of the next landing. `check.sh` gives its own generator runs the same private directory. `MAIPAI_LAND_GENERATE_CMD` receives the same `MAIPAI_DATA_DIR`.
 5. For each `--done ITEM-ID`, flip the open `- [ ] **ITEM:` line in `docs/BACKLOG.md` to done with the date and sha, committed by the lander. An unknown id bounces.
 6. Static check: `scripts/check.sh --pre` (typecheck of backend, scripts and frontend, UI rules, secrets scan, PII wordlist, drift checks) plus eslint. A bounce names the failed stage, for example `static check failed at pre: frontend typecheck`.
-7. **Safety surface (T2):** if the branch touches a path in `WT_T2_GLOBS` (read from `scripts/wt.sh`: `RULES.md`, auth, credentials, consent, child and teen gates, migrations), also run the backend and frontend suites through the sharder; a failure bounces with the failing files.
+7. **Safety surface (T2):** if the branch touches a path in `WT_T2_GLOBS` (read from `scripts/wt.sh`: rules, auth, credentials, consent, child and teen gates, migrations, and the gate scripts), also run the backend and frontend suites through the sharder; glob matching disables shell pathname expansion so newly added migration files match. If the T2 list cannot be read, the lander logs a warning and treats every changed file as T2. A failure bounces with the failing files.
 8. Push `main` (fast-forward, up to three rebase retries; a re-check only if main's change overlaps the branch's files). Delete the remote branch. Write the note and a `landings.jsonl` line.
 9. Fast-forward the main checkout to `origin/main` when it is clean, unlocked and on `main`, so scripts there stay current. The hook that blocks sessions from changing that checkout does not apply to the daemon.
 
@@ -137,6 +137,8 @@ No gate stamp is needed for a T1 commit when the repo has `scripts/land.sh`: the
 The watcher runs the whole suite on the newest `origin/main` in its own checkout and answers one question: is main green, and if not, which commit broke it. Each leg has its own process group and 1500 s watchdog; a timed-out leg is `stalled`, advances last-run, and creates no red, issue or bisect.
 
 - **Waits briefly before a run:** quiet means no landing queued, the CPU used by our own work (bun, node, codex, tsc, vite, eslint, the Stack) under 200% (two cores), and at least 40 GB free memory. The quiet wait is capped at 300 s. A lander-busy condition counts only during the first 120 s. The whole-machine load average is not used as a quiet test.
+- **Checks out before testing:** after detaching at the selected main SHA, the watcher verifies `HEAD` equals that SHA. A checkout failure is logged and skipped, so a previous tree cannot be marked green for the requested commit.
+- **Repeat flake reports:** the issue body is written to a temporary file and passed with `--body-file`; the file is recorded in `flake-issues.json` only after issue creation succeeds.
 - **Takes the machine gate lock** around the suite only (released before the reruns and the bisect), so it never overlaps a full `check.sh` gate from another repo and never holds the lock for hours.
 - **Runs three legs, one after another** (memory-safe): scripts, backend, frontend, each through `shardTests.ts`. A failing leg does not stop the next. A leg that dies without an exit status counts as failed (137).
 - **Classifies:** reruns wait once before the pass, then each failing file is rerun alone under `nice 10`, up to `MAIPAI_WATCH_RERUNS`. Passing on any rerun makes the run `flaky` (counted green, with the files named); failing every time makes it `red`.
@@ -239,7 +241,7 @@ Measured on the Studio (18 cores, 128 GB, the Stack's model holding about 35 GB)
 
 ## 16. Known limits and open items
 
-- Several test files that share process-wide state still flake when many workers run; the watcher reports them, and moving each to the serial list with its cause is routine work. The watcher's own "repeat flake" issue filing has a path bug (the issue body file is not found), so those issues are not created yet.
+- Several test files that share process-wide state still flake when many workers run; the watcher reports them, and moving each to the serial list with its cause is routine work. For repeat flakes, the watcher writes the issue body to a temp file, passes its path to `gh --body-file`, and records the file as reported only when filing succeeds.
 - The org repo's own `wt.sh` tests are timing-sensitive and fail when the machine is busy; landing org changes needs a quiet moment.
 - A change reaches the live hub only through `ship.sh`; `ship.sh` does not reuse a build from the watcher, so a ship rebuilds (about 2.5 minutes).
 - Other sessions on old worktrees still use the old path until they rebase onto a base that has `scripts/land.sh`.

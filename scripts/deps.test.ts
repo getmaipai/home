@@ -141,6 +141,25 @@ describe("INSTALL-STAMP-01: node_modules records what it was installed from", ()
     expect(installs(l)).toBe(4);
   });
 
+  test("AUDIT-GATE-01: the workspace root package.json and bun.lock are part of the stamp", () => {
+    const l = layout("stamp-root");
+    mkdirSync(l.tagDir, { recursive: true });
+    mkdirSync(join(l.backend, "node_modules"), { recursive: true });
+    const home = join(l.base, "home");
+    writeFileSync(join(home, "package.json"), JSON.stringify({ name: "home", workspaces: ["backend"], overrides: { zod: "4.0.0" } }));
+    writeFileSync(join(home, "bun.lock"), "root lock v1\n");
+    sh(`deps_ensure ${l.backend}`, env(l));
+    expect(installs(l)).toBe(1);
+    writeFileSync(join(home, "bun.lock"), "root lock v2\n");
+    sh(`deps_ensure ${l.backend}`, env(l));
+    expect(installs(l)).toBe(2);
+    writeFileSync(join(home, "package.json"), JSON.stringify({ name: "home", workspaces: ["backend"], overrides: { zod: "4.1.0" } }));
+    sh(`deps_ensure ${l.backend}`, env(l));
+    expect(installs(l)).toBe(3);
+    sh(`deps_ensure ${l.backend}`, env(l));
+    expect(installs(l)).toBe(3);
+  });
+
   test("a failed install leaves no stamp, so the next call installs again", () => {
     const l = layout("stamp-fail", { tag: false });
     mkdirSync(join(l.backend, "node_modules"), { recursive: true });

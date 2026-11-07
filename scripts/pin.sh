@@ -13,13 +13,13 @@ cd "$root"
 branch="$(git branch --show-current)"
 [[ "$branch" == wt/* ]] || die "branch '$branch' is not wt/*; switch to a wt/* worktree and run pin.sh again."
 [[ -z "$(git status --porcelain --untracked-files=no)" ]] || die "tracked changes are uncommitted; commit or discard them, then run pin.sh again."
-sha_cmd="${MAIPAI_PIN_SHA256_CMD:-curl -fsSL \$1 | shasum -a 256 | cut -d' ' -f1}"
+sha_cmd="${MAIPAI_PIN_SHA256_CMD:-set -o pipefail; curl -fsSL \$1 | shasum -a 256 | cut -d' ' -f1}"
 ensure_cmd="${MAIPAI_PIN_ENSURE_TAG_CMD:-bash ../commons/scripts/ensure-tag.sh \"\$@\"}"
 install_cmd="${MAIPAI_PIN_INSTALL_CMD:-bun install --force}"
 stack_dir="${MAIPAI_PIN_STACK_DIR:-../stack}"
 gh_cmd="${MAIPAI_PIN_GH_CMD:-gh}"
 land_cmd="${MAIPAI_PIN_LAND_CMD:-bash scripts/land.sh}"
-run_cmd() { local command="$1"; shift; bash -c "$command" -- "$@"; }
+run_cmd() { local command="$1"; shift; bash -o pipefail -c "$command" -- "$@"; }
 print_cmd() { printf '  %s\n' "$*"; }
 changed=()
 add_changed() { local item="$1" current; for current in "${changed[@]:-}"; do [[ "$current" == "$item" ]] && return; done; changed+=("$item"); }
@@ -47,6 +47,7 @@ case "$kind" in
       run_cmd "$ensure_cmd" "$pkg" "$tag" || die "could not ensure $pkg $tag; check the Commons checkout and retry."
       digest="$(run_cmd "$sha_cmd" "$digest_url")" || die "digest command failed for $digest_url; check the command override or network, then retry."
       [[ "$digest" =~ ^[0-9a-fA-F]{64}$ ]] || die "digest command returned an invalid SHA-256 for $digest_url; fix the override and retry."
+      [[ "$digest" != e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855 ]] || die "digest is the SHA-256 of an empty file; the download of $digest_url failed; check the URL and the network, then retry."
       for file in "${package_files[@]}"; do
         PIN_FILE="$file" PIN_PKG="$pkg" PIN_TAG="$tag" python3 - <<'PY'
 import os, re
@@ -119,11 +120,12 @@ for entry in pin.get("assets", {}).values():
     else:
         url = asset.get("url")
         if not url: raise SystemExit(f"release asset has no digest or URL: {entry.get('name')}")
-        command = os.environ.get("MAIPAI_PIN_SHA256_CMD", "curl -fsSL $1 | shasum -a 256 | cut -d' ' -f1")
-        result = subprocess.run(["bash", "-c", command, "--", url], text=True, capture_output=True)
+        command = os.environ.get("MAIPAI_PIN_SHA256_CMD", "set -o pipefail; curl -fsSL $1 | shasum -a 256 | cut -d' ' -f1")
+        result = subprocess.run(["bash", "-o", "pipefail", "-c", command, "--", url], text=True, capture_output=True)
         if result.returncode: raise SystemExit(f"digest command failed for {url}: {result.stderr.strip()}")
         digest = result.stdout.strip()
         if len(digest) != 64 or any(c not in "0123456789abcdefABCDEF" for c in digest): raise SystemExit(f"invalid SHA-256 for {entry.get('name')}")
+        if digest.lower() == "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855": raise SystemExit(f"digest is the SHA-256 of an empty file; the download of {url} failed; check the URL and the network, then retry.")
         entry["sha256"] = digest
 pin["version"] = version
 with open(path, "w") as f: json.dump(pin, f, indent=2); f.write("\n")

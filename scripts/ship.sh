@@ -132,7 +132,11 @@ if (( ! dry )); then
   waited=0; wait_started="$(date +%s)"
   until mkdir "$lock_dir" 2>/dev/null; do
     owner_pid="$(cat "$lock_dir/pid" 2>/dev/null || true)"
-    if [[ "$owner_pid" =~ ^[0-9]+$ ]] && ! kill -0 "$owner_pid" 2>/dev/null; then echo "ship.sh: the ship that held the lock (pid $owner_pid) is gone; clearing its lock." >&2; rm -rf "$lock_dir"; continue; fi
+    stale=0
+    if [[ "$owner_pid" =~ ^[0-9]+$ ]] && ! kill -0 "$owner_pid" 2>/dev/null; then stale=1
+    elif [[ ! "$owner_pid" =~ ^[0-9]+$ ]]; then lock_mtime="$(stat -f %m "$lock_dir" 2>/dev/null || echo 0)"; (( $(date +%s) - lock_mtime > 120 )) && stale=1
+    fi
+    if (( stale )); then stale_dir="$lock_dir.stale.$$"; if mv "$lock_dir" "$stale_dir" 2>/dev/null; then rm -rf "$stale_dir"; echo "ship.sh: clearing stale ship lock." >&2; continue; fi; fi
     (( waited < lock_wait )) || die "another ship ($(cat "$lock_dir/what" 2>/dev/null || echo unknown)) is still running after ${lock_wait}s; wait for it, then run ship.sh again."
     (( waited % 30 )) || echo "ship.sh: waiting for another ship to finish ($(cat "$lock_dir/what" 2>/dev/null || echo starting)); ${waited}s so far." >&2
     sleep 2; waited=$((waited + 2))

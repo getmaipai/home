@@ -10,7 +10,7 @@ set -euo pipefail
 export WT_INSTALL_DIRS="backend frontend"
 # T2 (full gate, review, architect) is the safety and auth surface only (GATE-FAST-01, 2026-10-16):
 # everything else, pins and the turn pipeline included, is T1 (preflight plus the tests beside the change).
-export WT_T2_GLOBS="docs/design/RULES.md backend/src/auth/* backend/src/credentials* backend/src/consent* backend/src/people/*child* backend/src/people/*teen* backend/src/db/migrations/*"
+export WT_T2_GLOBS="docs/design/RULES.md scripts/check.sh scripts/wt.sh scripts/lander.sh scripts/watcher.sh scripts/ship.sh backend/src/middleware/auth.ts backend/src/middleware/setupLocalOnly.ts backend/src/routes/auth*.ts backend/src/routes/totp.ts backend/src/routes/passkeys.ts backend/src/routes/adultLock.ts backend/src/routes/deviceAuth.ts backend/src/routes/quickConnect.ts backend/src/routes/grants.ts backend/src/routes/setup.ts backend/src/lib/session.ts backend/src/lib/totp.ts backend/src/lib/passkeys.ts backend/src/lib/apiKeys.ts backend/src/lib/secret*.ts backend/src/lib/*redential*.ts backend/src/lib/adultLock.ts backend/src/lib/personAuthMethods.ts backend/src/lib/quickConnect.ts backend/src/lib/consent*.ts backend/src/lib/child*.ts backend/src/lib/safety*.ts backend/src/lib/ageBand.ts backend/src/lib/contentPolicy.ts backend/src/lib/codeSafety.ts backend/src/lib/turnMachine/nodes/safety.ts backend/src/lib/turnMachine/toolGates.ts backend/src/db/migrations/*"
 export WT_TEST_WORKSPACES="backend frontend scripts"
 export WT_PIN_REMINDER="a pin changed; run bun install --force in backend and frontend, then bun restart, in the main checkout to make it live."
 common="$(git rev-parse --git-common-dir)"
@@ -46,7 +46,7 @@ if [[ -d "$wt_path" ]] && declare -F pipeline_main_sha >/dev/null; then
     ahead="$(git -C "$wt_path" rev-list --count "$head..$pm" 2>/dev/null || echo '?')"
     if git -C "$wt_path" merge --ff-only "$pm" >/dev/null 2>&1; then
       echo "wt: GitHub main is $ahead landed commits behind the pipeline's main (the push is still pending); this worktree starts from the landed main ${pm:0:7}." >&2
-      if git -C "$wt_path" diff --name-only "$head" "$pm" -- backend/package.json backend/bun.lock frontend/package.json frontend/bun.lock 2>/dev/null | grep -q .; then
+      if git -C "$wt_path" diff --name-only "$head" "$pm" -- package.json bun.lock backend/package.json frontend/package.json 2>/dev/null | grep -q .; then
         for d in $WT_INSTALL_DIRS; do [[ -d "$wt_path/$d" ]] && { (cd "$wt_path/$d" && bounded_run 600 "bun install $d (new worktree)" bun install --force >/dev/null 2>&1) || echo "wt: bun install --force failed in $d; run it there before working." >&2; }; done
       fi
     else

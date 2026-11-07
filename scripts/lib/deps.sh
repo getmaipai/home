@@ -81,9 +81,9 @@ DEPS_STAMP_NAME=".maipai-install-stamp"
 
 deps_stamp_value() {
   local dir="$1" f
-  for f in package.json bun.lock; do
+  for f in "$dir/package.json" "$dir/bun.lock" "$(cd "$dir/.." && pwd -P)/package.json" "$(cd "$dir/.." && pwd -P)/bun.lock"; do
     printf '%s:' "$f"
-    if [[ -f "$dir/$f" ]]; then shasum -a 256 < "$dir/$f" | cut -d' ' -f1; else echo none; fi
+    if [[ -f "$f" ]]; then shasum -a 256 < "$f" | cut -d' ' -f1; else echo none; fi
   done | shasum -a 256 | cut -d' ' -f1
 }
 

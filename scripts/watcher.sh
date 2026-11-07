@@ -304,7 +304,15 @@ PY
   [[ -n "$details" ]] || return 0
   title="Flaky: $file failed with the suite and passed alone 3 times in 7 days"
   body="$(printf 'The last three flaky suite runs for %s were:\n%s\n\nMove this file to scripts/gate/flakes.json as bench or serial, with the cause.\n\nfiled by the watcher' "$file" "$details")"
-  file_issue "$title" "$file" "$body"
+  local body_file
+  body_file="$(mktemp "$data/.flake-issue.XXXXXX")"
+  printf '%s\n' "$body" > "$body_file"
+  set +e
+  file_issue "$title" "$file" "$body_file"
+  local issue_rc=$?
+  set -e
+  rm -f "$body_file"
+  (( issue_rc == 0 )) || return 0
   python3 - "$issue_file" "$file" <<'PY'
 import json, os, sys, tempfile, datetime
 path, target = sys.argv[1:]
@@ -468,14 +476,14 @@ wait_for_quiet() {
 file_issue() {
   local title="$1" first_file="$2" note="$3" command="${MAIPAI_WATCH_ISSUE_CMD:-}" number
   if [[ -n "$command" ]]; then
-    (cd "$main" && bash -c "$command \"\$1\" \"\$2\"" _ "$title" "$note") || echo "watcher.sh: could not file issue for $title" >> "$data/watcher.log"
+    (cd "$main" && bash -c "$command \"\$1\" \"\$2\"" _ "$title" "$note") || { echo "watcher.sh: could not file issue for $title" >> "$data/watcher.log"; return 1; }
     return 0
   fi
   number="$(gh issue list -R getmaipai/home --state open --search "Watcher: $first_file" --limit 5 --json number -q '.[0].number' 2>/dev/null || true)"
   if [[ -n "$number" ]]; then
-    gh issue comment "$number" --body-file "$note" >>"$data/watcher.log" 2>&1 || echo "watcher.sh: could not comment on issue $number" >> "$data/watcher.log"
+    gh issue comment "$number" --body-file "$note" >>"$data/watcher.log" 2>&1 || { echo "watcher.sh: could not comment on issue $number" >> "$data/watcher.log"; return 1; }
   else
-    gh issue create -R getmaipai/home --title "$title" --body-file "$note" --label bug >>"$data/watcher.log" 2>&1 || gh issue create -R getmaipai/home --title "$title" --body-file "$note" >>"$data/watcher.log" 2>&1 || echo "watcher.sh: could not create issue: $title" >> "$data/watcher.log"
+    gh issue create -R getmaipai/home --title "$title" --body-file "$note" --label bug >>"$data/watcher.log" 2>&1 || gh issue create -R getmaipai/home --title "$title" --body-file "$note" >>"$data/watcher.log" 2>&1 || { echo "watcher.sh: could not create issue: $title" >> "$data/watcher.log"; return 1; }
   fi
 }
 
@@ -495,7 +503,21 @@ run_once() {
   last_run="$(cat "$data/last-run" 2>/dev/null || true)"
   last_green="$(cat "$data/last-green" 2>/dev/null || true)"
   if [[ "$head" == "$last_run" || "$head" == "$last_green" ]]; then echo "up to date at ${head:0:7}"; return 0; fi
-  git -C "$checkout" checkout --detach "$head" >/dev/null 2>&1
+  local checkout_error checkout_head
+  # AUDIT-GATE-01: a tree that was not checked out is never tested or marked green. The failure is logged once per sha
+  # (data/checkout-failed holds the last sha that failed) and retried on the next tick, since an index.lock is often transient.
+  checkout_failed() {
+    local why="$1"
+    if [[ "$(cat "$data/checkout-failed" 2>/dev/null || true)" != "$head" ]]; then
+      echo "$(date -u +%Y-%m-%dT%H:%M:%SZ) watcher: could not check out $head: $why; not marking green" >> "$data/watcher.log"
+      printf '%s\n' "$head" > "$data/checkout-failed"
+    fi
+    return 0
+  }
+  checkout_error="$(git -C "$checkout" checkout --detach "$head" 2>&1)" || { checkout_failed "$checkout_error"; return 0; }
+  checkout_head="$(git -C "$checkout" rev-parse HEAD 2>&1)" || checkout_head=""
+  [[ "$checkout_head" == "$head" ]] || { checkout_failed "${checkout_error:-HEAD is $checkout_head}"; return 0; }
+  rm -f "$data/checkout-failed"
   install_if_needed
   started="$(date +%s)"; output="$(mktemp "$data/.suite.XXXXXX")"
   if [[ "${MAIPAI_WATCH_NO_LOCK:-}" == 1 ]]; then :

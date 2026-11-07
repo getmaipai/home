@@ -270,9 +270,15 @@ safety_surface_files() {
   local changed="$1" glob regex file matches=""
   local globs
   globs="$(git -C "$checkout" show "$(pipeline_main_sha "$checkout" 2>/dev/null || echo origin/main):scripts/wt.sh" 2>/dev/null | sed -n 's/^export WT_T2_GLOBS="\(.*\)"$/\1/p' | head -n 1)"
-  [[ -n "$globs" ]] || return 0
+  if [[ -z "$globs" ]]; then
+    echo "lander: T2 globs not found in scripts/wt.sh; treating every change as T2" >> "$data/lander.log"
+    printf '%s' "$changed"
+    return 0
+  fi
+  local -a t2globs
+  set -f; read -r -a t2globs <<< "$globs"; set +f
   for file in $changed; do
-    for glob in $globs; do
+    for glob in "${t2globs[@]}"; do
       regex="$(printf '%s' "$glob" | sed -E 's/[][(){}.+?^$|\\]/\\&/g; s/\*/.*/g')"
       if printf '%s\n' "$file" | grep -Eq "^${regex}$"; then
         matches="${matches:+$matches
