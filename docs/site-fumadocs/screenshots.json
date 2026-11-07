@@ -126,8 +126,8 @@
   },
   "notifications-bell-es": {
     "file": "docs-notifications-bell-es.png",
-    "alt": "The bell's notice list on the Home screen in Spanish: two notices in Spanish, then two safety notices that stay in English",
-    "caption": "Notices show in the language you picked. Safety notices stay in English."
+    "alt": "The bell's notice list on the Home screen in Spanish: the buttons and two notices in Spanish, then safety and other fixed notices that stay in English",
+    "caption": "The buttons and new notices show in the language you picked. Safety notices stay in English."
   },
   "sign-in-es": {
     "file": "docs-sign-in-es.png",

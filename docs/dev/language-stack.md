@@ -81,8 +81,8 @@ The kit (`@maipai/ui`, commons) has its own catalogs: `ui/locales/{en-US,en-GB,e
 The kit reads Lingui's global `i18n` (peer dependency `@lingui/core`) and shows English from a private instance when Home loaded nothing.
 Its Spanish is machine-written and flagged `needs-review`; 13 protected entries stay English.
 
-Status on 2026-11-07: Home still pins `ui-v0.5.506`, so kit strings (the settings rail hints, search box, checklist rows and the profile menu) show in
-English on a Spanish screen until the pin moves to 0.5.518 and `usePersonLocale` calls `loadKitCatalog`. Spec `0.1.338` (I18N-K2) is pinned:
+Status on 2026-11-07 (I18N-K1b): Home pins `ui-v0.5.518` and `activateLocale` calls `loadKitCatalog` after Home's own entries, so the kit's text (the rail, the search box,
+the profile menu, "Restablecer a los valores predeterminados", the composer) shows in Spanish. Spec `0.1.338` (I18N-K2) is pinned:
 `describeSetting` takes a translator, and Home passes the generated setting copy through `installSettingCopyCache`.
 
 ## Server wording

@@ -1477,7 +1477,7 @@ export function ChatPage({ person }: { person: Roster }) {
     column.setSearch("");
     setSheetOpen(false);
   };
-  const newChatAction = { label: "New chat", disabled: chatAvailability === "unavailable", onClick: () => { void runtime.threads.switchToNewThread(); setPendingChatFolder(null); setSheetOpen(false); } };
+  const newChatAction = { label: i18n._({ id: "New chat", message: "New chat" }), disabled: chatAvailability === "unavailable", onClick: () => { void runtime.threads.switchToNewThread(); setPendingChatFolder(null); setSheetOpen(false); } };
   const threadSidebar = (id: string, mobile = false) => (
     <SectionSidebar
       standalone
@@ -1487,10 +1487,10 @@ export function ChatPage({ person }: { person: Roster }) {
       collapseLabels={{ hide: "Hide conversations", show: "Show conversations", pin: "Keep conversations open" }}
       collapsedStyle="hidden"
       headerActions={mobile ? <TooltipIconButton tooltip={i18n._({ id: "Chat settings", message: "Chat settings" })} data-slot="chat-column-icon" asChild><Link to={CHAT_SETTINGS_PATH} aria-label={i18n._({ id: "Chat settings", message: "Chat settings" })}><VoiceSettingsIcon className="size-4.5" /></Link></TooltipIconButton> : undefined}
-      search={hasThreads ? { value: column.search, onChange: column.setSearch, onSubmit: openFirstSearchResult, label: "Search chats" } : undefined}
+      search={hasThreads ? { value: column.search, onChange: column.setSearch, onSubmit: openFirstSearchResult, label: i18n._({ id: "Search chats", message: "Search chats" }) } : undefined}
       primaryAction={newChatAction}
       collapseShortcut={{ label: chatColumnShortcutLabel(), keys: "Meta+B Control+B" }}
-      sidebarProps={{ id, "data-slot": "chat-rail", "aria-label": "Conversations", role: "region", "data-touch-target-exempt": "", ...(mobile ? { "data-chat-column-mobile": "" } : {}) }}
+      sidebarProps={{ id, "data-slot": "chat-rail", "aria-label": i18n._({ id: "Conversations", message: "Conversations" }), role: "region", "data-touch-target-exempt": "", ...(mobile ? { "data-chat-column-mobile": "" } : {}) }}
       body={threadSidebarBody}
     />
   );
@@ -1900,7 +1900,7 @@ export function ChatPage({ person }: { person: Roster }) {
               <SheetTitle>{i18n._({ id: "Conversations", message: "Conversations" })}</SheetTitle>
               <SheetDescription>{i18n._({ id: "Past conversations", message: "Past conversations" })}</SheetDescription>
             </SheetHeader>
-            <SectionSidebar standalone density="compact" headerActions={<TooltipIconButton tooltip={i18n._({ id: "Chat settings", message: "Chat settings" })} data-slot="chat-column-icon" asChild><Link to={CHAT_SETTINGS_PATH} aria-label={i18n._({ id: "Chat settings", message: "Chat settings" })}><VoiceSettingsIcon className="size-4.5" /></Link></TooltipIconButton>} search={{ value: column.search, onChange: column.setSearch, label: "Search chats" }} primaryAction={newChatAction} sidebarProps={{ id: "next-chat-threads", "data-slot": "chat-rail", "aria-label": "Conversations", role: "region", "data-chat-column-mobile": "" }} body={threadSidebarBody} />
+            <SectionSidebar standalone density="compact" headerActions={<TooltipIconButton tooltip={i18n._({ id: "Chat settings", message: "Chat settings" })} data-slot="chat-column-icon" asChild><Link to={CHAT_SETTINGS_PATH} aria-label={i18n._({ id: "Chat settings", message: "Chat settings" })}><VoiceSettingsIcon className="size-4.5" /></Link></TooltipIconButton>} search={{ value: column.search, onChange: column.setSearch, label: i18n._({ id: "Search chats", message: "Search chats" }) }} primaryAction={newChatAction} sidebarProps={{ id: "next-chat-threads", "data-slot": "chat-rail", "aria-label": i18n._({ id: "Conversations", message: "Conversations" }), role: "region", "data-chat-column-mobile": "" }} body={threadSidebarBody} />
           </SheetContent>
         </Sheet>
         {/* CANVAS-SHEET-DESKTOP-01 (fixes #183): `open` is gated on

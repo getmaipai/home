@@ -12,6 +12,7 @@ import { ChatHeaderDataProvider } from "@/apps/chat/chatHeaderData";
 import { writeIncognitoCache } from "@/shell/incognitoCache";
 import { IncognitoProvider, useIncognitoContext } from "@/shell/incognitoContext";
 import { __setUnwiredControlsForTests } from "@/apps/chat/composerAddMenu";
+import { activateLocale } from "@/i18n";
 import { api, type NotificationDeliveryView, type Roster } from "@/lib/api";
 import { FakeAudioContext } from "../../../tests/fakeAudioContext";
 import { ndjsonStream as bareNdjsonStream } from "../../../tests/ndjsonStream";
@@ -632,6 +633,24 @@ describe("ChatPage (SHELL-02's slice 2: the thread list)", () => {
       fireEvent.click(await view.findByRole("menuitem", { name: "Delete" }));
       await waitFor(() => expect(view.calls.some((call) => call.method === "DELETE" && call.url.includes("conv-search-today"))).toBe(true));
     } finally { view.restore(); }
+  });
+
+  test("the column reads Spanish when es is active: Buscar chats, Chat nuevo and the Conversaciones region", async () => {
+    await activateLocale("es");
+    const fetch = stubSearchRows();
+    try {
+      const view = renderPage(
+        <MemoryRouter initialEntries={["/chat"]}>
+          <ChatPage person={makePerson()} />
+        </MemoryRouter>,
+      );
+      expect(await view.findByRole("button", { name: "Buscar chats" })).toBeTruthy();
+      expect(view.getByRole("button", { name: "Chat nuevo" })).toBeTruthy();
+      expect(view.getByRole("region", { name: "Conversaciones" })).toBeTruthy();
+    } finally {
+      fetch.restore();
+      await activateLocale("en-US");
+    }
   });
 
   test("shows New chat and an empty thread list with no past conversations", async () => {

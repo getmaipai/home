@@ -40,7 +40,7 @@ When you pick **Español** or **English (United Kingdom)**, a short line appears
 
 ![Settings with Spanish picked](../assets/screens/docs-settings-es.png)
 
-![The bell with two notices in Spanish and two safety notices that stay in English](../assets/screens/docs-notifications-bell-es.png)
+![The bell in Spanish: the kit's own words and two new notices in Spanish, while safety and other fixed notices stay in English](../assets/screens/docs-notifications-bell-es.png)
 
 ## What stays in English, and why
 
@@ -48,7 +48,7 @@ When you pick **Español** or **English (United Kingdom)**, a short line appears
 - **Lines written for children and teens, safety and crisis messages, refusals, fixed voice lines and robot speech.** These stay in English until a grown-up has read and approved the translation. A wrong word in these lines could matter more than in a menu, so Home does not use an unreviewed translation for them.
 - **Names.** MaiPai, Home and the names of your companions are not translated.
 
-If a line is not translated yet, Home shows it in English. You never see a blank or a code. Some parts of the screen, such as the search box and the profile menu, are still in English while the translation is finished.
+If a line is not translated yet, Home shows it in English. You never see a blank or a code. The menu rail, the search box and the profile menu are in Spanish. A few descriptions inside Settings are still in English while the translation is finished.
 
 ## The home's language
 

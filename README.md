@@ -15,26 +15,21 @@ Your chats, people and memories stay in your house. Home goes online for downloa
 
 ## What Home does today
 
-- **Private chat with memory.** Talk to an AI that runs on your own computer. It remembers what matters, shows its sources, and lets you see, fix or forget any memory.
-- **Reads your pictures.** Attach a photo and ask about it. This needs a computer with 32 GB of memory or more.
-- **Makes and edits pictures.** Ask for a picture, make variations, add styles. The editor has Remove background, Erase, Upscale, Resize, Markup and Comment (describe a change in words). Children and teens get a safer picture lane.
+- **Private chat with memory.** Talk to an AI that runs on your own computer. It remembers what matters, shows its sources, and lets you see, fix or forget any memory. An admin, or an adult an admin allows, can use one large model for hard chat and coding work.
+- **Reads, makes and edits pictures.** Attach a photo and ask about it (this needs a computer with 32 GB of memory or more). Ask for a picture, make variations, add styles. The editor has Remove background, Erase, Upscale, Resize, Markup and Comment (describe a change in words). Children and teens get a safer picture lane.
 - **Makes short videos and films.** Start from words or a picture, then trim, join and add voice lines and songs in the Studio. Turn the words in a clip into captions you can fix and download. Adults-only clips stay behind a lock. This needs a Mac with 128 GB of memory.
-- **Music and songs.** Play your music library, tune in online radio, make songs and albums, split a song into stems, remix, and follow the lyrics in the player.
-- **Videos, shows, books and podcasts.** Watch your saved videos, shows and films, read books and listen to audiobooks, and follow podcasts. Each picks up where you stopped.
+- **Music, shows, books and podcasts.** Play your music library, tune in online radio, make songs and albums, split a song into stems, remix, and follow the lyrics in the player. Watch your saved videos, shows and films, read books, listen to audiobooks and follow podcasts. Each picks up where you stopped.
 - **News and Weather.** Read stories from the news shelf you choose. Weather has your places, Fahrenheit or Celsius, and a weather card in chat.
 - **Library.** One place for every picture, video, song and document, with sharing and a trash you can restore from.
 - **Natural voice.** Talk and listen, or wake Home with a word. Home speaks with Chatterbox Turbo on bigger computers.
 - **Web search.** Home searches with DuckDuckGo, or with your own SearXNG. Teens and children use your own SearXNG unless a grown-up allows more.
-- **Reminders, lists, alarms and timers.** Ask in chat or use the Reminders and Clock apps.
-- **House.** With Home Assistant connected, see your rooms and ask Home to control lights and locks.
+- **Reminders, lists, alarms, timers and House.** Ask in chat or use the Reminders and Clock apps. With Home Assistant connected, see your rooms and ask Home to control lights and locks.
 - **Companions.** Browse, add, copy or make a companion, pick one for each chat, or @mention another for one question.
-- **Max chat.** An admin, or an adult an admin allows, can use one large model for hard chat and coding work.
 - **A real household.** One profile per person. Children are restricted by default, teens get more privacy, and the safety gates cannot be switched off.
 - **Your language.** Each person picks English (US or UK) or Spanish in their profile, and the home sets the default. Dates, units and notices follow it. The Spanish is written by your own AI, marked for review, and kept in English for children and teens until a grown-up has read it.
 - **Careful sign-in.** Passcode boxes, optional two-step codes tied to the first step, a lockout for one person on one device so a child's guesses cannot lock the owner out, a lock screen after you step away, and a check that Home is opened only by its own addresses.
 - **Backups, updates and repairs** you start yourself, with a way to go back. Errors say what went wrong and what to do next.
-- **Phone layout.** Apps use a bottom section bar and share the top bar with Home.
-- **A one-line installer** for a Mac. It opens the setup wizard in your browser, and Home works in Chrome and Safari.
+- **Phone layout and a one-line installer.** Apps use a bottom section bar and share the top bar with Home. The installer for a Mac opens the setup wizard in your browser, and Home works in Chrome and Safari.
 
 ## Coming soon
 

@@ -10424,7 +10424,7 @@ async function captureDocsShots(browser: Browser, sessionValue: string): Promise
     }
     await shot("notifications-bell-es", desktop, "light", async (page) => {
       await page.goto(`${BASE_URL}/`);
-      await page.getByRole("button", { name: /Open profile menu for .*\(\d+ (notifications?|notificaciones)/ }).click();
+      await page.getByRole("button", { name: /(Open profile menu for|Abrir menú de perfil de) .*\(\d+ (notifications?|notificaciones?)/ }).click();
       await page.getByRole("menuitem", { name: /Notifications|Notificaciones/ }).click();
       await page.getByRole("button", { name: "Descartar todo" }).waitFor({ timeout: 15000 });
     });

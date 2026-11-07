@@ -4608,7 +4608,7 @@ msgid "Built-in companion"
 msgstr "Compañía integrada"
 
 #. js-lingui-explicit-id
-#: src/shell/library/TranscriptCaptionTracks.tsx:124
+#: src/shell/library/TranscriptCaptionTracks.tsx:141
 msgid "Burn into video"
 msgstr ""
 
@@ -4872,8 +4872,8 @@ msgid "Caption track refreshed. Captions you fixed by hand were kept."
 msgstr "Pista de subtítulos actualizada. Se conservaron los cambios que hiciste a mano."
 
 #. js-lingui-explicit-id
-#: src/shell/library/TranscriptCaptionTracks.tsx:99
-#: src/shell/library/TranscriptCaptionTracks.tsx:100
+#: src/shell/library/TranscriptCaptionTracks.tsx:116
+#: src/shell/library/TranscriptCaptionTracks.tsx:117
 #, needs-review
 msgid "Caption tracks"
 msgstr "Pistas de subtítulos"
@@ -6799,7 +6799,9 @@ msgstr "Conversación con {name}"
 
 #. js-lingui-explicit-id
 #: src/shell/AmbientCompanionPane.tsx:309
+#: src/shell/pages/ChatPage.tsx:1493
 #: src/shell/pages/ChatPage.tsx:1900
+#: src/shell/pages/ChatPage.tsx:1903
 #, needs-review
 msgid "Conversations"
 msgstr "Conversaciones"
@@ -15939,7 +15941,7 @@ msgid "Make any song"
 msgstr "Crear cualquier canción"
 
 #. js-lingui-explicit-id
-#: src/shell/library/TranscriptCaptionTracks.tsx:141
+#: src/shell/library/TranscriptCaptionTracks.tsx:158
 #, needs-review
 msgid "Make caption track"
 msgstr "Crear pista de subtítulos"
@@ -17148,7 +17150,7 @@ msgid "Needs fixing"
 msgstr "Necesita reparación"
 
 #. js-lingui-explicit-id
-#: src/shell/library/TranscriptCaptionTracks.tsx:104
+#: src/shell/library/TranscriptCaptionTracks.tsx:121
 msgid "Needs refreshing"
 msgstr ""
 
@@ -17291,6 +17293,12 @@ msgstr "Nueva"
 #, needs-review
 msgid "New alarm"
 msgstr "Nueva alarma"
+
+#. js-lingui-explicit-id
+#: src/shell/pages/ChatPage.tsx:1480
+#, needs-review
+msgid "New chat"
+msgstr "Chat nuevo"
 
 #. js-lingui-explicit-id
 #: src/apps/chat/composerDictationWaveform.tsx:99
@@ -21347,7 +21355,7 @@ msgid "setting.reference.update.max_mbps.label"
 msgstr "Límite de velocidad de actualización de referencias (MB/s)"
 
 #. js-lingui-explicit-id
-#: src/shell/library/TranscriptCaptionTracks.tsx:135
+#: src/shell/library/TranscriptCaptionTracks.tsx:152
 #, needs-review
 msgid "Refresh"
 msgstr "Actualizar"
@@ -23079,6 +23087,13 @@ msgstr "Búsqueda y web"
 #, needs-review
 msgid "Search articles"
 msgstr "Buscar artículos"
+
+#. js-lingui-explicit-id
+#: src/shell/pages/ChatPage.tsx:1490
+#: src/shell/pages/ChatPage.tsx:1903
+#, needs-review
+msgid "Search chats"
+msgstr "Buscar chats"
 
 #. js-lingui-explicit-id
 #: src/apps/clock/WorldClocksTab.tsx:165
@@ -28111,13 +28126,13 @@ msgid "Transcript tools"
 msgstr "Herramientas de transcripción"
 
 #. js-lingui-explicit-id
-#: src/shell/library/TranscriptCaptionTracks.tsx:157
+#: src/shell/library/TranscriptCaptionTracks.tsx:174
 #, needs-review
 msgid "Translate"
 msgstr "Traducir"
 
 #. js-lingui-explicit-id
-#: src/shell/library/TranscriptCaptionTracks.tsx:146
+#: src/shell/library/TranscriptCaptionTracks.tsx:163
 #, needs-review
 msgid "Translate captions to"
 msgstr "Traducir subtítulos a"
@@ -28129,7 +28144,7 @@ msgid "setting.music.lyrics_translate.label"
 msgstr "Traducir letras"
 
 #. js-lingui-explicit-id
-#: src/shell/library/TranscriptCaptionTracks.tsx:104
+#: src/shell/library/TranscriptCaptionTracks.tsx:121
 #, needs-review
 msgid "Translated"
 msgstr "Traducido"
@@ -28866,7 +28881,7 @@ msgstr "Hasta {minutes, plural, one {# minuto} other {# minutos}} en este equipo
 #. js-lingui-explicit-id
 #: src/apps/settings/HouseholdRobotsSection.tsx:171
 #: src/apps/settings/HouseholdRobotsSection.tsx:178
-#: src/shell/library/TranscriptCaptionTracks.tsx:104
+#: src/shell/library/TranscriptCaptionTracks.tsx:121
 #: src/shell/pages/UpdatesPage.tsx:62
 #: src/shell/pages/UpdatesPage.tsx:64
 msgid "Up to date"
