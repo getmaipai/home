@@ -1,11 +1,11 @@
 import { describe, expect, test } from "bun:test";
-import { COMPANION_DIALS, COMPANION_PERSONALITIES, cleanStyleNotes, safeExamples } from "@/lib/companionPersonality";
+import { COMPANION_PERSONALITIES, cleanStyleNotes, safeExamples } from "@/lib/companionPersonality";
 import { COMPANION_DIAL_OPTIONS } from "@/lib/companionPersonalityDials";
 
 describe("companion personality presets", () => {
   test("every preset uses valid dials and has enough named examples per band", () => {
     for (const [name, preset] of Object.entries(COMPANION_PERSONALITIES)) {
-      for (const [dial, value] of Object.entries(preset.dials)) expect((COMPANION_DIALS[dial as keyof typeof COMPANION_DIALS] as readonly string[]).includes(value), `${name}.${dial}`).toBe(true);
+      for (const [dial, value] of Object.entries(preset.dials)) expect((COMPANION_DIAL_OPTIONS[dial as keyof typeof COMPANION_DIAL_OPTIONS].options as readonly string[]).includes(value), `${name}.${dial}`).toBe(true);
       expect(preset.examples.general.length).toBeGreaterThanOrEqual(3);
       for (const band of ["child", "teen", "adult"] as const) expect(preset.examples[band].length).toBeGreaterThanOrEqual(2);
       for (const line of [...preset.examples.general, ...preset.examples.child, ...preset.examples.teen, ...preset.examples.adult]) expect(line).toContain("{name}");

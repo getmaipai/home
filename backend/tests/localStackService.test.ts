@@ -1,9 +1,9 @@
 import { tmpdir } from "node:os";
 import { afterEach, describe, expect, test } from "bun:test";
+import { DEFAULT_STACK_PORT } from "@/lib/ports";
 import {
   __setStackServiceRunnerForTests,
   installRoot,
-  HOME_STACK_PORT,
   startLocalStackService,
   stopLocalStackService,
   type StackServiceCommand,
@@ -29,7 +29,7 @@ describe("local Stack service commands", () => {
     expect(calls[0]!.binary).toContain("maipai-stack-");
     expect(calls[0]!.env).toMatchObject({
       STACK_DATA_DIR: "/tmp/home-install/stack/data",
-      PORT: String(HOME_STACK_PORT),
+      PORT: String(DEFAULT_STACK_PORT),
       STACK_BUN_BIN: "/tmp/home-install/.bun/bin/bun",
     });
   });

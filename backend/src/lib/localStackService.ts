@@ -2,9 +2,7 @@ import { existsSync, realpathSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve, sep } from "node:path";
 import { spawnSync } from "node:child_process";
-import { DEFAULT_STACK_PORT, stackPort } from "./ports";
-
-export const HOME_STACK_PORT = DEFAULT_STACK_PORT;
+import { stackPort } from "./ports";
 
 export type StackServiceCommand = "start" | "stop";
 export type StackServiceRunner = (binary: string, command: StackServiceCommand, env: NodeJS.ProcessEnv) => void;

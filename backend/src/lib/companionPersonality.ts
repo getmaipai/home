@@ -1,9 +1,6 @@
 import { evaluateSafety, forOutput, carriesCrisisSignal } from "@/lib/safety";
 import type { AgeBand } from "@/lib/ageBand";
-import { COMPANION_DIAL_OPTIONS } from "@/lib/companionPersonalityDials";
 
-// The editor owns the option arrays; importing them here makes this the preset table's source of truth.
-export const COMPANION_DIALS = Object.fromEntries(Object.entries(COMPANION_DIAL_OPTIONS).map(([name, definition]) => [name, definition.options]));
 export type PersonalityId = "friendly" | "funny" | "calm" | "professional" | "playful" | "custom";
 const lines = (general: string[], child: string[], teen: string[], adult: string[]) => ({ general, child, teen, adult });
 export const COMPANION_PERSONALITIES = {
