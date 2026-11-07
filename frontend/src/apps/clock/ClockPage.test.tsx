@@ -109,9 +109,10 @@ describe("ClockPage", () => {
     try {
       Object.defineProperty(window, "innerWidth", { configurable: true, value: 402 });
       const view = renderWithQueryClient(<MemoryRouter><ClockPage /></MemoryRouter>);
-      expect(await view.findByText("No alarms yet. Add one with the plus button.")).toBeInTheDocument();
-      expect(view.container.querySelector("h1")?.className).toContain("sr-only");
-      expect(view.getByText("No alarms yet. Add one with the plus button.").className).toContain("border-b");
+      expect(await view.findByText("Add an alarm with the plus button.")).toBeInTheDocument();
+      // The route draws the page's one h1 (PageHeaderLayout); the page adds none of its own.
+      expect(view.container.querySelector("h1")).toBeNull();
+      expect(view.getByText("Add an alarm with the plus button.").className).toContain("border-b");
       expect(view.container.querySelector('[data-slot="tabs-list"]')?.getAttribute("data-variant")).toBe("bottom");
     } finally {
       api.restore(); window.matchMedia = originalMatchMedia;

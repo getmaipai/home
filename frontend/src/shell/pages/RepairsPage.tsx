@@ -6,7 +6,7 @@ import { getIcon } from "@maipai/ui/src/icons";
 import { DataTable } from "@maipai/ui/src/elements/data-table";
 import { DataTableRowActions } from "@/shell/components/DataTableRowActions";
 import { tableColumns, useDataTableModel } from "@/shell/components/dataTableModel";
-import { Card, CardContent, CardHeader, CardTitle } from "@maipai/ui/src/dashboard/components/ui/card";
+import { Card, CardContent } from "@maipai/ui/src/dashboard/components/ui/card";
 import { Button } from "@maipai/ui/src/dashboard/components/ui/button";
 import { Button as KitButton } from "@maipai/ui/src/ui/button";
 import { Input } from "@maipai/ui/src/dashboard/components/ui/input";
@@ -105,13 +105,6 @@ export function RepairsPage({ person }: { person: Roster }) {
 
   return (
     <>
-      <CardHeader>
-        <CardTitle><span className="flex items-center gap-2">
-          <RepairsIcon size={16} className="text-muted-foreground" />
-          Repairs
-        </span></CardTitle>
-      </CardHeader>
-
       {!canManage ? (
         <Card>
           <CardContent>

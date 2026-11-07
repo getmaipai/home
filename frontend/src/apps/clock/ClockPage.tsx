@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Page } from "@maipai/ui/src/primitives/Page";
 import { Tabs, TabsList, TabsTrigger } from "@maipai/ui/src/ui/tabs";
 import { useBreakpoint } from "@maipai/ui/src/hooks/useBreakpoint";
 import { AlarmsTab } from "@/apps/clock/AlarmsTab";
@@ -11,9 +10,10 @@ import { setClockHeaderTab, type ClockTab } from "@/apps/clock/clockHeader";
 import { api, type ComingUpItem } from "@/lib/api";
 
 const taglines: Record<ClockTab, string> = {
-  alarms: "No alarms yet. Add one with the plus button.",
-  timers: "No timers yet. Add one with the plus button.",
-  "world-clocks": "No world clocks yet. Add one with the plus button.",
+  // AUDIT-UI-01: a hint, not an empty state (each tab draws its own "No alarms" line, so the page said "no alarms" twice).
+  alarms: "Add an alarm with the plus button.",
+  timers: "Add a timer with the plus button.",
+  "world-clocks": "Add a world clock with the plus button.",
   stopwatch: "Every moment, counted.",
 };
 
@@ -48,7 +48,8 @@ export function ClockPage() {
   );
 
   return (
-    <Page title="Clock" hideTitle>
+    // AUDIT-UI-01: the route (PageHeaderLayout) draws this page's one h1; a second one here made two.
+    <div className="flex h-full min-w-0 flex-col">
       <div className="flex min-h-[calc(100dvh-7rem)] flex-1 flex-col">
         {isPhone ? null : tabBar}
         <section className="min-h-0 flex-1 overflow-y-auto px-4">
@@ -57,6 +58,6 @@ export function ClockPage() {
         </section>
         {isPhone ? <div className="mt-auto">{tabBar}</div> : null}
       </div>
-    </Page>
+    </div>
   );
 }

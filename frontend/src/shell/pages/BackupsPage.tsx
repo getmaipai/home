@@ -8,9 +8,7 @@ export const BackupsIcon = getIcon("archive");
 export function BackupsPage({ person }: { person: Roster }) {
   useTabItem("Backups");
   return (
-    <div>
-      <h1>Backups</h1>
-      <BackupsSection person={person} />
-    </div>
+    // AUDIT-UI-01: the header bar already names this page; the body does not say it again.
+    <BackupsSection person={person} headed={false} />
   );
 }

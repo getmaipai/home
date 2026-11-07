@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState, useContext } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import type { List as ListRecord } from "@maipai/spec/gen/ts/list.js";
-import { Page } from "@maipai/ui/src/primitives/Page";
 import { Button } from "@maipai/ui/src/ui/button";
 import { AlertDialog, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@maipai/ui/src/ui/alert-dialog";
 import { useBreakpoint } from "@maipai/ui/src/hooks/useBreakpoint";
@@ -135,7 +134,8 @@ export function RemindersPage() {
   const todayCount = todayJobs.length + todayItems.length;
   const scheduledCount = jobs.length + dueItems.length;
 
-  return <Page title="Reminders" hideTitle>
+  // AUDIT-UI-01: the route (PageHeaderLayout) draws this page's one h1; a second one here made two.
+  return <div className="flex h-full min-w-0 flex-col">
     <div className="flex min-h-0 flex-1">
       {showColumn ? <ListColumn
         lists={lists}
@@ -180,5 +180,5 @@ export function RemindersPage() {
       </AlertDialogContent>
     </AlertDialog>
     {listsQuery.isError || comingQuery.isError ? <div role="alert" className="p-4 text-destructive"><p>Could not load reminders. Check your connection and try again.</p>{listsQuery.isError ? <Button variant="outline" onClick={() => void listsQuery.refetch()}>Retry</Button> : null}{comingQuery.isError ? <Button variant="outline" onClick={() => void comingQuery.refetch()}>Retry</Button> : null}</div> : null}
-  </Page>;
+  </div>;
 }

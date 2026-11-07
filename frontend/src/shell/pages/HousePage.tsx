@@ -1,7 +1,6 @@
 import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Page } from "@maipai/ui/src/primitives/Page";
-import { Button } from "@maipai/ui/src/dashboard/components/ui/button";
+import { EmptyState } from "@maipai/ui/src/primitives/EmptyState";
 import { LightTile } from "@maipai/ui/src/elements/light-tile";
 import { SwitchTile } from "@maipai/ui/src/elements/switch-tile";
 import { SceneTile } from "@maipai/ui/src/elements/scene-tile";
@@ -40,8 +39,9 @@ export function HousePage() {
     } finally { setPending((old) => { const copy = new Set(old); copy.delete(entity.id); return copy; }); }
   }
   const body = query.data;
-  return <Page title="House" hideTitle><main className="p-4">
-    {query.isPending ? <p role="status">Loading rooms…</p> : query.isError ? <p role="status">Home could not load rooms. Try again.</p> : body?.status === "not_configured" ? <p>Home Assistant is not set up yet</p> : body?.status === "unreachable" ? <p>Home Assistant did not answer. Check that it is on, then reload.</p> : !body?.rooms.length ? <p>No devices are shared with you yet.</p> : <div className="space-y-6">{body.rooms.map((room) => {
+  // AUDIT-UI-01: the route (PageHeaderLayout) draws this page's one h1; a second one here made two.
+  return <div className="flex h-full min-w-0 flex-col"><main className="p-4">
+    {query.isPending ? <p role="status">Loading rooms…</p> : query.isError ? <p role="status">Home could not load rooms. Try again.</p> : body?.status === "not_configured" ? <EmptyState icon="house" text="Home Assistant is not set up yet. Connect it in Settings to control your lights, locks and scenes here." actionLabel="Open Settings" onAction={() => { window.location.href = "/settings"; }} /> : body?.status === "unreachable" ? <p>Home Assistant did not answer. Check that it is on, then reload.</p> : !body?.rooms.length ? <p>No devices are shared with you yet.</p> : <div className="space-y-6">{body.rooms.map((room) => {
       const active = room.entities.filter((entity) => entity.on).length;
       return <section key={room.id} aria-labelledby={`room-${room.id}`}>
         <header className="mb-3"><h2 id={`room-${room.id}`} className="text-lg font-semibold">{room.name}</h2><p className="text-sm text-muted-foreground">{active} of {room.entities.length} on</p></header>
@@ -56,6 +56,5 @@ export function HousePage() {
         {errors[room.id] ? <p role="status" className="mt-2 text-sm text-muted-foreground">{errors[room.id]}</p> : null}
       </section>;
     })}</div>}
-    {body?.status === "not_configured" ? <Button variant="link" onClick={() => { window.location.href = "/settings"; }}>Open Settings</Button> : null}
-  </main></Page>;
+  </main></div>;
 }

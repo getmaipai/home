@@ -5,7 +5,7 @@ import { AsyncState } from "@maipai/ui/src/primitives/AsyncState";
 import { getIcon } from "@maipai/ui/src/icons";
 import { DataTable, type DataTableColumn } from "@maipai/ui/src/elements/data-table";
 import { Button } from "@maipai/ui/src/dashboard/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@maipai/ui/src/dashboard/components/ui/card";
+import { Card, CardContent } from "@maipai/ui/src/dashboard/components/ui/card";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -122,15 +122,6 @@ export function UpdatesPage({ person }: { person: Roster }) {
 
   return (
     <>
-      <div className="mb-4">
-        <CardHeader>
-          <CardTitle><span className="flex items-center gap-2">
-            <UpdatesIcon size={16} className="text-muted-foreground" />
-            Updates
-          </span></CardTitle>
-        </CardHeader>
-      </div>
-
       {!canManage ? (
         <Card>
           <CardContent>

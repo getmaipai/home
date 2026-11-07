@@ -8,6 +8,8 @@ import { formatBytes } from "@maipai/ui/src/format";
 
 interface BackupsSectionProps {
   person: Roster;
+  /** False where the page's own header already says "Backups" (the Backups page); the Storage page keeps the heading. */
+  headed?: boolean;
 }
 
 export const EMERGENCY_KIT_SAVED_KEY = "backups.emergency_kit_saved_at";
@@ -108,7 +110,7 @@ function whenText(iso: string): string {
 // what is actually about to happen, and cannot be tested. It replaces the
 // row with a panel that names the backup by date and says in plain words
 // what will be lost.
-export function BackupsSection({ person }: BackupsSectionProps) {
+export function BackupsSection({ person, headed = true }: BackupsSectionProps) {
   const [backups, setBackups] = useState<BackupInfo[] | null>(null);
   const [pending, setPending] = useState<PendingRestore | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -190,7 +192,7 @@ export function BackupsSection({ person }: BackupsSectionProps) {
   }
 
   return (
-    <Section heading="Backups">
+    <Section {...(headed ? { heading: "Backups" } : {})}>
       {error ? <p className="text-base text-destructive">{error}</p> : null}
 
       {canRestore ? (

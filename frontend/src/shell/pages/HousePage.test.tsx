@@ -59,7 +59,7 @@ test("failed action rolls back and shows room feedback", async () => {
 
 test("shows not configured and unreachable states", async () => {
   fixture({ status: "not_configured" });
-  expect(await renderWithQueryClient(<HousePage />).findByText("Home Assistant is not set up yet")).toBeTruthy();
+  expect(await renderWithQueryClient(<HousePage />).findByText(/Home Assistant is not set up yet/)).toBeTruthy();
   cleanup(); fixture({ status: "unreachable" });
   expect(await renderWithQueryClient(<HousePage />).findByText("Home Assistant did not answer. Check that it is on, then reload.")).toBeTruthy();
 });
