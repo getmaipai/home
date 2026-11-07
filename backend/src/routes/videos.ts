@@ -43,6 +43,7 @@ import { conversationTurns, videoJobs } from "@/db/schema";
 import { isOwnerOrAdmin } from "@/lib/access";
 import type { PersonRow } from "@/types";
 import { likenessRefusal } from "@/lib/likeness";
+import { serveBytes } from "@/lib/media/serve";
 import { adultStylesAllowed } from "@/lib/pictures/policy";
 import { refusalLineOf, runEditVideo } from "@/lib/videos/editTool";
 import { editRefusal } from "@/lib/videos/editGate";
@@ -228,24 +229,7 @@ videosRoutes.openapi(fileRoute, (c) => {
   // ADULT-LOCK-02: a locked clip or poster answers exactly like a missing one (404, same body, no-store) until a proof is held.
   const file = job && videoJobLockState(actor, job) === "open" ? readVideoFile(actor, job, fileId) : null;
   if (!job || !file) return c.json({ error: "That video isn't available any more." }, 404, NO_STORE) as never;
-  const total = file.bytes.byteLength;
-  const headers: Record<string, string> = { "content-type": file.mediaType, "accept-ranges": "bytes", "cache-control": "private, no-store", "x-content-type-options": "nosniff" };
-  const range = /^bytes=(\d*)-(\d*)$/.exec(c.req.header("Range") ?? "");
-  if (range) {
-    const hasStart = range[1] !== "";
-    const start = hasStart ? Number(range[1]) : Math.max(total - Number(range[2] || 0), 0);
-    const end = hasStart && range[2] ? Math.min(Number(range[2]), total - 1) : total - 1;
-    if (Number.isInteger(start) && Number.isInteger(end) && start >= 0 && start <= end && end < total) {
-      const slice = file.bytes.subarray(start, end + 1);
-      headers["content-range"] = `bytes ${start}-${end}/${total}`;
-      headers["content-length"] = String(slice.byteLength);
-      return new Response(slice, { status: 206, headers }) as never;
-    }
-    // A range that starts past the end (or ends before it starts) is unsatisfiable, not "send everything".
-    return new Response(null, { status: 416, headers: { "content-range": `bytes */${total}`, "cache-control": "private, no-store" } }) as never;
-  }
-  headers["content-length"] = String(total);
-  return new Response(file.bytes, { status: 200, headers }) as never;
+  return serveBytes(file.bytes, file.mediaType, c.req.header("Range")) as never;
 });
 
 const voiceParams = z.object({ id: z.string().min(1).max(80).openapi({ param: { name: "id", in: "path" } }) });

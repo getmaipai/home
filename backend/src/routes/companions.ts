@@ -57,6 +57,7 @@ import { complete } from "@/lib/llm";
 import { topicMessages } from "@/lib/topicPrompt";
 import { COMPANION_PERSONALITIES, cleanStyleNotes, backstoryTagline } from "@/lib/companionPersonality";
 import { evaluateSafety, forOutput, carriesCrisisSignal } from "@/lib/safety";
+import { serveBytes } from "@/lib/media/serve";
 
 const pendingKeyframeJobs = new Map<string, { state: string; instruction: string; style: string }>();
 let backstoryCompleteForTests: typeof complete | null = null;
@@ -568,22 +569,7 @@ const CompanionStateId = z.enum(media.states.map((row) => row.id) as [string, ..
 const CreatorStateId = z.enum(creatorStateRows().map((row) => row.id) as [string, ...string[]]);
 const statesParams = z.object({ id: z.string().min(1).max(80), state: CompanionStateId.optional(), take: z.string().min(1).max(80).optional(), file: z.string().min(1).max(80).optional() });
 function rangeResponse(bytes: Uint8Array, type: string, range?: string, options: { etag?: string; cacheControl?: string } = {}): Response {
-  const size = bytes.length;
-  let start = 0, end = size - 1, status: 200 | 206 = 200;
-  if (range) {
-    const match = /^bytes=(\d*)-(\d*)$/.exec(range);
-    if (!match) return new Response(null, { status: 416, headers: { "content-range": `bytes */${size}` } });
-    if (match[1]) start = Number(match[1]);
-    if (match[2]) end = Number(match[2]);
-    if (start > end || start >= size) return new Response(null, { status: 416, headers: { "content-range": `bytes */${size}` } });
-    end = Math.min(end, size - 1);
-    status = 206;
-  }
-  return new Response(bytes.subarray(start, end + 1), { status, headers: {
-    "content-type": type, "accept-ranges": "bytes", "cache-control": options.cacheControl ?? "private, max-age=0, must-revalidate",
-    ...(options.etag ? { etag: options.etag } : {}),
-    ...(status === 206 ? { "content-range": `bytes ${start}-${end}/${size}` } : {}),
-  } });
+  return serveBytes(bytes, type, range, { headers: { "accept-ranges": "bytes", "cache-control": options.cacheControl ?? "private, max-age=0, must-revalidate", ...(options.etag ? { etag: options.etag } : {}) } });
 }
 function matchesEtag(header: string | undefined, etag: string): boolean {
   return Boolean(header?.split(/\s*,\s*/).some((value) => value === "*" || value.replace(/^W\//, "") === etag));

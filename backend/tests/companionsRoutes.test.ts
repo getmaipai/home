@@ -709,6 +709,11 @@ describe("household companion routes", () => {
     expect(stateBody.states[0]?.required).toBe(true);
     const partial = await app.request(`http://localhost/api/companions/${created.value.id}/states/idle/${take.id}/clip.h264.mp4`, { headers: { cookie: `session=${adult}`, range: "bytes=2-5" } });
     expect(partial.status).toBe(206); expect(partial.headers.get("content-range")).toBe("bytes 2-5/10"); expect(await partial.text()).toBe("2345");
+    // AUDIT-DUP-NET-01: the suffix form is the LAST bytes (it used to answer 0..n), a start past the end is a 416.
+    const tail = await app.request(`http://localhost/api/companions/${created.value.id}/states/idle/${take.id}/clip.h264.mp4`, { headers: { cookie: `session=${adult}`, range: "bytes=-4" } });
+    expect(tail.status).toBe(206); expect(tail.headers.get("content-range")).toBe("bytes 6-9/10"); expect(await tail.text()).toBe("6789");
+    const past = await app.request(`http://localhost/api/companions/${created.value.id}/states/idle/${take.id}/clip.h264.mp4`, { headers: { cookie: `session=${adult}`, range: "bytes=50-60" } });
+    expect(past.status).toBe(416); expect(past.headers.get("content-range")).toBe("bytes */10");
     const full = await app.request(`http://localhost/api/companions/${created.value.id}/states/idle/${take.id}/clip.h264.mp4`, { headers: { cookie: `session=${adult}` } });
     expect(full.status).toBe(200); expect(full.headers.get("accept-ranges")).toBe("bytes");
     const unknown = await app.request(`http://localhost/api/companions/${created.value.id}/states/idle/${take.id}/manifest.json`, { headers: { cookie: `session=${adult}` } }); expect(unknown.status).toBe(404);

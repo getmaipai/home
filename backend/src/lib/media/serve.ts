@@ -61,12 +61,20 @@ export function resolveUnderRoot(sourceId: string, rel: string): string | null {
   }
 }
 
-function bytesResponse(source: { size: number; slice(start?: number, end?: number): Blob }, mediaType: string, range: ByteRange | null | "unsatisfiable", extra: Record<string, string> = {}): Response {
-  if (range === "unsatisfiable") return new Response(null, { status: 416, headers: { ...BASE_HEADERS, "content-range": `bytes */${source.size}` } });
-  if (range === null) return new Response(source.slice(0, source.size), { status: 200, headers: { ...BASE_HEADERS, ...extra, "content-type": mediaType, "content-length": String(source.size) } });
-  return new Response(source.slice(range.start, range.end + 1), {
+export interface RangeSource { size: number; slice(start?: number, end?: number): Blob | Uint8Array }
+
+/** AUDIT-DUP-NET-01: the one Range server. `source` is bytes or a lazily sliced file (`Bun.file`), so a seek never reads the whole file;
+ * the answer is 200 (no or unreadable Range header), 206, or 416 for an unsatisfiable range, the same on every route. `headers` replaces
+ * the default header set (the media routes' own `cache-control` and the like); `content-type`, `content-range` and `content-length` are set here. */
+export function serveBytes(source: Uint8Array | RangeSource, mediaType: string, rangeHeader: string | undefined | null, options: { headers?: Record<string, string> } = {}): Response {
+  const src: RangeSource = source instanceof Uint8Array ? { size: source.byteLength, slice: (start = 0, end = source.byteLength) => source.subarray(start, end) as never } : source;
+  const base = options.headers ?? BASE_HEADERS;
+  const range = parseRange(rangeHeader, src.size);
+  if (range === "unsatisfiable") return new Response(null, { status: 416, headers: { ...base, "content-range": `bytes */${src.size}` } });
+  if (range === null) return new Response(src.slice(0, src.size) as never, { status: 200, headers: { ...base, "content-type": mediaType, "content-length": String(src.size) } });
+  return new Response(src.slice(range.start, range.end + 1) as never, {
     status: 206,
-    headers: { ...BASE_HEADERS, ...extra, "content-type": mediaType, "content-range": `bytes ${range.start}-${range.end}/${source.size}`, "content-length": String(range.end - range.start + 1) },
+    headers: { ...base, "content-type": mediaType, "content-range": `bytes ${range.start}-${range.end}/${src.size}`, "content-length": String(range.end - range.start + 1) },
   });
 }
 
@@ -108,11 +116,11 @@ export async function serveItemBytes(actor: PersonRow, item: MediaItem, rangeHea
   const location = item.location as { file_id?: string; root_id?: string; path?: string; url?: string };
   if (location.file_id) {
     const fetched = await verifiedFetchedBlob(location.file_id);
-    if (fetched) return bytesResponse(fetched.file, item.media_type, parseRange(rangeHeader, fetched.file.size));
+    if (fetched) return serveBytes(fetched.file, item.media_type, rangeHeader);
     const read = readAttachment(actor, location.file_id);
     if (!read.ok) return { error: "That file is not available to you.", status: 404 };
     const blob = new Blob([read.value.bytes as never]);
-    return bytesResponse(blob as never, item.media_type, parseRange(rangeHeader, blob.size));
+    return serveBytes(blob as never, item.media_type, rangeHeader);
   }
   if (location.root_id && location.path !== undefined) {
     const abs = resolveUnderRoot(item.source_id, location.path);
@@ -121,7 +129,7 @@ export async function serveItemBytes(actor: PersonRow, item: MediaItem, rangeHea
     try { info = statSync(abs); } catch { return { error: "This file is not available right now.", status: 404 }; }
     if (info.isDirectory()) return { error: "This audiobook is a folder of parts. Play its parts one by one.", status: 422 };
     const file = Bun.file(abs);
-    return bytesResponse(file, item.media_type, parseRange(rangeHeader, file.size));
+    return serveBytes(file, item.media_type, rangeHeader);
   }
   return { error: "This item is not saved on this computer yet.", status: 404 };
 }

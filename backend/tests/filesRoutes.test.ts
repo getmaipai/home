@@ -166,12 +166,34 @@ describe("GET /api/files/{id}/content", () => {
     expect(await res.text()).toBe("byt");
   });
 
-  test("an unsatisfiable Range (past the end) falls back to the full body rather than erroring", async () => {
+  // AUDIT-DUP-NET-01: files answers a Range exactly as videos, music and companions do (one serveBytes): an end past the end is
+  // clamped to the last byte (206), a start past the end is a 416 with `Content-Range: bytes */size` (it used to be a 200 full body).
+  test("a Range whose end is past the end of the file is clamped to the last byte", async () => {
     const owner = await ownerSession();
     const fileId = uploadFileFor(owner.id);
 
     const res = await owner.client.get(`/api/files/${fileId}/content`, { Range: "bytes=0-999" });
+    expect(res.status).toBe(206);
+    expect(res.headers.get("content-range")).toBe("bytes 0-4/5");
+    expect(await res.text()).toBe("bytes");
+  });
+
+  test("a Range that starts past the end of the file is a 416 with the file size", async () => {
+    const owner = await ownerSession();
+    const fileId = uploadFileFor(owner.id);
+
+    const res = await owner.client.get(`/api/files/${fileId}/content`, { Range: "bytes=100-200" });
+    expect(res.status).toBe(416);
+    expect(res.headers.get("content-range")).toBe("bytes */5");
+  });
+
+  test("a request with no Range gets the full body", async () => {
+    const owner = await ownerSession();
+    const fileId = uploadFileFor(owner.id);
+
+    const res = await owner.client.get(`/api/files/${fileId}/content`);
     expect(res.status).toBe(200);
+    expect(res.headers.get("content-length")).toBe("5");
     expect(await res.text()).toBe("bytes");
   });
 

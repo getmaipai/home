@@ -20,6 +20,7 @@ import { musicVersions, getMusicJobFor } from "@/lib/music/jobs";
 import { sungLyricsFromLrc, withoutLastLines } from "@/lib/music/sections";
 import { timedLyricsFor, type TimedWordLine } from "@/lib/music/timedWords";
 import { canAccessFile } from "@/lib/access";
+import { serveBytes } from "@/lib/media/serve";
 
 export const filesRoutes = apiRouter();
 // A share is its own addressable resource (share.schema.json), so its
@@ -159,54 +160,11 @@ filesRoutes.openapi(contentRoute, (c) => {
     "cache-control": "private, no-store",
   };
 
-  // Range support (a code review, PEOPLE-PROFILE-02): MediaGrid's own
-  // lightbox plays a shared video with a real `<video controls>` element,
-  // and a browser seeking or starting playback sends a `Range` request -
-  // returning a full 200 body unconditionally either breaks seeking or
-  // (Safari in particular, per this codebase's own YouTube-wall history)
-  // refuses to play at all. `lib/modelDownload.ts`'s own Range usage is
-  // the opposite direction (this hub AS THE CLIENT resuming a download);
-  // there was no existing server-side Range responder to reuse, so this
-  // is the one place that needed it, kept minimal (a single "bytes=a-b"
-  // range, the only shape a real browser's own video element sends). A
-  // raw `Response` here, not `c.body()`, the same pattern `voice.ts`'s
-  // own cloned-voice file route already uses for a binary body: two
-  // 2xx statuses (200 and 206) sharing one content schema defeats
-  // `c.body()`'s generated overloads (found live - both calls failed
-  // `tsc --noEmit` with "Uint8Array is not assignable to null").
-  const range = c.req.header("Range");
-  const rangeMatch = range ? /^bytes=(\d*)-(\d*)$/.exec(range) : null;
-  if (rangeMatch) {
-    const total = bytes.byteLength;
-    // A code review caught the first cut of this treating an empty
-    // start as `0` unconditionally - correct for "bytes=500-" (from
-    // byte 500 to the end), wrong for the suffix form "bytes=-500"
-    // (RFC 7233: the LAST 500 bytes), which this codebase's own tests
-    // don't send today but a real video player's seek-to-end can. Both
-    // empty means the whole file (`bytes=-` never occurs in practice,
-    // handled the same way for safety).
-    const hasStart = rangeMatch[1] !== "";
-    const start = hasStart ? Number(rangeMatch[1]) : Math.max(total - Number(rangeMatch[2] || 0), 0);
-    const end = hasStart && rangeMatch[2] ? Number(rangeMatch[2]) : total - 1;
-    // An unsatisfiable range (past the end, reversed) falls through to
-    // the plain full-body response below rather than a strict RFC 7233
-    // 416 - a real browser's own video element computes ranges from the
-    // Content-Length it was just given, so this only ever guards against
-    // a range this server itself would never have implied.
-    if (Number.isInteger(start) && Number.isInteger(end) && start >= 0 && start <= end && end < total) {
-      const slice = bytes.subarray(start, end + 1);
-      headers["content-range"] = `bytes ${start}-${end}/${total}`;
-      // A code review caught this never being asserted (a real gap in
-      // the exact case - partial video content - this route exists
-      // for): set explicitly rather than assumed, since this test
-      // harness's own `app.request()` doesn't compute it automatically
-      // the way a real Bun.serve() response over the wire would.
-      headers["content-length"] = String(slice.byteLength);
-      return new Response(slice, { status: 206, headers });
-    }
-  }
-  headers["content-length"] = String(bytes.byteLength);
-  return new Response(bytes, { status: 200, headers });
+  // Range support (PEOPLE-PROFILE-02): MediaGrid's lightbox plays a shared video with a real `<video controls>`, and a browser seeking or
+  // starting playback sends a `Range` request. AUDIT-DUP-NET-01: the one Range server answers it (206, or 416 for an unsatisfiable
+  // range; this route used to send the whole body with a 200 there). A raw `Response`, not `c.body()`: two 2xx statuses sharing one
+  // content schema defeat `c.body()`'s generated overloads.
+  return serveBytes(bytes, record.media_type, c.req.header("Range"), { headers });
 });
 
 const listSharesRoute = createRoute({

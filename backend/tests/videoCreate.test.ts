@@ -128,6 +128,14 @@ describe("POST /api/videos/make", () => {
     expect(clip.provenance.startsWith("video-gen:")).toBe(true);
     const file = await adult.client.get(`/api/videos/jobs/${card.id}/files/${job.files[0]!.id}`);
     expect(file.status).toBe(200);
+    // AUDIT-DUP-NET-01: the clip route answers Range through the one serveBytes (suffix = last bytes, start past the end = 416).
+    const size = Number(file.headers.get("content-length"));
+    const clipUrl = `/api/videos/jobs/${card.id}/files/${job.files[0]!.id}`;
+    const tail = await adult.client.get(clipUrl, { Range: "bytes=-2" });
+    expect(tail.status).toBe(206); expect(tail.headers.get("content-range")).toBe(`bytes ${size - 2}-${size - 1}/${size}`);
+    const past = await adult.client.get(clipUrl, { Range: `bytes=${size}-` });
+    expect(past.status).toBe(416); expect(past.headers.get("content-range")).toBe(`bytes */${size}`);
+    expect((await adult.client.get(clipUrl, { Range: `bytes=0-${size + 50}` })).headers.get("content-range")).toBe(`bytes 0-${size - 1}/${size}`);
     const feed = await (await adult.client.post("/api/plugins/videos/data/recipes", { scope: "feed" })).json() as Array<Record<string, any>>;
     expect(feed).toHaveLength(1);
     expect(feed[0]).toMatchObject({ id: card.id, prompt: BOAT, status: "ready", state: "done", percent: 100, favorite: false, phase: null, error: null });

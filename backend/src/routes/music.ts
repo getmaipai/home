@@ -1,3 +1,4 @@
+import { serveBytes } from "@/lib/media/serve";
 import { getPictureJob } from "@/lib/pictures/jobs";
 import { PERSISTED_HOLDS, answerableFitAsk, pendingFitAsk, type PersistedHold } from "@/lib/jobs/householdQueue";
 import { pictureEngineReady } from "@/lib/pictures/ready";
@@ -553,20 +554,9 @@ musicRoutes.openapi(qualityRoute, async (c) => {
   }
   return c.json(await musicCardView(actor, root), 200);
 });
-/** Audio seeking uses the same single-Range semantics as the video card. */
+/** Audio seeking uses the one Range server (`serveBytes`); the slice is read from the file on demand. */
 function audioResponse(file: MusicFileHandle, rangeHeader?: string): Response {
-  const total = file.size;
-  const headers: Record<string, string> = { "content-type": file.mediaType, "accept-ranges": "bytes", "cache-control": "private, no-store", "x-content-type-options": "nosniff" };
-  if (rangeHeader) {
-    const range = /^bytes=(\d*)-(\d*)$/.exec(rangeHeader);
-    if (!range || (!range[1] && !range[2])) return new Response(null, { status: 416, headers: { ...headers, "content-range": `bytes */${total}` } });
-    const start = range[1] ? Number(range[1]) : Math.max(0, total - Number(range[2]));
-    const end = range[1] && range[2] ? Math.min(Number(range[2]), total - 1) : total - 1;
-    if (!Number.isSafeInteger(start) || !Number.isSafeInteger(end) || start < 0 || end < start || end >= total) return new Response(null, { status: 416, headers: { ...headers, "content-range": `bytes */${total}` } });
-    const bytes = file.read(start, end + 1);
-    return new Response(bytes, { status: 206, headers: { ...headers, "content-range": `bytes ${start}-${end}/${total}`, "content-length": String(bytes.length) } });
-  }
-  return new Response(file.read(0, total), { status: 200, headers: { ...headers, "content-length": String(total) } });
+  return serveBytes({ size: file.size, slice: (start = 0, end = file.size) => file.read(start, end) as never }, file.mediaType, rangeHeader);
 }
 const fileRoute = createRoute({ method: "get", path: "/jobs/{id}/files/{fileId}", tags: ["Music"], summary: "The owner's audio with Range support", middleware: viewMiddleware,
   request: { params: params.extend({ fileId: z.string().min(1).max(80) }) },
