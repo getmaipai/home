@@ -12,18 +12,19 @@ import { people, scheduledTasks } from "@/db/schema";
 import { nextHlc } from "@/lib/hlc";
 import { raiseIssue, resolveIssue } from "@/lib/issues";
 import { effectivePermissions } from "@/lib/permissions";
-import { loadHouseRegistry } from "@/lib/house/cache";
+import { listInstances } from "@/lib/connectors/instances";
 import { houseInstanceLanFetch } from "@/lib/house/connection";
-import { onHouseConnected } from "@/lib/house/connectHooks";
-import { buildAutomationBody, createAutomation, deleteAutomation, listMaipaiAutomationIds, newAutomationId } from "@/lib/house/automations";
-import { checkTargets, scheduleActor } from "./guard";
+import { onHouseConnected, onScheduleRecheck } from "@/lib/house/connectHooks";
+import { buildAutomationBody, createAutomation, deleteAutomation, listMaipaiAutomationIds, newAutomationId, readHouseTimeZone } from "@/lib/house/automations";
+import { checkTargets, instancesOf, isUnknownReason, loadScheduleRegistry, scheduleActor } from "./guard";
 import { pauseTask } from "./executor";
-import { automationSpecOf, defaultZone, instanceOfRow, pendingAutomationIds, type ScheduleDeps } from "./store";
+import { automationDeps, automationSpecOf, instanceOfRow, pendingAutomationIds, type ScheduleDeps } from "./store";
 
 export type ReconcileReport = { recreated: number; orphansRemoved: number; grantRevoked: number; sceneChanged: number; finished: number };
 export type ReconcileResult = { ran: false; reason: "no_connection" | "unreadable" | "busy" } | { ran: true; report: ReconcileReport };
 
 const ISSUE_SOURCE = "schedules";
+const UNREADABLE_KEY = "schedules_unreadable";
 const KEYS = { recreated: "drift-missing", orphansRemoved: "drift-orphan", grantRevoked: "drift-grant-revoked", sceneChanged: "drift-scene-changed" } as const;
 const WORDS: Record<keyof typeof KEYS, { title: string; one: string; many: string }> = {
   recreated: { title: "Home Assistant schedules were put back", one: "1 schedule was missing from Home Assistant and Home made it again.", many: "schedules were missing from Home Assistant and Home made them again." },
@@ -43,10 +44,15 @@ export function reconcileSchedules(instance: string, deps: ScheduleDeps = {}): P
 }
 
 async function reconcileOnce(instance: string, deps: ScheduleDeps): Promise<ReconcileResult> {
-  const connection = houseInstanceLanFetch(instance, deps.house);
+  const connection = houseInstanceLanFetch(instance, automationDeps(deps));
   if (!connection.ok) return { ran: false, reason: "no_connection" };
   const listed = await listMaipaiAutomationIds({ lanFetch: connection.lanFetch, token: connection.token });
-  if (!listed.ok) return { ran: false, reason: "unreadable" };
+  if (!listed.ok) {
+    // Visible, count-free, and it changes nothing: a list that cannot be read is never treated as an empty one.
+    await raiseIssue({ source: ISSUE_SOURCE, key: UNREADABLE_KEY, severity: "warning", title: "Home could not check its Home Assistant schedules", detail: "Home Assistant did not return a list Home could read. Home will try again in a few minutes.", fix: null });
+    return { ran: false, reason: "unreadable" };
+  }
+  resolveIssue(ISSUE_SOURCE, UNREADABLE_KEY, { suppressNotification: true });
   const present = new Set(listed.ids);
   const now = (deps.now ?? (() => new Date()))();
   const report: ReconcileReport = { recreated: 0, orphansRemoved: 0, grantRevoked: 0, sceneChanged: 0, finished: 0 };
@@ -63,36 +69,47 @@ async function reconcileOnce(instance: string, deps: ScheduleDeps): Promise<Reco
   }
 
   // (c) and (d): access is checked from the live registry; a registry that cannot be read pauses nothing.
-  const registry = await (deps.loadRegistry ? deps.loadRegistry() : loadHouseRegistry(instance));
+  const registry = await (deps.loadRegistry ? deps.loadRegistry() : loadScheduleRegistry([instance]));
   const active = db.select().from(scheduledTasks).where(and(eq(scheduledTasks.executor, "home_assistant"), eq(scheduledTasks.state, "active"), isNull(scheduledTasks.deletedAt))).all()
     .filter((row) => instanceOfRow(row) === instance);
   const entities = registry.ok ? registry.entities : null;
   for (const row of entities ? active : []) {
-    const person = db.select({ id: people.id, role: people.role, deletedAt: people.deletedAt }).from(people).where(eq(people.id, row.person)).get();
-    const actor = person && person.deletedAt === null ? scheduleActor(person) : null;
+    const person = db.select({ id: people.id, role: people.role, deletedAt: people.deletedAt, enabled: people.enabled }).from(people).where(eq(people.id, row.person)).get();
+    const actor = person && person.deletedAt === null && person.enabled ? scheduleActor(person) : null;
     const snapshot = JSON.parse(row.grantSnapshot) as string[];
     const checked = actor
       ? checkTargets({ actor, permissions: (deps.permissionsOf ?? effectivePermissions)(row.person), entities: entities!, targets: snapshot })
       : ({ ok: false, reason: "no_access" } as const);
-    // A target that left Home Assistant is not a revoked grant; the automation just has nothing to act on.
-    if (checked.ok || checked.reason === "not_found") continue;
+    // A target or scene member the registry could not show (a partial read, Home Assistant restarting) is not a revoked grant: skip.
+    if (checked.ok || isUnknownReason(checked.reason)) continue;
     const sceneChange = checked.reason === "scene_changed";
     if (row.externalRef !== null && present.has(row.externalRef)) { await remove(row.externalRef); present.delete(row.externalRef); }
     pauseTask(row.id, sceneChange ? "scene_changed" : "grant_revoked", now);
   }
 
-  // (a) recreate what is missing from the tasks that are still active.
+  // (a) recreate what is missing from the tasks that are still active, in Home Assistant's own zone only.
   const stillActive = db.select().from(scheduledTasks).where(and(eq(scheduledTasks.executor, "home_assistant"), eq(scheduledTasks.state, "active"), isNull(scheduledTasks.deletedAt))).all()
     .filter((row) => instanceOfRow(row) === instance);
-  for (const row of stillActive) {
-    if (row.externalRef !== null && present.has(row.externalRef)) continue;
-    const spec = automationSpecOf(row, (deps.zoneOf ?? defaultZone)(row.person));
+  const missing = stillActive.filter((row) => row.externalRef === null || !present.has(row.externalRef));
+  const automationZone = missing.length ? await readHouseTimeZone({ lanFetch: connection.lanFetch, token: connection.token }) : null;
+  for (const row of missing) {
+    // The task's stored zone is the one its time was meant in; a changed person zone never rebuilds it.
+    if (automationZone === null || row.zone !== automationZone) continue;
+    const spec = automationSpecOf(row);
     const body = spec ? buildAutomationBody(spec) : null;
     if (!body) continue;
+    const fresh = row.externalRef === null;
     const id = row.externalRef ?? (deps.newAutomationId ?? newAutomationId)();
+    pendingAutomationIds.add(id);
     const made = await createAutomation({ lanFetch: connection.lanFetch, token: connection.token, id, body });
-    if (!made.ok) continue;
-    if (row.externalRef === null) db.update(scheduledTasks).set({ externalRef: id, updatedAt: now.toISOString(), hlc: nextHlc() }).where(eq(scheduledTasks.id, row.id)).run();
+    if (!made.ok) {
+      // A timeout can follow a write that finished; a fresh id is removed so it cannot fire beside a later retry.
+      if (fresh) await remove(id);
+      pendingAutomationIds.delete(id);
+      continue;
+    }
+    if (fresh) db.update(scheduledTasks).set({ externalRef: id, updatedAt: now.toISOString(), hlc: nextHlc() }).where(eq(scheduledTasks.id, row.id)).run();
+    pendingAutomationIds.delete(id);
     present.add(id);
     report.recreated += 1;
   }
@@ -137,6 +154,22 @@ export function registerScheduleReconcile(deps: ScheduleDeps = {}): () => void {
     lastRun.set(instance, at);
     await reconcileSchedules(instance, deps);
   });
+}
+
+/** True when at least one active home_assistant task exists, so the periodic pass costs nothing otherwise. */
+export function hasActiveAutomationTasks(): boolean {
+  return db.select({ id: scheduledTasks.id }).from(scheduledTasks).where(and(eq(scheduledTasks.executor, "home_assistant"), eq(scheduledTasks.state, "active"), isNull(scheduledTasks.deletedAt))).get() !== undefined;
+}
+
+/** Every enabled Home Assistant instance, now. The core job `schedules.reconcile` (every 5 minutes) and the access-change recheck both call this, so a revoked grant never waits for a reconnect. */
+export async function reconcileAllInstances(deps: ScheduleDeps = {}): Promise<void> {
+  if (!hasActiveAutomationTasks()) return;
+  for (const { instance } of listInstances("home_assistant", deps.house)) await reconcileSchedules(instance, deps);
+}
+
+/** Registers the access-change recheck: a house grant created or revoked, a role change, or a deleted person reconciles at once. */
+export function registerScheduleRecheck(deps: ScheduleDeps = {}): () => void {
+  return onScheduleRecheck(() => reconcileAllInstances(deps));
 }
 
 export function __resetReconcileForTests(): void { lastRun.clear(); inFlight.clear(); }

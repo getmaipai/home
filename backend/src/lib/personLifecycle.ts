@@ -21,6 +21,7 @@
 //    that simply vanishes is indistinguishable, to a robot syncing later,
 //    from a row it has not been told about yet, so the delete would
 //    silently undo itself on the next sync. A tombstone transfers.
+import { emitScheduleRecheck } from "@/lib/house/connectHooks";
 import { revokeAllApiKeys } from "@/lib/apiKeys";
 import { and, eq, isNull, ne, lt } from "drizzle-orm";
 import { existsSync, unlinkSync, rmSync } from "node:fs";
@@ -214,6 +215,7 @@ export const commitPersonUpdate = sqlite.transaction(
     const lastOwnerError = lastOwnerGuardError(personId, wouldLeaveOwnerRole);
     if (lastOwnerError) return lastOwnerError;
     db.update(people).set(dbValues).where(eq(people.id, personId)).run();
+    emitScheduleRecheck(); // SCHED-02: a role change or deactivation can end a person's right to a device schedule
     return { ok: true, value: true };
   },
 );
@@ -570,6 +572,7 @@ export function deletePerson(actor: PersonRow, personId: string): PersonOpResult
   const projectDirsAfterCommit: string[] = [];
   const result = commitDeletePerson(actor, personId, blobsAfterCommit, projectDirsAfterCommit);
   if (result.ok) {
+    emitScheduleRecheck(); // SCHED-02
     removeFileBlobs(blobsAfterCommit);
     for (const dir of projectDirsAfterCommit) rmSync(dir, { recursive: true, force: true });
   }

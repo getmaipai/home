@@ -37,7 +37,8 @@ function isAllowedAddress(host: string): boolean {
   return a === 10 || (a === 172 && b >= 16 && b <= 31) || (a === 192 && b === 168);
 }
 
-export function createLanFetch(allowed: { host: string; port: number }, deps: LanFetchDeps = {}) {
+/** `allowDelete` (default false) lets this connection send DELETE; only a caller that removes things it made on that host (the automation client) passes true. */
+export function createLanFetch(allowed: { host: string; port: number; allowDelete?: boolean }, deps: LanFetchDeps = {}) {
   if (!isAllowedAddress(allowed.host) || !Number.isInteger(allowed.port) || allowed.port < 1 || allowed.port > 65535) {
     throw new Error(BAD_ADDRESS);
   }
@@ -50,8 +51,8 @@ export function createLanFetch(allowed: { host: string; port: number }, deps: La
       return { ok: false, kind: "refused" };
     }
     const method = init.method ?? "GET";
-    // DELETE is for Home Assistant's own config API (SCHED-02 removes an automation Home made); callers choose the path, never the host.
-    if (method !== "GET" && method !== "POST" && method !== "DELETE") return { ok: false, kind: "refused" };
+    // DELETE is off unless the connection was made with allowDelete (SCHED-02 removes an automation Home made); callers choose the path, never the host.
+    if (method !== "GET" && method !== "POST" && !(method === "DELETE" && allowed.allowDelete === true)) return { ok: false, kind: "refused" };
     const controller = new AbortController();
     let timedOut = false;
     const timer = setTimeout(() => { timedOut = true; controller.abort(); }, timeoutMs);

@@ -17,3 +17,14 @@ export function emitHouseConnected(instance: string, opts: { force?: boolean } =
 }
 
 export function __clearHouseConnectHooksForTests(): void { hooks.clear(); }
+
+// Access changes (a house grant, a role change, a deleted person) ask for an immediate recheck of every schedule.
+const rechecks = new Set<() => void | Promise<void>>();
+export function onScheduleRecheck(hook: () => void | Promise<void>): () => void {
+  rechecks.add(hook);
+  return () => { rechecks.delete(hook); };
+}
+export function emitScheduleRecheck(): void {
+  for (const hook of rechecks) void Promise.resolve().then(hook).catch(() => {});
+}
+export function __clearScheduleRechecksForTests(): void { rechecks.clear(); }

@@ -1,14 +1,14 @@
 import { beforeEach, describe, expect, test } from "bun:test";
 import { eq } from "drizzle-orm";
 import { db } from "@/db";
-import { issues, people, scheduledJobs, scheduledTasks, toolAudit } from "@/db/schema";
+import { grants, integrations, issues, people, scheduledJobs, scheduledTasks, toolAudit } from "@/db/schema";
 import type { EffectivePermission } from "@/lib/house/access";
 import { AUTOMATION_ID, AUTOMATION_TEXT, buildAutomationBody, createAutomation, deleteAutomation } from "@/lib/house/automations";
-import { emitHouseConnected, __clearHouseConnectHooksForTests } from "@/lib/house/connectHooks";
+import { emitHouseConnected, emitScheduleRecheck, __clearHouseConnectHooksForTests, __clearScheduleRechecksForTests } from "@/lib/house/connectHooks";
 import type { HouseEntity, HouseRegistryResult } from "@/lib/house/registry";
 import type { JobRow } from "@/lib/scheduler";
 import { fireHubDeviceTask } from "@/lib/schedules/executor";
-import { __resetReconcileForTests, reconcileSchedules, registerScheduleReconcile } from "@/lib/schedules/reconcile";
+import { __resetReconcileForTests, reconcileAllInstances, reconcileSchedules, registerScheduleReconcile, registerScheduleRecheck } from "@/lib/schedules/reconcile";
 import { adminScheduleCount, cancelSchedule, createDeviceSchedule, listOwnSchedules, type ScheduleDeps } from "@/lib/schedules/store";
 import { resetDb } from "../reset-db";
 import { fakeHa, HOUSE_SETTINGS } from "./fakeHa";
@@ -53,6 +53,7 @@ beforeEach(() => {
   consoleLines = [];
   __resetReconcileForTests();
   __clearHouseConnectHooksForTests();
+  __clearScheduleRechecksForTests();
 });
 
 async function createPorch(extra: Partial<Parameters<typeof createDeviceSchedule>[0]> = {}, d: ScheduleDeps = deps()) {
@@ -93,7 +94,8 @@ describe("creating a device schedule", () => {
     expect(bodies[1]!.triggers).toEqual([{ trigger: "time", at: "16:30:00" }]);
     expect(bodies[1]!.conditions).toEqual([{ condition: "template", value_template: "{{ now().strftime('%Y-%m-%d') == '2026-11-08' }}" }]);
     const once = db.select().from(scheduledTasks).all().find((row) => row.onceAt !== null)!;
-    expect(once.zone).toBeNull();
+    // The zone stays in the column for a one-shot (so a rebuild never uses a changed person zone) but never on the record.
+    expect(once.zone).toBe("America/New_York");
     expect(once.time).toBeNull();
   });
 
@@ -384,5 +386,231 @@ describe("the Home Assistant events socket", () => {
     await new Promise((resolve) => setTimeout(resolve, 20));
     expect(seen).toEqual([{ instance: "default", force: true }]);
     unsubscribe(); off(); __resetHomeAssistantEventsForTests();
+  });
+});
+
+
+// ---- Review fixes (SCHED-02 part A, second pass) ----
+const settle = (ms = 80) => new Promise((resolve) => setTimeout(resolve, ms));
+
+describe("access changes stop automations at once", () => {
+  function putGrant(id: string, personId: string, action: string): void {
+    const now = "2026-11-06T00:00:00.000Z";
+    db.insert(grants).values({ id, person: personId, action, effect: "allow", grantedByPersonId: OWNER, createdAt: now, updatedAt: now, hlc: "1:0:testnode" }).run();
+  }
+
+  test("revoking a house grant pauses the task and deletes the automation without any reconnect", async () => {
+    const made = await createDeviceSchedule({ person: { id: ADULT, role: "adult" }, kind: "device_action", targets: ["light.porch"], action: "turn_on", ...weekly }, deps());
+    if (!made.ok) throw new Error("setup");
+    registerScheduleRecheck(deps());
+    putGrant("grant-hhhhhh", ADULT, "house.control:default/entity:light.porch");
+    putGrant("grant-nnnnnn", ADULT, "backups.run");
+    const { revokeGrant } = await import("@/lib/grants");
+    // A grant that is not a house grant does not recheck.
+    grantedTo[ADULT] = [];
+    revokeGrant("grant-nnnnnn");
+    await settle();
+    expect(ha.automations.size).toBe(1);
+    revokeGrant("grant-hhhhhh");
+    for (let i = 0; i < 40 && ha.automations.size > 0; i++) await settle(10);
+    expect(ha.automations.size).toBe(0);
+    expect(db.select().from(scheduledTasks).where(eq(scheduledTasks.id, made.id)).get()!.pausedReason).toBe("grant_revoked");
+  });
+
+  test("a role change recheck pauses a demoted person's task, and the periodic pass does nothing when no automation task exists", async () => {
+    expect(await reconcileAllInstances(deps())).toBeUndefined();
+    expect(ha.requests).toHaveLength(0);
+    const made = await createPorch();
+    if (!made.ok) throw new Error("setup");
+    ha.requests.length = 0;
+    registerScheduleRecheck(deps());
+    db.update(people).set({ role: "teen" }).where(eq(people.id, OWNER)).run();
+    emitScheduleRecheck();
+    for (let i = 0; i < 40 && ha.automations.size > 0; i++) await settle(10);
+    expect(ha.automations.size).toBe(0);
+    // Cheap: one list read, one registry read (injected here), no per-task calls beyond the delete and reload.
+    expect(ha.requests.filter((request) => request.path === "/api/template")).toHaveLength(1);
+  });
+
+  test("the periodic pass reconciles every instance when a task exists", async () => {
+    const made = await createPorch();
+    if (!made.ok) throw new Error("setup");
+    const ref = db.select().from(scheduledTasks).get()!.externalRef!;
+    ha.automations.delete(ref);
+    await reconcileAllInstances(deps());
+    expect(ha.automations.has(ref)).toBe(true);
+  });
+});
+
+describe("listing through the fixed template", () => {
+  test("never reads /api/states, and a truncated answer changes nothing and raises one count-free issue that clears on the next good read", async () => {
+    const made = await createPorch();
+    if (!made.ok) throw new Error("setup");
+    ha.requests.length = 0;
+    ha.state.truncateTemplate = true;
+    expect(await reconcileSchedules("default", deps())).toEqual({ ran: false, reason: "unreadable" });
+    expect(ha.automations.size).toBe(1);
+    let rows = db.select().from(issues).where(eq(issues.source, "schedules")).all();
+    expect(rows.map((row) => row.key)).toEqual(["schedules_unreadable"]);
+    expect(`${rows[0]!.title} ${rows[0]!.detail}`).not.toMatch(/\d/);
+    ha.state.truncateTemplate = false;
+    await reconcileSchedules("default", deps());
+    rows = db.select().from(issues).where(eq(issues.source, "schedules")).all().filter((row) => row.resolvedAt === null);
+    expect(rows).toHaveLength(0);
+    expect(ha.requests.some((request) => request.path === "/api/states")).toBe(false);
+    const template = ha.requests.find((request) => request.path === "/api/template")!;
+    expect(template.method).toBe("POST");
+    expect(JSON.parse(template.body)).toEqual({ template: expect.stringContaining("maipai_") });
+  });
+
+  test("no other template body can be sent", async () => {
+    const { createAutomation: unusedCreate, listMaipaiAutomationIds } = await import("@/lib/house/automations");
+    void unusedCreate;
+    const sent: string[] = [];
+    const lanFetch = async (path: string, init?: { body?: unknown }) => { sent.push(`${path} ${String(init?.body)}`); return { ok: true as const, status: 200, text: "[]", truncated: false }; };
+    expect((await listMaipaiAutomationIds({ lanFetch, token: "t" })).ok).toBe(true);
+    expect(sent).toHaveLength(1);
+    const { LIST_TEMPLATE_BODY } = await import("@/lib/house/automations");
+    expect(sent[0]).toBe(`/api/template ${LIST_TEMPLATE_BODY}`);
+  });
+});
+
+describe("a second Home Assistant instance", () => {
+  function addInstance(slug: string): void {
+    const now = "2026-11-06T00:00:00.000Z";
+    db.insert(integrations).values({ id: `integ-${slug}00000`, type: "home_assistant", instance: slug, label: slug, address: "http://192.168.1.21:8123", credentialRef: "home.access_token", options: "{}", provenance: "test", createdAt: now, updatedAt: now, hlc: "1:0:testnode" }).run();
+  }
+  const upstairs = [light("light.den", "Den", { instance: "upstairs", instanceLabel: "Upstairs" })];
+  const registryTwo = async (): Promise<HouseRegistryResult> => ({ ok: true, areas: [], entities: upstairs });
+
+  test("a revoked grant on the second instance pauses the task", async () => {
+    addInstance("upstairs");
+    grantedTo[ADULT] = [];
+    const permissions = (personId: string): EffectivePermission[] => personId === ADULT && grantedTo[ADULT]!.length === 0 && state.granted ? ["see", "control"].map((level) => ({ action: `house.${level}:upstairs/entity:light.den`, effect: "allow" as const })) : [];
+    const state = { granted: true };
+    const d = deps({ loadRegistry: registryTwo, permissionsOf: permissions });
+    const made = await createDeviceSchedule({ person: { id: ADULT, role: "adult" }, kind: "device_action", targets: ["upstairs/light.den"], action: "turn_on", ...weekly }, d);
+    expect(made.ok).toBe(true);
+    if (!made.ok) return;
+    expect(made.executor).toBe("home_assistant");
+    state.granted = false;
+    const result = await reconcileSchedules("upstairs", d);
+    expect(result.ran).toBe(true);
+    const row = db.select().from(scheduledTasks).where(eq(scheduledTasks.id, made.id)).get()!;
+    expect(row.pausedReason).toBe("grant_revoked");
+    expect(ha.automations.size).toBe(0);
+  });
+
+  test("the registry the reconciler loads carries the instance on every entity", async () => {
+    addInstance("upstairs");
+    const { loadScheduleRegistry } = await import("@/lib/schedules/guard");
+    const { __setHouseRegistryCacheDepsForTests, clearHouseRegistry } = await import("@/lib/house/cache");
+    clearHouseRegistry();
+    __setHouseRegistryCacheDepsForTests({ read: HOUSE_SETTINGS, fetch: async (_url, init) => new Response(JSON.parse(String(init.body)).template.includes("states") ? JSON.stringify([{ id: "light.den", name: "Den", state: "off", area: "", dc: "", rgb: [], bri: 0, ents: [] }]) : "[]") });
+    const loaded = await loadScheduleRegistry(["upstairs"]);
+    clearHouseRegistry();
+    expect(loaded.ok && loaded.entities.map((entity) => `${entity.instance}/${entity.id}`)).toEqual(["upstairs/light.den"]);
+  });
+});
+
+describe("a registry that cannot answer is not a revoked grant", () => {
+  test("the hub executor skips an unknown target and a scene with a missing member, and queues the next run", async () => {
+    ha.state.failWrites = true;
+    const made = await createDeviceSchedule({ person: { id: ADULT, role: "adult" }, kind: "scene", targets: ["scene.evening"], action: "activate", ...weekly }, deps());
+    if (!made.ok) throw new Error("setup");
+    ha.state.failWrites = false;
+    const job = db.select().from(scheduledJobs).all().find((item) => item.job === "schedules.device.fire")! as JobRow;
+    const performed: string[] = [];
+    const perform = async (entity: HouseEntity) => { performed.push(entity.id); return { ok: false as const, kind: "refused" as const }; };
+    entities = [PORCH, SCENE(["light.porch", "light.hall"])]; // light.hall is briefly missing
+    await fireHubDeviceTask(job, { ...deps(), perform });
+    entities = [PORCH, HALL]; // the scene itself is missing
+    await fireHubDeviceTask(job, { ...deps(), perform });
+    expect(performed).toEqual([]);
+    expect(db.select().from(scheduledTasks).get()!.state).toBe("active");
+    expect(db.select().from(scheduledJobs).all().filter((item) => item.job === "schedules.device.fire").length).toBe(3);
+  });
+
+  test("reconcile keeps a scheduled scene and its automation while a member is missing, and pauses only when a present member turns sensitive", async () => {
+    const made = await createDeviceSchedule({ person: { id: ADULT, role: "adult" }, kind: "scene", targets: ["scene.evening"], action: "activate", ...weekly }, deps());
+    if (!made.ok) throw new Error("setup");
+    entities = [PORCH, SCENE(["light.porch", "light.hall"])]; // Home Assistant is restarting: light.hall not back yet
+    await reconcileSchedules("default", deps());
+    expect(db.select().from(scheduledTasks).get()!.state).toBe("active");
+    expect(ha.automations.size).toBe(1);
+    entities = [PORCH, light("light.hall", "Hall", { sensitive: "lock" }), SCENE(["light.porch", "light.hall"])];
+    await reconcileSchedules("default", deps());
+    expect(db.select().from(scheduledTasks).get()!.pausedReason).toBe("scene_changed");
+  });
+
+  test("a scene with an unreadable member list cannot be created yet, and says to try again", async () => {
+    entities = [PORCH, { ...SCENE([]), sceneMembers: null }];
+    const result = await createDeviceSchedule({ person: { id: ADULT, role: "adult" }, kind: "scene", targets: ["scene.evening"], action: "activate", ...weekly }, deps());
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.reason).toBe("unavailable");
+  });
+});
+
+describe("time zones", () => {
+  test("a Home Assistant in another zone, or one whose zone cannot be read, gets the hub executor", async () => {
+    ha.state.timeZone = "America/Los_Angeles";
+    const other = await createPorch();
+    ha.state.timeZone = null;
+    const unreadable = await createPorch();
+    expect(other.ok && other.executor).toBe("hub");
+    expect(unreadable.ok && unreadable.executor).toBe("hub");
+    expect(ha.automations.size).toBe(0);
+  });
+
+  test("reconcile rebuilds a one-shot from the task's stored zone, not the person's current zone", async () => {
+    const made = await createPorch({ onceAt: "2026-11-08T21:30:00.000Z", time: undefined, days: undefined });
+    if (!made.ok) throw new Error("setup");
+    const ref = db.select().from(scheduledTasks).get()!.externalRef!;
+    const original = JSON.stringify(ha.automations.get(ref));
+    ha.automations.delete(ref);
+    await reconcileSchedules("default", deps({ zoneOf: () => "Asia/Tokyo" }));
+    expect(JSON.stringify(ha.automations.get(ref))).toBe(original);
+  });
+
+  test("reconcile does not rebuild an automation when Home Assistant's zone is not the task's", async () => {
+    const made = await createPorch();
+    if (!made.ok) throw new Error("setup");
+    const ref = db.select().from(scheduledTasks).get()!.externalRef!;
+    ha.automations.delete(ref);
+    ha.state.timeZone = "Europe/Paris";
+    await reconcileSchedules("default", deps());
+    expect(ha.automations.has(ref)).toBe(false);
+  });
+});
+
+describe("a create that times out after Home Assistant wrote it", () => {
+  test("the automation is deleted before the hub fallback, so it cannot fire twice", async () => {
+    ha.state.writeThenTimeout = true;
+    const result = await createPorch();
+    expect(result.ok && result.executor).toBe("hub");
+    expect(ha.automations.size).toBe(0);
+    expect(ha.requests.some((request) => request.method === "DELETE")).toBe(true);
+  });
+});
+
+describe("DELETE on lanFetch", () => {
+  test("is refused unless the connection asked for it", async () => {
+    const { createLanFetch } = await import("@/lib/lanFetch");
+    const calls: string[] = [];
+    const fetcher = async (_url: string, init: RequestInit) => { calls.push(String(init.method)); return new Response("ok"); };
+    const plain = createLanFetch({ host: "192.168.1.20", port: 8123 }, { fetch: fetcher });
+    expect(await plain("/x", { method: "DELETE" })).toEqual({ ok: false, kind: "refused" });
+    expect(calls).toEqual([]);
+    const allowed = createLanFetch({ host: "192.168.1.20", port: 8123, allowDelete: true }, { fetch: fetcher });
+    expect((await allowed("/x", { method: "DELETE" })).ok).toBe(true);
+    expect(calls).toEqual(["DELETE"]);
+  });
+
+  test("only the automation client's connection carries allowDelete", async () => {
+    const { houseInstanceLanFetch } = await import("@/lib/house/connection");
+    const refused = houseInstanceLanFetch("default", { read: HOUSE_SETTINGS, fetch: ha.fetch });
+    if (!refused.ok) throw new Error("setup");
+    expect(await refused.lanFetch("/api/config/automation/config/maipai_0123456789abcdef", { method: "DELETE", headers: { Authorization: "Bearer fake-ha-token" } })).toEqual({ ok: false, kind: "refused" });
+    expect(ha.requests).toHaveLength(0);
   });
 });

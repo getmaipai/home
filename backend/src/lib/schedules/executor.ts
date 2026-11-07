@@ -9,12 +9,11 @@ import { nextHlc } from "@/lib/hlc";
 import { newJobId } from "@/lib/id";
 import { nextOccurrence, type JobRow } from "@/lib/scheduler";
 import { effectivePermissions } from "@/lib/permissions";
-import { loadHouseRegistries } from "@/lib/house/cache";
 import { houseInstanceLanFetch, type HouseLanFetchDeps } from "@/lib/house/connection";
 import { performHouseAction, type HouseActionInput, type HouseActionResult } from "@/lib/house/act";
 import type { EffectivePermission } from "@/lib/house/access";
 import type { HouseEntity, HouseRegistryResult } from "@/lib/house/registry";
-import { checkTargets, scheduleActor } from "./guard";
+import { checkTargets, instancesOf, isUnknownReason, loadScheduleRegistry, scheduleActor } from "./guard";
 import type { TaskRow } from "./store";
 
 export const HUB_FIRE_JOB = "schedules.device.fire";
@@ -61,14 +60,18 @@ export async function fireHubDeviceTask(job: JobRow, deps: ExecutorDeps = {}): P
   if (row.onceAt !== null) db.update(scheduledTasks).set({ state: "done", updatedAt: now.toISOString(), hlc: nextHlc() }).where(eq(scheduledTasks.id, row.id)).run();
   else queueHubRun(row, new Date(Math.max(now.getTime(), Date.parse(job.nextRunAt))));
 
-  const person = db.select({ id: people.id, role: people.role, deletedAt: people.deletedAt }).from(people).where(eq(people.id, row.person)).get();
-  const actor = person && person.deletedAt === null ? scheduleActor(person) : null;
+  const person = db.select({ id: people.id, role: people.role, deletedAt: people.deletedAt, enabled: people.enabled }).from(people).where(eq(people.id, row.person)).get();
+  const actor = person && person.deletedAt === null && person.enabled ? scheduleActor(person) : null;
   if (!actor) { pauseTask(row.id, "grant_revoked", now); return; }
-  const registry = await (deps.loadRegistry ?? loadHouseRegistries)();
-  if (!registry.ok) throw new Error("Home Assistant did not answer, so a scheduled home action was skipped.");
   const what = JSON.parse(row.what) as { targets: string[]; action: string; value?: number };
+  const registry = await (deps.loadRegistry ?? (() => loadScheduleRegistry(instancesOf(what.targets))))();
+  if (!registry.ok) throw new Error("Home Assistant did not answer, so a scheduled home action was skipped.");
   const checked = checkTargets({ actor, permissions: (deps.permissionsOf ?? effectivePermissions)(row.person), entities: registry.entities, targets: what.targets });
-  if (!checked.ok) { pauseTask(row.id, checked.reason === "scene_changed" ? "scene_changed" : "grant_revoked", now); return; }
+  // A target the registry could not show (a partial read, Home Assistant restarting) skips this run; only a real denial pauses.
+  if (!checked.ok) {
+    if (!isUnknownReason(checked.reason)) pauseTask(row.id, checked.reason === "scene_changed" ? "scene_changed" : "grant_revoked", now);
+    return;
+  }
 
   const action = inputOf(what.action === "activate" ? "activate" : what.action, what.value);
   let failed = 0;

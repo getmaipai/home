@@ -516,9 +516,9 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/hotReloadState.ts` | hotReloadState |
 | `backend/src/lib/house/access.ts` | approverCell, houseAccess, canRestartServer, visibleEntities |
 | `backend/src/lib/house/act.ts` | supportedActions, performHouseServerAction, houseServiceCall, undoFor, performHouseAction |
-| `backend/src/lib/house/automations.ts` | AUTOMATION_ID, AUTOMATION_TEXT, newAutomationId, buildAutomationBody, createAutomation, updateAutomation |
+| `backend/src/lib/house/automations.ts` | AUTOMATION_ID, AUTOMATION_TEXT, newAutomationId, buildAutomationBody, LIST_TEMPLATE_BODY, createAutomation |
 | `backend/src/lib/house/cache.ts` | peekHouseRegistry, warmHouseRegistry, loadHouseRegistry, peekHouseRegistries, warmHouseRegistries, loadHouseRegistries |
-| `backend/src/lib/house/connectHooks.ts` | onHouseConnected, emitHouseConnected, __clearHouseConnectHooksForTests |
+| `backend/src/lib/house/connectHooks.ts` | onHouseConnected, emitHouseConnected, __clearHouseConnectHooksForTests, onScheduleRecheck, emitScheduleRecheck, __clearScheduleRechecksForTests |
 | `backend/src/lib/house/connection.ts` | houseLanFetch, houseInstanceLanFetch, houseAnyConnected |
 | `backend/src/lib/house/ids.ts` | HOUSE_TOOL_ID |
 | `backend/src/lib/house/registry.ts` | classify, fetchHouseRegistry |
@@ -903,9 +903,9 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/sayEvidence.ts` | sayFields |
 | `backend/src/lib/scheduler.ts` | parseWhen, nextOccurrence, scheduleJob, scheduleCoreJob, ensureCoreJob, listJobs |
 | `backend/src/lib/schedules/executor.ts` | HUB_FIRE_JOB, nextRunOf, queueHubRun, pauseTask, fireHubDeviceTask |
-| `backend/src/lib/schedules/guard.ts` | scheduleActor, parseTarget, schedulableDomain, checkTargets |
-| `backend/src/lib/schedules/reconcile.ts` | reconcileSchedules, registerScheduleReconcile, __resetReconcileForTests |
-| `backend/src/lib/schedules/store.ts` | pendingAutomationIds, defaultZone, recordOf, wallClock, automationSpecOf, instanceOfRow |
+| `backend/src/lib/schedules/guard.ts` | scheduleActor, parseTarget, schedulableDomain, isUnknownReason, checkTargets, loadScheduleRegistry |
+| `backend/src/lib/schedules/reconcile.ts` | reconcileSchedules, registerScheduleReconcile, hasActiveAutomationTasks, reconcileAllInstances, registerScheduleRecheck, __resetReconcileForTests |
+| `backend/src/lib/schedules/store.ts` | pendingAutomationIds, automationDeps, defaultZone, recordOf, wallClock, automationSpecOf |
 | `backend/src/lib/search/providers.ts` | SEARCH_PROVIDERS, matchScore, rankGroups |
 | `backend/src/lib/searchAddressSave.ts` | SEARXNG_URL_KEY, __resetSearchTestPassedForTests, testOrSaveSearchAddress, clearSearchAddress |
 | `backend/src/lib/searchAssist/counters.ts` | SEARCH_ASSIST_COUNTER_NAMES, bumpSearchAssistCounter, searchAssistCounters, __resetSearchAssistCountersForTests |

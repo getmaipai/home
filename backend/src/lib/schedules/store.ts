@@ -11,12 +11,11 @@ import { nextHlc } from "@/lib/hlc";
 import { newScheduledTaskId } from "@/lib/id";
 import { getSettingValueForPerson } from "@/lib/settings";
 import { effectivePermissions } from "@/lib/permissions";
-import { loadHouseRegistries } from "@/lib/house/cache";
 import { houseInstanceLanFetch, type HouseLanFetchDeps } from "@/lib/house/connection";
 import type { EffectivePermission } from "@/lib/house/access";
 import type { HouseRegistryResult } from "@/lib/house/registry";
-import { buildAutomationBody, createAutomation, deleteAutomation, newAutomationId, type AutomationAction, type AutomationSpec } from "@/lib/house/automations";
-import { checkTargets, parseTarget, scheduleActor, schedulableDomain, type SchedulePerson, type TargetReason } from "./guard";
+import { buildAutomationBody, createAutomation, deleteAutomation, newAutomationId, readHouseTimeZone, type AutomationAction, type AutomationSpec } from "@/lib/house/automations";
+import { checkTargets, instancesOf, loadScheduleRegistry, parseTarget, scheduleActor, schedulableDomain, type SchedulePerson, type TargetReason } from "./guard";
 import { queueHubRun } from "./executor";
 
 export type ScheduleDeps = {
@@ -76,8 +75,12 @@ const REFUSALS: Record<TargetReason, { reason: Extract<CreateScheduleResult, { o
   sensitive: { reason: "sensitive", text: `A schedule runs on its own with nobody to confirm it, so locks, alarms, garage doors, cameras, entry doors and scripts cannot be scheduled.${REMINDER_OFFER}`, offerReminder: true },
   not_found: { reason: "not_found", text: "I could not find that device in your home. Check the name and try again.", offerReminder: false },
   no_access: { reason: "no_access", text: "You are not set up to control that device, so you cannot schedule it. Ask a parent to give you access.", offerReminder: false },
+  scene_unknown: { reason: "unavailable", text: "I could not read what that scene sets just now. Try again in a minute.", offerReminder: false },
   scene_changed: { reason: "sensitive", text: `That scene sets something a schedule is not allowed to run, such as a lock or a device you cannot control.${REMINDER_OFFER}`, offerReminder: true },
 };
+
+/** The connection options the automation client uses: the only caller that may send DELETE. */
+export function automationDeps(deps: ScheduleDeps): HouseLanFetchDeps { return { ...(deps.house ?? {}), allowDelete: true }; }
 
 function jsonOf<T>(text: string | null, fallback: T): T {
   if (text === null) return fallback;
@@ -97,7 +100,8 @@ export function recordOf(row: TaskRow): Record<string, unknown> {
     ...(row.onceAt !== null ? { once_at: row.onceAt } : {}),
     ...(row.time !== null ? { time: row.time } : {}),
     ...(row.days !== null ? { days: jsonOf<number[]>(row.days, []) } : {}),
-    ...(row.zone !== null ? { zone: row.zone } : {}),
+    // A one-shot keeps its zone in the column only (the record forbids a zone beside once_at).
+    ...(row.zone !== null && row.onceAt === null ? { zone: row.zone } : {}),
     what: jsonOf(row.what, { targets: [] }),
     enabled: row.enabled, state: row.state,
     ...(row.pausedReason !== null ? { paused_reason: row.pausedReason } : {}),
@@ -111,7 +115,7 @@ export function recordOf(row: TaskRow): Record<string, unknown> {
 function publicOf(row: TaskRow): PublicSchedule {
   return {
     id: row.id, kind: row.kind, executor: row.executor, once_at: row.onceAt, time: row.time,
-    days: row.days === null ? null : jsonOf<number[]>(row.days, []), zone: row.zone,
+    days: row.days === null ? null : jsonOf<number[]>(row.days, []), zone: row.onceAt === null ? row.zone : null,
     what: jsonOf(row.what, { targets: [] }), enabled: row.enabled, state: row.state, paused_reason: row.pausedReason, created_at: row.createdAt,
   };
 }
@@ -123,13 +127,13 @@ export function wallClock(at: Date, zone: string): { date: string; time: string 
 }
 
 /** The automation a stored task needs, in the task's own zone. Null when the task cannot be an automation. */
-export function automationSpecOf(row: TaskRow, zone: string): AutomationSpec | null {
+export function automationSpecOf(row: TaskRow): AutomationSpec | null {
   const what = jsonOf<{ targets: string[]; action?: AutomationAction; value?: number }>(row.what, { targets: [] });
   const parsed = what.targets.map(parseTarget);
   if (!what.action || parsed.some((entry) => entry === null)) return null;
   const spec = { action: what.action, ...(what.value !== undefined ? { value: what.value } : {}), entityIds: parsed.map((entry) => entry!.native) };
   if (row.onceAt !== null) {
-    const clock = wallClock(new Date(row.onceAt), zone);
+    const clock = wallClock(new Date(row.onceAt), row.zone ?? hubZone());
     return { ...spec, time: clock.time, date: clock.date, days: [] };
   }
   return row.time === null ? null : { ...spec, time: row.time, days: jsonOf<number[]>(row.days, []) };
@@ -161,7 +165,7 @@ export async function createDeviceSchedule(input: CreateScheduleInput, deps: Sch
   if (targets.some((target) => !schedulableDomain(parseTarget(target)!.native))) return refusalFor("sensitive");
   if (buildAutomationBody(spec) === null) return invalid("That action does not fit those devices. Use on, off or a brightness for lights, and on or off for switches and fans.");
 
-  const registry = await (deps.loadRegistry ?? loadHouseRegistries)();
+  const registry = await (deps.loadRegistry ?? (() => loadScheduleRegistry(instancesOf(targets))))();
   if (!registry.ok) return { ok: false, reason: "unavailable", text: "I could not reach Home Assistant to check that device. Try again in a minute.", offerReminder: false };
   const permissions = (deps.permissionsOf ?? effectivePermissions)(input.person.id);
   const checked = checkTargets({ actor, permissions, entities: registry.entities, targets });
@@ -173,23 +177,31 @@ export async function createDeviceSchedule(input: CreateScheduleInput, deps: Sch
   const base = {
     id, person: input.person.id, kind: input.kind,
     onceAt: once ? new Date(input.onceAt!).toISOString() : null,
-    time: once ? null : input.time!, days: once ? null : JSON.stringify(input.days!), zone: once ? null : zone,
+    time: once ? null : input.time!, days: once ? null : JSON.stringify(input.days!), zone,
     what: JSON.stringify({ targets, action: input.action, ...(input.value !== undefined ? { value: input.value } : {}) }),
     enabled: true, state: "active", pausedReason: null, grantSnapshot: JSON.stringify(targets), deliverOn: null,
     provenance: input.provenance ?? "chat", createdAt: stamp, updatedAt: stamp, hlc: nextHlc(), deletedAt: null,
   } as const;
 
-  // A one-shot keeps no zone on the record (the spec's rule); its wall clock is read in the person's zone when the automation is built.
   let row: TaskRow = { ...base, executor: "home_assistant", externalRef: null };
-  const rowSpec = automationSpecOf(row, zone);
+  const rowSpec = automationSpecOf(row);
   const body = rowSpec ? buildAutomationBody(rowSpec) : null;
   let made: string | null = null;
-  const connection = instance !== null && body ? houseInstanceLanFetch(instance, deps.house) : null;
+  const connection = instance !== null && body ? houseInstanceLanFetch(instance, automationDeps(deps)) : null;
   if (connection?.ok && body) {
-    const automationId = (deps.newAutomationId ?? newAutomationId)();
-    pendingAutomationIds.add(automationId);
-    const result = await createAutomation({ lanFetch: connection.lanFetch, token: connection.token, id: automationId, body });
-    if (result.ok) made = automationId; else pendingAutomationIds.delete(automationId);
+    // An automation fires in Home Assistant's own zone, so it is made only when that is the task's zone; otherwise the hub runs it.
+    const automationZone = await readHouseTimeZone({ lanFetch: connection.lanFetch, token: connection.token });
+    if (automationZone === zone) {
+      const automationId = (deps.newAutomationId ?? newAutomationId)();
+      pendingAutomationIds.add(automationId);
+      const result = await createAutomation({ lanFetch: connection.lanFetch, token: connection.token, id: automationId, body });
+      if (result.ok) made = automationId;
+      else {
+        // A timeout can follow a write Home Assistant did finish: remove it before falling back, or both would fire.
+        await deleteAutomation({ lanFetch: connection.lanFetch, token: connection.token, id: automationId });
+        pendingAutomationIds.delete(automationId);
+      }
+    }
   }
   row = made ? { ...row, externalRef: made } : { ...row, executor: "hub", externalRef: null };
 
@@ -220,7 +232,7 @@ export async function cancelSchedule(personId: string, taskId: string, deps: Sch
   let removed = row.externalRef === null;
   if (row.executor === "home_assistant" && row.externalRef !== null) {
     const instance = instanceOfRow(row);
-    const connection = instance === null ? null : houseInstanceLanFetch(instance, deps.house);
+    const connection = instance === null ? null : houseInstanceLanFetch(instance, automationDeps(deps));
     if (connection?.ok) removed = (await deleteAutomation({ lanFetch: connection.lanFetch, token: connection.token, id: row.externalRef })).ok;
   }
   const stamp = (deps.now ?? (() => new Date()))().toISOString();

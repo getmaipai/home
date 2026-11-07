@@ -79,17 +79,22 @@ export function buildAutomationBody(spec: AutomationSpec): Record<string, unknow
   };
 }
 
+/** The one read-only template Home sends to list its automations: only the `id` attribute of `automation.*` states whose id starts `maipai_`. The body is fixed text built here, never from a task. */
+const LIST_TEMPLATE = "{{ states.automation | map(attribute='attributes.id') | select('string') | select('match', 'maipai_') | list | tojson }}";
+export const LIST_TEMPLATE_BODY = JSON.stringify({ template: LIST_TEMPLATE });
+
 /** Only these request shapes ever leave this module; anything else is refused before it reaches the network. */
-function allowed(method: string, path: string): boolean {
+function allowed(method: string, path: string, body: unknown): boolean {
   const config = /^\/api\/config\/automation\/config\/(maipai_[a-z0-9]{16,})$/.exec(path);
   if (config) return method === "POST" || method === "DELETE" || method === "GET";
-  if (path === "/api/states") return method === "GET";
+  if (path === "/api/config") return method === "GET";
+  if (path === "/api/template") return method === "POST" && body === LIST_TEMPLATE_BODY;
   if (path === "/api/services/automation/reload") return method === "POST";
   return false;
 }
 
 function guarded(lanFetch: AutomationFetch): AutomationFetch {
-  return (path, init) => allowed(init?.method ?? "GET", path) ? lanFetch(path, init) : Promise.resolve({ ok: false, kind: "refused" });
+  return (path, init) => allowed(init?.method ?? "GET", path, init?.body) ? lanFetch(path, init) : Promise.resolve({ ok: false, kind: "refused" });
 }
 
 const json = (token: string) => ({ Authorization: `Bearer ${token}`, "Content-Type": "application/json" });
@@ -125,19 +130,23 @@ export async function deleteAutomation(input: { lanFetch: AutomationFetch; token
   return { ok: true };
 }
 
-/** The `maipai_` automation ids Home Assistant holds. A truncated or unreadable list is a failure, never a short list, so the caller cannot delete on a guess. */
+/** The `maipai_` automation ids Home Assistant holds, read through the fixed template. A truncated or unreadable answer is a failure, never a short list, so the caller cannot delete on a guess. */
 export async function listMaipaiAutomationIds(input: { lanFetch: AutomationFetch; token: string }): Promise<AutomationListResult> {
-  const response = await guarded(input.lanFetch)("/api/states", { headers: json(input.token) });
+  const response = await guarded(input.lanFetch)("/api/template", { method: "POST", headers: json(input.token), body: LIST_TEMPLATE_BODY });
   if (!good(response)) return failure(response) as AutomationListResult;
   try {
     const rows: unknown = JSON.parse((response as { text: string }).text);
-    if (!Array.isArray(rows)) return { ok: false, kind: "refused" };
-    const ids = rows.flatMap((row): string[] => {
-      if (!row || typeof row !== "object") return [];
-      const { entity_id: entityId, attributes } = row as { entity_id?: unknown; attributes?: { id?: unknown } };
-      const id = attributes?.id;
-      return typeof entityId === "string" && entityId.startsWith("automation.") && typeof id === "string" && AUTOMATION_ID.test(id) ? [id] : [];
-    });
-    return { ok: true, ids };
+    if (!Array.isArray(rows) || rows.some((id) => typeof id !== "string")) return { ok: false, kind: "refused" };
+    return { ok: true, ids: (rows as string[]).filter((id) => AUTOMATION_ID.test(id)) };
   } catch { return { ok: false, kind: "refused" }; }
+}
+
+/** Home Assistant's own time zone (an automation fires in it). Null when it cannot be read. */
+export async function readHouseTimeZone(input: { lanFetch: AutomationFetch; token: string }): Promise<string | null> {
+  const response = await guarded(input.lanFetch)("/api/config", { headers: json(input.token) });
+  if (!good(response)) return null;
+  try {
+    const zone = (JSON.parse((response as { text: string }).text) as { time_zone?: unknown }).time_zone;
+    return typeof zone === "string" && zone !== "" ? zone : null;
+  } catch { return null; }
 }

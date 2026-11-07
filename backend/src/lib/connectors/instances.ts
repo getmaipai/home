@@ -27,6 +27,8 @@ export type InstanceDeps = {
   /** Reads a household setting (address for the virtual default, secret by reference). */
   read?: (key: string) => unknown;
   fetch?: LanFetchDeps["fetch"];
+  /** Lets the connection send DELETE (default false). */
+  allowDelete?: boolean;
 };
 
 export type InstanceLanFetchFailure = { ok: false; reason: "not_set" | "bad_address" | "no_token"; message: string };
@@ -96,7 +98,7 @@ export function instanceLanFetch(instance: ConnectorInstance, deps: InstanceDeps
   const explicit80 = url.port === "" && /^[a-z]+:\/\/[^/]+:80\/?$/i.test(baseUrl.trim());
   const port = url.port !== "" ? Number(url.port) : explicit80 ? 80 : DEFAULT_PORT[instance.type];
   try {
-    const lanFetch = createLanFetch({ host: url.hostname, port }, deps.fetch === undefined ? {} : { fetch: deps.fetch });
+    const lanFetch = createLanFetch({ host: url.hostname, port, ...(deps.allowDelete ? { allowDelete: true } : {}) }, deps.fetch === undefined ? {} : { fetch: deps.fetch });
     return { ok: true, lanFetch, token, host: url.hostname, port };
   } catch { return badAddress; }
 }

@@ -10,6 +10,7 @@
 // its answer to "does this person have this, even though their role
 // alone wouldn't allow it" - a widening mechanism only. It never narrows
 // what the role ladder already allows an owner/admin to do.
+import { emitScheduleRecheck } from "@/lib/house/connectHooks";
 import { and, eq, inArray, isNull } from "drizzle-orm";
 import { db } from "@/db";
 import { grants, people } from "@/db/schema";
@@ -167,6 +168,7 @@ export function createGrant(actor: { id: string; role: Role }, input: GrantCreat
   if (problems.length > 0) return { ok: false, status: 400, error: problems.join("; ") };
 
   db.insert(grants).values(toRow(candidate.data)).run();
+  if (input.action.startsWith("house.")) emitScheduleRecheck();
   return { ok: true, status: 201, value: candidate.data };
 }
 
@@ -181,10 +183,11 @@ export function listGrants(personId?: string): GrantT[] {
 }
 
 export function revokeGrant(id: string): OpResult<{ id: string }> {
-  const row = db.select({ id: grants.id }).from(grants).where(and(eq(grants.id, id), isNull(grants.deletedAt))).get();
+  const row = db.select({ id: grants.id, action: grants.action }).from(grants).where(and(eq(grants.id, id), isNull(grants.deletedAt))).get();
   if (!row) return { ok: false, status: 404, error: "no such grant" };
   const now = new Date().toISOString();
   db.update(grants).set({ deletedAt: now, updatedAt: now, hlc: nextHlc() }).where(eq(grants.id, id)).run();
+  if (row.action.startsWith("house.")) emitScheduleRecheck();
   return { ok: true, status: 200, value: { id } };
 }
 

@@ -20,6 +20,7 @@ export type HouseLanFetchResult = HouseLanFetchSuccess | HouseLanFetchFailure;
 export type HouseLanFetchDeps = {
   read?: (key: string) => unknown;
   fetch?: LanFetchDeps["fetch"];
+  allowDelete?: boolean;
 };
 
 /** The default Home Assistant instance, resolved through the connector helper (the settings keys are read through as `default` until an `integration` record exists). */

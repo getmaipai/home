@@ -7,7 +7,7 @@ export function fakeHa() {
   // Automations the household made by hand: Home must never touch these.
   const manual = new Set(["manual_morning_lights", "abc123"]);
   const requests: FakeRequest[] = [];
-  const state = { failWrites: false, failStates: false };
+  const state = { failWrites: false, failStates: false, truncateTemplate: false, timeZone: "America/New_York" as string | null, writeThenTimeout: false };
 
   const fetch = async (input: string, init: RequestInit): Promise<Response> => {
     const url = new URL(input);
@@ -21,6 +21,8 @@ export function fakeHa() {
       if (method === "POST") {
         if (state.failWrites) return new Response("{}", { status: 500 });
         automations.set(id, JSON.parse(body) as Record<string, unknown>);
+        // Home Assistant finished the write but the answer never came back.
+        if (state.writeThenTimeout) throw new Error("socket timeout");
         return Response.json({ result: "ok" });
       }
       if (method === "DELETE") {
@@ -29,14 +31,13 @@ export function fakeHa() {
       }
       if (method === "GET") return automations.has(id) ? Response.json(automations.get(id)) : new Response("{}", { status: 404 });
     }
-    if (url.pathname === "/api/states" && method === "GET") {
+    if (url.pathname === "/api/template" && method === "POST") {
       if (state.failStates) return new Response("{}", { status: 500 });
-      return Response.json([
-        ...[...automations.keys()].map((id) => ({ entity_id: `automation.${id}`, state: "on", attributes: { id } })),
-        ...[...manual].map((id) => ({ entity_id: `automation.${id}`, state: "on", attributes: { id } })),
-        { entity_id: "light.porch", state: "off", attributes: {} },
-      ]);
+      if (state.truncateTemplate) return new Response("[\"maipai_");
+      // What the fixed template returns: the ids of the maipai_ automations only.
+      return Response.json([...automations.keys()].filter((id) => id.startsWith("maipai_")));
     }
+    if (url.pathname === "/api/config" && method === "GET") return state.timeZone === null ? new Response("{}", { status: 500 }) : Response.json({ time_zone: state.timeZone });
     if (url.pathname === "/api/services/automation/reload" && method === "POST") return Response.json([]);
     return new Response("{}", { status: 404 });
   };

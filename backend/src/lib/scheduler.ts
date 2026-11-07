@@ -28,6 +28,7 @@ import { recomputeNightlyMixes, pruneReads } from "@/lib/news/records";
 // own `host.schedule` real implementation (packageHost.ts) now carry a
 // recipe's own `schedule` step's `inputs` field through for real.
 import { fireHubDeviceTask } from "@/lib/schedules/executor";
+import { reconcileAllInstances } from "@/lib/schedules/reconcile";
 import { sweepLiveViews } from "@/lib/liveView";
 import { dispatchRobotOffers, sweepRobotOffers } from "@/lib/robotOffers";
 import { eq, and, lte, isNull, inArray, notInArray } from "drizzle-orm";
@@ -452,6 +453,8 @@ const CORE_JOBS: Record<string, CoreJobHandler> = {
   },
   // SCHED-02: a device schedule the hub runs itself (executor hub); the creator's access is rechecked each run.
   "schedules.device.fire": async (row) => { await fireHubDeviceTask(row); },
+  // SCHED-02: every 5 minutes, one list read and one registry read per Home Assistant instance, and nothing when no automation task exists.
+  "schedules.reconcile": async () => { await reconcileAllInstances(); },
   "timers.fire": async (row) => {
     const { label } = JSON.parse(row.inputs) as { label: string };
     await trigger("timer.done", { duration_text: label }, { personId: row.personId ?? undefined });
