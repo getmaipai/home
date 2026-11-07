@@ -14,6 +14,7 @@ import { channelData, householdTodayData, mixData, moreData, savedRows, sourceRo
 import { recentRows, searchData } from "@/lib/news/search";
 import { releasedItem } from "@/lib/news/cards";
 import { bumpNewsCounter } from "@/lib/news/newsCounters";
+import { jsonBody } from "@/lib/validation";
 import { NEWS_PICTURE_WIDTHS, newsFigurePicture, newsImagesOn, newsPicture, type NewsPictureWidth } from "@/lib/news/pictures";
 import { genericPicture, publisherIconPicture } from "@/lib/news/pictureFallback";
 import { figureAddressesOf } from "@/lib/news/article";
@@ -25,16 +26,11 @@ type DataId = (typeof DATA_IDS)[number];
 const isDataId = (value: string): value is DataId => (DATA_IDS as readonly string[]).includes(value);
 const isAction = (value: string): value is NewsActionName => (NEWS_ACTIONS as readonly string[]).includes(value);
 
-async function bodyOf(c: { req: { json: () => Promise<unknown> } }): Promise<Record<string, unknown>> {
-  const body = await c.req.json().catch(() => ({}));
-  return body && typeof body === "object" && !Array.isArray(body) ? (body as Record<string, unknown>) : {};
-}
-
 newsRoutes.post("/data/:dataId", requireAuth, async (c) => {
   const person = c.get("person");
   const id = c.req.param("dataId");
   if (!isDataId(id) || !appRouteAllowed(person, "news", "data", id)) { bumpNewsCounter("route_refused"); return c.json({ error: "no such data" }, 404); }
-  const body = await bodyOf(c);
+  const body = await jsonBody(c);
   switch (id) {
     case "today": return c.json(await todayData(person, body), 200);
     case "mix": {
@@ -70,7 +66,7 @@ newsRoutes.post("/actions/:action", requireAuth, async (c) => {
   const person = c.get("person");
   const action = c.req.param("action");
   if (!isAction(action) || !appRouteAllowed(person, "news", "actions", action)) { bumpNewsCounter("route_refused"); return c.json({ error: "no such action" }, 404); }
-  const result = await runNewsAction(person, action, await bodyOf(c));
+  const result = await runNewsAction(person, action, await jsonBody(c));
   return result.ok ? c.json(result.value, 200) : c.json({ error: result.error }, result.status);
 });
 

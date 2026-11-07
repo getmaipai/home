@@ -19,3 +19,9 @@ export function validateSecret(value: unknown): ValidationResult<string> {
   }
   return { ok: true, value };
 }
+
+/** AUDIT-DUP-ROUTES-01: a request's JSON body as a plain object; anything else (bad JSON, an array, a string) is `{}`. One definition for the media routes. */
+export async function jsonBody(c: { req: { json: () => Promise<unknown> } }): Promise<Record<string, unknown>> {
+  const parsed = await c.req.json().catch(() => ({}));
+  return parsed && typeof parsed === "object" && !Array.isArray(parsed) ? (parsed as Record<string, unknown>) : {};
+}

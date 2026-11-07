@@ -3,8 +3,10 @@
 import type { Context } from "hono";
 import { allowedSources, queryItems, readableIn } from "@/lib/media/appHost";
 import { correctedStamp, getProgress, writeProgress } from "@/lib/media/progress";
-import { coerceNumber, mediaAppAllowed } from "@/lib/media/appHost";
+import { coerceNumber } from "@/lib/media/appHost";
 import { queuePodcastAutoRules, exportOpml, getPodcastTranscript, importOpml, pollPodcastNow, saveEpisode, searchPodcastTranscripts, subscribePodcast, unsaveEpisode, unsubscribePodcast, updatePodcastSource } from "@/lib/media/podcasts";
+import { jsonBody } from "@/lib/validation";
+import { gateMediaApp } from "@/middleware/mediaAppGate";
 import { apiRouter } from "@/lib/openapi";
 import { requireAuth } from "@/middleware/auth";
 import type { PersonRow } from "@/types";
@@ -21,11 +23,6 @@ import { lookup } from "node:dns/promises";
 import { mediaItems } from "@/db/schema";
 import { eq } from "drizzle-orm";
 
-type Body = Record<string, unknown>;
-const bodyOf = async (c: Context): Promise<Body> => {
-  const parsed = await c.req.raw.json().catch(() => ({}));
-  return parsed && typeof parsed === "object" && !Array.isArray(parsed) ? (parsed as Body) : {};
-};
 const fail = (c: Context, result: { status: number; error: string }) => c.json({ error: result.error }, result.status as 400);
 
 type DirectoryRow = { id: string; title: string; author: string; summary: string; thumbnail: string | null; feed_url: string; action_label?: string };
@@ -88,11 +85,11 @@ export async function podcastShowEpisodeRows(person: PersonRow, id: string): Pro
 
 export function podcastRoutes() {
   const routes = apiRouter();
+  gateMediaApp(routes, "podcasts", ["/data/directory", "/preview/*", "/transcript/*", "/transcripts/*", "/save", "/bookmark", "/snips", "/subscribe", "/unsubscribe", "/source", "/filters", "/filters/*", "/opml/*", "/directory/*"]);
 
   routes.post("/data/directory", requireAuth, async (c, next) => {
     const person = c.get("person");
-    if (!mediaAppAllowed(person, "podcasts")) return next();
-    const body = await bodyOf(c);
+    const body = await jsonBody(c);
     return c.json(await podcastDirectoryRows(person, typeof body.q === "string" ? body.q : "", typeof body.scope === "string" ? body.scope : "search"), 200);
   });
 
@@ -105,7 +102,6 @@ const lookupPreferringV4: DnsLookup = async (hostname) => {
   // keeps to same-origin addresses. Range requests pass on, so seeking works. Nothing is stored.
   routes.get("/preview/:id", requireAuth, async (c, next) => {
     const person = c.get("person");
-    if (!mediaAppAllowed(person, "podcasts")) return next();
     const address = previewEpisodeAddress(person, c.req.param("id"));
     if (!address) return c.json({ error: "That episode is no longer available. Open the show again." }, 404);
     const abort = new AbortController();
@@ -128,22 +124,19 @@ const lookupPreferringV4: DnsLookup = async (hostname) => {
 
   routes.get("/transcript/:media_id", requireAuth, async (c, next) => {
     const person = c.get("person");
-    if (!mediaAppAllowed(person, "podcasts")) return next();
     const result = await getPodcastTranscript(person, c.req.param("media_id"));
     return result.ok ? c.json({ ok: true as const, ...result.value }, 200) : fail(c, result);
   });
 
   routes.get("/transcripts/search", requireAuth, async (c, next) => {
     const person = c.get("person");
-    if (!mediaAppAllowed(person, "podcasts")) return next();
     const query = (c.req.query("q") ?? "").trim().slice(0, 120);
     return c.json({ ok: true as const, hits: searchPodcastTranscripts(person, query) }, 200);
   });
 
   routes.post("/save", requireAuth, async (c, next) => {
     const person = c.get("person");
-    if (!mediaAppAllowed(person, "podcasts")) return next();
-    const body = await bodyOf(c);
+    const body = await jsonBody(c);
     const id = typeof body.media_id === "string" ? body.media_id : "";
     if (!readableIn(person, "podcasts", id)) return c.json({ error: "That episode is not in your podcasts." }, 404);
     const off = body.on === false || body.on === "false";
@@ -153,8 +146,7 @@ const lookupPreferringV4: DnsLookup = async (hostname) => {
 
   routes.post("/bookmark", requireAuth, async (c, next) => {
     const person = c.get("person");
-    if (!mediaAppAllowed(person, "podcasts")) return next();
-    const body = await bodyOf(c);
+    const body = await jsonBody(c);
     const item = typeof body.media_id === "string" ? readableIn(person, "podcasts", body.media_id) : null;
     if (!item) return c.json({ error: "That episode is not in your podcasts." }, 404);
     const current = getProgress(person.id, item.id);
@@ -168,9 +160,8 @@ const lookupPreferringV4: DnsLookup = async (hostname) => {
 
   routes.post("/snips", requireAuth, async (c, next) => {
     const person = c.get("person");
-    if (!mediaAppAllowed(person, "podcasts")) return next();
     if (mediaBandOf(person) === "child") return c.json({ error: "Snips are not available for child accounts." }, 403);
-    const body = await bodyOf(c);
+    const body = await jsonBody(c);
     const item = typeof body.media_id === "string" ? readableIn(person, "podcasts", body.media_id) : null;
     if (!item) return c.json({ error: "That episode is not in your podcasts." }, 404);
     const at = coerceNumber(body.start_s);
@@ -186,16 +177,14 @@ const lookupPreferringV4: DnsLookup = async (hostname) => {
 
   routes.get("/snips", requireAuth, async (c, next) => {
     const person = c.get("person");
-    if (!mediaAppAllowed(person, "podcasts")) return next();
     if (mediaBandOf(person) === "child") return c.json({ error: "Snips are not available for child accounts." }, 403);
     return c.json({ ok: true, rows: podcastSnipRowsForRoute(person) }, 200);
   });
 
   routes.delete("/snips", requireAuth, async (c, next) => {
     const person = c.get("person");
-    if (!mediaAppAllowed(person, "podcasts")) return next();
     if (mediaBandOf(person) === "child") return c.json({ error: "Snips are not available for child accounts." }, 403);
-    const body = await bodyOf(c);
+    const body = await jsonBody(c);
     const mediaId = typeof body.media_id === "string" ? body.media_id : "";
     const at = coerceNumber(body.start_s);
     const label = typeof body.snip_label === "string" ? body.snip_label : "";
@@ -210,8 +199,7 @@ const lookupPreferringV4: DnsLookup = async (hostname) => {
 
   routes.post("/subscribe", requireAuth, async (c, next) => {
     const person = c.get("person");
-    if (!mediaAppAllowed(person, "podcasts")) return next();
-    const body = await bodyOf(c);
+    const body = await jsonBody(c);
     const result = subscribePodcast(person, { url: typeof body.url === "string" ? body.url : "", visibleTo: Array.isArray(body.visible_to) ? (body.visible_to as string[]) : "household" });
     if (!result.ok) return fail(c, result);
     void pollPodcastNow(result.value.feed.id);
@@ -220,17 +208,15 @@ const lookupPreferringV4: DnsLookup = async (hostname) => {
 
   routes.post("/unsubscribe", requireAuth, async (c, next) => {
     const person = c.get("person");
-    if (!mediaAppAllowed(person, "podcasts")) return next();
-    const body = await bodyOf(c);
+    const body = await jsonBody(c);
     const result = unsubscribePodcast(person, typeof body.source_id === "string" ? body.source_id : "");
     return result.ok ? c.json({ ok: true as const }, 200) : fail(c, result);
   });
 
   routes.post("/source", requireAuth, async (c, next) => {
     const person = c.get("person");
-    if (!mediaAppAllowed(person, "podcasts")) return next();
-    const body = await bodyOf(c);
-    const auto = body.auto && typeof body.auto === "object" ? (body.auto as Body) : undefined;
+    const body = await jsonBody(c);
+    const auto = body.auto && typeof body.auto === "object" ? (body.auto as Record<string, unknown>) : undefined;
     const result = updatePodcastSource(person, typeof body.source_id === "string" ? body.source_id : "", {
       ...(body.speed !== undefined ? { speed: body.speed === null ? null : coerceNumber(body.speed) ?? NaN } : {}),
       ...(body.skip_intro_s !== undefined ? { skip_intro_s: coerceNumber(body.skip_intro_s) ?? NaN } : {}),
@@ -249,20 +235,17 @@ const lookupPreferringV4: DnsLookup = async (hostname) => {
   // episodes the person can already read, so the child and band gates are the Episodes page's own.
   routes.get("/filters", requireAuth, async (c, next) => {
     const person = c.get("person");
-    if (!mediaAppAllowed(person, "podcasts")) return next();
     return c.json({ ok: true as const, filters: personFilters(person).map((collection) => viewOf(person, collection)) }, 200);
   });
 
   routes.post("/filters", requireAuth, async (c, next) => {
     const person = c.get("person");
-    if (!mediaAppAllowed(person, "podcasts")) return next();
-    const result = saveFilter(person, await bodyOf(c));
+    const result = saveFilter(person, await jsonBody(c));
     return result.ok ? c.json({ ok: true as const, filter: result.filter, label: "Filter saved" }, 200) : fail(c, result);
   });
 
   routes.delete("/filters/:id", requireAuth, async (c, next) => {
     const person = c.get("person");
-    if (!mediaAppAllowed(person, "podcasts")) return next();
     const own = resolveCollection(person.id, c.req.param("id"));
     if (!own || own.kind !== "filter") return c.json({ error: "That filter is not yours or no longer exists. Reload the page." }, 404);
     deleteCollection(own);
@@ -271,8 +254,7 @@ const lookupPreferringV4: DnsLookup = async (hostname) => {
 
   routes.post("/opml/import", requireAuth, async (c, next) => {
     const person = c.get("person");
-    if (!mediaAppAllowed(person, "podcasts")) return next();
-    const body = await bodyOf(c);
+    const body = await jsonBody(c);
     const result = importOpml(person, typeof body.opml === "string" ? body.opml : "");
     if (!result.ok) return fail(c, result);
     // createFeed marks every imported feed due. The normal tick takes at most ten.
@@ -281,7 +263,6 @@ const lookupPreferringV4: DnsLookup = async (hostname) => {
 
   routes.get("/opml/export", requireAuth, async (c, next) => {
     const person = c.get("person");
-    if (!mediaAppAllowed(person, "podcasts")) return next();
     if (person.role !== "owner" && person.role !== "admin") return c.json({ error: "Only an admin can export the show list." }, 403);
     return new Response(exportOpml(), { status: 200, headers: { "content-type": "text/x-opml; charset=utf-8", "content-disposition": 'attachment; filename="podcasts.opml"', "cache-control": "no-store" } });
   });
@@ -297,7 +278,6 @@ const lookupPreferringV4: DnsLookup = async (hostname) => {
   const NOT_ON = "Finding new podcasts is not turned on for you. Ask the person who runs this home.";
 
   routes.get("/directory/search", requireAuth, async (c, next) => {
-    if (!mediaAppAllowed(c.get("person"), "podcasts")) return next();
     const { band, allowed } = directoryGate(c);
     if (!allowed) return c.json({ error: NOT_ON }, 403);
     const q = (c.req.query("q") ?? "").trim();
@@ -307,15 +287,13 @@ const lookupPreferringV4: DnsLookup = async (hostname) => {
   });
 
   routes.get("/directory/top", requireAuth, async (c, next) => {
-    if (!mediaAppAllowed(c.get("person"), "podcasts")) return next();
     if (!directoryGate(c).allowed) return c.json({ error: NOT_ON }, 403);
     const result = await topShows();
     return result.ok ? c.json({ ok: true as const, shows: result.shows }, 200) : c.json({ error: result.error }, result.status);
   });
 
   routes.post("/directory/add", requireAuth, async (c, next) => {
-    if (!mediaAppAllowed(c.get("person"), "podcasts")) return next();
-    const body = await bodyOf(c);
+    const body = await jsonBody(c);
     const result = subscribePodcast(c.get("person"), { url: typeof body.url === "string" ? body.url : "" });
     if (!result.ok) return fail(c, result);
     void pollPodcastNow(result.value.feed.id);
@@ -323,7 +301,6 @@ const lookupPreferringV4: DnsLookup = async (hostname) => {
   });
 
   routes.get("/directory/art", requireAuth, async (c, next) => {
-    if (!mediaAppAllowed(c.get("person"), "podcasts")) return next();
     if (!directoryGate(c).allowed) return c.body(null, 403);
     const art = await fetchDirectoryArt(c.req.query("u") ?? "");
     if (!art) return c.body(null, 404);
