@@ -1,3 +1,4 @@
+import { i18n } from "@lingui/core";
 import { useQueries, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useContext, useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
@@ -287,7 +288,7 @@ export function PackageAppPage({ person }: { person: Roster }) {
           {packageId === "music" && pageId === "play" ? <MusicVisualizerSection id={new URLSearchParams(location.search).get("id") ?? String((location.state as { pageState?: { id?: string } } | null)?.pageState?.id ?? "")} /> : null}
           {packageId === "weather" && pageId === "index" ? <>
             {weatherMessage ? <p role="status" className="text-sm text-muted-foreground">{weatherMessage}</p> : null}
-            {weatherLoading ? <RouteSkeleton label="Loading weather" /> : <WeatherForecastPage locations={weatherLocations} selectedId={weatherSelectedPlace?.id} onSelect={(id: string) => { if (id) setWeatherSelectedId(id); }} onSearch={(value: string) => { setWeatherSearch(value); setWeatherResults([]); setWeatherMessage(""); }} searchResults={(weatherSearchQuery.data ?? weatherResults).map((r) => ({ id: `${r.lat.toFixed(2)},${r.lon.toFixed(2)}`, city: r.name, state: r.area ?? undefined, latitude: r.lat, longitude: r.lon }))} onSelectResult={async (result) => {
+            {weatherLoading ? <RouteSkeleton label={i18n._({ id: "Loading weather", message: "Loading weather" })} /> : <WeatherForecastPage locations={weatherLocations} selectedId={weatherSelectedPlace?.id} onSelect={(id: string) => { if (id) setWeatherSelectedId(id); }} onSearch={(value: string) => { setWeatherSearch(value); setWeatherResults([]); setWeatherMessage(""); }} searchResults={(weatherSearchQuery.data ?? weatherResults).map((r) => ({ id: `${r.lat.toFixed(2)},${r.lon.toFixed(2)}`, city: r.name, state: r.area ?? undefined, latitude: r.lat, longitude: r.lon }))} onSelectResult={async (result) => {
               setWeatherMessage("");
               const latitude = Number(result.latitude!.toFixed(2)); const longitude = Number(result.longitude!.toFixed(2));
               const sameSpot = (geo: { lat?: number; lon?: number } | null | undefined) => geo?.lat !== undefined && geo.lon !== undefined && geo.lat.toFixed(2) === latitude.toFixed(2) && geo.lon.toFixed(2) === longitude.toFixed(2);

@@ -12,13 +12,33 @@ msgstr ""
 "Plural-Forms: \n"
 
 #. js-lingui-explicit-id
+#: src/shell/pages/PackageAppPage.tsx:291
+msgid "Loading weather"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/settings/VoiceBrowserSection.tsx:87
+msgid "Pick a person to see or change their voice."
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/i18n.test.tsx:40
 #: src/shell/usePersonLocale.test.tsx:43
 msgid "Search"
 msgstr "Buscar"
 
 #. js-lingui-explicit-id
+#: src/apps/settings/VoiceBrowserSection.tsx:91
+msgid "The voice Home speaks with when it talks to {who}."
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/i18n.chain.test.tsx:96
 #: src/i18n.test.tsx:53
 msgid "Today"
 msgstr "Hoy"
+
+#. js-lingui-explicit-id
+#: src/apps/settings/VoiceBrowserSection.tsx:87
+msgid "Whose voice"
+msgstr ""
