@@ -41,6 +41,7 @@ export type EditOp =
   | { op: "sharpen" | "denoise"; amount: number }
   | { op: "pip"; input: number; corner: "top_left" | "top_right" | "bottom_left" | "bottom_right"; size: number; margin: number }
   | { op: "upscale"; factor: 2 }
+  | { op: "cutout"; background: "black" | "white" | "green" | "blur" | "transparent" | `#${string}`; feather_px?: number; subject?: { frame?: number; box?: [number, number, number, number]; point?: { x: number; y: number } } }
   | { op: "captions"; lines: Array<{ from_s: number; to_s: number; text: string }>; position: "bottom" | "middle" | "top" };
 
 /** One file the Stack reads: its bytes and the extension it is staged with (the Stack looks at the content, not the name). */

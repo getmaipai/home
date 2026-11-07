@@ -73,7 +73,8 @@ export interface VideoRequest {
   adultOnly?: boolean;
   /** ADULT-LOCK-06: whether the Adult lock applies while the clip is made. Absent with `adultOnly` means on (a job stored before the lock was split from the audience). */
   adultLock?: "on" | "off";
-  edit?: { from: string; change: "trim" | "join" | "mix" | "reframe" | "grade" | "speed" | "captions" | "upscale"; with?: string[] };
+  edit?: { from: string; change: "trim" | "join" | "mix" | "reframe" | "grade" | "speed" | "captions" | "upscale" | "remove_background"; with?: string[] };
+  background?: string;
 }
 
 export interface VideoJob {
@@ -299,6 +300,8 @@ export function __resetVideoJobsForTests(): void {
   memory.clear();
   temporaryClips.clear();
 }
+/** Test-only fixture seam for an already finished source clip. */
+export function __setVideoJobForTests(job: VideoJob): void { liveJobs.set(job.id, job); }
 
 // ---------------------------------------------------------------- reference pictures
 
@@ -538,6 +541,7 @@ async function waitForTurnRow(turnId: string): Promise<boolean> {
 export function looksLikeMp4(bytes: Uint8Array): boolean {
   return bytes.byteLength > 1024 && bytes[4] === 0x66 && bytes[5] === 0x74 && bytes[6] === 0x79 && bytes[7] === 0x70;
 }
+export function looksLikeWebm(bytes: Uint8Array): boolean { return bytes.byteLength > 1024 && bytes[0] === 0x1a && bytes[1] === 0x45 && bytes[2] === 0xdf && bytes[3] === 0xa3; }
 function looksLikeJpeg(bytes: Uint8Array): boolean {
   return bytes.byteLength > 100 && bytes[0] === 0xff && bytes[1] === 0xd8;
 }
@@ -547,7 +551,7 @@ function saveFailureLine(status: number): string {
 }
 
 /** The finished-clip check, the store and the job's end, for a clip the Stack made (`finish`) and one an edit made (`finishEdit`). The Stack's bytes are stored unchanged. */
-async function settleClip(job: VideoJob, actor: PersonRow, video: Uint8Array, posterIn: Uint8Array | null, clip: StackClip, signal: AbortSignal, writer: "video-gen" | "video-edit"): Promise<void> {
+async function settleClip(job: VideoJob, actor: PersonRow, video: Uint8Array, posterIn: Uint8Array | null, clip: StackClip, signal: AbortSignal, writer: "video-gen" | "video-edit", mediaType: "video/mp4" | "video/webm" = "video/mp4"): Promise<void> {
   // VIDEO-GEN / IMGGEN-SAFE-01: the finished-clip check, before anything is stored or shown. First, middle and last
   // keyframes go through the same local vision check as a picture; a Mac that cannot decode a clip checks the poster alone.
   // An edit is adult-only when any clip it is made from is (`request.adultOnly`, set when the edit starts), never lower than its sources.
@@ -583,7 +587,7 @@ async function settleClip(job: VideoJob, actor: PersonRow, video: Uint8Array, po
   if (job.temporary) {
     const id = newFileId();
     const posterId = newFileId();
-    storeTemporaryClip({ id, conversationId: conversationId!, ownerPersonId: actor.id, mediaType: "video/mp4", bytes: video });
+    storeTemporaryClip({ id, conversationId: conversationId!, ownerPersonId: actor.id, mediaType, bytes: video });
     storeTemporaryClip({ id: posterId, conversationId: conversationId!, ownerPersonId: actor.id, mediaType: "image/jpeg", bytes: poster,  });
     file = { id, poster_id: posterId, width, height, seconds: meta.seconds, seed: meta.seed, model: meta.model, ms: meta.ms, bytes: video.byteLength, quality, audio: meta.audio };
   } else {
@@ -593,8 +597,8 @@ async function settleClip(job: VideoJob, actor: PersonRow, video: Uint8Array, po
     const clipProvenance = `${writer}:${JSON.stringify({ v: 1, ...markNote, job: job.id, ...meta, ...(job.request.edit ? { from: job.request.edit.from, change: job.request.edit.change } : {}) })}`;
     const posterProvenance = `${CLIP_POSTER_NOTE}${JSON.stringify({ v: 1, ...markNote, job: job.id, width, height,  })}`;
     const made = own
-      ? storeFile(actor, { conversationId: null, turnId: null, mediaType: "video/mp4", bytes: video, provenance: clipProvenance, deduplicate: false, retention: "kept" })
-      : createAttachment(actor, { conversationId: conversationId!, turnId: job.turnId!, mediaType: "video/mp4", bytes: video, provenance: clipProvenance, deduplicate: false, retention: "conversation" });
+      ? storeFile(actor, { conversationId: null, turnId: null, mediaType, bytes: video, provenance: clipProvenance, deduplicate: false, retention: "kept", name: mediaType === "video/webm" ? "Edited video.webm" : undefined })
+      : createAttachment(actor, { conversationId: conversationId!, turnId: job.turnId!, mediaType, bytes: video, provenance: clipProvenance, deduplicate: false, retention: "conversation", name: mediaType === "video/webm" ? "Edited video.webm" : undefined });
     if (!made.ok) { job.state = "failed"; job.error = saveFailureLine(made.status); saveVideoJob(job); return; }
     const madePoster = own
       ? storeFile(actor, { conversationId: null, turnId: null, mediaType: "image/jpeg", bytes: poster, provenance: posterProvenance, deduplicate: false, retention: "kept" })
@@ -639,7 +643,7 @@ export type EditRun = (signal: AbortSignal, onProgress?: (percent: number) => vo
 export const EDIT_FAILED_PREFIX = "I couldn't change that video.";
 export const EDIT_RESTART_LINE = `${EDIT_FAILED_PREFIX} Home restarted while it was working. Ask again.`;
 
-export interface StartEditInput { /** The styles the new clip is made with (recorded for lineage and the Adult lock; an edit is a local cut and sends no LoRA to the Stack). */ styleIds?: readonly string[]; adultLock?: "on" | "off"; actor: PersonRow; conversationId: string | null; turnId: string | null; temporary: boolean; source: VideoJob; edit: NonNullable<VideoRequest["edit"]>; run: EditRun; phase?: string; /** Called after an edited clip has been safely stored. */ onSaved?: (fileId: string) => void; /** Any source clip, track or typed line is adult-only. */ adultOnly: boolean }
+export interface StartEditInput { /** The styles the new clip is made with (recorded for lineage and the Adult lock; an edit is a local cut and sends no LoRA to the Stack). */ styleIds?: readonly string[]; background?: string; adultLock?: "on" | "off"; actor: PersonRow; conversationId: string | null; turnId: string | null; temporary: boolean; source: VideoJob; edit: NonNullable<VideoRequest["edit"]>; run: EditRun; phase?: string; /** Called after an edited clip has been safely stored. */ onSaved?: (fileId: string) => void; /** Any source clip, track or typed line is adult-only. */ adultOnly: boolean }
 
 /** Starts a new clip made by editing others and returns its job at once (the card polls it like any clip). The old clips stay.
  * One clip at a time per person, as for a made clip; a refusal is the plain line. */
@@ -650,7 +654,7 @@ export function startVideoEditJob(input: StartEditInput): { ok: true; job: Video
   const job: VideoJob = {
     id: newVideoJobId(), personId: input.actor.id, conversationId: input.conversationId, turnId: input.turnId, companionId: null, kind: "edit", state: "running", stackJob: null,
     percent: 5, phase: input.phase ?? "editing", position: null, prompt: input.source.prompt,
-    request: { size: from.size, seconds: from.seconds, seed: from.seed, loras: [...(input.styleIds ?? [])], source_file_id: null, audience: from.audience, ...(from.quality ? { quality: from.quality } : {}), ...(from.create ? { create: from.create } : {}), edit: input.edit, ...(input.adultOnly ? { adultOnly: true, adultLock: input.adultLock ?? "on" } : {}) },
+    request: { size: from.size, seconds: from.seconds, seed: from.seed, loras: [...(input.styleIds ?? [])], source_file_id: null, audience: from.audience, ...(from.quality ? { quality: from.quality } : {}), ...(from.create ? { create: from.create } : {}), edit: input.edit, ...(input.background ? { background: input.background } : {}), ...(input.adultOnly ? { adultOnly: true, adultLock: input.adultLock ?? "on" } : {}) },
     error: null, files: [], temporary: input.temporary, createdAt: now, updatedAt: now,
   };
   liveJobs.set(job.id, job);
@@ -667,11 +671,12 @@ async function runEdit(job: VideoJob, actor: PersonRow, run: EditRun, source: Vi
     if (controller.signal.aborted) return;
     if (!made.ok) { job.state = "failed"; job.error = made.line; saveVideoJob(job); return; }
     const { clip } = made;
-    if (!looksLikeMp4(clip.video)) { job.state = "failed"; job.error = `${EDIT_FAILED_PREFIX} The edited video didn't come out right. Try again.`; saveVideoJob(job); return; }
+    const webm = job.request.edit?.change === "remove_background" && job.request?.background === "transparent";
+    if (webm ? !looksLikeWebm(clip.video) : !looksLikeMp4(clip.video)) { job.state = "failed"; job.error = `${EDIT_FAILED_PREFIX} The edited video didn't come out right. Try again.`; saveVideoJob(job); return; }
     const seconds = clip.seconds === null ? null : Math.round(clip.seconds * 100) / 100;
     if (seconds !== null) job.request.seconds = Math.max(1, Math.round(seconds));
     const quality = job.request.quality === "detailed" ? "detailed" as const : "quick" as const;
-    await settleClip(job, actor, clip.video, null, { seconds: seconds ?? undefined, width: clip.width ?? undefined, height: clip.height ?? undefined, seed: source.request.seed ?? undefined, model: source.files[0]?.model ?? undefined, ms: clip.ms, quality, audio: clip.audio }, controller.signal, "video-edit");
+    await settleClip(job, actor, clip.video, null, { seconds: seconds ?? undefined, width: clip.width ?? undefined, height: clip.height ?? undefined, seed: source.request.seed ?? undefined, model: source.files[0]?.model ?? undefined, ms: clip.ms, quality, audio: clip.audio }, controller.signal, "video-edit", webm ? "video/webm" : "video/mp4");
     if (job.state === "done" && job.files[0]) { try { onSaved?.(job.files[0].id); } catch { /* the saved film remains delivered */ } }
   } catch {
     job.state = "failed";

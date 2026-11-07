@@ -65,8 +65,10 @@ export function installFakeEditStack(): FakeEditStack {
           writeFileSync(path, png);
           return { ...stamp(job), result: { path, size_bytes: png.byteLength, container: "png", width: 128, height: 72, elapsed_ms: 80 } };
         }
-        writeFileSync(path, testMp4());
-        return { ...stamp(job), result: { path, size_bytes: 4096, container: "mp4", duration_s: fake.durationS, width: 832, height: 480, video_codec: "h264", audio_codec: "aac", elapsed_ms: 1200 } };
+        const webm = job.input.output.name.endsWith(".webm");
+        const bytes = webm ? new Uint8Array([0x1a, 0x45, 0xdf, 0xa3, ...new Uint8Array(2044)]) : testMp4();
+        writeFileSync(path, bytes);
+        return { ...stamp(job), result: { path, size_bytes: bytes.byteLength, container: webm ? "webm" : "mp4", duration_s: fake.durationS, width: 832, height: 480, video_codec: webm ? "vp9" : "h264", ...(webm ? { alpha: true } : { audio_codec: "aac" }), elapsed_ms: 1200 } };
       }
       return stamp(job);
     },

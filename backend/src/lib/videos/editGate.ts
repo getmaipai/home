@@ -49,7 +49,7 @@ export function clipFileOf(actor: PersonRow, job: VideoJob): EditFile | null {
   // A clip in Trash or gone from the Library is not edited.
   if (file && !job.temporary) { const row = db.select().from(attachments).where(eq(attachments.id, file.id)).get(); if (!row || row.deletedAt !== null || row.ownerPersonId !== actor.id) return null; }
   const read = file ? readVideoFile(actor, job, file.id) : null;
-  return read ? { bytes: read.bytes, ext: "mp4" } : null;
+  return read ? { bytes: read.bytes, ext: read.mediaType === "video/webm" ? "webm" : "mp4" } : null;
 }
 
 /** ADULT-LOCK-06: the flags a source clip carries right now (design 3.10): from its Library file when it has one (so a lock the creator cleared since the job

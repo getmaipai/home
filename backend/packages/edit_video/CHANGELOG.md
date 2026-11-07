@@ -4,6 +4,8 @@
 
 ### Added
 
+- `remove_background` cuts out the main subject with a color, blur or transparent background, for clips up to a minute and 1920 pixels wide.
+
 - `upscale` makes a clip sharper and twice as big, for clips up to a minute and under 2048 pixels wide.
 - `cut_to_beat` cuts one to six of your videos to the beat of one of your songs, using the existing video editor job.
 

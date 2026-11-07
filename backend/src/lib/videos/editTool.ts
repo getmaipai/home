@@ -28,7 +28,7 @@ import { isRemoteStackSelected } from "@/lib/stackEngine";
 import { videoJobLockState, LOCKED_START_LINE } from "@/lib/videos/lock";
 import { activeVideoJobsFor, getVideoJobByFileFor, sourceVideoJob, startVideoEditJob, storeContinueFrame, type EditRun, type VideoJob, type VideoRequest } from "./jobs";
 import { fetchClip, getVideoJob as getStackVideoJob, submitVideo } from "./stack";
-import { CAPTION_POSITIONS, titleSubtitle, CROSSFADE_IN_STACK, DEFAULT_CROSSFADE_S, DEFAULT_MUSIC_LEVEL, DEFAULT_VOICE_LEVEL, FILM_LOOK_PRESETS, JOIN_TRANSITIONS, LETTERBOX_RATIOS, MAX_CROSSFADE_S, MAX_EDIT_OPS, MAX_EDIT_SECONDS, MAX_JOIN_CLIPS, MIN_CROSSFADE_S, MIN_JOIN_CLIPS, MIX_LEVEL_IDS, VIDEO_ASPECTS, TRANSITION_KINDS, captionsOps, creditsOp, crossfadeProblem, effectOps, filmLookOps, filmOps, frameOps, gradeOps, joinOps, lastFrameAt, letterboxOps, mixOps, reframeOps, speedOps, titleCardOp, trimOps, trimRange, upscaleOps } from "./editPlan";
+import { CAPTION_POSITIONS, titleSubtitle, CROSSFADE_IN_STACK, DEFAULT_CROSSFADE_S, DEFAULT_MUSIC_LEVEL, DEFAULT_VOICE_LEVEL, FILM_LOOK_PRESETS, JOIN_TRANSITIONS, LETTERBOX_RATIOS, MAX_CROSSFADE_S, MAX_EDIT_OPS, MAX_EDIT_SECONDS, MAX_JOIN_CLIPS, MIN_CROSSFADE_S, MIN_JOIN_CLIPS, MIX_LEVEL_IDS, VIDEO_ASPECTS, TRANSITION_KINDS, captionsOps, creditsOp, crossfadeProblem, cutoutOps, effectOps, filmLookOps, filmOps, frameOps, gradeOps, joinOps, lastFrameAt, letterboxOps, mixOps, reframeOps, speedOps, titleCardOp, trimOps, trimRange, upscaleOps } from "./editPlan";
 import { runStackEdit, stageClipForStack, type EditFile } from "./stackEdit";
 import { newItemMark, type MarkSource } from "@/lib/adultLock";
 import { clipFileOf, clipMarkOf, editableClip, editRefusal, lineMark, ownTrackFile, speakLine, voiceChoice } from "./editGate";
@@ -49,7 +49,8 @@ const ids = <T extends { id: string }>(list: readonly T[]) => list.map((item) =>
 
 export const editVideoArgs = z.object({
   clip: z.string().trim().min(1).max(80).optional(),
-  change: z.enum(["another_take", "remix", "make_it_max", "trim", "join", "film", "mix", "cut_to_beat", "reframe", "grade", "film_look", "letterbox", "speed", "captions", "title_card", "credits", "effect", "upscale", "continue", "extend", "retake"]),
+  change: z.enum(["another_take", "remix", "make_it_max", "trim", "join", "film", "mix", "cut_to_beat", "reframe", "grade", "film_look", "letterbox", "speed", "captions", "title_card", "credits", "effect", "upscale", "remove_background", "continue", "extend", "retake"]),
+  background: z.string().optional(),
   effect: z.enum(["speed_ramp", "reverse", "freeze", "loop", "fps_boost", "flip", "rotate", "sharpen", "denoise", "pip", "kenburns"]).optional(),
   amount: z.number().min(0).max(1).optional(), times: z.number().int().min(2).max(6).optional(), fps: z.union([z.literal(30), z.literal(48), z.literal(60)]).optional(),
   direction: z.enum(["horizontal", "vertical"]).optional(), degrees: z.union([z.literal(90), z.literal(180), z.literal(270)]).optional(), from_factor: z.number().min(0.25).max(4).optional(), to_factor: z.number().min(0.25).max(4).optional(),
@@ -100,6 +101,7 @@ export const editVideoArgs = z.object({
   if (value.change === "film") { if (!value.production) ctx.addIssue({ code: "custom", path: ["production"], message: "A production is required" }); }
   else if (!value.clip) ctx.addIssue({ code: "custom", path: ["clip"], message: "A video is required" });
   if (value.change === "upscale") for (const key of Object.keys(value)) if (key !== "clip" && key !== "change") ctx.addIssue({ code: "custom", path: [key], message: "Upscale takes only a clip." });
+  if (value.change === "remove_background") for (const key of Object.keys(value)) if (!["clip", "change", "background"].includes(key)) ctx.addIssue({ code: "custom", path: [key], message: "Background removal takes only a clip and background." });
 });
 
 export const NO_CLIP_LINE = "I can't find that video. Ask for a new one, or open the video you mean and try again.";
@@ -190,7 +192,7 @@ export async function runEditVideo(input: RunEditVideoInput): Promise<ToolExecut
   if (value.change === "captions" && value.captions?.some((line) => line.to_s <= line.from_s)) return refused(callId, args, "Give me caption words with a start and end time for each line.", "bad_captions");
   const actor = state.actor as PersonRow;
   const audience = videoAudienceOf(state as Parameters<typeof videoAudienceOf>[0], input.spoken);
-  if (["extend", "retake", "trim", "join", "film", "mix", "cut_to_beat", "reframe", "grade", "film_look", "letterbox", "speed", "captions", "title_card", "credits", "upscale"].includes(value.change)) {
+  if (["extend", "retake", "trim", "join", "film", "mix", "cut_to_beat", "reframe", "grade", "film_look", "letterbox", "speed", "captions", "title_card", "credits", "upscale", "remove_background"].includes(value.change)) {
     const editGate = editRefusal(audience, "");
     if (editGate) return refused(callId, args, editGate.line, editGate.kind === "denied" ? editGate.why : "minor");
   }
@@ -204,7 +206,7 @@ export async function runEditVideo(input: RunEditVideoInput): Promise<ToolExecut
   const temporary = state.temporary === true || state.ephemeral === true;
   if (value.change === "continue" && laneOf(audience) !== "adult") return refused(callId, args, MINOR_MAKE_LINE, "minor");
   if (value.change === "cut_to_beat" && (!value.track || (!value.clip && !value.clips))) return refused(callId, args, value.track ? NO_CLIP_LINE : MIX_SOUND_LINE, "missing_argument");
-  if (["extend", "retake", "trim", "join", "film", "mix", "cut_to_beat", "reframe", "grade", "film_look", "letterbox", "speed", "captions", "title_card", "credits", "effect", "upscale"].includes(value.change)) {
+  if (["extend", "retake", "trim", "join", "film", "mix", "cut_to_beat", "reframe", "grade", "film_look", "letterbox", "speed", "captions", "title_card", "credits", "effect", "upscale", "remove_background"].includes(value.change)) {
     // Cutting, joining and mixing are for adults on their own screen, like making one: a child's turn passes the screen above but never reaches the editor.
     if (laneOf(audience) !== "adult") return refused(callId, args, MINOR_MAKE_LINE, "minor");
     // A crossfade needs a Stack step that does not exist yet; say so before any clip is read or any job starts.
@@ -460,6 +462,12 @@ async function editFinishedClips(input: RunEditVideoInput, value: EditArgs, acto
     if (seconds !== null && seconds > 60) return refused(callId, args, "Sharpening works on clips up to a minute. Trim it first.", "upscale_too_long");
     if ((first.files[0]?.width ?? 0) >= 2048) return refused(callId, args, "This clip is already large; sharpening would make a very big file.", "upscale_too_wide");
   }
+  const background = value.background ?? "green";
+  if (value.change === "remove_background") {
+    if (!["black", "white", "green", "blur", "transparent"].includes(background) && !/^#[0-9a-fA-F]{6}$/.test(background)) return refused(callId, args, "Choose black, white, green, blur, transparent or a six-digit hex color for the background.", "bad_background");
+    if (seconds !== null && seconds > 60) return refused(callId, args, "Removing the background works on clips up to a minute. Trim it first.", "cutout_too_long");
+    if ((first.files[0]?.width ?? 0) > 1920) return refused(callId, args, "This clip is too large for that. Make it smaller first.", "cutout_too_wide");
+  }
 
   let inputs: EditFile[];
   let ops: import("./stackEdit").EditOp[];
@@ -469,6 +477,8 @@ async function editFinishedClips(input: RunEditVideoInput, value: EditArgs, acto
   let describe: string;
   if (value.change === "upscale") {
     inputs = [clipFiles[0]!]; ops = upscaleOps(); describe = "sharpened and doubled in size";
+  } else if (value.change === "remove_background") {
+    inputs = [clipFiles[0]!]; ops = cutoutOps(background as import("./editPlan").CutoutBackground); describe = "background removed";
   } else if (value.change === "trim") {
     const range = trimRange({ from_s: value.from_s, to_s: value.to_s }, seconds);
     if (!range.ok) return refused(callId, args, range.line, "bad_cut");
@@ -606,16 +616,16 @@ async function editFinishedClips(input: RunEditVideoInput, value: EditArgs, acto
       if (!line) return { ok: false, line: SPEECH_FAILED_LINE };
       files.push(line);
     }
-    const made = await runStackEdit({ inputs: files, ops: ops!, name: "edited.mp4", signal, onProgress });
+    const made = await runStackEdit({ inputs: files, ops: ops!, name: value.change === "remove_background" && background === "transparent" ? "edited.webm" : "edited.mp4", signal, onProgress });
     return made.ok ? { ok: true, clip: { video: made.bytes, seconds: made.seconds, width: made.width, height: made.height, audio: made.audio, ms: made.ms } } : { ok: false, line: made.line };
   };
   const mark = newItemMark(marks, false);
-  const started = startVideoEditJob({ actor, conversationId: state.conversationId, turnId: state.turnId, temporary, source: first, edit, run, phase: value.change === "upscale" ? "sharpening" : "editing", adultOnly: mark.madeAudience === "adult-only", adultLock: mark.lock, ...(film && actor.id === film.production.owner_person_id ? { onSaved: (fileId: string) => { const current = getMediaProduction(actor, film.production.id); if (current) updateMediaProduction(actor, current.id, { finished_cut_file_ids: [...current.finished_cut_file_ids, fileId] }); } } : {}) });
+  const started = startVideoEditJob({ actor, conversationId: state.conversationId, turnId: state.turnId, temporary, source: first, edit, run, background: value.change === "remove_background" ? background : undefined, phase: value.change === "upscale" ? "sharpening" : value.change === "remove_background" ? "cutting out the subject" : "editing", adultOnly: mark.madeAudience === "adult-only", adultLock: mark.lock });
   if (!started.ok) return refused(callId, args, started.line, "already_making");
   return outcomeOf({
     callId, packageId, status: "succeeded", via: "tool_call", args, durationMs: 0,
     result: {
-      reply: { text: value.change === "upscale" ? `A new sharper, twice-size version is being made; the first one is kept. It takes about ${Math.max(2, Math.ceil((seconds ?? 0) / 5) * 2)} minutes. The video card shows progress.` : `A new version of the video (${describe}) is being made; the first one is kept. It takes under a minute and appears below your reply when it is ready. You have not seen it or heard it: do not describe how it looks or sounds. Tell the person in one short sentence that it is on its way.` },
+      reply: { text: value.change === "upscale" ? `A new sharper, twice-size version is being made; the first one is kept. It takes about ${Math.max(2, Math.ceil((seconds ?? 0) / 5) * 2)} minutes. The video card shows progress.` : value.change === "remove_background" ? `A new version with the background removed is being made; the first one is kept. It takes about ${Math.max(1, Math.ceil((seconds ?? 0) / 10))} minute${Math.max(1, Math.ceil((seconds ?? 0) / 10)) === 1 ? "" : "s"}. The video card shows progress.` : `A new version of the video (${describe}) is being made; the first one is kept. It takes under a minute and appears below your reply when it is ready. You have not seen it or heard it: do not describe how it looks or sounds. Tell the person in one short sentence that it is on its way.` },
       data: { videoJobId: started.job.id },
       actions: [],
     },
