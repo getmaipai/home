@@ -1,3 +1,4 @@
+import { i18n } from "@lingui/core";
 import { useQuery } from "@tanstack/react-query";
 import { Link, useSearchParams } from "react-router-dom";
 import { AsyncState } from "@maipai/ui/src/primitives/AsyncState";
@@ -70,7 +71,7 @@ function personAvatarClass(entry: PersonRosterEntry): string {
  * table, once as a row in it"). Tapping a card, including your own,
  * opens `/people/:id`; an owner's or admin's view of a teen's card is not a link (ruling 2026-09-30). */
 export function FamilyPage({ person }: { person: Roster }) {
-  useTabItem("Family");
+  useTabItem(i18n._({ id: "Family", message: "Family" }));
   const [params, setParams] = useSearchParams();
   const requestedTab = params.get("tab");
   const botsQuery = useQuery<DeviceInfo[]>({ queryKey: familyBotsQueryKey(person), queryFn: () => fetchFamilyBots(person) });
@@ -91,9 +92,9 @@ export function FamilyPage({ person }: { person: Roster }) {
     <>
     <Tabs value={activeTab} onValueChange={onTabChange}>
       <TabsList>
-        <TabsTrigger value="people">People{query.data ? <> <Badge>{query.data.length}</Badge></> : null}</TabsTrigger>
-        <TabsTrigger value="pets">Pets{petsQuery.data && petsQuery.data.length > 0 ? <> <Badge>{petsQuery.data.length}</Badge></> : null}</TabsTrigger>
-        <TabsTrigger value="bots">Bots{botsQuery.data && botsQuery.data.length > 0 ? <> <Badge>{botsQuery.data.length}</Badge></> : null}</TabsTrigger>
+        <TabsTrigger value="people">{i18n._({ id: "People", message: "People" })}{query.data ? <> <Badge>{query.data.length}</Badge></> : null}</TabsTrigger>
+        <TabsTrigger value="pets">{i18n._({ id: "Pets", message: "Pets" })}{petsQuery.data && petsQuery.data.length > 0 ? <> <Badge>{petsQuery.data.length}</Badge></> : null}</TabsTrigger>
+        <TabsTrigger value="bots">{i18n._({ id: "Bots", message: "Bots" })}{botsQuery.data && botsQuery.data.length > 0 ? <> <Badge>{botsQuery.data.length}</Badge></> : null}</TabsTrigger>
       </TabsList>
       <TabsContent value="people">
     <AsyncState
@@ -101,8 +102,8 @@ export function FamilyPage({ person }: { person: Roster }) {
       error={query.isError}
       isFetching={query.isFetching}
       onRetry={() => query.refetch()}
-      errorMessage={errorLine(query.error, "Could not load the household.")}
-      loadingLabel="Loading household"
+      errorMessage={errorLine(query.error, i18n._({ id: "Could not load the household.", message: "Could not load the household." }))}
+      loadingLabel={i18n._({ id: "Loading household", message: "Loading household" })}
     >
       {(roster: PersonRosterEntry[]) => {
         const ordered = [...roster].sort((a, b) => {
@@ -113,7 +114,7 @@ export function FamilyPage({ person }: { person: Roster }) {
         return (
           <div className="flex flex-col gap-4">
             <CardHeader>
-              <CardTitle>Family</CardTitle>
+              <CardTitle>{i18n._({ id: "Family", message: "Family" })}</CardTitle>
             </CardHeader>
             <div className={`grid gap-4 ${GRID_COLUMNS.default}`}>
               {ordered.map((entry) => {
@@ -143,10 +144,10 @@ export function FamilyPage({ person }: { person: Roster }) {
     </AsyncState>
       </TabsContent>
       <TabsContent value="pets">
-        <AsyncState data={petsQuery.data} error={petsQuery.isError} isFetching={petsQuery.isFetching} onRetry={() => petsQuery.refetch()} errorMessage="Could not load pets." loadingLabel="Loading pets">
-          {(pets: Entity[]) => pets.length === 0 ? <EmptyState icon="inbox" text="Nothing here yet." /> : <div className={`grid gap-4 ${GRID_COLUMNS.default}`}>{pets.map((pet) => {
+        <AsyncState data={petsQuery.data} error={petsQuery.isError} isFetching={petsQuery.isFetching} onRetry={() => petsQuery.refetch()} errorMessage={i18n._({ id: "Could not load pets.", message: "Could not load pets." })} loadingLabel={i18n._({ id: "Loading pets", message: "Loading pets" })}>
+          {(pets: Entity[]) => pets.length === 0 ? <EmptyState icon="inbox" text={i18n._({ id: "Nothing here yet.", message: "Nothing here yet." })} /> : <div className={`grid gap-4 ${GRID_COLUMNS.default}`}>{pets.map((pet) => {
             const unconfirmed = pet.source === "inferred" && !pet.confirmed_by_person_id;
-            return <Card key={pet.id}><CardContent><FamilyBody title={pet.name} detail={pet.description} icon={PetIcon} badge={unconfirmed ? "Unconfirmed" : undefined} /></CardContent></Card>;
+            return <Card key={pet.id}><CardContent><FamilyBody title={pet.name} detail={pet.description} icon={PetIcon} badge={unconfirmed ? i18n._({ id: "Unconfirmed", message: "Unconfirmed" }) : undefined} /></CardContent></Card>;
           })}</div>}
         </AsyncState>
       </TabsContent>

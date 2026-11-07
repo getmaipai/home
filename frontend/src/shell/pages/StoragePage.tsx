@@ -1,3 +1,4 @@
+import { i18n } from "@lingui/core";
 import { Link } from "react-router-dom";
 import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -43,18 +44,18 @@ interface CacheRow extends Record<string, unknown> {
   size: string;
 }
 
-const CACHE_COLUMNS: readonly DataTableColumn<CacheRow>[] = [
-  { id: "label", header: "Source" },
-  { id: "entries", header: "Saved copies" },
-  { id: "size", header: "Size" },
+const cacheColumns = (): readonly DataTableColumn<CacheRow>[] => [
+  { id: "label", header: i18n._({ id: "Source", message: "Source" }) },
+  { id: "entries", header: i18n._({ id: "Saved copies", message: "Saved copies" }) },
+  { id: "size", header: i18n._({ id: "Size", message: "Size" }) },
 ];
 
-const CLEAR_CONFIRM = "Saved copies of weather, news and other things Home looked up online. Your own chats, memories and the news shelf stay. Home will fetch it again the next time someone asks.";
+const clearConfirm = (): string => i18n._({ id: "Saved copies of weather, news and other things Home looked up online. Your own chats, memories and the news shelf stay. Home will fetch it again the next time someone asks.", message: "Saved copies of weather, news and other things Home looked up online. Your own chats, memories and the news shelf stay. Home will fetch it again the next time someone asks." });
 
 function capLabel(capBytes: number): string {
   // 0 is every cap key's own "no cap enforced at this level" (usage.ts's
   // own comment) - shown as a plain fact, never a fabricated number.
-  return capBytes > 0 ? formatBytes(capBytes) : "No cap set";
+  return capBytes > 0 ? formatBytes(capBytes) : i18n._({ id: "No cap set", message: "No cap set" });
 }
 
 function toRow(row: PersonStorageRow): PersonUsageRow {
@@ -64,7 +65,7 @@ function toRow(row: PersonStorageRow): PersonUsageRow {
     role: row.role,
     used: formatBytes(row.usageBytes),
     cap: capLabel(row.capBytes),
-    "top kind": top ? `${top.kind} (${formatBytes(top.bytes)})` : "None yet",
+    "top kind": top ? i18n._({ id: "{kind} ({size})", message: "{kind} ({size})", values: { kind: top.kind, size: formatBytes(top.bytes) } }) : i18n._({ id: "None yet", message: "None yet" }),
   };
 }
 
@@ -74,11 +75,11 @@ function toRow(row: PersonStorageRow): PersonUsageRow {
 // no longer here"; they count toward the household total, not a person.
 function inheritedRow(inherited: { files: number; bytes: number }): PersonUsageRow {
   return {
-    person: "Shared by people no longer here",
+    person: i18n._({ id: "Shared by people no longer here", message: "Shared by people no longer here" }),
     role: "household",
     used: formatBytes(inherited.bytes),
-    cap: "Household total",
-    "top kind": `${inherited.files} ${inherited.files === 1 ? "file" : "files"}`,
+    cap: i18n._({ id: "Household total", message: "Household total" }),
+    "top kind": i18n._({ id: "{count, plural, one {# file} other {# files}}", message: "{count, plural, one {# file} other {# files}}", values: { count: inherited.files } }),
   };
 }
 
@@ -110,7 +111,7 @@ function inheritedRow(inherited: { files: number; bytes: number }): PersonUsageR
  * "backend is the one gate" posture PerformancePage.tsx's own
  * comment already states for its owner/admin-only case. */
 export function StoragePage({ person }: { person: Roster }) {
-  useTabItem("Storage");
+  useTabItem(i18n._({ id: "Storage", message: "Storage" }));
   const query = useQuery<StorageUsageOverview>({ queryKey: ["storage-usage"], queryFn: () => api.storageUsage() });
   const isAdmin = isOwnerOrAdminRole(person.role);
   const cacheQuery = useQuery<PackageCacheSourceRow[]>({ queryKey: ["storage-package-cache"], queryFn: () => api.packageCacheSources(), enabled: isAdmin });
@@ -121,10 +122,10 @@ export function StoragePage({ person }: { person: Roster }) {
     try {
       const result = await api.clearPackageCache(source);
       await client.invalidateQueries({ queryKey: ["storage-package-cache"] });
-      toast.success(`Cleared ${result.removed} saved ${result.removed === 1 ? "copy" : "copies"} (${formatBytes(result.bytes)}) from ${label ?? "all sources"}.`);
+      toast.success(label ? i18n._({ id: "Cleared {count, plural, one {# saved copy} other {# saved copies}} ({size}) from {source}.", message: "Cleared {count, plural, one {# saved copy} other {# saved copies}} ({size}) from {source}.", values: { count: result.removed, size: formatBytes(result.bytes), source: label } }) : i18n._({ id: "Cleared {count, plural, one {# saved copy} other {# saved copies}} ({size}) from all sources.", message: "Cleared {count, plural, one {# saved copy} other {# saved copies}} ({size}) from all sources.", values: { count: result.removed, size: formatBytes(result.bytes) } }));
       setClearAllOpen(false);
     } catch {
-      toast.error("Home could not clear the saved copies. Check that Home is running and try again.");
+      toast.error(i18n._({ id: "Home could not clear the saved copies. Check that Home is running and try again.", message: "Home could not clear the saved copies. Check that Home is running and try again." }));
     }
   }
 
@@ -134,8 +135,8 @@ export function StoragePage({ person }: { person: Roster }) {
       error={query.isError}
       isFetching={query.isFetching}
       onRetry={() => query.refetch()}
-      errorMessage={errorLine(query.error, "Could not load storage.")}
-      loadingLabel="Loading storage"
+      errorMessage={errorLine(query.error, i18n._({ id: "Could not load storage.", message: "Could not load storage." }))}
+      loadingLabel={i18n._({ id: "Loading storage", message: "Loading storage" })}
     >
       {(data: StorageUsageOverview) => <StorageContent data={data} person={person} isAdmin={isAdmin} cacheRows={cacheQuery.data ?? []} cacheLoading={cacheQuery.isLoading} clearAllOpen={clearAllOpen} setClearAllOpen={setClearAllOpen} clear={clear} />}
     </AsyncState>
@@ -150,18 +151,18 @@ function StorageContent({ data, person, isAdmin, cacheRows, cacheLoading, clearA
     used: 120,
     cap: 140,
     "top kind": 240,
-  }), "No files yet.");
+  }, { person: i18n._({ id: "Person", message: "Person" }), role: i18n._({ id: "Role", message: "Role" }), used: i18n._({ id: "Used", message: "Used" }), cap: i18n._({ id: "Cap", message: "Cap" }), "top kind": i18n._({ id: "Top kind", message: "Top kind" }) }), i18n._({ id: "No files yet.", message: "No files yet." }));
   return (
     <>
       <CardHeader>
         <CardTitle><span className="flex items-center gap-2">
           <StorageIcon size={16} className="text-muted-foreground" />
-          Storage
+          {i18n._({ id: "Storage", message: "Storage" })}
         </span></CardTitle>
       </CardHeader>
       {data.household?.capBytes && data.household.capBytes > 0 ? (
         <>
-          <CardTitle>Household total</CardTitle>
+          <CardTitle>{i18n._({ id: "Household total", message: "Household total" })}</CardTitle>
           <QuotaBanner
             used={data.household.usageBytes}
             limit={data.household.capBytes}
@@ -172,44 +173,44 @@ function StorageContent({ data, person, isAdmin, cacheRows, cacheLoading, clearA
       ) : data.household ? (
         <Card>
           <CardHeader>
-            <CardTitle>Household total</CardTitle>
+            <CardTitle>{i18n._({ id: "Household total", message: "Household total" })}</CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-sm text-muted-foreground">{formatBytes(data.household.usageBytes)} used, no cap set</p>
+            <p className="text-sm text-muted-foreground">{i18n._({ id: "{size} used, no cap set", message: "{size} used, no cap set", values: { size: formatBytes(data.household.usageBytes) } })}</p>
           </CardContent>
         </Card>
       ) : null}
-      <div className="mb-3 flex justify-end"><Button variant="outline" nativeButton={false} render={<Link to="/storage/trash" />}>Trash</Button></div>
-      <DataTable {...model.tableProps} toolbar={rows.length >= 10 ? <DataTableControls model={model} /> : undefined} caption="Storage usage by person" getRowId={(row) => row.person} />
+      <div className="mb-3 flex justify-end"><Button variant="outline" nativeButton={false} render={<Link to="/storage/trash" />}>{i18n._({ id: "Trash", message: "Trash" })}</Button></div>
+      <DataTable {...model.tableProps} toolbar={rows.length >= 10 ? <DataTableControls model={model} /> : undefined} caption={i18n._({ id: "Storage usage by person", message: "Storage usage by person" })} getRowId={(row) => row.person} />
       {isAdmin ? <>
         <SettingsRenderer scope="household" scopeValue="household" only={["household.storage"]} />
         <BackupsSection person={person} />
         <Card>
           <CardHeader>
-            <CardTitle>Saved online data</CardTitle>
+            <CardTitle>{i18n._({ id: "Saved online data", message: "Saved online data" })}</CardTitle>
           </CardHeader>
           <CardContent>
-            <p>Saved copies of weather, news and other things Home looked up online. Your own chats, memories and the news shelf stay. Home will fetch cleared data again the next time someone asks.</p>
+            <p>{i18n._({ id: "Saved copies of weather, news and other things Home looked up online. Your own chats, memories and the news shelf stay. Home will fetch cleared data again the next time someone asks.", message: "Saved copies of weather, news and other things Home looked up online. Your own chats, memories and the news shelf stay. Home will fetch cleared data again the next time someone asks." })}</p>
           </CardContent>
           <DataTable
-            columns={CACHE_COLUMNS}
+            columns={cacheColumns()}
             rows={cacheRows.map((row) => ({ source: row.source, label: row.label, entries: String(row.entryCount), size: formatBytes(row.sizeBytes) }))}
-            caption="Saved data by source"
+            caption={i18n._({ id: "Saved data by source", message: "Saved data by source" })}
             getRowId={(row) => row.source}
-            emptyLabel={cacheLoading ? "Loading saved data…" : "No saved online data."}
-            rowActions={(row) => <DataTableRowActions actions={[{ label: `Clear ${row.label}`, destructive: true, confirmLabel: CLEAR_CONFIRM, onClick: () => clear(row.source, row.label) }]} />}
+            emptyLabel={cacheLoading ? i18n._({ id: "Loading saved data\u2026", message: "Loading saved data\u2026" }) : i18n._({ id: "No saved online data.", message: "No saved online data." })}
+            rowActions={(row) => <DataTableRowActions actions={[{ label: i18n._({ id: "Clear {name}", message: "Clear {name}", values: { name: row.label } }), destructive: true, confirmLabel: clearConfirm(), onClick: () => clear(row.source, row.label) }]} />}
           />
-          <Button type="button" variant="destructive" disabled={cacheRows.length === 0} onClick={() => setClearAllOpen(true)}>Clear all</Button>
+          <Button type="button" variant="destructive" disabled={cacheRows.length === 0} onClick={() => setClearAllOpen(true)}>{i18n._({ id: "Clear all", message: "Clear all" })}</Button>
         </Card>
         <AlertDialog open={clearAllOpen} onOpenChange={setClearAllOpen}>
           <AlertDialogContent>
             <AlertDialogHeader>
-              <AlertDialogTitle>Clear all saved online data?</AlertDialogTitle>
-              <AlertDialogDescription>{CLEAR_CONFIRM}</AlertDialogDescription>
+              <AlertDialogTitle>{i18n._({ id: "Clear all saved online data?", message: "Clear all saved online data?" })}</AlertDialogTitle>
+              <AlertDialogDescription>{clearConfirm()}</AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
-              <AlertDialogCancel>Cancel</AlertDialogCancel>
-              <AlertDialogAction variant="destructive" onClick={() => void clear()}>Clear all</AlertDialogAction>
+              <AlertDialogCancel>{i18n._({ id: "Cancel", message: "Cancel" })}</AlertDialogCancel>
+              <AlertDialogAction variant="destructive" onClick={() => void clear()}>{i18n._({ id: "Clear all", message: "Clear all" })}</AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>

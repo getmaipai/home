@@ -1,3 +1,4 @@
+import { i18n } from "@lingui/core";
 import { DataTable } from "@maipai/ui/src/elements/data-table";
 import { tableColumns, useDataTableModel } from "@/shell/components/dataTableModel";
 import { DataTableControls } from "@/shell/components/DataTableControls";
@@ -24,12 +25,12 @@ export function LabelsBody({ labels }: { labels: PerformanceLabels }) {
     ...labels.rule_hits.map((h) => ({ kind: "rule", key: h.key, count: h.count })),
     ...labels.rungs.map((h) => ({ kind: "rung", key: h.key, count: h.count })),
   ];
-  const model = useDataTableModel(rows, tableColumns<HitRow>(["kind", "key", "count"], { kind: 100, key: 300, count: 80 }));
+  const model = useDataTableModel(rows, tableColumns<HitRow>(["kind", "key", "count"], { kind: 100, key: 300, count: 80 }, { kind: i18n._({ id: "Kind", message: "Kind" }), key: i18n._({ id: "Key", message: "Key" }), count: i18n._({ id: "Count", message: "Count" }) }));
   return (
     <>
-      <DataTable {...model.tableProps} toolbar={model.rows.length >= 10 ? <DataTableControls model={model} /> : undefined} caption="Label harvest counts" getRowId={(row) => `${row.kind}-${row.key}`} />
+      <DataTable {...model.tableProps} toolbar={model.rows.length >= 10 ? <DataTableControls model={model} /> : undefined} caption={i18n._({ id: "Label harvest counts", message: "Label harvest counts" })} getRowId={(row) => `${row.kind}-${row.key}`} />
       {labels.retire_eligible.length > 0 && (
-        <p className="mt-4 text-sm text-muted-foreground">Zero hits this window, retire-eligible: {labels.retire_eligible.join(", ")}</p>
+        <p className="mt-4 text-sm text-muted-foreground">{i18n._({ id: "Zero hits this window, retire-eligible: {rules}", message: "Zero hits this window, retire-eligible: {rules}", values: { rules: labels.retire_eligible.join(", ") } })}</p>
       )}
     </>
   );

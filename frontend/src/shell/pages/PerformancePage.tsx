@@ -1,3 +1,4 @@
+import { i18n } from "@lingui/core";
 import { useQuery } from "@tanstack/react-query";
 import { AsyncState } from "@maipai/ui/src/primitives/AsyncState";
 import { getIcon } from "@maipai/ui/src/icons";
@@ -49,7 +50,7 @@ const icons = {
 export const PerformanceIcon = getIcon("gauge");
 
 export function PerformancePage() {
-  useTabItem("Performance");
+  useTabItem(i18n._({ id: "Performance", message: "Performance" }));
   const query = useQuery<Performance>({ queryKey: ["performance"], queryFn: () => api.performance() });
 
   return (
@@ -58,8 +59,8 @@ export function PerformancePage() {
       error={query.isError}
       isFetching={query.isFetching}
       onRetry={() => query.refetch()}
-      errorMessage={errorLine(query.error, "Could not load performance.")}
-      loadingLabel="Loading performance"
+      errorMessage={errorLine(query.error, i18n._({ id: "Could not load performance.", message: "Could not load performance." }))}
+      loadingLabel={i18n._({ id: "Loading performance", message: "Loading performance" })}
     >
       {(data: Performance) => (
         <div className="flex flex-col gap-4 pb-4">
@@ -69,7 +70,7 @@ export function PerformancePage() {
                 <CardHeader>
                   <CardTitle>
                     <icons.gauge size={16} className="mr-2 inline text-muted-foreground" />
-                    Reply time per day
+                    {i18n._({ id: "Reply time per day", message: "Reply time per day" })}
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
@@ -82,7 +83,7 @@ export function PerformancePage() {
                 <CardHeader>
                   <CardTitle>
                     <icons.inbox size={16} className="mr-2 inline text-muted-foreground" />
-                    Queues
+                    {i18n._({ id: "Queues", message: "Queues" })}
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
@@ -95,7 +96,7 @@ export function PerformancePage() {
                 <CardHeader>
                   <CardTitle>
                     <icons.cpu size={16} className="mr-2 inline text-muted-foreground" />
-                    Turns per engine
+                    {i18n._({ id: "Turns per engine", message: "Turns per engine" })}
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
@@ -108,7 +109,7 @@ export function PerformancePage() {
                 <CardHeader>
                   <CardTitle>
                     <icons.history size={16} className="mr-2 inline text-muted-foreground" />
-                    Route taken
+                    {i18n._({ id: "Route taken", message: "Route taken" })}
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
@@ -121,7 +122,7 @@ export function PerformancePage() {
                 <CardHeader>
                   <CardTitle>
                     <icons.wrench size={16} className="mr-2 inline text-muted-foreground" />
-                    Tools offered per turn
+                    {i18n._({ id: "Tools offered per turn", message: "Tools offered per turn" })}
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
@@ -134,7 +135,7 @@ export function PerformancePage() {
                 <CardHeader>
                   <CardTitle>
                     <icons.workflow size={16} className="mr-2 inline text-muted-foreground" />
-                    Layers
+                    {i18n._({ id: "Layers", message: "Layers" })}
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
@@ -146,9 +147,7 @@ export function PerformancePage() {
               <Card>
                 <CardHeader>
                   <CardTitle>
-                    <icons.filter size={16} className="mr-2 inline text-muted-foreground" />
-                    Label harvest ({data.labels.turns} turn{data.labels.turns === 1 ? "" : "s"})
-                  </CardTitle>
+                    <icons.filter size={16} className="mr-2 inline text-muted-foreground" />{i18n._({ id: "Label harvest ({turns, plural, one {# turn} other {# turns}})", message: "Label harvest ({turns, plural, one {# turn} other {# turns}})", values: { turns: data.labels.turns } })}</CardTitle>
                 </CardHeader>
                 <CardContent>
                   <LabelsBody labels={data.labels} />
@@ -160,7 +159,7 @@ export function PerformancePage() {
                 <CardHeader>
                   <CardTitle>
                     <icons.server size={16} className="mr-2 inline text-muted-foreground" />
-                    Engines
+                    {i18n._({ id: "Engines", message: "Engines" })}
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
@@ -173,7 +172,7 @@ export function PerformancePage() {
                 <CardHeader>
                   <CardTitle>
                     <icons.database size={16} className="mr-2 inline text-muted-foreground" />
-                    Storage &amp; hardware
+                    {i18n._({ id: "Storage & hardware", message: "Storage & hardware" })}
                   </CardTitle>
                 </CardHeader>
                 <CardContent>

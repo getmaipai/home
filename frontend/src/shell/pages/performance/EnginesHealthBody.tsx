@@ -1,3 +1,4 @@
+import { i18n } from "@lingui/core";
 import { getIcon } from "@maipai/ui/src/icons";
 import { Link } from "react-router-dom";
 import { DataTable } from "@maipai/ui/src/elements/data-table";
@@ -25,33 +26,31 @@ export function EnginesHealthBody({ engines }: { engines: PerformanceEngines }) 
     issue: i.key,
     severity: i.severity,
     since: new Date(i.createdAt).toLocaleString(),
-    status: i.resolvedAt ? `Resolved ${new Date(i.resolvedAt).toLocaleDateString()}` : "Open",
+    status: i.resolvedAt ? i18n._({ id: "Resolved {date}", message: "Resolved {date}", values: { date: new Date(i.resolvedAt).toLocaleDateString() } }) : i18n._({ id: "Open", message: "Open" }),
   }));
   const model = useDataTableModel(rows, tableColumns<IssueRow>(["issue", "severity", "since", "status"], {
     issue: 180,
     severity: 100,
     since: 170,
     status: 120,
-  }));
+  }, { issue: i18n._({ id: "Issue", message: "Issue" }), severity: i18n._({ id: "Severity", message: "Severity" }), since: i18n._({ id: "Since", message: "Since" }), status: i18n._({ id: "Status", message: "Status" }) }));
   return !engines.configured ? (
     <div className="flex items-center gap-3">
       <div className="rounded-md border border-border p-2.5">
         <ServerIcon size={16} />
       </div>
       <div className="flex flex-col gap-0.5">
-        <p className="text-sm font-medium">No Stack configured</p>
-        <p className="text-sm text-muted-foreground">Set up MaiPai Stack to run your own engines and see their health history here.</p>
+        <p className="text-sm font-medium">{i18n._({ id: "No Stack configured", message: "No Stack configured" })}</p>
+        <p className="text-sm text-muted-foreground">{i18n._({ id: "Set up MaiPai Stack to run your own engines and see their health history here.", message: "Set up MaiPai Stack to run your own engines and see their health history here." })}</p>
       </div>
     </div>
   ) : (
     <>
-      <p className="mb-4 text-sm text-muted-foreground">
-        {engines.roles.length} role(s), {engines.engines.length} engine(s) -{" "}
-        <Link to="/engines" className="underline hover:text-foreground">
-          see the live roster
+      <p className="mb-4 text-sm text-muted-foreground">{i18n._({ id: "{roles, plural, one {# role} other {# roles}}, {engines, plural, one {# engine} other {# engines}} -", message: "{roles, plural, one {# role} other {# roles}}, {engines, plural, one {# engine} other {# engines}} -", values: { roles: engines.roles.length, engines: engines.engines.length } })}{" "}<Link to="/engines" className="underline hover:text-foreground">
+          {i18n._({ id: "see the live roster", message: "see the live roster" })}
         </Link>
       </p>
-      <DataTable {...model.tableProps} toolbar={model.rows.length >= 10 ? <DataTableControls model={model} /> : undefined} caption="Recent engine issues" getRowId={(row) => `${row.issue}-${row.since}`} />
+      <DataTable {...model.tableProps} toolbar={model.rows.length >= 10 ? <DataTableControls model={model} /> : undefined} caption={i18n._({ id: "Recent engine issues", message: "Recent engine issues" })} getRowId={(row) => `${row.issue}-${row.since}`} />
     </>
   );
 }

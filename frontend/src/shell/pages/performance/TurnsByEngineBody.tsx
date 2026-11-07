@@ -1,3 +1,4 @@
+import { i18n } from "@lingui/core";
 import { DataTable } from "@maipai/ui/src/elements/data-table";
 import { useDataTableModel } from "@/shell/components/dataTableModel";
 import { DataTableControls } from "@/shell/components/DataTableControls";
@@ -30,15 +31,15 @@ function toRow(e: PerformanceEngineStats): EngineRow {
 export function TurnsByEngineBody({ byEngine }: { byEngine: readonly PerformanceEngineStats[] }) {
   const rows = byEngine.map(toRow);
   const model = useDataTableModel(rows, [
-    { id: "engine", header: "Engine", sortable: true, minWidth: 100 },
-    { id: "turns", header: "Turns", sortable: true, minWidth: 55 },
-    { id: "median first token (ms)", header: "Median first token", sortable: true, minWidth: 145 },
-    { id: "median total (ms)", header: "Median total", sortable: true, minWidth: 115 },
-    { id: "tokens/sec", header: "Tokens/s", sortable: true, minWidth: 90 },
+    { id: "engine", header: i18n._({ id: "Engine", message: "Engine" }), sortable: true, minWidth: 100 },
+    { id: "turns", header: i18n._({ id: "Turns", message: "Turns" }), sortable: true, minWidth: 55 },
+    { id: "median first token (ms)", header: i18n._({ id: "Median first token", message: "Median first token" }), sortable: true, minWidth: 145 },
+    { id: "median total (ms)", header: i18n._({ id: "Median total", message: "Median total" }), sortable: true, minWidth: 115 },
+    { id: "tokens/sec", header: i18n._({ id: "Tokens/s", message: "Tokens/s" }), sortable: true, minWidth: 90 },
   ]);
   return (
     <>
-      <DataTable {...model.tableProps} toolbar={model.rows.length >= 10 ? <DataTableControls model={model} /> : undefined} caption="Turns per engine" getRowId={(row) => row.engine} />
+      <DataTable {...model.tableProps} toolbar={model.rows.length >= 10 ? <DataTableControls model={model} /> : undefined} caption={i18n._({ id: "Turns per engine", message: "Turns per engine" })} getRowId={(row) => row.engine} />
     </>
   );
 }

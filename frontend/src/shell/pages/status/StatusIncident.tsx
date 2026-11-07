@@ -1,5 +1,6 @@
+import { i18n } from "@lingui/core";
 import type { StatusHistory } from "@/lib/api";
-import { ENGINE_ROWS } from "@/shell/pages/status/StatusComponents";
+import { engineRows } from "@/shell/pages/status/StatusComponents";
 import { durationWords } from "@/shell/pages/status/statusHistoryFormat";
 import { joinNames } from "@/shell/pages/status/statusBoardFormat";
 
@@ -18,13 +19,13 @@ export function statusIncidentFacts({ level, problems, history, appReason }: { l
   if (level !== "offline" && level !== "degraded") return null;
   const names = joinNames(problems);
   const chatSearchLimited = level === "degraded" && problems.length === 1 && problems[0] === "Chat" && /search is limited right now/i.test(appReason ?? "");
-  const title = chatSearchLimited ? "Chat is working" : appReason ? `${names} ${problems.length === 1 ? "needs" : "need"} attention` : level === "degraded" ? `${names} ${problems.length === 1 ? "is" : "are"} starting up` : `${names} ${problems.length === 1 ? "isn't" : "aren't"} running`;
-  const message = chatSearchLimited ? "Search is limited right now." : appReason ?? "MaiPai is checking on it.";
+  const title = chatSearchLimited ? i18n._({ id: "Chat is working", message: "Chat is working" }) : appReason ? i18n._({ id: "{names} {count, plural, one {needs attention} other {need attention}}", message: "{names} {count, plural, one {needs attention} other {need attention}}", values: { names, count: problems.length } }) : level === "degraded" ? i18n._({ id: "{names} {count, plural, one {is starting up} other {are starting up}}", message: "{names} {count, plural, one {is starting up} other {are starting up}}", values: { names, count: problems.length } }) : i18n._({ id: "{names} {count, plural, one {isn't running} other {aren't running}}", message: "{names} {count, plural, one {isn't running} other {aren't running}}", values: { names, count: problems.length } });
+  const message = chatSearchLimited ? i18n._({ id: "Search is limited right now.", message: "Search is limited right now." }) : appReason ?? i18n._({ id: "MaiPai is checking on it.", message: "MaiPai is checking on it." });
   const ongoing = appReason ? [] : history?.incidents.filter((incident) => incident.ongoing && incident.ended_at === null) ?? [];
   const earliest = ongoing.reduce<(typeof ongoing)[number] | undefined>((found, incident) => !found || incident.started_at < found.started_at ? incident : found, undefined);
-  const affects = ongoing.map((incident) => ENGINE_ROWS.find((row) => row.key === incident.component)?.label).filter((name): name is string => Boolean(name));
+  const affects = ongoing.map((incident) => engineRows().find((row) => row.key === incident.component)?.label).filter((name): name is string => Boolean(name));
   const elapsed = earliest ? Math.max(0, Math.floor((new Date(history!.generated_at).getTime() - new Date(earliest.started_at).getTime()) / 60_000)) : null;
-  const detail = appReason ? undefined : earliest && elapsed !== null ? `Investigating · Ongoing for ${durationWords(elapsed)} · Affects ${joinNames(affects)}` : `Investigating · Affects ${names}`;
+  const detail = appReason ? undefined : earliest && elapsed !== null ? i18n._({ id: "Investigating \u00b7 Ongoing for {duration} \u00b7 Affects {affects}", message: "Investigating \u00b7 Ongoing for {duration} \u00b7 Affects {affects}", values: { duration: durationWords(elapsed), affects: joinNames(affects) } }) : i18n._({ id: "Investigating \u00b7 Affects {names}", message: "Investigating \u00b7 Affects {names}", values: { names } });
   return { title, amber: chatSearchLimited, message, detail };
 }
 

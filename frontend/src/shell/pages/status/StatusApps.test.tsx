@@ -82,7 +82,7 @@ describe("app status presentation", () => {
     expect(view.getByText("No recent problems.")).toBeInTheDocument();
     expect(view.queryByText("MusicBrainz")).not.toBeInTheDocument();
     fireEvent.click(trigger);
-    const noRecent = view.getByRole("button", { name: "No recent use: 1 services" });
+    const noRecent = view.getByRole("button", { name: "No recent use: 1 service" });
     expect(noRecent).toHaveAttribute("data-size", "sm");
     fireEvent.click(noRecent);
     expect(view.getByText("MusicBrainz")).toBeInTheDocument();

@@ -1,3 +1,4 @@
+import { i18n } from "@lingui/core";
 import { useId, useMemo, useState } from "react";
 import type { ReactNode } from "react";
 import type { DataTableColumn, DataTableSort } from "@maipai/ui/src/elements/data-table";
@@ -19,7 +20,7 @@ function csvValue(value: unknown): string {
 export function useDataTableModel<Row extends Record<string, unknown>>(
   data: readonly Row[],
   columns: readonly DataTableColumn<Row>[],
-  emptyMessage = "No data available.",
+  emptyMessage = i18n._({ id: "No data available.", message: "No data available." }),
 ) {
   const [filter, setFilter] = useState("");
   const [sort, setSort] = useState<DataTableSort | null>(null);
@@ -47,7 +48,7 @@ export function useDataTableModel<Row extends Record<string, unknown>>(
   const rows = sortedRows.slice(currentPage * pageSize, (currentPage + 1) * pageSize);
   const pageSizes = [5, 10, 20, 50].filter((size) => size <= data.length);
   const availablePageSizes = pageSizes.length > 0 ? pageSizes : [5];
-  const emptyLabel: ReactNode = data.length === 0 ? emptyMessage : "No results found.";
+  const emptyLabel: ReactNode = data.length === 0 ? emptyMessage : i18n._({ id: "No results found.", message: "No results found." });
 
   const downloadCsv = () => {
     if (data.length === 0) return;
@@ -88,6 +89,7 @@ export function useDataTableModel<Row extends Record<string, unknown>>(
   };
 }
 
-export function tableColumns<Row>(keys: readonly (keyof Row & string)[], widths: Partial<Record<keyof Row & string, number>> = {}): DataTableColumn<Row>[] {
-  return keys.map((id) => ({ id, header: titleFor(id), sortable: true, minWidth: widths[id] }));
+/** `headers` carries the translated header per column id; a column without one falls back to its id in title case (English only). */
+export function tableColumns<Row>(keys: readonly (keyof Row & string)[], widths: Partial<Record<keyof Row & string, number>> = {}, headers: Partial<Record<keyof Row & string, string>> = {}): DataTableColumn<Row>[] {
+  return keys.map((id) => ({ id, header: headers[id] ?? titleFor(id), sortable: true, minWidth: widths[id] }));
 }

@@ -1,12 +1,13 @@
+import { i18n } from "@lingui/core";
 import { Line, LineChart, CartesianGrid, XAxis, YAxis } from "recharts";
 import { ChartConfig, ChartContainer, ChartTooltip, ChartTooltipContent } from "@maipai/ui/src/dashboard/components/ui/chart";
 import type { PerformanceTurnDayStats } from "@/lib/api";
 
 
-const chartConfig = {
-  median_ttft_ms: { label: "Median first token (ms)", color: "var(--color-primary)" },
-  median_total_ms: { label: "Median total (ms)", color: "var(--color-muted-foreground)" },
-} satisfies ChartConfig;
+const chartConfig = (): ChartConfig => ({
+  median_ttft_ms: { label: i18n._({ id: "Median first token (ms)", message: "Median first token (ms)" }), color: "var(--color-primary)" },
+  median_total_ms: { label: i18n._({ id: "Median total (ms)", message: "Median total (ms)" }), color: "var(--color-muted-foreground)" },
+});
 
 /** ADMIN-PERF-01: mirrors `dashboard/TurnsPerDayChart.tsx`'s own shape
  * (itself a mirror of the vendored `total-sales.tsx`) - one
@@ -19,7 +20,7 @@ const chartConfig = {
 export function TurnsChartBody({ byDay }: { byDay: readonly PerformanceTurnDayStats[] }) {
   return (
     <div>
-      <ChartContainer config={chartConfig}>
+      <ChartContainer config={chartConfig()}>
         <LineChart data={byDay as PerformanceTurnDayStats[]} margin={{ top: 8, right: 4, bottom: 0, left: -10 }}>
           <CartesianGrid vertical={false} stroke="var(--border)" strokeDasharray="4 4" />
           <XAxis dataKey="date" tickLine={false} axisLine={false} tickMargin={10} tick={{ fontSize: 12, fill: "var(--muted-foreground)" }} tickFormatter={(v: string) => v.slice(5)} />

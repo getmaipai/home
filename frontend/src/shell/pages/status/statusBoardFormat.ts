@@ -1,12 +1,13 @@
+import { i18n } from "@lingui/core";
 import type { StatusMaintenance } from "@/lib/api";
-import { ENGINE_ROWS } from "@/shell/pages/status/StatusComponents";
+import { engineRows } from "@/shell/pages/status/StatusComponents";
 
-export const STATUS_PARTS = ENGINE_ROWS.map(({ key, label }) => ({ id: key, name: label }));
+export const statusParts = () => engineRows().map(({ key, label }) => ({ id: key, name: label }));
 
 export function joinNames(names: string[]) {
-  if (names.length < 2) return names[0] ?? "Parts";
-  if (names.length === 2) return `${names[0]} and ${names[1]}`;
-  return `${names.slice(0, -1).join(", ")} and ${names[names.length - 1]}`;
+  if (names.length < 2) return names[0] ?? i18n._({ id: "Parts", message: "Parts" });
+  if (i18n.locale.startsWith("en")) return names.length === 2 ? `${names[0]} and ${names[1]}` : `${names.slice(0, -1).join(", ")} and ${names[names.length - 1]}`;
+  return new Intl.ListFormat(i18n.locale, { style: "long", type: "conjunction" }).format(names);
 }
 
 function localParts(date: Date, timeZone: string) {
@@ -38,15 +39,15 @@ export function formatMaintenanceRange(startsAt: string, endsAt: string, now = n
   const startTime = clock(start, timeZone, !sameDay || suffix(start) !== suffix(end));
   const endTime = clock(end, timeZone);
   const range = sameDay && suffix(start) === suffix(end)
-    ? `${clock(start, timeZone, false)} to ${endTime}`
-    : `${startTime} to ${endTime}`;
+    ? i18n._({ id: "{start} to {end}", message: "{start} to {end}", values: { start: clock(start, timeZone, false), end: endTime } })
+    : i18n._({ id: "{start} to {end}", message: "{start} to {end}", values: { start: startTime, end: endTime } });
   if (startKey === nowKey) {
     const hour = Number(new Intl.DateTimeFormat("en-US", { timeZone, hour: "numeric", hour12: false }).format(start));
-    return `${hour >= 18 || hour < 5 ? "Tonight" : "Today"}, ${range}`;
+    return i18n._({ id: "{day}, {range}", message: "{day}, {range}", values: { day: hour >= 18 || hour < 5 ? i18n._({ id: "Tonight", message: "Tonight" }) : i18n._({ id: "Today", message: "Today" }), range } });
   }
-  if (startKey === tomorrowKey) return `Tomorrow, ${range}`;
-  const dateLabel = new Intl.DateTimeFormat("en-US", { timeZone, month: "short", day: "numeric" }).format(start);
-  return `${dateLabel}, ${range}`;
+  if (startKey === tomorrowKey) return i18n._({ id: "Tomorrow, {range}", message: "Tomorrow, {range}", values: { range } });
+  const dateLabel = new Intl.DateTimeFormat(i18n.locale, { timeZone, month: "short", day: "numeric" }).format(start);
+  return i18n._({ id: "{day}, {range}", message: "{day}, {range}", values: { day: dateLabel, range } });
 }
 
 export function activeMaintenanceParts(windows: StatusMaintenance[] | undefined): string[] {
@@ -63,5 +64,5 @@ export function relativePostedTime(iso: string, now = Date.now()): string {
     if (Math.abs(value) < limit) break;
     value /= limit;
   }
-  return new Intl.RelativeTimeFormat("en", { numeric: "auto" }).format(Math.round(value), unit);
+  return new Intl.RelativeTimeFormat(i18n.locale, { numeric: "auto" }).format(Math.round(value), unit);
 }

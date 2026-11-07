@@ -1,3 +1,4 @@
+import { i18n } from "@lingui/core";
 import { getIcon } from "@maipai/ui/src/icons";
 import { EmptyState } from "@maipai/ui/src/primitives/EmptyState";
 import { DataTable } from "@maipai/ui/src/elements/data-table";
@@ -35,20 +36,20 @@ export function LayersBody({ layers }: { layers: PerformanceLayers }) {
     turns: 80,
     "median (ms)": 120,
     "p95 (ms)": 100,
-  }));
+  }, { node: i18n._({ id: "Node", message: "Node" }), turns: i18n._({ id: "Turns", message: "Turns" }), "median (ms)": i18n._({ id: "Median (ms)", message: "Median (ms)" }), "p95 (ms)": i18n._({ id: "p95 (ms)", message: "p95 (ms)" }) }));
   return layers.turns_with_trace === 0 ? (
     <div className="flex items-center gap-3">
       <div className="rounded-md border border-border p-2.5">
         <WorkflowIcon size={16} />
       </div>
       <div className="flex flex-col gap-0.5">
-        <EmptyState icon="workflow" text="No traced turns yet. No turn on this hub has left a per-layer trace yet." />
+        <EmptyState icon="workflow" text={i18n._({ id: "No traced turns yet. No turn on this hub has left a per-layer trace yet.", message: "No traced turns yet. No turn on this hub has left a per-layer trace yet." })} />
       </div>
     </div>
   ) : (
     <>
-      <p className="mb-4 text-sm text-muted-foreground">{layers.turns_with_trace} traced turn(s) in this window</p>
-      <DataTable {...model.tableProps} toolbar={model.rows.length >= 10 ? <DataTableControls model={model} /> : undefined} caption="Layer timing" getRowId={(row) => row.node} />
+      <p className="mb-4 text-sm text-muted-foreground">{i18n._({ id: "{traced, plural, one {# traced turn} other {# traced turns}} in this window", message: "{traced, plural, one {# traced turn} other {# traced turns}} in this window", values: { traced: layers.turns_with_trace } })}</p>
+      <DataTable {...model.tableProps} toolbar={model.rows.length >= 10 ? <DataTableControls model={model} /> : undefined} caption={i18n._({ id: "Layer timing", message: "Layer timing" })} getRowId={(row) => row.node} />
     </>
   );
 }

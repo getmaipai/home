@@ -1,3 +1,4 @@
+import { i18n } from "@lingui/core";
 import { useState } from "react";
 import { useHeaderExtra } from "@maipai/ui/src/dashboard/layouts/full/vertical/header/HeaderExtraContext";
 import { PageHeaderTitle } from "@/shell/pageHeaderTitle";
@@ -20,12 +21,12 @@ export interface TrashRow {
   kind: string; id: string; title: string; deleted_at: string; trash_until: string | null; can_restore: boolean; can_purge: boolean;
 }
 // Storage's record actions have no preference keys. The kit owns the settings layout.
-const TRASH_AREA: SettingsAreaDef = {
-  id: "storage-trash", title: "Storage", audience: { min_role: "guest" }, groups: [{ label: "Storage", sections: ["trash"] }], sections: [{ id: "trash", label: "Trash", icon: "trash", kind: "view", view: "trash" }],
-};
+const trashArea = (): SettingsAreaDef => ({
+  id: "storage-trash", title: i18n._({ id: "Storage", message: "Storage" }), audience: { min_role: "guest" }, groups: [{ label: i18n._({ id: "Storage", message: "Storage" }), sections: ["trash"] }], sections: [{ id: "trash", label: i18n._({ id: "Trash", message: "Trash" }), icon: "trash", kind: "view", view: "trash" }],
+});
 export function TrashPage({ person }: { person: Roster }) {
   useHeaderExtra(PageHeaderTitle);
-  useTabItem("Trash");
+  useTabItem(i18n._({ id: "Trash", message: "Trash" }));
   const navigate = useNavigate();
   const client = useQueryClient();
   const query = useQuery({ queryKey: ["trash", person.id], queryFn: () => request<{ rows: TrashRow[] }>("/api/trash") });
@@ -42,24 +43,24 @@ export function TrashPage({ person }: { person: Roster }) {
       setPending(null);
       await client.invalidateQueries({ queryKey: ["trash", person.id] });
     } catch {
-      setError(restore ? "Home could not restore this item. Refresh Trash and try again." : "Home could not delete this item forever. Refresh Trash and try again.");
+      setError(restore ? i18n._({ id: "Home could not restore this item. Refresh Trash and try again.", message: "Home could not restore this item. Refresh Trash and try again." }) : i18n._({ id: "Home could not delete this item forever. Refresh Trash and try again.", message: "Home could not delete this item forever. Refresh Trash and try again." }));
     } finally { setBusy(false); }
   }
   const rows = query.data?.rows.filter((row) => row.title.toLocaleLowerCase().includes(search.toLocaleLowerCase())) ?? [];
   return <>
-    <SettingsShell area={TRASH_AREA} viewer={baseViewer(person)} activeSection="trash" layout="docked" contentAs="section"
+    <SettingsShell area={trashArea()} viewer={baseViewer(person)} activeSection="trash" layout="docked" contentAs="section"
       sectionHref={() => "/storage/trash"} onNavigate={() => navigate("/storage/trash")}
       searchQuery={search} onSearchChange={setSearch} onBack={() => navigate("/storage")}
-      backLink={<Button variant="link" nativeButton={false} render={<Link to="/storage" />}>Storage</Button>}>
-      {error ? <Alert variant="destructive"><AlertDescription>{error}</AlertDescription><Button onClick={() => void query.refetch()}>Refresh Trash</Button></Alert> : null}
-      <AsyncState data={query.data} error={query.isError} isFetching={query.isFetching} onRetry={() => void query.refetch()} errorMessage="Home could not load Trash. Try again." loadingLabel="Loading Trash">{() => rows.length === 0 ? <Empty><EmptyHeader><EmptyDescription>{search ? "No items match your search." : "Trash is empty. Things you delete stay here for 30 days."}</EmptyDescription></EmptyHeader></Empty> :
+      backLink={<Button variant="link" nativeButton={false} render={<Link to="/storage" />}>{i18n._({ id: "Storage", message: "Storage" })}</Button>}>
+      {error ? <Alert variant="destructive"><AlertDescription>{error}</AlertDescription><Button onClick={() => void query.refetch()}>{i18n._({ id: "Refresh Trash", message: "Refresh Trash" })}</Button></Alert> : null}
+      <AsyncState data={query.data} error={query.isError} isFetching={query.isFetching} onRetry={() => void query.refetch()} errorMessage={i18n._({ id: "Home could not load Trash. Try again.", message: "Home could not load Trash. Try again." })} loadingLabel={i18n._({ id: "Loading Trash", message: "Loading Trash" })}>{() => rows.length === 0 ? <Empty><EmptyHeader><EmptyDescription>{search ? i18n._({ id: "No items match your search.", message: "No items match your search." }) : i18n._({ id: "Trash is empty. Things you delete stay here for 30 days.", message: "Trash is empty. Things you delete stay here for 30 days." })}</EmptyDescription></EmptyHeader></Empty> :
         <ItemGroup>{rows.map((row) => <Item key={`${row.kind}:${row.id}`}>
-          <ItemContent><ItemTitle>{row.title}</ItemTitle><ItemDescription>{row.trash_until ? `Kept until ${new Date(row.trash_until).toLocaleDateString()}` : "Waiting for removal"}</ItemDescription></ItemContent>
-          <ItemActions><Button disabled={busy || !row.can_restore} onClick={() => void act(row, true)}>Restore</Button><Button variant="destructive" disabled={busy || !row.can_purge} onClick={() => setPending(row)}>Delete forever</Button></ItemActions>
+          <ItemContent><ItemTitle>{row.title}</ItemTitle><ItemDescription>{row.trash_until ? i18n._({ id: "Kept until {date}", message: "Kept until {date}", values: { date: new Date(row.trash_until).toLocaleDateString() } }) : i18n._({ id: "Waiting for removal", message: "Waiting for removal" })}</ItemDescription></ItemContent>
+          <ItemActions><Button disabled={busy || !row.can_restore} onClick={() => void act(row, true)}>{i18n._({ id: "Restore", message: "Restore" })}</Button><Button variant="destructive" disabled={busy || !row.can_purge} onClick={() => setPending(row)}>{i18n._({ id: "Delete forever", message: "Delete forever" })}</Button></ItemActions>
         </Item>)}</ItemGroup>}</AsyncState>
     </SettingsShell>
     {pending ? <AlertDialog open onOpenChange={(open) => { if (!open && !busy) setPending(null); }}>
-      <AlertDialogContent><AlertDialogHeader><AlertDialogTitle>Delete forever?</AlertDialogTitle><AlertDialogDescription>This removes the item from Home for good. You cannot undo this.</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel disabled={busy}>Cancel</AlertDialogCancel><AlertDialogAction variant="destructive" disabled={busy} onClick={() => { if (pending) void act(pending, false); }}>Delete forever</AlertDialogAction></AlertDialogFooter></AlertDialogContent>
+      <AlertDialogContent><AlertDialogHeader><AlertDialogTitle>{i18n._({ id: "Delete forever?", message: "Delete forever?" })}</AlertDialogTitle><AlertDialogDescription>{i18n._({ id: "This removes the item from Home for good. You cannot undo this.", message: "This removes the item from Home for good. You cannot undo this." })}</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel disabled={busy}>{i18n._({ id: "Cancel", message: "Cancel" })}</AlertDialogCancel><AlertDialogAction variant="destructive" disabled={busy} onClick={() => { if (pending) void act(pending, false); }}>{i18n._({ id: "Delete forever", message: "Delete forever" })}</AlertDialogAction></AlertDialogFooter></AlertDialogContent>
     </AlertDialog> : null}
   </>;
 }

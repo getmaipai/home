@@ -1,7 +1,7 @@
 import { i18n } from "@lingui/core";
 import type { HealthStatus } from "@/lib/api";
 import { chatAvailability } from "@/apps/chat/chatAvailability";
-import { ENGINE_ROWS } from "@/shell/pages/status/StatusComponents";
+import { engineRows } from "@/shell/pages/status/StatusComponents";
 
 export interface StatusSummary {
   level: "online" | "degraded" | "offline" | "maintenance";
@@ -9,10 +9,10 @@ export interface StatusSummary {
   problems: string[];
 }
 
-const SIDECAR_LABELS: Record<string, string> = {
-  "kiwix-serve": ENGINE_ROWS.find((row) => row.key === "library")!.label,
-  searxng: "Search",
-};
+const sidecarLabel = (id: string): string | undefined => ({
+  "kiwix-serve": engineRows().find((row) => row.key === "library")!.label,
+  searxng: i18n._({ id: "Search", message: "Search" }),
+} as Record<string, string>)[id];
 
 export function statusSummary(health: HealthStatus | undefined, underMaintenance: string[] = []): StatusSummary {
   if (!health) return underMaintenance.length ? { level: "maintenance", text: i18n._({ id: "Maintenance", message: "Maintenance" }), problems: [] } : { level: "online", text: i18n._({ id: "All good", message: "All good" }), problems: [] };
@@ -20,7 +20,7 @@ export function statusSummary(health: HealthStatus | undefined, underMaintenance
   let level: StatusSummary["level"] = "online";
   const problems: string[] = [];
 
-  for (const row of ENGINE_ROWS) {
+  for (const row of engineRows()) {
     if (row.key === "library" || row.key === "hub") continue;
     if (underMaintenance.includes(row.key)) continue;
     const availability = chatAvailability(health.engines[row.key]);
@@ -37,7 +37,7 @@ export function statusSummary(health: HealthStatus | undefined, underMaintenance
     if (sidecar.id === "kiwix-serve" && underMaintenance.includes("library")) continue;
     if (sidecar.status === "unhealthy" || sidecar.status === "crashed") {
       if (level === "online") level = "degraded";
-      problems.push(SIDECAR_LABELS[sidecar.id] ?? sidecar.id);
+      problems.push(sidecarLabel(sidecar.id) ?? sidecar.id);
     }
   }
 

@@ -1,3 +1,4 @@
+import { i18n } from "@lingui/core";
 import type { PerformanceQueues } from "@/lib/api";
 
 /** ADMIN-PERF-01: the memory judge queue, the embedding retry queue and
@@ -7,9 +8,9 @@ import type { PerformanceQueues } from "@/lib/api";
  * table - three numbers don't need columns. */
 export function QueuesBody({ queues }: { queues: PerformanceQueues }) {
   const rows: Array<{ label: string; value: number; detail?: string }> = [
-    { label: "Memory judge", value: queues.judge.pending, detail: queues.judge.oldest_created_at ? `oldest since ${new Date(queues.judge.oldest_created_at).toLocaleString()}` : undefined },
-    { label: "Embedding retry", value: queues.embedding.pending },
-    { label: "Ingestion", value: queues.ingestion.pending, detail: queues.ingestion.by_reason.map((r) => `${r.reason}: ${r.count}`).join(", ") || undefined },
+    { label: i18n._({ id: "Memory judge", message: "Memory judge" }), value: queues.judge.pending, detail: queues.judge.oldest_created_at ? i18n._({ id: "oldest since {date}", message: "oldest since {date}", values: { date: new Date(queues.judge.oldest_created_at).toLocaleString() } }) : undefined },
+    { label: i18n._({ id: "Embedding retry", message: "Embedding retry" }), value: queues.embedding.pending },
+    { label: i18n._({ id: "Ingestion", message: "Ingestion" }), value: queues.ingestion.pending, detail: queues.ingestion.by_reason.map((r) => `${r.reason}: ${r.count}`).join(", ") || undefined },
   ];
   return (
     <div className="flex flex-col gap-4">

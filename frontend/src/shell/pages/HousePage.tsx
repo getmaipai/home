@@ -1,3 +1,4 @@
+import { i18n } from "@lingui/core";
 import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Page } from "@maipai/ui/src/primitives/Page";
@@ -17,7 +18,7 @@ type ActionResponse = { ok: boolean; undoId?: string };
 const queryKey = ["house-rooms"];
 
 export function HousePage() {
-  useTabItem("House");
+  useTabItem(i18n._({ id: "House", message: "House" }));
   const client = useQueryClient();
   const query = useQuery({ queryKey, queryFn: () => request<RoomsResponse>("/api/house/rooms"), refetchInterval: () => document.visibilityState === "visible" ? 5000 : false, refetchIntervalInBackground: false });
   const [pending, setPending] = useState<Set<string>>(() => new Set());
@@ -37,15 +38,15 @@ export function HousePage() {
       if (!confirmed || ((action === "turn_on" || action === "turn_off") && confirmed.on !== (action === "turn_on")) || (action === "set_brightness" && confirmed.brightness !== value)) throw new Error("not_confirmed");
     } catch {
       if (prior) client.setQueryData(queryKey, prior);
-      setErrors((old) => ({ ...old, [room.id]: `The ${entity.name} did not respond. Try again.` }));
+      setErrors((old) => ({ ...old, [room.id]: i18n._({ id: "The {name} did not respond. Try again.", message: "The {name} did not respond. Try again.", values: { name: entity.name } }) }));
     } finally { setPending((old) => { const copy = new Set(old); copy.delete(entity.id); return copy; }); }
   }
   const body = query.data;
-  return <Page title="House" hideTitle><main className="p-4">
-    {!body ? <AsyncState data={body} error={query.isError} isFetching={query.isFetching} onRetry={() => void query.refetch()} errorMessage="Home could not load rooms. Try again." loadingLabel="Loading rooms">{() => null}</AsyncState> : body.status === "not_configured" ? <EmptyState icon="house" text="Home Assistant is not set up yet. Connect it in Settings to control your lights, locks and scenes here." actionLabel="Open Settings" onAction={() => { window.location.href = "/settings"; }} /> : body?.status === "unreachable" ? <p>Home Assistant did not answer. Check that it is on, then reload.</p> : !body?.rooms.length ? <p>No devices are shared with you yet.</p> : <div className="space-y-6">{body.rooms.map((room) => {
+  return <Page title={i18n._({ id: "House", message: "House" })} hideTitle><main className="p-4">
+    {!body ? <AsyncState data={body} error={query.isError} isFetching={query.isFetching} onRetry={() => void query.refetch()} errorMessage={i18n._({ id: "Home could not load rooms. Try again.", message: "Home could not load rooms. Try again." })} loadingLabel={i18n._({ id: "Loading rooms", message: "Loading rooms" })}>{() => null}</AsyncState> : body.status === "not_configured" ? <EmptyState icon="house" text={i18n._({ id: "Home Assistant is not set up yet. Connect it in Settings to control your lights, locks and scenes here.", message: "Home Assistant is not set up yet. Connect it in Settings to control your lights, locks and scenes here." })} actionLabel={i18n._({ id: "Open Settings", message: "Open Settings" })} onAction={() => { window.location.href = "/settings"; }} /> : body?.status === "unreachable" ? <p>{i18n._({ id: "Home Assistant did not answer. Check that it is on, then reload.", message: "Home Assistant did not answer. Check that it is on, then reload." })}</p> : !body?.rooms.length ? <p>{i18n._({ id: "No devices are shared with you yet.", message: "No devices are shared with you yet." })}</p> : <div className="space-y-6">{body.rooms.map((room) => {
       const active = room.entities.filter((entity) => entity.on).length;
       return <section key={room.id} aria-labelledby={`room-${room.id}`}>
-        <header className="mb-3"><h2 id={`room-${room.id}`} className="text-lg font-semibold">{room.name}</h2><p className="text-sm text-muted-foreground">{active} of {room.entities.length} on</p></header>
+        <header className="mb-3"><h2 id={`room-${room.id}`} className="text-lg font-semibold">{room.name}</h2><p className="text-sm text-muted-foreground">{i18n._({ id: "{active} of {length} on", message: "{active} of {length} on", values: { active, length: room.entities.length } })}</p></header>
         <div className="grid grid-cols-1 gap-3 min-[640px]:grid-cols-2 min-[960px]:grid-cols-3">{room.entities.map((entity) => {
           const busy = pending.has(entity.id), unavailable = entity.unavailable || !entity.canControl;
           const toggle = () => void act(room, entity, entity.on ? "turn_off" : "turn_on");

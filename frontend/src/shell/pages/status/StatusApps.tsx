@@ -1,3 +1,4 @@
+import { i18n } from "@lingui/core";
 import { useState, type ReactNode } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@maipai/ui/src/dashboard/components/ui/card";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@maipai/ui/src/dashboard/components/ui/collapsible";
@@ -14,7 +15,7 @@ function appStripData(app: StatusApp) {
 }
 
 function appStripSummary(app: StatusApp) {
-  return `Last 90 days: ${app.uptimePercent.toFixed(1)}% uptime.`;
+  return i18n._({ id: "Last 90 days: {percent}% uptime.", message: "Last 90 days: {percent}% uptime.", values: { percent: app.uptimePercent.toFixed(1) } });
 }
 
 function appHasKnownProblem(app: StatusApp) {
@@ -22,9 +23,9 @@ function appHasKnownProblem(app: StatusApp) {
 }
 
 function needStateLabel(state: StatusAppNeed["state"]): string {
-  if (state === "operational") return "fine";
-  if (state === "waiting") return "waiting for internet";
-  if (state === "unknown") return "no recent use";
+  if (state === "operational") return i18n._({ id: "fine", message: "fine" });
+  if (state === "waiting") return i18n._({ id: "waiting for internet", message: "waiting for internet" });
+  if (state === "unknown") return i18n._({ id: "no recent use", message: "no recent use" });
   return state;
 }
 
@@ -32,8 +33,8 @@ function NeedRow({ need }: { need: StatusAppNeed }) {
   return <li className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 py-1.5">
     <span className="font-medium">{need.name}</span>
     <span className="text-sm text-muted-foreground">{needStateLabel(need.state)}</span>
-    {need.last_success_at ? <span className="w-full text-sm text-muted-foreground">Last success: {need.last_success_at}</span> : null}
-    {need.last_error_class ? <span className="w-full text-sm text-muted-foreground">Last error: {need.last_error_class.replaceAll("_", " ")}</span> : null}
+    {need.last_success_at ? <span className="w-full text-sm text-muted-foreground">{i18n._({ id: "Last success: {last_success_at}", message: "Last success: {last_success_at}", values: { last_success_at: need.last_success_at } })}</span> : null}
+    {need.last_error_class ? <span className="w-full text-sm text-muted-foreground">{i18n._({ id: "Last error: {error}", message: "Last error: {error}", values: { error: need.last_error_class.replaceAll("_", " ") } })}</span> : null}
   </li>;
 }
 
@@ -43,16 +44,16 @@ function AppNeeds({ appId, needs }: { appId: string; needs: StatusAppNeed[] }) {
   const unused = needs.filter((need) => need.state === "unknown");
   return <div className="flex flex-col gap-3 border-t border-border pt-3">
     {attention.length ? <section aria-labelledby={`needs-attention-${appId}`}>
-      <h3 id={`needs-attention-${appId}`} className="text-sm font-semibold">Needs attention</h3>
+      <h3 id={`needs-attention-${appId}`} className="text-sm font-semibold">{i18n._({ id: "Needs attention", message: "Needs attention" })}</h3>
       <ul className="divide-y divide-border">{attention.map((need) => <NeedRow key={`${need.kind}:${need.id}`} need={need} />)}</ul>
     </section> : null}
     {working.length ? <section aria-labelledby={`needs-working-${appId}`}>
-      <h3 id={`needs-working-${appId}`} className="text-sm font-semibold">Working</h3>
+      <h3 id={`needs-working-${appId}`} className="text-sm font-semibold">{i18n._({ id: "Working", message: "Working" })}</h3>
       <ul className="divide-y divide-border">{working.map((need) => <NeedRow key={`${need.kind}:${need.id}`} need={need} />)}</ul>
     </section> : null}
     {unused.length ? <Collapsible>
       <CollapsibleTrigger render={<Button type="button" variant="ghost" size="sm" />}>
-        <span>No recent use: {unused.length} services</span><span aria-hidden="true">⌄</span>
+        <span>{i18n._({ id: "No recent use: {count, plural, one {# service} other {# services}}", message: "No recent use: {count, plural, one {# service} other {# services}}", values: { count: unused.length } })}</span><span aria-hidden="true">⌄</span>
       </CollapsibleTrigger>
       <CollapsibleContent>
         <ul className="divide-y divide-border pl-3">{unused.map((need) => <li key={`${need.kind}:${need.id}`} className="py-1.5 text-sm text-muted-foreground">{need.name}</li>)}</ul>
@@ -77,7 +78,7 @@ function AppRow({ app, canExpand }: { app: StatusApp; canExpand: boolean }) {
     <div className="flex min-h-12 flex-wrap items-center justify-between gap-3">
       <span className="font-medium">{app.name}</span>
       <div className="flex min-h-12 flex-wrap items-center gap-2">
-        <span className="text-sm text-muted-foreground">{app.uptimePercent.toFixed(1)}% uptime</span>
+        <span className="text-sm text-muted-foreground">{i18n._({ id: "{percent}% uptime", message: "{percent}% uptime", values: { percent: app.uptimePercent.toFixed(1) } })}</span>
         <Status status={presentation.status}>{presentation.label}</Status>
       </div>
     </div>
@@ -90,11 +91,11 @@ function AppRow({ app, canExpand }: { app: StatusApp; canExpand: boolean }) {
       <div className="flex min-h-12 flex-wrap items-center gap-3">
         <span className="mr-auto font-medium">{app.name}</span>
         <span className="ml-auto flex max-w-full flex-wrap items-center justify-end gap-2">
-          <span className="text-sm text-muted-foreground">{app.uptimePercent.toFixed(1)}% uptime</span>
+          <span className="text-sm text-muted-foreground">{i18n._({ id: "{percent}% uptime", message: "{percent}% uptime", values: { percent: app.uptimePercent.toFixed(1) } })}</span>
           <Status status={presentation.status}>{presentation.label}</Status>
           <span className="inline-flex min-h-12 items-center">
             <CollapsibleTrigger aria-controls={detailsId} render={<Button type="button" variant="outline" size="sm" />}>
-              {open ? "Hide details" : "Show details"}
+              {open ? i18n._({ id: "Hide details", message: "Hide details" }) : i18n._({ id: "Show details", message: "Show details" })}
               <ChevronDown data-testid="app-details-chevron" className={`size-4 transition-transform ${open ? "rotate-180" : ""}`} aria-hidden="true" />
             </CollapsibleTrigger>
           </span>
@@ -110,7 +111,7 @@ export function StatusApps({ person, apps, behindTheScenes }: { person: Roster; 
   const canSeeNeeds = isOwnerOrAdminRole(person.role);
   return <>
     <Card>
-      <CardHeader><CardTitle>Apps</CardTitle></CardHeader>
+      <CardHeader><CardTitle>{i18n._({ id: "Apps", message: "Apps" })}</CardTitle></CardHeader>
       <CardContent>
         <div className="flex flex-col divide-y divide-border">
           {apps.map((app) => <AppRow key={app.id} app={app} canExpand={canSeeNeeds} />)}
@@ -118,7 +119,7 @@ export function StatusApps({ person, apps, behindTheScenes }: { person: Roster; 
       </CardContent>
     </Card>
     {canSeeNeeds && behindTheScenes ? <section aria-labelledby="behind-scenes-title" className="flex flex-col gap-4">
-      <h2 id="behind-scenes-title" className="text-lg font-semibold">Behind the scenes</h2>
+      <h2 id="behind-scenes-title" className="text-lg font-semibold">{i18n._({ id: "Behind the scenes", message: "Behind the scenes" })}</h2>
       {behindTheScenes}
     </section> : null}
   </>;

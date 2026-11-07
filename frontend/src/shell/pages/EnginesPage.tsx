@@ -1,3 +1,4 @@
+import { i18n } from "@lingui/core";
 import { useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
@@ -15,6 +16,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@maipai/ui/src/dashboa
 import { api, isOwnerOrAdminRole, type EnginesOverview, type EnginesHealth, type StackRoleInfo, type StackEngineInfo, type StackHealthItem, type Roster } from "@/lib/api";
 import { useDataTableControls } from "@/shell/pages/useDataTableControls";
 import { useMutation } from "@tanstack/react-query";
+import { severityLabel } from "@/shell/pages/severityLabel";
 import { errorLine } from "@/lib/hubReachability";
 
 /** /engines: SHELL-06's own row - `GET /api/engines` and
@@ -24,13 +26,13 @@ const RolesIcon = getIcon("server");
 const HealthIcon = getIcon("activity");
 const MoreHorizontal = getIcon("more-horizontal");
 
-const ROLE_STATE_LABEL: Record<StackRoleInfo["state"]["state"], string> = {
-  notInstalled: "Not installed",
-  installed: "Installed",
-  loaded: "Loaded",
-  ready: "Ready",
-  offline: "Offline",
-};
+const roleStateLabel = (state: StackRoleInfo["state"]["state"]): string => ({
+  notInstalled: i18n._({ id: "Not installed", message: "Not installed" }),
+  installed: i18n._({ id: "Installed", message: "Installed" }),
+  loaded: i18n._({ id: "Loaded", message: "Loaded" }),
+  ready: i18n._({ id: "Ready", message: "Ready" }),
+  offline: i18n._({ id: "Offline", message: "Offline" }),
+})[state];
 
 interface RoleRow extends Record<string, unknown> {
   role: string;
@@ -39,17 +41,17 @@ interface RoleRow extends Record<string, unknown> {
   address: string;
 }
 
-const ROLE_COLUMNS: readonly DataTableColumn<RoleRow>[] = [
-  { id: "role", header: "Role" },
-  { id: "status", header: "Status", minWidth: 128 },
-  { id: "model", header: "Model", minWidth: 200 },
-  { id: "address", header: "Address", minWidth: 240 },
+const ROLE_COLUMNS = (): readonly DataTableColumn<RoleRow>[] => [
+  { id: "role", header: i18n._({ id: "Role", message: "Role" }) },
+  { id: "status", header: i18n._({ id: "Status", message: "Status" }), minWidth: 128 },
+  { id: "model", header: i18n._({ id: "Model", message: "Model" }), minWidth: 200 },
+  { id: "address", header: i18n._({ id: "Address", message: "Address" }), minWidth: 240 },
 ];
 
 function toRoleRow(role: StackRoleInfo): RoleRow {
   return {
     role: role.label,
-    status: ROLE_STATE_LABEL[role.state.state],
+    status: roleStateLabel(role.state.state),
     model: role.model?.id ?? "-",
     address: role.endpoints.join(", ") || "-",
   };
@@ -62,17 +64,17 @@ interface EngineRow extends Record<string, unknown> {
   name: string;
 }
 
-const ENGINE_COLUMNS: readonly DataTableColumn<EngineRow>[] = [
-  { id: "engine", header: "Engine" },
-  { id: "version", header: "Version", minWidth: 120 },
-  { id: "status", header: "Status", minWidth: 160 },
+const ENGINE_COLUMNS = (): readonly DataTableColumn<EngineRow>[] => [
+  { id: "engine", header: i18n._({ id: "Engine", message: "Engine" }) },
+  { id: "version", header: i18n._({ id: "Version", message: "Version" }), minWidth: 120 },
+  { id: "status", header: i18n._({ id: "Status", message: "Status" }), minWidth: 160 },
 ];
 
 function toEngineRow(engine: StackEngineInfo): EngineRow {
   const row = {
     engine: engine.label,
     version: engine.currentTag ?? "-",
-    status: engine.needsRestart ? "Needs restart" : engine.state === "current" ? "Current" : "Update available",
+    status: engine.needsRestart ? i18n._({ id: "Needs restart", message: "Needs restart" }) : engine.state === "current" ? i18n._({ id: "Current", message: "Current" }) : i18n._({ id: "Update available", message: "Update available" }),
   };
   Object.defineProperty(row, "name", { value: engine.name });
   return row as EngineRow;
@@ -84,14 +86,14 @@ interface HealthRow extends Record<string, unknown> {
   since: string;
 }
 
-const HEALTH_COLUMNS: readonly DataTableColumn<HealthRow>[] = [
-  { id: "item", header: "Issue" },
-  { id: "status", header: "Severity", minWidth: 128 },
-  { id: "since", header: "Since", minWidth: 176 },
+const HEALTH_COLUMNS = (): readonly DataTableColumn<HealthRow>[] => [
+  { id: "item", header: i18n._({ id: "Issue", message: "Issue" }) },
+  { id: "status", header: i18n._({ id: "Severity", message: "Severity" }), minWidth: 128 },
+  { id: "since", header: i18n._({ id: "Since", message: "Since" }), minWidth: 176 },
 ];
 
 function toHealthRow(item: StackHealthItem): HealthRow {
-  return { item: item.title, status: item.severity.charAt(0).toUpperCase() + item.severity.slice(1), since: new Date(item.since).toLocaleString() };
+  return { item: item.title, status: severityLabel(item.severity), since: new Date(item.since).toLocaleString() };
 }
 
 /** ENGINES-AI-01: the engines console (roles, installed engines, health, the connection check), drawn inside Home
@@ -110,9 +112,9 @@ export function EnginesConsole({ person }: { person: Roster }) {
   const roles = useMemo(() => overviewQuery.data?.roles?.map(toRoleRow) ?? [], [overviewQuery.data]);
   const engines = useMemo(() => overviewQuery.data?.engines?.map(toEngineRow) ?? [], [overviewQuery.data]);
   const health = useMemo(() => healthQuery.data?.health?.map(toHealthRow) ?? [], [healthQuery.data]);
-  const rolesTable = useDataTableControls(roles, ROLE_COLUMNS);
-  const enginesTable = useDataTableControls(engines, ENGINE_COLUMNS);
-  const healthTable = useDataTableControls(health, HEALTH_COLUMNS);
+  const rolesTable = useDataTableControls(roles, ROLE_COLUMNS());
+  const enginesTable = useDataTableControls(engines, ENGINE_COLUMNS());
+  const healthTable = useDataTableControls(health, HEALTH_COLUMNS());
 
   async function runAction(name: string, action: "start" | "stop" | "restart" | "install") {
     setBusyNames((previous) => new Set(previous).add(name));
@@ -123,7 +125,7 @@ export function EnginesConsole({ person }: { person: Roster }) {
         queryClient.invalidateQueries({ queryKey: ["engines-health"] }),
       ]);
     } catch (error) {
-      toast.error(errorLine(error, "That didn't work."));
+      toast.error(errorLine(error, i18n._({ id: "That didn't work.", message: "That didn't work." })));
     } finally {
       setBusyNames((previous) => {
         const next = new Set(previous);
@@ -142,26 +144,25 @@ export function EnginesConsole({ person }: { person: Roster }) {
       {!canManage ? (
         <Card>
           <CardContent>
-            <p className="text-sm text-muted-foreground">Only an owner or admin can manage engines.</p>
+            <p className="text-sm text-muted-foreground">{i18n._({ id: "Only an owner or admin can manage engines.", message: "Only an owner or admin can manage engines." })}</p>
           </CardContent>
         </Card>
       ) : <>
       <Button type="button" disabled={doctor.isPending} onClick={() => doctor.mutate()}>
-        {doctor.isPending ? "Checking connection…" : "Check the connection"}
+        {doctor.isPending ? i18n._({ id: "Checking connection…", message: "Checking connection…" }) : i18n._({ id: "Check the connection", message: "Check the connection" })}
       </Button>
       {doctor.data && (
         <Card>
           <CardContent>
             {doctor.data.hops.map((hop) => (
-              <p key={hop.id}>
-                {hop.pass ? "PASS" : "FAIL"} hop {hop.id}{hop.detail ? `: ${hop.detail}` : ""}
-                {!hop.pass && ` — Fix: ${hop.fix}`}
-              </p>
+              <p key={hop.id}>{hop.pass
+                ? (hop.detail ? i18n._({ id: "PASS hop {id}: {detail}", message: "PASS hop {id}: {detail}", values: { id: hop.id, detail: hop.detail } }) : i18n._({ id: "PASS hop {id}", message: "PASS hop {id}", values: { id: hop.id } }))
+                : (hop.detail ? i18n._({ id: "FAIL hop {id}: {detail} — Fix: {fix}", message: "FAIL hop {id}: {detail} — Fix: {fix}", values: { id: hop.id, detail: hop.detail, fix: hop.fix } }) : i18n._({ id: "FAIL hop {id} — Fix: {fix}", message: "FAIL hop {id} — Fix: {fix}", values: { id: hop.id, fix: hop.fix } }))}</p>
             ))}
           </CardContent>
         </Card>
       )}
-      {doctor.isError && <p role="alert">{errorLine(doctor.error, "Could not check the connection.")}</p>}
+      {doctor.isError && <p role="alert">{errorLine(doctor.error, i18n._({ id: "Could not check the connection.", message: "Could not check the connection." }))}</p>}
       <AsyncState
         data={data}
         error={error}
@@ -170,8 +171,8 @@ export function EnginesConsole({ person }: { person: Roster }) {
           if (overviewQuery.isError) overviewQuery.refetch();
           if (healthQuery.isError) healthQuery.refetch();
         }}
-        errorMessage={errorLine(firstError, "Could not load engines.")}
-        loadingLabel="Loading engines"
+        errorMessage={errorLine(firstError, i18n._({ id: "Could not load engines.", message: "Could not load engines." }))}
+        loadingLabel={i18n._({ id: "Loading engines", message: "Loading engines" })}
       >
         {({ overview }: { overview: EnginesOverview; health: EnginesHealth }) =>
           !overview.configured ? (
@@ -182,8 +183,8 @@ export function EnginesConsole({ person }: { person: Roster }) {
                     <EnginesIcon size={16} />
                   </div>
                   <div className="flex flex-col gap-0.5">
-                    <p className="text-sm font-medium">No Stack configured</p>
-                    <p className="text-sm text-muted-foreground">Set up MaiPai Stack in Settings to run your own engines and see their roles, versions and health here.</p>
+                    <p className="text-sm font-medium">{i18n._({ id: "No Stack configured", message: "No Stack configured" })}</p>
+                    <p className="text-sm text-muted-foreground">{i18n._({ id: "Set up MaiPai Stack in Settings to run your own engines and see their roles, versions and health here.", message: "Set up MaiPai Stack in Settings to run your own engines and see their roles, versions and health here." })}</p>
                   </div>
                 </div>
               </CardContent>
@@ -194,13 +195,13 @@ export function EnginesConsole({ person }: { person: Roster }) {
                 <CardHeader>
                   <CardTitle id="engine-roles-heading"><span className="flex items-center gap-2">
                     <RolesIcon size={16} className="text-muted-foreground" />
-                    Roles
+                    {i18n._({ id: "Roles", message: "Roles" })}
                   </span></CardTitle>
                 </CardHeader>
                 <DataTable
                   rows={rolesTable.rows}
                   columns={rolesTable.columns}
-                  caption="Engine roles"
+                  caption={i18n._({ id: "Engine roles", message: "Engine roles" })}
                   sort={rolesTable.sort}
                   onSortChange={rolesTable.onSortChange}
                   toolbar={rolesTable.toolbar}
@@ -212,33 +213,33 @@ export function EnginesConsole({ person }: { person: Roster }) {
                 <CardHeader>
                   <CardTitle id="installed-engines-heading"><span className="flex items-center gap-2">
                     <EnginesIcon size={16} className="text-muted-foreground" />
-                    Installed engines
+                    {i18n._({ id: "Installed engines", message: "Installed engines" })}
                   </span></CardTitle>
                 </CardHeader>
                 <DataTable
                   rows={enginesTable.rows}
                   columns={enginesTable.columns}
                   getRowId={(row) => row.name}
-                  caption="Installed engines"
+                  caption={i18n._({ id: "Installed engines", message: "Installed engines" })}
                   sort={enginesTable.sort}
                   onSortChange={enginesTable.onSortChange}
                   toolbar={enginesTable.toolbar}
                   emptyLabel={enginesTable.emptyLabel}
-                  rowActionsLabel="Engine actions"
+                  rowActionsLabel={i18n._({ id: "Engine actions", message: "Engine actions" })}
                   rowActions={(row) => {
                     const engine = overview.engines.find((candidate) => candidate.name === row.name);
                     if (!engine) return null;
                     const busy = busyNames.has(engine.name);
                     const actions = engine.installed
                       ? [
-                          ...(engine.running === null ? [{ label: "Start", action: "start" as const }] : [{ label: "Stop", action: "stop" as const }]),
-                          { label: "Restart", action: "restart" as const },
+                          ...(engine.running === null ? [{ label: i18n._({ id: "Start", message: "Start" }), action: "start" as const }] : [{ label: i18n._({ id: "Stop", message: "Stop" }), action: "stop" as const }]),
+                          { label: i18n._({ id: "Restart", message: "Restart" }), action: "restart" as const },
                         ]
-                      : [{ label: "Install", action: "install" as const }];
+                      : [{ label: i18n._({ id: "Install", message: "Install" }), action: "install" as const }];
                     return (
                       <DropdownMenu>
                         <DropdownMenuTrigger render={
-                          <Button type="button" variant="ghost" size="icon-lg" aria-label="More actions">
+                          <Button type="button" variant="ghost" size="icon-lg" aria-label={i18n._({ id: "More actions", message: "More actions" })}>
                             <MoreHorizontal aria-hidden="true" size={16} />
                           </Button>
                         } />
@@ -259,13 +260,13 @@ export function EnginesConsole({ person }: { person: Roster }) {
                 <CardHeader>
                   <CardTitle id="engine-health-heading"><span className="flex items-center gap-2">
                     <HealthIcon size={16} className="text-muted-foreground" />
-                    Health
+                    {i18n._({ id: "Health", message: "Health" })}
                   </span></CardTitle>
                 </CardHeader>
                 <DataTable
                   rows={healthTable.rows}
                   columns={healthTable.columns}
-                  caption="Engine health"
+                  caption={i18n._({ id: "Engine health", message: "Engine health" })}
                   sort={healthTable.sort}
                   onSortChange={healthTable.onSortChange}
                   toolbar={healthTable.toolbar}

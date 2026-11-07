@@ -33,7 +33,15 @@ export function usePersonLocale(person: Pick<SignedInPerson, "id"> | null | unde
     const personScope = `person:${personId}`;
     let personValue: unknown;
     let householdValue: unknown;
-    const apply = () => activate(chooseLocale(personValue, householdValue));
+    // The settings caches are rewritten on every language change (installSettingCopyCache), which raises this subscriber again:
+    // activating an unchanged choice would re-fire the language change and loop forever, so only a new choice activates.
+    let lastChosen: string | undefined;
+    const apply = () => {
+      const chosen = chooseLocale(personValue, householdValue);
+      if (chosen === lastChosen) return;
+      lastChosen = chosen;
+      activate(chosen);
+    };
     void Promise.all([api.settingsValues(personScope, "person.locale"), api.settingsValues("household", "household.locale")])
       .then(([personValues, householdValues]) => {
         if (!current) return;

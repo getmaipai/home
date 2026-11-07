@@ -1,3 +1,4 @@
+import { i18n } from "@lingui/core";
 import { Card, CardContent } from "@maipai/ui/src/dashboard/components/ui/card";
 import { getIcon } from "@maipai/ui/src/icons";
 import { UsersSection } from "@/apps/settings/UsersSection";
@@ -7,7 +8,7 @@ import { useTabItem } from "@/shell/tabIdentity";
 export const UsersIcon = getIcon("users");
 
 export function UsersPage({ person }: { person: Roster }) {
-  useTabItem("Users");
+  useTabItem(i18n._({ id: "Users", message: "Users" }));
   const canManage = isOwnerOrAdminRole(person.role);
 
   return (
@@ -17,7 +18,7 @@ export function UsersPage({ person }: { person: Roster }) {
       ) : (
         <Card>
           <CardContent>
-            <p className="text-sm text-muted-foreground">Only an owner or admin can manage users.</p>
+            <p className="text-sm text-muted-foreground">{i18n._({ id: "Only an owner or admin can manage users.", message: "Only an owner or admin can manage users." })}</p>
           </CardContent>
         </Card>
       )}

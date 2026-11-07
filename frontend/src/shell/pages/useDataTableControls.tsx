@@ -1,3 +1,4 @@
+import { i18n } from "@lingui/core";
 import { useMemo, useState } from "react";
 import type { ReactNode } from "react";
 import { Button } from "@maipai/ui/src/ui/button";
@@ -16,7 +17,7 @@ function csvValue(value: unknown): string {
 export function useDataTableControls<Row extends Record<string, unknown>>(
   sourceRows: readonly Row[],
   columns: readonly DataTableColumn<Row>[],
-  emptyMessage = "No data available.",
+  emptyMessage = i18n._({ id: "No data available.", message: "No data available." }),
   searchColumnIds?: readonly string[],
 ) {
   const [search, setSearch] = useState("");
@@ -85,25 +86,25 @@ export function useDataTableControls<Row extends Record<string, unknown>>(
   const emptyLabel: ReactNode = sourceRows.length === 0
     ? emptyMessage
     : filteredRows.length === 0
-      ? "No results found."
+      ? i18n._({ id: "No results found.", message: "No results found." })
       : undefined;
   const toolbar = sourceRows.length === 0 ? undefined : (
     <div className="flex flex-col gap-3">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <Input
           type="search"
-          aria-label="Search table rows"
+          aria-label={i18n._({ id: "Search table rows", message: "Search table rows" })}
           value={search}
           onChange={(event) => changeSearch(event.target.value)}
-          placeholder="Search rows…"
+          placeholder={i18n._({ id: "Search rows…", message: "Search rows…" })}
         />
         <Button
           type="button"
           variant="outline"
-          aria-label="Download table as CSV"
+          aria-label={i18n._({ id: "Download table as CSV", message: "Download table as CSV" })}
           onClick={downloadCsv}
         >
-          Download CSV
+          {i18n._({ id: "Download CSV", message: "Download CSV" })}
         </Button>
       </div>
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -114,19 +115,19 @@ export function useDataTableControls<Row extends Record<string, unknown>>(
             disabled={currentPage === 0}
             onClick={() => setPageIndex((page) => Math.max(0, page - 1))}
           >
-            Previous
+            {i18n._({ id: "Previous", message: "Previous" })}
           </Button>
           <Button
             type="button"
             disabled={currentPage + 1 >= pageCount}
             onClick={() => setPageIndex((page) => Math.min(pageCount - 1, page + 1))}
           >
-            Next
+            {i18n._({ id: "Next", message: "Next" })}
           </Button>
         </div>
-        <p aria-live="polite">Page {currentPage + 1} of {pageCount}</p>
+        <p aria-live="polite">{i18n._({ id: "Page {value} of {pageCount}", message: "Page {value} of {pageCount}", values: { value: currentPage + 1, pageCount } })}</p>
         <Select
-          aria-label="Rows per page"
+          aria-label={i18n._({ id: "Rows per page", message: "Rows per page" })}
           value={String(pageSize)}
           options={(pageSizes.length ? pageSizes : [5]).map(String)}
           onValueChange={(value) => {

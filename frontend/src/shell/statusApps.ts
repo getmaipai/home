@@ -17,7 +17,7 @@ export function appStatusToSidebar(state: StatusAppState): "amber" | "red" | nul
 
 export function appStatusSentence(name: string, state: StatusAppState, reason: string | null): { ariaLabel: string; title: string } {
   const label = appStatusPresentation(state).label.toLocaleLowerCase();
-  return { ariaLabel: `${name}: ${label}`, title: reason ?? (state === "operational" ? `${name} is working.` : `${name} needs attention.`) };
+  return { ariaLabel: `${name}: ${label}`, title: reason ?? (state === "operational" ? i18n._({ id: "{name} is working.", message: "{name} is working.", values: { name } }) : i18n._({ id: "{name} needs attention.", message: "{name} needs attention.", values: { name } })) };
 }
 
 export function appStatusMenuBadge(app: StatusApp): { badge: "amber" | "red"; level: "degraded" | "offline"; title: string; ariaLabel: string } | undefined {
@@ -39,9 +39,9 @@ export function statusAppsSummary(apps: readonly { id?: string; name: string; st
   const messages = affected.map((app) => app.reason).filter((reason): reason is string => Boolean(reason));
   const names = affected.map((app) => app.name);
   if (affected.length === 1 && affected[0] && isSearchLimitedChat(affected[0])) {
-    return { level, text: pillText(affected, level), problems: names, message: "Chat is working, but search is limited right now." };
+    return { level, text: pillText(affected, level), problems: names, message: i18n._({ id: "Chat is working, but search is limited right now.", message: "Chat is working, but search is limited right now." }) };
   }
-  return { level, text: pillText(affected, level), problems: names, message: messages.join(" ") || `${names.join(", ")} need attention.` };
+  return { level, text: pillText(affected, level), problems: names, message: messages.join(" ") || i18n._({ id: "{names} need attention.", message: "{names} need attention.", values: { names: names.join(", ") } }) };
 }
 
 /** The public Chat reason is only used as a signal. The exact safe wording
@@ -59,9 +59,9 @@ export function isSearchLimitedChat(app: { id?: string; name: string; state: Sta
 // optional part down, more than one part) keeps the general wording.
 function pillText(affected: readonly { id?: string; state: StatusAppState; paused?: boolean }[], level: "offline" | "degraded"): string {
   const only = affected.length === 1 ? affected[0] : undefined;
-  if (only?.id === "chat" && only.state === "degraded" && only.paused) return "Chat paused";
-  if (only?.id === "chat" && only.state === "down") return "Chat is down";
-  return level === "offline" ? "Something is down" : "Degraded";
+  if (only?.id === "chat" && only.state === "degraded" && only.paused) return i18n._({ id: "Chat paused", message: "Chat paused" });
+  if (only?.id === "chat" && only.state === "down") return i18n._({ id: "Chat is down", message: "Chat is down" });
+  return level === "offline" ? i18n._({ id: "Something is down", message: "Something is down" }) : i18n._({ id: "Degraded", message: "Degraded" });
 }
 
 function problemPriority(state: StatusAppNeed["state"]): number {
@@ -71,50 +71,52 @@ function problemPriority(state: StatusAppNeed["state"]): number {
   return 0;
 }
 
+const isSearchNeed = (need: StatusAppNeed): boolean => need.name === "Household web search";
+
 function plainNeedName(need: StatusAppNeed): string {
-  if (need.kind === "internet" || need.name.toLocaleLowerCase() === "internet") return "the internet";
-  if (need.name === "Household web search") return "search";
+  if (need.kind === "internet" || need.name.toLocaleLowerCase() === "internet") return i18n._({ id: "the internet", message: "the internet" });
+  if (isSearchNeed(need)) return i18n._({ id: "search", message: "search" });
   return need.name;
 }
 
 function needProblemWords(need: StatusAppNeed): string {
   const name = plainNeedName(need);
-  if (need.state === "waiting") return "the internet is having trouble";
+  if (need.state === "waiting") return i18n._({ id: "the internet is having trouble", message: "the internet is having trouble" });
   if (need.kind === "engine") {
-    if (need.state === "down") return `${name} isn't running`;
-    if (need.state === "degraded") return `${name} is still starting`;
+    if (need.state === "down") return i18n._({ id: "{name} isn't running", message: "{name} isn't running", values: { name } });
+    if (need.state === "degraded") return i18n._({ id: "{name} is still starting", message: "{name} is still starting", values: { name } });
   }
-  if (need.state === "down") return `${name} isn't reachable`;
-  return `${name} is having trouble`;
+  if (need.state === "down") return i18n._({ id: "{name} isn't reachable", message: "{name} isn't reachable", values: { name } });
+  return i18n._({ id: "{name} is having trouble", message: "{name} is having trouble", values: { name } });
 }
 
 /** Summarizes known need state without counting services that have not been used recently. */
 export function summarizeStatusApp(app: StatusApp, includeNeedNames = true): string {
   const needs = app.needs;
   if (!includeNeedNames || !needs) {
-    if (app.state === "operational") return "All fine.";
-    if (isSearchLimitedChat(app)) return "Chat is working, but search is limited right now.";
-    return app.reason ?? `${app.name} needs attention.`;
+    if (app.state === "operational") return i18n._({ id: "All fine.", message: "All fine." });
+    if (isSearchLimitedChat(app)) return i18n._({ id: "Chat is working, but search is limited right now.", message: "Chat is working, but search is limited right now." });
+    return app.reason ?? i18n._({ id: "{name} needs attention.", message: "{name} needs attention.", values: { name: app.name } });
   }
 
   const problems = needs
     .filter((need) => need.state !== "operational" && need.state !== "unknown")
     .sort((a, b) => Number(b.required) - Number(a.required) || problemPriority(b.state) - problemPriority(a.state));
   const problem = problems[0];
-  if (!problem) return needs.some((need) => need.state === "unknown") ? "No recent problems." : "All fine.";
+  if (!problem) return needs.some((need) => need.state === "unknown") ? i18n._({ id: "No recent problems.", message: "No recent problems." }) : i18n._({ id: "All fine.", message: "All fine." });
 
   if (problem.state === "waiting") {
     return problem.required
-      ? `${app.name} is waiting for the internet.`
-      : `${app.name} is working, but the internet is having trouble.`;
+      ? i18n._({ id: "{name} is waiting for the internet.", message: "{name} is waiting for the internet.", values: { name: app.name } })
+      : i18n._({ id: "{name} is working, but the internet is having trouble.", message: "{name} is working, but the internet is having trouble.", values: { name: app.name } });
   }
 
   const cause = needProblemWords(problem);
-  if (app.id === "chat" && !problem.required && plainNeedName(problem) === "search") {
-    return "Chat is working, but search is limited right now.";
+  if (app.id === "chat" && !problem.required && isSearchNeed(problem)) {
+    return i18n._({ id: "Chat is working, but search is limited right now.", message: "Chat is working, but search is limited right now." });
   }
-  if (!problem.required) return `${app.name} is working, but ${cause}.`;
-  if (problem.state === "down") return `${app.name} isn't working: ${cause}.`;
-  if (problem.kind === "engine") return `${app.name} is slow to start: ${cause}.`;
-  return `${app.name} is working slowly: ${cause}.`;
+  if (!problem.required) return i18n._({ id: "{name} is working, but {cause}.", message: "{name} is working, but {cause}.", values: { name: app.name, cause } });
+  if (problem.state === "down") return i18n._({ id: "{name} isn't working: {cause}.", message: "{name} isn't working: {cause}.", values: { name: app.name, cause } });
+  if (problem.kind === "engine") return i18n._({ id: "{name} is slow to start: {cause}.", message: "{name} is slow to start: {cause}.", values: { name: app.name, cause } });
+  return i18n._({ id: "{name} is working slowly: {cause}.", message: "{name} is working slowly: {cause}.", values: { name: app.name, cause } });
 }
