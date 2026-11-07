@@ -5,10 +5,8 @@
 // not audio is refused, the stream is piped as it arrives (back-pressure, never buffered whole), the upstream closes when the listener
 // goes, one person plays one station at a time (a new one replaces the old) and a home plays at most four at once. The song title that
 // the station sends in-band stays in memory while the stream is open; it is never stored or logged. No listen report is sent anywhere.
-import { assertNotPrivateHost, guardedFetch, SsrfBlockedError, type DnsLookup } from "@maipai/core/src/ssrfGuard";
-import { HOME_USER_AGENT } from "@/lib/outbound";
-import { tryConsume } from "@/lib/rateLimiter";
-import { RateLimited, RedirectLimitError } from "@/lib/shelf/shelfPoller";
+import { SsrfBlockedError, type DnsLookup } from "@maipai/core/src/ssrfGuard";
+import { guardedGet, RateLimited, RedirectLimitError } from "@/lib/outbound";
 import { IcyDemuxer, usableMetaint } from "./radioIcy";
 import type { SavedStation } from "./radio";
 import { resolvePublicTarget } from "@maipai/core/src/ssrfGuard";
@@ -45,37 +43,15 @@ export type StreamFailure = { ok: false; status: 415 | 422 | 429 | 502 | 504; er
 export type StreamOpen = { ok: true; response: Response };
 
 
-/** One guarded GET with `Icy-MetaData: 1`. Every hop (the first and each redirect) passes the address guard before a byte is sent. */
-async function getUpstream(station: SavedStation, deps: StreamDeps, signal: AbortSignal): Promise<Response> {
-  const fetcher = deps.fetch ?? platformFetch;
-  const pinned = fetcher === platformFetch;
-  const now = deps.nowMs ?? Date.now;
-  const httpAllowed = /^http:\/\//i.test(station.url);
-  let url = new URL(station.url);
-  const paced = new Set<string>();
-  for (let hop = 0; ; hop++) {
-    const secure = url.protocol === "https:";
-    if ((!secure && !(httpAllowed && url.protocol === "http:")) || url.username || url.password) throw new SsrfBlockedError(url.host);
-    await assertNotPrivateHost(url.hostname, deps.dnsLookup);
-    const host = url.hostname.toLowerCase();
-    if (!paced.has(host)) {
-      if (!tryConsume(`net:radio-stream:${host}`, HOST_PACE, now())) throw new RateLimited();
-      paced.add(host);
-    }
-    const headers = { "User-Agent": HOME_USER_AGENT, Accept: "audio/*, */*;q=0.5", "Icy-MetaData": "1" };
-    const response = pinned
-      ? await guardedFetch(url, { method: "GET", redirect: "manual", signal, maxRedirects: 0, headers }, deps.dnsLookup)
-      : await fetcher(url, { method: "GET", redirect: "manual", signal, headers, credentials: "omit", referrerPolicy: "no-referrer" });
-    if (response.status >= 300 && response.status < 400) {
-      const location = response.headers.get("location");
-      // A redirect body is tiny; with the pinned request it is left to finish (see stopUpstream below for why it is never cancelled).
-      if (!pinned) await response.body?.cancel().catch(() => undefined);
-      if (!location || hop >= MAX_REDIRECTS) throw new RedirectLimitError("The station sent too many redirects.");
-      url = new URL(location, url);
-      continue;
-    }
-    return response;
-  }
+/** One guarded GET with `Icy-MetaData: 1`. Every hop (the first and each redirect) passes the address guard before a byte is sent;
+ * an http station may use http hops, an https station stays https. A redirect body is left to finish when the request is pinned
+ * (see stopUpstream below for why it is never cancelled). */
+function getUpstream(station: SavedStation, deps: StreamDeps, signal: AbortSignal): Promise<Response> {
+  return guardedGet(station.url, {
+    schemePolicy: "http-after-http", bucket: { prefix: "radio-stream", ...HOST_PACE }, redirectCap: MAX_REDIRECTS, signal,
+    accept: "audio/*, */*;q=0.5", headers: { "Icy-MetaData": "1" }, redirectMessage: "The station sent too many redirects.",
+    fetch: deps.fetch, dnsLookup: deps.dnsLookup, now: deps.nowMs, keepPinnedRedirectBody: true,
+  });
 }
 
 /** No saved station currently has a format-level refusal; HLS is served through radioHls. */

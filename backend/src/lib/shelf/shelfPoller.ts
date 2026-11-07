@@ -18,11 +18,10 @@
 // 30 minutes, so the 2 bundled lists (about 45 feeds by topic) cost roughly 90
 // requests an hour, fewer when servers answer 304. A fresh install fills every
 // topic within two ticks.
-import { assertNotPrivateHost, guardedFetch, SsrfBlockedError, type DnsLookup } from "@maipai/core/src/ssrfGuard";
+import { assertNotPrivateHost, SsrfBlockedError, type DnsLookup } from "@maipai/core/src/ssrfGuard";
 import { parseFeed } from "feedsmith";
 import { feedImageAddress, isSiteArt, largerFeedImage } from "./imageAddress";
 import { NewsItem } from "@maipai/spec/gen/ts/news-item.js";
-import { tryConsume } from "@/lib/rateLimiter";
 import { nextHlc } from "@/lib/hlc";
 import { newNewsItemId } from "@/lib/id";
 import { DEFAULT_IDLE_WINDOW_MS, turnActiveWithin } from "@/lib/turnActivity";
@@ -35,7 +34,7 @@ import { sharedShelfStore, type ShelfStore } from "./shelfStore";
 import { topicsHintFor } from "./shelfFeeds";
 import { ingestPodcastFeed, podcastFeedIsWanted, podcastPollIntervalS, queuePodcastAutoRules, sourceRowForFeed } from "@/lib/media/podcasts";
 
-import { HOME_USER_AGENT } from "@/lib/outbound";
+import { guardedGet as outboundGet, RateLimited, RedirectLimitError } from "@/lib/outbound";
 import { readBodyLimited } from "@/lib/net/readBody";
 export const MAX_BACKOFF_S = 86_400;
 export const MAX_FEEDS_PER_TICK = 24;
@@ -65,7 +64,6 @@ export interface PollDeps {
 
 export type PollOutcome = "ok" | "not_modified" | "backoff" | "rate_limited" | "blocked";
 
-const platformFetch = globalThis.fetch;
 import { backoffSeconds as sharedBackoffSeconds, parseRetryAfter, maxAgeSeconds } from "@/lib/httpCachePolicy";
 
 /** The wait after a failure: the interval doubled per failure so far, capped
@@ -76,8 +74,7 @@ export function backoffSeconds(intervalS: number, failCount: number, retryAfterS
 export { parseRetryAfter };
 function feedMaxAgeSeconds(cacheControl: string | null): number | null { return maxAgeSeconds(cacheControl); }
 
-class RateLimited extends Error {}
-export class RedirectLimitError extends Error {}
+export { RateLimited, RedirectLimitError };
 
 function charsetOf(contentType: string | null): string {
   const match = contentType ? /charset=["']?([\w.:-]+)/i.exec(contentType) : null;
@@ -90,11 +87,6 @@ async function readLimited(response: Response, limit: number): Promise<string | 
   return bytes && new TextDecoder(charsetOf(response.headers.get("content-type")) as "utf-8").decode(bytes);
 }
 
-async function validateHop(url: URL, dns: DnsLookup | undefined): Promise<void> {
-  if (url.protocol !== "https:" || url.username || url.password) throw new SsrfBlockedError(url.host);
-  await assertNotPrivateHost(url.hostname, dns);
-}
-
 export interface HopOptions {
   maxRedirects?: number;
   /** The per-host pacing bucket: feeds share `feed`, enclosure downloads have their own. */
@@ -103,42 +95,15 @@ export interface HopOptions {
   conditional?: { etag?: string | null; lastModified?: string | null };
 }
 
-/** One guarded GET (a feed, or an enclosure): every hop passes the SSRF guard, redirects are followed by hand, the host is paced, no
- * cookies and no referrer. Shared by the poller and the podcast Save so there is one outbound path. */
-export async function guardedGet(address: string, deps: PollDeps, now: () => number, signal: AbortSignal, options: HopOptions = {}): Promise<Response> {
-  const maxRedirects = options.maxRedirects ?? MAX_REDIRECTS;
-  const fetcher = deps.fetch ?? fetch;
-  const pinned = fetcher === platformFetch;
-  const headers: Record<string, string> = { "User-Agent": HOME_USER_AGENT, Accept: options.accept ?? "*/*" };
-  if (options.conditional?.etag) headers["If-None-Match"] = options.conditional.etag;
-  if (options.conditional?.lastModified) headers["If-Modified-Since"] = options.conditional.lastModified;
-  const bucket = options.bucket ?? { prefix: "feed", ...HOST_RATE };
-  let url = new URL(address);
-  const firstHost = url.host;
-  const paced = new Set<string>();
-  for (let hop = 0; ; hop++) {
-    await validateHop(url, deps.dnsLookup);
-    const host = url.hostname.toLowerCase();
-    if (!paced.has(host)) {
-      if (!tryConsume(`net:${bucket.prefix}:${host}`, bucket, now())) throw new RateLimited();
-      paced.add(host);
-    }
-    if (hop > 0 && url.host !== firstHost) { delete headers["If-None-Match"]; delete headers["If-Modified-Since"]; }
-    const response = pinned
-      ? await guardedFetch(url, { method: "GET", redirect: "manual", signal, maxRedirects, headers })
-      : await fetcher(url, { method: "GET", redirect: "manual", signal, headers, credentials: "omit", referrerPolicy: "no-referrer" });
-    if (response.status >= 300 && response.status < 400 && response.status !== 304) {
-      const location = response.headers.get("location");
-      await response.body?.cancel().catch(() => undefined);
-      if (!location || hop >= maxRedirects) throw new RedirectLimitError("The server sent too many redirects or left out the next address. Try again later or use a direct feed or episode address.");
-      url = new URL(location, url);
-      continue;
-    }
-    return response;
-  }
+/** One guarded GET (a feed, or an enclosure): the shared outbound path (`lib/outbound.ts`) with https only and the feed pacing bucket.
+ * Shared by the poller and the podcast Save so there is one outbound path. */
+export function guardedGet(address: string, deps: PollDeps, now: () => number, signal: AbortSignal, options: HopOptions = {}): Promise<Response> {
+  return outboundGet(address, {
+    schemePolicy: "https", bucket: options.bucket ?? { prefix: "feed", ...HOST_RATE }, redirectCap: options.maxRedirects ?? MAX_REDIRECTS, signal,
+    accept: options.accept, conditional: options.conditional, fetch: deps.fetch, dnsLookup: deps.dnsLookup, now,
+    redirectMessage: "The server sent too many redirects or left out the next address. Try again later or use a direct feed or episode address.",
+  });
 }
-
-export { RateLimited };
 
 function request(feed: FeedRecord, deps: PollDeps, now: () => number, signal: AbortSignal): Promise<Response> {
   return guardedGet(feed.url, deps, now, signal, {

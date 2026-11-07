@@ -1,8 +1,6 @@
 // RADIO-06: same-origin HLS playlist and segment proxy. The browser receives only proxy URLs; every upstream hop is checked.
-import { assertNotPrivateHost, guardedFetch, SsrfBlockedError, type DnsLookup } from "@maipai/core/src/ssrfGuard";
-import { HOME_USER_AGENT } from "@/lib/outbound";
-import { tryConsume } from "@/lib/rateLimiter";
-import { RedirectLimitError, RateLimited } from "@/lib/shelf/shelfPoller";
+import { SsrfBlockedError, type DnsLookup } from "@maipai/core/src/ssrfGuard";
+import { guardedGet, RedirectLimitError, RateLimited } from "@/lib/outbound";
 import type { SavedStation } from "./radio";
 import { MAX_REDIRECTS, CONNECT_TIMEOUT_MS, claimRadioSlot } from "./radioStream";
 
@@ -17,34 +15,12 @@ export type HlsFailure = { ok: false; status: 404 | 415 | 422 | 429 | 502 | 504;
 export type HlsOpen = { ok: true; response: Response };
 const failure = (status: HlsFailure["status"], error: string): HlsFailure => ({ ok: false, status, error });
 
-async function get(address: string, deps: HlsDeps, signal: AbortSignal): Promise<Response> {
-  const fetcher = deps.fetch ?? platformFetch;
-  const pinned = fetcher === platformFetch;
-  const now = deps.nowMs ?? Date.now;
-  let url = new URL(address);
-  const initialProtocol = url.protocol;
-  const paced = new Set<string>();
-  for (let hop = 0; ; hop++) {
-    if (!(url.protocol === "https:" || (initialProtocol === "http:" && url.protocol === "http:")) || url.username || url.password) throw new SsrfBlockedError(url.host);
-    await assertNotPrivateHost(url.hostname, deps.dnsLookup);
-    const host = url.hostname.toLowerCase();
-    if (!paced.has(host)) {
-      if (!tryConsume(`net:radio-hls:${host}`, pace, now())) throw new RateLimited();
-      paced.add(host);
-    }
-    const headers = { "User-Agent": HOME_USER_AGENT, Accept: "application/vnd.apple.mpegurl, application/x-mpegURL, video/mp2t, */*;q=0.5" };
-    const response = pinned
-      ? await guardedFetch(url, { method: "GET", redirect: "manual", signal, maxRedirects: 0, headers }, deps.dnsLookup)
-      : await fetcher(url, { method: "GET", redirect: "manual", signal, headers, credentials: "omit", referrerPolicy: "no-referrer" });
-    if (response.status >= 300 && response.status < 400) {
-      const location = response.headers.get("location");
-      if (!pinned) await response.body?.cancel().catch(() => undefined);
-      if (!location || hop >= MAX_REDIRECTS) throw new RedirectLimitError("Too many redirects");
-      url = new URL(location, url);
-      continue;
-    }
-    return response;
-  }
+function get(address: string, deps: HlsDeps, signal: AbortSignal): Promise<Response> {
+  return guardedGet(address, {
+    schemePolicy: "http-after-http", bucket: { prefix: "radio-hls", ...pace }, redirectCap: MAX_REDIRECTS, signal,
+    accept: "application/vnd.apple.mpegurl, application/x-mpegURL, video/mp2t, */*;q=0.5", redirectMessage: "Too many redirects",
+    fetch: deps.fetch, dnsLookup: deps.dnsLookup, now: deps.nowMs, keepPinnedRedirectBody: true,
+  });
 }
 
 function proxyUrl(stationId: string, resource: URL, basePath: string): string {

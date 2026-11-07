@@ -20,7 +20,7 @@ import { lookup as defaultLookup } from "node:dns/promises";
 import { fetchTryingEachAddress } from "@/lib/addressFallback";
 import { assertNotPrivateHost, SsrfBlockedError, type DnsLookup, type PinnedRequest } from "@maipai/core/src/ssrfGuard";
 import { cacheDir } from "@/lib/paths";
-import { HOME_USER_AGENT } from "@/lib/outbound";
+import { GuardedStop, guardedGet, RedirectLimitError } from "@/lib/outbound";
 import { readBodyLimited } from "@/lib/net/readBody";
 import { tryConsume } from "@/lib/rateLimiter";
 import { getHouseholdSettingValue } from "@/lib/settings";
@@ -178,25 +178,18 @@ async function downloadOnce(imageUrl: string, band: AgeBand, lane: Lane = "view"
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
     try {
-      let current = url;
-      let response: Response;
-      for (let hop = 0; ; hop++) {
-        if (!/^https?:$/.test(current.protocol) || current.username || current.password || !urlAllowedFor(band, current.href)) return null;
-        if (newsHostQuiet(current.hostname.toLowerCase(), clock())) return null;
-        response = await fetchTryingEachAddress(current, {
-          method: "GET", redirect: "manual", signal: controller.signal,
-          headers: { "User-Agent": HOME_USER_AGENT, Accept: "image/avif,image/webp,image/jpeg,image/png" },
-        }, {
+      // AUDIT-DUP-NET-01: the shared outbound path walks the redirects; this module keeps its own pacing (above), its quiet-host rule,
+      // the age band's address rule and its transport (each resolved address is tried in turn, IPv4 first).
+      const response = await guardedGet(url, {
+        schemePolicy: "web", bucket: null, redirectCap: MAX_REDIRECTS, signal: controller.signal, accept: "image/avif,image/webp,image/jpeg,image/png",
+        dnsLookup: lookup,
+        beforeHop: (hopUrl) => urlAllowedFor(band, hopUrl.href) && !newsHostQuiet(hopUrl.hostname.toLowerCase(), clock()),
+        afterResponse: (answer, hopUrl) => { if (answer.status === 403 || answer.status === 429) quietNewsHost(hopUrl.hostname.toLowerCase(), clock()); },
+        send: (hopUrl, init) => fetchTryingEachAddress(hopUrl, init, {
           lookupAll: deps.dnsLookup ? async (name) => [await deps.dnsLookup!(name)] : undefined,
           request: deps.request, onAttempt: (attemptFamily) => { family = attemptFamily; },
-        });
-        if (response.status === 403 || response.status === 429) quietNewsHost(current.hostname.toLowerCase(), clock());
-        const location = response.status >= 300 && response.status < 400 ? response.headers.get("location") : null;
-        if (!location) break;
-        await response.body?.cancel().catch(() => undefined);
-        if (hop >= MAX_REDIRECTS) { pictureFailed("picture_failed_redirects", family); return null; }
-        current = new URL(location, current);
-      }
+        }),
+      });
       if (response.status === 429 || response.status === 403) {
         quietNewsHost(host, clock());
         bumpNewsCounter("picture_host_backoff");
@@ -212,6 +205,8 @@ async function downloadOnce(imageUrl: string, band: AgeBand, lane: Lane = "view"
       if (!bytes) { bumpNewsCounter("picture_too_big"); return null; }
       return bytes;
     } catch (error) {
+      if (error instanceof GuardedStop) return null;
+      if (error instanceof RedirectLimitError) { pictureFailed("picture_failed_redirects", family); return null; }
       if (error instanceof SsrfBlockedError) bumpNewsCounter("picture_ssrf_blocked");
       else pictureFailed(controller.signal.aborted ? "picture_failed_timeout" : pictureFetchFailureReason(error), family);
       return null;

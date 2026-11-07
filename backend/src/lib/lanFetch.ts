@@ -1,3 +1,4 @@
+// AUDIT-DUP-NET-01: this is a LAN-only fetch (private addresses are the point), so it is not the public-internet path in `lib/outbound.ts` (`guardedGet`).
 export type LanFetchFailure = { ok: false; kind: "unreachable" | "refused" | "timeout" };
 export type LanFetchSuccess = { ok: true; status: number; text: string; truncated: boolean };
 export type LanFetchResult = LanFetchSuccess | LanFetchFailure;

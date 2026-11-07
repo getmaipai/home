@@ -1,9 +1,9 @@
-import { assertNotPrivateHost, guardedFetch, SsrfBlockedError, type DnsLookup } from "@maipai/core/src/ssrfGuard";
-import { tryConsume, __resetRateLimiterForTests } from "@/lib/rateLimiter";
+import { assertNotPrivateHost, SsrfBlockedError, type DnsLookup } from "@maipai/core/src/ssrfGuard";
+import { __resetRateLimiterForTests } from "@/lib/rateLimiter";
 import { filterAnswerImages, type QualityResult, type ValidatedAnswerImage } from "./quality";
 import { warmGeometry } from "@/lib/imageSimilarity";
 import { ANSWER_IMAGES_MAX_CANDIDATES } from "./gallery";
-import { HOME_USER_AGENT } from "@/lib/outbound";
+import { GuardedStop, guardedGet, HOME_USER_AGENT, RateLimited, RedirectLimitError } from "@/lib/outbound";
 import { readBodyLimited } from "@/lib/net/readBody";
 import { kiwixBaseUrl } from "@/lib/kiwixSidecar";
 
@@ -134,34 +134,15 @@ async function fetchOne(source: AnswerImageSource, options: Options, deadline: n
     let timedOut = false;
     const timer = setTimeout(() => { timedOut = true; controller.abort(); }, Math.min(1_200, remaining));
     try {
+      // AUDIT-DUP-NET-01: the shared outbound path walks the redirects (scheme, address guard, host pacing and the quiet-host rule on every hop).
       let url = original;
-      let response: Response | null = null;
-      for (let hop = 0; hop <= MAX_REDIRECTS; hop++) {
-        await validateUrl(url, options.dnsLookup);
-        const hopHost = url.hostname.toLowerCase();
-        if ((quietHosts.get(hopHost) ?? 0) > now()) return null;
-        if (!pacedHosts.has(hopHost)) {
-          if (!tryConsume(`net:${hopHost}`, HOST_RATE, now())) return null;
-          pacedHosts.add(hopHost);
-        }
-        response = pinned ? await guardedFetch(url, {
-          method: "GET", redirect: "manual", signal: controller.signal, maxRedirects: MAX_REDIRECTS,
-          headers: { "User-Agent": HOME_USER_AGENT, Accept: "image/avif,image/webp,image/jpeg,image/png" },
-        }) : await fetcher(url, {
-          method: "GET", redirect: "manual", signal: controller.signal,
-          headers: { "User-Agent": HOME_USER_AGENT, Accept: "image/avif,image/webp,image/jpeg,image/png" },
-          credentials: "omit", referrerPolicy: "no-referrer",
-        });
-        if ([403, 429].includes(response.status)) { quiet(url.hostname.toLowerCase(), now() + QUIET_MS, now()); return null; }
-        if (response.status >= 300 && response.status < 400) {
-          const location = response.headers.get("location");
-          if (!location || hop === MAX_REDIRECTS) return null;
-          url = new URL(location, url);
-          continue;
-        }
-        break;
-      }
-      if (!response || response.status !== 200) return null;
+      const response = await guardedGet(original, {
+        schemePolicy: "web", bucket: HOST_RATE, pacedHosts, redirectCap: MAX_REDIRECTS, signal: controller.signal,
+        accept: "image/avif,image/webp,image/jpeg,image/png", fetch: options.fetch, dnsLookup: options.dnsLookup ?? testDnsLookup ?? undefined, now,
+        beforeHop: (hopUrl) => { url = hopUrl; return (quietHosts.get(hopUrl.hostname.toLowerCase()) ?? 0) <= now(); },
+        afterResponse: (answer, hopUrl) => { if ([403, 429].includes(answer.status)) { quiet(hopUrl.hostname.toLowerCase(), now() + QUIET_MS, now()); throw new GuardedStop(); } },
+      });
+      if (response.status !== 200) return null;
       const contentType = (response.headers.get("content-type") ?? "").split(";")[0]!.trim().toLowerCase();
       if (contentType === "text/html" || contentType === "application/xhtml+xml") {
         quiet(url.hostname.toLowerCase(), now() + QUIET_MS, now());
@@ -181,6 +162,7 @@ async function fetchOne(source: AnswerImageSource, options: Options, deadline: n
       if (now() > deadline) return null;
       return { id: source.id, bytes, contentType, host: new URL(source.url).hostname };
     } catch (error) {
+      if (error instanceof GuardedStop || error instanceof RateLimited || error instanceof RedirectLimitError) return null;
       if (error instanceof SsrfBlockedError) { dropped.ssrf = (dropped.ssrf ?? 0) + 1; return null; }
       if (controller.signal.aborted) {
         if (timedOut && attempt === 0 && now() < deadline) continue;

@@ -348,6 +348,7 @@ const packageResponseMeta = new WeakMap<HostError, AttemptResult["meta"] & { sta
 // `redirect: "manual"` plus this loop re-runs `validateHop` (the same
 // assertNotPrivateHost + requirePermission check the caller did on the
 // original url) against every hop's own target before ever following it.
+// AUDIT-DUP-NET-01: a plugin fetch (any method, a body, per-plugin allow lists) keeps this loop; the plain public GET is `guardedGet` in `lib/outbound.ts`.
 const MAX_FETCH_REDIRECTS = 5;
 
 /** 301/302 historically downgrade a non-GET/HEAD request to GET on
