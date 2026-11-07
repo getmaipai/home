@@ -16,7 +16,7 @@ function denoCanRunBundledHandlers(): boolean {
       env: { ...denoEnv(), PATH: process.env.PATH ?? "", HOME: process.env.HOME ?? "" },
       stdout: "ignore",
       stderr: "ignore",
-      timeout: 15_000,
+      timeout: 60_000,
     });
     return probe.exitCode === 0;
   } catch {

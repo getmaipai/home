@@ -1,3 +1,5 @@
+import { setupI18n } from "@lingui/core";
+import { I18nProvider } from "@lingui/react";
 import { afterEach, describe, expect, test, mock, spyOn } from "bun:test";
 import { cleanup, fireEvent, waitFor, within } from "@testing-library/react";
 import { api, ApiError, type ResolvedSetting, type StackVoice } from "@/lib/api";
@@ -5,6 +7,8 @@ import { householdVoicesApi, type HouseholdVoice } from "@/lib/householdVoicesAp
 import { voicePreviewPlayer } from "@/lib/voice/voicePreviewPlayer";
 import { VoiceManagerSection } from "@/apps/settings/VoiceManagerSection";
 import { renderWithQueryClient } from "../../../tests/renderWithQueryClient";
+
+const testI18n = setupI18n({ locale: "en", messages: { en: {} } });
 
 afterEach(() => { cleanup(); mock.restore(); });
 
@@ -16,7 +20,7 @@ function render(voices: StackVoice[], household: HouseholdVoice[] = [], home: un
   spyOn(api, "stackVoices").mockResolvedValue({ voices });
   spyOn(householdVoicesApi, "list").mockResolvedValue({ voices: household });
   spyOn(api, "settingsValues").mockResolvedValue([setting(home)]);
-  return renderWithQueryClient(<VoiceManagerSection />);
+  return renderWithQueryClient(<I18nProvider i18n={testI18n}><VoiceManagerSection /></I18nProvider>);
 }
 const builtIn = stackVoice("chatterbox-turbo-voice-default", { name: "Chatterbox default", gender: "unknown" });
 const cutey = stackVoice("voice-cutey1234", { name: "Cutey", source: "cloned", gender: "unknown" });
@@ -114,6 +118,12 @@ describe("VoiceManagerSection", () => {
     fireEvent.submit(document.getElementById("add-voice-form")!);
     expect((await within(dialog).findByRole("alert")).textContent).toContain("6 to 30 seconds");
     expect((within(dialog).getByLabelText("Name") as HTMLInputElement).value).toBe("Keep me");
+  });
+
+  test("an Inspired voice is labelled Inspired voice with its level, never clone", async () => {
+    const view = render([builtIn, cutey], [made("voice-cutey1234", { label: "Cutey", creatorName: "Poppy", kind: "inspired", inspiredLevel: "very_different" })]);
+    await view.findByText(/Inspired voice \(Very different\) · Made by Poppy/);
+    expect(document.body.textContent).not.toMatch(/clone/i);
   });
 
   test("the dialog states the responsibility sentence without a checkbox", async () => {

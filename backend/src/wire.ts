@@ -670,6 +670,9 @@ export interface ClonedVoiceInfo {
   temperature?: number;
   /** VOICES-03: pitch offset in semitones (-12 to 12), formants kept; absent means no shift. */
   pitchSemitones?: number;
+  /** AUDIO-PARITY-01 V5: set only on an Inspired voice, with how far it was moved from the clip it is based on. */
+  kind?: "inspired";
+  inspiredLevel?: "different" | "very_different";
 }
 
 export interface StackVoice {

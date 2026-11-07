@@ -1,3 +1,5 @@
+import { setupI18n } from "@lingui/core";
+import { I18nProvider } from "@lingui/react";
 import { afterEach, describe, expect, test, mock, spyOn } from "bun:test";
 import { cleanup, fireEvent, waitFor } from "@testing-library/react";
 import { api } from "@/lib/api";
@@ -6,6 +8,8 @@ import { householdVoicesApi } from "@/lib/householdVoicesApi";
 import { VoiceBrowserSection } from "@/apps/settings/VoiceBrowserSection";
 import { renderWithQueryClient } from "../../../tests/renderWithQueryClient";
 import type { StackVoice, Roster } from "@/lib/api";
+
+const testI18n = setupI18n({ locale: "en", messages: { en: {} } });
 
 const person = (role: Roster["role"] = "adult"): Roster => ({ id: "person-1", display_name: "Taylor", role, nickname: null, avatar_seed: "x", source: "hub", local_only: false, created_at: "", updated_at: "", deleted_at: null, enabled: true, guest_expires_at: null, memorialized_at: null, hlc: "", hasSecret: false } as Roster);
 const voice = (id: string, more: Partial<StackVoice> = {}): StackVoice => ({ id, name: id, description: "unknown", language: "en", country: "US", gender: "female", source: "preset", engine: "engine-a", onDisk: true, licence: null, revision: "", ...more });
@@ -27,7 +31,7 @@ function renderPage(voices: StackVoice[], options = ["alba", "mira"], settings: 
   spyOn(api, "people").mockResolvedValue([actor] as never);
   spyOn(api, "settingsValues").mockResolvedValue([{ key: "tts.voice_id", value: settings.voice ?? "alba", source: "default", label: "Speaking voice", level: "basic", secret: false, locked: settings.locked as boolean | undefined, reason: settings.reason as string | undefined }]);
   spyOn(api, "setSetting").mockImplementation(async (_scope: string, key: string, value: unknown) => ({ key, value, source: "user", label: "Speaking voice", level: "basic", secret: false }) as never);
-  return renderWithQueryClient(<VoiceBrowserSection person={actor} />);
+  return renderWithQueryClient(<I18nProvider i18n={testI18n}><VoiceBrowserSection person={actor} /></I18nProvider>);
 }
 
 const trigger = (view: ReturnType<typeof renderPage>) => view.findByRole("combobox", { name: "Voice for you" });
@@ -124,7 +128,7 @@ describe("VoiceBrowserSection", () => {
   });
   test("a down voice service says what to do, offers a retry, and Test is off", async () => {
     const loader = spyOn(api, "stackVoices").mockRejectedValueOnce(new Error("Stack is offline")).mockResolvedValue({ voices: [] });
-    const view = renderWithQueryClient(<VoiceBrowserSection person={person()} />);
+    const view = renderWithQueryClient(<I18nProvider i18n={testI18n}><VoiceBrowserSection person={person()} /></I18nProvider>);
     await view.findByText(/Home can't reach its voice service\. Check Repairs, then come back\./);
     expect((view.getByRole("button", { name: "Test" }) as HTMLButtonElement).disabled).toBe(true);
     fireEvent.click(await view.findByRole("button", { name: "Try again" }));
@@ -147,7 +151,7 @@ describe("VoiceBrowserSection", () => {
     const setter = spyOn(api, "setSetting").mockResolvedValue({ key: "tts.voice_id", value: "mira", source: "user", label: "Speaking voice", level: "basic", secret: false });
     const settings = spyOn(api, "settingsValues").mockImplementation(async () => [{ key: "tts.voice_id", value: "alba", source: "user", label: "Speaking voice", level: "basic", secret: false } as never]);
     spyOn(api, "settingsRegistry").mockResolvedValue([{ key: "tts.voice_id", label: "Speaking voice", scope: "person", selector: "select", range: { options: ["alba", "mira"] }, default: "alba" }] as never);
-    const view = renderWithQueryClient(<VoiceBrowserSection person={{ ...person("owner"), id: "person-1" }} />);
+    const view = renderWithQueryClient(<I18nProvider i18n={testI18n}><VoiceBrowserSection person={{ ...person("owner"), id: "person-1" }} /></I18nProvider>);
     fireEvent.click(await view.findByRole("combobox", { name: "Choose a voice for" }));
     fireEvent.click(await view.findByRole("option", { name: "Bramble" }));
     await waitFor(() => expect(settings).toHaveBeenCalledWith("person:person-child"));
@@ -186,5 +190,26 @@ describe("VoiceBrowserSection", () => {
     const guest = renderPage(three(), ["alba", "javert", "mira"], { role: "guest" });
     await trigger(guest);
     expect(guest.queryByRole("button", { name: "Make a voice from a recording" })).toBeNull();
+  });
+  test.each(["adult", "teen", "child"] as const)("a %s can make an Inspired voice: level choice, no tuning fields, no clone wording", async (role) => {
+    const make = spyOn(householdVoicesApi, "make").mockResolvedValue({ id: "voice-new", label: "Spark", creatorId: "person-1", creatorName: "Taylor", bytes: 1, createdAt: "", kind: "inspired", inspiredLevel: "different" });
+    const view = renderPage(three(), ["alba", "javert", "mira"], { role });
+    await trigger(view);
+    fireEvent.click(view.getByRole("button", { name: "Make an Inspired voice" }));
+    await view.findByText("How different from the original");
+    expect(view.queryByLabelText(/Liveliness/)).toBeNull();
+    expect(view.queryByLabelText(/Pitch/)).toBeNull();
+    expect(document.body.textContent).not.toMatch(/clone/i);
+    fireEvent.change(view.getByLabelText("Name"), { target: { value: "Spark" } });
+    fireEvent.change(view.getByLabelText("Recording"), { target: { files: [new File(["a"], "c.wav", { type: "audio/wav" })] } });
+    fireEvent.submit(document.getElementById("add-voice-form")!);
+    await waitFor(() => expect(make).toHaveBeenCalled());
+    expect(make.mock.calls[0]![0]).toMatchObject({ name: "Spark", inspiredLevel: "different" });
+    expect(make.mock.calls[0]![0].temperature).toBeUndefined();
+  });
+  test("a guest has no Make an Inspired voice button", async () => {
+    const guest = renderPage(three(), ["alba", "javert", "mira"], { role: "guest" });
+    await trigger(guest);
+    expect(guest.queryByRole("button", { name: "Make an Inspired voice" })).toBeNull();
   });
 });

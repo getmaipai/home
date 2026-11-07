@@ -85,7 +85,7 @@ describe("Reduced chat reaches the Stack", () => {
       expect(calls).toEqual([true, false]);
       expect(reduced).toBe(false);
       expect(reducedChatState()).toBeNull();
-      resetReducedTruthForTests();
+      resetReducedTruthForTests(); __resetChatPauseTrackingForTests();
       expect((await chatNotice()).notice?.adult ?? "").not.toContain("simpler");
     } finally { remove(); }
   });
@@ -93,7 +93,7 @@ describe("Reduced chat reaches the Stack", () => {
   test("the line follows the Stack: Home's flag alone shows nothing", async () => {
     setReducedChat({ minutesLeft: 5 });
     expect((await chatNotice()).cause).not.toBe("tier_reduced");
-    reduced = true; resetReducedTruthForTests();
+    reduced = true; resetReducedTruthForTests(); __resetChatPauseTrackingForTests();
     expect((await chatNotice()).cause).toBe("tier_reduced");
   });
 
