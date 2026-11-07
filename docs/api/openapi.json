@@ -7332,6 +7332,13 @@
                       "text": {
                         "type": "string"
                       },
+                      "values": {
+                        "type": "object",
+                        "nullable": true,
+                        "additionalProperties": {
+                          "type": "string"
+                        }
+                      },
                       "channels": {
                         "type": "array",
                         "items": {
@@ -7378,6 +7385,7 @@
                       "typeId",
                       "level",
                       "text",
+                      "values",
                       "channels",
                       "createdAt",
                       "readAt",
@@ -7437,6 +7445,13 @@
                       "text": {
                         "type": "string"
                       },
+                      "values": {
+                        "type": "object",
+                        "nullable": true,
+                        "additionalProperties": {
+                          "type": "string"
+                        }
+                      },
                       "channels": {
                         "type": "array",
                         "items": {
@@ -7483,6 +7498,7 @@
                       "typeId",
                       "level",
                       "text",
+                      "values",
                       "channels",
                       "createdAt",
                       "readAt",
@@ -7551,6 +7567,13 @@
                     "text": {
                       "type": "string"
                     },
+                    "values": {
+                      "type": "object",
+                      "nullable": true,
+                      "additionalProperties": {
+                        "type": "string"
+                      }
+                    },
                     "channels": {
                       "type": "array",
                       "items": {
@@ -7597,6 +7620,7 @@
                     "typeId",
                     "level",
                     "text",
+                    "values",
                     "channels",
                     "createdAt",
                     "readAt",
@@ -31343,601 +31367,6 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/coding-setup/pieces": {
-      "get": {
-        "tags": [
-          "Coding"
-        ],
-        "summary": "The pieces local coding runs on, with state and disk size",
-        "responses": {
-          "200": {
-            "description": "The engine, the coding model and the Splash draft. With the engine unreachable the list is empty and `message` says what to do.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "stack": {
-                      "type": "string",
-                      "enum": [
-                        "ok",
-                        "unreachable"
-                      ]
-                    },
-                    "message": {
-                      "type": "string",
-                      "nullable": true
-                    },
-                    "coding_enabled": {
-                      "type": "boolean"
-                    },
-                    "engine": {
-                      "type": "string",
-                      "nullable": true,
-                      "enum": [
-                        "splash",
-                        "llama-server",
-                        null
-                      ],
-                      "description": "The engine the Stack chose for coding on this computer."
-                    },
-                    "missing": {
-                      "type": "string",
-                      "nullable": true,
-                      "description": "The first piece coding cannot run without, as a sentence; null when coding has what it needs. Coding keys show suspended while this is set."
-                    },
-                    "pieces": {
-                      "type": "array",
-                      "items": {
-                        "type": "object",
-                        "properties": {
-                          "id": {
-                            "type": "string",
-                            "enum": [
-                              "engine",
-                              "model",
-                              "draft",
-                              "heavy_model",
-                              "heavy_draft"
-                            ]
-                          },
-                          "name": {
-                            "type": "string",
-                            "description": "What the Stack runs or stores: splash, llama-server or the model id."
-                          },
-                          "label": {
-                            "type": "string"
-                          },
-                          "summary": {
-                            "type": "string"
-                          },
-                          "state": {
-                            "type": "string",
-                            "enum": [
-                              "installed",
-                              "installing",
-                              "notInstalled",
-                              "failed",
-                              "unsupported"
-                            ]
-                          },
-                          "size_bytes": {
-                            "type": "number",
-                            "nullable": true,
-                            "description": "Bytes on disk when installed, the pinned download size otherwise, null when the Stack states none."
-                          },
-                          "percent": {
-                            "type": "number",
-                            "nullable": true
-                          },
-                          "failure": {
-                            "type": "string",
-                            "nullable": true
-                          },
-                          "can_install": {
-                            "type": "boolean"
-                          },
-                          "install_block": {
-                            "type": "string",
-                            "nullable": true
-                          },
-                          "can_remove": {
-                            "type": "boolean"
-                          },
-                          "remove_block": {
-                            "type": "string",
-                            "nullable": true
-                          }
-                        },
-                        "required": [
-                          "id",
-                          "name",
-                          "label",
-                          "summary",
-                          "state",
-                          "size_bytes",
-                          "percent",
-                          "failure",
-                          "can_install",
-                          "install_block",
-                          "can_remove",
-                          "remove_block"
-                        ]
-                      }
-                    }
-                  },
-                  "required": [
-                    "stack",
-                    "message",
-                    "coding_enabled",
-                    "engine",
-                    "missing",
-                    "pieces"
-                  ]
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Not signed in",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Admins only",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "No such piece",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "409": {
-            "description": "It cannot be installed or removed right now (the message says why)",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "503": {
-            "description": "The engine is not answering",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/coding-setup/pieces/{id}/install": {
-      "post": {
-        "tags": [
-          "Coding"
-        ],
-        "summary": "Install one coding piece (progress on the install strip)",
-        "parameters": [
-          {
-            "schema": {
-              "type": "string",
-              "enum": [
-                "engine",
-                "model",
-                "draft",
-                "heavy_model",
-                "heavy_draft"
-              ]
-            },
-            "required": true,
-            "name": "id",
-            "in": "path"
-          }
-        ],
-        "responses": {
-          "202": {
-            "description": "Started.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "job": {
-                      "type": "string",
-                      "nullable": true
-                    },
-                    "piece": {
-                      "type": "string",
-                      "enum": [
-                        "engine",
-                        "model",
-                        "draft",
-                        "heavy_model",
-                        "heavy_draft"
-                      ]
-                    }
-                  },
-                  "required": [
-                    "job",
-                    "piece"
-                  ]
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Not signed in",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Admins only",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "No such piece",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "409": {
-            "description": "It cannot be installed or removed right now (the message says why)",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "503": {
-            "description": "The engine is not answering",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/coding-setup/pieces/{id}": {
-      "delete": {
-        "tags": [
-          "Coding"
-        ],
-        "summary": "Remove one coding piece and free its space",
-        "parameters": [
-          {
-            "schema": {
-              "type": "string",
-              "enum": [
-                "engine",
-                "model",
-                "draft",
-                "heavy_model",
-                "heavy_draft"
-              ]
-            },
-            "required": true,
-            "name": "id",
-            "in": "path"
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Removed.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "piece": {
-                      "type": "string",
-                      "enum": [
-                        "engine",
-                        "model",
-                        "draft",
-                        "heavy_model",
-                        "heavy_draft"
-                      ]
-                    },
-                    "removed": {
-                      "type": "boolean",
-                      "enum": [
-                        true
-                      ]
-                    }
-                  },
-                  "required": [
-                    "piece",
-                    "removed"
-                  ]
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Not signed in",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Admins only",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "No such piece",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "409": {
-            "description": "It cannot be installed or removed right now (the message says why)",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "503": {
-            "description": "The engine is not answering",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/coding-setup/mode": {
-      "get": {
-        "tags": [
-          "Coding"
-        ],
-        "summary": "Coding mode readiness and current Stack state",
-        "responses": {
-          "200": {
-            "description": "Readiness and mode state.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "readiness": {
-                      "nullable": true
-                    },
-                    "mode": {
-                      "type": "string",
-                      "nullable": true,
-                      "enum": [
-                        "normal",
-                        "coding",
-                        null
-                      ]
-                    },
-                    "state": {
-                      "type": "string",
-                      "nullable": true,
-                      "enum": [
-                        "stable",
-                        "waiting",
-                        "switching",
-                        "failed",
-                        null
-                      ]
-                    },
-                    "reason": {
-                      "type": "string",
-                      "nullable": true
-                    }
-                  },
-                  "required": [
-                    "mode",
-                    "state",
-                    "reason"
-                  ]
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Not signed in",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Admins only",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "No such piece",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "409": {
-            "description": "It cannot be installed or removed right now (the message says why)",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "503": {
-            "description": "The engine is not answering",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/coding-setup/mode/self-test": {
-      "post": {
-        "tags": [
-          "Coding"
-        ],
-        "summary": "Ask the AI engine to test the coding model",
-        "responses": {
-          "202": {
-            "description": "The Stack accepted the test.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "accepted": {
-                      "type": "boolean",
-                      "enum": [
-                        true
-                      ]
-                    }
-                  },
-                  "required": [
-                    "accepted"
-                  ]
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Not signed in",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Admins only",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "409": {
-            "description": "The Stack refused the test in plain words.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "error": {
-                      "type": "string"
-                    }
-                  },
-                  "required": [
-                    "error"
-                  ]
-                }
-              }
-            }
-          },
-          "503": {
-            "description": "The AI engine is not answering.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "error": {
-                      "type": "string"
-                    }
-                  },
-                  "required": [
-                    "error"
-                  ]
                 }
               }
             }
@@ -58296,6 +57725,168 @@
           },
           "502": {
             "description": "The language model could not translate",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/transcripts/{id}/caption-tracks/{track}/burn-in": {
+      "post": {
+        "tags": [
+          "Transcripts"
+        ],
+        "summary": "Start burning a caption track into a copy of the video",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            },
+            "required": true,
+            "name": "track",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "position": {
+                    "type": "string",
+                    "enum": [
+                      "bottom",
+                      "middle",
+                      "top"
+                    ],
+                    "default": "bottom"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "The running burn-in job",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "nullable": true
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Audio only or no captions",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Transcripts are available to teens and adults",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Transcript, caption track or video unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Too many captions",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/transcript-burn-ins/{job}": {
+      "get": {
+        "tags": [
+          "Transcripts"
+        ],
+        "summary": "Progress of a caption burn-in and the new file when done",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 64
+            },
+            "required": true,
+            "name": "job",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Burn-in state, progress 0 to 1, file_id when done",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "nullable": true
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Burn-in not found",
             "content": {
               "application/json": {
                 "schema": {

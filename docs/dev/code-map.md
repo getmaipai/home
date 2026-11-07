@@ -1044,6 +1044,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/topicPrompt.ts` | topicBlockFor, topicBlockForTurn, withTopicBlock, topicMessages, topicMessagesForId |
 | `backend/src/lib/topicStances.ts` | resolveTopicStances, topicStancesForPerson |
 | `backend/src/lib/totp.ts` | beginEnrollment, verifyEnrollment, isTotpEnabled, verifyTotp, disableTotp |
+| `backend/src/lib/transcripts/burnIn.ts` | BURN_MAX_CUES, __setBurnRunnerForTests, __resetBurnJobsForTests, startBurnIn, burnJob |
 | `backend/src/lib/transcripts/captionTranslate.ts` | TRANSLATION_LANGUAGES, MAX_TRANSLATED_CUES, __setTranslationCompleterForTests, translateCaptionTrack |
 | `backend/src/lib/transcripts/captions.ts` | listCaptionTracks, createCaptionTrack, refreshedCues, refreshCaptionTrack, captionTrackCues |
 | `backend/src/lib/transcripts/cues.ts` | buildCues |
