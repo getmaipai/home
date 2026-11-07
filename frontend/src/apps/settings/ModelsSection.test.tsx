@@ -1,5 +1,6 @@
 import { describe, test, expect, mock, afterEach } from "bun:test";
-import { render, cleanup, fireEvent, act } from "@testing-library/react";
+import { cleanup, fireEvent, act } from "@testing-library/react";
+import { renderWithQueryClient } from "../../../tests/renderWithQueryClient";
 import { ModelsSection } from "@/apps/settings/ModelsSection";
 import { api, type FitPlanResponse } from "@/lib/api";
 import { __resetFitPlanCacheForTests } from "@/lib/useFitPlan";
@@ -105,7 +106,7 @@ describe("ModelsSection", () => {
     const response = { plan, wording: { verdict: "unknown", headline: "Can't tell yet", detail: "The model file is about 11 GB, and this computer can give 16 GB to models. How much more memory it needs while running is not known for this model family yet." } };
     const restore = stubFetchWithFitPlan(baseResponses, response);
     try {
-      const { findByRole, getByRole, findAllByText } = render(<ModelsSection />);
+      const { findByRole, getByRole, findAllByText } = renderWithQueryClient(<ModelsSection />);
       const input = await findByRole("textbox", { name: "Hugging Face model link" });
       fireEvent.change(input, { target: { value: GGUF_LINK } });
       await act(async () => { fireEvent.click(getByRole("button", { name: "Check" })); });
@@ -116,7 +117,7 @@ describe("ModelsSection", () => {
   test("after two successful checks Compare shows the recommended model and both checked models", async () => {
     const restore = stubFetchWithFitPlanResponder(baseResponses, ({ source }) => source.repo ? FIT_NO : FIT_YES);
     try {
-      const { findByRole, getByRole, findByText } = render(<ModelsSection />);
+      const { findByRole, getByRole, findByText } = renderWithQueryClient(<ModelsSection />);
       await findByText("This computer: Apple Silicon, 24 GB memory.");
       const input = await findByRole("textbox", { name: "Hugging Face model link" });
       fireEvent.change(input, { target: { value: GGUF_LINK } });
@@ -135,7 +136,7 @@ describe("ModelsSection", () => {
   test("checking the same model link again replaces its row", async () => {
     const restore = stubFetchWithFitPlanResponder(baseResponses, () => FIT_YES);
     try {
-      const { findByRole, getByRole, findByText } = render(<ModelsSection />);
+      const { findByRole, getByRole, findByText } = renderWithQueryClient(<ModelsSection />);
       const input = await findByRole("textbox", { name: "Hugging Face model link" });
       for (let i = 0; i < 2; i += 1) {
         fireEvent.change(input, { target: { value: GGUF_LINK } });
@@ -150,7 +151,7 @@ describe("ModelsSection", () => {
   test("shows no Compare card with only the recommended model", async () => {
     const restore = stubFetchWithFitPlanResponder(baseResponses, () => FIT_YES);
     try {
-      const { findByText } = render(<ModelsSection />);
+      const { findByText } = renderWithQueryClient(<ModelsSection />);
       await findByText("This computer: Apple Silicon, 24 GB memory.");
       expect(document.querySelector('[data-slot="comparison-card"]')).toBeNull();
     } finally { restore(); }
@@ -159,7 +160,7 @@ describe("ModelsSection", () => {
   test("each comparison shows complete names and verdicts without pick tags or checks for a no", async () => {
     const restore = stubFetchWithFitPlanResponder(baseResponses, ({ source }) => source.repo ? FIT_NO : FIT_YES);
     try {
-      const { findByRole, getByRole, findByText } = render(<ModelsSection />);
+      const { findByRole, getByRole, findByText } = renderWithQueryClient(<ModelsSection />);
       const input = await findByRole("textbox", { name: "Hugging Face model link" });
       for (const link of [GGUF_LINK, "https://huggingface.co/example-org/example-big-model"]) {
         fireEvent.change(input, { target: { value: link } });
@@ -188,7 +189,7 @@ describe("ModelsSection", () => {
     Object.defineProperty(navigator, "clipboard", { configurable: true, value: { writeText: async (value: string) => { copied = value; } } });
     const restore = stubFetchWithFitPlanResponder(baseResponses, ({ source }) => source.repo ? FIT_NO : FIT_YES);
     try {
-      const { findByRole, getByRole, findByText } = render(<ModelsSection />);
+      const { findByRole, getByRole, findByText } = renderWithQueryClient(<ModelsSection />);
       const input = await findByRole("textbox", { name: "Hugging Face model link" });
       fireEvent.change(input, { target: { value: GGUF_LINK } });
       await act(async () => { fireEvent.click(getByRole("button", { name: "Check" })); });
@@ -210,7 +211,7 @@ describe("ModelsSection", () => {
     Object.defineProperty(navigator, "clipboard", { configurable: true, value: { writeText: async () => { throw new Error("denied"); } } });
     const restore = stubFetchWithFitPlanResponder(baseResponses, ({ source }) => source.repo ? FIT_NO : FIT_YES);
     try {
-      const { findByRole, getByRole, findByText } = render(<ModelsSection />);
+      const { findByRole, getByRole, findByText } = renderWithQueryClient(<ModelsSection />);
       const input = await findByRole("textbox", { name: "Hugging Face model link" });
       for (const link of [GGUF_LINK, "https://huggingface.co/example-org/second-model"]) {
         fireEvent.change(input, { target: { value: link } });
@@ -230,7 +231,7 @@ describe("ModelsSection", () => {
       "/models/selection": NO_SELECTION, "/engine/status": NO_ENGINE,
     }, FIT_YES, (body) => { posted = body; });
     try {
-      const { findByRole, getByRole, findAllByText } = render(<ModelsSection />);
+      const { findByRole, getByRole, findAllByText } = renderWithQueryClient(<ModelsSection />);
       const input = await findByRole("textbox", { name: "Hugging Face model link" });
       fireEvent.change(input, { target: { value: GGUF_LINK } });
       await act(async () => { fireEvent.click(getByRole("button", { name: "Check" })); });
@@ -244,7 +245,7 @@ describe("ModelsSection", () => {
     let posted: unknown;
     const restore = stubFetchWithFitPlan({ "/api/host/hardware": HARDWARE, "role=chat": [chatFit()], "role=image": [], "role=video": [], "/models/selection": NO_SELECTION, "/engine/status": NO_ENGINE }, FIT_YES, (body) => { posted = body; });
     try {
-      const { findByRole, getByRole, findAllByText } = render(<ModelsSection />);
+      const { findByRole, getByRole, findAllByText } = renderWithQueryClient(<ModelsSection />);
       fireEvent.change(await findByRole("textbox", { name: "Hugging Face model link" }), { target: { value: "https://huggingface.co/example-org/example-mlx" } });
       await act(async () => { fireEvent.click(getByRole("button", { name: "Check" })); });
       await findAllByText("Runs well on this computer");
@@ -255,7 +256,7 @@ describe("ModelsSection", () => {
   test("an unknown verdict stays neutral", async () => {
     const restore = stubFetchWithFitPlan({ "/api/host/hardware": HARDWARE, "role=chat": [chatFit()], "role=image": [], "role=video": [], "/models/selection": NO_SELECTION, "/engine/status": NO_ENGINE }, FIT_UNKNOWN);
     try {
-      const { findByRole, getByRole, findAllByText, queryByText } = render(<ModelsSection />);
+      const { findByRole, getByRole, findAllByText, queryByText } = renderWithQueryClient(<ModelsSection />);
       fireEvent.change(await findByRole("textbox", { name: "Hugging Face model link" }), { target: { value: GGUF_LINK } });
       await act(async () => { fireEvent.click(getByRole("button", { name: "Check" })); });
       const headlines = await findAllByText("Can't tell yet");
@@ -268,7 +269,7 @@ describe("ModelsSection", () => {
     let fitPlanCalls = 0;
     const restore = stubFetchWithFitPlan({ "/api/host/hardware": HARDWARE, "role=chat": [chatFit()], "role=image": [], "role=video": [], "/models/selection": NO_SELECTION, "/engine/status": NO_ENGINE }, FIT_YES, () => { fitPlanCalls += 1; });
     try {
-      const { findByRole, getByRole, findByText } = render(<ModelsSection />);
+      const { findByRole, getByRole, findByText } = renderWithQueryClient(<ModelsSection />);
       await findByText("This computer: Apple Silicon, 24 GB memory.");
       const callsBeforeClick = fitPlanCalls;
       fireEvent.change(await findByRole("textbox", { name: "Hugging Face model link" }), { target: { value: "not a link" } });
@@ -281,7 +282,7 @@ describe("ModelsSection", () => {
   test("a plan-null answer shows its unavailable wording", async () => {
     const restore = stubFetchWithFitPlan({ "/api/host/hardware": HARDWARE, "role=chat": [chatFit()], "role=image": [], "role=video": [], "/models/selection": NO_SELECTION, "/engine/status": NO_ENGINE }, FIT_UNAVAILABLE);
     try {
-      const { findByRole, getByRole, findByText } = render(<ModelsSection />);
+      const { findByRole, getByRole, findByText } = renderWithQueryClient(<ModelsSection />);
       fireEvent.change(await findByRole("textbox", { name: "Hugging Face model link" }), { target: { value: GGUF_LINK } });
       await act(async () => { fireEvent.click(getByRole("button", { name: "Check" })); });
       await findByText("Can't check right now");
@@ -292,7 +293,7 @@ describe("ModelsSection", () => {
   test("opening recommended model Details shows the plan memory range", async () => {
     const restore = stubFetchWithFitPlan({ "/api/host/hardware": HARDWARE, "role=chat": [chatFit()], "role=image": [], "role=video": [], "/models/selection": NO_SELECTION, "/engine/status": NO_ENGINE }, FIT_YES);
     try {
-      const { findByText, getByText } = render(<ModelsSection />);
+      const { findByText, getByText } = renderWithQueryClient(<ModelsSection />);
       await findByText("This computer: Apple Silicon, 24 GB memory.");
       fireEvent.click(getByText("Details"));
       await findByText("Memory it needs");
@@ -310,7 +311,7 @@ describe("ModelsSection", () => {
     for (const { response, badge, token } of cases) {
       const restore = stubFetchWithFitPlan({ "/api/host/hardware": HARDWARE, "role=chat": [chatFit()], "role=image": [], "role=video": [], "/models/selection": NO_SELECTION, "/engine/status": NO_ENGINE }, response);
       try {
-        const { findByText, getByText } = render(<ModelsSection />);
+        const { findByText, getByText } = renderWithQueryClient(<ModelsSection />);
         await findByText(badge);
         await findByText(response.wording.headline);
         const pill = getByText(badge).closest("[data-verdict]");
@@ -324,7 +325,7 @@ describe("ModelsSection", () => {
   test("the Stack sentence is inside Details", async () => {
     const restore = stubFetchWithFitPlan({ "/api/host/hardware": HARDWARE, "role=chat": [chatFit()], "role=image": [], "role=video": [], "/models/selection": NO_SELECTION, "/engine/status": NO_ENGINE }, FIT_YES);
     try {
-      const { findByText, getByText, queryByText } = render(<ModelsSection />);
+      const { findByText, getByText, queryByText } = renderWithQueryClient(<ModelsSection />);
       await findByText("This computer: Apple Silicon, 24 GB memory.");
       expect(queryByText("Chat runs through the MaiPai Stack.")).toBeNull();
       fireEvent.click(getByText("Details"));
@@ -336,7 +337,7 @@ describe("ModelsSection", () => {
   test("a no verdict plan shows the plan's remedy", async () => {
     const restore = stubFetchWithFitPlan({ "/api/host/hardware": HARDWARE, "role=chat": [chatFit()], "role=image": [], "role=video": [], "/models/selection": NO_SELECTION, "/engine/status": NO_ENGINE }, FIT_NO);
     try {
-      const { findByText, getByText } = render(<ModelsSection />);
+      const { findByText, getByText } = renderWithQueryClient(<ModelsSection />);
       await findByText("This computer: Apple Silicon, 24 GB memory.");
       fireEvent.click(getByText("Details"));
       await findByText("It needs about 6 GB more memory. A smaller version of this model, or a shorter conversation memory, would help.");
@@ -353,7 +354,7 @@ describe("ModelsSection", () => {
   test("a plan-null response keeps the legacy memory line without a fit panel", async () => {
     const restore = stubFetchWithFitPlan({ "/api/host/hardware": HARDWARE, "role=chat": [chatFit()], "role=image": [], "role=video": [], "/models/selection": NO_SELECTION, "/engine/status": NO_ENGINE }, FIT_UNAVAILABLE);
     try {
-      const { findByText, getByText, queryByText } = render(<ModelsSection />);
+      const { findByText, getByText, queryByText } = renderWithQueryClient(<ModelsSection />);
       await findByText("This computer: Apple Silicon, 24 GB memory.");
       fireEvent.click(getByText("Details"));
       await findByText(/Uses about .* of memory\./);
@@ -364,7 +365,7 @@ describe("ModelsSection", () => {
   test("a checked model result names the file used to size a plan", async () => {
     const restore = stubFetchWithFitPlan({ "/api/host/hardware": HARDWARE, "role=chat": [chatFit()], "role=image": [], "role=video": [], "/models/selection": NO_SELECTION, "/engine/status": NO_ENGINE }, FIT_YES);
     try {
-      const { findByRole, findByText, getByRole } = render(<ModelsSection />);
+      const { findByRole, findByText, getByRole } = renderWithQueryClient(<ModelsSection />);
       fireEvent.change(await findByRole("textbox", { name: "Hugging Face model link" }), { target: { value: GGUF_LINK } });
       await act(async () => { fireEvent.click(getByRole("button", { name: "Check" })); });
       await findByText("Sized from example.");
@@ -375,7 +376,7 @@ describe("ModelsSection", () => {
   test("a checked model result without a plan does not name a sized file", async () => {
     const restore = stubFetchWithFitPlan({ "/api/host/hardware": HARDWARE, "role=chat": [chatFit()], "role=image": [], "role=video": [], "/models/selection": NO_SELECTION, "/engine/status": NO_ENGINE }, FIT_UNAVAILABLE);
     try {
-      const { findByRole, findByText, getByRole, queryByText } = render(<ModelsSection />);
+      const { findByRole, findByText, getByRole, queryByText } = renderWithQueryClient(<ModelsSection />);
       fireEvent.change(await findByRole("textbox", { name: "Hugging Face model link" }), { target: { value: GGUF_LINK } });
       await act(async () => { fireEvent.click(getByRole("button", { name: "Check" })); });
       await findByText("Can't check right now");
@@ -388,7 +389,7 @@ describe("ModelsSection", () => {
     const memory = { available: true, memory: { usableGb: 16, usedGb: 6.2, freeGb: 9.8, pressure: "normal", pressureText: "This computer has plenty of free memory right now.", loaded: [{ id: "chat", label: "Chat", gb: 5.1 }], homeOwnedRoles: [] } };
     const restore = stubFetch({ "/api/host/hardware": HARDWARE, "role=chat": [chatFit()], "role=image": [], "role=video": [], "/models/selection": NO_SELECTION, "/engine/status": NO_ENGINE, "/api/computer-memory": memory });
     try {
-      const { findByText } = render(<ModelsSection />);
+      const { findByText } = renderWithQueryClient(<ModelsSection />);
       await findByText("Memory right now");
       await findByText("6.2 GB in use of 16 GB");
       expect((await findByText("5.1 GB")).textContent).toBe("5.1 GB");
@@ -400,7 +401,7 @@ describe("ModelsSection", () => {
     const memory = { available: true, memory: { usableGb: 16, usedGb: 0, freeGb: 16, pressure: "normal", pressureText: "This computer has plenty of free memory right now.", loaded: [], homeOwnedRoles: [] as Array<"chat" | "embeddings" | "stt" | "tts"> } };
     const restore = stubFetch({ "/api/host/hardware": HARDWARE, "role=chat": [chatFit()], "role=image": [], "role=video": [], "/models/selection": NO_SELECTION, "/engine/status": NO_ENGINE, "/api/computer-memory": memory });
     try {
-      const { findByText } = render(<ModelsSection />);
+      const { findByText } = renderWithQueryClient(<ModelsSection />);
       await findByText("Nothing is loaded right now.");
       expect(document.body.textContent).not.toContain("Home's own engines still run");
     } finally { restore(); }
@@ -410,7 +411,7 @@ describe("ModelsSection", () => {
     const memory = { available: true, memory: { usableGb: 16, usedGb: 0, freeGb: 16, pressure: "normal", pressureText: "This computer has plenty of free memory right now.", loaded: [], homeOwnedRoles: [] } };
     const restore = stubFetch({ "/api/host/hardware": HARDWARE, "role=chat": [chatFit()], "role=image": [], "role=video": [], "/models/selection": NO_SELECTION, "/engine/status": NO_ENGINE, "/api/computer-memory": memory });
     try {
-      const { findByText, queryByText } = render(<ModelsSection />);
+      const { findByText, queryByText } = renderWithQueryClient(<ModelsSection />);
       await findByText("Nothing is loaded right now.");
       expect(queryByText(/This counts only what the Stack has loaded/)).toBeNull();
     } finally { restore(); }
@@ -419,7 +420,7 @@ describe("ModelsSection", () => {
   test("renders no memory card when the Stack is unavailable", async () => {
     const restore = stubFetch({ "/api/host/hardware": HARDWARE, "role=chat": [chatFit()], "role=image": [], "role=video": [], "/models/selection": NO_SELECTION, "/engine/status": NO_ENGINE, "/api/computer-memory": { available: false } });
     try {
-      const { findByText, queryByText } = render(<ModelsSection />);
+      const { findByText, queryByText } = renderWithQueryClient(<ModelsSection />);
       await findByText("This computer: Apple Silicon, 24 GB memory.");
       expect(queryByText("Memory right now")).toBeNull();
     } finally { restore(); }
@@ -435,7 +436,7 @@ describe("ModelsSection", () => {
       "/engine/status": NO_ENGINE,
     });
     try {
-      const { findByText } = render(<ModelsSection />);
+      const { findByText } = renderWithQueryClient(<ModelsSection />);
       await findByText(/Apple Silicon, 24 GB memory/);
     } finally {
       restore();
@@ -452,7 +453,7 @@ describe("ModelsSection", () => {
       "/engine/status": NO_ENGINE,
     });
     try {
-      const { findByText, queryByRole } = render(<ModelsSection />);
+      const { findByText, queryByRole } = renderWithQueryClient(<ModelsSection />);
       await findByText("Stack Chat Model");
       await findByText("Ready");
       await findByText("This computer: Apple Silicon, 24 GB memory.");
@@ -482,7 +483,7 @@ describe("ModelsSection", () => {
       "/engine/status": NO_ENGINE,
     });
     try {
-      const { findByText, queryByText } = render(<ModelsSection />);
+      const { findByText, queryByText } = renderWithQueryClient(<ModelsSection />);
       await findByText("Not available on this computer yet.");
       expect(queryByText(/Runs well on a single 8GB GPU/)).toBeNull();
     } finally {
@@ -508,7 +509,7 @@ describe("ModelsSection", () => {
       "/models/selection": NO_SELECTION, "/engine/status": NO_ENGINE,
     });
     try {
-      const { findByText, getByText, queryByText } = render(<ModelsSection />);
+      const { findByText, getByText, queryByText } = renderWithQueryClient(<ModelsSection />);
       await findByText(response.wording.headline);
       expect(getByText(response.wording.detail)).toBeTruthy();
       expect(queryByText("This may run slowly on this computer.")).toBeNull();
@@ -528,7 +529,7 @@ describe("ModelsSection", () => {
     const original = api.fitPlan;
     api.fitPlan = mock(() => Promise.resolve({ plan: testPlan(verdict), wording: { verdict, headline, detail } })) as typeof api.fitPlan;
     const restore = stubFetch({ "/api/host/hardware": HARDWARE, "role=chat": [fit], "role=image": [], "role=video": [], "/models/selection": NO_SELECTION, "/engine/status": NO_ENGINE });
-    try { const { findByText } = render(<ModelsSection />); await findByText(headline); await findByText(detail); }
+    try { const { findByText } = renderWithQueryClient(<ModelsSection />); await findByText(headline); await findByText(detail); }
     finally { restore(); api.fitPlan = original; }
   });
 
@@ -538,7 +539,7 @@ describe("ModelsSection", () => {
     api.fitPlan = (mode === "null" ? mock(() => Promise.resolve({ plan: null, wording: { verdict: "unknown", headline: "ignored", detail: "ignored" } })) : mock(() => Promise.reject(new Error("offline")))) as typeof api.fitPlan;
     const restore = stubFetch({ "/api/host/hardware": HARDWARE, "role=chat": [fit], "role=image": [], "role=video": [], "/models/selection": NO_SELECTION, "/engine/status": NO_ENGINE });
     try {
-      const { findByText, getByText } = render(<ModelsSection />);
+      const { findByText, getByText } = renderWithQueryClient(<ModelsSection />);
       await findByText("This may run slowly on this computer.");
       await act(async () => { fireEvent.click(getByText("Details")); });
       await findByText(/Uses about/);
@@ -550,7 +551,7 @@ describe("ModelsSection", () => {
     const fitPlan = mock(() => Promise.reject(new Error("unused")));
     api.fitPlan = fitPlan as typeof api.fitPlan;
     const restore = stubFetch({ "/api/host/hardware": HARDWARE, "role=chat": [chatFit({ url: "https://example.invalid/model.gguf" })], "role=image": [], "role=video": [], "/models/selection": NO_SELECTION, "/engine/status": NO_ENGINE });
-    try { const { findByText } = render(<ModelsSection />); await findByText("This computer: Apple Silicon, 24 GB memory."); expect(fitPlan).not.toHaveBeenCalled(); }
+    try { const { findByText } = renderWithQueryClient(<ModelsSection />); await findByText("This computer: Apple Silicon, 24 GB memory."); expect(fitPlan).not.toHaveBeenCalled(); }
     finally { restore(); api.fitPlan = original; }
   });
 
@@ -566,7 +567,7 @@ describe("ModelsSection chat model choices (MODEL-SWITCH-01)", () => {
       "/models/selection": { modelId: "muse-glimmer-30b-q4-k-xl", name: "muse", state: "ready", installed: ["muse-glimmer-30b-q4-k-xl"] }, "/engine/status": NO_ENGINE,
     });
     try {
-      const { findByText, getByRole } = render(<ModelsSection />);
+      const { findByText, getByRole } = renderWithQueryClient(<ModelsSection />);
       await findByText("Chat models");
       expect(await findByText("In use")).toBeTruthy();
       expect(await findByText("Thinking can be switched off, so short questions get quick answers")).toBeTruthy();
@@ -581,7 +582,7 @@ describe("ModelsSection chat model choices (MODEL-SWITCH-01)", () => {
       "/models/selection": { modelId: "muse-glimmer-30b-q4-k-xl", name: "muse", state: "ready", installed: ["muse-glimmer-30b-q4-k-xl"] }, "/engine/status": NO_ENGINE,
     });
     try {
-      const { findByText, getAllByText } = render(<ModelsSection />);
+      const { findByText, getAllByText } = renderWithQueryClient(<ModelsSection />);
       await findByText("Chat models");
       expect(getAllByText("Uncensored")).toHaveLength(1);
       const row = (await findByText("Qwen3.6 35B A3B Uncensored (Q4_K_M)")).closest("li")!;
@@ -606,7 +607,7 @@ describe("ModelsSection chat model choices (MODEL-SWITCH-01)", () => {
       return Promise.resolve(jsonResponse(match[1]));
     }) as unknown as typeof fetch;
     try {
-      const { findByRole } = render(<ModelsSection />);
+      const { findByRole } = renderWithQueryClient(<ModelsSection />);
       const button = await findByRole("button", { name: "Use this model" });
       await act(async () => { fireEvent.click(button); });
       await new Promise((resolve) => setTimeout(resolve, 50));

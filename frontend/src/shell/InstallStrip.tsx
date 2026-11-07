@@ -1,10 +1,10 @@
-import { useSharedReads } from "@/lib/sharedReads";
-import { useEffect, useState, type ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import { Link } from "react-router-dom";
 import { JobProgress } from "@maipai/ui/src/elements/job-progress";
 import { Progress } from "@maipai/ui/src/primitives/Progress";
 import { Button } from "@maipai/ui/src/ui/button";
 import { api, ApiError, type InstallStatusView } from "@/lib/api";
+import { useInstallStatus } from "@/lib/useInstallStatus";
 
 // The engine install comes first (fetch, build, start), then the models.
 const STAGES = [
@@ -34,27 +34,8 @@ export function InstallStrip({ detailsHref = "/settings/ai?tab=overview", read: 
   /** What the strip's Try again does. Setup before the owner exists restarts the install through the setup route. */
   retry?: () => Promise<unknown>;
 }) {
-  const reads = useSharedReads();
-  const read = readProp ?? reads.installStatus;
-  const [status, setStatus] = useState<InstallStatusView | null>(null);
+  const status = useInstallStatus(readProp, true).data ?? null;
   const [retryError, setRetryError] = useState<string | null>(null);
-
-  useEffect(() => {
-    let disposed = false;
-    let timer: ReturnType<typeof setTimeout> | undefined;
-    const poll = async () => {
-      let delay = 15_000;
-      try {
-        const next = await read();
-        if (disposed) return;
-        setStatus(next);
-        if (next.state === "downloading" || next.state === "starter_ready" || next.state === "installing_engine" || next.background?.state === "running") delay = 2_000;
-      } catch { /* The strip is a courtesy; a missed poll is retried. */ }
-      if (!disposed) timer = setTimeout(() => void poll(), delay);
-    };
-    void poll();
-    return () => { disposed = true; if (timer) clearTimeout(timer); };
-  }, [read]);
 
   if (!status) return null;
   // A part installed later from Settings (Models and storage) rides the same strip once the first install is out of the way.

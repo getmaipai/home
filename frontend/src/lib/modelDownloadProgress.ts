@@ -1,7 +1,7 @@
 import type { JobProgressItem } from "@maipai/ui/src/elements/job-progress";
-import { useEffect, useState } from "react";
 import { downloadProgress, type DownloadProgressProps } from "@/lib/downloadProgress";
-import { api, type HomeJobView } from "@/lib/api";
+import type { HomeJobView } from "@/lib/api";
+import { useJobs } from "@/lib/useInstallStatus";
 
 const ACTIVE_STATES = new Set(["queued", "running", "paused", "stalled"]);
 const RECENT_MS = 15 * 60_000;
@@ -13,28 +13,12 @@ export function isVisibleModelDownload(job: HomeJobView, now = Date.now()): bool
   return Number.isFinite(updated) && now - updated <= RECENT_MS;
 }
 
+const NO_JOBS: HomeJobView[] = [];
+const modelDownloads = (rows: HomeJobView[]) => rows.filter((row) => row.kind === "model_download");
+const downloadMoving = (rows: HomeJobView[] | undefined) => (rows ?? NO_JOBS).some((row) => row.kind === "model_download" && ACTIVE_STATES.has(row.state ?? ""));
+
 export function useModelDownloadJobs(enabled = true): HomeJobView[] {
-  const [jobs, setJobs] = useState<HomeJobView[]>([]);
-  useEffect(() => {
-    if (!enabled) return;
-    let disposed = false;
-    let timer: ReturnType<typeof setTimeout> | undefined;
-    const poll = async () => {
-      try {
-        const rows = await api.jobs();
-        if (disposed) return;
-        const downloads = rows.filter((row) => row.kind === "model_download");
-        setJobs(downloads);
-        const active = downloads.some((row) => row.state === "queued" || row.state === "running" || row.state === "paused" || row.state === "stalled");
-        timer = setTimeout(() => void poll(), active ? 1_000 : 15_000);
-      } catch {
-        if (!disposed) timer = setTimeout(() => void poll(), 15_000);
-      }
-    };
-    void poll();
-    return () => { disposed = true; if (timer) clearTimeout(timer); };
-  }, [enabled]);
-  return jobs;
+  return useJobs({ enabled, fast: downloadMoving, select: modelDownloads }).data ?? NO_JOBS;
 }
 
 function number(value: unknown): number | undefined {

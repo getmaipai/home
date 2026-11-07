@@ -4,6 +4,7 @@
 // names a route. A saved edit comes back as a new card, so the chat card, the Music app and the edit tools always show one record.
 // What a button did is said in a toast (the kit's one transient notice).
 import { useCallback, useContext, useEffect, useRef, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import { useToast } from "@maipai/ui/src/primitives/Toast";
 import { MediaHostContext } from "@maipai/ui/src/schema/mediaHost";
@@ -40,6 +41,8 @@ export function studioAsk(action: "make_album" | "make_song", kind: MusicCardKin
 /** The kit's edit action for a card kind, as the action route names it. */
 const EDIT_ACTION = { album: "edit_album", song_style: "edit_song_style", band: "edit_band" } as const;
 
+type CardReply = { block: { props: Record<string, unknown> }; cover_state?: CoverState };
+const musicCardKey = (kind: MusicCardKind, id: string, conversationId: string | null, turnId: string | null) => ["music-card-live", kind, id, conversationId, turnId];
 const POLL_MS = 3000;
 const POLL_MAX = 40;
 
@@ -64,34 +67,36 @@ export function useMusicCard(block: Block): { props: Record<string, unknown> | n
   const ref = musicRefOf(block.kind, block.provenance ?? "");
   const kind = (ref ? block.kind : "album") as MusicCardKind;
   const id = ref?.id ?? ""; const conversationId = ref?.conversationId ?? null; const turnId = ref?.turnId ?? null;
-  const [live, setLive] = useState<Record<string, unknown> | null>(null);
-  const [gone, setGone] = useState(false);
+  const [discarded, setDiscarded] = useState(false);
   const [busy, setBusy] = useState(false);
-  const [watch, setWatch] = useState(0);
   const told = useRef(false);
 
+  // The card, read again every 3 s while a picture or a song is still coming (at most POLL_MAX reads); a 404 means the record is gone.
+  // A band's pictures come from useBandCard; the band card is read here only after an edit, so it is not read at all.
+  const cardKey = musicCardKey(kind, id, conversationId, turnId);
+  const look = useQuery({
+    queryKey: cardKey,
+    enabled: id !== "" && kind !== "band",
+    retry: false,
+    queryFn: () => request<CardReply>(cardPath(kind, id, conversationId, turnId)),
+    refetchInterval: (query) => {
+      const data = query.state.data;
+      if ((query.state.error as { status?: number } | null)?.status === 404) return false;
+      if (data && !stillMaking(kind, data.block.props, data.cover_state)) return false;
+      return query.state.dataUpdateCount + query.state.errorUpdateCount < POLL_MAX ? POLL_MS : false;
+    },
+  });
+  // After an edit the saved card comes back whole and replaces what was read.
+  const [edited, setEdited] = useState<Record<string, unknown> | null>(null);
+  const live = edited ?? look.data?.block.props ?? null;
+  const gone = discarded || (look.error as { status?: number } | null)?.status === 404;
+  const refetchCard = look.refetch;
+  const cover = look.data?.cover_state;
+  const readProps = look.data?.block.props;
   useEffect(() => {
-    // A band's pictures come from useBandCard; the band card is read here only after an edit.
-    if (!id || kind === "band") return;
-    let alive = true; let polls = 0; let timer: ReturnType<typeof setTimeout> | undefined;
-    const look = async () => {
-      try {
-        const got = await request<{ block: { props: Record<string, unknown> }; cover_state?: CoverState }>(cardPath(kind, id, conversationId, turnId));
-        if (!alive) return;
-        setLive(got.block.props);
-        // Said once, and only while the album is new (its songs are still coming), so an old album does not announce it on every visit.
-        if (got.cover_state === "no_engine" && !told.current && !(Array.isArray(got.block.props.tracks) && got.block.props.tracks.length > 0)) { told.current = true; push(NO_ENGINE_NOTE); }
-        if (!stillMaking(kind, got.block.props, got.cover_state)) return;
-      } catch (error) {
-        if (!alive) return;
-        if ((error as { status?: number }).status === 404) { setGone(true); return; }
-      }
-      polls += 1;
-      if (alive && polls < POLL_MAX) timer = setTimeout(look, POLL_MS);
-    };
-    void look();
-    return () => { alive = false; if (timer) clearTimeout(timer); };
-  }, [id, kind, conversationId, turnId, watch, push]);
+    // Said once, and only while the album is new (its songs are still coming), so an old album does not announce it on every visit.
+    if (cover === "no_engine" && !told.current && readProps && !(Array.isArray(readProps.tracks) && readProps.tracks.length > 0)) { told.current = true; push(NO_ENGINE_NOTE); }
+  }, [cover, readProps, push]);
 
   const play = useCallback((mediaId: string) => {
     if (host) void Promise.resolve(host.onPlay(mediaId, {})).catch((error: unknown) => push(error instanceof Error && error.message ? error.message : "That song could not play. Try again."));
@@ -109,15 +114,15 @@ export function useMusicCard(block: Block): { props: Record<string, unknown> | n
     request<Done>(`/api/music/${ROUTE[kind]}/${encodeURIComponent(id)}/action`, { method: "POST", body: JSON.stringify({ ...send, conversation_id: conversationId, turn_id: turnId }) })
       .then((done) => {
         push(done.done);
-        if (action === "discard") { setGone(true); return; }
+        if (action === "discard") { setDiscarded(true); return; }
         const next = (done.album ?? done.style ?? done.band)?.props;
-        if (next) setLive(next);
+        if (next) setEdited(next);
         if ((action === "play_all" || action === "keep") && done.media_id) play(done.media_id);
-        if (action === "remake_cover") setWatch((n) => n + 1);
+        if (action === "remake_cover") { setEdited(null); void refetchCard(); }
       })
       .catch((error: unknown) => push(error instanceof Error && error.message ? error.message : "That did not work. Try again."))
       .finally(() => setBusy(false));
-  }, [id, kind, busy, conversationId, turnId, navigate, play, push]);
+  }, [id, kind, busy, conversationId, turnId, navigate, play, push, refetchCard]);
 
   if (!ref) return { props: null, onAction: null, gone: false };
   // A band's props stay useBandCard's until an edit brings back the whole saved card.

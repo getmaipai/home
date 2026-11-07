@@ -1,4 +1,3 @@
-import { useSharedReads } from "@/lib/sharedReads";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { Progress } from "@maipai/ui/src/primitives/Progress";
@@ -7,6 +6,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@maipai/ui/
 import { getIcon } from "@maipai/ui/src/icons";
 import { api, ApiError, type HomeJobView, type InstallStatusView } from "@/lib/api";
 import { InstallDockRow } from "@/shell/InstallDockRow";
+import { installActive, useInstallStatus, useJobs } from "@/lib/useInstallStatus";
 import { installLabel, installWords, speedLine, timeLeft, type InstallWords } from "@/shell/installWords";
 
 const ChevronDown = getIcon("chevron-down");
@@ -108,6 +108,9 @@ function useAnchorBox(active: boolean): { left: number; right: number } | null {
   return box;
 }
 
+const NO_ROWS: HomeJobView[] = [];
+const modelDownloadRows = (rows: HomeJobView[]) => rows.filter((row) => row.kind === "model_download");
+
 /** The one install line, pinned to the bottom of the page: what is installing, why it matters and how far
  * along. People who can act on it (owner, admin) open it like an accordion for each install's size, speed,
  * files, Cancel and Try again; everyone else sees the same line, not expandable. */
@@ -119,33 +122,11 @@ export function InstallDock({ admin, read: readProp, readJobs: readJobsProp, ret
   stop?: (id: string) => Promise<unknown>;
   repairsHref?: string;
 }) {
-  // AUDIT-UI-01: the default reads go through the shared query client, so the strip, the Ask box and the activity line share one request.
-  const reads = useSharedReads();
-  const read = readProp ?? reads.installStatus;
-  const readJobs = readJobsProp ?? reads.jobs;
-  const [status, setStatus] = useState<InstallStatusView | null>(null);
-  const [jobs, setJobs] = useState<HomeJobView[]>([]);
+  const status = useInstallStatus(readProp).data ?? null;
+  const jobs = useJobs({ read: readJobsProp, enabled: admin, fast: () => installActive(status), select: modelDownloadRows }).data ?? NO_ROWS;
   const [open, setOpen] = useState(false);
   const [retryError, setRetryError] = useState<string | null>(null);
   const [announcement, setAnnouncement] = useState("");
-
-  useEffect(() => {
-    let disposed = false;
-    let timer: ReturnType<typeof setTimeout> | undefined;
-    const poll = async () => {
-      let delay = 15_000;
-      try {
-        const [next, rows] = await Promise.all([read(), admin ? readJobs().catch(() => [] as HomeJobView[]) : Promise.resolve([] as HomeJobView[])]);
-        if (disposed) return;
-        setStatus(next && typeof next === "object" ? next : null);
-        setJobs(Array.isArray(rows) ? rows.filter((row) => row.kind === "model_download") : []);
-        if (next?.state === "downloading" || next.state === "starter_ready" || next.state === "installing_engine") delay = 2_000;
-      } catch { /* The dock is a courtesy; a missed poll is retried. */ }
-      if (!disposed) timer = setTimeout(() => void poll(), delay);
-    };
-    void poll();
-    return () => { disposed = true; if (timer) clearTimeout(timer); };
-  }, [read, readJobs, admin]);
 
   const model = buildDock(status, jobs);
   const showing = model.primary !== null;

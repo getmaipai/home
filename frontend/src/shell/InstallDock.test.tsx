@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, test } from "bun:test";
-import { cleanup, fireEvent, render, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
+import { renderWithQueryClient } from "../../tests/renderWithQueryClient";
 import { InstallDock, buildDock } from "./InstallDock";
 import type { HomeJobView, InstallStatusView } from "@/lib/api";
 
@@ -13,7 +14,7 @@ const status = (over: Partial<InstallStatusView> = {}): InstallStatusView => ({
 });
 const job: HomeJobView = { id: "stack:j1", kind: "model_download", state: "running", title: "muse-glimmer-30b-mlx-4bit", actions: ["stop"], progress: { completedBytes: 972_700_000, totalBytes: 19_443_246_692, bytesPerSecond: 44_800_000, items: [{ id: "a.safetensors", label: "a.safetensors", completedBytes: 1, totalBytes: 2, state: "running" }] } };
 const show = (admin: boolean, s: InstallStatusView, extra: Partial<Parameters<typeof InstallDock>[0]> = {}) =>
-  render(<MemoryRouter><InstallDock admin={admin} read={async () => s} readJobs={async () => [job]} {...extra} /></MemoryRouter>);
+  renderWithQueryClient(<MemoryRouter><InstallDock admin={admin} read={async () => s} readJobs={async () => [job]} {...extra} /></MemoryRouter>);
 
 describe("InstallDock", () => {
   test("says what is installing and why, in plain words, with the percent and time left", async () => {
@@ -108,7 +109,7 @@ describe("InstallDock", () => {
     let current = status();
     let polls = 0;
     const read = async () => { polls += 1; return current; };
-    const view = render(<MemoryRouter><InstallDock admin={false} read={read} readJobs={async () => []} /></MemoryRouter>);
+    const view = renderWithQueryClient(<MemoryRouter><InstallDock admin={false} read={read} readJobs={async () => []} /></MemoryRouter>);
     const announcer = view.getByTestId("install-announcer");
     expect(announcer.getAttribute("role")).toBe("status");
     await waitFor(() => expect(announcer.textContent).toContain("has started"));
@@ -118,7 +119,7 @@ describe("InstallDock", () => {
   });
 
   test("a payload that is not an install status draws nothing and does not crash", async () => {
-    const view = render(<MemoryRouter><InstallDock admin read={async () => ({}) as InstallStatusView} readJobs={async () => ({}) as unknown as HomeJobView[]} /></MemoryRouter>);
+    const view = renderWithQueryClient(<MemoryRouter><InstallDock admin read={async () => ({}) as InstallStatusView} readJobs={async () => ({}) as unknown as HomeJobView[]} /></MemoryRouter>);
     await new Promise((r) => setTimeout(r, 20));
     expect(view.queryByTestId("install-dock")).toBeNull();
   });

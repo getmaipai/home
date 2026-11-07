@@ -7,6 +7,7 @@ import type { BackgroundRun } from "@maipai/ui/src/elements/background-inbox";
 import { api, type HomeJobView } from "@/lib/api";
 import { WakeWordPersonContext } from "@/apps/chat/chatThreadContexts";
 import { NOTIFICATIONS_QUERY_KEY } from "@/shell/NotificationBell";
+import { JOBS_KEY } from "@/lib/sharedReads";
 import {
   runningNowView,
   type RunningNowActionKey,
@@ -15,7 +16,7 @@ import {
   type RunningNowView,
 } from "@/shell/runningNow";
 
-export const JOBS_QUERY_KEY = ["jobs"];
+export const JOBS_QUERY_KEY = JOBS_KEY;
 const ACTIVE_POLL_MS = 5_000;
 const IDLE_POLL_MS = 30_000;
 const RECENT_DONE_MS = 15 * 60_000;

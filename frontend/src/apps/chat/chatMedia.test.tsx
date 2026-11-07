@@ -7,13 +7,14 @@ import { afterEach, describe, expect, test } from "bun:test";
 import { cleanup, fireEvent, render as plainRender, waitFor, within } from "@testing-library/react";
 import type { ReactElement } from "react";
 import { MemoryRouter } from "react-router-dom";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { ToastProvider } from "@maipai/ui/src/primitives/Toast";
 import { AnswerBlockDataRender, textWithAnswerParts } from "@/apps/chat/chatAnswerBlocks";
 import { galleryBlockFor, legacyGalleryBlock } from "@maipai/home-backend/src/lib/answerImages/gallery";
 import type { AnswerImageSet } from "@maipai/home-backend/src/wire";
 import type { AnswerBlock } from "@maipai/spec/gen/ts/answer-block.js";
 
-const render = (ui: ReactElement) => plainRender(<MemoryRouter><ToastProvider>{ui}</ToastProvider></MemoryRouter>);
+const render = (ui: ReactElement) => plainRender(<QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}><MemoryRouter><ToastProvider>{ui}</ToastProvider></MemoryRouter></QueryClientProvider>);
 
 afterEach(cleanup);
 // Hub-relative picture addresses need a page address to resolve against, as in

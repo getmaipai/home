@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, test } from "bun:test";
-import { cleanup, fireEvent, render, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
+import { renderWithQueryClient } from "../../tests/renderWithQueryClient";
 import { InstallStrip } from "./InstallStrip";
 import { ApiError, type InstallStatusView } from "@/lib/api";
 
@@ -9,7 +10,7 @@ const status = (over: Partial<InstallStatusView>): InstallStatusView => ({
   state: "downloading", chatReady: false, complete: false, percent: 40, completedBytes: 4, totalBytes: 10,
   bytesPerSecond: null, etaSeconds: null, problem: null, items: [], ...over,
 });
-const show = (s: InstallStatusView) => render(<MemoryRouter><InstallStrip read={async () => s} /></MemoryRouter>);
+const show = (s: InstallStatusView) => renderWithQueryClient(<MemoryRouter><InstallStrip read={async () => s} /></MemoryRouter>);
 
 describe("InstallStrip", () => {
   test("shows progress while downloading", async () => {
@@ -24,7 +25,7 @@ describe("InstallStrip", () => {
   });
   test("a failed engine install shows its plain-words problem and Try again", async () => {
     const calls: string[] = [];
-    const view = render(<MemoryRouter><InstallStrip read={async () => status({ state: "engine_failed", problem: "No network. Check the connection, then press Try again." })} retry={async () => { calls.push("retry"); }} /></MemoryRouter>);
+    const view = renderWithQueryClient(<MemoryRouter><InstallStrip read={async () => status({ state: "engine_failed", problem: "No network. Check the connection, then press Try again." })} retry={async () => { calls.push("retry"); }} /></MemoryRouter>);
     await view.findAllByText(/No network/);
     fireEvent.click(await view.findByRole("button", { name: /try again|retry/i }));
     await waitFor(() => expect(calls).toEqual(["retry"]));
@@ -42,7 +43,7 @@ describe("InstallStrip", () => {
     const view = show(status({ state: "ready", complete: true, chatReady: true, background }));
     await view.findByText("Downloading Pictures: Z-Image-Turbo");
     cleanup();
-    const compact = render(<MemoryRouter><InstallStrip compact read={async () => status({ state: "none", background })} /></MemoryRouter>);
+    const compact = renderWithQueryClient(<MemoryRouter><InstallStrip compact read={async () => status({ state: "none", background })} /></MemoryRouter>);
     await compact.findByText("Downloading Pictures: Z-Image-Turbo");
     compact.getByText("29%");
   });
@@ -58,12 +59,12 @@ describe("InstallStrip", () => {
   test("the framed (bottom strip) form renders no empty container while idle, and the frame only with an install", async () => {
     const frame = (line: React.ReactNode) => <div data-testid="frame" className="border">{line}</div>;
     for (const state of ["none", "ready"] as const) {
-      const view = render(<MemoryRouter><InstallStrip compact frame={frame} read={async () => status({ state })} /></MemoryRouter>);
+      const view = renderWithQueryClient(<MemoryRouter><InstallStrip compact frame={frame} read={async () => status({ state })} /></MemoryRouter>);
       await new Promise((r) => setTimeout(r, 20));
       expect(view.container.innerHTML).toBe("");
       cleanup();
     }
-    const busy = render(<MemoryRouter><InstallStrip compact frame={frame} read={async () => status({})} /></MemoryRouter>);
+    const busy = renderWithQueryClient(<MemoryRouter><InstallStrip compact frame={frame} read={async () => status({})} /></MemoryRouter>);
     await busy.findByTestId("frame");
     busy.getByTestId("install-strip");
   });
@@ -72,7 +73,7 @@ describe("InstallStrip", () => {
     const withLink = show(status({}));
     await withLink.findByRole("link", { name: "Details" });
     cleanup();
-    const view = render(<MemoryRouter><InstallStrip detailsHref={null} read={async () => status({})} /></MemoryRouter>);
+    const view = renderWithQueryClient(<MemoryRouter><InstallStrip detailsHref={null} read={async () => status({})} /></MemoryRouter>);
     await view.findByTestId("install-strip");
     expect(view.queryByRole("link", { name: "Details" })).toBeNull();
   });
@@ -80,7 +81,7 @@ describe("InstallStrip", () => {
   test("a failed download's retry runs the given retry, and a refusal says what to do", async () => {
     const calls: string[] = [];
     const retry = async () => { calls.push("retry"); throw new ApiError("The AI engine isn't answering yet.", 409, undefined, "Wait a minute and press Check again."); };
-    const view = render(<MemoryRouter><InstallStrip read={async () => status({ state: "failed", problem: "A download did not finish." })} retry={retry} /></MemoryRouter>);
+    const view = renderWithQueryClient(<MemoryRouter><InstallStrip read={async () => status({ state: "failed", problem: "A download did not finish." })} retry={retry} /></MemoryRouter>);
     await view.findByTestId("install-strip");
     fireEvent.click(await view.findByRole("button", { name: /try again|retry/i }));
     await view.findByText("The AI engine isn't answering yet. Wait a minute and press Check again.");
@@ -88,7 +89,7 @@ describe("InstallStrip", () => {
   });
 
   test("compact is one line: title, percent, a thin bar, and no byte counts or stage table", async () => {
-    const view = render(<MemoryRouter><InstallStrip compact read={async () => status({ percent: 40, bytesPerSecond: 5, etaSeconds: 60 })} /></MemoryRouter>);
+    const view = renderWithQueryClient(<MemoryRouter><InstallStrip compact read={async () => status({ percent: 40, bytesPerSecond: 5, etaSeconds: 60 })} /></MemoryRouter>);
     await view.findByTestId("install-strip");
     view.getByText("Downloading your AI");
     view.getByText("40%");
@@ -99,7 +100,7 @@ describe("InstallStrip", () => {
 
   test("compact failure is one line with Try again", async () => {
     const calls: string[] = [];
-    const view = render(<MemoryRouter><InstallStrip compact read={async () => status({ state: "failed", problem: "A download did not finish." })} retry={async () => { calls.push("retry"); }} /></MemoryRouter>);
+    const view = renderWithQueryClient(<MemoryRouter><InstallStrip compact read={async () => status({ state: "failed", problem: "A download did not finish." })} retry={async () => { calls.push("retry"); }} /></MemoryRouter>);
     await view.findByText("A download did not finish.");
     expect(view.queryByRole("progressbar")).toBeNull();
     fireEvent.click(view.getByRole("button", { name: "Try again" }));

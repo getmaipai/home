@@ -2,6 +2,7 @@ import { afterEach, describe, expect, spyOn, test } from "bun:test";
 import { act, cleanup, fireEvent, render as plainRender } from "@testing-library/react";
 import type { ReactElement } from "react";
 import { MemoryRouter } from "react-router-dom";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { ToastProvider } from "@maipai/ui/src/primitives/Toast";
 import { AnswerBlockDataRender, drawableBlocks } from "@/apps/chat/chatAnswerBlocks";
 import * as api from "@/lib/api";
@@ -10,8 +11,8 @@ import newsFeedFixture from "@maipai/spec/fixtures/answer-block/valid-story_feed
 
 afterEach(cleanup);
 
-// The chat draws answer blocks under the router and the toast host; a band card uses both.
-const render = (ui: ReactElement) => plainRender(<MemoryRouter><ToastProvider>{ui}</ToastProvider></MemoryRouter>);
+// The chat draws answer blocks under the router, the toast host and the query client; a band card uses all three.
+const render = (ui: ReactElement) => plainRender(<QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}><MemoryRouter><ToastProvider>{ui}</ToastProvider></MemoryRouter></QueryClientProvider>);
 
 const block = {
   id: "blk-aaaaaaaaaaaa",
