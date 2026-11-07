@@ -18106,6 +18106,19 @@
                     },
                     "pitchSemitones": {
                       "type": "number"
+                    },
+                    "kind": {
+                      "type": "string",
+                      "enum": [
+                        "inspired"
+                      ]
+                    },
+                    "inspiredLevel": {
+                      "type": "string",
+                      "enum": [
+                        "different",
+                        "very_different"
+                      ]
                     }
                   },
                   "required": [
