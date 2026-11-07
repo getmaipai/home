@@ -699,7 +699,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/memoryRoom.ts` | readReclaim, runReclaim, capabilityView, readCapabilities, cannotRunJobs, cannotRunWhy |
 | `backend/src/lib/memoryShape.ts` | toMemoryRecord |
 | `backend/src/lib/modelCatalog.ts` | CATALOG, kvCacheBytes, weightsBytes, usableChatBudgetBytes, fitsWithin, recommend |
-| `backend/src/lib/modelDownload.ts` | sweepStaleDownloads, sha256OfFile, downloadUrl |
+| `backend/src/lib/modelDownload.ts` | __setDownloadIdleTimeoutForTests, __setDownloadRetryDelayScaleForTests, sweepStaleDownloads, sha256OfFile, downloadUrl |
 | `backend/src/lib/modelDownloadJobs.ts` | getJob, listJobs, recoverInterruptedJobsAtBoot, extractDownloadedArchive, startSelectJob |
 | `backend/src/lib/music/album.ts` | MAKE_ALBUM_TOOL_ID, EDIT_ALBUM_TOOL_ID, ALBUM_NOT_HERE_LINE, ALBUM_MODEL_LINE, ALBUM_GONE_LINE, albumPrompt |
 | `backend/src/lib/music/band.ts` | MAKE_BAND_TOOL_ID, BAND_NOT_HERE_LINE, BAND_MODEL_LINE, briefFor, bandPrompt, parseDraft |
@@ -799,7 +799,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/pictures/editTool.ts` | GENERATE_IMAGE_TOOL_ID, nameEditModel, latestPictureId, pictureIdsInConversation, runEditPicture |
 | `backend/src/lib/pictures/finishedCheck.ts` | stricterLane, sha256Of, checkFinishedAssets |
 | `backend/src/lib/pictures/jobStore.ts` | PICTURE_FAILED_PREFIX, plainFailure, saveJob, markLive, markSettled, getPictureJob |
-| `backend/src/lib/pictures/jobs.ts` | __resetPictureJobsForTests, startPictureJob, __setPicturePollMsForTests, cancelPictureJob, resumePictureJobs, fileUrl |
+| `backend/src/lib/pictures/jobs.ts` | __resetPictureJobsForTests, startPictureJob, __setPicturePollMsForTests, __setPictureTurnWaitForTests, cancelPictureJob, resumePictureJobs |
 | `backend/src/lib/pictures/keyframes.ts` | ensureKeyframeHelper, __setKeyframesForTests, __resetKeyframeHelperForTests, keyframeCount, extractKeyframes |
 | `backend/src/lib/pictures/lane.ts` | laneOf, KIDS_KEY, KID_ENABLED_KEY, KIDS_DAILY_PICTURES_KEY, KIDS_DAILY_VIDEOS_KEY, DEFAULT_KIDS_DAILY_PICTURES |
 | `backend/src/lib/pictures/laneGate.ts` | CHILD_SAFETY_SCHEMA, CHILD_SAFETY_SYSTEM_PROMPT, MIN_CHILD_CONFIDENCE, parseChildSafety, childSafetyOk, __setChildSafetyRunnerForTests |
@@ -942,7 +942,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/serviceComponent.ts` | serviceId, serviceComponent |
 | `backend/src/lib/serviceHealth.ts` | classifyServiceOutcome, recordServiceOutcome, serviceState, serviceDetail, serviceDiagnostics, reconcileServiceBlockIssues |
 | `backend/src/lib/session.ts` | generateSessionToken, hashSessionToken, sessionExpiresAt, sessionSignInSource, pruneExpiredSessions, issueSession |
-| `backend/src/lib/settings.ts` | parseScope, assertCanAccessScope, assertCanSetTtsVoice, resolveForResponse, listValues, onHouseholdWrite |
+| `backend/src/lib/settings.ts` | parseScope, assertCanAccessScope, assertCanSetTtsVoice, validateSelectorValue, resolveForResponse, listValues |
 | `backend/src/lib/settingsAreas.ts` | getSettingsAreas, settingsViewerFor, placeSetting, settingHref |
 | `backend/src/lib/settingsLayers.ts` | SELF, userDefaultItems, globalDefaultItems, layeredListKeys, resolveUnion, bandOfPerson |
 | `backend/src/lib/settingsMediaMigration.ts` | OLD_PICTURE_ADULT_KEY, OLD_VIDEO_ADULT_KEY, NEW_ADULT_STYLES_KEY, OLD_PICTURE_QUALITY_KEY, OLD_VIDEO_QUALITY_KEY, NEW_PICTURE_TIER_KEY |
@@ -1136,6 +1136,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/voiceTools.ts` | VOICEOVER_TOOL_ID, CHANGE_VOICE_TOOL_ID, voiceoverToolSpec, changeVoiceToolSpec, runVoiceoverTool, runChangeVoiceTool |
 | `backend/src/lib/voiceover.ts` | voicesFor, makeVoiceover, speakToBytes, speakAndStore |
 | `backend/src/lib/wakewordAssets.ts` | WAKEWORD_SHARED_ASSETS, WAKEWORD_STOCK_DETECTOR, WAKEWORD_ALL_ASSETS, wakewordAssetPath, isWakewordAssetInstalled, areWakewordAssetsInstalled |
+| `backend/src/lib/wallClock.ts` | wallClockParts, wallClockMinutes, validTimeZone |
 | `backend/src/lib/weatherAdvice.ts` | weatherAdvice, adviceLine, adviceFromRecipeData, adviceChips |
 | `backend/src/lib/weatherAlerts.ts` | __resetWeatherAlertsForTests, __setWeatherAlertsFetcherForTests, isUsAlertCoordinate, weatherAlerts, notifyWeatherAlertsForHome |
 | `backend/src/lib/weatherMoon.ts` | __resetMoonForTests, moonTile, cardMoon |
