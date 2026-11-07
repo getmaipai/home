@@ -88,9 +88,11 @@ service_state() {
   fi
 }
 
+# deno is listed because backend/tests/support/deno.ts finds it on PATH; launchd's default PATH lacks ~/.local/bin, so the
+# lander's safety-surface shard saw HAS_DENO false and tests/denoGate.test.ts failed (2026-11-07).
 launch_path() {
   local found="" p
-  for p in bun git gh node python3; do
+  for p in bun git gh node python3 deno; do
     found="$(command -v "$p" 2>/dev/null || true)"
     if [[ -n "$found" ]]; then printf '%s\n' "$(dirname "$found")"; fi
   done | awk '!seen[$0]++' | paste -sd ':' -
