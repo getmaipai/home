@@ -45,7 +45,20 @@ async function waitFor(job: string, signal: AbortSignal): Promise<EditResult> {
   try { return await waitPicture(job, signal); } catch (error) { void cancelOrDelete(job); throw error; }
 }
 
-export const realDeps: LikenessDeps = {
+const BUSY = /busy|something larger|stopped answering|no_memory|not ready|unreachable/i;
+/** The Stack is shared with chat and video: when it is busy or restarting, wait and try again, never show that raw. */
+export async function whenFree<T>(run: () => Promise<T>, waitMs = 15_000, tries = 8): Promise<T> {
+  for (let i = 0; ; i += 1) {
+    try { return await run(); } catch (error) {
+      const message = error instanceof Error ? error.message : "";
+      const code = (error as { code?: string }).code ?? "";
+      if (i >= tries || error instanceof DOMException || !(BUSY.test(message) || BUSY.test(code))) throw error;
+      await new Promise((r) => setTimeout(r, waitMs));
+    }
+  }
+}
+
+const rawDeps: LikenessDeps = {
   ensureAssets: async () => { await ensureVisionAssets(); },
   detect: detectFaces, embed: embedFace, silhouette: personSilhouette, head: headMask,
   seed: () => Math.floor(Math.random() * 2 ** 31),
@@ -96,6 +109,14 @@ async function similarity(deps: LikenessDeps, source: Uint8Array, result: Uint8A
   const [a, b] = await Promise.all([deps.embed(source, face), deps.embed(result, out)]);
   return a.ok && b.ok ? faceCosine(a.value, b.value) : 0;
 }
+
+export const realDeps: LikenessDeps = {
+  ...rawDeps,
+  silhouette: (...a) => whenFree(() => rawDeps.silhouette(...a)),
+  head: (...a) => whenFree(() => rawDeps.head(...a)),
+  edit: (...a) => whenFree(() => rawDeps.edit(...a)),
+  editMasked: (...a) => whenFree(() => rawDeps.editMasked(...a)),
+};
 
 /** Throws a plain sentence; returns the finished picture and its one-line note. Never hands over a picture that failed a guard. */
 export async function runLikenessEdit(

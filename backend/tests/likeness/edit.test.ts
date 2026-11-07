@@ -96,3 +96,13 @@ describe("likeness edit pipeline", () => {
     expect(await run(r, "clothes")).toBeNull();
   });
 });
+
+describe("waiting for a busy Stack", () => {
+  test("a busy answer is retried, a real failure is not", async () => {
+    const { whenFree } = await import("@/lib/pictures/likeness/edit");
+    let n = 0;
+    expect(await whenFree(async () => { n += 1; if (n < 3) throw new Error("Home is busy with something larger."); return "ok"; }, 1)).toBe("ok");
+    expect(n).toBe(3);
+    await expect(whenFree(async () => { throw new Error("bad picture"); }, 1)).rejects.toThrow("bad picture");
+  });
+});
