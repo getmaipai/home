@@ -73434,6 +73434,20 @@
                           "usable": {
                             "type": "boolean"
                           },
+                          "base_note": {
+                            "type": "string",
+                            "nullable": true,
+                            "description": "LTXD-18B: for an LTX-2.3 style that is not offered (untested on 2.5, or a test found no effect), the one plain line the library shows; else null."
+                          },
+                          "tested_on_25": {
+                            "type": "string",
+                            "nullable": true,
+                            "enum": [
+                              "tested",
+                              "no_effect",
+                              null
+                            ]
+                          },
                           "allow_suggesting": {
                             "type": "boolean"
                           },
@@ -73606,6 +73620,8 @@
                           "base_model",
                           "compatible_with",
                           "usable",
+                          "base_note",
+                          "tested_on_25",
                           "allow_suggesting",
                           "trigger_words",
                           "trigger_position",
@@ -74081,6 +74097,20 @@
                     "usable": {
                       "type": "boolean"
                     },
+                    "base_note": {
+                      "type": "string",
+                      "nullable": true,
+                      "description": "LTXD-18B: for an LTX-2.3 style that is not offered (untested on 2.5, or a test found no effect), the one plain line the library shows; else null."
+                    },
+                    "tested_on_25": {
+                      "type": "string",
+                      "nullable": true,
+                      "enum": [
+                        "tested",
+                        "no_effect",
+                        null
+                      ]
+                    },
                     "allow_suggesting": {
                       "type": "boolean"
                     },
@@ -74253,6 +74283,8 @@
                     "base_model",
                     "compatible_with",
                     "usable",
+                    "base_note",
+                    "tested_on_25",
                     "allow_suggesting",
                     "trigger_words",
                     "trigger_position",
@@ -74392,6 +74424,20 @@
                     "usable": {
                       "type": "boolean"
                     },
+                    "base_note": {
+                      "type": "string",
+                      "nullable": true,
+                      "description": "LTXD-18B: for an LTX-2.3 style that is not offered (untested on 2.5, or a test found no effect), the one plain line the library shows; else null."
+                    },
+                    "tested_on_25": {
+                      "type": "string",
+                      "nullable": true,
+                      "enum": [
+                        "tested",
+                        "no_effect",
+                        null
+                      ]
+                    },
                     "allow_suggesting": {
                       "type": "boolean"
                     },
@@ -74564,6 +74610,8 @@
                     "base_model",
                     "compatible_with",
                     "usable",
+                    "base_note",
+                    "tested_on_25",
                     "allow_suggesting",
                     "trigger_words",
                     "trigger_position",
@@ -74727,6 +74775,20 @@
                     "usable": {
                       "type": "boolean"
                     },
+                    "base_note": {
+                      "type": "string",
+                      "nullable": true,
+                      "description": "LTXD-18B: for an LTX-2.3 style that is not offered (untested on 2.5, or a test found no effect), the one plain line the library shows; else null."
+                    },
+                    "tested_on_25": {
+                      "type": "string",
+                      "nullable": true,
+                      "enum": [
+                        "tested",
+                        "no_effect",
+                        null
+                      ]
+                    },
                     "allow_suggesting": {
                       "type": "boolean"
                     },
@@ -74899,6 +74961,8 @@
                     "base_model",
                     "compatible_with",
                     "usable",
+                    "base_note",
+                    "tested_on_25",
                     "allow_suggesting",
                     "trigger_words",
                     "trigger_position",
@@ -75038,6 +75102,20 @@
                     "usable": {
                       "type": "boolean"
                     },
+                    "base_note": {
+                      "type": "string",
+                      "nullable": true,
+                      "description": "LTXD-18B: for an LTX-2.3 style that is not offered (untested on 2.5, or a test found no effect), the one plain line the library shows; else null."
+                    },
+                    "tested_on_25": {
+                      "type": "string",
+                      "nullable": true,
+                      "enum": [
+                        "tested",
+                        "no_effect",
+                        null
+                      ]
+                    },
                     "allow_suggesting": {
                       "type": "boolean"
                     },
@@ -75210,6 +75288,8 @@
                     "base_model",
                     "compatible_with",
                     "usable",
+                    "base_note",
+                    "tested_on_25",
                     "allow_suggesting",
                     "trigger_words",
                     "trigger_position",
@@ -75349,6 +75429,20 @@
                     "usable": {
                       "type": "boolean"
                     },
+                    "base_note": {
+                      "type": "string",
+                      "nullable": true,
+                      "description": "LTXD-18B: for an LTX-2.3 style that is not offered (untested on 2.5, or a test found no effect), the one plain line the library shows; else null."
+                    },
+                    "tested_on_25": {
+                      "type": "string",
+                      "nullable": true,
+                      "enum": [
+                        "tested",
+                        "no_effect",
+                        null
+                      ]
+                    },
                     "allow_suggesting": {
                       "type": "boolean"
                     },
@@ -75521,6 +75615,8 @@
                     "base_model",
                     "compatible_with",
                     "usable",
+                    "base_note",
+                    "tested_on_25",
                     "allow_suggesting",
                     "trigger_words",
                     "trigger_position",
@@ -75660,6 +75756,20 @@
                     "usable": {
                       "type": "boolean"
                     },
+                    "base_note": {
+                      "type": "string",
+                      "nullable": true,
+                      "description": "LTXD-18B: for an LTX-2.3 style that is not offered (untested on 2.5, or a test found no effect), the one plain line the library shows; else null."
+                    },
+                    "tested_on_25": {
+                      "type": "string",
+                      "nullable": true,
+                      "enum": [
+                        "tested",
+                        "no_effect",
+                        null
+                      ]
+                    },
                     "allow_suggesting": {
                       "type": "boolean"
                     },
@@ -75832,6 +75942,8 @@
                     "base_model",
                     "compatible_with",
                     "usable",
+                    "base_note",
+                    "tested_on_25",
                     "allow_suggesting",
                     "trigger_words",
                     "trigger_position",
