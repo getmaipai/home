@@ -75,7 +75,9 @@ export function gpuCompilerFault(): boolean {
 function chatBlockedByGpu(): boolean { return gpuCompilerFault() && canaryResults.lastReal("chat_hello")?.status === "fail"; }
 const GPU_HEALTH: RoleHealth = { availability: "unavailable", reason: "gpu_compiler", cause: "gpu" };
 
-export async function roleHealth(role: HealthRole, opts: { live?: boolean } = {}): Promise<RoleHealth> {
+/** `fresh: true` reads the Stack's role list now instead of the 2 s shared copy, keeping every other rule (a remembered
+ * refusal still counts): for classifying a failure the moment after a stream dropped. */
+export async function roleHealth(role: HealthRole, opts: { live?: boolean; fresh?: boolean } = {}): Promise<RoleHealth> {
   if (roleHealthForTests[role]) return roleHealthForTests[role]!;
   if (role === "chat" && chatBlockedByGpu()) return GPU_HEALTH;
   if (!isStackConfigured()) return { availability: "unavailable", reason: "stack_unreachable", cause: "restarting" };
@@ -105,7 +107,7 @@ export async function roleHealth(role: HealthRole, opts: { live?: boolean } = {}
   if (refusal) return { availability: "unavailable", reason: "stack_refused", detail: refusal.household, ...(/memory/i.test(refusal.household) ? { cause: "memory" as const } : {}) };
   try {
     const id = STACK_ROLE_ID[role] ?? role;
-    const { roles } = opts.live ? await getStackClient().roles() : await sharedStackRoles();
+    const { roles } = opts.live || opts.fresh ? await getStackClient().roles() : await sharedStackRoles();
     const row = roles.find((item) => item.id === id);
     if (!row) return { availability: "unavailable", reason: "stack_unreachable", cause: "restarting" };
     const state = row.state.state;

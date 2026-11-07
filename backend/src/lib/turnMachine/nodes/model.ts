@@ -17,6 +17,8 @@ import { EMPTY_LENGTH_RETRY_EXTRA_TOKENS } from "@/lib/reasoningReserve";
 import { foldedBlock } from "@/lib/systemFold";
 import { notePrefix } from "@/lib/prefixPrewarm";
 import { complete, startCompleteStreamPieces, envelopeToolCall, StackStreamError } from "@/lib/llm";
+// AUDIT-PERF-01: role reads are shared for 2 s; classifying a failure after a dropped stream asks the Stack fresh
+// (remembered refusals still count), or the pre-failure "ready" answer hides the outage.
 import { roleHealth } from "@/lib/roleHealth";
 import type { LlmMessage, ToolSpec, ToolCall } from "@/lib/llm";
 import { missingRequired } from "@/lib/capabilities";
@@ -1381,7 +1383,7 @@ const modelRound: Node<ModelInput, ModelOutput> = async (state, input, signal) =
     if (!attempt.ok) {
       settleFailedGate(gate, state, attempt.message, signal.aborted && !isDeadlineAbort(signal));
       const failureMessage = attempt.message ?? "";
-      if ((await roleHealth("chat")).availability === "unavailable" || failureMessage.includes("could not reach") || failureMessage.includes("connection refused") || failureMessage.includes("ForeignPortHolderError")) {
+      if ((await roleHealth("chat", { fresh: true })).availability === "unavailable" || failureMessage.includes("could not reach") || failureMessage.includes("connection refused") || failureMessage.includes("ForeignPortHolderError")) {
         state.engineUnavailable = true;
         return { outcome: { ok: false, code: "engine_unavailable", message: "MaiPai's AI isn't running right now." }, output: { kind: "model_failed" } };
       }
@@ -1626,7 +1628,7 @@ export const ENGINE_HEAL_POLL_MS = 2_000;
 /** TURN-TTL-01: the engine, not the request, is why a generation failed. */
 export async function engineLost(attempt: { ok: boolean; message?: string }): Promise<boolean> {
   if (attempt.ok) return false;
-  return connectionLost(attempt) || (await roleHealth("chat")).availability === "unavailable";
+  return connectionLost(attempt) || (await roleHealth("chat", { fresh: true })).availability === "unavailable";
 }
 
 /** TURN-TTL-01: the failure text says the connection to the engine dropped (not a refusal for memory or a bad request).
@@ -1650,7 +1652,7 @@ export async function waitForEngineHeal(signal: AbortSignal, maxMs: number, poll
       signal.addEventListener("abort", () => { clearTimeout(timer); resolve(); }, { once: true });
     });
     if (signal.aborted) return false;
-    if ((await roleHealth("chat")).availability !== "unavailable") return true;
+    if ((await roleHealth("chat", { fresh: true })).availability !== "unavailable") return true;
   }
   return false;
 }
