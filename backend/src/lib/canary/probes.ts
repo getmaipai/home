@@ -20,7 +20,7 @@ import { turnActiveWithin } from "@/lib/turnActivity";
 import { getHouseholdSettingValue } from "@/lib/settings";
 import { submitGeneration, getGenerationJob, cancelOrDelete } from "@/lib/pictures/stack";
 import { HEALTH_ACTOR_ID, healthActor } from "./identity";
-import { IDLE_WINDOW_MS } from "./schedule";
+import { CALM_CHAT_QUIET_MS, IDLE_WINDOW_MS } from "./schedule";
 import { decodeWav } from "./wav";
 import type { ChatImagePart } from "@/wire";
 import type { CanaryDeps, ChatProbe, ChatProbeRequest } from "./types";
@@ -181,6 +181,7 @@ export const realDeps: CanaryDeps = {
   },
   blocker: stackBlocker,
   turnActive: () => turnActiveWithin(IDLE_WINDOW_MS),
+  chatWithinHour: () => turnActiveWithin(CALM_CHAT_QUIET_MS),
   requestRestart: stackRestart,
   gpuCompile: stackGpuCompile,
   loadHigh: loadIsHigh,

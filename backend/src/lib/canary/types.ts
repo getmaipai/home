@@ -35,6 +35,8 @@ export interface CanaryDeps {
   blocker(): Promise<string | null>;
   /** A person's turn started or finished recently. */
   turnActive(): boolean;
+  /** Anyone chatted in the last hour (AUDIT-PERF-01: the slowed cadence waits for a quiet hour). */
+  chatWithinHour(): boolean;
   /** Ask the Stack for ONE supervised restart of the chat engine (its own self-heal path; the breaker keeps its count). False when it declines. */
   requestRestart(reason: string, role?: "chat" | "image" | "video"): Promise<boolean>;
   /** GPU-HEALTH-01: the Stack compiles one tiny shader. null when the Stack cannot be asked (older Stack, unreachable). */

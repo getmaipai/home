@@ -6,8 +6,8 @@ import { listIssues } from "@/lib/issues";
 import { CHECKS, WEATHER_PHRASE, wordMatch } from "@/lib/canary/checks";
 import { HEALTH_ACTOR_ID, healthActor } from "@/lib/canary/identity";
 import { __resetCanaryResultsForTests, failuresInARow, last } from "@/lib/canary/results";
-import { __resetCanaryRunnerForTests, canaryStatus, canaryTick, MANUAL_DEBOUNCE_MS, runNow, runSuite } from "@/lib/canary/runner";
-import { __resetCanaryScheduleForTests, dueChecks, emptySchedule, INTERVAL_MS, noteRun, schedule, searchAllowed, SEARCH_PER_DAY } from "@/lib/canary/schedule";
+import { __resetCanaryRunnerForTests, canaryStatus, canaryTick, requestFullSuite, MANUAL_DEBOUNCE_MS, runNow, runSuite } from "@/lib/canary/runner";
+import { __resetCanaryScheduleForTests, CALM_AFTER_PASSES, CALM_INTERVAL_MS, calmCadence, noteStatus, dueChecks, emptySchedule, INTERVAL_MS, noteRun, schedule, searchAllowed, SEARCH_PER_DAY } from "@/lib/canary/schedule";
 import { decodeWav } from "@/lib/canary/wav";
 import { encodeWav } from "@/lib/sttSession";
 import { gpuCompilerFault, roleHealth, __resetMakingHealthForTests } from "@/lib/roleHealth";
@@ -41,6 +41,7 @@ function deps(over: Partial<CanaryDeps> = {}): CanaryDeps {
     async visionReady() { return true; },
     async blocker() { return null; },
     turnActive: () => false,
+    chatWithinHour: () => false,
     async requestRestart(_reason, role) { restarts += 1; restartRoles.push(role ?? "chat"); return true; },
     async gpuCompile() { return { ok: true, reason: null }; },
     searchTrouble: () => false,
@@ -454,5 +455,50 @@ describe("GPU-HEALTH-01: the graphics compiler canary", () => {
 
   test("the check is scheduled even with keep-warm off", () => {
     expect(dueChecks(clock, emptySchedule(), { keepWarm: false })).toContain("gpu_metal");
+  });
+});
+
+describe("calm cadence (AUDIT-PERF-01)", () => {
+  const t0 = 1_800_000_000_000;
+  const ran = (st: ReturnType<typeof emptySchedule>) => { for (const id of ["chat_hello", "embed", "chat_tool_weather", "spoken_turn", "stt_tts_loopback", "chat_picture_read", "image_tiny", "gpu_metal"] as const) noteRun(st, id, t0, 0.5); st.nextSearchAt = t0 + 99 * 3_600_000; };
+  const calmState = () => { const st = emptySchedule(); ran(st); for (let i = 0; i < CALM_AFTER_PASSES; i++) noteStatus(st, "pass"); return st; };
+
+  test("full cadence until ten passes in a row: nine passes are not enough", () => {
+    const st = emptySchedule(); ran(st);
+    for (let i = 0; i < CALM_AFTER_PASSES - 1; i++) noteStatus(st, "pass");
+    expect(calmCadence(st, false)).toBe(false);
+    expect(dueChecks(t0 + 11 * 60_000, st, { keepWarm: true })).toEqual(["chat_hello", "embed"]);
+    expect(dueChecks(t0 + 31 * 60_000, st, { keepWarm: true })).toContain("chat_tool_weather");
+  });
+
+  test("after ten passes and a quiet hour: hello every 30 min, weather, spoken and loopback every 2 h, the rest unchanged", () => {
+    const st = calmState();
+    expect(CALM_INTERVAL_MS).toEqual({ chat_hello: 30 * 60_000, chat_tool_weather: 2 * 3_600_000, spoken_turn: 2 * 3_600_000, stt_tts_loopback: 2 * 3_600_000 });
+    expect(dueChecks(t0 + 11 * 60_000, st, { keepWarm: true })).toEqual(["embed"]);
+    expect(dueChecks(t0 + 31 * 60_000, st, { keepWarm: true })).toEqual(["chat_hello", "embed", "gpu_metal"]);
+    expect(dueChecks(t0 + 31 * 60_000, st, { keepWarm: true })).not.toContain("spoken_turn");
+    expect(dueChecks(t0 + 121 * 60_000, st, { keepWarm: true })).toEqual(expect.arrayContaining(["chat_tool_weather", "spoken_turn", "stt_tts_loopback", "chat_picture_read"]));
+  });
+
+  test("family chat in the last hour, a failure, or a full-suite request brings the full cadence back", () => {
+    const st = calmState();
+    expect(dueChecks(t0 + 11 * 60_000, st, { keepWarm: true, familyChatLastHour: true })).toEqual(["chat_hello", "embed"]);
+    noteStatus(st, "fail");
+    expect(calmCadence(st, false)).toBe(false);
+    const again = calmState();
+    requestFullSuite("post_start");
+    expect(again.passStreak).toBe(CALM_AFTER_PASSES); // a separate state is untouched
+    Object.assign(schedule, calmState());
+    expect(calmCadence(schedule, false)).toBe(true);
+    requestFullSuite("post_start");
+    expect(schedule.passStreak).toBe(0);
+  });
+
+  test("the runner counts only real results: ten passing suites turn the calm cadence on, a failing hello turns it off", async () => {
+    for (let i = 0; i < 2; i++) { await runSuite(deps(), { reason: "post_start" }); clock += 11 * 60_000; }
+    expect(schedule.passStreak).toBeGreaterThanOrEqual(CALM_AFTER_PASSES);
+    expect(calmCadence(schedule, false)).toBe(true);
+    await runSuite(deps({ async chat() { throw new Error("down"); } }), { reason: "manual", only: ["chat_hello"] });
+    expect(schedule.passStreak).toBe(0);
   });
 });

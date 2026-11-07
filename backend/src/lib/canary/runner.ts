@@ -5,7 +5,7 @@ import { raiseIssue, resolveIssue } from "@/lib/issues";
 import { getStackClient, isStackConfigured } from "@/lib/stackEngine";
 import { CHECKS, CHECK_BY_ID } from "./checks";
 import * as results from "./results";
-import { ORDER, SLOW_BACKOFF_MS, dueChecks, noteRun, pickSearchPhrase, schedule, searchAllowed, SEARCH_QUIET_MS } from "./schedule";
+import { ORDER, SLOW_BACKOFF_MS, dueChecks, noteRun, noteStatus, pickSearchPhrase, schedule, searchAllowed, SEARCH_QUIET_MS } from "./schedule";
 import type { CanaryCheck, CanaryDeps, CanaryGroup, CanaryId, CheckResult, Outcome } from "./types";
 
 export const ISSUE_SOURCE = "canary";
@@ -101,7 +101,7 @@ export async function runSuite(deps: CanaryDeps, opts: RunOptions): Promise<Chec
     const now = deps.now();
     let ids: CanaryId[];
     if (opts.only) ids = ORDER.filter((id) => opts.only!.includes(id));
-    else if (opts.reason === "scheduled") ids = dueChecks(now, schedule, { keepWarm: deps.keepWarm() });
+    else if (opts.reason === "scheduled") ids = dueChecks(now, schedule, { keepWarm: deps.keepWarm(), familyChatLastHour: deps.chatWithinHour() });
     else ids = ORDER.filter((id) => id !== "image_tiny" && id !== "chat_search_trigger");
     if (opts.reason !== "scheduled" && !opts.only) {
       const wantSearch = opts.reason === "manual" ? opts.includeSearch === true : deps.keepWarm() && searchAllowed(schedule, now);
@@ -123,7 +123,7 @@ export async function runSuite(deps: CanaryDeps, opts: RunOptions): Promise<Chec
       }
       const searchPhrase = pickSearchPhrase(deps.random());
       const { result, outcome } = await runOne(check, deps, { searchPhrase, chatDown });
-      if (result.status !== "skipped") noteRun(schedule, id, deps.now(), deps.random());
+      if (result.status !== "skipped") { noteRun(schedule, id, deps.now(), deps.random()); noteStatus(schedule, result.status); }
       else if (id !== "chat_hello") schedule.lastRun[id] = deps.now();
       if (id === "chat_hello" && result.status === "fail") chatDown = true;
       if (id === "chat_search_trigger" && result.status === "fail") schedule.searchQuietUntil = deps.now() + SEARCH_QUIET_MS;
@@ -148,6 +148,7 @@ export async function runNow(deps: CanaryDeps, opts: { includeSearch?: boolean; 
 export function requestFullSuite(reason: RunReason = "heal"): void {
   flags.pendingPostStart = true;
   flags.pendingReason = reason;
+  schedule.passStreak = 0; // the full cadence returns until ten checks pass again
 }
 
 async function chatGeneration(): Promise<string | null> {
