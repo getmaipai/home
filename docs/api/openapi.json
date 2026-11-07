@@ -18116,9 +18116,14 @@
                     "inspiredLevel": {
                       "type": "string",
                       "enum": [
+                        "much_lower",
+                        "lower",
                         "different",
                         "very_different"
                       ]
+                    },
+                    "inspiredBaseId": {
+                      "type": "string"
                     }
                   },
                   "required": [
@@ -18165,6 +18170,76 @@
           },
           "404": {
             "description": "Unknown voice",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/voice/cloned/preview": {
+      "post": {
+        "tags": [
+          "Voice"
+        ],
+        "summary": "Preview an Inspired voice level",
+        "description": "Takes the same multipart form as creating a voice (file, inspired_level, optional base_voice_id) and returns about four seconds of the shifted clip as WAV audio. Nothing is saved.",
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "nullable": true
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "A short WAV sample.",
+            "content": {
+              "audio/wav": {
+                "schema": {
+                  "nullable": true
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Missing file or level",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not allowed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Unknown voice to blend with",
             "content": {
               "application/json": {
                 "schema": {
