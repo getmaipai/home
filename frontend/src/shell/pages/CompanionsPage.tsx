@@ -31,6 +31,7 @@ import { useCompanionStills } from "@/apps/chat/useCompanionAvatar";
 import { ActivityFeed, type ActivityFeedGroup } from "@maipai/ui/src/elements/activity-feed";
 import { TaskBrowser } from "@maipai/ui/src/elements/task-browser";
 import { Card } from "@maipai/ui/src/primitives/Card";
+import { errorLine } from "@/lib/hubReachability";
 
 const listKey = ["companions"] as const;
 const ROBOT_SETTINGS = "/settings/apps?tab=robot";
@@ -47,7 +48,7 @@ async function openCompanionChat(card: CompanionCard, navigate: ReturnType<typeo
       navigate(`/chat?conversation=${encodeURIComponent(conversation.id)}`);
     }
   } catch (error) {
-    onError(error instanceof ApiError ? error.message : "Could not open a chat. Check your connection and try again.");
+    onError(errorLine(error, "Could not open a chat. Check your connection and try again."));
   }
 }
 
@@ -87,13 +88,13 @@ function CompanionsDirectory() {
   const admin = viewer?.role === "owner" || viewer?.role === "admin";
   const queryClient = useQueryClient();
   const companionStills = useCompanionStills([...(query.data?.companions ?? []), ...(query.data?.discover ?? [])].map(({ id }) => id));
-  const saveDefault = useMutation({ mutationFn: (id: string) => api.setDefaultCompanion(id), onSuccess: () => { void queryClient.invalidateQueries({ queryKey: listKey }); }, onError: (error) => setActionError(error instanceof ApiError ? error.message : "Could not set your default. Check your connection and try again.") });
-  const remove = useMutation({ mutationFn: (id: string) => api.deleteCompanion(id), onSuccess: () => { setDeleteTarget(null); void queryClient.invalidateQueries({ queryKey: listKey }); }, onError: (error) => setActionError(error instanceof ApiError ? error.message : "Could not delete this companion. Check your connection and try again.") });
-  const addToYours = useMutation({ mutationFn: (id: string) => api.addCompanion(id), onSuccess: () => { setActionError(null); void queryClient.invalidateQueries({ queryKey: listKey }); }, onError: (error) => setActionError(error instanceof ApiError ? error.message : "Could not add this companion. Check your connection and try again.") });
-  const removeFromYours = useMutation({ mutationFn: (id: string) => api.removeCompanion(id), onSuccess: () => { setActionError(null); void queryClient.invalidateQueries({ queryKey: listKey }); }, onError: (error) => setActionError(error instanceof ApiError ? error.message : "Could not remove this companion. Check your connection and try again.") });
+  const saveDefault = useMutation({ mutationFn: (id: string) => api.setDefaultCompanion(id), onSuccess: () => { void queryClient.invalidateQueries({ queryKey: listKey }); }, onError: (error) => setActionError(errorLine(error, "Could not set your default. Check your connection and try again.")) });
+  const remove = useMutation({ mutationFn: (id: string) => api.deleteCompanion(id), onSuccess: () => { setDeleteTarget(null); void queryClient.invalidateQueries({ queryKey: listKey }); }, onError: (error) => setActionError(errorLine(error, "Could not delete this companion. Check your connection and try again.")) });
+  const addToYours = useMutation({ mutationFn: (id: string) => api.addCompanion(id), onSuccess: () => { setActionError(null); void queryClient.invalidateQueries({ queryKey: listKey }); }, onError: (error) => setActionError(errorLine(error, "Could not add this companion. Check your connection and try again.")) });
+  const removeFromYours = useMutation({ mutationFn: (id: string) => api.removeCompanion(id), onSuccess: () => { setActionError(null); void queryClient.invalidateQueries({ queryKey: listKey }); }, onError: (error) => setActionError(errorLine(error, "Could not remove this companion. Check your connection and try again.")) });
   const editPath = (id: string) => `/companions/${encodeURIComponent(id)}/create`;
-  const copy = useMutation({ mutationFn: (id: string) => api.copyCompanion(id), onSuccess: (result) => { setActionError(null); void queryClient.invalidateQueries({ queryKey: listKey }); navigate(editPath(result.id)); }, onError: (error) => setActionError(error instanceof ApiError ? error.message : "Could not make a copy. Check your connection and try again.") });
-  const setStatus = useMutation({ mutationFn: (input: { id: string; next: "draft" | "ready" }) => api.setCompanionStatus(input.id, input.next), onSuccess: () => { setActionError(null); void queryClient.invalidateQueries({ queryKey: listKey }); }, onError: (error) => setActionError(error instanceof ApiError ? error.message : "Could not change this companion's status. Check your connection and try again.") });
+  const copy = useMutation({ mutationFn: (id: string) => api.copyCompanion(id), onSuccess: (result) => { setActionError(null); void queryClient.invalidateQueries({ queryKey: listKey }); navigate(editPath(result.id)); }, onError: (error) => setActionError(errorLine(error, "Could not make a copy. Check your connection and try again.")) });
+  const setStatus = useMutation({ mutationFn: (input: { id: string; next: "draft" | "ready" }) => api.setCompanionStatus(input.id, input.next), onSuccess: () => { setActionError(null); void queryClient.invalidateQueries({ queryKey: listKey }); }, onError: (error) => setActionError(errorLine(error, "Could not change this companion's status. Check your connection and try again.")) });
   const menuActions: MenuActions = { onDelete: setDeleteTarget, onSetDefault: (item) => saveDefault.mutate(item.id), onEdit: (item) => navigate(editPath(item.id)), onCopy: (item) => copy.mutate(item.id), onStatus: (item, next) => setStatus.mutate({ id: item.id, next }), ...(admin ? { onAudience: setAudienceTarget } : {}) };
   return (
     <>
@@ -109,7 +110,7 @@ function CompanionsDirectory() {
         error={query.isError}
         isFetching={query.isFetching}
         onRetry={() => query.refetch()}
-        errorMessage={query.error instanceof ApiError ? query.error.message : "Could not load the companions. Check your connection and try again."}
+        errorMessage={errorLine(query.error, "Could not load the companions. Check your connection and try again.")}
         loadingLabel="Loading companions"
       >
         {(data: CompanionList) => (
@@ -208,7 +209,7 @@ function DetailSetup({ companion, saved, copy, save }: { companion: CompanionDet
       const conversation = await api.createConversation(undefined, undefined, undefined, companion.id);
       navigate(`/chat?conversation=${encodeURIComponent(conversation.id)}`);
     } catch (error) {
-      setChatError(error instanceof ApiError ? `${error.message} Choose another companion or try again.` : "Could not start a chat with this companion. Check your connection and try again.");
+      setChatError(errorLine(error, "Could not start a chat with this companion. Check your connection and try again."));
     } finally {
       setStartingChat(false);
     }
@@ -221,9 +222,9 @@ function DetailSetup({ companion, saved, copy, save }: { companion: CompanionDet
           {companion.can_copy ? <Button type="button" variant="outline" disabled={copy.isPending} onClick={() => copy.mutate()}>Customize a copy</Button> : null}
           {companion.can_edit ? <Link to={`/companions/${encodeURIComponent(companion.id)}/create`}><Button type="button" variant="outline">Edit</Button></Link> : null}
       </>} />
-      {save.isError ? <Alert variant="destructive"><AlertDescription>{save.error instanceof ApiError ? save.error.message : "Could not save this. Check your connection and try again."}</AlertDescription></Alert> : null}
+      {save.isError ? <Alert variant="destructive"><AlertDescription>{errorLine(save.error, "Could not save this. Check your connection and try again.")}</AlertDescription></Alert> : null}
       {chatError ? <Alert variant="destructive"><AlertDescription>{chatError}</AlertDescription></Alert> : null}
-      {copy.isError ? <Alert variant="destructive"><AlertDescription>{copy.error instanceof ApiError ? copy.error.message : "Could not reach Home. Check your connection and try again."}</AlertDescription></Alert> : null}
+      {copy.isError ? <Alert variant="destructive"><AlertDescription>{errorLine(copy.error, "Could not reach Home. Check your connection and try again.")}</AlertDescription></Alert> : null}
       {!companion.is_household && companion.can_copy ? <p>This companion comes with Home, so it can't be changed. Make a copy and edit that.</p> : null}
       <ProfileTabs companion={companion} stills={stills} />
     </>
@@ -350,7 +351,7 @@ function VoiceRow({ companion }: { companion: CompanionDetail }) {
             disabled={saveVoice.isPending}
             onValueChange={(value) => saveVoice.mutate(value)}
           />
-          {saveVoice.isError ? <Alert variant="destructive"><AlertDescription>{saveVoice.error instanceof ApiError ? saveVoice.error.message : "Could not save this voice. Check your connection and try again."}</AlertDescription></Alert> : null}
+          {saveVoice.isError ? <Alert variant="destructive"><AlertDescription>{errorLine(saveVoice.error, "Could not save this voice. Check your connection and try again.")}</AlertDescription></Alert> : null}
         </div>
       ) : null}
       {voices.isError ? <Alert variant="destructive"><AlertDescription>Home can't reach its voice service. Check Repairs, then come back.</AlertDescription></Alert> : null}

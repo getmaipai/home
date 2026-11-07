@@ -19,6 +19,7 @@ import { api, ApiError, type PersonDeletionPreview, type PersonRosterEntry, type
 import { ROLE_LABELS, canDeletePerson, canManagePerson, creatableRoles } from "@/apps/people/roles";
 import { SettingsRenderer } from "@/shell/pages/settings/SettingsRenderer";
 import { OtherPersonMemories } from "@/apps/memory/PersonMemories";
+import { errorLine } from "@/lib/hubReachability";
 
 interface UsersSectionProps {
   person: Roster;
@@ -111,7 +112,7 @@ export function UsersSection({ person }: UsersSectionProps) {
     } catch (err) {
       setFormError(err instanceof ApiError && /profile requires a secret/i.test(err.message)
         ? "This role requires a PIN or password. Enter one above, then try again."
-        : err instanceof ApiError ? err.message : "Could not add that person.");
+        : errorLine(err, "Could not add that person."));
       throw err;
     } finally {
       setSubmitting(false);
@@ -125,7 +126,7 @@ export function UsersSection({ person }: UsersSectionProps) {
       const updated = await api.setSetting("household", "companions.allowed", true);
       queryClient.setQueryData<typeof householdSettingsQuery.data>(["settings-values", "household", "companions.allowed"], (rows) => (rows ?? []).map((row) => row.key === updated.key ? updated : row));
     } catch (err) {
-      setActionError(err instanceof ApiError ? err.message : "Could not save the AI companions setting.");
+      setActionError(errorLine(err, "Could not save the AI companions setting."));
     } finally { setCompanionsSaving(false); }
   }
 
@@ -139,7 +140,7 @@ export function UsersSection({ person }: UsersSectionProps) {
       const updated = await api.setSetting("household", "companions.allowed", false);
       queryClient.setQueryData<typeof householdSettingsQuery.data>(["settings-values", "household", "companions.allowed"], (rows) => (rows ?? []).map((row) => row.key === updated.key ? updated : row));
     } catch (err) {
-      setActionError(err instanceof ApiError ? err.message : "Could not save the AI companions setting.");
+      setActionError(errorLine(err, "Could not save the AI companions setting."));
     } finally { setCompanionsSaving(false); }
   }
 
@@ -165,7 +166,7 @@ export function UsersSection({ person }: UsersSectionProps) {
       setEditingId(null);
       await invalidateRoster();
     } catch (err) {
-      setActionError(err instanceof ApiError ? err.message : "Could not save those changes.");
+      setActionError(errorLine(err, "Could not save those changes."));
     } finally {
       setBusy(false);
     }
@@ -179,7 +180,7 @@ export function UsersSection({ person }: UsersSectionProps) {
       setConfirmingDelete(null);
       await invalidateRoster();
     } catch (err) {
-      setActionError(err instanceof ApiError ? err.message : "Could not remove that person.");
+      setActionError(errorLine(err, "Could not remove that person."));
     } finally {
       setBusy(false);
     }
@@ -201,7 +202,7 @@ export function UsersSection({ person }: UsersSectionProps) {
       leaveSelectMode();
       await invalidateRoster();
     } catch (err) {
-      setActionError(err instanceof ApiError ? err.message : "Could not remove those people.");
+      setActionError(errorLine(err, "Could not remove those people."));
     } finally {
       setBusy(false);
     }

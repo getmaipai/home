@@ -16,9 +16,9 @@ export function isHubUnreachable(error: unknown): boolean {
   return error instanceof TypeError || (error instanceof Error && /failed to fetch|networkerror|load failed|network request failed/i.test(error.message));
 }
 
-/** The line to print for a failed request: the hub's own words when it
+/** The one line to print for a failed request (AUDIT-DUP-FE-01): the hub's own words when it
  * answered, the restarting line when it did not. */
-export function hubErrorMessage(error: unknown, fallback = HUB_DOWN_LINE): string {
+export function errorLine(error: unknown, fallback = HUB_DOWN_LINE): string {
   if (isHubUnreachable(error)) return HUB_DOWN_LINE;
   return error instanceof ApiError ? error.message : fallback;
 }

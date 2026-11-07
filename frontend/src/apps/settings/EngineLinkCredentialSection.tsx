@@ -9,7 +9,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@maipai/ui/src/dashboard/components/ui/select";
 import { ApiError, api } from "@/lib/api";
 import { DestructiveConfirm } from "@maipai/ui/src/primitives/DestructiveConfirm";
-import { hubErrorMessage } from "@/lib/hubReachability";
+import { errorLine } from "@/lib/hubReachability";
 import { useHubMutation } from "@/lib/useHubMutation";
 
 // ENGINES-AI-01: pairing is a wizard, one screen per step, with Back and Next, in the kit Dialog as it ships. The step
@@ -87,7 +87,7 @@ export function EngineLinkCredentialSection() {
     verb: "complete engine setup",
     mutationFn: async (perform: () => Promise<void>) => {
       try { await perform(); }
-      catch (err) { setError(hubErrorMessage(err, "Home could not do that. Check that Home is running, then try again.")); }
+      catch (err) { setError(errorLine(err, "Home could not do that. Check that Home is running, then try again.")); }
     },
   });
   const revokeAction = useHubMutation({ verb: "revoke the link key", mutationFn: () => revoke(), onSuccess: () => setConfirmRevoke(false) });
@@ -178,7 +178,7 @@ export function EngineLinkCredentialSection() {
       const result = await api.engineConnectionCheck();
       setHops(result.hops);
     } catch (err) {
-      setError(`${hubErrorMessage(err, "Home could not check the connection.")} Select Retry, or open Engines and AI and select Check the connection.`);
+      setError(`${errorLine(err, "Home could not check the connection.")} Select Retry, or open Engines and AI and select Check the connection.`);
     }
   }
 

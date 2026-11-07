@@ -23,9 +23,10 @@ import {
   DropdownMenuTrigger,
 } from "@maipai/ui/src/dashboard/components/ui/dropdown-menu";
 import { rowsFrom, hasUpdate, type UpdateRow } from "@/apps/settings/updatesData";
-import { api, ApiError, isOwnerOrAdminRole, type UpdateProjection, type Roster } from "@/lib/api";
+import { api, isOwnerOrAdminRole, type UpdateProjection, type Roster } from "@/lib/api";
 import { useTabItem } from "@/shell/tabIdentity";
 import { useDataTableControls } from "@/shell/pages/useDataTableControls";
+import { errorLine } from "@/lib/hubReachability";
 
 /** /updates: SHELL-07's own row (docs/plans/shell-on-shadcndashboard-
  * 2026-09-21.md's plan row) - `GET /api/updates` through the kit's
@@ -88,7 +89,7 @@ export function UpdatesPage({ person }: { person: Roster }) {
     try {
       await run();
     } catch (error) {
-      toast.error(error instanceof ApiError ? error.message : "That didn't work.");
+      toast.error(errorLine(error, "That didn't work."));
     } finally {
       setBusyIds((previous) => {
         const next = new Set(previous);
@@ -134,7 +135,7 @@ export function UpdatesPage({ person }: { person: Roster }) {
           error={query.isError}
           isFetching={query.isFetching}
           onRetry={() => query.refetch()}
-          errorMessage={query.error instanceof ApiError ? query.error.message : "Could not load updates."}
+          errorMessage={errorLine(query.error, "Could not load updates.")}
           loadingLabel="Loading updates"
         >
           {() => (

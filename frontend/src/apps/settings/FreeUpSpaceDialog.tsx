@@ -10,9 +10,9 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Skeleton } from "@maipai/ui/src/ui/skeleton";
 import { Item, ItemActions, ItemContent, ItemDescription, ItemGroup, ItemTitle } from "@maipai/ui/src/dashboard/components/ui/item";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@maipai/ui/src/dashboard/components/ui/alert-dialog";
-import { ApiError } from "@/lib/api";
 import { aiChoicesApi, type CleanupResult } from "@/lib/aiChoicesApi";
 import { sizeGb } from "../../../../shared/diskPlanMath";
+import { errorLine } from "@/lib/hubReachability";
 
 const KEY = ["ai", "unused"] as const;
 
@@ -23,7 +23,7 @@ export interface FreeUpSpaceDialogProps {
   onChanged?: () => void;
 }
 
-const messageOf = (error: unknown, fallback: string) => (error instanceof ApiError ? error.message : fallback);
+const messageOf = (error: unknown, fallback: string) => (errorLine(error, fallback));
 const joinNames = (names: string[]) => (names.length <= 1 ? (names[0] ?? "") : `${names.slice(0, -1).join(", ")} and ${names[names.length - 1]}`);
 
 export function FreeUpSpaceDialog({ open, onOpenChange, onChanged }: FreeUpSpaceDialogProps) {

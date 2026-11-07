@@ -34,6 +34,7 @@ import { StorageStep, type StorageChoice } from "./StorageStep";
 import { NewPersonForm } from "@/apps/people/NewPersonForm";
 import { EngineLinkCredentialSection } from "@/apps/settings/EngineLinkCredentialSection";
 import type { SetupCodingView } from "@/lib/api";
+import { errorLine } from "@/lib/hubReachability";
 
 const ErrorIcon = getIcon("alert-triangle");
 
@@ -206,19 +207,19 @@ export function SetupWizard({ onDone, initialScreen }: SetupWizardProps) {
   const chooseCoding = async (choice: "set_up" | "later") => {
     setCodingBusy(choice); setCodingError(null);
     try { await api.chooseSetupCoding(choice); sessionStorage.setItem("maipai:setup-coding-mode-choice", choice === "later" ? "later" : "set_up"); await queryClient.invalidateQueries({ queryKey: ["setup-coding"] }); if (choice === "later") finishCodingChoice(); }
-    catch (reason) { setCodingError(reason instanceof ApiError ? reason.message : "Home could not save this choice. Try again."); }
+    catch (reason) { setCodingError(errorLine(reason, "Home could not save this choice. Try again.")); }
     finally { setCodingBusy(null); }
   };
   const runCodingTest = async () => {
     setCodingBusy("test"); setCodingError(null);
     try { await api.runCodingModeSelfTest(); await queryClient.invalidateQueries({ queryKey: ["setup-coding"] }); }
-    catch (reason) { setCodingError(reason instanceof ApiError ? reason.message : "Home could not run the coding test. Try again."); }
+    catch (reason) { setCodingError(errorLine(reason, "Home could not run the coding test. Try again.")); }
     finally { setCodingBusy(null); }
   };
   const createCodingKey = async () => {
     setCodingBusy("key"); setCodingError(null);
     try { const result = await api.createApiKey({ name: "My coding tool", scopes: ["code"], expires_in_days: 90 }); setCodingKey({ secret: result.secret, hint: result.key.hint }); }
-    catch (reason) { setCodingError(reason instanceof ApiError ? reason.message : "Home could not create your key. Try again."); }
+    catch (reason) { setCodingError(errorLine(reason, "Home could not create your key. Try again.")); }
     finally { setCodingBusy(null); }
   };
   const neighbour = (from: ScreenId, step: 1 | -1): ScreenId | undefined => {

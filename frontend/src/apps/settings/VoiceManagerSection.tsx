@@ -4,13 +4,14 @@ import { AsyncState } from "@maipai/ui/src/primitives/AsyncState";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@maipai/ui/src/dashboard/components/ui/alert-dialog";
 import { Badge } from "@maipai/ui/src/ui/badge";
 import { Button } from "@maipai/ui/src/ui/button";
-import { ApiError, api, type ResolvedSetting, type StackVoice } from "@/lib/api";
+import { api, type ResolvedSetting, type StackVoice } from "@/lib/api";
 import { householdVoicesApi, type HouseholdVoice } from "@/lib/householdVoicesApi";
 import { playableVoices, presetNameForVoice, voiceDisplayName } from "@/lib/voice/voiceBrowserRows";
 import { voicePreviewPlayer, type VoicePreviewState } from "@/lib/voice/voicePreviewPlayer";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@maipai/ui/src/ui/dialog";
 import { Input } from "@maipai/ui/src/ui/input";
 import { AddVoiceForm } from "@/apps/settings/AddVoiceForm";
+import { errorLine } from "@/lib/hubReachability";
 
 const GENDER: Record<StackVoice["gender"], string> = { female: "Female", male: "Male", neutral: "Neutral", unknown: "Not stated" };
 // AUDIT-UI-01: the five columns need about 640 px; the settings content pane is 728 px at most and about 470 px beside the 1024 px column, so
@@ -60,7 +61,7 @@ export function VoiceManagerSection() {
       const result = await api.setSetting("household", "tts.home_voice", isEngineVoice(voice) ? "default" : voice.id);
       queryClient.setQueryData<ResolvedSetting[]>(["settings-values", "household"], (old) => (old ?? []).some((item) => item.key === result.key) ? (old ?? []).map((item) => item.key === result.key ? result : item) : [...(old ?? []), result]);
       setNotice(`${voiceDisplayName(voice)} is now Home's default voice.`);
-    } catch (cause) { setError(cause instanceof ApiError ? cause.message : "Could not save Home's default voice. Try again."); }
+    } catch (cause) { setError(errorLine(cause, "Could not save Home's default voice. Try again.")); }
     finally { setBusyId(null); }
   }
 
@@ -70,7 +71,7 @@ export function VoiceManagerSection() {
       const result = await householdVoicesApi.rename(voice.id, label);
       await Promise.all([queryClient.invalidateQueries({ queryKey: ["household-voices"] }), queryClient.invalidateQueries({ queryKey: ["stack-voices"] })]);
       setNotice(`The voice is now called ${result.label}.`);
-    } catch (cause) { setError(cause instanceof ApiError ? cause.message : "Could not rename this voice. Try again."); }
+    } catch (cause) { setError(errorLine(cause, "Could not rename this voice. Try again.")); }
     finally { setBusyId(null); }
   }
 
@@ -81,7 +82,7 @@ export function VoiceManagerSection() {
       await householdVoicesApi.remove(voice.id);
       await Promise.all([queryClient.invalidateQueries({ queryKey: ["household-voices"] }), queryClient.invalidateQueries({ queryKey: ["stack-voices"] }), queryClient.invalidateQueries({ queryKey: ["settings-values"] })]);
       setNotice(`${voiceDisplayName(voice)} was deleted.`);
-    } catch (cause) { setError(cause instanceof ApiError ? cause.message : "Could not delete this voice. Try again."); }
+    } catch (cause) { setError(errorLine(cause, "Could not delete this voice. Try again.")); }
     finally { setBusyId(null); }
   }
 

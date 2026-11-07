@@ -5,12 +5,13 @@ import { AsyncState } from "@maipai/ui/src/primitives/AsyncState";
 import { Badge } from "@maipai/ui/src/ui/badge";
 import { Input } from "@maipai/ui/src/ui/input";
 import { Button } from "@maipai/ui/src/ui/button";
-import { api, ApiError, type DeviceInfo } from "@/lib/api";
+import { api, type DeviceInfo } from "@/lib/api";
 import { NO_VENDOR_LOGIN } from "./capabilityLabels";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@maipai/ui/src/ui/dialog";
 import { Item, ItemContent, ItemTitle } from "@maipai/ui/src/dashboard/components/ui/item";
 import { ItemGroup } from "@maipai/ui/src/dashboard/components/ui/item";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@maipai/ui/src/ui/select";
+import { errorLine } from "@/lib/hubReachability";
 
 // ROBOT-DEVICE-01: "the add flow refuses to finish while the unit's
 // published default SSH password stands and rotates it into the
@@ -55,7 +56,7 @@ export function RobotPasswordRow({
       await queryClient.invalidateQueries({ queryKey: ["robot-password-status", device.id] });
       onRotated?.();
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Could not rotate the password.");
+      setError(errorLine(err, "Could not rotate the password."));
     } finally {
       setSubmitting(false);
     }

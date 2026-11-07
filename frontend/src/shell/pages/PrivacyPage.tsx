@@ -2,9 +2,10 @@ import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@maipai/ui/src/dashboard/components/ui/card";
 import { AsyncState } from "@maipai/ui/src/primitives/AsyncState";
 import { getIcon } from "@maipai/ui/src/icons";
-import { api, ApiError, type PrivacyConnection } from "@/lib/api";
+import { api, type PrivacyConnection } from "@/lib/api";
 import { joinNames, sourceName } from "@/apps/privacy/privacyCopy";
 import { useTabItem } from "@/shell/tabIdentity";
+import { errorLine } from "@/lib/hubReachability";
 
 export const PrivacyIcon = getIcon("lock");
 
@@ -49,7 +50,7 @@ export function PrivacyPage() {
         error={query.isError}
         isFetching={query.isFetching}
         onRetry={() => void query.refetch()}
-        errorMessage={query.error instanceof ApiError ? query.error.message : "Could not load the privacy page."}
+        errorMessage={errorLine(query.error, "Could not load the privacy page.")}
         loadingLabel="Loading the privacy page"
       >
         {(data) => {

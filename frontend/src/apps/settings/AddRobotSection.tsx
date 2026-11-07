@@ -8,6 +8,7 @@ import { Button } from "@maipai/ui/src/ui/button";
 import { api, ApiError, type DeviceInfo, type DiscoveredRobotInfo } from "@/lib/api";
 import { RobotPasswordRow } from "./RobotPasswordSection";
 import { NO_VENDOR_LOGIN } from "./capabilityLabels";
+import { errorLine } from "@/lib/hubReachability";
 
 const TOTP_REQUIRED_MESSAGE = "A current TOTP code is required to approve a new device";
 const AWAIT_ROBOT_POLL_MS = 2000;
@@ -137,7 +138,7 @@ export function AddRobotSection({ onClose }: { onClose?: () => void } = {}) {
         setNeedsTotp(true);
         setError(null);
       } else {
-        setError(err instanceof ApiError ? err.message : "Could not approve that code.");
+        setError(errorLine(err, "Could not approve that code."));
       }
     } finally {
       setSubmitting(false);

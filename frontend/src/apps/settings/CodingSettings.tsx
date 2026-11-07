@@ -16,13 +16,14 @@ import { Item, ItemActions, ItemContent, ItemDescription, ItemGroup, ItemTitle, 
 import { JobProgress } from "@maipai/ui/src/elements/job-progress";
 import { AsyncState } from "@maipai/ui/src/primitives/AsyncState";
 import { SettingsRenderer } from "@maipai/ui/src/settings/SettingsRenderer";
-import { api, ApiError, type CodingGrant, type CodingModeReadinessItemId, type CodingModeView, type CodingPiece, type PersonalApiKey, type PersonRosterEntry, type Roster } from "@/lib/api";
+import { api, type CodingGrant, type CodingModeReadinessItemId, type CodingModeView, type CodingPiece, type PersonalApiKey, type PersonRosterEntry, type Roster } from "@/lib/api";
 import codingModeReasons from "@maipai/spec/vocab/coding-mode-readiness-reasons.json";
 import { downloadProgress } from "@/lib/downloadProgress";
+import { errorLine } from "@/lib/hubReachability";
 
 const KEYS = ["coding.enabled", "coding.paused", "coding.adults_by_default", "coding.max_streams_per_person", "coding.requests_per_minute_per_key", "coding.daily_tokens_per_person", "coding.keep_warm_minutes", "coding.thinking_budget", "coding.thinking_budget_ceiling", "coding.api.enabled", "coding.api.away"];
 const codingKeysQuery = (personId?: string) => ["coding-api-keys", personId ?? "self"] as const;
-const messageOf = (error: unknown, fallback: string) => error instanceof ApiError ? error.message : fallback;
+const messageOf = (error: unknown, fallback: string) => errorLine(error, fallback);
 const sizeText = (bytes: number | null) => bytes == null ? "Size not reported" : bytes >= 1024 ** 3 ? `${(bytes / 1024 ** 3).toFixed(1)} GB` : `${Math.ceil(bytes / 1024 ** 2)} MB`;
 const dateText = (date: string | null) => date ? new Date(date).toLocaleDateString() : "Never";
 const timeText = (date: string | null) => date ? new Date(date).toLocaleString() : "Never";

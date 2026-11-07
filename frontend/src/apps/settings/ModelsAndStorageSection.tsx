@@ -12,9 +12,9 @@ import { Button } from "@maipai/ui/src/ui/button";
 import { JobProgress } from "@maipai/ui/src/elements/job-progress";
 import { Item, ItemActions, ItemContent, ItemDescription, ItemGroup, ItemTitle } from "@maipai/ui/src/dashboard/components/ui/item";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@maipai/ui/src/dashboard/components/ui/alert-dialog";
-import { ApiError } from "@/lib/api";
 import { componentsApi, type ComponentGroup, type ComponentRow } from "@/lib/componentsApi";
 import { downloadProgress } from "@/lib/downloadProgress";
+import { errorLine } from "@/lib/hubReachability";
 
 const KEY = ["components"] as const;
 const GROUPS: Array<{ id: ComponentGroup; title: string }> = [
@@ -23,7 +23,7 @@ const GROUPS: Array<{ id: ComponentGroup; title: string }> = [
 ];
 
 export const sizeWords = (n: number): string => (n >= 1e12 ? `${(n / 1e12).toFixed(1)} TB` : n >= 1e9 ? `${n >= 1e10 ? Math.round(n / 1e9) : (n / 1e9).toFixed(1)} GB` : n >= 1e6 ? `${Math.round(n / 1e6)} MB` : `${Math.max(1, Math.round(n / 1e3))} KB`);
-const messageOf = (error: unknown, fallback: string) => (error instanceof ApiError ? error.message : fallback);
+const messageOf = (error: unknown, fallback: string) => (errorLine(error, fallback));
 
 /** "today", "3 weeks ago": how long since a part was last used, for the person deciding what to free. */
 export function lastUsedWords(iso: string | null, now = Date.now()): string {

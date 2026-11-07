@@ -1,11 +1,11 @@
 // VIDEO-LORA-08: small shared parts of the Styles tab: the spec card's words, error sentences, the plain lines for a style's base and its age check,
 // and the picture (an adult-only style's picture is fetched with the unlock proof; an ordinary one is a plain image).
 import { useEffect, useState } from "react";
-import { ApiError } from "@/lib/api";
 import { adultBlobUrl } from "@/lib/adultLock";
 import { formatBytes } from "@maipai/ui/src/format";
 import type { Card as SpecCard } from "@maipai/ui/src/settings/settingsAudience";
 import type { AdultCheckState, BaseModelId, StyleRow } from "@/apps/settings/styles/stylesApi";
+import { errorLine } from "@/lib/hubReachability";
 
 /** The spec card's copy (rule S5). The fallbacks are the same sentences, so a view drawn without a card (a test, a preview) reads the same. */
 export const STYLES_COPY_DEFAULTS = {
@@ -35,7 +35,7 @@ export function stylesCopy(card?: SpecCard): StylesCopy {
   return { ...STYLES_COPY_DEFAULTS, ...given };
 }
 
-export const messageOf = (error: unknown, fallback: string): string => (error instanceof ApiError ? error.message : fallback);
+export const messageOf = (error: unknown, fallback: string): string => (errorLine(error, fallback));
 
 export const sizeWords = (bytes: number): string => (bytes > 0 ? formatBytes(bytes) : "Size unknown");
 

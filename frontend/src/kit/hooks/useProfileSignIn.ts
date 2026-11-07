@@ -2,6 +2,7 @@ import { useState, type FormEvent } from "react";
 import { api, ApiError, type Roster } from "@/lib/api";
 import { usePinAutoSubmit } from "@/kit/hooks/usePinAutoSubmit";
 import { usePasscodeAttempt } from "@/kit/hooks/usePasscodeAttempt";
+import { errorLine } from "@/lib/hubReachability";
 
 /** The profile-tap -> secret-prompt -> verify state machine (a code
  * review, SHELL-08: selected/secret/secretError/tapError/busy plus both
@@ -67,7 +68,7 @@ export function useProfileSignIn(onSignedIn: () => void) {
       await api.select(person.id);
       onSignedIn();
     } catch (e) {
-      setTapError(e instanceof ApiError ? e.message : "Sign-in failed");
+      setTapError(errorLine(e, "Sign-in failed"));
     } finally {
       setBusy(false);
     }

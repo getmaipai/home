@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { AsyncState } from "@maipai/ui/src/primitives/AsyncState";
 import { getIcon } from "@maipai/ui/src/icons";
-import { api, ApiError, type Performance } from "@/lib/api";
+import { api, type Performance } from "@/lib/api";
 import { useTabItem } from "@/shell/tabIdentity";
 import { Card, CardHeader, CardContent, CardTitle } from "@maipai/ui/src/dashboard/components/ui/card";
 import { TurnsChartBody } from "@/shell/pages/performance/TurnsChartBody";
@@ -13,6 +13,7 @@ import { QueuesBody } from "@/shell/pages/performance/QueuesBody";
 import { LabelsBody } from "@/shell/pages/performance/LabelsBody";
 import { EnginesHealthBody } from "@/shell/pages/performance/EnginesHealthBody";
 import { DiskHardwareBody } from "@/shell/pages/performance/DiskHardwareBody";
+import { errorLine } from "@/lib/hubReachability";
 
 const icons = {
   gauge: getIcon("gauge"),
@@ -57,7 +58,7 @@ export function PerformancePage() {
       error={query.isError}
       isFetching={query.isFetching}
       onRetry={() => query.refetch()}
-      errorMessage={query.error instanceof ApiError ? query.error.message : "Could not load performance."}
+      errorMessage={errorLine(query.error, "Could not load performance.")}
       loadingLabel="Loading performance"
     >
       {(data: Performance) => (

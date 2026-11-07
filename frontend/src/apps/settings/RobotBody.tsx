@@ -5,10 +5,11 @@ import { CardAction, CardContent, CardDescription, CardFooter, CardHeader, CardT
 import { Progress } from "@maipai/ui/src/dashboard/components/ui/progress";
 import { Image } from "@maipai/ui/src/elements/image";
 import { ErrorState } from "@maipai/ui/src/elements/error-state";
-import { ApiError, type DeviceInfo, type RobotDeviceState } from "@/lib/api";
+import { type DeviceInfo, type RobotDeviceState } from "@/lib/api";
 import { NO_VENDOR_LOGIN, robotCapabilityLabel } from "@/apps/settings/capabilityLabels";
 import { isOwnerOrAdminRole } from "@/lib/api";
 import type { Role } from "@maipai/ui/src/settings/settingsAudience";
+import { errorLine } from "@/lib/hubReachability";
 
 const ACTIVITY_LABELS: Record<RobotDeviceState["activity"], string> = {
   starting: "Starting up",
@@ -136,7 +137,7 @@ export function RobotBody({
       setLiveView({ viewId: started.view_id, stream: started.stream });
     } catch (err) {
       setLiveView(null);
-      setLiveError(err instanceof ApiError ? err.message : `Could not open the live view of ${device.name}. Check that it is switched on, then try again.`);
+      setLiveError(errorLine(err, `Could not open the live view of ${device.name}. Check that it is switched on, then try again.`));
     } finally {
       setLiveStarting(false);
     }
@@ -166,7 +167,7 @@ export function RobotBody({
     try {
       await onAnswerMotorReboot(answer);
     } catch (err) {
-      setRebootError(err instanceof ApiError ? err.message : `Could not send that to ${device.name}. Check that it is switched on, then try again.`);
+      setRebootError(errorLine(err, `Could not send that to ${device.name}. Check that it is switched on, then try again.`));
     } finally {
       setRebootBusy(false);
     }

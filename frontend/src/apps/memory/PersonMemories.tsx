@@ -10,7 +10,8 @@ import { useSelectMode } from "@/kit/hooks/useSelectMode";
 import { Checkbox } from "@maipai/ui/src/ui/checkbox";
 import { Button } from "@maipai/ui/src/dashboard/components/ui/button";
 import { getIcon } from "@maipai/ui/src/icons";
-import { api, ApiError, type MemoryRecordWithDevice as MemoryRecord, type PersonRosterEntry } from "@/lib/api";
+import { api, type MemoryRecordWithDevice as MemoryRecord, type PersonRosterEntry } from "@/lib/api";
+import { errorLine } from "@/lib/hubReachability";
 
 const ArchiveIcon = getIcon("archive");
 
@@ -179,7 +180,7 @@ export function OtherPersonMemories({ personId, personName }: { personId: string
       const records = await api.exportPersonMemories(personId);
       downloadJson(`${personName}-memories`, records);
     } catch (err) {
-      setActionError(err instanceof ApiError ? err.message : "Could not export those memories. Check your connection and try again.");
+      setActionError(errorLine(err, "Could not export those memories. Check your connection and try again."));
     } finally {
       setBusy(false);
     }
@@ -193,7 +194,7 @@ export function OtherPersonMemories({ personId, personName }: { personId: string
       setConfirmingForget(false);
       await query.refetch();
     } catch (err) {
-      setActionError(err instanceof ApiError ? err.message : "Could not forget those memories. Check your connection and try again.");
+      setActionError(errorLine(err, "Could not forget those memories. Check your connection and try again."));
     } finally {
       setBusy(false);
     }
@@ -206,7 +207,7 @@ export function OtherPersonMemories({ personId, personName }: { personId: string
       await api.archiveMemory(id);
       await query.refetch();
     } catch (err) {
-      setActionError(err instanceof ApiError ? err.message : "Could not archive that memory. Check your connection and try again.");
+      setActionError(errorLine(err, "Could not archive that memory. Check your connection and try again."));
     } finally {
       setArchivingId(null);
     }
@@ -316,7 +317,7 @@ export function OwnMemories({ filterIds, actorIsAdult }: { filterIds: Set<string
       await api.setAudience(id, value);
       await queryClient.invalidateQueries({ queryKey: ["memory-list", ME] });
     } catch (err) {
-      setActionError(err instanceof ApiError ? err.message : "Could not change who may hear that memory. Check your connection and try again.");
+      setActionError(errorLine(err, "Could not change who may hear that memory. Check your connection and try again."));
     } finally {
       setAudienceId(null);
     }
@@ -342,7 +343,7 @@ export function OwnMemories({ filterIds, actorIsAdult }: { filterIds: Set<string
       leaveSelectMode();
       await queryClient.invalidateQueries({ queryKey: ["memory-list", ME] });
     } catch (err) {
-      setActionError(err instanceof ApiError ? err.message : "Could not forget those memories. Check your connection and try again.");
+      setActionError(errorLine(err, "Could not forget those memories. Check your connection and try again."));
     } finally {
       setBusy(false);
     }
@@ -355,7 +356,7 @@ export function OwnMemories({ filterIds, actorIsAdult }: { filterIds: Set<string
       await api.archiveMemory(id);
       await queryClient.invalidateQueries({ queryKey: ["memory-list", ME] });
     } catch (err) {
-      setActionError(err instanceof ApiError ? err.message : "Could not archive that memory. Check your connection and try again.");
+      setActionError(errorLine(err, "Could not archive that memory. Check your connection and try again."));
     } finally {
       setArchivingId(null);
     }

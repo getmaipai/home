@@ -3,8 +3,9 @@ import { Section } from "@maipai/ui/src/primitives/Section";
 import { EmptyState } from "@maipai/ui/src/primitives/EmptyState";
 import { Progress } from "@maipai/ui/src/primitives/Progress";
 import { Button } from "@maipai/ui/src/ui/button";
-import { api, ApiError, type BackupInfo, type PendingRestore, type Roster } from "@/lib/api";
+import { api, type BackupInfo, type PendingRestore, type Roster } from "@/lib/api";
 import { formatBytes } from "@maipai/ui/src/format";
+import { errorLine } from "@/lib/hubReachability";
 
 interface BackupsSectionProps {
   person: Roster;
@@ -140,7 +141,7 @@ export function BackupsSection({ person, headed = true }: BackupsSectionProps) {
     api
       .backups()
       .then(setBackups)
-      .catch((e: unknown) => setError(e instanceof ApiError ? e.message : "Could not load backups."));
+      .catch((e: unknown) => setError(errorLine(e, "Could not load backups.")));
     if (canSeePending) {
       api
         .pendingRestore()
@@ -158,7 +159,7 @@ export function BackupsSection({ person, headed = true }: BackupsSectionProps) {
       await api.runBackup();
       load();
     } catch (e) {
-      setError(e instanceof ApiError ? e.message : "Could not run a backup.");
+      setError(errorLine(e, "Could not run a backup."));
     } finally {
       setRunning(false);
     }
@@ -175,7 +176,7 @@ export function BackupsSection({ person, headed = true }: BackupsSectionProps) {
       // The backend's refusals are written for the person reading them
       // ("that backup was made by a newer version of MaiPai Home"), so
       // they are shown as-is rather than replaced with a generic message.
-      setError(e instanceof ApiError ? e.message : "Could not get that backup ready.");
+      setError(errorLine(e, "Could not get that backup ready."));
     } finally {
       setBusyFilename(null);
     }
@@ -187,7 +188,7 @@ export function BackupsSection({ person, headed = true }: BackupsSectionProps) {
       await api.cancelRestore();
       setPending(null);
     } catch (e) {
-      setError(e instanceof ApiError ? e.message : "Could not cancel the restore.");
+      setError(errorLine(e, "Could not cancel the restore."));
     }
   }
 

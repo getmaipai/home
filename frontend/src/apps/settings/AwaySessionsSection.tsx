@@ -5,7 +5,8 @@ import { Section } from "@maipai/ui/src/primitives/Section";
 import { AsyncState } from "@maipai/ui/src/primitives/AsyncState";
 import { EmptyState } from "@maipai/ui/src/primitives/EmptyState";
 import { Button } from "@maipai/ui/src/ui/button";
-import { api, ApiError, type SessionInfo } from "@/lib/api";
+import { api, type SessionInfo } from "@/lib/api";
+import { errorLine } from "@/lib/hubReachability";
 
 function whenText(iso: string): string {
   return new Date(iso).toLocaleString();
@@ -26,7 +27,7 @@ export function AwaySessionsSection() {
       await queryClient.invalidateQueries({ queryKey: ["away-sessions"] });
       setConfirming(null);
     } catch (cause) {
-      setError(cause instanceof ApiError ? cause.message : "Could not sign out that device.");
+      setError(errorLine(cause, "Could not sign out that device."));
     }
   }
 

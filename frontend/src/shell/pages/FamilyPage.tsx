@@ -10,9 +10,10 @@ import { getIcon } from "@maipai/ui/src/icons";
 import type { Icon } from "@maipai/ui/src/icons";
 import { GRID_COLUMNS } from "@maipai/ui/src/responsive";
 import { ROLE_LABELS, ACCENT_RING_CLASS, isProfileClosedTo } from "@/apps/people/roles";
-import { api, ApiError, isOwnerOrAdminRole, type DeviceInfo, type Entity, type PersonRosterEntry, type Roster } from "@/lib/api";
+import { api, isOwnerOrAdminRole, type DeviceInfo, type Entity, type PersonRosterEntry, type Roster } from "@/lib/api";
 import { RobotCards, fetchFamilyBots, familyBotsQueryKey } from "@/apps/settings/RobotCards";
 import { useTabItem } from "@/shell/tabIdentity";
+import { errorLine } from "@/lib/hubReachability";
 
 const PetIcon = getIcon("box");
 
@@ -100,7 +101,7 @@ export function FamilyPage({ person }: { person: Roster }) {
       error={query.isError}
       isFetching={query.isFetching}
       onRetry={() => query.refetch()}
-      errorMessage={query.error instanceof ApiError ? query.error.message : "Could not load the household."}
+      errorMessage={errorLine(query.error, "Could not load the household.")}
       loadingLabel="Loading household"
     >
       {(roster: PersonRosterEntry[]) => {

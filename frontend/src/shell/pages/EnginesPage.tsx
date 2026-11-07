@@ -12,9 +12,10 @@ import {
   DropdownMenuTrigger,
 } from "@maipai/ui/src/dashboard/components/ui/dropdown-menu";
 import { Card, CardContent, CardHeader, CardTitle } from "@maipai/ui/src/dashboard/components/ui/card";
-import { api, ApiError, isOwnerOrAdminRole, type EnginesOverview, type EnginesHealth, type StackRoleInfo, type StackEngineInfo, type StackHealthItem, type Roster } from "@/lib/api";
+import { api, isOwnerOrAdminRole, type EnginesOverview, type EnginesHealth, type StackRoleInfo, type StackEngineInfo, type StackHealthItem, type Roster } from "@/lib/api";
 import { useDataTableControls } from "@/shell/pages/useDataTableControls";
 import { useMutation } from "@tanstack/react-query";
+import { errorLine } from "@/lib/hubReachability";
 
 /** /engines: SHELL-06's own row - `GET /api/engines` and
  * `GET /api/engines/health`, through the kit DataTable and its slots. */
@@ -122,7 +123,7 @@ export function EnginesConsole({ person }: { person: Roster }) {
         queryClient.invalidateQueries({ queryKey: ["engines-health"] }),
       ]);
     } catch (error) {
-      toast.error(error instanceof ApiError ? error.message : "That didn't work.");
+      toast.error(errorLine(error, "That didn't work."));
     } finally {
       setBusyNames((previous) => {
         const next = new Set(previous);
@@ -160,7 +161,7 @@ export function EnginesConsole({ person }: { person: Roster }) {
           </CardContent>
         </Card>
       )}
-      {doctor.isError && <p role="alert">{doctor.error instanceof ApiError ? doctor.error.message : "Could not check the connection."}</p>}
+      {doctor.isError && <p role="alert">{errorLine(doctor.error, "Could not check the connection.")}</p>}
       <AsyncState
         data={data}
         error={error}
@@ -169,7 +170,7 @@ export function EnginesConsole({ person }: { person: Roster }) {
           if (overviewQuery.isError) overviewQuery.refetch();
           if (healthQuery.isError) healthQuery.refetch();
         }}
-        errorMessage={firstError instanceof ApiError ? firstError.message : "Could not load engines."}
+        errorMessage={errorLine(firstError, "Could not load engines.")}
         loadingLabel="Loading engines"
       >
         {({ overview }: { overview: EnginesOverview; health: EnginesHealth }) =>

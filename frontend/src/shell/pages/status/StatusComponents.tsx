@@ -8,9 +8,10 @@ import { TooltipIconButton } from "@maipai/ui/src/elements/tooltip-icon-button";
 import { getIcon } from "@maipai/ui/src/icons";
 import { AlertDialog, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@maipai/ui/src/dashboard/components/ui/alert-dialog";
 import { toast } from "sonner";
-import { api, ApiError, isOwnerOrAdminRole, request, type EngineComputerStatus as EngineComputerStatusData, type HealthStatus, type Roster, type EngineHealthEntry, type StatusHistory } from "@/lib/api";
+import { api, isOwnerOrAdminRole, request, type EngineComputerStatus as EngineComputerStatusData, type HealthStatus, type Roster, type EngineHealthEntry, type StatusHistory } from "@/lib/api";
 import { dayData, statusStripSummary } from "@/shell/pages/status/statusHistoryFormat";
 import "@/shell/pages/status/statusLegend.css";
+import { errorLine } from "@/lib/hubReachability";
 
 interface StatusPartsProps { person: Roster; health: HealthStatus; maintenance?: string[]; history?: StatusHistory; engineComputer?: EngineComputerStatusData; }
 // The Status page lists the four engines that make up "is Home up"; the picture and video rows (ENGINE-STATUS-MEDIA-01) are read by the making controls instead.
@@ -84,7 +85,7 @@ export function StatusPartsBody({ person, health: initialHealth, maintenance = [
       await query.refetch();
       setPendingRole(null);
     } catch (e) {
-      toast.error(e instanceof ApiError ? e.message : `Could not restart ${row.label}.`);
+      toast.error(errorLine(e, `Could not restart ${row.label}.`));
     } finally { setRestartingRole(null); }
   }
 
@@ -98,7 +99,7 @@ export function StatusPartsBody({ person, health: initialHealth, maintenance = [
       toast.success(`${row.label} ${action === "stop" ? "stopped" : "started"}.`);
       await query.refetch();
     } catch (e) {
-      toast.error(e instanceof ApiError ? e.message : `Could not ${action} ${row.label}.`);
+      toast.error(errorLine(e, `Could not ${action} ${row.label}.`));
     } finally { setChangingRole(null); }
   }
 

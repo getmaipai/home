@@ -4,7 +4,8 @@ import { Button } from "@maipai/ui/src/dashboard/components/ui/button";
 import { Input } from "@maipai/ui/src/dashboard/components/ui/input";
 import { Label } from "@maipai/ui/src/dashboard/components/ui/label";
 import { QrCode } from "@maipai/ui/src/ui/qr-code";
-import { ApiError, api, type Roster } from "@/lib/api";
+import { api, type Roster } from "@/lib/api";
+import { errorLine } from "@/lib/hubReachability";
 
 export function TwoStepSignInSection({ person }: { person: Roster }) {
   const allowed = person.role === "owner" || person.role === "admin";
@@ -23,7 +24,7 @@ export function TwoStepSignInSection({ person }: { person: Roster }) {
   async function start() {
     setBusy(true); setError("");
     try { setUri((await api.totpEnroll()).uri); setCode(""); }
-    catch (cause) { setError(cause instanceof ApiError ? cause.message : "Could not start setup. Try again."); }
+    catch (cause) { setError(errorLine(cause, "Could not start setup. Try again.")); }
     finally { setBusy(false); }
   }
   async function submit() {
@@ -33,7 +34,7 @@ export function TwoStepSignInSection({ person }: { person: Roster }) {
       if (uri) { await api.totpVerify(code); setUri(null); setEnabled(true); }
       else { await api.totpDisable(code); setEnabled(false); }
       setCode("");
-    } catch (cause) { setError(cause instanceof ApiError ? cause.message : "That code did not work. Check it and try again."); }
+    } catch (cause) { setError(errorLine(cause, "That code did not work. Check it and try again.")); }
     finally { setBusy(false); }
   }
   if (!allowed) return null;

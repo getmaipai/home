@@ -4,7 +4,8 @@ import { Section } from "@maipai/ui/src/primitives/Section";
 import { AsyncState } from "@maipai/ui/src/primitives/AsyncState";
 import { Select } from "@maipai/ui/src/primitives/Select";
 import { OptionMatrix } from "@maipai/ui/src/settings/OptionMatrix";
-import { api, ApiError, type PersonRosterEntry, type SiteBlocksView } from "@/lib/api";
+import { api, type PersonRosterEntry, type SiteBlocksView } from "@/lib/api";
+import { errorLine } from "@/lib/hubReachability";
 
 interface SiteBlocksSectionProps {
   /** The people the signed-in owner or admin may open (already filtered by the caller). */
@@ -32,7 +33,7 @@ export function SiteBlocksSection({ roster }: SiteBlocksSectionProps) {
     try {
       queryClient.setQueryData(["site-blocks", chosen!.id], await action());
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Could not save that change. Check your connection and try again.");
+      setError(errorLine(err, "Could not save that change. Check your connection and try again."));
     } finally {
       setBusy(false);
     }

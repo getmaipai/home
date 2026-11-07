@@ -1,7 +1,8 @@
 // Every change the Library page makes to a file, in one place. Each call goes to a hub route that checks the caller
 // again (owner only, age band, role), so the page never relies on hiding a button.
 import { useQueryClient } from "@tanstack/react-query";
-import { api, ApiError, type LibraryItem } from "@/lib/api";
+import { api, type LibraryItem } from "@/lib/api";
+import { errorLine } from "@/lib/hubReachability";
 
 export interface BatchResult { done: string[]; refused: { id: string; reason: string }[] }
 const NOT_YOURS = "it is not yours to change";
@@ -11,7 +12,7 @@ export function useLibraryActions(meId: string) {
   const refresh = async () => {
     await Promise.all(["library", "library-summary", "library-trash", "storage-usage", "file-shares"].map((key) => queryClient.invalidateQueries({ queryKey: [key] })));
   };
-  const reason = (error: unknown) => error instanceof ApiError ? error.message : "Home could not do that. Check your connection and try again.";
+  const reason = (error: unknown) => errorLine(error, "Home could not do that. Check your connection and try again.");
 
   async function each(items: readonly LibraryItem[], run: (item: LibraryItem) => Promise<unknown>, ownOnly = true): Promise<BatchResult> {
     const result: BatchResult = { done: [], refused: [] };

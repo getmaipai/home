@@ -168,7 +168,7 @@ test("tile words: Out of date, Waiting its turn, Needs another try, Making", asy
 test("a refused clip request shows as one plain line", async () => {
   const { view } = open(() => states(["idle"]));
   await view.findByRole("button", { name: "Idle" });
-  api.generateCompanionStates = async () => { throw new ApiError("The video engine is not ready. Check it, then try again.", 503); };
+  api.generateCompanionStates = async () => { throw new ApiError("The video engine is not ready. Check it, then try again.", 503, "engine_unavailable"); };
   fireEvent.click(btn(view, "Idle"));
   await act(async () => { fireEvent.click(btn(view, "Make another")); });
   const alerts = await view.findAllByRole("alert");

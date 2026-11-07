@@ -6,7 +6,8 @@ import { Card, CardContent, CardHeader } from "@maipai/ui/src/dashboard/componen
 import { FolderPicker, type FolderPickerCopy } from "@maipai/ui/src/primitives/FolderPicker";
 import { RouteSkeleton } from "@maipai/ui/src/primitives/RouteSkeleton";
 import { needGb } from "../../../../shared/diskPlanMath";
-import { api, ApiError, type SetupFolderListing, type SetupPlacementRow } from "@/lib/api";
+import { api, type SetupFolderListing, type SetupPlacementRow } from "@/lib/api";
+import { errorLine } from "@/lib/hubReachability";
 
 const ErrorIcon = getIcon("alert-triangle");
 
@@ -85,7 +86,7 @@ export function StorageStep({ split, value, onChange }: {
     setCheckError(null);
     void api.setupStorageCheck({ ...layout, split }).then(
       (result) => { if (active) setRows(result.rows); },
-      (reason) => { if (active) { setRows(null); setCheckError(reason instanceof ApiError ? reason.message : "Home couldn't check that folder. Choose it again, or keep the default folder."); } },
+      (reason) => { if (active) { setRows(null); setCheckError(errorLine(reason, "Home couldn't check that folder. Choose it again, or keep the default folder.")); } },
     ).finally(() => { if (active) setChecking(false); });
     return () => { active = false; };
     // The layout is read through its key so an equal object does not re-run the check.
@@ -104,7 +105,7 @@ export function StorageStep({ split, value, onChange }: {
       setListing(next);
       setLastPath(next.path);
     } catch (reason) {
-      setPickerError(reason instanceof ApiError ? reason.message : PICKER_ERROR);
+      setPickerError(errorLine(reason, PICKER_ERROR));
     } finally { setLoading(false); }
   }
 
@@ -140,7 +141,7 @@ export function StorageStep({ split, value, onChange }: {
       setListing(next);
       setLastPath(next.path);
     } catch (reason) {
-      setPickerError(reason instanceof ApiError ? reason.message : PICKER_ERROR);
+      setPickerError(errorLine(reason, PICKER_ERROR));
     } finally { setLoading(false); }
   }
 

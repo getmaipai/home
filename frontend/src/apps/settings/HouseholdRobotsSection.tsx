@@ -15,13 +15,14 @@ import { Label } from "@maipai/ui/src/dashboard/components/ui/label";
 import { Item, ItemContent, ItemDescription, ItemGroup, ItemTitle } from "@maipai/ui/src/dashboard/components/ui/item";
 import areasFile from "@maipai/spec/settings/areas.json";
 import { SettingsRenderer } from "@/shell/pages/settings/SettingsRenderer";
-import { api, ApiError, type DeviceInfo } from "@/lib/api";
+import { api, type DeviceInfo } from "@/lib/api";
 import { StackChanInstallDialog } from "@/apps/settings/StackChanInstallDialog";
 import { RobotSelfTests } from "@/apps/settings/RobotSelfTests";
 import { RobotCompanionChoices } from "@/apps/settings/RobotCompanionChoices";
 import { playableVoices, voiceFriendlyName } from "@/lib/voice/voiceBrowserRows";
 import { Card, CardAction, CardContent, CardHeader, CardTitle } from "@maipai/ui/src/dashboard/components/ui/card";
 import { useTabItem } from "@/shell/tabIdentity";
+import { errorLine } from "@/lib/hubReachability";
 
 
 function statusText(device: DeviceInfo): string {
@@ -116,7 +117,7 @@ function RobotDetail({ device, tab, onClose }: { device: DeviceInfo; tab?: strin
     setSaveBusy(true);
     setSaveError(null);
     try { await api.updateDevice(device.id, { name, area: area.trim() || null }); refreshAll(); }
-    catch (error) { setSaveError(error instanceof ApiError ? error.message : "Could not save this robot. Check the connection and try again."); }
+    catch (error) { setSaveError(errorLine(error, "Could not save this robot. Check the connection and try again.")); }
     finally { setSaveBusy(false); }
   }
   async function endLifecycle(): Promise<void> {
@@ -129,7 +130,7 @@ function RobotDetail({ device, tab, onClose }: { device: DeviceInfo; tab?: strin
       onClose();
     } catch (error) {
       setConfirming(false);
-      setLifecycleError(error instanceof ApiError ? error.message : `${installing ? "The install could not be cancelled" : `${device.name} could not be forgotten`}. Check the connection and try again.`);
+      setLifecycleError(errorLine(error, `${installing ? "The install could not be cancelled" : `${device.name} could not be forgotten`}. Check the connection and try again.`));
     } finally { setLifecycleBusy(false); }
   }
 

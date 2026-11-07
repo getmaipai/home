@@ -3,9 +3,10 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Button } from "@maipai/ui/src/ui/button";
 import { JobProgress } from "@maipai/ui/src/elements/job-progress";
 import { Alert, AlertDescription } from "@maipai/ui/src/ui/alert";
-import { api, ApiError } from "@/lib/api";
+import { api } from "@/lib/api";
 import { addLogLine, browserCanFlash, createBrowserSerialTransport, FLASH_BYTES, installStackChan, STALL_TIMEOUT_MESSAGE, type FlashStage, type FlashTransport } from "@/lib/stackchan/flash";
 import { downloadProgress } from "@/lib/downloadProgress";
+import { errorLine } from "@/lib/hubReachability";
 
 const BROWSER_MESSAGE = "Installing needs Chrome or Edge on a computer, with Home opened at its https address. Open Home there and try again.";
 const PORT_HELP = "When Chrome asks which port to use, choose \"USB JTAG/serial debug unit\" (it may be listed as usbmodem). Do not choose a Bluetooth entry.";
@@ -83,7 +84,7 @@ export function StackChanInstallDialog({ updateOf, install = installStackChan, r
       setStage(null);
     } catch (error) {
       setStalledInBackup(error instanceof Error && error.message === STALL_TIMEOUT_MESSAGE);
-      const detail = error instanceof ApiError ? error.message : error instanceof Error ? error.message : "The StackChan install stopped.";
+      const detail = errorLine(error, error instanceof Error ? error.message : "The StackChan install stopped.");
       setMessage(flashComplete ? `Firmware was written, but Home could not record its version. ${detail}` : hostCreated ? `${detail} Use Cancel install on the robot card before starting again.` : `${detail} Check the USB cable and try again.`);
     } finally { transportRef.current = null; setWorking(false); }
   }

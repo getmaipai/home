@@ -11,6 +11,7 @@ import { SettingField } from "@/shell/pages/settings/SettingField";
 import { api, ApiError, type ResolvedSetting } from "@/lib/api";
 import type { KitSettingsKey } from "@/shell/pages/settings/settingsViewer";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@maipai/ui/src/dashboard/components/ui/alert-dialog";
+import { errorLine } from "@/lib/hubReachability";
 
 interface SettingsRendererProps {
   scope: "household" | "person" | "device";
@@ -118,7 +119,7 @@ export function SettingsRenderer({ scope, scopeValue, only, includeKeys, include
       if (key === "persona.active_id" && selfPersonId) void queryClient.invalidateQueries({ queryKey: ["companion-avatar", selfPersonId] });
       return true;
     } catch (e) {
-      setWriteError(e instanceof ApiError ? e.message : "Could not save that change.");
+      setWriteError(errorLine(e, "Could not save that change."));
       return false;
     } finally {
       setPendingKey(null);
@@ -133,7 +134,7 @@ export function SettingsRenderer({ scope, scopeValue, only, includeKeys, include
       replaceValue(restored);
       if (key === "persona.active_id" && selfPersonId) void queryClient.invalidateQueries({ queryKey: ["companion-avatar", selfPersonId] });
     } catch (e) {
-      setWriteError(e instanceof ApiError ? e.message : "Could not reset that setting.");
+      setWriteError(errorLine(e, "Could not reset that setting."));
     } finally {
       setPendingKey(null);
     }
@@ -175,7 +176,7 @@ export function SettingsRenderer({ scope, scopeValue, only, includeKeys, include
               setPendingKey(pending.key);
               setWriteError(null);
               try { replaceValue(await api.setSetting(scopeValue, pending.key, pending.value, true)); }
-              catch (e) { setWriteError(e instanceof ApiError ? e.message : "Could not save that change."); }
+              catch (e) { setWriteError(errorLine(e, "Could not save that change.")); }
               finally { setPendingKey(null); }
             }}>Confirm</AlertDialogAction>
           </AlertDialogFooter>

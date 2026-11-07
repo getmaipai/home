@@ -16,14 +16,15 @@ import { StorageBar } from "@maipai/ui/src/primitives/StorageBar";
 import { Item, ItemActions, ItemContent, ItemDescription, ItemGroup, ItemTitle } from "@maipai/ui/src/dashboard/components/ui/item";
 import { RouteSkeleton } from "@maipai/ui/src/primitives/RouteSkeleton";
 import presetsData from "@maipai/spec/vocab/reference-presets.json";
-import { api, ApiError, type ReferenceCatalogSet, type ReferenceJob } from "@/lib/api";
+import { api, type ReferenceCatalogSet, type ReferenceJob } from "@/lib/api";
 import { sizeGb } from "../../../../shared/diskPlanMath";
 import { downloadProgress, useByteRates, type DownloadSnapshot } from "@/lib/downloadProgress";
+import { errorLine } from "@/lib/hubReachability";
 
 const presets = presetsData.presets;
 const duration = (n: number | null) => n === null ? "Time estimate unavailable" : n < 60 ? `About ${n} seconds` : n < 3600 ? `About ${Math.ceil(n / 60)} minutes` : `About ${Math.ceil(n / 3600)} hours`;
 const signed = (bytes: number) => `${bytes < 0 ? "-" : "+"}${sizeGb(Math.abs(bytes))}`;
-const messageOf = (error: unknown, fallback: string) => (error instanceof ApiError ? error.message : fallback);
+const messageOf = (error: unknown, fallback: string) => (errorLine(error, fallback));
 
 const TOPICS: Array<{ topic: string; sources: string[] }> = [
   { topic: "Encyclopedia", sources: ["wikipedia-en", "wikipedia-simple", "vikidia"] },

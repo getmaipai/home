@@ -8,11 +8,11 @@ import { Badge } from "@maipai/ui/src/ui/badge";
 import { Button } from "@maipai/ui/src/ui/button";
 import { Input } from "@maipai/ui/src/dashboard/components/ui/input";
 import { Item, ItemContent, ItemDescription, ItemTitle } from "@maipai/ui/src/dashboard/components/ui/item";
-import { ApiError } from "@/lib/api";
 import { aiChoicesApi, type InspectedChatModel } from "@/lib/aiChoicesApi";
 import { sizeGb } from "../../../../shared/diskPlanMath";
+import { errorLine } from "@/lib/hubReachability";
 
-const messageOf = (error: unknown) => (error instanceof ApiError ? error.message : "The model link did not open. Check the link, then try again.");
+const messageOf = (error: unknown) => (errorLine(error, "The model link did not open. Check the link, then try again."));
 
 export function AddChatModel({ copy, onAdded }: { copy: Record<string, string>; onAdded?: () => void }) {
   const [link, setLink] = useState("");

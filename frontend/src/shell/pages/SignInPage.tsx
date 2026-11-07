@@ -12,7 +12,7 @@ import { Alert, AlertDescription } from "@maipai/ui/src/dashboard/components/ui/
 import FullLogo from "@maipai/ui/src/dashboard/layouts/full/shared/logo/FullLogo";
 import { useProfileSignIn } from "@/kit/hooks/useProfileSignIn";
 import { api, type Roster } from "@/lib/api";
-import { hubErrorMessage, isHubUnreachable, useWhenHubBack } from "@/lib/hubReachability";
+import { errorLine, isHubUnreachable, useWhenHubBack } from "@/lib/hubReachability";
 import { useTabItem } from "@/shell/tabIdentity";
 
 type MaskedSecretStyle = CSSProperties & { WebkitTextSecurity: "disc" };
@@ -82,7 +82,7 @@ export function SignInPage({ onSignedIn }: { onSignedIn: () => void }) {
             error={profilesQuery.isError}
             isFetching={profilesQuery.isFetching}
             onRetry={() => profilesQuery.refetch()}
-            errorMessage={hubErrorMessage(profilesQuery.error)}
+            errorMessage={errorLine(profilesQuery.error)}
             loadingLabel="Loading household"
           >
             {(profiles: Roster[]) =>

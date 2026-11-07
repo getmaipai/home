@@ -8,7 +8,7 @@ import { Textarea } from "@maipai/ui/src/ui/textarea";
 import { getIcon } from "@maipai/ui/src/icons";
 import { IconTile } from "@maipai/ui/src/primitives/IconTile";
 import { ComparisonCard } from "@maipai/ui/src/elements/comparison-card";
-import { api, ApiError, type ChatModelChoice, type HardwareInfo, type ModelFit } from "@/lib/api";
+import { api, type ChatModelChoice, type HardwareInfo, type ModelFit } from "@/lib/api";
 import { formatBytes } from "@maipai/ui/src/format";
 import { useFitPlan } from "@/lib/useFitPlan";
 import { modelLinkName, parseModelLink } from "@/lib/modelLink";
@@ -19,6 +19,7 @@ import type { ComputerMemoryResponse } from "@/lib/api";
 import type { FitPlanResponse } from "@/lib/api";
 import { summarizeFits } from "@/lib/fitSummary";
 import { isVisibleModelDownload, modelDownloadProgress, useModelDownloadJobs } from "@/lib/modelDownloadProgress";
+import { errorLine } from "@/lib/hubReachability";
 
 // The model-selection wizard, real half (2026-09-04): docs/SETTINGS.md
 // Rule 3 ("One card per role... with the chosen model... and 'change.'
@@ -57,7 +58,7 @@ export function ModelsSection() {
         setStackChat({ name: selection.name, state: selection.state });
         setInstalledIds(selection.installed ?? []);
       })
-      .catch((e: unknown) => setError(e instanceof ApiError ? e.message : "Could not load this computer's information."));
+      .catch((e: unknown) => setError(errorLine(e, "Could not load this computer's information.")));
   }, []);
 
   useEffect(load, [load]);
@@ -211,7 +212,7 @@ function CheckModelCard({ onChecked }: { onChecked: (name: string, response: Fit
       setResponse(fitResponse);
       if (fitResponse.plan !== null) onChecked(modelLinkName(parsed), fitResponse);
     } catch (e) {
-      setError(e instanceof ApiError ? e.message : "Could not check that link.");
+      setError(errorLine(e, "Could not check that link."));
     } finally {
       setBusy(false);
     }
@@ -334,7 +335,7 @@ function ChatModelChoices({ fits, selectedModelId, installedIds, downloading, on
       watch(id);
     } catch (e) {
       setWorking(null);
-      setMessage(e instanceof ApiError ? e.message : "Could not change the chat model. Try again.");
+      setMessage(errorLine(e, "Could not change the chat model. Try again."));
     }
   }
 

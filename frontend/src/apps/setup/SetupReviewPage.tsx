@@ -6,6 +6,7 @@ import { Button } from "@maipai/ui/src/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@maipai/ui/src/dashboard/components/ui/card";
 import { api, ApiError } from "@/lib/api";
 import { renderSetupReviewScreen } from "./SetupWizard";
+import { errorLine } from "@/lib/hubReachability";
 
 const ErrorIcon = getIcon("alert-triangle");
 
@@ -45,7 +46,7 @@ export function SetupReviewPage() {
       if (engine !== originalEngine) await api.setSetting("household", "engines.stack.where", engine);
       navigate("/repairs", { replace: true });
     } catch (reason) {
-      setError(reason instanceof ApiError ? reason.message : "Home couldn't save this choice. Check the engine link in Home settings, then try again.");
+      setError(errorLine(reason, "Home couldn't save this choice. Check the engine link in Home settings, then try again."));
     } finally { setBusy(false); }
   }
 

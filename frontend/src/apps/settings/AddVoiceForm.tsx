@@ -3,8 +3,8 @@ import { useQueryClient } from "@tanstack/react-query";
 import { Progress } from "@maipai/ui/src/primitives/Progress";
 import { Button } from "@maipai/ui/src/ui/button";
 import { Input } from "@maipai/ui/src/ui/input";
-import { ApiError } from "@/lib/api";
 import { householdVoicesApi } from "@/lib/householdVoicesApi";
+import { errorLine } from "@/lib/hubReachability";
 
 const FIELD = "flex flex-col gap-1";
 const HELP = "text-sm text-muted-foreground";
@@ -32,7 +32,7 @@ export function AddVoiceForm({ onCancel, onMade, onBusyChange, canTune = true, m
       setBusy(false);
       onMade(voiceName);
     } catch (cause) {
-      setError(cause instanceof ApiError ? cause.message : cause instanceof Error ? cause.message : "Could not make this voice. Try again.");
+      setError(errorLine(cause, cause instanceof Error ? cause.message : "Could not make this voice. Try again."));
       setBusy(false);
     }
   }

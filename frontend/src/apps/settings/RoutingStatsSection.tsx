@@ -2,7 +2,8 @@ import { useEffect, useState } from "react";
 import { Section } from "@maipai/ui/src/primitives/Section";
 import { Progress } from "@maipai/ui/src/primitives/Progress";
 import { EmptyState } from "@maipai/ui/src/primitives/EmptyState";
-import { api, ApiError, type RoutingStats } from "@/lib/api";
+import { api, type RoutingStats } from "@/lib/api";
+import { errorLine } from "@/lib/hubReachability";
 
 // The plan's own next step after shipping real plugins (4.5): "count
 // fall-throughs to chat using conversation history... and decide on
@@ -18,7 +19,7 @@ export function RoutingStatsSection() {
     api
       .routingStats()
       .then(setStats)
-      .catch((e: unknown) => setError(e instanceof ApiError ? e.message : "Could not load routing stats."));
+      .catch((e: unknown) => setError(errorLine(e, "Could not load routing stats.")));
   }, []);
 
   return (

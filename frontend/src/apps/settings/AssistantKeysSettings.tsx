@@ -14,13 +14,14 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@maipai/ui/src/ui/alert-dialog";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@maipai/ui/src/dashboard/components/ui/card";
 import { Item, ItemActions, ItemContent, ItemDescription, ItemGroup, ItemTitle } from "@maipai/ui/src/dashboard/components/ui/item";
-import { api, ApiError, type PersonalApiKey } from "@/lib/api";
+import { api, type PersonalApiKey } from "@/lib/api";
+import { errorLine } from "@/lib/hubReachability";
 
 const KEYS = ["settings-api-keys"] as const;
 type Kind = "settings" | "diagnose" | "engine";
 const kindOf = (key: PersonalApiKey): Kind => key.scopes.includes("engine") ? "engine" : key.scopes.includes("diagnose") ? "diagnose" : "settings";
 const dateText = (date: string | null) => date ? new Date(date).toLocaleDateString() : "Never";
-const messageOf = (error: unknown, fallback: string) => error instanceof ApiError ? error.message : fallback;
+const messageOf = (error: unknown, fallback: string) => errorLine(error, fallback);
 
 export function AssistantKeysSettings() {
   const client = useQueryClient();

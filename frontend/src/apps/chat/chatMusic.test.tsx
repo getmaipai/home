@@ -195,7 +195,7 @@ describe("MusicToolRender", () => {
     globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
       calls.push({ url, method: init?.method ?? "GET", ...(typeof init?.body === "string" ? { body: init.body } : {}) });
-      if (url.includes("/revise")) return new Response(JSON.stringify({ error: "The music model is busy." }), { status: 503 });
+      if (url.includes("/revise")) return new Response(JSON.stringify({ error: "The music model is busy.", code: "engine_busy" }), { status: 503 });
       if (url.includes("/files/")) return new Response(new Uint8Array(16), { status: 200, headers: { "content-type": "audio/mp4" } });
       return new Response(JSON.stringify(card), { status: 200, headers: { "content-type": "application/json" } });
     }) as typeof fetch;

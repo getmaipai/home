@@ -15,7 +15,7 @@ import { Item, ItemActions, ItemContent, ItemDescription, ItemGroup, ItemMedia, 
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@maipai/ui/src/dashboard/components/ui/alert-dialog";
 import { getIcon } from "@maipai/ui/src/icons";
 import { Link } from "react-router-dom";
-import { api, ApiError } from "@/lib/api";
+import { api } from "@/lib/api";
 import { aiChoicesApi } from "@/lib/aiChoicesApi";
 import { StagedApplyBar } from "@/apps/settings/StagedApplyBar";
 import { InstallStrip } from "@/shell/InstallStrip";
@@ -31,9 +31,10 @@ import { sizeGb } from "../../../../shared/diskPlanMath";
 import type { AiJobId } from "../../../../shared/aiChoices";
 import type { SettingsViewProps } from "@/shell/pages/settings/settingsViews";
 import { downloadProgress } from "@/lib/downloadProgress";
+import { errorLine } from "@/lib/hubReachability";
 
 const GB = 1_000_000_000;
-const messageOf = (error: unknown, fallback: string) => (error instanceof ApiError ? error.message : fallback);
+const messageOf = (error: unknown, fallback: string) => (errorLine(error, fallback));
 const delta = (bytes: number) => `${bytes < 0 ? "-" : "+"}${sizeGb(Math.abs(bytes))}`;
 
 function whenText(updatedAt: number): string {

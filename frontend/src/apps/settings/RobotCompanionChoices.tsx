@@ -4,8 +4,9 @@ import { Alert, AlertDescription } from "@maipai/ui/src/ui/alert";
 import { Field, FieldDescription, FieldGroup, FieldLabel } from "@maipai/ui/src/dashboard/components/ui/field";
 import { Select } from "@maipai/ui/src/primitives/Select";
 import { Section } from "@maipai/ui/src/primitives/Section";
-import { api, ApiError, type RobotCompanionInfo, type StackVoice } from "@/lib/api";
+import { api, type RobotCompanionInfo, type StackVoice } from "@/lib/api";
 import { voiceFriendlyName } from "@/lib/voice/voiceBrowserRows";
+import { errorLine } from "@/lib/hubReachability";
 
 const NONE = "none";
 const CONTROLS = ["child", "teen", "adult"] as const;
@@ -36,7 +37,7 @@ export function RobotCompanionChoices({ deviceId }: { deviceId: string }) {
   useEffect(() => { let active = true; void api.stackVoices().then((result) => { if (active) setVoices(result.voices); }).catch(() => undefined); return () => { active = false; }; }, []);
   const load = useCallback(async () => {
     try { setInfo(await api.robotCompanion(deviceId)); }
-    catch (failure) { setError(failure instanceof ApiError ? failure.message : "Could not load this robot's companion. Check the connection and try again."); }
+    catch (failure) { setError(errorLine(failure, "Could not load this robot's companion. Check the connection and try again.")); }
   }, [deviceId]);
   useEffect(() => { void load(); }, [load]);
 
@@ -44,7 +45,7 @@ export function RobotCompanionChoices({ deviceId }: { deviceId: string }) {
     setBusy(true);
     setError(null);
     try { await api.setSetting(`device:${deviceId}`, key, value); await load(); }
-    catch (failure) { setError(failure instanceof ApiError ? failure.message : "Could not save this. Check the connection and try again."); }
+    catch (failure) { setError(errorLine(failure, "Could not save this. Check the connection and try again.")); }
     finally { setBusy(false); }
   }
 

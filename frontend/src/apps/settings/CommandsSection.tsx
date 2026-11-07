@@ -1,11 +1,12 @@
 import { useEffect, useState, type FormEvent } from "react";
-import { api, ApiError, isOwnerOrAdminRole, type Roster, type CommandRow, type CommandAction } from "@/lib/api";
+import { api, isOwnerOrAdminRole, type Roster, type CommandRow, type CommandAction } from "@/lib/api";
 import { Section } from "@maipai/ui/src/primitives/Section";
 import { EmptyState } from "@maipai/ui/src/primitives/EmptyState";
 import { Input } from "@maipai/ui/src/ui/input";
 import { Button } from "@maipai/ui/src/ui/button";
 import { Select } from "@maipai/ui/src/primitives/Select";
 import { ROLE_LABELS, ROLE_LADDER, meetsMinRole } from "@/apps/people/roles";
+import { errorLine } from "@/lib/hubReachability";
 
 interface CommandsSectionProps {
   person: Roster;
@@ -49,7 +50,7 @@ export function CommandsSection({ person, management = false }: CommandsSectionP
     try {
       setCommands(await api.commands());
     } catch (e) {
-      setLoadError(e instanceof ApiError ? e.message : "Could not load commands.");
+      setLoadError(errorLine(e, "Could not load commands."));
     }
   }
 
@@ -77,7 +78,7 @@ export function CommandsSection({ person, management = false }: CommandsSectionP
       setEntityId("");
       if (management) await load();
     } catch (err) {
-      setCreateError(err instanceof ApiError ? err.message : "Could not create that command.");
+      setCreateError(errorLine(err, "Could not create that command."));
     } finally {
       setCreating(false);
     }
@@ -90,7 +91,7 @@ export function CommandsSection({ person, management = false }: CommandsSectionP
       await api.deleteCommand(id);
       if (management) await load();
     } catch (err) {
-      setActionError(err instanceof ApiError ? err.message : "Could not delete that command.");
+      setActionError(errorLine(err, "Could not delete that command."));
     } finally {
       setPendingId(null);
     }

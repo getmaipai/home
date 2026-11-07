@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { ApiError, api } from "@/lib/api";
+import { errorLine } from "@/lib/hubReachability";
 
 export const companionStatesKey = (id: string) => ["companions", id, "states"] as const;
 export const companionAppearanceKey = (id: string) => ["companion-appearance", id] as const;
 const networkError = "Could not reach Home. Check your connection and try again.";
-const errorText = (error: unknown) => error instanceof ApiError ? error.message : networkError;
+const errorText = (error: unknown) => errorLine(error, networkError);
 
 export function useCompanionStates(id: string, active: boolean) {
   const client = useQueryClient();

@@ -10,7 +10,8 @@ import { Switch } from "@maipai/ui/src/ui/switch";
 import { Label } from "@maipai/ui/src/dashboard/components/ui/label";
 import { Alert, AlertDescription } from "@maipai/ui/src/ui/alert";
 import { listKept, removeAllOfflineMedia } from "@/lib/offlineMedia";
-import { api, ApiError, type DeviceInfo, type SessionInfo } from "@/lib/api";
+import { api, type DeviceInfo, type SessionInfo } from "@/lib/api";
+import { errorLine } from "@/lib/hubReachability";
 
 function whenText(iso: string): string {
   return new Date(iso).toLocaleString();
@@ -60,7 +61,7 @@ export function DevicesSection({ search = "" }: { search?: string }) {
       }
       setConfirming(null);
     } catch (err) {
-      setActionError(err instanceof ApiError ? err.message : "Could not revoke that.");
+      setActionError(errorLine(err, "Could not revoke that."));
     } finally {
       setBusy(false);
     }

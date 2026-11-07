@@ -23,6 +23,7 @@ import { isFormAnswer, parseTurnAsk, type AskAnswerArm } from "@/apps/chat/chatA
 import { randomUuid } from "@/lib/randomUuid";
 import { unstable_defaultDirectiveFormatter } from "@assistant-ui/react";
 import type { PageContext as SpecPageContext } from "@maipai/spec/gen/ts/page-context.js";
+import { errorLine } from "@/lib/hubReachability";
 
 // The backend already emits the song job id; the pinned spec has not added it yet.
 const MusicToolResultEvent = ToolTurnStreamEvent.options[1].extend({
@@ -927,7 +928,7 @@ export function createChatModelAdapter(deps: ChatModelAdapterDeps): ChatModelAda
         if (askForm && !askFormSettled) {
           askFormSettled = true;
           const code = e instanceof ApiError ? e.code ?? "unavailable" : "client_unreachable";
-          askForm.onSettled?.({ ok: false, code, message: askFormFailureLine(code, e instanceof ApiError ? e.message : undefined) });
+          askForm.onSettled?.({ ok: false, code, message: askFormFailureLine(code, errorLine(e, undefined)) });
           deps.onReplyState?.("idle");
           scheduler.stop();
           throw new DOMException("The form was not accepted.", "AbortError");

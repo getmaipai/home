@@ -15,9 +15,10 @@ import { DataTable, type DataTableColumn } from "@maipai/ui/src/elements/data-ta
 import { DataTableRowActions } from "@/shell/components/DataTableRowActions";
 import { formatBytes } from "@maipai/ui/src/format";
 import { BackupsSection } from "@/apps/settings/BackupsSection";
-import { api, ApiError, isOwnerOrAdminRole, type Roster, type StorageUsageOverview, type PersonStorageRow } from "@/lib/api";
+import { api, isOwnerOrAdminRole, type Roster, type StorageUsageOverview, type PersonStorageRow } from "@/lib/api";
 import type { PackageCacheSourceRow } from "@maipai/home-backend/src/wire";
 import { useTabItem } from "@/shell/tabIdentity";
+import { errorLine } from "@/lib/hubReachability";
 
 // Exported: pageHeaderTitle.tsx's own MANAGE_PAGE_ENTRIES imports this
 // directly for the header's left slot, the same "that page's own exported
@@ -133,7 +134,7 @@ export function StoragePage({ person }: { person: Roster }) {
       error={query.isError}
       isFetching={query.isFetching}
       onRetry={() => query.refetch()}
-      errorMessage={query.error instanceof ApiError ? query.error.message : "Could not load storage."}
+      errorMessage={errorLine(query.error, "Could not load storage.")}
       loadingLabel="Loading storage"
     >
       {(data: StorageUsageOverview) => <StorageContent data={data} person={person} isAdmin={isAdmin} cacheRows={cacheQuery.data ?? []} cacheLoading={cacheQuery.isLoading} clearAllOpen={clearAllOpen} setClearAllOpen={setClearAllOpen} clear={clear} />}

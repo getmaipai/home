@@ -3,7 +3,8 @@ import { Section } from "@maipai/ui/src/primitives/Section";
 import { DestructiveConfirm } from "@maipai/ui/src/primitives/DestructiveConfirm";
 import { Input } from "@maipai/ui/src/ui/input";
 import { Button } from "@maipai/ui/src/ui/button";
-import { api, ApiError } from "@/lib/api";
+import { api } from "@/lib/api";
+import { errorLine } from "@/lib/hubReachability";
 
 const KEY = "voice.hf_token";
 
@@ -38,7 +39,7 @@ export function HuggingFaceTokenSection() {
       const setting = values.find((v) => v.key === KEY);
       setIsSet(setting?.isSet ?? false);
     } catch (e) {
-      setLoadError(e instanceof ApiError ? e.message : "Could not load the current status.");
+      setLoadError(errorLine(e, "Could not load the current status."));
     }
   }
 
@@ -57,7 +58,7 @@ export function HuggingFaceTokenSection() {
       setSuccess(true);
       await load();
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Could not save that token.");
+      setError(errorLine(err, "Could not save that token."));
     } finally {
       setSubmitting(false);
     }
@@ -72,7 +73,7 @@ export function HuggingFaceTokenSection() {
       setConfirmRemove(false);
       await load();
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Could not remove it.");
+      setError(errorLine(err, "Could not remove it."));
     } finally {
       setSubmitting(false);
     }

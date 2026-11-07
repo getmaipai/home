@@ -332,7 +332,7 @@ describe("StatusPartsBody", () => {
       const url = typeof input === "string" ? input : input.toString();
       if (url.includes("/api/health")) return Promise.resolve(new Response(JSON.stringify(health()), { status: 200 }));
       if (url.includes("/api/host/engines/embed/restart") && init?.method === "POST") {
-        return Promise.resolve(new Response(JSON.stringify({ error: "Understanding could not restart." }), { status: 503 }));
+        return Promise.resolve(new Response(JSON.stringify({ error: "Understanding could not restart.", code: "engine_unavailable" }), { status: 503 }));
       }
       return Promise.reject(new Error(`unstubbed fetch: ${url}`));
     }) as unknown as typeof fetch;

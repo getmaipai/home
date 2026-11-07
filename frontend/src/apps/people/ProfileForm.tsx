@@ -6,9 +6,10 @@ import { Input } from "@maipai/ui/src/dashboard/components/ui/input";
 import { Label } from "@maipai/ui/src/dashboard/components/ui/label";
 import { Textarea } from "@maipai/ui/src/dashboard/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@maipai/ui/src/dashboard/components/ui/select";
-import { api, ApiError, type PersonRosterEntry, type Roster } from "@/lib/api";
+import { api, type PersonRosterEntry, type Roster } from "@/lib/api";
 import { ACCENT_SELECT_LABELS, ACCENT_SELECT_OPTIONS, NO_ACCENT } from "@/apps/people/roles";
 import { registerRouteLeaveGuard } from "@/shell/routeLeaveGuard";
+import { errorLine } from "@/lib/hubReachability";
 
 export type ProfileFormPerson = PersonRosterEntry | Roster;
 
@@ -151,7 +152,7 @@ export function ProfileForm({ person, canEdit, onSaved, onCancel, layout = "dial
       setSaved(true);
       if (layout === "dialog") onCancel?.();
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Could not save those changes. Check your connection and try again.");
+      setError(errorLine(err, "Could not save those changes. Check your connection and try again."));
     } finally {
       setSubmitting(false);
     }

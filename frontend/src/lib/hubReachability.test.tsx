@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { ApiError } from "@/lib/api";
-import { HUB_DOWN_LINE, hubErrorMessage, isHubUnreachable, waitForHub } from "@/lib/hubReachability";
+import { HUB_DOWN_LINE, errorLine, isHubUnreachable, waitForHub } from "@/lib/hubReachability";
 
 describe("isHubUnreachable", () => {
   test("a refused or dropped request, and a proxy's 502, 504 or bare 503, mean the hub did not answer", () => {
@@ -21,11 +21,17 @@ describe("isHubUnreachable", () => {
   });
 });
 
-describe("hubErrorMessage", () => {
+describe("errorLine", () => {
   test("says Home is restarting when the hub is down, and keeps the hub's own words when it answered", () => {
-    expect(hubErrorMessage(new TypeError("Failed to fetch"))).toBe(HUB_DOWN_LINE);
-    expect(hubErrorMessage(new ApiError("Wrong passcode", 401))).toBe("Wrong passcode");
+    expect(errorLine(new TypeError("Failed to fetch"))).toBe(HUB_DOWN_LINE);
+    expect(errorLine(new ApiError("Wrong passcode", 401))).toBe("Wrong passcode");
     expect(HUB_DOWN_LINE).toBe("One moment. Home will be back in about a minute.");
+  });
+
+  test("a restarting hub never shows the caller's fallback, an unrelated error does", () => {
+    expect(errorLine(new ApiError("Bad gateway", 502), "Could not save.")).toBe(HUB_DOWN_LINE);
+    expect(errorLine(new TypeError("Failed to fetch"), "Could not save.")).toBe(HUB_DOWN_LINE);
+    expect(errorLine(new Error("boom"), "Could not save.")).toBe("Could not save.");
   });
 });
 

@@ -43,7 +43,7 @@ import { AsyncState } from "@maipai/ui/src/primitives/AsyncState";
 import { useBreakpoint } from "@maipai/ui/src/hooks/useBreakpoint";
 import { getIcon } from "@maipai/ui/src/icons";
 import { cn } from "@maipai/ui/src/utils";
-import { api, ApiError, isOwnerOrAdminRole, canHaveTemporaryChatRole, readBareCompareStream, type BareCompareTrace, type ChatModelsResponse, type EnginesOverview, type InstalledPackage, type Roster } from "@/lib/api";
+import { api, isOwnerOrAdminRole, canHaveTemporaryChatRole, readBareCompareStream, type BareCompareTrace, type ChatModelsResponse, type EnginesOverview, type InstalledPackage, type Roster } from "@/lib/api";
 import { useHubMutation } from "@/lib/useHubMutation";
 import { CHAT_CAPABILITIES_QUERY_KEY, chatCapabilitiesFrom, modelThinks, NO_CHAT_PICTURES } from "@/apps/chat/visionCapability";
 import type { Conversation } from "@maipai/spec/gen/ts/conversation.js";
@@ -98,6 +98,7 @@ import { discardDraft } from "@/apps/chat/draftStore";
 import { chatFoldersQueryKey, useChatProjects } from "@/apps/chat/chatProjects";
 import { projectConversationRows, projectSourcesVisible } from "@/shell/pages/chatProjectPageModel";
 import { useControlledConversationId } from "./useControlledConversationId";
+import { errorLine } from "@/lib/hubReachability";
 
 const VoiceSettingsIcon = getIcon("settings");
 const LazyProjectHomeHeader = lazy(() => import("@maipai/ui/src/elements/project-home-page").then((module) => ({ default: module.ProjectHomeHeader })));
@@ -155,7 +156,7 @@ function useBareCompareCanvas(target: CompareTarget | null) {
       } catch (err) {
         if (controller.signal.aborted) return;
         setStatus("error");
-        setErrorMessage(err instanceof ApiError ? err.message : "Could not compare with the bare model.");
+        setErrorMessage(errorLine(err, "Could not compare with the bare model."));
       }
     })();
     return () => controller.abort();
@@ -1567,7 +1568,7 @@ export function ChatPage({ person }: { person: Roster }) {
           error={artifactQuery.isError}
           isFetching={artifactQuery.isFetching}
           onRetry={() => void artifactQuery.refetch()}
-          errorMessage={artifactQuery.error instanceof ApiError ? artifactQuery.error.message : "Could not load this document."}
+          errorMessage={errorLine(artifactQuery.error, "Could not load this document.")}
           loadingLabel="Loading document"
         >
           {(artifact) => (

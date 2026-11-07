@@ -10,9 +10,10 @@ import { Checkbox } from "@maipai/ui/src/ui/checkbox";
 import { Badge } from "@maipai/ui/src/ui/badge";
 import { Button } from "@maipai/ui/src/ui/button";
 import { NOTIFICATIONS_QUERY_KEY, NOTIFICATIONS_HISTORY_QUERY_KEY } from "@/shell/NotificationBell";
-import { api, ApiError, type NotificationDeliveryView } from "@/lib/api";
+import { api, type NotificationDeliveryView } from "@/lib/api";
 import { cn, FOCUS_RING } from "@maipai/ui/src/utils";
 import { getIcon } from "@maipai/ui/src/icons";
+import { errorLine } from "@/lib/hubReachability";
 
 /** The page's one icon choice; the header title reads it too. */
 export const NotificationsIcon = getIcon("bell");
@@ -74,7 +75,7 @@ export function NotificationsPage() {
       await api.dismissNotification(id);
       await invalidate();
     } catch (err) {
-      setActionError(err instanceof ApiError ? err.message : "Could not dismiss that notification.");
+      setActionError(errorLine(err, "Could not dismiss that notification."));
     } finally {
       setBusy(false);
     }
@@ -91,7 +92,7 @@ export function NotificationsPage() {
       selectMode.exit();
       await invalidate();
     } catch (err) {
-      setActionError(err instanceof ApiError ? err.message : "Could not clear those notifications.");
+      setActionError(errorLine(err, "Could not clear those notifications."));
       // A review caught this catch block leaving the on-screen list
       // unrefetched on a failed call, unlike every other path here -
       // the list can silently drift from server state (a partial

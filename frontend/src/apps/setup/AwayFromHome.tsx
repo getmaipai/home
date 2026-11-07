@@ -6,7 +6,7 @@ import { Wizard, type WizardStep } from "@maipai/ui/src/primitives/Wizard";
 import { Button } from "@maipai/ui/src/ui/button";
 import { QrCode } from "@maipai/ui/src/ui/qr-code";
 import { api, type SignedInPerson, type TailscaleStatus } from "@/lib/api";
-import { hubErrorMessage } from "@/lib/hubReachability";
+import { errorLine } from "@/lib/hubReachability";
 
 const STEPS: WizardStep[] = [
   { id: "device", title: "Install and sign in" },
@@ -47,7 +47,7 @@ export function AwayFromHome({ operator }: { operator: SignedInPerson | null }) 
       setStatus(next);
       setError(null);
     }).catch((reason) => {
-      if (active) setError(`${hubErrorMessage(reason, "Home couldn't check Tailscale.")} Check your connection and try again.`);
+      if (active) setError(`${errorLine(reason, "Home couldn't check Tailscale.")} Check your connection and try again.`);
     }).finally(() => { pollPending.current = false; });
     };
     poll();

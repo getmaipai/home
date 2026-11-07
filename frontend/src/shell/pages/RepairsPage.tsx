@@ -12,8 +12,9 @@ import { Button as KitButton } from "@maipai/ui/src/ui/button";
 import { Input } from "@maipai/ui/src/dashboard/components/ui/input";
 import { Label } from "@maipai/ui/src/dashboard/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@maipai/ui/src/dashboard/components/ui/select";
-import { api, ApiError, isOwnerOrAdminRole, type Issue, type Roster } from "@/lib/api";
+import { api, isOwnerOrAdminRole, type Issue, type Roster } from "@/lib/api";
 import { useTabItem } from "@/shell/tabIdentity";
+import { errorLine } from "@/lib/hubReachability";
 
 /** /repairs: SHELL-07's own row (docs/plans/shell-on-shadcndashboard-
  * 2026-09-21.md's plan row) - `GET /api/repairs` through Home's
@@ -67,7 +68,7 @@ export function RepairsPage({ person }: { person: Roster }) {
       await api.fixIssue(id);
       await queryClient.invalidateQueries({ queryKey: ["repairs"] });
     } catch (error) {
-      toast.error(error instanceof ApiError ? error.message : "Could not fix that repair.");
+      toast.error(errorLine(error, "Could not fix that repair."));
     } finally {
       setPendingIds((previous) => {
         const next = new Set(previous);
@@ -83,7 +84,7 @@ export function RepairsPage({ person }: { person: Roster }) {
       await api.dismissIssue(id);
       await queryClient.invalidateQueries({ queryKey: ["repairs"] });
     } catch (error) {
-      toast.error(error instanceof ApiError ? error.message : "Could not dismiss that repair.");
+      toast.error(errorLine(error, "Could not dismiss that repair."));
     } finally {
       setPendingIds((previous) => {
         const next = new Set(previous);
@@ -99,7 +100,7 @@ export function RepairsPage({ person }: { person: Roster }) {
       await queryClient.invalidateQueries({ queryKey: ["repairs"] });
       toast.success("Home checked your computers and updated Health.");
     } catch (error) {
-      toast.error(error instanceof ApiError ? error.message : "Home couldn't check your computers. Check the engine connection, then try again.");
+      toast.error(errorLine(error, "Home couldn't check your computers. Check the engine connection, then try again."));
     }
   }
 
@@ -122,7 +123,7 @@ export function RepairsPage({ person }: { person: Roster }) {
           error={query.isError}
           isFetching={query.isFetching}
           onRetry={() => query.refetch()}
-          errorMessage={query.error instanceof ApiError ? query.error.message : "Could not load repairs."}
+          errorMessage={errorLine(query.error, "Could not load repairs.")}
           loadingLabel="Loading repairs"
         >
           {(issues: Issue[]) => (

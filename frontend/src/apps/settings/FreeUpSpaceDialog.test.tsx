@@ -111,7 +111,7 @@ describe("Free up space", () => {
   });
 
   test("a list that fails to load shows the destructive Alert with the next step", async () => {
-    const v = mount(new ApiError("The engine isn't answering. Check that the engine is running, then try again.", 503));
+    const v = mount(new ApiError("The engine isn't answering. Check that the engine is running, then try again.", 503, "engine_unavailable"));
     expect(await v.findByText("The list did not load")).toBeTruthy();
     expect(v.getByText(/engine isn't answering/)).toBeTruthy();
     v.restore();
