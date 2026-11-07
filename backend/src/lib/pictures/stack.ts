@@ -3,9 +3,10 @@
 // (the Stack's URL setting already guarantees it). The prompt and the pictures travel in bodies and are
 // never logged or put in an error message (rule 6a). A test replaces `fetch` with `__setPicturesFetchForTests`.
 import { makingStateOf, plainMakingLine } from "@/lib/pictures/plainLine";
-import { forgetMediaRefusal, getStackUrl, rememberMediaRefusal } from "@/lib/stackEngine";
+import { forgetMediaRefusal, rememberMediaRefusal } from "@/lib/stackEngine";
+import { createStackHttp } from "@/lib/stack/http";
 import type { StackLiveFields } from "@/lib/genLive";
-import { sendWithView, StackViewError, VIEW_KEY_LINE, type FullView } from "@/lib/stack/fullView";
+import type { FullView } from "@/lib/stack/fullView";
 
 export type StackPicState = "queued" | "running" | "done" | "failed" | "cancelled";
 
@@ -96,40 +97,22 @@ export class StackPicturesError extends Error {
   }
 }
 
-let fetchForTests: typeof fetch | null = null;
-/** Test seam: a function that answers the Stack's picture routes. */
-export function __setPicturesFetchForTests(fn: typeof fetch | null): void { fetchForTests = fn; }
+const stack = createStackHttp({
+  makeError: (status, code, message, job) => new StackPicturesError(status, code, message, job),
+  noStackMessage: "Pictures are not set up on this computer yet. Ask an admin.",
+  unreachableMessage: "Pictures are not ready yet. Try again in a few minutes.",
+});
+/** Test seam: a function that answers the Stack's image routes. */
+export const __setPicturesFetchForTests = stack.__setFetchForTests;
+const request = stack.request;
 
-function baseUrl(): string {
-  if (fetchForTests) return "http://127.0.0.1:1";
-  const url = getStackUrl();
-  if (!url) throw new StackPicturesError(503, "no_stack", "Pictures are not set up on this computer yet. Ask an admin.");
-  return url.replace(/\/$/, "");
-}
-
-/** `view` (ADULT-LOCK-03) is the full-view grant of an adult job; without it the call is the plain one and carries no extra header. */
-async function request(path: string, init: RequestInit & { timeoutMs?: number } = {}, view?: FullView): Promise<Response> {
-  const doFetch = fetchForTests ?? globalThis.fetch;
-  const { timeoutMs = 15_000, ...rest } = init;
-  const signal = rest.signal ? AbortSignal.any([rest.signal, AbortSignal.timeout(timeoutMs)]) : AbortSignal.timeout(timeoutMs);
-  try {
-    return await sendWithView(doFetch, baseUrl(), path, { ...rest, signal }, view);
-  } catch (error) {
-    if (error instanceof StackPicturesError) throw error;
-    if (error instanceof StackViewError) throw new StackPicturesError(503, error.code, VIEW_KEY_LINE);
-    throw new StackPicturesError(503, "unreachable", "Pictures are not ready yet. Try again in a few minutes.");
-  }
-}
-
-async function failure(res: Response): Promise<never> {
-  let body: { error?: unknown; code?: unknown; job?: unknown } = {};
-  try { body = await res.json() as typeof body; } catch { /* a body that is not JSON carries no detail */ }
-  const code = typeof body.code === "string" ? body.code : null;
-  const message = plainMakingLine("image", code, typeof body.error === "string" && body.error ? body.error : "Pictures could not be made right now. Try again in a few minutes.");
-  // ENGINE-STATUS-MEDIA-01: a refusal that is a state Home can show in advance is remembered for the health row.
-  const state = makingStateOf(code);
-  if (state === "memory" || state === "restarting") rememberMediaRefusal("image", state, code!, message);
-  throw new StackPicturesError(res.status, typeof body.code === "string" ? body.code : `http_${res.status}`, message, typeof body.job === "string" ? body.job : undefined);
+function failure(res: Response): Promise<never> {
+  return stack.failure(res, {
+    fallback: "Pictures could not be made right now. Try again in a few minutes.",
+    describe: (code, text) => plainMakingLine("image", code, text),
+    // ENGINE-STATUS-MEDIA-01: a refusal that is a state Home can show in advance is remembered for the health row.
+    onFailure: (code, message) => { const state = makingStateOf(code); if (state === "memory" || state === "restarting") rememberMediaRefusal("image", state, code!, message); },
+  });
 }
 
 /** Submits a picture and returns the job id at once (the Stack's 202 with `timeout_ms: 1`; a 200 means it was already done, and its pictures ride along). */

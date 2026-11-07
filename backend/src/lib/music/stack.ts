@@ -1,6 +1,7 @@
 // MUSIC-GEN-03: Stack section 12. Words and source bytes travel only in bodies, never in logs or errors.
 import type { MusicRequest } from "./types";
 import { getStackUrl } from "@/lib/stackEngine";
+import { createStackHttp } from "@/lib/stack/http";
 export type MusicState = "queued" | "running" | "done" | "failed" | "cancelled";
 export interface StackSong { url?: string; duration_s: number; seed: number; lrc?: string; bpm?: number; key?: string; model?: string }
 /** What the Stack lists for a finished split: each stem by name, fetched at its url; every stem is as long as the song. */
@@ -38,22 +39,17 @@ export interface StackMusicJob {
 export class StackMusicError extends Error {
   constructor(readonly status: number, readonly code: string) { super("The song could not be made. Try again."); this.name = "StackMusicError"; }
 }
-let fetchForTests: typeof fetch | null = null;
-/** Whether a Stack address is set (or a test fake stands in), so a caller can skip reading a big file for a Stack that is not there. */
-export function musicStackConfigured(): boolean { return fetchForTests !== null || !!getStackUrl(); }
-export function __setMusicFetchForTests(fn: typeof fetch | null): void { fetchForTests = fn; }
+const stack = createStackHttp({
+  makeError: (status, code) => new StackMusicError(status, code),
+  noStackMessage: "", unreachableMessage: "", // the error carries one sentence of its own
+});
+export function musicStackConfigured(): boolean { return stack.hasTestFetch() || !!getStackUrl(); }
+export const __setMusicFetchForTests = stack.__setFetchForTests;
 export const __setStemsFetchForTests = __setMusicFetchForTests;
-async function request(path: string, init: RequestInit = {}, timeoutMs = 15_000): Promise<Response> {
-  const base = fetchForTests ? "http://127.0.0.1:1" : getStackUrl();
-  if (!base) throw new StackMusicError(503, "no_stack");
-  try { return await (fetchForTests ?? globalThis.fetch)(base.replace(/\/$/, "") + path, { ...init, signal: AbortSignal.timeout(timeoutMs) }); }
-  catch { throw new StackMusicError(503, "unreachable"); }
-}
+function request(path: string, init: RequestInit = {}, timeoutMs = 15_000): Promise<Response> { return stack.request(path, { ...init, timeoutMs }); }
 async function checked(res: Response): Promise<Response> {
   if (res.ok) return res;
-  let code = `http_${res.status}`;
-  try { const body = await res.json() as { code?: unknown }; if (typeof body.code === "string") code = body.code; } catch { /* no raw error text */ }
-  throw new StackMusicError(res.status, code);
+  return stack.failure(res, { fallback: "" }); // no raw error text: the code alone
 }
 export async function submitMusic(body: MusicBody): Promise<{ job: string; done: StackSong[] | null }> {
   const res = await checked(await request("/v1/audio/music", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) }, 60_000));
@@ -98,8 +94,7 @@ export async function deleteStemsJob(job: string): Promise<void> {
   try { await (await request(`/v1/audio/stems/${encodeURIComponent(job)}`, { method: "DELETE" })).arrayBuffer(); } catch { /* Stack retention is the fallback */ }
 }
 export async function fetchStem(url: string): Promise<Uint8Array> {
-  const base = fetchForTests ? "http://127.0.0.1:1" : getStackUrl();
-  if (!base) throw new StackMusicError(503, "no_stack");
+  const base = stack.baseUrl();
   let parsed: URL;
   try { parsed = new URL(url, base); } catch { throw new StackMusicError(502, "bad_reply"); }
   if (parsed.origin !== new URL(base).origin) throw new StackMusicError(502, "bad_reply");

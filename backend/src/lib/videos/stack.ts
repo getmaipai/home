@@ -4,9 +4,10 @@
 // put in an error message (rule 6a). A test replaces `fetch` with `__setVideosFetchForTests`.
 import { makingStateOf, plainMakingLine } from "@/lib/pictures/plainLine";
 import type { AnyBaseId, Media } from "@/lib/loras/baseFamilies";
-import { forgetMediaRefusal, getStackUrl, rememberMediaRefusal } from "@/lib/stackEngine";
+import { forgetMediaRefusal, rememberMediaRefusal } from "@/lib/stackEngine";
+import { createStackHttp } from "@/lib/stack/http";
 import type { StackLiveFields } from "@/lib/genLive";
-import { sendWithView, StackViewError, VIEW_KEY_LINE, type FullView } from "@/lib/stack/fullView";
+import type { FullView } from "@/lib/stack/fullView";
 
 export type StackVideoState = "queued" | "running" | "done" | "failed" | "cancelled";
 
@@ -159,40 +160,22 @@ export class StackVideoError extends Error {
   }
 }
 
-let fetchForTests: typeof fetch | null = null;
+const stack = createStackHttp({
+  makeError: (status, code, message, job) => new StackVideoError(status, code, message, job),
+  noStackMessage: "Videos are not set up on this computer yet. Ask an admin.",
+  unreachableMessage: "Videos are not ready yet. Try again in a few minutes.",
+});
 /** Test seam: a function that answers the Stack's video routes. */
-export function __setVideosFetchForTests(fn: typeof fetch | null): void { fetchForTests = fn; }
+export const __setVideosFetchForTests = stack.__setFetchForTests;
+const request = stack.request;
 
-function baseUrl(): string {
-  if (fetchForTests) return "http://127.0.0.1:1";
-  const url = getStackUrl();
-  if (!url) throw new StackVideoError(503, "no_stack", "Videos are not set up on this computer yet. Ask an admin.");
-  return url.replace(/\/$/, "");
-}
-
-/** `view` (ADULT-LOCK-03) is the full-view grant of an adult job; without it the call is the plain one and carries no extra header. */
-async function request(path: string, init: RequestInit & { timeoutMs?: number } = {}, view?: FullView): Promise<Response> {
-  const doFetch = fetchForTests ?? globalThis.fetch;
-  const { timeoutMs = 15_000, ...rest } = init;
-  const signal = rest.signal ? AbortSignal.any([rest.signal, AbortSignal.timeout(timeoutMs)]) : AbortSignal.timeout(timeoutMs);
-  try {
-    return await sendWithView(doFetch, baseUrl(), path, { ...rest, signal }, view);
-  } catch (error) {
-    if (error instanceof StackVideoError) throw error;
-    if (error instanceof StackViewError) throw new StackVideoError(503, error.code, VIEW_KEY_LINE);
-    throw new StackVideoError(503, "unreachable", "Videos are not ready yet. Try again in a few minutes.");
-  }
-}
-
-async function failure(res: Response): Promise<never> {
-  let body: { error?: unknown; code?: unknown; job?: unknown } = {};
-  try { body = await res.json() as typeof body; } catch { /* a body that is not JSON carries no detail */ }
-  const code = typeof body.code === "string" ? body.code : null;
-  const message = plainMakingLine("video", code, typeof body.error === "string" && body.error ? body.error : "Videos could not be made right now. Try again in a few minutes.");
-  // ENGINE-STATUS-MEDIA-01: a refusal that is a state Home can show in advance is remembered for the health row.
-  const state = makingStateOf(code);
-  if (state === "memory" || state === "restarting") rememberMediaRefusal("video", state, code!, message);
-  throw new StackVideoError(res.status, typeof body.code === "string" ? body.code : `http_${res.status}`, message, typeof body.job === "string" ? body.job : undefined);
+function failure(res: Response): Promise<never> {
+  return stack.failure(res, {
+    fallback: "Videos could not be made right now. Try again in a few minutes.",
+    describe: (code, text) => plainMakingLine("video", code, text),
+    // ENGINE-STATUS-MEDIA-01: a refusal that is a state Home can show in advance is remembered for the health row.
+    onFailure: (code, message) => { const state = makingStateOf(code); if (state === "memory" || state === "restarting") rememberMediaRefusal("video", state, code!, message); },
+  });
 }
 
 /** Starts a clip and returns the job id at once (`timeout_ms` 1: the Stack answers 202 with the job; a clip takes over two minutes). */

@@ -2,7 +2,7 @@
 // DELETE /{id}). One module, loopback only. The Stack's `error` is already a sentence for the person (it says
 // what to do first), so it is passed through; nothing here words a refusal itself. A test replaces `fetch`
 // with `__setComponentsFetchForTests`.
-import { getStackUrl } from "@/lib/stackEngine";
+import { createStackHttp } from "@/lib/stack/http";
 import { ackCovers, currentLicenceAck } from "@/lib/licenceAcceptance";
 
 export type ComponentGroup = "chat" | "voice" | "pictures" | "video" | "music" | "stems" | "tools" | "loras";
@@ -30,24 +30,15 @@ export class StackComponentError extends Error {
   constructor(readonly status: number, readonly code: string, message: string) { super(message); this.name = "StackComponentError"; }
 }
 
-let fetchForTests: typeof fetch | null = null;
-export function __setComponentsFetchForTests(fn: typeof fetch | null): void { fetchForTests = fn; }
-
-async function call(path: string, init: RequestInit = {}): Promise<Response> {
-  const url = fetchForTests ? "http://127.0.0.1:1" : getStackUrl();
-  if (!url) throw new StackComponentError(503, "no_stack", "The engine isn't set up on this computer yet. Ask an admin to check Settings, Engine.");
-  try {
-    return await (fetchForTests ?? globalThis.fetch)(url.replace(/\/$/, "") + path, { ...init, signal: AbortSignal.timeout(20_000) });
-  } catch {
-    throw new StackComponentError(503, "unreachable", "The engine isn't answering. Check that the engine is running, then try again.");
-  }
-}
-
-async function failure(res: Response): Promise<never> {
-  let body: { error?: unknown; code?: unknown } = {};
-  try { body = await res.json() as typeof body; } catch { /* no detail */ }
-  throw new StackComponentError(res.status, typeof body.code === "string" ? body.code : `http_${res.status}`, typeof body.error === "string" && body.error ? body.error : `The engine answered ${res.status}. Try again in a moment.`);
-}
+const stack = createStackHttp({
+  makeError: (status, code, message) => new StackComponentError(status, code, message),
+  noStackMessage: "The engine isn't set up on this computer yet. Ask an admin to check Settings, Engine.",
+  unreachableMessage: "The engine isn't answering. Check that the engine is running, then try again.",
+  timeoutMs: 20_000,
+});
+export const __setComponentsFetchForTests = stack.__setFetchForTests;
+const call = (path: string, init: RequestInit = {}): Promise<Response> => stack.request(path, init);
+const failure = (res: Response): Promise<never> => stack.failure(res, { fallback: (status) => `The engine answered ${status}. Try again in a moment.` });
 
 export async function listStackComponents(): Promise<StackComponentList> {
   const res = await call("/stack/v1/components");

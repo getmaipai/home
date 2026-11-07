@@ -1,6 +1,6 @@
 // V6: recorded speech is a per-render choice. Request bodies contain the line
 // and reference bytes, but errors and logs from this client never contain them.
-import { getStackUrl } from "@/lib/stackEngine";
+import { createStackHttp } from "@/lib/stack/http";
 
 export type RecordedSpeechStatus = { available?: boolean; ready?: boolean; installed?: boolean; engine?: string; version?: string; models?: Array<{ id?: string; revision?: string; installed?: boolean }> };
 export type RecordedSpeechJob = { job: string; data?: { url?: string; content_type?: string } | null };
@@ -8,17 +8,13 @@ const WAIT_MS = 30_000;
 const POLL_MS = 1_000;
 const MAX_QUEUE_MS = 60_000;
 const STATUS_WAIT_MS = 5_000;
-let fetchForTests: typeof fetch | null = null;
+const stack = createStackHttp({ makeError: () => new Error("unavailable"), noStackMessage: "", unreachableMessage: "" });
 let referenceForTests: ((voiceUrl?: string) => { bytes: Uint8Array; mimeType: string; transcript?: string } | null) | null = null;
-export function __setRecordedSpeechFetchForTests(fetcher: typeof fetch | null): void { fetchForTests = fetcher; }
+export const __setRecordedSpeechFetchForTests = stack.__setFetchForTests;
 export function __setRecordedSpeechReferenceForTests(getter: typeof referenceForTests): void { referenceForTests = getter; }
 export function recordedSpeechReferenceForTest(voiceUrl?: string) { return referenceForTests?.(voiceUrl) ?? null; }
 
-async function request(path: string, init: RequestInit = {}, timeout = 15_000): Promise<Response> {
-  const base = fetchForTests ? "http://127.0.0.1:1" : getStackUrl();
-  if (!base) throw new Error("unavailable");
-  return await (fetchForTests ?? globalThis.fetch)(base.replace(/\/$/, "") + path, { ...init, signal: AbortSignal.timeout(timeout) });
-}
+const request = (path: string, init: RequestInit = {}, timeoutMs = 15_000): Promise<Response> => stack.request(path, { ...init, timeoutMs });
 export async function recordedSpeechStatus(): Promise<RecordedSpeechStatus | null> {
   try {
     const res = await request("/stack/v1/speech-recorded", {}, 5_000);
