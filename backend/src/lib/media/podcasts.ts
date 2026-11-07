@@ -32,6 +32,8 @@ import { evaluateReply } from "@/lib/safety";
 import { tryConsume } from "@/lib/rateLimiter";
 import { artProxyAddress, directoryShowForFeed } from "./podcastDirectory";
 import { parseTranscriptDocument as parseTimedTranscript } from "@/lib/transcripts/parse";
+import { insertTranscript, storedTranscriptForItem, type Segment } from "@/lib/transcripts/store";
+import { applyOps } from "@/lib/transcripts/revisions";
 
 const MAX_EPISODES_PER_FEED = 200;
 const MAX_ENCLOSURE_BYTES = 400 * 1024 * 1024;
@@ -425,9 +427,10 @@ export async function ingestPodcastFeed(feed: FeedRecord, body: string, deps: Po
     if (existing) db.update(mediaItems).set({ ...values, id: existing.id }).where(eq(mediaItems.id, existing.id)).run();
     else db.insert(mediaItems).values(values).run();
     if (episode.transcriptUrl) {
-      const transcript = db.select().from(podcastTranscripts).where(eq(podcastTranscripts.itemId, record.id)).get();
-      const hlc = nextHlc(), transcriptValues = { itemId: record.id, transcriptUrl: episode.transcriptUrl, source: transcript?.source ?? null, text: transcript?.text ?? null, segments: transcript?.segments ?? "[]", jobId: transcript?.jobId ?? null, updatedAt: nowIso, hlc };
-      db.insert(podcastTranscripts).values(transcriptValues).onConflictDoUpdate({ target: podcastTranscripts.itemId, set: transcriptValues }).run();
+      // The transcript text lives in the shared Transcript record (CAPTION-01h); this row keeps the publisher address, the Stack job, the summary and takeaways.
+      const hlc = nextHlc();
+      db.insert(podcastTranscripts).values({ itemId: record.id, transcriptUrl: episode.transcriptUrl, jobId: null, updatedAt: nowIso, hlc })
+        .onConflictDoUpdate({ target: podcastTranscripts.itemId, set: { transcriptUrl: episode.transcriptUrl, updatedAt: nowIso, hlc } }).run();
     }
   }
   db.update(mediaSources).set({ lastCheckedAt: nowIso, lastStatus: "ok", failures: 0, backoffUntil: null }).where(eq(mediaSources.id, source.id)).run();
@@ -438,24 +441,36 @@ export interface TranscriptSegment { start_s: number; text: string }
 export interface PodcastTranscript { text: string; segments: TranscriptSegment[]; source: "publisher" | "whisper" }
 const TRANSCRIPT_MAX_BYTES = 12 * 1024 * 1024;
 const TRANSCRIPT_TEXT_MAX = 2_000_000;
-const transcriptOf = (row: MediaItemRow): PodcastTranscript | null => {
-  const stored = db.select().from(podcastTranscripts).where(eq(podcastTranscripts.itemId, row.id)).get();
-  if (typeof stored?.text !== "string") return null;
-  let segments: TranscriptSegment[];
-  try { const parsed: unknown = JSON.parse(stored.segments); if (!Array.isArray(parsed)) return null; segments = parsed as TranscriptSegment[]; } catch { return null; }
-  return { text: stored.text, segments, source: stored.source === "publisher" ? "publisher" : "whisper" };
+const toPodcastTranscript = (segments: Segment[], generated: boolean): PodcastTranscript => {
+  const lines = segments.map((segment) => ({ start_s: Math.floor(segment.start), text: segment.text }));
+  return { text: lines.map((line) => line.text).join(" ").slice(0, TRANSCRIPT_TEXT_MAX), segments: lines, source: generated ? "whisper" : "publisher" };
 };
-function storeTranscript(row: MediaItemRow, transcript: PodcastTranscript): void {
-  const hlc = nextHlc(), current = db.select().from(podcastTranscripts).where(eq(podcastTranscripts.itemId, row.id)).get();
-  const values = { itemId: row.id, transcriptUrl: current?.transcriptUrl ?? null, source: transcript.source, text: transcript.text.slice(0, TRANSCRIPT_TEXT_MAX), segments: JSON.stringify(transcript.segments), jobId: current?.jobId ?? null, updatedAt: new Date().toISOString(), hlc };
-  db.insert(podcastTranscripts).values(values).onConflictDoUpdate({ target: podcastTranscripts.itemId, set: values }).run();
+/** The episode's transcript from the shared Transcript record, in the podcast API's {start_s, text} shape. Access checks are the caller's. */
+const transcriptOf = (row: { id: string }): PodcastTranscript | null => {
+  const record = storedTranscriptForItem(row.id);
+  if (!record || record.segments.length === 0) return null;
+  return toPodcastTranscript(record.segments, record.provenance.source_kind === "generated");
+};
+/** Segments with an end time: the next line's start, or 5 seconds after the last. */
+function timedSegments(lines: TranscriptSegment[]): Segment[] {
+  return lines.map((line, index) => {
+    const next = lines[index + 1]?.start_s;
+    return { id: `seg-${index + 1}`, start: line.start_s, end: next !== undefined && next > line.start_s ? next : line.start_s + 5, text: line.text };
+  });
 }
-function parseTranscriptDocument(input: string, mime: string): PodcastTranscript {
+function storeTranscript(actor: PersonRow, row: MediaItemRow, segments: Segment[]): PodcastTranscript {
+  let size = 0;
+  const kept = segments.filter((segment) => (size += segment.text.length + 1) <= TRANSCRIPT_TEXT_MAX);
+  const existing = storedTranscriptForItem(row.id);
+  if (existing) applyOps(actor, existing.id, actor.id, [{ kind: "replace_range", start: 0, end: Number.MAX_SAFE_INTEGER, segments: kept }], "podcast fetch");
+  else insertTranscript(actor, { itemId: row.id, language: "und", segments: kept, provenance: { engine: "podcast-import", model_id: "publisher", source_kind: "imported" } });
+  return toPodcastTranscript(kept, false);
+}
+function parseTranscriptDocument(input: string, mime: string): Segment[] {
   if (!/json/i.test(mime) && !/^\s*\{/.test(input)) {
     const format = /vtt/i.test(mime) || /^\uFEFF?WEBVTT/i.test(input) ? "vtt" : "srt";
     const parsed = parseTimedTranscript(input, format);
-    const segments = parsed.segments.map(segment => ({ start_s: Math.floor(segment.start), text: segment.text }));
-    return { text: segments.map(segment => segment.text).join(" ").slice(0, TRANSCRIPT_TEXT_MAX), segments, source: "publisher" };
+    return parsed.segments.map(segment => ({ ...segment, start: Math.floor(segment.start) }));
   }
   const segments: TranscriptSegment[] = [];
   const clean = (s: string) => plainNotes(s, TRANSCRIPT_TEXT_MAX).replace(/\s+/g, " ").trim();
@@ -483,9 +498,8 @@ function parseTranscriptDocument(input: string, mime: string): PodcastTranscript
     if (!segments.length) { const value = clean(input); if (value) segments.push({ start_s: 0, text: value }); }
   }
   segments.sort((a, b) => a.start_s - b.start_s);
-  const text = segments.map((segment) => segment.text).join(" ").slice(0, TRANSCRIPT_TEXT_MAX);
-  if (!text) throw new Error("empty transcript");
-  return { text, segments, source: "publisher" };
+  if (!segments.some((segment) => segment.text)) throw new Error("empty transcript");
+  return timedSegments(segments);
 }
 
 /** Publisher transcript first; otherwise submit one Stack media.fetch job. Search only scans stored episode segments. */
@@ -507,8 +521,7 @@ export async function getPodcastTranscript(actor: PersonRow, itemId: string, dep
           const bytes = await readBytesLimited(response, TRANSCRIPT_MAX_BYTES);
           if (bytes) {
             const parsed = parseTranscriptDocument(new TextDecoder().decode(bytes), response.headers.get("content-type") ?? "");
-            storeTranscript(row, parsed);
-            return { ok: true, value: { transcript: parsed } };
+            return { ok: true, value: { transcript: storeTranscript(actor, row, parsed) } };
           }
         }
         await response.body?.cancel().catch(() => undefined);
@@ -519,8 +532,9 @@ export async function getPodcastTranscript(actor: PersonRow, itemId: string, dep
     if (!row.locUrl) return { ok: false, status: 422, error: "This episode has no audio address to transcribe." };
     if (typeof transcriptRow?.jobId === "string") return { ok: true, value: { job_id: transcriptRow.jobId } };
     const job: StackJob = await getStackClient().submitJob({ kind: "media.fetch", input: { url: row.locUrl, kind: "audio", person_initiated: true, subtitles: true, quality: "best", max_items: 1 } });
-    const hlc = nextHlc(), values = { itemId: row.id, transcriptUrl: transcriptRow?.transcriptUrl ?? null, source: transcriptRow?.source ?? null, text: transcriptRow?.text ?? null, segments: transcriptRow?.segments ?? "[]", jobId: job.id, updatedAt: new Date().toISOString(), hlc };
-    db.insert(podcastTranscripts).values(values).onConflictDoUpdate({ target: podcastTranscripts.itemId, set: values }).run();
+    const hlc = nextHlc(), updatedAt = new Date().toISOString();
+    db.insert(podcastTranscripts).values({ itemId: row.id, jobId: job.id, updatedAt, hlc })
+      .onConflictDoUpdate({ target: podcastTranscripts.itemId, set: { jobId: job.id, updatedAt, hlc } }).run();
     return { ok: true, value: { job_id: job.id } };
   } catch {
     return { ok: false, status: 502, error: "The transcript could not be fetched and the Stack could not start transcription. Try again later." };
@@ -557,9 +571,9 @@ async function generatePodcastSummary(itemId: string, transcript: string): Promi
     ]);
     const summary = result.ok ? parsePodcastSummary(result.text) : null;
     if (!summary) return;
-    const row = db.select().from(podcastTranscripts).where(eq(podcastTranscripts.itemId, itemId)).get();
-    if (!row?.text) return;
-    db.update(podcastTranscripts).set({ summary: summary.summary, takeaways: JSON.stringify(summary.takeaways), updatedAt: new Date().toISOString(), hlc: nextHlc() }).where(eq(podcastTranscripts.itemId, itemId)).run();
+    if (!storedTranscriptForItem(itemId)?.segments.length) return;
+    const values = { summary: summary.summary, takeaways: JSON.stringify(summary.takeaways), updatedAt: new Date().toISOString(), hlc: nextHlc() };
+    db.insert(podcastTranscripts).values({ itemId, ...values }).onConflictDoUpdate({ target: podcastTranscripts.itemId, set: values }).run();
   } catch { /* A missing summary leaves the transcript available; failures carry no transcript text to logs. */ }
   finally { podcastSummaryInFlight.delete(itemId); }
 }
@@ -569,9 +583,10 @@ export function podcastSummaryFor(actor: PersonRow, itemId: string): PodcastSumm
   if (mediaBandOf(actor) === "child") return null;
   const item = readableItem(actor, itemId);
   if (!item || item.kind !== "podcast_episode") return null;
+  const text = transcriptOf({ id: itemId })?.text;
+  if (!text) return null;
   const row = db.select().from(podcastTranscripts).where(eq(podcastTranscripts.itemId, itemId)).get();
-  if (!row?.text) return null;
-  if (row.summary) {
+  if (row?.summary) {
     let storedTakeaways: unknown = [];
     try { storedTakeaways = row.takeaways ? JSON.parse(row.takeaways) : []; } catch { storedTakeaways = []; }
     const cached = parsePodcastSummary(JSON.stringify({ summary: row.summary, takeaways: storedTakeaways }));
@@ -579,7 +594,7 @@ export function podcastSummaryFor(actor: PersonRow, itemId: string): PodcastSumm
   }
   if (!podcastSummaryInFlight.has(itemId)) {
     podcastSummaryInFlight.add(itemId);
-    void generatePodcastSummary(itemId, row.text);
+    void generatePodcastSummary(itemId, text);
   }
   return null;
 }

@@ -67,6 +67,12 @@ export function listTranscriptsForItem(actor: PersonRow, itemId: string): Transc
   return record ? [record] : [];
 }
 
+/** The stored transcript for a Library item, read without an actor. The caller has already checked who may see the item. */
+export function storedTranscriptForItem(itemId: string): Transcript | null {
+  const row = db.select().from(transcripts).where(eq(transcripts.libraryItemId, itemId)).get();
+  return row ? asRecord(row) : null;
+}
+
 export function getTranscriptDatabaseRow(actor: PersonRow, id: string) {
   const row = db.select().from(transcripts).where(eq(transcripts.id, id)).get();
   if (!row) throw new TranscriptError("That transcript is not available to you.", 404);
@@ -74,20 +80,23 @@ export function getTranscriptDatabaseRow(actor: PersonRow, id: string) {
   return row;
 }
 
-export function createTranscript(
-  actor: PersonRow,
-  input: {
-    itemId: string;
-    language: string;
-    segments: Segment[];
-    speakers?: Transcript["speakers"];
-    vocabulary?: string[];
-    provenance: Provenance;
-    author?: string;
-  },
-): Transcript {
-  gate(actor, input.itemId);
+export type NewTranscript = {
+  itemId: string;
+  language: string;
+  segments: Segment[];
+  speakers?: Transcript["speakers"];
+  vocabulary?: string[];
+  provenance: Provenance;
+  author?: string;
+};
 
+export function createTranscript(actor: PersonRow, input: NewTranscript): Transcript {
+  gate(actor, input.itemId);
+  return insertTranscript(actor, input);
+}
+
+/** The write behind createTranscript, for a caller that already ran its own access and age checks (the podcast fetch). */
+export function insertTranscript(actor: PersonRow, input: NewTranscript): Transcript {
   const stamp = nextHlc();
   const id = newTranscriptId();
   const row = {

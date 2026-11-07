@@ -2,9 +2,9 @@
 import { beforeEach, describe, expect, test } from "bun:test";
 import { existsSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { db } from "@/db";
-import { attachments, conversationTurns, fileReferences, mediaCollections, mediaItems, mediaSources, podcastTranscripts, shares, people } from "@/db/schema";
+import { attachments, conversationTurns, fileReferences, mediaCollections, mediaItems, mediaSources, podcastTranscripts, shares, people, transcripts, transcriptRevisions } from "@/db/schema";
 import { evaluateFilter, filterSummary } from "@/lib/media/podcastFilters";
 import { sharedWith } from "@/lib/media/collections";
 import { TestClient } from "./client";
@@ -29,6 +29,8 @@ import { setHouseholdSettingValue } from "@/lib/settings";
 import { syncShelfFeeds } from "@/lib/shelf/shelfFeeds";
 import { runShelfTick } from "@/lib/shelf/shelfJobs";
 import { getPodcastTranscript, searchPodcastTranscripts } from "@/lib/media/podcasts";
+import { insertTranscript, storedTranscriptForItem } from "@/lib/transcripts/store";
+import { applyOps } from "@/lib/transcripts/revisions";
 import { __setStackClientForTests } from "@/lib/stackEngine";
 import type { StackJob } from "@maipai/spec/stack/ts/stack-job.js";
 
@@ -145,8 +147,7 @@ describe("podcast transcripts", () => {
     const { feedId, sourceId } = await subscribe([adult.id, child.id]); await poll(feedId);
     const id = await idOf("Question 4");
     expect(podcastSummaryFor(personRow(adult.id), id)).toBeNull();
-    const now = new Date().toISOString();
-    db.insert(podcastTranscripts).values({ itemId: id, transcriptUrl: null, source: "stack", text: "A careful discussion of ocean habitats and how researchers study them.", segments: "[]", jobId: null, updatedAt: now, hlc: nextHlc() }).run();
+    insertTranscript(personRow(adult.id), { itemId: id, language: "und", segments: [{ id: "seg-1", start: 0, end: 9, text: "A careful discussion of ocean habitats and how researchers study them." }], provenance: { engine: "podcast-import", model_id: "stack", source_kind: "generated" } });
     const teenMade = await owner.post("/api/people", { displayName: "Rowan", role: "teen", secret: "0000", birthdate: "2010-03-01" });
     const teenInfo = await teenMade.json() as { id: string };
     db.update(mediaSources).set({ visibleTo: JSON.stringify([adult.id, child.id, teenInfo.id]) }).where(eq(mediaSources.id, sourceId)).run();
@@ -169,9 +170,9 @@ describe("podcast transcripts", () => {
   });
 
   test("stores a publisher VTT transcript and searches its timestamp without any search network call", async () => {
-    const { adult, data, subscribe, poll, idOf } = await setup();
+    const { adult, child, data, subscribe, poll, idOf } = await setup();
     feedXml = feedFor(`<item><title>Transcript episode</title><guid>transcript-ep</guid><pubDate>Wed, 14 Oct 2026 06:00:00 GMT</pubDate><enclosure url="${HOST}/sprout-ep4.mp3" type="audio/mpeg"/><podcast:transcript url="${HOST}/transcript.vtt" type="text/vtt"/></item>`);
-    const { feedId } = await subscribe([adult.id]); await poll(feedId);
+    const { feedId } = await subscribe([adult.id, child.id]); await poll(feedId);
     const id = await idOf("Transcript episode");
     expect((await data(adult.client, "episodes")).some((row) => row.id === id)).toBe(true);
     const episodeRow = db.select().from(mediaItems).where(eq(mediaItems.id, id)).get()!;
@@ -188,8 +189,41 @@ describe("podcast transcripts", () => {
     const before = calls.length;
     expect(searchPodcastTranscripts(personRow(adult.id), "harbor seals")).toMatchObject([{ episode_id: id, start_s: 12 }]);
     expect(calls).toHaveLength(before);
+    // The fetched text is a shared Transcript record with a first revision, and the podcast row holds no text.
+    const record = storedTranscriptForItem(id)!;
+    expect(record).toMatchObject({ source: id, current_revision: 1, provenance: { engine: "podcast-import", source_kind: "imported" }, segments: [{ start: 12, end: 16, text: "The harbor seals are sleeping." }] });
+    expect(db.select().from(transcriptRevisions).where(eq(transcriptRevisions.transcriptId, record.id)).all()).toHaveLength(1);
+    expect(db.select().from(podcastTranscripts).where(eq(podcastTranscripts.itemId, id)).get()).toMatchObject({ text: null, segments: "[]" });
+    // A child is refused and the stored transcript stays unread by them.
+    expect(await getPodcastTranscript(personRow(child.id), id)).toMatchObject({ ok: false, status: 403, error: "Transcripts are available to teens and adults." });
+    // A correction made in the transcript editor is what the podcast app then shows and searches.
+    applyOps(personRow(adult.id), record.id, adult.id, [{ kind: "edit_text", segment_id: "seg-1", text: "The harbor otters are sleeping." }]);
+    expect(await getPodcastTranscript(personRow(adult.id), id)).toMatchObject({ ok: true, value: { transcript: { segments: [{ start_s: 12, text: "The harbor otters are sleeping." }] } } });
+    expect(searchPodcastTranscripts(personRow(adult.id), "harbor seals")).toEqual([]);
+    expect(searchPodcastTranscripts(personRow(adult.id), "harbor otters")).toMatchObject([{ episode_id: id, start_s: 12 }]);
     // The page row for a hit carries the second to seek to.
-    expect(await data(adult.client, "episodes", { q: "harbor seals" })).toMatchObject([{ id, start_s: 12 }]);
+    expect(await data(adult.client, "episodes", { q: "harbor otters" })).toMatchObject([{ id, start_s: 12 }]);
+  });
+
+  test("the 0176 migration copies old podcast transcript rows into Transcript records once and leaves the old rows", async () => {
+    const { adult, subscribe, poll, idOf } = await setup();
+    feedXml = feedFor(episode4);
+    const { feedId } = await subscribe([adult.id]); await poll(feedId);
+    const id = await idOf("Question 4");
+    const now = new Date().toISOString();
+    db.insert(podcastTranscripts).values({ itemId: id, source: "publisher", text: "Hello there. Second line.", segments: JSON.stringify([{ start_s: 3, text: "Hello there." }, { start_s: 10, text: "Second line." }]), summary: "kept", updatedAt: now, hlc: nextHlc() }).run();
+    const migration = readFileSync(join(import.meta.dir, "../src/db/migrations/0176_podcast_transcripts_to_transcripts.sql"), "utf8");
+    const run = () => { for (const statement of migration.split("--> statement-breakpoint")) db.run(sql.raw(statement)); };
+    run(); run();
+    const rows = db.select().from(transcripts).where(eq(transcripts.libraryItemId, id)).all();
+    expect(rows).toHaveLength(1);
+    expect(JSON.parse(rows[0]!.segments)).toEqual([{ id: "seg-1", start: 3, end: 10, text: "Hello there." }, { id: "seg-2", start: 10, end: 15, text: "Second line." }]);
+    expect(JSON.parse(rows[0]!.provenance)).toEqual({ engine: "podcast-import", model_id: "publisher", source_kind: "imported" });
+    expect(rows[0]!.ownerId).toBeTruthy();
+    expect(db.select().from(transcriptRevisions).where(eq(transcriptRevisions.transcriptId, rows[0]!.id)).all()).toHaveLength(1);
+    expect(db.select().from(podcastTranscripts).where(eq(podcastTranscripts.itemId, id)).get()).toMatchObject({ summary: "kept", text: "Hello there. Second line." });
+    expect(await getPodcastTranscript(personRow(adult.id), id)).toMatchObject({ ok: true, value: { transcript: { source: "publisher", segments: [{ start_s: 3, text: "Hello there." }, { start_s: 10, text: "Second line." }] } } });
+    expect(storedTranscriptForItem(id)?.segments).toHaveLength(2);
   });
 
   test("an episode without a publisher transcript queues one Stack media.fetch job", async () => {
