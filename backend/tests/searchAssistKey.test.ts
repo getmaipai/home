@@ -42,6 +42,7 @@ describe("chat.search_assist", () => {
     expect(hits).toHaveLength(1);
     expect(hits[0]).toMatchObject({ scope: "household", selector: "select", default: "shadow", level: "advanced", lives_in: "household.ai_advanced" });
     expect(hits[0]!.range).toEqual({ options: ["off", "shadow", "rescue"] });
+    expect(hits[0]!.help).toContain("not active yet");
   });
 
   test("getHouseholdSettingValue returns shadow by default", () => {
