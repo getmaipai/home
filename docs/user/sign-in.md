@@ -11,6 +11,10 @@ description: How the passcode boxes work, what happens after wrong tries, and ho
 
 If your PIN is a password with letters or symbols, you see one password field and a **Sign in** button instead.
 
+## Two-step sign-in
+
+An owner or admin can turn on two-step sign-in in **Settings** > **Profile and sign-in**. Scan the setup code with an authenticator app and type the 6-digit code to finish setup. After your PIN, password or passkey, Home asks for a code from that app. Type the code and choose **Continue**. Keep your authenticator app available when you sign in.
+
 ## If you type the wrong code
 
 The boxes shake, turn red and clear, so you can try again. Home says what to do next in plain words. If the network drops while you sign in, the boxes keep what you typed. Try again when the hub is back.

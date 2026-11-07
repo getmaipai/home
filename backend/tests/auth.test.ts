@@ -262,8 +262,9 @@ describe("verify-secret and lockout", () => {
     const client = new TestClient();
     const res = await client.post("/api/auth/verify-secret", { personId: person.id, secret: "correcthorse" });
     expect(res.status).toBe(200);
-    const body = (await res.json()) as { totpRequired: boolean };
+    const body = (await res.json()) as { totpRequired: boolean; pendingToken: string };
     expect(body.totpRequired).toBe(true);
+    expect(body.pendingToken.length).toBeGreaterThan(30);
 
     const me = await client.get("/api/auth/me");
     expect(me.status).toBe(401); // no session cookie was set

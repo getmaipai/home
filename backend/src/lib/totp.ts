@@ -26,6 +26,7 @@ function makeTotp(secret: Secret, accountLabel: string): TOTP {
  * complete on secret creation alone, or someone who never finished
  * scanning the QR would get locked out of their own next sign-in. */
 export function beginEnrollment(personId: string, accountLabel: string): { uri: string } {
+  if (isTotpEnabled(personId)) throw new Error("TOTP_ALREADY_ENABLED");
   const secret = new Secret({ size: 20 });
   const now = new Date().toISOString();
   db.insert(totpSecrets)

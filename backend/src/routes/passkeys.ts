@@ -17,6 +17,7 @@ import { tryConsume } from "@/lib/rateLimiter";
 import { recordFailedAttempt, clearFailedAttempts, ensureCredentialRowExists, currentLockout, LOCKOUT_THRESHOLD } from "@/lib/credentialLockout";
 import { registrationOptions, verifyRegistration, authenticationOptions, verifyAuthentication, listPasskeys, deletePasskey } from "@/lib/passkeys";
 import { isTotpEnabled } from "@/lib/totp";
+import { issuePendingLogin } from "@/lib/pendingLogin";
 
 export const passkeysRoutes = apiRouter();
 
@@ -156,7 +157,7 @@ const authVerifyRoute = createRoute({
   },
   responses: {
     200: {
-      content: { "application/json": { schema: z.object({ success: z.literal(true), totpRequired: z.boolean() }) } },
+      content: { "application/json": { schema: z.object({ success: z.literal(true), totpRequired: z.boolean(), pendingToken: z.string().optional() }) } },
       description: "A session cookie is set unless totpRequired is true, in which case POST /api/auth/totp/challenge finishes signing in.",
     },
     ...errorResponses({ 401: "Could not verify this passkey", 404: "No such profile", 429: "Too many attempts" }),
@@ -199,7 +200,7 @@ passkeysRoutes.openapi(authVerifyRoute, async (c) => {
   throttleReset(ip);
   clearFailedAttempts(personId);
 
-  if (isTotpEnabled(personId)) return c.json({ success: true as const, totpRequired: true }, 200);
+  if (isTotpEnabled(personId)) return c.json({ success: true as const, totpRequired: true, pendingToken: issuePendingLogin(personId) }, 200);
   issueSession(c, personId, sessionSignInSource(c));
   return c.json({ success: true as const, totpRequired: false }, 200);
 });

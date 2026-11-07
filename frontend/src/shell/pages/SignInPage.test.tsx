@@ -141,6 +141,29 @@ describe("SignInPage", () => {
     }
   });
 
+  test("two-step code submits the pending token and signs in only after challenge succeeds", async () => {
+    const onSignedIn = mock(() => {});
+    const seen: unknown[] = [];
+    const restore = stubFetch({
+      "/api/auth/profiles": [makePerson()],
+      "/api/auth/verify-secret": { success: true, totpRequired: true, pendingToken: "pending-abc" },
+      "/api/auth/totp/challenge": () => { seen.push(JSON.parse("{}")); return Response.json({ error: "That code didn't match.", attemptsLeft: 4 }, { status: 401 }); },
+    });
+    try {
+      renderSignIn(onSignedIn);
+      await waitFor(() => expect(document.body.querySelector("button")).not.toBeNull());
+      await act(async () => fireEvent.click(document.body.querySelector("button")!));
+      const pin = await waitFor(() => document.body.querySelector('input[data-input-otp]') as HTMLInputElement);
+      await act(async () => fireEvent.change(pin, { target: { value: "1234" } }));
+      const code = await waitFor(() => document.body.querySelector('input[autocomplete="one-time-code"]') as HTMLInputElement);
+      expect(onSignedIn).not.toHaveBeenCalled();
+      await act(async () => { fireEvent.change(code, { target: { value: "123456" } }); fireEvent.click(buttonByText(/Continue/)); });
+      await waitFor(() => expect(document.body.textContent).toContain("That code is not right"));
+      expect(onSignedIn).not.toHaveBeenCalled();
+      expect(seen).toHaveLength(1);
+    } finally { restore(); }
+  });
+
   test("a wrong secret shows the error inline and keeps the PIN screen, not a full-screen wipe", async () => {
     const onSignedIn = mock(() => {});
     const restore = stubFetch({

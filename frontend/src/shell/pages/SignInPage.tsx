@@ -8,6 +8,7 @@ import { Input } from "@maipai/ui/src/dashboard/components/ui/input";
 import { PasscodeInput } from "@maipai/ui/src/ui/passcode-input";
 import { Label } from "@maipai/ui/src/dashboard/components/ui/label";
 import { Button } from "@maipai/ui/src/dashboard/components/ui/button";
+import { Alert, AlertDescription } from "@maipai/ui/src/dashboard/components/ui/alert";
 import FullLogo from "@maipai/ui/src/dashboard/layouts/full/shared/logo/FullLogo";
 import { useProfileSignIn } from "@/kit/hooks/useProfileSignIn";
 import { api, type Roster } from "@/lib/api";
@@ -59,7 +60,7 @@ export function SignInPage({ onSignedIn }: { onSignedIn: () => void }) {
   // The hub restarting or updating: ask again by itself as soon as it answers.
   useWhenHubBack(profilesQuery.isError && isHubUnreachable(profilesQuery.error), () => { void profilesQuery.refetch(); });
   const [wantsPassword, setUsePassword] = useState(false);
-  const { selected, secret, setSecret, secretError, locked, attempt, tapError, busy, handleSecretSubmit, handleProfileTap, backToPicker } =
+  const { selected, secret, setSecret, pendingToken, totpCode, setTotpCode, secretError, locked, attempt, tapError, busy, handleSecretSubmit, handleTotpSubmit, handleProfileTap, backToPicker } =
     useProfileSignIn(onSignedIn);
 
   // pinDigits null/absent: length unknown or a password, so no keypad.
@@ -91,12 +92,17 @@ export function SignInPage({ onSignedIn }: { onSignedIn: () => void }) {
               profiles.length === 0 ? (
                 <Navigate to="/setup" replace />
               ) : selected ? (
-                <form onSubmit={handleSecretSubmit} className="flex flex-col gap-4">
+                <form onSubmit={pendingToken ? handleTotpSubmit : handleSecretSubmit} className="flex flex-col gap-4">
                   <div className="flex flex-col items-center gap-4">
                     <Avatar name={selected.display_name} className="size-16 text-xl" />
                     <h1 className="text-lg font-semibold">{selected.display_name}</h1>
                   </div>
-                  {passcodeDigits === null ? (
+                  {pendingToken ? (
+                    <div className="space-y-1.5">
+                      <Label htmlFor="totp-code">Enter your 6-digit code</Label>
+                      <Input id="totp-code" inputMode="numeric" autoComplete="one-time-code" maxLength={6} value={totpCode} onChange={(e) => setTotpCode(e.target.value.replace(/\D/g, "").slice(0, 6))} disabled={busy} required />
+                    </div>
+                  ) : passcodeDigits === null ? (
                     <div className="space-y-1.5">
                       <Label htmlFor="secret" className="text-sm font-normal text-muted-foreground">
                         Password
@@ -146,20 +152,16 @@ export function SignInPage({ onSignedIn }: { onSignedIn: () => void }) {
                       />
                     </div>
                   )}
-                  {secretError ? (
-                    <p role="alert" className="text-center text-sm text-destructive">
-                      {secretError}
-                    </p>
-                  ) : null}
+                  {secretError ? <Alert variant="destructive"><AlertDescription>{secretError}</AlertDescription></Alert> : null}
                   {secretError && !usePassword && !locked ? (
                     <p className="text-center text-sm text-muted-foreground">Using a password? Tap "Use a password instead".</p>
                   ) : null}
-                  {usePassword ? (
+                  {pendingToken || usePassword ? (
                     <Button type="submit" size="lg" disabled={busy || locked}>
-                      {busy ? "Signing in…" : "Sign in"}
+                      {busy ? "Signing in…" : pendingToken ? "Continue" : "Sign in"}
                     </Button>
                   ) : null}
-                  {pinDigits !== null ? (
+                  {!pendingToken && pinDigits !== null ? (
                     <Button
                       type="button"
                       variant="link"
@@ -171,11 +173,11 @@ export function SignInPage({ onSignedIn }: { onSignedIn: () => void }) {
                       {usePassword ? "Use a PIN instead" : "Use a password instead"}
                     </Button>
                   ) : null}
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="lg"
-                    onClick={() => {
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="lg"
+                      onClick={() => {
                       setUsePassword(false);
                       backToPicker();
                     }}

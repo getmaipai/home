@@ -49,15 +49,14 @@ describe("beginEnrollment()", () => {
     expect(isTotpEnabled(personId)).toBe(false); // not enabled until verified
   });
 
-  test("re-enrolling replaces the previous secret and resets enabled to false", () => {
+  test("enabled enrollment cannot be replaced", () => {
     const personId = insertPerson();
     const first = beginEnrollment(personId, "Sage");
     verifyEnrollment(personId, realCodeFor(first.uri));
     expect(isTotpEnabled(personId)).toBe(true);
 
-    const second = beginEnrollment(personId, "Sage");
-    expect(second.uri).not.toBe(first.uri);
-    expect(isTotpEnabled(personId)).toBe(false);
+    expect(() => beginEnrollment(personId, "Sage")).toThrow("TOTP_ALREADY_ENABLED");
+    expect(isTotpEnabled(personId)).toBe(true);
   });
 });
 

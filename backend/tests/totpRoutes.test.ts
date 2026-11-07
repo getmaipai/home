@@ -20,6 +20,12 @@ function codeFromUri(uri: string, stepOffset = 0): string {
 }
 
 describe("TOTP enrollment and sign-in, end to end", () => {
+  test("challenge without a pending token is 401 and sets no cookie", async () => {
+    const client = new TestClient();
+    const res = await client.post("/api/auth/totp/challenge", { pendingToken: "", token: "123456" });
+    expect(res.status).toBe(401);
+    expect(res.headers.get("set-cookie")).toBeNull();
+  });
   test("owner/admin only - a teen gets 403 on enroll", async () => {
     const owner = new TestClient();
     await owner.post("/api/auth/setup", { displayName: "Sage", secret: "correcthorse" });
@@ -52,14 +58,17 @@ describe("TOTP enrollment and sign-in, end to end", () => {
     const profiles = (await (await fresh.get("/api/auth/profiles")).json()) as Array<{ id: string; display_name: string }>;
     const personId = profiles.find((p) => p.display_name === "Sage")!.id;
     const verifySecretRes = await fresh.post("/api/auth/verify-secret", { personId, secret: "correcthorse" });
-    const verifySecretBody = (await verifySecretRes.json()) as { totpRequired: boolean };
+    const verifySecretBody = (await verifySecretRes.json()) as { totpRequired: boolean; pendingToken: string };
     expect(verifySecretBody.totpRequired).toBe(true);
     expect((await fresh.get("/api/auth/me")).status).toBe(401);
 
     // The real code finishes signing in.
-    const challengeRes = await fresh.post("/api/auth/totp/challenge", { personId, token: codeFromUri(uri) });
+    const challengeRes = await fresh.post("/api/auth/totp/challenge", { pendingToken: verifySecretBody.pendingToken, token: codeFromUri(uri) });
     expect(challengeRes.status).toBe(200);
     expect((await fresh.get("/api/auth/me")).status).toBe(200);
+    const replayRes = await fresh.post("/api/auth/totp/challenge", { pendingToken: verifySecretBody.pendingToken, token: codeFromUri(uri, 1) });
+    expect(replayRes.status).toBe(401);
+    expect(replayRes.headers.get("set-cookie")).toBeNull();
   });
 
   // A code review (2026-09-06) found /challenge callable standalone with
@@ -77,12 +86,14 @@ describe("TOTP enrollment and sign-in, end to end", () => {
     const profiles = (await (await client.get("/api/auth/profiles")).json()) as Array<{ id: string; display_name: string }>;
     const personId = profiles.find((p) => p.display_name === "Sage")!.id;
 
+    const signin = await client.post("/api/auth/verify-secret", { personId, secret: "correcthorse" });
+    const { pendingToken } = (await signin.json()) as { pendingToken: string };
     for (let i = 0; i < 5; i++) {
-      const res = await new TestClient().post("/api/auth/totp/challenge", { personId, token: "000000" });
+      const res = await new TestClient().post("/api/auth/totp/challenge", { pendingToken, token: "000000" });
       expect(res.status).toBe(401);
     }
 
-    const locked = await new TestClient().post("/api/auth/totp/challenge", { personId, token: codeFromUri(uri, 1) });
+    const locked = await new TestClient().post("/api/auth/totp/challenge", { pendingToken, token: codeFromUri(uri, 1) });
     expect(locked.status).toBe(429);
   });
 
@@ -96,8 +107,12 @@ describe("TOTP enrollment and sign-in, end to end", () => {
     const profiles = (await (await client.get("/api/auth/profiles")).json()) as Array<{ id: string; display_name: string }>;
     const personId = profiles.find((p) => p.display_name === "Sage")!.id;
 
-    const res = await new TestClient().post("/api/auth/totp/challenge", { personId, token: "000000" });
+    const signin = await client.post("/api/auth/verify-secret", { personId, secret: "correcthorse" });
+    const { pendingToken } = (await signin.json()) as { pendingToken: string };
+    const res = await new TestClient().post("/api/auth/totp/challenge", { pendingToken, token: "000000" });
     expect(res.status).toBe(401);
+    const retry = await new TestClient().post("/api/auth/totp/challenge", { pendingToken, token: codeFromUri(uri, 1) });
+    expect(retry.status).toBe(200);
   });
 
   test("disable turns off the sign-in gate", async () => {
@@ -107,7 +122,7 @@ describe("TOTP enrollment and sign-in, end to end", () => {
     const { uri } = (await enrollRes.json()) as { uri: string };
     await client.post("/api/auth/totp/verify", { token: codeFromUri(uri) });
 
-    const disableRes = await client.post("/api/auth/totp/disable", {});
+    const disableRes = await client.post("/api/auth/totp/disable", { token: codeFromUri(uri, 1) });
     expect(disableRes.status).toBe(200);
 
     const fresh = new TestClient();
@@ -117,5 +132,18 @@ describe("TOTP enrollment and sign-in, end to end", () => {
     const verifySecretBody = (await verifySecretRes.json()) as { totpRequired: boolean };
     expect(verifySecretBody.totpRequired).toBe(false);
     expect((await fresh.get("/api/auth/me")).status).toBe(200);
+  });
+
+  test("enabled enrollment returns 409 and wrong disable code leaves it enabled", async () => {
+    const client = new TestClient();
+    await client.post("/api/auth/setup", { displayName: "Sage", secret: "correcthorse" });
+    const { uri } = (await (await client.post("/api/auth/totp/enroll", {})).json()) as { uri: string };
+    await client.post("/api/auth/totp/verify", { token: codeFromUri(uri, -1) });
+    const enrollAgain = await client.post("/api/auth/totp/enroll", {});
+    expect(enrollAgain.status).toBe(409);
+    expect(await (await client.get("/api/auth/totp")).json()).toEqual({ enabled: true });
+    const disable = await client.post("/api/auth/totp/disable", { token: "000000" });
+    expect(disable.status).toBe(401);
+    expect(await (await client.get("/api/auth/totp")).json()).toEqual({ enabled: true });
   });
 });

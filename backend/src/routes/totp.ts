@@ -8,6 +8,7 @@ import { eq, and, isNull } from "drizzle-orm";
 import { apiRouter, errorResponses } from "@/lib/openapi";
 import { requireRole } from "@/middleware/auth";
 import { beginEnrollment, verifyEnrollment, verifyTotp, isTotpEnabled, disableTotp } from "@/lib/totp";
+import { consumePendingLogin, getPendingLoginPerson } from "@/lib/pendingLogin";
 import { issueSession, sessionSignInSource } from "@/lib/session";
 import { getClientIp, throttleCheck, throttleFail, throttleReset } from "@/lib/secretThrottle";
 import { recordFailedAttempt, clearFailedAttempts, ensureCredentialRowExists, currentLockout, LOCKOUT_THRESHOLD } from "@/lib/credentialLockout";
@@ -36,14 +37,16 @@ const challengeRoute = createRoute({
   path: "/challenge",
   tags: ["TOTP"],
   summary: "Finish signing in with a TOTP code",
-  request: { body: { content: { "application/json": { schema: z.object({ personId: z.string(), token: z.string().min(6).max(6) }) } } } },
+  request: { body: { content: { "application/json": { schema: z.object({ pendingToken: z.string(), token: z.string().min(6).max(6) }) } } } },
   responses: {
     200: { content: { "application/json": { schema: z.object({ success: z.literal(true) }) } }, description: "A session cookie is now set." },
-    ...errorResponses({ 401: "Wrong code", 429: "Too many attempts" }),
+    ...errorResponses({ 401: "Wrong code or start sign-in again", 429: "Too many attempts" }),
   },
 });
 totpRoutes.openapi(challengeRoute, (c) => {
-  const { personId, token } = c.req.valid("json");
+  const { pendingToken, token } = c.req.valid("json");
+  const personId = getPendingLoginPerson(pendingToken);
+  if (!personId) return c.json({ error: "Start signing in again with your PIN or passkey." }, 401);
 
   // Step 7: this route only ever runs after a PIN/password or passkey
   // ceremony already returned totpRequired: true, but it is reachable on
@@ -70,6 +73,7 @@ totpRoutes.openapi(challengeRoute, (c) => {
   }
   throttleReset(ip);
   clearFailedAttempts(personId);
+  consumePendingLogin(pendingToken);
   issueSession(c, personId, sessionSignInSource(c));
   return c.json({ success: true as const }, 200);
 });
@@ -85,10 +89,12 @@ const enrollRoute = createRoute({
       content: { "application/json": { schema: z.object({ uri: z.string() }) } },
       description: "An otpauth:// URI - render as a QR code. Not usable to sign in until POST /verify confirms a real generated code.",
     },
+    ...errorResponses({ 409: "Two-step sign-in is already on" }),
   },
 });
 totpRoutes.openapi(enrollRoute, (c) => {
   const actor = c.get("person");
+  if (isTotpEnabled(actor.id)) return c.json({ error: "Two-step sign-in is already on.", next: "Turn it off with a code first, then set it up again." }, 409);
   const { uri } = beginEnrollment(actor.id, actor.displayName);
   return c.json({ uri }, 200);
 });
@@ -133,12 +139,28 @@ const disableRoute = createRoute({
   tags: ["TOTP"],
   summary: "Turn off TOTP for my own profile",
   middleware: [requireRole("owner", "admin")] as const,
+  request: { body: { content: { "application/json": { schema: z.object({ token: z.string().min(6).max(6) }) } } } },
   responses: {
     200: { content: { "application/json": { schema: z.object({ success: z.literal(true) }) } }, description: "TOTP is no longer required at sign-in." },
+    ...errorResponses({ 401: "That code didn't match.", 429: "Too many attempts" }),
   },
 });
 totpRoutes.openapi(disableRoute, (c) => {
   const actor = c.get("person");
+  const { token } = c.req.valid("json");
+  const ip = getClientIp(c);
+  const throttled = throttleCheck(ip);
+  if (throttled.blocked) return c.json({ error: "Too many attempts", retryAfter: throttled.retryAfter }, 429);
+  const lockout = currentLockout(actor.id);
+  if (lockout?.lockedUntil && new Date(lockout.lockedUntil).getTime() > Date.now()) return c.json({ error: "Too many attempts", retryAfter: Math.ceil((new Date(lockout.lockedUntil).getTime() - Date.now()) / 1000) }, 429);
+  if (!verifyTotp(actor.id, token)) {
+    throttleFail(ip);
+    ensureCredentialRowExists(actor.id);
+    recordFailedAttempt(actor.id);
+    return c.json({ error: "That code didn't match." }, 401);
+  }
+  throttleReset(ip);
+  clearFailedAttempts(actor.id);
   disableTotp(actor.id);
   return c.json({ success: true as const }, 200);
 });

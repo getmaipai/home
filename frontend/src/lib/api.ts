@@ -1115,10 +1115,15 @@ export const api = {
       body: JSON.stringify({ personId }),
     }),
   verifySecret: (personId: string, secret: string) =>
-    request<{ success: true }>("/api/auth/verify-secret", {
+    request<{ success: true; totpRequired?: boolean; pendingToken?: string }>("/api/auth/verify-secret", {
       method: "POST",
       body: JSON.stringify({ personId, secret }),
     }),
+  totpChallenge: (pendingToken: string, token: string) => request<{ success: true }>("/api/auth/totp/challenge", { method: "POST", body: JSON.stringify({ pendingToken, token }) }),
+  totpStatus: () => request<{ enabled: boolean }>("/api/auth/totp"),
+  totpEnroll: () => request<{ uri: string }>("/api/auth/totp/enroll", { method: "POST" }),
+  totpVerify: (token: string) => request<{ success: true }>("/api/auth/totp/verify", { method: "POST", body: JSON.stringify({ token }) }),
+  totpDisable: (token: string) => request<{ success: true }>("/api/auth/totp/disable", { method: "POST", body: JSON.stringify({ token }) }),
   changeSecret: (currentSecret: string | undefined, newSecret: string) =>
     request<{ success: true }>("/api/auth/change-secret", {
       method: "POST",

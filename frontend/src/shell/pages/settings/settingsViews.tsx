@@ -9,6 +9,7 @@ import { ProfileForm } from "@/apps/people/ProfileForm";
 import { DevicesSection } from "@/apps/settings/DevicesSection";
 import { AwaySessionsSection } from "@/apps/settings/AwaySessionsSection";
 import { SignInSecretSection } from "@/apps/settings/SignInSecretSection";
+import { TwoStepSignInSection } from "@/apps/settings/TwoStepSignInSection";
 import { ChatSkillsSection } from "@/shell/pages/settings/ChatSkillsSection";
 import { ChatShortcutsView } from "@/shell/pages/settings/ChatShortcutsView";
 import { DeviceAppearanceControl } from "@/shell/pages/settings/DeviceAppearanceControl";
@@ -65,6 +66,7 @@ function AccountProfile({ person, onPersonChange }: SettingsViewProps) {
         <CardHeader><CardTitle>PIN or password</CardTitle></CardHeader>
         <CardContent><SignInSecretSection person={person} onPersonChange={onPersonChange} /></CardContent>
       </Card>
+      {(person.role === "owner" || person.role === "admin") ? <Card><CardHeader><CardTitle>Two-step sign-in</CardTitle></CardHeader><CardContent><TwoStepSignInSection person={person} /></CardContent></Card> : null}
       <AwaySessionsSection />
       <DevicesSection />
       {canViewFaceEnrollment(person, person) ? <Card><VoiceEnrollmentBody profile={person} viewer={person} /></Card> : null}

@@ -16,6 +16,7 @@ import { db, sqlite } from "@/db";
 import { people, personCredentials, passkeyCredentials, sessions } from "@/db/schema";
 import { requiresCredential, getAuthMethods, pinDigitsHint, roleRequiresCredential } from "@/lib/personAuthMethods";
 import { isTotpEnabled } from "@/lib/totp";
+import { issuePendingLogin } from "@/lib/pendingLogin";
 import { hashSessionToken, issueSession, sessionSignInSource } from "@/lib/session";
 import { deviceTokens } from "@/db/schema";
 import { hashSecret, secretDigitsOf } from "@/lib/secret";
@@ -213,7 +214,7 @@ const verifySecretRoute = createRoute({
   request: { body: { content: { "application/json": { schema: z.object({ personId: z.string(), secret: z.string() }) } } } },
   responses: {
     200: {
-      content: { "application/json": { schema: z.object({ success: z.literal(true), totpRequired: z.boolean() }) } },
+      content: { "application/json": { schema: z.object({ success: z.literal(true), totpRequired: z.boolean(), pendingToken: z.string().optional() }) } },
       description: "totpRequired: true means no session cookie yet - POST /api/auth/totp/challenge finishes signing in.",
     },
     ...errorResponses({ 400: "No PIN or password set for this profile", 401: "Invalid PIN or password", 404: "Profile not found", 429: "Too many attempts" }),
@@ -260,7 +261,7 @@ auth.openapi(verifySecretRoute, async (c) => {
   // session, it never replaces the PIN/password check above. POST
   // /api/auth/totp/challenge is the follow-up that actually issues the
   // session once the code checks out.
-  if (isTotpEnabled(personId)) return c.json({ success: true as const, totpRequired: true }, 200);
+  if (isTotpEnabled(personId)) return c.json({ success: true as const, totpRequired: true, pendingToken: issuePendingLogin(personId) }, 200);
 
   issueSession(c, personId, sessionSignInSource(c));
   return c.json({ success: true as const, totpRequired: false }, 200);
