@@ -16,7 +16,7 @@ import { addCaptionTrack } from "./viewerMedia";
 
 const START_FAILED = "The transcript could not be made. Check that Home is ready, then try again.";
 const SAVE_FAILED = "Could not save. Check Home and try again.";
-const IMPORT_FAILED = "That file could not be read. Pick an SRT, VTT or text file and try again.";
+const IMPORT_FAILED = "Home could not open that file. Pick an SRT, VTT or text file and try again.";
 
 const DETECT_FAILED = "Speakers could not be detected. Check that Home is ready, then try again.";
 const REDO_FAILED = "That range could not be redone. Check the times and that Home is ready, then try again.";
