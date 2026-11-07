@@ -753,6 +753,9 @@ export function setValue(
           ? assertCanSetRobotMayAddress(actor, parsed.id!)
         : key.startsWith("topics.") && parsed.kind === "person"
           ? assertCanSetChildTopic(actor, parsed.id!)
+        // TALENT-00: the synths.* person keys are held by the band's declared control (a parent sets them for a child or teen).
+        : key.startsWith("synths.") && parsed.kind === "person"
+          ? assertCanSetCodingPersonKey(actor, parsed.id!, keyDef)
         : key === PERSON_STORAGE_CAP_KEY
           ? assertCanSetPersonStorageCap(actor, parsed.id!)
           : assertCanAccessScope(actor, parsed, "write");
