@@ -1,5 +1,5 @@
 import { getIcon } from "@maipai/ui/src/icons";
-import { greetingFor, timeOfDay } from "@/apps/home/greeting";
+import { familyLabel, greetingFor, timeOfDay } from "@/apps/home/greeting";
 
 const SunIcon = getIcon("sun");
 const MoonIcon = getIcon("moon");
@@ -23,11 +23,13 @@ const MoonIcon = getIcon("moon");
  * than freezing a computed value in `useState` from a mount-only
  * effect - the second bug the review found, since a frozen value never
  * updates across an hour boundary while the page stays open. */
-export function Greeting({ displayName }: { displayName: string }) {
+export function Greeting({ displayName, familyName }: { displayName: string; familyName?: unknown }) {
   const isDaytime = timeOfDay(new Date().getHours()) !== "evening";
+  const family = familyLabel(familyName);
 
   return (
     <div className="flex flex-col items-start">
+      {family ? <p className="text-sm font-normal text-muted-foreground">{family}</p> : null}
       <h2 className="text-xl flex items-center gap-2 capitalize">
         {greetingFor(new Date(), displayName)} <span className="flex items-center">{isDaytime ? <SunIcon size={25} color="orange" /> : <MoonIcon size={25} />}</span>
       </h2>

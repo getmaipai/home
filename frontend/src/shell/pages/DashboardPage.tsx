@@ -32,6 +32,7 @@ export function DashboardPage({ person }: { person: Roster }) {
     staleTime: 0, refetchOnMount: "always" });
   const rawLayout = layoutSetting.data?.value;
   const layout = (layoutSetting.data?.layer === "band" && layoutSetting.data?.source === "default" ? "ask" : rawLayout === "ask" || rawLayout === "board" || rawLayout === "shelves" ? rawLayout : "shelves");
+  const familyName = useQuery({ queryKey: ["settings", "household", "household.family_name"], queryFn: async () => (await reads.settingsValues("household")).find((row) => row.key === "household.family_name"), retry: false });
   const media = useQuery({ queryKey: ["home-media"], queryFn: api.mediaHome, retry: false, enabled: layout === "shelves" });
   const continueRows = useQuery({ queryKey: ["home-continue"], queryFn: api.continueRows, retry: false, enabled: layout === "shelves" });
   const people = useQuery({ queryKey: ["home-family"], queryFn: api.people, retry: false, enabled: !incognito && person.role !== "guest" });
@@ -40,7 +41,7 @@ export function DashboardPage({ person }: { person: Roster }) {
 
   const renderBlock = (block: HomeBlockId) => {
     switch (block) {
-      case "greeting": return <div key={block} className="lg:col-span-8"><Greeting displayName={person.display_name} /></div>;
+      case "greeting": return <div key={block} className="lg:col-span-8"><Greeting displayName={person.display_name} familyName={familyName.data?.value} /></div>;
       case "admin": return admin ? <nav key={block} aria-label="Looking after your hub" className="flex flex-wrap gap-x-2 gap-y-5 lg:col-span-4"><Button variant="outline" size="row" nativeButton={false} render={<Link to="/updates" />}>Updates</Button><Button variant="outline" size="row" nativeButton={false} render={<Link to="/repairs" />}>Repairs</Button></nav> : null;
       case "ask": return <div key={block} className="lg:col-span-8"><AskBox /></div>;
       case "media_continue": return (media.data?.continue.length || continueRows.data?.rows?.length) ? <div key={block} className="lg:col-span-12"><HomeMedia kind="continue" /></div> : null;

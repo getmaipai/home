@@ -45,6 +45,7 @@ interface Mocks {
   install?: Partial<InstallStatusView>;
   chat?: "ready" | "starting";
   layout?: "ask" | "board" | "shelves";
+  family?: string;
 }
 
 function mockFetch(mocks: Mocks = {}) {
@@ -53,7 +54,10 @@ function mockFetch(mocks: Mocks = {}) {
     const url = typeof input === "string" ? input : input.toString();
     // The real route refuses a key filter for this key (400 "unsupported settings key filter"); Home must read the whole list.
     if (url.includes("/api/settings") && url.includes("key=")) return Promise.resolve(new Response(JSON.stringify({ error: "unsupported settings key filter" }), { status: 400 }));
-    if (url.includes("/api/settings")) return Promise.resolve(Response.json(mocks.layout ? [{ key: "ui.home_layout", value: mocks.layout, layer: "person", source: "user" }] : []));
+    if (url.includes("/api/settings")) return Promise.resolve(Response.json([
+      ...(mocks.layout ? [{ key: "ui.home_layout", value: mocks.layout, layer: "person", source: "user" }] : []),
+      ...(mocks.family !== undefined ? [{ key: "household.family_name", value: mocks.family, layer: "household", source: "user" }] : []),
+    ]));
     if (url.includes("/api/setup-checklist")) return Promise.resolve(Response.json(mocks.checklist ?? []));
     if (url.includes("/api/install")) return Promise.resolve(Response.json({ state: "none", ...mocks.install }));
     if (url.includes("/api/widgets/") && url.endsWith("/data")) {
@@ -95,6 +99,23 @@ const hrefOf = (label: string) => Array.from(document.querySelectorAll("a")).fin
 const urls = (fetchMock: ReturnType<typeof mock>) => fetchMock.mock.calls.map(([input]) => (typeof input === "string" ? input : String(input)));
 
 describe("DashboardPage (Home)", () => {
+  test("the household's family name shows above the greeting as '<name> Family' (DOCS-GAP-04)", async () => {
+    const { restore } = mockFetch({ layout: "ask", family: "Willow" });
+    try {
+      const view = renderHome(makePerson("adult"));
+      await view.findByText("Willow Family");
+    } finally { restore(); }
+  });
+
+  test("no family name set shows only the greeting", async () => {
+    const { restore } = mockFetch({ layout: "ask" });
+    try {
+      const view = renderHome(makePerson("adult"));
+      await view.findByRole("button", { name: /Ask|Send/i }).catch(() => undefined);
+      expect(view.queryByText(/ Family$/)).toBeNull();
+    } finally { restore(); }
+  });
+
   test("keeps the home block order in one layout function", async () => {
     const { homeBlocks } = await import("@/shell/pages/dashboard/homeBlocks");
     expect(homeBlocks("ask")).toEqual(["greeting", "admin", "ask", "today_chips", "pick_up", "family", "getting_started"]);

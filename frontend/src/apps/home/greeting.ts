@@ -7,6 +7,15 @@ export function timeOfDay(hour: number): "morning" | "afternoon" | "evening" {
   return "evening";
 }
 
+/** The household's family name for the line above the greeting ("Willow" becomes "Willow Family"), or null when none is set.
+ * A name that already ends in "Family" is shown as typed. */
+export function familyLabel(familyName: unknown): string | null {
+  if (typeof familyName !== "string") return null;
+  const name = familyName.trim();
+  if (!name) return null;
+  return /\bfamily$/i.test(name) ? name : `${name} Family`;
+}
+
 export function greetingFor(now: Date, displayName: string): string {
   return `Good ${timeOfDay(now.getHours())}, ${displayName}`;
 }
