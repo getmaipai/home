@@ -13,6 +13,16 @@ Home already has `edit_video` `extend` and `retake` (980e0c43f; the file's top c
 only what is missing. Rechecked against `origin/main` (918b30ace): `video-loras-2026-11-02.md`, `styles-one-system-2026-11-05.md` and STYLES-04 (f37c523f9) are on `main`, so
 the style rules below are quoted from them, not from briefs.
 
+## Owner ruling 2026-11-06: our own way
+
+Jesse, 2026-11-06, in chat: "We don't care about the license, just review the code and implement the same features just coded our own way." So no feature here depends on a gated Lightricks IC-LoRA or camera file, and nothing waits on the licence report. The same user features are built with our code on engines we already run. This section sits near the top on purpose; where it disagrees with text below, it wins. Measured facts (bench 2026-11-06, `data-scratch/reports/ltxd-01-claymation-on-25-2026-11-06.md`):
+
+1. The 2.3 Claymation style LoRA changes a 2.5 Max clip (1024x576, seed 7), visibly and cleanly. The Stack TS refusal of a 2.3-labelled file on a 2.5 clip is therefore too strict for at least this file. New row LTXD-18B relaxes it to a warning plus a per-file "tested on 2.5" mark. The googlyeyes finding stands: that 2.3 file did nothing.
+2. `ltx-2-mlx enhance` refuses our Gemma 4 pack. LTXD-02 (Stack route) is dropped; LTXD-03 is Home-only, on the hub's chat model, plus the commons `prompt_bar` prop.
+3. The ungated Lightricks Dolly In camera LoRA (an LTX-2 19b file) runs on the 2.5 Max pack and pushes in harder than the engine's own drift (1.9x against 1.4x, one clip). The gated 2.5 IC-LoRA files (Day to Night and the rest) cannot be obtained without an accepted account agreement, so nothing is planned around them.
+
+What changes in section 7: LTXD-LIC-01 done; LTXD-02 dropped; LTXD-03 Home-only; LTXD-07A, 07, 08, 09 and 17 replaced by LTXD-E1 to E3; LTXD-10 limited to ungated tested files; LTXD-18B added; the order line rebuilt. Marks inheritance, Max-only for model-guided work, and `allow_suggesting` false for effects all stay.
+
 ## 1. Where each piece stands today
 
 | Piece | Stack engine (ltx-2-mlx 0.18.0 on the Max tier) | Home |
@@ -42,6 +52,7 @@ LTXD-01 settles it before any Home work.
   household setting `video.enhance_prompt` (`ask`, `auto`, `off`; default `ask`, which is the chip). Chat `generate_video` gets the same through the
   model deciding (rule 1), never wording matching. Style trigger words and recipe wording are kept: Home sends them to the rewrite as "must appear
   unchanged" and checks they are still in the result, falling back to the typed words if not (LTX Desktop does the same check).
+- **Superseded by the ruling near the top:** the rewrite runs in Home on the hub's chat model, not on the Stack (the engine refuses our Gemma 4 pack). The next bullet describes the first plan and is kept for history; the safety screens in the Gates bullet still apply.
 - **Local only:** the rewrite runs on the Stack with the same Gemma folder LTX-2.5 already installs for text encoding (Gemma 3 12B per the runtime
   README; **unknown** whether our pinned folder is the same file the enhancer wants, LTXD-01 checks). If it is missing, the typed words go through and
   the page says so. No Gemini or any other cloud path, ever (LTX Desktop offers a Gemini API choice; Home drops it).
@@ -61,6 +72,7 @@ LTXD-01 settles it before any Home work.
 
 ### 2.3 IC-LoRA effects on a clip
 
+- **Superseded by the ruling near the top:** no IC-LoRA is installed. Effects are ffmpeg looks plus bench-gated prompt-guided restyle (LTXD-E1 to E3). The package table and Stack IC-LoRA bullets below describe the first plan and are kept for history.
 - **Plain words:** take a finished clip and change one thing while the motion stays: day to night, sharpen a blurry clip, colorize black and white,
   restore old footage, remove people and cars (clean plate), turn water into simulated water, or render a rough layout in the look of a picture.
 - **Home surface:** an "Effects" group on a clip's action menu (Creations and the card) and an `edit_video` change that is **not** the existing `effect` (that already has 11 plain ffmpeg values, `editTool.ts` line 53, and a second list under the same name would be a duplicate). The choice: a distinct change name `restyle`, an additive value in the `change` enum with one new field `restyle` (an enum of the IC-LoRA effect ids), so the two lists never mix and no existing call changes. The list is data, one place (like `recipes.ts`): `VIDEO_EFFECTS` with id, label, hint, the IC-LoRA package id, whether it needs a
@@ -91,6 +103,7 @@ LTXD-01 settles it before any Home work.
 
 ### 2.4 Camera moves and Transition
 
+- **Superseded in part by the ruling near the top:** only ungated, tested camera files are used (Dolly In is tested), and only if they beat the wording cards (LTXD-10).
 - **Plain words:** dolly in and out, jib up and down (the camera rises or sinks), drone fly-through; and Transition, which makes a clip that morphs
   from one picture into another.
 - **Today:** Home's Camera cards already add wording (Dolly in, Aerial). The question is whether LoRAs do better than wording.
@@ -140,6 +153,8 @@ mean frame difference between the two clips (a difference near zero means the Lo
 2.5 file (Day to Night IC-LoRA) to settle the IC path. Record both in `video-speed-bench-2026-11-01.md`.
 
 ## 6. Micro features and workflows
+
+Row names in this section that read LTXD-02, -07, -08, -09 or -17 follow the owner ruling near the top: they now map to LTXD-03 (Home-only rewrite) and LTXD-E1 to E3 (own-way Effects), and an item whose only own-way version is dishonest is dropped as listed under LTXD-E3.
 
 Source: `data-scratch/reports/ltx-desktop-inventory-2026-11-06.md` (339 items). The 19 items flagged `[CLOUD]` or `[DESKTOP]` are left out (cloud
 services and the Electron shell have no place in Home). Each of the other 320 items has one line and one verdict:
@@ -531,9 +546,7 @@ Format is `docs/BACKLOG.md`. Each slice lands alone. Owner-set order (2026-11-06
 14, then the engine slices. Rows that duplicated an existing row are folded into it (list at the end of this section); this note adds no second row for
 the same work.
 
-- [ ] **LTXD-LIC-01: read the LTX-2 Community License** (S, owner report, no code). Read the licence text that covers the Lightricks IC-LoRA and
-  camera LoRA files (and the Alpha-Gen file), report the commercial terms and limits in plain words, and say whether Home's existing licence step is
-  enough. Exit: a plain-words report to Jesse and a go or no-go for LTXD-07 to -09 and LTXD-17. Nothing from the effect or camera list downloads before it.
+- [x] **LTXD-LIC-01: LTX-2 Community License** (DONE: owner waived on 2026-11-06, "We don't care about the license"). Home's existing licence step stays for the weights it already installs. One duty remains because the 2.x licence asks that AI-disclosure marks and metadata stay in outputs: a task in LTXD-E1 verifies that our ffmpeg conversion keeps them.
 - [ ] **LTXD-01: bench the unknowns** (S, Stack bench, owner judges frames). One measured clip each on the Studio: the Claymation 2.3-on-2.5 test of
   section 5; `ltx-2-mlx enhance` with our Gemma folder (and whether it can use a start picture); one IC-LoRA (Day to Night, 327 MB) through `ltx-2-mlx
   ic-lora`; one Lightricks camera LoRA (Dolly In) on 2.5. Time, footprint and true size recorded the video-tiers way. Exit: a verdict row for each in
@@ -552,32 +565,32 @@ the same work.
   in the More menu (the still takes the clip's mark); the active take flag for a group of versions (Library record field, spec first). Exit: Day to
   Night shown as a curtain at 1440 and 390, light and dark.
 - [ ] **LTXD-14: window pick** (S, commons then Home; feeds VIDEO-STUDIO-11, VIDEO-INPUTS-05 and VIDEO-UI-09). Reuse, not a new block: the kit two-thumb `Slider` (Radix, takes an array value) placed next to `Player`, not over it; an overlay on the video needs a `Player` slot, which is a commons change first (rule 9(c)) and is not planned here. Min and max clamps: 2 to 10 s for Redo from here, 2 to 20 s for a voice clip, 10 s for an IC-LoRA source. `TrackStudio` (VIDEO-STUDIO-04 and -05) does not fit because it is a full multi-lane studio page, not an inline control on a clip card or in a reference slot; inside the Studio its own trim handles are used. Any waveform uses the one peaks definition (`peaksOf`, moved into `TrackStudio`); no separate waveform lane. Exit: both clamps tested; opened at 1440 and 390.
-- [ ] **LTXD-02: prompt rewrite on the Stack** (S, Stack). `POST /v1/videos/enhance` (additive), runs the runtime's enhance on the installed Gemma, takes
-  the prompt, mode (text, picture start), a seed, and a list of words that must stay; returns the new words or `unavailable`. Exit: trigger words
-  survive in a test that fails if the rewrite drops one; no outbound connection asserted; unavailable path tested.
-- [ ] **LTXD-03: prompt rewrite in Home** (M, commons then Home; needs LTXD-02). Commons first: `PromptBarChip` only picks a value (rule 9(c)), so an Enhance action that rewrites the field is an additive `prompt_bar` prop, tagged. Then Home: the `video.enhance_prompt` setting (spec first, default `ask`), the chat `generate_video` rewrite flag chosen by the model, and the rewrite output through the CSAM screen for adults and the age band's content floor for minors (rule 10). Failures reach the person through the failing call's own response read by `failureCopy`, or the existing muted line under the field (RULES S6); no new banner. Reuse check: `prompt_bar`, `recipes.ts`, the prompt screen in `policy.ts`. Exit: desktop and phone click-through; recipe wording kept; a failed rewrite falls back to the typed words and shows the muted line.
+- [x] **LTXD-02: prompt rewrite on the Stack** (DROPPED by the owner ruling: the engine refuses our Gemma 4 pack; LTXD-03 is Home-only).
+- [ ] **LTXD-03: prompt rewrite in Home, with the hub's chat model** (M, commons then Home; no Stack route). The engine's `enhance` refuses our Gemma 4 pack (measured 2026-11-06), so the rewrite runs in Home on the hub's own chat model. Commons first: `PromptBarChip` only picks a value (rule 9(c)), so an Enhance action that rewrites the field is an additive `prompt_bar` prop, tagged. Then Home: the `video.enhance_prompt` setting (spec first, default `ask`), the chat `generate_video` rewrite flag chosen by the model, trigger words and recipe wording sent as "must appear unchanged" and checked after, and the rewrite output through the CSAM screen for adults and the age band's content floor for minors (rule 10). Failures reach the person through the failing call's own response read by `failureCopy`, or the existing muted line under the field (RULES S6); no new banner. Reuse check: `prompt_bar`, `recipes.ts`, the prompt screen in `policy.ts`. Exit: desktop and phone click-through; recipe wording kept; a failed rewrite falls back to the typed words and shows the muted line.
 - [ ] **LTXD-04: retake window on the Stack** (S, Stack; needs the VIDEO-INPUTS-04 retake bench). `retake_end_seconds` beside `retake_from_seconds`, 2 to
   10 s window, footprint table row, 422 plain lines. Exit: one real 10 s clip with a 3 s middle window, kept parts within 40 dB of the source as the
   earlier retake was.
-- [ ] **LTXD-07A: LoRA kind `ic` in the spec** (S, commons/spec, then Home and Stack). Add `ic` to the LoRA record `kind` enum (`style`, `character`,
-  `motion`, `other` today), spec tag first, so an IC-LoRA is never offered as a style. Exit: the spec test and the Stack reader accept it; the picker
-  groups ignore it.
-- [ ] **LTXD-07: IC-LoRA lane on the Stack** (M, Stack; needs LTXD-01 go, LTXD-LIC-01 and LTXD-07A). Worker mode `ic_lora`, source video 10 s cap,
-  strength 0 to 2, the audience second lock, gated-download through the existing VIDEO-LORA-07 install route with licence accept and the existing `voice.hf_token` (section 4; no new token store). Exit: Day to Night end to end
-  on a real clip.
-- [ ] **LTXD-08: Effects in Home** (M, Home; needs LTXD-07 and LTXD-LIC-01). `VIDEO_EFFECTS` list (with templated prompts and demo prompts), the `restyle` change of `edit_video` (additive: one new value in the `change` enum and one new `restyle` field; the existing 11-value `effect` is untouched), Effects menu on a clip, mark inheritance, `allow_suggesting` false. Exit: Day to Night, Deblur, Colorization, Clean Plate each run for real; a marked source stays marked.
-- [ ] **LTXD-09: more effects** (S, Home and Stack; needs LTXD-08 and LTXD-LIC-01). Restore, Water Simulation, Decompression, Layout to Render (needs
-  the look-picture slot).
-- [ ] **LTXD-10: camera LoRA bench** (S, bench then Home; needs LTXD-01 and LTXD-LIC-01). Bench Dolly in and out, Jib up and down against the
-  wording-only cards; add the winners as `lora` ids (kind `motion`) on the Camera cards of `recipes.ts`. Morph is VIDEO-INPUTS-03, not here. Exit: a
-  bench row each; no card changes when the LoRA does not beat the wording.
+- [x] **LTXD-07A, LTXD-07, LTXD-08, LTXD-09: DROPPED, replaced by LTXD-E1 to E3 below** (owner ruling 2026-11-06). No IC-LoRA file is installed, so the `ic` LoRA kind, the `ic_lora` worker mode and the gated-download path are not built.
+- [ ] **LTXD-E1: deterministic looks on the Stack** (M, Stack; no model, no download). Add filter-chain ops to the Stack edit ops (`EDIT_OPS`), each with an honest quality line: Day to Night grade (darker, cooler, lifted contrast; it does not turn lights on or add moon shadows, so the label is "Night look"); Sharpen+ (a stronger unsharp preset for a soft clip; it sharpens edges and cannot recover detail that is not there; the existing `sharpen` effect stays); Restore (denoise, deblock and a mild levels fix; it cleans noise and compression blocks, it does not repair scratches or missing pieces); Warm tone (a single-hue tint; this is not Colorization and the label never says colorize); Ripple (a whole-frame water-like distortion; it is a look, not simulated water). The output keeps the source's audio and the AI-disclosure marks and metadata (see LTXD-LIC-01). Exit: each op run on one real clip with frames opened; marks inherited; the metadata check passes.
+- [ ] **LTXD-E2: Effects in Home** (M, Home; needs LTXD-E1, and LTXD-E3 for its entries). `VIDEO_EFFECTS` list (id, label, hint, honest quality line, kind `look` or `guided`, templated and demo prompts for `guided`), the `restyle` change of `edit_video` (additive: one new value in the `change` enum and one new `restyle` field; the existing 11-value `effect` is untouched), Effects menu on a clip (with the LTXD-13 curtain to judge it), mark inheritance through `newItemMark` with the source as a source, Max-only for the `guided` kind (a `look` runs on every tier), `allow_suggesting` false. Exit: each shipped effect runs for real from the menu and from chat; a marked source stays marked.
+- [ ] **LTXD-E3: model-guided restyle bench** (S, bench, then Home entries). Day to Night, Water and Clean Plate as prompt-guided regeneration through the existing 2.5 `retake` and `extend` source-video path with a templated prompt, no LoRA. Each needs a bench row with frames opened beside the source (one clip, then three if the first holds). No ship if it does not hold the source's composition (subjects, layout and camera path recognisably the same). An entry that fails stays out of `VIDEO_EFFECTS`; Clean Plate (removing people and cars) is the likeliest to fail and is dropped on a failed bench. Exit: a verdict row per entry in `video-speed-bench-2026-11-01.md`.
+
+  Effects with no honest own-way version, dropped (one line each):
+  - Colorization: dropped as a real colorizer; only the Warm tone tint ships, named as a tint.
+  - Water Simulation: dropped as simulation; Ripple (look) and the Water guided entry (bench) stand in, and neither claims to simulate water.
+  - Decompression: folded into Restore (the deblock step); no separate effect.
+  - Layout to Render: dropped (needs a control model and a look picture; no honest own-way version).
+  - Refine Details: dropped (LTXD-17); Sharpen+ is the honest part.
+  - Deblur: kept only as Sharpen+, not as a deblur model.
+- [ ] **LTXD-10: camera LoRA bench** (S, bench then Home; needs LTXD-01, which is done for Dolly In). The ungated Lightricks Dolly In file (an LTX-2 19b file, measured to run on the 2.5 Max pack, 1.9x push-in against 1.4x for the engine's own drift, one clip) is used only if it wins a bench of several clips against the wording-only card; then it is added as a `lora` id (kind `motion`) on the Dolly in card of `recipes.ts`. Dolly Out and the Jib files are added only if each is also ungated and passes the same bench; a gated file is never planned. Morph is VIDEO-INPUTS-03, not here. Exit: a bench row each; no card changes when the LoRA does not beat the wording.
 - [ ] **LTXD-15: phone and polish** (S, commons then Home). Verify and test reduced-motion for loops and hover play; wording cards for Dolly out, Dolly
   left, Dolly right and Focus shift in `recipes.ts` (no kit change; `recipes.ts` gains cards, see Supersedes); an empty-feed starter that loads a sample
   picture; check the Download filename follows the words. Exit: opened at phone width; no new kit prop beyond the test.
-- [ ] **LTXD-17: Refine Details** (S, Stack then Home; needs LTXD-07, LTXD-LIC-01; LTX-2.5 only). One more `restyle` entry. Cutout is not a row: Alpha-Gen becomes a candidate in LOCAL-BENCH-01 and results use `media.companion_clip` (CMEDIA-STACK-01) and the kit `GenerationStage` `transparency="checker"`. Exit: one real refined clip, frames opened; marks inherited.
+- [ ] **LTXD-18B: relax the 2.3-on-2.5 LoRA refusal** (S, Stack then Home). `video/loras.ts` and the TS layer refuse a 2.3-labelled file on a 2.5 clip. Change it to a warning plus a per-file `tested_on_25` mark: a file shows as tested only after a bench clip changed the output (Claymation did; googlyeyes did not and stays marked as doing nothing). Untested 2.3 files still run with the warning but are not offered by default. Home shows the mark through the existing LoRA record, spec first if a field is needed. Exit: Claymation runs on a 2.5 clip through the Stack route, not the worker directly; googlyeyes keeps its no-effect note; refusal and warning lines tested.
+- [x] **LTXD-17: Refine Details** (DROPPED by the owner ruling; no model pass). The honest part is the Deblur/Sharpen look of LTXD-E1. Cutout is not a row: Alpha-Gen stays a candidate in LOCAL-BENCH-01 (its licence is no longer a blocker) and results use `media.companion_clip` (CMEDIA-STACK-01) and the kit `GenerationStage` `transparency="checker"`.
 - [ ] **LTXD-16: Ingredients, and research for Motion Track** (L, own design pass first; Stack, Home, possibly commons; needs LTXD-07). Ingredients: 1 to 10 pictures in the References group, the Stack builds the reference sheet; the clip takes every picture's mark (fix `jobs.ts` line 444, test with one adult-only picture among ten). Motion Track is research only, no commitment to a kit block. Reuse check done now: commons `ui` has the `ImageEditor` Element (`image-editor.tsx`, `image-editor-state.ts`, `image-editor-surface.tsx`) with freehand strokes, brush, undo and redo over a picture; a grep of commons `ui` for path, sketch, signature and draw tools found nothing else; shadcn, assistant-ui and shadcndashboard registries have not been searched by this note. The exit is a design note that (1) reads those registries, (2) decides whether `ImageEditor` strokes can supply the path with the stroke-to-motion conversion in the Stack (one sampler tested against a golden file) or a new block is justified (UI-DECISIONS.md row, rule 9b), and (3) is ruled on by the architect. Exit for Ingredients: one real clip from Create and chat.
 
-Recommended order after the owner-set start: LTXD-02 and -03, LTXD-04, LTXD-07A, LTXD-07 to -09, LTXD-10, LTXD-15, LTXD-17, LTXD-16 last.
+Recommended order (owner ruling 2026-11-06): LTXD-12, 14, 13, 11, 03, 04, 18B, then the Effects rows (LTXD-E1, E2, E3), then LTXD-10, 15, 16 last.
 
 Folded into existing rows (no row of their own):
 - Redo a part (was LTXD-05): into VIDEO-STUDIO-11 and the landed `edit_video` `retake`, with the 2 to 10 s window from LTXD-04 and the Slider from LTXD-14.
@@ -600,8 +613,8 @@ Rows and lines this note replaces or adds to (each is edited in the slice that b
 - Household queue order (`lib/jobs/householdQueue.ts`, resource priority order of 2026-10-21): a person may reorder only their own pending video jobs;
   the order across kinds and people is unchanged.
 - `recipes.ts` camera cards: gain optional `lora` ids (kind `motion`) and four wording cards; the card text and ids already there stay.
-- `video-loras-2026-11-02.md` record table: `kind` gains `ic` (LTXD-07A).
-- `edit_video`: gains the `restyle` change (LTXD-08), additive; the existing `effect` list is not changed.
+- `video-loras-2026-11-02.md` record table: no change now (the `ic` kind of LTXD-07A is dropped by the owner ruling; no IC-LoRA is installed).
+- `edit_video`: gains the `restyle` change (LTXD-E2), additive; the existing `effect` list is not changed.
 - VIDEO-INPUTS-03 gains the mark rule for its start and end pictures (section 3).
 
 ## 8. Owner questions
@@ -610,8 +623,7 @@ Answered by Jesse, 2026-11-06:
 
 1. Max only for retake and the first effects: **answered, OK.** Lower tiers need their own bench later.
 2. Prompt rewrite default: **answered, ASK.** An Enhance chip; setting `video.enhance_prompt` defaults to `ask`.
-3. LTX-2 Community License for the Lightricks effect and camera files: **answered, wait until it is read.** Row LTXD-LIC-01 (section 7) reads it and
-   reports the commercial terms in plain words before any effect file is downloaded. Effects slices LTXD-07 to LTXD-09 depend on it.
+3. LTX-2 Community License for the Lightricks effect and camera files: **answered, waived (Jesse, 2026-11-06, see the ruling near the top).** LTXD-LIC-01 is done; the plan no longer depends on any gated Lightricks file.
 4. Build order: **answered.** LTXD-01 bench first, then the small wins LTXD-12, 11, 13, 14, then the engine slices.
 
 Still open (my recommendation in brackets):
