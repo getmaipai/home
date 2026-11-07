@@ -16,6 +16,7 @@ import { Entity } from "@maipai/spec/gen/ts/entity.js";
 import type { Entity as EntityT } from "@maipai/spec/gen/ts/entity.js";
 import { childSafeAreaLabel } from "@/lib/placePrivacy";
 import { getHouseholdSettingValue } from "@/lib/settings";
+import { isOwnerOrAdmin } from "@/lib/access";
 
 export type EntityRow = typeof entities.$inferSelect;
 
@@ -105,7 +106,7 @@ export interface EntityCreate {
  * signed in - it is the shared roster of who/what the family knows
  * about, the same reach GET /api/people already has. */
 export function listEntities(actor: { id: string; role: string }, kind?: string): EntityT[] {
-  const canSeeAll = actor.role === "owner" || actor.role === "admin";
+  const canSeeAll = isOwnerOrAdmin(actor);
   const rows = db
     .select()
     .from(entities)
@@ -119,7 +120,7 @@ export function listEntities(actor: { id: string; role: string }, kind?: string)
 export function getEntity(actor: { id: string; role: string }, id: string): OpResult<EntityT> {
   const row = db.select().from(entities).where(and(eq(entities.id, id), isNull(entities.deletedAt))).get();
   if (!row) return { ok: false, status: 404, error: "no such entity" };
-  const canSeeAll = actor.role === "owner" || actor.role === "admin";
+  const canSeeAll = isOwnerOrAdmin(actor);
   if (row.scope === "person" && row.person !== actor.id && (row.kind === "place" || !canSeeAll)) {
     return { ok: false, status: 404, error: "no such entity" };
   }
@@ -234,7 +235,7 @@ export function updateEntity(actor: { id: string; role: string }, id: string, ed
   const existing = getEntity(actor, id);
   if (!existing.ok || !existing.value) return existing;
   const target = existing.value;
-  if (target.kind === "place" && target.scope === "household" && actor.role !== "owner" && actor.role !== "admin") return { ok: false, status: 403, error: "only owner or admin may change the household home" };
+  if (target.kind === "place" && target.scope === "household" && !isOwnerOrAdmin(actor)) return { ok: false, status: 403, error: "only owner or admin may change the household home" };
 
   let confirmed: { source: "local"; confirmed_by_person_id: string; confirmed_at: string } | null = null;
   if (edit.confirm) {
@@ -279,7 +280,7 @@ export function updateEntity(actor: { id: string; role: string }, id: string, ed
 export function deleteEntity(actor: { id: string; role: string }, id: string): OpResult<{ id: string }> {
   const existing = getEntity(actor, id);
   if (!existing.ok) return { ok: false, status: existing.status, error: existing.error };
-  if (existing.value?.kind === "place" && existing.value.scope === "household" && actor.role !== "owner" && actor.role !== "admin") return { ok: false, status: 403, error: "only owner or admin may remove a household place" };
+  if (existing.value?.kind === "place" && existing.value.scope === "household" && !isOwnerOrAdmin(actor)) return { ok: false, status: 403, error: "only owner or admin may remove a household place" };
   if (existing.value?.kind === "place" && existing.value.scope === "household") {
     if (getHouseholdSettingValue("household.home") === id) return { ok: false, status: 409, error: "cannot remove the current household home" };
   }

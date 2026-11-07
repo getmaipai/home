@@ -40,6 +40,7 @@ import type { PersonRow } from "@/types";
 import { wallClockMinutes } from "@/lib/wallClock";
 import { renderNotification, renderNotificationFor } from "@/lib/i18nServer";
 import type { Result } from "@/lib/result";
+import { isOwnerOrAdmin } from "@/lib/access";
 
 function renderTemplate(template: string, vars: Record<string, string>): string {
   return template.replace(/\{(\w+)\}/g, (match, name: string) => vars[name] ?? match);
@@ -53,7 +54,7 @@ function resolveRecipients(type: NotificationType, personId?: string): PersonRow
   }
   const everyone = listActivePeople();
   if (type.audience === "household") return everyone;
-  if (type.audience === "admins") return everyone.filter((p) => p.role === "owner" || p.role === "admin");
+  if (type.audience === "admins") return everyone.filter((p) => isOwnerOrAdmin(p));
   // Session C step 7 (session-c-brain-and-voice.md): a code review found
   // this used to share isMinorRole(role) with evaluateSafety()'s own
   // pre-step-7 check, so the two always agreed by construction. Now that

@@ -9,6 +9,7 @@ import { requireAuth, requireRoleOrGrant } from "@/middleware/auth";
 import { createGrant, listGrants, revokeGrant } from "@/lib/grants";
 import { Grant } from "@maipai/spec/gen/ts/grant.js";
 import type { Role } from "@/middleware/auth";
+import { isOwnerOrAdmin } from "@/lib/access";
 
 export const grantsRoutes = apiRouter();
 
@@ -28,7 +29,7 @@ grantsRoutes.openapi(listRoute, (c) => {
   const actor = c.get("person");
   const { person } = c.req.valid("query");
   const targetId = person ?? actor.id;
-  const canSeeOthers = actor.role === "owner" || actor.role === "admin";
+  const canSeeOthers = isOwnerOrAdmin(actor);
   if (targetId !== actor.id && !canSeeOthers) {
     return c.json({ error: "not allowed to see this person's grants" }, 403);
   }

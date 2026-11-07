@@ -43,6 +43,7 @@ import type { DiskPlan } from "../../../shared/diskPlanMath";
 import { REMOTE_ALLOW_TAILNET_KEY, refreshConfiguredEngineLink, validateRemoteEngineSetting } from "@/lib/remoteStackSettings";
 import { codingModeReadiness } from "@/lib/codingMode";
 import { listCodingPieces, installCodingPiece, type CodingPieceId } from "@/lib/stackCodingPieces";
+import { isOwnerOrAdmin } from "@/lib/access";
 
 // A person on the household's own LAN hits this a handful of times while
 // working through the trust step, never dozens of times a second - the
@@ -307,7 +308,7 @@ setupRoutes.openapi(setupStateRoute, (c) => {
   if (!anyone) return c.json(getSetupState(), 200);
   const token = getCookie(c, "session");
   const person = token ? resolveHumanSession(token) : null;
-  if (person && (person.role === "owner" || person.role === "admin")) return c.json(getSetupState(), 200);
+  if (person && isOwnerOrAdmin(person)) return c.json(getSetupState(), 200);
   return c.json({ done: true as const }, 200);
 });
 

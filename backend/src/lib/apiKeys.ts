@@ -12,6 +12,7 @@ import { effectivePermissions } from "@/lib/permissions";
 import { getHouseholdSettingValue, getPersonSettingValue } from "@/lib/settings";
 import { missingCodingPiece } from "@/lib/stackCodingPieces";
 import type { PersonRow } from "@/types";
+import { isOwnerOrAdmin } from "@/lib/access";
 
 export type ApiKeyScope = "turn" | "code" | "settings" | "diagnose" | "engine";
 export type KeyOrigin = { place: "home_network" | "away"; address: string };
@@ -76,7 +77,7 @@ export const mayHoldEngineKey = (person: PersonRow) => mayHoldSettingsKey(person
 export const ENGINE_KEY_MAX_DAYS = 30;
 /** OPS-KEY-01: a settings key belongs to an owner or admin who is still enabled; it stops working the moment that stops being true. */
 export function mayHoldSettingsKey(person: PersonRow): boolean {
-  return !person.deletedAt && person.enabled && !person.memorializedAt && (person.role === "owner" || person.role === "admin");
+  return !person.deletedAt && person.enabled && !person.memorializedAt && isOwnerOrAdmin(person);
 }
 /** The longest a settings key lives. It changes household behaviour, so it is short-lived. */
 export const SETTINGS_KEY_MAX_DAYS = 90;

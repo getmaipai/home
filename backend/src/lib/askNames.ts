@@ -48,6 +48,7 @@ import { visibleText } from "@/lib/wellFormed";
 import type { PersonRow } from "@/types";
 import type { TurnSignal } from "@maipai/spec/gen/ts/turn-signal.js";
 import type { ProtocolAnswer } from "@/lib/turnSignal";
+import { isOwnerOrAdmin } from "@/lib/access";
 
 // ---------------------------------------------------------------------------
 // Subjects: the names in the utterance, resolved before the model runs.
@@ -136,7 +137,7 @@ function subjectsSectionFor(actor: PersonRow, subjects: readonly SubjectRef[]): 
     if (ref.type !== "household") continue;
     const entity = entityForSpeaker(actor, ref.entity_id);
     if (!entity || entity.account_person_id || (entity.source === "inferred" && !entity.confirmed_by_person_id)) continue;
-    if (entity.sensitive && !(actor.role === "owner" || actor.role === "admin")) continue;
+    if (entity.sensitive && !(isOwnerOrAdmin(actor))) continue;
     const label = subjectLabel(actor, entity.id) ?? entity.name;
     const kind = label.includes("(") ? label : `${label} (${entity.kind === "person" ? "someone the household knows" : `a ${entity.kind}`})`;
     const pronouns = entity.pronouns ? `, ${entity.pronouns}` : "";

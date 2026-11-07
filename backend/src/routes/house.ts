@@ -16,6 +16,7 @@ import { listActivePeople } from "@/lib/access";
 import type { HouseEntity } from "@/lib/house/registry";
 import type { PersonRow } from "@/types";
 import { apiError } from "@/lib/apiErrorCopy";
+import { isOwnerOrAdmin } from "@/lib/access";
 
 export type HouseRoomsDeps = {
   loadRegistry: () => Promise<HouseRegistryResult>;
@@ -68,7 +69,7 @@ const adminRegistryRoute = createRoute({ method: "get", path: "/admin/registry",
 
 houseRoutes.openapi(houseTestRoute, async (c) => {
   const actor = c.get("person");
-  if (!(actor.role === "owner" || actor.role === "admin" || effectivePermissions(actor.id).some((p) => p.action === "people.grant" && p.effect === "allow"))) return c.json({ error: "Forbidden" }, 403);
+  if (!(isOwnerOrAdmin(actor) || effectivePermissions(actor.id).some((p) => p.action === "people.grant" && p.effect === "allow"))) return c.json({ error: "Forbidden" }, 403);
   const connection = deps().connection();
   if (!connection.ok) {
     const kind: "bad_address" | "no_token" | "not_configured" = connection.reason === "bad_address" ? "bad_address" : connection.reason === "no_token" ? "no_token" : "not_configured";

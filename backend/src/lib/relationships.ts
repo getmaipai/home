@@ -12,6 +12,7 @@ import { Relationship } from "@maipai/spec/gen/ts/relationship.js";
 import type { Relationship as RelationshipT } from "@maipai/spec/gen/ts/relationship.js";
 import type { Entity as EntityT } from "@maipai/spec/gen/ts/entity.js";
 import { confirmTransition, type OpResult } from "@/lib/entities";
+import { isOwnerOrAdmin } from "@/lib/access";
 
 export type RelationshipRow = typeof relationships.$inferSelect;
 
@@ -165,7 +166,7 @@ export function createRelationship(actor: { id: string }, input: RelationshipCre
  * `actor` (their own person-scoped statements), or anything at all if
  * the actor is owner/admin. */
 export function listRelationships(actor: { id: string; role: string }, entityId?: string): RelationshipT[] {
-  const canSeeAll = actor.role === "owner" || actor.role === "admin";
+  const canSeeAll = isOwnerOrAdmin(actor);
   const rows = db
     .select()
     .from(relationships)
@@ -201,7 +202,7 @@ export function calledAdminForOwnSettings(reader: { id: string; role: string }):
 function getOwnedRow(actor: { id: string; role: string }, id: string): RelationshipRow | undefined {
   const row = db.select().from(relationships).where(and(eq(relationships.id, id), isNull(relationships.deletedAt))).get();
   if (!row) return undefined;
-  const canSeeAll = actor.role === "owner" || actor.role === "admin";
+  const canSeeAll = isOwnerOrAdmin(actor);
   if (row.scope === "person" && row.person !== actor.id && !canSeeAll) return undefined;
   return row;
 }

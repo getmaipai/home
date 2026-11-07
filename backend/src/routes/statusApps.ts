@@ -9,6 +9,7 @@ import { serviceDiagnostics } from "@/lib/serviceHealth";
 import { getHouseholdSettingValue } from "@/lib/settings";
 import { getEngineLink } from "@/lib/stack/link";
 import type { StatusAppsWire } from "../wire";
+import { isOwnerOrAdmin } from "@/lib/access";
 
 export const statusAppsRoutes = apiRouter();
 const EngineComputerResponse = z.object({
@@ -35,7 +36,7 @@ statusAppsRoutes.openapi(engineComputerRoute, (c) => {
   const label: EngineComputerPublicState = state === "ready" ? "working" : state === "connecting" ? "connecting" : state === "degraded" ? "slow_to_answer" : state === "reconnecting" ? "reconnecting" : "not_reachable";
   const reason = snapshot?.reason ? reasonWords[snapshot.reason] ?? "The engine computer connection needs attention." : configured && !link ? reasonWords.link_not_paired! : null;
   const person = c.get("person");
-  const admin = person.role === "owner" || person.role === "admin";
+  const admin = isOwnerOrAdmin(person);
   const details = link?.statusDetails();
   return c.json({ configured, state: label, reason, ...(admin && configured ? { details: {
     path: details?.path ?? null, lastProbeAt: details?.lastProbeAt ?? null, contract: details?.contract ?? null,
@@ -52,7 +53,7 @@ export const appsRoute = createRoute({ method: "get", path: "/apps", tags: ["Sta
 
 statusAppsRoutes.openapi(appsRoute, async (c) => {
   const person = c.get("person");
-  const showNeeds = person.role === "owner" || person.role === "admin";
+  const showNeeds = isOwnerOrAdmin(person);
   const events = db.select({ component: statusEvents.component, state: statusEvents.state, at: statusEvents.at }).from(statusEvents).all();
   const apps = await Promise.all(listStatusApps().map(async (app) => {
     const result = await appResponseWithLiveRoleHealth(app, events, showNeeds);

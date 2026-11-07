@@ -7,7 +7,7 @@ import { createHash } from "node:crypto";
 import { statSync } from "node:fs";
 import { apiRouter, errorResponses, idParamSchema, refuseWith } from "@/lib/openapi";
 import { requireAuth } from "@/middleware/auth";
-import { isOwnerOrAdmin } from "@/lib/access";
+import { isOwnerOrAdmin, canMakeCompanion, COMPANION_BAND_LINE } from "@/lib/access";
 import { companionDetail, draftPersonaFor, companionAreaOn, canCreateCompanion, currentCompanionId, listCompanionCards, discoverCompanionCards, heldCompanionIds, mayUseCompanion, pickRefusal, robotAssignments } from "@/lib/companionsApp";
 import { publishSettingsChanged } from "@/lib/deviceCommands";
 import { getPersonSettingValue, setValue } from "@/lib/settings";
@@ -206,10 +206,10 @@ function lookStyleChoices(band: "child" | "teen" | "adult") {
   return { styles: stylesForBand(band).map(({ id, label }) => ({ id, label, custom: id === "custom" })), keep: { id: "keep" as const, label: "Keep as is" } };
 }
 const lookStylesRoute = createRoute({ method: "get", path: "/look-styles", tags: ["Companions"], summary: "List companion look styles for the signed-in person's age band", middleware: [requireAuth] as const,
-  responses: { 200: { content: { "application/json": { schema: z.object({ styles: z.array(LookStyleChoice), keep: KeepLookChoice }) } }, description: "Look styles available to this person." }, ...errorResponses({ 401: "Not signed in", 403: "Only teens and adults can make a companion." }) } });
+  responses: { 200: { content: { "application/json": { schema: z.object({ styles: z.array(LookStyleChoice), keep: KeepLookChoice }) } }, description: "Look styles available to this person." }, ...errorResponses({ 401: "Not signed in", 403: COMPANION_BAND_LINE }) } });
 companionsRoutes.openapi(lookStylesRoute, (c) => {
   const actor = c.get("person"), band = speakerAgeBand(actor, new Date());
-  if (band === "child" && !isOwnerOrAdmin(actor)) return c.json({ error: "Only teens and adults can make a companion." }, 403);
+  if (!canMakeCompanion(actor)) return c.json({ error: COMPANION_BAND_LINE }, 403);
   return c.json(lookStyleChoices(band), 200);
 });
 
@@ -778,19 +778,19 @@ function allUseCounts(id: string) {
 const createCompanionRoute = createRoute({ method: "post", path: "/", tags: ["Companions"], summary: "Create a household companion draft", middleware: [requireAuth] as const,
   request: { body: fieldsJson }, responses: { 201: { content: { "application/json": { schema: z.object({ id: z.string() }) } }, description: "Draft created." }, 400: companionValidationError, ...errorResponses({ 401: "Not signed in", 403: "Only adults can make a companion." }) } });
 companionsRoutes.openapi(createCompanionRoute, (c) => {
-  const actor = c.get("person"), band = speakerAgeBand(actor, new Date()); if (band === "child" && !isOwnerOrAdmin(actor)) return c.json({ error: "Only teens and adults can make a companion." }, 403);
+  const actor = c.get("person"), band = speakerAgeBand(actor, new Date()); if (!canMakeCompanion(actor)) return c.json({ error: COMPANION_BAND_LINE }, 403);
   const result = createHouseholdCompanion(normalizedFields(c.req.valid("json")) as never, { display_name: actor.displayName, person_id: actor.id }, band === "teen" ? "teen" : "adult");
   if (!result.ok) return c.json({ error: result.error, ...(result.fields ? { fields: result.fields } : {}) }, 400);
   return c.json({ id: result.value.id }, 201);
 });
 
 const draftRoute = createRoute({ method: "post", path: "/draft", tags: ["Companions"], summary: "Create a name-only companion draft", middleware: [requireAuth] as const, request: { body: { content: { "application/json": { schema: z.object({ name: z.string().trim().min(1).max(40) }) } } } }, responses: { 200: { content: { "application/json": { schema: z.object({ id: z.string() }) } }, description: "Existing draft returned." }, 201: { content: { "application/json": { schema: z.object({ id: z.string() }) } }, description: "Draft created." }, ...errorResponses({ 400: "Invalid name", 403: "Only teens and adults can make a companion" }) } });
-companionsRoutes.openapi(draftRoute, (c) => { const actor = c.get("person"), band = speakerAgeBand(actor, new Date()); if (band === "child" && !isOwnerOrAdmin(actor)) return c.json({ error: "Only teens and adults can make a companion." }, 403); const { name } = c.req.valid("json"); for (const existing of listHouseholdCompanionIds()) { const found = getHouseholdCompanion(existing), author = householdCompanionAuthorId(existing); if (author === actor.id && found?.companion?.display_name.toLowerCase() === name.toLowerCase() && found.companion.status === "draft" && readLook(existing).versions.length === 0) return c.json({ id: existing }, 200); } const made = createHouseholdCompanion({ display_name: name, formality: "neutral", complexity: "standard", engagement: "balanced", filler_density: "light", status: "draft" } as never, { display_name: actor.displayName, person_id: actor.id }, band === "teen" ? "teen" : "adult"); if (!made.ok) return c.json({ error: made.error }, 400); const draftFolder = householdCompanionFolder(made.value.id); if (draftFolder) writeFileSync(join(draftFolder, ".name-only-draft"), ""); return c.json({ id: made.value.id }, 201); });
+companionsRoutes.openapi(draftRoute, (c) => { const actor = c.get("person"), band = speakerAgeBand(actor, new Date()); if (!canMakeCompanion(actor)) return c.json({ error: COMPANION_BAND_LINE }, 403); const { name } = c.req.valid("json"); for (const existing of listHouseholdCompanionIds()) { const found = getHouseholdCompanion(existing), author = householdCompanionAuthorId(existing); if (author === actor.id && found?.companion?.display_name.toLowerCase() === name.toLowerCase() && found.companion.status === "draft" && readLook(existing).versions.length === 0) return c.json({ id: existing }, 200); } const made = createHouseholdCompanion({ display_name: name, formality: "neutral", complexity: "standard", engagement: "balanced", filler_density: "light", status: "draft" } as never, { display_name: actor.displayName, person_id: actor.id }, band === "teen" ? "teen" : "adult"); if (!made.ok) return c.json({ error: made.error }, 400); const draftFolder = householdCompanionFolder(made.value.id); if (draftFolder) writeFileSync(join(draftFolder, ".name-only-draft"), ""); return c.json({ id: made.value.id }, 201); });
 
 const copyRoute = createRoute({ method: "post", path: "/{id}/copy", tags: ["Companions"], summary: "Copy a companion into a household draft", middleware: [requireAuth] as const,
   request: { params: idPath }, responses: { 201: { content: { "application/json": { schema: z.object({ id: z.string() }) } }, description: "Draft copied." }, ...errorResponses({ 401: "Not signed in", 403: "Only adults can make a companion.", 404: "No such companion" }) } });
 companionsRoutes.openapi(copyRoute, (c) => {
-  const actor = c.get("person"); if (speakerAgeBand(actor, new Date()) === "child" && !isOwnerOrAdmin(actor)) return c.json({ error: "Only teens and adults can make a companion." }, 403);
+  const actor = c.get("person"); if (!canMakeCompanion(actor)) return c.json({ error: COMPANION_BAND_LINE }, 403);
   const id = c.req.valid("param").id;
   const author = { display_name: actor.displayName, person_id: actor.id };
   const result = getHouseholdCompanion(id) ? copyHouseholdCompanion(id, author) : copyBundledCompanion(id, author);

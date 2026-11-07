@@ -10,6 +10,7 @@ import { issueDeviceCommand, registerDeviceAlarmActionHandler } from "@/lib/devi
 import { readHomeAssistantEntityState, subscribeHomeAssistantEntities, type HomeAssistantChange } from "@/lib/integrations/homeAssistant";
 import { getHouseholdSettingValue } from "@/lib/settings";
 import { trigger } from "@/lib/notifications";
+import { isOwnerOrAdminRole } from "@/wire";
 
 export type SafetyAlarmKind = "smoke" | "carbon_monoxide" | "gas" | "water_leak" | "alarm_panel";
 export interface SafetySensorMapping { entityId: string; area: string | null; kind: SafetyAlarmKind }
@@ -188,7 +189,7 @@ export function applyAlarmAction(personId: string, alarmId: string, action: Safe
   }
   const isAdult = speakerAgeBand(person, new Date()) === "adult";
   if (!isAdult) return { ok: false, status: 403, error: "Only an adult can act on a safety alarm" };
-  if (action === "false_alarm" && !["owner", "admin"].includes(role)) return { ok: false, status: 403, error: "Only an admin can mark a safety alarm as false" };
+  if (action === "false_alarm" && !isOwnerOrAdminRole(role)) return { ok: false, status: 403, error: "Only an admin can mark a safety alarm as false" };
   if (action === "quiet_here" && !robotId) return { ok: false, status: 400, error: "quiet_here needs a robot" };
   const row = db.select().from(safetyAlarms).where(and(eq(safetyAlarms.id, alarmId), eq(safetyAlarms.state, "active"))).get();
   if (!row) return { ok: false, status: 404, error: "No active alarm with that id" };
@@ -216,7 +217,7 @@ export function applyRobotAlarmAction(robotId: string, alarmId: string, action: 
   }
   if (action === "false_alarm") {
     const role = db.select({ role: people.role }).from(people).where(and(eq(people.id, rawEvidence.person), eq(people.enabled, true), isNull(people.deletedAt))).get()?.role;
-    if (!role || !["owner", "admin"].includes(role)) {
+    if (!role || !isOwnerOrAdminRole(role)) {
       return { ok: false, status: 403, error: "Only an admin may mark a safety alarm as false" };
     }
   }

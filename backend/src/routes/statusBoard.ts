@@ -13,6 +13,7 @@ import { engineCrashSummary } from "@/lib/stackSelfHeal";
 import { readStackMemoryLedger } from "@/lib/stackHealthSync";
 import { readResourceDay } from "@/lib/resourceDay";
 import { hostGuardInstalled, hostGuardStatusView, readHostGuardStatus } from "@/lib/hostGuard";
+import { isOwnerOrAdmin } from "@/lib/access";
 
 export const statusBoardRoutes = apiRouter();
 const NoteInput = z.object({ body: z.string().min(1).max(500), expires_at: z.string().datetime({ offset: true }).optional() });
@@ -43,7 +44,7 @@ statusBoardRoutes.openapi(historyRoute, async (c) => {
   const days = raw === undefined ? 90 : /^\d+$/.test(raw) ? Number(raw) : NaN;
   if (!Number.isInteger(days) || days < 1 || days > 90) return c.text("days must be an integer from 1 to 90.", 400);
   const person = c.get("person");
-  const admin = person.role === "owner" || person.role === "admin";
+  const admin = isOwnerOrAdmin(person);
   const [memoryLedger, resourceDay] = admin ? await Promise.all([readStackMemoryLedger(), readResourceDay()]) : [];
   const hostGuard = admin ? hostGuardStatusView(readHostGuardStatus(), hostGuardInstalled()) : undefined;
   return c.json({ ...buildStatusHistory(days), chat_pauses: chatPauseSummary(), engine_crashes: engineCrashSummary(), ...(memoryLedger ? { memory_ledger: memoryLedger } : {}), ...(resourceDay ? { resource_day: resourceDay } : {}), ...(hostGuard ? { host_guard: hostGuard } : {}) }, 200);

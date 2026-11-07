@@ -13,6 +13,7 @@ import type { PersonRow } from "@/types";
 import { speakerAgeBand } from "@/lib/ageBand";
 import { issueDeviceCommand } from "@/lib/deviceCommands";
 import { getHouseholdSettingValue } from "@/lib/settings";
+import { isOwnerOrAdmin } from "@/lib/access";
 
 export const LIVE_VIEW_MAX_MS = 10 * 60_000;
 /** A viewer has this long after the start to attach before the view is dropped. */
@@ -43,7 +44,7 @@ export function liveViewAdmits(person: PersonRow, now: Date = new Date()): { ok:
   if (speakerAgeBand(person, now) !== "adult") {
     return { ok: false, status: 403, error: "Live view is for adults only. Ask an adult to watch it for you." };
   }
-  if (person.role === "owner" || person.role === "admin") return { ok: true };
+  if (isOwnerOrAdmin(person)) return { ok: true };
   const who = getHouseholdSettingValue("robot.live_view.who");
   if (Array.isArray(who) && who.includes(person.id)) return { ok: true };
   return { ok: false, status: 403, error: "You are not on the live view list. Ask an admin to add you in the robot settings." };
@@ -59,7 +60,7 @@ export function startLiveView(person: PersonRow, deviceId: string, now: Date = n
   const admitted = liveViewAdmits(person, now);
   if (!admitted.ok) return admitted;
   const device = db.select().from(devices).where(eq(devices.id, deviceId)).get();
-  if (!device || (device.personId !== person.id && person.role !== "owner" && person.role !== "admin")) {
+  if (!device || (device.personId !== person.id && !isOwnerOrAdmin(person))) {
     return { ok: false, status: 404, error: "No such robot. Pick one of the robots on the Devices page." };
   }
   if (device.kind !== "robot") return { ok: false, status: 400, error: "That device is not a robot, so it has no camera to show." };

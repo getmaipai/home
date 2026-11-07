@@ -21,6 +21,7 @@ import { validateList } from "@maipai/spec/records/ts/validate.js";
 import { List } from "@maipai/spec/gen/ts/list.js";
 import type { List as ListT } from "@maipai/spec/gen/ts/list.js";
 import type { PersonRow } from "@/types";
+import { isOwnerOrAdmin } from "@/lib/access";
 
 export type ListRow = typeof lists.$inferSelect;
 
@@ -73,7 +74,7 @@ const DEFAULT_TITLE: Record<"shopping" | "todo", string> = {
  * owner/admin, the same reach they already have over everything else in
  * the household) - the same rule lib/entities.ts's listEntities() takes. */
 export function listLists(actor: { id: string; role: string }): ListT[] {
-  const canSeeAll = actor.role === "owner" || actor.role === "admin";
+  const canSeeAll = isOwnerOrAdmin(actor);
   const rows = db
     .select()
     .from(lists)
@@ -86,7 +87,7 @@ export function listLists(actor: { id: string; role: string }): ListT[] {
 export function getList(actor: { id: string; role: string }, id: string): OpResult<ListT> {
   const row = db.select().from(lists).where(and(eq(lists.id, id), isNull(lists.deletedAt))).get();
   if (!row) return { ok: false, status: 404, error: "no such list" };
-  const canSeeAll = actor.role === "owner" || actor.role === "admin";
+  const canSeeAll = isOwnerOrAdmin(actor);
   if (row.scope === "person" && row.person !== actor.id && !canSeeAll) {
     return { ok: false, status: 404, error: "no such list" };
   }

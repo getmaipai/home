@@ -19,6 +19,7 @@ import { getPersonRole, isOwnerOrAdmin } from "@/lib/access";
 import type { AgeBand } from "@/lib/ageBand";
 import type { SettingsKey } from "@maipai/spec/gen/ts/settings-key.js";
 import type { PersonRow } from "@/types";
+import { isOwnerOrAdminRole } from "@/wire";
 
 export type ScalarLayer = "person" | "household" | "band" | "default";
 
@@ -60,7 +61,7 @@ export function isLockStamp(setBy: string | null | undefined): boolean {
   if (!setBy || setBy === SELF_STAMP || setBy === SYSTEM_STAMP) return false;
   // Only a live owner or admin's id locks; a removed or demoted admin's stamp, or any other writer's, does not.
   const role = getPersonRole(setBy);
-  return role === "owner" || role === "admin";
+  return role !== undefined && isOwnerOrAdminRole(role);
 }
 
 export function resolveLayeredScalar(def: SettingsKey, personId: string, band: AgeBand): LayeredScalar {

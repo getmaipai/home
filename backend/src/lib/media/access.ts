@@ -8,9 +8,10 @@ import { getPersonSettingValue } from "@/lib/settings";
 import { MEDIA_ALLOWLIST_KEY } from "@/settings/mediaKeys";
 import { bandAllows, mediaBandOf } from "./band";
 import { itemFromRow, sourceFromRow, type MediaItem, type MediaSource } from "./model";
+import { isOwnerOrAdmin } from "@/lib/access";
 
 export function isMediaAdmin(actor: PersonRow): boolean {
-  return actor.role === "owner" || actor.role === "admin";
+  return isOwnerOrAdmin(actor);
 }
 
 /** App routes use this before assembling discovery shelves or chips. Library search still uses the access gate. */

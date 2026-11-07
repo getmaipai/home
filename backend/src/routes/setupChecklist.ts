@@ -2,6 +2,7 @@ import { createRoute, z } from "@hono/zod-openapi";
 import { apiRouter, errorResponses } from "@/lib/openapi";
 import { requireAuth } from "@/middleware/auth";
 import { getSetupChecklist } from "@/lib/setupChecklist";
+import { isOwnerOrAdmin } from "@/lib/access";
 
 export const setupChecklistRoutes = apiRouter();
 
@@ -28,7 +29,7 @@ const getRoute = createRoute({
 
 setupChecklistRoutes.openapi(getRoute, async (c) => {
   const actor = c.get("person");
-  if (actor.role !== "owner" && actor.role !== "admin") {
+  if (!isOwnerOrAdmin(actor)) {
     return c.json({ error: "This checklist is for the owner and admins. Sign in with an owner or admin account." }, 403);
   }
   return c.json(await getSetupChecklist(actor), 200);

@@ -5,6 +5,7 @@
 // no person text: the record holds a person id, times and a state.
 import { holdsMax } from "@/lib/tiers";
 import type { PersonRow } from "@/types";
+import { isOwnerOrAdmin } from "@/lib/access";
 
 export type LeaseState = "off" | "starting" | "held" | "releasing";
 export type LeaseRefusal = "not_a_holder" | "not_ready" | "swap_failed" | "stack_busy" | "max_window";
@@ -71,7 +72,7 @@ export function createChatLease(deps: LeaseDeps) {
     if (person.role === "teen" || !holdsMax(person, "chat")) return { ok: false, refusal: "not_a_holder" };
     if (state === "held" && holderId === person.id) {
       lastActivityAt = deps.now();
-      if (opts.pinned && (person.role === "owner" || person.role === "admin")) pinned = true;
+      if (opts.pinned && isOwnerOrAdmin(person)) pinned = true;
       return { ok: true, state: "held" };
     }
     if (deps.windowOpen?.()) return { ok: false, refusal: "max_window" };
@@ -91,7 +92,7 @@ export function createChatLease(deps: LeaseDeps) {
     transition = null;
     state = "held";
     holderId = person.id;
-    pinned = !!opts.pinned && (person.role === "owner" || person.role === "admin");
+    pinned = !!opts.pinned && isOwnerOrAdmin(person);
     lastActivityAt = deps.now();
     return { ok: true, state: "held" };
   }
