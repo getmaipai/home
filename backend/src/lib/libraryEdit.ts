@@ -11,8 +11,9 @@ import { nextHlc } from "@/lib/hlc";
 import { isGeneratedFile } from "@/lib/libraryProvenance";
 import { redactCredentials } from "@/lib/memoryContentPolicy";
 import type { PersonRow } from "@/types";
+import type { Result } from "@/lib/result";
 
-export type EditResult = { ok: true; value: { id: string; name: string | null; retention: string } } | { ok: false; status: 400 | 403 | 404; error: string };
+export type EditResult = Result<{ id: string; name: string | null; retention: string }, 400 | 403 | 404>;
 
 const MAX_NAME = 255;
 

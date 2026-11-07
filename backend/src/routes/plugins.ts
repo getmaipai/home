@@ -1,7 +1,7 @@
 import { writingFormatsFor } from "@/lib/writingFormats";
 import { join } from "node:path";
 import { createRoute, z } from "@hono/zod-openapi";
-import { apiRouter, errorResponses } from "@/lib/openapi";
+import { apiRouter, errorResponses, refuseWith } from "@/lib/openapi";
 import { speakerAgeBand } from "@/lib/ageBand";
 import { roleHealth } from "@/lib/roleHealth";
 import { VOICEOVER_TOOL_ID, CHANGE_VOICE_TOOL_ID } from "@/lib/voiceTools";
@@ -197,7 +197,7 @@ pluginsRoutes.post("/:id/run", requireAuth, async (c) => {
       const fallback = refusePackageReplyIfUnsafe(actor, result.fallback_reply) ?? result.fallback_reply;
       return c.json({ error: result.error, fallback_reply: fallback }, result.status);
     }
-    return c.json({ error: result.error }, result.status);
+    return refuseWith(c, result);
   }
   // GENUI-05: a package's blocks leave through the same filter a turn applies
   // (manifest allowlist, spec check, this person's age band, the output floor);
@@ -230,7 +230,7 @@ pluginsRoutes.get("/:id/assets/*", requireAuth, (c) => {
 pluginsRoutes.get("/:id/pages/:pageId", requireAuth, async (c) => {
   await warmAppPage(c.req.param("id"), c.req.param("pageId"));
   const result = getAppPage(c.get("person"), c.req.param("id"), c.req.param("pageId"));
-  return result.ok ? c.json(result.value as Record<string, unknown>, 200) : c.json({ error: result.error }, result.status as 404);
+  return result.ok ? c.json(result.value as Record<string, unknown>, 200) : refuseWith(c, result);
 });
 
 pluginsRoutes.post("/:id/data/:dataId", requireAuth, async (c) => {

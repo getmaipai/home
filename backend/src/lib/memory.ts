@@ -26,10 +26,9 @@ import { retireOrphanSubjects } from "@/lib/subjects";
 import { MemoryRecord } from "@maipai/spec/gen/ts/memory-record.js";
 import { ingestMemory } from "@/lib/memoryIngestion";
 import type { PersonRow, MemoryRecordRow } from "@/types";
+import type { Result } from "@/lib/result";
 
-export type MemoryOpResult<T> =
-  | { ok: true; value: T }
-  | { ok: false; status: number; error: string };
+export type MemoryOpResult<T> = Result<T, number>;
 
 // scope=self is "not shared with anyone" per the schema's own field
 // description: no read path, however privileged, ever returns it.

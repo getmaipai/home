@@ -1,5 +1,5 @@
 import { createRoute, z } from "@hono/zod-openapi";
-import { apiRouter, errorResponses } from "@/lib/openapi";
+import { apiRouter, errorResponses, respond } from "@/lib/openapi";
 import { requireAuth } from "@/middleware/auth";
 import { evaluateSafety } from "@/lib/safety";
 import { speakerAgeBand } from "@/lib/ageBand";
@@ -67,6 +67,6 @@ const alarmActionRoute = createRoute({
 });
 safetyRoutes.openapi(alarmActionRoute, (c) => {
   const result = applyAlarmAction(c.get("person").id, c.req.valid("param").id, c.req.valid("json").action as SafetyAlarmAction);
-  if (!result.ok) return c.json({ error: result.error }, result.status);
+  if (!result.ok) return respond(c, result);
   return c.json({ state: result.state }, 200);
 });

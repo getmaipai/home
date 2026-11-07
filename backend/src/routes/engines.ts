@@ -10,7 +10,7 @@
 // calls as `Record<string, unknown>` - the Stack has not spec'd their
 // shape yet, so a hand-typed schema here would just be guessing.
 import { createRoute, z } from "@hono/zod-openapi";
-import { apiRouter, errorResponses } from "@/lib/openapi";
+import { apiRouter, errorResponses, respond } from "@/lib/openapi";
 import { requireRole } from "@/middleware/auth";
 import { getStackClient, isStackConfigured } from "@/lib/stackEngine";
 import { getHomeSupervisorRoles } from "@/lib/homeSupervisorRoles";
@@ -370,7 +370,7 @@ const updatesRoute = createRoute({
 });
 enginesRoutes.openapi(updatesRoute, async (c) => {
   const result = await getStackUpdatesState();
-  if (!result.ok) return c.json({ error: result.error }, result.status);
+  if (!result.ok) return respond(c, result);
   return c.json({ checksEnabled: result.value.checksEnabled, engines: result.value.engines, models: result.value.models }, 200);
 });
 
@@ -387,7 +387,7 @@ const updatesCheckRoute = createRoute({
 });
 enginesRoutes.openapi(updatesCheckRoute, async (c) => {
   const result = await checkStackUpdates();
-  if (!result.ok) return c.json({ error: result.error }, result.status);
+  if (!result.ok) return respond(c, result);
   return c.json({ checksEnabled: result.value.checksEnabled, engines: result.value.engines, models: result.value.models }, 200);
 });
 
@@ -415,11 +415,11 @@ enginesRoutes.openapi(updatesActionRoute, async (c) => {
   if (action === "rollback") {
     if (!tag) return c.json({ error: "tag is required to roll back" }, 400);
     const result = await rollbackStackEngine(name, tag);
-    if (!result.ok) return c.json({ error: result.error }, result.status);
+    if (!result.ok) return respond(c, result);
     return c.json(result.value, 200);
   }
   const result = await applyStackEngineUpdate(name);
-  if (!result.ok) return c.json({ error: result.error }, result.status);
+  if (!result.ok) return respond(c, result);
   return c.json(result.value, 200);
 });
 

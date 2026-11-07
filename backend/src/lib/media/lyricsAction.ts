@@ -18,6 +18,7 @@ import { startLibraryAlign } from "@/lib/music/libraryAlign";
 import { lookupLyrics } from "./lyricsLookup";
 import { hasReceipt, isPaused, recordReceipt, recordRefusal, recordSuccess } from "./lyricsReceipts";
 import type { MediaItem } from "./model";
+import type { Result } from "@/lib/result";
 
 // One lookup per second across the whole household for this host (the shared
 // net bucket the music app declares).
@@ -31,9 +32,7 @@ function isScannedTrack(item: MediaItem): boolean {
   return db.select({ id: mediaSources.id }).from(mediaSources).where(eq(mediaSources.id, item.source_id)).get() !== undefined;
 }
 
-export type LookupResult =
-  | { ok: true; value: Record<string, unknown> }
-  | { ok: false; status: 400 | 403 | 404 | 429; error: string };
+export type LookupResult = Result<Record<string, unknown>, 400 | 403 | 404 | 429>;
 
 export async function lookupLyricsFor(
   person: PersonRow,

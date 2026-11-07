@@ -15,8 +15,9 @@ import { sourceFromRow, sourcesFromRows, type MediaSource } from "./model";
 import { removeSource } from "./sources";
 import type { DirectoryStation } from "./radioDirectory";
 import { cleanStationName } from "./radioName";
+import type { Result } from "@/lib/result";
 
-export type RadioOutcome<T> = { ok: true; value: T } | { ok: false; status: 400 | 403 | 404 | 409; error: string };
+export type RadioOutcome<T> = Result<T, 400 | 403 | 404 | 409>;
 
 const ADULT_TAG = /adult|porn|xxx|erotic/i;
 /** Whether any tag marks the station as adult content. */

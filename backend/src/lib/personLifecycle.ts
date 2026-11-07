@@ -60,10 +60,9 @@ import { roleRequiresCredential } from "@/lib/personAuthMethods";
 import { eraseChatFolderReferences } from "@/lib/chatFolders";
 import type { PersonRow } from "@/types";
 import type { personToDbValues } from "@/lib/personShape";
+import type { Result } from "@/lib/result";
 
-export type PersonOpResult<T> =
-  | { ok: true; value: T }
-  | { ok: false; status: 400 | 403 | 404; error: string };
+export type PersonOpResult<T> = Result<T, 400 | 403 | 404>;
 
 /** Whose profiles each role may edit or delete. Mirrors routes/people.ts's
  * CREATABLE_BY exactly: if you cannot create that role, you cannot manage

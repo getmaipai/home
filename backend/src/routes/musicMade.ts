@@ -1,7 +1,7 @@
 import { createRoute, z } from "@hono/zod-openapi";
 import { SongStyle } from "@maipai/spec/gen/ts/song-style.js";
 import { MadeArtist } from "@maipai/spec/gen/ts/made-artist.js";
-import { apiRouter, errorResponses, idParamSchema } from "@/lib/openapi";
+import { apiRouter, errorResponses, idParamSchema, respond } from "@/lib/openapi";
 import { requireAuth } from "@/middleware/auth";
 import { MadeAlbum } from "@maipai/spec/gen/ts/made-album.js";
 import { BAND_ACTION_NAMES, runBandAction } from "@/lib/music/bandActions";
@@ -142,7 +142,7 @@ const BandAction = createRoute({
 madeArtistsRoutes.openapi(BandAction, async (c) => {
   const body = c.req.valid("json");
   const r = await runBandAction(c.get("person"), c.req.valid("param").id, body.action, { conversationId: body.conversation_id ?? null, turnId: body.turn_id ?? null }, body.patch);
-  if (!r.ok) return c.json({ error: r.error }, r.status);
+  if (!r.ok) return respond(c, r);
   const { mediaId, seedMediaId, ...rest } = r.value;
   return c.json({ ...rest, ...(mediaId !== undefined ? { media_id: mediaId } : {}), ...(seedMediaId !== undefined ? { seed_media_id: seedMediaId } : {}) }, 200);
 });
@@ -164,7 +164,7 @@ const AlbumAction = createRoute({
 madeAlbumsRoutes.openapi(AlbumAction, async (c) => {
   const body = c.req.valid("json");
   const r = await runAlbumAction(c.get("person"), c.req.valid("param").id, body.action, { patch: body.patch, conversationId: body.conversation_id ?? null, turnId: body.turn_id ?? null });
-  if (!r.ok) return c.json({ error: r.error }, r.status);
+  if (!r.ok) return respond(c, r);
   const { media_id, ...rest } = r.value;
   return c.json({ ...rest, ...(media_id !== undefined ? { media_id } : {}) }, 200);
 });
@@ -186,5 +186,5 @@ const StyleAction = createRoute({
 songStylesRoutes.openapi(StyleAction, (c) => {
   const body = c.req.valid("json");
   const r = runStyleAction(c.get("person"), c.req.valid("param").id, body.action, { patch: body.patch, conversationId: body.conversation_id ?? null, turnId: body.turn_id ?? null });
-  return r.ok ? c.json(r.value, 200) : c.json({ error: r.error }, r.status);
+  return respond(c, r);
 });

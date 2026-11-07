@@ -74,6 +74,7 @@ import { validTimeZone } from "@/lib/wallClock";
 import type { PluginOpResult } from "@/lib/plugins";
 import type { PluginResult } from "@maipai/spec/interpreters/ts/recipe-interpreter.js";
 import type { PersonRow } from "@/types";
+import type { Result } from "@/lib/result";
 
 // lib/plugins.ts's runPlugin isn't imported directly: plugins.ts already
 // imports lib/packageHost.ts (createHost), and packageHost.ts imports
@@ -82,9 +83,7 @@ import type { PersonRow } from "@/types";
 // caller (index.ts, or a test) passes its own runPlugin in instead.
 type RunPluginFn = (id: string, actor: PersonRow, inputs: Record<string, unknown>) => Promise<PluginOpResult<PluginResult>>;
 
-export type SchedulerOpResult<T> =
-  | { ok: true; value: T }
-  | { ok: false; status: 400 | 403 | 404; error: string };
+export type SchedulerOpResult<T> = Result<T, 400 | 403 | 404>;
 
 export type JobKind = "plugin" | "core";
 

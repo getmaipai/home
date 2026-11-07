@@ -2,7 +2,7 @@ import { type Context } from "hono";
 import { resolvePersona } from "@/lib/persona";
 import { mayUseCompanion } from "@/lib/companionsApp";
 import { createRoute, z } from "@hono/zod-openapi";
-import { apiRouter, emptyJsonBodyAsObject, errorResponses, idParamSchema } from "@/lib/openapi";
+import { apiRouter, emptyJsonBodyAsObject, errorResponses, idParamSchema, respond, refuseWith } from "@/lib/openapi";
 import { Conversation } from "@maipai/spec/gen/ts/conversation.js";
 import { ReplyFeedback } from "@maipai/spec/gen/ts/reply-feedback.js";
 import { TurnArtifact } from "@maipai/spec/gen/ts/turn-artifact.js";
@@ -54,14 +54,6 @@ import type { Surface } from "@/lib/turnShared";
 import { apiError } from "@/lib/apiErrorCopy";
 
 export const conversationsRoutes = apiRouter();
-
-// Matches every sibling route file's own fail() (memory.ts, commands.ts,
-// notifications.ts, scheduler.ts, settings.ts) - a code review,
-// 2026-09-05, found this file was the one inlining the identical
-// `{ error: result.error }, result.status` shape four times instead.
-function fail(c: Context<AppEnv>, result: Extract<ConversationOpResult<unknown>, { ok: false }>) {
-  return c.json({ error: result.error }, result.status);
-}
 
 // list() enforces the real visibility rule (self, or owner/admin for a
 // child) internally and returns an empty result rather than an error for
@@ -144,13 +136,13 @@ conversationsRoutes.openapi(followUpSuggestionsRoute, async (c) => {
 
 conversationsRoutes.post("/turns/:id/choose", requireAuth, async (c) => {
   const result = chooseConversationTurn(c.get("person"), c.req.param("id"));
-  if (!result.ok) return fail(c, result);
+  if (!result.ok) return refuseWith(c, result);
   return c.json({ turn_id: result.value.id, parent_turn_id: result.value.parentTurnId, branch_chosen: result.value.branchChosen });
 });
 
 conversationsRoutes.post("/turns/:id/fork", requireAuth, async (c) => {
   const result = forkConversationAtTurn(c.get("person"), c.req.param("id"));
-  if (!result.ok) return fail(c, result);
+  if (!result.ok) return refuseWith(c, result);
   return c.json(result.value, 201);
 });
 
@@ -158,7 +150,7 @@ conversationsRoutes.get("/export", requireAuth, async (c) => {
   const actor = c.get("person");
   const person = c.req.query("person") ?? actor.id;
   const result = exportPerson(actor, person);
-  if (!result.ok) return fail(c, result);
+  if (!result.ok) return refuseWith(c, result);
   return c.json(result.value);
 });
 
@@ -206,7 +198,7 @@ conversationsRoutes.openapi(createConversationRoute, (c) => {
   // THIN-3G: carry_from seeds the new chat with that chat's summary.
   // PROJECTS-01a: folder_id starts the chat inside one of the person's projects.
   const result = createConversation(actor, { surface: body.surface, placement: body.placement, companionId: body.companion_id, mode: mode?.data, carryFrom: (body.carry_from as string | null | undefined) ?? null, folderId: (body.folder_id as string | null | undefined) ?? null, deviceId: body.device_id ?? null });
-  if (!result.ok) return c.json({ error: result.error }, result.status as 400 | 403 | 404);
+  if (!result.ok) return respond(c, result);
   return c.json(result.value, 201);
 });
 
@@ -503,7 +495,7 @@ conversationsRoutes.openapi(searchRoute, async (c) => {
 conversationsRoutes.get("/:id", requireAuth, async (c) => {
   const actor = c.get("person");
   const result = getConversation(actor, c.req.param("id"));
-  if (!result.ok) return fail(c, result);
+  if (!result.ok) return refuseWith(c, result);
   // CHAT-TITLE-01: a stored chat read with no title and nothing on its way gets its title asked for again.
   if (result.value.mode === "temporary") return c.json(result.value);
   // CHAT-TITLE-02: a stored chat with no title gets its provisional one now; one still on a provisional (or none) is asked for a model title.
@@ -516,7 +508,7 @@ conversationsRoutes.get("/:id/turns", requireAuth, async (c) => {
   const actor = c.get("person");
   const since = c.req.query("since");
   const result = listConversationTurns(actor, c.req.param("id"), { since });
-  if (!result.ok) return fail(c, result);
+  if (!result.ok) return refuseWith(c, result);
   return c.json(result.value);
 });
 
@@ -577,7 +569,7 @@ conversationsRoutes.openapi(patchConversationRoute, (c) => {
   try { tx(); } catch (error) {
     if (error && typeof error === "object" && "ok" in error && (error as { ok?: unknown }).ok === false) {
       const refusal = error as Extract<ConversationOpResult<Conversation>, { ok: false }>;
-      return c.json({ error: refusal.error }, refusal.status as 400 | 403 | 404);
+      return refuseWith(c, refusal);
     }
     throw error;
   }
@@ -588,14 +580,14 @@ conversationsRoutes.openapi(patchConversationRoute, (c) => {
 conversationsRoutes.delete("/:id", requireAuth, async (c) => {
   const actor = c.get("person");
   const result = deleteConversationById(actor, c.req.param("id"), { media: c.req.query("media") === "1" });
-  if (!result.ok) return fail(c, result);
+  if (!result.ok) return refuseWith(c, result);
   return c.json({ ok: true });
 });
 
 conversationsRoutes.get("/:id/media-count", requireAuth, (c) => {
   const actor = c.get("person");
   const found = getConversation(actor, c.req.param("id"));
-  if (!found.ok) return fail(c, found);
+  if (!found.ok) return refuseWith(c, found);
   const files = chatMediaFiles(actor, c.req.param("id"));
   return c.json({ images: files.filter((f) => f.kind === "image").length, videos: files.filter((f) => f.kind === "video").length });
 });

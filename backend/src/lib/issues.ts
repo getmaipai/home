@@ -20,6 +20,7 @@ import { trackBackgroundWork } from "@/lib/backgroundWork";
 import { hotReloadState } from "@/lib/hotReloadState";
 import { Issue } from "@maipai/spec/gen/ts/issue.js";
 import { componentForIssueSource, maintenanceEndsAt } from "@/lib/statusBoard";
+import type { Result } from "@/lib/result";
 
 export type IssueSeverity = Issue["severity"];
 export type IssueFix = NonNullable<Issue["fix"]>;
@@ -293,7 +294,7 @@ export function listIssues(opts: { includeResolved?: boolean } = {}): Issue[] {
 // found routes/repairs.ts's converted dismiss endpoint needed to declare
 // a 400 response it could never actually produce, just to satisfy a type
 // that claimed a possibility the function's own code never takes.
-export type IssueOpResult<T, S extends number = 400 | 404> = { ok: true; value: T } | { ok: false; status: S; error: string };
+export type IssueOpResult<T, S extends number = 400 | 404> = Result<T, S>;
 
 function getRow(id: string): IssueRow | undefined {
   return db.select().from(issues).where(eq(issues.id, id)).get();

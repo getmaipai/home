@@ -1,5 +1,5 @@
 import { createRoute, z } from "@hono/zod-openapi";
-import { apiRouter, errorResponses } from "@/lib/openapi";
+import { apiRouter, errorResponses, respond } from "@/lib/openapi";
 import { requireAuth } from "@/middleware/auth";
 import { listLibrary, librarySummary, LibraryCursorError } from "@/lib/library";
 import { assertLibraryUploadAllowed, beginLibraryUpload, appendLibraryUpload, finishLibraryUpload, cancelLibraryUpload, UploadError } from "@/lib/libraryUploadStream";
@@ -56,7 +56,7 @@ libraryRoutes.post("/upload", requireAuth, async c => {
     // Legacy single-request uploads retain Bun's default body limit; larger files use sessions.
     await appendLibraryUpload(actor, id, upload.body, 0, MAX_LIBRARY_UPLOAD_BYTES);
     const result = await finishLibraryUpload(actor, id); id = undefined;
-    if (!result.ok) return c.json({ error: result.error }, result.status);
+    if (!result.ok) return respond(c, result);
     return c.json(result.value, 201);
   } catch (error) {
     if (id) await cancelLibraryUpload(c.get("person"), id).catch(() => {});
@@ -88,7 +88,7 @@ libraryRoutes.openapi(createRoute({
   method: "post", path: "/uploads/{id}/finish", tags: ["Library"], summary: "Validate and store a finished upload", middleware: [requireAuth] as const,
   request: { params: uploadParam }, responses: { 201: { description: "The kept Library file, deduplicated by hash.", content: { "application/json": { schema: z.object({ id: z.string(), name: z.string(), kind: z.string(), media_type: z.string(), size_bytes: z.number(), duplicate: z.boolean() }) } } }, ...uploadErrors },
 }), async c => {
-  try { const result = await finishLibraryUpload(c.get("person"), c.req.valid("param").id); if (!result.ok) return c.json({ error: result.error }, result.status); return c.json(result.value, 201); }
+  try { const result = await finishLibraryUpload(c.get("person"), c.req.valid("param").id); if (!result.ok) return respond(c, result); return c.json(result.value, 201); }
   catch (e) { if (e instanceof UploadError) return c.json({ error: e.message }, e.status); throw e; }
 });
 libraryRoutes.openapi(createRoute({

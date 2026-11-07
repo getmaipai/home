@@ -7,7 +7,7 @@ import { answerableFitAsk } from "@/lib/jobs/householdQueue";
 import { phaseLabel } from "@/lib/videos/phaseLabel";
 import { MIX_LEVEL_IDS } from "@/lib/videos/editPlan";
 import { createRoute, z } from "@hono/zod-openapi";
-import { apiRouter, errorResponses } from "@/lib/openapi";
+import { apiRouter, errorResponses, refuseWith } from "@/lib/openapi";
 import { requireAuth, requireRole } from "@/middleware/auth";
 import { speakerAgeBand } from "@/lib/ageBand";
 import { videoAdaptersFor, dropVideoAdapterCache, adapterOfLora } from "@/lib/videos/adapters";
@@ -329,7 +329,7 @@ videosRoutes.openapi(adultMarkRoute, (c) => {
   }
   if (!fileId) return c.json({ error: "That video isn't available any more." }, 404) as never;
   const done = setItemLock({ actor, fileId, action, ticket: ticket ?? null, ticketItem: id, sessionKey: sessionKeyOf(getCookie(c, "session")) });
-  if (!done.ok) return c.json({ error: done.error }, done.status) as never;
+  if (!done.ok) return refuseWith(c, done) as never;
   return c.json({ made_audience: done.made_audience, lock: done.lock }, 200);
 });
 

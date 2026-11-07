@@ -4,7 +4,7 @@
 // lib/media/appHost.ts; this file is the wire.
 import { jsonBody } from "@/lib/validation";
 import { gateMediaApp } from "@/middleware/mediaAppGate";
-import { apiRouter } from "@/lib/openapi";
+import { apiRouter, respond, refuseWith } from "@/lib/openapi";
 import { appRouteAllowed } from "@/lib/apps";
 import { requireAuth } from "@/middleware/auth";
 import { getCookie } from "hono/cookie";
@@ -157,7 +157,7 @@ export function createMediaAppRoutes(appId: MediaAppId) {
       const id = typeof body.id === "string" ? body.id : "";
       const target = typeof body.person_id === "string" ? body.person_id : undefined;
       const result = appId === "videos" ? changeVideoCreationShare(person, op, id, target) : changeMusicCreationShare(person, op, id, target);
-      return result.ok ? c.json(result.value as never, 200) : c.json({ error: result.error }, result.status as 400 | 403 | 404);
+      return respond(c, result);
     });
   }
 
@@ -263,7 +263,7 @@ export function createMediaAppRoutes(appId: MediaAppId) {
     const body = await jsonBody(c);
     const id = typeof body.id === "string" ? body.id : typeof body.media_id === "string" ? body.media_id : "";
     const result = await lookupLyricsFor(person, id);
-    return result.ok ? c.json(result.value as never, 200) : c.json({ error: result.error }, result.status);
+    return respond(c, result);
   });
 
   // MUSIC-GEN-20c: the player's "Lyrics look off" action; the same function as POST /api/music/library/:id/lyrics-realign.
@@ -274,7 +274,7 @@ export function createMediaAppRoutes(appId: MediaAppId) {
     const body = await jsonBody(c);
     const id = typeof body.id === "string" ? body.id : typeof body.media_id === "string" ? body.media_id : "";
     const { result } = requestRealign(person, id);
-    return result.ok ? c.json({ ok: true as const, state: "queued" as const }, 202) : c.json({ error: result.error }, result.status);
+    return result.ok ? c.json({ ok: true as const, state: "queued" as const }, 202) : refuseWith(c, result);
   });
 
   routes.post("/actions/edit", requireAuth, async (c, next) => {
@@ -282,7 +282,7 @@ export function createMediaAppRoutes(appId: MediaAppId) {
     if (appId === "books") return next();
     if (!appRouteAllowed(person, appId, "actions", "edit", undefined, "open")) return next();
     const result = editMediaItem(person, appId, await jsonBody(c));
-    if (!result.ok) return c.json({ error: result.error }, result.status);
+    if (!result.ok) return respond(c, result);
     return c.json((itemViewFor(person, appId, String(result.value.id)) ?? result.value) as never, 200);
   });
 
@@ -293,33 +293,33 @@ export function createMediaAppRoutes(appId: MediaAppId) {
     const form = await c.req.parseBody().catch(() => ({} as Record<string, unknown>));
     const file = form.file;
     const result = await saveMediaCover(person, appId, typeof form.id === "string" ? form.id : "", file instanceof File ? file : null);
-    return result.ok ? c.json(result.value as never, 200) : c.json({ error: result.error }, result.status);
+    return respond(c, result);
   });
 
   routes.post("/progress", requireAuth, async (c, next) => {
     const person = c.get("person");
     const result = saveProgress(person, appId, await jsonBody(c), new Date(), `s:${hashSessionToken(getCookie(c, "session")!)}`);
-    return result.ok ? c.json({ ok: true as const, ...result.value }, 200) : c.json({ error: result.error }, result.status);
+    return result.ok ? c.json({ ok: true as const, ...result.value }, 200) : refuseWith(c, result);
   });
 
   if (appId === "shows") routes.post("/watchlist", requireAuth, async (c, next) => {
     const person = c.get("person");
     const result = setWatchlist(person, await jsonBody(c));
-    return result.ok ? c.json({ ok: true, ...result.value }, 200) : c.json({ error: result.error }, result.status);
+    return result.ok ? c.json({ ok: true, ...result.value }, 200) : refuseWith(c, result);
   });
 
   routes.post("/playlist", requireAuth, async (c, next) => {
     const person = c.get("person");
     if (appId !== "music") return next();
     const result = musicPlaylistAction(person, await jsonBody(c));
-    return result.ok ? c.json({ ok: true as const, ...result.value }, 200) : c.json({ error: result.error }, result.status);
+    return result.ok ? c.json({ ok: true as const, ...result.value }, 200) : refuseWith(c, result);
   });
 
   routes.post("/queue", requireAuth, async (c, next) => {
     const person = c.get("person");
     if (appId !== "music") return next();
     const result = startMusicQueue(person, await jsonBody(c));
-    return result.ok ? c.json(result.value, 200) : c.json({ error: result.error }, result.status);
+    return respond(c, result);
   });
 
   const lists: ReadonlyArray<readonly [string, "watch_later" | "liked" | "queue"]> = appId === "podcasts" ? [["queue", "queue"]] : [["watch-later", "watch_later"], ["like", "liked"]];
@@ -328,7 +328,7 @@ export function createMediaAppRoutes(appId: MediaAppId) {
       const person = c.get("person");
       const body = await jsonBody(c);
       const result = setListed(person, appId, kind, body.media_id, body.on);
-      return result.ok ? c.json({ ok: true as const, ...result.value }, 200) : c.json({ error: result.error }, result.status);
+      return result.ok ? c.json({ ok: true as const, ...result.value }, 200) : refuseWith(c, result);
     });
   }
 

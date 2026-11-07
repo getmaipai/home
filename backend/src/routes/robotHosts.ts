@@ -1,5 +1,5 @@
 import { createRoute, z } from "@hono/zod-openapi";
-import { apiRouter, errorResponses } from "@/lib/openapi";
+import { apiRouter, errorResponses, respond } from "@/lib/openapi";
 import { requireRole } from "@/middleware/auth";
 import { createRobotHost, forgetRobotHost, getRobotHostRecord } from "@/lib/robotHost";
 import { getDeviceById, deleteDevice } from "@/lib/devices";
@@ -54,7 +54,7 @@ robotHostRoutes.openapi(firmwareInstalledRoute, (c) => {
   const { version } = c.req.valid("json");
   if (version !== botReleaseVersion()) return c.json({ error: "Home did not serve that firmware version. Update Home, then try again." }, 400);
   const result = setRobotFirmwareInstalled(deviceId, { version, at: new Date().toISOString() }, c.get("person").id);
-  if (!result.ok) return c.json({ error: result.error }, result.status);
+  if (!result.ok) return respond(c, result);
   return c.json({ recorded: true as const }, 200);
 });
 

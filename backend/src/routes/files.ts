@@ -4,7 +4,7 @@ import { fileThumbnail } from "@/lib/fileThumbnails";
 // lib/attachments.ts hold the rules, this is only the wire, the same
 // split routes/lists.ts already takes over lib/lists.ts.
 import { createRoute, z } from "@hono/zod-openapi";
-import { apiRouter, errorResponses, idParamSchema } from "@/lib/openapi";
+import { apiRouter, errorResponses, idParamSchema, respond } from "@/lib/openapi";
 import { requireAuth } from "@/middleware/auth";
 import { getAttachment, readAttachment } from "@/lib/attachments";
 import { canDeleteInherited, trashFile } from "@/lib/libraryTrash";
@@ -207,7 +207,7 @@ filesRoutes.openapi(createShareRoute, (c) => {
   const { id } = c.req.valid("param");
   const { to } = c.req.valid("json");
   const result = createShare(actor, { fileId: id, to });
-  if (!result.ok) return c.json({ error: result.error }, result.status);
+  if (!result.ok) return respond(c, result);
   return c.json(result.value, 201);
 });
 
@@ -226,7 +226,7 @@ const deleteShareRoute = createRoute({
 sharesRoutes.openapi(deleteShareRoute, (c) => {
   const actor = c.get("person");
   const result = deleteShare(actor, c.req.valid("param").id);
-  if (!result.ok) return c.json({ error: result.error }, result.status);
+  if (!result.ok) return respond(c, result);
   return c.json(result.value, 200);
 });
 
@@ -267,7 +267,7 @@ filesRoutes.openapi(deleteFileRoute, (c) => {
     return c.json({ error: "Only the person who added this file can delete it. You can stop seeing it by asking them to unshare." }, 403);
   }
   const result = trashFile(actor, id);
-  if (!result.ok) return c.json({ error: result.error }, result.status);
+  if (!result.ok) return respond(c, result);
   return c.json(result.value, 200);
 });
 
@@ -285,7 +285,7 @@ const patchFileRoute = createRoute({
 });
 filesRoutes.openapi(patchFileRoute, (c) => {
   const result = updateLibraryFile(c.get("person"), c.req.valid("param").id, c.req.valid("json"));
-  if (!result.ok) return c.json({ error: result.error }, result.status);
+  if (!result.ok) return respond(c, result);
   return c.json(result.value, 200);
 });
 
@@ -298,6 +298,6 @@ filesRoutes.openapi(createRoute({
   },
 }), async c => {
   const result = await recheckFileAudience(c.get("person"), c.req.valid("param").id);
-  if (!result.ok) return c.json({ error: result.error }, result.status);
+  if (!result.ok) return respond(c, result);
   return c.json(result.value, 200);
 });

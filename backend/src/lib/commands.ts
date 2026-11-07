@@ -26,10 +26,9 @@ import { HostError } from "@maipai/spec/emulators/ts/host-emulator.js";
 import { matchPattern } from "@/lib/turnShared";
 import { ROLE_LADDER, type Role } from "@/middleware/auth";
 import type { PersonRow } from "@/types";
+import type { Result } from "@/lib/result";
 
-export type CommandOpResult<T> =
-  | { ok: true; value: T }
-  | { ok: false; status: 400 | 403 | 404; error: string };
+export type CommandOpResult<T> = Result<T, 400 | 403 | 404>;
 
 const ReplyAction = z.object({
   kind: z.literal("reply"),

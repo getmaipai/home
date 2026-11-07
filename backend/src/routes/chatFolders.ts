@@ -1,5 +1,5 @@
 import { createRoute, z } from "@hono/zod-openapi";
-import { apiRouter, errorResponses, idParamSchema } from "@/lib/openapi";
+import { apiRouter, errorResponses, idParamSchema, respond } from "@/lib/openapi";
 import { requireAuth } from "@/middleware/auth";
 import { ChatFolderView, createChatFolder, deleteChatFolder, getChatFolder, listChatFolders, removeFolderShare, setFolderShare, updateChatFolder } from "@/lib/chatFolders";
 
@@ -143,7 +143,7 @@ chatFoldersRoutes.openapi(listRoute, (c) => {
 
 chatFoldersRoutes.openapi(createRouteDef, (c) => {
   const result = createChatFolder(c.get("person"), c.req.valid("json"));
-  if (!result.ok) return c.json({ error: result.error }, result.status as 400 | 403 | 404);
+  if (!result.ok) return respond(c, result);
   return c.json(result.value, 201);
 });
 
@@ -155,26 +155,26 @@ chatFoldersRoutes.openapi(getRoute, (c) => {
 
 chatFoldersRoutes.openapi(patchRoute, (c) => {
   const result = updateChatFolder(c.get("person"), c.req.valid("param").id, c.req.valid("json"));
-  if (!result.ok) return c.json({ error: result.error }, result.status as 400 | 403 | 404);
+  if (!result.ok) return respond(c, result);
   return c.json(result.value, 200);
 });
 
 chatFoldersRoutes.openapi(deleteRoute, (c) => {
   const result = deleteChatFolder(c.get("person"), c.req.valid("param").id);
-  if (!result.ok) return c.json({ error: result.error }, result.status as 403 | 404);
+  if (!result.ok) return respond(c, result);
   return c.json({ ok: true as const, ...result.value }, 200);
 });
 
 chatFoldersRoutes.openapi(putShareRoute, (c) => {
   const { id, person } = c.req.valid("param");
   const result = setFolderShare(c.get("person"), id, person, c.req.valid("json").role);
-  if (!result.ok) return c.json({ error: result.error }, result.status as 400 | 403 | 404);
+  if (!result.ok) return respond(c, result);
   return c.json(result.value, 200);
 });
 
 chatFoldersRoutes.openapi(deleteShareRoute, (c) => {
   const { id, person } = c.req.valid("param");
   const result = removeFolderShare(c.get("person"), id, person);
-  if (!result.ok) return c.json({ error: result.error }, result.status as 403 | 404);
+  if (!result.ok) return respond(c, result);
   return c.json(result.value, 200);
 });

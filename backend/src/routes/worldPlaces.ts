@@ -1,6 +1,6 @@
 import { createRoute, z } from "@hono/zod-openapi";
 import { WorldPlace } from "@maipai/spec/gen/ts/world-place.js";
-import { apiRouter, errorResponses, idParamSchema } from "@/lib/openapi";
+import { apiRouter, errorResponses, idParamSchema, respond } from "@/lib/openapi";
 import { requireAuth } from "@/middleware/auth";
 import { createWorldPlace, deleteWorldPlace, listWorldPlaces, updateWorldPlace } from "@/lib/worldPlaces";
 
@@ -61,7 +61,7 @@ const patch = createRoute({
 });
 worldPlacesRoutes.openapi(patch, (c) => {
   const result = updateWorldPlace(c.get("person"), c.req.valid("param").id, c.req.valid("json"));
-  return result.ok ? c.json(result.value, 200) : c.json({ error: result.error }, result.status);
+  return respond(c, result);
 });
 
 const del = createRoute({

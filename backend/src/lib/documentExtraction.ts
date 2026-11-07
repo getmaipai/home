@@ -14,6 +14,7 @@ import { FileObject as FileRecordSchema } from "@/lib/fileRecordObject";
 import { readAttachment } from "@/lib/attachments";
 import type { PersonRow } from "@/types";
 import { readStreamLimited } from "@/lib/net/readBody";
+import type { Result } from "@/lib/result";
 
 export const MAX_DOCUMENT_BYTES = 50 * 1024 * 1024;
 export const MAX_EXTRACTED_TEXT_BYTES = 2 * 1024 * 1024;
@@ -34,9 +35,7 @@ export interface ExtractedDocument {
   parser: "tika";
 }
 
-export type ExtractionResult =
-  | { ok: true; value: ExtractedDocument }
-  | { ok: false; status: 400 | 403 | 404 | 413 | 500; error: string };
+export type ExtractionResult = Result<ExtractedDocument, 400 | 403 | 404 | 413 | 500>;
 
 type TextRunner = (bytes: Uint8Array, mediaType: string) => Promise<string> | string;
 type OcrRunner = (bytes: Uint8Array, mediaType: string) => Promise<string> | string;

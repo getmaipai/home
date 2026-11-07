@@ -4,7 +4,7 @@
 // is done). MEM-SPACE-13: once setup is done the owner keeps the same routes, for the
 // list under Settings > Performance; anyone else is refused. The work is scripts/studio/host-tune.sh; see lib/hostTune.ts.
 import { createRoute, z } from "@hono/zod-openapi";
-import { apiRouter } from "@/lib/openapi";
+import { apiRouter, respond, refuseWith } from "@/lib/openapi";
 import { getCookie } from "hono/cookie";
 import type { Context } from "hono";
 import { accessRefusal } from "@/routes/setupFolders";
@@ -41,7 +41,7 @@ setupHostTuneRoutes.openapi(getRoute, async (c) => {
   const refusal = hostTuneRefusal(c);
   if (refusal) return refusal as never;
   const result = await detectHostTune();
-  return result.ok ? c.json(result.value, 200) : (c.json({ error: result.error }, result.status) as never);
+  return respond(c, result);
 });
 
 const IdBody = z.object({ id: z.enum(HOST_TUNE_IDS) }).strict();
@@ -57,6 +57,6 @@ for (const [verb, summary] of [["apply", "Make one tuning item the proposed way"
     const refusal = hostTuneRefusal(c);
     if (refusal) return refusal as never;
     const result = await changeHostTune(verb, c.req.valid("json").id);
-    return result.ok ? c.json({ item: result.value }, 200) : (c.json({ error: result.error }, result.status) as never);
+    return result.ok ? c.json({ item: result.value }, 200) : (refuseWith(c, result) as never);
   });
 }

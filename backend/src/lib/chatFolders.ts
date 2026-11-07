@@ -37,6 +37,7 @@ import { nextHlc } from "@/lib/hlc";
 import { newChatFolderId } from "@/lib/id";
 import { evaluateSafety } from "@/lib/safety";
 import type { PersonRow } from "@/types";
+import type { Result } from "@/lib/result";
 
 export type FolderAccess = "manage" | "edit" | "use";
 
@@ -50,7 +51,7 @@ export const ChatFolderView = ChatFolder.extend({
 });
 export type ChatFolderView = z.infer<typeof ChatFolderView>;
 
-export type FolderOpResult<T> = { ok: true; value: T } | { ok: false; status: 400 | 403 | 404; error: string };
+export type FolderOpResult<T> = Result<T, 400 | 403 | 404>;
 
 type ChatFolderRow = typeof chatFolders.$inferSelect;
 type ShareRow = typeof chatFolderShares.$inferSelect;

@@ -6,6 +6,7 @@ import { accessSync, constants, mkdirSync, readdirSync, realpathSync, statfsSync
 import { homedir } from "node:os";
 import { dirname, isAbsolute, join, resolve, sep } from "node:path";
 import { repoRoot } from "./paths";
+import type { Result } from "@/lib/result";
 
 export type FolderRow = { name: string; path: string; writable: boolean };
 export type FolderListing = {
@@ -15,7 +16,7 @@ export type FolderListing = {
   writable: boolean;
   folders: FolderRow[];
 };
-export type FolderResult<T> = { ok: true; value: T } | { ok: false; status: 400 | 403 | 404 | 409; error: string };
+export type FolderResult<T> = Result<T, 400 | 403 | 404 | 409>;
 
 const POSIX_SYSTEM_ROOTS = ["/System", "/proc", "/sys", "/dev", "/etc", "/bin", "/sbin", "/usr", "/boot", "/lib", "/lib64", "/private/etc"];
 const WINDOWS_SYSTEM_ROOTS = ["Windows", "Program Files", "Program Files (x86)", "ProgramData", "$Recycle.Bin", "System Volume Information"];

@@ -13,9 +13,10 @@ import { newFileId } from "@/lib/id";
 import { attachmentsDir, ensureDataDir } from "@/lib/paths";
 import { checkStorageCap } from "@/lib/storage/usage";
 import type { PersonRow } from "@/types";
+import type { Result } from "@/lib/result";
 
 export type FetchedFile = ReturnType<typeof toRecord>;
-export type FetchedFileResult = { ok: true; value: FetchedFile } | { ok: false; status: 400 | 403 | 500; error: string };
+export type FetchedFileResult = Result<FetchedFile, 400 | 403 | 500>;
 interface Metadata { mediaType: string; mediaSourceId: string; note: string }
 export interface FetchedFileInput extends Metadata { bytes: Uint8Array }
 const invalidType = (): FetchedFileResult => ({ ok: false, status: 400, error: "That download is not a file type Home can keep. Try playing it from the show's website." });

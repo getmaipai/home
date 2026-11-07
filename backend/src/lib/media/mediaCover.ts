@@ -8,8 +8,9 @@ import type { PersonRow } from "@/types";
 import { MAX_CHAT_IMAGE_BYTES, CHAT_IMAGE_REFUSAL } from "@/wire";
 import { readableIn, type MediaAppId } from "./appHost";
 import { mediaBandOf } from "./band";
+import type { Result as SharedResult } from "@/lib/result";
 
-type Result = { ok: true; value: { file_id: string; url: string; alt: string } } | { ok: false; status: 400 | 403 | 404; error: string };
+type Result = SharedResult<{ file_id: string; url: string; alt: string }, 400 | 403 | 404>;
 
 export async function saveMediaCover(person: PersonRow, appId: MediaAppId, id: string, file: File | null): Promise<Result> {
   if (!isOwnerOrAdmin(person) && mediaBandOf(person) !== "adult") return { ok: false, status: 403, error: "You can't edit this." };
