@@ -1,10 +1,15 @@
+---
+title: Companions
+description: Pick a companion, make your own, and set how your assistant sounds.
+---
+
 # Companions
 
 A companion is how your assistant sounds. Some are plain and short. Some are cheerful and ask you questions.
 
-Open **Companions** from All apps. Choose **Discover** to browse companions you can add. Choose **Add** on one you like to put it in your list, or **Remove** to take it out.
+Open **Companions** from All apps. The **Yours** tab lists the companions you use. Choose **Discover** to browse companions you can add. Choose **Add** on one you like to put it in your list. To take one out, open the menu on its card and choose **Remove from Yours**. Use **Search companions** to find one by name.
 
-Tessa is the built-in companion for anyone who has not picked one. She is available to children, teens and adults.
+Home comes with these companions: Tessa, MaiPai, Nova, Sprout, Riff, Pal, Rivet, The Tutor and Buddy. Tessa is the one for anyone who has not picked another. She is available to children, teens and adults.
 
 ## Pick one
 
@@ -15,12 +20,11 @@ Each card shows the companion's name, one line about it, and who it is for:
 
 You only see the companions that fit you. A child sees companions for everyone. A teen also sees teen companions. An adult sees all of them.
 
-Tap a card to read more. You will see how it talks, things it might say, and its voice. Press **Play a sample** to hear the voice.
-Press **Set as my default** to use it in your chats.
+Tap a card to open the companion's page. The **About** tab shows how it talks, things it might say, and its voice. Press **Play a sample** to hear the voice. The **Activity** and **Tasks** tabs show what it has been doing for you. Press **Chat with** the companion to start a chat.
+To use it in all your chats, open the menu on its card and choose **Set as my default**.
 
 Open one of your chats and choose the companion in the chat header to use it for that chat. The choice stays with that chat. Type **@** followed by another companion's name to ask that companion one question. The chat's own companion stays the same.
 
-On a companion's page, you can see your chats with it and start a new chat.
 
 ## Make your own
 
@@ -35,7 +39,7 @@ Home saves your work as a draft while you go. If you close the window early, Hom
 
 ## Change a companion
 
-On a companion's card, open the menu and choose **Edit**. It opens on the same three screens, starting from the current picture. Choose **Make a copy** to start from a companion you like.
+On a companion you made, open the menu on its card and choose **Edit**. It opens on the same three screens, starting from the current picture. A companion that comes with Home cannot be changed. Choose **Make a copy** (or **Customize a copy** on its page) and edit the copy. Your own companion can also be set **Back to draft** or **Mark ready** from the same menu, and **Delete** removes it for the whole home.
 
 ## Examples
 
@@ -51,6 +55,7 @@ An owner or admin can turn companions off for a person. Ask one of them to turn 
 
 ## For owners and admins
 
-- The gallery has a **Robots** list. It shows which companion each robot uses. Choose **Companion settings** to change a robot's companion and controls.
+- On a companion you made, the menu has **Audience**, where you choose who can use it. Before it is for everyone, you check each picture and the personality.
+- Robots use companions too. Open the robot under **Settings**, **Apps and devices**, **Devices** to change its companion and controls.
 - A companion's page also lists the people and robots that use it.
 - On a companion's page you can pick the voice that companion uses. Leave it on Home's default voice to follow the voice you chose for Home.

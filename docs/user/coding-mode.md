@@ -5,24 +5,25 @@ description: Use one big model for chat and coding for a while, and what changes
 
 # Max chat
 
-There is no switch to flip. An admin, or an adult an admin gave **Max**, picks Max for a chat or connects a coding app. Home then loads one large model and gives it most of the memory. That one model writes code and also answers chat. When nobody has used it for 30 minutes, Home gives the memory back by itself. Children and teens never hold Max chat.
+Max chat gives one message the strongest answer Home can make. Home loads one large model and gives it most of the computer's memory. That one model writes code and also answers chat. When nobody has used it for a few minutes, Home gives the memory back by itself. There is no household switch to flip.
+
+## Who can use Max
+
+Owners and admins can use Max. An adult can use it when an admin has given them **Max**. Children and teens never use Max chat.
 
 ## Why it exists
 
-A large coding model is smarter on hard tasks, but it is big. It needs about 85 GB of memory. The usual chat model and the other parts need about 36 GB. A 128 GB Mac cannot hold both. Max chat makes room by letting the big model do both jobs.
+A large coding model is smarter on hard tasks, but it is big. The usual chat model and the other parts already fill most of a large Mac. Max chat makes room by letting the big model do both jobs for a short time.
 
 ## What changes while it is on
 
-- Chat is answered by the large model. It may feel different from the usual chat model.
-- Pictures, videos and songs wait. You see a message that big jobs are waiting for Max chat.
-- Voice and search keep working.
-- For children and teens, chat works but without tools such as web search, and without thinking. That keeps their protections the same until the new model has been measured.
-- Home uses about 91 GB of memory instead of 36 GB.
+- The answer comes from the large model. It may feel different from the usual chat model.
+- Pictures, videos and songs wait. You see a line that someone is using Max chat, and your job starts by itself when it is over.
 - Everything you made before stays where it is.
 
 ## What it needs
 
-Coding mode needs a Mac with 128 GB of memory, Apple silicon and macOS 26.4 or later. Home checks eight things before it lets you switch. The row is greyed out until all eight are ready, and it tells you the first one that is not.
+An admin finishes a short checklist once. Open **Settings**, **AI and models**, **Coding**, and find **Max chat checklist**. Each row says **Ready**, **Needs setup** or **Needs a step from you**, and what to do. People cannot pick Max until every row is **Ready**. Home checks eight things.
 
 ### Turn on coding
 
@@ -30,7 +31,7 @@ Coding must be on. Open **Settings**, **AI and models**, **Coding** and turn **C
 
 ### Choose a coding engine
 
-The coding engine must be Splash. Leave **Coding engine** on **Auto** and Home picks Splash on a Mac that can run it.
+Home needs a coding engine. Leave **Coding engine** on **Auto** and Home picks one on a Mac that can run it.
 
 ### Add the model files
 
@@ -38,7 +39,7 @@ Home needs the large model, its helper model and the engine files. Press **Insta
 
 ### Check your computer
 
-Your computer must be a 128 GB Mac with Apple silicon. Other computers can still use normal coding, but not coding mode.
+Max chat needs a Mac with 128 GB of memory and Apple silicon. Other computers can still use normal coding, but not Max chat.
 
 ### Make room in memory
 
@@ -46,11 +47,11 @@ The large model and the parts that stay on must fit in memory. Close big apps an
 
 ### Test the coding model
 
-Press **Run the test**. Home switches to coding mode, asks the model a few questions, then switches back. It takes a few minutes. The test must pass on this computer before you can switch for real, and it must be repeated after an update or after a week.
+Press **Run the test**. Home loads the large model, asks it a few questions, then switches back. It takes a few minutes, and you can leave the page. The test must pass on this computer before anyone can pick Max, and it must be repeated after an update or after a week.
 
 ### Connect a coding app
 
-At least one coding app must be connected, or you chose **Later** in setup. Make a personal key in **Settings**, **Coding**, then follow the lines it shows for OpenCode, Claude Code or Codex CLI. Home cannot install an app on another computer for you.
+At least one coding app must be connected, or you chose **Later** in setup. Make a personal key in **Settings**, **Chat and AI**, **Coding**, then follow the lines it shows for OpenCode, Claude Code or Codex CLI. Home cannot install an app on another computer for you.
 
 ### Check coding speed
 
@@ -58,10 +59,10 @@ Home needs a recorded speed and quality check for the large model on this kind o
 
 ## Start it and stop it
 
-Pick **Max** on a chat, or send a request from a coding app. Chat shows that Home is getting ready. This takes a minute or so. The usual chat model unloads first, then the large model loads and Home tests it.
+In the message box, choose **Max** from the answer style control (the other choices are **Instant** and **Thinking**). A box asks **Use Max for this message?** and says it takes about a minute to start. Choose **Use Max**. The usual chat model unloads first, then the large model loads. If Home needs the test first, an admin sees **Run self-test** and everyone else is told to ask an admin. A coding app can ask for Max too.
 
-It stops by itself 30 minutes after the last answer, and never in the middle of an answer. An admin can keep it for longer: it still stops after 4 hours without use. Anyone who holds it can also give it back at once.
+Max is for one message at a time. Home hands it back about 3 minutes after the last answer, and never in the middle of an answer. An admin can keep it longer: it still stops after 4 hours without use. Choose **Instant** again to give it back at once.
 
 ## If it fails
 
-Home puts everything back the way it was and tells you what went wrong. Chat keeps working on the usual model. Fix the problem named in the checklist and try again.
+Home puts everything back the way it was and says what went wrong. Chat keeps working on the usual model. Fix the problem named in the checklist and try again.

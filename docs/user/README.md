@@ -14,6 +14,8 @@ day the hub arrives; the rest are for when you need them.
 - [Chat and talking to MaiPai](chat.md): how to send a message, use voice input, and manage your conversations.
 - [Talking to Home](voice.md): allow the microphone, pick a voice, and turn natural speech sounds on or off.
 - [Weather](weather.md): ask in chat, open the Weather app, and set your places and units.
+- [Companions](companions.md): pick a companion, make your own, and set your default.
+- [Robots](robots.md): add a StackChan robot and choose how it talks.
 - [Turn Home off and on](maipai-command.md): stop Home to free the computer's memory, start it again, and check it is running.
 - [All apps](all-apps.md): find any app, and choose which ones sit in the left rail.
 - [Media](media.md): open the Videos, Shows and Films, Music, Podcasts and Books apps from one place.
@@ -26,6 +28,12 @@ day the hub arrives; the rest are for when you need them.
 - [Songs](songs.md): ask chat to write and make a song, change it by asking, play it, and choose who can make songs.
 - [Standard, Boost and Max](levels.md): what the levels mean for pictures, video and songs, and who can use each.
 - [Share the computer during big jobs](performance.md): choose whether chat or big jobs get the room, and free up memory.
+- [Max chat](coding-mode.md): use one big model for the strongest answers, and what an admin sets up first.
+- [Coding settings for admins](coding-settings.md): turn local coding on, choose who may use it and manage its parts.
+- [Coding keys](coding-keys.md): make a personal key and connect a coding tool.
+- [Use another computer for the AI](engine-computer.md): pair a second computer to run the AI engines.
+- [Keep copies on this device](keep-on-this-device.md): keep a video, song or audiobook on a device.
+- [Read the offline library](reference.md): open the books saved on your hub and read articles.
 - [Let Home close apps](close-apps.md): pick the apps Home may close when a big job needs room.
 - [Watch videos](watch-videos.md): open the Videos app, play a video from your hub, pick up where you stopped, and save videos for later.
 - [What MaiPai remembers](memory.md): see, export, or forget what MaiPai has remembered from your conversations.
@@ -34,7 +42,10 @@ day the hub arrives; the rest are for when you need them.
 - [Offline data](reference-library.md): choose and manage offline books (Wikipedia, health and more) for your household.
 - [Ease of use](ease-of-use.md): make words bigger, buttons roomier and colors clearer for yourself.
 
+- [Use the Clock app](clock.md): set alarms and timers, add world clocks, and use the stopwatch.
 - [Lists, reminders and alarms](lists-reminders-alarms.md): what to say to add to your shopping list, set a reminder, set an alarm or start a timer.
+- [Control your house from Home](house.md): connect Home Assistant, see rooms and devices, and ask chat to turn lights on or off and lock doors.
+- [Teach MaiPai your own phrase](commands.md): make a command that answers or controls a device.
 - [Notifications](notifications.md): see MaiPai's alerts, and set up Telegram notifications.
 - [Trash](trash.md): bring back or delete for good the files, videos, songs and playlists you deleted.
 - [Set up voice recognition](voice-enrollment.md): record a few samples so MaiPai can tell who is speaking.

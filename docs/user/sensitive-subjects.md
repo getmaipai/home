@@ -24,4 +24,4 @@ If a child says they want to hurt themselves, MaiPai tells them to talk to a gro
 
 ## For teens
 
-A teen's own settings stay private. You choose two household rows in Settings, Privacy: Bodies and Risk. They apply to every teen in the house. No one can set these two for a single teen from the family page.
+A teen's own settings stay private. You choose two household rows in **Settings**, **Privacy and safety**: Bodies and Risk. They apply to every teen in the house. No one can set these two for a single teen from the family page.

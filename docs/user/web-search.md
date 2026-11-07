@@ -7,7 +7,7 @@ description: How to connect MaiPai to your own SearXNG search server, use it awa
 
 ## What web search needs
 
-Web search works with no setup for adults. Home's own small search service reaches DuckDuckGo for them. You can also run your own SearXNG server. It is the main source for teens and children. MaiPai sends your search words to the source you chose. Home's own SearXNG, run by the AI engine, is planned (STACK-SEARCH-01).
+Web search works with no setup for adults. Home's own small search service reaches DuckDuckGo for them. You can also run your own SearXNG server. It is the main source for teens and children. MaiPai sends your search words to the source you chose. Home's own SearXNG, run by the AI engine, is planned.
 
 The model decides when a question needs a search. You do not have to press a button.
 
@@ -34,7 +34,7 @@ The Web tab uses the same sources and the same rules as a chat question. It show
 
 ## Connect MaiPai
 
-1. Open **Settings**, then then **Search**. Only an owner or an admin sees this page.
+1. Open **Settings**, then **Search and web**. Only an owner or an admin sees this page.
 2. Under **Web search**, paste the address into **SearXNG address**, for example `http://192.0.2.10:8888`.
 3. Press **Test**. Home says in plain words whether the address works, with a **Recommended** line and a **Details** list. A warning still counts as working.
 4. Press **Save**. **Save** stays off until the exact text in the box has passed a Test. If you change the address afterward, test it again.
@@ -46,16 +46,16 @@ The line at the top of the Web search block says what web search uses right now,
 
 ## Add DuckDuckGo as a second source (optional)
 
-SearXNG stays your main search. You can also add DuckDuckGo, and MaiPai blends both lists into one. If SearXNG could not be set up during setup, DuckDuckGo is turned on for you, and you can turn it off under **Settings**, **Search**. MaiPai sets up its small search service by itself, which can take a few minutes after install, and only adults use it unless you allow it for teens or children (below). Guests always use SearXNG alone.
+SearXNG stays your main search. You can also add DuckDuckGo, and MaiPai blends both lists into one. If SearXNG could not be set up during setup, DuckDuckGo is turned on for you, and you can turn it off under **Settings**, **Search and web**. MaiPai sets up its small search service by itself, which can take a few minutes after install, and only adults use it unless you allow it for teens or children (below). Guests always use SearXNG alone.
 
 1. Wait for the small search service to finish setting itself up. Until it does, a web question answers "Web search is still being set up on this computer." If it cannot, **Repairs** says why and has a **Try again** button.
-2. Open **Settings**, **Search**, and check that **DuckDuckGo** is on under the address box. The switch appears once the helper runs, and it is on for you when SearXNG is not set up.
+2. Open **Settings**, **Search and web**, and check that **DuckDuckGo** is on under the address box. The switch appears once the helper runs, and it is on for you when SearXNG is not set up.
 
 What it sends: the words searched and your home's internet address go to DuckDuckGo, from the service on your computer. Nothing else anyone in the house said or saved. It asks at a person's pace. If DuckDuckGo pushes back, MaiPai stops asking for an hour or more and answers from your other source meanwhile.
 
 ### Allow DuckDuckGo for teens and children (off by default)
 
-Teens and children use SearXNG alone. An admin can change that. Once DuckDuckGo is running, open **Settings**, **Search**, and set **DuckDuckGo for teens and children** (under **Teens and children**) to **Teens** or **Teens and children**. Only an admin can change it.
+Teens and children use SearXNG alone. An admin can change that. Once DuckDuckGo is running, open **Settings**, **Search and web**, and set **DuckDuckGo for teens and children** (under **Teens and children**) to **Teens** or **Teens and children**. Only an admin can change it.
 
 Read this first. DuckDuckGo's own filter is not guaranteed, and the tool MaiPai uses to reach it often ignores the strict setting MaiPai asks for. Adult results may reach this age group. Leave this off unless you accept that.
 
@@ -80,7 +80,7 @@ Whichever you pick, the search server only answers an address it trusts. Check t
 
 ## Where answers come from: Library only, Library first, Internet first
 
-If you have installed the offline library (articles stored on your own computer), you choose how MaiPai uses it. Open **Settings**, then **Search**, then **Search sources**. There are three choices.
+If you have installed the offline library (articles stored on your own computer), you choose how MaiPai uses it. Open **Settings**, then **Search and web**, then **Search sources**. There are three choices.
 
 - **Library first** (the default). MaiPai checks the library first. If it has an answer, MaiPai uses it and sends nothing out of your house. If it has nothing, MaiPai searches the internet. When the question is about something recent, MaiPai can still ask the internet right away.
 - **Internet first.** MaiPai searches the internet every time and shows the library's article next to the results when it has one.
@@ -94,13 +94,13 @@ If you turned off **Ask Wikipedia when web search fails or finds nothing** in an
 
 ## Choosing which search engines answer
 
-Open **Settings**, then **Search**, then **Web search sources** (an advanced option). SearXNG is picked by default. When you pick more than one source, MaiPai asks them all at once and merges the answers into one list. A page that two sources both find moves to the top, and the same page never appears twice. If one source fails, the others still answer.
+Open **Settings**, then **Search and web**, then **Web search sources** (an advanced option). SearXNG is picked by default. When you pick more than one source, MaiPai asks them all at once and merges the answers into one list. A page that two sources both find moves to the top, and the same page never appears twice. If one source fails, the others still answer.
 
 You must keep at least one source picked. To turn web search off, set **Web searches** to **Library only** instead. DuckDuckGo only answers once its small search service is running (see Add DuckDuckGo as a second source). Children and teens use SearXNG alone unless an admin allows DuckDuckGo for them (see Add DuckDuckGo as a second source).
 
 ## Looking up a word online
 
-**Look up words online** is off until an adult switches it on. Open **Settings**, then **Search**, then **Search sources**.
+**Look up words online** is off until an adult switches it on. Open **Settings**, then **Search and web**, then **Search sources**.
 
 When it is on and an adult asks what one word means, MaiPai checks your offline dictionary first. If the dictionary has no entry for that word, MaiPai asks Wiktionary, an online dictionary. MaiPai only does this for a single word, never for a phrase.
 
@@ -110,9 +110,9 @@ Children and teens never use it. It also stays off when your search sources are 
 
 ## Saved pages and missing pages
 
-MaiPai keeps a saved copy of the web pages it reads, so a page it read in the last week is not fetched again (a news site's page is kept for a day). The copies stay on this computer. Open **Settings**, then **Search**, and use **Search fetch cache limit (GB)** to set how much disk space they may use. When the limit is reached, the pages used least recently go first. Setting it to 0 turns saving off. A temporary chat never saves or reuses a page.
+MaiPai keeps a saved copy of the web pages it reads, so a page it read in the last week is not fetched again (a news site's page is kept for a day). The copies stay on this computer. Open **Settings**, then **Search and web**, and use **Search fetch cache limit (GB)** to set how much disk space they may use. When the limit is reached, the pages used least recently go first. Setting it to 0 turns saving off. A temporary chat never saves or reuses a page.
 
-When a page that a search found has been taken down, MaiPai can show the Internet Archive's Wayback Machine copy instead and says that it is a copy, with its date. This is on by default. Turn it off with **Use archived pages when a source is missing** in **Settings**, then **Search**. Only the address of the missing page goes to the Internet Archive, which sees your home's internet address too. Children never get this, and it stays off when your search sources are set to **Library only**. Teens' copies pass the same safety check as any other page.
+When a page that a search found has been taken down, MaiPai can show the Internet Archive's Wayback Machine copy instead and says that it is a copy, with its date. This is on by default. Turn it off with **Use archived pages when a source is missing** in **Settings**, then **Search and web**. Only the address of the missing page goes to the Internet Archive, which sees your home's internet address too. Children never get this, and it stays off when your search sources are set to **Library only**. Teens' copies pass the same safety check as any other page.
 
 ## Kids and safe search
 
@@ -120,7 +120,7 @@ MaiPai picks the safe search level for each person. It uses strict for kids, mod
 
 ## What an admin sees when search has a problem
 
-An owner or admin can open **Settings**, then **Repairs**. Two search problems can show up there.
+An owner or admin can open **Repairs** (under **Settings**, **Backups, storage and updates**, **Maintenance**). Two search problems can show up there.
 
 - **Web search can't reach your SearXNG instance.** This is an error. The line under it says what went wrong and ends with: "Check the SearXNG address in Settings, Search, Web search."
 - **Web search isn't finding anything.** This is a warning. It means the search server answers, but its search sites are paused or blocked. The line under it says: "SearXNG reports its own search engines are currently suspended (too many requests, or a CAPTCHA) - this usually clears on its own within a while. If it doesn't, check which engines are enabled in SearXNG's own settings." A second version says a test search for "Earth" found nothing, and that SearXNG may be out of date.
@@ -134,7 +134,7 @@ Each problem goes away by itself when search works again. MaiPai also runs a tes
 Go down this list in order.
 
 1. **Is the search server running?** Open its address in a browser on the computer that runs MaiPai. You should see the SearXNG page.
-2. **Is the address right?** Check **SearXNG address** in **Settings**, **Search**, and press **Test**. It needs `http://`, the right number after the colon, and no login page in front.
+2. **Is the address right?** Check **SearXNG address** in **Settings**, **Search and web**, and press **Test**. It needs `http://`, the right number after the colon, and no login page in front.
 3. **Is Home allowed?** Check `pass_ip` in `limiter.toml` and your firewall for the address MaiPai connects from. Restart SearXNG.
 4. **Is JSON on?** Check `formats: [html, json]` in `settings.yml`.
 5. **Is the tailnet up?** If you reach the search server over Tailscale, make sure Tailscale is running on the computer that runs MaiPai.

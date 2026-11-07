@@ -7,13 +7,13 @@ description: Choose which offline books your household can read.
 
 Offline data stores books on your Home computer. People in your household can read those books even when the internet is down.
 
-Only an owner or admin can change the library. Open **Settings** and choose **Offline data** in The home group. The Wikipedia app and the Search and web page link straight to it. Children, teens, and other adults cannot open this page.
+Only an owner or admin can change the library. Open **Settings** and choose **Offline data**. The Wikipedia app and the Search and web page link straight to it. Children, teens, and other adults cannot open this page.
 
 Books are grouped by topic: Encyclopedia, Dictionaries, Health and medicine, Travel and the world, and Books and how-to. Each Wikipedia choice says what you get. Everything with pictures is the biggest. Everything without pictures is smaller. Short introductions only is the smallest.
 
 ## Choose how much to keep
 
-At the top, the **Disk space** bar shows the whole drive: what the offline books use, what everything else uses, and what is free. Under **How much to keep**, choose **Minimum**, **Moderate**, or **Full**. The choice switches every book at once, and the page marks it. Nothing changes yet: Home stages the changes and shows an **Apply** bar at the bottom. It says how much will download, how long that takes, and how much will be freed. If the drive is too full, the message says so and **Apply** stays off.
+At the top, the **Disk space** bar shows the whole drive: what the offline books use, what everything else uses, and what is free. Under **Library size** (**How much to keep**), choose **Minimum**, **Moderate**, or **Full**. The choice switches every book at once, and the page marks it. Nothing changes yet: Home stages the changes and shows an **Apply** bar at the bottom. It says how much will download, how long that takes, and how much will be freed. If the drive is too full, the message says so and **Apply** stays off.
 
 ## Change one book
 

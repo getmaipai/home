@@ -1,3 +1,8 @@
+---
+title: Use another computer for the AI
+description: Pair a second computer to run the AI engines while Home keeps your family settings.
+---
+
 # Use another computer for the AI
 
 MaiPai Home can use a second computer for its AI engines. Home keeps your family settings. The other computer runs the engines.
@@ -17,8 +22,8 @@ MaiPai Home can use a second computer for its AI engines. Home keeps your family
    ```
 
    If asked to install OpenSSH, type `y` and press Enter.
-2. In Home, open **Engines**. Choose **Another computer** and enter the engine computer's name or home network address.
-3. Open **Settings**, then **Devices**. Under **Engine computer link**, select **Pair engine computer**. Copy the one-time code. On the engine computer, run:
+2. In Home, open **Settings**, then **AI and models**, then the **Engines** tab. Under **Where the engine runs**, choose **Another computer** and enter the engine computer's name or home network address.
+3. On the same tab, under **Engine computer link**, select **Pair engine computer**. Copy the one-time code. On the engine computer, run:
 
    ```sh
    sudo maipai-engine pair https://home.example ABCD-EFGH-JKLM
@@ -39,6 +44,6 @@ Check that both computers are on and connected to your home network. Open **Stat
 
 ## Use it away from home
 
-Both computers need to be on your Tailscale network. In **Engines**, open the advanced settings and turn on **Reach the engine computer when away from home**. Use its Tailscale name or address. The setting starts off. Chat and pictures pause if the connection drops and resume when it returns.
+Both computers need to be on your Tailscale network. On the **Engines** tab, open the advanced settings and turn on **Reach the engine computer when away from home**. Use its Tailscale name or address. The setting starts off. Chat and pictures pause if the connection drops and resume when it returns.
 
-To go back, open **Engines** and choose **This computer**. To remove pairing from the engine computer, run `sudo maipai-engine unpair` in its terminal. For more help, open **Settings**, then **Devices**, and select **Revoke link key**.
+To go back, open the **Engines** tab and choose **This computer**. To remove pairing from the engine computer, run `sudo maipai-engine unpair` in its terminal. To remove the link from Home, open the **Engines** tab and select **Revoke link key**.

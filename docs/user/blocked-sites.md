@@ -18,7 +18,7 @@ When MaiPai searches the web, it can check each result against lists of sites th
 
 Only an admin can change these.
 
-1. Open **Settings**, then **Home**, then **Search**.
+1. Open **Settings**, then **Search and web**.
 2. Find the **Blocked sites** card. It has a row for each kind of site (adult, gambling, scam, phishing, malware, drugs) and a column of boxes for **Kids**, **Teens** and **Adults**.
 3. Tick a box to block that kind of site for that group, or clear it to allow it. Each tick saves on its own.
 

@@ -20,7 +20,7 @@ The help box has a different message for each problem:
 - **In use.** Another app has the microphone. Close that app.
 - **Not a secure address.** Browsers only allow the microphone on `localhost` or an `https` address. Open Home from one of those.
 
-If you have more than one microphone, the **Voices** page in Settings shows a **Microphone** choice. It is remembered on this device only. Voice capture works in Safari and Firefox as well as Chrome.
+If you have more than one microphone, the **Voice** tab in Settings shows a **Microphone** choice. It is remembered on this device only. Voice capture works in Safari and Firefox as well as Chrome.
 
 ## Talk to Home
 
@@ -30,7 +30,7 @@ To hear one reply read aloud, tap **Listen** under it. To have every reply read 
 
 ## Choose your voice
 
-Open **Settings**, the **Me** tab, then **Voices**. Choose a voice in the **Voice for you** list and press **Test** to hear it. Press **Stop** to end the sample. Your pick is saved when you choose it. The first choice is **Default voice**, the voice built into the speaking engine Home uses now. Home always lists the voice it is speaking with.
+Open **Settings**, **Voice and robot**, then the **Voice** tab. Choose a voice in the **Voice for you** list and press **Test** to hear it. Press **Stop** to end the sample. Your pick is saved when you choose it. The first choice is **Default voice**, the voice built into the speaking engine Home uses now. Home always lists the voice it is speaking with.
 
 If you saved a voice the current engine does not have (for example a name from the smaller engine), the page says so in one line, for example "Javert is not available with this engine, using the default voice." Home switches you to **Default voice** and speaks with it, so what you hear matches what the page shows.
 
@@ -42,7 +42,7 @@ On a computer with 64 GB of memory or more, like the Mac Studio, Home speaks wit
 
 ## Natural speech sounds
 
-An owner or admin can let spoken replies include a small human touch, like "hmm," or a laugh. Open **Settings**, then then **Engines and AI**, and find **Natural speech sounds**.
+An owner or admin can let spoken replies include a small human touch, like "hmm," or a laugh. Open **Settings**, **AI and models**, then the **Advanced** tab, and find **Natural speech sounds**.
 
 - **Off.** Replies are read exactly as written.
 - **Light.** A rare "hmm," or laugh, at most once per reply. This is the default.
@@ -59,7 +59,7 @@ These sounds only happen in spoken replies, never in the written chat, and never
 - **The conversation button is missing.** Why: speech in or speech out is not installed yet. Fix: wait for the downloads to finish, or look in **Repairs**.
 - **Home answers in text but does not speak.** Why: the voice service is not ready, or it fell back. Fix: wait a minute after a restart. Check **Repairs**. Tap **Listen** under the reply to try again.
 - **"Getting ready, one moment".** Why: the AI is warming up after a start. Fix: wait. Send works again when it is ready.
-- **Your voice is not picked up.** Why: the wrong microphone is chosen. Fix: open **Settings**, **Me**, **Voices** and choose the **Microphone**.
+- **Your voice is not picked up.** Why: the wrong microphone is chosen. Fix: open **Settings**, **Voice and robot**, **Voice** and choose the **Microphone**.
 - **No laughs or sighs.** Why: **Natural speech sounds** is off, the voice is Pocket TTS, or you are a child or teen. Fix: an owner or admin sets it to **Light** or **Natural**. Only Chatterbox can make the sounds. Children and teens never hear them.
 
 See also [Fix a problem](fix-a-problem.md).

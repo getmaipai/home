@@ -1,3 +1,8 @@
+---
+title: Read the offline library
+description: Open the books saved on your Home hub, search them, and read articles.
+---
+
 # Read the offline library
 
 MaiPai's Reference page lets you read books saved on your Home hub.

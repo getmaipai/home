@@ -5,6 +5,8 @@ description: What to say to MaiPai to add to your shopping list, set a reminder,
 
 You can ask MaiPai to keep your shopping list, remind you of things, wake you up and time things. Type it in chat or say it out loud.
 
+You can also work by hand. Open the **Reminders** app to see your lists, **Today** and **Scheduled**. Open the **Clock** app for alarms, timers, world clocks and a stopwatch. See [Use the Clock app](clock.md).
+
 ## What you need to get started
 
 You need to be signed in as yourself. If MaiPai does not know who is talking, it will not set an alarm.

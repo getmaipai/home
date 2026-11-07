@@ -5,7 +5,7 @@ description: Make a personal key and connect a coding tool to your home computer
 
 # Coding keys
 
-Open **Settings**, then **My account**, then **Coding**. An admin must turn Coding on and allow your account before you can make a key.
+Open **Settings**, then **Chat and AI**, then the **Coding** tab. An admin must turn Coding on and allow your account before you can make a key.
 
 ## Make a key
 

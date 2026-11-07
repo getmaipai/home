@@ -5,13 +5,13 @@ description: See what feature lookups send, who can use them, and how to clear s
 
 # What Home looks up for you
 
-Home keeps your conversations here. Some features look up one small thing from a public service. This page lists those feature lookups. It does not list every connection. Open **Settings**, then **Privacy**, or read [Privacy](privacy.md) for the full list.
+Home keeps your conversations here. Some features look up one small thing from a public service. This page lists those feature lookups. It does not list every connection. Open **Settings**, then **Privacy and safety**, or read [Privacy](privacy.md) for the full list.
 
 ## How to see it live
 
-Open **Settings**, then **Privacy**. This page lists the connections Home can make and what each one sends.
+Open **Settings**, then **Privacy and safety**, and choose **What connects to the internet**. This page lists the connections Home can make and what each one sends.
 
-![Settings > Privacy lists connections and what each one sends](../assets/screens/privacy-desktop-light.png)
+![The Privacy page lists connections and what each one sends](../assets/screens/privacy-desktop-light.png)
 
 ## Weather
 
@@ -23,7 +23,7 @@ Open **Settings**, then **Privacy**. This page lists the connections Home can ma
 
 **Who can use it:** Everyone. The package floor is child.
 
-**How to clear what it saved:** Home keeps a saved answer for 30 minutes and may use it for up to one hour. An owner or admin can clear it in **Settings > Storage > Saved online data**. Home does not know how long Open-Meteo keeps its copy. See its own policy.
+**How to clear what it saved:** Home keeps a saved answer for 30 minutes and may use it for up to one hour. An owner or admin can clear it in **Settings > Backups, storage and updates > Storage > Saved online data**. Home does not know how long Open-Meteo keeps its copy. See its own policy.
 
 ## News and news feeds
 
@@ -102,7 +102,7 @@ Open **Settings**, then **Privacy**. This page lists the connections Home can ma
 
 **Who can use it:** Everyone can ask for news. The news and child-feed packages start at child. The household-feed package starts at teen. Children read child feeds. Teens and adults read household feeds. Headlines for children and teens are checked before Home uses them.
 
-**How to clear what it saved:** The live NPR answer stays for 15 minutes; an older answer may be used for up to one hour. An owner or admin can clear that saved answer in **Settings > Storage > Saved online data**. The shelf keeps headlines for the number of days set by **News retention** in Settings. News pictures are kept up to the size set by **News picture storage (MB)**, and a picture nobody has looked at for 14 days is removed. There is no clear button for the shelf. Turning the shelf off stops its use, but does not erase its saved headlines. They drop after the set number of days. See [The news shelf](news-shelf.md) for the retention setting and shelf switch. Home does not know how long feed publishers keep request records. See each publisher's policy.
+**How to clear what it saved:** The live NPR answer stays for 15 minutes; an older answer may be used for up to one hour. An owner or admin can clear that saved answer in **Settings > Backups, storage and updates > Storage > Saved online data**. The shelf keeps headlines for the number of days set by **News retention** in Settings. News pictures are kept up to the size set by **News picture storage (MB)**, and a picture nobody has looked at for 14 days is removed. There is no clear button for the shelf. Turning the shelf off stops its use, but does not erase its saved headlines. They drop after the set number of days. See [The news shelf](news-shelf.md) for the retention setting and shelf switch. Home does not know how long feed publishers keep request records. See each publisher's policy.
 
 ## Sports
 
@@ -114,7 +114,7 @@ Open **Settings**, then **Privacy**. This page lists the connections Home can ma
 
 **Who can use it:** Everyone. The package floor is child.
 
-**How to clear what it saved:** Home keeps the answer for five minutes and may use it for up to 15 minutes. An owner or admin can clear it in **Settings > Storage > Saved online data**. Home does not know how long MLB keeps its copy. See its own policy.
+**How to clear what it saved:** Home keeps the answer for five minutes and may use it for up to 15 minutes. An owner or admin can clear it in **Settings > Backups, storage and updates > Storage > Saved online data**. Home does not know how long MLB keeps its copy. See its own policy.
 
 ## Trivia
 
@@ -150,7 +150,7 @@ Open **Settings**, then **Privacy**. This page lists the connections Home can ma
 
 **Who can use it:** Everyone. The package floor is child.
 
-**How to clear what it saved:** Home keeps the answer for one hour and may use it for up to one day. An owner or admin can clear it in **Settings > Storage > Saved online data**. Home does not know how long Frankfurter keeps request records. See its own policy.
+**How to clear what it saved:** Home keeps the answer for one hour and may use it for up to one day. An owner or admin can clear it in **Settings > Backups, storage and updates > Storage > Saved online data**. Home does not know how long Frankfurter keeps request records. See its own policy.
 
 ## Book lookup
 
@@ -162,7 +162,7 @@ Open **Settings**, then **Privacy**. This page lists the connections Home can ma
 
 **Who can use it:** Teens and adults. The package floor is teen.
 
-**How to clear what it saved:** Home keeps the answer for one day and may use it for one more day. An owner or admin can clear it in **Settings > Storage > Saved online data**. Home does not know how long the Library of Congress keeps request records. See its own policy.
+**How to clear what it saved:** Home keeps the answer for one day and may use it for one more day. An owner or admin can clear it in **Settings > Backups, storage and updates > Storage > Saved online data**. Home does not know how long the Library of Congress keeps request records. See its own policy.
 
 ## Place lookup
 
@@ -174,7 +174,7 @@ Open **Settings**, then **Privacy**. This page lists the connections Home can ma
 
 **Who can use it:** Teens and adults. The package floor is teen.
 
-**How to clear what it saved:** Home keeps the answer for seven days and may use it for seven more days. An owner or admin can clear it in **Settings > Storage > Saved online data**. Home does not know how long OpenStreetMap Nominatim keeps request records. See its own policy.
+**How to clear what it saved:** Home keeps the answer for seven days and may use it for seven more days. An owner or admin can clear it in **Settings > Backups, storage and updates > Storage > Saved online data**. Home does not know how long OpenStreetMap Nominatim keeps request records. See its own policy.
 
 ## Music
 
@@ -186,7 +186,7 @@ Open **Settings**, then **Privacy**. This page lists the connections Home can ma
 
 **Who can use it:** Everyone. The package floor is child.
 
-**How to clear what it saved:** Home keeps the answer for one day and may use it for up to seven days. An owner or admin can clear it in **Settings > Storage > Saved online data**. Home does not know how long MusicBrainz, the Wikimedia Foundation or the Cover Art Archive keeps request records. See its own policy.
+**How to clear what it saved:** Home keeps the answer for one day and may use it for up to seven days. An owner or admin can clear it in **Settings > Backups, storage and updates > Storage > Saved online data**. Home does not know how long MusicBrainz, the Wikimedia Foundation or the Cover Art Archive keeps request records. See its own policy.
 
 ## Film and TV lookup
 
@@ -198,7 +198,7 @@ Open **Settings**, then **Privacy**. This page lists the connections Home can ma
 
 **Who can use it:** Everyone. The package floor is child.
 
-**How to clear what it saved:** Home keeps the answer for one day and may use it for up to seven days. An owner or admin can clear it in **Settings > Storage > Saved online data**. Home does not know how long the Wikimedia Foundation keeps request records. See its own policy.
+**How to clear what it saved:** Home keeps the answer for one day and may use it for up to seven days. An owner or admin can clear it in **Settings > Backups, storage and updates > Storage > Saved online data**. Home does not know how long the Wikimedia Foundation keeps request records. See its own policy.
 
 ## Pictures
 
@@ -222,7 +222,7 @@ Open **Settings**, then **Privacy**. This page lists the connections Home can ma
 
 **Who can use it:** Everyone. The package floor is child.
 
-**How to clear what it saved:** Home keeps the answer for 12 hours and may use it for up to one day. An owner or admin can clear it in **Settings > Storage > Saved online data**. Home does not know how long the Wikimedia Foundation keeps request records. See its own policy.
+**How to clear what it saved:** Home keeps the answer for 12 hours and may use it for up to one day. An owner or admin can clear it in **Settings > Backups, storage and updates > Storage > Saved online data**. Home does not know how long the Wikimedia Foundation keeps request records. See its own policy.
 
 ## Sun and moon
 
@@ -244,15 +244,15 @@ Open **Settings**, then **Privacy**. This page lists the connections Home can ma
 
 **What it sends:** The SearXNG source gets your search words and sends them to its chosen search engines. DuckDuckGo gets the same words and your home's internet address, and nothing else. If an adult has added a Brave key, adult searches also go to Brave. Children and teens do not use Brave. A page site gets a normal request for its page, not your search. Wiktionary gets one word. Wikipedia gets the search words. Wayback gets the missing page's address. These sites also see your home's internet address.
 
-**Who can use it:** Everyone. The package floor is child. Children and teens use SearXNG only, unless an owner or admin turns on **DuckDuckGo for teens and children** in **Settings > Search**. They do not use Wikipedia fallback, Wiktionary or Wayback.
+**Who can use it:** Everyone. The package floor is child. Children and teens use SearXNG only, unless an owner or admin turns on **DuckDuckGo for teens and children** in **Settings > Search and web**. They do not use Wikipedia fallback, Wiktionary or Wayback.
 
-**How to clear what it saved:** Home keeps page copies for up to one week, or one day for a news page. In **Settings > Search**, set **Search fetch cache limit (GB)** to 0 to stop saving pages. Old copies are removed by the daily cleanup. See [Set up web search](web-search.md) for this setting. SearXNG and the other sites set how long they keep their own records. Web search needs no key or account.
+**How to clear what it saved:** Home keeps page copies for up to one week, or one day for a news page. In **Settings > Search and web**, set **Search fetch cache limit (GB)** to 0 to stop saving pages. Old copies are removed by the daily cleanup. See [Set up web search](web-search.md) for this setting. SearXNG and the other sites set how long they keep their own records. Web search needs no key or account.
 
 ## Clearing everything
 
-An owner or admin can open **Settings > Storage** and find **Saved online data**. Choose **Clear <source>** for one source, or **Clear all** for all saved online data. The **Clear all saved online data?** message asks you to confirm. These buttons clear saved copies in this list. They do not clear your chats, memories, the news shelf or saved web pages.
+An owner or admin can open **Settings > Backups, storage and updates > Storage** and find **Saved online data**. Choose **Clear <source>** for one source, or **Clear all** for all saved online data. The **Clear all saved online data?** message asks you to confirm. These buttons clear saved copies in this list. They do not clear your chats, memories, the news shelf or saved web pages.
 
-![Settings > Storage showing the Saved online data section for the seeded demo household](../assets/screens/storage-desktop-light.png)
+![Storage showing the Saved online data section for the seeded demo household](../assets/screens/storage-desktop-light.png)
 
 ## What never happens
 

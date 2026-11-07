@@ -43,7 +43,7 @@ Some answers include small numbered markers such as **[1]** in the reply. Tap a 
 
 ## See what MaiPai can do
 
-Open **Settings**, **Me**, **Chat skills** to see the skills MaiPai has, like the weather, timers and reminders. Each one says **Used in chat** when MaiPai can use it in your chats today. Skills added to your home from the MaiPai Catalog show up under **Added to this home**. Children do not have this section.
+Open **Settings**, **Chat and AI**, then the **Skills** tab to see the skills MaiPai has, like the weather, timers and reminders. Each one says **Used in chat** when MaiPai can use it in your chats today. Skills added to your home from the MaiPai Catalog show up under **Added to this home**. Children do not have this section.
 
 ## Save a draft
 
@@ -71,13 +71,17 @@ You can talk over Home or tap Stop, and it will stop speaking and listen.
 
 ## Wake word (experimental)
 
-Open **Chat status**, then tap **Wake word** to turn on the wake-word listener. Saying the wake word opens a voice conversation. Home stops listening by itself if nobody speaks for a few seconds.
+An adult can turn on the wake-word listener for one device. Open **Settings**, **Voice and robot**, then the **This device** tab, and turn on **Wake word**. The tab shows up once the wake word files are installed. Saying the wake word opens a voice conversation. Home stops listening by itself if nobody speaks for a few seconds.
 
-## Chat options and status
+## Chat options
 
-The message box grows as you type. When your model can switch, choose **Instant** or **Thinking**. Models that always think show the **Thinking** badge instead (see above).
+The message box grows as you type. When your model can switch, choose how it answers: **Instant** for quick answers, **Thinking** for slower answers that are only for you, or **Max** for the strongest answers. Models that always think show the **Thinking** badge instead (see above).
 
-Open **Chat status** to see the Brain, Mouth, Ears and Eyes indicators. Each shows what is ready and what needs attention. Archived chats are available from the chat history.
+**Max** is for adults an admin allowed to use it. It asks **Use Max for this message?** and says it slows everyone down, because Home gives the big model most of the computer. It takes about a minute to start, and Home hands it back soon after the answer. See [Max chat](coding-mode.md).
+
+Type **@** and a companion's name to ask that companion one question. The chat's own companion stays the same.
+
+After some replies, small suggestion buttons offer a next question. Tap one to send it. When MaiPai needs your OK before it acts, or needs a few details from you, a card appears under its reply. Fill it in or choose the button on the card.
 
 ## More on a message
 
@@ -86,7 +90,7 @@ Each of MaiPai's replies has a few small buttons under it:
 - **Copy** the text
 - **Refresh** to get a new answer
 - **Listen**, to have MaiPai read the answer out loud
-- **More**, for extra options like remembering or forgetting that exchange
+- **More**, for extra options like remembering or forgetting that exchange, and **Details** (see below)
 
 ![The "What went wrong?" form that opens under a reply after a thumbs down.](../assets/screens/chat-feedback-reasons-desktop-light.png)
 
@@ -104,23 +108,15 @@ When MaiPai saves something from a reply, the saved fact shows as a small chip u
 
 If MaiPai stops a reply partway because it wasn't safe to finish, one short sentence under the reply says so and what to try instead. If the conversation sounds like someone might be in crisis, MaiPai shows **Support is available** beside the reply instead, with links to call, text or chat with the 988 Suicide & Crisis Lifeline. Nothing is hidden or blocked, and everyone in the household sees the same help.
 
-## Open the details pane
-
-Some replies come from a lookup, like the weather or a word meaning. Under that reply is a **Details** handle. Tap it and the full answer opens beside the chat, with the sources listed. On a phone the pane slides up from the bottom instead.
-
-![The details pane open beside the chat on a desktop window.](../assets/screens/chat-document-pane-desktop-light.png)
-
 ## See the reply stats
 
-Beside the **Chat** title, tap **Details** to turn on the reply stats. Under each of MaiPai's replies, a small line appears with the token counts and the timing, for example how long the first token took and how fast the reply streamed. Tap the line to open the full set of numbers. Tap **Details** again to turn them off.
-
-The setting is off by default, and children do not see the stats at all.
+Open **More** under a reply and choose **Details**. A small line appears with the token counts and the timing, for example how long the first token took and how fast the reply streamed. Tap the line to open the full set of numbers. Choose **Details** again to hide it. Children do not see the stats at all.
 
 ![The stats line under a reply, with its details popover open.](../assets/screens/chat-turn-stats-desktop-light.png)
 
 ## Attach a document or picture
 
-Tap the **+** button next to the message box. The menu opens above the plus, one short row for each choice. Choose a document or a picture from your device, and it appears as a small tile above the box. On a phone, **Take a photo** opens the camera. You can also paste a picture, or drag a file anywhere onto the chat page. Tap the **x** on a tile to take it back out. Type your question, then send. MaiPai reads a document and answers about it.
+Tap the **+** button next to the message box. The menu opens above the plus, one short row for each choice, such as **Add photos and files**, **Take a photo**, **Create image**, **Search the web** and **Start a voice conversation**. Choose a document or a picture from your device, and it appears as a small tile above the box. On a phone, **Take a photo** opens the camera. You can also paste a picture, or drag a file anywhere onto the chat page. Tap the **x** on a tile to take it back out. Type your question, then send. MaiPai reads a document and answers about it.
 
 Pictures you send show as small thumbnails above your message. Tap one to see it full size. On computers with 32 GB of memory or more, the chat model (Muse Glimmer) looks at the picture and answers about what is in it. Big pictures are shrunk to 2000 pixels on the long side first. iPhone photos in the HEIC format work too. On a smaller computer the model cannot see pictures. The **+** menu then says why pictures are off, and MaiPai tells you it can't look at the picture. You can add up to 4 pictures to a message, each up to 10 MB.
 
@@ -154,35 +150,27 @@ Use the chat list beside the conversation to find a chat. Type in **Search chats
 
 Open **More options** beside a chat to rename, pin, archive or delete it. The menu at the top of a chat has the same choices: **Rename**, **Pin** or **Unpin**, **Archive** and **Delete**, then **Read replies aloud** below a line. Deleting asks you to confirm first.
 
-Open **Conversations** from navigation for bulk actions and parental oversight:
+Owners and admins can also view another household member's conversations. This helps with parental oversight.
 
-- Tap one of your chat titles to reopen it.
-- Tap **Rename** to give it a clearer title.
-- Tap **Pin** to keep it in the **Pinned** group. Tap **Unpin** to remove it from that group.
-- Tap **Delete** to remove a chat you don't need.
-- Tap **Select conversations** to choose several at once, or **Clear all** to remove everything.
+## Choose the companion
 
-![The conversations list with its search box and pinned chats.](../assets/screens/conversations-desktop-light.png)
+A companion picker sits in the chat header. Choose a companion and a line says who will answer next. The choice stays with that chat. See [Companions](companions.md).
 
+## Keyboard shortcuts
 
+On a computer, these work in Chat. Cmd is for Mac and Ctrl is for Windows.
 
-Owners and admins can also view another household member's conversations from this page. This helps with parental oversight.
+- **New chat**: Cmd or Ctrl + Shift + O
+- **Focus composer**: Shift + Esc
+- **Stop reply**: Esc
+- **Command palette**: Cmd or Ctrl + K
+- **Toggle sidebar**: Cmd or Ctrl + B
 
-## Research mode
-
-Beside the **Chat** title, tap **Research** to turn on research mode for that conversation. While it is on, MaiPai looks everything up and opens the full answer in the details pane for each reply, so you can see the source. Tap it again to turn research mode off. The setting saves with the conversation, so it is still on when you come back.
-
-![Research mode on, with the details pane open for the reply.](../assets/screens/chat-research-mode-desktop-light.png)
-
-## Choose the model
-
-A model picker sits beside the **Chat** title. It shows the models you can use. The one in use is under the title, so a parent can see it right away. If a model is out of reach, the picker has one fix button. Children see a plain label, not model names.
-
-![The model picker open beside the Chat title.](../assets/screens/chat-model-picker-desktop-light.png)
+Open **Settings**, **Chat and AI**, then the **Keyboard shortcuts** tab to see the same list.
 
 ## Incognito
 
-Turn on **Incognito** before you send a message. An Incognito chat is temporary and is not saved with your regular conversations. It has no saved title, cannot be pinned, and does not keep drafts. When you turn Incognito off, its chats are cleared.
+Turn on **Incognito** from your profile menu before you send a message. An Incognito chat is temporary and is not saved with your regular conversations. It has no saved title, cannot be pinned, and does not keep drafts. When you turn Incognito off, its chats are cleared.
 
 ![A chat in temporary mode with its banner.](../assets/screens/chat-temporary-mode-desktop-light.png)
 

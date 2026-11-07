@@ -5,9 +5,9 @@ description: Add a StackChan and connect it to Home.
 
 # Add a StackChan
 
-An owner or admin can add a StackChan from **Settings**, then **Household**, then **Devices**.
+An owner or admin can add a StackChan from **Settings**, then **Apps and devices**, then the **Devices** tab.
 
-First, turn on **Robots**. Then choose **Add a StackChan**. Use Chrome or Edge on a computer, and open Home at its secure `https` address. Phones and tablets cannot install the robot.
+First, turn on **Robots**. Then choose **Add a robot** and **Add a StackChan**. Use Chrome or Edge on a computer, and open Home at its secure `https` address. Phones and tablets cannot install the robot.
 
 Plug the StackChan into the computer with a USB-C data cable. Choose its port when the browser asks. Home saves a backup of the robot before it changes anything. The backup may include the Wi-Fi password already saved on the robot. Home encrypts the backup as it arrives and keeps it with the robot's files.
 
@@ -21,24 +21,24 @@ If a robot has never come online, an owner or admin can choose **Cancel install*
 
 ## Update a robot's software
 
-When a newer version is ready, open the robot in **Settings, Home, Devices** and choose **Update firmware**. Use Chrome or Edge on a computer, and plug the robot in with a USB-C data cable. Home can save a backup first. When it finishes, unplug the robot and plug it in again.
+When a newer version is ready, open the robot in **Settings**, **Apps and devices**, **Devices** and choose **Update firmware**. Use Chrome or Edge on a computer, and plug the robot in with a USB-C data cable. Home can save a backup first. When it finishes, unplug the robot and plug it in again.
 
 Most improvements come with a Home update. They need no new robot software. Update the firmware only when Home says so.
 
 ## See which software a robot has
 
-Open the robot in **Settings, Home, Devices** and look under **Software**. Home shows the firmware version it last wrote, the version ready to install, and whether an update is ready. It also shows the Bot software running on this computer and whether it needs a restart.
+Open the robot in **Settings**, **Apps and devices**, **Devices** and look under **Software**. Home shows the firmware version it last wrote, the version ready to install, and whether an update is ready. It also shows the Bot software running on this computer and whether it needs a restart.
 
 Home records the firmware version when the robot checks in. It also shows whether the robot is online, when it last checked in, its network address, Wi-Fi signal and battery level. A check-in arrives about once a minute. If the robot is offline, check that it is on and joined to the same Wi-Fi network as the Home computer.
 
 ## A robot's settings
 
-Open the robot from **Settings, Home, Devices**. The **This robot** card holds its name, voice, face color and night mode. It also sets how long the robot listens for a follow-up and how much its camera watches. The **Companion and controls** card sets how it talks and what it may say.
+Open the robot from **Settings**, **Apps and devices**, **Devices**. The **This robot** card holds its name, voice, face color and night mode. It also sets how long the robot listens for a follow-up and how much its camera watches. The **Companion and controls** card sets how it talks and what it may say.
 
 
 ### What the robot's camera remembers
 
-A robot with its camera on can tell you what it sees, such as "a person, three chairs and a tv, and it is bright in here." It keeps only a short list of the kinds of things it saw, with counts, colors and the light. It forgets each kind 90 seconds after it last saw it. It never keeps the picture, and it never writes the list down anywhere, so nobody can read it back later. When you ask it about something, such as a car, it can say the color or a guess at the make. It does not describe people beyond how many there are, and it does not say who anyone is. To let it name things, install the **Look** part under **Settings, Engines and AI, Models and storage** (it is about 4 MB); without it, the robot describes the room in one sentence instead. To change how much it watches, open the robot in **Settings, Home, Devices** and pick **Always watching**, **Only when asked** or **Camera off**.
+A robot with its camera on can tell you what it sees, such as "a person, three chairs and a tv, and it is bright in here." It keeps only a short list of the kinds of things it saw, with counts, colors and the light. It forgets each kind 90 seconds after it last saw it. It never keeps the picture, and it never writes the list down anywhere, so nobody can read it back later. When you ask it about something, such as a car, it can say the color or a guess at the make. It does not describe people beyond how many there are, and it does not say who anyone is. To let it name things, install the **Look** part under **Settings**, **AI and models** (find **Models and storage**) (it is about 4 MB); without it, the robot describes the room in one sentence instead. To change how much it watches, open the robot in **Settings**, **Apps and devices**, **Devices** and change **Robot camera watch level**. It can be off, presence only, or identify.
 ## Choose a robot's companion
 
 An owner or admin picks how a robot talks. Open the robot and look for **Companion and controls**.
@@ -59,6 +59,6 @@ The **Voice** row on the **This robot** card decides how the robot sounds.
 
 A robot set to child or teen can use any voice in the list, including a voice made from a recording. Everything it says still follows the same safety rules for a child or teen.
 
-To rename a voice you made, open **Settings, Voices**, find the voice, and choose **Rename**.
+To rename a voice you made, open **Settings**, **Voice**, **Voices**, find the voice, and choose **Rename**.
 
 For what the robot does, its lights, touch and voice commands, see the StackChan guide in the Bot repository.

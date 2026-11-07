@@ -41,7 +41,7 @@ Each person has their own list and unit. A child sees their own list. In an Inco
 
 The first time an owner or admin opens Home, it asks where home is. Press **Use my location** to let the browser tell Home (this works on `localhost` or an `https` address), or type a city. Home looks it up in a list that is built in, so no outside service learns your city at this step. It asks you to confirm, like "Chicago, Illinois?", and then saves it. A teen or child sees "Ask a grown-up to set the home location". A city and state works. ZIP codes do not work yet.
 
-You can change the home place later in **Settings**, **General**.
+You can change the home place later in **Settings**, **Household and people**, **General**, under **Home location**.
 
 ## What leaves your house
 
@@ -61,5 +61,5 @@ Weather asks one outside service, Open-Meteo, a free public weather service. It 
 
 ## Ask a robot about the weather
 
-A robot does not know who is talking, so it answers with the household's home place, never one person's saved place. Anyone can ask a robot, a child too, and a child gets the same forecast with the spot rounded to about 10 km. If the robot says it does not know where you are, an owner or admin sets the home place in **Settings, Home, General**.
+A robot does not know who is talking, so it answers with the household's home place, never one person's saved place. Anyone can ask a robot, a child too, and a child gets the same forecast with the spot rounded to about 10 km. If the robot says it does not know where you are, an owner or admin sets the home place in **Settings**, **Household and people**, **General**.
 

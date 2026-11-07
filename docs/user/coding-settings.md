@@ -13,9 +13,13 @@ Coding is off when you first set it up. Turn it on to let people use the coding 
 
 The **Stop all coding now** button pauses requests. Keys stay in place. Press **Resume coding** when you are ready.
 
+## Max chat checklist
+
+The **Max chat checklist** on the same page shows what is still needed before anyone can pick **Max** for chat or a coding app. See [Max chat](coding-mode.md).
+
 ## Install the parts
 
-The page lists the coding engine, model and any draft model. Each row shows its size and status. Press **Install** to get a part. Press **Remove** to free its space. Coding must be off before a part can be removed.
+Under **What Coding needs**, the page lists the coding engine, model and any draft model. Each row shows its size and status. Press **Install** to get a part. Press **Remove** to free its space. Coding must be off before a part can be removed.
 
 Home does not install a coding app. Each person chooses a tool and connects it with their own key. See [Coding keys](coding-keys.md).
 
