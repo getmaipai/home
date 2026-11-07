@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, spyOn, test } from "bun:test";
 import { cleanup, fireEvent, render, waitFor } from "@testing-library/react";
 import type { Transcript } from "@maipai/spec/gen/ts/transcript.js";
-import { transcriptApi } from "@/lib/transcriptApi";
+import { transcriptApi, type DetectSpeakersResult } from "@/lib/transcriptApi";
 import type { LibraryItem, Roster } from "@/lib/api";
 import { useTranscriptWorkspace } from "./TranscriptPanel";
 
@@ -236,5 +236,65 @@ describe("Library transcript workspace: words and speakers", () => {
     expect(edit).toHaveBeenCalledWith("tx-1", [{ kind: "replace_text", segment_id: "seg-1", text: "Hi world" }]);
     fireEvent.change(view.getByLabelText("Filter by speaker"), { target: { value: "all" } });
     expect(view.getByText("Goodbye world")).toBeTruthy();
+  });
+});
+
+describe("detect speakers and redo a range", () => {
+  test("Detect speakers is disabled while it runs, then shows the result and refreshes the transcript", async () => {
+    let finish: (value: DetectSpeakersResult) => void = () => {};
+    const detect = stub(spyOn(transcriptApi, "detectSpeakers").mockReturnValue(new Promise<DetectSpeakersResult>((resolve) => (finish = resolve))));
+    const view = await readyView("edit", spoken);
+    fireEvent.click(view.getByRole("button", { name: "Detect speakers" }));
+    await waitFor(() => expect(detect).toHaveBeenCalledWith("tx-1"));
+    expect((view.getByRole("button", { name: "Detect speakers" }) as HTMLButtonElement).disabled).toBe(true);
+    expect(view.getByText("Working…")).toBeTruthy();
+    finish({ transcript: { ...spoken, language: "fr" } as Transcript, diarization: "done", note: null });
+    expect(await view.findByText("Speakers detected. Undo puts the lines back.")).toBeTruthy();
+    expect((view.getByRole("button", { name: "Detect speakers" }) as HTMLButtonElement).disabled).toBe(false);
+  });
+
+  test("when detection is unavailable the Stack's note is shown and the transcript is not replaced", async () => {
+    stub(spyOn(transcriptApi, "detectSpeakers").mockResolvedValue({
+      transcript: record,
+      diarization: "unavailable",
+      note: "Speaker detection needs its models. Install them in Stack and try again.",
+    }));
+    const view = await readyView("edit", spoken);
+    fireEvent.click(view.getByRole("button", { name: "Detect speakers" }));
+    expect(await view.findByText("Speaker detection needs its models. Install them in Stack and try again.")).toBeTruthy();
+    // still the spoken transcript, with its speaker filter
+    expect(view.getByLabelText("Filter by speaker")).toBeTruthy();
+  });
+
+  test("a failed detection says what to do", async () => {
+    stub(spyOn(transcriptApi, "detectSpeakers").mockRejectedValue(new Error("x")));
+    const view = await readyView("edit", spoken);
+    fireEvent.click(view.getByRole("button", { name: "Detect speakers" }));
+    expect(await view.findByText(/Speakers could not be detected\. Check that Home is ready/)).toBeTruthy();
+  });
+
+  test("Redo prefills From and To from the picked line and sends those seconds", async () => {
+    const redo = stub(spyOn(transcriptApi, "regenerateRange").mockResolvedValue(record));
+    const view = await readyView("edit", record, 0);
+    fireEvent.click(view.getByRole("button", { name: "Edit line at 0:03" }));
+    await waitFor(() => expect((view.getByLabelText("From") as HTMLInputElement).value).toBe("0:03"));
+    expect((view.getByLabelText("To") as HTMLInputElement).value).toBe("0:05");
+    fireEvent.change(view.getByLabelText("To"), { target: { value: "0:06.5" } });
+    fireEvent.click(view.getByRole("button", { name: "Redo" }));
+    await waitFor(() => expect(redo).toHaveBeenCalledWith("tx-1", 3, 6.5));
+    expect(await view.findByText("Range redone. Undo puts the lines back.")).toBeTruthy();
+  });
+
+  test("bad times are explained and nothing is sent; a failed redo says what to do", async () => {
+    const redo = stub(spyOn(transcriptApi, "regenerateRange").mockRejectedValue(new Error("x")));
+    const view = await readyView("edit", record);
+    fireEvent.change(view.getByLabelText("From"), { target: { value: "0:09" } });
+    fireEvent.change(view.getByLabelText("To"), { target: { value: "0:04" } });
+    fireEvent.click(view.getByRole("button", { name: "Redo" }));
+    expect(await view.findByText(/Enter the From and To times/)).toBeTruthy();
+    expect(redo).not.toHaveBeenCalled();
+    fireEvent.change(view.getByLabelText("To"), { target: { value: "0:12" } });
+    fireEvent.click(view.getByRole("button", { name: "Redo" }));
+    expect(await view.findByText(/That range could not be redone\. Check the times/)).toBeTruthy();
   });
 });

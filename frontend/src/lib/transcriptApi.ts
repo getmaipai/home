@@ -10,6 +10,13 @@ export type TranscriptOp =
   | { kind: "add_speaker"; speaker_id: string; label: string }
   | { kind: "rename_speaker"; speaker_id: string; label: string };
 
+/** What detect-speakers answers: the transcript, whether detection worked, and the Stack's plain-words note when it did not. */
+export type DetectSpeakersResult = {
+  transcript: Transcript;
+  diarization: "done" | "unavailable";
+  note: string | null;
+};
+
 const JSON_HEADERS = { "content-type": "application/json" };
 
 function post<T>(path: string, body?: unknown): Promise<T> {
@@ -48,6 +55,15 @@ export const transcriptApi = {
   undo: (id: string) => post<Transcript>(`${transcriptPath(id)}/undo`),
   restore: (id: string, revision: number) =>
     post<Transcript>(`${transcriptPath(id)}/restore`, { revision }),
+  /** Label who is speaking on every line. An unavailable result leaves the transcript as it was. */
+  detectSpeakers: (id: string, numSpeakers?: number) =>
+    post<DetectSpeakersResult>(
+      `${transcriptPath(id)}/detect-speakers`,
+      numSpeakers === undefined ? undefined : { num_speakers: numSpeakers },
+    ),
+  /** Redo only the lines between start and end (seconds). */
+  regenerateRange: (id: string, start: number, end: number) =>
+    post<Transcript>(`${transcriptPath(id)}/regenerate-range`, { start, end }),
   import: (item: string, format: ImportFormat, text: string) =>
     post<Transcript>(`${itemPath(item)}/import`, { format, text }),
   exportUrl: (id: string, format: TranscriptFormat) => `${transcriptPath(id)}/export?format=${format}`,

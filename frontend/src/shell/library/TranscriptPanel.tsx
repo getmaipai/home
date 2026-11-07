@@ -16,6 +16,10 @@ const START_FAILED = "The transcript could not be made. Check that Home is ready
 const SAVE_FAILED = "Could not save. Check Home and try again.";
 const IMPORT_FAILED = "That file could not be read. Pick an SRT, VTT or text file and try again.";
 
+const DETECT_FAILED = "Speakers could not be detected. Check that Home is ready, then try again.";
+const REDO_FAILED = "That range could not be redone. Check the times and that Home is ready, then try again.";
+const REDO_BAD_TIMES = "Enter the From and To times as minutes and seconds, like 1:05, with To after From.";
+
 const DOWNLOADS: Array<[TranscriptFormat, string]> = [
   ["srt", "SRT"],
   ["vtt", "VTT"],
@@ -28,6 +32,20 @@ export function timeLabel(seconds: number): string {
   const minutes = Math.floor(seconds / 60);
   const rest = String(Math.floor(seconds % 60)).padStart(2, "0");
   return `${minutes}:${rest}`;
+}
+
+/** Seconds as m:ss, with tenths only when the time has them, so a prefilled range keeps its exact edges. */
+function clockLabel(seconds: number): string {
+  const whole = Math.floor(seconds);
+  const tenths = Math.round((seconds - whole) * 10);
+  return tenths > 0 ? `${timeLabel(whole)}.${tenths}` : timeLabel(whole);
+}
+
+/** "1:05", "1:05.5" or "65" to seconds; null when it is not a time. */
+export function parseClock(text: string): number | null {
+  const match = /^\s*(?:(\d+):)?(\d+(?:\.\d+)?)\s*$/.exec(text);
+  if (!match) return null;
+  return Number(match[1] ?? 0) * 60 + Number(match[2]);
 }
 
 const ALL_SPEAKERS = "all";
@@ -144,6 +162,49 @@ function EditTab({ transcript, lines, currentTime, onSeek, revisions, onChange }
   const [filter, setFilter] = useState(ALL_SPEAKERS);
   const [newName, setNewName] = useState("");
   const [renames, setRenames] = useState<Record<string, string>>({});
+  const [rework, setRework] = useState<{ busy: boolean; message: string }>({ busy: false, message: "" });
+  const [rangeFrom, setRangeFrom] = useState("");
+  const [rangeTo, setRangeTo] = useState("");
+
+  // Picking a line prefills the range to redo with that line's edges.
+  useEffect(() => {
+    const segment = transcript.segments.find((entry) => entry.id === selected);
+    if (!segment) return;
+    setRangeFrom(clockLabel(segment.start));
+    setRangeTo(clockLabel(segment.end));
+  }, [selected, transcript.segments]);
+
+  const runRework = async (run: () => Promise<string>, failure: string) => {
+    setRework({ busy: true, message: "Working…" });
+    try {
+      setRework({ busy: false, message: await run() });
+    } catch {
+      setRework({ busy: false, message: failure });
+    }
+  };
+
+  const detectSpeakers = () =>
+    runRework(async () => {
+      const result = await transcriptApi.detectSpeakers(transcript.id);
+      if (result.diarization === "unavailable") {
+        return result.note ?? DETECT_FAILED;
+      }
+      onChange(result.transcript);
+      return "Speakers detected. Undo puts the lines back.";
+    }, DETECT_FAILED);
+
+  const redoRange = () => {
+    const from = parseClock(rangeFrom);
+    const to = parseClock(rangeTo);
+    if (from === null || to === null || to <= from) {
+      setRework({ busy: false, message: REDO_BAD_TIMES });
+      return Promise.resolve();
+    }
+    return runRework(async () => {
+      onChange(await transcriptApi.regenerateRange(transcript.id, from, to));
+      return "Range redone. Undo puts the lines back.";
+    }, REDO_FAILED);
+  };
 
   // Visible lines keep their segment index, so seeks and edits always hit the right segment.
   const visible = useMemo(
@@ -345,6 +406,24 @@ function EditTab({ transcript, lines, currentTime, onSeek, revisions, onChange }
             Add speaker
           </Button>
         </div>
+      </section>
+      <section aria-label="Redo with the speech engine" className="flex flex-col gap-2">
+        <h3 className="text-sm font-semibold">Redo with the speech engine</h3>
+        <div className="flex flex-wrap gap-2">
+          <Button type="button" variant="secondary" disabled={rework.busy} onClick={() => void detectSpeakers()}>
+            Detect speakers
+          </Button>
+        </div>
+        <div className="flex flex-wrap items-end gap-2">
+          <Input aria-label="From" placeholder="From 0:00" value={rangeFrom} onChange={(event) => setRangeFrom(event.target.value)} />
+          <Input aria-label="To" placeholder="To 0:30" value={rangeTo} onChange={(event) => setRangeTo(event.target.value)} />
+          <Button type="button" variant="secondary" disabled={rework.busy || !rangeFrom.trim() || !rangeTo.trim()} onClick={() => void redoRange()}>
+            Redo
+          </Button>
+        </div>
+        <p role="status" className="text-sm text-muted-foreground">
+          {rework.message}
+        </p>
       </section>
       <div className="flex flex-wrap gap-2">
         <Button type="button" variant="secondary" onClick={() => void change(() => transcriptApi.undo(transcript.id))}>

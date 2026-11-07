@@ -157,3 +157,182 @@ describe("transcript routes", () => {
     expect((await req(`/transcripts/${id}`, child)).status).toBe(403);
   });
 });
+
+// CAPTION-01g: detect speakers and redo one range. The Stack is scripted; nothing reaches a real engine.
+type JobInput = { item_id: string; diarize?: boolean; num_speakers?: number; from_s?: number; to_s?: number };
+type Doc = {
+  id: string;
+  current_revision: number;
+  segments: Array<{ id: string; start: number; end: number; text: string; speaker?: string }>;
+  speakers: Array<{ id: string; label: string }>;
+};
+
+async function importedTranscript(token: string): Promise<Doc> {
+  const made = await req("/library/media-caption01/transcript/import", token, "POST", {
+    format: "srt",
+    text: "1\n00:00:00,000 --> 00:00:04,000\nHello there\n\n2\n00:00:05,000 --> 00:00:09,000\nHi back\n\n3\n00:00:10,000 --> 00:00:14,000\nBye now",
+  });
+  expect(made.status).toBe(201);
+  return await made.json() as Doc;
+}
+
+describe("detect speakers", () => {
+  const jobs: JobInput[] = [];
+  beforeEach(() => { jobs.length = 0; });
+
+  function script(result: Record<string, unknown>) {
+    __setTranscriptStackClientForTests({
+      transcribeJob: async (input) => {
+        jobs.push(input as JobInput);
+        return { language: "en", segments: [], engine: "stack", model_id: "m", ...result } as never;
+      },
+    });
+  }
+
+  test("assigns speakers by time overlap, keeps edited text, and adds ONE revision that undo reverses", async () => {
+    const token = person("person-sage0001", "adult");
+    item("person-sage0001");
+    const doc = await importedTranscript(token);
+    const edited = await req(`/transcripts/${doc.id}`, token, "PATCH", {
+      ops: [{ kind: "replace_text", segment_id: doc.segments[1]!.id, text: "Hi back, corrected" }],
+    });
+    expect(edited.status).toBe(200);
+    const before = await (await req(`/transcripts/${doc.id}`, token)).json() as Doc;
+
+    script({
+      diarization: "done",
+      speakers: [{ id: "spk-1", label: "Speaker 1" }, { id: "spk-2", label: "Speaker 2" }],
+      // Stack lines are cut differently and carry different text: only the speaker may be used.
+      segments: [
+        { id: "s1", start: 0, end: 3, text: "different words", speaker: "spk-1" },
+        { id: "s2", start: 3.5, end: 9.5, text: "other words", speaker: "spk-2" },
+        { id: "s3", start: 10, end: 14, text: "more", speaker: "spk-1" },
+      ],
+    });
+    const response = await req(`/transcripts/${doc.id}/detect-speakers`, token, "POST", { num_speakers: 2 });
+    expect(response.status).toBe(200);
+    const body = await response.json() as { transcript: Doc; diarization: string; note: string | null };
+    expect(body.diarization).toBe("done");
+    expect(jobs[0]).toMatchObject({ diarize: true, num_speakers: 2 });
+    expect(body.transcript.segments.map((s) => s.speaker)).toEqual(["spk-1", "spk-2", "spk-1"]);
+    expect(body.transcript.segments.map((s) => s.text)).toEqual(["Hello there", "Hi back, corrected", "Bye now"]);
+    expect(body.transcript.speakers.map((s) => s.id)).toEqual(["spk-1", "spk-2"]);
+    expect(body.transcript.current_revision).toBe(before.current_revision + 1);
+
+    const revisions = await (await req(`/transcripts/${doc.id}/revisions`, token)).json() as Array<{ reason: string }>;
+    expect(revisions.at(-1)!.reason).toBe("detect speakers");
+
+    const undone = await (await req(`/transcripts/${doc.id}/undo`, token, "POST")).json() as Doc;
+    expect(undone.segments.map((s) => s.speaker)).toEqual([undefined, undefined, undefined]);
+    expect(undone.segments.map((s) => s.text)).toEqual(before.segments.map((s) => s.text));
+  });
+
+  test("keeps a name the person gave a speaker", async () => {
+    const token = person("person-sage0001", "adult");
+    item("person-sage0001");
+    const doc = await importedTranscript(token);
+    await req(`/transcripts/${doc.id}`, token, "PATCH", { ops: [{ kind: "add_speaker", speaker_id: "spk-1", label: "Nova" }] });
+    script({
+      diarization: "done",
+      speakers: [{ id: "spk-1", label: "Speaker 1" }],
+      segments: [{ id: "s1", start: 0, end: 14, text: "x", speaker: "spk-1" }],
+    });
+    const body = await (await req(`/transcripts/${doc.id}/detect-speakers`, token, "POST")).json() as { transcript: Doc };
+    expect(body.transcript.speakers).toEqual([{ id: "spk-1", label: "Nova" }]);
+  });
+
+  test("unavailable leaves the transcript unchanged and returns the Stack's note", async () => {
+    const token = person("person-sage0001", "adult");
+    item("person-sage0001");
+    const doc = await importedTranscript(token);
+    script({ diarization: "unavailable", diarization_note: "Speaker detection needs the speaker models. Install them in Stack and try again." });
+    const response = await req(`/transcripts/${doc.id}/detect-speakers`, token, "POST");
+    expect(response.status).toBe(200);
+    const body = await response.json() as { transcript: Doc; diarization: string; note: string };
+    expect(body.diarization).toBe("unavailable");
+    expect(body.note).toContain("speaker models");
+    expect(body.transcript.current_revision).toBe(doc.current_revision);
+    expect(body.transcript.segments.every((s) => s.speaker === undefined)).toBe(true);
+  });
+
+  test("a Stack failure is a plain 502, a bad count is 400, a child is refused", async () => {
+    const token = person("person-sage0001", "adult");
+    const child = person("person-sprout1", "child");
+    item("person-sage0001", ["person-sage0001", "person-sprout1"]);
+    const doc = await importedTranscript(token);
+    __setTranscriptStackClientForTests({ transcribeJob: async () => { throw new Error("engine down"); } });
+    const failed = await req(`/transcripts/${doc.id}/detect-speakers`, token, "POST");
+    expect(failed.status).toBe(502);
+    expect((await failed.json() as { error: string }).error).toContain("try again");
+    expect((await req(`/transcripts/${doc.id}/detect-speakers`, token, "POST", { num_speakers: 99 })).status).toBe(400);
+    expect((await req(`/transcripts/${doc.id}/detect-speakers`, child, "POST")).status).toBe(403);
+  });
+});
+
+describe("regenerate range", () => {
+  const jobs: unknown[] = [];
+  beforeEach(() => { jobs.length = 0; });
+
+  test("replaces only the lines in the range, on the original timeline, as one revision; corrections elsewhere stay", async () => {
+    const token = person("person-sage0001", "adult");
+    item("person-sage0001");
+    const doc = await importedTranscript(token);
+    await req(`/transcripts/${doc.id}`, token, "PATCH", { ops: [{ kind: "replace_text", segment_id: doc.segments[0]!.id, text: "Hello there, corrected" }] });
+    const before = await (await req(`/transcripts/${doc.id}`, token)).json() as Doc;
+    __setTranscriptStackClientForTests({
+      transcribeJob: async (input) => {
+        jobs.push(input);
+        return { language: "en", engine: "stack", model_id: "m", segments: [
+          { id: "r1", start: 5, end: 7, text: "Hi again" },
+          { id: "r2", start: 7, end: 9.5, text: "friend" },
+        ] };
+      },
+    });
+    const response = await req(`/transcripts/${doc.id}/regenerate-range`, token, "POST", { start: 5, end: 9 });
+    expect(response.status).toBe(200);
+    expect(jobs[0]).toMatchObject({ from_s: 5, to_s: 9 });
+    const after = await response.json() as Doc;
+    expect(after.segments.map((s) => s.text)).toEqual(["Hello there, corrected", "Hi again", "friend", "Bye now"]);
+    // times stay on the original timeline and are clamped to the range
+    expect(after.segments.slice(1, 3).map((s) => [s.start, s.end])).toEqual([[5, 7], [7, 9]]);
+    expect(new Set(after.segments.map((s) => s.id)).size).toBe(4);
+    expect(after.current_revision).toBe(before.current_revision + 1);
+    const revisions = await (await req(`/transcripts/${doc.id}/revisions`, token)).json() as Array<{ reason: string }>;
+    expect(revisions.at(-1)!.reason).toBe("regenerate range");
+    const undone = await (await req(`/transcripts/${doc.id}/undo`, token, "POST")).json() as Doc;
+    expect(undone.segments.map((s) => s.text)).toEqual(before.segments.map((s) => s.text));
+  });
+
+  test("a redone line keeps the speaker of the line it replaced", async () => {
+    const token = person("person-sage0001", "adult");
+    item("person-sage0001");
+    const doc = await importedTranscript(token);
+    await req(`/transcripts/${doc.id}`, token, "PATCH", { ops: [
+      { kind: "add_speaker", speaker_id: "spk-1", label: "Nova" },
+      { kind: "set_speaker", segment_id: doc.segments[1]!.id, speaker: "spk-1" },
+    ] });
+    __setTranscriptStackClientForTests({ transcribeJob: async () => ({ language: "en", segments: [{ id: "r", start: 5, end: 9, text: "Hi" }] }) });
+    const after = await (await req(`/transcripts/${doc.id}/regenerate-range`, token, "POST", { start: 5, end: 9 })).json() as Doc;
+    expect(after.segments[1]).toMatchObject({ text: "Hi", speaker: "spk-1" });
+  });
+
+  test("validation: end before start, past the end, no speech, Stack failure", async () => {
+    const token = person("person-sage0001", "adult");
+    item("person-sage0001");
+    const doc = await importedTranscript(token);
+    const bad = await req(`/transcripts/${doc.id}/regenerate-range`, token, "POST", { start: 9, end: 5 });
+    expect(bad.status).toBe(400);
+    expect((await bad.json() as { error: string }).error).toContain("after the start");
+    expect((await req(`/transcripts/${doc.id}/regenerate-range`, token, "POST", { start: 500, end: 600 })).status).toBe(400);
+    expect(jobs.length).toBe(0);
+
+    __setTranscriptStackClientForTests({ transcribeJob: async () => ({ language: "en", segments: [] }) });
+    const silent = await req(`/transcripts/${doc.id}/regenerate-range`, token, "POST", { start: 5, end: 9 });
+    expect(silent.status).toBe(409);
+    const unchanged = await (await req(`/transcripts/${doc.id}`, token)).json() as Doc;
+    expect(unchanged.current_revision).toBe(doc.current_revision);
+
+    __setTranscriptStackClientForTests({ transcribeJob: async () => { throw new Error("engine down"); } });
+    expect((await req(`/transcripts/${doc.id}/regenerate-range`, token, "POST", { start: 5, end: 9 })).status).toBe(502);
+  });
+});

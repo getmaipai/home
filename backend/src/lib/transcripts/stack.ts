@@ -13,16 +13,24 @@ export type TranscriptJobResult = {
   vocabulary?: string[];
   engine?: string;
   model_id?: string;
+  /** Set only when the job asked to diarize. "unavailable" means no speakers were found; `diarization_note` says why in plain words. */
+  diarization?: "done" | "unavailable";
+  diarization_note?: string;
+};
+
+/** What a transcription job can be asked to do. Range times are seconds on the original timeline. */
+export type TranscriptJobInput = {
+  item_id: string;
+  language?: string;
+  vocabulary?: string[];
+  from_s?: number;
+  to_s?: number;
+  diarize?: boolean;
+  num_speakers?: number;
 };
 
 export type TranscriptStackClient = {
-  transcribeJob(input: {
-    item_id: string;
-    language?: string;
-    vocabulary?: string[];
-    source?: string;
-    source_sha256?: string;
-  }, signal?: AbortSignal): Promise<TranscriptJobResult>;
+  transcribeJob(input: TranscriptJobInput, signal?: AbortSignal): Promise<TranscriptJobResult>;
 };
 
 let scripted: TranscriptStackClient | null = null;
@@ -47,12 +55,10 @@ async function itemBytes(actor: PersonRow, itemId: string): Promise<Uint8Array> 
 
 export async function transcribeJob(
   actor: PersonRow,
-  input: { item_id: string; language?: string; vocabulary?: string[] },
+  input: TranscriptJobInput,
   signal?: AbortSignal,
 ): Promise<TranscriptJobResult> {
-  if (scripted) {
-    return scripted.transcribeJob({ item_id: input.item_id, language: input.language, vocabulary: input.vocabulary }, signal);
-  }
+  if (scripted) return scripted.transcribeJob(input, signal);
   const bytes = await itemBytes(actor, input.item_id);
   const source = Buffer.from(bytes).toString("base64");
   const source_sha256 = createHash("sha256").update(bytes).digest("hex");
@@ -66,18 +72,25 @@ export async function transcribeJob(
     source_sha256,
     ...(input.language ? { language: input.language } : {}),
     ...(input.vocabulary ? { vocabulary: input.vocabulary } : {}),
+    ...(input.from_s !== undefined && input.to_s !== undefined ? { from_s: input.from_s, to_s: input.to_s } : {}),
+    ...(input.diarize ? { diarize: true, ...(input.num_speakers ? { num_speakers: input.num_speakers } : {}) } : {}),
   }, { signal });
   if (!response.data.data) {
     throw new Error("Transcription is still running. Check the job status and try again when it finishes.");
   }
 
+  const data = response.data.data;
   return {
-    language: response.data.data.language,
-    segments: response.data.data.segments.map((segment, index) => ({
+    language: data.language,
+    ...(data.speakers ? { speakers: data.speakers } : {}),
+    ...(data.diarization ? { diarization: data.diarization } : {}),
+    ...(data.diarization_note ? { diarization_note: data.diarization_note } : {}),
+    segments: data.segments.map((segment, index) => ({
       id: `segment-${index + 1}`,
       start: segment.start,
       end: segment.end,
       text: segment.text,
+      ...(segment.speaker ? { speaker: segment.speaker } : {}),
       ...(segment.words?.length ? { words: segment.words } : {}),
     })),
     engine: response.identity.host,

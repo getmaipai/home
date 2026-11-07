@@ -224,7 +224,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `frontend/src/shell/library/LibraryTrash.tsx` | LibraryTrash |
 | `frontend/src/shell/library/LibraryUploads.tsx` | useLibraryUploads, UploadTray |
 | `frontend/src/shell/library/LibraryViewer.tsx` | viewerItemOf, LibraryViewer |
-| `frontend/src/shell/library/TranscriptPanel.tsx` | timeLabel, useTranscriptWorkspace |
+| `frontend/src/shell/library/TranscriptPanel.tsx` | timeLabel, parseClock, useTranscriptWorkspace |
 | `frontend/src/shell/media/AudioVisualizer.tsx` | VISUALIZERS, getVisualizerPref, setVisualizerPref, getVisualizerEnabled, setVisualizerEnabled, useVisualizerEnabled |
 | `frontend/src/shell/media/MinimizeButton.tsx` | MinimizeButton |
 | `frontend/src/shell/media/MusicVisualizerSection.tsx` | MusicVisualizerSection |
@@ -1021,6 +1021,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/transcripts/import.ts` | importTranscript |
 | `backend/src/lib/transcripts/parse.ts` | parseTranscriptDocument |
 | `backend/src/lib/transcripts/revisions.ts` | applyOps, undo, restoreRevision, __resetAutosavesForTests |
+| `backend/src/lib/transcripts/rework.ts` | NO_SPEECH_IN_RANGE, RANGE_PAST_END, RANGE_ORDER, speakerByOverlap, detectSpeakers, regenerateRange |
 | `backend/src/lib/transcripts/stack.ts` | __setTranscriptStackClientForTests, transcribeJob |
 | `backend/src/lib/transcripts/store.ts` | TranscriptError, CHILD_TRANSCRIPT_ERROR, canSeeItem, getTranscript, transcriptRowForItem, listTranscriptsForItem |
 | `backend/src/lib/transcripts/writers.ts` | writeSrt, writeVtt, writeText, writeMarkdown, writeJson |
