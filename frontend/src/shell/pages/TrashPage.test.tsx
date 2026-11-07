@@ -62,3 +62,14 @@ test("a failed action shows what to do and keeps the item", async () => {
   await waitFor(() => expect(view.getByRole("alert").textContent).toContain("Refresh Trash and try again."));
   expect(view.getByText("nova")).toBeTruthy();
 });
+
+// AUDIT-DUP-FE-01: the list's loading and failure lines are the kit AsyncState's, and Try again asks the hub again.
+test("a Trash list that fails to load says so and Try again loads it", async () => {
+  let ok = false;
+  globalThis.fetch = (async () => (ok ? Response.json({ rows: [row] }) : Response.json({ error: "Nothing answered." }, { status: 500 }))) as unknown as typeof fetch;
+  const view = renderPage();
+  await waitFor(() => expect(view.getByText("Home could not load Trash. Try again.")).toBeTruthy());
+  ok = true;
+  fireEvent.click(view.getByRole("button", { name: "Try again" }));
+  await waitFor(() => expect(view.getByText("nova")).toBeTruthy());
+});

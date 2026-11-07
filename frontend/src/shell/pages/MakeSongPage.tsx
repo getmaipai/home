@@ -13,6 +13,7 @@ import { Label } from "@maipai/ui/src/ui/label";
 import { Switch } from "@maipai/ui/src/ui/switch";
 import { Textarea } from "@maipai/ui/src/ui/textarea";
 import { ToggleGroup, ToggleGroupItem } from "@maipai/ui/src/ui/toggle-group";
+import { AsyncState } from "@maipai/ui/src/primitives/AsyncState";
 import { Chip } from "@maipai/ui/src/primitives/Chip";
 import { EmptyState } from "@maipai/ui/src/primitives/EmptyState";
 import { useToast } from "@maipai/ui/src/primitives/Toast";
@@ -58,7 +59,7 @@ export function Field({ id, label, hint, children }: { id?: string; label: strin
 
 export function Shelf({ label, hint, picks, value, onChange, empty }: { label: string; hint: string; picks: Pick[]; value: string | null; onChange: (id: string | null) => void; empty?: React.ReactNode }) {
   return <Field label={label} hint={hint}>
-    {picks.length === 0 ? <p className="text-muted-foreground text-sm">{empty}</p>
+    {picks.length === 0 ? <div className="text-muted-foreground text-sm">{empty}</div>
       : <div className="flex flex-wrap gap-2" role="group" aria-label={label}>
         {picks.map((pick) => <Chip key={pick.id} selected={value === pick.id} onClick={() => onChange(value === pick.id ? null : pick.id)}>{pick.name}</Chip>)}
       </div>}
@@ -154,9 +155,9 @@ export function Maker({ search, simple = false, onMade }: { search: string; simp
         <Textarea id="song-lyrics" rows={6} maxLength={4000} value={lyrics} onChange={(event) => setLyrics(event.currentTarget.value)} />
       </Field>}
       <Shelf label="Song style (optional)" hint="A saved sound to start from. Pick it again to clear it." picks={stylePicks} value={styleId} onChange={setStyleId}
-        empty={styles.isPending ? "Loading styles" : styles.isError ? "Styles could not be loaded. Open this page again." : <>No styles yet. <Link className="text-foreground underline underline-offset-4" to="/apps/music/make-style">Make a song style</Link></>} />
+        empty={<AsyncState data={styles.data} error={styles.isError} isFetching={styles.isFetching} onRetry={() => void styles.refetch()} errorMessage="Styles could not be loaded. Open this page again." loadingLabel="Loading styles">{() => <>No styles yet. <Link className="text-foreground underline underline-offset-4" to="/apps/music/make-style">Make a song style</Link></>}</AsyncState>} />
       <Shelf label="In a band's sound (optional)" hint="Makes the song sound like one of the bands you made." picks={bandPicks} value={bandId} onChange={setBandId}
-        empty={bands.isPending ? "Loading bands" : bands.isError ? "Bands could not be loaded. Open this page again." : <>No bands yet. <Link className="text-foreground underline underline-offset-4" to="/apps/music/make-band">Make a band</Link></>} />
+        empty={<AsyncState data={bands.data} error={bands.isError} isFetching={bands.isFetching} onRetry={() => void bands.refetch()} errorMessage="Bands could not be loaded. Open this page again." loadingLabel="Loading bands">{() => <>No bands yet. <Link className="text-foreground underline underline-offset-4" to="/apps/music/make-band">Make a band</Link></>}</AsyncState>} />
       <Field id="song-title" label="Title (optional)"><Input id="song-title" maxLength={200} value={title} onChange={(event) => setTitle(event.currentTarget.value)} placeholder="Home picks one if you leave this empty" /></Field>
       <div className="grid gap-4 sm:grid-cols-3">
         <Field label="Length" hint={limits ? `Up to ${Math.floor(limits.max_seconds / 60)} minutes on this computer.` : undefined}>

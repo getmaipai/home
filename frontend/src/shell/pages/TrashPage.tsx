@@ -10,6 +10,7 @@ import { Button } from "@maipai/ui/src/dashboard/components/ui/button";
 import { Alert, AlertDescription } from "@maipai/ui/src/dashboard/components/ui/alert";
 import { Empty, EmptyDescription, EmptyHeader } from "@maipai/ui/src/dashboard/components/ui/empty";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@maipai/ui/src/dashboard/components/ui/alert-dialog";
+import { AsyncState } from "@maipai/ui/src/primitives/AsyncState";
 import { request, type Roster } from "@/lib/api";
 import { baseViewer } from "@/shell/pages/settings/settingsViewer";
 import { useTabItem } from "@/shell/tabIdentity";
@@ -51,11 +52,11 @@ export function TrashPage({ person }: { person: Roster }) {
       searchQuery={search} onSearchChange={setSearch} onBack={() => navigate("/storage")}
       backLink={<Button variant="link" nativeButton={false} render={<Link to="/storage" />}>Storage</Button>}>
       {error ? <Alert variant="destructive"><AlertDescription>{error}</AlertDescription><Button onClick={() => void query.refetch()}>Refresh Trash</Button></Alert> : null}
-      {query.isError ? <Alert variant="destructive"><AlertDescription>Home could not load Trash. Try again.</AlertDescription><Button onClick={() => void query.refetch()}>Try again</Button></Alert> : query.isPending ? <p>Loading Trash</p> : rows.length === 0 ? <Empty><EmptyHeader><EmptyDescription>{search ? "No items match your search." : "Trash is empty. Things you delete stay here for 30 days."}</EmptyDescription></EmptyHeader></Empty> :
+      <AsyncState data={query.data} error={query.isError} isFetching={query.isFetching} onRetry={() => void query.refetch()} errorMessage="Home could not load Trash. Try again." loadingLabel="Loading Trash">{() => rows.length === 0 ? <Empty><EmptyHeader><EmptyDescription>{search ? "No items match your search." : "Trash is empty. Things you delete stay here for 30 days."}</EmptyDescription></EmptyHeader></Empty> :
         <ItemGroup>{rows.map((row) => <Item key={`${row.kind}:${row.id}`}>
           <ItemContent><ItemTitle>{row.title}</ItemTitle><ItemDescription>{row.trash_until ? `Kept until ${new Date(row.trash_until).toLocaleDateString()}` : "Waiting for removal"}</ItemDescription></ItemContent>
           <ItemActions><Button disabled={busy || !row.can_restore} onClick={() => void act(row, true)}>Restore</Button><Button variant="destructive" disabled={busy || !row.can_purge} onClick={() => setPending(row)}>Delete forever</Button></ItemActions>
-        </Item>)}</ItemGroup>}
+        </Item>)}</ItemGroup>}</AsyncState>
     </SettingsShell>
     {pending ? <AlertDialog open onOpenChange={(open) => { if (!open && !busy) setPending(null); }}>
       <AlertDialogContent><AlertDialogHeader><AlertDialogTitle>Delete forever?</AlertDialogTitle><AlertDialogDescription>This removes the item from Home for good. You cannot undo this.</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel disabled={busy}>Cancel</AlertDialogCancel><AlertDialogAction variant="destructive" disabled={busy} onClick={() => { if (pending) void act(pending, false); }}>Delete forever</AlertDialogAction></AlertDialogFooter></AlertDialogContent>

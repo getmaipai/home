@@ -16,6 +16,7 @@ import { Switch } from "@maipai/ui/src/ui/switch";
 import { ToggleGroup, ToggleGroupItem } from "@maipai/ui/src/ui/toggle-group";
 import { Chip } from "@maipai/ui/src/primitives/Chip";
 import { DestructiveConfirm } from "@maipai/ui/src/primitives/DestructiveConfirm";
+import { AsyncState } from "@maipai/ui/src/primitives/AsyncState";
 import { EmptyState } from "@maipai/ui/src/primitives/EmptyState";
 import { useToast } from "@maipai/ui/src/primitives/Toast";
 import { SongResult, MAKE_SONG_ADULT_LINE, NO_MUSIC_ENGINE_LINE, makeSongBody, Field } from "./MakeSongPage";
@@ -117,10 +118,10 @@ export function SongGallery({ selected, onOpen, actionsFor = TILE_ACTIONS, empty
   const { list, shown } = useShown(filter);
   return <div className="flex min-h-0 flex-col gap-4" data-testid="music-song-list">
     <div className="max-w-sm"><Input type="search" aria-label="Search your songs" placeholder="Search your songs" value={filter} onChange={(event) => setFilter(event.currentTarget.value)} /></div>
-    {list.isPending ? <p role="status" className="text-muted-foreground text-sm">Loading your songs</p>
-      : list.isError ? <p role="alert" className="text-muted-foreground text-sm">Your songs could not be loaded. Check your connection and open this page again.</p>
-        : shown.length === 0 ? <EmptyState icon="music" text={filter.trim() ? "No song matches that." : (empty ?? "No songs yet. Describe one in the bar below and press Create.")} />
-          : <ul className="flex list-none flex-wrap gap-4 p-0" aria-label="Your songs">{shown.map((card) => songTile({ card, selected: card.id === selected, onOpen: () => onOpen(card), actions: actionsFor(card) }))}</ul>}
+    <AsyncState data={list.data} error={list.isError} isFetching={list.isFetching} onRetry={() => void list.refetch()} errorMessage="Your songs could not be loaded. Check your connection and open this page again." loadingLabel="Loading your songs">
+      {() => shown.length === 0 ? <EmptyState icon="music" text={filter.trim() ? "No song matches that." : (empty ?? "No songs yet. Describe one in the bar below and press Create.")} />
+        : <ul className="flex list-none flex-wrap gap-4 p-0" aria-label="Your songs">{shown.map((card) => songTile({ card, selected: card.id === selected, onOpen: () => onOpen(card), actions: actionsFor(card) }))}</ul>}
+    </AsyncState>
   </div>;
 }
 
@@ -275,10 +276,12 @@ export function MusicWorkspace({ adult, search }: { adult: boolean; search: stri
       <div className="flex flex-col gap-1"><h2 className="text-2xl font-black tracking-wide uppercase">Your songs</h2><p className="text-muted-foreground text-sm">Open one to play it and see everything you can do.</p></div>
       {shown.some(card => !card.sound) ? <ul className="flex list-none flex-wrap gap-x-4 gap-y-6 p-0" aria-label="Your songs">
         {shown.filter(card => !card.sound).map((card) => songTile({ card, selected: card.id === song, onOpen: () => open(card.id), actions: TILE_ACTIONS(card) }))}
-      </ul> : <p className="text-muted-foreground bg-card rounded-2xl p-6 text-sm" data-testid="music-songs-empty">{list.isPending ? "Loading your songs." : list.isError ? "Your songs could not be loaded. Check your connection and open this page again." : "No songs yet. Describe one in the bar above and press Generate. It shows up here."}</p>}
+      </ul> : <AsyncState data={list.data} error={list.isError} isFetching={list.isFetching} onRetry={() => void list.refetch()} errorMessage="Your songs could not be loaded. Check your connection and open this page again." loadingLabel="Loading your songs">
+        {() => <p className="text-muted-foreground bg-card rounded-2xl p-6 text-sm" data-testid="music-songs-empty">No songs yet. Describe one in the bar above and press Generate. It shows up here.</p>}
+      </AsyncState>}
     </div>
     <MediaCarousel title="Your sounds" line="Sounds you have saved." label="Your sounds">
-      {sounds.isPending || sounds.isError ? <li className="text-muted-foreground text-base">{sounds.isPending ? "Loading your sounds" : "Your sounds could not be loaded."}</li> : sounds.data.length === 0 ? <li className="text-muted-foreground text-base" data-testid="music-sounds-empty">No sounds yet. Describe one in the bar above and press Generate.</li> : sounds.data.map(sound => <MediaTile key={sound.id} id={sound.id} title={sound.title} line={`${sound.duration_s}s${sound.loop ? " · Loop" : ""}`} coverUrl={null} playable onOpen={() => { const audio = new Audio(sound.src); audio.loop = sound.loop; void audio.play(); }} />)}
+      {!sounds.data ? <li className="text-muted-foreground text-base"><AsyncState data={sounds.data} error={sounds.isError} isFetching={sounds.isFetching} onRetry={() => void sounds.refetch()} errorMessage="Your sounds could not be loaded." loadingLabel="Loading your sounds">{() => null}</AsyncState></li> : sounds.data.length === 0 ? <li className="text-muted-foreground text-base" data-testid="music-sounds-empty">No sounds yet. Describe one in the bar above and press Generate.</li> : sounds.data.map(sound => <MediaTile key={sound.id} id={sound.id} title={sound.title} line={`${sound.duration_s}s${sound.loop ? " · Loop" : ""}`} coverUrl={null} playable onOpen={() => { const audio = new Audio(sound.src); audio.loop = sound.loop; void audio.play(); }} />)}
     </MediaCarousel>
     <MediaCarousel title="Start from a sound" line="Pick one and it goes into the bar above." label="Starter sounds">
       {STARTER_STYLES.map((name) => <MediaTile key={name} id={name} title={name} coverUrl={null} verb={styles.includes(name) ? "Remove" : "Use"} selected={styles.includes(name)} onOpen={() => pickSound(name)} />)}

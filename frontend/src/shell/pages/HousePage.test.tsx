@@ -69,3 +69,14 @@ test("unavailable entities render disabled controls", async () => {
   const toggle = await view.findByRole("switch", { name: "Kitchen light" });
   expect(toggle).toBeDisabled();
 });
+
+// AUDIT-DUP-FE-01: rooms that fail to load show the kit AsyncState's error with a Try again that asks again.
+test("rooms that fail to load say so and Try again loads them", async () => {
+  let ok = false;
+  globalThis.fetch = (async () => (ok ? Response.json({ rooms: [room] }) : Response.json({ error: "Nothing answered." }, { status: 500 }))) as unknown as typeof fetch;
+  const view = renderWithQueryClient(<HousePage />);
+  expect(await view.findByText("Home could not load rooms. Try again.")).toBeTruthy();
+  ok = true;
+  fireEvent.click(view.getByRole("button", { name: "Try again" }));
+  expect(await view.findByRole("switch", { name: "Kitchen light" })).toBeTruthy();
+});

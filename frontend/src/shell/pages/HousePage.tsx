@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Page } from "@maipai/ui/src/primitives/Page";
 import { EmptyState } from "@maipai/ui/src/primitives/EmptyState";
+import { AsyncState } from "@maipai/ui/src/primitives/AsyncState";
 import { LightTile } from "@maipai/ui/src/elements/light-tile";
 import { SwitchTile } from "@maipai/ui/src/elements/switch-tile";
 import { SceneTile } from "@maipai/ui/src/elements/scene-tile";
@@ -41,7 +42,7 @@ export function HousePage() {
   }
   const body = query.data;
   return <Page title="House" hideTitle><main className="p-4">
-    {query.isPending ? <p role="status">Loading rooms…</p> : query.isError ? <p role="status">Home could not load rooms. Try again.</p> : body?.status === "not_configured" ? <EmptyState icon="house" text="Home Assistant is not set up yet. Connect it in Settings to control your lights, locks and scenes here." actionLabel="Open Settings" onAction={() => { window.location.href = "/settings"; }} /> : body?.status === "unreachable" ? <p>Home Assistant did not answer. Check that it is on, then reload.</p> : !body?.rooms.length ? <p>No devices are shared with you yet.</p> : <div className="space-y-6">{body.rooms.map((room) => {
+    {!body ? <AsyncState data={body} error={query.isError} isFetching={query.isFetching} onRetry={() => void query.refetch()} errorMessage="Home could not load rooms. Try again." loadingLabel="Loading rooms">{() => null}</AsyncState> : body.status === "not_configured" ? <EmptyState icon="house" text="Home Assistant is not set up yet. Connect it in Settings to control your lights, locks and scenes here." actionLabel="Open Settings" onAction={() => { window.location.href = "/settings"; }} /> : body?.status === "unreachable" ? <p>Home Assistant did not answer. Check that it is on, then reload.</p> : !body?.rooms.length ? <p>No devices are shared with you yet.</p> : <div className="space-y-6">{body.rooms.map((room) => {
       const active = room.entities.filter((entity) => entity.on).length;
       return <section key={room.id} aria-labelledby={`room-${room.id}`}>
         <header className="mb-3"><h2 id={`room-${room.id}`} className="text-lg font-semibold">{room.name}</h2><p className="text-sm text-muted-foreground">{active} of {room.entities.length} on</p></header>

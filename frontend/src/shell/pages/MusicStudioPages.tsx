@@ -10,6 +10,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Album, type AlbumPatch } from "@maipai/ui/src/elements/album";
 import { Band, type BandPatch } from "@maipai/ui/src/elements/band";
 import { SongStyleCard, type SongStylePatch } from "@maipai/ui/src/elements/song-style";
+import { AsyncState } from "@maipai/ui/src/primitives/AsyncState";
 import { DestructiveConfirm } from "@maipai/ui/src/primitives/DestructiveConfirm";
 import { EmptyState } from "@maipai/ui/src/primitives/EmptyState";
 import { useToast } from "@maipai/ui/src/primitives/Toast";
@@ -132,9 +133,10 @@ function Shelf({ kind, title, makeTo, adult }: { kind: Kind; title: string; make
       <h3 className="text-lg font-semibold">{title}</h3>
       {adult ? <Link to={makeTo} className="text-muted-foreground hover:text-foreground text-sm underline underline-offset-4">Make one</Link> : null}
     </div>
-    {list.isPending ? <p role="status" className="text-muted-foreground px-4 text-sm lg:px-0">Loading</p>
-      : items.length === 0 ? <p className="text-muted-foreground px-4 text-sm lg:px-0">{list.isError ? `${title} could not be loaded. Check your connection and open this page again.` : `No ${title.toLowerCase()} yet.`}</p>
+    <AsyncState data={list.data} error={list.isError} isFetching={list.isFetching} onRetry={() => void list.refetch()} errorMessage={`${title} could not be loaded. Check your connection and open this page again.`} loadingLabel={`Loading ${title.toLowerCase()}`}>
+      {() => items.length === 0 ? <p className="text-muted-foreground px-4 text-sm lg:px-0">{`No ${title.toLowerCase()} yet.`}</p>
         : <div className="flex gap-3 overflow-x-auto px-4 pb-2 lg:px-0">{items.map((item) => <Tile key={item.id} kind={kind} item={item} />)}</div>}
+    </AsyncState>
   </section>;
 }
 

@@ -6,6 +6,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@maipai/ui/src/ui/button";
 import { Textarea } from "@maipai/ui/src/ui/textarea";
 import { SafeImage } from "@maipai/ui/src/primitives/SafeImage";
+import { AsyncState } from "@maipai/ui/src/primitives/AsyncState";
 import { api, ApiError } from "@/lib/api";
 import { uploadLibraryFile } from "@/lib/libraryUpload";
 
@@ -51,20 +52,19 @@ export function MediaPickerBody({ kind, personId, onDone }: { kind: PickKind; pe
           <Button type="button" variant="secondary" disabled={busy} onClick={() => input.current?.click()}>{busy ? "Adding" : "Add a picture"}</Button>
           {error ? <p role="alert" className="text-sm text-destructive">{error}</p> : null}
         </div>
-        {pictures.isPending ? <p className="text-sm text-muted-foreground">Loading your pictures.</p> : null}
-        {pictures.isError ? <p role="alert" className="text-sm text-destructive">Your pictures did not load. Close this and try again.</p> : null}
-        {pictures.data && pictures.data.length === 0 ? <p className="text-sm text-muted-foreground">You have no pictures in your Library yet. Add one above.</p> : null}
-        {pictures.data && pictures.data.length > 0 ? (
-          <ul className="grid grid-cols-3 gap-2 sm:grid-cols-4" aria-label="Your pictures">
-            {pictures.data.map((item) => (
-              <li key={item.id}>
-                <button type="button" className="block aspect-square w-full overflow-hidden rounded-md border border-border focus-visible:ring-2 focus-visible:ring-ring" aria-label={`Use ${item.name}`} onClick={() => onDone({ id: item.id, thumb: item.thumb_url })}>
-                  <SafeImage src={item.thumb_url} alt="" draggable={false} className="size-full object-cover" />
-                </button>
-              </li>
-            ))}
-          </ul>
-        ) : null}
+        <AsyncState data={pictures.data} error={pictures.isError} isFetching={pictures.isFetching} onRetry={() => void pictures.refetch()} errorMessage="Your pictures did not load. Close this and try again." loadingLabel="Loading your pictures">
+          {(rows) => rows.length === 0 ? <p className="text-sm text-muted-foreground">You have no pictures in your Library yet. Add one above.</p> : (
+            <ul className="grid grid-cols-3 gap-2 sm:grid-cols-4" aria-label="Your pictures">
+              {rows.map((item) => (
+                <li key={item.id}>
+                  <button type="button" className="block aspect-square w-full overflow-hidden rounded-md border border-border focus-visible:ring-2 focus-visible:ring-ring" aria-label={`Use ${item.name}`} onClick={() => onDone({ id: item.id, thumb: item.thumb_url })}>
+                    <SafeImage src={item.thumb_url} alt="" draggable={false} className="size-full object-cover" />
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </AsyncState>
     </div>
   );
 }
@@ -97,21 +97,20 @@ export function StudioPickerBody({ kind, start, personId, onDone }: { kind: Stud
         </div>
       ) : (
         <>
-          {library.isPending ? <p className="text-sm text-muted-foreground">Loading your {noun}.</p> : null}
-          {library.isError ? <p role="alert" className="text-sm text-destructive">Your {noun} did not load. Close this and try again.</p> : null}
-          {library.data && items.length === 0 ? <p className="text-sm text-muted-foreground">{kind === "video" ? "You have no clips yet. Make one on the Create page." : "You have no songs in your Library yet. Make one in Music."}</p> : null}
-          {items.length > 0 ? (
-            <ul className="grid grid-cols-2 gap-2 sm:grid-cols-3" aria-label={`Your ${noun}`}>
-              {items.map((item) => (
-                <li key={item.id}>
-                  <button type="button" className="block w-full overflow-hidden rounded-md border border-border text-left focus-visible:ring-2 focus-visible:ring-ring" aria-label={`Use ${item.name}`} onClick={() => onDone({ id: item.id, thumb: item.thumb_url })}>
-                    {kind === "video" && item.audience !== "adult-only" ? <SafeImage src={item.thumb_url} alt="" draggable={false} className="aspect-video w-full object-cover" /> : null}
-                    <span className="block truncate px-2 py-1 text-sm">{item.name}</span>
-                  </button>
-                </li>
-              ))}
-            </ul>
-          ) : null}
+          <AsyncState data={library.data} error={library.isError} isFetching={library.isFetching} onRetry={() => void library.refetch()} errorMessage={`Your ${noun} did not load. Close this and try again.`} loadingLabel={`Loading your ${noun}`}>
+            {() => items.length === 0 ? <p className="text-sm text-muted-foreground">{kind === "video" ? "You have no clips yet. Make one on the Create page." : "You have no songs in your Library yet. Make one in Music."}</p> : (
+              <ul className="grid grid-cols-2 gap-2 sm:grid-cols-3" aria-label={`Your ${noun}`}>
+                {items.map((item) => (
+                  <li key={item.id}>
+                    <button type="button" className="block w-full overflow-hidden rounded-md border border-border text-left focus-visible:ring-2 focus-visible:ring-ring" aria-label={`Use ${item.name}`} onClick={() => onDone({ id: item.id, thumb: item.thumb_url })}>
+                      {kind === "video" && item.audience !== "adult-only" ? <SafeImage src={item.thumb_url} alt="" draggable={false} className="aspect-video w-full object-cover" /> : null}
+                      <span className="block truncate px-2 py-1 text-sm">{item.name}</span>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </AsyncState>
         </>
       )}
     </div>
