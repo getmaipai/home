@@ -196,13 +196,14 @@ describe("chats in projects", () => {
 });
 
 describe("request bodies", () => {
-  test("POST and PATCH /api/conversations still accept an empty JSON body", async () => {
+  test("POST /api/conversations accepts an empty JSON body; an empty PATCH is parsed, then refused in plain words (AUDIT-ROUTES-01)", async () => {
     const owner = await ownerClient();
     const created = await owner.request("/api/conversations", { method: "POST", headers: { "content-type": "application/json" } });
     expect(created.status).toBe(201);
     const id = ((await created.json()) as { id: string }).id;
     const patched = await owner.request(`/api/conversations/${id}`, { method: "PATCH", headers: { "content-type": "application/json" } });
-    expect(patched.status).toBe(200);
+    expect(patched.status).toBe(400);
+    expect(((await patched.json()) as { error: string }).error).toBe("Send at least one conversation field to change.");
   });
 });
 
