@@ -1,6 +1,8 @@
 import { describe, expect, test, beforeEach, afterEach } from "bun:test";
 import { eq } from "drizzle-orm";
 import { resetDb } from "./reset-db";
+import { registerFixtureProjectType } from "./projectTypeFixture";
+import { __resetProjectTypesForTests } from "@/lib/projects/projectTypes";
 import { TestClient } from "./client";
 import { __resetThrottleForTests } from "@/lib/secretThrottle";
 import { __resetLlmSupervisorForTests } from "@/lib/llmSupervisor";
@@ -25,6 +27,9 @@ import type { PersonRow } from "@/types";
 
 beforeEach(() => {
   resetDb();
+  // PROJECT-TOOL-REFUSAL-01: start_project is offered only while a project type is registered.
+  __resetProjectTypesForTests();
+  registerFixtureProjectType();
   useDefaultScriptedStack();
   __resetThrottleForTests();
   __resetLlmSupervisorForTests();
