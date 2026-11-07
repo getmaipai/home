@@ -54,6 +54,8 @@ const musicRow: AppRow = {
 };
 const musicIndexPage = { type: "page", id: "index", title: "Music", body: [{ type: "empty_state", icon: "music", text: "No music yet." }] };
 const musicStationPage = { type: "page", id: "station", title: "Station", body: [{ type: "empty_state", icon: "radio", text: "Live radio station." }] };
+const musicAlbumPage = { type: "page", id: "album", title: "Album", body: [{ type: "empty_state", icon: "disc", text: "Album details." }] };
+const videoWatchPage = { type: "page", id: "watch", title: "Watch", body: [{ type: "empty_state", icon: "play", text: "Video details." }] };
 const mediaPageFiles = ["videos", "music", "shows", "podcasts", "books"] as const;
 const mediaIndexes = Object.fromEntries(mediaPageFiles.map((packageId) => [
   packageId,
@@ -81,6 +83,8 @@ beforeEach(() => {
     if (url.startsWith("/api/plugins/demo/pages/week")) return Promise.resolve(Response.json(weekPage));
     if (url.startsWith("/api/plugins/music/pages/index")) return Promise.resolve(Response.json(musicIndexPage));
     if (url.startsWith("/api/plugins/music/pages/station")) return Promise.resolve(Response.json(musicStationPage));
+    if (url.startsWith("/api/plugins/music/pages/album")) return Promise.resolve(Response.json(musicAlbumPage));
+    if (url.startsWith("/api/plugins/videos/pages/watch")) return Promise.resolve(Response.json(videoWatchPage));
     if (url.startsWith("/api/plugins/news/pages/story")) return Promise.resolve(Response.json(newsStoryPage));
     if (url.startsWith("/api/plugins/news/data/story")) { calls.push(String(init?.body)); return Promise.resolve(Response.json({ as_of: "x", blocks: [] })); }
     if (url.startsWith("/api/plugins/other/pages/")) return Promise.resolve(Response.json({ error: "no such app" }, { status: 404 }));
@@ -143,6 +147,55 @@ describe("a package app at /apps/<id>", () => {
     const view = open("/apps/music/station", 402);
     await view.findByText("Live radio station.");
     expect(view.container.querySelector('[data-slot="phone-nav"]')).not.toBeNull();
+  });
+
+  test("detail pages put Back in the controls row; only video watch has Minimize", async () => {
+    rows = [{ ...musicRow, sections: [{ page: "radio", label: "Radio", icon: null }, { page: "albums", label: "Albums", icon: null }] }];
+    let view = open("/apps/music/station", 402);
+    await view.findByText("Live radio station.");
+    let controls = await view.findByTestId("page-controls");
+    expect(controls.querySelector('button[aria-label="Back"]')).not.toBeNull();
+    expect(controls.querySelector('[aria-label="Minimize to the mini player"]')).toBeNull();
+    cleanup();
+    view = open("/apps/music/album", 402);
+    await view.findByText("Album details.");
+    controls = await view.findByTestId("page-controls");
+    expect(controls.querySelector('button[aria-label="Back"]')).not.toBeNull();
+    expect(controls.querySelector('[aria-label="Minimize to the mini player"]')).toBeNull();
+    cleanup();
+    rows = [{ ...musicRow, package: "videos", label: "Videos", to: "/apps/videos", sections: [] }];
+    view = open("/apps/videos/watch", 402);
+    await view.findByText("Video details.");
+    controls = await view.findByTestId("page-controls");
+    expect(controls.querySelector('button[aria-label="Back"]')).not.toBeNull();
+    expect(controls.querySelector('[aria-label="Minimize to the mini player"]')).not.toBeNull();
+  });
+
+  test("index and news story pages have no generic controls row", async () => {
+    rows = [musicRow];
+    let view = open("/apps/music", 402);
+    await view.findByText("No music yet.");
+    expect(view.queryByTestId("page-controls")).toBeNull();
+    cleanup();
+    rows = [newsRow];
+    view = open("/apps/news/story?id=story-1", 402);
+    await view.findByText("This story is not available.");
+    expect(view.queryByTestId("page-controls")).toBeNull();
+  });
+
+  test("Back uses the app home at history index zero and browser back otherwise", async () => {
+    rows = [{ ...musicRow, sections: [{ page: "radio", label: "Radio", icon: null }] }];
+    const originalState = window.history.state;
+    Object.defineProperty(window.history, "state", { configurable: true, value: { idx: 0 } });
+    const view = open("/apps/music/station", 402);
+    fireEvent.click(await view.findByRole("button", { name: "Back" }));
+    await waitFor(() => expect(view.getByTestId("where").textContent).toBe("/apps/music"));
+    cleanup();
+    Object.defineProperty(window.history, "state", { configurable: true, value: { idx: 2 } });
+    const second = open("/apps/music/station", 402);
+    fireEvent.click(await second.findByRole("button", { name: "Back" }));
+    await waitFor(() => expect(second.getByTestId("where").textContent).toBe("/apps/music/station"));
+    Object.defineProperty(window.history, "state", { configurable: true, value: originalState });
   });
 
   test("opens, draws its page from schema data and keeps the permanent rail", async () => {

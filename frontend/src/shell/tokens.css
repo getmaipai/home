@@ -671,15 +671,6 @@ body {
   html:has([data-slot="phone-nav"]):has([data-slot="global-mini-player"]) [data-slot="rail-body"] {
     padding-bottom: 9rem;
   }
-  [data-slot="media-minimize"] {
-    position: fixed;
-    top: 0.75rem;
-    inset-inline-end: 0.75rem;
-    z-index: 45;
-    border-radius: 9999px;
-    background: color-mix(in srgb, var(--card) 85%, transparent);
-    box-shadow: var(--shadow-sm);
-  }
 }
 
 /* RAIL-01 (owner's layout, 2026-10-06): the rail layout's body scrolls

@@ -29,7 +29,9 @@ import { PackageAppHeaderActions, PackageAppHeaderLeft, publishPackageAppHeader,
 import { PhoneNav } from "@maipai/ui/src/PhoneNav";
 import { MusicStudioPage, isStudioPage } from "@/shell/pages/MusicStudioPages";
 import { formatDate, formatTime } from "@/lib/format";
-import { useAppReading } from "@/shell/reader/useAppReading";
+import { navigateBack } from "@/shell/media/navigateBack";
+import { getIcon } from "@maipai/ui/src/icons";
+import { Button } from "@maipai/ui/src/dashboard/components/ui/button";
 import "./packageAppNews.css";
 
 
@@ -50,6 +52,7 @@ function VideoDetails({ id }: { id: string }) {
 }
 
 const PAGE_FRESH_MS = 5 * 60_000;
+const ArrowLeftIcon = getIcon("arrow-left");
 
 /** The advice chips the Weather app's details carry (the host builds them as short labels); anything else draws nothing. */
 function weatherChips(value: unknown): Array<{ id: string; label: string; icon?: string }> {
@@ -218,8 +221,7 @@ export function PackageAppPage({ person }: { person: Roster }) {
   // The reader draws its own Back and action pill, so on a phone the shell bar shrinks to the menu button and the pill sits beside it
   // (packageAppNews.css) instead of under an empty bar.
   const readingStory = packageId === "news" && pageId === "story";
-  const reading = inShellBar && readingStory;
-  useAppReading(reading);
+  const detail = pageId !== "index" && !app?.sections.some((section) => section.page === pageId && !(media && section.page === "station")) && !readingStory;
   // Every package app reads its query as page state, so a reload or a shared link opens the same item.
   const urlState = packageId !== "";
   const queryState = useMemo<Record<string, string>>(() => (urlState ? Object.fromEntries(new URLSearchParams(location.search)) : {}), [urlState, location.search]);
@@ -259,9 +261,9 @@ export function PackageAppPage({ person }: { person: Roster }) {
   const activeLabel = sidebarProps?.groups?.flatMap((group) => group.items).find((item) => item.active)?.label;
   const contextTitle = sidebarProps ? contextTitleFor(activeLabel, pageDoc?.title) : undefined;
   useEffect(() => {
-    publishPackageAppHeader(app ? { to: app.to, label: app.label, ...(contextTitle ? { title: contextTitle } : {}), ...(app.settings_area?.id ? { settingsArea: app.settings_area.id } : {}), ...(app.header ? { header: app.header, ...(mode ? { mode, onMode } : {}), ...(searchTo ? { searchTo } : {}) } : {}) } : null);
+    publishPackageAppHeader(app ? { to: app.to, label: app.label, detail, ...(contextTitle ? { title: contextTitle } : {}), ...(app.settings_area?.id ? { settingsArea: app.settings_area.id } : {}), ...(app.header ? { header: app.header, ...(mode ? { mode, onMode } : {}), ...(searchTo ? { searchTo } : {}) } : {}) } : null);
     return () => publishPackageAppHeader(null);
-  }, [app?.to, app?.label, app?.settings_area?.id, app?.header, contextTitle, mode, onMode, searchTo]); // eslint-disable-line react-hooks/exhaustive-deps -- app is read through its own fields
+  }, [app?.to, app?.label, app?.settings_area?.id, app?.header, contextTitle, mode, onMode, searchTo, detail]); // eslint-disable-line react-hooks/exhaustive-deps -- app is read through its own fields
 
   if (packageId === "" || (page.error instanceof ApiError && page.error.status === 404)) return <NotFoundPage />;
 
@@ -270,6 +272,7 @@ export function PackageAppPage({ person }: { person: Roster }) {
   // feed or an article) keeps its title for assistive technology only, so the same words are not drawn twice.
   const content = (
     <div className={cn("flex min-h-0 min-w-0 flex-1 flex-col", packageId === "music" && pageId === "play" && "relative z-10", !readingStory && "gap-2", (sidebarProps || media) && !readingStory && "lg:p-4 lg:ps-6", (sidebarProps || media) && !sectionsBar && !readingStory && "py-4")} data-testid="package-app" data-package={packageId}>
+      {detail ? <div data-slot="page-controls" data-testid="page-controls" className="sm:hidden"><Button type="button" variant="ghost" size="icon-lg" aria-label={i18n._({ id: "Back", message: "Back" })} onClick={() => navigateBack(navigate, app?.to ?? `/apps/${packageId}`)}><ArrowLeftIcon aria-hidden="true" /></Button>{media && packageId !== "music" && isMediaPlayPage(packageId, pageId) ? <span className="ms-auto"><MinimizeButton appHome={`/apps/${packageId}`} /></span> : null}</div> : null}
       {sectionsBar ? <PhoneNav variant="floating" label={i18n._({ id: "{name} sections", message: "{name} sections", values: { name: app?.label ?? i18n._({ id: "App", message: "App" }) } })} entries={sectionsBar.entries} more={sectionsBar.more} {...(sectionsBar.trailing ? { trailing: sectionsBar.trailing } : {})} /> : null}
       {app ? <AppToolbar inShellBar={inShellBar} sectionsInBar={sectionsBar !== null} hideSectionsOnWide={sidebar !== undefined} to={app.to} homeLabel={appHomeLabel(packageId, media)} sections={app.sections} current={pageId} familyHeader={familyHeader} /> : null}
       <AsyncState
@@ -282,7 +285,7 @@ export function PackageAppPage({ person }: { person: Roster }) {
       >
         {(shown) => { const doc = sectionsBar?.trailing && pageId !== "search" ? withoutSearchBox(shown) : shown; return (hasQuery && !sameQuery ? null : <>
           {isStudioPage(packageId, pageId) ? <MusicStudioPage pageId={pageId} search={location.search} adult={person.age_band === "adult"} /> : packageId === "weather" && pageId === "index" ? null : <ArticleSpeechBridge><SchemaPage key={`${packageId}/${pageId}`} page={doc} packageId={packageId} hideTitle sidebar={sidebarProps !== null} floatingBar={sectionsBar !== null} /></ArticleSpeechBridge>}
-          {media && packageId !== "music" && isMediaPlayPage(packageId, pageId) ? <div className="flex"><MinimizeButton appHome={`/apps/${packageId}`} /></div> : null}
+          {media && packageId !== "music" && isMediaPlayPage(packageId, pageId) ? <div className="flex max-sm:hidden"><MinimizeButton appHome={`/apps/${packageId}`} /></div> : null}
           {packageId === "videos" && pageId === "watch" ? <VideoDetails id={new URLSearchParams(location.search).get("id") ?? String((location.state as { pageState?: { id?: string } } | null)?.pageState?.id ?? "")} /> : null}
           {packageId === "music" && pageId === "play" ? <MusicVisualizerSection id={new URLSearchParams(location.search).get("id") ?? String((location.state as { pageState?: { id?: string } } | null)?.pageState?.id ?? "")} /> : null}
           {packageId === "weather" && pageId === "index" ? <>

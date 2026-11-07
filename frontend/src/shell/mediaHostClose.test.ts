@@ -1,4 +1,4 @@
-import { expect, test } from "bun:test";
+import { expect, jest, test } from "bun:test";
 import { createMediaStore } from "./mediaHost";
 
 const station = { id: "station-1", src: "/api/plugins/music/radio/stream/station-1", kind: "audio" as const, title: "Cabin FM" };
@@ -10,6 +10,33 @@ test("closing a playing station pauses it, clears the source and drops the now p
   expect(store.get()).toBeNull();
   expect(el.hasAttribute("src")).toBe(false);
   expect(el.paused).toBe(true);
+});
+
+test("clear pauses the held audio element and empties current", () => {
+  const store = createMediaStore();
+  const el = store.elementFor({ ...station, src: "/audio.mp3" }, "music") as HTMLAudioElement;
+  const pause = jest.spyOn(el, "pause");
+  store.clear();
+  expect(pause).toHaveBeenCalledTimes(1);
+  expect(store.get()).toBeNull();
+});
+
+test("playback reflects and observes the held element", async () => {
+  const store = createMediaStore();
+  const el = store.elementFor({ ...station, id: "a", src: "/audio.mp3" }, "music");
+  Object.defineProperty(el, "paused", { configurable: true, value: false });
+  expect(store.playback.isPlaying("a")).toBe(true);
+  expect(store.playback.isPlaying("b")).toBe(false);
+  const pause = jest.spyOn(el, "pause");
+  const listener = jest.fn();
+  const unsubscribe = store.playback.subscribe(listener);
+  store.playback.pause("a");
+  expect(pause).toHaveBeenCalledTimes(1);
+  el.dispatchEvent(new Event("pause"));
+  await Promise.resolve();
+  expect(listener).toHaveBeenCalled();
+  unsubscribe();
+  store.clear();
 });
 
 test("the page that still shows the closed station cannot start it again", () => {

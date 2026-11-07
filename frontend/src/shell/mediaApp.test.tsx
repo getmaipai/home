@@ -288,7 +288,7 @@ describe("MEDIA-POLISH-01 the docked mini bar", () => {
     fireEvent.click(view.getByRole("link", { name: "Go to Videos" }));
     expect(await view.findByRole("button", { name: "Open the player: Building a birdhouse" })).toBeTruthy();
     expect(video.isConnected).toBe(true);
-    fireEvent.click(view.getByRole("button", { name: "Close the player: Building a birdhouse" }));
+    fireEvent.click(view.getByRole("button", { name: "Close player: Building a birdhouse" }));
     // Count the bars, not the node: Bun 1.3.14 crashes (SIGTRAP) printing a failed `expect(<happy-dom element>)` while the bar is still closing.
     await waitFor(() => expect(document.querySelectorAll('[data-layout="mini"]').length).toBe(0));
     // Three page loads through the whole shell: slower than the default 5 s on a loaded machine.
@@ -361,7 +361,7 @@ describe("family app headers", () => {
     expect(view.getByRole("tablist", { name: "Sections" }).getAttribute("data-variant")).toBe("pill");
     expect(view.getByRole("button", { name: "News settings" }).closest('[data-slot="rail-page-header"]')).toBeTruthy();
     expect(view.queryByRole("button", { name: /favorites/ })).toBeNull();
-    expect(view.queryByRole("button", { name: /Close the player/ })).toBeNull();
+    expect(view.queryByRole("button", { name: /Close player/ })).toBeNull();
   });
 
   test("a media app keeps the same header", async () => {

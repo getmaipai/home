@@ -75,7 +75,7 @@ export function GlobalMiniPlayer() {
   const stateId = (state as { pageState?: { id?: string } } | null)?.pageState?.id;
   if (!held || !held.started || onPlayPageOf(held, pathname, search, stateId)) return null;
 
-  const CloseIcon = getIcon("x"), PipIcon = getIcon("picture-in-picture"), FullIcon = getIcon("maximize");
+  const PipIcon = getIcon("picture-in-picture"), FullIcon = getIcon("maximize");
   const el = held.el;
   const pictureInPicture = typeof document !== "undefined" && "pictureInPictureEnabled" in document && document.pictureInPictureEnabled && el instanceof HTMLVideoElement;
   // News Listen (NEWS-04) holds a story being read aloud: expanding opens the story, and its place is not a media position to save.
@@ -94,6 +94,7 @@ export function GlobalMiniPlayer() {
           src={held.src}
           kind={held.kind}
           layout="mini"
+          onClose={dock.clear}
           placement="dock"
           title={held.title}
           subtitle={held.subtitle}
@@ -133,7 +134,6 @@ export function GlobalMiniPlayer() {
               {isAudio ? <Button variant="ghost" size="icon" aria-label={i18n._({ id: "Full screen visualizer", message: "Full screen visualizer" })} onClick={() => setStage(true)}><FullIcon aria-hidden="true" /></Button> : null}
               {pictureInPicture ? <Button variant="ghost" size="icon" aria-label={i18n._({ id: "Picture in picture", message: "Picture in picture" })} onClick={() => void withVideoShown(el, () => (el as HTMLVideoElement).requestPictureInPicture(), "leavepictureinpicture")}><PipIcon aria-hidden="true" /></Button> : null}
               {held.kind === "video" ? <Button variant="ghost" size="icon" aria-label={i18n._({ id: "Full screen", message: "Full screen" })} onClick={() => void withVideoShown(el, () => el.requestFullscreen(), "fullscreenchange")}><FullIcon aria-hidden="true" /></Button> : null}
-              <Button variant="ghost" size="icon" aria-label={`Close the player: ${held.title}`} onClick={dock.clear}><CloseIcon aria-hidden="true" /></Button>
             </>
           }
         />

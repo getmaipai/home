@@ -3568,7 +3568,7 @@ msgstr ""
 
 #. js-lingui-explicit-id
 #: src/apps/chat/composerAddMenu.tsx:260
-#: src/shell/pages/PackageAppPage.tsx:189
+#: src/shell/pages/PackageAppPage.tsx:193
 #: src/shell/pages/status/StatusApps.tsx:114
 #: src/shell/phoneMenuLinks.tsx:31
 #, needs-review
@@ -3938,6 +3938,7 @@ msgstr "Azelma"
 #: src/apps/setup/SetupReviewPage.tsx:62
 #: src/shell/pages/companionFlow/AnimateStep.tsx:152
 #: src/shell/pages/companionFlow/CustomizeStep.tsx:149
+#: src/shell/pages/PackageAppPage.tsx:275
 #: src/shell/pages/settings/settingsBackLink.ts:51
 #: src/shell/pages/settings/settingsBackLink.ts:56
 #: src/shell/pages/SignInPage.tsx:185
@@ -4670,8 +4671,8 @@ msgid "Browse styles"
 msgstr "Explorar estilos"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/ReferencePage.tsx:52
 #: src/shell/pages/ReferencePage.tsx:53
+#: src/shell/pages/ReferencePage.tsx:54
 #, needs-review
 msgid "Browse this book"
 msgstr "Explora este libro"
@@ -4701,7 +4702,7 @@ msgid "setting.companion.voice.buddy.label"
 msgstr "Voz de Buddy"
 
 #. js-lingui-explicit-id
-#: src/shell/GlobalMiniPlayer.tsx:114
+#: src/shell/GlobalMiniPlayer.tsx:115
 #, needs-review
 msgid "Buffering"
 msgstr "Cargando"
@@ -5683,7 +5684,7 @@ msgid "setting.person.robot.topics.option_label.chit_chat"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/mediaHost.tsx:319
+#: src/shell/mediaHost.tsx:327
 #, needs-review
 msgid "Choose a clip"
 msgstr "Elige un clip"
@@ -6807,7 +6808,7 @@ msgstr "Conectado · {rooms, plural, one {# habitación} other {# habitaciones}}
 
 #. js-lingui-explicit-id
 #: src/apps/settings/StackChanInstallDialog.tsx:17
-#: src/shell/GlobalMiniPlayer.tsx:114
+#: src/shell/GlobalMiniPlayer.tsx:115
 #: src/shell/pages/StatusPage.tsx:25
 #, needs-review
 msgid "Connecting"
@@ -7614,7 +7615,7 @@ msgid "Could not load your keys."
 msgstr "No se pudieron cargar tus claves."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/ReferencePage.tsx:52
+#: src/shell/pages/ReferencePage.tsx:53
 #, needs-review
 msgid "Could not load your library."
 msgstr "No se pudo cargar tu biblioteca."
@@ -8539,7 +8540,7 @@ msgid "date not listed"
 msgstr "fecha no listada"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/ReferencePage.tsx:52
+#: src/shell/pages/ReferencePage.tsx:53
 #, needs-review
 msgid "date unavailable"
 msgstr "fecha no disponible"
@@ -11005,14 +11006,14 @@ msgid "setting.robot.barge_in.open_mic.label"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/GlobalMiniPlayer.tsx:135
+#: src/shell/GlobalMiniPlayer.tsx:136
 #: src/shell/media/MusicVisualizerSection.tsx:68
 #, needs-review
 msgid "Full screen"
 msgstr "Pantalla completa"
 
 #. js-lingui-explicit-id
-#: src/shell/GlobalMiniPlayer.tsx:133
+#: src/shell/GlobalMiniPlayer.tsx:134
 #: src/shell/media/MusicVisualizerSection.tsx:68
 #, needs-review
 msgid "Full screen visualizer"
@@ -14413,7 +14414,7 @@ msgid "setting.household.locale.label"
 msgstr "Idioma y región"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/ReferencePage.tsx:52
+#: src/shell/pages/ReferencePage.tsx:53
 #, needs-review
 msgid "Language unavailable"
 msgstr "Idioma no disponible"
@@ -15433,7 +15434,7 @@ msgid "Loading keys"
 msgstr "Cargando claves"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/ReferencePage.tsx:52
+#: src/shell/pages/ReferencePage.tsx:53
 #, needs-review
 msgid "Loading library"
 msgstr "Cargando biblioteca"
@@ -16915,19 +16916,19 @@ msgid "setting.music.dj.option_label.minimal"
 msgstr "Minimalista"
 
 #. js-lingui-explicit-id
-#: src/shell/media/MinimizeButton.tsx:22
+#: src/shell/media/MinimizeButton.tsx:18
 #, needs-review
 msgid "Minimize"
 msgstr "Minimizar"
 
 #. js-lingui-explicit-id
-#: src/shell/media/MinimizeButton.tsx:21
+#: src/shell/media/MinimizeButton.tsx:17
 #, needs-review
 msgid "Minimize to the mini player"
 msgstr "Minimizar al reproductor mini"
 
 #. js-lingui-explicit-id
-#: src/shell/media/MinimizeButton.tsx:21
+#: src/shell/media/MinimizeButton.tsx:17
 #, needs-review
 msgid "Minimize: keep playing in the mini player"
 msgstr "Minimizar: seguir reproduciendo en el reproductor mini"
@@ -18059,7 +18060,7 @@ msgid "No matches. Try a different word or clear a filter."
 msgstr "Sin coincidencias. Prueba con otra palabra o borra un filtro."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/ReferencePage.tsx:53
+#: src/shell/pages/ReferencePage.tsx:54
 #, needs-review
 msgid "No matching article titles."
 msgstr "No hay títulos de artículos que coincidan."
@@ -20493,7 +20494,7 @@ msgid "Pick one and it goes into the bar above."
 msgstr "Elige uno y se pone en la barra de arriba."
 
 #. js-lingui-explicit-id
-#: src/shell/mediaHost.tsx:320
+#: src/shell/mediaHost.tsx:328
 #, needs-review
 msgid "Pick one of your own clips to put after this one."
 msgstr "Elige uno de tus clips para ponerlo después de este."
@@ -20675,7 +20676,7 @@ msgid "Picture"
 msgstr "Imagen"
 
 #. js-lingui-explicit-id
-#: src/shell/GlobalMiniPlayer.tsx:134
+#: src/shell/GlobalMiniPlayer.tsx:135
 #, needs-review
 msgid "Picture in picture"
 msgstr "Imagen en imagen"
@@ -21715,7 +21716,7 @@ msgstr "Reducido"
 #: src/shell/pages/ReferencePage.tsx:28
 #: src/shell/pages/ReferencePage.tsx:37
 #: src/shell/pages/ReferencePage.tsx:37
-#: src/shell/pages/ReferencePage.tsx:50
+#: src/shell/pages/ReferencePage.tsx:51
 #, needs-review
 msgid "Reference"
 msgstr "Referencia"
@@ -22471,7 +22472,7 @@ msgstr "Retirado. El MaiPai Stack ahora decide qué motor hace cada tarea, así 
 #: src/apps/reminders/RemindersPage.tsx:183
 #: src/apps/settings/EngineLinkCredentialSection.tsx:279
 #: src/apps/settings/StackChanInstallDialog.tsx:146
-#: src/shell/GlobalMiniPlayer.tsx:119
+#: src/shell/GlobalMiniPlayer.tsx:120
 #: src/shell/pages/settings/HouseSettings.tsx:47
 #: src/shell/pages/settings/HouseSettings.tsx:47
 #: src/shell/pages/settings/HouseSettings.tsx:47
@@ -23499,7 +23500,7 @@ msgstr "búsqueda"
 #. js-lingui-explicit-id
 #: src/i18n.test.tsx:40
 #: src/shell/library/TranscriptPanel.tsx:553
-#: src/shell/pages/ReferencePage.tsx:47
+#: src/shell/pages/ReferencePage.tsx:48
 #: src/shell/routeHeader.ts:24
 #: src/shell/statusSummary.ts:14
 #: src/shell/usePersonLocale.test.tsx:43
@@ -23530,7 +23531,7 @@ msgid "area.Search and web"
 msgstr "Búsqueda y web"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/ReferencePage.tsx:46
+#: src/shell/pages/ReferencePage.tsx:47
 #, needs-review
 msgid "Search articles"
 msgstr "Buscar artículos"
@@ -23568,7 +23569,7 @@ msgid "Search for a title across your media apps."
 msgstr "Busca un título en tus apps de medios."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/ReferencePage.tsx:53
+#: src/shell/pages/ReferencePage.tsx:54
 #, needs-review
 msgid "Search for an article in this book."
 msgstr "Busca un artículo en este libro."
@@ -23599,7 +23600,7 @@ msgid "Search projects"
 msgstr "Buscar proyectos"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/ReferencePage.tsx:46
+#: src/shell/pages/ReferencePage.tsx:47
 #, needs-review
 msgid "Search reference"
 msgstr "Buscar referencia"
@@ -23825,7 +23826,7 @@ msgid "see the live roster"
 msgstr "ver la lista en vivo"
 
 #. js-lingui-explicit-id
-#: src/shell/GlobalMiniPlayer.tsx:126
+#: src/shell/GlobalMiniPlayer.tsx:127
 #: src/shell/media/NowPlayingStage.tsx:103
 #, needs-review
 msgid "Seek"
@@ -25027,7 +25028,7 @@ msgid "SMART LIST"
 msgstr "LISTA INTELIGENTE"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/ReferencePage.tsx:52
+#: src/shell/pages/ReferencePage.tsx:53
 #, needs-review
 msgid "Snapshot {date} · {count, plural, one {# article} other {# articles}}"
 msgstr "Instantánea {date} · {count, plural, one {# artículo} other {# artículos}}"
@@ -26208,7 +26209,7 @@ msgid "setting.generation.styles.adult_only.option.restricted"
 msgstr "Los estilos con límite de edad permanecen ocultos."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/ReferencePage.tsx:49
+#: src/shell/pages/ReferencePage.tsx:50
 #: src/shell/reader/SearchBox.tsx:38
 #, needs-review
 msgid "Suggested articles"
@@ -28235,7 +28236,7 @@ msgid "This app is also on the Never close list, so it stays open."
 msgstr "Esta app también está en la lista No cerrar nunca, así que se mantiene abierta."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/PackageAppPage.tsx:113
+#: src/shell/pages/PackageAppPage.tsx:117
 #, needs-review
 msgid "This app's page is not valid."
 msgstr "La página de esta app no es válida."
@@ -28603,7 +28604,7 @@ msgid "This song could not be made. Open it to try again."
 msgstr "No se pudo crear esta canción. Ábrela para intentarlo de nuevo."
 
 #. js-lingui-explicit-id
-#: src/shell/GlobalMiniPlayer.tsx:119
+#: src/shell/GlobalMiniPlayer.tsx:120
 #, needs-review
 msgid "This station did not start. Check your connection, then press Retry."
 msgstr "La estación no empezó. Revisa tu conexión y luego pulsa Reintentar."
@@ -32077,7 +32078,7 @@ msgid "Your key. Save it now; Home will show it only once."
 msgstr "Tu clave. Guárdala ahora; Home solo la mostrará una vez."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/ReferencePage.tsx:52
+#: src/shell/pages/ReferencePage.tsx:53
 #, needs-review
 msgid "Your library"
 msgstr "Tu biblioteca"

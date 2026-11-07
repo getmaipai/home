@@ -9,7 +9,6 @@ import { toArticleViewData } from "./articleData";
 import { useReferenceSaves } from "./saves";
 import { readKeptArticle } from "./offline";
 import { speakableParagraphs, useArticleListen } from "./useArticleListen";
-import { useAppReading } from "./useAppReading";
 
 const ARTICLE_ACTIONS: ArticleAction[] = ["save", "listen", "summarize"];
 const DISCUSS_PROMPT = "I'd like to talk about this article.";
@@ -51,7 +50,6 @@ export function ReaderArticle({ book, path, routeFor, appName, canDiscuss, onApp
       throw error;
     }
   }, retry: false });
-  useAppReading(query.data !== undefined);
   const reading = useArticleListen();
   const storyId = `${book}/${path}`;
   const loadPreview = useCallback(async (target: { book: string; path: string }): Promise<ArticlePreview | null> => {

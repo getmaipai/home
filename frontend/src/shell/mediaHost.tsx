@@ -59,6 +59,11 @@ export function createMediaStore() {
   let closedId: string | null = null;
   const listeners = new Set<() => void>();
   const notify = () => queueMicrotask(() => listeners.forEach((listener) => listener()));
+  const playback = {
+    subscribe(listener: () => void) { listeners.add(listener); return () => listeners.delete(listener); },
+    isPlaying(id: string) { return current?.id === id && !current.el.paused && !current.el.ended; },
+    pause(id: string) { if (current?.id === id) current.el.pause(); },
+  };
   const drop = (entry: HoistedMedia) => {
     entry.el.pause();
     entry.el.removeAttribute("src");
@@ -67,6 +72,7 @@ export function createMediaStore() {
   };
   return {
     get: (): HoistedMedia | null => current,
+    playback,
     subscribe(listener: () => void) {
       listeners.add(listener);
       return () => listeners.delete(listener);
@@ -100,6 +106,7 @@ export function createMediaStore() {
           notify();
         }
       });
+      for (const event of ["play", "pause", "ended", "emptied"] as const) el.addEventListener(event, notify);
       // A live station is asked for by the person's press on Play, so its bar opens at once and shows Connecting until sound arrives.
       current = { ...ref, appId, el, started: el.autoplay && liveStationIdOf(ref.src) !== null };
       notify();
@@ -182,6 +189,7 @@ export function MediaHostProvider({ children, personId, ageBand }: { children: R
   const speech = useSyncExternalStore(status.subscribe, status.get, status.get);
   const host = useMemo<MediaHost>(
     () => ({
+      playback: store.playback,
       async onPlay(mediaId, item) {
         if (mediaId === "story" && typeof item.story_id === "string") return listener.listen(item.story_id);
         // A row from a media app carries its kind; any other caller names only the id, and the hub says what it is.

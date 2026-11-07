@@ -9,5 +9,4 @@ test("mini player and minimize control clear the phone navigation", () => {
   expect(phoneBlock).toContain("bottom: calc(5rem + env(safe-area-inset-bottom));");
   expect(phoneBlock).toContain('html:has([data-slot="phone-nav"]):has([data-slot="global-mini-player"]) [data-slot="rail-body"]');
   expect(phoneBlock).toContain("padding-bottom: 9rem;");
-  expect(phoneBlock).toContain('[data-slot="media-minimize"]');
 });
