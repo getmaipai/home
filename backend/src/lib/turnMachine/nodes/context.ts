@@ -22,7 +22,9 @@ import { toolSpecFor, replyMaxTokensFor } from "./model";
 import { laneOfPerson } from "@/lib/pictures/laneGate";
 import { runSearchAssistShadow } from "@/lib/searchAssist/shadow";
 import { runWeatherAssistShadow } from "@/lib/searchAssist/weatherAssist";
-import { recall, embedQueryForRecall, bumpUsage } from "@/lib/memory";
+import { recall, embedQueryForRecall, bumpUsage, list as listMemory } from "@/lib/memory";
+import { getSynth } from "@/lib/synths";
+import { synthCard } from "@/lib/talent/life";
 import { buildProfileCard } from "@/lib/memoryProfile";
 import { entityForSpeaker, subjectRosterFor } from "@/lib/subjects";
 import type { PersonRow } from "@/types";
@@ -404,6 +406,19 @@ export const contextNode: Node<ContextInput, ContextOutput> = async (state, inpu
       items.push({ id: "profile-rule", text: card.ruleLine, source: "profile", subjects: [], disclosure: "child_ok" });
       for (const line of card.lines) {
         items.push({ id: `profile-${line.id}`, text: line.text, source: "profile", subjects: [], disclosure: line.disclosure, at: line.at });
+      }
+    }
+    const synth = !anonymous && !temporary ? getSynth(state.actor, state.persona.id) : null;
+    if (synth) {
+      const companionId = synth.id;
+      if (listMemory(state.actor, { scope: "companion", companionId }).length > 0) {
+        const cardText = synthCard(companionId, state.actor, now);
+        if (cardText) items.push({ id: "synth-card", text: cardText, source: "profile", subjects: [], disclosure: "child_ok" });
+      }
+      const beats = recall(state.actor, input.utterance, { scope: "companion", companionId, queryVector: recallVector, selfOnly: true, bumpUsage: false }).slice(0, 4);
+      for (const match of beats) {
+        const record = match.record;
+        items.push({ id: `synth-${record.id}`, text: record.text, source: "profile", subjects: [], disclosure: record.child_disclosure ?? "adult_only" });
       }
     }
     // MEM-AUDIT-05: what reached the prompt, by id and score, for the

@@ -5,7 +5,9 @@ import { eq } from "drizzle-orm";
 import { db } from "@/db";
 import { people } from "@/db/schema";
 import { listPackageIds } from "@/lib/plugins";
-import { createSynth, forkSynth, getSynth, listSynths, maySeeSynth, shareFork } from "@/lib/synths";
+import { createSynth, forkSynth, getSynth, isCompanionFork, listSynths, maySeeSynth, shareFork } from "@/lib/synths";
+import { list } from "@/lib/memory";
+import { __setTalentLifeCompleterForTests } from "@/lib/talent/life";
 import { setValue } from "@/lib/settings";
 import { createHouseholdCompanion, householdCompanionFolder, migrateOwnerJsonAll } from "@/lib/householdCompanions";
 import { resetDb } from "./reset-db";
@@ -22,18 +24,25 @@ const invented = {
 const none = { kind: "none", person_id: null, name: null, refresh: "7d", minor: false } as const;
 const basedOnMember = (personId: string) => ({ kind: "household_member", person_id: personId, name: null, refresh: "7d", minor: false } as const);
 
-beforeEach(() => resetDb());
+beforeEach(() => {
+  resetDb();
+  __setTalentLifeCompleterForTests(async () => ({ ok: true, text: JSON.stringify({ born_year: 1985, hometown: "Cedar Bay", occupation: "a baker", events: [{ date: "2018", text: "Moved to a bright apartment." }, { date: "2020", text: "Joined a weekend walking group." }, { date: "2022", text: "Learned to bake sourdough." }], memories: [{ date: "2021", text: "I remember the first loaf cooling on the windowsill." }, { date: "2022", text: "I still smile when I think about that rainy picnic." }] }) }));
+});
 
 describe("TALENT-01 synth store", () => {
   test("creates an invented synth for the owner and lists a bundled companion as a synth", async () => {
     const { row } = await owner();
-    const result = createSynth(row, { persona: invented, based_on: none, life: { enabled: true, seed: "" } });
+    const result = await createSynth(row, { persona: invented, based_on: none, life: { enabled: true, seed: "" } });
     expect(result.ok).toBe(true);
     if (!result.ok) return;
     expect(result.value.synth).toMatchObject({ based_on: { kind: "none" }, life: { enabled: true, seed: "" }, owner_person_id: row.id, private_to: null, forked_from: null });
     const bundledId = listPackageIds().find((id) => listSynths(row).some((synth) => synth.id === id));
     expect(bundledId).toBeDefined();
     expect(listSynths(row).some((synth) => synth.id === result.value.id)).toBe(true);
+    const beats = list(row, { scope: "companion", companionId: result.value.id });
+    expect(beats.filter((beat) => beat.category === "identity")).toHaveLength(3);
+    expect(beats.filter((beat) => beat.category === "event")).toHaveLength(5);
+    expect(beats.every((beat) => beat.scope === "companion" && beat.companion_id === result.value.id && beat.child_disclosure === "child_ok")).toBe(true);
   });
 
   test("a child or teen cannot create a synth based on a person", async () => {
@@ -43,8 +52,8 @@ describe("TALENT-01 synth store", () => {
     const teenRow = db.select().from(people).where(eq(people.role, "teen")).get()!;
     expect(teenClient).toBeDefined();
     const { row: childRow } = childResult;
-    expect(createSynth(teenRow, { persona: invented, based_on: basedOnMember(teenRow.id), life: { enabled: true, seed: "" } })).toMatchObject({ ok: false, error: "Only an adult can base a synth on a real person. Make an invented one instead." });
-    expect(createSynth(childRow, { persona: invented, based_on: basedOnMember(childRow.id), life: { enabled: true, seed: "" } })).toMatchObject({ ok: false, error: "Only an adult can base a synth on a real person. Make an invented one instead." });
+    expect(await createSynth(teenRow, { persona: invented, based_on: basedOnMember(teenRow.id), life: { enabled: true, seed: "" } })).toMatchObject({ ok: false, error: "Only an adult can base a synth on a real person. Make an invented one instead." });
+    expect(await createSynth(childRow, { persona: invented, based_on: basedOnMember(childRow.id), life: { enabled: true, seed: "" } })).toMatchObject({ ok: false, error: "Only an adult can base a synth on a real person. Make an invented one instead." });
   });
 
   test("a household member can refuse synths based on them", async () => {
@@ -52,13 +61,13 @@ describe("TALENT-01 synth store", () => {
     const { row: childRow } = await child(ownerClient);
     const ownerRow = db.select().from(people).where(eq(people.role, "owner")).get()!;
     setValue(ownerRow, `person:${childRow.id}`, "synths.of_me", false);
-    const result = createSynth(ownerRow, { persona: invented, based_on: basedOnMember(childRow.id), life: { enabled: true, seed: "" } });
+    const result = await createSynth(ownerRow, { persona: invented, based_on: basedOnMember(childRow.id), life: { enabled: true, seed: "" } });
     expect(result).toMatchObject({ ok: false, error: `${childRow.displayName} has turned off synths of them.` });
   });
 
   test("a real-person synth defaults to adult audience", async () => {
     const { row } = await owner();
-    const result = createSynth(row, { persona: { ...invented, audience: undefined }, based_on: { kind: "real_person", person_id: null, name: "A public figure", refresh: "7d", minor: false }, life: { enabled: true, seed: "" } });
+    const result = await createSynth(row, { persona: { ...invented, audience: undefined }, based_on: { kind: "real_person", person_id: null, name: "A public figure", refresh: "7d", minor: false }, life: { enabled: true, seed: "" } });
     expect(result.ok).toBe(true);
     if (result.ok) expect(result.value.companion?.audience).toBe("adult");
   });
@@ -66,13 +75,15 @@ describe("TALENT-01 synth store", () => {
   test("a fork is private to its maker and can be seen by a parent managing a child", async () => {
     const { client: ownerClient, row: ownerRow } = await owner();
     const { row: childRow } = await child(ownerClient);
-    const base = createSynth(ownerRow, { persona: invented, based_on: none, life: { enabled: true, seed: "" } });
+    const base = await createSynth(ownerRow, { persona: invented, based_on: none, life: { enabled: true, seed: "" } });
     expect(base.ok).toBe(true);
     if (!base.ok) return;
     const fork = forkSynth(childRow, base.value.id);
     expect(fork.ok).toBe(true);
     if (!fork.ok) return;
     expect(fork.value.synth).toMatchObject({ forked_from: base.value.id, private_to: childRow.id, owner_person_id: childRow.id });
+    expect(isCompanionFork(fork.value.id)).toBe(true);
+    expect(isCompanionFork(base.value.id)).toBe(false);
     expect(maySeeSynth(ownerRow, fork.value.synth!)).toBe(true);
     expect(getSynth(ownerRow, fork.value.id)).toBe(fork.value.synth);
     await teen(ownerClient);

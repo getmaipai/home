@@ -258,6 +258,7 @@ export function ingestMemory(input: IngestInput): IngestResult {
     status: "active" as const,
     scope,
     person,
+    companion_id: companionId,
     subject_id: input.subjectId ?? null,
     source: input.source,
     importance: input.importance,

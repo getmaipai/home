@@ -65,6 +65,7 @@ import { sweepAnswerImages } from "@/lib/answerImages/cache";
 import { sweepFetchCache } from "@/lib/retrieval/fetchCache";
 import { sweepPackageCache } from "@/lib/packageCache";
 import { pruneExpiredSessions } from "@/lib/session";
+import { localDayKey, hubTimeZone } from "@/lib/news/dayParts";
 import { prefetchNewsText } from "@/lib/news/prefetch";
 import { prefetchNewsPictures } from "@/lib/news/prefetchPictures";
 import { runShelfTick, pruneShelf } from "@/lib/shelf/shelfJobs";
@@ -332,6 +333,24 @@ const CORE_JOBS: Record<string, CoreJobHandler> = {
   },
   "memory.maintenance": () => {
     runMaintenance();
+  },
+  "talent.life.tick": async () => {
+    const [{ listHouseholdCompanionIds }, { allCompanions }, { isCompanionFork, ownerActor, synthById }, { isOnAir, tickLife }] = await Promise.all([
+      import("@/lib/householdCompanions"), import("@/lib/robotCompanion"), import("@/lib/synths"), import("@/lib/talent/life"),
+    ]);
+    const started = Date.now();
+    let synths = 0, beats = 0, errors = 0;
+    const ids = [...new Set([...listHouseholdCompanionIds(), ...allCompanions().map((companion) => companion.id)])];
+    const today = localDayKey(new Date(), hubTimeZone());
+    for (const id of ids) {
+      const synth = synthById(id);
+      if (!synth?.life.enabled || (!isOnAir(id) && !isCompanionFork(id))) continue;
+      const actor = ownerActor(synth);
+      if (!actor) continue;
+      synths++;
+      try { if (await tickLife(synth, actor, today) === "beat") beats++; } catch { errors++; }
+    }
+    console.log(`talent.life.tick synths=${synths} beats=${beats} errors=${errors} ms=${Date.now() - started}`);
   },
   "scheduler.prune": () => { pruneFinishedSchedules(); },
   "conversation.retention": () => {

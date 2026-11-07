@@ -6,7 +6,7 @@ import { people } from "@/db/schema";
 import type { PersonRow } from "@/types";
 import { listPackageIds, loadManifestOnly } from "@/lib/plugins";
 import { getHouseholdCompanion, householdCompanionAuthorId, listHouseholdCompanionIds, copyBundledCompanion, copyHouseholdCompanion, createHouseholdCompanion, updateHouseholdCompanionSynth } from "@/lib/householdCompanions";
-import { personaFromManifest, type Persona } from "@/lib/persona";
+import { personaFromManifest, reloadPersonas, type Persona } from "@/lib/persona";
 import { companionFloor } from "@/lib/robotCompanion";
 import { mayUseCompanion, pickRefusal } from "@/lib/companionsApp";
 import { getPersonSettingValue, getSettingValueForPerson, setValue } from "@/lib/settings";
@@ -95,17 +95,22 @@ function stampSynth(id: string, persona: Companion, base: Partial<Synth>, owner:
   return Synth.parse({ id, persona, based_on: base.based_on ?? { kind: "none", person_id: null, name: null, refresh: "7d", minor: false }, life: base.life ?? { enabled: true, seed: "" }, subject_id: base.subject_id ?? null, pins: base.pins ?? { dials: [], examples: [] }, phrase_sources: base.phrase_sources ?? {}, forked_from: base.forked_from ?? null, private_to: base.private_to ?? null, owner_person_id: owner, provenance, created_at: base.created_at ?? now, updated_at: now, hlc: nextHlc() });
 }
 function synthBlock(synth: SynthRecord): NonNullable<PackageManifest["synth"]> { const { id: _id, persona: _persona, ...block } = synth; return block; }
-export function createSynth(actor: PersonRow, input: { persona: Companion; based_on: Synth["based_on"]; life: Synth["life"] }): SynthWriteResult {
+export async function createSynth(actor: PersonRow, input: { persona: Companion; based_on: Synth["based_on"]; life: Synth["life"] }): Promise<SynthWriteResult> {
   if (speakerAgeBand(actor, new Date()) !== "adult" && input.based_on.kind !== "none") return { ok: false, status: 403, error: "Only an adult can base a synth on a real person. Make an invented one instead." };
   if (input.based_on.kind === "household_member" && input.based_on.person_id) {
     const member = personById(input.based_on.person_id);
     if (member && getSettingValueForPerson(member.id, "synths.of_me") === false) return { ok: false, status: 403, error: `${member.displayName} has turned off synths of them.` };
   }
-  const persona = { ...input.persona, audience: input.based_on.kind === "real_person" ? input.persona.audience ?? "adult" : input.persona.audience };
+  const persona = { ...input.persona, status: input.persona.status ?? "ready", audience: input.based_on.kind === "real_person" ? input.persona.audience ?? "adult" : input.persona.audience };
   const synth = stampSynth("hc-pending", persona, { based_on: input.based_on, life: { ...input.life, enabled: input.based_on.kind === "none" && input.life.enabled }, private_to: null, forked_from: null }, actor.id, "home:synth");
-  const made = createHouseholdCompanion(persona, { display_name: actor.displayName, person_id: actor.id }, persona.audience ?? "adult", { synth: synthBlock(synth), companion: { audience: persona.audience ?? "adult" } });
+  const made = createHouseholdCompanion(persona, { display_name: actor.displayName, person_id: actor.id }, persona.audience ?? "adult", { synth: synthBlock(synth), companion: { audience: persona.audience ?? "adult", status: persona.status ?? "ready" } });
   if (!made.ok || !made.value.companion) return { ok: false, status: 400, error: made.ok ? "The synth could not be saved. Check its fields and try again." : made.error };
   const saved = synthFor(made.value, made.value.id);
+  reloadPersonas();
+  if (saved?.life.enabled) {
+    const { writeOrigin } = await import("@/lib/talent/life");
+    await writeOrigin(saved, actor);
+  }
   return saved ? { ok: true, value: { id: made.value.id, manifest: made.value, companion: made.value.companion, synth: saved } } : { ok: false, status: 400, error: "The synth could not be saved. Check its fields and try again." };
 }
 export function updateSynth(actor: PersonRow, id: string, patch: Partial<Pick<SynthRecord, "persona" | "based_on" | "life" | "subject_id">>): SynthWriteResult {
@@ -126,7 +131,9 @@ export function forkSynth(actor: PersonRow, baseId: string): SynthWriteResult {
   const synth = synthFor(forked.value, forked.value.id);
   if (!synth) return { ok: false, status: 400, error: "The synth copy could not be read. Try again." };
   synthCache.set(synth.id, { signature: JSON.stringify(forked.value), value: synth });
-  setValue(actor, `person:${actor.id}`, "persona.active_id", synth.id);
+  reloadPersonas();
+  const picked = setValue(actor, `person:${actor.id}`, "persona.active_id", synth.id);
+  if (!picked.ok) return { ok: false, status: 400, error: `The synth was forked, but could not be selected. ${picked.error} Choose it again from your companions.` };
   return { ok: true, value: { id: synth.id, manifest: forked.value, companion: forked.value.companion, synth } };
 }
 export function shareFork(actor: PersonRow, id: string): SynthWriteResult {
