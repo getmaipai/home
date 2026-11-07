@@ -6,10 +6,12 @@ import { lockedFilterSql } from "@/lib/adultLock";
 import { trashTotals } from "@/lib/libraryTrash";
 import { expiringLibraryFiles } from "@/lib/libraryRetention";
 import type { PersonRow } from "@/types";
+import { apiError } from "@/lib/apiErrorCopy";
 
 export interface LibraryQuery { limit?: number; cursor?: string; type?: string; origin?: "made" | "sent" | "fetched"; owner?: string; shared?: "with-me" | "by-me" | "none"; search?: string; sort?: "newest" | "oldest" | "name" | "size" }
 interface Cursor { v: 1; key: string | number; created: string; id: string; scope: string }
-export class LibraryCursorError extends Error {}
+/** The page address (cursor) cannot be read; the route answers with the `library_cursor_invalid` table line. */
+export class LibraryCursorError extends Error { constructor() { super(apiError("library_cursor_invalid").error); } }
 function scope(q: LibraryQuery) { return q.origin ? JSON.stringify([q.type ?? "", q.origin, q.owner ?? "", q.shared ?? "", q.search ?? "", q.sort ?? "newest"]) : JSON.stringify([q.type ?? "", q.owner ?? "", q.shared ?? "", q.search ?? "", q.sort ?? "newest"]); }
 function cursor(q: LibraryQuery): Cursor | null {
   if (!q.cursor) return null;
@@ -17,7 +19,7 @@ function cursor(q: LibraryQuery): Cursor | null {
     const c = JSON.parse(Buffer.from(q.cursor, "base64url").toString()) as Cursor;
     if (c.v !== 1 || c.scope !== scope(q) || typeof c.created !== "string" || typeof c.id !== "string" || !(typeof c.key === "string" || typeof c.key === "number")) throw new Error();
     return c;
-  } catch { throw new LibraryCursorError("The page address is invalid. Open the Library again."); }
+  } catch { throw new LibraryCursorError(); }
 }
 
 /** One joined read, with a grouped share relation so multiple pointers never multiply files. */

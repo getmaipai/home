@@ -25,7 +25,7 @@ import { contentFor, dropFileReferences, ensureContent, releaseContent, syncFile
 import { canAccessFile, canAccessPerson, canReadFileAudience } from "@/lib/access";
 import { lockItemOfProvenance, lockState } from "@/lib/adultLock";
 import type { PersonRow } from "@/types";
-import type { Result } from "@/lib/result";
+import { refusal, type Result } from "@/lib/result";
 
 export type AttachmentOpResult<T> = Result<T, 400 | 403 | 404 | 500>;
 
@@ -271,9 +271,9 @@ export function storeFile(actor: PersonRow, input: StoreFileInput): AttachmentOp
  * confirm the id exists. */
 export function getAttachment(actor: PersonRow, id: string): AttachmentOpResult<FileRecord> {
   const row = db.select().from(attachments).where(eq(attachments.id, id)).get();
-  if (!row || !canAccessFile(actor, row.ownerPersonId, id)) return { ok: false, status: 404, error: "attachment not found" };
+  if (!row || !canAccessFile(actor, row.ownerPersonId, id)) return refusal(404, "file_not_in_library");
   // ADULT-LOCK-02: a locked item answers exactly like a missing one until the viewer holds an unlock proof.
-  if (lockState(lockItemOfProvenance(row.ownerPersonId, row.provenance), actor) !== "open") return { ok: false, status: 404, error: "attachment not found" };
+  if (lockState(lockItemOfProvenance(row.ownerPersonId, row.provenance), actor) !== "open") return refusal(404, "file_not_in_library");
   return { ok: true, value: toRecord(row) };
 }
 
@@ -289,7 +289,7 @@ export function readAttachment(actor: PersonRow, id: string): AttachmentOpResult
     }
     return { ok: true, value: { record: found.value, bytes } };
   } catch {
-    return { ok: false, status: 404, error: "attachment file not found" };
+    return refusal(404, "file_not_in_library");
   }
 }
 

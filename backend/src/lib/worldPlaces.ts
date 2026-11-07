@@ -6,10 +6,10 @@ import type { PersonRow } from "@/types";
 
 const places = ownedRecordCrud({
   table: worldPlaces, spec: WorldPlace, idPrefix: "place", fields: ["name", "country", "zone"], trimmed: ["name", "country"], blankDefaults: ["zone"],
-  invalid: "Invalid world place.", missing: "No such place.",
-  limit: { max: 12, error: "You can save up to 12 places." },
+  invalid: "world_place_invalid", missing: "world_place_missing",
+  limit: { max: 12, code: "world_place_limit" },
   validate: (values) => {
-    try { new Intl.DateTimeFormat("en", { timeZone: values.zone }); } catch { return "Choose a valid time zone."; }
+    try { new Intl.DateTimeFormat("en", { timeZone: values.zone }); } catch { return "world_place_zone_invalid"; }
     return null;
   },
 });

@@ -9,7 +9,7 @@ import { nextOccurrence } from "@/lib/scheduler";
 import { getSettingValueForPerson } from "@/lib/settings";
 import { validTimeZone } from "@/lib/wallClock";
 import type { PersonRow } from "@/types";
-import type { Result as SharedResult } from "@/lib/result";
+import { refusal, type Result as SharedResult } from "@/lib/result";
 
 type Result<T> = SharedResult<T, 400 | 404>;
 type AlarmRow = typeof alarms.$inferSelect;
@@ -43,26 +43,26 @@ export function listAlarms(actor: PersonRow): (AlarmT & { next_at: string | null
 export function createAlarm(actor: PersonRow, input: Partial<Pick<AlarmT, "time" | "days" | "label" | "tag" | "enabled" | "sound" | "snooze_minutes">>): Result<AlarmT> {
   const now = new Date().toISOString();
   const candidate = Alarm.safeParse({ id: `alarm-${Math.random().toString(36).slice(2, 12)}`, person: actor.id, time: input.time, days: input.days ?? [], label: input.label ?? "", tag: input.tag ?? "", enabled: input.enabled ?? true, skip_until: null, sound: input.sound ?? "default", snooze_minutes: input.snooze_minutes ?? null, source: "hub", created_at: now, updated_at: now, deleted_at: null, hlc: nextHlc() });
-  if (!candidate.success) return { ok: false, status: 400, error: "invalid alarm" };
+  if (!candidate.success) return refusal(400, "alarm_invalid");
   db.insert(alarms).values(rowOf(candidate.data)).run(); syncAlarmJob(candidate.data); return { ok: true, value: candidate.data };
 }
 
 export function updateAlarm(actor: PersonRow, id: string, edit: Partial<Pick<AlarmT, "time" | "days" | "label" | "tag" | "enabled" | "sound" | "snooze_minutes">>): Result<AlarmT> {
-  const row = owned(actor, id); if (!row) return { ok: false, status: 404, error: "no such alarm" };
+  const row = owned(actor, id); if (!row) return refusal(404, "alarm_missing");
   const current = shape(row); const parsed = Alarm.safeParse({ ...current, ...edit, updated_at: new Date().toISOString(), hlc: nextHlc() });
-  if (!parsed.success) return { ok: false, status: 400, error: "invalid alarm" };
+  if (!parsed.success) return refusal(400, "alarm_invalid");
   db.update(alarms).set(rowOf(parsed.data)).where(eq(alarms.id, id)).run(); syncAlarmJob(parsed.data); return { ok: true, value: parsed.data };
 }
 
 export function skipNext(actor: PersonRow, id: string): Result<AlarmT> {
-  const row = owned(actor, id); if (!row) return { ok: false, status: 404, error: "no such alarm" };
-  const current = shape(row); const next = nextAt(current); if (!next) return { ok: false, status: 400, error: "alarm has no next occurrence" };
+  const row = owned(actor, id); if (!row) return refusal(404, "alarm_missing");
+  const current = shape(row); const next = nextAt(current); if (!next) return refusal(400, "alarm_no_next");
   const updated = Alarm.parse({ ...current, skip_until: new Date(Date.parse(next) + 1).toISOString(), updated_at: new Date().toISOString(), hlc: nextHlc() });
   db.update(alarms).set(rowOf(updated)).where(eq(alarms.id, id)).run(); syncAlarmJob(updated); return { ok: true, value: updated };
 }
 
 export function deleteAlarm(actor: PersonRow, id: string): Result<{ id: string }> {
-  const row = owned(actor, id); if (!row) return { ok: false, status: 404, error: "no such alarm" };
+  const row = owned(actor, id); if (!row) return refusal(404, "alarm_missing");
   const now = new Date().toISOString(); db.update(alarms).set({ deletedAt: now, updatedAt: now, hlc: nextHlc() }).where(eq(alarms.id, id)).run(); syncAlarmJob(Alarm.parse({ ...shape(row), deleted_at: now, updated_at: now, hlc: nextHlc() })); return { ok: true, value: { id } };
 }
 

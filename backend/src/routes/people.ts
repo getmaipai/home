@@ -116,7 +116,7 @@ peopleRoutes.openapi(createRoute_, async (c) => {
   const body = c.req.valid("json");
 
   const displayName = validateDisplayName(body.displayName);
-  if (!displayName.ok) return c.json({ error: displayName.error }, 400);
+  if (!displayName.ok) return c.json(apiError(displayName.code), 400);
 
   const role = body.role as Role;
   if (!ROLE_LADDER.includes(role)) {
@@ -155,7 +155,7 @@ peopleRoutes.openapi(createRoute_, async (c) => {
   let secret: string | undefined;
   if (body.secret !== undefined) {
     const validated = validateSecret(body.secret);
-    if (!validated.ok) return c.json({ error: validated.error }, 400);
+    if (!validated.ok) return c.json(apiError(validated.code), 400);
     secret = validated.value;
   }
 
@@ -294,7 +294,7 @@ peopleRoutes.openapi(patchRoute, async (c) => {
   let displayName = target.displayName;
   if (body.displayName !== undefined) {
     const validated = validateDisplayName(body.displayName);
-    if (!validated.ok) return c.json({ error: validated.error }, 400);
+    if (!validated.ok) return c.json(apiError(validated.code), 400);
     displayName = validated.value;
   }
 

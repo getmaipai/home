@@ -10,6 +10,8 @@ import { createGrant, listGrants, revokeGrant } from "@/lib/grants";
 import { Grant } from "@maipai/spec/gen/ts/grant.js";
 import type { Role } from "@/middleware/auth";
 import { isOwnerOrAdmin } from "@/lib/access";
+import { apiError } from "@/lib/apiErrorCopy";
+import { refusalBody } from "@/lib/result";
 
 export const grantsRoutes = apiRouter();
 
@@ -31,7 +33,7 @@ grantsRoutes.openapi(listRoute, (c) => {
   const targetId = person ?? actor.id;
   const canSeeOthers = isOwnerOrAdmin(actor);
   if (targetId !== actor.id && !canSeeOthers) {
-    return c.json({ error: "not allowed to see this person's grants" }, 403);
+    return c.json(apiError("grants_view_forbidden"), 403);
   }
   return c.json(listGrants(targetId), 200);
 });
@@ -68,7 +70,7 @@ const createRoute_ = createRoute({
 grantsRoutes.openapi(createRoute_, (c) => {
   const actor = c.get("person");
   const result = createGrant({ id: actor.id, role: actor.role as Role }, c.req.valid("json"));
-  if (!result.ok || !result.value) return c.json({ error: result.error ?? "invalid grant" }, 400);
+  if (!result.ok) return c.json(refusalBody(result), 400);
   return c.json(result.value, 201);
 });
 
@@ -86,6 +88,6 @@ const revokeRoute = createRoute({
 });
 grantsRoutes.openapi(revokeRoute, (c) => {
   const result = revokeGrant(c.req.valid("param").id);
-  if (!result.ok || !result.value) return c.json({ error: result.error ?? "no such grant" }, 404);
+  if (!result.ok) return c.json(refusalBody(result), 404);
   return c.json(result.value, 200);
 });

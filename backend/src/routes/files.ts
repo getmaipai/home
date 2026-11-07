@@ -21,6 +21,8 @@ import { sungLyricsFromLrc, withoutLastLines } from "@/lib/music/sections";
 import { timedLyricsFor, type TimedWordLine } from "@/lib/music/timedWords";
 import { canAccessFile } from "@/lib/access";
 import { serveBytes } from "@/lib/media/serve";
+import { refusalBody } from "@/lib/result";
+import { apiError } from "@/lib/apiErrorCopy";
 
 export const filesRoutes = apiRouter();
 // A share is its own addressable resource (share.schema.json), so its
@@ -79,7 +81,7 @@ const getRoute = createRoute({
 filesRoutes.openapi(getRoute, (c) => {
   const actor = c.get("person");
   const result = getAttachment(actor, c.req.valid("param").id);
-  if (!result.ok) return c.json({ error: result.error }, 404);
+  if (!result.ok) return c.json(refusalBody(result), 404);
   const songRow = db.select().from(musicJobs).where(eq(musicJobs.fileId, c.req.valid("param").id)).get();
   let music: { id: string; title: string | null; description: string | null; lyrics: string | null; timed_lyrics: TimedWordLine[] | null; cover_url: string | null; versions: { id: string; label: string; url: string }[]; current_id: string | null; owner: boolean } | undefined;
   if (songRow && songRow.state === "done") {
@@ -143,7 +145,7 @@ filesRoutes.openapi(contentRoute, (c) => {
   // returns (404 for no access/missing bytes, 500 for a failed
   // integrity check) - narrowed here the same way getRoute above
   // hardcodes 404 rather than passing `result.status` straight through.
-  if (!result.ok) return c.json({ error: result.error }, result.status === 500 ? 500 : 404, { "cache-control": "private, no-store" });
+  if (!result.ok) return c.json(refusalBody(result), result.status === 500 ? 500 : 404, { "cache-control": "private, no-store" });
   const { bytes, record } = result.value;
   // A code review caught the first cut of this: sha256 content-addressing
   // (file.schema.json) makes the BYTES at this id immutable forever, but
@@ -183,7 +185,7 @@ filesRoutes.openapi(listSharesRoute, (c) => {
   const actor = c.get("person");
   const { id } = c.req.valid("param");
   const found = getAttachment(actor, id);
-  if (!found.ok) return c.json({ error: found.error }, 404);
+  if (!found.ok) return c.json(refusalBody(found), 404);
   return c.json(listSharesForFile(id), 200);
 });
 
@@ -261,10 +263,10 @@ filesRoutes.openapi(deleteFileRoute, (c) => {
   const actor = c.get("person");
   const { id } = c.req.valid("param");
   const found = getAttachment(actor, id);
-  if (!found.ok) return c.json({ error: "That file is not in your Library. Refresh the page and try again." }, 404);
+  if (!found.ok) return c.json(apiError("file_not_in_library"), 404);
   // Issue 213: a file inherited from someone who left the household can be deleted by an owner or admin; it goes to Trash like any other.
   if (found.value.owner_person_id !== actor.id && !canDeleteInherited(actor, found.value.owner_person_id)) {
-    return c.json({ error: "Only the person who added this file can delete it. You can stop seeing it by asking them to unshare." }, 403);
+    return c.json(apiError("file_delete_owner_only"), 403);
   }
   const result = trashFile(actor, id);
   if (!result.ok) return respond(c, result);

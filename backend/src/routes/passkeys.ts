@@ -69,7 +69,7 @@ passkeysRoutes.openapi(registerVerifyRoute, async (c) => {
   const actor = c.get("person");
   const { response, name } = c.req.valid("json");
   const result = await verifyRegistration(actor.id, response as RegistrationResponseJSON, name);
-  if (!result.ok) return c.json({ error: result.error ?? "Could not verify this passkey." }, 400);
+  if (!result.ok) return c.json(apiError(result.code ?? "passkey_verify_failed"), 400);
   return c.json({ success: true as const }, 200);
 });
 
@@ -197,7 +197,7 @@ passkeysRoutes.openapi(authVerifyRoute, async (c) => {
     throttleFail(ip);
     ensureCredentialRowExists(personId);
     const { failedAttempts } = recordFailedAttempt(personId);
-    return c.json({ error: result.error ?? "Could not verify this passkey.", attemptsLeft: failSigninAddress(ip, personId) }, 401);
+    return c.json(apiError(result.code ?? "passkey_verify_failed", { attemptsLeft: failSigninAddress(ip, personId) }), 401);
   }
 
   throttleReset(ip);

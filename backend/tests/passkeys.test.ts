@@ -82,7 +82,7 @@ describe("verifyRegistration()", () => {
 
     const second = await verifyRegistration(personId, { id: "garbage" } as never, "My phone");
     expect(second.ok).toBe(false);
-    expect(second.error).toContain("expired");
+    expect(second.code).toBe("passkey_registration_expired");
   });
 });
 
@@ -109,14 +109,14 @@ describe("verifyAuthentication()", () => {
     await authenticationOptions(personId);
     const result = await verifyAuthentication(personId, { id: "never-registered" } as never);
     expect(result.ok).toBe(false);
-    expect(result.error).toContain("isn't registered");
+    expect(result.code).toBe("passkey_not_registered_here");
   });
 
   test("refuses when no authentication attempt is in progress", async () => {
     const personId = insertPerson();
     const result = await verifyAuthentication(personId, { id: "whatever" } as never);
     expect(result.ok).toBe(false);
-    expect(result.error).toContain("expired");
+    expect(result.code).toBe("passkey_signin_expired");
   });
 });
 

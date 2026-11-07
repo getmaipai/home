@@ -24,6 +24,7 @@ import {
 } from "@/lib/lists";
 import { List } from "@maipai/spec/gen/ts/list.js";
 import { parseQuickAddReminder } from "@/lib/reminderParsing";
+import { refusalBody } from "@/lib/result";
 
 export const listsRoutes = apiRouter();
 
@@ -67,7 +68,7 @@ const getRoute = createRoute({
 listsRoutes.openapi(getRoute, (c) => {
   const actor = c.get("person");
   const result = getList(actor, c.req.valid("param").id);
-  if (!result.ok) return c.json({ error: result.error }, 404);
+  if (!result.ok) return c.json(refusalBody(result), 404);
   return c.json(result.value, 200);
 });
 
@@ -101,7 +102,7 @@ const createRoute_ = createRoute({
 listsRoutes.openapi(createRoute_, (c) => {
   const actor = c.get("person");
   const result = createList(actor, c.req.valid("json"));
-  if (!result.ok) return c.json({ error: result.error }, 400);
+  if (!result.ok) return c.json(refusalBody(result), 400);
   return c.json(result.value, 201);
 });
 
@@ -133,7 +134,7 @@ listsRoutes.openapi(patchRoute, (c) => {
   const actor = c.get("person");
   const { id } = c.req.valid("param");
   const result = updateList(actor, id, c.req.valid("json"));
-  if (!result.ok) return c.json({ error: result.error }, statusFor(result.status));
+  if (!result.ok) return c.json(refusalBody(result), statusFor(result.status));
   return c.json(result.value, 200);
 });
 
@@ -152,7 +153,7 @@ const deleteRoute = createRoute({
 listsRoutes.openapi(deleteRoute, (c) => {
   const actor = c.get("person");
   const result = deleteList(actor, c.req.valid("param").id);
-  if (!result.ok) return c.json({ error: result.error }, result.status === 403 ? 403 : 404);
+  if (!result.ok) return c.json(refusalBody(result), result.status === 403 ? 403 : 404);
   return c.json(result.value, 200);
 });
 
@@ -197,7 +198,7 @@ listsRoutes.openapi(addItemRoute, (c) => {
   } else {
     result = addItem(actor, id, input);
   }
-  if (!result.ok) return c.json({ error: result.error }, statusFor(result.status));
+  if (!result.ok) return c.json(refusalBody(result), statusFor(result.status));
   return c.json(result.value, 200);
 });
 
@@ -226,7 +227,7 @@ listsRoutes.openapi(editItemRoute, (c) => {
   const actor = c.get("person");
   const { id, itemId } = c.req.valid("param");
   const result = editItem(actor, id, itemId, c.req.valid("json"));
-  if (!result.ok) return c.json({ error: result.error }, statusFor(result.status));
+  if (!result.ok) return c.json(refusalBody(result), statusFor(result.status));
   return c.json(result.value, 200);
 });
 
@@ -248,7 +249,7 @@ listsRoutes.openapi(removeItemRoute, (c) => {
   const actor = c.get("person");
   const { id, itemId } = c.req.valid("param");
   const result = removeItem(actor, id, itemId);
-  if (!result.ok) return c.json({ error: result.error }, 404);
+  if (!result.ok) return c.json(refusalBody(result), 404);
   return c.json(result.value, 200);
 });
 
@@ -267,7 +268,7 @@ const clearRoute = createRoute({
 listsRoutes.openapi(clearRoute, (c) => {
   const actor = c.get("person");
   const result = clearList(actor, c.req.valid("param").id);
-  if (!result.ok) return c.json({ error: result.error }, 404);
+  if (!result.ok) return c.json(refusalBody(result), 404);
   return c.json(result.value, 200);
 });
 
@@ -286,6 +287,6 @@ const clearDoneRoute = createRoute({
 listsRoutes.openapi(clearDoneRoute, (c) => {
   const actor = c.get("person");
   const result = clearDoneItems(actor, c.req.valid("param").id);
-  if (!result.ok) return c.json({ error: result.error }, 404);
+  if (!result.ok) return c.json(refusalBody(result), 404);
   return c.json(result.value, 200);
 });

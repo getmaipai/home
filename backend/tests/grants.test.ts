@@ -80,6 +80,7 @@ describe("POST /api/grants", () => {
       const res = await admin.client.post("/api/grants", { person, action: "backups.restore", effect: "allow" });
       expect(res.status).toBe(400);
       expect(await res.json()).toEqual({
+        code: person === admin.id ? "grant_backup_self" : "grant_not_held",
         error: person === admin.id
           ? "Admins cannot grant themselves backup restore access. Ask the owner to grant it."
           : "You can't give someone a permission you don't have. Ask the owner to grant it.",

@@ -8,9 +8,11 @@ import type { SQLiteTable } from "drizzle-orm/sqlite-core";
 import { db } from "@/db";
 import { randomSuffix } from "@/lib/id";
 import { nextHlc } from "@/lib/hlc";
+import type { ApiErrorBodyCode } from "@/lib/apiErrorCopy";
+import { refusal, type Result } from "@/lib/result";
 import type { PersonRow } from "@/types";
 
-export type CrudResult<T> = { ok: true; value: T } | { ok: false; status: 400 | 404; error: string };
+export type CrudResult<T> = Result<T, 400 | 404>;
 
 type Loose = Record<string, any>;
 
@@ -25,12 +27,13 @@ export type OwnedRecordSpec<S extends z.ZodTypeAny> = {
   trimmed: readonly string[];
   /** Fields that default to "" on create when missing and are not trimmed. */
   blankDefaults?: readonly string[];
-  invalid: string;
-  missing: string;
-  /** At most this many live rows per person (create refuses beyond it with `error`). */
-  limit?: { max: number; error: string };
-  /** A refusal for the merged values of a create or update, or null. Runs before the spec parse. */
-  validate?: (values: Loose) => string | null;
+  /** The table codes (lib/apiErrorCopy.ts) for a failed spec parse and for a missing row. */
+  invalid: ApiErrorBodyCode;
+  missing: ApiErrorBodyCode;
+  /** At most this many live rows per person (create refuses beyond it with the table line `code`). */
+  limit?: { max: number; code: ApiErrorBodyCode };
+  /** A refusal code for the merged values of a create or update, or null. Runs before the spec parse. */
+  validate?: (values: Loose) => ApiErrorBodyCode | null;
 };
 
 export function ownedRecordCrud<S extends z.ZodTypeAny>(config: OwnedRecordSpec<S>) {
@@ -57,20 +60,20 @@ export function ownedRecordCrud<S extends z.ZodTypeAny>(config: OwnedRecordSpec<
   }
 
   function create(actor: PersonRow, input: Loose): CrudResult<T> {
-    if (config.limit && rows(actor).length >= config.limit.max) return { ok: false, status: 400, error: config.limit.error };
+    if (config.limit && rows(actor).length >= config.limit.max) return refusal(400, config.limit.code);
     const values: Loose = {};
     for (const key of config.fields) {
       const value = input[key];
       values[key] = config.trimmed.includes(key) ? (typeof value === "string" ? value.trim() : "") : value ?? (config.blankDefaults?.includes(key) ? "" : undefined);
     }
-    const refusal = config.validate?.(values);
-    if (refusal) return { ok: false, status: 400, error: refusal };
+    const invalid = config.validate?.(values);
+    if (invalid) return refusal(400, invalid);
     const now = new Date().toISOString();
     const candidate = config.spec.safeParse({
       id: `${config.idPrefix}-${randomSuffix(10)}`, person: actor.id, ...values, position: input.position ?? rows(actor).length,
       source: input.source ?? "hub", created_at: now, updated_at: now, deleted_at: null, hlc: nextHlc(),
     });
-    if (!candidate.success) return { ok: false, status: 400, error: config.invalid };
+    if (!candidate.success) return refusal(400, config.invalid);
     const data = candidate.data as Loose;
     db.insert(config.table).values({
       id: data.id, person: data.person, ...Object.fromEntries(columns.map((key) => [key, data[key]])), source: data.source,
@@ -81,22 +84,22 @@ export function ownedRecordCrud<S extends z.ZodTypeAny>(config: OwnedRecordSpec<
 
   function update(actor: PersonRow, id: string, edit: Loose): CrudResult<T> {
     const row = own(actor, id);
-    if (!row) return { ok: false, status: 404, error: config.missing };
+    if (!row) return refusal(404, config.missing);
     const current = shape(row) as Loose;
     const merged: Loose = { ...current, ...edit };
     for (const key of config.trimmed) merged[key] = typeof edit[key] === "string" ? edit[key].trim() : current[key];
-    const refusal = config.validate?.(merged);
-    if (refusal) return { ok: false, status: 400, error: refusal };
+    const invalid = config.validate?.(merged);
+    if (invalid) return refusal(400, invalid);
     const now = new Date().toISOString();
     const candidate = config.spec.safeParse({ ...merged, updated_at: now, hlc: nextHlc() });
-    if (!candidate.success) return { ok: false, status: 400, error: config.invalid };
+    if (!candidate.success) return refusal(400, config.invalid);
     const data = candidate.data as Loose;
     db.update(config.table).set({ ...Object.fromEntries(columns.map((key) => [key, data[key]])), updatedAt: now, hlc: data.hlc } as never).where(eq(table.id, id)).run();
     return { ok: true, value: candidate.data };
   }
 
   function remove(actor: PersonRow, id: string): CrudResult<{ id: string }> {
-    if (!own(actor, id)) return { ok: false, status: 404, error: config.missing };
+    if (!own(actor, id)) return refusal(404, config.missing);
     const now = new Date().toISOString();
     db.update(config.table).set({ deletedAt: now, updatedAt: now, hlc: nextHlc() } as never).where(eq(table.id, id)).run();
     return { ok: true, value: { id } };

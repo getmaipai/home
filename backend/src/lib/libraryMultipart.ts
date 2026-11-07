@@ -3,10 +3,10 @@ import { UploadError } from "@/lib/libraryUploadStream";
 export async function libraryMultipart(request: Request): Promise<{ name: string; body: ReadableStream<Uint8Array> }> {
   const boundary = /boundary=(?:"([^"]+)"|([^;\s]+))/i.exec(request.headers.get("content-type") ?? "");
   const token = boundary?.[1] ?? boundary?.[2];
-  if (!token || token.length > 200 || /[\r\n]/.test(token) || !request.body) throw new UploadError(400, "Choose a file to add.");
+  if (!token || token.length > 200 || /[\r\n]/.test(token) || !request.body) throw new UploadError(400, "upload_choose_file");
   const reader = request.body.getReader();
   let buffer = Buffer.alloc(0);
-  const fail = () => new UploadError(400, "That upload could not be read. Choose one file and add it again.");
+  const fail = () => new UploadError(400, "upload_request_unreadable");
   try {
     for (;;) {
       const end = buffer.indexOf("\r\n\r\n");

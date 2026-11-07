@@ -16,12 +16,16 @@ import { cleanChatImageFile } from "@/lib/imageUpload";
 import { digestOfFile } from "@/lib/fileBlobs";
 import { nextHlc } from "@/lib/hlc";
 import type { PersonRow } from "@/types";
-import { MAX_LIBRARY_UPLOAD_BYTES, UNSUPPORTED_UPLOAD, type UploadResult } from "@/lib/libraryUpload";
+import { apiError, type ApiErrorBodyCode } from "@/lib/apiErrorCopy";
+import { MAX_LIBRARY_UPLOAD_BYTES, type UploadResult } from "@/lib/libraryUpload";
 
 export const LIBRARY_CHUNK_BYTES = 8 * 1024 * 1024;
 const AGE = 60 * 60 * 1000;
+/** A refusal an upload route sends: a table code (lib/apiErrorCopy.ts, the words live only there), or `{ text }` for the storage-cap
+ * message, which is built from live numbers and stays as sent. */
 export class UploadError extends Error {
-  constructor(public status: 400 | 403 | 404 | 413 | 409, message: string) { super(message); }
+  readonly code?: ApiErrorBodyCode;
+  constructor(public status: 400 | 403 | 404 | 413 | 409, what: ApiErrorBodyCode | { text: string }) { super(typeof what === "string" ? apiError(what).error : what.text); if (typeof what === "string") this.code = what; }
 }
 interface Prefix { path: string; size: number; read: number; hash: Hash }
 interface Session {
@@ -43,8 +47,8 @@ let cap = MAX_LIBRARY_UPLOAD_BYTES;
 export function __setLibraryUploadCapForTests(bytes = MAX_LIBRARY_UPLOAD_BYTES) { cap = bytes; }
 export function assertLibraryUploadAllowed(actor: PersonRow) {
   const current = db.select().from(people).where(eq(people.id, actor.id)).get();
-  if (!current || current.deletedAt || !current.enabled) throw new UploadError(403, "Your profile is no longer available. Sign in again.");
-  if (current.role === "child" || current.role === "guest") throw new UploadError(403, "Ask a grown-up to add this file. Adding files to the Library is turned off for your profile.");
+  if (!current || current.deletedAt || !current.enabled) throw new UploadError(403, "upload_profile_gone");
+  if (current.role === "child" || current.role === "guest") throw new UploadError(403, "upload_not_allowed_minor");
 }
 async function discard(id: string) {
   const session = sessions.get(id);
@@ -56,7 +60,7 @@ async function discard(id: string) {
 export async function beginLibraryUpload(actor: PersonRow, name: string, sessionLimit = 3) {
   assertLibraryUploadAllowed(actor);
   // Bound abandoned staging files even before the expiry timer runs.
-  if ([...sessions.values()].filter(s => s.owner === actor.id).length + (starting.get(actor.id) ?? 0) >= sessionLimit) throw new UploadError(409, "You already have three uploads running. Finish or cancel one, then try again.");
+  if ([...sessions.values()].filter(s => s.owner === actor.id).length + (starting.get(actor.id) ?? 0) >= sessionLimit) throw new UploadError(409, "upload_too_many");
   starting.set(actor.id, (starting.get(actor.id) ?? 0) + 1);
   let dir: string | undefined;
   try {
@@ -91,8 +95,8 @@ export async function beginLibraryUpload(actor: PersonRow, name: string, session
 }
 function owned(actor: PersonRow, id: string) {
   const s = sessions.get(id);
-  if (!s || s.owner !== actor.id || s.expires <= Date.now()) throw new UploadError(404, "That upload is no longer available. Add the file again.");
-  if (s.busy) throw new UploadError(409, "That upload is still working. Wait for it to finish, then try again.");
+  if (!s || s.owner !== actor.id || s.expires <= Date.now()) throw new UploadError(404, "upload_gone");
+  if (s.busy) throw new UploadError(409, "upload_busy");
   return s;
 }
 // A duplicate still fits a full store. Only an exact matching prefix of an existing blob can defer refusal until finish.
@@ -126,12 +130,12 @@ function capacity(actor: PersonRow, s: Session, size: number, digest: string) {
     } catch { s.prefixes.delete(sha256); }
     finally { if (fd !== undefined) closeSync(fd); }
   }
-  if (!matches) throw new UploadError(403, raw.error!);
+  if (!matches) throw new UploadError(403, { text: raw.error! });
 }
 
 export async function appendLibraryUpload(actor: PersonRow, id: string, body: ReadableStream<Uint8Array> | null, offset: number, chunkLimit = LIBRARY_CHUNK_BYTES) {
   const s = owned(actor, id);
-  if (offset !== s.size) throw new UploadError(409, "That chunk is out of order. Send the next chunk at the returned offset.");
+  if (offset !== s.size) throw new UploadError(409, "upload_chunk_order");
   s.busy = true;
   const reader = body?.getReader();
   s.cancel = async () => { await reader?.cancel(); };
@@ -140,20 +144,20 @@ export async function appendLibraryUpload(actor: PersonRow, id: string, body: Re
   try {
     assertLibraryUploadAllowed(actor);
     handle = await open(s.path, "a");
-    if (!reader) throw new UploadError(400, "That chunk is empty. Send the file bytes again.");
+    if (!reader) throw new UploadError(400, "upload_chunk_empty");
     for (;;) {
       const { done, value } = await reader.read();
-      if (s.expires <= Date.now() || sessions.get(id) !== s) throw new UploadError(404, "That upload is no longer available. Add the file again.");
+      if (s.expires <= Date.now() || sessions.get(id) !== s) throw new UploadError(404, "upload_gone");
       if (done) break;
       count += value.byteLength;
-      if (s.size + value.byteLength > cap) throw new UploadError(413, "That file is bigger than 500 MB. Choose a smaller file.");
-      if (count > chunkLimit) throw new UploadError(413, "That chunk is bigger than 8 MB. Add the file again using smaller chunks.");
+      if (s.size + value.byteLength > cap) throw new UploadError(413, "upload_too_big");
+      if (count > chunkLimit) throw new UploadError(413, "upload_chunk_too_big");
       s.hash.update(value);
       capacity(actor, s, s.size + value.byteLength, s.hash.copy().digest("hex"));
       await handle.writeFile(value);
       s.size += value.byteLength;
     }
-    if (!count) throw new UploadError(400, "That chunk is empty. Add the file again.");
+    if (!count) throw new UploadError(400, "upload_chunk_empty");
     return { offset: s.size };
   } catch (error) {
     s.cancel = undefined;
@@ -161,7 +165,7 @@ export async function appendLibraryUpload(actor: PersonRow, id: string, body: Re
     await handle?.close().catch(() => {}); handle = undefined;
     await discard(id);
     if (error instanceof UploadError) throw error;
-    throw new UploadError(400, "The upload stopped before it finished. Add the file again.");
+    throw new UploadError(400, "upload_interrupted");
   } finally { await handle?.close(); reader?.releaseLock(); s.cancel = undefined; s.busy = false; }
 }
 async function classify(s: Session) {
@@ -169,24 +173,24 @@ async function classify(s: Session) {
   if (found) {
     if (["image/jpeg", "image/png", "image/webp", "image/gif", "image/heic", "image/heif"].includes(found.mime)) return { type: found.mime, picture: true };
     if (found.mime.startsWith("audio/") || found.mime.startsWith("video/") || isDocumentMediaType(found.mime)) return { type: found.mime, picture: false };
-    throw new UploadError(400, UNSUPPORTED_UPLOAD);
+    throw new UploadError(400, "upload_unsupported");
   }
   const ext = s.name.split(".").pop()!.toLowerCase();
-  if (!["txt", "md", "csv"].includes(ext)) throw new UploadError(400, UNSUPPORTED_UPLOAD);
+  if (!["txt", "md", "csv"].includes(ext)) throw new UploadError(400, "upload_unsupported");
   const decoder = new TextDecoder("utf-8", { fatal: true });
   try {
     for await (const bytes of Bun.file(s.path).stream()) { if (bytes.includes(0)) throw new Error(); decoder.decode(bytes, { stream: true }); }
     decoder.decode();
-  } catch { throw new UploadError(400, UNSUPPORTED_UPLOAD); }
+  } catch { throw new UploadError(400, "upload_unsupported"); }
   return { type: ext === "csv" ? "text/csv" : "text/plain", picture: false };
 }
 export async function finishLibraryUpload(actor: PersonRow, id: string): Promise<UploadResult> {
   const s = owned(actor, id); s.busy = true;
   try {
     const current = db.select().from(people).where(eq(people.id, actor.id)).get();
-    if (!current || current.deletedAt || !current.enabled) throw new UploadError(403, "Your profile is no longer available. Sign in again.");
+    if (!current || current.deletedAt || !current.enabled) throw new UploadError(403, "upload_profile_gone");
     assertLibraryUploadAllowed(current);
-    if (!s.size) throw new UploadError(400, "That file is empty. Choose a file with something in it.");
+    if (!s.size) throw new UploadError(400, "upload_file_empty");
     const found = await classify(s);
     let path = s.path, size = s.size, sha256 = s.hash.copy().digest("hex"), mediaType = found.type;
     if (found.picture) {
@@ -196,7 +200,7 @@ export async function finishLibraryUpload(actor: PersonRow, id: string): Promise
     }
     const duplicate = !!db.select().from(attachments).where(and(eq(attachments.sha256, sha256), eq(attachments.origin, "sent"), eq(attachments.ownerPersonId, actor.id), isNull(attachments.deletedAt))).get();
     const writer = db.select().from(people).where(eq(people.id, actor.id)).get();
-    if (!writer) throw new UploadError(403, "Your profile is no longer available. Sign in again.");
+    if (!writer) throw new UploadError(403, "upload_profile_gone");
     assertLibraryUploadAllowed(writer);
     const stored = storeFile(writer, { conversationId: null, turnId: null, mediaType, staged: { path, size, sha256 }, provenance: "library:upload", retention: "kept", name: s.name });
     if (!stored.ok) return { ok: false, status: stored.status === 403 ? 403 : 400, error: stored.error };
@@ -205,7 +209,7 @@ export async function finishLibraryUpload(actor: PersonRow, id: string): Promise
     return { ok: true, value: { id: row.id, name: row.name ?? s.name, kind: stored.value.kind, media_type: row.mediaType, size_bytes: row.size, duplicate } };
   } catch (error) {
     if (error instanceof UploadError) throw error;
-    throw new UploadError(400, "That file could not be read. Save it in a supported format and add it again.");
+    throw new UploadError(400, "upload_unreadable");
   } finally { await discard(id); }
 }
 export async function cancelLibraryUpload(actor: PersonRow, id: string) { owned(actor, id); await discard(id); }

@@ -3,6 +3,7 @@ import { QuickTimer } from "@maipai/spec/gen/ts/quick-timer.js";
 import { apiRouter, errorResponses, idParamSchema, respond } from "@/lib/openapi";
 import { requireAuth } from "@/middleware/auth";
 import { createQuickTimer, deleteQuickTimer, listQuickTimers, updateQuickTimer } from "@/lib/quickTimers";
+import { refusalBody } from "@/lib/result";
 
 export const quickTimersRoutes = apiRouter();
 
@@ -39,7 +40,7 @@ const create = createRoute({
 });
 quickTimersRoutes.openapi(create, (c) => {
   const result = createQuickTimer(c.get("person"), c.req.valid("json"));
-  return result.ok ? c.json(result.value, 201) : c.json({ error: result.error }, 400);
+  return result.ok ? c.json(result.value, 201) : c.json(refusalBody(result), 400);
 });
 
 const patch = createRoute({
@@ -76,5 +77,5 @@ const del = createRoute({
 });
 quickTimersRoutes.openapi(del, (c) => {
   const result = deleteQuickTimer(c.get("person"), c.req.valid("param").id);
-  return result.ok ? c.json(result.value, 200) : c.json({ error: result.error }, 404);
+  return result.ok ? c.json(result.value, 200) : c.json(refusalBody(result), 404);
 });

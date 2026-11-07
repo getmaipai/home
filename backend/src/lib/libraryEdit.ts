@@ -11,7 +11,7 @@ import { nextHlc } from "@/lib/hlc";
 import { isGeneratedFile } from "@/lib/libraryProvenance";
 import { redactCredentials } from "@/lib/memoryContentPolicy";
 import type { PersonRow } from "@/types";
-import type { Result } from "@/lib/result";
+import { refusal, type Result } from "@/lib/result";
 
 export type EditResult = Result<{ id: string; name: string | null; retention: string }, 400 | 403 | 404>;
 
@@ -23,25 +23,25 @@ export function cleanFileName(raw: string): string {
 
 export function updateLibraryFile(actor: PersonRow, id: string, patch: { name?: string | null; keep?: boolean }): EditResult {
   const row = db.select().from(attachments).where(eq(attachments.id, id)).get();
-  if (!row || !canAccessFile(actor, row.ownerPersonId, id) || lockState(lockItemOfProvenance(row.ownerPersonId, row.provenance), actor) !== "open") return { ok: false, status: 404, error: "That file is not in your Library. Refresh the page and try again." };
-  if (row.ownerPersonId !== actor.id) return { ok: false, status: 403, error: "Only the person who added this file can change it." };
-  if (row.origin === "fetched") return { ok: false, status: 403, error: "Saved media belongs to its app. Change it there." };
+  if (!row || !canAccessFile(actor, row.ownerPersonId, id) || lockState(lockItemOfProvenance(row.ownerPersonId, row.provenance), actor) !== "open") return refusal(404, "file_not_in_library");
+  if (row.ownerPersonId !== actor.id) return refusal(403, "file_change_owner_only");
+  if (row.origin === "fetched") return refusal(403, "file_edit_in_app");
   const set: Partial<typeof attachments.$inferInsert> = {};
   if (patch.name !== undefined) {
     if (patch.name === null || patch.name.trim() === "") set.name = null;
     else {
       const name = cleanFileName(patch.name);
-      if (name === "") return { ok: false, status: 400, error: "Type a name for this file." };
-      if (name.length > MAX_NAME) return { ok: false, status: 400, error: `Use a name of ${MAX_NAME} characters or fewer.` };
+      if (name === "") return refusal(400, "file_name_required");
+      if (name.length > MAX_NAME) return refusal(400, "file_name_too_long");
       set.name = name;
     }
   }
   if (patch.keep !== undefined) {
     if (patch.keep) set.retention = "kept";
-    else if (!isGeneratedFile(row)) return { ok: false, status: 400, error: "Files you added stay until you delete them." };
+    else if (!isGeneratedFile(row)) return refusal(400, "file_stays_until_deleted");
     else set.retention = "conversation";
   }
-  if (Object.keys(set).length === 0) return { ok: false, status: 400, error: "Send a new name or a keep setting." };
+  if (Object.keys(set).length === 0) return refusal(400, "file_edit_nothing");
   db.update(attachments).set({ ...set, hlc: nextHlc() }).where(eq(attachments.id, id)).run();
   const updated = db.select().from(attachments).where(eq(attachments.id, id)).get()!;
   return { ok: true, value: { id, name: updated.name, retention: updated.retention } };

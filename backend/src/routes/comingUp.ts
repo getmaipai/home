@@ -2,6 +2,7 @@ import { createRoute, z } from "@hono/zod-openapi";
 import { apiRouter, errorResponses, idParamSchema } from "@/lib/openapi";
 import { requireAuth } from "@/middleware/auth";
 import { createTimer, doneComingUp, extendTimer, listComingUp, snoozeComingUp } from "@/lib/comingUp";
+import { refusalBody } from "@/lib/result";
 
 export const comingUpRoutes = apiRouter();
 
@@ -59,7 +60,7 @@ const createTimerRoute = createRoute({
 
 comingUpRoutes.openapi(createTimerRoute, (context) => {
   const result = createTimer(context.get("person"), context.req.valid("json"));
-  return result.ok ? context.json(result.value, 201) : context.json({ error: result.error }, 400);
+  return result.ok ? context.json(result.value, 201) : context.json(refusalBody(result), 400);
 });
 
 const extendTimerRoute = createRoute({
@@ -82,7 +83,7 @@ comingUpRoutes.openapi(extendTimerRoute, (context) => {
   const result = extendTimer(context.get("person"), context.req.valid("param").id);
   return result.ok
     ? context.json(result.value, 200)
-    : context.json({ error: result.error }, result.status);
+    : context.json(refusalBody(result), result.status);
 });
 
 const doneRoute = createRoute({
@@ -104,8 +105,8 @@ const doneRoute = createRoute({
 comingUpRoutes.openapi(doneRoute, (context) => {
   const result = doneComingUp(context.get("person"), context.req.valid("param").id);
   if (result.ok) return context.json({ ok: true as const }, 200);
-  if (result.status === 404) return context.json({ error: result.error }, 404);
-  return context.json({ error: result.error }, 403);
+  if (result.status === 404) return context.json(refusalBody(result), 404);
+  return context.json(refusalBody(result), 403);
 });
 
 const snoozeRoute = createRoute({
@@ -143,7 +144,7 @@ comingUpRoutes.openapi(snoozeRoute, (context) => {
     context.req.valid("json"),
   );
   if (result.ok) return context.json({ ok: true as const }, 200);
-  if (result.status === 404) return context.json({ error: result.error }, 404);
-  if (result.status === 403) return context.json({ error: result.error }, 403);
-  return context.json({ error: result.error }, 400);
+  if (result.status === 404) return context.json(refusalBody(result), 404);
+  if (result.status === 403) return context.json(refusalBody(result), 403);
+  return context.json(refusalBody(result), 400);
 });

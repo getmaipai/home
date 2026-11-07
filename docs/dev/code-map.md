@@ -598,7 +598,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/libraryProvenance.ts` | libraryProvenance, libraryProvenanceSql, isGeneratedFile |
 | `backend/src/lib/libraryRetention.ts` | expiringLibraryFiles, previewLibraryRetention, runLibraryRetention |
 | `backend/src/lib/libraryTrash.ts` | trashDays, companionsOf, parentOf, canDeleteInherited, trashFile, listTrashedFiles |
-| `backend/src/lib/libraryUpload.ts` | MAX_LIBRARY_UPLOAD_BYTES, UNSUPPORTED_UPLOAD |
+| `backend/src/lib/libraryUpload.ts` | MAX_LIBRARY_UPLOAD_BYTES |
 | `backend/src/lib/libraryUploadStream.ts` | LIBRARY_CHUNK_BYTES, UploadError, __setLibraryUploadCapForTests, assertLibraryUploadAllowed, beginLibraryUpload, appendLibraryUpload |
 | `backend/src/lib/licenceAcceptance.ts` | readLicenceAck, currentLicenceAck, ackCovers, licenceCovered, recordLicenceAck, adoptLicenceAck |
 | `backend/src/lib/licenceFlow.ts` | licenceOverview, acceptLicences, widenLicenceAck, installRecommendedExtras, autoInstallOnUpgrade |
@@ -875,7 +875,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/resourceDay.ts` | describeResourceDay, readResourceDay |
 | `backend/src/lib/resourceGovernor.ts` | __setGovernorTuningForTestsOnly, __resetGovernorTuningForTests, __stopAllGovernorsForTests, systemAvailableBytes, startResourceGovernor |
 | `backend/src/lib/restoreStaging.ts` | RestoreRefused, pendingRestore, cancelPendingRestore, moveDbSet, dbSetExists, partialMoveInProgress |
-| `backend/src/lib/result.ts` | conflictStatus |
+| `backend/src/lib/result.ts` | refusal, refusalBody, conflictStatus |
 | `backend/src/lib/retrieval/articleClean.ts` | isPromoText, cleanArticleDocument |
 | `backend/src/lib/retrieval/articleImages.ts` | extractArticleImages |
 | `backend/src/lib/retrieval/ddgsConfig.ts` | DDGS_URL_ENV, setDdgsStackReport, ddgsStackReport, ddgsBaseUrl, ddgsConfigured, ddgsStarting |

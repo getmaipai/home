@@ -223,7 +223,8 @@ describe("sharing bounds (household-storage-2026-09-23.md decisions 2 and 6)", (
     expect(createShare(bramble, { fileId: file.id, to: newPersonId() })).toEqual({
       ok: false,
       status: 400,
-      error: "the household does not have that person",
+      error: "The household does not have that person. Choose someone from the list.",
+      code: "share_person_missing",
     });
   });
 
@@ -262,7 +263,8 @@ describe("sharing bounds (household-storage-2026-09-23.md decisions 2 and 6)", (
     expect(createShare(marlow, { fileId: file.id, to: "household" })).toEqual({
       ok: false,
       status: 403,
-      error: "you do not have access to this file",
+      error: "You do not have access to this file. Ask the owner to share it with you.",
+      code: "share_no_access",
     });
   });
 });

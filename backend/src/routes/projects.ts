@@ -18,6 +18,7 @@
 // not this one's scope.
 import { createRoute, z } from "@hono/zod-openapi";
 import { apiRouter, errorResponses, idParamSchema } from "@/lib/openapi";
+import { apiError } from "@/lib/apiErrorCopy";
 import { requireAuth } from "@/middleware/auth";
 import { canAccessPerson } from "@/lib/access";
 import { loadProject } from "@/lib/projects/store";
@@ -77,7 +78,7 @@ projectsRoutes.openapi(getRoute, (c) => {
   // batch, never per step. Falls back to the persisted row once the
   // project is terminal or this process never launched it (a restart).
   const project = liveProject(id) ?? loadProject(id);
-  if (!project || !canSeeProject(actor, project)) return c.json({ error: "project not found" }, 404);
+  if (!project || !canSeeProject(actor, project)) return c.json(apiError("project_missing"), 404);
   return c.json({ ...project, posted_artifact: postedProjectArtifact(id) }, 200);
 });
 
@@ -99,8 +100,8 @@ projectsRoutes.openapi(cancelRoute, (c) => {
   const actor = c.get("person");
   const id = c.req.valid("param").id;
   const project = loadProject(id);
-  if (!project || !canSeeProject(actor, project)) return c.json({ error: "project not found" }, 404);
+  if (!project || !canSeeProject(actor, project)) return c.json(apiError("project_missing"), 404);
   const sent = cancelProject(id);
-  if (!sent) return c.json({ error: `project ${id} already finished - there's no live run to cancel` }, 409);
+  if (!sent) return c.json(apiError("project_finished"), 409);
   return c.json(loadProject(id) ?? project, 202);
 });

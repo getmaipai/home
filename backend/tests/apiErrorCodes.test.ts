@@ -9,14 +9,61 @@ beforeEach(() => resetDb());
 
 const SRC = join(import.meta.dir, "..", "src");
 const routeSources = [...readdirSync(join(SRC, "routes")).filter((f) => f.endsWith(".ts") && !f.endsWith(".test.ts")).map((f) => join(SRC, "routes", f)), join(SRC, "app.ts")];
-const used = new Set(routeSources.flatMap((file) => [...readFileSync(file, "utf8").matchAll(/apiError\("([a-z_]+)"/g)].map((m) => m[1]!)));
+const libSources = readdirSync(join(SRC, "lib")).filter((f) => f.endsWith(".ts") && f !== "apiErrorCopy.ts").map((f) => join(SRC, "lib", f));
+const text = (file: string) => readFileSync(file, "utf8");
+// A code is "named" where a route sends `apiError("code")` or a lib builds `refusal(status, "code")` / `new UploadError(status, "code")`.
+const NAMING = /(?:apiError\("|refusal\([^,()]*(?:\([^()]*\))?[^,()]*, "|new UploadError\(\d+, "|invalid\(")([a-z_]+)"/g;
+const used = new Set([...routeSources, ...libSources].flatMap((file) => [...text(file).matchAll(NAMING)].map((m) => m[1]!)));
+// A lib that returns a code from a callback or a config object (ownedRecordCrud users, grant tier refusals) names it as a bare string.
+const quoted = new Set([...routeSources, ...libSources].flatMap((file) => [...text(file).matchAll(/"([a-z][a-z_]+)"/g)].map((m) => m[1]!)));
 const lines = API_ERROR_LINES as Record<string, ApiErrorLine>;
 
 describe("API error codes (I18N-B2)", () => {
   test("every table code with an error line is sent by a route, and every route use names a table code", () => {
     const withError = Object.entries(lines).filter(([, line]) => line.error).map(([code]) => code);
-    expect(withError.filter((code) => !used.has(code))).toEqual([]);
+    expect(withError.filter((code) => !used.has(code) && !quoted.has(code))).toEqual([]);
     expect([...used].filter((code) => !(code in lines))).toEqual([]);
+  });
+
+  test("every printed error has a code: the lib groups the audit listed carry no sentence of their own", () => {
+    // I18N-B2b. These routes and libs build user-facing refusals; each names a table code (`refusal(status, "code")`, `apiError("code")`),
+    // so no `error: "sentence"` literal may remain. The allowlist is the developer-only text docs/dev/api-error-audit.md lists.
+    const group = [
+      "routes/alarms.ts", "routes/quickTimers.ts", "routes/worldPlaces.ts", "routes/comingUp.ts", "routes/grants.ts", "routes/lists.ts", "routes/projects.ts", "routes/files.ts", "routes/library.ts",
+      "lib/alarms.ts", "lib/quickTimers.ts", "lib/worldPlaces.ts", "lib/comingUp.ts", "lib/validation.ts", "lib/passkeys.ts", "lib/grants.ts", "lib/lists.ts", "lib/ownedRecordCrud.ts",
+      "lib/libraryEdit.ts", "lib/libraryTrash.ts", "lib/shares.ts", "lib/libraryAudience.ts", "lib/libraryUploadStream.ts", "lib/libraryMultipart.ts", "lib/library.ts",
+      "routes/passkeys.ts",
+    ];
+    const developerOnly = [/Invalid shared filter/, /unknown grant action:/, /candidate\.error\.issues/, /error: error\.message/, /problems\.join/, /issues\.join/];
+    const stray = group.flatMap((file) => text(join(SRC, file)).split("\n").filter((line) => /\berror: ["`]/.test(line) && !developerOnly.some((ok) => ok.test(line))).map((line) => `${file}: ${line.trim().slice(0, 100)}`));
+    expect(stray).toEqual([]);
+  });
+
+  test("a lib refusal answers with its code, the table's English and the status", async () => {
+    const tooShort = await new TestClient().post("/api/auth/setup", { displayName: "Sage", secret: "x" });
+    expect(tooShort.status).toBe(400);
+    expect(await tooShort.json()).toEqual(apiError("secret_length"));
+    const client = new TestClient();
+    await client.post("/api/auth/setup", { displayName: "Sage", secret: "correcthorse" });
+    const alarm = await client.post("/api/alarms", { time: "not a time" });
+    expect(alarm.status).toBe(400);
+    expect(await alarm.json()).toEqual(apiError("alarm_invalid"));
+    const gone = await client.delete("/api/alarms/alarm-none");
+    expect(gone.status).toBe(404);
+    expect(await gone.json()).toEqual(apiError("alarm_missing"));
+    const timer = await client.post("/api/quick-timers", { name: "", minutes: 5 });
+    expect(await timer.json()).toEqual(apiError("quick_timer_invalid"));
+    const place = await client.post("/api/world-places", { name: "Nowhere", country: "X", zone: "Not/AZone" });
+    expect(await place.json()).toEqual(apiError("world_place_zone_invalid"));
+    const list = await client.get("/api/lists/list-none");
+    expect(list.status).toBe(404);
+    expect(await list.json()).toEqual(apiError("list_missing"));
+    const project = await client.get("/api/projects/project-none");
+    expect(await project.json()).toEqual(apiError("project_missing"));
+    const grant = await client.delete("/api/grants/grant-none");
+    expect(await grant.json()).toEqual(apiError("grant_missing"));
+    const file = await client.get("/api/files/file-none");
+    expect(await file.json()).toEqual(apiError("file_not_in_library"));
   });
 
   test("codes are snake_case, ids are unique, minor lines carry minor in the id, and no line has an em dash", () => {

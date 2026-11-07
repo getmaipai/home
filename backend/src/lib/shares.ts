@@ -34,7 +34,7 @@ import { trigger } from "@/lib/notifications";
 import { trackBackgroundWork } from "@/lib/backgroundWork";
 import type { File as FileRecord } from "@maipai/spec/gen/ts/file.js";
 import type { PersonRow } from "@/types";
-import type { Result } from "@/lib/result";
+import { refusal, type Result } from "@/lib/result";
 
 export type ShareOpResult<T, S extends number = 400 | 403 | 404> = Result<T, S>;
 
@@ -78,23 +78,23 @@ function targetIsAdult(to: string): boolean {
 export function createShare(actor: PersonRow, input: CreateShareInput): ShareOpResult<Share, 400 | 403 | 404> {
   const file = db.select().from(attachments).where(eq(attachments.id, input.fileId)).get();
   // ADULT-LOCK-02: a locked item cannot be shared (it answers like a missing one); after an unlock the share goes through the adult-only rule below.
-  if (!file || file.deletedAt !== null || !canReadFileAudience(actor, file) || lockState(lockItemOfProvenance(file.ownerPersonId, file.provenance), actor) !== "open") return { ok: false, status: 404, error: "File unavailable. Ask the owner to share a suitable file." };
+  if (!file || file.deletedAt !== null || !canReadFileAudience(actor, file) || lockState(lockItemOfProvenance(file.ownerPersonId, file.provenance), actor) !== "open") return refusal(404, "file_unavailable_to_share");
 
   if (!canAccessFile(actor, file.ownerPersonId, input.fileId)) {
-    return { ok: false, status: 403, error: "you do not have access to this file" };
+    return refusal(403, "share_no_access");
   }
 
   // A file the child cannot see stays a 404 above. LIBRARY-REVAMP-04 (kid-mode note, F10): a child never shares; the page hides Share, and this is the rule behind it.
-  if (actor.role === "child") return { ok: false, status: 403, error: "Sharing is turned off for children. Ask a grown-up to share this for you." };
-  if (file.origin === "fetched") return { ok: false, status: 403, error: "Saved media files cannot be shared through Files. Change the show's audience in Podcasts instead." };
+  if (actor.role === "child") return refusal(403, "share_children_off");
+  if (file.origin === "fetched") return refusal(403, "share_media_in_app");
   const to = input.to.trim();
   if (!isValidShareTarget(to)) {
-    return { ok: false, status: 400, error: "the household does not have that person" };
+    return refusal(400, "share_person_missing");
   }
 
   // An adult-only file is never offered to the whole home (it includes children and teens) or to a child or a teen.
   if (fileAudience(file.provenance) === "adult-only" && !targetIsAdult(to)) {
-    return { ok: false, status: 403, error: "That file is adult only, so it cannot be shared with the whole home or with a child or teen. Share it with an adult instead." };
+    return refusal(403, "share_adult_only");
   }
 
   const existing = db.select().from(shares).where(and(eq(shares.fileId, input.fileId), eq(shares.to, to))).get();
@@ -185,15 +185,15 @@ function notifyShareCreated(actor: PersonRow, to: string, file: typeof attachmen
  * came from" (household-storage-2026-09-23.md). */
 export function deleteShare(actor: PersonRow, shareId: string): ShareOpResult<{ deletedShareIds: string[] }, 403 | 404> {
   const share = db.select().from(shares).where(eq(shares.id, shareId)).get();
-  if (!share) return { ok: false, status: 404, error: "share not found" };
+  if (!share) return refusal(404, "share_missing");
   const file = db.select().from(attachments).where(eq(attachments.id, share.fileId)).get();
-  if (!file || !canReadFileAudience(actor, file) || lockState(lockItemOfProvenance(file.ownerPersonId, file.provenance), actor) !== "open") return { ok: false, status: 404, error: "File unavailable. Ask the owner to share a suitable file." };
+  if (!file || !canReadFileAudience(actor, file) || lockState(lockItemOfProvenance(file.ownerPersonId, file.provenance), actor) !== "open") return refusal(404, "file_unavailable_to_share");
 
   const canDelete =
     actor.id === share.fromPersonId ||
     actor.id === file.ownerPersonId ||
     (isOwnerOrAdmin(actor) && getPersonRole(file.ownerPersonId) === "child");
-  if (!canDelete) return { ok: false, status: 403, error: "you may not remove this share" };
+  if (!canDelete) return refusal(403, "share_remove_forbidden");
 
   db.delete(shares).where(eq(shares.id, shareId)).run();
   const pruned = pruneUnreachableShares(share.fileId, file.ownerPersonId);

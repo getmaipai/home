@@ -126,7 +126,6 @@ const beforeStartDetails = () => [
   { id: "internet", title: i18n._({ id: "Home goes online for you", message: "Home goes online for you" }), detail: i18n._({ id: "Home fetches downloads, updates, and searches you ask for the way you would. Some sites limit, block, or disallow automated visits, so now and then a site may not work.", message: "Home fetches downloads, updates, and searches you ask for the way you would. Some sites limit, block, or disallow automated visits, so now and then a site may not work." }) + " " + i18n._({ id: "You also accept the licences of the AI models and tools Home installs for you. Each is listed with its terms on the Plan page and in Models and storage.", message: "You also accept the licences of the AI models and tools Home installs for you. Each is listed with its terms on the Plan page and in Models and storage." }) },
 ];
 const ownerCopy = () => i18n._({ id: "You manage this Home, its people, files, and backups. Nobody can remove the owner.", message: "You manage this Home, its people, files, and backups. Nobody can remove the owner." });
-const SECRET_SERVER_TEXT = "secret must be 4-128 characters";
 const secretLengthCopy = () => i18n._({ id: "Use 4 to 128 characters for your PIN or password, then press Create owner account again.", message: "Use 4 to 128 characters for your PIN or password, then press Create owner account again." });
 const stepIsDone = (state: SetupState, id: string) => state.steps.find((step) => step.id === id)?.status === "done";
 
@@ -405,7 +404,7 @@ export function SetupWizard({ onDone, initialScreen }: SetupWizardProps) {
       setScreen("coding_mode");
     } catch (reason) {
       const already = reason instanceof ApiError && reason.status === 409;
-      const message = already ? i18n._({ id: "Home is already set up. Sign in instead.", message: "Home is already set up. Sign in instead." }) : reason instanceof Error && reason.message === SECRET_SERVER_TEXT ? secretLengthCopy() : reason instanceof Error ? reason.message : i18n._({ id: "Home couldn't save your account. Check the name and PIN, then press Create owner account again.", message: "Home couldn't save your account. Check the name and PIN, then press Create owner account again." });
+      const message = already ? i18n._({ id: "Home is already set up. Sign in instead.", message: "Home is already set up. Sign in instead." }) : reason instanceof ApiError && reason.code === "secret_length" ? secretLengthCopy() : reason instanceof Error ? reason.message : i18n._({ id: "Home couldn't save your account. Check the name and PIN, then press Create owner account again.", message: "Home couldn't save your account. Check the name and PIN, then press Create owner account again." });
       setError(message);
       if (already) navigate("/sign-in", { replace: true });
       else throw reason;

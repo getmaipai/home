@@ -4,6 +4,7 @@ import { scheduledJobs } from "@/db/schema";
 import type { PersonRow } from "@/types";
 import { cancelJob, scheduleCoreJob } from "@/lib/scheduler";
 import { getSettingValueForPerson } from "@/lib/settings";
+import { refusal } from "@/lib/result";
 
 const JOB_KINDS = ["alarms.fire", "reminders.fire", "timers.fire"] as const;
 
@@ -70,11 +71,7 @@ export function listComingUp(actor: PersonRow): ComingUpRow[] {
 export function createTimer(actor: PersonRow, input: { label: string; minutes: number }) {
   const label = input.label.trim();
   if (!label || !Number.isInteger(input.minutes) || input.minutes < 1 || input.minutes > 1440) {
-    return {
-      ok: false as const,
-      status: 400 as const,
-      error: "Enter a label and a duration from 1 to 1440 minutes.",
-    };
+    return refusal(400, "coming_up_timer_invalid");
   }
 
   const totalSeconds = input.minutes * 60;
@@ -90,14 +87,10 @@ export function createTimer(actor: PersonRow, input: { label: string; minutes: n
 export function extendTimer(actor: PersonRow, id: string) {
   const row = db.select().from(scheduledJobs).where(eq(scheduledJobs.id, id)).get();
   if (!row || row.personId !== actor.id || row.kind !== "core" || row.job !== "timers.fire") {
-    return {
-      ok: false as const,
-      status: row ? 403 as const : 404 as const,
-      error: "timer not found",
-    };
+    return refusal(row ? 403 as const : 404 as const, "coming_up_timer_missing");
   }
   if (row.status !== "pending") {
-    return { ok: false as const, status: 400 as const, error: "timer is no longer pending" };
+    return refusal(400, "coming_up_timer_not_pending");
   }
 
   const inputs = parseInputs(row.inputs);
@@ -122,7 +115,7 @@ export function extendTimer(actor: PersonRow, id: string) {
 export function doneComingUp(actor: PersonRow, id: string) {
   const row = db.select().from(scheduledJobs).where(eq(scheduledJobs.id, id)).get();
   if (!row || row.personId !== actor.id || row.kind !== "core" || !(JOB_KINDS as readonly string[]).includes(row.job)) {
-    return { ok: false as const, status: row ? 403 : 404, error: "job not found" };
+    return refusal(row ? 403 as const : 404 as const, "coming_up_item_missing");
   }
 
   const cancelled = cancelJob(actor, id);
@@ -153,12 +146,12 @@ function tomorrowMorning(timeZone: string) {
 export function snoozeComingUp(actor: PersonRow, id: string, input: { minutes?: number; until?: "tomorrow_morning" }) {
   const row = db.select().from(scheduledJobs).where(eq(scheduledJobs.id, id)).get();
   if (!row || row.personId !== actor.id || row.kind !== "core" || !(JOB_KINDS as readonly string[]).includes(row.job)) {
-    return { ok: false as const, status: row ? 403 : 404, error: "job not found" };
+    return refusal(row ? 403 as const : 404 as const, "coming_up_item_missing");
   }
 
   const firedAlarm = row.job === "alarms.fire" && row.status === "done";
   if (row.status !== "pending" && !firedAlarm) {
-    return { ok: false as const, status: 400, error: "job is no longer pending" };
+    return refusal(400, "coming_up_item_not_pending");
   }
 
   const next = input.minutes

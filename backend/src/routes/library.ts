@@ -5,6 +5,10 @@ import { listLibrary, librarySummary, LibraryCursorError } from "@/lib/library";
 import { assertLibraryUploadAllowed, beginLibraryUpload, appendLibraryUpload, finishLibraryUpload, cancelLibraryUpload, UploadError } from "@/lib/libraryUploadStream";
 import { MAX_LIBRARY_UPLOAD_BYTES } from "@/lib/libraryUpload";
 import { libraryMultipart } from "@/lib/libraryMultipart";
+import { apiError } from "@/lib/apiErrorCopy";
+
+/** An upload refusal as the response body: coded when the error names a table code, else the bare message (storage-cap text). */
+const uploadBody = (error: UploadError): { error: string; code?: string; next?: string } => (error.code ? apiError(error.code) : { error: error.message });
 
 export const libraryRoutes = apiRouter();
 const kind = z.enum(["image", "video", "audio", "document", "story", "file"]);
@@ -26,7 +30,7 @@ libraryRoutes.openapi(createRoute({ method: "get", path: "/", tags: ["Library"],
     ...errorResponses({ 400: "Invalid page address or filter. Use shared=with-me, by-me, or none.", 401: "Not signed in" }),
   } }), c => {
   try { return c.json(listLibrary(c.get("person"), c.req.valid("query")),200); }
-  catch (error) { if (error instanceof LibraryCursorError) return c.json({ error: error.message },400); throw error; }
+  catch (error) { if (error instanceof LibraryCursorError) return c.json(apiError("library_cursor_invalid"), 400); throw error; }
 });
 libraryRoutes.openapi(createRoute({ method: "get", path: "/summary", tags: ["Library"], summary: "Visible Library counts and stored bytes by kind",
   middleware: [requireAuth] as const, request: { query: query.omit({ cursor: true, limit: true, sort: true }) }, responses: {
@@ -60,7 +64,7 @@ libraryRoutes.post("/upload", requireAuth, async c => {
     return c.json(result.value, 201);
   } catch (error) {
     if (id) await cancelLibraryUpload(c.get("person"), id).catch(() => {});
-    if (error instanceof UploadError) return c.json({ error: error.message }, error.status);
+    if (error instanceof UploadError) return c.json(uploadBody(error), error.status);
     throw error;
   }
 });
@@ -72,7 +76,7 @@ libraryRoutes.openapi(createRoute({
   responses: { 201: { description: "An owner-bound session expires after one hour. PUT sequential chunks, then POST finish. No Library record exists before finish.", content: { "application/json": { schema: z.object({ upload_id: z.string(), chunk_bytes: z.number(), max_bytes: z.number() }) } } }, ...errorResponses({ 400: "Invalid upload", 404: "Upload unavailable", 413: "Upload too large", 401: "Not signed in", 403: "Ask a grown-up", 409: "Finish or cancel an upload first" }) },
 }), async c => {
   try { return c.json(await beginLibraryUpload(c.get("person"), c.req.valid("json").name), 201); }
-  catch (e) { if (e instanceof UploadError) return c.json({ error: e.message }, e.status); throw e; }
+  catch (e) { if (e instanceof UploadError) return c.json(uploadBody(e), e.status); throw e; }
 });
 const uploadParam = z.object({ id: z.string() });
 const uploadErrors = errorResponses({ 400: "Upload stopped or file unreadable. Add it again.", 401: "Not signed in", 403: "Storage full or uploads unavailable", 404: "Upload unavailable. Add it again.", 409: "Chunk out of order or upload busy", 413: "File or chunk too large. Use smaller chunks or a smaller file." });
@@ -82,19 +86,19 @@ libraryRoutes.openapi(createRoute({
   responses: { 200: { description: "Next byte offset; wait for this response before sending another chunk.", content: { "application/json": { schema: z.object({ offset: z.number() }) } } }, ...uploadErrors },
 }), async c => {
   try { return c.json(await appendLibraryUpload(c.get("person"), c.req.valid("param").id, c.req.raw.body, c.req.valid("query").offset), 200); }
-  catch (e) { if (e instanceof UploadError) return c.json({ error: e.message }, e.status); throw e; }
+  catch (e) { if (e instanceof UploadError) return c.json(uploadBody(e), e.status); throw e; }
 });
 libraryRoutes.openapi(createRoute({
   method: "post", path: "/uploads/{id}/finish", tags: ["Library"], summary: "Validate and store a finished upload", middleware: [requireAuth] as const,
   request: { params: uploadParam }, responses: { 201: { description: "The kept Library file, deduplicated by hash.", content: { "application/json": { schema: z.object({ id: z.string(), name: z.string(), kind: z.string(), media_type: z.string(), size_bytes: z.number(), duplicate: z.boolean() }) } } }, ...uploadErrors },
 }), async c => {
   try { const result = await finishLibraryUpload(c.get("person"), c.req.valid("param").id); if (!result.ok) return respond(c, result); return c.json(result.value, 201); }
-  catch (e) { if (e instanceof UploadError) return c.json({ error: e.message }, e.status); throw e; }
+  catch (e) { if (e instanceof UploadError) return c.json(uploadBody(e), e.status); throw e; }
 });
 libraryRoutes.openapi(createRoute({
   method: "delete", path: "/uploads/{id}", tags: ["Library"], summary: "Cancel an upload and remove its staging file", middleware: [requireAuth] as const,
   request: { params: uploadParam }, responses: { 200: { description: "Cancelled", content: { "application/json": { schema: z.object({ ok: z.boolean() }) } } }, ...uploadErrors },
 }), async c => {
   try { await cancelLibraryUpload(c.get("person"), c.req.valid("param").id); return c.json({ ok: true }, 200); }
-  catch (e) { if (e instanceof UploadError) return c.json({ error: e.message }, e.status); throw e; }
+  catch (e) { if (e instanceof UploadError) return c.json(uploadBody(e), e.status); throw e; }
 });

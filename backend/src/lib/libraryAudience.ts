@@ -8,16 +8,17 @@ import { nextHlc } from "@/lib/hlc";
 import { appendLogLine } from "@/lib/log";
 import { checkImages, decideAgeCheck, MIN_ADULT_CONFIDENCE } from "@/lib/pictures/ageCheck";
 import { tryConsume } from "@/lib/rateLimiter";
+import { refusal } from "@/lib/result";
 import type { PersonRow } from "@/types";
 
-const missing = { ok: false as const, status: 404 as const, error: "That picture is not available for rechecking. Open one of your own adult-only pictures." };
+const missing = refusal(404, "recheck_not_available");
 export async function recheckFileAudience(actor: PersonRow, id: string) {
   const eligible = (person: PersonRow) => speakerAgeBand(person, new Date()) === "adult" && ["adult", "owner", "admin"].includes(person.role);
   const caller = db.select().from(people).where(eq(people.id, actor.id)).get();
   if (!caller || caller.deletedAt || !caller.enabled || !eligible(caller)) return missing;
   const row = db.select().from(attachments).where(and(eq(attachments.id, id), isNull(attachments.deletedAt))).get();
   if (!row || row.ownerPersonId !== actor.id || !row.mediaType.startsWith("image/") || fileAudience(row.provenance) !== "adult-only") return missing;
-  if (!tryConsume(`library:recheck:${actor.id}`, { capacity: 20, refillPerSecond: 20 / 3600 })) return { ok: false as const, status: 429 as const, error: "You have checked too many pictures. Wait an hour and try again." };
+  if (!tryConsume(`library:recheck:${actor.id}`, { capacity: 20, refillPerSecond: 20 / 3600 })) return refusal(429, "recheck_too_many");
   let passed = false;
   let result = "unreadable";
   try {
@@ -41,5 +42,5 @@ export async function recheckFileAudience(actor: PersonRow, id: string) {
   appendLogLine(JSON.stringify({ event: "library.recheck-audience", personId: actor.id, fileId: id, before: "adult-only", after: changed ? "all-ages" : "adult-only", result }));
   return changed
     ? { ok: true as const, value: { audience: "all-ages" as const } }
-    : { ok: false as const, status: 400 as const, error: "That picture could not be confirmed as safe for everyone. It stays adult-only. Try again later or choose another picture to share." };
+    : refusal(400, "recheck_unconfirmed");
 }

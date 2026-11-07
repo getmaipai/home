@@ -135,7 +135,7 @@ msgid "{category} at {tier}"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/setup/SetupWizard.tsx:147
+#: src/apps/setup/SetupWizard.tsx:146
 msgid "{checksErrorMessage} Refresh this page and try again."
 msgstr ""
 
@@ -422,7 +422,7 @@ msgstr ""
 
 #. js-lingui-explicit-id
 #: src/apps/setup/PlanStep.tsx:139
-#: src/apps/setup/SetupWizard.tsx:479
+#: src/apps/setup/SetupWizard.tsx:478
 #: src/shell/pages/performance/DiskHardwareBody.tsx:15
 msgid "{gb} GB"
 msgstr ""
@@ -1177,7 +1177,7 @@ msgid "{text}: {percent}%"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/setup/SetupWizard.tsx:492
+#: src/apps/setup/SetupWizard.tsx:491
 msgid "{thingsLeftLine}. You'll find them in Home settings."
 msgstr ""
 
@@ -1388,7 +1388,7 @@ msgid "1 year"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/setup/SetupWizard.tsx:485
+#: src/apps/setup/SetupWizard.tsx:484
 msgid "1. Install OpenCode on your computer"
 msgstr ""
 
@@ -1433,7 +1433,7 @@ msgid "2 beats"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/setup/SetupWizard.tsx:485
+#: src/apps/setup/SetupWizard.tsx:484
 msgid "2. Install Claude Code on your computer"
 msgstr ""
 
@@ -1503,6 +1503,11 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:231
 msgid "setting.ease.preset.help"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: ../backend/src/lib/apiErrorCopy.ts:70
+msgid "api.minor.grant_child_max"
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -1753,6 +1758,11 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/shell/pages/MusicStudioPages.tsx:99
 msgid "A style is a sound you can reuse. Words only, never lyrics."
+msgstr ""
+
+#. js-lingui-explicit-id
+#: ../backend/src/lib/apiErrorCopy.ts:71
+msgid "api.minor.grant_teen_max_pictures"
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -2191,6 +2201,11 @@ msgid "setting.robot.live_view.who.help"
 msgstr ""
 
 #. js-lingui-explicit-id
+#: ../backend/src/lib/apiErrorCopy.ts:69
+msgid "api.error.grant_backup_self"
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/apps/settings/AiSlotDialog.tsx:28
 msgid "Admins only"
 msgstr ""
@@ -2360,7 +2375,7 @@ msgid "setting.resources.cooldown_seconds.help"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/setup/SetupWizard.tsx:146
+#: src/apps/setup/SetupWizard.tsx:145
 msgid "After setup, choose and download AI models in Home settings."
 msgstr ""
 
@@ -2545,7 +2560,7 @@ msgid "All voice samples deleted."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/setup/SetupWizard.tsx:464
+#: src/apps/setup/SetupWizard.tsx:463
 msgid "Allow"
 msgstr ""
 
@@ -2884,7 +2899,7 @@ msgid "Answers your conversations."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/setup/SetupWizard.tsx:483
+#: src/apps/setup/SetupWizard.tsx:482
 msgid "ANTHROPIC_BASE_URL={codingHome}/code/v1 ANTHROPIC_API_KEY=maipai_key_...{hint} claude"
 msgstr ""
 
@@ -3103,8 +3118,18 @@ msgid "setting.tools.timer.mode.option_label.ask"
 msgstr ""
 
 #. js-lingui-explicit-id
+#: ../backend/src/lib/apiErrorCopy.ts:108
+msgid "api.minor.upload_not_allowed_minor"
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/shell/pages/FilesPage.tsx:68
 msgid "Ask a grown-up to add this file. Adding files to the Library is turned off for your profile."
+msgstr ""
+
+#. js-lingui-explicit-id
+#: ../backend/src/lib/apiErrorCopy.ts:78
+msgid "api.minor.list_child_delete_household"
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -3863,7 +3888,7 @@ msgid "Boost"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/setup/SetupWizard.tsx:458
+#: src/apps/setup/SetupWizard.tsx:457
 msgid "Boost and Max downloads are offered only where this computer can run them. While a big job runs, chat may get simpler."
 msgstr ""
 
@@ -4672,7 +4697,7 @@ msgid "Check the engine computer"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/apiErrorCopy.ts:53
+#: ../backend/src/lib/apiErrorCopy.ts:128
 msgid "api.next.invalid_input"
 msgstr ""
 
@@ -4857,8 +4882,18 @@ msgid "Choose a different folder"
 msgstr ""
 
 #. js-lingui-explicit-id
+#: ../backend/src/lib/apiErrorCopy.ts:80
+msgid "api.error.list_move_same"
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/shell/pages/MusicVoiceCreate.tsx:92
 msgid "Choose a file first."
+msgstr ""
+
+#. js-lingui-explicit-id
+#: ../backend/src/lib/apiErrorCopy.ts:120
+msgid "api.error.upload_choose_file"
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -4914,6 +4949,11 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/shell/pages/CompanionsPage.tsx:286
 msgid "Choose a task to see its details."
+msgstr ""
+
+#. js-lingui-explicit-id
+#: ../backend/src/lib/apiErrorCopy.ts:56
+msgid "api.error.world_place_zone_invalid"
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -5354,7 +5394,7 @@ msgid "Civitai key"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/setup/SetupWizard.tsx:483
+#: src/apps/setup/SetupWizard.tsx:482
 msgid "Claude Code · same key"
 msgstr ""
 
@@ -5507,7 +5547,7 @@ msgid "Coding app"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/setup/SetupWizard.tsx:485
+#: src/apps/setup/SetupWizard.tsx:484
 msgid "Coding apps you install"
 msgstr ""
 
@@ -5542,7 +5582,7 @@ msgid "Coding is waiting for its helper to start. The Status page shows what is 
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/setup/SetupWizard.tsx:478
+#: src/apps/setup/SetupWizard.tsx:477
 msgid "Coding mode gives most of this computer's memory to one big coding model, which also answers chat, and pictures, videos and songs wait while it is on."
 msgstr ""
 
@@ -5582,7 +5622,7 @@ msgid "Coding on this Home"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/setup/SetupWizard.tsx:479
+#: src/apps/setup/SetupWizard.tsx:478
 msgid "Coding parts to install"
 msgstr ""
 
@@ -5797,7 +5837,7 @@ msgstr ""
 #: src/apps/setup/AwayFromHome.tsx:185
 #: src/apps/setup/CloseAppsStep.tsx:64
 #: src/apps/setup/SetupReviewPage.tsx:63
-#: src/apps/setup/SetupWizard.tsx:502
+#: src/apps/setup/SetupWizard.tsx:501
 #: src/shell/AmbientCompanionPane.tsx:256
 #: src/shell/pages/companionFlow/AnimateStep.tsx:153
 #: src/shell/pages/CompanionsPage.tsx:135
@@ -5894,7 +5934,7 @@ msgstr ""
 #: src/apps/settings/CodingSettings.tsx:232
 #: src/apps/settings/EngineLinkCredentialSection.tsx:74
 #: src/apps/settings/ModelsSection.tsx:280
-#: src/apps/setup/SetupWizard.tsx:483
+#: src/apps/setup/SetupWizard.tsx:482
 msgid "Copied"
 msgstr ""
 
@@ -5912,7 +5952,7 @@ msgstr ""
 #: src/apps/settings/CodingSettings.tsx:232
 #: src/apps/settings/CodingSettings.tsx:232
 #: src/apps/settings/EngineLinkCredentialSection.tsx:74
-#: src/apps/setup/SetupWizard.tsx:483
+#: src/apps/setup/SetupWizard.tsx:482
 msgid "Copy"
 msgstr ""
 
@@ -5923,7 +5963,7 @@ msgid "Copy details"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/setup/SetupWizard.tsx:483
+#: src/apps/setup/SetupWizard.tsx:482
 msgid "Copy is not available in this browser. Select the key and copy it."
 msgstr ""
 
@@ -6899,6 +6939,11 @@ msgid "Could not update the reminder."
 msgstr ""
 
 #. js-lingui-explicit-id
+#: ../backend/src/lib/apiErrorCopy.ts:67
+msgid "api.error.passkey_verify_failed"
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/shell/pages/UpdatesPage.tsx:186
 msgid "Couldn't check for robot updates: {robotsError}"
 msgstr ""
@@ -7009,13 +7054,13 @@ msgid "Create list"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/setup/SetupWizard.tsx:482
+#: src/apps/setup/SetupWizard.tsx:481
 msgid "Create my key"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/setup/SetupWizard.tsx:472
-#: src/apps/setup/SetupWizard.tsx:502
+#: src/apps/setup/SetupWizard.tsx:471
+#: src/apps/setup/SetupWizard.tsx:501
 msgid "Create owner account"
 msgstr ""
 
@@ -7040,7 +7085,7 @@ msgid "Created"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/setup/SetupWizard.tsx:482
+#: src/apps/setup/SetupWizard.tsx:481
 msgid "Creating"
 msgstr ""
 
@@ -7894,7 +7939,7 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/apps/chat/chatToolUis.tsx:107
 #: src/apps/settings/BackupsSection.tsx:92
-#: src/apps/setup/SetupWizard.tsx:491
+#: src/apps/setup/SetupWizard.tsx:490
 #: src/shell/library/LibraryItems.tsx:33
 #: src/shell/library/LibraryViewer.tsx:158
 #: src/shell/library/LibraryViewer.tsx:158
@@ -7953,7 +7998,7 @@ msgid "area.Download Wikipedia, health and other offline books"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/setup/SetupWizard.tsx:491
+#: src/apps/setup/SetupWizard.tsx:490
 msgid "Download your backup key to continue."
 msgstr ""
 
@@ -8343,6 +8388,16 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/apps/settings/TwoStepSignInSection.tsx:52
 msgid "Enter a code to turn it off"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: ../backend/src/lib/apiErrorCopy.ts:57
+msgid "api.error.coming_up_timer_invalid"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: ../backend/src/lib/apiErrorCopy.ts:62
+msgid "api.error.display_name_length"
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -8839,8 +8894,18 @@ msgid "File"
 msgstr ""
 
 #. js-lingui-explicit-id
+#: ../backend/src/lib/apiErrorCopy.ts:95
+msgid "api.error.file_unavailable_to_share"
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/shell/library/LibraryTrash.tsx:33
 msgid "Files in Trash"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: ../backend/src/lib/apiErrorCopy.ts:92
+msgid "api.error.file_stays_until_deleted"
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -8942,7 +9007,7 @@ msgid "Fingerprint"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/setup/SetupWizard.tsx:486
+#: src/apps/setup/SetupWizard.tsx:485
 msgid "Finish"
 msgstr ""
 
@@ -9537,6 +9602,11 @@ msgid "setting.coding.home_mode.option.coding"
 msgstr ""
 
 #. js-lingui-explicit-id
+#: ../backend/src/lib/apiErrorCopy.ts:76
+msgid "api.error.list_needs_title"
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/shell/pages/companionFlow/CompanionFlowDialog.tsx:16
 msgid "Give your companion a voice, personality, and history"
 msgstr ""
@@ -9865,7 +9935,7 @@ msgid "Home address unavailable"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/setup/SetupWizard.tsx:483
+#: src/apps/setup/SetupWizard.tsx:482
 msgid "Home address: {codingHome}/code/v1"
 msgstr ""
 
@@ -9880,7 +9950,7 @@ msgid "Home adds these to the person's words when they pick this style."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/setup/SetupWizard.tsx:144
+#: src/apps/setup/SetupWizard.tsx:143
 msgid "Home and AI both run on this computer."
 msgstr ""
 
@@ -9962,9 +10032,9 @@ msgid "Home can't reach its voice service. Check Repairs, then come back."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/setup/SetupWizard.tsx:271
-#: src/apps/setup/SetupWizard.tsx:449
-#: src/apps/setup/SetupWizard.tsx:449
+#: src/apps/setup/SetupWizard.tsx:270
+#: src/apps/setup/SetupWizard.tsx:448
+#: src/apps/setup/SetupWizard.tsx:448
 msgid "Home can't read its setup progress. Refresh this page. If it keeps happening, restart MaiPai Home on this computer or run the installer again."
 msgstr ""
 
@@ -10095,7 +10165,7 @@ msgid "Home could not confirm that. Try again."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/setup/SetupWizard.tsx:223
+#: src/apps/setup/SetupWizard.tsx:222
 msgid "Home could not create your key. Try again."
 msgstr ""
 
@@ -10125,7 +10195,7 @@ msgid "Home could not install the helper. Press Install helper to try again."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/setup/SetupWizard.tsx:476
+#: src/apps/setup/SetupWizard.tsx:475
 msgid "Home could not load coding setup. Refresh this page and try again."
 msgstr ""
 
@@ -10212,7 +10282,7 @@ msgstr ""
 
 #. js-lingui-explicit-id
 #: src/apps/settings/CodingSettings.tsx:90
-#: src/apps/setup/SetupWizard.tsx:217
+#: src/apps/setup/SetupWizard.tsx:216
 msgid "Home could not run the coding test. Try again."
 msgstr ""
 
@@ -10246,7 +10316,7 @@ msgid "Home could not save that. Check the Home connection, then try again."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/setup/SetupWizard.tsx:211
+#: src/apps/setup/SetupWizard.tsx:210
 msgid "Home could not save this choice. Try again."
 msgstr ""
 
@@ -10277,7 +10347,7 @@ msgid "Home could not update coding mode. Try again."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/setup/SetupWizard.tsx:431
+#: src/apps/setup/SetupWizard.tsx:430
 msgid "Home couldn't allow Tailscale for the engine link. Sign in as an owner or admin, then try again."
 msgstr ""
 
@@ -10317,13 +10387,13 @@ msgid "Home couldn't load these setup choices. Refresh this page and try again."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/setup/SetupWizard.tsx:492
+#: src/apps/setup/SetupWizard.tsx:491
 msgid "Home couldn't make the certificate for your other devices. Phones and tablets can still use Home from this computer's address for now. Open Home settings, Repairs to fix it."
 msgstr ""
 
 #. js-lingui-explicit-id
 #: src/apps/settings/BackupsSection.tsx:19
-#: src/apps/setup/SetupWizard.tsx:491
+#: src/apps/setup/SetupWizard.tsx:490
 msgid "Home couldn't make your backup key. Press Download again. If it fails again, Home will show a fix under Home settings, Repairs."
 msgstr ""
 
@@ -10353,7 +10423,7 @@ msgid "Home couldn't read this computer's tuning options. Press Try again, or sk
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/setup/SetupWizard.tsx:491
+#: src/apps/setup/SetupWizard.tsx:490
 msgid "Home couldn't save that choice. Try again. If it fails again, Home will show a fix under Home settings, Repairs."
 msgstr ""
 
@@ -10363,7 +10433,7 @@ msgid "Home couldn't save this choice. Check the engine link in Home settings, t
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/setup/SetupWizard.tsx:350
+#: src/apps/setup/SetupWizard.tsx:349
 msgid "Home couldn't save this step. Try again."
 msgstr ""
 
@@ -10373,12 +10443,12 @@ msgid "Home couldn't save your accept. Check that the engine is running, then pr
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/setup/SetupWizard.tsx:408
+#: src/apps/setup/SetupWizard.tsx:407
 msgid "Home couldn't save your account. Check the name and PIN, then press Create owner account again."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/setup/SetupWizard.tsx:380
+#: src/apps/setup/SetupWizard.tsx:379
 msgid "Home couldn't save your acknowledgement. Press I understand again."
 msgstr ""
 
@@ -10439,7 +10509,7 @@ msgid "Home highlight"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/apiErrorCopy.ts:50
+#: ../backend/src/lib/apiErrorCopy.ts:125
 msgid "api.error.internal"
 msgstr ""
 
@@ -10449,8 +10519,8 @@ msgid "Home installs no coding tool."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/setup/SetupWizard.tsx:350
-#: src/apps/setup/SetupWizard.tsx:408
+#: src/apps/setup/SetupWizard.tsx:349
+#: src/apps/setup/SetupWizard.tsx:407
 msgid "Home is already set up. Sign in instead."
 msgstr ""
 
@@ -10570,7 +10640,7 @@ msgid "setting.coding.engine.option.auto"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/setup/SetupWizard.tsx:144
+#: src/apps/setup/SetupWizard.tsx:143
 msgid "Home runs on this computer. The AI runs on a bigger, more powerful computer on your network. You pair it on the last screen of setup."
 msgstr ""
 
@@ -10600,7 +10670,7 @@ msgid "Home stays up, but other big jobs wait their turn."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/setup/SetupWizard.tsx:145
+#: src/apps/setup/SetupWizard.tsx:144
 msgid "Home uses its ready-to-use default folder."
 msgstr ""
 
@@ -10620,7 +10690,7 @@ msgid "Home will use DuckDuckGo for adults and the Library only for teens and ch
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/setup/SetupWizard.tsx:145
+#: src/apps/setup/SetupWizard.tsx:144
 msgid "Home will use its default folder for AI models."
 msgstr ""
 
@@ -10741,8 +10811,8 @@ msgstr ""
 
 #. js-lingui-explicit-id
 #: src/apps/settings/CodingSettings.tsx:137
-#: src/apps/setup/SetupWizard.tsx:485
-#: src/apps/setup/SetupWizard.tsx:485
+#: src/apps/setup/SetupWizard.tsx:484
+#: src/apps/setup/SetupWizard.tsx:484
 msgid "How"
 msgstr ""
 
@@ -11222,7 +11292,7 @@ msgid "failure.composer.memory.child"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/setup/SetupWizard.tsx:502
+#: src/apps/setup/SetupWizard.tsx:501
 msgid "I understand"
 msgstr ""
 
@@ -11282,7 +11352,7 @@ msgid "If this computer breaks, this file brings your Home back on a new one. Ke
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/setup/SetupWizard.tsx:491
+#: src/apps/setup/SetupWizard.tsx:490
 msgid "If this computer breaks, this key restores your Home on a new one."
 msgstr ""
 
@@ -11497,7 +11567,7 @@ msgstr ""
 #: src/apps/settings/styles/StyleBrowser.tsx:102
 #: src/apps/settings/styles/StyleBrowser.tsx:102
 #: src/apps/setup/PlanStep.tsx:185
-#: src/apps/setup/SetupWizard.tsx:479
+#: src/apps/setup/SetupWizard.tsx:478
 #: src/shell/pages/EnginesPage.tsx:32
 #: src/shell/pages/UpdatesPage.tsx:51
 msgid "Installed"
@@ -11530,10 +11600,10 @@ msgstr ""
 #: src/apps/settings/CodingSettings.tsx:163
 #: src/apps/settings/CodingSettings.tsx:164
 #: src/apps/settings/ModelsAndStorageSection.tsx:41
-#: src/apps/setup/SetupWizard.tsx:479
-#: src/apps/setup/SetupWizard.tsx:479
-#: src/apps/setup/SetupWizard.tsx:481
-#: src/apps/setup/SetupWizard.tsx:481
+#: src/apps/setup/SetupWizard.tsx:478
+#: src/apps/setup/SetupWizard.tsx:478
+#: src/apps/setup/SetupWizard.tsx:480
+#: src/apps/setup/SetupWizard.tsx:480
 msgid "Installing"
 msgstr ""
 
@@ -12975,8 +13045,8 @@ msgid "Loading Coding access"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/setup/SetupWizard.tsx:476
-#: src/apps/setup/SetupWizard.tsx:476
+#: src/apps/setup/SetupWizard.tsx:475
+#: src/apps/setup/SetupWizard.tsx:475
 msgid "Loading coding setup"
 msgstr ""
 
@@ -13568,7 +13638,7 @@ msgid "MaiPai couldn't get what it needs for face recognition. Check the connect
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/setup/SetupWizard.tsx:502
+#: src/apps/setup/SetupWizard.tsx:501
 #: src/shell/routeHeader.ts:50
 msgid "MaiPai Home"
 msgstr ""
@@ -13589,7 +13659,7 @@ msgid "MaiPai Home emergency backup key\n"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/setup/SetupWizard.tsx:313
+#: src/apps/setup/SetupWizard.tsx:312
 msgid "MaiPai Home emergency kit\n"
 "Home: {hubName}\n"
 "Home id: {hubInstanceId}\n"
@@ -14637,7 +14707,7 @@ msgid "Muted"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/setup/SetupWizard.tsx:222
+#: src/apps/setup/SetupWizard.tsx:221
 msgid "My coding tool"
 msgstr ""
 
@@ -14771,7 +14841,7 @@ msgstr ""
 
 #. js-lingui-explicit-id
 #: src/apps/settings/CodingSettings.tsx:163
-#: src/apps/setup/SetupWizard.tsx:479
+#: src/apps/setup/SetupWizard.tsx:478
 #: src/shell/pages/status/StatusApps.tsx:47
 #: src/shell/pages/status/StatusComponents.tsx:151
 msgid "Needs attention"
@@ -15564,6 +15634,11 @@ msgid "setting.synths.real_people.option.off"
 msgstr ""
 
 #. js-lingui-explicit-id
+#: ../backend/src/lib/apiErrorCopy.ts:81
+msgid "api.error.list_move_none"
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/shell/pages/CompanionsPage.tsx:311
 msgid "none yet"
 msgstr ""
@@ -15584,7 +15659,7 @@ msgid "Normal"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/setup/SetupWizard.tsx:477
+#: src/apps/setup/SetupWizard.tsx:476
 msgid "Normal keeps chat and pictures running as usual."
 msgstr ""
 
@@ -15650,7 +15725,7 @@ msgstr ""
 #: src/apps/settings/ModelsAndStorageSection.tsx:47
 #: src/apps/settings/ReferenceLibrarySettings.tsx:261
 #: src/apps/settings/styles/StyleBrowser.tsx:102
-#: src/apps/setup/SetupWizard.tsx:479
+#: src/apps/setup/SetupWizard.tsx:478
 #: src/shell/pages/EnginesPage.tsx:31
 msgid "Not installed"
 msgstr ""
@@ -15668,8 +15743,8 @@ msgstr ""
 #: src/apps/setup/CloseAppsStep.tsx:56
 #: src/apps/setup/CloseAppsStep.tsx:73
 #: src/apps/setup/CloseAppsStep.tsx:73
-#: src/apps/setup/SetupWizard.tsx:481
-#: src/apps/setup/SetupWizard.tsx:481
+#: src/apps/setup/SetupWizard.tsx:480
+#: src/apps/setup/SetupWizard.tsx:480
 #: src/shell/pages/settings/SettingsAreaPage.tsx:276
 msgid "Not now"
 msgstr ""
@@ -16411,7 +16486,7 @@ msgid "failure.ask_form.invalid"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/setup/SetupWizard.tsx:144
+#: src/apps/setup/SetupWizard.tsx:143
 msgid "One computer"
 msgstr ""
 
@@ -16574,6 +16649,16 @@ msgid "Only the owner or an admin can set up away access."
 msgstr ""
 
 #. js-lingui-explicit-id
+#: ../backend/src/lib/apiErrorCopy.ts:87
+msgid "api.error.file_change_owner_only"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: ../backend/src/lib/apiErrorCopy.ts:86
+msgid "api.error.file_delete_owner_only"
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:627
 msgid "setting.network.lan_exposure.option.loopback"
 msgstr ""
@@ -16672,7 +16757,7 @@ msgid "Open licence. It lets a household use the style at home."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/setup/SetupWizard.tsx:502
+#: src/apps/setup/SetupWizard.tsx:501
 msgid "Open my Home"
 msgstr ""
 
@@ -16743,22 +16828,22 @@ msgid "Open your settings"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/setup/SetupWizard.tsx:483
+#: src/apps/setup/SetupWizard.tsx:482
 msgid "OPENAI_BASE_URL={codingHome}/code/v1 OPENAI_API_KEY=maipai_key_...{hint} MODEL=$(curl -s {codingHome}/code/v1/models | jq -r '.data[0].id')"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/setup/SetupWizard.tsx:483
+#: src/apps/setup/SetupWizard.tsx:482
 msgid "OPENAI_BASE_URL={codingHome}/code/v1 OPENAI_API_KEY=maipai_key_...{hint} opencode"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/setup/SetupWizard.tsx:483
+#: src/apps/setup/SetupWizard.tsx:482
 msgid "OpenAI-compatible · same key"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/setup/SetupWizard.tsx:483
+#: src/apps/setup/SetupWizard.tsx:482
 msgid "OpenCode · same key"
 msgstr ""
 
@@ -16966,7 +17051,7 @@ msgid "Pair engine computer"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/setup/SetupWizard.tsx:492
+#: src/apps/setup/SetupWizard.tsx:491
 msgid "Pair the computer that runs the AI. You can also do this later in Home settings, Engines and AI."
 msgstr ""
 
@@ -18221,7 +18306,7 @@ msgstr ""
 #: src/apps/setup/AwayFromHome.tsx:127
 #: src/apps/setup/AwayFromHome.tsx:139
 #: src/apps/setup/CheckGrid.tsx:31
-#: src/apps/setup/SetupWizard.tsx:479
+#: src/apps/setup/SetupWizard.tsx:478
 #: src/shell/pages/companionFlow/AnimateStep.tsx:29
 #: src/shell/pages/CompanionsPage.tsx:221
 #: src/shell/pages/EnginesPage.tsx:34
@@ -18910,7 +18995,7 @@ msgid "Restore the backup from {whenText}?"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/setup/SetupWizard.tsx:453
+#: src/apps/setup/SetupWizard.tsx:452
 msgid "Restoring a backup? Finish setup, then open Backups."
 msgstr ""
 
@@ -19435,7 +19520,7 @@ msgstr ""
 
 #. js-lingui-explicit-id
 #: src/apps/settings/CodingSettings.tsx:139
-#: src/apps/setup/SetupWizard.tsx:482
+#: src/apps/setup/SetupWizard.tsx:481
 msgid "Run the test"
 msgstr ""
 
@@ -19449,7 +19534,7 @@ msgstr ""
 #: src/apps/settings/CodingSettings.tsx:132
 #: src/apps/settings/CodingSettings.tsx:139
 #: src/apps/settings/CodingSettings.tsx:139
-#: src/apps/setup/SetupWizard.tsx:482
+#: src/apps/setup/SetupWizard.tsx:481
 #: src/shell/pages/CompanionsPage.tsx:286
 #: src/shell/pages/status/StatusComponents.tsx:39
 #: src/shell/pages/status/StatusComponents.tsx:49
@@ -19611,6 +19696,21 @@ msgid "Saved files on the hub still work when the internet is down. Copies here 
 msgstr ""
 
 #. js-lingui-explicit-id
+#: ../backend/src/lib/apiErrorCopy.ts:88
+msgid "api.error.file_edit_in_app"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: ../backend/src/lib/apiErrorCopy.ts:89
+msgid "api.error.file_remove_in_app"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: ../backend/src/lib/apiErrorCopy.ts:99
+msgid "api.error.share_media_in_app"
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/apps/settings/BackupsSection.tsx:86
 msgid "Saved on {whenText}"
 msgstr ""
@@ -19645,7 +19745,7 @@ msgstr ""
 
 #. js-lingui-explicit-id
 #: src/apps/setup/SetupReviewPage.tsx:63
-#: src/apps/setup/SetupWizard.tsx:481
+#: src/apps/setup/SetupWizard.tsx:480
 #: src/shell/pages/CompanionAudienceDialog.tsx:64
 #: src/shell/pages/companionFlow/CustomizeStep.tsx:140
 msgid "Saving"
@@ -20228,6 +20328,11 @@ msgid "Send"
 msgstr ""
 
 #. js-lingui-explicit-id
+#: ../backend/src/lib/apiErrorCopy.ts:93
+msgid "api.error.file_edit_nothing"
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:78
 msgid "setting.chat.photo_uploads.label"
 msgstr ""
@@ -20328,7 +20433,7 @@ msgid "Set up away access"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/setup/SetupWizard.tsx:481
+#: src/apps/setup/SetupWizard.tsx:480
 msgid "Set up coding"
 msgstr ""
 
@@ -20343,7 +20448,7 @@ msgid "Set up MaiPai Stack to run your own engines and see their health history 
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/setup/SetupWizard.tsx:502
+#: src/apps/setup/SetupWizard.tsx:501
 msgid "Set up my Home"
 msgstr ""
 
@@ -20353,7 +20458,7 @@ msgid "Set up on {date}"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/setup/SetupWizard.tsx:481
+#: src/apps/setup/SetupWizard.tsx:480
 msgid "Set up standard coding"
 msgstr ""
 
@@ -20530,7 +20635,7 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/apps/settings/CodingSettings.tsx:229
 #: src/apps/settings/CodingSettings.tsx:232
-#: src/apps/setup/SetupWizard.tsx:483
+#: src/apps/setup/SetupWizard.tsx:482
 msgid "Setup lines for your tool"
 msgstr ""
 
@@ -20540,7 +20645,7 @@ msgid "Setup preview controls"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/setup/SetupWizard.tsx:449
+#: src/apps/setup/SetupWizard.tsx:448
 msgid "Setup progress unavailable"
 msgstr ""
 
@@ -20581,6 +20686,11 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/shell/library/libraryModel.ts:121
 msgid "shared with {count, plural, one {# person} other {# people}}"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: ../backend/src/lib/apiErrorCopy.ts:98
+msgid "api.minor.share_children_off"
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -20991,7 +21101,7 @@ msgstr ""
 
 #. js-lingui-explicit-id
 #: src/apps/settings/CodingSettings.tsx:29
-#: src/apps/setup/SetupWizard.tsx:479
+#: src/apps/setup/SetupWizard.tsx:478
 msgid "Size not reported"
 msgstr ""
 
@@ -21746,8 +21856,8 @@ msgid "starting"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/setup/SetupWizard.tsx:481
-#: src/apps/setup/SetupWizard.tsx:481
+#: src/apps/setup/SetupWizard.tsx:480
+#: src/apps/setup/SetupWizard.tsx:480
 #: src/shell/pages/MusicRemix.tsx:39
 #: src/shell/pages/MusicWorkspacePage.tsx:101
 #: src/shell/pages/MusicWorkspacePage.tsx:235
@@ -22522,8 +22632,33 @@ msgid "setting.ease.contrast.option.more"
 msgstr ""
 
 #. js-lingui-explicit-id
+#: ../backend/src/lib/apiErrorCopy.ts:49
+msgid "api.error.alarm_missing"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: ../backend/src/lib/apiErrorCopy.ts:48
+msgid "api.error.alarm_invalid"
+msgstr ""
+
+#. js-lingui-explicit-id
 #: ../backend/src/lib/apiErrorCopy.ts:41
 msgid "api.error.backup_unreadable"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: ../backend/src/lib/apiErrorCopy.ts:115
+msgid "api.error.upload_chunk_too_big"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: ../backend/src/lib/apiErrorCopy.ts:113
+msgid "api.error.upload_chunk_empty"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: ../backend/src/lib/apiErrorCopy.ts:112
+msgid "api.error.upload_chunk_order"
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -22586,8 +22721,33 @@ msgid "That didn't work."
 msgstr ""
 
 #. js-lingui-explicit-id
+#: ../backend/src/lib/apiErrorCopy.ts:119
+msgid "api.error.upload_unreadable"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: ../backend/src/lib/apiErrorCopy.ts:100
+msgid "api.error.share_adult_only"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: ../backend/src/lib/apiErrorCopy.ts:114
+msgid "api.error.upload_too_big"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: ../backend/src/lib/apiErrorCopy.ts:118
+msgid "api.error.upload_file_empty"
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/shell/pages/FilesPage.tsx:159
 msgid "That file is not available to you. Ask the person who added it to share it again."
+msgstr ""
+
+#. js-lingui-explicit-id
+#: ../backend/src/lib/apiErrorCopy.ts:85
+msgid "api.error.file_not_in_library"
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -22596,8 +22756,38 @@ msgid "That file is not yours to delete. Ask the person who added it."
 msgstr ""
 
 #. js-lingui-explicit-id
+#: ../backend/src/lib/apiErrorCopy.ts:117
+msgid "api.error.upload_unsupported"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: ../backend/src/lib/apiErrorCopy.ts:73
+msgid "api.error.grant_missing"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: ../backend/src/lib/apiErrorCopy.ts:61
+msgid "api.error.coming_up_item_not_pending"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: ../backend/src/lib/apiErrorCopy.ts:79
+msgid "api.error.list_item_missing"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: ../backend/src/lib/apiErrorCopy.ts:60
+msgid "api.error.coming_up_item_missing"
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/apps/people/FaceEnrollmentPage.tsx:242
 msgid "That link is missing a person to enroll."
+msgstr ""
+
+#. js-lingui-explicit-id
+#: ../backend/src/lib/apiErrorCopy.ts:75
+msgid "api.error.list_missing"
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -22621,6 +22811,11 @@ msgid "That motor"
 msgstr ""
 
 #. js-lingui-explicit-id
+#: ../backend/src/lib/apiErrorCopy.ts:91
+msgid "api.error.file_name_too_long"
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/shell/pages/NotFoundPage.tsx:13
 msgid "That page does not exist. The link may be old or mistyped. Go to Home and pick it from the menu."
 msgstr ""
@@ -22628,6 +22823,41 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/shell/pages/MusicStudioPages.tsx:215
 msgid "That page needs a band, an album or a style. Open it from My creations."
+msgstr ""
+
+#. js-lingui-explicit-id
+#: ../backend/src/lib/apiErrorCopy.ts:68
+msgid "api.error.grant_person_missing"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: ../backend/src/lib/apiErrorCopy.ts:77
+msgid "api.error.list_person_missing"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: ../backend/src/lib/apiErrorCopy.ts:105
+msgid "api.error.recheck_unconfirmed"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: ../backend/src/lib/apiErrorCopy.ts:103
+msgid "api.error.recheck_not_available"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: ../backend/src/lib/apiErrorCopy.ts:54
+msgid "api.error.world_place_missing"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: ../backend/src/lib/apiErrorCopy.ts:53
+msgid "api.error.world_place_invalid"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: ../backend/src/lib/apiErrorCopy.ts:83
+msgid "api.error.project_missing"
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -22647,6 +22877,11 @@ msgid "that session"
 msgstr ""
 
 #. js-lingui-explicit-id
+#: ../backend/src/lib/apiErrorCopy.ts:101
+msgid "api.error.share_missing"
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/shell/pages/MusicWorkspacePage.tsx:154
 msgid "That song could not be deleted. Try again."
 msgstr ""
@@ -22663,6 +22898,26 @@ msgid "That style is not in the list yet. Reload this page and look again."
 msgstr ""
 
 #. js-lingui-explicit-id
+#: ../backend/src/lib/apiErrorCopy.ts:59
+msgid "api.error.coming_up_timer_not_pending"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: ../backend/src/lib/apiErrorCopy.ts:52
+msgid "api.error.quick_timer_missing"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: ../backend/src/lib/apiErrorCopy.ts:51
+msgid "api.error.quick_timer_invalid"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: ../backend/src/lib/apiErrorCopy.ts:58
+msgid "api.error.coming_up_timer_missing"
+msgstr ""
+
+#. js-lingui-explicit-id
 #: ../backend/src/lib/failureCopy.ts:120
 msgid "failure.slow.minor"
 msgstr ""
@@ -22670,6 +22925,21 @@ msgstr ""
 #. js-lingui-explicit-id
 #: ../backend/src/lib/failureCopy.ts:119
 msgid "failure.slow.adult"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: ../backend/src/lib/apiErrorCopy.ts:121
+msgid "api.error.upload_request_unreadable"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: ../backend/src/lib/apiErrorCopy.ts:110
+msgid "api.error.upload_gone"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: ../backend/src/lib/apiErrorCopy.ts:111
+msgid "api.error.upload_busy"
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -22980,6 +23250,11 @@ msgid "area.The home"
 msgstr ""
 
 #. js-lingui-explicit-id
+#: ../backend/src/lib/apiErrorCopy.ts:97
+msgid "api.error.share_person_missing"
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:576
 msgid "setting.household.home.help"
 msgstr ""
@@ -23228,6 +23503,11 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/apps/people/NewPersonForm.tsx:116
 msgid "The owner is always an admin."
+msgstr ""
+
+#. js-lingui-explicit-id
+#: ../backend/src/lib/apiErrorCopy.ts:106
+msgid "api.error.library_cursor_invalid"
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -23491,6 +23771,11 @@ msgid "The two passcodes are different. Type the same passcode in both boxes."
 msgstr ""
 
 #. js-lingui-explicit-id
+#: ../backend/src/lib/apiErrorCopy.ts:116
+msgid "api.error.upload_interrupted"
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:207
 msgid "setting.ease.contrast.option.standard"
 msgstr ""
@@ -23632,6 +23917,11 @@ msgid "There is not enough room"
 msgstr ""
 
 #. js-lingui-explicit-id
+#: ../backend/src/lib/apiErrorCopy.ts:82
+msgid "api.error.list_restore_none"
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/apps/settings/ModelsAndStorageSection.tsx:161
 msgid "These are the licences that come with parts Home installs for you. Accepting covers all of them."
 msgstr ""
@@ -23675,6 +23965,11 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/shell/pages/ChatPage.tsx:1604
 msgid "Thinking:"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: ../backend/src/lib/apiErrorCopy.ts:50
+msgid "api.error.alarm_no_next"
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -23795,7 +24090,7 @@ msgid "This computer needs no changes."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/setup/SetupWizard.tsx:481
+#: src/apps/setup/SetupWizard.tsx:480
 msgid "This computer needs to be a Mac with 128 GB of memory for Coding mode. You can still use the standard coding setup."
 msgstr ""
 
@@ -23837,6 +24132,11 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/apps/settings/aiTierSlots.ts:108
 msgid "This does not fit this level on this computer."
+msgstr ""
+
+#. js-lingui-explicit-id
+#: ../backend/src/lib/apiErrorCopy.ts:94
+msgid "api.error.file_belongs_to_item"
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -23895,6 +24195,11 @@ msgid "This part cannot reach the engine computer: {value}"
 msgstr ""
 
 #. js-lingui-explicit-id
+#: ../backend/src/lib/apiErrorCopy.ts:66
+msgid "api.error.passkey_not_registered_here"
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/apps/people/NewPersonForm.tsx:125
 msgid "This person will use it to sign in."
 msgstr ""
@@ -23922,6 +24227,16 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/apps/chat/composerDictationWaveform.tsx:99
 msgid "this project"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: ../backend/src/lib/apiErrorCopy.ts:84
+msgid "api.error.project_finished"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: ../backend/src/lib/apiErrorCopy.ts:64
+msgid "api.error.passkey_registration_expired"
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -23962,6 +24277,11 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/apps/settings/UsersSection.tsx:115
 msgid "This role requires a PIN or password. Enter one above, then try again."
+msgstr ""
+
+#. js-lingui-explicit-id
+#: ../backend/src/lib/apiErrorCopy.ts:65
+msgid "api.error.passkey_signin_expired"
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -24105,7 +24425,7 @@ msgid "To 0:30"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/setup/SetupWizard.tsx:479
+#: src/apps/setup/SetupWizard.tsx:478
 msgid "To install"
 msgstr ""
 
@@ -24239,7 +24559,7 @@ msgid "Total on disk"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/setup/SetupWizard.tsx:480
+#: src/apps/setup/SetupWizard.tsx:479
 msgid "Total: {gb} GB"
 msgstr ""
 
@@ -24374,8 +24694,8 @@ msgstr ""
 #: src/apps/settings/VoiceManagerSection.tsx:101
 #: src/apps/setup/HostTuneStep.tsx:68
 #: src/apps/setup/PlanStep.tsx:126
-#: src/apps/setup/SetupWizard.tsx:449
-#: src/apps/setup/SetupWizard.tsx:502
+#: src/apps/setup/SetupWizard.tsx:448
+#: src/apps/setup/SetupWizard.tsx:501
 #: src/apps/setup/StorageStep.tsx:35
 #: src/apps/setup/WebSearchStep.tsx:74
 #: src/shell/AmbientCompanionPane.tsx:256
@@ -24409,7 +24729,7 @@ msgid "Try again."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/apiErrorCopy.ts:51
+#: ../backend/src/lib/apiErrorCopy.ts:126
 msgid "api.next.internal"
 msgstr ""
 
@@ -24658,7 +24978,7 @@ msgid "TV"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/setup/SetupWizard.tsx:144
+#: src/apps/setup/SetupWizard.tsx:143
 msgid "Two computers"
 msgstr ""
 
@@ -24685,6 +25005,11 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:617
 msgid "setting.music.lyrics_translate.help"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: ../backend/src/lib/apiErrorCopy.ts:90
+msgid "api.error.file_name_required"
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -25010,8 +25335,13 @@ msgid "Use 4 to 128 characters for the PIN or password."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/setup/SetupWizard.tsx:130
+#: src/apps/setup/SetupWizard.tsx:129
 msgid "Use 4 to 128 characters for your PIN or password, then press Create owner account again."
+msgstr ""
+
+#. js-lingui-explicit-id
+#: ../backend/src/lib/apiErrorCopy.ts:63
+msgid "api.error.secret_length"
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -26596,6 +26926,11 @@ msgid "You already have this style. Press to open it."
 msgstr ""
 
 #. js-lingui-explicit-id
+#: ../backend/src/lib/apiErrorCopy.ts:109
+msgid "api.error.upload_too_many"
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/apps/setup/SetupWizard.tsx:126
 msgid "You also accept the licences of the AI models and tools Home installs for you. Each is listed with its terms on the Plan page and in Models and storage."
 msgstr ""
@@ -26616,8 +26951,18 @@ msgid "You can get {value} back later. It is a download of the same size, {joinN
 msgstr ""
 
 #. js-lingui-explicit-id
+#: ../backend/src/lib/apiErrorCopy.ts:74
+msgid "api.error.grants_view_forbidden"
+msgstr ""
+
+#. js-lingui-explicit-id
 #: ../backend/src/lib/apiErrorCopy.ts:26
 msgid "api.error.sessions_own_only"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: ../backend/src/lib/apiErrorCopy.ts:55
+msgid "api.error.world_place_limit"
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -26626,8 +26971,13 @@ msgid "You can save up to 12 places."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/setup/SetupWizard.tsx:492
+#: src/apps/setup/SetupWizard.tsx:491
 msgid "You can talk with Home as soon as you open it. Start a chat, add people, or choose apps whenever you're ready. If the AI is still downloading, chat starts answering when the first model finishes. To have Home greet you by face, turn it on in your profile; face data stays on this computer."
+msgstr ""
+
+#. js-lingui-explicit-id
+#: ../backend/src/lib/apiErrorCopy.ts:72
+msgid "api.error.grant_not_held"
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -26658,6 +27008,16 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/apps/settings/RobotCompanionChoices.tsx:25
 msgid "you chose"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: ../backend/src/lib/apiErrorCopy.ts:96
+msgid "api.error.share_no_access"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: ../backend/src/lib/apiErrorCopy.ts:104
+msgid "api.error.recheck_too_many"
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -26693,6 +27053,11 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/apps/setup/SetupWizard.tsx:128
 msgid "You manage this Home, its people, files, and backups. Nobody can remove the owner."
+msgstr ""
+
+#. js-lingui-explicit-id
+#: ../backend/src/lib/apiErrorCopy.ts:102
+msgid "api.error.share_remove_forbidden"
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -26777,7 +27142,7 @@ msgid "Your chats will show up here."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/setup/SetupWizard.tsx:453
+#: src/apps/setup/SetupWizard.tsx:452
 msgid "Your chats, people, and memories stay on your computers. Home goes online only for downloads, updates, and searches you ask for."
 msgstr ""
 
@@ -26882,7 +27247,7 @@ msgid "Your key is ready"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/setup/SetupWizard.tsx:483
+#: src/apps/setup/SetupWizard.tsx:482
 msgid "Your key. Save it now; Home will show it only once."
 msgstr ""
 
@@ -26970,6 +27335,11 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/apps/settings/SignInSecretSection.tsx:39
 msgid "Your PIN is set."
+msgstr ""
+
+#. js-lingui-explicit-id
+#: ../backend/src/lib/apiErrorCopy.ts:107
+msgid "api.error.upload_profile_gone"
 msgstr ""
 
 #. js-lingui-explicit-id

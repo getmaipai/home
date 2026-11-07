@@ -10,7 +10,7 @@ import type { PersonRow } from "@/types";
 
 const timers = ownedRecordCrud({
   table: quickTimers, spec: QuickTimer, idPrefix: "qtimer", fields: ["name", "minutes"], trimmed: ["name"],
-  invalid: "Invalid quick timer.", missing: "No such quick timer.",
+  invalid: "quick_timer_invalid", missing: "quick_timer_missing",
 });
 
 export function listQuickTimers(actor: PersonRow): QT[] {

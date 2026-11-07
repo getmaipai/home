@@ -66,17 +66,35 @@ Screen column: where the text reaches a person. "any form" means the shared `err
 Counts: 34 codes in the table (33 with an `error` line plus `invalid_input`, which has only a `next`), 51 `apiError(...)` call sites in `backend/src/routes` and
 `app.ts`, 1 code added to the validation hook, 15 `useHubMutation` verbs.
 
-## Printed by a screen, text built outside the handler (not coded yet)
+## Printed by a screen, text built outside the handler (coded, I18N-B2b)
 
-These answer with `error: result.error` from a lib function, so the sentence is composed away from the route. Each needs its lib function
-to return a code first. They still show the server's English, never a key.
+These routes answered with `error: result.error` from a lib function, so the sentence was composed away from the route. The lib function now
+returns a code next to `error`, and the sentence lives only in `API_ERROR_LINES`:
 
-- `alarms.ts`, `quickTimers.ts`, `worldPlaces.ts`, `comingUp.ts` (create, change, delete a timer, alarm, place or reminder): Clock and Reminders screens.
-- `auth.ts` setup and change-secret: the secret and display-name checks (`displayName.error`, `secret.error`), Setup wizard and Settings, Sign-in.
-- `passkeys.ts` register and authenticate verify (`result.error ?? "Could not verify this passkey."`).
-- `grants.ts`, `lists.ts`, `projects.ts`, `files.ts`, `library.ts`: Library, Lists, Projects.
+- A lib refusal is built with `refusal(status, "code")` (`lib/result.ts`): the status, the table's English as `error` (so no second copy of the
+  words), and the `code`. `refuseWith`, `respond` and `refusalBody` send it as `apiError(code)`; a refusal with no code (a dynamic or developer text)
+  goes out as the bare `{ error }` as before.
+- `lib/validation.ts` returns the code with each refusal; `lib/passkeys.ts` returns `code` instead of English; `UploadError` takes a table code
+  (or `{ text }` for the storage-cap message, which is built from live numbers).
+- A line that names a minor (a child, teen or guest reads or acts on it) has an id under `api.minor.*`, so the translate script never fills it.
+- No line needed a `{placeholder}`: the three sentences that carried a value (the name length, the project id, the 500 MB cap) now read the same
+  without it or keep the fixed number.
 
-Follow-up slice: code these by lib function, one table row each.
+| Group | Codes added | Files |
+|---|---|---|
+| Alarms | 3 (`alarm_invalid`, `alarm_missing`, `alarm_no_next`) | `lib/alarms.ts`, `routes/alarms.ts` |
+| Quick timers | 2 | `lib/quickTimers.ts`, `lib/ownedRecordCrud.ts` |
+| World places | 4 (invalid, missing, limit, time zone) | `lib/worldPlaces.ts`, `lib/ownedRecordCrud.ts` |
+| Coming up | 5 (timer invalid, missing, not pending; item missing, not pending) | `lib/comingUp.ts`, `routes/comingUp.ts` |
+| Auth secret checks | 2 (`display_name_length`, `secret_length`) | `lib/validation.ts`, `routes/auth.ts`, `routes/people.ts`; Setup wizard matches the code, not the text |
+| Passkey verify | 4 | `lib/passkeys.ts`, `routes/passkeys.ts` |
+| Grants | 7 (2 minor) | `lib/grants.ts`, `routes/grants.ts` |
+| Lists | 8 (1 minor) | `lib/lists.ts`, `routes/lists.ts` |
+| Projects | 2 | `routes/projects.ts` |
+| Files and Library | 37 (2 minor): file edit, delete and trash 11, shares 7 (1 minor), picture recheck 3, library cursor 1, uploads 15 (1 minor) | `lib/libraryEdit.ts`, `libraryTrash.ts`, `shares.ts`, `libraryAudience.ts`, `libraryUploadStream.ts`, `libraryMultipart.ts`, `library.ts`, `attachments.ts`, `routes/files.ts`, `routes/library.ts` |
+
+Counts: 74 codes added in this slice, 108 in the table now (34 before). The test `apiErrorCodes.test.ts` also scans these route and lib files and
+fails on any `error: "sentence"` literal left in them, except the developer texts below. Real routes are checked for code plus the table's English.
 
 ## Developer text (left alone, English)
 
@@ -87,6 +105,10 @@ About 1,080 literal `error:` sites remain. They are of these kinds, and no scree
 - Machine-to-machine routes (openai, codeGateway, quickConnect, deviceAuth, stt, tts, voice streams, turn stream wire errors): read by another program; the chat screen translates its own stream errors through `failureCopy.ts`.
 - Internal state errors ("turn not found", "Setup already completed"): the screen prints its own wording for these (for example the Setup wizard on 409).
 - Log lines and `console.error` text.
+- Still uncoded inside the coded groups (the test allows exactly these): `unknown grant action: <action>` (a caller bug), the joined schema or list
+  validation messages (`candidate.error.issues`, `validateList` problems, `validateGrant` problems: built from the field that failed), the zod
+  query message for the Library `shared` filter, the storage-cap text on an upload (live numbers), `cancelJob`'s messages passed through
+  Coming up "done" and "snooze" (the scheduler's operator texts), and the 500 "attachment integrity check failed" on a file read.
 
-A new route that wants a screen to print its error adds a row to `API_ERROR_LINES` and sends `apiError("code")`; the test in
+A new route that wants a screen to print its error adds a row to `API_ERROR_LINES` and sends `apiError("code")` (or a lib returns `refusal(status, "code")`); the test in
 `backend/tests/apiErrorCodes.test.ts` fails if the table and the routes disagree.

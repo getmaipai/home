@@ -123,9 +123,9 @@ auth.openapi(setupRoute, async (c) => {
 
   const body = c.req.valid("json");
   const displayName = validateDisplayName(body.displayName);
-  if (!displayName.ok) return c.json({ error: displayName.error }, 400);
+  if (!displayName.ok) return c.json(apiError(displayName.code), 400);
   const secret = validateSecret(body.secret);
-  if (!secret.ok) return c.json({ error: secret.error }, 400);
+  if (!secret.ok) return c.json(apiError(secret.code), 400);
 
   const now = new Date().toISOString();
   const id = newPersonId();
@@ -326,7 +326,7 @@ auth.openapi(changeSecretRoute, async (c) => {
   const actor = c.get("person");
   const body = c.req.valid("json");
   const newSecret = validateSecret(body.newSecret);
-  if (!newSecret.ok) return c.json({ error: newSecret.error }, 400);
+  if (!newSecret.ok) return c.json(apiError(newSecret.code), 400);
 
   const record = db
     .select()

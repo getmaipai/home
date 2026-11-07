@@ -3,6 +3,7 @@ import { WorldPlace } from "@maipai/spec/gen/ts/world-place.js";
 import { apiRouter, errorResponses, idParamSchema, respond } from "@/lib/openapi";
 import { requireAuth } from "@/middleware/auth";
 import { createWorldPlace, deleteWorldPlace, listWorldPlaces, updateWorldPlace } from "@/lib/worldPlaces";
+import { refusalBody } from "@/lib/result";
 
 export const worldPlacesRoutes = apiRouter();
 
@@ -41,7 +42,7 @@ const create = createRoute({
 });
 worldPlacesRoutes.openapi(create, (c) => {
   const result = createWorldPlace(c.get("person"), c.req.valid("json"));
-  return result.ok ? c.json(result.value, 201) : c.json({ error: result.error }, 400);
+  return result.ok ? c.json(result.value, 201) : c.json(refusalBody(result), 400);
 });
 
 const patch = createRoute({
@@ -78,5 +79,5 @@ const del = createRoute({
 });
 worldPlacesRoutes.openapi(del, (c) => {
   const result = deleteWorldPlace(c.get("person"), c.req.valid("param").id);
-  return result.ok ? c.json(result.value, 200) : c.json({ error: result.error }, 404);
+  return result.ok ? c.json(result.value, 200) : c.json(refusalBody(result), 404);
 });

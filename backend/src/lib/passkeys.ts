@@ -33,6 +33,7 @@ import { passkeyCredentials } from "@/db/schema";
 import { detectLanIps } from "@/lib/hubEndpoints";
 import { ensureCredentialRowExists } from "@/lib/credentialLockout";
 import { configuredHubPort } from "@/lib/networkSettings";
+import type { ApiErrorBodyCode } from "@/lib/apiErrorCopy";
 
 const RP_ID = "maipai.local";
 const RP_NAME = "MaiPai Home";
@@ -95,12 +96,13 @@ export async function registrationOptions(personId: string, personDisplayName: s
 
 export interface RegistrationVerifyResult {
   ok: boolean;
-  error?: string;
+  /** The table code (lib/apiErrorCopy.ts) of the refusal; the route sends `apiError(code)`. */
+  code?: ApiErrorBodyCode;
 }
 
 export async function verifyRegistration(personId: string, response: RegistrationResponseJSON, label: string): Promise<RegistrationVerifyResult> {
   const expectedChallenge = takeChallenge(personId);
-  if (!expectedChallenge) return { ok: false, error: "This registration attempt has expired. Try again." };
+  if (!expectedChallenge) return { ok: false, code: "passkey_registration_expired" };
 
   let result;
   try {
@@ -111,9 +113,9 @@ export async function verifyRegistration(personId: string, response: Registratio
       expectedRPID: RP_ID,
     });
   } catch {
-    return { ok: false, error: "Could not verify this passkey." };
+    return { ok: false, code: "passkey_verify_failed" };
   }
-  if (!result.verified) return { ok: false, error: "Could not verify this passkey." };
+  if (!result.verified) return { ok: false, code: "passkey_verify_failed" };
 
   const { credential, credentialDeviceType, credentialBackedUp } = result.registrationInfo;
   ensureCredentialRowExists(personId); // the shared lockout counter (lib/credentialLockout.ts) needs a row to live on
@@ -148,19 +150,19 @@ export async function authenticationOptions(personId: string) {
 
 export interface AuthenticationVerifyResult {
   ok: boolean;
-  error?: string;
+  code?: ApiErrorBodyCode;
 }
 
 export async function verifyAuthentication(personId: string, response: AuthenticationResponseJSON): Promise<AuthenticationVerifyResult> {
   const expectedChallenge = takeChallenge(personId);
-  if (!expectedChallenge) return { ok: false, error: "This sign-in attempt has expired. Try again." };
+  if (!expectedChallenge) return { ok: false, code: "passkey_signin_expired" };
 
   const stored = db
     .select()
     .from(passkeyCredentials)
     .where(and(eq(passkeyCredentials.id, response.id), eq(passkeyCredentials.personId, personId)))
     .get();
-  if (!stored) return { ok: false, error: "This passkey isn't registered to this profile." };
+  if (!stored) return { ok: false, code: "passkey_not_registered_here" };
 
   let result;
   try {
@@ -177,9 +179,9 @@ export async function verifyAuthentication(personId: string, response: Authentic
       },
     });
   } catch {
-    return { ok: false, error: "Could not verify this passkey." };
+    return { ok: false, code: "passkey_verify_failed" };
   }
-  if (!result.verified) return { ok: false, error: "Could not verify this passkey." };
+  if (!result.verified) return { ok: false, code: "passkey_verify_failed" };
 
   // The updated counter guards against a cloned authenticator replaying
   // an old assertion - persisted immediately, not just returned, or the

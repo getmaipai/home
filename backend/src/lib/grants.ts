@@ -22,7 +22,9 @@ import grantActions from "@maipai/spec/vocab/grant-actions.json" with { type: "j
 import { validateGrant, matchGrantAction } from "@maipai/spec/records/ts/validate.js";
 import { Grant } from "@maipai/spec/gen/ts/grant.js";
 import type { Grant as GrantT } from "@maipai/spec/gen/ts/grant.js";
-import type { OpResult } from "@/lib/entities";
+import { refusal } from "@/lib/result";
+
+type OpResult<T> = { ok: true; status: 200 | 201; value: T } | { ok: false; status: 400 | 404; error: string; code?: string };
 
 export type GrantRow = typeof grants.$inferSelect;
 
@@ -109,7 +111,6 @@ const ADMIN_HELD_GRANT_ACTIONS = new Set([
   "house.control:<target>",
   "house.confirm:<target>",
 ]);
-const GRANT_AUTHORITY_ERROR = "You can't give someone a permission you don't have. Ask the owner to grant it.";
 
 export function grantActionClassificationIsComplete(): boolean {
   const classified = new Set([...OWNER_ONLY_GRANT_ACTIONS, ...ADMIN_HELD_GRANT_ACTIONS]);
@@ -125,25 +126,25 @@ function actorHoldsAction(actor: { id: string; role: Role }, action: string, cat
 }
 
 /** RULES.md rules 0 and 8 and the spec policy for `tier.max`: a child never holds it, and a teen holds it only for pictures. */
-function tierGrantRefusal(catalogActionId: string, action: string, personId: string): string | null {
+function tierGrantRefusal(catalogActionId: string, action: string, personId: string): "grant_child_max" | "grant_teen_max_pictures" | null {
   if (catalogActionId !== "tier.max" && catalogActionId !== "tier.max:<category>") return null;
   const role = db.select({ role: people.role }).from(people).where(eq(people.id, personId)).get()?.role;
-  if (role === "child") return "A child can't be given Max. Children keep the Standard level.";
-  if (role === "teen" && action !== "tier.max:image") return "A teen can be given Max only for pictures. Chat, video and music stay Standard for them.";
+  if (role === "child") return "grant_child_max";
+  if (role === "teen" && action !== "tier.max:image") return "grant_teen_max_pictures";
   return null;
 }
 
 export function createGrant(actor: { id: string; role: Role }, input: GrantCreate): OpResult<GrantT> {
   const person = db.select({ id: people.id }).from(people).where(and(eq(people.id, input.person), isNull(people.deletedAt))).get();
-  if (!person) return { ok: false, status: 400, error: "person does not name an existing profile" };
+  if (!person) return refusal(400, "grant_person_missing");
   const matchedAction = matchGrantAction(input.action);
   if (!matchedAction) return { ok: false, status: 400, error: `unknown grant action: ${input.action}` };
   if (actor.role === "admin" && actor.id === input.person && input.action === "backups.restore") {
-    return { ok: false, status: 400, error: "Admins cannot grant themselves backup restore access. Ask the owner to grant it." };
+    return refusal(400, "grant_backup_self");
   }
   const tierRefusal = tierGrantRefusal(matchedAction.id, input.action, person.id);
-  if (tierRefusal) return { ok: false, status: 400, error: tierRefusal };
-  if (!actorHoldsAction(actor, input.action, matchedAction.id)) return { ok: false, status: 400, error: GRANT_AUTHORITY_ERROR };
+  if (tierRefusal) return refusal(400, tierRefusal);
+  if (!actorHoldsAction(actor, input.action, matchedAction.id)) return refusal(400, "grant_not_held");
 
   const now = new Date().toISOString();
   const candidate = Grant.safeParse({
@@ -184,7 +185,7 @@ export function listGrants(personId?: string): GrantT[] {
 
 export function revokeGrant(id: string): OpResult<{ id: string }> {
   const row = db.select({ id: grants.id, action: grants.action }).from(grants).where(and(eq(grants.id, id), isNull(grants.deletedAt))).get();
-  if (!row) return { ok: false, status: 404, error: "no such grant" };
+  if (!row) return refusal(404, "grant_missing");
   const now = new Date().toISOString();
   db.update(grants).set({ deletedAt: now, updatedAt: now, hlc: nextHlc() }).where(eq(grants.id, id)).run();
   if (row.action.startsWith("house.")) emitScheduleRecheck();

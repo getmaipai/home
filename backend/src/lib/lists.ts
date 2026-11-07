@@ -22,6 +22,7 @@ import { List } from "@maipai/spec/gen/ts/list.js";
 import type { List as ListT } from "@maipai/spec/gen/ts/list.js";
 import type { PersonRow } from "@/types";
 import { isOwnerOrAdmin } from "@/lib/access";
+import { refusal } from "@/lib/result";
 
 export type ListRow = typeof lists.$inferSelect;
 
@@ -29,7 +30,7 @@ export type ListRow = typeof lists.$inferSelect;
 // code" shape lib/entities.ts's own OpResult<T> takes - that shape never
 // narrows `status` down to just the failure codes on the `!ok` branch,
 // which callers can handle at their boundary.
-export type OpResult<T> = { ok: true; status: 200 | 201; value: T } | { ok: false; status: 400 | 403 | 404; error: string };
+export type OpResult<T> = { ok: true; status: 200 | 201; value: T } | { ok: false; status: 400 | 403 | 404; error: string; code?: string };
 
 function toList(row: ListRow): ListT {
   return List.parse({
@@ -86,10 +87,10 @@ export function listLists(actor: { id: string; role: string }): ListT[] {
 
 export function getList(actor: { id: string; role: string }, id: string): OpResult<ListT> {
   const row = db.select().from(lists).where(and(eq(lists.id, id), isNull(lists.deletedAt))).get();
-  if (!row) return { ok: false, status: 404, error: "no such list" };
+  if (!row) return refusal(404, "list_missing");
   const canSeeAll = isOwnerOrAdmin(actor);
   if (row.scope === "person" && row.person !== actor.id && !canSeeAll) {
-    return { ok: false, status: 404, error: "no such list" };
+    return refusal(404, "list_missing");
   }
   return { ok: true, status: 200, value: toList(row) };
 }
@@ -105,7 +106,7 @@ export interface ListCreate {
 export function createList(actor: { id: string }, input: ListCreate): OpResult<ListT> {
   const now = new Date().toISOString();
   const title = input.title ?? (input.kind === "custom" ? null : DEFAULT_TITLE[input.kind]);
-  if (!title) return { ok: false, status: 400, error: "a custom list needs a title" };
+  if (!title) return refusal(400, "list_needs_title");
 
   const candidate = List.safeParse({
     id: newListId(),
@@ -132,7 +133,7 @@ export function createList(actor: { id: string }, input: ListCreate): OpResult<L
       .from(people)
       .where(and(eq(people.id, candidate.data.person), isNull(people.deletedAt)))
       .get();
-    if (!person) return { ok: false, status: 400, error: "person does not name an existing person" };
+    if (!person) return refusal(400, "list_person_missing");
   }
 
   db.insert(lists).values(toRow(candidate.data)).run();
@@ -201,9 +202,9 @@ export function updateList(actor: { id: string; role: string }, id: string, edit
 
 export function deleteList(actor: { id: string; role: string }, id: string): OpResult<{ id: string }> {
   const existing = getList(actor, id);
-  if (!existing.ok) return { ok: false, status: existing.status, error: existing.error };
+  if (!existing.ok) return existing;
   if (actor.role === "child" && existing.value.scope === "household") {
-    return { ok: false, status: 403, error: "children cannot delete household lists" };
+    return refusal(403, "list_child_delete_household");
   }
   const now = new Date().toISOString();
   db.update(lists).set({ deletedAt: now, updatedAt: now, hlc: nextHlc() }).where(eq(lists.id, id)).run();
@@ -247,7 +248,7 @@ export function editItem(actor: { id: string; role: string }, listId: string, it
   if (!existing.ok || !existing.value) return existing;
   const target = existing.value;
   const item = target.items.find((i) => i.id === itemId);
-  if (!item) return { ok: false, status: 404, error: "no such item on this list" };
+  if (!item) return refusal(404, "list_item_missing");
 
   const now = new Date().toISOString();
   const candidate = List.safeParse({
@@ -273,7 +274,7 @@ export function removeItem(actor: { id: string; role: string }, listId: string, 
   const existing = getList(actor, listId);
   if (!existing.ok || !existing.value) return existing;
   const target = existing.value;
-  if (!target.items.some((i) => i.id === itemId)) return { ok: false, status: 404, error: "no such item on this list" };
+  if (!target.items.some((i) => i.id === itemId)) return refusal(404, "list_item_missing");
 
   const now = new Date().toISOString();
   const candidate = List.parse({
@@ -320,9 +321,9 @@ export function moveItems(actor: { id: string; role: string }, fromListId: strin
   if (!source.ok) return source;
   const target = getList(actor, toListId);
   if (!target.ok) return target;
-  if (fromListId === toListId) return { ok: false, status: 400, error: "source and target must differ" };
+  if (fromListId === toListId) return refusal(400, "list_move_same");
   const selected = source.value.items.filter((item) => itemIds.includes(item.id));
-  if (selected.length === 0) return { ok: false, status: 404, error: "no matching items" };
+  if (selected.length === 0) return refusal(404, "list_move_none");
   const now = new Date().toISOString();
   const from = List.parse({ ...source.value, items: source.value.items.filter((item) => !itemIds.includes(item.id)), updated_at: now, hlc: nextHlc() });
   const to = List.parse({ ...target.value, items: [...target.value.items, ...selected], updated_at: now, hlc: nextHlc() });
@@ -377,7 +378,7 @@ export function restoreItems(actor: { id: string; role: string }, listId: string
     items.splice(Math.min(Math.max(entry.index, 0), items.length), 0, entry.item);
     restored += 1;
   }
-  if (restored === 0) return { ok: false, status: 404, error: "no items to restore" };
+  if (restored === 0) return refusal(404, "list_restore_none");
   const candidate = List.safeParse({ ...existing.value, items, updated_at: new Date().toISOString(), hlc: nextHlc() });
   if (!candidate.success) return { ok: false, status: 400, error: candidate.error.issues.map((i) => i.message).join("; ") };
   const problems = validateList(candidate.data);
