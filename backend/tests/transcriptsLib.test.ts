@@ -165,4 +165,30 @@ describe("transcript helpers", () => {
     expect(db.select().from(transcriptRevisions).all().map((revision) => revision.n)).toEqual([1, 2, 3, 4]);
     expect(getTranscript(actor, created.id).segments[0]?.text).toBe("Iris");
   });
+  test("add_speaker and rename_speaker persist, and undo and restore bring speakers back", () => {
+    const created = createTranscript(actor, {
+      itemId: "media-transcript",
+      language: "en",
+      segments: [{ id: "s1", start: 0, end: 1, text: "Sage" }],
+      provenance: transcript.provenance,
+    });
+    applyOps(actor, created.id, actor.id, [
+      { kind: "add_speaker", speaker_id: "spk-a1", label: "Sage" },
+      { kind: "set_speaker", segment_id: "s1", speaker: "spk-a1" },
+    ]);
+    expect(getTranscript(actor, created.id).speakers).toEqual([{ id: "spk-a1", label: "Sage" }]);
+    expect(getTranscript(actor, created.id).segments[0]?.speaker).toBe("spk-a1");
+    expect(() => applyOps(actor, created.id, actor.id, [{ kind: "add_speaker", speaker_id: "spk-a1", label: "Again" }])).toThrow("already exists");
+    expect(() => applyOps(actor, created.id, actor.id, [{ kind: "rename_speaker", speaker_id: "nope", label: "X" }])).toThrow("not found");
+    expect(() => applyOps(actor, created.id, actor.id, [{ kind: "add_speaker", speaker_id: "spk-b2", label: "  " }])).toThrow("Give the speaker a name");
+    applyOps(actor, created.id, actor.id, [{ kind: "rename_speaker", speaker_id: "spk-a1", label: "Marlow" }]);
+    expect(getTranscript(actor, created.id).speakers).toEqual([{ id: "spk-a1", label: "Marlow" }]);
+    undo(actor, created.id, actor.id);
+    expect(getTranscript(actor, created.id).speakers).toEqual([{ id: "spk-a1", label: "Sage" }]);
+    restoreRevision(actor, created.id, 1, actor.id);
+    expect(getTranscript(actor, created.id).speakers).toEqual([]);
+    expect(getTranscript(actor, created.id).segments[0]?.speaker).toBeUndefined();
+    restoreRevision(actor, created.id, 3, actor.id);
+    expect(getTranscript(actor, created.id).speakers).toEqual([{ id: "spk-a1", label: "Marlow" }]);
+  });
 });

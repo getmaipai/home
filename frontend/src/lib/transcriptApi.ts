@@ -4,7 +4,11 @@ import { ApiError, requestJson } from "@/lib/api";
 
 export type TranscriptFormat = "srt" | "vtt" | "txt" | "md" | "json";
 export type ImportFormat = "srt" | "vtt" | "txt";
-export type TranscriptOp = { kind: "replace_text"; segment_id: string; text: string };
+export type TranscriptOp =
+  | { kind: "replace_text"; segment_id: string; text: string }
+  | { kind: "set_speaker"; segment_id: string; speaker: string }
+  | { kind: "add_speaker"; speaker_id: string; label: string }
+  | { kind: "rename_speaker"; speaker_id: string; label: string };
 
 const JSON_HEADERS = { "content-type": "application/json" };
 

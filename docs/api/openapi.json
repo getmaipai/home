@@ -57074,6 +57074,30 @@
                             "kind": {
                               "type": "string",
                               "enum": [
+                                "add_speaker",
+                                "rename_speaker"
+                              ]
+                            },
+                            "speaker_id": {
+                              "type": "string",
+                              "minLength": 1
+                            },
+                            "label": {
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "kind",
+                            "speaker_id",
+                            "label"
+                          ]
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "kind": {
+                              "type": "string",
+                              "enum": [
                                 "replace_range"
                               ]
                             },
@@ -57115,6 +57139,25 @@
                                   "start",
                                   "end",
                                   "text"
+                                ]
+                              }
+                            },
+                            "speakers": {
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "properties": {
+                                  "id": {
+                                    "type": "string",
+                                    "minLength": 1
+                                  },
+                                  "label": {
+                                    "type": "string"
+                                  }
+                                },
+                                "required": [
+                                  "id",
+                                  "label"
                                 ]
                               }
                             }

@@ -16,6 +16,7 @@ export class TranscriptError extends Error {
 }
 
 export type Segment = Transcript["segments"][number];
+export type Speaker = Transcript["speakers"][number];
 export type Provenance = Transcript["provenance"];
 export const CHILD_TRANSCRIPT_ERROR = "Transcripts are available to teens and adults.";
 
@@ -115,6 +116,7 @@ export function createTranscript(
         start: 0,
         end: Number.MAX_SAFE_INTEGER,
         segments: input.segments,
+        speakers: input.speakers ?? [],
       }]),
       provenance: JSON.stringify(input.provenance),
       hlc: stamp,

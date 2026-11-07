@@ -23,12 +23,12 @@ const record = {
   clock: { created_at: "2026-11-06T00:00:00Z", updated_at: "2026-11-06T00:00:00Z", hlc: "1:1:abcdef" },
 } as Transcript;
 
-function Harness({ me = person, initialTab }: { me?: Roster; initialTab?: string }) {
+function Harness({ me = person, initialTab, currentTime = 0 }: { me?: Roster; initialTab?: string; currentTime?: number }) {
   const node = useTranscriptWorkspace({
     item,
     me,
     initialTab,
-    currentTime: 0,
+    currentTime,
     onSeek: (time) => {
       document.body.dataset.seek = String(time);
     },
@@ -44,10 +44,10 @@ function stub<T extends { mockRestore: () => void }>(spy: T): T {
 function stubRevisions() {
   return stub(spyOn(transcriptApi, "revisions").mockResolvedValue([]));
 }
-async function readyView(initialTab?: string) {
-  stub(spyOn(transcriptApi, "start").mockResolvedValue(record));
+async function readyView(initialTab?: string, transcript: Transcript = record, currentTime = 0) {
+  stub(spyOn(transcriptApi, "start").mockResolvedValue(transcript));
   stubRevisions();
-  const view = render(<Harness initialTab={initialTab} />);
+  const view = render(<Harness initialTab={initialTab} currentTime={currentTime} />);
   fireEvent.click(view.getByRole("button", { name: "Make transcript" }));
   await view.findByRole("tab", { name: "Search" });
   return view;
@@ -170,5 +170,71 @@ describe("Library transcript workspace tools", () => {
     const view = render(<Harness me={child} />);
     expect(view.container.textContent).toBe("");
     expect(start).not.toHaveBeenCalled();
+  });
+});
+
+const spoken = {
+  ...record,
+  segments: [
+    {
+      id: "seg-1", start: 0, end: 2, text: "Hello world", speaker: "spk-aaa111",
+      words: [{ start: 0, end: 1, text: "Hello" }, { start: 1, end: 2, text: "world" }],
+    },
+    { id: "seg-2", start: 3, end: 5, text: "Goodbye world", speaker: "spk-bbb222" },
+  ],
+  speakers: [{ id: "spk-aaa111", label: "Sage" }, { id: "spk-bbb222", label: "Nova" }],
+} as Transcript;
+
+describe("Library transcript workspace: words and speakers", () => {
+  test("the word being spoken is marked current and a click seeks to that word", async () => {
+    const view = await readyView("edit", spoken, 1.2);
+    const world = view.getByRole("button", { name: "world" });
+    expect(world.getAttribute("aria-current")).toBe("true");
+    expect(view.getByRole("button", { name: "Hello" }).getAttribute("aria-current")).toBeNull();
+    fireEvent.click(view.getByRole("button", { name: "Hello" }));
+    expect(document.body.dataset.seek).toBe("0");
+    fireEvent.click(world);
+    expect(document.body.dataset.seek).toBe("1");
+  });
+
+  test("a selected line with words shows the editor and a speaker choice that calls set_speaker", async () => {
+    const edit = stub(spyOn(transcriptApi, "edit").mockResolvedValue(spoken));
+    const view = await readyView("edit", spoken, 4);
+    fireEvent.click(view.getByRole("button", { name: "Edit line at 0:00" }));
+    expect(await view.findByRole("textbox", { name: "Edit line at 0:00" })).toBeTruthy();
+    fireEvent.change(view.getByLabelText("Speaker for line at 0:00"), { target: { value: "spk-bbb222" } });
+    await waitFor(() => expect(edit).toHaveBeenCalledTimes(1));
+    expect(edit).toHaveBeenCalledWith("tx-1", [{ kind: "set_speaker", segment_id: "seg-1", speaker: "spk-bbb222" }]);
+  });
+
+  test("add and rename speaker send the speaker ops", async () => {
+    const edit = stub(spyOn(transcriptApi, "edit").mockResolvedValue(spoken));
+    const view = await readyView("edit", spoken);
+    fireEvent.change(view.getByLabelText("New speaker name"), { target: { value: "Iris" } });
+    fireEvent.click(view.getByRole("button", { name: "Add speaker" }));
+    await waitFor(() => expect(edit).toHaveBeenCalledTimes(1));
+    const added = edit.mock.calls[0]![1][0]!;
+    expect(added).toMatchObject({ kind: "add_speaker", label: "Iris" });
+    expect((added as { speaker_id: string }).speaker_id).toMatch(/^spk-[a-z0-9]{6}$/);
+    fireEvent.change(view.getByLabelText("Name for Sage"), { target: { value: "Jesse" } });
+    fireEvent.click(view.getByRole("button", { name: "Rename Sage" }));
+    await waitFor(() => expect(edit).toHaveBeenCalledTimes(2));
+    expect(edit.mock.calls[1]![1]).toEqual([{ kind: "rename_speaker", speaker_id: "spk-aaa111", label: "Jesse" }]);
+  });
+
+  test("the speaker filter hides other speakers' lines and edits still hit the right segment", async () => {
+    const edit = stub(spyOn(transcriptApi, "edit").mockResolvedValue(spoken));
+    const view = await readyView("edit", spoken, 4);
+    fireEvent.change(view.getByLabelText("Filter by speaker"), { target: { value: "spk-aaa111" } });
+    expect(view.queryByText("Goodbye world")).toBeNull();
+    expect(view.queryByRole("textbox", { name: "Edit line at 0:03" })).toBeNull();
+    fireEvent.click(view.getByRole("button", { name: "Edit line at 0:00" }));
+    const editor = await view.findByRole("textbox", { name: "Edit line at 0:00" });
+    fireEvent.change(editor, { target: { value: "Hi world" } });
+    fireEvent.blur(editor);
+    await waitFor(() => expect(edit).toHaveBeenCalledTimes(1));
+    expect(edit).toHaveBeenCalledWith("tx-1", [{ kind: "replace_text", segment_id: "seg-1", text: "Hi world" }]);
+    fireEvent.change(view.getByLabelText("Filter by speaker"), { target: { value: "all" } });
+    expect(view.getByText("Goodbye world")).toBeTruthy();
   });
 });

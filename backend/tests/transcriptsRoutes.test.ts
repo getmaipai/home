@@ -123,6 +123,17 @@ describe("transcript routes", () => {
       expect(await response.text()).not.toBe("");
     }
 
+    const withSpeaker = await req(`/transcripts/${record.id}`, token, "PATCH", {
+      ops: [
+        { kind: "add_speaker", speaker_id: "spk-route1", label: "Sage" },
+        { kind: "set_speaker", segment_id: "seg-sage", speaker: "spk-route1" },
+        { kind: "rename_speaker", speaker_id: "spk-route1", label: "Nova" },
+      ],
+    });
+    expect(withSpeaker.status).toBe(200);
+    expect((await withSpeaker.json() as { speakers: unknown }).speakers).toEqual([{ id: "spk-route1", label: "Nova" }]);
+    expect((await req(`/transcripts/${record.id}`, token, "PATCH", { ops: [{ kind: "rename_speaker", speaker_id: "ghost", label: "X" }] })).status).toBe(400);
+
     const imported = await req("/library/media-caption01/transcript/import", token, "POST", {
       format: "srt",
       text: "1\n00:00:00,000 --> 00:00:01,000\nSage speaks",
