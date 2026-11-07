@@ -26,7 +26,7 @@ import type { PlaceAdapter } from "@maipai/ui/src/settings/LocationField";
 /** SEARXNG-SET-05: the keys the Web search block above the Search cards draws itself, so the cards never repeat them. */
 const WEB_SEARCH_BLOCK_KEYS = ["search.searxng_url", "search.web_sources", "search.ddgs_for_minors"];
 const MINOR_DDGS_ONLY = ["search.ddgs_for_minors"];
-const MINOR_DDGS_TITLE = { "household.search": "Teens and children" };
+const minorDdgsTitle = () => ({ "household.search": i18n._({ id: "Teens and children", message: "Teens and children" }) });
 
 const ChevronDown = getIcon("chevron-down");
 
@@ -36,20 +36,20 @@ const ChevronDown = getIcon("chevron-down");
  * stable. */
 export const beforeSettingChange: BeforeChange = async (key, value) => {
   if (key === "notifications.browser.enabled" && value) {
-    if (typeof Notification === "undefined" || !("serviceWorker" in navigator)) return "This browser cannot show system alerts.";
-    if (!(await requestBrowserAlertPermission(() => Notification.requestPermission(), true))) return "Browser permission was not granted, so alerts are off.";
+    if (typeof Notification === "undefined" || !("serviceWorker" in navigator)) return i18n._({ id: "This browser cannot show system alerts.", message: "This browser cannot show system alerts." });
+    if (!(await requestBrowserAlertPermission(() => Notification.requestPermission(), true))) return i18n._({ id: "Browser permission was not granted, so alerts are off.", message: "Browser permission was not granted, so alerts are off." });
   }
   if (key === "network.hub_port") {
     const port = Number(value);
-    return window.confirm(`Home will restart after this is saved. Devices will use maipai.local:${port}. Continue?`)
+    return window.confirm(i18n._({ id: "Home will restart after this is saved. Devices will use maipai.local:{port}. Continue?", message: "Home will restart after this is saved. Devices will use maipai.local:{port}. Continue?", values: { port } }))
       ? true
-      : "No change was made.";
+      : i18n._({ id: "No change was made.", message: "No change was made." });
   }
   if (key === "network.lan_exposure") {
-    const reach = value === "loopback" ? "Only this computer will be able to reach Home." : "Devices on your home network will be able to reach Home.";
-    return window.confirm(`Home will restart after this is saved. ${reach} Continue?`)
+    const reach = value === "loopback" ? i18n._({ id: "Only this computer will be able to reach Home.", message: "Only this computer will be able to reach Home." }) : i18n._({ id: "Devices on your home network will be able to reach Home.", message: "Devices on your home network will be able to reach Home." });
+    return window.confirm(i18n._({ id: "Home will restart after this is saved. {reach} Continue?", message: "Home will restart after this is saved. {reach} Continue?", values: { reach } }))
       ? true
-      : "No change was made.";
+      : i18n._({ id: "No change was made.", message: "No change was made." });
   }
   return true;
 };
@@ -97,7 +97,7 @@ function keysCard(card: Card, viewer: SettingsViewer, props: SectionContentProps
     only: [group],
     includeKeys: ownsWebSearch ? props.registry.filter((k) => k.lives_in === group && !WEB_SEARCH_BLOCK_KEYS.includes(k.key)).map((k) => k.key) : allowed ? [...allowed, ...(props.packageKeys ?? [])] : undefined,
     places: scope === "device" ? undefined : places[scope],
-    titleOverrides: { [group]: ownsWebSearch ? "Web search rules" : title },
+    titleOverrides: { [group]: ownsWebSearch ? i18n._({ id: "Web search rules", message: "Web search rules" }) : title },
     beforeChange: beforeSettingChange,
     focusKey: props.focusKey,
     matrix: card.matrix,
@@ -143,7 +143,7 @@ export function SettingsSectionContent(props: SectionContentProps) {
   const webSearchBlock = section.id === "search" && !tabView && (viewer.role === "owner" || viewer.role === "admin");
   return (
     <div className="flex min-w-0 flex-col gap-14">
-      {webSearchBlock ? <WebSearchSettings minorsControl={<SettingsRenderer scope="household" scopeValue={scopeValueFor("household", props.person.id)} honouredBy="home" only={["household.search"]} includeKeys={MINOR_DDGS_ONLY} titleOverrides={MINOR_DDGS_TITLE} beforeChange={beforeSettingChange} focusKey={props.focusKey} />} /> : null}
+      {webSearchBlock ? <WebSearchSettings minorsControl={<SettingsRenderer scope="household" scopeValue={scopeValueFor("household", props.person.id)} honouredBy="home" only={["household.search"]} includeKeys={MINOR_DDGS_ONLY} titleOverrides={minorDdgsTitle()} beforeChange={beforeSettingChange} focusKey={props.focusKey} />} /> : null}
       {tabView ? <SettingsView view={tabView} {...viewProps} /> : null}
       {section.lead_view ? <SettingsView view={section.lead_view} {...viewProps} /> : null}
       {cardsInTab(visibleCards(section, viewer, registry, "home"), props.tab).map((card) => {

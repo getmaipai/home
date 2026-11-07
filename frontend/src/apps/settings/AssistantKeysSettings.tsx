@@ -21,7 +21,7 @@ import { errorLine } from "@/lib/hubReachability";
 const KEYS = ["settings-api-keys"] as const;
 type Kind = "settings" | "diagnose" | "engine";
 const kindOf = (key: PersonalApiKey): Kind => key.scopes.includes("engine") ? "engine" : key.scopes.includes("diagnose") ? "diagnose" : "settings";
-const dateText = (date: string | null) => date ? new Date(date).toLocaleDateString() : "Never";
+const dateText = (date: string | null) => date ? new Date(date).toLocaleDateString() : i18n._({ id: "Never", message: "Never" });
 const messageOf = (error: unknown, fallback: string) => errorLine(error, fallback);
 
 export function AssistantKeysSettings() {
@@ -39,11 +39,11 @@ export function AssistantKeysSettings() {
   const create = async () => {
     setError(null);
     try { setCreated(await api.createApiKey({ name: name.trim(), scopes: [kind], expires_in_days: kind !== "settings" && days === 90 ? 30 : days })); setName(""); setCreateOpen(false); await refresh(); }
-    catch (reason) { setError(messageOf(reason, "Could not make this key. Try again.")); }
+    catch (reason) { setError(messageOf(reason, i18n._({ id: "Could not make this key. Try again.", message: "Could not make this key. Try again." }))); }
   };
   const confirmRevoke = async () => {
     const target = revoke; setRevoke(null); if (!target) return;
-    try { await api.revokeApiKey(target.id); await refresh(); } catch (reason) { setError(messageOf(reason, "Could not revoke this key. Try again.")); }
+    try { await api.revokeApiKey(target.id); await refresh(); } catch (reason) { setError(messageOf(reason, i18n._({ id: "Could not revoke this key. Try again.", message: "Could not revoke this key. Try again." }))); }
   };
   return (
     <>
@@ -54,7 +54,7 @@ export function AssistantKeysSettings() {
       </CardHeader>
       <CardContent>
         <div className="flex flex-col gap-3">
-        <AsyncState data={query.data ? keys : undefined} error={query.isError} isFetching={query.isFetching} onRetry={() => void query.refetch()} errorMessage="Could not load assistant keys." loadingLabel="Loading keys">
+        <AsyncState data={query.data ? keys : undefined} error={query.isError} isFetching={query.isFetching} onRetry={() => void query.refetch()} errorMessage={i18n._({ id: "Could not load assistant keys.", message: "Could not load assistant keys." })} loadingLabel={i18n._({ id: "Loading keys", message: "Loading keys" })}>
           {(loadedKeys) => loadedKeys.length === 0 ? <EmptyState icon="key" text={i18n._({ id: "No assistant keys", message: "No assistant keys" })} /> : (
           <ItemGroup variant="card" aria-label={i18n._({ id: "Assistant keys", message: "Assistant keys" })}>
             {loadedKeys.map((key) => (

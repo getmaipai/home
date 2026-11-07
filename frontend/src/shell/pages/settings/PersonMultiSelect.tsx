@@ -1,3 +1,4 @@
+import { i18n } from "@lingui/core";
 import { useQuery } from "@tanstack/react-query";
 import {
   Combobox,
@@ -56,10 +57,10 @@ export function PersonMultiSelect({ value, onValueChange, disabled, excludePerso
           {value.map((id) => (
             <ComboboxChip key={id}>{getLabel(id)}</ComboboxChip>
           ))}
-          <ComboboxChipsInput placeholder={value.length === 0 ? (placeholder ?? "Add a person…") : undefined} />
+          <ComboboxChipsInput placeholder={value.length === 0 ? (placeholder ?? i18n._({ id: "Add a person…", message: "Add a person…" })) : undefined} />
         </ComboboxChips>
         <ComboboxContent>
-          <ComboboxEmpty>{emptyText ?? "No one else in the household."}</ComboboxEmpty>
+          <ComboboxEmpty>{emptyText ?? i18n._({ id: "No one else in the household.", message: "No one else in the household." })}</ComboboxEmpty>
           <ComboboxList>{(id: string) => <ComboboxItem key={id} value={id}>{getLabel(id)}</ComboboxItem>}</ComboboxList>
         </ComboboxContent>
       </Combobox>

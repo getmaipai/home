@@ -15,15 +15,12 @@ interface CommandsSectionProps {
 }
 
 type ActionKind = CommandAction["kind"];
-const ACTION_LABELS: Record<ActionKind, string> = {
-  reply: "Say something back",
-  home_call_service: "Control a smart-home device",
-};
+const actionLabel = (kind: ActionKind): string => kind === "reply" ? i18n._({ id: "Say something back", message: "Say something back" }) : i18n._({ id: "Control a smart-home device", message: "Control a smart-home device" });
 
 function summarize(action: CommandAction): string {
-  if (action.kind === "reply") return `Replies: "${action.text}"`;
+  if (action.kind === "reply") return i18n._({ id: "Replies: \"{text}\"", message: "Replies: \"{text}\"", values: { text: action.text } });
   const entityId = typeof action.target.entity_id === "string" ? action.target.entity_id : "?";
-  return `Calls ${action.domain}.${action.service} on ${entityId}`;
+  return i18n._({ id: "Calls {service} on {entityId}", message: "Calls {service} on {entityId}", values: { service: `${action.domain}.${action.service}`, entityId } });
 }
 
 // The management view lists commands in Home settings. Adult members
@@ -51,7 +48,7 @@ export function CommandsSection({ person, management = false }: CommandsSectionP
     try {
       setCommands(await api.commands());
     } catch (e) {
-      setLoadError(errorLine(e, "Could not load commands."));
+      setLoadError(errorLine(e, i18n._({ id: "Could not load commands.", message: "Could not load commands." })));
     }
   }
 
@@ -79,7 +76,7 @@ export function CommandsSection({ person, management = false }: CommandsSectionP
       setEntityId("");
       if (management) await load();
     } catch (err) {
-      setCreateError(errorLine(err, "Could not create that command."));
+      setCreateError(errorLine(err, i18n._({ id: "Could not create that command.", message: "Could not create that command." })));
     } finally {
       setCreating(false);
     }
@@ -92,7 +89,7 @@ export function CommandsSection({ person, management = false }: CommandsSectionP
       await api.deleteCommand(id);
       if (management) await load();
     } catch (err) {
-      setActionError(errorLine(err, "Could not delete that command."));
+      setActionError(errorLine(err, i18n._({ id: "Could not delete that command.", message: "Could not delete that command." })));
     } finally {
       setPendingId(null);
     }
@@ -132,7 +129,7 @@ export function CommandsSection({ person, management = false }: CommandsSectionP
                 value={actionKind}
                 onValueChange={(v) => setActionKind(v as ActionKind)}
                 options={["reply", "home_call_service"]}
-                getLabel={(v) => ACTION_LABELS[v as ActionKind]}
+                getLabel={(v) => actionLabel(v as ActionKind)}
                 aria-label={i18n._({ id: "What this command does", message: "What this command does" })}
               />
               {actionKind === "reply" ? (

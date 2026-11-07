@@ -6,6 +6,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { SUPPORTED_LOCALES } from "../src/supportedLocales";
 import { englishSources, parsePo } from "./po";
+import { generatedIsCurrent } from "./extract-setting-copy";
 import { isProtected } from "./translate-catalog";
 
 const fail = (message: string): never => { console.error(message); process.exit(1); };
@@ -26,6 +27,8 @@ try {
 } finally {
   rmSync(scratch, { recursive: true, force: true });
 }
+
+if (!generatedIsCurrent()) fail("src/lib/settingCopy.generated.ts is stale against the settings registry (a key, option, reason line or area label changed); run bun run i18n:settings, then bun run i18n:extract, and commit both.");
 
 const placeholders = (value: string) => [...value.matchAll(/\{\s*\w+(?=\s*[,}])|<\/?\d+\/?>/g)].map((match) => match[0].replace(/\s+/g, "")).sort();
 for (const locale of SUPPORTED_LOCALES) {

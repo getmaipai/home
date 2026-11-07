@@ -12,15 +12,15 @@ import { isOwnerOrAdminRole } from "@/lib/api";
 import type { Role } from "@maipai/ui/src/settings/settingsAudience";
 import { errorLine } from "@/lib/hubReachability";
 
-const ACTIVITY_LABELS: Record<RobotDeviceState["activity"], string> = {
-  starting: "Starting up",
-  idle: "Ready",
-  listening: "Listening",
-  thinking: "Thinking",
-  speaking: "Speaking",
-  reconnecting: "Reconnecting",
-  sleeping: "Sleeping",
-};
+const activityLabels = (): Record<RobotDeviceState["activity"], string> => ({
+  starting: i18n._({ id: "Starting up", message: "Starting up" }),
+  idle: i18n._({ id: "Ready", message: "Ready" }),
+  listening: i18n._({ id: "Listening", message: "Listening" }),
+  thinking: i18n._({ id: "Thinking", message: "Thinking" }),
+  speaking: i18n._({ id: "Speaking", message: "Speaking" }),
+  reconnecting: i18n._({ id: "Reconnecting", message: "Reconnecting" }),
+  sleeping: i18n._({ id: "Sleeping", message: "Sleeping" }),
+});
 
 function whenText(iso: string): string {
   return new Date(iso).toLocaleString();
@@ -30,21 +30,21 @@ function batteryText(state: RobotDeviceState): string {
   if (state.battery_level !== null && state.battery_level !== undefined) {
     return `${Math.round(state.battery_level * 100)}%`;
   }
-  if (state.on_battery === true) return "On battery, level unknown";
-  if (state.on_battery === false) return "Plugged in";
-  return "Level unknown";
+  if (state.on_battery === true) return i18n._({ id: "On battery, level unknown", message: "On battery, level unknown" });
+  if (state.on_battery === false) return i18n._({ id: "Plugged in", message: "Plugged in" });
+  return i18n._({ id: "Level unknown", message: "Level unknown" });
 }
 
 /** Plain-words body health (spec-v0.1.147): null when the robot reports nothing wrong or nothing at all. */
 export function bodyHealthText(state: RobotDeviceState): string | null {
   const parts: string[] = [];
   const latched = state.motors_latched ?? [];
-  if (latched.length > 0) parts.push(`${latched.join(", ")} switched off after a failed recovery`);
-  else if (state.motors_stuck === true) parts.push("Working on a stuck motor");
+  if (latched.length > 0) parts.push(i18n._({ id: "{motors} switched off after a failed recovery", message: "{motors} switched off after a failed recovery", values: { motors: latched.join(", ") } }));
+  else if (state.motors_stuck === true) parts.push(i18n._({ id: "Working on a stuck motor", message: "Working on a stuck motor" }));
   switch (state.thermal?.level) {
-    case "vision_slowed": parts.push("Warm: watching less often"); break;
-    case "gestures_suspended": parts.push("Hot: gestures paused"); break;
-    case "idle_still": parts.push("Very hot: resting until it cools"); break;
+    case "vision_slowed": parts.push(i18n._({ id: "Warm: watching less often", message: "Warm: watching less often" })); break;
+    case "gestures_suspended": parts.push(i18n._({ id: "Hot: gestures paused", message: "Hot: gestures paused" })); break;
+    case "idle_still": parts.push(i18n._({ id: "Very hot: resting until it cools", message: "Very hot: resting until it cools" })); break;
     default: break;
   }
   return parts.length > 0 ? parts.join(". ") : null;
@@ -138,7 +138,7 @@ export function RobotBody({
       setLiveView({ viewId: started.view_id, stream: started.stream });
     } catch (err) {
       setLiveView(null);
-      setLiveError(errorLine(err, `Could not open the live view of ${device.name}. Check that it is switched on, then try again.`));
+      setLiveError(errorLine(err, i18n._({ id: "Could not open the live view of {name}. Check that it is switched on, then try again.", message: "Could not open the live view of {name}. Check that it is switched on, then try again.", values: { name: device.name } })));
     } finally {
       setLiveStarting(false);
     }
@@ -168,7 +168,7 @@ export function RobotBody({
     try {
       await onAnswerMotorReboot(answer);
     } catch (err) {
-      setRebootError(errorLine(err, `Could not send that to ${device.name}. Check that it is switched on, then try again.`));
+      setRebootError(errorLine(err, i18n._({ id: "Could not send that to {name}. Check that it is switched on, then try again.", message: "Could not send that to {name}. Check that it is switched on, then try again.", values: { name: device.name } })));
     } finally {
       setRebootBusy(false);
     }
@@ -176,14 +176,14 @@ export function RobotBody({
   const unreachable = state !== null && !state.reachable;
   const rebootOffer = state !== null && !unreachable ? state.motors_reboot_offer ?? [] : [];
   const showMuted = state !== null && !unreachable && state.muted && (state.activity === "idle" || state.activity === "listening");
-  const status = state === null ? "Waiting for first report" : unreachable ? "Not responding" : showMuted ? "Muted" : ACTIVITY_LABELS[state.activity];
+  const status = state === null ? i18n._({ id: "Waiting for first report", message: "Waiting for first report" }) : unreachable ? i18n._({ id: "Not responding", message: "Not responding" }) : showMuted ? i18n._({ id: "Muted", message: "Muted" }) : activityLabels()[state.activity];
   const motion = state?.motion ?? null;
   const battery = state?.battery_level;
   return (
     <>
       <CardHeader>
         <CardTitle className="truncate">{device.name}</CardTitle>
-        <CardDescription>{[device.area ?? "Robot", device.ownerName ? `Belongs to ${device.ownerName}` : null].filter(Boolean).join(" · ")}</CardDescription>
+        <CardDescription>{[device.area ?? i18n._({ id: "Robot", message: "Robot" }), device.ownerName ? i18n._({ id: "Belongs to {owner}", message: "Belongs to {owner}", values: { owner: device.ownerName } }) : null].filter(Boolean).join(" · ")}</CardDescription>
         <CardAction>
           <Badge variant={unreachable ? "destructive" : "secondary"}>{status}</Badge>
           <Badge variant="secondary">{i18n._({ id: "Paired", message: "Paired" })}</Badge>
@@ -212,7 +212,7 @@ export function RobotBody({
             {motion === "held" ? <p className="text-sm font-medium">{i18n._({ id: "Being carried", message: "Being carried" })}</p> : null}
             {putDownChanged ? (
               <p className="text-sm text-muted-foreground">
-                {device.area ? `${device.name} was moved: is it still in ${device.area}?` : `${device.name} was moved.`}
+                {device.area ? i18n._({ id: "{name} was moved: is it still in {area}?", message: "{name} was moved: is it still in {area}?", values: { name: device.name, area: device.area } }) : i18n._({ id: "{name} was moved.", message: "{name} was moved.", values: { name: device.name } })}
               </p>
             ) : null}
             <Row label={i18n._({ id: "Battery", message: "Battery" })}>{batteryText(state)}</Row>
@@ -220,8 +220,8 @@ export function RobotBody({
               <Progress value={Math.round(battery * 100)} aria-label={i18n._({ id: "Battery level", message: "Battery level" })} />
             ) : null}
             {bodyHealthText(state) ? <Row label={i18n._({ id: "Body health", message: "Body health" })}>{bodyHealthText(state)}</Row> : null}
-            <Row label={i18n._({ id: "MaiPai version", message: "MaiPai version" })}>{state.app_version ?? "Unknown"}</Row>
-            <Row label={i18n._({ id: "Body software", message: "Body software" })}>{state.daemon_version ?? "Unknown"}</Row>
+            <Row label={i18n._({ id: "MaiPai version", message: "MaiPai version" })}>{state.app_version ?? i18n._({ id: "Unknown", message: "Unknown" })}</Row>
+            <Row label={i18n._({ id: "Body software", message: "Body software" })}>{state.daemon_version ?? i18n._({ id: "Unknown", message: "Unknown" })}</Row>
           </dl>
         )}
         {rebootOffer.length > 0 ? (
@@ -242,7 +242,7 @@ export function RobotBody({
         {liveView && liveView.stream ? (
           <div className="mt-4" data-testid="robot-live-view">
             <Image.Root size="full">
-              <Image.Preview src={liveView.stream} alt={`Live view from ${device.name}'s camera`} />
+              <Image.Preview src={liveView.stream} alt={i18n._({ id: "Live view from {name}'s camera", message: "Live view from {name}'s camera", values: { name: device.name } })} />
             </Image.Root>
             <p className="mt-2 text-sm text-muted-foreground">{i18n._({ id: "Live view stops by itself after 10 minutes. Nothing is recorded.", message: "Live view stops by itself after 10 minutes. Nothing is recorded." })}</p>
           </div>
@@ -252,7 +252,7 @@ export function RobotBody({
           <ErrorState
             layout="inline"
             retrying={false}
-            title={`Could not send that to ${device.name}.`}
+            title={i18n._({ id: "Could not send that to {name}.", message: "Could not send that to {name}.", values: { name: device.name } })}
             onRetry={() => void askMute(!state.muted)}
           />
         ) : null}

@@ -7,7 +7,7 @@ import { readMicDevicePreference, writeMicDevicePreference } from "@/lib/voice/m
  * granted at least once (browsers refuse to leak hardware names before
  * that) - the honest fallback name every OS does the same thing for. */
 function micLabel(device: MediaDeviceInfo, index: number): string {
-  return device.label || `Microphone ${index + 1}`;
+  return device.label || i18n._({ id: "Microphone {number}", message: "Microphone {number}", values: { number: index + 1 } });
 }
 
 /** The microphones the browser reports, refreshed on `devicechange` -

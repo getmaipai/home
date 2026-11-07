@@ -25,7 +25,7 @@ export interface FreeUpSpaceDialogProps {
 }
 
 const messageOf = (error: unknown, fallback: string) => (errorLine(error, fallback));
-const joinNames = (names: string[]) => (names.length <= 1 ? (names[0] ?? "") : `${names.slice(0, -1).join(", ")} and ${names[names.length - 1]}`);
+const joinNames = (names: string[]) => (names.length <= 1 ? (names[0] ?? "") : i18n._({ id: "{names} and {last}", message: "{names} and {last}", values: { names: names.slice(0, -1).join(", "), last: names[names.length - 1] } }));
 
 export function FreeUpSpaceDialog({ open, onOpenChange, onChanged }: FreeUpSpaceDialogProps) {
   const queryClient = useQueryClient();
@@ -58,18 +58,18 @@ export function FreeUpSpaceDialog({ open, onOpenChange, onChanged }: FreeUpSpace
           <DialogHeader>
             <DialogTitle>{i18n._({ id: "Free up space", message: "Free up space" })}</DialogTitle>
             <DialogDescription>
-              {query.isLoading ? i18n._({ id: "Looking for parts nothing uses.", message: "Looking for parts nothing uses." }) : items.length > 0 ? `You can free ${sizeGb(total)}. Nothing is removed until you pick it and confirm.` : i18n._({ id: "Nothing to clean up.", message: "Nothing to clean up." })}
+              {query.isLoading ? i18n._({ id: "Looking for parts nothing uses.", message: "Looking for parts nothing uses." }) : items.length > 0 ? i18n._({ id: "You can free {size}. Nothing is removed until you pick it and confirm.", message: "You can free {size}. Nothing is removed until you pick it and confirm.", values: { size: sizeGb(total) } }) : i18n._({ id: "Nothing to clean up.", message: "Nothing to clean up." })}
             </DialogDescription>
           </DialogHeader>
           {query.isLoading ? <Skeleton aria-label={i18n._({ id: "Loading", message: "Loading" })} /> : null}
-          {query.isError ? <Alert variant="destructive"><AlertTitle>{i18n._({ id: "The list did not load", message: "The list did not load" })}</AlertTitle><AlertDescription>{messageOf(query.error, "Check that Home is running, then open Free up space again.")}</AlertDescription></Alert> : null}
-          {remove.isError ? <Alert variant="destructive"><AlertTitle>{i18n._({ id: "That did not work", message: "That did not work" })}</AlertTitle><AlertDescription>{messageOf(remove.error, "Check that the engine is running, then try again.")}</AlertDescription></Alert> : null}
+          {query.isError ? <Alert variant="destructive"><AlertTitle>{i18n._({ id: "The list did not load", message: "The list did not load" })}</AlertTitle><AlertDescription>{messageOf(query.error, i18n._({ id: "Check that Home is running, then open Free up space again.", message: "Check that Home is running, then open Free up space again." }))}</AlertDescription></Alert> : null}
+          {remove.isError ? <Alert variant="destructive"><AlertTitle>{i18n._({ id: "That did not work", message: "That did not work" })}</AlertTitle><AlertDescription>{messageOf(remove.error, i18n._({ id: "Check that the engine is running, then try again.", message: "Check that the engine is running, then try again." }))}</AlertDescription></Alert> : null}
           {result ? (
             <Alert>
-              <AlertTitle>{result.freed_bytes > 0 ? `Freed ${sizeGb(result.freed_bytes)}.` : i18n._({ id: "Nothing was removed.", message: "Nothing was removed." })}</AlertTitle>
+              <AlertTitle>{result.freed_bytes > 0 ? i18n._({ id: "Freed {size}.", message: "Freed {size}.", values: { size: sizeGb(result.freed_bytes) } }) : i18n._({ id: "Nothing was removed.", message: "Nothing was removed." })}</AlertTitle>
               <AlertDescription>
-                {result.kept > 0 ? `${result.kept} kept because ${result.kept === 1 ? i18n._({ id: "it is", message: "it is" }) : i18n._({ id: "they are", message: "they are" })} in use. ` : ""}
-                {result.failed > 0 ? `${result.failed} did not finish. Try again. ` : ""}
+                {result.kept > 0 ? i18n._({ id: "{count, plural, one {# kept because it is in use. } other {# kept because they are in use. }}", message: "{count, plural, one {# kept because it is in use. } other {# kept because they are in use. }}", values: { count: result.kept } }) : ""}
+                {result.failed > 0 ? i18n._({ id: "{count} did not finish. Try again. ", message: "{count} did not finish. Try again. ", values: { count: result.failed } }) : ""}
                 {keptNames.join(" ")}
               </AlertDescription>
             </Alert>
@@ -97,7 +97,7 @@ export function FreeUpSpaceDialog({ open, onOpenChange, onChanged }: FreeUpSpace
             <Button type="button" variant="outline" onClick={() => close(false)}>{i18n._({ id: "Close", message: "Close" })}</Button>
             {items.length > 0 ? (
               <Button type="button" onClick={() => setConfirm(true)} disabled={chosen.length === 0 || remove.isPending}>
-                {chosen.length === 0 ? i18n._({ id: "Pick what to remove", message: "Pick what to remove" }) : `Remove ${chosen.length} and free ${sizeGb(chosenBytes)}`}
+                {chosen.length === 0 ? i18n._({ id: "Pick what to remove", message: "Pick what to remove" }) : i18n._({ id: "Remove {count} and free {size}", message: "Remove {count} and free {size}", values: { count: chosen.length, size: sizeGb(chosenBytes) } })}
               </Button>
             ) : null}
           </DialogFooter>

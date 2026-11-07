@@ -139,7 +139,7 @@ export function AddRobotSection({ onClose }: { onClose?: () => void } = {}) {
         setNeedsTotp(true);
         setError(null);
       } else {
-        setError(errorLine(err, "Could not approve that code."));
+        setError(errorLine(err, i18n._({ id: "Could not approve that code.", message: "Could not approve that code." })));
       }
     } finally {
       setSubmitting(false);
@@ -157,15 +157,15 @@ export function AddRobotSection({ onClose }: { onClose?: () => void } = {}) {
         error={discoveryQuery.isError}
         isFetching={discoveryQuery.isFetching}
         onRetry={() => discoveryQuery.refetch()}
-        errorMessage="Could not search your network for a robot."
-        loadingLabel="Searching your network"
+        errorMessage={i18n._({ id: "Could not search your network for a robot.", message: "Could not search your network for a robot." })}
+        loadingLabel={i18n._({ id: "Searching your network", message: "Searching your network" })}
       >
         {(robots) =>
           robots.length === 0 ? (
             <EmptyState
               icon="search"
               text={i18n._({ id: "No robot found on your network yet.", message: "No robot found on your network yet." })}
-              actionLabel="Search again"
+              actionLabel={i18n._({ id: "Search again", message: "Search again" })}
               onAction={() => discoveryQuery.refetch()}
             />
           ) : (

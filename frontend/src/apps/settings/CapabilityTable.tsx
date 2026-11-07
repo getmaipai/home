@@ -9,13 +9,13 @@ export interface CapabilityData {
   available: boolean; machine_class: string;
   rows: { category: string; label: string; cells: { tier: "standard" | "boost" | "max"; fits: boolean; needs_bytes: number | null }[] }[];
 }
-const TIERS = [["standard", "Standard"], ["boost", "Boost"], ["max", "Max"]] as const;
+const tiers = () => [["standard", i18n._({ id: "Standard", message: "Standard" })], ["boost", i18n._({ id: "Boost", message: "Boost" })], ["max", i18n._({ id: "Max", message: "Max" })]] as const;
 const gb = (bytes: number) => Math.round(bytes / 1024 ** 3);
 
 export function capabilityWords(cell: CapabilityData["rows"][number]["cells"][number] | undefined): string {
-  if (!cell) return "Not offered";
-  if (cell.fits) return "Yes";
-  return cell.needs_bytes ? `No, needs ${gb(cell.needs_bytes)} GB` : "No";
+  if (!cell) return i18n._({ id: "Not offered", message: "Not offered" });
+  if (cell.fits) return i18n._({ id: "Yes", message: "Yes" });
+  return cell.needs_bytes ? i18n._({ id: "No, needs {gb} GB", message: "No, needs {gb} GB", values: { gb: gb(cell.needs_bytes) } }) : i18n._({ id: "No", message: "No" });
 }
 
 /** The Stack reading as a table; hides itself when the Stack is older or not running yet. `path` picks the route (setup before the owner exists, Performance after). */
@@ -24,12 +24,12 @@ export function CapabilityTable({ path, framed = false }: { path: string; framed
   if (!data?.available || data.rows.length === 0) return null;
   const table = (
     <Table data-testid="capability-table">
-      <TableHeader><TableRow><TableHead>{i18n._({ id: "Kind of job", message: "Kind of job" })}</TableHead>{TIERS.map(([, label]) => <TableHead key={label}>{label}</TableHead>)}</TableRow></TableHeader>
+      <TableHeader><TableRow><TableHead>{i18n._({ id: "Kind of job", message: "Kind of job" })}</TableHead>{tiers().map(([id, label]) => <TableHead key={id}>{label}</TableHead>)}</TableRow></TableHeader>
       <TableBody>
         {data.rows.map((row) => (
           <TableRow key={row.category}>
             <TableCell>{row.label}</TableCell>
-            {TIERS.map(([tier, label]) => <TableCell key={label}>{capabilityWords(row.cells.find((cell) => cell.tier === tier))}</TableCell>)}
+            {tiers().map(([tier]) => <TableCell key={tier}>{capabilityWords(row.cells.find((cell) => cell.tier === tier))}</TableCell>)}
           </TableRow>
         ))}
       </TableBody>

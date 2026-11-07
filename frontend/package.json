@@ -16,11 +16,12 @@
     "test": "bun test",
     "lint": "tsc --noEmit && eslint .",
     "lint:ui-rules": "bun test --timeout 60000 src/dev/kitElementLints.test.ts src/dev/handBuiltChat.test.ts src/dev/colorLints.test.ts",
-    "lint:i18n": "bun test src/dev/i18nLints.test.ts src/dev/i18nLintRun.test.ts scripts/translate-catalog.test.ts scripts/i18n-flag.test.ts scripts/i18n-codemod.test.ts",
+    "lint:i18n": "bun test src/dev/i18nLints.test.ts src/dev/i18nLintRun.test.ts scripts/translate-catalog.test.ts scripts/i18n-flag.test.ts scripts/i18n-codemod.test.ts scripts/extract-setting-copy.test.ts src/lib/settingCopy.test.ts",
     "i18n:extract": "lingui extract --clean",
     "i18n:check": "bun scripts/i18n-check.ts",
     "i18n:codemod": "bun scripts/i18n-codemod.ts --",
-    "i18n:translate": "bun scripts/translate-catalog.ts"
+    "i18n:translate": "bun scripts/translate-catalog.ts",
+    "i18n:settings": "bun scripts/extract-setting-copy.ts"
   },
   "dependencies": {
     "@assistant-ui/core": "0.3.20",

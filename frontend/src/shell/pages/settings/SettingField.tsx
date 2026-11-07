@@ -1,8 +1,9 @@
 import { i18n } from "@lingui/core";
+import { languageName, settingDoes, settingLabel, settingOptionLabel, settingOptionNote, settingReason, settingState } from "../../../lib/settingCopy";
 import { useEffect, useState, type ReactNode } from "react";
 import type { MergedSetting } from "@maipai/ui/src/settings/groupSettings";
 import type { ResolvedSetting } from "@/lib/api";
-import { titleCaseOption, localeDisplayName } from "@maipai/ui/src/settings/SettingField";
+import { titleCaseOption } from "@maipai/ui/src/settings/SettingField";
 import { Input } from "@maipai/ui/src/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@maipai/ui/src/ui/select";
 import { Switch } from "@maipai/ui/src/dashboard/components/ui/switch";
@@ -128,7 +129,7 @@ export function SettingField({ setting, onChange, onReset, disabled, selfPersonI
             value={secretDraft}
             disabled={secretSaving}
             onChange={(e) => setSecretDraft(e.target.value)}
-            aria-label={def.label}
+            aria-label={settingLabel(def)}
             autoComplete="off"
           />
         </div>
@@ -158,7 +159,7 @@ export function SettingField({ setting, onChange, onReset, disabled, selfPersonI
       </div>
     );
   } else if (def.selector === "boolean") {
-    control = <><Switch size={def.key === "companions.allowed" || def.key === "ui.enrollment_sounds" ? "md" : "default"} checked={Boolean(resolved.value)} onCheckedChange={handleSwitchChange} disabled={disabled} aria-label={def.label} />{permissionMessage ? <span role="status" className="text-sm text-muted-foreground">{permissionMessage}</span> : null}</>;
+    control = <><Switch size={def.key === "companions.allowed" || def.key === "ui.enrollment_sounds" ? "md" : "default"} checked={Boolean(resolved.value)} onCheckedChange={handleSwitchChange} disabled={disabled} aria-label={settingLabel(def)} />{permissionMessage ? <span role="status" className="text-sm text-muted-foreground">{permissionMessage}</span> : null}</>;
   } else if (def.selector === "select" && (def.range as { multiple?: boolean } | undefined)?.multiple) {
     control = (
       <OptionMultiSelect
@@ -167,7 +168,7 @@ export function SettingField({ setting, onChange, onReset, disabled, selfPersonI
         labels={(def as { copy?: { option_labels?: Record<string, string> } }).copy?.option_labels}
         onValueChange={onChange}
         disabled={disabled}
-        ariaLabel={def.label}
+        ariaLabel={settingLabel(def)}
       />
     );
   } else if (def.selector === "select") {
@@ -177,15 +178,15 @@ export function SettingField({ setting, onChange, onReset, disabled, selfPersonI
     const optionDescriptions = (def as { copy?: { options?: Record<string, string> } }).copy?.options;
     const optionLabels = (def as { copy?: { option_labels?: Record<string, string> } }).copy?.option_labels;
     // MINOR-TOPICS-01e: a key's spec copy names its options in plain words; titleCaseOption is the fallback.
-    const getLabel = (option: string) => optionLabels?.[option] ?? (option === "until_storage_threshold" ? "Until storage runs low" : def.key === "household.locale" ? localeDisplayName(option) : titleCaseOption(option));
+    const getLabel = (option: string) => option === "until_storage_threshold" ? i18n._({ id: "Until storage runs low", message: "Until storage runs low" }) : def.key === "household.locale" || def.key === "person.locale" ? languageName(option) : settingOptionLabel(def, option, optionLabels?.[option] ?? titleCaseOption(option));
     control = (
       <Select value={String(resolved.value)} onValueChange={onChange} disabled={disabled || Boolean(source && !runtimeOptions && !source.startsWith("models."))}>
-        <SelectTrigger aria-label={def.label}>
+        <SelectTrigger aria-label={settingLabel(def)}>
           <SelectValue />
         </SelectTrigger>
         <SelectContent>
           {runtimeOptions ? runtimeOptions.map((option) => <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>) : options.map((option) => (
-            <SelectItem key={option} value={option}>{optionDescriptions?.[option] ?? getLabel(option)}</SelectItem>
+            <SelectItem key={option} value={option}>{optionDescriptions?.[option] ? settingOptionNote(def, option, optionDescriptions[option]!) : getLabel(option)}</SelectItem>
           ))}
         </SelectContent>
       </Select>
@@ -202,7 +203,7 @@ export function SettingField({ setting, onChange, onReset, disabled, selfPersonI
           disabled={disabled}
           onChange={(e) => setDraft(e.target.value)}
           onBlur={commitDraft}
-          aria-label={def.label}
+          aria-label={settingLabel(def)}
         />
       </div>
     );
@@ -216,7 +217,7 @@ export function SettingField({ setting, onChange, onReset, disabled, selfPersonI
           disabled={disabled}
           onChange={(e) => setDraft(e.target.value)}
           onBlur={commitDraft}
-          aria-label={def.label}
+          aria-label={settingLabel(def)}
         />
       </div>
     );
@@ -231,7 +232,7 @@ export function SettingField({ setting, onChange, onReset, disabled, selfPersonI
         onValueChange={onChange}
         disabled={disabled}
         excludePersonId={selfPersonId}
-        ariaLabel={def.label}
+        ariaLabel={settingLabel(def)}
       />
     );
   } else if (def.selector === "location") {
@@ -244,11 +245,11 @@ export function SettingField({ setting, onChange, onReset, disabled, selfPersonI
     <>
     <div className="flex flex-col items-start gap-2 py-3 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
       <div className="flex min-w-0 flex-col gap-0.5">
-        {def.key === "companions.allowed" ? <span className="flex min-h-12 items-center text-sm">{def.label}</span> : <span className="text-sm">{def.key === "storage.household.cap_bytes" ? i18n._({ id: "Household storage cap", message: "Household storage cap" }) : def.label}</span>}
+        {def.key === "companions.allowed" ? <span className="flex min-h-12 items-center text-sm">{settingLabel(def)}</span> : <span className="text-sm">{def.key === "storage.household.cap_bytes" ? i18n._({ id: "Household storage cap", message: "Household storage cap" }) : settingLabel(def)}</span>}
         {def.key === "storage.household.cap_bytes" && typeof resolved.value === "number" ? <ItemDescription clamp={false}>{formatBytes(resolved.value)}</ItemDescription> : null}
-        {resolved.does ? <ItemDescription clamp={false}>{resolved.does}</ItemDescription> : null}
-        {resolved.state ? <ItemDescription clamp={false}>{resolved.state}</ItemDescription> : null}
-        {resolved.reason ? <ItemDescription clamp={false}>{resolved.reason}</ItemDescription> : null}
+        {resolved.does ? <ItemDescription clamp={false}>{settingDoes(def, resolved.does)}</ItemDescription> : null}
+        {resolved.state ? <ItemDescription clamp={false}>{settingState(resolved.state)}</ItemDescription> : null}
+        {resolved.reason ? <ItemDescription clamp={false}>{settingReason(resolved.reason)}</ItemDescription> : null}
         {canReset ? (
           <Button type="button" variant="link" onClick={onReset} disabled={disabled}>
             {i18n._({ id: "Reset to default", message: "Reset to default" })}
@@ -260,7 +261,7 @@ export function SettingField({ setting, onChange, onReset, disabled, selfPersonI
     <AlertDialog open={companionsOffOpen} onOpenChange={setCompanionsOffOpen}>
       <AlertDialogContent>
         <AlertDialogHeader>
-          <AlertDialogTitle>{def.label}</AlertDialogTitle>
+          <AlertDialogTitle>{settingLabel(def)}</AlertDialogTitle>
           <AlertDialogDescription>{i18n._({ id: "The person may have grown attached to their AI companions. Turn them off with care. Their companion and personality data will be kept.", message: "The person may have grown attached to their AI companions. Turn them off with care. Their companion and personality data will be kept." })}</AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>

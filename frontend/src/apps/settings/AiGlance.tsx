@@ -40,7 +40,7 @@ const delta = (bytes: number) => `${bytes < 0 ? "-" : "+"}${sizeGb(Math.abs(byte
 
 function whenText(updatedAt: number): string {
   const minutes = Math.floor((Date.now() - updatedAt) / 60_000);
-  return minutes < 1 ? "just now" : minutes === 1 ? "1 minute ago" : `${minutes} minutes ago`;
+  return minutes < 1 ? i18n._({ id: "just now", message: "just now" }) : i18n._({ id: "{minutes, plural, one {# minute ago} other {# minutes ago}}", message: "{minutes, plural, one {# minute ago} other {# minutes ago}}", values: { minutes } });
 }
 
 export function AiGlance({ card }: SettingsViewProps) {
@@ -98,19 +98,19 @@ export function AiGlance({ card }: SettingsViewProps) {
       for (const tier of configurableTiers(row.job)) if (!sameDraft(before[tier], drafts[tier])) await api.setSetting("household", slotKey(role, tier), toStored(drafts[tier], tier));
     },
     onSuccess: () => { setLevelTier(null); setLevelsError(null); void settings.refetch(); refresh(); },
-    onError: (e) => setLevelsError(messageOf(e, "Could not save the levels. Check that Home is running, then try again.")),
+    onError: (e) => setLevelsError(messageOf(e, i18n._({ id: "Could not save the levels. Check that Home is running, then try again.", message: "Could not save the levels. Check that Home is running, then try again." }))),
   });
 
   const download = useMutation({
     mutationFn: async (targets: GlanceRow[]) => { for (const row of targets) if (row.live) await aiChoicesApi.choose(row.job, row.live.id); },
     onSuccess: refresh,
-    onError: (e) => setError(messageOf(e, "Could not start the downloads. Check that the engine is running, then try again.")),
+    onError: (e) => setError(messageOf(e, i18n._({ id: "Could not start the downloads. Check that the engine is running, then try again.", message: "Could not start the downloads. Check that the engine is running, then try again." }))),
   });
 
   const apply = useMutation({
     mutationFn: async () => {
       for (const row of rows.filter((entry) => entry.staged)) {
-        setStep(`${row.shownEnabled ? "Setting up" : "Turning off"} ${row.title}…`);
+        setStep(row.shownEnabled ? i18n._({ id: "Setting up {title}…", message: "Setting up {title}…", values: { title: row.title } }) : i18n._({ id: "Turning off {title}…", message: "Turning off {title}…", values: { title: row.title } }));
         const role = ENGINE_ROLE[row.job];
         const single = row.options.length === 1 && row.options[0]!.kind === "switch" ? row.options[0]! : null;
         if (!row.shownEnabled) {
@@ -131,11 +131,11 @@ export function AiGlance({ card }: SettingsViewProps) {
       }
     },
     onSuccess: () => { setStep(null); setStaged({}); setError(null); refresh(); void settings.refetch(); },
-    onError: (e) => { setStep(null); setError(messageOf(e, "Could not apply the changes. Check that the engine is running, then try again.")); refresh(); void settings.refetch(); },
+    onError: (e) => { setStep(null); setError(messageOf(e, i18n._({ id: "Could not apply the changes. Check that the engine is running, then try again.", message: "Could not apply the changes. Check that the engine is running, then try again." }))); refresh(); void settings.refetch(); },
   });
 
   if (query.isLoading) return <RouteSkeleton label={i18n._({ id: "Loading your AI setup", message: "Loading your AI setup" })} />;
-  if (query.isError || !data) return <section><Alert variant="destructive"><AlertTitle>{i18n._({ id: "The page did not load", message: "The page did not load" })}</AlertTitle><AlertDescription>{messageOf(query.error, "Check that Home is running, then reload this page.")}</AlertDescription></Alert></section>;
+  if (query.isError || !data) return <section><Alert variant="destructive"><AlertTitle>{i18n._({ id: "The page did not load", message: "The page did not load" })}</AlertTitle><AlertDescription>{messageOf(query.error, i18n._({ id: "Check that Home is running, then reload this page.", message: "Check that Home is running, then reload this page." }))}</AlertDescription></Alert></section>;
 
   const totalRam = (hardware.data?.totalRamGb ?? 0) * GB;
   const installed = data.installed_bytes;
@@ -145,17 +145,17 @@ export function AiGlance({ card }: SettingsViewProps) {
   const whenUsedBytes = Math.max(0, Math.min(projection.ramNow, projection.ramAfter) - alwaysBytes);
   const otherApps = totalRam > 0 && data.memory_available_bytes != null ? Math.max(0, totalRam - data.memory_available_bytes - projection.ramNow) : 0;
   const memorySegments = [
-    { id: "home", label: "Always loaded", bytes: alwaysBytes, hue: "--hue-violet" },
-    ...(whenUsedBytes > 0 ? [{ id: "when-used", label: "Loads when used", bytes: whenUsedBytes, hue: "--hue-blue" }] : []),
-    ...(otherApps > 0 ? [{ id: "other", label: "Other apps", bytes: otherApps, hue: "--hue-teal" }] : []),
-    ...(projection.ramAfter > projection.ramNow ? [{ id: "pending", label: copy.staged_label ?? "Staged", bytes: projection.ramAfter - projection.ramNow, hue: "--hue-orange" }] : []),
+    { id: "home", label: i18n._({ id: "Always loaded", message: "Always loaded" }), bytes: alwaysBytes, hue: "--hue-violet" },
+    ...(whenUsedBytes > 0 ? [{ id: "when-used", label: i18n._({ id: "Loads when used", message: "Loads when used" }), bytes: whenUsedBytes, hue: "--hue-blue" }] : []),
+    ...(otherApps > 0 ? [{ id: "other", label: i18n._({ id: "Other apps", message: "Other apps" }), bytes: otherApps, hue: "--hue-teal" }] : []),
+    ...(projection.ramAfter > projection.ramNow ? [{ id: "pending", label: copy.staged_label ?? i18n._({ id: "Staged", message: "Staged" }), bytes: projection.ramAfter - projection.ramNow, hue: "--hue-orange" }] : []),
   ];
   const storageSegments = [
-    { id: "models", label: "Models", bytes: installed, hue: "--hue-violet" },
-    ...(projection.downloadBytes > 0 ? [{ id: "pending", label: copy.staged_label ?? "Staged", bytes: projection.downloadBytes, hue: "--hue-orange" }] : []),
+    { id: "models", label: i18n._({ id: "Models", message: "Models" }), bytes: installed, hue: "--hue-violet" },
+    ...(projection.downloadBytes > 0 ? [{ id: "pending", label: copy.staged_label ?? i18n._({ id: "Staged", message: "Staged" }), bytes: projection.downloadBytes, hue: "--hue-orange" }] : []),
   ];
   const storageCapacity = freeDisk !== null ? installed + freeDisk : null;
-  const device = hardware.data?.computerName ?? "this computer";
+  const device = hardware.data?.computerName ?? i18n._({ id: "this computer", message: "this computer" });
 
   return (
     <section aria-label={copy.title} className="flex flex-col gap-4" data-testid="ai-glance">
@@ -195,7 +195,7 @@ export function AiGlance({ card }: SettingsViewProps) {
       {maxWindow.data && (maxWindow.data.open || maxWindow.data.profile || (maxWindow.data.closed_apps?.length ?? 0) > 0) ? (
         <div className="flex flex-wrap items-center justify-between gap-3 text-base" role="status" data-testid="max-window-line">
           <div className="space-y-1">
-            {maxWindow.data.open ? <p>{maxWindow.data.line}{maxWindow.data.minutes_left !== null ? ` About ${maxWindow.data.minutes_left} ${maxWindow.data.minutes_left === 1 ? i18n._({ id: "minute", message: "minute" }) : i18n._({ id: "minutes", message: "minutes" })} left.` : ""}</p> : null}
+            {maxWindow.data.open ? <p>{maxWindow.data.line}{maxWindow.data.minutes_left !== null ? ` ${i18n._({ id: "About {count, plural, one {# minute} other {# minutes}} left.", message: "About {count, plural, one {# minute} other {# minutes}} left.", values: { count: maxWindow.data.minutes_left } })}` : ""}</p> : null}
             {maxWindow.data.profile ? <p data-testid="profile-line">{maxWindow.data.profile}</p> : null}
             {(maxWindow.data.closed_apps ?? []).map((line) => <p key={line} className="text-muted-foreground" data-testid="closed-apps-line">{line}</p>)}
           </div>
@@ -222,7 +222,7 @@ export function AiGlance({ card }: SettingsViewProps) {
       <Dialog open={levels !== null} onOpenChange={(open) => { if (!open) { setLevels(null); setLevelTier(null); } }}>
         <DialogContent scroll="viewport">{levels && levelTier === null ? <AiJobSummary key={`${levels.job}-summary`} row={levels} drafts={slotDrafts(levels)} picks={tierPicks.data ?? null} copy={copy} onClose={() => setLevels(null)} onEdit={(tier) => { if (tier === "standard") { setLevels(null); setEditing(levels); } else setLevelTier(tier); }} /> : null}{levels && levelTier !== null ? <AiSlotChoices key={`${levels.job}-${levelTier}`} only={levelTier} row={levels} initial={slotDrafts(levels)} picks={tierPicks.data ?? null} copy={copy} saving={saveLevels.isPending} error={levelsError} onClose={() => setLevelTier(null)} onSave={(drafts) => saveLevels.mutate({ row: levels, drafts })} /> : null}</DialogContent>
       </Dialog>
-      <StagedApplyBar testId="ai-action-bar" stagedTestId="ai-staged" notices={error ? <Alert variant="destructive"><AlertTitle>{i18n._({ id: "That did not work", message: "That did not work" })}</AlertTitle><AlertDescription>{error}</AlertDescription></Alert> : null} staged={stagedCount > 0} title={fill(copy.staged ?? "", { count: stagedCount })} step={step} applying={apply.isPending} applyLabel={copy.apply ?? "Apply"} discardLabel={copy.discard ?? "Discard"} onApply={() => apply.mutate()} onDiscard={() => setStaged({})} />
+      <StagedApplyBar testId="ai-action-bar" stagedTestId="ai-staged" notices={error ? <Alert variant="destructive"><AlertTitle>{i18n._({ id: "That did not work", message: "That did not work" })}</AlertTitle><AlertDescription>{error}</AlertDescription></Alert> : null} staged={stagedCount > 0} title={fill(copy.staged ?? "", { count: stagedCount })} step={step} applying={apply.isPending} applyLabel={copy.apply ?? i18n._({ id: "Apply", message: "Apply" })} discardLabel={copy.discard ?? i18n._({ id: "Discard", message: "Discard" })} onApply={() => apply.mutate()} onDiscard={() => setStaged({})} />
       <AlertDialog open={resetting !== null} onOpenChange={(open) => { if (!open) setResetting(null); }}>
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -250,7 +250,8 @@ function glanceRow({ row, copy, onSwitch, onEdit, onReset, onDownload }: { row: 
   const model = row.shown;
   // What the engine is doing for this row right now: a download or install in flight (any of its models), or the chosen model's failure.
   const busy = row.options.find((option) => option.state === "installing") ?? null;
-  const progress = busy ? { text: busy.percent !== null ? `${fill(copy.installing ?? "Downloading and installing {name}", { name: busy.label })}: ${Math.round(busy.percent)}%` : fill(copy.installing ?? "Downloading and installing {name}", { name: busy.label }), percent: busy.percent } : null;
+  const installingText = busy ? (copy.installing ? fill(copy.installing, { name: busy.label }) : i18n._({ id: "Downloading and installing {name}", message: "Downloading and installing {name}", values: { name: busy.label } })) : "";
+  const progress = busy ? { text: busy.percent !== null ? i18n._({ id: "{text}: {percent}%", message: "{text}: {percent}%", values: { text: installingText, percent: Math.round(busy.percent) } }) : installingText, percent: busy.percent } : null;
   const failed = !busy && model?.state === "failed" ? model : null;
   const line = !row.offered ? (copy.not_offered ?? "") : model?.description ?? row.summary;
   return (

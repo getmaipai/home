@@ -28,18 +28,18 @@ export function AwaySessionsSection() {
       await queryClient.invalidateQueries({ queryKey: ["away-sessions"] });
       setConfirming(null);
     } catch (cause) {
-      setError(errorLine(cause, "Could not sign out that device."));
+      setError(errorLine(cause, i18n._({ id: "Could not sign out that device.", message: "Could not sign out that device." })));
     }
   }
 
   return (
     <Section heading={i18n._({ id: "Signed in away from home", message: "Signed in away from home" })}>
       {error ? <p className="text-base text-destructive">{error}</p> : null}
-      <AsyncState data={query.data} error={query.isError} isFetching={query.isFetching} onRetry={() => query.refetch()} errorMessage="Could not load your away sessions." loadingLabel="Loading away sessions">
+      <AsyncState data={query.data} error={query.isError} isFetching={query.isFetching} onRetry={() => query.refetch()} errorMessage={i18n._({ id: "Could not load your away sessions.", message: "Could not load your away sessions." })} loadingLabel={i18n._({ id: "Loading away sessions", message: "Loading away sessions" })}>
         {(rows) => rows.length === 0 ? <EmptyState icon="inbox" text={i18n._({ id: "No devices have signed in away from home.", message: "No devices have signed in away from home." })} /> : (
           <List items={rows} getKey={(session) => session.id} label={i18n._({ id: "Devices signed in away from home", message: "Devices signed in away from home" })} renderItem={(session) => (
             <div className="flex min-w-0 flex-1 flex-col gap-1 py-1">
-              <span className="truncate text-base font-medium">{session.userAgent ?? "Unknown browser"}</span>
+              <span className="truncate text-base font-medium">{session.userAgent ?? i18n._({ id: "Unknown browser", message: "Unknown browser" })}</span>
               <span className="text-sm text-muted-foreground">{i18n._({ id: "Last signed in {whenText}", message: "Last signed in {whenText}", values: { whenText: whenText(session.createdAt) } })}</span>
             </div>
           )} renderAction={(session) => confirming?.id === session.id ? (
@@ -48,7 +48,7 @@ export function AwaySessionsSection() {
               <Button variant="ghost" onClick={() => setConfirming(null)}>{i18n._({ id: "Keep it", message: "Keep it" })}</Button>
             </div>
           ) : (
-            <Button variant="ghost" aria-label={`Sign out ${session.userAgent ?? "that device"}`} onClick={() => setConfirming(session)}>{i18n._({ id: "Revoke", message: "Revoke" })}</Button>
+            <Button variant="ghost" aria-label={i18n._({ id: "Sign out {agent}", message: "Sign out {agent}", values: { agent: session.userAgent ?? i18n._({ id: "that device", message: "that device" }) } })} onClick={() => setConfirming(session)}>{i18n._({ id: "Revoke", message: "Revoke" })}</Button>
           )} />
         )}
       </AsyncState>

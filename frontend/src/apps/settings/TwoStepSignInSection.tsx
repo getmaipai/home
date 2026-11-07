@@ -25,7 +25,7 @@ export function TwoStepSignInSection({ person }: { person: Roster }) {
   async function start() {
     setBusy(true); setError("");
     try { setUri((await api.totpEnroll()).uri); setCode(""); }
-    catch (cause) { setError(errorLine(cause, "Could not start setup. Try again.")); }
+    catch (cause) { setError(errorLine(cause, i18n._({ id: "Could not start setup. Try again.", message: "Could not start setup. Try again." }))); }
     finally { setBusy(false); }
   }
   async function submit() {
@@ -35,7 +35,7 @@ export function TwoStepSignInSection({ person }: { person: Roster }) {
       if (uri) { await api.totpVerify(code); setUri(null); setEnabled(true); }
       else { await api.totpDisable(code); setEnabled(false); }
       setCode("");
-    } catch (cause) { setError(errorLine(cause, "That code did not work. Check it and try again.")); }
+    } catch (cause) { setError(errorLine(cause, i18n._({ id: "That code did not work. Check it and try again.", message: "That code did not work. Check it and try again." }))); }
     finally { setBusy(false); }
   }
   if (!allowed) return null;

@@ -32,7 +32,7 @@ export function StyleAddFile({ onClose, onAdded }: { onClose: () => void; onAdde
     form.append("classification", adultsOnly === "no" ? "all-ages" : "adult-only");
     form.append("file", file, file.name);
     try { await stylesApi.addFile(form); onAdded(); }
-    catch (e) { setError(messageOf(e, "The style could not be added. Check that the engine is running, then try again.")); }
+    catch (e) { setError(messageOf(e, i18n._({ id: "The style could not be added. Check that the engine is running, then try again.", message: "The style could not be added. Check that the engine is running, then try again." }))); }
     finally { setBusy(false); }
   }
 

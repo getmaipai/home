@@ -1,3 +1,4 @@
+import { i18n } from "@lingui/core";
 import { useMemo } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import type { SettingsKey } from "@maipai/spec/gen/ts/settings-key.js";
@@ -22,7 +23,7 @@ export function usePlaceAdapter(scope: "household" | "person", options: { enable
     const rows = (data ?? []).filter((e) => e.kind === "place");
     const names = new Map(rows.map((e) => [e.id, e.name]));
     return {
-      labelFor: (id) => names.get(id) ?? "Saved place",
+      labelFor: (id) => names.get(id) ?? i18n._({ id: "Saved place", message: "Saved place" }),
       // Incognito saves nothing and looks nothing up: no search request leaves, no place is stored.
       search: (q) => (incognito ? Promise.resolve([]) : api.searchPlaces(q)),
       add: async (hit) => {

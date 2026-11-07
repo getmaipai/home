@@ -23,30 +23,35 @@ import { downloadProgress, useByteRates, type DownloadSnapshot } from "@/lib/dow
 import { errorLine } from "@/lib/hubReachability";
 
 const presets = presetsData.presets;
-const duration = (n: number | null) => n === null ? "Time estimate unavailable" : n < 60 ? `About ${n} seconds` : n < 3600 ? `About ${Math.ceil(n / 60)} minutes` : `About ${Math.ceil(n / 3600)} hours`;
+const duration = (n: number | null) => {
+  if (n === null) return i18n._({ id: "Time estimate unavailable", message: "Time estimate unavailable" });
+  if (n < 60) return i18n._({ id: "About {count, plural, one {# second} other {# seconds}}", message: "About {count, plural, one {# second} other {# seconds}}", values: { count: n } });
+  if (n < 3600) return i18n._({ id: "About {count, plural, one {# minute} other {# minutes}}", message: "About {count, plural, one {# minute} other {# minutes}}", values: { count: Math.ceil(n / 60) } });
+  return i18n._({ id: "About {count, plural, one {# hour} other {# hours}}", message: "About {count, plural, one {# hour} other {# hours}}", values: { count: Math.ceil(n / 3600) } });
+};
 const signed = (bytes: number) => `${bytes < 0 ? "-" : "+"}${sizeGb(Math.abs(bytes))}`;
 const messageOf = (error: unknown, fallback: string) => (errorLine(error, fallback));
 
-const TOPICS: Array<{ topic: string; sources: string[] }> = [
-  { topic: "Encyclopedia", sources: ["wikipedia-en", "wikipedia-simple", "vikidia"] },
-  { topic: "Dictionaries", sources: ["wiktionary-simple", "wiktionary-en"] },
-  { topic: "Health and medicine", sources: ["medlineplus"] },
-  { topic: "Travel and the world", sources: ["wikivoyage", "world-factbook"] },
-  { topic: "Books and how-to", sources: ["wikibooks", "stackexchange"] },
+const topics = (): Array<{ topic: string; sources: string[] }> => [
+  { topic: i18n._({ id: "Encyclopedia", message: "Encyclopedia" }), sources: ["wikipedia-en", "wikipedia-simple", "vikidia"] },
+  { topic: i18n._({ id: "Dictionaries", message: "Dictionaries" }), sources: ["wiktionary-simple", "wiktionary-en"] },
+  { topic: i18n._({ id: "Health and medicine", message: "Health and medicine" }), sources: ["medlineplus"] },
+  { topic: i18n._({ id: "Travel and the world", message: "Travel and the world" }), sources: ["wikivoyage", "world-factbook"] },
+  { topic: i18n._({ id: "Books and how-to", message: "Books and how-to" }), sources: ["wikibooks", "stackexchange"] },
 ];
-const SOURCE_BLURB: Record<string, string> = {
-  "wikipedia-en": "The English Wikipedia.",
-  "wikipedia-simple": "Wikipedia in plain, simple English.",
-  vikidia: "An encyclopedia written for children.",
-  "wiktionary-simple": "Word meanings in simple English.",
-  "wiktionary-en": "Word meanings, origins and translations.",
-  medlineplus: "Plain-language health and medicine pages from the US National Library of Medicine.",
-  wikivoyage: "Travel guides.",
-  "world-factbook": "Facts about every country.",
-  wikibooks: "Free textbooks and manuals.",
-  stackexchange: "Questions and answers on cooking, repairs, gardens and computers.",
-};
-const FLAVOUR_LABEL: Record<string, string> = { maxi: "Everything, with pictures", nopic: "Everything, no pictures", mini: "Short introductions only" };
+const sourceBlurb = (source: string): string | undefined => ({
+  "wikipedia-en": i18n._({ id: "The English Wikipedia.", message: "The English Wikipedia." }),
+  "wikipedia-simple": i18n._({ id: "Wikipedia in plain, simple English.", message: "Wikipedia in plain, simple English." }),
+  vikidia: i18n._({ id: "An encyclopedia written for children.", message: "An encyclopedia written for children." }),
+  "wiktionary-simple": i18n._({ id: "Word meanings in simple English.", message: "Word meanings in simple English." }),
+  "wiktionary-en": i18n._({ id: "Word meanings, origins and translations.", message: "Word meanings, origins and translations." }),
+  medlineplus: i18n._({ id: "Plain-language health and medicine pages from the US National Library of Medicine.", message: "Plain-language health and medicine pages from the US National Library of Medicine." }),
+  wikivoyage: i18n._({ id: "Travel guides.", message: "Travel guides." }),
+  "world-factbook": i18n._({ id: "Facts about every country.", message: "Facts about every country." }),
+  wikibooks: i18n._({ id: "Free textbooks and manuals.", message: "Free textbooks and manuals." }),
+  stackexchange: i18n._({ id: "Questions and answers on cooking, repairs, gardens and computers.", message: "Questions and answers on cooking, repairs, gardens and computers." }),
+} as Record<string, string>)[source];
+const flavourLabel = (flavour: string): string | undefined => ({ maxi: i18n._({ id: "Everything, with pictures", message: "Everything, with pictures" }), nopic: i18n._({ id: "Everything, no pictures", message: "Everything, no pictures" }), mini: i18n._({ id: "Short introductions only", message: "Short introductions only" }) } as Record<string, string>)[flavour];
 const FLAVOUR_ORDER = ["maxi", "nopic", "mini"];
 const SOURCE_LABEL: Record<string, string> = {
   "wikipedia-en": "Wikipedia", "wikipedia-simple": "Simple English Wikipedia", vikidia: "Vikidia", "wiktionary-simple": "Simple English Wiktionary", "wiktionary-en": "Wiktionary",
@@ -56,10 +61,10 @@ const SOURCE_LABEL: Record<string, string> = {
 const titleOf = (set: { source: string; flavour: string; name: string }) => {
   const label = SOURCE_LABEL[set.source];
   if (!label) return set.name;
-  const flavour = FLAVOUR_LABEL[set.flavour];
-  return flavour ? `${label}: ${flavour.charAt(0).toLowerCase()}${flavour.slice(1)}` : label;
+  const flavour = flavourLabel(set.flavour);
+  return flavour ? i18n._({ id: "{label}: {flavour}", message: "{label}: {flavour}", values: { label, flavour: `${flavour.charAt(0).toLowerCase()}${flavour.slice(1)}` } }) : label;
 };
-const versionLabel = (set: { flavour: string }) => FLAVOUR_LABEL[set.flavour] ?? "Standard";
+const versionLabel = (set: { flavour: string }) => flavourLabel(set.flavour) ?? i18n._({ id: "Standard", message: "Standard" });
 
 /** One entry per source, with its versions biggest first. A source with one version has just that one. */
 interface SourceRow { source: string; label: string; versions: ReferenceCatalogSet[] }
@@ -69,20 +74,20 @@ function sourceRows(sets: ReferenceCatalogSet[]): Array<{ topic: string; rows: S
     const versions = sets.filter((set) => set.source === source).sort((a, b) => order(a) - order(b));
     return versions.length ? { source, label: SOURCE_LABEL[source] ?? versions[0]!.name, versions } : null;
   };
-  const known = new Set(TOPICS.flatMap((t) => t.sources));
-  const groups = TOPICS.map((t) => ({ topic: t.topic, rows: t.sources.map(rowFor).filter((row): row is SourceRow => row !== null) }));
+  const known = new Set(topics().flatMap((t) => t.sources));
+  const groups = topics().map((t) => ({ topic: t.topic, rows: t.sources.map(rowFor).filter((row): row is SourceRow => row !== null) }));
   const others = [...new Set(sets.filter((set) => !known.has(set.source)).map((set) => set.source))].map(rowFor).filter((row): row is SourceRow => row !== null);
-  return [...groups, { topic: "Other", rows: others }].filter((group) => group.rows.length > 0);
+  return [...groups, { topic: i18n._({ id: "Other", message: "Other" }), rows: others }].filter((group) => group.rows.length > 0);
 }
 
 /** A book download in the shared progress card's words. Waiting for the nightly window reads as queued with the reason. */
 export function referenceDownload(job: ReferenceJob, title: string, bytesPerSecond?: number): DownloadSnapshot {
   const state = job.state === "downloading" ? "running" : job.state === "waiting_window" ? "queued" : job.state;
-  const status = job.state === "waiting_window" ? "Waits for the nightly download window"
-    : job.state === "queued" ? "Starting soon"
-      : job.state === "paused" ? "Paused"
-        : job.state === "failed" ? job.message ?? "The download failed. Cancel it, then switch the book on again to retry."
-          : job.state === "downloading" ? "Downloading" : job.message ?? "";
+  const status = job.state === "waiting_window" ? i18n._({ id: "Waits for the nightly download window", message: "Waits for the nightly download window" })
+    : job.state === "queued" ? i18n._({ id: "Starting soon", message: "Starting soon" })
+      : job.state === "paused" ? i18n._({ id: "Paused", message: "Paused" })
+        : job.state === "failed" ? job.message ?? i18n._({ id: "The download failed. Cancel it, then switch the book on again to retry.", message: "The download failed. Cancel it, then switch the book on again to retry." })
+          : job.state === "downloading" ? i18n._({ id: "Downloading", message: "Downloading" }) : job.message ?? "";
   return { title, state, status, completedBytes: job.completedBytes, totalBytes: job.totalBytes, ...(bytesPerSecond !== undefined && job.state === "downloading" ? { bytesPerSecond } : {}) };
 }
 
@@ -148,11 +153,11 @@ export function ReferenceLibrarySettings() {
 
   const apply = useMutation({
     mutationFn: async () => {
-      for (const set of removals) { setStep(`Removing ${titleOf(set)}…`); await api.referenceRemove(set.id); }
-      for (const set of additions) { setStep(`Starting ${titleOf(set)}…`); await api.referenceInstall(set.id); }
+      for (const set of removals) { setStep(i18n._({ id: "Removing {title}…", message: "Removing {title}…", values: { title: titleOf(set) } })); await api.referenceRemove(set.id); }
+      for (const set of additions) { setStep(i18n._({ id: "Starting {title}…", message: "Starting {title}…", values: { title: titleOf(set) } })); await api.referenceInstall(set.id); }
     },
     onSuccess: async () => { setStep(null); setStaged({}); setError(null); await client.invalidateQueries({ queryKey: ["reference-state"] }); await client.invalidateQueries({ queryKey: ["reference-catalog"] }); },
-    onError: async (e) => { setStep(null); setError(messageOf(e, "Home could not change the offline books. Check the drive space and the Home connection, then try again.")); await client.invalidateQueries({ queryKey: ["reference-state"] }); await client.invalidateQueries({ queryKey: ["reference-catalog"] }); },
+    onError: async (e) => { setStep(null); setError(messageOf(e, i18n._({ id: "Home could not change the offline books. Check the drive space and the Home connection, then try again.", message: "Home could not change the offline books. Check the drive space and the Home connection, then try again." }))); await client.invalidateQueries({ queryKey: ["reference-state"] }); await client.invalidateQueries({ queryKey: ["reference-catalog"] }); },
   });
   const jobAction = useMutation({
     mutationFn: ({ job, action }: { job: ReferenceJob; action: "pause" | "resume" | "cancel" }) => api.referenceJob(job.id, action),
@@ -167,9 +172,9 @@ export function ReferenceLibrarySettings() {
   // Everything else on the drive is the part that is neither free nor an offline book.
   const otherBytes = total !== null && free !== null ? Math.max(0, total - free - installedBytes) : 0;
   const segments = [
-    ...(otherBytes > 0 ? [{ id: "other", label: "Everything else", bytes: otherBytes, hue: "--hue-blue" }] : []),
-    { id: "books", label: "Offline books", bytes: installedBytes, hue: "--hue-violet" },
-    ...(addBytes > 0 ? [{ id: "pending", label: "Staged", bytes: addBytes, hue: "--hue-orange" }] : []),
+    ...(otherBytes > 0 ? [{ id: "other", label: i18n._({ id: "Everything else", message: "Everything else" }), bytes: otherBytes, hue: "--hue-blue" }] : []),
+    { id: "books", label: i18n._({ id: "Offline books", message: "Offline books" }), bytes: installedBytes, hue: "--hue-violet" },
+    ...(addBytes > 0 ? [{ id: "pending", label: i18n._({ id: "Staged", message: "Staged" }), bytes: addBytes, hue: "--hue-orange" }] : []),
   ];
   const refusal = plan.data?.refusal ?? null;
   const planFailed = additions.length > 0 && plan.isError;
@@ -186,8 +191,8 @@ export function ReferenceLibrarySettings() {
           <ItemContent>
             <ItemTitle>{i18n._({ id: "Disk space", message: "Disk space" })}</ItemTitle>
             <StorageBar segments={segments} capacityBytes={capacity} formatBytes={sizeGb} />
-            <ItemDescription clamp={false}>{i18n._({ id: "{value}{value2} · {sizeGb} of offline books.", message: "{value}{value2} · {sizeGb} of offline books.", values: { value: total !== null ? `${sizeGb(total)} drive` : i18n._({ id: "This computer", message: "This computer" }), value2: free !== null ? ` · ${sizeGb(free)} free` : "", sizeGb: sizeGb(installedBytes) } })}</ItemDescription>
-            {stagedCount > 0 ? <ItemDescription clamp={false}>{i18n._({ id: "After applying: {sizeGb} of books ({signed}){value}.", message: "After applying: {sizeGb} of books ({signed}){value}.", values: { sizeGb: sizeGb(installedBytes + addBytes - freedBytes), signed: signed(addBytes - freedBytes), value: free !== null ? `, ${sizeGb(Math.max(0, free - addBytes + freedBytes))} free` : "" } })}</ItemDescription> : null}
+            <ItemDescription clamp={false}>{i18n._({ id: "{value}{value2} · {sizeGb} of offline books.", message: "{value}{value2} · {sizeGb} of offline books.", values: { value: total !== null ? i18n._({ id: "{size} drive", message: "{size} drive", values: { size: sizeGb(total) } }) : i18n._({ id: "This computer", message: "This computer" }), value2: free !== null ? i18n._({ id: " · {size} free", message: " · {size} free", values: { size: sizeGb(free) } }) : "", sizeGb: sizeGb(installedBytes) } })}</ItemDescription>
+            {stagedCount > 0 ? <ItemDescription clamp={false}>{i18n._({ id: "After applying: {sizeGb} of books ({signed}){value}.", message: "After applying: {sizeGb} of books ({signed}){value}.", values: { sizeGb: sizeGb(installedBytes + addBytes - freedBytes), signed: signed(addBytes - freedBytes), value: free !== null ? i18n._({ id: ", {size} free", message: ", {size} free", values: { size: sizeGb(Math.max(0, free - addBytes + freedBytes)) } }) : "" } })}</ItemDescription> : null}
           </ItemContent>
         </Item>
       </ItemGroup>
@@ -200,7 +205,7 @@ export function ReferenceLibrarySettings() {
           </ToggleGroup>
           {activePreset === undefined && sets.length > 0 ? <Badge variant="secondary">{i18n._({ id: "Custom", message: "Custom" })}</Badge> : null}
         </div>
-        <p className="text-base text-muted-foreground">{presets.find((preset) => preset.id === activePreset)?.copy ?? "Your own mix. Pick Minimum, Moderate or Full to start from a ready-made set, then switch single books on or off below."}</p>
+        <p className="text-base text-muted-foreground">{presets.find((preset) => preset.id === activePreset)?.copy ?? i18n._({ id: "Your own mix. Pick Minimum, Moderate or Full to start from a ready-made set, then switch single books on or off below.", message: "Your own mix. Pick Minimum, Moderate or Full to start from a ready-made set, then switch single books on or off below." })}</p>
       </section>
 
       {catalog.isLoading || state.isLoading ? <RouteSkeleton label={i18n._({ id: "Loading offline books", message: "Loading offline books" })} /> : null}
@@ -220,17 +225,17 @@ export function ReferenceLibrarySettings() {
           {planFailed ? <Alert variant="destructive"><AlertTitle>{i18n._({ id: "Home could not check the drive space", message: "Home could not check the drive space" })}</AlertTitle><AlertDescription>{i18n._({ id: "Check that Home is running and online, then switch a book off and on again to retry.", message: "Check that Home is running and online, then switch a book off and on again to retry." })}</AlertDescription></Alert> : null}
           {refusal ? <Alert variant="warning"><AlertTitle>{i18n._({ id: "There is not enough room", message: "There is not enough room" })}</AlertTitle><AlertDescription>{refusal}</AlertDescription></Alert> : null}
         </>}
-        staged={stagedCount > 0} title={stagedCount === 1 ? i18n._({ id: "1 change is waiting", message: "1 change is waiting" }) : `${stagedCount} changes are waiting`}
-        summary={<p className="text-base">{additions.length > 0 ? `${additions.length} to download (${sizeGb(addBytes)}${plan.data ? `, ${duration(plan.data.estimatedSeconds)}` : ""}). ` : ""}{removals.length > 0 ? `${removals.length} to remove (frees ${sizeGb(freedBytes)}).` : ""}</p>}
+        staged={stagedCount > 0} title={i18n._({ id: "{count, plural, one {# change is waiting} other {# changes are waiting}}", message: "{count, plural, one {# change is waiting} other {# changes are waiting}}", values: { count: stagedCount } })}
+        summary={<p className="text-base">{additions.length > 0 ? i18n._({ id: "{count} to download ({size}{time}). ", message: "{count} to download ({size}{time}). ", values: { count: additions.length, size: sizeGb(addBytes), time: plan.data ? `, ${duration(plan.data.estimatedSeconds)}` : "" } }) : ""}{removals.length > 0 ? i18n._({ id: "{count} to remove (frees {size}).", message: "{count} to remove (frees {size}).", values: { count: removals.length, size: sizeGb(freedBytes) } }) : ""}</p>}
         step={step} applying={apply.isPending} applyDisabled={Boolean(refusal) || (additions.length > 0 && plan.isPending) || planFailed}
-        applyLabel="Apply" discardLabel="Discard" onApply={() => removals.length > 0 ? setConfirmRemove(true) : apply.mutate()} onDiscard={() => setStaged({})}
+        applyLabel={i18n._({ id: "Apply", message: "Apply" })} discardLabel={i18n._({ id: "Discard", message: "Discard" })} onApply={() => removals.length > 0 ? setConfirmRemove(true) : apply.mutate()} onDiscard={() => setStaged({})}
       />
 
       <AlertDialog open={confirmRemove} onOpenChange={setConfirmRemove}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>{removals.length === 1 ? `Remove ${removals[0] ? titleOf(removals[0]) : i18n._({ id: "this book", message: "this book" })}?` : `Remove ${removals.length} books?`}</AlertDialogTitle>
-            <AlertDialogDescription>{i18n._({ id: "{sizeGb} will be freed. {value} You can download them again later.", message: "{sizeGb} will be freed. {value} You can download them again later.", values: { sizeGb: sizeGb(freedBytes), value: kidsLose.length > 0 ? "Children and teens may lose access to " + kidsLose.map((set) => titleOf(set)).join(", ") + "." : i18n._({ id: "No book for children or teens is removed.", message: "No book for children or teens is removed." }) } })}</AlertDialogDescription>
+            <AlertDialogTitle>{removals.length === 1 ? i18n._({ id: "Remove {title}?", message: "Remove {title}?", values: { title: removals[0] ? titleOf(removals[0]) : i18n._({ id: "this book", message: "this book" }) } }) : i18n._({ id: "Remove {count} books?", message: "Remove {count} books?", values: { count: removals.length } })}</AlertDialogTitle>
+            <AlertDialogDescription>{i18n._({ id: "{sizeGb} will be freed. {value} You can download them again later.", message: "{sizeGb} will be freed. {value} You can download them again later.", values: { sizeGb: sizeGb(freedBytes), value: kidsLose.length > 0 ? i18n._({ id: "Children and teens may lose access to {books}.", message: "Children and teens may lose access to {books}.", values: { books: kidsLose.map((set) => titleOf(set)).join(", ") } }) : i18n._({ id: "No book for children or teens is removed.", message: "No book for children or teens is removed." }) } })}</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>{i18n._({ id: "Cancel", message: "Cancel" })}</AlertDialogCancel>
@@ -253,7 +258,7 @@ function rowOf({ row, wanted, installed, jobFor, rates, onChoose, onJob }: { row
   const pending = wanted !== installed;
   const jobSet = job ? row.versions.find((set) => set.id === job.setId) : undefined;
   const download = job ? referenceDownload(job, jobSet ? titleOf(jobSet) : row.label, rates[job.id]) : undefined;
-  const status = installed ? "Installed" : download ? download.status : "Not installed";
+  const status = installed ? i18n._({ id: "Installed", message: "Installed" }) : download ? download.status : i18n._({ id: "Not installed", message: "Not installed" });
   const blocked = Boolean(job) || row.versions.every((set) => !set.installed && !set.available);
   return (
     <Item key={row.source} data-testid={`offline-row-${row.source}`}>
@@ -263,11 +268,11 @@ function rowOf({ row, wanted, installed, jobFor, rates, onChoose, onJob }: { row
           {forKids ? <Badge variant="secondary">{i18n._({ id: "For children", message: "For children" })}</Badge> : null}
           {pending ? <Badge variant="outline">{wanted ? i18n._({ id: "Will download", message: "Will download" }) : i18n._({ id: "Will remove", message: "Will remove" })}</Badge> : null}
         </ItemTitle>
-        <ItemDescription clamp={false}>{SOURCE_BLURB[row.source]}</ItemDescription>
-        <ItemDescription clamp={false}>{i18n._({ id: "{value} · Snapshot {value2} · {status}{value3}", message: "{value} · Snapshot {value2} · {status}{value3}", values: { value: multi ? (current ? `${versionLabel(current)} · ${sizeGb(current.sizeBytes)}` : i18n._({ id: "Off", message: "Off" })) : sizeGb(shown.sizeBytes), value2: shown.snapshotDate ?? "date not listed", status, value3: shown.message ? ` · ${shown.message}` : "" } })}</ItemDescription>
+        <ItemDescription clamp={false}>{sourceBlurb(row.source)}</ItemDescription>
+        <ItemDescription clamp={false}>{i18n._({ id: "{value} · Snapshot {value2} · {status}{value3}", message: "{value} · Snapshot {value2} · {status}{value3}", values: { value: multi ? (current ? `${versionLabel(current)} · ${sizeGb(current.sizeBytes)}` : i18n._({ id: "Off", message: "Off" })) : sizeGb(shown.sizeBytes), value2: shown.snapshotDate ?? i18n._({ id: "date not listed", message: "date not listed" }), status, value3: shown.message ? ` · ${shown.message}` : "" } })}</ItemDescription>
         {job && download ? (
           <>
-            <JobProgress {...downloadProgress(download)} variant="full" cancelLabel={`Cancel the ${row.label} download`} onCancel={() => onJob(job, "cancel")} {...(job.state === "paused" ? { onResume: () => onJob(job, "resume") } : {})} />
+            <JobProgress {...downloadProgress(download)} variant="full" cancelLabel={i18n._({ id: "Cancel the {label} download", message: "Cancel the {label} download", values: { label: row.label } })} onCancel={() => onJob(job, "cancel")} {...(job.state === "paused" ? { onResume: () => onJob(job, "resume") } : {})} />
             {job.state === "downloading" ? <div><Button type="button" variant="outline" size="sm" onClick={() => onJob(job, "pause")}>{i18n._({ id: "Pause", message: "Pause" })}</Button></div> : null}
             {job.state === "waiting_window" ? <div><Button type="button" variant="outline" size="sm" onClick={() => onJob(job, "resume")}>{i18n._({ id: "Start now", message: "Start now" })}</Button></div> : null}
           </>
@@ -276,13 +281,13 @@ function rowOf({ row, wanted, installed, jobFor, rates, onChoose, onJob }: { row
       <ItemActions>
         {multi ? (
           <Select value={wanted ?? "off"} disabled={blocked} onValueChange={(value) => onChoose(value === "off" ? null : value)}>
-            <SelectTrigger aria-label={`${row.label} version`}><SelectValue /></SelectTrigger>
+            <SelectTrigger aria-label={i18n._({ id: "{label} version", message: "{label} version", values: { label: row.label } })}><SelectValue /></SelectTrigger>
             <SelectContent>
               <SelectItem value="off">{i18n._({ id: "Off", message: "Off" })}</SelectItem>
               {row.versions.map((set) => <SelectItem key={set.id} value={set.id}>{versionLabel(set)} · {sizeGb(set.sizeBytes)}</SelectItem>)}
             </SelectContent>
           </Select>
-        ) : <Switch checked={wanted !== null} disabled={blocked} onCheckedChange={(on) => onChoose(on ? row.versions[0]!.id : null)} aria-label={`${row.label}: ${wanted ? i18n._({ id: "on", message: "on" }) : i18n._({ id: "off", message: "off" })}`} />}
+        ) : <Switch checked={wanted !== null} disabled={blocked} onCheckedChange={(on) => onChoose(on ? row.versions[0]!.id : null)} aria-label={wanted ? i18n._({ id: "{label}: on", message: "{label}: on", values: { label: row.label } }) : i18n._({ id: "{label}: off", message: "{label}: off", values: { label: row.label } })} />}
       </ItemActions>
     </Item>
   );

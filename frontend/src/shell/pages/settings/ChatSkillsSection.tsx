@@ -57,7 +57,7 @@ export function ChatSkillsSection({ person }: { person: Roster }) {
   const minor = isChild || person.role === "teen";
   const skillsQuery = useQuery({ queryKey: ["skills"], queryFn: () => api.skills(), enabled: !isChild });
   if (isChild) return null;
-  if (skillsQuery.isLoading || skillsQuery.isError) return <AsyncState data={skillsQuery.data} error={skillsQuery.isError} isFetching={skillsQuery.isFetching} onRetry={() => void skillsQuery.refetch()} errorMessage="Could not load skills." loadingLabel="Loading skills">{() => null}</AsyncState>;
+  if (skillsQuery.isLoading || skillsQuery.isError) return <AsyncState data={skillsQuery.data} error={skillsQuery.isError} isFetching={skillsQuery.isFetching} onRetry={() => void skillsQuery.refetch()} errorMessage={i18n._({ id: "Could not load skills.", message: "Could not load skills." })} loadingLabel={i18n._({ id: "Loading skills", message: "Loading skills" })}>{() => null}</AsyncState>;
   if (skillsQuery.isError) return <p role="alert" className="text-destructive text-sm">{i18n._({ id: "Could not load skills. Try again in a moment.", message: "Could not load skills. Try again in a moment." })}</p>;
 
   const skills = skillsQuery.data ?? [];

@@ -11,20 +11,20 @@ import { errorLine } from "@/lib/hubReachability";
 
 const NONE = "none";
 const CONTROLS = ["child", "teen", "adult"] as const;
-const CONTROLS_LABEL: Record<string, string> = { child: "Child controls", teen: "Teen controls", adult: "Adult controls" };
-const CONTROLS_NOTE: Record<string, string> = {
-  child: "Every child protection applies, whichever companion is chosen.",
-  teen: "Teen protections apply, whichever companion is chosen. Still no adult content.",
-  adult: "Adult answers. Any companion can be chosen.",
-};
+const controlsLabel = (): Record<string, string> => ({ child: i18n._({ id: "Child controls", message: "Child controls" }), teen: i18n._({ id: "Teen controls", message: "Teen controls" }), adult: i18n._({ id: "Adult controls", message: "Adult controls" }) });
+const controlsNote = (): Record<string, string> => ({
+  child: i18n._({ id: "Every child protection applies, whichever companion is chosen.", message: "Every child protection applies, whichever companion is chosen." }),
+  teen: i18n._({ id: "Teen protections apply, whichever companion is chosen. Still no adult content.", message: "Teen protections apply, whichever companion is chosen. Still no adult content." }),
+  adult: i18n._({ id: "Adult answers. Any companion can be chosen.", message: "Adult answers. Any companion can be chosen." }),
+});
 
 /** "Speaking in Alba, from the companion Rivet." The voice the robot uses and why. */
 function speakingLine(speaking: RobotCompanionInfo["speaking"], voices: StackVoice[]): string {
   const voice = speaking.voice_id === "default" ? null : voices.find((entry) => entry.id === speaking.voice_id);
-  const name = speaking.voice_id === "default" ? "Home's default voice" : voice ? voiceFriendlyName(voice) : "a voice made at home";
-  if (speaking.source === "companion") return `Speaking in ${name}, from the companion ${speaking.companion_name ?? "you chose"}.`;
-  if (speaking.source === "robot") return `Speaking in ${name}, this robot's own voice.`;
-  return speaking.voice_id === "default" ? "Speaking in Home's default voice." : `Speaking in ${name}, Home's default voice.`;
+  const name = speaking.voice_id === "default" ? i18n._({ id: "Home's default voice", message: "Home's default voice" }) : voice ? voiceFriendlyName(voice) : i18n._({ id: "a voice made at home", message: "a voice made at home" });
+  if (speaking.source === "companion") return i18n._({ id: "Speaking in {name}, from the companion {companion}.", message: "Speaking in {name}, from the companion {companion}.", values: { name, companion: speaking.companion_name ?? i18n._({ id: "you chose", message: "you chose" }) } });
+  if (speaking.source === "robot") return i18n._({ id: "Speaking in {name}, this robot's own voice.", message: "Speaking in {name}, this robot's own voice.", values: { name } });
+  return speaking.voice_id === "default" ? i18n._({ id: "Speaking in Home's default voice.", message: "Speaking in Home's default voice." }) : i18n._({ id: "Speaking in {name}, Home's default voice.", message: "Speaking in {name}, Home's default voice.", values: { name } });
 }
 
 /** ROBOT-COMPANION-01: an admin picks a robot's controls and its companion. The robot's controls set which protections apply, whatever
@@ -38,7 +38,7 @@ export function RobotCompanionChoices({ deviceId }: { deviceId: string }) {
   useEffect(() => { let active = true; void api.stackVoices().then((result) => { if (active) setVoices(result.voices); }).catch(() => undefined); return () => { active = false; }; }, []);
   const load = useCallback(async () => {
     try { setInfo(await api.robotCompanion(deviceId)); }
-    catch (failure) { setError(errorLine(failure, "Could not load this robot's companion. Check the connection and try again.")); }
+    catch (failure) { setError(errorLine(failure, i18n._({ id: "Could not load this robot's companion. Check the connection and try again.", message: "Could not load this robot's companion. Check the connection and try again." }))); }
   }, [deviceId]);
   useEffect(() => { void load(); }, [load]);
 
@@ -46,7 +46,7 @@ export function RobotCompanionChoices({ deviceId }: { deviceId: string }) {
     setBusy(true);
     setError(null);
     try { await api.setSetting(`device:${deviceId}`, key, value); await load(); }
-    catch (failure) { setError(errorLine(failure, "Could not save this. Check the connection and try again.")); }
+    catch (failure) { setError(errorLine(failure, i18n._({ id: "Could not save this. Check the connection and try again.", message: "Could not save this. Check the connection and try again." }))); }
     finally { setBusy(false); }
   }
 
@@ -55,8 +55,8 @@ export function RobotCompanionChoices({ deviceId }: { deviceId: string }) {
       {!info ? (error ? <Alert variant="destructive"><AlertDescription>{error}</AlertDescription></Alert> : null) : <FieldGroup>
         <Field>
           <FieldLabel htmlFor={`robot-controls-${deviceId}`}>{i18n._({ id: "Controls", message: "Controls" })}</FieldLabel>
-          <Select aria-label={i18n._({ id: "Controls", message: "Controls" })} value={info.controls} options={[...CONTROLS]} getLabel={(value) => CONTROLS_LABEL[value] ?? value} disabled={busy} onValueChange={(value) => void save("robot.controls", value)} />
-          <FieldDescription>{CONTROLS_NOTE[info.controls]}</FieldDescription>
+          <Select aria-label={i18n._({ id: "Controls", message: "Controls" })} value={info.controls} options={[...CONTROLS]} getLabel={(value) => controlsLabel()[value] ?? value} disabled={busy} onValueChange={(value) => void save("robot.controls", value)} />
+          <FieldDescription>{controlsNote()[info.controls]}</FieldDescription>
         </Field>
         <Field>
           <FieldLabel htmlFor={`robot-companion-${deviceId}`}>{i18n._({ id: "Companion", message: "Companion" })}</FieldLabel>
@@ -64,7 +64,7 @@ export function RobotCompanionChoices({ deviceId }: { deviceId: string }) {
             aria-label={i18n._({ id: "Companion", message: "Companion" })}
             value={info.companion_id || NONE}
             options={[NONE, ...info.companions.map((companion) => companion.id)]}
-            getLabel={(value) => value === NONE ? "None (child controls)" : (() => { const companion = info.companions.find((entry) => entry.id === value); return companion ? (companion.audience === "all" ? companion.name : `${companion.name} (${companion.audience} only)`) : value; })()}
+            getLabel={(value) => value === NONE ? i18n._({ id: "None (child controls)", message: "None (child controls)" }) : (() => { const companion = info.companions.find((entry) => entry.id === value); return companion ? (companion.audience === "all" ? companion.name : i18n._({ id: "{name} ({audience} only)", message: "{name} ({audience} only)", values: { name: companion.name, audience: companion.audience } })) : value; })()}
             disabled={busy}
             onValueChange={(value) => void save("robot.companion.id", value === NONE ? "" : value)}
           />

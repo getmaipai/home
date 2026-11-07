@@ -57,7 +57,7 @@ export function RobotPasswordRow({
       await queryClient.invalidateQueries({ queryKey: ["robot-password-status", device.id] });
       onRotated?.();
     } catch (err) {
-      setError(errorLine(err, "Could not rotate the password."));
+      setError(errorLine(err, i18n._({ id: "Could not rotate the password.", message: "Could not rotate the password." })));
     } finally {
       setSubmitting(false);
     }
@@ -133,8 +133,8 @@ export function RobotPasswordSection() {
         error={devicesQuery.isError}
         isFetching={false}
         onRetry={() => devicesQuery.refetch()}
-        errorMessage="Could not load your robots."
-        loadingLabel="Loading"
+        errorMessage={i18n._({ id: "Could not load your robots.", message: "Could not load your robots." })}
+        loadingLabel={i18n._({ id: "Loading", message: "Loading" })}
       >
         {(rows) => <PasswordDialogRow devices={rows} />}
       </AsyncState>

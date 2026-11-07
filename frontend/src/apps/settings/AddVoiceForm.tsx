@@ -33,7 +33,7 @@ export function AddVoiceForm({ onCancel, onMade, onBusyChange, canTune = true, m
       setBusy(false);
       onMade(voiceName);
     } catch (cause) {
-      setError(errorLine(cause, cause instanceof Error ? cause.message : "Could not make this voice. Try again."));
+      setError(errorLine(cause, cause instanceof Error ? cause.message : i18n._({ id: "Could not make this voice. Try again.", message: "Could not make this voice. Try again." })));
       setBusy(false);
     }
   }

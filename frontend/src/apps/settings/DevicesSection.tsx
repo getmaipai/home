@@ -18,14 +18,14 @@ function whenText(iso: string): string {
   return new Date(iso).toLocaleString();
 }
 
-const DEVICE_KIND_LABELS: Record<DeviceInfo["kind"], string> = {
-  robot: "Robot",
-  pod: "Pod",
-  tv: "TV",
-  phone: "Phone",
-  desktop: "Desktop",
-  browser: "Browser",
-};
+const deviceKindLabels = (): Record<DeviceInfo["kind"], string> => ({
+  robot: i18n._({ id: "Robot", message: "Robot" }),
+  pod: i18n._({ id: "Pod", message: "Pod" }),
+  tv: i18n._({ id: "TV", message: "TV" }),
+  phone: i18n._({ id: "Phone", message: "Phone" }),
+  desktop: i18n._({ id: "Desktop", message: "Desktop" }),
+  browser: i18n._({ id: "Browser", message: "Browser" }),
+});
 
 // Session E step 6: "sessions and devices with revoke", against F's
 // real, landed GET/DELETE /api/devices and GET/DELETE /api/auth/sessions
@@ -62,7 +62,7 @@ export function DevicesSection({ search = "" }: { search?: string }) {
       }
       setConfirming(null);
     } catch (err) {
-      setActionError(errorLine(err, "Could not revoke that."));
+      setActionError(errorLine(err, i18n._({ id: "Could not revoke that.", message: "Could not revoke that." })));
     } finally {
       setBusy(false);
     }
@@ -76,7 +76,7 @@ export function DevicesSection({ search = "" }: { search?: string }) {
       await api.setDeviceOfflineScope(device.id, scopes);
       await devicesQuery.refetch();
     } catch {
-      setActionError("The offline permission could not be saved. Check your connection, then try again.");
+      setActionError(i18n._({ id: "The offline permission could not be saved. Check your connection, then try again.", message: "The offline permission could not be saved. Check your connection, then try again." }));
     } finally { setBusy(false); }
   }
 
@@ -90,8 +90,8 @@ export function DevicesSection({ search = "" }: { search?: string }) {
           error={devicesQuery.isError}
           isFetching={devicesQuery.isFetching}
           onRetry={() => devicesQuery.refetch()}
-          errorMessage="Could not load your devices."
-          loadingLabel="Loading devices"
+          errorMessage={i18n._({ id: "Could not load your devices.", message: "Could not load your devices." })}
+          loadingLabel={i18n._({ id: "Loading devices", message: "Loading devices" })}
         >
           {(allRows) => {
             const allDevices = allRows.filter((d) => matchesSearch(`${d.name} ${d.kind} ${d.area ?? ""}`));
@@ -114,12 +114,12 @@ export function DevicesSection({ search = "" }: { search?: string }) {
                   return (
                     <div className="flex min-w-0 flex-1 flex-col gap-1 py-1">
                       <div className="flex items-center gap-2">
-                        <Badge variant="secondary">{DEVICE_KIND_LABELS[d.kind]}</Badge>
+                        <Badge variant="secondary">{deviceKindLabels()[d.kind]}</Badge>
                         <span className="truncate text-base font-medium">{d.name}</span>
                       </div>
                       <span className="text-sm text-muted-foreground">
                         {d.area ? `${d.area} · ` : ""}
-                        {d.lastSeenAt ? `last seen ${whenText(d.lastSeenAt)}` : i18n._({ id: "never connected", message: "never connected" })}
+                        {d.lastSeenAt ? i18n._({ id: "last seen {time}", message: "last seen {time}", values: { time: whenText(d.lastSeenAt) } }) : i18n._({ id: "never connected", message: "never connected" })}
                       </span>
                       {d.kind === "tv" || d.kind === "pod" ? null : (
                         <Label htmlFor={`offline-${d.id}`}>
@@ -143,7 +143,7 @@ export function DevicesSection({ search = "" }: { search?: string }) {
                   ) : (
                     <Button
                       variant="ghost"
-                      aria-label={`Remove ${d.name}`}
+                      aria-label={i18n._({ id: "Remove {name}", message: "Remove {name}", values: { name: d.name } })}
                       onClick={() => setConfirming({ kind: "device", id: d.id, label: d.name })}
                     >
                       {i18n._({ id: "Remove", message: "Remove" })}
@@ -159,13 +159,13 @@ export function DevicesSection({ search = "" }: { search?: string }) {
 
       <Section heading={i18n._({ id: "Copies in this browser", message: "Copies in this browser" })}>
         <p>{i18n._({ id: "Saved files on the hub still work when the internet is down. Copies here let this browser open kept items when it cannot reach the hub.", message: "Saved files on the hub still work when the internet is down. Copies here let this browser open kept items when it cannot reach the hub." })}</p>
-        <AsyncState data={keptQuery.data} error={keptQuery.isError} isFetching={keptQuery.isFetching} onRetry={() => keptQuery.refetch()} errorMessage="Copies could not be listed. Try again." loadingLabel="Loading copies">
+        <AsyncState data={keptQuery.data} error={keptQuery.isError} isFetching={keptQuery.isFetching} onRetry={() => keptQuery.refetch()} errorMessage={i18n._({ id: "Copies could not be listed. Try again.", message: "Copies could not be listed. Try again." })} loadingLabel={i18n._({ id: "Loading copies", message: "Loading copies" })}>
           {(rows) => { const items = rows.filter((item) => matchesSearch(`${item.title} ${item.kind}`)).sort((a, b) => a.kind.localeCompare(b.kind) || a.title.localeCompare(b.title)); return items.length ? <List items={items} getKey={(item) => `${item.kind}:${item.id}`} label={i18n._({ id: "Offline copies", message: "Offline copies" })} renderItem={(item) => <span>{item.title} <Badge variant="secondary">{item.kind === "media" ? i18n._({ id: "Media", message: "Media" }) : item.kind.replaceAll("_", " ")}</Badge></span>} /> : <EmptyState icon="inbox" text={i18n._({ id: "No copies kept in this browser.", message: "No copies kept in this browser." })} />; }}
         </AsyncState>
         <Button variant="destructive" disabled={busy} onClick={async () => {
           setBusy(true);
           try { await removeAllOfflineMedia(); await keptQuery.refetch(); }
-          catch { setActionError("Offline copies could not be removed. Try again in this browser."); }
+          catch { setActionError(i18n._({ id: "Offline copies could not be removed. Try again in this browser.", message: "Offline copies could not be removed. Try again in this browser." })); }
           finally { setBusy(false); }
         }}>{i18n._({ id: "Remove all offline copies", message: "Remove all offline copies" })}</Button>
       </Section>
@@ -176,10 +176,10 @@ export function DevicesSection({ search = "" }: { search?: string }) {
           error={sessionsQuery.isError}
           isFetching={sessionsQuery.isFetching}
           onRetry={() => sessionsQuery.refetch()}
-          errorMessage="Could not load your sessions."
-          loadingLabel="Loading sessions"
+          errorMessage={i18n._({ id: "Could not load your sessions.", message: "Could not load your sessions." })}
+          loadingLabel={i18n._({ id: "Loading sessions", message: "Loading sessions" })}
         >
-          {(allRows) => { const rows = allRows.filter((row) => matchesSearch(row.userAgent ?? "Unknown browser")); return (
+          {(allRows) => { const rows = allRows.filter((row) => matchesSearch(row.userAgent ?? i18n._({ id: "Unknown browser", message: "Unknown browser" }))); return (
             rows.length === 0 ? (
               <EmptyState icon="inbox" text={i18n._({ id: "No active sessions.", message: "No active sessions." })} />
             ) : (
@@ -198,7 +198,7 @@ export function DevicesSection({ search = "" }: { search?: string }) {
                     <div className="flex min-w-0 flex-1 flex-col gap-1 py-1">
                       <div className="flex items-center gap-2">
                         {s.isCurrent ? <Badge>{i18n._({ id: "This device", message: "This device" })}</Badge> : null}
-                        <span className="truncate text-base">{s.userAgent ?? "Unknown browser"}</span>
+                        <span className="truncate text-base">{s.userAgent ?? i18n._({ id: "Unknown browser", message: "Unknown browser" })}</span>
                       </div>
                       <span className="text-sm text-muted-foreground">{i18n._({ id: "Signed in {whenText} · expires {whenText2}", message: "Signed in {whenText} · expires {whenText2}", values: { whenText: whenText(s.createdAt), whenText2: whenText(s.expiresAt) } })}</span>
                     </div>
@@ -226,8 +226,8 @@ export function DevicesSection({ search = "" }: { search?: string }) {
                   return (
                     <Button
                       variant="ghost"
-                      aria-label={`Sign out ${s.userAgent ?? "that session"}`}
-                      onClick={() => setConfirming({ kind: "session", id: s.id, label: s.userAgent ?? "that session" })}
+                      aria-label={i18n._({ id: "Sign out {agent}", message: "Sign out {agent}", values: { agent: s.userAgent ?? i18n._({ id: "that session", message: "that session" }) } })}
+                      onClick={() => setConfirming({ kind: "session", id: s.id, label: s.userAgent ?? i18n._({ id: "that session", message: "that session" }) })}
                     >
                       {i18n._({ id: "Sign out", message: "Sign out" })}
                     </Button>

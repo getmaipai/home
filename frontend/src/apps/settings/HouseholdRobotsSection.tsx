@@ -27,9 +27,9 @@ import { errorLine } from "@/lib/hubReachability";
 
 
 function statusText(device: DeviceInfo): string {
-  if (device.lastSeenAt === null && device.state == null) return "Waiting for first report";
-  if (device.state && !device.state.reachable) return "Not responding";
-  return "Paired";
+  if (device.lastSeenAt === null && device.state == null) return i18n._({ id: "Waiting for first report", message: "Waiting for first report" });
+  if (device.state && !device.state.reachable) return i18n._({ id: "Not responding", message: "Not responding" });
+  return i18n._({ id: "Paired", message: "Paired" });
 }
 
 function robotOnline(device: DeviceInfo): boolean {
@@ -52,7 +52,7 @@ export function HouseholdRobotsSection({ detailId, tab }: { detailId?: string; t
     return () => window.removeEventListener("devices-updated", refresh);
   }, [queryClient]);
   return (
-    <AsyncState data={query.data} error={query.isError} isFetching={query.isFetching} onRetry={() => query.refetch()} errorMessage="Could not load the household's robots." loadingLabel="Loading robots">
+    <AsyncState data={query.data} error={query.isError} isFetching={query.isFetching} onRetry={() => query.refetch()} errorMessage={i18n._({ id: "Could not load the household's robots.", message: "Could not load the household's robots." })} loadingLabel={i18n._({ id: "Loading robots", message: "Loading robots" })}>
       {(robots: DeviceInfo[]) => {
         const open = detailId ? robots.find((robot) => robot.id === detailId) : undefined;
         if (detailId && !open) {
@@ -66,10 +66,10 @@ export function HouseholdRobotsSection({ detailId, tab }: { detailId?: string; t
             <CardContent>{robots.length === 0 ? <EmptyState icon="inbox" text={i18n._({ id: "No robots yet.", message: "No robots yet." })} /> : (
               <ItemGroup variant="card" aria-label={i18n._({ id: "Household robots", message: "Household robots" })}>
                 {robots.map((robot) => (
-                  <Item key={robot.id} size="setting" render={<Link to={`/settings/apps/${encodeURIComponent(robot.id)}?tab=overview`} aria-label={`${robot.name} settings`} />}>
+                  <Item key={robot.id} size="setting" render={<Link to={`/settings/apps/${encodeURIComponent(robot.id)}?tab=overview`} aria-label={i18n._({ id: "{name} settings", message: "{name} settings", values: { name: robot.name } })} />}>
                     <ItemContent>
                       <ItemTitle>{robot.name}</ItemTitle>
-                      <ItemDescription>{robot.area ? `${robot.area} · ` : ""}{robot.lastSeenAt ? robotOnline(robot) ? i18n._({ id: "Online", message: "Online" }) : `Offline, last seen ${robotLastSeen(robot)}` : i18n._({ id: "Never connected", message: "Never connected" })}</ItemDescription>
+                      <ItemDescription>{robot.area ? `${robot.area} · ` : ""}{robot.lastSeenAt ? robotOnline(robot) ? i18n._({ id: "Online", message: "Online" }) : i18n._({ id: "Offline, last seen {time}", message: "Offline, last seen {time}", values: { time: robotLastSeen(robot) } }) : i18n._({ id: "Never connected", message: "Never connected" })}</ItemDescription>
                     </ItemContent>
                     <Badge variant="secondary">{robotOnline(robot) ? i18n._({ id: "Online", message: "Online" }) : statusText(robot)}</Badge>
                   </Item>
@@ -110,7 +110,7 @@ function RobotDetail({ device, tab, onClose }: { device: DeviceInfo; tab?: strin
   const top = useRef<HTMLDivElement>(null);
   useEffect(() => { top.current?.scrollIntoView?.({ block: "start" }); }, []);
   const installing = hostedInstall && device.lastSeenAt === null;
-  const voiceOptions = [{ value: "default", label: "Use the companion's voice" }, ...playableVoices(robotVoices).map((voice) => ({ value: voice.id, label: voiceFriendlyName(voice) }))];
+  const voiceOptions = [{ value: "default", label: i18n._({ id: "Use the companion's voice", message: "Use the companion's voice" }) }, ...playableVoices(robotVoices).map((voice) => ({ value: voice.id, label: voiceFriendlyName(voice) }))];
   const cards = useMemo(() => ((areasFile as { device_cards?: Array<{ device_kind: string; group: string; scope: "device"; label: string; min_role?: string }> }).device_cards ?? []).filter((card) => card.device_kind === "robot" && card.scope === "device" && (!card.min_role || card.min_role === "admin" || card.min_role === "owner")), []);
   const refreshAll = () => { window.dispatchEvent(new Event("devices-updated")); void queryClient.invalidateQueries({ queryKey: ["robot-devices"] }); void queryClient.invalidateQueries({ queryKey: ["robots"] }); };
 
@@ -118,7 +118,7 @@ function RobotDetail({ device, tab, onClose }: { device: DeviceInfo; tab?: strin
     setSaveBusy(true);
     setSaveError(null);
     try { await api.updateDevice(device.id, { name, area: area.trim() || null }); refreshAll(); }
-    catch (error) { setSaveError(errorLine(error, "Could not save this robot. Check the connection and try again.")); }
+    catch (error) { setSaveError(errorLine(error, i18n._({ id: "Could not save this robot. Check the connection and try again.", message: "Could not save this robot. Check the connection and try again." }))); }
     finally { setSaveBusy(false); }
   }
   async function endLifecycle(): Promise<void> {
@@ -131,7 +131,7 @@ function RobotDetail({ device, tab, onClose }: { device: DeviceInfo; tab?: strin
       onClose();
     } catch (error) {
       setConfirming(false);
-      setLifecycleError(errorLine(error, `${installing ? "The install could not be cancelled" : `${device.name} could not be forgotten`}. Check the connection and try again.`));
+      setLifecycleError(errorLine(error, installing ? i18n._({ id: "The install could not be cancelled. Check the connection and try again.", message: "The install could not be cancelled. Check the connection and try again." }) : i18n._({ id: "{name} could not be forgotten. Check the connection and try again.", message: "{name} could not be forgotten. Check the connection and try again.", values: { name: device.name } })));
     } finally { setLifecycleBusy(false); }
   }
 
@@ -139,24 +139,24 @@ function RobotDetail({ device, tab, onClose }: { device: DeviceInfo; tab?: strin
     <div ref={top} className="scroll-mt-4">
     <DetailPane
       title={device.name}
-      subtitle={device.area ?? "Robot"}
+      subtitle={device.area ?? i18n._({ id: "Robot", message: "Robot" })}
       onClose={onClose}
-      closeLabel="Back to robots"
+      closeLabel={i18n._({ id: "Back to robots", message: "Back to robots" })}
       actions={null}
     >
       <div className="flex flex-col gap-4">
         {lifecycleError ? <Alert variant="destructive"><AlertDescription>{lifecycleError}</AlertDescription></Alert> : null}
         {activeTab === "overview" ? <>
-        <p className="text-base"><Badge variant="secondary">{softwareQuery.data?.checkin?.online ? i18n._({ id: "Online", message: "Online" }) : device.lastSeenAt ? i18n._({ id: "Offline", message: "Offline" }) : statusText(device)}</Badge>{softwareQuery.data?.checkin ? <>{" "}{i18n._({ id: "Last seen {format}{value}", message: "Last seen {format}{value}", values: { format: new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "short" }).format(new Date(softwareQuery.data.checkin.lastSeen)), value: softwareQuery.data.checkin.ip ? ` · IP address ${softwareQuery.data.checkin.ip}` : "" } })}</> : device.lastSeenAt ? <>{" "}{i18n._({ id: "Last seen {format}", message: "Last seen {format}", values: { format: new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "short" }).format(new Date(device.lastSeenAt)) } })}</> : null}</p>
+        <p className="text-base"><Badge variant="secondary">{softwareQuery.data?.checkin?.online ? i18n._({ id: "Online", message: "Online" }) : device.lastSeenAt ? i18n._({ id: "Offline", message: "Offline" }) : statusText(device)}</Badge>{softwareQuery.data?.checkin ? <>{" "}{i18n._(softwareQuery.data.checkin.ip ? { id: "Last seen {format} · IP address {ip}", message: "Last seen {format} · IP address {ip}", values: { format: new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "short" }).format(new Date(softwareQuery.data.checkin.lastSeen)), ip: softwareQuery.data.checkin.ip } } : { id: "Last seen {format}", message: "Last seen {format}", values: { format: new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "short" }).format(new Date(softwareQuery.data.checkin.lastSeen)) } })}</> : device.lastSeenAt ? <>{" "}{i18n._({ id: "Last seen {format}", message: "Last seen {format}", values: { format: new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "short" }).format(new Date(device.lastSeenAt)) } })}</> : null}</p>
         <RobotSelfTests device={device} />
         {hostedInstall && softwareQuery.data ? <Section heading={i18n._({ id: "Software", message: "Software" })}>
           <ItemGroup variant="card" aria-label={i18n._({ id: "Robot software", message: "Robot software" })}>
             <Item size="setting">
               <ItemContent><ItemTitle>{i18n._({ id: "Connection", message: "Connection" })}</ItemTitle><ItemDescription>{softwareQuery.data.checkin || softwareQuery.data.lastSeenAt
-                ? [softwareQuery.data.checkin?.online ? null : `Offline, last seen ${new Intl.DateTimeFormat(undefined, { hour: "2-digit", minute: "2-digit" }).format(new Date(softwareQuery.data.checkin?.lastSeen ?? softwareQuery.data.lastSeenAt!))}`,
-                  softwareQuery.data.checkin?.signal ? `Wi-Fi ${softwareQuery.data.checkin.signal}` : null,
-                  softwareQuery.data.checkin?.battery.level !== null && softwareQuery.data.checkin ? `Battery ${softwareQuery.data.checkin.battery.level}%${softwareQuery.data.checkin.battery.charging ? i18n._({ id: ", charging", message: ", charging" }) : ""}` : null,
-                  softwareQuery.data.checkin?.ip ? `IP address ${softwareQuery.data.checkin.ip}` : null].filter(Boolean).join(" · ") || "No connection details reported."
+                ? [softwareQuery.data.checkin?.online ? null : i18n._({ id: "Offline, last seen {time}", message: "Offline, last seen {time}", values: { time: new Intl.DateTimeFormat(undefined, { hour: "2-digit", minute: "2-digit" }).format(new Date(softwareQuery.data.checkin?.lastSeen ?? softwareQuery.data.lastSeenAt!)) } }),
+                  softwareQuery.data.checkin?.signal ? i18n._({ id: "Wi-Fi {signal}", message: "Wi-Fi {signal}", values: { signal: softwareQuery.data.checkin.signal } }) : null,
+                  softwareQuery.data.checkin?.battery.level !== null && softwareQuery.data.checkin ? (softwareQuery.data.checkin.battery.charging ? i18n._({ id: "Battery {level}%, charging", message: "Battery {level}%, charging", values: { level: softwareQuery.data.checkin.battery.level } }) : i18n._({ id: "Battery {level}%", message: "Battery {level}%", values: { level: softwareQuery.data.checkin.battery.level } })) : null,
+                  softwareQuery.data.checkin?.ip ? i18n._({ id: "IP address {ip}", message: "IP address {ip}", values: { ip: softwareQuery.data.checkin.ip } }) : null].filter(Boolean).join(" · ") || i18n._({ id: "No connection details reported.", message: "No connection details reported." })
                 : i18n._({ id: "Waiting for the robot to check in.", message: "Waiting for the robot to check in." })}</ItemDescription></ItemContent>
               <Badge variant="secondary">{softwareQuery.data.checkin?.online ? i18n._({ id: "Online", message: "Online" }) : i18n._({ id: "Offline", message: "Offline" })}</Badge>
             </Item>
@@ -164,15 +164,15 @@ function RobotDetail({ device, tab, onClose }: { device: DeviceInfo; tab?: strin
               <ItemContent>
                 <ItemTitle>{i18n._({ id: "Robot firmware", message: "Robot firmware" })}</ItemTitle>
                 <ItemDescription>{softwareQuery.data.firmware.installed
-                  ? `Installed ${softwareQuery.data.firmware.installed.version}, recorded ${new Intl.DateTimeFormat(undefined, { month: "short", day: "numeric" }).format(new Date(softwareQuery.data.firmware.installed.at))}. Ready to install: ${softwareQuery.data.firmware.available}.`
-                  : `Not recorded. Ready to install: ${softwareQuery.data.firmware.available}. Install the update from here to keep track.`}</ItemDescription>
+                  ? i18n._({ id: "Installed {version}, recorded {date}. Ready to install: {available}.", message: "Installed {version}, recorded {date}. Ready to install: {available}.", values: { version: softwareQuery.data.firmware.installed.version, date: new Intl.DateTimeFormat(undefined, { month: "short", day: "numeric" }).format(new Date(softwareQuery.data.firmware.installed.at)), available: softwareQuery.data.firmware.available } })
+                  : i18n._({ id: "Not recorded. Ready to install: {available}. Install the update from here to keep track.", message: "Not recorded. Ready to install: {available}. Install the update from here to keep track.", values: { available: softwareQuery.data.firmware.available } })}</ItemDescription>
               </ItemContent>
               <Badge variant="secondary">{softwareQuery.data.firmware.status === "up_to_date" ? i18n._({ id: "Up to date", message: "Up to date" }) : softwareQuery.data.firmware.status === "update_available" ? i18n._({ id: "Update available", message: "Update available" }) : i18n._({ id: "Unknown", message: "Unknown" })}</Badge>
             </Item>
             <Item size="setting">
               <ItemContent>
                 <ItemTitle>{i18n._({ id: "Bot software on this computer", message: "Bot software on this computer" })}</ItemTitle>
-                <ItemDescription>{softwareQuery.data.bot.running ? `${softwareQuery.data.bot.running}. Ready: ${softwareQuery.data.bot.available}.` : `Not running. Ready: ${softwareQuery.data.bot.available}.`}</ItemDescription>
+                <ItemDescription>{softwareQuery.data.bot.running ? i18n._({ id: "{running}. Ready: {available}.", message: "{running}. Ready: {available}.", values: { running: softwareQuery.data.bot.running, available: softwareQuery.data.bot.available } }) : i18n._({ id: "Not running. Ready: {available}.", message: "Not running. Ready: {available}.", values: { available: softwareQuery.data.bot.available } })}</ItemDescription>
               </ItemContent>
               <Badge variant="secondary">{softwareQuery.data.bot.status === "up_to_date" ? i18n._({ id: "Up to date", message: "Up to date" }) : softwareQuery.data.bot.status === "restart_needed" ? i18n._({ id: "Restart needed", message: "Restart needed" }) : softwareQuery.data.bot.running ? i18n._({ id: "Unknown", message: "Unknown" }) : i18n._({ id: "Not running", message: "Not running" })}</Badge>
             </Item>
@@ -186,7 +186,7 @@ function RobotDetail({ device, tab, onClose }: { device: DeviceInfo; tab?: strin
         </> : null}
         {activeTab === "access" ? <>
         <Section heading={i18n._({ id: "Access", message: "Access" })}><div className="flex flex-col gap-3"><Label htmlFor={`robot-name-${device.id}`}>{i18n._({ id: "Name", message: "Name" })}</Label><Input id={`robot-name-${device.id}`} value={name} maxLength={60} aria-invalid={saveError !== null} onChange={(event) => setName(event.target.value)} /><FieldError errors={saveError ? [{ message: saveError }] : []} /><Label htmlFor={`robot-area-${device.id}`}>{i18n._({ id: "Area", message: "Area" })}</Label><Input id={`robot-area-${device.id}`} value={area} maxLength={60} onChange={(event) => setArea(event.target.value)} /><Button disabled={saveBusy || !name.trim()} onClick={() => void saveIdentity()}>{saveBusy ? i18n._({ id: "Saving…", message: "Saving…" }) : i18n._({ id: "Save name and area", message: "Save name and area" })}</Button></div></Section>
-        <Section heading={i18n._({ id: "Remove", message: "Remove" })}>{confirming ? <DestructiveConfirm message={installing ? `Cancel the install and forget ${device.name}?` : `Forget ${device.name}?`} detail={installing ? "This revokes its enrollment code and deletes its saved firmware backup." : "It will need to be paired again. This also deletes the robot's memories and its saved firmware backup."} confirmLabel={installing ? "Yes, cancel install" : "Yes, forget it"} busyLabel="Working…" busy={lifecycleBusy} cancelLabel={installing ? "Keep installing" : "Keep it"} onConfirm={() => void endLifecycle()} onCancel={() => setConfirming(false)} /> : <ItemGroup variant="card"><Item size="setting"><ItemContent><ItemTitle>{installing ? i18n._({ id: "Cancel install", message: "Cancel install" }) : i18n._({ id: "Forget this robot", message: "Forget this robot" })}</ItemTitle><ItemDescription>{installing ? i18n._({ id: "Stop this robot's installation.", message: "Stop this robot's installation." }) : i18n._({ id: "Remove this robot from the household.", message: "Remove this robot from the household." })}</ItemDescription></ItemContent><Button size="lg" variant="destructive" onClick={() => setConfirming(true)}>{installing ? i18n._({ id: "Cancel install", message: "Cancel install" }) : i18n._({ id: "Forget this robot", message: "Forget this robot" })}</Button></Item></ItemGroup>}</Section>
+        <Section heading={i18n._({ id: "Remove", message: "Remove" })}>{confirming ? <DestructiveConfirm message={installing ? i18n._({ id: "Cancel the install and forget {name}?", message: "Cancel the install and forget {name}?", values: { name: device.name } }) : i18n._({ id: "Forget {name}?", message: "Forget {name}?", values: { name: device.name } })} detail={installing ? i18n._({ id: "This revokes its enrollment code and deletes its saved firmware backup.", message: "This revokes its enrollment code and deletes its saved firmware backup." }) : i18n._({ id: "It will need to be paired again. This also deletes the robot's memories and its saved firmware backup.", message: "It will need to be paired again. This also deletes the robot's memories and its saved firmware backup." })} confirmLabel={installing ? i18n._({ id: "Yes, cancel install", message: "Yes, cancel install" }) : i18n._({ id: "Yes, forget it", message: "Yes, forget it" })} busyLabel={i18n._({ id: "Working…", message: "Working…" })} busy={lifecycleBusy} cancelLabel={installing ? i18n._({ id: "Keep installing", message: "Keep installing" }) : i18n._({ id: "Keep it", message: "Keep it" })} onConfirm={() => void endLifecycle()} onCancel={() => setConfirming(false)} /> : <ItemGroup variant="card"><Item size="setting"><ItemContent><ItemTitle>{installing ? i18n._({ id: "Cancel install", message: "Cancel install" }) : i18n._({ id: "Forget this robot", message: "Forget this robot" })}</ItemTitle><ItemDescription>{installing ? i18n._({ id: "Stop this robot's installation.", message: "Stop this robot's installation." }) : i18n._({ id: "Remove this robot from the household.", message: "Remove this robot from the household." })}</ItemDescription></ItemContent><Button size="lg" variant="destructive" onClick={() => setConfirming(true)}>{installing ? i18n._({ id: "Cancel install", message: "Cancel install" }) : i18n._({ id: "Forget this robot", message: "Forget this robot" })}</Button></Item></ItemGroup>}</Section>
         </> : null}
       </div>
     </DetailPane>

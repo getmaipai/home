@@ -32,12 +32,12 @@ function AppList({ kind, value, write, names, candidates, starter }: { kind: "al
   };
   const add = (id: string) => {
     const name = nameOf(id);
-    return save({ [LIST_KEYS[kind]]: JSON.stringify([...list, id]) }, kind === "always" ? `${name} will be closed when a big job needs room${value("resources.close_apps.reopen") === false ? "." : ", and reopened afterwards."}` : `${name} will always stay open.`);
+    return save({ [LIST_KEYS[kind]]: JSON.stringify([...list, id]) }, kind === "always" ? (value("resources.close_apps.reopen") === false ? i18n._({ id: "{name} will be closed when a big job needs room.", message: "{name} will be closed when a big job needs room.", values: { name } }) : i18n._({ id: "{name} will be closed when a big job needs room, and reopened afterwards.", message: "{name} will be closed when a big job needs room, and reopened afterwards.", values: { name } })) : i18n._({ id: "{name} will always stay open.", message: "{name} will always stay open.", values: { name } }));
   };
   const addable = candidates.filter((app) => !list.includes(app.bundleId));
   const starterToAdd = starter.filter((app) => !list.includes(app.bundleId));
-  const title = kind === "always" ? "Always close" : "Never close";
-  const blurb = kind === "always" ? "Home may quit these when a big job needs room and nothing else is left to try." : "Home never quits these, even if they are also on the Always close list.";
+  const title = kind === "always" ? i18n._({ id: "Always close", message: "Always close" }) : i18n._({ id: "Never close", message: "Never close" });
+  const blurb = kind === "always" ? i18n._({ id: "Home may quit these when a big job needs room and nothing else is left to try.", message: "Home may quit these when a big job needs room and nothing else is left to try." }) : i18n._({ id: "Home never quits these, even if they are also on the Always close list.", message: "Home never quits these, even if they are also on the Always close list." });
   return (
     <section aria-label={title} data-testid={`close-apps-${kind}`}>
       <ItemGroup variant="card">
@@ -45,10 +45,10 @@ function AppList({ kind, value, write, names, candidates, starter }: { kind: "al
           <ItemContent><ItemTitle>{title}</ItemTitle><ItemDescription clamp={false}>{blurb}</ItemDescription></ItemContent>
         </Item>
         <div className="flex flex-wrap gap-2 px-4 pb-3">
-            {starterToAdd.length > 0 ? <Button variant="outline" onClick={() => save({ [LIST_KEYS[kind]]: JSON.stringify([...list, ...starterToAdd.map((app) => app.bundleId)]) }, kind === "always" ? "The starter apps will be closed when a big job needs room. Review the list, then turn Automatic on." : "The starter apps will always stay open.")}>{i18n._({ id: "Use the starter list", message: "Use the starter list" })}</Button> : null}
+            {starterToAdd.length > 0 ? <Button variant="outline" onClick={() => save({ [LIST_KEYS[kind]]: JSON.stringify([...list, ...starterToAdd.map((app) => app.bundleId)]) }, kind === "always" ? i18n._({ id: "The starter apps will be closed when a big job needs room. Review the list, then turn Automatic on.", message: "The starter apps will be closed when a big job needs room. Review the list, then turn Automatic on." }) : i18n._({ id: "The starter apps will always stay open.", message: "The starter apps will always stay open." }))}>{i18n._({ id: "Use the starter list", message: "Use the starter list" })}</Button> : null}
             {addable.length > 0 ? (
               <Select value="" onValueChange={(id) => { if (id) void add(id); }}>
-                <SelectTrigger aria-label={`Add an app to ${title}`}><SelectValue placeholder={i18n._({ id: "Add an app", message: "Add an app" })} /></SelectTrigger>
+                <SelectTrigger aria-label={i18n._({ id: "Add an app to {title}", message: "Add an app to {title}", values: { title } })}><SelectValue placeholder={i18n._({ id: "Add an app", message: "Add an app" })} /></SelectTrigger>
                 <SelectContent>{addable.map((app) => <SelectItem key={app.bundleId} value={app.bundleId}>{app.name}</SelectItem>)}</SelectContent>
               </Select>
             ) : null}
@@ -61,8 +61,8 @@ function AppList({ kind, value, write, names, candidates, starter }: { kind: "al
               {kind === "always" && other.includes(id) ? <ItemDescription clamp={false}>{i18n._({ id: "This app is also on the Never close list, so it stays open.", message: "This app is also on the Never close list, so it stays open." })}</ItemDescription> : null}
             </ItemContent>
             <ItemActions>
-              {kind === "always" ? <Switch aria-label={`Reopen ${nameOf(id)} when done`} checked={!noReopen.includes(id)} onCheckedChange={(on) => void save({ [NO_REOPEN]: JSON.stringify(on ? noReopen.filter((x) => x !== id) : [...noReopen, id]) }, on ? `${nameOf(id)} will reopen when the job is done.` : `${nameOf(id)} will stay closed when the job is done.`)} /> : null}
-              <Button variant="outline" aria-label={`Remove ${nameOf(id)}`} onClick={() => void save({ [LIST_KEYS[kind]]: JSON.stringify(list.filter((x) => x !== id)) }, kind === "always" ? `${nameOf(id)} will no longer be closed.` : `${nameOf(id)} can be closed again if it is on the Always close list.`)}>{i18n._({ id: "Remove", message: "Remove" })}</Button>
+              {kind === "always" ? <Switch aria-label={i18n._({ id: "Reopen {name} when done", message: "Reopen {name} when done", values: { name: nameOf(id) } })} checked={!noReopen.includes(id)} onCheckedChange={(on) => void save({ [NO_REOPEN]: JSON.stringify(on ? noReopen.filter((x) => x !== id) : [...noReopen, id]) }, on ? i18n._({ id: "{name} will reopen when the job is done.", message: "{name} will reopen when the job is done.", values: { name: nameOf(id) } }) : i18n._({ id: "{name} will stay closed when the job is done.", message: "{name} will stay closed when the job is done.", values: { name: nameOf(id) } }))} /> : null}
+              <Button variant="outline" aria-label={i18n._({ id: "Remove {name}", message: "Remove {name}", values: { name: nameOf(id) } })} onClick={() => void save({ [LIST_KEYS[kind]]: JSON.stringify(list.filter((x) => x !== id)) }, kind === "always" ? i18n._({ id: "{name} will no longer be closed.", message: "{name} will no longer be closed.", values: { name: nameOf(id) } }) : i18n._({ id: "{name} can be closed again if it is on the Always close list.", message: "{name} can be closed again if it is on the Always close list.", values: { name: nameOf(id) } }))}>{i18n._({ id: "Remove", message: "Remove" })}</Button>
             </ItemActions>
           </Item>
         ))}

@@ -34,7 +34,7 @@ export function SiteBlocksSection({ roster }: SiteBlocksSectionProps) {
     try {
       queryClient.setQueryData(["site-blocks", chosen!.id], await action());
     } catch (err) {
-      setError(errorLine(err, "Could not save that change. Check your connection and try again."));
+      setError(errorLine(err, i18n._({ id: "Could not save that change. Check your connection and try again.", message: "Could not save that change. Check your connection and try again." })));
     } finally {
       setBusy(false);
     }
@@ -55,14 +55,14 @@ export function SiteBlocksSection({ roster }: SiteBlocksSectionProps) {
         error={query.isError}
         isFetching={query.isFetching}
         onRetry={() => query.refetch()}
-        errorMessage="Could not load this person's blocked sites. Check your connection and try again."
-        loadingLabel="Loading blocked sites"
+        errorMessage={i18n._({ id: "Could not load this person's blocked sites. Check your connection and try again.", message: "Could not load this person's blocked sites. Check your connection and try again." })}
+        loadingLabel={i18n._({ id: "Loading blocked sites", message: "Loading blocked sites" })}
       >
         {(view) => (
           <>
             <p className="text-base text-muted-foreground">{chosen.display_name}: {view.label}</p>
             <OptionMatrix
-              rowsLabel="Blocked sites"
+              rowsLabel={i18n._({ id: "Blocked sites", message: "Blocked sites" })}
               rows={view.rows.map((r) => ({
                 id: r.id,
                 label: r.label,
@@ -71,10 +71,10 @@ export function SiteBlocksSection({ roster }: SiteBlocksSectionProps) {
                 resetLabel: r.id in view.setBy ? view.resetLabel : undefined,
               }))}
               columns={[
-                { key: "defaults", label: "Global defaults", value: view.defaults, locked: view.defaults },
-                { key: "mine", label: `${chosen.display_name}'s changes`, value: view.mine, locked: view.locked },
+                { key: "defaults", label: i18n._({ id: "Global defaults", message: "Global defaults" }), value: view.defaults, locked: view.defaults },
+                { key: "mine", label: i18n._({ id: "{name}'s changes", message: "{name}'s changes", values: { name: chosen.display_name } }), value: view.mine, locked: view.locked },
               ]}
-              lockedNote="Ticked boxes you cannot change are the age group's setting, or a block that always stays on to keep children and teens safe."
+              lockedNote={i18n._({ id: "Ticked boxes you cannot change are the age group's setting, or a block that always stays on to keep children and teens safe.", message: "Ticked boxes you cannot change are the age group's setting, or a block that always stays on to keep children and teens safe." })}
               disabled={busy}
               onToggle={(column, rowId, checked) => {
                 if (column === "mine") void run(() => api.setSiteBlock(chosen.id, rowId, checked));

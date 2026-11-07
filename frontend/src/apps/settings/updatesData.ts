@@ -1,3 +1,4 @@
+import { i18n } from "@lingui/core";
 import type { UpdateProjection } from "@/lib/api";
 
 export interface UpdateRow {
@@ -45,7 +46,7 @@ export function rowsFrom(projection: UpdateProjection): UpdateRow[] {
       notes: null,
       updateAvailable: robot.updateAvailable,
       blockedBy: robot.blockedBy,
-      detail: robot.daemonVersion ? `Body software ${robot.daemonVersion}` : null,
+      detail: robot.daemonVersion ? i18n._({ id: "Body software {version}", message: "Body software {version}", values: { version: robot.daemonVersion } }) : null,
     });
   }
   return rows;

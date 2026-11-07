@@ -1,5 +1,6 @@
 // VIDEO-LORA-08: the Styles tab's calls to Home (`/api/loras`, docs/dev/loras.md and docs/dev/lora-sources.md). Data only; nothing here draws.
 // The unlock proof rides on every same-origin `/api/` call by itself (`installAdultFetch`), so none of these functions touch it.
+import { i18n } from "@lingui/core";
 import { requestJson } from "@/lib/api";
 
 export type StyleKind = "style" | "character" | "motion" | "other";
@@ -73,4 +74,4 @@ export const stylesApi = {
   addFile: (form: FormData) => requestJson<{ id: string }>("/api/videos/adapters", { method: "POST", body: form }),
 };
 
-export const BASE_WORDS: Record<BaseModelId, string> = { "ltx-2.5": "LTX-2.5", "ltx-2.3": "Retired video model, no longer available", "wan2.2-ti2v-5b": "Wan", unknown: "an unknown base" };
+export const baseWords = (): Record<BaseModelId, string> => ({ "ltx-2.5": "LTX-2.5", "ltx-2.3": i18n._({ id: "Retired video model, no longer available", message: "Retired video model, no longer available" }), "wan2.2-ti2v-5b": "Wan", unknown: i18n._({ id: "an unknown base", message: "an unknown base" }) });

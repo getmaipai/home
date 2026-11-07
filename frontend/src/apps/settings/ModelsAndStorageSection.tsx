@@ -18,9 +18,9 @@ import { downloadProgress } from "@/lib/downloadProgress";
 import { errorLine } from "@/lib/hubReachability";
 
 const KEY = ["components"] as const;
-const GROUPS: Array<{ id: ComponentGroup; title: string }> = [
-  { id: "chat", title: "Chat and thinking" }, { id: "voice", title: "Voice" }, { id: "pictures", title: "Pictures" },
-  { id: "video", title: "Video" }, { id: "music", title: "Music" }, { id: "stems", title: "Stems" }, { id: "tools", title: "Picture tools" },
+const groups = (): Array<{ id: ComponentGroup; title: string }> => [
+  { id: "chat", title: i18n._({ id: "Chat and thinking", message: "Chat and thinking" }) }, { id: "voice", title: i18n._({ id: "Voice", message: "Voice" }) }, { id: "pictures", title: i18n._({ id: "Pictures", message: "Pictures" }) },
+  { id: "video", title: i18n._({ id: "Video", message: "Video" }) }, { id: "music", title: i18n._({ id: "Music", message: "Music" }) }, { id: "stems", title: i18n._({ id: "Stems", message: "Stems" }) }, { id: "tools", title: i18n._({ id: "Picture tools", message: "Picture tools" }) },
 ];
 
 export const sizeWords = (n: number): string => (n >= 1e12 ? `${(n / 1e12).toFixed(1)} TB` : n >= 1e9 ? `${n >= 1e10 ? Math.round(n / 1e9) : (n / 1e9).toFixed(1)} GB` : n >= 1e6 ? `${Math.round(n / 1e6)} MB` : `${Math.max(1, Math.round(n / 1e3))} KB`);
@@ -28,23 +28,23 @@ const messageOf = (error: unknown, fallback: string) => (errorLine(error, fallba
 
 /** "today", "3 weeks ago": how long since a part was last used, for the person deciding what to free. */
 export function lastUsedWords(iso: string | null, now = Date.now()): string {
-  if (!iso) return "Not used yet";
+  if (!iso) return i18n._({ id: "Not used yet", message: "Not used yet" });
   const days = Math.floor((now - Date.parse(iso)) / 86_400_000);
-  if (!Number.isFinite(days) || days <= 0) return "Used today";
-  if (days === 1) return "Used yesterday";
-  if (days < 14) return `Used ${days} days ago`;
-  if (days < 60) return `Used ${Math.floor(days / 7)} weeks ago`;
-  return `Used ${Math.floor(days / 30)} months ago`;
+  if (!Number.isFinite(days) || days <= 0) return i18n._({ id: "Used today", message: "Used today" });
+  if (days === 1) return i18n._({ id: "Used yesterday", message: "Used yesterday" });
+  if (days < 14) return i18n._({ id: "Used {days} days ago", message: "Used {days} days ago", values: { days } });
+  if (days < 60) return i18n._({ id: "Used {weeks} weeks ago", message: "Used {weeks} weeks ago", values: { weeks: Math.floor(days / 7) } });
+  return i18n._({ id: "Used {months} months ago", message: "Used {months} months ago", values: { months: Math.floor(days / 30) } });
 }
 
 function stateBadge(row: ComponentRow): { text: string; variant: "secondary" | "destructive" | "outline" } {
-  if (row.state === "installing") return { text: "Installing", variant: "secondary" };
-  if (row.state === "failed") return { text: "Did not finish", variant: "destructive" };
-  if (row.state === "installed") return { text: row.requirement === "required" ? "Installed, needed" : "Installed", variant: "secondary" };
-  if (row.requirement === "unsupported") return { text: "Not for this computer", variant: "outline" };
+  if (row.state === "installing") return { text: i18n._({ id: "Installing", message: "Installing" }), variant: "secondary" };
+  if (row.state === "failed") return { text: i18n._({ id: "Did not finish", message: "Did not finish" }), variant: "destructive" };
+  if (row.state === "installed") return { text: row.requirement === "required" ? i18n._({ id: "Installed, needed", message: "Installed, needed" }) : i18n._({ id: "Installed", message: "Installed" }), variant: "secondary" };
+  if (row.requirement === "unsupported") return { text: i18n._({ id: "Not for this computer", message: "Not for this computer" }), variant: "outline" };
   // A recommended part an upgrade did not pull: said quietly here, with the Install button; never a notification.
-  if (row.plan_need === "recommended") return { text: "Recommended, not installed", variant: "outline" };
-  return { text: "Not installed", variant: "outline" };
+  if (row.plan_need === "recommended") return { text: i18n._({ id: "Recommended, not installed", message: "Recommended, not installed" }), variant: "outline" };
+  return { text: i18n._({ id: "Not installed", message: "Not installed" }), variant: "outline" };
 }
 
 function Row({ row, refresh, setError }: { row: ComponentRow; refresh: () => void; setError: (message: string | null) => void }) {
@@ -59,19 +59,19 @@ function Row({ row, refresh, setError }: { row: ComponentRow; refresh: () => voi
   async function install(accepted?: string) {
     setError(null); setBusy(true);
     try { await componentsApi.install(row.id, accepted); refresh(); }
-    catch (e) { setError(messageOf(e, `Could not start installing ${row.label}. Check that the engine is running, then try again.`)); }
+    catch (e) { setError(messageOf(e, i18n._({ id: "Could not start installing {label}. Check that the engine is running, then try again.", message: "Could not start installing {label}. Check that the engine is running, then try again.", values: { label: row.label } }))); }
     finally { setBusy(false); }
   }
   async function uninstall() {
     setError(null); setConfirm(false); setBusy(true);
     try { await componentsApi.uninstall(row.id); refresh(); }
-    catch (e) { setError(messageOf(e, `Could not remove ${row.label}. Try again.`)); }
+    catch (e) { setError(messageOf(e, i18n._({ id: "Could not remove {label}. Try again.", message: "Could not remove {label}. Try again.", values: { label: row.label } }))); }
     finally { setBusy(false); }
   }
   const facts = [
-    installed || row.state === "installing" ? (row.size_bytes ? `Uses ${sizeWords(row.size_bytes)}` : null) : row.download_bytes > 0 ? `Download about ${sizeWords(row.download_bytes)}` : null,
+    installed || row.state === "installing" ? (row.size_bytes ? i18n._({ id: "Uses {size}", message: "Uses {size}", values: { size: sizeWords(row.size_bytes) } }) : null) : row.download_bytes > 0 ? i18n._({ id: "Download about {size}", message: "Download about {size}", values: { size: sizeWords(row.download_bytes) } }) : null,
     installed ? lastUsedWords(row.last_used_at) : null,
-    row.used_by.length ? `Used by: ${row.used_by.join(", ")}` : null,
+    row.used_by.length ? i18n._({ id: "Used by: {apps}", message: "Used by: {apps}", values: { apps: row.used_by.join(", ") } }) : null,
   ].filter(Boolean).join(" · ");
   // The plain reason a button is off sits under the row, so it never hides in a tooltip.
   const reason = row.state === "failed" && row.failure ? row.failure
@@ -83,15 +83,15 @@ function Row({ row, refresh, setError }: { row: ComponentRow; refresh: () => voi
         <ItemContent>
           <ItemTitle>{row.label} <Badge variant={badge.variant}>{badge.text}</Badge></ItemTitle>
           <ItemDescription clamp={false}>{row.summary}{facts ? ` ${facts}` : ""}</ItemDescription>
-          {row.state === "installing" ? <JobProgress {...downloadProgress({ title: row.label, state: "running", status: "Downloading and installing", percent: row.percent ?? undefined })} variant="full" /> : null}
+          {row.state === "installing" ? <JobProgress {...downloadProgress({ title: row.label, state: "running", status: i18n._({ id: "Downloading and installing", message: "Downloading and installing" }), percent: row.percent ?? undefined })} variant="full" /> : null}
           {reason ? <p className="text-sm text-muted-foreground">{reason}</p> : null}
         </ItemContent>
         <ItemActions>
           {!installed && row.state !== "installing" ? (
-            <Button type="button" onClick={() => (needsLicence ? setLicenceOpen(true) : void install())} disabled={busy || !row.can_install} aria-label={`${row.state === "failed" ? i18n._({ id: "Try again: ", message: "Try again: " }) : i18n._({ id: "Install ", message: "Install " })}${row.label}`}>{row.state === "failed" ? i18n._({ id: "Try again", message: "Try again" }) : i18n._({ id: "Install", message: "Install" })}</Button>
+            <Button type="button" onClick={() => (needsLicence ? setLicenceOpen(true) : void install())} disabled={busy || !row.can_install} aria-label={row.state === "failed" ? i18n._({ id: "Try again: {label}", message: "Try again: {label}", values: { label: row.label } }) : i18n._({ id: "Install {label}", message: "Install {label}", values: { label: row.label } })}>{row.state === "failed" ? i18n._({ id: "Try again", message: "Try again" }) : i18n._({ id: "Install", message: "Install" })}</Button>
           ) : null}
           {installed ? (
-            <Button type="button" variant="outline" onClick={() => setConfirm(true)} disabled={busy || !row.can_uninstall} aria-label={`Uninstall ${row.label}`}>{i18n._({ id: "Uninstall", message: "Uninstall" })}</Button>
+            <Button type="button" variant="outline" onClick={() => setConfirm(true)} disabled={busy || !row.can_uninstall} aria-label={i18n._({ id: "Uninstall {label}", message: "Uninstall {label}", values: { label: row.label } })}>{i18n._({ id: "Uninstall", message: "Uninstall" })}</Button>
           ) : null}
         </ItemActions>
       </Item>
@@ -140,11 +140,11 @@ function LicencePrompt({ refresh, setError, installing }: { refresh: () => void;
   const done = () => { void queryClient.invalidateQueries({ queryKey: ["licences"] }); refresh(); };
   async function accept() {
     setError(null); setBusy(true); setOpen(false);
-    try { await componentsApi.acceptLicences(); done(); } catch (e) { setError(messageOf(e, "Home couldn't save your accept. Check that the engine is running, then press Accept again.")); } finally { setBusy(false); }
+    try { await componentsApi.acceptLicences(); done(); } catch (e) { setError(messageOf(e, i18n._({ id: "Home couldn't save your accept. Check that the engine is running, then press Accept again.", message: "Home couldn't save your accept. Check that the engine is running, then press Accept again." }))); } finally { setBusy(false); }
   }
   async function installExtras() {
     setError(null); setBusy(true);
-    try { await componentsApi.installExtras(); done(); } catch (e) { setError(messageOf(e, "Home couldn't start the extras. Check that the engine is running, then try again.")); } finally { setBusy(false); }
+    try { await componentsApi.installExtras(); done(); } catch (e) { setError(messageOf(e, i18n._({ id: "Home couldn't start the extras. Check that the engine is running, then try again.", message: "Home couldn't start the extras. Check that the engine is running, then try again." }))); } finally { setBusy(false); }
   }
   if (data.needs_prompt) return (
     <section aria-label={i18n._({ id: "Licences", message: "Licences" })} data-testid="licence-prompt">
@@ -205,13 +205,13 @@ export function ModelsAndStorageSection() {
     <section aria-labelledby="models-storage-heading" className="flex flex-col gap-3">
       <h2 id="models-storage-heading" className="text-lg font-semibold">{i18n._({ id: "Models and storage", message: "Models and storage" })}</h2>
       {data ? (
-        <p className="text-sm text-muted-foreground">{i18n._({ id: "{sizeWords} of AI on this computer{value}. Add or remove parts here. Everything stays on this computer.", message: "{sizeWords} of AI on this computer{value}. Add or remove parts here. Everything stays on this computer.", values: { sizeWords: sizeWords(data.installed_bytes), value: data.free_disk_bytes !== null ? `, ${sizeWords(data.free_disk_bytes)} free` : "" } })}</p>
+        <p className="text-sm text-muted-foreground">{i18n._({ id: "{sizeWords} of AI on this computer{value}. Add or remove parts here. Everything stays on this computer.", message: "{sizeWords} of AI on this computer{value}. Add or remove parts here. Everything stays on this computer.", values: { sizeWords: sizeWords(data.installed_bytes), value: data.free_disk_bytes !== null ? i18n._({ id: ", {size} free", message: ", {size} free", values: { size: sizeWords(data.free_disk_bytes) } }) : "" } })}</p>
       ) : null}
       <LicencePrompt refresh={refresh} setError={setError} installing={!!data?.components?.some((row) => row.state === "installing")} />
-      {query.isError ? <Alert variant="destructive"><AlertTitle>{i18n._({ id: "The list did not load", message: "The list did not load" })}</AlertTitle><AlertDescription>{messageOf(query.error, "Check that Home is running, then reload this page.")}</AlertDescription></Alert> : null}
+      {query.isError ? <Alert variant="destructive"><AlertTitle>{i18n._({ id: "The list did not load", message: "The list did not load" })}</AlertTitle><AlertDescription>{messageOf(query.error, i18n._({ id: "Check that Home is running, then reload this page.", message: "Check that Home is running, then reload this page." }))}</AlertDescription></Alert> : null}
       {data?.stack === "unreachable" ? <p className="text-sm text-muted-foreground">{i18n._({ id: "The AI is waiting for its helper to start. The Status page shows what is happening.", message: "The AI is waiting for its helper to start. The Status page shows what is happening." })}</p> : null}
       {error ? <Alert variant="destructive"><AlertTitle>{i18n._({ id: "That did not work", message: "That did not work" })}</AlertTitle><AlertDescription>{error}</AlertDescription></Alert> : null}
-      {data?.stack === "ok" ? GROUPS.map((group) => {
+      {data?.stack === "ok" ? groups().map((group) => {
         const rows = (data.components ?? []).filter((row) => row.group === group.id);
         // VIDEO-SETTINGS-05: styles are listed only on Settings, Pictures, videos and music, tab Styles (one list). Any style file the Stack reports has no group here.
         if (rows.length === 0) return null;

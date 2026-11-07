@@ -1,3 +1,4 @@
+import { areaText } from "../../../lib/settingCopy";
 import areasFile from "@maipai/spec/settings/areas.json";
 import type { SettingsAreaDef } from "@maipai/ui/src/settings/settingsAudience";
 
@@ -27,8 +28,16 @@ export const SETTINGS_AREAS = [...(areasFile.areas as unknown as SettingsAreaDef
 
 SETTINGS_AREAS.push({ id: "house", title: "House", audience: { min_role: "admin" }, groups: [{ label: "House", sections: ["house"] }], sections: [{ id: "house", label: "House", icon: "house", kind: "view", view: "home.house_admin", min_role: "admin" }] } as SettingsAreaDef);
 
+/** The area with every title and label in the active language (the spec English is the key; an unknown label stays English). */
+function localizeArea<T>(node: T): T {
+  if (Array.isArray(node)) return node.map(localizeArea) as T;
+  if (node && typeof node === "object") return Object.fromEntries(Object.entries(node).map(([k, v]) => [k, (k === "title" || k === "label") && typeof v === "string" ? areaText(v) : localizeArea(v)])) as T;
+  return node;
+}
+
 export function settingsArea(id: string | undefined): SettingsAreaDef | undefined {
-  return SETTINGS_AREAS.find((area) => area.id === id);
+  const area = SETTINGS_AREAS.find((candidate) => candidate.id === id);
+  return area && localizeArea(area);
 }
 
 /** `/settings/<section>[/<detailId>][?tab=<tab>][#<key>]`. */

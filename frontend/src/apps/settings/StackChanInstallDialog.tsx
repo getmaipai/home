@@ -9,9 +9,18 @@ import { addLogLine, browserCanFlash, createBrowserSerialTransport, FLASH_BYTES,
 import { downloadProgress } from "@/lib/downloadProgress";
 import { errorLine } from "@/lib/hubReachability";
 
-const BROWSER_MESSAGE = "Installing needs Chrome or Edge on a computer, with Home opened at its https address. Open Home there and try again.";
-const PORT_HELP = "When Chrome asks which port to use, choose \"USB JTAG/serial debug unit\" (it may be listed as usbmodem). Do not choose a Bluetooth entry.";
-const ONLINE_MESSAGE = "The robot did not reach Home. Check it joined the same Wi-Fi as this hub, then press Retry.";
+const browserMessage = () => i18n._({ id: "Installing needs Chrome or Edge on a computer, with Home opened at its https address. Open Home there and try again.", message: "Installing needs Chrome or Edge on a computer, with Home opened at its https address. Open Home there and try again." });
+const portHelp = () => i18n._({ id: "When Chrome asks which port to use, choose \"USB JTAG/serial debug unit\" (it may be listed as usbmodem). Do not choose a Bluetooth entry.", message: "When Chrome asks which port to use, choose \"USB JTAG/serial debug unit\" (it may be listed as usbmodem). Do not choose a Bluetooth entry." });
+const onlineMessage = () => i18n._({ id: "The robot did not reach Home. Check it joined the same Wi-Fi as this hub, then press Retry.", message: "The robot did not reach Home. Check it joined the same Wi-Fi as this hub, then press Retry." });
+const stageLabel = (stage: FlashStage): string => {
+  switch (stage) {
+    case "Connecting": return i18n._({ id: "Connecting", message: "Connecting" });
+    case "Backing up": return i18n._({ id: "Backing up", message: "Backing up" });
+    case "Writing": return i18n._({ id: "Writing", message: "Writing" });
+    case "Checking": return i18n._({ id: "Checking", message: "Checking" });
+    case "Restarting": return i18n._({ id: "Restarting", message: "Restarting" });
+  }
+};
 
 /** With `updateOf` it updates the firmware of a robot Home already knows (no new entry, no backup, the robot keeps its
  * name, Wi-Fi and pairing); without it, it adds a new StackChan. */
@@ -54,14 +63,14 @@ export function StackChanInstallDialog({ updateOf, install = installStackChan, r
     setMessage(null);
     setStalledInBackup(false);
     setOpen(true);
-    if (!browserCanFlash(window, navigator)) setMessage(BROWSER_MESSAGE);
+    if (!browserCanFlash(window, navigator)) setMessage(browserMessage());
   }
 
   async function startInstall(skipBackup: boolean) {
     setMessage(null);
     setStalledInBackup(false);
     if (!browserCanFlash(window, navigator)) {
-      setMessage(BROWSER_MESSAGE);
+      setMessage(browserMessage());
       return;
     }
     setWorking(true);
@@ -85,22 +94,22 @@ export function StackChanInstallDialog({ updateOf, install = installStackChan, r
       setStage(null);
     } catch (error) {
       setStalledInBackup(error instanceof Error && error.message === STALL_TIMEOUT_MESSAGE);
-      const detail = errorLine(error, error instanceof Error ? error.message : "The StackChan install stopped.");
-      setMessage(flashComplete ? `Firmware was written, but Home could not record its version. ${detail}` : hostCreated ? `${detail} Use Cancel install on the robot card before starting again.` : `${detail} Check the USB cable and try again.`);
+      const detail = errorLine(error, error instanceof Error ? error.message : i18n._({ id: "The StackChan install stopped.", message: "The StackChan install stopped." }));
+      setMessage(flashComplete ? i18n._({ id: "Firmware was written, but Home could not record its version. {detail}", message: "Firmware was written, but Home could not record its version. {detail}", values: { detail } }) : hostCreated ? i18n._({ id: "{detail} Use Cancel install on the robot card before starting again.", message: "{detail} Use Cancel install on the robot card before starting again.", values: { detail } }) : i18n._({ id: "{detail} Check the USB cable and try again.", message: "{detail} Check the USB cable and try again.", values: { detail } }));
     } finally { transportRef.current = null; setWorking(false); }
   }
 
   /** Safe only before anything is written. A read that is stuck keeps the USB port busy, so the page reloads to free it. */
   function stopInstall() { void transportRef.current?.close?.(); window.setTimeout(() => window.location.reload(), 1500); }
   const canStop = working && (stage === "Connecting" || stage === "Backing up" || stage === null);
-  const stageNote = stage === "Connecting" ? "Connecting to the StackChan. This takes up to 30 seconds."
-    : stage === "Backing up" ? `${(completed / (1024 * 1024)).toFixed(1)} of ${FLASH_BYTES / (1024 * 1024)} MB saved. The backup takes about 6 minutes; keep the cable in and this tab open.`
-    : stage === "Writing" ? "Writing the MaiPai firmware. Do not unplug the StackChan."
+  const stageNote = stage === "Connecting" ? i18n._({ id: "Connecting to the StackChan. This takes up to 30 seconds.", message: "Connecting to the StackChan. This takes up to 30 seconds." })
+    : stage === "Backing up" ? i18n._({ id: "{saved} of {total} MB saved. The backup takes about 6 minutes; keep the cable in and this tab open.", message: "{saved} of {total} MB saved. The backup takes about 6 minutes; keep the cable in and this tab open.", values: { saved: (completed / (1024 * 1024)).toFixed(1), total: FLASH_BYTES / (1024 * 1024) } })
+    : stage === "Writing" ? i18n._({ id: "Writing the MaiPai firmware. Do not unplug the StackChan.", message: "Writing the MaiPai firmware. Do not unplug the StackChan." })
     : null;
 
   /** A read that stalled leaves the USB port busy, so starting over reloads the page, which frees it. */
   function startOver() { window.location.reload(); }
-  const choosing = !deviceId && !working && !installFinished && !stalledInBackup && message !== BROWSER_MESSAGE;
+  const choosing = !deviceId && !working && !installFinished && !stalledInBackup && message !== browserMessage();
 
   function retryOnline() { setOnlineFailed(false); }
 
@@ -118,17 +127,17 @@ export function StackChanInstallDialog({ updateOf, install = installStackChan, r
           {message ? <Alert variant="destructive"><AlertDescription>{message}</AlertDescription></Alert> : null}
           {stalledInBackup && !working ? <p>{i18n._({ id: "The backup did not work with this computer or cable. Press Start over, unplug and replug the StackChan, then choose Install without a backup. The firmware now on it will be replaced and cannot be restored from Home.", message: "The backup did not work with this computer or cable. Press Start over, unplug and replug the StackChan, then choose Install without a backup. The firmware now on it will be replaced and cannot be restored from Home." })}</p> : null}
           {choosing && updating ? <>
-            <p>{PORT_HELP}</p>
+            <p>{portHelp()}</p>
             <p><strong>{i18n._({ id: "Update firmware.", message: "Update firmware." })}</strong> {i18n._({ id: "Writes the newest MaiPai firmware, about 1 to 2 minutes. The StackChan keeps its name, Wi-Fi and pairing, so you do not set up its Wi-Fi again.", message: "Writes the newest MaiPai firmware, about 1 to 2 minutes. The StackChan keeps its name, Wi-Fi and pairing, so you do not set up its Wi-Fi again." })}</p>
           </> : null}
           {choosing && !updating ? <>
-            <p>{PORT_HELP}</p>
+            <p>{portHelp()}</p>
             <p><strong>{i18n._({ id: "Back up first, then install.", message: "Back up first, then install." })}</strong> {i18n._({ id: "Saves the StackChan's whole memory, then installs. About 6 minutes longer.", message: "Saves the StackChan's whole memory, then installs. About 6 minutes longer." })}</p>
             <p><strong>{i18n._({ id: "Install without a backup.", message: "Install without a backup." })}</strong> {i18n._({ id: "Faster, about 1 to 2 minutes. The firmware now on the StackChan is replaced and cannot be restored from Home.", message: "Faster, about 1 to 2 minutes. The firmware now on the StackChan is replaced and cannot be restored from Home." })}</p>
           </> : null}
-          {working ? <><p>{stage ?? "Preparing"}</p><JobProgress {...downloadProgress({ title: "StackChan", state: "running", status: stage ?? "Preparing", percent: progress })} variant="full" />{stageNote ? <p>{stageNote}</p> : null}</> : null}
+          {working ? <><p>{stage ? stageLabel(stage) : i18n._({ id: "Preparing", message: "Preparing" })}</p><JobProgress {...downloadProgress({ title: i18n._({ id: "StackChan", message: "StackChan" }), state: "running", status: stage ? stageLabel(stage) : i18n._({ id: "Preparing", message: "Preparing" }), percent: progress })} variant="full" />{stageNote ? <p>{stageNote}</p> : null}</> : null}
           {installFinished && deviceId && !online && !onlineFailed ? <p>{i18n._({ id: "On a phone, join the robot's Wi-Fi hotspot and choose your home Wi-Fi. Home never asks for the Wi-Fi password.", message: "On a phone, join the robot's Wi-Fi hotspot and choose your home Wi-Fi. Home never asks for the Wi-Fi password." })}</p> : null}
-          {onlineFailed ? <Alert variant="destructive"><AlertDescription>{ONLINE_MESSAGE}</AlertDescription></Alert> : null}
+          {onlineFailed ? <Alert variant="destructive"><AlertDescription>{onlineMessage()}</AlertDescription></Alert> : null}
           {online ? <p>{i18n._({ id: "The robot is online.", message: "The robot is online." })}</p> : null}
           {lines.length > 0 ? <details><summary>{i18n._({ id: "Show details", message: "Show details" })}</summary><pre className="max-h-48 overflow-auto whitespace-pre-wrap text-base">{lines.join("\n")}</pre></details> : null}
           <DialogFooter>
@@ -139,7 +148,7 @@ export function StackChanInstallDialog({ updateOf, install = installStackChan, r
             {choosing && !updating ? <Button variant="outline" onClick={() => void startInstall(true)}>{i18n._({ id: "Install without a backup", message: "Install without a backup" })}</Button> : null}
             {choosing && !updating ? <Button onClick={() => void startInstall(false)}>{i18n._({ id: "Back up first, then install", message: "Back up first, then install" })}</Button> : null}
             {updateDone && !working ? <Button onClick={() => setOpen(false)}>{i18n._({ id: "Done", message: "Done" })}</Button> : null}
-            {message === BROWSER_MESSAGE && !working ? <Button onClick={openDialog}>{i18n._({ id: "Try again", message: "Try again" })}</Button> : null}
+            {message === browserMessage() && !working ? <Button onClick={openDialog}>{i18n._({ id: "Try again", message: "Try again" })}</Button> : null}
             {deviceId && !working && (!installFinished || online || onlineFailed || message) ? <Button onClick={() => setOpen(false)}>{online ? i18n._({ id: "Done", message: "Done" }) : i18n._({ id: "Close", message: "Close" })}</Button> : null}
           </DialogFooter>
         </DialogContent>

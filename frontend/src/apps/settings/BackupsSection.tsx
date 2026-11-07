@@ -15,7 +15,7 @@ interface BackupsSectionProps {
 }
 
 export const EMERGENCY_KIT_SAVED_KEY = "backups.emergency_kit_saved_at";
-const EMERGENCY_KIT_ERROR = "Home couldn't make your backup key. Press Download again. If it fails again, Home will show a fix under Home settings, Repairs.";
+const emergencyKitError = () => i18n._({ id: "Home couldn't make your backup key. Press Download again. If it fails again, Home will show a fix under Home settings, Repairs.", message: "Home couldn't make your backup key. Press Download again. If it fails again, Home will show a fix under Home settings, Repairs." });
 
 function EmergencyBackupKeyRow() {
   const [savedAt, setSavedAt] = useState<string | null>(null);
@@ -36,7 +36,7 @@ function EmergencyBackupKeyRow() {
   }
 
   function kitContents(kit: Awaited<ReturnType<typeof api.emergencyKit>>): string {
-    return `MaiPai Home emergency backup key\n\nHub: ${kit.hubName}\nHub ID: ${kit.hubInstanceId}\nBackup key: ${kit.backupKeyHex}\n`;
+    return i18n._({ id: "MaiPai Home emergency backup key\n\nHub: {hubName}\nHub ID: {hubId}\nBackup key: {backupKey}\n", message: "MaiPai Home emergency backup key\n\nHub: {hubName}\nHub ID: {hubId}\nBackup key: {backupKey}\n", values: { hubName: kit.hubName, hubId: kit.hubInstanceId, backupKey: kit.backupKeyHex } });
   }
 
   async function download(): Promise<void> {
@@ -52,7 +52,7 @@ function EmergencyBackupKeyRow() {
       URL.revokeObjectURL(url);
       await saveFact();
     } catch {
-      setError(EMERGENCY_KIT_ERROR);
+      setError(emergencyKitError());
     } finally {
       setBusy(false);
     }
@@ -64,7 +64,7 @@ function EmergencyBackupKeyRow() {
     try {
       const kit = await api.emergencyKit();
       const printWindow = window.open("", "_blank");
-      if (!printWindow) throw new Error("Printing is unavailable");
+      if (!printWindow) throw new Error("Printing is unavailable"); // i18n: dev
       const escaped = kitContents(kit).replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;");
       printWindow.document.write(`<pre>${escaped}</pre>`);
       printWindow.document.close();
@@ -72,7 +72,7 @@ function EmergencyBackupKeyRow() {
       printWindow.print();
       await saveFact();
     } catch {
-      setError(EMERGENCY_KIT_ERROR);
+      setError(emergencyKitError());
     } finally {
       setBusy(false);
     }
@@ -134,7 +134,7 @@ export function BackupsSection({ person, headed = true }: BackupsSectionProps) {
    * cares about lives on the backup itself. */
   function backupDate(filename: string): string {
     const match = (backups ?? []).find((b) => b.filename === filename);
-    return match ? whenText(match.createdAt) : "the one you chose";
+    return match ? whenText(match.createdAt) : i18n._({ id: "the one you chose", message: "the one you chose" });
   }
 
   const load = useCallback(() => {
@@ -142,7 +142,7 @@ export function BackupsSection({ person, headed = true }: BackupsSectionProps) {
     api
       .backups()
       .then(setBackups)
-      .catch((e: unknown) => setError(errorLine(e, "Could not load backups.")));
+      .catch((e: unknown) => setError(errorLine(e, i18n._({ id: "Could not load backups.", message: "Could not load backups." }))));
     if (canSeePending) {
       api
         .pendingRestore()
@@ -160,7 +160,7 @@ export function BackupsSection({ person, headed = true }: BackupsSectionProps) {
       await api.runBackup();
       load();
     } catch (e) {
-      setError(errorLine(e, "Could not run a backup."));
+      setError(errorLine(e, i18n._({ id: "Could not run a backup.", message: "Could not run a backup." })));
     } finally {
       setRunning(false);
     }
@@ -177,7 +177,7 @@ export function BackupsSection({ person, headed = true }: BackupsSectionProps) {
       // The backend's refusals are written for the person reading them
       // ("that backup was made by a newer version of MaiPai Home"), so
       // they are shown as-is rather than replaced with a generic message.
-      setError(errorLine(e, "Could not get that backup ready."));
+      setError(errorLine(e, i18n._({ id: "Could not get that backup ready.", message: "Could not get that backup ready." })));
     } finally {
       setBusyFilename(null);
     }
@@ -189,12 +189,12 @@ export function BackupsSection({ person, headed = true }: BackupsSectionProps) {
       await api.cancelRestore();
       setPending(null);
     } catch (e) {
-      setError(errorLine(e, "Could not cancel the restore."));
+      setError(errorLine(e, i18n._({ id: "Could not cancel the restore.", message: "Could not cancel the restore." })));
     }
   }
 
   return (
-    <Section {...(headed ? { heading: "Backups" } : {})}>
+    <Section {...(headed ? { heading: i18n._({ id: "Backups", message: "Backups" }) } : {})}>
       {error ? <p className="text-base text-destructive">{error}</p> : null}
 
       {canRestore ? (
@@ -260,7 +260,7 @@ export function BackupsSection({ person, headed = true }: BackupsSectionProps) {
                     <Button
                       variant="ghost"
                       onClick={() => setConfirming(b.filename)}
-                      aria-label={`Restore the backup from ${whenText(b.createdAt)}`}
+                      aria-label={i18n._({ id: "Restore the backup from {when}", message: "Restore the backup from {when}", values: { when: whenText(b.createdAt) } })}
                     >
                       {i18n._({ id: "Restore", message: "Restore" })}
                     </Button>

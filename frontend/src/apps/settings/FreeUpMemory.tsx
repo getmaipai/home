@@ -22,7 +22,7 @@ export function FreeUpMemory() {
     setBusy(true); setError(null); setDone(null);
     try {
       const result = await request<{ unloaded: number; freed_bytes: number }>("/api/performance/reclaim", { method: "POST", body: JSON.stringify({}) });
-      setDone(result.unloaded === 0 ? "Nothing was idle, so nothing changed." : `Unloaded ${result.unloaded} idle ${result.unloaded === 1 ? "model" : "models"}, about ${gb(result.freed_bytes)} GB.`);
+      setDone(result.unloaded === 0 ? i18n._({ id: "Nothing was idle, so nothing changed.", message: "Nothing was idle, so nothing changed." }) : i18n._({ id: "Unloaded {count, plural, one {# idle model} other {# idle models}}, about {size} GB.", message: "Unloaded {count, plural, one {# idle model} other {# idle models}}, about {size} GB.", values: { count: result.unloaded, size: gb(result.freed_bytes) } }));
       await client.invalidateQueries({ queryKey: KEY });
     } catch { setError(i18n._({ id: "Home could not free memory just now. Try again in a moment.", message: "Home could not free memory just now. Try again in a moment." })); } finally { setBusy(false); }
   }
@@ -32,7 +32,7 @@ export function FreeUpMemory() {
       <Card>
         <CardHeader>
           <CardTitle>{i18n._({ id: "Free up memory", message: "Free up memory" })}</CardTitle>
-          <CardDescription>{data.models === 0 ? i18n._({ id: "Nothing idle to unload right now.", message: "Nothing idle to unload right now." }) : `Unload ${data.models} idle ${data.models === 1 ? i18n._({ id: "model", message: "model" }) : i18n._({ id: "models", message: "models" })}, about ${gb(data.bytes)} GB. Chat and anything running are left alone. Other apps could free more; see System status.`}</CardDescription>
+          <CardDescription>{data.models === 0 ? i18n._({ id: "Nothing idle to unload right now.", message: "Nothing idle to unload right now." }) : i18n._({ id: "Unload {count, plural, one {# idle model} other {# idle models}}, about {size} GB. Chat and anything running are left alone. Other apps could free more; see System status.", message: "Unload {count, plural, one {# idle model} other {# idle models}}, about {size} GB. Chat and anything running are left alone. Other apps could free more; see System status.", values: { count: data.models, size: gb(data.bytes) } })}</CardDescription>
         </CardHeader>
         <CardContent>
           <Button type="button" variant="outline" disabled={busy || data.models === 0} onClick={() => void run()}>{busy ? i18n._({ id: "Freeing", message: "Freeing" }) : i18n._({ id: "Free up memory", message: "Free up memory" })}</Button>

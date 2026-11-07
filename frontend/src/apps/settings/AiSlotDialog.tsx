@@ -15,17 +15,17 @@ import type { GlanceRow } from "@/apps/settings/aiGlanceRows";
 import type { TierPicks } from "@/lib/aiChoicesApi";
 import { sizeGb } from "../../../../shared/diskPlanMath";
 import { MAX_RECOMMENDED_LABEL } from "../../../../shared/tierSlotOptions";
-import { groupByFamily, FAMILY_NOTE, type PickGroup } from "@/apps/settings/aiTierSlots";
+import { groupByFamily, familyNote, type PickGroup } from "@/apps/settings/aiTierSlots";
 import { TIERED_JOBS, configurableTiers, consequences, isOn, optionDefs, whoChoices, withOn, type SlotDraft, type SlotDrafts, type SlotTier, type SlotWho } from "@/apps/settings/aiTierSlots";
 
-const TIER_TITLE: Record<SlotTier, string> = { standard: "Standard", boost: "Boost", max: "Max", reduced: "Let big jobs simplify chat" };
-const TIER_PROMISE: Record<SlotTier, string> = {
-  standard: "Home keeps working normally while this runs. It is the floor, so it stays on.",
-  boost: "Home stays up, but other big jobs wait their turn.",
-  max: "This takes the computer. Everything big waits.",
-  reduced: "When a Max job needs more room than is free, chat switches to a simpler model while it runs.",
-};
-const WHO_LABEL: Record<SlotWho, string> = { everyone: "Everyone the age gates allow", assigned: "Assigned people only", admins: "Admins only" };
+const tierTitle = (tier: SlotTier): string => ({ standard: i18n._({ id: "Standard", message: "Standard" }), boost: i18n._({ id: "Boost", message: "Boost" }), max: i18n._({ id: "Max", message: "Max" }), reduced: i18n._({ id: "Let big jobs simplify chat", message: "Let big jobs simplify chat" }) } as Record<SlotTier, string>)[tier];
+const tierPromise = (tier: SlotTier): string => ({
+  standard: i18n._({ id: "Home keeps working normally while this runs. It is the floor, so it stays on.", message: "Home keeps working normally while this runs. It is the floor, so it stays on." }),
+  boost: i18n._({ id: "Home stays up, but other big jobs wait their turn.", message: "Home stays up, but other big jobs wait their turn." }),
+  max: i18n._({ id: "This takes the computer. Everything big waits.", message: "This takes the computer. Everything big waits." }),
+  reduced: i18n._({ id: "When a Max job needs more room than is free, chat switches to a simpler model while it runs.", message: "When a Max job needs more room than is free, chat switches to a simpler model while it runs." }),
+} as Record<SlotTier, string>)[tier];
+const whoLabel = (who: SlotWho): string => ({ everyone: i18n._({ id: "Everyone the age gates allow", message: "Everyone the age gates allow" }), assigned: i18n._({ id: "Assigned people only", message: "Assigned people only" }), admins: i18n._({ id: "Admins only", message: "Admins only" }) } as Record<SlotWho, string>)[who];
 
 export interface AiSlotChoicesProps {
   row: GlanceRow;
@@ -50,7 +50,7 @@ export function AiSlotChoices({ row, initial, picks, copy, saving, error, onClos
   const recommendedLabel = (tier: SlotTier) => {
     const id = level(tier)?.recommended;
     const named = id ? level(tier)?.candidates.find((candidate) => candidate.id === id)?.label : tier === "max" ? MAX_RECOMMENDED_LABEL[spec.category] : row.recommended?.label;
-    return `${named ? `${named}. ` : ""}Follows catalog updates.`;
+    return named ? i18n._({ id: "{named}. Follows catalog updates.", message: "{named}. Follows catalog updates.", values: { named } }) : i18n._({ id: "Follows catalog updates.", message: "Follows catalog updates." });
   };
   const groupsFor = (tier: SlotTier): PickGroup[] => {
     const found = level(tier);
@@ -62,29 +62,29 @@ export function AiSlotChoices({ row, initial, picks, copy, saving, error, onClos
     <>
       <DialogHeader>
         <p className="text-base font-medium uppercase tracking-wide text-muted-foreground">{row.title}</p>
-        <DialogTitle>{only ? TIER_TITLE[only] : i18n._({ id: "Levels", message: "Levels" })}</DialogTitle>
-        <DialogDescription>{i18n._({ id: "{value} Nothing is deleted or cancelled by turning a level off.", message: "{value} Nothing is deleted or cancelled by turning a level off.", values: { value: only ? TIER_PROMISE[only] : i18n._({ id: "Choose which levels exist, the model each one uses and who can use it.", message: "Choose which levels exist, the model each one uses and who can use it." }) } })}</DialogDescription>
+        <DialogTitle>{only ? tierTitle(only) : i18n._({ id: "Levels", message: "Levels" })}</DialogTitle>
+        <DialogDescription>{i18n._({ id: "{value} Nothing is deleted or cancelled by turning a level off.", message: "{value} Nothing is deleted or cancelled by turning a level off.", values: { value: only ? tierPromise(only) : i18n._({ id: "Choose which levels exist, the model each one uses and who can use it.", message: "Choose which levels exist, the model each one uses and who can use it." }) } })}</DialogDescription>
       </DialogHeader>
       {configurableTiers(row.job).filter((tier) => !only || tier === only).map((tier) => {
         const draft = drafts[tier];
         const on = isOn(draft);
         const floor = tier === "standard";
         return (
-          <section key={tier} data-testid={`ai-slot-${tier}`} className="flex flex-col gap-2" aria-label={TIER_TITLE[tier]}>
+          <section key={tier} data-testid={`ai-slot-${tier}`} className="flex flex-col gap-2" aria-label={tierTitle(tier)}>
             <Field orientation="horizontal">
               <FieldContent>
-                <FieldTitle>{TIER_TITLE[tier]}</FieldTitle>
-                <FieldDescription>{TIER_PROMISE[tier]}</FieldDescription>
+                <FieldTitle>{tierTitle(tier)}</FieldTitle>
+                <FieldDescription>{tierPromise(tier)}</FieldDescription>
               </FieldContent>
-              <Switch checked={on} disabled={floor} aria-label={`${TIER_TITLE[tier]}: ${on ? (copy.on ?? "On") : (copy.off ?? "Off")}`} onCheckedChange={(next) => change(tier, withOn(draft, next))} />
+              <Switch checked={on} disabled={floor} aria-label={i18n._({ id: "{tier}: {state}", message: "{tier}: {state}", values: { tier: tierTitle(tier), state: on ? (copy.on ?? i18n._({ id: "On", message: "On" })) : (copy.off ?? i18n._({ id: "Off", message: "Off" })) } })} onCheckedChange={(next) => change(tier, withOn(draft, next))} />
             </Field>
             {on && tier !== "reduced" ? (
               <>
-                <RadioGroup value={draft.model} onValueChange={(model) => change(tier, { ...draft, model })} aria-label={`${TIER_TITLE[tier]} model`}>
+                <RadioGroup value={draft.model} onValueChange={(model) => change(tier, { ...draft, model })} aria-label={i18n._({ id: "{tier} model", message: "{tier} model", values: { tier: tierTitle(tier) } })}>
                   <FieldLabel htmlFor={`ai-slot-${tier}-recommended`}>
                     <Field orientation="horizontal">
                       <FieldContent>
-                        <FieldTitle>{copy.use_recommended ?? "Use the recommended model"}</FieldTitle>
+                        <FieldTitle>{copy.use_recommended ?? i18n._({ id: "Use the recommended model", message: "Use the recommended model" })}</FieldTitle>
                         <FieldDescription>{recommendedLabel(tier)}</FieldDescription>
                       </FieldContent>
                       <RadioGroupItem value="recommended" id={`ai-slot-${tier}-recommended`} />
@@ -111,7 +111,7 @@ export function AiSlotChoices({ row, initial, picks, copy, saving, error, onClos
                     </div>
                   ))}
                 </RadioGroup>
-                {picks && groupsFor(tier).some((group) => group.heading) ? <p className="text-base text-muted-foreground">{FAMILY_NOTE}</p> : null}
+                {picks && groupsFor(tier).some((group) => group.heading) ? <p className="text-base text-muted-foreground">{familyNote()}</p> : null}
                 {defs.map((def) => {
                   const id = `ai-slot-${tier}-opt-${def.id}`;
                   const value = draft.options[def.id] ?? def.default;
@@ -128,11 +128,11 @@ export function AiSlotChoices({ row, initial, picks, copy, saving, error, onClos
                 {whoChoices(tier).length > 1 ? (
                   <>
                   <p className="text-base font-medium">{i18n._({ id: "Who can use it", message: "Who can use it" })}</p>
-                  <RadioGroup value={draft.who} onValueChange={(who) => change(tier, { ...draft, who: who as SlotWho })} aria-label={`Who can use ${TIER_TITLE[tier]}`}>
+                  <RadioGroup value={draft.who} onValueChange={(who) => change(tier, { ...draft, who: who as SlotWho })} aria-label={i18n._({ id: "Who can use {tier}", message: "Who can use {tier}", values: { tier: tierTitle(tier) } })}>
                     {whoChoices(tier).map((who) => (
                       <FieldLabel key={who} htmlFor={`ai-slot-${tier}-who-${who}`}>
                         <Field orientation="horizontal">
-                          <FieldContent><FieldTitle>{WHO_LABEL[who]}</FieldTitle></FieldContent>
+                          <FieldContent><FieldTitle>{whoLabel(who)}</FieldTitle></FieldContent>
                           <RadioGroupItem value={who} id={`ai-slot-${tier}-who-${who}`} />
                         </Field>
                       </FieldLabel>
@@ -148,8 +148,8 @@ export function AiSlotChoices({ row, initial, picks, copy, saving, error, onClos
       {notes.length > 0 ? <Alert data-testid="ai-slot-consequences"><AlertDescription>{notes.map((line) => <p key={line}>{line}</p>)}</AlertDescription></Alert> : null}
       {error ? <Alert variant="destructive"><AlertDescription>{error}</AlertDescription></Alert> : null}
       <DialogFooter>
-        <Button type="button" variant="outline" onClick={onClose}>{only ? i18n._({ id: "Back", message: "Back" }) : (copy.cancel ?? "Cancel")}</Button>
-        <Button type="button" disabled={saving} onClick={() => onSave(drafts)}>{saving ? i18n._({ id: "Saving…", message: "Saving…" }) : (copy.save_choice ?? "Save")}</Button>
+        <Button type="button" variant="outline" onClick={onClose}>{only ? i18n._({ id: "Back", message: "Back" }) : (copy.cancel ?? i18n._({ id: "Cancel", message: "Cancel" }))}</Button>
+        <Button type="button" disabled={saving} onClick={() => onSave(drafts)}>{saving ? i18n._({ id: "Saving…", message: "Saving…" }) : (copy.save_choice ?? i18n._({ id: "Save", message: "Save" }))}</Button>
       </DialogFooter>
     </>
   );

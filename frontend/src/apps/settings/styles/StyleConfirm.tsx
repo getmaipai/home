@@ -17,13 +17,13 @@ import { useFreshConfirm } from "@/apps/settings/styles/FreshConfirm";
 import { stylesApi, type BrowseHit, type InstallBody } from "@/apps/settings/styles/stylesApi";
 import { messageOf, sizeWords, StylePicture } from "@/apps/settings/styles/stylesShared";
 
-const SOURCE_LINE = { normal: "The source says it is safe.", adult: "The source marks this adult.", unknown: "The source says nothing about age." } as const;
-const LICENCE_LINE = {
-  open: "Open licence. It lets a household use the style at home.",
-  non_commercial: "No-selling licence. You may use it at home, but not sell what you make with it.",
-  custom: "Custom licence. Read it on the source's page before you install.",
-  unknown: "The source does not state a licence. Read its page before you install.",
-} as const;
+const sourceLine = (): Record<BrowseHit["adult_check"], string> => ({ normal: i18n._({ id: "The source says it is safe.", message: "The source says it is safe." }), adult: i18n._({ id: "The source marks this adult.", message: "The source marks this adult." }), unknown: i18n._({ id: "The source says nothing about age.", message: "The source says nothing about age." }) });
+const licenceLine = (): Record<BrowseHit["licence"]["class"], string> => ({
+  open: i18n._({ id: "Open licence. It lets a household use the style at home.", message: "Open licence. It lets a household use the style at home." }),
+  non_commercial: i18n._({ id: "No-selling licence. You may use it at home, but not sell what you make with it.", message: "No-selling licence. You may use it at home, but not sell what you make with it." }),
+  custom: i18n._({ id: "Custom licence. Read it on the source's page before you install.", message: "Custom licence. Read it on the source's page before you install." }),
+  unknown: i18n._({ id: "The source does not state a licence. Read its page before you install.", message: "The source does not state a licence. Read its page before you install." }),
+});
 
 export function StyleConfirm({ hit, person, revealed, onClose, onInstalled, onOpenInstalled }: {
   hit: BrowseHit; person: Roster; revealed: boolean; onClose: () => void; onInstalled: () => void; onOpenInstalled: (id: string | null) => void;
@@ -56,13 +56,13 @@ export function StyleConfirm({ hit, person, revealed, onClose, onInstalled, onOp
     } catch (e) {
       if (e instanceof ApiError && e.code === "duplicate") setDuplicate({ id: e.existingId ?? null, line: e.message });
       else if (e instanceof ApiError && e.code === "changed_file") setChanged(true);
-      else setError(messageOf(e, "The download could not start. Check your connection, then try again."));
+      else setError(messageOf(e, i18n._({ id: "The download could not start. Check your connection, then try again.", message: "The download could not start. Check your connection, then try again." })));
       throw e;
     } finally { setBusy(false); }
   }
   const fresh = useFreshConfirm({
-    person, item: hit.confirm_item, title: "Make this style all ages?", description: "Everyone who can use it will see its name and picture without a passcode. People under 18 still never see styles. Enter your passcode to continue.",
-    actionLabel: "Make all ages", run: (ticket) => install(ticket), onFailed: () => undefined,
+    person, item: hit.confirm_item, title: i18n._({ id: "Make this style all ages?", message: "Make this style all ages?" }), description: i18n._({ id: "Everyone who can use it will see its name and picture without a passcode. People under 18 still never see styles. Enter your passcode to continue.", message: "Everyone who can use it will see its name and picture without a passcode. People under 18 still never see styles. Enter your passcode to continue." }),
+    actionLabel: i18n._({ id: "Make all ages", message: "Make all ages" }), run: (ticket) => install(ticket), onFailed: () => undefined,
   });
   const start = () => {
     if (adultsOnly === "no" && hit.adult_check === "adult") { fresh.ask(); return; }
@@ -90,7 +90,7 @@ export function StyleConfirm({ hit, person, revealed, onClose, onInstalled, onOp
             </div>
             <div className="flex flex-col gap-5">
               <DialogSection title={i18n._({ id: "Made for", message: "Made for" })}>
-                <p className="text-sm">{needsBase ? (hit.base_unstated ? `${hit.reason ?? ""}.` : i18n._({ id: "Home could not tell what this style was made for.", message: "Home could not tell what this style was made for." })) : `${hit.base_label}. ${sizeWords(hit.bytes ?? 0)}.`}</p>
+                <p className="text-sm">{needsBase ? (hit.base_unstated ? `${hit.reason ?? ""}.` : i18n._({ id: "Home could not tell what this style was made for.", message: "Home could not tell what this style was made for." })) : i18n._({ id: "{label}. {size}.", message: "{label}. {size}.", values: { label: hit.base_label, size: sizeWords(hit.bytes ?? 0) } })}</p>
                 {needsBase ? (
                   <div className="flex flex-col gap-2">
                     <Label htmlFor="style-base">{i18n._({ id: "What was this style made for?", message: "What was this style made for?" })}</Label>
@@ -111,7 +111,7 @@ export function StyleConfirm({ hit, person, revealed, onClose, onInstalled, onOp
                 ) : null}
               </DialogSection>
               <DialogSection title={i18n._({ id: "Licence", message: "Licence" })}>
-                <p className="text-sm">{LICENCE_LINE[hit.licence.class]}</p>
+                <p className="text-sm">{licenceLine()[hit.licence.class]}</p>
                 {open ? null : (
                   <div className="flex items-start gap-2">
                     <Checkbox id="style-read" checked={read} onCheckedChange={(v) => setRead(v === true)} disabled={busy} />
@@ -124,7 +124,7 @@ export function StyleConfirm({ hit, person, revealed, onClose, onInstalled, onOp
                   <div className="flex items-center gap-2"><RadioGroupItem value="yes" id="style-adult-yes" /><Label htmlFor="style-adult-yes">{i18n._({ id: "Yes, adults only", message: "Yes, adults only" })}</Label></div>
                   <div className="flex items-center gap-2"><RadioGroupItem value="no" id="style-adult-no" /><Label htmlFor="style-adult-no">{i18n._({ id: "No, all ages", message: "No, all ages" })}</Label></div>
                 </RadioGroup>
-                <p className="text-sm text-muted-foreground">{SOURCE_LINE[hit.adult_check]} {adultsOnly === "no" && hit.adult_check === "adult" ? i18n._({ id: "Choosing all ages asks for your passcode again.", message: "Choosing all ages asks for your passcode again." }) : null}</p>
+                <p className="text-sm text-muted-foreground">{sourceLine()[hit.adult_check]} {adultsOnly === "no" && hit.adult_check === "adult" ? i18n._({ id: "Choosing all ages asks for your passcode again.", message: "Choosing all ages asks for your passcode again." }) : null}</p>
               </DialogSection>
               {hit.installed ? (
                 <Alert><AlertDescription><span className="flex flex-wrap items-center gap-3">{i18n._({ id: "You already have this as {name}.", message: "You already have this as {name}.", values: { name: hit.installed.name } })}<Button type="button" variant="outline" size="sm" onClick={() => onOpenInstalled(hit.installed!.id)}>{i18n._({ id: "Open it", message: "Open it" })}</Button></span></AlertDescription></Alert>

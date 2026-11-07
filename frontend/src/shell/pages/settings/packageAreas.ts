@@ -1,3 +1,4 @@
+import { i18n } from "@lingui/core";
 // WEATHER-APP-01: a package's own settings area (`contributes.settings_area`, SPEC-SETAREA-01) as the shell
 // draws it. The hub lists it on the app row (`GET /api/apps`); this merges those with the spec's central areas
 // so `/settings/<id>` opens one. Home holds no layout of its own: the area is the package's declared object.
@@ -13,7 +14,7 @@ export function withSidebarSection(area: SettingsAreaDef): SettingsAreaDef {
   const existing = area.groups ?? [];
   if (!area.app || sections.some((section) => section.id === "sidebar")) return area;
   const groups = existing.length > 0 ? existing.map((group, index) => (index === 0 ? { ...group, sections: [...group.sections, "sidebar"] } : group)) : [{ label: area.title, sections: ["sidebar"] }];
-  return { ...area, groups, sections: [...sections, { id: "sidebar", label: "Sidebar", icon: "pin", kind: "view", view: `app.pin:${area.app}` }] };
+  return { ...area, groups, sections: [...sections, { id: "sidebar", label: i18n._({ id: "Sidebar", message: "Sidebar" }), icon: "pin", kind: "view", view: `app.pin:${area.app}` }] };
 }
 
 /** The package areas on these app rows. A central area id is never overridden (the hub refuses one at install). */

@@ -61,14 +61,14 @@ export function StylesTab({ person, card, children }: { person: Roster; card?: S
   // "Already added, open it": the card behind the lock when the style is locked (the unlock comes first).
   const openStyle = (id: string | null) => {
     const found = id ? rows.find((r) => r.id === id) : undefined;
-    if (found) setEditing(found.id); else { setBrowsing(false); if (!lock.unlocked) lock.requestUnlock(); else setProblem("That style is not in the list yet. Reload this page and look again."); }
+    if (found) setEditing(found.id); else { setBrowsing(false); if (!lock.unlocked) lock.requestUnlock(); else setProblem(i18n._({ id: "That style is not in the list yet. Reload this page and look again.", message: "That style is not in the list yet. Reload this page and look again." })); }
   };
 
   async function setWho(row: StyleRow, who: StyleWho) {
     setProblem(null);
     if (who === "people") { setEditing(row.id); return; }
     try { await stylesApi.patch(row.id, { availability: { who } }); refresh(); }
-    catch (e) { setProblem(messageOf(e, "Home could not change who can use that style. Try again.")); }
+    catch (e) { setProblem(messageOf(e, i18n._({ id: "Home could not change who can use that style. Try again.", message: "Home could not change who can use that style. Try again." }))); }
   }
 
   return (
@@ -81,7 +81,7 @@ export function StylesTab({ person, card, children }: { person: Roster; card?: S
         </div>
         <DownloadsNow jobs={running} />
         {problem ? <p role="alert" className="text-sm text-destructive">{problem}</p> : null}
-        <AsyncState data={list.data} error={list.isError} isFetching={list.isFetching} onRetry={() => void list.refetch()} errorMessage="Home could not load the styles. Check the Home connection, then reload this page." loadingLabel="Loading the styles">
+        <AsyncState data={list.data} error={list.isError} isFetching={list.isFetching} onRetry={() => void list.refetch()} errorMessage={i18n._({ id: "Home could not load the styles. Check the Home connection, then reload this page.", message: "Home could not load the styles. Check the Home connection, then reload this page." })} loadingLabel={i18n._({ id: "Loading the styles", message: "Loading the styles" })}>
           {(data) => (
             <>
               {data.items.length === 0 && !data.locked ? <p className="text-sm text-muted-foreground">{copy.empty}</p> : (
@@ -107,7 +107,7 @@ export function StylesTab({ person, card, children }: { person: Roster; card?: S
 
 /** The running downloads, each the kit's JobProgress card with no name (an adult-only style is never named). */
 function DownloadsNow({ jobs }: { jobs: Array<{ job: string; title: string; percent: number | null }> }) {
-  return jobs.map((job) => <JobProgress key={job.job} {...downloadProgress({ title: job.title, state: "running", status: "Downloading and checking the file", percent: job.percent ?? undefined })} variant="full" />);
+  return jobs.map((job) => <JobProgress key={job.job} {...downloadProgress({ title: job.title, state: "running", status: i18n._({ id: "Downloading and checking the file", message: "Downloading and checking the file" }), percent: job.percent ?? undefined })} variant="full" />);
 }
 
 function StyleListRow({ row, onWho, onEdit }: { row: StyleRow; onWho: (who: StyleWho) => void; onEdit: () => void }) {
@@ -123,7 +123,7 @@ function StyleListRow({ row, onWho, onEdit }: { row: StyleRow; onWho: (who: Styl
       </ItemContent>
       <ItemActions>
         <Select value={row.availability.who} onValueChange={(v) => onWho(v as StyleWho)}>
-          <SelectTrigger aria-label={`Who can use ${row.name}`}><SelectValue /></SelectTrigger>
+          <SelectTrigger aria-label={i18n._({ id: "Who can use {name}", message: "Who can use {name}", values: { name: row.name } })}><SelectValue /></SelectTrigger>
           <SelectContent><SelectItem value="admins">{i18n._({ id: "Only admins", message: "Only admins" })}</SelectItem><SelectItem value="adults">{i18n._({ id: "All adults", message: "All adults" })}</SelectItem><SelectItem value="people">{i18n._({ id: "Chosen people", message: "Chosen people" })}</SelectItem></SelectContent>
         </Select>
         <Button type="button" variant="outline" onClick={onEdit}>{i18n._({ id: "Edit", message: "Edit" })}</Button>
@@ -153,7 +153,7 @@ function SecretRow({ label, savedLine, emptyLine, placeholder, saved, onSave, on
         <ItemTitle>{label}</ItemTitle>
         <ItemDescription clamp={false}>{saved ? savedLine : emptyLine}</ItemDescription>
         {showField ? (
-          <form className="flex max-w-md gap-2" onSubmit={(e) => { e.preventDefault(); if (value.trim()) void run(() => onSave(value.trim()), "Home could not save that. Check it, then try again."); }}>
+          <form className="flex max-w-md gap-2" onSubmit={(e) => { e.preventDefault(); if (value.trim()) void run(() => onSave(value.trim()), i18n._({ id: "Home could not save that. Check it, then try again.", message: "Home could not save that. Check it, then try again." })); }}>
             <Input type="password" autoComplete="off" aria-label={label} placeholder={placeholder} value={value} onChange={(e) => setValue(e.target.value)} disabled={busy} />
             <Button type="submit" disabled={busy || !value.trim()}>{i18n._({ id: "Save", message: "Save" })}</Button>
             {saved ? <Button type="button" variant="ghost" onClick={() => { setEditing(false); setValue(""); }}>{i18n._({ id: "Cancel", message: "Cancel" })}</Button> : null}
@@ -164,7 +164,7 @@ function SecretRow({ label, savedLine, emptyLine, placeholder, saved, onSave, on
       {saved && !editing ? (
         <ItemActions>
           <Button type="button" variant="outline" disabled={busy} onClick={() => setEditing(true)}>{copy.replace}</Button>
-          <Button type="button" variant="outline" disabled={busy} onClick={() => void run(onRemove, "Home could not remove it. Try again.")}>{copy.remove}</Button>
+          <Button type="button" variant="outline" disabled={busy} onClick={() => void run(onRemove, i18n._({ id: "Home could not remove it. Try again.", message: "Home could not remove it. Try again." }))}>{copy.remove}</Button>
         </ItemActions>
       ) : null}
     </Item>
@@ -180,7 +180,7 @@ function SourcesSection({ copy, state, onChanged }: { copy: ReturnType<typeof st
   async function turn(on: boolean) {
     setError(null);
     try { await stylesApi.setCivitai(on); onChanged(); }
-    catch (e) { setError(messageOf(e, "Home could not change that. Try again.")); }
+    catch (e) { setError(messageOf(e, i18n._({ id: "Home could not change that. Try again.", message: "Home could not change that. Try again." }))); }
   }
   return (
     <section aria-label={copy.sources_title} className="flex flex-col gap-3">
@@ -188,7 +188,7 @@ function SourcesSection({ copy, state, onChanged }: { copy: ReturnType<typeof st
       <ItemGroup variant="card" aria-label={copy.sources_title}>
         <Item><ItemContent><ItemTitle>{i18n._({ id: "Hugging Face", message: "Hugging Face" })}</ItemTitle><ItemDescription clamp={false}>{copy.huggingface_note}</ItemDescription></ItemContent></Item>
         <SecretRow label={i18n._({ id: "Hugging Face token", message: "Hugging Face token" })} saved={state?.huggingface?.token_saved === true} placeholder={i18n._({ id: "hf_...", message: "hf_..." })} copy={{ replace: copy.civitai_key_replace, remove: copy.civitai_key_remove }}
-          emptyLine="Optional. Paste a read token. Home keeps it private and never shows it again." savedLine="A token is saved. Home keeps it private and never shows it again."
+          emptyLine={i18n._({ id: "Optional. Paste a read token. Home keeps it private and never shows it again.", message: "Optional. Paste a read token. Home keeps it private and never shows it again." })} savedLine={i18n._({ id: "A token is saved. Home keeps it private and never shows it again.", message: "A token is saved. Home keeps it private and never shows it again." })}
           onSave={(v) => after(stylesApi.saveHuggingFaceToken(v))} onRemove={() => after(stylesApi.removeHuggingFaceToken())} />
         <Item>
           <ItemContent><ItemTitle>{i18n._({ id: "Civitai", message: "Civitai" })}</ItemTitle><ItemDescription clamp={false}>{civitai ? i18n._({ id: "On. This computer contacts civitai.com when you search or install.", message: "On. This computer contacts civitai.com when you search or install." }) : copy.civitai_off_note}</ItemDescription>{error ? <p role="alert" className="text-sm text-destructive">{error}</p> : null}</ItemContent>
@@ -196,7 +196,7 @@ function SourcesSection({ copy, state, onChanged }: { copy: ReturnType<typeof st
         </Item>
         {civitai ? (
           <SecretRow label={i18n._({ id: "Civitai key", message: "Civitai key" })} saved={state?.civitai?.key_saved === true} placeholder={i18n._({ id: "Paste your Civitai key", message: "Paste your Civitai key" })} copy={{ replace: copy.civitai_key_replace, remove: copy.civitai_key_remove }}
-            emptyLine="Some downloads need a free Civitai key. Home keeps it private and never shows it again." savedLine="A key is saved. Home keeps it private and never shows it again."
+            emptyLine={i18n._({ id: "Some downloads need a free Civitai key. Home keeps it private and never shows it again.", message: "Some downloads need a free Civitai key. Home keeps it private and never shows it again." })} savedLine={i18n._({ id: "A key is saved. Home keeps it private and never shows it again.", message: "A key is saved. Home keeps it private and never shows it again." })}
             onSave={(v) => after(stylesApi.saveCivitaiKey(v))} onRemove={() => after(stylesApi.removeCivitaiKey())} />
         ) : null}
       </ItemGroup>
@@ -233,7 +233,7 @@ function RemovedList({ copy, onChanged }: { copy: ReturnType<typeof stylesCopy>;
           return (
             <Item key={row.id}>
               <ItemContent><ItemTitle>{row.name}</ItemTitle><ItemDescription clamp={false}>{copy.removed_line.replace("{days}", String(days)).replace("{left}", String(left))}</ItemDescription></ItemContent>
-              <ItemActions><Button type="button" variant="outline" onClick={() => { setProblem(null); void stylesApi.restore(row.id).then(onChanged).catch((e: unknown) => setProblem(messageOf(e, "Home could not restore that style. Try again."))); }}>{copy.restore_button}</Button></ItemActions>
+              <ItemActions><Button type="button" variant="outline" onClick={() => { setProblem(null); void stylesApi.restore(row.id).then(onChanged).catch((e: unknown) => setProblem(messageOf(e, i18n._({ id: "Home could not restore that style. Try again.", message: "Home could not restore that style. Try again." })))); }}>{copy.restore_button}</Button></ItemActions>
             </Item>
           );
         })}

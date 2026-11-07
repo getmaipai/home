@@ -26,19 +26,19 @@ const isLockedTile = (tile: Tile): tile is { locked: true } => (tile as { locked
 /** A hit the household already has (by source version or fingerprint): the tile opens that style instead of starting another download (design 15.4). */
 const alreadyHave = (hit: BrowseHit): boolean => hit.installed !== null || hit.reason?.startsWith("Already installed") === true;
 
-const LICENCE_BADGE = { open: "Open licence", non_commercial: "No selling", custom: "Custom licence", unknown: "Licence not stated" } as const;
+const licenceBadge = (): Record<BrowseHit["licence"]["class"], string> => ({ open: i18n._({ id: "Open licence", message: "Open licence" }), non_commercial: i18n._({ id: "No selling", message: "No selling" }), custom: i18n._({ id: "Custom licence", message: "Custom licence" }), unknown: i18n._({ id: "Licence not stated", message: "Licence not stated" }) });
 const HF_LINK = /^https?:\/\/(?:www\.)?huggingface\.co\/([^/\s?#]+)\/([^/\s?#]+)/i;
 
 /** The plain line for each way the search can fail (settings-media 5.2). Every one says what went wrong and what to do. */
 export function browseProblem(error: unknown): string {
   if (error instanceof ApiError) {
-    if (error.status === 429) return "Searching too fast. Try again in a minute.";
-    if (error.status === 503) return "The source asked Home to slow down. Try again in a few minutes.";
-    if (error.status === 502) return "The source did not answer. Check your connection, then search again.";
+    if (error.status === 429) return i18n._({ id: "Searching too fast. Try again in a minute.", message: "Searching too fast. Try again in a minute." });
+    if (error.status === 503) return i18n._({ id: "The source asked Home to slow down. Try again in a few minutes.", message: "The source asked Home to slow down. Try again in a few minutes." });
+    if (error.status === 502) return i18n._({ id: "The source did not answer. Check your connection, then search again.", message: "The source did not answer. Check your connection, then search again." });
     if (error.status === 403) return error.message;
     return error.message;
   }
-  return "Home could not search just now. Check the Home connection, then try again.";
+  return i18n._({ id: "Home could not search just now. Check the Home connection, then try again.", message: "Home could not search just now. Check the Home connection, then try again." });
 }
 
 export function StyleBrowser({ person, civitaiOn, onClose, onInstalled, onOpenStyle }: {
@@ -87,7 +87,7 @@ export function StyleBrowser({ person, civitaiOn, onClose, onInstalled, onOpenSt
     if (!link) { setLinkError(null); return; }
     let alive = true;
     setLinkError(null);
-    void stylesApi.hit("huggingface", `${link[1]}/${link[2]!.replace(/\.git$/, "")}`, null).then((hit) => { if (alive) setPicked(hit); }).catch((error: unknown) => { if (alive) setLinkError(messageOf(error, "Home could not read that link. Check it, then paste it again.")); });
+    void stylesApi.hit("huggingface", `${link[1]}/${link[2]!.replace(/\.git$/, "")}`, null).then((hit) => { if (alive) setPicked(hit); }).catch((error: unknown) => { if (alive) setLinkError(messageOf(error, i18n._({ id: "Home could not read that link. Check it, then paste it again.", message: "Home could not read that link. Check it, then paste it again." }))); });
     return () => { alive = false; };
   }, [q]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -97,11 +97,11 @@ export function StyleBrowser({ person, civitaiOn, onClose, onInstalled, onOpenSt
 
   const filters = (
     <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
-      <Pick id="style-filter-type" label={i18n._({ id: "Type", message: "Type" })} value={kind} onChange={(v) => setKind(v as typeof kind)} options={[["any", "Any"], ["style", "Style"], ["character", "Character"]]} />
-      <Pick id="style-filter-base" wide label={i18n._({ id: "Made for", message: "Made for" })} value={base} onChange={(v) => setBase(v as typeof base)} options={[["default", "LTX-2.5 and Wan"], ["ltx-2.5", "LTX-2.5"], ["wan", "Wan"], ["all", "All"]]} />
-      <Pick id="style-filter-installed" label={i18n._({ id: "Installed", message: "Installed" })} value={installed} onChange={(v) => setInstalled(v as typeof installed)} options={[["any", "Any"], ["not_installed", "Not installed"], ["installed", "Installed"]]} />
-      <Pick id="style-filter-source" label={i18n._({ id: "Source", message: "Source" })} value={source} onChange={(v) => setSource(v as BrowseSource)} options={[["huggingface", "Hugging Face"], ["civitai", civitaiOn ? "Civitai" : "Civitai (off)", !civitaiOn], ["both", "Both", !civitaiOn]]} />
-      <Pick id="style-filter-sort" label={i18n._({ id: "Sort", message: "Sort" })} value={sort} onChange={(v) => setSort(v as typeof sort)} options={[["downloads", "Most downloaded"], ["rating", "Top rated"], ["newest", "Newest"]]} />
+      <Pick id="style-filter-type" label={i18n._({ id: "Type", message: "Type" })} value={kind} onChange={(v) => setKind(v as typeof kind)} options={[["any", i18n._({ id: "Any", message: "Any" })], ["style", i18n._({ id: "Style", message: "Style" })], ["character", i18n._({ id: "Character", message: "Character" })]]} />
+      <Pick id="style-filter-base" wide label={i18n._({ id: "Made for", message: "Made for" })} value={base} onChange={(v) => setBase(v as typeof base)} options={[["default", i18n._({ id: "LTX-2.5 and Wan", message: "LTX-2.5 and Wan" })], ["ltx-2.5", "LTX-2.5"], ["wan", "Wan"], ["all", i18n._({ id: "All", message: "All" })]]} />
+      <Pick id="style-filter-installed" label={i18n._({ id: "Installed", message: "Installed" })} value={installed} onChange={(v) => setInstalled(v as typeof installed)} options={[["any", i18n._({ id: "Any", message: "Any" })], ["not_installed", i18n._({ id: "Not installed", message: "Not installed" })], ["installed", i18n._({ id: "Installed", message: "Installed" })]]} />
+      <Pick id="style-filter-source" label={i18n._({ id: "Source", message: "Source" })} value={source} onChange={(v) => setSource(v as BrowseSource)} options={[["huggingface", "Hugging Face"], ["civitai", civitaiOn ? i18n._({ id: "Civitai", message: "Civitai" }) : i18n._({ id: "Civitai (off)", message: "Civitai (off)" }), !civitaiOn], ["both", i18n._({ id: "Both", message: "Both" }), !civitaiOn]]} />
+      <Pick id="style-filter-sort" label={i18n._({ id: "Sort", message: "Sort" })} value={sort} onChange={(v) => setSort(v as typeof sort)} options={[["downloads", i18n._({ id: "Most downloaded", message: "Most downloaded" })], ["rating", i18n._({ id: "Top rated", message: "Top rated" })], ["newest", i18n._({ id: "Newest", message: "Newest" })]]} />
     </div>
   );
 
@@ -130,20 +130,20 @@ export function StyleBrowser({ person, civitaiOn, onClose, onInstalled, onOpenSt
             {link ? null : results.isError && !results.data ? (
               <div role="alert" className="flex flex-col items-start gap-2 text-sm"><p className="text-destructive">{browseProblem(results.error)}</p><Button type="button" variant="outline" size="sm" onClick={() => void results.refetch()}>{i18n._({ id: "Try again", message: "Try again" })}</Button></div>
             ) : (
-              <AsyncState data={results.data} error={false} isFetching={results.isFetching} onRetry={() => void results.refetch()} loadingLabel="Searching for styles" errorMessage="">
+              <AsyncState data={results.data} error={false} isFetching={results.isFetching} onRetry={() => void results.refetch()} loadingLabel={i18n._({ id: "Searching for styles", message: "Searching for styles" })} errorMessage="">
                 {() => empty ? <p className="text-sm text-muted-foreground">{i18n._({ id: "No styles match. Try fewer words.", message: "No styles match. Try fewer words." })}</p> : (
                   <MediaShelf<Tile>
                     label={i18n._({ id: "Styles from the source", message: "Styles from the source" })} items={tiles} variant="plain" layout="grid" aspect="wide" density="compact"
                     getKey={(tile) => (isLockedTile(tile) ? "locked" : tile.key)} isLocked={isLockedTile} onUnlock={() => lock.requestUnlock()}
-                    getLabel={(tile) => (isLockedTile(tile) ? "Locked items" : tile.title)}
+                    getLabel={(tile) => (isLockedTile(tile)  ? i18n._({ id: "Locked items", message: "Locked items" }) : tile.title)}
                     onSelect={(tile) => { if (isLockedTile(tile)) return; if (alreadyHave(tile)) onOpenStyle(tile.installed?.id ?? null); else setPicked(tile); }}
                     renderItem={(tile) => (isLockedTile(tile) ? null : <StylePicture path={tile.preview} proof={tile.adult_check !== "normal"} />)}
-                    renderBadge={(tile) => (isLockedTile(tile) ? null : <Badge variant="secondary">{LICENCE_BADGE[tile.licence.class]}</Badge>)}
+                    renderBadge={(tile) => (isLockedTile(tile) ? null : <Badge variant="secondary">{licenceBadge()[tile.licence.class]}</Badge>)}
                     renderCaption={(tile) => (isLockedTile(tile) ? null : (
                       <span className="flex min-w-0 flex-col gap-0.5">
                         <span className="truncate text-sm font-semibold">{tile.title}</span>
                         {tile.creator ? <span className="truncate text-sm text-muted-foreground">{tile.creator}</span> : null}
-                        <span className="text-sm text-muted-foreground">{alreadyHave(tile) ? (tile.installed ? `Already added as ${tile.installed.name}. Press to open it.` : i18n._({ id: "You already have this style. Press to open it.", message: "You already have this style. Press to open it." })) : tile.reason ?? tile.line}</span>
+                        <span className="text-sm text-muted-foreground">{alreadyHave(tile) ? (tile.installed ? i18n._({ id: "Already added as {name}. Press to open it.", message: "Already added as {name}. Press to open it.", values: { name: tile.installed.name } }) : i18n._({ id: "You already have this style. Press to open it.", message: "You already have this style. Press to open it." })) : tile.reason ?? tile.line}</span>
                         {tile.also_on.length ? <span className="text-sm text-muted-foreground">{i18n._({ id: "Also on {join}", message: "Also on {join}", values: { join: tile.also_on.join(" and ") } })}</span> : null}
                       </span>
                     ))}

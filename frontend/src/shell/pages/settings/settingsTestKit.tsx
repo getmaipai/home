@@ -94,6 +94,8 @@ export function mockHome({ robots = false, robotsEnabled = robots, wakeword = fa
       const kind = scope.split(":")[0];
       return Promise.resolve(Response.json(registry.filter((k) => k.scope === kind).map((k) => ({ key: k.key, value: k.key === "ui.pinned_apps" ? pinnedAppsSerialized : k.default ?? null, source: k.key === "ui.pinned_apps" && pinnedAppsExplicit ? "user" : "default", label: k.label, help: k.help, level: k.level, secret: k.secret ?? false }))));
     }
+    if (url.includes("/api/reference/state")) return Promise.resolve(Response.json({ installed: [], jobs: [], matchesPresets: [] }));
+    if (url.includes("/api/reference/catalog")) return Promise.resolve(Response.json([]));
     if (url.includes("/api/voice/wakewords")) return Promise.resolve(Response.json({ detectors: [], installed: wakeword }));
     if (url.endsWith("/api/commands")) return Promise.resolve(Response.json([]));
     if (url.includes("/api/auth/sessions")) return Promise.resolve(Response.json([]));

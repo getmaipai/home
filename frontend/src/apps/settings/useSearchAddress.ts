@@ -1,5 +1,6 @@
 // AUDIT-DUP-FE-01: the SearXNG address test-and-save state machine that Settings > Web search and the setup screen both used to write out:
 // the typed text, what is busy, the latest Test result and the exact text it tested, the error line, and the "tested text still matches" rules.
+import { i18n } from "@lingui/core";
 import { useState } from "react";
 import type { SearchTestResultData } from "@/shell/components/searchTestResult";
 import { ApiError } from "@/lib/api";
@@ -7,7 +8,7 @@ import { ApiError } from "@/lib/api";
 /** The failure as one sentence: what went wrong, then the next step. */
 export function webSearchFailure(reason: unknown): string {
   if (reason instanceof ApiError) return [reason.message.replace(/\s+$/, ""), reason.next].filter(Boolean).join(" ");
-  return "Home couldn't reach that address. Check it and that the search service is running, then press Test.";
+  return i18n._({ id: "Home couldn't reach that address. Check it and that the search service is running, then press Test.", message: "Home couldn't reach that address. Check it and that the search service is running, then press Test." });
 }
 
 export type SearchTest = (url: string) => Promise<{ saved: boolean; result?: SearchTestResultData }>;

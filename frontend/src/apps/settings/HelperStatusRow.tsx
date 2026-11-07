@@ -6,8 +6,8 @@ import { Button } from "@maipai/ui/src/ui/button";
 import { Item, ItemActions, ItemContent, ItemDescription, ItemTitle } from "@maipai/ui/src/dashboard/components/ui/item";
 import type { HelperInstall } from "@/lib/api";
 
-const NOT_MAC = "The helper works only when Home runs on a Mac, so Close apps stays Off on this computer.";
-const FAILED = "Home could not install the helper. Press Install helper to try again.";
+const notMac = () => i18n._({ id: "The helper works only when Home runs on a Mac, so Close apps stays Off on this computer.", message: "The helper works only when Home runs on a Mac, so Close apps stays Off on this computer." });
+const failedText = () => i18n._({ id: "Home could not install the helper. Press Install helper to try again.", message: "Home could not install the helper. Press Install helper to try again." });
 
 /** `canInstall` false means this hub cannot offer the install (not a Mac, or an older install without the installer): the row then says why and shows no button. */
 export function HelperStatusRow({ canInstall, install, onInstalled }: { canInstall: boolean; install: () => Promise<HelperInstall>; onInstalled: () => void }) {
@@ -18,14 +18,14 @@ export function HelperStatusRow({ canInstall, install, onInstalled }: { canInsta
     try {
       const outcome = await install();
       if (outcome.result === "installed") onInstalled(); else setProblem(outcome.message);
-    } catch { setProblem(FAILED); } finally { setBusy(false); }
+    } catch { setProblem(failedText()); } finally { setBusy(false); }
   }
   return (
     <div data-testid="helper-status" className="flex flex-col gap-2">
       <Item size="setting" role="status">
         <ItemContent>
           <ItemTitle>{i18n._({ id: "Helper not installed", message: "Helper not installed" })}</ItemTitle>
-          <ItemDescription clamp={false}>{canInstall ? i18n._({ id: "Install it so Home can see and close apps when a big job needs room. It runs only for you on this Mac, is built here, and sends nothing anywhere. Close apps stays Off until you turn it on.", message: "Install it so Home can see and close apps when a big job needs room. It runs only for you on this Mac, is built here, and sends nothing anywhere. Close apps stays Off until you turn it on." }) : NOT_MAC}</ItemDescription>
+          <ItemDescription clamp={false}>{canInstall ? i18n._({ id: "Install it so Home can see and close apps when a big job needs room. It runs only for you on this Mac, is built here, and sends nothing anywhere. Close apps stays Off until you turn it on.", message: "Install it so Home can see and close apps when a big job needs room. It runs only for you on this Mac, is built here, and sends nothing anywhere. Close apps stays Off until you turn it on." }) : notMac()}</ItemDescription>
         </ItemContent>
         {canInstall ? <ItemActions><Button type="button" variant="outline" disabled={busy} onClick={() => void run()}>{busy ? i18n._({ id: "Installing, this can take a minute or two", message: "Installing, this can take a minute or two" }) : i18n._({ id: "Install helper", message: "Install helper" })}</Button></ItemActions> : null}
       </Item>

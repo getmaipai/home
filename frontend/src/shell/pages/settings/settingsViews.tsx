@@ -93,7 +93,7 @@ function DeviceAppearanceSettings() { return <DeviceAppearanceControl />; }
 function ChatSkillsSettings({ person }: SettingsViewProps) { return <ChatSkillsSection person={person} />; }
 function ChatShortcutsSettings() { return <ChatShortcutsView />; }
 function HomeCommandsSettings({ person }: SettingsViewProps) { return <CommandsSection person={person} management />; }
-function HomeVoiceCatalogSettings() { useTabItem("Voices"); return <VoiceManagerSection />; }
+function HomeVoiceCatalogSettings() { useTabItem(i18n._({ id: "Voices", message: "Voices" })); return <VoiceManagerSection />; }
 
 // ADMIN-HOME-SETTINGS-01: the household admin sections that had no entry.
 // Each is a trail view of its Home settings section (spec/settings/areas.json),
@@ -169,6 +169,6 @@ export function SettingsView({ view, person, onPersonChange, tab, detailId, card
 }
 
 function AccountVoiceControls({ person }: SettingsViewProps) {
-  useTabItem("Voice");
+  useTabItem(i18n._({ id: "Voice", message: "Voice" }));
   return <VoiceBrowserSection person={person} />;
 }

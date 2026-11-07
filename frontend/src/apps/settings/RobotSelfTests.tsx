@@ -6,7 +6,7 @@ import { Alert, AlertDescription } from "@maipai/ui/src/ui/alert";
 import { api, ApiError, type DeviceInfo } from "@/lib/api";
 import { robotSelfTestPartsFor, type RobotSelfTestPart, type RobotSelfTestResult } from "@maipai/home-backend/src/wire";
 
-const LABELS: Record<RobotSelfTestPart, string> = { speaker: "Speaker", face: "Face", head: "Head", lights: "Lights", mic: "Microphone" };
+const labels = (): Record<RobotSelfTestPart, string> => ({ speaker: i18n._({ id: "Speaker", message: "Speaker" }), face: i18n._({ id: "Face", message: "Face" }), head: i18n._({ id: "Head", message: "Head" }), lights: i18n._({ id: "Lights", message: "Lights" }), mic: i18n._({ id: "Microphone", message: "Microphone" }) });
 
 /** ROBOT-ADMIN-PLACE-01: "Test this robot" is an admin action, so it lives in the robot's detail view in Home settings,
  * Devices, not on the Family card. Only the parts the robot reports are offered. */
@@ -26,7 +26,7 @@ export function RobotSelfTests({ device }: { device: DeviceInfo }) {
         ? { kind: "offline", message: apiError.message }
         : apiError?.status === 504
           ? { kind: "timeout", message: apiError.message }
-          : { kind: "error", message: apiError?.message ?? "Could not test that part. Reload the page and try again." } }));
+          : { kind: "error", message: apiError?.message ?? i18n._({ id: "Could not test that part. Reload the page and try again.", message: "Could not test that part. Reload the page and try again." }) } }));
     } finally { setSelfTestBusy(null); }
   }
   return (
@@ -36,7 +36,7 @@ export function RobotSelfTests({ device }: { device: DeviceInfo }) {
         {robotSelfTestPartsFor(device).map((part) => {
           const result = selfTests[part];
           return <div key={part}>
-            <Button variant="outline" disabled={unreachable || selfTestBusy !== null} onClick={() => void runSelfTest(part)}>{selfTestBusy === part ? i18n._({ id: "Testing…", message: "Testing…" }) : LABELS[part]}</Button>
+            <Button variant="outline" disabled={unreachable || selfTestBusy !== null} onClick={() => void runSelfTest(part)}>{selfTestBusy === part ? i18n._({ id: "Testing…", message: "Testing…" }) : labels()[part]}</Button>
             {result && "ok" in result ? <p className="mt-1 text-sm"><Badge variant={result.ok ? "secondary" : "destructive"}>{result.ok ? i18n._({ id: "Passed", message: "Passed" }) : i18n._({ id: "Failed", message: "Failed" })}</Badge>{" "}{i18n._({ id: "{detail} ({took_ms} ms)", message: "{detail} ({took_ms} ms)", values: { detail: result.detail, took_ms: result.took_ms } })}</p> : null}
             {result && "kind" in result && result.kind === "offline" ? <p className="mt-1 text-sm text-muted-foreground">{result.message}</p> : null}
             {result && "kind" in result && (result.kind === "timeout" || result.kind === "error") ? <Alert variant="destructive"><AlertDescription>{result.message}</AlertDescription></Alert> : null}

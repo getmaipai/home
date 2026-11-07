@@ -1,3 +1,4 @@
+import { i18n } from "@lingui/core";
 import { useQuery } from "@tanstack/react-query";
 import { useState, type ComponentProps } from "react";
 import { api } from "@/lib/api";
@@ -16,9 +17,9 @@ export function ClockCardRenderer(props: Props) {
   const volume = (values.data as Stored[] | undefined)?.find((entry) => entry.key === "alarms.volume")?.value as AlarmVolume | undefined;
   const rowExtras: Readonly<Record<string, Pick<SettingRowProps, "note" | "lockedReason" | "action">>> = sound ? {
     "alarms.sound": {
-      action: { label: "Preview", onPress: () => {
+      action: { label: i18n._({ id: "Preview", message: "Preview" }), onPress: () => {
         const playback = playAlarmSound(sound, volume ?? "medium");
-        if (playback.blocked) setMessage("Tap to turn the sound on");
+        if (playback.blocked) setMessage(i18n._({ id: "Tap to turn the sound on", message: "Tap to turn the sound on" }));
         else setMessage("");
       } },
     },

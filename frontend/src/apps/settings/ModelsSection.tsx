@@ -59,7 +59,7 @@ export function ModelsSection() {
         setStackChat({ name: selection.name, state: selection.state });
         setInstalledIds(selection.installed ?? []);
       })
-      .catch((e: unknown) => setError(errorLine(e, "Could not load this computer's information.")));
+      .catch((e: unknown) => setError(errorLine(e, i18n._({ id: "Could not load this computer's information.", message: "Could not load this computer's information." }))));
   }, []);
 
   useEffect(load, [load]);
@@ -110,12 +110,12 @@ export function ModelsSection() {
 // rather than reusing this one, so Settings > AI models and the wizard
 // described the same hardware inconsistently.
 export function describeHardware(hw: HardwareInfo): string {
-  if (hw.isAppleSilicon) return `This computer: Apple Silicon, ${hw.unifiedMemoryGb} GB memory.`;
+  if (hw.isAppleSilicon) return i18n._({ id: "This computer: Apple Silicon, {memory} GB memory.", message: "This computer: Apple Silicon, {memory} GB memory.", values: { memory: hw.unifiedMemoryGb } });
   if (hw.cudaDevices.length > 0) {
     const cards = hw.cudaDevices.map((d) => `${d.name} (${formatBytes(d.vramBytes)})`).join(", ");
-    return `This computer: ${cards}.`;
+    return i18n._({ id: "This computer: {cards}.", message: "This computer: {cards}.", values: { cards } });
   }
-  return `This computer: no graphics card detected, ${hw.totalRamGb} GB memory. AI models will run slowly.`;
+  return i18n._({ id: "This computer: no graphics card detected, {memory} GB memory. AI models will run slowly.", message: "This computer: no graphics card detected, {memory} GB memory. AI models will run slowly.", values: { memory: hw.totalRamGb } });
 }
 
 function ChatModelCard({
@@ -142,7 +142,7 @@ function ChatModelCard({
     <RoleCardShell title={i18n._({ id: "Chat", message: "Chat" })}>
       <div className="flex flex-col gap-2">
         <div className="flex items-center justify-between gap-2">
-          <span className="text-base font-medium">{stackName ?? "No chat model selected in the MaiPai Stack"}</span>
+          <span className="text-base font-medium">{stackName ?? i18n._({ id: "No chat model selected in the MaiPai Stack", message: "No chat model selected in the MaiPai Stack" })}</span>
           {stackState === "ready" || stackState === "loaded" ? (
             <span className="flex items-center gap-1 text-base text-primary">
               <CheckIcon className="h-4 w-4" aria-hidden /> {stackState === "ready" ? i18n._({ id: "Ready", message: "Ready" }) : i18n._({ id: "Loaded", message: "Loaded" })}
@@ -156,7 +156,7 @@ function ChatModelCard({
             {primary ? fitDetails ? <>
               <SpecSheet title={i18n._({ id: "Fit details", message: "Fit details" })} rows={fitDetails.rows.map(({ label, value }) => ({ label, value }))} visibleCount={fitDetails.rows.length} />
               {fitDetails.rows.filter((row) => row.source).map((row) => <FitSource key={row.label} row={row} />)}
-              {fitDetails.remedy ? <RecommendationCard state="idle" question="What would help?">{fitDetails.remedy}</RecommendationCard> : null}
+              {fitDetails.remedy ? <RecommendationCard state="idle" question={i18n._({ id: "What would help?", message: "What would help?" })}>{fitDetails.remedy}</RecommendationCard> : null}
             </> : <p className="text-base text-muted-foreground">{i18n._({ id: "Uses about {formatBytes} of memory.", message: "Uses about {formatBytes} of memory.", values: { formatBytes: formatBytes(primary.requiredBytes) } })}</p> : <p className="text-base text-muted-foreground">{i18n._({ id: "The Stack has not reported a chat model.", message: "The Stack has not reported a chat model." })}</p>}
           </div>
         </Disclosure>
@@ -213,7 +213,7 @@ function CheckModelCard({ onChecked }: { onChecked: (name: string, response: Fit
       setResponse(fitResponse);
       if (fitResponse.plan !== null) onChecked(modelLinkName(parsed), fitResponse);
     } catch (e) {
-      setError(errorLine(e, "Could not check that link."));
+      setError(errorLine(e, i18n._({ id: "Could not check that link.", message: "Could not check that link." })));
     } finally {
       setBusy(false);
     }
@@ -231,7 +231,7 @@ function CheckModelCard({ onChecked }: { onChecked: (name: string, response: Fit
       {response ? <div className="mt-2"><FitResult headline={response.wording.headline} detail={response.wording.detail} verdict={response.wording.verdict} sizedModel={response.plan && typeof response.plan.model === "string" && response.plan.model.length > 0 ? response.plan.model : null} />{response.plan && fitDetails ? <Disclosure open={showPlan} onToggle={() => setShowPlan((open) => !open)} label={i18n._({ id: "How this was worked out", message: "How this was worked out" })} icon={getIcon("chevron-down")}>
         <SpecSheet title={i18n._({ id: "Fit details", message: "Fit details" })} rows={fitDetails.rows.map(({ label, value }) => ({ label, value }))} visibleCount={fitDetails.rows.length} />
         {fitDetails.rows.filter((row) => row.source).map((row) => <FitSource key={row.label} row={row} />)}
-        {fitDetails.remedy ? <RecommendationCard state="idle" question="What would help?">{fitDetails.remedy}</RecommendationCard> : null}
+        {fitDetails.remedy ? <RecommendationCard state="idle" question={i18n._({ id: "What would help?", message: "What would help?" })}>{fitDetails.remedy}</RecommendationCard> : null}
       </Disclosure> : null}</div> : null}
     </RoleCardShell>
   );
@@ -248,9 +248,9 @@ function ModelComparison({ recommended, checked, hardware }: { recommended: { na
   ];
   if (comparable.length < 2) return null;
   const options = comparable.map((item, index) => {
-    const need = describeFitPlan(item.response.plan!).rows.find((row) => row.label === "Memory it needs")?.value ?? "Not known yet";
+    const need = describeFitPlan(item.response.plan!).rows.find((row) => row.label === "Memory it needs")?.value ?? i18n._({ id: "Not known yet", message: "Not known yet" });
     const verdict = item.response.wording.verdict;
-    const headline = verdict === "yes" ? item.response.wording.headline : `${item.response.wording.headline} · Memory it needs: ${need}`;
+    const headline = verdict === "yes" ? item.response.wording.headline : i18n._({ id: "{headline} · Memory it needs: {need}", message: "{headline} · Memory it needs: {need}", values: { headline: item.response.wording.headline, need } });
     return { id: `${index}-${item.name}`, name: item.name, headline, traits: [verdict === "yes" ? need : false as const] };
   });
   const usableGb = recommended.response?.plan?.cap.high === null || recommended.response?.plan?.cap.high === undefined
@@ -276,7 +276,7 @@ function ModelComparison({ recommended, checked, hardware }: { recommended: { na
   return (
     <>
       <h2 className="text-base font-medium">{i18n._({ id: "Compare", message: "Compare" })}</h2>
-      <ComparisonCard traitLabels={["Memory it needs"]} options={options} />
+      <ComparisonCard traitLabels={[i18n._({ id: "Memory it needs", message: "Memory it needs" })]} options={options} />
       <Button type="button" variant="secondary" onClick={() => void copySummary()}>{copied ? i18n._({ id: "Copied", message: "Copied" }) : i18n._({ id: "Copy summary", message: "Copy summary" })}</Button>
       {copyFailed ? <div className="flex flex-col gap-2"><p className="text-base text-muted-foreground">{i18n._({ id: "Could not copy. Select the text below instead.", message: "Could not copy. Select the text below instead." })}</p><Textarea aria-label={i18n._({ id: "Summary to copy", message: "Summary to copy" })} readOnly rows={Math.min(12, summary.split("\n").length)} value={summary} /></div> : null}
     </>
@@ -320,7 +320,7 @@ function ChatModelChoices({ fits, selectedModelId, installedIds, downloading, on
   function watch(id: string) {
     api.chatModelChoice(id).then((choice: ChatModelChoice) => {
       if (choice.status === "ready") { setWorking(null); onChanged(); return; }
-      if (choice.status === "failed") { setWorking(null); setMessage(choice.reason ?? "The model did not start. Your previous model is still the one answering."); onChanged(); return; }
+      if (choice.status === "failed") { setWorking(null); setMessage(choice.reason ?? i18n._({ id: "The model did not start. Your previous model is still the one answering.", message: "The model did not start. Your previous model is still the one answering." })); onChanged(); return; }
       timer.current = setTimeout(() => watch(id), 2000);
     }).catch(() => { timer.current = setTimeout(() => watch(id), 4000); });
   }
@@ -328,7 +328,7 @@ function ChatModelChoices({ fits, selectedModelId, installedIds, downloading, on
   async function choose(fit: ModelFit) {
     setMessage(null);
     const id = fit.model.id;
-    setWorking({ id, text: `Starting ${fit.model.label}. This takes about a minute.` });
+    setWorking({ id, text: i18n._({ id: "Starting {label}. This takes about a minute.", message: "Starting {label}. This takes about a minute.", values: { label: fit.model.label } }) });
     try {
       const choice = await api.chooseChatModel(id);
       if (choice.status === "downloading") { setWorking(null); onChanged(); return; }
@@ -336,7 +336,7 @@ function ChatModelChoices({ fits, selectedModelId, installedIds, downloading, on
       watch(id);
     } catch (e) {
       setWorking(null);
-      setMessage(errorLine(e, "Could not change the chat model. Try again."));
+      setMessage(errorLine(e, i18n._({ id: "Could not change the chat model. Try again.", message: "Could not change the chat model. Try again." })));
     }
   }
 

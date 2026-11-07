@@ -19,7 +19,7 @@ import { PhraseListField, PhrasePairsField, type PhrasePair } from "@maipai/ui/s
 import { PersonMultiSelect, type PersonOption } from "@maipai/ui/src/settings/PersonMultiSelect";
 import { requestJson, type Roster } from "@/lib/api";
 import { useFreshConfirm } from "@/apps/settings/styles/FreshConfirm";
-import { BASE_WORDS, stylesApi, type BaseModelId, type StylePatch, type StyleRow, type StyleWho } from "@/apps/settings/styles/stylesApi";
+import { baseWords, stylesApi, type BaseModelId, type StylePatch, type StyleRow, type StyleWho } from "@/apps/settings/styles/stylesApi";
 import { adultCheckLine, filePath, messageOf, sizeWords, StylePicture } from "@/apps/settings/styles/stylesShared";
 
 const pairsOf = (row: StyleRow): PhrasePair[] => row.negative_addins.map((avoid, i) => ({ avoid, say: row.avoid_as_positive[i] ?? "" }));
@@ -44,10 +44,10 @@ export function StyleEditor({ row, person, onClose, onChanged }: { row: StyleRow
   const alive = useRef(true);
   useEffect(() => { alive.current = true; return () => { alive.current = false; }; }, []);
 
-  async function save(patch: StylePatch, what = "Saved.") {
+  async function save(patch: StylePatch, what = i18n._({ id: "Saved.", message: "Saved." })) {
     setStatus(null);
     try { await stylesApi.patch(row.id, patch); setStatus({ ok: true, text: what }); onChanged(); }
-    catch (e) { setStatus({ ok: false, text: messageOf(e, "Home could not save that. Check the Home connection, then try again.") }); }
+    catch (e) { setStatus({ ok: false, text: messageOf(e, i18n._({ id: "Home could not save that. Check the Home connection, then try again.", message: "Home could not save that. Check the Home connection, then try again." })) }); }
   }
   async function act(run: () => Promise<unknown>, done: string, fallback: string) {
     setStatus(null);
@@ -56,15 +56,15 @@ export function StyleEditor({ row, person, onClose, onChanged }: { row: StyleRow
   }
   const who = row.availability.who;
   const setWho = (next: StyleWho) => {
-    if (next === "people" && people.length === 0) { void save({ availability: { who: "people", people: [] } }, "Saved. Choose who below."); return; }
+    if (next === "people" && people.length === 0) { void save({ availability: { who: "people", people: [] } }, i18n._({ id: "Saved. Choose who below.", message: "Saved. Choose who below." })); return; }
     void save({ availability: { who: next, people: next === "people" ? people : [] } });
   };
   const fresh = useFreshConfirm({
-    person, item: row.id, title: "Make this style all ages?", description: "The source marked this style adult. Enter your passcode again to make it all ages.",
-    actionLabel: "Make all ages", run: async (ticket) => { await stylesApi.markAllAges(row.id, ticket); setStatus({ ok: true, text: "Now all ages." }); onChanged(); },
-    onFailed: (e) => setStatus({ ok: false, text: messageOf(e, "Home could not change that. Try again.") }),
+    person, item: row.id, title: i18n._({ id: "Make this style all ages?", message: "Make this style all ages?" }), description: i18n._({ id: "The source marked this style adult. Enter your passcode again to make it all ages.", message: "The source marked this style adult. Enter your passcode again to make it all ages." }),
+    actionLabel: i18n._({ id: "Make all ages", message: "Make all ages" }), run: async (ticket) => { await stylesApi.markAllAges(row.id, ticket); setStatus({ ok: true, text: i18n._({ id: "Now all ages.", message: "Now all ages." }) }); onChanged(); },
+    onFailed: (e) => setStatus({ ok: false, text: messageOf(e, i18n._({ id: "Home could not change that. Try again.", message: "Home could not change that. Try again." })) }),
   });
-  const lowerAdult = () => { if (row.adult_check === "adult") fresh.ask(); else void act(() => stylesApi.markAllAges(row.id), "Now all ages.", "Home could not change that. Try again."); };
+  const lowerAdult = () => { if (row.adult_check === "adult") fresh.ask(); else void act(() => stylesApi.markAllAges(row.id), i18n._({ id: "Now all ages.", message: "Now all ages." }), i18n._({ id: "Home could not change that. Try again.", message: "Home could not change that. Try again." })); };
 
   return (
     <>
@@ -99,20 +99,20 @@ export function StyleEditor({ row, person, onClose, onChanged }: { row: StyleRow
               </DialogSection>
               <DialogSection title={i18n._({ id: "Who can use it", message: "Who can use it" })}>
                 {row.needs_confirmation ? (
-                  <Alert><AlertDescription><span className="flex flex-col items-start gap-2">{i18n._({ id: "Read the licence and fingerprint under Details, then confirm them. Until you do, only admins can use this style.", message: "Read the licence and fingerprint under Details, then confirm them. Until you do, only admins can use this style." })}<Button type="button" size="sm" variant="outline" onClick={() => void act(() => stylesApi.confirmLicence(row.id), "Confirmed.", "Home could not confirm that. Try again.")}>{i18n._({ id: "I have read them", message: "I have read them" })}</Button></span></AlertDescription></Alert>
+                  <Alert><AlertDescription><span className="flex flex-col items-start gap-2">{i18n._({ id: "Read the licence and fingerprint under Details, then confirm them. Until you do, only admins can use this style.", message: "Read the licence and fingerprint under Details, then confirm them. Until you do, only admins can use this style." })}<Button type="button" size="sm" variant="outline" onClick={() => void act(() => stylesApi.confirmLicence(row.id), i18n._({ id: "Confirmed.", message: "Confirmed." }), i18n._({ id: "Home could not confirm that. Try again.", message: "Home could not confirm that. Try again." }))}>{i18n._({ id: "I have read them", message: "I have read them" })}</Button></span></AlertDescription></Alert>
                 ) : null}
                 <RadioGroup value={who} onValueChange={(v) => setWho(v as StyleWho)} aria-label={i18n._({ id: "Who can use this style", message: "Who can use this style" })} disabled={row.base_model === "ltx-2.3"}>
-                  {([["admins", "Only admins"], ["adults", "All adults"], ["people", "Chosen people"]] as const).map(([v, text]) => (
+                  {([["admins", i18n._({ id: "Only admins", message: "Only admins" })], ["adults", i18n._({ id: "All adults", message: "All adults" })], ["people", i18n._({ id: "Chosen people", message: "Chosen people" })]] as const).map(([v, text]) => (
                     <div key={v} className="flex items-center gap-2"><RadioGroupItem value={v} id={`se-who-${v}`} disabled={v !== "admins" && row.needs_confirmation} /><Label htmlFor={`se-who-${v}`}>{text}</Label></div>
                   ))}
                 </RadioGroup>
                 {row.base_model === "ltx-2.3" ? <p className="text-sm text-muted-foreground">{i18n._({ id: "Retired video model, no longer available", message: "Retired video model, no longer available" })}</p> : null}
                 {who === "people" ? (
-                  <PersonMultiSelect ariaLabel="Chosen people" people={adults} value={people} onValueChange={(ids) => { setPeople(ids); void save({ availability: { who: "people", people: ids } }); }} />
+                  <PersonMultiSelect ariaLabel={i18n._({ id: "Chosen people", message: "Chosen people" })} people={adults} value={people} onValueChange={(ids) => { setPeople(ids); void save({ availability: { who: "people", people: ids } }); }} />
                 ) : null}
                 <div className="flex items-center gap-3">
                   <Switch id="se-adult" checked={row.audience === "adult-only"} aria-label={i18n._({ id: "Adults only", message: "Adults only" })}
-                    onCheckedChange={(on) => { if (on) void act(() => stylesApi.markAdultOnly(row.id), "Now adults only.", "Home could not change that. Try again."); else setAskLower(true); }} />
+                    onCheckedChange={(on) => { if (on) void act(() => stylesApi.markAdultOnly(row.id), i18n._({ id: "Now adults only.", message: "Now adults only." }), i18n._({ id: "Home could not change that. Try again.", message: "Home could not change that. Try again." })); else setAskLower(true); }} />
                   <Label htmlFor="se-adult">{i18n._({ id: "Adults only", message: "Adults only" })}</Label>
                 </div>
                 <p className="text-sm text-muted-foreground">{i18n._({ id: "{adultCheckLine} People under 18 never see styles.", message: "{adultCheckLine} People under 18 never see styles.", values: { adultCheckLine: adultCheckLine(row.adult_check) } })}</p>
@@ -120,8 +120,8 @@ export function StyleEditor({ row, person, onClose, onChanged }: { row: StyleRow
             </div>
             <div className="flex flex-col gap-6">
               <DialogSection title={i18n._({ id: "Added to the prompt", message: "Added to the prompt" })}>
-                <PhraseListField label={i18n._({ id: "Words that switch it on", message: "Words that switch it on" })} help="Home adds these to the person's words when they pick this style." value={row.trigger_words} addLabel="Add a word" maxItems={12} maxItemChars={80} onChange={(v) => void save({ trigger_words: v })} />
-                <PhraseListField label={i18n._({ id: "Also add", message: "Also add" })} help="Phrases added to the person's words, never replacing them." value={row.positive_addins} addLabel="Add a phrase" maxItems={8} maxItemChars={120} maxTotalChars={400} onChange={(v) => void save({ positive_addins: v })} />
+                <PhraseListField label={i18n._({ id: "Words that switch it on", message: "Words that switch it on" })} help={i18n._({ id: "Home adds these to the person's words when they pick this style.", message: "Home adds these to the person's words when they pick this style." })} value={row.trigger_words} addLabel={i18n._({ id: "Add a word", message: "Add a word" })} maxItems={12} maxItemChars={80} onChange={(v) => void save({ trigger_words: v })} />
+                <PhraseListField label={i18n._({ id: "Also add", message: "Also add" })} help={i18n._({ id: "Phrases added to the person's words, never replacing them.", message: "Phrases added to the person's words, never replacing them." })} value={row.positive_addins} addLabel={i18n._({ id: "Add a phrase", message: "Add a phrase" })} maxItems={8} maxItemChars={120} maxTotalChars={400} onChange={(v) => void save({ positive_addins: v })} />
                 <Collapsible>
                   <CollapsibleTrigger asChild><Button type="button" variant="link">{i18n._({ id: "More", message: "More" })}</Button></CollapsibleTrigger>
                   <CollapsibleContent>
@@ -134,7 +134,7 @@ export function StyleEditor({ row, person, onClose, onChanged }: { row: StyleRow
                 </Collapsible>
               </DialogSection>
               <DialogSection title={i18n._({ id: "Avoid", message: "Avoid" })}>
-                <PhrasePairsField label={i18n._({ id: "Avoid, and say this instead", message: "Avoid, and say this instead" })} help="Videos at Standard and Boost cannot use avoid words. Say the opposite instead." value={pairsOf(row)} firstLabel="Avoid" secondLabel="Say instead" addLabel="Add a pair" maxItems={8} maxItemChars={120} maxTotalChars={400}
+                <PhrasePairsField label={i18n._({ id: "Avoid, and say this instead", message: "Avoid, and say this instead" })} help={i18n._({ id: "Videos at Standard and Boost cannot use avoid words. Say the opposite instead.", message: "Videos at Standard and Boost cannot use avoid words. Say the opposite instead." })} value={pairsOf(row)} firstLabel={i18n._({ id: "Avoid", message: "Avoid" })} secondLabel={i18n._({ id: "Say instead", message: "Say instead" })} addLabel={i18n._({ id: "Add a pair", message: "Add a pair" })} maxItems={8} maxItemChars={120} maxTotalChars={400}
                   onChange={(v) => void save({ negative_addins: v.map((p) => p.avoid), avoid_as_positive: v.map((p) => p.say) })} />
               </DialogSection>
               <DialogSection title={i18n._({ id: "Strength", message: "Strength" })}>
@@ -152,8 +152,8 @@ export function StyleEditor({ row, person, onClose, onChanged }: { row: StyleRow
               <DialogSection title={i18n._({ id: "Details", message: "Details" })}>
                 <dl className="grid grid-cols-[max-content_1fr] gap-x-4 gap-y-1 text-sm">
                   <dt className="text-muted-foreground">{i18n._({ id: "Source", message: "Source" })}</dt><dd className="min-w-0 break-words">{row.source.url ? <a className="underline" href={row.source.url} target="_blank" rel="noreferrer">{row.source.site}</a> : row.source.site === "file" ? i18n._({ id: "A file you added", message: "A file you added" }) : row.source.site}</dd>
-                  <dt className="text-muted-foreground">{i18n._({ id: "Licence", message: "Licence" })}</dt><dd>{row.licence.id ?? "Not stated"}{row.needs_confirmation ? i18n._({ id: ", not confirmed yet", message: ", not confirmed yet" }) : i18n._({ id: ", confirmed by an admin", message: ", confirmed by an admin" })}</dd>
-                  <dt className="text-muted-foreground">{i18n._({ id: "Made for", message: "Made for" })}</dt><dd>{BASE_WORDS[row.base_model]}</dd>
+                  <dt className="text-muted-foreground">{i18n._({ id: "Licence", message: "Licence" })}</dt><dd>{row.licence.id ?? i18n._({ id: "Not stated", message: "Not stated" })}{row.needs_confirmation ? i18n._({ id: ", not confirmed yet", message: ", not confirmed yet" }) : i18n._({ id: ", confirmed by an admin", message: ", confirmed by an admin" })}</dd>
+                  <dt className="text-muted-foreground">{i18n._({ id: "Made for", message: "Made for" })}</dt><dd>{baseWords()[row.base_model]}</dd>
                   <dt className="text-muted-foreground">{i18n._({ id: "Size", message: "Size" })}</dt><dd>{sizeWords(row.file.bytes)}</dd>
                   <dt className="text-muted-foreground">{i18n._({ id: "Fingerprint", message: "Fingerprint" })}</dt><dd className="font-mono break-all text-sm">{row.file.sha256}</dd>
                 </dl>
@@ -179,7 +179,7 @@ export function StyleEditor({ row, person, onClose, onChanged }: { row: StyleRow
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>{i18n._({ id: "Keep it", message: "Keep it" })}</AlertDialogCancel>
-            <AlertDialogAction onClick={() => { void stylesApi.remove(row.id).then(() => { onChanged(); onClose(); }).catch((e: unknown) => setStatus({ ok: false, text: messageOf(e, "Home could not remove it. Try again.") })); }}>{i18n._({ id: "Remove", message: "Remove" })}</AlertDialogAction>
+            <AlertDialogAction onClick={() => { void stylesApi.remove(row.id).then(() => { onChanged(); onClose(); }).catch((e: unknown) => setStatus({ ok: false, text: messageOf(e, i18n._({ id: "Home could not remove it. Try again.", message: "Home could not remove it. Try again." })) })); }}>{i18n._({ id: "Remove", message: "Remove" })}</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

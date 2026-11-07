@@ -16,7 +16,7 @@ import { PRESET_IDS, PRESET_VALUES, currentPreset, specKey, type PresetId } from
 import { usePerformanceSettings } from "@/apps/settings/usePerformanceSettings";
 import type { SettingsViewProps } from "@/shell/pages/settings/settingsViews";
 
-const PRESET_TITLES: Record<PresetId, string> = { chat_first: "Chat first", balanced: "Balanced", big_jobs_first: "Big jobs first" };
+const presetTitles = (): Record<PresetId, string> => ({ chat_first: i18n._({ id: "Chat first", message: "Chat first" }), balanced: i18n._({ id: "Balanced", message: "Balanced" }), big_jobs_first: i18n._({ id: "Big jobs first", message: "Big jobs first" }) });
 
 export function PerformanceSettings({ person }: SettingsViewProps) {
   const { ready, value, write } = usePerformanceSettings();
@@ -40,8 +40,8 @@ export function PerformanceSettings({ person }: SettingsViewProps) {
             <ItemGroup variant="card">
               {PRESET_IDS.map((id) => (
                 <Item key={id} size="setting">
-                  <ItemContent><ItemTitle>{PRESET_TITLES[id]}</ItemTitle><ItemDescription clamp={false}>{options[id]}</ItemDescription></ItemContent>
-                  <ItemActions><RadioGroupItem value={id} aria-label={PRESET_TITLES[id]} /></ItemActions>
+                  <ItemContent><ItemTitle>{presetTitles()[id]}</ItemTitle><ItemDescription clamp={false}>{options[id]}</ItemDescription></ItemContent>
+                  <ItemActions><RadioGroupItem value={id} aria-label={presetTitles()[id]} /></ItemActions>
                 </Item>
               ))}
             </ItemGroup>

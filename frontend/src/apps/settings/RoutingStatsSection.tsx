@@ -20,7 +20,7 @@ export function RoutingStatsSection() {
     api
       .routingStats()
       .then(setStats)
-      .catch((e: unknown) => setError(errorLine(e, "Could not load routing stats.")));
+      .catch((e: unknown) => setError(errorLine(e, i18n._({ id: "Could not load routing stats.", message: "Could not load routing stats." }))));
   }, []);
 
   return (

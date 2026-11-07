@@ -112,8 +112,8 @@ export function UsersSection({ person }: UsersSectionProps) {
       await invalidateRoster();
     } catch (err) {
       setFormError(err instanceof ApiError && /profile requires a secret/i.test(err.message)
-        ? "This role requires a PIN or password. Enter one above, then try again."
-        : errorLine(err, "Could not add that person."));
+        ? i18n._({ id: "This role requires a PIN or password. Enter one above, then try again.", message: "This role requires a PIN or password. Enter one above, then try again." })
+        : errorLine(err, i18n._({ id: "Could not add that person.", message: "Could not add that person." })));
       throw err;
     } finally {
       setSubmitting(false);
@@ -127,7 +127,7 @@ export function UsersSection({ person }: UsersSectionProps) {
       const updated = await api.setSetting("household", "companions.allowed", true);
       queryClient.setQueryData<typeof householdSettingsQuery.data>(["settings-values", "household", "companions.allowed"], (rows) => (rows ?? []).map((row) => row.key === updated.key ? updated : row));
     } catch (err) {
-      setActionError(errorLine(err, "Could not save the AI companions setting."));
+      setActionError(errorLine(err, i18n._({ id: "Could not save the AI companions setting.", message: "Could not save the AI companions setting." })));
     } finally { setCompanionsSaving(false); }
   }
 
@@ -141,7 +141,7 @@ export function UsersSection({ person }: UsersSectionProps) {
       const updated = await api.setSetting("household", "companions.allowed", false);
       queryClient.setQueryData<typeof householdSettingsQuery.data>(["settings-values", "household", "companions.allowed"], (rows) => (rows ?? []).map((row) => row.key === updated.key ? updated : row));
     } catch (err) {
-      setActionError(errorLine(err, "Could not save the AI companions setting."));
+      setActionError(errorLine(err, i18n._({ id: "Could not save the AI companions setting.", message: "Could not save the AI companions setting." })));
     } finally { setCompanionsSaving(false); }
   }
 
@@ -167,7 +167,7 @@ export function UsersSection({ person }: UsersSectionProps) {
       setEditingId(null);
       await invalidateRoster();
     } catch (err) {
-      setActionError(errorLine(err, "Could not save those changes."));
+      setActionError(errorLine(err, i18n._({ id: "Could not save those changes.", message: "Could not save those changes." })));
     } finally {
       setBusy(false);
     }
@@ -181,7 +181,7 @@ export function UsersSection({ person }: UsersSectionProps) {
       setConfirmingDelete(null);
       await invalidateRoster();
     } catch (err) {
-      setActionError(errorLine(err, "Could not remove that person."));
+      setActionError(errorLine(err, i18n._({ id: "Could not remove that person.", message: "Could not remove that person." })));
     } finally {
       setBusy(false);
     }
@@ -197,13 +197,13 @@ export function UsersSection({ person }: UsersSectionProps) {
       // and why, or a parent is left guessing what happened.
       const refused = outcomes.filter((o) => !o.deleted);
       if (refused.length > 0) {
-        const names = refused.map((o) => (roster ?? []).find((p) => p.id === o.id)?.display_name ?? "someone");
-        setActionError(`${names.join(", ")} could not be removed: ${refused[0]?.reason ?? "not allowed"}`);
+        const names = refused.map((o) => (roster ?? []).find((p) => p.id === o.id)?.display_name ?? i18n._({ id: "someone", message: "someone" }));
+        setActionError(i18n._({ id: "{names} could not be removed: {reason}", message: "{names} could not be removed: {reason}", values: { names: names.join(", "), reason: refused[0]?.reason ?? i18n._({ id: "not allowed", message: "not allowed" }) } }));
       }
       leaveSelectMode();
       await invalidateRoster();
     } catch (err) {
-      setActionError(errorLine(err, "Could not remove those people."));
+      setActionError(errorLine(err, i18n._({ id: "Could not remove those people.", message: "Could not remove those people." })));
     } finally {
       setBusy(false);
     }
@@ -218,8 +218,8 @@ export function UsersSection({ person }: UsersSectionProps) {
         error={rosterQuery.isError}
         isFetching={rosterQuery.isFetching}
         onRetry={() => rosterQuery.refetch()}
-        errorMessage="Could not load the household."
-        loadingLabel="Loading household"
+        errorMessage={i18n._({ id: "Could not load the household.", message: "Could not load the household." })}
+        loadingLabel={i18n._({ id: "Loading household", message: "Loading household" })}
       >
         {(loadedRoster) => (
         <Section heading={i18n._({ id: "Users", message: "Users" })}>
@@ -245,7 +245,7 @@ export function UsersSection({ person }: UsersSectionProps) {
 
           {confirmingDelete === "batch" ? (
             <div className="flex flex-col gap-2 rounded-[var(--radius)] border border-destructive p-3">
-              <p className="text-base font-medium">{i18n._({ id: "Remove {count} {value} from your household?", message: "Remove {count} {value} from your household?", values: { count: selectMode.count, value: selectMode.count === 1 ? i18n._({ id: "person", message: "person" }) : i18n._({ id: "people", message: "people" }) } })}</p>
+              <p className="text-base font-medium">{i18n._({ id: "{count, plural, one {Remove # person from your household?} other {Remove # people from your household?}}", message: "{count, plural, one {Remove # person from your household?} other {Remove # people from your household?}}", values: { count: selectMode.count } })}</p>
               <p className="text-base text-muted-foreground">
                 {i18n._({ id: "Everything MaiPai remembers about them, every conversation they had, their settings and any voice they recorded will be deleted. So will any files only they could see; files they shared stay with the household. To save someone's files first, remove them one at a time. This cannot be undone.", message: "Everything MaiPai remembers about them, every conversation they had, their settings and any voice they recorded will be deleted. So will any files only they could see; files they shared stay with the household. To save someone's files first, remove them one at a time. This cannot be undone." })}
               </p>
@@ -254,7 +254,7 @@ export function UsersSection({ person }: UsersSectionProps) {
               </p>
               <div className="flex flex-wrap gap-2">
                 <Button variant="destructive" onClick={handleDeleteSelected} disabled={busy}>
-                  {busy ? i18n._({ id: "Removing…", message: "Removing…" }) : `Yes, remove ${selectMode.count}`}
+                  {busy ? i18n._({ id: "Removing…", message: "Removing…" }) : i18n._({ id: "Yes, remove {count}", message: "Yes, remove {count}", values: { count: selectMode.count } })}
                 </Button>
                 <Button variant="secondary" onClick={() => setConfirmingDelete(null)}>
                   {i18n._({ id: "Keep them", message: "Keep them" })}
@@ -275,7 +275,7 @@ export function UsersSection({ person }: UsersSectionProps) {
                       <Input
                         value={editName}
                         onChange={(e) => setEditName(e.target.value)}
-                        aria-label={`Name for ${p.display_name}`}
+                        aria-label={i18n._({ id: "Name for {name}", message: "Name for {name}", values: { name: p.display_name } })}
                       />
                     </div>
                     {actorRole === "owner" && p.id !== person.id ? (
@@ -284,7 +284,7 @@ export function UsersSection({ person }: UsersSectionProps) {
                         onValueChange={(v) => setEditRole(v as Role)}
                         options={creatableRoles("owner")}
                         getLabel={(v) => ROLE_LABELS[v as Role]}
-                        aria-label={`Role for ${p.display_name}`}
+                        aria-label={i18n._({ id: "Role for {name}", message: "Role for {name}", values: { name: p.display_name } })}
                       />
                     ) : null}
                     {/* INCOGNITO-07: admin-configurable per account, any
@@ -296,7 +296,7 @@ export function UsersSection({ person }: UsersSectionProps) {
                       <Checkbox
                         checked={editSessionLockRequired}
                         onCheckedChange={(checked) => setEditSessionLockRequired(checked === true)}
-                        aria-label={`Require session lock for ${p.display_name}`}
+                        aria-label={i18n._({ id: "Require session lock for {name}", message: "Require session lock for {name}", values: { name: p.display_name } })}
                       />
                       {i18n._({ id: "Require PIN lock", message: "Require PIN lock" })}
                     </span>
@@ -308,7 +308,7 @@ export function UsersSection({ person }: UsersSectionProps) {
                           max={120}
                           value={editSessionLockTimeoutMinutes}
                           onChange={(e) => setEditSessionLockTimeoutMinutes(Number(e.target.value))}
-                          aria-label={`Session lock timeout, minutes, for ${p.display_name}`}
+                          aria-label={i18n._({ id: "Session lock timeout, minutes, for {name}", message: "Session lock timeout, minutes, for {name}", values: { name: p.display_name } })}
                         />
                       </div>
                     ) : null}
@@ -340,7 +340,7 @@ export function UsersSection({ person }: UsersSectionProps) {
                       <Checkbox
                         checked={selectMode.isSelected(p.id)}
                         onCheckedChange={() => selectMode.toggle(p.id)}
-                        aria-label={`Select ${p.display_name}`}
+                        aria-label={i18n._({ id: "Select {name}", message: "Select {name}", values: { name: p.display_name } })}
                         className="shrink-0"
                       />
                     ) : null}
@@ -394,7 +394,7 @@ export function UsersSection({ person }: UsersSectionProps) {
                   {mayEdit ? (
                     <Button
                       variant="ghost"
-                      aria-label={`Edit ${p.display_name}`}
+                      aria-label={i18n._({ id: "Edit {name}", message: "Edit {name}", values: { name: p.display_name } })}
                       onClick={() => {
                         setEditingId(p.id);
                         setEditName(p.display_name);
@@ -409,7 +409,7 @@ export function UsersSection({ person }: UsersSectionProps) {
                   {mayDelete ? (
                     <Button
                       variant="ghost"
-                      aria-label={`Remove ${p.display_name}`}
+                      aria-label={i18n._({ id: "Remove {name}", message: "Remove {name}", values: { name: p.display_name } })}
                       onClick={() => setConfirmingDelete(p.id)}
                     >
                       {i18n._({ id: "Remove", message: "Remove" })}
@@ -424,7 +424,7 @@ export function UsersSection({ person }: UsersSectionProps) {
       </AsyncState>
 
       {roster?.filter((p) => p.age_band === "child").map((p) => (
-        <Section key={`memories-${p.id}`} heading={`Memories for ${p.display_name}`}>
+        <Section key={`memories-${p.id}`} heading={i18n._({ id: "Memories for {name}", message: "Memories for {name}", values: { name: p.display_name } })}>
           <OtherPersonMemories personId={p.id} personName={p.display_name} />
         </Section>
       ))}
@@ -436,7 +436,7 @@ export function UsersSection({ person }: UsersSectionProps) {
       ) : null}
 
       <Section heading={i18n._({ id: "Add someone", message: "Add someone" })}>
-        <NewPersonForm actorRole={actorRole} onSubmit={handleAdd} submitLabel="Add to household" busy={submitting} error={formError} extra={companionKey ? <Field>
+        <NewPersonForm actorRole={actorRole} onSubmit={handleAdd} submitLabel={i18n._({ id: "Add to household", message: "Add to household" })} busy={submitting} error={formError} extra={companionKey ? <Field>
           <FieldLabel htmlFor="new-person-companions-allowed"><Checkbox id="new-person-companions-allowed" checked={newPersonCompanionsAllowed ?? Boolean(householdCompanionsAllowed)} disabled={submitting} onCheckedChange={(checked) => { if (checked === true) setNewPersonCompanionsAllowed(true); else setCompanionsConfirm("new-person"); }} />{companionKey.label}</FieldLabel>
           <FieldDescription>{companionKey.help}</FieldDescription>
         </Field> : null} />
@@ -464,14 +464,15 @@ function DeletionFilesNote({ name, preview, failed }: { name: string; preview: P
   if (!preview) return null;
   const { purged, keptForHousehold } = preview.files;
   if (purged.files === 0 && keptForHousehold.files === 0) return null;
-  const files = (n: number) => `${n} ${n === 1 ? "file" : "files"}`;
   return (
     <div className="flex flex-col gap-2">
       {purged.files > 0 ? (
-        <p className="text-base text-muted-foreground">{i18n._({ id: "{files} only {name} could see will be deleted too. {value}", message: "{files} only {name} could see will be deleted too. {value}", values: { files: files(purged.files), name, value: preview.export.url ? i18n._({ id: "Download them first if you want to keep them.", message: "Download them first if you want to keep them." }) : `Only ${name} can download their own files, so ask them to save anything they want to keep before you remove them.` } })}</p>
+        <p className="text-base text-muted-foreground">{preview.export.url
+          ? i18n._({ id: "{count, plural, one {# file only {name} could see will be deleted too. Download it first if you want to keep it.} other {# files only {name} could see will be deleted too. Download them first if you want to keep them.}}", message: "{count, plural, one {# file only {name} could see will be deleted too. Download it first if you want to keep it.} other {# files only {name} could see will be deleted too. Download them first if you want to keep them.}}", values: { count: purged.files, name } })
+          : i18n._({ id: "{count, plural, one {# file only {name} could see will be deleted too. Only {name} can download their own files, so ask them to save anything they want to keep before you remove them.} other {# files only {name} could see will be deleted too. Only {name} can download their own files, so ask them to save anything they want to keep before you remove them.}}", message: "{count, plural, one {# file only {name} could see will be deleted too. Only {name} can download their own files, so ask them to save anything they want to keep before you remove them.} other {# files only {name} could see will be deleted too. Only {name} can download their own files, so ask them to save anything they want to keep before you remove them.}}", values: { count: purged.files, name } })}</p>
       ) : null}
       {keptForHousehold.files > 0 ? (
-        <p className="text-base text-muted-foreground">{i18n._({ id: "{files} other people can still see will stay, kept by the household.", message: "{files} other people can still see will stay, kept by the household.", values: { files: files(keptForHousehold.files) } })}</p>
+        <p className="text-base text-muted-foreground">{i18n._({ id: "{count, plural, one {# file other people can still see will stay, kept by the household.} other {# files other people can still see will stay, kept by the household.}}", message: "{count, plural, one {# file other people can still see will stay, kept by the household.} other {# files other people can still see will stay, kept by the household.}}", values: { count: keptForHousehold.files } })}</p>
       ) : null}
       {purged.files > 0 && preview.export.url ? (
         <Button asChild variant="secondary" className="self-start">

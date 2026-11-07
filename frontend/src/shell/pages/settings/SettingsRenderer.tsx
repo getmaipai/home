@@ -117,7 +117,7 @@ export function SettingsRenderer({ scope, scopeValue, only, includeKeys, titleOv
       if (key === "persona.active_id" && selfPersonId) void queryClient.invalidateQueries({ queryKey: ["companion-avatar", selfPersonId] });
       return true;
     } catch (e) {
-      setWriteError(errorLine(e, "Could not save that change."));
+      setWriteError(errorLine(e, i18n._({ id: "Could not save that change.", message: "Could not save that change." })));
       return false;
     } finally {
       setPendingKey(null);
@@ -174,7 +174,7 @@ export function SettingsRenderer({ scope, scopeValue, only, includeKeys, titleOv
               setPendingKey(pending.key);
               setWriteError(null);
               try { replaceValue(await api.setSetting(scopeValue, pending.key, pending.value, true)); }
-              catch (e) { setWriteError(errorLine(e, "Could not save that change.")); }
+              catch (e) { setWriteError(errorLine(e, i18n._({ id: "Could not save that change.", message: "Could not save that change." }))); }
               finally { setPendingKey(null); }
             }}>{i18n._({ id: "Confirm", message: "Confirm" })}</AlertDialogAction>
           </AlertDialogFooter>
@@ -189,8 +189,8 @@ export function SettingsRenderer({ scope, scopeValue, only, includeKeys, titleOv
           if (registryQuery.isError) registryQuery.refetch();
           if (valuesQuery.isError) valuesQuery.refetch();
         }}
-        errorMessage="Could not load settings."
-        loadingLabel="Loading settings"
+        errorMessage={i18n._({ id: "Could not load settings.", message: "Could not load settings." })}
+        loadingLabel={i18n._({ id: "Loading settings", message: "Loading settings" })}
       >
         {({ registry, values }: { registry: SettingsKey[]; values: ResolvedSetting[] }) => {
           const renderableRegistry = registry.filter((key) => key.selector !== "location" || key.key === "household.home") as KitSettingsKey[];

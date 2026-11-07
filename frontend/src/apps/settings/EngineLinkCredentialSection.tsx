@@ -18,7 +18,7 @@ import { useHubMutation } from "@/lib/useHubMutation";
 // full-page one (it draws its own <main>, <h1> and page padding), so it is not used inside a dialog or a settings
 // column; the steps are named with plain headings, "Step 2 of 5" (the report lists the kit part that is missing).
 
-const STEPS = ["Where the engine runs", "The engine computer's address", "Run one command on the engine computer", "Check the engine computer", "Done"] as const;
+const steps = (): string[] => [i18n._({ id: "Where the engine runs", message: "Where the engine runs" }), i18n._({ id: "The engine computer's address", message: "The engine computer's address" }), i18n._({ id: "Run one command on the engine computer", message: "Run one command on the engine computer" }), i18n._({ id: "Check the engine computer", message: "Check the engine computer" }), i18n._({ id: "Done", message: "Done" })];
 type StepIndex = 0 | 1 | 2 | 3 | 4;
 
 const WHERE_KEY = "engines.stack.where";
@@ -30,10 +30,10 @@ const SSH_PORT_KEY = "engines.stack.remote.ssh_port";
 export function addressProblem(host: string, port: string): { host: string | null; port: string | null } {
   const name = host.trim();
   let hostProblem: string | null = null;
-  if (name === "") hostProblem = "Enter the engine computer's name or its home network address, for example 192.168.1.20.";
-  else if (/[\s/\\]|:\/\//.test(name)) hostProblem = "Enter only the name or the address, with no spaces, no slashes and no http:// in front. For example 192.168.1.20.";
+  if (name === "") hostProblem = i18n._({ id: "Enter the engine computer's name or its home network address, for example 192.168.1.20.", message: "Enter the engine computer's name or its home network address, for example 192.168.1.20." });
+  else if (/[\s/\\]|:\/\//.test(name)) hostProblem = i18n._({ id: "Enter only the name or the address, with no spaces, no slashes and no http:// in front. For example 192.168.1.20.", message: "Enter only the name or the address, with no spaces, no slashes and no http:// in front. For example 192.168.1.20." });
   const number = Number(port);
-  const portProblem = port.trim() !== "" && Number.isInteger(number) && number >= 1 && number <= 65535 ? null : "Enter a port number between 1 and 65535. It is usually 22.";
+  const portProblem = port.trim() !== "" && Number.isInteger(number) && number >= 1 && number <= 65535 ? null : i18n._({ id: "Enter a port number between 1 and 65535. It is usually 22.", message: "Enter a port number between 1 and 65535. It is usually 22." });
   return { host: hostProblem, port: portProblem };
 }
 
@@ -48,6 +48,14 @@ export function pairCommand(origin: string, code: string): string {
 }
 
 type Hop = { id: number; pass: boolean; detail?: string; fix: string };
+
+function hopLine(hop: Hop): string {
+  const result = hop.pass ? i18n._({ id: "PASS", message: "PASS" }) : i18n._({ id: "FAIL", message: "FAIL" });
+  if (hop.detail && !hop.pass) return i18n._({ id: "{result} hop {id}: {detail}. To fix: {fix}", message: "{result} hop {id}: {detail}. To fix: {fix}", values: { result, id: hop.id, detail: hop.detail, fix: hop.fix } });
+  if (hop.detail) return i18n._({ id: "{result} hop {id}: {detail}", message: "{result} hop {id}: {detail}", values: { result, id: hop.id, detail: hop.detail } });
+  if (!hop.pass) return i18n._({ id: "{result} hop {id}. To fix: {fix}", message: "{result} hop {id}. To fix: {fix}", values: { result, id: hop.id, fix: hop.fix } });
+  return i18n._({ id: "{result} hop {id}", message: "{result} hop {id}", values: { result, id: hop.id } });
+}
 
 function CopyLine({ label, text }: { label: string; text: string }) {
   const [copied, setCopied] = useState(false);
@@ -88,7 +96,7 @@ export function EngineLinkCredentialSection() {
     verb: "complete engine setup",
     mutationFn: async (perform: () => Promise<void>) => {
       try { await perform(); }
-      catch (err) { setError(errorLine(err, "Home could not do that. Check that Home is running, then try again.")); }
+      catch (err) { setError(errorLine(err, i18n._({ id: "Home could not do that. Check that Home is running, then try again.", message: "Home could not do that. Check that Home is running, then try again." }))); }
     },
   });
   const revokeAction = useHubMutation({ verb: "revoke the link key", mutationFn: () => revoke(), onSuccess: () => setConfirmRevoke(false) });
@@ -127,7 +135,7 @@ export function EngineLinkCredentialSection() {
   async function next() {
     if (step === 0) {
       await run(async () => {
-        if (where !== "another_computer") throw new ApiError("Pairing is for a second computer. Choose Another computer to continue, or close this window to keep the engine on this computer.", 400);
+        if (where !== "another_computer") throw new ApiError(i18n._({ id: "Pairing is for a second computer. Choose Another computer to continue, or close this window to keep the engine on this computer.", message: "Pairing is for a second computer. Choose Another computer to continue, or close this window to keep the engine on this computer." }), 400);
         await save(WHERE_KEY, where);
         setStep(1);
       });
@@ -179,7 +187,7 @@ export function EngineLinkCredentialSection() {
       const result = await api.engineConnectionCheck();
       setHops(result.hops);
     } catch (err) {
-      setError(`${errorLine(err, "Home could not check the connection.")} Select Retry, or open Engines and AI and select Check the connection.`);
+      setError(i18n._({ id: "{problem} Select Retry, or open Engines and AI and select Check the connection.", message: "{problem} Select Retry, or open Engines and AI and select Check the connection.", values: { problem: errorLine(err, i18n._({ id: "Home could not check the connection.", message: "Home could not check the connection." })) } }));
     }
   }
 
@@ -205,20 +213,20 @@ export function EngineLinkCredentialSection() {
     <Section heading={i18n._({ id: "Engine computer link", message: "Engine computer link" })}>
       <p className="text-base text-muted-foreground">{i18n._({ id: "Key: {value}", message: "Key: {value}", values: { value: status.data.paired ? i18n._({ id: "Present", message: "Present" }) : i18n._({ id: "Not paired", message: "Not paired" }) } })}</p>
       <Button variant="outline" onClick={begin}>{i18n._({ id: "Pair engine computer", message: "Pair engine computer" })}</Button>
-      {status.data.paired ? <div className="flex flex-col items-start gap-2"><p className="text-sm text-muted-foreground">{i18n._({ id: "Before revoking, run", message: "Before revoking, run" })} <code>{i18n._({ id: "maipai-engine unpair", message: "maipai-engine unpair" })}</code> {i18n._({ id: "on the engine computer.", message: "on the engine computer." })}</p><Button variant="destructive" disabled={busy} onClick={() => setConfirmRevoke(true)}>{i18n._({ id: "Revoke link key", message: "Revoke link key" })}</Button></div> : null}
-      {confirmRevoke ? <DestructiveConfirm message={i18n._({ id: "Revoke this engine link key?", message: "Revoke this engine link key?" })} detail="The engine computer will need to be paired again." confirmLabel="Revoke key" busyLabel="Revoking" busy={revokeAction.busy} onConfirm={() => void revokeAction.run()} onCancel={() => setConfirmRevoke(false)} /> : null}
+      {status.data.paired ? <div className="flex flex-col items-start gap-2"><p className="text-sm text-muted-foreground">{i18n._({ id: "Before revoking, run maipai-engine unpair on the engine computer.", message: "Before revoking, run maipai-engine unpair on the engine computer." })}</p><Button variant="destructive" disabled={busy} onClick={() => setConfirmRevoke(true)}>{i18n._({ id: "Revoke link key", message: "Revoke link key" })}</Button></div> : null}
+      {confirmRevoke ? <DestructiveConfirm message={i18n._({ id: "Revoke this engine link key?", message: "Revoke this engine link key?" })} detail={i18n._({ id: "The engine computer will need to be paired again.", message: "The engine computer will need to be paired again." })} confirmLabel={i18n._({ id: "Revoke key", message: "Revoke key" })} busyLabel={i18n._({ id: "Revoking", message: "Revoking" })} busy={revokeAction.busy} onConfirm={() => void revokeAction.run()} onCancel={() => setConfirmRevoke(false)} /> : null}
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>{i18n._({ id: "Pair engine computer", message: "Pair engine computer" })}</DialogTitle>
-            <DialogDescription>{i18n._({ id: "Step {value} of {length}: {STEPS}", message: "Step {value} of {length}: {STEPS}", values: { value: step + 1, length: STEPS.length, STEPS: STEPS[step] } })}</DialogDescription>
+            <DialogDescription>{i18n._({ id: "Step {value} of {length}: {STEPS}", message: "Step {value} of {length}: {STEPS}", values: { value: step + 1, length: steps().length, STEPS: steps()[step] } })}</DialogDescription>
           </DialogHeader>
           <div className="flex flex-col gap-3">
             {step === 0 ? (
               <>
                 <p className="text-base">{i18n._({ id: "Pairing connects Home to a second computer in your home that runs the AI engines. Choose where the engine runs.", message: "Pairing connects Home to a second computer in your home that runs the AI engines. Choose where the engine runs." })}</p>
                 <Label htmlFor="pair-where">{i18n._({ id: "Where the engine runs", message: "Where the engine runs" })}</Label>
-                <Select value={where} onValueChange={(value) => { if (value) setWhere(value); }} items={[{ value: "this_computer", label: "This computer" }, { value: "another_computer", label: "Another computer" }]}>
+                <Select value={where} onValueChange={(value) => { if (value) setWhere(value); }} items={[{ value: "this_computer", label: i18n._({ id: "This computer", message: "This computer" }) }, { value: "another_computer", label: i18n._({ id: "Another computer", message: "Another computer" }) }]}>
                   <SelectTrigger id="pair-where" aria-label={i18n._({ id: "Where the engine runs", message: "Where the engine runs" })}><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="this_computer">{i18n._({ id: "This computer", message: "This computer" })}</SelectItem>
@@ -243,7 +251,7 @@ export function EngineLinkCredentialSection() {
                 <>
                   <p className="text-base">{i18n._({ id: "On the engine computer, open a terminal and run this one command. Copy it with the button.", message: "On the engine computer, open a terminal and run this one command. Copy it with the button." })}</p>
                   <CopyLine label={i18n._({ id: "Pairing command", message: "Pairing command" })} text={pairCommand(origin, pairing.code)} />
-                  <p className="text-sm text-muted-foreground">{i18n._({ id: "One-time code:", message: "One-time code:" })} <code>{groupCode(pairing.code)}</code>{i18n._({ id: ". It works once and expires at {toLocaleTimeString}. The command prints a check code. Keep it for the next step.", message: ". It works once and expires at {toLocaleTimeString}. The command prints a check code. Keep it for the next step.", values: { toLocaleTimeString: new Date(pairing.expires_at).toLocaleTimeString() } })}</p>
+                  <p className="text-sm text-muted-foreground">{i18n._({ id: "One-time code:", message: "One-time code:" })} <code>{groupCode(pairing.code)}</code>{". "}{i18n._({ id: "It works once and expires at {toLocaleTimeString}. The command prints a check code. Keep it for the next step.", message: "It works once and expires at {toLocaleTimeString}. The command prints a check code. Keep it for the next step.", values: { toLocaleTimeString: new Date(pairing.expires_at).toLocaleTimeString() } })}</p>
                 </>
               ) : (
                 <Button variant="outline" disabled={busy} onClick={() => void run(async () => setPairing(await api.issueEngineLinkPairing()))}>{i18n._({ id: "Get a one-time code", message: "Get a one-time code" })}</Button>
@@ -266,7 +274,7 @@ export function EngineLinkCredentialSection() {
               <>
                 <p className="text-base">{i18n._({ id: "Paired. Home now trusts this engine computer.", message: "Paired. Home now trusts this engine computer." })}</p>
                 {hops ? hops.map((hop) => (
-                  <p key={hop.id} className="text-sm">{i18n._({ id: "{value} hop {id}{value2}{value3}", message: "{value} hop {id}{value2}{value3}", values: { value: hop.pass ? i18n._({ id: "PASS", message: "PASS" }) : i18n._({ id: "FAIL", message: "FAIL" }), id: hop.id, value2: hop.detail ? `: ${hop.detail}` : "", value3: hop.pass ? "" : `. To fix: ${hop.fix}` } })}</p>
+                  <p key={hop.id} className="text-sm">{hopLine(hop)}</p>
                 )) : error ? <><Button type="button" variant="outline" disabled={busy} onClick={() => { setError(null); setHops(null); void run(checkConnection); }}>{i18n._({ id: "Retry", message: "Retry" })}</Button></> : <RouteSkeleton label={i18n._({ id: "Checking the connection", message: "Checking the connection" })} />}
               </>
             ) : null}

@@ -1,3 +1,4 @@
+import { i18n } from "@lingui/core";
 // VIDEO-SETTINGS-05: the Pictures, Videos and Music tab views and the Styles tab shell of Settings, Pictures, videos and music (settings-media-2026-11-02 sections 3 and 4).
 // Each card draws its registry group through the kit renderer, so every key shows with the spec's own label and help, then the card's link rows (text from the spec
 // card's `copy`, rule S5). The old style lists, the Quick and Detailed sections and the install buttons are gone: the one list of styles is the Styles tab, and which
@@ -52,14 +53,14 @@ const CHOOSE_MODELS = settingsPath("ai", "overview");
 export function MediaKidsView(props: SettingsViewProps) { return <MediaKeysList person={props.person} card={props.card} />; }
 
 export function MediaPicturesView(props: SettingsViewProps) {
-  useTabItem("Pictures");
+  useTabItem(i18n._({ id: "Pictures", message: "Pictures" }));
   const copy = copyOf(props.card);
   const navigate = useNavigate();
   return <><MediaKeysList person={props.person} card={props.card} />{linkRows([{ title: copy.models_label, help: copy.models_help, button: copy.models_button, to: CHOOSE_MODELS }], navigate)}</>;
 }
 
 export function MediaVideosView(props: SettingsViewProps) {
-  useTabItem("Videos");
+  useTabItem(i18n._({ id: "Videos", message: "Videos" }));
   const copy = copyOf(props.card);
   const navigate = useNavigate();
   return (
@@ -75,13 +76,13 @@ export function MediaVideosView(props: SettingsViewProps) {
 }
 
 export function MediaMusicView(props: SettingsViewProps) {
-  useTabItem("Music");
+  useTabItem(i18n._({ id: "Music", message: "Music" }));
   const copy = copyOf(props.card);
   const navigate = useNavigate();
   return <><MediaKeysList person={props.person} card={props.card} />{linkRows([{ title: copy.models_label, help: copy.models_help, button: copy.models_button, to: CHOOSE_MODELS }], navigate)}</>;
 }
 
 export function MediaStylesView(props: SettingsViewProps) {
-  useTabItem("Styles");
+  useTabItem(i18n._({ id: "Styles", message: "Styles" }));
   return <StylesTab person={props.person} card={props.card}><MediaKeysList person={props.person} card={{ ...props.card!, description: undefined }} includeKeys={STYLES_CARD_KEYS} /></StylesTab>;
 }

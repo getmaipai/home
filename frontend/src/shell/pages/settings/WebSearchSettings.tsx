@@ -31,11 +31,12 @@ export function webSearchStatusLine(state: WebSearchState): string {
   if (state.sources.includes("searxng")) {
     if (state.address) {
       const host = hostOf(state.address);
-      parts.push(state.works === true ? `SearXNG at ${host} works` : state.works === false ? `SearXNG at ${host} is not answering` : `SearXNG at ${host}`);
-    } else if (state.stackOwned) parts.push("Home's own search service");
+      parts.push(state.works === true ? i18n._({ id: "SearXNG at {host} works", message: "SearXNG at {host} works", values: { host } }) : state.works === false ? i18n._({ id: "SearXNG at {host} is not answering", message: "SearXNG at {host} is not answering", values: { host } }) : i18n._({ id: "SearXNG at {host}", message: "SearXNG at {host}", values: { host } }));
+    } else if (state.stackOwned) parts.push(i18n._({ id: "Home's own search service", message: "Home's own search service" }));
   }
-  if (state.sources.includes("ddgs") && state.ddgsReady) parts.push("DuckDuckGo (adults only)");
-  return parts.length ? parts.join(", and ") : "Library only";
+  if (state.sources.includes("ddgs") && state.ddgsReady) parts.push(i18n._({ id: "DuckDuckGo (adults only)", message: "DuckDuckGo (adults only)" }));
+  if (parts.length === 2) return i18n._({ id: "{first}, and {second}", message: "{first}, and {second}", values: { first: parts[0], second: parts[1] } });
+  return parts[0] ?? i18n._({ id: "Library only", message: "Library only" });
 }
 
 export interface WebSearchSettingsProps {

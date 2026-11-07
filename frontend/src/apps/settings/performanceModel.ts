@@ -1,11 +1,12 @@
 // MEM-SPACE-04/09: the Performance page's data. The keys, words and defaults live in the settings spec (@maipai/spec); this file holds only what the making-space note says a preset implies and the starter app lists.
+import { i18n } from "@lingui/core";
 import keys from "@maipai/spec/settings/keys.json";
 
 export type PresetId = "chat_first" | "balanced" | "big_jobs_first";
 export const PRESET_IDS: PresetId[] = ["chat_first", "balanced", "big_jobs_first"];
 export const CATEGORIES = ["chat", "image", "video", "music"] as const;
 export type Category = (typeof CATEGORIES)[number];
-export const CATEGORY_WORDS: Record<Category | "tools", string> = { chat: "Chat", image: "Pictures", video: "Video", music: "Music", tools: "Stems and tools" };
+export const categoryWords = (): Record<Category | "tools", string> => ({ chat: i18n._({ id: "Chat", message: "Chat" }), image: i18n._({ id: "Pictures", message: "Pictures" }), video: i18n._({ id: "Video", message: "Video" }), music: i18n._({ id: "Music", message: "Music" }), tools: i18n._({ id: "Stems and tools", message: "Stems and tools" }) });
 
 interface SpecKey { key: string; label: string; help: string; default: unknown; range?: { options?: string[] }; copy?: { does?: string; options?: Record<string, string> } }
 const byKey = new Map((keys as unknown as SpecKey[]).map((entry) => [entry.key, entry]));
@@ -46,6 +47,16 @@ export type ProfileTable = Record<string, Partial<Record<Category | "tools", Cel
 export function parseProfiles(raw: unknown): ProfileTable {
   try { const parsed = typeof raw === "string" ? JSON.parse(raw) : raw; return parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed as ProfileTable : {}; } catch { return {}; }
 }
-export const ROW_WORDS = (row: string) => { const [kind, tier] = row.split("."); return `${CATEGORY_WORDS[(kind === "image" || kind === "video" || kind === "chat" || kind === "music" ? kind : "tools") as Category]} at ${tier ? tier[0]!.toUpperCase() + tier.slice(1) : ""}`; };
+const tierWord = (tier: string | undefined): string => {
+  switch (tier) {
+    case undefined: case "": return "";
+    case "reduced": return i18n._({ id: "Reduced", message: "Reduced" });
+    case "standard": return i18n._({ id: "Standard", message: "Standard" });
+    case "boost": return i18n._({ id: "Boost", message: "Boost" });
+    case "max": return i18n._({ id: "Max", message: "Max" });
+    default: return tier[0]!.toUpperCase() + tier.slice(1);
+  }
+};
+export const ROW_WORDS = (row: string) => { const [kind, tier] = row.split("."); return i18n._({ id: "{category} at {tier}", message: "{category} at {tier}", values: { category: categoryWords()[(kind === "image" || kind === "video" || kind === "chat" || kind === "music" ? kind : "tools") as Category], tier: tierWord(tier) } }); };
 /** Chat is never queued or off; it is lowered to Reduced at the lowest (profiles note section 3). */
 export const cellOptions = (category: Category | "tools"): Cell[] => category === "chat" ? ["reduced", "standard", "boost", "max"] : ["standard", "boost", "max", "queued", "off"];

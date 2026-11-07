@@ -7,12 +7,13 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Switch } from "@maipai/ui/src/ui/switch";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@maipai/ui/src/ui/table";
 import { Item, ItemActions, ItemContent, ItemDescription, ItemGroup, ItemTitle } from "@maipai/ui/src/dashboard/components/ui/item";
-import { CATEGORIES, CATEGORY_WORDS, ROW_WORDS, cellOptions, parseList, parseProfiles, specKey, type Category, type Cell } from "@/apps/settings/performanceModel";
+import { CATEGORIES, categoryWords, ROW_WORDS, cellOptions, parseList, parseProfiles, specKey, type Category, type Cell } from "@/apps/settings/performanceModel";
 
 type Value = (key: string) => unknown;
 type Write = (changes: Record<string, unknown>) => Promise<void>;
 const QUEUE_KINDS = ["image", "video", "music"] as const;
-const CELL_WORDS: Record<Cell, string> = { reduced: "Reduced", standard: "Standard", boost: "Boost", max: "Max", queued: "Waits", off: "Off" };
+const cellWords = (): Record<Cell, string> => ({ reduced: i18n._({ id: "Reduced", message: "Reduced" }), standard: i18n._({ id: "Standard", message: "Standard" }), boost: i18n._({ id: "Boost", message: "Boost" }), max: i18n._({ id: "Max", message: "Max" }), queued: i18n._({ id: "Waits", message: "Waits" }), off: i18n._({ id: "Off", message: "Off" }) });
+const unitWord = (unit: string): string => (unit === "jobs" ? i18n._({ id: "jobs", message: "jobs" }) : unit === "minutes" ? i18n._({ id: "minutes", message: "minutes" }) : i18n._({ id: "seconds", message: "seconds" }));
 
 function NumberRow({ id, value, write, onError, unit = "seconds" }: { id: string; value: Value; write: Write; onError: (message: string) => void; unit?: string }) {
   const entry = specKey(id) as ReturnType<typeof specKey> & { range?: { min?: number; max?: number } };
@@ -23,8 +24,8 @@ function NumberRow({ id, value, write, onError, unit = "seconds" }: { id: string
     if (draft === null) return;
     const next = Number(draft);
     setDraft(null);
-    if (!Number.isFinite(next) || next < min || (entry.range?.max !== undefined && next > entry.range.max)) return onError(`${entry.label} must be a whole number of ${unit} from ${min}${entry.range?.max !== undefined ? ` to ${entry.range.max}` : ""}.`);
-    write({ [id]: Math.round(next) }).catch(() => onError("Home could not save that change. Check your connection and try again."));
+    if (!Number.isFinite(next) || next < min || (entry.range?.max !== undefined && next > entry.range.max)) return onError(entry.range?.max !== undefined ? i18n._({ id: "{label} must be a whole number of {unit} from {min} to {max}.", message: "{label} must be a whole number of {unit} from {min} to {max}.", values: { label: entry.label, unit: unitWord(unit), min, max: entry.range.max } }) : i18n._({ id: "{label} must be a whole number of {unit} from {min}.", message: "{label} must be a whole number of {unit} from {min}.", values: { label: entry.label, unit: unitWord(unit), min } }));
+    write({ [id]: Math.round(next) }).catch(() => onError(i18n._({ id: "Home could not save that change. Check your connection and try again.", message: "Home could not save that change. Check your connection and try again." })));
   };
   return (
     <div data-testid={`number-${id}`}><Item size="setting">
@@ -51,10 +52,10 @@ export function PerformanceCustomize({ value, write }: { value: Value; write: Wr
           <Item size="setting"><ItemContent><ItemTitle>{specKey("resources.priority").label}</ItemTitle><ItemDescription clamp={false}>{i18n._({ id: "Chat and voice always go first. When two big jobs want the same room, the one higher here goes first.", message: "Chat and voice always go first. When two big jobs want the same room, the one higher here goes first." })}</ItemDescription></ItemContent></Item>
           {order.map((id, index) => (
             <Item key={id} size="setting">
-              <ItemContent><ItemTitle>{CATEGORY_WORDS[id as Category] ?? id}</ItemTitle></ItemContent>
+              <ItemContent><ItemTitle>{categoryWords()[id as Category] ?? id}</ItemTitle></ItemContent>
               <ItemActions>
-                <Button variant="outline" aria-label={`Move ${CATEGORY_WORDS[id as Category] ?? id} up`} disabled={index === 0} onClick={() => move(index, -1)}>{i18n._({ id: "Up", message: "Up" })}</Button>
-                <Button variant="outline" aria-label={`Move ${CATEGORY_WORDS[id as Category] ?? id} down`} disabled={index === order.length - 1} onClick={() => move(index, 1)}>{i18n._({ id: "Down", message: "Down" })}</Button>
+                <Button variant="outline" aria-label={i18n._({ id: "Move {name} up", message: "Move {name} up", values: { name: categoryWords()[id as Category] ?? id } })} disabled={index === 0} onClick={() => move(index, -1)}>{i18n._({ id: "Up", message: "Up" })}</Button>
+                <Button variant="outline" aria-label={i18n._({ id: "Move {name} down", message: "Move {name} down", values: { name: categoryWords()[id as Category] ?? id } })} disabled={index === order.length - 1} onClick={() => move(index, 1)}>{i18n._({ id: "Down", message: "Down" })}</Button>
               </ItemActions>
             </Item>
           ))}
@@ -109,7 +110,7 @@ export function PerformanceCustomize({ value, write }: { value: Value; write: Wr
           <Item size="setting"><ItemContent><ItemTitle>{specKey("resources.profiles").label}</ItemTitle><ItemDescription clamp={false}>{i18n._({ id: "Each row is a big job. Each column says what that category does while the job runs. Chat is never paused, only made simpler.", message: "Each row is a big job. Each column says what that category does while the job runs. Chat is never paused, only made simpler." })}</ItemDescription></ItemContent></Item>
         </ItemGroup>
         <Table data-testid="profile-table">
-          <TableHeader><TableRow><TableHead>{i18n._({ id: "While this runs", message: "While this runs" })}</TableHead>{columns.map((column) => <TableHead key={column}>{CATEGORY_WORDS[column]}</TableHead>)}</TableRow></TableHeader>
+          <TableHeader><TableRow><TableHead>{i18n._({ id: "While this runs", message: "While this runs" })}</TableHead>{columns.map((column) => <TableHead key={column}>{categoryWords()[column]}</TableHead>)}</TableRow></TableHeader>
           <TableBody>
             {Object.entries(profiles).map(([row, cells]) => (
               <TableRow key={row}>
@@ -117,8 +118,8 @@ export function PerformanceCustomize({ value, write }: { value: Value; write: Wr
                 {columns.map((column) => (
                   <TableCell key={column}>
                     <Select value={cells[column] ?? "standard"} onValueChange={(next) => setCell(row, column, next as Cell)}>
-                      <SelectTrigger aria-label={`${ROW_WORDS(row)}: ${CATEGORY_WORDS[column]}`}><SelectValue /></SelectTrigger>
-                      <SelectContent>{cellOptions(column).map((cell) => <SelectItem key={cell} value={cell}>{CELL_WORDS[cell]}</SelectItem>)}</SelectContent>
+                      <SelectTrigger aria-label={i18n._({ id: "{row}: {category}", message: "{row}: {category}", values: { row: ROW_WORDS(row), category: categoryWords()[column] } })}><SelectValue /></SelectTrigger>
+                      <SelectContent>{cellOptions(column).map((cell) => <SelectItem key={cell} value={cell}>{cellWords()[cell]}</SelectItem>)}</SelectContent>
                     </Select>
                   </TableCell>
                 ))}

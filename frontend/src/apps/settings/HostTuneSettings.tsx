@@ -24,7 +24,7 @@ export function HostTuneSettings() {
       const { item: next } = await (verb === "apply" ? api.setupHostTuneApply(item.id) : api.setupHostTuneRevert(item.id));
       queryClient.setQueryData(KEY, { ...data!, items: data!.items.map((entry) => (entry.id === next.id ? next : entry)) });
     } catch (reason) {
-      setError(reason instanceof ApiError ? `${reason.message.replace(/\s+$/, "")} ${reason.next ?? "Try again."}`.trim() : "Home could not change that setting. Try again.");
+      setError(reason instanceof ApiError ? `${reason.message.replace(/\s+$/, "")} ${reason.next ?? i18n._({ id: "Try again.", message: "Try again." })}`.trim() : i18n._({ id: "Home could not change that setting. Try again.", message: "Home could not change that setting. Try again." }));
     } finally { setBusyId(null); }
   }
 
@@ -44,7 +44,7 @@ export function HostTuneSettings() {
                 <Item key={item.id} size="setting" data-testid="host-tune-item">
                   <ItemContent>
                     <ItemTitle>{item.title}</ItemTitle>
-                    <ItemDescription clamp={false}>{done ? `On. ${item.proposed}.` : item.state === "unknown" ? i18n._({ id: "Home can't tell what this is set to, so it leaves it alone.", message: "Home can't tell what this is set to, so it leaves it alone." }) : `Now: ${item.current}. After: ${item.proposed}.`}</ItemDescription>
+                    <ItemDescription clamp={false}>{done ? i18n._({ id: "On. {proposed}.", message: "On. {proposed}.", values: { proposed: item.proposed } }) : item.state === "unknown" ? i18n._({ id: "Home can't tell what this is set to, so it leaves it alone.", message: "Home can't tell what this is set to, so it leaves it alone." }) : i18n._({ id: "Now: {current}. After: {proposed}.", message: "Now: {current}. After: {proposed}.", values: { current: item.current, proposed: item.proposed } })}</ItemDescription>
                   </ItemContent>
                   <ItemActions>
                     {item.state === "applied" || (item.state === "ok" && item.mode === "auto")

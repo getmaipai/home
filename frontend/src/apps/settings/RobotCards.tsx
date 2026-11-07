@@ -22,7 +22,7 @@ export function RobotCards({ person }: { person: Roster }) {
   const query = useQuery<DeviceInfo[]>({ queryKey: familyBotsQueryKey(person), queryFn: () => fetchFamilyBots(person), refetchInterval: 5000 });
   const refresh = () => void queryClient.invalidateQueries({ queryKey: familyBotsQueryKey(person) });
   return (
-    <AsyncState data={query.data} error={query.isError} isFetching={query.isFetching} onRetry={() => query.refetch()} errorMessage={errorLine(query.error, "Could not load the robots.")} loadingLabel="Loading robots">
+    <AsyncState data={query.data} error={query.isError} isFetching={query.isFetching} onRetry={() => query.refetch()} errorMessage={errorLine(query.error, i18n._({ id: "Could not load the robots.", message: "Could not load the robots." }))} loadingLabel={i18n._({ id: "Loading robots", message: "Loading robots" })}>
       {(rows: DeviceInfo[]) => rows.length === 0 ? <EmptyState icon="inbox" text={i18n._({ id: "No robots yet. An admin adds one in Settings, Home, Devices.", message: "No robots yet. An admin adds one in Settings, Home, Devices." })} /> : (
         <div className="flex flex-col gap-4">
           {rows.map((robot) => (

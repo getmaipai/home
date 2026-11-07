@@ -2,6 +2,7 @@
 // Reduced); a slot record is `{ model, options, who }` (spec `tier-slot`), where `model` is a candidate id, `recommended` or `off`. The
 // on/off switch of a mode is the slot's `off` value, so there is one definition (resource-tiers section 3a rule 7). The per-category Boost and
 // Max switches live here and nowhere else (RULES.md S4).
+import { i18n } from "@lingui/core";
 import vocab from "@maipai/spec/vocab/resource-tiers.json";
 import type { AiJobId } from "../../../../shared/aiChoices";
 import { MAX_RECOMMENDED_LABEL, SLOT_LEVELS_READ, SLOT_OPTIONS_READ } from "../../../../shared/tierSlotOptions";
@@ -70,25 +71,25 @@ export function consequences(drafts: SlotDrafts, job: AiJobId, title: string): s
   const lines: string[] = [];
   const name = title.toLowerCase();
   const levels = configurableTiers(job);
-  if (levels.includes("boost") && !isOn(drafts.boost)) lines.push(`Boost is off for ${name}. A request for Boost is made at Standard, and Boost jobs not yet started are made at Standard.`);
-  if (levels.includes("max") && !isOn(drafts.max)) lines.push(`Max is off for ${name}. Nobody can start a Max window for it, including admins. A Max job already running finishes.`);
-  if (job === "chat" && !isOn(drafts.reduced)) lines.push("Big jobs will not simplify chat, so a Max job that needs more room than the rest leaves is not offered.");
-  if (levels.includes("boost") && isOn(drafts.boost) && drafts.boost.model !== "recommended" && drafts.boost.model === drafts.standard.model && JSON.stringify(drafts.boost.options) === JSON.stringify(drafts.standard.options)) lines.push("Boost is the same as Standard, so Boost will be hidden.");
+  if (levels.includes("boost") && !isOn(drafts.boost)) lines.push(i18n._({ id: "Boost is off for {name}. A request for Boost is made at Standard, and Boost jobs not yet started are made at Standard.", message: "Boost is off for {name}. A request for Boost is made at Standard, and Boost jobs not yet started are made at Standard.", values: { name } }));
+  if (levels.includes("max") && !isOn(drafts.max)) lines.push(i18n._({ id: "Max is off for {name}. Nobody can start a Max window for it, including admins. A Max job already running finishes.", message: "Max is off for {name}. Nobody can start a Max window for it, including admins. A Max job already running finishes.", values: { name } }));
+  if (job === "chat" && !isOn(drafts.reduced)) lines.push(i18n._({ id: "Big jobs will not simplify chat, so a Max job that needs more room than the rest leaves is not offered.", message: "Big jobs will not simplify chat, so a Max job that needs more room than the rest leaves is not offered." }));
+  if (levels.includes("boost") && isOn(drafts.boost) && drafts.boost.model !== "recommended" && drafts.boost.model === drafts.standard.model && JSON.stringify(drafts.boost.options) === JSON.stringify(drafts.standard.options)) lines.push(i18n._({ id: "Boost is the same as Standard, so Boost will be hidden.", message: "Boost is the same as Standard, so Boost will be hidden." }));
   return lines;
 }
 
 /** The one line under a row on AI and models: what each level is, in words. A person's name or an app's name never appears (making-space note section 9); Max says who holds it. */
 export function levelsLine(drafts: SlotDrafts, job: AiJobId, models: ReadonlyArray<{ id: string; label: string }>): string {
-  const name = (d: SlotDraft) => !isOn(d) ? "off" : d.model === "recommended" ? "recommended" : models.find((m) => m.id === d.model)?.label ?? "your pick";
+  const name = (d: SlotDraft) => !isOn(d) ? i18n._({ id: "off", message: "off" }) : d.model === "recommended" ? i18n._({ id: "recommended", message: "recommended" }) : models.find((m) => m.id === d.model)?.label ?? i18n._({ id: "your pick", message: "your pick" });
   const levels = configurableTiers(job);
-  const parts = [`Standard: ${name(drafts.standard)}`];
-  if (levels.includes("boost")) parts.push(`Boost: ${name(drafts.boost)}`);
-  if (levels.includes("max")) parts.push(!isOn(drafts.max) ? "Max: off" : drafts.max.model === "recommended" ? (MAX_RECOMMENDED_LABEL[TIERED_JOBS[job]?.category ?? ""] ? "Max: recommended" : "Max: no model of its own yet") : `Max: ${name(drafts.max)}`);
-  if (job === "chat") parts.push(`Simplify chat for big jobs: ${isOn(drafts.reduced) ? "on" : "off"}`);
-  return `${parts.join(" · ")}.${levels.includes("max") ? " Max is for admins and anyone an admin assigns." : ""}`;
+  const parts = [i18n._({ id: "Standard: {model}", message: "Standard: {model}", values: { model: name(drafts.standard) } })];
+  if (levels.includes("boost")) parts.push(i18n._({ id: "Boost: {model}", message: "Boost: {model}", values: { model: name(drafts.boost) } }));
+  if (levels.includes("max")) parts.push(!isOn(drafts.max) ? i18n._({ id: "Max: off", message: "Max: off" }) : drafts.max.model === "recommended" ? (MAX_RECOMMENDED_LABEL[TIERED_JOBS[job]?.category ?? ""] ? i18n._({ id: "Max: recommended", message: "Max: recommended" }) : i18n._({ id: "Max: no model of its own yet", message: "Max: no model of its own yet" })) : i18n._({ id: "Max: {model}", message: "Max: {model}", values: { model: name(drafts.max) } }));
+  if (job === "chat") parts.push(isOn(drafts.reduced) ? i18n._({ id: "Simplify chat for big jobs: on", message: "Simplify chat for big jobs: on" }) : i18n._({ id: "Simplify chat for big jobs: off", message: "Simplify chat for big jobs: off" }));
+  return `${parts.join(" · ")}.${levels.includes("max") ? i18n._({ id: " Max is for admins and anyone an admin assigns.", message: " Max is for admins and anyone an admin assigns." }) : ""}`;
 }
 
-export const FAMILY_NOTE = "Models in one family keep the same look and voice at every level, and switch faster.";
+export const familyNote = (): string => i18n._({ id: "Models in one family keep the same look and voice at every level, and switch faster.", message: "Models in one family keep the same look and voice at every level, and switch faster." });
 export interface PickOption { id: string; label: string; description: string; blockedReason: string | null }
 export interface PickGroup { family: string; /** Null when the job's own list is shown with no family to name. */ heading: string | null; options: PickOption[] }
 
@@ -103,8 +104,8 @@ export function groupByFamily(candidates: ReadonlyArray<{ id: string; label: str
     if (!group) { group = { family: candidate.family, heading: titleOf(candidate.family), options: [] }; groups.push(group); }
     group.options.push({
       id: candidate.id, label: candidate.label,
-      description: `Needs about ${size(candidate.peak_bytes)} of memory${candidate.verified ? "" : " (not measured here yet)"}.`,
-      blockedReason: candidate.fits ? null : candidate.refusal ?? "This does not fit this level on this computer.",
+      description: candidate.verified ? i18n._({ id: "Needs about {size} of memory.", message: "Needs about {size} of memory.", values: { size: size(candidate.peak_bytes) } }) : i18n._({ id: "Needs about {size} of memory (not measured here yet).", message: "Needs about {size} of memory (not measured here yet).", values: { size: size(candidate.peak_bytes) } }),
+      blockedReason: candidate.fits ? null : candidate.refusal ?? i18n._({ id: "This does not fit this level on this computer.", message: "This does not fit this level on this computer." }),
     });
   }
   return groups;

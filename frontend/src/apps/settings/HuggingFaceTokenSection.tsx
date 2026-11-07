@@ -40,7 +40,7 @@ export function HuggingFaceTokenSection() {
       const setting = values.find((v) => v.key === KEY);
       setIsSet(setting?.isSet ?? false);
     } catch (e) {
-      setLoadError(errorLine(e, "Could not load the current status."));
+      setLoadError(errorLine(e, i18n._({ id: "Could not load the current status.", message: "Could not load the current status." })));
     }
   }
 
@@ -59,7 +59,7 @@ export function HuggingFaceTokenSection() {
       setSuccess(true);
       await load();
     } catch (err) {
-      setError(errorLine(err, "Could not save that token."));
+      setError(errorLine(err, i18n._({ id: "Could not save that token.", message: "Could not save that token." })));
     } finally {
       setSubmitting(false);
     }
@@ -74,7 +74,7 @@ export function HuggingFaceTokenSection() {
       setConfirmRemove(false);
       await load();
     } catch (err) {
-      setError(errorLine(err, "Could not remove it."));
+      setError(errorLine(err, i18n._({ id: "Could not remove it.", message: "Could not remove it." })));
     } finally {
       setSubmitting(false);
     }
@@ -108,7 +108,7 @@ export function HuggingFaceTokenSection() {
           </Button>
         </div>
       </form>
-      {isSet ? confirmRemove ? <DestructiveConfirm message={i18n._({ id: "Remove the connected Hugging Face token?", message: "Remove the connected Hugging Face token?" })} detail="Voice cloning will no longer be able to use this token." confirmLabel="Remove token" busyLabel="Removing…" busy={submitting} onConfirm={() => void handleRemove()} onCancel={() => setConfirmRemove(false)} /> : <Button type="button" variant="destructive" disabled={submitting} onClick={() => setConfirmRemove(true)}>{i18n._({ id: "Remove", message: "Remove" })}</Button> : null}
+      {isSet ? confirmRemove ? <DestructiveConfirm message={i18n._({ id: "Remove the connected Hugging Face token?", message: "Remove the connected Hugging Face token?" })} detail={i18n._({ id: "Voice cloning will no longer be able to use this token.", message: "Voice cloning will no longer be able to use this token." })} confirmLabel={i18n._({ id: "Remove token", message: "Remove token" })} busyLabel={i18n._({ id: "Removing…", message: "Removing…" })} busy={submitting} onConfirm={() => void handleRemove()} onCancel={() => setConfirmRemove(false)} /> : <Button type="button" variant="destructive" disabled={submitting} onClick={() => setConfirmRemove(true)}>{i18n._({ id: "Remove", message: "Remove" })}</Button> : null}
     </Section>
   );
 }

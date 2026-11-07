@@ -13,7 +13,7 @@ import { aiChoicesApi, type InspectedChatModel } from "@/lib/aiChoicesApi";
 import { sizeGb } from "../../../../shared/diskPlanMath";
 import { errorLine } from "@/lib/hubReachability";
 
-const messageOf = (error: unknown) => (errorLine(error, "The model link did not open. Check the link, then try again."));
+const messageOf = (error: unknown) => (errorLine(error, i18n._({ id: "The model link did not open. Check the link, then try again.", message: "The model link did not open. Check the link, then try again." })));
 
 export function AddChatModel({ copy, onAdded }: { copy: Record<string, string>; onAdded?: () => void }) {
   const [link, setLink] = useState("");
@@ -42,7 +42,7 @@ export function AddChatModel({ copy, onAdded }: { copy: Record<string, string>; 
           <ItemContent>
             <ItemTitle>{found.repo} <Badge variant="outline" tone="warning">{copy.not_tested}</Badge></ItemTitle>
             <ItemDescription>{found.file}</ItemDescription>
-            <ItemDescription>{sizeGb(found.sizeBytes)} · {found.licence ?? "Licence not stated"} · {found.architecture}</ItemDescription>
+            <ItemDescription>{sizeGb(found.sizeBytes)} · {found.licence ?? i18n._({ id: "Licence not stated", message: "Licence not stated" })} · {found.architecture}</ItemDescription>
             <ItemDescription>{found.fits === "fits" ? (copy.add_model_fits) : (copy.add_model_estimate)}</ItemDescription>
           </ItemContent>
           <Button type="button" disabled={add.isPending} onClick={() => add.mutate()}>{copy.add_model_confirm}</Button>

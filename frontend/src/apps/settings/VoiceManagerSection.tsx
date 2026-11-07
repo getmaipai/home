@@ -14,14 +14,14 @@ import { Input } from "@maipai/ui/src/ui/input";
 import { AddVoiceForm } from "@/apps/settings/AddVoiceForm";
 import { errorLine } from "@/lib/hubReachability";
 
-const GENDER: Record<StackVoice["gender"], string> = { female: "Female", male: "Male", neutral: "Neutral", unknown: "Not stated" };
+const genderLabel = (gender: StackVoice["gender"]): string => gender === "female" ? i18n._({ id: "Female", message: "Female" }) : gender === "male" ? i18n._({ id: "Male", message: "Male" }) : gender === "neutral" ? i18n._({ id: "Neutral", message: "Neutral" }) : i18n._({ id: "Not stated", message: "Not stated" });
 // AUDIT-UI-01: the five columns need about 640 px; the settings content pane is 728 px at most and about 470 px beside the 1024 px column, so
 // the table form starts at xl and narrower screens use the stacked row (name, one detail line, actions).
 const COLUMNS = "xl:grid-cols-[minmax(10rem,1fr)_4.5rem_5rem_5.5rem_12rem]";
 const MUTED = "text-sm text-muted-foreground";
 
 function languageName(code: string): string {
-  if (!code || code === "unknown") return "Not stated";
+  if (!code || code === "unknown") return i18n._({ id: "Not stated", message: "Not stated" });
   try { return new Intl.DisplayNames(["en"], { type: "language" }).of(code) ?? code; } catch { return code; }
 }
 const isEngineVoice = (voice: Pick<StackVoice, "id">) => presetNameForVoice(voice.id, ["default"]) === "default";
@@ -61,8 +61,8 @@ export function VoiceManagerSection() {
     try {
       const result = await api.setSetting("household", "tts.home_voice", isEngineVoice(voice) ? "default" : voice.id);
       queryClient.setQueryData<ResolvedSetting[]>(["settings-values", "household"], (old) => (old ?? []).some((item) => item.key === result.key) ? (old ?? []).map((item) => item.key === result.key ? result : item) : [...(old ?? []), result]);
-      setNotice(`${voiceDisplayName(voice)} is now Home's default voice.`);
-    } catch (cause) { setError(errorLine(cause, "Could not save Home's default voice. Try again.")); }
+      setNotice(i18n._({ id: "{name} is now Home's default voice.", message: "{name} is now Home's default voice.", values: { name: voiceDisplayName(voice) } }));
+    } catch (cause) { setError(errorLine(cause, i18n._({ id: "Could not save Home's default voice. Try again.", message: "Could not save Home's default voice. Try again." }))); }
     finally { setBusyId(null); }
   }
 
@@ -71,8 +71,8 @@ export function VoiceManagerSection() {
     try {
       const result = await householdVoicesApi.rename(voice.id, label);
       await Promise.all([queryClient.invalidateQueries({ queryKey: ["household-voices"] }), queryClient.invalidateQueries({ queryKey: ["stack-voices"] })]);
-      setNotice(`The voice is now called ${result.label}.`);
-    } catch (cause) { setError(errorLine(cause, "Could not rename this voice. Try again.")); }
+      setNotice(i18n._({ id: "The voice is now called {label}.", message: "The voice is now called {label}.", values: { label: result.label } }));
+    } catch (cause) { setError(errorLine(cause, i18n._({ id: "Could not rename this voice. Try again.", message: "Could not rename this voice. Try again." }))); }
     finally { setBusyId(null); }
   }
 
@@ -82,8 +82,8 @@ export function VoiceManagerSection() {
       voicePreviewPlayer.stop();
       await householdVoicesApi.remove(voice.id);
       await Promise.all([queryClient.invalidateQueries({ queryKey: ["household-voices"] }), queryClient.invalidateQueries({ queryKey: ["stack-voices"] }), queryClient.invalidateQueries({ queryKey: ["settings-values"] })]);
-      setNotice(`${voiceDisplayName(voice)} was deleted.`);
-    } catch (cause) { setError(errorLine(cause, "Could not delete this voice. Try again.")); }
+      setNotice(i18n._({ id: "{name} was deleted.", message: "{name} was deleted.", values: { name: voiceDisplayName(voice) } }));
+    } catch (cause) { setError(errorLine(cause, i18n._({ id: "Could not delete this voice. Try again.", message: "Could not delete this voice. Try again." }))); }
     finally { setBusyId(null); }
   }
 
@@ -96,7 +96,7 @@ export function VoiceManagerSection() {
     {error ? <p role="alert" className="text-base text-destructive">{error}</p> : null}
     {preview.error ? <p role="alert" className="text-base text-destructive">{preview.error}</p> : null}
     {failed ? <p role="alert" className="text-base">{i18n._({ id: "Home can't reach its voice service. Check Repairs, then come back.", message: "Home can't reach its voice service. Check Repairs, then come back." })} <Button type="button" variant="outline" onClick={retry}>{i18n._({ id: "Try again", message: "Try again" })}</Button></p>
-      : <AsyncState data={voicesQuery.data && madeQuery.data && homeQuery.data ? voices : undefined} isFetching={voicesQuery.isFetching || madeQuery.isFetching || homeQuery.isFetching} onRetry={retry} loadingLabel="Loading voices">
+      : <AsyncState data={voicesQuery.data && madeQuery.data && homeQuery.data ? voices : undefined} isFetching={voicesQuery.isFetching || madeQuery.isFetching || homeQuery.isFetching} onRetry={retry} loadingLabel={i18n._({ id: "Loading voices", message: "Loading voices" })}>
         {(list) => list.length === 0 ? <p className="text-base text-muted-foreground">{i18n._({ id: "Voices are still getting ready. This takes a minute after setup.", message: "Voices are still getting ready. This takes a minute after setup." })}</p> : <div className="flex flex-col">
           <div className={`hidden gap-3 border-b border-border pb-2 xl:grid ${COLUMNS} ${MUTED}`}><span>{i18n._({ id: "Voice", message: "Voice" })}</span><span>{i18n._({ id: "Source", message: "Source" })}</span><span>{i18n._({ id: "Gender", message: "Gender" })}</span><span>{i18n._({ id: "Language", message: "Language" })}</span><span className="text-right">{i18n._({ id: "Actions", message: "Actions" })}</span></div>
           <ul className="flex flex-col divide-y divide-[var(--border)]">{list.map((voice) => {
@@ -104,15 +104,15 @@ export function VoiceManagerSection() {
             const home = isHomeDefault(voice, homeDefault);
             const record = made.get(voice.id);
             const testing = preview.voiceId === voice.id;
-            const detail = [custom ? "Custom" : "Built in", GENDER[voice.gender], languageName(voice.language)].join(" · ");
+            const detail = [custom ? i18n._({ id: "Custom", message: "Custom" }) : i18n._({ id: "Built in", message: "Built in" }), genderLabel(voice.gender), languageName(voice.language)].join(" · ");
             return <li key={voice.id} className={`grid items-center gap-x-3 gap-y-2 py-3 ${COLUMNS}`}>
               <div className="flex min-w-0 flex-col gap-0.5">
                 <div className="flex flex-wrap items-center gap-2"><span className="truncate text-base font-medium">{voiceDisplayName(voice)}</span>{home ? <Badge variant="secondary">{i18n._({ id: "Home's default", message: "Home's default" })}</Badge> : null}</div>
-                <span className={MUTED}>{record ? `Made by ${record.creatorName}${record.temperature !== undefined ? ` · Liveliness ${record.temperature}` : ""}${record.pitchSemitones ? ` · Pitch ${record.pitchSemitones > 0 ? "+" : ""}${record.pitchSemitones}` : ""}` : isEngineVoice(voice) ? i18n._({ id: "The voice built into Home's speech engine.", message: "The voice built into Home's speech engine." }) : i18n._({ id: "Comes with Home.", message: "Comes with Home." })}</span>
+                <span className={MUTED}>{record ? [i18n._({ id: "Made by {name}", message: "Made by {name}", values: { name: record.creatorName } }), ...(record.temperature !== undefined ? [i18n._({ id: "Liveliness {value}", message: "Liveliness {value}", values: { value: record.temperature } })] : []), ...(record.pitchSemitones ? [i18n._({ id: "Pitch {value}", message: "Pitch {value}", values: { value: `${record.pitchSemitones > 0 ? "+" : ""}${record.pitchSemitones}` } })] : [])].join(" · ") : isEngineVoice(voice) ? i18n._({ id: "The voice built into Home's speech engine.", message: "The voice built into Home's speech engine." }) : i18n._({ id: "Comes with Home.", message: "Comes with Home." })}</span>
                 <span className={`${MUTED} xl:hidden`}>{detail}</span>
               </div>
               <span className="hidden text-base xl:block">{custom ? i18n._({ id: "Custom", message: "Custom" }) : i18n._({ id: "Built in", message: "Built in" })}</span>
-              <span className="hidden text-base xl:block">{GENDER[voice.gender]}</span>
+              <span className="hidden text-base xl:block">{genderLabel(voice.gender)}</span>
               <span className="hidden text-base xl:block">{languageName(voice.language)}</span>
               <div className="flex flex-wrap gap-2 xl:justify-end">
                 <Button type="button" variant="outline" onClick={() => testing ? voicePreviewPlayer.stop() : void voicePreviewPlayer.start(voice.id)}>{testing && !preview.busy ? i18n._({ id: "Stop", message: "Stop" }) : i18n._({ id: "Test", message: "Test" })}</Button>
@@ -130,7 +130,7 @@ export function VoiceManagerSection() {
           <DialogTitle>{i18n._({ id: "Add a voice", message: "Add a voice" })}</DialogTitle>
           <DialogDescription>{i18n._({ id: "Make a voice from a WAV, MP3 or FLAC recording of 6 to 30 seconds. Everyone in the home can pick it, and so can a robot.", message: "Make a voice from a WAV, MP3 or FLAC recording of 6 to 30 seconds. Everyone in the home can pick it, and so can a robot." })}</DialogDescription>
         </DialogHeader>
-        <AddVoiceForm onBusyChange={setAddBusy} onCancel={() => setAdding(false)} onMade={(name) => { setAdding(false); setNotice(`${name} is ready. Test it here, then pick it for a person or a robot.`); }} />
+        <AddVoiceForm onBusyChange={setAddBusy} onCancel={() => setAdding(false)} onMade={(name) => { setAdding(false); setNotice(i18n._({ id: "{name} is ready. Test it here, then pick it for a person or a robot.", message: "{name} is ready. Test it here, then pick it for a person or a robot.", values: { name } })); }} />
       </DialogContent>
     </Dialog>
     <Dialog open={renaming !== null} onOpenChange={(open) => { if (!open) setRenaming(null); }}>

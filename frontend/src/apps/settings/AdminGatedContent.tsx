@@ -1,3 +1,4 @@
+import { i18n } from "@lingui/core";
 import type { ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
 import { EmptyState } from "@maipai/ui/src/primitives/EmptyState";
@@ -33,7 +34,7 @@ export function AdminGatedContent({ title, person, deniedText, children }: Admin
   if (!isOwnerOrAdminRole(person.role)) {
     return (
       <Section heading={title}>
-        <EmptyState icon="lock" text={deniedText} actionLabel="Back to Settings" onAction={() => navigate("/settings")} />
+        <EmptyState icon="lock" text={deniedText} actionLabel={i18n._({ id: "Back to Settings", message: "Back to Settings" })} onAction={() => navigate("/settings")} />
       </Section>
     );
   }

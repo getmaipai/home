@@ -1,3 +1,4 @@
+import { i18n } from "@lingui/core";
 const LAST_APP_ROUTE_KEY = "maipai.settings.last-app-route";
 
 export function rememberLastAppRoute(path: string): void {
@@ -47,10 +48,10 @@ export function activeAppHref(pathname: string, packageAreaApps: Readonly<Record
 export function backLabelFor(path: string, appLabels: Readonly<Record<string, string>> = {}): string {
   const pathname = path.split(/[?#]/, 1)[0] ?? path;
   const packageApp = /^\/apps\/([a-z][a-z0-9-]*)(?=\/|$)/.exec(pathname)?.[1];
-  if (packageApp) return appLabels[packageApp] ?? "Back";
-  if (pathname === "/chat" || pathname.startsWith("/chat/")) return "Chat";
-  if (pathname === "/files" || pathname.startsWith("/files/")) return "Library";
-  if (pathname === "/people" || pathname.startsWith("/people/")) return "People";
-  if (pathname === "/") return "Home";
-  return "Back";
+  if (packageApp) return appLabels[packageApp] ?? i18n._({ id: "Back", message: "Back" });
+  if (pathname === "/chat" || pathname.startsWith("/chat/")) return i18n._({ id: "Chat", message: "Chat" });
+  if (pathname === "/files" || pathname.startsWith("/files/")) return i18n._({ id: "Library", message: "Library" });
+  if (pathname === "/people" || pathname.startsWith("/people/")) return i18n._({ id: "People", message: "People" });
+  if (pathname === "/") return i18n._({ id: "Home", message: "Home" });
+  return i18n._({ id: "Back", message: "Back" });
 }
