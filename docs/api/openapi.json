@@ -84857,7 +84857,8 @@
                               "feed",
                               "channel",
                               "link",
-                              "station"
+                              "station",
+                              "production"
                             ]
                           },
                           "scope": {
@@ -85340,6 +85341,18 @@
                           "provenance": {
                             "type": "string",
                             "minLength": 1
+                          },
+                          "production_id": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "pattern": "^mprd-[a-z0-9]{6,}$"
+                              },
+                              {
+                                "nullable": true
+                              }
+                            ],
+                            "default": null
                           }
                         },
                         "required": [
@@ -85556,7 +85569,8 @@
                             "feed",
                             "channel",
                             "link",
-                            "station"
+                            "station",
+                            "production"
                           ]
                         },
                         "scope": {
@@ -86039,6 +86053,18 @@
                         "provenance": {
                           "type": "string",
                           "minLength": 1
+                        },
+                        "production_id": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "pattern": "^mprd-[a-z0-9]{6,}$"
+                            },
+                            {
+                              "nullable": true
+                            }
+                          ],
+                          "default": null
                         }
                       },
                       "required": [
@@ -96392,6 +96418,18 @@
                                 }
                               ],
                               "default": null
+                            },
+                            "synth_id": {
+                              "anyOf": [
+                                {
+                                  "type": "string",
+                                  "pattern": "^[a-z0-9][a-z0-9-]{0,39}$"
+                                },
+                                {
+                                  "nullable": true
+                                }
+                              ],
+                              "default": null
                             }
                           },
                           "required": [
@@ -96732,6 +96770,18 @@
                               {
                                 "type": "string",
                                 "pattern": "^file-[a-z0-9]{6,}$"
+                              },
+                              {
+                                "nullable": true
+                              }
+                            ],
+                            "default": null
+                          },
+                          "synth_id": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "pattern": "^[a-z0-9][a-z0-9-]{0,39}$"
                               },
                               {
                                 "nullable": true
@@ -97096,6 +97146,18 @@
                               }
                             ],
                             "default": null
+                          },
+                          "synth_id": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "pattern": "^[a-z0-9][a-z0-9-]{0,39}$"
+                              },
+                              {
+                                "nullable": true
+                              }
+                            ],
+                            "default": null
                           }
                         },
                         "required": [
@@ -97439,6 +97501,18 @@
                               {
                                 "type": "string",
                                 "pattern": "^file-[a-z0-9]{6,}$"
+                              },
+                              {
+                                "nullable": true
+                              }
+                            ],
+                            "default": null
+                          },
+                          "synth_id": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "pattern": "^[a-z0-9][a-z0-9-]{0,39}$"
                               },
                               {
                                 "nullable": true
@@ -98067,6 +98141,18 @@
                               {
                                 "type": "string",
                                 "pattern": "^file-[a-z0-9]{6,}$"
+                              },
+                              {
+                                "nullable": true
+                              }
+                            ],
+                            "default": null
+                          },
+                          "synth_id": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "pattern": "^[a-z0-9][a-z0-9-]{0,39}$"
                               },
                               {
                                 "nullable": true
