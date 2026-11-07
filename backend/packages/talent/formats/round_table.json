@@ -1,0 +1,78 @@
+{
+  "id": "round_table",
+  "label": "Round table",
+  "parts": [
+    {
+      "id": "host",
+      "label": "Host",
+      "min": 1,
+      "max": 1,
+      "leads": true,
+      "dials": {
+        "formality": "casual",
+        "filler_density": "light",
+        "hedging": "medium"
+      }
+    },
+    {
+      "id": "co_host",
+      "label": "Co Host",
+      "min": 1,
+      "max": 2,
+      "leads": false,
+      "dials": {
+        "formality": "casual",
+        "filler_density": "light",
+        "hedging": "medium"
+      }
+    },
+    {
+      "id": "guest",
+      "label": "Guest",
+      "min": 0,
+      "max": 1,
+      "leads": false,
+      "dials": {
+        "formality": "casual",
+        "filler_density": "light",
+        "hedging": "medium"
+      }
+    }
+  ],
+  "structure": [
+    {
+      "kind": "intro",
+      "share": 0.1,
+      "repeat": false
+    },
+    {
+      "kind": "exchange",
+      "share": 0.75,
+      "repeat": true
+    },
+    {
+      "kind": "closing",
+      "share": 0.15,
+      "repeat": false
+    }
+  ],
+  "length_s": {
+    "min": 480,
+    "default": 900,
+    "max": 1800
+  },
+  "talk_over": "lively",
+  "gap_ms": 180,
+  "sources_allowed": [
+    "news",
+    "bookmarks",
+    "documents",
+    "media_item",
+    "household"
+  ],
+  "min_audience": "all",
+  "substitute": "skip",
+  "stingers": true,
+  "words_per_minute": 180,
+  "first_app": "podcasts"
+}

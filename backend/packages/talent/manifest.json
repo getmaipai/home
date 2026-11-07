@@ -1,0 +1,45 @@
+{
+  "id": "talent",
+  "version": "0.2.12",
+  "kind": "app",
+  "category": "Media",
+  "display": "Talent",
+  "description": "Makes spoken shows from the household's own news, weather and life.",
+  "routing": {
+    "examples": [
+      "make a spoken show",
+      "create a news briefing",
+      "make a show about the news",
+      "write a short narration",
+      "make an announcement"
+    ],
+    "patterns": []
+  },
+  "author": "MaiPai",
+  "license": "AGPL-3.0",
+  "homepage": "https://github.com/getmaipai/home",
+  "requires": [],
+  "optional": [],
+  "platforms": [
+    "home"
+  ],
+  "min_role": "child",
+  "consequential": false,
+  "offline": "full",
+  "config": [],
+  "data_sources": [],
+  "permissions": [],
+  "notifications": [],
+  "backup": "exclude",
+  "background": false,
+  "contributes": {
+    "pages": [],
+    "data": []
+  },
+  "min_app": "0.1.0",
+  "tier": 0,
+  "incognito": "unaffected",
+  "smoke": {
+    "kind": "static"
+  }
+}

@@ -1,0 +1,66 @@
+{
+  "id": "debate",
+  "label": "Debate",
+  "parts": [
+    {
+      "id": "moderator",
+      "label": "Moderator",
+      "min": 1,
+      "max": 1,
+      "leads": true,
+      "dials": {
+        "formality": "neutral",
+        "filler_density": "none",
+        "hedging": "low"
+      }
+    },
+    {
+      "id": "side",
+      "label": "Side",
+      "min": 2,
+      "max": 2,
+      "leads": false,
+      "dials": {
+        "engagement": "curious",
+        "hedging": "low",
+        "social": {
+          "initiative": "high"
+        }
+      }
+    }
+  ],
+  "structure": [
+    {
+      "kind": "intro",
+      "share": 0.1,
+      "repeat": false
+    },
+    {
+      "kind": "exchange",
+      "share": 0.8,
+      "repeat": true
+    },
+    {
+      "kind": "closing",
+      "share": 0.1,
+      "repeat": false
+    }
+  ],
+  "length_s": {
+    "min": 360,
+    "default": 600,
+    "max": 1200
+  },
+  "talk_over": "heated",
+  "gap_ms": 80,
+  "sources_allowed": [
+    "news",
+    "documents",
+    "media_item"
+  ],
+  "min_audience": "all",
+  "substitute": "skip",
+  "stingers": true,
+  "words_per_minute": 185,
+  "first_app": "podcasts"
+}

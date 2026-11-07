@@ -1,0 +1,40 @@
+{
+  "id": "narration",
+  "label": "Narration",
+  "parts": [
+    {
+      "id": "narrator",
+      "label": "Narrator",
+      "min": 1,
+      "max": 1,
+      "leads": true,
+      "dials": {
+        "formality": "neutral",
+        "filler_density": "none",
+        "clock_style": "formal"
+      }
+    }
+  ],
+  "structure": [
+    {
+      "kind": "segment",
+      "share": 1,
+      "repeat": false
+    }
+  ],
+  "length_s": {
+    "min": 30,
+    "default": 60,
+    "max": 600
+  },
+  "talk_over": "none",
+  "gap_ms": 400,
+  "sources_allowed": [
+    "documents"
+  ],
+  "min_audience": "all",
+  "substitute": "stand_in",
+  "stingers": false,
+  "words_per_minute": 150,
+  "first_app": "films"
+}
