@@ -219,6 +219,8 @@ describe("layout by screen", () => {
       await waitFor(() => expect(tile("Fox")).toBeTruthy());
       const chips = document.querySelector('[aria-label="Library sections"]') as HTMLElement;
       expect(chips).not.toBeNull();
+      // AUDIT-UI-01: a scrolling strip in a column must not shrink to the tops of its chips under the sticky header.
+      expect(chips.className).toContain("shrink-0");
       expect(within(chips).getByText("Only me")).toBeTruthy();
       fireEvent.click(within(chips).getByText("Videos"));
       await waitFor(() => expect(where()).toBe("?section=videos"));
