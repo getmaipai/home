@@ -86,7 +86,9 @@ const TurnTracePage = lazyNamed(() => import("@/shell/pages/TurnTracePage"), "Tu
 const UpdatesPage = lazyNamed(() => import("@/shell/pages/UpdatesPage"), "UpdatesPage");
 const RepairsPage = lazyNamed(() => import("@/shell/pages/RepairsPage"), "RepairsPage");
 const StatusPage = lazyNamed(() => import("@/shell/pages/StatusPage"), "StatusPage");
-const UiShowcasePage = lazyNamed(() => import("@/shell/pages/UiShowcasePage"), "UiShowcasePage");
+// AUDIT-DEAD-01: the chat showcase and the Elements adoption ledger (77 KB of JSON) are developer tools; `import.meta.env.DEV` is a
+// build-time constant, so a production build drops the import, the route and the chunk (bundle.test.ts checks for the ledger).
+const UiShowcasePage = import.meta.env.DEV ? lazyNamed(() => import("@/shell/pages/UiShowcasePage"), "UiShowcasePage") : null;
 const BackupsPage = lazyNamed(() => import("@/shell/pages/BackupsPage"), "BackupsPage");
 const CommandsPage = lazyNamed(() => import("@/shell/pages/CommandsPage"), "CommandsPage");
 const PrivacyPage = lazyNamed(() => import("@/shell/pages/PrivacyPage"), "PrivacyPage");
@@ -485,7 +487,7 @@ function RoutesWithIncognito({ person, onPersonChange, onSignedOut, appCatalog }
             <Route path="reminders" element={<Suspense fallback={null}><RemindersPage /></Suspense>} />
             <Route path="reminders/coming-up" element={<Navigate to="/reminders" replace />} />
             <Route path="clock" element={<Suspense fallback={null}><ClockPage /></Suspense>} />
-            <Route path="dev/ui" element={<UiShowcasePage person={person} />} />
+            {UiShowcasePage ? <Route path="dev/ui" element={<UiShowcasePage person={person} />} /> : null}
             <Route path="mic-test" element={<MicTestPage />} />
             <Route path="*" element={<NotFoundPage />} />
           </Route>

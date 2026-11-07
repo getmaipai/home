@@ -8,12 +8,17 @@ const root = process.cwd();
 function buildAndAssertAbsent() {
   const outputDir = mkdtempSync(join(tmpdir(), "setup-preview-build-"));
   try {
-    const result = spawnSync("bunx", ["vite", "build", "--outDir", outputDir, "--emptyOutDir"], { cwd: root, encoding: "utf8" });
+    const result = spawnSync("bunx", ["vite", "build", "--outDir", outputDir, "--emptyOutDir"], { cwd: root, encoding: "utf8", env: { ...process.env, NODE_ENV: "production" } });
     if (result.status !== 0) throw new Error(`${result.stdout}\n${result.stderr}`);
     const files = readdirSync(outputDir, { recursive: true }).map(String);
     expect(files.some((file) => file.endsWith("mockServiceWorker.js"))).toBe(false);
     const js = files.filter((file) => file.endsWith(".js")).map((file) => readFileSync(join(outputDir, file), "utf8")).join("\n");
     expect(js).not.toContain("SETUP_PREVIEW_ONLY_MARKER_20261014");
+    // AUDIT-DEAD-01: the /dev/ui showcase and the Elements adoption ledger (src/dev/elements-adoption.json) are dev-only; their
+    // chunk and the ledger's own keys must not reach a production build.
+    expect(files.some((file) => /UiShowcasePage|elements-adoption/.test(file))).toBe(false);
+    expect(js).not.toContain("verdictReason");
+    expect(js).not.toContain("elements-adoption");
     // BUNDLE-SPLIT-01: the PWA precache refuses a file over 4 MiB (vite.config.ts), which fails the build, so an install
     // that builds the frontend breaks. Warn at 3 MiB, while a split is still cheap; the Routes chunk was 2.3 MB after it.
     const big = files.filter((file) => file.endsWith(".js") && !file.startsWith("ort/") && !/ort\.bundle/.test(file))

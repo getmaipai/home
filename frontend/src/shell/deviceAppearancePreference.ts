@@ -22,13 +22,3 @@ export function writeDeviceAppearancePreference(value: Appearance | null): void 
   }
   if (typeof window !== "undefined") window.dispatchEvent(new Event(EVENT));
 }
-
-export function subscribeDeviceAppearancePreference(listener: () => void): () => void {
-  if (typeof window === "undefined") return () => {};
-  window.addEventListener(EVENT, listener);
-  window.addEventListener("storage", listener);
-  return () => {
-    window.removeEventListener(EVENT, listener);
-    window.removeEventListener("storage", listener);
-  };
-}

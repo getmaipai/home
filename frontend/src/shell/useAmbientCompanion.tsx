@@ -1,7 +1,7 @@
 import { useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useLocation, useNavigate } from "react-router-dom";
-import { api, type DeviceInfo, type Roster } from "@/lib/api";
+import { api, type Roster } from "@/lib/api";
 import { COMPANION_AVATAR_QUERY_KEY, mapCompanionClips } from "@/apps/chat/useCompanionAvatar";
 
 /** The ambient companion data used by the shell, or null while settings load,
@@ -65,7 +65,3 @@ export function useAmbientCompanion(person: Roster) {
     action: row ? { label: "Review", onClick: () => navigate(`/companions/${encodeURIComponent(companion.id)}?tab=tasks&task=${encodeURIComponent(row.id)}`) } : undefined,
   };
 }
-
-export type AmbientBot = Extract<NonNullable<ReturnType<typeof useAmbientCompanion>>, { kind: "bot" }>;
-export type AmbientCompanion = Extract<NonNullable<ReturnType<typeof useAmbientCompanion>>, { kind: "companion" }>;
-export type AmbientRobot = DeviceInfo;

@@ -1,5 +1,4 @@
 import { isDeviceRevoked, removeAllOfflineMedia } from "@/lib/offlineMedia";
-import { randomUuid } from "@/lib/randomUuid";
 import type { StatusAppsWire, AppRow as AppRowWire } from "@maipai/home-backend/src/wire";
 import type { RobotState } from "@maipai/spec/gen/ts/robot-state.js";
 import type { StackFitPlan } from "@maipai/spec/gen/ts/stack-fit-plan.js";
@@ -437,7 +436,6 @@ export interface CompanionStateRun { state: "queued" | "running" | "done" | "fai
 export interface CompanionStateJob { state: "running" | "done" | "failed"; label: string; report?: { ok: boolean; reasons: string[]; seconds: number; bytes: { h264: number; av1: number | null }; colour_distance: number | null; area_ratio: number; loop_gap: number; opaque_share: { min: number; max: number } }; failure?: string }
 
 export type MemoryRecordWithDevice = MemoryRecord & { device_name?: string };
-export type MemoryRecordWithProvenance = MemoryRecord & { created_by?: string | null };
 // ROBOT-CARD-01: the robot's last reported frame plus the hub's derived
 // reachability, hand-typed to match backend/src/routes/devices.ts's
 // DeviceSchema.state.
@@ -820,15 +818,6 @@ export async function request<T>(path: string, init?: RequestInit & { timeoutMs?
 /** JSON API request entry point for feature-specific API modules and components. */
 export async function requestJson<T>(path: string, init?: RequestInit & { timeoutMs?: number }): Promise<T> {
   return request<T>(path, init);
-}
-
-/** Upload audio through the same route and multipart shape used by chat. */
-export async function uploadAudioAttachment(file: File): Promise<{ id: string; name: string; media_type: string }> {
-  const form = new FormData();
-  form.append("file", file, file.name);
-  form.append("turn_id", `turn-${randomUuid().replaceAll("-", "").toLowerCase()}`);
-  const result = await request<{ audio: { id: string; name: string; media_type: string } }>("/api/attachments/upload-audio", { method: "POST", body: form });
-  return result.audio;
 }
 
 // Shared by streamSpeech() and streamTurn(): both POST JSON and want the

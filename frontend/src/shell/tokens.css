@@ -272,8 +272,6 @@ html.dark body {
 [data-chat-column-mobile] {
   --sidebar: var(--shell-history);
   --border: var(--shell-divider);
-  --column-hover: color-mix(in srgb, var(--foreground) 5%, transparent);
-  --column-subdued: color-mix(in srgb, var(--foreground) 48%, transparent);
   --aui-thread-list-row-hover: color-mix(in srgb, var(--foreground) 5%, transparent);
 }
 /* COLUMN-02 hover peek: the kit panel overlays the conversation without

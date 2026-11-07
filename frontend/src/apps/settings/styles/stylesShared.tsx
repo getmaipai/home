@@ -58,10 +58,6 @@ export function adultCheckLine(state: AdultCheckState): string {
   return "The source says nothing about age, so it stays locked until you decide.";
 }
 
-export function availabilityWords(who: StyleRow["availability"]["who"]): string {
-  return who === "adults" ? "All adults" : who === "people" ? "Chosen people" : "Only admins";
-}
-
 /** A picture drawn from a path. `proof` fetches it with the unlock proof (an adult-only style or a revealed adult hit); otherwise it is an ordinary image. */
 export function StylePicture({ path, proof, className }: { path: string | null; proof: boolean; className?: string }) {
   const [url, setUrl] = useState<string | null>(proof || !path ? null : path);
