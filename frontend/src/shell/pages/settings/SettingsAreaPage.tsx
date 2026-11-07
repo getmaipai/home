@@ -287,7 +287,7 @@ function SettingsAreaBody({ area, packageAreas, person, onPersonChange, packageA
 
   return (
     <SettingsShell
-      layout="docked"
+      layout={desktop ? "docked" : "default"}
       backLink={<SettingsBackLink title="Settings" reach={active?.scope === "household" ? "Applies to everyone at home" : "Only you"} />}
       labels={{ columnTitle: "Settings" }}
       trail={[{ label: area.title, href: packageArea && area.id !== "clock" ? `/settings/${area.id}` : settingsPath() }, ...(active ? [{ label: active.label, href: detailId ? pagePath(active.id, tab) : undefined }] : []), ...(detailId ? [{ label: detailName ?? active?.label ?? detailId }] : [])]}
