@@ -1,6 +1,6 @@
 import { afterEach, expect, test } from "bun:test";
 import { cleanup, render, waitFor } from "@testing-library/react";
-import { ClockHeaderAdd } from "@/apps/clock/ClockHeaderAdd";
+import { ClockHeaderAdd } from "@/apps/clock/ClockHeaderTitle";
 import { setClockHeaderTab } from "@/apps/clock/clockHeader";
 
 afterEach(cleanup);

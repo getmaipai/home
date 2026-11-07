@@ -40,7 +40,7 @@ import { UsersIcon } from "@/shell/pages/UsersPage";
 import { NotificationsIcon } from "@/apps/notifications/NotificationsPage";
 import { RemindersIcon } from "@/apps/reminders/remindersIcon";
 import { StatusIcon } from "@/shell/pages/StatusPage";
-import { ClockHeaderAdd } from "@/apps/clock/ClockHeaderAdd";
+import { ClockHeaderAdd } from "@/apps/clock/ClockHeaderTitle";
 
 interface PageHeaderEntry {
   icon: Icon;
