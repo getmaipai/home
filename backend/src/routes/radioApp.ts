@@ -4,7 +4,8 @@
 // tagged as adult content. Saved stations are `media-source` records of kind station (lib/media/radio.ts).
 import type { Context } from "hono";
 import type { PersonRow } from "@/types";
-import { mediaAppAllowed } from "@/lib/media/appHost";
+import { jsonBody } from "@/lib/validation";
+import { gateMediaApp } from "@/middleware/mediaAppGate";
 import { mediaBandOf } from "@/lib/media/band";
 import { addStation, directoryRowsFor, listSavedStations, removeStation, savedStationFor, stationVisibleAtBand, type SavedStation } from "@/lib/media/radio";
 import { nowPlayingOf, openStationStream, type StreamDeps } from "@/lib/media/radioStream";
@@ -20,10 +21,6 @@ import { apiRouter } from "@/lib/openapi";
 import { requireAuth } from "@/middleware/auth";
 
 type Body = Record<string, unknown>;
-const bodyOf = async (c: Context): Promise<Body> => {
-  const parsed = await c.req.raw.json().catch(() => ({}));
-  return parsed && typeof parsed === "object" && !Array.isArray(parsed) ? (parsed as Body) : {};
-};
 const str = (value: unknown): string => (typeof value === "string" ? value : "");
 const NOT_ON = "Finding radio stations is not turned on for you. Ask the person who runs this home.";
 
@@ -97,6 +94,7 @@ export function radioAddressDeps(): StreamDeps { return streamDeps; }
 
 export function radioRoutes() {
   const routes = apiRouter();
+  gateMediaApp(routes, "music", ["/popular", "/search", "/stations", "/stations/*", "/recordings/*", "/stream/*", "/preview", "/preview/*", "/hls/*", "/now/*"]);
 
   const gate = (c: Context) => {
     const person = c.get("person");
@@ -104,7 +102,6 @@ export function radioRoutes() {
   };
 
   routes.get("/popular", requireAuth, async (c, next) => {
-    if (!mediaAppAllowed(c.get("person"), "music")) return next();
     const { person, allowed } = gate(c);
     if (!allowed) return c.json({ error: NOT_ON }, 403);
     const result = await findStations({ kind: "popular" });
@@ -113,7 +110,6 @@ export function radioRoutes() {
   });
 
   routes.get("/search", requireAuth, async (c, next) => {
-    if (!mediaAppAllowed(c.get("person"), "music")) return next();
     const { person, allowed } = gate(c);
     if (!allowed) return c.json({ error: NOT_ON }, 403);
     const band = mediaBandOf(person);
@@ -134,30 +130,26 @@ export function radioRoutes() {
 
   routes.get("/stations", requireAuth, async (c, next) => {
     const person = c.get("person");
-    if (!mediaAppAllowed(person, "music")) return next();
     return c.json({ ok: true as const, stations: listSavedStations(person) }, 200);
   });
 
   routes.post("/recordings/:id/start", requireAuth, async (c, next) => {
     const person = c.get("person");
-    if (!mediaAppAllowed(person, "music")) return next();
     const station = savedStationFor(person, c.req.param("id"));
     if (!station) return c.json({ error: "That station is not in your list." }, 404);
-    const result = await startRadioRecording(person, station, str((await bodyOf(c)).length));
+    const result = await startRadioRecording(person, station, str((await jsonBody(c)).length));
     return result.ok ? c.json(result.value, 200) : c.json({ error: result.error }, result.status);
   });
 
   routes.post("/recordings/:id/stop", requireAuth, async (c, next) => {
     const person = c.get("person");
-    if (!mediaAppAllowed(person, "music")) return next();
     const result = await stopRadioRecording(person, c.req.param("id"));
     return result.ok ? c.json(result.value, 200) : c.json({ error: result.error }, result.status);
   });
 
   routes.post("/stations", requireAuth, async (c, next) => {
     const person = c.get("person");
-    if (!mediaAppAllowed(person, "music")) return next();
-    const body = await bodyOf(c);
+    const body = await jsonBody(c);
     const fromDirectory = body.from === "directory";
     // Adding a directory row is part of the directory: the same switch and band decide. Adding by name and address is not a lookup,
     // so it needs no switch, but a child still cannot do it (a parent names the child as the target).
@@ -181,7 +173,6 @@ export function radioRoutes() {
   // so no directory switch is needed and an unsaved id is a 404. A station address never comes from the request.
   routes.get("/stream/:id", requireAuth, async (c, next) => {
     const person = c.get("person");
-    if (!mediaAppAllowed(person, "music")) return next();
     const station = savedStationFor(person, c.req.param("id"));
     if (!station) return c.json({ error: "That station is not in your list. Open Radio and pick one of Your stations." }, 404);
     if (station.hls) {
@@ -194,7 +185,6 @@ export function radioRoutes() {
 
   routes.get("/preview/:id", requireAuth, async (c, next) => {
     const person = c.get("person");
-    if (!mediaAppAllowed(person, "music")) return next();
     if (!radioDirectoryAllowed({ band: mediaBandOf(person) }, getHouseholdSettingValue("radio.directory.enabled") === true)) return c.json({ error: NOT_ON }, 403);
     const station = previewStationFor("household", c.req.param("id"));
     if (!station || (mediaBandOf(person) !== "adult" && /adult|porn|xxx|erotic/i.test(station.tags.join(" ")))) return c.json({ error: "That preview is no longer available. Find the station again." }, 404);
@@ -205,9 +195,8 @@ export function radioRoutes() {
   });
   routes.post("/preview", requireAuth, async (c, next) => {
     const person = c.get("person");
-    if (!mediaAppAllowed(person, "music")) return next();
     if (!radioDirectoryAllowed({ band: mediaBandOf(person) }, getHouseholdSettingValue("radio.directory.enabled") === true)) return c.json({ error: NOT_ON }, 403);
-    const id = str((await bodyOf(c)).id);
+    const id = str((await jsonBody(c)).id);
     const station = previewStationFor("household", id);
     if (!station || (mediaBandOf(person) !== "adult" && /adult|porn|xxx|erotic/i.test(station.tags.join(" ")))) return c.json({ error: "That preview is no longer available. Find the station again." }, 404);
     const opened = station.hls
@@ -220,7 +209,6 @@ export function radioRoutes() {
   // still resolves a saved station first, then the proxy checks every destination and redirect hop.
   routes.get("/hls/:id/resource/:token", requireAuth, async (c, next) => {
     const person = c.get("person");
-    if (!mediaAppAllowed(person, "music")) return next();
     const id = c.req.param("id");
     const saved = savedStationFor(person, id);
     const preview = !saved && radioDirectoryAllowed({ band: mediaBandOf(person) }, getHouseholdSettingValue("radio.directory.enabled") === true) ? previewStationFor("household", id) : null;
@@ -235,7 +223,6 @@ export function radioRoutes() {
   // The song the station says is on now, kept in memory while a stream is open. Same gate as the stream; nothing is stored.
   routes.get("/now/:id", requireAuth, async (c, next) => {
     const person = c.get("person");
-    if (!mediaAppAllowed(person, "music")) return next();
     const station = savedStationFor(person, c.req.param("id"));
     if (!station) return c.json({ error: "That station is not in your list. Open Radio and pick one of Your stations." }, 404);
     c.header("Cache-Control", "no-store");
@@ -244,7 +231,6 @@ export function radioRoutes() {
 
   routes.delete("/stations/:id", requireAuth, async (c, next) => {
     const person = c.get("person");
-    if (!mediaAppAllowed(person, "music")) return next();
     const result = removeStation(person, c.req.param("id"));
     return result.ok ? c.json({ ok: true as const }, 200) : c.json({ error: result.error }, result.status as 404);
   });

@@ -2,6 +2,8 @@
 // `POST /:id/data/:dataId` in routes/plugins.ts (app.ts mounts it first). It answers only an installed, visible media app: for any other
 // package, or an id it does not know, it passes on, so the generic route (and its 404) still decide. The rules live in
 // lib/media/appHost.ts; this file is the wire.
+import { jsonBody } from "@/lib/validation";
+import { gateMediaApp } from "@/middleware/mediaAppGate";
 import { apiRouter } from "@/lib/openapi";
 import { appRouteAllowed } from "@/lib/apps";
 import { requireAuth } from "@/middleware/auth";
@@ -31,17 +33,12 @@ import { saveMediaCover } from "@/lib/media/mediaCover";
 import { lookupLyricsFor } from "@/lib/media/lyricsAction";
 import { requestRealign } from "@/lib/music/libraryAlign";
 import { cachedTranslation, fillTranslation, readableLyrics, translationLanguage } from "@/lib/music/lyricsTranslate";
-import { musicPlaylistAction, startMusicQueue, coerceNumber, mediaAppAllowed, mediaAppData, saveProgress, setListed, setWatchlist, changeVideoCreationShare, changeMusicCreationShare, MEDIA_APP_IDS, itemViewFor, madeFileFor, type DataParams, type MediaAppId } from "@/lib/media/appHost";
+import { musicPlaylistAction, startMusicQueue, coerceNumber, mediaAppData, saveProgress, setListed, setWatchlist, changeVideoCreationShare, changeMusicCreationShare, MEDIA_APP_IDS, itemViewFor, madeFileFor, type DataParams, type MediaAppId } from "@/lib/media/appHost";
 
 type Body = Record<string, unknown>;
 
 /** VIDEO-STUDIO-07: Another take and Make it Max on a clip the Studio exported. */
 const EDITED_CLIP_LINE = "This clip was made by editing others, so it has no words to make again. Open the original clip and try there.";
-
-async function bodyOf(request: Request): Promise<Body> {
-  const parsed = await request.json().catch(() => ({}));
-  return parsed && typeof parsed === "object" && !Array.isArray(parsed) ? (parsed as Body) : {};
-}
 
 function paramsOf(body: Body): DataParams {
   return {
@@ -75,11 +72,13 @@ function withLimit<T>(body: Record<string, unknown>, rows: T[]): T[] {
 /** One media app's routes. `data/:dataId` serves the package's `contributes.data[]` ids; `progress`, `watch-later` and `like` are its actions. */
 export function createMediaAppRoutes(appId: MediaAppId) {
   const routes = apiRouter();
+  // AUDIT-DUP-ROUTES-01: one gate per path prefix; a person without the app is refused here, never passed to the next router.
+  gateMediaApp(routes, appId, ["/data/*", "/actions/*", "/progress", "/watchlist", "/playlist", "/queue", "/watch-later", "/like", ...(appId === "music" ? ["/library/*", "/radio/*"] : [])]);
 
   if (appId === "music") {
     routes.get("/library/:id/lyrics-translation", requireAuth, async (c, next) => {
       const person = c.get("person");
-      if (!mediaAppAllowed(person, "music") || !appRouteAllowed(person, "music", "data", "library", undefined, "open")) return next();
+      if (!appRouteAllowed(person, "music", "data", "library", undefined, "open")) return next();
       const id = c.req.param("id");
       const language = translationLanguage(person);
       if (!language) return c.body(null, 204);
@@ -93,7 +92,6 @@ export function createMediaAppRoutes(appId: MediaAppId) {
     const radio = radioRoutes();
     radio.get("/art", requireAuth, async (c, next) => {
     const person = c.get("person");
-    if (!mediaAppAllowed(person, "music")) return next();
     const address = c.req.query("u") ?? "";
     const normalizedAddress = address.replace(/^http:\/\//i, "https://");
     const saved = listSavedStations(person).some((station) => station.favicon === normalizedAddress);
@@ -105,7 +103,6 @@ export function createMediaAppRoutes(appId: MediaAppId) {
     return new Response(art.bytes, { status: 200, headers: { "content-type": art.type, "cache-control": "private, max-age=86400", "x-content-type-options": "nosniff", "content-security-policy": "default-src 'none'", "cross-origin-resource-policy": "same-origin" } });
     });
     radio.get("/card", requireAuth, async (c, next) => {
-      if (!mediaAppAllowed(c.get("person"), "music")) return next();
       const art = radioArtCard(c.req.query("n") ?? "");
       return new Response(art.bytes, { status: 200, headers: { "content-type": art.type, "cache-control": "private, max-age=86400", "x-content-type-options": "nosniff", "content-security-policy": "default-src 'none'", "cross-origin-resource-policy": "same-origin" } });
     });
@@ -114,13 +111,12 @@ export function createMediaAppRoutes(appId: MediaAppId) {
 
   routes.post("/data/:dataId", requireAuth, async (c, next) => {
     const person = c.get("person");
-    if (!mediaAppAllowed(person, appId)) return next();
     // NEWS-00 review: a data id a raised page binds needs that page's floor; ids the media host serves that no page binds stay under the host's own rules.
     const isRadioDirectoryScope = appId === "music" && c.req.param("dataId") === "radio";
     if (!appRouteAllowed(person, appId, "data", c.req.param("dataId"), undefined, "open")) return next();
     // PODCAST-PORT-01: the directory is a network lookup, so it is answered here (async) beside the sync host data. Same gates as its routes.
     if (appId === "podcasts" && c.req.param("dataId") === "directory") {
-      const body = await bodyOf(c.req.raw);
+      const body = await jsonBody(c);
       if (body.scope === "show") return c.json(await podcastShowRows(person, typeof body.id === "string" ? body.id : "", "show") as never, 200);
       if (body.scope === "show-episodes") return c.json(await podcastShowEpisodeRows(person, typeof body.id === "string" ? body.id : "") as never, 200);
       return c.json(withLimit(body, await podcastDirectoryRows(person, typeof body.q === "string" ? body.q : "", typeof body.scope === "string" ? body.scope : "search")) as never, 200);
@@ -128,7 +124,7 @@ export function createMediaAppRoutes(appId: MediaAppId) {
     // RADIO-02: Music's Radio pages. The directory is a network lookup (async); the rest are sync rows. Same gates as the radio routes.
     if (appId === "music") {
       if (c.req.param("dataId") === "radio") {
-        const body = await bodyOf(c.req.raw);
+        const body = await jsonBody(c);
         const field = (key: string) => (typeof body[key] === "string" ? (body[key] as string) : "");
         const scope = field("scope");
         if (scope === "station") {
@@ -147,7 +143,7 @@ export function createMediaAppRoutes(appId: MediaAppId) {
         if (scope === "genres") return c.json({ as_of: new Date().toISOString(), rows: radioGenreRows() } as never, 200);
       }
     }
-    const value = mediaAppData(person, appId, c.req.param("dataId"), paramsOf(await bodyOf(c.req.raw)));
+    const value = mediaAppData(person, appId, c.req.param("dataId"), paramsOf(await jsonBody(c)));
     if (value === null) return next();
     return c.json(value as never, 200);
   });
@@ -155,9 +151,9 @@ export function createMediaAppRoutes(appId: MediaAppId) {
   for (const [path, op] of [["share-add", "add"], ["share-remove", "remove"], ["share-private", "private"]] as const) {
     routes.post(`/actions/${path}`, requireAuth, async (c, next) => {
       const person = c.get("person");
-      if ((appId !== "videos" && appId !== "music") || !mediaAppAllowed(person, appId)) return next();
+      if (appId !== "videos" && appId !== "music") return next();
       if (!appRouteAllowed(person, appId, "actions", path)) return next();
-      const body = await bodyOf(c.req.raw);
+      const body = await jsonBody(c);
       const id = typeof body.id === "string" ? body.id : "";
       const target = typeof body.person_id === "string" ? body.person_id : undefined;
       const result = appId === "videos" ? changeVideoCreationShare(person, op, id, target) : changeMusicCreationShare(person, op, id, target);
@@ -168,9 +164,9 @@ export function createMediaAppRoutes(appId: MediaAppId) {
   // VIDEO-CREATE-01: the Make a video form's submit. The page may only call under /api/plugins/videos, so the action lives here; the rule is lib/videos/make.ts.
   routes.post("/actions/make", requireAuth, async (c, next) => {
     const person = c.get("person");
-    if (appId !== "videos" || !mediaAppAllowed(person, appId)) return next();
+    if (appId !== "videos") return next();
     if (!appRouteAllowed(person, appId, "actions", "make")) return next();
-    const read = readMakeBody(await bodyOf(c.req.raw));
+    const read = readMakeBody(await jsonBody(c));
     if (!read.ok) return c.json({ error: read.error, code: "bad_arguments" }, 422);
     const made = await makeVideoFor(person, read.body);
     return made.ok ? c.json({ ok: true as const, id: made.job.id, state: made.job.state, notice: made.notice }, 200) : c.json({ error: made.error, code: made.code }, made.status);
@@ -179,9 +175,9 @@ export function createMediaAppRoutes(appId: MediaAppId) {
   // VIDEO-CREATE-01 (V1b): Another take on the newest Create clip: the same words and choices, a new seed.
   routes.post("/actions/another", requireAuth, async (c, next) => {
     const person = c.get("person");
-    if (appId !== "videos" || !mediaAppAllowed(person, appId)) return next();
+    if (appId !== "videos") return next();
     if (!appRouteAllowed(person, appId, "actions", "another")) return next();
-    const body = await bodyOf(c.req.raw);
+    const body = await jsonBody(c);
     const source = typeof body.id === "string" ? getVideoJobFor(person, body.id) ?? getVideoJobByFileFor(person, body.id) : null;
     if (!source || source.conversationId || source.state === "queued" || source.state === "running") return c.json({ error: "That video isn't available any more. Make a new one from the words above.", code: "gone" }, 404);
     // VIDEO-STUDIO-07: a clip made by editing others has no words of its own to make again; the original clip does.
@@ -196,9 +192,9 @@ export function createMediaAppRoutes(appId: MediaAppId) {
   // a typed line is screened and spoken here, so no speech is made for a line the gate refuses. The rules are lib/videos/studio.ts.
   routes.post("/actions/add", requireAuth, async (c, next) => {
     const person = c.get("person");
-    if (appId !== "videos" || !mediaAppAllowed(person, appId)) return next();
+    if (appId !== "videos") return next();
     if (!appRouteAllowed(person, appId, "actions", "add")) return next();
-    const added = await studioAdd(person, await bodyOf(c.req.raw));
+    const added = await studioAdd(person, await jsonBody(c));
     return added.ok ? c.json(added.piece as never, 200) : c.json({ error: added.line, code: added.code }, added.status);
   });
 
@@ -206,18 +202,18 @@ export function createMediaAppRoutes(appId: MediaAppId) {
   // the reply is the job's id, which the page's export card follows. The rules are lib/videos/studioExport.ts.
   routes.post("/actions/export", requireAuth, async (c, next) => {
     const person = c.get("person");
-    if (appId !== "videos" || !mediaAppAllowed(person, appId)) return next();
+    if (appId !== "videos") return next();
     if (!appRouteAllowed(person, appId, "actions", "export")) return next();
-    const started = await startStudioExport(person, await bodyOf(c.req.raw));
+    const started = await startStudioExport(person, await jsonBody(c));
     return started.ok ? c.json({ ok: true as const, id: started.job.id, state: started.job.state }, 200) : c.json({ error: started.line, code: started.code }, started.status);
   });
 
   // VIDEO-UI-06: the Create feed's Stop. Only the person's own Create clip (no chat behind it); a finished clip stays finished.
   routes.post("/actions/cancel", requireAuth, async (c, next) => {
     const person = c.get("person");
-    if (appId !== "videos" || !mediaAppAllowed(person, appId)) return next();
+    if (appId !== "videos") return next();
     if (!appRouteAllowed(person, appId, "actions", "cancel")) return next();
-    const body = await bodyOf(c.req.raw);
+    const body = await jsonBody(c);
     const job = typeof body.id === "string" ? getVideoJobFor(person, body.id) : null;
     if (!job || job.conversationId || videoJobLockState(person, job) !== "open") return c.json({ error: "That video isn't available any more.", code: "gone" }, 404);
     const stopped = await cancelVideoJob(person, job.id);
@@ -228,9 +224,9 @@ export function createMediaAppRoutes(appId: MediaAppId) {
   // makeVideoFor, so the Max grant, the ready Max model, the words-only rule, the age and surface gate and the one-clip-at-a-time rule are the same.
   routes.post("/actions/max", requireAuth, async (c, next) => {
     const person = c.get("person");
-    if (appId !== "videos" || !mediaAppAllowed(person, appId)) return next();
+    if (appId !== "videos") return next();
     if (!appRouteAllowed(person, appId, "actions", "max")) return next();
-    const body = await bodyOf(c.req.raw);
+    const body = await jsonBody(c);
     const source = typeof body.id === "string" ? getVideoJobFor(person, body.id) ?? getVideoJobByFileFor(person, body.id) : null;
     if (!source || source.conversationId || source.state !== "done") return c.json({ error: "That video isn't available any more. Make a new one from the words on the left.", code: "gone" }, 404);
     if (source.kind === "edit") return c.json({ error: EDITED_CLIP_LINE, code: "edited" }, 422);
@@ -249,9 +245,9 @@ export function createMediaAppRoutes(appId: MediaAppId) {
   // cannot see in their own Library is a 404. `favorite` true or false sets the mark; left out, the mark is flipped.
   routes.post("/actions/favorite", requireAuth, async (c, next) => {
     const person = c.get("person");
-    if (appId !== "videos" || !mediaAppAllowed(person, appId)) return next();
+    if (appId !== "videos") return next();
     if (!appRouteAllowed(person, appId, "actions", "favorite")) return next();
-    const body = await bodyOf(c.req.raw);
+    const body = await jsonBody(c);
     const id = typeof body.id === "string" ? body.id : "";
     const job = id ? getVideoJobFor(person, id) : null;
     const fileId = job ? (job.state === "done" && videoJobLockState(person, job) === "open" ? job.files[0]?.id : undefined) : id && madeFileFor(person, "videos", id) ? id : undefined;
@@ -262,9 +258,9 @@ export function createMediaAppRoutes(appId: MediaAppId) {
 
   routes.post("/actions/lyrics", requireAuth, async (c, next) => {
     const person = c.get("person");
-    if (appId !== "music" || !mediaAppAllowed(person, appId)) return next();
+    if (appId !== "music") return next();
     if (!appRouteAllowed(person, appId, "actions", "lyrics")) return next();
-    const body = await bodyOf(c.req.raw);
+    const body = await jsonBody(c);
     const id = typeof body.id === "string" ? body.id : typeof body.media_id === "string" ? body.media_id : "";
     const result = await lookupLyricsFor(person, id);
     return result.ok ? c.json(result.value as never, 200) : c.json({ error: result.error }, result.status);
@@ -273,9 +269,9 @@ export function createMediaAppRoutes(appId: MediaAppId) {
   // MUSIC-GEN-20c: the player's "Lyrics look off" action; the same function as POST /api/music/library/:id/lyrics-realign.
   routes.post("/actions/lyrics-realign", requireAuth, async (c, next) => {
     const person = c.get("person");
-    if (appId !== "music" || !mediaAppAllowed(person, appId)) return next();
+    if (appId !== "music") return next();
     if (!appRouteAllowed(person, appId, "actions", "lyrics-realign")) return next();
-    const body = await bodyOf(c.req.raw);
+    const body = await jsonBody(c);
     const id = typeof body.id === "string" ? body.id : typeof body.media_id === "string" ? body.media_id : "";
     const { result } = requestRealign(person, id);
     return result.ok ? c.json({ ok: true as const, state: "queued" as const }, 202) : c.json({ error: result.error }, result.status);
@@ -283,16 +279,16 @@ export function createMediaAppRoutes(appId: MediaAppId) {
 
   routes.post("/actions/edit", requireAuth, async (c, next) => {
     const person = c.get("person");
-    if (appId === "books" || !mediaAppAllowed(person, appId)) return next();
+    if (appId === "books") return next();
     if (!appRouteAllowed(person, appId, "actions", "edit", undefined, "open")) return next();
-    const result = editMediaItem(person, appId, await bodyOf(c.req.raw));
+    const result = editMediaItem(person, appId, await jsonBody(c));
     if (!result.ok) return c.json({ error: result.error }, result.status);
     return c.json((itemViewFor(person, appId, String(result.value.id)) ?? result.value) as never, 200);
   });
 
   routes.post("/actions/cover", requireAuth, async (c, next) => {
     const person = c.get("person");
-    if (appId === "books" || !mediaAppAllowed(person, appId)) return next();
+    if (appId === "books") return next();
     if (!appRouteAllowed(person, appId, "actions", "cover", undefined, "open")) return next();
     const form = await c.req.parseBody().catch(() => ({} as Record<string, unknown>));
     const file = form.file;
@@ -302,29 +298,27 @@ export function createMediaAppRoutes(appId: MediaAppId) {
 
   routes.post("/progress", requireAuth, async (c, next) => {
     const person = c.get("person");
-    if (!mediaAppAllowed(person, appId)) return next();
-    const result = saveProgress(person, appId, await bodyOf(c.req.raw), new Date(), `s:${hashSessionToken(getCookie(c, "session")!)}`);
+    const result = saveProgress(person, appId, await jsonBody(c), new Date(), `s:${hashSessionToken(getCookie(c, "session")!)}`);
     return result.ok ? c.json({ ok: true as const, ...result.value }, 200) : c.json({ error: result.error }, result.status);
   });
 
   if (appId === "shows") routes.post("/watchlist", requireAuth, async (c, next) => {
     const person = c.get("person");
-    if (!mediaAppAllowed(person, appId)) return next();
-    const result = setWatchlist(person, await bodyOf(c.req.raw));
+    const result = setWatchlist(person, await jsonBody(c));
     return result.ok ? c.json({ ok: true, ...result.value }, 200) : c.json({ error: result.error }, result.status);
   });
 
   routes.post("/playlist", requireAuth, async (c, next) => {
     const person = c.get("person");
-    if (appId !== "music" || !mediaAppAllowed(person, appId)) return next();
-    const result = musicPlaylistAction(person, await bodyOf(c.req.raw));
+    if (appId !== "music") return next();
+    const result = musicPlaylistAction(person, await jsonBody(c));
     return result.ok ? c.json({ ok: true as const, ...result.value }, 200) : c.json({ error: result.error }, result.status);
   });
 
   routes.post("/queue", requireAuth, async (c, next) => {
     const person = c.get("person");
-    if (appId !== "music" || !mediaAppAllowed(person, appId)) return next();
-    const result = startMusicQueue(person, await bodyOf(c.req.raw));
+    if (appId !== "music") return next();
+    const result = startMusicQueue(person, await jsonBody(c));
     return result.ok ? c.json(result.value, 200) : c.json({ error: result.error }, result.status);
   });
 
@@ -332,8 +326,7 @@ export function createMediaAppRoutes(appId: MediaAppId) {
   for (const [path, kind] of lists) {
     routes.post(`/${path}`, requireAuth, async (c, next) => {
       const person = c.get("person");
-      if (!mediaAppAllowed(person, appId)) return next();
-      const body = await bodyOf(c.req.raw);
+      const body = await jsonBody(c);
       const result = setListed(person, appId, kind, body.media_id, body.on);
       return result.ok ? c.json({ ok: true as const, ...result.value }, 200) : c.json({ error: result.error }, result.status);
     });
