@@ -8,12 +8,17 @@ import { ApiError, api, type Roster } from "@/lib/api";
 
 export function TwoStepSignInSection({ person }: { person: Roster }) {
   const allowed = person.role === "owner" || person.role === "admin";
-  const [enabled, setEnabled] = useState(false);
+  const [enabled, setEnabled] = useState<boolean | null>(null);
   const [uri, setUri] = useState<string | null>(null);
   const [code, setCode] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
-  useEffect(() => { if (allowed) void api.totpStatus().then((result) => setEnabled(result.enabled)).catch(() => setError("Could not check two-step sign-in. Check your connection and try again.")); }, [allowed]);
+  useEffect(() => {
+    if (!allowed) return;
+    let live = true;
+    void api.totpStatus().then((result) => { if (live) setEnabled(result.enabled); }).catch(() => { if (live) setError("Could not check two-step sign-in. Check your connection and try again."); });
+    return () => { live = false; };
+  }, [allowed]);
 
   async function start() {
     setBusy(true); setError("");
@@ -33,7 +38,7 @@ export function TwoStepSignInSection({ person }: { person: Roster }) {
   }
   if (!allowed) return null;
   return <div className="flex flex-col gap-4">
-    {!enabled && !uri ? <Button type="button" size="lg" disabled={busy} onClick={() => void start()}>Turn on</Button> : null}
+    {enabled === false && !uri ? <Button type="button" size="lg" disabled={busy} onClick={() => void start()}>Turn on</Button> : null}
     {uri ? <>
       <p className="text-sm">Scan this code with an authenticator app, then enter the 6-digit code it shows.</p>
       <QrCode value={uri} size={192} label="Authenticator setup QR code" />
@@ -42,7 +47,7 @@ export function TwoStepSignInSection({ person }: { person: Roster }) {
       <Input id="totp-code" inputMode="numeric" autoComplete="one-time-code" maxLength={6} value={code} onChange={(event) => setCode(event.target.value.replace(/\D/g, "").slice(0, 6))} disabled={busy} />
       <Button type="button" size="lg" disabled={busy || code.length !== 6} onClick={() => void submit()}>Confirm</Button>
     </> : null}
-    {enabled ? <><p className="text-sm">Two-step sign-in is on.</p><Label htmlFor="totp-code">Enter a code to turn it off</Label><Input id="totp-code" inputMode="numeric" autoComplete="one-time-code" maxLength={6} value={code} onChange={(event) => setCode(event.target.value.replace(/\D/g, "").slice(0, 6))} disabled={busy} /><Button type="button" size="lg" disabled={busy || code.length !== 6} onClick={() => void submit()}>Turn off</Button></> : null}
+    {enabled === true ? <><p className="text-sm">Two-step sign-in is on.</p><Label htmlFor="totp-code">Enter a code to turn it off</Label><Input id="totp-code" inputMode="numeric" autoComplete="one-time-code" maxLength={6} value={code} onChange={(event) => setCode(event.target.value.replace(/\D/g, "").slice(0, 6))} disabled={busy} /><Button type="button" size="lg" disabled={busy || code.length !== 6} onClick={() => void submit()}>Turn off</Button></> : null}
     {error ? <Alert variant="destructive"><AlertDescription>{error}</AlertDescription></Alert> : null}
   </div>;
 }

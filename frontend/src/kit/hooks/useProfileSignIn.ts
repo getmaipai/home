@@ -27,8 +27,11 @@ export function useProfileSignIn(onSignedIn: () => void) {
     attemptState.clear();
     try {
       const result = await api.verifySecret(selected.id, secret);
-      if (result.totpRequired && result.pendingToken) { setPendingToken(result.pendingToken); setTotpCode(""); }
-      else onSignedIn();
+      if (result.totpRequired) {
+        // No cookie was set: a code step follows. A hub that asks for a code without handing out the token cannot finish the sign-in.
+        if (!result.pendingToken) throw new ApiError("Home asked for a two-step code but could not start it. Try signing in again.", 401);
+        setPendingToken(result.pendingToken); setTotpCode("");
+      } else onSignedIn();
     } catch (e) {
       // A wrong code empties the boxes so the next try starts clean; a network error keeps what was typed.
       const what = selected.pinDigits ? "passcode" : "PIN or password";

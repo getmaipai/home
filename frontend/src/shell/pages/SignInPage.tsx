@@ -153,7 +153,7 @@ export function SignInPage({ onSignedIn }: { onSignedIn: () => void }) {
                     </div>
                   )}
                   {secretError ? <Alert variant="destructive"><AlertDescription>{secretError}</AlertDescription></Alert> : null}
-                  {secretError && !usePassword && !locked ? (
+                  {secretError && !pendingToken && !usePassword && !locked ? (
                     <p className="text-center text-sm text-muted-foreground">Using a password? Tap "Use a password instead".</p>
                   ) : null}
                   {pendingToken || usePassword ? (
