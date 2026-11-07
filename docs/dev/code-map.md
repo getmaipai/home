@@ -928,7 +928,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/secretCheck.ts` | verifyAgainstRecord |
 | `backend/src/lib/secretPaths.ts` | protectSecretPath, protectExistingSecretPaths |
 | `backend/src/lib/secretThrottle.ts` | throttleCheck, throttleFail, throttleReset, __resetThrottleForTests, getClientIp |
-| `backend/src/lib/secrets.ts` | encryptSecret, decryptSecret, __resetSecretsKeyCacheForTests |
+| `backend/src/lib/secrets.ts` | SECRETS_KEY_NAME, SECRETS_KEY_ENV, householdKeyBytes, encryptSecret, decryptSecret, __resetSecretsKeyCacheForTests |
 | `backend/src/lib/selfUrl.ts` | selfBaseUrl |
 | `backend/src/lib/serverConfig.ts` | SERVER_IDLE_TIMEOUT_SECONDS |
 | `backend/src/lib/serverRebind.ts` | rebindWithRetry |
