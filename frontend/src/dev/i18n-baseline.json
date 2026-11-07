@@ -141,7 +141,7 @@
   "shell/pages/MusicWorkspacePage.tsx": 54,
   "shell/pages/NotFoundPage.tsx": 1,
   "shell/pages/PackageAppPage.tsx": 3,
-  "shell/pages/PerformancePage.tsx": 9,
+  "shell/pages/PerformancePage.tsx": 10,
   "shell/pages/PersonProfilePage.tsx": 21,
   "shell/pages/PrivacyPage.tsx": 27,
   "shell/pages/ProjectsPage.tsx": 12,
@@ -195,5 +195,6 @@
   "shell/reader/SearchBox.tsx": 1,
   "shell/reader/SearchResults.tsx": 9,
   "shell/sessionLockContext.tsx": 2,
-  "shell/useSideChat.tsx": 1
+  "shell/useSideChat.tsx": 1,
+  "shell/pages/performance/ToolsOfferedBody.tsx": 7
 }
