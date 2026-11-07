@@ -23,6 +23,17 @@ describe("Host allowlist", () => {
     });
   });
 
+  test("leaves the coding wire and first-run setup to their own source checks", async () => {
+    const server = new Hono();
+    server.use("*", hostCheck);
+    server.post("/v1/chat/completions", (c) => c.text("wire"));
+    server.post("/code/v1/messages", (c) => c.text("wire"));
+    server.get("/api/setup/state", (c) => c.text("setup"));
+    expect((await server.request("/v1/chat/completions", { method: "POST", headers: { host: "home.example.com" } })).status).toBe(200);
+    expect((await server.request("/code/v1/messages", { method: "POST", headers: { host: "home.example.com" } })).status).toBe(200);
+    expect((await server.request("/api/setup/state", { headers: { host: "home.example.com" } })).status).toBe(200);
+  });
+
   test("accepts loopback and the Home TLS name", async () => {
     for (const host of ["localhost:8787", "127.0.0.1", "[::1]:8787", "maipai.local"]) {
       expect((await app().request("/", { headers: { host } })).status).toBe(200);

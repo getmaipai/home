@@ -40,6 +40,9 @@ export const hostCheck: MiddlewareHandler = async (c, next) => {
   // First-run setup has its own stricter local-only Host response (403); let
   // that route guard preserve its established response contract.
   if (c.req.path === "/api/auth/setup" || c.req.path.startsWith("/api/setup/")) return next();
+  // The coding wire (/v1/* and /code/*) never carries a cookie: it needs an API key and keeps its own source policy (home
+  // network, tailnet, public URL) in routes/codeGateway.ts, so a rebound page gains nothing there and that policy answers.
+  if (c.req.path.startsWith("/v1/") || c.req.path.startsWith("/code/")) return next();
   const allowed = await allowedHosts();
   const host = parseHostName(c.req.header("host") ?? new URL(c.req.url).host);
   const forwarded = TRUST_PROXY ? c.req.header("x-forwarded-host")?.split(",")[0]?.trim() : undefined;
