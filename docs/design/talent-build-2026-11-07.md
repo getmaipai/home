@@ -2,8 +2,8 @@
 
 Status: build instructions for [talent-2026-11-07.md](talent-2026-11-07.md) (the design, architect APPROVED). This file: architect
 APPROVED 2026-11-07 (record `TALENT-BUILD.verdict`), then NEEDS-RULE-CHANGE after the owner's ruling that minors may use real-person
-synths under a parental control, pending the `.github/docs/SAFETY.md` amendment (`Owner-approved: 2026-11-07`); no slice is built
-before that edit lands. Written so that a smaller
+synths under a parental control; that rule change landed in `.github/docs/SAFETY.md` on 2026-11-07 (`Owner-approved: 2026-11-07`,
+org commit 545a2a5), so the verdict is APPROVED again and the slices build. Written so that a smaller
 coding model can build each slice from this file alone. Every path, name and signature below was read from `origin/main` of `home`,
 `commons` and `stack` on 2026-11-07; if a named thing is missing when you build, stop and report it instead of inventing a replacement.
 No code exists yet. Owner's words: "do not code, we are just planning" (2026-11-07); this file is the plan, a slice is built only when
