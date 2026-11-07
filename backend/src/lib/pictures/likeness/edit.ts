@@ -94,10 +94,12 @@ async function atSourceSize(result: EditResult, width: number, height: number): 
 }
 
 /** True when every protected face is found again and its pixels are untouched. */
-async function facesUntouched(deps: LikenessDeps, source: Uint8Array, result: Uint8Array, faces: Face[], width: number, height: number): Promise<boolean> {
+async function facesUntouched(deps: LikenessDeps, source: Uint8Array, result: Uint8Array, faces: Face[], width: number, height: number, keep?: Uint8Array): Promise<boolean> {
   const found = await deps.detect(result);
   if (!found.ok) return false;
   const [a, b] = await Promise.all([gray(source, width, height), gray(result, width, height)]);
+  // Only the head is judged: a face box also holds corners of a neighbour's shoulder or hair that the edit may legitimately change.
+  if (keep) for (let i = 0; i < keep.length; i += 1) if (keep[i]! < 128) { a[i] = 0; b[i] = 0; }
   return matchFaces(faces, found.value).every((m) => m.kind === "matched" && faceUntouched(a, b, m.source, width, height) >= LIKENESS.untouchedSsim);
 }
 
@@ -177,7 +179,7 @@ export async function runLikenessEdit(
     check(signal); progress(clothes ? "changing the clothes" : "changing the background", 45 + attempt * 10);
     const candidate = await atSourceSize(await deps.editMasked(source, mask, width, height, `${prompt}. ${suffix}`, featherPx, deps.seed(), signal), width, height);
     progress("checking the faces", 80);
-    if (await facesUntouched(deps, source, candidate.bytes, faces, width, height)) { made = candidate; break; }
+    if (await facesUntouched(deps, source, candidate.bytes, faces, width, height, head)) { made = candidate; break; }
   }
   if (!made) throw new Error(LINES.guard);
 
@@ -190,7 +192,7 @@ export async function runLikenessEdit(
       for (let t = 0; t < LIKENESS.personTries && best < LIKENESS.coverage; t += 1) {
         check(signal); progress("changing the clothes", 85);
         const retry = await atSourceSize(await deps.editMasked(made.bytes, region, width, height, `${prompt}. Change the clothing of this person. ${suffix}`, featherPx, deps.seed(), signal), width, height);
-        if (!(await facesUntouched(deps, source, retry.bytes, faces, width, height))) continue;
+        if (!(await facesUntouched(deps, source, retry.bytes, faces, width, height, head))) continue;
         const c = coverage(src, await rgba(retry.bytes, width, height), region);
         if (c > best) { best = c; made = retry; }
       }
