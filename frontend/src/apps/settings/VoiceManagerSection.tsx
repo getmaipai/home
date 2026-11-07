@@ -6,7 +6,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Badge } from "@maipai/ui/src/ui/badge";
 import { Button } from "@maipai/ui/src/ui/button";
 import { api, type ResolvedSetting, type StackVoice } from "@/lib/api";
-import { householdVoicesApi, type HouseholdVoice } from "@/lib/householdVoicesApi";
+import { householdVoicesApi, inspiredLevelLabel, type HouseholdVoice } from "@/lib/householdVoicesApi";
 import { playableVoices, presetNameForVoice, voiceDisplayName } from "@/lib/voice/voiceBrowserRows";
 import { voicePreviewPlayer, type VoicePreviewState } from "@/lib/voice/voicePreviewPlayer";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@maipai/ui/src/ui/dialog";
@@ -38,6 +38,7 @@ export function VoiceManagerSection() {
   const homeQuery = useQuery<ResolvedSetting[]>({ queryKey: ["settings-values", "household"], queryFn: () => api.settingsValues("household") });
   const [preview, setPreview] = useState<VoicePreviewState>(voicePreviewPlayer.getState());
   const [adding, setAdding] = useState(false);
+  const [addInspired, setAddInspired] = useState(false);
   const [addBusy, setAddBusy] = useState(false);
   const [removing, setRemoving] = useState<StackVoice | null>(null);
   const [renaming, setRenaming] = useState<StackVoice | null>(null);
@@ -92,7 +93,7 @@ export function VoiceManagerSection() {
   return <section className="flex flex-col gap-4">
     <div className="flex items-start justify-between gap-4">
       <p className="min-w-0 flex-1 text-base text-muted-foreground">{i18n._({ id: "Every voice Home can speak with. Home's default voice is used by anyone, and any robot, with no voice of their own.", message: "Every voice Home can speak with. Home's default voice is used by anyone, and any robot, with no voice of their own." })}</p>
-      <div className="shrink-0"><Button type="button" onClick={() => { setNotice(null); setAdding(true); }}>{i18n._({ id: "Add voice", message: "Add voice" })}</Button></div>
+      <div className="flex shrink-0 flex-wrap gap-2"><Button type="button" onClick={() => { setNotice(null); setAddInspired(false); setAdding(true); }}>{i18n._({ id: "Add voice", message: "Add voice" })}</Button><Button type="button" variant="outline" onClick={() => { setNotice(null); setAddInspired(true); setAdding(true); }}>{i18n._({ id: "Add Inspired voice", message: "Add Inspired voice" })}</Button></div>
     </div>
     {notice ? <p role="status" className="text-base text-primary">{notice}</p> : null}
     {error ? <p role="alert" className="text-base text-destructive">{error}</p> : null}
@@ -110,7 +111,7 @@ export function VoiceManagerSection() {
             return <li key={voice.id} className={`grid items-center gap-x-3 gap-y-2 py-3 ${COLUMNS}`}>
               <div className="flex min-w-0 flex-col gap-0.5">
                 <div className="flex flex-wrap items-center gap-2"><span className="truncate text-base font-medium">{voiceDisplayName(voice)}</span>{home ? <Badge variant="secondary">{i18n._({ id: "Home's default", message: "Home's default" })}</Badge> : null}</div>
-                <span className={MUTED}>{record ? [i18n._({ id: "Made by {name}", message: "Made by {name}", values: { name: record.creatorName } }), ...(record.temperature !== undefined ? [i18n._({ id: "Liveliness {value}", message: "Liveliness {value}", values: { value: record.temperature } })] : []), ...(record.pitchSemitones ? [i18n._({ id: "Pitch {value}", message: "Pitch {value}", values: { value: `${record.pitchSemitones > 0 ? "+" : ""}${record.pitchSemitones}` } })] : [])].join(" · ") : isEngineVoice(voice) ? i18n._({ id: "The voice built into Home's speech engine.", message: "The voice built into Home's speech engine." }) : i18n._({ id: "Comes with Home.", message: "Comes with Home." })}</span>
+                <span className={MUTED}>{record ? [...(record.kind === "inspired" && record.inspiredLevel ? [i18n._({ id: "Inspired voice ({level})", message: "Inspired voice ({level})", values: { level: inspiredLevelLabel(record.inspiredLevel) } })] : []), i18n._({ id: "Made by {name}", message: "Made by {name}", values: { name: record.creatorName } }), ...(record.temperature !== undefined ? [i18n._({ id: "Liveliness {value}", message: "Liveliness {value}", values: { value: record.temperature } })] : []), ...(record.pitchSemitones ? [i18n._({ id: "Pitch {value}", message: "Pitch {value}", values: { value: `${record.pitchSemitones > 0 ? "+" : ""}${record.pitchSemitones}` } })] : [])].join(" · ") : isEngineVoice(voice) ? i18n._({ id: "The voice built into Home's speech engine.", message: "The voice built into Home's speech engine." }) : i18n._({ id: "Comes with Home.", message: "Comes with Home." })}</span>
                 <span className={`${MUTED} xl:hidden`}>{detail}</span>
               </div>
               <span className="hidden text-base xl:block">{custom ? i18n._({ id: "Custom", message: "Custom" }) : i18n._({ id: "Built in", message: "Built in" })}</span>
@@ -129,10 +130,10 @@ export function VoiceManagerSection() {
     <Dialog open={adding} onOpenChange={(open) => { if (!addBusy) setAdding(open); }}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>{i18n._({ id: "Add a voice", message: "Add a voice" })}</DialogTitle>
-          <DialogDescription>{i18n._({ id: "Make a voice from a WAV, MP3 or FLAC recording of 6 to 30 seconds. Everyone in the home can pick it, and so can a robot.", message: "Make a voice from a WAV, MP3 or FLAC recording of 6 to 30 seconds. Everyone in the home can pick it, and so can a robot." })}</DialogDescription>
+          <DialogTitle>{addInspired ? i18n._({ id: "Add an Inspired voice", message: "Add an Inspired voice" }) : i18n._({ id: "Add a voice", message: "Add a voice" })}</DialogTitle>
+          <DialogDescription>{addInspired ? i18n._({ id: "Make a new voice based on a WAV, MP3 or FLAC recording of 6 to 30 seconds. It is not a copy. Everyone in the home can pick it, and so can a robot.", message: "Make a new voice based on a WAV, MP3 or FLAC recording of 6 to 30 seconds. It is not a copy. Everyone in the home can pick it, and so can a robot." }) : i18n._({ id: "Make a voice from a WAV, MP3 or FLAC recording of 6 to 30 seconds. Everyone in the home can pick it, and so can a robot.", message: "Make a voice from a WAV, MP3 or FLAC recording of 6 to 30 seconds. Everyone in the home can pick it, and so can a robot." })}</DialogDescription>
         </DialogHeader>
-        <AddVoiceForm onBusyChange={setAddBusy} onCancel={() => setAdding(false)} onMade={(name) => { setAdding(false); setNotice(i18n._({ id: "{name} is ready. Test it here, then pick it for a person or a robot.", message: "{name} is ready. Test it here, then pick it for a person or a robot.", values: { name } })); }} />
+        <AddVoiceForm inspired={addInspired} onBusyChange={setAddBusy} onCancel={() => setAdding(false)} onMade={(name) => { setAdding(false); setNotice(i18n._({ id: "{name} is ready. Test it here, then pick it for a person or a robot.", message: "{name} is ready. Test it here, then pick it for a person or a robot.", values: { name } })); }} />
       </DialogContent>
     </Dialog>
     <Dialog open={renaming !== null} onOpenChange={(open) => { if (!open) setRenaming(null); }}>

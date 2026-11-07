@@ -22,6 +22,7 @@ import { ResolvedSettingSchema } from "@/routes/settings";
 import {
   listClonedVoices,
   saveClonedVoice,
+  saveInspiredVoice,
   deleteClonedVoice,
   getClonedVoiceFile,
   clonedVoiceExists,
@@ -501,6 +502,8 @@ const clonedUploadRoute = createRoute({
             createdAt: z.string(),
             temperature: z.number().optional(),
             pitchSemitones: z.number().optional(),
+            kind: z.literal("inspired").optional(),
+            inspiredLevel: z.enum(["different", "very_different"]).optional(),
           }),
         },
       },
@@ -519,7 +522,10 @@ voiceRoutes.openapi(clonedUploadRoute, async (c) => {
   if (typeof label !== "string") return c.json({ error: "label is required" }, 400);
   const bytes = new Uint8Array(await file.arrayBuffer());
   const options = { temperature: optionalNumber(body.temperature), pitchSemitones: optionalNumber(body.pitch_semitones) };
-  const result = saveClonedVoice(actor, label, bytes, file.type, options);
+  // V5 "Inspired voice": an inspired_level field (different or very_different) makes a new voice based on the clip instead of a copy.
+  const inspiredLevel = typeof body.inspired_level === "string" && body.inspired_level ? body.inspired_level : null;
+  if (inspiredLevel && (options.temperature !== null || options.pitchSemitones !== null)) return c.json({ error: "An Inspired voice has no liveliness or pitch setting. Make it without them." }, 400);
+  const result = inspiredLevel ? await saveInspiredVoice(actor, label, bytes, file.type, inspiredLevel) : saveClonedVoice(actor, label, bytes, file.type, options);
   if (!result.ok) {
     if (result.status === 404) return c.json({ error: result.error }, 404);
     return result.status === 400 ? c.json({ error: result.error }, 400) : c.json({ error: result.error }, 403);

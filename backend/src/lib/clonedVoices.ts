@@ -24,6 +24,7 @@ import type { PersonRow } from "@/types";
 import type { ClonedVoiceInfo } from "@/wire";
 import type { StackVoice } from "@/lib/stack/types";
 import { appendLogLine } from "@/lib/log";
+import { isInspiredLevel, makeInspiredReference, type InspiredLevel } from "@/lib/voiceShift";
 import { transcribeClonedVoiceOnce } from "@/lib/clonedVoiceTranscript";
 import { householdKeyBytes } from "@/lib/secrets";
 import type { Result } from "@/lib/result";
@@ -67,6 +68,7 @@ function toInfo(row: typeof clonedVoices.$inferSelect, creatorName: string): Clo
     createdAt: row.createdAt,
     ...(row.temperature !== null ? { temperature: row.temperature } : {}),
     ...(row.pitchSemitones !== null ? { pitchSemitones: row.pitchSemitones } : {}),
+    ...(row.kind === "inspired" && isInspiredLevel(row.inspiredLevel) ? { kind: "inspired" as const, inspiredLevel: row.inspiredLevel } : {}),
   };
 }
 
@@ -99,6 +101,7 @@ export function saveClonedVoice(
   bytes: Uint8Array,
   mimeType: string,
   options: HouseholdVoiceOptions = {},
+  inspired: InspiredLevel | null = null,
 ): ClonedVoiceOpResult<ClonedVoiceInfo> {
   // AUDIO-PARITY-01 V4 (owner-approved 2026-11-05): every member makes a voice; a guest does not (SAFETY.md).
   if (!mayUseClipVoices(creator)) return { ok: false, status: 403, error: "A guest cannot make a voice. Ask the person who manages Home to add you as a member first." };
@@ -136,6 +139,8 @@ export function saveClonedVoice(
     temperature,
     pitchSemitones,
     transcript: null,
+    kind: inspired ? "inspired" : null,
+    inspiredLevel: inspired,
   };
   try {
     db.insert(clonedVoices).values(row).run();
@@ -155,9 +160,24 @@ export function saveClonedVoice(
     throw err;
   }
   // One audit line: the role of the maker and the settings; never a person id or name, a voice id, the voice's name or the clip (rule 6a).
-  appendLogLine(`voice.created role=${creator.role} temperature=${temperature ?? "default"} pitch=${pitchSemitones ?? 0}`);
+  appendLogLine(`voice.created role=${creator.role} temperature=${temperature ?? "default"} pitch=${pitchSemitones ?? 0}${inspired ? ` kind=inspired level=${inspired}` : ""}`);
   void transcribeClonedVoiceOnce(id, bytes, mimeType).catch(() => {});
   return { ok: true, value: toInfo(row, creator.displayName) };
+}
+
+/** AUDIO-PARITY-01 V5, "Inspired voice": a new voice based on an uploaded clip, not a copy. The clip is moved in pitch and formants
+ * (about 2 semitones for "Different", 4 for "Very different") and kept as the reference of an ordinary household voice, whose record
+ * says it is inspired and by how much. Same rules as making a voice: every member but a guest, same clip limits, no tuning controls. */
+export async function saveInspiredVoice(creator: PersonRow, label: string, bytes: Uint8Array, mimeType: string, level: unknown): Promise<ClonedVoiceOpResult<ClonedVoiceInfo>> {
+  if (!mayUseClipVoices(creator)) return { ok: false, status: 403, error: "A guest cannot make a voice. Ask the person who manages Home to add you as a member first." };
+  if (!isInspiredLevel(level)) return { ok: false, status: 400, error: "Choose how different the new voice should be: Different or Very different." };
+  const extension = EXTENSION_BY_MIME[mimeType];
+  if (!extension || !NEW_VOICE_EXTENSIONS.has(extension)) return { ok: false, status: 400, error: "Use a WAV, MP3 or FLAC recording. Save it in one of those formats and choose it again." };
+  if (bytes.byteLength === 0) return { ok: false, status: 400, error: "the uploaded file is empty" };
+  if (bytes.byteLength > MAX_BYTES) return { ok: false, status: 400, error: `file must be ${MAX_BYTES / (1024 * 1024)}MB or smaller` };
+  const shifted = await makeInspiredReference(bytes, extension, level);
+  if (!shifted) return { ok: false, status: 400, error: extension === "wav" ? "Home could not read this recording. Try a different WAV file." : "Home cannot open this kind of recording on this computer. Save it as a WAV file and choose it again." };
+  return saveClonedVoice(creator, label, shifted, "audio/wav", {}, level);
 }
 
 const MAX_RENAME_LENGTH = 40;

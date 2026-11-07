@@ -28,6 +28,7 @@ export function VoiceBrowserSection({ person }: { person: Roster }) {
   const mayMake = person.role !== "guest";
   const minor = person.role === "child" || person.role === "teen";
   const [making, setMaking] = useState(false);
+  const [inspired, setInspired] = useState(false);
   const [makeBusy, setMakeBusy] = useState(false);
   const [madeName, setMadeName] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -101,15 +102,15 @@ export function VoiceBrowserSection({ person }: { person: Roster }) {
     {preview.error ? <p role="alert">{preview.error}</p> : null}
     {saveError ? <p role="alert">{saveError}</p> : null}
     <p role="status" className="text-sm text-muted-foreground">{saved ? i18n._({ id: "Saved.", message: "Saved." }) : ""}</p>
-    {mayMake ? <div className="flex flex-wrap items-center gap-2"><Button type="button" variant="outline" onClick={() => { setMadeName(null); setMaking(true); }}>{i18n._({ id: "Make a voice from a recording", message: "Make a voice from a recording" })}</Button></div> : null}
+    {mayMake ? <div className="flex flex-wrap items-center gap-2"><Button type="button" variant="outline" onClick={() => { setMadeName(null); setInspired(false); setMaking(true); }}>{i18n._({ id: "Make a voice from a recording", message: "Make a voice from a recording" })}</Button><Button type="button" variant="outline" onClick={() => { setMadeName(null); setInspired(true); setMaking(true); }}>{i18n._({ id: "Make an Inspired voice", message: "Make an Inspired voice" })}</Button></div> : null}
     {madeName ? <p role="status" className="text-sm text-muted-foreground">{person.role === "child" ? i18n._({ id: "{madeName} is ready. Ask a parent to pick it for you.", message: "{madeName} is ready. Ask a parent to pick it for you.", values: { madeName } }) : i18n._({ id: "{madeName} is ready. Choose it in the list above.", message: "{madeName} is ready. Choose it in the list above.", values: { madeName } })}</p> : null}
     {mayMake ? <Dialog open={making} onOpenChange={(open) => { if (!makeBusy) setMaking(open); }}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>{i18n._({ id: "Make a voice", message: "Make a voice" })}</DialogTitle>
-          <DialogDescription>{minor ? i18n._({ id: "Make a voice from a WAV, MP3 or FLAC recording of 6 to 30 seconds. A parent can see it, listen to it and delete it.", message: "Make a voice from a WAV, MP3 or FLAC recording of 6 to 30 seconds. A parent can see it, listen to it and delete it." }) : i18n._({ id: "Make a voice from a WAV, MP3 or FLAC recording of 6 to 30 seconds. Everyone in the home can pick it, and so can a robot.", message: "Make a voice from a WAV, MP3 or FLAC recording of 6 to 30 seconds. Everyone in the home can pick it, and so can a robot." })}</DialogDescription>
+          <DialogTitle>{inspired ? i18n._({ id: "Make an Inspired voice", message: "Make an Inspired voice" }) : i18n._({ id: "Make a voice", message: "Make a voice" })}</DialogTitle>
+          <DialogDescription>{inspired ? i18n._({ id: "Make a new voice based on a WAV, MP3 or FLAC recording of 6 to 30 seconds. It is not a copy. A parent can see it, listen to it and delete it.", message: "Make a new voice based on a WAV, MP3 or FLAC recording of 6 to 30 seconds. It is not a copy. A parent can see it, listen to it and delete it." }) : minor ? i18n._({ id: "Make a voice from a WAV, MP3 or FLAC recording of 6 to 30 seconds. A parent can see it, listen to it and delete it.", message: "Make a voice from a WAV, MP3 or FLAC recording of 6 to 30 seconds. A parent can see it, listen to it and delete it." }) : i18n._({ id: "Make a voice from a WAV, MP3 or FLAC recording of 6 to 30 seconds. Everyone in the home can pick it, and so can a robot.", message: "Make a voice from a WAV, MP3 or FLAC recording of 6 to 30 seconds. Everyone in the home can pick it, and so can a robot." })}</DialogDescription>
         </DialogHeader>
-        <AddVoiceForm canTune={person.role === "owner" || person.role === "admin"} minor={minor} onBusyChange={setMakeBusy} onCancel={() => setMaking(false)} onMade={(name) => { setMaking(false); setMadeName(name); }} />
+        <AddVoiceForm inspired={inspired} canTune={person.role === "owner" || person.role === "admin"} minor={minor} onBusyChange={setMakeBusy} onCancel={() => setMaking(false)} onMade={(name) => { setMaking(false); setMadeName(name); }} />
       </DialogContent>
     </Dialog> : null}
   </>;

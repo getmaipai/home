@@ -11,17 +11,20 @@ import { denoEnv } from "@/lib/denoHost";
 function denoCanRunBundledHandlers(): boolean {
   const deno = Bun.which("deno");
   if (!deno) return false;
-  try {
-    const probe = Bun.spawnSync([deno, "eval", "--cached-only", 'import "npm:zod@4.6.5";'], {
-      env: { ...denoEnv(), PATH: process.env.PATH ?? "", HOME: process.env.HOME ?? "" },
-      stdout: "ignore",
-      stderr: "ignore",
-      timeout: 15_000,
-    });
-    return probe.exitCode === 0;
-  } catch {
-    return false;
+  // Three tries: concurrent shards probing the same npm cache can fail one probe while Deno itself is fine.
+  for (let attempt = 0; attempt < 3; attempt++) {
+    try {
+      const probe = Bun.spawnSync([deno, "eval", "--cached-only", 'import "npm:zod@4.6.5";'], {
+        env: { ...denoEnv(), PATH: process.env.PATH ?? "", HOME: process.env.HOME ?? "" },
+        stdout: "ignore",
+        stderr: "ignore",
+        timeout: 60_000,
+      });
+      if (probe.exitCode === 0) return true;
+    } catch { /* try again */ }
+    Bun.sleepSync(500);
   }
+  return false;
 }
 
 export const HAS_DENO = denoCanRunBundledHandlers();

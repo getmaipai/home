@@ -1033,6 +1033,9 @@ export const clonedVoices = sqliteTable("cloned_voices", {
   temperature: real("temperature"),
   pitchSemitones: real("pitch_semitones"),
   transcript: text("transcript"),
+  // AUDIO-PARITY-01 V5: provenance of a voice made by "Inspired voice" ("inspired" and how far it was moved); null for a voice made as it is.
+  kind: text("kind"),
+  inspiredLevel: text("inspired_level"),
 });
 
 export const scheduledJobs = sqliteTable("scheduled_jobs", {
