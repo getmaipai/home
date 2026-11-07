@@ -5,7 +5,7 @@ description: Every outside address Home can contact, when, and what it sends.
 
 {/* generated-source: backend/src/lib/privacy.ts, backend/src/routes/privacy.ts, backend/packages manifests (data_sources) */}
 
-Home runs in your house. Nothing leaves unless a row on this page says so. Open it at **Settings**, **Home settings**, **Privacy**, **What connects to the internet**, or **Settings**, **Data and privacy** for your own view.
+Home runs in your house. Nothing leaves unless a row on this page says so. Open it at **Settings**, **Privacy and safety**, **What connects to the internet**. You can also reach it from **Your data and apps**, **Data and privacy**.
 
 The page is built from the code and each package's declared sources, so it cannot drift from what Home does. A row shows only while that feature is in use.
 
@@ -17,13 +17,21 @@ The page is built from the code and each package's declared sources, so it canno
 | News image framing model | Once, the first time News shows an image that needs content-aware framing | A download request for the pinned FocalNet model. The picture stays on this computer. |
 | Update check (GitHub) | At most once a day | Your internet address |
 | Blocked-site index and lists | Index about daily, lists about monthly | Your internet address. Shown only while a list is on. |
-| Internet check | Once a minute | A DNS lookup of example.com and an empty connection to 1.1.1.1:443. Turn it off under **Internet check**. |
+| Internet check | Once a minute | A DNS lookup of example.com and an empty connection to 1.1.1.1:443. Turn it off under **Household and people**, **Internet check**. |
 | News feeds | About every 30 minutes at most, while the shelf is on | A plain request for the feed file |
 | Reference books (Kiwix) | When an adult installs or updates one | A download request |
 | Answer pictures (Wikipedia, Wikidata) | When a picture is picked for an answer | A request for the picture |
 | Voice list | When an adult opens the list of voices | A request for the list |
 | DuckDuckGo | Adult web search, only if picked | The search words |
 | Brave | Adult web search, only with a key | The search words |
+| Speech model (voice activity) | The first time someone uses streaming speech input | A download request |
+| Podcast feeds and directory | Feeds about hourly for shows an admin follows; the directory only when an allowed person searches | The feed request or the words searched |
+| Radio station directory | Only when an adult or teen browses or searches stations | The words, country or genre searched |
+| Weather alerts (api.weather.gov) | Only when **Show weather alerts** is on and someone opens weather for a US place | Coordinates rounded to about 1 km (10 km for a child) |
+| Song lyrics (lrclib.net) | Once per song when someone opens Lyrics, never for a child | Title, artist, album and length |
+| Song facts and album covers (MusicBrainz, Wikimedia, Cover Art Archive) | In the background, about one song a second | Public ids and page titles |
+| News story pages | While **Load News stories ahead of time** is on and nobody is using Home | A request for the story page |
+| Coding model and engine download | Once, when an admin installs local Coding | A file request |
 | Telegram | When a notification you chose fires | The notification text |
 | Tailscale and Let's Encrypt | Only after an owner turns on away access, and at renewal | Device names, the computer's name |
 
@@ -42,7 +50,7 @@ A child's or teen's search words never go to DuckDuckGo or Brave.
 
 1. Open the page and read each row's destination.
 2. Confirm every destination is one you expect.
-3. To turn something off: the internet check under **Internet check**, the news shelf under **News shelf**, Telegram by clearing the token, DuckDuckGo by unpicking it, Brave by clearing its key, away access under **Network and access**.
+3. To turn something off: the internet check under **Household and people**, **Internet check**; the news shelf under **Search and web**, **News shelf**; Telegram by clearing the token; DuckDuckGo by switching it off under **Search and web**, **Web search**; Brave by clearing its key; away access under **Advanced**, **Network and access**; radio and podcast directories under **Pictures, videos and music**, **Music**, **Online radio and podcasts**; the song lookups under **Looking up songs online**.
 4. Look again. The row is gone when the feature is off.
 
 Package data sources appear here too, with the destination, when, what and who. For how privacy works in plain words, see [What never leaves](/docs/user/privacy-and-safety/what-never-leaves).

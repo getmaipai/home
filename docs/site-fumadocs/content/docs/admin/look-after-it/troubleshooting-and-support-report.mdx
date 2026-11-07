@@ -7,7 +7,7 @@ description: Find a problem in Repairs, fix it, and share a redacted report when
 
 ## 🛠️ Repairs
 
-Open **Settings**, **Home settings**, **Maintenance**, then **Repairs**. Home lists problems it found, such as web search failing, a backup copy failing or an engine reporting trouble. Each item may have a fix button, named for what it does, and has a **Dismiss** button.
+Open **Settings**, then **Backups, storage and updates**. On the **Maintenance** tab, choose **Repairs**. Home lists problems it found, such as web search failing, a backup copy failing or an engine reporting trouble. Each item may have a fix button, named for what it does, and has a **Dismiss** button.
 
 - The fix button runs the repair Home offers. Not every item has one.
 - **Dismiss** asks you to confirm, then hides the item.
@@ -33,8 +33,8 @@ The switch is **Restart engines that crash** in the Stack settings (on by defaul
 |---|---|
 | **Status** (Maintenance) | Whether Home, the engines and the internet check are working. |
 | **Performance** (Maintenance) | How busy the computer is. |
-| **Engines** | Engine health, and **Check the connection** to a separate engine computer. |
-| **Storage** | Free disk space. Home warns when free space drops below 2 GB. |
+| **Engines** (**AI and models**, **Engines** tab) | Engine health, and **Check the connection** to a separate engine computer. |
+| **Storage** (**Your data and apps**, **Data and privacy**) | Free disk space. Home warns when free space drops below 2 GB. |
 | `data/local-app/app.log` | The log when you run from source. |
 
 ## 🧰 Common fixes
@@ -57,12 +57,12 @@ only if you ask for it).
 - A check that fails twice in a row becomes one item in **Repairs** with what went wrong and what to do, and you get one
   notification. It clears itself when the check passes.
 - A check never restarts an engine because it was slow. Only an engine that is not running, or that gave no sign of life at three checks in a row (a 2 minute wait each), is restarted, once, through the Stack's own self-heal path, and never more than once in 30 minutes, under heavy load, or while memory is low or an install is running.
-- A web search check is skipped, with no Repairs item, until a search address is set in Settings, Web search.
+- A web search check is skipped, with no Repairs item, until a search address is set in **Settings**, **Search and web**.
 - The checks use a built-in "health" visitor that is not a person. Nothing it says or hears is saved: not in memory, history,
   feed, search history or notifications, and it is left out of usage counts.
 - They wait while an install, an engine update, a picture or video job, or low memory is going on, and while someone is
   chatting.
-- **Settings, AI, Keep the AI warm** turns the timers and the web search check off. It also keeps the AI's opening prompt
+- **Keep the AI warm** under **Settings**, **AI and models**, **Advanced**, **AI settings** turns the timers and the web search check off. It also keeps the AI's opening prompt
   ready so the first reply of the day is quicker. About 1,000 words of AI output an hour.
 
 ## 📄 Support report

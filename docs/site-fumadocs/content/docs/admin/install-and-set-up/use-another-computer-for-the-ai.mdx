@@ -27,9 +27,9 @@ The installer creates a `maipai-stack` service user, installs the Stack under `/
 
 ## 🔗 Pair it with Home
 
-1. In Home, open **Settings**, **Home settings**, **Engines and AI**.
-2. Press **Pair engine computer**.
-3. Pick **Another computer**, then **Next**.
+1. In Home, open **Settings**, then **AI and models**, then the **Engines** tab.
+2. Under **Engine computer link**, press **Pair engine computer**.
+3. Under **Where the engine runs**, pick **Another computer**, then **Next**.
 4. Type the engine computer's name or home network address, for example `192.0.2.20`, and its SSH port (usually 22).
 5. Press **Get a one-time code**. Home shows a command like `sudo maipai-engine pair https://home.example ABCD-EFGH-JKLM`. Copy it.
 6. Run that command on the engine computer. The code works once and Home shows when it expires. The command prints a **check code**.
@@ -41,7 +41,7 @@ Home runs a hop-by-hop connection test and shows **PASS** or **FAIL** for each h
 
 ## 🩺 Check it later
 
-- **Engines** shows **Engine health** and a **Check the connection** button.
+- The **Engines** tab shows **Engine health** and a **Check the connection** button.
 - On the engine computer, `sudo maipai-engine status` and `sudo maipai-engine doctor` report what is running.
 - **Needs restart** or **Update available** on a row means exactly that.
 
@@ -52,7 +52,7 @@ Home runs a hop-by-hop connection test and shows **PASS** or **FAIL** for each h
 
 ## 🌍 Away from home
 
-Reaching the engine computer through Tailscale is off by default. Turn on the `engines.stack.remote.allow_tailnet` setting only after you have joined both computers to your Tailscale network yourself. See [Remote access](/docs/admin/connect-and-extend/remote-access).
+Reaching the engine computer through Tailscale is off by default. On the **Engines** tab, open the advanced settings and turn on **Reach the engine computer when away from home** only after you have joined both computers to your Tailscale network yourself. See [Remote access](/docs/admin/connect-and-extend/remote-access).
 
 ## 🔧 If chat stops answering
 

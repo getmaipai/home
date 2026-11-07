@@ -19,12 +19,13 @@ Pick a plain computer name first. Turning this on publishes the computer's Tails
 
 ## ✍️ Turn it on
 
-1. Open **Settings**, then **Home settings**, then **Network and access**.
-2. Under **Reach Home from anywhere**, wait until the three lines say Ready.
-3. Press **Turn on**.
-4. Home shows a secure address and a QR code.
+1. Open **Settings**, then **Advanced**. On the **Network and access** tab, press **Set up away access**. The setup checklist has the same button.
+2. Step **Install and sign in**: press **Get Tailscale** if it is missing, then sign in. Home checks again by itself.
+3. Step **Turn on secure addresses**: press **Open DNS settings** and turn on HTTPS certificates in Tailscale.
+4. Press **Turn on away access**.
+5. Step **Scan the code**: Home shows your Home address and a QR code.
 
-If a line is not ready, the **Turn on** button stays grey. If Tailscale is not signed in or HTTPS certificates are off, Home says "Sign in to Tailscale and enable HTTPS certificates first." Fix that in Tailscale, return to Home and try again.
+If Tailscale is not signed in or HTTPS certificates are off, the step stays open until you fix that in Tailscale.
 
 ## 📱 Add a phone or tablet
 
@@ -38,7 +39,7 @@ The address works only on devices signed in to your Tailscale account.
 
 | Setting | Default | Meaning |
 |---|---|---|
-| **Away access through Tailscale** | Off | Set when you turn this on. |
+| **Away access through Tailscale** | Off | Set when you turn this on. It is on **Advanced**, **Network and access**. |
 | **Who can reach Home** | LAN | Loopback keeps Home on this computer. LAN lets devices on your home network connect. Needs a restart. |
 | **Home network port** | 3000 | The port Home listens on. Changing it changes the address devices use. |
 | **Reach the engine computer when away from home** | Off | For a separate engine computer. See [Use another computer for the AI](/docs/admin/install-and-set-up/use-another-computer-for-the-ai). |
@@ -47,4 +48,4 @@ The address works only on devices signed in to your Tailscale account.
 
 Tailscale and the certificate authority are the two outside services involved. Both appear on the [privacy page](/docs/admin/look-after-it/privacy-audit), and only after you opt in.
 
-Planned, not in the app yet: turning remote access on from the setup wizard. The wizard shows "Set up later", and you finish here.
+The first-run setup wizard no longer has an away step. Finish away access here, or from the setup checklist.

@@ -1,270 +1,188 @@
 ---
 title: Settings reference
-description: "Every household and per-person setting, its default and what it changes."
+description: "Every Settings page, tab and card, with each setting's label, default and what it changes."
 ---
 
-{/* generated-source: backend/src/settings/*Keys.ts, commons/spec/settings/areas.json, commons/spec/settings/keys.json */}
+{/* generated-source: commons/spec/settings/areas.json, commons/spec/settings/keys.json */}
 
 <Callout type="info" title="How to read this page">
-**Home** settings are set once for the household. **Person** settings belong to one person, and the guardian rules decide who may change them for a child or teen. Level is **basic**, **advanced** or **expert**; the app hides higher levels until asked. A blank "What it does" means the screen explains it in place. Settings marked "Not active yet" are saved but nothing reads them today. Robot and vision settings (keys starting `robot.`, `person.robot.`, `person.vision.` and `vision.`) are used by MaiPai Bot, not by Home itself.
+Settings has one column of pages. The top group, **Yours**, is for your own choices. The second group, **The home**, is for owners and admins and applies to everyone. Each heading below reads Page, then tab, then card. **Home** scope means set once for the household. **Person** scope belongs to one person, and the guardian rules decide who may change it for a child or teen. Level is **basic**, **advanced** or **expert**; the app hides higher levels until asked. A setting marked "Not active yet" is saved but nothing reads it today. Robot and vision settings (keys starting `robot.`, `person.robot.`, `person.vision.` and `vision.`) are used by MaiPai Bot, not by Home itself.
 
-One more setting, **Wake word listening** (`voice.wakeword.enabled`, device scope, default off), appears only when the wake-word files are installed, so it is not in the tables. Only owners, admins and adults see it. The one detector today is openWakeWord "Hey Jarvis", and it runs in the browser. No setup screen downloads the wake-word files; the setting stays hidden until all four are on disk in the `voice/wakewords` data folder (see [Where your data lives](/docs/admin/how-it-works/where-your-data-lives)).
+One more setting, **Wake word listening** (`voice.wakeword.enabled`, device scope, default off), shows under **Voice and robot**, then **This device**, only when the wake-word files are installed. Only owners, admins and adults see it. The one detector today is openWakeWord "Hey Jarvis", and it runs in the browser. No setup screen downloads the wake-word files; the setting stays hidden until all four are on disk in the `voice/wakewords` data folder (see [Where your data lives](/docs/admin/how-it-works/where-your-data-lives)).
 </Callout>
 
 Each table gives the label as shown, the key (useful in a support report), the default, the level and what it does. For the same screens in plain language, see the [user guide](/docs/user).
 
 
-## Home settings
+## Yours
 
 
-### Home settings > Engines and AI > Chat card
+### Profile and sign-in
 
-| Setting | Key | Default | Level | What it does |
-|---|---|---|---|---|
-| **Chat context size override** | `chat.context_size_override` | 0 | advanced | 0 lets the hub pick the largest context that fits this computer's memory. A higher number can run out of memory; a lower one leaves headroom but remembers less of the conversation. |
-| **Flash attention override** | `chat.flash_attention_override` | auto | advanced | "Auto" lets the hub decide based on the model and the quantized-KV-cache setting. Flash attention speeds up longer conversations; a very old GPU may not support it. |
-| **KV cache precision override** | `chat.kv_cache_override` | auto | advanced | "Auto" quantizes the conversation cache to fit more context in the same memory, with a small quality tradeoff. "Full" uses full precision: more accurate, uses roughly twice the memory for the same context size. |
-| **Selected chat model** | `chat.model_id` | empty | expert | The catalog model id currently downloaded and running for chat. Changed through the AI models page, not here. |
-| **Pause chat for everyone** | `chat.paused` | off | basic | Turns chat off for the whole household until you turn it back on. Messages are not sent while it is paused. Timers, alarms and the emergency lines keep working. |
-| **Message shown while chat is paused** | `chat.paused_message` | empty | basic | Optional. One short line everyone sees next to the pause notice, for example when chat comes back. |
-| **Chat model choice** | `engines.chat.choice` | auto | basic | Choose the model for the Chat role. Auto follows the selected setup plan. Only an admin can change this. |
-| **Router model choice** | `engines.router.choice` | auto | basic | Choose the model for the Router role. Auto follows the selected setup plan. Only an admin can change this. |
-| **Embed model choice** | `engines.embed.choice` | auto | basic | Choose the model for the Embed role. Auto follows the selected setup plan. Only an admin can change this. |
-| **Rerank model choice** | `engines.rerank.choice` | auto | basic | Choose the model for the Rerank role. Auto follows the selected setup plan. Only an admin can change this. |
-| **Vision model choice** | `engines.vision.choice` | auto | basic | Choose the model for the Vision role. Auto follows the selected setup plan. Only an admin can change this. |
-| **Image model choice** | `engines.image.choice` | auto | basic | Choose the model for the Image role. Auto follows the selected setup plan. Only an admin can change this. |
-| **Video model choice** | `engines.video.choice` | auto | basic | Choose the model for the Video role. Auto follows the selected setup plan. Only an admin can change this. |
-| **Music model choice** | `engines.music.choice` | auto | basic | Choose the model for the Music role. Auto follows the selected setup plan. Only an admin can change this. |
-| **Coding model choice** | `engines.coding.choice` | auto | basic | Choose the model for the Coding role. Auto follows the selected setup plan. Only an admin can change this. |
-| **Judge model choice** | `engines.judge.choice` | auto | basic | Choose the model for the Judge role. Auto follows the selected setup plan. Only an admin can change this. |
-| **Tts model choice** | `engines.tts.choice` | auto | basic | Choose the model for the Tts role. Auto follows the selected setup plan. Only an admin can change this. |
-| **Stt model choice** | `engines.stt.choice` | auto | basic | Choose the model for the Stt role. Auto follows the selected setup plan. Only an admin can change this. |
-| **Wakeword model choice** | `engines.wakeword.choice` | auto | basic | Choose the model for the Wakeword role. Auto follows the selected setup plan. Only an admin can change this. |
-| **Turn Signal model choice** | `engines.turn_signal.choice` | auto | basic | Choose the model for the Turn Signal role. Auto follows the selected setup plan. Only an admin can change this. |
-| **Reach the engine computer when away from home** | `engines.stack.remote.allow_tailnet` | off | advanced | Off, Home reaches the engine computer only from inside your home network. On, Home may also reach it through your private tailnet when you are away. Turn it on only if you have joined both computers to your tailnet yourself. Only an admin can change this. Shown only while the engine runs on another computer. |
-| **Engine computer name** | `engines.stack.remote.host` | empty | basic | The name of the computer that runs the engine, the way your network knows it. Only an admin can change this. Shown only while the engine runs on another computer. |
-| **Engine computer local port** | `engines.stack.remote.local_port` | 8771 | advanced | The port on this computer where the engine computer's connection appears. Change it only if another program already uses it. Only an admin can change this. Shown only while the engine runs on another computer. |
-| **Engine computer secure connection port** | `engines.stack.remote.ssh_port` | 22 | advanced | The port Home uses to open its secure connection to the engine computer. Leave it at 22 unless that computer was set up differently. Only an admin can change this. Shown only while the engine runs on another computer. |
-| **MaiPai Stack address** | `engines.stack.url` | empty | expert | Empty uses Home's own built-in engines. With the engine on this computer, set this to the address of the MaiPai Stack installed here to route chat, embeddings and voice through it. With the engine on another computer, Home fills this in for you from the connection settings, so leave it empty. Only an admin can change this. |
-| **Help the chat remember to search the web** | `chat.search_assist` | shadow | advanced | "Off" is the kill switch: nothing is scored. "Shadow" (the default) only counts, as a number, how often a web search looked needed, and changes no reply. "Rescue" is not active yet; for now it behaves like shadow. Children and teens are never scored. |
-| **Use the MaiPai Stack for chat** | `engines.stack.use_chat` | off | expert | Deprecated, ignored. A configured Stack serves every role. |
-| **Use the MaiPai Stack for search (embeddings)** | `engines.stack.use_embeddings` | off | expert | Deprecated, ignored. A configured Stack serves every role. |
-| **Use the MaiPai Stack for listening (speech to text)** | `engines.stack.use_stt` | off | expert | Deprecated, ignored. A configured Stack serves every role. |
-| **Use the MaiPai Stack for speaking (text to speech)** | `engines.stack.use_tts` | off | expert | Deprecated, ignored. A configured Stack serves every role. |
-| **Where the engine runs** | `engines.stack.where` | this_computer | basic | "This computer" runs the engine on the machine Home is installed on. "Another computer" runs it on a different computer in your home that you reach over your network. Only an admin can change this. |
-| **Hugging Face token (for voice cloning)** | `voice.hf_token` | empty | advanced | Needed to clone a voice from a recording. Accept the terms at huggingface.co/kyutai/pocket-tts, then create a read token at huggingface.co/settings/tokens and paste it here. |
+For everyone. Scope: person.
 
-### Home settings > Search > Blocked sites
-
-| Setting | Key | Default | Level | What it does |
-|---|---|---|---|---|
-| **Blocked sites with child controls** | `search.blocklists.child` | ["blp-gambling", "blp-scam", "blp-phishi | advanced | Which lists of blocked sites are checked when MaiPai searches the web for people using child controls. Adult sites are always blocked for child and teen controls and are not listed here. Home downloads each list once and keeps it up to date. Web search for child controls starts once every list checked here has been downloaded. Only an admin can change this. |
-| **Blocked sites with teen controls** | `search.blocklists.teen` | ["blp-gambling", "blp-scam", "blp-phishi | advanced | Which lists of blocked sites are checked when MaiPai searches the web for people using teen controls. Adult sites are always blocked for child and teen controls and are not listed here. Web search for teen controls starts once every list checked here has been downloaded. Only an admin can change this. It does not show anyone what a teen searched for or which sites were blocked. |
-| **Blocked sites with adult controls** | `search.blocklists.adult` | [] | advanced | Lists of blocked sites to check when MaiPai searches the web for adults. None are checked unless you pick them. Scam, phishing and malware lists are a good start for a household that wants that protection. Only an admin can change this. |
-| **Kinds of sites to block** | `search.blocklists` | [] | advanced | Kinds of sites that web search, page reads and answer pictures leave out. Kids, Teens and Adults each start from their own user defaults. The global defaults add kinds for everyone, and a user override adds or removes kinds for one person. The adult-site list is always on for a child or teen and no override can turn it off. Only an admin can change this, and it never shows what anyone searched for. |
-| **Always block these sites** | `search.hosts.deny` | empty | advanced | Sites that web search never shows for anyone, separated by commas, like example.com. A site you list here also blocks its subpages. This works for every age, and it always wins over the allowed list. Only an admin can change this. |
-| **Allow these sites** | `search.hosts.allow` | empty | advanced | Sites that web search may show even when a blocked-sites list has them, separated by commas, like example.com. It cannot allow an adult site for child or teen controls, and it cannot allow a site you list under Always block these sites. Only an admin can change this. |
-| **Always block these sites for child** | `search.hosts.child.deny` | empty | advanced | Sites that web search never shows to a child, separated by commas, like example.com, on top of the household list. A site you list here also blocks its subpages. It always wins over the allowed lists. Only an admin can change this. |
-| **Allow these sites for child** | `search.hosts.child.allow` | empty | advanced | Sites that web search may show to a child even when a blocked-sites list has them, separated by commas, like example.com, on top of the household list. It cannot allow an adult site for child or teen controls, and it cannot allow a site that is in an always-block list. Only an admin can change this. |
-| **Always block these sites for teen** | `search.hosts.teen.deny` | empty | advanced | Sites that web search never shows to a teen, separated by commas, like example.com, on top of the household list. A site you list here also blocks its subpages. It always wins over the allowed lists. Only an admin can change this. |
-| **Allow these sites for teen** | `search.hosts.teen.allow` | empty | advanced | Sites that web search may show to a teen even when a blocked-sites list has them, separated by commas, like example.com, on top of the household list. It cannot allow an adult site for child or teen controls, and it cannot allow a site that is in an always-block list. Only an admin can change this. |
-| **Always block these sites for adult** | `search.hosts.adult.deny` | empty | advanced | Sites that web search never shows to an adult, separated by commas, like example.com, on top of the household list. A site you list here also blocks its subpages. It always wins over the allowed lists. Only an admin can change this. |
-| **Allow these sites for adult** | `search.hosts.adult.allow` | empty | advanced | Sites that web search may show to an adult even when a blocked-sites list has them, separated by commas, like example.com, on top of the household list. It cannot allow an adult site for child or teen controls, and it cannot allow a site that is in an always-block list. Only an admin can change this. |
-
-### Home settings > Integrations > Home Assistant
-
-| Setting | Key | Default | Level | What it does |
-|---|---|---|---|---|
-| **Home Assistant access token** | `home.access_token` | empty | advanced | A long-lived access token from your Home Assistant profile page, used to control your smart-home devices. |
-| **Home Assistant URL** | `home.base_url` | empty | advanced | The address of your Home Assistant instance, e.g. http://homeassistant.local:8123. |
-| **Safety alarm sensors** | `safety.alarm.sensors` | [] | basic | Home Assistant sensors whose alarm events the robot announces. No sensors are selected by default. |
-
-### Home settings > Network and access > Network
-
-<Shot id="settings-network" />
-
-| Setting | Key | Default | Level | What it does |
-|---|---|---|---|---|
-| **Home network port** | `network.hub_port` | 3000 | expert | The port Home listens on. Changing it needs a restart and changes the address devices use. Only an admin can change this. |
-| **Who can reach Home** | `network.lan_exposure` | lan | advanced | Loopback keeps Home on this computer. LAN lets devices on your home network connect. Changing this needs a restart. Only an admin can change this. |
-| **Away access through Tailscale** | `network.tailnet_access` | off | basic | Lets your devices reach Home through your private Tailscale network. Tailscale sees device names and addresses, not your conversations. Home never turns this on for you. Only an admin can change this. |
-
-### Home settings > Search > News shelf
-
-| Setting | Key | Default | Level | What it does |
-|---|---|---|---|---|
-| **Pictures in News** | `news.images` | on | advanced | Show the picture each news story came with. Home asks the publisher for a picture once, the first time a screen shows that story, and keeps a copy; it never fetches pictures in the background. Turn this off and News shows text only. |
-| **News picture storage (MB)** | `news.image_cache_mb` | 512 | advanced | How much disk space News pictures may use. When it fills, Home removes the pictures nobody has looked at for the longest time. A picture nobody opens for 14 days is removed either way. |
-| **News poll interval (seconds)** | `news.poll_interval_s` | 1800 | advanced | How often Home checks enabled news feeds. At least 900 seconds. |
-| **News retention (days)** | `news.retention_days` | 90 | advanced | How long Home keeps news items and stories. |
-| **News shelf** | `news.shelf.enabled` | on | advanced | Turn the household news shelf on or off. |
-| **News lists with child controls** | `news.lists.child` | ["feeds-children"] | basic | Which lists of news feeds appear on the news shelf for people using child controls. A list that is not offered to this user type never appears here and is never shown to them. Every item is still checked by the age filter before anyone sees it. A list unchecked for every user type is switched off. Only an admin can change this. |
-| **News lists with teen controls** | `news.lists.teen` | ["feeds-household"] | basic | Which lists of news feeds appear on the news shelf for people using teen controls. A list that is not offered to this user type never appears here and is never shown to them. Every item is still checked by the age filter before anyone sees it. A list unchecked for every user type is switched off. Only an admin can change this. |
-| **News lists with adult controls** | `news.lists.adult` | ["feeds-household"] | basic | Which lists of news feeds appear on the news shelf for people using adult controls. A list that is not offered to this user type never appears here and is never shown to them. Every item is still checked by the age filter before anyone sees it. A list unchecked for every user type is switched off. Only an admin can change this. |
-| **Extra news feeds for child** | `news.feeds.child` | empty | advanced | News feed addresses to add for people using child controls, starting with https:// and separated by commas or spaces. Remove an address to remove its feed. These sit on top of the checked lists. Home checks every item against the age filter, and an address that points inside your home network is refused. Only an admin can change this. |
-| **Extra news feeds for teen** | `news.feeds.teen` | empty | advanced | News feed addresses to add for people using teen controls, starting with https:// and separated by commas or spaces. Remove an address to remove its feed. These sit on top of the checked lists. Home checks every item against the age filter, and an address that points inside your home network is refused. Only an admin can change this. |
-| **Extra news feeds for adult** | `news.feeds.adult` | empty | advanced | News feed addresses to add for people using adult controls, starting with https:// and separated by commas or spaces. Remove an address to remove its feed. These sit on top of the checked lists. Home checks every item against the age filter, and an address that points inside your home network is refused. Only an admin can change this. |
-
-### Home settings > Integrations > Telegram
-
-| Setting | Key | Default | Level | What it does |
-|---|---|---|---|---|
-| **Quiet hours start** | `household.quiet_hours.from` | 21:00 | basic | Quiet hours begin at 9:00 pm by default. Safety alarms always override quiet hours. |
-| **Quiet hours end** | `household.quiet_hours.to` | 07:00 | basic | Quiet hours end at 7:00 am by default. |
-| **Telegram bot token** | `notifications.telegram.bot_token` | empty | advanced | A bot token from @BotFather, used to send notifications to Telegram. One bot for the whole household; each person links their own chat below. |
-
-### Home settings > Integrations > Reference library
-
-| Setting | Key | Default | Level | What it does |
-|---|---|---|---|---|
-| **Reference library location** | `reference.library_dir` | empty | basic | Where the household's offline knowledge archives live: a local folder, an external drive, or a NAS mount. Empty uses Home's own data folder. Moving this later moves the files and updates the library records. |
-| **Reference update speed limit (MB/s)** | `reference.update.max_mbps` | 20 | advanced | Not active yet. Planned; this setting has no effect today. |
-
-### Home settings > Search > Web search
-
-| Setting | Key | Default | Level | What it does |
-|---|---|---|---|---|
-| **Look up words online** | `search.dictionary_fallback` | off | advanced | Look up a word online when the library does not have it. The word you ask about is sent to Wiktionary (Wikimedia). Adults only. Off by default. |
-| **Search fetch cache limit (GB)** | `search.fetch_cache_gb` | 2 | advanced | Maximum disk space used for cached search pages. The default is 2 GB on p16 and 10 GB on p64 and p128. |
-| **Your own SearXNG (optional)** | `search.searxng_url` | empty | advanced | Your own SearXNG (optional). Leave empty to use the search service MaiPai runs for you. |
-| **Search sources** | `search.source_mode` | mix | basic | Where MaiPai looks for answers: Internet first, Library only, or Library first (the recommended choice). Library only turns off just the live Wikipedia-style lookup; web search stays on unless web search is itself set to Library only. Children and teens keep their current protections in every mode, and this choice never widens what they can reach. |
-| **Encyclopedia lookups** | `search.source_mode.wikimedia` | inherit | advanced | Gives the live Wikipedia-style lookup its own choice. Same as the household choice follows the search sources setting. Library only turns this lookup off. Children and teens never use this lookup in any mode. |
-| **Web searches** | `search.source_mode.web` | inherit | advanced | Gives web search its own choice. Same as the household choice follows the search sources setting. Library only here turns off web search, link reading, Wayback and the hosted search provider together. Children and teens keep their current protections in every mode. |
-| **Web search with child controls** | `search.web.child_mode` | on | basic | When this is on, MaiPai can look things up on the web for people using child controls. Results go through SafeSearch at its strictest, adult sites are blocked, and links are hidden. When it is off, answers come only from the offline library. Only an admin can change this, and a child's searches show in that child's own chats. |
-| **Web search with teen controls** | `search.web.teen_mode` | on | basic | When this is on, MaiPai can look things up on the web for people using teen controls. Results go through SafeSearch at moderate or stricter, and adult sites are blocked. When it is off, answers come only from the offline library. Only an admin can change this. It does not show anyone what a teen searched for. |
-| **Web search sources** | `search.web_sources` | ["searxng"] | advanced | Which services answer web searches. SearXNG, the household's own search service, is on by default. DuckDuckGo is not available yet. With more than one picked, their results are blended into one list. Children and teens only use SearXNG. To turn web search off, set Web searches to Library only. Pictures and videos always use SearXNG. |
-| **Use archived pages when a source is missing** | `search.wayback_fallback` | on | advanced | Check the Wayback Machine when a cited page returns not found. |
-| **Brave Search key (optional)** | `search.brave_api_key` | empty | advanced | Optional. Search works without any key. If you add a Brave Search API key, an adult's web searches go to Brave Search instead of your SearXNG, so the words searched leave your house. A child's or teen's searches never do. The key is stored encrypted and can't be read back. Clear it to go back to keyless search. |
-
-### Home settings > General > Internet check
-
-| Setting | Key | Default | Level | What it does |
-|---|---|---|---|---|
-| **Internet check name** | `status.internet_probe.dns_name` | example.com | advanced | The name MaiPai looks up once a minute to check whether internet name lookups work. |
-| **Check whether the internet is reachable** | `status.internet_probe.enabled` | on | basic | Once a minute, MaiPai looks up a neutral name and opens an empty connection to the chosen address. Turn this off to stop those checks. |
-| **Internet check address** | `status.internet_probe.tcp_address` | 1.1.1.1 | advanced | The public IP address MaiPai connects to once a minute without sending data. |
-| **Internet check port** | `status.internet_probe.tcp_port` | 443 | advanced | The port MaiPai opens and immediately closes without sending data. |
-
-### Home settings > Storage and backups > Limits
-
-| Setting | Key | Default | Level | What it does |
-|---|---|---|---|---|
-| **Backup storage limit (GB)** | `backup.max_total_gb` | 0 | advanced | Once total backup storage passes this, the oldest backups are deleted first - checked after the normal seven-daily/four-weekly/three-monthly schedule. 0 means no extra limit. |
-| **Backup key saved** | `backups.emergency_kit_saved_at` | empty | basic | The date and time the owner saved or printed the emergency backup key. The key itself is never stored here. |
-| **Warn when free disk space drops below (GB)** | `storage.critical_free_gb` | 2 | advanced | A Repairs item is raised once free space on the hub's own disk drops below this. |
-| **Household storage cap (bytes)** | `storage.household.cap_bytes` | 0 | basic | The total bytes the whole household's files may use. 0 means no cap is set yet - the setup wizard sets this from the disk. |
-| **Default per-person storage cap (bytes)** | `storage.person.default_cap_bytes` | 21474836480 | basic | How many bytes each person may use for their own files, unless that person has their own override below. |
-
-### Home settings > General > Household
-
-| Setting | Key | Default | Level | What it does |
-|---|---|---|---|---|
-| **Conversation history retention** | `household.conversation_retention_days` | 90 | advanced | How long chat history is kept before it's deleted. A safety-flagged conversation involving a teen or child is always kept for at least 90 days regardless of this setting. |
-| **Family name** | `household.family_name` | empty | basic | Not active yet. The name is saved but Home does not show it yet. |
-| **Home location** | `household.home` | empty | basic | The household place used as the fallback for location-based answers. |
-| **Language and region** | `household.locale` | en-US | basic | Sets the household's date, time, and unit formatting. |
-
-### Home settings > Privacy > Sensitive subjects
-
-| Setting | Key | Default | Level | What it does |
-|---|---|---|---|---|
-| **Bodies and relationships with teen controls** | `topics.teen.bodies` | informative | basic | How MaiPai answers teens' questions about puberty, sex, consent, relationships and identity. The standard answer is factual and respectful, and never sexual or romantic. It applies to everyone on teen controls and is set by an admin. An admin cannot see what a teen asks. |
-| **Drugs, alcohol and betting with teen controls** | `topics.teen.risk` | informative | basic | How MaiPai answers teens' questions about drugs, alcohol, vaping, gambling and dangerous challenges. The standard answer explains the real risks and how to get help fast, and never gives tips for getting high, buying or betting. It applies to everyone on teen controls and is set by an admin. An admin cannot see what a teen asks. |
-
-### Robot settings
-
-| Setting | Key | Default | Level | What it does |
-|---|---|---|---|---|
-| **Robot greeting style** | `robot.greetings.mode` | gesture | basic | Use a gesture by default; spoken greeting remains subject to person and age-band rules. |
-| **Offer acceptance phrases** | `robot.initiative.accept_phrases` | default | basic | Uses the closed default set: “go ahead” or “yes please” to accept, and “not now” or “no thanks” to decline. No gesture accepts an offer. |
-| **Robot initiative** | `robot.initiative.enabled` | on | basic | When on, the robot may make approved offers. On by default for gestures only; spoken offers remain controlled by tiers_spoken. |
-| **Maximum offers per hour** | `robot.initiative.max_offers_per_hour` | 3 | basic | At most three offers per hour by default; tier 3 is limited to one. |
-| **Spoken offer tiers** | `robot.initiative.tiers_spoken` | tier_1 | basic | Tier 1 may speak; tiers 2 and 3 ask first by default. |
-| **Allow robot live view** | `robot.live_view.enabled` | off | basic | Off until an admin enables it. Only admins and adults explicitly named in robot.live_view.who may view. |
-| **Adults allowed to view the robot camera** | `robot.live_view.who` | [] | basic | Admins can view. This list may name adults only; children and teens are never admitted. |
-| **Allow robot access over the tailnet** | `robot.offlan.tailnet` | off | advanced | Off by default. Turn on only after the owner manually joins the device to the household tailnet; Home holds no tailnet key. |
-| **Child safety alarm line** | `safety.alarm.child_line` | Smoke alarm. Please go to your grown-up. | basic | Spoken after a mapped safety alarm for a child. |
-| **Safety alarm repeat interval** | `safety.alarm.repeat_seconds` | 20 | basic | Repeat between 10 and 60 seconds; 20 seconds by default. |
-| **Safety alarm voice** | `safety.alarm.voice` | default | basic | The fixed alarm voice; the deterministic alarm path does not use a model. |
-| **Safety alarm volume** | `safety.alarm.volume` | 70 | basic | Alarm volume has a hard floor of 70; Home enforces the floor. |
-| **Allow vision when requested** | `vision.on_request.enabled` | on | basic | Allows a requested camera turn. Frames are never kept for a child. |
-
-## Per-person settings
+Tabs: **Profile**.
 
 
-### Personal Settings > Commands (maps)
-
-| Setting | Key | Default | Level | What it does |
-|---|---|---|---|---|
-| **Maps places** | `maps.places` | [] | basic | Places saved for this surface. |
-| **Maps default place** | `maps.default_place` | current | basic | The place used by default on this surface. |
-
-### Person profile > Limits (daily minutes per package category)
-
-| Setting | Key | Default | Level | What it does |
-|---|---|---|---|---|
-| **Daily Family minutes** | `allowance.family.daily_minutes` | 0 | basic | Saved but not applied yet. Nothing limits time with it today. |
-| **Daily Fun minutes** | `allowance.fun.daily_minutes` | 0 | basic | Saved but not applied yet. Nothing limits time with it today. |
-| **Daily Health minutes** | `allowance.health.daily_minutes` | 0 | basic | Saved but not applied yet. Nothing limits time with it today. |
-| **Daily Home minutes** | `allowance.home.daily_minutes` | 0 | basic | Saved but not applied yet. Nothing limits time with it today. |
-| **Daily Info minutes** | `allowance.info.daily_minutes` | 0 | basic | Saved but not applied yet. Nothing limits time with it today. |
-| **Daily Learning minutes** | `allowance.learning.daily_minutes` | 0 | basic | Saved but not applied yet. Nothing limits time with it today. |
-| **Daily Media minutes** | `allowance.media.daily_minutes` | 0 | basic | Saved but not applied yet. Nothing limits time with it today. |
-| **Daily Robot body minutes** | `allowance.robot_body.daily_minutes` | 0 | basic | Saved but not applied yet. Nothing limits time with it today. |
-| **Daily Utilities minutes** | `allowance.utilities.daily_minutes` | 0 | basic | Saved but not applied yet. Nothing limits time with it today. |
-
-### Chat settings
-
-| Setting | Key | Default | Level | What it does |
-|---|---|---|---|---|
-| **Send photos in chat** | `chat.photo_uploads` | on | basic | Adults and teens are on by default; children are off until a parent enables this. Teens control their own setting. |
-| **Show pictures in answers** | `reference.images` | on | basic | Adults and teens are on by default; children are off until a parent enables this. Teens control their own setting. |
-| **Show advanced reply stats** | `ui.show_turn_stats` | off | advanced | Show engine timing and token details below your chat replies. |
-
-### Personal Settings > Notifications > Alerts
-
-| Setting | Key | Default | Level | What it does |
-|---|---|---|---|---|
-| **Show alerts on this device** | `notifications.browser.enabled` | off | basic | You'll see a pop-up when MaiPai needs attention, while MaiPai is open. It won't reach you when MaiPai is closed. |
-| **Don't notify me about shares from** | `notifications.file_shared.muted_senders` | [] | basic | Pick anyone in the household whose shared files you don't want a notification about. You'll still be notified about everyone else's. |
-| **Send time-sensitive notifications to a robot** | `notifications.time_sensitive.robot` | off | basic | Deliver time-sensitive notifications through a robot channel when one is configured. Private notification content is never spoken. |
-| **Personal quiet hours start** | `person.quiet_hours.from` | empty | basic | Leave unset to inherit household quiet hours. A parent sets this for a child; teens can set their own. |
-| **Personal quiet hours end** | `person.quiet_hours.to` | empty | basic | Leave unset to inherit household quiet hours. A parent sets this for a child; teens can set their own. |
-
-### Personal Settings > Voice (persona)
-
-| Setting | Key | Default | Level | What it does |
-|---|---|---|---|---|
-| **Personality** | `persona.active_id` | default | basic | How MaiPai talks to you: formality, complexity, and how much it follows up on what you say. |
-
-### Personal Settings > Profile
+#### Profile > Face enrollment
 
 | Setting | Key | Default | Level | What it does |
 |---|---|---|---|---|
 | **Enrollment sounds** | `ui.enrollment_sounds` | on | basic | Play soft sounds during face enrollment as the camera finds your face, then a chime when a photo is taken. |
 
-### Personal Settings > Search
+
+#### Profile > Voice print enrollment
+
+| Setting | Key | Default | Level | What it does |
+|---|---|---|---|---|
+| **Voice print enrollment** | `person.voice_print.enrollment` | off | basic | Choose whether to enroll a voice print for recognition. |
+
+
+### Look and ease
+
+For everyone. Scope: person.
+
+Tabs: **Appearance**.
+
+
+#### Appearance > Appearance
+
+| Setting | Key | Default | Level | What it does |
+|---|---|---|---|---|
+| **Start tours automatically** | `tours.autostart.enabled` | on | basic | A guide opens on a page's first visit when enabled. Help can open Show me around at any time. |
+| **Appearance** | `ui.appearance` | system | basic | Light, dark, or match this device's own setting. |
+| **Look** | `ui.look` | neutral | basic | Neutral is the standard black-and-white theme, the same as shadcn's own dashboard; the rest are shadcn's other color sets; Navy is MaiPai's own. |
+| **Home layout** | `ui.home_layout` | shelves | basic | Choose how Home is arranged; this only changes its layout. |
+
+
+#### Appearance > Ease of use
+
+| Setting | Key | Default | Level | What it does |
+|---|---|---|---|---|
+| **Comfort style** | `ease.preset` | standard | basic | A bundle of comfort settings: text size, spacing, button size, contrast, calm and helpers. Pick one, then change any single setting below. It is about comfort, not age, and it never changes what is safe or allowed. |
+| **Text size** | `ease.text_size` | preset | basic | Percent of the normal text size. "Preset" follows your ease of use choice. |
+| **Spacing** | `ease.spacing` | preset | basic | How much room there is between things. "Preset" follows your ease of use choice. |
+| **Button size** | `ease.targets` | preset | basic | The smallest size of a button or tap area. Large is about 2 cm. "Preset" follows your ease of use choice. |
+| **Contrast** | `ease.contrast` | preset | basic | More makes text stand out at 7 to 1. "Preset" follows your ease of use choice. |
+| **Motion and color** | `ease.motion` | preset | basic | Calm mutes colors and stops animation. "Preset" follows your ease of use choice. |
+| **Simple mode** | `ease.simple_mode` | preset | basic | Shows only the main apps and settings and hides the rest. It hides, it does not forbid. "Preset" follows your ease of use choice. |
+| **Reading level** | `ease.reading_level` | standard | basic | How plainly MaiPai words its answers and app text: standard, plain or very simple. It changes words and sentence shape only, never what MaiPai will talk about. |
+| **Short explainers** | `ease.explainers` | preset | basic | Shows a short note at the top of a screen about what it is for, until you dismiss it. "Preset" follows your ease of use choice. |
+| **Word help** | `ease.word_help` | preset | basic | Press a word to see what it means in plain words. "Preset" follows your ease of use choice. |
+| **Read aloud** | `ease.read_aloud` | preset | basic | Adds a button to read replies and news aloud in MaiPai's own voice. "Preset" follows your ease of use choice. |
+
+
+### Chat and AI
+
+For everyone. Scope: person.
+
+Tabs: **General**, **Personalization**, **Skills**, **Keyboard shortcuts**, **Coding**.
+
+
+#### General > Chat
+
+| Setting | Key | Default | Level | What it does |
+|---|---|---|---|---|
+| **Send photos in chat** | `chat.photo_uploads` | on | basic | Adults and teens are on by default; children are off until a parent enables this. Teens control their own setting. |
+| **Show pictures in answers** | `reference.images` | on | basic | Adults and teens are on by default; children are off until a parent enables this. Teens control their own setting. |
+| **Show reasoning expanded** | `ui.reasoning_open` | off | advanced | Open the model's reasoning under each chat reply instead of keeping it collapsed. |
+| **Show advanced reply stats** | `ui.show_turn_stats` | off | advanced | Show engine timing and token details below your chat replies. |
+
+
+#### General > Search
 
 | Setting | Key | Default | Level | What it does |
 |---|---|---|---|---|
 | **Safe search level** | `search.safe_search` | default | basic | How strictly web search filters results for you. "Default" follows your age: strict for a child, moderate for a teen, off for an adult. A child's is always strict. A teen can make theirs stricter but never lower than moderate. An adult can change their own. |
 | **Page text check** | `search.page_text_cleaning` | off | advanced | When this is on, text MaiPai fetches from a web page is checked and cleaned before the assistant reads it. It is on by default for Kids and Teens and off for Adults. An admin can change it for everyone or for one person. A child or teen cannot turn it off. |
 
-### Personal Settings > Developer tools > Session lock
+
+#### Personalization > Personality
 
 | Setting | Key | Default | Level | What it does |
 |---|---|---|---|---|
-| **Require PIN to unlock after inactivity** | `security.session_lock_required` | off | expert | When on, this account locks behind its PIN or password after sitting idle. Content stays put; unlocking just re-enters the PIN. Set by an owner or admin, for any account. |
-| **Session lock timeout (minutes)** | `security.session_lock_timeout_minutes` | 5 | expert | How many minutes of inactivity before this account locks, when session lock is required. |
+| **Personality** | `persona.active_id` | tessa | basic | How MaiPai talks to you: formality, complexity, and how much it follows up on what you say. |
 
-### Personal Settings > Data and privacy > Storage
+
+#### Personalization > AI companions
 
 | Setting | Key | Default | Level | What it does |
 |---|---|---|---|---|
-| **This person's storage quota (GB)** | `storage.person_quota_gb` | 0 | advanced | How much disk space this person's own uploads (cloned voices today) may use. 0 means no limit. |
-| **This person's storage cap override (bytes)** | `storage.person.cap_bytes` | 0 | advanced | Overrides the household's default per-person cap for this one person. 0 means no override: this person follows the household default. Set by an owner or admin. |
+| **AI companions** | `companions.allowed` | on | basic | AI companions are on for everyone unless an admin turns them off for the household or for one person. Turning this off hides companions and keeps their data. |
+| **Ambient companion** | `companions.dock` | on | basic | Shows your companion at the top right of every page. Hover or tap it to open the companion pane. Turn it off to hide the companion everywhere. |
+| **Bot in the companion spot** | `companions.ambient_bot` | empty | basic | Puts one of the household's robots in the top-right companion spot instead of a companion. Pick it from the companion pane. Leave empty to show your companion. |
 
-### Personal Settings > Notifications > Telegram
+
+#### Personalization > Music
+
+| Setting | Key | Default | Level | What it does |
+|---|---|---|---|---|
+| **Music DJ** | `music.dj` | full | basic | A DJ voice can speak between songs. Minimal only says what is playing next. Full also adds a short fact about the song or artist when Home has one. |
+| **Translate lyrics** | `music.lyrics_translate` | empty | basic | Type a language name, such as Spanish or French, and each lyric line also shows in that language under the original, translated on this computer. Leave it empty to show the original only. |
+
+
+### Voice and robot
+
+For everyone. Scope: person.
+
+Tabs: **Voice**, **This device**, **Robot**.
+
+
+#### Voice > Voice
+
+| Setting | Key | Default | Level | What it does |
+|---|---|---|---|---|
+| **Speaking voice** | `tts.voice_id` | default | basic | The voice MaiPai uses when it reads its replies aloud to you. "default" is the voice built into the speech engine now in use. |
+| **Podcast speed** | `audio.speed.podcast` | 1 | basic | How fast podcast episodes play for you. 1 is normal speed and 1.5 is one and a half times as fast. A player's speed menu changes this too. |
+| **Audiobook speed** | `audio.speed.audiobook` | 1 | basic | How fast audiobooks play for you. 1 is normal speed and 0.75 is slower. A player's speed menu changes this too. |
+| **Video speed** | `audio.speed.video` | 1 | basic | How fast videos play for you. 1 is normal speed. A player's speed menu changes this too. |
+| **Spoken reply speed** | `audio.speed.spoken_reply` | 1 | basic | How fast MaiPai talks when it reads a reply aloud to you. 1 is normal speed. Faster speeds also sound a little higher. |
+
+
+#### Voice > Commands
+
+This card links to: **Create a command**.
+
+
+#### This device > Wake word
+
+| Setting | Key | Default | Level | What it does |
+|---|---|---|---|---|
+| **Wake word listening** | `voice.wakeword.enabled` | off | basic | Let this device listen locally for its wake word. Listening is always visible and can be stopped from the indicator. |
+
+
+#### Robot > Robot
+
+| Setting | Key | Default | Level | What it does |
+|---|---|---|---|---|
+| **Robot may listen for a follow-up** | `person.robot.follow_up` | on | basic | Adults and teens are on by default. Children are off unless a parent enables this. |
+| **Robot may greet by name** | `person.robot.greet_by_name` | on | basic | Adults are on by default; children are off until a parent enables this. Teens control their own setting. |
+| **Robot may address this person** | `person.robot.may_address` | on | basic | Adults are on by default. Children are off until a parent enables this; teens control their own setting. |
+| **Allow playful robot clips** | `person.robot.playful_clips` | on | basic | Adults are on by default; children are off until a parent enables this. Teens control their own setting. |
+| **Robot conversation topics** | `person.robot.topics` | nudges | basic | Controls optional nudges and chit-chat. Adults get nudges on and chit-chat off by default; children get both off. Teens control their own setting. |
+| **Allow robot gesture sensing** | `person.vision.gestures` | on | basic | On by default; a parent can change a child setting and teens control their own setting. |
+| **Robot vision watch level** | `person.vision.watch` | presence | basic | Identity is used only for enrolled people. Children stay at presence until a parent chooses; teens control their own setting. The stricter person and robot levels apply. |
+
+
+### Notifications
+
+For everyone. Scope: person.
+
+Tabs: **Notifications**.
+
+
+#### Notifications > Alerts
+
+| Setting | Key | Default | Level | What it does |
+|---|---|---|---|---|
+| **Show alerts on this device** | `notifications.browser.enabled` | off | basic | You'll see a pop-up when MaiPai needs attention, while MaiPai is open. It won't reach you when MaiPai is closed. |
+| **Don't notify me about shares from** | `notifications.file_shared.muted_senders` | empty | basic | Pick anyone in the household whose shared files you don't want a notification about. You'll still be notified about everyone else's. |
+| **Send time-sensitive notifications to a robot** | `notifications.time_sensitive.robot` | off | basic | Deliver time-sensitive notifications through a robot channel when one is configured. Private notification content is never spoken. |
+| **Personal quiet hours start** | `person.quiet_hours.from` | empty | basic | Leave unset to inherit household quiet hours. A parent sets this for a child; teens can set their own. |
+| **Personal quiet hours end** | `person.quiet_hours.to` | empty | basic | Leave unset to inherit household quiet hours. A parent sets this for a child; teens can set their own. |
+
+
+#### Notifications > Telegram
 
 | Setting | Key | Default | Level | What it does |
 |---|---|---|---|---|
@@ -285,7 +203,493 @@ Each table gives the label as shown, the key (useful in a support report), the d
 | **Your Telegram chat id** | `notifications.telegram.chat_id` | empty | basic | Message the household bot once, then paste the chat id it replies with, to receive your notifications on Telegram. |
 | **Telegram me when a MaiPai Home update is available** | `notifications.updates.available.telegram` | off | basic |  |
 
-### Person profile > Topics (Sensitive subjects)
+
+### Your data and apps
+
+For everyone. Scope: person.
+
+Tabs: **Data and privacy**, **Developer tools**.
+
+
+#### Data and privacy > Your data
+
+This card links to: **Signed-in devices**, **Storage**, **What connects to the internet**.
+
+
+#### Developer tools > Session lock
+
+| Setting | Key | Default | Level | What it does |
+|---|---|---|---|---|
+| **Require PIN to unlock after inactivity** | `security.session_lock_required` | off | expert | When on, this account locks behind its PIN or password after sitting idle. Content stays put; unlocking just re-enters the PIN. Set by an owner or admin, for any account. |
+| **Session lock timeout (minutes)** | `security.session_lock_timeout_minutes` | 5 | expert | How many minutes of inactivity before this account locks, when session lock is required. |
+
+
+## The home
+
+
+### Household and people
+
+For owners and admins. Scope: household.
+
+Tabs: **General**, **People**.
+
+
+#### General > Household
+
+| Setting | Key | Default | Level | What it does |
+|---|---|---|---|---|
+| **Conversation history retention** | `household.conversation_retention_days` | 90 | advanced | How long chat history is kept before it's deleted. A safety-flagged conversation involving a teen or child is always kept for at least 90 days regardless of this setting. |
+| **Family name** | `household.family_name` | empty | basic | Shown above your greeting on Home, e.g. "Willow" becomes "Willow Family." |
+| **Home location** | `household.home` | empty | basic | The household place used as the fallback for location-based answers. |
+| **Language and region** | `household.locale` | en-US | basic | Sets the household's date, time, and unit formatting. |
+
+
+#### General > Internet check
+
+| Setting | Key | Default | Level | What it does |
+|---|---|---|---|---|
+| **Internet check name** | `status.internet_probe.dns_name` | example.com | advanced | The name MaiPai looks up once a minute to check whether internet name lookups work. |
+| **Check whether the internet is reachable** | `status.internet_probe.enabled` | on | basic | Once a minute, MaiPai looks up a neutral name and opens an empty connection to the chosen address. Turn this off to stop those checks. |
+| **Internet check address** | `status.internet_probe.tcp_address` | 1.1.1.1 | advanced | The public IP address MaiPai connects to once a minute without sending data. |
+| **Internet check port** | `status.internet_probe.tcp_port` | 443 | advanced | The port MaiPai opens and immediately closes without sending data. |
+
+
+#### People > Manage
+
+This card links to: **Users**, **Family**.
+
+
+### Privacy and safety
+
+For owners and admins. Scope: household.
+
+Tabs: **Privacy**.
+
+
+#### Privacy > Sensitive subjects with teen controls
+
+| Setting | Key | Default | Level | What it does |
+|---|---|---|---|---|
+| **Bodies and relationships with teen controls** | `topics.teen.bodies` | informative | basic | How MaiPai answers teens' questions about puberty, sex, consent, relationships and identity. The standard answer is factual and respectful, and never sexual or romantic. It applies to everyone on teen controls and is set by an admin. An admin cannot see what a teen asks. |
+| **Drugs, alcohol and betting with teen controls** | `topics.teen.risk` | informative | basic | How MaiPai answers teens' questions about drugs, alcohol, vaping, gambling and dangerous challenges. The standard answer explains the real risks and how to get help fast, and never gives tips for getting high, buying or betting. It applies to everyone on teen controls and is set by an admin. An admin cannot see what a teen asks. |
+
+
+#### Privacy > Manage
+
+This card links to: **What connects to the internet**.
+
+
+### AI and models
+
+For owners and admins. Scope: household.
+
+Tabs: **Overview**, **Engines**, **Advanced**, **Coding**.
+
+
+#### Overview > AI and models
+
+| Setting | Key | Default | Level | What it does |
+|---|---|---|---|---|
+| **Chat model choice** | `engines.chat.choice` | auto | basic | Choose the model for the Chat role. Auto follows the selected setup plan. Only an admin can change this. |
+| **Image model choice** | `engines.image.choice` | auto | basic | Choose the model for the Image role. Auto follows the selected setup plan. Only an admin can change this. |
+| **Picture quality** | `generation.picture_quality` | quick | basic | Quick makes a picture in a few seconds. Detailed takes longer and has more looks to choose from. Anyone can ask chat for the other one for a single picture. |
+| **Quick picture model** | `generation.picture_quick_model` | ernie | basic | Which model makes Quick pictures. ERNIE follows your words closely. FLUX.2 Klein also changes pictures and is the backup. If the one you pick is not on this computer, Quick uses the other. |
+| **Detailed pictures** | `generation.picture_detailed.enabled` | on | basic | When off, chat makes every picture Quick, even when someone asks for Detailed. Turning it off does not remove the model. |
+| **Video model choice** | `engines.video.choice` | auto | basic | Choose the model for the Video role. Auto follows the selected setup plan. Only an admin can change this. |
+| **Video quality** | `generation.video_quality` | quick | basic | Quick makes a short silent clip and can start from a picture. Detailed adds sound and spoken words, and makes longer clips from words. Anyone who can make videos can ask chat for the other one for a single video. |
+| **Music model choice** | `engines.music.choice` | auto | basic | Choose the model for the Music role. Auto follows the selected setup plan. Only an admin can change this. |
+| **Tts model choice** | `engines.tts.choice` | auto | basic | Choose the model for the Tts role. Auto follows the selected setup plan. Only an admin can change this. |
+| **Wakeword model choice** | `engines.wakeword.choice` | auto | basic | Choose the model for the Wakeword role. Auto follows the selected setup plan. Only an admin can change this. |
+| **Vision model choice** | `engines.vision.choice` | auto | basic | Choose the model for the Vision role. Auto follows the selected setup plan. Only an admin can change this. |
+| **Coding model choice** | `engines.coding.choice` | auto | basic | Choose the model for the Coding role. Auto follows the selected setup plan. Only an admin can change this. |
+
+
+#### Overview > Chat pause
+
+| Setting | Key | Default | Level | What it does |
+|---|---|---|---|---|
+| **Pause chat for everyone** | `chat.paused` | off | basic | Turns chat off for the whole household until you turn it back on. Messages are not sent while it is paused. Timers, alarms and the emergency lines keep working. |
+| **Message shown while chat is paused** | `chat.paused_message` | empty | basic | Optional. One short line everyone sees next to the pause notice, for example when chat comes back. |
+
+
+#### Advanced > Model per job
+
+| Setting | Key | Default | Level | What it does |
+|---|---|---|---|---|
+| **Router model choice** | `engines.router.choice` | auto | basic | Choose the model for the Router role. Auto follows the selected setup plan. Only an admin can change this. |
+| **Embed model choice** | `engines.embed.choice` | auto | basic | Choose the model for the Embed role. Auto follows the selected setup plan. Only an admin can change this. |
+| **Rerank model choice** | `engines.rerank.choice` | auto | basic | Choose the model for the Rerank role. Auto follows the selected setup plan. Only an admin can change this. |
+| **Judge model choice** | `engines.judge.choice` | auto | basic | Choose the model for the Judge role. Auto follows the selected setup plan. Only an admin can change this. |
+| **Stt model choice** | `engines.stt.choice` | auto | basic | Choose the model for the Stt role. Auto follows the selected setup plan. Only an admin can change this. |
+| **Turn Signal model choice** | `engines.turn_signal.choice` | auto | basic | Choose the model for the Turn Signal role. Auto follows the selected setup plan. Only an admin can change this. |
+
+
+#### Advanced > AI settings
+
+| Setting | Key | Default | Level | What it does |
+|---|---|---|---|---|
+| **Chat context size override** | `chat.context_size_override` | 0 | advanced | 0 lets the hub pick the largest context that fits this computer's memory. A higher number can run out of memory; a lower one leaves headroom but remembers less of the conversation. |
+| **Flash attention override** | `chat.flash_attention_override` | auto | advanced | "Auto" lets the hub decide based on the model and the quantized-KV-cache setting. Flash attention speeds up longer conversations; a very old GPU may not support it. |
+| **KV cache precision override** | `chat.kv_cache_override` | auto | advanced | "Auto" quantizes the conversation cache to fit more context in the same memory, with a small quality tradeoff. "Full" uses full precision: more accurate, uses roughly twice the memory for the same context size. |
+| **Reach the engine computer when away from home** | `engines.stack.remote.allow_tailnet` | off | advanced | Off, Home reaches the engine computer only from inside your home network. On, Home may also reach it through your private tailnet when you are away. Turn it on only if you have joined both computers to your tailnet yourself. Only an admin can change this. Shown only while the engine runs on another computer. |
+| **Engine computer name** | `engines.stack.remote.host` | empty | basic | The name of the computer that runs the engine, the way your network knows it. Only an admin can change this. Shown only while the engine runs on another computer. |
+| **Engine computer local port** | `engines.stack.remote.local_port` | 8771 | advanced | The port on this computer where the engine computer's connection appears. Change it only if another program already uses it. Only an admin can change this. Shown only while the engine runs on another computer. |
+| **Engine computer secure connection port** | `engines.stack.remote.ssh_port` | 22 | advanced | The port Home uses to open its secure connection to the engine computer. Leave it at 22 unless that computer was set up differently. Only an admin can change this. Shown only while the engine runs on another computer. |
+| **Help the chat remember to search the web** | `chat.search_assist` | shadow | advanced | "Off" is the kill switch: nothing is scored. "Shadow" (the default) only counts, as a number, how often a web search looked needed, and changes no reply. "Rescue" is not active yet; for now it behaves like shadow. Children and teens are never scored. |
+| **Natural speech sounds** | `voice.hesitations` | light | basic | Lets spoken replies include a light "hmm," or a laugh now and then. The written chat never shows them, and children and teens never hear them. |
+| **Hugging Face token** | `voice.hf_token` | hidden | advanced | Needed to clone a voice from a recording and to download styles that ask you to accept terms. Create a read token at huggingface.co/settings/tokens and paste it here. Voice cloning also needs the terms accepted at huggingface.co/kyutai/pocket-tts. |
+| **Keep the AI warm** | `health.keep_warm` | on | basic | Home sends a tiny made-up message to the AI every few minutes so the first real reply is quick, and checks that chat, tools, search and voice still work. It uses about 1,000 words of AI output an hour, stores nothing, and never runs while someone is talking to the AI. Turn it off to stop these checks. |
+
+
+#### Engines > Engines
+
+| Setting | Key | Default | Level | What it does |
+|---|---|---|---|---|
+| **Where the engine runs** | `engines.stack.where` | this_computer | basic | "This computer" runs the engine on the machine Home is installed on. "Another computer" runs it on a different computer in your home that you reach over your network. Only an admin can change this. |
+
+
+#### Overview > Search and memory
+
+This card links to: **Web search and memory settings**.
+
+
+#### Overview > Always on
+
+This card draws a full view instead of single settings.
+
+
+#### Coding > Coding
+
+| Setting | Key | Default | Level | What it does |
+|---|---|---|---|---|
+| **Coding** | `coding.enabled` | off | basic | Let people write code with Home's AI. Loads the coding model only when needed. |
+| **Pause coding** | `coding.paused` | off | basic | Stops coding now. Resume to let people code again. |
+| **Coding tools** | `coding.api.enabled` | on | basic | Let people use their own coding tools with API keys. |
+| **Coding away from home** | `coding.api.away` | off | basic | Let API keys work away from home through your Tailscale. |
+| **Devices allowed over Tailscale Serve** | `coding.api.tailnet_nodes` | empty | advanced | Names of your own devices, separated by commas, that may use coding through Tailscale Serve. Empty means none. |
+| **Coding engine** | `coding.engine` | auto | advanced | Choose which engine runs coding. Auto picks the best engine for this computer. |
+| **Home mode** | `coding.home_mode` | normal | basic | Choose how Home uses this computer. Normal keeps chat and pictures running. Coding gives most memory to one coding model. That model also answers chat. |
+| **Splash disk cache** | `coding.splash_cache_gb` | 8 | advanced | Sets how much disk space Splash may use for its coding cache. |
+
+
+#### Coding > Who can code
+
+| Setting | Key | Default | Level | What it does |
+|---|---|---|---|---|
+| **Adults by default** | `coding.adults_by_default` | on | basic | Adults can code unless you turn them off. Teens and children need an admin grant. |
+
+
+#### Coding > Sharing the computer
+
+| Setting | Key | Default | Level | What it does |
+|---|---|---|---|---|
+| **Streams per person** | `coding.max_streams_per_person` | 2 | advanced | Limits how many coding replies one person can stream at once. |
+| **Requests per minute** | `coding.requests_per_minute_per_key` | 60 | advanced | Limits how many requests each key can send in one minute. |
+| **Daily tokens per person** | `coding.daily_tokens_per_person` | 0 | advanced | Limits coding tokens each day. Zero means no cap. |
+| **Keep warm minutes** | `coding.keep_warm_minutes` | 15 | advanced | Unloads the coding model after this many quiet minutes. Chat stays loaded. |
+| **Thinking tokens per request** | `coding.thinking_budget` | 2000 | advanced | Limits thinking to this many tokens per request, up to the admin ceiling. A client cannot raise it past that ceiling. This never turns thinking on for a minor. |
+| **Thinking token ceiling** | `coding.thinking_budget_ceiling` | 2000 | advanced | Sets the most thinking tokens a client can request. Only an admin can change this. Minors never use thinking. |
+| **Wait for chat** | `coding.yield_to_chat` | on | advanced | Pauses coding while chat is answering so chat can respond sooner. |
+
+
+### Pictures, videos and music
+
+For owners and admins. Scope: household.
+
+Tabs: **Pictures**, **Videos**, **Music**, **Styles**.
+
+
+#### Pictures > Pictures
+
+| Setting | Key | Default | Level | What it does |
+|---|---|---|---|---|
+| **Adults can make pictures** | `generation.adults` | on | basic | Turns picture making on or off for adults. Teens can always make pictures with nothing adult in them. Children are set below. |
+| **Level when nobody says** | `generation.picture_tier` | standard | basic | Standard is fast. Boost has finer detail and takes longer. Anyone can pick a level for one picture. |
+
+
+#### Pictures > Children and teens
+
+| Setting | Key | Default | Level | What it does |
+|---|---|---|---|---|
+| **Family can make pictures, videos and songs of each other** | `generation.household_likeness` | on | basic | Anyone in the home may make things with or of any household member. Turn it off to stop that. |
+| **Let children make cartoon pictures and videos** | `generation.kids` | on | basic | Children get cartoons with no sound, up to the limits below. Photos, real people and anything scary or grown-up are never made for them. |
+| **Cartoon pictures a child can make each day** | `generation.kids_daily_pictures` | 20 | basic | 0 means none. |
+| **Cartoon videos a child can make each day** | `generation.kids_daily_videos` | 5 | basic | 0 means none. |
+
+
+#### Videos > Videos
+
+| Setting | Key | Default | Level | What it does |
+|---|---|---|---|---|
+| **Video making** | `generation.video.enabled` | on | basic | Turns video making on or off for everyone in the home, children and teens too. Children's daily limits are under Pictures. |
+| **Level when nobody says** | `generation.video_tier` | standard | basic | Standard is fast and has sound. Boost has a sharper picture and takes a little longer. Anyone can pick a level for one video. |
+
+
+#### Music > Music
+
+| Setting | Key | Default | Level | What it does |
+|---|---|---|---|---|
+| **Adults can make songs** | `generation.music.enabled` | on | basic | Turns song making on or off for adults. Children and teens cannot make songs, whatever this says. |
+| **Song length** | `generation.music.length` | full | basic | What chat makes when nobody says. Anyone can ask for the other kind. A song is as long as its words. |
+
+
+#### Music > Online radio and podcasts
+
+| Setting | Key | Default | Level | What it does |
+|---|---|---|---|---|
+| **Find radio stations online** | `radio.directory.enabled` | on | basic | Lets people search a public station directory and play stations from the internet. The station sees your home's address. On by default; turn it off to keep radio to stations a parent saved. |
+| **Find podcasts online** | `podcasts.directory.enabled` | on | basic | Lets adults search a public podcast directory to add shows. On by default; turn it off to stop all directory searches. |
+| **Let teens find podcasts** | `podcasts.directory.teens` | off | basic | Lets teens search the podcast directory too, once finding podcasts is on. Children never can. |
+
+
+#### Music > Looking up songs online
+
+| Setting | Key | Default | Level | What it does |
+|---|---|---|---|---|
+| **Look up song lyrics online** | `music.lyrics_online` | on | advanced | When someone opens Lyrics for a song with no words, Home sends its title, artist, album and length once per song to look them up. Never for songs made at home or for a child. |
+| **Match my songs to MusicBrainz** | `music.musicbrainz_match` | on | advanced | In the background, Home sends each library song's title, artist, album and track number to MusicBrainz, about one song a second, to find its public MusicBrainz id. Nothing else leaves your home. Off stops it; ids already found stay. |
+| **Show facts and photos from Wikimedia** | `music.artist_wikimedia` | on | advanced | In the background, Home asks Wikidata, Wikipedia and Wikimedia Commons about an artist you have songs by, and about each song, using only public ids found through MusicBrainz. It keeps one photo, a short bio and a short fact on your computer. Nothing about your home is sent. Never for an artist under 18. Off stops it; what is already kept stays, and artists show the generated cover instead. |
+| **Fetch album covers from the Cover Art Archive** | `music.album_art_online` | on | advanced | In the background, Home asks the Cover Art Archive for the front cover of an album that has no art in its files or folder, using only the album's public MusicBrainz id, and keeps the picture on your computer. Nothing about your home is sent. Art in your files or folders is never replaced. Off stops it; covers already kept stay, and other albums show the generated cover. |
+
+
+#### Styles > Styles
+
+| Setting | Key | Default | Level | What it does |
+|---|---|---|---|---|
+| **Adult-only styles** | `generation.styles.adult_only` | allowed | basic | Hidden removes every adult-only style for all adults, admins too, until you switch it back. Nothing is deleted. |
+| **Use Civitai** | `generation.styles.civitai` | off | basic | Off until you turn it on. This computer only contacts civitai.com when you search or install. |
+| **Civitai key** | `generation.styles.civitai_key` | hidden | basic | Some downloads need a free Civitai key. Home keeps it private and never shows it again. |
+
+
+### Voice
+
+For owners and admins. Scope: household.
+
+Tabs: **Voices**, **Commands**.
+
+
+### Search and web
+
+For owners and admins. Scope: household.
+
+Tabs: **Search**.
+
+
+#### Search > Web search
+
+| Setting | Key | Default | Level | What it does |
+|---|---|---|---|---|
+| **Look up words online** | `search.dictionary_fallback` | off | advanced | Look up a word online when the library does not have it. The word you ask about is sent to Wiktionary (Wikimedia). Adults only. Off by default. |
+| **Max can search the web in depth** | `research.max_web` | on | advanced | When someone picks Max for a question, it may run up to 12 searches and read up to 40 pages, at most 4 from one site, 3 seconds apart, and it stops reading at the first refusal. Teens and children never get Max. Turn this off to keep Max to the offline library and one ordinary search. |
+| **Search fetch cache limit (GB)** | `search.fetch_cache_gb` | 2 | advanced | Maximum disk space used for cached search pages. The default is 2 GB on p16 and 10 GB on p64 and p128. |
+| **Your own SearXNG (optional)** | `search.searxng_url` | empty | advanced | Your own SearXNG (optional). Leave empty to use the search service MaiPai runs for you. |
+| **Search sources** | `search.source_mode` | mix | basic | Where MaiPai looks for answers: Internet first, Library only, or Library first (the recommended choice). Library only turns off just the live Wikipedia-style lookup; web search stays on unless web search is itself set to Library only. Children and teens keep their current protections in every mode, and this choice never widens what they can reach. |
+| **Encyclopedia lookups** | `search.source_mode.wikimedia` | inherit | advanced | Gives the live Wikipedia-style lookup its own choice. Same as the household choice follows the search sources setting. Library only turns this lookup off. Children and teens never use this lookup in any mode. |
+| **Web searches** | `search.source_mode.web` | inherit | advanced | Gives web search its own choice. Same as the household choice follows the search sources setting. Library only here turns off web search, link reading, Wayback and the hosted search provider together. Children and teens keep their current protections in every mode. |
+| **Web search with child controls** | `search.web.child_mode` | on | basic | When this is on, MaiPai can look things up on the web for people using child controls. Results go through SafeSearch at its strictest, adult sites are blocked, and links are hidden. When it is off, answers come only from the offline library. Only an admin can change this, and a child's searches show in that child's own chats. |
+| **Web search with teen controls** | `search.web.teen_mode` | on | basic | When this is on, MaiPai can look things up on the web for people using teen controls. Results go through SafeSearch at moderate or stricter, and adult sites are blocked. When it is off, answers come only from the offline library. Only an admin can change this. It does not show anyone what a teen searched for. |
+| **Web search sources** | `search.web_sources` | `["searxng"]` | advanced | Which services answer web searches. SearXNG, the household's own search service, is on by default. DuckDuckGo is not available yet. With more than one picked, their results are blended into one list. Children and teens only use SearXNG. To turn web search off, set Web searches to Library only. Pictures and videos always use SearXNG. |
+| **Use archived pages when a source is missing** | `search.wayback_fallback` | on | advanced | Check the Wayback Machine when a cited page returns not found. |
+| **Ask Wikipedia when web search fails or finds nothing** | `search.wikipedia_fallback` | on | advanced | When your SearXNG instance is down or a search comes back empty, MaiPai asks Wikipedia's own official API instead - covers people, shows, places, products and history. On by default whenever web search is set up; turn it off here if you don't want it. |
+
+
+#### Search > Blocked sites
+
+| Setting | Key | Default | Level | What it does |
+|---|---|---|---|---|
+| **Blocked sites with child controls** | `search.blocklists.child` | `["blp-gambling", "blp-scam", "blp-phishing", "blp-malware", "blp-drugs"]` | advanced | Which lists of blocked sites are checked when MaiPai searches the web for people using child controls. Adult sites are always blocked for child and teen controls and are not listed here. Home downloads each list once and keeps it up to date. Web search for child controls starts once every list checked here has been downloaded. Only an admin can change this. |
+| **Blocked sites with teen controls** | `search.blocklists.teen` | `["blp-gambling", "blp-scam", "blp-phishing", "blp-malware"]` | advanced | Which lists of blocked sites are checked when MaiPai searches the web for people using teen controls. Adult sites are always blocked for child and teen controls and are not listed here. Web search for teen controls starts once every list checked here has been downloaded. Only an admin can change this. It does not show anyone what a teen searched for or which sites were blocked. |
+| **Blocked sites with adult controls** | `search.blocklists.adult` | empty | advanced | Lists of blocked sites to check when MaiPai searches the web for adults. None are checked unless you pick them. Scam, phishing and malware lists are a good start for a household that wants that protection. Only an admin can change this. |
+| **Kinds of sites to block** | `search.blocklists` | empty | advanced | Kinds of sites that web search, page reads and answer pictures leave out. Kids, Teens and Adults each start from their own user defaults. The global defaults add kinds for everyone, and a user override adds or removes kinds for one person. The adult-site list is always on for a child or teen and no override can turn it off. Only an admin can change this, and it never shows what anyone searched for. |
+| **Always block these sites** | `search.hosts.deny` | empty | advanced | Sites that web search never shows for anyone, separated by commas, like example.com. A site you list here also blocks its subpages. This works for every age, and it always wins over the allowed list. Only an admin can change this. |
+| **Allow these sites** | `search.hosts.allow` | empty | advanced | Sites that web search may show even when a blocked-sites list has them, separated by commas, like example.com. It cannot allow an adult site for child or teen controls, and it cannot allow a site you list under Always block these sites. Only an admin can change this. |
+| **Always block these sites for child** | `search.hosts.child.deny` | empty | advanced | Sites that web search never shows to a child, separated by commas, like example.com, on top of the household list. A site you list here also blocks its subpages. It always wins over the allowed lists. Only an admin can change this. |
+| **Allow these sites for child** | `search.hosts.child.allow` | empty | advanced | Sites that web search may show to a child even when a blocked-sites list has them, separated by commas, like example.com, on top of the household list. It cannot allow an adult site for child or teen controls, and it cannot allow a site that is in an always-block list. Only an admin can change this. |
+| **Always block these sites for teen** | `search.hosts.teen.deny` | empty | advanced | Sites that web search never shows to a teen, separated by commas, like example.com, on top of the household list. A site you list here also blocks its subpages. It always wins over the allowed lists. Only an admin can change this. |
+| **Allow these sites for teen** | `search.hosts.teen.allow` | empty | advanced | Sites that web search may show to a teen even when a blocked-sites list has them, separated by commas, like example.com, on top of the household list. It cannot allow an adult site for child or teen controls, and it cannot allow a site that is in an always-block list. Only an admin can change this. |
+| **Always block these sites for adult** | `search.hosts.adult.deny` | empty | advanced | Sites that web search never shows to an adult, separated by commas, like example.com, on top of the household list. A site you list here also blocks its subpages. It always wins over the allowed lists. Only an admin can change this. |
+| **Allow these sites for adult** | `search.hosts.adult.allow` | empty | advanced | Sites that web search may show to an adult even when a blocked-sites list has them, separated by commas, like example.com, on top of the household list. It cannot allow an adult site for child or teen controls, and it cannot allow a site that is in an always-block list. Only an admin can change this. |
+
+
+#### Search > News shelf
+
+| Setting | Key | Default | Level | What it does |
+|---|---|---|---|---|
+| **News poll interval (seconds)** | `news.poll_interval_s` | 1800 | advanced | How often Home checks enabled news feeds. At least 900 seconds. |
+| **News retention (days)** | `news.retention_days` | 90 | advanced | How long Home keeps news items and stories. |
+| **News shelf** | `news.shelf.enabled` | on | advanced | Turn the household news shelf on or off. |
+| **News lists with child controls** | `news.lists.child` | `["feeds-children"]` | basic | Which lists of news feeds appear on the news shelf for people using child controls. A list that is not offered to this user type never appears here and is never shown to them. Every item is still checked by the age filter before anyone sees it. A list unchecked for every user type is switched off. Only an admin can change this. |
+| **News lists with teen controls** | `news.lists.teen` | `["feeds-household"]` | basic | Which lists of news feeds appear on the news shelf for people using teen controls. A list that is not offered to this user type never appears here and is never shown to them. Every item is still checked by the age filter before anyone sees it. A list unchecked for every user type is switched off. Only an admin can change this. |
+| **News lists with adult controls** | `news.lists.adult` | `["feeds-household"]` | basic | Which lists of news feeds appear on the news shelf for people using adult controls. A list that is not offered to this user type never appears here and is never shown to them. Every item is still checked by the age filter before anyone sees it. A list unchecked for every user type is switched off. Only an admin can change this. |
+| **Extra news feeds for child** | `news.feeds.child` | empty | advanced | News feed addresses to add for people using child controls, starting with https:// and separated by commas or spaces. Remove an address to remove its feed. These sit on top of the checked lists. Home checks every item against the age filter, and an address that points inside your home network is refused. Only an admin can change this. |
+| **Extra news feeds for teen** | `news.feeds.teen` | empty | advanced | News feed addresses to add for people using teen controls, starting with https:// and separated by commas or spaces. Remove an address to remove its feed. These sit on top of the checked lists. Home checks every item against the age filter, and an address that points inside your home network is refused. Only an admin can change this. |
+| **Extra news feeds for adult** | `news.feeds.adult` | empty | advanced | News feed addresses to add for people using adult controls, starting with https:// and separated by commas or spaces. Remove an address to remove its feed. These sit on top of the checked lists. Home checks every item against the age filter, and an address that points inside your home network is refused. Only an admin can change this. |
+| **Load News stories ahead of time** | `news.full_text_prefetch` | on | advanced | Keep full text ready for followed channels and the top stories in Today. On by default. Home tries each item only once, at most one every 30 seconds for each site (so no one site is flooded) and 150 per site in 24 hours. It follows each site's robots rules and pauses on the first block. Turn this off to load pages only when someone opens or saves a story. |
+| **Pictures in News** | `news.images` | on | advanced | Show the picture each news story came with. Home asks the publisher for a picture once, the first time a screen shows that story, and keeps a copy; it never fetches pictures in the background. Turn this off and News shows text only. |
+| **News picture storage (MB)** | `news.image_cache_mb` | 512 | advanced | How much disk space News pictures may use. When it fills, Home removes the pictures nobody has looked at for the longest time. A picture nobody opens for 14 days is removed either way. |
+
+
+#### Search > Offline books
+
+This card links to: **Download Wikipedia, health and other offline books**.
+
+
+### Offline data
+
+For owners and admins. Scope: household.
+
+
+### Apps and devices
+
+For owners and admins. Scope: household.
+
+Tabs: **Devices**, **Integrations**.
+
+
+#### Devices > Robots
+
+| Setting | Key | Default | Level | What it does |
+|---|---|---|---|---|
+| **Robots** | `home.robots.enabled` | off | basic | Lets this home use robots. When it's off, robots can't connect and nothing about them shows here. Nothing is deleted. |
+
+
+#### Devices > Robot
+
+| Setting | Key | Default | Level | What it does |
+|---|---|---|---|---|
+| **Robot greeting style** | `robot.greetings.mode` | gesture | basic | Use a gesture by default; spoken greeting remains subject to person and age-band rules. |
+| **Offer acceptance phrases** | `robot.initiative.accept_phrases` | default | basic | Uses the closed default set: “go ahead” or “yes please” to accept, and “not now” or “no thanks” to decline. No gesture accepts an offer. |
+| **Robot initiative** | `robot.initiative.enabled` | on | basic | When on, the robot may make approved offers. On by default for gestures only; spoken offers remain controlled by tiers_spoken. |
+| **Maximum offers per hour** | `robot.initiative.max_offers_per_hour` | 3 | basic | At most three offers per hour by default; tier 3 is limited to one. |
+| **Spoken offer tiers** | `robot.initiative.tiers_spoken` | tier_1 | basic | Tier 1 may speak; tiers 2 and 3 ask first by default. |
+| **Allow robot live view** | `robot.live_view.enabled` | off | basic | Off until an admin enables it. Only admins and adults explicitly named in robot.live_view.who may view. |
+| **Adults allowed to view the robot camera** | `robot.live_view.who` | empty | basic | Admins can view. This list may name adults only; children and teens are never admitted. |
+| **Allow robot access over the tailnet** | `robot.offlan.tailnet` | off | advanced | Off by default. Turn on only after the owner manually joins the device to the household tailnet; Home holds no tailnet key. |
+| **Child safety alarm line** | `safety.alarm.child_line` | Smoke alarm. Please go to your grown-up. | basic | Spoken after a mapped safety alarm for a child. |
+| **Safety alarm repeat interval** | `safety.alarm.repeat_seconds` | 20 | basic | Repeat between 10 and 60 seconds; 20 seconds by default. |
+| **Safety alarm voice** | `safety.alarm.voice` | default | basic | The fixed alarm voice; the deterministic alarm path does not use a model. |
+| **Safety alarm volume** | `safety.alarm.volume` | 70 | basic | Alarm volume has a hard floor of 70; Home enforces the floor. |
+| **Allow vision when requested** | `vision.on_request.enabled` | on | basic | Allows a requested camera turn. Frames are never kept for a child. |
+
+
+#### Integrations > Home Assistant
+
+| Setting | Key | Default | Level | What it does |
+|---|---|---|---|---|
+| **Home Assistant access token** | `home.access_token` | hidden | advanced | A long-lived access token from your Home Assistant profile page, used to control your smart-home devices. |
+| **Home Assistant URL** | `home.base_url` | empty | advanced | The address of your Home Assistant instance, e.g. http://homeassistant.local:8123. |
+| **Safety alarm sensors** | `safety.alarm.sensors` | empty | basic | Home Assistant sensors whose alarm events the robot announces. No sensors are selected by default. |
+
+
+#### Integrations > Telegram
+
+| Setting | Key | Default | Level | What it does |
+|---|---|---|---|---|
+| **Quiet hours start** | `household.quiet_hours.from` | 21:00 | basic | Quiet hours begin at 9:00 pm by default. Safety alarms always override quiet hours. |
+| **Quiet hours end** | `household.quiet_hours.to` | 07:00 | basic | Quiet hours end at 7:00 am by default. |
+| **Telegram bot token** | `notifications.telegram.bot_token` | hidden | advanced | A bot token from @BotFather, used to send notifications to Telegram. One bot for the whole household; each person links their own chat below. |
+
+
+#### Integrations > Reference library
+
+| Setting | Key | Default | Level | What it does |
+|---|---|---|---|---|
+| **Reference download time** | `reference.download.when` | window | advanced | Choose when reference books may download. The nightly window is set in Home updates. |
+| **Reference library location** | `reference.library_dir` | empty | basic | Where the household's offline knowledge archives live: a local folder, an external drive, or a NAS mount. Empty uses Home's own data folder. Moving this later moves the files and updates the library records. |
+| **Reference update speed limit (MB/s)** | `reference.update.max_mbps` | 20 | advanced | Maximum speed used for automatic reference library updates. |
+
+
+### Backups, storage and updates
+
+For owners and admins. Scope: household.
+
+Tabs: **Storage and backups**, **Maintenance**.
+
+
+#### Storage and backups > Limits
+
+| Setting | Key | Default | Level | What it does |
+|---|---|---|---|---|
+| **Backup storage limit (GB)** | `backup.max_total_gb` | 0 | advanced | Once total backup storage passes this, the oldest backups are deleted first, checked after the normal seven-daily/four-weekly/three-monthly schedule. 0 means no extra limit. |
+| **Backup key saved** | `backups.emergency_kit_saved_at` | empty | basic | The date and time the owner saved or printed the emergency backup key. The key itself is never stored here. |
+| **Warn when free disk space drops below (GB)** | `storage.critical_free_gb` | 2 | advanced | A Repairs item is raised once free space on the hub's own disk drops below this. |
+| **Household storage cap (bytes)** | `storage.household.cap_bytes` | 0 | basic | The total bytes the whole household's files may use. 0 means no cap is set yet, the setup wizard sets this from the disk. |
+| **Default per-person storage cap (bytes)** | `storage.person.default_cap_bytes` | 21474836480 | basic | How many bytes each person may use for their own files, unless that person has their own override below. |
+
+
+#### Storage and backups > Manage
+
+This card links to: **Backups**, **Storage**.
+
+
+#### Maintenance > Manage
+
+This card links to: **Updates**, **Repairs**, **Performance**, **Status**.
+
+
+### Advanced
+
+For owners and admins. Scope: household.
+
+Tabs: **Developer tools**, **Network and access**.
+
+
+#### Developer tools > Media minutes
+
+| Setting | Key | Default | Level | What it does |
+|---|---|---|---|---|
+| **Audio outside screen time** | `media.budget.exempt_bedtime_audio` | off | expert | Music and audiobooks do not use the daily media minutes when this is on. |
+
+
+#### Developer tools > AI developer settings
+
+| Setting | Key | Default | Level | What it does |
+|---|---|---|---|---|
+| **Selected chat model** | `chat.model_id` | empty | expert | The catalog model id currently downloaded and running for chat. Changed through the AI models page, not here. |
+| **MaiPai Stack address** | `engines.stack.url` | empty | expert | Empty uses Home's own built-in engines. With the engine on this computer, set this to the address of the MaiPai Stack installed here to route chat, embeddings and voice through it. With the engine on another computer, Home fills this in for you from the connection settings, so leave it empty. Only an admin can change this. |
+| **Use the MaiPai Stack for chat** | `engines.stack.use_chat` | off | expert | Off, Home's own engine does this. Turn on only after the Stack has been proven for it. The memory judge and background worker follow this switch because they share chat's model. |
+| **Use the MaiPai Stack for search (embeddings)** | `engines.stack.use_embeddings` | off | expert | Off, Home's own engine does this. Turn on only after the Stack has been proven for it. |
+| **Use the MaiPai Stack for listening (speech to text)** | `engines.stack.use_stt` | off | expert | Off, Home's own engine does this. Turn on only after the Stack has been proven for it. |
+| **Use the MaiPai Stack for speaking (text to speech)** | `engines.stack.use_tts` | off | expert | Off, Home's own engine does this. Turn on only after the Stack has been proven for it. |
+
+
+#### Network and access > Network
+
+| Setting | Key | Default | Level | What it does |
+|---|---|---|---|---|
+| **Who can reach Home** | `network.lan_exposure` | lan | advanced | Loopback keeps Home on this computer. LAN lets devices on your home network connect. Changing this needs a restart. Only an admin can change this. |
+| **Away access through Tailscale** | `network.tailnet_access` | off | basic | Lets your devices reach Home through your private Tailscale network. Tailscale sees device names and addresses, not your conversations. Home never turns this on for you. Only an admin can change this. |
+
+
+#### Network and access > Port
+
+| Setting | Key | Default | Level | What it does |
+|---|---|---|---|---|
+| **Home network port** | `network.hub_port` | 3000 | expert | The port Home listens on. Changing it needs a restart and changes the address devices use. Only an admin can change this. |
+
+
+## Set from other screens
+
+These settings are not on a Settings page. An owner or admin sets them on a person's Family page or on Users and storage.
+
+
+### Daily minutes by package category (Family page)
+
+| Setting | Key | Default | Level | What it does |
+|---|---|---|---|---|
+| **Daily Family minutes** | `allowance.family.daily_minutes` | 0 | basic | How many minutes of Family packages this person may use per day. 0 means no limit. |
+| **Daily Fun minutes** | `allowance.fun.daily_minutes` | 0 | basic | How many minutes of Fun packages this person may use per day. 0 means no limit. |
+| **Daily Health minutes** | `allowance.health.daily_minutes` | 0 | basic | How many minutes of Health packages this person may use per day. 0 means no limit. |
+| **Daily Home minutes** | `allowance.home.daily_minutes` | 0 | basic | How many minutes of Home packages this person may use per day. 0 means no limit. |
+| **Daily Info minutes** | `allowance.info.daily_minutes` | 0 | basic | How many minutes of Info packages this person may use per day. 0 means no limit. |
+| **Daily Learning minutes** | `allowance.learning.daily_minutes` | 0 | basic | How many minutes of Learning packages this person may use per day. 0 means no limit. |
+| **Daily Media minutes** | `allowance.media.daily_minutes` | 0 | basic | How many minutes of Media packages this person may use per day. 0 means no limit. |
+| **Daily Robot body minutes** | `allowance.robot_body.daily_minutes` | 0 | basic | How many minutes of Robot body packages this person may use per day. 0 means no limit. |
+| **Daily Utilities minutes** | `allowance.utilities.daily_minutes` | 0 | basic | How many minutes of Utilities packages this person may use per day. 0 means no limit. |
+| **Approved media only** | `media.allowlist_only` | off | basic | Shows the home library and sources picked for you. |
+
+
+### Sensitive subject levels for a child (Family page)
 
 | Setting | Key | Default | Level | What it does |
 |---|---|---|---|---|
@@ -296,67 +700,85 @@ Each table gives the label as shown, the key (useful in a support report), the d
 | **Santa Claus and other family stories** | `topics.family_stories` | keep | basic | Whether MaiPai keeps stories like Santa Claus, the Tooth Fairy and the Easter Bunny for a child: it never says whether they are real, plays along, and points the child to the family. Turn it off if you would rather MaiPai answered plainly. Only a parent or admin can change a child's. It applies only while the person is on child controls. |
 | **Names of family stories** | `topics.family_story_names` | Santa Claus, the Tooth Fairy, the Easter Bunny | basic | The stories MaiPai keeps for this child, separated by commas. Add your family's own, such as Elf on the Shelf or the Three Kings. Only a parent or admin can change a child's. |
 
-### Personal Settings > Voice
+
+### Storage quota for a person (Users and storage)
 
 | Setting | Key | Default | Level | What it does |
 |---|---|---|---|---|
-| **Speaking voice** | `tts.voice_id` | default | basic | The voice MaiPai uses when it reads its replies aloud to you. `default` is the voice built into the speech engine now in use. |
-| **Podcast speed** | `audio.speed.podcast` | 1 | basic | Plays episodes faster or slower than normal. |
-| **Audiobook speed** | `audio.speed.audiobook` | 1 | basic | Plays audiobooks faster or slower than normal. |
-| **Video speed** | `audio.speed.video` | 1 | basic | Plays videos faster or slower than normal. |
-| **Spoken reply speed** | `audio.speed.spoken_reply` | 1 | basic | Speeds up or slows down spoken replies. |
+| **This person's storage quota (GB)** | `storage.person_quota_gb` | 0 | advanced | How much disk space this person's own uploads (cloned voices today) may use. 0 means no limit. |
+| **This person's storage cap override (bytes)** | `storage.person.cap_bytes` | 0 | advanced | Overrides the household's default per-person cap for this one person. 0 means no override: this person follows the household default. Set by an owner or admin. |
 
-### Personal Settings > Appearance > Appearance
+
+### Coding grants and limits (Family page)
 
 | Setting | Key | Default | Level | What it does |
 |---|---|---|---|---|
-| **Start tours automatically** | `tours.autostart.enabled` | on | basic | A guide opens on a page's first visit when enabled. Help can open Show me around at any time. |
-| **Appearance** | `ui.appearance` | system | basic | Light, dark, or match this device's own setting. |
-| **Look** | `ui.look` | neutral | basic | Neutral is the standard black-and-white theme, the same as shadcn's own dashboard; the rest are shadcn's other color sets; Navy is MaiPai's own. |
-| **Pinned apps (advanced)** | `ui.pinned_apps` | [] | expert | A JSON list of nav entry ids, in the order they should appear. Normally set by pinning an app, not by editing this directly. |
-| **Setup checklist items hidden** | `setup.checklist_dismissed` | [] | expert | A JSON list of setup checklist item ids this person chose not to see again. |
+| **Api keys** | `coding.person.api_keys` | on | basic | Lets this person hold API keys. A key reaches tools Home cannot control. Home still checks every answer. |
+| **Git hosts** | `coding.person.git_hosts` | on | basic | Lets this person connect a code host. This stays off for a child. |
+| **Network hosts** | `coding.person.network_hosts` | empty | basic | Lists hosts this person may use from the home list. An empty list means no internet. Unset follows the home list. |
+| **Max sessions** | `coding.person.max_sessions` | empty | basic | Limits this person's coding sessions. Unset follows the home cap. The home cap always wins. |
+| **Daily tokens** | `coding.person.daily_tokens` | empty | basic | Limits this person's coding tokens each day. Unset follows the home cap. Zero means no cap. The home cap always wins. |
+| **Sandbox size** | `coding.person.sandbox_size` | standard | basic | Small gives 2 CPUs, 2 GB of memory and 5 GB of storage. Standard gives 4 CPUs and 4 GB within the home storage cap. |
+| **Message minutes** | `coding.person.message_minutes` | 30 | basic | Limits the minutes each coding message can run. The home cap always wins. |
 
-### Personal Settings > Appearance > Ease of use
 
-<Shot id="settings-ease" />
-
-| Setting | Key | Default | Level | What it does |
-|---|---|---|---|---|
-| **Comfort style** | `ease.preset` | standard | basic | A bundle of comfort settings: text size, spacing, button size, contrast, calm and helpers. Pick one, then change any single setting below. It is about comfort, not age, and it never changes what is safe or allowed. |
-| **Text size** | `ease.text_size` | preset | basic | Percent of the normal text size. "Preset" follows your ease of use choice. |
-| **Spacing** | `ease.spacing` | preset | basic | How much room there is between things. "Preset" follows your ease of use choice. |
-| **Button size** | `ease.targets` | preset | basic | The smallest size of a button or tap area. Large is about 2 cm. "Preset" follows your ease of use choice. |
-| **Contrast** | `ease.contrast` | preset | basic | More makes text stand out at 7 to 1. "Preset" follows your ease of use choice. |
-| **Motion and color** | `ease.motion` | preset | basic | Calm mutes colors and stops animation. "Preset" follows your ease of use choice. |
-| **Simple mode** | `ease.simple_mode` | preset | basic | Shows only the main apps and settings and hides the rest. It hides, it does not forbid. "Preset" follows your ease of use choice. |
-| **Reading level** | `ease.reading_level` | standard | basic | How plainly MaiPai words its answers and app text: standard, plain or very simple. It changes words and sentence shape only, never what MaiPai will talk about. |
-| **Short explainers** | `ease.explainers` | preset | basic | Shows a short note at the top of a screen about what it is for, until you dismiss it. "Preset" follows your ease of use choice. |
-| **Word help** | `ease.word_help` | preset | basic | Press a word to see what it means in plain words. "Preset" follows your ease of use choice. |
-| **Read aloud** | `ease.read_aloud` | preset | basic | Adds a button to read replies and news aloud in MaiPai's own voice. "Preset" follows your ease of use choice. |
-
-### Robot settings
+### AI and models > Performance (memory and tiers)
 
 | Setting | Key | Default | Level | What it does |
 |---|---|---|---|---|
-| **Robot may listen for a follow-up** | `person.robot.follow_up` | on | basic | Adults and teens are on by default. Children are off unless a parent enables this. |
-| **Robot may greet by name** | `person.robot.greet_by_name` | on | basic | Adults are on by default; children are off until a parent enables this. Teens control their own setting. |
-| **Robot may address this person** | `person.robot.may_address` | on | basic | Adults are on by default. Children are off until a parent enables this; teens control their own setting. |
-| **Allow playful robot clips** | `person.robot.playful_clips` | on | basic | Adults are on by default; children are off until a parent enables this. Teens control their own setting. |
-| **Robot conversation topics** | `person.robot.topics` | nudges | basic | Controls optional nudges and chit-chat. Adults get nudges on and chit-chat off by default; children get both off. Teens control their own setting. |
-| **Allow robot gesture sensing** | `person.vision.gestures` | on | basic | On by default; a parent can change a child setting and teens control their own setting. |
-| **Robot vision watch level** | `person.vision.watch` | presence | basic | Identity is used only for enrolled people. Children stay at presence until a parent chooses; teens control their own setting. The stricter person and robot levels apply. |
+| **Minutes of failure before a restart** | `host.guard.hard_minutes` | 3 | advanced | Choose how long the Mac's account lookup or service start must keep failing before it restarts. |
+| **Most restarts per 12 hours** | `host.guard.max_reboots_per_12h` | 2 | advanced | Choose how many times the guard may restart the Mac in 12 hours. Choose 0 so the guard never restarts it. |
+| **Minutes of graphics failure before a restart** | `host.guard.metal_minutes` | 10 | advanced | Choose how long the graphics compiler must keep failing while the Mac is quiet before it restarts. |
+| **Restart the Mac when it stops responding** | `host.guard.mode` | live | basic | Choose off so it never watches or restarts, dry to watch and record but never restart, or live to restart the Mac when the system stops answering. |
+| **Big-job behaviour** | `resources.preset` | chat_first | basic | How Home shares the computer when a big job needs more room. A preset sets the quiet time, the wait and whether Home asks before lowering a job. Changing one of those by hand shows Custom. |
+| **Quiet time before chat is simplified** | `resources.quiet_seconds` | 60 | basic | Chat is simplified only after nobody has chatted or spoken for this many seconds. The least is 20, because swapping the chat model takes 20 to 60 seconds. |
+| **Longest wait for a quiet moment** | `resources.quiet_max_wait` | 600 | basic | How many seconds a big job waits for a quiet moment in chat. After that, the next setting decides what happens. |
+| **When the wait runs out** | `resources.quiet_timeout` | proceed | basic | What a big job does when chat never goes quiet: go ahead at the next turn boundary, or keep waiting. |
+| **Wait before lowering chat again** | `resources.cooldown_seconds` | 300 | advanced | After chat is restored it is not lowered again for this many seconds, unless the next job is part of the same window. |
+| **Lower chat quietly** | `resources.lower_without_asking.chat` | off | basic | When on, Home may run a job with chat at a lower level to make room without asking first. When off, Home asks the person who started the job. |
+| **Lower pictures quietly** | `resources.lower_without_asking.image` | off | basic | When on, Home may run a job with pictures at a lower level to make room without asking first. When off, Home asks the person who started the job. |
+| **Lower video quietly** | `resources.lower_without_asking.video` | off | basic | When on, Home may run a job with video at a lower level to make room without asking first. When off, Home asks the person who started the job. |
+| **Lower music quietly** | `resources.lower_without_asking.music` | off | basic | When on, Home may run a job with music at a lower level to make room without asking first. When off, Home asks the person who started the job. |
+| **Order of importance** | `resources.priority` | ["chat", "image", "video", "music"] | advanced | A JSON list of categories, most important first. Chat and voice always go first and cannot be moved. Normally set by dragging on the Performance page. |
+| **Big-job profiles** | `resources.profiles` | {"video.max": {"chat": "reduced", "image": "boost", "video": "max", "music": "queued", "tools": "queued"}, "video.boost": {"chat": "standard", "image": "standard", "video": "boost", "music": "queued", "tools": "standard"}, "image.max": {"chat": "standard", "image": "max", "video": "queued", "music": "queued", "tools": "queued"}, "chat.max": {"chat": "max", "image": "queued", "video": "queued", "music": "queued", "tools": "queued"}} | advanced | A JSON table. Each row is a big job and its tier; each cell says what chat, pictures, video, music and tools do while it runs: a tier (reduced, standard, boost, max), queued, or off. Chat is never queued or off. Normally edited under Customize on the Performance page; changing it shows Custom. |
+| **Close apps for big jobs** | `resources.close_apps.mode` | off | basic | Off by default. Automatic lets Home close apps you listed under Always close, and only those, when a big job needs room and nothing else is left to try. Apps on the Never list and the built-in floor are never closed. |
+| **Allowed to close** | `resources.close_apps.always` | [] | advanced | A JSON list of app bundle ids, in the order they are tried. Empty means none. Home keeps the names only in memory while a job runs and stores counts only. |
+| **Apps Home never closes** | `resources.close_apps.never` | [] | advanced | A JSON list of app bundle ids that win over everything, on top of a built-in list of system apps that can never be closed. |
+| **Reopen closed apps afterwards** | `resources.close_apps.reopen` | on | basic | When on, Home reopens the apps it closed once the job ends, in the order it closed them. |
+| **Apps to leave closed** | `resources.close_apps.no_reopen` | [] | advanced | A JSON list of app bundle ids that Home does not reopen after a job, even when reopening is on. Normally set with the Reopen when done switch beside each app on the Performance page. |
+| **Big jobs at once per person** | `resources.max_concurrent_per_person` | 1 | advanced | How many picture, video or song jobs one person may have running at the same time. One keeps a heavy user from holding the computer while others wait. |
+| **Minutes before waiting pictures move up** | `resources.max_wait_before_aging.image` | 0 | advanced | How many minutes a waiting picture job sits before it starts moving up the line. Zero starts moving it right away, one place for each minute it waits. |
+| **Minutes before waiting videos move up** | `resources.max_wait_before_aging.video` | 0 | advanced | How many minutes a waiting video job sits before it starts moving up the line. Zero starts moving it right away, one place for each minute it waits. |
+| **Minutes before waiting songs move up** | `resources.max_wait_before_aging.music` | 0 | advanced | How many minutes a waiting song job sits before it starts moving up the line. Zero starts moving it right away, one place for each minute it waits. |
+| **Pictures always go first** | `resources.strict.image` | off | advanced | When on, a waiting picture job goes before every other kind of big job, however long the others have waited. Chat always goes first either way. |
+| **Videos always go first** | `resources.strict.video` | off | advanced | When on, a waiting video job goes before every other kind of big job, however long the others have waited. Chat always goes first either way. |
+| **Songs always go first** | `resources.strict.music` | off | advanced | When on, a waiting song job goes before every other kind of big job, however long the others have waited. Chat always goes first either way. |
+| **Chat at Reduced** | `engines.chat.tier.reduced` | `{"model": "off", "options": {}}` | advanced | The model and options that fill the Reduced level of chat. A JSON object {model, options}; model is a catalog id, recommended, or off. Normally set from the AI and models page. |
+| **Chat at Standard** | `engines.chat.tier.standard` | `{"model": "recommended", "options": {}}` | advanced | The model and options that fill the Standard level of chat. A JSON object {model, options}; model is a catalog id, recommended, or off. Normally set from the AI and models page. |
+| **Chat at Boost** | `engines.chat.tier.boost` | `{"model": "recommended", "options": {}}` | advanced | The model and options that fill the Boost level of chat. A JSON object {model, options}; model is a catalog id, recommended, or off. Normally set from the AI and models page. |
+| **Chat at Max** | `engines.chat.tier.max` | `{"model": "recommended", "options": {}}` | advanced | The model and options that fill the Max level of chat. A JSON object {model, options}; model is a catalog id, recommended, or off. Normally set from the AI and models page. |
+| **Pictures at Reduced** | `engines.image.tier.reduced` | `{"model": "off", "options": {}}` | advanced | The model and options that fill the Reduced level of pictures. A JSON object {model, options}; model is a catalog id, recommended, or off. Normally set from the AI and models page. |
+| **Pictures at Standard** | `engines.image.tier.standard` | `{"model": "recommended", "options": {}}` | advanced | The model and options that fill the Standard level of pictures. A JSON object {model, options}; model is a catalog id, recommended, or off. Normally set from the AI and models page. |
+| **Pictures at Boost** | `engines.image.tier.boost` | `{"model": "recommended", "options": {}}` | advanced | The model and options that fill the Boost level of pictures. A JSON object {model, options}; model is a catalog id, recommended, or off. Normally set from the AI and models page. |
+| **Pictures at Max** | `engines.image.tier.max` | `{"model": "recommended", "options": {}}` | advanced | The model and options that fill the Max level of pictures. A JSON object {model, options}; model is a catalog id, recommended, or off. Normally set from the AI and models page. |
+| **Video at Reduced** | `engines.video.tier.reduced` | `{"model": "off", "options": {}}` | advanced | The model and options that fill the Reduced level of video. A JSON object {model, options}; model is a catalog id, recommended, or off. Normally set from the AI and models page. |
+| **Video at Standard** | `engines.video.tier.standard` | `{"model": "recommended", "options": {}}` | advanced | The model and options that fill the Standard level of video. A JSON object {model, options}; model is a catalog id, recommended, or off. Normally set from the AI and models page. |
+| **Video at Boost** | `engines.video.tier.boost` | `{"model": "recommended", "options": {}}` | advanced | The model and options that fill the Boost level of video. A JSON object {model, options}; model is a catalog id, recommended, or off. Normally set from the AI and models page. |
+| **Video at Max** | `engines.video.tier.max` | `{"model": "recommended", "options": {}}` | advanced | The model and options that fill the Max level of video. A JSON object {model, options}; model is a catalog id, recommended, or off. Normally set from the AI and models page. |
+| **Music at Reduced** | `engines.music.tier.reduced` | `{"model": "off", "options": {}}` | advanced | The model and options that fill the Reduced level of music. A JSON object {model, options}; model is a catalog id, recommended, or off. Normally set from the AI and models page. |
+| **Music at Standard** | `engines.music.tier.standard` | `{"model": "recommended", "options": {}}` | advanced | The model and options that fill the Standard level of music. A JSON object {model, options}; model is a catalog id, recommended, or off. Normally set from the AI and models page. |
+| **Music at Boost** | `engines.music.tier.boost` | `{"model": "recommended", "options": {}}` | advanced | The model and options that fill the Boost level of music. A JSON object {model, options}; model is a catalog id, recommended, or off. Normally set from the AI and models page. |
+| **Music at Max** | `engines.music.tier.max` | `{"model": "recommended", "options": {}}` | advanced | The model and options that fill the Max level of music. A JSON object {model, options}; model is a catalog id, recommended, or off. Normally set from the AI and models page. |
+| **Voice at Reduced** | `engines.tts.tier.reduced` | `{"model": "off", "options": {}}` | advanced | The model and options that fill the Reduced level of voice. A JSON object {model, options}; model is a catalog id, recommended, or off. Normally set from the AI and models page. |
+| **Voice at Standard** | `engines.tts.tier.standard` | `{"model": "recommended", "options": {}}` | advanced | The model and options that fill the Standard level of voice. A JSON object {model, options}; model is a catalog id, recommended, or off. Normally set from the AI and models page. |
+| **Voice at Boost** | `engines.tts.tier.boost` | `{"model": "recommended", "options": {}}` | advanced | The model and options that fill the Boost level of voice. A JSON object {model, options}; model is a catalog id, recommended, or off. Normally set from the AI and models page. |
+| **Voice at Max** | `engines.tts.tier.max` | `{"model": "recommended", "options": {}}` | advanced | The model and options that fill the Max level of voice. A JSON object {model, options}; model is a catalog id, recommended, or off. Normally set from the AI and models page. |
 
-### Personal Settings > Commands (weather)
-
-| Setting | Key | Default | Level | What it does |
-|---|---|---|---|---|
-| **Weather places** | `weather.places` | [] | basic | Places saved for this surface. |
-| **Weather default place** | `weather.default_place` | current | basic | The place used by default on this surface. |
 
 ## This device
 
 
-### Robot hello (this device)
+### This robot (a robot)
 
 | Setting | Key | Default | Level | What it does |
 |---|---|---|---|---|
@@ -365,5 +787,8 @@ Each table gives the label as shown, the key (useful in a support report), the d
 | **Robot follow-up window** | `robot.follow_up.seconds` | 8 | basic | Robot-only device setting delivered by Home as settings_changed. 0 disables the window; child access still requires the person switch. |
 | **Robot gesture sensing** | `robot.gestures.enabled` | off | basic | Robot-only device setting delivered by Home as settings_changed. Packages may explicitly arm gestures while this is off. |
 | **Robot idle movement** | `robot.idle.level` | calm | basic | Robot-only device setting delivered by Home as settings_changed. |
+| **Face color** | `robot.face.color` | mint | basic | The color behind this robot's face during the day. Only an admin changes this, for each robot on its own. |
+| **Night mode** | `robot.night.mode` | on | basic | During quiet hours or when the room is dark, the face turns black, the screen dims, the voice gets quieter and the robot holds still, so it stays quiet. Talking to it or its wake word still works. |
 | **Allow offers in this room** | `robot.initiative.allowed_here` | off | basic | Robot-only device setting delivered by Home as settings_changed. Off until an admin allows offers in this room. |
+| **Voice** | `robot.voice.id` | default | basic | The voice this robot speaks with. "default" keeps the voice Home uses for it today. |
 | **Sleep when dark and quiet** | `robot.sleep.auto` | on | basic | On by default. This robot goes to sleep after 10 minutes of darkness and no speech, and during household quiet hours. A face, speech or a knock wakes it, and the wake word still works. Turn off to keep it awake. Only an admin changes this, for each robot on its own. |
