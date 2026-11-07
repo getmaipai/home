@@ -1818,5 +1818,47 @@
     "theme": "dark",
     "capturedAt": "2026-10-16T03:22:41.415Z",
     "captureScript": "scripts/screenshot.ts --reference-review"
+  },
+  "docs-engines-another-computer.png": {
+    "route": "docs-engines-another-computer",
+    "viewport": "desktop",
+    "theme": "light",
+    "capturedAt": "2026-11-07T20:13:59.832Z",
+    "captureScript": "scripts/screenshot.ts --docs-review",
+    "review": {
+      "pass1": "opened and confirmed",
+      "pass2": "checked against the declared expectation (screenshots.json alt text, or the page it is added to)",
+      "reviewer": "Claude Sonnet 5.5 (session read of the image)",
+      "date": "2026-11-07",
+      "verdict": "pass"
+    }
+  },
+  "docs-chat-empty.png": {
+    "route": "docs-chat-empty",
+    "viewport": "desktop",
+    "theme": "light",
+    "capturedAt": "2026-11-07T20:13:59.832Z",
+    "captureScript": "scripts/screenshot.ts --docs-review",
+    "review": {
+      "pass1": "opened and confirmed",
+      "pass2": "checked against the declared expectation (screenshots.json alt text, or the page it is added to)",
+      "reviewer": "Claude Sonnet 5.5 (session read of the image)",
+      "date": "2026-11-07",
+      "verdict": "pass"
+    }
+  },
+  "docs-chat-delete-menu.png": {
+    "route": "docs-chat-delete-menu",
+    "viewport": "desktop",
+    "theme": "light",
+    "capturedAt": "2026-11-07T20:13:59.832Z",
+    "captureScript": "scripts/screenshot.ts --docs-review",
+    "review": {
+      "pass1": "opened and confirmed",
+      "pass2": "checked against the declared expectation (screenshots.json alt text, or the page it is added to)",
+      "reviewer": "Claude Sonnet 5.5 (session read of the image)",
+      "date": "2026-11-07",
+      "verdict": "pass"
+    }
   }
 }

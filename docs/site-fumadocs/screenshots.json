@@ -117,7 +117,7 @@
   "profile-language-es": {
     "file": "docs-profile-language-es.png",
     "alt": "The Language card with Spanish picked and the page in Spanish",
-    "caption": "Pick Español and the page changes at once."
+    "caption": "Pick Espa\u00f1ol and the page changes at once."
   },
   "settings-es": {
     "file": "docs-settings-es.png",
@@ -133,5 +133,15 @@
     "file": "docs-sign-in-es.png",
     "alt": "The sign-in passcode boxes with the prompt in Spanish",
     "caption": "The sign-in page uses the home's language."
+  },
+  "chat-delete-menu": {
+    "file": "docs-chat-delete-menu.png",
+    "alt": "The Chat page with the menu open on a chat named Weekend plans in the chat list, showing Rename, Pin, Archive and Delete",
+    "caption": "The three dots beside a chat open Rename, Pin, Archive and Delete."
+  },
+  "engines-another-computer": {
+    "file": "docs-engines-another-computer.png",
+    "alt": "The Pair engine computer window on step 2 of 5, with the engine computer's address filled in as 192.0.2.20 and the port set to 22",
+    "caption": "Step 2 asks for the engine computer's address and port."
   }
 }

@@ -862,6 +862,16 @@
         "backend/src/lib/locale.ts",
         "backend/src/lib/supportedLocales.ts"
       ]
+    },
+    "chat-delete-menu": {
+      "areas": [
+        "chat"
+      ]
+    },
+    "engines-another-computer": {
+      "areas": [
+        "engines"
+      ]
     }
   }
 }

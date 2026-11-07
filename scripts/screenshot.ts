@@ -1568,15 +1568,18 @@ async function exerciseChat(page: import("playwright").Page, viewport: ViewportS
   await other.hover();
   await other.getByRole("button", { name: "More options" }).click();
   await page.getByRole("menuitem", { name: "Delete", exact: true }).click();
-  await page.getByRole("button", { name: "Delete chat", exact: true }).click();
-  // A bare `dialog` role, not scoped to this one's own name ("Delete
-  // chat"), started matching the phone thread list's own Sheet too
-  // once step 5b made that a real dialog-role element (spec.md
-  // "Layout": phone opens the thread list as a sheet) - the confirm
-  // dialog closes on delete, but that outer sheet correctly stays
-  // open, so an unscoped wait for "any dialog hidden" hung forever on
-  // the wrong one.
-  await page.getByRole("dialog", { name: "Delete chat" }).waitFor({ state: "hidden" });
+  // A chat that made no pictures or videos is deleted at once (chatDeleteMedia.tsx: the confirm dialog only asks about its
+  // media), so there is no "Delete chat" button to press. Wait for the row to go instead. A chat with media would show the
+  // alertdialog; answer it with the choice that deletes the chat so the step cannot hang on either shape.
+  const mediaAsk = page.getByRole("alertdialog");
+  const deleted = page.locator('[data-slot="aui_thread-list-item"]').filter({ hasText: "Help me choose a book" });
+  await Promise.race([
+    deleted.first().waitFor({ state: "detached", timeout: 15000 }),
+    mediaAsk.waitFor({ state: "visible", timeout: 15000 }).then(async () => {
+      await mediaAsk.getByRole("button", { name: /^Delete chat and/ }).click();
+      await deleted.first().waitFor({ state: "detached", timeout: 15000 });
+    }),
+  ]);
   await page.reload();
   await showThreads();
   await page.getByRole("button", { name: "Garden plans", exact: true }).waitFor();
@@ -10199,9 +10202,24 @@ async function captureDocsShots(browser: Browser, sessionValue: string): Promise
       await context.close();
     }
   }
+  // The throwaway backend has no speech engine, so the chat composer notice would read "Voice isn't running". Show the state a
+  // working home has: every engine need up (the same fixture idea as the chat ready/paused review, which sets the voice row ready).
+  const engineNeedsReady = async (page: import("playwright").Page) => {
+    await page.route("**/api/status/apps", async (route) => {
+      const response = await route.fetch();
+      const apps = (await response.json()) as Array<{ state: string; reason: string | null; needs?: Array<{ state: string }> }>;
+      for (const app of apps) {
+        app.state = "operational";
+        app.reason = null;
+        for (const need of app.needs ?? []) need.state = "operational";
+      }
+      await route.fulfill({ response, json: apps });
+    });
+  };
   const ready = async (page: import("playwright").Page, path: string, text: string | RegExp) => {
     await page.goto(`${BASE_URL}${path}`);
-    await page.getByText(text).first().waitFor({ timeout: 15000 });
+    // The first text match can be a hidden measuring span (the thread list keeps one), so wait for a visible match.
+    await page.getByText(text).locator("visible=true").first().waitFor({ timeout: 15000 });
     await page.locator('[role="status"]').first().waitFor({ state: "detached", timeout: 3000 }).catch(() => {});
   };
 
@@ -10259,7 +10277,9 @@ async function captureDocsShots(browser: Browser, sessionValue: string): Promise
   // Chat: an empty first chat, and the delete menu on a saved chat.
   await fetch(`${BASE_URL}/api/conversations/clear`, { method: "POST", headers: { "Content-Type": "application/json", ...cookie }, body: "{}" });
   await shot("chat-empty", desktop, "light", async (page) => {
+    await engineNeedsReady(page);
     await ready(page, "/chat", /New chat/);
+    await page.getByText(/Voice isn't running|Open Repairs/).first().waitFor({ state: "hidden", timeout: 10000 });
   });
   {
     const db = new Database(join(DATA_DIR, "hub.db"));
@@ -10269,22 +10289,18 @@ async function captureDocsShots(browser: Browser, sessionValue: string): Promise
     db.close();
   }
   await shot("chat-delete-menu", desktop, "light", async (page) => {
+    await engineNeedsReady(page);
     await ready(page, "/chat?conversation=conv-docsweekend1", /Weekend plans/);
+    await page.getByText(/Voice isn't running/).waitFor({ state: "hidden", timeout: 10000 });
     const row = page.locator('[data-slot="aui_thread-list-item"]').filter({ hasText: "Weekend plans" });
     await row.hover();
     await row.locator('[data-slot="aui_thread-list-item-more"]').click();
     await page.getByRole("menuitem", { name: /Delete/ }).waitFor({ timeout: 10000 });
   });
 
-  // Family: the page, a child's profile with Limits and Topics, add someone.
+  // Family: the page and a child's Topics tab (Limits and add someone had no page that shows them, so they are not captured).
   await shot("family", desktop, "light", async (page) => {
     await ready(page, "/people", "Nova");
-  });
-  await shot("family-child-limits", desktop, "light", async (page) => {
-    await ready(page, "/people", "Nova");
-    await page.getByText("Nova", { exact: true }).first().click();
-    await page.getByRole("tab", { name: "Limits" }).click();
-    await settleAnimations(page);
   });
   await shot("family-child-topics", desktop, "light", async (page) => {
     await ready(page, "/people", "Nova");
@@ -10304,22 +10320,12 @@ async function captureDocsShots(browser: Browser, sessionValue: string): Promise
     await page.getByRole("button", { name: "Clear all" }).click();
     await page.getByRole("alertdialog").or(page.getByRole("dialog")).first().waitFor({ timeout: 10000 });
   });
-  await shot("add-someone", desktop, "light", async (page) => {
-    await ready(page, "/users", "Add");
-    await page.getByRole("button", { name: /Add someone|Add person|Add/ }).first().click();
-    await page.getByRole("combobox").first().waitFor({ timeout: 10000 });
-  });
-
   // Settings pages.
   await shot("settings-ease", desktop, "light", async (page) => {
     await ready(page, "/settings/account/appearance", /Comfort style/);
   });
   await shot("settings-search", desktop, "light", async (page) => {
     await ready(page, "/settings/home/search", /Search/);
-  });
-  await shot("settings-blocked-sites", desktop, "light", async (page) => {
-    await ready(page, "/settings/home/search", /Blocked sites/i);
-    await page.locator('[id="settings-household.blocked_sites"]').scrollIntoViewIfNeeded().catch(() => {});
   });
   await shot("settings-network", desktop, "light", async (page) => {
     await ready(page, "/settings/home/network", /Network and access/);
@@ -10351,16 +10357,33 @@ async function captureDocsShots(browser: Browser, sessionValue: string): Promise
     await page.getByRole("tab", { name: "Engines" }).click();
     await settleAnimations(page);
   });
-  await shot("engines-another-computer", desktop, "light", async (page) => {
-    await ready(page, "/settings/home/ai", /Engine computer link/);
-    await page.getByRole("button", { name: "Pair engine computer" }).click();
-    await page.getByRole("dialog").first().waitFor({ timeout: 10000 });
-    await settleAnimations(page);
-    await page.locator("#pair-where").click({ timeout: 8000 });
-    await page.getByRole("option", { name: "Another computer" }).click({ timeout: 8000 });
-    await page.getByRole("dialog").getByRole("button", { name: "Next", exact: true }).click({ timeout: 8000 });
-    await page.getByText("Engine computer name or address").waitFor({ timeout: 10000 });
-  });
+  // The pairing dialog opens with "Where the engine runs" set from the household setting (EngineLinkCredentialSection begin()). The
+  // dialog's own dropdown does not open on a click in the dev hub (the same kit select opens fine on the page; filed in the DOCS-SHOTS-01
+  // report), so the capture sets the real setting the person would have chosen and checks the dialog shows it, instead of driving
+  // the dropdown. The setting is put back afterwards.
+  {
+    const whereRows: unknown = await (await fetch(`${BASE_URL}/api/settings?scope=household`, { headers: cookie })).json().catch(() => []);
+    const before = (Array.isArray(whereRows) ? (whereRows as Array<{ key: string; value: unknown }>).find((row) => row.key === "engines.stack.where")?.value : undefined) ?? "this_computer";
+    const putWhere = (value: unknown) => fetch(`${BASE_URL}/api/settings`, { method: "PUT", headers: { "Content-Type": "application/json", ...cookie }, body: JSON.stringify({ scope: "household", key: "engines.stack.where", value }) });
+    await putWhere("another_computer");
+    await shot("engines-another-computer", desktop, "light", async (page) => {
+      // The Engine computer link card lives on the Engines tab, so open the tab before looking for it.
+      await ready(page, "/settings/home/ai", /AI and models/);
+      await page.getByRole("tab", { name: "Engines" }).click();
+      await page.getByText("Engine computer link").locator("visible=true").first().waitFor({ timeout: 15000 });
+      await page.getByRole("button", { name: "Pair engine computer" }).click();
+      const dialog = page.getByRole("dialog").first();
+      await dialog.waitFor({ timeout: 10000 });
+      await settleAnimations(page);
+      await dialog.getByRole("combobox", { name: "Where the engine runs" }).filter({ hasText: "Another computer" }).waitFor({ timeout: 8000 });
+      await dialog.getByRole("button", { name: "Next", exact: true }).click({ timeout: 8000 });
+      await page.getByText("Engine computer name or address").waitFor({ timeout: 10000 });
+      // An empty address shows the red "needs a value" border; the guide's own example address (documentation range) reads as a normal step.
+      await dialog.getByRole("textbox", { name: "Engine computer name or address" }).fill("192.0.2.20");
+      await settleAnimations(page);
+    });
+    await putWhere(before);
+  }
 
   // Backups with a real row, and Repairs with a Fix button.
   await shot("backups", desktop, "light", async (page) => {
