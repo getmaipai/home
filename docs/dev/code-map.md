@@ -342,7 +342,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 
 | File | Exported names |
 |---|---|
-| `backend/src/lib/access.ts` | isOwnerOrAdmin, canHaveTemporaryChat, rolesById, getPersonRole, canAccessPerson, listActivePeople |
+| `backend/src/lib/access.ts` | isOwnerOrAdmin, canHaveTemporaryChat, mayUseClipVoices, rolesById, getPersonRole, canAccessPerson |
 | `backend/src/lib/addModel.ts` | AddModelError, inspectForAdd, addChatModel |
 | `backend/src/lib/addModelRecord.ts` | addedModelId, recordFor |
 | `backend/src/lib/addedModels.ts` | listAddedModels, saveAddedModel, removeAddedModel |
