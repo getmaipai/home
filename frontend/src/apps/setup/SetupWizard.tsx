@@ -35,7 +35,7 @@ import { NewPersonForm } from "@/apps/people/NewPersonForm";
 import { EngineLinkCredentialSection } from "@/apps/settings/EngineLinkCredentialSection";
 import type { SetupCodingView } from "@/lib/api";
 
-const ErrorIcon = getIcon("circle-alert");
+const ErrorIcon = getIcon("alert-triangle");
 
 interface SetupWizardProps { onDone: () => void; initialScreen?: ScreenId }
 

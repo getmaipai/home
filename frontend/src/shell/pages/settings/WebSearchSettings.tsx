@@ -16,7 +16,7 @@ import { SEARCH_RESULT_VARIANT, type SearchTestResultData } from "@/shell/compon
 import { SearchResultIcon, SearchTestResultBody } from "@/shell/components/SearchTestResultBody";
 import { webSearchFailure } from "@/apps/setup/WebSearchStep";
 
-const ErrorIcon = getIcon("circle-alert");
+const ErrorIcon = getIcon("alert-triangle");
 
 type Source = "searxng" | "ddgs";
 

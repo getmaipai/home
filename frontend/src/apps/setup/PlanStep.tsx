@@ -16,7 +16,7 @@ import { liveVerdict, PlanDiskSummary } from "./PlanDiskSummary";
 import { defaultPicks, selectedRows, settingsFor, setupJobs, type Picks, type SetupJob } from "./planChoices";
 
 /** Total graphics memory choices when Home cannot read it (GB). */
-const ErrorIcon = getIcon("circle-alert");
+const ErrorIcon = getIcon("alert-triangle");
 
 export const VRAM_CHOICES = [8, 12, 16, 24, 32, 48, 64, 96, 128] as const;
 

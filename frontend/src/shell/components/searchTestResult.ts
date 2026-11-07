@@ -14,5 +14,5 @@ export interface SearchTestResultData {
 /** The kit Alert variant for a result level (colors come from tokens). */
 export const SEARCH_RESULT_VARIANT = { pass: "default", warn: "warning", fail: "destructive" } as const;
 /** The icon name for a result level. */
-export const SEARCH_RESULT_ICON = { pass: "circle-check", warn: "alert-triangle", fail: "circle-alert" } as const;
+export const SEARCH_RESULT_ICON = { pass: "check", warn: "alert-triangle", fail: "alert-triangle" } as const;
 export const SEARCH_ROW_STATE_WORD = { pass: "Passed", warn: "Warning", fail: "Failed", unknown: "Not checked" } as const;

@@ -8,7 +8,7 @@ import { RouteSkeleton } from "@maipai/ui/src/primitives/RouteSkeleton";
 import { needGb } from "../../../../shared/diskPlanMath";
 import { api, ApiError, type SetupFolderListing, type SetupPlacementRow } from "@/lib/api";
 
-const ErrorIcon = getIcon("circle-alert");
+const ErrorIcon = getIcon("alert-triangle");
 
 const CheckIcon = getIcon("check");
 

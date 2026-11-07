@@ -7,7 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@maipai/ui/src/dashboa
 import { api, ApiError } from "@/lib/api";
 import { renderSetupReviewScreen } from "./SetupWizard";
 
-const ErrorIcon = getIcon("circle-alert");
+const ErrorIcon = getIcon("alert-triangle");
 
 const REVIEW_SCREENS = ["engine_location", "storage", "checks", "plan"] as const;
 type ReviewScreen = (typeof REVIEW_SCREENS)[number];

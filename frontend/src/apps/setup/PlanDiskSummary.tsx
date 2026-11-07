@@ -5,7 +5,7 @@ import { diskVerdict, freeGb, needGb, selectionTotals, sizeGb } from "../../../.
 
 const OkIcon = getIcon("check");
 const WarnIcon = getIcon("alert-triangle");
-const BadIcon = getIcon("circle-alert");
+const BadIcon = getIcon("alert-triangle");
 
 /** The live disk verdict for a choice: the same function the installer and the setup checks run. */
 export function liveVerdict(disk: PlanDiskView, selected: ReadonlySet<string>) {

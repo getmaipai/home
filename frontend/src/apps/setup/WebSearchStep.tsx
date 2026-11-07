@@ -8,7 +8,7 @@ import { api, ApiError } from "@/lib/api";
 import { SEARCH_RESULT_VARIANT, type SearchTestResultData } from "@/shell/components/searchTestResult";
 import { SearchResultIcon, SearchTestResultBody } from "@/shell/components/SearchTestResultBody";
 
-const ErrorIcon = getIcon("circle-alert");
+const ErrorIcon = getIcon("alert-triangle");
 
 const SKIP_FAILED = "Home couldn't turn on DuckDuckGo search. Press Skip for now again to go on, or set up web search later in Settings.";
 
