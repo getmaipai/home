@@ -61,7 +61,7 @@
 // defaults to ADD, matching legacy's own catch block) - dedupe deciding
 // "keep both" safely is never wrong enough to burn a turn's whole budget
 // over.
-import { eq, and, or, isNull, isNotNull, notInArray, inArray, ne, asc, lt, desc } from "drizzle-orm";
+import { eq, and, or, isNull, isNotNull, notInArray, inArray, ne, asc, lt, desc, sql } from "drizzle-orm";
 import { hasEligibleClause, isEligibleClause } from "@/lib/turnSignal";
 import type { TurnSignal } from "@maipai/spec/gen/ts/turn-signal.js";
 import type { SignalClause } from "@/lib/turnSignal";
@@ -2012,8 +2012,8 @@ function markSkipped(turnId: string): void {
 
 export function judgeQueueStats(): JudgeQueueStats {
   const [oldest] = db.select({ createdAt: conversationTurns.createdAt }).from(conversationTurns).where(pendingTurnWhere()).orderBy(asc(conversationTurns.createdAt)).limit(1).all();
-  const all = db.select({ id: conversationTurns.id }).from(conversationTurns).where(pendingTurnWhere()).all();
-  return { pending: all.length, oldestCreatedAt: oldest?.createdAt ?? null };
+  const [count] = db.select({ n: sql<number>`count(*)` }).from(conversationTurns).where(pendingTurnWhere()).all();
+  return { pending: count?.n ?? 0, oldestCreatedAt: oldest?.createdAt ?? null };
 }
 
 /** The core job's own entry point (scheduler.ts's "memory.judge",

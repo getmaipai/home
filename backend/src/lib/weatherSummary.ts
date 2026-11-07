@@ -28,6 +28,7 @@ const cache = new Map<string, string>();
 const inFlight = new Set<string>();
 
 export const __setWeatherSummaryCompleterForTests = (fn: Completer): void => { completer = fn; };
+export function __weatherSummaryCacheKeysForTests(): string[] { return [...cache.keys()]; }
 export function __resetWeatherSummaryForTests(): void {
   cache.clear();
   inFlight.clear();
@@ -113,7 +114,12 @@ async function generate(key: string, input: SummaryInput): Promise<void> {
       { role: "user", content: `<facts>\n${factsFor(input)}\n</facts>` },
     ]);
     const text = result.ok ? result.text.trim() : "";
-    if (text !== "" && text.length <= 400 && passesChildFloor(text)) cache.set(key, text);
+    if (text !== "" && text.length <= 400 && passesChildFloor(text)) {
+      // AUDIT-PERF-01: this place and unit keep only the current hour's line.
+      const prefix = key.slice(0, key.lastIndexOf("|") + 1);
+      for (const old of [...cache.keys()]) if (old !== key && old.startsWith(prefix)) cache.delete(old);
+      cache.set(key, text);
+    }
   } catch {
     // The factual line stays; the page never sees the failure.
   } finally {

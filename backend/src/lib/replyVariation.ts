@@ -1,3 +1,4 @@
+import { setBounded } from "@/lib/boundedMap";
 // Phrase rotation for the household's fixed, constant replies (2026-09-05,
 // Jesse: "it can't just be repeating one response after another - it has
 // to [not] repeat exact phrasing in a conversation" and "we probably have
@@ -136,7 +137,7 @@ export function pickStillCue(personId: string, banned: readonly string[] = []): 
   const available = pool.filter((cue) => cue !== _lastStillCues.get(personId));
   if (available.length === 0) return null;
   const cue = pickVariant(personId, "still_cue", available);
-  _lastStillCues.set(personId, cue);
+  setBounded(_lastStillCues, personId, cue);
   return cue;
 }
 
@@ -150,7 +151,7 @@ export function pickThinkingCue(personId: string, banned: readonly string[] = []
   const available = pool.filter((cue) => cue !== _lastThinkingCues.get(personId));
   if (available.length === 0) return null;
   const cue = pickVariant(personId, "thinking_cue", available);
-  _lastThinkingCues.set(personId, cue);
+  setBounded(_lastThinkingCues, personId, cue);
   return cue;
 }
 

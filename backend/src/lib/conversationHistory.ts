@@ -1,4 +1,5 @@
 import { trackBackgroundWork } from "@/lib/backgroundWork";
+import { setBounded } from "@/lib/boundedMap";
 import { runLibraryRetention } from "@/lib/libraryRetention";
 import { musicJobIdsByTurn, deleteMusicJobsForConversation, musicJobStateByTurnId } from "@/lib/music/store";
 // Conversation history (platform plan 4.14, split): "conversations are
@@ -2194,6 +2195,7 @@ export function updateConversationArchived(actor: PersonRow, id: string, archive
   if (!found.ok) return found;
   if (isTemporaryConversation(id)) return { ok: false, status: 400, error: "a temporary chat cannot be archived" };
   db.update(conversations).set({ archived, hlc: nextHlc() }).where(eq(conversations.id, id)).run();
+  if (archived) forgetConversationMemory(id);
   return found;
 }
 
@@ -2334,6 +2336,7 @@ export function deleteConversationById(actor: PersonRow, id: string, opts: { med
     .query("DELETE FROM reply_feedback WHERE turn_id IN (SELECT id FROM conversation_turns WHERE conversation_id = ?)")
     .run(id);
   sqlite.query("DELETE FROM conversation_turns WHERE conversation_id = ?").run(id);
+  forgetConversationMemory(id);
   return { ok: true, value: true };
 }
 
@@ -2796,7 +2799,7 @@ export async function buildConversationWindow(conversation: Conversation, opts: 
   // may predate the policy; it is redacted on the way in like a row.
   const summaryLine = anchored && conversation.summary ? summaryLineFor(conversation.summary) : undefined;
   const budget = opts.historyBudgetTokens !== undefined ? opts.historyBudgetTokens : await defaultHistoryBudget();
-  if (opts.historyBudgetTokens !== undefined) lastHistoryBudgets.set(conversation.id, opts.historyBudgetTokens);
+  if (opts.historyBudgetTokens !== undefined) setBounded(lastHistoryBudgets, conversation.id, opts.historyBudgetTokens);
   const empty = { messages: [], turnIds: [], droppedOlder: liveRows.length > 0, summaryLine, historyTokens: 0, historyBudgetTokens: budget };
   if (uncovered.length === 0) return empty;
 
@@ -2835,7 +2838,7 @@ export async function buildConversationWindow(conversation: Conversation, opts: 
         const grew = fresh.summary ? await summaryGrowth(summaryLine, summaryLineFor(fresh.summary)) : 0;
         if (grew !== null) {
           const rebuilt = await buildConversationWindow(fresh, { ...opts, foldWhenOver: false, historyBudgetTokens: Math.max(0, budget - grew) });
-          lastHistoryBudgets.set(conversation.id, budget);
+          setBounded(lastHistoryBudgets, conversation.id, budget);
           return rebuilt;
         }
       }
@@ -3032,6 +3035,20 @@ const FOLD_REFUSED_BACKOFF_MS = 10 * 60 * 1000;
 const foldRefusedUntil = new Map<string, number>();
 const foldRetryRequested = new Set<string>();
 
+/** AUDIT-PERF-01: a deleted or archived chat leaves nothing behind in the two per-conversation maps above. */
+export function forgetConversationMemory(conversationId: string): void {
+  lastHistoryBudgets.delete(conversationId);
+  foldRefusedUntil.delete(conversationId);
+  foldRetryRequested.delete(conversationId);
+}
+export function __rememberConversationForTests(conversationId: string): void {
+  setBounded(lastHistoryBudgets, conversationId, 1000);
+  setBounded(foldRefusedUntil, conversationId, Date.now() + FOLD_REFUSED_BACKOFF_MS);
+}
+export function __conversationMemorySizesForTests(): { budgets: number; refused: number; hasBudget: (id: string) => boolean; hasRefused: (id: string) => boolean } {
+  return { budgets: lastHistoryBudgets.size, refused: foldRefusedUntil.size, hasBudget: (id) => lastHistoryBudgets.has(id), hasRefused: (id) => foldRefusedUntil.has(id) };
+}
+
 function passesFloor(text: string, band: AgeBand): boolean {
   return evaluateReply({ text }, band).effective.action === "allow";
 }
@@ -3080,7 +3097,7 @@ async function storeFold(conversation: Conversation, temporary: boolean, block: 
       if (!passesFloor(folded, band)) {
         folded = await fold(`${FOLD_INSTRUCTIONS} ${PLAIN_NOTES_INSTRUCTION}`);
         if (folded === null || !passesFloor(folded, band)) {
-          foldRefusedUntil.set(conversation.id, Date.now() + FOLD_REFUSED_BACKOFF_MS);
+          setBounded(foldRefusedUntil, conversation.id, Date.now() + FOLD_REFUSED_BACKOFF_MS);
           log("summary fold withheld: it did not pass the output floor; the block stays verbatim");
           return false;
         }

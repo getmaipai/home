@@ -50,6 +50,7 @@ import { householdHomeCountryName, householdHomePlaceName, householdHomeSkyInput
 import { getHouseholdSettingValue } from "@/lib/settings";
 import { applyWidenedAssist } from "@/lib/assistWidened";
 import { PACKAGES_DIR, statMtimeMs, isValidPackageId } from "@/lib/paths";
+import { cachedMtimeMs, invalidateManifestStats } from "@/lib/manifestStat";
 import { resolvePackageDir, listInstalledPackageIds } from "@/lib/packageResolve";
 import { promptNow, seededOutcomeFor } from "@/lib/benchSampling";
 import { cardMoon, moonTile } from "@/lib/weatherMoon";
@@ -156,6 +157,7 @@ const packageCache = new Map<string, { manifestMtimeMs: number; recipeMtimeMs: n
 const manifestWarnedAtMtime = new Map<string, number>();
 
 export function __resetPackageCachesForTests(): void {
+  invalidateManifestStats();
   manifestCache.clear();
   packageCache.clear();
   manifestWarnedAtMtime.clear();
@@ -202,7 +204,7 @@ function loadManifestFromDisk(id: string): PluginOpResult<PackageManifest> {
     return { ok: false, status: 400, error: `${id} is not a valid package id` };
   }
   const manifestPath = join(resolvePackageDir(id), "manifest.json");
-  const mtimeMs = statMtimeMs(manifestPath);
+  const mtimeMs = cachedMtimeMs(manifestPath);
   if (mtimeMs === null) {
     manifestCache.delete(id);
     return { ok: false, status: 404, error: `no bundled package ${id}` };
@@ -264,8 +266,8 @@ export function loadPackage(id: string): PluginOpResult<LoadedPackage> {
   const packageDir = resolvePackageDir(id);
   const manifestPath = join(packageDir, "manifest.json");
   const recipePath = join(packageDir, "recipe.json");
-  const manifestMtimeMs = statMtimeMs(manifestPath);
-  const recipeMtimeMs = statMtimeMs(recipePath);
+  const manifestMtimeMs = cachedMtimeMs(manifestPath);
+  const recipeMtimeMs = cachedMtimeMs(recipePath);
   if (manifestMtimeMs === null || recipeMtimeMs === null) {
     packageCache.delete(id);
     return { ok: false, status: 404, error: `no bundled package ${id}` };
