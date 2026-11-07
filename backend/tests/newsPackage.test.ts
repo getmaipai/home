@@ -42,7 +42,7 @@ test("News is a valid manifest and its seven pages validate against the pinned s
 
 test("News declares list rows, local person keys and the shelf matrix without premature widget fields", () => {
   expect(manifest.offline).toBe("degraded");
-  expect(manifest.contributes.data.filter((entry: { rows?: string }) => entry.rows === "list").map((entry: { id: string }) => entry.id)).toEqual(["topics", "sources", "saved", "search-recents"]);
+  expect(manifest.contributes.data.filter((entry: { rows?: string }) => entry.rows === "list").map((entry: { id: string }) => entry.id)).toEqual(["briefing", "briefing-item", "topics", "sources", "saved", "search-recents"]);
   for (const key of manifest.config) expect(SettingsKey.safeParse(key).success).toBe(true);
   expect(manifest.config.filter((key: { scope: string }) => key.scope === "person").map((key: { key: string }) => key.key)).toEqual(["news.my_mix", "news.reader_open", "news.digest"]);
   expect(manifest.contributes.settings_area.sections[2].min_role).toBe("admin");
@@ -52,7 +52,7 @@ test("News declares list rows, local person keys and the shelf matrix without pr
 
 test("page references declare every data id and keep Mix-only actions off child pages", () => {
   const references = new Map<string, Set<string>>();
-  const permitted = new Set(["page", "section", "answer_blocks", "tabs", "list", "picker", "empty_state", "search"]);
+  const permitted = new Set(["page", "section", "answer_blocks", "tabs", "list", "picker", "empty_state", "search", "media_shelf"]);
   function visit(value: unknown, found: Set<string>): void {
     if (!value || typeof value !== "object") return;
     if (Array.isArray(value)) { value.forEach((item) => visit(item, found)); return; }
