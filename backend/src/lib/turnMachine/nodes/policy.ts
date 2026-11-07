@@ -500,6 +500,9 @@ export const policyNode: Node<PolicyInput, PolicyOutput> = async (state, input) 
         const named = planned.labels.slice(0, 3).join(", ");
         const more = planned.labels.length > 3 ? ` and ${planned.labels.length - 3} more` : "";
         const prompt = planned.prompt ?? `${verb.charAt(0).toUpperCase()}${verb.slice(1)} ${named}${more}?`;
+        // SCHED-02: the parked call is rewritten to exactly the devices the card names (one explicit target each), so a device that joins an
+        // area between the ask and the yes is never included; the resumed call carries these arguments and must match them to run.
+        if (planned.pinned) { for (const key of Object.keys(args)) delete args[key]; Object.assign(args, planned.pinned); }
         noteRefusal("confirm_needed");
         entries.push({ proposal, decision: { allow: false, reason: "confirm_needed", ask: { prompt, capabilities: [], consequential: true } } });
       } else entries.push({ proposal, decision: { allow: true } });

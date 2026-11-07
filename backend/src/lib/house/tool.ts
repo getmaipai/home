@@ -169,7 +169,7 @@ export function visibleHouseEntities({ actor, permissions, entities }: { actor: 
 
 export type HouseCallPlan =
   | { kind: "refuse"; reason: string; text: string; count: number; rejected?: boolean }
-  | { kind: "ask"; reason: string; action: string; count: number; kinds: string[]; labels: string[]; prompt?: string }
+  | { kind: "ask"; reason: string; action: string; count: number; kinds: string[]; labels: string[]; prompt?: string; pinned?: Record<string, unknown> }
   | { kind: "run"; input: HouseArgs; actor: HouseActor; permissions: EffectivePermission[]; registry: { ok: true; areas: HouseArea[]; entities: HouseEntity[] }; matches: HouseEntity[]; action: HouseActionInput; mode: BrakeMode; count: number };
 
 function canonicalActor(actor: PersonRow | HouseActor, bandIn: HouseBand): HouseActor {
@@ -179,7 +179,7 @@ function canonicalActor(actor: PersonRow | HouseActor, bandIn: HouseBand): House
 }
 
 /** Pure call-time access and brake decision shared by policy and execution. */
-export function planHouseCall({ actor, band, args, tainted = false, approved = false, registry, permissions, mode, zone }: { actor: PersonRow | HouseActor; band: HouseBand; args: Record<string, unknown>; tainted?: boolean; approved?: boolean; registry: { ok: true; areas: HouseArea[]; entities: HouseEntity[] }; permissions: EffectivePermission[]; mode: BrakeMode; zone?: string }): HouseCallPlan {
+export function planHouseCall({ actor, band, args, tainted = false, approved = false, registry, permissions, mode, zone, now }: { actor: PersonRow | HouseActor; band: HouseBand; args: Record<string, unknown>; tainted?: boolean; approved?: boolean; registry: { ok: true; areas: HouseArea[]; entities: HouseEntity[] }; permissions: EffectivePermission[]; mode: BrakeMode; zone?: string; now?: Date }): HouseCallPlan {
   const parsed = argsSchema.safeParse(args);
   if (!parsed.success) return { kind: "refuse", reason: "invalid", text: "That home request was invalid. Name an area or device and try again.", count: 0 };
   const houseActor = canonicalActor(actor, band);
@@ -191,9 +191,9 @@ export function planHouseCall({ actor, band, args, tainted = false, approved = f
   const visible = input.instance === undefined ? allVisible : allVisible.filter((entity) => (entity.instance ?? "default") === input.instance);
   if (input.instance !== undefined && input.action !== "find" && !input.action.startsWith("restart_") && input.action !== "reboot_host" && visible.length === 0) return { kind: "refuse", reason: "missing", text: "I could not find a visible device matching that area or name.", count: 0 };
   if (isScheduleAction(input.action)) {
-    const planned = planSchedule({ args: input as unknown as ScheduleArgs, actor: houseActor, registry, permissions, visible, approved, resolve: resolveTargets, label: houseLabel, ...(zone !== undefined ? { zone } : {}) });
+    const planned = planSchedule({ args: input as unknown as ScheduleArgs, actor: houseActor, registry, permissions, visible, approved, resolve: resolveTargets, label: houseLabel, pin: pinTarget, ...(zone !== undefined ? { zone } : {}), ...(now ? { now } : {}) });
     if (planned.kind === "refuse") return { kind: "refuse", reason: planned.reason, text: planned.text, count: planned.count };
-    if (planned.kind === "ask") return { kind: "ask", reason: planned.reason, action: planned.action, count: planned.count, kinds: planned.kinds, labels: planned.labels, prompt: planned.prompt };
+    if (planned.kind === "ask") return { kind: "ask", reason: planned.reason, action: planned.action, count: planned.count, kinds: planned.kinds, labels: planned.labels, prompt: planned.prompt, pinned: planned.pinned };
     return { kind: "run", input, actor: houseActor, permissions: [...permissions], registry, matches: planned.matches, action: { name: "turn_on" }, mode, count: planned.count };
   }
   if (input.action.startsWith("restart_") || input.action === "reboot_host") {
@@ -239,6 +239,10 @@ export function houseLabel(entity: HouseEntity, areas: HouseArea[]): string {
   return `${hasKind ? name : `${name} ${entity.kind}`}${place ? ` in ${place}` : ""}`;
 }
 
+/** One explicit target for one device: the exact area, name and kind the card showed. */
+function pinTarget(entity: HouseEntity, areas: HouseArea[]): { area?: string; name: string; kind: string } {
+  return { ...(entity.area ? { area: areaName(entity, areas) } : {}), name: entity.name, kind: entity.kind };
+}
 function normalize(value: string): string { return value.trim().replace(/\s+/g, " ").toLocaleLowerCase(); }
 function areaName(entity: HouseEntity, areas: HouseArea[]): string { return areas.find((area) => area.id === entity.area && (area.instance ?? "default") === (entity.instance ?? "default"))?.name ?? "the home"; }
 function fail(callId: string, raw: Record<string, unknown>, line: string, status: "failed" | "rejected" = "failed", confirmNeeded = false, failureKind: "unavailable" | "bad_arguments" | "found_nothing" = "unavailable"): ToolExecutionOutcome {
@@ -280,39 +284,41 @@ function resolveTargets(targets: NonNullable<HouseArgs["targets"]>, entities: Ho
 
 export async function runHouseTool({ actor, band: bandIn, args, callId, tainted = false, approved = false, deps = {} }: { actor: PersonRow | HouseActor; band: HouseBand; args: Record<string, unknown>; callId: string; tainted?: boolean; approved?: boolean; deps?: HouseToolDeps }): Promise<ToolExecutionOutcome> {
   const personId = actor.id ?? "";
+  // Rule 6a: a schedule action records its name only. The device names, instance and time stay out of every outcome, refusal and trace.
+  const recorded: Record<string, unknown> = isScheduleAction(String(args.action)) ? { action: args.action } : args;
   const serverKind = typeof args.action === "string" && ["restart_core", "restart_addon", "reboot_host"].includes(args.action) ? args.action as HouseServerAction : null;
   const callActor = canonicalActor(actor, bandIn);
-  if (serverKind && !canRestartServer(callActor)) return fail(callId, args, "That server action is not available.", "failed", false, "found_nothing");
+  if (serverKind && !canRestartServer(callActor)) return fail(callId, recorded, "That server action is not available.", "failed", false, "found_nothing");
   const registry = await (deps.loadRegistry ?? defaultLoadRegistry)();
   if (!registry.ok) return fail(callId, {}, failureCopy[registry.kind] ?? failureCopy.unreachable!);
-  if (serverKind === "restart_addon" && !(await availableAddons(deps)).some((addon) => addon.id === args.addon)) return fail(callId, args, "Choose a Home Assistant add-on from the available list.", "failed", false, "bad_arguments");
+  if (serverKind === "restart_addon" && !(await availableAddons(deps)).some((addon) => addon.id === args.addon)) return fail(callId, recorded, "Choose a Home Assistant add-on from the available list.", "failed", false, "bad_arguments");
   const permissions = (deps.permissionsOf ?? effectivePermissions)(personId);
   const mode = brakeModeOf((deps.brakeMode ?? (() => getHouseholdSettingValue("tools.house.mode")))());
   const plan = planHouseCall({ actor, band: bandIn, args, tainted, registry, permissions, mode, ...(deps.schedule?.zoneOf ? { zone: deps.schedule.zoneOf(personId) } : {}) });
   // A malformed call is a tool error, not an answer, so the reply cannot claim it worked.
-  if (plan.kind === "refuse" && ["invalid", "missing", "ambiguous", "bulk", "unsupported"].includes(plan.reason)) return fail(callId, args, plan.text, "failed", false, plan.reason === "missing" ? "found_nothing" : "bad_arguments");
-  if (plan.kind === "refuse") return plan.rejected ? outcomeOf({ callId, packageId: HOUSE_TOOL_ID, status: "rejected", via: "tool_call", args, durationMs: 0, reason: "unconfirmed", userMessage: plan.text } as Parameters<typeof outcomeOf>[0]) : reply(callId, args, plan.text);
+  if (plan.kind === "refuse" && ["invalid", "missing", "ambiguous", "bulk", "unsupported"].includes(plan.reason)) return fail(callId, recorded, plan.text, "failed", false, plan.reason === "missing" ? "found_nothing" : "bad_arguments");
+  if (plan.kind === "refuse") return plan.rejected ? outcomeOf({ callId, packageId: HOUSE_TOOL_ID, status: "rejected", via: "tool_call", args: recorded, durationMs: 0, reason: "unconfirmed", userMessage: plan.text } as Parameters<typeof outcomeOf>[0]) : reply(callId, recorded, plan.text);
   if (plan.kind === "ask" && !approved) {
     const homeLabel = typeof args.instance === "string" ? visibleInstances(registry.entities).find((home) => home.instance === args.instance)?.label : undefined;
     const inHome = homeLabel ? ` in the ${homeLabel} home` : "";
     const copy = plan.prompt ? plan.prompt : serverKind ? `This cannot be undone. Confirm ${serverKind === "restart_core" ? "restarting Home Assistant" : serverKind === "reboot_host" ? "rebooting the Home Assistant host" : `restarting the Home Assistant add-on ${String(args.addon)}`}${inHome}?` : `Please confirm ${plan.action.replaceAll("_", " ")} for ${plan.count} ${plan.count === 1 ? "device" : "devices"}.`;
-    return outcomeOf({ callId, packageId: HOUSE_TOOL_ID, status: "rejected", via: "tool_call", args, durationMs: 0, reason: "blocked_by_confirmation", userMessage: copy, ...({ confirmNeeded: true } as object) } as Parameters<typeof outcomeOf>[0]);
+    return outcomeOf({ callId, packageId: HOUSE_TOOL_ID, status: "rejected", via: "tool_call", args: recorded, durationMs: 0, reason: "blocked_by_confirmation", userMessage: copy, ...({ confirmNeeded: true } as object) } as Parameters<typeof outcomeOf>[0]);
   }
   if (approved && callId.startsWith("resumed:")) {
     const currentMode = brakeModeOf((deps.brakeMode ?? (() => getHouseholdSettingValue("tools.house.mode")))());
-    if (currentMode === "never") return outcomeOf({ callId, packageId: HOUSE_TOOL_ID, status: "rejected", via: "tool_call", args, durationMs: 0, reason: "unconfirmed", userMessage: "Home controls are turned off for this household." } as Parameters<typeof outcomeOf>[0]);
+    if (currentMode === "never") return outcomeOf({ callId, packageId: HOUSE_TOOL_ID, status: "rejected", via: "tool_call", args: recorded, durationMs: 0, reason: "unconfirmed", userMessage: "Home controls are turned off for this household." } as Parameters<typeof outcomeOf>[0]);
     const parsed = argsSchema.safeParse(args);
-    if (!parsed.success) return reply(callId, args, "That home request was invalid. Name an area or device and try again.");
+    if (!parsed.success) return reply(callId, recorded, "That home request was invalid. Name an area or device and try again.");
     const retryPlan = planHouseCall({ actor, band: bandIn, args, tainted: false, approved: true, registry, permissions, mode, ...(deps.schedule?.zoneOf ? { zone: deps.schedule.zoneOf(personId) } : {}) });
-    if (retryPlan.kind === "refuse") return reply(callId, args, retryPlan.text);
+    if (retryPlan.kind === "refuse") return reply(callId, recorded, retryPlan.text);
     if (retryPlan.kind === "run" && (retryPlan.actor.band === "child" || retryPlan.actor.band === "teen")) {
       const requiresAdult = retryPlan.matches.some((entity) => !!entity.sensitive || entity.kind === "scene" && (entity.sceneMembers === null || entity.sceneMembers.some((id) => registry.entities.find((item) => item.id === id && (item.instance ?? "default") === (entity.instance ?? "default"))?.sensitive)));
-      if (requiresAdult) return outcomeOf({ callId, packageId: HOUSE_TOOL_ID, status: "rejected", via: "tool_call", args, durationMs: 0, reason: "unconfirmed", userMessage: "A parent needs to approve that home action." } as Parameters<typeof outcomeOf>[0]);
+      if (requiresAdult) return outcomeOf({ callId, packageId: HOUSE_TOOL_ID, status: "rejected", via: "tool_call", args: recorded, durationMs: 0, reason: "unconfirmed", userMessage: "A parent needs to approve that home action." } as Parameters<typeof outcomeOf>[0]);
     }
-    if (retryPlan.kind === "ask") return reply(callId, args, "That home action could not be confirmed.");
+    if (retryPlan.kind === "ask") return reply(callId, recorded, "That home action could not be confirmed.");
     if (retryPlan.kind === "run") return executeHousePlan({ plan: { ...retryPlan, mode: "do" }, actor, personId, args, callId, band: bandIn, deps });
   }
-  if (mode === "never") return outcomeOf({ callId, packageId: HOUSE_TOOL_ID, status: "rejected", via: "tool_call", args, durationMs: 0, reason: "unconfirmed", userMessage: "Home controls are turned off for this household." } as Parameters<typeof outcomeOf>[0]);
+  if (mode === "never") return outcomeOf({ callId, packageId: HOUSE_TOOL_ID, status: "rejected", via: "tool_call", args: recorded, durationMs: 0, reason: "unconfirmed", userMessage: "Home controls are turned off for this household." } as Parameters<typeof outcomeOf>[0]);
   if (plan.kind !== "run") return fail(callId, {}, "That home request was invalid.");
   return executeHousePlan({ plan, actor, personId, args, callId, band: bandIn, deps });
 }

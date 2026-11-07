@@ -20,6 +20,7 @@ import type { TurnAskField } from "@/wire";
 import { resolveWeatherPlace } from "@/lib/places";
 import { blockEventsFor } from "../blockEvents";
 import { HOUSE_TOOL_ID, runHouseTool } from "@/lib/house/tool";
+import { isScheduleAction } from "@/lib/house/scheduleTool";
 import { UPTIME_TOOL_ID, runUptimeTool } from "@/lib/uptime/tool";
 import { outcomeOf, type FailureKind } from "@/lib/turnContext";
 import { lookupFailureKind } from "./lookupFallback";
@@ -299,7 +300,7 @@ export const toolNode: Node<ToolInput, ToolOutput> = async (state, input, signal
     if ((tool === VOICEOVER_TOOL_ID || tool === CHANGE_VOICE_TOOL_ID) && !proposal.redactArgs) args = { voice: args.voice };
     // RESEARCH-TIER-01: on a research turn the step row names the search it ran (the model's own query), so the person sees what each round looked into.
     const stepLabel = tool === "websearch" && researchRun !== undefined && typeof (args as { expression?: unknown }).expression === "string" ? (args as { expression: string }).expression.trim().slice(0, 100) : "";
-    if (!resumedAsk) toolEvents.push({ t: "tool_call", package_id: tool, call_id: callId, args, ...(stepLabel ? { label: stepLabel } : {}) });
+    if (!resumedAsk) toolEvents.push({ t: "tool_call", package_id: tool, call_id: callId, args: tool === HOUSE_TOOL_ID && isScheduleAction(String(args.action)) ? { action: args.action } : args, ...(stepLabel ? { label: stepLabel } : {}) });
     // ANSWER-IMG-02: show_images acknowledges at once and never runs a package
     // (the picture pipeline was started above, beside the answer).
     if (tool === SHOW_IMAGES_TOOL_ID) {

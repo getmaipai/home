@@ -2,7 +2,7 @@
 // cannot express, or Home Assistant's automation API was unavailable when it was made) runs from the scheduler's job loop
 // as the core job `schedules.device.fire`. The creator's access is checked again every time it runs. Nothing here writes a
 // tool audit row, a log line or an error that carries a task, entity, instance or person id (rule 6a).
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { db } from "@/db";
 import { people, scheduledJobs, scheduledTasks } from "@/db/schema";
 import { nextHlc } from "@/lib/hlc";
@@ -62,6 +62,15 @@ function retryOnce(row: TaskRow, now: Date): void {
   if (now.getTime() > Date.parse(row.onceAt!) + ONCE_GRACE_MS) markDone(row.id, now);
   else insertFireJob(row, new Date(now.getTime() + RETRY_MS), now);
 }
+function markFailed(taskId: string, now: Date): void {
+  db.update(scheduledTasks).set({ state: "failed", updatedAt: now.toISOString(), hlc: nextHlc() }).where(eq(scheduledTasks.id, taskId)).run();
+}
+/** No pending run of this task other than the one in hand is left behind. */
+function cancelOtherFires(taskId: string, exceptJobId: string): void {
+  for (const pending of db.select().from(scheduledJobs).where(and(eq(scheduledJobs.job, HUB_FIRE_JOB), eq(scheduledJobs.status, "pending"))).all()) {
+    if (pending.id !== exceptJobId && (JSON.parse(pending.inputs) as { taskId?: unknown }).taskId === taskId) db.update(scheduledJobs).set({ status: "cancelled" }).where(eq(scheduledJobs.id, pending.id)).run();
+  }
+}
 function markDone(taskId: string, now: Date): void {
   db.update(scheduledTasks).set({ state: "done", updatedAt: now.toISOString(), hlc: nextHlc() }).where(eq(scheduledTasks.id, taskId)).run();
 }
@@ -96,14 +105,23 @@ export async function fireHubDeviceTask(job: JobRow, deps: ExecutorDeps = {}): P
   }
 
   const action = inputOf(what.action === "activate" ? "activate" : what.action, what.value);
-  let failed = 0;
-  for (const entity of checked.entities) {
-    const result = await (deps.perform ?? (async (target, act) => {
-      const connection = houseInstanceLanFetch(target.instance ?? "default", deps.house);
-      return connection.ok ? performHouseAction({ lanFetch: connection.lanFetch, token: connection.token, entity: target, action: act }) : { ok: false as const, kind: "unreachable" as const };
-    }))(entity, action);
-    if (!result.ok) failed += 1;
-  }
+  // Every check passed and a device will be reached: a one-shot is claimed (done) BEFORE it runs, so a crash mid-run can never fire it twice.
   if (once) markDone(row.id, now);
-  if (failed > 0) throw new Error("A scheduled home action could not reach every device.");
+  let failed = 0;
+  try {
+    for (const entity of checked.entities) {
+      const result = await (deps.perform ?? (async (target, act) => {
+        const connection = houseInstanceLanFetch(target.instance ?? "default", deps.house);
+        return connection.ok ? performHouseAction({ lanFetch: connection.lanFetch, token: connection.token, entity: target, action: act }) : { ok: false as const, kind: "unreachable" as const };
+      }))(entity, action);
+      if (!result.ok) failed += 1;
+    }
+  } catch {
+    if (once) { markFailed(row.id, now); cancelOtherFires(row.id, job.id); }
+    throw new Error("A scheduled home action could not run.");
+  }
+  if (failed > 0) {
+    if (once) { markFailed(row.id, now); cancelOtherFires(row.id, job.id); }
+    throw new Error("A scheduled home action could not reach every device.");
+  }
 }

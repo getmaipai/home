@@ -147,7 +147,7 @@ describe("list and cancel", () => {
     if (!made.ok) throw new Error("setup");
     return made.id;
   }
-  const call = (who: { id: string; role: string }, args: Record<string, unknown>, deps: HouseToolDeps) => runHouseTool({ actor: actor(who.id, who.role), band: "adult", args, callId: "call-1", deps });
+  const call = (who: { id: string; role: string }, args: Record<string, unknown>, deps: HouseToolDeps, approved = args.action !== "list_schedules") => runHouseTool({ actor: actor(who.id, who.role), band: "adult", args, callId: approved ? "resumed:call-1" : "call-1", approved, deps });
 
   test("list shows only the speaker's own rows; an owner or admin also gets a count of others", async () => {
     const deps = setup({ permissionsOf: () => [...grantAll(""), { action: "house.see:default/entity:light.hall", effect: "allow" }] }).deps;
@@ -184,7 +184,7 @@ describe("list and cancel", () => {
     await seed(OWNER, "owner", "porch", "16:00");
     await seed(OWNER, "owner", "porch", "21:30");
     const deps = setup().deps;
-    const asked = await call({ id: OWNER, role: "owner" }, { action: "cancel_schedule", targets: [{ name: "Porch" }] }, deps);
+    const asked = await call({ id: OWNER, role: "owner" }, { action: "cancel_schedule", targets: [{ name: "Porch" }] }, deps, false);
     expect(said(asked)).toContain("Porch at 4:00 PM");
     expect(said(asked)).toContain("Porch at 9:30 PM");
     expect(db.select().from(scheduledTasks).all().filter((row) => row.deletedAt === null)).toHaveLength(2);
@@ -198,7 +198,7 @@ describe("audit and instances", () => {
     const s = setup();
     await runHouseTool({ actor: actor(OWNER, "owner"), band: "adult", args: everyDay, callId: "resumed:call-1", approved: true, deps: s.deps });
     await runHouseTool({ actor: actor(OWNER, "owner"), band: "adult", args: { action: "list_schedules" }, callId: "call-2", deps: s.deps });
-    await runHouseTool({ actor: actor(OWNER, "owner"), band: "adult", args: { action: "cancel_schedule", targets: [{ name: "Porch" }] }, callId: "call-3", deps: s.deps });
+    await runHouseTool({ actor: actor(OWNER, "owner"), band: "adult", args: { action: "cancel_schedule", targets: [{ name: "Porch" }] }, callId: "resumed:call-3", approved: true, deps: s.deps });
     expect(s.audits.map((audit) => audit.action)).toEqual(["schedule", "list_schedules", "cancel_schedule"]);
     const row = db.select().from(scheduledTasks).get()!;
     const text = JSON.stringify(s.audits.map(({ personId: _owner, ...rest }) => rest)) + JSON.stringify(db.select().from(toolAudit).all().map(({ personId: _p, ...rest }) => rest));
@@ -213,5 +213,127 @@ describe("audit and instances", () => {
     const done = await runHouseTool({ actor: actor(OWNER, "owner"), band: "adult", args: { action: "schedule", targets: [{ name: "Den" }], do: "turn_off", when: { time: "23:00" } }, callId: "resumed:call-1", approved: true, deps: s.deps });
     expect(said(done)).toContain("Done. Den light turns off every day at 11:00 PM.");
     expect(db.select().from(scheduledTasks).all().map((row) => JSON.parse(row.what).targets)).toEqual([["upstairs/light.den"]]);
+  });
+});
+
+// ---- Review fixes (part B, second pass) ----
+describe("cancel asks first", () => {
+  async function seedAdult(name = "porch", time = "16:00") {
+    const made = await createDeviceSchedule({ person: { id: ADULT, role: "adult" }, kind: "device_action", targets: [`default/light.${name}`], action: "turn_on", time, days: [] }, { ...setup().deps.schedule!, loadRegistry: async () => ({ ok: true, areas, entities }), permissionsOf: grantAll });
+    if (!made.ok) throw new Error("setup");
+    return made.id;
+  }
+  const planAdult = (args: Record<string, unknown>, mode: "do" | "ask" | "never" = "do", approved = false) => plan(args, { id: ADULT, role: "adult" }, mode, approved);
+
+  test("the card names the device and time; mode do still asks; mode never blocks; approved runs", async () => {
+    await seedAdult();
+    for (const mode of ["do", "ask"] as const) {
+      const planned = planAdult({ action: "cancel_schedule", targets: [{ name: "Porch" }] }, mode);
+      expect(planned.kind === "ask" && planned.prompt).toBe("Cancel the Porch light schedule at 4:00 PM?");
+    }
+    expect(planAdult({ action: "cancel_schedule", targets: [{ name: "Porch" }] }, "never").kind).toBe("refuse");
+    expect(planAdult({ action: "cancel_schedule", targets: [{ name: "Porch" }] }, "do", true).kind).toBe("run");
+  });
+
+  test("an unapproved cancel, as a page or search result could send it, cancels nothing", async () => {
+    await seedAdult();
+    const out = await runHouseTool({ actor: actor(ADULT, "adult"), band: "adult", args: { action: "cancel_schedule", targets: [{ name: "Porch" }] }, callId: "call-1", tainted: true, deps: setup().deps });
+    expect(said(out)).toBe("Cancel the Porch light schedule at 4:00 PM?");
+    expect(db.select().from(scheduledTasks).all().filter((row) => row.deletedAt === null)).toHaveLength(1);
+  });
+
+  test("a hidden same-name device in another home neither blocks nor leaks, and a revoked-grant schedule can still be cancelled", async () => {
+    await seedAdult();
+    entities = [...entities, entity("light.porch", "Porch", "light", { instance: "cabin", instanceLabel: "Cabin" })];
+    const planned = planAdult({ action: "cancel_schedule", targets: [{ name: "Porch" }] });
+    expect(planned.kind).toBe("ask");
+    const none = (): EffectivePermission[] => [];
+    const revoked = planHouseCall({ actor: actor(ADULT, "adult"), band: "adult", args: { action: "cancel_schedule", targets: [{ name: "Porch" }] }, registry: { ok: true, areas, entities: entities.slice(0, 4) }, permissions: none(), mode: "do", zone: NY });
+    expect(revoked.kind).toBe("ask");
+    const ambiguousText = planHouseCall({ actor: actor(OWNER, "owner"), band: "adult", args: { action: "cancel_schedule", targets: [{ name: "Porch" }], instance: "cabin" }, registry: { ok: true, areas, entities }, permissions: none(), mode: "do", zone: NY });
+    expect(ambiguousText.kind === "refuse" && ambiguousText.text).not.toContain("Cabin");
+  });
+
+  test("a finished schedule cannot be cancelled and is not listed", async () => {
+    const id = await seedAdult();
+    db.update(scheduledTasks).set({ state: "done" }).where(eq(scheduledTasks.id, id)).run();
+    const planned = planAdult({ action: "cancel_schedule", targets: [{ name: "Porch" }] });
+    expect(planned.kind).toBe("refuse");
+  });
+});
+
+describe("the confirm is pinned to what the card showed", () => {
+  test("an area-only target is rewritten to one explicit target per device, and a device added later is not included", () => {
+    const first = plan({ action: "schedule", targets: [{ area: "Outside", kind: "light" }], do: "turn_on", when: { time: "16:00" } });
+    expect(first.kind).toBe("ask");
+    if (first.kind !== "ask") return;
+    const pinned = first.pinned!;
+    expect(pinned.targets).toEqual([{ area: "Outside", name: "Porch", kind: "light" }, { area: "Outside", name: "Hall", kind: "light" }]);
+    entities = [...entities, entity("light.garden", "Garden", "light")];
+    const resumed = plan(pinned, undefined, "do", true);
+    expect(resumed.kind).toBe("run");
+    if (resumed.kind === "run") expect(resumed.matches.map((item) => item.id)).toEqual(["light.porch", "light.hall"]);
+  });
+
+  test("the policy node parks the pinned arguments, not the model's", async () => {
+    const { policyNode } = await import("@/lib/turnMachine/nodes/policy");
+    const { setHouseholdSettingValue } = await import("@/lib/settings");
+    const { __setHouseRegistryCacheDepsForTests, clearHouseRegistry } = await import("@/lib/house/cache");
+    setHouseholdSettingValue("home.base_url", "http://192.168.1.20:8123");
+    setHouseholdSettingValue("home.access_token", "test-token");
+    clearHouseRegistry();
+    const rows = [{ id: "light.porch", name: "Porch", state: "off", area: "out", dc: "", rgb: [], bri: 0, ents: [] }, { id: "light.hall", name: "Hall", state: "off", area: "out", dc: "", rgb: [], bri: 0, ents: [] }];
+    __setHouseRegistryCacheDepsForTests({ read: (key) => key === "home.base_url" ? "http://192.168.1.20:8123" : "test-token", fetch: async (_url, init) => new Response(JSON.parse(String(init.body)).template.includes("states") ? JSON.stringify(rows) : JSON.stringify([{ id: "out", name: "Outside" }])) });
+    const state = { actor: { id: OWNER, role: "owner" }, surface: "chat", speakerEvidence: { kind: "person" }, context: [], crisis: false, temporary: false, utterance: "x", houseAllowed: true, houseContext: { visible: [], areas } } as never;
+    const args: Record<string, unknown> = { action: "schedule", target: { area: "Outside" }, do: "turn_on", when: { time: "16:00" } };
+    const out = await policyNode(state, { calls: [{ id: "c1", tool: "house", args }] }, new AbortController().signal);
+    clearHouseRegistry();
+    const entry = out.output.entries[0]!;
+    expect(entry.decision).toMatchObject({ allow: false, reason: "confirm_needed" });
+    expect(entry.proposal.request.args).toEqual({ action: "schedule", targets: [{ area: "Outside", name: "Porch", kind: "light" }, { area: "Outside", name: "Hall", kind: "light" }], do: "turn_on", when: { time: "16:00" } });
+  });
+});
+
+describe("refused before the yes", () => {
+  const ok = (args: Record<string, unknown>) => plan({ action: "schedule", targets: [{ name: "Porch" }], do: "turn_on", ...args }).kind;
+  test("a once_at without an offset, a date only, a past time, an out of range value and brightness on a non-light are all refused", () => {
+    expect(ok({ when: { once_at: "2026-12-12T18:00:00" } })).toBe("refuse");
+    expect(ok({ when: { once_at: "2026-12-12" } })).toBe("refuse");
+    expect(ok({ when: { once_at: "2020-01-01T18:00:00-05:00" } })).toBe("refuse");
+    expect(ok({ when: { once_at: "2035-12-12T18:00:00-05:00" } })).toBe("ask");
+    expect(ok({ when: { once_at: "2035-12-12T23:00:00Z" } })).toBe("ask");
+    expect(ok({ when: { time: "16:00" }, value: 150 })).toBe("refuse");
+    entities = [...entities, entity("switch.lamp", "Lamp", "switch")];
+    expect(plan({ action: "schedule", targets: [{ name: "Lamp" }], do: "set_brightness", value: 50, when: { time: "16:00" } }).kind).toBe("refuse");
+    expect(plan({ action: "schedule", targets: [{ name: "Porch" }], do: "set_brightness", value: 50, when: { time: "16:00" } }).kind).toBe("ask");
+  });
+});
+
+describe("the admin count", () => {
+  test("counts only other people's active and paused schedules", async () => {
+    const mk = (id: string, name: string) => createDeviceSchedule({ person: { id, role: id === OWNER ? "owner" : "adult" }, kind: "device_action", targets: [`default/light.${name}`], action: "turn_on", time: "16:00", days: [] }, { ...setup().deps.schedule!, loadRegistry: async () => ({ ok: true, areas, entities }), permissionsOf: grantAll });
+    const mine = await mk(OWNER, "porch");
+    const theirs = await mk(ADULT, "hall");
+    const gone = await mk(ADULT, "porch");
+    if (!mine.ok || !theirs.ok || !gone.ok) throw new Error("setup");
+    db.update(scheduledTasks).set({ state: "done" }).where(eq(scheduledTasks.id, gone.id)).run();
+    const text = said(await runHouseTool({ actor: actor(OWNER, "owner"), band: "adult", args: { action: "list_schedules" }, callId: "call-1", deps: setup().deps }));
+    expect(text).toContain("1 schedule belongs to other people.");
+  });
+});
+
+describe("rule 6a: refusals and failures record the action name only", () => {
+  test("every refusal, failure and ask outcome of the three actions carries {action} and nothing else", async () => {
+    const s = setup();
+    const outcomes = [
+      await runHouseTool({ actor: actor(TEEN, "teen"), band: "teen", args: { ...everyDay, instance: "cabin" }, callId: "c1", deps: s.deps }),
+      await runHouseTool({ actor: actor(OWNER, "owner"), band: "adult", args: { action: "schedule", targets: [{ name: "Nope" }], do: "turn_on", when: { time: "16:00" }, instance: "cabin" }, callId: "c2", deps: s.deps }),
+      await runHouseTool({ actor: actor(OWNER, "owner"), band: "adult", args: { action: "schedule", targets: [{ name: "Front door" }], do: "turn_on", when: { time: "16:00" } }, callId: "c3", deps: s.deps }),
+      await runHouseTool({ actor: actor(OWNER, "owner"), band: "adult", args: everyDay, callId: "c4", deps: s.deps }),
+      await runHouseTool({ actor: actor(OWNER, "owner"), band: "adult", args: { action: "cancel_schedule", targets: [{ name: "Porch" }] }, callId: "c5", deps: s.deps }),
+    ];
+    for (const out of outcomes) expect((out as { args?: unknown }).args).toEqual({ action: expect.any(String) });
+    expect(JSON.stringify(outcomes)).not.toContain("cabin");
+    expect(JSON.stringify(outcomes.map((out) => (out as { args?: unknown }).args))).not.toContain("Porch");
   });
 });

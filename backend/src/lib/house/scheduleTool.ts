@@ -21,9 +21,17 @@ function validTime(text: string): boolean {
 }
 
 /** Either a wall-clock repeat or one instant. No cron and no free text; the zone is never sent by the model. */
+/** An explicit UTC offset or Z, so the instant never depends on a guessed zone: "2026-11-12T18:00:00-05:00" or "...Z". */
+function hasOffset(text: string): boolean {
+  if (!text.includes("T")) return false;
+  if (text.endsWith("Z")) return true;
+  const tail = text.slice(-6);
+  return (tail[0] === "+" || tail[0] === "-") && tail[3] === ":" && !Number.isNaN(Number(tail.slice(1, 3))) && !Number.isNaN(Number(tail.slice(4)));
+}
+
 export const whenShape = z.union([
   z.object({ time: z.string().length(5).refine(validTime, "time must be HH:MM"), days: z.array(z.number().int().min(1).max(7)).max(7).optional() }).strict(),
-  z.object({ once_at: z.string().min(10).max(40).refine((value) => !Number.isNaN(Date.parse(value)), "once_at must be a timestamp") }).strict(),
+  z.object({ once_at: z.string().min(10).max(40).refine((value) => hasOffset(value) && !Number.isNaN(Date.parse(value)), "once_at must be a timestamp with an offset such as Z or -05:00") }).strict(),
 ]);
 export type ScheduleWhen = z.infer<typeof whenShape>;
 
@@ -80,7 +88,7 @@ const REFUSAL_TEXT: Partial<Record<TargetReason, string>> = {
 
 export type SchedulePlan =
   | { kind: "refuse"; reason: string; text: string; count: number }
-  | { kind: "ask"; reason: string; action: string; count: number; kinds: string[]; labels: string[]; prompt: string }
+  | { kind: "ask"; reason: string; action: string; count: number; kinds: string[]; labels: string[]; prompt: string; pinned: Record<string, unknown> }
   | { kind: "run"; matches: HouseEntity[]; count: number };
 
 type Resolve = (targets: NonNullable<ScheduleArgs["targets"]>, entities: HouseEntity[], areas: HouseArea[]) => { matches: HouseEntity[]; ambiguous?: string[]; acrossInstances?: string[]; missing?: boolean };
@@ -90,6 +98,7 @@ export type ScheduleArgs = {
   do?: (typeof SCHEDULE_DO)[number];
   value?: number;
   when?: ScheduleWhen;
+  instance?: string;
 };
 
 const refuse = (reason: string, text: string, count = 0): SchedulePlan => ({ kind: "refuse", reason, text, count });
@@ -97,16 +106,19 @@ const NOT_FOUND = "I could not find a visible device matching that area or name.
 
 function whenOfRow(row: PublicSchedule, zone: string): string { return describeWhen({ time: row.time, days: row.days, once_at: row.once_at }, zone); }
 
-/** The speaker's own schedules whose targets include one of these devices, narrowed by `when` when given. */
+/** Rows that can still run (the list shows these); done and failed ones are history. */
+const isLive = (row: PublicSchedule): boolean => row.state === "active" || row.state === "paused";
+
+/** The speaker's own live schedules whose targets include one of these devices, narrowed by `when` when given. */
 function ownMatching(personId: string, devices: readonly HouseEntity[], when: ScheduleWhen | undefined): PublicSchedule[] {
   const keys = new Set(devices.map(keyOf));
-  return listOwnSchedules(personId).filter((row) => row.what.targets.some((target) => keys.has(target)) && (
+  return listOwnSchedules(personId).filter(isLive).filter((row) => row.what.targets.some((target) => keys.has(target)) && (
     !when ? true : "once_at" in when ? row.once_at !== null && Date.parse(row.once_at) === Date.parse(when.once_at) : row.time === when.time));
 }
 
 export function planSchedule(ctx: {
   args: ScheduleArgs; actor: HouseActor; registry: { areas: HouseArea[]; entities: HouseEntity[] }; permissions: readonly EffectivePermission[];
-  visible: HouseEntity[]; approved: boolean; resolve: Resolve; label: (entity: HouseEntity, areas: HouseArea[]) => string; zone?: string;
+  visible: HouseEntity[]; approved: boolean; resolve: Resolve; label: (entity: HouseEntity, areas: HouseArea[]) => string; pin: (entity: HouseEntity, areas: HouseArea[]) => { area?: string; name: string; kind: string }; zone?: string; now?: Date;
 }): SchedulePlan {
   const { args, actor, registry } = ctx;
   // Rule 0 and 1: anyone who is not an adult on a private surface finds nothing.
@@ -115,18 +127,37 @@ export function planSchedule(ctx: {
   const zone = ctx.zone ?? defaultZone(actor.id ?? "");
   if (!args.targets || args.targets.length === 0) return refuse("invalid", "Name the light, switch, fan or scene.");
 
+  // What the confirm card showed is what resumes: the targets are rewritten to one explicit entry per device, so a device that joins an area
+  // between the ask and the yes cannot be included. Applied by the policy node to the parked call.
+  const pinnedFor = (matches: readonly HouseEntity[]): Record<string, unknown> => {
+    const homes = new Set(matches.map((entity) => entity.instance ?? "default"));
+    return {
+      action: args.action, targets: matches.map((entity) => ctx.pin(entity, registry.areas)),
+      ...(args.do ? { do: args.do } : {}), ...(args.value !== undefined ? { value: args.value } : {}), ...(args.when ? { when: args.when } : {}),
+      ...(homes.size === 1 && matches[0]!.instance !== undefined ? { instance: matches[0]!.instance } : args.instance ? { instance: args.instance } : {}),
+    };
+  };
+
   if (args.action === "cancel_schedule") {
-    const resolved = ctx.resolve(args.targets, registry.entities, registry.areas);
+    // The speaker's visible devices plus the targets of their own schedules (a revoked-grant row can still be cancelled); nothing hidden is named or counted.
+    const ownKeys = new Set(listOwnSchedules(actor.id ?? "").filter(isLive).flatMap((row) => row.what.targets));
+    const extra = registry.entities.filter((entity) => ownKeys.has(keyOf(entity)) && (!args.instance || (entity.instance ?? "default") === args.instance));
+    const candidates = [...new Map([...ctx.visible, ...extra].map((entity) => [keyOf(entity), entity])).values()];
+    const resolved = ctx.resolve(args.targets, candidates, registry.areas);
     if (resolved.missing || resolved.matches.length === 0) return refuse("missing", NOT_FOUND);
     if (resolved.ambiguous) return refuse("ambiguous", `That name matches more than one device: ${resolved.ambiguous.join(", ")}. Please be more specific.`, resolved.ambiguous.length);
     if (resolved.acrossInstances) return refuse("ambiguous", `That name matches in more than one home: ${resolved.acrossInstances.join(" or ")}. Say which one.`, resolved.acrossInstances.length);
     const rows = ownMatching(actor.id ?? "", resolved.matches, args.when);
     if (rows.length === 0) return refuse("missing", "You have no schedule for that.");
+    const names = new Map(candidates.map((entity) => [keyOf(entity), entity]));
     if (rows.length > 1) {
-      const names = new Map(registry.entities.map((entity) => [keyOf(entity), entity.name]));
-      const each = rows.map((row) => `${names.get(row.what.targets[0]!) ?? "A device"} at ${shortWhen(row, zone)}`);
+      const each = rows.map((row) => `${names.get(row.what.targets[0]!)?.name ?? "A device"} at ${shortWhen(row, zone)}`);
       return refuse("ambiguous", `You have more than one schedule for that: ${each.join("; ")}. Say which time to cancel.`, rows.length);
     }
+    const shown = rows[0]!.what.targets.flatMap((target) => { const entity = names.get(target); return entity ? [plainName(entity)] : []; });
+    const prompt = `Cancel the ${shown.join(", ") || "device"} schedule at ${shortWhen(rows[0]!, zone)}?`;
+    // Cancelling always asks too, whatever tools.house.mode says; a page or search result cannot cancel by itself.
+    if (!ctx.approved) return { kind: "ask", reason: "confirmation_required", action: "cancel_schedule", count: 1, kinds: ["schedule"], labels: [prompt], prompt, pinned: pinnedFor(resolved.matches) };
     return { kind: "run", matches: resolved.matches, count: 1 };
   }
 
@@ -138,7 +169,11 @@ export function planSchedule(ctx: {
   if (!args.when) return refuse("invalid", "Say when: a time of day (and days), or one date and time.");
   const scenes = resolved.matches.filter((entity) => entity.kind === "scene").length;
   if (scenes !== 0 && scenes !== resolved.matches.length) return refuse("invalid", "A scene and a device cannot share one schedule. Schedule them separately.");
+  // Everything the store would reject is refused here, so the card never shows something that fails after the yes.
+  if (args.value !== undefined && !(args.value >= 1 && args.value <= 100)) return refuse("invalid", "A level must be between 1 and 100.");
+  if ("once_at" in args.when && Date.parse(args.when.once_at) <= (ctx.now ?? new Date()).getTime()) return refuse("invalid", "That time has already passed. Pick a time later than now.");
   const doAction = args.do ?? (scenes > 0 ? "activate" : undefined);
+  if (doAction === "set_brightness" && !resolved.matches.every((entity) => entity.kind === "light")) return refuse("invalid", "Only lights can be dimmed. Use on or off for the others.");
   if (!doAction || (doAction === "activate") !== (scenes > 0) || (doAction === "set_brightness" && !(args.value !== undefined && args.value >= 1 && args.value <= 100))) {
     return refuse("invalid", "Use on, off or a brightness from 1 to 100 for lights, on or off for switches and fans, and activate for scenes.");
   }
@@ -148,7 +183,7 @@ export function planSchedule(ctx: {
   const labels = resolved.matches.map((entity) => ctx.label(entity, registry.areas));
   const prompt = schedulePrompt(labels, doAction, args.value, describeWhen(args.when as { time?: string; days?: number[]; once_at?: string }, zone));
   // A schedule runs without Home's brakes, so it always asks, whatever tools.house.mode says (mode "never" is refused before this).
-  if (!ctx.approved) return { kind: "ask", reason: "confirmation_required", action: "schedule", count: resolved.matches.length, kinds: [...new Set(resolved.matches.map((entity) => entity.kind))], labels, prompt };
+  if (!ctx.approved) return { kind: "ask", reason: "confirmation_required", action: "schedule", count: resolved.matches.length, kinds: [...new Set(resolved.matches.map((entity) => entity.kind))], labels, prompt, pinned: pinnedFor(resolved.matches) };
   return { kind: "run", matches: resolved.matches, count: resolved.matches.length };
 }
 
@@ -180,8 +215,10 @@ export async function runScheduleAction(ctx: {
   const names = new Map(ctx.registry.entities.map((entity) => [keyOf(entity), plainName(entity)]));
 
   if (ctx.args.action === "list_schedules") {
-    const own = listOwnSchedules(personId).filter((row) => row.state !== "done");
-    const others = ctx.role === "owner" || ctx.role === "admin" ? adminScheduleCount().total - listOwnSchedules(personId).length : 0;
+    const own = listOwnSchedules(personId).filter(isLive);
+    // Others' live schedules as a count only; done and failed rows are history.
+    const all = adminScheduleCount();
+    const others = ctx.role === "owner" || ctx.role === "admin" ? all.active + all.paused - own.length : 0;
     const lines = own.map((row) => listLine(row, names, zone));
     const count = others > 0 ? `${others} ${others === 1 ? "schedule belongs" : "schedules belong"} to other people.` : "";
     if (lines.length === 0) return { ok: true, text: `You have no device schedules.${count ? ` ${count}` : ""}` };

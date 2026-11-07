@@ -656,11 +656,32 @@ describe("a hub one-shot is done only after it fires", () => {
     expect(performed).toEqual([]);
   });
 
-  test("it is not marked done before the device action runs", async () => {
+  test("it is claimed (done) before the device action runs, so a crash mid-run cannot fire it twice", async () => {
     const { id, job } = await hubOnce();
     let stateDuringRun = "";
     await fireHubDeviceTask(job, { ...deps({ now: () => new Date("2026-11-06T20:31:00.000Z") }), perform: async () => { stateDuringRun = db.select().from(scheduledTasks).where(eq(scheduledTasks.id, id)).get()!.state; return ok(); } });
-    expect(stateDuringRun).toBe("active");
+    expect(stateDuringRun).toBe("done");
     expect(db.select().from(scheduledTasks).where(eq(scheduledTasks.id, id)).get()!.state).toBe("done");
+  });
+
+  test("a device that cannot be reached leaves it failed with no retry left", async () => {
+    const { id, job } = await hubOnce();
+    let message = "";
+    try { await fireHubDeviceTask(job, { ...deps({ now: () => new Date("2026-11-06T20:31:00.000Z") }), perform: async () => ({ ok: false, kind: "unreachable" }) }); } catch (error) { message = String(error); }
+    expect(message).not.toBe("");
+    expect(db.select().from(scheduledTasks).where(eq(scheduledTasks.id, id)).get()!.state).toBe("failed");
+    expect(fireJobs().filter((item) => item.status === "pending" && item.id !== job.id)).toHaveLength(0);
+  });
+
+  test("a perform that throws leaves it failed, not active with nothing pending, and cancels a queued retry", async () => {
+    const { id, job } = await hubOnce();
+    // An earlier skipped attempt queued a retry.
+    await fireHubDeviceTask(job, { ...deps({ now: () => new Date("2026-11-06T20:30:10.000Z") }), loadRegistry: async () => ({ ok: false, kind: "unreachable" }) }).catch(() => {});
+    expect(fireJobs().filter((item) => item.status === "pending")).toHaveLength(2);
+    let message = "";
+    try { await fireHubDeviceTask(job, { ...deps({ now: () => new Date("2026-11-06T20:31:00.000Z") }), perform: async () => { throw new Error("socket closed for light.porch"); } }); } catch (error) { message = String(error); }
+    expect(message).not.toContain("light.porch");
+    expect(db.select().from(scheduledTasks).where(eq(scheduledTasks.id, id)).get()!.state).toBe("failed");
+    expect(fireJobs().filter((item) => item.status === "pending" && item.id !== job.id)).toHaveLength(0);
   });
 });
