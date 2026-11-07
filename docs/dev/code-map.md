@@ -203,7 +203,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `frontend/src/shell/MediaPickerDialog.tsx` | SAY_PREFIX, SAY_MAX_LENGTH, thumbUrlFor, MediaPickerBody, StudioPickerBody |
 | `frontend/src/shell/MediaPlayerRegistration.tsx` | chaptersWithEnds, audioKindOfApp, MediaPlayerRegistration |
 | `frontend/src/shell/MemoriesRedirect.tsx` | MemoriesRedirect, LegacyProfileMemoriesRedirect |
-| `frontend/src/shell/NotificationBell.tsx` | POLL_MS, NOTIFICATIONS_QUERY_KEY, NOTIFICATIONS_HISTORY_QUERY_KEY, useNotificationsQuery, usePendingNotificationCount, NotificationToaster |
+| `frontend/src/shell/NotificationBell.tsx` | notificationLine, POLL_MS, NOTIFICATIONS_QUERY_KEY, NOTIFICATIONS_HISTORY_QUERY_KEY, useNotificationsQuery, usePendingNotificationCount |
 | `frontend/src/shell/RailProfile.tsx` | RailProfile |
 | `frontend/src/shell/Routes.tsx` | Routes |
 | `frontend/src/shell/StatusIndicator.tsx` | useStatusSummary, StatusIndicator |
@@ -539,6 +539,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/hubIdentity.ts` | getHubInstanceId, getHubName, setHubName, __resetHubIdentityForTests |
 | `backend/src/lib/hubRestart.ts` | HUB_RESTART_EXIT_CODE, scheduleHubRestart, __setHubRestartSchedulerForTests |
 | `backend/src/lib/hubShutdown.ts` | SHUTDOWN_DEADLINE_MS, shutdownEngines, __resetHubShutdownForTests |
+| `backend/src/lib/i18nServer.ts` | notificationLanguage, placeholdersOf, renderNotification, renderNotificationFor, spokenNotificationLine |
 | `backend/src/lib/id.ts` | newPersonId, newApiKeyId, newBiometricPrintId, newJobId, newConversationTurnId, newToolUndoId |
 | `backend/src/lib/imageEdit.ts` | ImageEditError, EDIT_OPERATIONS, EDIT_WAIT_MS, PICTURES_OFF_REASON, COMMENT_NOT_SET_UP, __setImageToolsForTests |
 | `backend/src/lib/imageSimilarity/cluster.ts` | SAME_PIXELS_BITS, VERIFY_RADIUS_BITS, MAX_VERIFIED_PAIRS, VERIFY_TIME_BUDGET_MS, cluster |
@@ -766,6 +767,8 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/news/topicTagger.ts` | TOPIC_OVERRIDE_MARGIN, cosine, chooseTopic, __resetTopicTaggerForTests, classifyPendingTopics |
 | `backend/src/lib/news/topics.ts` | TOPICS, topicsFor, topicById, topicOfferedTo |
 | `backend/src/lib/newsMinorFloor.ts` | NEWS_NONE_FOR_MINOR_TEXT, NEWS_NONE_FOR_TEEN_TEXT, applyNewsMinorFloor |
+| `backend/src/lib/notificationCopy.ts` | NOTIFICATION_COPY |
+| `backend/src/lib/notificationCopyEs.ts` | NOTIFICATION_ES |
 | `backend/src/lib/notificationTypes.ts` | NOTIFICATION_TYPES, registerPackageNotificationTypes, getNotificationType |
 | `backend/src/lib/notifications.ts` | trigger, quietHours, deliverHeldNotifications, notifyIfFlagged, listPending, listHistory |
 | `backend/src/lib/offline/media.ts` | matches, playableItem, keepRefusal, missing, mediaManifest, mediaFile |
@@ -977,6 +980,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/specDir.ts` | SPEC_DIR |
 | `backend/src/lib/spokenArg.ts` | wantsSpoken |
 | `backend/src/lib/spokenText.ts` | toSpokenText |
+| `backend/src/lib/spokenTextEs.ts` | spanishNumber, spanishSpoken, SPOKEN_LINES_ES |
 | `backend/src/lib/stack/client.ts` | identityFromHeaders, createStackClient |
 | `backend/src/lib/stack/contract.ts` | STACK_CONTRACT_MIN, STACK_CONTRACT_MAX, StackCodingModeSchema |
 | `backend/src/lib/stack/errors.ts` | StackError |
