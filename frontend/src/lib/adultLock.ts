@@ -13,6 +13,8 @@ let proof: string | null = null;
 
 export function getAdultProof(): string | null { return proof; }
 export function setAdultProof(value: string | null): void { proof = value; }
+/** The header object for a request: empty while locked. */
+export function adultHeaders(): Record<string, string> { return proof ? { [ADULT_PROOF_HEADER]: proof } : {}; }
 
 // ---- Blob sources -------------------------------------------------------------------------------------------------------------------------
 
