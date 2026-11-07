@@ -38,6 +38,7 @@ import { activeTakeRun, cancelTakeRun, companionHasTakeRun, publicTakeRun, start
 import { clipPromptPack, picturePromptPack } from "@/lib/companionPromptPack";
 import { portraitPath, readRetainedPortrait, retainCompanionPortrait } from "@/lib/companionPortrait";
 import { checkFinishedAssets, type FinishedAsset } from "@/lib/pictures/finishedCheck";
+import { forkSynth, getSynth, shareFork, synthById, maySeeSynth } from "@/lib/synths";
 import { checkCompanionArt, collectLiveAssets } from "@/lib/companionArtCheck";
 import { extractKeyframes } from "@/lib/pictures/keyframes";
 import { routeAudience } from "@/lib/pictures/audience";
@@ -113,7 +114,7 @@ companionsRoutes.openapi(listRoute, (c) => {
   const person = c.get("person");
   const admin = isOwnerOrAdmin(person);
   const decorate = (card: ReturnType<typeof listCompanionCards>[number]) => ({ ...card, ...companionCounts(person.id, card.id), can_edit: card.is_household && mayEdit(person, card.id), can_copy: canCreateCompanion(person, admin) });
-  return c.json({ allowed: companionAreaOn(person), can_create: canCreateCompanion(person, admin), can_discover: speakerAgeBand(person, new Date()) !== "child", default_id: currentCompanionId(person), companions: listCompanionCards(person, admin).map(decorate), discover: discoverCompanionCards(person).map(decorate), robots: admin ? robotAssignments() : null }, 200);
+  return c.json({ allowed: companionAreaOn(person), can_create: canCreateCompanion(person, admin), can_discover: speakerAgeBand(person, new Date()) !== "child", default_id: currentCompanionId(person), companions: listCompanionCards(person, admin).filter((card) => !!getSynth(person, card.id)).map(decorate), discover: discoverCompanionCards(person).map(decorate), robots: admin ? robotAssignments() : null }, 200);
 });
 
 const setMembershipRoute = (action: "add" | "remove") => {
@@ -225,6 +226,8 @@ const detailRoute = createRoute({
 companionsRoutes.openapi(detailRoute, (c) => {
   const person = c.get("person");
   const id = c.req.valid("param").id, found = PERSONAS.find((candidate) => candidate.id === id);
+  const synth = synthById(id);
+  if (synth && !maySeeSynth(person, synth)) return c.json({ error: "No such companion" }, 404);
   const persona = found && mayUseCompanion(person, found) ? found : found ? null : draftPersonaFor(person, id, isOwnerOrAdmin(person));
   if (!persona) return c.json({ error: "No such companion" }, 404);
   const detail = companionDetail(person, persona, isOwnerOrAdmin(person));
@@ -796,6 +799,22 @@ companionsRoutes.openapi(copyRoute, (c) => {
   const result = getHouseholdCompanion(id) ? copyHouseholdCompanion(id, author) : copyBundledCompanion(id, author);
   if (!result.ok) return c.json({ error: result.error }, 404);
   reloadPersonas(); return c.json({ id: result.value.id }, 201);
+});
+
+const forkSynthRoute = createRoute({ method: "post", path: "/{id}/fork", tags: ["Companions"], summary: "Make a synth your private companion", middleware: [requireAuth] as const,
+  request: { params: idPath }, responses: { 201: { content: { "application/json": { schema: z.object({ id: z.string() }) } }, description: "Private companion fork created." }, ...errorResponses({ 400: "The synth copy could not be created", 403: "This companion cannot be used", 404: "No synth you can use" }) } });
+companionsRoutes.openapi(forkSynthRoute, (c) => {
+  const result = forkSynth(c.get("person"), c.req.valid("param").id);
+  if (!result.ok) return c.json({ error: result.error }, result.status ?? 400);
+  reloadPersonas(); return c.json({ id: result.value.id }, 201);
+});
+
+const shareForkRoute = createRoute({ method: "post", path: "/{id}/share", tags: ["Companions"], summary: "Share a private synth fork with the household", middleware: [requireAuth] as const,
+  request: { params: idPath }, responses: { 200: { content: { "application/json": { schema: z.object({ id: z.string() }) } }, description: "Fork shared with the household." }, ...errorResponses({ 400: "Only a private fork can be shared", 403: "Only the fork owner or a manager of a minor owner can share it", 404: "No such fork" }) } });
+companionsRoutes.openapi(shareForkRoute, (c) => {
+  const result = shareFork(c.get("person"), c.req.valid("param").id);
+  if (!result.ok) return c.json({ error: result.error }, result.status ?? 400);
+  reloadPersonas(); return c.json({ id: result.value.id }, 200);
 });
 
 const editRoute = createRoute({ method: "get", path: "/{id}/edit", tags: ["Companions"], summary: "Read an editable household companion", middleware: [requireAuth] as const,

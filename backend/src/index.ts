@@ -66,6 +66,9 @@ import { pushCodingSettings } from "@/lib/stackCodingSync";
 import { syncStackRequirementIssue } from "@/lib/stackRequirement";
 import { initSafetyAlarm } from "@/lib/safetyAlarm";
 import { migratePendingAsksThroughGate } from "@/lib/gate/pendingAskMigration";
+import { registerCompanionReadGate } from "@/lib/memory";
+import { maySeeSynth, synthById } from "@/lib/synths";
+import { migrateOwnerJsonAll } from "@/lib/householdCompanions";
 import { migrateWikipediaFallbackToSourceMode } from "@/lib/retrieval/sourceModeMigration";
 import { migrateRobotsSwitch } from "@/lib/robotsSwitchMigration";
 import { migrateTierSlots } from "@/lib/tierSlotMigration";
@@ -151,6 +154,8 @@ void recordStatusSample();
 // forever. Correcting it once, here, before anything else touches
 // download-job state.
 recoverInterruptedJobsAtBoot();
+registerCompanionReadGate((actor, id) => { const synth = synthById(id); return !!synth && maySeeSynth(actor, synth); });
+migrateOwnerJsonAll();
 
 // The scheduler's own timer: app.ts/routes stay import-only (no side
 // effects) so tests booting the app via Hono's .request() never start a
