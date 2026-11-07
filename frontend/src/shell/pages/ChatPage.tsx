@@ -242,9 +242,11 @@ function useChatRuntime(person: Roster, closeSheet: () => void, temporaryNext: b
   const capabilitiesQuery = useQuery({
     queryKey: CHAT_CAPABILITIES_QUERY_KEY,
     queryFn: async () => chatCapabilitiesFrom(await api.chatCapabilities().catch(() => undefined)),
-    staleTime: 0,
-    refetchInterval: 10_000,
-    refetchOnWindowFocus: true,
+    // AUDIT-PERF-01: a model change refetches (the effect on currentModelId below); otherwise once a minute is enough.
+    staleTime: 60_000,
+    refetchInterval: 60_000,
+    // Coming back to the tab still asks once, so a picture-reading model that just loaded shows without waiting.
+    refetchOnWindowFocus: "always",
   });
   const chatCapabilities = capabilitiesQuery.data ?? NO_CHAT_PICTURES;
   const imagePartsAvailable = chatCapabilities.image_parts;
@@ -373,6 +375,13 @@ function useChatRuntime(person: Roster, closeSheet: () => void, temporaryNext: b
   }, [onConversationSettingsLoaded]);
   const currentModelId = isOwnerOrAdmin ? chatRole?.model?.id : chatModelsQuery.data?.selectedModel?.id;
   const activeModelId = currentModelId;
+  // AUDIT-PERF-01: the capabilities answer follows the chat model, so a model change refetches it at once.
+  const lastCapabilitiesModelRef = useRef(currentModelId);
+  useEffect(() => {
+    if (lastCapabilitiesModelRef.current === currentModelId) return;
+    lastCapabilitiesModelRef.current = currentModelId;
+    void maxQueryClient.invalidateQueries({ queryKey: CHAT_CAPABILITIES_QUERY_KEY });
+  }, [currentModelId, maxQueryClient]);
   const thinkingModeCapability = activeModelId
     ? chatCapabilities.thinking_modes[activeModelId] ?? chatCapabilities.thinking
     : chatCapabilities.thinking;

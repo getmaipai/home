@@ -23,3 +23,13 @@ describe("SHELL-FOLD-01 phone chat header", () => {
     expect(source).toContain("voiceBargeIn: true");
   });
 });
+
+describe("AUDIT-PERF-01 chat capabilities polling", () => {
+  test("capabilities stay fresh for a minute and refetch when the chat model changes", () => {
+    const query = source.match(/queryKey: CHAT_CAPABILITIES_QUERY_KEY,([\s\S]*?)\}\);/)?.[1] ?? "";
+    expect(query).toContain("staleTime: 60_000");
+    expect(query).not.toContain("staleTime: 0");
+    expect(query).not.toContain("refetchInterval: 10_000");
+    expect(source).toMatch(/invalidateQueries\(\{ queryKey: CHAT_CAPABILITIES_QUERY_KEY \}\)/);
+  });
+});

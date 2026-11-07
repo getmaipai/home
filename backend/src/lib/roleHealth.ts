@@ -3,7 +3,7 @@ import { activeTransition, observeModeChange, transitionNotice } from "@/lib/cha
 import * as canaryResults from "@/lib/canary/results";
 import { stackReducedChat } from "@/lib/reducedChat";
 import { warmupInFlight } from "@/lib/stackWarmup";
-import { getStackClient, isStackConfigured, stackRefusal } from "@/lib/stackEngine";
+import { getStackClient, isStackConfigured, stackEpoch, stackRefusal } from "@/lib/stackEngine";
 import { getHomeSupervisorRoles } from "@/lib/homeSupervisorRoles";
 import type { EngineHealthEntry } from "@/wire";
 import type { ChatRoleContext } from "@maipai/spec/stack/ts/role-context.js";
@@ -26,6 +26,26 @@ export function cachedRoleHealth(role: HealthRole): RoleHealth | undefined {
   const cached = cachedHealth.get(role);
   return roleHealthForTests[role] ?? (cached && Date.now() - cached.at < 30_000 ? cached.health : undefined);
 }
+/** AUDIT-PERF-01: one read of the Stack's role list and coding mode shared for 2 s by every caller (the six role rows, the call
+ * check, chat-capabilities), so a health snapshot costs one `roles()` request, not four to six. A failed read is not kept. */
+const SHARED_READ_MS = 2_000;
+type Shared<T> = { at: number; epoch: number; read: Promise<T> };
+function shared<T>(slot: Shared<T> | null, read: () => Promise<T>, set: (next: Shared<T> | null) => void): Promise<T> {
+  if (slot && slot.epoch === stackEpoch() && Date.now() - slot.at < SHARED_READ_MS) return slot.read;
+  const entry: Shared<T> = { at: Date.now(), epoch: stackEpoch(), read: read() };
+  set(entry);
+  entry.read.catch(() => { if (slotIs(entry)) set(null); });
+  return entry.read;
+}
+let rolesSlot: Shared<Awaited<ReturnType<ReturnType<typeof getStackClient>["roles"]>>> | null = null;
+let codingSlot: Shared<Awaited<ReturnType<ReturnType<typeof getStackClient>["getCodingMode"]>>> | null = null;
+function slotIs(entry: Shared<unknown>): boolean { return rolesSlot === entry || codingSlot === entry; }
+/** The Stack's role list, shared for 2 s. Throws as `roles()` does. */
+export function sharedStackRoles() { return shared(rolesSlot, () => getStackClient().roles(), (next) => { rolesSlot = next; }); }
+/** The Stack's coding mode, shared for 2 s. Throws as `getCodingMode()` does. */
+export function sharedCodingMode() { return shared(codingSlot, () => getStackClient().getCodingMode(), (next) => { codingSlot = next; }); }
+export function __resetSharedStackReadsForTests(): void { rolesSlot = null; codingSlot = null; }
+
 const STACK_ROLE_ID: Partial<Record<HealthRole, string>> = { embed: "embed", background: "judge", voice: "tts" };
 /** The role name each Stack call site passes to stackFailureResult()
  * (llm.ts, tts.ts, stt.ts) - what a remembered refusal is keyed by,
@@ -69,7 +89,7 @@ export async function roleHealth(role: HealthRole, opts: { live?: boolean } = {}
   }
   if (role === "chat") {
     try {
-      const mode = await getStackClient().getCodingMode();
+      const mode = await sharedCodingMode();
       const sinceMs = observeModeChange(mode.state === "switching");
       if (sinceMs !== null) return { availability: "starting", reason: null, cause: "mode_change", detail: transitionNotice("mode_change", sinceMs).adult };
     } catch { /* Older or unreachable Stack; role health below remains authoritative. */ }
@@ -85,7 +105,7 @@ export async function roleHealth(role: HealthRole, opts: { live?: boolean } = {}
   if (refusal) return { availability: "unavailable", reason: "stack_refused", detail: refusal.household, ...(/memory/i.test(refusal.household) ? { cause: "memory" as const } : {}) };
   try {
     const id = STACK_ROLE_ID[role] ?? role;
-    const { roles } = await getStackClient().roles();
+    const { roles } = opts.live ? await getStackClient().roles() : await sharedStackRoles();
     const row = roles.find((item) => item.id === id);
     if (!row) return { availability: "unavailable", reason: "stack_unreachable", cause: "restarting" };
     const state = row.state.state;
@@ -111,14 +131,14 @@ function readMakingInputs(): Promise<MakingInputs> {
   if (makingInputs && Date.now() - makingInputs.at < 1_000) return makingInputs.read;
   const safe = async <T,>(read: () => Promise<T>, fallback: T): Promise<T> => { try { return await read(); } catch { return fallback; } };
   const read = Promise.all([
-    safe(async () => (await getStackClient().roles()).roles, null),
+    safe(async () => (await sharedStackRoles()).roles, null),
     safe(async () => (await getStackClient().memory?.())?.watchdog?.generation_paused === true, false),
-    safe(async () => { const mode = await getStackClient().getCodingMode(); return mode.mode === "coding" || mode.state === "switching"; }, false),
+    safe(async () => { const mode = await sharedCodingMode(); return mode.mode === "coding" || mode.state === "switching"; }, false),
   ]).then(([roles, paused, coding]) => ({ roles, paused, coding }));
   makingInputs = { at: Date.now(), read };
   return read;
 }
-export function __resetMakingHealthForTests(): void { makingInputs = null; }
+export function __resetMakingHealthForTests(): void { makingInputs = null; __resetSharedStackReadsForTests(); }
 
 /** ENGINE-STATUS-MEDIA-01 (RULES.md S6): whether a picture or a clip can be started now. Not installed outranks every passing
  * state; then a remembered Stack refusal (the same rule chat follows), then coding mode, then the memory watchdog pausing generation,
@@ -186,7 +206,7 @@ export function roleHealthEntry(role: HealthRole, local: EngineHealthEntry, stat
  * button, without the admin-only Engines routes. A Stack that does not answer reads false. */
 export async function voiceCallReady(): Promise<boolean> {
   try {
-    const roles = isStackConfigured() ? (await getStackClient().roles()).roles : await getHomeSupervisorRoles();
+    const roles = isStackConfigured() ? (await sharedStackRoles()).roles : await getHomeSupervisorRoles();
     const usable = (id: string) => roles.some((row) => row.id === id && ["installed", "loaded", "ready"].includes(row.state.state));
     return usable("stt") && usable("tts");
   } catch {
