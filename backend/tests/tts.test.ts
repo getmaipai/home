@@ -157,7 +157,9 @@ describe("POST /api/tts", () => {
       expect(receivedVoiceUrls).toEqual(["vera"]);
     });
 
-    test("a child's robot ignores a non-preset device voice", async () => {
+    // AUDIO-PARITY-01 V4 (owner-approved 2026-11-05, "everyone means everyone not just adult"): a clip voice is spoken in every band,
+    // a minor's robot included, under the same text floors; only a guest speaks a preset or the engine default.
+    test("a child's robot speaks the clip voice chosen for the device", async () => {
       const owner = new TestClient();
       await owner.post("/api/auth/setup", { displayName: "Sage", secret: "correcthorse" });
       const { id: childId } = (await (await owner.post("/api/people", { displayName: "Bramble", role: "child" })).json()) as { id: string };
@@ -165,7 +167,21 @@ describe("POST /api/tts", () => {
       const { robot, deviceId } = await pairedRobot(childId);
       await setRobotVoice(owner, deviceId, "community-voice");
       expect((await robot.post("/api/tts", { text: "hi" })).status).toBe(200);
-      expect(receivedVoiceUrls).toEqual(["alba"]);
+      expect(receivedVoiceUrls).toEqual(["community-voice"]);
+    });
+
+    test("a guest's robot never speaks a clip voice: it speaks a preset or the engine default", async () => {
+      const owner = new TestClient();
+      await owner.post("/api/auth/setup", { displayName: "Sage", secret: "correcthorse" });
+      const created = await owner.post("/api/people", { displayName: "Visitor", role: "guest" });
+      expect(created.status).toBeLessThan(300);
+      const { id: guestId } = (await created.json()) as { id: string };
+      await owner.put("/api/settings", { scope: `person:${guestId}`, key: "tts.voice_id", value: "alba" });
+      const { robot, deviceId } = await pairedRobot(guestId);
+      await setRobotVoice(owner, deviceId, "community-voice");
+      expect((await robot.post("/api/tts", { text: "hi" })).status).toBe(200);
+      expect(receivedVoiceUrls).toHaveLength(1);
+      expect(receivedVoiceUrls).not.toContain("community-voice");
     });
 
     test.each(["child", "teen"] as const)("a %s robot speaks with a full Stack preset id", async (role) => {
