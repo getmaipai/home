@@ -42,7 +42,8 @@ describe("chat.search_assist", () => {
     expect(hits).toHaveLength(1);
     expect(hits[0]).toMatchObject({ scope: "household", selector: "select", default: "shadow", level: "advanced", lives_in: "household.ai_advanced" });
     expect(hits[0]!.range).toEqual({ options: ["off", "shadow", "rescue"] });
-    expect(hits[0]!.help).toContain("not active yet");
+    // AUDIT-DEAD-01 reworded the help: the model decides when to search; the setting only picks the shadow or rescue count.
+    expect(hits[0]!.help).toContain("The model decides when to search the web");
   });
 
   test("getHouseholdSettingValue returns shadow by default", () => {
