@@ -78,7 +78,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 
 | File | Exported names |
 |---|---|
-| `frontend/src/App.tsx` | PersonLocale, App |
+| `frontend/src/App.tsx` | PersonLocale, LocaleKey, App |
 | `frontend/src/apps/chat/AskHandoff.tsx` | ASK_HANDOFF_MAX, askFromSearch, AskHandoff |
 | `frontend/src/apps/chat/ChatThread.tsx` | ChatExtrasContext, ChatThread |
 | `frontend/src/apps/chat/ChatThreadExtras.tsx` | ChatThreadExtras |
@@ -539,7 +539,8 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/hubIdentity.ts` | getHubInstanceId, getHubName, setHubName, __resetHubIdentityForTests |
 | `backend/src/lib/hubRestart.ts` | HUB_RESTART_EXIT_CODE, scheduleHubRestart, __setHubRestartSchedulerForTests |
 | `backend/src/lib/hubShutdown.ts` | SHUTDOWN_DEADLINE_MS, shutdownEngines, __resetHubShutdownForTests |
-| `backend/src/lib/i18nServer.ts` | notificationLanguage, placeholdersOf, renderNotification, renderNotificationFor, spokenNotificationLine |
+| `backend/src/lib/i18nServer.ts` | notificationLanguage, renderNotification, renderNotificationFor, spokenNotificationLine |
+| `backend/src/lib/icuPlaceholders.ts` | placeholderOccurrences, placeholdersOf, requiredPlaceholdersOf |
 | `backend/src/lib/id.ts` | newPersonId, newApiKeyId, newBiometricPrintId, newJobId, newConversationTurnId, newToolUndoId |
 | `backend/src/lib/imageEdit.ts` | ImageEditError, EDIT_OPERATIONS, EDIT_WAIT_MS, PICTURES_OFF_REASON, COMMENT_NOT_SET_UP, __setImageToolsForTests |
 | `backend/src/lib/imageSimilarity/cluster.ts` | SAME_PIXELS_BITS, VERIFY_RADIUS_BITS, MAX_VERIFIED_PAIRS, VERIFY_TIME_BUDGET_MS, cluster |
