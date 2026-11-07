@@ -692,8 +692,8 @@ export const conversationTurns = sqliteTable(
     // this, that scan is a full table scan of every turn the household
     // has ever had, not just the still-unjudged ones.
     index("conversation_turns_judge_status_idx").on(table.source, table.judgeStatus),
-    // AUDIT-PERF-01: the history reads filter by conversation and status and order by time; the retention and dashboard scans go by time alone.
-    index("conversation_turns_conv_status_created_idx").on(table.conversationId, table.status, table.createdAt),
+    // AUDIT-PERF-01: the retention and dashboard scans go by time alone. (A (conversation_id, status, created_at) index was tried and left
+    // out: it flips the order of turns that share one millisecond in the history window until those queries add a tie-break.)
     index("conversation_turns_created_idx").on(table.createdAt),
     // list()/listConversationTurns()/exportPerson() (conversationHistory.ts)
     // and lib/dashboard.ts's own recentActivity()/turnsPerDay() all filter
