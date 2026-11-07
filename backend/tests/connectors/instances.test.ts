@@ -16,7 +16,7 @@ const settings = (values: Record<string, unknown>) => (key: string) => values[ke
 describe("connector instances", () => {
   test("with no record, the settings keys read through as the default instance", () => {
     const read = settings({ "home.base_url": "http://192.168.1.20:8123", "home.access_token": "tok-default" });
-    expect(listInstances("home_assistant", { read })).toEqual([{ type: "home_assistant", instance: "default", label: "Home", address: "http://192.168.1.20:8123", credentialRef: "home.access_token", virtual: true }]);
+    expect(listInstances("home_assistant", { read })).toEqual([{ type: "home_assistant", instance: "default", label: "Home", address: "http://192.168.1.20:8123", credentialRef: "home.access_token", options: {}, virtual: true }]);
     const connection = houseLanFetch({ read });
     expect(connection).toMatchObject({ ok: true, host: "192.168.1.20", port: 8123, token: "tok-default" });
   });

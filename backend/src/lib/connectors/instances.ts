@@ -18,6 +18,8 @@ export type ConnectorInstance = {
   label: string;
   address: string;
   credentialRef: string;
+  /** Per-type options (Uptime Kuma: `status_page`). Virtual default instances carry none. */
+  options: Record<string, string>;
   virtual: boolean;
 };
 
@@ -34,6 +36,17 @@ export type InstanceLanFetchResult = InstanceLanFetchSuccess | InstanceLanFetchF
 const DEFAULT_PORT: Record<ConnectorType, number> = { home_assistant: 8123, uptime_kuma: 3001, gitea: 3000, immich: 2283, unifi: 443, plex: 32400 };
 const NAME: Record<ConnectorType, string> = { home_assistant: "Home Assistant", uptime_kuma: "Uptime Kuma", gitea: "Gitea", immich: "Immich", unifi: "UniFi", plex: "Plex" };
 
+function parseOptions(raw: string): Record<string, string> {
+  try {
+    const parsed: unknown = JSON.parse(raw);
+    if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) return {};
+    return Object.fromEntries(Object.entries(parsed).filter((entry): entry is [string, string] => typeof entry[1] === "string"));
+  } catch { return {}; }
+}
+
+/** Types whose instances need no secret: they read a public status page. */
+const NO_CREDENTIAL: ReadonlySet<ConnectorType> = new Set<ConnectorType>(["uptime_kuma"]);
+
 function isIpv4Literal(hostname: string): boolean {
   const parts = hostname.split(".");
   return parts.length === 4 && parts.every(part => /^(0|[1-9]\d{0,2})$/.test(part) && Number(part) <= 255);
@@ -46,10 +59,10 @@ export function listInstances(type: ConnectorType, deps: InstanceDeps = {}): Con
   if (!anyRecord && type === "home_assistant") {
     const read = deps.read ?? getHouseholdSettingValue;
     const address = read("home.base_url");
-    return [{ type, instance: DEFAULT_INSTANCE, label: "Home", address: typeof address === "string" ? address : "", credentialRef: "home.access_token", virtual: true }];
+    return [{ type, instance: DEFAULT_INSTANCE, label: "Home", address: typeof address === "string" ? address : "", credentialRef: "home.access_token", options: {}, virtual: true }];
   }
   return rows.filter((row) => row.enabled)
-    .map((row): ConnectorInstance => ({ type, instance: row.instance, label: row.label, address: row.address, credentialRef: row.credentialRef, virtual: false }))
+    .map((row): ConnectorInstance => ({ type, instance: row.instance, label: row.label, address: row.address, credentialRef: row.credentialRef, options: parseOptions(row.options), virtual: false }))
     .sort((a, b) => a.label.localeCompare(b.label) || a.instance.localeCompare(b.instance));
 }
 
@@ -74,9 +87,10 @@ export function instanceLanFetch(instance: ConnectorInstance, deps: InstanceDeps
   if (url.protocol !== "http:" || !isIpv4Literal(url.hostname) || url.username !== "" || url.password !== "" ||
       (url.pathname !== "" && url.pathname !== "/") || url.search !== "" || url.hash !== "") return badAddress;
 
-  const tokenValue = read(instance.credentialRef);
+  const needsToken = !NO_CREDENTIAL.has(instance.type);
+  const tokenValue = needsToken ? read(instance.credentialRef) : "";
   const token = typeof tokenValue === "string" ? tokenValue : "";
-  if (token.trim() === "") return { ok: false, reason: "no_token", message: `A ${name} access token is needed. Open Settings, House and add it.` };
+  if (needsToken && token.trim() === "") return { ok: false, reason: "no_token", message: `A ${name} access token is needed. Open Settings, House and add it.` };
 
   // The URL parser drops an explicit :80 (the http default), so check the text before falling back to the type's port.
   const explicit80 = url.port === "" && /^[a-z]+:\/\/[^/]+:80\/?$/i.test(baseUrl.trim());

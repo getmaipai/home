@@ -20,6 +20,7 @@ import type { TurnAskField } from "@/wire";
 import { resolveWeatherPlace } from "@/lib/places";
 import { blockEventsFor } from "../blockEvents";
 import { HOUSE_TOOL_ID, runHouseTool } from "@/lib/house/tool";
+import { UPTIME_TOOL_ID, runUptimeTool } from "@/lib/uptime/tool";
 import { outcomeOf, type FailureKind } from "@/lib/turnContext";
 import { lookupFailureKind } from "./lookupFallback";
 import { pickStatusPhrase } from "@/lib/statusPhrases";
@@ -392,6 +393,14 @@ export const toolNode: Node<ToolInput, ToolOutput> = async (state, input, signal
         ? await runVoiceoverTool(state.actor, voiceArgs, callId)
         : await runChangeVoiceTool(state.actor, voiceArgs, callId);
       if (outcome.args) outcome.args = { voice: voiceArgs.voice };
+      outcomes.push(outcome);
+      if (outcome.status === "succeeded") toolEvents.push({ t: "tool_result", call_id: callId, package_id: tool, outcome: { text: outcome.result?.reply?.text } });
+      else toolEvents.push({ t: "tool_error", call_id: callId, package_id: tool, error: lookupFailureKind(outcome) });
+      continue;
+    }
+
+    if (tool === UPTIME_TOOL_ID) {
+      const outcome = await runUptimeTool({ actor: state.actor, band: turnAgeBand(state.surface, state.actor, state.speakerEvidence, new Date(), state.deviceId), args: args as Record<string, unknown>, callId });
       outcomes.push(outcome);
       if (outcome.status === "succeeded") toolEvents.push({ t: "tool_result", call_id: callId, package_id: tool, outcome: { text: outcome.result?.reply?.text } });
       else toolEvents.push({ t: "tool_error", call_id: callId, package_id: tool, error: lookupFailureKind(outcome) });

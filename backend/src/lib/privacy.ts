@@ -36,6 +36,7 @@ import { getHouseholdSettingValue } from "@/lib/settings";
 import { INTERNET_PROBE_ENABLED_KEY, INTERNET_PROBE_DNS_NAME_KEY, INTERNET_PROBE_TCP_ADDRESS_KEY, INTERNET_PROBE_TCP_PORT_KEY } from "@/settings/coreKeys";
 import { isRemoteStackSelected, isStackConfigured } from "@/lib/stackEngine";
 import { hasBotReleaseAssets } from "@/lib/botRelease";
+import { listInstances } from "@/lib/connectors/instances";
 
 function ddgsPicked(): boolean {
   return webSourcesPicked().includes("ddgs");
@@ -296,6 +297,21 @@ export function platformConnections(): PrivacyConnection[] {
       who: "your household's own Home Assistant instance",
       optIn: true,
       retention: "Home keeps only the current alarm state and its local history. Home Assistant keeps whatever its own history records for the commands it receives. Home's own log of a command holds the kind of device and the result, never a device name or who asked.",
+      direction: "outbound",
+    });
+  }
+  // AGENT-SVC-01: one row while the household has an enabled Uptime Kuma instance; the read-only uptime tool is the only caller.
+  if (listInstances("uptime_kuma").length > 0) {
+    rows.push({
+      id: "platform:uptime-kuma",
+      source: "MaiPai Home",
+      sourceKind: "platform",
+      destination: "your own Uptime Kuma on your LAN",
+      when: "when an adult asks whether your services are up",
+      what: "Home reads the public status page of each Uptime Kuma you added: the monitor names, whether each is up and its uptime over the last day. Nothing leaves your home network and Home never phones home about it. Uptime Kuma is told nothing about who asked.",
+      who: "your household's own Uptime Kuma instances",
+      optIn: true,
+      retention: "Home keeps nothing from the page after the answer. Home's own log of a check holds the kind of check and the result, never a service name or which Uptime Kuma.",
       direction: "outbound",
     });
   }

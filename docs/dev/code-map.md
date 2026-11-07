@@ -1067,6 +1067,9 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/uiFixtures.ts` | fixtureListing, DEFAULT_PACE, remaining, UI_FIXTURES, findFixture |
 | `backend/src/lib/unknownNames.ts` | pronounFamiliesIn, relationFramesIn, properNounsIn, resolveNames, framedName, looksLikeWhoAnswer |
 | `backend/src/lib/updates.ts` | isNewerVersion, checkForAppUpdate, checkForBotUpdate, checkForUpdates, cachedUpdateProjection, cachedRobotUpdates |
+| `backend/src/lib/uptime/ids.ts` | UPTIME_TOOL_ID |
+| `backend/src/lib/uptime/kuma.ts` | KUMA_SLUG, fetchKumaStatus |
+| `backend/src/lib/uptime/tool.ts` | UPTIME_ACTIONS, safeUptimeAction, visibleUptimeInstances, uptimeAllowed, uptimeToolSpec, runUptimeTool |
 | `backend/src/lib/utteranceShape.ts` | COURTESY_PREFIX, QUESTION_OPENER, commandOpenersFrom, readClauses, utteranceShape, shapeFromReading |
 | `backend/src/lib/validation.ts` | validateDisplayName, validateSecret |
 | `backend/src/lib/videos/adapters.ts` | __resetVideoAdapterCacheForTests, dropVideoAdapterCache, adapterOfLora, allVideoAdapters, loraSurfaceOf, videoAdaptersFor |

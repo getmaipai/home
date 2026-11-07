@@ -2588,6 +2588,8 @@ export const integrations = sqliteTable("integrations", {
   label: text("label").notNull(),
   address: text("address").notNull(),
   credentialRef: text("credential_ref").notNull(),
+  /** Per-type options as a JSON object of strings (Uptime Kuma: `status_page`). */
+  options: text("options").notNull().default("{}"),
   enabled: integer("enabled", { mode: "boolean" }).notNull().default(true),
   deletedAt: text("deleted_at"),
   provenance: text("provenance").notNull(),

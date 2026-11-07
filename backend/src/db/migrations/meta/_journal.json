@@ -1212,6 +1212,13 @@
       "when": 1794540000001,
       "tag": "0173_integrations",
       "breakpoints": true
+    },
+    {
+      "idx": 173,
+      "version": "6",
+      "when": 1794540000002,
+      "tag": "0174_integration_options",
+      "breakpoints": true
     }
   ]
 }

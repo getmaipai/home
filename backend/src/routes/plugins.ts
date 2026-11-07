@@ -26,6 +26,7 @@ import { newsRoutes } from "./newsRoutes";
 import { houseAnyConnected } from "@/lib/house/connection";
 import { peekHouseRegistries, warmHouseRegistries } from "@/lib/house/cache";
 import { visibleHouseEntities, houseToolSpec } from "@/lib/house/tool";
+import { uptimeAllowed } from "@/lib/uptime/tool";
 import { effectivePermissions } from "@/lib/permissions";
 import { getHouseholdSettingValue } from "@/lib/settings";
 
@@ -107,6 +108,7 @@ export async function writtenChatToolIds(actor: PersonRow): Promise<Set<string>>
     houseOk = visible.length > 0;
     if (houseOk) houseContext = { visible, areas: registry.areas };
   } else if (houseEligible) warmHouseRegistries();
+  const uptimeOk = uptimeAllowed({ actor, band, surfaceClass: "written", spoken: false, bare: false });
   const budget = withTurnToolGates(
     await resolveTurnBudgetWithStack(undefined, band),
     answerImagesAllowed({ actor, band, surfaceClass: "written", spoken: false, temporary: false, bare: false, ephemeral: false }),
@@ -114,8 +116,9 @@ export async function writtenChatToolIds(actor: PersonRow): Promise<Set<string>>
     // WRITING-FORMATS-03: the same gate a real written turn applies, so the list matches what the chat sends.
     writingFormatsFor(actor.role).length > 0,
     false, voiceoverOk, false, houseOk,
+    uptimeOk,
   );
-  return new Set(budget.tools_offered.filter((id) => id === "house" ? Boolean(houseOk && houseContext && houseToolSpec(houseContext)) : (id === VOICEOVER_TOOL_ID || id === CHANGE_VOICE_TOOL_ID ? voiceoverOk : toolSpecFor(id) !== null)));
+  return new Set(budget.tools_offered.filter((id) => id === "house" ? Boolean(houseOk && houseContext && houseToolSpec(houseContext)) : id === "uptime" ? uptimeOk : (id === VOICEOVER_TOOL_ID || id === CHANGE_VOICE_TOOL_ID ? voiceoverOk : toolSpecFor(id) !== null)));
 }
 
 pluginsRoutes.openapi(skillsRoute, async (c) => {

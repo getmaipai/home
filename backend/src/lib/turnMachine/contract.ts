@@ -262,6 +262,8 @@ export interface TurnState {
   /** V1/V2 voice tools are offered only for written adult turns while the Stack voice role is ready. */
   voiceoverAllowed?: boolean;
   houseAllowed?: boolean;
+  /** AGENT-SVC-01: an adult speaker and at least one enabled Uptime Kuma instance. */
+  uptimeAllowed?: boolean;
   houseContext?: { visible: import("@/lib/house/registry").HouseEntity[]; areas: import("@/lib/house/registry").HouseArea[] };
   /** MUSIC-LIKE-01: the message holds a maipai://music/track reference on a turn that may make music; `make_band` is offered only then. */
   musicBandAllowed?: boolean;

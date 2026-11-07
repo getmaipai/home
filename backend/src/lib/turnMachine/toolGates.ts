@@ -26,6 +26,7 @@ import { effectivePermissions } from "@/lib/permissions";
 import type { HouseArea, HouseEntity } from "@/lib/house/registry";
 import { getHouseholdSettingValue } from "@/lib/settings";
 import type { HouseBand } from "@/lib/house/access";
+import { uptimeAllowed } from "@/lib/uptime/tool";
 
 export interface TurnToolGateInput {
   conversationId?: string;
@@ -86,6 +87,7 @@ export interface TurnToolGateResult {
   writingFormatOk: boolean;
   voiceoverOk: boolean;
   houseOk: boolean;
+  uptimeOk: boolean;
   houseContext?: { visible: HouseEntity[]; areas: HouseArea[] };
 }
 
@@ -168,11 +170,13 @@ export async function budgetWithTurnToolGates(input: TurnToolGateInput): Promise
       if (houseOk) houseContext = { visible, areas: registry.areas };
     } else { warmHouseRegistries(); houseOk = false; }
   } else houseOk = false;
+  const uptimeOk = safeGate(() => uptimeAllowed({ actor: input.actor, band: input.band, surface: input.surface, surfaceClass: input.surfaceClass, spoken: input.spoken, bare: input.bare }));
   return {
-    budget: withTurnToolGates(input.budget, answerImagesOk, picturesOk, videosOk, musicOk, musicEditOk, itemRefOk, musicBandOk, videoEditOk, musicObject, writingFormatOk, editPictureOk, voiceoverOk, filmOk, houseOk),
+    budget: withTurnToolGates(input.budget, answerImagesOk, picturesOk, videosOk, musicOk, musicEditOk, itemRefOk, musicBandOk, videoEditOk, musicObject, writingFormatOk, editPictureOk, voiceoverOk, filmOk, houseOk, uptimeOk),
     writingFormatOk,
     voiceoverOk,
     houseOk,
+    uptimeOk,
     ...(houseContext ? { houseContext } : {}),
     answerImagesOk,
     picturesOk,

@@ -1,0 +1,17 @@
+{
+  "id": "uptime",
+  "version": "0.1.0",
+  "kind": "plugin",
+  "category": "Home",
+  "display": "Uptime",
+  "description": "Check which of the household's services are up or down, from your own Uptime Kuma.",
+  "offer": { "mode": "conditional", "gate": "uptimeAllowed", "bench_row": "uptime-tool", "priority": 4 },
+  "author": "MaiPai",
+  "license": "AGPL-3.0",
+  "homepage": "https://github.com/getmaipai/home",
+  "routing": { "examples": ["Is everything up?", "Is anything down right now?", "How is the media server doing?", "List the services and their uptime", "Is the backup service running?"], "patterns": [] },
+  "args": { "type": "object", "required": ["action"], "properties": { "action": { "type": "string", "enum": ["status", "list"] }, "name": { "type": "string", "maxLength": 64 }, "instance": { "type": "string", "maxLength": 31 } }, "additionalProperties": false },
+  "incognito": "unaffected",
+  "requires": [], "optional": [], "platforms": ["home"], "min_role": "adult", "consequential": false, "offline": "unavailable", "returns_blocks": [], "config": [], "data_sources": [], "permissions": [], "notifications": [], "backup": "exclude", "background": false, "contributes": {}, "min_app": "0.1.0", "tier": 0, "quality_scale": "bronze",
+  "smoke": { "kind": "recipe_fixture", "fixture": "tests/smoke.json" }
+}

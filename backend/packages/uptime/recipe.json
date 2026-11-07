@@ -1,0 +1,16 @@
+{
+  "id": "uptime",
+  "inputs": [
+    {
+      "name": "action",
+      "selector": "text"
+    }
+  ],
+  "steps": [
+    {
+      "op": "format",
+      "as": "reply",
+      "text": "Service status is available through the native tool."
+    }
+  ]
+}
