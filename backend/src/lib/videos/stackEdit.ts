@@ -27,7 +27,7 @@ export type EditOp =
   | { op: "credits"; lines: Array<{ role?: string; name: string }>; duration_s?: number; speed?: number; background: "black" | "white" | string; text_color: "black" | "white" | string; title?: string }
   | { op: "reframe"; aspect: "9:16" | "1:1" | "16:9" | "4:5"; fill: "crop" | "blur" }
   | { op: "grade"; brightness?: number; contrast?: number; saturation?: number; warmth?: number; grain?: number; vignette?: number }
-  | { op: "film_look"; preset: "70s_color" | "noir" | "teal_orange" | "bleach_bypass" | "technicolor" | "faded_vintage" | "cool_thriller"; strength?: number }
+  | { op: "film_look"; preset: "70s_color" | "noir" | "teal_orange" | "bleach_bypass" | "technicolor" | "faded_vintage" | "cool_thriller" | "night"; strength?: number }
   | { op: "letterbox"; ratio: "2.39:1" | "2:1" | "1.85:1" | "1.33:1" }
   | { op: "speed"; factor: number }
   | { op: "speed_ramp"; from_factor: number; to_factor: number; at_s: number; over_s: number }
@@ -38,7 +38,10 @@ export type EditOp =
   | { op: "fps_boost"; fps: 30 | 48 | 60 }
   | { op: "flip"; direction: "horizontal" | "vertical" }
   | { op: "rotate"; degrees: 90 | 180 | 270 }
-  | { op: "sharpen" | "denoise"; amount: number }
+  /** `sharpen` amounts above 1 up to 1.5 are Sharpen+. */
+  | { op: "sharpen"; amount: number }
+  | { op: "denoise"; amount: number; deblock?: boolean }
+  | { op: "ripple"; amount: number }
   | { op: "pip"; input: number; corner: "top_left" | "top_right" | "bottom_left" | "bottom_right"; size: number; margin: number }
   | { op: "upscale"; factor: 2 }
   | { op: "cutout"; background: "black" | "white" | "green" | "blur" | "transparent" | `#${string}`; feather_px?: number; subject?: { frame?: number; box?: [number, number, number, number]; point?: { x: number; y: number } } }

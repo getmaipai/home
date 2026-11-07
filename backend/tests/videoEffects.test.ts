@@ -53,12 +53,21 @@ describe("video finishing effects", () => {
     ["flip", { direction: "horizontal" }, [{ op: "flip", direction: "horizontal" }]], ["rotate", { degrees: 90 }, [{ op: "rotate", degrees: 90 }]],
     ["sharpen", { amount: 0.5 }, [{ op: "sharpen", amount: 0.5 }]], ["denoise", { amount: 0.5 }, [{ op: "denoise", amount: 0.5 }]],
     ["kenburns", { from_factor: 1, to_factor: 1.5 }, [{ op: "kenburns", zoom_from: 1, zoom_to: 1.5, pan: "none" }]],
+    ["sharpen", { amount: 1.5 }, [{ op: "sharpen", amount: 1.5 }]], ["denoise", { amount: 0.5, deblock: true }, [{ op: "denoise", amount: 0.5, deblock: true }]],
+    ["ripple", { amount: 0.6 }, [{ op: "ripple", amount: 0.6 }]],
   ] as const)("sends %s and keeps the original", async (effect, args, ops) => {
     const actor = person(); const { job, state } = await makeClip(actor);
     const outcome = await runEditVideo({ state, args: { clip: "latest", change: "effect", effect, ...args }, callId: "effect", spoken: false });
     const id = (outcome.result?.data as { videoJobId?: string } | undefined)?.videoJobId; expect(id).toBeTruthy();
     await until(() => ["done", "failed", "cancelled"].includes(getVideoJobFor(actor, id!)?.state ?? ""));
     const edited = getVideoJobFor(actor, id!)!; expect(edited.state, `${edited.error}; stack jobs ${stack.jobs.length}`).toBe("done"); expect(edited.error).toBeNull(); expect(edited.request.edit?.from).toBe(job.id); expect(getVideoJobFor(actor, job.id)?.state).toBe("done"); expect(stack.jobs.at(-1)?.input.ops).toEqual([...ops]);
+  }, 20000);
+
+  test("sends the Night film look to the Stack", async () => {
+    const actor = person(); const { state } = await makeClip(actor);
+    const outcome = await runEditVideo({ state, args: { clip: "latest", change: "film_look", preset: "night", strength: 0.8 }, callId: "night", spoken: false });
+    const id = (outcome.result?.data as { videoJobId?: string } | undefined)?.videoJobId; expect(id).toBeTruthy();
+    await until(() => getVideoJobFor(actor, id!)?.state === "done"); expect(stack.jobs.at(-1)?.input.ops).toEqual([{ op: "film_look", preset: "night", strength: 0.8 }]);
   }, 20000);
 
   test("pip uses the second clip as input 1", async () => {
@@ -71,7 +80,7 @@ describe("video finishing effects", () => {
 
   test("refuses missing or invalid effect args before a Stack job", async () => {
     const actor = person(); const { state } = await makeClip(actor);
-    for (const args of [{ effect: "pip", corner: "top_left", size: 0.2 }, { effect: "loop", times: 7 }, { effect: "freeze", at_s: 1, hold_s: 8 }, { effect: "speed_ramp", from_factor: 0.1, to_factor: 2, at_s: 1, over_s: 2 }]) {
+    for (const args of [{ effect: "pip", corner: "top_left", size: 0.2 }, { effect: "loop", times: 7 }, { effect: "sharpen", amount: 1.6 }, { effect: "denoise", amount: 1.2 }, { effect: "ripple", amount: 1.2 }, { effect: "ripple" }, { effect: "freeze", at_s: 1, hold_s: 8 }, { effect: "speed_ramp", from_factor: 0.1, to_factor: 2, at_s: 1, over_s: 2 }]) {
       const result = await runEditVideo({ state, args: { clip: "latest", change: "effect", ...args }, callId: "bad", spoken: false }); expect(result.result?.data).toHaveProperty("refused");
     }
     expect(stack.jobs).toHaveLength(0);
