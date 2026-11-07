@@ -43,7 +43,7 @@ export const CORE_SETTINGS_KEYS: SettingsKey[] = [
     key: "household.locale",
     scope: "household",
     selector: "select",
-    range: { options: ["en-US", "en-GB"] },
+    range: { options: ["en-US", "en-GB", "es"] },
     default: "en-US",
     label: "Language and region",
     help: "Sets the household's date, time, and unit formatting.",
