@@ -132,6 +132,8 @@ export function stackEpoch(): number { return stackClientEpoch; }
 export function __bumpStackEpochForTests(): void { stackClientEpoch++; }
 
 export function __setStackClientForTests(client: StackClient | null): void {
+  // AUDIT-PERF-01: role reads are shared for 2 s keyed by this epoch; a swapped fixture client is a new Stack.
+  stackClientEpoch++;
   stackClientEpoch++;
   testClient = client;
   defaultTestClientEnabled = false;
