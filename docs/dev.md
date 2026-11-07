@@ -30150,6 +30150,8 @@ fixes verified with `tsc --noEmit` and the targeted suites
 (`projects/`, `turnMachine/`, the four bench-adjacent test files), 234
 tests, 0 failures, before the full gate.
 
+**PROJECT-TOOL-REFUSAL-01 (2026-11-07, RULES rule 6):** `start_project` is offered only while `listProjectTypes()` is non-empty (`budget.ts`, a structural check; a tool whose `type` enum is empty can only fail). A call naming a type nothing registered (the model's `story` on a hub with no writing type) is dropped like an unknown tool: the machine's `projectTypeCallDropped` guard runs one more model round without tools so the model writes the answer itself, and `unknown_project_type` is in the draft-rescue list, so text beside the call survives. The person never sees the "I won't guess" refusal line for it; the refusal stays in the policy trace.
+
 ## PEOPLE-PROFILE-01 landed: the profile page's header card and Edit dialog, photo upload deliberately deferred (2026-09-26)
 
 `docs/plans/people-profile-2026-09-26.md` named `PEOPLE-PROFILE-01` as

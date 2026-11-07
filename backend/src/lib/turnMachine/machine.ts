@@ -104,6 +104,8 @@ interface MachineContext {
   // GROUND-02: set once when a refused decorative call was dropped and the model is asked again
   // without tools; a second refusal takes the ordinary path, so this can never loop.
   decorativeDropped?: boolean;
+  /** PROJECT-TOOL-REFUSAL-01: set once when a start_project call naming an unregistered type was dropped and the model asked again without tools. */
+  projectTypeDropped?: boolean;
   /** A research turn's refused later-round call was dropped once and the answer written from the notes already gathered. */
   researchCallDropped?: boolean;
   // CF-SEARCH-02: set once when the model's search query was refused as ungrounded and the person's own
@@ -247,6 +249,15 @@ export const turnMachine = setup({
       if (context.modelDraft && context.modelDraft.trim().length > 0) return false;
       const entries = (event as unknown as { output: PolicyOutput }).output.entries;
       return entries.length > 0 && entries.every((e) => !e.decision.allow && (e.decision.reason === "ungrounded_args" || e.decision.reason === "unknown_tool"));
+    },
+    // PROJECT-TOOL-REFUSAL-01 (rule 6, a failed tool never fails the answer): a start_project call naming a type nothing registered
+    // (a "story" on a hub with no writing type) can only fail, so it is dropped like an unknown tool and the model writes the answer itself.
+    projectTypeCallDropped: ({ context, event }) => {
+      const { toRun, parkedAsk } = proposalsFrom((event as unknown as { output: PolicyOutput }).output);
+      if (toRun.length > 0 || parkedAsk !== null || context.projectTypeDropped || retryRound(context)) return false;
+      if (context.modelDraft && context.modelDraft.trim().length > 0) return false;
+      const entries = (event as unknown as { output: PolicyOutput }).output.entries;
+      return entries.some((e) => !e.decision.allow && e.decision.reason === "unknown_project_type") && entries.every((e) => !e.decision.allow && (e.decision.reason === "unknown_project_type" || e.decision.reason === "ungrounded_args" || e.decision.reason === "unknown_tool"));
     },
     moreRoundsAvailable: ({ context }) => context.turnState.budget.model_transitions && context.roundsUsed < context.turnState.budget.rounds,
     // THIN-1B (rule 6) removed SEARCH-EMPTY-01's `toolAllFailed` guard
@@ -499,6 +510,7 @@ export const turnMachine = setup({
           // (roundsUsed 1 is what makes the next model call the phrasing one).
           { guard: "retryRefused", actions: assign({ roundsUsed: ({ context }) => context.roundsUsed + 1 }), target: "model" },
           { guard: "decorativeCallDropped", actions: assign(({ context }) => ({ decorativeDropped: true, roundsUsed: Math.max(context.roundsUsed + 1, context.turnState.budget.rounds), modelDraft: undefined })), target: "model" },
+          { guard: "projectTypeCallDropped", actions: assign(({ context }) => ({ projectTypeDropped: true, roundsUsed: Math.max(context.roundsUsed + 1, context.turnState.budget.rounds), modelDraft: undefined })), target: "model" },
           { guard: "researchCallDropped", actions: assign(({ context }) => ({ researchCallDropped: true, roundsUsed: Math.max(context.roundsUsed + 1, context.turnState.budget.rounds), modelDraft: undefined })), target: "model" },
           { guard: "policyAllRefused", actions: assign(({ event }) => ({ step: event.output })), target: "answer" },
           { actions: assign(({ event }) => ({ step: event.output })), target: "tool" },
@@ -624,7 +636,7 @@ function answerInputFrom(context: MachineContext): AnswerInput {
     // dropped; the refusal line is for a generation that produced none. Every other reason
     // (age, surface, crisis, temporary, household, consent) keeps its line, and the text
     // still passes output_gate like any reply.
-    const onlyCallFaults = p.entries.length > 0 && p.entries.every((e) => e.decision.allow || e.decision.reason === "ungrounded_args" || e.decision.reason === "unknown_tool" || e.decision.reason === "format_not_here");
+    const onlyCallFaults = p.entries.length > 0 && p.entries.every((e) => e.decision.allow || e.decision.reason === "ungrounded_args" || e.decision.reason === "unknown_tool" || e.decision.reason === "unknown_project_type" || e.decision.reason === "format_not_here");
     if (onlyCallFaults && context.modelDraft && context.modelDraft.trim().length > 0) {
       return { kind: "model_text", text: context.modelDraft };
     }

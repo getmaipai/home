@@ -1,7 +1,9 @@
-import { beforeEach, describe, expect, test } from "bun:test";
+import { afterAll, beforeEach, describe, expect, test } from "bun:test";
 import { readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import { resetDb } from "./reset-db";
+import { registerFixtureProjectType } from "./projectTypeFixture";
+import { __resetProjectTypesForTests } from "@/lib/projects/projectTypes";
 import { db } from "@/db";
 import { people } from "@/db/schema";
 import { answerImagesAllowed } from "@/lib/answerImages/turn";
@@ -15,7 +17,8 @@ import { resolveTurnBudget, toolOfferLabel, withTurnToolGates } from "@/lib/turn
 
 const BASE_TOOL_IDS = ["almanac-date", "almanac-time", "convert", "math", "remember", "remind", START_PROJECT_TOOL_ID, "timer", "weather", "websearch"];
 
-beforeEach(() => resetDb());
+beforeEach(() => { resetDb(); registerFixtureProjectType(); });
+afterAll(() => __resetProjectTypesForTests());
 
 describe("TOOL-OFFER-01 manifest-derived tool offers", () => {
   test("every bundled package with args and every virtual tool resolves to a declared or not-measured decision", () => {

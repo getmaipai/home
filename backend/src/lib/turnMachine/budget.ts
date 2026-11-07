@@ -8,7 +8,8 @@ import { getHouseholdSettingValue } from "@/lib/settings";
 import { CATALOG, catalogEntries, chatCatalogEntry, thinkingModeFor } from "@/lib/modelCatalog";
 import { listInstalledManifests } from "@/lib/plugins";
 import { allPackageStatuses } from "@/lib/smoke";
-import { VIRTUAL_TOOL_REGISTRY } from "@/lib/projects/tool";
+import { START_PROJECT_TOOL_ID, VIRTUAL_TOOL_REGISTRY } from "@/lib/projects/tool";
+import { listProjectTypes } from "@/lib/projects/projectTypes";
 import { chatWindowContext, MINIMUM_CHAT_WINDOW_TOKENS } from "@/lib/roleHealth";
 import type { AgeBand } from "@/lib/ageBand";
 import type { TurnBudget } from "./contract";
@@ -219,6 +220,8 @@ export function withTurnToolGates(budget: TurnBudget, answerImagesOk: boolean, p
     candidates.set(manifest.id, { id: manifest.id, priority: offer?.priority ?? 1000 });
   }
   for (const tool of VIRTUAL_TOOL_REGISTRY) {
+    // PROJECT-TOOL-REFUSAL-01: start_project's `type` enum is the registered project types; with none registered every call can only fail, so the tool is not offered (rule 6).
+    if (tool.id === START_PROJECT_TOOL_ID && listProjectTypes().length === 0 && !offerOverridesForTests.has(tool.id)) continue;
     if (offerOverridesForTests.has(tool.id) || offerPassesGate(tool.offer, answerImagesOk, picturesOk, videosOk, musicOk, musicEditOk, itemRefOk, musicBandOk, videoEditOk, musicObject, writingFormatOk, editPictureOk, voiceoverOk, filmOk, houseOk, uptimeOk)) candidates.set(tool.id, { id: tool.id, priority: tool.offer.priority ?? 1000 });
   }
 

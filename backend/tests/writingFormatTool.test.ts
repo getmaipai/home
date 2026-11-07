@@ -1,6 +1,8 @@
 // WRITING-FORMATS-03: the chat's writing_format tool: the offer gate, the cap, the description size, the min_role refusal and the result.
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { resetDb } from "./reset-db";
+import { registerFixtureProjectType } from "./projectTypeFixture";
+import { __resetProjectTypesForTests } from "@/lib/projects/projectTypes";
 import { createBenchPeople } from "../scripts/bench/conversationRunner";
 import { VIRTUAL_TOOL_REGISTRY } from "@/lib/projects/tool";
 import { WRITING_FORMAT_TOOL_ID, __setWritingFormatsForTests, installedWritingFormats, runWritingFormatTool, writingFormatToolSpec } from "@/lib/writingFormats";
@@ -14,8 +16,8 @@ import type { TurnState } from "@/lib/turnMachine/contract";
 
 const MODEL = "qwen3-8b-instruct-q4-k-m";
 let people: ReturnType<typeof createBenchPeople>;
-beforeEach(() => { resetDb(); people = createBenchPeople(); });
-afterEach(() => __setWritingFormatsForTests(null));
+beforeEach(() => { resetDb(); registerFixtureProjectType(); people = createBenchPeople(); });
+afterEach(() => { __setWritingFormatsForTests(null); __resetProjectTypesForTests(); });
 
 const gateInput = (actor: typeof people.owner, band: "adult" | "child", over: Partial<{ bare: boolean; surfaceClass: "written" | "spoken" }> = {}) => ({
   budget: withTurnToolGates(resolveTurnBudget(MODEL, band), false),

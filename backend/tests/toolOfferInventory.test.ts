@@ -1,11 +1,17 @@
 // TOOL-OFFER-01 layer 1, now backed by layer 2's manifest-derived offer.
 // Every bundled tool is either in the real derived set or has a visible
 // reason why it is not offered; no separate hand-maintained inventory exists.
-import { describe, expect, test } from "bun:test";
+import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { CATALOG } from "@/lib/modelCatalog";
 import { resolveTurnBudget, toolOfferLabel } from "@/lib/turnMachine/budget";
+
+import { registerFixtureProjectType } from "./projectTypeFixture";
+import { __resetProjectTypesForTests } from "@/lib/projects/projectTypes";
+
+beforeAll(() => registerFixtureProjectType());
+afterAll(() => __resetProjectTypesForTests());
 
 const PACKAGES_DIR = join(import.meta.dir, "..", "packages");
 const VIRTUAL_TOOLS = ["start_project", "voiceover", "change_voice"];
