@@ -54,8 +54,9 @@ describe("companion art model resolution", () => {
     expect(resolveCompanionClipFromStatus(readyVideoStatusForTests())).toEqual({ model: "wan2.2-ti2v-5b-fastwan-mlx", quality: "quick" });
     setHouseholdSettingValue("generation.video_tier", "boost");
     expect(resolveCompanionClipFromStatus(readyVideoStatusForTests({ ltx25: "ready", ltx25Picture: true }), "detailed")).toEqual({ model: "ltx25-q8", quality: "detailed" });
-    // Teens and children are never sent to Detailed, even when the household default is Detailed.
-    expect(resolveCompanionClipFromStatus(readyVideoStatusForTests({ ltx25: "ready", ltx25Picture: true }))).toEqual({ model: "fastwan2-2-ti2v-5b-mlx-bf16", quality: "quick" });
+    // Teens and children are never sent to Detailed, even when the household default is Detailed. Since c4491124f (2026-11-06, the
+    // LTX-2.3 Detailed maker retired, Wan rejected) the quick clip on a Boost household is LTX-2.5 at quick quality.
+    expect(resolveCompanionClipFromStatus(readyVideoStatusForTests({ ltx25: "ready", ltx25Picture: true }))).toEqual({ model: "ltx25-q8", quality: "quick" });
     expect(resolveCompanionClipFromStatus(readyVideoStatusForTests({ ltx25: "ready" }), "detailed")).toEqual({ model: "fastwan2-2-ti2v-5b-mlx-bf16", quality: "quick" });
     expect(resolveCompanionEdit().model).toBe("flux2-klein-4b");
   });
@@ -79,7 +80,7 @@ describe("companion art model resolution", () => {
     const takes = readFileSync(new URL("./companionTakes.ts", import.meta.url), "utf8");
     expect(lookJobs).not.toContain("QUICK_MODEL");
     expect(takes).toMatch(/submitVideo\(\{[\s\S]{0,400}?model:\s*stackVideoModel\(art\)/);
-    expect(COMPANION_MODEL_MISMATCH_LINE).toBe("The engine used a different model than the one chosen. Try again.");
+    expect(COMPANION_MODEL_MISMATCH_LINE).toBe("The picture came out different from the one chosen. Try again.");
   });
 
   test("sends explicit models through generation, edit and take submissions", async () => {
@@ -123,7 +124,7 @@ describe("companion art model resolution", () => {
   });
 
   test("marks a take failed when the completed clip reports a different model", async () => {
-    expect(COMPANION_MODEL_MISMATCH_LINE).toBe("The engine used a different model than the one chosen. Try again.");
+    expect(COMPANION_MODEL_MISMATCH_LINE).toBe("The picture came out different from the one chosen. Try again.");
     const result = createHouseholdCompanion({ ...fixture.value.companion!, display_name: "Mismatch test" }, { display_name: "Author", person_id: "art-test" });
     if (!result.ok) throw new Error(result.error);
     const id = result.value.id, image = new Uint8Array(await sharp({ create: { width: 8, height: 8, channels: 4, background: "red" } }).png().toBuffer());
