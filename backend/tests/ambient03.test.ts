@@ -205,11 +205,13 @@ describe("AMBIENT-03 side conversations", () => {
     expect(rows.filter((row) => row.placement === "chat" && row.status === "open")).toHaveLength(1);
   });
 
-  test("a placement change must be sent on its own", async () => {
+  test("a placement change can ride with other fields in one PATCH (AUDIT-ROUTES-01: every field sent is applied, in one transaction)", async () => {
     const { client } = await signedInOwner();
     const side = await (await client.post("/api/conversations", { placement: "side" })).json() as { id: string };
     const mixed = await client.request(`/api/conversations/${side.id}`, { method: "PATCH", body: { placement: "chat", title: "Mixed" } });
-    expect(mixed.status).toBe(400);
-    expect(((await mixed.json()) as { error: string }).error).toContain("on its own");
+    expect(mixed.status).toBe(200);
+    const updated = (await mixed.json()) as { placement: string; title: string | null };
+    expect(updated.placement).toBe("chat");
+    expect(updated.title).toBe("Mixed");
   });
 });
