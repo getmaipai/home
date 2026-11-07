@@ -2851,7 +2851,6 @@ msgid "failure.voice.microphone_busy.adultNoRepairs"
 msgstr "Another app is using the microphone. Close it, then tap the waveform again."
 
 #. js-lingui-explicit-id
-#: src/apps/settings/EngineLinkCredentialSection.tsx:230
 #: src/apps/settings/EngineLinkCredentialSection.tsx:234
 msgid "Another computer"
 msgstr "Another computer"
@@ -24219,7 +24218,6 @@ msgid "this computer"
 msgstr "this computer"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/EngineLinkCredentialSection.tsx:230
 #: src/apps/settings/EngineLinkCredentialSection.tsx:233
 #: src/apps/settings/ReferenceLibrarySettings.tsx:194
 msgid "This computer"

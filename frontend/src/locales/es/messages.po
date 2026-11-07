@@ -3335,7 +3335,6 @@ msgid "failure.voice.microphone_busy.adultNoRepairs"
 msgstr "Otra app está usando el micrófono. Ciérrala y toca la forma de onda de nuevo."
 
 #. js-lingui-explicit-id
-#: src/apps/settings/EngineLinkCredentialSection.tsx:230
 #: src/apps/settings/EngineLinkCredentialSection.tsx:234
 #, needs-review
 msgid "Another computer"
@@ -28273,7 +28272,6 @@ msgid "this computer"
 msgstr "este equipo"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/EngineLinkCredentialSection.tsx:230
 #: src/apps/settings/EngineLinkCredentialSection.tsx:233
 #: src/apps/settings/ReferenceLibrarySettings.tsx:194
 #, needs-review
