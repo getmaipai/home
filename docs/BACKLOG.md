@@ -2449,7 +2449,7 @@ clear it in full:
       anything beyond English to route at all - not a small addition
       once the `embed` role and Tier 2 both eventually depend on
       matching against those same examples.
-- [ ] **Full i18n string extraction across the shell, kit, and apps**
+- [ ] **Full i18n string extraction across the shell, kit, and apps** (superseded 2026-11-07 by I18N-02, see the Language stack section)
       (M-L) - the sweep the item above deliberately deferred. Every
       hardcoded user-facing string in `frontend/src` (a first grep
       pass for this decision found strings scattered across
@@ -2748,9 +2748,26 @@ From `docs/plans/docs-vs-reality-2026-10-14.md`. The guides now say only what wo
 - [ ] **DOCS-GAP-05: Packages page promised a "Your apps" section on Home; no such section exists** (M). Build it or leave the docs as corrected.
     Design: [home-page-2026-10-17](design/home-page-2026-10-17.md)
 
+## Language stack (design [i18n-2026-11-07.md](design/i18n-2026-11-07.md), I18N-02, architect APPROVED 2026-11-07; owner decisions 2026-11-06)
+
+Keep Lingui and finish it: en-US, en-GB and Spanish first, each person picks a language in Profile with `household.locale` as the default, catalogs translated by the hub's own model through a repo script and reviewed at home, a lint on new hardcoded strings. Measured 2026-11-07: 1,968 hardcoded strings in Home's frontend, 1,024 in the kit, 577 spec setting copy fields. Slices run in the note's order; acceptance per slice is in its section 13. Reuse check: Lingui 6.6.0 (in use), `eslint-plugin-lingui` `no-unlocalized-strings` and ESLint bulk suppressions (adopted for the lint unless F0 states why not), `Intl.*`, the `colorLints` scanner and baseline pattern, `describeSetting`, `failureCopy.ts`, KID-MODE-04's fallback and coverage lint; nothing hand-rolled.
+
+- [ ] **I18N-F0: foundation** (M). `supportedLocales.ts`, the `person.locale` key with the household default, `resolveLocale`, public `GET /api/locale`, lazy catalog loader with fallback chains, `usePersonLocale`, extract and check scripts, the codemod, `lint:i18n` with a shrink-only baseline, the glossary, the translation script (needs-review flags, never on child, teen or safety lines), `en-GB` and `es` catalogs created, the org docs paragraphs. No language line in any prompt.
+- [ ] **I18N-F1: shell and sign-in** (M; after F0). The shell, rail, menus, strips, bell, sign-in, and the Profile "Language" card; the rail test of RULES S3 passes in `es` at every width.
+- [ ] **I18N-K2: kit setting copy translator** (S, commons; with F1). `describeSetting` takes a translator argument.
+- [ ] **I18N-F2: chat** (M; after F1). `apps/chat` and the `failureCopy` descriptors as message ids; minor lines stay only in `failureCopy.ts`.
+- [ ] **I18N-F3: settings** (L, two runs; after K2's pin). All of Settings in `es`, generated setting copy, option labels through `Intl.DisplayNames`.
+- [ ] **I18N-F4: shell pages** (L, two runs; after F3). Admin and system pages first, person pages second.
+- [ ] **I18N-F5: apps** (M; after F4). Setup, clock, people, reminders, memory, notifications, home, library, privacy.
+- [ ] **I18N-F6: formats** (S-M; after F5). `useFormat` over the 84 `Intl` and `toLocale` calls, plurals, units.
+- [ ] **I18N-B1: notifications and channels** (M; after F2 and a locale-aware spoken-text path). `{ typeId, values }` rows, Telegram, Bark and robot lines from the same catalogs; never machine-translated unreviewed.
+- [ ] **I18N-B2: API errors** (S-M; after F2). Every printed `error` gets a code and a client message id, or is listed as developer text.
+- [ ] **I18N-K1: kit extraction** (L, commons, own tag; any time after F0). Kit catalogs, kit lint and baseline, Home pin bump.
+- [ ] **I18N-C1: the model is told an adult's language** (S-M, Chat turn; after F0, own architect verdict). One fixed line per locale in the stable prefix, adults only, `en-US` prompt unchanged byte for byte, CHAT-AB-01 rerun; no line for child, teen, robot or shared-surface turns until Spanish is in the safety classifier (spec first) and measured.
+
 ## Cross-cutting
 
-- [ ] **I18N-01b:** Real i18n (L) - "language and region" is a stored preference today
+- [ ] **I18N-01b:** Real i18n (L; superseded 2026-11-07 by I18N-02, see the Language stack section) - "language and region" is a stored preference today
       with no translation behind it.
 - [ ] **Commit the platform plan into `home/spec/design/`** (S; answered
       by Jesse 2026-09-25: not yet - stays open, deliberately deferred,
