@@ -2,7 +2,8 @@
 // cycle. `ddgsConfigured` now lives in ddgsConfig.ts, which imports nothing; each module below must load first in a
 // fresh process, and ddgsConfig.ts must stay import-free so the cycle cannot come back.
 import { describe, expect, test } from "bun:test";
-import { readFileSync } from "node:fs";
+import { mkdtempSync, readFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 const root = join(import.meta.dir, "..");
@@ -10,7 +11,8 @@ const root = join(import.meta.dir, "..");
 describe("ddgs module load order", () => {
   for (const mod of ["settingsRegistry", "retrieval/ddgsSource", "retrieval/sourceMode", "retrieval/webSources"]) {
     test(`${mod} loads first in a fresh process`, () => {
-      const run = Bun.spawnSync([process.execPath, "-e", `await import("@/lib/${mod}"); console.log("ok")`], { cwd: root, stderr: "pipe", stdout: "pipe" });
+      // GEN-DATADIR-01: a private data directory, so a leftover hub.db with a newer schema in a warm checkout never fails this test.
+      const run = Bun.spawnSync([process.execPath, "-e", `await import("@/lib/${mod}"); console.log("ok")`], { cwd: root, stderr: "pipe", stdout: "pipe", env: { ...process.env, MAIPAI_DATA_DIR: mkdtempSync(join(tmpdir(), "ddgs-order-")) } });
       expect(run.stderr.toString()).toBe("");
       expect(run.stdout.toString().trim()).toBe("ok");
       expect(run.exitCode).toBe(0);

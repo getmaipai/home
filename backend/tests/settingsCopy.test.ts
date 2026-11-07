@@ -105,7 +105,8 @@ describe("settings guard agreement metadata", () => {
           : key.key === "search.page_text_cleaning" ? true : key.default,
         teen: key.key === "search.safe_search" ? resolveSafeSearchLevel("default", "teen")
           : key.key === "search.page_text_cleaning" ? true : key.default,
-        adult: key.key === "search.safe_search" ? resolveSafeSearchLevel("default", "adult") : key.default,
+        // TALENT-00: an adult is never gated by synths.real_people, so the adult band default is "all" while the key default is "ask".
+        adult: key.key === "search.safe_search" ? resolveSafeSearchLevel("default", "adult") : key.key === "synths.real_people" ? "all" : key.default,
       };
       // Ease of use is comfort, not protection: only the preset and reading level differ for a child (EASE-OF-USE-01).
       const coding = CODING_PERSON_BAND_DEFAULTS[key.key];
