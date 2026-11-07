@@ -248,6 +248,7 @@ Measured on the Studio (18 cores, 128 GB, the Stack's model holding about 35 GB)
 - `check.sh --pre` slot control applies only to fresh worktrees. A worktree created before PRE-SLOT-01 keeps its old `check.sh` until it is rebased or recreated.
 - Spotlight indexes `node_modules` in every worktree; `mds_stores` used 50% CPU for 17 h while indexing about 80 worktrees. Excluding the `wt/` folder in System Settings, Spotlight, Search Privacy is a manual step for the owner.
 - The retired `home-main-gate` worktree was removed on 2026-10-31.
+- `scripts/main-gate.sh` and its test, `studio-claude.sh`, `publish-docs.sh`, `leftovers.sh`, `preview-demo.ts` and `screenshotCompanions.ts` were deleted on 2026-11-06 (AUDIT-GATE-01): nothing referenced them. `docs/dev.md` keeps the history of the main-gate loop.
 - The shared main preview on 8787 from the first design was not built.
 - Issue 231: an embedding that finishes after a person is erased still writes onto the erased memory (found while making backend tests runnable without sockets).
 
