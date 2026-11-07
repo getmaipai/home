@@ -959,7 +959,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/settingsLayers.ts` | SELF, userDefaultItems, globalDefaultItems, layeredListKeys, resolveUnion, bandOfPerson |
 | `backend/src/lib/settingsMediaMigration.ts` | OLD_PICTURE_ADULT_KEY, OLD_VIDEO_ADULT_KEY, NEW_ADULT_STYLES_KEY, OLD_PICTURE_QUALITY_KEY, OLD_VIDEO_QUALITY_KEY, NEW_PICTURE_TIER_KEY |
 | `backend/src/lib/settingsMinorSnapshot.ts` | EASE_SETTING_KEYS, ALARM_SETTING_KEYS, CHILD_VISIBLE_SETTING_KEYS, TEEN_VISIBLE_SETTING_KEYS, minorVisibleSettingKeys |
-| `backend/src/lib/settingsRegistry.ts` | PLACE_SETTINGS_KEYS, getRegistry, registerStoredHouseholdReader, getRegistryKey, __reloadRegistryForTests |
+| `backend/src/lib/settingsRegistry.ts` | PLACE_SETTINGS_KEYS, getRegistry, registerStoredHouseholdReader, isRetiredKey, getRegistryKey, __reloadRegistryForTests |
 | `backend/src/lib/setupChecklist.ts` | SETUP_CHECKLIST_ITEMS, checklistFromFacts, getSetupChecklist |
 | `backend/src/lib/setupSearchAddress.ts` | SEARCH_ADDRESS_NOT_LOCAL, SEARCH_ADDRESS_NOT_AN_ADDRESS, parseSearchAddress |
 | `backend/src/lib/setupState.ts` | SETUP_STEP_IDS, PRE_OWNER_STEPS, setupCodingChoice, setSetupCodingChoice, codingClientLater, getMemoryAnswerGb |
