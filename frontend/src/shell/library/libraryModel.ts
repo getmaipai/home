@@ -69,9 +69,16 @@ export function fileKind(kind: LibraryItem["kind"] | string): FileKind {
 }
 const KIND_WORDS: Record<FileKind, string> = { image: "Picture", video: "Video", audio: "Song", document: "Document", other: "File" };
 export const kindWord = (kind: LibraryItem["kind"] | string): string => KIND_WORDS[fileKind(kind)];
+/** Audio the media type names plainly: an MPEG audio file is MP3 and an MP4 container of audio is M4A, whatever the file name says. */
+const AUDIO_LABEL: Record<string, string> = { "audio/mpeg": "MP3", "audio/mp3": "MP3", "audio/mp4": "M4A", "audio/x-m4a": "M4A", "audio/m4a": "M4A", "audio/aac": "AAC", "audio/wav": "WAV", "audio/x-wav": "WAV", "audio/ogg": "OGG", "audio/flac": "FLAC" };
+
 export function extensionOf(item: Pick<LibraryItem, "name" | "media_type">): string | undefined {
+  const mediaType = item.media_type.split(";")[0]!.trim().toLowerCase();
+  // AUDIT-UI-01: a song saved in an MP4 container carries the name ending .mp4 but is audio; "MP4" on its tile read as a video.
+  const audio = AUDIO_LABEL[mediaType];
+  if (audio) return audio;
   const fromName = /\.([A-Za-z0-9]{1,5})$/.exec(item.name)?.[1];
-  if (fromName) return fromName.toUpperCase();
+  if (fromName) return mediaType.startsWith("audio/") && fromName.toLowerCase() === "mp4" ? "M4A" : fromName.toUpperCase();
   const sub = item.media_type.split("/")[1]?.split(/[+;]/)[0];
   return sub && sub.length <= 5 ? sub.toUpperCase() : undefined;
 }

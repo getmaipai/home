@@ -57,6 +57,11 @@ describe("how an item reads", () => {
   test("a type label from the name, else the media type", () => {
     expect(extensionOf({ name: "Trip plan.pdf", media_type: "application/pdf" })).toBe("PDF");
     expect(extensionOf({ name: "Fox", media_type: "image/png" })).toBe("PNG");
+    // AUDIT-UI-01: a song is never labelled MP4.
+    expect(extensionOf({ name: "Night Bus.mp4", media_type: "audio/mp4" })).toBe("M4A");
+    expect(extensionOf({ name: "Static Bloom.mp4", media_type: "audio/x-unknown" })).toBe("M4A");
+    expect(extensionOf({ name: "Song.mp3", media_type: "audio/mpeg" })).toBe("MP3");
+    expect(extensionOf({ name: "Clip.mp4", media_type: "video/mp4" })).toBe("MP4");
   });
   test("a child and a guest ask a grown-up to add files", () => {
     expect(canAddFiles({ role: "child" })).toBe(false);

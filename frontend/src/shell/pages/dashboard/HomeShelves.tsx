@@ -6,9 +6,19 @@ import { AsyncState } from "@maipai/ui/src/primitives/AsyncState";
 import { SafeImage, type ImageFallbackKind } from "@maipai/ui/src/primitives/SafeImage";
 import { Card, CardContent, CardHeader, CardTitle } from "@maipai/ui/src/dashboard/components/ui/card";
 import { Item, ItemContent, ItemDescription, ItemGroup, ItemTitle } from "@maipai/ui/src/dashboard/components/ui/item";
+import { getIcon } from "@maipai/ui/src/icons";
 import { api, type MediaHome, type MediaHomeRow, type PersonRosterEntry, type Roster } from "@/lib/api";
 
 const FALLBACK: Record<MediaHomeRow["app"], ImageFallbackKind> = { videos: "video", shows: "video", music: "music", podcasts: "music", books: "file" };
+const ChatIcon = getIcon("message-circle");
+
+/** AUDIT-UI-01: a tile with no picture shows an icon for what it is: a chat bubble for a conversation (it rides the shelf under the videos app,
+ * which used to give it a film strip), a film for a clip, a note for a song. */
+export function tilePicture(row: MediaHomeRow) {
+  return row.kind === "chat"
+    ? <SafeImage src={row.artwork_url} alt="" fallbackContent={<ChatIcon aria-hidden className="size-1/3" />} />
+    : <SafeImage src={row.artwork_url} alt="" kind={FALLBACK[row.app]} />;
+}
 
 export function ContinueShelf() {
   const query = useQuery({ queryKey: ["home-continue"], queryFn: api.continueRows, retry: false });
@@ -34,7 +44,7 @@ export function FamilyShelf({ viewer, incognito }: { viewer: Roster; incognito: 
 function MediaRows({ heading, rows }: { heading: string; rows: MediaHomeRow[] }) {
   const navigate = useNavigate();
   if (!rows.length) return null;
-  return <MediaShelf heading={heading} items={rows} getKey={(row) => row.id} getLabel={(row) => row.title} renderItem={(row) => <SafeImage src={row.artwork_url} alt="" kind={FALLBACK[row.app]} />} renderCaption={(row) => <span className="flex min-w-0 flex-col"><span className="truncate text-sm font-semibold">{row.title}</span>{row.subtitle ? <span className="truncate text-sm text-muted-foreground">{row.subtitle}</span> : null}</span>} aspect="wide" getProgress={(row) => row.percent === null ? undefined : row.percent / 100} variant="card" onSelect={(row) => navigate(row.href)} />;
+  return <MediaShelf heading={heading} items={rows} getKey={(row) => row.id} getLabel={(row) => row.title} renderItem={tilePicture} renderCaption={(row) => <span className="flex min-w-0 flex-col"><span className="truncate text-sm font-semibold">{row.title}</span>{row.subtitle ? <span className="truncate text-sm text-muted-foreground">{row.subtitle}</span> : null}</span>} aspect="wide" getProgress={(row) => row.percent === null ? undefined : row.percent / 100} variant="card" onSelect={(row) => navigate(row.href)} />;
 }
 
 export function HomeMedia({ kind }: { kind: "continue" | "new" | "made_at_home" }) {
