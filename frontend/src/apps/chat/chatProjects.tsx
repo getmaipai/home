@@ -1,3 +1,4 @@
+import { i18n } from "@lingui/core";
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import type { AssistantRuntime } from "@assistant-ui/react";
@@ -74,7 +75,7 @@ export function useChatProjects({ person, temporary, onNewChatStarted, runtime }
               await refresh();
               setEditingId(created.id);
             } catch {
-              toast.error("Could not make that project. Try again.");
+              toast.error(i18n._({ id: "Could not make that project. Try again.", message: "Could not make that project. Try again." }));
             }
           }
         : undefined,
@@ -88,7 +89,7 @@ export function useChatProjects({ person, temporary, onNewChatStarted, runtime }
               // each chat's own metadata says so.
               await threads.reload();
             } catch {
-              toast.error("Could not delete that project. Try again.");
+              toast.error(i18n._({ id: "Could not delete that project. Try again.", message: "Could not delete that project. Try again." }));
             }
           }
         : undefined,
@@ -99,7 +100,7 @@ export function useChatProjects({ person, temporary, onNewChatStarted, runtime }
               await api.updateChatFolder(id, { pinned });
               await refresh();
             } catch {
-              toast.error("Could not update that project. Try again.");
+              toast.error(i18n._({ id: "Could not update that project. Try again.", message: "Could not update that project. Try again." }));
             }
           }
         : undefined,
@@ -135,7 +136,7 @@ export function useChatProjects({ person, temporary, onNewChatStarted, runtime }
           await api.updateChatFolder(editing.id, patch);
           await refresh();
         } catch (error) {
-          toast.error("Could not save that project. Try again.");
+          toast.error(i18n._({ id: "Could not save that project. Try again.", message: "Could not save that project. Try again." }));
           throw error;
         }
       }}
@@ -146,7 +147,7 @@ export function useChatProjects({ person, temporary, onNewChatStarted, runtime }
           await refresh();
           await threads.reload();
         } catch (error) {
-          toast.error("Could not delete that project. Try again.");
+          toast.error(i18n._({ id: "Could not delete that project. Try again.", message: "Could not delete that project. Try again." }));
           throw error;
         }
       } : undefined}

@@ -1,5 +1,6 @@
 "use client";
 
+import { i18n } from "@lingui/core";
 import { MessagePrimitive, useAui, useAuiState } from "@assistant-ui/react";
 import { ErrorState } from "@maipai/ui/src/elements/error-state";
 import { GuardrailNotice } from "@maipai/ui/src/elements/guardrail-notice";
@@ -7,6 +8,8 @@ import { useContext, useEffect, useRef, useState } from "react";
 import { QueryClientContext } from "@tanstack/react-query";
 import { useWhenHubBack } from "@/lib/hubReachability";
 import { ChatTurnError } from "@/apps/chat/chatTurnError";
+import { translateServerLine } from "@/apps/chat/serverLines";
+import { ChatAgeBandContext } from "@/apps/chat/chatThreadContexts";
 import { ChatAvailabilityContext, chatWasRecentlyNotReady, engineDownReason, RECENT_NOT_READY_MS } from "@/apps/chat/useChatAvailability";
 
 type MessageErrorValue = {
@@ -31,6 +34,7 @@ export function ChatMessageError() {
   const isRunning = useAuiState((s) => s.thread.isRunning);
   const aui = useAui();
   const availability = useContext(ChatAvailabilityContext);
+  const band = useContext(ChatAgeBandContext);
   const queryClient = useContext(QueryClientContext);
   const messageId = useAuiState((s) => s.message.id);
   const isLast = useAuiState((s) => s.message.isLast);
@@ -114,7 +118,7 @@ export function ChatMessageError() {
   if (error.code === "engine_unavailable" && availability !== "ready") return null;
   // Chat is back but it was not ready a moment ago: this reply was cut off by
   // the restart, so say that instead of the generic failure line.
-  const title = failedWhileNotReady ? RESTARTED_LINE : error.message;
+  const title = failedWhileNotReady ? i18n._({ id: "The AI restarted while I was answering. Try again in a minute.", message: "The AI restarted while I was answering. Try again in a minute." }) : translateServerLine(error.message, band !== "adult");
 
   const retry = () => {
     setRetrying(true);

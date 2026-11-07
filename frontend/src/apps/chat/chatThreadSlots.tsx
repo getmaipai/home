@@ -1,3 +1,4 @@
+import { i18n } from "@lingui/core";
 // The chat thread's slot components (more-menu items, composer extras,
 // thinking indicator, welcome, reasoning group, sources and message footer),
 // moved verbatim out of ChatPage.tsx (SHARED-THREAD-01). ChatThread.tsx
@@ -87,7 +88,7 @@ export function ComposerExtraControls() {
       <ComposerVoiceControls disabled={writtenTurnBusy} engineDown={engineDown} />
       {isRunning ? (
         <ComposerPrimitive.Send asChild>
-          <ElementsButton type="button" size="icon" className="size-7 rounded-full" aria-label="Queue message" title="Queue message" disabled={engineDown !== undefined}>
+          <ElementsButton type="button" size="icon" className="size-7 rounded-full" aria-label={i18n._({ id: "Queue message", message: "Queue message" })} title={i18n._({ id: "Queue message", message: "Queue message" })} disabled={engineDown !== undefined}>
             <QueueSendIcon className="size-4" />
           </ElementsButton>
         </ComposerPrimitive.Send>
@@ -178,7 +179,7 @@ export function ChatMessageQueue() {
       </KitButton>
     )),
     ...(pick.kind === "done" || pick.kind === "failed"
-      ? [<KitButton key="dismiss" type="button" variant="ghost" onClick={dismiss}>Dismiss</KitButton>]
+      ? [<KitButton key="dismiss" type="button" variant="ghost" onClick={dismiss}>{i18n._({ id: "Dismiss", message: "Dismiss" })}</KitButton>]
       : []),
   ] : [];
   const result = pick && row
@@ -242,7 +243,7 @@ export function ComposerTrailingWithThinkingMode() {
         <TooltipProvider>
           <Tooltip>
             <TooltipTrigger asChild>
-              <Badge variant="outline" aria-description={ALWAYS_THINKS_REASON}>Thinking</Badge>
+              <Badge variant="outline" aria-description={ALWAYS_THINKS_REASON}>{i18n._({ id: "Thinking", message: "Thinking" })}</Badge>
             </TooltipTrigger>
             <TooltipContent side="top">{ALWAYS_THINKS_REASON}</TooltipContent>
           </Tooltip>
@@ -266,8 +267,8 @@ export function ComposerTrailingWithThinkingMode() {
             <AlertDialogDescription>{MAX_DIALOG_BODY}{max.startLine ? ` ${max.startLine}` : ""}</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={() => { setMode("instant"); max.confirm(); }}>Use Max</AlertDialogAction>
+            <AlertDialogCancel>{i18n._({ id: "Cancel", message: "Cancel" })}</AlertDialogCancel>
+            <AlertDialogAction onClick={() => { setMode("instant"); max.confirm(); }}>{i18n._({ id: "Use Max", message: "Use Max" })}</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
@@ -327,8 +328,7 @@ export function MessageDetailsMenuItem() {
       }}
     >
       <DetailsIcon className="size-4" />
-      Details
-    </ActionBarMorePrimitive.Item>
+      {i18n._({ id: "Details", message: "Details" })}</ActionBarMorePrimitive.Item>
   );
 }
 
@@ -379,8 +379,7 @@ export function TurnTraceMenuItem() {
     >
       <Link to={`/trace/${encodeURIComponent(turnId)}`}>
         <TraceIcon className="size-4" />
-        Turn trace
-      </Link>
+        {i18n._({ id: "Turn trace", message: "Turn trace" })}</Link>
     </ActionBarMorePrimitive.Item>
   );
 }
@@ -448,8 +447,7 @@ export function MakeVariationMenuItem() {
       }}
     >
       <VariationIcon className="size-4" />
-      Make a variation
-    </ActionBarMorePrimitive.Item>
+      {i18n._({ id: "Make a variation", message: "Make a variation" })}</ActionBarMorePrimitive.Item>
   );
 }
 
@@ -490,8 +488,7 @@ export function AnimatePictureMenuItem() {
       }}
     >
       <AnimateIcon className="size-4" />
-      Animate this picture
-    </ActionBarMorePrimitive.Item>
+      {i18n._({ id: "Animate this picture", message: "Animate this picture" })}</ActionBarMorePrimitive.Item>
   );
 }
 
@@ -527,7 +524,7 @@ export function RetryWithCurrentCompanionMenuItem() {
     // eslint-disable-next-line shadcn/no-unknown-classes -- aui-action-bar-more-item is a kit ActionBarMorePrimitive class, not a Tailwind utility
     className="aui-action-bar-more-item hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground flex cursor-pointer items-center gap-2 rounded-lg px-2.5 py-1.5 text-sm outline-none select-none"
       onSelect={(event) => { event.preventDefault(); retryChoice.arm(); void Promise.resolve(aui.message().reload()).catch(() => { retryChoice.consume(); }); }}
-  ><RetryCurrentIcon className="size-4" />Retry with current companion</ActionBarMorePrimitive.Item>;
+  ><RetryCurrentIcon className="size-4" />{i18n._({ id: "Retry with current companion", message: "Retry with current companion" })}</ActionBarMorePrimitive.Item>;
 }
 
 
@@ -591,7 +588,7 @@ export function EngineStartingLoader({ Loader = GenerationLoader }: {
     return () => clearInterval(timer);
   }, [availability]);
   if (availability !== "starting") return null;
-  return <Loader label="Starting your AI…" tick={tick} role="status" aria-live="polite" className="py-8" />;
+  return <Loader label={i18n._({ id: "Starting your AI…", message: "Starting your AI…" })} tick={tick} role="status" aria-live="polite" className="py-8" />;
 }
 
 // Incognito is controlled from the global shell header; this welcome
@@ -606,7 +603,7 @@ export function ChatWelcome() {
       <EngineStartingLoader />
       <EmptyState>
         <EmptyStateGreeting size="lg">{on ? "Temporary chat" : starterGreeting(person?.display_name ?? "", new Date().getHours(), pick)}</EmptyStateGreeting>
-        {on ? <p className="text-muted-foreground text-center text-sm">This chat won&apos;t be saved to your history.</p> : null}
+        {on ? <p className="text-muted-foreground text-center text-sm">{i18n._({ id: "This chat won't be saved to your history.", message: "This chat won't be saved to your history." })}</p> : null}
       </EmptyState>
       {/* Room between the greeting and the composer now that the chips no longer sit there. */}
       <div aria-hidden className="h-8" />
@@ -822,8 +819,7 @@ export function BareModelBadge() {
   if (!bare) return null;
   return (
     <Badge variant="destructive" className="mb-1">
-      Bare model
-    </Badge>
+      {i18n._({ id: "Bare model", message: "Bare model" })}</Badge>
   );
 }
 

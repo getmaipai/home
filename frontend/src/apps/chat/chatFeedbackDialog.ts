@@ -1,3 +1,4 @@
+import { i18n } from "@lingui/core";
 import { useContext, useEffect } from "react";
 import { useAuiState } from "@assistant-ui/react";
 import { toast } from "sonner";
@@ -58,7 +59,7 @@ export function useReplyFeedbackForm() {
       api
         .submitConversationFeedback(turnId, "down", reasons[0] ?? null, { reasons, note: trimmed ? trimmed : null })
         .then(() => update(turnId, { sent: true }))
-        .catch(() => toast.error("Couldn't save feedback - try again."));
+        .catch(() => toast.error(i18n._({ id: "Couldn't save feedback - try again.", message: "Couldn't save feedback - try again." })));
     },
   };
 }

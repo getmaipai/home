@@ -1,3 +1,4 @@
+import { i18n } from "@lingui/core";
 import { lazy, Suspense, useCallback, useContext, useEffect, useMemo, useRef, useState, } from "react";
 import { PageHeaderTitle } from "@/shell/pageHeaderTitle";
 import { describeMedia, useDeleteMediaAsk } from "@/apps/chat/chatDeleteMedia";
@@ -9,7 +10,8 @@ import { currentLocationIfGranted } from "@/lib/currentLocation";
 import { Link, useLocation, useMatch, useNavigate, useSearchParams } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { voiceFailureLine, type VoiceFailureKind } from "@maipai/home-backend/src/lib/failureCopy";
+import { voiceFailureMessage, type VoiceFailureKind } from "@maipai/home-backend/src/lib/failureCopy";
+import { translateDescriptor } from "@/apps/chat/serverLines";
 import { AssistantRuntimeProvider, useAui, useAuiState, useLocalRuntime, useRemoteThreadListRuntime } from "@assistant-ui/react";
 import { useLockProof } from "@maipai/ui/src/elements/adult-lock";
 import { ChatThread } from "@/apps/chat/ChatThread";
@@ -315,7 +317,7 @@ function useChatRuntime(person: Roster, closeSheet: () => void, temporaryNext: b
         try {
           await api.setConversationSettings(conversationId, { read_aloud: value });
         } catch {
-          toast.error("Could not save this chat's settings. Try again.");
+          toast.error(i18n._({ id: "Could not save this chat's settings. Try again.", message: "Could not save this chat's settings. Try again." }));
         }
       });
   }, []);
@@ -355,7 +357,7 @@ function useChatRuntime(person: Roster, closeSheet: () => void, temporaryNext: b
         try {
           await api.setConversationSettings(conversationId, { thinking: value });
         } catch {
-          toast.error("Could not save this chat's settings. Try again.");
+          toast.error(i18n._({ id: "Could not save this chat's settings. Try again.", message: "Could not save this chat's settings. Try again." }));
         }
       });
   }, [applyConversationThinking]);
@@ -467,7 +469,7 @@ function useChatRuntime(person: Roster, closeSheet: () => void, temporaryNext: b
         // still uninstalled re-fire this every time, and without an id
         // sonner stacks a new toast per click instead of replacing the
         // one already showing.
-        onNotInstalled: () => toast.error("Voice input needs a one-time download that hasn't finished on this hub yet.", { id: "stt-not-installed" }),
+        onNotInstalled: () => toast.error(i18n._({ id: "Voice input needs a one-time download that hasn't finished on this hub yet.", message: "Voice input needs a one-time download that hasn't finished on this hub yet." }), { id: "stt-not-installed" }),
         // Unlike ChatPage.tsx's own dictation, no auto-send here yet -
         // the brief for this slice is "speech into the text box", not
         // the old page's own send-on-final behavior; a household member
@@ -506,7 +508,7 @@ function useChatRuntime(person: Roster, closeSheet: () => void, temporaryNext: b
                 try {
                   await api.setConversationSettings(remoteId, { thinking: true });
                 } catch {
-                  toast.error("Could not save this chat's settings. Try again.");
+                  toast.error(i18n._({ id: "Could not save this chat's settings. Try again.", message: "Could not save this chat's settings. Try again." }));
                 }
               }
             } else if (!thinkingDirtyRef.current) {
@@ -872,7 +874,7 @@ function ChatHeaderDataBridge({ autoReadReplies, setAutoReadReplies, ttsAvailabl
         if (!conversationId) {
           // A new chat has no stored conversation yet: the choice becomes the person's own companion, which the empty chat and the first message follow.
           // There is no "no companion" setting, so the default choice is answered out loud, never dropped silently.
-          if (companionId === null) { toast.error("A new chat always uses one of your companions. Choose a companion to switch."); return; }
+          if (companionId === null) { toast.error(i18n._({ id: "A new chat always uses one of your companions. Choose a companion to switch.", message: "A new chat always uses one of your companions. Choose a companion to switch." })); return; }
           await api.setSetting(`person:${person.id}`, "persona.active_id", companionId);
           await Promise.all([
             queryClient.invalidateQueries({ queryKey: ["settings-values", `person:${person.id}`] }),
@@ -917,7 +919,7 @@ function ChatHeaderDataBridge({ autoReadReplies, setAutoReadReplies, ttsAvailabl
       try {
         await aui.threadListItem.rename(next);
       } catch (error) {
-        toast.error("Could not rename this chat. Try again.");
+        toast.error(i18n._({ id: "Could not rename this chat. Try again.", message: "Could not rename this chat. Try again." }));
         throw error;
       }
     },
@@ -925,7 +927,7 @@ function ChatHeaderDataBridge({ autoReadReplies, setAutoReadReplies, ttsAvailabl
       try {
         await aui.threadListItem.delete();
       } catch (error) {
-        if (!(error instanceof DeleteCancelled)) toast.error("Could not delete this chat. Try again.");
+        if (!(error instanceof DeleteCancelled)) toast.error(i18n._({ id: "Could not delete this chat. Try again.", message: "Could not delete this chat. Try again." }));
         return;
       }
       // The deleted conversation was the one open in this very header -
@@ -1109,7 +1111,7 @@ function ChatAmbientRing({ isSpeaking, voiceListening, wakeListening, person, co
 /** Chat settings sit in the header, left of the companion avatar, like every other section's settings. */
 function ChatHeaderActions() {
   const navigate = useNavigate();
-  return <><Button type="button" variant="ghost" size="icon-lg" aria-label="Chat settings" onClick={() => navigate(CHAT_SETTINGS_PATH)}><VoiceSettingsIcon aria-hidden="true" /></Button></>;
+  return <><Button type="button" variant="ghost" size="icon-lg" aria-label={i18n._({ id: "Chat settings", message: "Chat settings" })} onClick={() => navigate(CHAT_SETTINGS_PATH)}><VoiceSettingsIcon aria-hidden="true" /></Button></>;
 }
 
 export function ChatPage({ person }: { person: Roster }) {
@@ -1201,7 +1203,7 @@ export function ChatPage({ person }: { person: Roster }) {
             await api.updateChatFolder(projectFolder.id, patch);
             await refreshProject();
           } catch (error) {
-            toast.error("Could not update that project. Try again.");
+            toast.error(i18n._({ id: "Could not update that project. Try again.", message: "Could not update that project. Try again." }));
             throw error;
           }
         }}
@@ -1211,7 +1213,7 @@ export function ChatPage({ person }: { person: Roster }) {
             await refreshProject();
             navigate("/chat/projects");
           } catch {
-            toast.error("Could not update that project. Try again.");
+            toast.error(i18n._({ id: "Could not update that project. Try again.", message: "Could not update that project. Try again." }));
           }
         }}
         onDelete={async () => {
@@ -1220,7 +1222,7 @@ export function ChatPage({ person }: { person: Roster }) {
             await refreshProject();
             navigate("/chat/projects");
           } catch {
-            toast.error("Could not delete that project. Try again.");
+            toast.error(i18n._({ id: "Could not delete that project. Try again.", message: "Could not delete that project. Try again." }));
           }
         }}
       /></Suspense>,
@@ -1460,7 +1462,7 @@ export function ChatPage({ person }: { person: Roster }) {
   const threadSidebarBody = (
     <ThreadListRoot density="compact" tourId="chat.history">
       <ThreadListItems density="compact" searchQuery={hasThreads ? column.search : ""} pinnable={!temporaryNext} projects={projects} />
-      {!isLoadingThreads && !hasThreads ? <p data-slot="chat-column-empty" className="px-2.5 py-2 text-sm text-muted-foreground">Your chats will show up here.</p> : null}
+      {!isLoadingThreads && !hasThreads ? <p data-slot="chat-column-empty" className="px-2.5 py-2 text-sm text-muted-foreground">{i18n._({ id: "Your chats will show up here.", message: "Your chats will show up here." })}</p> : null}
     </ThreadListRoot>
   );
   // Enter in the column's search opens the first match, pinned conversations first, the same order the list draws.
@@ -1484,7 +1486,7 @@ export function ChatPage({ person }: { person: Roster }) {
       onCollapsedChange={(collapsed) => { if (mobile) setSheetOpen(!collapsed); else column.setCollapsedPreference(collapsed); }}
       collapseLabels={{ hide: "Hide conversations", show: "Show conversations", pin: "Keep conversations open" }}
       collapsedStyle="hidden"
-      headerActions={mobile ? <TooltipIconButton tooltip="Chat settings" data-slot="chat-column-icon" asChild><Link to={CHAT_SETTINGS_PATH} aria-label="Chat settings"><VoiceSettingsIcon className="size-4.5" /></Link></TooltipIconButton> : undefined}
+      headerActions={mobile ? <TooltipIconButton tooltip={i18n._({ id: "Chat settings", message: "Chat settings" })} data-slot="chat-column-icon" asChild><Link to={CHAT_SETTINGS_PATH} aria-label={i18n._({ id: "Chat settings", message: "Chat settings" })}><VoiceSettingsIcon className="size-4.5" /></Link></TooltipIconButton> : undefined}
       search={hasThreads ? { value: column.search, onChange: column.setSearch, onSubmit: openFirstSearchResult, label: "Search chats" } : undefined}
       primaryAction={newChatAction}
       collapseShortcut={{ label: chatColumnShortcutLabel(), keys: "Meta+B Control+B" }}
@@ -1514,12 +1516,12 @@ export function ChatPage({ person }: { person: Roster }) {
       // Adults also see which step failed and the browser's own error, with a button that copies the details.
       const failure = lastMicFailure();
       const detail = !minor && kind.startsWith("microphone_") && failure
-        ? { description: micFailureLine(failure), duration: 20_000, action: { label: "Copy details", onClick: () => void copyMicDetails(failure).then((ok) => toast(ok ? "Details copied." : "Could not copy. Select the text instead.")) } }
+        ? { description: micFailureLine(failure), duration: 20_000, action: { label: "Copy details", onClick: () => void copyMicDetails(failure).then((ok) => toast(ok ? i18n._({ id: "Details copied.", message: "Details copied." }) : i18n._({ id: "Could not copy. Select the text instead.", message: "Could not copy. Select the text instead." }))) } }
         : {};
-      const line = () => toast.error(voiceFailureLine(kind, { minor, canOpenRepairs: isOwnerOrAdminRole(person.role) }), { id: "voice-problem", ...detail });
+      const line = () => toast.error(translateDescriptor(voiceFailureMessage(kind, { minor, canOpenRepairs: isOwnerOrAdminRole(person.role) })), { id: "voice-problem", ...detail });
       if (kind !== "microphone_blocked") return line();
       // Diagnose only: the browser allows the mic here, so the failure is something else; say so once, never reopen.
-      void micGate.diagnose().then((ok) => { if (ok) toast.error(voiceFailureLine("microphone_setup", { minor, canOpenRepairs: false }), { id: "voice-problem", ...detail }); });
+      void micGate.diagnose().then((ok) => { if (ok) toast.error(translateDescriptor(voiceFailureMessage("microphone_setup", { minor, canOpenRepairs: false })), { id: "voice-problem", ...detail }); });
     },
     idleCloseMs: voiceOpenedByWake ? WAKE_SESSION_IDLE_CLOSE_MS : null,
     turnSchedulerRef,
@@ -1586,33 +1588,33 @@ export function ChatPage({ person }: { person: Roster }) {
   const compareCanvasElement = compareTarget === null ? null : (
     <CanvasSplit>
       <CanvasSplitDocument>
-        <CanvasSplitHeader title="Ours" version={1} saved onCopy={() => void navigator.clipboard.writeText(compareTarget.ourText)} onClose={closeCompare} />
+        <CanvasSplitHeader title={i18n._({ id: "Ours", message: "Ours" })} version={1} saved onCopy={() => void navigator.clipboard.writeText(compareTarget.ourText)} onClose={closeCompare} />
         <CanvasSplitBody>
           <CanvasSplitLine>{compareTarget.ourText}</CanvasSplitLine>
           {compareCanvas.trace ? (
             <>
-              <CanvasSplitLine heading>Trace</CanvasSplitLine>
-              <CanvasSplitLine>Rung: {compareCanvas.trace.rung ?? "none"}</CanvasSplitLine>
+              <CanvasSplitLine heading>{i18n._({ id: "Trace", message: "Trace" })}</CanvasSplitLine>
+              <CanvasSplitLine>{i18n._({ id: "Rung:", message: "Rung:" })}{" "}{compareCanvas.trace.rung ?? "none"}</CanvasSplitLine>
               <CanvasSplitLine>
-                Route: {compareCanvas.trace.routing_tier ?? "model"}
+                {i18n._({ id: "Route:", message: "Route:" })}{" "}{compareCanvas.trace.routing_tier ?? "model"}
                 {compareCanvas.trace.routing_score !== null ? ` (${compareCanvas.trace.routing_score.toFixed(2)})` : ""}
               </CanvasSplitLine>
-              <CanvasSplitLine>Rules fired: {compareCanvas.trace.rules.length > 0 ? compareCanvas.trace.rules.join(", ") : "none"}</CanvasSplitLine>
-              <CanvasSplitLine>Guard: {compareCanvas.trace.guard_reason ?? "none"}</CanvasSplitLine>
-              <CanvasSplitLine>Thinking: {compareCanvas.trace.stats?.thinking ? "on" : "off"}</CanvasSplitLine>
-              <CanvasSplitLine>Model: {compareCanvas.trace.stats?.engine ?? "unknown"}</CanvasSplitLine>
-              <CanvasSplitLine>Persona in effect: {compareCanvas.trace.persona_fragments || "none"}</CanvasSplitLine>
+              <CanvasSplitLine>{i18n._({ id: "Rules fired:", message: "Rules fired:" })}{" "}{compareCanvas.trace.rules.length > 0 ? compareCanvas.trace.rules.join(", ") : "none"}</CanvasSplitLine>
+              <CanvasSplitLine>{i18n._({ id: "Guard:", message: "Guard:" })}{" "}{compareCanvas.trace.guard_reason ?? "none"}</CanvasSplitLine>
+              <CanvasSplitLine>{i18n._({ id: "Thinking:", message: "Thinking:" })}{" "}{compareCanvas.trace.stats?.thinking ? "on" : "off"}</CanvasSplitLine>
+              <CanvasSplitLine>{i18n._({ id: "Model:", message: "Model:" })}{" "}{compareCanvas.trace.stats?.engine ?? "unknown"}</CanvasSplitLine>
+              <CanvasSplitLine>{i18n._({ id: "Persona in effect:", message: "Persona in effect:" })}{" "}{compareCanvas.trace.persona_fragments || "none"}</CanvasSplitLine>
             </>
           ) : null}
         </CanvasSplitBody>
       </CanvasSplitDocument>
       <CanvasSplitDocument>
-        <CanvasSplitHeader title="Bare model" version={1} saved onCopy={() => void navigator.clipboard.writeText(compareCanvas.bareText)} onClose={closeCompare} />
+        <CanvasSplitHeader title={i18n._({ id: "Bare model", message: "Bare model" })} version={1} saved onCopy={() => void navigator.clipboard.writeText(compareCanvas.bareText)} onClose={closeCompare} />
         <CanvasSplitBody writing={compareCanvas.status === "streaming"}>
-          {compareCanvas.status === "loading" ? <CanvasSplitLine>Asking the bare model…</CanvasSplitLine> : null}
+          {compareCanvas.status === "loading" ? <CanvasSplitLine>{i18n._({ id: "Asking the bare model…", message: "Asking the bare model…" })}</CanvasSplitLine> : null}
           {compareCanvas.status === "error" ? <CanvasSplitLine>{compareCanvas.errorMessage}</CanvasSplitLine> : null}
           {compareCanvas.bareText ? <CanvasSplitLine>{compareCanvas.bareText}</CanvasSplitLine> : null}
-          {compareCanvas.refused ? <CanvasSplitLine>The bare reply was refused by the same safety pass a real turn uses.</CanvasSplitLine> : null}
+          {compareCanvas.refused ? <CanvasSplitLine>{i18n._({ id: "The bare reply was refused by the same safety pass a real turn uses.", message: "The bare reply was refused by the same safety pass a real turn uses." })}</CanvasSplitLine> : null}
         </CanvasSplitBody>
       </CanvasSplitDocument>
     </CanvasSplit>
@@ -1656,13 +1658,13 @@ export function ChatPage({ person }: { person: Roster }) {
                 <AlertDialog open onOpenChange={(open) => { if (!open) deleteMedia.answer("cancel"); }}>
                   <AlertDialogContent data-testid="chat-delete-media">
                     <AlertDialogHeader>
-                      <AlertDialogTitle>Delete this chat?</AlertDialogTitle>
-                      <AlertDialogDescription>This chat made {describeMedia(deleteMedia.ask.count)}. Delete them too, or keep them in your Library? Deleted files wait in Trash for 30 days.</AlertDialogDescription>
+                      <AlertDialogTitle>{i18n._({ id: "Delete this chat?", message: "Delete this chat?" })}</AlertDialogTitle>
+                      <AlertDialogDescription>{i18n._({ id: "This chat made {media}. Delete them too, or keep them in your Library? Deleted files wait in Trash for 30 days.", message: "This chat made {media}. Delete them too, or keep them in your Library? Deleted files wait in Trash for 30 days.", values: { media: describeMedia(deleteMedia.ask.count) } })}</AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>
-                      <AlertDialogCancel onClick={() => deleteMedia.answer("cancel")}>Cancel</AlertDialogCancel>
-                      <AlertDialogCancel onClick={() => deleteMedia.answer("keep")}>Keep {describeMedia(deleteMedia.ask.count)}</AlertDialogCancel>
-                      <AlertDialogAction variant="destructive" onClick={() => deleteMedia.answer("delete")}>Delete chat and {describeMedia(deleteMedia.ask.count)}</AlertDialogAction>
+                      <AlertDialogCancel onClick={() => deleteMedia.answer("cancel")}>{i18n._({ id: "Cancel", message: "Cancel" })}</AlertDialogCancel>
+                      <AlertDialogCancel onClick={() => deleteMedia.answer("keep")}>{i18n._({ id: "Keep {media}", message: "Keep {media}", values: { media: describeMedia(deleteMedia.ask.count) } })}</AlertDialogCancel>
+                      <AlertDialogAction variant="destructive" onClick={() => deleteMedia.answer("delete")}>{i18n._({ id: "Delete chat and {media}", message: "Delete chat and {media}", values: { media: describeMedia(deleteMedia.ask.count) } })}</AlertDialogAction>
                     </AlertDialogFooter>
                   </AlertDialogContent>
                 </AlertDialog>
@@ -1671,13 +1673,13 @@ export function ChatPage({ person }: { person: Roster }) {
                 <AlertDialog open onOpenChange={(open) => { if (!open) remix.answer(null); }}>
                   <AlertDialogContent data-testid="remix-dialog">
                     <AlertDialogHeader>
-                      <AlertDialogTitle>Remix this {remix.ask.kind}</AlertDialogTitle>
-                      <AlertDialogDescription>Describe what you want changed. The original stays.</AlertDialogDescription>
+                      <AlertDialogTitle>{i18n._({ id: "Remix this {kind}", message: "Remix this {kind}", values: { kind: remix.ask.kind } })}</AlertDialogTitle>
+                      <AlertDialogDescription>{i18n._({ id: "Describe what you want changed. The original stays.", message: "Describe what you want changed. The original stays." })}</AlertDialogDescription>
                     </AlertDialogHeader>
-                    <Textarea aria-label={`Describe the changes to this ${remix.ask.kind}`} placeholder="For example: make it night time, add a red hat" value={remix.words} maxLength={2000} rows={5} onChange={(event) => remix.setWords(event.target.value)} />
+                    <Textarea aria-label={i18n._({ id: "Describe the changes to this {kind}", message: "Describe the changes to this {kind}", values: { kind: remix.ask.kind } })} placeholder={i18n._({ id: "For example: make it night time, add a red hat", message: "For example: make it night time, add a red hat" })} value={remix.words} maxLength={2000} rows={5} onChange={(event) => remix.setWords(event.target.value)} />
                     <AlertDialogFooter>
-                      <AlertDialogCancel onClick={() => remix.answer(null)}>Cancel</AlertDialogCancel>
-                      <AlertDialogAction disabled={remix.words.trim() === ""} onClick={() => remix.answer(remix.words.trim())}>Make it</AlertDialogAction>
+                      <AlertDialogCancel onClick={() => remix.answer(null)}>{i18n._({ id: "Cancel", message: "Cancel" })}</AlertDialogCancel>
+                      <AlertDialogAction disabled={remix.words.trim() === ""} onClick={() => remix.answer(remix.words.trim())}>{i18n._({ id: "Make it", message: "Make it" })}</AlertDialogAction>
                     </AlertDialogFooter>
                   </AlertDialogContent>
                 </AlertDialog>
@@ -1689,7 +1691,7 @@ export function ChatPage({ person }: { person: Roster }) {
         <ProjectResultReload />
         {settingsDialog}
         <Dialog open={micGate.problem !== null} onOpenChange={(open) => { if (!open) micGate.dismiss(); }}>
-          <DialogContent aria-label="Microphone help">
+          <DialogContent aria-label={i18n._({ id: "Microphone help", message: "Microphone help" })}>
             {micGate.problem ? (() => {
               const help = micHelp(micGate.problem);
               return (
@@ -1701,8 +1703,8 @@ export function ChatPage({ person }: { person: Roster }) {
                   {help.steps.length ? <ol className="list-decimal space-y-1 pl-5 text-sm">{help.steps.map((step) => <li key={step}>{step}</li>)}</ol> : null}
                   {micGate.problem !== "insecure" && micGate.problem !== "safari_ask" && lastMicFailure() ? <p className="break-words text-xs text-muted-foreground">{micFailureLine(lastMicFailure()!)}</p> : null}
                   <DialogFooter>
-                    {micGate.problem !== "insecure" && micGate.problem !== "safari_ask" && lastMicFailure() ? <Button variant="ghost" onClick={() => void copyMicDetails().then((ok) => toast(ok ? "Details copied." : "Could not copy. Select the text instead."))}>Copy details</Button> : null}
-                    <Button variant="outline" onClick={micGate.dismiss}>Close</Button>
+                    {micGate.problem !== "insecure" && micGate.problem !== "safari_ask" && lastMicFailure() ? <Button variant="ghost" onClick={() => void copyMicDetails().then((ok) => toast(ok ? "Details copied." : "Could not copy. Select the text instead."))}>{i18n._({ id: "Copy details", message: "Copy details" })}</Button> : null}
+                    <Button variant="outline" onClick={micGate.dismiss}>{i18n._({ id: "Close", message: "Close" })}</Button>
                     <Button onClick={() => void micGate.request()}>{micGate.problem === "safari_ask" ? "Continue" : "Try again"}</Button>
                   </DialogFooter>
                 </>
@@ -1711,7 +1713,7 @@ export function ChatPage({ person }: { person: Roster }) {
           </DialogContent>
         </Dialog>
         <Dialog open={voiceOpen} onOpenChange={closeAwareSetVoiceOpen}>
-          <DialogContent variant="call" showCloseButton={false} aria-label="Voice conversation">
+          <DialogContent variant="call" showCloseButton={false} aria-label={i18n._({ id: "Voice conversation", message: "Voice conversation" })}>
             <VoiceConversation
               stage={<CompanionSpeechContext.Provider value={{ isSpeaking, liveVoiceListening: voiceSession.mode === "listening" }}><VoiceStage conversationId={temporaryNext ? null : draftConversationId ?? null} mode={voiceSession.mode} /></CompanionSpeechContext.Provider>}
               mode={voiceSession.mode}
@@ -1730,7 +1732,7 @@ export function ChatPage({ person }: { person: Roster }) {
             />
           </DialogContent>
         </Dialog>
-        <h1 className="sr-only">Chat</h1>
+        <h1 className="sr-only">{i18n._({ id: "Chat", message: "Chat" })}</h1>
         {/* CHAT-UI-01 finding 3: `overflow-hidden` keeps this box's own
             height a hard ceiling, not a floor a growing composer or a
             streaming reply could push past - FullLayout.tsx's own
@@ -1769,7 +1771,7 @@ export function ChatPage({ person }: { person: Roster }) {
                   sit at the top. While the history column is hidden, its
                   show control sits at this header's left edge, in flow. */}
               {companionShells ? (chatColumnBreakpoint.atLeast(960) ? <ChatHeaderBar shells onCall={callReady ? openVoiceFromHeader : undefined} /> : null) : <header data-slot="chat-header" className="hidden h-13 shrink-0 items-center gap-1 px-5 lg:flex">
-                {column.collapsed ? <SectionSidebarShowButton label="Show conversations" controls={CHAT_COLUMN_ID} onClick={() => column.setCollapsedPreference(false)} /> : null}
+                {column.collapsed ? <SectionSidebarShowButton label={i18n._({ id: "Show conversations", message: "Show conversations" })} controls={CHAT_COLUMN_ID} onClick={() => column.setCollapsedPreference(false)} /> : null}
                 <ChatHeaderBar />
               </header>}
           {bareMode ? (
@@ -1781,8 +1783,8 @@ export function ChatPage({ person }: { person: Roster }) {
             // behavior.
             <Alert variant="destructive" className="mx-auto mt-3 mb-1 w-full max-w-200" role="status">
               <CompareIcon className="size-4" />
-              <AlertTitle>Bare mode is on</AlertTitle>
-              <AlertDescription>Every reply in this conversation is the bare model - no persona, routing, packages, or quality guards.</AlertDescription>
+              <AlertTitle>{i18n._({ id: "Bare mode is on", message: "Bare mode is on" })}</AlertTitle>
+              <AlertDescription>{i18n._({ id: "Every reply in this conversation is the bare model - no persona, routing, packages, or quality guards.", message: "Every reply in this conversation is the bare model - no persona, routing, packages, or quality guards." })}</AlertDescription>
             </Alert>
           ) : null}
           {/* CHAT-CALM-ERRORS-01d: no engine-state banner. While chat cannot
@@ -1895,10 +1897,10 @@ export function ChatPage({ person }: { person: Roster }) {
           >
             {/* eslint-disable-next-line shadcn/no-restyle -- sr-only hides the header visually while keeping it accessible */}
             <SheetHeader className="sr-only">
-              <SheetTitle>Conversations</SheetTitle>
-              <SheetDescription>Past conversations</SheetDescription>
+              <SheetTitle>{i18n._({ id: "Conversations", message: "Conversations" })}</SheetTitle>
+              <SheetDescription>{i18n._({ id: "Past conversations", message: "Past conversations" })}</SheetDescription>
             </SheetHeader>
-            <SectionSidebar standalone density="compact" headerActions={<TooltipIconButton tooltip="Chat settings" data-slot="chat-column-icon" asChild><Link to={CHAT_SETTINGS_PATH} aria-label="Chat settings"><VoiceSettingsIcon className="size-4.5" /></Link></TooltipIconButton>} search={{ value: column.search, onChange: column.setSearch, label: "Search chats" }} primaryAction={newChatAction} sidebarProps={{ id: "next-chat-threads", "data-slot": "chat-rail", "aria-label": "Conversations", role: "region", "data-chat-column-mobile": "" }} body={threadSidebarBody} />
+            <SectionSidebar standalone density="compact" headerActions={<TooltipIconButton tooltip={i18n._({ id: "Chat settings", message: "Chat settings" })} data-slot="chat-column-icon" asChild><Link to={CHAT_SETTINGS_PATH} aria-label={i18n._({ id: "Chat settings", message: "Chat settings" })}><VoiceSettingsIcon className="size-4.5" /></Link></TooltipIconButton>} search={{ value: column.search, onChange: column.setSearch, label: "Search chats" }} primaryAction={newChatAction} sidebarProps={{ id: "next-chat-threads", "data-slot": "chat-rail", "aria-label": "Conversations", role: "region", "data-chat-column-mobile": "" }} body={threadSidebarBody} />
           </SheetContent>
         </Sheet>
         {/* CANVAS-SHEET-DESKTOP-01 (fixes #183): `open` is gated on
@@ -1914,8 +1916,8 @@ export function ChatPage({ person }: { person: Roster }) {
           <SheetContent side="bottom" className="max-h-[85vh] overflow-y-auto lg:hidden">
             {/* eslint-disable-next-line shadcn/no-restyle -- sr-only hides the header visually while keeping it accessible */}
             <SheetHeader className="sr-only">
-              <SheetTitle>Document</SheetTitle>
-              <SheetDescription>The document from this reply</SheetDescription>
+              <SheetTitle>{i18n._({ id: "Document", message: "Document" })}</SheetTitle>
+              <SheetDescription>{i18n._({ id: "The document from this reply", message: "The document from this reply" })}</SheetDescription>
             </SheetHeader>
             {!isDesktopCanvas && openArtifactId !== null ? artifactCanvas : null}
           </SheetContent>
@@ -1926,8 +1928,8 @@ export function ChatPage({ person }: { person: Roster }) {
           <SheetContent side="bottom" className="max-h-[85vh] overflow-y-auto lg:hidden">
             {/* eslint-disable-next-line shadcn/no-restyle -- sr-only hides the header visually while keeping it accessible */}
             <SheetHeader className="sr-only">
-              <SheetTitle>Compare with the bare model</SheetTitle>
-              <SheetDescription>Our reply beside the same model with no routing, packages, persona or guards</SheetDescription>
+              <SheetTitle>{i18n._({ id: "Compare with the bare model", message: "Compare with the bare model" })}</SheetTitle>
+              <SheetDescription>{i18n._({ id: "Our reply beside the same model with no routing, packages, persona or guards", message: "Our reply beside the same model with no routing, packages, persona or guards" })}</SheetDescription>
             </SheetHeader>
             {compareCanvasElement}
           </SheetContent>

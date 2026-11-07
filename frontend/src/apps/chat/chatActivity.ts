@@ -1,3 +1,4 @@
+import { i18n } from "@lingui/core";
 import { useContext, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
@@ -76,12 +77,12 @@ export function useChatActivity() {
   ]);
   const stop = useMutation({
     mutationFn: (id: string) => api.stopJob(id),
-    onError: () => toast.error("Could not stop that. Try again."),
+    onError: () => toast.error(i18n._({ id: "Could not stop that. Try again.", message: "Could not stop that. Try again." })),
     onSettled: refresh,
   });
   const decide = useMutation({
     mutationFn: ({ id, decision }: { id: string; decision: "approve" | "deny" }) => api.decideApproval(id, decision),
-    onError: () => toast.error("Could not save that answer. Try again."),
+    onError: () => toast.error(i18n._({ id: "Could not save that answer. Try again.", message: "Could not save that answer. Try again." })),
     onSettled: refresh,
   });
 

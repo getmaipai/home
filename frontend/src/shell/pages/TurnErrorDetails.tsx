@@ -1,3 +1,4 @@
+import { i18n } from "@lingui/core";
 // Admin-only failure details, triggered from the shipped assistant action bar.
 // CHAT-CALM-ERRORS-01c (design section 10): the cause in plain words, one
 // next step, the raw facts and a Copy button, or no control at all. The
@@ -12,6 +13,7 @@ import { TooltipIconButton } from "@maipai/ui/src/assistant-ui/tooltip-icon-butt
 import { useCopyToClipboard } from "@maipai/ui/src/elements/hooks/use-copy-to-clipboard";
 import { getIcon } from "@maipai/ui/src/icons";
 import { api, ApiError, type TurnErrorDetail } from "@/lib/api";
+import { translateServerLine } from "@/apps/chat/serverLines";
 
 const AlertIcon = getIcon("alert-triangle");
 const CopyIcon = getIcon("copy");
@@ -72,9 +74,9 @@ function DetailBody({ detail }: { detail: TurnErrorDetail }) {
     <div className="flex max-h-80 flex-col gap-3 overflow-y-auto">
       {detail.advice ? (
         <div className="flex flex-col gap-1">
-          <p className="text-sm">{detail.advice.cause}</p>
+          <p className="text-sm">{translateServerLine(detail.advice.cause, false)}</p>
           <p className="text-muted-foreground text-xs">
-            {detail.advice.repairs ? <Link to="/repairs" className="underline">{detail.advice.next_step}</Link> : detail.advice.next_step}
+            {detail.advice.repairs ? <Link to="/repairs" className="underline">{translateServerLine(detail.advice.next_step, false)}</Link> : translateServerLine(detail.advice.next_step, false)}
           </p>
         </div>
       ) : null}
@@ -89,7 +91,7 @@ function DetailBody({ detail }: { detail: TurnErrorDetail }) {
         </dl>
       ))}
       <div className="flex justify-end">
-        <TooltipIconButton tooltip={isCopied ? "Copied" : "Copy details"} aria-label="Copy details" side="top" onClick={() => copyToClipboard(detailAsText(detail))}>
+        <TooltipIconButton tooltip={isCopied ? "Copied" : "Copy details"} aria-label={i18n._({ id: "Copy details", message: "Copy details" })} side="top" onClick={() => copyToClipboard(detailAsText(detail))}>
           {isCopied ? <CopiedIcon className="size-3.5" /> : <CopyIcon className="size-3.5" />}
         </TooltipIconButton>
       </div>
@@ -104,7 +106,7 @@ function StoredDetail({ turnId }: { turnId: string }) {
     const status = query.error instanceof ApiError && query.error.status > 0 ? String(query.error.status) : "the hub did not answer";
     return <p className="text-muted-foreground text-xs">{`The details request failed: ${status}`}</p>;
   }
-  return <p className="text-muted-foreground text-xs">Reading the details…</p>;
+  return <p className="text-muted-foreground text-xs">{i18n._({ id: "Reading the details…", message: "Reading the details…" })}</p>;
 }
 
 /** `streamed` is the detail the turn's own error event carried (kept in
@@ -117,7 +119,7 @@ export function TurnErrorDetails({ turnId, streamed }: { turnId?: string; stream
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
-        <TooltipIconButton aria-label="Error details" tooltip="Error details" side="top" className="text-muted-foreground">
+        <TooltipIconButton aria-label={i18n._({ id: "Error details", message: "Error details" })} tooltip={i18n._({ id: "Error details", message: "Error details" })} side="top" className="text-muted-foreground">
           <AlertIcon className="size-3.5" />
         </TooltipIconButton>
       </PopoverTrigger>

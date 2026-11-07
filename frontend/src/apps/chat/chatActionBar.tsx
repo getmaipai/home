@@ -1,3 +1,4 @@
+import { i18n } from "@lingui/core";
 import { type ExportedMessageRepository, type FeedbackAdapter } from "@assistant-ui/react";
 import { toast } from "sonner";
 import { create } from "zustand";
@@ -45,7 +46,7 @@ export function createChatFeedbackAdapter(options: { clearRating?: (messageId: s
       if (message.metadata?.submittedFeedback?.type === type) {
         form.close(turnId);
         void api.clearConversationFeedback(turnId).catch(() => {
-          toast.error("Couldn't remove your rating - try again.");
+          toast.error(i18n._({ id: "Couldn't remove your rating - try again.", message: "Couldn't remove your rating - try again." }));
         });
         // The runtime marks the thumb after this adapter returns.
         queueMicrotask(() => options.clearRating?.(message.id));
@@ -54,7 +55,7 @@ export function createChatFeedbackAdapter(options: { clearRating?: (messageId: s
       if (type === "negative") form.openFor(turnId);
       else form.close(turnId);
       void api.submitConversationFeedback(turnId, type === "positive" ? "up" : "down").catch(() => {
-        toast.error("Couldn't save feedback - try again.");
+        toast.error(i18n._({ id: "Couldn't save feedback - try again.", message: "Couldn't save feedback - try again." }));
       });
     },
   };

@@ -31,7 +31,8 @@ import type { AmbientRing, AmbientWakeIndicator } from "@/shell/ambientRing";
 import { api, type Roster, type DeviceInfo } from "@/lib/api";
 import { useLiveVoiceSession, WAKE_SESSION_IDLE_CLOSE_MS } from "@/apps/chat/liveVoiceSession";
 import { useMicGate, micHelp } from "@/lib/media/micGate";
-import { voiceFailureLine } from "@maipai/home-backend/src/lib/failureCopy";
+import { voiceFailureMessage } from "@maipai/home-backend/src/lib/failureCopy";
+import { translateDescriptor } from "@/apps/chat/serverLines";
 import { Suggestions } from "@maipai/ui/src/elements/suggestions";
 import { useAmbientPageContext } from "@/shell/pageContext";
 import { useSpokenReply } from "@/shell/spokenReply";
@@ -219,7 +220,7 @@ function StageBody({ person, personId, companionName, clips, still, bot, registe
   const micGate = useMicGate(() => { setVoiceOpen(true); side.setCallActive(true); });
   const requestMic = micGate.request;
   const session = useLiveVoiceSession({ composer: aui.composer(), open: voiceOpen, onOpenChange: (open) => { if (!open) { setWakeOpened(false); side.setCallActive(false); } setVoiceOpen(open); }, onProblem: (kind) => {
-    const showFailure = (failureKind: typeof kind) => toast.error(voiceFailureLine(failureKind, { minor: person.age_band !== "adult", canOpenRepairs: false }), { id: "voice-problem" });
+    const showFailure = (failureKind: typeof kind) => toast.error(translateDescriptor(voiceFailureMessage(failureKind, { minor: person.age_band !== "adult", canOpenRepairs: false })), { id: "voice-problem" });
     if (kind !== "microphone_blocked") { showFailure(kind); return; }
     void micGate.diagnose().then((allowed) => { if (allowed) showFailure("microphone_setup"); });
   }, idleCloseMs: wakeOpened ? WAKE_SESSION_IDLE_CLOSE_MS : null, turnSchedulerRef: side.turnSchedulerRef, liveVoiceActiveRef: side.liveVoiceActiveRef, pendingSpeechRef: side.pendingSpeechRef, activeTurnRef: side.activeTurnRef, cancelRun: aui.thread.cancelRun, voiceBargeIn: true, isSpeaking: side.isSpeaking, speakingEndedAt: side.speakingEndedAt, speechFailed: side.speechFailed });

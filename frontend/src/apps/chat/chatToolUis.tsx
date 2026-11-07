@@ -1,3 +1,4 @@
+import { i18n } from "@lingui/core";
 // The chat thread's tool-call renderers (spec sheet, artifact card, confirm,
 // project, tool timeline), moved verbatim out of ChatPage.tsx
 // (SHARED-THREAD-01). elementBindings.ts maps tool ids to these.
@@ -96,14 +97,14 @@ export function ProducedArtifactCard({ id, title, meta, generating, onOpen, onSh
       <div className="shrink-0">
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button type="button" variant="ghost" size="icon" aria-label="More">
+            <Button type="button" variant="ghost" size="icon" aria-label={i18n._({ id: "More", message: "More" })}>
               <MoreIcon />
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="start">
-            <DropdownMenuItem onSelect={onOpen}>Open</DropdownMenuItem>
-            <DropdownMenuItem onSelect={() => { window.location.assign(`/api/artifacts/${encodeURIComponent(id)}/export`); }}>Download</DropdownMenuItem>
-            <DropdownMenuItem onSelect={onShowInLibrary}>Show in Library</DropdownMenuItem>
+            <DropdownMenuItem onSelect={onOpen}>{i18n._({ id: "Open", message: "Open" })}</DropdownMenuItem>
+            <DropdownMenuItem onSelect={() => { window.location.assign(`/api/artifacts/${encodeURIComponent(id)}/export`); }}>{i18n._({ id: "Download", message: "Download" })}</DropdownMenuItem>
+            <DropdownMenuItem onSelect={onShowInLibrary}>{i18n._({ id: "Show in Library", message: "Show in Library" })}</DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
@@ -157,7 +158,7 @@ export const ConfirmToolRender: ToolCallMessagePartComponent<Record<string, neve
     <ApprovalCard
       state="request"
       icon={<ShieldCheckIcon aria-hidden />}
-      title="Go ahead?"
+      title={i18n._({ id: "Go ahead?", message: "Go ahead?" })}
       subtitle={`Nothing happens until you choose.${waitingSince}`}
       allowHint={pointer === "fine" ? <Kbd aria-hidden>{IS_MAC ? "⌘ ↵" : "Ctrl ↵"}</Kbd> : undefined}
       onAllowOnce={() => respond(turnId, true)}
@@ -317,7 +318,7 @@ export const ProjectToolRender: ToolCallMessagePartComponent<Record<string, neve
     // A persistently failing fetch gets a real (if quiet) line, not
     // silence forever - the same isError branch ArtifactCardToolRender/
     // ProjectFinishedArtifact below already have for their own fetch.
-    if (query.isError) return <p className="text-sm text-destructive">Couldn't check on this project right now.</p>;
+    if (query.isError) return <p className="text-sm text-destructive">{i18n._({ id: "Couldn't check on this project right now.", message: "Couldn't check on this project right now." })}</p>;
     // Nothing to show yet on the very first, still-in-flight poll - the
     // reply's own text already told the person the project started
     // (tool.ts's own `runStartProjectTool()` phrasing), so a brief gap
@@ -334,10 +335,10 @@ export const ProjectToolRender: ToolCallMessagePartComponent<Record<string, neve
     return <ProjectFinishedArtifact id={project.posted_artifact.id} />;
   }
   if (project.state === "failed") {
-    return <p className="text-sm text-destructive">{project.title} didn't finish{project.error ? `: ${project.error}` : "."}</p>;
+    return <p className="text-sm text-destructive">{project.error ? i18n._({ id: "{title} didn't finish: {error}", message: "{title} didn't finish: {error}", values: { title: project.title, error: project.error } }) : i18n._({ id: "{title} didn't finish.", message: "{title} didn't finish.", values: { title: project.title } })}</p>;
   }
   if (project.state === "cancelled") {
-    return <p className="text-muted-foreground text-sm">{project.title} was cancelled.</p>;
+    return <p className="text-muted-foreground text-sm">{i18n._({ id: "{title} was cancelled.", message: "{title} was cancelled.", values: { title: project.title } })}</p>;
   }
   const stages = projectStages(project.steps);
   const stageIndex = projectStageIndex(project.steps);
@@ -623,7 +624,7 @@ export const PictureToolRender: ToolCallMessagePartComponent<Record<string, neve
   if (result.locked || (query.data && "locked" in query.data)) return createElement(VideoPlayer, { locked: true, making: query.data && "locked" in query.data ? query.data.making : false });
   if (!card) {
     if (!query.isError) return null;
-    const errorCard = <ErrorState layout="inline" title="I couldn't check on that picture" detail="Reload the chat to try again." retrying={false} />;
+    const errorCard = <ErrorState layout="inline" title={i18n._({ id: "I couldn't check on that picture", message: "I couldn't check on that picture" })} detail="Reload the chat to try again." retrying={false} />;
     return errorCard;
   }
   if (card.files.length > 0) {
@@ -726,7 +727,7 @@ export const VideoToolRender: ToolCallMessagePartComponent<Record<string, never>
   const adultMark = useVideoAdultMark(readyItem ?? null, refresh);
   const [spatialBusy, setSpatialBusy] = useState(false);
   if (!result) return null;
-  if (!card) return query.isError ? <ErrorState layout="inline" title="I couldn't check on that video" detail="Reload the chat to try again." retrying={false} /> : null;
+  if (!card) return query.isError ? <ErrorState layout="inline" title={i18n._({ id: "I couldn't check on that video", message: "I couldn't check on that video" })} detail="Reload the chat to try again." retrying={false} /> : null;
   // ADULT-LOCK-02: a card with an adult-only clip while the page holds no unlock proof is the one lock tile (a creator marking a clip NSFW lands here too).
   if ("locked" in card) return <VideoPlayer locked making={card.making} />;
   // The newest clip of the turn is the one on show; earlier ones stay in the Library as files.
@@ -766,9 +767,9 @@ export const VideoToolRender: ToolCallMessagePartComponent<Record<string, never>
         onShare: () => { void shareClip({ prepared: prepared.data, title: item.prompt, nav: navigator, fallback: () => navigate(`/files?file=${encodeURIComponent(clip.file_id)}`) }); },
         // VIDEO-LTX-01: the on-the-fly choice, the same two words as pictures. A Quick video offers Detailed (with sound and speech); a Detailed one offers Quick. No model names.
         actions: [
-          ...(item.switch_to && card.can_make_another ? [<TierSegment key="tier" label="Quality" value={item.quality === "detailed" ? "boost" : "standard"} tiers={[{ id: "standard", label: "Standard", hint: "No sound, up to 5 seconds, can start from a picture", ...(making.reason ? { disabledReason: making.reason } : {}) }, { id: "boost", label: "Boost", hint: "With sound and speech, up to 10 seconds", ...(making.reason ? { disabledReason: making.reason } : {}) }, ...(item.max_offered ? [{ id: "max" as const, label: "Max", hint: "The biggest model", confirm: "Max uses the whole computer. Other big jobs wait, and Home goes back to normal by itself when it is done. Continue?", ...(making.reason ? { disabledReason: making.reason } : {}) }] : [])]} onValueChange={(tier) => { void videosApi.another(item.id, tier === "standard" ? "quick" : "detailed", undefined, tier === "max" ? "max" : undefined).then(refresh).catch(refresh); }} />] : []),
-          ...(card.can_make_another ? [<Button key="remix" type="button" variant="ghost" size="sm" disabled={making.disabled} title={making.reason ?? undefined} onClick={() => { void askRemix("video", item.prompt).then((words) => { if (words) void videosApi.another(item.id, undefined, words).then(refresh).catch(refresh); }); }}>Remix</Button>] : []),
-          <Button key="original" type="button" variant="ghost" size="sm" onClick={() => saveClip({ url: clip.url, name: (prepared.data?.name ?? "video.mp4").replace(/\.mp4$/, "-original.mp4") })}>Download original</Button>,
+          ...(item.switch_to && card.can_make_another ? [<TierSegment key="tier" label={i18n._({ id: "Quality", message: "Quality" })} value={item.quality === "detailed" ? "boost" : "standard"} tiers={[{ id: "standard", label: "Standard", hint: "No sound, up to 5 seconds, can start from a picture", ...(making.reason ? { disabledReason: making.reason } : {}) }, { id: "boost", label: "Boost", hint: "With sound and speech, up to 10 seconds", ...(making.reason ? { disabledReason: making.reason } : {}) }, ...(item.max_offered ? [{ id: "max" as const, label: "Max", hint: "The biggest model", confirm: "Max uses the whole computer. Other big jobs wait, and Home goes back to normal by itself when it is done. Continue?", ...(making.reason ? { disabledReason: making.reason } : {}) }] : [])]} onValueChange={(tier) => { void videosApi.another(item.id, tier === "standard" ? "quick" : "detailed", undefined, tier === "max" ? "max" : undefined).then(refresh).catch(refresh); }} />] : []),
+          ...(card.can_make_another ? [<Button key="remix" type="button" variant="ghost" size="sm" disabled={making.disabled} title={making.reason ?? undefined} onClick={() => { void askRemix("video", item.prompt).then((words) => { if (words) void videosApi.another(item.id, undefined, words).then(refresh).catch(refresh); }); }}>{i18n._({ id: "Remix", message: "Remix" })}</Button>] : []),
+          <Button key="original" type="button" variant="ghost" size="sm" onClick={() => saveClip({ url: clip.url, name: (prepared.data?.name ?? "video.mp4").replace(/\.mp4$/, "-original.mp4") })}>{i18n._({ id: "Download original", message: "Download original" })}</Button>,
           ...adultMark.actions,
           ...(adultMark.dialog ? [adultMark.dialog] : []),
         ],
@@ -807,6 +808,6 @@ export const MusicToolRender: ToolCallMessagePartComponent<Record<string, never>
   const trackProps = useMusicTrackProps({ card, navigate, onRefresh: () => { void query.refetch(); }, onStemsStarted: reloadThread, onStop: () => { void musicApi.stop(card.id).then(() => query.refetch()).catch(() => query.refetch()); } });
   const byline = useSongByline(card, me ?? null);
   if (!result) return null;
-  if (!query.data) return query.isError ? <ErrorState layout="inline" title="I couldn't check on that song" detail="Reload the chat to try again." retrying={false} /> : <MusicTrack status="queued" title="Your song" waitingForMemory copy={{ waitingForMemory: "Waiting for memory, your song starts when there is room" }} />;
+  if (!query.data) return query.isError ? <ErrorState layout="inline" title={i18n._({ id: "I couldn't check on that song", message: "I couldn't check on that song" })} detail="Reload the chat to try again." retrying={false} /> : <MusicTrack status="queued" title={i18n._({ id: "Your song", message: "Your song" })} waitingForMemory copy={{ waitingForMemory: "Waiting for memory, your song starts when there is room" }} />;
   return <MusicTrack {...trackProps} {...(byline ? { byline: <CreationHeader variant="byline" title="" {...byline} /> } : {})} />;
 };

@@ -1,3 +1,4 @@
+import { i18n } from "@lingui/core";
 import { isHubUnreachable, waitForHub } from "@/lib/hubReachability";
 import { useMemo } from "react";
 import { openedChat, takeCarry } from "./chatCarry";
@@ -179,7 +180,7 @@ export function createChatThreadListAdapter(selfName: string, options: ChatThrea
       try {
         await api.setConversationArchived(remoteId, true);
       } catch (error) {
-        toast.error("Could not archive this chat. Try again.");
+        toast.error(i18n._({ id: "Could not archive this chat. Try again.", message: "Could not archive this chat. Try again." }));
         onArchiveUnavailable?.(remoteId);
         throw error;
       }
@@ -188,7 +189,7 @@ export function createChatThreadListAdapter(selfName: string, options: ChatThrea
       try {
         await api.setConversationArchived(remoteId, false);
       } catch (error) {
-        toast.error("Could not restore this chat. Try again.");
+        toast.error(i18n._({ id: "Could not restore this chat. Try again.", message: "Could not restore this chat. Try again." }));
         throw error;
       }
     },

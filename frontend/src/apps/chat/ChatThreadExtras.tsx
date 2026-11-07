@@ -1,3 +1,4 @@
+import { i18n } from "@lingui/core";
 import { memo, useCallback, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useAui, useAuiState } from "@assistant-ui/react";
 import { CommandPaletteDialog } from "@maipai/ui/src/elements/command-palette";
@@ -200,7 +201,7 @@ export function ChatThreadExtras() {
         <CommandPaletteDialog
           open
           onOpenChange={(open) => { if (!open) { setPaletteOpen(false); setPaletteQuery(""); } }}
-          title="Chat commands"
+          title={i18n._({ id: "Chat commands", message: "Chat commands" })}
           size="lg"
           commands={paletteCommands}
           query={paletteQuery}

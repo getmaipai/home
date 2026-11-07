@@ -1,3 +1,4 @@
+import { i18n } from "@lingui/core";
 import { ActionBarMorePrimitive, useAuiState } from "@assistant-ui/react";
 import { useSearchParams } from "react-router-dom";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
@@ -23,7 +24,7 @@ export function BranchInNewChatMenuItem() {
       void queryClient.invalidateQueries({ queryKey: ["conversations"] });
       setSearchParams({ conversation: conversation.id });
     },
-    onError: () => toast.error("Could not start a new chat from this reply."),
+    onError: () => toast.error(i18n._({ id: "Could not start a new chat from this reply.", message: "Could not start a new chat from this reply." })),
   });
   return (
     <ActionBarMorePrimitive.Item
@@ -35,7 +36,6 @@ export function BranchInNewChatMenuItem() {
       }}
     >
       <NewChatIcon className="size-4" />
-      Branch in new chat
-    </ActionBarMorePrimitive.Item>
+      {i18n._({ id: "Branch in new chat", message: "Branch in new chat" })}</ActionBarMorePrimitive.Item>
   );
 }

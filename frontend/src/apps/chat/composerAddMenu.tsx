@@ -1,5 +1,6 @@
 "use client";
 
+import { i18n } from "@lingui/core";
 // SHELL-02 slice 6: the composer's "+" menu (Add: photos and files, a
 // phone's camera; behind the unwired-controls flag: Create image, Web
 // search, and Apps - see that flag's own comment below) and the
@@ -114,7 +115,7 @@ function AddPhotosAndFilesItem({ onSelect, photos, reason }: { onSelect: () => v
     <>
     <ComposerPrimitive.AddAttachment asChild>
       {photos
-        ? <ComposerAddMenuItem icon={FileTextIcon} name="Add photos and files" description="Images, text, PDF, Office" onClick={onSelect} />
+        ? <ComposerAddMenuItem icon={FileTextIcon} name="Add photos and files" description={i18n._({ id: "Images, text, PDF, Office", message: "Images, text, PDF, Office" })} onClick={onSelect} />
         : <ComposerAddMenuItem icon={FileTextIcon} name="Add files" description={reason} onClick={onSelect} />}
     </ComposerPrimitive.AddAttachment>
     {/* Pictures are off on purpose (profile setting or no vision model): the
@@ -131,7 +132,7 @@ function AddAudioItem({ onSelect }: { onSelect: () => void }) {
   const { addAttachment, disabled } = useComposerAddAttachment();
   const allowed = useContext(AudioUploadsContext);
   if (!allowed) return null;
-  return <ComposerAddMenuItem icon={MusicIcon} name="Add a song or audio file" description="MP3, M4A, WAV, AAC, OGG or FLAC" disabled={disabled} onClick={() => {
+  return <ComposerAddMenuItem icon={MusicIcon} name="Add a song or audio file" description={i18n._({ id: "MP3, M4A, WAV, AAC, OGG or FLAC", message: "MP3, M4A, WAV, AAC, OGG or FLAC" })} disabled={disabled} onClick={() => {
     const input = document.createElement("input"); input.type = "file"; input.accept = "audio/mpeg,audio/mp4,audio/x-m4a,audio/wav,audio/x-wav,audio/aac,audio/ogg,audio/flac,.mp3,.m4a,.wav,.aac,.ogg,.flac"; input.hidden = true;
     input.onchange = () => { const file = input.files?.[0]; input.remove(); if (file) void addAttachment(file); };
     document.body.appendChild(input); input.click(); onSelect();
@@ -210,7 +211,7 @@ function TakeAPhotoItem({ onSelect }: { onSelect: () => void }) {
     <ComposerAddMenuItem
       icon={CameraIcon}
       name="Take a photo"
-      description="This device's camera"
+      description={i18n._({ id: "This device's camera", message: "This device's camera" })}
       className="sm:hidden"
       disabled={disabled}
       onClick={() => {
@@ -224,12 +225,12 @@ function TakeAPhotoItem({ onSelect }: { onSelect: () => void }) {
 function CreateImageItem({ overview, onSelect }: { overview: EnginesOverview | undefined; onSelect: () => void }) {
   if (!unwiredControlsAreEnabled()) return null;
   if (!readyRole(overview, "image")) return null;
-  return <ComposerAddMenuItem icon={SparklesIcon} name="Create image" description="Generate a picture" onClick={onSelect} />;
+  return <ComposerAddMenuItem icon={SparklesIcon} name="Create image" description={i18n._({ id: "Generate a picture", message: "Generate a picture" })} onClick={onSelect} />;
 }
 
 function WebSearchItem({ onSelect }: { onSelect: () => void }) {
   if (!unwiredControlsAreEnabled()) return null;
-  return <ComposerAddMenuItem icon={SearchIcon} name="Web search" description="Search the web" onClick={onSelect} />;
+  return <ComposerAddMenuItem icon={SearchIcon} name="Web search" description={i18n._({ id: "Search the web", message: "Search the web" })} onClick={onSelect} />;
 }
 
 function AppsGroup({ onSelect }: { onSelect: (pkg: InstalledPackage) => void }) {
@@ -256,7 +257,7 @@ function AppsGroup({ onSelect }: { onSelect: (pkg: InstalledPackage) => void }) 
   if (apps.length === 0) return null;
   return (
     <>
-      <GroupLabel>Apps</GroupLabel>
+      <GroupLabel>{i18n._({ id: "Apps", message: "Apps" })}</GroupLabel>
       {apps.map((pkg) => {
         const style = kindStyle(pkg.kind);
         // Deliberate type-floor exception: same compact-row shape as
@@ -291,7 +292,7 @@ export function ComposerAddMenu() {
   if (directAttachment) {
     return (
       <ComposerPrimitive.AddAttachment asChild>
-        <ComposerAttachButton aria-label="Add" />
+        <ComposerAttachButton aria-label={i18n._({ id: "Add", message: "Add" })} />
       </ComposerPrimitive.AddAttachment>
     );
   }
@@ -302,7 +303,7 @@ export function ComposerAddMenu() {
     // it ran off one edge or the other).
     <DismissableLayer.Root onDismiss={open ? close : undefined}>
       <ComposerAttachButton
-        aria-label="Add"
+        aria-label={i18n._({ id: "Add", message: "Add" })}
         aria-expanded={open}
         onClick={() => setOpen((value) => !value)}
       />
@@ -311,7 +312,7 @@ export function ComposerAddMenu() {
           composer root, so "start" lines the two up. "end" put it over
           the right corner (Jesse, live, 2026-10-17). */}
       <ComposerMenu open={open} inert={!open} align="start">
-        <GroupLabel>Add</GroupLabel>
+        <GroupLabel>{i18n._({ id: "Add", message: "Add" })}</GroupLabel>
         <AddPhotosAndFilesItem onSelect={close} photos={photosAllowed} reason={photoDisabledReason} />
         <AddAudioItem onSelect={close} />
         {photosAllowed && <TakeAPhotoItem onSelect={close} />}

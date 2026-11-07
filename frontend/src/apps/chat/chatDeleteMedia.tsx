@@ -1,3 +1,4 @@
+import { i18n } from "@lingui/core";
 // Deleting a chat that made pictures or videos asks whether they go too. The thread-list adapter is not a React tree, so it
 // awaits askDeleteMedia(), and the one dialog in ChatPage answers it.
 import { useEffect, useState } from "react";
@@ -13,8 +14,9 @@ export function askDeleteMedia(count: MediaCount): Promise<DeleteMediaChoice> {
 }
 
 export function describeMedia({ images, videos }: MediaCount): string {
-  const parts = [images ? `${images} ${images === 1 ? "picture" : "pictures"}` : "", videos ? `${videos} ${videos === 1 ? "video" : "videos"}` : ""].filter(Boolean);
-  return parts.join(" and ");
+  const pictures = images ? i18n._({ id: "{count, plural, one {# picture} other {# pictures}}", message: "{count, plural, one {# picture} other {# pictures}}", values: { count: images } }) : "";
+  const clips = videos ? i18n._({ id: "{count, plural, one {# video} other {# videos}}", message: "{count, plural, one {# video} other {# videos}}", values: { count: videos } }) : "";
+  return pictures && clips ? i18n._({ id: "{pictures} and {videos}", message: "{pictures} and {videos}", values: { pictures, videos: clips } }) : pictures || clips;
 }
 
 export function useDeleteMediaAsk() {

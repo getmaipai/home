@@ -1,3 +1,4 @@
+import { i18n } from "@lingui/core";
 import { z } from "zod";
 import type { ChatModelAdapter, ChatModelRunOptions, ChatModelRunResult, ThreadAssistantMessagePart } from "@assistant-ui/react";
 import { offerCarry, withdrawCarry } from "./chatCarry";
@@ -17,8 +18,9 @@ import type { TurnWithMedia } from "@/apps/chat/chatCitations";
 import type { CrisisSupport } from "@maipai/home-backend/src/wire";
 import type { PendingContinuation } from "@/apps/chat/chatContinue";
 import { ChatTurnError } from "@/apps/chat/chatTurnError";
-import { HUB_DOWN_LINE, isHubUnreachable } from "@/lib/hubReachability";
-import { askFormFailureLine, failureLine } from "@maipai/home-backend/src/lib/failureCopy";
+import { isHubUnreachable } from "@/lib/hubReachability";
+import { askFormFailureMessage, failureMessage } from "@maipai/home-backend/src/lib/failureCopy";
+import { translateDescriptor } from "@/apps/chat/serverLines";
 import { isFormAnswer, parseTurnAsk, type AskAnswerArm } from "@/apps/chat/chatAsk";
 import { randomUuid } from "@/lib/randomUuid";
 import { unstable_defaultDirectiveFormatter } from "@assistant-ui/react";
@@ -928,7 +930,7 @@ export function createChatModelAdapter(deps: ChatModelAdapterDeps): ChatModelAda
         if (askForm && !askFormSettled) {
           askFormSettled = true;
           const code = e instanceof ApiError ? e.code ?? "unavailable" : "client_unreachable";
-          askForm.onSettled?.({ ok: false, code, message: askFormFailureLine(code, errorLine(e, undefined)) });
+          askForm.onSettled?.({ ok: false, code, message: translateDescriptor(askFormFailureMessage(code, errorLine(e, undefined))) });
           deps.onReplyState?.("idle");
           scheduler.stop();
           throw new DOMException("The form was not accepted.", "AbortError");
@@ -950,16 +952,16 @@ export function createChatModelAdapter(deps: ChatModelAdapterDeps): ChatModelAda
         const hubDown = isHubUnreachable(e);
         const message =
           hubDown
-            ? HUB_DOWN_LINE
+            ? i18n._({ id: "One moment. Home will be back in about a minute.", message: "One moment. Home will be back in about a minute." })
           : e instanceof AudioUploadError
             ? e.message
           : e instanceof ApiError && e.code === "unavailable"
-            ? failureLine("unreachable", false)
+            ? translateDescriptor(failureMessage("unreachable", false))
             : e instanceof ApiError && e.code === "temporary_mismatch"
-              ? "Incognito can't turn on partway through a chat. Start a new chat to go incognito."
+              ? i18n._({ id: "Incognito can't turn on partway through a chat. Start a new chat to go incognito.", message: "Incognito can't turn on partway through a chat. Start a new chat to go incognito." })
             : e instanceof ApiError
               ? e.message
-              : "That did not send. Try again.";
+              : i18n._({ id: "That did not send. Try again.", message: "That did not send. Try again." });
         const code = hubDown ? "hub_unreachable" : e instanceof ApiError ? e.code ?? "unavailable" : "client_unreachable";
         throw new ChatTurnError(message, code, resumeTurnId, code === "safety_refused" ? crisisSupport : undefined);
       }

@@ -1,5 +1,6 @@
 "use client";
 
+import { i18n } from "@lingui/core";
 // CHAT-HEADER-01: the conversation's own title and actions, in the
 // shell header - beside the sidebar trigger (ui-v0.5.35's headerExtra
 // slot), never a second row (the owner's own rejected pattern,
@@ -130,7 +131,7 @@ function ChatHeaderRename({ title, onRename, onDone, commitOnBlur = true }: { ti
   return (
     <Input
       ref={inputRef}
-      aria-label="Rename conversation"
+      aria-label={i18n._({ id: "Rename conversation", message: "Rename conversation" })}
       value={value}
       className="h-8 min-w-0 flex-1 text-base"
       onChange={(event) => setValue(event.target.value)}
@@ -167,7 +168,7 @@ type ShellsProps = { shells?: boolean; onMenu?: (() => void) | undefined; menuEx
 
 function CompanionPickerFooter() {
   const navigate = useNavigate();
-  return <><DropdownMenuItem onSelect={() => navigate("/companions")}>Manage companions</DropdownMenuItem><DropdownMenuItem onSelect={() => navigate("/companions/create")}>Create a companion</DropdownMenuItem></>;
+  return <><DropdownMenuItem onSelect={() => navigate("/companions")}>{i18n._({ id: "Manage companions", message: "Manage companions" })}</DropdownMenuItem><DropdownMenuItem onSelect={() => navigate("/companions/create")}>{i18n._({ id: "Create a companion", message: "Create a companion" })}</DropdownMenuItem></>;
 }
 
 export function ChatHeaderBar({ phoneRow = false, trailing, shells = false, onMenu, menuExpanded, menuControls, onHistory, onCall }: { phoneRow?: boolean; trailing?: ReactNode } & ShellsProps = {}) {
@@ -211,15 +212,15 @@ export function ChatHeaderBar({ phoneRow = false, trailing, shells = false, onMe
       {trailing}
       <DropdownMenu open={open} onOpenChange={setOpen}>
         <DropdownMenuTrigger asChild>
-          <Button type="button" variant="ghost" size="icon" className="text-muted-foreground" aria-label="Conversation actions"><MoreIcon className="size-[18px]" /></Button>
+          <Button type="button" variant="ghost" size="icon" className="text-muted-foreground" aria-label={i18n._({ id: "Conversation actions", message: "Conversation actions" })}><MoreIcon className="size-[18px]" /></Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" density="compact">
-          {onHistory ? <><DropdownMenuItem onClick={onHistory}><HistoryIcon className="size-4" />Chat history</DropdownMenuItem><DropdownMenuSeparator /></> : null}
-          <DropdownMenuItem onClick={() => setRenaming(true)}><PencilIcon className="size-4" />Rename</DropdownMenuItem>
+          {onHistory ? <><DropdownMenuItem onClick={onHistory}><HistoryIcon className="size-4" />{i18n._({ id: "Chat history", message: "Chat history" })}</DropdownMenuItem><DropdownMenuSeparator /></> : null}
+          <DropdownMenuItem onClick={() => setRenaming(true)}><PencilIcon className="size-4" />{i18n._({ id: "Rename", message: "Rename" })}</DropdownMenuItem>
           {data.pinnable ? <DropdownMenuItem onClick={() => void data.onPinChange(!data.pinned)}>{data.pinned ? <PinOffIcon className="size-4" /> : <PinIcon className="size-4" />}{data.pinned ? "Unpin" : "Pin"}</DropdownMenuItem> : null}
-          <DropdownMenuItem onClick={() => void data.onArchive()}><ArchiveIcon className="size-4" />Archive</DropdownMenuItem>
-          <DropdownMenuItem variant="destructive" onClick={() => void data.onDelete()}><TrashIcon className="size-4" />Delete</DropdownMenuItem>
-          {data.ttsAvailable ? <><DropdownMenuSeparator /><DropdownMenuCheckboxItem checked={data.autoReadReplies} onCheckedChange={data.onAutoReadRepliesChange}>Read replies aloud</DropdownMenuCheckboxItem></> : null}
+          <DropdownMenuItem onClick={() => void data.onArchive()}><ArchiveIcon className="size-4" />{i18n._({ id: "Archive", message: "Archive" })}</DropdownMenuItem>
+          <DropdownMenuItem variant="destructive" onClick={() => void data.onDelete()}><TrashIcon className="size-4" />{i18n._({ id: "Delete", message: "Delete" })}</DropdownMenuItem>
+          {data.ttsAvailable ? <><DropdownMenuSeparator /><DropdownMenuCheckboxItem checked={data.autoReadReplies} onCheckedChange={data.onAutoReadRepliesChange}>{i18n._({ id: "Read replies aloud", message: "Read replies aloud" })}</DropdownMenuCheckboxItem></> : null}
         </DropdownMenuContent>
       </DropdownMenu>
     </>
@@ -247,7 +248,7 @@ export function ChatHeaderBar({ phoneRow = false, trailing, shells = false, onMe
         <WithCompanion companionId={companionId} fallbackName={selectedName} portrait={data.companions.find(({ id }) => id === companionId)?.portrait}>{(name, media) => <ChatHeader name={name} media={media} end={ambient} identityChoices={identityChoices} identityValue={companionId ?? undefined} onIdentityChange={(value) => void changeCompanion(value)} identityIntro="Earlier messages keep their original speaker." identitySearchLabel="Search companions" identityNotice={identityNotice} identityFooter={<CompanionPickerFooter />} onMenu={onMenu} onCall={onCall} actions={actions} menuExpanded={menuExpanded} menuControls={menuControls} />}</WithCompanion>
         <Dialog open={renaming} onOpenChange={setRenaming}>
           <DialogContent>
-            <DialogHeader><DialogTitle>Rename</DialogTitle><DialogDescription>{title}</DialogDescription></DialogHeader>
+            <DialogHeader><DialogTitle>{i18n._({ id: "Rename", message: "Rename" })}</DialogTitle><DialogDescription>{title}</DialogDescription></DialogHeader>
             <ChatHeaderRename title={data.title} onRename={data.onRename} onDone={() => setRenaming(false)} commitOnBlur={false} />
           </DialogContent>
         </Dialog>
@@ -284,7 +285,7 @@ export function ChatHeaderBar({ phoneRow = false, trailing, shells = false, onMe
             <DropdownMenuTrigger asChild>
               {/* Keep an 8px visual gap between the two independent
                   48px targets. */}
-              <Button type="button" variant="ghost" size={phoneRow ? "icon-lg" : "icon"} className="text-muted-foreground" aria-label="Conversation actions">
+              <Button type="button" variant="ghost" size={phoneRow ? "icon-lg" : "icon"} className="text-muted-foreground" aria-label={i18n._({ id: "Conversation actions", message: "Conversation actions" })}>
                 <MoreIcon className="size-[18px]" />
               </Button>
             </DropdownMenuTrigger>
@@ -297,8 +298,7 @@ export function ChatHeaderBar({ phoneRow = false, trailing, shells = false, onMe
             <DropdownMenuContent align="end" density="compact">
               <DropdownMenuItem onClick={() => setRenaming(true)}>
                 <PencilIcon className="size-4" />
-                Rename
-              </DropdownMenuItem>
+                {i18n._({ id: "Rename", message: "Rename" })}</DropdownMenuItem>
               {data.pinnable ? (
                 <DropdownMenuItem onClick={() => void data.onPinChange(!data.pinned)}>
                   {data.pinned ? <PinOffIcon className="size-4" /> : <PinIcon className="size-4" />}
@@ -307,12 +307,10 @@ export function ChatHeaderBar({ phoneRow = false, trailing, shells = false, onMe
               ) : null}
               <DropdownMenuItem onClick={() => void data.onArchive()}>
                 <ArchiveIcon className="size-4" />
-                Archive
-              </DropdownMenuItem>
+                {i18n._({ id: "Archive", message: "Archive" })}</DropdownMenuItem>
               <DropdownMenuItem variant="destructive" onClick={() => void data.onDelete()}>
                 <TrashIcon className="size-4" />
-                Delete
-              </DropdownMenuItem>
+                {i18n._({ id: "Delete", message: "Delete" })}</DropdownMenuItem>
               {data.ttsAvailable ? (
                 <>
                   <DropdownMenuSeparator />
@@ -320,8 +318,7 @@ export function ChatHeaderBar({ phoneRow = false, trailing, shells = false, onMe
                     checked={data.autoReadReplies}
                     onCheckedChange={data.onAutoReadRepliesChange}
                   >
-                    Read replies aloud
-                  </DropdownMenuCheckboxItem>
+                    {i18n._({ id: "Read replies aloud", message: "Read replies aloud" })}</DropdownMenuCheckboxItem>
                 </>
               ) : null}
             </DropdownMenuContent>

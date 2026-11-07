@@ -9,11 +9,13 @@
 // Same scripted-stream structure as ChatPage.errorDetail.test.tsx.
 import { afterEach, beforeEach, describe, expect, mock, test } from "bun:test";
 import type { ReactElement } from "react";
+import { i18n } from "@lingui/core";
 import { act, cleanup, fireEvent, render, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { MemoryRouter } from "react-router-dom";
 import { TooltipProvider } from "@maipai/ui/src/ui/tooltip";
 import { composerNotice, failureLine } from "@maipai/home-backend/src/lib/failureCopy";
+import { activateLocale } from "@/i18n";
 import { ChatPage } from "@/shell/pages/ChatPage";
 import { IncognitoProvider } from "@/shell/incognitoContext";
 import type { Roster } from "@/lib/api";
@@ -263,6 +265,80 @@ describe("CHAT-NOTICE-DEGRADED-01: search trouble leaves chat available", () => 
       const button = (await view.findByLabelText("Send message")) as HTMLButtonElement;
       expect(button.disabled).toBe(false);
       expect(view.queryByRole("button", { name: "Error details" })).toBeNull();
+    } finally {
+      stubbed.restore();
+    }
+  });
+});
+
+// I18N-F2: the hub's failure wording is data (an id plus the English default); the client translates it from the same catalogs.
+// Expectations read the catalog through i18n so reviewing a Spanish line never breaks a test; they assert it differs from English.
+describe("I18N-F2: the composer line and the failure line follow the person's language", () => {
+  const say = (id: string, message: string) => i18n._({ id, message });
+  beforeEach(async () => { await activateLocale("es"); });
+  afterEach(async () => { await activateLocale("en-US"); });
+
+  test("a Spanish owner reads the composer line in Spanish, with the Repairs link", async () => {
+    const stubbed = stub({ health: () => DOWN });
+    try {
+      const spanish = say("failure.composer.paused.adult", PAUSED.adult);
+      expect(spanish).not.toBe(PAUSED.adult);
+      const view = openChat("owner");
+      await waitFor(() => expect(notice(view.container)?.querySelector("[data-chat-notice-text]")?.textContent).toBe(spanish));
+      expect(notice(view.container)?.textContent).not.toContain(PAUSED.adult);
+      expect(view.container.querySelector('a[href="/repairs"]')?.textContent).toBe(say("failure.composer.repairs.open", PAUSED.repairs_link!));
+    } finally {
+      stubbed.restore();
+    }
+  });
+
+  test("a reply that failed shows the failure line in Spanish", async () => {
+    const line = failureLine("busy", false);
+    const stubbed = stub({
+      health: () => READY,
+      stream: () => [
+        { type: "turn_meta", conversation_id: "conv-calm123", turn_id: "turn-calm123" },
+        { type: "error", error: line, code: "engine_unavailable" },
+      ],
+    });
+    try {
+      const spanish = say("failure.busy.adult", line);
+      expect(spanish).not.toBe(line);
+      const view = openChat("owner");
+      await send(view, "cuéntame una historia");
+      const failure = await waitFor(() => { const found = inlineFailure(view.container); expect(found).toBeTruthy(); return found!; });
+      expect(failure.textContent).toContain(spanish);
+      expect(failure.textContent).not.toContain(line);
+    } finally {
+      stubbed.restore();
+    }
+  });
+
+  test("a child profile reads the child line from the child ids, never the adult Spanish", async () => {
+    const stubbed = stub({ health: () => DOWN });
+    try {
+      expect(say("failure.composer.paused.child", PAUSED.child)).toBe(PAUSED.child);
+      const view = openChat("child");
+      await waitFor(() => expect(notice(view.container)?.querySelector("[data-chat-notice-text]")?.textContent).toBe(PAUSED.child));
+    } finally {
+      stubbed.restore();
+    }
+  });
+
+  test("a child's failure line is the child id's text", async () => {
+    const line = failureLine("busy", true);
+    const stubbed = stub({
+      health: () => READY,
+      stream: () => [
+        { type: "turn_meta", conversation_id: "conv-calm123", turn_id: "turn-calm123" },
+        { type: "error", error: line, code: "engine_unavailable" },
+      ],
+    });
+    try {
+      const view = openChat("child");
+      await send(view, "tell me a story");
+      const failure = await waitFor(() => { const found = inlineFailure(view.container); expect(found).toBeTruthy(); return found!; });
+      expect(failure.textContent).toContain(line);
     } finally {
       stubbed.restore();
     }

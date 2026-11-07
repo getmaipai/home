@@ -1,3 +1,4 @@
+import { i18n } from "@lingui/core";
 import { createContext, useContext, useEffect, useState } from "react";
 import { useQuery, useQueryClient, type QueryClient } from "@tanstack/react-query";
 import { api, isOwnerOrAdminRole, type EngineHealthEntry, type HealthStatus, type Roster } from "@/lib/api";
@@ -5,6 +6,7 @@ import { chatAvailability } from "@/apps/chat/chatAvailability";
 import type { ChatComposerNoticeValue } from "@/apps/chat/chatThreadContexts";
 import { useStatusApps } from "@/shell/useStatusApps";
 import { isSearchLimitedChat } from "@/shell/statusApps";
+import { translateServerLine } from "@/apps/chat/serverLines";
 
 export const ChatAvailabilityContext = createContext<"ready" | "starting" | "unavailable">("ready");
 
@@ -110,38 +112,39 @@ export function useChatComposerNotice(person: Pick<Roster, "role" | "age_band">)
   const readiness = useChatReadiness();
   const health = readiness.chat;
   const notice = health?.notice;
+  const minor = person.age_band !== "adult";
   const apps = useStatusApps().data;
   if (readiness.hubDown) {
     const text = person.age_band === "child"
-      ? (readiness.hubDown === "offline" ? "I'm taking a break. Ask a grown-up." : "One moment. Back soon.")
-      : (readiness.hubDown === "offline" ? "The AI isn't answering." : "One moment. Back soon.");
-    return { text, repairsLink: readiness.hubDown === "offline" && isOwnerOrAdminRole(person.role) ? "Check Repairs" : null };
+      ? (readiness.hubDown === "offline" ? i18n._({ id: "I'm taking a break. Ask a grown-up.", message: "I'm taking a break. Ask a grown-up." }) : i18n._({ id: "One moment. Back soon.", message: "One moment. Back soon." }))
+      : (readiness.hubDown === "offline" ? i18n._({ id: "The AI isn't answering.", message: "The AI isn't answering." }) : i18n._({ id: "One moment. Back soon.", message: "One moment. Back soon." }));
+    return { text, repairsLink: readiness.hubDown === "offline" && isOwnerOrAdminRole(person.role) ? i18n._({ id: "Check Repairs", message: "Check Repairs" }) : null };
   }
   // TIER-HOME-03: chat is on its simpler model while a Max job runs. It still answers, so this is a line, never a hold on Send.
   if (chatAvailability(health) === "ready" && (health?.cause as string | undefined) === "tier_reduced" && notice) {
     const text = person.age_band === "child" ? notice.child : person.age_band === "teen" ? notice.teen : notice.adult;
-    return { text, ...(notice.more ? { more: notice.more } : {}), repairsLink: null };
+    return { text: translateServerLine(text, minor), ...(notice.more ? { more: translateServerLine(notice.more, minor) } : {}), repairsLink: null };
   }
   if (chatAvailability(health) === "ready" && Array.isArray(apps)) {
-    if (apps.some(isSearchLimitedChat)) return { text: "Searches may be limited right now.", repairsLink: null };
+    if (apps.some(isSearchLimitedChat)) return { text: i18n._({ id: "Searches may be limited right now.", message: "Searches may be limited right now." }), repairsLink: null };
     // STATUS-REASON-01: chat answers, but one of its optional parts is not
     // fully up. Owners and admins read the status reason and get the Repairs
     // link; everyone else gets the plain line with no part names.
     const degraded = apps.find((app) => app.state === "degraded" && (app.id === "chat" || app.name.toLocaleLowerCase() === "chat"));
     if (degraded) {
       return isOwnerOrAdminRole(person.role)
-        ? { text: degraded.reason ?? "Chat works, but a part is down.", repairsLink: "Open Repairs" }
-        : { text: "Some chat features are limited.", repairsLink: null };
+        ? { text: degraded.reason ?? i18n._({ id: "Chat works, but a part is down.", message: "Chat works, but a part is down." }), repairsLink: i18n._({ id: "Open Repairs", message: "Open Repairs" }) }
+        : { text: i18n._({ id: "Some chat features are limited.", message: "Some chat features are limited." }), repairsLink: null };
     }
   }
   if (chatAvailability(health) === "ready") return null;
   if (health?.kind === "starting" && (health.reason as string | undefined) === "ai_installing") {
     const text = person.age_band === "child"
-      ? "Still installing. Ask a grown-up."
-      : "The AI is installing. Chat works after.";
+      ? i18n._({ id: "Still installing. Ask a grown-up.", message: "Still installing. Ask a grown-up." })
+      : i18n._({ id: "The AI is installing. Chat works after.", message: "The AI is installing. Chat works after." });
     return { text, repairsLink: null };
   }
   if (!notice) return null;
   const text = person.age_band === "child" ? notice.child : person.age_band === "teen" ? notice.teen : person.age_band === "adult" ? notice.adult : null;
-  return text === null ? null : { text, ...(notice.more ? { more: notice.more } : {}), repairsLink: isOwnerOrAdminRole(person.role) ? notice.repairs_link : null };
+  return text === null ? null : { text: translateServerLine(text, minor), ...(notice.more ? { more: translateServerLine(notice.more, minor) } : {}), repairsLink: isOwnerOrAdminRole(person.role) && notice.repairs_link ? translateServerLine(notice.repairs_link, false) : null };
 }

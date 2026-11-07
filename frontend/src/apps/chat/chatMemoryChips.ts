@@ -1,3 +1,4 @@
+import { i18n } from "@lingui/core";
 import { useContext } from "react";
 import { useAuiState } from "@assistant-ui/react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -52,7 +53,7 @@ export function useReplyMemoryChips(): { chips: MemoryChip[]; onForget: (id: str
     onForget: (id) => {
       forgetOneMemory(turnId, id)
         .then(() => queryClient.invalidateQueries({ queryKey: OWN_MEMORIES_KEY }))
-        .catch(() => toast.error("Couldn't forget that - try again."));
+        .catch(() => toast.error(i18n._({ id: "Couldn't forget that - try again.", message: "Couldn't forget that - try again." })));
     },
   };
 }

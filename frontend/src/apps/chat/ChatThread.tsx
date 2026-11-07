@@ -1,3 +1,4 @@
+import { i18n } from "@lingui/core";
 import { useMaxSendHold } from "@/apps/chat/maxChat";
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type CSSProperties, type RefObject } from "react";
 import { useAssistantDataUI, useAssistantToolUI, useAui, useAuiState, type ToolCallMessagePartComponent } from "@assistant-ui/react";
@@ -213,7 +214,7 @@ export function ChatThread({ temporary, onEditSend, thinkingModeVisible = false,
         <ChatConnectionBanner />
       </div>
       <ChatExtrasContext.Provider value={extraContext}>
-        {originMissing ? <p role="status" className="px-4 py-2 text-sm text-muted-foreground">That message is no longer available. This chat is open at the end.</p> : null}
+        {originMissing ? <p role="status" className="px-4 py-2 text-sm text-muted-foreground">{i18n._({ id: "That message is no longer available. This chat is open at the end.", message: "That message is no longer available. This chat is open at the end." })}</p> : null}
         {originHighlight ? <div data-origin-highlight aria-hidden="true" className="pointer-events-none z-50 rounded-lg border-2 border-primary bg-primary/10 motion-reduce:transition-none" style={{ "--origin-left": originHighlight["--origin-left"], "--origin-top": originHighlight["--origin-top"], "--origin-width": originHighlight["--origin-width"], "--origin-height": originHighlight["--origin-height"] } as CSSProperties} /> : null}
         <Thread
           tourId="chat.thread"

@@ -1,5 +1,6 @@
 "use client";
 
+import { i18n } from "@lingui/core";
 // VOICE-LIVE-04: while dictation records, the composer's own text field
 // gives way to the shipped ComposerVoiceLevels Element, fed by the live
 // microphone analyser. Mounted as ChatPage.tsx's own
@@ -100,7 +101,7 @@ export function ComposerDictationWaveform() {
     />;
   const input = !dictating ? (
     <CompanionComposerMentions>{field}</CompanionComposerMentions>
-  ) : <ComposerVoiceLevels levels={levels} recording={dictating} seconds={seconds} role="status" aria-label="Listening" />;
+  ) : <ComposerVoiceLevels levels={levels} recording={dictating} seconds={seconds} role="status" aria-label={i18n._({ id: "Listening", message: "Listening" })} />;
   return (
     <>
       {draftRestore ? <DraftRestore {...draftRestore} /> : null}
