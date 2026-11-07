@@ -43,6 +43,7 @@ import { getPersonSettingValue } from "@/lib/settings";
 import { readClonedVoiceClip } from "@/lib/clonedVoices";
 import { promoteMadeSoundFile, savedMadeSounds } from "@/lib/media/appHost";
 import { runMakeSound, makeSoundArgs } from "@/lib/music/soundMaker";
+import { addSoundToSong, soundTakesOf } from "@/lib/music/soundTakes";
 export const musicRoutes = apiRouter();
 export function musicRouteAudience(actor: PersonRow) { return { actor, band: speakerAgeBand(actor, new Date()), surface: "chat" as const, surfaceClass: "written" as const, spoken: false }; }
 // Making a song needs the full gate (age, surface and the household switch). A person's own existing song (the card, Stop,
@@ -87,7 +88,7 @@ const cardSchema = z.object({
   conversation_id: z.string().nullable().optional(), made_from_file: z.boolean().optional(),
   id: z.string(), state: z.enum(["queued", "running", "done", "failed", "cancelled"]), stage: z.string().nullable(), stage_label: z.string(),
   task: z.string(),
-  sound: z.object({ loop: z.boolean(), surprise: z.boolean() }).nullable(),
+  sound: z.object({ loop: z.boolean(), surprise: z.boolean(), looped: z.boolean().optional().describe("False when this computer had no audio tool to make the loop seamless."), trimTo: z.number().optional(), trimmed: z.boolean().optional().describe("False when this computer had no audio tool to cut the sound to the length asked."), takes: z.object({ group: z.string(), index: z.number().int(), total: z.number().int() }).nullable().optional() }).nullable(),
   fit_ask: z.object({ job_id: z.string(), picked: z.string().nullable(), actual: z.string().nullable() }).nullable().describe("Set while this card is asking whether to make it now with the level it can run at (TIER-PRIO-07; `picked` and `actual` are the level names the buttons use) and this person may answer: POST /api/ai/jobs/{job_id}/fit-answer with allow or wait. Null otherwise."),
   cut: z.enum(["asked", "ceiling"]).nullable(), max_seconds: z.number().nullable(),
   progress: z.number(), eta_seconds: z.number().nullable(), position: z.number().nullable(), error_line: z.string().nullable(),
@@ -329,8 +330,22 @@ musicRoutes.openapi(saveSoundRoute, (c) => {
   return item ? c.json({ item_id: item.id }, 200) : c.json({ error: "That sound cannot be saved." }, 404);
 });
 const soundsRoute = createRoute({ method: "get", path: "/sounds", tags: ["Music"], summary: "List saved sounds", middleware: viewMiddleware,
-  responses: { 200: { content: { "application/json": { schema: z.array(z.object({ id: z.string(), title: z.string(), duration_s: z.number().nullable(), file_id: z.string(), src: z.string(), loop: z.boolean() })) } }, description: "Saved sound items." }, ...refusals } });
+  responses: { 200: { content: { "application/json": { schema: z.array(z.object({ id: z.string(), title: z.string(), duration_s: z.number().nullable(), file_id: z.string(), job_id: z.string().nullable(), src: z.string(), loop: z.boolean() })) } }, description: "Saved sound items." }, ...refusals } });
 musicRoutes.openapi(soundsRoute, (c) => c.json(savedMadeSounds(c.get("person")), 200));
+const takeSchema = z.object({ job_id: z.string(), index: z.number().int(), total: z.number().int(), state: z.enum(["queued", "running", "done", "failed", "cancelled"]), file_id: z.string().nullable(), src: z.string().nullable(), saved: z.boolean(), loop: z.boolean(), seconds: z.number().nullable() });
+const soundTakesRoute = createRoute({ method: "get", path: "/sounds/takes/{group}", tags: ["Music"], summary: "The takes one sound request made", middleware: viewMiddleware,
+  request: { params: z.object({ group: z.string().regex(/^snd-[a-z0-9]{6,32}$/) }) }, responses: { 200: { content: { "application/json": { schema: z.array(takeSchema) } }, description: "The takes in order; one that was deleted is left out." }, ...refusals } });
+musicRoutes.openapi(soundTakesRoute, (c) => c.json(soundTakesOf(c.get("person"), c.req.valid("param").group), 200));
+const addSoundToSongRoute = createRoute({ method: "post", path: "/sounds/{id}/add-to-song", tags: ["Music"], summary: "Lay a made sound into a song as a new version", middleware,
+  request: { params, body: { content: { "application/json": { schema: z.object({ song_id: z.string().min(1).max(80), start_s: z.number().finite().min(0).max(3600), file_id: z.string().min(1).max(80).optional() }) } } } },
+  responses: { 200: { content: { "application/json": { schema: cardSchema } }, description: "The song's card with the new version shown." }, 422: { description: "The sound cannot be added as asked." }, ...refusals, ...errorResponses({ 503: "This computer cannot mix audio now" }) } });
+musicRoutes.openapi(addSoundToSongRoute, async (c) => {
+  const actor = c.get("person"), body = c.req.valid("json");
+  const refusal = musicRefusalFor(musicRouteAudience(actor), { description: "add a sound to a song" });
+  if (refusal) return c.json({ error: refusal.line }, 403) as never;
+  const result = await addSoundToSong(actor, { soundJobId: c.req.valid("param").id, songId: body.song_id, fileId: body.file_id, startSeconds: body.start_s });
+  return result.ok ? c.json(await musicCardView(actor, result.root), 200) : c.json({ error: result.line }, result.status) as never;
+});
 // Change a song's title, words, style, tempo or key: a new version on the same card; the earlier versions stay.
 const detailsRoute = createRoute({ method: "post", path: "/jobs/{id}/details", tags: ["Music"], summary: "Make a new version of the song with a new title, words, style, tempo or key", middleware,
   request: { params, body: { content: { "application/json": { schema: z.object({

@@ -30,7 +30,7 @@ export interface MusicCard {
   versions: MusicVersion[];
   current_id: string | null;
   /** The kind of the version on show: quick (the hook) or full (every part). */
-  sound?: { loop: boolean; surprise: boolean } | null;
+  sound?: { loop: boolean; surprise: boolean; looped?: boolean; trimTo?: number; trimmed?: boolean; takes?: { group: string; index: number; total: number } | null } | null;
   length: "quick" | "full";
   /** The maker the shown version really used: quick is Standard, detailed is Boost, max is Max. A Max song made without the Max models says detailed. */
   quality: "quick" | "detailed" | "max";
@@ -55,8 +55,9 @@ export interface MusicCard {
 export interface MusicStatus { can_make: boolean; engine_ready: boolean; limits: { min_seconds: number; max_seconds: number } | null }
 
 export interface MakeSongBody { idea: string; lyrics?: string; instrumental?: boolean; title?: string; length?: "quick" | "full"; bpm?: number; key?: string; song_style?: string; band?: string }
-export interface MakeSoundBody { description: string; seconds?: number; loop?: boolean; stick_to_words?: boolean }
-export interface SavedSound { id: string; title: string; duration_s: number; src: string; loop: boolean }
+export interface MakeSoundBody { description: string; seconds?: number; loop?: boolean; stick_to_words?: boolean; takes?: number }
+export interface SavedSound { id: string; title: string; duration_s: number; src: string; loop: boolean; job_id?: string | null }
+export interface SoundTake { job_id: string; index: number; total: number; state: "queued" | "running" | "done" | "failed" | "cancelled"; file_id: string | null; src: string | null; saved: boolean; loop: boolean; seconds: number | null }
 export interface SongDetailChanges { title?: string; lyrics?: string; description?: string; bpm?: number; key?: string }
 export interface FileEditBody { file_id: string; change: "restyle" | "instrumental" | "parts" | "stems" | "voice_swap"; voice?: string; style?: string; parts?: { keep?: string[]; drop?: string[] } }
 
@@ -77,6 +78,10 @@ export const musicApi = {
   makeSound: (body: MakeSoundBody) => requestJson<MusicCard>("/api/music/sounds", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) }),
   saveSound: (jobId: string) => requestJson<{ id: string }>(`/api/music/sounds/${encodeURIComponent(jobId)}/save`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ item_id: jobId }) }),
   listSounds: () => requestJson<SavedSound[]>("/api/music/sounds"),
+  /** The takes one sound request made, in order. */
+  soundTakes: (group: string) => requestJson<SoundTake[]>(`/api/music/sounds/takes/${encodeURIComponent(group)}`),
+  /** Lay a made sound into a song at a start time: a new version of the song; the first version stays. */
+  addSoundToSong: (soundJobId: string, body: { song_id: string; start_s: number; file_id?: string }) => requestJson<MusicCard>(`/api/music/sounds/${encodeURIComponent(soundJobId)}/add-to-song`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) }),
   /** A new title, words, style, tempo or key: a new version on the same card. */
   details: (id: string, changes: SongDetailChanges, fileId?: string) => requestJson<MusicCard>(`/api/music/jobs/${encodeURIComponent(id)}/details`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ ...changes, ...(fileId ? { file_id: fileId } : {}) }) }),
   stems: (id: string, fileId?: string) => requestJson<MusicCard>(`/api/music/jobs/${encodeURIComponent(id)}/stems`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(fileId ? { file_id: fileId } : {}) }),

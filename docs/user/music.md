@@ -63,7 +63,7 @@ Adults only. Open **Create**. A row of choices asks what to make: **Song**, **Ba
 - **Band:** a name, a look and a sound. Home draws the pictures in chat.
 - **Album:** a title, a look for the cover and a sound. Home adds the cover and the songs in chat.
 - **Style:** a sound you can reuse for many songs. It uses words only, never lyrics.
-- **Sound:** type a sound, such as a wooden door creaking open, and Home makes it. Your sounds show in the same page.
+- **Sound:** type a sound, such as a wooden door creaking open, and Home makes it. Your sounds show in the same page. See [Sounds](#sounds) for length, takes, loops and adding a sound to a song.
 - **Voice:** make a voiceover from a script, or change the voice in an audio or video file. Pick a household voice with a saved sample.
 
 You can fill the form, or ask in chat, for example "Make an album called Porch Light". Open **Library** to see everything you made. Choose one to change it, or change it right in chat from its card.
@@ -73,6 +73,13 @@ Every change keeps the earlier version, so nothing is lost. Children and teens d
 ### Make a song like this one
 
 On **Now playing**, choose **Song like this** or **Band like this** to start a new song or a new band that fits the one you are playing.
+
+### Sounds
+
+- **Length:** ask for 1 to 60 seconds. The music model cannot make less than 10 seconds, so for a short sound such as a click or a knock Home makes 10 seconds and cuts it to the length you asked. Home needs an audio tool (afconvert on a Mac, or ffmpeg) to cut it. Without one, you get the longer sound and a note that says so.
+- **Takes:** choose 1, 2 or 3 takes. Home makes them one after another. Each take is its own sound. Open the sound to see all the takes. Play each one, then choose **Keep this one** to save it to your sounds and delete the others, or **Delete** to remove one take.
+- **Loop:** turn on **Loop it** and Home blends the end of the sound into its start, so it repeats with no click or gap. The sound ends up half a second shorter. Without an audio tool, the sound is not blended, and the card says so.
+- **Add to a song:** open a sound, or find it in **Your sounds**, and choose **Add to a song**. Pick one of your made songs and the second where the sound starts. Home makes a new version of the song with the sound in it. The first version of the song stays, and so does the sound.
 
 ### Bring a song
 

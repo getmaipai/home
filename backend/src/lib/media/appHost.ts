@@ -1030,8 +1030,8 @@ export function savedMadeSounds(person: PersonRow) {
       if (!item || item.kind !== "sound" || !item.location.file_id) return [];
       const job = db.select().from(musicJobs).where(eq(musicJobs.fileId, item.location.file_id)).get();
       let loop = false;
-      try { loop = !!(JSON.parse(job?.request ?? "{}") as { sound?: { loop?: boolean } }).sound?.loop; } catch { /* malformed job has no loop flag */ }
-      return [{ id: item.id, title: item.title, duration_s: item.duration_s, file_id: item.location.file_id, src: `/api/files/${encodeURIComponent(item.location.file_id)}/content`, loop }];
+      try { const sound = (JSON.parse(job?.request ?? "{}") as { sound?: { loop?: boolean; looped?: boolean } }).sound; loop = !!sound?.loop && sound.looped !== false; } catch { /* malformed job has no loop flag */ }
+      return [{ id: item.id, title: item.title, duration_s: item.duration_s, file_id: item.location.file_id, job_id: job?.id ?? null, src: `/api/files/${encodeURIComponent(item.location.file_id)}/content`, loop }];
     });
 }
 /** MUSIC-LIKE-01: the finished single files of a made band, newest first (the music jobs that carry its id). */

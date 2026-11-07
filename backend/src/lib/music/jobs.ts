@@ -19,6 +19,7 @@ import { modelStampFor } from "./models";
 import { provenanceFor } from "./commercial";
 import { m4aSeconds } from "./m4a";
 import { mixMusicParts } from "./mixParts";
+import { shapeSoundM4a } from "./soundAudio";
 import { readClonedVoiceClip } from "@/lib/clonedVoices";
 import { refuseMusicPrompt } from "./policy";
 import { jobQueueCopy } from "@/lib/jobQueueCopy";
@@ -273,16 +274,27 @@ async function finish(job: MusicJob, actor: PersonRow, songs: StackSong[], signa
   if (signal.aborted) return;
   if (bytes.length < 12 || Buffer.from(bytes.subarray(4, 8)).toString() !== "ftyp") { fail(job, "bad_file"); return; }
   // The model comes from the Stack's own result, never from a constant: an unknown one is stamped unknown and never cleared.
+  let soundBytes = bytes, soundSeconds = song.duration_s;
+  const shape = job.request.sound;
+  if (shape && (shape.loop || shape.trimTo)) {
+    // A short or looping sound is shaped here, never by the model: cut to the asked length, then the tail is crossfaded into the head.
+    // A host without an audio tool keeps the plain sound, and the card says it is not trimmed or not seamless.
+    const shaped = await shapeSoundM4a(bytes, { trimTo: shape.trimTo, loop: shape.loop });
+    if (signal.aborted) return;
+    if (shape.loop) shape.looped = !!shaped;
+    if (shape.trimTo) shape.trimmed = !!shaped;
+    if (shaped) { soundBytes = shaped; soundSeconds = m4aSeconds(shaped) ?? (shape.trimTo ?? song.duration_s); }
+  }
   const stamp = modelStampFor(job.request.sound ? "sfx" : job.task, song.model, job.parentFileId ? provenanceFor(job.parentFileId) : null);
   const provenance: GenerationProvenance = {
-    kind: job.request.sound ? "sound" : "music", job_id: job.id, task: job.request.sound ? "sfx" : job.task, ...stamp, seed: song.seed, duration_s: song.duration_s,
+    kind: job.request.sound ? "sound" : "music", job_id: job.id, task: job.request.sound ? "sfx" : job.task, ...stamp, seed: song.seed, duration_s: soundSeconds,
     bpm: song.bpm ?? job.request.bpm ?? null, key: song.key ?? job.request.key ?? null,
     parent_file_id: job.request.ownedFile ? null : job.parentFileId, source_kind: job.request.ownedFile ? "upload" : job.parentFileId ? "made_here" : "none",
     made_at: new Date().toISOString(),
   };
   if (job.temporary) {
     job.fileId = newFileId();
-    temporarySongs.set(job.fileId, { bytes, jobId: job.id, personId: job.personId, conversationId: job.conversationId!, createdAt: Date.parse(job.createdAt), provenance });
+    temporarySongs.set(job.fileId, { bytes: soundBytes, jobId: job.id, personId: job.personId, conversationId: job.conversationId!, createdAt: Date.parse(job.createdAt), provenance });
   } else {
     // A quick edit may finish before the turn is written. Forget aborts this wait and prevents resurrection.
     let turn = false;
@@ -292,20 +304,32 @@ async function finish(job: MusicJob, actor: PersonRow, songs: StackSong[], signa
     }
     if (signal.aborted) return;
     if (!turn) { fail(job, "lost_turn"); return; }
-    const made = createAttachment(actor, { conversationId: job.conversationId!, turnId: job.turnId!, mediaType: "audio/mp4", bytes, provenance: MUSIC_NOTE + JSON.stringify(provenance), deduplicate: false, retention: "conversation" });
+    const made = createAttachment(actor, { conversationId: job.conversationId!, turnId: job.turnId!, mediaType: "audio/mp4", bytes: soundBytes, provenance: MUSIC_NOTE + JSON.stringify(provenance), deduplicate: false, retention: "conversation" });
     if (!made.ok) { fail(job, made.status === 403 ? "storage_full" : "save_failed"); return; }
     job.fileId = made.value.id;
   }
-  job.seed = song.seed; job.durationS = song.duration_s; job.lrc = song.lrc ?? null;
+  job.seed = song.seed; job.durationS = soundSeconds; job.lrc = song.lrc ?? null;
   if (stopped(job)) return;
   job.state = "done"; job.stage = "ready"; job.progress = 1; job.etaSeconds = 0; job.errorCode = null; job.errorLine = null;
   saveMusicJob(job);
+  if (job.request.sound) void startNextSoundTake(job, actor).catch(() => {});
   if (!job.request.sound) {
     void startSongCover(actor, job).catch(() => {});
     // MUSIC-GEN-20b: word timing runs in the background and never blocks or fails the song.
     void startWordTiming(job, bytes).catch(() => {});
   }
 }
+/** SOUNDS-FOLLOW-01: a request for up to three takes runs them one after another (a person has one music job at a time); each take is its own job and Library item. A take that fails or is stopped ends the run. */
+async function startNextSoundTake(job: MusicJob, actor: PersonRow): Promise<void> {
+  const sound = job.request.sound, takes = sound?.takes;
+  if (!sound || !takes || takes.index + 1 >= takes.total || !job.conversationId || !job.turnId) return;
+  const request: MusicRequest = { description: job.request.description, instrumental: true, lyrics: job.request.lyrics, seconds: job.request.seconds, quality: "quick", max_seconds: job.request.max_seconds,
+    sound: { loop: sound.loop, surprise: sound.surprise, ...(sound.trimTo ? { trimTo: sound.trimTo } : {}), takes: { ...takes, index: takes.index + 1 } } };
+  const body = musicBody(request, "text2music"); body.quality = "quick";
+  await startMusicJob({ actor, conversationId: job.conversationId, turnId: job.turnId, companionId: job.companionId ?? null, temporary: job.temporary, task: "text2music", request, body, parentFileId: null });
+}
+/** SOUNDS-FOLLOW-01: save a finished job that was built outside the Stack (a sound laid into a song). */
+export function saveFinishedMusicJob(job: MusicJob): void { saveMusicJob(job); }
 async function finishStems(job: MusicJob, actor: PersonRow, stems: StackStem[], signal: AbortSignal): Promise<void> {
   if (!stems.length || stems.some((s) => !["vocals", "drums", "bass", "other"].includes(s.stem) || !s.url)) { fail(job, "bad_reply"); return; }
   let turn = false;

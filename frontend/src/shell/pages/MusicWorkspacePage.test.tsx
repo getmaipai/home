@@ -54,6 +54,18 @@ describe("Create controls", () => {
     fireEvent.click(bar.getByRole("button", { name: "Generate" }));
     await waitFor(() => expect(calls.some(call => call.url === "/api/music/sounds" && call.body.includes('"loop":true') && call.body.includes('"stick_to_words":false'))).toBe(true));
   });
+  test("the Sound tab asks for takes and a short length, and the body carries them", async () => {
+    expect(makeSoundBody({ description: "a knock", seconds: "3", loop: false, stick: "words", takes: 3 })).toEqual({ description: "a knock", seconds: 3, loop: false, stick_to_words: true, takes: 3 });
+    expect(makeSoundBody({ description: "a knock", seconds: "3", loop: false, stick: "words", takes: 1 })).not.toHaveProperty("takes");
+    const view = open();
+    const bar = within(await view.findByTestId("music-docked-bar"));
+    fireEvent.click(bar.getByRole("button", { name: "Sound" }));
+    expect((bar.getByLabelText("Seconds") as HTMLInputElement).value).toBe("3");
+    fireEvent.change(await bar.findByLabelText("Describe the sound"), { target: { value: "A quiet knock" } });
+    fireEvent.click(bar.getByRole("radio", { name: "3" }));
+    fireEvent.click(bar.getByRole("button", { name: "Generate" }));
+    await waitFor(() => expect(calls.some(call => call.url === "/api/music/sounds" && call.body.includes('"takes":3') && call.body.includes('"seconds":3'))).toBe(true));
+  });
   test("adult Edit surface uploads a Library file and offers the supported actions", async () => {
     const view = open("?song=mus-1");
     const input = view.container.querySelector('[data-testid="bring-song"] input[type="file"]')!;

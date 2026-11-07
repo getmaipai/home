@@ -82,7 +82,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `frontend/src/apps/chat/AskHandoff.tsx` | ASK_HANDOFF_MAX, askFromSearch, AskHandoff |
 | `frontend/src/apps/chat/ChatThread.tsx` | ChatExtrasContext, ChatThread |
 | `frontend/src/apps/chat/ChatThreadExtras.tsx` | ChatThreadExtras |
-| `frontend/src/apps/chat/MusicCardView.tsx` | musicFileName, musicHint, soundCardCopy, useMusicTrackProps |
+| `frontend/src/apps/chat/MusicCardView.tsx` | musicFileName, musicHint, soundHintOf, soundCardCopy, useMusicTrackProps |
 | `frontend/src/apps/chat/branchInNewChatMenuItem.tsx` | BranchInNewChatMenuItem |
 | `frontend/src/apps/chat/chatActionBar.tsx` | useFeedbackFormStore, createChatFeedbackAdapter, clearSubmittedFeedback |
 | `frontend/src/apps/chat/chatAnswerBlocks.tsx` | ANSWER_BLOCK_PART, placeParts, drawableBlocks, textWithAnswerParts, AnswerBlockDataRender |
@@ -273,6 +273,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `frontend/src/shell/pages/ReferencePage.tsx` | ReferencePage |
 | `frontend/src/shell/pages/RepairsPage.tsx` | RepairsIcon, RepairsPage |
 | `frontend/src/shell/pages/SignInPage.tsx` | SignInPage |
+| `frontend/src/shell/pages/SoundExtras.tsx` | SoundTakes, AddSoundToSong |
 | `frontend/src/shell/pages/StatusPage.tsx` | StatusIcon, StatusPage |
 | `frontend/src/shell/pages/StoragePage.tsx` | StorageIcon, StoragePage |
 | `frontend/src/shell/pages/TrashPage.tsx` | TrashPage |
@@ -718,7 +719,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/music/lyricsTranslate.ts` | LYRICS_TRANSLATION_PROMPT, sourceHash, translateLines, localTranslate, cachedTranslation, fillTranslation |
 | `backend/src/lib/music/m4a.ts` | m4aSeconds |
 | `backend/src/lib/music/madeRecords.ts` | MADE_KINDS, listMade, getMade, createMade, updateMade, deleteMade |
-| `backend/src/lib/music/mixParts.ts` | __setMusicMixRunnerForTests, __setMusicMixToolsForTests, mixPcmWav, mixMusicParts |
+| `backend/src/lib/music/mixParts.ts` | __setMusicMixRunnerForTests, __setMusicMixToolsForTests, SAMPLE_RATE, parseWav, mixPcmWav, run |
 | `backend/src/lib/music/models.ts` | MUSIC_ENGINE, KNOWN_MUSIC_MODELS, modelStampFor |
 | `backend/src/lib/music/objects.ts` | isMusicObjectRef, musicObjectOf, cardProvenance, threadMusicObject, readMusicBand, readMusicAlbum |
 | `backend/src/lib/music/policy.ts` | MUSIC_ENABLED_KEY, MUSIC_DENIAL_LINE, MUSIC_NOT_HERE_LINE, MUSIC_LENGTH_KEY, householdSongLength, householdAllowsMusic |
@@ -726,7 +727,9 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/music/sections.ts` | resolveMusicSection, replaceMusicSection, secondsForWords, hookOf, sungSecondsFor, fitLyricsToLength |
 | `backend/src/lib/music/songEdit.ts` | SONG_GONE_LINE, runSongEdit |
 | `backend/src/lib/music/sound.ts` | SOUND_NOT_FOUND_LINE, resolveSound |
+| `backend/src/lib/music/soundAudio.ts` | LOOP_FADE_SECONDS, wavOfPcm, crossfadeLoopWav, mixSoundAtWav, m4aToWav, wavToM4a |
 | `backend/src/lib/music/soundMaker.ts` | MAKE_SOUND_TOOL_ID, makeSoundArgs, runMakeSound |
+| `backend/src/lib/music/soundTakes.ts` | soundTakesOf, addSoundToSong |
 | `backend/src/lib/music/stack.ts` | musicBody, StackMusicError, musicStackConfigured, __setMusicFetchForTests, submitMusic, getMusicJob |
 | `backend/src/lib/music/store.ts` | TEMP_MS, memory, liveJobs, watching, temporarySongs, storedMusicState |
 | `backend/src/lib/music/studioTools.ts` | EDIT_BAND_TOOL_ID, STUDIO_TOOL_IDS, isStudioTool, EDIT_TOOL_OBJECT, runStudioTool |

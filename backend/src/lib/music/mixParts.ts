@@ -10,14 +10,14 @@ let toolsForTests: { afconvert: string | null; ffmpeg: string | null } | null = 
 export function __setMusicMixRunnerForTests(runner: Runner | null): void { runnerForTests = runner; }
 export function __setMusicMixToolsForTests(tools: { afconvert: string | null; ffmpeg: string | null } | null): void { toolsForTests = tools; }
 
-const SAMPLE_RATE = 44100;
+export const SAMPLE_RATE = 44100;
 const CHANNELS = 2;
 const PEAK_LIMIT = 0.89;
 const RMS_FLOOR = 0.1; // -20 dBFS
 
-interface PcmWav { bytes: Uint8Array; dataOffset: number; dataLength: number; sampleRate: number; channels: number; bits: number; }
+export interface PcmWav { bytes: Uint8Array; dataOffset: number; dataLength: number; sampleRate: number; channels: number; bits: number; }
 
-function parseWav(bytes: Uint8Array): PcmWav {
+export function parseWav(bytes: Uint8Array): PcmWav {
   const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
   if (bytes.length < 12 || String.fromCharCode(...bytes.subarray(0, 4)) !== "RIFF" || String.fromCharCode(...bytes.subarray(8, 12)) !== "WAVE") throw new Error("mix_failed");
   let offset = 12, format = 0, subFormat = 0, channels = 0, sampleRate = 0, bits = 0, dataOffset = -1, dataLength = 0;
@@ -60,7 +60,7 @@ export function mixPcmWav(stems: readonly Uint8Array[]): Uint8Array {
   return output;
 }
 
-async function run(command: string[], cwd: string): Promise<boolean> {
+export async function run(command: string[], cwd: string): Promise<boolean> {
   if (runnerForTests) return runnerForTests(command, cwd);
   const prioritized = atBackgroundPriority(command);
   const child = Bun.spawn(prioritized, { cwd, stdout: "ignore", stderr: "ignore" });
@@ -70,6 +70,13 @@ async function run(command: string[], cwd: string): Promise<boolean> {
   if (prioritized.length !== command.length || prioritized[0] !== command[0]) return await Bun.spawn(command, { cwd, stdout: "ignore", stderr: "ignore" }).exited === 0;
   return false;
 }
+
+/** The decoder and encoder this host has: afconvert on a Mac, else ffmpeg; null for each that is missing. */
+export function musicAudioTools(): { afconvert: string | null; ffmpeg: string | null } {
+  if (toolsForTests) return toolsForTests;
+  return { afconvert: existsSync("/usr/bin/afconvert") ? "/usr/bin/afconvert" : null, ffmpeg: Bun.which("ffmpeg") };
+}
+export function hasRunnerForTests(): boolean { return runnerForTests !== null; }
 
 /** Mix selected private stem bytes; work files are removed before returning. */
 export async function mixMusicParts(stems: Partial<Record<Part, Uint8Array>>, keep: readonly Part[]): Promise<Uint8Array> {

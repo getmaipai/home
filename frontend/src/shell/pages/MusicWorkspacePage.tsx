@@ -30,6 +30,7 @@ import { requestJson } from "@/lib/api";
 import { musicApi, type MusicCard } from "@/lib/musicApi";
 import { BringSong } from "./BringSong";
 import { VoiceCreate } from "./MusicVoiceCreate";
+import { AddSoundToSong, SoundTakes } from "./SoundExtras";
 
 export type Make = "song" | "band" | "album" | "song_style" | "sound" | "voice";
 export const MAKES: () => Array<{ id: Make; label: string }> = () => ([{ id: "song", label: i18n._({ id: "Song", message: "Song" }) }, { id: "band", label: i18n._({ id: "Band", message: "Band" }) }, { id: "album", label: i18n._({ id: "Album", message: "Album" }) }, { id: "song_style", label: i18n._({ id: "Style", message: "Style" }) }, { id: "sound", label: i18n._({ id: "Sound", message: "Sound" }) }, { id: "voice", label: i18n._({ id: "Voice", message: "Voice" }) }]);
@@ -45,9 +46,9 @@ export const studioAddress = (id: string): string => `/apps/music/studio?song=${
 export const stemsAddress = (id: string): string => `/apps/music/studio?song=${encodeURIComponent(id)}&split=1`;
 /** Opens the song with the Remix panel showing. Nothing is made until the panel's confirm button is pressed. */
 export const remixAddress = (id: string): string => `/apps/music/create?song=${encodeURIComponent(id)}&remix=1`;
-export function makeSoundBody(form: { description: string; seconds: string; loop: boolean; stick: "words" | "surprise" }) {
+export function makeSoundBody(form: { description: string; seconds: string; loop: boolean; stick: "words" | "surprise"; takes?: number }) {
   const seconds = Number(form.seconds);
-  return { description: form.description.trim(), ...(form.seconds.trim() && Number.isFinite(seconds) && seconds > 0 ? { seconds } : {}), loop: form.loop, stick_to_words: form.stick === "words" };
+  return { description: form.description.trim(), ...(form.seconds.trim() && Number.isFinite(seconds) && seconds > 0 ? { seconds } : {}), loop: form.loop, stick_to_words: form.stick === "words", ...(form.takes && form.takes > 1 ? { takes: form.takes } : {}) };
 }
 
 /** What a tile says under the title: how far along it is, or its sound. */
@@ -79,14 +80,14 @@ function songTile({ card, selected, onOpen, actions }: { card: MusicCard; select
 function SoundMaker({ onMade }: { onMade: (id: string) => void }) {
   const { push } = useToast();
   const status = useQuery({ queryKey: ["music-status"], queryFn: () => musicApi.status(), staleTime: 10_000, retry: false });
-  const [description, setDescription] = useState(""); const [loop, setLoop] = useState(false); const [stick, setStick] = useState<"words" | "surprise">("words"); const [seconds, setSeconds] = useState(""); const [making, setMaking] = useState(false); const [problem, setProblem] = useState("");
+  const [description, setDescription] = useState(""); const [loop, setLoop] = useState(false); const [stick, setStick] = useState<"words" | "surprise">("words"); const [seconds, setSeconds] = useState("3"); const [takes, setTakes] = useState<"1" | "2" | "3">("1"); const [making, setMaking] = useState(false); const [problem, setProblem] = useState("");
   const engineMissing = status.data ? !status.data.can_make : false;
   const ready = description.trim().length >= 3 && description.trim().length <= 600 && !making && !engineMissing && !status.isPending;
   const hint = engineMissing ? NO_MUSIC_ENGINE_LINE() : problem || (description.trim().length < 3 ? i18n._({ id: "Describe the sound in at least 3 characters to turn Generate on.", message: "Describe the sound in at least 3 characters to turn Generate on." }) : i18n._({ id: "Describe the sound and press Generate.", message: "Describe the sound and press Generate." }));
   const create = () => {
     if (!ready) { if (!making) push(hint); return; }
     setMaking(true); setProblem("");
-    void musicApi.makeSound(makeSoundBody({ description, seconds, loop, stick }))
+    void musicApi.makeSound(makeSoundBody({ description, seconds, loop, stick, takes: Number(takes) }))
       .then(card => { setDescription(""); onMade(card.id); })
       .catch((error: unknown) => { const line = text(error, i18n._({ id: "Home could not start the sound. Check the request and try again.", message: "Home could not start the sound. Check the request and try again." })); setProblem(line); push(line); })
       .finally(() => setMaking(false));
@@ -96,7 +97,8 @@ function SoundMaker({ onMade }: { onMade: (id: string) => void }) {
     <div className="flex flex-wrap items-center gap-4">
       <Field label={i18n._({ id: "Loop it", message: "Loop it" })}><Switch checked={loop} onCheckedChange={setLoop} aria-label={i18n._({ id: "Loop it", message: "Loop it" })} /></Field>
       <Field label={i18n._({ id: "Stick to my words / Surprise me", message: "Stick to my words / Surprise me" })}><ToggleGroup type="single" variant="outline" value={stick} onValueChange={next => { if (next === "words" || next === "surprise") setStick(next); }} aria-label={i18n._({ id: "Sound direction", message: "Sound direction" })}><ToggleGroupItem value="words">{i18n._({ id: "Stick to my words", message: "Stick to my words" })}</ToggleGroupItem><ToggleGroupItem value="surprise">{i18n._({ id: "Surprise me", message: "Surprise me" })}</ToggleGroupItem></ToggleGroup></Field>
-      <div className="flex flex-col gap-2"><Label htmlFor="sound-seconds">{i18n._({ id: "Seconds", message: "Seconds" })}</Label><Input id="sound-seconds" type="number" min={1} max={600} placeholder="10" value={seconds} onChange={event => setSeconds(event.currentTarget.value)} /></div>
+      <div className="flex flex-col gap-2"><Label htmlFor="sound-seconds">{i18n._({ id: "Seconds", message: "Seconds" })}</Label><Input id="sound-seconds" type="number" min={1} max={60} placeholder="3" value={seconds} onChange={event => setSeconds(event.currentTarget.value)} aria-describedby="sound-seconds-note" /><p id="sound-seconds-note" className="text-muted-foreground text-xs">{status.data?.limits && Number(seconds) < status.data.limits.min_seconds ? i18n._({ id: "The music model makes at least {min} seconds, so Home cuts it to this length.", message: "The music model makes at least {min} seconds, so Home cuts it to this length.", values: { min: status.data.limits.min_seconds } }) : i18n._({ id: "From 1 to 60 seconds.", message: "From 1 to 60 seconds." })}</p></div>
+      <Field label={i18n._({ id: "Takes", message: "Takes" })}><ToggleGroup type="single" variant="outline" value={takes} onValueChange={next => { if (next === "1" || next === "2" || next === "3") setTakes(next); }} aria-label={i18n._({ id: "Number of takes", message: "Number of takes" })}><ToggleGroupItem value="1">1</ToggleGroupItem><ToggleGroupItem value="2">2</ToggleGroupItem><ToggleGroupItem value="3">3</ToggleGroupItem></ToggleGroup></Field>
       <p role={problem || engineMissing ? "alert" : "status"} className="text-muted-foreground text-xs">{hint}</p>
       <Button type="button" size="lg" aria-disabled={!ready} variant={ready ? "default" : "secondary"} onClick={create} title={hint}>{making ? i18n._({ id: "Starting", message: "Starting" }) : i18n._({ id: "Generate", message: "Generate" })}</Button>
     </div>
@@ -254,6 +256,8 @@ export function MusicWorkspace({ adult, search }: { adult: boolean; search: stri
   const { push } = useToast();
   const [styles, setStyles] = useState<string[]>([]);
   const [stylesOpen, setStylesOpen] = useState(false);
+  const queryClient = useQueryClient();
+  const [addingSound, setAddingSound] = useState<string | null>(null);
   const song = new URLSearchParams(search).get("song");
   const sounds = useQuery({ queryKey: ["music-sounds"], queryFn: () => musicApi.listSounds(), staleTime: 2000 });
   const { shown, list } = useShown("");
@@ -269,7 +273,11 @@ export function MusicWorkspace({ adult, search }: { adult: boolean; search: stri
   };
   if (!adult) return <EmptyState icon="music" text={MAKE_SONG_ADULT_LINE()} />;
   const open = (id: string | null) => navigate(songAddress(id), { replace: true });
-  return <>{song && openedCard.data?.sound ? <MusicTrack {...openedTrackProps} /> : null}<div className="dark flex min-h-0 flex-1 flex-col"><section className="music-surface bg-background text-foreground -mx-4 flex min-h-0 flex-1 flex-col gap-10 overflow-y-auto px-4 py-4 lg:mx-0 lg:rounded-3xl lg:px-6" data-testid="music-workspace">
+  return <>{song && openedCard.data?.sound ? <MusicTrack {...openedTrackProps} /> : null}<AddSoundToSong jobId={addingSound} open={addingSound !== null} onOpenChange={open => { if (!open) setAddingSound(null); }} songs={list.data ?? []} onAdded={id => { void queryClient.invalidateQueries({ queryKey: ["music-songs"] }); void queryClient.invalidateQueries({ queryKey: ["music-song", id] }); }} /><div className="dark flex min-h-0 flex-1 flex-col"><section className="music-surface bg-background text-foreground -mx-4 flex min-h-0 flex-1 flex-col gap-10 overflow-y-auto px-4 py-4 lg:mx-0 lg:rounded-3xl lg:px-6" data-testid="music-workspace">
+    {song && openedCard.data?.sound ? <div className="flex shrink-0 flex-col gap-3" data-testid="opened-sound">
+      {openedCard.data.state === "done" ? <div className="flex flex-wrap gap-2"><Button type="button" variant="secondary" onClick={() => setAddingSound(openedCard.data!.id)}>{i18n._({ id: "Add to a song", message: "Add to a song" })}</Button></div> : null}
+      {openedCard.data.sound.takes ? <SoundTakes group={openedCard.data.sound.takes.group} onChanged={() => { void openedCard.refetch(); }} /> : null}
+    </div> : null}
     {song ? <BringSong adult={adult} /> : null}
     {song && !openedCard.data?.sound ? <SongDetail key={song} id={song} remix={new URLSearchParams(search).get("remix") === "1"} onClose={() => open(null)} /> : null}
     <Hero styles={styles} onStyles={setStyles} onMade={open} stylesOpen={stylesOpen} onStylesOpen={setStylesOpen} />
@@ -282,7 +290,7 @@ export function MusicWorkspace({ adult, search }: { adult: boolean; search: stri
       </AsyncState>}
     </div>
     <MediaCarousel title={i18n._({ id: "Your sounds", message: "Your sounds" })} line={i18n._({ id: "Sounds you have saved.", message: "Sounds you have saved." })} label={i18n._({ id: "Your sounds", message: "Your sounds" })}>
-      {!sounds.data ? <li className="text-muted-foreground text-base"><AsyncState data={sounds.data} error={sounds.isError} isFetching={sounds.isFetching} onRetry={() => void sounds.refetch()} errorMessage={i18n._({ id: "Your sounds could not be loaded.", message: "Your sounds could not be loaded." })} loadingLabel={i18n._({ id: "Loading your sounds", message: "Loading your sounds" })}>{() => null}</AsyncState></li> : sounds.data.length === 0 ? <li className="text-muted-foreground text-base" data-testid="music-sounds-empty">{i18n._({ id: "No sounds yet. Describe one in the bar above and press Generate.", message: "No sounds yet. Describe one in the bar above and press Generate." })}</li> : sounds.data.map(sound => <MediaTile key={sound.id} id={sound.id} title={sound.title} line={`${sound.duration_s}s${sound.loop ? i18n._({ id: " · Loop", message: " · Loop" }) : ""}`} coverUrl={null} playable onOpen={() => { const audio = new Audio(sound.src); audio.loop = sound.loop; void audio.play(); }} />)}
+      {!sounds.data ? <li className="text-muted-foreground text-base"><AsyncState data={sounds.data} error={sounds.isError} isFetching={sounds.isFetching} onRetry={() => void sounds.refetch()} errorMessage={i18n._({ id: "Your sounds could not be loaded.", message: "Your sounds could not be loaded." })} loadingLabel={i18n._({ id: "Loading your sounds", message: "Loading your sounds" })}>{() => null}</AsyncState></li> : sounds.data.length === 0 ? <li className="text-muted-foreground text-base" data-testid="music-sounds-empty">{i18n._({ id: "No sounds yet. Describe one in the bar above and press Generate.", message: "No sounds yet. Describe one in the bar above and press Generate." })}</li> : sounds.data.map(sound => <MediaTile key={sound.id} id={sound.id} title={sound.title} line={`${sound.duration_s}s${sound.loop ? i18n._({ id: " · Loop", message: " · Loop" }) : ""}`} coverUrl={null} playable onOpen={() => { const audio = new Audio(sound.src); audio.loop = sound.loop; void audio.play(); }}>{sound.job_id ? <div className="flex flex-wrap gap-1"><Button size="sm" variant="secondary" onClick={() => setAddingSound(sound.job_id ?? null)}>{i18n._({ id: "Add to a song", message: "Add to a song" })}</Button></div> : null}</MediaTile>)}
     </MediaCarousel>
     <MediaCarousel title={i18n._({ id: "Start from a sound", message: "Start from a sound" })} line={i18n._({ id: "Pick one and it goes into the bar above.", message: "Pick one and it goes into the bar above." })} label={i18n._({ id: "Starter sounds", message: "Starter sounds" })}>
       {STARTER_STYLES.map((name) => <MediaTile key={name} id={name} title={name} coverUrl={null} verb={styles.includes(name) ? i18n._({ id: "Remove", message: "Remove" }) : i18n._({ id: "Use", message: "Use" })} selected={styles.includes(name)} onOpen={() => pickSound(name)} />)}

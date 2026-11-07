@@ -57,7 +57,7 @@ describe("music routes", () => {
     const made = await client.post("/api/music/sounds", { description: "rain on a tin roof", seconds: 8, loop: true });
     expect(made.status).toBe(201);
     const card = await made.json() as { id: string; sound: { loop: boolean; surprise: boolean } | null };
-    expect(card.sound).toEqual({ loop: true, surprise: false });
+    expect(card.sound).toMatchObject({ loop: true, surprise: false, trimTo: 8 });
     await waitForMusic(() => getMusicJobFor(actor, card.id)?.state === "done");
     const first = await client.post(`/api/music/sounds/${card.id}/save`, {});
     const second = await client.post(`/api/music/sounds/${card.id}/save`, {});
@@ -67,6 +67,36 @@ describe("music routes", () => {
     const sounds = await client.get("/api/music/sounds");
     expect(await sounds.json()).toMatchObject([{ id: firstItem, loop: true, file_id: getMusicJobFor(actor, card.id)!.fileId }]);
     expect(await (await client.get("/api/music/jobs")).json()).toEqual([]);
+  });
+  test("three takes: listed together, one kept and saved, the others deleted", async () => {
+    const { actor, client } = await owner();
+    const made = await client.post("/api/music/sounds", { description: "a door knock", seconds: 10, takes: 3 });
+    expect(made.status).toBe(201);
+    const card = await made.json() as { id: string; sound: { takes?: { group: string; index: number; total: number } | null } | null };
+    const group = card.sound!.takes!.group;
+    expect(card.sound!.takes).toMatchObject({ index: 0, total: 3 });
+    await waitForMusic(() => getMusicJobFor(actor, card.id)?.state === "done" && fake.submitted.length === 3);
+    let takes = await (await client.get(`/api/music/sounds/takes/${group}`)).json() as Array<{ job_id: string; state: string; saved: boolean }>;
+    await waitForMusic(() => (takes.length === 3 && takes.every((take) => take.state === "done")) || (void client.get(`/api/music/sounds/takes/${group}`).then(async (r) => { takes = await r.json() as typeof takes; }), false));
+    expect(takes).toHaveLength(3);
+    const [keep, ...others] = takes;
+    expect((await client.post(`/api/music/sounds/${keep!.job_id}/save`, {})).status).toBe(200);
+    for (const other of others) expect((await client.post(`/api/music/jobs/${other.job_id}/delete`, {})).status).toBe(200);
+    const after = await (await client.get(`/api/music/sounds/takes/${group}`)).json() as Array<{ job_id: string; saved: boolean }>;
+    expect(after).toMatchObject([{ job_id: keep!.job_id, saved: true }]);
+    expect((await client.get("/api/music/sounds/takes/not-a-group")).status).toBe(400);
+  });
+  test("adds a made sound to a song as a new version at a start time", async () => {
+    const { actor, client } = await owner(); const { job: songJob } = await song(actor);
+    const made = await (await client.post("/api/music/sounds", { description: "a door knock" })).json() as { id: string };
+    await waitForMusic(() => getMusicJobFor(actor, made.id)?.state === "done");
+    // The decoded song is three seconds of audio, so a start of one second is inside it.
+    __setMusicMixRunnerForTests(async (command) => { const output = command.at(-1)!; if (command.includes("WAVE")) writeFileSync(output, pcmFixture(new Array(44100 * 2 * 3).fill(500))); else writeFileSync(output, new Uint8Array([0, 0, 0, 28, 0x66, 0x74, 0x79, 0x70, 0x4d, 0x34, 0x41, 0x20])); return true; });
+    const added = await client.post(`/api/music/sounds/${made.id}/add-to-song`, { song_id: songJob.id, start_s: 1 });
+    expect(added.status).toBe(200);
+    expect(((await added.json()) as { versions: unknown[] }).versions).toHaveLength(2);
+    expect((await client.post(`/api/music/sounds/${made.id}/add-to-song`, { song_id: songJob.id, start_s: -1 })).status).toBe(400);
+    expect((await client.post(`/api/music/sounds/${made.id}/add-to-song`, { song_id: "mus-nope", start_s: 1 })).status).toBe(404);
   });
   test("music sound creation uses safety refusal and unavailable engine responses", async () => {
     const { actor, client } = await owner();
