@@ -1,22 +1,18 @@
-import { useEffect, useRef, useState, type MutableRefObject } from "react";
+import { useEffect, useRef, type MutableRefObject } from "react";
 import { getIcon } from "@maipai/ui/src/icons";
 import { Alert, AlertDescription } from "@maipai/ui/src/ui/alert";
 import { Button } from "@maipai/ui/src/ui/button";
 import { Input } from "@maipai/ui/src/ui/input";
 import { Field, FieldLabel } from "@maipai/ui/src/dashboard/components/ui/field";
-import { api, ApiError } from "@/lib/api";
+import { api } from "@/lib/api";
 import { SEARCH_RESULT_VARIANT, type SearchTestResultData } from "@/shell/components/searchTestResult";
 import { SearchResultIcon, SearchTestResultBody } from "@/shell/components/SearchTestResultBody";
+import { useSearchAddress, webSearchFailure } from "@/apps/settings/useSearchAddress";
 
 const ErrorIcon = getIcon("alert-triangle");
 
 const SKIP_FAILED = "Home couldn't turn on DuckDuckGo search. Press Skip for now again to go on, or set up web search later in Settings.";
 
-/** The failure as one sentence: what went wrong, then the next step. */
-export function webSearchFailure(reason: unknown): string {
-  if (reason instanceof ApiError) return [reason.message.replace(/\s+$/, ""), reason.next].filter(Boolean).join(" ");
-  return "Home couldn't reach that address. Check it and that the search service is running, then press Test.";
-}
 
 export interface WebSearchStepProps {
   /** A SearXNG found on this computer, filled in for the person to Test and Save. */
@@ -36,27 +32,10 @@ export interface WebSearchStepProps {
  * Continue is the only way on: with an empty field it skips SearXNG (DuckDuckGo for adults, owner ruling 2026-10-17);
  * with an address it saves it, and only once the latest Test of that exact text passed. */
 export function WebSearchStep({ candidate = null, onFinished, continueRef, test = (url) => api.setupUseSearchCandidate(url, true), save = (url) => api.setupUseSearchCandidate(url), skip = api.setupSkipSearch, onCanContinue }: WebSearchStepProps) {
-  const [address, setAddress] = useState(candidate ?? "");
-  const [busy, setBusy] = useState<"test" | "save" | "skip" | null>(null);
-  const [result, setResult] = useState<SearchTestResultData | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const { text: address, trimmed, empty, busy, setBusy, result, error, setError, passed, changedAfterTest, type, runTest } = useSearchAddress<"save" | "skip">(candidate ?? "", test);
   const skipFailed = useRef(false);
-
-  const trimmed = address.trim();
-  const empty = trimmed === "";
-  // Passed means the latest Test, of exactly this text, was usable (works or works with warnings).
-  const [testedText, setTestedText] = useState<string | null>(null);
-  const passed = !empty && result?.canUse === true && testedText === trimmed;
-  const changedAfterTest = !empty && result !== null && testedText !== trimmed;
   const canContinue = busy === null && (empty || passed);
 
-  async function runTest() {
-    if (empty) return;
-    setBusy("test"); setError(null); setResult(null);
-    try { setResult((await test(trimmed)).result ?? null); setTestedText(trimmed); }
-    catch (reason) { setError(webSearchFailure(reason)); }
-    finally { setBusy(null); }
-  }
   async function runContinue() {
     if (!canContinue) return;
     if (empty) { await runSkip(); return; }
@@ -84,7 +63,7 @@ export function WebSearchStep({ candidate = null, onFinished, continueRef, test 
       <p className="text-base text-muted-foreground md:text-lg">SearXNG is a search service you run yourself. It searches many sites at once and keeps no record of who asked.</p>
       <Field>
         <FieldLabel htmlFor="searxng-address">SearXNG address{candidate && address === candidate ? " (found on this computer)" : ""}</FieldLabel>
-        <Input id="searxng-address" type="url" inputMode="url" autoComplete="off" placeholder="http://searx.local:8888" value={address} onChange={(event) => { setAddress(event.target.value); setError(null); }} />
+        <Input id="searxng-address" type="url" inputMode="url" autoComplete="off" placeholder="http://searx.local:8888" value={address} onChange={(event) => type(event.target.value)} />
       </Field>
       {error ? <Alert variant="destructive"><ErrorIcon /><AlertDescription>{error}</AlertDescription></Alert> : null}
       {result && !changedAfterTest ? <Alert variant={SEARCH_RESULT_VARIANT[result.level]} role="status" data-level={result.level}><SearchResultIcon level={result.level} /><AlertDescription><SearchTestResultBody result={result} /></AlertDescription></Alert> : null}

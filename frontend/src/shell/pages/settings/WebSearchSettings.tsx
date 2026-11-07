@@ -14,7 +14,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { api, type WebSearchState } from "@/lib/api";
 import { SEARCH_RESULT_VARIANT, type SearchTestResultData } from "@/shell/components/searchTestResult";
 import { SearchResultIcon, SearchTestResultBody } from "@/shell/components/SearchTestResultBody";
-import { webSearchFailure } from "@/apps/setup/WebSearchStep";
+import { useSearchAddress, webSearchFailure } from "@/apps/settings/useSearchAddress";
 
 const ErrorIcon = getIcon("alert-triangle");
 
@@ -51,36 +51,20 @@ export function WebSearchSettings({ load = api.searchWeb, test = (url) => api.se
   const state = useQuery({ queryKey: ["search-web"], queryFn: load });
   const data = state.data;
   const saved = data?.address ?? "";
-  const [address, setAddress] = useState<string | null>(null);
-  const text = address ?? saved;
-  const trimmed = text.trim();
-  const empty = trimmed === "";
-  const [busy, setBusy] = useState<"test" | "save" | "source" | null>(null);
-  const [result, setResult] = useState<SearchTestResultData | null>(null);
-  const [testedText, setTestedText] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const { text, trimmed, empty, busy, setBusy, result, error, setError, passed, changedAfterTest, type, resetTyped, forgetTest, runTest } = useSearchAddress<"save" | "source">(saved, test);
   const [confirmClear, setConfirmClear] = useState(false);
 
-  useEffect(() => { setAddress(null); }, [saved]);
+  useEffect(() => { resetTyped(); }, [saved]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const passed = !empty && result?.canUse === true && testedText === trimmed;
-  const changedAfterTest = !empty && result !== null && testedText !== trimmed;
   const unchanged = trimmed === saved;
   // Save turns on for a tested address that differs from the saved one, or for clearing a saved address.
   const canSave = busy === null && !unchanged && (empty || passed);
 
-  async function runTest() {
-    if (empty) return;
-    setBusy("test"); setError(null); setResult(null);
-    try { setResult((await test(trimmed)).result ?? null); setTestedText(trimmed); }
-    catch (reason) { setError(webSearchFailure(reason)); }
-    finally { setBusy(null); }
-  }
   async function runSave() {
     setBusy("save"); setError(null); setConfirmClear(false);
     try {
       await save(trimmed);
-      setResult(null); setTestedText(null);
+      forgetTest();
       await queryClient.invalidateQueries({ queryKey: ["search-web"] });
     } catch (reason) { setError(webSearchFailure(reason)); }
     finally { setBusy(null); }
@@ -107,7 +91,7 @@ export function WebSearchSettings({ load = api.searchWeb, test = (url) => api.se
       <p className="text-base text-muted-foreground">SearXNG is a search service you run yourself. It is private, keeps no record of who asked, and searches many sites at once.</p>
       <Field>
         <FieldLabel htmlFor="searxng-address">SearXNG address</FieldLabel>
-        <Input id="searxng-address" type="url" inputMode="url" autoComplete="off" placeholder="http://searx.local:8888" value={text} onChange={(event) => { setAddress(event.target.value); setError(null); }} />
+        <Input id="searxng-address" type="url" inputMode="url" autoComplete="off" placeholder="http://searx.local:8888" value={text} onChange={(event) => type(event.target.value)} />
       </Field>
       {error ? <Alert variant="destructive"><ErrorIcon /><AlertDescription>{error}</AlertDescription></Alert> : null}
       {result && !changedAfterTest ? <Alert variant={SEARCH_RESULT_VARIANT[result.level]} role="status" data-level={result.level}><SearchResultIcon level={result.level} /><AlertDescription><SearchTestResultBody result={result} /></AlertDescription></Alert> : null}
