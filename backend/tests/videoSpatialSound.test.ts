@@ -363,7 +363,7 @@ describe("SPATIAL-REACH: the Create page action", () => {
   test("the Create feed offers Spatial sound and Spatial sound with 5.1 file beside its other actions, within the kit's five", async () => {
     const { readFileSync } = await import("node:fs");
     const page = JSON.parse(readFileSync(new URL("../packages/videos/pages/create.json", import.meta.url), "utf8")) as unknown;
-    const found: Array<{ label: string; starts?: string; action: { call?: { target: string; args: Record<string, string> } } }> = [];
+    const found: Array<{ label: string; starts?: string; action: { call?: { target: string; args: Record<string, unknown> } } }> = [];
     const walk = (node: unknown): void => { if (Array.isArray(node)) node.forEach(walk); else if (node && typeof node === "object") { const record = node as Record<string, unknown>; if (record.type === "result_feed") found.push(...(record.actions as typeof found)); Object.values(record).forEach(walk); } };
     walk(page);
     expect(found.length).toBeLessThanOrEqual(5);
