@@ -1135,6 +1135,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/videos/recipes.ts` | VIDEO_RECIPES, videoRecipeFor, withVideoRecipe, VIDEO_STARTERS, VIDEO_LOOKS, videoLookFor |
 | `backend/src/lib/videos/rerun.ts` | prepareVideoRerun |
 | `backend/src/lib/videos/slotBody.ts` | qualityOfSlotModel, videoBodyForSlot |
+| `backend/src/lib/videos/spatialStart.ts` | startSpatialSound |
 | `backend/src/lib/videos/stack.ts` | StackVideoError, __setVideosFetchForTests, submitVideo, convertForMessages, getVideoJob, fetchVideoPreview |
 | `backend/src/lib/videos/stackEdit.ts` | EDIT_UNAVAILABLE_LINE, EDIT_REMOTE_LINE, EDIT_FAILED_LINE, EDIT_TIMEOUT_LINE, EDIT_MISSING_LINE, __setStackEditTimingForTests |
 | `backend/src/lib/videos/studio.ts` | STUDIO_TITLE, STUDIO_NO_CLIP_LINE, STUDIO_LOCKED_LINE, STUDIO_NO_SONG_LINE, STUDIO_SPEECH_LINE, STUDIO_SAY_LINE |
