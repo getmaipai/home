@@ -44,6 +44,7 @@ import { useBreakpoint } from "@maipai/ui/src/hooks/useBreakpoint";
 import { getIcon } from "@maipai/ui/src/icons";
 import { cn } from "@maipai/ui/src/utils";
 import { api, ApiError, isOwnerOrAdminRole, canHaveTemporaryChatRole, readBareCompareStream, type BareCompareTrace, type ChatModelsResponse, type EnginesOverview, type InstalledPackage, type Roster } from "@/lib/api";
+import { useHubMutation } from "@/lib/useHubMutation";
 import { CHAT_CAPABILITIES_QUERY_KEY, chatCapabilitiesFrom, modelThinks, NO_CHAT_PICTURES } from "@/apps/chat/visionCapability";
 import type { Conversation } from "@maipai/spec/gen/ts/conversation.js";
 import { createChatModelAdapter } from "@/apps/chat/chatModelAdapter";
@@ -819,6 +820,7 @@ function ChatHeaderDataBridge({ autoReadReplies, setAutoReadReplies, ttsAvailabl
   const companionList = useQuery({ queryKey: ["companions"], queryFn: api.companions });
   const personSettings = useQuery({ queryKey: ["settingsValues", `person:${person.id}`], queryFn: () => api.settingsValues(`person:${person.id}`) });
   const conversation = useQuery({ queryKey: ["conversation", conversationId], queryFn: () => api.conversation(conversationId!), enabled: Boolean(conversationId) });
+  const companionMutation = useHubMutation({ verb: "change this chat's companion", mutationFn: async (perform: () => Promise<void>) => perform() });
   // Memoized: the header data hook re-sends on a changed reference, and a fresh array per render would loop.
   const companionChoices = useMemo(() => companionList.data?.companions?.map(({ id, name, tagline, portrait }) => ({ id, name, tagline, portrait })) ?? [], [companionList.data]);
   const activeCompanionId = Array.isArray(personSettings.data) ? personSettings.data.find((setting) => setting.key === "persona.active_id")?.value : undefined;
@@ -856,10 +858,11 @@ function ChatHeaderDataBridge({ autoReadReplies, setAutoReadReplies, ttsAvailabl
     onCompanionChange: async (companionId) => {
       if (trying) return;
       if (!pinnable) return;
-      try {
+      await companionMutation.run(async () => {
         if (!conversationId) {
           // A new chat has no stored conversation yet: the choice becomes the person's own companion, which the empty chat and the first message follow.
-          if (companionId === null) return;
+          // There is no "no companion" setting, so the default choice is answered out loud, never dropped silently.
+          if (companionId === null) { toast.error("A new chat always uses one of your companions. Choose a companion to switch."); return; }
           await api.setSetting(`person:${person.id}`, "persona.active_id", companionId);
           await Promise.all([
             queryClient.invalidateQueries({ queryKey: ["settingsValues", `person:${person.id}`] }),
@@ -873,10 +876,7 @@ function ChatHeaderDataBridge({ autoReadReplies, setAutoReadReplies, ttsAvailabl
           queryClient.invalidateQueries({ queryKey: ["conversation", conversationId] }),
           queryClient.invalidateQueries({ queryKey: ["companion-avatar"] }),
         ]);
-      } catch (error) {
-        toast.error(error instanceof ApiError ? `${error.message} Choose an available companion and try again.` : "Could not change this chat's companion. Check your connection and try again.");
-        throw error;
-      }
+      });
     },
     // Same call the row menu makes: updateCustom replaces the whole
     // object, so keep the other keys.

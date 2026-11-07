@@ -1,6 +1,17 @@
+import { toastError, spyOnToast } from "../../tests/toastSpy";
 import { describe, expect, test, mock, afterEach } from "bun:test";
-import { renderHook, waitFor } from "@testing-library/react";
+import { act, renderHook as renderHookBare, waitFor } from "@testing-library/react";
+import type { ReactNode } from "react";
+import { QueryClientProvider } from "@tanstack/react-query";
+import { createQueryClient } from "@/lib/queryClient";
 import { useAppearance } from "@/shell/useAppearance";
+
+function renderHook<T>(callback: () => T) {
+  const client = createQueryClient();
+  return renderHookBare(callback, { wrapper: ({ children }: { children: ReactNode }) => <QueryClientProvider client={client}>{children}</QueryClientProvider> });
+}
+
+spyOnToast();
 
 function jsonResponse(body: unknown): Response {
   return new Response(JSON.stringify(body), { status: 200 });
@@ -100,5 +111,33 @@ describe("useAppearance", () => {
     } finally {
       globalThis.fetch = original;
     }
+  });
+
+  test("a late stored value never overwrites a choice the person just made", async () => {
+    const original = globalThis.fetch;
+    let release: (response: Response) => void = () => {};
+    globalThis.fetch = mock((_input: RequestInfo | URL, init?: RequestInit) => {
+      if (init?.method === "PUT") return Promise.resolve(jsonResponse({ key: "ui.appearance", value: "dark" }));
+      return new Promise<Response>((resolve) => { release = resolve; });
+    }) as unknown as typeof fetch;
+    try {
+      const { result } = renderHook(() => useAppearance("person-1"));
+      act(() => result.current.setAppearance("dark"));
+      await act(async () => { release(jsonResponse([{ key: "ui.appearance", value: "light", scope: "person" }])); });
+      expect(result.current.appearance).toBe("dark");
+    } finally { globalThis.fetch = original; }
+  });
+
+  test("a failed save keeps the choice on screen and says it did not stick", async () => {
+    const original = globalThis.fetch;
+    globalThis.fetch = mock((_input: RequestInfo | URL, init?: RequestInit) => init?.method === "PUT"
+      ? Promise.resolve(new Response(JSON.stringify({ error: "Home could not save your appearance." }), { status: 500 }))
+      : Promise.resolve(jsonResponse([]))) as unknown as typeof fetch;
+    try {
+      const { result } = renderHook(() => useAppearance("person-1"));
+      await act(async () => { result.current.setAppearance("dark"); });
+      await waitFor(() => expect(toastError).toHaveBeenCalledWith("Home could not save your appearance. Check your connection and try again."));
+      expect(result.current.appearance).toBe("dark");
+    } finally { globalThis.fetch = original; }
   });
 });

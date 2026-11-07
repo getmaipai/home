@@ -9,6 +9,7 @@ import { api, type NotificationDeliveryView, type Roster } from "@/lib/api";
 import { SNOOZE_OPTIONS } from "@/lib/comingUp";
 import { ALARM_LOOP_MAX_MS, startAlarmLoop, unlockAlarmAudio, type AlarmPlayback, type AlarmSoundId, type AlarmVolume } from "@/lib/alarmSounds";
 import { NOTIFICATIONS_HISTORY_QUERY_KEY, NOTIFICATIONS_QUERY_KEY, useNotificationsQuery } from "@/shell/NotificationBell";
+import { useHubMutation } from "@/lib/useHubMutation";
 import styles from "@/shell/alarmRinger.module.css";
 
 const RECENT_MS = 2 * 60_000;
@@ -29,11 +30,12 @@ function lineFor(item: AlarmDelivery) {
   return text || "Your alarm";
 }
 
-function AlarmRows({ items, settings, blocked, reducedMotion, onUnlock, onDone, onSnooze }: {
+function AlarmRows({ items, settings, blocked, reducedMotion, busy, onUnlock, onDone, onSnooze }: {
   items: AlarmDelivery[];
   settings: { sound: AlarmSoundId; volume: AlarmVolume; snoozeMinutes: number };
   blocked: boolean;
   reducedMotion: boolean;
+  busy: boolean;
   onUnlock: () => void;
   onDone: (item: AlarmDelivery) => void;
   onSnooze: (item: AlarmDelivery, input: { minutes?: number; until?: "tomorrow_morning" }) => void;
@@ -54,9 +56,9 @@ function AlarmRows({ items, settings, blocked, reducedMotion, onUnlock, onDone, 
         </div>
         {!missed && blocked && settings.sound !== "none" ? <Button variant="link" onClick={onUnlock}>Tap to turn the sound on</Button> : null}
         <div className="flex flex-wrap items-center gap-2">
-          <Button variant="secondary" onClick={() => onDone(item)}>Done</Button>
+          <Button variant="secondary" disabled={busy} onClick={() => onDone(item)}>Done</Button>
           {item.subjectJobId ? <>
-            <Button variant="outline" onClick={() => onSnooze(item, { minutes: settings.snoozeMinutes })}>Snooze {settings.snoozeMinutes} minutes</Button>
+            <Button variant="outline" disabled={busy} onClick={() => onSnooze(item, { minutes: settings.snoozeMinutes })}>Snooze {settings.snoozeMinutes} minutes</Button>
             <DropdownMenu>
             <DropdownMenuTrigger asChild><Button variant="ghost" aria-label="More snooze options">More</Button></DropdownMenuTrigger>
             <DropdownMenuContent align="end">
@@ -86,6 +88,22 @@ export function AlarmRinger({ person }: { person: Roster | null }) {
   const [phone, setPhone] = useState(() => typeof window !== "undefined" && window.matchMedia("(max-width: 719.98px)").matches);
   const [reducedMotion, setReducedMotion] = useState(() => typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches);
   const rows = Array.isArray(query.data) ? query.data.filter((row) => row.typeId === "alarm.due") as AlarmDelivery[] : [];
+  const action = useHubMutation({
+    verb: "update the alarm",
+    mutationFn: async ({ item, snooze }: { item: AlarmDelivery; snooze?: { minutes?: number; until?: "tomorrow_morning" } }) => {
+      if (snooze && item.subjectJobId) await api.snoozeComingUp(item.subjectJobId, snooze);
+      await api.dismissNotification(item.id);
+    },
+    onSuccess: async (_data, { item }) => {
+      if (activeRows.length <= 1) playback.current?.stop();
+      arrivedIds.current.delete(item.id);
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: NOTIFICATIONS_QUERY_KEY }),
+        queryClient.invalidateQueries({ queryKey: NOTIFICATIONS_HISTORY_QUERY_KEY }),
+        queryClient.invalidateQueries({ queryKey: ["household-coming-up"] }),
+      ]);
+    },
+  });
 
   useEffect(() => {
     const media = window.matchMedia("(max-width: 719.98px)");
@@ -158,23 +176,9 @@ export function AlarmRinger({ person }: { person: Roster | null }) {
     setHidden((current) => new Set([...current, ...visibleRows.map((row) => row.id)]));
   }
 
-  async function done(item: AlarmDelivery) {
-    if (activeRows.length <= 1) playback.current?.stop();
-    await api.dismissNotification(item.id);
-    arrivedIds.current.delete(item.id);
-    await Promise.all([
-      queryClient.invalidateQueries({ queryKey: NOTIFICATIONS_QUERY_KEY }),
-      queryClient.invalidateQueries({ queryKey: NOTIFICATIONS_HISTORY_QUERY_KEY }),
-      // A snoozed alarm is pending again: the Clock and Reminders pages read it from here.
-      queryClient.invalidateQueries({ queryKey: ["household-coming-up"] }),
-    ]);
-  }
+  function done(item: AlarmDelivery) { void action.run({ item }); }
 
-  async function snooze(item: AlarmDelivery, input: { minutes?: number; until?: "tomorrow_morning" }) {
-    if (!item.subjectJobId) return;
-    await api.snoozeComingUp(item.subjectJobId, input);
-    await done(item);
-  }
+  function snooze(item: AlarmDelivery, input: { minutes?: number; until?: "tomorrow_morning" }) { void action.run({ item, snooze: input }); }
 
   async function unlock() {
     if (settings.sound === "none") return;
@@ -188,7 +192,7 @@ export function AlarmRinger({ person }: { person: Roster | null }) {
   }
 
   if (!person || !open) return null;
-  const content = <AlarmRows items={visibleRows} settings={settings} blocked={blocked} reducedMotion={reducedMotion} onUnlock={unlock} onDone={(item) => void done(item)} onSnooze={(item, input) => void snooze(item, input)} />;
+  const content = <AlarmRows items={visibleRows} settings={settings} blocked={blocked} reducedMotion={reducedMotion} busy={action.busy} onUnlock={unlock} onDone={done} onSnooze={snooze} />;
   return <>
     {phone ? <Sheet open onOpenChange={(next) => { if (!next) hideAll(); }}>
       <SheetContent side="top" aria-label="Ringing alarms">

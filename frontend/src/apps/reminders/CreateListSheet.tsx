@@ -10,7 +10,7 @@ import { LIST_ICONS, type ListIcon } from "./reminderTypes";
 export function CreateListSheet({ open, onOpenChange, onCreate, isPhone }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onCreate: (title: string, icon: ListIcon) => Promise<void>;
+  onCreate: (title: string, icon: ListIcon) => Promise<boolean | undefined>;
   isPhone: boolean;
 }) {
   const [name, setName] = useState("");
@@ -19,9 +19,10 @@ export function CreateListSheet({ open, onOpenChange, onCreate, isPhone }: {
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!name.trim()) return;
-    await onCreate(name.trim(), icon);
-    setName("");
-    setIcon("sparkle");
+    if (await onCreate(name.trim(), icon)) {
+      setName("");
+      setIcon("sparkle");
+    }
   }
 
   return <><Sheet open={open} onOpenChange={onOpenChange}>

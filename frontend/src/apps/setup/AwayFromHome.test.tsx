@@ -96,4 +96,17 @@ describe("AwayFromHome", () => {
     await view.findByRole("img", { name: "QR code for your Home address away from home" });
     expect(calls).toContain("POST /api/tailscale/enable");
   });
+
+  test("a slow status answer is not asked for again while it is pending, and a failed one says what to do", async () => {
+    let asks = 0;
+    let release: (response: Response) => void = () => {};
+    globalThis.fetch = mock(() => { asks += 1; return new Promise<Response>((resolve) => { release = resolve; }); }) as unknown as typeof fetch;
+    const view = renderAway(owner);
+    await waitFor(() => expect(asks).toBe(1));
+    fireEvent.focus(window);
+    window.dispatchEvent(new Event("focus"));
+    expect(asks).toBe(1);
+    release(Response.json({ error: "Home could not read Tailscale." }, { status: 500 }));
+    expect(await view.findByText(/Home could not read Tailscale\. Check your connection and try again\./)).toBeTruthy();
+  });
 });

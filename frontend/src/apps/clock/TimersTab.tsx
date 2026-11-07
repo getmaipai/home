@@ -9,6 +9,8 @@ import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "
 import { api, type ComingUpItem, type QuickTimerView } from "@/lib/api";
 import { ComingUpRow } from "@/apps/reminders/ComingUpRow";
 import { CLOCK_ADD_EVENT } from "@/apps/clock/clockHeader";
+import { DestructiveConfirm } from "@maipai/ui/src/primitives/DestructiveConfirm";
+import { useHubMutation } from "@/lib/useHubMutation";
 
 const timersKey = ["household-coming-up"];
 const quickKey = ["quick-timers"];
@@ -35,6 +37,15 @@ export function TimersTab({ running = [], enabled = true }: { running?: ComingUp
   const [minutes, setMinutes] = useState("5");
   const [editing, setEditing] = useState<QuickTimerView | null>(null);
   const [reducedMotion, setReducedMotion] = useState(false);
+  const [deleting, setDeleting] = useState<QuickTimerView | null>(null);
+  const timerAction = useHubMutation({ verb: "change the timer", mutationFn: async ({ kind, timerId }: { kind: "start" | "done" | "extend"; timerId?: string }) => {
+    if (kind === "start") { if (!preset) return null; return api.startTimer(preset.name, preset.minutes); }
+    if (!timerId) return null;
+    if (kind === "done") await api.doneComingUp(timerId); else await api.extendTimer(timerId);
+    return null;
+  }, onSuccess: async (result, { kind, timerId }) => { if (kind === "start" && result) setSelectedId(result.id); if (kind === "done" && selectedId === timerId) setSelectedId(null); await changed(); } });
+  const quickAction = useHubMutation({ verb: "save the quick timer", mutationFn: async () => { if (editing) await api.updateQuickTimer(editing.id, { name, minutes: Number(minutes) }); else await api.createQuickTimer(name, Number(minutes)); }, onSuccess: async () => { setEditorOpen(false); await changed(); } });
+  const deleteAction = useHubMutation({ verb: "delete the quick timer", mutationFn: (timer: QuickTimerView) => api.deleteQuickTimer(timer.id), onSuccess: async () => { setDeleting(null); await changed(); } });
 
   const timerRows = running;
   const timers = useMemo(() => [...timerRows].sort((a, b) => Date.parse(a.at) - Date.parse(b.at)), [timerRows]);
@@ -80,35 +91,15 @@ export function TimersTab({ running = [], enabled = true }: { running?: ComingUp
     ]);
   }
 
-  async function start() {
-    if (!preset) return;
-    const result = await api.startTimer(preset.name, preset.minutes);
-    setSelectedId(result.id);
-    await changed();
-  }
+  function start() { void timerAction.run({ kind: "start" }); }
 
-  async function reset(timer = active) {
-    if (!timer) return;
-    await api.doneComingUp(timer.id);
-    if (selectedId === timer.id) setSelectedId(null);
-    await changed();
-  }
+  function reset(timer = active) { if (timer) void timerAction.run({ kind: "done", timerId: timer.id }); }
 
-  async function extend() {
-    if (!active) return;
-    await api.extendTimer(active.id);
-    await changed();
-  }
+  function extend() { if (active) void timerAction.run({ kind: "extend", timerId: active.id }); }
 
-  async function saveQuick(event: React.FormEvent) {
+  function saveQuick(event: React.FormEvent) {
     event.preventDefault();
-    if (editing) {
-      await api.updateQuickTimer(editing.id, { name, minutes: Number(minutes) });
-    } else {
-      await api.createQuickTimer(name, Number(minutes));
-    }
-    setEditorOpen(false);
-    await changed();
+    void quickAction.run();
   }
 
   if (!enabled) return null;
@@ -129,9 +120,9 @@ export function TimersTab({ running = [], enabled = true }: { running?: ComingUp
           </div>
         </ProgressRing>
         <div className="flex flex-wrap justify-center gap-3">
-          <Button type="button" onClick={() => void start()}>Start</Button>
-          {active ? <Button type="button" onClick={() => void extend()}>+1 min</Button> : null}
-          <Button type="button" variant="outline" onClick={() => void reset()}>Reset</Button>
+          <Button type="button" disabled={!preset || timerAction.busy} onClick={start}>Start</Button>
+          {active ? <Button type="button" disabled={timerAction.busy} onClick={extend}>+1 min</Button> : null}
+          <Button type="button" variant="outline" disabled={!active || timerAction.busy} onClick={() => reset()}>Reset</Button>
         </div>
         {timers.length > 1 ? <ul aria-label="Other running timers" className="flex flex-wrap justify-center gap-3">
           {timers.filter((timer) => timer.id !== active?.id).map((timer) => {
@@ -153,7 +144,7 @@ export function TimersTab({ running = [], enabled = true }: { running?: ComingUp
       </ul> : null}
       <div>
         <h2 className="mb-3 text-lg font-semibold">Quick timers</h2>
-        {quickQuery.isError ? <p role="alert">Could not load quick timers.</p> : null}
+        {quickQuery.isError ? <div role="alert"><p>Could not load quick timers. Check your connection and try again.</p><Button variant="outline" onClick={() => void quickQuery.refetch()}>Retry</Button></div> : null}
         <ul className="m-0 list-none p-0">
           {quick.map((timer) => <li key={timer.id} className="flex items-center justify-between gap-3 border-b py-3">
             <div className="min-w-0 flex-1">
@@ -170,7 +161,7 @@ export function TimersTab({ running = [], enabled = true }: { running?: ComingUp
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
                 <DropdownMenuItem onSelect={() => { setEditing(timer); setName(timer.name); setMinutes(String(timer.minutes)); setEditorOpen(true); }}>Rename</DropdownMenuItem>
-                <DropdownMenuItem onSelect={() => void api.deleteQuickTimer(timer.id).then(changed)}>Delete</DropdownMenuItem>
+                <DropdownMenuItem onSelect={() => setDeleting(timer)}>Delete</DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
           </li>)}
@@ -185,10 +176,11 @@ export function TimersTab({ running = [], enabled = true }: { running?: ComingUp
           <form className="grid gap-4 px-4" onSubmit={(event) => void saveQuick(event)}>
             <div className="grid gap-2"><Label htmlFor="quick-name">Name</Label><Input id="quick-name" value={name} onChange={(event) => setName(event.target.value)} required /></div>
             <div className="grid gap-2"><Label htmlFor="quick-minutes">Minutes</Label><Input id="quick-minutes" type="number" min={1} max={1440} value={minutes} onChange={(event) => setMinutes(event.target.value)} required /></div>
-            <Button type="submit">Save</Button>
+            <Button type="submit" disabled={quickAction.busy}>{quickAction.busy ? "Saving…" : "Save"}</Button>
           </form>
         </SheetContent>
       </Sheet>
+      {deleting ? <DestructiveConfirm message={`Delete ${deleting.name}?`} confirmLabel="Delete timer" busyLabel="Deleting" busy={deleteAction.busy} onConfirm={() => { void deleteAction.run(deleting); }} onCancel={() => setDeleting(null)} /> : null}
     </section>
   );
 }

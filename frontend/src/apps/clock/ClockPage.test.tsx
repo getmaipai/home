@@ -1,3 +1,4 @@
+import { toastError, spyOnToast } from "../../../tests/toastSpy";
 import { afterEach, describe, expect, test, mock, vi } from "bun:test";
 import { cleanup, fireEvent, waitFor, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
@@ -5,6 +6,7 @@ import { ClockPage } from "@/apps/clock/ClockPage";
 import { openClockAlarmEditor } from "@/apps/clock/clockHeader";
 import { renderWithQueryClient } from "../../../tests/renderWithQueryClient";
 
+spyOnToast();
 afterEach(cleanup);
 
 function stub(items: Array<{ id: string; kind: "alarm" | "reminder" | "timer"; text: string; at: string }>, records: Array<Record<string, unknown>> = []) {
@@ -51,7 +53,7 @@ describe("ClockPage", () => {
       expect(view.queryByText("No places yet")).toBeNull();
       expect(view.getByText(/remaining/)).toBeInTheDocument();
       fireEvent.click(view.getByRole("button", { name: "Done" }));
-      expect(api.calls.some((call) => call.url.endsWith("/t1/done"))).toBe(true);
+      await waitFor(() => expect(api.calls.some((call) => call.url.endsWith("/t1/done"))).toBe(true));
     } finally { api.restore(); }
   });
 
@@ -251,5 +253,69 @@ describe("ClockPage", () => {
       await view.findByRole("dialog");
       expect(view.getByTestId("alarm-sheet-content").className).toContain("inset-x-0");
     } finally { api.restore(); window.matchMedia = media; Object.defineProperty(window, "innerWidth", { configurable: true, value: width }); }
+  });
+});
+
+describe("ClockPage failures", () => {
+  function failing(overrides: (url: string, method: string) => Response | null) {
+    const original = globalThis.fetch;
+    const record = { id: "alarm-abcdef", time: "06:30", days: [1, 2, 3, 4, 5], label: "Wake up", tag: "Wake up", enabled: true, sound: "gentle_wake", snooze_minutes: null, next_at: null };
+    globalThis.fetch = mock((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      const method = init?.method ?? "GET";
+      const special = overrides(url, method);
+      if (special) return Promise.resolve(special);
+      if (url.endsWith("/api/alarms") && method === "GET") return Promise.resolve(Response.json([record]));
+      if (url.endsWith("/api/coming-up") && method === "GET") return Promise.resolve(Response.json([]));
+      if (url.endsWith("/api/quick-timers")) return Promise.resolve(Response.json([]));
+      return Promise.resolve(Response.json({ ok: true }));
+    }) as unknown as typeof fetch;
+    return () => { globalThis.fetch = original; };
+  }
+
+  test("a failed alarm save toasts, leaves the editor open and Save usable again", async () => {
+    toastError.mockClear();
+    const restore = failing((url, method) => (method === "PATCH" && url.includes("/api/alarms/") ? Response.json({ error: "Home could not save that alarm." }, { status: 500 }) : null));
+    try {
+      const view = renderWithQueryClient(<MemoryRouter><ClockPage /></MemoryRouter>);
+      fireEvent.click(await view.findByRole("button", { name: /6:30 AM, weekdays, Wake up/i }));
+      fireEvent.change(await view.findByLabelText("Label"), { target: { value: "Stretch" } });
+      fireEvent.click(view.getByRole("button", { name: "Save" }));
+      await waitFor(() => expect(toastError).toHaveBeenCalledWith("Home could not save that alarm. Check your connection and try again."));
+      expect(view.getByLabelText("Label")).toHaveValue("Stretch");
+      await waitFor(() => expect((view.getByRole("button", { name: "Save" }) as HTMLButtonElement).disabled).toBe(false));
+    } finally { restore(); }
+  });
+
+  test("a failed alarm delete keeps the confirmation open", async () => {
+    toastError.mockClear();
+    const restore = failing((_url, method) => (method === "DELETE" ? Response.json({ error: "Home could not delete that alarm." }, { status: 500 }) : null));
+    try {
+      const view = renderWithQueryClient(<MemoryRouter><ClockPage /></MemoryRouter>);
+      fireEvent.click(await view.findByRole("button", { name: /6:30 AM, weekdays, Wake up/i }));
+      fireEvent.click(await view.findByRole("button", { name: "Delete" }));
+      fireEvent.click(await view.findByRole("button", { name: "Delete alarm" }));
+      await waitFor(() => expect(toastError).toHaveBeenCalledWith("Home could not delete that alarm. Check your connection and try again."));
+      expect(view.getByTestId("destructive-confirm")).toBeInTheDocument();
+    } finally { restore(); }
+  });
+
+  test("a failed alarm toggle toasts and a failed alarm load shows the error with Retry and never No alarms", async () => {
+    toastError.mockClear();
+    let loadFails = true;
+    const restore = failing((url, method) => {
+      if (method === "PATCH") return Response.json({ error: "Home could not change that alarm." }, { status: 500 });
+      if (url.endsWith("/api/alarms") && method === "GET" && loadFails) return Response.json({ error: "no" }, { status: 500 });
+      return null;
+    });
+    try {
+      const view = renderWithQueryClient(<MemoryRouter><ClockPage /></MemoryRouter>);
+      expect(await view.findByText("Could not load alarms. Check your connection and try again.")).toBeInTheDocument();
+      expect(view.queryByText("No alarms")).toBeNull();
+      loadFails = false;
+      fireEvent.click(view.getAllByRole("button", { name: "Retry" })[0]!);
+      fireEvent.click(await view.findByRole("switch", { name: /6:30 AM/i }));
+      await waitFor(() => expect(toastError).toHaveBeenCalledWith("Home could not change that alarm. Check your connection and try again."));
+    } finally { restore(); }
   });
 });

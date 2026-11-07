@@ -4,6 +4,7 @@ import { Button } from "@maipai/ui/src/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@maipai/ui/src/ui/dropdown-menu";
 import { api, type ComingUpItem } from "@/lib/api";
 import { SNOOZE_OPTIONS } from "@/lib/comingUp";
+import { useHubMutation } from "@/lib/useHubMutation";
 
 function describeTime(date: Date) {
   return new Intl.DateTimeFormat(undefined, { weekday: "long", hour: "numeric", minute: "2-digit" }).format(date);
@@ -20,14 +21,9 @@ export function TimerCountdown({ at }: { at: string }) {
 }
 
 export function ComingUpRow({ item, onChanged, presentation = "default" }: { item: ComingUpItem; onChanged: () => void; presentation?: "default" | "alarm" }) {
-  async function done() {
-    await api.doneComingUp(item.id);
-    onChanged();
-  }
-  async function snooze(input: { minutes?: number; until?: "tomorrow_morning" }) {
-    await api.snoozeComingUp(item.id, input);
-    onChanged();
-  }
+  const action = useHubMutation({ verb: "update the reminder", mutationFn: async ({ snooze }: { snooze?: { minutes?: number; until?: "tomorrow_morning" } }) => snooze ? api.snoozeComingUp(item.id, snooze) : api.doneComingUp(item.id), onSuccess: onChanged });
+  function done() { void action.run({}); }
+  function snooze(input: { minutes?: number; until?: "tomorrow_morning" }) { void action.run({ snooze: input }); }
   if (presentation === "alarm") {
     const date = new Date(item.at);
     const time = new Intl.DateTimeFormat(undefined, { hour: "numeric", minute: "2-digit", hour12: true }).formatToParts(date);
@@ -42,9 +38,9 @@ export function ComingUpRow({ item, onChanged, presentation = "default" }: { ite
       </div>
       <div className="flex flex-wrap items-center gap-2">
         {item.text ? <Badge variant="secondary">{item.text}</Badge> : null}
-        <Button variant="secondary" onClick={() => void done()}>Done</Button>
+        <Button variant="secondary" disabled={action.busy} onClick={done}>Done</Button>
         <DropdownMenu>
-          <DropdownMenuTrigger asChild><Button variant="outline">Snooze</Button></DropdownMenuTrigger>
+          <DropdownMenuTrigger asChild><Button variant="outline" disabled={action.busy}>Snooze</Button></DropdownMenuTrigger>
           <DropdownMenuContent align="end">
             {SNOOZE_OPTIONS.map((option) => <DropdownMenuItem key={option.label} onSelect={() => void snooze(option.input)}>{option.label}</DropdownMenuItem>)}
           </DropdownMenuContent>
@@ -57,9 +53,9 @@ export function ComingUpRow({ item, onChanged, presentation = "default" }: { ite
     <span className="min-w-0 break-words sm:flex-1 sm:truncate">{item.text}</span>
     <div className="flex flex-wrap items-center gap-2">
       {item.kind === "timer" ? <span className="text-sm tabular-nums text-muted-foreground"><TimerCountdown at={item.at} /></span> : null}
-      <Button variant="secondary" onClick={() => void done()}>Done</Button>
+      <Button variant="secondary" disabled={action.busy} onClick={done}>Done</Button>
       <DropdownMenu>
-        <DropdownMenuTrigger asChild><Button variant="outline">Snooze</Button></DropdownMenuTrigger>
+        <DropdownMenuTrigger asChild><Button variant="outline" disabled={action.busy}>Snooze</Button></DropdownMenuTrigger>
         <DropdownMenuContent align="end">
           {SNOOZE_OPTIONS.map((option) => <DropdownMenuItem key={option.label} onSelect={() => void snooze(option.input)}>{option.label}</DropdownMenuItem>)}
         </DropdownMenuContent>

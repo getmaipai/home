@@ -33,6 +33,8 @@ export function ProfileForm({ person, canEdit, onSaved, onCancel, layout = "dial
   const [submitting, setSubmitting] = useState(false);
   const [saved, setSaved] = useState(false);
   const lastHistoryIndex = useRef<number>(window.history.state?.idx ?? 0);
+  const draftPersonId = useRef(person.id);
+  const dirtyRef = useRef(false);
   const restoringPopState = useRef(false);
   const trimmedName = displayName.trim();
   const nextBio = bio.trim() || null;
@@ -40,10 +42,14 @@ export function ProfileForm({ person, canEdit, onSaved, onCancel, layout = "dial
   const hasUnsavedChanges = trimmedName !== savedValues.displayName
     || nextBio !== savedValues.bio
     || nextAccent !== savedValues.accent;
+  dirtyRef.current = hasUnsavedChanges;
   const bioTooLong = bio.length > 160;
   const canSave = canEdit && trimmedName.length > 0 && !bioTooLong && !submitting;
 
   useEffect(() => {
+    const changedPerson = draftPersonId.current !== person.id;
+    draftPersonId.current = person.id;
+    if (!changedPerson && dirtyRef.current) return;
     setDisplayName(person.display_name);
     setBio(person.bio ?? "");
     setAccent(person.accent ?? NO_ACCENT);
@@ -145,7 +151,7 @@ export function ProfileForm({ person, canEdit, onSaved, onCancel, layout = "dial
       setSaved(true);
       if (layout === "dialog") onCancel?.();
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Could not save those changes.");
+      setError(err instanceof ApiError ? err.message : "Could not save those changes. Check your connection and try again.");
     } finally {
       setSubmitting(false);
     }

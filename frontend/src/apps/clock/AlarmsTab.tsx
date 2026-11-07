@@ -7,6 +7,8 @@ import { ComingUpRow } from "@/apps/reminders/ComingUpRow";
 import { AlarmEditor } from "@/apps/clock/AlarmEditor";
 import { Sheet, SheetContent } from "@maipai/ui/src/ui/sheet";
 import { CLOCK_ADD_ALARM_EVENT } from "@/apps/clock/clockHeader";
+import { Button } from "@maipai/ui/src/ui/button";
+import { useHubMutation } from "@/lib/useHubMutation";
 
 const comingUpKey = ["household-coming-up"];
 const alarmsKey = ["household-alarms"];
@@ -33,6 +35,7 @@ export function AlarmsTab() {
   const client = useQueryClient();
   const query = useQuery({ queryKey: comingUpKey, queryFn: api.comingUp });
   const alarmQuery = useQuery({ queryKey: alarmsKey, queryFn: api.alarms });
+  const alarmChange = useHubMutation({ verb: "update the alarm", mutationFn: ({ id, patch }: { id: string; patch: Partial<AlarmView> }) => api.updateAlarm(id, patch), onSuccess: changed });
   const records = useMemo(() => alarmQuery.data ?? [], [alarmQuery.data]);
   const alarms = useMemo(() => (query.data ?? []).filter((item) => item.kind === "alarm").sort((a, b) => Date.parse(a.at) - Date.parse(b.at)), [query.data]);
   const nextAlarmAt = [...records.filter((alarm) => alarm.enabled && alarm.next_at).map((alarm) => alarm.next_at as string), ...alarms.map((alarm) => alarm.at)].sort((a, b) => Date.parse(a) - Date.parse(b))[0];
@@ -62,10 +65,10 @@ export function AlarmsTab() {
 
   return (
     <section aria-label="Alarms">
-      {query.isError ? <p role="alert" className="py-4 text-destructive">Could not load the clock.</p> : null}
-      {alarmQuery.isError ? <p role="alert" className="py-4 text-destructive">Could not load alarms.</p> : null}
+      {query.isError ? <div role="alert" className="py-4 text-destructive"><p>Could not load the clock. Check your connection and try again.</p><Button variant="outline" onClick={() => void query.refetch()}>Retry</Button></div> : null}
+      {alarmQuery.isError ? <div role="alert" className="py-4 text-destructive"><p>Could not load alarms. Check your connection and try again.</p><Button variant="outline" onClick={() => void alarmQuery.refetch()}>Retry</Button></div> : null}
       {nextAlarmAt ? <p className="m-0 py-4 text-sm text-muted-foreground">{nextLabel(nextAlarmAt, now)}</p> : null}
-      {records.length === 0 && alarms.length === 0 && !query.isLoading && !alarmQuery.isLoading
+      {records.length === 0 && alarms.length === 0 && !query.isLoading && !alarmQuery.isLoading && !query.isError && !alarmQuery.isError
         ? <p className="py-4 text-muted-foreground">No alarms</p>
         : null}
       <ul className="m-0 list-none p-0">
@@ -74,8 +77,8 @@ export function AlarmsTab() {
           alarm={alarm}
           now={now}
           onOpen={() => openEditor(alarm)}
-          onToggleDay={(days) => { void api.updateAlarm(alarm.id, { days }).then(changed); }}
-          onToggleEnabled={(enabled) => { void api.updateAlarm(alarm.id, { enabled }).then(changed); }}
+          onToggleDay={(days) => { void alarmChange.run({ id: alarm.id, patch: { days } }); }}
+          onToggleEnabled={(enabled) => { void alarmChange.run({ id: alarm.id, patch: { enabled } }); }}
         />)}
         {alarms.map((item) => <ComingUpRow key={item.id} item={item} presentation="alarm" onChanged={() => void query.refetch()} />)}
       </ul>

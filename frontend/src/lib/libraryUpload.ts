@@ -22,12 +22,16 @@ function sendMultipart(file: File, options: UploadOptions): Promise<UploadedFile
     xhr.withCredentials = true;
     xhr.upload.onprogress = (event) => { if (event.lengthComputable) options.onProgress?.(event.loaded); };
     xhr.onload = () => {
-      if (xhr.status >= 200 && xhr.status < 300) { options.onProgress?.(file.size); resolve(JSON.parse(xhr.responseText) as UploadedFile); }
+      if (xhr.status >= 200 && xhr.status < 300) {
+        try { const uploaded = JSON.parse(xhr.responseText) as UploadedFile; options.onProgress?.(file.size); resolve(uploaded); }
+        catch { reject(new ApiError("Home returned an unreadable upload response. Check your connection and try again.", xhr.status)); }
+      }
       else reject(fail(xhr.status, xhr.responseText));
     };
     xhr.onerror = () => reject(new ApiError(GENERIC, 0));
     xhr.onabort = () => reject(new DOMException("Upload cancelled", "AbortError"));
     options.signal?.addEventListener("abort", () => xhr.abort(), { once: true });
+    if (options.signal?.aborted) { reject(new DOMException("Upload cancelled", "AbortError")); return; }
     const form = new FormData();
     form.append("file", file, file.name);
     xhr.send(form);
@@ -56,5 +60,6 @@ async function sendChunks(file: File, options: UploadOptions): Promise<UploadedF
 }
 
 export function uploadLibraryFile(file: File, options: UploadOptions = {}): Promise<UploadedFile> {
+  if (options.signal?.aborted) return Promise.reject(new DOMException("Upload cancelled", "AbortError"));
   return file.size <= SINGLE_REQUEST_MAX_BYTES ? sendMultipart(file, options) : sendChunks(file, options);
 }

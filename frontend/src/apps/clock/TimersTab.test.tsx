@@ -1,8 +1,10 @@
+import { toastError, spyOnToast } from "../../../tests/toastSpy";
 import { afterEach, describe, expect, test } from "bun:test";
 import { cleanup, fireEvent, waitFor } from "@testing-library/react";
 import { TimersTab } from "@/apps/clock/TimersTab";
 import { renderWithQueryClient } from "../../../tests/renderWithQueryClient";
 
+spyOnToast();
 afterEach(cleanup);
 
 function mockApi() {
@@ -74,6 +76,7 @@ describe("TimersTab", () => {
       await waitFor(() => expect(api.calls.some((call) => call.method === "PATCH" && call.url.includes("/api/quick-timers/tea"))).toBe(true));
       fireEvent.pointerDown(view.getByRole("button", { name: "More options for Deep work" }), { button: 0, ctrlKey: false });
       fireEvent.click(await view.findByText("Delete"));
+      fireEvent.click(await view.findByRole("button", { name: "Delete timer" }));
       await waitFor(() => expect(api.calls.some((call) => call.method === "DELETE" && call.url.includes("/api/quick-timers/deep"))).toBe(true));
     } finally { api.restore(); }
   });
@@ -88,5 +91,54 @@ describe("TimersTab", () => {
       const ring = view.container.querySelector('[data-slot="progress-ring-arc"]');
       expect(ring).toHaveAttribute("data-animated", "false");
     } finally { api.restore(); window.matchMedia = originalMatchMedia; }
+  });
+});
+
+describe("TimersTab failures", () => {
+  function failing(match: (url: string, method: string) => boolean, message: string) {
+    const original = globalThis.fetch;
+    globalThis.fetch = ((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      const method = init?.method ?? "GET";
+      if (match(url, method)) return Promise.resolve(Response.json({ error: message }, { status: 500 }));
+      if (url.endsWith("/api/quick-timers") && method === "GET") return Promise.resolve(Response.json([{ id: "tea", name: "Tea steep", minutes: 4 }]));
+      if (url.endsWith("/api/coming-up") && method === "GET") return Promise.resolve(Response.json([]));
+      return Promise.resolve(Response.json({ id: "x" }));
+    }) as typeof fetch;
+    return () => { globalThis.fetch = original; };
+  }
+
+  test("a failed Start toasts and Start is usable again", async () => {
+    toastError.mockClear();
+    const restore = failing((url, method) => method === "POST" && url.endsWith("/api/coming-up/timers"), "Home could not start that timer.");
+    try {
+      const view = renderWithQueryClient(<TimersTab />);
+      await view.findAllByText("Tea steep");
+      fireEvent.click(view.getByRole("button", { name: "Select Tea steep, 4 min" }));
+      fireEvent.click(view.getByRole("button", { name: "Start" }));
+      await waitFor(() => expect(toastError).toHaveBeenCalledWith("Home could not start that timer. Check your connection and try again."));
+      await waitFor(() => expect((view.getByRole("button", { name: "Start" }) as HTMLButtonElement).disabled).toBe(false));
+    } finally { restore(); }
+  });
+
+  test("a failed quick-timer delete toasts and keeps the confirmation open; a failed load shows Retry", async () => {
+    toastError.mockClear();
+    const restore = failing((_url, method) => method === "DELETE", "Home could not delete that timer.");
+    try {
+      const view = renderWithQueryClient(<TimersTab />);
+      await view.findAllByText("Tea steep");
+      fireEvent.pointerDown(view.getByRole("button", { name: "More options for Tea steep" }), { button: 0, ctrlKey: false });
+      fireEvent.click(await view.findByText("Delete"));
+      fireEvent.click(await view.findByRole("button", { name: "Delete timer" }));
+      await waitFor(() => expect(toastError).toHaveBeenCalledWith("Home could not delete that timer. Check your connection and try again."));
+      expect(view.getByTestId("destructive-confirm")).toBeInTheDocument();
+    } finally { restore(); }
+    const restoreLoad = failing((url, method) => method === "GET" && url.endsWith("/api/quick-timers"), "no");
+    try {
+      cleanup();
+      const view = renderWithQueryClient(<TimersTab />);
+      expect(await view.findByText("Could not load quick timers. Check your connection and try again.")).toBeInTheDocument();
+      expect(view.getByRole("button", { name: "Retry" })).toBeInTheDocument();
+    } finally { restoreLoad(); }
   });
 });

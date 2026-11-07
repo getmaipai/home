@@ -14,11 +14,11 @@ export function ListMain({ list, isPhone, canManage, onBack, onAdd, onToggle, on
   isPhone: boolean;
   canManage: boolean;
   onBack: () => void;
-  onAdd: (text: string) => Promise<void>;
-  onToggle: (itemId: string, done: boolean) => Promise<void>;
-  onClearDone: () => Promise<void>;
-  onRename: (title: string) => Promise<void>;
-  onChangeIcon: (icon: ListIcon) => Promise<void>;
+  onAdd: (text: string) => Promise<boolean | undefined>;
+  onToggle: (itemId: string, done: boolean) => Promise<unknown>;
+  onClearDone: () => Promise<unknown>;
+  onRename: (title: string) => Promise<unknown>;
+  onChangeIcon: (icon: ListIcon) => Promise<unknown>;
   onDelete: () => void;
 }) {
   const [text, setText] = useState("");
@@ -27,19 +27,15 @@ export function ListMain({ list, isPhone, canManage, onBack, onAdd, onToggle, on
   const doneItems = list.items.filter((item) => item.done);
   const EmptyIcon = getIcon("sparkles");
   const tagline = list.kind === "shopping" ? "A few things to pick up" : list.kind === "todo" ? "What needs doing" : "Your own list";
-  const date = new Intl.DateTimeFormat("en-US", { weekday: "long", month: "long", day: "numeric" }).format(new Date());
+  const date = new Intl.DateTimeFormat(undefined, { weekday: "long", month: "long", day: "numeric" }).format(new Date());
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const value = text.trim();
     if (!value) return;
     setText("");
-    try {
-      await onAdd(value);
-    } catch (error) {
-      setText(value);
-      throw error;
-    }
+    const saved = await onAdd(value);
+    if (!saved) setText(value);
   }
 
   return <section className="flex min-h-0 min-w-0 flex-1 flex-col">

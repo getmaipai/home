@@ -1,5 +1,6 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { api } from "@/lib/api";
+import { useHubMutation } from "@/lib/useHubMutation";
 
 export type Appearance = "system" | "light" | "dark";
 
@@ -39,11 +40,16 @@ export function useAppearance(personId: string): {
   setAppearance: (value: Appearance) => void;
 } {
   const [appearance, setAppearanceState] = useState<Appearance>("system");
+  const touched = useRef({ personId, value: false });
+  const save = useHubMutation({ verb: "save your appearance", mutationFn: (value: Appearance) => api.setSetting(`person:${personId}`, "ui.appearance", value) });
 
   useEffect(() => {
+    let cancelled = false;
+    if (touched.current.personId !== personId) { touched.current.personId = personId; touched.current.value = false; setAppearanceState("system"); }
     api
       .settingsValues(`person:${personId}`)
       .then((values) => {
+        if (cancelled || touched.current.value) return;
         const found = values.find((v) => v.key === "ui.appearance");
         if (found && typeof found.value === "string") {
           setAppearanceState(found.value as Appearance);
@@ -53,6 +59,7 @@ export function useAppearance(personId: string): {
         // A failed read just keeps the "system" default rather than
         // blocking the shell from rendering over a settings fetch.
       });
+    return () => { cancelled = true; };
   }, [personId]);
 
   useEffect(() => {
@@ -67,12 +74,10 @@ export function useAppearance(personId: string): {
   }, [appearance]);
 
   function setAppearance(value: Appearance) {
+    touched.current.personId = personId;
+    touched.current.value = true;
     setAppearanceState(value);
-    api.setSetting(`person:${personId}`, "ui.appearance", value).catch(() => {
-      // The optimistic local class switch already applied; a failed
-      // write just means it doesn't persist past this session, not that
-      // the person's screen silently stays in the old theme.
-    });
+    void save.run(value);
   }
 
   return { appearance, setAppearance };

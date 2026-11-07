@@ -1,3 +1,4 @@
+import { toastError, spyOnToast } from "../../../tests/toastSpy";
 import { afterEach, describe, expect, test, mock } from "bun:test";
 import { act, cleanup, fireEvent, waitFor } from "@testing-library/react";
 import { RemindersPage } from "@/apps/reminders/RemindersPage";
@@ -7,6 +8,7 @@ import type { List as ListRecord } from "@maipai/spec/gen/ts/list.js";
 import { WakeWordPersonContext } from "@/apps/chat/chatThreadContexts";
 import type { Roster } from "@/lib/api";
 
+spyOnToast();
 afterEach(cleanup);
 
 const stamp = "2026-10-29T12:00:00.000Z";
@@ -238,4 +240,54 @@ describe("RemindersPage", () => {
     }
   });
 
+});
+
+describe("RemindersPage failures", () => {
+  function refuse(restore: () => void, match: (url: string, method: string) => boolean, message: string) {
+    const working = globalThis.fetch;
+    globalThis.fetch = mock((input: RequestInfo | URL, init?: RequestInit) => match(String(input), init?.method ?? "GET")
+      ? Promise.resolve(Response.json({ error: message }, { status: 500 }))
+      : working(input, init)) as unknown as typeof fetch;
+    return () => { globalThis.fetch = working; restore(); };
+  }
+
+  test("a refused add toasts and keeps the typed text in the box", async () => {
+    const restore = refuse(withLists(), (url, method) => method === "POST" && url.endsWith("/items"), "Home could not add that item.");
+    try {
+      const view = renderWithQueryClient(<MemoryRouter><RemindersPage /></MemoryRouter>);
+      const composer = await view.findByRole("textbox", { name: "Add an item" });
+      fireEvent.change(composer, { target: { value: "Apples" } });
+      fireEvent.submit(composer.closest("form")!);
+      await waitFor(() => expect(toastError).toHaveBeenCalledWith("Home could not add that item. Check your connection and try again."));
+      await waitFor(() => expect(view.getByRole("textbox", { name: "Add an item" })).toHaveValue("Apples"));
+      expect(view.queryByText("Apples", { selector: "li *" })).toBeNull();
+    } finally { restore(); }
+  });
+
+  test("a refused list delete toasts, keeps the dialog open and the list in place", async () => {
+    const restore = refuse(withLists(), (url, method) => method === "DELETE" && /\/api\/lists\//.test(url), "Home could not delete that list.");
+    try {
+      const view = renderWithQueryClient(<WakeWordPersonContext.Provider value={{ role: "adult" } as Roster}><MemoryRouter><RemindersPage /></MemoryRouter></WakeWordPersonContext.Provider>);
+      fireEvent.click(await view.findByRole("button", { name: /Personal/ }));
+      await view.findByRole("heading", { name: "Personal" });
+      const trigger = view.getByRole("button", { name: "List options" });
+      act(() => { fireEvent.pointerDown(trigger, { button: 0, ctrlKey: false, pointerId: 1 }); fireEvent.click(trigger); });
+      fireEvent.click(await view.findByRole("menuitem", { name: "Delete" }));
+      await view.findByRole("alertdialog");
+      fireEvent.click(view.getByRole("button", { name: "Delete list" }));
+      await waitFor(() => expect(toastError).toHaveBeenCalledWith("Home could not delete that list. Check your connection and try again."));
+      expect(view.getByRole("alertdialog")).toBeInTheDocument();
+      expect(view.getByRole("heading", { name: "Personal", hidden: true })).toBeInTheDocument();
+      await waitFor(() => expect((view.getByRole("button", { name: "Delete list" }) as HTMLButtonElement).disabled).toBe(false));
+    } finally { restore(); }
+  });
+
+  test("a failed load says what to do and offers Retry", async () => {
+    const restore = refuse(withLists(), (url, method) => method === "GET" && url.endsWith("/api/lists"), "no");
+    try {
+      const view = renderWithQueryClient(<MemoryRouter><RemindersPage /></MemoryRouter>);
+      expect(await view.findByText("Could not load reminders. Check your connection and try again.")).toBeInTheDocument();
+      expect(view.getByRole("button", { name: "Retry" })).toBeInTheDocument();
+    } finally { restore(); }
+  });
 });

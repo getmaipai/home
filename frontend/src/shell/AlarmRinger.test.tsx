@@ -1,3 +1,4 @@
+import { toastError, spyOnToast } from "../../tests/toastSpy";
 import { afterEach, describe, expect, test, mock } from "bun:test";
 import { act, cleanup, fireEvent, waitFor, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
@@ -7,6 +8,7 @@ import type { NotificationDeliveryView } from "@/lib/api";
 
 const person = { id: "person-1" } as never;
 
+spyOnToast();
 afterEach(cleanup);
 
 function alarm(id: string, createdAt: string, subjectJobId = `job-${id}`, text = "Your alarm"): NotificationDeliveryView {
@@ -95,5 +97,26 @@ describe("AlarmRinger", () => {
       globalThis.fetch = originalFetch;
       Object.defineProperty(window, "matchMedia", { configurable: true, value: originalMatchMedia });
     }
+  });
+});
+
+describe("AlarmRinger failures", () => {
+  test("a Done the hub refuses toasts, keeps the alarm on screen and re-enables the buttons", async () => {
+    toastError.mockClear();
+    const original = globalThis.fetch;
+    globalThis.fetch = mock((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (url.includes("/api/notifications") && !init?.method) return Promise.resolve(Response.json([alarm("a", new Date().toISOString())]));
+      if (url.includes("/api/settings?scope=")) return Promise.resolve(Response.json([{ key: "alarms.sound", value: "none" }]));
+      if (url.endsWith("/dismiss")) return Promise.resolve(Response.json({ error: "Home could not dismiss that alarm." }, { status: 500 }));
+      return Promise.resolve(Response.json({ ok: true }));
+    }) as unknown as typeof fetch;
+    try {
+      const view = renderWithQueryClient(<MemoryRouter><AlarmRinger person={person} /></MemoryRouter>);
+      fireEvent.click(await view.findByRole("button", { name: "Done" }));
+      await waitFor(() => expect(toastError).toHaveBeenCalledWith("Home could not dismiss that alarm. Check your connection and try again."));
+      await waitFor(() => expect((view.getByRole("button", { name: "Done" }) as HTMLButtonElement).disabled).toBe(false));
+      expect(view.getByText("Your alarm", { exact: false })).toBeInTheDocument();
+    } finally { globalThis.fetch = original; }
   });
 });

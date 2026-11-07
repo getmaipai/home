@@ -2,8 +2,10 @@ import { afterEach, describe, expect, mock, test } from "bun:test";
 import { act, cleanup, fireEvent, waitFor, within } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render } from "@testing-library/react";
+import { toastError, spyOnToast } from "../../../tests/toastSpy";
 import { EngineLinkCredentialSection, addressProblem, groupCode, pairCommand } from "@/apps/settings/EngineLinkCredentialSection";
 
+spyOnToast();
 afterEach(cleanup);
 
 const HTTPS_MESSAGE = "Pairing only works when Home is opened at a secure address that starts with https://. Open Home through its https:// address, then try again.";
@@ -14,7 +16,7 @@ interface Hub {
   calls: string[];
 }
 
-type Options = { confirmStatus?: number; issueError?: string; hostError?: string; connection?: Array<{ id: number; pass: boolean; detail?: string; fix: string }> };
+type Options = { paired?: boolean; revokeError?: string; connectionError?: boolean; confirmStatus?: number; issueError?: string; hostError?: string; connection?: Array<{ id: number; pass: boolean; detail?: string; fix: string }> };
 
 function stubFetch(hub: Hub, options: Options = {}) {
   const values: Record<string, unknown> = { "engines.stack.where": "this_computer", "engines.stack.remote.host": "", "engines.stack.remote.ssh_port": 22 };
@@ -23,7 +25,8 @@ function stubFetch(hub: Hub, options: Options = {}) {
     const method = init?.method ?? "GET";
     hub.calls.push(`${method} ${url}`);
     const json = (body: unknown, status = 200) => Promise.resolve(new Response(JSON.stringify(body), { status }));
-    if (url.endsWith("/api/engine-link/credentials") && method === "GET") return json({ paired: false });
+    if (url.endsWith("/api/engine-link/credentials") && method === "GET") return json({ paired: options.paired ?? false });
+    if (url.endsWith("/api/engine-link/credentials") && method === "DELETE") return options.revokeError ? json({ error: options.revokeError }, 500) : json({ paired: false });
     if (url.includes("/api/settings?scope=household")) return json(Object.entries(values).map(([key, value]) => ({ key, value, source: "default", label: key, level: "basic", secret: false })));
     if (url.endsWith("/api/settings") && method === "PUT") {
       const body = JSON.parse(String(init?.body)) as { key: string; value: unknown };
@@ -41,6 +44,7 @@ function stubFetch(hub: Hub, options: Options = {}) {
       const status = options.confirmStatus ?? 200;
       return status === 200 ? json({ paired: true }) : json({ error: "The check code did not match the engine computer" }, status);
     }
+    if (url.endsWith("/api/engines/connection-check") && options.connectionError) return json({ error: "The engine computer did not answer." }, 500);
     if (url.endsWith("/api/engines/connection-check")) return json({ hops: options.connection ?? [{ id: 1, pass: true, fix: "" }, { id: 2, pass: false, detail: "no answer", fix: "Check that the engine computer is on." }] });
     return Promise.reject(new Error(`unstubbed fetch: ${url} ${method}`));
   }) as unknown as typeof fetch;
@@ -228,6 +232,32 @@ describe("the pairing wizard (ENGINES-AI-01)", () => {
       await click(view.getByRole("button", { name: "Pin this computer" }));
       await view.findByText(stepLine(3, "Run one command on the engine computer"));
       expect(view.getByRole("button", { name: "Get a one-time code" })).toBeTruthy();
+    });
+  });
+});
+
+describe("failures (AUDIT-FE-MUTATIONS-01)", () => {
+  test("a failed final connection check drops the skeleton and offers Retry", async () => {
+    await withHub({ connectionError: true }, async (view) => {
+      await toCheckStep(view);
+      await click(view.getByRole("button", { name: "Check the engine computer" }));
+      fireEvent.change(await view.findByLabelText("Check code from the engine computer"), { target: { value: "abcd-efgh-jklm" } });
+      await click(view.getByRole("button", { name: "Pin this computer" }));
+      await view.findByText(stepLine(5, "Done"));
+      expect((await view.findByRole("alert")).textContent).toContain("The engine computer did not answer.");
+      expect(view.getByRole("button", { name: "Retry" })).toBeTruthy();
+      expect(view.queryByText("Checking the connection")).toBeNull();
+    });
+  });
+
+  test("Revoke link key asks first, and a failed revoke toasts and keeps the question open", async () => {
+    await withHub({ paired: true, revokeError: "Home could not revoke the key." }, async (view, hub) => {
+      await click(await view.findByRole("button", { name: "Revoke link key" }));
+      expect(hub.calls.some((call) => call.startsWith("DELETE"))).toBe(false);
+      await click(await view.findByRole("button", { name: "Revoke key" }));
+      await waitFor(() => expect(toastError).toHaveBeenCalledWith("Home could not revoke the key. Check your connection and try again."));
+      expect(view.getByTestId("destructive-confirm")).toBeTruthy();
+      expect((view.getByRole("button", { name: "Revoke key" }) as HTMLButtonElement).disabled).toBe(false);
     });
   });
 });

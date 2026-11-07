@@ -4,8 +4,10 @@ import { Input } from "@maipai/ui/src/ui/input";
 import { Label } from "@maipai/ui/src/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@maipai/ui/src/ui/select";
 import { SheetDescription, SheetHeader, SheetTitle } from "@maipai/ui/src/ui/sheet";
+import { DestructiveConfirm } from "@maipai/ui/src/primitives/DestructiveConfirm";
 import { AlarmDays } from "@/apps/clock/AlarmDays";
 import { api, type AlarmView } from "@/lib/api";
+import { useHubMutation } from "@/lib/useHubMutation";
 import type { AlarmDraft } from "@/apps/clock/alarmTypes";
 
 const emptyDraft = (): AlarmDraft => ({ time: "07:00", days: [], label: "", tag: "", sound: "default", snooze_minutes: null });
@@ -32,7 +34,10 @@ export function AlarmEditor({
 }) {
   const [draft, setDraft] = useState<AlarmDraft>(() => draftFrom(alarm));
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const saveMutation = useHubMutation({ verb: "save the alarm", mutationFn: async () => { if (alarm) await api.updateAlarm(alarm.id, draft); else await api.createAlarm({ ...draft, enabled: true }); }, onSuccess: async () => { await onSaved(); onClose(); } });
   const [skipping, setSkipping] = useState(false);
+  const skipMutation = useHubMutation({ verb: "skip the next alarm", mutationFn: async () => { if (alarm) await api.skipNextAlarm(alarm.id); }, onSuccess: async () => { setSkipping(true); await onSaved(); } });
+  const deleteMutation = useHubMutation({ verb: "delete the alarm", mutationFn: async () => { if (alarm) await api.deleteAlarm(alarm.id); }, onSuccess: async () => { await onSaved(); onClose(); } });
 
   useEffect(() => {
     setDraft(draftFrom(alarm));
@@ -40,26 +45,17 @@ export function AlarmEditor({
     setSkipping(false);
   }, [alarm]);
 
-  async function save(event: React.FormEvent) {
+  function save(event: React.FormEvent) {
     event.preventDefault();
-    if (alarm) await api.updateAlarm(alarm.id, draft);
-    else await api.createAlarm({ ...draft, enabled: true });
-    onClose();
-    await onSaved();
+    void saveMutation.run();
   }
 
-  async function skip() {
-    if (!alarm) return;
-    await api.skipNextAlarm(alarm.id);
-    setSkipping(true);
-    await onSaved();
+  function skip() {
+    void skipMutation.run();
   }
 
-  async function remove() {
-    if (!alarm) return;
-    await api.deleteAlarm(alarm.id);
-    onClose();
-    await onSaved();
+  function remove() {
+    void deleteMutation.run();
   }
 
   function toggleDay(day: number) {
@@ -112,18 +108,14 @@ export function AlarmEditor({
             </Select>
           </div>
           <div className="flex flex-wrap gap-2">
-            <Button type="submit">Save</Button>
+            <Button type="submit" disabled={saveMutation.busy}>Save</Button>
             {alarm ? <>
-              <Button type="button" variant="secondary" onClick={() => void skip()}>Skip next</Button>
+              <Button type="button" variant="secondary" disabled={skipMutation.busy} onClick={skip}>Skip next</Button>
               <Button type="button" variant="destructive" onClick={() => setConfirmDelete(true)}>Delete</Button>
             </> : null}
           </div>
           {skipping ? <p role="status" className="text-sm text-muted-foreground">Skipping the next one</p> : null}
-          {confirmDelete ? <div role="alertdialog" aria-label="Delete alarm?" className="grid gap-2">
-            <p>Delete this alarm?</p>
-            <Button type="button" variant="destructive" onClick={() => void remove()}>Delete alarm</Button>
-            <Button type="button" variant="outline" onClick={() => setConfirmDelete(false)}>Cancel</Button>
-          </div> : null}
+          {confirmDelete ? <DestructiveConfirm message="Delete this alarm?" confirmLabel="Delete alarm" busyLabel="Deleting" busy={deleteMutation.busy} onConfirm={remove} onCancel={() => setConfirmDelete(false)} /> : null}
         </form>
       </>
   );

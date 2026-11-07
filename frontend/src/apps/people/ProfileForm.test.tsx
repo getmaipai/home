@@ -168,4 +168,30 @@ describe("ProfileForm", () => {
     expect(withCancel.getAllByRole("button", { name: "Save" })).toHaveLength(1);
     expect(withCancel.getByRole("button", { name: "Cancel" })).toBeTruthy();
   });
+
+  test("a refetch of the same person does not wipe what is being typed", () => {
+    const { getByLabelText, rerender } = render(<ProfileForm person={makePerson()} canEdit />);
+    fireEvent.change(getByLabelText("Name"), { target: { value: "Avery Lane" } });
+    rerender(<ProfileForm person={makePerson({ bio: "Likes films" })} canEdit />);
+    expect((getByLabelText("Name") as HTMLInputElement).value).toBe("Avery Lane");
+  });
+
+  test("a different person resets the draft", () => {
+    const { getByLabelText, rerender } = render(<ProfileForm person={makePerson()} canEdit />);
+    fireEvent.change(getByLabelText("Name"), { target: { value: "Avery Lane" } });
+    rerender(<ProfileForm person={makePerson({ id: "person-other1", display_name: "Sam" })} canEdit />);
+    expect((getByLabelText("Name") as HTMLInputElement).value).toBe("Sam");
+  });
+
+  test("a save the hub refuses without words says what to do next and keeps the typed name", async () => {
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = mock(() => Promise.reject(new Error("odd"))) as unknown as typeof fetch;
+    try {
+      const { getByLabelText, getByRole, findByText } = render(<ProfileForm person={makePerson()} canEdit />);
+      fireEvent.change(getByLabelText("Name"), { target: { value: "Avery Lane" } });
+      fireEvent.click(getByRole("button", { name: "Save" }));
+      expect(await findByText(/Check your connection and try again\./)).toBeTruthy();
+      expect((getByLabelText("Name") as HTMLInputElement).value).toBe("Avery Lane");
+    } finally { globalThis.fetch = originalFetch; }
+  });
 });

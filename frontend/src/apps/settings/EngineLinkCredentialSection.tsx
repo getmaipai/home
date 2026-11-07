@@ -8,6 +8,9 @@ import { Label } from "@maipai/ui/src/ui/label";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@maipai/ui/src/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@maipai/ui/src/dashboard/components/ui/select";
 import { ApiError, api } from "@/lib/api";
+import { DestructiveConfirm } from "@maipai/ui/src/primitives/DestructiveConfirm";
+import { hubErrorMessage } from "@/lib/hubReachability";
+import { useHubMutation } from "@/lib/useHubMutation";
 
 // ENGINES-AI-01: pairing is a wizard, one screen per step, with Back and Next, in the kit Dialog as it ships. The step
 // state lives here, in the section; there is no wizard component of its own. The kit's `Wizard` primitive is a
@@ -78,7 +81,17 @@ export function EngineLinkCredentialSection() {
   const [typedCode, setTypedCode] = useState("");
   const [hops, setHops] = useState<Hop[] | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [busy, setBusy] = useState(false);
+  const [confirmRevoke, setConfirmRevoke] = useState(false);
+  // Wizard steps show their failure inline in the open dialog; the revoke confirm uses the shared toast.
+  const action = useHubMutation({
+    verb: "complete engine setup",
+    mutationFn: async (perform: () => Promise<void>) => {
+      try { await perform(); }
+      catch (err) { setError(hubErrorMessage(err, "Home could not do that. Check that Home is running, then try again.")); }
+    },
+  });
+  const revokeAction = useHubMutation({ verb: "revoke the link key", mutationFn: () => revoke(), onSuccess: () => setConfirmRevoke(false) });
+  const busy = action.busy || revokeAction.busy;
 
   // What the settings hold now seeds the wizard each time it opens.
   function begin() {
@@ -95,19 +108,19 @@ export function EngineLinkCredentialSection() {
     setOpen(true);
   }
 
-  async function run(action: () => Promise<void>) {
+  function run(perform: () => Promise<void>) {
     setError(null);
-    setBusy(true);
-    try { await action(); }
-    catch (err) { setError(err instanceof ApiError ? err.message : "Home could not do that. Check that Home is running, then try again."); }
-    finally { setBusy(false); }
+    return action.run(perform);
   }
 
   const problems = addressProblem(host, port);
 
   async function save(key: string, value: unknown) {
     const saved = await api.setSetting("household", key, value);
-    queryClient.setQueryData(["settings-values", "household"], (previous: typeof household.data) => (previous ?? []).map((entry) => (entry.key === saved.key ? saved : entry)));
+    queryClient.setQueryData(["settings-values", "household"], (previous: typeof household.data) => {
+      const rows = previous ?? [];
+      return rows.some((entry) => entry.key === saved.key) ? rows.map((entry) => (entry.key === saved.key ? saved : entry)) : [...rows, saved];
+    });
   }
 
   async function next() {
@@ -160,15 +173,20 @@ export function EngineLinkCredentialSection() {
     });
   }
 
+  async function checkConnection() {
+    try {
+      const result = await api.engineConnectionCheck();
+      setHops(result.hops);
+    } catch (err) {
+      setError(`${hubErrorMessage(err, "Home could not check the connection.")} Select Retry, or open Engines and AI and select Check the connection.`);
+    }
+  }
+
   // The last screen shows the result of Check the connection as soon as it opens.
   useEffect(() => {
     if (!open || step !== 4) return;
-    let cancelled = false;
-    api.engineConnectionCheck().then(
-      (result) => { if (!cancelled) setHops(result.hops); },
-      (err) => { if (!cancelled) setError(err instanceof ApiError ? err.message : "Home could not check the connection. Open Engines and AI and select Check the connection, then try again."); },
-    );
-    return () => { cancelled = true; };
+    void action.run(checkConnection);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- runs once on arrival at the last step
   }, [open, step]);
 
   async function revoke() {
@@ -186,7 +204,8 @@ export function EngineLinkCredentialSection() {
     <Section heading="Engine computer link">
       <p className="text-base text-muted-foreground">Key: {status.data.paired ? "Present" : "Not paired"}</p>
       <Button variant="outline" onClick={begin}>Pair engine computer</Button>
-      {status.data.paired ? <div className="flex flex-col items-start gap-2"><p className="text-sm text-muted-foreground">Before revoking, run <code>maipai-engine unpair</code> on the engine computer.</p><Button variant="destructive" disabled={busy} onClick={() => void run(revoke)}>Revoke link key</Button></div> : null}
+      {status.data.paired ? <div className="flex flex-col items-start gap-2"><p className="text-sm text-muted-foreground">Before revoking, run <code>maipai-engine unpair</code> on the engine computer.</p><Button variant="destructive" disabled={busy} onClick={() => setConfirmRevoke(true)}>Revoke link key</Button></div> : null}
+      {confirmRevoke ? <DestructiveConfirm message="Revoke this engine link key?" detail="The engine computer will need to be paired again." confirmLabel="Revoke key" busyLabel="Revoking" busy={revokeAction.busy} onConfirm={() => void revokeAction.run()} onCancel={() => setConfirmRevoke(false)} /> : null}
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent>
           <DialogHeader>
@@ -247,7 +266,7 @@ export function EngineLinkCredentialSection() {
                 <p className="text-base">Paired. Home now trusts this engine computer.</p>
                 {hops ? hops.map((hop) => (
                   <p key={hop.id} className="text-sm">{hop.pass ? "PASS" : "FAIL"} hop {hop.id}{hop.detail ? `: ${hop.detail}` : ""}{hop.pass ? "" : `. To fix: ${hop.fix}`}</p>
-                )) : <RouteSkeleton label="Checking the connection" />}
+                )) : error ? <><Button type="button" variant="outline" disabled={busy} onClick={() => { setError(null); setHops(null); void run(checkConnection); }}>Retry</Button></> : <RouteSkeleton label="Checking the connection" />}
               </>
             ) : null}
             {error ? <p role="alert" className="text-sm text-destructive">{error}</p> : null}

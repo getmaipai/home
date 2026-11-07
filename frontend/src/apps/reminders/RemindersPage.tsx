@@ -3,7 +3,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import type { List as ListRecord } from "@maipai/spec/gen/ts/list.js";
 import { Page } from "@maipai/ui/src/primitives/Page";
 import { Button } from "@maipai/ui/src/ui/button";
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@maipai/ui/src/ui/alert-dialog";
+import { AlertDialog, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@maipai/ui/src/ui/alert-dialog";
 import { useBreakpoint } from "@maipai/ui/src/hooks/useBreakpoint";
 import { WakeWordPersonContext } from "@/apps/chat/chatThreadContexts";
 import { useHeaderExtra } from "@maipai/ui/src/dashboard/layouts/full/vertical/header/HeaderExtraContext";
@@ -15,6 +15,7 @@ import { ListColumn } from "./ListColumn";
 import { ListMain } from "./ListMain";
 import { SmartListView, type SmartItem } from "./SmartListView";
 import { labelFor, type ListIcon, type ReminderView } from "./reminderTypes";
+import { useHubMutation } from "@/lib/useHubMutation";
 
 const LISTS_QUERY_KEY = ["household-lists"];
 const COMING_QUERY_KEY = ["household-coming-up"];
@@ -48,6 +49,7 @@ export function RemindersPage() {
   const isPhone = useBreakpoint().width < 640;
   const listsQuery = useQuery({ queryKey: LISTS_QUERY_KEY, queryFn: api.lists });
   const comingQuery = useQuery({ queryKey: COMING_QUERY_KEY, queryFn: api.comingUp });
+  const action = useHubMutation({ verb: "update reminders", mutationFn: async (perform: () => Promise<unknown>) => { await perform(); return true; }, onSuccess: refresh });
   const lists = useMemo(() => orderLists(listsQuery.data ?? []), [listsQuery.data]);
   const [view, setView] = useState<ReminderView>({ kind: "list", id: "" });
   const [sheetOpen, setSheetOpen] = useState(false);
@@ -94,50 +96,38 @@ export function RemindersPage() {
     ]);
   }
 
-  async function addItem(text: string) {
-    if (!selected) return;
-    await api.addListItem(selected.id, text, selected.kind !== "shopping");
-    await refresh();
+  function addItem(text: string) {
+    if (!selected) return Promise.resolve(undefined);
+    return action.run(() => api.addListItem(selected.id, text, selected.kind !== "shopping").then(() => undefined));
   }
 
-  async function toggleItem(itemId: string, done: boolean) {
-    if (!selected) return;
-    await api.editListItem(selected.id, itemId, done);
-    await refresh();
+  function toggleItem(itemId: string, done: boolean) {
+    if (!selected) return Promise.resolve(undefined);
+    return action.run(() => api.editListItem(selected.id, itemId, done).then(() => undefined));
   }
 
-  async function clearDone() {
-    if (!selected) return;
-    await api.clearDoneListItems(selected.id);
-    await refresh();
+  function clearDone() {
+    if (!selected) return Promise.resolve(undefined);
+    return action.run(() => api.clearDoneListItems(selected.id).then(() => undefined));
   }
 
-  async function createList(title: string, icon: ListIcon) {
-    const created = await api.createList({ kind: "custom", scope: "person", title, icon });
-    setSheetOpen(false);
-    setView({ kind: "list", id: created.id });
-    setPhoneShowingList(true);
-    await refresh();
+  function createList(title: string, icon: ListIcon) {
+    return action.run(async () => { const created = await api.createList({ kind: "custom", scope: "person", title, icon }); setSheetOpen(false); setView({ kind: "list", id: created.id }); setPhoneShowingList(true); return true; });
   }
 
-  async function renameList(title: string) {
-    if (!selected) return;
-    await api.updateList(selected.id, { title });
-    await refresh();
+  function renameList(title: string) {
+    if (!selected) return Promise.resolve(undefined);
+    return action.run(() => api.updateList(selected.id, { title }).then(() => undefined));
   }
 
-  async function changeIcon(icon: ListIcon) {
-    if (!selected) return;
-    await api.updateList(selected.id, { icon });
-    await refresh();
+  function changeIcon(icon: ListIcon) {
+    if (!selected) return Promise.resolve(undefined);
+    return action.run(() => api.updateList(selected.id, { icon }).then(() => undefined));
   }
 
-  async function deleteSelected() {
+  function deleteSelected() {
     if (!selected) return;
-    await api.deleteList(selected.id);
-    setConfirmDelete(false);
-    setView({ kind: "list", id: "" });
-    await refresh();
+    void action.run(async () => { await api.deleteList(selected.id); setConfirmDelete(false); setView({ kind: "list", id: "" }); });
   }
 
   const canManage = selected?.kind === "custom" && person?.role !== "child";
@@ -185,10 +175,10 @@ export function RemindersPage() {
         </AlertDialogHeader>
         <AlertDialogFooter>
           <AlertDialogCancel>Cancel</AlertDialogCancel>
-          <AlertDialogAction onClick={() => void deleteSelected()}>Delete list</AlertDialogAction>
+          <Button type="button" variant="destructive" disabled={action.busy} onClick={deleteSelected}>Delete list</Button>
         </AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>
-    {listsQuery.isError || comingQuery.isError ? <p role="alert" className="p-4 text-destructive">Could not load reminders.</p> : null}
+    {listsQuery.isError || comingQuery.isError ? <div role="alert" className="p-4 text-destructive"><p>Could not load reminders. Check your connection and try again.</p>{listsQuery.isError ? <Button variant="outline" onClick={() => void listsQuery.refetch()}>Retry</Button> : null}{comingQuery.isError ? <Button variant="outline" onClick={() => void comingQuery.refetch()}>Retry</Button> : null}</div> : null}
   </Page>;
 }

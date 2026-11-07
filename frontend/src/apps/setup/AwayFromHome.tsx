@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { Alert, AlertDescription, AlertTitle } from "@maipai/ui/src/dashboard/components/ui/alert";
 import { Field, FieldContent, FieldDescription, FieldGroup, FieldTitle } from "@maipai/ui/src/dashboard/components/ui/field";
@@ -6,6 +6,7 @@ import { Wizard, type WizardStep } from "@maipai/ui/src/primitives/Wizard";
 import { Button } from "@maipai/ui/src/ui/button";
 import { QrCode } from "@maipai/ui/src/ui/qr-code";
 import { api, type SignedInPerson, type TailscaleStatus } from "@/lib/api";
+import { hubErrorMessage } from "@/lib/hubReachability";
 
 const STEPS: WizardStep[] = [
   { id: "device", title: "Install and sign in" },
@@ -33,17 +34,22 @@ export function AwayFromHome({ operator }: { operator: SignedInPerson | null }) 
   const [enabledAddress, setEnabledAddress] = useState<{ url: string; qrPayload: string } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const pollPending = useRef(false);
 
   useEffect(() => {
     if (!isOwnerOrAdmin(operator)) return;
     let active = true;
-    const poll = () => void api.tailscaleStatus().then((next) => {
+    const poll = () => {
+      if (pollPending.current) return;
+      pollPending.current = true;
+      void api.tailscaleStatus().then((next) => {
       if (!active) return;
       setStatus(next);
       setError(null);
     }).catch((reason) => {
-      if (active) setError(reason instanceof Error ? reason.message : "Home couldn't check Tailscale. Try again.");
-    });
+      if (active) setError(`${hubErrorMessage(reason, "Home couldn't check Tailscale.")} Check your connection and try again.`);
+    }).finally(() => { pollPending.current = false; });
+    };
     poll();
     const timer = window.setInterval(poll, 4000);
     const focus = () => poll();

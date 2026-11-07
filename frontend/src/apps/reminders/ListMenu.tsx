@@ -9,8 +9,8 @@ import { LIST_ICONS, type ListIcon } from "./reminderTypes";
 
 export function ListMenu({ title, onRename, onChangeIcon, onDelete }: {
   title: string;
-  onRename: (title: string) => Promise<void>;
-  onChangeIcon: (icon: ListIcon) => Promise<void>;
+  onRename: (title: string) => Promise<unknown>;
+  onChangeIcon: (icon: ListIcon) => Promise<unknown>;
   onDelete: () => void;
 }) {
   const [renameOpen, setRenameOpen] = useState(false);
@@ -25,8 +25,7 @@ export function ListMenu({ title, onRename, onChangeIcon, onDelete }: {
   async function saveRename(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!name.trim()) return;
-    await onRename(name.trim());
-    setRenameOpen(false);
+    if (await onRename(name.trim())) setRenameOpen(false);
   }
 
   return <>
@@ -53,7 +52,7 @@ export function ListMenu({ title, onRename, onChangeIcon, onDelete }: {
         <div className="grid grid-cols-4 gap-2">
           {LIST_ICONS.map((icon) => {
             const Icon = getIcon(icon === "cart" ? "box" : icon === "sparkle" ? "sparkles" : icon);
-            return <Button key={icon} variant="outline" aria-label={icon} onClick={() => { void onChangeIcon(icon).then(() => setIconOpen(false)); }}><Icon aria-hidden /></Button>;
+            return <Button key={icon} variant="outline" aria-label={icon} onClick={() => { void onChangeIcon(icon).then((saved) => { if (saved) setIconOpen(false); }); }}><Icon aria-hidden /></Button>;
           })}
         </div>
       </DialogContent>
