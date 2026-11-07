@@ -38,6 +38,28 @@ describe("reference key points", () => {
     expect(calls).toHaveLength(1);
   });
 
+  test("a failed writing is tried again after the pause, and a model that never answers frees the article", async () => {
+    const c = await owner();
+    let attempt = 0;
+    __setReferenceKeyPointsModelForTests((async () => {
+      attempt += 1;
+      if (attempt === 1) return { ok: false };
+      if (attempt === 2) return new Promise(() => {});
+      return { ok: true, text: reply };
+    }) as never, { retryAfterMs: 30, deadlineMs: 40 });
+    expect((await keyPoints(c)).key_points).toBeNull();
+    await Bun.sleep(10);
+    expect((await keyPoints(c)).key_points).toBeNull();
+    expect(attempt).toBe(1); // inside the pause: no second call
+    await Bun.sleep(40);
+    expect((await keyPoints(c)).key_points).toBeNull(); // attempt 2 starts and hangs
+    await Bun.sleep(120); // deadline passes, pause passes
+    expect((await keyPoints(c)).key_points).toBeNull(); // attempt 3 starts
+    await Bun.sleep(30);
+    expect((await keyPoints(c)).key_points?.text).toContain("The river runs to the sea.");
+    expect(attempt).toBe(3);
+  });
+
   test("an article that is not there stays null and never calls the model", async () => {
     const c = await owner();
     expect((await keyPoints(c, "Missing")).key_points).toBeNull();
