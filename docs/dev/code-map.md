@@ -78,7 +78,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 
 | File | Exported names |
 |---|---|
-| `frontend/src/App.tsx` | App |
+| `frontend/src/App.tsx` | PersonLocale, App |
 | `frontend/src/apps/chat/AskHandoff.tsx` | ASK_HANDOFF_MAX, askFromSearch, AskHandoff |
 | `frontend/src/apps/chat/ChatThread.tsx` | ChatExtrasContext, ChatThread |
 | `frontend/src/apps/chat/ChatThreadExtras.tsx` | ChatThreadExtras |
