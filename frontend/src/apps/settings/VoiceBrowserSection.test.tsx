@@ -213,3 +213,37 @@ describe("VoiceBrowserSection", () => {
     expect(guest.queryByRole("button", { name: "Make an Inspired voice" })).toBeNull();
   });
 });
+
+describe("Inspired voice extras (VOICE-INSPIRED-02)", () => {
+  test("offers lower levels, previews the chosen level, and sends the blend voice on make", async () => {
+    spyOn(householdVoicesApi, "list").mockResolvedValue({ voices: [{ id: "voice-base1", label: "Warm", creatorId: "p", creatorName: "Taylor", bytes: 1, createdAt: "" }] });
+    const preview = spyOn(householdVoicesApi, "preview").mockResolvedValue(new Blob(["x"], { type: "audio/wav" }));
+    const make = spyOn(householdVoicesApi, "make").mockResolvedValue({ id: "voice-new", label: "Spark", creatorId: "person-1", creatorName: "Taylor", bytes: 1, createdAt: "" });
+    const played: string[] = [];
+    const realAudio = globalThis.Audio;
+    globalThis.Audio = class { onended: (() => void) | null = null; constructor(public src: string) {} async play() { played.push(this.src); } } as unknown as typeof Audio;
+    URL.createObjectURL = (() => "blob:sample") as typeof URL.createObjectURL;
+    try {
+      const view = renderPage(three(), ["alba", "javert", "mira"]);
+      await trigger(view);
+      fireEvent.click(view.getByRole("button", { name: "Make an Inspired voice" }));
+      await view.findByText("How different from the original");
+      const previewButton = view.getByRole("button", { name: "Preview" }) as HTMLButtonElement;
+      expect(previewButton.disabled).toBe(true);
+      fireEvent.change(view.getByLabelText("Name"), { target: { value: "Spark" } });
+      fireEvent.change(view.getByLabelText("Recording"), { target: { files: [new File(["a"], "c.wav", { type: "audio/wav" })] } });
+      await waitFor(() => expect((view.getByRole("button", { name: "Preview" }) as HTMLButtonElement).disabled).toBe(false));
+      fireEvent.click(view.getByRole("combobox", { name: "How different from the original" }));
+      fireEvent.click(await view.findByRole("option", { name: "Lower" }));
+      fireEvent.click(view.getByRole("button", { name: "Preview" }));
+      await waitFor(() => expect(played).toEqual(["blob:sample"]));
+      expect(preview.mock.calls[0]![0]).toMatchObject({ inspiredLevel: "lower" });
+      expect(preview.mock.calls[0]![0].baseVoiceId).toBeUndefined();
+      fireEvent.click(await view.findByRole("combobox", { name: "Blend with (optional)" }));
+      fireEvent.click(await view.findByRole("option", { name: "Warm" }));
+      fireEvent.submit(document.getElementById("add-voice-form")!);
+      await waitFor(() => expect(make).toHaveBeenCalled());
+      expect(make.mock.calls[0]![0]).toMatchObject({ inspiredLevel: "lower", baseVoiceId: "voice-base1" });
+    } finally { globalThis.Audio = realAudio; }
+  });
+});

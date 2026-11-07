@@ -6,8 +6,8 @@ import { clonedVoices, people } from "@/db/schema";
 import { resetDb } from "./reset-db";
 import { clonedVoicesDir, logsDir } from "@/lib/paths";
 import { __setClonedVoiceTranscriberForTests } from "@/lib/clonedVoiceTranscript";
-import { listClonedVoices, readClonedVoiceClip, saveInspiredVoice } from "@/lib/clonedVoices";
-import { decodeWavClip, encodeWavClip, INSPIRED_SEMITONES, shiftPitchAndFormants } from "@/lib/voiceShift";
+import { listClonedVoices, previewInspiredVoice, readClonedVoiceClip, saveClonedVoice, saveInspiredVoice } from "@/lib/clonedVoices";
+import { decodeWavClip, encodeWavClip, INSPIRED_SEMITONES, mixClips, shiftPitchAndFormants } from "@/lib/voiceShift";
 import type { PersonRow } from "@/types";
 
 function resetDir(): void {
@@ -50,6 +50,14 @@ describe("shiftPitchAndFormants()", () => {
     expect(ratio).toBeLessThan(2 ** (2.3 / 12));
     expect(Math.max(...shifted.samples.slice(RATE, RATE * 2))).toBeGreaterThan(0.2);
   });
+  test("moves the pitch down for a negative shift and keeps the length", () => {
+    const clip = decodeWavClip(tone(200))!;
+    const shifted = shiftPitchAndFormants(clip, -4);
+    expect(shifted.samples.length).toBe(clip.samples.length);
+    const ratio = pitchOf(shifted.samples) / pitchOf(clip.samples);
+    expect(ratio).toBeGreaterThan(2 ** (-4.5 / 12));
+    expect(ratio).toBeLessThan(2 ** (-3.5 / 12));
+  });
   test("zero shift returns the clip as it is", () => {
     const clip = decodeWavClip(tone(100))!;
     expect(shiftPitchAndFormants(clip, 0)).toBe(clip);
@@ -57,8 +65,8 @@ describe("shiftPitchAndFormants()", () => {
 });
 
 describe("saveInspiredVoice()", () => {
-  test("level mapping: Different is 2 semitones, Very different is 4", () => {
-    expect(INSPIRED_SEMITONES).toEqual({ different: 2, very_different: 4 });
+  test("level mapping: Lower and Much lower go down 2 and 4 semitones, Different and Very different go up 2 and 4", () => {
+    expect(INSPIRED_SEMITONES).toEqual({ much_lower: -4, lower: -2, different: 2, very_different: 4 });
   });
 
   test("keeps a shifted copy, not the upload, with provenance saying inspired and the level", async () => {
@@ -120,5 +128,72 @@ describe("saveInspiredVoice()", () => {
     expect(logs).not.toContain(result.value.id);
     expect(logs).not.toContain("Secretname");
     expect(logs).not.toContain(maker.id);
+  });
+});
+
+describe("mixClips()", () => {
+  test("averages two clips with equal weight, at the first clip's rate and length", () => {
+    const a = { samples: new Float32Array([0.4, 0.4, 0.4, 0.4]), sampleRate: 1000 };
+    const b = { samples: new Float32Array([0.2, 0.2]), sampleRate: 1000 };
+    const mixed = mixClips(a, b);
+    expect(mixed.sampleRate).toBe(1000);
+    expect(Array.from(mixed.samples).map((v) => Math.round(v * 100) / 100)).toEqual([0.3, 0.3, 0.3, 0.3]);
+  });
+  test("resamples the second clip to the first clip's rate", () => {
+    const a = { samples: new Float32Array(2000).fill(0.5), sampleRate: 2000 };
+    const b = { samples: new Float32Array(1000).fill(-0.5), sampleRate: 1000 };
+    const mixed = mixClips(a, b);
+    expect(mixed.samples.length).toBe(2000);
+    expect(Math.abs(mixed.samples[500]!)).toBeLessThan(1e-3);
+  });
+});
+
+describe("lower levels, blending and preview", () => {
+  test("a Lower voice is stored lower than the upload", async () => {
+    const result = await saveInspiredVoice(makePerson("Plow", "member"), "Deep", tone(200), "audio/wav", "much_lower");
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.value.inspiredLevel).toBe("much_lower");
+    const stored = decodeWavClip(readClonedVoiceClip(result.value.id)!.bytes)!;
+    expect(pitchOf(stored.samples) / pitchOf(decodeWavClip(tone(200))!.samples)).toBeLessThan(2 ** (-3 / 12));
+  });
+
+  test("blending keeps both sources in the record and mixes the waveforms", async () => {
+    const maker = makePerson("Pblend", "member");
+    const base = saveClonedVoice(maker, "Base", tone(300), "audio/wav");
+    expect(base.ok).toBe(true);
+    if (!base.ok) return;
+    const result = await saveInspiredVoice(maker, "Mixed", tone(100), "audio/wav", "different", base.value.id);
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.value.inspiredBaseId).toBe(base.value.id);
+    expect(db.select().from(clonedVoices).all().find((r) => r.id === result.value.id)!.inspiredBaseId).toBe(base.value.id);
+    const plain = await saveInspiredVoice(maker, "Plain", tone(100), "audio/wav", "different");
+    const mixedSamples = decodeWavClip(readClonedVoiceClip(result.value.id)!.bytes)!.samples;
+    const plainSamples = decodeWavClip(readClonedVoiceClip((plain as { ok: true; value: { id: string } }).value.id)!.bytes)!.samples;
+    expect(Array.from(mixedSamples.slice(5000, 5100))).not.toEqual(Array.from(plainSamples.slice(5000, 5100)));
+    const logs = readdirSync(logsDir).map((f) => readFileSync(join(logsDir, f), "utf8")).join("\n");
+    expect(logs).toContain("blended=yes");
+    expect(logs).not.toContain(base.value.id);
+  });
+
+  test("an unknown base voice is refused", async () => {
+    const result = await saveInspiredVoice(makePerson("Pnobase", "member"), "X", tone(100), "audio/wav", "different", "voice-nosuchone1");
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.status).toBe(404);
+    expect(db.select().from(clonedVoices).all()).toHaveLength(0);
+  });
+
+  test("a preview is about four seconds, saves nothing, and a guest is refused", async () => {
+    const result = await previewInspiredVoice(makePerson("Pprev", "teen"), tone(100), "audio/wav", "lower");
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(decodeWavClip(result.value)!.samples.length).toBe(RATE * 4);
+    expect(db.select().from(clonedVoices).all()).toHaveLength(0);
+    const guest = await previewInspiredVoice(makePerson("Pgst", "guest"), tone(100), "audio/wav", "lower");
+    expect(guest.ok).toBe(false);
+    if (!guest.ok) expect(guest.status).toBe(403);
+    const bad = await previewInspiredVoice(makePerson("Pbd", "member"), tone(100), "audio/wav", "nope");
+    expect(bad.ok).toBe(false);
   });
 });

@@ -8,11 +8,14 @@ import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "no
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-export const INSPIRED_LEVELS = ["different", "very_different"] as const;
+export const INSPIRED_LEVELS = ["much_lower", "lower", "different", "very_different"] as const;
 export type InspiredLevel = (typeof INSPIRED_LEVELS)[number];
 
-/** The single definition of how far each level moves the reference (semitones, upward). */
-export const INSPIRED_SEMITONES: Record<InspiredLevel, number> = { different: 2, very_different: 4 };
+/** The single definition of how far each level moves the reference (semitones; negative is lower). */
+export const INSPIRED_SEMITONES: Record<InspiredLevel, number> = { much_lower: -4, lower: -2, different: 2, very_different: 4 };
+
+/** How much of a clip a preview plays. */
+export const PREVIEW_SECONDS = 4;
 
 export function isInspiredLevel(value: unknown): value is InspiredLevel {
   return typeof value === "string" && (INSPIRED_LEVELS as readonly string[]).includes(value);
@@ -159,10 +162,45 @@ export async function clipToWav(bytes: Uint8Array, extension: string): Promise<U
   finally { rmSync(dir, { recursive: true, force: true }); }
 }
 
-/** The shifted reference for an Inspired voice, as WAV bytes; null when the clip cannot be read. */
-export async function makeInspiredReference(bytes: Uint8Array, extension: string, level: InspiredLevel): Promise<Uint8Array | null> {
+/** Linear resample to another sample rate (same speed and pitch). */
+function resampleRate(clip: PcmClip, rate: number): Float32Array {
+  if (clip.sampleRate === rate) return clip.samples;
+  const length = Math.max(1, Math.floor((clip.samples.length * rate) / clip.sampleRate));
+  const out = new Float32Array(length);
+  const step = clip.sampleRate / rate;
+  for (let i = 0; i < length; i++) {
+    const position = i * step;
+    const base = Math.floor(position);
+    const t = position - base;
+    const a = clip.samples[Math.min(base, clip.samples.length - 1)]!;
+    const b = clip.samples[Math.min(base + 1, clip.samples.length - 1)]!;
+    out[i] = a + (b - a) * t;
+  }
+  return out;
+}
+
+/** Blends two clips with equal weight. The result has the first clip's rate and length; the second is resampled to that rate
+ * and repeated if it is shorter. */
+export function mixClips(first: PcmClip, second: PcmClip): PcmClip {
+  const other = resampleRate(second, first.sampleRate);
+  const samples = new Float32Array(first.samples.length);
+  for (let i = 0; i < samples.length; i++) samples[i] = (first.samples[i]! + other[i % other.length]!) / 2;
+  return { samples, sampleRate: first.sampleRate };
+}
+
+/** The shifted reference for an Inspired voice, as WAV bytes; null when the clip cannot be read. With `base`, the shifted clip is
+ * blended with that voice's reference clip; null too when the base cannot be read. */
+export async function makeInspiredReference(bytes: Uint8Array, extension: string, level: InspiredLevel, base?: { bytes: Uint8Array; extension: string } | null, maxSeconds?: number): Promise<Uint8Array | null> {
   const wav = await clipToWav(bytes, extension);
-  const clip = wav ? decodeWavClip(wav) : null;
+  let clip = wav ? decodeWavClip(wav) : null;
   if (!clip) return null;
-  return encodeWavClip(shiftPitchAndFormants(clip, INSPIRED_SEMITONES[level]));
+  if (maxSeconds) clip = { samples: clip.samples.slice(0, Math.round(clip.sampleRate * maxSeconds)), sampleRate: clip.sampleRate };
+  let result = shiftPitchAndFormants(clip, INSPIRED_SEMITONES[level]);
+  if (base) {
+    const baseWav = await clipToWav(base.bytes, base.extension);
+    const baseClip = baseWav ? decodeWavClip(baseWav) : null;
+    if (!baseClip) return null;
+    result = mixClips(result, baseClip);
+  }
+  return encodeWavClip(result);
 }

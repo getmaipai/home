@@ -16,23 +16,40 @@ export interface HouseholdVoice {
   /** Set only on an Inspired voice (AUDIO-PARITY-01 V5), with how far it was moved from the recording it is based on. */
   kind?: "inspired";
   inspiredLevel?: InspiredLevel;
+  /** The household voice this one was blended with, when it was (VOICE-INSPIRED-02). */
+  inspiredBaseId?: string;
 }
 
-export type InspiredLevel = "different" | "very_different";
-export const inspiredLevelLabel = (level: InspiredLevel): string => level === "different" ? i18n._({ id: "Different", message: "Different" }) : i18n._({ id: "Very different", message: "Very different" });
-
+export type InspiredLevel = "much_lower" | "lower" | "different" | "very_different";
+/** In the order the person sees them: lowest first. */
+export const INSPIRED_LEVELS: InspiredLevel[] = ["much_lower", "lower", "different", "very_different"];
+export const inspiredLevelLabel = (level: InspiredLevel): string => level === "much_lower" ? i18n._({ id: "Much lower", message: "Much lower" }) : level === "lower" ? i18n._({ id: "Lower", message: "Lower" }) : level === "different" ? i18n._({ id: "Different", message: "Different" }) : i18n._({ id: "Very different", message: "Very different" });
 
 export const householdVoicesApi = {
   list: () => requestJson<{ voices: HouseholdVoice[] }>("/api/voice/cloned"),
   /** `temperature` and `pitchSemitones` are sent only when given (a blank field means the default). */
-  make: (input: { name: string; clip: File; temperature?: number; pitchSemitones?: number; inspiredLevel?: InspiredLevel }) => {
+  make: (input: { name: string; clip: File; temperature?: number; pitchSemitones?: number; inspiredLevel?: InspiredLevel; baseVoiceId?: string }) => {
     const form = new FormData();
     form.append("label", input.name);
     form.append("file", input.clip);
     if (input.temperature !== undefined) form.append("temperature", String(input.temperature));
     if (input.pitchSemitones !== undefined) form.append("pitch_semitones", String(input.pitchSemitones));
     if (input.inspiredLevel !== undefined) form.append("inspired_level", input.inspiredLevel);
+    if (input.baseVoiceId) form.append("base_voice_id", input.baseVoiceId);
     return requestJson<HouseholdVoice>("/api/voice/cloned", { method: "POST", body: form });
+  },
+  /** A short shifted sample of the clip (about four seconds of WAV). Saves nothing. */
+  preview: async (input: { clip: File; inspiredLevel: InspiredLevel; baseVoiceId?: string }): Promise<Blob> => {
+    const form = new FormData();
+    form.append("file", input.clip);
+    form.append("inspired_level", input.inspiredLevel);
+    if (input.baseVoiceId) form.append("base_voice_id", input.baseVoiceId);
+    const res = await fetch("/api/voice/cloned/preview", { method: "POST", body: form, credentials: "include" });
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({})) as { error?: string };
+      throw new Error(body.error ?? i18n._({ id: "Could not play a sample. Try again.", message: "Could not play a sample. Try again." }));
+    }
+    return res.blob();
   },
   rename: (id: string, label: string) => requestJson<HouseholdVoice>(`/api/voice/cloned/${encodeURIComponent(id)}/rename`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ label }) }),
   remove: (id: string) => requestJson<{ success: true }>(`/api/voice/cloned/${encodeURIComponent(id)}/delete`, { method: "POST" }),

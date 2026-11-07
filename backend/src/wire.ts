@@ -672,7 +672,9 @@ export interface ClonedVoiceInfo {
   pitchSemitones?: number;
   /** AUDIO-PARITY-01 V5: set only on an Inspired voice, with how far it was moved from the clip it is based on. */
   kind?: "inspired";
-  inspiredLevel?: "different" | "very_different";
+  inspiredLevel?: "much_lower" | "lower" | "different" | "very_different";
+  /** VOICE-INSPIRED-02: the household voice this one was blended with, when it was. */
+  inspiredBaseId?: string;
 }
 
 export interface StackVoice {

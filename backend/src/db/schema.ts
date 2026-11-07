@@ -1037,6 +1037,8 @@ export const clonedVoices = sqliteTable("cloned_voices", {
   // AUDIO-PARITY-01 V5: provenance of a voice made by "Inspired voice" ("inspired" and how far it was moved); null for a voice made as it is.
   kind: text("kind"),
   inspiredLevel: text("inspired_level"),
+  // VOICE-INSPIRED-02: the household voice an Inspired voice was blended with (second source); null when not blended.
+  inspiredBaseId: text("inspired_base_id"),
 });
 
 export const scheduledJobs = sqliteTable("scheduled_jobs", {

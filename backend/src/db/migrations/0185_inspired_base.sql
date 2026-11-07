@@ -1,0 +1,1 @@
+ALTER TABLE `cloned_voices` ADD `inspired_base_id` text;

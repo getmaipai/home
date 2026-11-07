@@ -23,6 +23,7 @@ import {
   listClonedVoices,
   saveClonedVoice,
   saveInspiredVoice,
+  previewInspiredVoice,
   deleteClonedVoice,
   getClonedVoiceFile,
   clonedVoiceExists,
@@ -503,7 +504,8 @@ const clonedUploadRoute = createRoute({
             temperature: z.number().optional(),
             pitchSemitones: z.number().optional(),
             kind: z.literal("inspired").optional(),
-            inspiredLevel: z.enum(["different", "very_different"]).optional(),
+            inspiredLevel: z.enum(["much_lower", "lower", "different", "very_different"]).optional(),
+            inspiredBaseId: z.string().optional(),
           }),
         },
       },
@@ -522,10 +524,10 @@ voiceRoutes.openapi(clonedUploadRoute, async (c) => {
   if (typeof label !== "string") return c.json({ error: "label is required" }, 400);
   const bytes = new Uint8Array(await file.arrayBuffer());
   const options = { temperature: optionalNumber(body.temperature), pitchSemitones: optionalNumber(body.pitch_semitones) };
-  // V5 "Inspired voice": an inspired_level field (different or very_different) makes a new voice based on the clip instead of a copy.
+  // V5 "Inspired voice": an inspired_level field (much_lower, lower, different or very_different) makes a new voice based on the clip instead of a copy.
   const inspiredLevel = typeof body.inspired_level === "string" && body.inspired_level ? body.inspired_level : null;
   if (inspiredLevel && (options.temperature !== null || options.pitchSemitones !== null)) return c.json({ error: "An Inspired voice has no liveliness or pitch setting. Make it without them." }, 400);
-  const result = inspiredLevel ? await saveInspiredVoice(actor, label, bytes, file.type, inspiredLevel) : saveClonedVoice(actor, label, bytes, file.type, options);
+  const result = inspiredLevel ? await saveInspiredVoice(actor, label, bytes, file.type, inspiredLevel, typeof body.base_voice_id === "string" && body.base_voice_id ? body.base_voice_id : null) : saveClonedVoice(actor, label, bytes, file.type, options);
   if (!result.ok) {
     if (result.status === 404) return c.json({ error: result.error }, 404);
     return result.status === 400 ? c.json({ error: result.error }, 400) : c.json({ error: result.error }, 403);
@@ -538,6 +540,33 @@ voiceRoutes.openapi(clonedUploadRoute, async (c) => {
   }
   if (check.audio && check.audio.byteLength > 44) cacheHouseholdPreview(result.value.id, check.audio);
   return c.json(result.value, 201);
+});
+
+// VOICE-INSPIRED-02: a short shifted sample of an upload, so the person hears a level before keeping it. Saves nothing.
+const clonedPreviewRoute = createRoute({
+  method: "post",
+  path: "/cloned/preview",
+  tags: ["Voice"],
+  summary: "Preview an Inspired voice level",
+  description: "Takes the same multipart form as creating a voice (file, inspired_level, optional base_voice_id) and returns about four seconds of the shifted clip as WAV audio. Nothing is saved.",
+  middleware: [requireAuth, bodyLimit({ maxSize: MAX_CLONED_VOICE_BYTES + 64 * 1024 })] as const,
+  request: { body: { content: { "multipart/form-data": { schema: z.unknown() } } } },
+  responses: {
+    200: { content: { "audio/wav": { schema: z.unknown() } }, description: "A short WAV sample." },
+    ...errorResponses({ 400: "Missing file or level", 401: "Not signed in", 403: "Not allowed", 404: "Unknown voice to blend with" }),
+  },
+});
+
+voiceRoutes.openapi(clonedPreviewRoute, async (c) => {
+  const actor = c.get("person");
+  if (!mayUseClipVoices(actor)) return c.json({ error: "A guest cannot make a voice. Ask the person who manages Home to add you as a member first." }, 403);
+  const body = await c.req.parseBody().catch(() => ({}) as Record<string, unknown>);
+  const file = body.file;
+  if (!(file instanceof File)) return c.json({ error: "an audio file is required" }, 400);
+  const bytes = new Uint8Array(await file.arrayBuffer());
+  const result = await previewInspiredVoice(actor, bytes, file.type, body.inspired_level, typeof body.base_voice_id === "string" && body.base_voice_id ? body.base_voice_id : null);
+  if (!result.ok) return result.status === 404 ? c.json({ error: result.error }, 404) : result.status === 400 ? c.json({ error: result.error }, 400) : c.json({ error: result.error }, 403);
+  return new Response(Buffer.from(result.value), { status: 200, headers: { "content-type": "audio/wav", "cache-control": "no-store" } }) as never;
 });
 
 // Sets the signed-in person's OWN tts.voice_id, the same

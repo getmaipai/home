@@ -426,7 +426,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/childDisclosure.ts` | hasAdultToTellCue, defaultChildDisclosure |
 | `backend/src/lib/childLinks.ts` | stripLinksForChild, sourcesForChild, sourcesForBand, stripLinksDeep, blocksForBand, structuredPartForBand |
 | `backend/src/lib/clonedVoiceTranscript.ts` | __setClonedVoiceTranscriberForTests, normalizeVoiceTranscript, updateClonedVoiceTranscript, transcribeClonedVoiceOnce |
-| `backend/src/lib/clonedVoices.ts` | MAX_BYTES, listClonedVoices, saveClonedVoice, saveInspiredVoice, renameClonedVoice, deleteClonedVoice |
+| `backend/src/lib/clonedVoices.ts` | MAX_BYTES, listClonedVoices, saveClonedVoice, saveInspiredVoice, previewInspiredVoice, renameClonedVoice |
 | `backend/src/lib/closeAppsProbe.ts` | HARMLESS_TEST_APP, probeCloseApps |
 | `backend/src/lib/codeGate.ts` | PROXY_HEADERS, isTailnetAddress, isPublicHost, transportRefusal, requestsPerMinute, rateRefusal |
 | `backend/src/lib/codeSafety.ts` | codingFloor, bandOf, crisisText, inputRefusalLine, outputRefusalLine, alertIfMinor |
@@ -1160,7 +1160,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/voiceForSpeech.ts` | isPresetVoice, voiceForSpeech |
 | `backend/src/lib/voiceList.ts` | playableVoices, listPlayableVoices, isPlayableVoiceId |
 | `backend/src/lib/voiceResolve.ts` | voiceMatchesLanguage, voiceMatchesStored, voicePresetName, resolveVoice, getOfferedVoices, __setOfferedVoicesForTests |
-| `backend/src/lib/voiceShift.ts` | INSPIRED_LEVELS, INSPIRED_SEMITONES, isInspiredLevel, decodeWavClip, encodeWavClip, shiftPitchAndFormants |
+| `backend/src/lib/voiceShift.ts` | INSPIRED_LEVELS, INSPIRED_SEMITONES, PREVIEW_SECONDS, isInspiredLevel, decodeWavClip, encodeWavClip |
 | `backend/src/lib/voiceTools.ts` | VOICEOVER_TOOL_ID, CHANGE_VOICE_TOOL_ID, voiceoverToolSpec, changeVoiceToolSpec, runVoiceoverTool, runChangeVoiceTool |
 | `backend/src/lib/voiceover.ts` | voicesFor, makeVoiceover, speakToBytes, speakAndStore |
 | `backend/src/lib/wakewordAssets.ts` | WAKEWORD_SHARED_ASSETS, WAKEWORD_STOCK_DETECTOR, WAKEWORD_ALL_ASSETS, wakewordAssetPath, isWakewordAssetInstalled, areWakewordAssetsInstalled |
