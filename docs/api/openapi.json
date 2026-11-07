@@ -76672,6 +76672,11 @@
                           "latest_activity": {
                             "type": "string",
                             "nullable": true
+                          },
+                          "latest_activity_at": {
+                            "type": "string",
+                            "nullable": true,
+                            "description": "The ISO time of the latest task or chat on this companion; latest_activity is its title."
                           }
                         },
                         "required": [
@@ -76694,7 +76699,8 @@
                           "chat_count",
                           "working_count",
                           "waiting_count",
-                          "latest_activity"
+                          "latest_activity",
+                          "latest_activity_at"
                         ]
                       }
                     },
@@ -76784,6 +76790,11 @@
                           "latest_activity": {
                             "type": "string",
                             "nullable": true
+                          },
+                          "latest_activity_at": {
+                            "type": "string",
+                            "nullable": true,
+                            "description": "The ISO time of the latest task or chat on this companion; latest_activity is its title."
                           }
                         },
                         "required": [
@@ -76806,7 +76817,8 @@
                           "chat_count",
                           "working_count",
                           "waiting_count",
-                          "latest_activity"
+                          "latest_activity",
+                          "latest_activity_at"
                         ]
                       }
                     },
@@ -77643,6 +77655,11 @@
                       "type": "string",
                       "nullable": true
                     },
+                    "latest_activity_at": {
+                      "type": "string",
+                      "nullable": true,
+                      "description": "The ISO time of the latest task or chat on this companion; latest_activity is its title."
+                    },
                     "about": {
                       "type": "string"
                     },
@@ -77741,6 +77758,7 @@
                     "working_count",
                     "waiting_count",
                     "latest_activity",
+                    "latest_activity_at",
                     "about",
                     "pronouns",
                     "interests",
