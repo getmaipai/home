@@ -6,6 +6,7 @@ description: Turn the speech in a video or audio file into text in the Library, 
 # Make a transcript of a video or song
 
 A transcript is the words said in a video or audio file, with the time of each line. Teens and adults can make one for a file in the Library.
+Transcripts are available in English only for now.
 
 ## Make one
 

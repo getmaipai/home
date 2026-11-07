@@ -4,7 +4,7 @@ import { readAttachment } from "@/lib/attachments";
 import { readableItem } from "@/lib/media/access";
 import { serveItemBytes } from "@/lib/media/serve";
 import type { PersonRow } from "@/types";
-import type { Segment } from "./store";
+import { TranscriptError, type Segment } from "./store";
 
 export type TranscriptJobResult = {
   segments: Segment[];
@@ -39,6 +39,12 @@ export function __setTranscriptStackClientForTests(client: TranscriptStackClient
   scripted = client;
 }
 
+export function isSupportedTranscriptLanguage(lang?: string): boolean {
+  if (!lang) return true;
+  const primary = lang.toLowerCase().split(/[-_]/, 1)[0];
+  return primary === "en" || primary === "auto" || primary === "und";
+}
+
 /** The audio or video bytes of a media item or of an uploaded or generated file the person can see. */
 async function itemBytes(actor: PersonRow, itemId: string): Promise<Uint8Array> {
   const item = readableItem(actor, itemId);
@@ -58,6 +64,9 @@ export async function transcribeJob(
   input: TranscriptJobInput,
   signal?: AbortSignal,
 ): Promise<TranscriptJobResult> {
+  if (input.language && !isSupportedTranscriptLanguage(input.language)) {
+    throw new TranscriptError("Transcripts are only available in English for now. Other languages are not available yet.", 400);
+  }
   if (scripted) return scripted.transcribeJob(input, signal);
   const bytes = await itemBytes(actor, input.item_id);
   const source = Buffer.from(bytes).toString("base64");

@@ -36,7 +36,7 @@ function person(id: string, role: string): string {
   return token;
 }
 
-function item(ownerId: string, visibleTo: unknown = "household"): void {
+function item(ownerId: string, visibleTo: unknown = "household", itemId = "media-caption01"): void {
   const sourceId = `msrc-${ownerId.slice(-8)}`;
   db.insert(mediaSources).values({
     id: sourceId,
@@ -52,7 +52,7 @@ function item(ownerId: string, visibleTo: unknown = "household"): void {
     provenance: `person:${ownerId}`,
   }).run();
   db.insert(mediaItems).values({
-    id: "media-caption01",
+    id: itemId,
     kind: "video",
     title: "Sample clip",
     sourceId,
@@ -101,6 +101,29 @@ afterEach(() => {
 });
 
 describe("transcript routes", () => {
+  test("English and automatic transcript requests work, while other languages fail before creating a transcript", async () => {
+    const token = person("person-sage0001", "adult");
+    item("person-sage0001");
+    const message = "Transcripts are only available in English for now. Other languages are not available yet.";
+
+    const unsupported = await req("/library/media-caption01/transcript", token, "POST", { language: "es" });
+    expect(unsupported.status).toBe(400);
+    expect(await unsupported.json()).toEqual({ error: message });
+    expect((await req("/library/media-caption01/transcript", token)).status).toBe(404);
+
+    for (const [index, language] of ["en", "en-US", undefined].entries()) {
+      const itemId = `media-caption0${index + 2}`;
+      db.insert(mediaItems).values({
+        id: itemId, kind: "video", title: "Sample clip", sourceId: "msrc-sage0001", locRootId: "msrc-sage0001",
+        locPath: `${itemId}.mp4`, mediaType: "video/mp4", playable: "original", chapters: "[]", subtitles: "[]",
+        locatorKind: "none", advisoryExplicit: false, advisorySource: "tag", bandOk: "child", addedAt: now,
+        fingerprint: itemId, hidden: false, createdAt: now, hlc: nextHlc(), provenance: "{}",
+      }).run();
+      const response = await req(`/library/${itemId}/transcript`, token, "POST", language ? { language } : {});
+      expect(response.status).toBe(201);
+    }
+  });
+
   test("generation, get, patch, history, restore and exports use the scripted Stack client", async () => {
     const token = person("person-sage0001", "adult");
     item("person-sage0001");
