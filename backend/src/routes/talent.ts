@@ -2,15 +2,17 @@ import { Hono } from "hono";
 import { z } from "zod";
 import type { AppEnv } from "@/types";
 import { requireAuth } from "@/middleware/auth";
-import { updateMediaProduction } from "@/lib/mediaProductions";
+import { updateMediaProduction, listMediaProductions } from "@/lib/mediaProductions";
 import { db } from "@/db";
 import { mediaItems, mediaSources } from "@/db/schema";
-import { eq } from "drizzle-orm";
+import { desc, eq } from "drizzle-orm";
 import { createShow, getShow, listShows, makeEpisode, briefingToday, type CreateShowInput } from "@/lib/talent/shows";
 import { loadFormats } from "@/lib/talent/formats";
 import { queryItems } from "@/lib/media/appHost";
 import { formatById } from "@/lib/talent/formats";
 import { speakerAgeBand } from "@/lib/ageBand";
+import { getSynth } from "@/lib/synths";
+import { listMade } from "@/lib/music/madeRecords";
 
 export const talentRoutes = new Hono<AppEnv>();
 talentRoutes.use("*", requireAuth);
@@ -20,6 +22,28 @@ export const createShowSchema = z.object({ title: z.string().min(1).max(160), fo
 
 talentRoutes.get("/formats", (c) => c.json([...loadFormats().values()], 200));
 talentRoutes.get("/shows", (c) => c.json({ shows: listShows(c.get("person")) }, 200));
+talentRoutes.get("/synths/:id/credits", (c) => {
+  const actor = c.get("person"), synthId = c.req.param("id");
+  if (!getSynth(actor, synthId)) return c.json({ error: "That synth is not available. Choose a synth you can use and try again." }, 404);
+  const productions = listMediaProductions(actor).filter((production) => production.cast.some((member) => member.synth_id === synthId));
+  const shows = productions.filter((production) => production.show !== null).map((production) => {
+    const sourceRow = db.select().from(mediaSources).where(eq(mediaSources.productionId, production.id)).get();
+    const episodes = sourceRow ? queryItems(actor, "podcasts", { where: eq(mediaItems.sourceId, sourceRow.id), limit: 200, order: [desc(mediaItems.addedAt)] }).map((item) => ({ item_id: item.id, title: item.title, aired_at: item.added_at, duration_s: item.duration_s })) : [];
+    return { production_id: production.id, title: production.title, part: production.cast.find((member) => member.synth_id === synthId)?.part ?? "", episodes };
+  }).sort((a, b) => (b.episodes[0]?.aired_at ?? "").localeCompare(a.episodes[0]?.aired_at ?? ""));
+  const readableFilms = queryItems(actor, "shows", { limit: 1000, all: true });
+  const filmItems = new Map(readableFilms.flatMap((item) => {
+    const fileId = (item.location as { file_id?: string }).file_id;
+    return fileId ? [[fileId, item] as const] : [];
+  }));
+  const films = productions.filter((production) => production.show === null).flatMap((production) => production.finished_cut_file_ids.flatMap((fileId) => {
+    const item = filmItems.get(fileId);
+    return item ? [{ production_id: production.id, title: item.title || production.title, part: production.cast.find((member) => member.synth_id === synthId)?.role ?? "", file_id: fileId, made_at: item.added_at }] : [];
+  })).sort((a, b) => b.made_at.localeCompare(a.made_at));
+  const made = listMade("made_artist", actor, { scope: "all" });
+  const bands = made.ok ? made.value.filter((band) => Array.isArray(band.members) && band.members.some((member) => typeof member === "object" && member !== null && (member as { synth_id?: unknown }).synth_id === synthId)).map((band) => ({ made_artist_id: band.id, name: String(band.name ?? band.title ?? "Band"), role: String((band.members as Array<{ synth_id?: string; role?: string }>).find((member) => member.synth_id === synthId)?.role ?? "Member"), made_at: String(band.created_at ?? "") })).sort((a, b) => b.made_at.localeCompare(a.made_at)).map(({ made_at: _madeAt, ...band }) => band) : [];
+  return c.json({ shows, films, bands }, 200);
+});
 talentRoutes.post("/shows", async (c) => {
   try { const input = createShowSchema.parse(await c.req.json()) as CreateShowInput; return c.json(await createShow(c.get("person"), input), 201); }
   catch (error) { return c.json({ error: error instanceof Error ? error.message : "The show could not be created. Check its fields and try again." }, 400); }

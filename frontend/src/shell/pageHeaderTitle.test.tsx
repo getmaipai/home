@@ -48,8 +48,8 @@ describe("PageHeaderTitle", () => {
     ["/files", "Library", "lucide-folder"],
     ["/notifications", "Notifications", "lucide-bell"],
     // Pages that drew no title, or text without an icon, before the one standard: every route reads as an icon and a name.
-    ["/companions", "Companions", "lucide-bot"],
-    ["/companions/create", "Companions", "lucide-bot"],
+    ["/companions", "Synths", "lucide-bot"],
+    ["/companions/create", "Synths", "lucide-bot"],
     ["/all-apps", "All apps", "lucide-layout-grid"],
     ["/reference", "Reference", "lucide-book-open"],
     ["/media", "Media", "lucide-cast"],

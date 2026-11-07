@@ -78,7 +78,7 @@ function companionMenu({ card, discover = false, onDelete, onRemove, onSetDefaul
 
 /** /companions: the companions this person may use, as a card grid. */
 function CompanionsDirectory() {
-  useTabItem(i18n._({ id: "Companions", message: "Companions" }));
+  useTabItem(i18n._({ id: "Companions", message: "Synths" }));
   const navigate = useNavigate();
   const query = useQuery<CompanionList>({ queryKey: listKey, queryFn: api.companions, retry: false });
   const [discoverFilter, setDiscoverFilter] = useState("All");

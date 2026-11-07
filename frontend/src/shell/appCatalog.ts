@@ -24,7 +24,7 @@ export const APP_CATALOG: readonly AppEntry[] = [
   // finding worth a comment so a future rename of "Memories" in
   // nav.ts doesn't wonder why this entry never follows it.
   { to: "/memory", icon: "brain", label: "Memories", description: "The details you want MaiPai to remember.", category: "Personal", keywords: ["remember", "saved", "memory"] },
-  { to: "/companions", icon: "bot", label: "Companions", description: "Meet the companions and pick how your assistant sounds.", category: "Personal", keywords: ["personality", "persona", "voice", "character", "sprout", "nova", "riff"] },
+  { to: "/companions", icon: "bot", label: "Synths", description: "Meet your household's synths and pick who is your companion.", category: "Personal", keywords: ["companions", "personality", "persona", "voice", "character", "sprout", "nova", "riff"] },
   { to: "/people", icon: "users", label: "Family", description: "Everyone who shares your home.", category: "Personal", keywords: ["family", "household"] },
   { to: "/reminders", icon: "layout-list", label: "Reminders", description: "Alarms, timers and things to remember.", category: "Everyday", keywords: ["alarm", "timer", "to do", "list", "remind"] },
   { to: "/clock", icon: "clock", label: "Clock", description: "The time, alarms and timers.", category: "Everyday", keywords: ["time", "alarm", "timer", "stopwatch"] },

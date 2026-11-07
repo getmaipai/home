@@ -6712,12 +6712,8 @@ msgstr "Configuración de la compañía"
 
 #. js-lingui-explicit-id
 #: src/shell/AmbientCompanionPane.tsx:174
-#: src/shell/coreLabels.ts:15
-#: src/shell/pages/CompanionsPage.tsx:81
-#: src/shell/phoneMenuLinks.tsx:14
-#, needs-review
-msgid "Companions"
-msgstr "Compañías"
+msgid "Companions in the companion selector"
+msgstr ""
 
 #. js-lingui-explicit-id
 #: src/shell/pages/CompanionsPage.tsx:121
@@ -16763,7 +16759,7 @@ msgstr "Medio"
 #: src/shell/coreLabels.ts:27
 #, needs-review
 msgid "Meet the companions and pick how your assistant sounds."
-msgstr "Conoce a las compañías y elige cómo suena tu asistente."
+msgstr "Conoce los seres sintéticos de tu hogar y elige quién será tu compañero."
 
 #. js-lingui-explicit-id
 #: src/apps/memory/PersonMemories.tsx:84
@@ -26215,6 +26211,14 @@ msgstr "Activa o desactiva la creación de clips para todo el hogar."
 #: src/lib/settingCopy.generated.ts:1600
 msgid "area.Synth controls"
 msgstr ""
+
+#. js-lingui-explicit-id
+#: src/shell/coreLabels.ts:15
+#: src/shell/pages/CompanionsPage.tsx:81
+#: src/shell/phoneMenuLinks.tsx:14
+#, needs-review
+msgid "Companions"
+msgstr "Seres sintéticos"
 
 #. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:1601

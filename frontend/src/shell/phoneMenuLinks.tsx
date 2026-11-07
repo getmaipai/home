@@ -11,7 +11,7 @@ import { api } from "@/lib/api";
 
 const entries = () => [
   { to: ALL_APPS_PATH, label: i18n._({ id: "All apps", message: "All apps" }), icon: "layout-grid" },
-  { to: "/companions", label: i18n._({ id: "Companions", message: "Companions" }), icon: "bot" },
+  { to: "/companions", label: i18n._({ id: "Companions", message: "Synths" }), icon: "bot" },
 ] as const;
 
 export function PhoneMenuLinks() {
