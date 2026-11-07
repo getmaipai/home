@@ -26,8 +26,7 @@ function createCallbackSet<T>() {
 }
 
 export interface SttDictationDeps {
-  /** `createSttSocket` once C's `WS /api/stt/stream` lands
-   * (`sttSocket.ts`); `createMockSttSocket` with a fixture until then -
+  /** `createSttSocket` (`sttSocket.ts`, the real `WS /api/stt/stream`); a test passes `createMockSttSocket` with a fixture -
    * this file never knows or cares which. */
   createSocket: (handlers: SttSocketHandlers) => SttSocket;
   /** Barge-in (session-e-ui-and-docs.md step 4): the server's own VAD

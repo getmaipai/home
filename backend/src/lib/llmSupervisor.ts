@@ -39,12 +39,11 @@ import { resolveLaunchFlags, launchFlagsToArgs, type LaunchFlags, type LaunchFla
 import { runPostLoadCheck, type PostLoadCheckResult } from "@/lib/enginePostLoadCheck";
 import { getHouseholdSettingValue } from "@/lib/settings";
 import { readEngineIdentity, formatEngineIdentity, identityIncomplete, type EngineIdentity } from "@/lib/engineIdentity";
-import { spawnAndWaitHealthy, freePort, sweepOrphanProcesses, watchEngine, probeAlive, engineHealthKind, blockedPortHolderAlive, blockedPortReason, expireStalledStart, cancelEngineRespawn, type EngineWatch, type EngineHealth } from "@/lib/sidecars";
+import { spawnAndWaitHealthy, freePort, sweepOrphanProcesses, watchEngine, expireStalledStart, cancelEngineRespawn, type EngineWatch } from "@/lib/sidecars";
 import { hotReloadState } from "@/lib/hotReloadState";
 import { assertNotInCrashBootHold } from "@/lib/dirtyBoot";
 import { startResourceGovernor } from "@/lib/resourceGovernor";
 import { resolveIssue } from "@/lib/issues";
-import { isStackRoleEnabled } from "@/lib/stackEngine";
 
 let lastChatRecoveryNudgeAt = 0;
 let chatRecoveryNudge: () => void = () => {
@@ -348,44 +347,6 @@ export function reportChatBackendUnreachable(message: string): void {
   if (backend.watch) backend.watch.markDown(`stopped answering (${message})`);
   else if (backend.kind === "url") return;
   else void restartChatBackend();
-}
-
-/** For GET /api/health: the configured kind plus a real probe of the
- * process behind it, so a dead engine reads as down rather than as its
- * kind label. */
-export async function probeChatEngine(): Promise<EngineHealth> {
-  // Stack-owned chat never uses the local supervisor. A boot warm-up from
-  // before the role was routed, or a stale local start in flight, must not
-  // leak into /api/health and status history as a local startup transition.
-  if (isStackRoleEnabled("chat") && !process.env.MAIPAI_LLAMA_SERVER_URL) {
-    return { kind: "stub", pid: null, alive: null, availability: "ready", reason: null };
-  }
-  const status = getEngineStatus();
-  const port = Number(process.env.MAIPAI_LLAMA_SERVER_PORT ?? 8788);
-  if (blockedPortReason(port)) blockedPortHolderAlive(port);
-  const kind = engineHealthKind("chat", status.kind, port);
-  const alive = await probeAlive(state.chatBackend?.client);
-  const availability = deriveChatAvailability(kind, alive);
-  if (status.kind === "none" && state.lastStartFailure) {
-    availability.availability = "unavailable";
-    availability.reason = state.lastStartFailure;
-  }
-  return { kind, pid: status.pid, alive, ...availability };
-}
-
-type ChatAvailabilityReason = "stopped" | "crashed" | "blocked_port" | "not_installed" | "failed_start";
-type ChatAvailabilityState = { availability: "ready" | "starting" | "unavailable"; reason: ChatAvailabilityReason | null };
-
-/** The single mapping from supervisor state to the household-facing chat state. */
-function deriveChatAvailability(kind: EngineHealth["kind"], alive: boolean | null): ChatAvailabilityState {
-  if (kind === "stopped") return { availability: "unavailable", reason: "stopped" };
-  if (kind === "blocked") return { availability: "unavailable", reason: "blocked_port" };
-  if (kind === "restarting") return { availability: "unavailable", reason: "crashed" };
-  if (kind === "failed" || kind === "stalled") return { availability: "unavailable", reason: "failed_start" };
-  if ((kind === "url" || kind === "override" || kind === "selection" || kind === "spawned") && alive === false)
-    return { availability: "unavailable", reason: "failed_start" };
-  if (kind === "starting") return { availability: "starting", reason: null };
-  return { availability: "ready", reason: null };
 }
 
 /** Null unless the engine is genuinely fully installed - both the binary

@@ -18,13 +18,7 @@ export interface SttSocket {
   close: () => void;
 }
 
-// GET /api/stt/stream doesn't exist yet (C's own step, confirmed not
-// started 2026-09-06) - built against the frozen contract
-// (docs/plans/wave-2.md's "C to E: speech to text") so swapping this in
-// once the route lands is just calling createSttSocket instead of
-// createMockSttSocket at the one call site (sttDictationAdapter.ts).
-// Untestable against a real server today; the mock below is what every
-// test and any interactive use before C ships actually exercises.
+// The real socket to `WS /api/stt/stream`, built against the frozen contract (sttContract.ts).
 export function createSttSocket(handlers: SttSocketHandlers): SttSocket {
   const proto = window.location.protocol === "https:" ? "wss:" : "ws:";
   const socket = new WebSocket(`${proto}//${window.location.host}/api/stt/stream`);
@@ -92,12 +86,8 @@ export interface SttFixtureStep {
   message: SttServerMessage;
 }
 
-// "Until C's route lands, a mock socket that replays a fixture"
-// (session-e-ui-and-docs.md step 4's own words) - the first WebSocket
-// consumer anywhere in this frontend, so there was no existing
-// mock-socket pattern to match; this is deliberately the same shape as
-// createSttSocket (sendAudio/close, one onMessage callback) so
-// sttDictationAdapter.ts's own code never has to know which one it got.
+// Test helper: a socket that replays a fixture. Same shape as createSttSocket (sendAudio/close, one onMessage callback),
+// so the code under test never knows which one it got. No production file calls it.
 export function createMockSttSocket(fixture: readonly SttFixtureStep[], handlers: SttSocketHandlers): SttSocket {
   let closed = false;
   const timers: ReturnType<typeof setTimeout>[] = [];
