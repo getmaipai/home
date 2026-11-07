@@ -686,14 +686,20 @@ export const conversationTurns = sqliteTable(
   // hottest path in the app (a code review, 2026-09-05, flagged the
   // missing index: a full table scan on every turn as history grows).
   (table) => [
-    index("conversation_turns_conversation_id_idx").on(table.conversationId),
+    // AUDIT-PERF-CONV-01: (conversation_id, created_at) replaces the bare conversation_id index (it is that index's prefix, so every
+    // lookup by conversation still uses it). The conversation list reads a conversation's count, newest time and newest
+    // turn from it without sorting or loading the rows.
+    index("conversation_turns_conversation_created_idx").on(table.conversationId, table.createdAt),
     // The judge's own core job scans for `source = 'model' AND
     // judge_status IS NULL` every tick (lib/memoryJudge.ts) - without
     // this, that scan is a full table scan of every turn the household
     // has ever had, not just the still-unjudged ones.
     index("conversation_turns_judge_status_idx").on(table.source, table.judgeStatus),
-    // AUDIT-PERF-01: the retention and dashboard scans go by time alone. (A (conversation_id, status, created_at) index was tried and left
-    // out: it flips the order of turns that share one millisecond in the history window until those queries add a tie-break.)
+    // AUDIT-PERF-CONV-01: the history window and the fold read one conversation's finished turns newest or oldest first; this
+    // index serves that sort. Those queries order by (created_at, rowid) explicitly, so turns that share one millisecond keep
+    // their insertion order (AUDIT-PERF-01 had left this index out until the tie-break existed).
+    index("conversation_turns_conversation_status_created_idx").on(table.conversationId, table.status, table.createdAt),
+    // AUDIT-PERF-01: the retention and dashboard scans go by time alone.
     index("conversation_turns_created_idx").on(table.createdAt),
     // list()/listConversationTurns()/exportPerson() (conversationHistory.ts)
     // and lib/dashboard.ts's own recentActivity()/turnsPerDay() all filter

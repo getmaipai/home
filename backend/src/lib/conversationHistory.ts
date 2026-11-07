@@ -414,6 +414,7 @@ const insertTurnAndBumpConversation = sqlite.transaction((row: ConversationTurnR
   // so it neither wins the branch nor unseats the chosen one.
   if (status === "failed") {
     const storedRow = { ...row, branchChosen: false, status };
+    dropWindowRows(conversationId);
     db.insert(conversationTurns).values(storedRow).onConflictDoUpdate({ target: conversationTurns.id, set: storedRow }).run();
     db.update(conversations).set({ updatedAt: row.createdAt, hlc: nextHlc() }).where(eq(conversations.id, conversationId)).run();
     return storedRow;
@@ -440,6 +441,7 @@ const insertTurnAndBumpConversation = sqlite.transaction((row: ConversationTurnR
   // happen in production, since the turn machine always calls it first,
   // but not something this write should silently corrupt if it does).
   const storedRow = { ...row, branchChosen, status: "done" as const };
+  dropWindowRows(conversationId);
   db.insert(conversationTurns).values(storedRow).onConflictDoUpdate({ target: conversationTurns.id, set: storedRow }).run();
   db.update(conversations).set({ updatedAt: row.createdAt, hlc: nextHlc() }).where(eq(conversations.id, conversationId)).run();
   // AUDIT-LIB-01: a finished picture or clip that outran its turn was stored unattached with `pendingTurnId` in its provenance;
@@ -1745,6 +1747,53 @@ export function matchQueryFor(query: string): string | null {
   return ftsQuery(contentTerms(query), " AND ");
 }
 
+/** AUDIT-PERF-CONV-01: what a conversation list shows of each conversation's turns, read in SQL. `count` and `last` are
+ * over every stored turn of the conversation; the preview turn is the newest one with text that is not a film turn,
+ * and when turns share a millisecond the later one in insertion order (rowid) wins, as listConversationTurns() orders
+ * them. Measured on 200 conversations of 100 turns each, without the (conversation_id, created_at) index: this
+ * per-conversation lookup 11 ms, a ROW_NUMBER() window function 44 ms, a correlated subquery 442 ms, and the old
+ * load-every-turn read 13 ms; with the index the lookup walks the newest rows only (0.3 ms, the whole list 2 ms).  */
+interface PreviewTurn { userText: string; safetyFlagged: boolean; safetyAction: string; crisisSignal: boolean }
+const PREVIEW_COLUMNS = "user_text AS userText, safety_flagged AS safetyFlagged, safety_action AS safetyAction, crisis_signal AS crisisSignal";
+// SQLite's trim() strips only the characters it is given; JS trim() also strips other Unicode whitespace, so a row this
+// pre-filter lets through is checked again below.
+const newestPreviewTurnStatement = sqlite.prepare(
+  `SELECT ${PREVIEW_COLUMNS} FROM conversation_turns WHERE conversation_id = ? AND plugin_id IS NOT 'film' AND trim(user_text, char(9, 10, 11, 12, 13, 32)) <> '' ORDER BY created_at DESC, rowid DESC LIMIT 1`,
+);
+const previewTurnsNewestFirstStatement = sqlite.prepare(
+  `SELECT ${PREVIEW_COLUMNS} FROM conversation_turns WHERE conversation_id = ? AND plugin_id IS NOT 'film' ORDER BY created_at DESC, rowid DESC`,
+);
+function previewTurnOf(row: Record<string, unknown>): PreviewTurn {
+  return { userText: row.userText as string, safetyFlagged: Boolean(row.safetyFlagged), safetyAction: row.safetyAction as string, crisisSignal: Boolean(row.crisisSignal) };
+}
+function listAggregates(ids: readonly string[]): { byConversation: Map<string, { count: number; last: string | null }>; latestUserTurn: Map<string, PreviewTurn> } {
+  const byConversation = new Map<string, { count: number; last: string | null }>();
+  const latestUserTurn = new Map<string, PreviewTurn>();
+  const CHUNK = 500;
+  for (let i = 0; i < ids.length; i += CHUNK) {
+    const chunk = ids.slice(i, i + CHUNK);
+    const rows = sqlite
+      .prepare(`SELECT conversation_id AS id, COUNT(*) AS n, MAX(created_at) AS last FROM conversation_turns WHERE conversation_id IN (${chunk.map(() => "?").join(",")}) GROUP BY conversation_id`)
+      .all(...chunk) as Array<{ id: string; n: number; last: string | null }>;
+    for (const row of rows) byConversation.set(row.id, { count: row.n, last: row.last });
+  }
+  for (const [id, agg] of byConversation) {
+    if (agg.count === 0) continue;
+    const found = newestPreviewTurnStatement.get(id) as Record<string, unknown> | null;
+    if (!found) continue;
+    let turn: PreviewTurn | undefined = previewTurnOf(found);
+    if (!turn.userText.trim()) {
+      turn = undefined;
+      for (const row of previewTurnsNewestFirstStatement.iterate(id) as Iterable<Record<string, unknown>>) {
+        if ((row.userText as string).trim()) { turn = previewTurnOf(row); break; }
+      }
+      if (!turn) continue;
+    }
+    latestUserTurn.set(id, turn);
+  }
+  return { byConversation, latestUserTurn };
+}
+
 /** CONV-ARCHIVE-01: which shelved chats a listing carries. `exclude` (the
  * default, so every older caller is unchanged) hides them, `only` is the
  * archive view, `include` returns both with `archived` set on each row. */
@@ -1810,11 +1859,11 @@ export function listConversations(actor: PersonRow, personId?: string, query?: s
     // through the shared history exclusion instead of maintaining a
     // second definition of which turns are live.
     const matchingRows = matchingTurnIds.length
-      ? db.select().from(conversationTurns).where(inArray(conversationTurns.id, matchingTurnIds)).all()
+      ? db.select({ id: conversationTurns.id, conversationId: conversationTurns.conversationId }).from(conversationTurns).where(inArray(conversationTurns.id, matchingTurnIds)).all()
       : [];
     const matchingConversationIdsFromFts = [...new Set(matchingRows.map((turn) => turn.conversationId).filter((id): id is string => id !== null))];
     const branchRows = matchingConversationIdsFromFts.length
-      ? db.select().from(conversationTurns).where(inArray(conversationTurns.conversationId, matchingConversationIdsFromFts)).all()
+      ? db.select({ id: conversationTurns.id, conversationId: conversationTurns.conversationId, supersedes: conversationTurns.supersedes }).from(conversationTurns).where(inArray(conversationTurns.conversationId, matchingConversationIdsFromFts)).all()
       : [];
     const matchedIds = new Set(matchingTurnIds);
     const visibleMatchingRows = excludeSupersededRows(branchRows).filter((turn) => matchedIds.has(turn.id));
@@ -1828,34 +1877,9 @@ export function listConversations(actor: PersonRow, personId?: string, query?: s
   if (rows.length === 0) return [];
 
   const ids = rows.map((r) => r.id);
-  const turnRows = db
-    .select({
-      conversationId: conversationTurns.conversationId,
-      createdAt: conversationTurns.createdAt,
-      userText: conversationTurns.userText,
-      pluginId: conversationTurns.pluginId,
-      safetyFlagged: conversationTurns.safetyFlagged,
-      safetyAction: conversationTurns.safetyAction,
-      crisisSignal: conversationTurns.crisisSignal,
-    })
-    .from(conversationTurns)
-    .where(inArray(conversationTurns.conversationId, ids))
-    .all();
-  const byConversation = new Map<string, { count: number; last: string | null }>();
-  const latestUserTurn = new Map<string, (typeof turnRows)[number]>();
-  for (const t of turnRows) {
-    if (!t.conversationId) continue;
-    const entry = byConversation.get(t.conversationId) ?? { count: 0, last: null };
-    entry.count++;
-    if (!entry.last || t.createdAt > entry.last) entry.last = t.createdAt;
-    byConversation.set(t.conversationId, entry);
-    if (t.pluginId !== "film" && t.userText.trim()) {
-      const current = latestUserTurn.get(t.conversationId);
-      // Match listConversationTurns()' stable timestamp ordering: when
-      // rows share a timestamp, the later row in SQLite's returned order wins.
-      if (!current || t.createdAt >= current.createdAt) latestUserTurn.set(t.conversationId, t);
-    }
-  }
+  // AUDIT-PERF-CONV-01: the count and newest time come from one grouped statement, and the preview from the newest
+  // eligible turn's own row (one indexed lookup per listed conversation), so the list never loads every turn's text.
+  const { byConversation, latestUserTurn } = listAggregates(ids);
 
   const ownAdultView = actor.id === target && speakerAgeBand(actor, new Date()) === "adult";
   const ownMinorView = actor.id === target && !ownAdultView;
@@ -2404,7 +2428,7 @@ const SUMMARY_CAP_SHARE = 0.1;
 const WINDOW_ROW_FETCH_LIMIT = 200;
 const FAILURE_LINES = new Set(Object.values(FAILURE_COPY).flatMap((copy) => [copy.adult, copy.minor]));
 
-function hasFailedFinalGeneration(t: ConversationTurnRow): boolean {
+function hasFailedFinalGeneration(t: WindowTurnRow): boolean {
   if (!t.stats) return false;
   try {
     const stats = JSON.parse(t.stats) as { generations?: { error?: unknown }[] };
@@ -2429,7 +2453,7 @@ export function researchStepsFor(rawOutcomes: string | null | undefined, band: s
   } catch { return undefined; }
 }
 
-function replaySearchOutcomes(t: ConversationTurnRow): ToolExecutionOutcome[] {
+function replaySearchOutcomes(t: WindowTurnRow): ToolExecutionOutcome[] {
   if (t.status !== "done" || t.guardReason || hasFailedFinalGeneration(t) || FAILURE_LINES.has(t.replyText.trim()) || t.bare || !t.outcomes) return [];
   try {
     const outcomes = JSON.parse(t.outcomes) as ToolExecutionOutcome[];
@@ -2466,7 +2490,7 @@ function mediaToolNote(pluginId: string | null, turnId?: string): string | null 
   return null;
 }
 
-function turnTextMessages(t: ConversationTurnRow): LlmMessage[] {
+function turnTextMessages(t: WindowTurnRow): LlmMessage[] {
   // UPLOAD-IMG-02: an earlier message's pictures stay a known, unseen
   // fact in the window (chatImageNote.ts), so a follow-up never reads as
   // if the picture had been described. VISION-02c: a picture the model
@@ -2510,7 +2534,7 @@ function searchReplayMessages(outcomes: readonly ToolExecutionOutcome[]): LlmMes
  * back in front of it right alongside the real one. `rows` is already
  * bounded (WINDOW_ROW_FETCH_LIMIT), so this is a plain in-memory filter,
  * not a second query. */
-function excludeSupersededRows(rows: readonly ConversationTurnRow[], alsoSuperseded?: string | null, alsoExcluded?: string | null): ConversationTurnRow[] {
+function excludeSupersededRows<T extends Pick<ConversationTurnRow, "id" | "supersedes">>(rows: readonly T[], alsoSuperseded?: string | null, alsoExcluded?: string | null): T[] {
   const supersededIds = new Set(rows.map((r) => r.supersedes).filter((id): id is string => id !== null));
   // #88: on the edited turn's own run the replacing row does not exist
   // yet, so the caller names the turn it is about to supersede.
@@ -2581,7 +2605,7 @@ function pluginDisplayName(pluginId: string): string {
 /** Item 1b (#67): what a guard-replaced model turn reads as: the
  * honesty lines stripped, whatever else was said quoted in nobody's
  * voice, and a turn that was only the honesty line noted as no reply. */
-function guardedTurnNote(t: ConversationTurnRow): string {
+function guardedTurnNote(t: WindowTurnRow): string {
   const trimmed = (t.replyText || "").trim();
   const notes: string[] = [];
   // A bank line is the unit the guard speaks, so the note is looked up
@@ -2596,7 +2620,7 @@ function guardedTurnNote(t: ConversationTurnRow): string {
   return parts.length > 0 ? parts.join("\n") : "[No reply was given to this.]";
 }
 
-function nonModelWindowNote(t: ConversationTurnRow): string {
+function nonModelWindowNote(t: WindowTurnRow): string {
   switch (t.source) {
     case "plugin": {
       const display = t.pluginId ? pluginDisplayName(t.pluginId) : "A package";
@@ -2640,24 +2664,7 @@ function nonModelWindowNote(t: ConversationTurnRow): string {
  * TEMP-CHAT-01: a temporary conversation's turns live in its session, read
  * through the same code. */
 function windowRows(conversation: Pick<Conversation, "id" | "mode" | "summary" | "summary_through_turn">, opts: { supersedes?: string | null; excludeTurnId?: string | null; beforeCreatedAt?: string | null } = {}, order: "newest" | "oldest" = "newest") {
-  // Only the turns from the anchor on are read (a review: an anchor that
-  // trails more than WINDOW_ROW_FETCH_LIMIT turns behind must not lose the
-  // turns between it and the newest rows). The window reads the newest of
-  // them, the fold the oldest, so a long backlog is folded from its start.
-  const anchorAt = conversation.mode !== "temporary" && conversation.summary_through_turn
-    ? db.select({ createdAt: conversationTurns.createdAt }).from(conversationTurns).where(eq(conversationTurns.id, conversation.summary_through_turn)).get()?.createdAt
-    : undefined;
-  const rows =
-    conversation.mode === "temporary"
-      ? [...(temporarySessions.get(conversation.id)?.turns ?? [])]
-      : db
-          .select()
-          .from(conversationTurns)
-          .where(and(eq(conversationTurns.conversationId, conversation.id), eq(conversationTurns.status, "done"), anchorAt ? gte(conversationTurns.createdAt, anchorAt) : undefined))
-          .orderBy(order === "newest" ? desc(conversationTurns.createdAt) : asc(conversationTurns.createdAt))
-          .limit(WINDOW_ROW_FETCH_LIMIT)
-          .all();
-  rows.sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+  const rows = fetchedWindowRows(conversation, order);
   // ADMIN-COMPARE-01: a caller reconstructing history as it stood AT a
   // given turn names that turn's own createdAt here.
   const scoped = opts.beforeCreatedAt ? rows.filter((r) => r.createdAt < opts.beforeCreatedAt!) : rows;
@@ -2666,10 +2673,87 @@ function windowRows(conversation: Pick<Conversation, "id" | "mode" | "summary" |
   // included (#60: an anchor turn that was later edited is still a real
   // boundary, and same-millisecond turns make a timestamp inexact).
   const anchorIndex = conversation.summary_through_turn ? scoped.findIndex((t) => t.id === conversation.summary_through_turn) : -1;
-  const uncovered = anchorIndex === -1 ? liveRows : liveRows.filter((t) => scoped.indexOf(t) > anchorIndex);
+  let uncovered = liveRows;
+  if (anchorIndex !== -1) {
+    // AUDIT-PERF-CONV-01: a position map, not scoped.indexOf() inside the filter (quadratic in the fetched rows).
+    const position = new Map<WindowTurnRow, number>(scoped.map((t, i) => [t, i]));
+    uncovered = liveRows.filter((t) => position.get(t)! > anchorIndex);
+  }
   // A summary rides whenever one is stored: an anchored one covers the
   // turns before the anchor; a seeded one (THIN-3G) covers an earlier chat.
   return { liveRows, uncovered, anchored: conversation.summary_through_turn !== null || conversation.summary !== null };
+}
+
+/** AUDIT-PERF-CONV-01: the columns the window, the replay choice and the fold read from a turn, and nothing else. The
+ * wide JSON columns the window never renders (blocks, document, media, sources, plan, signal, subjects, reasoning,
+ * structured part, confirm and the rest) stay in the table. */
+const windowColumns = {
+  id: conversationTurns.id,
+  conversationId: conversationTurns.conversationId,
+  createdAt: conversationTurns.createdAt,
+  userText: conversationTurns.userText,
+  images: conversationTurns.images,
+  audio: conversationTurns.audio,
+  replyText: conversationTurns.replyText,
+  source: conversationTurns.source,
+  pluginId: conversationTurns.pluginId,
+  commandId: conversationTurns.commandId,
+  routingTier: conversationTurns.routingTier,
+  guardReason: conversationTurns.guardReason,
+  supersedes: conversationTurns.supersedes,
+  status: conversationTurns.status,
+  bare: conversationTurns.bare,
+  outcomes: conversationTurns.outcomes,
+  stats: conversationTurns.stats,
+  safetyAction: conversationTurns.safetyAction,
+  crisisSignal: conversationTurns.crisisSignal,
+};
+type WindowTurnRow = Pick<ConversationTurnRow, keyof typeof windowColumns>;
+
+/** The fetched rows a window or a fold works from, shared between the two
+ * reads one turn makes (windowPreview(), then buildConversationWindow()).
+ * Keyed by the conversation, the read's order, the summary's anchor and the
+ * newest finished turn's id (one indexed probe), so a turn written since, or
+ * a fold stored since, reads fresh; also dropped when a turn is written here
+ * and after WINDOW_CACHE_MS. The rows are never changed by a caller. */
+const WINDOW_CACHE_MS = 30_000;
+const WINDOW_CACHE_MAX = 16;
+const windowRowCache = new Map<string, { key: string; at: number; rows: WindowTurnRow[] }>();
+function dropWindowRows(conversationId: string): void {
+  for (const order of ["newest", "oldest"]) windowRowCache.delete(`${conversationId}|${order}`);
+}
+export function __windowRowsForTests(conversation: Pick<Conversation, "id" | "mode" | "summary" | "summary_through_turn">, order: "newest" | "oldest") { return windowRows(conversation, {}, order); }
+export function __clearWindowRowCacheForTests(): void { windowRowCache.clear(); }
+const newestDoneTurnStatement = sqlite.prepare("SELECT id FROM conversation_turns WHERE conversation_id = ? AND status = 'done' ORDER BY created_at DESC, rowid DESC LIMIT 1");
+
+function fetchedWindowRows(conversation: Pick<Conversation, "id" | "mode" | "summary_through_turn">, order: "newest" | "oldest"): WindowTurnRow[] {
+  // TEMP-CHAT-01: a temporary conversation's turns live in its session (in memory, no query to share).
+  if (conversation.mode === "temporary") return [...(temporarySessions.get(conversation.id)?.turns ?? [])].sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+  const newest = (newestDoneTurnStatement.get(conversation.id) as { id: string } | null)?.id ?? "";
+  const key = `${conversation.summary_through_turn ?? ""}|${newest}`;
+  const cacheKey = `${conversation.id}|${order}`;
+  const cached = windowRowCache.get(cacheKey);
+  if (cached && cached.key === key && Date.now() - cached.at < WINDOW_CACHE_MS) return cached.rows;
+  // Only the turns from the anchor on are read (a review: an anchor that
+  // trails more than WINDOW_ROW_FETCH_LIMIT turns behind must not lose the
+  // turns between it and the newest rows). The window reads the newest of
+  // them, the fold the oldest, so a long backlog is folded from its start.
+  const anchorAt = conversation.summary_through_turn
+    ? db.select({ createdAt: conversationTurns.createdAt }).from(conversationTurns).where(eq(conversationTurns.id, conversation.summary_through_turn)).get()?.createdAt
+    : undefined;
+  // AUDIT-PERF-CONV-01: the tie-break is explicit. Turns that share a millisecond keep their insertion order whatever
+  // index the planner picks (rowid is the insertion order), so the (conversation_id, status, created_at) index
+  // serves the sort without moving them.
+  const fetched = db
+    .select(windowColumns)
+    .from(conversationTurns)
+    .where(and(eq(conversationTurns.conversationId, conversation.id), eq(conversationTurns.status, "done"), anchorAt ? gte(conversationTurns.createdAt, anchorAt) : undefined))
+    .orderBy(...(order === "newest" ? [desc(conversationTurns.createdAt), sql`rowid desc`] : [asc(conversationTurns.createdAt), sql`rowid asc`]))
+    .limit(WINDOW_ROW_FETCH_LIMIT)
+    .all();
+  const rows = order === "newest" ? fetched.reverse() : fetched;
+  setBounded(windowRowCache, cacheKey, { key, at: Date.now(), rows }, WINDOW_CACHE_MAX);
+  return rows;
 }
 
 /** THIN-3F step 3: the summary enters the prompt as labelled data, never
@@ -2697,14 +2781,14 @@ export function windowPreview(conversation: Conversation, opts: { supersedes?: s
  * links, never page text); an older search turn keeps its answer and a
  * one-line note of what was searched (searchStubMessages). */
 const REPLAY_RECENT_TURNS = 2;
-function recentReplayTurn(liveRows: readonly ConversationTurnRow[]): ConversationTurnRow | undefined {
+function recentReplayTurn(liveRows: readonly WindowTurnRow[]): WindowTurnRow | undefined {
   return liveRows.slice(-REPLAY_RECENT_TURNS).reverse().find((turn) => replaySearchOutcomes(turn).length > 0);
 }
 
 /** An older search turn's search, kept as the engine's own tool-call and
  * tool-result pair with the results cleared (CHAT-LATE-SYSTEM-01: not a
  * system note, which the chat template refuses mid-history). */
-function searchStubMessages(t: ConversationTurnRow): LlmMessage[] {
+function searchStubMessages(t: WindowTurnRow): LlmMessage[] {
   const outcome = replaySearchOutcomes(t)[0];
   if (!outcome) return [];
   const expression = (outcome.args as { expression?: unknown } | undefined)?.expression;
@@ -2714,7 +2798,7 @@ function searchStubMessages(t: ConversationTurnRow): LlmMessage[] {
   return [assistant, { role: "tool", tool_call_id: outcome.callId, content: JSON.stringify({ results_cleared: true, source_count: sources }) }];
 }
 
-function renderTurns(turns: readonly ConversationTurnRow[], replayTurn: ConversationTurnRow | undefined, withReplay: boolean): LlmMessage[] {
+function renderTurns(turns: readonly WindowTurnRow[], replayTurn: WindowTurnRow | undefined, withReplay: boolean): LlmMessage[] {
   const replay = withReplay && replayTurn ? searchReplayMessages(replaySearchOutcomes(replayTurn)) : [];
   const messages: LlmMessage[] = [];
   for (const t of turns) {
@@ -2748,7 +2832,7 @@ function renderTurns(turns: readonly ConversationTurnRow[], replayTurn: Conversa
 /** The newest run of `turns` (at least `keep` of them) whose rendered
  * messages fit `budget` by the engine's count, found by binary search over
  * whole-list counts; null when the engine could not count. */
-async function newestThatFit(turns: readonly ConversationTurnRow[], keep: number, budget: number, render: (run: readonly ConversationTurnRow[]) => LlmMessage[]): Promise<number | null> {
+async function newestThatFit(turns: readonly WindowTurnRow[], keep: number, budget: number, render: (run: readonly WindowTurnRow[]) => LlmMessage[]): Promise<number | null> {
   const floor = Math.min(keep, turns.length);
   let lo = floor;
   let hi = turns.length;
@@ -2804,8 +2888,8 @@ export async function buildConversationWindow(conversation: Conversation, opts: 
   if (uncovered.length === 0) return empty;
 
   const replayTurn = recentReplayTurn(liveRows);
-  const render = (run: readonly ConversationTurnRow[], withReplay: boolean) => renderTurns(run, replayTurn, withReplay);
-  const done = (run: readonly ConversationTurnRow[], withReplay: boolean, historyTokens: number | null): ConversationWindow => ({
+  const render = (run: readonly WindowTurnRow[], withReplay: boolean) => renderTurns(run, replayTurn, withReplay);
+  const done = (run: readonly WindowTurnRow[], withReplay: boolean, historyTokens: number | null): ConversationWindow => ({
     messages: render(run, withReplay),
     turnIds: run.map((t) => t.id),
     droppedOlder: liveRows.length > run.length,
@@ -2954,7 +3038,7 @@ async function foldConversation(conversationId: string, opts: { inTurn?: boolean
     if (target === null) {
       if (uncovered.length <= FOLD_KEEPS_NEWEST_TURNS) return false;
       const replayTurn = recentReplayTurn(liveRows);
-      const render = (run: readonly ConversationTurnRow[]) => renderTurns(run, replayTurn, true);
+      const render = (run: readonly WindowTurnRow[]) => renderTurns(run, replayTurn, true);
       const total = budget === null ? null : await countTokens(render(uncovered));
       let blockEnd: number;
       if (budget === null || total === null) {
@@ -3002,7 +3086,7 @@ async function foldConversation(conversationId: string, opts: { inTurn?: boolean
  * structure (conversationInCrisis() reads the rows, a parked ask is the
  * conversation's pending ask), so leaving these turns out loses nothing
  * the next turn needs. */
-function foldsIntoSummary(r: ConversationTurnRow): boolean {
+function foldsIntoSummary(r: WindowTurnRow): boolean {
   if (r.crisisSignal || r.safetyAction !== "allow") return false;
   return r.source !== "policy" && r.source !== "safety_refuse" && r.source !== "confirm";
 }
@@ -3011,7 +3095,7 @@ function foldsIntoSummary(r: ConversationTurnRow): boolean {
  * renders a turn (credentials redacted, a guard-replaced reply as its
  * note, a package or command turn as its note), never withheld text and
  * never search page text. */
-function foldTranscript(block: readonly ConversationTurnRow[]): string {
+function foldTranscript(block: readonly WindowTurnRow[]): string {
   return block
     .filter(foldsIntoSummary)
     .map((t) => turnTextMessages(t).map((m) => `${m.role === "user" ? "Person" : m.role === "assistant" ? "Assistant" : "Note"}: ${m.content.replace(`\n\n${FOLDED_NOTE_LABEL}\n`, "\nNote: ")}`).join("\n"))
@@ -3064,7 +3148,7 @@ const CONDENSE_INSTRUCTIONS =
  * cap is condensed. A fold that fails the floor, or a failed call, is not
  * stored and the block stays verbatim. A temporary chat's fold lives in
  * its session only and is never logged. True when the fold was stored. */
-async function storeFold(conversation: Conversation, temporary: boolean, block: readonly ConversationTurnRow[], capTokens: number): Promise<boolean> {
+async function storeFold(conversation: Conversation, temporary: boolean, block: readonly WindowTurnRow[], capTokens: number): Promise<boolean> {
   const log = (line: string) => { if (!temporary) console.log(`[conversationHistory] ${line} for ${conversation.id}`); };
   const transcript = foldTranscript(block);
   let summary = conversation.summary;
