@@ -2,6 +2,7 @@ import { useEffect } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { api, type SignedInPerson } from "@/lib/api";
 import { activateLocale } from "@/i18n";
+import { installSettingCopyCache } from "@/lib/settingCopyCache";
 
 type Values = Array<{ key: string; value: unknown }> | undefined;
 const valueOf = (values: Values, key: string): unknown => values?.find((entry) => entry.key === key)?.value;
@@ -17,6 +18,8 @@ export function chooseLocale(personValue: unknown, householdValue: unknown): str
 export function usePersonLocale(person: Pick<SignedInPerson, "id"> | null | undefined, enabled = true): void {
   const queryClient = useQueryClient();
   const personId = person?.id;
+  // The kit draws registry text as sent; this keeps the shared settings caches in the active language.
+  useEffect(() => installSettingCopyCache(queryClient), [queryClient]);
   useEffect(() => {
     if (!enabled) return;
     let current = true;

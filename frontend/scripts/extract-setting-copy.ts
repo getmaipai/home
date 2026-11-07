@@ -7,6 +7,8 @@ import { titleCaseOption } from "@maipai/ui/src/settings/SettingField";
 
 export const GENERATED_PATH = "src/lib/settingCopy.generated.ts";
 const q = JSON.stringify;
+// A literal brace in spec copy ("{model, options}") is not an ICU placeholder: quote it so the runtime formatter prints it.
+const icu = (text: string) => text.replace(/[{}]/g, (brace) => `'${brace}'`);
 const VOCAB = JSON.parse(readFileSync("node_modules/@maipai/spec/vocab/setting-reasons.json", "utf8")) as Record<string, Record<string, Record<string, string>>>;
 
 export function buildGenerated(): string {
@@ -40,7 +42,7 @@ export function buildGenerated(): string {
     "",
     "/** Registry copy by id: `en` is the spec English (a translation is used only while the incoming text still equals it). */",
     "export const SETTING_COPY: Record<string, { en: string; t: () => string }> = {",
-    ...copy.map(([id, en]) => `  ${q(id)}: { en: ${q(en)}, t: () => i18n._({ id: ${q(id)}, message: ${q(en)} }) },`),
+    ...copy.map(([id, en]) => `  ${q(id)}: { en: ${q(en)}, t: () => i18n._({ id: ${q(id)}, message: ${q(icu(en))} }) },`),
     "};",
     "",
     "/** Reason-line templates ({admin} and {person} are filled by the reader). */",
