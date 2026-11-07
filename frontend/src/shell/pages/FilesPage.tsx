@@ -347,8 +347,9 @@ export function FilesPage({ person }: { person: Roster }) {
           <input ref={fileInput} type="file" multiple hidden aria-label="Choose files to add" onChange={(event) => { const files = Array.from(event.target.files ?? []); event.target.value = ""; if (files.length > 0) addFiles(files); }} />
         </div>
 
+        {/* AUDIT-UI-01: shrink-0, or the column squeezes this scrolling strip down to the tops of its chips when the page is taller than the phone. */}
         {!wide ? (
-          <div role="group" aria-label="Library sections" className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1">
+          <div role="group" aria-label="Library sections" className="-mx-4 flex shrink-0 gap-2 overflow-x-auto px-4 pb-1">
             {sections.map((section) => <div key={section.id} className="shrink-0"><Button type="button" variant={view.section === section.id ? "secondary" : "outline"} aria-pressed={view.section === section.id} onClick={() => goSection(section.id)}>{section.label}</Button></div>)}
           </div>
         ) : null}
