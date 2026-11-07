@@ -170,7 +170,7 @@ describe("creating people", () => {
       });
       expect(res.status).toBe(201);
       const body = await res.json() as { id: string; age_band: string };
-      expect(body.age_band).toBe(role === "child" || role === "teen" ? role : "adult");
+      expect(body.age_band).toBe(role === "child" || role === "teen" ? role : role === "guest" ? "teen" : "adult");
       expect(db.select().from(people).all().find((p) => p.id === body.id)!.birthdate).toBeNull();
     }
 
@@ -243,6 +243,14 @@ async function sessionFor(personId: string, secret?: string): Promise<TestClient
 // the ones that decide whether a household can be taken over, locked
 // out, or left holding data it was told had been erased.
 describe("PATCH /api/people/:id", () => {
+  test("a guest cannot change or clear their own stay expiry", async () => {
+    const owner = await ownerSession();
+    const guest = await addPerson(owner, "Visitor", "guest");
+    const guestClient = await sessionFor(guest.id);
+    const res = await guestClient.request(`/api/people/${guest.id}`, { method: "PATCH", body: { guestExpiresAt: null } });
+    expect(res.status).toBe(403);
+    expect(((await res.json()) as { error: string }).error).toBe("Ask an adult in the household to change how long you stay.");
+  });
   test("a new accent shows in the very next /api/auth/me read, not after the session cache expires", async () => {
     const ownerClient = await ownerSession();
     const child = await addPerson(ownerClient, "Bramble", "child");

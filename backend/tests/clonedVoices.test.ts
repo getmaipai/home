@@ -263,12 +263,12 @@ describe("clonedVoiceUrl()", () => {
   test("uses Home's loopback address when the Stack is local", () => {
     setHouseholdSettingValue("engines.stack.where", "this_computer");
     const url = clonedVoiceUrl("voice-abc123");
-    expect(url).toMatch(/^http:\/\/127\.0\.0\.1:\d+\/api\/voice\/cloned\/voice-abc123\/file$/);
+    expect(url).toMatch(/^http:\/\/127\.0\.0\.1:\d+\/api\/voice\/cloned\/voice-abc123\/file\?t=\d+\.[a-f0-9]{64}$/);
   });
 
   test("uses the reverse SSH forward when the Stack is remote", () => {
     setHouseholdSettingValue("engines.stack.where", "another_computer");
-    expect(clonedVoiceUrl("voice-abc123")).toBe("http://127.0.0.1:8772/api/voice/cloned/voice-abc123/file");
+    expect(clonedVoiceUrl("voice-abc123")).toMatch(/^http:\/\/127\.0\.0\.1:8772\/api\/voice\/cloned\/voice-abc123\/file\?t=\d+\.[a-f0-9]{64}$/);
   });
 });
 

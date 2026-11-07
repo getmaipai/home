@@ -28,6 +28,7 @@ import {
   renameClonedVoice,
   householdVoiceEntries,
   householdVoiceSpeech,
+  isClonedVoiceTokenValid,
   MAX_BYTES as MAX_CLONED_VOICE_BYTES,
 } from "@/lib/clonedVoices";
 import type { AppEnv } from "@/types";
@@ -676,6 +677,8 @@ const clonedFileRoute = createRoute({
 
 voiceRoutes.openapi(clonedFileRoute, async (c) => {
   const id = c.req.valid("param").id;
+  if (!isClonedVoiceTokenValid(id, c.req.query("t"))) return c.json({ error: "This voice link has expired. Open the voice again to refresh it." }, 403);
+  if (!clonedVoiceExists(id)) return c.json({ error: "not found" }, 404);
   const file = getClonedVoiceFile(id);
   if (!file) return c.json({ error: "not found" }, 404);
   return new Response(Bun.file(file.path), { status: 200, headers: { "content-type": file.mimeType } });

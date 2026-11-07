@@ -46,7 +46,7 @@ describe("content policy", () => {
   for (const role of ["adult", "owner", "admin", "guest", "teen", "child"]) {
     test(`${role} keeps role defaults for every birthdate`, () => {
       const expected: ProtectionKind[] = role === "child" ? ["minor_line", "sexual", "swearing", "drugs", "gambling", "gore"]
-        : role === "teen" ? ["minor_line", "sexual", "swearing", "gore"] : ["minor_line"];
+        : role === "teen" || role === "guest" ? ["minor_line", "sexual", "swearing", "gore"] : ["minor_line"];
       for (const birthdate of [null, undefined, "", "invalid", "1990-01-01", "2011-01-01", "2020-01-01", "2026-02-30", "2099-01-01"]) {
         const p = { ...person(role), birthdate } as PersonRow;
         if (birthdate === undefined) delete (p as Partial<PersonRow>).birthdate;

@@ -8,6 +8,7 @@
 // and serving it at a stable local URL is sufficient; precomputing is a
 // later optimization (faster reload), not a correctness requirement.
 import { writeFileSync, unlinkSync, existsSync, readFileSync } from "node:fs";
+import { createHmac, timingSafeEqual } from "node:crypto";
 import { join } from "node:path";
 import { eq } from "drizzle-orm";
 import { db } from "@/db";
@@ -24,6 +25,7 @@ import type { ClonedVoiceInfo } from "@/wire";
 import type { StackVoice } from "@/lib/stack/types";
 import { appendLogLine } from "@/lib/log";
 import { transcribeClonedVoiceOnce } from "@/lib/clonedVoiceTranscript";
+import { getOrCreateHexKey } from "@/lib/keystore";
 
 export type ClonedVoiceOpResult<T> =
   | { ok: true; value: T }
@@ -255,7 +257,26 @@ export function clonedVoiceExists(id: string): boolean {
  * no new scheme or translation needed. */
 export function clonedVoiceUrl(id: string): string {
   const baseUrl = isRemoteStackSelected() ? "http://127.0.0.1:8772" : selfBaseUrl();
-  return `${baseUrl}/api/voice/cloned/${id}/file`;
+  const expiry = Math.floor(Date.now() / 1000) + 24 * 60 * 60;
+  return `${baseUrl}/api/voice/cloned/${id}/file?t=${expiry}.${clonedVoiceToken(id, expiry)}`;
+}
+
+export function isClonedVoiceTokenValid(id: string, token: string | undefined): boolean {
+  if (!token || !/^\d+\.[a-f0-9]{64}$/.test(token)) return false;
+  const [rawExpiry, supplied] = token.split(".");
+  const expiry = Number(rawExpiry);
+  if (!Number.isSafeInteger(expiry) || expiry <= Math.floor(Date.now() / 1000)) return false;
+  const expected = clonedVoiceToken(id, expiry);
+  const suppliedBytes = Buffer.from(supplied!, "hex");
+  const expectedBytes = Buffer.from(expected, "hex");
+  return suppliedBytes.length === expectedBytes.length && timingSafeEqual(suppliedBytes, expectedBytes);
+}
+
+function clonedVoiceToken(id: string, expiry: number): string {
+  const keyHex = process.env.MAIPAI_SECRETS_KEY ?? getOrCreateHexKey("secrets_key", 32);
+  const householdKey = Buffer.from(keyHex, "hex");
+  const signingKey = createHmac("sha256", householdKey).update("maipai-cloned-voice-url-v1").digest();
+  return createHmac("sha256", signingKey).update(`${id}:${expiry}`).digest("hex");
 }
 
 const VOICE_TOKEN = /^voice-[a-z0-9]{6,}$/;

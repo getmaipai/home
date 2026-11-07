@@ -67,6 +67,17 @@ describe("GET /api/setup/ca", () => {
   });
 });
 
+test("open setup work routes close after an owner exists", async () => {
+  const client = new TestClient();
+  await client.post("/api/auth/setup", { displayName: "Sage", secret: "correcthorse" });
+  const checks = await client.post("/api/setup/checks/run", {});
+  expect(checks.status).toBe(409);
+  expect((await client.get("/api/setup/install")).status).toBe(200); // the install footer keeps reading this after setup
+  expect((await client.get("/api/setup/plan")).status).toBe(409);
+  expect((await client.get("/api/setup/licences")).status).toBe(409);
+  expect((await client.post("/api/setup/hardware", {})).status).toBe(409);
+});
+
 describe("POST /api/setup/hardware", () => {
   test("is public - no session required", async () => {
     const client = new TestClient();

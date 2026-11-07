@@ -406,6 +406,15 @@ describe("forwarded-header trust (only behind TRUST_PROXY)", () => {
 });
 
 describe("change-secret (self-service PIN/password change)", () => {
+  test("changing a secret ends every other browser session", async () => {
+    const first = new TestClient();
+    const { person } = await setUpOwner(first);
+    const second = new TestClient();
+    expect((await second.post("/api/auth/verify-secret", { personId: person.id, secret: "correcthorse" })).status).toBe(200);
+    expect((await first.post("/api/auth/change-secret", { currentSecret: "correcthorse", newSecret: "newpassword123" })).status).toBe(200);
+    expect((await second.get("/api/auth/me")).status).toBe(401);
+    expect((await first.get("/api/auth/me")).status).toBe(200);
+  });
   test("changes a PIN with the correct current one, and the new one signs in afterward", async () => {
     const owner = new TestClient();
     const { person } = await setUpOwner(owner);

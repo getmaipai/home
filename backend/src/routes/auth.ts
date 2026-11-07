@@ -9,7 +9,7 @@
 // consumers (Go, Desktop, firmware pods).
 import { createRoute, z } from "@hono/zod-openapi";
 import { getCookie, deleteCookie } from "hono/cookie";
-import { and, eq, isNull, isNotNull } from "drizzle-orm";
+import { and, eq, isNull, isNotNull, ne } from "drizzle-orm";
 import { Person } from "@maipai/spec/gen/ts/person.js";
 import { apiRouter, errorResponses } from "@/lib/openapi";
 import { db, sqlite } from "@/db";
@@ -370,7 +370,11 @@ auth.openapi(changeSecretRoute, async (c) => {
 
   // Password changes revoke every long-lived device credential for this person.
   db.delete(deviceTokens).where(eq(deviceTokens.personId, actor.id)).run();
-  db.delete(sessions).where(and(eq(sessions.personId, actor.id), isNotNull(sessions.deviceId))).run();
+  const currentToken = getCookie(c, "session");
+  const currentHash = currentToken ? hashSessionToken(currentToken) : null;
+  db.delete(sessions).where(currentHash
+    ? and(eq(sessions.personId, actor.id), ne(sessions.tokenHash, currentHash))
+    : eq(sessions.personId, actor.id)).run();
   invalidateSessionCacheForPerson(actor.id);
   return c.json({ success: true as const }, 200);
 });

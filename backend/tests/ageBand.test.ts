@@ -34,7 +34,8 @@ describe("speakerAgeBand()", () => {
         const person = actor({ role, birthdate });
         if (birthdate === undefined) delete (person as Partial<PersonRow>).birthdate;
         for (const now of [NOW, new Date("2100-01-01"), new Date(NaN)]) {
-          expect(speakerAgeBand(person, now)).toBe(role === "child" || role === "teen" ? role : "adult");
+          const expected = role === "guest" ? "teen" : role === "child" || role === "teen" ? role : "adult";
+          expect(speakerAgeBand(person, now)).toBe(expected);
         }
       }
     });

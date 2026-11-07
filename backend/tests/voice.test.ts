@@ -2,6 +2,7 @@ import { describe, expect, test, beforeEach, afterEach } from "bun:test";
 import { existsSync, readdirSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { TestClient } from "./client";
+import { clonedVoiceUrl } from "@/lib/clonedVoices";
 import { resetDb } from "./reset-db";
 import { clonedVoicesDir } from "@/lib/paths";
 import { setHouseholdSettingValue } from "@/lib/settings";
@@ -216,12 +217,19 @@ describe("cloned voices", () => {
     expect(selected.value).toBe(uploaded.id);
 
     // The file-serving route is real and unauthenticated for the Stack's voice fetch.
-    const fileRes = await new TestClient().get(`/api/voice/cloned/${uploaded.id}/file`);
+    const voiceUrl = new URL(clonedVoiceUrl(uploaded.id));
+    const filePath = `${voiceUrl.pathname}${voiceUrl.search}`;
+    const fileRes = await new TestClient().get(filePath);
     expect(fileRes.status).toBe(200);
     // Bun's own multipart parser reports "sample.wav" as "audio/x-wav",
     // not the "audio/wav" the File() constructor was given - both are
     // real wav mime types EXTENSION_BY_MIME already treats identically.
     expect(fileRes.headers.get("content-type")).toMatch(/^audio\/(x-)?wav$/);
+    const [expiry, signature] = voiceUrl.searchParams.get("t")!.split(".");
+    expect((await new TestClient().get(`${voiceUrl.pathname.replace(uploaded.id, `${uploaded.id}x`)}${voiceUrl.search}`)).status).toBe(403);
+    expect((await new TestClient().get(`${voiceUrl.pathname}?t=${Number(expiry) + 1}.${signature}`)).status).toBe(403);
+    expect((await new TestClient().get(voiceUrl.pathname)).status).toBe(403);
+    expect((await new TestClient().get(`${voiceUrl.pathname}?t=${Math.floor(Date.now() / 1000) - 1}.${"0".repeat(64)}`)).status).toBe(403);
 
     // The adult (not the creator) can't delete it...
     const forbiddenDelete = await adultClient.post(`/api/voice/cloned/${uploaded.id}/delete`, {});
@@ -230,7 +238,7 @@ describe("cloned voices", () => {
     const deleteRes = await owner.post(`/api/voice/cloned/${uploaded.id}/delete`, {});
     expect(deleteRes.status).toBe(200);
 
-    const afterDelete = await new TestClient().get(`/api/voice/cloned/${uploaded.id}/file`);
+    const afterDelete = await new TestClient().get(filePath);
     expect(afterDelete.status).toBe(404);
   });
 
@@ -240,9 +248,9 @@ describe("cloned voices", () => {
     expect(res.status).toBe(404);
   });
 
-  test("a made-up file id 404s, never resolving to an arbitrary path", async () => {
+  test("a made-up file id without a valid token is refused", async () => {
     const res = await new TestClient().get("/api/voice/cloned/voice-neverissued/file");
-    expect(res.status).toBe(404);
+    expect(res.status).toBe(403);
   });
 
   test("upload rejects a missing file", async () => {

@@ -1,5 +1,5 @@
-// The shared age band is the person's role: child, teen, or adult for
-// every other role. Birthdate is not used for tone or protection decisions.
+// The shared age band is the person's role: child, teen (including guests),
+// or adult for adult household roles. Birthdate is not used for decisions.
 // Owner ruling, 2026-10-18: stop using the birthdate for anything.
 import type { PersonRow } from "@/types";
 
@@ -8,6 +8,7 @@ export type AgeBand = "child" | "teen" | "adult";
 function ageBandFromRole(role: string): AgeBand {
   if (role === "child") return "child";
   if (role === "teen") return "teen";
+  if (role === "guest") return "teen";
   return "adult";
 }
 

@@ -79,6 +79,18 @@ test("expiry, scope and deletion are checked, and usage writes happen at most on
   expect(listApiKeys(p)[0]!.status).toBe("expired");
 });
 
+test("turn keys stop working for disabled, memorialized, and expired guests", () => {
+  const p = person();
+  const { secret } = createApiKey(p, { name: "Turn", scopes: ["turn"] });
+  expect(resolveApiKey(secret, "turn")).not.toBeNull();
+  db.update(people).set({ enabled: false }).where(eq(people.id, p.id)).run();
+  expect(resolveApiKey(secret, "turn")).toBeNull();
+  db.update(people).set({ enabled: true, memorializedAt: new Date().toISOString() }).where(eq(people.id, p.id)).run();
+  expect(resolveApiKey(secret, "turn")).toBeNull();
+  db.update(people).set({ memorializedAt: null, role: "guest", guestExpiresAt: new Date(Date.now() - 1000).toISOString() }).where(eq(people.id, p.id)).run();
+  expect(resolveApiKey(secret, "turn")).toBeNull();
+});
+
 test("ten live keys per adult; expiry and revocation free slots", () => {
   const p = person();
   for (let i = 0; i < 10; i++) createApiKey(p, { name: "Voice", scopes: ["turn"] });

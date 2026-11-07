@@ -57,6 +57,10 @@ const SETUP_CA_RATE_LIMIT = { capacity: 10, refillPerSecond: 0.5 };
 
 export const setupRoutes = apiRouter();
 setupRoutes.use("*", setupLocalOnly);
+function setupIsOver(): boolean {
+  return db.select({ id: people.id }).from(people).limit(1).get() !== undefined;
+}
+const SETUP_CLOSED = { error: "Home is already set up. Sign in instead.", next: "Change setup under Home settings." };
 // WIZ-STORAGE-02: folder picker endpoints; mounted before the `/{step}` catch-all below.
 setupRoutes.route("/", setupFolderRoutes);
 // HOST-TUNE-01: the Mac tuning step; also before the catch-all.
@@ -116,10 +120,11 @@ setupRoutes.openapi(setupCodingChoiceRoute, async c => {
 
 const checksRoute = createRoute({
   method: "post", path: "/checks/run", tags: ["Setup"], summary: "Run setup checks and persist their health items",
-  responses: { 200: { content: { "application/json": { schema: z.object({ rows: z.array(z.object({ id: z.string(), title: z.string(), state: z.enum(["green", "amber", "red", "idle"]), text: z.string() })), state: SetupState, searchCandidate: z.string().nullable(), searchNeeded: z.boolean() }) } }, description: "The ordered check rows and updated setup state. searchNeeded: setup should offer the Web search screen." } },
+  responses: { 200: { content: { "application/json": { schema: z.object({ rows: z.array(z.object({ id: z.string(), title: z.string(), state: z.enum(["green", "amber", "red", "idle"]), text: z.string() })), state: SetupState, searchCandidate: z.string().nullable(), searchNeeded: z.boolean() }) } }, description: "The ordered check rows and updated setup state. searchNeeded: setup should offer the Web search screen." }, ...errorResponses({ 409: "Home is already set up" }) },
 });
 const allowTailnetErrorSchema = z.object({ error: z.string(), next: z.string().optional() });
 setupRoutes.openapi(checksRoute, async (c) => {
+  if (setupIsOver()) return c.json(SETUP_CLOSED, 409);
   const candidatesOut: Array<{ url: string; status: "pass" | "fail" }> = [];
   const rows = await runSetupChecks({ candidatesOut, preInstall: true });
   const passed = rows.every((row) => row.state === "green" || row.state === "idle");
@@ -151,9 +156,10 @@ const planQuery = z.object({ vram_gb: z.coerce.number().int().min(1).max(512).op
 const planRoute = createRoute({
   method: "get", path: "/plan", tags: ["Setup"], summary: "What Home would install on the AI computer",
   request: { query: planQuery },
-  responses: { 200: { content: { "application/json": { schema: z.object({ plan: z.unknown().nullable(), wording: PlanWordingSchema, licences: z.array(z.object({ row_id: z.string(), component: z.string(), id: z.string(), name: z.string(), url: z.string(), summary: z.array(z.string()), accepted_at: z.string().nullable(), covered: z.boolean().optional() })).optional().describe("The licences of the licensed rows on this plan (Detailed video): the notice to show, and whether it was already accepted."), choices: z.object({ cards: z.array(z.unknown()), alwaysOn: z.unknown() }).nullable().optional().describe("The same job cards Settings shows (AI and models), built from this plan; null when there is no disk plan to build them from."), cannot_run: z.array(z.string()).optional().describe("Job ids (pictures, videos, music, voice) the Stack's capability table says no tier can run on this computer; the wizard leaves them off. Empty when the Stack cannot say."), cannot_run_why: z.record(z.string(), z.string()).optional().describe("For each job in cannot_run, the reason in plain words (how much memory it asks for).") }) } }, description: "The Stack's plan and Home's words for it." } },
+  responses: { 200: { content: { "application/json": { schema: z.object({ plan: z.unknown().nullable(), wording: PlanWordingSchema, licences: z.array(z.object({ row_id: z.string(), component: z.string(), id: z.string(), name: z.string(), url: z.string(), summary: z.array(z.string()), accepted_at: z.string().nullable(), covered: z.boolean().optional() })).optional().describe("The licences of the licensed rows on this plan (Detailed video): the notice to show, and whether it was already accepted."), choices: z.object({ cards: z.array(z.unknown()), alwaysOn: z.unknown() }).nullable().optional().describe("The same job cards Settings shows (AI and models), built from this plan; null when there is no disk plan to build them from."), cannot_run: z.array(z.string()).optional().describe("Job ids (pictures, videos, music, voice) the Stack's capability table says no tier can run on this computer; the wizard leaves them off. Empty when the Stack cannot say."), cannot_run_why: z.record(z.string(), z.string()).optional().describe("For each job in cannot_run, the reason in plain words (how much memory it asks for).") }) } }, description: "The Stack's plan and Home's words for it." }, ...errorResponses({ 409: "Home is already set up" }) },
 });
 setupRoutes.openapi(planRoute, async (c) => {
+  if (setupIsOver()) return c.json(SETUP_CLOSED, 409);
   const { vram_gb: vramGb } = c.req.valid("query");
   const preview = await previewPlan(vramGb);
   const disk = preview.wording.disk?.plan as DiskPlan | undefined;
@@ -176,7 +182,7 @@ const installStartRoute = createRoute({
 });
 setupRoutes.openapi(installStartRoute, async (c) => {
   // This router is open on the local network until Home has an owner.
-  if (db.select({ id: people.id }).from(people).limit(1).get()) return c.json({ error: "Home is already set up. Sign in instead.", next: "Change the AI under Home settings." }, 409);
+  if (setupIsOver()) return c.json(SETUP_CLOSED, 409);
   const { vram_gb: vramGb, components, accepted_licences: acceptedLicences, settings } = c.req.valid("json");
   const unknownKey = Object.keys(settings ?? {}).find((key) => !SETUP_CHOICE_KEYS.has(key));
   if (unknownKey) return c.json({ error: `${unknownKey} is not a choice setup can save.`, next: "Reload this page and choose again." }, 409);
@@ -194,9 +200,10 @@ setupRoutes.openapi(installStartRoute, async (c) => {
 
 const licencesRoute = createRoute({
   method: "get", path: "/licences", tags: ["Setup"], summary: "The licences Home lists with the wizard's internet item, and whether they were accepted",
-  responses: { 200: { content: { "application/json": { schema: z.object({ stack: z.enum(["ok", "unreachable"]), terms_version: z.string(), acknowledged: z.unknown().nullable(), licences: z.array(z.unknown()) }) } }, description: "Each licensed part the AI engine lists (empty before the engine exists)." } },
+  responses: { 200: { content: { "application/json": { schema: z.object({ stack: z.enum(["ok", "unreachable"]), terms_version: z.string(), acknowledged: z.unknown().nullable(), licences: z.array(z.unknown()) }) } }, description: "Each licensed part the AI engine lists (empty before the engine exists)." }, ...errorResponses({ 409: "Home is already set up" }) },
 });
 setupRoutes.openapi(licencesRoute, async (c) => {
+  if (setupIsOver()) return c.json(SETUP_CLOSED, 409);
   const { stack, terms_version, acknowledged, licences } = await licenceOverview();
   return c.json({ stack, terms_version, acknowledged, licences }, 200);
 });
@@ -205,7 +212,7 @@ const licencesAcceptRoute = createRoute({
   responses: { 200: { content: { "application/json": { schema: z.object({ accepted: z.literal(true) }) } }, description: "Recorded for the household." }, 409: { content: { "application/json": { schema: SetupErrorSchemaForInstall } }, description: "Home already has an owner: the admin prompt in Home settings does this instead." } },
 });
 setupRoutes.openapi(licencesAcceptRoute, async (c) => {
-  if (db.select({ id: people.id }).from(people).limit(1).get()) return c.json({ error: "Home is already set up. Sign in instead.", next: "An owner or admin accepts the licences from the prompt in Home settings." }, 409);
+  if (setupIsOver()) return c.json({ error: "Home is already set up. Sign in instead.", next: "An owner or admin accepts the licences from the prompt in Home settings." }, 409);
   await acceptLicences("setup");
   return c.json({ accepted: true as const }, 200);
 });
@@ -218,7 +225,7 @@ const engineInstallRoute = createRoute({
   },
 });
 setupRoutes.openapi(engineInstallRoute, (c) => {
-  if (db.select({ id: people.id }).from(people).limit(1).get()) return c.json({ error: "Home is already set up. Sign in instead.", next: "Change the AI under Home settings." }, 409);
+  if (setupIsOver()) return c.json(SETUP_CLOSED, 409);
   if (!engineNeedsInstall()) return c.json({ started: true as const }, 202);
   const started = startEngineInstall();
   if (!started.ok) return c.json({ error: started.error, next: started.next }, 409);
@@ -237,7 +244,7 @@ const useSearchCandidateRoute = createRoute({
   responses: { 200: { content: { "application/json": { schema: z.object({ saved: z.boolean(), result: SearchTestSummarySchema.optional() }) } }, description: "A Test answers 200 with result (pass, warn or fail in plain words) and saved false; a Save answers 200 with saved true once it, or the skip choice, was saved." }, 400: { content: { "application/json": { schema: allowTailnetErrorSchema } }, description: "The address is not allowed, or a Save found the service not usable." } },
 });
 setupRoutes.openapi(useSearchCandidateRoute, async (c) => {
-  if (db.select({ id: people.id }).from(people).limit(1).get()) return c.json({ error: "Home is already set up. Sign in instead." }, 400);
+  if (setupIsOver()) return c.json({ error: SETUP_CLOSED.error }, 400);
   const { url, dry_run: dryRun, ddgs_default: ddgsDefault } = c.req.valid("json");
   if (url === undefined) {
     // Skipping SearXNG: adults get DuckDuckGo by default (it answers once its helper runs). Nothing else is saved.
@@ -260,10 +267,7 @@ const allowTailnetRoute = createRoute({
   },
 });
 setupRoutes.openapi(allowTailnetRoute, async (c) => {
-  const anyone = db.select({ id: people.id }).from(people).limit(1).get();
-  if (anyone) {
-    return c.json({ error: "Home already has an owner. Sign in as an owner or admin and use Settings to allow Tailscale for the engine link." }, 403);
-  }
+  if (setupIsOver()) return c.json(SETUP_CLOSED, 403);
   const refusal = await validateRemoteEngineSetting(REMOTE_ALLOW_TAILNET_KEY, true);
   if (refusal) return c.json({ error: refusal }, 400);
   const saved = setHouseholdSettingValue(REMOTE_ALLOW_TAILNET_KEY, true);
@@ -441,10 +445,11 @@ const hardwareRoute = createRoute({
       },
       description: "Real detected hardware plus whether any implemented chat-role model fits it.",
     },
-    ...errorResponses({ 429: "Too many requests from this address" }),
+    ...errorResponses({ 429: "Too many requests from this address", 409: "Home is already set up" }),
   },
 });
 setupRoutes.openapi(hardwareRoute, async (c) => {
+  if (setupIsOver()) return c.json(SETUP_CLOSED, 409);
   const ip = getClientIp(c);
   if (!tryConsume(`setup-hardware:${ip}`, SETUP_HARDWARE_RATE_LIMIT)) {
     return c.json({ error: "Too many requests. Wait a moment and try again." }, 429);

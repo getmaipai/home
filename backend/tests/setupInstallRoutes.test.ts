@@ -22,7 +22,7 @@ describe("setup install routes", () => {
 
   test("GET /api/setup/plan words the Stack's plan", async () => {
     __setStackClientForTests(stack(async () => plan()));
-    const { client } = await owner();
+    const client = new TestClient();
     const body = await (await client.get("/api/setup/plan")).json() as { plan: StackInstallPlan; wording: { level: string } };
     expect(body.plan.tier).toBe("p16");
     expect(body.wording.level).toBe("minimal");
@@ -30,7 +30,7 @@ describe("setup install routes", () => {
 
   test("GET /api/setup/plan with an unreachable Stack still answers", async () => {
     __setStackClientForTests(stack(async () => { throw new Error("offline"); }));
-    const { client } = await owner();
+    const client = new TestClient();
     const response = await client.get("/api/setup/plan");
     expect(response.status).toBe(200);
     expect((await response.json() as { plan: unknown }).plan).toBeNull();
@@ -65,7 +65,7 @@ describe("setup install routes", () => {
 
   test("GET /api/setup/plan carries the job cards built from the disk plan, or none without one", async () => {
     __setStackClientForTests(stack(async () => plan()));
-    const { client } = await owner();
+    const client = new TestClient();
     const body = await (await client.get("/api/setup/plan")).json() as { wording: { disk?: unknown }; choices?: { cards: Array<{ id: string }> } | null };
     if (body.wording.disk) expect(body.choices?.cards.map((card) => card.id)).toContain("chat");
     else expect(body.choices ?? null).toBeNull();
@@ -73,7 +73,7 @@ describe("setup install routes", () => {
 
   test("GET /api/setup/plan lists the optional song and recorded voice choices from the shared cards", async () => {
     __setStackClientForTests(stack(async () => plan({ tier: "p64", memory_gb: 64 })));
-    const { client } = await owner();
+    const client = new TestClient();
     const body = await (await client.get("/api/setup/plan")).json() as { choices: { cards: Array<{ id: string; choices: Array<{ id: string; kind: string; recommended: boolean }> }> } };
     const music = body.choices.cards.find((card) => card.id === "music")!;
     const voice = body.choices.cards.find((card) => card.id === "voice")!;
