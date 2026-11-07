@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "fded0fda-63d0-478f-97b3-d0136b9d40e3",
+  "id": "83ce20a3-3ca1-4db0-98bc-2754570fdb9d",
   "prevId": "6223555c-95ee-40f2-91fb-6a4295e9a173",
   "tables": {
     "added_models": {
@@ -2129,15 +2129,6 @@
           "columns": [
             "source",
             "judge_status"
-          ],
-          "isUnique": false
-        },
-        "conversation_turns_conv_status_created_idx": {
-          "name": "conversation_turns_conv_status_created_idx",
-          "columns": [
-            "conversation_id",
-            "status",
-            "created_at"
           ],
           "isUnique": false
         },

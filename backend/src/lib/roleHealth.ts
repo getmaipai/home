@@ -3,7 +3,7 @@ import { activeTransition, observeModeChange, transitionNotice } from "@/lib/cha
 import * as canaryResults from "@/lib/canary/results";
 import { stackReducedChat } from "@/lib/reducedChat";
 import { warmupInFlight } from "@/lib/stackWarmup";
-import { getStackClient, isStackConfigured, stackEpoch, stackRefusal } from "@/lib/stackEngine";
+import { __bumpStackEpochForTests, getStackClient, isStackConfigured, stackEpoch, stackRefusal } from "@/lib/stackEngine";
 import { getHomeSupervisorRoles } from "@/lib/homeSupervisorRoles";
 import type { EngineHealthEntry } from "@/wire";
 import type { ChatRoleContext } from "@maipai/spec/stack/ts/role-context.js";
@@ -18,7 +18,7 @@ export const MAKING_ROLES: readonly MakingRole[] = ["image", "video"];
  * carries. `reason` stays the short code the consumers switch on. */
 export type RoleHealth = { availability: "ready" | "starting" | "unavailable"; reason: string | null; /** CHAT-PAUSE-01: why it is unavailable, when known. */ cause?: "restarting" | "memory" | "not_installed" | "mode_change" | "reduced_swap" | "tier_reduced" | "gpu"; detail?: string; contextLength?: number; slots?: number; contextPerSlot?: number; contextScope?: "total" | "per_slot"; /** VISION-02d: the model the Stack's chat role runs (or would start). */ modelId?: string; pictureTokensMax?: number };
 let roleHealthForTests: Partial<Record<HealthRole, RoleHealth>> = {};
-export function __setRoleHealthForTests(value: Partial<Record<HealthRole, RoleHealth>>): void { roleHealthForTests = value; cachedHealth.clear(); }
+export function __setRoleHealthForTests(value: Partial<Record<HealthRole, RoleHealth>>): void { roleHealthForTests = value; cachedHealth.clear(); __bumpStackEpochForTests(); }
 
 const cachedHealth = new Map<HealthRole, { at: number; health: RoleHealth }>();
 /** Read-only generation metadata. Never refreshes on the first-word path. */

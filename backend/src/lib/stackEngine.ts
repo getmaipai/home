@@ -128,6 +128,8 @@ export function getStackClient(): StackClient {
 /** AUDIT-PERF-01: bumped whenever the Stack client is swapped (tests), so the 2 s health memos never outlive their fixture. */
 let stackClientEpoch = 0;
 export function stackEpoch(): number { return stackClientEpoch; }
+/** Test fixtures that change what a health read would answer call this so the 2 s memos start over. */
+export function __bumpStackEpochForTests(): void { stackClientEpoch++; }
 
 export function __setStackClientForTests(client: StackClient | null): void {
   stackClientEpoch++;

@@ -652,10 +652,10 @@ describe("pruneFinishedSchedules (AUDIT-PERF-01)", () => {
 });
 
 describe("hot-path indexes (AUDIT-PERF-01)", () => {
-  test("the five indexes exist and the due-job query uses one", async () => {
+  test("the four indexes exist and the due-job query uses one", async () => {
     const { sqlite } = await import("@/db");
     const names = (sqlite.query("SELECT name FROM sqlite_master WHERE type = 'index'").all() as Array<{ name: string }>).map((row) => row.name);
-    for (const name of ["scheduled_jobs_status_next_run_idx", "device_commands_device_delivered_idx", "jobs_state_kind_idx", "conversation_turns_conv_status_created_idx", "conversation_turns_created_idx"]) expect(names).toContain(name);
+    for (const name of ["scheduled_jobs_status_next_run_idx", "device_commands_device_delivered_idx", "jobs_state_kind_idx", "conversation_turns_created_idx"]) expect(names).toContain(name);
     const plan = (sqlite.query("EXPLAIN QUERY PLAN SELECT * FROM scheduled_jobs WHERE status = 'pending' AND next_run_at <= 'z'").all() as Array<{ detail: string }>).map((row) => row.detail).join(" ");
     expect(plan).toContain("scheduled_jobs_status_next_run_idx");
   });
