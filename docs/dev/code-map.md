@@ -193,7 +193,6 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `frontend/src/lib/media/micGate.tsx` | useMicGate, micDeviceSteps, micFixSteps, micHelp |
 | `frontend/src/shell/AdultLockHost.tsx` | unlockRequest, sendLock, AdultLockController, useAdultLockProps |
 | `frontend/src/shell/AlarmRinger.tsx` | AlarmRinger |
-| `frontend/src/shell/AliasRedirect.tsx` | AliasRedirect |
 | `frontend/src/shell/AmbientCompanionPane.tsx` | AMBIENT_QUICK_ACTIONS, ambientQuickActionsForApp, ambientQuickActionPrompt, readAmbientPaneState, isProtectedReply, ambientHistoryItems |
 | `frontend/src/shell/BrowserAlerts.tsx` | shouldShowBrowserAlert, requestBrowserAlertPermission, BrowserAlerts |
 | `frontend/src/shell/GlobalMiniPlayer.tsx` | onPlayPageOf, GlobalMiniPlayer |
@@ -431,7 +430,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/codeSafety.ts` | codingFloor, bandOf, crisisText, inputRefusalLine, outputRefusalLine, alertIfMinor |
 | `backend/src/lib/codeStream.ts` | gateStream |
 | `backend/src/lib/codeWire.ts` | WIRE_PATH, CodeRequestError, parseBody, personText, DEFAULT_OUTPUT_TOKENS, shapeRequest |
-| `backend/src/lib/codingMode.ts` | codingModeReason, codingModeReadiness, reconcileCodingModeAtStartup |
+| `backend/src/lib/codingMode.ts` | codingModeReadiness, reconcileCodingModeAtStartup |
 | `backend/src/lib/comingUp.ts` | listComingUp, createTimer, extendTimer, doneComingUp, snoozeComingUp |
 | `backend/src/lib/commands.ts` | __resetCommandsCacheForTests, createCommand, listCommands, deleteCommand, matchCommand, runCommand |
 | `backend/src/lib/companionArt.ts` | COMPANION_STILL_MODEL_MISSING_LINE, COMPANION_CLIP_MODEL_MISSING_LINE, COMPANION_MODEL_MISMATCH_LINE, COMPANION_EDIT_MODEL, __setCompanionArtStatusReadersForTests, promptHash |
@@ -439,23 +438,23 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/companionLook.ts` | LookSchema, EMPTY_LOOK, PROMPT_MAX_CHARS, LOOK_LIMIT_LINE, lookPromptFor, KEY_ALPHA_START |
 | `backend/src/lib/companionLookJobs.ts` | LOOK_JOB_BUSY_LINE, LOOK_PICTURE_UNREAD_LINE, LOOK_PROMPT_REQUIRED_LINE, LOOK_EDIT_PROMPT_LINE, LOOK_ENGINE_NOT_READY_LINE, runningSheetJob |
 | `backend/src/lib/companionLookStyles.ts` | LOOK_STYLES, LOOK_STYLE_IDS, DEFAULT_LOOK_STYLE, stylesForBand, capOfStyle, lookStylePhrase |
-| `backend/src/lib/companionPersonality.ts` | COMPANION_DIALS, COMPANION_PERSONALITIES, cleanStyleNotes, backstoryTagline, safeExamples |
+| `backend/src/lib/companionPersonality.ts` | COMPANION_PERSONALITIES, cleanStyleNotes, backstoryTagline, safeExamples |
 | `backend/src/lib/companionPersonalityDials.ts` | COMPANION_DIAL_OPTIONS |
 | `backend/src/lib/companionPortrait.ts` | portraitPath, readRetainedPortrait, retainCompanionPortrait, voiceVersion, companionVoiceVersion |
 | `backend/src/lib/companionPromptPack.ts` | picturePromptPack, clipPromptPack |
 | `backend/src/lib/companionStates.ts` | TAKE_LIMIT_LINE, CLIP_MISSING_LINE, FINISH_POLL_MS, MEDIA_ROOT_REMOTE_LINE, keyframePath, keyframeMetaPath |
-| `backend/src/lib/companionTakes.ts` | TAKE_RUN_BUSY_LINE, TAKE_QUICK_NOT_READY_LINE, TAKE_RUN_NOT_FOUND_LINE, TAKE_RUN_TIMEOUT_LINE, TAKE_RETRY_WAIT_MS, TAKE_POLL_MS |
+| `backend/src/lib/companionTakes.ts` | TAKE_RUN_BUSY_LINE, TAKE_QUICK_NOT_READY_LINE, TAKE_RUN_TIMEOUT_LINE, TAKE_RETRY_WAIT_MS, TAKE_POLL_MS, TAKE_NEGATIVE_PROMPT |
 | `backend/src/lib/companions.ts` | companionsAllowed |
 | `backend/src/lib/companionsApp.ts` | currentCompanionId, mayUseCompanion, companionAreaOn, canCreateCompanion, cardOf, listCompanionCards |
 | `backend/src/lib/composer.ts` | COMPOSE_FALLBACK_LINE, COMPOSER_MAX_CALLS, COMPOSE_FAILURE_LINE, DEFAULT_MOVES, groundedIn, emptyLookupLine |
 | `backend/src/lib/computerMemory.ts` | describeComputerMemory |
-| `backend/src/lib/connectors/instances.ts` | DEFAULT_INSTANCE, INSTANCE_SLUG, listInstances, resolveInstance, instanceLanFetch |
+| `backend/src/lib/connectors/instances.ts` | DEFAULT_INSTANCE, listInstances, resolveInstance, instanceLanFetch |
 | `backend/src/lib/consentVocab.ts` | CONSENT_WORD, AFFIRMATIVE_RE, NEGATIVE_RE, SHORT_ANSWERS |
 | `backend/src/lib/contentCeiling.ts` | CONTENT_CEILINGS, getCeilingForBand, getMinorCeilingForBand, hasUnrestrictedGrant |
 | `backend/src/lib/contentPolicy.ts` | CHILD_UNSAFE_TERMS, CHILD_IP_NAMES, createContentPolicyResolver, contentPolicyFor, filtersFor |
 | `backend/src/lib/contentPolicy/dataSchema.ts` | policyWord, lanesSchema, floorsSchema |
 | `backend/src/lib/continue/providers.ts` | mediaContinueRows |
-| `backend/src/lib/continue/registry.ts` | CONTINUE_BUDGET, registerContinueProvider, __clearContinueProvidersForTests, continueRows |
+| `backend/src/lib/continue/registry.ts` | CONTINUE_BUDGET, registerContinueProvider, continueRows |
 | `backend/src/lib/conversationHistory.ts` | shownPicturesIn, turnOwnerId, applyHeardPrefix, __temporaryReplyForTests, outcomesForConversation, packageLatencyFromRecentOutcomes |
 | `backend/src/lib/conversationOpening.ts` | THREAD_WINDOW_DAYS, MOOD_WINDOW_DAYS, dayPartAt, sinceLastAt, conversationOpening, renderConversationOpening |
 | `backend/src/lib/conversationTitle.ts` | DEFAULT_CHAT_TITLE, provisionalTitleFrom, ensureProvisionalTitle, refreshProvisionalTitle, cleanTitle, generateConversationTitle |
@@ -481,7 +480,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/engineCatalog.ts` | ENGINE_BINARIES, ENGINE_READY_MARKER, selectEngineBinary |
 | `backend/src/lib/engineIdentity.ts` | hostLabel, sanitizeEngineUrl, modelFileName, readEngineIdentity, formatEngineIdentity, identityIncomplete |
 | `backend/src/lib/enginePostLoadCheck.ts` | measureProcessMemoryBytes, runPostLoadCheck |
-| `backend/src/lib/engineStats.ts` | sampleEngineStats, getEngineStatsSamples, __clearEngineStatsForTests |
+| `backend/src/lib/engineStats.ts` | sampleEngineStats, getEngineStatsSamples |
 | `backend/src/lib/entities.ts` | toEntity, listEntities, getEntity, createEntity, confirmTransition, updateEntity |
 | `backend/src/lib/episodes.ts` | replyIsAnAnswer, recordEpisodes, embedPendingEpisodes, deleteEpisodesForTurns, deleteEpisodesForPerson, listEpisodes |
 | `backend/src/lib/faceModelPins.ts` | SFACE_MODEL_ID, SFACE_SHA256, SFACE_DIM |
@@ -505,7 +504,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/gate/decide.ts` | approverFor, assertGated, registeredCapabilities, decide |
 | `backend/src/lib/gate/pendingAskMigration.ts` | decidePendingAsk, migratePendingAsksThroughGate |
 | `backend/src/lib/gazetteer.ts` | searchLocalPlaces, nearestLocalPlace |
-| `backend/src/lib/genLive.ts` | getLive, clearLive, __clearLiveForTests, previewVersionOf, updateLive, liveCardFields |
+| `backend/src/lib/genLive.ts` | getLive, clearLive, previewVersionOf, updateLive, liveCardFields |
 | `backend/src/lib/generationFailure.ts` | classifyGenerationFailure, RETRY_BACKOFF_MS |
 | `backend/src/lib/grants.ts` | grantActionClassificationIsComplete, createGrant, listGrants, revokeGrant, isGrantActive, personIsGranted |
 | `backend/src/lib/guards.ts` | EMPTIED_LINES, MALFORMED, CLOSER_RE, isCloserSentence, trimClosers, OBJECTION_RE |
@@ -518,7 +517,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/hostGuardNotice.ts` | __setHostGuardNotifierForTests, __resetHostGuardNoticeForTests, notifyHostGuardRestart |
 | `backend/src/lib/hostGuardTuning.ts` | HOST_GUARD_STATE_DIR, writeHostGuardTuning, isHostGuardSetting |
 | `backend/src/lib/hostTune.ts` | HOST_TUNE_IDS, HostTuneItemSchema, detectHostTune, changeHostTune |
-| `backend/src/lib/hostedSearch.ts` | HOSTED_SEARCH_KEY_SETTING, HOSTED_SEARCH_PROVIDER_NAME, HOSTED_SEARCH_HOST, __setHostedSearchEndpointForTests, hostedSearchKey, hostedSearchAllowed |
+| `backend/src/lib/hostedSearch.ts` | HOSTED_SEARCH_KEY_SETTING, HOSTED_SEARCH_HOST, __setHostedSearchEndpointForTests, hostedSearchKey, hostedSearchAllowed, hostedSearch |
 | `backend/src/lib/hotReloadState.ts` | hotReloadState |
 | `backend/src/lib/house/access.ts` | approverCell, houseAccess, canRestartServer, visibleEntities |
 | `backend/src/lib/house/act.ts` | supportedActions, performHouseServerAction, houseServiceCall, undoFor, performHouseAction |
@@ -566,7 +565,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/integrations/homeAssistant.ts` | isLanHomeAssistantUrl, subscribeHomeAssistantEntities, homeAssistantEventsHealth, readHomeAssistantEntityState, refreshHomeAssistantEvents, __resetHomeAssistantEventsForTests |
 | `backend/src/lib/internetProbe.ts` | classifyInternetFailures, probeInternet, runConfiguredInternetProbe, __resetInternetProbeForTests |
 | `backend/src/lib/interruptedReply.ts` | noteInterruptedReply, takeInterruptedReply, mayCarryInterruptedReply, dropInterruptedReply, __clearInterruptedRepliesForTests |
-| `backend/src/lib/issues.ts` | __setReminderTimingForTests, __resetReminderTimersForTests, __setMaintenanceNowForTests, raiseIssue, resolveIssue, listIssues |
+| `backend/src/lib/issues.ts` | __setReminderTimingForTests, __resetReminderTimersForTests, raiseIssue, resolveIssue, listIssues, registerFixHandler |
 | `backend/src/lib/items/tool.ts` | READ_ITEM_TOOL_ID, ITEM_REF_PATTERN, ITEM_READERS, itemRefsIn, readItemToolSpec, runReadItemTool |
 | `backend/src/lib/jobProducers.ts` | mapStackJobToHomeJob, mapModelDownloadStackJob, modelDownloadJobsAsHomeJobs, listStackModelDownloadJobs, startImageProducerJob, pollActiveStackImageJobs |
 | `backend/src/lib/jobQueueCopy.ts` | JOB_QUEUE_COPY, jobQueueCopy, plainStageLabel |
@@ -592,7 +591,6 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/library.ts` | LibraryCursorError, listLibrary, librarySummary |
 | `backend/src/lib/libraryAudience.ts` | recheckFileAudience |
 | `backend/src/lib/libraryEdit.ts` | cleanFileName, updateLibraryFile |
-| `backend/src/lib/libraryGenerated.ts` | generatedLibraryReport |
 | `backend/src/lib/libraryMultipart.ts` | libraryMultipart |
 | `backend/src/lib/libraryProvenance.ts` | libraryProvenance, libraryProvenanceSql, isGeneratedFile |
 | `backend/src/lib/libraryRetention.ts` | expiringLibraryFiles, previewLibraryRetention, runLibraryRetention |
@@ -612,13 +610,13 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/llm.ts` | PERSON_TURN_BUDGET, EPHEMERAL_TURN_BUDGET, personWithinTurnBudget, personWithinEphemeralBudget, toToolDefinition, envelopeToolCall |
 | `backend/src/lib/llmSampling.ts` | chatSamplingOf |
 | `backend/src/lib/llmSupervisor.ts` | __setBlockedPortRetryForTests, __setBlockedPortRetryIntervalForTests, startBlockedPortRetryForTests, setWarmupPrompt, sweepOrphanEngineProcesses, reportChatBackendUnreachable |
-| `backend/src/lib/localStackService.ts` | HOME_STACK_PORT, installRoot, stackDataDir, stopLocalStackService, startLocalStackService, __setStackServiceRunnerForTests |
+| `backend/src/lib/localStackService.ts` | installRoot, stackDataDir, stopLocalStackService, startLocalStackService, __setStackServiceRunnerForTests |
 | `backend/src/lib/locale.ts` | resolveLocale, resolveLocaleFromValues, householdLocale, isSafeAutoTranslation |
 | `backend/src/lib/log.ts` | appendLogLine, installConsoleFileMirror, installFatalErrorHandlers |
 | `backend/src/lib/loras/access.ts` | isAdult, availableTo, loraAccess, loraUsable, readLoras, readLora |
 | `backend/src/lib/loras/admin.ts` | NOT_ADMIN_LINE, NOT_HERE_LINE, NOT_CONFIRMED_LINE, TRASH_DAYS, patchLora, confirmLora |
-| `backend/src/lib/loras/adultCheck.ts` | CIVITAI_ADULT_LEVEL, classifyCivitai, classifyHuggingFace, NO_EVIDENCE, cleanTriggerWords |
-| `backend/src/lib/loras/baseFamilies.ts` | BASE_FAMILIES, ALL_BASE_IDS, BROWSE_BASES, INSTALLABLE_BASE_IDS, installableBaseIds, mediaOfBase |
+| `backend/src/lib/loras/adultCheck.ts` | CIVITAI_ADULT_LEVEL, classifyCivitai, classifyHuggingFace, cleanTriggerWords |
+| `backend/src/lib/loras/baseFamilies.ts` | BASE_FAMILIES, ALL_BASE_IDS, BROWSE_BASES, installableBaseIds, mediaOfBase, setInstalledBasesProvider |
 | `backend/src/lib/loras/install.ts` | INSTALL_KIND, INSTALL_TITLE, ISSUE_SOURCE, LICENCE_STEP_LINE, SHARED_SCREEN_LINE, NOT_LTX_LINE |
 | `backend/src/lib/loras/promptPlan.ts` | STYLE_STRENGTHS, STRENGTH_FACTOR, STRENGTH_CEILING, MAX_STYLES, MAX_ADDED_CHARS, TWO_AT_A_TIME_LINE |
 | `backend/src/lib/loras/readiness.ts` | installedBasesNow |
@@ -637,7 +635,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/media/access.ts` | isMediaAdmin, discoveryAllowed, allowlistMode, noDiscovery, sourceVisibleTo, liveSourceById |
 | `backend/src/lib/media/albumCoverStore.ts` | ALBUM_ART_KEY, COVER_PATH_PREFIX, COVER_TYPES, albumArtEnabled, coverDir, albumCoverFile |
 | `backend/src/lib/media/albumCovers.ts` | coverArtArchiveFetch, runAlbumCoverPass, kickAlbumCovers |
-| `backend/src/lib/media/appHost.ts` | MEDIA_APPS, MEDIA_APP_IDS, isMediaAppId, laterKindOf, mediaAppAllowed, allowlistOnly |
+| `backend/src/lib/media/appHost.ts` | MEDIA_APPS, MEDIA_APP_IDS, laterKindOf, mediaAppAllowed, allowlistOnly, allowedSources |
 | `backend/src/lib/media/artistProfiles.ts` | ARTIST_WIKIMEDIA_KEY, artistWikimediaEnabled, wikimediaFetchPhoto, shortBio, lookupArtistProfile, mostCommon |
 | `backend/src/lib/media/band.ts` | trips, bandOkAtIngest, mediaBandOf, allowedBandsFor, bandAllows |
 | `backend/src/lib/media/collections.ts` | SINGLETON_KINDS, MADE_KINDS, ensureStandingCollections, listCollections, resolveCollection, createFilterCollection |
@@ -666,7 +664,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/media/podcastDirectory.ts` | __resetDirectoryForTests, directoryShowForFeed, directoryAllowed, searchDirectory, topShows, smallArt |
 | `backend/src/lib/media/podcastFilters.ts` | MAX_FILTERS, parseRules, matchesRules, evaluateFilter, filterSummary, draftRows |
 | `backend/src/lib/media/podcastStats.ts` | aggregatePodcastStats, podcastStats, podcastStatsRows |
-| `backend/src/lib/media/podcasts.ts` | previewPodcastFeed, __resetPodcastPreviewForTests, previewEpisodeAddress, previewEpisodeView, __setPodcastFetchDepsForTests, podcastFetchDeps |
+| `backend/src/lib/media/podcasts.ts` | previewPodcastFeed, __resetPodcastPreviewForTests, previewEpisodeAddress, previewEpisodeView, __setPodcastFetchDepsForTests, plainNotes |
 | `backend/src/lib/media/prober.ts` | probeResultFrom, createStackProber |
 | `backend/src/lib/media/progress.ts` | LATCH_PERCENT, BOOK_END_PERCENT, correctedStamp, percentOf, reachesLatch, mergeProgress |
 | `backend/src/lib/media/radio.ts` | adultTagged, stationVisibleAtBand, listSavedStations, savedStationFor, stationItemView, previewStationItemView |
@@ -689,7 +687,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/mediaClaims.ts` | asksForMedia, claimsMedia, MEDIA_NOT_STARTED_LINE, MUSIC_STARTED_LINE, MEDIA_REASK_INSTRUCTION, asksForSong |
 | `backend/src/lib/mediaOps/chatSchema.ts` | editPictureSpec, generateImageSchema |
 | `backend/src/lib/mediaOps/ids.ts` | BACKGROUND_REMOVAL_OP |
-| `backend/src/lib/mediaOps/registry.ts` | registerMediaOp, registeredMediaOps, mediaOpSchema, listMediaOps, runMediaOp, getMediaOpJob |
+| `backend/src/lib/mediaOps/registry.ts` | registerMediaOp, registeredMediaOps, listMediaOps, runMediaOp, getMediaOpJob, runPictureEdit |
 | `backend/src/lib/mediaProductions.ts` | canSeeProduction, listMediaProductions, getMediaProduction, createMediaProduction, updateMediaProduction, setShotClip |
 | `backend/src/lib/mediaSubjectSheet.ts` | sheetPromptFor, makeSubjectSheet |
 | `backend/src/lib/mediaSubjects.ts` | isSheetReference, canUseSubject, listMediaSubjects, getMediaSubject, createMediaSubject, updateMediaSubject |
@@ -705,7 +703,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/modelCatalog.ts` | CATALOG, kvCacheBytes, weightsBytes, usableChatBudgetBytes, fitsWithin, recommend |
 | `backend/src/lib/modelDownload.ts` | __setDownloadIdleTimeoutForTests, __setDownloadRetryDelayScaleForTests, sweepStaleDownloads, sha256OfFile, downloadUrl |
 | `backend/src/lib/modelDownloadJobs.ts` | getJob, listJobs, recoverInterruptedJobsAtBoot, extractDownloadedArchive, startSelectJob |
-| `backend/src/lib/music/album.ts` | MAKE_ALBUM_TOOL_ID, EDIT_ALBUM_TOOL_ID, ALBUM_NOT_HERE_LINE, ALBUM_MODEL_LINE, ALBUM_GONE_LINE, albumPrompt |
+| `backend/src/lib/music/album.ts` | MAKE_ALBUM_TOOL_ID, EDIT_ALBUM_TOOL_ID, ALBUM_NOT_HERE_LINE, ALBUM_MODEL_LINE, albumPrompt, parseAlbumDraft |
 | `backend/src/lib/music/band.ts` | MAKE_BAND_TOOL_ID, BAND_NOT_HERE_LINE, BAND_MODEL_LINE, briefFor, bandPrompt, parseDraft |
 | `backend/src/lib/music/bandActions.ts` | BAND_ACTION_NAMES, runBandAction |
 | `backend/src/lib/music/commercial.ts` | COMMERCIAL_REFUSAL_LINE, provenanceFor, commercialUseOf |
@@ -725,7 +723,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/music/sections.ts` | resolveMusicSection, replaceMusicSection, secondsForWords, hookOf, sungSecondsFor, fitLyricsToLength |
 | `backend/src/lib/music/sound.ts` | SOUND_NOT_FOUND_LINE, resolveSound |
 | `backend/src/lib/music/soundMaker.ts` | MAKE_SOUND_TOOL_ID, makeSoundArgs, runMakeSound |
-| `backend/src/lib/music/stack.ts` | musicBody, StackMusicError, musicStackConfigured, __setMusicFetchForTests, __setStemsFetchForTests, submitMusic |
+| `backend/src/lib/music/stack.ts` | musicBody, StackMusicError, musicStackConfigured, __setMusicFetchForTests, submitMusic, getMusicJob |
 | `backend/src/lib/music/store.ts` | TEMP_MS, memory, liveJobs, watching, temporarySongs, storedMusicState |
 | `backend/src/lib/music/studioTools.ts` | EDIT_BAND_TOOL_ID, STUDIO_TOOL_IDS, isStudioTool, EDIT_TOOL_OBJECT, runStudioTool |
 | `backend/src/lib/music/styleCard.ts` | MAKE_SONG_STYLE_TOOL_ID, EDIT_SONG_STYLE_TOOL_ID, STYLE_NOT_HERE_LINE, STYLE_BAD_LINE, styleProvenance, styleBlock |
@@ -805,7 +803,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/pictures/finishedCheck.ts` | stricterLane, sha256Of, checkFinishedAssets |
 | `backend/src/lib/pictures/jobStore.ts` | PICTURE_FAILED_PREFIX, plainFailure, saveJob, markLive, markSettled, getPictureJob |
 | `backend/src/lib/pictures/jobs.ts` | __resetPictureJobsForTests, startPictureJob, __setPicturePollMsForTests, __setPictureTurnWaitForTests, cancelPictureJob, resumePictureJobs |
-| `backend/src/lib/pictures/keyframes.ts` | ensureKeyframeHelper, __setKeyframesForTests, __resetKeyframeHelperForTests, keyframeCount, extractKeyframes |
+| `backend/src/lib/pictures/keyframes.ts` | ensureKeyframeHelper, __setKeyframesForTests, keyframeCount, extractKeyframes |
 | `backend/src/lib/pictures/lane.ts` | laneOf, KIDS_KEY, KID_ENABLED_KEY, KIDS_DAILY_PICTURES_KEY, KIDS_DAILY_VIDEOS_KEY, DEFAULT_KIDS_DAILY_PICTURES |
 | `backend/src/lib/pictures/laneGate.ts` | CHILD_SAFETY_SCHEMA, CHILD_SAFETY_SYSTEM_PROMPT, MIN_CHILD_CONFIDENCE, parseChildSafety, childSafetyOk, __setChildSafetyRunnerForTests |
 | `backend/src/lib/pictures/likeness/edit.ts` | LIKENESS, LINES, whenFree, realDeps, runLikenessEdit, hasProtectableFace |
@@ -815,7 +813,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/pictures/likeness/stackSegment.ts` | stackSegment |
 | `backend/src/lib/pictures/lock.ts` | isAdultPictureStyle, LOCKED_PICTURE_STYLE_LINE, lockedPictureStyleOutcome, pictureJobLockItem, pictureJobLockState, pictureJobGroupLockState |
 | `backend/src/lib/pictures/minorLine.ts` | MINOR_MARKERS, SEXUAL_WORDS, UNCLOTHED_PHRASES, normalise, hasWord, mentionsSexualWord |
-| `backend/src/lib/pictures/people.ts` | __setPeopleRetryPauseForTests, runPictureTool |
+| `backend/src/lib/pictures/people.ts` | runPictureTool |
 | `backend/src/lib/pictures/plainLine.ts` | plainEngineLine, makingStateOf, plainMakingLine |
 | `backend/src/lib/pictures/policy.ts` | GENERATION_ADULTS_KEY, GENERATION_ADULT_STYLES_KEY, PICTURE_STARTED_CONFIRM_NOTE, GENERATION_PICTURE_TIER_KEY, PICTURE_DENIAL_LINE, PICTURE_NOT_HERE_LINE |
 | `backend/src/lib/pictures/quality.ts` | QUICK_MODEL, ERNIE_MODEL, DETAILED_MODEL, qualityOfModel, isPictureQuality, quickModelFor |
@@ -848,7 +846,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/rateLimiter.ts` | tryConsume, __resetRateLimiterForTests, __setRateLimiterClockForTests |
 | `backend/src/lib/reasoningReserve.ts` | EMPTY_LENGTH_RETRY_EXTRA_TOKENS, setCeilingEngineIdentity, rememberCeilingSpentInvisibly, __resetLearnedCeilingsForTests, reasoningReserveFor, availableAnswerTokens |
 | `backend/src/lib/recallShapes.ts` | asksWhatHubSaid, asksAboutEarlierTalk |
-| `backend/src/lib/receivedBackups.ts` | ReceivedBackupRefused, storeReceivedBackup, listReceivedBackups, deleteReceivedBackup, deleteReceivedBackupsForDevice |
+| `backend/src/lib/receivedBackups.ts` | ReceivedBackupRefused, storeReceivedBackup, listReceivedBackups, deleteReceivedBackupsForDevice |
 | `backend/src/lib/recordedSpeech.ts` | __setRecordedSpeechFetchForTests, __setRecordedSpeechReferenceForTests, recordedSpeechReferenceForTest, recordedSpeechStatus, waitForRecordedSpeech, submitRecordedSpeech |
 | `backend/src/lib/recordedTags.ts` | FISH_DRAMA_TAGS, tagsForEngine |
 | `backend/src/lib/reducedChat.ts` | setReducedChat, reducedChatState, reducedChatNotice, resetReducedTruthForTests, enterStackReducedChat, leaveStackReducedChat |
@@ -878,7 +876,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/retrieval/dictionaryFallback.ts` | WIKTIONARY_ORIGIN, WIKTIONARY_LABEL, __resetDictionaryFallbackForTests, headwordOf, dictionaryLookup |
 | `backend/src/lib/retrieval/extractArticle.ts` | LEAD_MAX_CHARS, safeOutboundHref, extractFullArticle, cleanText, cutAtSentence, deriveDescription |
 | `backend/src/lib/retrieval/fetchCache.ts` | FETCH_CACHE_GB_KEY, FETCH_TTL_S, setNewsHostMatcher, ttlSecondsFor, openFetchCache, sharedFetchCache |
-| `backend/src/lib/retrieval/knowledgeDb.ts` | openKnowledgeDb, sharedKnowledgeDb, __resetSharedKnowledgeDbForTests |
+| `backend/src/lib/retrieval/knowledgeDb.ts` | openKnowledgeDb, sharedKnowledgeDb |
 | `backend/src/lib/retrieval/lookup.ts` | parseScope, referenceUrl, referenceToLookupRow, webTimeRange, federatedLookup |
 | `backend/src/lib/retrieval/minorFloor.ts` | articleFloorText, tripsMinorFloor, releaseToBand |
 | `backend/src/lib/retrieval/minorQueryCheck.ts` | MINOR_QUERY_PERSONAL_NOTE, closedFormatHit, minorQueryHit |
@@ -907,10 +905,10 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/robotSelfTestRuns.ts` | ROBOT_SELF_TEST_TIMEOUT_MS, ROBOT_SELF_TEST_RESULT_TTL_MS, startRobotSelfTest, acceptRobotSelfTestResult, pruneRobotSelfTests, __resetRobotSelfTestsForTests |
 | `backend/src/lib/robotSoftware.ts` | compareSemver, robotSoftwareStatus, getRobotSoftware |
 | `backend/src/lib/robotSsh.ts` | RobotPasswordRotationError, readRobotHostKey, rotateRobotPassword |
-| `backend/src/lib/robotVision.ts` | SCENE_TTL_MS, MIN_FRAME_INTERVAL_MS, SCENE_FRAME_INTERVAL_MS, MAX_FRAME_BYTES, FRESH_ENOUGH_MS, robotVisionMode |
+| `backend/src/lib/robotVision.ts` | SCENE_TTL_MS, MIN_FRAME_INTERVAL_MS, SCENE_FRAME_INTERVAL_MS, MAX_FRAME_BYTES, robotVisionMode, __setLookForTests |
 | `backend/src/lib/robots.ts` | ROBOTS_OFF_MESSAGE, robotsEnabled |
 | `backend/src/lib/robotsSwitchMigration.ts` | migrateRobotsSwitch |
-| `backend/src/lib/roleHealth.ts` | MAKING_ROLES, __setRoleHealthForTests, cachedRoleHealth, sharedStackRoles, sharedCodingMode, __resetSharedStackReadsForTests |
+| `backend/src/lib/roleHealth.ts` | __setRoleHealthForTests, cachedRoleHealth, sharedStackRoles, sharedCodingMode, __resetSharedStackReadsForTests, STACK_REFUSAL_KEY |
 | `backend/src/lib/routing.ts` | embedUtterance, __embedCallCountForTests, __resetEmbedCallCountForTests |
 | `backend/src/lib/ruleNames.ts` | RUNGS, isTypedSourcePackage, isLookupPackage, rungOf, RULES, RULE_NAMES |
 | `backend/src/lib/safeSearch.ts` | safeSearchDefaultFor, safeSearchStrictness, applySafeSearchLimits, resolveSafeSearchLevel, safeSearchNumericLevel |
@@ -923,7 +921,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/schedules/reconcile.ts` | reconcileSchedules, registerScheduleReconcile, hasActiveAutomationTasks, reconcileAllInstances, registerScheduleRecheck, __resetReconcileForTests |
 | `backend/src/lib/schedules/store.ts` | pendingAutomationIds, automationDeps, defaultZone, recordOf, wallClock, automationSpecOf |
 | `backend/src/lib/search/providers.ts` | SEARCH_PROVIDERS, matchScore, rankGroups |
-| `backend/src/lib/searchAddressSave.ts` | SEARXNG_URL_KEY, __resetSearchTestPassedForTests, testOrSaveSearchAddress, clearSearchAddress |
+| `backend/src/lib/searchAddressSave.ts` | SEARXNG_URL_KEY, testOrSaveSearchAddress, clearSearchAddress |
 | `backend/src/lib/searchAssist/counters.ts` | SEARCH_ASSIST_COUNTER_NAMES, bumpSearchAssistCounter, searchAssistCounters, __resetSearchAssistCountersForTests |
 | `backend/src/lib/searchAssist/eligible.ts` | MINOR_RESCUE_ENABLED, cappedSearchAssistMode, searchAssistEligibility |
 | `backend/src/lib/searchAssist/embedIdentity.ts` | embedModelFromFile, stackEmbedModel, __setStackEmbedModelReaderForTests |
@@ -971,8 +969,8 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/shelf/shelfPoller.ts` | MAX_BACKOFF_S, MAX_FEEDS_PER_TICK, MAX_FEEDS_PER_HOST_PER_TICK, backoffSeconds, guardedGet, extractEntries |
 | `backend/src/lib/shelf/shelfRead.ts` | __resetFloorMemoForTests, visibleFeedIds, feedIsOfferedTo, releaseShelfItems, releaseShelfItem |
 | `backend/src/lib/shelf/shelfStore.ts` | openShelfStore, sharedShelfStore, __resetSharedShelfStoreForTests |
-| `backend/src/lib/sidecars.ts` | blockedPortReason, blockedPortDetails, stopBlockedPortHolder, blockedPortHolderAlive, __recordOwnedPortForTests, __blockPortForTests |
-| `backend/src/lib/sileroVad.ts` | getSileroStream, __resetSileroVadForTests, SileroVadStream |
+| `backend/src/lib/sidecars.ts` | blockedPortReason, stopBlockedPortHolder, blockedPortHolderAlive, __recordOwnedPortForTests, __blockPortForTests, __failEngineForTests |
+| `backend/src/lib/sileroVad.ts` | getSileroStream, SileroVadStream |
 | `backend/src/lib/skills.ts` | listSkillIds, __resetSkillCacheForTests, loadSkill, loadAllSkills |
 | `backend/src/lib/smoke.ts` | setDenoLookupForTest, runDenoTestSmoke, runSmoke, runAllSmokeTests, getPackageStatus, allPackageStatuses |
 | `backend/src/lib/specDir.ts` | SPEC_DIR |
@@ -992,7 +990,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/stackCodingPieces.ts` | CodingPieceError, CODING_ON_REFUSAL, __setCodingStackForTests, missingFrom, missingCodingPiece, __setMissingCodingPieceForTests |
 | `backend/src/lib/stackCodingSync.ts` | CODING_STACK_MAP, isCodingStackKey, codingStackValues, __setCodingSyncClientForTests, pushCodingSettings |
 | `backend/src/lib/stackComponents.ts` | StackComponentError, __setComponentsFetchForTests, listStackComponents, installStackComponent, uninstallStackComponent, listTierCandidates |
-| `backend/src/lib/stackEngine.ts` | getStackUrl, isRemoteStackSelected, engineComputerAwayFromHome, isStackConfigured, STACK_ROLES, isStackRoleEnabled |
+| `backend/src/lib/stackEngine.ts` | getStackUrl, isRemoteStackSelected, engineComputerAwayFromHome, isStackConfigured, isStackRoleEnabled, getHomeOwnedRoles |
 | `backend/src/lib/stackHealthSync.ts` | readStackMemoryLedger, syncStackHealthIssues, syncHostGuardIssue |
 | `backend/src/lib/stackInstall.ts` | NO_ENGINE_INSTALL, __setEngineInstallRunnerForTests, engineInstallStatus, startEngineInstall |
 | `backend/src/lib/stackRequirement.ts` | STACK_REQUIREMENT_ISSUE, syncStackRequirementIssue |
@@ -1127,10 +1125,10 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/videos/stack.ts` | StackVideoError, __setVideosFetchForTests, submitVideo, convertForMessages, getVideoJob, fetchVideoPreview |
 | `backend/src/lib/videos/stackEdit.ts` | EDIT_UNAVAILABLE_LINE, EDIT_REMOTE_LINE, EDIT_FAILED_LINE, EDIT_TIMEOUT_LINE, EDIT_MISSING_LINE, __setStackEditTimingForTests |
 | `backend/src/lib/videos/studio.ts` | STUDIO_TITLE, STUDIO_NO_CLIP_LINE, STUDIO_LOCKED_LINE, STUDIO_NO_SONG_LINE, STUDIO_SPEECH_LINE, STUDIO_SAY_LINE |
-| `backend/src/lib/videos/studioExport.ts` | STUDIO_VOICE_GONE_LINE, STUDIO_EXPORT_LINE, studioRun, startStudioExport |
+| `backend/src/lib/videos/studioExport.ts` | STUDIO_VOICE_GONE_LINE, studioRun, startStudioExport |
 | `backend/src/lib/videos/studioPlan.ts` | STUDIO_VIDEO_PIECES, STUDIO_AUDIO_PIECES, STUDIO_FILM_S, STUDIO_MIN_PIECE_S, studioPlanSchema, STUDIO_PLAN_LINE |
 | `backend/src/lib/videos/studioVoices.ts` | VOICE_TTL_MS, VOICES_PER_PERSON, estimatedSpeechSeconds, putStudioVoice, getStudioVoice, VOICE_REF_PREFIX |
-| `backend/src/lib/videos/styleChoice.ts` | STYLE_GONE_LINE, STYLE_MIXED_LEVELS_LINE, STYLE_NOT_AT_LEVEL_LINE, STYLES_NEED_MAX_LINE, strengthWord, styleNamesOf |
+| `backend/src/lib/videos/styleChoice.ts` | STYLE_GONE_LINE, STYLE_MIXED_LEVELS_LINE, STYLE_NOT_AT_LEVEL_LINE, strengthWord, styleNamesOf, resolveStyles |
 | `backend/src/lib/videos/styleToolSpec.ts` | withStyleList |
 | `backend/src/lib/videos/tool.ts` | GENERATE_VIDEO_TOOL_ID, videoAudienceOf, ATTACHED_PHOTO, videoRefusalFor, latestGeneratedPictureId, runGenerateVideo |
 | `backend/src/lib/videos/waitLine.ts` | STACK_WAIT_RUNNING_PHASE, STACK_WAIT_COMPUTER_PHASE, videoWaitLine |
@@ -1153,7 +1151,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/webTabSearch.ts` | WEB_TAB_MAX_RESULTS, WEB_TAB_QUERY_MAX, webTabSearch |
 | `backend/src/lib/wellFormed.ts` | EMOJI_RE, visibleText, analysisLead, thinkingPrefix, newThinkSplitState, feedThinkSplit |
 | `backend/src/lib/widgets.ts` | widgetCardBlock, listWidgets, orderHomeCards, getWidgetData |
-| `backend/src/lib/wikimediaLive.ts` | WIKIMEDIA_LIVE_ID, WIKIMEDIA_LIVE_RATE_LIMIT_KEY, WIKIMEDIA_LIVE_RATE_LIMIT, wikimediaLiveBaseUrl |
+| `backend/src/lib/wikimediaLive.ts` | WIKIMEDIA_LIVE_RATE_LIMIT_KEY, WIKIMEDIA_LIVE_RATE_LIMIT, wikimediaLiveBaseUrl |
 | `backend/src/lib/worldPlaces.ts` | listWorldPlaces, createWorldPlace, updateWorldPlace, deleteWorldPlace |
 | `backend/src/lib/writingFormats.ts` | WRITING_FORMAT_TOOL_ID, __setWritingFormatsForTests, installedWritingFormats, writingFormatsFor, writingFormatToolSpec, writingFormatForArgs |
 | `backend/src/lib/wyoming.ts` | encodeWyomingMessage, WyomingFramer, readWavPcm |
