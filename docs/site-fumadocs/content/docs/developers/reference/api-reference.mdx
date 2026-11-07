@@ -1,18 +1,13 @@
 ---
 title: API reference
-description: "Planned page. Every route, generated."
+description: "Every route, generated from the code as an OpenAPI document."
 ---
 
-<Callout type="warn" title="Table of contents draft">This page is not written yet. This is the plan for it. Approve or change it before any writing starts.</Callout>
+The API is described by `docs/api/openapi.json`, generated from the live route registrations in `backend/src/app.ts`. Nobody edits it by hand.
 
-## What this page will cover
+- **Browse it on a running hub:** open `/api/docs` (a Scalar reference) or fetch `/api/openapi.json`.
+- **Regenerate it:** `cd backend && bun run gen:api-docs`. The lander runs the generators on every landing and commits any change as `Generated: ...`, so a session never commits this file.
+- **Add a route:** register it with `createRoute` from `@hono/zod-openapi` through `apiRouter()` in `backend/src/lib/openapi.ts`, and give every error status a plain `errorResponses` message (what went wrong and what to do). A route outside that router does not appear in the document.
+- **Compatibility:** API changes are additive. The turn stream's event names (`turn_meta`, `signal`, `delta`, `status`, `spoken_cue`, `done`, `error`) stay available to the robot, satellites and Go, with additions only.
 
-Every route, generated.
-
-## Screenshots it will have (each with a caption)
-
-- None. Text only.
-
-## Kept current by
-
-Generated from code: the page is rebuilt by the docs script and the gate fails on a hand edit. Source: the generated OpenAPI file.
+Routes under `/stack/v1` and `/v1` belong to the Stack, not to Home; Home's client for them is `backend/src/lib/stack/client.ts`.

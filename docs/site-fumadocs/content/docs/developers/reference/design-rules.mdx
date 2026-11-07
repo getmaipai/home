@@ -1,18 +1,15 @@
 ---
 title: Design rules
-description: "Planned page. The hard rules, with links to the authority file."
+description: "The hard rules for Home, with a pointer to the file that is the authority."
 ---
 
-<Callout type="warn" title="Table of contents draft">This page is not written yet. This is the plan for it. Approve or change it before any writing starts.</Callout>
+`docs/design/RULES.md` is the authority. A change, backlog item or design note that breaks a rule there is rejected, whatever older document it cites. Only the owner changes a rule; the commit carries an `Owner-approved: <date>` line.
 
-## What this page will cover
+Read it before any work on the chat turn, search, the turn stream, the chat UI, the canvas or the engine launch. It has four parts:
 
-The hard rules, with links to the authority file.
+- **Chat turn** (rules 0 to 14). Age and surface gates outrank everything. The model decides when to search. The engine's native features are the implementation. Each model runs on its own sampling settings. There is no length cap on adult written chat. A failed tool never fails the answer. Shipped kit parts only. Only the Stack's tested components run models. Port before delete.
+- **App shell** (S1 and following). The rail, Settings, phone layout, and how system status reaches a person through existing mechanisms.
+- **Live video services.**
+- **Robot vision.**
 
-## Screenshots it will have (each with a caption)
-
-- None. Text only.
-
-## Kept current by
-
-Linked, never copied.
+The `architect` review rules APPROVED, REJECTED, DUPLICATE or NEEDS-RULE-CHANGE on new design notes and plans against this file. See also [UI rules in practice](/docs/developers/build/ui-rules).

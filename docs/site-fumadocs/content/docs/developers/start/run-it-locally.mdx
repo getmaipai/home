@@ -1,18 +1,45 @@
 ---
 title: Run it locally
-description: "Planned page. Clone, install, start, seeded demo household, run the gate."
+description: "Clone, install, start a seeded demo household, and run the checks."
 ---
 
-<Callout type="warn" title="Table of contents draft">This page is not written yet. This is the plan for it. Approve or change it before any writing starts.</Callout>
+## Before you start
 
-## What this page will cover
+- Bun installed.
+- This repo cloned, with `getmaipai/commons` cloned beside it. Dependencies on `@maipai/core`, `@maipai/spec` and `@maipai/ui` resolve to tag worktrees under `../commons-tags/`; `bash ../commons/scripts/ensure-tag.sh <workspace> <tag>` creates a missing one.
+- Optional: a Stack on `127.0.0.1:8770` so chat and generation work. Without one, start with `--no-stack`.
 
-Clone, install, start, seeded demo household, run the gate.
+## Install and start
 
-## Screenshots it will have (each with a caption)
+```bash
+cd backend && bun install
+cd ../frontend && bun install
+cd .. && bun run dev
+```
 
-- None. Text only.
+`bun run dev` (`scripts/dev.sh start`) runs the backend with `bun run --hot` and Vite with hot reload. No build. A frontend edit shows in about a second; a backend edit restarts the hub in one to three seconds.
 
-## Kept current by
+- The first start seeds a demo household into `data/dev/hub`: Sage (owner), Marlow (teen), Nova (child). The sign-in secret is printed by `dev.sh start` and works for the demo household only.
+- `bash scripts/dev.sh url` prints the address. The API port is 8800 plus a number derived from the worktree path; the app is that port plus 1000. In the main checkout the API port is 8787.
+- `bash scripts/dev.sh status` lists what runs. `bash scripts/dev.sh reseed` starts the demo data fresh.
+- Options: `--no-stack`, `--stack <url>`, `--port <n>`.
+- `bun run dev:stop` stops it. It also stops after 30 idle minutes with no browser connected (`MAIPAI_DEV_IDLE_MINUTES`).
 
-Commands pulled from the package scripts.
+Do not use the installed hub's data or port for development. `bun start` and `bun stop` run a source checkout as a local app (`scripts/app.sh`); they are not the development loop.
+
+## Run the checks
+
+```bash
+cd backend && bun test
+cd frontend && bun test
+cd backend && bun run lint
+cd frontend && bun run lint
+cd frontend && bun run lint:ui-rules
+```
+
+- `bash scripts/check.sh --pre` is the cheap preflight (typechecks, UI rules, secrets scan, PII wordlist, drift checks). Plain `bash scripts/check.sh` is the full gate and takes a machine-wide lock. `--docs` is for docs-only changes.
+- `MAIPAI_TEST_NO_PORTS=1 bun test` skips the port probe for tests that start no server.
+
+## Land a change
+
+Work in a worktree made by `scripts/wt.sh start`, commit by file name, then `bash scripts/land.sh`. The lander runs the static check and fast-forwards `main`; the watcher runs the full suite afterward. The whole path, including shipping to a live hub, is in `docs/dev/delivery-pipeline.md`.

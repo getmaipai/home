@@ -8,16 +8,17 @@ A package is a folder with a `manifest.json`, an optional recipe and optional pa
 ## 🧩 Kinds
 
 - **plugin**: tools the chat model can call, written as recipes (data, not code).
-- **app**: a plugin that also lists `contributes.pages`. It opens at `/apps/<package id>`, shows in search and favorites, and draws pages written as JSON. No React ships in a package.
+- **app**: a package whose manifest lists `contributes.pages`. It opens at `/apps/<package id>`, shows in search and favorites, and draws pages written as JSON. No React ships in a package. Bundled apps include weather, news, music, podcasts, books, shows and videos.
+- **companion**, **skill**, **module** and **project** are the other kinds Home bundles; `integration`, `model`, `wakeword`, `voice`, `theme` and `reference` are also valid kinds (`spec/schemas/manifest.schema.json`).
 
-Weather is the first app. The chat tool and the app are one package and one recipe (`backend/packages/weather`).
+Weather is the first app. The chat tool and the app are one package and one recipe (`backend/packages/weather`). Home bundles 63 packages in `backend/packages`.
 
 ## 📄 An app's pieces
 
 | Piece | Where | What it does |
 |---|---|---|
-| Manifest | `manifest.json` | `contributes.pages[]` (one `index` is required), `contributes.data[]`, `keywords` (up to 8), `min_role`, `returns_blocks` |
-| Pages | `pages/<module>.json` | `page` documents using only `page`, `section`, `empty_state`, `progress`, `detail_pane`, `answer_blocks` and `picker` |
+| Manifest | `manifest.json` | `contributes.pages[]` (one `index` is required), `contributes.data[]`, `contributes.sidebar`, `keywords` (up to 8), `min_role`, `returns_blocks` |
+| Pages | `pages/<module>.json` | `page` documents using only the node types in `PACKAGE_PAGE_NODE_TYPES` (`spec/ui/app-check.ts`): `page`, `section`, `empty_state`, `progress`, `answer_blocks`, `picker`, `search`, `detail_pane`, `tabs`, `list`, `media_shelf`, `billboard`, `player`, `reader`, `split_view`, `creation_header`, `prompt_bar`, `quick_tiles`, `top_result`, `category_tiles`, `track_rows`, `result_feed` and `studio` |
 | Data | `POST /api/plugins/<id>/data/<data id>` | The host resolves the place and rounds coordinates; the page never sends raw ones |
 | Settings | `contributes.settings_area` | An area at `/settings/<id>` with a Settings gear in the app toolbar. Cards draw only the package's own `config[]` groups |
 

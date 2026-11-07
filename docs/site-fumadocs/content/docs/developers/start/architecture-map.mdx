@@ -1,18 +1,33 @@
 ---
 title: Architecture map
-description: "Planned page. Hub, Stack, commons, catalog, bot: who owns what and how they talk."
+description: "Hub, Stack, commons, catalog, bot: who owns what and how they talk."
 ---
 
-<Callout type="warn" title="Table of contents draft">This page is not written yet. This is the plan for it. Approve or change it before any writing starts.</Callout>
+MaiPai is several repos with different release cadences. Home is the one a household runs; the others feed it or sit beside it.
 
-## What this page will cover
+## Who owns what
 
-Hub, Stack, commons, catalog, bot: who owns what and how they talk.
+| Repo | Owns | Talks to |
+|---|---|---|
+| `home` (this repo) | The hub: people, memory, the turn engine, settings, the package host, the credentials center, backups, updates and the shell. Backend in Bun, Hono, Zod and Drizzle on SQLite; frontend in React and Vite. | The Stack over HTTP; the catalog for packages; robots that pair with it. |
+| `stack` | The headless engine: models, the resource governor, jobs for pictures, video and music. Home is its only caller. | Called by Home on the same computer. |
+| `commons` | Three libraries, each tagged on its own: `core`, `spec` and `ui`. Public. Imports no product. | Pinned by Home by tag. |
+| `catalog` | The public signed package catalog. Pins `spec`. | Read by the hub and the robot. |
+| `bot` | The robot companion. Complete without a hub, pairs with one for more. | Home, over the pairing routes. |
+| `go` | The Apple TV and iPhone client; renders the UI schema natively. | Home. |
+| `.github` | Org standards, the shared Claude plugin, the shared `wt.sh` and `gate-lock.sh`. | Every repo's scripts. |
 
-## Screenshots it will have (each with a caption)
+## How the pieces connect
 
-- Diagram (generated). Caption: "The products and how they connect."
+- **Home to Stack.** Home reads the Stack's address from the household setting `engines.stack.url` (the dev hub uses `http://127.0.0.1:8770` when that answers). The client is `backend/src/lib/stack/client.ts`; the wire shapes are in `backend/src/lib/stack/contract.ts`. Home never loads a model itself.
+- **Shared records.** Anything the hub and robot both store is a record type in `@maipai/spec`. A shape change goes spec first, then Home, then the robot. Home pins `@maipai/spec` by tag; the current pins are in `backend/package.json` and `frontend/package.json` (see [Repo layout and pins](/docs/developers/start/repo-layout)).
+- **Packages.** Features ship as packages. The default set is bundled in `backend/packages` (63 packages, with provenance in `bundled-provenance.json`); the package host (`backend/src/lib/packageHost.ts`) loads them without a rebuild. Package pages are JSON validated against `spec/ui/schema.json` and drawn by the kit interpreter in `frontend`. See [Build a package](/docs/developers/build/build-a-package).
+- **UI.** The kit (`@maipai/ui`) holds the primitives and Elements. Home restyles them by tokens only.
+- **Privacy.** Nothing leaves the household by default; an outbound connection needs an entry in the org's `PRIVACY.md` and `THIRD-PARTY-SERVICES.md` first.
 
-## Kept current by
+## Where a change goes
 
-Reviewed whenever the platform note changes.
+1. A shared record or setting key: `commons` `spec`, then tag it.
+2. A kit look or Element prop: `commons` `ui`, then tag it, then bump the pin with `bash scripts/pin.sh commons ui-vX.Y.Z`.
+3. A hub feature: a package if it can be data, otherwise `backend/src` and `frontend/src`.
+4. An engine job or model: the Stack, then `bash scripts/pin.sh stack <sha>` as its own commit.

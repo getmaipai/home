@@ -1,7 +1,7 @@
 # Chat engine key (SPLASH-KEY-01)
 
 An assistant session can switch the chat engine between llama-server and Splash without a person at the Settings page. It holds an
-`engine` API key. The key can do that one thing and nothing else. Credentials rules: [CREDENTIALS.md](../CREDENTIALS.md) in the org docs.
+`engine` API key. The key can do that one thing and nothing else. Credentials rules: `docs/CREDENTIALS.md` in the org docs (`getmaipai/.github`).
 
 ## What the key can do
 

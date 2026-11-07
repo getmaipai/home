@@ -1,18 +1,38 @@
 ---
 title: Repo layout and pins
-description: "Planned page. Backend, frontend, commons pins, lockfile rules."
+description: "Backend, frontend, bundled packages, commons pins and the lockfile rules."
 ---
 
-<Callout type="warn" title="Table of contents draft">This page is not written yet. This is the plan for it. Approve or change it before any writing starts.</Callout>
+## Top level
 
-## What this page will cover
+| Path | What it holds |
+|---|---|
+| `backend/` | Bun, Hono, Zod, Drizzle on SQLite. `src/routes` (HTTP routes), `src/lib` (the work), `src/db` (schema and `migrations`), `src/middleware`, `src/settings`, `tests/`, `scripts/` (smoke, bench, seed and generator scripts). |
+| `backend/packages/` | The 63 bundled packages: plugins, apps, companions, skills, modules and one project. Each has a `manifest.json`, and a recipe and `pages/*.json` where it has them. `bundled-provenance.json` records where each came from. |
+| `frontend/` | React and Vite. `src/shell` (rail, routes, host players), `src/apps` (chat, library, people, memory, settings, setup and the other built-in screens), `src/kit` (the schema interpreter), `src/lib` (the API client), `src/locales`, `public/`. |
+| `shared/` | Code both workspaces import, such as the disk plan and AI choices. |
+| `scripts/` | The delivery pipeline and tooling: `dev.sh`, `land.sh`, `lander.sh`, `watcher.sh`, `pipeline.sh`, `ship.sh`, `pin.sh`, `check.sh`, `wt.sh`, `where.sh`, the screenshot scripts. |
+| `native/` | The macOS app helper. |
+| `docs/` | `user/` and `dev/` docs, `design/` (the rules and design records), `plans/`, `api/openapi.json` (generated), `site-fumadocs/` (the docs site), `BACKLOG.md`. |
+| `data-scratch/` | Git-ignored private scratch: queue, notes, reports. Never committed. |
 
-Backend, frontend, commons pins, lockfile rules.
+The root `package.json` declares the two workspaces (`backend`, `frontend`) and pins `zod` and `hono` through `overrides`.
 
-## Screenshots it will have (each with a caption)
+## Commons pins
 
-- None. Text only.
+Home takes `@maipai/core`, `@maipai/spec` and `@maipai/ui` from tag worktrees, not from the mutable `commons` checkout. Each `file:` dependency points at `../../commons-tags/<workspace>-<tag>/<workspace>`:
 
-## Kept current by
+| Package | Pinned in | Tag at this commit |
+|---|---|---|
+| `@maipai/core` | `backend/package.json` | `core-v0.1.7` |
+| `@maipai/spec` | `backend/package.json`, `frontend/package.json` | `spec-v0.1.333` |
+| `@maipai/ui` | `frontend/package.json` | `ui-v0.5.506` |
 
-Generated folder map and pin list.
+The values above are read from the `package.json` files; check them there, since a pin bump lands several times a day.
+
+## Rules
+
+- Bump a pin with `bash scripts/pin.sh commons <core|spec|ui>-vX.Y.Z | stack <sha> | bot <version>`. It edits every file the pin lives in, reinstalls, commits and lands. Do not edit pin lines by hand.
+- A tag worktree that is missing is created by `bash ../commons/scripts/ensure-tag.sh <workspace> <tag>`.
+- Never delete `node_modules` and `bun.lock` to fix a conflict: a fresh install floats every dependency. The full procedure is in `docs/PINNING.md`.
+- Generated files (`docs/api/openapi.json`, the settings registry, `docs/BACKLOG.md` status lines) are written by the lander, not by hand.

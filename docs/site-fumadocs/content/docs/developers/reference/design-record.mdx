@@ -1,18 +1,17 @@
 ---
 title: Design record
-description: "Planned page. Index of design notes with status current, superseded, historical."
+description: "Where the design notes live and how to read their status."
 ---
 
-<Callout type="warn" title="Table of contents draft">This page is not written yet. This is the plan for it. Approve or change it before any writing starts.</Callout>
+Design notes live in `docs/design` (current and recent decisions), `docs/plans` and `docs/dev.md` (history and reasoning). None of them is the authority; [Design rules](/docs/developers/reference/design-rules) is.
 
-## What this page will cover
+`docs/design/INDEX.md` lists every record with its status and the backlog row that owns it:
 
-Index of design notes with status current, superseded, historical.
+| Status | Meaning |
+|---|---|
+| current | A design still being built against, or still the reason for what exists. |
+| built | All its backlog rows are ticked; kept because it explains the code. |
+| partly superseded | Carries `Superseded in part` markers pointing at the rule that overrides a passage; the rest stands. |
+| history | A work order, handoff, audit, bench result or research pass; the record of what happened. |
 
-## Screenshots it will have (each with a caption)
-
-- None. Text only.
-
-## Kept current by
-
-Generated index (DOCS-INDEX-01).
+A record moves to `docs/design/retired/` only when a named record or rule replaces all of it. The backlog (`docs/BACKLOG.md`) is the source for what is built and what is missing. Whoever adds, retires or supersedes a record updates the index in the same commit.

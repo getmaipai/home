@@ -1,18 +1,27 @@
 ---
 title: UI rules in practice
-description: "Planned page. Kit Elements as shipped, tokens, never wrappers."
+description: "Kit Elements as shipped, restyled by tokens, never wrapped; the lints that enforce it."
 ---
 
-<Callout type="warn" title="Table of contents draft">This page is not written yet. This is the plan for it. Approve or change it before any writing starts.</Callout>
+The authority is `docs/design/RULES.md` (rule 9, "Shipped parts only", and the App shell rules). This page is the working summary.
 
-## What this page will cover
+## The rule
 
-Kit Elements as shipped, tokens, never wrappers.
+- Use a kit Element as it ships. Never put a `className` on one that changes shape, border, radius, shadow, background, padding, margin, size or layout, and never write a Home wrapper around an Element.
+- Restyle by design tokens and by the Element's own props. Every colour follows the person's selected theme: no hex or `rgb()` literals and no palette classes in Home code.
+- The chat screen is assistant-ui Elements from the kit, never hand-written. Before writing a chat component, look the job up in `frontend/src/dev/elements-adoption.json`. If an Element does it, the hand-written version is a defect.
+- Status reaches the person through the existing mechanisms (the Status row, the line under the chat box, one toast), never a new status surface.
 
-## Screenshots it will have (each with a caption)
+## When the look is not reachable
 
-- Right and wrong examples. Caption: "A kit Element used as shipped."
+Add a prop or variant in `getmaipai/commons` first, in a commons worktree (the pinned tag directory under `../commons-tags/` is immutable; the `commons` repo itself is not blocked). Tag it, then bump the pin with `bash scripts/pin.sh commons ui-vX.Y.Z`. The steps are in `docs/PINNING.md`, "Changing a shared kit element".
 
-## Kept current by
+## The lints
 
-Lint output of the UI rules.
+```bash
+cd frontend && bun run lint:ui-rules
+```
+
+It runs `kitElementLints.test.ts`, `handBuiltChat.test.ts` and `colorLints.test.ts` in `frontend/src/dev` in about a second. The baselines they compare against (`kit-classname-override-baseline.json`, `kit-wrapper-baseline.json`, `kit-css-override-baseline.json`, `hand-built-chat-baseline.json`, `color-lint-allowlist.json`) only shrink. `scripts/ui-rules-precommit.sh` runs the same checks on staged files, and `scripts/check.sh` always runs them, so a skipped hook cannot land a violation.
+
+To see how far the migration to Elements has come: `bun run elements:status`; to rebuild the inventory, `bun run elements:scan`.

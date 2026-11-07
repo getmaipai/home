@@ -72,7 +72,7 @@ Where it ended up (measured on the Studio):
 | `scripts/land.sh` | A session's landing command: pushes the branch, keeps one newest queued request per branch, waits up to 3600 s for the verdict. |
 | `scripts/lander.sh` | The lander: takes the newest request per branch, processes them oldest first, runs every landing step, writes notes. |
 | `scripts/watcher.sh` | The watcher: runs the suite on `main`, classifies, bisects, files issues, writes green marks. |
-| `scripts/pipeline.sh` | `status`, `start`, `stop`, `install-service`, `uninstall-service` for the two daemons. |
+| `scripts/pipeline.sh` | `status`, `start`, `stop`, `install-service`, `uninstall-service` for the two daemons; also `wait`, `sweep`, `outbox` and `stack on|off|status`. |
 | `scripts/ship.sh` | Promote a landed commit to the live hub; `--tag` cuts the release. It does nothing when that commit is already live and the hub answers (a repeat install can break a working hub: 2026-10-27); a hub that is not answering is still repaired, and `--reinstall` forces it. |
 | `scripts/maipai-promote`, `scripts/install-promote.sh` | The one root helper and its one-time setup. |
 | `scripts/install.sh --commit <sha>` | Installs a commit of `main` from a root-owned mirror, recorded as the label `sha-<first 7>`. |
@@ -113,7 +113,7 @@ All under `<main checkout>/data-scratch/` (git-ignored), unless noted.
 
 ## 6. Landing
 
-`bash scripts/land.sh [--detach] [--done ITEM-ID]... [--note "..."] [--queue-anyway]` from a `wt/*` worktree with a clean tracked tree.
+`bash scripts/land.sh [--detach] [--timeout SECONDS] [--done ITEM-ID]... [--note "..."] [--queue-anyway]` (and `bash scripts/land.sh wait` to wait on an earlier `--detach`) from a `wt/*` worktree with a clean tracked tree.
 
 **In the session:** refuse on a dirty tree, a branch with no commit over `origin/main`, or no running lander (exit 3, with the command to start it; `--queue-anyway` skips that). Push the branch, replace any earlier queued request for that branch, write a millisecond-named request, print `queued ... position N`, then wait for the matching verdict (default 3600 s). It prints `waiting: position N of M` every minute. A commit already on `origin/main` is success, regardless of an older note. Exit codes: 0 landed, 1 bounced, 2 timed out.
 
@@ -198,7 +198,7 @@ Self-healing installs (DEPS-SELFHEAL-01, 2026-11-02): the lander and the watcher
 | Per-session full gate and the 4-hour gate stamp (T1) | 2009 runs in a week, stamps invalidated by any edit. Landing runs the static check; tests run once after. |
 | The machine-wide gate lock for Home landings | One runner, nothing to lock. The lock remains for repos without a lander, for T2 stamps and for the watcher's suite. Session `--pre` checks use the heavy slots; the lander holds `GATE_HEAVY_HELD=1` so its own check never waits. |
 | The background "main gate" that `wt.sh land` started | It ran a full gate in a stale checkout, went red on its own errors and competed with the watcher. The watcher replaced it. |
-| Port leases, `bun start` and `bun restart` in the main checkout, a preview on 8787 | A development hub there blocked the installer three times. Preview is per worktree. A shared "main preview" on 8787 was in the first design and is not built. |
+| Port leases and a preview on 8787 (`bun start` and `bun restart` still run the local app from `scripts/app.sh`, but nothing previews there) | A development hub there blocked the installer three times. Preview is per worktree. A shared "main preview" on 8787 was in the first design and is not built. |
 | `scripts/release-home.sh` for this Mac | Superseded by `ship.sh`. It remains for installing a tag. |
 
 ## 13. Operations

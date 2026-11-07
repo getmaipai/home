@@ -225,10 +225,10 @@ The Media allowance's guardian-only `control` is written once, on the key defini
 from there because the shared spec snapshot still declares the key without it (drop the lookup when a commons spec tag carries
 it). `discoveryAllowed(person)` has no caller in this slice by design: the discovery shelves that call it are the app slices'.
 
-`frontend/src/lib/useMediaBudget.ts` reads the signed-in person's budget and returns `{exhausted, leftMinutes}`. Pass the person id
-so changing profiles cannot reuse another person's allowance. Unknown or failed reads return exhausted. Players feed every
-progress response's `budget` to `updateMediaBudget(queryClient, personId, budget)`; after an extension, invalidate that person's
-`mediaBudgetQueryKey`. This uses React Query and progress responses, with no new status surface or polling loop.
+`frontend/src/shell/mediaBudgetGuard.ts` (`guardMediaBudget`) is the player side of the budget. `frontend/src/shell/mediaHost.tsx` attaches it to the one
+host element every media app uses. It calls `GET /api/media/budget` (`api.mediaBudget()`) when the element attaches, on a load error, on every play and every
+15 s (`BUDGET_CHECK_MS`) while it plays. When `exhausted` is true it pauses the element, shows the hub's kid line (`line`) once through the toast, and pauses any
+later play until a check shows minutes again. A failed read never pauses and never throws. Tests: `mediaBudgetGuard.test.ts`, `mediaBudgetToast.test.tsx`.
 
 Open: `media.allowed_hours` needs a shipped time selector (see `allowanceKeys.ts`); every app must wire pause, ticks, resume and
 extension refresh; the ask-a-grown-up action must use the one Ask record. No second ask store or UI is added here. Also open: an
