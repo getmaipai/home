@@ -4,7 +4,7 @@
   "kind": "plugin",
   "category": "Media",
   "display": "Edit a Song",
-  "description": "Have a household voice sing a song you made or brought into chat.",
+  "description": "Change a song made here or brought in.",
   "offer": {
     "mode": "conditional",
     "gate": "musicEditAllowed",
@@ -45,53 +45,46 @@
       "description": {
         "type": "string",
         "grounded": false,
-        "description": "Genre, mood, instruments and original voice, based on the request. Never claim a song exists without calling this tool.",
+        "description": "Never claim a song exists without calling this tool.",
         "minLength": 3,
         "maxLength": 1200
       },
       "lyrics": {
         "type": "string",
         "grounded": false,
-        "description": "Write the lyrics yourself with [Verse] and [Chorus] tags. The words you write are the words that are sung and the person will see them. Omit for an instrumental.",
         "maxLength": 4000
       },
       "title": {
         "type": "string",
         "grounded": false,
-        "description": "A new title for the song, when the person asks to rename it.",
         "minLength": 1,
         "maxLength": 200
       },
       "bpm": {
         "type": "number",
-        "grounded": false,
-        "description": "Optional tempo in beats per minute.",
         "minimum": 20,
         "maximum": 300
       },
       "key": {
         "type": "string",
         "grounded": false,
-        "description": "Optional. A key such as C major or F# minor.",
         "maxLength": 20,
         "pattern": "^[A-G][#b]?\\s?(major|minor|maj|min|m)?$"
       },
       "track": {
         "type": "string",
         "grounded": false,
-        "description": "Use attached for the audio file on this message, latest for the selected song in this chat, a made-here file id, or the id of an audio file the person owns.",
+        "description": "attached, latest or an id.",
         "minLength": 1,
         "maxLength": 80
       },
       "voice": {
         "type": "string",
-        "grounded": false,
-        "description": "For voice_swap, the household voice id or companion to sing the song."
+        "grounded": false
       },
       "change": {
         "type": "string",
-        "grounded": false,
-        "description": "The change requested. For parts, give exactly one of parts.keep or parts.drop using vocals, drums, bass or other. For voice_swap, set voice. This returns one finished song.",
+        "description": "parts: set one of keep or drop. voice_swap: set voice.",
         "enum": [
           "remake",
           "restyle",
@@ -111,41 +104,54 @@
       },
       "parts": {
         "type": "object",
-        "grounded": false,
-        "description": "For change parts, set exactly one: keep (parts to keep) or drop (parts to remove). Choose at least one part and leave at least one part in the mix.",
         "properties": {
-          "keep": { "type": "array", "items": { "type": "string", "enum": ["vocals", "drums", "bass", "other"] }, "minItems": 1 },
-          "drop": { "type": "array", "items": { "type": "string", "enum": ["vocals", "drums", "bass", "other"] }, "minItems": 1 }
+          "keep": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "vocals",
+                "drums",
+                "bass",
+                "other"
+              ]
+            },
+            "minItems": 1
+          },
+          "drop": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "vocals",
+                "drums",
+                "bass",
+                "other"
+              ]
+            },
+            "minItems": 1
+          }
         }
       },
       "section": {
         "type": "string",
         "grounded": false,
-        "description": "A section tag in the stored lyrics, such as chorus or verse 2. For a rewrite, give this or explicit from_s and to_s.",
         "maxLength": 80
       },
       "from_s": {
         "type": "number",
-        "grounded": false,
-        "description": "Start of the section or trim in seconds.",
         "minimum": 0
       },
       "to_s": {
         "type": "number",
-        "grounded": false,
-        "description": "End of the section or trim in seconds.",
         "exclusiveMinimum": 0
       },
       "seconds": {
         "type": "number",
-        "grounded": false,
-        "description": "For extend: seconds to add. For fade: fade length. For remake or variation: total length.",
         "exclusiveMinimum": 0
       },
       "at": {
         "type": "string",
-        "grounded": false,
-        "description": "Where to extend.",
         "enum": [
           "start",
           "end"
@@ -153,8 +159,6 @@
       },
       "where": {
         "type": "string",
-        "grounded": false,
-        "description": "Which end to fade.",
         "enum": [
           "in",
           "out",
@@ -163,15 +167,11 @@
       },
       "strength": {
         "type": "number",
-        "grounded": false,
-        "description": "How much a cover changes the style. Default 0.6.",
         "minimum": 0.3,
         "maximum": 1
       },
       "lufs": {
         "type": "number",
-        "grounded": false,
-        "description": "Loudness target in LUFS, default -14.",
         "minimum": -70,
         "maximum": -5
       }

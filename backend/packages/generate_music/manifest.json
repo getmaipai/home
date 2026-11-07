@@ -4,7 +4,7 @@
   "kind": "plugin",
   "category": "Media",
   "display": "Make a Song",
-  "description": "Make a real sung song or an instrumental, with lyrics you write, whenever asked to make, write or sing one.",
+  "description": "Make a sung song or instrumental when asked.",
   "offer": {
     "mode": "conditional",
     "gate": "musicAllowed",
@@ -38,58 +38,48 @@
       "description": {
         "type": "string",
         "grounded": false,
-        "description": "Genre, mood, instruments and original voice, based on the request. Never claim a song exists without calling this tool, and never answer a song request with lyrics alone.",
+        "description": "Genre, mood, instruments, voice. Never claim a song exists without calling this tool.",
         "minLength": 3,
         "maxLength": 1200
       },
       "lyrics": {
         "type": "string",
         "grounded": false,
-        "description": "Write the lyrics yourself with [Verse] and [Chorus] tags. The words you write are the words that are sung and the player shows them. Put them here, never repeat them in your reply. Omit for an instrumental.",
+        "description": "Lyrics with [Verse]/[Chorus] tags; shown by the player, not repeated in the reply.",
         "maxLength": 4000
       },
       "bpm": {
         "type": "number",
-        "grounded": false,
-        "description": "Optional tempo in beats per minute.",
         "minimum": 20,
         "maximum": 300
       },
       "key": {
         "type": "string",
         "grounded": false,
-        "description": "Optional. A key such as C major or F# minor.",
         "maxLength": 20,
         "pattern": "^[A-G][#b]?\\s?(major|minor|maj|min|m)?$"
       },
       "imitates_real_voice": {
         "type": "boolean",
-        "grounded": false,
-        "description": "Set true when the person asks to sound like a named real singer or another real identifiable person. Home refuses copying real voices. Use an original voice for a similar style instead."
+        "description": "True if asked to sound like a real person."
       },
       "instrumental": {
-        "type": "boolean",
-        "grounded": false,
-        "description": "True for music with no singing."
+        "type": "boolean"
       },
       "seconds": {
         "type": "number",
-        "grounded": false,
-        "description": "Optional exact length in seconds. Quick songs are 10 to 60, full songs 150 to 240.",
         "minimum": 10,
         "default": 60
       },
       "language": {
         "type": "string",
         "grounded": false,
-        "description": "Optional. A language code for the singing, such as en or es.",
         "maxLength": 20,
         "pattern": "^([a-z]{2,3}(-[A-Za-z]{2,4})?|unknown)$"
       },
       "title": {
         "type": "string",
         "grounded": false,
-        "description": "Short title for the person to see.",
         "maxLength": 200
       },
       "length": {
@@ -97,9 +87,7 @@
         "enum": [
           "quick",
           "full"
-        ],
-        "grounded": false,
-        "description": "quick (about 45 seconds) unless the person asks for a whole or full song or a long piece; then full (about 3 minutes) and write every part: intro, verses, chorus, bridge, outro."
+        ]
       },
       "tier": {
         "type": "string",
@@ -108,25 +96,21 @@
           "boost",
           "max"
         ],
-        "grounded": false,
-        "description": "Optional typed level: standard, boost or max. Use it only when the person asks for more or less of the computer than usual: \"use max quality\" or \"the biggest model\" is max, \"a better one\" is boost, \"just a quick one\" is standard. Leave it out otherwise. Max is for people an admin allowed; if it is not allowed the tool says so, and you tell the person in your own words. Do not use it for age or content reasons."
+        "description": "Only if asked; max needs admin permission."
       },
       "song_style": {
         "type": "string",
         "grounded": false,
-        "description": "A saved song style's id (sstyle-...), only when the person named one. The song is made in that sound.",
         "maxLength": 40
       },
       "band": {
         "type": "string",
         "grounded": false,
-        "description": "A made band's id (mband-...), only when the person named that band. The song is made in the band's sound and filed under it.",
         "maxLength": 40
       },
       "album": {
         "type": "string",
         "grounded": false,
-        "description": "A made album's id (malbum-...), only when the person asked for a song for that album. The song joins the album when it is finished.",
         "maxLength": 40
       }
     }

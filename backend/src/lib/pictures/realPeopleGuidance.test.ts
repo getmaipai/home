@@ -13,8 +13,8 @@ describe("the picture model decides content", () => {
     const spec = toolSpecFor("generate_image", "adult");
     if (spec === null) return; // tool not offered in this environment (capability off)
     const args = JSON.stringify(spec.args) ?? "";
-    expect(args).toContain("even when a release or event is unannounced or unverified");
-    expect(args).toContain("don't research release status or treat uncertainty about it as a reason to decline the artwork");
+    expect(args).toContain("for an unannounced or unverified release, is still a picture request");
+    expect(args).toContain("do not research the release or decline");
   });
 
   test("started jobs still get their confirmation instruction", () => { expect(PICTURE_STARTED_CONFIRM_NOTE).toContain("do not refuse"); });

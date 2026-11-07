@@ -15,8 +15,8 @@ test("the show_images wording holds none of the held-out bench subjects", () => 
 
 test("the show_images wording keeps its examples to call shape and intent, no counts and no look descriptions", () => {
   const text = manifest.args.properties.subject.description;
-  expect(text).toContain("Examples");
-  expect(text).toContain("These never call it");
+  expect(text).toContain("not for advice or how-to");
+  expect(text).not.toContain("Examples");
   expect(text).not.toMatch(/\b\d+ (photos|pictures|images|words)\b/i);
   expect(text).not.toContain("—");
   expect(manifest.description.length).toBeLessThanOrEqual(200);

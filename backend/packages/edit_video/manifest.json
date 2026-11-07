@@ -4,7 +4,7 @@
   "kind": "plugin",
   "category": "Media",
   "display": "Change a Video",
-  "description": "Change a video here: cut, join, film a Production, reframe, grade, speed, caption, mix, continue or remake it.",
+  "description": "Change a video made here: remix, trim, join, film, mix, continue, reframe, grade, speed, captions, effects.",
   "offer": {
     "mode": "conditional",
     "gate": "videoEditAllowed",
@@ -44,7 +44,7 @@
         "type": "string",
         "maxLength": 80,
         "grounded": false,
-        "description": "Which video: \"latest\" for the newest one in this chat, or a video id. Required for every change except film."
+        "description": "\"latest\" or a video id. Needed except for film."
       },
       "change": {
         "type": "string",
@@ -73,15 +73,14 @@
           "credits",
           "spatial_sound"
         ],
-        "grounded": false,
-        "description": "another_take makes the same video again with a new random result. remix makes it again with changes. make_it_max makes it at Max for people an admin allowed. trim cuts it; set from_s and to_s. join puts your videos in order; set clips. mix adds a voice or song; to add new music made for the video, use sound music with make_music. cut_to_beat cuts your videos to the beat of your song; set track, clips, beats_per_cut (1, 2, 4 or 8, default 4) and length_s (5 to 60, default 30). reframe changes shape; grade changes the look; film_look applies a preset; letterbox adds cinema bars; speed changes playback; captions adds timed words. upscale: make the clip sharper and twice as big. remove_background cuts out the main subject. title_card adds a title at the start; credits adds rolling names at the end. spatial_sound makes the sound of a video with sound follow who is talking on screen; set surround true to also make a 5.1 file. continue starts from its last picture. extend makes it longer at Max; set seconds to how many more seconds. retake makes it again from a time at Max; set from_s and prompt only if the words change. These make a new version and keep the first. A video exists only if you called this tool in this reply. film turns a Production into a movie; set production and leave clip out."
+        "description": "remix: again with changes. another_take: same again. trim: from_s, to_s. join: clips. film: production, no clip. mix: sound. extend, retake: Max only. cut_to_beat: track, clips, beats_per_cut 1|2|4|8, length_s 5-60. spatial_sound: sound follows who talks on screen. grade: warmth, brightness, contrast, saturation, grain, vignette, only if asked. Each keeps the first video. A video exists only if you called this tool in this reply."
       },
       "prompt": {
         "type": "string",
         "minLength": 3,
         "maxLength": 1200,
         "grounded": false,
-        "description": "For remix and continue, or retake: the new full description of the video, when the person changed what it shows or says what happens next. A line a person says goes in quotes, one person speaking at a time. Cartoon characters should be named and described with their era and animation style."
+        "description": "remix, continue, retake: full new description; spoken lines in quotes, one speaker at a time."
       },
       "look": {
         "type": "string",
@@ -98,9 +97,7 @@
           "technicolor",
           "faded_vintage",
           "cool_thriller"
-        ],
-        "grounded": false,
-        "description": "For remix and continue: a video look. For join or film: one of the film look presets."
+        ]
       },
       "camera": {
         "type": "string",
@@ -113,18 +110,14 @@
           "aerial",
           "close-up",
           "still"
-        ],
-        "grounded": false,
-        "description": "For remix and continue: a new camera move or style, when the person asks for one."
+        ]
       },
       "voices": {
         "type": "string",
         "enum": [
           "clean",
           "full"
-        ],
-        "grounded": false,
-        "description": "For remix and continue: clean means no laugh track and no music; full adds music and sound effects. Use full only when the person asks for music or effects."
+        ]
       },
       "tier": {
         "type": "string",
@@ -132,35 +125,27 @@
           "standard",
           "boost",
           "max"
-        ],
-        "grounded": false,
-        "description": "For remix and continue: a new level, when the person asks for more or less quality. Max is for people an admin allowed."
+        ]
       },
       "seconds": {
         "type": "integer",
         "minimum": 1,
-        "maximum": 10,
-        "grounded": false,
-        "description": "For remix and continue: a new length in seconds. For extend: how many more seconds to add, within this computer’s range. Max is required."
+        "maximum": 10
       },
       "keep_seed": {
         "type": "boolean",
-        "grounded": false,
-        "description": "For remix only: true when the person wants the same result with the change, as close to the first as possible. Leave it out otherwise."
+        "description": "remix: stay close to the first."
       },
       "from_s": {
         "type": "number",
         "minimum": 0,
         "maximum": 600,
-        "grounded": false,
-        "description": "For trim: where the kept part starts. For retake: the start time in seconds, within this computer’s range. Max is required."
+        "description": "trim: where the kept part starts. retake: start time."
       },
       "to_s": {
         "type": "number",
         "exclusiveMinimum": 0,
-        "maximum": 600,
-        "grounded": false,
-        "description": "For trim only: where the kept part ends, in seconds from the start. \"Cut the first two seconds\" is from_s 2 with to_s left out; \"keep the first four seconds\" is to_s 4."
+        "maximum": 600
       },
       "clips": {
         "type": "array",
@@ -170,42 +155,36 @@
           "type": "string",
           "maxLength": 80
         },
-        "grounded": false,
-        "description": "For join only: 2 to 6 of the person's own videos in the order they want them, each a video id or \"latest\". Only videos made by this person."
+        "description": "join: 2-6 of the person's video ids or \"latest\", in order."
       },
       "sound": {
         "type": "string",
         "enum": [
           "voice",
           "music"
-        ],
-        "grounded": false,
-        "description": "For mix only: voice lays a spoken line over the video (set line); music lays one of the person's own songs or sound files (set track)."
+        ]
       },
       "line": {
         "type": "string",
         "minLength": 1,
         "maxLength": 600,
-        "grounded": false,
-        "description": "For mix with voice: the exact words to say, as the person typed or dictated them. A line of about 12 words fits 5 seconds."
+        "grounded": false
       },
       "voice": {
         "type": "string",
         "maxLength": 80,
-        "grounded": false,
-        "description": "For mix with voice: the name of one of this home's voices when the person names one. Leave it out to use the person's own voice."
+        "grounded": false
       },
       "track": {
         "type": "string",
         "maxLength": 80,
-        "grounded": false,
-        "description": "For mix with music: the id of the person's own song (a music job) or sound file in their Library."
+        "grounded": false
       },
       "make_music": {
         "type": "string",
         "maxLength": 600,
         "grounded": false,
-        "description": "For mix with music, when the person wants new music made for the video instead of one of their songs: a short description of the music (mood, instruments, pace). Home makes an instrumental the length of the video first, then lays it under the video. Leave track out."
+        "description": "mix music: describe new music; leave track out."
       },
       "level": {
         "type": "string",
@@ -215,16 +194,12 @@
           "balanced",
           "loud",
           "very_loud"
-        ],
-        "grounded": false,
-        "description": "For mix only: how loud the new sound is against the video's own sound, from quiet to very_loud. Leave it out for the default: a voice over a lowered video sound, a song softly under it."
+        ]
       },
       "start_s": {
         "type": "number",
         "minimum": 0,
-        "maximum": 600,
-        "grounded": false,
-        "description": "For mix only: seconds into the video where the new sound starts. Leave it out to start at the beginning."
+        "maximum": 600
       },
       "transition": {
         "type": "string",
@@ -251,28 +226,22 @@
           "fadewhite",
           "zoomin",
           "pixelize"
-        ],
-        "grounded": false,
-        "description": "For join or film: the transition between videos. dissolve is a smooth blend; speckle is grainy. Film uses a fade by default; join uses a straight cut."
+        ]
       },
       "transition_s": {
         "type": "number",
         "minimum": 0.3,
-        "maximum": 1.0,
-        "grounded": false,
-        "description": "For join or film with a transition: how long it lasts in seconds, from 0.3 to 1. Leave it out for half a second."
+        "maximum": 1.0
       },
       "title": {
         "type": "string",
         "maxLength": 120,
-        "grounded": false,
-        "description": "For join or title_card: title text. A film uses its Production title."
+        "grounded": false
       },
       "subtitle": {
         "type": "string",
         "maxLength": 160,
-        "grounded": false,
-        "description": "For a title card. A film uses its Production summary."
+        "grounded": false
       },
       "credits": {
         "type": "array",
@@ -293,15 +262,12 @@
           "required": [
             "name"
           ]
-        },
-        "grounded": false,
-        "description": "For join or credits: names and optional roles for rolling credits. A film uses its Production cast."
+        }
       },
       "credits_title": {
         "type": "string",
         "maxLength": 120,
-        "grounded": false,
-        "description": "Optional heading above the rolling credits. Set only when the person asks for one."
+        "grounded": false
       },
       "styles": {
         "type": "array",
@@ -311,8 +277,7 @@
           "minLength": 1,
           "maxLength": 60
         },
-        "grounded": false,
-        "description": "Optional, for another_take, remix and continue. The names of up to two of the person's saved video styles, only when the person names one; an empty list takes the style off. Left out, the new video keeps the first one's style. Never invent a name."
+        "description": "Saved style names, only if named; [] removes."
       },
       "strength": {
         "oneOf": [
@@ -330,8 +295,7 @@
             "maximum": 1
           }
         ],
-        "grounded": false,
-        "description": "Optional. Style strength (less, normal or more) or film look strength from 0.2 to 1."
+        "grounded": false
       },
       "aspect": {
         "type": "string",
@@ -340,77 +304,59 @@
           "1:1",
           "16:9",
           "4:5"
-        ],
-        "grounded": false,
-        "description": "For reframe: the video's new shape."
+        ]
       },
       "background": {
         "type": "string",
         "grounded": false,
-        "description": "What goes behind the person or thing that stays: a color, a blur, or see-through. Use black, white, green, blur, transparent or a six-digit hex color."
+        "description": "What fills behind the subject: black, white, green, blur, transparent or hex."
       },
       "surround": {
         "type": "boolean",
-        "grounded": false,
-        "description": "For spatial_sound: also make a 5.1 file for a surround system, as a second file of the new video."
+        "description": "spatial_sound: also make a 5.1 file."
       },
       "fill": {
         "type": "string",
         "enum": [
           "crop",
           "blur"
-        ],
-        "grounded": false,
-        "description": "For reframe: crop to fill (default) or blur the empty edges."
+        ]
       },
       "warmth": {
         "type": "number",
         "minimum": -1,
-        "maximum": 1,
-        "grounded": false,
-        "description": "For grade: warmth from cool to warm; set only when asked."
+        "maximum": 1
       },
       "brightness": {
         "type": "number",
         "minimum": -1,
-        "maximum": 1,
-        "grounded": false,
-        "description": "For grade: brightness; set only when asked."
+        "maximum": 1
       },
       "contrast": {
         "type": "number",
         "minimum": -1,
-        "maximum": 1,
-        "grounded": false,
-        "description": "For grade: contrast; set only when asked."
+        "maximum": 1
       },
       "saturation": {
         "type": "number",
         "minimum": -1,
-        "maximum": 1,
-        "grounded": false,
-        "description": "For grade: saturation; set only when asked."
+        "maximum": 1
       },
       "grain": {
         "type": "number",
         "minimum": 0,
-        "maximum": 1,
-        "grounded": false,
-        "description": "For grade: film grain amount; set only when asked."
+        "maximum": 1
       },
       "vignette": {
         "type": "number",
         "minimum": 0,
-        "maximum": 1,
-        "grounded": false,
-        "description": "For grade: vignette amount; set only when asked."
+        "maximum": 1
       },
       "factor": {
         "type": "number",
         "minimum": 0.25,
         "maximum": 4,
-        "grounded": false,
-        "description": "For speed: playback speed from 0.25 to 4; use 0.5 for half speed and 2 for double."
+        "description": "speed: 0.5 is half, 2 is double."
       },
       "captions": {
         "type": "array",
@@ -436,9 +382,7 @@
               "maxLength": 160
             }
           }
-        },
-        "grounded": false,
-        "description": "For captions: exact caption text and its start and end times, up to 40 lines."
+        }
       },
       "position": {
         "type": "string",
@@ -446,15 +390,13 @@
           "bottom",
           "middle",
           "top"
-        ],
-        "grounded": false,
-        "description": "For captions: where the words appear; bottom by default."
+        ]
       },
       "production": {
         "type": "string",
         "maxLength": 160,
         "grounded": false,
-        "description": "For film: the Production id or its exact title, when that title is unique among productions you can see."
+        "description": "film: Production id or its exact title."
       },
       "preset": {
         "type": "string",
@@ -466,9 +408,7 @@
           "technicolor",
           "faded_vintage",
           "cool_thriller"
-        ],
-        "grounded": false,
-        "description": "For film_look: the film look preset to apply."
+        ]
       },
       "ratio": {
         "type": "string",
@@ -477,9 +417,7 @@
           "2:1",
           "1.85:1",
           "1.33:1"
-        ],
-        "grounded": false,
-        "description": "For letterbox: the cinema frame ratio."
+        ]
       },
       "letterbox": {
         "type": "string",
@@ -488,9 +426,7 @@
           "2:1",
           "1.85:1",
           "1.33:1"
-        ],
-        "grounded": false,
-        "description": "Optional for join or film: add cinema bars at this frame ratio."
+        ]
       },
       "effect": {
         "type": "string",
@@ -506,23 +442,17 @@
           "denoise",
           "pip",
           "kenburns"
-        ],
-        "grounded": false,
-        "description": "For effect: the finishing effect to apply to the existing video. kenburns adds a zoom and pan to that clip."
+        ]
       },
       "amount": {
         "type": "number",
         "minimum": 0,
-        "maximum": 1,
-        "grounded": false,
-        "description": "For sharpen or denoise: amount from 0 to 1."
+        "maximum": 1
       },
       "times": {
         "type": "integer",
         "minimum": 2,
-        "maximum": 6,
-        "grounded": false,
-        "description": "For loop: total plays, from 2 to 6."
+        "maximum": 6
       },
       "fps": {
         "type": "integer",
@@ -530,18 +460,14 @@
           30,
           48,
           60
-        ],
-        "grounded": false,
-        "description": "For fps_boost: smooth the clip to 30, 48 or 60 frames per second."
+        ]
       },
       "direction": {
         "type": "string",
         "enum": [
           "horizontal",
           "vertical"
-        ],
-        "grounded": false,
-        "description": "For flip: direction. For kenburns, horizontal moves right and vertical moves down."
+        ]
       },
       "degrees": {
         "type": "integer",
@@ -549,44 +475,34 @@
           90,
           180,
           270
-        ],
-        "grounded": false,
-        "description": "For rotate: clockwise degrees."
+        ]
       },
       "from_factor": {
         "type": "number",
         "minimum": 0.25,
         "maximum": 4,
-        "grounded": false,
-        "description": "For speed_ramp: starting speed. For kenburns: starting zoom from 1 to 2."
+        "description": "speed_ramp, kenburns start."
       },
       "to_factor": {
         "type": "number",
         "minimum": 0.25,
         "maximum": 4,
-        "grounded": false,
-        "description": "For speed_ramp: ending speed. For kenburns: ending zoom from 1 to 2."
+        "description": "speed_ramp, kenburns end."
       },
       "at_s": {
         "type": "number",
         "minimum": 0,
-        "maximum": 600,
-        "grounded": false,
-        "description": "For speed_ramp: where it starts. For freeze: the frame time, in seconds."
+        "maximum": 600
       },
       "over_s": {
         "type": "number",
         "minimum": 0.3,
-        "maximum": 10,
-        "grounded": false,
-        "description": "For speed_ramp: ramp duration from 0.3 to 10 seconds."
+        "maximum": 10
       },
       "hold_s": {
         "type": "number",
         "minimum": 0.5,
-        "maximum": 5,
-        "grounded": false,
-        "description": "For freeze: how long to hold the frame, from 0.5 to 5 seconds."
+        "maximum": 5
       },
       "corner": {
         "type": "string",
@@ -595,22 +511,17 @@
           "top_right",
           "bottom_left",
           "bottom_right"
-        ],
-        "grounded": false,
-        "description": "For pip: which corner holds the other video."
+        ]
       },
       "size": {
         "type": "number",
         "minimum": 0.15,
-        "maximum": 0.5,
-        "grounded": false,
-        "description": "For pip: size of the small video, from 0.15 to 0.5."
+        "maximum": 0.5
       },
       "with_clip": {
         "type": "string",
         "maxLength": 80,
-        "grounded": false,
-        "description": "For pip: id or latest for a second video to show in the corner."
+        "grounded": false
       }
     }
   },

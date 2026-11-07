@@ -36,7 +36,7 @@
         "minLength": 3,
         "maxLength": 1200,
         "grounded": false,
-        "description": "Only for a picture the person asks you to make, draw or design. Follow the model's content rules and refusal decisions; Home blocks CSAM and applies age and surface access rules. For a request to find or show an existing real poster, photo, film or product, use show_images instead. A request to create promotional artwork, an album cover, or other imagined artwork is a picture request even when a release or event is unannounced or unverified; don't research release status or treat uncertainty about it as a reason to decline the artwork. Don't claim that a release is scheduled or available unless verified. What to draw, written as a full description in plain English: the subject, the setting, the style and the light or mood, built from what the person asked for. Keep their own words for names and for any text that must appear in the picture. Do not add people, objects or themes they did not ask for. When they ask for another one, one more or the same again, call this tool again with a fresh description of the same subject; never say a picture is coming, ready or on its way without calling it in this reply, and never describe a picture you did not make. When `change` is set, `prompt` is the instruction for the change instead, in plain English and in the person's own words (for example \"remove the man in the red jacket\" or \"make the sky clear blue with no clouds\"); say what to keep if it matters."
+        "description": "A picture to make, not a real poster or photo (use show_images). Full description; their words for names and text. Never claim a picture exists without calling this tool. Imagined artwork, such as an album cover for an unannounced or unverified release, is still a picture request; do not research the release or decline. With change: the edit."
       },
       "size": {
         "type": "string",
@@ -46,38 +46,34 @@
           "landscape",
           "wide",
           "tall"
-        ],
-        "grounded": false,
-        "description": "Optional shape of the picture. square is the default. Use portrait or tall for a person, a phone wallpaper or a poster, landscape or wide for scenery or a banner, only when the shape matters."
+        ]
       },
       "count": {
         "type": "integer",
         "minimum": 1,
-        "maximum": 4,
-        "grounded": false,
-        "description": "Optional. How many different pictures, 1 to 4. Leave it out for one. Use it only when the person asks for several or for options."
+        "maximum": 4
       },
       "style": {
         "type": "string",
         "maxLength": 80,
         "grounded": false,
-        "description": "Optional. The name of one of the household's saved styles, only when the person names it, for example \"my pixel style\" gives \"pixel\". Leave it out otherwise; never invent one."
+        "description": "Saved style name, only if named."
       },
       "subjects": {
         "type": "array",
-        "items": { "type": "string", "maxLength": 80 },
+        "items": {
+          "type": "string",
+          "maxLength": 80
+        },
         "maxItems": 3,
-        "grounded": false,
-        "description": "Optional. Names from the available saved subjects list, only when the person chooses them. Home supplies their saved look and reference pictures. Never invent or guess a subject name."
+        "description": "Saved subject names, only if chosen."
       },
       "quality": {
         "type": "string",
         "enum": [
           "quick",
           "detailed"
-        ],
-        "grounded": false,
-        "description": "Optional. Leave it out for almost every request: Home then uses the household's setting. Use detailed only when the person asks for the best quality, the finest detail, a photoreal or lifelike picture, or a custom look; it takes about 30 to 45 seconds instead of 15 to 25. Use quick for most requests; it draws words clearly and takes about 15 to 25 seconds. When you choose detailed, say so in one short sentence."
+        ]
       },
       "tier": {
         "type": "string",
@@ -86,14 +82,13 @@
           "boost",
           "max"
         ],
-        "grounded": false,
-        "description": "Optional typed level: standard, boost or max. Use it only when the person asks for more or less of the computer than usual: \"use max quality\" or \"the biggest model\" is max, \"a better one\" is boost, \"just a quick one\" is standard. Leave it out otherwise. Max is for people an admin allowed; if it is not allowed the tool says so, and you tell the person in your own words. Do not use it for age or content reasons."
+        "description": "Only if asked; max needs admin permission."
       },
       "change": {
         "type": "string",
         "maxLength": 40,
         "grounded": false,
-        "description": "Set this, instead of making a new picture, when the person wants a picture they already have changed: change the sky or weather, change the colour of something, add someone or something, swap the background, fix lighting, remove a person or object. Use \"attached\" for the picture on this message (\"attached_2\" for a second one), \"latest\" for the newest picture in this chat (one you made or they showed earlier). The original is kept and the change is a new version. Leave it out to make a new picture."
+        "description": "Edit a picture they have: attached, attached_2 or latest."
       },
       "kind": {
         "type": "string",
@@ -101,15 +96,13 @@
           "remove_background",
           "upscale",
           "change"
-        ],
-        "grounded": false,
-        "description": "Only with `change`. remove_background for a cut-out with a transparent background. upscale to make it bigger and sharper. change for any other edit."
+        ]
       },
       "reference": {
         "type": "string",
         "maxLength": 40,
         "grounded": false,
-        "description": "Only with `change`: a second picture the change draws on, for example the photo of the person to add to the scene (\"add her to the picture\"). Same words as `change`: \"attached\", \"attached_2\" or \"latest\"."
+        "description": "With change: second picture, same words."
       }
     }
   },

@@ -4,7 +4,7 @@
   "kind": "plugin",
   "category": "Media",
   "display": "Make a Video",
-  "description": "Make a short video when someone asks for a clip, a video or an animation, and call it before you say so.",
+  "description": "Make a short video; call before saying one exists.",
   "offer": {
     "mode": "conditional",
     "gate": "videosAllowed",
@@ -36,28 +36,26 @@
         "minLength": 3,
         "maxLength": 1200,
         "grounded": false,
-        "description": "What the video shows, written as a full description in plain English: the subject, what moves, the setting and the light or mood, built from what the person asked for. For a picture that moves, describe the motion. Keep their own words for names. Follow the model's content rules and refusal decisions; Home blocks CSAM and applies age and surface access rules. Do not add people, objects or themes they did not ask for. A video exists only if you called this tool in this reply: never say one is being made, ready or on its way without calling it, and never describe a clip you did not make. A line a person in the video says goes in quotes, one person speaking at a time."
+        "description": "Scene description; spoken lines in quotes, one speaker at a time."
       },
       "from_picture": {
         "type": "string",
         "maxLength": 80,
         "grounded": false,
-        "description": "Optional. Set to \"latest\" only when the person asks to animate or bring to life a picture that was made earlier in this chat. Set to \"attached\" when the person attached a photo to this message and asks to animate it. Leave it out for a video from words alone."
+        "description": "latest or attached."
       },
       "end_frame": {
         "type": "string",
         "maxLength": 80,
         "grounded": false,
-        "description": "Optional. A picture the video should end on. Use \"latest\" or a picture id made earlier in this chat. Needs from_picture too; the video starts on that picture and ends on this one."
+        "description": "Needs from_picture."
       },
       "orientation": {
         "type": "string",
         "enum": [
           "landscape",
           "portrait"
-        ],
-        "grounded": false,
-        "description": "Optional shape of the video. landscape is the default. Use portrait only for a phone-style tall video when the person asks."
+        ]
       },
       "look": {
         "type": "string",
@@ -68,8 +66,7 @@
           "3d-animated",
           "film"
         ],
-        "grounded": false,
-        "description": "Optional look of the video: natural (the default), classic-cartoon (a 1980s hand-drawn cartoon), anime, 3d-animated (a modern 3D animated film) or film (a live-action movie still). Set it only when the person asks for a look or a cartoon. For a cartoon character, also name and describe the character in the prompt and say its era and animation style, for example a 1980s hand-drawn cartoon fox in a red scarf."
+        "description": "Cartoon: name the character, era, style in the prompt."
       },
       "camera": {
         "type": "string",
@@ -82,25 +79,20 @@
           "aerial",
           "close-up",
           "still"
-        ],
-        "grounded": false,
-        "description": "Optional camera move or style: dolly-in, slow-orbit, handheld, slow-motion, time-lapse, aerial, close-up or still. Set it only when the person asks for that kind of shot."
+        ]
       },
       "voices": {
         "type": "string",
         "enum": [
           "clean",
           "full"
-        ],
-        "grounded": false,
-        "description": "Optional sound for any clip that has sound (Standard or Boost on a computer with the newest video model, else Boost or Max). clean (the default) means no laugh track and no music, and one person speaks at a time. full means music and sound effects too; use it only when the person asks for music or effects. A person's spoken line goes in the prompt inside quotes, and only one person speaks at a time."
+        ]
       },
       "seconds": {
         "type": "integer",
         "minimum": 1,
         "maximum": 10,
-        "grounded": false,
-        "description": "Optional length in seconds, 1 to 10. Leave it out for 5. On a computer with the newer video model, Standard makes up to 10 seconds with sound and Boost makes up to 5 seconds with sound; otherwise a request for sound uses a silent Quick video. When a length is cut to fit, the tool says so and you tell the person. A video that starts from a picture is 5 seconds at most and has no sound."
+        "description": "Default 5; 5 max from a picture."
       },
       "tier": {
         "type": "string",
@@ -108,9 +100,7 @@
           "standard",
           "boost",
           "max"
-        ],
-        "grounded": false,
-        "description": "Optional level: standard, boost or max. Leave it out for almost every request; Home then uses the household's setting. Use boost when the person wants a better one, or, on a computer where Standard has no sound, wants people to speak, wants sound or music, or wants more than 5 seconds. Use max only when they ask for max quality or the biggest model; it is for people an admin allowed, and if it is not allowed the tool says so and you tell the person in your own words. Use standard for \"just a quick one\", for a longer clip with sound when the tool allows it, or when they want it to start from a picture. Do not use it for age or content reasons."
+        ]
       },
       "styles": {
         "type": "array",
@@ -120,27 +110,26 @@
           "minLength": 1,
           "maxLength": 60
         },
-        "grounded": false,
-        "description": "Optional. The names of up to two of the person's saved video styles, only when the person names one or asks for that look in a way a listed style matches. Leave it out otherwise; never invent a name."
+        "description": "Saved style names, if named."
       },
       "subjects": {
         "type": "array",
         "maxItems": 3,
-        "items": { "type": "string", "minLength": 1, "maxLength": 80 },
-        "grounded": false,
-        "description": "Optional. Names of the person's saved characters, places or props the video should show; only names they gave."
+        "items": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 80
+        }
       },
       "production": {
         "type": "string",
         "maxLength": 80,
-        "grounded": false,
-        "description": "Optional. Set both only when the person asked to make a shot of their film; the finished video is kept on that shot."
+        "grounded": false
       },
       "shot": {
         "type": "string",
         "maxLength": 80,
-        "grounded": false,
-        "description": "Optional. Set both only when the person asked to make a shot of their film; the finished video is kept on that shot."
+        "grounded": false
       },
       "strength": {
         "type": "string",
@@ -148,9 +137,7 @@
           "less",
           "normal",
           "more"
-        ],
-        "grounded": false,
-        "description": "Optional. How strongly the styles apply: less, normal or more. Set it only when the person asks for a lighter or stronger style."
+        ]
       }
     }
   },

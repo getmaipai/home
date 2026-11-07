@@ -84,9 +84,9 @@ describe("C1: generate_video declares what the Create page has", () => {
     expect(props.tier!.enum).toEqual(["standard", "boost", "max"]);
     expect(props.seconds).toMatchObject({ minimum: 1, maximum: 10 });
     expect(props.quality).toBeUndefined();
-    expect(props.voices!.description).toContain("quotes");
-    expect(props.voices!.description).toContain("one person speaks at a time");
-    expect(props.look!.description).toContain("era and animation style");
+    expect(props.prompt!.description).toContain("quotes");
+    expect(props.prompt!.description).toContain("one speaker at a time");
+    expect(props.look!.description).toContain("era, style");
   });
 
   test("an older call that sends quality still runs: detailed means Boost, quick means Standard", async () => {
