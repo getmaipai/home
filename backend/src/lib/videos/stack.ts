@@ -197,6 +197,18 @@ export async function submitVideo(body: VideoBody): Promise<{ job: string; done:
   return failure(res);
 }
 
+export async function submitVideoRestyle(body: { model: "ltx25-max"; source: string; lora: string; strength: number; prompt: string; seed?: number; conditioning?: "source" | "edges" }): Promise<{ job: string; done: StackClip[] | null }> {
+  const res = await request("/v1/videos/restyle", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body), timeoutMs: 60_000 });
+  if (res.status === 200 || res.status === 202) {
+    const parsed = await res.json() as { job?: string; data?: StackClip[] };
+    if (!parsed.job) throw new StackVideoError(502, "bad_reply", "That did not work. Try again.");
+    return { job: parsed.job, done: res.status === 200 && Array.isArray(parsed.data) ? parsed.data : null };
+  }
+  let payload: { code?: string; error?: string; job?: string } = {};
+  try { payload = await res.json() as typeof payload; } catch { /* use the stable fallback */ }
+  throw new StackVideoError(res.status, payload.code ?? "restyle_failed", payload.error ?? "The clip could not be restyled. Try again.", payload.job);
+}
+
 /** Asks the Stack to prepare an mp4 for messaging apps (a silent AAC track, a title, at most 20 MB). The title (from the prompt) travels in a header, percent-encoded, never in the URL. Nothing is kept on the Stack. */
 export async function convertForMessages(bytes: Uint8Array, title: string): Promise<Uint8Array> {
   const res = await request("/v1/videos/messages", { method: "POST", headers: { "content-type": "video/mp4", "x-title": encodeURIComponent(title) }, body: new Blob([bytes as unknown as ArrayBuffer], { type: "video/mp4" }), timeoutMs: 120_000 });

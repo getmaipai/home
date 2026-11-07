@@ -71,9 +71,10 @@
           "remove_background",
           "title_card",
           "credits",
-          "spatial_sound"
+          "spatial_sound",
+          "restyle"
         ],
-        "description": "remix: again with changes. another_take: same again. trim: from_s, to_s. join: clips. film: production, no clip. mix: sound. extend, retake: Max only. cut_to_beat: track, clips, beats_per_cut 1|2|4|8, length_s 5-60. spatial_sound: sound follows who talks on screen. grade: warmth, brightness, contrast, saturation, grain, vignette, only if asked. Each keeps the first video. A video exists only if you called this tool in this reply."
+        "description": "remix: again with changes. another_take: same again. trim: from_s, to_s. join: clips. film: production, no clip. mix: sound. extend, retake: Max only. cut_to_beat: track, clips, beats_per_cut 1|2|4|8, length_s 5-60. spatial_sound: sound follows who talks on screen. restyle: restyle colorize turns the clip into colour (Max only, clip up to 10 s), optional words steer it. grade: warmth, brightness, contrast, saturation, grain, vignette, only if asked. Each keeps the first video. A video exists only if you called this tool in this reply."
       },
       "prompt": {
         "type": "string",
@@ -310,6 +311,19 @@
         "type": "string",
         "grounded": false,
         "description": "What fills behind the subject: black, white, green, blur, transparent or hex."
+      },
+      "restyle": {
+        "type": "string",
+        "enum": [
+          "colorize"
+        ],
+        "description": "restyle: which effect. colorize: colour added to a black and white look."
+      },
+      "words": {
+        "type": "string",
+        "maxLength": 600,
+        "grounded": false,
+        "description": "restyle: what the colours should look like, in plain words."
       },
       "surround": {
         "type": "boolean",

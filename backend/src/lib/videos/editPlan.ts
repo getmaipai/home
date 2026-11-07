@@ -2,6 +2,15 @@
 // file, no Stack. The levels of a mix are named here once; the chat tool and the manifest read them from this list.
 import type { EditOp } from "./stackEdit";
 
+export const VIDEO_RESTYLES = [{ id: "colorize", label: "Colour it in", lora: "ltx-ic-colorizer", conditioning: "source", prompt_template: "{words}, natural realistic colours, daylight", allow_suggesting: false }] as const;
+export type VideoRestyle = (typeof VIDEO_RESTYLES)[number]["id"];
+/** `lora` is the installed record's Stack id when it differs from the style's name (the Stack ids a file `lora-` plus the start of its hash). */
+export function restyleBody(input: { source: string; restyle: VideoRestyle; words?: string; seed?: number; lora?: string }): { model: "ltx25-max"; source: string; lora: string; strength: 1; prompt: string; conditioning: "source"; seed?: number } {
+  const style = VIDEO_RESTYLES.find((row) => row.id === input.restyle)!;
+  const words = (input.words ?? "").trim();
+  return { model: "ltx25-max", source: input.source, lora: input.lora ?? style.lora, strength: 1, prompt: (words ? style.prompt_template.replace("{words}", words) : "natural realistic colours, daylight"), conditioning: style.conditioning, ...(input.seed === undefined ? {} : { seed: input.seed }) };
+}
+
 /** The balance of a mix, quiet to loud: how loud the laid-over sound is (gain_db) and how far the clip's own sound is turned down (clip_gain_db). */
 export const MIX_LEVEL_IDS = ["quiet", "soft", "balanced", "loud", "very_loud"] as const;
 export type MixLevel = (typeof MIX_LEVEL_IDS)[number];

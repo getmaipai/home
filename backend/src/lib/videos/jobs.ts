@@ -75,7 +75,7 @@ export interface VideoRequest {
   adultOnly?: boolean;
   /** ADULT-LOCK-06: whether the Adult lock applies while the clip is made. Absent with `adultOnly` means on (a job stored before the lock was split from the audience). */
   adultLock?: "on" | "off";
-  edit?: { from: string; change: "trim" | "join" | "mix" | "reframe" | "grade" | "speed" | "captions" | "upscale" | "remove_background" | "spatial_sound"; with?: string[];
+  edit?: { from: string; change: "trim" | "join" | "mix" | "reframe" | "grade" | "speed" | "captions" | "upscale" | "remove_background" | "spatial_sound" | "restyle"; with?: string[];
     /** SPATIAL-04: the one plain line kept with a spatial-sound clip (the Stack's own lines); the card shows it as its muted notice. */
     note?: string };
   background?: string;

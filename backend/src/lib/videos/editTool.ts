@@ -27,11 +27,12 @@ import { attachmentFilePath } from "@/lib/attachments";
 import { existsSync } from "node:fs";
 import { isRemoteStackSelected } from "@/lib/stackEngine";
 import { videoJobLockState, LOCKED_START_LINE } from "@/lib/videos/lock";
-import { activeVideoJobsFor, getVideoJobByFileFor, sourceVideoJob, startVideoEditJob, storeContinueFrame, type EditRun, type VideoJob, type VideoRequest } from "./jobs";
-import { fetchClip, getVideoJob as getStackVideoJob, submitVideo } from "./stack";
-import { CAPTION_POSITIONS, titleSubtitle, CROSSFADE_IN_STACK, DEFAULT_CROSSFADE_S, DEFAULT_MUSIC_LEVEL, DEFAULT_VOICE_LEVEL, FILM_LOOK_PRESETS, JOIN_TRANSITIONS, maxEffectAmount, LETTERBOX_RATIOS, MAX_CROSSFADE_S, MAX_EDIT_OPS, MAX_EDIT_SECONDS, MAX_JOIN_CLIPS, MIN_CROSSFADE_S, MIN_JOIN_CLIPS, MIX_LEVEL_IDS, VIDEO_ASPECTS, TRANSITION_KINDS, captionsOps, creditsOp, crossfadeProblem, cutoutOps, effectOps, filmLookOps, filmOps, frameOps, gradeOps, joinOps, lastFrameAt, letterboxOps, mixOps, reframeOps, speedOps, titleCardOp, spatialNote, spatialOps, trimOps, trimRange, upscaleOps } from "./editPlan";
+import { allVideoAdapters } from "./adapters";
+import { EDIT_FAILED_PREFIX, activeVideoJobsFor, getVideoJobByFileFor, sourceVideoJob, startVideoEditJob, storeContinueFrame, type EditRun, type VideoJob, type VideoRequest } from "./jobs";
+import { fetchClip, getVideoJob as getStackVideoJob, StackVideoError, submitVideo, submitVideoRestyle } from "./stack";
+import { CAPTION_POSITIONS, titleSubtitle, CROSSFADE_IN_STACK, DEFAULT_CROSSFADE_S, DEFAULT_MUSIC_LEVEL, DEFAULT_VOICE_LEVEL, FILM_LOOK_PRESETS, JOIN_TRANSITIONS, maxEffectAmount, LETTERBOX_RATIOS, MAX_CROSSFADE_S, MAX_EDIT_OPS, MAX_EDIT_SECONDS, MAX_JOIN_CLIPS, MIN_CROSSFADE_S, MIN_JOIN_CLIPS, MIX_LEVEL_IDS, VIDEO_ASPECTS, TRANSITION_KINDS, captionsOps, creditsOp, crossfadeProblem, cutoutOps, effectOps, filmLookOps, filmOps, frameOps, gradeOps, joinOps, lastFrameAt, letterboxOps, mixOps, reframeOps, speedOps, titleCardOp, spatialNote, spatialOps, trimOps, trimRange, upscaleOps, VIDEO_RESTYLES, restyleBody } from "./editPlan";
 import { runStackEdit, stageClipForStack, type EditFile } from "./stackEdit";
-import { SPATIAL_FAILURE_COPY } from "@/lib/failureCopy";
+import { RESTYLE_FAILURE_COPY, SPATIAL_FAILURE_COPY } from "@/lib/failureCopy";
 import { newItemMark, type MarkSource } from "@/lib/adultLock";
 import { clipFileOf, clipMarkOf, editableClip, editRefusal, lineMark, ownTrackFile, speakLine, voiceChoice } from "./editGate";
 import { VIDEO_LOOKS, VIDEO_RECIPES, VIDEO_VOICES } from "./recipes";
@@ -54,7 +55,9 @@ const ids = <T extends { id: string }>(list: readonly T[]) => list.map((item) =>
 
 export const editVideoArgs = z.object({
   clip: z.string().trim().min(1).max(80).optional(),
-  change: z.enum(["another_take", "remix", "make_it_max", "trim", "join", "film", "mix", "cut_to_beat", "reframe", "grade", "film_look", "letterbox", "speed", "captions", "title_card", "credits", "effect", "upscale", "remove_background", "spatial_sound", "continue", "extend", "retake"]),
+  change: z.enum(["another_take", "remix", "make_it_max", "trim", "join", "film", "mix", "cut_to_beat", "reframe", "grade", "film_look", "letterbox", "speed", "captions", "title_card", "credits", "effect", "upscale", "remove_background", "spatial_sound", "restyle", "continue", "extend", "retake"]),
+  restyle: z.enum(["colorize"]).optional(),
+  words: z.string().trim().max(600).optional(),
   background: z.string().optional(),
   /** SPATIAL-04: with `spatial_sound`, also make a 5.1 file (a second file of the new clip). */
   surround: z.boolean().optional(),
@@ -112,9 +115,14 @@ export const editVideoArgs = z.object({
   if (value.change === "film") { if (!value.production) ctx.addIssue({ code: "custom", path: ["production"], message: "A production is required" }); }
   else if (!value.clip) ctx.addIssue({ code: "custom", path: ["clip"], message: "A video is required" });
   if (value.change === "spatial_sound") { for (const key of Object.keys(value)) if (!["clip", "change", "surround", "side"].includes(key)) ctx.addIssue({ code: "custom", path: [key], message: "Spatial sound takes only a clip, surround and side." }); }
-  else {
+  if (value.change === "restyle") { for (const key of Object.keys(value)) if (!["clip", "change", "restyle", "words"].includes(key)) ctx.addIssue({ code: "custom", path: [key], message: "Restyle takes a clip, a style and optional words." }); }
+  if (value.change !== "spatial_sound") {
     if (value.surround !== undefined) ctx.addIssue({ code: "custom", path: ["surround"], message: "Surround is only for spatial sound." });
     if (value.side !== undefined) ctx.addIssue({ code: "custom", path: ["side"], message: "Side is only for spatial sound." });
+  }
+  if (value.change !== "restyle") {
+    if (value.restyle !== undefined) ctx.addIssue({ code: "custom", path: ["restyle"], message: "A style is only for restyle." });
+    if (value.words !== undefined) ctx.addIssue({ code: "custom", path: ["words"], message: "Words are only for restyle." });
   }
   if (value.change === "upscale") for (const key of Object.keys(value)) if (key !== "clip" && key !== "change") ctx.addIssue({ code: "custom", path: [key], message: "Upscale takes only a clip." });
   if (value.change === "remove_background") for (const key of Object.keys(value)) if (!["clip", "change", "background"].includes(key)) ctx.addIssue({ code: "custom", path: [key], message: "Background removal takes only a clip and background." });
@@ -145,6 +153,10 @@ export const CONTINUE_FRAME_LINE = "I couldn't continue that video. The last pic
 export const SPATIAL_NO_SOUND_LINE = SPATIAL_FAILURE_COPY.no_audio;
 export const START_PAST_END_LINE = "That is after the video ends. Pick a start time inside it.";
 export const MAX_EDIT_NOT_READY_LINE = "This computer cannot extend or retake videos yet. An admin can check Settings, Models and storage.";
+export const RESTYLE_MAX_SECONDS = 10;
+export const RESTYLE_NOTE = "Colour added from your clip. This uses the Max model and takes a few minutes.";
+export const RESTYLE_SOURCE_TOO_LONG_LINE = `Colour works on clips up to ${RESTYLE_MAX_SECONDS} seconds. Trim the clip first, then try again.`;
+export const RESTYLE_LORA_MISSING_LINE = "The colorize style is not installed on this computer. An admin can add it in Settings, Styles, then try again.";
 export const MAX_EDIT_RANGE_LINE = "That time is outside the range this computer can use. Pick a time in range, then try again.";
 
 export interface RunEditVideoInput { state: GenerateVideoState; args: Record<string, unknown>; callId: string; spoken: boolean }
@@ -210,13 +222,13 @@ export async function runEditVideo(input: RunEditVideoInput): Promise<ToolExecut
   if (value.change === "captions" && value.captions?.some((line) => line.to_s <= line.from_s)) return refused(callId, args, "Give me caption words with a start and end time for each line.", "bad_captions");
   const actor = state.actor as PersonRow;
   const audience = videoAudienceOf(state as Parameters<typeof videoAudienceOf>[0], input.spoken);
-  if (["extend", "retake", "trim", "join", "film", "mix", "cut_to_beat", "reframe", "grade", "film_look", "letterbox", "speed", "captions", "title_card", "credits", "upscale", "remove_background", "spatial_sound"].includes(value.change)) {
+  if (["extend", "retake", "trim", "join", "film", "mix", "cut_to_beat", "reframe", "grade", "film_look", "letterbox", "speed", "captions", "title_card", "credits", "upscale", "remove_background", "spatial_sound", "restyle"].includes(value.change)) {
     const editGate = editRefusal(audience, "");
     if (editGate) return refused(callId, args, editGate.line, editGate.kind === "denied" ? editGate.why : "minor");
   }
   // The surface and age gate, then the same screening any typed prompt gets (a remix's new words are screened like a first request).
   // A typed voice line is screened like a prompt, before any speech is made.
-  const typed = value.change === "remix" || value.change === "continue" || value.change === "retake" ? value.prompt ?? "" : value.change === "mix" && value.sound === "voice" ? value.line ?? "" : "";
+  const typed = value.change === "remix" || value.change === "continue" || value.change === "retake" ? value.prompt ?? "" : value.change === "mix" && value.sound === "voice" ? value.line ?? "" : value.change === "restyle" ? value.words ?? "" : "";
   const refusal = videoRefusalFor(audience, { prompt: typed });
   if (refusal) return refused(callId, args, refusal.line, refusal.why);
   { const likeness = likenessRefusal(actor, typed); if (likeness) return refused(callId, args, likeness, "household_likeness_off"); }
@@ -224,13 +236,14 @@ export async function runEditVideo(input: RunEditVideoInput): Promise<ToolExecut
   const temporary = state.temporary === true || state.ephemeral === true;
   if (value.change === "continue" && laneOf(audience) !== "adult") return refused(callId, args, MINOR_MAKE_LINE, "minor");
   if (value.change === "cut_to_beat" && (!value.track || (!value.clip && !value.clips))) return refused(callId, args, value.track ? NO_CLIP_LINE : MIX_SOUND_LINE, "missing_argument");
-  if (["extend", "retake", "trim", "join", "film", "mix", "cut_to_beat", "reframe", "grade", "film_look", "letterbox", "speed", "captions", "title_card", "credits", "effect", "upscale", "remove_background", "spatial_sound"].includes(value.change)) {
+  if (["extend", "retake", "trim", "join", "film", "mix", "cut_to_beat", "reframe", "grade", "film_look", "letterbox", "speed", "captions", "title_card", "credits", "effect", "upscale", "remove_background", "spatial_sound", "restyle"].includes(value.change)) {
     // Cutting, joining and mixing are for adults on their own screen, like making one: a child's turn passes the screen above but never reaches the editor.
     if (laneOf(audience) !== "adult") return refused(callId, args, MINOR_MAKE_LINE, "minor");
     // A crossfade needs a Stack step that does not exist yet; say so before any clip is read or any job starts.
     if ((value.change === "join" || value.change === "film") && value.transition === "crossfade" && !CROSSFADE_IN_STACK) return refused(callId, args, CROSSFADE_NOT_SUPPORTED_LINE, "not_supported");
     if (value.change === "captions" && value.captions?.some((line) => line.to_s <= line.from_s)) return refused(callId, args, "Give me caption words with a start and end time for each line.", "bad_captions");
     if (value.change === "film") return filmProduction(input, value, actor, temporary);
+    if (value.change === "restyle") return restyleClip(input, value, actor, audience, temporary);
     if (value.change === "extend" || value.change === "retake") return extendOrRetake(input, value, actor, audience, temporary);
     return editFinishedClips(input, value, actor, temporary);
   }
@@ -428,6 +441,64 @@ async function extendOrRetake(input: RunEditVideoInput, value: EditArgs, actor: 
   const started = startVideoEditJob({ actor, conversationId: state.conversationId, turnId: state.turnId, temporary: false, source, edit: { from: source.id, change: mode as "mix" }, run, adultOnly: true, adultLock: (await clipMarkOf(source)).lock });
   if (!started.ok) return refuse(started.line, "already_making");
   return outcomeOf({ callId, packageId, status: "succeeded", via: "tool_call", args, durationMs: 0, result: { reply: { text: `A new version of the video is being made at Max; the first one is kept. Tell the person it is on its way.` }, data: { videoJobId: started.job.id }, actions: [] } });
+}
+
+/** LTXD-E2/E3: `restyle` (first effect `colorize`). One Stack job on `POST /v1/videos/restyle` at Max, read back like a made clip; the new clip is a normal clip
+ * that takes its source's mark. Every refusal is one plain line before anything is staged or sent. */
+async function restyleClip(input: RunEditVideoInput, value: EditArgs, actor: PersonRow, audience: ReturnType<typeof videoAudienceOf>, temporary: boolean): Promise<ToolExecutionOutcome> {
+  const { state, args, callId } = input;
+  const refuse = (line: string, why: string) => refused(callId, args, line, why);
+  if (tierArgument({ person: actor, category: "video", arg: "max", band: audience.band }).line === MAX_NEEDS_ADMIN_LINE) return refuse(MAX_NEEDS_ADMIN_LINE, "max_needs_admin");
+  const style = VIDEO_RESTYLES.find((row) => row.id === (value.restyle ?? "colorize"));
+  if (!style) return refuse(WHAT_TO_CHANGE_LINE, "nothing_to_change");
+  const source = ownClip(actor, state, value.clip!, temporary);
+  if (!source) return refuse(NO_CLIP_LINE, "no_clip");
+  const file = source.files[0];
+  const clipSeconds = file?.seconds ?? source.request.seconds;
+  if (clipSeconds !== null && clipSeconds !== undefined && clipSeconds > RESTYLE_MAX_SECONDS) return refuse(RESTYLE_SOURCE_TOO_LONG_LINE, "restyle_too_long");
+  const row = file ? db.select().from(attachments).where(eq(attachments.id, file.id)).get() : null;
+  if (!row || row.deletedAt !== null || row.ownerPersonId !== actor.id) return refuse(NO_CLIP_LINE, "no_clip");
+  const sourceVideo = attachmentFilePath(row.storagePath);
+  if (!existsSync(sourceVideo)) return refuse(NO_CLIP_LINE, "no_clip");
+  if (isRemoteStackSelected()) return refuse(MAX_EDIT_NOT_READY_LINE, "stack_path_unavailable");
+  const engine = await videoEngineStatus();
+  if (!ltx25MaxReady(engine)) return refuse(videoMaxNotReadyReason(engine), "max_not_ready");
+  // The style needs its LoRA in the library; a missing one is a plain line for an admin, never the Stack's raw refusal.
+  // The Stack ids a file `lora-` plus the start of its hash, so the style is found by that id or by the name it was added under.
+  const installed = (await allVideoAdapters()).find((adapter) => adapter.id === style.lora || adapter.name.trim().toLowerCase() === style.lora);
+  if (!installed) return refuse(RESTYLE_LORA_MISSING_LINE, "lora_missing");
+  if (activeVideoJobsFor(actor) > 0) return refuse(CONTINUE_BUSY_LINE, "already_making");
+  const failedLine = (why: string) => `${EDIT_FAILED_PREFIX} ${why}`;
+  const codeLine = (code: string | null | undefined, fallback: string) => failedLine(code && Object.prototype.hasOwnProperty.call(RESTYLE_FAILURE_COPY, code) ? RESTYLE_FAILURE_COPY[code as keyof typeof RESTYLE_FAILURE_COPY] : fallback);
+  const run: EditRun = async (signal, onProgress) => {
+    // The Stack reads only folders Home declared: it gets a private copy of the clip, removed when the job ends.
+    const staged = await stageClipForStack(sourceVideo);
+    if (!staged) return { ok: false, line: failedLine(MAX_EDIT_NOT_READY_LINE) };
+    try {
+      const submitted = await submitVideoRestyle(restyleBody({ source: staged.path, restyle: style.id, lora: installed.id, ...(value.words ? { words: value.words } : {}) }));
+      const read = async (clip: { seconds?: number | null; width?: number | null; height?: number | null; audio?: boolean; ms?: number }) => ({ ok: true as const, clip: { video: await fetchClip(submitted.job), seconds: clip.seconds ?? null, width: clip.width ?? null, height: clip.height ?? null, audio: clip.audio === true, ms: clip.ms ?? 0, note: RESTYLE_NOTE } });
+      if (submitted.done?.[0]?.url) return await read(submitted.done[0]);
+      for (;;) {
+        if (signal.aborted) return { ok: false, line: failedLine("The edit did not finish. Try again.") };
+        const job = await getStackVideoJob(submitted.job);
+        if (job.state === "failed" || job.state === "cancelled") return { ok: false, line: codeLine(job.code, "The edit did not finish. Try again.") };
+        if (job.state === "done") {
+          const clip = job.data[0];
+          if (!clip) return { ok: false, line: failedLine("The new video could not be read back. Try again.") };
+          return await read(clip);
+        }
+        onProgress?.(job.progress);
+        await new Promise((resolve) => setTimeout(resolve, 500));
+      }
+    } catch (error) {
+      return { ok: false, line: codeLine(error instanceof StackVideoError ? error.code : null, "The edit did not finish. Try again.") };
+    } finally { staged.cleanup(); }
+  };
+  // Never lower than the source: an adult-only source makes an adult-only, locked clip.
+  const mark = newItemMark([await clipMarkOf(source)], false);
+  const started = startVideoEditJob({ actor, conversationId: state.conversationId, turnId: state.turnId, temporary, source, edit: { from: source.id, change: "restyle" }, run, phase: "adding colour", adultOnly: mark.madeAudience === "adult-only", adultLock: mark.lock });
+  if (!started.ok) return refuse(started.line, "already_making");
+  return outcomeOf({ callId, packageId, status: "succeeded", via: "tool_call", args, durationMs: 0, result: { reply: { text: "A new coloured version of the video is being made at Max; the first one is kept. It takes a few minutes and appears below your reply when it is ready. You have not seen it: do not describe how it looks. Tell the person in one short sentence that it is on its way." }, data: { videoJobId: started.job.id }, actions: [] } });
 }
 
 async function filmProduction(input: RunEditVideoInput, value: EditArgs, actor: PersonRow, temporary: boolean): Promise<ToolExecutionOutcome> {

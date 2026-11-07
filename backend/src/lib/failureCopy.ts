@@ -85,6 +85,13 @@ export function isSpatialFailureCode(code: unknown): code is SpatialFailureCode 
   return typeof code === "string" && Object.prototype.hasOwnProperty.call(SPATIAL_FAILURE_COPY, code);
 }
 
+export const RESTYLE_FAILURE_COPY = {
+  ic_lora_refused: "The colorize style could not be used with this clip. Try another clip or ask an admin to check Settings, Styles.",
+  no_memory: "There is not enough free memory for colorize right now. Wait for other work to finish, then try again.",
+  not_installed: "The Max video model is not installed. An admin can install it in Settings, Models and storage.",
+  lora_missing: "The colorize style is not installed. An admin can add it in Settings, Styles, then try again.",
+} as const;
+
 interface FailureCopy {
   adult: string;
   adultAway?: string;
