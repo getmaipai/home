@@ -64,7 +64,7 @@ async function setPersonSetting(client: TestClient, personId: string, key: strin
   expect(res.status).toBe(200);
 }
 function registerDue() {
-  registerPackageNotificationTypes({ id: "alarm", notifications: [{ id: "alarm.due", level: "time_sensitive", audience: "person", template: "Alarm: {task}", configurable: true, default_channels: ["in_app"] }] });
+  registerPackageNotificationTypes({ id: "alarm", notifications: [{ id: "alarm.due", level: "time_sensitive", audience: "person", template: "{labelled, select, no {Alarm} other {Alarm: {task}}}", configurable: true, default_channels: ["in_app"] }] });
 }
 
 test("a Spanish person gets Spanish in Telegram and the row keeps the English text and the values; an English person gets English", async () => {

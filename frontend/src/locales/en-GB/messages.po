@@ -615,6 +615,11 @@ msgid "{label}. {size}."
 msgstr ""
 
 #. js-lingui-explicit-id
+#: ../backend/src/lib/notificationCopy.ts:23
+msgid "notification.alarm.due"
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/apps/settings/styles/StyleEditor.tsx:86
 msgid "{length} of 140 characters"
 msgstr ""
@@ -2408,11 +2413,6 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:1023
 msgid "setting.safety.alarm.volume.help"
-msgstr ""
-
-#. js-lingui-explicit-id
-#: ../backend/src/lib/notificationCopy.ts:23
-msgid "notification.alarm.due"
 msgstr ""
 
 #. js-lingui-explicit-id

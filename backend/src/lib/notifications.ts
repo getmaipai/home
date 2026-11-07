@@ -38,7 +38,7 @@ import { issueDeviceCommand } from "@/lib/deviceCommands";
 import { trackBackgroundWork } from "@/lib/backgroundWork";
 import type { PersonRow } from "@/types";
 import { wallClockMinutes } from "@/lib/wallClock";
-import { renderNotificationFor } from "@/lib/i18nServer";
+import { renderNotification, renderNotificationFor } from "@/lib/i18nServer";
 
 function renderTemplate(template: string, vars: Record<string, string>): string {
   return template.replace(/\{(\w+)\}/g, (match, name: string) => vars[name] ?? match);
@@ -183,7 +183,9 @@ export async function trigger(typeId: string, vars: Record<string, string> = {},
   const resolved = resolveRecipients(type, opts.personId);
   const afterExclude = type.audience === "person" ? resolved : resolved.filter((r) => r.id !== opts.excludePersonId);
   const recipients = opts.mutedSenderId ? afterExclude.filter((r) => !hasMutedSender(r.id, opts.mutedSenderId!)) : afterExclude;
-  const text = renderTemplate(type.template, vars);
+  // The English text kept on the row comes from the same typed line the channels render (so "Alarm" alone for an unlabelled alarm);
+  // a type with no typed line, or a value it needs missing, keeps the package's own template.
+  const text = renderNotification(type.id, vars, "en-US") ?? renderTemplate(type.template, vars);
 
   for (const recipient of recipients) {
     if (opts.repeatKey && db.select({ id: notificationDeliveries.id }).from(notificationDeliveries)

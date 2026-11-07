@@ -5,8 +5,9 @@ import { NOTIFICATIONS_HISTORY_QUERY_KEY } from "@/shell/NotificationBell";
 import { renderWithQueryClient } from "../../../tests/renderWithQueryClient";
 import type { NotificationDeliveryView } from "@/lib/api";
 import { waitForGone } from "../../../tests/waitForGone";
+import { activateLocale } from "@/i18n";
 
-afterEach(cleanup);
+afterEach(async () => { cleanup(); await activateLocale("en-US"); });
 
 function notification(overrides: Partial<NotificationDeliveryView> = {}): NotificationDeliveryView {
   return {
@@ -92,6 +93,24 @@ describe("NotificationsPage", () => {
       const { findByText } = renderPage();
       await findByText("Backups haven't run in a while");
       await findByText("New");
+    } finally {
+      restore();
+    }
+  });
+
+  test("I18N-B1: the history page renders typed rows in the viewer's language, the stored English text is the fallback", async () => {
+    await activateLocale("es");
+    const restore = stubFetch([
+      notification({ id: "a1", typeId: "alarm.due", text: "Alarm: gym", values: { task: "gimnasio" } }),
+      notification({ id: "a2", typeId: "alarm.due", text: "Alarm", values: { task: "Alarm", labelled: "no" } }),
+      notification({ id: "a3", typeId: "repairs.new", text: "A repair needs your attention", values: null }),
+    ]);
+    try {
+      const { findByText, findByRole } = renderPage();
+      await findByText("Alarma: gimnasio");
+      await findByText("Alarma");
+      await findByText("A repair needs your attention");
+      await findByRole("button", { name: /Alarma: gimnasio/ });
     } finally {
       restore();
     }

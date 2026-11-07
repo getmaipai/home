@@ -396,6 +396,12 @@ describe("notificationLine", () => {
     await activateLocale("en-US");
     expect(notificationLine(row)).toBe("Alarm: gimnasio");
   });
+  test("an unlabelled alarm reads Alarm / Alarma, never Alarm: Alarm", async () => {
+    const row = notification("n5", "Alarm", { typeId: "alarm.due", values: { task: "Alarm", labelled: "no" } });
+    expect(notificationLine(row)).toBe("Alarm");
+    await activateLocale("es");
+    expect(notificationLine(row)).toBe("Alarma");
+  });
   test("a stored English row (no values) or a type with no template still renders its text", async () => {
     await activateLocale("es");
     expect(notificationLine(notification("n2", "Old Model finished downloading and is ready to use."))).toBe("Old Model finished downloading and is ready to use.");

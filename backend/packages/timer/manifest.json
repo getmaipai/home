@@ -72,7 +72,7 @@
       "id": "alarm.due",
       "level": "time_sensitive",
       "audience": "person",
-      "template": "Alarm: {task}",
+      "template": "{labelled, select, no {Alarm} other {Alarm: {task}}}",
       "configurable": true,
       "default_channels": ["in_app"]
     }

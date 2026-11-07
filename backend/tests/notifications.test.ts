@@ -149,7 +149,7 @@ async function setPersonSetting(client: TestClient, personId: string, key: strin
 describe("trigger()", () => {
   const personalDueNotifications = [
     { id: "remind.due", level: "time_sensitive" as const, audience: "person" as const, template: "Reminder: {task}", configurable: true, default_channels: ["in_app"] },
-    { id: "alarm.due", level: "time_sensitive" as const, audience: "person" as const, template: "Alarm: {task}", configurable: true, default_channels: ["in_app"] },
+    { id: "alarm.due", level: "time_sensitive" as const, audience: "person" as const, template: "{labelled, select, no {Alarm} other {Alarm: {task}}}", configurable: true, default_channels: ["in_app"] },
     { id: "timer.done", level: "passive" as const, audience: "person" as const, template: "Your {duration_text} timer is up.", configurable: true, default_channels: ["in_app"] },
   ];
 

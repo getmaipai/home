@@ -615,6 +615,11 @@ msgid "{label}. {size}."
 msgstr "{label}. {size}."
 
 #. js-lingui-explicit-id
+#: ../backend/src/lib/notificationCopy.ts:23
+msgid "notification.alarm.due"
+msgstr "{labelled, select, no {Alarm} other {Alarm: {task}}}"
+
+#. js-lingui-explicit-id
 #: src/apps/settings/styles/StyleEditor.tsx:86
 msgid "{length} of 140 characters"
 msgstr "{length} of 140 characters"
@@ -2409,11 +2414,6 @@ msgstr "Alarm volume"
 #: src/lib/settingCopy.generated.ts:1023
 msgid "setting.safety.alarm.volume.help"
 msgstr "Alarm volume has a hard floor of 70; Home enforces the floor."
-
-#. js-lingui-explicit-id
-#: ../backend/src/lib/notificationCopy.ts:23
-msgid "notification.alarm.due"
-msgstr "Alarm: {task}"
 
 #. js-lingui-explicit-id
 #: src/apps/clock/AlarmsTab.tsx:69

@@ -20,7 +20,7 @@ export const NOTIFICATION_COPY: Readonly<Record<string, NotificationLine>> = {
   "engines.problem": /*i18n*/ { id: "notification.engines.problem", message: "Problem: {title}. {fix}" },
   "project.done": /*i18n*/ { id: "notification.project.done", message: "{title} is ready." },
   "project.failed": /*i18n*/ { id: "notification.project.failed", message: "{title} didn't finish: {reason}" },
-  "alarm.due": /*i18n*/ { id: "notification.alarm.due", message: "Alarm: {task}" },
+  "alarm.due": /*i18n*/ { id: "notification.alarm.due", message: "{labelled, select, no {Alarm} other {Alarm: {task}}}" },
   "remind.due": /*i18n*/ { id: "notification.remind.due", message: "Reminder: {task}" },
   "timer.done": /*i18n*/ { id: "notification.timer.done", message: "Your {duration_text} timer is up." },
 };

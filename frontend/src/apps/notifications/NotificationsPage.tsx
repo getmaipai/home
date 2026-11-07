@@ -10,7 +10,7 @@ import { useSelectMode } from "@/kit/hooks/useSelectMode";
 import { Checkbox } from "@maipai/ui/src/ui/checkbox";
 import { Badge } from "@maipai/ui/src/ui/badge";
 import { Button } from "@maipai/ui/src/ui/button";
-import { NOTIFICATIONS_QUERY_KEY, NOTIFICATIONS_HISTORY_QUERY_KEY } from "@/shell/NotificationBell";
+import { NOTIFICATIONS_QUERY_KEY, NOTIFICATIONS_HISTORY_QUERY_KEY, notificationLine } from "@/shell/NotificationBell";
 import { api, type NotificationDeliveryView } from "@/lib/api";
 import { cn, FOCUS_RING } from "@maipai/ui/src/utils";
 import { getIcon } from "@maipai/ui/src/icons";
@@ -182,7 +182,7 @@ export function NotificationsPage() {
                         <Checkbox
                           checked={selectMode.isSelected(n.id)}
                           onCheckedChange={() => selectMode.toggle(n.id)}
-                          aria-label={i18n._({ id: "Select {text}", message: "Select {text}", values: { text: n.text } })}
+                          aria-label={i18n._({ id: "Select {text}", message: "Select {text}", values: { text: notificationLine(n) } })}
                           className="shrink-0"
                         />
                       ) : null}
@@ -195,7 +195,7 @@ export function NotificationsPage() {
                           ) : (
                             <Badge>{i18n._({ id: "New", message: "New" })}</Badge>
                           )}
-                          <span className="text-base">{n.text}</span>
+                          <span className="text-base">{notificationLine(n)}</span>
                         </div>
                         <span className="text-sm text-muted-foreground">{whenText(n.createdAt)}</span>
                       </div>
@@ -208,7 +208,7 @@ export function NotificationsPage() {
                           n.dismissedAt ? null : (
                             <Button
                               variant="ghost"
-                              aria-label={i18n._({ id: "Dismiss {text}", message: "Dismiss {text}", values: { text: n.text } })}
+                              aria-label={i18n._({ id: "Dismiss {text}", message: "Dismiss {text}", values: { text: notificationLine(n) } })}
                               onClick={() => handleDismiss(n.id)}
                               disabled={busy}
                             >

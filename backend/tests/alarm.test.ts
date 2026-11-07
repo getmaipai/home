@@ -11,6 +11,7 @@ import { commandsNode } from "@/lib/turnMachine/nodes/commands";
 import { classifyTurnSignal } from "@/lib/turnSignal";
 import { commandOpeners, loadAllManifests } from "@/lib/turnShared";
 import { getNotificationType } from "@/lib/notificationTypes";
+import { renderNotification } from "@/lib/i18nServer";
 import { policyNode } from "@/lib/turnMachine/nodes/policy";
 import type { TurnState } from "@/lib/turnMachine/contract";
 import { listPackageIds } from "@/lib/plugins";
@@ -89,6 +90,36 @@ describe("alarms through the timer package", () => {
     expect(listPending(actor).find((n) => n.typeId === "alarm.due")?.subjectJobId).toBe(scheduled.value.id);
     expect((await runDueJobs(runPlugin)).ran).toBe(0);
     expect(listPending(actor).filter((n) => n.typeId === "alarm.due")).toHaveLength(1);
+  });
+
+  test("an unlabelled alarm reads just Alarm, in English and in Spanish, never Alarm: Alarm", async () => {
+    registerAllPackageNotificationTypes();
+    const actor = await person("Sage");
+    for (const label of ["Alarm", ""]) {
+      const scheduled = scheduleCoreJob(actor, "alarms.fire", "2099-01-01T00:00:00.000Z", { task: label });
+      if (!scheduled.ok) throw new Error("setup failed");
+      db.update(scheduledJobs).set({ nextRunAt: new Date(0).toISOString() }).where(eq(scheduledJobs.id, scheduled.value.id)).run();
+    }
+    await runDueJobs(runPlugin);
+    const rows = listPending(actor).filter((n) => n.typeId === "alarm.due");
+    expect(rows).toHaveLength(2);
+    for (const row of rows) {
+      expect(row.text).toBe("Alarm");
+      expect(renderNotification("alarm.due", row.values, "en-US")).toBe("Alarm");
+      expect(renderNotification("alarm.due", row.values, "es")).toBe("Alarma");
+    }
+  });
+
+  test("a labelled alarm keeps its label in both languages", async () => {
+    registerAllPackageNotificationTypes();
+    const actor = await person("Sage");
+    const scheduled = scheduleCoreJob(actor, "alarms.fire", "2099-01-01T00:00:00.000Z", { task: "gimnasio" });
+    if (!scheduled.ok) throw new Error("setup failed");
+    db.update(scheduledJobs).set({ nextRunAt: new Date(0).toISOString() }).where(eq(scheduledJobs.id, scheduled.value.id)).run();
+    await runDueJobs(runPlugin);
+    const row = listPending(actor).find((n) => n.typeId === "alarm.due")!;
+    expect(row.text).toBe("Alarm: gimnasio");
+    expect(renderNotification("alarm.due", row.values, "es")).toBe("Alarma: gimnasio");
   });
 
   test("a child may set an alarm for themselves", async () => {
@@ -299,9 +330,9 @@ describe("the alarm port into timer", () => {
   test("alarm.due keeps its id and defaults and is registered from timer's manifest", () => {
     const loaded = loadManifestOnly("timer");
     if (!loaded.ok) throw new Error(loaded.error);
-    expect(loaded.value.notifications).toContainEqual({ id: "alarm.due", level: "time_sensitive", audience: "person", template: "Alarm: {task}", configurable: true, default_channels: ["in_app"] });
+    expect(loaded.value.notifications).toContainEqual({ id: "alarm.due", level: "time_sensitive", audience: "person", template: "{labelled, select, no {Alarm} other {Alarm: {task}}}", configurable: true, default_channels: ["in_app"] });
     registerAllPackageNotificationTypes();
-    expect(getNotificationType("alarm.due")).toMatchObject({ id: "alarm.due", level: "time_sensitive", audience: "person", template: "Alarm: {task}", configurable: true, defaultChannels: ["in_app"] });
+    expect(getNotificationType("alarm.due")).toMatchObject({ id: "alarm.due", level: "time_sensitive", audience: "person", template: "{labelled, select, no {Alarm} other {Alarm: {task}}}", configurable: true, defaultChannels: ["in_app"] });
     expect(getNotificationType("timer.done")).toBeDefined();
   });
 

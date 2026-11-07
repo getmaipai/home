@@ -729,6 +729,12 @@ msgid "{label}. {size}."
 msgstr "{label}. {size}."
 
 #. js-lingui-explicit-id
+#: ../backend/src/lib/notificationCopy.ts:23
+#, needs-review
+msgid "notification.alarm.due"
+msgstr "{labelled, select, no {Alarma} other {Alarma: {task}}}"
+
+#. js-lingui-explicit-id
 #: src/apps/settings/styles/StyleEditor.tsx:86
 #, needs-review
 msgid "{length} of 140 characters"
@@ -2837,12 +2843,6 @@ msgstr "Volumen de alarma"
 #, needs-review
 msgid "setting.safety.alarm.volume.help"
 msgstr "El volumen de alarma tiene un límite inferior fijo de 70; Home aplica ese límite."
-
-#. js-lingui-explicit-id
-#: ../backend/src/lib/notificationCopy.ts:23
-#, needs-review
-msgid "notification.alarm.due"
-msgstr "Alarma: {task}"
 
 #. js-lingui-explicit-id
 #: src/apps/clock/AlarmsTab.tsx:69

@@ -5,6 +5,7 @@ import { cpSync, existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { SUPPORTED_LOCALES } from "../src/supportedLocales";
+import { placeholderOccurrences } from "../../backend/src/lib/icuPlaceholders";
 import { englishSources, parsePo } from "./po";
 import { generatedIsCurrent } from "./extract-setting-copy";
 import { isProtected } from "./translate-catalog";
@@ -30,7 +31,7 @@ try {
 
 if (!generatedIsCurrent()) fail("src/lib/settingCopy.generated.ts is stale against the settings registry (a key, option, reason line or area label changed); run bun run i18n:settings, then bun run i18n:extract, and commit both.");
 
-const placeholders = (value: string) => [...value.matchAll(/\{\s*\w+(?=\s*[,}])|<\/?\d+\/?>/g)].map((match) => match[0].replace(/\s+/g, "")).sort();
+const placeholders = (value: string) => [...placeholderOccurrences(value).map((name) => `{${name}`), ...[...value.matchAll(/<\/?\d+\/?>/g)].map((match) => match[0])].sort();
 for (const locale of SUPPORTED_LOCALES) {
   const text = readFileSync(`src/locales/${locale}/messages.po`, "utf8");
   if (!text.includes(`"Language: ${locale}\\n"`)) fail(`src/locales/${locale}/messages.po has no Language: ${locale} header.`);

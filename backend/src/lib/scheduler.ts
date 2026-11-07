@@ -479,7 +479,9 @@ const CORE_JOBS: Record<string, CoreJobHandler> = {
   },
   "alarms.fire": async (row) => {
     const { task, alarmId } = JSON.parse(row.inputs) as { task: string; alarmId?: string };
-    await trigger("alarm.due", { task: task || "Alarm" }, { personId: row.personId ?? undefined, subjectJobId: row.id });
+    // An alarm with no label of its own is stored as "Alarm"; the line reads "Alarm" (or "Alarma"), never "Alarm: Alarm".
+    const labelled = !!task && task !== "Alarm";
+    await trigger("alarm.due", labelled ? { task } : { task: "Alarm", labelled: "no" }, { personId: row.personId ?? undefined, subjectJobId: row.id });
     if (alarmId) {
       const alarm = db.select().from(alarms).where(eq(alarms.id, alarmId)).get();
       if (alarm && !alarm.deletedAt && alarm.enabled) {

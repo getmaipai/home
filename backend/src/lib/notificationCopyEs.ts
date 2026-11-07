@@ -16,7 +16,7 @@ export const NOTIFICATION_ES: Readonly<Record<string, string>> = {
   "engines.problem": "Problema: {title}. {fix}",
   "project.done": "Terminado: {title}.",
   "project.failed": "{title} no terminó: {reason}",
-  "alarm.due": "Alarma: {task}",
+  "alarm.due": "{labelled, select, no {Alarma} other {Alarma: {task}}}",
   "remind.due": "Recordatorio: {task}",
   "timer.done": "Tu temporizador de {duration_text} terminó.",
 };

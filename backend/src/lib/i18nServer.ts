@@ -9,9 +9,11 @@ import { speakerAgeBand } from "@/lib/ageBand";
 import { resolveLocale } from "@/lib/locale";
 import { NOTIFICATION_COPY } from "@/lib/notificationCopy";
 import { NOTIFICATION_ES } from "@/lib/notificationCopyEs";
+import { placeholdersOf, requiredPlaceholdersOf } from "@/lib/icuPlaceholders";
 import { SPOKEN_LINES_ES } from "@/lib/spokenTextEs";
 import { toSpokenText } from "@/lib/spokenText";
 
+export { placeholdersOf, requiredPlaceholdersOf };
 export type NotificationValues = Record<string, string>;
 
 const instances = new Map<string, I18n>();
@@ -37,20 +39,13 @@ function coerce(values: NotificationValues): Record<string, string | number> {
 /** The language a locale renders in: Spanish for any `es` locale, English for everything else. */
 export function notificationLanguage(locale: string): "en" | "es" { return /^es(?:-|$)/i.test(locale) ? "es" : "en"; }
 
-/** The placeholder names a template uses (plural arguments included), for the consistency test. */
-export function placeholdersOf(template: string): string[] {
-  const names = new Set<string>();
-  for (const match of template.matchAll(/\{\s*(\w+)\s*[,}]/g)) names.add(match[1]!);
-  return [...names].sort();
-}
-
 /** The typed line for a locale, or null when the type has no template or a value it needs is missing. */
 export function renderNotification(typeId: string, values: NotificationValues | null | undefined, locale: string): string | null {
   const line = NOTIFICATION_COPY[typeId];
   if (!line || !values) return null;
   const lang = notificationLanguage(locale);
   const template = lang === "es" ? NOTIFICATION_ES[typeId] ?? line.message : line.message;
-  if (placeholdersOf(template).some((name) => !(name in values))) return null;
+  if (requiredPlaceholdersOf(template).some((name) => !(name in values))) return null;
   try { return instanceFor(lang)._(line.id, coerce(values)); } catch { return null; }
 }
 
