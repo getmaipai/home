@@ -72,8 +72,10 @@ describe("TALENT-04 shows", () => {
           return { id, state: "done", result: { lines: rendered }, reason: null };
         }
         if (failMix) { failMix = false; throw new Error("The scripted mix failure needs a retry."); }
-        const output = input.output as { dir: string; name: string };
-        mkdirSync(output.dir, { recursive: true }); const path = `${output.dir}/${output.name}`; writeFileSync(path, new Uint8Array([1, 2, 3]));
+        // The Stack writes the mix in its own job folder: no output.dir is sent (the test double plays that folder).
+        const output = input.output as { dir?: string; name: string };
+        expect(output.dir).toBeUndefined();
+        const dir = `/tmp/talent-mix-${id}`; mkdirSync(dir, { recursive: true }); const path = `${dir}/${output.name}`; writeFileSync(path, new Uint8Array([1, 2, 3]));
         return { id, state: "done", result: { path, duration_s: 1 }, reason: null };
       },
     } as unknown as StackClient;
