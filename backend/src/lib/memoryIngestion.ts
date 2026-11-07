@@ -30,6 +30,7 @@ function vectorToBuffer(vector: readonly number[]): Buffer {
 function findActiveByKey(
   scope: string,
   person: string | null,
+  companionId: string | null,
   key: string,
 ): IngestedRecord | null {
   const rows = db
@@ -43,6 +44,9 @@ function findActiveByKey(
         person === null
           ? isNull(memoryRecords.person)
           : eq(memoryRecords.person, person),
+        companionId === null
+          ? isNull(memoryRecords.companionId)
+          : eq(memoryRecords.companionId, companionId),
       ),
     )
     .all();
@@ -145,6 +149,7 @@ export function supersedeInTx(
         status: fullCandidate.status,
         scope: fullCandidate.scope,
         person: fullCandidate.person,
+        companionId: fullCandidate.companionId,
         subjectId: fullCandidate.subjectId,
         source: fullCandidate.source,
         importance: fullCandidate.importance,
@@ -179,8 +184,9 @@ export type IngestInput = {
   text: string;
   category: string;
   tier: string;
-  scope: "self" | "person" | "household";
+  scope: "self" | "person" | "household" | "companion";
   person?: string | null;
+  companion_id?: string | null;
   subjectId?: string | null;
   source: string;
   importance: number;
@@ -204,6 +210,7 @@ export function ingestMemory(input: IngestInput): IngestResult {
   const text = input.text;
   const scope = input.scope;
   const person = scope === "person" ? (input.person ?? null) : null;
+  const companionId = input.companion_id ?? null;
   const key = canonicalKey(text);
 
   if (detectCredential(text).detected) {
@@ -226,7 +233,16 @@ export function ingestMemory(input: IngestInput): IngestResult {
     if (!exists) return { ok: false, status: 400, error: `person not found: ${person}` };
   }
 
-  const existing = findActiveByKey(scope, person, key);
+  if (scope === "companion") {
+    if (!input.source.startsWith("talent.")) {
+      return { ok: false, status: 403, error: "Companion scope requires a source starting with talent. Use a talent source before saving." };
+    }
+    if (!companionId) {
+      return { ok: false, status: 400, error: "Companion scope requires a companion id. Set companion_id before saving." };
+    }
+  }
+
+  const existing = findActiveByKey(scope, person, companionId, key);
   if (existing) {
     return { ok: true, record: existing, deduped: true, existingId: existing.id };
   }
@@ -281,6 +297,7 @@ export function ingestMemory(input: IngestInput): IngestResult {
     status: parsed.data.status,
     scope: parsed.data.scope,
     person: parsed.data.person ?? null,
+    companionId,
     subjectId: parsed.data.subject_id ?? null,
     source: parsed.data.source,
     importance: parsed.data.importance,
@@ -374,7 +391,7 @@ export function supersedeMemory(input: SupersedeInput): SupersedeResult {
     }
   }
 
-  const existing = findActiveByKey(scope, person, key);
+  const existing = findActiveByKey(scope, person, input.oldRecord.companionId, key);
   if (existing && existing.id !== input.oldRecord.id) {
     sqlite.transaction(() => {
       db.update(memoryRecords)
@@ -404,6 +421,7 @@ export function supersedeMemory(input: SupersedeInput): SupersedeResult {
     status: "active" as const,
     scope,
     person,
+    companionId: input.oldRecord.companionId,
     subjectId: input.subjectId ?? null,
     source: input.source,
     importance: input.importance,

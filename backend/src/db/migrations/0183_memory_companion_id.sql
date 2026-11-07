@@ -1,0 +1,2 @@
+ALTER TABLE `memory_records` ADD `companion_id` text;--> statement-breakpoint
+CREATE INDEX `memory_records_companion_idx` ON `memory_records` (`companion_id`,`status`) WHERE "memory_records"."companion_id" IS NOT NULL;

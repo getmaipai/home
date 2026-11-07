@@ -47,6 +47,13 @@ export type MemoryOpResult<T> = Result<T, number>;
 // AGE-01 (b): a child or a teen reads a household record by its audience.
 // The "teen exception" - an adult writing a key whose audience is set to
 // child so the teen never sees it - is NOT built.
+type CompanionReadGate = (actor: PersonRow, companionId: string) => boolean;
+let companionReadGate: CompanionReadGate = () => false;
+
+export function registerCompanionReadGate(gate: CompanionReadGate): void {
+  companionReadGate = gate;
+}
+
 function canRead(actor: PersonRow, record: MemoryRecordRow, roleOf: Map<string, string>, selfOnly = false, withholdSensitive = false, anonymous = false): boolean {
   if (withholdSensitive && record.sensitive) return false;
   if (record.scope === "self") return false;
@@ -55,6 +62,14 @@ function canRead(actor: PersonRow, record: MemoryRecordRow, roleOf: Map<string, 
     if (!record.person) return false;
     if (selfOnly) return record.person === actor.id;
     return canAccessPerson(actor, record.person, roleOf);
+  }
+  if (record.scope === "companion") {
+    if (anonymous || !record.companionId || !companionReadGate(actor, record.companionId)) return false;
+    if (record.sensitive) return isOwnerOrAdmin(actor);
+    const band = speakerAgeBand(actor, new Date());
+    if (band === "child") return record.childDisclosure === "child_ok";
+    if (band === "teen") return record.childDisclosure === "child_ok" || record.childDisclosure === "teen_ok";
+    return true;
   }
   // household
   if (record.sensitive) return isOwnerOrAdmin(actor);
@@ -141,6 +156,8 @@ function assertCanWrite(
   actor: PersonRow,
   scope: string,
   person: string | null | undefined,
+  companionId: string | null | undefined,
+  source: string,
 ): MemoryOpResult<true> {
   if (scope === "self") {
     if (!isOwnerOrAdmin(actor)) {
@@ -156,6 +173,11 @@ function assertCanWrite(
     return { ok: true, value: true };
   }
   if (scope === "household") return { ok: true, value: true };
+  if (scope === "companion") {
+    if (!source.startsWith("talent.")) return { ok: false, status: 403, error: "Companion scope requires a source starting with talent. Use a talent source before saving." };
+    if (!companionId) return { ok: false, status: 400, error: "Companion scope requires a companion id. Set companion_id before saving." };
+    return { ok: true, value: true };
+  }
   return { ok: false, status: 400, error: `unknown scope: ${scope}` };
 }
 
@@ -182,6 +204,7 @@ export interface RememberInput {
   tier: string;
   scope: string;
   person?: string | null;
+  companion_id?: string | null;
   /** Step 3a: the entity (entities.id) this record is about, when the
    * judge or a person could name one. */
   subject_id?: string | null;
@@ -219,8 +242,9 @@ export function remember(actor: PersonRow, input: RememberInput): MemoryOpResult
     text: input.text,
     category: input.category,
     tier: input.tier,
-    scope: input.scope as "self" | "person" | "household",
+    scope: input.scope as "self" | "person" | "household" | "companion",
     person: input.person,
+    companion_id: input.companion_id,
     subjectId: input.subject_id,
     source: input.source,
     importance: input.importance,
@@ -360,8 +384,9 @@ export async function drainPendingEmbeddings(): Promise<{ embedded: number; stil
 }
 
 export interface ListOptions {
-  scope?: "household" | "person" | "self";
+  scope?: "household" | "person" | "self" | "companion";
   person?: string;
+  companionId?: string;
   /** See canRead()'s own comment: turn-scoped recall only, never the
    * parental-view routes. */
   selfOnly?: boolean;
@@ -399,6 +424,7 @@ export function list(actor: PersonRow, opts: ListOptions = {}): MemoryRecord[] {
       : eq(memoryRecords.status, "active")).all();
   if (opts.scope) rows = rows.filter((r) => r.scope === opts.scope);
   if (opts.person) rows = rows.filter((r) => r.person === opts.person);
+  if (opts.scope === "companion" && opts.companionId) rows = rows.filter((r) => r.companionId === opts.companionId);
   rows = rows.filter((r) => validAt(r, asOf));
   rows = rows.filter((r) => r.deviceId === null || (opts.robotBound === "all" && opts.deviceId == null) || (opts.deviceId != null && r.deviceId === opts.deviceId && (opts.robotBound === "all" || opts.surface === "robot")));
   rows = rows.filter((r) => canRead(actor, r, roleOf, opts.selfOnly));
@@ -683,6 +709,7 @@ function activeStatusScopePersonWhere(opts: ListOptions) {
   const conditions = [eq(memoryRecords.status, "active")];
   if (opts.scope) conditions.push(eq(memoryRecords.scope, opts.scope));
   if (opts.person) conditions.push(eq(memoryRecords.person, opts.person));
+  if (opts.scope === "companion" && opts.companionId) conditions.push(eq(memoryRecords.companionId, opts.companionId));
   return and(...conditions);
 }
 
@@ -696,6 +723,7 @@ export function recall(actor: PersonRow, query: string, opts: RecallOptions = {}
   ];
   if (opts.scope) conditions.push(eq(memoryRecords.scope, opts.scope));
   if (opts.person) conditions.push(eq(memoryRecords.person, opts.person));
+  if (opts.scope === "companion" && opts.companionId) conditions.push(eq(memoryRecords.companionId, opts.companionId));
   // MEM-AUDIT-04: a dated event stays recallable for EVENT_GRACE_DAYS
   // past its own end ("how was the dentist" the day after), then
   // leaves; runMaintenance() archives it as "event_passed" on the same
@@ -989,7 +1017,7 @@ export function similarByVector(
 function getWritable(actor: PersonRow, id: string): MemoryOpResult<MemoryRecordRow> {
   const row = db.select().from(memoryRecords).where(eq(memoryRecords.id, id)).get();
   if (!row) return { ok: false, status: 404, error: "memory record not found" };
-  const auth = assertCanWrite(actor, row.scope, row.person);
+  const auth = assertCanWrite(actor, row.scope, row.person, row.companionId, row.source);
   if (!auth.ok) return auth;
   return { ok: true, value: row };
 }
