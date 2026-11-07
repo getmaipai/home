@@ -253,9 +253,10 @@ describe("PUT /api/settings for tts.voice_id", () => {
     const teen = (await (await owner.post("/api/people", { displayName: "Nova", role: "teen" })).json()) as { id: string };
     const setChild = await owner.request("/api/settings", { method: "PUT", body: { scope: `person:${child.id}`, key: "tts.voice_id", value: "alba" } });
     expect(setChild.status).toBe(200);
+    // Since the voice catalog moved to presets plus cloned voices, "hf://" is not a registry option: the write is a 400 before any
+    // role check, so the "pick a preset voice" refusal no longer exists (stale on main until 2026-11-07).
     const customChildVoice = await owner.request("/api/settings", { method: "PUT", body: { scope: `person:${child.id}`, key: "tts.voice_id", value: "hf://example/community" } });
-    expect(customChildVoice.status).toBe(403);
-    expect(await customChildVoice.json()).toEqual({ error: "A parent chooses your voice. Ask the person who manages Home to pick a preset voice for you." });
+    expect(customChildVoice.status).toBe(400);
     const setTeen = await owner.request("/api/settings", { method: "PUT", body: { scope: `person:${teen.id}`, key: "tts.voice_id", value: "mira" } });
     expect(setTeen.status).toBe(403);
     expect(await setTeen.json()).toEqual({ error: "That person chooses their own voice. Only they can change it." });
