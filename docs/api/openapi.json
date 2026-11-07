@@ -68114,6 +68114,11 @@
                                   "edit"
                                 ]
                               },
+                              "note": {
+                                "type": "string",
+                                "nullable": true,
+                                "description": "SPATIAL-04: one plain line kept with a spatial-sound clip (what the sound did, or why it is unchanged), shown as the card's muted notice; null for any other clip."
+                              },
                               "error": {
                                 "type": "string",
                                 "nullable": true
@@ -68301,6 +68306,7 @@
                               "started_at",
                               "prompt",
                               "kind",
+                              "note",
                               "error",
                               "quality",
                               "switch_to",
@@ -68314,6 +68320,10 @@
                         "can_make_another": {
                           "type": "boolean"
                         },
+                        "can_edit": {
+                          "type": "boolean",
+                          "description": "SPATIAL-05: this person may edit a finished clip (adults on their own screen), so the clip's More menu offers Spatial sound."
+                        },
                         "limits": {
                           "type": "string"
                         }
@@ -68323,6 +68333,7 @@
                         "conversation_id",
                         "items",
                         "can_make_another",
+                        "can_edit",
                         "limits"
                       ]
                     },
@@ -68748,6 +68759,11 @@
                                   "edit"
                                 ]
                               },
+                              "note": {
+                                "type": "string",
+                                "nullable": true,
+                                "description": "SPATIAL-04: one plain line kept with a spatial-sound clip (what the sound did, or why it is unchanged), shown as the card's muted notice; null for any other clip."
+                              },
                               "error": {
                                 "type": "string",
                                 "nullable": true
@@ -68935,6 +68951,7 @@
                               "started_at",
                               "prompt",
                               "kind",
+                              "note",
                               "error",
                               "quality",
                               "switch_to",
@@ -68948,6 +68965,10 @@
                         "can_make_another": {
                           "type": "boolean"
                         },
+                        "can_edit": {
+                          "type": "boolean",
+                          "description": "SPATIAL-05: this person may edit a finished clip (adults on their own screen), so the clip's More menu offers Spatial sound."
+                        },
                         "limits": {
                           "type": "string"
                         }
@@ -68957,6 +68978,7 @@
                         "conversation_id",
                         "items",
                         "can_make_another",
+                        "can_edit",
                         "limits"
                       ]
                     },
@@ -69287,6 +69309,11 @@
                                   "edit"
                                 ]
                               },
+                              "note": {
+                                "type": "string",
+                                "nullable": true,
+                                "description": "SPATIAL-04: one plain line kept with a spatial-sound clip (what the sound did, or why it is unchanged), shown as the card's muted notice; null for any other clip."
+                              },
                               "error": {
                                 "type": "string",
                                 "nullable": true
@@ -69474,6 +69501,7 @@
                               "started_at",
                               "prompt",
                               "kind",
+                              "note",
                               "error",
                               "quality",
                               "switch_to",
@@ -69487,6 +69515,10 @@
                         "can_make_another": {
                           "type": "boolean"
                         },
+                        "can_edit": {
+                          "type": "boolean",
+                          "description": "SPATIAL-05: this person may edit a finished clip (adults on their own screen), so the clip's More menu offers Spatial sound."
+                        },
                         "limits": {
                           "type": "string"
                         }
@@ -69496,6 +69528,7 @@
                         "conversation_id",
                         "items",
                         "can_make_another",
+                        "can_edit",
                         "limits"
                       ]
                     },
@@ -69758,6 +69791,11 @@
                                       "edit"
                                     ]
                                   },
+                                  "note": {
+                                    "type": "string",
+                                    "nullable": true,
+                                    "description": "SPATIAL-04: one plain line kept with a spatial-sound clip (what the sound did, or why it is unchanged), shown as the card's muted notice; null for any other clip."
+                                  },
                                   "error": {
                                     "type": "string",
                                     "nullable": true
@@ -69945,6 +69983,7 @@
                                   "started_at",
                                   "prompt",
                                   "kind",
+                                  "note",
                                   "error",
                                   "quality",
                                   "switch_to",
@@ -69958,6 +69997,10 @@
                             "can_make_another": {
                               "type": "boolean"
                             },
+                            "can_edit": {
+                              "type": "boolean",
+                              "description": "SPATIAL-05: this person may edit a finished clip (adults on their own screen), so the clip's More menu offers Spatial sound."
+                            },
                             "limits": {
                               "type": "string"
                             }
@@ -69967,6 +70010,7 @@
                             "conversation_id",
                             "items",
                             "can_make_another",
+                            "can_edit",
                             "limits"
                           ]
                         },
@@ -70192,6 +70236,11 @@
                                   "edit"
                                 ]
                               },
+                              "note": {
+                                "type": "string",
+                                "nullable": true,
+                                "description": "SPATIAL-04: one plain line kept with a spatial-sound clip (what the sound did, or why it is unchanged), shown as the card's muted notice; null for any other clip."
+                              },
                               "error": {
                                 "type": "string",
                                 "nullable": true
@@ -70379,6 +70428,7 @@
                               "started_at",
                               "prompt",
                               "kind",
+                              "note",
                               "error",
                               "quality",
                               "switch_to",
@@ -70392,6 +70442,10 @@
                         "can_make_another": {
                           "type": "boolean"
                         },
+                        "can_edit": {
+                          "type": "boolean",
+                          "description": "SPATIAL-05: this person may edit a finished clip (adults on their own screen), so the clip's More menu offers Spatial sound."
+                        },
                         "limits": {
                           "type": "string"
                         }
@@ -70401,6 +70455,7 @@
                         "conversation_id",
                         "items",
                         "can_make_another",
+                        "can_edit",
                         "limits"
                       ]
                     },
@@ -70644,6 +70699,11 @@
                                   "edit"
                                 ]
                               },
+                              "note": {
+                                "type": "string",
+                                "nullable": true,
+                                "description": "SPATIAL-04: one plain line kept with a spatial-sound clip (what the sound did, or why it is unchanged), shown as the card's muted notice; null for any other clip."
+                              },
                               "error": {
                                 "type": "string",
                                 "nullable": true
@@ -70831,6 +70891,7 @@
                               "started_at",
                               "prompt",
                               "kind",
+                              "note",
                               "error",
                               "quality",
                               "switch_to",
@@ -70844,6 +70905,10 @@
                         "can_make_another": {
                           "type": "boolean"
                         },
+                        "can_edit": {
+                          "type": "boolean",
+                          "description": "SPATIAL-05: this person may edit a finished clip (adults on their own screen), so the clip's More menu offers Spatial sound."
+                        },
                         "limits": {
                           "type": "string"
                         }
@@ -70853,6 +70918,7 @@
                         "conversation_id",
                         "items",
                         "can_make_another",
+                        "can_edit",
                         "limits"
                       ]
                     },
@@ -71017,6 +71083,429 @@
                     "conversation_id",
                     "video_job_id",
                     "music_job_id"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Videos are off for this profile",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such video job",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "That request is not allowed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Videos could not be made",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Videos are not ready",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/videos/jobs/{id}/spatial-sound": {
+      "post": {
+        "tags": [
+          "Videos"
+        ],
+        "summary": "Make the sound of a clip follow who is talking on screen (and, if asked, a 5.1 file); adults on their own screen only",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 80
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "surround": {
+                    "type": "boolean",
+                    "description": "Also make a 5.1 file, a second file of the new clip."
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The card with the new clip being made (or the lock tile).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string"
+                        },
+                        "conversation_id": {
+                          "type": "string",
+                          "nullable": true
+                        },
+                        "items": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "id": {
+                                "type": "string"
+                              },
+                              "state": {
+                                "type": "string",
+                                "enum": [
+                                  "queued",
+                                  "running",
+                                  "done",
+                                  "failed",
+                                  "cancelled"
+                                ]
+                              },
+                              "percent": {
+                                "type": "number"
+                              },
+                              "label": {
+                                "type": "string",
+                                "description": "One plain line for the card: what is happening now."
+                              },
+                              "position": {
+                                "type": "number",
+                                "nullable": true
+                              },
+                              "eta_seconds": {
+                                "type": "number",
+                                "nullable": true,
+                                "description": "While running: seconds left, from earlier clips of this size and length."
+                              },
+                              "step": {
+                                "type": "number",
+                                "nullable": true
+                              },
+                              "steps": {
+                                "type": "number",
+                                "nullable": true
+                              },
+                              "preview_url": {
+                                "type": "string",
+                                "nullable": true,
+                                "description": "While running, once the motion is done: the clip's first frame (a JPEG); the `v` query changes with each new one."
+                              },
+                              "started_at": {
+                                "type": "number",
+                                "description": "Epoch milliseconds the job started, for the card's elapsed clock."
+                              },
+                              "prompt": {
+                                "type": "string"
+                              },
+                              "kind": {
+                                "type": "string",
+                                "enum": [
+                                  "generate",
+                                  "animate",
+                                  "edit"
+                                ]
+                              },
+                              "note": {
+                                "type": "string",
+                                "nullable": true,
+                                "description": "SPATIAL-04: one plain line kept with a spatial-sound clip (what the sound did, or why it is unchanged), shown as the card's muted notice; null for any other clip."
+                              },
+                              "error": {
+                                "type": "string",
+                                "nullable": true
+                              },
+                              "quality": {
+                                "type": "string",
+                                "enum": [
+                                  "quick",
+                                  "detailed"
+                                ],
+                                "description": "Which kind made it: Quick (silent) or Detailed (with sound and speech)."
+                              },
+                              "switch_to": {
+                                "type": "string",
+                                "nullable": true,
+                                "enum": [
+                                  "quick",
+                                  "detailed",
+                                  null
+                                ],
+                                "description": "The other kind this video can be made again as, or null (it uses a style made for one kind, or the other kind is not on this computer)."
+                              },
+                              "fit_ask": {
+                                "type": "object",
+                                "nullable": true,
+                                "properties": {
+                                  "job_id": {
+                                    "type": "string"
+                                  },
+                                  "picked": {
+                                    "type": "string",
+                                    "nullable": true
+                                  },
+                                  "actual": {
+                                    "type": "string",
+                                    "nullable": true
+                                  }
+                                },
+                                "required": [
+                                  "job_id",
+                                  "picked",
+                                  "actual"
+                                ],
+                                "description": "Set while this card is asking whether to make it now with the level it can run at (TIER-PRIO-07; `picked` and `actual` are the level names the buttons use) and this person may answer: POST /api/ai/jobs/{job_id}/fit-answer with allow or wait. Null otherwise."
+                              },
+                              "max_offered": {
+                                "type": "boolean",
+                                "description": "Whether this person is shown Make it Max: they hold Max, the age band reaches it and a Max model is set for this kind."
+                              },
+                              "clip": {
+                                "type": "object",
+                                "nullable": true,
+                                "properties": {
+                                  "url": {
+                                    "type": "string"
+                                  },
+                                  "poster_url": {
+                                    "type": "string"
+                                  },
+                                  "width": {
+                                    "type": "number"
+                                  },
+                                  "height": {
+                                    "type": "number"
+                                  },
+                                  "seconds": {
+                                    "type": "number",
+                                    "nullable": true
+                                  },
+                                  "seed": {
+                                    "type": "number",
+                                    "nullable": true
+                                  },
+                                  "file_id": {
+                                    "type": "string"
+                                  },
+                                  "poster_file_id": {
+                                    "type": "string"
+                                  },
+                                  "has_sound": {
+                                    "type": "boolean",
+                                    "description": "The clip has a sound track the model made (speech included)."
+                                  }
+                                },
+                                "required": [
+                                  "url",
+                                  "poster_url",
+                                  "width",
+                                  "height",
+                                  "seconds",
+                                  "seed",
+                                  "file_id",
+                                  "poster_file_id",
+                                  "has_sound"
+                                ]
+                              },
+                              "adult": {
+                                "type": "object",
+                                "nullable": true,
+                                "properties": {
+                                  "made_audience": {
+                                    "type": "string",
+                                    "enum": [
+                                      "all-ages",
+                                      "adult-only"
+                                    ],
+                                    "description": "The machine fact and the minor ceiling; never lowered."
+                                  },
+                                  "lock": {
+                                    "type": "string",
+                                    "enum": [
+                                      "on",
+                                      "off"
+                                    ],
+                                    "description": "Whether the Adult lock applies; the creator can clear it."
+                                  },
+                                  "can_clear": {
+                                    "type": "boolean",
+                                    "description": "Show 'Unmark as NSFW': the creator, the item is adult-only and locked. Needs the confirm dialog and a fresh passcode (POST /api/adult-lock/confirm, then adult-mark)."
+                                  },
+                                  "can_mark": {
+                                    "type": "boolean",
+                                    "description": "Show 'Mark as NSFW': the creator, the item is not locked."
+                                  },
+                                  "line": {
+                                    "type": "string",
+                                    "nullable": true,
+                                    "description": "The state in plain words, for an adult-only item."
+                                  },
+                                  "history": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "object",
+                                      "properties": {
+                                        "action": {
+                                          "type": "string",
+                                          "enum": [
+                                            "clear",
+                                            "mark"
+                                          ]
+                                        },
+                                        "via": {
+                                          "type": "string",
+                                          "enum": [
+                                            "creator_passcode",
+                                            "creator",
+                                            "admin",
+                                            "auto"
+                                          ]
+                                        },
+                                        "at": {
+                                          "type": "string"
+                                        }
+                                      },
+                                      "required": [
+                                        "action",
+                                        "via",
+                                        "at"
+                                      ]
+                                    },
+                                    "description": "The creator's own audit rows for this item (no content)."
+                                  }
+                                },
+                                "required": [
+                                  "made_audience",
+                                  "lock",
+                                  "can_clear",
+                                  "can_mark",
+                                  "line",
+                                  "history"
+                                ],
+                                "description": "ADULT-LOCK-06: the item's Adult lock state for its creator, once it is shown (null for a clip still being made, a minor or a temporary chat)."
+                              }
+                            },
+                            "required": [
+                              "id",
+                              "state",
+                              "percent",
+                              "label",
+                              "position",
+                              "eta_seconds",
+                              "step",
+                              "steps",
+                              "preview_url",
+                              "started_at",
+                              "prompt",
+                              "kind",
+                              "note",
+                              "error",
+                              "quality",
+                              "switch_to",
+                              "fit_ask",
+                              "max_offered",
+                              "clip",
+                              "adult"
+                            ]
+                          }
+                        },
+                        "can_make_another": {
+                          "type": "boolean"
+                        },
+                        "can_edit": {
+                          "type": "boolean",
+                          "description": "SPATIAL-05: this person may edit a finished clip (adults on their own screen), so the clip's More menu offers Spatial sound."
+                        },
+                        "limits": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "conversation_id",
+                        "items",
+                        "can_make_another",
+                        "can_edit",
+                        "limits"
+                      ]
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "locked": {
+                          "type": "boolean",
+                          "enum": [
+                            true
+                          ]
+                        },
+                        "making": {
+                          "type": "boolean"
+                        }
+                      },
+                      "required": [
+                        "locked",
+                        "making"
+                      ],
+                      "description": "An adult-only item that is locked: draw the lock tile; `making` adds its spinner."
+                    }
                   ]
                 }
               }
