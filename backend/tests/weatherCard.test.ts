@@ -157,3 +157,32 @@ describe("WEATHER card attribution line", () => {
     expect((card!.props as { attribution: string }).attribution).toBe("");
   });
 });
+
+describe("WEATHER-SCENE-07: sunrise, sunset and wind_speed on the card", () => {
+  const base = { place: "X", temperature: 50, conditions: "clear", unit: "fahrenheit", block_code: 0, block_is_day: 1, block_day_dates: ["2026-11-07"], block_day_highs: [60], block_day_lows: [40], block_day_codes: [1] };
+  const props = (extra: Record<string, unknown>) => weatherCard("weather", "p", { ...base, ...extra })!.props as Record<string, unknown>;
+
+  test("valid source values are added, wind rounded to one decimal, and the block validates", () => {
+    const card = weatherCard("weather", "p", { ...base, block_detail_sunrise: "2026-11-07T06:58", block_detail_sunset: "2026-11-07T16:49", block_detail_wind_speed: 12.345 })!;
+    const p = card.props as Record<string, unknown>;
+    expect(p.sunrise).toBe("2026-11-07T06:58");
+    expect(p.sunset).toBe("2026-11-07T16:49");
+    expect(p.wind_speed).toBe(12.3);
+    expect(AnswerBlock.safeParse(card).success).toBe(true);
+  });
+
+  test("each field is omitted when missing or invalid", () => {
+    for (const p of [props({}), props({ block_detail_sunrise: "6:58", block_detail_sunset: 5, block_detail_wind_speed: "fast" }), props({ block_detail_wind_speed: -1 }), props({ block_detail_wind_speed: 401 }), props({ block_detail_wind_speed: null })]) {
+      expect("sunrise" in p).toBe(false);
+      expect("sunset" in p).toBe(false);
+      expect("wind_speed" in p).toBe(false);
+    }
+    expect(props({ block_detail_wind_speed: 0 }).wind_speed).toBe(0);
+  });
+
+  test("a valid value is kept while an invalid sibling is dropped", () => {
+    const p = props({ block_detail_sunrise: "2026-11-07T06:58", block_detail_sunset: "bad" });
+    expect(p.sunrise).toBe("2026-11-07T06:58");
+    expect("sunset" in p).toBe(false);
+  });
+});

@@ -172,6 +172,11 @@ function wmoCode(value: unknown): number | null {
   return n !== null && Number.isInteger(n) && n >= 0 ? n : null;
 }
 
+/** A local `YYYY-MM-DDTHH:MM` string in the place's zone, or null. */
+function localDateTime(value: unknown): string | null {
+  return typeof value === "string" && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(value) ? value : null;
+}
+
 const CARD_HOURS_MAX = 24;
 const CARD_DAYS_MAX = 8;
 // The card draws no attribution line (owner, 2026-10-28); the data source still names its credit in the package manifest.
@@ -226,10 +231,18 @@ export function weatherCard(producer: string, provenance: string, data: Record<s
   const alert = data.alert && typeof data.alert === "object" ? data.alert as Record<string, unknown> : undefined;
   const alertTitle = alert && typeof alert.title === "string" ? alert.title.trim() : "";
   const alertDescription = alert && typeof alert.text === "string" ? alert.text.trim() : "";
+  // Sun times and wind for the sky scene: each is added only when the source value is valid (WEATHER-SCENE-07).
+  const sunrise = localDateTime(data.block_detail_sunrise);
+  const sunset = localDateTime(data.block_detail_sunset);
+  const windRaw = finite(data.block_detail_wind_speed);
+  const wind = windRaw !== null && windRaw >= 0 && windRaw <= 400 ? Math.round(windRaw * 10) / 10 : null;
   return blockEnvelope("weather_card", producer, alt, provenance, {
     place,
     unit,
     current: { temp, condition, code, is_day: isDay },
+    ...(sunrise ? { sunrise } : {}),
+    ...(sunset ? { sunset } : {}),
+    ...(wind !== null ? { wind_speed: wind } : {}),
     ...(advice.length > 0 ? { advice } : {}),
     ...(alertTitle ? { alert: { title: alertTitle, ...(alertDescription ? { text: alertDescription } : {}), ...(alert?.severity === "info" || alert?.severity === "warn" || alert?.severity === "severe" ? { severity: alert.severity } : {}) } } : {}),
     ...(hourly.length > 0 ? { hourly } : {}),
