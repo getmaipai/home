@@ -59,3 +59,23 @@ export function retiredManagePageTarget(pathname: string, viewer: { canManageHou
 export function customizeTarget(band: "child" | "teen" | "adult"): string {
   return band === "child" ? settingsPath("chat") : settingsPath("chat", "skills");
 }
+
+/** The live alias map behind `App.tsx`'s `AliasRedirect`: an old path and where it lands. A path with no entry lands on itself. */
+export function aliasTarget(path: string, viewer: { canManageHousehold: boolean }): string {
+  const fixed: Record<string, string> = {
+    "/conversations": "/chat",
+    "/settings/users": settingsPath("household", "people"),
+    // AUDIT-UI-01: Backups and Updates are their own pages; pointing this at /settings/backups looped it onto itself and drew a blank shell.
+    "/settings/backups": "/backups",
+    "/settings/commands": settingsPath("home-voice", "commands"),
+    "/settings/devices": settingsPath("profile", "profile"),
+    "/settings/repairs": settingsPath("advanced"),
+    "/settings/updates": "/updates",
+    // AUDIT-UI-01: radio is a page of the Music app (its Radio tab), not an app of its own.
+    "/apps/radio": "/apps/music/radio",
+  };
+  return fixed[path]
+    ?? (path === "/settings/models" ? retiredManagePageTarget("/models", viewer) : undefined)
+    ?? (path === "/settings/voices" ? retiredManagePageTarget("/voices", viewer) : undefined)
+    ?? path;
+}

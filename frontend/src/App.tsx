@@ -4,8 +4,7 @@ import { BrowserRouter, Routes as RouterRoutes, Route, Navigate, useLocation } f
 import { I18nProvider } from "@lingui/react";
 import { i18n } from "@/i18n";
 import { createQueryClient } from "@/lib/queryClient";
-import { retiredManagePageTarget } from "@/shell/pages/settings/settingsRedirects";
-import { settingsPath } from "@/shell/pages/settings/settingsAreas";
+import { aliasTarget } from "@/shell/pages/settings/settingsRedirects";
 import type { SignedInPerson } from "@/lib/api";
 import { usePersonLocale } from "@/shell/usePersonLocale";
 import { Progress } from "@maipai/ui/src/primitives/Progress";
@@ -53,20 +52,10 @@ const queryClient = createQueryClient();
 function AliasRedirect({ path, person }: { path: string; person: SignedInPerson | null | undefined }) {
   const location = useLocation();
   const canManageHousehold = person?.role === "owner" || person?.role === "admin";
-  const destinations: Record<string, string> = {
-    "/conversations": "/chat",
-    "/settings/users": settingsPath("household", "people"),
-    "/settings/backups": settingsPath("backups"),
-    "/settings/commands": settingsPath("home-voice", "commands"),
-    "/settings/devices": settingsPath("profile", "profile"),
-    "/settings/repairs": settingsPath("advanced"),
-    "/settings/updates": settingsPath("backups", "updates"),
-  };
-  const destination = destinations[path]
-    ?? (path === "/settings/models" ? retiredManagePageTarget("/models", { canManageHousehold }) : undefined)
-    ?? (path === "/settings/voices" ? retiredManagePageTarget("/voices", { canManageHousehold }) : undefined)
-    ?? path;
+  const [destination, destinationQuery = ""] = aliasTarget(path, { canManageHousehold }).split("?");
+  // The destination's own query (a tab) wins over the old link's; the rest of the old query carries over.
   const params = new URLSearchParams(location.search);
+  new URLSearchParams(destinationQuery).forEach((value, key) => params.set(key, value));
   if (path === "/conversations" && !params.has("list")) params.set("list", "1");
   const query = params.size > 0 ? `?${params}` : "";
   return <Navigate to={`${destination}${query}${location.hash}`} replace />;
@@ -182,6 +171,7 @@ export function App() {
                     <Route path="/settings/devices" element={<AliasRedirect path="/settings/devices" person={person} />} />
                     <Route path="/settings/repairs" element={<AliasRedirect path="/settings/repairs" person={person} />} />
                     <Route path="/settings/updates" element={<AliasRedirect path="/settings/updates" person={person} />} />
+                    <Route path="/apps/radio" element={<AliasRedirect path="/apps/radio" person={person} />} />
                     <Route
                       path="/*"
                       element={

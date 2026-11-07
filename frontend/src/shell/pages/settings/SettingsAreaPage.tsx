@@ -1,6 +1,7 @@
 import { Fragment, useEffect, useMemo, type ReactNode } from "react";
 import { useHeaderExtra } from "@maipai/ui/src/dashboard/layouts/full/vertical/header/HeaderExtraContext";
 import { PageHeaderTitle } from "@/shell/pageHeaderTitle";
+import { NotFoundPage } from "@/shell/pages/NotFoundPage";
 import { Link, Navigate, useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { useQueries, useQuery } from "@tanstack/react-query";
 import type { SettingsKey } from "@maipai/spec/gen/ts/settings-key.js";
@@ -71,7 +72,7 @@ export function SettingsAreaPage({ person, onPersonChange }: { person: Roster; o
           <EmptyHeader>
             <EmptyDescription>Only a parent or admin can change these settings. Ask the person who set up Home.</EmptyDescription>
           </EmptyHeader>
-          <Button variant="link" render={<Link to={settingsPath("profile")} />}>Open your settings</Button>
+          <Button variant="link" nativeButton={false} role="link" render={<Link to={settingsPath("profile")} />}>Open your settings</Button>
         </Empty>
       </>
     );
@@ -82,7 +83,7 @@ export function SettingsAreaPage({ person, onPersonChange }: { person: Roster; o
     <>
       <Empty>
         <EmptyHeader><EmptyDescription>Only a parent or admin can change these settings. Ask the person who set up Home.</EmptyDescription></EmptyHeader>
-        <Button variant="link" render={<Link to={settingsPath("profile")} />}>Open your settings</Button>
+        <Button variant="link" nativeButton={false} role="link" render={<Link to={settingsPath("profile")} />}>Open your settings</Button>
       </Empty>
     </>
   );
@@ -99,7 +100,7 @@ function SettingsBackLink({ title, reach }: { title: string; reach: string }) {
   const label = backLabelFor(to, Object.fromEntries((rows ?? []).map((row) => [row.package, row.label])));
   return (
     <>
-      <div className="flex"><Button variant="ghost" size="row" render={<Link to={to} aria-label={label === "Back" ? label : `Back to ${label}`} onClick={(event) => { if (!confirmRouteLeave()) event.preventDefault(); }} />}>
+      <div className="flex"><Button variant="ghost" size="row" nativeButton={false} role="link" render={<Link to={to} aria-label={label === "Back" ? label : `Back to ${label}`} onClick={(event) => { if (!confirmRouteLeave()) event.preventDefault(); }} />}>
         <BackIcon aria-hidden />
         {label}
       </Button></div>
@@ -180,7 +181,8 @@ function SettingsAreaBody({ area, packageAreas, person, onPersonChange, packageA
   if (!sectionId && desktop && first) return <Navigate to={pagePath(first.id)} replace />;
   // A section that is hidden, unknown or has no content here: the response never says it exists.
   if (sectionId && !active && !(sectionDefinition && sectionDefinition.needs && !ready)) {
-    if (area.id === "settings" && !first) return null;
+    // AUDIT-UI-01: nothing to open here is a page that does not exist, never an empty shell.
+    if (area.id === "settings" && !first) return <NotFoundPage />;
     return <Navigate to={desktop && first ? pagePath(first.id) : settingsPath("profile")} replace />;
   }
   if (detailId && !active?.detail) return <Navigate to={settingsPath(active?.id)} replace />;
@@ -269,7 +271,7 @@ function SettingsAreaBody({ area, packageAreas, person, onPersonChange, packageA
                 </ItemContent>
                 <ItemFooter>
                   {item.done ? <Badge variant="secondary">Done</Badge> : <>
-                    <Button aria-label={`Open ${item.title}`} variant="outline" size="row" render={<Link to={item.open.href} state={item.id === "away-access" ? { from: `${location.pathname}${location.search}${location.hash}` } : undefined} />}>{item.open.label}</Button>
+                    <Button aria-label={`Open ${item.title}`} variant="outline" size="row" nativeButton={false} role="link" render={<Link to={item.open.href} state={item.id === "away-access" ? { from: `${location.pathname}${location.search}${location.hash}` } : undefined} />}>{item.open.label}</Button>
                     <Button variant="ghost" size="row" disabled={setupChecklist.dismiss.isPending} onClick={() => setupChecklist.dismiss.mutate(item.id)}>Not now</Button>
                   </>}
                 </ItemFooter>

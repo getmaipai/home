@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import type { SettingsKey } from "@maipai/spec/gen/ts/settings-key.js";
 import legacyMap from "@maipai/spec/settings/legacy-sections.json";
-import { customizeTarget, legacySettingsSectionTarget, legacySettingsTarget, retiredManagePageTarget } from "@/shell/pages/settings/settingsRedirects";
+import { aliasTarget, customizeTarget, legacySettingsSectionTarget, legacySettingsTarget, retiredManagePageTarget } from "@/shell/pages/settings/settingsRedirects";
 import { settingsPath } from "@/shell/pages/settings/settingsAreas";
 
 const admin = { canManageHousehold: true };
@@ -68,5 +68,21 @@ describe("other moved routes", () => {
   test("customize keeps the audience gate", () => {
     expect(customizeTarget("adult")).toBe("/settings/chat?tab=skills");
     expect(customizeTarget("child")).toBe("/settings/chat");
+  });
+});
+
+describe("aliasTarget (AUDIT-UI-01)", () => {
+  test("/settings/backups lands on the Backups page, never on itself (it looped and drew a blank shell)", () => {
+    expect(aliasTarget("/settings/backups", admin)).toBe("/backups");
+    expect(aliasTarget("/settings/updates", admin)).toBe("/updates");
+  });
+  test("/apps/radio lands on the Radio page of Music", () => {
+    expect(aliasTarget("/apps/radio", member)).toBe("/apps/music/radio");
+  });
+  test("the older aliases keep their destinations and an unknown path lands on itself", () => {
+    expect(aliasTarget("/conversations", admin)).toBe("/chat");
+    expect(aliasTarget("/settings/voices", admin)).toBe(settingsPath("home-voice", "voices"));
+    expect(aliasTarget("/settings/voices", member)).toBe(settingsPath("voice", "voice"));
+    expect(aliasTarget("/nowhere", admin)).toBe("/nowhere");
   });
 });
