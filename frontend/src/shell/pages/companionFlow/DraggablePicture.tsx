@@ -1,3 +1,4 @@
+import { i18n } from "@lingui/core";
 import { useEffect, useRef, type CSSProperties, type KeyboardEvent, type PointerEvent as ReactPointerEvent } from "react";
 import { DEFAULT_FRAME, type PictureFrame } from "@/shell/pages/companionFlow/PreviewControls";
 
@@ -62,7 +63,7 @@ export function DraggablePicture({ src, alt, frame, baked = DEFAULT_FRAME, disab
   return (
     // The box is one custom control (drag, arrow keys, wheel) with no native element that fits.
     // eslint-disable-next-line jsx-a11y/no-noninteractive-element-interactions
-    <div ref={box} role="application" aria-label="Character position. Drag the character or use the arrow keys to move it, and the mouse wheel or the plus and minus keys to zoom."
+    <div ref={box} role="application" aria-label={i18n._({ id: "Character position. Drag the character or use the arrow keys to move it, and the mouse wheel or the plus and minus keys to zoom.", message: "Character position. Drag the character or use the arrow keys to move it, and the mouse wheel or the plus and minus keys to zoom." })}
       tabIndex={disabled ? -1 : 0} data-slot="character-drag" className={`absolute inset-0 touch-none select-none ${disabled ? "" : "cursor-grab active:cursor-grabbing"}`}
       onPointerDown={down} onPointerMove={move} onPointerUp={up} onPointerCancel={up} onKeyDown={key}>
       <img src={src} alt={alt} draggable={false} data-slot="character-picture"

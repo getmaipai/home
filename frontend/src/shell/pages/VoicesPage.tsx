@@ -1,3 +1,4 @@
+import { i18n } from "@lingui/core";
 import { CardHeader, CardTitle } from "@maipai/ui/src/dashboard/components/ui/card";
 import { getIcon } from "@maipai/ui/src/icons";
 import { MicrophoneSection } from "@/apps/settings/MicrophoneSection";
@@ -10,11 +11,11 @@ export const VoicesIcon = getIcon("audio-waveform");
 /** Personal voice choice and microphone, composed from the existing
  * settings sections. Their own APIs enforce the applicable permissions. */
 export function VoicesPage({ person }: { person: Roster }) {
-  useTabItem("Voices");
+  useTabItem(i18n._({ id: "Voices", message: "Voices" }));
   return (
     <div className="flex flex-col gap-4">
       <CardHeader>
-        <CardTitle><VoicesIcon size={16} className="mr-2 inline text-muted-foreground" />Voices</CardTitle>
+        <CardTitle><VoicesIcon size={16} className="mr-2 inline text-muted-foreground" />{i18n._({ id: "Voices", message: "Voices" })}</CardTitle>
       </CardHeader>
       <VoiceBrowserSection person={person} />
       <MicrophoneSection />

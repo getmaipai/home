@@ -1,3 +1,4 @@
+import { i18n } from "@lingui/core";
 import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import { PageHeaderTitle } from "@/shell/pageHeaderTitle";
 import { Link, Navigate } from "react-router-dom";
@@ -35,7 +36,7 @@ function projectsHeaderSnapshot() { return projectsCreateAllowed; }
 function ProjectsHeaderAction() {
   const canCreate = useSyncExternalStore(subscribeProjectsHeader, projectsHeaderSnapshot, projectsHeaderSnapshot);
   if (!canCreate) return null;
-  return <><Button type="button" onClick={() => window.dispatchEvent(new Event("maipai:projects-create"))}><PlusIcon className="size-4" />Create</Button></>;
+  return <><Button type="button" onClick={() => window.dispatchEvent(new Event("maipai:projects-create"))}><PlusIcon className="size-4" />{i18n._({ id: "Create", message: "Create" })}</Button></>;
 }
 
 const projectsQueryKey = (personId: string) => ["chat-projects", personId, "all", "updated"] as const;
@@ -55,7 +56,7 @@ const emptyValue: ProjectSettingsValue = {
 export function ProjectsPage({ person }: { person: Roster }) {
   useHeaderExtra(PageHeaderTitle, ProjectsHeaderAction);
   const { on: incognito } = useIncognitoContext();
-  useTabItem("Projects");
+  useTabItem(i18n._({ id: "Projects", message: "Projects" }));
   const queryClient = useQueryClient();
   const [search, setSearch] = useState("");
   const [dialog, setDialog] = useState<DialogState | null>(null);
@@ -101,7 +102,7 @@ export function ProjectsPage({ person }: { person: Roster }) {
         });
         await refresh();
       } catch (error) {
-        toast.error("Could not make that project. Try again.");
+        toast.error(i18n._({ id: "Could not make that project. Try again.", message: "Could not make that project. Try again." }));
         throw error;
       }
       return;
@@ -111,7 +112,7 @@ export function ProjectsPage({ person }: { person: Roster }) {
       await api.updateChatFolder(editingProject.id, patch);
       await refresh();
     } catch (error) {
-      toast.error("Could not save that project. Try again.");
+      toast.error(i18n._({ id: "Could not save that project. Try again.", message: "Could not save that project. Try again." }));
       throw error;
     }
   };
@@ -120,7 +121,7 @@ export function ProjectsPage({ person }: { person: Roster }) {
       await api.deleteChatFolder(editingProject.id);
       await refresh();
     } catch (error) {
-      toast.error("Could not delete that project. Try again.");
+      toast.error(i18n._({ id: "Could not delete that project. Try again.", message: "Could not delete that project. Try again." }));
       throw error;
     }
   } : undefined;
@@ -128,33 +129,33 @@ export function ProjectsPage({ person }: { person: Roster }) {
   if (incognito) return <Navigate to="/chat" replace />;
 
   return (
-    <Page title="Projects" hideTitle>
+    <Page title={i18n._({ id: "Projects", message: "Projects" })} hideTitle>
       <div className="flex min-h-0 flex-1 flex-col gap-4 px-4 py-4 sm:px-6">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-end">
           <div className="relative min-w-0 flex-1 sm:max-w-sm">
             <SearchIcon className="text-muted-foreground pointer-events-none absolute end-3 top-1/2 size-4 -translate-y-1/2" />
             <Input
-              aria-label="Search projects"
-              placeholder="Search projects"
+              aria-label={i18n._({ id: "Search projects", message: "Search projects" })}
+              placeholder={i18n._({ id: "Search projects", message: "Search projects" })}
               value={search}
               onChange={(event) => setSearch(event.target.value)}
             />
           </div>
         </div>
 
-        {query.isError ? <AsyncState data={undefined} error onRetry={() => void query.refetch()} errorMessage="Could not load projects. Try again." loadingLabel="Loading projects">{() => null}</AsyncState> : query.isLoading ? <AsyncState data={undefined} onRetry={() => void query.refetch()} loadingLabel="Loading projects">{() => null}</AsyncState> : filtered.length === 0 ? (
+        {query.isError ? <AsyncState data={undefined} error onRetry={() => void query.refetch()} errorMessage={i18n._({ id: "Could not load projects. Try again.", message: "Could not load projects. Try again." })} loadingLabel={i18n._({ id: "Loading projects", message: "Loading projects" })}>{() => null}</AsyncState> : query.isLoading ? <AsyncState data={undefined} onRetry={() => void query.refetch()} loadingLabel={i18n._({ id: "Loading projects", message: "Loading projects" })}>{() => null}</AsyncState> : filtered.length === 0 ? (
           <EmptyState>
-            <EmptyStateGreeting>{projects.length === 0 ? "No projects yet" : "No matching projects"}</EmptyStateGreeting>
-            {projects.length === 0 ? <p className="text-muted-foreground text-center">Projects keep related chats together.</p> : null}
+            <EmptyStateGreeting>{projects.length === 0 ? i18n._({ id: "No projects yet", message: "No projects yet" }) : i18n._({ id: "No matching projects", message: "No matching projects" })}</EmptyStateGreeting>
+            {projects.length === 0 ? <p className="text-muted-foreground text-center">{i18n._({ id: "Projects keep related chats together.", message: "Projects keep related chats together." })}</p> : null}
           </EmptyState>
         ) : (
           <div className="min-w-0 flex-1 overflow-x-auto">
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Name</TableHead>
-                <TableHead>Updated</TableHead>
-                <TableHead><span className="sr-only">Project actions</span></TableHead>
+                <TableHead>{i18n._({ id: "Name", message: "Name" })}</TableHead>
+                <TableHead>{i18n._({ id: "Updated", message: "Updated" })}</TableHead>
+                <TableHead><span className="sr-only">{i18n._({ id: "Project actions", message: "Project actions" })}</span></TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -176,14 +177,14 @@ export function ProjectsPage({ person }: { person: Roster }) {
                           <Button
                             variant="ghost"
                             size="icon-sm"
-                            aria-label={`${project.pinned ? "Unpin" : "Pin"} ${project.name}`}
+                            aria-label={`${project.pinned ? i18n._({ id: "Unpin", message: "Unpin" }) : i18n._({ id: "Pin", message: "Pin" })} ${project.name}`}
                             aria-pressed={project.pinned}
                             onClick={async () => {
                               try {
                                 await api.updateChatFolder(project.id, { pinned: !project.pinned });
                                 await refresh();
                               } catch {
-                                toast.error("Could not update that project. Try again.");
+                                toast.error(i18n._({ id: "Could not update that project. Try again.", message: "Could not update that project. Try again." }));
                               }
                             }}
                           >
@@ -191,7 +192,7 @@ export function ProjectsPage({ person }: { person: Roster }) {
                           </Button>
                         ) : null}
                         {canEdit ? (
-                          <Button variant="ghost" size="icon-sm" aria-label={`Edit ${project.name}`} onClick={() => setDialog({ kind: "edit", project })}>
+                          <Button variant="ghost" size="icon-sm" aria-label={i18n._({ id: "Edit {name}", message: "Edit {name}", values: { name: project.name } })} onClick={() => setDialog({ kind: "edit", project })}>
                             <EditIcon className="size-4" />
                           </Button>
                         ) : null}
@@ -215,7 +216,7 @@ export function ProjectsPage({ person }: { person: Roster }) {
           onDelete={deleteProject}
           memoryModes={[]}
           readOnly={dialog.kind === "edit" && dialog.project.access !== "manage" && dialog.project.access !== "edit"}
-          labels={{ instructionsHelp: "These instructions shape answers in this project.", confirmDelete: "Its chats stay." }}
+          labels={{ instructionsHelp: i18n._({ id: "These instructions shape answers in this project.", message: "These instructions shape answers in this project." }), confirmDelete: i18n._({ id: "Its chats stay.", message: "Its chats stay." }) }}
         />
       ) : null}
     </Page>

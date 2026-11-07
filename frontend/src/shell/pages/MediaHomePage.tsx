@@ -1,3 +1,4 @@
+import { i18n } from "@lingui/core";
 import { useQuery } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import { AsyncState } from "@maipai/ui/src/primitives/AsyncState";
@@ -20,7 +21,7 @@ const FALLBACK_KIND: Record<MediaHomeRow["app"], ImageFallbackKind> = {
 /** Task 11 of the media hub: the Media home page. The person's shelves from `GET /api/media/home`, drawn in the hub's
  * own column beside its section sidebar; each tile opens its app's play page. */
 export function MediaHomePage() {
-  useTabItem("Media");
+  useTabItem(i18n._({ id: "Media", message: "Media" }));
   const navigate = useNavigate();
   const page = useQuery({ queryKey: ["media-home"], queryFn: api.mediaHome, retry: false });
 
@@ -32,23 +33,23 @@ export function MediaHomePage() {
           error={page.isError}
           isFetching={page.isFetching}
           onRetry={() => page.refetch()}
-          errorMessage="Could not load Media. Check your connection and try again."
-          loadingLabel="Loading Media"
+          errorMessage={i18n._({ id: "Could not load Media. Check your connection and try again.", message: "Could not load Media. Check your connection and try again." })}
+          loadingLabel={i18n._({ id: "Loading Media", message: "Loading Media" })}
         >
           {(data: MediaHome) => {
             const shelves = [
-              { heading: "Made at home", items: data.made_at_home, aspect: "wide" as const, getProgress: undefined },
+              { heading: i18n._({ id: "Made at home", message: "Made at home" }), items: data.made_at_home, aspect: "wide" as const, getProgress: undefined },
               {
-                heading: "Pick up where you left off",
+                heading: i18n._({ id: "Pick up where you left off", message: "Pick up where you left off" }),
                 items: data.continue,
                 aspect: "wide" as const,
                 getProgress: (row: MediaHomeRow) => (row.percent === null ? undefined : row.percent / 100),
               },
-              { heading: "New in your media", items: data.new, aspect: "wide" as const, getProgress: undefined },
-              { heading: "Recently played", items: data.recent_music, aspect: "wide" as const, getProgress: undefined },
+              { heading: i18n._({ id: "New in your media", message: "New in your media" }), items: data.new, aspect: "wide" as const, getProgress: undefined },
+              { heading: i18n._({ id: "Recently played", message: "Recently played" }), items: data.recent_music, aspect: "wide" as const, getProgress: undefined },
             ].filter((shelf) => shelf.items.length > 0);
             if (shelves.length === 0 && data.made_at_home.length === 0) {
-              return <EmptyState icon="film" text="Nothing here yet. Add music, videos, shows, podcasts or books to your library and they show up here." />;
+              return <EmptyState icon="film" text={i18n._({ id: "Nothing here yet. Add music, videos, shows, podcasts or books to your library and they show up here.", message: "Nothing here yet. Add music, videos, shows, podcasts or books to your library and they show up here." })} />;
             }
             return shelves.map((shelf) => (
               <MediaShelf

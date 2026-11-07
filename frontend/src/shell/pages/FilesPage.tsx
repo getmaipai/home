@@ -1,3 +1,4 @@
+import { i18n } from "@lingui/core";
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore, type CSSProperties } from "react";
 import { PageHeaderTitle } from "@/shell/pageHeaderTitle";
 import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
@@ -44,7 +45,7 @@ function subscribeLibraryHeader(listener: () => void) { libraryHeaderListeners.a
 function libraryHeaderSnapshot() { return libraryCanAdd; }
 function LibraryHeaderAction() {
   const canUpload = useSyncExternalStore(subscribeLibraryHeader, libraryHeaderSnapshot, libraryHeaderSnapshot);
-  return <><Button type="button" onClick={() => window.dispatchEvent(new Event(LIBRARY_UPLOAD_EVENT))}>{canUpload ? <UploadIcon aria-hidden className="size-4" /> : null}{canUpload ? "Upload" : "Ask to add a file"}</Button></>;
+  return <><Button type="button" onClick={() => window.dispatchEvent(new Event(LIBRARY_UPLOAD_EVENT))}>{canUpload ? <UploadIcon aria-hidden className="size-4" /> : null}{canUpload ? i18n._({ id: "Upload", message: "Upload" }) : i18n._({ id: "Ask to add a file", message: "Ask to add a file" })}</Button></>;
 }
 const GridIcon = getIcon("layout-grid");
 const ListIcon = getIcon("layout-list");
@@ -64,13 +65,16 @@ function useWide(): boolean {
 }
 const editable = (target: EventTarget | null): boolean => target instanceof HTMLElement && (target.isContentEditable || /^(input|textarea|select)$/i.test(target.tagName));
 const itemsWord = (count: number) => `${count} ${count === 1 ? "item" : "items"}`;
-const CHILD_ADD = "Ask a grown-up to add this file. Adding files to the Library is turned off for your profile.";
+const CHILD_ADD = () => i18n._({ id: "Ask a grown-up to add this file. Adding files to the Library is turned off for your profile.", message: "Ask a grown-up to add this file. Adding files to the Library is turned off for your profile." });
 
 /** The Library: a Dropbox-style page. Sections, search, filters and sort are all in the address; the hub does the filtering
  * and paging; the kit draws the tiles, the table, the viewer and the share dialog. No folders. */
+const restoreFailed = (count: number, reason: string) => i18n._({ id: "{count, plural, one {# could not be restored: {reason}.} other {# could not be restored: {reason}.}}", message: "{count, plural, one {# could not be restored: {reason}.} other {# could not be restored: {reason}.}}", values: { count, reason } });
+const keepFailed = (count: number, reason: string) => i18n._({ id: "{count, plural, one {# could not be kept: {reason}.} other {# could not be kept: {reason}.}}", message: "{count, plural, one {# could not be kept: {reason}.} other {# could not be kept: {reason}.}}", values: { count, reason } });
+
 export function FilesPage({ person }: { person: Roster }) {
   useHeaderExtra(PageHeaderTitle, LibraryHeaderAction);
-  useTabItem("Library");
+  useTabItem(i18n._({ id: "Library", message: "Library" }));
   const [params, setParams] = useSearchParams();
   const view = useMemo(() => parseView(params), [params]);
   const wide = useWide();
@@ -143,16 +147,16 @@ export function FilesPage({ person }: { person: Roster }) {
   const people = useQuery({ queryKey: ["people"], queryFn: () => api.people(), enabled: deep.data !== undefined });
   const deepItem = useMemo<LibraryItem | null>(() => deep.data && deepId ? {
     id: deep.data.id, kind: deep.data.kind === "image" || deep.data.kind === "video" || deep.data.kind === "audio" || deep.data.kind === "document" || deep.data.kind === "story" ? deep.data.kind : "file",
-    name: ({ image: "Picture", video: "Video", audio: "Song", document: "Document" } as Record<string, string>)[deep.data.kind] ?? "File",
+    name: ({ image: i18n._({ id: "Picture", message: "Picture" }), video: i18n._({ id: "Video", message: "Video" }), audio: i18n._({ id: "Song", message: "Song" }), document: i18n._({ id: "Document", message: "Document" }) } as Record<string, string>)[deep.data.kind] ?? i18n._({ id: "File", message: "File" }),
     media_type: deep.data.media_type, size_bytes: deep.data.size, created_at: deep.data.created_at,
-    owner: { id: deep.data.owner_person_id, display_name: deep.data.owner_person_id === person.id ? person.display_name : people.data?.find((entry) => entry.id === deep.data!.owner_person_id)?.display_name ?? "Someone in your home" },
+    owner: { id: deep.data.owner_person_id, display_name: deep.data.owner_person_id === person.id ? person.display_name : people.data?.find((entry) => entry.id === deep.data!.owner_person_id)?.display_name ?? i18n._({ id: "Someone in your home", message: "Someone in your home" }) },
     shared_with: { count: 0, household: false }, retention: deep.data.retention, chat_id: null, can_edit: false, audience: null, duration_seconds: null,
     thumb_url: `/api/files/${deep.data.id}/thumb?w=320`, expires_at: null, version_count: 1,
   } : null, [deep.data, deepId, people.data, person.id, person.display_name]);
   const viewerList = useMemo(() => (deepItem && !loaded ? [deepItem, ...items] : items), [deepItem, loaded, items]);
   useEffect(() => {
     if (deep.isError && deepId) {
-      toast.error(deep.error instanceof ApiError && deep.error.message ? deep.error.message : "That file is not available to you. Ask the person who added it to share it again.");
+      toast.error(deep.error instanceof ApiError && deep.error.message ? deep.error.message : i18n._({ id: "That file is not available to you. Ask the person who added it to share it again.", message: "That file is not available to you. Ask the person who added it to share it again." }));
       update({ file: null });
     }
   }, [deep.isError, deep.error, deepId, update]);
@@ -165,16 +169,16 @@ export function FilesPage({ person }: { person: Roster }) {
       const result = await actions.trash(targets);
       leaveSelection(); setConfirm(null);
       if (result.done.includes(view.file ?? "")) closeViewer();
-      const sentence = batchSentence(result, (count) => `${count === 1 ? `'${targets.find((item) => item.id === result.done[0])?.name ?? "File"}'` : `${count} files`} moved to Trash. Kept 30 days`, result.done.length ? "could not be moved" : "could not be moved to Trash");
+      const sentence = batchSentence(result, (count) => count === 1 ? i18n._({ id: "‘{name}’ moved to Trash. Kept 30 days", message: "‘{name}’ moved to Trash. Kept 30 days", values: { name: targets.find((item) => item.id === result.done[0])?.name ?? i18n._({ id: "File", message: "File" }) } }) : i18n._({ id: "{count} files moved to Trash. Kept 30 days", message: "{count} files moved to Trash. Kept 30 days", values: { count } }), (count, reason) => result.done.length ? i18n._({ id: "{count, plural, one {# could not be moved: {reason}.} other {# could not be moved: {reason}.}}", message: "{count, plural, one {# could not be moved: {reason}.} other {# could not be moved: {reason}.}}", values: { count, reason } }) : i18n._({ id: "{count, plural, one {# could not be moved to Trash: {reason}.} other {# could not be moved to Trash: {reason}.}}", message: "{count, plural, one {# could not be moved to Trash: {reason}.} other {# could not be moved to Trash: {reason}.}}", values: { count, reason } }));
       const done = [...result.done];
-      if (done.length > 0) toast(sentence, { action: { label: "Undo", onClick: () => { void actions.restore(done).then((back) => { if (back.refused.length) toast.error(batchSentence(back, (count) => `${count} restored`, "could not be restored")); }); } } });
+      if (done.length > 0) toast(sentence, { action: { label: i18n._({ id: "Undo", message: "Undo" }), onClick: () => { void actions.restore(done).then((back) => { if (back.refused.length) toast.error(batchSentence(back, (count) => i18n._({ id: "{count} restored", message: "{count} restored", values: { count } }), restoreFailed)); }); } } });
       else toast.error(sentence);
     } finally { setBusy(false); }
   }, [actions, closeViewer, leaveSelection, view.file]);
 
   const requestTrash = useCallback((targets: readonly LibraryItem[]) => {
     const own = targets.filter((item) => item.owner.id === person.id);
-    if (own.length === 0) { toast.error("That file is not yours to delete. Ask the person who added it."); return; }
+    if (own.length === 0) { toast.error(i18n._({ id: "That file is not yours to delete. Ask the person who added it.", message: "That file is not yours to delete. Ask the person who added it." })); return; }
     const sharedOne = own.length === 1 && (own[0]!.shared_with.count > 0 || own[0]!.shared_with.household);
     if (own.length === 1 && !sharedOne && targets.length === 1) void doTrash(own);
     else setConfirm([...targets]);
@@ -183,12 +187,12 @@ export function FilesPage({ person }: { person: Roster }) {
   const itemActions: ItemActions = useMemo(() => ({
     open: (item) => update({ file: item.id }, false),
     rename: (item) => { setRenaming(item); setRenameText(item.name); },
-    keep: (item) => { void actions.keep([item]).then((result) => result.refused.length ? toast.error(batchSentence(result, () => "", "could not be kept")) : toast(`'${item.name}' is kept until you delete it.`)); },
+    keep: (item) => { void actions.keep([item]).then((result) => result.refused.length ? toast.error(batchSentence(result, () => "", keepFailed)) : toast(i18n._({ id: "‘{name}’ is kept until you delete it.", message: "‘{name}’ is kept until you delete it.", values: { name: item.name } }))); },
     share: (item) => setSharing([item]),
     trash: (item) => requestTrash([item]),
     recheck: (item) => {
-      toast("Checking the picture. This can take a minute.");
-      void actions.recheck(item.id).then(() => toast.success(`'${item.name}' is now marked all-ages.`)).catch((error: unknown) => toast.error(actions.reason(error)));
+      toast(i18n._({ id: "Checking the picture. This can take a minute.", message: "Checking the picture. This can take a minute." }));
+      void actions.recheck(item.id).then(() => toast.success(i18n._({ id: "‘{name}’ is now marked all-ages.", message: "‘{name}’ is now marked all-ages.", values: { name: item.name } }))).catch((error: unknown) => toast.error(actions.reason(error)));
     },
   }), [actions, requestTrash, update]);
 
@@ -196,12 +200,12 @@ export function FilesPage({ person }: { person: Roster }) {
   const uploads = useLibraryUploads(useCallback(() => { void actions.refresh(); }, [actions]));
   const fileInput = useRef<HTMLInputElement>(null);
   useEffect(() => {
-    const openUpload = () => { if (canAdd) fileInput.current?.click(); else toast(CHILD_ADD); };
+    const openUpload = () => { if (canAdd) fileInput.current?.click(); else toast(CHILD_ADD()); };
     window.addEventListener(LIBRARY_UPLOAD_EVENT, openUpload);
     return () => window.removeEventListener(LIBRARY_UPLOAD_EVENT, openUpload);
   }, [canAdd]);
   const [dragging, setDragging] = useState(false);
-  const addFiles = (files: readonly File[]) => { if (!canAdd) toast.error(CHILD_ADD); else uploads.add(files); };
+  const addFiles = (files: readonly File[]) => { if (!canAdd) toast.error(CHILD_ADD()); else uploads.add(files); };
   useEffect(() => {
     const onPaste = (event: ClipboardEvent) => {
       if (editable(event.target)) return;
@@ -277,7 +281,7 @@ export function FilesPage({ person }: { person: Roster }) {
     ];
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [view.section, countsKey, person.role]);
-  const footer = useMemo<SectionSidebarItem[]>(() => [{ id: "settings", label: "Settings", icon: "settings", href: "/settings" }], []);
+  const footer = useMemo<SectionSidebarItem[]>(() => [{ id: "settings", label: i18n._({ id: "Settings", message: "Settings" }), icon: "settings", href: "/settings" }], []);
   const drawer = useMemo(() => <SectionSidebarDrawerSections groups={groups} footer={footer} />, [groups, footer]);
   useDrawerSections(drawer);
   const [collapsed, setCollapsedState] = useState(() => readLibrarySidebarCollapsed(person.id));
@@ -287,45 +291,45 @@ export function FilesPage({ person }: { person: Roster }) {
   const headline = trashView ? (trashRows.length > 0 || trash.data ? itemsWord(trashRows.length) : "") : current ? `${itemsWord(current.items)} · ${formatBytes(current.bytes)}` : "";
   const filtersOn = view.q.trim() !== "" || view.filter !== "any";
   const searchField = (
-    <Input type="search" aria-label="Search your Library" placeholder="Search your Library" value={searchText} onChange={(event) => setSearchText(event.target.value)}
+    <Input type="search" aria-label={i18n._({ id: "Search your Library", message: "Search your Library" })} placeholder={i18n._({ id: "Search your Library", message: "Search your Library" })} value={searchText} onChange={(event) => setSearchText(event.target.value)}
       onKeyDown={(event) => { if (event.key === "Escape" && searchText) { event.preventDefault(); setSearchText(""); } }} />
   );
 
   const loadError = (message: string, retry: () => void) => (
     <div className="flex flex-col items-start gap-3">
       <Alert variant="destructive" role="alert"><AlertDescription>{message}</AlertDescription></Alert>
-      <Button type="button" variant="secondary" onClick={retry}>Try again</Button>
+      <Button type="button" variant="secondary" onClick={retry}>{i18n._({ id: "Try again", message: "Try again" })}</Button>
     </div>
   );
   const status = (() => {
     if (trashView) {
-      if (trash.isError) return loadError("Home could not load your Trash. Check that Home is running, then try again.", () => void trash.refetch());
-      if (!trash.data) return <RouteSkeleton label="Loading your files" />;
-      return <LibraryTrash rows={trashRows} busy={busy} onRestore={(ids) => { setBusy(true); void actions.restore(ids).then((r) => toast(batchSentence(r, (n) => `${n === 1 ? "File" : `${n} files`} restored`, "could not be restored"))).finally(() => setBusy(false)); }}
-        onPurge={(ids) => { setBusy(true); void actions.purge(ids).then((r) => toast(batchSentence(r, (n) => `${n === 1 ? "File" : `${n} files`} deleted forever`, "could not be deleted"))).finally(() => setBusy(false)); }} />;
+      if (trash.isError) return loadError(i18n._({ id: "Home could not load your Trash. Check that Home is running, then try again.", message: "Home could not load your Trash. Check that Home is running, then try again." }), () => void trash.refetch());
+      if (!trash.data) return <RouteSkeleton label={i18n._({ id: "Loading your files", message: "Loading your files" })} />;
+      return <LibraryTrash rows={trashRows} busy={busy} onRestore={(ids) => { setBusy(true); void actions.restore(ids).then((r) => toast(batchSentence(r, (n) => i18n._({ id: "{count, plural, one {File restored} other {# files restored}}", message: "{count, plural, one {File restored} other {# files restored}}", values: { count: n } }), restoreFailed))).finally(() => setBusy(false)); }}
+        onPurge={(ids) => { setBusy(true); void actions.purge(ids).then((r) => toast(batchSentence(r, (n) => i18n._({ id: "{count, plural, one {File deleted forever} other {# files deleted forever}}", message: "{count, plural, one {File deleted forever} other {# files deleted forever}}", values: { count: n } }), (count, reason) => i18n._({ id: "{count, plural, one {# could not be deleted: {reason}.} other {# could not be deleted: {reason}.}}", message: "{count, plural, one {# could not be deleted: {reason}.} other {# could not be deleted: {reason}.}}", values: { count, reason } })))).finally(() => setBusy(false)); }} />;
     }
-    if (list.isError && !list.isFetchNextPageError) return loadError(list.error instanceof ApiError && list.error.message ? list.error.message : "Home could not load your Library. Check that Home is running, then try again.", () => void list.refetch());
-    if (list.isPending) return <RouteSkeleton label="Loading your files" />;
+    if (list.isError && !list.isFetchNextPageError) return loadError(list.error instanceof ApiError && list.error.message ? list.error.message : i18n._({ id: "Home could not load your Library. Check that Home is running, then try again.", message: "Home could not load your Library. Check that Home is running, then try again." }), () => void list.refetch());
+    if (list.isPending) return <RouteSkeleton label={i18n._({ id: "Loading your files", message: "Loading your files" })} />;
     if (items.length === 0) {
-      if (filtersOn) return <EmptyState icon="search" text="No matches. Try a different word or clear a filter." actionLabel="Clear filters" onAction={() => { setSearchText(""); update({ q: "", filter: "any" }); }} />;
-      if (view.section === "all") return <EmptyState icon="folder" text="Nothing here yet. Pictures, videos and songs you make in chat land here, along with files you upload. Drop a file anywhere on this page to add it." />;
-      return <EmptyState icon={sectionOf(view.section).icon} text={`Nothing in ${sectionOf(view.section).label} yet.`} actionLabel="Show all files" onAction={() => goSection("all")} />;
+      if (filtersOn) return <EmptyState icon="search" text={i18n._({ id: "No matches. Try a different word or clear a filter.", message: "No matches. Try a different word or clear a filter." })} actionLabel={i18n._({ id: "Clear filters", message: "Clear filters" })} onAction={() => { setSearchText(""); update({ q: "", filter: "any" }); }} />;
+      if (view.section === "all") return <EmptyState icon="folder" text={i18n._({ id: "Nothing here yet. Pictures, videos and songs you make in chat land here, along with files you upload. Drop a file anywhere on this page to add it.", message: "Nothing here yet. Pictures, videos and songs you make in chat land here, along with files you upload. Drop a file anywhere on this page to add it." })} />;
+      return <EmptyState icon={sectionOf(view.section).icon} text={i18n._({ id: "Nothing in {label} yet.", message: "Nothing in {label} yet.", values: { label: sectionOf(view.section).label } })} actionLabel={i18n._({ id: "Show all files", message: "Show all files" })} onAction={() => goSection("all")} />;
     }
     return (
       <div className="flex flex-col gap-4" style={{ "--maipai-card-size": `${cardSize}px` } as CSSProperties}>
         <LibraryItems items={items} me={person} layout={view.layout} phone={phone} selectedIds={selected} onSelectionChange={setSelected} selectionMode={selecting}
           onExitSelectionMode={leaveSelection} actions={itemActions} sort={view.sort} onSort={(sort) => update({ sort })} />
-        {list.isFetchNextPageError ? loadError("Home could not load more files. Check that Home is running, then try again.", () => void fetchNextPage()) : null}
-        {hasNextPage ? <div ref={sentinel} className="flex justify-center"><Button type="button" variant="secondary" disabled={isFetchingNextPage} onClick={() => void fetchNextPage()}>{isFetchingNextPage ? "Loading more files" : "Show more files"}</Button></div> : null}
+        {list.isFetchNextPageError ? loadError(i18n._({ id: "Home could not load more files. Check that Home is running, then try again.", message: "Home could not load more files. Check that Home is running, then try again." }), () => void fetchNextPage()) : null}
+        {hasNextPage ? <div ref={sentinel} className="flex justify-center"><Button type="button" variant="secondary" disabled={isFetchingNextPage} onClick={() => void fetchNextPage()}>{isFetchingNextPage ? i18n._({ id: "Loading more files", message: "Loading more files" }) : i18n._({ id: "Show more files", message: "Show more files" })}</Button></div> : null}
       </div>
     );
   })();
 
   const batchActions = (
     <>
-      {canShare ? <Button type="button" variant="secondary" disabled={selectedItems.length === 0} onClick={() => setSharing(selectedItems)}>Share</Button> : null}
-      <Button type="button" variant="secondary" disabled={selectedItems.length === 0 || busy} onClick={() => { setBusy(true); void actions.keep(selectedItems).then((result) => { toast(batchSentence(result, (n) => `${n} kept until you delete ${n === 1 ? "it" : "them"}`, "could not be kept")); leaveSelection(); }).finally(() => setBusy(false)); }}>Keep</Button>
-      <Button type="button" variant="destructive" disabled={selectedItems.length === 0 || busy} onClick={() => requestTrash(selectedItems)}>Delete</Button>
+      {canShare ? <Button type="button" variant="secondary" disabled={selectedItems.length === 0} onClick={() => setSharing(selectedItems)}>{i18n._({ id: "Share", message: "Share" })}</Button> : null}
+      <Button type="button" variant="secondary" disabled={selectedItems.length === 0 || busy} onClick={() => { setBusy(true); void actions.keep(selectedItems).then((result) => { toast(batchSentence(result, (n) => i18n._({ id: "{count, plural, one {# kept until you delete it} other {# kept until you delete them}}", message: "{count, plural, one {# kept until you delete it} other {# kept until you delete them}}", values: { count: n } }), keepFailed)); leaveSelection(); }).finally(() => setBusy(false)); }}>{i18n._({ id: "Keep", message: "Keep" })}</Button>
+      <Button type="button" variant="destructive" disabled={selectedItems.length === 0 || busy} onClick={() => requestTrash(selectedItems)}>{i18n._({ id: "Delete", message: "Delete" })}</Button>
     </>
   );
 
@@ -336,7 +340,7 @@ export function FilesPage({ person }: { person: Roster }) {
       onDrop={(event) => { setDragging(false); const files = Array.from(event.dataTransfer?.files ?? []); if (files.length > 0) { event.preventDefault(); addFiles(files); } }}>
       <SectionSidebar standalone groups={groups} footer={footer} footerSlot={<div className="px-3 pb-2"><LibraryStorage me={person} /></div>} density="compact" collapsedStyle="hidden" collapsed={collapsed} onCollapsedChange={setCollapsed}
         sidebarProps={{ id: "library-sidebar" }}
-        search={{ value: searchText, onChange: setSearchText, label: "Search your Library", onSubmit: () => update({ q: searchText }) }} />
+        search={{ value: searchText, onChange: setSearchText, label: i18n._({ id: "Search your Library", message: "Search your Library" }), onSubmit: () => update({ q: searchText }) }} />
       <div className="flex min-w-0 flex-1 flex-col gap-4 p-4">
         <div className="flex flex-wrap items-center gap-3">
           {wide && collapsed ? <SectionSidebarShowButton onClick={() => setCollapsed(false)} controls="library-sidebar" /> : null}
@@ -344,12 +348,12 @@ export function FilesPage({ person }: { person: Roster }) {
             <h1 className="truncate text-2xl font-semibold tracking-tight">{sectionOf(view.section).label}</h1>
             <p className="text-base text-muted-foreground" aria-live="polite">{headline}</p>
           </div>
-          <input ref={fileInput} type="file" multiple hidden aria-label="Choose files to add" onChange={(event) => { const files = Array.from(event.target.files ?? []); event.target.value = ""; if (files.length > 0) addFiles(files); }} />
+          <input ref={fileInput} type="file" multiple hidden aria-label={i18n._({ id: "Choose files to add", message: "Choose files to add" })} onChange={(event) => { const files = Array.from(event.target.files ?? []); event.target.value = ""; if (files.length > 0) addFiles(files); }} />
         </div>
 
         {/* AUDIT-UI-01: shrink-0, or the column squeezes this scrolling strip down to the tops of its chips when the page is taller than the phone. */}
         {!wide ? (
-          <div role="group" aria-label="Library sections" className="-mx-4 flex shrink-0 gap-2 overflow-x-auto px-4 pb-1">
+          <div role="group" aria-label={i18n._({ id: "Library sections", message: "Library sections" })} className="-mx-4 flex shrink-0 gap-2 overflow-x-auto px-4 pb-1">
             {sections.map((section) => <div key={section.id} className="shrink-0"><Button type="button" variant={view.section === section.id ? "secondary" : "outline"} aria-pressed={view.section === section.id} onClick={() => goSection(section.id)}>{section.label}</Button></div>)}
           </div>
         ) : null}
@@ -357,28 +361,28 @@ export function FilesPage({ person }: { person: Roster }) {
 
         {!trashView ? (
           <div className="flex flex-wrap items-center gap-3">
-            {filterAllowed(view.section, "mine") ? <div role="group" aria-label="Filters"><Button type="button" variant={view.filter === "mine" ? "secondary" : "outline"} aria-pressed={view.filter === "mine"} onClick={() => update({ filter: view.filter === "mine" ? "any" : "mine" })}>Mine</Button></div> : null}
-            <div className="sm:ml-auto"><Select aria-label="Sort by" value={view.sort} onValueChange={(value) => update({ sort: value as SortId })} options={Object.keys(SORT_LABELS)} getLabel={(value) => SORT_LABELS[value as SortId]} /></div>
-            {view.layout === "grid" && !phone ? <CardSizeSlider size={cardSize} onChange={setCardSize} label="Tile size" /> : null}
-            <div role="group" aria-label="Layout" className="flex gap-1">
-              <Button type="button" variant={view.layout === "grid" ? "secondary" : "ghost"} size="icon" aria-pressed={view.layout === "grid"} aria-label="Grid view" onClick={() => update({ layout: "grid" })}><GridIcon aria-hidden className="size-4" /></Button>
-              <Button type="button" variant={view.layout === "list" ? "secondary" : "ghost"} size="icon" aria-pressed={view.layout === "list"} aria-label="List view" onClick={() => update({ layout: "list" })}><ListIcon aria-hidden className="size-4" /></Button>
+            {filterAllowed(view.section, "mine") ? <div role="group" aria-label={i18n._({ id: "Filters", message: "Filters" })}><Button type="button" variant={view.filter === "mine" ? "secondary" : "outline"} aria-pressed={view.filter === "mine"} onClick={() => update({ filter: view.filter === "mine" ? "any" : "mine" })}>{i18n._({ id: "Mine", message: "Mine" })}</Button></div> : null}
+            <div className="sm:ml-auto"><Select aria-label={i18n._({ id: "Sort by", message: "Sort by" })} value={view.sort} onValueChange={(value) => update({ sort: value as SortId })} options={Object.keys(SORT_LABELS)} getLabel={(value) => SORT_LABELS[value as SortId]} /></div>
+            {view.layout === "grid" && !phone ? <CardSizeSlider size={cardSize} onChange={setCardSize} label={i18n._({ id: "Tile size", message: "Tile size" })} /> : null}
+            <div role="group" aria-label={i18n._({ id: "Layout", message: "Layout" })} className="flex gap-1">
+              <Button type="button" variant={view.layout === "grid" ? "secondary" : "ghost"} size="icon" aria-pressed={view.layout === "grid"} aria-label={i18n._({ id: "Grid view", message: "Grid view" })} onClick={() => update({ layout: "grid" })}><GridIcon aria-hidden className="size-4" /></Button>
+              <Button type="button" variant={view.layout === "list" ? "secondary" : "ghost"} size="icon" aria-pressed={view.layout === "list"} aria-label={i18n._({ id: "List view", message: "List view" })} onClick={() => update({ layout: "list" })}><ListIcon aria-hidden className="size-4" /></Button>
             </div>
-            {!selecting && selected.length === 0 ? <SelectModeToggle label="Select" onClick={() => setSelecting(true)} /> : null}
+            {!selecting && selected.length === 0 ? <SelectModeToggle label={i18n._({ id: "Select", message: "Select" })} onClick={() => setSelecting(true)} /> : null}
           </div>
         ) : null}
 
         {selecting || selected.length > 0 ? <BatchBar count={selected.length} onExit={leaveSelection}>{batchActions}</BatchBar> : null}
         {confirm ? (
           <DestructiveConfirm
-            message={confirm.length === 1 ? `Delete '${confirm[0]!.name}'?` : `Move ${confirm.length} files to Trash?`}
-            detail={`${confirm.some((item) => item.shared_with.household) ? "It is shared with everyone in the home. " : confirm.some((item) => item.shared_with.count > 0) ? "Some of it is shared with people in your home. " : ""}${confirm.some((item) => item.shared_with.count > 0 || item.shared_with.household) ? "They lose access now. " : ""}You can get it back from Trash for 30 days.`}
-            confirmLabel="Move to Trash" busyLabel="Moving" busy={busy} cancelLabel="Keep it"
+            message={confirm.length === 1 ? i18n._({ id: "Delete ‘{name}’?", message: "Delete ‘{name}’?", values: { name: confirm[0]!.name } }) : i18n._({ id: "Move {count} files to Trash?", message: "Move {count} files to Trash?", values: { count: confirm.length } })}
+            detail={i18n._({ id: "{shared}{access}You can get it back from Trash for 30 days.", message: "{shared}{access}You can get it back from Trash for 30 days.", values: { shared: confirm.some((item) => item.shared_with.household) ? `${i18n._({ id: "It is shared with everyone in the home.", message: "It is shared with everyone in the home." })} ` : confirm.some((item) => item.shared_with.count > 0) ? `${i18n._({ id: "Some of it is shared with people in your home.", message: "Some of it is shared with people in your home." })} ` : "", access: confirm.some((item) => item.shared_with.count > 0 || item.shared_with.household) ? `${i18n._({ id: "They lose access now.", message: "They lose access now." })} ` : "" } })}
+            confirmLabel={i18n._({ id: "Move to Trash", message: "Move to Trash" })} busyLabel={i18n._({ id: "Moving", message: "Moving" })} busy={busy} cancelLabel={i18n._({ id: "Keep it", message: "Keep it" })}
             onConfirm={() => void doTrash(confirm)} onCancel={() => setConfirm(null)} />
         ) : null}
 
         <UploadTray cards={uploads.cards} onCancel={uploads.cancel} onRetry={uploads.retry} onDismiss={uploads.dismiss} />
-        {dragging ? <div role="status" className="rounded-lg border-2 border-dashed border-primary p-6 text-center text-base">Drop to add to your Library</div> : null}
+        {dragging ? <div role="status" className="rounded-lg border-2 border-dashed border-primary p-6 text-center text-base">{i18n._({ id: "Drop to add to your Library", message: "Drop to add to your Library" })}</div> : null}
         {status}
         {!wide ? <div className="max-w-xl"><LibraryStorage me={person} /></div> : null}
       </div>
@@ -390,12 +394,12 @@ export function FilesPage({ person }: { person: Roster }) {
           <form onSubmit={(event) => {
             event.preventDefault();
             const target = renaming; if (!target) return;
-            void actions.rename(target.id, renameText).then(() => { setRenaming(null); toast.success("Renamed."); }).catch((error: unknown) => toast.error(actions.reason(error)));
+            void actions.rename(target.id, renameText).then(() => { setRenaming(null); toast.success(i18n._({ id: "Renamed.", message: "Renamed." })); }).catch((error: unknown) => toast.error(actions.reason(error)));
           }}>
-            <DialogHeader><DialogTitle>Rename file</DialogTitle><DialogDescription>Leave it empty to go back to the name Home chose.</DialogDescription></DialogHeader>
-            <label htmlFor="library-rename" className="text-base font-medium">Name</label>
+            <DialogHeader><DialogTitle>{i18n._({ id: "Rename file", message: "Rename file" })}</DialogTitle><DialogDescription>{i18n._({ id: "Leave it empty to go back to the name Home chose.", message: "Leave it empty to go back to the name Home chose." })}</DialogDescription></DialogHeader>
+            <label htmlFor="library-rename" className="text-base font-medium">{i18n._({ id: "Name", message: "Name" })}</label>
             <Input id="library-rename" value={renameText} maxLength={1000} onChange={(event) => setRenameText(event.target.value)} />
-            <DialogFooter><Button type="button" variant="ghost" onClick={() => setRenaming(null)}>Cancel</Button><Button type="submit">Save name</Button></DialogFooter>
+            <DialogFooter><Button type="button" variant="ghost" onClick={() => setRenaming(null)}>{i18n._({ id: "Cancel", message: "Cancel" })}</Button><Button type="submit">{i18n._({ id: "Save name", message: "Save name" })}</Button></DialogFooter>
           </form>
         </DialogContent>
       </Dialog>

@@ -1,3 +1,4 @@
+import { i18n } from "@lingui/core";
 import { useEffect, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
@@ -15,10 +16,10 @@ import { voicePreviewPlayer, type VoicePreviewState } from "@/lib/voice/voicePre
 import { lookKey } from "@/shell/pages/companionFlow/CreateCharacterStep";
 import { flowErrorText } from "@/shell/pages/companionFlow/errors";
 
-const PERSONALITIES: Array<{ id: CompanionPersonality; label: string }> = [
-  { id: "friendly", label: "Friendly" }, { id: "funny", label: "Funny" }, { id: "calm", label: "Calm" },
-  { id: "professional", label: "Professional" }, { id: "playful", label: "Playful" }, { id: "custom", label: "Custom" },
-];
+const PERSONALITIES: () => Array<{ id: CompanionPersonality; label: string }> = () => ([
+  { id: "friendly", label: i18n._({ id: "Friendly", message: "Friendly" }) }, { id: "funny", label: i18n._({ id: "Funny", message: "Funny" }) }, { id: "calm", label: i18n._({ id: "Calm", message: "Calm" }) },
+  { id: "professional", label: i18n._({ id: "Professional", message: "Professional" }) }, { id: "playful", label: i18n._({ id: "Playful", message: "Playful" }) }, { id: "custom", label: i18n._({ id: "Custom", message: "Custom" }) },
+]);
 
 // The five presets differ in these five dials, so a saved companion can be matched back to its chip when it is reopened.
 // Anything else (an older or hand-edited companion) reads as Custom and keeps its own dials until the person picks a chip.
@@ -82,7 +83,7 @@ export function CustomizeStep({ companionId, name, onBack, onGoTo }: { companion
   async function generate() {
     setError({ text: "", back: null }); setGenerating(true);
     try {
-      const hint = notes.trim() || (personality === "custom" ? "" : PERSONALITIES.find((p) => p.id === personality)!.label);
+      const hint = notes.trim() || (personality === "custom" ? "" : `${personality.charAt(0).toUpperCase()}${personality.slice(1)}`);
       const result = await api.generateCompanionBackstory(companionId, hint ? { hint: hint.slice(0, 300) } : {});
       setBackstory(result.text.slice(0, BACKSTORY_MAX));
     } catch (e) { setError({ text: flowErrorText(e), back: null }); } finally { setGenerating(false); }
@@ -103,58 +104,58 @@ export function CustomizeStep({ companionId, name, onBack, onGoTo }: { companion
     <>
     <DialogBody columns="two">
       <div className="flex flex-col gap-6">
-        <DialogSection title="Voice" icon={<Mic aria-hidden="true" />}>
-          <ToggleGroup type="single" variant="segmented" fill value="choose" onValueChange={chooseSource} aria-label="Voice source">
-            <ToggleGroupItem value="choose">Choose Voice</ToggleGroupItem>
-            <ToggleGroupItem value="clone">Create / Clone</ToggleGroupItem>
+        <DialogSection title={i18n._({ id: "Voice", message: "Voice" })} icon={<Mic aria-hidden="true" />}>
+          <ToggleGroup type="single" variant="segmented" fill value="choose" onValueChange={chooseSource} aria-label={i18n._({ id: "Voice source", message: "Voice source" })}>
+            <ToggleGroupItem value="choose">{i18n._({ id: "Choose Voice", message: "Choose Voice" })}</ToggleGroupItem>
+            <ToggleGroupItem value="clone">{i18n._({ id: "Create / Clone", message: "Create / Clone" })}</ToggleGroupItem>
           </ToggleGroup>
           <div className="flex items-center gap-2">
             <div className="min-w-0 flex-1"><Select value={selectedValue} onValueChange={setVoiceId} disabled={!choices}>
-              <SelectTrigger shape="pill" width="full" aria-label="Voice"><SelectValue /></SelectTrigger>
-              <SelectContent>{(choices?.options ?? [{ value: selectedValue, label: "Loading voices" }]).map((option) => <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>)}</SelectContent>
+              <SelectTrigger shape="pill" width="full" aria-label={i18n._({ id: "Voice", message: "Voice" })}><SelectValue /></SelectTrigger>
+              <SelectContent>{(choices?.options ?? [{ value: selectedValue, label: i18n._({ id: "Loading voices", message: "Loading voices" }) }]).map((option) => <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>)}</SelectContent>
             </Select></div>
-            <Button variant="outline" shape="pill" disabled={!previewId || (playing && preview.busy)} onClick={() => playing ? voicePreviewPlayer.stop() : previewId && void voicePreviewPlayer.start(previewId)}>{playing && !preview.busy ? "Stop" : "Preview"}</Button>
+            <Button variant="outline" shape="pill" disabled={!previewId || (playing && preview.busy)} onClick={() => playing ? voicePreviewPlayer.stop() : previewId && void voicePreviewPlayer.start(previewId)}>{playing && !preview.busy ? i18n._({ id: "Stop", message: "Stop" }) : i18n._({ id: "Preview", message: "Preview" })}</Button>
           </div>
           {voices.isError ? <p role="alert" className="text-sm text-destructive">{flowErrorText(voices.error)}</p> : null}
           {choices?.notice ? <p className="text-sm text-muted-foreground">{choices.notice}</p> : null}
           {preview.error ? <p role="alert" className="text-sm text-destructive">{preview.error}</p> : null}
           {notice ? <p role="status" className="text-sm text-muted-foreground">{notice}</p> : null}
         </DialogSection>
-        <DialogSection title="Personality" icon={<Heart aria-hidden="true" />}>
-          <ToggleGroup type="single" variant="chip" wrap value={personality} onValueChange={(next) => { if (next) setPersonality(next as CompanionPersonality); }} aria-label="Personality">
-            {PERSONALITIES.map((item) => <ToggleGroupItem key={item.id} value={item.id}>{item.label}</ToggleGroupItem>)}
+        <DialogSection title={i18n._({ id: "Personality", message: "Personality" })} icon={<Heart aria-hidden="true" />}>
+          <ToggleGroup type="single" variant="chip" wrap value={personality} onValueChange={(next) => { if (next) setPersonality(next as CompanionPersonality); }} aria-label={i18n._({ id: "Personality", message: "Personality" })}>
+            {PERSONALITIES().map((item) => <ToggleGroupItem key={item.id} value={item.id}>{item.label}</ToggleGroupItem>)}
           </ToggleGroup>
-          <Textarea aria-label="Personality notes" shape="rounded" maxLength={NOTES_MAX} value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="How should your companion behave, speak, and interact? (Optional)" />
+          <Textarea aria-label={i18n._({ id: "Personality notes", message: "Personality notes" })} shape="rounded" maxLength={NOTES_MAX} value={notes} onChange={(e) => setNotes(e.target.value)} placeholder={i18n._({ id: "How should your companion behave, speak, and interact? (Optional)", message: "How should your companion behave, speak, and interact? (Optional)" })} />
         </DialogSection>
-        <DialogSection title="Backstory" icon={<Book aria-hidden="true" />} aside={<Button variant="secondary" shape="pill" disabled={generating || loading} onClick={() => void generate()}><Sparkles aria-hidden="true" />{generating ? "Writing" : "Generate"}</Button>}>
-          <Textarea aria-label="Backstory" shape="rounded" maxLength={BACKSTORY_MAX} value={backstory} onChange={(e) => setBackstory(e.target.value)} placeholder="Who is your companion? Describe their history, experiences, interests, occupation, relationships, and personal story..." />
-          <p className="text-sm text-muted-foreground">Generate a suggested backstory or write your own. You can edit it anytime.</p>
+        <DialogSection title={i18n._({ id: "Backstory", message: "Backstory" })} icon={<Book aria-hidden="true" />} aside={<Button variant="secondary" shape="pill" disabled={generating || loading} onClick={() => void generate()}><Sparkles aria-hidden="true" />{generating ? i18n._({ id: "Writing", message: "Writing" }) : i18n._({ id: "Generate", message: "Generate" })}</Button>}>
+          <Textarea aria-label={i18n._({ id: "Backstory", message: "Backstory" })} shape="rounded" maxLength={BACKSTORY_MAX} value={backstory} onChange={(e) => setBackstory(e.target.value)} placeholder={i18n._({ id: "Who is your companion? Describe their history, experiences, interests, occupation, relationships, and personal story...", message: "Who is your companion? Describe their history, experiences, interests, occupation, relationships, and personal story..." })} />
+          <p className="text-sm text-muted-foreground">{i18n._({ id: "Generate a suggested backstory or write your own. You can edit it anytime.", message: "Generate a suggested backstory or write your own. You can edit it anytime." })}</p>
         </DialogSection>
       </div>
-      <DialogSection title="Companion Preview" aside={name}>
+      <DialogSection title={i18n._({ id: "Companion Preview", message: "Companion Preview" })} aside={name}>
         <CompanionStage surface="panel" frame="strong" transparency="checker" name={name || "Your companion"} mode="idle" showHeader={false} talk={null}
-          character={portrait ? <img src={portrait} alt={`${name || "Your companion"}, companion preview`} draggable={false} className="aspect-square max-h-96 w-full object-contain" /> : <p className="p-6 text-center text-muted-foreground">Your companion will appear here</p>}
+          character={portrait ? <img src={portrait} alt={i18n._({ id: "{name}, companion preview", message: "{name}, companion preview", values: { name: name || i18n._({ id: "Your companion", message: "Your companion" }) } })} draggable={false} className="aspect-square max-h-96 w-full object-contain" /> : <p className="p-6 text-center text-muted-foreground">{i18n._({ id: "Your companion will appear here", message: "Your companion will appear here" })}</p>}
           actions={[
-            { id: "test", label: "Test Conversation", onSelect: () => { window.open(`/chat?try=${encodeURIComponent(companionId)}`, "_blank", "noopener"); } },
-            { id: "save", label: saving ? "Saving" : "Save Companion", primary: true, disabled: saving || loading, onSelect: () => void save() },
+            { id: "test", label: i18n._({ id: "Test Conversation", message: "Test Conversation" }), onSelect: () => { window.open(`/chat?try=${encodeURIComponent(companionId)}`, "_blank", "noopener"); } },
+            { id: "save", label: saving ? i18n._({ id: "Saving", message: "Saving" }) : i18n._({ id: "Save Companion", message: "Save Companion" }), primary: true, disabled: saving || loading, onSelect: () => void save() },
           ]} />
         {error.text ? <div className="flex flex-col gap-2">
           <p role="alert" className="text-sm text-destructive">{error.text}</p>
-          {error.back ? <Button variant="outline" shape="pill" onClick={() => onGoTo(error.back === "look" ? 0 : 1)}>{error.back === "look" ? "Go to Create Character" : "Go to Animate Character"}</Button> : null}
+          {error.back ? <Button variant="outline" shape="pill" onClick={() => onGoTo(error.back === "look" ? 0 : 1)}>{error.back === "look" ? i18n._({ id: "Go to Create Character", message: "Go to Create Character" }) : i18n._({ id: "Go to Animate Character", message: "Go to Animate Character" })}</Button> : null}
         </div> : null}
       </DialogSection>
     </DialogBody>
     <DialogFooter align="between">
-      <Button variant="outline" shape="pill" onClick={onBack}><Back aria-hidden="true" />Back</Button>
-      <span className="text-sm text-muted-foreground">All settings can be changed later.</span>
+      <Button variant="outline" shape="pill" onClick={onBack}><Back aria-hidden="true" />{i18n._({ id: "Back", message: "Back" })}</Button>
+      <span className="text-sm text-muted-foreground">{i18n._({ id: "All settings can be changed later.", message: "All settings can be changed later." })}</span>
     </DialogFooter>
     <Dialog open={cloning} onOpenChange={(open) => { if (!cloneBusy) setCloning(open); }}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Add a voice</DialogTitle>
-          <DialogDescription>Make a voice from a WAV, MP3 or FLAC recording of 6 to 30 seconds. Everyone in the home can pick it, and so can a robot.</DialogDescription>
+          <DialogTitle>{i18n._({ id: "Add a voice", message: "Add a voice" })}</DialogTitle>
+          <DialogDescription>{i18n._({ id: "Make a voice from a WAV, MP3 or FLAC recording of 6 to 30 seconds. Everyone in the home can pick it, and so can a robot.", message: "Make a voice from a WAV, MP3 or FLAC recording of 6 to 30 seconds. Everyone in the home can pick it, and so can a robot." })}</DialogDescription>
         </DialogHeader>
-        <AddVoiceForm onBusyChange={setCloneBusy} onCancel={() => setCloning(false)} onMade={(made) => { setCloning(false); setNotice(`${made} is ready. Pick it from the list and press Preview to hear it.`); void client.invalidateQueries({ queryKey: ["stack-voices"] }); }} />
+        <AddVoiceForm onBusyChange={setCloneBusy} onCancel={() => setCloning(false)} onMade={(made) => { setCloning(false); setNotice(i18n._({ id: "{made} is ready. Pick it from the list and press Preview to hear it.", message: "{made} is ready. Pick it from the list and press Preview to hear it.", values: { made } })); void client.invalidateQueries({ queryKey: ["stack-voices"] }); }} />
       </DialogContent>
     </Dialog>
     </>

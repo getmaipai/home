@@ -41,7 +41,7 @@ const open = (search = "") => renderWithQueryClient(<ToastProvider><MemoryRouter
 
 describe("Create controls", () => {
   test("includes Sound mode, sound body mapping and sound card copy without changing song controls", async () => {
-    expect(MAKES.some(mode => mode.id === "sound" && mode.label === "Sound")).toBe(true);
+    expect(MAKES().some(mode => mode.id === "sound" && mode.label === "Sound")).toBe(true);
     expect(soundCardCopy.saveToLibrary).toBe("Save to Sounds");
     expect(makeSoundBody({ description: "door creak", seconds: "10", loop: true, stick: "surprise" })).toEqual({ description: "door creak", seconds: 10, loop: true, stick_to_words: false });
     const view = open();

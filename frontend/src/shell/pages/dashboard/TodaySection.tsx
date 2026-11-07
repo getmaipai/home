@@ -1,3 +1,4 @@
+import { i18n } from "@lingui/core";
 import { useState } from "react";
 import { useQueries, useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@maipai/ui/src/dashboard/components/ui/card";
@@ -10,7 +11,7 @@ import { api, type HomeWidgets, type WidgetData, type WidgetDescriptor } from "@
 
 /** Design note section 6: never more than four Today cards before "More". */
 export const TODAY_CARD_BUDGET = 4;
-const displayTitle = (widget: WidgetDescriptor) => widget.package === "almanac-date" && widget.id === "today" ? "Coming up" : widget.title;
+const displayTitle = (widget: WidgetDescriptor) => widget.package === "almanac-date" && widget.id === "today" ? i18n._({ id: "Coming up", message: "Coming up" }) : widget.title;
 
 interface Slot { widget: WidgetDescriptor; data: WidgetData }
 
@@ -44,8 +45,8 @@ export function TodaySection({ home, heroOnly = false, chips = false }: { home?:
   const slots = todaySlots(widgets, results);
   const heroQuery = useQuery({ queryKey: ["home-hero"], queryFn: () => home?.hero ? api.widgetData(home.hero.package, home.hero.id) : Promise.resolve(undefined), enabled: Boolean(home?.hero), retry: false });
 
-  if (!home && list.isPending) return <RouteSkeleton label="Loading Today" />;
-  if (!home && list.isError) return <p role="alert" className="text-sm text-muted-foreground">Could not load Today. Refresh Home to try again.</p>;
+  if (!home && list.isPending) return <RouteSkeleton label={i18n._({ id: "Loading Today", message: "Loading Today" })} />;
+  if (!home && list.isError) return <p role="alert" className="text-sm text-muted-foreground">{i18n._({ id: "Could not load Today. Refresh Home to try again.", message: "Could not load Today. Refresh Home to try again." })}</p>;
   if (slots.length === 0) return null;
 
   const cards = (shown: Slot[]) => shown.map((slot) => slot.data.card ? (
@@ -77,8 +78,8 @@ export function TodaySection({ home, heroOnly = false, chips = false }: { home?:
     const key = (slot: Slot) => `${slot.widget.package}/${slot.widget.id}`;
     const opened = slots.find((slot) => key(slot) === open);
     return (
-      <section aria-label="Today" className="flex flex-col gap-3 lg:col-span-12">
-        <h2 className="text-base leading-snug font-medium">Today</h2>
+      <section aria-label={i18n._({ id: "Today", message: "Today" })} className="flex flex-col gap-3 lg:col-span-12">
+        <h2 className="text-base leading-snug font-medium">{i18n._({ id: "Today", message: "Today" })}</h2>
         <div className="flex flex-wrap gap-2">
           {slots.map((slot) => (
             <Button key={key(slot)} variant="outline" size="sm" aria-expanded={open === key(slot)} onClick={() => setOpen(open === key(slot) ? null : key(slot))}>{displayTitle(slot.widget)}</Button>
@@ -94,17 +95,17 @@ export function TodaySection({ home, heroOnly = false, chips = false }: { home?:
   const heroData: WidgetData | undefined = heroQuery.data;
   const heroSlot = home?.hero && heroData && heroData.items.length > 0 && !heroData.degraded ? { widget: home.hero, data: heroData } : null;
   const showHeroSkeleton = heroOnly && Boolean(home?.hero) && heroQuery.isPending;
-  if (showHeroSkeleton) return <RouteSkeleton label="Loading Home highlight" />;
-  if (heroOnly) return heroSlot ? <section aria-label="Home highlight" className="lg:col-span-4"><Card size="sm" data-testid="home-hero"><CardHeader><CardTitle>{displayTitle(heroSlot.widget)}</CardTitle></CardHeader><CardContent><ItemGroup>{heroSlot.data.items.map((item, index) => <Item key={`${item.title}-${index}`} size="sm"><ItemContent><ItemTitle>{item.title}</ItemTitle>{item.subtitle ? <ItemDescription>{item.subtitle}</ItemDescription> : null}</ItemContent>{item.value ? <ItemActions>{item.value}</ItemActions> : null}</Item>)}</ItemGroup></CardContent></Card></section> : null;
+  if (showHeroSkeleton) return <RouteSkeleton label={i18n._({ id: "Loading Home highlight", message: "Loading Home highlight" })} />;
+  if (heroOnly) return heroSlot ? <section aria-label={i18n._({ id: "Home highlight", message: "Home highlight" })} className="lg:col-span-4"><Card size="sm" data-testid="home-hero"><CardHeader><CardTitle>{displayTitle(heroSlot.widget)}</CardTitle></CardHeader><CardContent><ItemGroup>{heroSlot.data.items.map((item, index) => <Item key={`${item.title}-${index}`} size="sm"><ItemContent><ItemTitle>{item.title}</ItemTitle>{item.subtitle ? <ItemDescription>{item.subtitle}</ItemDescription> : null}</ItemContent>{item.value ? <ItemActions>{item.value}</ItemActions> : null}</Item>)}</ItemGroup></CardContent></Card></section> : null;
   return (
     <>
-    {heroSlot ? <section aria-label="Home highlight" className="lg:col-span-4"><Card size="sm" data-testid="home-hero"><CardHeader><CardTitle>{heroSlot.widget.title}</CardTitle></CardHeader><CardContent><ItemGroup>{heroSlot.data.items.map((item, index) => <Item key={`${item.title}-${index}`} size="sm"><ItemContent><ItemTitle>{item.title}</ItemTitle>{item.subtitle ? <ItemDescription>{item.subtitle}</ItemDescription> : null}</ItemContent>{item.value ? <ItemActions>{item.value}</ItemActions> : null}</Item>)}</ItemGroup></CardContent></Card></section> : null}
-    <section aria-label="Today" className="flex flex-col gap-3 lg:col-span-12">
-      <h2 className="text-base leading-snug font-medium">Today</h2>
+    {heroSlot ? <section aria-label={i18n._({ id: "Home highlight", message: "Home highlight" })} className="lg:col-span-4"><Card size="sm" data-testid="home-hero"><CardHeader><CardTitle>{heroSlot.widget.title}</CardTitle></CardHeader><CardContent><ItemGroup>{heroSlot.data.items.map((item, index) => <Item key={`${item.title}-${index}`} size="sm"><ItemContent><ItemTitle>{item.title}</ItemTitle>{item.subtitle ? <ItemDescription>{item.subtitle}</ItemDescription> : null}</ItemContent>{item.value ? <ItemActions>{item.value}</ItemActions> : null}</Item>)}</ItemGroup></CardContent></Card></section> : null}
+    <section aria-label={i18n._({ id: "Today", message: "Today" })} className="flex flex-col gap-3 lg:col-span-12">
+      <h2 className="text-base leading-snug font-medium">{i18n._({ id: "Today", message: "Today" })}</h2>
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">{cards(first)}</div>
       {rest.length === 0 ? null : (
         <Collapsible>
-          <CollapsibleTrigger render={<Button variant="outline" size="row" />}>More</CollapsibleTrigger>
+          <CollapsibleTrigger render={<Button variant="outline" size="row" />}>{i18n._({ id: "More", message: "More" })}</CollapsibleTrigger>
           <CollapsibleContent>
             <div className="grid gap-4 pt-3 sm:grid-cols-2 lg:grid-cols-3">{cards(rest)}</div>
           </CollapsibleContent>

@@ -1,3 +1,4 @@
+import { i18n } from "@lingui/core";
 import { useCallback, useEffect, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { ApiError, api } from "@/lib/api";
@@ -5,8 +6,8 @@ import { errorLine } from "@/lib/hubReachability";
 
 export const companionStatesKey = (id: string) => ["companions", id, "states"] as const;
 export const companionAppearanceKey = (id: string) => ["companion-appearance", id] as const;
-const networkError = "Could not reach Home. Check your connection and try again.";
-const errorText = (error: unknown) => errorLine(error, networkError);
+const networkError = () => i18n._({ id: "Could not reach Home. Check your connection and try again.", message: "Could not reach Home. Check your connection and try again." });
+const errorText = (error: unknown) => errorLine(error, networkError());
 
 export function useCompanionStates(id: string, active: boolean) {
   const client = useQueryClient();
@@ -46,10 +47,10 @@ export function useCompanionStates(id: string, active: boolean) {
         client.invalidateQueries({ queryKey: companionStatesKey(id) }),
         client.invalidateQueries({ queryKey: ["companion-avatar"] }),
       ]);
-      setStatus("Appearance published.");
+      setStatus(i18n._({ id: "Appearance published.", message: "Appearance published." }));
     } catch (cause) {
       if (cause instanceof ApiError && (cause.status === 409 || cause.status === 422)) {
-        setError([...(cause.reasons?.length ? cause.reasons : [cause.message]), cause.next].filter(Boolean).join(" ") || "Publishing failed. Review the appearance and try again.");
+        setError([...(cause.reasons?.length ? cause.reasons : [cause.message]), cause.next].filter(Boolean).join(" ") || i18n._({ id: "Publishing failed. Review the appearance and try again.", message: "Publishing failed. Review the appearance and try again." }));
       } else setError(errorText(cause));
     } finally { setPublishing(false); }
   }

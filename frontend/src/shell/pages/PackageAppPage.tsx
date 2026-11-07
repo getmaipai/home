@@ -68,7 +68,7 @@ function weatherLocation(place: { id: string; label: string; geo?: { lat?: numbe
   const clock = (value: string) => {
     const match = /T(\d{2}):(\d{2})/.exec(value);
     if (!match) return value;
-    return new Intl.DateTimeFormat(undefined, { hour: "numeric", minute: "2-digit", timeZone: "UTC" }).format(new Date(Date.UTC(2020, 0, 1, Number(match[1]), Number(match[2]))));
+    return new Intl.DateTimeFormat(i18n.locale, { hour: "numeric", minute: "2-digit", timeZone: "UTC" }).format(new Date(Date.UTC(2020, 0, 1, Number(match[1]), Number(match[2]))));
   };
   const hasWeather = number(current, "temp") !== undefined && string(current, "condition") !== undefined;
   return { id: place.id, city: place.label.replace(/ \(home\)$/, ""), state: place.geo?.area ?? undefined, latitude: place.geo?.lat, longitude: place.geo?.lon, timezone: string(details, "timezone"), isMyLocation: place.label.endsWith(" (home)"), detail: hasWeather ? {
@@ -81,7 +81,7 @@ function weatherLocation(place: { id: string; label: string; geo?: { lat?: numbe
     pressure: number(details, "pressure"), visibility: number(details, "visibility") === undefined ? undefined : number(details, "visibility")! / 1000,
     sunrise: string(details, "sunrise") ? clock(string(details, "sunrise")!) : undefined, sunset: string(details, "sunset") ? clock(string(details, "sunset")!) : undefined, uvIndex: number(details, "uv_index"),
     moon: moonDetail(details.moon),
-  } : undefined, localTime: string(details, "timezone") ? new Intl.DateTimeFormat(undefined, { hour: "numeric", minute: "2-digit", timeZone: string(details, "timezone") }).format(new Date()) : undefined };
+  } : undefined, localTime: string(details, "timezone") ? new Intl.DateTimeFormat(i18n.locale, { hour: "numeric", minute: "2-digit", timeZone: string(details, "timezone") }).format(new Date()) : undefined };
 }
 
 /** The Weather moon tile's data from a page document's `moon` object; the next full and new moon dates ride along only when they are strings. */
@@ -94,6 +94,7 @@ function moonDetail(value: unknown): { phase: string; illumination: number; next
 
 /** One page document of a package app. A document the interpreter cannot parse is an error state with a retry, never a crashed page. */
 /** Page titles that name a kind of page, not a place: never drawn as the app's title. */
+// Matches the title text the package manifest sends (data, English), so these stay literal.
 const GENERIC_PAGE_TITLES: ReadonlySet<string> = new Set(["Channel", "Story"]);
 
 /** The title that says where the person is inside an app with a sidebar column: the chosen row's label, else the page's own title
@@ -108,7 +109,7 @@ function appPageQuery(packageId: string, pageId: string) {
     queryKey: ["app-page", packageId, pageId],
     queryFn: async () => {
       const doc = await api.appPage(packageId, pageId);
-      if (!PageNodeSchema.safeParse(doc).success) throw new Error("This app's page is not valid.");
+      if (!PageNodeSchema.safeParse(doc).success) throw new Error(i18n._({ id: "This app's page is not valid.", message: "This app's page is not valid." }));
       return doc;
     },
     staleTime: PAGE_FRESH_MS,
@@ -184,7 +185,7 @@ export function PackageAppPage({ person }: { person: Roster }) {
   const weatherSelectedAdvice = weatherSelectedForecast?.advice;
   const rows = useAppRows();
   const app = rows?.find((row) => row.package === packageId);
-  useTabItem(app?.label ?? "Apps");
+  useTabItem(app?.label ?? i18n._({ id: "Apps", message: "Apps" }));
 
   const page = useQuery({ ...appPageQuery(packageId, pageId), enabled: packageId !== "", retry: false });
 
@@ -271,15 +272,15 @@ export function PackageAppPage({ person }: { person: Roster }) {
   // feed or an article) keeps its title for assistive technology only, so the same words are not drawn twice.
   const content = (
     <div className={cn("flex min-h-0 min-w-0 flex-1 flex-col", packageId === "music" && pageId === "play" && "relative z-10", !readingStory && "gap-2", (sidebarProps || media) && !readingStory && "lg:p-4 lg:ps-6", (sidebarProps || media) && !sectionsBar && !readingStory && "py-4")} data-testid="package-app" data-package={packageId}>
-      {sectionsBar ? <PhoneNav variant="floating" label={`${app?.label ?? "App"} sections`} entries={sectionsBar.entries} more={sectionsBar.more} {...(sectionsBar.trailing ? { trailing: sectionsBar.trailing } : {})} /> : null}
+      {sectionsBar ? <PhoneNav variant="floating" label={i18n._({ id: "{name} sections", message: "{name} sections", values: { name: app?.label ?? i18n._({ id: "App", message: "App" }) } })} entries={sectionsBar.entries} more={sectionsBar.more} {...(sectionsBar.trailing ? { trailing: sectionsBar.trailing } : {})} /> : null}
       {app ? <AppToolbar inShellBar={inShellBar} sectionsInBar={sectionsBar !== null} hideSectionsOnWide={sidebar !== undefined} to={app.to} homeLabel={appHomeLabel(packageId, media)} sections={app.sections} current={pageId} familyHeader={familyHeader} /> : null}
       <AsyncState
         data={page.isError ? null : page.data}
         error={page.isError}
         isFetching={page.isFetching}
         onRetry={() => page.refetch()}
-        errorMessage="Could not open this app. Check your connection and try again."
-        loadingLabel="Opening the app"
+        errorMessage={i18n._({ id: "Could not open this app. Check your connection and try again.", message: "Could not open this app. Check your connection and try again." })}
+        loadingLabel={i18n._({ id: "Opening the app", message: "Opening the app" })}
       >
         {(shown) => { const doc = sectionsBar?.trailing && pageId !== "search" ? withoutSearchBox(shown) : shown; return (hasQuery && !sameQuery ? null : <>
           {isStudioPage(packageId, pageId) ? <MusicStudioPage pageId={pageId} search={location.search} adult={person.age_band === "adult"} /> : packageId === "weather" && pageId === "index" ? null : <ArticleSpeechBridge><SchemaPage key={`${packageId}/${pageId}`} page={doc} packageId={packageId} hideTitle sidebar={sidebarProps !== null} floatingBar={sectionsBar !== null} /></ArticleSpeechBridge>}
@@ -295,7 +296,7 @@ export function PackageAppPage({ person }: { person: Roster }) {
               const duplicate = weatherVisiblePlaces.find((place) => place.id === result.id || sameSpot(place.geo)) ?? (weatherHomeId ? weatherEntities.data?.find((place) => place.id === weatherHomeId && sameSpot(place.geo)) : undefined);
               if (duplicate || result.id === weatherHomeId) {
                 const duplicateName = duplicate && "label" in duplicate ? duplicate.label.replace(/ \(home\)$/, "") : duplicate?.name;
-                setWeatherMessage(`${duplicateName ?? result.city} is already in your list.`);
+                setWeatherMessage(i18n._({ id: "{place} is already in your list.", message: "{place} is already in your list.", values: { place: duplicateName ?? result.city } }));
               } else {
                 const entity = await api.createEntity({ kind: "place", name: result.city, place_kind: "map", scope: "person", geo: { lat: latitude, lon: longitude, precision: "exact", area: result.state ?? null, from: "search" } });
                 const ids = (weatherPlaces.data?.rows ?? []).map((row) => row.id);
@@ -306,14 +307,14 @@ export function PackageAppPage({ person }: { person: Roster }) {
             }} onAddLocation={() => { if (weatherSearch.trim()) void weatherSearchQuery.refetch().then(({ data }) => setWeatherResults(data ?? [])); }} onRemoveLocation={(id) => {
               const location = weatherLocations.find((place) => place.id === id);
               if (id === weatherHomeId || (weatherPlaces.data?.rows ?? []).find((place) => place.id === id)?.label.endsWith(" (home)")) {
-                setWeatherMessage(`${location?.city ?? "This place"} is your home place. Change it in Settings, Weather.`); return;
+                setWeatherMessage(i18n._({ id: "{place} is your home place. Change it in Settings, Weather.", message: "{place} is your home place. Change it in Settings, Weather.", values: { place: location?.city ?? i18n._({ id: "This place", message: "This place" }) } })); return;
               }
               setWeatherMessage("");
               void api.deleteEntity(id).then(async () => {
                 await queryClient.invalidateQueries({ queryKey: ["weather-places", person.id] });
                 await queryClient.invalidateQueries({ queryKey: ["weather-place-entities", person.id] });
-                setWeatherMessage(`${location?.city ?? "Place"} removed from your list.`);
-              }).catch((error: unknown) => setWeatherMessage(error instanceof Error ? error.message : "Could not remove this place."));
+                setWeatherMessage(i18n._({ id: "{place} removed from your list.", message: "{place} removed from your list.", values: { place: location?.city ?? i18n._({ id: "Place", message: "Place" }) } }));
+              }).catch((error: unknown) => setWeatherMessage(error instanceof Error ? error.message : i18n._({ id: "Could not remove this place.", message: "Could not remove this place." })));
             }} locale={navigator.language} unit={weatherUnit === "celsius" ? "C" : "F"} advice={weatherSelectedAdvice} summary={weatherSelectedForecast?.summary} />}
           </> : null}
         </>); }}
@@ -353,7 +354,7 @@ function AppToolbar({ inShellBar = false, sectionsInBar = false, hideSectionsOnW
     const tabs = sections.length > 0 ? (
       <div className={cn("-mx-4 min-w-0 overflow-x-auto overflow-y-hidden overscroll-x-contain px-4 touch-pan-x lg:mx-0 lg:px-0", hideSectionsOnWide && "lg:hidden")} data-slot="app-section-tabs">
         <Tabs value={current} onValueChange={(value) => navigate(value === "index" ? to : `${to}/${String(value)}`)}>
-          <TabsList variant="pill" aria-label="Sections">
+          <TabsList variant="pill" aria-label={i18n._({ id: "Sections", message: "Sections" })}>
             <TabsTrigger value="index">{homeLabel}</TabsTrigger>
             {sections.map((section) => (
               <TabsTrigger key={section.page} value={section.page}>{section.label}</TabsTrigger>
@@ -371,7 +372,7 @@ function AppToolbar({ inShellBar = false, sectionsInBar = false, hideSectionsOnW
     return (
       <div className="-mx-4 min-w-0 overflow-x-auto overflow-y-hidden overscroll-x-contain px-4 touch-pan-x" data-slot="app-section-tabs">
         <Tabs value={current} onValueChange={(value) => navigate(value === "index" ? to : `${to}/${String(value)}`)}>
-          <TabsList variant="pill" aria-label="Sections">
+          <TabsList variant="pill" aria-label={i18n._({ id: "Sections", message: "Sections" })}>
             <TabsTrigger value="index">{homeLabel}</TabsTrigger>
             {sections.map((section) => (
               <TabsTrigger key={section.page} value={section.page}>{section.label}</TabsTrigger>
@@ -386,7 +387,7 @@ function AppToolbar({ inShellBar = false, sectionsInBar = false, hideSectionsOnW
       {sections.length > 0 ? (
         <div className={hideSectionsOnWide ? "lg:hidden" : undefined} data-slot="app-section-tabs">
           <Tabs value={current} onValueChange={(value) => navigate(value === "index" ? to : `${to}/${String(value)}`)}>
-            <TabsList variant="line" aria-label="Sections">
+            <TabsList variant="line" aria-label={i18n._({ id: "Sections", message: "Sections" })}>
               <TabsTrigger value="index">{homeLabel}</TabsTrigger>
               {sections.map((section) => (
                 <TabsTrigger key={section.page} value={section.page}>{section.label}</TabsTrigger>

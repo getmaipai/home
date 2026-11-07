@@ -1,3 +1,4 @@
+import { i18n } from "@lingui/core";
 import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Button } from "@maipai/ui/src/ui/button";
@@ -21,13 +22,13 @@ const keyframeSrc = (row: CompanionStateRow) => row.keyframe ? `${row.keyframe.u
 const made = (row: CompanionStateRow) => row.approved !== null;
 
 /** The words on one tile: where that animation stands, in the order a person cares about. */
-export function tileWord(row: CompanionStateRow): "Making" | "Waiting its turn" | "Out of date" | "Needs another try" | "Ready" | "No animation yet" {
-  if (row.busy) return "Making";
-  if (row.status === "waiting") return "Waiting its turn";
-  if (made(row) && row.clip_out_of_date) return "Out of date";
-  if (made(row)) return "Ready";
-  if (row.status === "Needs another try") return "Needs another try";
-  return "No animation yet";
+export function tileWord(row: CompanionStateRow): string {
+  if (row.busy) return i18n._({ id: "Making", message: "Making" });
+  if (row.status === "waiting") return i18n._({ id: "Waiting its turn", message: "Waiting its turn" });
+  if (made(row) && row.clip_out_of_date) return i18n._({ id: "Out of date", message: "Out of date" });
+  if (made(row)) return i18n._({ id: "Ready", message: "Ready" });
+  if (row.status === "Needs another try") return i18n._({ id: "Needs another try", message: "Needs another try" });
+  return i18n._({ id: "No animation yet", message: "No animation yet" });
 }
 
 /** The selected animation's looping clip. Under reduced motion, or when the clip cannot play, its still shows instead. */
@@ -36,10 +37,10 @@ function ClipPlayer({ urls, label }: { urls: CompanionStateUrls; label: string }
   return (
     <>
       {preview.failed || preview.reduced
-        ? <img src={urls.still} alt={`${label} still`} draggable={false} className="min-h-0 w-full flex-1 object-contain" />
+        ? <img src={urls.still} alt={i18n._({ id: "{label} still", message: "{label} still", values: { label } })} draggable={false} className="min-h-0 w-full flex-1 object-contain" />
         : <StackedAlphaVideo src={preview.source} loop label={preview.label} onError={preview.onError} />}
-      {preview.failed ? <p className="text-center text-xs text-muted-foreground">Preview not available in this browser.</p> : null}
-      {preview.reduced ? <Button variant="outline" shape="pill" onClick={preview.play}>Play</Button> : null}
+      {preview.failed ? <p className="text-center text-xs text-muted-foreground">{i18n._({ id: "Preview not available in this browser.", message: "Preview not available in this browser." })}</p> : null}
+      {preview.reduced ? <Button variant="outline" shape="pill" onClick={preview.play}>{i18n._({ id: "Play", message: "Play" })}</Button> : null}
     </>
   );
 }
@@ -72,12 +73,12 @@ export function AnimateStep({ companionId, name, sheetJob = null, autoMake = fal
   const missingRequired = required.filter((row) => !made(row)).map((row) => row.id);
   const pending = useMemo(() => optional.filter((row) => ticked.has(row.id) && !made(row)).map((row) => row.id), [optional, ticked]);
   const allTicked = optional.length > 0 && optional.every((row) => ticked.has(row.id));
-  const label = name.trim() || "Your character";
+  const label = name.trim() || i18n._({ id: "Your character", message: "Your character" });
   const progress = states.run?.percent ?? states.data?.run?.percent ?? 0;
   // What the buttons say while work is under way: the step in plain words, never just a greyed label.
-  const doing = sheet.waiting || picturing?.kind === "sheet" ? "Drawing your character..."
+  const doing = sheet.waiting || picturing?.kind === "sheet" ? i18n._({ id: "Drawing your character...", message: "Drawing your character..." })
     : picturing ? `${picturing.label}...`
-    : running ? `${states.run?.label ?? states.data?.run?.label ?? "Making animations"}... ${progress}%` : "";
+    : running ? `${states.run?.label ?? states.data?.run?.label ?? i18n._({ id: "Making animations", message: "Making animations" })}... ${progress}%` : "";
 
   const reducedMotion = typeof window !== "undefined" && window.matchMedia?.("(prefers-reduced-motion: reduce)").matches === true;
   // Which Generate button started the work, so only that one reads as busy; the others stay as they are, disabled.
@@ -97,9 +98,9 @@ export function AnimateStep({ companionId, name, sheetJob = null, autoMake = fal
     const word = tileWord(row), src = keyframeSrc(row) ?? portrait;
     return {
       name: row.label, selected: selectedId === row.id, onSelect: () => setSelectedId(row.id),
-      media: row.approved ? (reducedMotion ? <img src={row.approved.urls.still} alt="" draggable={false} className="size-full object-cover" /> : <StackedAlphaVideo key={row.approved.take_id} src={row.approved.urls.h264} loop label={`${row.label} animation`} />) : src ? <img src={src} alt="" draggable={false} className={`size-full object-cover ${row.keyframe ? "" : "opacity-40"}`} /> : undefined,
+      media: row.approved ? (reducedMotion ? <img src={row.approved.urls.still} alt="" draggable={false} className="size-full object-cover" /> : <StackedAlphaVideo key={row.approved.take_id} src={row.approved.urls.h264} loop label={i18n._({ id: "{label} animation", message: "{label} animation", values: { label: row.label } })} />) : src ? <img src={src} alt="" draggable={false} className={`size-full object-cover ${row.keyframe ? "" : "opacity-40"}`} /> : undefined,
       line: <span className="text-xs">{word}</span>,
-      status: word === "Making" ? <Progress mode="determinate" value={progress} label={`${row.label} progress`} /> : undefined,
+      status: row.busy ? <Progress mode="determinate" value={progress} label={i18n._({ id: "{label} progress", message: "{label} progress", values: { label: row.label } })} /> : undefined,
     };
   };
   const errorLine = sheet.message || states.error || (states.query.isError ? flowErrorText(states.query.error) : "");
@@ -109,47 +110,47 @@ export function AnimateStep({ companionId, name, sheetJob = null, autoMake = fal
   return (
     <>
     <DialogBody columns="two">
-      <DialogSection title="Preview">
+      <DialogSection title={i18n._({ id: "Preview", message: "Preview" })}>
         <div className="mx-auto w-full max-w-sm">
-        <GenerationStage generating={generating} shape="panel" frame="strong" transparency="checker" aspectRatio="1 / 1" caption={selected ? `${label} · ${selected.label}` : `${label} · Character`}>
+        <GenerationStage generating={generating} shape="panel" frame="strong" transparency="checker" aspectRatio="1 / 1" caption={selected ? `${label} · ${selected.label}` : i18n._({ id: "{label} · Character", message: "{label} · Character", values: { label } })}>
           {selected?.approved
             ? <div className="absolute inset-0 flex flex-col items-center justify-center gap-2"><ClipPlayer key={`${selected.id}:${selected.approved.take_id}`} urls={selected.approved.urls} label={`${label} ${selected.label}`} /></div>
-            : previewImage ? <img src={previewImage} alt={`${label}, ${selected ? `${selected.label} keyframe` : "portrait"}`} draggable={false} className="absolute inset-0 size-full object-contain" /> : null}
+            : previewImage ? <img src={previewImage} alt={`${label}, ${selected ? i18n._({ id: "{label} keyframe", message: "{label} keyframe", values: { label: selected.label } }) : i18n._({ id: "portrait", message: "portrait" })}`} draggable={false} className="absolute inset-0 size-full object-contain" /> : null}
         </GenerationStage>
         </div>
         <div className="flex flex-wrap gap-3">
-          <Button shape="pill" disabled={!selected || running || clips.disabled} aria-describedby={clips.reason ? reasonId : undefined} title={clips.reason ?? undefined} onClick={() => selected && generate([selected.id], "one")}><Sparkles aria-hidden="true" />Make another</Button>
-          <Button variant="outline" shape="pill" disabled={!selected || running || pictures.disabled} aria-describedby={pictures.reason ? reasonId : undefined} title={pictures.reason ?? undefined} onClick={() => setEditing(true)}><Pencil aria-hidden="true" />Edit keyframe</Button>
+          <Button shape="pill" disabled={!selected || running || clips.disabled} aria-describedby={clips.reason ? reasonId : undefined} title={clips.reason ?? undefined} onClick={() => selected && generate([selected.id], "one")}><Sparkles aria-hidden="true" />{i18n._({ id: "Make another", message: "Make another" })}</Button>
+          <Button variant="outline" shape="pill" disabled={!selected || running || pictures.disabled} aria-describedby={pictures.reason ? reasonId : undefined} title={pictures.reason ?? undefined} onClick={() => setEditing(true)}><Pencil aria-hidden="true" />{i18n._({ id: "Edit keyframe", message: "Edit keyframe" })}</Button>
         </div>
         {selected ? <p className="text-sm text-muted-foreground">{selected.when_it_plays}</p> : null}
         {pausedLine ? <p id={reasonId} role="status" className="text-sm text-muted-foreground">{pausedLine}</p> : null}
       </DialogSection>
       <div className="flex flex-col gap-6">
-        {sheet.waiting || picturing ? <div role="status" className="flex flex-col gap-2"><p className="text-sm text-foreground">{sheet.waiting || picturing?.kind === "sheet" ? "Drawing your character from the sides and with its mouth open, so every animation matches. This takes a few minutes, and your animations start by themselves when it is done." : `${picturing?.label ?? "Making a picture"} for your animations...`}</p><Progress mode="determinate" value={sheet.waiting ? sheet.percent : picturing?.percent ?? 0} label="Progress" /></div> : null}
+        {sheet.waiting || picturing ? <div role="status" className="flex flex-col gap-2"><p className="text-sm text-foreground">{sheet.waiting || picturing?.kind === "sheet" ? i18n._({ id: "Drawing your character from the sides and with its mouth open, so every animation matches. This takes a few minutes, and your animations start by themselves when it is done.", message: "Drawing your character from the sides and with its mouth open, so every animation matches. This takes a few minutes, and your animations start by themselves when it is done." }) : i18n._({ id: "{what} for your animations...", message: "{what} for your animations...", values: { what: picturing?.label ?? i18n._({ id: "Making a picture", message: "Making a picture" }) } })}</p><Progress mode="determinate" value={sheet.waiting ? sheet.percent : picturing?.percent ?? 0} label={i18n._({ id: "Progress", message: "Progress" })} /></div> : null}
         {errorLine ? <p role="alert" className="text-sm text-destructive">{errorLine}</p> : null}
-        {sheet.failed ? <Button variant="outline" shape="pill" onClick={() => void sheet.retry()}>Try again</Button> : null}
-        <DialogSection title="Required" aside={`${required.length || 4} animations · Always included`}>
+        {sheet.failed ? <Button variant="outline" shape="pill" onClick={() => void sheet.retry()}>{i18n._({ id: "Try again", message: "Try again" })}</Button> : null}
+        <DialogSection title={i18n._({ id: "Required", message: "Required" })} aside={i18n._({ id: "{count, plural, one {# animation} other {# animations}} · Always included", message: "{count, plural, one {# animation} other {# animations}} · Always included", values: { count: required.length || 4 } })}>
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
             {required.map((row) => <CharacterTile key={row.id} variant="animation" locked {...tile(row)} />)}
           </div>
-          <Button shape="pill" width="full" disabled={running || clips.disabled || missingRequired.length === 0} aria-describedby={clips.reason ? reasonId : undefined} title={clips.reason ?? undefined} onClick={() => generate(missingRequired, "required")}>{group === "required" ? <Spinner className="animate-spin" aria-hidden="true" /> : <Sparkles aria-hidden="true" />}{group === "required" ? doing : "Generate Required"}</Button>
-          {group === "required" ? <Button variant="outline" shape="pill" width="full" onClick={stop}>Stop</Button> : null}
+          <Button shape="pill" width="full" disabled={running || clips.disabled || missingRequired.length === 0} aria-describedby={clips.reason ? reasonId : undefined} title={clips.reason ?? undefined} onClick={() => generate(missingRequired, "required")}>{group === "required" ? <Spinner className="animate-spin" aria-hidden="true" /> : <Sparkles aria-hidden="true" />}{group === "required" ? doing : i18n._({ id: "Generate Required", message: "Generate Required" })}</Button>
+          {group === "required" ? <Button variant="outline" shape="pill" width="full" onClick={stop}>{i18n._({ id: "Stop", message: "Stop" })}</Button> : null}
         </DialogSection>
         <Separator />
-        <DialogSection title="Optional" aside={<Button variant="link" size="sm" disabled={running} onClick={() => setTicked(allTicked ? new Set() : new Set(optional.map((row) => row.id)))}>{allTicked ? "Clear All" : "Select All"}</Button>}>
-          <p className="text-sm text-muted-foreground">{`${optional.length || 9} animations · Select the ones you want`}</p>
+        <DialogSection title={i18n._({ id: "Optional", message: "Optional" })} aside={<Button variant="link" size="sm" disabled={running} onClick={() => setTicked(allTicked ? new Set() : new Set(optional.map((row) => row.id)))}>{allTicked ? i18n._({ id: "Clear All", message: "Clear All" }) : i18n._({ id: "Select All", message: "Select All" })}</Button>}>
+          <p className="text-sm text-muted-foreground">{i18n._({ id: "{count, plural, one {# animation} other {# animations}} · Select the ones you want", message: "{count, plural, one {# animation} other {# animations}} · Select the ones you want", values: { count: optional.length || 9 } })}</p>
           <div className="grid grid-cols-3 gap-3 xl:grid-cols-5">
             {optional.map((row) => <CharacterTile key={row.id} variant="animation" checked={ticked.has(row.id)} onCheckedChange={(on) => toggle(row.id, on)} {...tile(row)} />)}
           </div>
-          <Button variant="secondary" shape="pill" width="full" disabled={running || clips.disabled || pending.length === 0} aria-describedby={clips.reason ? reasonId : undefined} title={clips.reason ?? undefined} onClick={() => generate(pending, "optional")}>{group === "optional" ? doing : `Generate Optional (${pending.length})`}</Button>
-          {group === "optional" ? <Button variant="outline" shape="pill" width="full" onClick={stop}>Stop</Button> : null}
+          <Button variant="secondary" shape="pill" width="full" disabled={running || clips.disabled || pending.length === 0} aria-describedby={clips.reason ? reasonId : undefined} title={clips.reason ?? undefined} onClick={() => generate(pending, "optional")}>{group === "optional" ? doing : i18n._({ id: "Generate Optional ({count})", message: "Generate Optional ({count})", values: { count: pending.length } })}</Button>
+          {group === "optional" ? <Button variant="outline" shape="pill" width="full" onClick={stop}>{i18n._({ id: "Stop", message: "Stop" })}</Button> : null}
         </DialogSection>
-        {states.data && !states.data.sheet_ready && !errorLine ? <p className="text-sm text-muted-foreground">Finish your character on the first screen before making animations.</p> : null}
+        {states.data && !states.data.sheet_ready && !errorLine ? <p className="text-sm text-muted-foreground">{i18n._({ id: "Finish your character on the first screen before making animations.", message: "Finish your character on the first screen before making animations." })}</p> : null}
       </div>
     </DialogBody>
     <DialogFooter align="between">
-      <Button variant="outline" shape="pill" onClick={onBack}><Back aria-hidden="true" />Back</Button>
-      <Button shape="pill" disabled={required.length === 0 || missingRequired.length > 0} onClick={onContinue}>Continue<Next aria-hidden="true" /></Button>
+      <Button variant="outline" shape="pill" onClick={onBack}><Back aria-hidden="true" />{i18n._({ id: "Back", message: "Back" })}</Button>
+      <Button shape="pill" disabled={required.length === 0 || missingRequired.length > 0} onClick={onContinue}>{i18n._({ id: "Continue", message: "Continue" })}<Next aria-hidden="true" /></Button>
     </DialogFooter>
     {selected ? <KeyframeEditor key={selected.id} companionId={companionId} row={selected} open={editing} onOpenChange={setEditing} /> : null}
     </>

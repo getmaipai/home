@@ -1,3 +1,4 @@
+import { i18n } from "@lingui/core";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
@@ -10,7 +11,7 @@ import { STARTER_SUGGESTIONS } from "@/apps/chat/chatStarterSuggestions";
 import { engineDownReason, useChatAvailability } from "@/apps/chat/useChatAvailability";
 import { installTitle } from "@/shell/InstallStrip";
 
-const PLACEHOLDER = "Ask anything";
+const PLACEHOLDER = () => i18n._({ id: "Ask anything", message: "Ask anything" });
 const STARTERS = STARTER_SUGGESTIONS.slice(0, 3);
 
 /** The install strip's own line while an install is moving, else null (one wording, InstallStrip.tsx). */
@@ -46,7 +47,7 @@ export function AskBox() {
       return state === undefined || state === "none" || state === "ready" ? 30_000 : 2_000;
     },
   });
-  const placeholder = installPlaceholder(install.data) ?? PLACEHOLDER;
+  const placeholder = installPlaceholder(install.data) ?? PLACEHOLDER();
 
   const submit = (event: FormEvent) => {
     event.preventDefault();
@@ -65,11 +66,11 @@ export function AskBox() {
               disabled, while the box is empty: a disabled control fades the whole group (kit has-disabled), and
               the faded placeholder fails WCAG contrast. An empty submit does nothing (see submit). */}
           <HitField pad={10} className="flex-1">
-            <InputGroupInput ref={inputRef} value={text} onChange={(event) => setText(event.target.value)} placeholder={placeholder} aria-label="Ask" maxLength={2000} />
+            <InputGroupInput ref={inputRef} value={text} onChange={(event) => setText(event.target.value)} placeholder={placeholder} aria-label={i18n._({ id: "Ask", message: "Ask" })} maxLength={2000} />
           </HitField>
           <InputGroupAddon align="inline-end">
             <span className="flex">
-              <Button type="submit" variant="default" size="row" aria-disabled={text.trim() === "" || undefined}>Ask</Button>
+              <Button type="submit" variant="default" size="row" aria-disabled={text.trim() === "" || undefined}>{i18n._({ id: "Ask", message: "Ask" })}</Button>
             </span>
           </InputGroupAddon>
         </InputGroup>

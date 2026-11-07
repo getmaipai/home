@@ -1,3 +1,4 @@
+import { i18n } from "@lingui/core";
 import { useEffect, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, type CompanionLookJob } from "@/lib/api";
@@ -23,6 +24,6 @@ export function useSheetWait(companionId: string, jobId: string | null, pictureI
     try { const result = await api.approveCompanionLook(companionId, pictureId); setJob(result.job); await client.invalidateQueries({ queryKey: companionStatesKey(companionId) }); }
     catch (e) { setError(flowErrorText(e)); }
   }
-  const message = error || (failed ? (query.data?.error ?? (query.isError ? flowErrorText(query.error) : "The character could not be made ready. Try again.")) : "");
-  return { waiting, failed, percent: query.data?.percent ?? 0, label: query.data?.label ?? "Getting your character ready", message, retry };
+  const message = error || (failed ? (query.data?.error ?? (query.isError ? flowErrorText(query.error) : i18n._({ id: "The character could not be made ready. Try again.", message: "The character could not be made ready. Try again." }))) : "");
+  return { waiting, failed, percent: query.data?.percent ?? 0, label: query.data?.label ?? i18n._({ id: "Getting your character ready", message: "Getting your character ready" }), message, retry };
 }

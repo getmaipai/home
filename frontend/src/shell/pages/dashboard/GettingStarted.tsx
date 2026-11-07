@@ -1,3 +1,4 @@
+import { i18n } from "@lingui/core";
 import { Link } from "react-router-dom";
 import { Button } from "@maipai/ui/src/dashboard/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@maipai/ui/src/dashboard/components/ui/card";
@@ -20,9 +21,9 @@ export function GettingStarted({ person }: { person: Roster }) {
   if (!allowed || open.length === 0) return null;
   const rows = open.slice(0, GETTING_STARTED_ROWS);
   return (
-    <section aria-label="Getting started">
+    <section aria-label={i18n._({ id: "Getting started", message: "Getting started" })}>
       <Card size="sm">
-        <CardHeader><CardTitle>Getting started</CardTitle></CardHeader>
+        <CardHeader><CardTitle>{i18n._({ id: "Getting started", message: "Getting started" })}</CardTitle></CardHeader>
         <CardContent>
           <ItemGroup>
             {rows.map((item) => (
@@ -30,12 +31,12 @@ export function GettingStarted({ person }: { person: Roster }) {
                 <ItemContent><ItemTitle>{item.title}</ItemTitle></ItemContent>
                 <ItemActions>
                   <Button variant="outline" size="row" nativeButton={false} render={<Link to={item.open.href} />}>{item.open.label}<span className="sr-only"> {item.title}</span></Button>
-                  <Button variant="ghost" size="row" disabled={dismiss.isPending} onClick={() => dismiss.mutate(item.id)}>Skip<span className="sr-only"> {item.title}</span></Button>
+                  <Button variant="ghost" size="row" disabled={dismiss.isPending} onClick={() => dismiss.mutate(item.id)}>{i18n._({ id: "Skip", message: "Skip" })}<span className="sr-only"> {item.title}</span></Button>
                 </ItemActions>
               </Item>
             ))}
           </ItemGroup>
-          {open.length > rows.length ? <Button variant="link" size="row" nativeButton={false} render={<Link to="/settings/household?tab=general" />}>{`Show ${open.length - rows.length} more`}</Button> : null}
+          {open.length > rows.length ? <Button variant="link" size="row" nativeButton={false} render={<Link to="/settings/household?tab=general" />}>{i18n._({ id: "Show {count} more", message: "Show {count} more", values: { count: open.length - rows.length } })}</Button> : null}
         </CardContent>
       </Card>
     </section>

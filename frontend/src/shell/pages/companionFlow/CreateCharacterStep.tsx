@@ -1,3 +1,4 @@
+import { i18n } from "@lingui/core";
 import { useEffect, useId, useRef, useState, type MutableRefObject } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@maipai/ui/src/ui/button";
@@ -90,7 +91,7 @@ export function CreateCharacterStep({ creating, companionId, initialName, onDraf
       const made = job.versions[job.versions.length - 1];
       if (made) choose(made.id);
       void client.invalidateQueries({ queryKey: lookKey(draftId!) }); setJobId(null);
-    } else if (job.state === "failed") { const text = job.error ?? "The picture could not be made. Change the description and try again."; setError(text); setPreviewError(text); setJobId(null); }
+    } else if (job.state === "failed") { const text = job.error ?? i18n._({ id: "The picture could not be made. Change the description and try again.", message: "The picture could not be made. Change the description and try again." }); setError(text); setPreviewError(text); setJobId(null); }
     else if (job.state === "cancelled") setJobId(null);
   }, [job, jobId, draftId, client]);
 
@@ -215,60 +216,60 @@ export function CreateCharacterStep({ creating, companionId, initialName, onDraf
     <>
     <DialogBody columns="three">
       <div className="flex flex-col gap-6">
-        <DialogSection title="Character name">
-          <Input aria-label="Character name" shape="pill" placeholder="Enter character name" maxLength={40} value={name} disabled={locked}
+        <DialogSection title={i18n._({ id: "Character name", message: "Character name" })}>
+          <Input aria-label={i18n._({ id: "Character name", message: "Character name" })} shape="pill" placeholder={i18n._({ id: "Enter character name", message: "Enter character name" })} maxLength={40} value={name} disabled={locked}
             onChange={(e) => setName(e.target.value)} onBlur={nameDone} />
         </DialogSection>
-        <DialogSection title="Start with">
-          <ToggleGroup type="single" variant="segmented" fill value={mode} onValueChange={chooseMode} aria-label="Start with">
-            <ToggleGroupItem value="describe">Describe</ToggleGroupItem>
-            <ToggleGroupItem value="upload">Upload Photo</ToggleGroupItem>
+        <DialogSection title={i18n._({ id: "Start with", message: "Start with" })}>
+          <ToggleGroup type="single" variant="segmented" fill value={mode} onValueChange={chooseMode} aria-label={i18n._({ id: "Start with", message: "Start with" })}>
+            <ToggleGroupItem value="describe">{i18n._({ id: "Describe", message: "Describe" })}</ToggleGroupItem>
+            <ToggleGroupItem value="upload">{i18n._({ id: "Upload Photo", message: "Upload Photo" })}</ToggleGroupItem>
           </ToggleGroup>
           {mode === "describe"
-            ? <Textarea aria-label="Describe the character" shape="rounded" maxRows={12} placeholder="Describe the character you want to create..." value={description} disabled={locked} onChange={(e) => setDescription(e.target.value)} />
-            : <Input ref={fileInput} aria-label="Photo" type="file" shape="pill" accept="image/png,image/jpeg,image/webp" disabled={locked} aria-describedby={making.reason ? reasonId : undefined} onChange={(e) => { const chosen = e.target.files?.[0] ?? null; setFile(chosen); setUploadedId(null); maybeUpload(chosen); }} />}
-          {mode === "upload" && thumb ? <div className="flex items-center gap-3"><img src={thumb} alt="Your upload" draggable={false} className="size-14 rounded-xl object-cover" /><p className="min-w-0 truncate text-sm text-muted-foreground">{file?.name}</p></div> : null}
+            ? <Textarea aria-label={i18n._({ id: "Describe the character", message: "Describe the character" })} shape="rounded" maxRows={12} placeholder={i18n._({ id: "Describe the character you want to create...", message: "Describe the character you want to create..." })} value={description} disabled={locked} onChange={(e) => setDescription(e.target.value)} />
+            : <Input ref={fileInput} aria-label={i18n._({ id: "Photo", message: "Photo" })} type="file" shape="pill" accept="image/png,image/jpeg,image/webp" disabled={locked} aria-describedby={making.reason ? reasonId : undefined} onChange={(e) => { const chosen = e.target.files?.[0] ?? null; setFile(chosen); setUploadedId(null); maybeUpload(chosen); }} />}
+          {mode === "upload" && thumb ? <div className="flex items-center gap-3"><img src={thumb} alt={i18n._({ id: "Your upload", message: "Your upload" })} draggable={false} className="size-14 rounded-xl object-cover" /><p className="min-w-0 truncate text-sm text-muted-foreground">{file?.name}</p></div> : null}
         </DialogSection>
       </div>
       <div className="flex flex-col gap-6">
-        <DialogSection title="Choose a style">
+        <DialogSection title={i18n._({ id: "Choose a style", message: "Choose a style" })}>
           {tiles.length ? <div className="grid grid-cols-3 gap-3">
             {tiles.map((tile) => <CharacterTile key={tile.id} variant="picture" name={tile.label} selected={style === tile.id}
               media={tile.custom ? <Palette className="size-6 text-muted-foreground" aria-hidden="true" /> : tile.id === "keep" ? <User className="size-6 text-muted-foreground" aria-hidden="true" /> : <Sparkles className="size-6 text-muted-foreground" aria-hidden="true" />}
               onSelect={() => { if (!locked) chooseStyle(tile.id); }} />)}
-          </div> : <p className="text-sm text-muted-foreground">{stylesQuery.isError ? flowErrorText(stylesQuery.error) : lookQuery.isError ? flowErrorText(lookQuery.error) : "Loading the styles"}</p>}
-          {customSelected ? <Input aria-label="Custom style" shape="pill" placeholder="Type a style, for example paper cut-out" maxLength={120} value={customStyle} disabled={locked} onChange={(e) => setCustomStyle(e.target.value)} /> : null}
+          </div> : <p className="text-sm text-muted-foreground">{stylesQuery.isError ? flowErrorText(stylesQuery.error) : lookQuery.isError ? flowErrorText(lookQuery.error) : i18n._({ id: "Loading the styles", message: "Loading the styles" })}</p>}
+          {customSelected ? <Input aria-label={i18n._({ id: "Custom style", message: "Custom style" })} shape="pill" placeholder={i18n._({ id: "Type a style, for example paper cut-out", message: "Type a style, for example paper cut-out" })} maxLength={120} value={customStyle} disabled={locked} onChange={(e) => setCustomStyle(e.target.value)} /> : null}
         </DialogSection>
         <div className="flex flex-col gap-2">
-          <Button shape="pill" width="full" disabled={!canGenerate || (mode === "upload" && style === "keep")} aria-describedby={making.reason ? reasonId : undefined} title={making.reason ?? undefined} aria-busy={makingCharacter} onClick={() => void generate()}>{makingCharacter ? <><Spinner className="animate-spin" aria-hidden="true" />Making your character...</> : <><Sparkles aria-hidden="true" />Generate Character</>}</Button>
+          <Button shape="pill" width="full" disabled={!canGenerate || (mode === "upload" && style === "keep")} aria-describedby={making.reason ? reasonId : undefined} title={making.reason ?? undefined} aria-busy={makingCharacter} onClick={() => void generate()}>{makingCharacter ? <><Spinner className="animate-spin" aria-hidden="true" />{i18n._({ id: "Making your character...", message: "Making your character..." })}</> : <><Sparkles aria-hidden="true" />{i18n._({ id: "Generate Character", message: "Generate Character" })}</>}</Button>
           {look && !look.can_generate && look.generate_reason ? <p className="text-sm text-muted-foreground">{look.generate_reason}</p> : null}
           {making.reason ? <p id={reasonId} role="status" className="text-sm text-muted-foreground">{making.reason}</p> : null}
           {error ? <p role="alert" className="text-sm text-destructive">{error}</p> : null}
         </div>
       </div>
-      <DialogSection title="Character Preview">
+      <DialogSection title={i18n._({ id: "Character Preview", message: "Character Preview" })}>
         <GenerationStage generating={generating || preparingPhoto || busyKind === "complete"} shape="panel" frame="strong" transparency="checker" aspectRatio="1 / 1">
           {picture
-            ? <DraggablePicture src={picture.url} alt={`${name.trim() || "Your character"}, preview`} frame={frame} baked={baked} disabled={placeLocked} onFrameChange={place} />
+            ? <DraggablePicture src={picture.url} alt={i18n._({ id: "{name}, preview", message: "{name}, preview", values: { name: name.trim() || i18n._({ id: "Your character", message: "Your character" }) } })} frame={frame} baked={baked} disabled={placeLocked} onFrameChange={place} />
             : <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 p-6 text-center text-muted-foreground">
               <User className="size-12" aria-hidden="true" />
-              <p>{generating ? "Getting your character started" : "Your character will appear here"}</p>
+              <p>{generating ? i18n._({ id: "Getting your character started", message: "Getting your character started" }) : i18n._({ id: "Your character will appear here", message: "Your character will appear here" })}</p>
             </div>}
           {generating ? <div className="absolute inset-x-4 bottom-4 flex flex-col gap-2 rounded-2xl bg-background/90 p-3">
-            <p className="text-center text-sm text-foreground">{job?.label ?? "Making your character"}</p>
-            <Progress mode="determinate" value={job?.percent ?? 0} label={job?.label ?? "Making your character"} />
+            <p className="text-center text-sm text-foreground">{job?.label ?? i18n._({ id: "Making your character", message: "Making your character" })}</p>
+            <Progress mode="determinate" value={job?.percent ?? 0} label={job?.label ?? i18n._({ id: "Making your character", message: "Making your character" })} />
           </div> : preparingPhoto || busyKind === "complete" ? <div className="absolute inset-x-4 bottom-4 flex items-center justify-center gap-2 rounded-2xl bg-background/90 p-3">
-            <Progress mode="spinner" label={preparingPhoto ? "Getting your photo ready" : "Filling in the parts that were cut off"} />
-            <p className="text-sm text-foreground">{preparingPhoto ? "Getting your photo ready. This can take up to a minute." : "Filling in the parts that were cut off. This can take a minute."}</p>
+            <Progress mode="spinner" label={preparingPhoto ? i18n._({ id: "Getting your photo ready", message: "Getting your photo ready" }) : i18n._({ id: "Filling in the parts that were cut off", message: "Filling in the parts that were cut off" })} />
+            <p className="text-sm text-foreground">{preparingPhoto ? i18n._({ id: "Getting your photo ready. This can take up to a minute.", message: "Getting your photo ready. This can take up to a minute." }) : i18n._({ id: "Filling in the parts that were cut off. This can take a minute.", message: "Filling in the parts that were cut off. This can take a minute." })}</p>
           </div> : null}
         </GenerationStage>
-        <p className="text-sm text-muted-foreground">{picture ? "Drag the character to move it. Use the mouse wheel to zoom. Change the description or style and generate again until you're happy." : "Change the description or style and generate again until you're happy with your character."}</p>
-        {generating ? <Button variant="outline" shape="pill" onClick={() => void stop()}>Stop</Button> : null}
-        {busyKind === "prepare" ? <p role="status" className="text-sm text-muted-foreground">Placing your character...</p> : null}
-        {preparingPhoto ? <p role="status" className="text-sm text-muted-foreground">Getting your photo ready...</p> : null}
-        {busyKind === "complete" ? <p role="status" className="text-sm text-muted-foreground">Filling in the parts that were cut off...</p> : null}
+        <p className="text-sm text-muted-foreground">{picture ? i18n._({ id: "Drag the character to move it. Use the mouse wheel to zoom. Change the description or style and generate again until you're happy.", message: "Drag the character to move it. Use the mouse wheel to zoom. Change the description or style and generate again until you're happy." }) : i18n._({ id: "Change the description or style and generate again until you're happy with your character.", message: "Change the description or style and generate again until you're happy with your character." })}</p>
+        {generating ? <Button variant="outline" shape="pill" onClick={() => void stop()}>{i18n._({ id: "Stop", message: "Stop" })}</Button> : null}
+        {busyKind === "prepare" ? <p role="status" className="text-sm text-muted-foreground">{i18n._({ id: "Placing your character...", message: "Placing your character..." })}</p> : null}
+        {preparingPhoto ? <p role="status" className="text-sm text-muted-foreground">{i18n._({ id: "Getting your photo ready...", message: "Getting your photo ready..." })}</p> : null}
+        {busyKind === "complete" ? <p role="status" className="text-sm text-muted-foreground">{i18n._({ id: "Filling in the parts that were cut off...", message: "Filling in the parts that were cut off..." })}</p> : null}
         <Button shape="pill" width="full" disabled={!picture || locked || making.disabled} aria-describedby={making.reason ? reasonId : undefined} title={making.reason ?? undefined} aria-busy={busyKind === "approve"} onClick={() => void approve()}>
-          {busyKind === "approve" ? <><Spinner className="animate-spin" aria-hidden="true" />Getting your character ready...</> : <>Approve &amp; Continue</>}
+          {busyKind === "approve" ? <><Spinner className="animate-spin" aria-hidden="true" />{i18n._({ id: "Getting your character ready...", message: "Getting your character ready..." })}</> : <>{i18n._({ id: "Approve & Continue", message: "Approve & Continue" })}</>}
         </Button>
         {previewError ? <p role="alert" className="text-sm text-destructive">{previewError}</p> : null}
       </DialogSection>

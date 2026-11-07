@@ -1,3 +1,4 @@
+import { i18n } from "@lingui/core";
 import { useCallback, useEffect, useRef, useState, type MutableRefObject } from "react";
 import { useNavigate } from "react-router-dom";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@maipai/ui/src/ui/dialog";
@@ -9,11 +10,11 @@ import { CustomizeStep } from "@/shell/pages/companionFlow/CustomizeStep";
 import { CreateCharacterStep } from "@/shell/pages/companionFlow/CreateCharacterStep";
 import { flowErrorText } from "@/shell/pages/companionFlow/errors";
 
-const STEPS = [
-  { title: "Create Character", line: "Design your companion's appearance" },
-  { title: "Animate Character", line: "Generate and review your animations" },
-  { title: "Customize Companion", line: "Give your companion a voice, personality, and history" },
-] as const;
+const STEPS = () => ([
+  { title: i18n._({ id: "Create Character", message: "Create Character" }), line: i18n._({ id: "Design your companion's appearance", message: "Design your companion's appearance" }) },
+  { title: i18n._({ id: "Animate Character", message: "Animate Character" }), line: i18n._({ id: "Generate and review your animations", message: "Generate and review your animations" }) },
+  { title: i18n._({ id: "Customize Companion", message: "Customize Companion" }), line: i18n._({ id: "Give your companion a voice, personality, and history", message: "Give your companion a voice, personality, and history" }) },
+] as const);
 
 /** The three-screen companion dialog. Screen 3 saves and publishes. `initialStep` (editing only) opens on a later screen. */
 export function CompanionFlowDialog({ companionId, initialName, initialStep = 0 }: { companionId: string | null; initialName: string; initialStep?: number }) {
@@ -50,7 +51,7 @@ export function CompanionFlowDialog({ companionId, initialName, initialStep = 0 
     const url = `/companions/${encodeURIComponent(draft.id)}/create${step > 0 ? `?step=${step + 1}` : ""}`;
     if (window.location.pathname + window.location.search !== url) window.history.replaceState(window.history.state, "", url);
   }, [draft.id, step]);
-  const current = STEPS[step]!;
+  const current = STEPS()[step]!;
   return (
     <>
     <Dialog open onOpenChange={(open) => { if (!open) void close(); }}>
@@ -58,10 +59,10 @@ export function CompanionFlowDialog({ companionId, initialName, initialStep = 0 
       <DialogContent variant="flow" size={step === 0 ? "xl" : "default"} onInteractOutside={(event) => event.preventDefault()} onOpenAutoFocus={(event) => { if (initialStep > 0) { event.preventDefault(); (event.currentTarget as HTMLElement | null)?.focus(); } }}>
         <DialogHeader>
           <DialogTitle size="xl">{current.title}</DialogTitle>
-          <DialogDescription>{`Step ${step + 1} of 3 · ${current.line}`}</DialogDescription>
+          <DialogDescription>{i18n._({ id: "Step {step} of 3 · {line}", message: "Step {step} of 3 · {line}", values: { step: step + 1, line: current.line } })}</DialogDescription>
         </DialogHeader>
-        <Progress mode="determinate" value={((step + 1) / 3) * 100} segments={3} tone="solid" size="md" label={`Step ${step + 1} of 3`} />
-        {asking ? <DestructiveConfirm message="Keep this draft or discard it?" detail="A draft with no picture can wait in your list until you come back." confirmLabel="Discard" busyLabel="Discarding" cancelLabel="Keep draft" busy={discarding} onConfirm={() => void discard()} onCancel={leave} /> : null}
+        <Progress mode="determinate" value={((step + 1) / 3) * 100} segments={3} tone="solid" size="md" label={i18n._({ id: "Step {step} of 3", message: "Step {step} of 3", values: { step: step + 1 } })} />
+        {asking ? <DestructiveConfirm message={i18n._({ id: "Keep this draft or discard it?", message: "Keep this draft or discard it?" })} detail={i18n._({ id: "A draft with no picture can wait in your list until you come back.", message: "A draft with no picture can wait in your list until you come back." })} confirmLabel={i18n._({ id: "Discard", message: "Discard" })} busyLabel={i18n._({ id: "Discarding", message: "Discarding" })} cancelLabel={i18n._({ id: "Keep draft", message: "Keep draft" })} busy={discarding} onConfirm={() => void discard()} onCancel={leave} /> : null}
         {error ? <p role="alert" className="text-sm text-destructive">{error}</p> : null}
         <div hidden={step !== 0}>
           <CreateCharacterStep creating={creating} companionId={companionId} initialName={initialName} onDraft={onDraft} onApproved={(job) => { setSheetJob(job); setJustApproved(true); setStep(1); }} />

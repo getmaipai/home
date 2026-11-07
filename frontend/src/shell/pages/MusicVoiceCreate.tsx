@@ -1,3 +1,4 @@
+import { i18n } from "@lingui/core";
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
@@ -19,14 +20,14 @@ type ChangeResult = { file_id: string; kind_of_source: "audio" | "video"; second
 type MadeResult = { operation: "voiceover"; value: MadeVoiceover } | { operation: "change"; value: ChangeResult & { key: number } };
 
 function VideoResult({ src }: { src: string }) {
-  return <video src={src} controls><track kind="captions" srcLang="en" label="Captions unavailable" /></video>;
+  return <video src={src} controls><track kind="captions" srcLang="en" label={i18n._({ id: "Captions unavailable", message: "Captions unavailable" })} /></video>;
 }
 
-const ENGINE_LABEL: Record<VoiceOption["engine"], string> = {
-  "fish-audio-drama-3": "the recorded voice engine",
-  "chatterbox-turbo": "the standard voice engine",
-};
-const VOICE_UNAVAILABLE_LINE = "Home can't speak right now. Try again in a minute.";
+const ENGINE_LABEL: () => Record<VoiceOption["engine"], string> = () => ({
+  "fish-audio-drama-3": i18n._({ id: "the recorded voice engine", message: "the recorded voice engine" }),
+  "chatterbox-turbo": i18n._({ id: "the standard voice engine", message: "the standard voice engine" }),
+});
+const VOICE_UNAVAILABLE_LINE = () => i18n._({ id: "Home can't speak right now. Try again in a minute.", message: "Home can't speak right now. Try again in a minute." });
 
 export function VoiceCreate() {
   const options = useQuery({ queryKey: ["voiceover-options"], queryFn: () => requestJson<VoiceOptions>("/api/voiceover/options"), staleTime: 30_000 });
@@ -44,7 +45,7 @@ export function VoiceCreate() {
   const selectedVoice = voices.find((item) => item.id === voice) ?? voices[0];
   const selectedId = selectedVoice?.id ?? "";
   const scriptEmpty = !script.trim();
-  const reason = scriptEmpty ? "Write something to speak." : making ? "Making your voiceover…" : !voiceAvailable ? VOICE_UNAVAILABLE_LINE : "";
+  const reason = scriptEmpty ? i18n._({ id: "Write something to speak.", message: "Write something to speak." }) : making ? i18n._({ id: "Making your voiceover…", message: "Making your voiceover…" }) : !voiceAvailable ? VOICE_UNAVAILABLE_LINE() : "";
 
   const make = async () => {
     if (!selectedId || scriptEmpty || making || !voiceAvailable) return;
@@ -58,7 +59,7 @@ export function VoiceCreate() {
       });
       setResults((current) => [{ operation: "voiceover", value: { ...result, key: Date.now() } }, ...current]);
     } catch (error) {
-      setProblem(error instanceof Error && error.message ? error.message : "Home could not make that voiceover. Try again.");
+      setProblem(error instanceof Error && error.message ? error.message : i18n._({ id: "Home could not make that voiceover. Try again.", message: "Home could not make that voiceover. Try again." }));
     } finally {
       setMaking(false);
     }
@@ -74,7 +75,7 @@ export function VoiceCreate() {
       const result = await request<{ id: string; name: string }>("/api/library/upload", { method: "POST", body: form });
       setSource({ id: result.id, name: result.name });
     } catch (error) {
-      setChangeProblem(error instanceof Error && error.message ? error.message : "Home could not add that file. Try again.");
+      setChangeProblem(error instanceof Error && error.message ? error.message : i18n._({ id: "Home could not add that file. Try again.", message: "Home could not add that file. Try again." }));
     } finally { setUploading(false); }
   };
 
@@ -84,69 +85,69 @@ export function VoiceCreate() {
     try {
       const result = await requestJson<ChangeResult>("/api/voiceover/change", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ file_id: source.id, voice: selectedId }) });
       setResults((current) => [{ operation: "change", value: { ...result, key: Date.now() } }, ...current]);
-    } catch (error) { setChangeProblem(error instanceof Error && error.message ? error.message : "Home could not change that voice. Try again."); }
+    } catch (error) { setChangeProblem(error instanceof Error && error.message ? error.message : i18n._({ id: "Home could not change that voice. Try again.", message: "Home could not change that voice. Try again." })); }
     finally { setMaking(false); }
   };
 
-  const changeReason = !source ? "Choose a file first." : !selectedId ? "Choose a voice." : making ? "Changing the voice…" : !voiceAvailable ? VOICE_UNAVAILABLE_LINE : "";
+  const changeReason = !source ? i18n._({ id: "Choose a file first.", message: "Choose a file first." }) : !selectedId ? i18n._({ id: "Choose a voice.", message: "Choose a voice." }) : making ? i18n._({ id: "Changing the voice…", message: "Changing the voice…" }) : !voiceAvailable ? VOICE_UNAVAILABLE_LINE() : "";
   const differenceLine = (difference: number | null, sourceKind: "audio" | "video") => {
     if (difference === null || Math.abs(difference) < 0.5) return null;
     const amount = Math.abs(difference) < 0.75 ? "0.5" : String(Math.round(Math.abs(difference)));
-    return difference > 0 ? `The new voice is ${amount} seconds longer than the ${sourceKind}, so the end was cut.` : `The new voice is ${amount} seconds shorter, so the end is quiet.`;
+    return difference > 0 ? i18n._({ id: "{sourceKind, select, video {The new voice is {amount} seconds longer than the video, so the end was cut.} other {The new voice is {amount} seconds longer than the audio, so the end was cut.}}", message: "{sourceKind, select, video {The new voice is {amount} seconds longer than the video, so the end was cut.} other {The new voice is {amount} seconds longer than the audio, so the end was cut.}}", values: { amount, sourceKind } }) : i18n._({ id: "The new voice is {amount} seconds shorter, so the end is quiet.", message: "The new voice is {amount} seconds shorter, so the end is quiet.", values: { amount } });
   };
   const resultRows = results.map((entry) => entry.operation === "voiceover"
     ? <article key={`voiceover-${entry.value.key}`} className="flex flex-col gap-2">
-      <Player src={`/api/files/${encodeURIComponent(entry.value.file_id)}/content`} kind="audio" layout="audio" title="Voiceover" />
-      <p>Spoken by {ENGINE_LABEL[entry.value.engine]}</p>
-      <Link to={`/files?file=${encodeURIComponent(entry.value.file_id)}`}>Open in Library</Link>
+      <Player src={`/api/files/${encodeURIComponent(entry.value.file_id)}/content`} kind="audio" layout="audio" title={i18n._({ id: "Voiceover", message: "Voiceover" })} />
+      <p>{i18n._({ id: "Spoken by {engine}", message: "Spoken by {engine}", values: { engine: ENGINE_LABEL()[entry.value.engine] } })}</p>
+      <Link to={`/files?file=${encodeURIComponent(entry.value.file_id)}`}>{i18n._({ id: "Open in Library", message: "Open in Library" })}</Link>
     </article>
     : <article key={`change-${entry.value.key}`} className="flex flex-col gap-2">
-      {entry.value.kind_of_source === "video" ? <VideoResult src={`/api/files/${encodeURIComponent(entry.value.file_id)}/content`} /> : <Player src={`/api/files/${encodeURIComponent(entry.value.file_id)}/content`} kind="audio" layout="audio" title="Changed voice" />}
-      <p>Spoken by {ENGINE_LABEL[entry.value.engine]}</p>
+      {entry.value.kind_of_source === "video" ? <VideoResult src={`/api/files/${encodeURIComponent(entry.value.file_id)}/content`} /> : <Player src={`/api/files/${encodeURIComponent(entry.value.file_id)}/content`} kind="audio" layout="audio" title={i18n._({ id: "Changed voice", message: "Changed voice" })} />}
+      <p>{i18n._({ id: "Spoken by {engine}", message: "Spoken by {engine}", values: { engine: ENGINE_LABEL()[entry.value.engine] } })}</p>
       {differenceLine(entry.value.difference_seconds, entry.value.kind_of_source) ? <p>{differenceLine(entry.value.difference_seconds, entry.value.kind_of_source)}</p> : null}
-      <Link to={`/files?file=${encodeURIComponent(entry.value.file_id)}`}>Open in Library</Link>
+      <Link to={`/files?file=${encodeURIComponent(entry.value.file_id)}`}>{i18n._({ id: "Open in Library", message: "Open in Library" })}</Link>
     </article>);
 
   return <div className="flex flex-col gap-3" data-testid="music-voice-create">
-    <ToggleGroup type="single" variant="segmented" fill value={mode} onValueChange={(next) => { if (next === "voiceover" || next === "change") setMode(next); }} aria-label="Voice mode">
-      <ToggleGroupItem value="voiceover">Voiceover</ToggleGroupItem><ToggleGroupItem value="change">Change voice</ToggleGroupItem>
+    <ToggleGroup type="single" variant="segmented" fill value={mode} onValueChange={(next) => { if (next === "voiceover" || next === "change") setMode(next); }} aria-label={i18n._({ id: "Voice mode", message: "Voice mode" })}>
+      <ToggleGroupItem value="voiceover">{i18n._({ id: "Voiceover", message: "Voiceover" })}</ToggleGroupItem><ToggleGroupItem value="change">{i18n._({ id: "Change voice", message: "Change voice" })}</ToggleGroupItem>
     </ToggleGroup>
     {mode === "voiceover" ? <>
-    <h2 className="text-lg font-semibold">Make a voiceover</h2>
+    <h2 className="text-lg font-semibold">{i18n._({ id: "Make a voiceover", message: "Make a voiceover" })}</h2>
     <div className="flex flex-col gap-1">
-      <label htmlFor="voiceover-voice">Voice</label>
+      <label htmlFor="voiceover-voice">{i18n._({ id: "Voice", message: "Voice" })}</label>
       <Select value={selectedId} onValueChange={(value) => setVoice(value ?? "")}>
-        <SelectTrigger id="voiceover-voice" aria-label="Voice"><SelectValue placeholder="Choose a voice" /></SelectTrigger>
+        <SelectTrigger id="voiceover-voice" aria-label={i18n._({ id: "Voice", message: "Voice" })}><SelectValue placeholder={i18n._({ id: "Choose a voice", message: "Choose a voice" })} /></SelectTrigger>
         <SelectContent>{voices.map((item) => <SelectItem key={item.id} value={item.id}>{item.label}</SelectItem>)}</SelectContent>
       </Select>
     </div>
     <div className="flex flex-col gap-1">
-      <label htmlFor="voiceover-script">Script</label>
-      <Textarea id="voiceover-script" aria-label="Script" rows={5} maxLength={2000} value={script} onChange={(event) => setScript(event.currentTarget.value)} />
+      <label htmlFor="voiceover-script">{i18n._({ id: "Script", message: "Script" })}</label>
+      <Textarea id="voiceover-script" aria-label={i18n._({ id: "Script", message: "Script" })} rows={5} maxLength={2000} value={script} onChange={(event) => setScript(event.currentTarget.value)} />
     </div>
-    {selectedVoice?.tags.length ? <div className="flex flex-wrap gap-2" role="group" aria-label="Voice tags">
+    {selectedVoice?.tags.length ? <div className="flex flex-wrap gap-2" role="group" aria-label={i18n._({ id: "Voice tags", message: "Voice tags" })}>
       {selectedVoice.tags.map((tag) => <Chip key={tag} onClick={() => setScript((current) => `${current}${current && !current.endsWith(" ") ? " " : ""}[${tag}]`)}>[{tag}]</Chip>)}
     </div> : null}
     <div className="flex flex-wrap items-center gap-2">
-      <Button type="button" disabled={scriptEmpty || making || !voiceAvailable || !selectedId} onClick={() => { void make(); }}>Make voiceover</Button>
+      <Button type="button" disabled={scriptEmpty || making || !voiceAvailable || !selectedId} onClick={() => { void make(); }}>{i18n._({ id: "Make voiceover", message: "Make voiceover" })}</Button>
       {reason ? <p className="text-muted-foreground text-sm">{reason}</p> : null}
     </div>
     {problem ? <p role="alert">{problem}</p> : null}
     </> : <>
-      <Dropzone label={uploading ? "Adding your file…" : source ? source.name : "Choose an audio or video file or drop it here"} accept="audio/*,video/*" disabled={uploading || making} onFile={(picked) => { void addSource(picked); }} />
+      <Dropzone label={uploading ? i18n._({ id: "Adding your file…", message: "Adding your file…" }) : source ? source.name : i18n._({ id: "Choose an audio or video file or drop it here", message: "Choose an audio or video file or drop it here" })} accept="audio/*,video/*" disabled={uploading || making} onFile={(picked) => { void addSource(picked); }} />
       <div className="flex flex-col gap-1">
-        <label htmlFor="change-voice-voice">Voice</label>
+        <label htmlFor="change-voice-voice">{i18n._({ id: "Voice", message: "Voice" })}</label>
         <Select value={selectedId} onValueChange={(value) => setVoice(value ?? "")}>
-          <SelectTrigger id="change-voice-voice" aria-label="Voice"><SelectValue placeholder="Choose a voice" /></SelectTrigger>
+          <SelectTrigger id="change-voice-voice" aria-label={i18n._({ id: "Voice", message: "Voice" })}><SelectValue placeholder={i18n._({ id: "Choose a voice", message: "Choose a voice" })} /></SelectTrigger>
           <SelectContent>{voices.map((item) => <SelectItem key={item.id} value={item.id}>{item.label}</SelectItem>)}</SelectContent>
         </Select>
       </div>
       <div className="flex flex-wrap items-center gap-2">
-        <Button type="button" disabled={!source || !selectedId || making || !voiceAvailable} onClick={() => { void changeVoice(); }}>Change voice</Button>
+        <Button type="button" disabled={!source || !selectedId || making || !voiceAvailable} onClick={() => { void changeVoice(); }}>{i18n._({ id: "Change voice", message: "Change voice" })}</Button>
         {changeReason ? <p className="text-muted-foreground text-sm">{changeReason}</p> : null}
       </div>
       {changeProblem ? <p role="alert">{changeProblem}</p> : null}
-      <p className="text-muted-foreground text-sm">The video's own sound is replaced. The original file is not changed.</p>
+      <p className="text-muted-foreground text-sm">{i18n._({ id: "The video's own sound is replaced. The original file is not changed.", message: "The video's own sound is replaced. The original file is not changed." })}</p>
     </>}
     {resultRows}
   </div>;

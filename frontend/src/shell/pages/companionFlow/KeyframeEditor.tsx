@@ -1,3 +1,4 @@
+import { i18n } from "@lingui/core";
 import { useEffect, useId, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@maipai/ui/src/ui/button";
@@ -37,7 +38,7 @@ export function KeyframeEditor({ companionId, row, open, onOpenChange }: {
   useEffect(() => {
     if (!job || !jobId) return;
     if (job.state === "done") { setJobId(null); setInstruction(""); setFrame(DEFAULT_FRAME); void refresh(); }
-    else if (job.state === "failed") { setError(job.error ?? "The picture could not be made. Change the description and try again."); setJobId(null); void refresh(); }
+    else if (job.state === "failed") { setError(job.error ?? i18n._({ id: "The picture could not be made. Change the description and try again.", message: "The picture could not be made. Change the description and try again." })); setJobId(null); void refresh(); }
     else if (job.state === "cancelled") setJobId(null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [job, jobId]);
@@ -70,29 +71,29 @@ export function KeyframeEditor({ companionId, row, open, onOpenChange }: {
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent scroll="viewport">
         <DialogHeader>
-          <DialogTitle>{`Edit keyframe: ${row.label}`}</DialogTitle>
-          <DialogDescription>The still picture this animation starts from. Changing it marks the animation out of date.</DialogDescription>
+          <DialogTitle>{i18n._({ id: "Edit keyframe: {label}", message: "Edit keyframe: {label}", values: { label: row.label } })}</DialogTitle>
+          <DialogDescription>{i18n._({ id: "The still picture this animation starts from. Changing it marks the animation out of date.", message: "The still picture this animation starts from. Changing it marks the animation out of date." })}</DialogDescription>
         </DialogHeader>
         {keyframe
-          ? <img src={`${keyframe.url}${keyframe.edited_at ? `?v=${encodeURIComponent(keyframe.edited_at)}` : ""}`} alt={`${row.label} keyframe`} draggable={false} className="aspect-square w-full rounded-2xl bg-muted object-contain" />
-          : <p className="text-sm text-muted-foreground">This animation has no picture yet. Make one to start from.</p>}
-        {working ? <p className="text-sm text-muted-foreground">{job?.label ?? "Working on the picture"}</p> : null}
+          ? <img src={`${keyframe.url}${keyframe.edited_at ? `?v=${encodeURIComponent(keyframe.edited_at)}` : ""}`} alt={i18n._({ id: "{label} keyframe", message: "{label} keyframe", values: { label: row.label } })} draggable={false} className="aspect-square w-full rounded-2xl bg-muted object-contain" />
+          : <p className="text-sm text-muted-foreground">{i18n._({ id: "This animation has no picture yet. Make one to start from.", message: "This animation has no picture yet. Make one to start from." })}</p>}
+        {working ? <p className="text-sm text-muted-foreground">{job?.label ?? i18n._({ id: "Working on the picture", message: "Working on the picture" })}</p> : null}
         {making.reason ? <p id={reasonId} role="status" className="text-sm text-muted-foreground">{making.reason}</p> : null}
         {keyframe ? <>
-          <DialogSection title="Describe a change">
-            <Textarea aria-label="Describe a change" shape="rounded" placeholder="For example, make the smile bigger" maxLength={500} value={instruction} disabled={working} onChange={(e) => setInstruction(e.target.value)} />
-            <Button shape="pill" disabled={working || making.disabled || instruction.trim().length === 0} aria-describedby={making.reason ? reasonId : undefined} title={making.reason ?? undefined} onClick={() => void change()}><Sparkles aria-hidden="true" />Change picture</Button>
+          <DialogSection title={i18n._({ id: "Describe a change", message: "Describe a change" })}>
+            <Textarea aria-label={i18n._({ id: "Describe a change", message: "Describe a change" })} shape="rounded" placeholder={i18n._({ id: "For example, make the smile bigger", message: "For example, make the smile bigger" })} maxLength={500} value={instruction} disabled={working} onChange={(e) => setInstruction(e.target.value)} />
+            <Button shape="pill" disabled={working || making.disabled || instruction.trim().length === 0} aria-describedby={making.reason ? reasonId : undefined} title={making.reason ?? undefined} onClick={() => void change()}><Sparkles aria-hidden="true" />{i18n._({ id: "Change picture", message: "Change picture" })}</Button>
           </DialogSection>
-          <DialogSection title="Upload a replacement">
-            <Input aria-label="Replacement picture" type="file" shape="pill" accept="image/png,image/jpeg,image/webp" disabled={working} onChange={(e) => setFile(e.target.files?.[0] ?? null)} />
-            <Button variant="outline" shape="pill" disabled={working || file === null} onClick={() => void replace()}>Use this picture</Button>
+          <DialogSection title={i18n._({ id: "Upload a replacement", message: "Upload a replacement" })}>
+            <Input aria-label={i18n._({ id: "Replacement picture", message: "Replacement picture" })} type="file" shape="pill" accept="image/png,image/jpeg,image/webp" disabled={working} onChange={(e) => setFile(e.target.files?.[0] ?? null)} />
+            <Button variant="outline" shape="pill" disabled={working || file === null} onClick={() => void replace()}>{i18n._({ id: "Use this picture", message: "Use this picture" })}</Button>
           </DialogSection>
           <PreviewControls idPrefix="keyframe" position frame={frame} disabled={working}
             onFrameChange={setFrame} onFrameCommit={(next) => void prepare(next)} />
-        </> : <Button shape="pill" disabled={working || making.disabled} aria-describedby={making.reason ? reasonId : undefined} title={making.reason ?? undefined} onClick={() => void make()}><Sparkles aria-hidden="true" />Make picture</Button>}
+        </> : <Button shape="pill" disabled={working || making.disabled} aria-describedby={making.reason ? reasonId : undefined} title={making.reason ?? undefined} onClick={() => void make()}><Sparkles aria-hidden="true" />{i18n._({ id: "Make picture", message: "Make picture" })}</Button>}
         {error ? <p role="alert" className="text-sm text-destructive">{error}</p> : null}
         <DialogFooter>
-          <Button variant="outline" shape="pill" onClick={() => onOpenChange(false)}>Done</Button>
+          <Button variant="outline" shape="pill" onClick={() => onOpenChange(false)}>{i18n._({ id: "Done", message: "Done" })}</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

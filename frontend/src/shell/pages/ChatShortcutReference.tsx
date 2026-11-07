@@ -1,3 +1,4 @@
+import { i18n } from "@lingui/core";
 import { useContext, useEffect, useState } from "react";
 import { useAui, useAuiState } from "@assistant-ui/react";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@maipai/ui/src/dashboard/components/ui/dialog";
@@ -20,8 +21,8 @@ export function ChatShortcutReference() {
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Keyboard shortcuts</DialogTitle>
-          <DialogDescription>Shortcuts for chat and navigation.</DialogDescription>
+          <DialogTitle>{i18n._({ id: "Keyboard shortcuts", message: "Keyboard shortcuts" })}</DialogTitle>
+          <DialogDescription>{i18n._({ id: "Shortcuts for chat and navigation.", message: "Shortcuts for chat and navigation." })}</DialogDescription>
         </DialogHeader>
         <dl className="flex flex-col gap-3 text-sm">
           {CHAT_SHORTCUTS.map(([label, shortcut]) => (

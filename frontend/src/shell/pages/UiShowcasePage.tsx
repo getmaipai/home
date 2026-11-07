@@ -1,3 +1,4 @@
+import { i18n } from "@lingui/core";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { AssistantRuntimeProvider, useAui, useLocalRuntime } from "@assistant-ui/react";
@@ -28,7 +29,7 @@ import type { Roster } from "@/lib/api";
 // ChatThread (the one composition the chat page renders too) shows it with
 // the chat's own reasoning, sources and tool parts. Nothing is stored.
 const PACES: ShowcasePace[] = ["instant", "normal", "slow"];
-const PACE_LABELS: Record<string, string> = { instant: "Instant", normal: "Normal pace", slow: "Slow pace" };
+const PACE_LABELS: () => Record<string, string> = () => ({ instant: i18n._({ id: "Instant", message: "Instant" }), normal: i18n._({ id: "Normal pace", message: "Normal pace" }), slow: i18n._({ id: "Slow pace", message: "Slow pace" }) });
 type Settle = "ready" | "error" | "idle" | "waiting" | "responding";
 
 function ShowcaseWorkspace({ scenarios, pace, setPace, setScenario, settleRef }: {
@@ -48,7 +49,7 @@ function ShowcaseWorkspace({ scenarios, pace, setPace, setScenario, settleRef }:
     setScenario(scenario.id);
     // Through the composer, as a person's own send goes: a failure scenario
     // rejects its run by design and the thread shows it as the message's error.
-    aui.composer().setText(`Show: ${scenario.title}`);
+    aui.composer().setText(i18n._({ id: "Show: {title}", message: "Show: {title}", values: { title: scenario.title } }));
     aui.composer().send();
   }, [aui, setScenario]);
 
@@ -77,7 +78,7 @@ function ShowcaseWorkspace({ scenarios, pace, setPace, setScenario, settleRef }:
     <div className="flex h-full min-h-0 flex-col">
     {/* APP-SET-02 (kit report KIT-SET-02): the settings look and the settings shell, as the kit ships them. */}
     <details>
-      <summary>Settings look and shell</summary>
+      <summary>{i18n._({ id: "Settings look and shell", message: "Settings look and shell" })}</summary>
       <SettingsShowcase />
       <SettingsShellShowcase />
     </details>
@@ -85,18 +86,18 @@ function ShowcaseWorkspace({ scenarios, pace, setPace, setScenario, settleRef }:
     <div className="min-h-0 flex-1">
     <SplitView
       detailOpen={current !== null}
-      listLabel="Scenarios"
-      detailLabel="Chat"
+      listLabel={i18n._({ id: "Scenarios", message: "Scenarios" })}
+      detailLabel={i18n._({ id: "Chat", message: "Chat" })}
       list={
         <div className="flex flex-col gap-2 p-2">
           <div className="flex flex-wrap items-center gap-2 px-2">
-            <Select value={pace} onValueChange={(value) => setPace(value as ShowcasePace)} options={PACES} getLabel={(value) => PACE_LABELS[value] ?? value} aria-label="Streaming pace" />
-            <Button onClick={() => void playAll()} disabled={playingAll}>Play all</Button>
-            <Button variant="outline" onClick={stop}>Stop</Button>
-            <Button variant="outline" onClick={() => { stop(); aui.thread().reset(); setCurrent(null); }}>Clear</Button>
+            <Select value={pace} onValueChange={(value) => setPace(value as ShowcasePace)} options={PACES} getLabel={(value) => PACE_LABELS()[value] ?? value} aria-label={i18n._({ id: "Streaming pace", message: "Streaming pace" })} />
+            <Button onClick={() => void playAll()} disabled={playingAll}>{i18n._({ id: "Play all", message: "Play all" })}</Button>
+            <Button variant="outline" onClick={stop}>{i18n._({ id: "Stop", message: "Stop" })}</Button>
+            <Button variant="outline" onClick={() => { stop(); aui.thread().reset(); setCurrent(null); }}>{i18n._({ id: "Clear", message: "Clear" })}</Button>
           </div>
           <List
-            label="Scenarios"
+            label={i18n._({ id: "Scenarios", message: "Scenarios" })}
             items={scenarios}
             getKey={(scenario) => scenario.id}
             isSelected={(scenario) => scenario.id === current}
@@ -114,7 +115,7 @@ function ShowcaseWorkspace({ scenarios, pace, setPace, setScenario, settleRef }:
       detail={
         <div className="flex h-full min-h-0 flex-col">
           <div className="flex items-center gap-2 border-b border-border px-2 py-1 sm:hidden">
-            <Button variant="ghost" onClick={() => setCurrent(null)}>Scenarios</Button>
+            <Button variant="ghost" onClick={() => setCurrent(null)}>{i18n._({ id: "Scenarios", message: "Scenarios" })}</Button>
           </div>
           <div className="flex h-full min-h-0 flex-1 flex-col overflow-hidden">
             <ChatThread />
@@ -128,7 +129,7 @@ function ShowcaseWorkspace({ scenarios, pace, setPace, setScenario, settleRef }:
 }
 
 export function UiShowcasePage({ person }: { person: Roster }) {
-  useTabItem("Chat showcase");
+  useTabItem(i18n._({ id: "Chat showcase", message: "Chat showcase" }));
   const query = useQuery({ queryKey: ["dev-ui-fixtures"], queryFn: listShowcaseScenarios, retry: false });
   const [pace, setPace] = useState<ShowcasePace>("normal");
   const paceRef = useRef(pace);
@@ -163,10 +164,10 @@ export function UiShowcasePage({ person }: { person: Roster }) {
   const runtime = useLocalRuntime(adapter);
 
   return (
-    <AdminGatedContent title="Chat showcase" person={person} deniedText="The Chat showcase is for owners and admins.">
+    <AdminGatedContent title={i18n._({ id: "Chat showcase", message: "Chat showcase" })} person={person} deniedText={i18n._({ id: "The Chat showcase is for owners and admins.", message: "The Chat showcase is for owners and admins." })}>
       {/* The showcase-specific full-height slot bounds the thread within this page. */}
       <div data-slot="next-chat-showcase-shell" className="flex h-full min-h-0 flex-col overflow-hidden">
-      <Page title="Chat showcase">
+      <Page title={i18n._({ id: "Chat showcase", message: "Chat showcase" })}>
         <AsyncState data={query.isError ? null : query.data} error={query.isError} isFetching={query.isFetching} onRetry={() => void query.refetch()} errorMessage={query.error?.message}>
           {(scenarios) => (
             <AssistantRuntimeProvider runtime={runtime}>

@@ -1,3 +1,4 @@
+import { i18n } from "@lingui/core";
 import { getIcon } from "@maipai/ui/src/icons";
 import { familyLabel, greetingFor, timeOfDay } from "@/apps/home/greeting";
 
@@ -33,7 +34,7 @@ export function Greeting({ displayName, familyName }: { displayName: string; fam
       <h2 className="text-xl flex items-center gap-2 capitalize">
         {greetingFor(new Date(), displayName)} <span className="flex items-center">{isDaytime ? <SunIcon size={25} color="orange" /> : <MoonIcon size={25} />}</span>
       </h2>
-      <p className="text-sm font-normal text-muted-foreground">Here is your household today.</p>
+      <p className="text-sm font-normal text-muted-foreground">{i18n._({ id: "Here is your household today.", message: "Here is your household today." })}</p>
     </div>
   );
 }

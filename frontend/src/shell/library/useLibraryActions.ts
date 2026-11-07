@@ -51,13 +51,13 @@ export function useLibraryActions(meId: string) {
   };
 }
 
-/** "4 moved to Trash. 1 could not be moved: it is not yours to change." */
-export function batchSentence(result: BatchResult, done: (count: number) => string, failed: string): string {
+/** "4 files moved to Trash. 1 could not be moved to Trash: it is not yours to change." `failed` gets the refused count and the first reason. */
+export function batchSentence(result: BatchResult, done: (count: number) => string, failed: (count: number, reason: string) => string): string {
   const parts: string[] = [];
   if (result.done.length > 0) parts.push(`${done(result.done.length)}.`);
   if (result.refused.length > 0) {
     const first = result.refused[0]!.reason;
-    parts.push(`${result.refused.length} ${failed}: ${first.charAt(0).toLowerCase()}${first.slice(1).replace(/\.$/, "")}.`);
+    parts.push(failed(result.refused.length, `${first.charAt(0).toLowerCase()}${first.slice(1).replace(/\.$/, "")}`));
   }
   return parts.join(" ");
 }

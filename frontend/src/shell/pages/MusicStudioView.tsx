@@ -4,6 +4,7 @@
 // action (the same one the chat card uses), so nothing here is a second path. The side panel is a live listening EQ (six bands) and compressor
 // built on the browser's Web Audio: they change what you hear in the Studio, never the saved file. Not built yet: the MIDI piano roll, warp
 // markers and the floating "ask me to add a part" bar; they need an engine that edits audio, which Home does not have.
+import { i18n } from "@lingui/core";
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
@@ -30,13 +31,13 @@ export interface StudioTrack { id: string; name: string; url: string; hue: strin
 
 const HUES = ["var(--hue-pink)", "var(--hue-violet)", "var(--hue-blue)", "var(--hue-yellow)", "var(--hue-green)", "var(--hue-teal)", "var(--hue-orange)"];
 const STEM_HUE: Record<string, string> = { vocals: "var(--hue-violet)", drums: "var(--hue-blue)", bass: "var(--hue-orange)", other: "var(--hue-yellow)" };
-export const STEMS_UNAVAILABLE_LINE = "This computer has no stem model installed, so the song cannot be split. An admin can add one in Settings. The full song still plays here.";
+export const STEMS_UNAVAILABLE_LINE = () => i18n._({ id: "This computer has no stem model installed, so the song cannot be split. An admin can add one in Settings. The full song still plays here.", message: "This computer has no stem model installed, so the song cannot be split. An admin can add one in Settings. The full song still plays here." });
 
 /** The rows to show: the full song first, then one row per stem. */
 export function studioTracks(song: MusicCard | undefined, stems: MusicCard | undefined): StudioTrack[] {
   const tracks: StudioTrack[] = [];
   const full = song?.versions.find((version) => version.id === song.current_id) ?? song?.versions.at(-1);
-  if (song && full) tracks.push({ id: "mix", name: song.title ?? "Full song", url: full.url, hue: HUES[0] ?? "var(--primary)" });
+  if (song && full) tracks.push({ id: "mix", name: song.title ?? i18n._({ id: "Full song", message: "Full song" }), url: full.url, hue: HUES[0] ?? "var(--primary)" });
   if (stems?.state === "done") stems.versions.forEach((version, index) => tracks.push({ id: version.id, name: version.label, url: version.url, hue: STEM_HUE[version.label.toLowerCase()] ?? HUES[(index + 1) % HUES.length] ?? "var(--primary)" }));
   return tracks;
 }
@@ -71,18 +72,18 @@ function Row({ track, number, duration, now, muted, solo, volume, onMute, onSolo
     <div className="bg-card border-background relative flex h-28 flex-col justify-center gap-2 border-t-2 py-2 pr-3 pl-4">
       <span aria-hidden="true" className="bg-(--track) absolute inset-y-0 left-0 w-1.5" />
       <div className="flex items-center gap-2">
-        <Button type="button" size="icon-sm" variant="ghost" aria-pressed={muted} aria-label={`Mute ${track.name}`} onClick={onMute}>{muted ? <SpeakerOffIcon className="size-4" aria-hidden="true" /> : <SpeakerIcon className="size-4" aria-hidden="true" />}</Button>
+        <Button type="button" size="icon-sm" variant="ghost" aria-pressed={muted} aria-label={i18n._({ id: "Mute {name}", message: "Mute {name}", values: { name: track.name } })} onClick={onMute}>{muted ? <SpeakerOffIcon className="size-4" aria-hidden="true" /> : <SpeakerIcon className="size-4" aria-hidden="true" />}</Button>
         <span className="min-w-0 flex-1 truncate text-sm font-semibold">{number}. {track.name}</span>
-        <Button type="button" size="icon-sm" variant={solo ? "default" : "outline"} aria-pressed={solo} aria-label={`Solo ${track.name}`} onClick={onSolo}>S</Button>
+        <Button type="button" size="icon-sm" variant={solo ? "default" : "outline"} aria-pressed={solo} aria-label={i18n._({ id: "Solo {name}", message: "Solo {name}", values: { name: track.name } })} onClick={onSolo}>S</Button>
       </div>
-      <Slider aria-label={`Volume of ${track.name}`} min={0} max={100} value={[Math.round(volume * 100)]} onValueChange={(value) => onVolume((value[0] ?? 100) / 100)} />
+      <Slider aria-label={i18n._({ id: "Volume of {name}", message: "Volume of {name}", values: { name: track.name } })} min={0} max={100} value={[Math.round(volume * 100)]} onValueChange={(value) => onVolume((value[0] ?? 100) / 100)} />
     </div>
-    <button type="button" aria-label={`${track.name} waveform; click to move the playhead`} className="bg-(--track)/10 hover:bg-(--track)/15 border-background relative h-28 w-full overflow-hidden border-t-2 px-1 py-3 text-left transition-colors"
+    <button type="button" aria-label={i18n._({ id: "{name} waveform; click to move the playhead", message: "{name} waveform; click to move the playhead", values: { name: track.name } })} className="bg-(--track)/10 hover:bg-(--track)/15 border-background relative h-28 w-full overflow-hidden border-t-2 px-1 py-3 text-left transition-colors"
       onClick={(event) => { const box = event.currentTarget.getBoundingClientRect(); onSeek(Math.min(1, Math.max(0, (event.clientX - box.left) / box.width))); }}>
       {bars.map((bar) => <span key={bar} aria-hidden="true" className="bg-foreground/10 absolute inset-y-0 left-(--at) w-px" style={{ "--at": `${bar}%` } as CSSProperties} />)}
       {loop ? <span aria-hidden="true" className="bg-foreground/10 absolute inset-y-0 left-(--from) w-(--span)" style={{ "--from": `${loop[0] * 100}%`, "--span": `${(loop[1] - loop[0]) * 100}%` } as CSSProperties} /> : null}
-      {peaks ? <Waveform peaks={peaks} played={at} hue={track.hue} label={`${track.name} waveform`} />
-        : <span className="text-muted-foreground text-xs">{failed ? "This audio could not be drawn. It still plays." : "Drawing the waveform"}</span>}
+      {peaks ? <Waveform peaks={peaks} played={at} hue={track.hue} label={i18n._({ id: "{name} waveform", message: "{name} waveform", values: { name: track.name } })} />
+        : <span className="text-muted-foreground text-xs">{failed ? i18n._({ id: "This audio could not be drawn. It still plays.", message: "This audio could not be drawn. It still plays." }) : i18n._({ id: "Drawing the waveform", message: "Drawing the waveform" })}</span>}
       <span aria-hidden="true" className="bg-foreground absolute inset-y-0 left-(--at) w-0.5" style={{ "--at": `${at * 100}%` } as CSSProperties} />
     </button>
     <audio ref={audioRef} src={track.url} preload="auto" className="hidden"><track kind="captions" /></audio>
@@ -151,13 +152,13 @@ export function MusicStudioView({ adult, search }: { adult: boolean; search: str
     asked.current = true;
     setSplitting(true);
     musicApi.stems(songId).then((card) => navigate(`/apps/music/studio?song=${encodeURIComponent(songId)}&stems=${encodeURIComponent(card.id)}`, { replace: true }))
-      .catch((error: unknown) => setStemsProblem(error instanceof Error && error.message ? error.message : STEMS_UNAVAILABLE_LINE))
+      .catch((error: unknown) => setStemsProblem(error instanceof Error && error.message ? error.message : STEMS_UNAVAILABLE_LINE()))
       .finally(() => setSplitting(false));
   }, [autoSplit, songId, navigate]);
 
-  if (!adult) return <EmptyState icon="music" text={MAKE_SONG_ADULT_LINE} />;
-  if (!songId) return <EmptyState icon="music" text="Open a song from your list, then choose Studio." actionLabel="Open Create" onAction={() => navigate("/apps/music/create")} />;
-  if (song.isError) return <EmptyState icon="music" text="That song is not here any more. It may have been removed from your Library." actionLabel="Open Create" onAction={() => navigate("/apps/music/create")} />;
+  if (!adult) return <EmptyState icon="music" text={MAKE_SONG_ADULT_LINE()} />;
+  if (!songId) return <EmptyState icon="music" text={i18n._({ id: "Open a song from your list, then choose Studio.", message: "Open a song from your list, then choose Studio." })} actionLabel={i18n._({ id: "Open Create", message: "Open Create" })} onAction={() => navigate("/apps/music/create")} />;
+  if (song.isError) return <EmptyState icon="music" text={i18n._({ id: "That song is not here any more. It may have been removed from your Library.", message: "That song is not here any more. It may have been removed from your Library." })} actionLabel={i18n._({ id: "Open Create", message: "Open Create" })} onAction={() => navigate("/apps/music/create")} />;
 
   const everyAudio = () => tracks.map((track) => audios.current.get(track.id)).filter((el): el is HTMLAudioElement => !!el);
   /** Routes every row through the EQ and compressor. An element can be wired once, so rows that arrive later (the stems) are added as they appear. */
@@ -170,14 +171,14 @@ export function MusicStudioView({ adult, search }: { adult: boolean; search: str
     }
     void live.ctx.resume();
   };
-  const play = () => { wire(); void Promise.all(everyAudio().map((el) => { el.currentTime = now; return el.play(); })).then(() => setPlaying(true)).catch(() => push("The audio could not start. Press play again.")); };
+  const play = () => { wire(); void Promise.all(everyAudio().map((el) => { el.currentTime = now; return el.play(); })).then(() => setPlaying(true)).catch(() => push(i18n._({ id: "The audio could not start. Press play again.", message: "The audio could not start. Press play again." }))); };
   const pause = () => { everyAudio().forEach((el) => el.pause()); setPlaying(false); };
   const seek = (fraction: number) => { const at = fraction * duration; everyAudio().forEach((el) => { el.currentTime = at; }); setNow(at); };
   const flip = (set: Set<string>, id: string) => { const next = new Set(set); if (!next.delete(id)) next.add(id); return next; };
   const split = () => {
     setSplitting(true); setStemsProblem("");
     musicApi.stems(songId).then((card) => navigate(`/apps/music/studio?song=${encodeURIComponent(songId)}&stems=${encodeURIComponent(card.id)}`, { replace: true }))
-      .catch((error: unknown) => setStemsProblem(error instanceof Error && error.message ? error.message : STEMS_UNAVAILABLE_LINE))
+      .catch((error: unknown) => setStemsProblem(error instanceof Error && error.message ? error.message : STEMS_UNAVAILABLE_LINE()))
       .finally(() => setSplitting(false));
   };
   const stemsBusy = stems.data && (stems.data.state === "queued" || stems.data.state === "running");
@@ -190,47 +191,47 @@ export function MusicStudioView({ adult, search }: { adult: boolean; search: str
   return <div className="dark flex min-h-0 flex-1 flex-col"><section className="music-surface bg-background text-foreground -mx-4 flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-4 py-4 lg:mx-0 lg:rounded-3xl lg:px-6" data-testid="music-studio-view">
     <BringSong mode="stems" adult={adult} />
     <div className="flex shrink-0 flex-wrap items-center gap-4">
-      <div className="size-16 shrink-0 overflow-hidden rounded-xl shadow-2xl sm:size-20"><Cover id={songId} title={song.data?.title ?? "Studio"} url={song.data?.cover_url ?? null} bare /></div>
-      <div className="flex min-w-0 flex-1 flex-col gap-1"><p className="text-muted-foreground text-xs font-semibold tracking-widest uppercase">Studio</p>
-        <h2 className="min-w-0 truncate text-2xl leading-none font-black tracking-tight uppercase sm:text-4xl">{song.data?.title ?? "Studio"}</h2></div>
+      <div className="size-16 shrink-0 overflow-hidden rounded-xl shadow-2xl sm:size-20"><Cover id={songId} title={song.data?.title ?? i18n._({ id: "Studio", message: "Studio" })} url={song.data?.cover_url ?? null} bare /></div>
+      <div className="flex min-w-0 flex-1 flex-col gap-1"><p className="text-muted-foreground text-xs font-semibold tracking-widest uppercase">{i18n._({ id: "Studio", message: "Studio" })}</p>
+        <h2 className="min-w-0 truncate text-2xl leading-none font-black tracking-tight uppercase sm:text-4xl">{song.data?.title ?? i18n._({ id: "Studio", message: "Studio" })}</h2></div>
       <div className="flex w-full flex-wrap gap-2 sm:w-auto">
-        <Button asChild variant="secondary"><Link to={`/apps/music/create?song=${encodeURIComponent(songId)}`}>Back to the song</Link></Button>
-        <Button type="button" disabled={splitting || !!stemsBusy || tracks.length > 1 || tracks.length === 0} onClick={split}>{stemsBusy || splitting ? "Splitting into stems" : tracks.length > 1 ? "Split into stems (done)" : "Split into stems"}</Button>
+        <Button asChild variant="secondary"><Link to={`/apps/music/create?song=${encodeURIComponent(songId)}`}>{i18n._({ id: "Back to the song", message: "Back to the song" })}</Link></Button>
+        <Button type="button" disabled={splitting || !!stemsBusy || tracks.length > 1 || tracks.length === 0} onClick={split}>{stemsBusy || splitting ? i18n._({ id: "Splitting into stems", message: "Splitting into stems" }) : tracks.length > 1 ? i18n._({ id: "Split into stems (done)", message: "Split into stems (done)" }) : i18n._({ id: "Split into stems", message: "Split into stems" })}</Button>
       </div>
     </div>
-    {stemsBusy || splitting ? <p role="status" data-testid="music-stems-progress" className="bg-card rounded-xl p-3 text-sm">Splitting the song into vocals, drums, bass and other{stems.data && stems.data.progress > 0 ? `: ${Math.round(stems.data.progress * 100)} percent` : ""}. This takes a minute or two. The rows appear here when it is done.</p> : null}
-    {stems.data?.state === "failed" ? <p role="alert" data-testid="music-stems-failed" className="bg-card rounded-xl p-3 text-sm">{stems.data.error_line || STEMS_UNAVAILABLE_LINE}</p> : null}
+    {stemsBusy || splitting ? <p role="status" data-testid="music-stems-progress" className="bg-card rounded-xl p-3 text-sm">{i18n._({ id: "Splitting the song into vocals, drums, bass and other{progress, select, none {} other {: {progress} percent}}. This takes a minute or two. The rows appear here when it is done.", message: "Splitting the song into vocals, drums, bass and other{progress, select, none {} other {: {progress} percent}}. This takes a minute or two. The rows appear here when it is done.", values: { progress: stems.data && stems.data.progress > 0 ? String(Math.round(stems.data.progress * 100)) : "none" } })}</p> : null}
+    {stems.data?.state === "failed" ? <p role="alert" data-testid="music-stems-failed" className="bg-card rounded-xl p-3 text-sm">{stems.data.error_line || STEMS_UNAVAILABLE_LINE()}</p> : null}
     {stemsProblem ? <p role="alert" className="text-muted-foreground bg-card rounded-xl p-3 text-sm">{stemsProblem}</p> : null}
-    {tracks.length === 0 ? <p role="status" className="text-muted-foreground text-sm">{song.data?.state === "failed" ? "This song could not be made, so there is nothing to open." : "Opening your song. The Studio shows it as soon as it is made."}</p> : <div className="flex min-h-0 flex-col gap-4 lg:flex-row">
+    {tracks.length === 0 ? <p role="status" className="text-muted-foreground text-sm">{song.data?.state === "failed" ? i18n._({ id: "This song could not be made, so there is nothing to open.", message: "This song could not be made, so there is nothing to open." }) : i18n._({ id: "Opening your song. The Studio shows it as soon as it is made.", message: "Opening your song. The Studio shows it as soon as it is made." })}</p> : <div className="flex min-h-0 flex-col gap-4 lg:flex-row">
       <div className="flex min-w-0 flex-1 flex-col gap-3">
         <div className="bg-card grid grid-cols-(--lanes) overflow-hidden rounded-2xl" data-testid="studio-timeline">
-          <div className="flex items-center justify-between gap-2 px-3 py-2"><span className="text-muted-foreground text-xs font-semibold tracking-widest uppercase">Tracks</span>
-            <Button type="button" size="sm" variant="outline" disabled={splitting || !!stemsBusy || tracks.length > 1} onClick={split} aria-label="Add tracks by splitting the song into stems"><PlusIcon className="size-4" aria-hidden="true" />Add track</Button></div>
+          <div className="flex items-center justify-between gap-2 px-3 py-2"><span className="text-muted-foreground text-xs font-semibold tracking-widest uppercase">{i18n._({ id: "Tracks", message: "Tracks" })}</span>
+            <Button type="button" size="sm" variant="outline" disabled={splitting || !!stemsBusy || tracks.length > 1} onClick={split} aria-label={i18n._({ id: "Add tracks by splitting the song into stems", message: "Add tracks by splitting the song into stems" })}><PlusIcon className="size-4" aria-hidden="true" />{i18n._({ id: "Add track", message: "Add track" })}</Button></div>
           <div className="relative h-14" data-testid="studio-ruler">
             {barMarks.map((mark) => <span key={mark.bar} className="text-muted-foreground absolute bottom-0 left-(--at) border-l border-foreground/20 pl-1 text-xs tabular-nums" style={{ "--at": `${mark.at}%` } as CSSProperties}>{mark.bar}</span>)}
             {sections.map((line) => <span key={`${line.t}`} className="bg-(--hue-orange) text-background absolute top-0 left-(--at) rounded-br px-1.5 text-xs font-semibold" style={{ "--at": `${(line.t / duration) * 100}%` } as CSSProperties}>{line.section}</span>)}
-            {loop ? <><span className="bg-primary absolute top-0 left-(--at) h-3 w-1 rounded-b" aria-label="Loop start" style={{ "--at": `${loop[0] * 100}%` } as CSSProperties} /><span className="bg-primary absolute top-0 left-(--at) h-3 w-1 rounded-b" aria-label="Loop end" style={{ "--at": `${loop[1] * 100}%` } as CSSProperties} /></> : null}
+            {loop ? <><span className="bg-primary absolute top-0 left-(--at) h-3 w-1 rounded-b" aria-label={i18n._({ id: "Loop start", message: "Loop start" })} style={{ "--at": `${loop[0] * 100}%` } as CSSProperties} /><span className="bg-primary absolute top-0 left-(--at) h-3 w-1 rounded-b" aria-label={i18n._({ id: "Loop end", message: "Loop end" })} style={{ "--at": `${loop[1] * 100}%` } as CSSProperties} /></> : null}
             <span aria-hidden="true" className="bg-foreground absolute inset-y-0 left-(--at) w-0.5" style={{ "--at": `${at * 100}%` } as CSSProperties} />
           </div>
           {tracks.map((track, index) => <Row key={track.id} track={track} number={index + 1} duration={duration} now={now} muted={muted.has(track.id)} solo={soloed.has(track.id)} volume={volumes[track.id] ?? 1} bars={barMarks.map((mark) => mark.at)} loop={loop}
             onMute={() => setMuted(flip(muted, track.id))} onSolo={() => setSoloed(flip(soloed, track.id))} onVolume={(value) => setVolumes({ ...volumes, [track.id]: value })} onSeek={seek}
             audioRef={(el) => { if (el) audios.current.set(track.id, el); else audios.current.delete(track.id); }} />)}
           {tracks.length === 1 ? <div className="text-muted-foreground border-background col-span-2 flex flex-col items-start gap-3 border-t-2 p-4 text-sm" data-testid="studio-stems-hint">
-            <p>{stemsBusy ? "Splitting the song into vocals, drums, bass and other. The rows appear here when it is done." : "Split the song to get a row for the vocals, the drums, the bass and the rest. Each one gets its own volume, mute and solo."}</p>
-            {stemsBusy ? null : <Button type="button" disabled={splitting} onClick={split}>Split into stems</Button>}
+            <p>{stemsBusy ? i18n._({ id: "Splitting the song into vocals, drums, bass and other. The rows appear here when it is done.", message: "Splitting the song into vocals, drums, bass and other. The rows appear here when it is done." }) : i18n._({ id: "Split the song to get a row for the vocals, the drums, the bass and the rest. Each one gets its own volume, mute and solo.", message: "Split the song to get a row for the vocals, the drums, the bass and the rest. Each one gets its own volume, mute and solo." })}</p>
+            {stemsBusy ? null : <Button type="button" disabled={splitting} onClick={split}>{i18n._({ id: "Split into stems", message: "Split into stems" })}</Button>}
           </div> : null}
         </div>
         <div className="bg-card sticky bottom-2 flex flex-wrap items-center gap-3 rounded-2xl p-3 shadow-2xl" data-testid="studio-transport">
-          <Button type="button" size="lg" onClick={playing ? pause : play}>{playing ? <PauseIcon className="size-4" aria-hidden="true" /> : <PlayIcon className="size-4" aria-hidden="true" />}{playing ? "Pause" : "Play"}</Button>
-          <Button type="button" variant="secondary" onClick={() => { pause(); seek(0); }}>Back to start</Button>
-          <Button type="button" variant={looping ? "default" : "outline"} aria-pressed={looping} onClick={() => setLooping(!looping)}><LoopIcon className="size-4" aria-hidden="true" />Loop</Button>
-          <div className="flex w-40 flex-col gap-1"><Knob label="BPM" value={bpm} unit="" min={60} max={180} step={1} onChange={setBpm} /></div>
+          <Button type="button" size="lg" onClick={playing ? pause : play}>{playing ? <PauseIcon className="size-4" aria-hidden="true" /> : <PlayIcon className="size-4" aria-hidden="true" />}{playing ? i18n._({ id: "Pause", message: "Pause" }) : i18n._({ id: "Play", message: "Play" })}</Button>
+          <Button type="button" variant="secondary" onClick={() => { pause(); seek(0); }}>{i18n._({ id: "Back to start", message: "Back to start" })}</Button>
+          <Button type="button" variant={looping ? "default" : "outline"} aria-pressed={looping} onClick={() => setLooping(!looping)}><LoopIcon className="size-4" aria-hidden="true" />{i18n._({ id: "Loop", message: "Loop" })}</Button>
+          <div className="flex w-40 flex-col gap-1"><Knob label={i18n._({ id: "BPM", message: "BPM" })} value={bpm} unit="" min={60} max={180} step={1} onChange={setBpm} /></div>
           <span className="ml-auto font-mono text-sm tabular-nums">{timeLabel(now)} / {timeLabel(duration)}</span>
         </div>
       </div>
-      <aside className="flex w-full shrink-0 flex-col gap-4 lg:w-80" aria-label="Listening effects" data-testid="studio-effects">
+      <aside className="flex w-full shrink-0 flex-col gap-4 lg:w-80" aria-label={i18n._({ id: "Listening effects", message: "Listening effects" })} data-testid="studio-effects">
         <div className="bg-card flex flex-col gap-4 rounded-2xl p-4">
-          <div className="flex items-baseline justify-between"><h3 className="text-sm font-black tracking-wide uppercase">EQ</h3><Button type="button" size="sm" variant="ghost" onClick={() => setEq(FLAT)}>Reset</Button></div>
+          <div className="flex items-baseline justify-between"><h3 className="text-sm font-black tracking-wide uppercase">{i18n._({ id: "EQ", message: "EQ" })}</h3><Button type="button" size="sm" variant="ghost" onClick={() => setEq(FLAT)}>{i18n._({ id: "Reset", message: "Reset" })}</Button></div>
           <div className="flex justify-between gap-1">
             {EQ_BANDS.map((band, index) => <div key={band.label} className="flex flex-col items-center gap-2">
               <span className="text-xs tabular-nums">{eq[index] ?? 0}</span>
@@ -240,13 +241,13 @@ export function MusicStudioView({ adult, search }: { adult: boolean; search: str
           </div>
         </div>
         <div className="bg-card flex flex-col gap-4 rounded-2xl p-4">
-          <div className="flex items-baseline justify-between"><h3 className="text-sm font-black tracking-wide uppercase">Compressor</h3><Button type="button" size="sm" variant="ghost" onClick={() => setComp(COMP_DEFAULT)}>Reset</Button></div>
-          <Knob label="Threshold" value={comp.threshold} unit=" dB" min={-60} max={0} step={1} onChange={(threshold) => setComp({ ...comp, threshold })} />
-          <Knob label="Ratio" value={comp.ratio} unit=":1" min={1} max={20} step={1} onChange={(ratio) => setComp({ ...comp, ratio })} />
-          <Knob label="Attack" value={comp.attack} unit=" ms" min={1} max={100} step={1} onChange={(attack) => setComp({ ...comp, attack })} />
-          <Knob label="Release" value={comp.release} unit=" ms" min={50} max={1000} step={10} onChange={(release) => setComp({ ...comp, release })} />
+          <div className="flex items-baseline justify-between"><h3 className="text-sm font-black tracking-wide uppercase">{i18n._({ id: "Compressor", message: "Compressor" })}</h3><Button type="button" size="sm" variant="ghost" onClick={() => setComp(COMP_DEFAULT)}>{i18n._({ id: "Reset", message: "Reset" })}</Button></div>
+          <Knob label={i18n._({ id: "Threshold", message: "Threshold" })} value={comp.threshold} unit=" dB" min={-60} max={0} step={1} onChange={(threshold) => setComp({ ...comp, threshold })} />
+          <Knob label={i18n._({ id: "Ratio", message: "Ratio" })} value={comp.ratio} unit=":1" min={1} max={20} step={1} onChange={(ratio) => setComp({ ...comp, ratio })} />
+          <Knob label={i18n._({ id: "Attack", message: "Attack" })} value={comp.attack} unit=" ms" min={1} max={100} step={1} onChange={(attack) => setComp({ ...comp, attack })} />
+          <Knob label={i18n._({ id: "Release", message: "Release" })} value={comp.release} unit=" ms" min={50} max={1000} step={10} onChange={(release) => setComp({ ...comp, release })} />
         </div>
-        <p className="text-muted-foreground text-xs">These change what you hear in the Studio. The saved song is not changed.</p>
+        <p className="text-muted-foreground text-xs">{i18n._({ id: "These change what you hear in the Studio. The saved song is not changed.", message: "These change what you hear in the Studio. The saved song is not changed." })}</p>
       </aside>
     </div>}
   </section></div>;

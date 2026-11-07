@@ -1,3 +1,4 @@
+import { i18n } from "@lingui/core";
 import { useSharedReads } from "@/lib/sharedReads";
 import { useQuery } from "@tanstack/react-query";
 
@@ -21,7 +22,7 @@ import { homeBlocks, type HomeBlockId } from "@/shell/pages/dashboard/homeBlocks
  * Today (01e), Getting started (01g) and the admin links (01b). The server filters Today by the viewer's
  * role and age; Home adds no gate and removes none. Nothing here shows another person's activity. */
 export function DashboardPage({ person }: { person: Roster }) {
-  useTabItem("Home");
+  useTabItem(i18n._({ id: "Home", message: "Home" }));
   const admin = isOwnerOrAdminRole(person.role);
   const { on: incognito } = useIncognitoContext();
   const widgets = useQuery({ queryKey: ["home-widgets"], queryFn: api.homeWidgets, retry: false });
@@ -42,7 +43,7 @@ export function DashboardPage({ person }: { person: Roster }) {
   const renderBlock = (block: HomeBlockId) => {
     switch (block) {
       case "greeting": return <div key={block} className="lg:col-span-8"><Greeting displayName={person.display_name} familyName={familyName.data?.value} /></div>;
-      case "admin": return admin ? <nav key={block} aria-label="Looking after your hub" className="flex flex-wrap gap-x-2 gap-y-5 lg:col-span-4"><Button variant="outline" size="row" nativeButton={false} render={<Link to="/updates" />}>Updates</Button><Button variant="outline" size="row" nativeButton={false} render={<Link to="/repairs" />}>Repairs</Button></nav> : null;
+      case "admin": return admin ? <nav key={block} aria-label={i18n._({ id: "Looking after your hub", message: "Looking after your hub" })} className="flex flex-wrap gap-x-2 gap-y-5 lg:col-span-4"><Button variant="outline" size="row" nativeButton={false} render={<Link to="/updates" />}>{i18n._({ id: "Updates", message: "Updates" })}</Button><Button variant="outline" size="row" nativeButton={false} render={<Link to="/repairs" />}>{i18n._({ id: "Repairs", message: "Repairs" })}</Button></nav> : null;
       case "ask": return <div key={block} className="lg:col-span-8"><AskBox /></div>;
       case "media_continue": return (media.data?.continue.length || continueRows.data?.rows?.length) ? <div key={block} className="lg:col-span-12"><HomeMedia kind="continue" /></div> : null;
       case "media_new": return media.data?.new.length ? <div key={block} className="lg:col-span-12"><HomeMedia kind="new" /></div> : null;
@@ -59,8 +60,8 @@ export function DashboardPage({ person }: { person: Roster }) {
   return (
     <div className="flex flex-col gap-4 pb-4">
       <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-12">
-      {!widgets.data && !widgets.isError ? <div className="md:col-span-2 lg:col-span-12"><RouteSkeleton label="Loading Home" /></div> : null}
-      {widgets.isError ? <p role="alert" className="md:col-span-2 lg:col-span-12 text-sm text-muted-foreground">Could not load Home cards. Refresh Home to try again.</p> : null}
+      {!widgets.data && !widgets.isError ? <div className="md:col-span-2 lg:col-span-12"><RouteSkeleton label={i18n._({ id: "Loading Home", message: "Loading Home" })} /></div> : null}
+      {widgets.isError ? <p role="alert" className="md:col-span-2 lg:col-span-12 text-sm text-muted-foreground">{i18n._({ id: "Could not load Home cards. Refresh Home to try again.", message: "Could not load Home cards. Refresh Home to try again." })}</p> : null}
       {blocks.map(renderBlock)}
       </div>
     </div>

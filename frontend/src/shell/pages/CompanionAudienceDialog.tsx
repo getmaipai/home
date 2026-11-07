@@ -1,3 +1,4 @@
+import { i18n } from "@lingui/core";
 import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@maipai/ui/src/ui/button";
@@ -9,18 +10,18 @@ import { api } from "@/lib/api";
 import { flowErrorText } from "@/shell/pages/companionFlow/errors";
 
 type Audience = "adult" | "teen" | "all";
-const CHECKLIST = [
-  "I looked at the starting picture and every animation.",
-  "Nothing in the pictures or the personality would scare or confuse a young child.",
-  "I know Home checks the artwork again for children and says why if it does not pass.",
-];
+const CHECKLIST = () => ([
+  i18n._({ id: "I looked at the starting picture and every animation.", message: "I looked at the starting picture and every animation." }),
+  i18n._({ id: "Nothing in the pictures or the personality would scare or confuse a young child.", message: "Nothing in the pictures or the personality would scare or confuse a young child." }),
+  i18n._({ id: "I know Home checks the artwork again for children and says why if it does not pass.", message: "I know Home checks the artwork again for children and says why if it does not pass." }),
+]);
 
 /** Admin only: who a companion is for. Making it for everyone needs the checklist; Home answers a refusal with one plain sentence and it shows here. */
 export function CompanionAudienceDialog({ companionId, name, onClose }: { companionId: string; name: string; onClose: () => void }) {
   const client = useQueryClient();
   const saved = useQuery({ queryKey: ["companions", companionId, "edit"], queryFn: () => api.editCompanion(companionId), retry: false });
   const [choice, setChoice] = useState<Audience | null>(null);
-  const [checked, setChecked] = useState<boolean[]>(CHECKLIST.map(() => false));
+  const [checked, setChecked] = useState<boolean[]>(CHECKLIST().map(() => false));
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const audience: Audience = choice ?? saved.data?.audience ?? "adult";
@@ -41,26 +42,26 @@ export function CompanionAudienceDialog({ companionId, name, onClose }: { compan
     <Dialog open onOpenChange={(open) => { if (!open && !busy) onClose(); }}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Who is {name} for?</DialogTitle>
-          <DialogDescription>Adults only, teens and adults, or everyone. Home checks the artwork again before it widens who can use a companion.</DialogDescription>
+          <DialogTitle>{i18n._({ id: "Who is {name} for?", message: "Who is {name} for?", values: { name } })}</DialogTitle>
+          <DialogDescription>{i18n._({ id: "Adults only, teens and adults, or everyone. Home checks the artwork again before it widens who can use a companion.", message: "Adults only, teens and adults, or everyone. Home checks the artwork again before it widens who can use a companion." })}</DialogDescription>
         </DialogHeader>
         {saved.isError ? <p role="alert" className="text-sm text-destructive">{flowErrorText(saved.error)}</p> : null}
-        <ToggleGroup type="single" variant="segmented" fill value={audience} onValueChange={(next) => { if (next) setChoice(next as Audience); }} aria-label="Who can use this companion">
-          <ToggleGroupItem value="adult">Adults only</ToggleGroupItem>
-          <ToggleGroupItem value="teen">Teens and adults</ToggleGroupItem>
-          <ToggleGroupItem value="all">Everyone</ToggleGroupItem>
+        <ToggleGroup type="single" variant="segmented" fill value={audience} onValueChange={(next) => { if (next) setChoice(next as Audience); }} aria-label={i18n._({ id: "Who can use this companion", message: "Who can use this companion" })}>
+          <ToggleGroupItem value="adult">{i18n._({ id: "Adults only", message: "Adults only" })}</ToggleGroupItem>
+          <ToggleGroupItem value="teen">{i18n._({ id: "Teens and adults", message: "Teens and adults" })}</ToggleGroupItem>
+          <ToggleGroupItem value="all">{i18n._({ id: "Everyone", message: "Everyone" })}</ToggleGroupItem>
         </ToggleGroup>
         {everyone ? <div className="flex flex-col gap-3">
-          <p className="text-sm font-medium">Before this companion is for everyone, check each one.</p>
-          {CHECKLIST.map((line, index) => <div key={line} className="flex items-start gap-3">
+          <p className="text-sm font-medium">{i18n._({ id: "Before this companion is for everyone, check each one.", message: "Before this companion is for everyone, check each one." })}</p>
+          {CHECKLIST().map((line, index) => <div key={line} className="flex items-start gap-3">
             <Checkbox id={`all-ages-${index}`} checked={checked[index]} onCheckedChange={(value) => setChecked((old) => old.map((item, i) => i === index ? value === true : item))} />
             <Label htmlFor={`all-ages-${index}`}>{line}</Label>
           </div>)}
         </div> : null}
         {error ? <p role="alert" className="text-sm text-destructive">{error}</p> : null}
         <DialogFooter>
-          <Button variant="outline" shape="pill" disabled={busy} onClick={onClose}>Cancel</Button>
-          <Button shape="pill" disabled={!ready || busy} onClick={() => void save()}>{busy ? "Saving" : "Save audience"}</Button>
+          <Button variant="outline" shape="pill" disabled={busy} onClick={onClose}>{i18n._({ id: "Cancel", message: "Cancel" })}</Button>
+          <Button shape="pill" disabled={!ready || busy} onClick={() => void save()}>{busy ? i18n._({ id: "Saving", message: "Saving" }) : i18n._({ id: "Save audience", message: "Save audience" })}</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
