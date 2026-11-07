@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { existsSync, readFileSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import sharp from "sharp";
-import { addVersion, approveSheet, chooseKeyColour, compositeOnKey, deleteLook, deleteVersion, describeCharacter, dominantColours, keyOut, lookPromptFor, normalizePicture, readLook, setRest, updateSheet, versionOriginalPath, versionPath, KEY_ALPHA_END, KEY_ALPHA_START, __setCharacterCompletionForTests, __setCharacterPictureCapabilityForTests, LOOK_LIMIT_LINE } from "@/lib/companionLook";
+import { addVersion, approveSheet, chooseKeyColour, compositeOnKey, deleteLook, deleteVersion, describeCharacter, dominantColours, keyOut, lookPromptFor, PROMPT_MAX_CHARS, normalizePicture, readLook, setRest, updateSheet, versionOriginalPath, versionPath, KEY_ALPHA_END, KEY_ALPHA_START, __setCharacterCompletionForTests, __setCharacterPictureCapabilityForTests, LOOK_LIMIT_LINE } from "@/lib/companionLook";
 import { createHouseholdCompanion, deleteHouseholdCompanion } from "@/lib/householdCompanions";
 import { loadManifestOnly } from "@/lib/plugins";
 import { __setStackClientForTests } from "@/lib/stackEngine";
@@ -89,7 +89,8 @@ describe("companion look store", () => {
 
   test("builds a clipped character prompt with the selected key colour", () => {
     expect(lookPromptFor("  small red fox  ", "#00FF00")).toBe("small red fox. A single character, full body, centred in the frame, standing in a relaxed neutral pose, facing the viewer, mouth closed, arms down. Simple clean cartoon illustration, flat colours. Plain solid green background, no shadow, no ground, no text, no other objects.");
-    expect(lookPromptFor("x".repeat(700), "#FF00FF").startsWith("x".repeat(600) + ". A single character")).toBe(true);
+    expect(lookPromptFor("x".repeat(700), "#FF00FF").startsWith("x".repeat(700) + ". A single character")).toBe(true);
+    expect(lookPromptFor("x".repeat(PROMPT_MAX_CHARS + 5), "#FF00FF").startsWith("x".repeat(PROMPT_MAX_CHARS) + ". A single character")).toBe(true);
     expect(lookPromptFor("cat", "#FF00FF")).toContain("solid magenta background");
   });
   test("puts the chosen style in the prompt and defaults to cartoon", () => {
