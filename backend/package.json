@@ -18,6 +18,8 @@
   },
   "dependencies": {
     "@hono/zod-openapi": "^1.6.3",
+    "@lingui/core": "6.6.0",
+    "@lingui/message-utils": "6.6.0",
     "@maipai/core": "file:../../commons-tags/core-core-v0.1.7/core",
     "@maipai/spec": "file:../../commons-tags/spec-spec-v0.1.338/spec",
     "@modelcontextprotocol/client": "2.4.0",

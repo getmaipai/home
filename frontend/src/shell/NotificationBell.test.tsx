@@ -1,7 +1,8 @@
 import { describe, expect, test, mock, afterEach } from "bun:test";
 import { act, cleanup, fireEvent, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
-import { NotificationBell, NotificationToaster } from "@/shell/NotificationBell";
+import { NotificationBell, NotificationToaster, notificationLine } from "@/shell/NotificationBell";
+import { activateLocale } from "@/i18n";
 import { ToastProvider } from "@maipai/ui/src/primitives/Toast";
 import { renderWithQueryClient } from "../../tests/renderWithQueryClient";
 import type { NotificationDeliveryView } from "@/lib/api";
@@ -49,12 +50,13 @@ function renderBell() {
 // getmaipai/home#109: `toast` is declared once on NotificationType
 // (backend/src/lib/notificationTypes.ts) and carried on the delivery
 // view; the bell reads it directly instead of string-matching.
-function notification(id: string, text: string, opts?: { typeId?: string; toast?: boolean }): NotificationDeliveryView {
+function notification(id: string, text: string, opts?: { typeId?: string; toast?: boolean; values?: Record<string, string> }): NotificationDeliveryView {
   return {
     id,
     typeId: opts?.typeId ?? "model.download_ready",
     level: opts?.typeId === "engines.problem" ? "time_sensitive" : "passive",
     text,
+    values: opts?.values ?? null,
     channels: ["in_app"],
     createdAt: "2026-09-05T00:00:00.000Z",
     readAt: null,
@@ -381,5 +383,27 @@ describe("NotificationBell", () => {
       await new Promise((resolve) => setTimeout(resolve, 20));
       expect(queryByText("Alarm: gym")).toBeNull();
     } finally { restore(); }
+  });
+});
+
+// I18N-B1: a typed notification renders from { typeId, values } in the viewer's language; anything else shows its stored English text.
+describe("notificationLine", () => {
+  afterEach(async () => { await activateLocale("en-US"); });
+  test("a Spanish viewer sees the typed line in Spanish and an English viewer sees English", async () => {
+    const row = notification("n1", "Alarm: gimnasio", { typeId: "alarm.due", values: { task: "gimnasio" } });
+    await activateLocale("es");
+    expect(notificationLine(row)).toBe("Alarma: gimnasio");
+    await activateLocale("en-US");
+    expect(notificationLine(row)).toBe("Alarm: gimnasio");
+  });
+  test("a stored English row (no values) or a type with no template still renders its text", async () => {
+    await activateLocale("es");
+    expect(notificationLine(notification("n2", "Old Model finished downloading and is ready to use."))).toBe("Old Model finished downloading and is ready to use.");
+    expect(notificationLine(notification("n3", "Repair title", { typeId: "repairs.new", values: { title: "Repair title" } }))).toBe("Repair title");
+  });
+  test("a plural follows the count", async () => {
+    await activateLocale("es");
+    const row = notification("n4", "x", { typeId: "backups.target_failing", values: { target: "NAS", count: "1", message: "m" } });
+    expect(notificationLine(row)).toContain("1 vez");
   });
 });

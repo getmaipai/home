@@ -743,6 +743,18 @@ msgid "{minutes}:{seconds} remaining"
 msgstr "Quedan {minutes}:{seconds}"
 
 #. js-lingui-explicit-id
+#: ../backend/src/lib/notificationCopy.ts:10
+#, needs-review
+msgid "notification.model.download_failed"
+msgstr "{modelName} no se descargó: {error}"
+
+#. js-lingui-explicit-id
+#: ../backend/src/lib/notificationCopy.ts:9
+#, needs-review
+msgid "notification.model.download_ready"
+msgstr "{modelName} terminó de descargar y está listo para usar."
+
+#. js-lingui-explicit-id
 #: src/apps/settings/RobotBody.tsx:42
 msgid "{motors} switched off after a failed recovery"
 msgstr ""
@@ -821,6 +833,12 @@ msgstr "Conversaciones con {name}"
 #: src/apps/settings/HouseholdRobotsSection.tsx:134
 msgid "{name} could not be forgotten. Check the connection and try again."
 msgstr ""
+
+#. js-lingui-explicit-id
+#: ../backend/src/lib/notificationCopy.ts:19
+#, needs-review
+msgid "notification.engines.update_failed"
+msgstr "{name} no se pudo actualizar: {reason}."
 
 #. js-lingui-explicit-id
 #: src/apps/home/greeting.ts:17
@@ -989,6 +1007,12 @@ msgid "{name} taken out of the bar."
 msgstr "{name} quitado de la barra."
 
 #. js-lingui-explicit-id
+#: ../backend/src/lib/notificationCopy.ts:18
+#, needs-review
+msgid "notification.engines.update_applied"
+msgstr "{name} actualizado a {tag}."
+
+#. js-lingui-explicit-id
 #: src/apps/settings/VoiceManagerSection.tsx:85
 #, needs-review
 msgid "{name} was deleted."
@@ -1069,6 +1093,12 @@ msgstr "{name}, vista previa"
 #, needs-review
 msgid "{name}'s changes"
 msgstr "Cambios de {name}"
+
+#. js-lingui-explicit-id
+#: ../backend/src/lib/notificationCopy.ts:11
+#, needs-review
+msgid "notification.media_time_up"
+msgstr "Se acabó el tiempo de pantalla diario de {name}. Puedes añadir más minutos para hoy."
 
 #. js-lingui-explicit-id
 #: src/apps/settings/AiSlotDialog.tsx:53
@@ -1357,10 +1387,22 @@ msgid "{title} didn't finish: {error}"
 msgstr "{title} no terminó: {error}"
 
 #. js-lingui-explicit-id
+#: ../backend/src/lib/notificationCopy.ts:22
+#, needs-review
+msgid "notification.project.failed"
+msgstr "{title} no terminó: {reason}"
+
+#. js-lingui-explicit-id
 #: src/apps/chat/chatToolUis.tsx:338
 #, needs-review
 msgid "{title} didn't finish."
 msgstr "{title} no terminó."
+
+#. js-lingui-explicit-id
+#: ../backend/src/lib/notificationCopy.ts:21
+#, needs-review
+msgid "notification.project.done"
+msgstr "{title} está listo."
 
 #. js-lingui-explicit-id
 #: src/apps/settings/AiJobSummary.tsx:67
@@ -2701,6 +2743,12 @@ msgid "setting.safety.alarm.volume.help"
 msgstr "El volumen de alarma tiene un límite inferior fijo de 70; Home aplica ese límite."
 
 #. js-lingui-explicit-id
+#: ../backend/src/lib/notificationCopy.ts:23
+#, needs-review
+msgid "notification.alarm.due"
+msgstr "Alarma: {task}"
+
+#. js-lingui-explicit-id
 #: src/apps/clock/AlarmsTab.tsx:69
 #: src/apps/clock/ClockPage.tsx:42
 #: src/shell/AlarmRinger.tsx:199
@@ -3021,6 +3069,12 @@ msgid "setting.companions.dock.label"
 msgstr "Compañía ambiental"
 
 #. js-lingui-explicit-id
+#: ../backend/src/lib/notificationCopy.ts:14
+#, needs-review
+msgid "notification.jobs.admin_stopped"
+msgstr "Un administrador detuvo esta tarea."
+
+#. js-lingui-explicit-id
 #: ../backend/src/lib/failureCopy.ts:208
 #, needs-review
 msgid "failure.composer.paused_by_admin.adult"
@@ -3053,6 +3107,12 @@ msgstr "Un dueño o un administrador puede descargarlo en Ajustes, Datos sin con
 #, needs-review
 msgid "an unknown base"
 msgstr "una base desconocida"
+
+#. js-lingui-explicit-id
+#: ../backend/src/lib/notificationCopy.ts:17
+#, needs-review
+msgid "notification.engines.update_available"
+msgstr "Hay una actualización disponible para {name}: {version}."
 
 #. js-lingui-explicit-id
 #: src/shell/pages/companionFlow/CompanionFlowDialog.tsx:15
@@ -3806,6 +3866,12 @@ msgstr "Copias de seguridad"
 #, needs-review
 msgid "area.Backups"
 msgstr "Copias de seguridad"
+
+#. js-lingui-explicit-id
+#: ../backend/src/lib/notificationCopy.ts:15
+#, needs-review
+msgid "notification.backups.target_failing"
+msgstr "Las copias de seguridad en {target} han fallado {count, plural, one {# vez} other {# veces}} seguidas: {message}"
 
 #. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:1469
@@ -5099,6 +5165,12 @@ msgstr "Configuración del chat"
 #, needs-review
 msgid "Chat showcase"
 msgstr "Demo de chat"
+
+#. js-lingui-explicit-id
+#: ../backend/src/lib/notificationCopy.ts:8
+#, needs-review
+msgid "notification.engines.chat_engine_changed"
+msgstr "El chat cambió de {from} a {to} con una clave de asistente."
 
 #. js-lingui-explicit-id
 #: src/shell/pages/status/StatusComponents.tsx:119
@@ -8817,7 +8889,7 @@ msgstr "Espacio en disco"
 #: src/apps/notifications/NotificationsPage.tsx:215
 #: src/shell/library/LibraryUploads.tsx:75
 #: src/shell/library/LibraryUploads.tsx:76
-#: src/shell/NotificationBell.tsx:248
+#: src/shell/NotificationBell.tsx:258
 #: src/shell/pages/RepairsPage.tsx:154
 #, needs-review
 msgid "Dismiss"
@@ -8836,7 +8908,7 @@ msgid "Dismiss {text}"
 msgstr "Descartar {text}"
 
 #. js-lingui-explicit-id
-#: src/shell/NotificationBell.tsx:233
+#: src/shell/NotificationBell.tsx:243
 #, needs-review
 msgid "Dismiss all"
 msgstr "Descartar todo"
@@ -8854,7 +8926,7 @@ msgid "Dismissed"
 msgstr "Descartada"
 
 #. js-lingui-explicit-id
-#: src/shell/NotificationBell.tsx:233
+#: src/shell/NotificationBell.tsx:243
 #, needs-review
 msgid "Dismissing…"
 msgstr "Descartando…"
@@ -12811,6 +12883,12 @@ msgid "failure.stopped.minor"
 msgstr ""
 
 #. js-lingui-explicit-id
+#: ../backend/src/lib/notificationCopy.ts:13
+#, needs-review
+msgid "notification.memory.judge_failed"
+msgstr "Tuve problemas para recordar algo de nuestra conversación."
+
+#. js-lingui-explicit-id
 #: src/apps/settings/AssistantKeysSettings.tsx:104
 #, needs-review
 msgid "I have copied it"
@@ -15545,6 +15623,12 @@ msgid "MaiPai Home"
 msgstr "MaiPai Home"
 
 #. js-lingui-explicit-id
+#: ../backend/src/lib/notificationCopy.ts:16
+#, needs-review
+msgid "notification.updates.available"
+msgstr "MaiPai Home {version} está disponible."
+
+#. js-lingui-explicit-id
 #: src/apps/settings/BackupsSection.tsx:39
 #, needs-review
 msgid "MaiPai Home emergency backup key\n"
@@ -18177,7 +18261,7 @@ msgid "Nothing on the list yet"
 msgstr "Nada en la lista aún"
 
 #. js-lingui-explicit-id
-#: src/shell/NotificationBell.tsx:222
+#: src/shell/NotificationBell.tsx:232
 #, needs-review
 msgid "Nothing pending."
 msgstr "Nada pendiente."
@@ -18258,8 +18342,8 @@ msgstr "Historial de notificaciones"
 
 #. js-lingui-explicit-id
 #: src/apps/notifications/NotificationsPage.tsx:110
-#: src/shell/NotificationBell.tsx:200
-#: src/shell/NotificationBell.tsx:215
+#: src/shell/NotificationBell.tsx:210
+#: src/shell/NotificationBell.tsx:225
 #: src/shell/pageHeaderTitle.tsx:104
 #: src/shell/routeHeader.ts:25
 #, needs-review
@@ -18273,7 +18357,7 @@ msgid "area.Notifications"
 msgstr "Notificaciones"
 
 #. js-lingui-explicit-id
-#: src/shell/NotificationBell.tsx:200
+#: src/shell/NotificationBell.tsx:210
 #, needs-review
 msgid "Notifications ({count} pending)"
 msgstr "Notificaciones ({count} pendientes)"
@@ -20599,6 +20683,12 @@ msgid "area.Privacy and safety"
 msgstr "Privacidad y seguridad"
 
 #. js-lingui-explicit-id
+#: ../backend/src/lib/notificationCopy.ts:20
+#, needs-review
+msgid "notification.engines.problem"
+msgstr "Problema: {title}. {fix}"
+
+#. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:913
 #, needs-review
 msgid "setting.resources.quiet_timeout.option_label.proceed"
@@ -21172,6 +21262,12 @@ msgstr "Acciones de recordatorio"
 #, needs-review
 msgid "Reminder lists"
 msgstr "Listas de recordatorios"
+
+#. js-lingui-explicit-id
+#: ../backend/src/lib/notificationCopy.ts:24
+#, needs-review
+msgid "notification.remind.due"
+msgstr "Recordatorio: {task}"
 
 #. js-lingui-explicit-id
 #: src/shell/coreLabels.ts:16
@@ -25102,6 +25198,12 @@ msgstr ""
 #, needs-review
 msgid "Still installing. Ask a grown-up."
 msgstr "Sigo instalando. Pregunta a un adulto."
+
+#. js-lingui-explicit-id
+#: ../backend/src/lib/notificationCopy.ts:12
+#, needs-review
+msgid "notification.repairs.still_open"
+msgstr "Aún sin arreglar: {title}"
 
 #. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:1394
@@ -29151,7 +29253,7 @@ msgid "View"
 msgstr "Ver"
 
 #. js-lingui-explicit-id
-#: src/shell/NotificationBell.tsx:259
+#: src/shell/NotificationBell.tsx:269
 #, needs-review
 msgid "View history"
 msgstr "Ver historial"
@@ -30673,6 +30775,12 @@ msgstr "Verás una notificación emergente cuando MaiPai necesite atención, mie
 #, needs-review
 msgid "You're all set"
 msgstr "Estás listo"
+
+#. js-lingui-explicit-id
+#: ../backend/src/lib/notificationCopy.ts:25
+#, needs-review
+msgid "notification.timer.done"
+msgstr "Tu temporizador de {duration_text} terminó."
 
 #. js-lingui-explicit-id
 #: src/shell/MediaPickerDialog.tsx:104

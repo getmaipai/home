@@ -8,7 +8,17 @@ import { Badge } from "@maipai/ui/src/dashboard/components/ui/badge";
 import { getIcon } from "@maipai/ui/src/icons";
 import { useToast } from "@maipai/ui/src/primitives/Toast";
 import { pauseTvNavForOverlay } from "@maipai/ui/src/tvNav";
+import { NOTIFICATION_COPY } from "@maipai/home-backend/src/lib/notificationCopy";
 import { api, type NotificationDeliveryView } from "@/lib/api";
+
+/** I18N-B1: a typed notification renders from its { typeId, values } in the viewer's language; a row with no values or no template (an older
+ * row, a pass-through type, a safety or child line) shows the English text it was stored with. */
+export function notificationLine(n: Pick<NotificationDeliveryView, "typeId" | "text" | "values">): string {
+  const line = NOTIFICATION_COPY[n.typeId];
+  if (!line || !n.values) return n.text;
+  const values = Object.fromEntries(Object.entries(n.values).map(([key, value]) => [key, /^\d+$/.test(value) && String(Number(value)) === value ? Number(value) : value]));
+  try { return i18n._({ id: line.id, message: line.message, values }); } catch { return n.text; }
+}
 
 // Exported: chatMemoryChip.tsx reads this same cached list (the "memory
 // updated" chip, getmaipai/home#64) and polls it on the same schedule,
@@ -89,7 +99,7 @@ export function NotificationToaster(): null {
         // real delivery still lands there and in the 30-day history,
         // only the toast itself is skipped.
         if (!n.toast || n.typeId === "alarm.due") continue;
-        push(n.text);
+        push(notificationLine(n));
       }
     }
   }, [query.data, push]);
@@ -235,7 +245,7 @@ export function NotificationBell({ anchored = false, open: controlledOpen, onOpe
               </div>
               {items.map((n) => (
                 <div key={n.id} className="flex items-start justify-between gap-2 py-2 px-2">
-                  <p className="text-base">{n.text}</p>
+                  <p className="text-base">{notificationLine(n)}</p>
                   {/* 48px minimum, not "sm": this is the only way to
                       dismiss a notification, the same accessibility
                       floor docs/UI.md's 2026-09-05 audit already

@@ -54,3 +54,16 @@ describe("synthesizeSpeech spoken wording", () => {
     expect(received).toBe("3 PM");
   });
 });
+
+describe("toSpokenText in Spanish (I18N-B1)", () => {
+  const es: [string, string][] = [
+    ["Son las 7:30 AM", "Son las siete y media de la mañana"], ["A las 15:45", "A las cuatro menos cuarto de la tarde"], ["3 PM", "las tres de la tarde"], ["12:00 PM", "el mediodía"], ["1:05 pm", "la una y cinco de la tarde"],
+    ["23:10", "las once y diez de la noche"], ["2026-10-21", "veintiuno de octubre de dos mil veintiséis"], ["Tienes 3 mensajes", "Tienes tres mensajes"], ["Hay 21000", "Hay veintiún mil"], ["45%", "cuarenta y cinco por ciento"],
+    ["72°F", "setenta y dos grados Fahrenheit"], ["5 km", "cinco kilómetros"], ["999999", "novecientos noventa y nueve mil novecientos noventa y nueve"], ["100", "cien"], ["101", "ciento uno"], ["Visita https://example.com/2026", "Visita https://example.com/2026"],
+  ];
+  test.each(es)("%s becomes %s", (input, expected) => expect(toSpokenText(input, { locale: "es" })).toBe(expected));
+  test("en-US output is byte-identical with and without a locale, and other locales are left as written", () => {
+    expect(toSpokenText("It's 3:27 PM on Oct 21, 2026 with 5 km.", { locale: "en-US" })).toBe(toSpokenText("It's 3:27 PM on Oct 21, 2026 with 5 km."));
+    expect(toSpokenText("3 PM", { locale: "fr" })).toBe("3 PM");
+  });
+});

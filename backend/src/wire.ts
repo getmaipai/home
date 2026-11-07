@@ -966,6 +966,8 @@ export interface NotificationDeliveryView {
   typeId: string;
   level: "immediate" | "time_sensitive" | "passive";
   text: string;
+  /** I18N-B1: the values the typed line was built from (null or absent on older rows: show `text`). */
+  values?: Record<string, string> | null;
   channels: ("in_app" | "telegram" | "robot")[];
   createdAt: string;
   readAt: string | null;

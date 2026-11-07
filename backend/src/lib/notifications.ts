@@ -38,6 +38,7 @@ import { issueDeviceCommand } from "@/lib/deviceCommands";
 import { trackBackgroundWork } from "@/lib/backgroundWork";
 import type { PersonRow } from "@/types";
 import { wallClockMinutes } from "@/lib/wallClock";
+import { renderNotificationFor } from "@/lib/i18nServer";
 
 function renderTemplate(template: string, vars: Record<string, string>): string {
   return template.replace(/\{(\w+)\}/g, (match, name: string) => vars[name] ?? match);
@@ -189,22 +190,22 @@ export async function trigger(typeId: string, vars: Record<string, string> = {},
       .where(and(eq(notificationDeliveries.typeId, type.id), eq(notificationDeliveries.recipientId, recipient.id), eq(notificationDeliveries.repeatKey, opts.repeatKey))).get()) continue;
     const now = new Date();
     if (type.level === "immediate") {
-      await deliver(type, recipient, text, opts, now);
+      await deliver(type, recipient, text, vars, opts, now);
       continue;
     }
     // An alarm the person set for themselves rings at its time, so a 6:30 alarm is not held to the
     // end of quiet hours. A child's alarm still waits (the hours an admin set bind a child).
     if (RINGS_THROUGH_QUIET_HOURS.has(type.id) && ["adult", "teen"].includes(speakerAgeBand(recipient, now))) {
-      await deliver(type, recipient, text, opts, now);
+      await deliver(type, recipient, text, vars, opts, now);
       continue;
     }
     const quiet = quietHours(recipient, now);
     if (quiet.active) {
       const duplicateHold = opts.repeatKey && db.select().from(notificationHolds).where(and(eq(notificationHolds.typeId, type.id), eq(notificationHolds.recipientId, recipient.id))).all().some((h) => (JSON.parse(h.options) as TriggerOptions).repeatKey === opts.repeatKey);
-      if (!duplicateHold) db.insert(notificationHolds).values({ id: newNotificationId(), typeId: type.id, recipientId: recipient.id, text, options: JSON.stringify(opts), deliverAfter: quiet.endAt.toISOString() }).run();
+      if (!duplicateHold) db.insert(notificationHolds).values({ id: newNotificationId(), typeId: type.id, recipientId: recipient.id, text, values: JSON.stringify(vars), options: JSON.stringify(opts), deliverAfter: quiet.endAt.toISOString() }).run();
       continue;
     }
-    await deliver(type, recipient, text, opts, now);
+    await deliver(type, recipient, text, vars, opts, now);
   }
 }
 
@@ -236,7 +237,7 @@ export function quietHours(recipient: PersonRow, now: Date): { active: boolean; 
   return { active, endAt };
 }
 
-async function deliver(type: NotificationType, recipient: PersonRow, text: string, opts: TriggerOptions, now: Date): Promise<void> {
+async function deliver(type: NotificationType, recipient: PersonRow, text: string, vars: Record<string, string>, opts: TriggerOptions, now: Date): Promise<void> {
     const channels = resolveChannelsFor(type, recipient);
     const notificationId = newNotificationId();
     if (channels.includes("telegram")) {
@@ -246,7 +247,8 @@ async function deliver(type: NotificationType, recipient: PersonRow, text: strin
       // that function return it alongside the channel list) keeps the
       // settings lookup in exactly one place.
       const chatId = getSettingValueForPerson(recipient.id, "notifications.telegram.chat_id") as string;
-      await sendTelegramMessage(chatId, text);
+      // I18N-B1: Telegram has no client to translate, so the line is rendered here in the recipient's language; the English text is the fallback.
+      await sendTelegramMessage(chatId, renderNotificationFor(recipient, type.id, vars, now) ?? text);
     }
     db.insert(notificationDeliveries)
       .values({
@@ -254,6 +256,7 @@ async function deliver(type: NotificationType, recipient: PersonRow, text: strin
         typeId: type.id,
         recipientId: recipient.id,
         text,
+        values: JSON.stringify(vars),
         channels: JSON.stringify(channels),
         createdAt: now.toISOString(),
         subjectPersonId: opts.subjectPersonId ?? null,
@@ -291,7 +294,7 @@ export async function deliverHeldNotifications(now = new Date()): Promise<number
     if (type.level === "immediate" || !quiet.active) {
       const opts = JSON.parse(row.options) as TriggerOptions;
       const duplicate = opts.repeatKey && db.select({ id: notificationDeliveries.id }).from(notificationDeliveries).where(and(eq(notificationDeliveries.typeId, type.id), eq(notificationDeliveries.recipientId, recipient.id), eq(notificationDeliveries.repeatKey, opts.repeatKey))).get();
-      if (!duplicate) await deliver(type, recipient, row.text, opts, now);
+      if (!duplicate) await deliver(type, recipient, row.text, row.values ? (JSON.parse(row.values) as Record<string, string>) : {}, opts, now);
       db.delete(notificationHolds).where(eq(notificationHolds.id, row.id)).run();
     } else db.update(notificationHolds).set({ deliverAfter: quiet.endAt.toISOString() }).where(eq(notificationHolds.id, row.id)).run();
     } catch (error) { console.error(`[notifications] held delivery failed for ${row.id}: ${(error as Error).message}`); }
@@ -327,6 +330,8 @@ export interface NotificationDeliveryView {
   typeId: string;
   level: "immediate" | "time_sensitive" | "passive";
   text: string;
+  /** I18N-B1: the values the line was built from; with `typeId` the bell renders it in the viewer's language. Null on rows older than the column (show `text`). */
+  values: Record<string, string> | null;
   channels: NotificationChannel[];
   createdAt: string;
   readAt: string | null;
@@ -349,6 +354,7 @@ function toView(row: typeof notificationDeliveries.$inferSelect): NotificationDe
     typeId: row.typeId,
     level: getNotificationType(row.typeId)?.level ?? "passive",
     text: row.text,
+    values: row.values ? (JSON.parse(row.values) as Record<string, string>) : null,
     channels: JSON.parse(row.channels) as NotificationChannel[],
     createdAt: row.createdAt,
     readAt: row.readAt,

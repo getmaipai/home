@@ -626,6 +626,16 @@ msgid "{minutes}:{seconds} remaining"
 msgstr ""
 
 #. js-lingui-explicit-id
+#: ../backend/src/lib/notificationCopy.ts:10
+msgid "notification.model.download_failed"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: ../backend/src/lib/notificationCopy.ts:9
+msgid "notification.model.download_ready"
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/apps/settings/RobotBody.tsx:42
 msgid "{motors} switched off after a failed recovery"
 msgstr ""
@@ -693,6 +703,11 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/apps/settings/HouseholdRobotsSection.tsx:134
 msgid "{name} could not be forgotten. Check the connection and try again."
+msgstr ""
+
+#. js-lingui-explicit-id
+#: ../backend/src/lib/notificationCopy.ts:19
+msgid "notification.engines.update_failed"
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -837,6 +852,11 @@ msgid "{name} taken out of the bar."
 msgstr ""
 
 #. js-lingui-explicit-id
+#: ../backend/src/lib/notificationCopy.ts:18
+msgid "notification.engines.update_applied"
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/apps/settings/VoiceManagerSection.tsx:85
 msgid "{name} was deleted."
 msgstr ""
@@ -904,6 +924,11 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/apps/settings/SiteBlocksSection.tsx:75
 msgid "{name}'s changes"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: ../backend/src/lib/notificationCopy.ts:11
+msgid "notification.media_time_up"
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -1147,8 +1172,18 @@ msgid "{title} didn't finish: {error}"
 msgstr ""
 
 #. js-lingui-explicit-id
+#: ../backend/src/lib/notificationCopy.ts:22
+msgid "notification.project.failed"
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/apps/chat/chatToolUis.tsx:338
 msgid "{title} didn't finish."
+msgstr ""
+
+#. js-lingui-explicit-id
+#: ../backend/src/lib/notificationCopy.ts:21
+msgid "notification.project.done"
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -2295,6 +2330,11 @@ msgid "setting.safety.alarm.volume.help"
 msgstr ""
 
 #. js-lingui-explicit-id
+#: ../backend/src/lib/notificationCopy.ts:23
+msgid "notification.alarm.due"
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/apps/clock/AlarmsTab.tsx:69
 #: src/apps/clock/ClockPage.tsx:42
 #: src/shell/AlarmRinger.tsx:199
@@ -2572,6 +2612,11 @@ msgid "setting.companions.dock.label"
 msgstr ""
 
 #. js-lingui-explicit-id
+#: ../backend/src/lib/notificationCopy.ts:14
+msgid "notification.jobs.admin_stopped"
+msgstr ""
+
+#. js-lingui-explicit-id
 #: ../backend/src/lib/failureCopy.ts:208
 msgid "failure.composer.paused_by_admin.adult"
 msgstr ""
@@ -2599,6 +2644,11 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/apps/settings/styles/stylesApi.ts:77
 msgid "an unknown base"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: ../backend/src/lib/notificationCopy.ts:17
+msgid "notification.engines.update_available"
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -3245,6 +3295,11 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:1468
 msgid "area.Backups"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: ../backend/src/lib/notificationCopy.ts:15
+msgid "notification.backups.target_failing"
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -4364,6 +4419,11 @@ msgstr ""
 #: src/shell/pages/UiShowcasePage.tsx:170
 #: src/shell/Routes.tsx:157
 msgid "Chat showcase"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: ../backend/src/lib/notificationCopy.ts:8
+msgid "notification.engines.chat_engine_changed"
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -7528,7 +7588,7 @@ msgstr ""
 #: src/apps/notifications/NotificationsPage.tsx:215
 #: src/shell/library/LibraryUploads.tsx:75
 #: src/shell/library/LibraryUploads.tsx:76
-#: src/shell/NotificationBell.tsx:248
+#: src/shell/NotificationBell.tsx:258
 #: src/shell/pages/RepairsPage.tsx:154
 msgid "Dismiss"
 msgstr ""
@@ -7544,7 +7604,7 @@ msgid "Dismiss {text}"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/NotificationBell.tsx:233
+#: src/shell/NotificationBell.tsx:243
 msgid "Dismiss all"
 msgstr ""
 
@@ -7559,7 +7619,7 @@ msgid "Dismissed"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/NotificationBell.tsx:233
+#: src/shell/NotificationBell.tsx:243
 msgid "Dismissing…"
 msgstr ""
 
@@ -10926,6 +10986,11 @@ msgid "failure.stopped.minor"
 msgstr ""
 
 #. js-lingui-explicit-id
+#: ../backend/src/lib/notificationCopy.ts:13
+msgid "notification.memory.judge_failed"
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/apps/settings/AssistantKeysSettings.tsx:104
 msgid "I have copied it"
 msgstr ""
@@ -13263,6 +13328,11 @@ msgid "MaiPai Home"
 msgstr ""
 
 #. js-lingui-explicit-id
+#: ../backend/src/lib/notificationCopy.ts:16
+msgid "notification.updates.available"
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/apps/settings/BackupsSection.tsx:39
 msgid "MaiPai Home emergency backup key\n"
 "\n"
@@ -15501,7 +15571,7 @@ msgid "Nothing on the list yet"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/NotificationBell.tsx:222
+#: src/shell/NotificationBell.tsx:232
 msgid "Nothing pending."
 msgstr ""
 
@@ -15569,8 +15639,8 @@ msgstr ""
 
 #. js-lingui-explicit-id
 #: src/apps/notifications/NotificationsPage.tsx:110
-#: src/shell/NotificationBell.tsx:200
-#: src/shell/NotificationBell.tsx:215
+#: src/shell/NotificationBell.tsx:210
+#: src/shell/NotificationBell.tsx:225
 #: src/shell/pageHeaderTitle.tsx:104
 #: src/shell/routeHeader.ts:25
 msgid "Notifications"
@@ -15582,7 +15652,7 @@ msgid "area.Notifications"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/NotificationBell.tsx:200
+#: src/shell/NotificationBell.tsx:210
 msgid "Notifications ({count} pending)"
 msgstr ""
 
@@ -17570,6 +17640,11 @@ msgid "area.Privacy and safety"
 msgstr ""
 
 #. js-lingui-explicit-id
+#: ../backend/src/lib/notificationCopy.ts:20
+msgid "notification.engines.problem"
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:913
 msgid "setting.resources.quiet_timeout.option_label.proceed"
 msgstr ""
@@ -18054,6 +18129,11 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/apps/reminders/ListColumn.tsx:18
 msgid "Reminder lists"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: ../backend/src/lib/notificationCopy.ts:24
+msgid "notification.remind.due"
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -21445,6 +21525,11 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/apps/chat/useChatAvailability.ts:143
 msgid "Still installing. Ask a grown-up."
+msgstr ""
+
+#. js-lingui-explicit-id
+#: ../backend/src/lib/notificationCopy.ts:12
+msgid "notification.repairs.still_open"
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -24905,7 +24990,7 @@ msgid "View"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/NotificationBell.tsx:259
+#: src/shell/NotificationBell.tsx:269
 msgid "View history"
 msgstr ""
 
@@ -26201,6 +26286,11 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/apps/setup/SetupWizard.tsx:70
 msgid "You're all set"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: ../backend/src/lib/notificationCopy.ts:25
+msgid "notification.timer.done"
 msgstr ""
 
 #. js-lingui-explicit-id

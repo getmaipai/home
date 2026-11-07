@@ -479,7 +479,7 @@ const CORE_JOBS: Record<string, CoreJobHandler> = {
   },
   "alarms.fire": async (row) => {
     const { task, alarmId } = JSON.parse(row.inputs) as { task: string; alarmId?: string };
-    await trigger("alarm.due", { task: task ? `Alarm: ${task}` : "Alarm" }, { personId: row.personId ?? undefined, subjectJobId: row.id });
+    await trigger("alarm.due", { task: task || "Alarm" }, { personId: row.personId ?? undefined, subjectJobId: row.id });
     if (alarmId) {
       const alarm = db.select().from(alarms).where(eq(alarms.id, alarmId)).get();
       if (alarm && !alarm.deletedAt && alarm.enabled) {

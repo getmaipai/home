@@ -1,3 +1,4 @@
+import { spanishSpoken } from "@/lib/spokenTextEs";
 /** Deterministic English wording for text sent to speech engines. */
 const SMALL = ["zero", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten", "eleven", "twelve", "thirteen", "fourteen", "fifteen", "sixteen", "seventeen", "eighteen", "nineteen"];
 const TENS = ["", "", "twenty", "thirty", "forty", "fifty", "sixty", "seventy", "eighty", "ninety"];
@@ -68,7 +69,9 @@ function clockWords(hour: number, minute: number, meridiem?: string): string {
 }
 
 export function toSpokenText(text: string, opts: { locale?: string } = {}): string {
-  if (opts.locale && !/^en(?:-|$)/i.test(opts.locale)) return text;
+  // I18N-B1: Spanish has its own path (spokenTextEs.ts); every other non-English locale is left as written.
+  const spanish = !!opts.locale && /^es(?:-|$)/i.test(opts.locale);
+  if (opts.locale && !spanish && !/^en(?:-|$)/i.test(opts.locale)) return text;
   const protectedParts: string[] = [];
   const tokenFor = (index: number) => {
     let n = index;
@@ -85,6 +88,8 @@ export function toSpokenText(text: string, opts: { locale?: string } = {}): stri
     .replace(/#[\p{L}\p{N}_]+/gu, hold)
     .replace(/\b(?:COVID-\d+|[A-Z]*\d+[A-Z][A-Z\d]*|[A-Z]{2,}\d+[A-Z\d]*)\b/g, hold);
 
+  if (spanish) out = spanishSpoken(out);
+  else {
   // Full dates before clocks and general numbers.
   out = out.replace(new RegExp(`\\b(${MONTH_PATTERN})\\.?\\s+(\\d{1,2})(?:st|nd|rd|th)?(?:,?\\s+(\\d{4}))?\\b`, "gi"), (_m, month: string, day: string, year?: string) => `${monthName(month)} ${ordinal(Number(day))}${year ? `, ${yearWords(Number(year))}` : ""}`);
   out = out.replace(/\b(\d{1,2})\/(\d{1,2})\/(\d{4})\b/g, (_m, month: string, day: string, year: string) => `${MONTHS[Number(month) - 1] ?? month} ${ordinal(Number(day))}, ${yearWords(Number(year))}`);
@@ -118,6 +123,7 @@ export function toSpokenText(text: string, opts: { locale?: string } = {}): stri
   out = out.replace(/\b(\d{1,3})(st|nd|rd|th)\b/gi, (_m, n: string) => ordinal(Number(n)));
   out = out.replace(/\b(\d{1,3})\s*-\s*(\d{1,3})\b/g, (_m, a: string, b: string) => `${numberWords(a)} to ${numberWords(b)}`);
   out = out.replace(/(?<![\w.])(-?\d[\d,]*(?:\.\d+)?)(?![\w.]|\s*(?:%|°|[A-Za-z]))/g, (_m, value: string) => numberWords(value));
+  }
 
   return out.replace(/\uE000([A-Z]+)\uE001/g, (_m, key: string) => {
     let index = 0;

@@ -1128,6 +1128,9 @@ export const notificationDeliveries = sqliteTable("notification_deliveries", {
   // Notification fan-out remains one row per person, while retries across
   // process restarts cannot deliver the same event twice.
   repeatKey: text("repeat_key"),
+  // I18N-B1: the values (JSON object of strings) the typed notification was built from; `text` stays the English line.
+  // Null on rows written before this column: the bell and the channels show their `text` as it is.
+  values: text("values_json"),
 }, (table) => [uniqueIndex("notification_deliveries_repeat_key_idx").on(table.typeId, table.recipientId, table.repeatKey)]);
 
 export const notificationHolds = sqliteTable("notification_holds", {
@@ -1137,6 +1140,8 @@ export const notificationHolds = sqliteTable("notification_holds", {
   text: text("text").notNull(),
   options: text("options").notNull(),
   deliverAfter: text("deliver_after").notNull(),
+  // I18N-B1: the typed values, kept so a held notification renders in the recipient's language when it is released.
+  values: text("values_json"),
 });
 
 // SAFETY-ALARM-01: durable alarm state and action audit, with no transcript
