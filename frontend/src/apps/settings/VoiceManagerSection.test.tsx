@@ -123,4 +123,12 @@ describe("VoiceManagerSection", () => {
     within(dialog).getByText("You are responsible for having the right to use this voice.");
     expect(within(dialog).queryAllByRole("checkbox")).toHaveLength(0);
   });
+
+  test("a parent or admin sees a minor's voice with who made it, can test it and can delete it (AUDIO-PARITY-01 V4)", async () => {
+    const view = render([builtIn, cutey], [made("voice-cutey1234", { label: "Cutey", creatorName: "Poppy" })]);
+    await view.findByText("Cutey");
+    view.getByText("Made by Poppy");
+    expect(view.getAllByRole("button", { name: "Test" }).length).toBeGreaterThan(1);
+    expect(view.getAllByRole("button", { name: "Delete" })).toHaveLength(1);
+  });
 });

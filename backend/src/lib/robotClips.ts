@@ -13,7 +13,7 @@ import { getDeviceSettingValue } from "@/lib/settings";
 import { speakerAgeBand } from "@/lib/ageBand";
 import { VOICE_SETTINGS_KEYS, VOICE_ENGINE_DEFAULT } from "@/settings/voiceKeys";
 import { synthesizeRecordedSpeech } from "@/lib/tts";
-import { isPresetVoice, voiceForSpeech } from "@/lib/voiceForSpeech";
+import { voiceForSpeech } from "@/lib/voiceForSpeech";
 
 export interface RobotClip {
   id: string;
@@ -230,10 +230,10 @@ function adultVoice(deviceId: string): string {
   const person = db.select().from(people)
     .where(and(eq(people.id, robot.personId), eq(people.enabled, true), isNull(people.deletedAt))).get();
   if (!person) return defaultVoice;
-  // A child's private tts.voice_id never reaches a robot's clips; only a preset or the engine default from the device applies.
+  // A minor's private tts.voice_id never reaches a robot's clips; only the voice chosen on the device applies (a preset or, since AUDIO-PARITY-01 V4, a voice made from a clip).
   if (speakerAgeBand(person, new Date()) !== "adult") {
     const robotVoice = getDeviceSettingValue(deviceId, "robot.voice.id");
-    return typeof robotVoice === "string" && isPresetVoice(robotVoice) ? robotVoice === VOICE_ENGINE_DEFAULT ? defaultVoice : robotVoice : defaultVoice;
+    return typeof robotVoice === "string" && robotVoice ? robotVoice === VOICE_ENGINE_DEFAULT ? defaultVoice : robotVoice : defaultVoice;
   }
   return voiceForSpeech({ actor: person, deviceId });
 }

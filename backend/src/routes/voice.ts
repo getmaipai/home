@@ -17,7 +17,7 @@ import { getVoiceCatalog, isVoiceCatalogPath } from "@/lib/voiceCatalog";
 import { setPersonTtsVoiceUnchecked, resolveForResponse } from "@/lib/settings";
 import { getRegistryKey } from "@/lib/settingsRegistry";
 import { getStackUrl, getStackClient, stackFailureResult, isStackConfigured } from "@/lib/stackEngine";
-import { isOwnerOrAdmin } from "@/lib/access";
+import { isOwnerOrAdmin, mayUseClipVoices } from "@/lib/access";
 import { ResolvedSettingSchema } from "@/routes/settings";
 import {
   listClonedVoices,
@@ -67,8 +67,8 @@ voiceRoutes.openapi(stackVoicesRoute, async (c) => {
   if (!isStackConfigured()) return c.json({ error: `The Stack that speaks for Home is not running. ${outageHelp}` }, 503);
   try {
     const stackVoices: StackVoice[] = await getStackClient().voices();
-    // Voices an admin made from a clip are spoken by Chatterbox Turbo, so they are offered only beside it, and never to a child or teen.
-    const clipVoices = speakerAgeBand(c.get("person"), new Date()) === "adult" && stackVoices.some((voice) => voice.engine === "chatterbox-turbo") ? householdVoiceEntries() : [];
+    // Voices made from a clip are spoken by Chatterbox Turbo, so they are offered only beside it, to every member but a guest.
+    const clipVoices = mayUseClipVoices(c.get("person")) && stackVoices.some((voice) => voice.engine === "chatterbox-turbo") ? householdVoiceEntries() : [];
     const all: StackVoice[] = [...stackVoices, ...clipVoices];
     // Owner ruling 2026-10-17: an owner or admin lists every voice (a voice not yet downloaded installs on first
     // preview); everyone else sees only voices already on disk, so Test never ends in a refusal.
@@ -99,7 +99,7 @@ voiceRoutes.openapi(voicePreviewRoute, async (c) => {
     : "Ask the person who manages Home to check the voice setup in Settings.";
   if (!isStackConfigured()) return c.json({ error: `Home could not prepare this voice preview. ${help}` }, 503);
   if (householdVoiceSpeech(id)) {
-    if (speakerAgeBand(actor, new Date()) !== "adult") return c.json({ error: "This voice is not available for your account. Ask the person who manages Home to choose a voice." }, 403);
+    if (!mayUseClipVoices(actor)) return c.json({ error: "This voice is not available for your account. Ask the person who manages Home to choose a voice." }, 403);
     let audio = householdPreviewAudio(id);
     if (!audio) {
       const rendered = await renderHouseholdVoice(id, c.req.raw.signal);
@@ -570,7 +570,7 @@ voiceRoutes.openapi(clonedSelectRoute, async (c) => {
   const actor = c.get("person");
   const id = c.req.valid("param").id;
   if (!clonedVoiceExists(id)) return c.json({ error: `cloned voice not found: ${id}` }, 404);
-  if (speakerAgeBand(actor, new Date()) !== "adult") return c.json({ error: "This voice is not available for your account. Ask the person who manages Home to choose a voice." }, 403);
+  if (!mayUseClipVoices(actor)) return c.json({ error: "This voice is not available for your account. Ask the person who manages Home to choose a voice." }, 403);
   const result = setPersonTtsVoiceUnchecked(actor, id);
   if (!result.ok) {
     return result.status === 400 ? c.json({ error: result.error }, 400) : c.json({ error: result.error }, 403);

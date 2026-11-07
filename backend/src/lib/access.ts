@@ -30,6 +30,12 @@ export function canHaveTemporaryChat(actor: PersonRow): boolean {
   return canHaveTemporaryChatRole(actor.role);
 }
 
+// AUDIO-PARITY-01 V4 (owner-approved 2026-11-05): every member, adult, teen and child, may make, list and use a voice made from a clip.
+// A guest may not (no clip voice is made or used in a guest session); the content floors on what the voice says apply in every band.
+export function mayUseClipVoices(actor: PersonRow): boolean {
+  return actor.role !== "guest";
+}
+
 // Batch form, for a caller filtering many records against many different
 // target people in one pass (memory.ts's list()/recall(), one query
 // instead of one per record).

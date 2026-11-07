@@ -1,4 +1,4 @@
-// VOICES-04: voices an owner or admin makes from a reference clip (the hub's /api/voice/cloned routes).
+// VOICES-04: voices a member makes from a reference clip (the hub's /api/voice/cloned routes).
 import { requestJson } from "@/lib/api";
 
 export interface HouseholdVoice {

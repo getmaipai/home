@@ -1,6 +1,6 @@
 import type { PersonRow } from "@/types";
 import { storeFile } from "@/lib/attachments";
-import { speakerAgeBand } from "@/lib/ageBand";
+import { mayUseClipVoices } from "@/lib/access";
 import { listPlayableVoices } from "@/lib/voiceList";
 import { householdVoiceEntries, householdVoiceSpeech } from "@/lib/clonedVoices";
 import { voiceForSpeech, isPresetVoice } from "@/lib/voiceForSpeech";
@@ -17,7 +17,6 @@ export type VoiceoverResult =
   | { ok: false; status: 400 | 403 | 422 | 503; line: string };
 
 export async function voicesFor(actor: PersonRow): Promise<VoiceoverVoice[]> {
-  const minor = speakerAgeBand(actor, new Date()) !== "adult";
   const listed = await listPlayableVoices();
   const rows: StackVoice[] = [...listed, ...householdVoiceEntries().filter((v) => !listed.some((x) => x.id === v.id))];
   const defaultId = voiceForSpeech({ actor });
@@ -25,7 +24,8 @@ export async function voicesFor(actor: PersonRow): Promise<VoiceoverVoice[]> {
   const engineDefaultId = householdDefault?.voiceUrl ?? defaultId;
   const candidates = rows.filter((v) => v.source === "preset" || v.source === "cloned");
   if (!candidates.some((v) => v.id === engineDefaultId)) candidates.push({ id: engineDefaultId, name: defaultId, description: "Home's default voice.", language: "en", country: "unknown", gender: "unknown", source: householdDefault ? "cloned" : "preset", engine: "chatterbox-turbo", onDisk: true, licence: null, revision: "unknown" });
-  const safe = minor ? candidates.filter((v) => v.source === "preset" && isPresetVoice(v.id)) : candidates;
+  // A guest speaks presets only; every member may use a voice made from a clip (AUDIO-PARITY-01 V4).
+  const safe = mayUseClipVoices(actor) ? candidates : candidates.filter((v) => v.source === "preset" && isPresetVoice(v.id));
   const result: VoiceoverVoice[] = [];
   for (const item of safe) {
     const engine = await plannedRecordedEngine(item.id);

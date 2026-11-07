@@ -160,4 +160,31 @@ describe("VoiceBrowserSection", () => {
     const view = renderPage(three()); await trigger(view);
     expect(view.getAllByRole("combobox")).toHaveLength(1);
   });
+
+  // AUDIO-PARITY-01 V4: every member but a guest makes a voice from a recording; only an owner or admin tunes it (rule 8).
+  test.each(["adult", "teen", "child"] as const)("a %s can open Make a voice and sees no liveliness or pitch fields", async (role) => {
+    const view = renderPage(three(), ["alba", "javert", "mira"], { role });
+    await trigger(view);
+    fireEvent.click(view.getByRole("button", { name: "Make a voice from a recording" }));
+    await view.findByLabelText("Recording");
+    expect(view.queryByLabelText(/Liveliness/)).toBeNull();
+    expect(view.queryByLabelText(/Pitch/)).toBeNull();
+  });
+  test("an owner sees the liveliness and pitch fields", async () => {
+    const view = renderPage(three(), ["alba", "javert", "mira"], { role: "owner" });
+    await trigger(view);
+    fireEvent.click(view.getByRole("button", { name: "Make a voice from a recording" }));
+    await view.findByLabelText(/Liveliness/);
+    view.getByLabelText(/Pitch/);
+  });
+  test("a minor is told a parent can see and delete the voice; a guest has no Make a voice button", async () => {
+    const teen = renderPage(three(), ["alba", "javert", "mira"], { role: "teen" });
+    await trigger(teen);
+    fireEvent.click(teen.getByRole("button", { name: "Make a voice from a recording" }));
+    await teen.findByText(/A parent can see it, listen to it and delete it/);
+    cleanup(); mock.restore();
+    const guest = renderPage(three(), ["alba", "javert", "mira"], { role: "guest" });
+    await trigger(guest);
+    expect(guest.queryByRole("button", { name: "Make a voice from a recording" })).toBeNull();
+  });
 });

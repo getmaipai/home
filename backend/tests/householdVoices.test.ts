@@ -77,16 +77,48 @@ describe("renaming a voice", () => {
 });
 
 describe("making a voice", () => {
-  test("a member, teen and child are refused with 403 and nothing is stored; an admin and the owner can", async () => {
+  test("every member can make one (V4): owner, admin, member, teen and child each get 201; a minor may not set liveliness or pitch", async () => {
     const h = await household();
-    for (const who of [h.adult, h.teen, h.child]) {
-      const res = await makeVoice(who.client);
-      expect(res.status).toBe(403);
-      expect(((await res.json()) as { error: string }).error).toBe("Only an owner or an admin can make a voice.");
+    for (const [name, who] of [["adult", h.adult], ["teen", h.teen], ["child", h.child]] as const) {
+      const res = await makeVoice(who.client, { label: `By ${name}` });
+      expect(res.status).toBe(201);
+      expect(await res.json()).toMatchObject({ label: `By ${name}`, creatorId: who.id });
+      const tuned = await makeVoice(who.client, { label: "Tuned", temperature: "1.2" });
+      expect(tuned.status).toBe(400);
+      expect((await makeVoice(who.client, { label: "Tuned", pitch_semitones: "2" })).status).toBe(400);
     }
-    expect(((await (await h.owner.get("/api/voice/cloned")).json()) as { voices: unknown[] }).voices).toHaveLength(0);
-    expect((await makeVoice(h.admin.client, { label: "By admin" })).status).toBe(201);
+    expect((await makeVoice(h.admin.client, { label: "By admin", temperature: "1.2" })).status).toBe(201);
     expect((await makeVoice(h.owner, { label: "By owner" })).status).toBe(201);
+    expect(((await (await h.owner.get("/api/voice/cloned")).json()) as { voices: unknown[] }).voices).toHaveLength(5);
+  });
+
+  test("a parent or admin sees, listens to and deletes a minor's voice; another member cannot delete it", async () => {
+    const h = await household();
+    const teenVoice = (await (await makeVoice(h.teen.client, { label: "Nova voice" })).json()) as { id: string };
+    const childVoice = (await (await makeVoice(h.child.client, { label: "Poppy voice" })).json()) as { id: string };
+    for (const guardian of [h.owner, h.admin.client]) {
+      const list = (await (await guardian.get("/api/voice/cloned")).json()) as { voices: Array<{ id: string; creatorId: string; creatorName: string }> };
+      expect(list.voices).toEqual(expect.arrayContaining([expect.objectContaining({ id: teenVoice.id, creatorId: h.teen.id, creatorName: "Nova" }), expect.objectContaining({ id: childVoice.id, creatorId: h.child.id, creatorName: "Poppy" })]));
+      const manager = (await (await guardian.get("/api/voice/voices")).json()) as { voices: Array<{ id: string }> };
+      expect(manager.voices.map((v) => v.id)).toEqual(expect.arrayContaining([teenVoice.id, childVoice.id]));
+      expect((await guardian.post(`/api/voice/voices/${teenVoice.id}/preview`)).status).toBe(200);
+      expect((await guardian.post(`/api/voice/voices/${childVoice.id}/preview`)).status).toBe(200);
+    }
+    // A member who is not a parent or admin, and another minor, cannot delete someone else's voice.
+    expect((await h.adult.client.post(`/api/voice/cloned/${childVoice.id}/delete`)).status).toBe(403);
+    expect((await h.teen.client.post(`/api/voice/cloned/${childVoice.id}/delete`)).status).toBe(403);
+    expect((await h.admin.client.post(`/api/voice/cloned/${teenVoice.id}/delete`)).status).toBe(200);
+    expect((await h.owner.post(`/api/voice/cloned/${childVoice.id}/delete`)).status).toBe(200);
+    expect(((await (await h.owner.get("/api/voice/cloned")).json()) as { voices: unknown[] }).voices).toHaveLength(0);
+  });
+
+  test("a minor deletes their own voice, and the delete clears who was using it", async () => {
+    const h = await household();
+    const mine = (await (await makeVoice(h.teen.client, { label: "Mine" })).json()) as { id: string };
+    expect((await h.teen.client.post(`/api/voice/cloned/${mine.id}/select`, {})).status).toBe(200);
+    expect((await h.teen.client.post(`/api/voice/cloned/${mine.id}/delete`)).status).toBe(200);
+    const nova = db.select().from(people).where(eq(people.id, h.teen.id)).get()!;
+    expect(voiceForSpeech({ actor: nova })).toBe("default");
   });
 
   test("temperature and pitch are stored, returned, and sent to the Stack with the first render; the voice is usable at once", async () => {
@@ -140,28 +172,30 @@ describe("making a voice", () => {
 });
 
 describe("who sees and picks a voice made at home", () => {
-  test("adults list it beside the Stack's voices; a teen and a child never see it, preview it or pick it", async () => {
+  test("every member lists it beside the Stack's voices and previews it; a teen picks it; a child's own pick stays with a parent", async () => {
     const h = await household();
     const made = (await (await makeVoice(h.owner)).json()) as { id: string };
     const ids = async (client: TestClient) => ((await (await client.get("/api/voice/voices")).json()) as { voices: Array<{ id: string }> }).voices.map((v) => v.id);
     expect(await ids(h.owner)).toContain(made.id);
     expect(await ids(h.adult.client)).toContain(made.id);
-    expect(await ids(h.teen.client)).not.toContain(made.id);
-    expect(await ids(h.child.client)).not.toContain(made.id);
-    for (const who of [h.teen, h.child]) {
-      expect((await who.client.post(`/api/voice/voices/${made.id}/preview`)).status).toBe(403);
-      expect((await who.client.post(`/api/voice/cloned/${made.id}/select`, {})).status).toBe(403);
-    }
+    expect(await ids(h.teen.client)).toContain(made.id);
+    expect(await ids(h.child.client)).toContain(made.id);
+    for (const who of [h.adult, h.teen, h.child]) expect((await who.client.post(`/api/voice/voices/${made.id}/preview`)).status).toBe(200);
     expect((await h.adult.client.post(`/api/voice/cloned/${made.id}/select`, {})).status).toBe(200);
+    expect((await h.teen.client.post(`/api/voice/cloned/${made.id}/select`, {})).status).toBe(200);
+    // A child never chooses their own voice (a parent does, existing rule), clip voice or not.
+    expect((await h.child.client.post(`/api/voice/cloned/${made.id}/select`, {})).status).toBe(403);
   });
 
-  test("a voice made at home is accepted as a robot's voice and as a person's, and a parent cannot give one to a child", async () => {
+  test("a voice made at home is accepted as a robot's voice and as a person's, and a parent can give one to a child", async () => {
     const h = await household();
     const made = (await (await makeVoice(h.owner)).json()) as { id: string };
     const own = await h.owner.put("/api/settings", { scope: `person:${(await (await h.owner.get("/api/auth/me")).json() as { id: string }).id}`, key: "tts.voice_id", value: made.id });
     expect(own.status).toBe(200);
     const forChild = await h.owner.put("/api/settings", { scope: `person:${h.child.id}`, key: "tts.voice_id", value: made.id });
-    expect([400, 403]).toContain(forChild.status);
+    expect(forChild.status).toBe(200);
+    const poppy = db.select().from(people).where(eq(people.id, h.child.id)).get()!;
+    expect(voiceForSpeech({ actor: poppy })).toBe(made.id);
   });
 });
 
@@ -191,7 +225,7 @@ describe("speaking with a saved choice", () => {
 });
 
 describe("a robot's voice (robot.voice.id)", () => {
-  test("a voice made at home can be chosen for a robot; the robot then speaks it for an adult, and a child gets the default", async () => {
+  test("a voice made at home can be chosen for a robot; the robot then speaks it for an adult and for a child", async () => {
     const h = await household();
     const made = (await (await makeVoice(h.owner, { label: "Cutey", temperature: "1.05" })).json()) as { id: string };
     const sage = db.select().from(people).where(eq(people.displayName, "Sage")).get()!;
@@ -200,25 +234,24 @@ describe("a robot's voice (robot.voice.id)", () => {
     expect(set.status).toBe(200);
     expect(voiceForSpeech({ actor: sage, deviceId })).toBe(made.id);
     const poppy = db.select().from(people).where(eq(people.id, h.child.id)).get()!;
-    expect(voiceForSpeech({ actor: poppy, deviceId })).not.toBe(made.id);
+    expect(voiceForSpeech({ actor: poppy, deviceId })).toBe(made.id);
     // The speech seam turns the saved id into the clip address and the voice's own temperature.
     speechForms = [];
     await synthesizeSpeech("Hi", voiceForSpeech({ actor: sage, deviceId }));
     expect(speechForms.at(-1)).toMatchObject({ temperature: "1.05" });
   });
 
-  test("a child whose own saved voice is a voice made at home still speaks the engine default", async () => {
+  test("a child whose saved voice is a voice made at home speaks it", async () => {
     const h = await household();
     const made = (await (await makeVoice(h.owner)).json()) as { id: string };
-    const { setPersonTtsVoiceUnchecked } = await import("@/lib/settings");
+    expect((await h.owner.put("/api/settings", { scope: `person:${h.child.id}`, key: "tts.voice_id", value: made.id })).status).toBe(200);
     const poppy = db.select().from(people).where(eq(people.id, h.child.id)).get()!;
-    setPersonTtsVoiceUnchecked(poppy, made.id);
-    expect(voiceForSpeech({ actor: poppy })).toBe("default");
+    expect(voiceForSpeech({ actor: poppy })).toBe(made.id);
   });
 });
 
 describe("Home's default voice (tts.home_voice)", () => {
-  test("only an admin sets it; a person with no voice of their own, and a robot with none, speak it; a child never gets a clip voice from it", async () => {
+  test("only an admin sets it; a person with no voice of their own, and a robot with none, speak it; a child gets it too (V4)", async () => {
     const h = await household();
     const made = (await (await makeVoice(h.owner, { label: "Cutey", temperature: "1.05" })).json()) as { id: string };
     expect((await h.adult.client.put("/api/settings", { scope: "household", key: "tts.home_voice", value: made.id })).status).toBe(403);
@@ -226,17 +259,17 @@ describe("Home's default voice (tts.home_voice)", () => {
     const adult = db.select().from(people).where(eq(people.id, h.adult.id)).get()!;
     expect(voiceForSpeech({ actor: adult })).toBe(made.id);
     const child = db.select().from(people).where(eq(people.id, h.child.id)).get()!;
-    expect(voiceForSpeech({ actor: child })).toBe("default");
+    expect(voiceForSpeech({ actor: child })).toBe(made.id);
     // A person's own choice still wins over the home default.
     const { setPersonTtsVoiceUnchecked } = await import("@/lib/settings");
     setPersonTtsVoiceUnchecked(adult, "vera");
     expect(voiceForSpeech({ actor: adult })).toBe("vera");
   });
 
-  test("the engine's built-in voice can be the home default; a child speaks the engine default", async () => {
+  test("the engine's built-in voice can be the home default; a child speaks it too", async () => {
     const h = await household();
     expect((await h.owner.put("/api/settings", { scope: "household", key: "tts.home_voice", value: "chatterbox-turbo-voice-default" })).status).toBe(200);
     const child = db.select().from(people).where(eq(people.id, h.child.id)).get()!;
-    expect(voiceForSpeech({ actor: child })).toBe("default");
+    expect(voiceForSpeech({ actor: child })).toBe("chatterbox-turbo-voice-default");
   });
 });

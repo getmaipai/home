@@ -43,14 +43,16 @@ describe("recorded voiceover", () => {
     expect(await plannedRecordedEngine(ref)).toBe("chatterbox-turbo");
   });
 
-  test("minors see presets only", async () => {
+  test("a minor sees a voice made from a clip like anyone else (AUDIO-PARITY-01 V4); a guest sees presets only", async () => {
     const household = await owner();
+    const saved = saveClonedVoice(household.row, "Home voice", new Uint8Array([4, 5]), "audio/wav");
+    if (!saved.ok) throw new Error("voice setup failed");
     const teenClient = await teen(household.client);
     const response = await teenClient.get("/api/auth/me");
     const { id } = await response.json() as { id: string };
     const actor = db.query.people.findFirst({ where: (p, { eq }) => eq(p.id, id) })!;
-    const options = await voicesFor(actor as never);
-    expect(options.every((v) => v.kind === "preset")).toBe(true);
+    expect((await voicesFor(actor as never)).some((v) => v.kind === "clip")).toBe(true);
+    expect((await voicesFor({ ...(actor as object), role: "guest" } as never)).every((v) => v.kind === "preset")).toBe(true);
   });
 
   test("stores a private script-free Library audio record", async () => {

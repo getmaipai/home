@@ -4,6 +4,8 @@ import { AsyncState } from "@maipai/ui/src/primitives/AsyncState";
 import { Select } from "@maipai/ui/src/primitives/Select";
 import { Progress } from "@maipai/ui/src/primitives/Progress";
 import { Button } from "@maipai/ui/src/ui/button";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@maipai/ui/src/ui/dialog";
+import { AddVoiceForm } from "@/apps/settings/AddVoiceForm";
 import { api, type PersonRosterEntry, type ResolvedSetting, type Roster } from "@/lib/api";
 import { playableVoices, previewIdFor, voiceChoices, voiceTargets } from "@/lib/voice/voiceBrowserRows";
 import { voicePreviewPlayer, type VoicePreviewState } from "@/lib/voice/voicePreviewPlayer";
@@ -19,6 +21,12 @@ export function VoiceBrowserSection({ person }: { person: Roster }) {
   const target = targets.find((entry) => entry.id === targetId) ?? person;
   const registryQuery = useQuery({ queryKey: ["settings-registry"], queryFn: api.settingsRegistry, staleTime: Infinity });
   const valuesQuery = useQuery<ResolvedSetting[]>({ queryKey: ["settings-values", `person:${target.id}`], queryFn: () => api.settingsValues(`person:${target.id}`) });
+  // AUDIO-PARITY-01 V4: every member but a guest may make a voice from a recording; liveliness and pitch stay with the owner and admin (rule 8).
+  const mayMake = person.role !== "guest";
+  const minor = person.role === "child" || person.role === "teen";
+  const [making, setMaking] = useState(false);
+  const [makeBusy, setMakeBusy] = useState(false);
+  const [madeName, setMadeName] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
@@ -89,5 +97,16 @@ export function VoiceBrowserSection({ person }: { person: Roster }) {
     {preview.error ? <p role="alert">{preview.error}</p> : null}
     {saveError ? <p role="alert">{saveError}</p> : null}
     <p role="status" className="text-sm text-muted-foreground">{saved ? "Saved." : ""}</p>
+    {mayMake ? <div className="flex flex-wrap items-center gap-2"><Button type="button" variant="outline" onClick={() => { setMadeName(null); setMaking(true); }}>Make a voice from a recording</Button></div> : null}
+    {madeName ? <p role="status" className="text-sm text-muted-foreground">{person.role === "child" ? `${madeName} is ready. Ask a parent to pick it for you.` : `${madeName} is ready. Choose it in the list above.`}</p> : null}
+    {mayMake ? <Dialog open={making} onOpenChange={(open) => { if (!makeBusy) setMaking(open); }}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Make a voice</DialogTitle>
+          <DialogDescription>{minor ? "Make a voice from a WAV, MP3 or FLAC recording of 6 to 30 seconds. A parent can see it, listen to it and delete it." : "Make a voice from a WAV, MP3 or FLAC recording of 6 to 30 seconds. Everyone in the home can pick it, and so can a robot."}</DialogDescription>
+        </DialogHeader>
+        <AddVoiceForm canTune={person.role === "owner" || person.role === "admin"} minor={minor} onBusyChange={setMakeBusy} onCancel={() => setMaking(false)} onMade={(name) => { setMaking(false); setMadeName(name); }} />
+      </DialogContent>
+    </Dialog> : null}
   </>;
 }

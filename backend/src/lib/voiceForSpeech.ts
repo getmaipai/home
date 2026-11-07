@@ -1,8 +1,8 @@
 import type { PersonRow } from "@/types";
 import { getDeviceSettingValue, getHouseholdSettingValue, getPersonSettingValue } from "@/lib/settings";
 import { getDeviceById } from "@/lib/devices";
-import { speakerAgeBand } from "@/lib/ageBand";
-import { robotCompanionBand, robotCompanionOf, stricterBand } from "@/lib/robotCompanion";
+import { mayUseClipVoices } from "@/lib/access";
+import { robotCompanionOf } from "@/lib/robotCompanion";
 import { VOICE_ENGINE_DEFAULT, VOICE_PRESET_NAMES } from "@/settings/voiceKeys";
 import { voicePresetName } from "@/lib/voiceResolve";
 import { companionVoiceKey } from "@/settings/companionVoiceKeys";
@@ -27,10 +27,8 @@ export function voiceForSpeech(input: { actor: PersonRow; deviceId?: string; com
   }
   // Nobody (companion, robot or person) chose a voice: Home's default voice, which is the engine's own voice until an admin picks one.
   if (selected === VOICE_ENGINE_DEFAULT) selected = String(getHouseholdSettingValue("tts.home_voice") ?? VOICE_ENGINE_DEFAULT);
-  // A child or teen never speaks in a voice made from a clip (VOICES-04), whoever chose it: only a preset or the engine default.
-  // DYNAMIC-COMPANION-01: a robot's controls level counts too, so a child or teen robot never speaks a clip voice whoever is signed in.
-  const companionBand = input.deviceId ? robotCompanionBand(input.deviceId) : null;
-  const voiceBand = companionBand ? stricterBand(speakerAgeBand(input.actor, new Date()), companionBand) : speakerAgeBand(input.actor, new Date());
-  if (voiceBand !== "adult" && !isPresetVoice(selected)) return isPresetVoice(personVoice) ? personVoice : VOICE_ENGINE_DEFAULT;
+  // AUDIO-PARITY-01 V4 (owner-approved 2026-11-05): a voice made from a clip is spoken in every band, a minor's robot included, under the same
+  // text floors as every voice. A guest speaks a preset or the engine default only (no clip voice in a guest session).
+  if (!mayUseClipVoices(input.actor) && !isPresetVoice(selected)) return isPresetVoice(personVoice) ? personVoice : VOICE_ENGINE_DEFAULT;
   return selected;
 }

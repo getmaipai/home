@@ -308,6 +308,7 @@ describe("household voice catalog routes", () => {
     upload.set("label", "Sage voice");
     upload.set("file", wavFile());
     const uploaded = (await (await owner.postForm("/api/voice/cloned", upload)).json()) as { id: string };
+    // A child's own voice is chosen by a parent (existing rule), not by the child.
     expect((await childClient.post(`/api/voice/cloned/${uploaded.id}/select`, {})).status).toBe(403);
     // Owner/admin proceed to the catalog fetch; use an unreachable local endpoint so the test stays offline.
     expect((await adminClient.get("/api/voice/catalog")).status).toBe(503);

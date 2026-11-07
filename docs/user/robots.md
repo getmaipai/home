@@ -57,7 +57,7 @@ The **Voice** row on the **This robot** card decides how the robot sounds.
 - **Use the companion's voice** is the default. That is the voice an admin picked for the companion on the Companions page. If none was picked, it is Home's default voice.
 - Pick any voice from the list to give this one robot its own voice. It wins over the companion's voice.
 
-A robot set to child or teen always uses a built-in voice, never a voice made from a recording.
+A robot set to child or teen can use any voice in the list, including a voice made from a recording. Everything it says still follows the same safety rules for a child or teen.
 
 To rename a voice you made, open **Settings, Voices**, find the voice, and choose **Rename**.
 

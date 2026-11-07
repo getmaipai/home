@@ -276,15 +276,36 @@ describe("clonedVoiceUrl()", () => {
 import { householdVoiceEntries, householdVoiceSpeech } from "@/lib/clonedVoices";
 
 describe("making a voice (VOICES-04)", () => {
-  test("only an owner or an admin can make one: a member, teen and child get 403 and nothing is stored", () => {
-    for (const role of ["adult", "teen", "child"]) {
-      const result = saveClonedVoice(makePerson(`P${role}`, role), "Nope", WAV_BYTES, "audio/wav");
-      expect(result).toEqual({ ok: false, status: 403, error: "Only an owner or an admin can make a voice." });
-    }
+  test("every member can make one (AUDIO-PARITY-01 V4); a guest gets 403 and nothing is stored", () => {
+    const refused = saveClonedVoice(makePerson("Pguest", "guest"), "Nope", WAV_BYTES, "audio/wav");
+    expect(refused).toMatchObject({ ok: false, status: 403 });
     expect(listClonedVoices()).toHaveLength(0);
     expect(existsSync(clonedVoicesDir) ? readdirSync(clonedVoicesDir) : []).toHaveLength(0);
-    expect(saveClonedVoice(makePerson("Mara", "admin"), "Ok", WAV_BYTES, "audio/wav").ok).toBe(true);
-    expect(saveClonedVoice(makePerson("Jess", "owner"), "Ok too", WAV_BYTES, "audio/wav").ok).toBe(true);
+    for (const role of ["owner", "admin", "adult", "teen", "child"]) {
+      expect(saveClonedVoice(makePerson(`P${role}`, role), `Voice ${role}`, WAV_BYTES, "audio/wav").ok).toBe(true);
+    }
+    expect(listClonedVoices()).toHaveLength(5);
+  });
+
+  test("liveliness and pitch are owner and admin controls (rule 8): a member, teen or child asking for them is refused", () => {
+    for (const role of ["adult", "teen", "child"]) {
+      const person = makePerson(`Q${role}`, role);
+      expect(saveClonedVoice(person, "X", WAV_BYTES, "audio/wav", { temperature: 1 })).toMatchObject({ ok: false, status: 400 });
+      expect(saveClonedVoice(person, "X", WAV_BYTES, "audio/wav", { pitchSemitones: 1 })).toMatchObject({ ok: false, status: 400 });
+    }
+    expect(listClonedVoices()).toHaveLength(0);
+    expect(saveClonedVoice(makePerson("Mara", "admin"), "Ok", WAV_BYTES, "audio/wav", { temperature: 1, pitchSemitones: 1 }).ok).toBe(true);
+  });
+
+  test("the creation log line carries the maker's role and settings, never a person id, a voice id or a name (rule 6a)", () => {
+    const child = makePerson("Poppy", "child");
+    const saved = saveClonedVoice(child, "Poppy secret name", WAV_BYTES, "audio/wav");
+    if (!saved.ok) throw new Error("setup failed");
+    const text = readFileSync(join(logsDir, "hub.log"), "utf8");
+    expect(text).toContain("voice.created role=child");
+    expect(text).not.toContain(saved.value.id);
+    expect(text).not.toContain(child.id);
+    expect(text).not.toContain("Poppy");
   });
 
   test("temperature and pitch are kept and listed; without them both keys are absent", () => {

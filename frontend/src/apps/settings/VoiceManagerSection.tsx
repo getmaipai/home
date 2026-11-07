@@ -24,7 +24,7 @@ const isEngineVoice = (voice: Pick<StackVoice, "id">) => presetNameForVoice(voic
 const isHomeDefault = (voice: StackVoice, homeDefault: string) => homeDefault === "default" ? isEngineVoice(voice) : voice.id === homeDefault || presetNameForVoice(voice.id, [homeDefault]) === homeDefault;
 
 /** Home settings, Voices (owner and admin): every voice Home can speak with, where it came from, who can hear it, which one is Home's default,
- * and the way to add one made from a recording. */
+ * and the way to add one made from a recording. A parent or admin sees, listens to and deletes any voice here, a minor's included. */
 export function VoiceManagerSection() {
   const queryClient = useQueryClient();
   const voicesQuery = useQuery({ queryKey: ["stack-voices"], queryFn: api.stackVoices });

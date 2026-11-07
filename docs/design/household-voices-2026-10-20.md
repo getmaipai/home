@@ -1,9 +1,13 @@
 # Voices made at home (2026-10-20)
 
+**Amended 2026-11-05 (AUDIO-PARITY-01 V4, `Owner-approved: 2026-11-05`).** Jesse ruled "Voice cloning for everyone is fine", then "everyone means
+everyone not just adult". Decision 7 and the minor rule below are replaced as marked; the rest of this note stands. See
+[audio-parity-2026-11-05.md](audio-parity-2026-11-05.md) (V4).
+
 Design note for the minimum of VOICES-02, VOICES-03 and VOICES-04. Owner ruling (Jesse, 2026-10-18): "Admin can create a voice
 with whatever they want, no limitations." Rules in [RULES.md](RULES.md) govern; nothing here asks for a rule change (age and surface
-gates outrank everything: a child or teen never lists, picks or hears a clip voice, and the text floors apply to everything any
-voice says).
+gates outrank everything: ~~a child or teen never lists, picks or hears a clip voice~~ (replaced 2026-11-05: every member but a guest may make, list, hear
+and pick a clip voice), and the text floors apply to everything any voice says).
 
 ## What it is
 
@@ -33,10 +37,15 @@ the installed model and ignores all of it.
 5. **The clip tokenizer** (S3TokenizerV2, 495 MB, `mlx-community/S3TokenizerV2` at one commit, sha256 pinned) is fetched on the first
    clip voice, not with the first-run plan, so a household that never makes a voice never pays the disk. The engine loads it
    lazily and says so in `/health` (`cloning`).
-6. **Audit.** One line in the hub log per voice made or removed: who, their role, the settings; never the voice's name or the
+6. **Audit.** One line in the hub log per voice made, renamed or removed: the maker's role and the settings (2026-11-05: no person id and no voice id, rule 6a); never the voice's name or the
    clip. The hub has no household audit event type yet (SETTINGS-AUDIT-01 is the open row that would add one).
-7. **Role gate.** `POST /api/voice/cloned` answers 403 to anyone but an owner or admin. Selecting a voice (`/cloned/:id/select`),
-   previewing one and the voice list are adult-only for clip voices.
+7. **Role gate (replaced 2026-11-05).** `POST /api/voice/cloned` answers 403 to a guest only; an owner, admin, member, teen and child make a voice.
+   Selecting a voice (`/cloned/:id/select`), previewing one and the voice list are open to every member but a guest. A child still does not
+   choose their own voice (`assertCanSetTtsVoice`: a parent does, and a parent may now choose a clip voice for a child). Liveliness
+   (temperature) and pitch at creation are owner and admin only (rule 8): anyone else sending them gets 400. A parent or admin sees every
+   voice with who made it in the Voices manager, can Test it and Delete it (a maker deletes their own); the voice only, never other settings.
+   A robot speaks the voice chosen on the robot, whatever the controls level, under the same text floors. The audit line (decision 6) no longer carries a person id.
+   Open: a temporary chat's reply read aloud (`/api/tts` with a `turn_id`, through `voiceForTurn`) or a spoken temporary turn still speaks the person's chosen voice, a clip voice included. Temporary chat is adults-only (`canHaveTemporaryChat`), so no minor reaches it; a backlog row is still to be filed.
 
 ## Pitch, same as the robot
 
@@ -63,6 +72,6 @@ default install should bring several voices to choose from.
   liveliness and pitch, Source, Gender, Language), Test, Set as default, Delete (custom voices only, after a confirmation), and an Add voice
   dialog. The personal choosers (Account, Voice and the Voices page) stay as the one-dropdown choice for a person.
 - Home's default voice is the household setting `tts.home_voice` (commons `spec-v0.1.200`, admin to write). A person or robot with no choice of
-  their own speaks it; a child or teen never speaks a clip voice, so they get the engine's built-in voice when the default is one.
+  their own speaks it, a child or teen included (replaced 2026-11-05; a guest gets the engine's built-in voice when the default is a clip voice).
 - The first choice of every personal list is that default voice shown by its own name with "(Home's default)". The engine's built-in voice has no
   name of its own yet and reads "Built-in voice"; naming it and installing the starter set stay open under VOICES-09 and VOICES-02.

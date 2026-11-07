@@ -202,17 +202,17 @@ describe("a companion never loosens who may approve an action", () => {
   });
 });
 
-describe("a child or teen robot never speaks a clip voice", () => {
-  test("the robot's voice follows the household default at adult controls and falls back to the built-in voice at child and teen", async () => {
+describe("a child or teen robot may speak a clip voice (AUDIO-PARITY-01 V4)", () => {
+  test("the robot's voice follows the household default at every controls level", async () => {
     const { owner, row, deviceId, scope } = await setup();
     setHouseholdSettingValue("tts.home_voice", "voice-abcdefghijklmnop");
     await put(owner, scope, "robot.controls", "adult");
     await put(owner, scope, "robot.companion.id", "lively-adult");
     expect(voiceForSpeech({ actor: row, deviceId })).toBe("voice-abcdefghijklmnop");
     await put(owner, scope, "robot.controls", "teen");
-    expect(voiceForSpeech({ actor: row, deviceId })).not.toBe("voice-abcdefghijklmnop");
+    expect(voiceForSpeech({ actor: row, deviceId })).toBe("voice-abcdefghijklmnop");
     await put(owner, scope, "robot.controls", "child");
-    expect(voiceForSpeech({ actor: row, deviceId })).not.toBe("voice-abcdefghijklmnop");
+    expect(voiceForSpeech({ actor: row, deviceId })).toBe("voice-abcdefghijklmnop");
   });
 });
 
@@ -236,9 +236,9 @@ describe("a robot's voice order", () => {
     // Back to "use the companion's voice".
     expect(setValue(row, scope, "robot.voice.id", "default").ok).toBe(true);
     expect(voiceForSpeech({ actor: row, deviceId })).toBe("voice-cccccccccccccccc");
-    // A child robot never speaks a clip voice, even the companion's.
+    // A child robot may speak the companion's clip voice too (the text floors, not the voice, protect the child).
     await put(owner, scope, "robot.controls", "child");
-    expect(voiceForSpeech({ actor: row, deviceId })).not.toBe("voice-cccccccccccccccc");
+    expect(voiceForSpeech({ actor: row, deviceId })).toBe("voice-cccccccccccccccc");
   });
   test("each installed companion has its own household voice setting, and an admin can set it", async () => {
     const { owner } = await setup();

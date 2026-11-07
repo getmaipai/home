@@ -17,7 +17,7 @@ import { clonedVoicesDir, ensureDataDir } from "@/lib/paths";
 import { newClonedVoiceId } from "@/lib/id";
 import { selfBaseUrl } from "@/lib/selfUrl";
 import { isRemoteStackSelected } from "@/lib/stackEngine";
-import { isOwnerOrAdmin } from "@/lib/access";
+import { isOwnerOrAdmin, mayUseClipVoices } from "@/lib/access";
 import { clearMatchingValues } from "@/lib/settings";
 import { companionVoiceSettingsKeys } from "@/settings/companionVoiceKeys";
 import type { PersonRow } from "@/types";
@@ -101,8 +101,8 @@ export function saveClonedVoice(
   mimeType: string,
   options: HouseholdVoiceOptions = {},
 ): ClonedVoiceOpResult<ClonedVoiceInfo> {
-  // VOICES-04: making a voice is for an owner or an admin, with no other limit (SAFETY.md, owner-approved 2026-10-18).
-  if (!isOwnerOrAdmin(creator)) return { ok: false, status: 403, error: "Only an owner or an admin can make a voice." };
+  // AUDIO-PARITY-01 V4 (owner-approved 2026-11-05): every member makes a voice; a guest does not (SAFETY.md).
+  if (!mayUseClipVoices(creator)) return { ok: false, status: 403, error: "A guest cannot make a voice. Ask the person who manages Home to add you as a member first." };
   const trimmedLabel = label.trim();
   if (!trimmedLabel) return { ok: false, status: 400, error: "label is required" };
   if (trimmedLabel.length > MAX_LABEL_LENGTH) return { ok: false, status: 400, error: `The name can be ${MAX_LABEL_LENGTH} characters or fewer.` };
@@ -115,6 +115,8 @@ export function saveClonedVoice(
   if (!extension || !NEW_VOICE_EXTENSIONS.has(extension)) return { ok: false, status: 400, error: "Use a WAV, MP3 or FLAC recording. Save it in one of those formats and choose it again." };
   const temperature = options.temperature ?? null;
   const pitchSemitones = options.pitchSemitones ?? null;
+  // Rule 8: liveliness and pitch are owner and admin controls; a minor's or a member's voice always uses the engine's defaults.
+  if (!isOwnerOrAdmin(creator) && (temperature !== null || pitchSemitones !== null)) return { ok: false, status: 400, error: "Liveliness and pitch can only be set by the person who manages Home. Make the voice without them." };
   if (temperature !== null && !inRange(temperature, TEMPERATURE_RANGE)) return { ok: false, status: 400, error: "The sampling temperature must be a number from 0.1 to 2.0." };
   if (pitchSemitones !== null && !inRange(pitchSemitones, PITCH_RANGE)) return { ok: false, status: 400, error: "The pitch offset must be a number from -12 to 12 semitones." };
 
@@ -153,8 +155,8 @@ export function saveClonedVoice(
     }
     throw err;
   }
-  // One audit line: who made it and with which settings; never the person's name, the voice's name or the clip.
-  appendLogLine(`voice.created id=${id} by=${creator.id} role=${creator.role} temperature=${temperature ?? "default"} pitch=${pitchSemitones ?? 0}`);
+  // One audit line: the role of the maker and the settings; never a person id or name, a voice id, the voice's name or the clip (rule 6a).
+  appendLogLine(`voice.created role=${creator.role} temperature=${temperature ?? "default"} pitch=${pitchSemitones ?? 0}`);
   void transcribeClonedVoiceOnce(id, bytes, mimeType).catch(() => {});
   return { ok: true, value: toInfo(row, creator.displayName) };
 }
@@ -170,7 +172,7 @@ export function renameClonedVoice(actor: PersonRow, id: string, label: string): 
   const row = db.select().from(clonedVoices).where(eq(clonedVoices.id, id)).get();
   if (!row) return { ok: false, status: 404, error: "cloned voice not found" };
   db.update(clonedVoices).set({ label: trimmed }).where(eq(clonedVoices.id, id)).run();
-  appendLogLine(`voice.renamed id=${id} by=${actor.id} role=${actor.role}`);
+  appendLogLine(`voice.renamed role=${actor.role}`);
   const creator = db.select({ name: people.displayName }).from(people).where(eq(people.id, row.creatorId)).get();
   return { ok: true, value: toInfo({ ...row, label: trimmed }, creator?.name ?? "Someone") };
 }
@@ -207,7 +209,7 @@ export function deleteClonedVoice(actor: PersonRow, id: string): ClonedVoiceOpRe
   clearMatchingValues("robot.voice.id", id);
   clearMatchingValues("tts.home_voice", id);
   for (const key of companionVoiceSettingsKeys()) clearMatchingValues(key.key, id);
-  appendLogLine(`voice.deleted id=${id} by=${actor.id} role=${actor.role}`);
+  appendLogLine(`voice.deleted role=${actor.role}`);
   const filePath = join(clonedVoicesDir, row.fileName);
   try {
     if (existsSync(filePath)) unlinkSync(filePath);
