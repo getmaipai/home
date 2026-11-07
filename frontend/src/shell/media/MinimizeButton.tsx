@@ -17,9 +17,9 @@ export function MinimizeButton({ appHome }: { appHome: string }) {
   const navigate = useNavigate();
   const MinimizeIcon = getIcon("minimize");
   return (
-    <span className="inline-flex">
+    <span className="inline-flex" data-slot="media-minimize">
     <Button type="button" variant="ghost" size="sm" aria-label={i18n._({ id: "Minimize to the mini player", message: "Minimize to the mini player" })} title={i18n._({ id: "Minimize: keep playing in the mini player", message: "Minimize: keep playing in the mini player" })} onClick={() => { if (cameFromWithinTheApp()) navigate(-1); else navigate(appHome); }}>
-      <MinimizeIcon aria-hidden="true" />{i18n._({ id: "Minimize", message: "Minimize" })}</Button>
+      <MinimizeIcon aria-hidden="true" /><span className="max-sm:sr-only">{i18n._({ id: "Minimize", message: "Minimize" })}</span></Button>
     </span>
   );
 }

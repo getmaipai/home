@@ -53,6 +53,7 @@ const musicRow: AppRow = {
   incognito: "unaffected",
 };
 const musicIndexPage = { type: "page", id: "index", title: "Music", body: [{ type: "empty_state", icon: "music", text: "No music yet." }] };
+const musicStationPage = { type: "page", id: "station", title: "Station", body: [{ type: "empty_state", icon: "radio", text: "Live radio station." }] };
 const mediaPageFiles = ["videos", "music", "shows", "podcasts", "books"] as const;
 const mediaIndexes = Object.fromEntries(mediaPageFiles.map((packageId) => [
   packageId,
@@ -79,6 +80,7 @@ beforeEach(() => {
     if (url.startsWith("/api/plugins/demo/pages/index")) return Promise.resolve(rows.length ? Response.json(indexPage) : Response.json({ error: "no such app" }, { status: 404 }));
     if (url.startsWith("/api/plugins/demo/pages/week")) return Promise.resolve(Response.json(weekPage));
     if (url.startsWith("/api/plugins/music/pages/index")) return Promise.resolve(Response.json(musicIndexPage));
+    if (url.startsWith("/api/plugins/music/pages/station")) return Promise.resolve(Response.json(musicStationPage));
     if (url.startsWith("/api/plugins/news/pages/story")) return Promise.resolve(Response.json(newsStoryPage));
     if (url.startsWith("/api/plugins/news/data/story")) { calls.push(String(init?.body)); return Promise.resolve(Response.json({ as_of: "x", blocks: [] })); }
     if (url.startsWith("/api/plugins/other/pages/")) return Promise.resolve(Response.json({ error: "no such app" }, { status: 404 }));
@@ -136,6 +138,13 @@ describe("an app that declares a settings area", () => {
 });
 
 describe("a package app at /apps/<id>", () => {
+  test("a music station keeps the phone section navigation", async () => {
+    rows = [{ ...musicRow, sections: [{ page: "station", label: "Radio", icon: null }] }];
+    const view = open("/apps/music/station", 402);
+    await view.findByText("Live radio station.");
+    expect(view.container.querySelector('[data-slot="phone-nav"]')).not.toBeNull();
+  });
+
   test("opens, draws its page from schema data and keeps the permanent rail", async () => {
     const view = open("/apps/demo");
     await waitFor(() => expect(view.container.querySelector('[data-slot="weather-card"]')).not.toBeNull());

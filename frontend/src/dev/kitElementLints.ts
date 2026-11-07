@@ -623,6 +623,9 @@ export function cssOverrideFindings(src: string, overrides?: Record<string, stri
   const files = overrides ? Object.keys(overrides) : frontendCssFiles(src);
   return files.flatMap((rel) =>
     cssRules(overrides?.[rel] ?? readFileSync(join(src, rel), "utf8")).flatMap((rule) => {
+      // These two shell-level offsets reserve room for Home's own fixed mini player and floating navigation.
+      // The selectors also name the kit nav and rail body, so scope this allowlist to the exact clearance rules.
+      if (rel === "shell/tokens.css" && (rule.selector === 'html:has([data-slot="phone-nav"]) [data-slot="global-mini-player"]' || rule.selector === 'html:has([data-slot="phone-nav"]):has([data-slot="global-mini-player"]) [data-slot="rail-body"]')) return [];
       const part = kitPartInSelector(rule.selector, homeSlots);
       const properties = [...new Set(rule.properties.filter((p) => !p.startsWith("--") && FORBIDDEN_CSS_PROPERTY.test(p)))];
       return part && properties.length ? [{ file: rel, selector: rule.selector, part, line: rule.line, properties }] : [];

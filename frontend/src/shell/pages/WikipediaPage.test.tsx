@@ -44,6 +44,7 @@ describe("Wikipedia app", () => {
 
   test("the home screen has the search box, Home and Explore, a Random article button, picture picks and the attribution line", async () => {
     const view = mount();
+    expect(view.container.querySelectorAll("[data-header-flat]")).toHaveLength(1);
     expect(await view.findByRole("search")).toBeTruthy();
     expect(view.getByRole("button", { name: "Home" }).getAttribute("aria-pressed")).toBe("true");
     expect(view.getByRole("button", { name: "Explore" })).toBeTruthy();
@@ -55,6 +56,7 @@ describe("Wikipedia app", () => {
   test("an article draws through the reader with the app's own home in the breadcrumb, and it is remembered under Recent", async () => {
     const view = mount(`/wikipedia/a/${encodeURIComponent("wikipedia_en_all_maxi_2026-09")}/Aurora`);
     expect(await view.findByText("Lights in the sky.")).toBeTruthy();
+    expect(view.container.querySelectorAll("[data-header-flat]")).toHaveLength(0);
     expect(document.querySelector('nav[aria-label="Breadcrumb"]')?.textContent).toContain("Wikipedia");
     await waitFor(() => expect(window.sessionStorage.getItem("maipai.wikipedia.recent")).toContain("Aurora"));
   });

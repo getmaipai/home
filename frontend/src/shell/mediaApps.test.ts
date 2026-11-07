@@ -1,5 +1,13 @@
 import { describe, expect, test } from "bun:test";
-import { playIsAlreadyOpen, playRoute } from "@/shell/mediaApps";
+import { isMediaPlayPage, playIsAlreadyOpen, playRoute } from "@/shell/mediaApps";
+
+describe("isMediaPlayPage", () => {
+  test("only pages with their own player are media play pages", () => {
+    expect(isMediaPlayPage("music", "station")).toBe(false);
+    expect(isMediaPlayPage("music", "play")).toBe(true);
+    expect(isMediaPlayPage("videos", "watch")).toBe(true);
+  });
+});
 
 describe("playIsAlreadyOpen", () => {
   const to = playRoute("station", "st-1")!;

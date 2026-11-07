@@ -23,6 +23,9 @@ describe("MinimizeButton", () => {
   test("is a labelled button on a play page", () => {
     const view = render(<MemoryRouter><MinimizeButton appHome="/apps/music" /></MemoryRouter>);
     const button = view.getByRole("button", { name: "Minimize to the mini player" });
+    expect(button.parentElement).toHaveAttribute("data-slot", "media-minimize");
+    expect(button.querySelector(".max-sm\\:sr-only")?.textContent).toBe("Minimize");
+    expect(button.getAttribute("aria-label")).toBe("Minimize to the mini player");
     expect(button.textContent).toContain("Minimize");
     expect(() => fireEvent.click(button)).not.toThrow();
   });

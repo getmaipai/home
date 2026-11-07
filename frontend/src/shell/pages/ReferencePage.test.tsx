@@ -39,6 +39,7 @@ describe("Reference reader", () => {
 
   test("library home lists the readable book and its snapshot metadata", async () => {
     const view = mount();
+    expect(view.container.querySelectorAll("[data-header-flat]")).toHaveLength(1);
     expect(await view.findByText("English Wikipedia")).toBeTruthy();
     expect(view.getByText(/2 MB/)).toBeTruthy();
     expect(view.getByText(/2026-09-01/)).toBeTruthy();
@@ -54,6 +55,7 @@ describe("Reference reader", () => {
 
   test("renders every closed block and internal links while leaving outside links plain", async () => {
     const view = mount("/reference/wiki_en/A/Moon");
+    expect(view.container.querySelectorAll("[data-header-flat]")).toHaveLength(1);
     expect(await view.findByRole("heading", { name: "History" })).toBeTruthy();
     expect(view.getByText("Plain", { exact: false })).toBeTruthy();
     expect(view.getByText("One")).toBeTruthy();

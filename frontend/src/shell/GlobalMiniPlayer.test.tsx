@@ -3,6 +3,14 @@ import { describe, expect, test } from "bun:test";
 import { onPlayPageOf } from "@/shell/GlobalMiniPlayer";
 import { clock } from "@/shell/media/NowPlayingStage";
 import { analyserFor } from "@/lib/media/audioGraph";
+import { cleanup, render } from "@testing-library/react";
+import { MemoryRouter } from "react-router-dom";
+import { QueryClientProvider } from "@tanstack/react-query";
+import { TooltipProvider } from "@maipai/ui/src/ui/tooltip";
+import { ToastProvider } from "@maipai/ui/src/primitives/Toast";
+import { createQueryClient } from "@maipai/ui/src/queryClient";
+import { GlobalMiniPlayer } from "@/shell/GlobalMiniPlayer";
+import { MediaDockContext } from "@/shell/mediaHost";
 import type { HoistedMedia } from "@/shell/mediaHost";
 
 const held = (appId: string, id: string) => ({ appId, id, src: "/s", kind: "audio", title: "T", el: document.createElement("audio"), started: true }) as HoistedMedia;
@@ -17,6 +25,13 @@ describe("onPlayPageOf", () => {
     expect(onPlayPageOf(held("music", "m1"), "/chat", "", undefined)).toBe(false);
     expect(onPlayPageOf(held("books", "b1"), "/apps/books/listen", "", undefined)).toBe(true);
   });
+});
+
+test("mini player keeps its clearance slot", () => {
+  const current = held("music", "m1");
+  const view = render(<QueryClientProvider client={createQueryClient()}><TooltipProvider><ToastProvider><MemoryRouter><MediaDockContext.Provider value={{ current, clear: () => {}, next: async () => {} }}><GlobalMiniPlayer /></MediaDockContext.Provider></MemoryRouter></ToastProvider></TooltipProvider></QueryClientProvider>);
+  expect(view.container.querySelector('[data-slot="global-mini-player"]')).not.toBeNull();
+  cleanup();
 });
 
 describe("stage clock", () => {

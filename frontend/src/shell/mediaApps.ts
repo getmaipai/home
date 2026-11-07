@@ -53,6 +53,8 @@ export function playPageOf(app: string): string | null {
 }
 
 export function isMediaPlayPage(app: string, page: string): boolean {
+  // Radio's station page hosts playback in the shell's global mini player, not in the page itself.
+  if (app === "music" && page === "station") return false;
   return page === playPageOf(app) || (app === "books" && page === "read") || Object.values(MEDIA_APP_FOR_KIND).some((target) => target.app === app && target.page === page);
 }
 

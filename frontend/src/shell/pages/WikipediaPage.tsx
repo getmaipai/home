@@ -159,7 +159,7 @@ export function WikipediaPage({ person }: { person?: Roster } = {}) {
 
   return (
     <Page title={i18n._({ id: "Wikipedia", message: "Wikipedia" })} hideTitle>
-      <div className="flex min-h-0 flex-1" data-workspace-fill="">
+      <div className="flex min-h-0 flex-1" data-workspace-fill="" {...(!articleMatch ? { "data-header-flat": "" } : {})}>
       <SectionSidebar standalone density="compact" groups={[{ id: "wikipedia-sections", items: sectionItems }]} />
       <div className={`flex min-h-0 min-w-0 flex-1 flex-col gap-5 overflow-y-auto ${articleMatch ? "pb-4" : "p-4"}`}>
         {booksQuery.isPending ? <p role="status">{i18n._({ id: "Opening Wikipedia…", message: "Opening Wikipedia…" })}</p> : null}

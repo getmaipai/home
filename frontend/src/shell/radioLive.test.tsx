@@ -78,7 +78,7 @@ describe("station helpers", () => {
 
   test("a station plays on its own page, and the bar stays up there because the page has no player", () => {
     expect(playRoute("station", "source-abc123")).toBe("/apps/music/station?id=source-abc123");
-    expect(isMediaPlayPage("music", "station")).toBe(true);
+    expect(isMediaPlayPage("music", "station")).toBe(false);
     expect(isMediaPlayPage("music", "radio")).toBe(false);
     expect(onPlayPageOf(held(STREAM, ""), "/apps/music/station", "?id=source-abc123", undefined)).toBe(false);
   });

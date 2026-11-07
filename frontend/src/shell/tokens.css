@@ -664,6 +664,24 @@ body {
   overscroll-behavior-y: none;
 }
 
+@media (max-width: 639.98px) {
+  html:has([data-slot="phone-nav"]) [data-slot="global-mini-player"] {
+    bottom: calc(5rem + env(safe-area-inset-bottom));
+  }
+  html:has([data-slot="phone-nav"]):has([data-slot="global-mini-player"]) [data-slot="rail-body"] {
+    padding-bottom: 9rem;
+  }
+  [data-slot="media-minimize"] {
+    position: fixed;
+    top: 0.75rem;
+    inset-inline-end: 0.75rem;
+    z-index: 45;
+    border-radius: 9999px;
+    background: color-mix(in srgb, var(--card) 85%, transparent);
+    box-shadow: var(--shadow-sm);
+  }
+}
+
 /* RAIL-01 (owner's layout, 2026-10-06): the rail layout's body scrolls
  * on its own under a fixed-height workspace. Chat (and the showcase's
  * thread) fill that body instead: no padding, no width cap, no page

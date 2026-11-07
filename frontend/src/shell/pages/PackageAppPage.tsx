@@ -29,6 +29,7 @@ import { PackageAppHeaderActions, PackageAppHeaderLeft, publishPackageAppHeader,
 import { PhoneNav } from "@maipai/ui/src/PhoneNav";
 import { MusicStudioPage, isStudioPage } from "@/shell/pages/MusicStudioPages";
 import { formatDate, formatTime } from "@/lib/format";
+import { useAppReading } from "@/shell/reader/useAppReading";
 import "./packageAppNews.css";
 
 
@@ -218,11 +219,7 @@ export function PackageAppPage({ person }: { person: Roster }) {
   // (packageAppNews.css) instead of under an empty bar.
   const readingStory = packageId === "news" && pageId === "story";
   const reading = inShellBar && readingStory;
-  useEffect(() => {
-    if (!reading) return;
-    document.documentElement.setAttribute("data-app-reading", "");
-    return () => document.documentElement.removeAttribute("data-app-reading");
-  }, [reading]);
+  useAppReading(reading);
   // Every package app reads its query as page state, so a reload or a shared link opens the same item.
   const urlState = packageId !== "";
   const queryState = useMemo<Record<string, string>>(() => (urlState ? Object.fromEntries(new URLSearchParams(location.search)) : {}), [urlState, location.search]);
