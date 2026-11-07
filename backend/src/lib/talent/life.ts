@@ -45,14 +45,14 @@ function memoryDate(value: string | null | undefined, end = false): string | nul
   return Number.isNaN(parsed.getTime()) || parsed.getFullYear() !== year || parsed.getMonth() + 1 !== month || parsed.getDate() !== day ? value : parsed.toISOString();
 }
 
-export function rememberBeat(synthId: string, actor: PersonRow, beat: { text: string; category: string; tier: string; source: string; valid_from?: string | null; valid_to?: string | null; importance?: number }): MemoryOpResult<MemoryRecord> {
+export function rememberBeat(synthId: string, actor: PersonRow, beat: { text: string; category: string; tier: string; source: string; valid_from?: string | null; valid_to?: string | null; importance?: number; fact_confidence?: number | null; confidence_evidence?: Array<{ source: string; at: string; kind: string }> }): MemoryOpResult<MemoryRecord> {
   const synth = synthById(synthId);
   if (!synth || !synthPersona(synth)) return { ok: false, status: 404, error: "That synth is not here anymore." };
   if (actor.id !== synth.owner_person_id && actor.role !== "owner" && actor.role !== "admin") return { ok: false, status: 403, error: "Only the synth's maker or an admin can change its life." };
   if (evaluateReply({ text: beat.text }, synthFloor(synth)).effective.action === "refuse") {
     return { ok: false, status: 422, error: "That line is not suitable for this synth's audience, so it was not saved." };
   }
-  return remember(actor, { text: beat.text, category: beat.category, tier: beat.tier, scope: "companion", companion_id: synthId, source: beat.source, importance: beat.importance ?? 0.5, child_disclosure: disclosure(synth), valid_from: memoryDate(beat.valid_from), valid_to: memoryDate(beat.valid_to, true) });
+  return remember(actor, { text: beat.text, category: beat.category, tier: beat.tier, scope: "companion", companion_id: synthId, source: beat.source, importance: beat.importance ?? 0.5, child_disclosure: disclosure(synth), valid_from: memoryDate(beat.valid_from), valid_to: memoryDate(beat.valid_to, true), fact_confidence: beat.fact_confidence, confidence_evidence: beat.confidence_evidence });
 }
 
 registerCompanionReadGate((actor, id) => { const synth = synthById(id); return !!synth && maySeeSynth(actor, synth); });
@@ -83,7 +83,10 @@ export async function writeOrigin(synth: SynthRecord, actor: PersonRow, complete
 }
 
 export function activeBeats(synthId: string, actor: PersonRow, now = new Date()): MemoryRecord[] {
-  return list(actor, { scope: "companion", companionId: synthId, asOf: now }).filter((record) => {
+  const synth = synthById(synthId);
+  const own = list(actor, { scope: "companion", companionId: synthId, asOf: now });
+  const inheritedResearch = synth?.forked_from ? list(actor, { scope: "companion", companionId: synth.forked_from, asOf: now }).filter((record) => record.source.startsWith("talent.research")) : [];
+  return [...own, ...inheritedResearch].filter((record) => {
     const from = record.valid_from ? Date.parse(record.valid_from) : NaN;
     const to = record.valid_to ? Date.parse(record.valid_to.length === 10 ? `${record.valid_to}T23:59:59.999` : record.valid_to) : NaN;
     return (Number.isNaN(from) || from <= now.getTime()) && (Number.isNaN(to) || to >= now.getTime());

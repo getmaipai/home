@@ -1296,6 +1296,20 @@
       "when": 1794540008001,
       "tag": "0185_inspired_base",
       "breakpoints": true
+    },
+    {
+      "idx": 186,
+      "version": "6",
+      "when": 1794092425987,
+      "tag": "0186_memory_confidence",
+      "breakpoints": true
+    },
+    {
+      "idx": 187,
+      "version": "6",
+      "when": 1794092435838,
+      "tag": "0187_talent_research_runs",
+      "breakpoints": true
     }
   ]
 }

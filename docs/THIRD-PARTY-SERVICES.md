@@ -65,3 +65,11 @@ Pressing Play on a saved station makes the hub open that station's own address a
 | RADIO-03 | One GET of the station's stream address, asking for in-band song titles (`Icy-MetaData: 1`); no cookies, no referrer | None | A burst of six per station host, then one every five seconds (a Pause then Play connects again) | One station per person (a new Play replaces it), four at once in the home; at most four redirects, each one re-checked against the address guard; audio content types only; HLS is refused until RADIO-06 | The hub closes the station's connection when the listener leaves, pauses or switches; no answer in 10 seconds is an error the person sees |
 
 The song title the station sends stays in the hub's memory while the stream is open and is never stored or logged. This traffic is the same destination the person saved the station for; it is not listed as a platform connection because the person chose the address.
+
+## TALENT-14: public figure synth research
+
+When an adult creates or refreshes a real-person synth, Home asks its enabled adult web search sources for public material about the name in `based_on.name`. A first run can issue three queries; later runs issue one. The scheduled refresh is at most once per day per synth, and a household can make at most 20 research runs per local day. Every query goes through the existing search source limiter, page budget and backoff. The query contains only the public figure's name and, on a first run, the words `interview` or `speech transcript`. It carries no household identity, member name or conversation text. Search providers pass the query to the public engines they use under their existing service rules.
+
+| Backlog row | Request | Lifetime limit | Pace | Site limit | Stop rule |
+|---|---|---|---|---|---|
+| TALENT-14 | Public figure name; first run adds interview and speech transcript searches | At most one run per synth per day; 20 runs per household per local day | Existing shared web search limiter | At most 3 result pages per query and 9 per first run, subject to the shared host budget | The shared search path pauses on refusal or rate limit; no retry through a block |

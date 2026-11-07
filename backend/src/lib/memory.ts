@@ -210,6 +210,9 @@ export interface RememberInput {
   subject_id?: string | null;
   source: string;
   importance: number;
+  fact_confidence?: number | null;
+  confidence_evidence?: Array<{ source: string; at: string; kind: string }>;
+  skip_dedupe?: boolean;
   pinned?: boolean;
   sensitive?: boolean;
   /** NAT-07c: the judge's opening-thread withholding tag; it can only add withholding. */
@@ -248,6 +251,9 @@ export function remember(actor: PersonRow, input: RememberInput): MemoryOpResult
     subjectId: input.subject_id,
     source: input.source,
     importance: input.importance,
+    fact_confidence: input.fact_confidence,
+    confidence_evidence: input.confidence_evidence,
+    skipDedupe: input.skip_dedupe,
     pinned: input.pinned,
     sensitive: input.sensitive,
     offerWithheld: input.offer_withheld,
@@ -1140,6 +1146,9 @@ export interface SupersedeInput {
   sensitive?: boolean;
   offer_withheld?: boolean | null;
   source: string;
+  fact_confidence?: number | null;
+  confidence_evidence?: Array<{ source: string; at: string; kind: string }>;
+  allow_same_text?: boolean;
   /** The NEW record's own dated bounds (e.g. a dated state/trip fact
    * that happened to dedupe-match an existing similar record) - distinct
    * from SupersedeOptions.closeValidTo below, which is about the OLD
@@ -1208,8 +1217,12 @@ export function supersede(
     tier: input.tier ?? old.tier,
     scope: old.scope,
     person: old.person,
+    companion_id: old.companionId,
     subject_id: input.subject_id ?? old.subjectId ?? null,
     source: input.source,
+    fact_confidence: input.fact_confidence,
+    confidence_evidence: input.confidence_evidence,
+    skip_dedupe: input.allow_same_text,
     importance: input.importance ?? old.importance,
     pinned: input.pinned ?? old.pinned,
     sensitive: input.sensitive ?? old.sensitive,

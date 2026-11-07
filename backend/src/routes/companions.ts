@@ -38,8 +38,9 @@ import { activeTakeRun, cancelTakeRun, companionHasTakeRun, publicTakeRun, start
 import { clipPromptPack, picturePromptPack } from "@/lib/companionPromptPack";
 import { portraitPath, readRetainedPortrait, retainCompanionPortrait } from "@/lib/companionPortrait";
 import { checkFinishedAssets, type FinishedAsset } from "@/lib/pictures/finishedCheck";
-import { forkSynth, getSynth, shareFork, synthById, maySeeSynth } from "@/lib/synths";
+import { createSynth, forkSynth, getSynth, shareFork, synthById, maySeeSynth } from "@/lib/synths";
 import { activeBeats, rememberBeat } from "@/lib/talent/life";
+import { isResearchingSynth, researchSince, researchSynth } from "@/lib/talent/researcher";
 import { forgetByIds, list as listMemory } from "@/lib/memory";
 import { checkCompanionArt, collectLiveAssets } from "@/lib/companionArtCheck";
 import { extractKeyframes } from "@/lib/pictures/keyframes";
@@ -80,6 +81,7 @@ const Detail = Card.extend({
   about: z.string(), pronouns: z.string().nullable(), interests: z.array(z.string()), examples: z.array(z.string()),
   voice_value: z.string().describe("The voice id the page previews through /api/voice/voices/{id}/preview."), voice_is_own: z.boolean(), voice_setting: z.string().nullable(),
   used_by: z.object({ people: z.array(z.object({ id: z.string(), name: z.string() })), robots: z.array(z.object({ id: z.string(), name: z.string() })) }).nullable(),
+  researching: z.boolean(),
 });
 
 function companionCounts(personId: string, companionId: string) {
@@ -251,7 +253,7 @@ companionsRoutes.openapi(detailRoute, (c) => {
   const persona = found && mayUseCompanion(person, found) ? found : found ? null : draftPersonaFor(person, id, isOwnerOrAdmin(person));
   if (!persona) return c.json({ error: "No such companion" }, 404);
   const detail = companionDetail(person, persona, isOwnerOrAdmin(person));
-  return c.json({ ...detail, ...companionCounts(person.id, detail.id), can_edit: detail.is_household && mayEdit(person, detail.id), can_copy: speakerAgeBand(person, new Date()) === "adult" || isOwnerOrAdmin(person), synth: synthSummary(person, detail.id) }, 200);
+  return c.json({ ...detail, ...companionCounts(person.id, detail.id), can_edit: detail.is_household && mayEdit(person, detail.id), can_copy: speakerAgeBand(person, new Date()) === "adult" || isOwnerOrAdmin(person), synth: synthSummary(person, detail.id), researching: !!synth && isResearchingSynth(synth.id) }, 200);
 });
 
 const activityRow = z.object({ id: z.string(), kind: z.string(), title: z.string(), state: z.string(), created_at: z.string(), updated_at: z.string(), conversation_id: z.string().nullable().optional(), placement: z.enum(["chat", "side"]).optional(), waiting_reason: z.string().nullable().optional(), progress: z.string().max(200).nullable().optional(), result_ref: z.string().nullable().optional(), needs_you: z.boolean().optional() });
@@ -282,6 +284,18 @@ companionsRoutes.openapi(lifeRoute, (c) => {
   if (!synth) return c.json({ error: "That synth is not here anymore." }, 404);
   const beats = activeBeats(id, actor).sort((a, b) => b.created_at.localeCompare(a.created_at)).map((beat) => ({ id: beat.id, text: beat.text, at: beat.valid_from ?? beat.created_at, valid_from: beat.valid_from, valid_to: beat.valid_to, source: beat.source }));
   return c.json({ beats }, 200);
+});
+
+const researchRoute = createRoute({ method: "post", path: "/{id}/research", tags: ["Companions"], summary: "Refresh a synth's public history", middleware: [requireAuth] as const,
+  request: { params: idParamSchema("id", "moss") },
+  responses: { 200: { content: { "application/json": { schema: z.object({ facts: z.number(), views: z.number(), style: z.boolean(), skipped: z.string().nullable() }) } }, description: "Research result." }, ...errorResponses({ 401: "Not signed in", 403: "Only the owner or an admin can refresh a synth's history.", 404: "That synth could not be found. Check its ID and try again." }) },
+});
+companionsRoutes.openapi(researchRoute, async (c) => {
+  const actor = c.get("person"), synth = synthById(c.req.valid("param").id);
+  if (!synth) return c.json({ error: "That synth could not be found. Check its ID and try again." }, 404);
+  if (!isOwnerOrAdmin(actor)) return c.json({ error: "Only the owner or an admin can refresh a synth's history." }, 403);
+  const result = await researchSynth(synth, actor, { since: researchSince(synth.id) });
+  return c.json({ facts: result.facts, views: result.views, style: result.style, skipped: result.skipped }, 200);
 });
 
 const lifeBody = z.object({ text: z.string().min(1).max(200), date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).refine((value) => {
@@ -359,6 +373,10 @@ function normalizedFields(value: z.infer<typeof fields>) {
 }
 const idPath = idParamSchema("id", "hc-companion");
 const fieldsJson = { content: { "application/json": { schema: fields } } };
+const synthCreateFields = fields.extend({
+  based_on: z.object({ kind: z.enum(["none", "household_member", "real_person"]), person_id: z.string().nullable().optional(), name: z.string().max(120).nullable().optional(), refresh: z.enum(["1d", "7d"]).default("7d"), minor: z.boolean().default(false) }).optional(),
+  life: z.object({ enabled: z.boolean().default(true), seed: z.string().max(500).default("") }).optional(),
+});
 const companionValidationError = { content: { "application/json": { schema: z.object({ error: z.string(), fields: z.record(z.string(), z.string()).optional() }) } }, description: "Companion fields are invalid." };
 function mayEdit(actor: import("@/types").PersonRow, id: string): boolean { return isOwnerOrAdmin(actor) || householdCompanionAuthorId(id) === actor.id; }
 const bundledLookLine = "A bundled companion can't be changed. Make a copy to edit it.";
@@ -843,10 +861,17 @@ function allUseCounts(id: string) {
 }
 
 const createCompanionRoute = createRoute({ method: "post", path: "/", tags: ["Companions"], summary: "Create a household companion draft", middleware: [requireAuth] as const,
-  request: { body: fieldsJson }, responses: { 201: { content: { "application/json": { schema: z.object({ id: z.string() }) } }, description: "Draft created." }, 400: companionValidationError, ...errorResponses({ 401: "Not signed in", 403: "Only adults can make a companion." }) } });
-companionsRoutes.openapi(createCompanionRoute, (c) => {
+  request: { body: { content: { "application/json": { schema: synthCreateFields } } } }, responses: { 201: { content: { "application/json": { schema: z.object({ id: z.string(), researching: z.boolean().optional() }) } }, description: "Draft or synth created." }, 400: companionValidationError, ...errorResponses({ 401: "Not signed in", 403: "Only adults can make a companion.", 404: "A requested synth source could not be found." }) } });
+companionsRoutes.openapi(createCompanionRoute, async (c) => {
   const actor = c.get("person"), band = speakerAgeBand(actor, new Date()); if (!canMakeCompanion(actor)) return c.json({ error: COMPANION_BAND_LINE }, 403);
-  const result = createHouseholdCompanion(normalizedFields(c.req.valid("json")) as never, { display_name: actor.displayName, person_id: actor.id }, band === "teen" ? "teen" : "adult");
+  const input = c.req.valid("json");
+  if (input.based_on) {
+    const { based_on, life, ...personaFields } = input;
+    const made = await createSynth(actor, { persona: normalizedFields(personaFields) as never, based_on: based_on as never, life: life ?? { enabled: true, seed: "" } });
+    if (!made.ok) return c.json({ error: made.error }, made.status ?? 400);
+    return c.json({ id: made.value.id, ...(made.value.researching ? { researching: true } : {}) }, 201);
+  }
+  const result = createHouseholdCompanion(normalizedFields(input) as never, { display_name: actor.displayName, person_id: actor.id }, band === "teen" ? "teen" : "adult");
   if (!result.ok) return c.json({ error: result.error, ...(result.fields ? { fields: result.fields } : {}) }, 400);
   return c.json({ id: result.value.id }, 201);
 });

@@ -411,14 +411,22 @@ export const contextNode: Node<ContextInput, ContextOutput> = async (state, inpu
     const synth = !anonymous && !temporary ? getSynth(state.actor, state.persona.id) : null;
     if (synth) {
       const companionId = synth.id;
+      const baseResearch = synth.forked_from
+        ? listMemory(state.actor, { scope: "companion", companionId: synth.forked_from }).filter((record) => record.source.startsWith("talent.research"))
+        : [];
       // A synth with no life written yet costs the turn nothing: no card, no second recall.
-      if (listMemory(state.actor, { scope: "companion", companionId }).length > 0) {
+      if (listMemory(state.actor, { scope: "companion", companionId }).length > 0 || baseResearch.length > 0) {
         const cardText = synthCard(companionId, state.actor, now);
         if (cardText) items.push({ id: "synth-card", text: cardText, source: "profile", subjects: [], disclosure: "child_ok" });
         const beats = recall(state.actor, input.utterance, { scope: "companion", companionId, queryVector: recallVector, selfOnly: true, bumpUsage: false }).slice(0, 4);
         for (const match of beats) {
           const record = match.record;
           items.push({ id: `synth-${record.id}`, text: record.text, source: "profile", subjects: [], disclosure: record.child_disclosure ?? "adult_only" });
+        }
+        if (beats.length < 4 && synth.forked_from) {
+          const inherited = recall(state.actor, input.utterance, { scope: "companion", companionId: synth.forked_from, queryVector: recallVector, selfOnly: true, bumpUsage: false })
+            .filter((match) => match.record.source.startsWith("talent.research")).slice(0, 4 - beats.length);
+          for (const match of inherited) items.push({ id: `synth-${match.record.id}`, text: match.record.text, source: "profile", subjects: [], disclosure: match.record.child_disclosure ?? "adult_only" });
         }
       }
     }

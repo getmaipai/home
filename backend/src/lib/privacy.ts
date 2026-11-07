@@ -177,6 +177,16 @@ export function platformConnections(): PrivacyConnection[] {
       when: "when an adult asks something that needs a web search, and only while DuckDuckGo is picked under Settings, Search, Web search sources. Never for a child, teen or guest.",
       what: "the words searched, and your home's internet address, sent by a small search service running on this computer. Nothing else anyone in the house said or saved.",
     }),
+    webSourcesPicked().length > 0 ? {
+      id: "platform:talent-research", source: "MaiPai Home", sourceKind: "platform" as const,
+      destination: "Your adult web search service and the public search engines it uses",
+      when: "At most once a day for each real-person synth, after an adult creates it or asks to refresh its history; no more than 20 research runs in a local day",
+      what: "The public figure's name, with interview or speech transcript added on its first run, and up to nine public article pages on the first run or three later. No household name, conversation or other household data.",
+      who: "Your enabled adult web search source and the public engines it uses",
+      optIn: true,
+      retention: "Home keeps the dated facts, views, style phrases and their source addresses in the synth's local memory. The search service and engines follow their own policies.",
+      direction: "outbound" as const,
+    } : null,
     // KS-05: the news shelf. Bundled feed lists get their own rows from their
     // package manifests' data_sources; this row covers feeds an adult typed in
     // under Settings, News shelf. Listed only while the shelf is on and at least

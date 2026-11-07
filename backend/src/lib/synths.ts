@@ -18,10 +18,11 @@ import { createMediaSubject } from "@/lib/mediaSubjects";
 import { readLook, versionPath } from "@/lib/companionLook";
 import { readFileSync } from "node:fs";
 import { storeFile } from "@/lib/attachments";
+import { trackBackgroundWork } from "@/lib/backgroundWork";
 
 export type SynthRecord = SynthShape;
 type Companion = NonNullable<PackageManifest["companion"]>;
-export type SynthWriteResult = { ok: true; value: { id: string; manifest: PackageManifest; companion: Companion; synth: SynthRecord } } | { ok: false; status?: 400 | 403 | 404; error: string };
+export type SynthWriteResult = { ok: true; value: { id: string; manifest: PackageManifest; companion: Companion; synth: SynthRecord; researching?: boolean } } | { ok: false; status?: 400 | 403 | 404; error: string };
 const synthCache = new Map<string, { signature: string; value: SynthRecord }>();
 
 function manifestOf(id: string): PackageManifest | null {
@@ -101,13 +102,19 @@ function stampSynth(id: string, persona: Companion, base: Partial<Synth>, owner:
 }
 function synthBlock(synth: SynthRecord): NonNullable<PackageManifest["synth"]> { const { id: _id, persona: _persona, ...block } = synth; return block; }
 export async function createSynth(actor: PersonRow, input: { persona: Companion; based_on: Synth["based_on"]; life: Synth["life"] }): Promise<SynthWriteResult> {
+  if (input.based_on.kind === "real_person" && speakerAgeBand(actor, new Date()) !== "adult") return { ok: false, status: 403, error: "Only an adult can base a synth on a real person." };
+  if (input.based_on.kind === "household_member" && (!input.based_on.person_id || !personById(input.based_on.person_id))) return { ok: false, status: 400, error: "Pick a person from the household." };
   if (speakerAgeBand(actor, new Date()) !== "adult" && input.based_on.kind !== "none") return { ok: false, status: 403, error: "Only an adult can base a synth on a real person. Make an invented one instead." };
+  if (input.based_on.kind === "real_person" && !input.based_on.name?.trim()) return { ok: false, status: 400, error: "A real-person synth needs a name. Enter the public figure's name and try again." };
+  if (input.based_on.kind === "household_member" && !input.based_on.person_id) return { ok: false, status: 400, error: "A household-member synth needs a person. Choose a household member and try again." };
   if (input.based_on.kind === "household_member" && input.based_on.person_id) {
     const member = personById(input.based_on.person_id);
     if (member && getSettingValueForPerson(member.id, "synths.of_me") === false) return { ok: false, status: 403, error: `${member.displayName} has turned off synths of them.` };
   }
   const persona = { ...input.persona, status: input.persona.status ?? "ready", audience: input.based_on.kind === "real_person" ? input.persona.audience ?? "adult" : input.persona.audience };
-  const synth = stampSynth("hc-pending", persona, { based_on: input.based_on, life: { ...input.life, enabled: input.based_on.kind === "none" && input.life.enabled }, private_to: null, forked_from: null }, actor.id, "home:synth");
+  let synth: SynthRecord;
+  try { synth = stampSynth("hc-pending", persona, { based_on: input.based_on, life: { ...input.life, enabled: input.based_on.kind === "none" && input.life.enabled }, private_to: null, forked_from: null }, actor.id, "home:synth"); }
+  catch { return { ok: false, status: 400, error: "The synth details are incomplete or invalid. Fill in its name, speaking style and examples, then try again." }; }
   const made = createHouseholdCompanion(persona, { display_name: actor.displayName, person_id: actor.id }, persona.audience ?? "adult", { synth: synthBlock(synth), companion: { audience: persona.audience ?? "adult", status: persona.status ?? "ready" } });
   if (!made.ok || !made.value.companion) return { ok: false, status: 400, error: made.ok ? "The synth could not be saved. Check its fields and try again." : made.error };
   const saved = synthFor(made.value, made.value.id);
@@ -116,9 +123,12 @@ export async function createSynth(actor: PersonRow, input: { persona: Companion;
     const { writeOrigin } = await import("@/lib/talent/life");
     await writeOrigin(saved, actor);
   }
-  return saved ? { ok: true, value: { id: made.value.id, manifest: made.value, companion: made.value.companion, synth: saved } } : { ok: false, status: 400, error: "The synth could not be saved. Check its fields and try again." };
+  if (saved?.based_on.kind === "real_person") {
+    trackBackgroundWork(import("@/lib/talent/researcher").then(({ startInitialResearch }) => startInitialResearch(saved, actor)).catch(() => undefined));
+  }
+  return saved ? { ok: true, value: { id: made.value.id, manifest: made.value, companion: made.value.companion, synth: saved, ...(saved.based_on.kind === "real_person" ? { researching: true } : {}) } } : { ok: false, status: 400, error: "The synth could not be saved. Check its fields and try again." };
 }
-export function updateSynth(actor: PersonRow, id: string, patch: Partial<Pick<SynthRecord, "persona" | "based_on" | "life" | "subject_id">>): SynthWriteResult {
+export function updateSynth(actor: PersonRow, id: string, patch: Partial<Pick<SynthRecord, "persona" | "based_on" | "life" | "subject_id" | "pins" | "phrase_sources">>): SynthWriteResult {
   const current = synthById(id), manifest = manifestOf(id);
   if (!current || !manifest?.companion) return { ok: false, status: 404, error: "That synth could not be found. Check its ID and try again." };
   if (current.owner_person_id !== actor.id && actor.role !== "owner" && actor.role !== "admin") return { ok: false, status: 403, error: "Only the synth's maker or an admin can change it." };

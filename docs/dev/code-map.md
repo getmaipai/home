@@ -1041,6 +1041,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/talent/brief.ts` | buildBrief |
 | `backend/src/lib/talent/formats.ts` | loadFormats, formatById |
 | `backend/src/lib/talent/life.ts` | LIFE_SOURCE, ORIGIN_SCHEMA, TICK_SCHEMA, ORIGIN_PROMPT, TICK_PROMPT, __setTalentLifeCompleterForTests |
+| `backend/src/lib/talent/researcher.ts` | RESEARCH_SOURCE, RESEARCH_PROMPT, RESEARCH_SCHEMA, __setResearchCompleterForTests, __setResearchSearchForTests, __setResearchReferenceForTests |
 | `backend/src/lib/talent/shows.ts` | __setTalentShowCompleterForTests, inventCast, createShow, listShows, getShow, dueShows |
 | `backend/src/lib/talent/studio.ts` | speakableText, splitAtWord, renderLines, layout, mixEpisode |
 | `backend/src/lib/talent/types.ts` | OutlineSchema, LineSchema, SegmentScriptSchema |

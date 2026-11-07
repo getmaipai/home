@@ -319,7 +319,7 @@ type CoreJobHandler = (row: JobRow) => void | Promise<void | CoreJobIdle>;
  * activity row. Such a job also writes no "running" row up front, so a tick that does work records one finished row. */
 export type CoreJobIdle = { idle: true };
 const IDLE: CoreJobIdle = { idle: true };
-const QUIET_CORE_JOBS = new Set(["notifications.deliver_held", "robot.offers.tick", "memory.embedding_retry", "memory.judge", "news.full_text.prefetch", "stack.image_jobs"]);
+const QUIET_CORE_JOBS = new Set(["notifications.deliver_held", "robot.offers.tick", "memory.embedding_retry", "memory.judge", "news.full_text.prefetch", "stack.image_jobs", "talent.history.refresh"]);
 let talentShowsDuePromise: Promise<void> | null = null;
 export function isQuietCoreJob(job: string): boolean { return QUIET_CORE_JOBS.has(job); }
 
@@ -352,6 +352,26 @@ const CORE_JOBS: Record<string, CoreJobHandler> = {
       try { if (await tickLife(synth, actor, today) === "beat") beats++; } catch { errors++; }
     }
     console.log(`talent.life.tick synths=${synths} beats=${beats} errors=${errors} ms=${Date.now() - started}`);
+  },
+  "talent.history.refresh": async () => {
+    const [{ listHouseholdCompanionIds }, { allCompanions }, { ownerActor, synthById }, { researchSynth }, { talentResearchRuns }] = await Promise.all([
+      import("@/lib/householdCompanions"), import("@/lib/robotCompanion"), import("@/lib/synths"), import("@/lib/talent/researcher"), import("@/db/schema"),
+    ]);
+    const { db } = await import("@/db");
+    const started = Date.now(); let synths = 0, facts = 0, views = 0, errors = 0;
+    const ids = [...new Set([...listHouseholdCompanionIds(), ...allCompanions().map((companion) => companion.id)])];
+    for (const id of ids) {
+      const synth = synthById(id);
+      if (!synth || synth.forked_from || synth.based_on.kind !== "real_person") continue;
+      const actor = ownerActor(synth); if (!actor) continue;
+      const last = db.select().from(talentResearchRuns).where(eq(talentResearchRuns.synthId, synth.id)).all().sort((a, b) => b.ranAt.localeCompare(a.ranAt))[0];
+      const age = last ? Date.now() - Date.parse(last.ranAt) : Number.POSITIVE_INFINITY;
+      if (synth.based_on.refresh !== "1d" && age < 7 * 86_400_000) continue;
+      synths++;
+      try { const result = await researchSynth(synth, actor, { since: last?.ranAt.slice(0, 10) ?? null }); facts += result.facts; views += result.views; } catch { errors++; }
+    }
+    console.log(`talent.history.refresh synths=${synths} facts=${facts} views=${views} errors=${errors} ms=${Date.now() - started}`);
+    return synths === 0 ? IDLE : undefined;
   },
   "talent.shows.due": async () => {
     if (talentShowsDuePromise) return talentShowsDuePromise;

@@ -174,6 +174,9 @@ export const memoryRecords = sqliteTable("memory_records", {
   // judge or a person could name one; null otherwise.
   subjectId: text("subject_id"),
   source: text("source").notNull(),
+  factConfidence: real("fact_confidence"),
+  confidenceEvidence: text("confidence_evidence").notNull().default("[]"),
+  conflictsWith: text("conflicts_with").notNull().default("[]"),
   importance: real("importance").notNull(),
   pinned: integer("pinned", { mode: "boolean" }).notNull().default(false),
   sensitive: integer("sensitive", { mode: "boolean" }).notNull().default(false),
@@ -210,6 +213,17 @@ export const memoryRecords = sqliteTable("memory_records", {
   deviceId: text("device_id").references(() => devices.id, { onDelete: "cascade" }),
   createdBy: text("created_by").references(() => people.id, { onDelete: "set null" }),
 }, (table) => [index("memory_records_status_scope_person_idx").on(table.status, table.scope, table.person), index("memory_records_device_id_idx").on(table.deviceId), index("memory_records_companion_idx").on(table.companionId, table.status).where(sql`${table.companionId} IS NOT NULL`)]);
+
+export const talentResearchRuns = sqliteTable("talent_research_runs", {
+  id: text("id").primaryKey(),
+  synthId: text("synth_id").notNull(),
+  ranAt: text("ran_at").notNull(),
+  dayKey: text("day_key").notNull(),
+  facts: integer("facts").notNull(),
+  views: integer("views").notNull(),
+  style: integer("style").notNull(),
+}, (table) => [index("talent_research_runs_day").on(table.dayKey)]);
+
 // PERF-4 (code review, 2026-09-06): recall() and similarByVector() both
 // filter on status (always) plus scope/person (often) before ever
 // touching a vector - without this, every recall was a full table scan

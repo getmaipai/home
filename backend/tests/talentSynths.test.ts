@@ -72,6 +72,22 @@ describe("TALENT-01 synth store", () => {
     if (result.ok) expect(result.value.companion?.audience).toBe("adult");
   });
 
+  test("only adults can create real-person synths and household bases must exist", async () => {
+    const { client: ownerClient, row: ownerRow } = await owner();
+    const teenClient = await teen(ownerClient);
+    const teenRow = db.select().from(people).where(eq(people.role, "teen")).get()!;
+    const realPerson = { kind: "real_person", person_id: null, name: "A public figure", refresh: "7d", minor: false } as const;
+    const denied = await createSynth(teenRow, { persona: invented, based_on: realPerson, life: { enabled: true, seed: "" } });
+    expect(denied).toMatchObject({ ok: false, status: 403, error: "Only an adult can base a synth on a real person." });
+    const beforeAdultCreate = listSynths(ownerRow).filter((synth) => synth.based_on.kind === "real_person" && synth.based_on.name === "A public figure").length;
+    const allowed = await createSynth(ownerRow, { persona: invented, based_on: realPerson, life: { enabled: false, seed: "" } });
+    expect(allowed.ok).toBe(true);
+    const unknown = await createSynth(ownerRow, { persona: invented, based_on: basedOnMember("person-missing"), life: { enabled: false, seed: "" } });
+    expect(unknown).toMatchObject({ ok: false, status: 400, error: "Pick a person from the household." });
+    expect(listSynths(ownerRow).filter((synth) => synth.based_on.kind === "real_person" && synth.based_on.name === "A public figure")).toHaveLength(beforeAdultCreate + 1);
+    expect(teenClient).toBeDefined();
+  });
+
   test("a fork is private to its maker and can be seen by a parent managing a child", async () => {
     const { client: ownerClient, row: ownerRow } = await owner();
     const { row: childRow } = await child(ownerClient);

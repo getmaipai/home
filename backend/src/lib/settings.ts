@@ -763,6 +763,13 @@ export function setValue(
           : assertCanAccessScope(actor, parsed, "write");
   if (!auth.ok) return auth;
 
+  if (key === "synths.real_people" && parsed.kind === "person" && value === "all") {
+    const target = db.select().from(people).where(and(eq(people.id, parsed.id!), isNull(people.deletedAt))).get();
+    if (target && speakerAgeBand(target as PersonRow, new Date()) === "child") {
+      return { ok: false, status: 400, error: "Children cannot allow every real-person synth. Choose Ask or Off for this setting." };
+    }
+  }
+
   if (keyDef.selector === "location" && key !== HOUSEHOLD_HOME_KEY) {
     const range = keyDef.range as { multiple?: boolean; allow_current?: boolean } | undefined;
     const entries = range?.multiple ? value as unknown[] : [value];

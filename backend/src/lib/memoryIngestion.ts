@@ -152,6 +152,9 @@ export function supersedeInTx(
         companionId: fullCandidate.companionId,
         subjectId: fullCandidate.subjectId,
         source: fullCandidate.source,
+        factConfidence: fullCandidate.factConfidence,
+        confidenceEvidence: fullCandidate.confidenceEvidence,
+        conflictsWith: fullCandidate.conflictsWith,
         importance: fullCandidate.importance,
         pinned: fullCandidate.pinned,
         sensitive: fullCandidate.sensitive,
@@ -190,6 +193,9 @@ export type IngestInput = {
   subjectId?: string | null;
   source: string;
   importance: number;
+  fact_confidence?: number | null;
+  confidence_evidence?: Array<{ source: string; at: string; kind: string }>;
+  skipDedupe?: boolean;
   pinned?: boolean;
   sensitive?: boolean;
   offerWithheld?: boolean | null;
@@ -242,7 +248,7 @@ export function ingestMemory(input: IngestInput): IngestResult {
     }
   }
 
-  const existing = findActiveByKey(scope, person, companionId, key);
+  const existing = input.skipDedupe ? null : findActiveByKey(scope, person, companionId, key);
   if (existing) {
     return { ok: true, record: existing, deduped: true, existingId: existing.id };
   }
@@ -261,6 +267,9 @@ export function ingestMemory(input: IngestInput): IngestResult {
     companion_id: companionId,
     subject_id: input.subjectId ?? null,
     source: input.source,
+    fact_confidence: input.fact_confidence ?? null,
+    confidence_evidence: (input.confidence_evidence ?? []).map((entry) => ({ source_id: entry.source, source_person_id: null, kind: entry.kind === "web" ? "corroboration" : "initial_assertion", observed_at: entry.at })),
+    conflicts_with: [],
     importance: input.importance,
     pinned: input.pinned ?? false,
     sensitive: input.sensitive ?? false,
@@ -301,6 +310,9 @@ export function ingestMemory(input: IngestInput): IngestResult {
     companionId,
     subjectId: parsed.data.subject_id ?? null,
     source: parsed.data.source,
+    factConfidence: parsed.data.fact_confidence,
+    confidenceEvidence: JSON.stringify(input.confidence_evidence ?? []),
+    conflictsWith: JSON.stringify(parsed.data.conflicts_with ?? []),
     importance: parsed.data.importance,
     pinned: parsed.data.pinned,
     sensitive: parsed.data.sensitive,
@@ -358,6 +370,8 @@ export type SupersedeInput = {
   subjectId?: string | null;
   source: string;
   importance: number;
+  factConfidence?: number | null;
+  confidenceEvidence?: Array<{ source: string; at: string; kind: string }>;
   pinned?: boolean;
   sensitive?: boolean;
   offerWithheld?: boolean | null;
@@ -425,6 +439,9 @@ export function supersedeMemory(input: SupersedeInput): SupersedeResult {
     companionId: input.oldRecord.companionId,
     subjectId: input.subjectId ?? null,
     source: input.source,
+    factConfidence: input.factConfidence ?? null,
+    confidenceEvidence: JSON.stringify(input.confidenceEvidence ?? []),
+    conflictsWith: JSON.stringify([]),
     importance: input.importance,
     pinned: input.pinned ?? input.oldRecord.pinned,
     sensitive: input.sensitive ?? input.oldRecord.sensitive,

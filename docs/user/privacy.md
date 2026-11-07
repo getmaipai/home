@@ -78,6 +78,10 @@ When you ask for a book, Home sends the title or author you said to the Library 
 
 News uses the feeds the household chose. It sends no follows, saves, searches or reading history to publishers. What you type in the News search box goes only to your hub.
 
+## Public figure synths
+
+When you create or refresh a synth based on a real person, Home searches for public information about the person's name using your enabled adult web search source. The first search can include the words "interview" and "speech transcript". Home reads up to three result pages per search, for at most nine pages on the first run. Home can refresh a synth once a day, with a limit of 20 research runs per household each local day. The search service and the public engines it uses receive the public person's name, not your family's names, conversations or other household information. Publishers receive requests for the public pages Home reads. It uses the same web search setting and shared request limits as other searches.
+
 ## Online radio and podcast directories
 
 An adult can search for a radio station or a podcast. Home sends the search words to a public directory. For radio, the directory also sees your home's internet address. For podcasts, the directory is Apple's. Both searches are on by default. An admin can turn each one off in **Settings**, **Pictures, videos and music**. Then no directory search leaves the house. Stations and shows you already follow still play. See [Radio](radio.md) and [Podcasts](podcasts.md).
