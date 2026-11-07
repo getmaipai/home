@@ -109,7 +109,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `frontend/src/apps/clock/AlarmEditor.tsx` | AlarmEditor |
 | `frontend/src/apps/clock/AlarmRecordRow.tsx` | alarmTime, AlarmRecordRow |
 | `frontend/src/apps/clock/AlarmsTab.tsx` | AlarmsTab |
-| `frontend/src/apps/clock/ClockHeaderTitle.tsx` | ClockHeaderTitle |
+| `frontend/src/apps/clock/ClockHeaderAdd.tsx` | ClockHeaderAdd |
 | `frontend/src/apps/clock/ClockPage.tsx` | ClockPage |
 | `frontend/src/apps/clock/StopwatchTab.tsx` | StopwatchTab |
 | `frontend/src/apps/clock/TimersTab.tsx` | TimersTab |
@@ -295,7 +295,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `frontend/src/shell/pages/dashboard/AskBox.tsx` | installPlaceholder, askHref, AskBox |
 | `frontend/src/shell/pages/dashboard/GettingStarted.tsx` | GETTING_STARTED_ROWS, openChecklistItems, GettingStarted |
 | `frontend/src/shell/pages/dashboard/Greeting.tsx` | Greeting |
-| `frontend/src/shell/pages/dashboard/HomeShelves.tsx` | ContinueShelf, FamilyShelf, HomeMedia |
+| `frontend/src/shell/pages/dashboard/HomeShelves.tsx` | tilePicture, ContinueShelf, FamilyShelf, HomeMedia |
 | `frontend/src/shell/pages/dashboard/TodaySection.tsx` | TODAY_CARD_BUDGET, todaySlots, TodaySection |
 | `frontend/src/shell/pages/packageAppHeaderBar.tsx` | publishPackageAppHeader, PackageAppHeaderLeft, PackageAppHeaderActions, sectionsBarEntries |
 | `frontend/src/shell/pages/performance/DiskHardwareBody.tsx` | DiskHardwareBody |
