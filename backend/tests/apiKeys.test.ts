@@ -256,3 +256,12 @@ test("a coding key is suspended while a coding piece is missing and active again
     expect(listApiKeys(p).find(k => k.scopes.includes("code"))!.status).toBe("active");
   } finally { __setMissingCodingPieceForTests(null); }
 });
+
+test("AUDIT-DEAD-01: a new key takes the admin's coding.requests_per_minute_per_key as its own limit, 60 when unset", () => {
+  const p = person();
+  const before = createApiKey(p, { name: "Default", scopes: ["turn"] });
+  expect(db.select().from(apiKeys).where(eq(apiKeys.id, before.key.id)).get()!.limits).toEqual({ requests_per_minute: 60 });
+  setHouseholdSettingValue("coding.requests_per_minute_per_key", 25);
+  const after = createApiKey(p, { name: "Limited", scopes: ["turn"] });
+  expect(db.select().from(apiKeys).where(eq(apiKeys.id, after.key.id)).get()!.limits).toEqual({ requests_per_minute: 25 });
+});

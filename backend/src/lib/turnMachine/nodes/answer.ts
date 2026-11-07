@@ -1,7 +1,6 @@
 import { markUnsourcedNames } from "../fabrication";
 import { checkClaims, dropUnknownCitations, dropUnsupportedCredits, evidenceBySource, researchEvidence, type ClaimJudge } from "../research";
 import { completeBackground } from "@/lib/llm";
-import { getHouseholdSettingValue } from "@/lib/settings";
 import { MUSIC_NOT_HERE_LINE, MUSIC_REFUSAL_LINE } from "@/lib/music/policy";
 // U2c, the `answer` node (turn-machine-state-record-2026-09-22.md's
 // state table): "the model's final text or the package reply, the
@@ -193,13 +192,13 @@ export const answerNode: Node<AnswerInput, AnswerOutput> = async (state, input) 
       // ... and drops a sentence that credits a named person no fetched source named.
       const credited = research ? dropUnsupportedCredits(cited.text, `${researchEvidence(state.outcomes)}\n${state.backbone?.text ?? ""}\n${(state.pageNotes ?? []).map((n) => `${n.note} ${n.quote}`).join("\n")}`, state.utterance) : { text: cited.text, dropped: 0 };
       const note = credited.dropped > 0 ? "\n\nI left out a statement about who made or wrote something, because none of the sources I read named them." : "";
-      // RESEARCH-CLAIM-01: a sentence its cited sources do not back is marked "not confirmed by the sources" (admin switch research.claim_check, default on).
+      // RESEARCH-CLAIM-01: a sentence its cited sources do not back is marked "not confirmed by the sources".
       // RESEARCH-FABRICATION-01: a name or title that no source, note or article gives is marked; an uncited sentence that states a fact is judged
       // against the notes' quotes and the article.
       const evidenceText = `${researchEvidence(state.outcomes)}\n${state.backbone?.text ?? ""}\n${state.entityAnchor?.text ?? ""}\n${(state.pageNotes ?? []).map((n) => `${n.note} ${n.quote}`).join("\n")}\n${sources.map((s) => `${s.site ?? ""} ${s.url}`).join("\n")}`;
       const marked = research ? markUnsourcedNames(credited.text, evidenceText, state.utterance) : { text: credited.text, marked: 0, dropped: 0 };
       const uncitedPassages = research ? `${state.backbone?.text.slice(0, 3_000) ?? ""}\n${(state.pageNotes ?? []).map((n) => n.quote).join("\n")}\n${state.entityAnchor?.lead ?? ""}\n${researchEvidence(state.outcomes)}`.trim() : "";
-      const claims = research && sources.length > 0 && getHouseholdSettingValue("research.claim_check") !== false
+      const claims = research && sources.length > 0
         ? await checkClaims(marked.text, [...evidenceBySource(state.outcomes, state.pageNotes ?? []), ...(backboneSource ? [state.backbone?.text ?? ""] : [])], claimJudgeOverride ?? lightModelJudge, { uncitedPassages })
         : { text: marked.text };
       return { outcome: { ok: true }, output: { text: `${claims.text}${note}`, sources } };

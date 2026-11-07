@@ -11,7 +11,6 @@ import { runPlugin } from "@/lib/plugins";
 import { RESEARCH_SEARCHES_MAX, newResearchBudget, runWithResearchBudget } from "@/lib/researchBudget";
 import { researchQuestion } from "../researchPipeline";
 import { NOTES_START_BUDGET_MS, NOTE_CONCURRENCY, currentNoteWriter, makeGate, newNoteStats, writePageNotes } from "../pageNotes";
-import { getHouseholdSettingValue } from "@/lib/settings";
 import { isRepeatQuery, markResearch, memoryDetailsIn, researchCapMs, researchCutAt, researchEvidence, rewordEmptyQuery, withoutMemoryDetails } from "../research";
 import { anchorQuery } from "../entityPin";
 import { PluginResult } from "@maipai/spec/gen/ts/result.js";
@@ -196,8 +195,8 @@ export const toolNode: Node<ToolInput, ToolOutput> = async (state, input, signal
   const researchRun = state.answerStyle !== undefined && state.answerStyle !== "instant" && state.budget.rounds > 1 ? (state.researchBudget ??= newResearchBudget(state.answerStyle === "max" && state.researchLibraryOnly === true)) : undefined;
   // RESEARCH-CLOCK-01: page reading of this turn stops at the style's cut-off time.
   if (researchRun) researchRun.deadlineAt ??= researchCutAt(state);
-  // RESEARCH-NOTES-01: the light model writes notes from each page the run reads (admin switch research.page_notes, default on).
-  if (researchRun && !researchRun.noteJob && getHouseholdSettingValue("research.page_notes") !== false) {
+  // RESEARCH-NOTES-01: the light model writes notes from each page the run reads.
+  if (researchRun && !researchRun.noteJob) {
     const gate = makeGate(NOTE_CONCURRENCY);
     const stats = researchRun.noteStats ??= newNoteStats();
     const question = researchQuestion(state.messages, state.utterance);

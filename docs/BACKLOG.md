@@ -1869,6 +1869,7 @@ Design: [the assistant layer plan](plans/assistant-layer-2026-10-04.md), note-le
     Design: [assistant-layer-2026-10-04](plans/assistant-layer-2026-10-04.md)
 - [ ] **BROWSER-BENCH-01: Browser worker bench** (M). Bench only: 20 scripted read-only web tasks through Skyvern (AGPL, separate process) or Browser Use (MIT). The connector needs its own verdict. Depends on: none. Builder: Claude local (Sonnet). Status: not started; queue priority: chat UI first, chat quality second, then this. Design: [plan](plans/assistant-layer-2026-10-04.md).
     Design: [assistant-layer-2026-10-04](plans/assistant-layer-2026-10-04.md)
+- [ ] **RESEARCH-SWITCH-01: admin switches for claim check and page notes** (S, optional). AUDIT-DEAD-01 removed the reads of `research.claim_check` (turnMachine/nodes/answer.ts) and `research.page_notes` (nodes/tool.ts): neither key was registered, so the settings API refused them and both features always ran. If the owner wants the two switches, add the keys to `@maipai/spec` `settings/keys.json` first (default on), then read them again in those two nodes. Depends on: a spec tag. Builder: Codex.
 
 ## Incognito (2026-09-24, priority for Saturday's push)
 

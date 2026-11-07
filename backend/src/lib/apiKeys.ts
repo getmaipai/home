@@ -162,7 +162,7 @@ export function createApiKey(person: PersonRow, input: z.input<typeof CreateApiK
     const id = newApiKeyId();
     const secret = `maipai_${id}_${base32(crypto.randomBytes(32))}`;
     const at = new Date().toISOString();
-    const rpm = getHouseholdSettingValue("coding.api.rate_per_minute");
+    const rpm = getHouseholdSettingValue("coding.requests_per_minute_per_key");
     const row = db.insert(apiKeys).values({ id, personId: person.id, name, scopes, createdAt: at,
       expiresAt: new Date(Date.now() + days * DAY).toISOString(), status: "active", hint: hintOf(secret),
       limits: { requests_per_minute: typeof rpm === "number" && Number.isInteger(rpm) && rpm > 0 ? rpm : 60 },
