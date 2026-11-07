@@ -857,6 +857,34 @@
         }
       }
     },
+    "/api/auth/locale": {
+      "get": {
+        "tags": [
+          "Auth"
+        ],
+        "summary": "The sign-in language",
+        "responses": {
+          "200": {
+            "description": "Household language or en-US.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "locale": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "locale"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/auth/profiles": {
       "get": {
         "tags": [
