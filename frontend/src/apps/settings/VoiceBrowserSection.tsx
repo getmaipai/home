@@ -5,6 +5,7 @@ import { Select } from "@maipai/ui/src/primitives/Select";
 import { Progress } from "@maipai/ui/src/primitives/Progress";
 import { Button } from "@maipai/ui/src/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@maipai/ui/src/ui/dialog";
+import { Item, ItemActions, ItemContent, ItemDescription, ItemTitle } from "@maipai/ui/src/dashboard/components/ui/item";
 import { AddVoiceForm } from "@/apps/settings/AddVoiceForm";
 import { api, type PersonRosterEntry, type ResolvedSetting, type Roster } from "@/lib/api";
 import { playableVoices, previewIdFor, voiceChoices, voiceTargets } from "@/lib/voice/voiceBrowserRows";
@@ -81,17 +82,17 @@ export function VoiceBrowserSection({ person }: { person: Roster }) {
   // An owner or admin can test a voice that is not downloaded yet; it downloads on first play (owner ruling 2026-10-17).
   const downloading = testBusy && voices.find((voice) => voice.id === previewId)?.onDisk === false;
   return <>
-    <h2 className="text-base font-medium">Choose a voice for {who}</h2>
-    {isGuardian && targets.length > 1 ? <Select aria-label="Choose a voice for" value={target.id} options={targets.map((entry) => entry.id)} getLabel={(id) => id === person.id ? "You" : targets.find((entry) => entry.id === id)?.display_name ?? id} onValueChange={(id) => { voicePreviewPlayer.stop(); setTargetId(id); setSaved(false); setSaveError(null); }} /> : null}
+    {/* AUDIT-UI-01: the same label-and-description row every other settings page uses, so each dropdown says what it is. */}
+    {isGuardian && targets.length > 1 ? <Item><ItemContent><ItemTitle>Whose voice</ItemTitle><ItemDescription clamp={false}>Pick a person to see or change their voice.</ItemDescription></ItemContent><ItemActions><Select aria-label="Choose a voice for" value={target.id} options={targets.map((entry) => entry.id)} getLabel={(id) => id === person.id ? "You" : targets.find((entry) => entry.id === id)?.display_name ?? id} onValueChange={(id) => { voicePreviewPlayer.stop(); setTargetId(id); setSaved(false); setSaveError(null); }} /></ItemActions></Item> : null}
     {target.role === "child" ? <p>Ask a parent to choose your voice.</p> : null}
     {settingReason && target.id === person.id ? <p className="text-sm text-muted-foreground">{settingReason}</p> : null}
     {choices.notice || (migrated?.target === target.id && migrated.line) ? <p role="status" className="text-sm text-muted-foreground">{choices.notice ?? migrated?.line}</p> : null}
     {failed ? <><p role="alert">Home can't reach its voice service. Check Repairs, then come back. <Button type="button" variant="outline" onClick={retry}>Try again</Button></p><Button type="button" variant="outline" disabled>Test</Button></> : <AsyncState data={voicesQuery.data && registryQuery.data && valuesQuery.data ? voices : undefined} isFetching={voicesQuery.isFetching || registryQuery.isFetching || valuesQuery.isFetching || (isGuardian && rosterQuery.isFetching)} onRetry={retry} loadingLabel="Loading voices">
-      {(list) => list.length === 0 ? <><p>Voices are still getting ready. This takes a minute after setup.</p><Button type="button" variant="outline" disabled>Test</Button></> : <div className="flex flex-wrap items-center gap-2">
+      {(list) => list.length === 0 ? <><p>Voices are still getting ready. This takes a minute after setup.</p><Button type="button" variant="outline" disabled>Test</Button></> : <Item><ItemContent><ItemTitle>Choose a voice for {who}</ItemTitle><ItemDescription clamp={false}>The voice Home speaks with when it talks to {who}.</ItemDescription></ItemContent><ItemActions>
         <Select aria-label={`Voice for ${who}`} value={selectedId} options={choices.options.map((option) => option.id)} getLabel={(id) => choices.options.find((option) => option.id === id)?.label ?? id} disabled={!canChoose || saving} onValueChange={(id) => { const option = choices.options.find((entry) => entry.id === id); if (option && option.id !== selectedId) void choose(option.value); }} />
         {testBusy ? <Progress mode="spinner" label="Preparing the voice test" /> : null}
         <Button type="button" variant="outline" disabled={previewId === null || testBusy} onClick={() => testing ? voicePreviewPlayer.stop() : previewId && void voicePreviewPlayer.start(previewId)}>{testing && !testBusy ? "Stop" : "Test"}</Button>
-      </div>}
+      </ItemActions></Item>}
     </AsyncState>}
     {downloading ? <p role="status" className="text-sm text-muted-foreground">Downloading this voice, one moment.</p> : null}
     {preview.error ? <p role="alert">{preview.error}</p> : null}
