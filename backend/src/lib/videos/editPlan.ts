@@ -179,3 +179,25 @@ export function gainOps(db: number): EditOp[] {
 export function fadeOps(inS: number, outS: number): EditOp[] {
   return inS > 0 || outS > 0 ? [{ op: "fade", in_s: Math.max(0, inS), out_s: Math.max(0, outS) }] : [];
 }
+
+/** SPATIAL-04: the Stack's `spatial_sound` step. `surround: true` also writes the 5.1 file and must be the last (here, the only) step. */
+export function spatialOps(surround: boolean): EditOp[] {
+  return [{ op: "spatial_sound", ...(surround ? { surround: true } : {}) }];
+}
+
+/** SPATIAL-04: the plain lines under a spatial clip when the Stack sent none of its own (docs/design/spatial-sound-2026-11-06.md, section 4). */
+export const SPATIAL_STEREO_LINE = "Sound now follows who is talking on screen. Wear headphones to hear it.";
+export const SPATIAL_SURROUND_LINE = "The 5.1 file plays on a surround system or an Apple TV. Other players play it as stereo.";
+export const SPATIAL_UNCHANGED_LINES: Record<string, string> = {
+  no_person: "Nobody was found on screen, so the sound is unchanged.",
+  no_speech: "Nobody speaks in this clip, so the sound is unchanged.",
+  several_people: "Several people are on screen and Home could not tell who talks, so the sound is unchanged.",
+  centered: "The speaker stands in the middle, so the sound is unchanged.",
+};
+
+/** The one muted line kept with a spatial clip: the Stack's own lines when it sent them, else the plain line for what happened. */
+export function spatialNote(input: { applied?: boolean; reason?: string | null; notes?: readonly string[]; surround: boolean }): string {
+  if (input.notes && input.notes.length > 0) return input.notes.join(" ").slice(0, 400);
+  if (input.applied === false) return SPATIAL_UNCHANGED_LINES[input.reason ?? ""] ?? "The sound is unchanged.";
+  return input.surround ? `${SPATIAL_STEREO_LINE} ${SPATIAL_SURROUND_LINE}` : SPATIAL_STEREO_LINE;
+}

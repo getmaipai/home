@@ -27,13 +27,17 @@ export interface FakeEditStack {
   /** The container length the finished job reports. */
   durationS: number;
   transcribedText: string;
+  /** SPATIAL-04: what a finished `spatial_sound` step reports (the Stack's `spatial` object). Null leaves the result without one. */
+  spatial?: { applied: boolean; reason: string | null; note: string | null; notes: string[]; rear_quiet?: boolean } | null;
+  /** SPATIAL-04: when set with `failWith`, the failed job also carries `failure: { code, detail }` as the Stack's new job shape does. */
+  failureCode?: string | null;
   restore(): void;
 }
 
 export function installFakeEditStack(): FakeEditStack {
   const base = getStackClient();
   const roots = { read: [] as string[], write: [] as string[] };
-  const fake: FakeEditStack = { jobs: [], speech: [], rootsSet: [], roots, pollsToFinish: 2, progressPercent: 0, failWith: null, refuseSubmit: false, speechFails: false, durationS: 6, transcribedText: "A harmless sentence.", restore() { __setStackEditTimingForTests(null); __setStackClientForTests(null); } };
+  const fake: FakeEditStack = { jobs: [], speech: [], rootsSet: [], roots, pollsToFinish: 2, progressPercent: 0, failWith: null, refuseSubmit: false, speechFails: false, durationS: 6, transcribedText: "A harmless sentence.", spatial: { applied: true, reason: null, note: "Sound now follows who is talking on screen. Wear headphones to hear it.", notes: ["Sound now follows who is talking on screen. Wear headphones to hear it."] }, failureCode: null, restore() { __setStackEditTimingForTests(null); __setStackClientForTests(null); } };
   __setStackEditTimingForTests({ pollMs: 5, deadlineMs: 5_000 });
   const stamp = (job: FakeEditJob) => ({
     id: job.id, kind: "media.edit", role: null, state: job.state, percent: fake.progressPercent, completedBytes: 0, totalBytes: 0, status: "", position: null, input: null, result: null, reason: null,
@@ -55,7 +59,7 @@ export function installFakeEditStack(): FakeEditStack {
       job.polls += 1;
       if (job.cancelled) job.state = "cancelled";
       else if (job.polls < fake.pollsToFinish) job.state = "running";
-      else if (fake.failWith) return { ...stamp({ ...job, state: "failed" }), state: "failed", reason: fake.failWith };
+      else if (fake.failWith) return { ...stamp({ ...job, state: "failed" }), state: "failed", reason: fake.failWith, ...(fake.failureCode ? { failure: { code: fake.failureCode, detail: fake.failWith } } : {}) };
       else {
         job.state = "done";
         const path = join(job.input.output.dir, job.input.output.name);
@@ -68,7 +72,20 @@ export function installFakeEditStack(): FakeEditStack {
         const webm = job.input.output.name.endsWith(".webm");
         const bytes = webm ? new Uint8Array([0x1a, 0x45, 0xdf, 0xa3, ...new Uint8Array(2044)]) : testMp4();
         writeFileSync(path, bytes);
-        return { ...stamp(job), result: { path, size_bytes: bytes.byteLength, container: webm ? "webm" : "mp4", duration_s: fake.durationS, width: 832, height: 480, video_codec: webm ? "vp9" : "h264", ...(webm ? { alpha: true } : { audio_codec: "aac" }), elapsed_ms: 1200 } };
+        // SPATIAL-04: a `spatial_sound` step adds `files[]` (the stereo clip first, then the 5.1 sibling beside it when asked) and `spatial`.
+        const spatialStep = job.input.ops.find((op) => op.op === "spatial_sound") as { surround?: boolean } | undefined;
+        let spatialFields: Record<string, unknown> = {};
+        if (spatialStep) {
+          const files: Array<Record<string, unknown>> = [{ role: "stereo", name: job.input.output.name, path, size_bytes: bytes.byteLength, audio_codec: "aac", channels: 2 }];
+          if (spatialStep.surround === true) {
+            const sibling = join(job.input.output.dir, job.input.output.name.replace(/\.mp4$/, "-5.1.mp4"));
+            const surroundBytes = testMp4(); surroundBytes[100] = 0x35;
+            writeFileSync(sibling, surroundBytes);
+            files.push({ role: "surround_5_1", name: sibling.split("/").pop(), path: sibling, size_bytes: surroundBytes.byteLength, audio_codec: "eac3", channels: 6 });
+          }
+          spatialFields = { files, ...(fake.spatial ? { spatial: { segments: 2, surround: spatialStep.surround === true, rear_quiet: false, side_level_db: -20, frames: 20, people_frames: 18, speech_spans: 2, ...fake.spatial } } : {}) };
+        }
+        return { ...stamp(job), result: { ...spatialFields, path, size_bytes: bytes.byteLength, container: webm ? "webm" : "mp4", duration_s: fake.durationS, width: 832, height: 480, video_codec: webm ? "vp9" : "h264", ...(webm ? { alpha: true } : { audio_codec: "aac" }), elapsed_ms: 1200 } };
       }
       return stamp(job);
     },

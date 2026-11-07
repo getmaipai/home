@@ -4,6 +4,7 @@
 
 ### Added
 
+- `spatial_sound` moves a clip's own dialog toward the side of the screen where the speaker stands, and with `surround` also makes a 5.1 file (a second file of the new clip).
 - `mix` with `make_music` makes an instrumental the length of the video and lays it under the video (Add music to a clip).
 - `remove_background` cuts out the main subject with a color, blur or transparent background, for clips up to a minute and 1920 pixels wide.
 

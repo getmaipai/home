@@ -44,7 +44,8 @@ import { isOwnerOrAdmin } from "@/lib/access";
 import type { PersonRow } from "@/types";
 import { likenessRefusal } from "@/lib/likeness";
 import { adultStylesAllowed } from "@/lib/pictures/policy";
-import { runEditVideo } from "@/lib/videos/editTool";
+import { refusalLineOf, runEditVideo } from "@/lib/videos/editTool";
+import { editRefusal } from "@/lib/videos/editGate";
 import { editVideoArgs, type RunEditVideoInput } from "@/lib/videos/editTool";
 
 export const videosRoutes = apiRouter();
@@ -74,6 +75,7 @@ const ItemSchema = z.object({
   started_at: z.number().describe("Epoch milliseconds the job started, for the card's elapsed clock."),
   prompt: z.string(),
   kind: z.enum(["generate", "animate", "edit"]),
+  note: z.string().nullable().describe("SPATIAL-04: one plain line kept with a spatial-sound clip (what the sound did, or why it is unchanged), shown as the card's muted notice; null for any other clip."),
   error: z.string().nullable(),
   quality: z.enum(["quick", "detailed"]).describe("Which kind made it: Quick (silent) or Detailed (with sound and speech)."),
   switch_to: z.enum(["quick", "detailed"]).nullable().describe("The other kind this video can be made again as, or null (it uses a style made for one kind, or the other kind is not on this computer)."),
@@ -89,7 +91,7 @@ const ItemSchema = z.object({
     history: z.array(z.object({ action: z.enum(["clear", "mark"]), via: z.enum(["creator_passcode", "creator", "admin", "auto"]), at: z.string() })).describe("The creator's own audit rows for this item (no content)."),
   }).nullable().describe("ADULT-LOCK-06: the item's Adult lock state for its creator, once it is shown (null for a clip still being made, a minor or a temporary chat)."),
 });
-const CardSchema = z.object({ id: z.string(), conversation_id: z.string().nullable(), items: z.array(ItemSchema), can_make_another: z.boolean(), limits: z.string() });
+const CardSchema = z.object({ id: z.string(), conversation_id: z.string().nullable(), items: z.array(ItemSchema), can_make_another: z.boolean(), can_edit: z.boolean().describe("SPATIAL-05: this person may edit a finished clip (adults on their own screen), so the clip's More menu offers Spatial sound."), limits: z.string() });
 /** ADULT-LOCK-02: a card with an adult-only clip in it, while the person holds no unlock proof: the one tile and nothing else (no id, words, picture or count). */
 const LockedCardSchema = z.object({ locked: z.literal(true), making: z.boolean() }).describe("An adult-only item that is locked: draw the lock tile; `making` adds its spinner.");
 const CardOrLocked = z.union([CardSchema, LockedCardSchema]);
@@ -113,6 +115,7 @@ function itemView(job: VideoJob, actor: PersonRow, ready: { quick: boolean; deta
     position: job.position,
     ...(job.state === "running" ? (({ eta_seconds, step, steps, preview_url }) => ({ eta_seconds, step, steps, preview_url: laneOfPerson(actor) === "adult" ? preview_url : null }))(liveCardFields(job.id, (version) => `/api/videos/jobs/${encodeURIComponent(job.id)}/preview?v=${version}`)) : { eta_seconds: null, step: null, steps: null, preview_url: null }), started_at: new Date(job.createdAt).getTime(), prompt: job.prompt, kind: job.kind,
     error: job.state === "failed" ? job.error : null,
+    note: job.state === "done" ? job.request.edit?.note ?? null : null,
     ...qualityFields(job, ready),
     fit_ask: job.state === "queued" && laneOfPerson(actor) === "adult" ? answerableFitAsk(actor, job.id) : null,
     max_offered: job.state === "done" && laneOfPerson(actor) === "adult" && maxOffered(actor, "video", undefined, ready.max === true),
@@ -137,7 +140,7 @@ export function videoCardView(actor: PersonRow, root: VideoJob, canMake: boolean
   const active = jobs.some((j) => j.state === "queued" || j.state === "running");
   return {
     id: root.id, conversation_id: root.conversationId, items: jobs.map((j) => itemView(j, actor, ready)),
-    can_make_another: canMake && !active && jobs.length < MAX_CLIPS_PER_CARD, limits: VIDEO_LIMITS_LINE,
+    can_make_another: canMake && !active && jobs.length < MAX_CLIPS_PER_CARD, can_edit: laneOfPerson(actor) === "adult", limits: VIDEO_LIMITS_LINE,
   };
 }
 
@@ -529,6 +532,33 @@ videosRoutes.openapi(addMusicRoute, async (c) => {
   const data = outcome.result?.data as { videoJobId?: string; musicJobId?: string; refused?: string } | undefined;
   if (!data?.videoJobId && !data?.musicJobId) return c.json({ error: outcome.result?.reply?.text ?? "I couldn't add music to that video.", code: String(data?.refused ?? "add_music_failed") }, 422) as never;
   return c.json({ conversation_id: conversationId, video_job_id: data.videoJobId ?? null, music_job_id: data.musicJobId ?? null }, 200);
+});
+
+// SPATIAL-05: "Spatial sound" in a clip's More menu. The same edit the chat tool runs (`edit_video`, change `spatial_sound`), so the age gate, the screening,
+// the ownership and lock checks and the finished-clip check are the ones the tool has. The new clip joins the source's card (the same turn) or, for a clip made
+// on the Create page, is a new Library clip. An adult-only source gives an adult-only result.
+const spatialRoute = createRoute({
+  method: "post", path: "/jobs/{id}/spatial-sound", tags: ["Videos"], summary: "Make the sound of a clip follow who is talking on screen (and, if asked, a 5.1 file); adults on their own screen only", middleware: [requireAuth] as const,
+  request: { params: idParams, body: { required: false, content: { "application/json": { schema: z.object({ surround: z.boolean().optional().describe("Also make a 5.1 file, a second file of the new clip.") }) } } } },
+  responses: { 200: { content: { "application/json": { schema: CardOrLocked } }, description: "The card with the new clip being made (or the lock tile)." }, ...refusals },
+});
+videosRoutes.openapi(spatialRoute, async (c) => {
+  const actor = c.get("person");
+  const audience = videoRouteAudience(actor);
+  // The one edit gate, before anything is read: a child or teen gets the edit line, whatever clip they name.
+  const gate = editRefusal(audience, "");
+  if (gate) return c.json({ error: gate.line, code: gate.kind === "denied" ? gate.why : "minor" }, gate.kind === "denied" ? 403 : 422) as never;
+  const source = getVideoJobFor(actor, c.req.valid("param").id) ?? getVideoJobByFileFor(actor, c.req.valid("param").id);
+  if (!source || source.state !== "done") return c.json({ error: "That video isn't available any more. Ask for it again.", code: "not_found" }, 404) as never;
+  if (videoJobLockState(actor, source) !== "open") return c.json({ error: LOCKED_START_LINE, code: "locked", locked: true }, 423) as never;
+  const asked = (await c.req.json().catch(() => ({}))) as { surround?: unknown };
+  const state = { actor, surface: "chat", conversationId: source.conversationId, turnId: source.turnId, temporary: source.temporary, planBasis: { surfaceClass: "written" }, context: [], utterance: "", persona: null, crisis: false } as unknown as RunEditVideoInput["state"];
+  const outcome = await runEditVideo({ state, args: { clip: source.id, change: "spatial_sound", ...(asked.surround === true ? { surround: true } : {}) }, callId: "route-spatial-sound", spoken: false });
+  const id = (outcome.result?.data as { videoJobId?: string } | undefined)?.videoJobId;
+  if (!id) return c.json({ error: refusalLineOf(outcome) ?? "I couldn't change the sound of that video. Try again.", code: String((outcome.result?.data as { refused?: string } | undefined)?.refused ?? "spatial_failed") }, 422) as never;
+  const started = getVideoJobFor(actor, id);
+  if (!started) return c.json({ error: "That video isn't available any more.", code: "not_found" }, 404) as never;
+  return c.json(videoCardOrLocked(actor, started, true, await readyFlags(actor)), 200);
 });
 
 // ---------------------------------------------------------------- settings page: the household's video LoRA library

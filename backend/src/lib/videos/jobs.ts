@@ -48,6 +48,8 @@ export interface VideoFile {
   /** VIDEO-LTX-01: which kind made the clip, and whether it has a sound track the model made (absent on a clip stored before: Quick, silent). */
   quality?: "quick" | "detailed";
   audio?: boolean;
+  /** SPATIAL-04: set only on the 5.1 sibling of a spatial-sound clip ("surround_5_1"). `files[0]` is always the stereo clip; the sibling shares its poster. */
+  role?: "stereo" | "surround_5_1";
 }
 
 /** What the person asked for, kept on their own job record (never in a log). */
@@ -73,7 +75,9 @@ export interface VideoRequest {
   adultOnly?: boolean;
   /** ADULT-LOCK-06: whether the Adult lock applies while the clip is made. Absent with `adultOnly` means on (a job stored before the lock was split from the audience). */
   adultLock?: "on" | "off";
-  edit?: { from: string; change: "trim" | "join" | "mix" | "reframe" | "grade" | "speed" | "captions" | "upscale" | "remove_background"; with?: string[] };
+  edit?: { from: string; change: "trim" | "join" | "mix" | "reframe" | "grade" | "speed" | "captions" | "upscale" | "remove_background" | "spatial_sound"; with?: string[];
+    /** SPATIAL-04: the one plain line kept with a spatial-sound clip (the Stack's own lines); the card shows it as its muted notice. */
+    note?: string };
   background?: string;
 }
 
@@ -537,6 +541,9 @@ async function waitForTurnRow(turnId: string): Promise<boolean> {
   return false;
 }
 
+/** SPATIAL-04: the Library name of the 5.1 file of a spatial-sound clip. */
+export const SURROUND_FILE_NAME = "Spatial sound 5.1.mp4";
+
 /** An mp4 starts with a box header: four size bytes, then `ftyp`. Anything else is not a clip and is never stored. */
 export function looksLikeMp4(bytes: Uint8Array): boolean {
   return bytes.byteLength > 1024 && bytes[4] === 0x66 && bytes[5] === 0x74 && bytes[6] === 0x79 && bytes[7] === 0x70;
@@ -551,7 +558,7 @@ function saveFailureLine(status: number): string {
 }
 
 /** The finished-clip check, the store and the job's end, for a clip the Stack made (`finish`) and one an edit made (`finishEdit`). The Stack's bytes are stored unchanged. */
-async function settleClip(job: VideoJob, actor: PersonRow, video: Uint8Array, posterIn: Uint8Array | null, clip: StackClip, signal: AbortSignal, writer: "video-gen" | "video-edit", mediaType: "video/mp4" | "video/webm" = "video/mp4"): Promise<void> {
+async function settleClip(job: VideoJob, actor: PersonRow, video: Uint8Array, posterIn: Uint8Array | null, clip: StackClip, signal: AbortSignal, writer: "video-gen" | "video-edit", mediaType: "video/mp4" | "video/webm" = "video/mp4", surround: Uint8Array | null = null): Promise<void> {
   // VIDEO-GEN / IMGGEN-SAFE-01: the finished-clip check, before anything is stored or shown. First, middle and last
   // keyframes go through the same local vision check as a picture; a Mac that cannot decode a clip checks the poster alone.
   // An edit is adult-only when any clip it is made from is (`request.adultOnly`, set when the edit starts), never lower than its sources.
@@ -567,6 +574,16 @@ async function settleClip(job: VideoJob, actor: PersonRow, video: Uint8Array, po
   if (signal.aborted) return;
   const decision = await gateFinished({ actor, kind: "video", jobId: job.id, adultOnly: adult, checks, images: keyframes ?? [poster], prompt: job.prompt });
   if (decision.action === "withhold") { job.state = "failed"; job.error = decision.line; job.files = []; saveVideoJob(job); return; }
+  // SPATIAL-04: the 5.1 file takes the same finished-clip check as the stereo clip (the same keyframe check and the same lane gate), before either is stored.
+  // It carries the same picture (the Stack copies the video stream), but it is its own file, so it is looked at on its own. One withheld file ends the job.
+  if (surround) {
+    const siblingFrames = await extractKeyframes(surround, clip.seconds ?? job.request.seconds);
+    const siblingChecks = await checkImages(siblingFrames ?? [poster], "video");
+    if (!siblingFrames) siblingChecks.push({ ok: false, why: "unavailable" });
+    if (signal.aborted) return;
+    const siblingDecision = await gateFinished({ actor, kind: "video", jobId: job.id, adultOnly: adult, checks: siblingChecks, images: siblingFrames ?? [poster], prompt: job.prompt });
+    if (siblingDecision.action === "withhold") { job.state = "failed"; job.error = siblingDecision.line; job.files = []; saveVideoJob(job); return; }
+  }
   // ADULT-LOCK-06: the lock is on from the start (an adult-only style or source: `request.adultLock`), or now, when the finished-clip check's own verdict is nude or
   // sexual. The prompt word check above raised the audience only. A job that started from a source (an edit, a continued frame) follows the source's flags (the table), so a verdict never relocks a clip the creator cleared.
   const verdictNude = !job.request.edit && job.request.adultLock === undefined && checks.some((check) => check.ok && check.verdict.is_nude_or_sexual);
@@ -584,12 +601,18 @@ async function settleClip(job: VideoJob, actor: PersonRow, video: Uint8Array, po
   const quality = clip.quality === "detailed" || ((clip.quality === "ltx25" || clip.quality === "ltx25max") && job.request.quality === "detailed") ? "detailed" as const : "quick" as const;
   const meta = { seed: clip.seed ?? null, model: clip.model ?? null, ms: clip.ms ?? null, seconds: clip.seconds ?? null, width, height, quality, audio: clip.audio === true };
   let file: VideoFile;
+  let sibling: VideoFile | null = null;
   if (job.temporary) {
     const id = newFileId();
     const posterId = newFileId();
     storeTemporaryClip({ id, conversationId: conversationId!, ownerPersonId: actor.id, mediaType, bytes: video });
     storeTemporaryClip({ id: posterId, conversationId: conversationId!, ownerPersonId: actor.id, mediaType: "image/jpeg", bytes: poster,  });
     file = { id, poster_id: posterId, width, height, seconds: meta.seconds, seed: meta.seed, model: meta.model, ms: meta.ms, bytes: video.byteLength, quality, audio: meta.audio };
+    if (surround) {
+      const siblingId = newFileId();
+      storeTemporaryClip({ id: siblingId, conversationId: conversationId!, ownerPersonId: actor.id, mediaType, bytes: surround });
+      sibling = { ...file, id: siblingId, bytes: surround.byteLength, role: "surround_5_1" };
+    }
   } else {
     const own = conversationId === null;
     if (!own && (!job.turnId || !(await waitForTurnRow(job.turnId)))) throw new Error("turn row never appeared");
@@ -606,8 +629,18 @@ async function settleClip(job: VideoJob, actor: PersonRow, video: Uint8Array, po
     if (!madePoster.ok) { job.state = "failed"; job.error = saveFailureLine(madePoster.status); saveVideoJob(job); return; }
     if (lock === "on") logAutoMark(made.value.id, actor.id);
     file = { id: made.value.id, poster_id: madePoster.value.id, width, height, seconds: meta.seconds, seed: meta.seed, model: meta.model, ms: meta.ms, bytes: video.byteLength, quality, audio: meta.audio };
+    if (surround) {
+      // SPATIAL-04: the 5.1 file is its own Library file, marked exactly like the stereo clip (same provenance flags), named so it can be told apart.
+      const siblingProvenance = `${writer}:${JSON.stringify({ v: 1, ...markNote, job: job.id, ...meta, role: "surround_5_1", ...(job.request.edit ? { from: job.request.edit.from, change: job.request.edit.change } : {}) })}`;
+      const siblingMade = own
+        ? storeFile(actor, { conversationId: null, turnId: null, mediaType, bytes: surround, provenance: siblingProvenance, deduplicate: false, retention: "kept", name: SURROUND_FILE_NAME })
+        : createAttachment(actor, { conversationId: conversationId!, turnId: job.turnId!, mediaType, bytes: surround, provenance: siblingProvenance, deduplicate: false, retention: "conversation", name: SURROUND_FILE_NAME });
+      if (!siblingMade.ok) { job.state = "failed"; job.error = saveFailureLine(siblingMade.status); saveVideoJob(job); return; }
+      if (lock === "on") logAutoMark(siblingMade.value.id, actor.id);
+      sibling = { ...file, id: siblingMade.value.id, bytes: surround.byteLength, role: "surround_5_1" };
+    }
   }
-  job.files = [file];
+  job.files = sibling ? [{ ...file, role: "stereo" }, sibling] : [file];
   job.state = "done";
   job.percent = 100;
   job.phase = "ready";
@@ -637,7 +670,11 @@ async function finish(job: VideoJob, actor: PersonRow, clips: StackClip[], signa
 // ---------------------------------------------------------------- edits (VIDEO-CHAT-01, C3 and C4)
 
 /** What an edit hands back: the new clip's bytes and what the Stack measured. Frame 0 of the clip is its poster. */
-export interface EditedClip { video: Uint8Array; seconds: number | null; width: number | null; height: number | null; audio: boolean; ms: number }
+export interface EditedClip { video: Uint8Array; seconds: number | null; width: number | null; height: number | null; audio: boolean; ms: number;
+  /** SPATIAL-04: the 5.1 file made beside the stereo clip (`video`); it takes the same finished-clip check and the same flags. */
+  surround?: Uint8Array;
+  /** SPATIAL-04: the plain line kept with the clip (the Stack's lines for a spatial-sound step). */
+  note?: string }
 /** The work of one edit (the Stack call, and any speech made first). It never throws: a failure is one plain line. */
 export type EditRun = (signal: AbortSignal, onProgress?: (percent: number) => void) => Promise<{ ok: true; clip: EditedClip } | { ok: false; line: string }>;
 export const EDIT_FAILED_PREFIX = "I couldn't change that video.";
@@ -676,7 +713,9 @@ async function runEdit(job: VideoJob, actor: PersonRow, run: EditRun, source: Vi
     const seconds = clip.seconds === null ? null : Math.round(clip.seconds * 100) / 100;
     if (seconds !== null) job.request.seconds = Math.max(1, Math.round(seconds));
     const quality = job.request.quality === "detailed" ? "detailed" as const : "quick" as const;
-    await settleClip(job, actor, clip.video, null, { seconds: seconds ?? undefined, width: clip.width ?? undefined, height: clip.height ?? undefined, seed: source.request.seed ?? undefined, model: source.files[0]?.model ?? undefined, ms: clip.ms, quality, audio: clip.audio }, controller.signal, "video-edit", webm ? "video/webm" : "video/mp4");
+    if (clip.surround && !looksLikeMp4(clip.surround)) { job.state = "failed"; job.error = `${EDIT_FAILED_PREFIX} The 5.1 file didn't come out right. Try again.`; saveVideoJob(job); return; }
+    if (clip.note && job.request.edit) job.request.edit = { ...job.request.edit, note: clip.note };
+    await settleClip(job, actor, clip.video, null, { seconds: seconds ?? undefined, width: clip.width ?? undefined, height: clip.height ?? undefined, seed: source.request.seed ?? undefined, model: source.files[0]?.model ?? undefined, ms: clip.ms, quality, audio: clip.audio }, controller.signal, "video-edit", webm ? "video/webm" : "video/mp4", clip.surround ?? null);
     if (job.state === "done" && job.files[0]) { try { onSaved?.(job.files[0].id); } catch { /* the saved film remains delivered */ } }
   } catch {
     job.state = "failed";

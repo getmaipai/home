@@ -26,6 +26,8 @@ export interface VideoItem {
   max_offered?: boolean;
   /** ADULT-LOCK-06: the item's Adult lock state for its creator, once it is shown (null while it is made, for a minor, in a temporary chat). */
   adult?: VideoAdultState | null;
+  /** SPATIAL-04: the one plain line kept with a spatial-sound clip (what the sound did, or why it is unchanged); null for any other clip. */
+  note?: string | null;
   clip: VideoClip | null;
 }
 /** ADULT-LOCK-06: what the item's menu needs. `can_clear` shows "Unmark as NSFW" (confirm dialog and a fresh passcode); `can_mark` shows "Mark as NSFW". */
@@ -39,7 +41,7 @@ export interface VideoAdultState {
 }
 /** ADULT-LOCK-02: a card that holds an adult-only clip while the page holds no unlock proof: the one lock tile. */
 export interface LockedVideoCard { locked: true; making: boolean }
-export interface VideoCard { id: string; conversation_id: string | null; items: VideoItem[]; can_make_another: boolean; limits: string }
+export interface VideoCard { id: string; conversation_id: string | null; items: VideoItem[]; can_make_another: boolean; /** SPATIAL-05: this person may edit a finished clip (an adult), so the clip's More menu offers Spatial sound. */ can_edit?: boolean; limits: string }
 export interface VideoStatus { can_make: boolean; reason: string | null; engine_ready: boolean; adult_styles: boolean; limits: string; styles: Array<{ id: string; name: string }> }
 const json = (body: unknown): RequestInit => ({ method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
 
@@ -56,5 +58,7 @@ export const videosApi = {
   adultMark: (id: string, body: { action: "clear" | "mark"; ticket?: string }) => requestJson<{ made_audience: "all-ages" | "adult-only"; lock: "on" | "off" }>(`/api/videos/jobs/${encodeURIComponent(id)}/adult-mark`, json(body)),
   animate: (input: { conversation_id: string; turn_id: string; file_id?: string; prompt?: string }) => requestJson<VideoCard>("/api/videos/animate", json(input)),
   cutToBeat: (input: { clips: string[]; track: string; beats_per_cut?: 1 | 2 | 4 | 8; length_s?: 15 | 30 | 60; conversation_id?: string }) => requestJson<VideoCard>("/api/videos/cut-to-beat", json(input)),
+  /** SPATIAL-05: make the sound of a finished clip follow who is talking on screen, with a 5.1 file when asked; the answer is the card with the new clip. */
+  spatialSound: (id: string, input: { surround?: boolean } = {}) => requestJson<VideoCard>(`/api/videos/jobs/${encodeURIComponent(id)}/spatial-sound`, json(input)),
   addMusic: (input: { clip: string; track?: string; make_music?: string; level?: "quiet" | "soft" | "balanced" | "loud" | "very_loud"; conversation_id?: string }) => requestJson<{ conversation_id: string; video_job_id: string | null; music_job_id: string | null }>("/api/videos/add-music", json(input)),
 };

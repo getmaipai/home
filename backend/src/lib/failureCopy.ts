@@ -51,6 +51,21 @@ export function voiceFailureLine(kind: VoiceFailureKind, options: { minor: boole
   return options.minor ? copy.minor : options.canOpenRepairs ? copy.adult : copy.adultNoRepairs;
 }
 
+/** SPATIAL-04: the plain line for each code the Stack's `spatial_sound` step fails with (docs/integrations.md, `media.edit`). Each says what went wrong and
+ * what to do; the Stack's own text is never shown (it can carry a path). */
+export const SPATIAL_FAILURE_COPY = {
+  no_audio: "This clip has no sound, so there is nothing to place. Make or add sound first.",
+  bad_input: "Spatial sound follows people on screen, and this clip has no picture it can read. Pick a clip with a picture.",
+  model_missing: "Spatial sound needs the Look part. An admin can install it in Settings, Models and storage, then try again.",
+  no_memory: "There is not enough free memory for spatial sound right now. Wait for other work to finish, then try again.",
+  speech_unavailable: "Spatial sound needs the speech part, and it is not running. An admin can check Settings, Models and storage, then try again.",
+  spatial_failed: "Spatial sound did not finish. Try again, or try a shorter clip.",
+} as const;
+export type SpatialFailureCode = keyof typeof SPATIAL_FAILURE_COPY;
+export function isSpatialFailureCode(code: unknown): code is SpatialFailureCode {
+  return typeof code === "string" && Object.prototype.hasOwnProperty.call(SPATIAL_FAILURE_COPY, code);
+}
+
 interface FailureCopy {
   adult: string;
   adultAway?: string;

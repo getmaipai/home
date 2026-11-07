@@ -70,10 +70,11 @@
           "upscale",
           "remove_background",
           "title_card",
-          "credits"
+          "credits",
+          "spatial_sound"
         ],
         "grounded": false,
-        "description": "another_take makes the same video again with a new random result. remix makes it again with changes. make_it_max makes it at Max for people an admin allowed. trim cuts it; set from_s and to_s. join puts your videos in order; set clips. mix adds a voice or song; to add new music made for the video, use sound music with make_music. cut_to_beat cuts your videos to the beat of your song; set track, clips, beats_per_cut (1, 2, 4 or 8, default 4) and length_s (5 to 60, default 30). reframe changes shape; grade changes the look; film_look applies a preset; letterbox adds cinema bars; speed changes playback; captions adds timed words. upscale: make the clip sharper and twice as big. remove_background cuts out the main subject. title_card adds a title at the start; credits adds rolling names at the end. continue starts from its last picture. extend makes it longer at Max; set seconds to how many more seconds. retake makes it again from a time at Max; set from_s and prompt only if the words change. These make a new version and keep the first. A video exists only if you called this tool in this reply. film turns a Production into a movie; set production and leave clip out."
+        "description": "another_take makes the same video again with a new random result. remix makes it again with changes. make_it_max makes it at Max for people an admin allowed. trim cuts it; set from_s and to_s. join puts your videos in order; set clips. mix adds a voice or song; to add new music made for the video, use sound music with make_music. cut_to_beat cuts your videos to the beat of your song; set track, clips, beats_per_cut (1, 2, 4 or 8, default 4) and length_s (5 to 60, default 30). reframe changes shape; grade changes the look; film_look applies a preset; letterbox adds cinema bars; speed changes playback; captions adds timed words. upscale: make the clip sharper and twice as big. remove_background cuts out the main subject. title_card adds a title at the start; credits adds rolling names at the end. spatial_sound makes the sound of a video with sound follow who is talking on screen; set surround true to also make a 5.1 file. continue starts from its last picture. extend makes it longer at Max; set seconds to how many more seconds. retake makes it again from a time at Max; set from_s and prompt only if the words change. These make a new version and keep the first. A video exists only if you called this tool in this reply. film turns a Production into a movie; set production and leave clip out."
       },
       "prompt": {
         "type": "string",
@@ -347,6 +348,11 @@
         "type": "string",
         "grounded": false,
         "description": "What goes behind the person or thing that stays: a color, a blur, or see-through. Use black, white, green, blur, transparent or a six-digit hex color."
+      },
+      "surround": {
+        "type": "boolean",
+        "grounded": false,
+        "description": "For spatial_sound: also make a 5.1 file for a surround system, as a second file of the new video."
       },
       "fill": {
         "type": "string",

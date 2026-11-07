@@ -28,8 +28,9 @@ import { isRemoteStackSelected } from "@/lib/stackEngine";
 import { videoJobLockState, LOCKED_START_LINE } from "@/lib/videos/lock";
 import { activeVideoJobsFor, getVideoJobByFileFor, sourceVideoJob, startVideoEditJob, storeContinueFrame, type EditRun, type VideoJob, type VideoRequest } from "./jobs";
 import { fetchClip, getVideoJob as getStackVideoJob, submitVideo } from "./stack";
-import { CAPTION_POSITIONS, titleSubtitle, CROSSFADE_IN_STACK, DEFAULT_CROSSFADE_S, DEFAULT_MUSIC_LEVEL, DEFAULT_VOICE_LEVEL, FILM_LOOK_PRESETS, JOIN_TRANSITIONS, maxEffectAmount, LETTERBOX_RATIOS, MAX_CROSSFADE_S, MAX_EDIT_OPS, MAX_EDIT_SECONDS, MAX_JOIN_CLIPS, MIN_CROSSFADE_S, MIN_JOIN_CLIPS, MIX_LEVEL_IDS, VIDEO_ASPECTS, TRANSITION_KINDS, captionsOps, creditsOp, crossfadeProblem, cutoutOps, effectOps, filmLookOps, filmOps, frameOps, gradeOps, joinOps, lastFrameAt, letterboxOps, mixOps, reframeOps, speedOps, titleCardOp, trimOps, trimRange, upscaleOps } from "./editPlan";
+import { CAPTION_POSITIONS, titleSubtitle, CROSSFADE_IN_STACK, DEFAULT_CROSSFADE_S, DEFAULT_MUSIC_LEVEL, DEFAULT_VOICE_LEVEL, FILM_LOOK_PRESETS, JOIN_TRANSITIONS, maxEffectAmount, LETTERBOX_RATIOS, MAX_CROSSFADE_S, MAX_EDIT_OPS, MAX_EDIT_SECONDS, MAX_JOIN_CLIPS, MIN_CROSSFADE_S, MIN_JOIN_CLIPS, MIX_LEVEL_IDS, VIDEO_ASPECTS, TRANSITION_KINDS, captionsOps, creditsOp, crossfadeProblem, cutoutOps, effectOps, filmLookOps, filmOps, frameOps, gradeOps, joinOps, lastFrameAt, letterboxOps, mixOps, reframeOps, speedOps, titleCardOp, spatialNote, spatialOps, trimOps, trimRange, upscaleOps } from "./editPlan";
 import { runStackEdit, stageClipForStack, type EditFile } from "./stackEdit";
+import { SPATIAL_FAILURE_COPY } from "@/lib/failureCopy";
 import { newItemMark, type MarkSource } from "@/lib/adultLock";
 import { clipFileOf, clipMarkOf, editableClip, editRefusal, lineMark, ownTrackFile, speakLine, voiceChoice } from "./editGate";
 import { VIDEO_LOOKS, VIDEO_RECIPES, VIDEO_VOICES } from "./recipes";
@@ -52,8 +53,10 @@ const ids = <T extends { id: string }>(list: readonly T[]) => list.map((item) =>
 
 export const editVideoArgs = z.object({
   clip: z.string().trim().min(1).max(80).optional(),
-  change: z.enum(["another_take", "remix", "make_it_max", "trim", "join", "film", "mix", "cut_to_beat", "reframe", "grade", "film_look", "letterbox", "speed", "captions", "title_card", "credits", "effect", "upscale", "remove_background", "continue", "extend", "retake"]),
+  change: z.enum(["another_take", "remix", "make_it_max", "trim", "join", "film", "mix", "cut_to_beat", "reframe", "grade", "film_look", "letterbox", "speed", "captions", "title_card", "credits", "effect", "upscale", "remove_background", "spatial_sound", "continue", "extend", "retake"]),
   background: z.string().optional(),
+  /** SPATIAL-04: with `spatial_sound`, also make a 5.1 file (a second file of the new clip). */
+  surround: z.boolean().optional(),
   effect: z.enum(["speed_ramp", "reverse", "freeze", "loop", "fps_boost", "flip", "rotate", "sharpen", "denoise", "pip", "kenburns", "ripple"]).optional(),
   amount: z.number().min(0).max(1.5).optional(), deblock: z.boolean().optional(), times: z.number().int().min(2).max(6).optional(), fps: z.union([z.literal(30), z.literal(48), z.literal(60)]).optional(),
   direction: z.enum(["horizontal", "vertical"]).optional(), degrees: z.union([z.literal(90), z.literal(180), z.literal(270)]).optional(), from_factor: z.number().min(0.25).max(4).optional(), to_factor: z.number().min(0.25).max(4).optional(),
@@ -105,6 +108,8 @@ export const editVideoArgs = z.object({
 }).superRefine((value, ctx) => {
   if (value.change === "film") { if (!value.production) ctx.addIssue({ code: "custom", path: ["production"], message: "A production is required" }); }
   else if (!value.clip) ctx.addIssue({ code: "custom", path: ["clip"], message: "A video is required" });
+  if (value.change === "spatial_sound") { for (const key of Object.keys(value)) if (!["clip", "change", "surround"].includes(key)) ctx.addIssue({ code: "custom", path: [key], message: "Spatial sound takes only a clip and surround." }); }
+  else if (value.surround !== undefined) ctx.addIssue({ code: "custom", path: ["surround"], message: "Surround is only for spatial sound." });
   if (value.change === "upscale") for (const key of Object.keys(value)) if (key !== "clip" && key !== "change") ctx.addIssue({ code: "custom", path: [key], message: "Upscale takes only a clip." });
   if (value.change === "remove_background") for (const key of Object.keys(value)) if (!["clip", "change", "background"].includes(key)) ctx.addIssue({ code: "custom", path: [key], message: "Background removal takes only a clip and background." });
 });
@@ -132,6 +137,7 @@ export const CONTINUE_NOT_READY_LINE = "Continuing a video from its last picture
 export const CONTINUE_TRASH_LINE = "That video is in Trash. Restore it from Trash, then ask me to continue it.";
 export const CONTINUE_BUSY_LINE = "You already have a video being made. Wait for it to finish, or stop it first.";
 export const CONTINUE_FRAME_LINE = "I couldn't continue that video. The last picture could not be read from it. Try again.";
+export const SPATIAL_NO_SOUND_LINE = SPATIAL_FAILURE_COPY.no_audio;
 export const START_PAST_END_LINE = "That is after the video ends. Pick a start time inside it.";
 export const MAX_EDIT_NOT_READY_LINE = "This computer cannot extend or retake videos yet. An admin can check Settings, Models and storage.";
 export const MAX_EDIT_RANGE_LINE = "That time is outside the range this computer can use. Pick a time in range, then try again.";
@@ -199,7 +205,7 @@ export async function runEditVideo(input: RunEditVideoInput): Promise<ToolExecut
   if (value.change === "captions" && value.captions?.some((line) => line.to_s <= line.from_s)) return refused(callId, args, "Give me caption words with a start and end time for each line.", "bad_captions");
   const actor = state.actor as PersonRow;
   const audience = videoAudienceOf(state as Parameters<typeof videoAudienceOf>[0], input.spoken);
-  if (["extend", "retake", "trim", "join", "film", "mix", "cut_to_beat", "reframe", "grade", "film_look", "letterbox", "speed", "captions", "title_card", "credits", "upscale", "remove_background"].includes(value.change)) {
+  if (["extend", "retake", "trim", "join", "film", "mix", "cut_to_beat", "reframe", "grade", "film_look", "letterbox", "speed", "captions", "title_card", "credits", "upscale", "remove_background", "spatial_sound"].includes(value.change)) {
     const editGate = editRefusal(audience, "");
     if (editGate) return refused(callId, args, editGate.line, editGate.kind === "denied" ? editGate.why : "minor");
   }
@@ -213,7 +219,7 @@ export async function runEditVideo(input: RunEditVideoInput): Promise<ToolExecut
   const temporary = state.temporary === true || state.ephemeral === true;
   if (value.change === "continue" && laneOf(audience) !== "adult") return refused(callId, args, MINOR_MAKE_LINE, "minor");
   if (value.change === "cut_to_beat" && (!value.track || (!value.clip && !value.clips))) return refused(callId, args, value.track ? NO_CLIP_LINE : MIX_SOUND_LINE, "missing_argument");
-  if (["extend", "retake", "trim", "join", "film", "mix", "cut_to_beat", "reframe", "grade", "film_look", "letterbox", "speed", "captions", "title_card", "credits", "effect", "upscale", "remove_background"].includes(value.change)) {
+  if (["extend", "retake", "trim", "join", "film", "mix", "cut_to_beat", "reframe", "grade", "film_look", "letterbox", "speed", "captions", "title_card", "credits", "effect", "upscale", "remove_background", "spatial_sound"].includes(value.change)) {
     // Cutting, joining and mixing are for adults on their own screen, like making one: a child's turn passes the screen above but never reaches the editor.
     if (laneOf(audience) !== "adult") return refused(callId, args, MINOR_MAKE_LINE, "minor");
     // A crossfade needs a Stack step that does not exist yet; say so before any clip is read or any job starts.
@@ -484,6 +490,10 @@ async function editFinishedClips(input: RunEditVideoInput, value: EditArgs, acto
   let describe: string;
   if (value.change === "upscale") {
     inputs = [clipFiles[0]!]; ops = upscaleOps(); describe = "sharpened and doubled in size";
+  } else if (value.change === "spatial_sound") {
+    // SPATIAL-04: a clip with no sound of its own has nothing to place; the Stack would refuse it, so the answer is the same plain line without a job.
+    if (first.files[0]?.audio !== true) return refused(callId, args, SPATIAL_NO_SOUND_LINE, "no_audio");
+    inputs = [clipFiles[0]!]; ops = spatialOps(value.surround === true); describe = value.surround === true ? "sound that follows who is talking, with a 5.1 file" : "sound that follows who is talking";
   } else if (value.change === "remove_background") {
     inputs = [clipFiles[0]!]; ops = cutoutOps(background as import("./editPlan").CutoutBackground); describe = "background removed";
   } else if (value.change === "trim") {
@@ -640,10 +650,13 @@ async function editFinishedClips(input: RunEditVideoInput, value: EditArgs, acto
       files.push(line);
     }
     const made = await runStackEdit({ inputs: files, ops: ops!, name: value.change === "remove_background" && background === "transparent" ? "edited.webm" : "edited.mp4", signal, onProgress });
-    return made.ok ? { ok: true, clip: { video: made.bytes, seconds: made.seconds, width: made.width, height: made.height, audio: made.audio, ms: made.ms } } : { ok: false, line: made.line };
+    if (!made.ok) return { ok: false, line: made.line };
+    // SPATIAL-04: the 5.1 file (if asked) and the one muted line, from the Stack's own words.
+    const spatial = value.change === "spatial_sound" ? { ...(made.surround ? { surround: made.surround } : {}), note: spatialNote({ applied: made.spatial?.applied, reason: made.spatial?.reason ?? null, notes: made.spatial?.notes, surround: value.surround === true }) } : {};
+    return { ok: true, clip: { video: made.bytes, seconds: made.seconds, width: made.width, height: made.height, audio: made.audio, ms: made.ms, ...spatial } };
   };
   const mark = newItemMark(marks, false);
-  const started = startVideoEditJob({ actor, conversationId: state.conversationId, turnId: state.turnId, temporary, source: first, edit, run, background: value.change === "remove_background" ? background : undefined, phase: value.change === "upscale" ? "sharpening" : value.change === "remove_background" ? "cutting out the subject" : "editing", adultOnly: mark.madeAudience === "adult-only", adultLock: mark.lock, ...(film && actor.id === film.production.owner_person_id ? { onSaved: (fileId: string) => { const current = getMediaProduction(actor, film.production.id); if (current) updateMediaProduction(actor, current.id, { finished_cut_file_ids: [...current.finished_cut_file_ids, fileId] }); } } : {}) });
+  const started = startVideoEditJob({ actor, conversationId: state.conversationId, turnId: state.turnId, temporary, source: first, edit, run, background: value.change === "remove_background" ? background : undefined, phase: value.change === "upscale" ? "sharpening" : value.change === "remove_background" ? "cutting out the subject" : value.change === "spatial_sound" ? "placing the sound" : "editing", adultOnly: mark.madeAudience === "adult-only", adultLock: mark.lock, ...(film && actor.id === film.production.owner_person_id ? { onSaved: (fileId: string) => { const current = getMediaProduction(actor, film.production.id); if (current) updateMediaProduction(actor, current.id, { finished_cut_file_ids: [...current.finished_cut_file_ids, fileId] }); } } : {}) });
   if (!started.ok) return refused(callId, args, started.line, "already_making");
   return outcomeOf({
     callId, packageId, status: "succeeded", via: "tool_call", args, durationMs: 0,
@@ -653,4 +666,12 @@ async function editFinishedClips(input: RunEditVideoInput, value: EditArgs, acto
       actions: [],
     },
   });
+}
+
+/** The refusal line of an `edit_video` outcome, without the words the model is told before it (for a route that answers the person directly). */
+export function refusalLineOf(outcome: ToolExecutionOutcome): string | null {
+  const text = outcome.result?.reply?.text ?? "";
+  const marker = "keep its meaning: ";
+  const at = text.indexOf(marker);
+  return at >= 0 ? text.slice(at + marker.length) : null;
 }

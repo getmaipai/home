@@ -22,5 +22,6 @@ export function phaseLabel(job: VideoJob, audience: "adult" | "child"): string {
   if (job.phase === "decoding") return "Finishing the frames";
   if (job.phase === "encoding") return "Putting the video together";
   if (job.phase === "editing") return "Putting your edit together";
+  if (job.phase === "placing the sound") return "Placing the sound";
   return "Making your video";
 }

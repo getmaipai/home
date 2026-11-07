@@ -10,6 +10,8 @@ Dev tier. Design and measurements are in [video-create](../design/video-create-2
 - Verified for VIDEO-UI-06 (the Create workspace and My clips): both pages opened on a dev hub at 1440 and 390 wide, light and dark. Style popover, level segment, Generate, Stop's button, Favorites only, Remix, the heart, the My clips tabs, day groups and size slider were pressed. With no Stack, Generate and Make it Max were disabled with the one plain line. A clip then moved from queued to a percent to ready without a reload, on a scripted scratch video Stack that answers the video routes on a timer (not the real engine). **Not verified:** a clip from a real Stack through this page, and the entry following a job while its tab is throttled in the background (the browser pane does not throttle a background tab); the unit tests cover the same code with a scripted Stack.
 - Built 2026-11-02 (VIDEO-INPUTS-01 Home side, EDITOR-15), scripted tests only: picture start on LTX-2.5, `edit_video` `continue`, the `join` `transition` field. A real `continue` clip was not run (see the session report). Not built: `retake`, the join crossfade (needs a Stack step, below), the End frame slot and `end_frame` argument (bench VIDEO-INPUTS-04 first), Characters, Places and Storyboard. VIDEO-TIERS-01 stays open for the parts below Max (the Stack pin and one memory-measurement method are the Stack's).
 
+- Built 2026-11-07 (SPATIAL-04 and SPATIAL-05), scripted tests only: `edit_video` `spatial_sound` and the clip menu entries. See [spatial sound](spatial-sound.md).
+
 ## Stack requirements
 
 Home reads what the Stack reports, and offers nothing the Stack did not say it can do.

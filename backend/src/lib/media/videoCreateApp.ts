@@ -153,7 +153,7 @@ function clipRows(person: PersonRow, view: string | undefined, limit: number): A
   const files = madeFiles(person, "videos");
   const favorites = favoriteFileIds(person, files.map((file) => file.id));
   // The person's own jobs say the level and length of a clip they made; a clip shared by someone else shows its maker's name.
-  const jobOf = new Map(doneVideoJobsFor(person, null, false).flatMap((job) => (job.files[0] ? [[job.files[0].id, job] as const] : [])));
+  const jobOf = new Map(doneVideoJobsFor(person, null, false).flatMap((job) => job.files.map((file) => [file.id, job] as const)));  // SPATIAL-04: every file of a clip, so its 5.1 sibling reads as the same clip
   const rows = files.filter((file) => view !== "favorites" || favorites.has(file.id)).slice(0, limit).map((file) => {
     const job = jobOf.get(file.id);
     const seconds = job?.files[0]?.seconds ?? file.duration_seconds;

@@ -8,6 +8,7 @@ import { join, resolve, sep } from "node:path";
 import { dataDir } from "@/lib/paths";
 import { newFileId } from "@/lib/id";
 import { getStackClient, isRemoteStackSelected, isStackConfigured } from "@/lib/stackEngine";
+import { SPATIAL_FAILURE_COPY, isSpatialFailureCode } from "@/lib/failureCopy";
 
 /** The steps `media.edit` takes, as the Stack's own input schema names them (the ones Home uses). */
 export type EditOp =
@@ -45,13 +46,19 @@ export type EditOp =
   | { op: "pip"; input: number; corner: "top_left" | "top_right" | "bottom_left" | "bottom_right"; size: number; margin: number }
   | { op: "upscale"; factor: 2 }
   | { op: "cutout"; background: "black" | "white" | "green" | "blur" | "transparent" | `#${string}`; feather_px?: number; subject?: { frame?: number; box?: [number, number, number, number]; point?: { x: number; y: number } } }
+  /** SPATIAL-04 (Stack 67481c2): move the clip's own dialog toward the side of the screen where the speaker stands; `surround: true` also writes a 5.1 E-AC-3 file, and must be the last step. */
+  | { op: "spatial_sound"; surround?: boolean }
   | { op: "captions"; lines: Array<{ from_s: number; to_s: number; text: string }>; position: "bottom" | "middle" | "top" };
 
 /** One file the Stack reads: its bytes and the extension it is staged with (the Stack looks at the content, not the name). */
 export interface EditFile { bytes: Uint8Array; ext: string }
 export interface StackEditRequest { inputs: EditFile[]; ops: EditOp[]; name: string; signal?: AbortSignal; onProgress?: (progress: number) => void }
 export type StackEditResult =
-  | { ok: true; bytes: Uint8Array; seconds: number | null; width: number | null; height: number | null; audio: boolean; ms: number }
+  | { ok: true; bytes: Uint8Array; seconds: number | null; width: number | null; height: number | null; audio: boolean; ms: number;
+      /** SPATIAL-04: the 5.1 file a `spatial_sound` step with `surround` wrote beside the stereo clip (the stereo clip is `bytes`). */
+      surround?: Uint8Array;
+      /** SPATIAL-04: what a `spatial_sound` step reported: whether it moved the sound, why not, and the Stack's own plain lines (cleaned). */
+      spatial?: { applied: boolean; reason: string | null; notes: string[] } }
   | { ok: false; code: "unavailable" | "remote" | "failed" | "timeout" | "cancelled" | "unreadable"; line: string };
 
 export const EDIT_UNAVAILABLE_LINE = "I couldn't change that video. The video editor isn't ready. Try again in a few minutes.";
@@ -69,11 +76,13 @@ const MAX_RESULT_BYTES = 1024 * 1024 * 1024;
 const ACTIVE = new Set(["queued", "running", "paused", "stalled", "waiting_for_you"]);
 
 /** The Stack's own sentence for a failed edit, when it has one that names no path; else null. */
-function stackReason(reason: string | null | undefined): string | null {
-  const clean = (reason ?? "").replace(/\s+/g, " ").trim();
+export function plainStackLine(text: unknown): string | null {
+  const clean = (typeof text === "string" ? text : "").replace(/\s+/g, " ").trim();
   if (!clean || clean.length > 240 || clean.includes("/") || clean.includes("\\")) return null;
   return /[.!?]$/.test(clean) ? clean : `${clean}.`;
 }
+
+function stackReason(reason: string | null | undefined): string | null { return plainStackLine(reason); }
 
 function sleep(ms: number, signal?: AbortSignal): Promise<void> {
   return new Promise((done) => {
@@ -143,6 +152,9 @@ export async function runStackEdit(request: StackEditRequest): Promise<StackEdit
       request.onProgress?.(job.percent);
     }
     if (job.state !== "done") {
+      // SPATIAL-04: a failed `spatial_sound` step carries a code (`failure.code`); each code has one plain line of its own (failureCopy.ts).
+      const code = (job as unknown as { failure?: { code?: unknown } }).failure?.code;
+      if (request.ops.some((op) => op.op === "spatial_sound") && isSpatialFailureCode(code)) return { ok: false, code: "failed", line: `I couldn't change that video. ${SPATIAL_FAILURE_COPY[code]}` };
       const reason = stackReason(job.reason);
       return { ok: false, code: "failed", line: reason ? `I couldn't change that video. ${reason}` : EDIT_FAILED_LINE };
     }
@@ -153,7 +165,27 @@ export async function runStackEdit(request: StackEditRequest): Promise<StackEdit
     const size = statSync(path).size;
     if (size === 0 || size > MAX_RESULT_BYTES) return { ok: false, code: "unreadable", line: EDIT_MISSING_LINE };
     const num = (value: unknown): number | null => (typeof value === "number" && Number.isFinite(value) ? value : null);
-    return { ok: true, bytes: new Uint8Array(readFileSync(path)), seconds: num(result.duration_s), width: num(result.width), height: num(result.height), audio: typeof result.audio_codec === "string" && result.audio_codec.length > 0, ms: num(result.elapsed_ms) ?? 0 };
+    // SPATIAL-04: the 5.1 sibling of a `spatial_sound` step (`files[]`, role surround_5_1), read from this job's own folder only, and the Stack's plain lines.
+    const spatialStep = request.ops.some((op) => op.op === "spatial_sound");
+    let surround: Uint8Array | undefined;
+    let spatialReport: { applied: boolean; reason: string | null; notes: string[] } | undefined;
+    if (spatialStep) {
+      const listed = Array.isArray((result as { files?: unknown }).files) ? (result as { files: unknown[] }).files : [];
+      const sibling = listed.find((entry): entry is { path: string } => !!entry && typeof entry === "object" && (entry as { role?: unknown }).role === "surround_5_1" && typeof (entry as { path?: unknown }).path === "string");
+      if (sibling) {
+        const siblingPath = resolve(sibling.path);
+        const siblingSize = siblingPath.startsWith(dir + sep) && existsSync(siblingPath) ? statSync(siblingPath).size : 0;
+        // A 5.1 file the Stack named but that cannot be read back is a failed edit, not a stereo clip passed off as the whole answer.
+        if (siblingSize === 0 || siblingSize > MAX_RESULT_BYTES) return { ok: false, code: "unreadable", line: EDIT_MISSING_LINE };
+        surround = new Uint8Array(readFileSync(siblingPath));
+      }
+      const spatial = (result as { spatial?: { applied?: unknown; reason?: unknown; note?: unknown; notes?: unknown } }).spatial;
+      // `notes` is the list of lines; `note` is the same lines as one (shown only when the list is empty).
+      const listedNotes = Array.isArray(spatial?.notes) ? spatial.notes : [];
+      const lines = (listedNotes.length > 0 ? listedNotes : spatial?.note !== undefined ? [spatial.note] : []).map(plainStackLine).filter((line): line is string => line !== null);
+      spatialReport = { applied: spatial?.applied !== false, reason: typeof spatial?.reason === "string" ? spatial.reason : null, notes: [...new Set(lines)] };
+    }
+    return { ok: true, ...(surround ? { surround } : {}), ...(spatialReport ? { spatial: spatialReport } : {}), bytes: new Uint8Array(readFileSync(path)), seconds: num(result.duration_s), width: num(result.width), height: num(result.height), audio: typeof result.audio_codec === "string" && result.audio_codec.length > 0, ms: num(result.elapsed_ms) ?? 0 };
   } catch {
     // A refused or unreachable Stack: the plain line, never the error text (it can hold a path).
     if (stackJob && request.signal?.aborted) void getStackClient().cancelJob(stackJob).catch(() => undefined);

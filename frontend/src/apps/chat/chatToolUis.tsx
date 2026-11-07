@@ -22,6 +22,8 @@ import { fitAskActions } from "@/lib/fitAsk";
 import { etaLabel } from "@/lib/etaLabel";
 import { VideoPlayer } from "@maipai/ui/src/elements/video-player";
 import { videosApi, type VideoItem } from "@/lib/videosApi";
+import { toast } from "sonner";
+import { spatialActionItems } from "./spatialSoundActions";
 import { filmsApi } from "@/lib/filmsApi";
 import { askRemix } from "@/apps/chat/chatRemix";
 import { MusicTrack } from "@maipai/ui/src/elements/music-track";
@@ -722,6 +724,7 @@ export const VideoToolRender: ToolCallMessagePartComponent<Record<string, never>
   // ADULT-LOCK-06: the creator's "Unmark as NSFW" and "Mark as NSFW" actions and the confirm dialog (a hook, so it is called before any early return).
   const refresh = () => { void query.refetch(); };
   const adultMark = useVideoAdultMark(readyItem ?? null, refresh);
+  const [spatialBusy, setSpatialBusy] = useState(false);
   if (!result) return null;
   if (!card) return query.isError ? <ErrorState layout="inline" title="I couldn't check on that video" detail="Reload the chat to try again." retrying={false} /> : null;
   // ADULT-LOCK-02: a card with an adult-only clip while the page holds no unlock proof is the one lock tile (a creator marking a clip NSFW lands here too).
@@ -732,6 +735,12 @@ export const VideoToolRender: ToolCallMessagePartComponent<Record<string, never>
   const status = videoStatusOf(item);
   const clip = status === "ready" ? item.clip : null;
   const pendingActions = status === "queued" ? fitAskActions(item.fit_ask, refresh) : undefined;
+  // SPATIAL-05: Spatial sound in the clip's More menu, for a person who may edit (an adult). Disabled with its reason when the clip has no sound or making is not ready.
+  const spatial = clip && card.can_edit === true ? spatialActionItems({
+    hasSound: clip.has_sound === true, makingReason: making.reason, busy: spatialBusy,
+    onRun: (surround) => { setSpatialBusy(true); void videosApi.spatialSound(item.id, surround ? { surround: true } : {}).then(refresh).catch((error: unknown) => { toast.error(error instanceof Error ? error.message : "The sound could not be changed. Try again in a minute."); }).finally(() => setSpatialBusy(false)); },
+  }) : [];
+  const notice = [item.note, adultMark.stateLine].filter((line): line is string => Boolean(line)).join(" ");
   return (
     <VideoPlayer
       status={status}
@@ -744,10 +753,11 @@ export const VideoToolRender: ToolCallMessagePartComponent<Record<string, never>
       queuePosition={item.position}
       startedAt={item.started_at}
       hint={videoHint(item)}
-      {...(adultMark.stateLine ? { notice: adultMark.stateLine } : {})}
+      {...(notice ? { notice } : {})}
       {...(pendingActions ? { pendingActions } : {})}
       {...(item.error ? { error: item.error } : {})}
       downloadName={prepared.data?.name ?? "video.mp4"}
+      {...(spatial.length > 0 ? { actionItems: spatial, actionsInline: 2 + (card.can_make_another && status !== "failed" ? 1 : 0) } : {})}
       onStop={() => { void videosApi.stop(item.id).then(refresh).catch(refresh); }}
       onRetry={() => { void videosApi.another(item.id).then(refresh).catch(refresh); }}
       {...(clip ? {

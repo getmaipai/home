@@ -484,7 +484,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/episodes.ts` | replyIsAnAnswer, recordEpisodes, embedPendingEpisodes, deleteEpisodesForTurns, deleteEpisodesForPerson, listEpisodes |
 | `backend/src/lib/faceModelPins.ts` | SFACE_MODEL_ID, SFACE_SHA256, SFACE_DIM |
 | `backend/src/lib/factoryReset.ts` | FACTORY_RESET_CONFIRMATION_PHRASE, stageFactoryReset, pendingFactoryReset, cancelPendingFactoryReset, applyPendingFactoryReset |
-| `backend/src/lib/failureCopy.ts` | VOICE_FAILURE_COPY, voiceFailureLine, FAILURE_COPY, composerNotice, makingNotice, makingRefusalLine |
+| `backend/src/lib/failureCopy.ts` | VOICE_FAILURE_COPY, voiceFailureLine, SPATIAL_FAILURE_COPY, isSpatialFailureCode, FAILURE_COPY, composerNotice |
 | `backend/src/lib/favicons.ts` | faviconsDir, pngFromIco, iconImageBytes, isUsableIcon, iconLinksOf, __setFaviconDnsLookupForTests |
 | `backend/src/lib/fileBlobs.ts` | digestOfFile, reclaimQueuedBlobs, reclaimQueuedBlobsInBackground |
 | `backend/src/lib/fileContent.ts` | FILE_REFERENCE_KINDS, contentFor, ensureContent, expectedReferences, syncFileReferences, syncAllFileReferences |
