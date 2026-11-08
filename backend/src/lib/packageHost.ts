@@ -102,7 +102,6 @@ import { topicMessages } from "@/lib/topicPrompt";
 import { complete as llmComplete, type LlmMessage } from "@/lib/llm";
 import { translateItems, TranslateHeldError } from "@/lib/translate/core";
 import { hubCompleter } from "@/lib/translate/engine";
-import { isKnownLanguage } from "@/lib/translate/languages";
 import { mediaBandOf } from "@/lib/media/band";
 import { evaluateReply } from "@/lib/safety";
 import { runRapidOcr } from "@/lib/documentExtraction";
@@ -2897,9 +2896,10 @@ export function createHost(actor: PersonRow, manifest: PackageManifest, secrets:
     async translate(opts: { text: string; to: string; from?: string }): Promise<unknown> {
       requirePermission("llm:complete");
       const text = typeof opts?.text === "string" ? opts.text.trim() : "";
-      const to = typeof opts?.to === "string" ? opts.to.trim().toLowerCase() : "";
+      const rawTo = typeof opts?.to === "string" ? opts.to.trim().replace(/^[\s"'`]+|[\s"'`.]+$/g, "") : "";
+      const to = /^[a-z]{2,3}(-[a-z0-9]{2,8})*$/i.test(rawTo) ? rawTo.toLowerCase() : rawTo;
       if (!text) throw new HostError("invalid_input", "Nothing to translate. Say what to translate and into which language.");
-      if (!isKnownLanguage(to.split("-")[0]!)) throw new HostError("invalid_input", "That language is not supported yet. Name another language.");
+      if (!to || to.length > 40) throw new HostError("invalid_input", "I could not tell which language to translate into. Name the language and try again.");
       const band = mediaBandOf(actor);
       try {
         const result = await translateItems({

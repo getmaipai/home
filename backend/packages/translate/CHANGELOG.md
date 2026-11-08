@@ -2,6 +2,12 @@
 
 All notable changes to the Translate package, in [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) format.
 
+## [0.3.0] - 2026-11-08
+
+### Changed
+
+- Translation goes through the household's one translation service (`host.translate`, TRANSLATE-06): names, brand words, URLs and numbers stay as written, and the result passes the speaker's age band like any reply. The recipe now finds the text and the language first, then translates.
+
 ## [0.2.0] - 2026-10-31
 
 ### Added

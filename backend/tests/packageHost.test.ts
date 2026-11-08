@@ -2422,6 +2422,19 @@ describe("packageHost llm.complete", () => {
   });
 });
 
+describe("packageHost translate (TRANSLATE-06)", () => {
+  test("requires the llm:complete permission", async () => {
+    const host = createHost(await owner(), manifest({ permissions: [] }));
+    await expect(host.translate({ text: "hello", to: "es" })).rejects.toMatchObject({ code: "permission_denied" });
+  });
+
+  test("rejects empty text and an empty language as invalid_input", async () => {
+    const host = createHost(await owner(), manifest({ permissions: ["llm:complete"] }));
+    await expect(host.translate({ text: "  ", to: "es" })).rejects.toMatchObject({ code: "invalid_input" });
+    await expect(host.translate({ text: "hello", to: "  " })).rejects.toMatchObject({ code: "invalid_input" });
+  });
+});
+
 describe("packageHost reminders and timers (session-d-packages-and-store.md step 8)", () => {
   test("reminders.set checks permission before parsing anything", async () => {
     const actor = await owner();

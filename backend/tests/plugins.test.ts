@@ -474,13 +474,12 @@ describe("POST /api/plugins/translate/run", () => {
   // proves the real recipe -> llm_complete -> host.llm.complete ->
   // lib/llm.ts wiring end to end without needing a real model loaded,
   // not real translation quality (that's the model's own job).
-  test("runs the recipe end to end: llm_complete through the real host, stub chat backend", async () => {
+  test("runs the recipe end to end: the stub model names no language, so the translate step answers with what to do", async () => {
     const client = await owner();
     const res = await client.post("/api/plugins/translate/run", { expression: "hello world to spanish" });
-    expect(res.status).toBe(200);
-    const body = (await res.json()) as { reply?: { text: string } };
-    expect(body.reply?.text).toContain("hello world to spanish");
-    expect(body.reply?.text).toContain("[stub model: no real model loaded, this is a canned reply]");
+    expect(res.status).toBe(400);
+    const body = (await res.json()) as { error?: string };
+    expect(body.error).toContain("Name the language and try again");
   });
 });
 
