@@ -11,7 +11,7 @@ Owners and admins receive an in-hub alert when a paired robot has been offline f
 
 Tap the bell in the header. It shows your recent alerts, and you stay on the page you're on. Tap **View history** for the full list. It goes back 30 days, and each line shows **New**, **Read** or **Dismissed**.
 
-Notices show in your own language. A notice is kept as a kind of notice plus its details, such as the name of a model, so Home writes it in the language you have now. See [Language](language.md). A notice that came in before this change may stay in English.
+Notices show in your own language. Home writes each one in the language you use now. See [Language](language.md). An older notice may stay in English.
 
 - Tap **Dismiss** to remove one from the list.
 - Tap **Dismiss all** in the bell to clear everything at once. On the history page, tap **Select** to pick several and dismiss them together.

@@ -638,6 +638,12 @@
         "backend/src/routes/house.ts"
       ]
     },
+    "user/media-and-more/synths": {
+      "covers": [
+        "frontend/src/shell/pages/CompanionsPage.tsx",
+        "backend/src/routes/companions.ts"
+      ]
+    },
     "user/media-and-more/companions": {
       "covers": [
         "frontend/src/shell/pages/CompanionsPage.tsx",
