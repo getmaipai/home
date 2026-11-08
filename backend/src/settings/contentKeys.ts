@@ -12,14 +12,14 @@ export const CONTENT_SETTINGS_KEYS: SettingsKey[] = [SettingsKey.parse({
   level: "basic",
   lives_in: "person.preferences",
   honoured_by: ["home"],
-}), ...(["content.policy.chat_output", "content.policy.search"] as const).map((key) => SettingsKey.parse({
+}), ...(["content.policy.chat_output", "content.policy.search", "content.policy.pictures", "content.policy.videos"] as const).map((key) => SettingsKey.parse({
   key,
   scope: "household",
   selector: "boolean",
   default: false,
-  label: key.endsWith("chat_output") ? "Chat and News content policy" : "Search content policy",
+  label: { "content.policy.chat_output": "Chat and News content policy", "content.policy.search": "Search content policy", "content.policy.pictures": "Child picture rewrite", "content.policy.videos": "Child video rewrite" }[key],
   help: "Apply each person's resolved content policy to this content.",
-  copy: { does: "Applies the household content policy to checked text." },
+  copy: { does: key.startsWith("content.policy.p") || key.endsWith("videos") ? "Lets the child creation lane gently rewrite soft requests before making media." : "Applies the household content policy to checked text." },
   level: "expert",
   lives_in: "household.preferences",
   honoured_by: ["home"],

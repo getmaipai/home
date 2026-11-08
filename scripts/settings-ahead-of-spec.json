@@ -4,6 +4,8 @@
   "content.filters",
   "content.policy.chat_output",
   "content.policy.search",
+  "content.policy.pictures",
+  "content.policy.videos",
   "news.default_topics.adult",
   "news.default_topics.teen",
   "news.default_topics.child",
