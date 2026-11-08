@@ -37,7 +37,7 @@ Music, pictures, video, films, podcasts, chat, voice and your smart home share o
 - **Create an album.** A title, cover art and the songs, made in chat or in Create.
 - **Make a new song or band like the one playing.** Press **Song like this** or **Band like this** on any song.
 - **Use an existing singer.** **Sing it in another voice** with a household voice that has a saved sample. Quality varies with the sample.
-- **Make a cover or a remix.** Bring your own audio file or pick a song you made, then change its style, words, tempo or voice.
+- **Turn a song you know into a new style.** Bring in a real song and hear it as reggae, jazz, lo-fi or an acoustic ballad. It is still the same song, in a new style. Or change the words, the tempo or who sings it. It works on songs you made too.
 - **Split a song into parts.** Vocals, drums, bass and everything else, on your own computer. Remove the vocals for karaoke.
 - **Mix in the Studio.** See each track as a waveform, then mute, solo, set the volume and add EQ.
 - **Make sound effects.** Type "a wooden door creaking open" and pick from up to three takes. Loop one with no click, or add it to a song.
