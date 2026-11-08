@@ -98,6 +98,7 @@ and a proposed design; otherwise the household IP gets blocked.
 | [music-generation-2026-10-17.md](music-generation-2026-10-17.md) | new 2026-10-17, measured; chat first, studio later | MUSIC-SPEC-01, MUSIC-GEN-01 to -14, MUSIC-STUDIO-01 (Music generation) |
 | [music-studio-2026-10-31.md](music-studio-2026-10-31.md) | proposed (architect ruling pending) | MUSIC-STUDIO-01 |
 | [transcripts-captions-2026-11-06.md](transcripts-captions-2026-11-06.md) | proposed (revision 2, architect APPROVED 2026-11-06) | CAPTION-01 |
+| [translation-service-2026-11-07.md](translation-service-2026-11-07.md) | proposed (architect APPROVED 2026-11-07) | TRANSLATE-01 to 06 |
 | [music-listen-create-2026-11-01.md](music-listen-create-2026-11-01.md) | proposed (architect ruling pending); amends the Studio note: Listen/Create, made bands and albums, own lyrics, playback first | MUSIC-STUDIO-01 |
 | [video-create-2026-11-01.md](video-create-2026-11-01.md) | proposed (architect APPROVED 2026-11-01); Videos Create: Make, keyframes, extend, Storyboard, characters, places, voice overlay, chat parity | VIDEO-CREATE-01 |
 | [video-tiers-2026-11-02.md](video-tiers-2026-11-02.md) | proposed (architect ruling pending); video tiers: LTX for every tier, H3 and Wan parked, Standard 512x288 for 10 s, Max under a 64 GB cap | VIDEO-TIERS-01 |
