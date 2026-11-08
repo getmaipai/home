@@ -586,6 +586,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/jobs/queuePolicy.ts` | STRICT_BONUS, queuePolicyFromSettings, wireQueuePolicy |
 | `backend/src/lib/jobs/stackHardware.ts` | refreshStackHardware, currentHardware, startStackHardwareRefresh, __setHardwareForTests |
 | `backend/src/lib/jobs/stackWindow.ts` | stackMaxWindow |
+| `backend/src/lib/judgeFallback.ts` | completeWithFallback |
 | `backend/src/lib/keystore.ts` | getOrCreateHexKey, markKeychainProvisioned, wasKeychainProvisioned |
 | `backend/src/lib/kiwixCatalog.ts` | KIWIX_BINARIES, KIWIX_READY_MARKER, selectKiwixBinary |
 | `backend/src/lib/kiwixClient.ts` | KIWIX_REQUEST_TIMEOUT_MS, libraryRequest, installed |
@@ -1043,6 +1044,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/talent/formats.ts` | loadFormats, formatById |
 | `backend/src/lib/talent/life.ts` | LIFE_SOURCE, ORIGIN_SCHEMA, TICK_SCHEMA, ORIGIN_PROMPT, TICK_PROMPT, __setTalentLifeCompleterForTests |
 | `backend/src/lib/talent/researcher.ts` | RESEARCH_SOURCE, RESEARCH_PROMPT, RESEARCH_SCHEMA, __setResearchCompleterForTests, __setResearchSearchForTests, __setResearchReferenceForTests |
+| `backend/src/lib/talent/scriptedBriefing.ts` | canScriptBriefing, buildScriptedBriefing |
 | `backend/src/lib/talent/shows.ts` | __setTalentShowCompleterForTests, inventCast, createShow, listShows, getShow, dueShows |
 | `backend/src/lib/talent/studio.ts` | speakableText, splitAtWord, renderLines, layout, mixEpisode |
 | `backend/src/lib/talent/types.ts` | OutlineSchema, LineSchema, SegmentScriptSchema |
