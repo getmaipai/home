@@ -31,10 +31,22 @@ function parseReply(raw: string, expected: number): string[] | null {
   } catch { return null; }
 }
 
+/** The glossary's curated words for one target language: {Library: {es: "Biblioteca"}}. */
+function glossaryWords(glossary: Record<string, unknown> | undefined, to: string): Array<[string, string]> {
+  const words: Array<[string, string]> = [];
+  for (const [term, value] of Object.entries(glossary ?? {})) {
+    // Only the curated per-language entries ({es: "Biblioteca"}) are enforced; plain string hints (bold UI labels) only guide the prompt,
+    // because a verb form such as "Búscalo" for "Search it" is correct without the label word.
+    const word = value && typeof value === "object" ? (value as Record<string, unknown>)[to] : undefined;
+    if (typeof word === "string" && word.trim() && term.length > 1) words.push([term, word.trim()]);
+  }
+  return words;
+}
+
 export async function translateItems(options: {
   items: string[]; from: string; to: string; kind: Kind; completer: Completer;
   keep?: string[]; spot?: boolean;
-  glossary?: Record<string, unknown>; dialect?: string; style?: string[]; check?: (outs: string[]) => string | null;
+  glossary?: Record<string, unknown>; accept?: (source: string, out: string) => boolean; dialect?: string; style?: string[]; check?: (outs: string[]) => string | null;
   batchSize?: number; onProgress?: (done: number, total: number) => void;
 }): Promise<{ results: (string | null)[]; failed: number[]; newTerms: string[] }> {
   const { items, kind, completer } = options;
@@ -72,7 +84,14 @@ export async function translateItems(options: {
       ]);
       return response.ok ? parseReply(response.text, texts.length) : null;
     };
-    const valid = (outs: string[], sources: string[]): boolean => outs.every((out, i) => validateTranslation(sources[i]!, out, kind) === null);
+    // A glossary term that appears in the source (outside kept spans) must come back as its chosen word.
+    const wanted = (kind === "ui" || kind === "doc") ? glossaryWords(options.glossary, options.to) : [];
+    const valid = (outs: string[], sources: string[], at: number[] = sources.map((_, i) => i)): boolean => outs.every((out, i) => {
+      if (validateTranslation(sources[i]!, out, kind) !== null) return false;
+      if (options.accept && !options.accept(sources[i]!, out)) return false;
+      const visible = masks[at[i]!]?.masked ?? sources[i]!;
+      return wanted.every(([term, word]) => !new RegExp(`(?<![\\p{L}\\p{N}])${term.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}(?![\\p{L}\\p{N}])`, "u").test(visible) || out.toLowerCase().includes(word.toLowerCase()));
+    });
     const checked = (outs: string[]): void => {
       const reason = options.check?.(outs);
       if (reason !== undefined && reason !== null) throw new TranslateHeldError(reason);
@@ -92,7 +111,7 @@ export async function translateItems(options: {
       for (let i = 0; i < batch.length; i += 1) {
         const source = batch[i]!;
         const single = await translateMasked([maskedBatch[i]!], [i]);
-        if (single && valid(single, [source])) {
+        if (single && valid(single, [source], [i])) {
           checked(single);
           results[start + i] = single[0]!;
         }

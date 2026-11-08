@@ -19,7 +19,10 @@ export function findKeepSpans(text: string, terms: string[], opts: { acronyms: b
   for (const term of terms) {
     if (!term) continue;
     const sensitive = /[A-Z]/.test(term) && /[a-z]/.test(term);
-    addMatches(new RegExp(`(?<![\\p{L}\\p{N}])${escapeRe(term)}(?![\\p{L}\\p{N}])`, sensitive ? "gu" : "giu"));
+    // Word boundaries only make sense at the word-like ends of a term; a tail such as "](library.md)" has none at its start.
+    const before = /^[\p{L}\p{N}]/u.test(term) ? "(?<![\\p{L}\\p{N}])" : "";
+    const after = /[\p{L}\p{N}]$/u.test(term) ? "(?![\\p{L}\\p{N}])" : "";
+    addMatches(new RegExp(`${before}${escapeRe(term)}${after}`, sensitive ? "gu" : "giu"));
   }
   const doc = nlp(text);
   for (const value of doc.urls().out("array") as string[]) if (value) spans.push(value);

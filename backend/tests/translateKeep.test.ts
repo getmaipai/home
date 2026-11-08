@@ -98,3 +98,29 @@ describe("repeated kept terms and wrapped replies", () => {
     expect(out.results).toEqual(["Hola"]);
   });
 });
+
+describe("glossary words are enforced", () => {
+  test("a reply that leaves a glossary term in English is retried, then the chosen word is used", async () => {
+    const seen: string[] = [];
+    const reply: Completer = async (messages) => {
+      seen.push(messages[messages.length - 1]!.content);
+      return { ok: true, text: JSON.stringify([seen.length === 1 ? "Abre la Library" : "Abre la Biblioteca"]) };
+    };
+    const out = await translateItems({ items: ["Open the Library"], from: "en", to: "es", kind: "doc", completer: reply, spot: false, glossary: { Library: { es: "Biblioteca" } } });
+    expect(out.results).toEqual(["Abre la Biblioteca"]);
+  });
+  test("a glossary term inside kept code is not demanded", async () => {
+    const reply: Completer = async () => ({ ok: true, text: JSON.stringify(["Ejecuta `Library` ahora"]) });
+    const out = await translateItems({ items: ["Run `Library` now"], from: "en", to: "es", kind: "doc", completer: reply, spot: false, glossary: { Library: { es: "Biblioteca" } } });
+    expect(out.failed).toEqual([]);
+  });
+});
+
+describe("accept hook", () => {
+  test("a reply the caller rejects is retried and the accepted one is used", async () => {
+    let n = 0;
+    const reply: Completer = async () => ({ ok: true, text: JSON.stringify([n++ === 0 ? "Pulsa **Transcript**" : "Pulsa **Transcripción**"]) });
+    const out = await translateItems({ items: ["Press **Transcript**"], from: "en", to: "es", kind: "doc", completer: reply, spot: false, accept: (_s, o) => o.includes("**Transcripción**") });
+    expect(out.results).toEqual(["Pulsa **Transcripción**"]);
+  });
+});

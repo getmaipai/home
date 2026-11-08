@@ -59,12 +59,15 @@ export async function translateDocs(options: TranslateDocsOptions): Promise<{ st
     })));
     const baseGlossary = Object.fromEntries(Object.entries(glossary).filter(([key]) => key !== "dialect" && key !== "style"));
     const allGlossary = { ...baseGlossary, ...labels };
-    const keep = [...new Set(split.segments.flatMap((segment) => [
-      ...segment.keep,
-      ...[...segment.text.matchAll(/!?\[[^\]]*\]\([^)]*\)/g)].map((match) => match[0]!),
-    ]))];
+    const keep = [...new Set(split.segments.flatMap((segment) => segment.keep))];
     const items = split.segments.map((segment) => segment.text.trim());
-    const result = await translateItems({ items, from: "en", to: options.locale, kind: "doc", completer, keep, spot: options.spot === true, glossary: allGlossary, dialect: glossary.dialect, style: glossary.style });
+    const count = (text: string, token: string) => text.split(token).length - 1;
+    // Structure must survive, and a bold app label must read exactly as the app's own catalog word (checked inside the core, so a miss is retried).
+    const accept = (source: string, out: string): boolean => {
+      if (!["**", "[", "](", "`"].every((token) => count(out, token) === count(source, token))) return false;
+      return [...source.matchAll(/\*\*([^*]+)\*\*/g)].every((match) => !(match[1]! in labels) || out.includes(`**${labels[match[1]!]}**`));
+    };
+    const result = await translateItems({ items, from: "en", to: options.locale, kind: "doc", completer, keep, accept, spot: options.spot === true, glossary: allGlossary, dialect: glossary.dialect, style: glossary.style });
     untranslated += result.failed.length;
     const translated = split.segments.map((segment, i) => {
       const original = segment.text;
@@ -72,7 +75,6 @@ export async function translateDocs(options: TranslateDocsOptions): Promise<{ st
       const trailing = original.match(/\s*$/)?.[0] ?? "";
       const candidate = result.results[i] ?? original.trim();
       const rebuilt = leading + candidate + trailing;
-      const count = (text: string, token: string) => text.split(token).length - 1;
       const intact = ["**", "[", "](", "`"] .every((token) => count(rebuilt, token) === count(original, token));
       if (!intact) { untranslated += 1; return original; }
       return rebuilt;

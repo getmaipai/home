@@ -29,7 +29,7 @@ describe("docs translation source freshness", () => {
       if (messages[0]!.content.startsWith("List names")) return { ok: true, text: "[]" };
       call += 1;
       const batch = JSON.parse(messages[1]!.content) as string[];
-      return { ok: true, text: JSON.stringify(batch.map((item, index) => index === 2 ? item.replace(/\*\*/g, "") : item.toUpperCase())) };
+      return { ok: true, text: JSON.stringify(batch.map((item) => item.includes("**") ? item.replace(/\*\*/g, "") : item.toUpperCase())) };
     };
     try {
       const result = await translateDocs({ root, locale: "es", date: "2026-11-07", completer });
