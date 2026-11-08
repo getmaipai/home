@@ -203,6 +203,7 @@ const EXEMPT: Record<string, string> = {
   "lib/talent/life.ts":"writes a synth's origin and daily life beats as JSON memory records; each beat passes evaluateReply at the synth's floor before it is stored, and it is never a chat reply (the chat turn carries the topic block when a beat is recalled)",
   "lib/personaJudge.ts": "admin evaluation judge; no person-facing text",
   "lib/replyParityJudge.ts": "admin evaluation judge; no person-facing text",
+  "lib/contentPolicy/rewrite.ts": "rewrites a child's request into a gentler one as JSON for a picture, video or song prompt; the model's text never reaches the person as a reply, and the rewritten words must pass every child floor (the shared content policy, the child lane floor and the minor line) before anything is made",
 };
 
 function sourceFiles(dir: string, out: string[] = []): string[] {
