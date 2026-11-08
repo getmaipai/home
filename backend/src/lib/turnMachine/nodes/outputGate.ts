@@ -43,6 +43,9 @@ import { SUICIDE_METHOD_NOTE, namesSuicideMethod, redactSuicideMethod } from "@m
 import type { SafetyResult } from "@maipai/spec/gen/ts/safety-result.js";
 import type { Node, TurnState } from "../contract";
 import type { AnswerOutput } from "./answer";
+import { policyForConsumer } from "@/lib/contentPolicy/consumers";
+import type { ContentPolicy } from "@/lib/contentPolicy";
+import kindsData from "@/lib/contentPolicy/data/kinds.v1.json";
 
 export interface StreamGateResult {
   /** Exactly what was released, concatenated - never a second,
@@ -52,6 +55,7 @@ export interface StreamGateResult {
   /** Set the moment a sentence (or the flushed tail) refuses; nothing
    * after it was ever released. */
   refused: SafetyResult | undefined;
+  refusedPolicyLine?: string;
   /** The most recent non-refuse flag (e.g. a self_harm mention that
    * never refuses), so finalize() can still derive crisis resources for
    * a turn that never refused at all - the same field gateOutputSafety()
@@ -77,6 +81,7 @@ export interface StreamGateResult {
   /** THIN-5B: a reasoning sentence refused. Reasoning stopped there; the
    * answer is unaffected, and what had already been released stays. */
   reasoningRefused: boolean;
+  reasoningRefusedPolicyLine?: string;
 }
 
 /** True when `text` ends a sentence: its last character, past trailing whitespace and closing quotes or brackets, is . ! ? or an ellipsis. */
@@ -98,7 +103,10 @@ function streamedSpeech(band: AgeBand, reply: { text: string; speech?: string },
   return reply.speech === reply.text ? delivered : redactSuicideMethod(reply.speech).text;
 }
 
-const FIXED_MINOR_REFUSAL_LINES: ReadonlySet<string> = new Set([PROMPT_REFUSAL_LINE.minor_sexual, VIDEO_REFUSAL_LINE.minor_sexual]);
+const FIXED_MINOR_REFUSAL_LINES: ReadonlySet<string> = new Set([PROMPT_REFUSAL_LINE.minor_sexual, VIDEO_REFUSAL_LINE.minor_sexual, kindsData.fallback, ...Object.values(kindsData.lines)]);
+function policyLine(safety: SafetyResult | undefined): string {
+  return (safety as (SafetyResult & { content_policy_line?: string }) | undefined)?.content_policy_line ?? REFUSAL_FIRST[0]!;
+}
 
 /** THIN-5B (rules 2 and 10): the reasoning lane of the streaming gate. An
  * adult's reasoning is released as it is generated and checked as it
@@ -120,18 +128,22 @@ class ReasoningLane {
   private isFirstChunk = true;
   private refused = false;
   private joinNext = false;
+  private refusedPolicyLine: string | undefined;
 
   constructor(
     private readonly band: AgeBand,
+    private readonly policy: ContentPolicy | undefined,
     private readonly actor: PersonRow,
     private readonly turnId: string,
     private readonly release: (text: string) => void,
   ) {}
 
   private refuses(text: string): boolean {
-    const safety = forOutput(evaluateSafety(text, this.band, "reply"));
+    const safety = forOutput(evaluateSafety(text, this.band, "reply", this.policy));
     notifyOncePerTurn(this.actor, safety, this.turnId, "[turn]");
-    return safety.action === "refuse";
+    const refuses = safety.action === "refuse";
+    if (refuses) this.refusedPolicyLine = (safety as SafetyResult & { content_policy_line?: string }).content_policy_line;
+    return refuses;
   }
 
   push(delta: string): void {
@@ -139,6 +151,7 @@ class ReasoningLane {
     const candidate = this.pending + delta;
     if (candidate.trim() && this.refuses(candidate.trim())) {
       this.refused = true;
+      this.refusedPolicyLine = policyLine(forOutput(evaluateSafety(candidate.trim(), this.band, "reply", this.policy)));
       return;
     }
     this.pending = candidate;
@@ -156,6 +169,7 @@ class ReasoningLane {
       this.pending = this.pending.slice(end);
       if (span.trim() && this.checked.trim() && this.refuses(`${this.checked}${span}`)) {
         this.refused = true;
+        this.refusedPolicyLine ??= policyLine(forOutput(evaluateSafety(`${this.checked}${span}`, this.band, "reply", this.policy)));
         return;
       }
       this.checked += span;
@@ -165,15 +179,18 @@ class ReasoningLane {
   /** One generation is over: whatever sentence was still open is checked
    * against the reasoning so far, and the next generation starts clean. */
   endGeneration(): void {
-    if (!this.refused && this.pending.trim() && this.checked.trim() && this.refuses(`${this.checked}${this.pending}`)) this.refused = true;
+    if (!this.refused && this.pending.trim() && this.checked.trim() && this.refuses(`${this.checked}${this.pending}`)) {
+      this.refused = true;
+      this.refusedPolicyLine ??= policyLine(forOutput(evaluateSafety(`${this.checked}${this.pending}`, this.band, "reply", this.policy)));
+    }
     this.checked += this.pending;
     this.pending = "";
     this.isFirstChunk = true;
     this.joinNext = true;
   }
 
-  result(): { text: string; refused: boolean } {
-    return { text: this.released, refused: this.refused };
+  result(): { text: string; refused: boolean; refusedPolicyLine?: string } {
+    return { text: this.released, refused: this.refused, refusedPolicyLine: this.refusedPolicyLine };
   }
 }
 
@@ -218,6 +235,7 @@ export interface StreamGateOptions {
   releaseReasoning?: (text: string) => void;
   /** THIN-5C: defaults to the strict per-sentence grain. */
   grain?: GateGrain;
+  policy?: ContentPolicy;
 }
 
 export class StreamGate {
@@ -232,10 +250,12 @@ export class StreamGate {
    * sentence is read against. Equals `delivered` per sentence. */
   private checked = "";
   private readonly grain: GateGrain;
+  private readonly policy: ContentPolicy | undefined;
   /** Arrival grain: an abandoned round's text was shown and stays shown,
    * so the next round's text starts a new paragraph. */
   private joinNext = false;
   private refused: SafetyResult | undefined;
+  private refusedPolicyLine: string | undefined;
   private lastFlagged: SafetyResult | undefined;
   /** A child's or teen's sentence naming how a person died by suicide was left out; the fixed note follows at the end. */
   private methodCut = false;
@@ -275,8 +295,9 @@ export class StreamGate {
     private readonly onDone: () => void,
     opts: StreamGateOptions = {},
   ) {
-    if (opts.releaseReasoning) this.reasoningLane = new ReasoningLane(band, actor, turnId, opts.releaseReasoning);
+    if (opts.releaseReasoning) this.reasoningLane = new ReasoningLane(band, opts.policy, actor, turnId, opts.releaseReasoning);
     this.grain = opts.grain ?? "sentence";
+    this.policy = opts.policy;
   }
 
   /** THIN-5B: one reasoning delta from the engine, released live under
@@ -345,7 +366,7 @@ export class StreamGate {
    * sentence on the streamed path reaches a parent exactly as it would
    * on the old path - never a second, silent check. */
   private checkAndNotify(chunk: string): SafetyResult {
-    const safety = forOutput(evaluateSafety(chunk, this.band, "reply"));
+    const safety = forOutput(evaluateSafety(chunk, this.band, "reply", this.policy));
     notifyOncePerTurn(this.actor, safety, this.turnId, "[turn]");
     return safety;
   }
@@ -362,7 +383,7 @@ export class StreamGate {
    * checkAndNotify()'s own unconditional call above it. */
   private wholeRefusal(next: string): SafetyResult | undefined {
     if (!this.checked.trim()) return undefined;
-    const whole = forOutput(evaluateSafety(`${this.checked}${next}`, this.band, "reply"));
+    const whole = forOutput(evaluateSafety(`${this.checked}${next}`, this.band, "reply", this.policy));
     if (whole.action !== "refuse") return undefined;
     notifyOncePerTurn(this.actor, whole, this.turnId, "[turn]");
     return whole;
@@ -428,13 +449,16 @@ export class StreamGate {
       // identical precedence the old engine file's own gateOutputSafety() uses
       // (`wholeRefusal(rawSpan) ?? safety`).
       if (safety.action === "refuse") {
-        this.refused = this.wholeRefusal(rawSpan) ?? safety;
+        const whole = this.wholeRefusal(rawSpan);
+        this.refused = whole ?? safety;
+        this.refusedPolicyLine = (whole as (SafetyResult & { content_policy_line?: string }) | undefined)?.content_policy_line ?? (safety as SafetyResult & { content_policy_line?: string }).content_policy_line;
         this.onRefuse(this.refused);
         return;
       }
       const whole = this.wholeRefusal(rawSpan);
       if (whole) {
         this.refused = whole;
+        this.refusedPolicyLine = (whole as SafetyResult & { content_policy_line?: string }).content_policy_line ?? this.refusedPolicyLine;
         this.onRefuse(whole);
         return;
       }
@@ -495,7 +519,9 @@ export class StreamGate {
       const safety = this.checkAndNotify(prefix);
       if (safety.flagged) this.lastFlagged = safety;
       if (safety.action === "refuse") {
-        this.refused = this.wholeRefusal(this.pending) ?? safety;
+        const whole = this.wholeRefusal(this.pending);
+        this.refused = whole ?? safety;
+        this.refusedPolicyLine = (whole as (SafetyResult & { content_policy_line?: string }) | undefined)?.content_policy_line ?? (safety as SafetyResult & { content_policy_line?: string }).content_policy_line;
         this.onRefuse(this.refused);
         return;
       }
@@ -524,6 +550,7 @@ export class StreamGate {
         const whole = this.wholeRefusal(span);
         if (whole) {
           this.refused = whole;
+          this.refusedPolicyLine = (whole as SafetyResult & { content_policy_line?: string }).content_policy_line ?? this.refusedPolicyLine;
           this.onRefuse(whole);
           return;
         }
@@ -569,13 +596,16 @@ export class StreamGate {
       const safety = this.checkAndNotify(remainder);
       if (safety.flagged) this.lastFlagged = safety;
       if (safety.action === "refuse") {
-        this.refused = this.wholeRefusal(remainder) ?? safety;
+        const whole = this.wholeRefusal(remainder);
+        this.refused = whole ?? safety;
+        this.refusedPolicyLine = (whole as (SafetyResult & { content_policy_line?: string }) | undefined)?.content_policy_line ?? (safety as SafetyResult & { content_policy_line?: string }).content_policy_line;
         this.onRefuse(this.refused);
         return;
       }
       const whole = this.wholeRefusal(remainder);
       if (whole) {
         this.refused = whole;
+        this.refusedPolicyLine = (whole as SafetyResult & { content_policy_line?: string }).content_policy_line ?? this.refusedPolicyLine;
         this.onRefuse(whole);
         return;
       }
@@ -625,7 +655,7 @@ export class StreamGate {
 
   result(): StreamGateResult {
     const lane = this.reasoningLane?.result();
-    return { text: this.delivered, refused: this.refused, lastFlagged: this.lastFlagged, heldAsEnvelope: this.heldAsEnvelope, toolMarkup: this.markupText, done: this.done, reasoning: lane?.text ?? "", reasoningRefused: lane?.refused ?? false };
+    return { text: this.delivered, refused: this.refused, refusedPolicyLine: this.refusedPolicyLine, reasoningRefusedPolicyLine: lane?.refusedPolicyLine, lastFlagged: this.lastFlagged, heldAsEnvelope: this.heldAsEnvelope, toolMarkup: this.markupText, done: this.done, reasoning: lane?.text ?? "", reasoningRefused: lane?.refused ?? false };
   }
 }
 
@@ -654,7 +684,8 @@ export type OutputGateOutput =
  * this node's branches share the one implementation. */
 function gateReasoning(input: OutputGateInput, band: AgeBand, actor: PersonRow, turnId: string): { reasoningOut: string | undefined; withheldFor: TurnState["reasoning"]["withheld_for"] } {
   if (input.reasoningEmit && input.reasoningIn !== undefined) {
-    const reasoningEvaluation = evaluateReply({ text: input.reasoningIn }, band);
+    const policy = policyForConsumer(actor, "chat_output", band).policy;
+    const reasoningEvaluation = evaluateReply({ text: input.reasoningIn }, band, policy ?? undefined);
     // SAFETY-NOTIFY-NEXT-01: no old-path equivalent (reasoning emission,
     // REASONING-02, is new-path-only - the old path never streamed or
     // exposed a chain-of-thought span at all), but the same category of
@@ -716,6 +747,7 @@ export const outputGateNode: Node<OutputGateInput, OutputGateOutput> = async (st
 
   // THIN-0N: the speaker's effective band, as the turn machine.
   const band = turnAgeBand(state.surface, state.actor, state.speakerEvidence, new Date(), state.deviceId);
+  const policy = policyForConsumer(state.actor, "chat_output", band).policy ?? undefined;
 
   // STREAM-NEXT-01 (b), ruling point 1: on a streamed turn output_gate
   // IS the per-sentence gate - nodes/model.ts's own runOneGeneration()
@@ -737,14 +769,14 @@ export const outputGateNode: Node<OutputGateInput, OutputGateOutput> = async (st
       // trace says so rather than claiming none was emitted.
       const shown = streamed.reasoning.length > 0;
       const refusedWithheldFor = shown ? null : input.reasoningEmit ? "gate" : input.reasoningWithheldFor;
-      return { outcome: { ok: true }, output: { refused: true, text: REFUSAL_FIRST[0]!, reasoning: { emitted: shown, withheld_for: refusedWithheldFor } } };
+      return { outcome: { ok: true }, output: { refused: true, text: streamed.refusedPolicyLine ?? (streamed.refused ? policyLine(streamed.refused) : REFUSAL_FIRST[0]!), safety: streamed.refused, reasoning: { emitted: shown, withheld_for: refusedWithheldFor } } };
     }
     // THIN-5B: reasoning the gate already released live is what is stored
     // and reported, never re-evaluated here (logged equals streamed). A
     // reasoning refusal ended the stream of it and reads "gate". Reasoning
     // that never went through the gate (a think block an engine leaked
     // into `content`) still gets the whole-span pass below.
-    if (input.reasoningEmit && (streamed.reasoning || streamed.reasoningRefused)) {
+  if (input.reasoningEmit && (streamed.reasoning || streamed.reasoningRefused)) {
       const reasoningOut = streamed.reasoning || undefined;
       return { outcome: { ok: true }, output: { refused: false, text: streamed.text, speech: streamedSpeech(band, input.reply, streamed.text), language: input.reply.language, sources: input.reply.sources, reasoningOut, reasoning: { emitted: reasoningOut !== undefined, withheld_for: streamed.reasoningRefused ? "gate" : null } } };
     }
@@ -761,7 +793,7 @@ export const outputGateNode: Node<OutputGateInput, OutputGateOutput> = async (st
   const repairedRaw = assessReply(input.reply.text) ? repairReply(input.reply.text) : input.reply.text;
   const linked = band === "child" ? stripLinksForChild(repairedRaw) : repairedRaw;
   const repaired = band === "adult" ? linked : redactSuicideMethod(linked).text;
-  const evaluation = evaluateReply({ text: repairedRaw, speech: input.reply.speech }, band);
+  const evaluation = evaluateReply({ text: repairedRaw, speech: input.reply.speech }, band, policy);
   const speechOut = minorSpeech(band, band === "child" && input.reply.speech ? stripLinksForChild(input.reply.speech) : input.reply.speech);
   // SAFETY-NOTIFY-NEXT-01: the immediate (non-streamed) path's own whole-
   // reply boundary - the identical call the old engine file's own
@@ -791,7 +823,7 @@ export const outputGateNode: Node<OutputGateInput, OutputGateOutput> = async (st
     // context-decided reason (minor/surface) still wins when emit was
     // already false, never overwritten by an unrelated answer refusal.
     const refusedWithheldFor = input.reasoningEmit ? "gate" : withheldFor;
-    return { outcome: { ok: true }, output: { refused: true, text: REFUSAL_FIRST[0]!, safety: evaluation.effective, reasoning: { emitted: false, withheld_for: refusedWithheldFor } } };
+    return { outcome: { ok: true }, output: { refused: true, text: evaluation.textPolicyLine ?? evaluation.speechPolicyLine ?? REFUSAL_FIRST[0]!, safety: evaluation.effective, reasoning: { emitted: false, withheld_for: refusedWithheldFor } } };
   }
 
   const reasoning ={ emitted: reasoningOut !== undefined, withheld_for: withheldFor };

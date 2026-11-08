@@ -5,6 +5,7 @@ import { REFUSAL_FIRST } from "@/lib/replyVariation";
 import { notifyIfFlagged } from "@/lib/notifications";
 import type { PersonRow } from "@/types";
 import type { PluginResult } from "@maipai/spec/interpreters/ts/recipe-interpreter.js";
+import type { ContentPolicy } from "@/lib/contentPolicy";
 
 // Session C step 7 (session-c-brain-and-voice.md): evaluateSafety() below
 // used to derive its own `isMinor` boolean straight from `actor.role`
@@ -45,7 +46,7 @@ function isBenignTermQuestion(text: string): boolean {
 
 /** Adults use request-aware CSAM screening on input and direct CSAM detection
  * on replies. Other content decisions belong to the model/provider. */
-export function evaluateSafety(text: string, speakerBand: AgeBand, direction?: SafetyDirection): SafetyResult {
+export function evaluateSafety(text: string, speakerBand: AgeBand, direction?: SafetyDirection, policy?: ContentPolicy): SafetyResult {
   const csamMode = speakerBand === "adult"
     ? direction === "reply" ? "adult_reply" : "adult_message"
     : "floor";
@@ -57,7 +58,7 @@ export function evaluateSafety(text: string, speakerBand: AgeBand, direction?: S
   // An adult's content is the model's decision. Keep the CSAM detector,
   // crisis signal, and non-content security checks; do not turn other
   // content categories into Home-side adult refusals.
-  const result = speakerBand === "adult" && direction !== undefined
+  let result = speakerBand === "adult" && direction !== undefined
     ? (() => {
       const allowed = new Set(["csam", "self_harm", "pii_extraction", "prompt_injection", "jailbreak"]);
       const categories = checked.categories.filter((category) => allowed.has(category));
@@ -67,7 +68,12 @@ export function evaluateSafety(text: string, speakerBand: AgeBand, direction?: S
       return { ...checked, flagged: categories.length > 0, categories, action, notify_parent: false };
     })()
     : checked;
-  if (result.flagged) {
+  let policyHit: ReturnType<ContentPolicy["check"]> = null;
+  try { policyHit = policy?.check(text, "transcript") ?? null; } catch { policyHit = { kind: "minor_line", line: "I couldn't check that safely. Try something different." }; }
+  if (policyHit) {
+    result = { ...result, flagged: true, action: "refuse", content_policy_line: policyHit.line } as SafetyResult;
+  }
+  if (result.flagged && !policyHit) {
     // 4.3: "logged with the fact, never the transcript." No structured
     // host.log exists yet (that's 4.9's package host); this is a
     // fact-only line, never the checked text itself.
@@ -109,17 +115,20 @@ export function carriesCrisisSignal(result: SafetyResult): boolean {
  * crisis resources or its notification categories. */
 export interface ReplyEvaluation {
   text: SafetyResult;
+  textPolicyLine?: string;
   speech?: SafetyResult;
+  speechPolicyLine?: string;
   /** The merged result the boundary acts on. */
   effective: SafetyResult;
 }
 
 const ACTION_RANK: Record<SafetyResult["action"], number> = { allow: 0, allow_with_resources: 1, refuse: 2 };
 
-export function evaluateReply(reply: { text: string; speech?: string }, speakerBand: AgeBand): ReplyEvaluation {
-  const text = forOutput(evaluateSafety(reply.text, speakerBand, "reply"));
-  const speech = reply.speech !== undefined && reply.speech !== reply.text ? forOutput(evaluateSafety(reply.speech, speakerBand, "reply")) : undefined;
-  if (!speech) return { text, effective: text };
+export function evaluateReply(reply: { text: string; speech?: string }, speakerBand: AgeBand, policy?: ContentPolicy): ReplyEvaluation {
+  const text = forOutput(evaluateSafety(reply.text, speakerBand, "reply", policy));
+  const speech = reply.speech !== undefined && reply.speech !== reply.text ? forOutput(evaluateSafety(reply.speech, speakerBand, "reply", policy)) : undefined;
+  const textPolicyLine = (text as SafetyResult & { content_policy_line?: string }).content_policy_line;
+  if (!speech) return { text, ...(textPolicyLine ? { textPolicyLine } : {}), effective: text };
   const stricter = ACTION_RANK[speech.action] > ACTION_RANK[text.action] ? speech : text;
   const effective: SafetyResult = {
     ...stricter,
@@ -128,7 +137,8 @@ export function evaluateReply(reply: { text: string; speech?: string }, speakerB
     matched_signals: [...new Set([...text.matched_signals, ...speech.matched_signals])],
     notify_parent: text.notify_parent || speech.notify_parent,
   };
-  return { text, speech, effective };
+  const speechPolicyLine = (speech as SafetyResult & { content_policy_line?: string }).content_policy_line;
+  return { text, speech, ...(textPolicyLine ? { textPolicyLine } : {}), ...(speechPolicyLine ? { speechPolicyLine } : {}), effective };
 }
 
 /** CHAT-02: the boundary for a package answer that reaches a person

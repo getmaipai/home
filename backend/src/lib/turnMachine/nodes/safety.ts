@@ -11,6 +11,7 @@ import { detectCredential } from "@/lib/memoryContentPolicy";
 import { turnAgeBand } from "../speaker";
 import { notifyOncePerTurn, conversationInCrisis } from "@/lib/turnShared";
 import type { Node, TurnState, NodeOutcome } from "../contract";
+import { policyForConsumer } from "@/lib/contentPolicy/consumers";
 
 export interface SafetyInput {
   utterance: string;
@@ -25,7 +26,7 @@ export interface SafetyOutput {
 export const safetyNode: Node<SafetyInput, SafetyOutput> = async (state, input) => {
   // THIN-0N: the speaker's effective band, as the turn machine.
   const band = turnAgeBand(state.surface, state.actor, state.speakerEvidence, new Date(), state.deviceId);
-  const safety = evaluateSafety(input.utterance, band, "message");
+  const safety = evaluateSafety(input.utterance, band, "message", policyForConsumer(state.actor, "chat_output", band).policy ?? undefined);
   // SAFETY-NOTIFY-NEXT-01: the identical input-side call the old engine file's
   // own the turn machine makes (CHAT-02: "the input side shares the per-turn
   // dedupe with the output side") - fired regardless of `action`

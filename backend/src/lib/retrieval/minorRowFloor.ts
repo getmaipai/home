@@ -6,11 +6,13 @@
 import { checkSafety } from "@maipai/spec/safety/ts/classifier.js";
 import type { AgeBand } from "@/lib/ageBand";
 import { urlAllowedFor } from "@/lib/blocklists/hostLists";
+import type { ContentPolicy } from "@/lib/contentPolicy";
 
-export function minorRowTrips(row: { title: string; snippet?: string | null }): boolean {
-  return checkSafety(`${row.title}. ${row.snippet ?? ""}`, { isMinor: true }).flagged;
+export function minorRowTrips(row: { title: string; snippet?: string | null }, policy?: ContentPolicy): boolean {
+  const text = `${row.title}. ${row.snippet ?? ""}`;
+  return checkSafety(text, { isMinor: true }).flagged || (policy !== undefined && policy.check(text, "transcript") !== null);
 }
 
-export function minorRowAllowed(band: AgeBand, row: { title: string; snippet?: string | null; url?: string | null }): boolean {
-  return !minorRowTrips(row) && urlAllowedFor(band, row.url);
+export function minorRowAllowed(band: AgeBand, row: { title: string; snippet?: string | null; url?: string | null }, policy?: ContentPolicy): boolean {
+  return !minorRowTrips(row, policy) && urlAllowedFor(band, row.url);
 }

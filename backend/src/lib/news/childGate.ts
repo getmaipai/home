@@ -10,6 +10,7 @@ import type { AgeBand } from "@/lib/ageBand";
 import { carriesCrisisSignal, evaluateSafety, forOutput } from "@/lib/safety";
 import type { ArticleBlock, ArticleInline } from "@/lib/retrieval/extractArticle";
 import { bumpNewsCounter } from "./newsCounters";
+import type { ContentPolicy } from "@/lib/contentPolicy";
 
 export interface Gate {
   /** The text with every sentence that fails the floor left out ("" when nothing is left). */
@@ -28,13 +29,13 @@ export function sentencesOf(value: string): string[] {
 }
 
 /** A gate for this person. A band that is not child gets a pass-through (its strings meet the floor whole at release). */
-export function gateFor(band: AgeBand): Gate {
-  if (band !== "child") return { text: (value) => value, passes: () => true, sawCrisis: () => false };
+export function gateFor(band: AgeBand, policy?: ContentPolicy): Gate {
+  if (band !== "child" && !policy) return { text: (value) => value, passes: () => true, sawCrisis: () => false };
   // No parent notification here: the child asked for nothing the publisher wrote, so a dropped sentence is not the child's
   // activity to report (the classifier still logs the category, never the text).
   let crisis = false;
   const refuses = (sentence: string): boolean => {
-    const safety = forOutput(evaluateSafety(sentence, band));
+    const safety = forOutput(evaluateSafety(sentence, band, undefined, policy));
     if (carriesCrisisSignal(safety)) { crisis = true; return true; }
     return safety.action === "refuse";
   };

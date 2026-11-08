@@ -18,6 +18,7 @@
 // reader (referenceReader.ts, minorFloor.ts); this module never reads a book
 // itself, so there is no second path past them.
 import type { AgeBand } from "@/lib/ageBand";
+import type { ContentPolicy } from "@/lib/contentPolicy";
 import { bumpReferenceCounter } from "@/lib/retrieval/referenceCounters";
 import { lookupReference, type ReferenceLookup, type ReferenceReaderDeps } from "@/lib/retrieval/referenceReader";
 import type { ReferenceRow } from "@/lib/retrieval/minorFloor";
@@ -81,6 +82,7 @@ export interface FederatedInput<R extends LookupResultShape> {
   query: string;
   band: AgeBand;
   scope: SearchScope;
+  policy?: ContentPolicy;
   /** True in a temporary chat (a child's web side is offline there). */
   temporary?: boolean;
   /** Runs the live web side. `kMatched` tells it the library already answered,
@@ -97,9 +99,10 @@ export interface FederatedDeps {
 export async function federatedLookup<R extends LookupResultShape>(input: FederatedInput<R>, deps: FederatedDeps = {}): Promise<LookupResultShape> {
   bumpReferenceCounter(input.scope === "reference" ? "scope_reference" : input.scope === "web" ? "scope_web" : "scope_both", input.band);
   const reader = deps.lookupReference ?? lookupReference;
-  const ref: ReferenceLookup = await reader({ query: input.query, band: input.band }, deps.reference);
-  const kRows = ref.rows.map(referenceToLookupRow);
-  const kPages = ref.rows.map(referenceToPage).filter((p): p is LookupPage => p !== null);
+  const ref: ReferenceLookup = await reader({ query: input.query, band: input.band, policy: input.policy }, deps.reference);
+  const checkedRows = input.policy ? ref.rows.filter((row) => input.policy!.check(`${row.title}. ${row.lead}. ${row.infobox.map((f) => `${f.label}: ${f.value}`).join(". ")}. ${row.options.join(". ")}`, "transcript") === null) : ref.rows;
+  const kRows = checkedRows.map(referenceToLookupRow);
+  const kPages = checkedRows.map(referenceToPage).filter((p): p is LookupPage => p !== null);
   const kOnly = { text: ref.text, rows: kRows, ...(kPages.length > 0 ? { pages: kPages } : {}) };
   if (input.scope === "reference") return withDictionaryFallback(input, ref, kOnly, kRows, kPages, deps.dictionary);
 

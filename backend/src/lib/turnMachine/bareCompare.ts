@@ -16,6 +16,7 @@ import { feedThinkSplit, flushThinkSplit, newThinkSplitState } from "@/lib/wellF
 import { BARE_SYSTEM_PROMPT, StreamSafetyRefusal } from "@/lib/turnShared";
 import type { PersonRow } from "@/types";
 import { StreamGate, gateGrainFor } from "./nodes/outputGate";
+import { policyForConsumer } from "@/lib/contentPolicy/consumers";
 import { turnAgeBand } from "./speaker";
 
 export type BareCompareChunk = { type: "reasoning" | "delta"; text: string };
@@ -43,7 +44,7 @@ export async function startBareCompare(historyMessages: LlmMessage[], userText: 
     (sentence) => channel.emit({ type: "delta", text: sentence }),
     () => channel.close(),
     () => channel.close(),
-    { releaseReasoning: (text) => channel.emit({ type: "reasoning", text }), grain: gateGrainFor(band, "chat", false) },
+    { releaseReasoning: (text) => channel.emit({ type: "reasoning", text }), grain: gateGrainFor(band, "chat", false), policy: policyForConsumer(speaker, "chat_output", band).policy ?? undefined },
   );
   let failure: Error | undefined;
   void (async () => {

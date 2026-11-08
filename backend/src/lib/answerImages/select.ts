@@ -9,6 +9,7 @@
 import { urlAllowedFor } from "@/lib/blocklists/hostLists";
 import sharp from "sharp";
 import { checkSafety } from "@maipai/spec/safety/ts/classifier.js";
+import { policyForConsumer } from "@/lib/contentPolicy/consumers";
 import { speakerNamedAny } from "@/lib/subjects";
 import { answerImageSearch, type SearxngImageRow } from "@/lib/packageHost";
 import type { AgeBand } from "@/lib/ageBand";
@@ -139,7 +140,7 @@ const PER_SOURCE_SLOTS = GALLERY_VISIBLE * 2 + 2;
  * when Commons has fewer good ones than the row has tiles). */
 const COMMONS_ENOUGH = GALLERY_VISIBLE;
 
-const trips = (text: string, band: AgeBand): boolean => text.trim().length > 0 && checkSafety(text, { isMinor: band !== "adult" }).flagged;
+const trips = (text: string, band: AgeBand, policy?: import("@/lib/contentPolicy").ContentPolicy): boolean => text.trim().length > 0 && (checkSafety(text, { isMinor: band !== "adult" }).flagged || (policy !== undefined && policy.check(text, "transcript") !== null));
 
 function hostOf(url: string): string {
   try { return new URL(url).hostname.replace(/^www\./, ""); } catch { return ""; }
@@ -155,12 +156,13 @@ function clip(text: string, max: number): string {
 export async function selectAnswerImages(input: { subject: string; kind?: string; actor: PersonRow; band: AgeBand; roster: readonly string[]; deadlineAt?: number; libraryDeadlineAt?: number; shown?: ShownPictures }): Promise<AnswerImageSelection> {
   const subject = input.subject.trim().slice(0, 200);
   const trace: AnswerImageTrace = { subject };
+  const policy = policyForConsumer(input.actor, "search", input.band).policy ?? undefined;
   const skip = (why: AnswerImageSkip): AnswerImageSelection => ({ set: null, trace: { ...trace, skipped: why } });
   if (!subject) return skip("empty_subject");
   // Rule 1's deterministic household-name list: a family member's name never
   // leaves the house as a picture query.
   if (input.roster.length > 0 && speakerNamedAny(subject, input.roster)) return skip("household_name");
-  if (trips(subject, input.band)) return skip("floor_subject");
+  if (trips(subject, input.band, policy)) return skip("floor_subject");
   // The duplicate check's feature matcher loads while Wikidata answers.
   warmGeometry();
   const deps = { ...testDeps };
@@ -183,7 +185,7 @@ export async function selectAnswerImages(input: { subject: string; kind?: string
     if ("skipped" in resolved && !searchOnly) return skip(resolved.skipped);
     const entity: WikimediaEntity = "entity" in resolved ? resolved.entity : { id: "", label: subject, description: "", human: false, wikipediaTitle: "", resolvedVia: "no_article_search" };
     if (entity.resolvedVia) trace.resolved_via = entity.resolvedVia;
-    if (trips(`${entity.label}. ${entity.description}`, input.band)) return skip("floor_subject");
+    if (trips(`${entity.label}. ${entity.description}`, input.band, policy)) return skip("floor_subject");
     if (entity.human && (entity.birthDate === undefined ? false : isUnder18(entity.birthDate, now()))) return skip("minor_subject");
 
     // Wikimedia (sources 1 and 2): adults; a teen only once the article's own
@@ -197,7 +199,7 @@ export async function selectAnswerImages(input: { subject: string; kind?: string
         // subject's own page there is none, and a teen gets no Wikimedia
         // pictures (the call budget stays at four).
         const extract = entity.pageExtract ?? null;
-        allowed = extract !== null && extract.trim().length > 0 && !trips(extract, "teen");
+        allowed = extract !== null && extract.trim().length > 0 && !trips(extract, "teen", policy);
       }
       if (!allowed) return [];
       const leadOnly = entity.human && entity.birthDate === undefined;
@@ -316,7 +318,7 @@ export async function selectAnswerImages(input: { subject: string; kind?: string
       if (hasShown && c.page && shown!.sources.has(c.page)) { excludedShown++; continue; }
       if (seen.has(c.url)) continue;
       seen.add(c.url);
-      if (trips(`${c.title}. ${c.description}`, input.band)) { droppedByFloor++; continue; }
+      if (trips(`${c.title}. ${c.description}`, input.band, policy)) { droppedByFloor++; continue; }
       // MINOR-SEARCH-01e-5: a picture hosted on, or taken from a page on, a blocked site is never shown.
       // ZIM-IMG-01: a library picture has no web host; it sits on the subject's own article in an installed book.
       if (c.source !== "library" && (!urlAllowedFor(input.band, c.url, input.actor.id) || (c.page && !urlAllowedFor(input.band, c.page, input.actor.id)))) { droppedByBlocklist++; continue; }

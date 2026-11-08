@@ -255,3 +255,12 @@ Changed files in slice 01:
 - `backend/src/settings/contentKeys.ts`, `scripts/settings-ahead-of-spec.json`
 - `backend/tests/contentPolicy.test.ts`, `backend/tests/fixtures/contentPolicy/corpus.json`,
   `backend/tests/fixtures/contentPolicy/boundaries.json`
+
+## Slice 02 as built, 2026-11-08
+
+Chat output, streamed sentences, adult reasoning, speech and News use each person's resolved policy when
+`content.policy.chat_output` is on. Search rows, fetched pages, offline reference rows and answer-image text use it
+when `content.policy.search` is on. Both household flags default off, are owner/admin writable, and a read error
+closes toward protection. Existing minor floors, SafeSearch transport, host lists and search decisions remain in place.
+Adults never get this policy (RULES.md rules 0 and 10, architect ruling 2026-11-08): the consumer returns none for the adult band, read errors included. `content.filters` stays out of the live settings registry until slice 05, so a minor's band defaults apply and a settings read cannot weaken them. The policy is deliberately not threaded into
+picture, video, music, likeness, minor-line detectors, other package text, or search-provider transport and host resolution.

@@ -14,6 +14,7 @@
 // reported as `unavailable` with a typed reason (refused, timed out, bad
 // reply), never an invented answer.
 import type { AgeBand } from "@/lib/ageBand";
+import type { ContentPolicy } from "@/lib/contentPolicy";
 import { kiwixBaseUrl } from "@/lib/kiwixSidecar";
 import { extractArticleImages } from "@/lib/retrieval/articleImages";
 import { extractArticle } from "@/lib/retrieval/extractArticle";
@@ -47,6 +48,7 @@ export interface ReferenceLookupInput {
   /** A name or topic, not a question. */
   query: string;
   band: AgeBand;
+  policy?: ContentPolicy;
   /** First source number (KS-02 numbers tier K rows after web rows). */
   startAt?: number;
   maxRows?: number;
@@ -251,7 +253,7 @@ async function fullText(ctx: Ctx, book: string, pattern: string): Promise<Hit | 
   return items[0] ?? null;
 }
 
-async function readArticle(ctx: Ctx, db: KnowledgeDb | null, rb: ReadableBook, hit: Hit): Promise<ReleaseCandidate | null> {
+async function readArticle(ctx: Ctx, db: KnowledgeDb | null, rb: ReadableBook, hit: Hit, policy?: ContentPolicy): Promise<ReleaseCandidate | null> {
   const snapshot = await snapshotDate(ctx, rb.book);
   const stamp = snapshot ?? "unknown";
   let cached: ReturnType<KnowledgeDb["getArticle"]> = null;
@@ -262,7 +264,7 @@ async function readArticle(ctx: Ctx, db: KnowledgeDb | null, rb: ReadableBook, h
   }
   if (cached) {
     bumpReferenceCounter("cache_hit");
-    return { source: rb.source, book: rb.book, path: hit.path, snapshotDate: snapshot, article: cached.article, minorOk: cached.minorOk };
+    return { source: rb.source, book: rb.book, path: hit.path, snapshotDate: snapshot, article: cached.article, minorOk: cached.minorOk && (!policy || !tripsMinorFloor(articleFloorText(cached.article), policy)) };
   }
   bumpReferenceCounter("cache_miss");
   bumpReferenceCounter("content");
@@ -361,7 +363,7 @@ export async function lookupReference(input: ReferenceLookupInput, deps: Referen
     let failure: ReferenceUnavailableReason | null = null;
     for (const { rb, hit } of picks) {
       try {
-        const c = await readArticle(ctx, db, rb, hit);
+        const c = await readArticle(ctx, db, rb, hit, input.policy);
         if (c) candidates.push(c);
       } catch (err) {
         if (!(err instanceof Unavailable)) throw err;
@@ -371,7 +373,7 @@ export async function lookupReference(input: ReferenceLookupInput, deps: Referen
       }
     }
     if (candidates.length === 0 && failure) return NOT_FOUND("unavailable", { unavailableReason: failure });
-    const rows = releaseToBand(candidates, input.band, input.startAt ?? 1);
+    const rows = releaseToBand(candidates, input.band, input.startAt ?? 1, input.policy);
     if (rows.length === 0) {
       bumpReferenceCounter("no_match", input.band);
       return NOT_FOUND("no_match");

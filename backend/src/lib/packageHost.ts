@@ -82,6 +82,7 @@ import { stricterBand } from "@/lib/robotCompanion";
 import { NO_SOURCE_FOR_BAND_TEXT, webSourcesFor, webSourceBuilt, webSourceSearch, runWebSources, type WebRows, type WebSourceId } from "@/lib/retrieval/webSources";
 import { MINOR_QUERY_PERSONAL_NOTE, closedFormatHit, minorQueryHit } from "@/lib/retrieval/minorQueryCheck";
 import { minorRowAllowed, minorRowTrips } from "@/lib/retrieval/minorRowFloor";
+import { policyForConsumer } from "@/lib/contentPolicy/consumers";
 import { wantsSpoken } from "@/lib/spokenArg";
 import { effectiveMode, refuseWeb, webSideOff, wikimediaAllowedAfterK, wikimediaGate } from "@/lib/retrieval/sourceMode";
 import { scheduleJob, scheduleCoreJob } from "@/lib/scheduler";
@@ -1172,7 +1173,7 @@ export function __resetSearchCacheForTests(): void {
   __resetSearchBackendsForTests(); // SEARCH-ROTATE-01: the rotation's cache, cooldowns and page cache start empty too
 }
 
-type SearchOptions = { kMatched?: boolean; timeRange?: "month"; allowWikipediaFallback?: boolean; safeSearchLevel?: SafeSearchLevel; bypassCache?: boolean; minorBand?: MinorBand; speakerBand?: "child" | "teen" | "adult"; signal?: AbortSignal; deadlineAt?: number; attemptLimitMs?: number; fallbackSignal?: AbortSignal; fallbackDeadlineAt?: number; supplementary?: boolean };
+type SearchOptions = { kMatched?: boolean; timeRange?: "month"; allowWikipediaFallback?: boolean; safeSearchLevel?: SafeSearchLevel; bypassCache?: boolean; minorBand?: MinorBand; speakerBand?: "child" | "teen" | "adult"; signal?: AbortSignal; deadlineAt?: number; attemptLimitMs?: number; fallbackSignal?: AbortSignal; fallbackDeadlineAt?: number; supplementary?: boolean; policy?: import("@/lib/contentPolicy").ContentPolicy };
 
 export async function searxngSearch(args: unknown, opts: SearchOptions = {}): Promise<SearxngSearchResult> {
   const parentSignal = opts.signal;
@@ -1193,7 +1194,7 @@ export async function searxngSearch(args: unknown, opts: SearchOptions = {}): Pr
 }
 
 async function searxngSearchWithOptions(args: unknown, opts: SearchOptions = {}): Promise<SearxngSearchResult> {
-  if (opts.bypassCache) return attachSearchPages(await searxngSearchUncached(args, opts), args, opts.minorBand, opts.fallbackSignal, true);
+  if (opts.bypassCache) return attachSearchPages(await searxngSearchUncached(args, opts), args, opts.minorBand, opts.fallbackSignal, true, opts.policy);
   const input = args as { query?: unknown; category?: unknown; read_page?: unknown } | undefined;
   const query = input?.query;
   if (typeof query !== "string" || query.length === 0) return searxngSearchUncached(args, opts);
@@ -1290,7 +1291,7 @@ async function searxngSearchWithOptions(args: unknown, opts: SearchOptions = {})
     const rows = dedupeRows([...result.rows, ...second.rows]);
     return { text: [result.text, second.text].filter((value) => value !== SEARXNG_NO_RESULTS_TEXT).join("\n"), rows };
   };
-  const promise = (async () => attachSearchPages(await searchRows(), args, opts.minorBand, opts.fallbackSignal))().then((result) => {
+  const promise = (async () => attachSearchPages(await searchRows(), args, opts.minorBand, opts.fallbackSignal, false, opts.policy))().then((result) => {
     // A search that wanted pages and got none (a rate limit, a timeout, a
     // robots decline) is not cached: a retry should try the pages again.
     if (result.rows.length > 0 && (!wantsPages(input) || (result.pages?.length ?? 0) > 0)) {
@@ -1650,7 +1651,7 @@ export function __setSearchPagesBudgetForTests(ms: number | null): void {
  * pages are requested one at a time, at most one per site, at most
  * SEARCH_PAGES_MAX requests in all (a failed one still counts), and only
  * the ones that finish inside the step's time budget are kept. */
-async function attachSearchPages(found: SearxngSearchResult, args: unknown, minorBand?: MinorBand, signal?: AbortSignal, temporary = false): Promise<SearxngSearchResult> {
+async function attachSearchPages(found: SearxngSearchResult, args: unknown, minorBand?: MinorBand, signal?: AbortSignal, temporary = false, policy?: import("@/lib/contentPolicy").ContentPolicy): Promise<SearxngSearchResult> {
   const input = args as { category?: unknown; read_page?: unknown; spoken?: unknown } | undefined;
   // RESEARCH-CLOCK-01: a research run's first searches read only their top two pages (cheap first); later searches read three.
   const researchStart = currentResearchBudget();
@@ -1659,7 +1660,7 @@ async function attachSearchPages(found: SearxngSearchResult, args: unknown, mino
   const pagesMax = wantsSpoken(input) ? SEARCH_PAGES_MAX_SPOKEN : researchStart ? RESEARCH_PAGES_PER_SEARCH : SEARCH_PAGES_MAX;
   const pageChars = wantsSpoken(input) ? SEARCH_PAGE_TEXT_CHARS_SPOKEN : researchStart ? RESEARCH_PAGE_TEXT_CHARS : SEARCH_PAGE_TEXT_CHARS;
   const deduped = { ...found, rows: dedupeRows(found.rows) };
-  const result = minorBand ? floorSearchResult(deduped, minorBand) : dropBlockedSites(deduped);
+  const result = minorBand ? floorSearchResult(deduped, minorBand, policy) : dropBlockedSites(deduped);
   if (!wantsPages(input) || input?.category === "images" || input?.category === "videos") return result;
   const hosts = new Set<string>();
   const candidates: SearxngRow[] = [];
@@ -1752,7 +1753,7 @@ async function attachSearchPages(found: SearxngSearchResult, args: unknown, mino
   }
   if (pages.length === 0) return result;
   const withPages = { ...result, ...(first ? { page: first } : {}), pages };
-  return minorBand ? floorSearchResult(withPages, minorBand) : dropBlockedSites(withPages);
+  return minorBand ? floorSearchResult(withPages, minorBand, policy) : dropBlockedSites(withPages);
 }
 
 /** MINOR-SEARCH-01e-8: a grown-up's results drop only what the household's always-block list names (and any
@@ -1782,6 +1783,7 @@ function dropBlockedSites(result: SearxngSearchResult): SearxngSearchResult {
 /** The household's picked web sources for one band, run and blended: the single place a web search (the websearch tool and
  * the search palette's Web tab) chooses sources, keeps a guest off ddgs and hands a minor's rows to the floor. WEB-TAB-01. */
 export async function searchPickedWebSources(p: { args: unknown; band: AgeBand; role: string; spoken: boolean; temporary: boolean; searxOpts: SearchOptions; signal?: AbortSignal; deadlineAt?: number; imagesOrVideos?: boolean }): Promise<SearxngSearchResult> {
+  const searchPolicy = p.searxOpts.policy;
   const sources = p.imagesOrVideos ? (["searxng"] as WebSourceId[]) : webSourcesFor(p.band, p.temporary, p.spoken).filter((id) => !(id === "ddgs" && p.role === "guest")); // SEARCH-DDGS-01: a guest carries no age signal, so ddgs stays closed for them
   if (sources.length === 0) return { text: NO_SOURCE_FOR_BAND_TEXT, rows: [] };
   const rowsOnly = { ...(p.args as object), read_page: false };
@@ -1812,14 +1814,17 @@ export async function searchPickedWebSources(p: { args: unknown; band: AgeBand; 
     } });
   }
   if (!rotate) {
-    if (sources.length === 1 && sources[0] === "searxng") return searxngSearch(p.args, p.searxOpts);
+    if (sources.length === 1 && sources[0] === "searxng") {
+      const found = await searxngSearch(p.args, p.searxOpts);
+      return p.band === "adult" ? found : floorSearchResult(found, p.band, searchPolicy);
+    }
     const blended = await runWebSources(sources.map((id) => (): Promise<WebRows> => {
       if (id === "searxng") return searxngSearch(rowsOnly, p.searxOpts);
       const search = webSourceSearch(id);
       if (!search) return Promise.reject(new Error(`web source ${id} is not available`));
       return search({ args: rowsOnly, band: p.band, signal: p.signal, deadlineAt: p.deadlineAt, role: p.role, spoken: p.spoken });
     }));
-    return attachSearchPages(blended, p.args, p.band === "adult" ? undefined : p.band, p.signal, p.temporary);
+    return attachSearchPages(blended, p.args, p.band === "adult" ? undefined : p.band, p.signal, p.temporary, searchPolicy);
   }
   const adapters: BackendAdapter[] = sources.map((id): BackendAdapter => {
     if (id === "searxng") return { id: "searxng", blockedCodes: ["search_unavailable"], search: (query) => searxngSearch({ ...rowsOnly, query }, p.searxOpts) };
@@ -1830,16 +1835,16 @@ export async function searchPickedWebSources(p: { args: unknown; band: AgeBand; 
     } };
   });
   const found = await rotateSearch({ query: (asked!.query as string), adapters: [...adapters, ...extras], scope: `${p.band}${p.temporary ? ":temporary" : ""}`, signal: p.signal, ...(currentResearchBudget() !== undefined ? { wantHosts: 2 } : {}) });
-  return attachSearchPages({ text: found.text, rows: found.rows }, p.args, p.band === "adult" ? undefined : p.band, p.signal, p.temporary);
+  return attachSearchPages({ text: found.text, rows: found.rows }, p.args, p.band === "adult" ? undefined : p.band, p.signal, p.temporary, searchPolicy);
 }
 
 export type MinorBand = "child" | "teen";
 
-export function floorSearchResult(result: SearxngSearchResult, band: MinorBand): SearxngSearchResult {
+export function floorSearchResult(result: SearxngSearchResult, band: MinorBand, policy?: import("@/lib/contentPolicy").ContentPolicy): SearxngSearchResult {
   // MINOR-SEARCH-01e-5: a row or page on a blocked site is dropped; a blocked image or thumbnail address is
   // stripped from a row that is otherwise fine. Counted by list id (hostLists.ts), never by site.
   const rows = result.rows
-    .filter((row) => minorRowAllowed(band, row))
+    .filter((row) => minorRowAllowed(band, row, policy))
     .map((row) => {
       const imageOk = !row.image || urlAllowedFor(band, row.image);
       const thumbOk = !row.thumbnail || urlAllowedFor(band, row.thumbnail);
@@ -1849,7 +1854,7 @@ export function floorSearchResult(result: SearxngSearchResult, band: MinorBand):
       if (!thumbOk) delete kept.thumbnail;
       return kept;
     });
-  const pages = result.pages?.filter((page) => !minorRowTrips({ title: page.title, snippet: page.text }) && urlAllowedFor(band, page.url));
+  const pages = result.pages?.filter((page) => !minorRowTrips({ title: page.title, snippet: page.text }, policy) && urlAllowedFor(band, page.url));
   const dropped = (result.floor_dropped ?? 0) + (result.rows.length - rows.length) + ((result.pages?.length ?? 0) - (pages?.length ?? 0));
   // A minor never gets the whole-document `page` (up to 32,000 characters,
   // of which only the excerpt in `pages` is checked); only the checked
@@ -2222,6 +2227,7 @@ export function userClauseFor(modelText: string, userText: string): string {
 }
 
 export function createHost(actor: PersonRow, manifest: PackageManifest, secrets: readonly string[] = [], turn?: { id: string; conversationId?: string; userText?: string }, runtime: { signal?: AbortSignal; deadlineAt?: number; capture?: BlockCapture; spoken?: boolean; band?: AgeBand } = {}): Host {
+  const searchPolicy = policyForConsumer(actor, "search", runtime.band ?? speakerAgeBand(actor, new Date())).policy ?? undefined;
   const hasPermission = (perm: string) => manifest.permissions?.includes(perm) ?? false;
 
   function requirePermission(perm: string): void {
@@ -2806,7 +2812,7 @@ export function createHost(actor: PersonRow, manifest: PackageManifest, secrets:
             }
             const hosted = typeof input?.query === "string" && input.query.length > 0 ? await hostedSearch(input.query, band, safeSearchLevel, input.category, actor.role, runtime.signal) : null;
             if (hosted) return hosted;
-            const searxOpts = { safeSearchLevel, signal: runtime.signal, deadlineAt: runtime.deadlineAt, speakerBand: band, ...(band === "adult" ? {} : { minorBand: band }), ...(temporary ? { bypassCache: true } : {}), ...(ctx.kMatched ? { kMatched: true, ...(wikimediaAllowedAfterK(band) ? {} : { allowWikipediaFallback: false }) } : {}), ...(ctx.timeRange ? { timeRange: ctx.timeRange } : {}) };
+            const searxOpts = { safeSearchLevel, signal: runtime.signal, deadlineAt: runtime.deadlineAt, speakerBand: band, policy: searchPolicy, ...(band === "adult" ? {} : { minorBand: band }), ...(temporary ? { bypassCache: true } : {}), ...(ctx.kMatched ? { kMatched: true, ...(wikimediaAllowedAfterK(band) ? {} : { allowWikipediaFallback: false }) } : {}), ...(ctx.timeRange ? { timeRange: ctx.timeRange } : {}) };
             // SEARCH-SOURCES-01: several picked sources run at once and blend by rank; one source (the default) is the old path unchanged.
             // SEARCH-DDGS-TEEN-01: whether this is a spoken turn comes from the turn's own surface (`runtime.spoken`, set by the
             // tool node from the planned surface class), never from the model-visible args alone. A caller
@@ -2822,7 +2828,7 @@ export function createHost(actor: PersonRow, manifest: PackageManifest, secrets:
             if (webSideOff(band, temporary)) return { text: refuseWeb(band, temporary), rows: [] };
             return webSide({ kMatched: false, timeRange: undefined });
           }
-          return federatedLookup({ query: input.query, band, scope: parseScope(scopeArg), temporary, web: webSide });
+          return federatedLookup({ query: input.query, band, scope: parseScope(scopeArg), temporary, policy: searchPolicy, web: webSide });
         }
         if (id === "searxng" && method === "page.read") {
           // KS-MODE-01: `search.source_mode.web = offline` turns page reads off with web search.
@@ -2838,7 +2844,7 @@ export function createHost(actor: PersonRow, manifest: PackageManifest, secrets:
           const doc = await searxngPageRead(args, runtime.signal, readBand === "adult" ? undefined : readBand, { temporary: readTemporary });
           // THIN-4C: a page a child or teen asks for by address passes the
           // same floor before their model call can see it.
-          if (speakerAgeBand(actor, new Date()) !== "adult" && checkSafety(`${doc.title}. ${doc.text}`, { isMinor: true }).flagged) {
+          if ((speakerAgeBand(actor, new Date()) !== "adult" && checkSafety(`${doc.title}. ${doc.text}`, { isMinor: true }).flagged) || (searchPolicy !== undefined && searchPolicy.check(`${doc.title}. ${doc.text}`, "transcript") !== null)) {
             throw new HostError("network_unreachable", "That page isn't available.");
           }
           return doc;

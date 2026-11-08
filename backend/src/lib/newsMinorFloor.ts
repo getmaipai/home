@@ -4,6 +4,8 @@
 import { checkSafety } from "@maipai/spec/safety/ts/classifier.js";
 import type { PluginResult } from "@maipai/spec/interpreters/ts/recipe-interpreter.js";
 import type { AgeBand } from "@/lib/ageBand";
+import type { PersonRow } from "@/types";
+import { policyForConsumer } from "@/lib/contentPolicy/consumers";
 
 export const NEWS_NONE_FOR_MINOR_TEXT =
   "I don't have any news that's right for you to read today. Ask a grown-up to read the news with you.";
@@ -14,7 +16,8 @@ const CHILD_NEWS_HINT =
 const TOP = 3;
 
 /** Applies the minor floor to a news result. Adults get the package's reply without the extra candidate list. */
-export function applyNewsMinorFloor(result: PluginResult, band: AgeBand): PluginResult {
+export function applyNewsMinorFloor(result: PluginResult, band: AgeBand, person?: PersonRow): PluginResult {
+  const policy = person ? policyForConsumer(person, "chat_output", band).policy ?? undefined : undefined;
   const raw = (result.data as Record<string, unknown> | undefined)?.headlines;
   if (band === "adult") {
     if (!Array.isArray(raw)) return result;
@@ -26,7 +29,7 @@ export function applyNewsMinorFloor(result: PluginResult, band: AgeBand): Plugin
     return result.reply?.text.startsWith("Top headlines:") ? { ...result, reply: { text: band === "child" ? NEWS_NONE_FOR_MINOR_TEXT : NEWS_NONE_FOR_TEEN_TEXT } } : result;
   }
   if (raw.length === 0) return { ...result, data: { headlines: [] } } as PluginResult;
-  const kept = raw.filter((h): h is string => typeof h === "string" && !checkSafety(h, { isMinor: true }).flagged).slice(0, TOP);
+  const kept = raw.filter((h): h is string => typeof h === "string" && !checkSafety(h, { isMinor: true }).flagged && !(policy?.check(h, "transcript") ?? null)).slice(0, TOP);
   if (kept.length === 0) {
     const none = band === "child" ? NEWS_NONE_FOR_MINOR_TEXT : NEWS_NONE_FOR_TEEN_TEXT;
     return { ...result, reply: { text: none, speech: none }, data: { headlines: [] } } as PluginResult;

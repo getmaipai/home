@@ -8,6 +8,7 @@ checklist (`docs/dev.md`). The first release is 0.1.0.
 ## [Unreleased]
 
 ### Added
+- **Per-person content policy rollout.** Chat, News and search text floors can apply resolved filters through separate household flags.
 - `generate_video` can target an owned Production shot, use its saved picture as the start frame, and record the finished Library clip on that shot.
 
 ## [0.2.129] - 2026-10-25

@@ -14,6 +14,7 @@ import type { AgeBand } from "@/lib/ageBand";
 import type { ExtractedArticle } from "@/lib/retrieval/extractArticle";
 import { bumpReferenceCounter } from "@/lib/retrieval/referenceCounters";
 import type { ReferenceSource } from "@/lib/retrieval/referenceSources";
+import type { ContentPolicy } from "@/lib/contentPolicy";
 
 /** Everything of an article that can reach the model. */
 export function articleFloorText(article: ExtractedArticle): string {
@@ -24,8 +25,8 @@ export function articleFloorText(article: ExtractedArticle): string {
 
 /** True when the text trips the minor's floor. The one definition tier K
  * uses, at ingest and at release. */
-export function tripsMinorFloor(text: string): boolean {
-  return checkSafety(text, { isMinor: true }).flagged;
+export function tripsMinorFloor(text: string, policy?: ContentPolicy): boolean {
+  return checkSafety(text, { isMinor: true }).flagged || (policy?.check(text, "transcript") !== null && policy !== undefined);
 }
 
 export interface ReleaseCandidate {
@@ -55,7 +56,7 @@ export interface ReferenceRow {
 }
 
 /** Applies the band's floor and numbers what is left from `startAt`. */
-export function releaseToBand(candidates: readonly ReleaseCandidate[], band: AgeBand, startAt = 1): ReferenceRow[] {
+export function releaseToBand(candidates: readonly ReleaseCandidate[], band: AgeBand, startAt = 1, policy?: ContentPolicy): ReferenceRow[] {
   const rows: ReferenceRow[] = [];
   for (const c of candidates) {
     if (band !== "adult") {
@@ -63,7 +64,7 @@ export function releaseToBand(candidates: readonly ReleaseCandidate[], band: Age
         bumpReferenceCounter("ingest_floor_dropped", band);
         continue;
       }
-      if (tripsMinorFloor(articleFloorText(c.article))) {
+      if (tripsMinorFloor(articleFloorText(c.article), policy)) {
         bumpReferenceCounter("floor_dropped", band);
         continue;
       }

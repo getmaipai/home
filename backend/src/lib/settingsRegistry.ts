@@ -37,6 +37,7 @@ import { ALLOWANCE_SETTINGS_KEYS } from "@/settings/allowanceKeys";
 import { VOICE_SETTINGS_KEYS } from "@/settings/voiceKeys";
 import { AUDIO_SETTINGS_KEYS } from "@/settings/audioKeys";
 import { NEWS_SETTINGS_KEYS } from "@/settings/newsKeys";
+import { CONTENT_SETTINGS_KEYS } from "@/settings/contentKeys";
 import { ALARM_SETTINGS_KEYS } from "@/settings/alarmKeys";
 import { TOOL_BRAKE_SETTINGS_KEYS } from "@/settings/toolBrakeKeys";
 
@@ -108,7 +109,7 @@ function loadRegistry(): SettingsKey[] {
   const keys = new Set(parsed.map((entry) => entry.key));
   // THIN-4H: search.brave_api_key likewise rides here until a commons spec tag carries it.
   const personaKey = bundledPersonaSettingsKey(raw);
-  const combined = [...parsed, ...(personaKey ? [personaKey] : []), ...[...LIBRARY_RETENTION_KEYS, ...AI_SETTINGS_KEYS, ...HOSTED_SEARCH_SETTINGS_KEYS, ...MINOR_DDGS_SETTINGS_KEYS, ...NOTIFICATION_SETTINGS_KEYS, ...REFERENCE_SETTINGS_KEYS, ...PICTURE_SETTINGS_KEYS, ...CHAT_SETTINGS_KEYS, ...VIDEO_SETTINGS_KEYS, ...MUSIC_SETTINGS_KEYS, ...INSTALL_SETTINGS_KEYS, ...COMPANION_SHELL_SETTINGS_KEYS, ...COMPANION_SET_SETTINGS_KEYS, ...NEWS_SETTINGS_KEYS, ...VOICE_SETTINGS_KEYS, ...AUDIO_SETTINGS_KEYS, ...MEDIA_SETTINGS_KEYS, ...PLACE_SETTINGS_KEYS, ...ROBOT_COMPANION_SETTINGS_KEYS, ...ROBOT_SOFTWARE_SETTINGS_KEYS, ...companionVoiceSettingsKeys(), ...ROBOT_VISION_SETTINGS_KEYS, ...ROBOT_LEVELS_SETTINGS_KEYS, ...ALARM_SETTINGS_KEYS, ...TOOL_BRAKE_SETTINGS_KEYS, ...bundledPackageKeys()].filter((entry) => !keys.has(entry.key))];
+  const combined = [...parsed, ...(personaKey ? [personaKey] : []), ...[...LIBRARY_RETENTION_KEYS, ...AI_SETTINGS_KEYS, ...HOSTED_SEARCH_SETTINGS_KEYS, ...MINOR_DDGS_SETTINGS_KEYS, ...NOTIFICATION_SETTINGS_KEYS, ...REFERENCE_SETTINGS_KEYS, ...PICTURE_SETTINGS_KEYS, ...CHAT_SETTINGS_KEYS, ...VIDEO_SETTINGS_KEYS, ...MUSIC_SETTINGS_KEYS, ...INSTALL_SETTINGS_KEYS, ...COMPANION_SHELL_SETTINGS_KEYS, ...COMPANION_SET_SETTINGS_KEYS, ...NEWS_SETTINGS_KEYS, ...CONTENT_SETTINGS_KEYS.filter((entry) => entry.key !== "content.filters"), ...VOICE_SETTINGS_KEYS, ...AUDIO_SETTINGS_KEYS, ...MEDIA_SETTINGS_KEYS, ...PLACE_SETTINGS_KEYS, ...ROBOT_COMPANION_SETTINGS_KEYS, ...ROBOT_SOFTWARE_SETTINGS_KEYS, ...companionVoiceSettingsKeys(), ...ROBOT_VISION_SETTINGS_KEYS, ...ROBOT_LEVELS_SETTINGS_KEYS, ...ALARM_SETTINGS_KEYS, ...TOOL_BRAKE_SETTINGS_KEYS, ...bundledPackageKeys()].filter((entry) => !keys.has(entry.key))];
   return combined.map((key) => withPersonGuardFacts(withOwnControl(key)));
 }
 
@@ -120,6 +121,8 @@ const CHILD_GUARDIAN_CONTROL_ONLY_KEYS = new Set(["person.vision.watch"]);
 // MINOR-TOPICS-01e: a child's sensitive-subject levels are guardian-set (assertCanSetChildTopic in settings.ts).
 const isChildTopicKey = (key: string) => key.startsWith("topics.");
 const ADMIN_ONLY_KEYS = new Set([
+  "content.policy.chat_output",
+  "content.policy.search",
   "security.session_lock_required",
   "security.session_lock_timeout_minutes",
   PERSON_STORAGE_CAP_KEY,

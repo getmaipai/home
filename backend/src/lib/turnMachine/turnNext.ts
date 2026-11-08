@@ -8,6 +8,7 @@ import { latestPictureId } from "@/lib/pictures/editTool";
 import { threadMusicObject } from "@/lib/music/objects";
 import { conversationHasVideo } from "@/lib/videos/jobs";
 import { pageContextForTurn } from "@/lib/pageContext";
+import { policyForConsumer } from "@/lib/contentPolicy/consumers";
 // U2b/c (docs/plans/turn-machine-state-record-2026-09-22.md, "Files"):
 // the entry `routes/turn.ts` calls, with the same TurnStreamResult shape
 // runTurnStream() already returns (the old engine file, imported here, never
@@ -1204,6 +1205,7 @@ function startStream(actor: PersonRow, surface: Surface, text: string, begunValu
 
   const queue = new StatusChannel<string>();
   const band = turnAgeBand(surface, actor, state.speakerEvidence, new Date(), state.deviceId); // THIN-0N
+  const policy = policyForConsumer(actor, "chat_output", band).policy ?? undefined;
   // ANSWER-IMG-02: released text passes the picture placer on its way out,
   // which marks the paragraph boundary the picture set goes after.
   const placer = new AnswerImagePlacer(state, (text) => queue.emit(text));
@@ -1222,7 +1224,7 @@ function startStream(actor: PersonRow, surface: Surface, text: string, begunValu
     () => queue.close(),
     () => queue.close(),
     // THIN-5B: reasoning released by the gate goes out as its own event.
-    { releaseReasoning: (text) => status.emit({ type: "reasoning", text }), grain: gateGrainFor(band, surface, state.spoken) },
+    { releaseReasoning: (text) => status.emit({ type: "reasoning", text }), grain: gateGrainFor(band, surface, state.spoken), policy },
   );
   state.streamGate = gate;
 
