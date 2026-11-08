@@ -59,7 +59,7 @@ export function describeWhen(when: { time?: string | null; days?: readonly numbe
 }
 
 /** "Porch light": the name, with the kind added when the name does not already say it. */
-function plainName(entity: HouseEntity): string { return entity.name.trim().toLocaleLowerCase().includes(entity.kind) ? entity.name.trim() : `${entity.name.trim()} ${entity.kind}`; }
+export function plainName(entity: HouseEntity): string { return entity.name.trim().toLocaleLowerCase().includes(entity.kind) ? entity.name.trim() : `${entity.name.trim()} ${entity.kind}`; }
 /** Just the time: "4:00 PM", or "Nov 12, 6:00 PM" for a one-shot. Used where a name already says the rest. */
 function shortWhen(row: PublicSchedule, zone: string): string {
   if (row.once_at) {
@@ -197,6 +197,15 @@ const PAUSED_WORDS: Record<string, string> = {
   owner_removed: "paused because its owner was removed",
 };
 const DONE_WORDS: Record<string, string> = { turn_on: "turns on", turn_off: "turns off", activate: "runs" };
+
+/** One schedule as the app shows it: what happens, when, and a plain note when it is paused. Built from the same words as the chat list. */
+export function describeSchedule(row: PublicSchedule, names: Map<string, string>, zone: string): { what: string; when: string; note: string | null } {
+  const targets = row.what.targets.map((target) => names.get(target) ?? "a device");
+  const subject = `${targets.slice(0, 3).join(", ")}${targets.length > 3 ? ` and ${targets.length - 3} more` : ""}`;
+  const action = row.what.action === "set_brightness" ? `is set to ${row.what.value}%` : DONE_WORDS[row.what.action ?? ""] ?? "runs";
+  const reason = row.state === "paused" ? PAUSED_WORDS[row.paused_reason ?? ""] ?? "paused" : null;
+  return { what: `${subject} ${action}`, when: whenOfRow(row, zone), note: reason === null ? null : `${reason.charAt(0).toUpperCase()}${reason.slice(1)}.` };
+}
 
 function listLine(row: PublicSchedule, names: Map<string, string>, zone: string): string {
   const targets = row.what.targets.map((target) => names.get(target) ?? "a device");

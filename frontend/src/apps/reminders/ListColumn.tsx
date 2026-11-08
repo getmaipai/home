@@ -10,11 +10,13 @@ type Props = {
   view: ReminderView;
   todayCount: number;
   scheduledCount: number;
+  /** Adults only: the HOUSE-04 schedule verdict keeps teens and children out for now. */
+  deviceCount: number | null;
   onCreate: () => void;
   onSelect: (view: ReminderView) => void;
 };
 
-export function ListColumn({ lists, view, todayCount, scheduledCount, onCreate, onSelect }: Props) {
+export function ListColumn({ lists, view, todayCount, scheduledCount, deviceCount, onCreate, onSelect }: Props) {
   return <aside className="flex w-full shrink-0 flex-col border-r p-3 sm:w-72" aria-label={i18n._({ id: "Reminder lists", message: "Reminder lists" })}>
     <div className="flex items-center justify-between px-3 py-2">
       <h2 className="text-lg font-semibold">{i18n._({ id: "Lists", message: "Lists" })}</h2>
@@ -27,6 +29,9 @@ export function ListColumn({ lists, view, todayCount, scheduledCount, onCreate, 
       <Button variant={view.kind === "scheduled" ? "secondary" : "ghost"} onClick={() => onSelect({ kind: "scheduled" })}>
         <span>{i18n._({ id: "Scheduled", message: "Scheduled" })}</span>{scheduledCount > 0 ? <span>{scheduledCount}</span> : null}
       </Button>
+      {deviceCount !== null ? <Button variant={view.kind === "devices" ? "secondary" : "ghost"} onClick={() => onSelect({ kind: "devices" })}>
+        <span>{i18n._({ id: "Device schedules", message: "Device schedules" })}</span>{deviceCount > 0 ? <span>{deviceCount}</span> : null}
+      </Button> : null}
       <hr className="my-2" />
       {lists.map((list, index) => {
         const name = iconFor(list);

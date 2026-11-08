@@ -4,7 +4,7 @@ import { formatDate } from "@/lib/format";
 
 export const LIST_ICONS = ["cart", "check", "sparkle", "briefcase", "home", "heart", "book", "star", "gift", "plane", "leaf", "sun"] as const;
 export type ListIcon = typeof LIST_ICONS[number];
-export type ReminderView = { kind: "list"; id: string } | { kind: "today" | "scheduled" };
+export type ReminderView = { kind: "list"; id: string } | { kind: "today" } | { kind: "scheduled" } | { kind: "devices" };
 
 export function iconFor(list: ListRecord): ListIcon {
   if (list.kind === "shopping") return "cart";

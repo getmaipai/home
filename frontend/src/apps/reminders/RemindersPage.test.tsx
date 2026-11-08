@@ -64,6 +64,51 @@ function withLists() {
   return () => { globalThis.fetch = original; };
 }
 
+describe("RemindersPage device schedules (HOUSE-04)", () => {
+  function withSchedules(rows: Array<{ id: string; what: string; when: string; state: "active" | "paused"; note: string | null }>, others: number | null) {
+    const restore = withLists();
+    const base = globalThis.fetch;
+    const calls: string[] = [];
+    globalThis.fetch = mock((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input); const method = init?.method ?? "GET";
+      if (url.endsWith("/api/house/schedules")) { calls.push("list"); return Promise.resolve(Response.json({ schedules: rows, others })); }
+      const del = url.match(/\/api\/house\/schedules\/(.+)$/);
+      if (del && method === "DELETE") { calls.push(`delete ${del[1]}`); rows = rows.filter((row) => row.id !== del[1]); return Promise.resolve(Response.json({ ok: true })); }
+      return base(input, init);
+    }) as unknown as typeof fetch;
+    return { calls, restore: () => { globalThis.fetch = base; restore(); } };
+  }
+  const row = { id: "sched-porch0001", what: "Porch Lamp light turns on", when: "every day at 6:00 PM", state: "active" as const, note: null };
+  const asRole = (role: string) => ({ id: "person-a", role }) as unknown as Roster;
+
+  test("an adult sees their own schedules, an admin count, and can cancel one after confirming", async () => {
+    const rig = withSchedules([row, { ...row, id: "sched-hall00002", what: "Hall light turns off", state: "paused", note: "Paused because you can no longer control the device." }], 2);
+    try {
+      const view = renderWithQueryClient(<MemoryRouter><WakeWordPersonContext.Provider value={asRole("owner")}><RemindersPage /></WakeWordPersonContext.Provider></MemoryRouter>);
+      fireEvent.click(await view.findByRole("button", { name: /Device schedules/ }));
+      expect(await view.findByText("Porch Lamp light turns on")).toBeInTheDocument();
+      expect(view.getByText("Paused because you can no longer control the device.")).toBeInTheDocument();
+      expect(view.getByText("2 schedules belong to other people.")).toBeInTheDocument();
+      fireEvent.click(view.getByRole("button", { name: "Cancel schedule: Porch Lamp light turns on" }));
+      fireEvent.click(await view.findByRole("button", { name: "Cancel schedule", hidden: false }));
+      await waitFor(() => expect(rig.calls).toContain("delete sched-porch0001"));
+    } finally { rig.restore(); }
+  });
+
+  test("a teen or child never sees the entry and never asks the server", async () => {
+    const rig = withSchedules([row], null);
+    try {
+      for (const role of ["teen", "child"]) {
+        const view = renderWithQueryClient(<MemoryRouter><WakeWordPersonContext.Provider value={asRole(role)}><RemindersPage /></WakeWordPersonContext.Provider></MemoryRouter>);
+        await view.findByRole("button", { name: /Shopping/ });
+        expect(view.queryByRole("button", { name: /Device schedules/ })).toBeNull();
+        view.unmount();
+      }
+      expect(rig.calls).toEqual([]);
+    } finally { rig.restore(); }
+  });
+});
+
 describe("RemindersPage", () => {
   test("shows the two standing lists with counts, adds and ticks an item, and clears the composer", async () => {
     const restore = withLists();

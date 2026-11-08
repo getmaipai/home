@@ -240,6 +240,11 @@ msgid "{count, plural, one {# result} other {# results}}"
 msgstr "{count, plural, one {# result} other {# results}}"
 
 #. js-lingui-explicit-id
+#: src/apps/reminders/DeviceSchedulesView.tsx:34
+msgid "{count, plural, one {# schedule belongs to another person.} other {# schedules belong to other people.}}"
+msgstr "{count, plural, one {# schedule belongs to another person.} other {# schedules belong to other people.}}"
+
+#. js-lingui-explicit-id
 #: src/shell/pages/MusicStudioPages.tsx:119
 msgid "{count, plural, one {# song} other {# songs}}"
 msgstr "{count, plural, one {# song} other {# songs}}"
@@ -305,7 +310,7 @@ msgid "{count, plural, one {Forget your memory? This cannot be undone.} other {F
 msgstr "{count, plural, one {Forget your memory? This cannot be undone.} other {Forget every one of your # memories? This cannot be undone.}}"
 
 #. js-lingui-explicit-id
-#: src/apps/reminders/RemindersPage.tsx:175
+#: src/apps/reminders/RemindersPage.tsx:182
 msgid "{count, plural, one {Its # item goes too.} other {Its # items go too.}}"
 msgstr "{count, plural, one {Its # item goes too.} other {Its # items go too.}}"
 
@@ -4157,7 +4162,7 @@ msgstr "Can someone reach into your house?"
 #: src/apps/chat/chatThreadSlots.tsx:271
 #: src/apps/people/ProfileForm.tsx:190
 #: src/apps/people/ProfileForm.tsx:195
-#: src/apps/reminders/RemindersPage.tsx:178
+#: src/apps/reminders/RemindersPage.tsx:185
 #: src/apps/settings/AddRobotSection.tsx:276
 #: src/apps/settings/AddVoiceForm.tsx:85
 #: src/apps/settings/AiSlotDialog.tsx:151
@@ -4216,6 +4221,17 @@ msgid "Cancel restore"
 msgstr "Cancel restore"
 
 #. js-lingui-explicit-id
+#: src/apps/reminders/DeviceSchedulesView.tsx:30
+#: src/apps/reminders/DeviceSchedulesView.tsx:43
+msgid "Cancel schedule"
+msgstr "Cancel schedule"
+
+#. js-lingui-explicit-id
+#: src/apps/reminders/DeviceSchedulesView.tsx:30
+msgid "Cancel schedule: {what}"
+msgstr "Cancel schedule: {what}"
+
+#. js-lingui-explicit-id
 #: src/apps/settings/ReferenceLibrarySettings.tsx:275
 msgid "Cancel the {label} download"
 msgstr "Cancel the {label} download"
@@ -4229,6 +4245,11 @@ msgstr "Cancel the install and forget {name}?"
 #: src/shell/pages/status/StatusBoard.tsx:70
 msgid "Cancel this maintenance?"
 msgstr "Cancel this maintenance?"
+
+#. js-lingui-explicit-id
+#: src/apps/reminders/DeviceSchedulesView.tsx:38
+msgid "Cancel this schedule?"
+msgstr "Cancel this schedule?"
 
 #. js-lingui-explicit-id
 #: src/shell/pages/status/StatusBoard.tsx:25
@@ -6365,7 +6386,7 @@ msgid "Could not load quick timers. Check your connection and try again."
 msgstr "Could not load quick timers. Check your connection and try again."
 
 #. js-lingui-explicit-id
-#: src/apps/reminders/RemindersPage.tsx:183
+#: src/apps/reminders/RemindersPage.tsx:190
 msgid "Could not load reminders. Check your connection and try again."
 msgstr "Could not load reminders. Check your connection and try again."
 
@@ -7120,8 +7141,8 @@ msgstr "Create key"
 
 #. js-lingui-explicit-id
 #: src/apps/reminders/CreateListSheet.tsx:41
-#: src/apps/reminders/ListColumn.tsx:21
-#: src/apps/reminders/RemindersPage.tsx:26
+#: src/apps/reminders/ListColumn.tsx:23
+#: src/apps/reminders/RemindersPage.tsx:28
 msgid "Create list"
 msgstr "Create list"
 
@@ -7480,7 +7501,7 @@ msgstr "Delete ‘{name}’?"
 
 #. js-lingui-explicit-id
 #: src/apps/clock/TimersTab.tsx:184
-#: src/apps/reminders/RemindersPage.tsx:174
+#: src/apps/reminders/RemindersPage.tsx:181
 #: src/shell/pages/CompanionsPage.tsx:178
 msgid "Delete {name}?"
 msgstr "Delete {name}?"
@@ -7519,7 +7540,7 @@ msgid "Delete forever?"
 msgstr "Delete forever?"
 
 #. js-lingui-explicit-id
-#: src/apps/reminders/RemindersPage.tsx:179
+#: src/apps/reminders/RemindersPage.tsx:186
 msgid "Delete list"
 msgstr "Delete list"
 
@@ -7721,6 +7742,12 @@ msgstr "Detect speakers"
 #: src/lib/settingCopy.generated.ts:1526
 msgid "area.Developer tools"
 msgstr "Developer tools"
+
+#. js-lingui-explicit-id
+#: src/apps/reminders/DeviceSchedulesView.tsx:18
+#: src/apps/reminders/ListColumn.tsx:33
+msgid "Device schedules"
+msgstr "Device schedules"
 
 #. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:1527
@@ -12052,6 +12079,7 @@ msgid "Keep installing"
 msgstr "Keep installing"
 
 #. js-lingui-explicit-id
+#: src/apps/reminders/DeviceSchedulesView.tsx:42
 #: src/apps/settings/AssistantKeysSettings.tsx:112
 #: src/apps/settings/AwaySessionsSection.tsx:49
 #: src/apps/settings/CodingSettings.tsx:167
@@ -12099,7 +12127,7 @@ msgid "Keep the defaults or pick your own."
 msgstr "Keep the defaults or pick your own."
 
 #. js-lingui-explicit-id
-#: src/apps/reminders/ListColumn.tsx:45
+#: src/apps/reminders/ListColumn.tsx:50
 msgid "Keep the little things somewhere safe, so you can stay with the moment."
 msgstr "Keep the little things somewhere safe, so you can stay with the moment."
 
@@ -13023,7 +13051,7 @@ msgid "Lines that would change"
 msgstr "Lines that would change"
 
 #. js-lingui-explicit-id
-#: src/apps/reminders/RemindersPage.tsx:174
+#: src/apps/reminders/RemindersPage.tsx:181
 msgid "list"
 msgstr "list"
 
@@ -13064,7 +13092,7 @@ msgid "setting.stack.engines.stt.smart_turn.does"
 msgstr "Listens to the tone of a pause, so a mid-sentence \"um\" does not cut the speaker off."
 
 #. js-lingui-explicit-id
-#: src/apps/reminders/ListColumn.tsx:20
+#: src/apps/reminders/ListColumn.tsx:22
 #: src/apps/reminders/ListMain.tsx:51
 msgid "Lists"
 msgstr "Lists"
@@ -15509,6 +15537,11 @@ msgid "no data."
 msgstr "no data."
 
 #. js-lingui-explicit-id
+#: src/apps/reminders/DeviceSchedulesView.tsx:21
+msgid "No device schedules. Ask in chat, for example: turn on the porch light every day at 6 PM."
+msgstr "No device schedules. Ask in chat, for example: turn on the porch light every day at 6 PM."
+
+#. js-lingui-explicit-id
 #: src/shell/pages/HousePage.tsx:46
 msgid "No devices are shared with you yet."
 msgstr "No devices are shared with you yet."
@@ -16634,6 +16667,7 @@ msgid "setting.search.web.teen_mode.option_label.on"
 msgstr "On"
 
 #. js-lingui-explicit-id
+#: src/apps/reminders/DeviceSchedulesView.tsx:29
 #: src/apps/settings/AiSlotDialog.tsx:79
 #: src/apps/settings/RobotBody.tsx:211
 #: src/apps/settings/RobotBody.tsx:212
@@ -17461,6 +17495,7 @@ msgid "Pause coding requests until you resume. This does not delete keys."
 msgstr "Pause coding requests until you resume. This does not delete keys."
 
 #. js-lingui-explicit-id
+#: src/apps/reminders/DeviceSchedulesView.tsx:29
 #: src/apps/settings/AssistantKeysSettings.tsx:64
 #: src/apps/settings/ReferenceLibrarySettings.tsx:88
 msgid "Paused"
@@ -18769,7 +18804,7 @@ msgid "Remembers and organizes what matters."
 msgstr "Remembers and organizes what matters."
 
 #. js-lingui-explicit-id
-#: src/apps/reminders/RemindersPage.tsx:75
+#: src/apps/reminders/RemindersPage.tsx:80
 msgid "Reminder"
 msgstr "Reminder"
 
@@ -18779,7 +18814,7 @@ msgid "setting.tools.remind.mode.label"
 msgstr "Reminder actions"
 
 #. js-lingui-explicit-id
-#: src/apps/reminders/ListColumn.tsx:18
+#: src/apps/reminders/ListColumn.tsx:20
 msgid "Reminder lists"
 msgstr "Reminder lists"
 
@@ -19354,8 +19389,8 @@ msgstr "Off, Home's own engine does this. Turn on only after the Stack has been 
 #: src/apps/clock/AlarmsTab.tsx:70
 #: src/apps/clock/AlarmsTab.tsx:71
 #: src/apps/clock/TimersTab.tsx:148
-#: src/apps/reminders/RemindersPage.tsx:183
-#: src/apps/reminders/RemindersPage.tsx:183
+#: src/apps/reminders/RemindersPage.tsx:190
+#: src/apps/reminders/RemindersPage.tsx:190
 #: src/apps/settings/EngineLinkCredentialSection.tsx:279
 #: src/apps/settings/StackChanInstallDialog.tsx:146
 #: src/shell/GlobalMiniPlayer.tsx:120
@@ -20194,8 +20229,8 @@ msgid "Schedule maintenance"
 msgstr "Schedule maintenance"
 
 #. js-lingui-explicit-id
-#: src/apps/reminders/ListColumn.tsx:28
-#: src/apps/reminders/SmartListView.tsx:15
+#: src/apps/reminders/ListColumn.tsx:30
+#: src/apps/reminders/SmartListView.tsx:14
 #: src/shell/pages/status/StatusBoard.tsx:25
 msgid "Scheduled"
 msgstr "Scheduled"
@@ -21560,7 +21595,8 @@ msgid "setting.tools.house.mode.label"
 msgstr "Smart home actions"
 
 #. js-lingui-explicit-id
-#: src/apps/reminders/SmartListView.tsx:18
+#: src/apps/reminders/DeviceSchedulesView.tsx:17
+#: src/apps/reminders/SmartListView.tsx:17
 msgid "SMART LIST"
 msgstr "SMART LIST"
 
@@ -24811,8 +24847,8 @@ msgstr "To skip SearXNG, leave the address empty and press Continue. That turns 
 
 #. js-lingui-explicit-id
 #: src/apps/clock/WorldClocksTab.tsx:48
-#: src/apps/reminders/ListColumn.tsx:25
-#: src/apps/reminders/SmartListView.tsx:15
+#: src/apps/reminders/ListColumn.tsx:27
+#: src/apps/reminders/SmartListView.tsx:14
 #: src/i18n.chain.test.tsx:96
 #: src/i18n.test.tsx:53
 #: src/shell/pages/CompanionsPage.tsx:288

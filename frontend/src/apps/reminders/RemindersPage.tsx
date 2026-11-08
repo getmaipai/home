@@ -13,12 +13,14 @@ import { CreateListSheet } from "./CreateListSheet";
 import { RemindersIcon } from "./remindersIcon";
 import { ListColumn } from "./ListColumn";
 import { ListMain } from "./ListMain";
+import { DeviceSchedulesView } from "./DeviceSchedulesView";
 import { SmartListView, type SmartItem } from "./SmartListView";
 import { labelFor, type ListIcon, type ReminderView } from "./reminderTypes";
 import { useHubMutation } from "@/lib/useHubMutation";
 
 const LISTS_QUERY_KEY = ["household-lists"];
 const COMING_QUERY_KEY = ["household-coming-up"];
+const DEVICES_QUERY_KEY = ["house-schedules"];
 
 export { RemindersIcon };
 
@@ -49,6 +51,9 @@ export function RemindersPage() {
   const isPhone = useBreakpoint().width < 640;
   const listsQuery = useQuery({ queryKey: LISTS_QUERY_KEY, queryFn: api.lists });
   const comingQuery = useQuery({ queryKey: COMING_QUERY_KEY, queryFn: api.comingUp });
+  // HOUSE-04: device schedules are adults only for now; a teen or child never asks for them or sees the entry.
+  const showDevices = person?.role === "owner" || person?.role === "admin" || person?.role === "adult";
+  const devicesQuery = useQuery({ queryKey: DEVICES_QUERY_KEY, queryFn: api.houseSchedules, enabled: showDevices });
   const action = useHubMutation({ verb: "update reminders", mutationFn: async (perform: () => Promise<unknown>) => { await perform(); return true; }, onSuccess: refresh });
   const lists = useMemo(() => orderLists(listsQuery.data ?? []), [listsQuery.data]);
   const [view, setView] = useState<ReminderView>({ kind: "list", id: "" });
@@ -143,6 +148,7 @@ export function RemindersPage() {
         view={view}
         todayCount={todayCount}
         scheduledCount={scheduledCount}
+        deviceCount={showDevices ? devicesQuery.data?.schedules.length ?? 0 : null}
         onCreate={() => setSheetOpen(true)}
         onSelect={(next) => {
           setView(next);
@@ -161,7 +167,8 @@ export function RemindersPage() {
         onChangeIcon={changeIcon}
         onDelete={() => setConfirmDelete(true)}
       /> : null}
-      {(!isPhone || phoneShowingList) && view.kind !== "list" ? <SmartListView
+      {(!isPhone || phoneShowingList) && view.kind === "devices" ? <DeviceSchedulesView data={devicesQuery.data} onChanged={() => void devicesQuery.refetch()} /> : null}
+      {(!isPhone || phoneShowingList) && view.kind !== "list" && view.kind !== "devices" ? <SmartListView
         view={view}
         items={smartItems}
         onChanged={() => void comingQuery.refetch()}
