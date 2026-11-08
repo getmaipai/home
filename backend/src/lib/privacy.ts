@@ -336,6 +336,16 @@ export function platformConnections(): PrivacyConnection[] {
       retention: "Home keeps the answer only as part of the conversation if household history is enabled. The audit keeps the action and result only.", direction: "outbound",
     });
   }
+  if (listInstances("plex").length > 0) {
+    rows.push({
+      id: "platform:plex", source: "MaiPai Home", sourceKind: "platform",
+      destination: "your own Plex server on your LAN",
+      when: "when an adult asks Home to read Plex libraries or titles",
+      what: "Home reads library names and counts, and titles and years for search, recent additions, now playing and on deck. Home never sends anything to plex.tv and does not read who is watching.",
+      who: "your household's own Plex Media Server instances", optIn: true,
+      retention: "Home keeps the answer only as part of the conversation if household history is enabled. The audit keeps the action and result only.", direction: "outbound",
+    });
+  }
   if (listInstances("immich").length > 0) {
     rows.push({
       id: "platform:immich", source: "MaiPai Home", sourceKind: "platform",

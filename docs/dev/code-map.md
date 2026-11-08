@@ -840,6 +840,9 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/placePrivacy.ts` | childSafeAreaLabel |
 | `backend/src/lib/placement.ts` | defaultModelBytes, minimum, checkPlacement |
 | `backend/src/lib/places.ts` | householdHomeCountryName, householdHomeSkyInput, householdHomePlaceName, resolvePlace, PlaceSearchUnavailable, searchPlaces |
+| `backend/src/lib/plex/client.ts` | fetchPlex |
+| `backend/src/lib/plex/ids.ts` | PLEX_TOOL_ID |
+| `backend/src/lib/plex/tool.ts` | PLEX_ACTIONS, visiblePlexInstances, plexAllowed, plexToolSpec, runPlexTool |
 | `backend/src/lib/plugins.ts` | almanacHostInputs, listPackageIds, hasNonDefaultInstalledPackage, __resetPackageCachesForTests, loadManifestOnly, loadPackage |
 | `backend/src/lib/ports.ts` | DEFAULT_HOME_PORT, DEFAULT_STACK_PORT, homePort, stackPort, defaultStackBaseUrl |
 | `backend/src/lib/prefixPrewarm.ts` | notePrefix, prewarmPrefix, warmSpokenPrefixAtBoot, __resetPrefixPrewarmForTests |

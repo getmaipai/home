@@ -39,6 +39,7 @@ import { isAlarmActionCall } from "@/lib/alarmCalls";
 import { HOUSE_TOOL_ID, planHouseCall, safeHouseAction } from "@/lib/house/tool";
 import { UPTIME_TOOL_ID } from "@/lib/uptime/ids";
 import { GITEA_TOOL_ID } from "@/lib/gitea/ids";
+import { PLEX_TOOL_ID } from "@/lib/plex/ids";
 import { IMMICH_TOOL_ID } from "@/lib/immich/ids";
 import { houseAnyConnected } from "@/lib/house/connection";
 import { loadHouseRegistries } from "@/lib/house/cache";
@@ -475,6 +476,15 @@ export const policyNode: Node<PolicyInput, PolicyOutput> = async (state, input) 
         noteRefusal("format_not_here");
         entries.push({ proposal, decision: { allow: false, reason: "format_not_here" } });
       } else entries.push({ proposal, decision: { allow: true } });
+      continue;
+    }
+
+    if (call.tool === PLEX_TOOL_ID) {
+      const args = (call.args ?? {}) as Record<string, unknown>;
+      const proposal: ActionProposal = { kind: "read_only", request: { tool: call.tool, args, callId: call.id ?? call.tool } };
+      const tainted = state.context.some((item) => item.source === "search_result" || item.source === "page");
+      if (!state.plexAllowed || tainted) { noteRefusal("format_not_here"); entries.push({ proposal, decision: { allow: false, reason: "format_not_here" } }); }
+      else entries.push({ proposal, decision: { allow: true } });
       continue;
     }
 

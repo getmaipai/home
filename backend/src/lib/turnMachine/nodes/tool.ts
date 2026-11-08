@@ -22,6 +22,7 @@ import { HOUSE_TOOL_ID, runHouseTool } from "@/lib/house/tool";
 import { isScheduleAction } from "@/lib/house/scheduleTool";
 import { UPTIME_TOOL_ID, runUptimeTool } from "@/lib/uptime/tool";
 import { GITEA_TOOL_ID, runGiteaTool } from "@/lib/gitea/tool";
+import { PLEX_TOOL_ID, runPlexTool } from "@/lib/plex/tool";
 import { IMMICH_TOOL_ID, runImmichTool } from "@/lib/immich/tool";
 import { outcomeOf, type FailureKind } from "@/lib/turnContext";
 import { lookupFailureKind } from "./lookupFallback";
@@ -415,6 +416,14 @@ export const toolNode: Node<ToolInput, ToolOutput> = async (state, input, signal
 
     if (tool === GITEA_TOOL_ID) {
       const outcome = await runGiteaTool({ actor: state.actor, band: turnAgeBand(state.surface, state.actor, state.speakerEvidence, new Date(), state.deviceId), args: args as Record<string, unknown>, callId });
+      outcomes.push(outcome);
+      if (outcome.status === "succeeded") toolEvents.push({ t: "tool_result", call_id: callId, package_id: tool, outcome: { text: outcome.result?.reply?.text } });
+      else toolEvents.push({ t: "tool_error", call_id: callId, package_id: tool, error: lookupFailureKind(outcome) });
+      continue;
+    }
+
+    if (tool === PLEX_TOOL_ID) {
+      const outcome = await runPlexTool({ actor: state.actor, band: turnAgeBand(state.surface, state.actor, state.speakerEvidence, new Date(), state.deviceId), args: args as Record<string, unknown>, callId });
       outcomes.push(outcome);
       if (outcome.status === "succeeded") toolEvents.push({ t: "tool_result", call_id: callId, package_id: tool, outcome: { text: outcome.result?.reply?.text } });
       else toolEvents.push({ t: "tool_error", call_id: callId, package_id: tool, error: lookupFailureKind(outcome) });

@@ -28,6 +28,7 @@ import { getHouseholdSettingValue } from "@/lib/settings";
 import type { HouseBand } from "@/lib/house/access";
 import { uptimeAllowed } from "@/lib/uptime/tool";
 import { giteaAllowed } from "@/lib/gitea/tool";
+import { plexAllowed } from "@/lib/plex/tool";
 import { immichAllowed } from "@/lib/immich/tool";
 import { mayUseClipVoices } from "@/lib/access";
 
@@ -93,6 +94,7 @@ export interface TurnToolGateResult {
   houseOk: boolean;
   uptimeOk: boolean;
   giteaOk: boolean;
+  plexOk: boolean;
   immichOk: boolean;
   houseContext?: { visible: HouseEntity[]; areas: HouseArea[] };
 }
@@ -179,10 +181,11 @@ export async function budgetWithTurnToolGates(input: TurnToolGateInput): Promise
   } else houseOk = false;
   const uptimeOk = safeGate(() => uptimeAllowed({ actor: input.actor, band: input.band, surface: input.surface, surfaceClass: input.surfaceClass, spoken: input.spoken, bare: input.bare }));
   const giteaOk = safeGate(() => giteaAllowed({ actor: input.actor, band: input.band, surface: input.surface, surfaceClass: input.surfaceClass, spoken: input.spoken, bare: input.bare }));
+  const plexOk = safeGate(() => plexAllowed({ actor: input.actor, band: input.band, surface: input.surface, surfaceClass: input.surfaceClass, spoken: input.spoken, bare: input.bare }));
   const immichOk = safeGate(() => immichAllowed({ actor: input.actor, band: input.band, surface: input.surface, surfaceClass: input.surfaceClass, spoken: input.spoken, bare: input.bare }));
   // TOOL-OFFER-VOICEOVER-01: `voiceover` is offered by structure alone (an adult, written, non-guest turn with the voice engine ready); the
   // person's wording is never read (rule 1). budget.ts keeps it past the sixteen-tool cap.
-  const gated = withTurnToolGates(input.budget, answerImagesOk, picturesOk, videosOk, musicOk, musicEditOk, itemRefOk, musicBandOk, videoEditOk, musicObject, writingFormatOk, editPictureOk, voiceoverOk, filmOk, houseOk, uptimeOk, inspiredVoiceOk, giteaOk, immichOk);
+  const gated = withTurnToolGates(input.budget, answerImagesOk, picturesOk, videosOk, musicOk, musicEditOk, itemRefOk, musicBandOk, videoEditOk, musicObject, writingFormatOk, editPictureOk, voiceoverOk, filmOk, houseOk, uptimeOk, inspiredVoiceOk, giteaOk, immichOk, plexOk);
   return {
     budget: gated,
     writingFormatOk,
@@ -192,6 +195,7 @@ export async function budgetWithTurnToolGates(input: TurnToolGateInput): Promise
     uptimeOk,
     giteaOk,
     immichOk,
+    plexOk,
     ...(houseContext ? { houseContext } : {}),
     answerImagesOk,
     picturesOk,
