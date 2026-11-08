@@ -9,6 +9,8 @@
 
 <p align="center"><a href="#install">Quick start</a> · <a href="docs/site-fumadocs/content/docs/user/index.mdx">Documentation</a> · <a href="CHANGELOG.md">Releases</a></p>
 
+[![Home on StartupScores](https://startupscores.com/badge/home.svg?style=shield&v=combo&theme=dark)](https://startupscores.com/open-source/home)
+
 Your own private AI at home, with chat, voice, pictures and videos, on your own hardware - for protection, privacy, and independence.
 
 Music, pictures, video, films, podcasts, chat, voice and your smart home share one memory, one Library and one set of family profiles. Nothing is sent to a cloud service to make any of it, and adults can run it uncensored. *Preview* means it works with rough edges. *Planned* means it is not built yet.
