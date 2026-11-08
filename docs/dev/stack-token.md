@@ -15,8 +15,7 @@ admin stored for an engine computer, then the local file) and caches it. Nothing
 ## Where Home adds it
 
 `stackFetch` ([stackFetch.ts](../../backend/src/lib/stack/stackFetch.ts)) is the default fetch of both Stack callers: the spec client
-(`createStackClient`, used through `getStackClient`) and `createStackHttp` (pictures, videos, music, engine components, coding pieces,
-recorded speech, translate). It adds the header to every write and to nothing else. A new Stack caller uses one of those two and
+(`createStackClient`, used through `getStackClient`) and `createStackHttp` (pictures, videos, music, engine components and recorded speech). It adds the header to every write and to nothing else. A new Stack caller uses one of those two and
 inherits it; a raw `fetch` to the Stack's URL would not, so do not write one.
 
 ## When Home and the Stack disagree
@@ -24,7 +23,7 @@ inherits it; a raw `fetch` to the Stack's URL would not, so do not write one.
 A refused write was not run. Home forgets its cached key, reads it again and sends the write once more (not for a one-shot stream
 body). If the Stack still refuses, the caller gets the Stack's own sentence (it says to restart Home) and Repairs shows one row,
 "Home cannot start or change anything on the engine until their keys match", with the fix: restart the engine from Repairs, then Home.
-For an engine computer the row says an admin copies the engine's key into Home (the same field the adult view key uses). The row
+For an engine computer the row says an admin stores the engine's key in Home with `PUT /api/engine-link/view-token` (the same stored key the adult view uses; there is no settings field for it yet). The row
 closes by itself on the next accepted write. The key is never in a log, a row or an error.
 
 ## Model servers

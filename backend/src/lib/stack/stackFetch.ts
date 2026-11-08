@@ -15,22 +15,26 @@ const READS = new Set(["GET", "HEAD", "OPTIONS"]);
 /** Fixed words: no host, path or key can enter the row. */
 export function homeTokenProblemCopy(): { title: string; detail: string } {
   return isRemoteStackSelected()
-    ? { title: "Home cannot start or change anything on the engine computer until it has the engine's key.", detail: "The engine computer refuses requests that do not carry its key. An admin copies the key from that computer into Home once (Engine computer settings), then tries again." }
+    ? { title: "Home cannot start or change anything on the engine computer until it has the engine's key.", detail: "The engine computer refuses requests that do not carry its key. An admin copies the key from that computer into Home once, then tries again." }
     : { title: "Home cannot start or change anything on the engine until their keys match.", detail: "The engine did not accept Home's key. Restart the engine from Repairs, then try again; if this stays, restart Home." };
 }
+// Once per run after the last refusal: a row left open by an earlier run (Home was restarted, which is what the row advises) closes too.
 let problemOpen = false;
+let worksChecked = false;
 function reportProblem(): void {
+  worksChecked = false;
   if (problemOpen) return;
   problemOpen = true;
   const copy = homeTokenProblemCopy();
   void raiseIssue({ source: ISSUE_SOURCE, key: ISSUE_KEY, severity: "error", title: copy.title, detail: copy.detail, notifyOnEscalation: false, suppressNotification: true }).catch(() => undefined);
 }
 function reportWorks(): void {
-  if (!problemOpen) return;
+  if (worksChecked) return;
+  worksChecked = true;
   problemOpen = false;
   try { resolveIssue(ISSUE_SOURCE, ISSUE_KEY, { suppressNotification: true }); } catch { /* the row stays until the next success */ }
 }
-export function __resetStackFetchForTests(): void { problemOpen = false; }
+export function __resetStackFetchForTests(): void { problemOpen = false; worksChecked = false; }
 
 async function isTokenRefusal(res: Response): Promise<boolean> {
   if (res.status !== 401) return false;

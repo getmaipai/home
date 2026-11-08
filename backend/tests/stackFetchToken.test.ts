@@ -6,6 +6,7 @@ import { __resetStackFetchForTests, stackFetch } from "@/lib/stack/stackFetch";
 import { __setHomeViewTokenForTests } from "@/lib/stack/homeViewToken";
 import { listIssues } from "@/lib/issues";
 import { createStackClient } from "@/lib/stack/client";
+import { raiseIssue } from "@/lib/issues";
 
 let accepted = "k".repeat(32);
 let seen: Array<{ method: string; path: string; token: string | null }> = [];
@@ -74,4 +75,18 @@ test("no key at all sends the write plainly and the Stack's refusal comes back",
   const res = await stackFetch(`${base}/x`, { method: "POST", body: "{}" });
   expect(res.status).toBe(401);
   expect(seen.filter((s) => s.method === "POST").every((s) => s.token === null)).toBe(true);
+});
+
+test("a row left open by an earlier run closes on the first accepted write of this run", async () => {
+  await raiseIssue({ source: "stack", key: "stack.home_token", severity: "error", title: "old", detail: "old", suppressNotification: true });
+  expect(stackIssues()).toHaveLength(1);
+  expect((await stackFetch(`${base}/x`, { method: "POST", body: "{}" })).status).toBe(200);
+  expect(stackIssues()).toHaveLength(0);
+});
+
+test("createStackHttp and the spec client both default to stackFetch (a write through either carries the token)", async () => {
+  const { readFileSync } = await import("node:fs");
+  const read = (name: string) => readFileSync(new URL(`../src/lib/stack/${name}`, import.meta.url), "utf8");
+  expect(read("http.ts")).toContain("fetchForTests ?? stackFetch");
+  expect(read("client.ts")).toContain("options.fetch ?? stackFetch");
 });
