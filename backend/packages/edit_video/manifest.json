@@ -4,7 +4,7 @@
   "kind": "plugin",
   "category": "Media",
   "display": "Change a Video",
-  "description": "Change a video made here: remix, trim, join, film, mix, continue, reframe, grade, speed, captions, effects.",
+  "description": "Change a video made here: remix, trim, join, film, mix, continue, grade, speed, captions.",
   "offer": {
     "mode": "conditional",
     "gate": "videoEditAllowed",
@@ -44,7 +44,7 @@
         "type": "string",
         "maxLength": 80,
         "grounded": false,
-        "description": "\"latest\" or a video id. Needed except for film."
+        "description": "latest or a video id; not for film."
       },
       "change": {
         "type": "string",
@@ -74,14 +74,14 @@
           "spatial_sound",
           "restyle"
         ],
-        "description": "remix: again with changes. another_take: same again. trim: from_s, to_s. join: clips. film: production, no clip. mix: sound. extend, retake: Max only. cut_to_beat: track, clips, beats_per_cut 1|2|4|8, length_s 5-60. spatial_sound: sound follows who talks on screen. restyle: restyle colorize turns the clip into colour (Max only, clip up to 10 s), optional words steer it. grade: warmth, brightness, contrast, saturation, grain, vignette, only if asked. Each keeps the first video. A video exists only if you called this tool in this reply."
+        "description": "remix: redo with changes. another_take: same again. trim: from_s, to_s. join: clips. film: production. mix: sound. extend, retake: Max only. cut_to_beat: track, clips, beats_per_cut 1|2|4|8, length_s 5-60. spatial_sound: sound follows who talks. restyle: colorize adds colour (Max only, up to 10 s), words steer. grade: only if asked. Each keeps the first video. A video exists only if you called this tool in this reply."
       },
       "prompt": {
         "type": "string",
         "minLength": 3,
         "maxLength": 1200,
         "grounded": false,
-        "description": "remix, continue, retake: full new description; spoken lines in quotes, one speaker at a time."
+        "description": "remix, continue, retake: full new description; quoted lines, one speaker at a time."
       },
       "look": {
         "type": "string",
@@ -141,7 +141,7 @@
         "type": "number",
         "minimum": 0,
         "maximum": 600,
-        "description": "trim: where the kept part starts. retake: start time."
+        "description": "trim, retake: start time."
       },
       "to_s": {
         "type": "number",
@@ -156,7 +156,7 @@
           "type": "string",
           "maxLength": 80
         },
-        "description": "join: 2-6 of the person's video ids or \"latest\", in order."
+        "description": "join: 2-6 video ids or latest, in order."
       },
       "sound": {
         "type": "string",
@@ -185,7 +185,7 @@
         "type": "string",
         "maxLength": 600,
         "grounded": false,
-        "description": "mix music: describe new music; leave track out."
+        "description": "mix music: describe it; no track."
       },
       "level": {
         "type": "string",
@@ -278,7 +278,7 @@
           "minLength": 1,
           "maxLength": 60
         },
-        "description": "Saved style names, only if named; [] removes."
+        "description": "Saved style names, if named; [] removes."
       },
       "strength": {
         "oneOf": [
@@ -310,24 +310,24 @@
       "background": {
         "type": "string",
         "grounded": false,
-        "description": "What fills behind the subject: black, white, green, blur, transparent or hex."
+        "description": "Behind the subject: black, white, green, blur, transparent or hex."
       },
       "restyle": {
         "type": "string",
         "enum": [
           "colorize"
         ],
-        "description": "restyle: which effect. colorize: colour added to a black and white look."
+        "description": "restyle: colorize adds colour to black and white."
       },
       "words": {
         "type": "string",
         "maxLength": 600,
         "grounded": false,
-        "description": "restyle: what the colours should look like, in plain words."
+        "description": "restyle: colours, in plain words."
       },
       "surround": {
         "type": "boolean",
-        "description": "spatial_sound: also make a 5.1 file."
+        "description": "spatial_sound: also a 5.1 file."
       },
       "fill": {
         "type": "string",
@@ -370,7 +370,7 @@
         "type": "number",
         "minimum": 0.25,
         "maximum": 4,
-        "description": "speed: 0.5 is half, 2 is double."
+        "description": "speed: 0.5 half, 2 double."
       },
       "captions": {
         "type": "array",
@@ -410,7 +410,7 @@
         "type": "string",
         "maxLength": 160,
         "grounded": false,
-        "description": "film: Production id or its exact title."
+        "description": "film: Production id or exact title."
       },
       "preset": {
         "type": "string",
