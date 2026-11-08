@@ -3,6 +3,7 @@
 // stated, and the engine identity read from the reply's headers instead
 // of probing a process.
 
+import { stackFetch } from "./stackFetch";
 import { withTimeout } from "@maipai/core/src/withTimeout";
 import type { SttEndpointResponse } from "@maipai/spec/voice/ts/sttTypes.js";
 import { StackJob as StackJobSchema } from "@maipai/spec/stack/ts/stack-job.js";
@@ -292,7 +293,7 @@ function isLoopback(url: string): boolean {
 export function createStackClient(options: StackClientOptions = {}): StackClient {
   const baseUrl = options.baseUrl ?? defaultStackBaseUrl();
   const timeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT_MS;
-  const doFetch = options.fetch ?? globalThis.fetch;
+  const doFetch = options.fetch ?? stackFetch;
 
   if (!isLoopback(baseUrl)) {
     throw new StackError("unexpected", `Stack baseUrl ${baseUrl} is not loopback; the Stack speaks only on this machine`);

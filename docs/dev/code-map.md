@@ -1001,6 +1001,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/stack/link.ts` | LINK_PROBE_INTERVAL_MS, LINK_PROBE_TIMEOUT_MS, LINK_CONNECT_WINDOW_MS, LINK_CONNECT_RETRY_MS, LINK_BACKOFF_BASE_MS, LINK_BACKOFF_CAP_MS |
 | `backend/src/lib/stack/linkKeys.ts` | normalizePairingCode, derivePairingLookup, issuePairingCode, getPairingPublicKey, verifyPairingPayload, knownHostsName |
 | `backend/src/lib/stack/linkRepairs.ts` | STACK_LINK_ISSUE_SOURCE, STACK_LINK_ISSUE_KEY, STACK_LINK_REPEAT_WINDOW_MS, STACK_LINK_RECOVERY_MS, STACK_LINK_OUTAGE_MS, StackLinkRepairs |
+| `backend/src/lib/stack/stackFetch.ts` | homeTokenProblemCopy, __resetStackFetchForTests, stackFetch |
 | `backend/src/lib/stack/types.ts` | StackVoiceSchema, ROLE_IDS |
 | `backend/src/lib/stackCodingPieces.ts` | CodingPieceError, CODING_ON_REFUSAL, __setCodingStackForTests, missingFrom, missingCodingPiece, __setMissingCodingPieceForTests |
 | `backend/src/lib/stackCodingSync.ts` | CODING_STACK_MAP, isCodingStackKey, codingStackValues, __setCodingSyncClientForTests, pushCodingSettings |
