@@ -97,7 +97,7 @@ Pictures, videos and songs can be made at different quality levels. Pick one whe
 - **Make one your companion.** Press **Make this my companion** on any synth.
 - **Cast one as your news anchor.** Guests and round tables are *Planned*.
 - **Use one in a film.** Link a synth to a saved character and a video can use its look.
-- **Base a synth on a real person, living or historical.** *Planned.* You can mark a synth as based on a real person today. A sourced history, and chatting with a figure from history, are not built yet.
+- **Base a synth on a real person, living or historical.** Give it a real name and Home researches the person, builds a dated history with its sources, and keeps it current. Chatting with a figure from history this way is *Preview*.
 - **Give a synth a voice.** Pick one from the voice list. Voices you make from a recording appear in the same list.
 
 ### Memory
