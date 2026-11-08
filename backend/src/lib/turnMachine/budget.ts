@@ -194,7 +194,7 @@ export function toolOfferLabel(manifest: { kind?: string; args?: unknown; offer?
 }
 
 /** TOOL-OFFER-VOICEOVER-01: past the cap, after `change_voice` and the shrink orders below, these independent tools give way (in this order) so `voiceover` stays. */
-const VOICEOVER_SWAP_ORDER = ["make_sound", "show_images", "edit_picture"];
+const VOICEOVER_SWAP_ORDER = "make_sound show_images edit_picture".split(" ");
 
 /** Derives the one live offer set used by turns, token counting, warmup,
  * and the Customize page. Installed manifests and the virtual registry
