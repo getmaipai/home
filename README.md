@@ -102,6 +102,20 @@ Music, pictures, video, films, podcasts, chat, voice and your smart home share o
 - **Search your reference library.** Wikipedia and books, with pictures in answers.
 - **Talk through your documents** as a spoken discussion. *Planned.*
 
+### Apps
+
+- **News.** Read the topics and sources you follow, laid out like Apple News, with Today, My Mix and Saved. Each story has **Key points**, an AI summary written on your own computer, **Listen**, which reads it to you, and **Discuss**, which opens a chat about the story.
+- **Wikipedia, kept on your computer.** Search and read English Wikipedia, with or without pictures, save articles, and keep reading with the internet off. Add dictionaries, health, travel and how-to books the same way.
+- **Weather.** An animated sky card with your places, current location and Fahrenheit or Celsius. Ask in chat and get the same card.
+- **Music and Radio.** Your library and internet radio, with stations you can save and record.
+- **Podcasts.** Follow shows, play new episodes at once, save them for offline, and pick up where you stopped.
+- **Videos, Shows and Films.** Browse your own files, keep a watchlist, play the next episode.
+- **Books.** Read EPUB and PDF books and listen to audiobooks. Your place follows you from screen to screen.
+- **Clock.** Alarms, timers, world clocks and a stopwatch.
+- **Library.** Every picture, video, song and file in one place.
+- **House.** Rooms and devices from Home Assistant.
+- **Synths.** Your companions and cast.
+
 ### Integrations
 
 - **Home Assistant.** Control lights, locks and scenes by room or name, with a confirm step and Undo. Schedule actions and read automations. See rooms and devices on the House page. Owners can restart Home Assistant itself, always after a confirm.
@@ -111,10 +125,11 @@ Music, pictures, video, films, podcasts, chat, voice and your smart home share o
 - **MusicBrainz, Cover Art Archive and Wikimedia.** Match songs, fetch covers, artist photos and bios. Each has an off switch.
 - **Hugging Face and Civitai.** Install styles. Civitai is off by default.
 
-### Family, safety and language
+### Adults, family and safety
 
-- **Give everyone a profile.** Children are restricted by default, teens get more privacy, guests get the teen ceiling. The safety gates cannot be switched off.
-- **Lock adult pictures and clips** behind a fresh passcode, with Lock now and Mark as NSFW. *Adults.*
+- **Give everyone a profile.** Children are filtered by default, teens get more privacy, guests get the teen limits. Parents set the rest, and the safety gates for children and teens cannot be switched off.
+- **Adults are treated like adults.** Adult profiles get straight answers and the full creative range: frank talk on health, law and politics, dark and mature fiction, horror, war and romance, with no content filter and no lectures.
+- **Private when you want it.** Mark any picture or clip as adult and it sits behind a locked tile until you enter a fresh passcode. Lock everything at once, and let the lock close itself again.
 - **Sign in carefully.** Passcode boxes, two-step codes, a lockout that cannot lock out the owner, and a check on the address Home opens at.
 - **Speak your language.** English (US or UK) or Spanish per person, in every screen, notice and spoken time.
 - **Get clear errors.** Each says what went wrong and what to do.
