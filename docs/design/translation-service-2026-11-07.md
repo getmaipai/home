@@ -12,6 +12,10 @@ It moves the engine half of [i18n-2026-11-07.md](i18n-2026-11-07.md) section 7 (
 - 7.5 retry: the `ui` kind keeps it exactly: each failed entry is retried alone, then left empty and reported, with no whole-batch retry. The other kinds retry the batch once, then each item alone.
 - 7.7 back translation (the review list) and 7.8 (no host but the Stack, with its test) stay in the catalog adapter and `stackCompleter`.
 
+It moves the brand and product entries (MaiPai, Home, Stack) and the style line "Brand and product names stay as they are" out of
+`frontend/src/locales/glossary.json` into `keep.json` (section 4a), and adds the persona roster there (i18n 7.4 named both). The same
+slice deletes them from the glossary, so the glossary holds only words that do translate (Library, Companion, Household, Repairs).
+
 It also merges the caption language list (17) and the lyric list (18) into one `LANGUAGES`; the `lyric` kind keeps its own batch size of 18 and `subtitle` keeps 20, and adds the reader-band output check to lyrics, which had none.
 
 ## 1. Reuse check
@@ -93,6 +97,39 @@ Each adapter keeps its existing tests green before its internals move (port befo
 - Same glossary as the app (`frontend/src/locales/glossary.json`), so product words match. Same style rules (grade 6, no em dash).
 - Pages carry a visible one-line "Translated by the home's AI, may read oddly" note until a person clears `machine_translated`.
 - Publishing the translated site is a separate step and needs Jesse's word; this slice only writes files.
+
+## 4a. Words that are never translated (owner ask, 2026-11-07)
+
+Names, brands and technical words (MaiPai, Wi-Fi, USB, a song title) must pass through untouched. Which layers apply depends on the kind,
+because "Home" or "Stack" is a product word in a screen or a document but an ordinary word in a lyric or a caption ("take me home"):
+
+| Kind | Fixed list (`keep.json`) | Finder: URLs, emails, paths, code spans, placeholders | All-caps acronyms | Model spotting | Caller terms |
+|---|---|---|---|---|---|
+| `ui`, `doc` | yes | yes | yes | yes (default on) | yes |
+| `subtitle`, `lyric`, `chat` | no | yes | no for `lyric` and `subtitle`, yes for `chat` | never | yes (a lyrics adapter passes the title and artist) |
+
+Three layers, cheapest first:
+
+1. **Fixed list**: `backend/src/lib/translate/keep.json`, the one place for the whole product (MaiPai, Home, Stack, Wi-Fi, Bluetooth, USB, HDMI,
+   AirPlay, Apple TV, Tailscale, the persona roster as capitalized, case-sensitive names, and so on). Not per locale. A person edits
+   it; nothing writes to it automatically. The per-locale `frontend/src/locales/glossary.json` is the place for words that DO translate
+   to a chosen term, and nothing else.
+2. **Deterministic finder** (`keep.ts`): URLs, emails, file paths, code spans, `{placeholders}`, and ALL-CAPS acronyms. Acronyms, URLs
+   and emails come from `compromise` (already a backend dependency, used by `unknownNames.ts`; offline). Measured on `docs/user/`:
+   `compromise` also tags sentence-first verbs ("Make", "Press") and bold UI labels as proper nouns, so its proper-noun tag is NOT used.
+   Mid-sentence capitalized words that are not in the glossary are not guessed; they go to layer 3.
+3. **Model spotting** (`ui` and `doc` only, default on; never for caption, lyric or chat text, so none of that text reaches a report or log,
+   rule 6a): the model reads the source once through the same completer (so `stackCompleter`'s readiness check, 7.3, covers it) and lists
+   terms to keep. A term counts only if it appears verbatim in the source and the glossary does not translate it. Spotted terms are
+   marker-swapped in the same run AND returned as candidates in the run report (product copy run by the operator); they are never added
+   to the fixed list automatically.
+
+Mechanism: before a batch is sent, each kept term is replaced by a numbered marker (`⟦K1⟧`), and restored after. A batch whose output lacks
+or alters a marker is retried per item and, failing that, reported failed (never emitted with a broken term). Item text and terms are not
+logged, only counts (rule 6a). `isProtected` is unchanged and still never applied to text.
+
+UI labels in documentation (for example the bold "Library" button) translate to the SAME word the Spanish app catalog uses, from the
+glossary and catalog, so a doc and the screen agree (used by TRANSLATE-05).
 
 ## 5. Slices (backlog rows TRANSLATE-01 to 06)
 

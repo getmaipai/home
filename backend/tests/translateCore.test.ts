@@ -25,14 +25,14 @@ describe("translation core", () => {
 
   test("count mismatch retries the batch once, then falls back to individual items", async () => {
     const calls = { count: 0 };
-    const result = await translateItems({ items: ["One", "Two"], from: "en", to: "fr", kind: "doc", completer: scripted(['["Un"]', '["Un"]', '["Un"]', '["Deux"]'], calls) });
+    const result = await translateItems({ items: ["One", "Two"], from: "en", to: "fr", kind: "doc", spot: false, completer: scripted(['["Un"]', '["Un"]', '["Un"]', '["Deux"]'], calls) });
     expect(calls.count).toBe(4);
     expect(result.results).toEqual(["Un", "Deux"]);
   });
 
   test("ui skips whole batch retry", async () => {
     const calls = { count: 0 };
-    const result = await translateItems({ items: ["One", "Two"], from: "en", to: "fr", kind: "ui", completer: scripted(['["Un"]', '["Un"]', '["Deux"]'], calls) });
+    const result = await translateItems({ items: ["One", "Two"], from: "en", to: "fr", kind: "ui", spot: false, completer: scripted(['["Un"]', '["Un"]', '["Deux"]'], calls) });
     expect(calls.count).toBe(3);
     expect(result.results).toEqual(["Un", "Deux"]);
   });
@@ -42,7 +42,7 @@ describe("translation core", () => {
     const good = await translateItems({ items: ["Hello"], from: "en", to: "es", kind: "chat", completer: scripted(["not json", '["Hola"]'], calls) });
     expect(calls.count).toBe(2);
     expect(good.results).toEqual(["Hola"]);
-    const failed = await translateItems({ items: ["Hello"], from: "en", to: "es", kind: "ui", completer: async () => ({ ok: true, text: '["\\u2014"]' }) });
+    const failed = await translateItems({ items: ["Hello"], from: "en", to: "es", kind: "ui", spot: false, completer: async () => ({ ok: true, text: '["\\u2014"]' }) });
     expect(failed.results).toEqual([null]);
     expect(failed.failed).toEqual([0]);
   });
