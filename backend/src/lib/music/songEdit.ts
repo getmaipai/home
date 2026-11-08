@@ -54,6 +54,8 @@ export async function runSongEdit(options: SongEditOptions): Promise<SongEditRes
   const editInput = options.input(source);
   const audience = routeAudience(actor), lane = laneOf(audience);
   if (lane === "child" && ["make_full", "extend"].includes(editInput.change)) return refuse({ status: 422, error: "Let's keep your song short." });
+  // An instrumental remake of a sung song is a cover the Stack does not transcribe, so a minor cannot ask for one.
+  if (lane !== "adult" && editInput.change === "instrumental") return refuse({ status: 403, error: "You can change only your own song from this chat." });
   const plan = prepareMusicEdit(source, { track: source.fileId!, ...editInput } as EditInput, ready.limits);
   if (!plan.ok) return refuse({ status: 422, error: plan.line });
   options.patch?.(plan);

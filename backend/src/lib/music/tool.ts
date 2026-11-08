@@ -274,6 +274,8 @@ async function runMusic(input: MusicToolInput, editing: boolean): Promise<ToolEx
     const source = resolveSongSource(actor, parsed.data.track === "attached" ? state.audio![0]!.id : parsed.data.track, state.conversationId, temporary);
     if (!source?.fileId) return refused(plainMusicFailure("source_not_made_here"), "source_not_made_here");
     if (lane !== "adult" && source.request.ownedFile) return refused("You can change only your own song from this chat.", "source_not_made_here");
+    // An instrumental remake of a sung song is a cover the Stack does not transcribe, so a minor cannot ask for one.
+    if (lane !== "adult" && parsed.data.change === "instrumental") return refused("You can change only your own song from this chat.", "minor_edit_source");
     if (parsed.data.change === "voice_swap") {
       const requestedVoice = parsed.data.voice!;
       let voiceId = requestedVoice;

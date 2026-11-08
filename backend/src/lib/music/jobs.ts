@@ -273,7 +273,9 @@ async function finish(job: MusicJob, actor: PersonRow, songs: StackSong[], signa
   if (minorLane || job.request.transcribe) {
     // Held in a local only: never stored, logged or traced.
     const transcript = song.transcript;
-    if (!job.request.instrumental && (!transcript?.trim() || musicProtections(minorAudience).checkWords(transcript, "transcript"))) { withholdMinor(job, actor); return; }
+    // Fail closed: a missing transcript always withholds; an empty one passes only for an instrumental; any words are checked, instrumental or not.
+    const unreadable = typeof transcript !== "string" || (!transcript.trim() && !job.request.instrumental);
+    if (unreadable || (transcript!.trim() && musicProtections(minorAudience).checkWords(transcript!, "transcript"))) { withholdMinor(job, actor); return; }
   }
   if (!job.request.retried && ["text2music", "remake", "variation"].includes(job.task) && song.lrc
     && sungLyricsFromLrc(song.lrc, song.duration_s).length < sungLyricsFromLrc(song.lrc, null, { keepSqueezed: true }).length) {

@@ -103,10 +103,35 @@ describe("minor song lane readiness", () => {
     expect(db.select().from(kidUsage).where(eq(kidUsage.ref, failedId)).all()).toHaveLength(0);
 
     fake.fail = null;
+    // An instrumental passes only with an empty transcript; words in it are checked, and a missing one withholds.
+    fake.transcript = "";
     const instrumentalState = musicState(actor);
     const instrumental = await runGenerateMusic({ state: instrumentalState, args: { description: "a quiet melody", instrumental: true }, callId: "instrumental", spoken: false });
     const instrumentalId = (instrumental.result?.data as { musicJobId: string }).musicJobId;
     await waitForMusic(() => getMusicJobFor(actor, instrumentalId)?.state === "done");
+
+    fake.transcript = (contentCorpus as Array<{ id: string; text: string }>).find((row) => row.id === "KIND_E")!.text;
+    const leakState = musicState(actor);
+    const leak = await runGenerateMusic({ state: leakState, args: { description: "a quiet melody", instrumental: true }, callId: "instrumental-words", spoken: false });
+    const leakId = (leak.result?.data as { musicJobId: string }).musicJobId;
+    await waitForMusic(() => getMusicJobFor(actor, leakId)?.state === "failed");
+    expect(getMusicJobFor(actor, leakId)?.errorCode).toBe("content_withheld");
+
+    fake.transcript = null;
+    const noneState = musicState(actor);
+    const none = await runGenerateMusic({ state: noneState, args: { description: "a quiet melody", instrumental: true }, callId: "instrumental-missing", spoken: false });
+    const noneId = (none.result?.data as { musicJobId: string }).musicJobId;
+    await waitForMusic(() => getMusicJobFor(actor, noneId)?.state === "failed");
+    expect(getMusicJobFor(actor, noneId)?.errorCode).toBe("content_withheld");
+  });
+
+  test("a minor cannot ask for an instrumental remake of a sung song", async () => {
+    __setMusicStatusForTests(readyMusicStatusForTests({ transcribe: { available: true } }));
+    const actor = { ...people.child, role: "teen" as const };
+    const made = await runGenerateMusic({ state: musicState(actor), args: { description: "a quiet melody" }, callId: "teen-song", spoken: false });
+    await waitForMusic(() => getMusicJobFor(actor, (made.result?.data as { musicJobId: string }).musicJobId)?.state === "done");
+    const out = await runEditMusic({ state: musicState(actor), args: { track: "latest", change: "instrumental" }, callId: "teen-instrumental", spoken: false });
+    expect(JSON.stringify(out)).toContain("minor_edit_source");
   });
 
   test("a child's edit rewrites its request and checks the new sung version", async () => {
