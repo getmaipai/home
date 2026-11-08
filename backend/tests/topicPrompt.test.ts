@@ -203,7 +203,6 @@ const EXEMPT: Record<string, string> = {
   "lib/talent/writer.ts":"writes a show's outline and spoken lines as JSON; every line passes checkLines (evaluateReply at the show's audience band, plus the minor check when a cast synth is based on a minor) before it is kept, and it is never a chat reply",
   "lib/talent/life.ts":"writes a synth's origin and daily life beats as JSON memory records; each beat passes evaluateReply at the synth's floor before it is stored, and it is never a chat reply (the chat turn carries the topic block when a beat is recalled)",
   "lib/personaJudge.ts": "admin evaluation judge; no person-facing text",
-  "lib/judgeFallback.ts": "the completer behind lib/talent/shows.ts: it tries the judge, then the chat model, and adds no prompt and writes no reply of its own; its one caller owns the prompt and checks every text at the show's audience band before it is kept (see the shows entry)",
   "lib/replyParityJudge.ts": "admin evaluation judge; no person-facing text",
 };
 
