@@ -50212,6 +50212,954 @@
         }
       }
     },
+    "/api/house/connectors/{type}": {
+      "get": {
+        "tags": [
+          "House"
+        ],
+        "summary": "Connector instances of one type",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "home_assistant",
+                "uptime_kuma",
+                "gitea",
+                "immich",
+                "unifi",
+                "plex"
+              ]
+            },
+            "required": true,
+            "name": "type",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Instances, never their tokens",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "instances": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "type": {
+                            "type": "string",
+                            "enum": [
+                              "home_assistant",
+                              "uptime_kuma",
+                              "gitea",
+                              "immich",
+                              "unifi",
+                              "plex"
+                            ]
+                          },
+                          "instance": {
+                            "type": "string"
+                          },
+                          "label": {
+                            "type": "string"
+                          },
+                          "address": {
+                            "type": "string"
+                          },
+                          "enabled": {
+                            "type": "boolean"
+                          },
+                          "virtual": {
+                            "type": "boolean"
+                          },
+                          "hasToken": {
+                            "type": "boolean"
+                          }
+                        },
+                        "required": [
+                          "type",
+                          "instance",
+                          "label",
+                          "address",
+                          "enabled",
+                          "virtual",
+                          "hasToken"
+                        ]
+                      }
+                    }
+                  },
+                  "required": [
+                    "instances"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Sign in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Only the owner or an admin",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "House"
+        ],
+        "summary": "Add a connector instance",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "home_assistant",
+                "uptime_kuma",
+                "gitea",
+                "immich",
+                "unifi",
+                "plex"
+              ]
+            },
+            "required": true,
+            "name": "type",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "label": {
+                    "type": "string"
+                  },
+                  "address": {
+                    "type": "string"
+                  },
+                  "token": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "label",
+                  "address"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Added",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string",
+                      "enum": [
+                        "home_assistant",
+                        "uptime_kuma",
+                        "gitea",
+                        "immich",
+                        "unifi",
+                        "plex"
+                      ]
+                    },
+                    "instance": {
+                      "type": "string"
+                    },
+                    "label": {
+                      "type": "string"
+                    },
+                    "address": {
+                      "type": "string"
+                    },
+                    "enabled": {
+                      "type": "boolean"
+                    },
+                    "virtual": {
+                      "type": "boolean"
+                    },
+                    "hasToken": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "type",
+                    "instance",
+                    "label",
+                    "address",
+                    "enabled",
+                    "virtual",
+                    "hasToken"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Fix the field named",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Sign in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Only the owner or an admin",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/house/connectors/{type}/{slug}": {
+      "put": {
+        "tags": [
+          "House"
+        ],
+        "summary": "Rename, re-address, enable or disable an instance, or replace its token",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "home_assistant",
+                "uptime_kuma",
+                "gitea",
+                "immich",
+                "unifi",
+                "plex"
+              ]
+            },
+            "required": true,
+            "name": "type",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 40
+            },
+            "required": true,
+            "name": "slug",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "label": {
+                    "type": "string"
+                  },
+                  "address": {
+                    "type": "string"
+                  },
+                  "enabled": {
+                    "type": "boolean"
+                  },
+                  "token": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Saved",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string",
+                      "enum": [
+                        "home_assistant",
+                        "uptime_kuma",
+                        "gitea",
+                        "immich",
+                        "unifi",
+                        "plex"
+                      ]
+                    },
+                    "instance": {
+                      "type": "string"
+                    },
+                    "label": {
+                      "type": "string"
+                    },
+                    "address": {
+                      "type": "string"
+                    },
+                    "enabled": {
+                      "type": "boolean"
+                    },
+                    "virtual": {
+                      "type": "boolean"
+                    },
+                    "hasToken": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "type",
+                    "instance",
+                    "label",
+                    "address",
+                    "enabled",
+                    "virtual",
+                    "hasToken"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Fix the field named",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Sign in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Only the owner or an admin",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such connection",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "House"
+        ],
+        "summary": "Remove an instance (its name is never reused)",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "home_assistant",
+                "uptime_kuma",
+                "gitea",
+                "immich",
+                "unifi",
+                "plex"
+              ]
+            },
+            "required": true,
+            "name": "type",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 40
+            },
+            "required": true,
+            "name": "slug",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Removed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    }
+                  },
+                  "required": [
+                    "ok"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Sign in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Only the owner or an admin",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such connection",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/house/connectors/{type}/{slug}/test": {
+      "post": {
+        "tags": [
+          "House"
+        ],
+        "summary": "Test one instance",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "home_assistant",
+                "uptime_kuma",
+                "gitea",
+                "immich",
+                "unifi",
+                "plex"
+              ]
+            },
+            "required": true,
+            "name": "type",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 40
+            },
+            "required": true,
+            "name": "slug",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Result with the next step",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "ok": {
+                          "type": "boolean",
+                          "enum": [
+                            true
+                          ]
+                        },
+                        "rooms": {
+                          "type": "number"
+                        },
+                        "devices": {
+                          "type": "number"
+                        }
+                      },
+                      "required": [
+                        "ok",
+                        "rooms",
+                        "devices"
+                      ]
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "ok": {
+                          "type": "boolean",
+                          "enum": [
+                            false
+                          ]
+                        },
+                        "kind": {
+                          "type": "string"
+                        },
+                        "nextStep": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "ok",
+                        "kind",
+                        "nextStep"
+                      ]
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Sign in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Only the owner or an admin",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such connection",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/house/connectors/{type}/{slug}/exposure": {
+      "get": {
+        "tags": [
+          "House"
+        ],
+        "summary": "Everything Home Assistant has, and what is exposed now",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "home_assistant",
+                "uptime_kuma",
+                "gitea",
+                "immich",
+                "unifi",
+                "plex"
+              ]
+            },
+            "required": true,
+            "name": "type",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 40
+            },
+            "required": true,
+            "name": "slug",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Registry and the saved list",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "configured": {
+                      "type": "boolean"
+                    },
+                    "exposedAreas": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "exposedEntities": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "areas": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "name": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "name"
+                        ]
+                      }
+                    },
+                    "entities": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "name": {
+                            "type": "string"
+                          },
+                          "kind": {
+                            "type": "string"
+                          },
+                          "area": {
+                            "type": "string",
+                            "nullable": true
+                          },
+                          "sensitive": {
+                            "type": "string",
+                            "nullable": true
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "name",
+                          "kind",
+                          "area",
+                          "sensitive"
+                        ]
+                      }
+                    }
+                  },
+                  "required": [
+                    "configured",
+                    "exposedAreas",
+                    "exposedEntities",
+                    "areas",
+                    "entities"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Sign in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Only the owner or an admin",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such connection",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Home Assistant did not answer",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "nextStep": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error",
+                    "nextStep"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "House"
+        ],
+        "summary": "Save which areas and entities Home may see",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "home_assistant",
+                "uptime_kuma",
+                "gitea",
+                "immich",
+                "unifi",
+                "plex"
+              ]
+            },
+            "required": true,
+            "name": "type",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 40
+            },
+            "required": true,
+            "name": "slug",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "areas": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "maxLength": 120
+                    },
+                    "maxItems": 500
+                  },
+                  "entities": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "maxLength": 160
+                    },
+                    "maxItems": 5000
+                  }
+                },
+                "required": [
+                  "areas",
+                  "entities"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Saved",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    }
+                  },
+                  "required": [
+                    "ok"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Sign in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Only the owner or an admin",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such connection",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/biometric-prints": {
       "get": {
         "tags": [
