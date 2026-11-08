@@ -325,6 +325,17 @@ export function platformConnections(): PrivacyConnection[] {
       direction: "outbound",
     });
   }
+  // AGENT-SVC-01: one row while an enabled Gitea instance exists.
+  if (listInstances("gitea").length > 0) {
+    rows.push({
+      id: "platform:gitea", source: "MaiPai Home", sourceKind: "platform",
+      destination: "your own Gitea on your LAN",
+      when: "when an adult asks Home to read a repository, file, issue, pull request, commit, branch or release",
+      what: "Home sends the requested read action and its repository, file path or number to your Gitea on your LAN. The Gitea access token stays in Home and is passed only to the local MCP process. Home's audit keeps the action and result only, never the repository or instance name.",
+      who: "your household's own Gitea instances", optIn: true,
+      retention: "Home keeps the answer only as part of the conversation if household history is enabled. The audit keeps the action and result only.", direction: "outbound",
+    });
+  }
   return rows.filter((r): r is PrivacyConnection => r !== null);
 }
 

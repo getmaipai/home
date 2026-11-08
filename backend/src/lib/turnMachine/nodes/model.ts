@@ -27,6 +27,7 @@ import { VIRTUAL_TOOL_REGISTRY } from "@/lib/projects/tool";
 import { VOICEOVER_TOOL_ID, CHANGE_VOICE_TOOL_ID, MAKE_INSPIRED_VOICE_TOOL_ID } from "@/lib/voiceTools";
 import { HOUSE_TOOL_ID, houseToolSpec } from "@/lib/house/tool";
 import { UPTIME_TOOL_ID, uptimeToolSpec, visibleUptimeInstances } from "@/lib/uptime/tool";
+import { GITEA_TOOL_ID, giteaToolSpec, visibleGiteaInstances } from "@/lib/gitea/tool";
 import { collapseSpaces, isBarePronoun, ownWordsQuery } from "@/lib/text";
 import { detectCsam } from "@maipai/spec/safety/ts/signals.js";
 import { asksForMedia, asksForSong, claimsMedia, lyricsInsteadOfSong, MEDIA_NOT_STARTED_LINE, MEDIA_REASK_INSTRUCTION, MUSIC_STARTED_LINE, SONG_LYRICS_ONLY_NOTE, SONG_LYRICS_REASK_INSTRUCTION } from "@/lib/mediaClaims";
@@ -178,6 +179,7 @@ export function toolSpecFor(id: string, lane: Lane = "adult", state?: TurnState)
   if (id === MAKE_INSPIRED_VOICE_TOOL_ID && !state?.inspiredVoiceAllowed) return null;
   if (id === HOUSE_TOOL_ID) return state?.houseAllowed && state.houseContext ? houseToolSpec({ ...state.houseContext, actor: { id: state.actor.id, role: state.actor.role as import("@/lib/house/access").HouseActor["role"], band: state.actor.role === "child" || state.actor.role === "teen" ? state.actor.role : "adult" } }) : null;
   if (id === UPTIME_TOOL_ID) return state?.uptimeAllowed ? uptimeToolSpec(visibleUptimeInstances()) : null;
+  if (id === GITEA_TOOL_ID) return state?.giteaAllowed ? giteaToolSpec(visibleGiteaInstances()) : null;
   if (id === "edit_picture") return editPictureSpec(id, state);
   // PROJECT-START-01: start_project is a virtual tool (tool.ts's own
   // header) - it never has a backend/packages/start_project manifest.json

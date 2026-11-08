@@ -1,0 +1,8 @@
+{
+  "about": "AGENT-SVC-01 minimal CHAT-AB-01 offer rows for uptime-tool. Skeleton only, unrun: adult service-status requests should call uptime; unrelated and minor requests must not. Persona names only.",
+  "rows": [
+    { "id": "uptime-status-adult", "family": "uptime", "split": "dev", "gold": "must", "age_row": "adult", "text": "Are any of my services down right now?" },
+    { "id": "uptime-unrelated-adult", "family": "uptime", "split": "dev", "gold": "must_not", "age_row": "adult", "text": "How does a web server handle requests?" },
+    { "id": "uptime-status-teen", "family": "uptime", "split": "dev", "gold": "must_not", "age_row": "teen", "text": "Are any of my services down right now?" }
+  ]
+}

@@ -26,6 +26,7 @@ import { WRITING_FORMAT_TOOL_ID, writingFormatToolSpec } from "@/lib/writingForm
 import { VOICEOVER_TOOL_ID, CHANGE_VOICE_TOOL_ID, MAKE_INSPIRED_VOICE_TOOL_ID, voiceoverToolSpec, changeVoiceToolSpec, makeInspiredVoiceToolSpec } from "@/lib/voiceTools";
 import { HOUSE_TOOL_ID } from "@/lib/house/ids";
 import { UPTIME_TOOL_ID } from "@/lib/uptime/ids";
+import { GITEA_TOOL_ID } from "@/lib/gitea/ids";
 
 export interface VirtualToolOffer {
   mode: "base" | "conditional" | "off";
@@ -53,6 +54,7 @@ export const VIRTUAL_TOOL_REGISTRY: VirtualToolRegistration[] = [
   { id: HOUSE_TOOL_ID, offer: { mode: "conditional", gate: "houseAllowed", bench_row: "house-tool", priority: 4 }, spec: () => ({ id: HOUSE_TOOL_ID, description: "Find or control permitted home devices.", args: { type: "object", required: ["action"], properties: { action: { type: "string" } } } }) },
   // AGENT-SVC-01: read-only service status over the household's Uptime Kuma instances; adults only (lib/uptime/tool.ts).
   { id: UPTIME_TOOL_ID, offer: { mode: "conditional", gate: "uptimeAllowed", bench_row: "uptime-tool", priority: 4 }, spec: () => ({ id: UPTIME_TOOL_ID, description: "Check whether the household's services are up.", args: { type: "object", required: ["action"], properties: { action: { type: "string" } } } }) },
+  { id: GITEA_TOOL_ID, offer: { mode: "conditional", gate: "giteaAllowed", bench_row: "gitea-tool", priority: 4 }, spec: () => ({ id: GITEA_TOOL_ID, description: "Read repositories, files, issues, pull requests, commits, branches, and releases from the household Gitea.", args: { type: "object", required: ["tool"], properties: { tool: { type: "string" } } } }) },
 ];
 export const START_PROJECT_TOOL_ID = VIRTUAL_TOOL_REGISTRY[0]!.id;
 
