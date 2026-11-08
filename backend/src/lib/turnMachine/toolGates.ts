@@ -28,6 +28,7 @@ import { getHouseholdSettingValue } from "@/lib/settings";
 import type { HouseBand } from "@/lib/house/access";
 import { uptimeAllowed } from "@/lib/uptime/tool";
 import { giteaAllowed } from "@/lib/gitea/tool";
+import { immichAllowed } from "@/lib/immich/tool";
 import { mayUseClipVoices } from "@/lib/access";
 
 export interface TurnToolGateInput {
@@ -92,6 +93,7 @@ export interface TurnToolGateResult {
   houseOk: boolean;
   uptimeOk: boolean;
   giteaOk: boolean;
+  immichOk: boolean;
   houseContext?: { visible: HouseEntity[]; areas: HouseArea[] };
 }
 
@@ -177,9 +179,10 @@ export async function budgetWithTurnToolGates(input: TurnToolGateInput): Promise
   } else houseOk = false;
   const uptimeOk = safeGate(() => uptimeAllowed({ actor: input.actor, band: input.band, surface: input.surface, surfaceClass: input.surfaceClass, spoken: input.spoken, bare: input.bare }));
   const giteaOk = safeGate(() => giteaAllowed({ actor: input.actor, band: input.band, surface: input.surface, surfaceClass: input.surfaceClass, spoken: input.spoken, bare: input.bare }));
+  const immichOk = safeGate(() => immichAllowed({ actor: input.actor, band: input.band, surface: input.surface, surfaceClass: input.surfaceClass, spoken: input.spoken, bare: input.bare }));
   // TOOL-OFFER-VOICEOVER-01: `voiceover` is offered by structure alone (an adult, written, non-guest turn with the voice engine ready); the
   // person's wording is never read (rule 1). budget.ts keeps it past the sixteen-tool cap.
-  const gated = withTurnToolGates(input.budget, answerImagesOk, picturesOk, videosOk, musicOk, musicEditOk, itemRefOk, musicBandOk, videoEditOk, musicObject, writingFormatOk, editPictureOk, voiceoverOk, filmOk, houseOk, uptimeOk, inspiredVoiceOk, giteaOk);
+  const gated = withTurnToolGates(input.budget, answerImagesOk, picturesOk, videosOk, musicOk, musicEditOk, itemRefOk, musicBandOk, videoEditOk, musicObject, writingFormatOk, editPictureOk, voiceoverOk, filmOk, houseOk, uptimeOk, inspiredVoiceOk, giteaOk, immichOk);
   return {
     budget: gated,
     writingFormatOk,
@@ -188,6 +191,7 @@ export async function budgetWithTurnToolGates(input: TurnToolGateInput): Promise
     houseOk,
     uptimeOk,
     giteaOk,
+    immichOk,
     ...(houseContext ? { houseContext } : {}),
     answerImagesOk,
     picturesOk,

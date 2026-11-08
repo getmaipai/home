@@ -16,6 +16,7 @@
       "version": "0.2.20",
       "dependencies": {
         "@hono/zod-openapi": "^1.6.3",
+        "@immich/sdk": "3.3.6",
         "@lingui/core": "6.6.0",
         "@lingui/message-utils": "6.6.0",
         "@maipai/core": "file:../../commons-tags/core-core-v0.1.7/core",
@@ -535,6 +536,8 @@
 
     "@img/sharp-win32-x64": ["@img/sharp-win32-x64@0.35.5", "", { "os": "win32", "cpu": "x64" }, "sha512-x76eH0vEiHlcMQu8Y8IenntaACtddpT6W0wmXtWrnKcnKI7ME5DdgqhAD6SEWOEl1v2zDvkZDhFA9KnURwpfqg=="],
 
+    "@immich/sdk": ["@immich/sdk@3.3.6", "", { "dependencies": { "@oazapfts/runtime": "^1.0.2" } }, "sha512-WzRHlgIqQYCMwlpaNSDkLomD80RHi0PQgJeT6xAkFw23O2uBlHCa3wKn/7UbPLOerz2TwaB2QF8/Ok5/XWMGyw=="],
+
     "@inquirer/ansi": ["@inquirer/ansi@2.0.9", "", {}, "sha512-0Ywt3S8tqM6TWUcsRlBFQ1x+X3/o8kktX0ZiKAnByYb9GFDknnOhse1PVtfiD2BXPI8ar+BWx9PV9R0lQIcygw=="],
 
     "@inquirer/confirm": ["@inquirer/confirm@6.3.3", "", { "dependencies": { "@inquirer/core": "^12.0.4", "@inquirer/type": "4.2.0" }, "peerDependencies": { "@types/node": ">=18" }, "optionalPeers": ["@types/node"] }, "sha512-ImOBgpl/sJTFp8naeSkNu4S0Sf8F8pxv3/CUx+LoBAdQvCVqFz6rSB2A/oZYsJge3+yphbEDxEkfaRNYq1OU0A=="],
@@ -650,6 +653,8 @@
     "@noriginmedia/norigin-spatial-navigation-core": ["@noriginmedia/norigin-spatial-navigation-core@4.1.2", "", { "dependencies": { "lodash-es": "^4.17.21" } }, "sha512-+SMXSilyBd5M3iP0UqXatY2s4ealKaPKqt6SFef5xsqB64Ijzkww+YxsYHgOtr871lSHIei8o3sbKjb5uDuxwA=="],
 
     "@noriginmedia/norigin-spatial-navigation-react": ["@noriginmedia/norigin-spatial-navigation-react@3.3.0", "", { "dependencies": { "@noriginmedia/norigin-spatial-navigation-core": "^4.1.0", "lodash-es": "^4.17.21" }, "peerDependencies": { "react": ">=16.8.0" } }, "sha512-YmiXFkczmfRTz6vmVmQoNhryi0j/09Ez77RPdCM2/VmXo7XcTVIYhrrQIqXkslLe2BzM2/k6ITqwTGhl2B/GTg=="],
+
+    "@oazapfts/runtime": ["@oazapfts/runtime@1.2.0", "", {}, "sha512-fi7dp7dNayyh/vzqhf0ZdoPfC7tJvYfjaE8MBL1yR+iIsH7cFoqHt+DV70VU49OMCqLc7wQa+yVJcSmIRnV4wA=="],
 
     "@open-draft/deferred-promise": ["@open-draft/deferred-promise@3.0.0", "", {}, "sha512-XW375UK8/9SqUVNVa6M0yEy8+iTi4QN5VZ7aZuRFQmy76LRwI9wy5F4YIBU6T+eTe2/DNDo8tqu8RHlwLHM6RA=="],
 

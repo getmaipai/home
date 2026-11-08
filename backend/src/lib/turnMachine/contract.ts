@@ -268,6 +268,8 @@ export interface TurnState {
   uptimeAllowed?: boolean;
   /** AGENT-SVC-01: adult written chat and at least one enabled Gitea instance. */
   giteaAllowed?: boolean;
+  /** AGENT-SVC-01: an adult written chat turn and an enabled Immich instance. */
+  immichAllowed?: boolean;
   houseContext?: { visible: import("@/lib/house/registry").HouseEntity[]; areas: import("@/lib/house/registry").HouseArea[] };
   /** MUSIC-LIKE-01: the message holds a maipai://music/track reference on a turn that may make music; `make_band` is offered only then. */
   musicBandAllowed?: boolean;

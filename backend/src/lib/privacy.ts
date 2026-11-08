@@ -336,6 +336,16 @@ export function platformConnections(): PrivacyConnection[] {
       retention: "Home keeps the answer only as part of the conversation if household history is enabled. The audit keeps the action and result only.", direction: "outbound",
     });
   }
+  if (listInstances("immich").length > 0) {
+    rows.push({
+      id: "platform:immich", source: "MaiPai Home", sourceKind: "platform",
+      destination: "your own Immich on your LAN",
+      when: "when an adult asks Home to search or read album and server counts",
+      what: "Home reads album names, counts and search result names from your Immich. It never copies photos, reads original files or thumbnails, or returns image links. Nothing leaves the LAN. Home's log keeps the action and result only, never a query, album, person, asset or instance name.",
+      who: "your household's own Immich instances", optIn: true,
+      retention: "Home keeps the answer only as part of the conversation if household history is enabled. The audit keeps the action and result only.", direction: "outbound",
+    });
+  }
   return rows.filter((r): r is PrivacyConnection => r !== null);
 }
 

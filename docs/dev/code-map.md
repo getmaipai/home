@@ -565,6 +565,8 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/imaging/subject.ts` | clippedEdges, subjectBounds, findSubject |
 | `backend/src/lib/imaging/targets.ts` | imagingTargets |
 | `backend/src/lib/imaging/tools.ts` | submitImageTool, fetchImageToolResult, runImageTool, removeBackground, upscale |
+| `backend/src/lib/immich/ids.ts` | IMMICH_TOOL_ID |
+| `backend/src/lib/immich/tool.ts` | IMMICH_ACTIONS, visibleImmichInstances, immichAllowed, immichToolSpec, runImmichTool |
 | `backend/src/lib/installActions.ts` | volumesFor, sanitizeSelection, previewPlan, engineNeedsInstall, ensureEngineInstalling, withoutUnfitJobs |
 | `backend/src/lib/installPlanWording.ts` | gbText, VOICE_LINE, wordPlan |
 | `backend/src/lib/installPreflight.ts` | isSupportedInstallPlatform, checkInstallPreflight |

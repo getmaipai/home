@@ -18,6 +18,7 @@
   },
   "dependencies": {
     "@hono/zod-openapi": "^1.6.3",
+    "@immich/sdk": "3.3.6",
     "@lingui/core": "6.6.0",
     "@lingui/message-utils": "6.6.0",
     "@maipai/core": "file:../../commons-tags/core-core-v0.1.7/core",

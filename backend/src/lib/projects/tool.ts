@@ -27,6 +27,7 @@ import { VOICEOVER_TOOL_ID, CHANGE_VOICE_TOOL_ID, MAKE_INSPIRED_VOICE_TOOL_ID, v
 import { HOUSE_TOOL_ID } from "@/lib/house/ids";
 import { UPTIME_TOOL_ID } from "@/lib/uptime/ids";
 import { GITEA_TOOL_ID } from "@/lib/gitea/ids";
+import { IMMICH_TOOL_ID } from "@/lib/immich/ids";
 
 export interface VirtualToolOffer {
   mode: "base" | "conditional" | "off";
@@ -55,6 +56,7 @@ export const VIRTUAL_TOOL_REGISTRY: VirtualToolRegistration[] = [
   // AGENT-SVC-01: read-only service status over the household's Uptime Kuma instances; adults only (lib/uptime/tool.ts).
   { id: UPTIME_TOOL_ID, offer: { mode: "conditional", gate: "uptimeAllowed", bench_row: "uptime-tool", priority: 4 }, spec: () => ({ id: UPTIME_TOOL_ID, description: "Check whether the household's services are up.", args: { type: "object", required: ["action"], properties: { action: { type: "string" } } } }) },
   { id: GITEA_TOOL_ID, offer: { mode: "conditional", gate: "giteaAllowed", bench_row: "gitea-tool", priority: 4 }, spec: () => ({ id: GITEA_TOOL_ID, description: "Read repositories, files, issues, pull requests, commits, branches, and releases from the household Gitea.", args: { type: "object", required: ["tool"], properties: { tool: { type: "string" } } } }) },
+  { id: IMMICH_TOOL_ID, offer: { mode: "conditional", gate: "immichAllowed", bench_row: "immich-tool", priority: 4 }, spec: () => ({ id: IMMICH_TOOL_ID, description: "Read album and search result names and counts from the household Immich.", args: { type: "object", required: ["action"], properties: { action: { type: "string" } } } }) },
 ];
 export const START_PROJECT_TOOL_ID = VIRTUAL_TOOL_REGISTRY[0]!.id;
 
