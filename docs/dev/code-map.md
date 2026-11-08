@@ -1074,6 +1074,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/transcripts/writers.ts` | writeSrt, writeVtt, writeText, writeMarkdown, writeJson |
 | `backend/src/lib/translate/core.ts` | DEFAULT_BATCH, TranslateHeldError, translateItems |
 | `backend/src/lib/translate/engine.ts` | hubCompleter |
+| `backend/src/lib/translate/keep.ts` | loadKeepTerms, findKeepSpans, maskKept, spotKeepTerms |
 | `backend/src/lib/translate/languages.ts` | LANGUAGES, languageName, isKnownLanguage |
 | `backend/src/lib/translate/validate.ts` | validateTranslation, isProtected |
 | `backend/src/lib/trash/podcastCopies.ts` | isPodcastCopyTrash, mayManagePodcastCopy, trashPodcastCopy |
