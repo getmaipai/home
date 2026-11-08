@@ -23,6 +23,8 @@ import type { File as FileRecord } from "@maipai/spec/gen/ts/file.js";
 import type { List as ListRecord } from "@maipai/spec/gen/ts/list.js";
 import type { Alarm } from "@maipai/spec/gen/ts/alarm.js";
 
+export type HouseScheduleItem = { id: string; what: string; when: string; state: "active" | "paused"; note: string | null };
+export type HouseSchedules = { schedules: HouseScheduleItem[]; others: number | null };
 export type ComingUpItem = { id: string; kind: "alarm" | "reminder" | "timer"; text: string; at: string; total_seconds?: number };
 export type QuickTimerView = { id: string; name: string; minutes: number; position: number };
 export type WorldPlaceView = { id: string; name: string; country: string; zone: string; position: number };
@@ -1007,6 +1009,8 @@ export interface MediaBudgetResponse { limit_min: number; used_min: number; left
 export const api = {
   lists: () => request<ListRecord[]>("/api/lists"),
   comingUp: () => request<ComingUpItem[]>("/api/coming-up"),
+  houseSchedules: () => request<HouseSchedules>("/api/house/schedules"),
+  cancelHouseSchedule: (id: string) => request<{ ok: true }>(`/api/house/schedules/${encodeURIComponent(id)}`, { method: "DELETE" }),
   startTimer: (label: string, minutes: number) => request<{ id: string }>("/api/coming-up/timers", { method: "POST", body: JSON.stringify({ label, minutes }) }),
   extendTimer: (id: string) => request<{ id: string; at: string; total_seconds: number }>(`/api/coming-up/${encodeURIComponent(id)}/extend`, { method: "POST" }),
   quickTimers: () => request<QuickTimerView[]>("/api/quick-timers"),

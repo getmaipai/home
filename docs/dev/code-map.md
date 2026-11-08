@@ -124,6 +124,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `frontend/src/apps/people/VoiceEnrollmentBody.tsx` | VoiceEnrollmentBody |
 | `frontend/src/apps/reminders/ComingUpRow.tsx` | TimerCountdown, ComingUpRow |
 | `frontend/src/apps/reminders/CreateListSheet.tsx` | CreateListSheet |
+| `frontend/src/apps/reminders/DeviceSchedulesView.tsx` | DeviceSchedulesView |
 | `frontend/src/apps/reminders/ListColumn.tsx` | ListColumn |
 | `frontend/src/apps/reminders/ListMain.tsx` | ListMain |
 | `frontend/src/apps/reminders/ListMenu.tsx` | ListMenu |

@@ -2,13 +2,12 @@ import { i18n } from "@lingui/core";
 import type { ComingUpItem } from "@/lib/api";
 import type { List as ListRecord } from "@maipai/spec/gen/ts/list.js";
 import { ComingUpRow } from "./ComingUpRow";
-import type { ReminderView } from "./reminderTypes";
 import { dueLabel } from "./reminderTypes";
 
 export type SmartItem = { id: string; label: string; text: string; at: string; list?: ListRecord };
 
 export function SmartListView({ view, items, onChanged }: {
-  view: Extract<ReminderView, { kind: "today" | "scheduled" }>;
+  view: { kind: "today" | "scheduled" };
   items: SmartItem[];
   onChanged: () => void;
 }) {
