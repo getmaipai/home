@@ -11,6 +11,7 @@ import { performanceRoutes } from "@/routes/performance";
 afterEach(() => { resetDb(); __resetPerfWatchForTests(); });
 
 test("slow middleware records only slow requests and uses a route template", async () => {
+  __resetPerfWatchForTests(); // another test in the same process may have left a slow request on a busy machine
   const app = new Hono();
   app.use("*", slowRequestMiddleware);
   app.get("/items/:id", async (c) => { await Bun.sleep(c.req.query("delay") === "800" ? 800 : 100); return c.text("ok"); });
