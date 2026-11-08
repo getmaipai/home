@@ -97,10 +97,17 @@ afterEach(() => {
   delete process.env.MAIPAI_LLAMA_SERVER_URL;
 });
 
+// The translate package asks three questions: which text, which language, then the shared translator (a JSON array).
+function translateStub(prompt: string): string {
+  if (prompt.includes("exact text they want translated")) return "hello world";
+  if (prompt.includes("Identify the target language")) return "es";
+  return JSON.stringify(["hola mundo"]);
+}
+
 describe("translate language speech", () => {
   test("keeps the translation visible and speaks the English no-voice notice", async () => {
     __setOfferedVoicesForTests([{ id: "voice-en", name: "English", description: "", language: "en", country: "", gender: "unknown", source: "preset", onDisk: true, licence: null, revision: "test" }]);
-    const result = await withStub({ reply: (request) => request.messages.at(-1)?.content.includes("ONLY the translated text") ? "hola mundo" : "es" }, () => runTurnNext(people.owner, "chat", "translate hello world to spanish"));
+    const result = await withStub({ reply: (request) => translateStub(request.messages.at(-1)?.content ?? "") }, () => runTurnNext(people.owner, "chat", "translate hello world to spanish"));
     expect(result.ok).toBe(true);
     if (!result.ok || result.kind !== "immediate") throw new Error("expected an immediate result");
     expect(result.value.reply.text).toContain("hola mundo");
@@ -112,7 +119,7 @@ describe("translate language speech", () => {
 
   test("on a spoken surface the visible reply also says no voice is installed", async () => {
     __setOfferedVoicesForTests([{ id: "voice-en", name: "English", description: "", language: "en", country: "", gender: "unknown", source: "preset", onDisk: true, licence: null, revision: "test" }]);
-    const result = await withStub({ reply: (request) => request.messages.at(-1)?.content.includes("ONLY the translated text") ? "hola mundo" : "es" }, () => runTurnNext(people.owner, "robot", "translate hello world to spanish", { speakerEvidence: { person: people.owner.id, basis: "voice", level: "confirmed" } }));
+    const result = await withStub({ reply: (request) => translateStub(request.messages.at(-1)?.content ?? "") }, () => runTurnNext(people.owner, "robot", "translate hello world to spanish", { speakerEvidence: { person: people.owner.id, basis: "voice", level: "confirmed" } }));
     expect(result.ok).toBe(true);
     if (!result.ok || result.kind !== "immediate") throw new Error("expected an immediate result");
     expect(result.value.reply.text).toContain("No Spanish voice is installed, so this was not read aloud.");
