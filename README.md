@@ -11,7 +11,7 @@
 
 Your own private AI at home, with chat, voice, pictures and videos, on your own hardware - for protection, privacy, and independence.
 
-Music, pictures, video, films, podcasts, chat, voice and your smart home share one memory, one Library and one set of family profiles. Nothing is sent to a cloud service to make any of it. *Preview* means it works with rough edges. *Planned* means it is not built yet. *Max* needs the Max resource level. *Adults* means adult profiles only.
+Music, pictures, video, films, podcasts, chat, voice and your smart home share one memory, one Library and one set of family profiles. Nothing is sent to a cloud service to make any of it, and the AI is uncensored for adults. *Preview* means it works with rough edges. *Planned* means it is not built yet. *Max* needs the Max resource level. *Adults* means adult profiles only.
 
 ## What you can do
 
@@ -128,7 +128,7 @@ Music, pictures, video, films, podcasts, chat, voice and your smart home share o
 ### Adults, family and safety
 
 - **Give everyone a profile.** Children are filtered by default, teens get more privacy, guests get the teen limits. Parents set the rest, and the safety gates for children and teens cannot be switched off.
-- **Adults are treated like adults.** Adult profiles get straight answers and the full creative range: frank talk on health, law and politics, dark and mature fiction, horror, war and romance, with no content filter and no lectures.
+- **Uncensored for adults.** Adult profiles get straight answers and the full creative range: frank talk on health, law and politics, dark and mature fiction, horror, war and romance, with no content filter and no lectures.
 - **Private when you want it.** Mark any picture or clip as adult and it sits behind a locked tile until you enter a fresh passcode. Lock everything at once, and let the lock close itself again.
 - **Sign in carefully.** Passcode boxes, two-step codes, a lockout that cannot lock out the owner, and a check on the address Home opens at.
 - **Speak your language.** English (US or UK) or Spanish per person, in every screen, notice and spoken time.
