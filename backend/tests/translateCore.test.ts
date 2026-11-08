@@ -37,6 +37,16 @@ describe("translation core", () => {
     expect(result.results).toEqual(["Un", "Deux"]);
   });
 
+  test("adds dialect and style to the system message", async () => {
+    let system = "";
+    await translateItems({ items: ["Hello"], from: "en", to: "es", kind: "ui", spot: false, dialect: "Neutral Spanish", style: ["Plain words", "Short sentences"], completer: async (messages) => {
+      system = messages[0]!.content;
+      return { ok: true, text: '["Hola"]' };
+    } });
+    expect(system).toContain("Dialect: Neutral Spanish");
+    expect(system).toContain("Style rules: Plain words; Short sentences");
+  });
+
   test("bad JSON retries, and validation failure is reported", async () => {
     const calls = { count: 0 };
     const good = await translateItems({ items: ["Hello"], from: "en", to: "es", kind: "chat", completer: scripted(["not json", '["Hola"]'], calls) });

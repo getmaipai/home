@@ -29,7 +29,7 @@ function parseReply(raw: string, expected: number): string[] | null {
 export async function translateItems(options: {
   items: string[]; from: string; to: string; kind: Kind; completer: Completer;
   keep?: string[]; spot?: boolean;
-  glossary?: Record<string, unknown>; check?: (outs: string[]) => string | null;
+  glossary?: Record<string, unknown>; dialect?: string; style?: string[]; check?: (outs: string[]) => string | null;
   batchSize?: number; onProgress?: (done: number, total: number) => void;
 }): Promise<{ results: (string | null)[]; failed: number[]; newTerms: string[] }> {
   const { items, kind, completer } = options;
@@ -55,6 +55,8 @@ export async function translateItems(options: {
     const masks = batch.map((item) => maskKept(item, findKeepSpans(item, terms, { acronyms: kind === "ui" || kind === "doc" || kind === "chat" })));
     const maskedBatch = masks.map((entry) => entry.masked);
     const system = [`Translate from ${from} to ${to}. ${KIND_INSTRUCTIONS[kind]}`, `Return only a JSON array of exactly ${batch.length} strings, in the same order.`, "Text like ⟦K1⟧ is a fixed marker: copy it exactly, unchanged, once."];
+    if (options.dialect) system.push(`Dialect: ${options.dialect}`);
+    if (options.style?.length) system.push(`Style rules: ${options.style.join("; ")}`);
     if (options.glossary) system.push(`Glossary terms to use: ${JSON.stringify(options.glossary)}`);
     const systemContent = system.join(" ");
     const messages = [{ role: "system" as const, content: systemContent }, { role: "user" as const, content: JSON.stringify(maskedBatch) }];

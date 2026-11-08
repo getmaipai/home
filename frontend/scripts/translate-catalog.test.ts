@@ -17,18 +17,20 @@ function setup(body: string) {
 }
 
 /** A fake Stack: roles answer, chat answers from `reply`, every chat prompt is recorded. */
-function fakeStack(state: string, reply: (prompt: string) => unknown) {
+function fakeStack(state: string, reply: (items: string[], prompt: string) => string[]) {
   const prompts: string[] = [];
   const fetchFn: Fetch = async (url, init) => {
     if (url.endsWith("/stack/v1/roles")) return Response.json({ roles: [{ id: "chat", state: { state } }] });
-    const prompt = JSON.parse(String(init?.body)).messages[0].content as string;
+    const messages = JSON.parse(String(init?.body)).messages as Array<{ content: string }>;
+    const prompt = messages.map((message) => message.content).join("\n");
     prompts.push(prompt);
-    return Response.json({ choices: [{ message: { content: JSON.stringify(reply(prompt)) } }] });
+    const items = JSON.parse(messages[messages.length - 1]!.content) as string[];
+    return Response.json({ choices: [{ message: { content: JSON.stringify(reply(items, prompt)) } }] });
   };
   return { fetchFn, prompts };
 }
 
-const echo = (prompt: string) => [...prompt.matchAll(/\{"id":"((?:[^"\\]|\\.)*)","from"/g)].map((m) => ({ id: JSON.parse(`"${m[1]}"`), msgstr: `ES ${JSON.parse(`"${m[1]}"`)}` }));
+const echo = (items: string[]) => items.map((item) => `ES ${item}`);
 const glossary = { dialect: "neutral", style: ["plain"], Library: { es: "Biblioteca" } };
 
 describe("validateTranslation", () => {
@@ -69,7 +71,7 @@ describe("translateCatalog with a fake Stack", () => {
     const poPath = join(dir, "es", "messages.po");
     writeFileSync(poPath, HEADER + entry("../backend/src/lib/failureCopy.ts", "failure.busy.adult") + "\n" + entry("../backend/src/lib/failureCopy.ts", "failure.busy.minor"));
     writeFileSync(join(dir, "en-US", "messages.po"), HEADER + entry("../backend/src/lib/failureCopy.ts", "failure.busy.adult", "One moment. Send that again in a bit.") + "\n" + entry("../backend/src/lib/failureCopy.ts", "failure.busy.minor", "One moment. Try again soon."));
-    const stack = fakeStack("ready", (prompt) => [...prompt.matchAll(/\{"id":"([^"]+)","from":\[[^\]]*\],"text":"([^"]+)"\}/g)].map((m) => ({ id: m[1], msgstr: `ES ${m[2]}` })));
+    const stack = fakeStack("ready", echo);
     const { text, report } = await translateCatalog({ locale: "es", poPath, glossary, stackUrl: STACK, fetch: stack.fetchFn });
     expect(stack.prompts[0]).toContain("One moment. Send that again in a bit.");
     expect(report.filled).toEqual(["failure.busy.adult"]);
@@ -114,7 +116,7 @@ describe("translateCatalog with a fake Stack", () => {
 
   test("a bad answer (lost placeholder, em dash) is retried once alone, then left empty and listed", async () => {
     const { dir, poPath } = setup(entry("src/a.tsx", "Saved {name}") + "\n" + entry("src/a.tsx", "Hello"));
-    const stack = fakeStack("ready", (prompt) => echo(prompt).map((r) => (r.id === "Saved {name}" ? { ...r, msgstr: "Guardado" } : { ...r, msgstr: "Hola — hola" })));
+    const stack = fakeStack("ready", (items) => items.map((item) => (item === "Saved {name}" ? "Guardado" : "Hola — hola")));
     const { text, report } = await translateCatalog({ locale: "es", poPath, glossary, stackUrl: STACK, fetch: stack.fetchFn });
     expect(stack.prompts.length).toBe(3);
     expect(report.failed.sort()).toEqual(["Hello", "Saved {name}"]);
@@ -150,7 +152,7 @@ describe("accept and review", () => {
 
   test("the review list shows the translation with a back translation", async () => {
     const { dir, poPath } = setup(entry("src/a.tsx", "Save", "Guardar", "#, needs-review\n"));
-    const stack = fakeStack("ready", () => [{ id: "Save", msgstr: "Save (back)" }]);
+    const stack = fakeStack("ready", () => ["Save (back)"]);
     const list = await reviewList({ locale: "es", poPath, stackUrl: STACK, fetch: stack.fetchFn });
     expect(list).toContain("Guardar");
     expect(list).toContain("Save (back)");
