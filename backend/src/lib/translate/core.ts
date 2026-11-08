@@ -20,7 +20,12 @@ const KIND_INSTRUCTIONS: Record<Kind, string> = {
 function parseReply(raw: string, expected: number): string[] | null {
   try {
     const body = raw.trim().replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/, "");
-    const value: unknown = JSON.parse(body);
+    let value: unknown = JSON.parse(body);
+    // Some models wrap the array in an object such as {"result": [...]}; accept a single array-valued property.
+    if (value && typeof value === "object" && !Array.isArray(value)) {
+      const arrays = Object.values(value as Record<string, unknown>).filter(Array.isArray);
+      if (arrays.length === 1) value = arrays[0];
+    }
     if (!Array.isArray(value) || value.length !== expected || !value.every((item) => typeof item === "string" && item.trim().length > 0)) return null;
     return value.map((item: string) => item.trim());
   } catch { return null; }
@@ -39,7 +44,7 @@ export async function translateItems(options: {
   const from = languageName(options.from) ?? options.from;
   const to = languageName(options.to) ?? options.to;
   const fixedTerms = loadKeepTerms(kind, options.keep);
-  const shouldSpot = (kind === "ui" || kind === "doc") && options.spot !== false;
+  const shouldSpot = (kind === "ui" || kind === "doc") && options.spot === true;
   const spotted: string[] = [];
   if (shouldSpot) {
     for (let at = 0; at < items.length; at += size) {

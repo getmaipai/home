@@ -37,24 +37,25 @@ export function findKeepSpans(text: string, terms: string[], opts: { acronyms: b
 }
 
 export function maskKept(text: string, spans: string[]): { masked: string; restore: (out: string) => string | null } {
-  const sorted = unique(spans).filter((span) => text.includes(span));
-  const markers = new Map<string, string>();
+  const markers = new Map<string, { span: string; count: number }>();
   let masked = text;
-  sorted.forEach((span, i) => {
-    const marker = `⟦K${i + 1}⟧`;
-    markers.set(marker, span);
+  // Longest first; a span already swallowed by a longer one (Library inside [Library](library.md)) gets no marker of its own.
+  for (const span of unique(spans)) {
+    const count = masked.split(span).length - 1;
+    if (count === 0) continue;
+    const marker = `\u27E6K${markers.size + 1}\u27E7`;
+    markers.set(marker, { span, count });
     masked = masked.split(span).join(marker);
-  });
+  }
   return { masked, restore: (out: string): string | null => {
-    for (const marker of markers.keys()) {
-      const escaped = escapeRe(marker);
-      const matches = out.match(new RegExp(escaped, "g")) ?? [];
-      const preserved = markers.get(marker)!;
-      if (matches.length !== 0 && matches.length !== 1) return null;
-      if (matches.length === 0 && out.split(preserved).length - 1 !== 1) return null;
-    }
     let restored = out;
-    for (const [marker, span] of markers) restored = restored.includes(marker) ? restored.split(marker).join(span) : restored;
+    for (const [marker, { span, count }] of markers) {
+      const found = out.split(marker).length - 1;
+      // A marker must come back exactly as often as it went in; a model that wrote the term itself must have written it as often too.
+      if (found === 0) { if (out.split(span).length - 1 !== count) return null; continue; }
+      if (found !== count) return null;
+      restored = restored.split(marker).join(span);
+    }
     return restored;
   } };
 }
@@ -62,7 +63,7 @@ export function maskKept(text: string, spans: string[]): { masked: string; resto
 export async function spotKeepTerms(items: string[], completer: Completer, from: string): Promise<string[]> {
   try {
     const response = await completer([
-      { role: "system", content: "List names, brands, product words, technical terms and acronyms in these texts that must stay in their original form when translated. Return only a JSON array of strings. Do not translate anything." },
+      { role: "system", content: "List only proper names, brand and product names (for example MaiPai or Wi-Fi), acronyms, and technical terms people keep in English in every language. Do NOT list button, menu, tab or page labels, headings, bold text or ordinary words, even when they are capitalized. Return only a JSON array of strings. Do not translate anything." },
       { role: "user", content: JSON.stringify({ from, items }) },
     ]);
     if (!response.ok) return [];

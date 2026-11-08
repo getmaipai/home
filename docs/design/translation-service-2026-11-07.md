@@ -105,7 +105,7 @@ because "Home" or "Stack" is a product word in a screen or a document but an ord
 
 | Kind | Fixed list (`keep.json`) | Finder: URLs, emails, paths, code spans, placeholders | All-caps acronyms | Model spotting | Caller terms |
 |---|---|---|---|---|---|
-| `ui`, `doc` | yes | yes | yes | yes (default on) | yes |
+| `ui`, `doc` | yes | yes | yes | opt-in (see below) | yes |
 | `subtitle`, `lyric`, `chat` | no | yes | no for `lyric` and `subtitle`, yes for `chat` | never | yes (a lyrics adapter passes the title and artist) |
 
 Three layers, cheapest first:
@@ -118,7 +118,7 @@ Three layers, cheapest first:
    and emails come from `compromise` (already a backend dependency, used by `unknownNames.ts`; offline). Measured on `docs/user/`:
    `compromise` also tags sentence-first verbs ("Make", "Press") and bold UI labels as proper nouns, so its proper-noun tag is NOT used.
    Mid-sentence capitalized words that are not in the glossary are not guessed; they go to layer 3.
-3. **Model spotting** (`ui` and `doc` only, default on; never for caption, lyric or chat text, so none of that text reaches a report or log,
+3. **Model spotting** (`ui` and `doc` only, opt-in with `spot: true` or `--spot`, after a real run on `docs/user/transcripts.md` showed the model lists every bold UI label as a name to keep, which leaves a localized app's labels in English; never for caption, lyric or chat text, so none of that text reaches a report or log,
    rule 6a): the model reads the source once through the same completer (so `stackCompleter`'s readiness check, 7.3, covers it) and lists
    terms to keep. A term counts only if it appears verbatim in the source and the glossary does not translate it. Spotted terms are
    marker-swapped in the same run AND returned as candidates in the run report (product copy run by the operator); they are never added
@@ -149,3 +149,10 @@ Order: 01, then 02 to 05 in any order (separate files), 06 last.
 Core: scripted completer tests (count mismatch, bad JSON, partial failure, protected refusal, each validation). Markdown: identity
 round trip on every file in `docs/user/`. Each adapter: its existing test file passes unchanged. One real run per adapter against the
 hub's model on a small input, output read by me. Docs: translate one page to Spanish, open it, judge it.
+
+## 7. Built state (2026-11-07)
+
+TRANSLATE-01, 01b, 02, 03, 04 and 05 are built. What the real runs changed from the design: documents translate whole blocks (paragraph,
+heading, table cell, with `**`, link and code counts checked) instead of text fragments; the doc script gives bold labels the app
+catalog's Spanish word through the glossary; model spotting is opt-in. TRANSLATE-06 needs a new recipe step in `commons/spec` first (the
+`translate` package is a declarative recipe, not code), so it is a spec-first change in its own slice.

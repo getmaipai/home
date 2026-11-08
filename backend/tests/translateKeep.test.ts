@@ -41,7 +41,7 @@ describe("translation keep terms", () => {
   });
 
   test("spotting drops absent candidates and reports protected source terms", async () => {
-    const run = async (answer: string) => translateItems({ items: ["Use Quasar now"], from: "en", to: "es", kind: "doc", completer: queue([JSON.stringify([answer]), '["Usa ⟦K1⟧ ahora"]']) });
+    const run = async (answer: string) => translateItems({ items: ["Use Quasar now"], from: "en", to: "es", kind: "doc", spot: true, completer: queue([JSON.stringify([answer]), '["Usa ⟦K1⟧ ahora"]']) });
     const absent = await run("NotInSource");
     expect(absent.newTerms).toEqual([]);
     const present = await run("Quasar");
@@ -74,5 +74,27 @@ describe("keep finder paths and spotting", () => {
   test("and/or is not a path, a real path is kept", () => {
     expect(findKeepSpans("Use this and/or that", [], { acronyms: false })).toEqual([]);
     expect(findKeepSpans("Open ./docs/user/songs.md now", [], { acronyms: false })).toContain("./docs/user/songs.md");
+  });
+});
+
+describe("nested kept spans", () => {
+  test("a short term inside a longer kept span does not break restoring", async () => {
+    const reply: Completer = async () => ({ ok: true, text: JSON.stringify(["Abre la ⟦K1⟧ y elige un archivo."]) });
+    const out = await translateItems({ items: ["Open the [Library](library.md) and pick a file."], from: "en", to: "es", kind: "doc", completer: reply, keep: ["[Library](library.md)", "Library"], spot: false });
+    expect(out.failed).toEqual([]);
+    expect(out.results).toEqual(["Abre la [Library](library.md) y elige un archivo."]);
+  });
+});
+
+describe("repeated kept terms and wrapped replies", () => {
+  test("a term that appears three times comes back three times and is restored", async () => {
+    const reply: Completer = async () => ({ ok: true, text: JSON.stringify(["⟦K1⟧ y ⟦K1⟧ y ⟦K1⟧ son archivos."]) });
+    const out = await translateItems({ items: ["SRT and SRT and SRT are files."], from: "en", to: "es", kind: "doc", completer: reply, keep: ["SRT"], spot: false });
+    expect(out.results).toEqual(["SRT y SRT y SRT son archivos."]);
+  });
+  test("an object wrapping the array is accepted", async () => {
+    const reply: Completer = async () => ({ ok: true, text: JSON.stringify({ result: ["Hola"] }) });
+    const out = await translateItems({ items: ["Hello"], from: "en", to: "es", kind: "doc", completer: reply, spot: false });
+    expect(out.results).toEqual(["Hola"]);
   });
 });

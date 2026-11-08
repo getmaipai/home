@@ -5,9 +5,11 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { englishSources, parsePo, rewriteEntries, type PoEntry } from "./po";
 import { translateItems, type Completer } from "../../backend/src/lib/translate/core";
+import { chatReady, stackCompleter, stackOnlyFetch, StackNotReadyError, type Fetch } from "../../backend/src/lib/translate/engine";
+export { stackOnlyFetch, StackNotReadyError } from "../../backend/src/lib/translate/engine";
 import { isProtected as coreIsProtected, validateTranslation as coreValidateTranslation } from "../../backend/src/lib/translate/validate";
 
-export type Fetch = (url: string, init?: RequestInit) => Promise<Response>;
+export type { Fetch };
 export type Glossary = { dialect?: string; style?: string[]; [term: string]: unknown };
 export type Report = { filled: string[]; failed: string[]; refused: string[]; batches: number; stopped?: string };
 
@@ -28,40 +30,6 @@ export function planBatches(entries: PoEntry[], limit = MAX_BATCH_ENTRIES): Arra
   const batches: Array<{ file: string; entries: PoEntry[] }> = [];
   for (const [file, list] of byFile) for (let i = 0; i < list.length; i += limit) batches.push({ file, entries: list.slice(i, i + limit) });
   return batches;
-}
-
-/** A fetch that refuses every host but the Stack's (nothing leaves the home, PRIVACY.md). */
-export function stackOnlyFetch(stackUrl: string, inner: Fetch = fetch): Fetch {
-  const host = new URL(stackUrl).host;
-  return (url, init) => {
-    if (new URL(url).host !== host) throw new Error(`Refusing a request to ${new URL(url).host}: only the Stack is allowed.`);
-    return inner(url, init);
-  };
-}
-
-async function chatReady(stack: string, doFetch: Fetch): Promise<boolean> {
-  try {
-    const res = await doFetch(`${stack}/stack/v1/roles`);
-    if (!res.ok) return false;
-    const body = (await res.json()) as { roles?: Array<{ id: string; state?: { state?: string } }> };
-    return body.roles?.find((role) => role.id === "chat")?.state?.state === "ready";
-  } catch {
-    return false;
-  }
-}
-
-export class StackNotReadyError extends Error {
-  constructor() { super("Stack chat is not ready; nothing more was translated. Try again when chat is ready."); this.name = "StackNotReadyError"; }
-}
-
-export function stackCompleter(stack: string, doFetch: Fetch): Completer {
-  return async (messages) => {
-    if (!(await chatReady(stack, doFetch))) throw new StackNotReadyError();
-    const res = await doFetch(`${stack}/v1/chat/completions`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ model: "chat", stream: false, messages }) });
-    if (!res.ok) throw new Error(`Stack chat answered ${res.status}`);
-    const content = ((await res.json()) as { choices?: Array<{ message?: { content?: string } }> }).choices?.[0]?.message?.content ?? "";
-    return { ok: true, text: content };
-  };
 }
 
 export type TranslateOptions = {
