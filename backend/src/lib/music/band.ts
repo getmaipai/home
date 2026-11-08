@@ -13,7 +13,7 @@ import { matchingEnabled, sameName, sharedMusicBrainzClient } from "@/lib/media/
 import { readableItem } from "@/lib/media/access";
 import { routeAudience } from "@/lib/pictures/audience";
 import { laneOf } from "@/lib/pictures/lane";
-import { pictureDenial, refusePrompt } from "@/lib/pictures/policy";
+import { adultStylesAllowed, pictureDenial, refusePrompt } from "@/lib/pictures/policy";
 import { QUICK_MODEL } from "@/lib/pictures/quality";
 import { pictureEngineReady } from "@/lib/pictures/ready";
 import { startPictureJob, type PictureJob } from "@/lib/pictures/jobs";
@@ -131,7 +131,7 @@ export async function startBandPicture(state: { conversationId: string | null; t
     if (!prompt || pictureDenial(audience) || refusePrompt(full, { lane: laneOf(audience) }) || !(await pictureEngineReady())) return;
     const picture = await startPictureJob({ actor, conversationId: state.conversationId, turnId: state.turnId, temporary: false,
       purpose: `band:${bandId}:${part}`, kind: "generate", prompt: full,
-      body: { prompt: full, model: QUICK_MODEL, size: "1024x1024", n: 1, seed: Math.floor(Math.random() * 2147483647), audience: "all-ages" } });
+      body: { prompt: full, model: QUICK_MODEL, size: "1024x1024", n: 1, seed: Math.floor(Math.random() * 2147483647), audience: adultStylesAllowed() ? "adult" : "all-ages" } });
     finishBandPicture(picture);
   } catch { /* A portrait or a logo never fails the band. */ }
 }
@@ -176,8 +176,7 @@ export function bandBlockFromRecord(rec: BandRecord, where: { conversationId: st
 export async function makeBand(input: { state: BandState; mediaId: string; callId: string; spoken: boolean }): Promise<BandResult> {
   const { state } = input;
   const actor = state.actor as PersonRow;
-  if (laneOf(musicAudienceOf(state, input.spoken)) !== "adult") return { ok: false, line: "You can change only your own song from this chat." };
-  if (laneOf(musicAudienceOf(state, input.spoken)) !== "adult") return { ok: false, line: "You can change only your own song from this chat." };
+  if (laneOf(musicAudienceOf(state, input.spoken)) !== "adult") return { ok: false, line: "Bands, albums, sound effects and saved styles are for adults. You can make a song here instead." };
   if (musicDenial(musicAudienceOf(state, input.spoken)) || pictureDenial({ ...routeAudience(actor), spoken: input.spoken })) return { ok: false, line: BAND_NOT_HERE_LINE };
   const brief = await briefFor(actor, input.mediaId);
   if (!brief) return { ok: false, line: "No band was made, because that song is not in the library the person can use. Ask which song they mean." };

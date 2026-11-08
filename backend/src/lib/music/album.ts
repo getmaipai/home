@@ -108,7 +108,7 @@ export async function startAlbumCover(state: { conversationId: string | null; tu
     if (!(await pictureEngineReady())) return { ok: false, error: NO_PICTURE_ENGINE_LINE };
     const picture = await startPictureJob({ actor, conversationId: state.conversationId, turnId: state.turnId, temporary: false,
       purpose: `album:${albumId}:cover`, kind: "generate", prompt: full,
-      body: { prompt: full, model: QUICK_MODEL, size: "1024x1024", n: 1, seed: Math.floor(Math.random() * 2147483647), audience: "all-ages" } });
+      body: { prompt: full, model: QUICK_MODEL, size: "1024x1024", n: 1, seed: Math.floor(Math.random() * 2147483647), audience: adultStylesAllowed() ? "adult" : "all-ages" } });
     finishAlbumPicture(picture);
     return { ok: true };
   } catch { return { ok: false, error: "The cover could not be started. Try again in a minute." }; }
@@ -175,8 +175,7 @@ export type AlbumResult = { ok: true; albumId: string; musicJobId: string | null
 export async function makeAlbum(input: { state: BandState; idea: string; bandId?: string; styleId?: string; callId: string; spoken: boolean }): Promise<AlbumResult> {
   const { state } = input;
   const actor = state.actor as PersonRow;
-  if (laneOf(musicAudienceOf(state, input.spoken)) !== "adult") return { ok: false, line: "You can change only your own song from this chat." };
-  if (laneOf(musicAudienceOf(state, input.spoken)) !== "adult") return { ok: false, line: "You can change only your own song from this chat." };
+  if (laneOf(musicAudienceOf(state, input.spoken)) !== "adult") return { ok: false, line: "Bands, albums, sound effects and saved styles are for adults. You can make a song here instead." };
   if (musicDenial(musicAudienceOf(state, input.spoken)) || pictureDenial({ ...routeAudience(actor), spoken: input.spoken })) return { ok: false, line: ALBUM_NOT_HERE_LINE };
   const sound = resolveSound(actor, { band: input.bandId, song_style: input.styleId });
   if (!sound.ok) return { ok: false, line: sound.line };
@@ -241,7 +240,7 @@ export function albumFieldsFromPatch(album: AlbumBody, patch: AlbumPatchInput): 
 }
 
 export async function runAlbumAction(actor: PersonRow, albumId: string, action: AlbumActionName, opts: { patch?: AlbumPatchInput; conversationId?: string | null; turnId?: string | null } = {}): Promise<AlbumActionResult> {
-  if (laneOf(routeAudience(actor)) !== "adult") return { ok: false, status: 403, error: "You can change only your own song from this chat." };
+  if (laneOf(routeAudience(actor)) !== "adult") return { ok: false, status: 403, error: "Bands, albums, sound effects and saved styles are for adults. You can make a song here instead." };
   syncAlbumTracks(actor, albumId);
   const found = getMade("made_album", actor, albumId);
   if (!found.ok) return { ok: false, status: 404, error: "That album is not here any more. It may have been discarded." };

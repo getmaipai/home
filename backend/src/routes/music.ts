@@ -283,7 +283,7 @@ musicRoutes.openapi(makeSongRoute, async (c) => {
   if (!generateMusicArgs.safeParse(args).success) return c.json({ error: "That song request is not valid. Check the tempo, the key and the style, then try again." }, 422) as never;
   const routeAudience_ = musicRouteAudience(actor);
   const refusal = musicRefusalFor(routeAudience_, args);
-  if (laneOf(routeAudience_) !== "adult" && (body.song_style || body.band)) return c.json({ error: "You can change only your own song from this chat." }, 403) as never;
+  if (laneOf(routeAudience_) !== "adult" && (body.song_style || body.band)) return c.json({ error: "Bands, albums, sound effects and saved styles are for adults. You can make a song here instead." }, 403) as never;
   if (refusal) return c.json({ error: refusal.line }, 403) as never;
   const sound = resolveSound(actor, { song_style: body.song_style, band: body.band });
   if (!sound.ok) return c.json({ error: sound.line }, 422) as never;
@@ -307,7 +307,7 @@ const makeSoundRoute = createRoute({ method: "post", path: "/sounds", tags: ["Mu
   responses: { 201: { content: { "application/json": { schema: cardSchema } }, description: "The sound card." }, 422: { description: "The sound cannot be made as asked." }, ...refusals, ...errorResponses({ 503: "No music model is installed or the computer cannot make sounds now" }) } });
 musicRoutes.openapi(makeSoundRoute, async (c) => {
   const actor = c.get("person"), args = c.req.valid("json");
-  if (laneOf(musicRouteAudience(actor)) !== "adult") return c.json({ error: "You can change only your own song from this chat." }, 403) as never;
+  if (laneOf(musicRouteAudience(actor)) !== "adult") return c.json({ error: "Bands, albums, sound effects and saved styles are for adults. You can make a song here instead." }, 403) as never;
   const engine = await musicEngineStatus();
   if (!musicStatusReady(engine)) return c.json({ error: plainMusicFailure("not_installed") }, 503) as never;
   const refusal = musicRefusalFor(musicRouteAudience(actor), args);
@@ -347,7 +347,7 @@ const addSoundToSongRoute = createRoute({ method: "post", path: "/sounds/{id}/ad
   responses: { 200: { content: { "application/json": { schema: cardSchema } }, description: "The song's card with the new version shown." }, 422: { description: "The sound cannot be added as asked." }, ...refusals, ...errorResponses({ 503: "This computer cannot mix audio now" }) } });
 musicRoutes.openapi(addSoundToSongRoute, async (c) => {
   const actor = c.get("person"), body = c.req.valid("json");
-  if (laneOf(musicRouteAudience(actor)) !== "adult") return c.json({ error: "You can change only your own song from this chat." }, 403) as never;
+  if (laneOf(musicRouteAudience(actor)) !== "adult") return c.json({ error: "Bands, albums, sound effects and saved styles are for adults. You can make a song here instead." }, 403) as never;
   const refusal = musicRefusalFor(musicRouteAudience(actor), { description: "add a sound to a song" });
   if (refusal) return c.json({ error: refusal.line }, 403) as never;
   const result = await addSoundToSong(actor, { soundJobId: c.req.valid("param").id, songId: body.song_id, fileId: body.file_id, startSeconds: body.start_s });
@@ -370,7 +370,6 @@ const stemsRoute = createRoute({ method: "post", path: "/jobs/{id}/stems", tags:
   responses: { 200: { content: { "application/json": { schema: cardSchema } }, description: "The card with stems coming." }, 422: { description: "The source cannot be split." }, ...refusals, ...errorResponses({ 503: "Stem splitting is unavailable" }) } });
 musicRoutes.openapi(stemsRoute, async (c) => {
   const actor = c.get("person"); const root = getMusicJobFor(actor, c.req.valid("param").id); const { file_id } = c.req.valid("json");
-  if (laneOf(musicRouteAudience(actor)) !== "adult") return c.json({ error: "You can change only your own song from this chat." }, 403) as never;
   const versions = root ? musicVersions(actor, root).filter((j) => j.state === "done" && j.fileId && j.task !== "stems") : [];
   const source = (file_id ? versions.find((j) => j.fileId === file_id) : versions.sort((a, b) => (b.chosenAt ?? b.createdAt).localeCompare(a.chosenAt ?? a.createdAt))[0]) ?? null;
   if (!root || !source || !source.conversationId || !source.turnId) return c.json({ error: "That song isn't available any more. Ask for it again." }, 404) as never;
@@ -390,7 +389,6 @@ const stemsFromFileRoute = createRoute({ method: "post", path: "/stems/from-file
   responses: { 200: { content: { "application/json": { schema: cardSchema } }, description: "The card with stems coming." }, 413: { description: "The file is too big." }, 422: { description: "The file cannot be split." }, ...refusals, ...errorResponses({ 503: "Stem splitting is unavailable" }) } });
 musicRoutes.openapi(stemsFromFileRoute, async (c) => {
   const actor = c.get("person"); const { file_id, temporary = false } = c.req.valid("json");
-  if (laneOf(musicRouteAudience(actor)) !== "adult") return c.json({ error: "You can change only your own song from this chat." }, 403) as never;
   const prepared = await prepareOwnedStemsJob(actor, file_id);
   if (!prepared.ok) return c.json({ error: prepared.line }, prepared.status) as never;
   const conversation = resolveOrCreateConversation(actor, "chat", undefined, { temporary });
@@ -408,7 +406,7 @@ const fromFileEditRoute = createRoute({ method: "post", path: "/from-file/edit",
   responses: { 200: { content: { "application/json": { schema: cardSchema } }, description: "The new song card." }, 413: { description: "The file is too big." }, 422: { description: "The edit cannot be made." }, ...refusals, ...errorResponses({ 503: "Music is unavailable" }) } });
 musicRoutes.openapi(fromFileEditRoute, async c => {
   const actor = c.get("person"), args = c.req.valid("json");
-  if (laneOf(musicRouteAudience(actor)) !== "adult") return c.json({ error: "You can change only your own song from this chat." }, 403) as never;
+  if (laneOf(musicRouteAudience(actor)) !== "adult" && !["stems", "parts"].includes(args.change)) return c.json({ error: "You can change only your own song from this chat." }, 403) as never;
   const source = resolveSongSource(actor, args.file_id, "pending");
   if (!source?.fileId) return c.json({ error: "That file isn't available any more." }, 404) as never;
   const engine = await musicEngineStatus();

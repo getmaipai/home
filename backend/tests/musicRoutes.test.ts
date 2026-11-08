@@ -289,7 +289,8 @@ describe("music routes", () => {
       db.update(people).set({ role }).where(eq(people.id, actor.id)).run(); invalidateSessionCacheForPerson(actor.id);
       expect((await client.get(`/api/music/jobs/${job.id}`)).status).toBe(200);
       expect((await client.get(`/api/music/jobs/${job.id}/files/${job.fileId}`)).status).toBe(200);
-      expect((await client.post(`/api/music/jobs/${job.id}/stems`, { file_id: job.fileId })).status).toBe(403);
+      // Splitting a song the person owns makes no new content (owner ruling 2026-11-01), so a minor is not refused by age.
+      expect((await client.post(`/api/music/jobs/${job.id}/stems`, { file_id: job.fileId })).status).not.toBe(403);
     }
     db.update(people).set({ role: "guest" }).where(eq(people.id, actor.id)).run(); invalidateSessionCacheForPerson(actor.id);
     expect((await client.get(`/api/music/jobs/${job.id}`)).status).toBe(403);

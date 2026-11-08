@@ -164,8 +164,8 @@ describe("minor song lane readiness", () => {
     const sound = await runMakeSound({ state, args: { description: "rain on a roof" }, callId: "sound", spoken: false });
     const album = await makeAlbum({ state, idea: "an album", callId: "album", spoken: false });
     const bandAction = await runBandAction(actor, "mband-example123", "remake_portrait", { conversationId: null, turnId: null });
-    const line = "You can change only your own song from this chat.";
-    expect(JSON.stringify(savedStyle)).toContain(line); expect(JSON.stringify(sound)).toContain(line);
+    const line = "Bands, albums, sound effects and saved styles are for adults. You can make a song here instead.";
+    expect(JSON.stringify(savedStyle)).toContain("You can change only your own song from this chat."); expect(JSON.stringify(sound)).toContain(line);
     expect(album).toMatchObject({ ok: false, line }); expect(bandAction).toMatchObject({ ok: false, status: 403, error: line });
     expect(fake.submitted).toHaveLength(0);
   });

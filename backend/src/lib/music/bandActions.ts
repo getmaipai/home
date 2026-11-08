@@ -38,7 +38,7 @@ function ownTurn(actor: PersonRow, conversationId: string | null, turnId: string
 }
 
 export async function runBandAction(actor: PersonRow, bandId: string, action: BandActionName, where: { conversationId: string | null; turnId: string | null } = { conversationId: null, turnId: null }, patch: BandPatchInput = {}): Promise<BandActionResult> {
-  if (laneOf(routeAudience(actor)) !== "adult") return { ok: false, status: 403, error: "You can change only your own song from this chat." };
+  if (laneOf(routeAudience(actor)) !== "adult") return { ok: false, status: 403, error: "Bands, albums, sound effects and saved styles are for adults. You can make a song here instead." };
   const found = getMade("made_artist", actor, bandId);
   if (!found.ok) return { ok: false, status: 404, error: "That band is not here any more. It may have been discarded." };
   const band = found.value as unknown as Band;

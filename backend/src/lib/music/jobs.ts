@@ -267,8 +267,8 @@ async function finish(job: MusicJob, actor: PersonRow, songs: StackSong[], signa
   if (stopped(job)) return;
   const minorAudience = routeAudience(actor);
   const minorLane = laneOf(minorAudience) !== "adult";
-  // Stems, parts and voice swaps are never offered to a minor and carry no transcript: withhold if one ever arrives.
-  if (minorLane && (job.request.voiceSwap || job.request.parts || job.task === "stems")) { withholdMinor(job, actor); return; }
+  // Splitting and mixing a file the person owns makes no new content (owner ruling 2026-11-01, stem note 10.7); a voice swap does, and is adult-only.
+  if (minorLane && job.request.voiceSwap) { withholdMinor(job, actor); return; }
   if (job.request.voiceSwap) return finishVoiceSwap(job, actor, songs as unknown as StackStem[], signal);
   if (job.request.parts) return finishParts(job, actor, songs as unknown as StackStem[], signal);
   if (job.task === "stems") return finishStems(job, actor, songs as unknown as StackStem[], signal);
@@ -281,7 +281,6 @@ async function finish(job: MusicJob, actor: PersonRow, songs: StackSong[], signa
     const unreadable = typeof transcript !== "string" || (!transcript.trim() && !job.request.instrumental);
     if (unreadable || (transcript!.trim() && musicProtections(minorAudience).checkWords(transcript!, "transcript"))) { withholdMinor(job, actor); return; }
   }
-  if (minorLane && job.state === "done" && !job.coverJobId && !job.request.sound) void startSongCover(actor, job).catch(() => {});
   if (!job.request.retried && ["text2music", "remake", "variation"].includes(job.task) && song.lrc
     && sungLyricsFromLrc(song.lrc, song.duration_s).length < sungLyricsFromLrc(song.lrc, null, { keepSqueezed: true }).length) {
     const ceiling = (await musicEngineStatus())?.limits.max_seconds ?? job.request.max_seconds;
@@ -345,7 +344,7 @@ async function finish(job: MusicJob, actor: PersonRow, songs: StackSong[], signa
   saveMusicJob(job);
   if (job.request.sound) void startNextSoundTake(job, actor).catch(() => {});
   if (!job.request.sound) {
-    if (!minorLane) void startSongCover(actor, job).catch(() => {});
+    void startSongCover(actor, job).catch(() => {});
     // MUSIC-GEN-20b: word timing runs in the background and never blocks or fails the song.
     void startWordTiming(job, bytes).catch(() => {});
   }

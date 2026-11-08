@@ -23,7 +23,7 @@ export async function runMakeSound(input: MusicToolInput): Promise<ToolExecution
   const { state, args, callId } = input;
   const failed = (code: string, kind: "bad_arguments" | "unavailable" | "errored") => outcomeOf({ callId, packageId: MAKE_SOUND_TOOL_ID, status: "failed", via: "tool_call", args, errorCode: code, failureKind: kind, durationMs: 0 });
   const refused = (line: string, why: string) => outcomeOf({ callId, packageId: MAKE_SOUND_TOOL_ID, status: "succeeded", via: "tool_call", args, durationMs: 0, result: { reply: { text: `${REFUSED_PREFIX}${line}` }, data: { refused: why }, actions: [] } });
-  if (laneOf(musicAudienceOf(state, input.spoken)) !== "adult") return refused("You can change only your own song from this chat.", "adult_music_feature");
+  if (laneOf(musicAudienceOf(state, input.spoken)) !== "adult") return refused("Bands, albums, sound effects and saved styles are for adults. You can make a song here instead.", "adult_music_feature");
   const parsed = makeSoundArgs.safeParse(args);
   if (!parsed.success) return failed("bad_arguments", "bad_arguments");
   const refusal = musicRefusalFor(musicAudienceOf(state, input.spoken), { description: parsed.data.description });

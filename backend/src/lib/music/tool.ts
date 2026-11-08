@@ -257,7 +257,7 @@ async function runMusic(input: MusicToolInput, editing: boolean): Promise<ToolEx
   let request: MusicRequest; let task: MusicTask; let body: Omit<MusicBody, "timeout_ms">; let parentFileId: string | null = null;
   if (editing) {
     const parsed = editMusicArgs.safeParse(args); if (!parsed.success) return failed("bad_arguments", "bad_arguments");
-    if (lane !== "adult" && (parsed.data.track === "attached" || ["stems", "voice_swap", "parts"].includes(parsed.data.change))) return refused("You can change only your own song from this chat.", "minor_edit_source");
+    if (lane !== "adult" && ((parsed.data.track === "attached" && !["stems", "parts"].includes(parsed.data.change)) || parsed.data.change === "voice_swap")) return refused("You can change only your own song from this chat.", "minor_edit_source");
     if (lane === "child" && ["make_full", "extend"].includes(parsed.data.change)) return refused("Let's keep your song short.", "child_length");
     if (parsed.data.change === "parts") {
       const source = resolveSongSource(actor, parsed.data.track === "attached" ? state.audio?.[0]?.id ?? "" : parsed.data.track, state.conversationId, temporary);

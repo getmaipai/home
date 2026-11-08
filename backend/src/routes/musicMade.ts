@@ -13,7 +13,7 @@ import { albumBlock } from "@/lib/music/album";
 import { createMade, deleteMade, getMade, listMade, listRevisions, restoreRevision, updateMade, type MadeKind, type StoreResult } from "@/lib/music/madeRecords";
 import { laneOf } from "@/lib/pictures/lane";
 import { routeAudience } from "@/lib/pictures/audience";
-const ADULT_MUSIC_ONLY_LINE = "You can change only your own song from this chat.";
+const ADULT_MUSIC_ONLY_LINE = "Bands, albums, sound effects and saved styles are for adults. You can make a song here instead.";
 const adultMadeMiddleware = [requireAuth, async (c: import("hono").Context, next: () => Promise<void>) => {
   if (laneOf(routeAudience(c.get("person"))) !== "adult") return c.json({ error: ADULT_MUSIC_ONLY_LINE }, 403);
   await next();
