@@ -218,7 +218,7 @@ test("real p128 plan with everything installed and Quick chosen: Detailed pictur
   const zimage = p.rows.find((row) => row.id === "pictures-zimage")!;
   const ltx = p.rows.find((row) => row.id === "video-ltx25")!;
   const klein = p.rows.find((row) => row.id === "pictures")!;
-  const extras = ["music-boost", "music-max", "video-ltx25-max", "video-mask", "pictures-qwen", "align"].map((id) => p.rows.find((row) => row.id === id)!);
+  const extras = ["music-boost", "music-max", "video-ltx25-max", "video-mask", "pictures-qwen", "align", "music-transcribe"].map((id) => p.rows.find((row) => row.id === id)!);
   const expectedIds = [...zimage.model_ids, ...ltx.model_ids, ...extras.flatMap((row) => row.model_ids)];
   expect(result.items.map((item) => item.id).sort()).toEqual([...expectedIds].sort());
   // Music Boost and Max, the Max LTX-2.5 video row, subject masks and Best pictures (Qwen-Image, the Max pictures row), and the lyric timing aid are offered by no card yet and are unused too; with no group on these test parts they carry the generic name.
