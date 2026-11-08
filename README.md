@@ -83,6 +83,14 @@ Try these in chat:
 - **Make your own AI podcast.** The news briefing works today. Round tables, debates, film reviews and other formats are *Planned*.
 - **Hear a DJ.** Turn on the DJ to talk between songs in your companion's voice. Choose Off, Minimal (only the next song) or Full (adds a short fact).
 
+### Quality levels
+
+Pictures, videos and songs can be made at different quality levels. Pick one when you ask, for example "make it Boost", or let Home choose.
+
+- **Standard.** The everyday level. Fast, and good for most things.
+- **Boost.** Takes longer and looks and sounds sharper.
+- **Max.** The best Home can do, and it takes the most time.
+
 ### Synths
 
 - **Make a synth.** An AI being with a name, personality, voice and look. It can keep a dated life that carries on from day to day.
@@ -113,7 +121,7 @@ Try these in chat:
 
 ### Chat
 
-- **Choose how hard it thinks.** Instant for quick answers, Thinking for harder ones, Max for the hardest. Adults see which style answered each reply.
+- **Choose how hard it thinks.** Instant for quick answers, Thinking for harder ones, Max for the deepest. This is separate from the quality levels above. Adults see which style answered each reply.
 - **Research a question.** On Thinking or Max, Home searches in several rounds, reads the pages and shows its sources. A sentence its sources do not back is marked "not confirmed by the sources".
 - **Search the web.** Adults use DuckDuckGo with no setup. Teens and children use only the Library and your own SearXNG unless an owner allows more.
 - **Connect your own coding tool,** such as OpenCode or Claude Code, to the coding model on your computer with a personal key. An admin turns Coding on first. A built-in code workspace is *Planned*.
@@ -161,7 +169,7 @@ Try these in chat:
 - **Install in one line** on a Mac. A setup wizard in your browser does the rest.
 - **Offload the AI to a second computer.** Keep Home where it is and let a stronger Ubuntu computer on your network run the AI engines. Home keeps your family's settings. You pair the two with a one-time code, and you can reach it from away through Tailscale.
 - **Chat keeps answering during big jobs.** Standard and Boost run beside chat. A Max job may switch chat to a smaller model for a while, a line under the box says so, and chat goes back afterward. Stop a Max job at any time.
-- **Four quality levels.** Standard is the everyday level. Boost is bigger and slower. Max is the biggest, for one job at a time. Reduced is never picked: a Max job brings it in only when it needs more room.
+- **Quality levels that share the computer.** Max is the biggest, for one job at a time. A fourth level, Reduced, is never picked: a Max job brings it in only when it needs more room.
 - **A fair queue.** Each person gets one big job at a time, taken in turns. A waiting job says why and starts by itself when there is room. If it can only run at a lower level, you can choose **Make it now** or **Wait**.
 - **Three presets for sharing the computer.** Chat first, Balanced or Big jobs first. Free up memory in one press, and tune the Mac with changes you can revert.
 - **See what Home is doing.** A System status page shows each app as working, degraded, waiting for internet or not working, with a 90-day record. Repairs offers a fix for each problem.
