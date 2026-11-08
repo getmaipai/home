@@ -48,6 +48,8 @@ describe("Create controls", () => {
     const bar = within(await view.findByTestId("music-docked-bar"));
     fireEvent.click(bar.getByRole("button", { name: "Sound" }));
     fireEvent.change(await bar.findByLabelText("Describe the sound"), { target: { value: "A quiet bell" } });
+    expect(bar.getByTestId("sound-maker-footer").className).toContain("sticky");
+    expect(within(bar.getByTestId("sound-maker-footer")).getByRole("button", { name: "Generate" })).toBeTruthy();
     fireEvent.click(bar.getByRole("switch", { name: "Loop it" }));
     fireEvent.click(bar.getByRole("radio", { name: "Surprise me" }));
     fireEvent.change(bar.getByLabelText("Seconds"), { target: { value: "10" } });
