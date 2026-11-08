@@ -181,7 +181,7 @@ export function platformConnections(): PrivacyConnection[] {
       id: "platform:talent-research", source: "MaiPai Home", sourceKind: "platform" as const,
       destination: "Your adult web search service and the public search engines it uses",
       when: "At most once a day for each real-person synth, after an adult creates it or asks to refresh its history; no more than 20 research runs in a local day",
-      what: "The public figure's name, with interview or speech transcript added on its first run, and up to nine public article pages on the first run or three later. No household name, conversation or other household data.",
+      what: "The public figure's name, with interview or speech transcript added on its first run, and up to nine public article pages on the first run or three later. Nothing anyone in the house said or saved, and no household name.",
       who: "Your enabled adult web search source and the public engines it uses",
       optIn: true,
       retention: "Home keeps the dated facts, views, style phrases and their source addresses in the synth's local memory. The search service and engines follow their own policies.",
