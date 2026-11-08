@@ -28,7 +28,7 @@ function InstanceForm({ initial, onDone, onCancel }: { initial?: HouseInstance; 
   const [token, setToken] = useState("");
   const [error, setError] = useState<string | null>(null);
   const save = useHubMutation({
-    verb: initial ? "save this connection" : "add this connection",
+    verb: "save this connection",
     mutationFn: async () => {
       if (initial) return api.houseUpdateInstance(initial.instance, { label, address, ...(token.trim() ? { token } : {}) });
       return api.houseAddInstance({ label, address, token });
