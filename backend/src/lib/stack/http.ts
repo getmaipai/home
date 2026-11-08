@@ -2,6 +2,7 @@
 // Each module makes its own with `createStackHttp` and keeps its own error class; the base URL, the timeout, the unreachable and
 // no-Stack mapping, the failure-body read and the test fetch seam are written once here. (`stack/client.ts` is the separate spec client.)
 import { getStackUrl } from "@/lib/stackEngine";
+import { stackFetch } from "./stackFetch";
 import { sendWithView, StackViewError, VIEW_KEY_LINE, type FullView } from "./fullView";
 
 /** The base a test fetch is called with (no real Stack answers there). */
@@ -39,7 +40,7 @@ export function createStackHttp<E extends Error>(config: StackHttpConfig<E>) {
 
   /** `view` (ADULT-LOCK-03) is the full-view grant of an adult job; without it the call is the plain one and carries no extra header. */
   async function request(path: string, init: RequestInit & { timeoutMs?: number } = {}, view?: FullView): Promise<Response> {
-    const doFetch = fetchForTests ?? globalThis.fetch;
+    const doFetch = fetchForTests ?? stackFetch;
     const { timeoutMs = config.timeoutMs ?? 15_000, ...rest } = init;
     const signal = rest.signal ? AbortSignal.any([rest.signal, AbortSignal.timeout(timeoutMs)]) : AbortSignal.timeout(timeoutMs);
     const base = baseUrl();
