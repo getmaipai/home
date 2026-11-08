@@ -4,7 +4,7 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { englishSources, parsePo, rewriteEntries, type PoEntry } from "./po";
-import { translateItems, type Completer } from "../../backend/src/lib/translate/core";
+import { translateItems } from "../../backend/src/lib/translate/core";
 import { chatReady, stackCompleter, stackOnlyFetch, StackNotReadyError, type Fetch } from "../../backend/src/lib/translate/stack";
 export { stackOnlyFetch, StackNotReadyError } from "../../backend/src/lib/translate/stack";
 import { isProtected as coreIsProtected, validateTranslation as coreValidateTranslation } from "../../backend/src/lib/translate/validate";
