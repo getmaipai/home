@@ -44,21 +44,30 @@ Music, pictures, video, films, podcasts, chat, voice and your smart home share o
 
 ### Video
 
-- **Make a video** from words or a start picture, with sound, 5 or 10 seconds, with Look and camera moves (eight camera recipes with loop previews).
-- **Choose a film look with LoRA styles.** Night film look, Characters and Strength sliders, and suggested styles.
-- **Continue, extend or retake a clip.** Set an end frame. *Max* for extend and retake.
+- **Make a video** from words or a start picture, with sound. One clip runs up to 10 seconds, with Look and camera moves (eight camera recipes with loop previews).
+- **Make it longer.** Press **Continue** and the next clip starts from the last frame of the last one. Join up to 6 clips with transitions. Or ask for a film and Home plans, shoots and assembles 40 seconds or more.
+- **Pick a style in plain words.** Say "claymation", "anime", "classic cartoon", "3D animated" or "1980s hand-drawn", or choose a Look card. Install style LoRAs for more.
+- **Use film looks and LoRA styles.** A night film look, Characters and Strength sliders, and style chips suggested from your prompt.
+- **Extend or retake a clip.** Set an end frame. *Max.*
 - **Join clips with 19 transitions.** Add a title card, rolling credits and cast credits.
 - **Edit in chat or the Studio.** Trim, mix, reframe, grade, change speed, add effects (speed ramp, reverse, freeze, loop, flip, rotate, sharpen, denoise, picture-in-picture, Ken Burns) and a letterbox.
 - **Remove a video background.** Color, blur or see-through.
 - **Upscale and sharpen** a clip with progress.
 - **Restyle a clip.** Pull a colour look from another clip. *Max.*
 - **Hear it in surround sound.** Add a 5.1 file to a stereo clip and export it with side channels.
-- **Cut to the beat** of a track.
+- **Cut to the beat.** Cut your clips to the beat of a song, so every cut lands on the music.
 - **Add voice-over, music and captions** in the Studio, then export.
+
+Try these in chat:
+
+- *Make a 10 second claymation video of a fox in the snow, slow orbit.*
+- *Keep going from where it ended.*
+- *Make it anime.*
+- *Join these three clips with a fade.*
 
 ### Movies and shows
 
-- **Make a film from a prompt.** Home plans the shots, casts your characters, draws stills, makes the clips, adds music and assembles it. Resume at any step, or redo one shot.
+- **Make a film from a prompt.** Say "make a 40 second claymation film of a paper boat in the rain". Home plans the shots, casts your characters, draws stills, makes the clips, adds music and assembles it. Resume at any step, or redo one shot.
 - **Keep Productions.** A private home for each film or show: cast, places, props, script, source clips and finished cuts, with sharing you control.
 - **Cast from saved subjects.** Each character gets model sheets from four angles so they look the same in every shot.
 - **Make a film with no faces.** Narration, Ken Burns moves and music.
@@ -71,23 +80,35 @@ Music, pictures, video, films, podcasts, chat, voice and your smart home share o
 
 - **Make a synth.** An AI being with a name, personality, voice, look and a life that carries on from day to day.
 - **Make one your companion.** It chats with you, speaks, and shows its face on every reply. Companions also live on robots.
-- **Cast one in your podcast or show.** Put Abraham Lincoln on a round table, or make a friend the host. Hosts remember last week and mention your birthday. *Preview.*
+- **Cast one in your podcast or show.** Put a historical figure on a round table, or make a friend the host. Hosts have lives that carry from one episode to the next, and can work in your birthday or a trip. *Preview.*
 - **Cast one in your movie.** Link a synth to a saved subject and the film uses its look and voice. Spoken dialogue between synths in a film is *Planned.*
 - **Base a synth on a real person, living or historical.** Give it the real name and Home's researcher builds a sourced history that it keeps current. *Preview.*
-- **Talk with a synth of Abraham Lincoln, or anyone else.** Ask a question in chat, or hear them debate on a round table. It answers from the sourced history and says when it does not know. *Preview.*
+- **Talk with a figure from history, or anyone else.** Ask a question in chat, or hear two of them debate. It answers from the sourced history and says when it does not know. *Preview.*
 - **Give a synth a voice.** Pick a household voice, a voice cloned from a clip, or an inspired voice.
+
+### Memory
+
+- **Never repeat yourself.** Home remembers your tastes, your routines, your kid's allergy and the trip you are planning, and uses a fact only when it changes the answer.
+- **Know what it knows.** A few standing facts about you are always in mind, each with the date it was learned. Everything else is looked up when you ask about it.
+- **Say "remember that...".** A note you ask for is always saved.
+- **See, fix or forget.** Look at every memory, forget one, forget several or clear them all. Forgotten means wiped, not hidden.
+- **Share with the house.** An adult chooses who may hear a household memory: everyone, teens and adults, or adults only. Parents can look at a child's memories and export them.
+- **Keep secrets out.** Home never stores passwords, PINs or keys, and blanks them from the chat history.
+- **Give a synth a memory of its own.** Its life, with dated events, carries across chats and shows.
 
 ### Voice
 
-- **Talk and listen.** Natural speech with small laughs and sighs, and a voice call button.
-- **Clone a voice from a clip.** Every adult can. Your robot or a synth can then speak in it, and a child's robot speaks only a clip voice chosen for it. Or make an inspired voice that is based on the clip and is not a copy.
+- **Talk like you would to a person.** Speak, and Home answers in a natural voice. Talk over it and it stops and listens, with no button to press.
+- **Hear emotion, not a reading.** Replies can include a laugh, a chuckle, a sigh, a gasp or a clear throat, chosen to fit what was said. You set how often: off, light or natural.
+- **Be heard right.** Home waits for you to stop talking, then answers. A smarter check that tells a finished thought from a pause is *Preview*.
+- **Get the right tone.** On an emotional message Home decides whether you want advice or someone to listen.
+- **Clone a voice from a clip.** Every adult can. Your robot or a synth can then speak in it. Or make an inspired voice that is based on the clip and is not a copy.
 - **Change the voice** in any audio or video file.
 - **Add a voice-over** from a script.
 - **Wake Home with a word.** *Preview.*
 
 ### Chat
 
-- **Chat with memory.** See, fix or forget what Home remembers.
 - **Pick an answer style.** Instant, Thinking or Max, and every reply says which one answered.
 - **Research a topic.** A plan, up to 12 searches, claims marked "not confirmed by the sources".
 - **Search the web** with DuckDuckGo or your own SearXNG.
