@@ -1,47 +1,47 @@
 {
   "book-lookup": {
     "sha256": "0f1edd944957bc9196cc09d2e561f71a9fd49000cc2e804e9df864a6beddc019",
-    "source_commit": "d8f0e48f471ac15386aa2c9383ea6aaa85181916",
+    "source_commit": "92c3a1e12c05131fcf07099704ce23aa4ddef8cd",
     "catalog_path": "plugins/info/book-lookup"
   },
   "format-birthday-card": {
     "sha256": "fdac07d635dff8dde522949772ad4be5afd9b959ad0ecd85f267cda3eca81926",
-    "source_commit": "35e1994c1ab150f31b9dc3f69bbfb721d6e29c23",
+    "source_commit": "92c3a1e12c05131fcf07099704ce23aa4ddef8cd",
     "catalog_path": "skills/family/format-birthday-card"
   },
   "format-email": {
     "sha256": "8fd1794e104649acdbc4771480b4f2c5f703b3a0846fc98f3b3608d51bbbb401",
-    "source_commit": "35e1994c1ab150f31b9dc3f69bbfb721d6e29c23",
+    "source_commit": "92c3a1e12c05131fcf07099704ce23aa4ddef8cd",
     "catalog_path": "skills/family/format-email"
   },
   "joke": {
     "sha256": "12ad2f0a107dbe90d6ade5a062995df009236464dee278766183c5a4fe2834a2",
-    "source_commit": "d8f0e48f471ac15386aa2c9383ea6aaa85181916",
+    "source_commit": "92c3a1e12c05131fcf07099704ce23aa4ddef8cd",
     "catalog_path": "plugins/fun/joke"
   },
   "media-lookup": {
     "sha256": "dfa2b838a04c28084c9f7283f71ab08c101ecaace763b5e13b0ef0ec54b37a9b",
-    "source_commit": "d8f0e48f471ac15386aa2c9383ea6aaa85181916",
+    "source_commit": "92c3a1e12c05131fcf07099704ce23aa4ddef8cd",
     "catalog_path": "plugins/info/media-lookup"
   },
   "place-lookup": {
     "sha256": "d568311ca3e364d78ae32a4d606206bc000f136d1fa4967d1a7709ec7700318b",
-    "source_commit": "d8f0e48f471ac15386aa2c9383ea6aaa85181916",
+    "source_commit": "92c3a1e12c05131fcf07099704ce23aa4ddef8cd",
     "catalog_path": "plugins/info/place-lookup"
   },
   "storytime-style": {
     "sha256": "aea745f9cb83564dbc6fd738c784a9f5447e0703255c7269a57ab9100808d21a",
-    "source_commit": "d8f0e48f471ac15386aa2c9383ea6aaa85181916",
+    "source_commit": "92c3a1e12c05131fcf07099704ce23aa4ddef8cd",
     "catalog_path": "skills/family/storytime-style"
   },
   "trivia": {
     "sha256": "e2b229acf08dda4b0a8e38d922532cc2d3970d18a02449fdb525cdadcd41f8d1",
-    "source_commit": "d8f0e48f471ac15386aa2c9383ea6aaa85181916",
+    "source_commit": "92c3a1e12c05131fcf07099704ce23aa4ddef8cd",
     "catalog_path": "plugins/fun/trivia"
   },
   "weather": {
-    "sha256": "b5fb70aa031dde26529bb38c48f483475701dcfb808d5d8411100d1876410fb9",
-    "source_commit": "d8f0e48f471ac15386aa2c9383ea6aaa85181916",
+    "sha256": "a6d76d2f97a96b7f8ff953a68f4c970c8244cf14e419bca7de3fba7cdda4d245",
+    "source_commit": "92c3a1e12c05131fcf07099704ce23aa4ddef8cd",
     "catalog_path": "plugins/utilities/weather"
   }
 }

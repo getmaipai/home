@@ -66,9 +66,16 @@
       "unless_set": "unit"
     },
     {
+      "op": "lookup",
+      "as": "precip_unit",
+      "from": "unit",
+      "table": { "celsius": "mm" },
+      "default": "inch"
+    },
+    {
       "op": "fetch",
       "as": "wx",
-      "url": "https://api.open-meteo.com/v1/forecast?latitude={latitude}&longitude={longitude}&current=temperature_2m,weather_code,is_day,apparent_temperature,relative_humidity_2m,precipitation,wind_speed_10m,wind_direction_10m,pressure_msl,visibility&hourly=temperature_2m,precipitation_probability&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max,sunrise,sunset,uv_index_max&forecast_days=10&forecast_hours=24&timezone=auto&temperature_unit={unit}",
+      "url": "https://api.open-meteo.com/v1/forecast?latitude={latitude}&longitude={longitude}&current=temperature_2m,weather_code,is_day,apparent_temperature,relative_humidity_2m,precipitation,wind_speed_10m,wind_direction_10m,pressure_msl,visibility&hourly=temperature_2m,precipitation_probability,precipitation&minutely_15=precipitation&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max,precipitation_sum,sunrise,sunset,uv_index_max&forecast_days=10&forecast_hours=24&forecast_minutely_15=12&timezone=auto&precipitation_unit={precip_unit}&temperature_unit={unit}",
       "method": "GET"
     },
     {
@@ -184,6 +191,10 @@
     { "op": "pick", "as": "sunset", "from": "wx", "path": "daily.sunset.0" },
     { "op": "pick", "as": "uv_index", "from": "wx", "path": "daily.uv_index_max.0" },
     { "op": "pick", "as": "timezone", "from": "wx", "path": "timezone" },
+    { "op": "pick", "as": "hour_amount", "from": "wx", "path": "hourly.precipitation" },
+    { "op": "pick", "as": "minutely_times", "from": "wx", "path": "minutely_15.time" },
+    { "op": "pick", "as": "minutely_amount", "from": "wx", "path": "minutely_15.precipitation" },
+    { "op": "pick", "as": "day_amount", "from": "wx", "path": "daily.precipitation_sum" },
     {
       "op": "pick",
       "as": "hour_times",
@@ -245,6 +256,11 @@
         "block_is_day": "{is_day}",
         "block_hour_times": "{hour_times}",
         "block_hour_pop": "{hour_pop}",
+        "block_hour_amount": "{hour_amount}",
+        "block_minutely_times": "{minutely_times}",
+        "block_minutely_amount": "{minutely_amount}",
+        "block_day_amount": "{day_amount}",
+        "block_precip_unit": "{precip_unit}",
         "block_day_codes": "{day_codes}",
         "block_detail_feels_like": "{feels_like}",
         "block_detail_humidity": "{humidity}",
