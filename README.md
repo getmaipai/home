@@ -160,19 +160,19 @@ Try these in chat:
 - **Sign in safely.** Passcode boxes, optional two-step codes, and a lockout that is per person and per device, so a child's guesses cannot lock the owner out.
 - **Get clear errors.** Each says what went wrong and what to do.
 
-### For the person running the server
+### Easy to run at home
 
-- **Four quality levels.** Standard is the everyday level. Boost is bigger and slower. Max is the biggest, for one job at a time, and an admin sets it up. Reduced is never picked: a Max job brings it in only when it needs more room.
+- **Install in one line** on a Mac. A setup wizard in your browser does the rest.
+- **Offload the AI to a second computer.** Keep Home where it is and let a stronger Ubuntu computer on your network run the AI engines. Home keeps your family's settings. You pair the two with a one-time code, and you can reach it from away through Tailscale.
 - **Chat keeps answering during big jobs.** Standard and Boost run beside chat. A Max job may switch chat to a smaller model for a while, a line under the box says so, and chat goes back afterward. Stop a Max job at any time.
+- **Four quality levels.** Standard is the everyday level. Boost is bigger and slower. Max is the biggest, for one job at a time, and an admin sets it up. Reduced is never picked: a Max job brings it in only when it needs more room.
 - **A fair queue.** Each person gets one big job at a time, taken in turns. A waiting job says why and starts by itself when there is room. If it can only run at a lower level, you can choose **Make it now** or **Wait**.
 - **Three presets for sharing the computer.** Chat first, Balanced or Big jobs first. Free up memory in one press, and tune the Mac with changes you can revert.
 - **See what Home is doing.** A System status page shows each app as working, degraded, waiting for internet or not working, with a 90-day record. Repairs offers a fix for each problem.
-- **Use a second computer for the AI.** Pair an Ubuntu computer on your network to run the engines. It needs Home's secure https address.
 - **Update with a way back.** Home checks every day. Update engine parts with a button and go back one version. Home itself updates and rolls back with the installer.
 - **Back up and restore.** A daily backup and a backup you can download, with a backup key. Only the owner can restore.
 - **Set storage limits per person,** with a Trash, and choose how much offline reference data to keep.
 - **Choose the models.** Pick the model for each level, add styles, and see every outside connection on the Privacy page.
-- **Install in one line** on a Mac, with a setup wizard in your browser.
 
 ## Similar tools
 
