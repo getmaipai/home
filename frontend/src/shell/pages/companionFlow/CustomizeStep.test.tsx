@@ -7,7 +7,7 @@ import { CompanionShellViewer } from "@/lib/companionShells";
 import { CompanionFlowPage } from "@/shell/pages/companionFlow/CompanionFlowPage";
 import { guessPersonality } from "@/shell/pages/companionFlow/CustomizeStep";
 
-const methods = ["settingsValues", "companions", "editCompanion", "companionLook", "companionStates", "getCompanionLookStyles", "stackVoices", "generateCompanionBackstory", "saveCompanion"] as const;
+const methods = ["settingsValues", "people", "companions", "editCompanion", "updateCompanion", "companionLook", "companionStates", "getCompanionLookStyles", "stackVoices", "generateCompanionBackstory", "saveCompanion"] as const;
 const originals = Object.fromEntries(methods.map((key) => [key, api[key]]));
 const realOpen = window.open;
 afterEach(() => { cleanup(); Object.assign(api, originals); window.open = realOpen; });
@@ -18,10 +18,11 @@ const saved = (extra: Record<string, unknown> = {}) => ({ id: "hc-one", name: "M
 function Where() { const location = useLocation(); return <div data-testid="where">{location.pathname}{location.search}</div>; }
 
 function open(editable = saved()) {
-  const calls = { saved: [] as unknown[], backstory: [] as unknown[], opened: [] as string[] };
+  const calls = { saved: [] as unknown[], updated: [] as unknown[], backstory: [] as unknown[], opened: [] as string[] };
   api.settingsValues = async () => [{ key: "companions.preview_shells", value: true, source: "user", label: "Preview", level: "basic", secret: false }] as never;
   api.companions = async () => ({ allowed: true, can_create: true, can_discover: false, default_id: "x", companions: [], discover: [], robots: null });
   api.editCompanion = async () => editable;
+  api.updateCompanion = async (_id, body) => { calls.updated.push(body); return { id: "hc-one" }; };
   api.companionLook = async () => look;
   api.getCompanionLookStyles = async () => ({ styles: [], keep: { id: "keep" as const, label: "Keep as is" } });
   api.companionStates = async () => ({ sheet_ready: true, start_ready: true, key: "#00FF00", states: [], run: null, counts: { approved: 0, total: 0, required_missing: [] } });
@@ -107,6 +108,15 @@ test("editing loads the saved voice, personality, notes and backstory", async ()
   await waitFor(() => expect(chip(view, "Professional").getAttribute("aria-checked")).toBe("true"));
   expect((view.getByLabelText("Personality notes") as HTMLTextAreaElement).value).toBe("Speaks plainly. Stays calm.");
   expect((view.getByLabelText("Backstory") as HTMLTextAreaElement).value).toBe("A retired ship captain.");
+});
+
+test("Style shows example sources and saving a pin sends synth pins", async () => {
+  const { view, calls } = open(saved({ examples: ["Hello there."], synth: { pins: { dials: [], examples: [] }, phrase_sources: { "Hello there.": "Marlow said this." } } }));
+  await waitFor(() => expect(view.getByText("Style")).toBeTruthy());
+  expect(view.getByText("Marlow said this.")).toBeTruthy();
+  fireEvent.click(view.getByRole("switch", { name: "Pin example: Hello there." }));
+  await waitFor(() => expect(calls.updated).toHaveLength(1));
+  expect(calls.updated[0]).toEqual({ pins: { dials: [], examples: ["Hello there."] } });
 });
 
 test("dials that match no chip read as Custom", () => {

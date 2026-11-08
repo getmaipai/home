@@ -381,9 +381,11 @@ export interface CompanionEditable {
   id: string; name: string; pronouns: string | null; tagline: string; backstory: string; interests: string[];
   formality: "casual" | "neutral" | "formal"; complexity: "simple" | "standard" | "advanced"; engagement: "brief" | "balanced" | "curious"; filler_density: "none" | "light" | "frequent";
   clock_style?: "formal" | "plain" | "loose"; hedging?: "low" | "medium" | "high"; humor?: "low" | "medium" | "high"; warmth?: "low" | "medium" | "high"; initiative?: "low" | "medium" | "high";
-  behavior: string[]; examples: string[]; examples_child: string[]; examples_teen: string[]; examples_adult: string[]; voice_id: string; look_prompt: string; audience: "adult" | "teen" | "all"; status: CompanionStatus; review: unknown; can_edit: boolean; can_copy: boolean; can_set_audience: boolean; look: { versions: number; rest: string | null; sheet_state: "empty" | "making" | "needs_review" | "approved" }; states: { approved: number; total: number };
+  behavior: string[]; examples: string[]; examples_child: string[]; examples_teen: string[]; examples_adult: string[]; voice_id: string; look_prompt: string; audience: "adult" | "teen" | "all"; status: CompanionStatus; review: unknown; can_edit: boolean; can_copy: boolean; can_set_audience: boolean; synth?: { pins: { dials: string[]; examples: string[] }; phrase_sources: Record<string, string> }; look: { versions: number; rest: string | null; sheet_state: "empty" | "making" | "needs_review" | "approved" }; states: { approved: number; total: number };
 }
-export type CompanionFields = Partial<Omit<CompanionEditable, "id" | "status" | "review" | "can_edit" | "can_set_audience" | "look" | "states">>;
+export type CompanionFields = Partial<Omit<CompanionEditable, "id" | "status" | "review" | "can_edit" | "can_set_audience" | "look" | "states" | "synth">>;
+export type CompanionUpdateFields = CompanionFields & { pins?: { dials: string[]; examples: string[] } };
+export type CompanionCreateFields = CompanionFields & { status?: CompanionStatus; based_on?: { kind: "none" | "household_member" | "real_person"; person_id?: string | null; name?: string | null }; life?: { enabled: boolean; seed: string } };
 export interface CompanionList {
   allowed: boolean; can_create: boolean; can_discover: boolean; default_id: string;
   companions: CompanionCard[];
@@ -1585,7 +1587,7 @@ export const api = {
   setDefaultCompanion: (id: string) => request<{ default_id: string }>(`/api/companions/${encodeURIComponent(id)}/default`, { method: "PUT" }),
   addCompanion: (id: string) => request<{ companions: string[] }>(`/api/companions/${encodeURIComponent(id)}/add`, { method: "POST" }),
   removeCompanion: (id: string) => request<{ companions: string[] }>(`/api/companions/${encodeURIComponent(id)}/remove`, { method: "POST" }),
-  createCompanion: (fields: CompanionFields) => request<{ id: string }>("/api/companions", { method: "POST", body: JSON.stringify(fields) }),
+  createCompanion: (fields: CompanionCreateFields) => request<{ id: string; researching?: boolean }>("/api/companions", { method: "POST", body: JSON.stringify(fields) }),
   copyCompanion: (id: string) => request<{ id: string }>(`/api/companions/${encodeURIComponent(id)}/copy`, { method: "POST", body: "{}" }),
   forkCompanion: (id: string) => request<{ id: string }>(`/api/companions/${encodeURIComponent(id)}/fork`, { method: "POST", body: "{}" }),
   shareCompanion: (id: string) => request<{ id: string }>(`/api/companions/${encodeURIComponent(id)}/share`, { method: "POST", body: "{}" }),
@@ -1643,7 +1645,7 @@ export const api = {
   setCompanionLookKey: (id: string, key: CompanionLookKey) => request<{ key: CompanionLookKey }>(`/api/companions/${encodeURIComponent(id)}/look/sheet/key`, { method: "PUT", body: JSON.stringify({ key }) }),
   approveCompanionLookSheet: (id: string) => request<{ sheet: CompanionLookSheet }>(`/api/companions/${encodeURIComponent(id)}/look/sheet/approve`, { method: "POST" }),
   unapproveCompanionLookSheet: (id: string) => request<{ sheet: CompanionLookSheet }>(`/api/companions/${encodeURIComponent(id)}/look/sheet/unapprove`, { method: "POST" }),
-  updateCompanion: (id: string, fields: CompanionFields) => request<{ id: string }>(`/api/companions/${encodeURIComponent(id)}`, { method: "PUT", body: JSON.stringify(fields) }),
+  updateCompanion: (id: string, fields: CompanionUpdateFields) => request<{ id: string }>(`/api/companions/${encodeURIComponent(id)}`, { method: "PUT", body: JSON.stringify(fields) }),
   setCompanionStatus: (id: string, status: "draft" | "ready") => request<{ id: string }>(`/api/companions/${encodeURIComponent(id)}/status`, { method: "PUT", body: JSON.stringify({ status }) }),
   deleteCompanion: (id: string) => request<void>(`/api/companions/${encodeURIComponent(id)}`, { method: "DELETE" }),
   mediaSearch: (q: string) => request<MediaSearch>(`/api/media/search?q=${encodeURIComponent(q)}`),

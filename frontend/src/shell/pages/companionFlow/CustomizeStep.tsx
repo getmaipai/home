@@ -6,6 +6,7 @@ import { Button } from "@maipai/ui/src/ui/button";
 import { DialogBody, DialogFooter, DialogSection, Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@maipai/ui/src/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@maipai/ui/src/ui/select";
 import { Textarea } from "@maipai/ui/src/ui/textarea";
+import { Switch } from "@maipai/ui/src/ui/switch";
 import { ToggleGroup, ToggleGroupItem } from "@maipai/ui/src/ui/toggle-group";
 import { CompanionStage } from "@maipai/ui/src/elements/companion-stage";
 import { getIcon } from "@maipai/ui/src/icons";
@@ -46,6 +47,8 @@ export function CustomizeStep({ companionId, name, onBack, onGoTo }: { companion
   const [personality, setPersonality] = useState<CompanionPersonality>("friendly");
   const [notes, setNotes] = useState("");
   const [backstory, setBackstory] = useState("");
+  const [pins, setPins] = useState<{ dials: string[]; examples: string[] }>({ dials: [], examples: [] });
+  const [pinError, setPinError] = useState("");
   const [cloning, setCloning] = useState(false);
   const [cloneBusy, setCloneBusy] = useState(false);
   const [notice, setNotice] = useState("");
@@ -66,6 +69,7 @@ export function CustomizeStep({ companionId, name, onBack, onGoTo }: { companion
     setPersonality(data.status === "draft" && behavior.length === 0 && !text ? "friendly" : guessPersonality(data));
     setNotes(behavior.join(" ").slice(0, NOTES_MAX));
     setBackstory(text.slice(0, BACKSTORY_MAX));
+    setPins(data.synth?.pins ?? { dials: [], examples: [] });
   }, [saved.data]);
   useEffect(() => { const unsubscribe = voicePreviewPlayer.subscribe(setPreview); return () => { unsubscribe(); voicePreviewPlayer.stop(); }; }, []);
 
@@ -76,6 +80,31 @@ export function CustomizeStep({ companionId, name, onBack, onGoTo }: { companion
   const playing = previewId !== null && preview.voiceId === previewId;
   const portrait = look.data?.versions.find((v) => v.id === (look.data?.rest ?? ""))?.url ?? look.data?.versions[look.data.versions.length - 1]?.url ?? null;
   const loading = saved.isLoading;
+  const dialRows = [
+    { key: "formality", label: i18n._({ id: "Formality", message: "Formality" }), value: saved.data?.formality },
+    { key: "complexity", label: i18n._({ id: "Complexity", message: "Complexity" }), value: saved.data?.complexity },
+    { key: "engagement", label: i18n._({ id: "Engagement", message: "Engagement" }), value: saved.data?.engagement },
+    { key: "filler_density", label: i18n._({ id: "Filler density", message: "Filler density" }), value: saved.data?.filler_density },
+    { key: "clock_style", label: i18n._({ id: "Clock style", message: "Clock style" }), value: saved.data?.clock_style },
+    { key: "hedging", label: i18n._({ id: "Hedging", message: "Hedging" }), value: saved.data?.hedging },
+    { key: "humor", label: i18n._({ id: "Humor", message: "Humor" }), value: saved.data?.humor },
+    { key: "warmth", label: i18n._({ id: "Warmth", message: "Warmth" }), value: saved.data?.warmth },
+    { key: "initiative", label: i18n._({ id: "Initiative", message: "Initiative" }), value: saved.data?.initiative },
+  ];
+  const examples = [...new Set([...(saved.data?.examples ?? []), ...(saved.data?.examples_child ?? []), ...(saved.data?.examples_teen ?? []), ...(saved.data?.examples_adult ?? [])])];
+
+  async function togglePin(kind: "dials" | "examples", value: string) {
+    const current = pins;
+    const next = { ...current, [kind]: current[kind].includes(value) ? current[kind].filter((item) => item !== value) : [...current[kind], value] };
+    setPins(next); setPinError("");
+    try {
+      await api.updateCompanion(companionId, { pins: next });
+      await client.invalidateQueries({ queryKey: ["companions", companionId, "edit"] });
+    } catch (e) {
+      setPins(current);
+      setPinError(flowErrorText(e));
+    }
+  }
 
   function chooseSource(next: string) {
     if (next === "clone") { setNotice(""); setCloning(true); }
@@ -126,6 +155,22 @@ export function CustomizeStep({ companionId, name, onBack, onGoTo }: { companion
             {PERSONALITIES().map((item) => <ToggleGroupItem key={item.id} value={item.id}>{item.label}</ToggleGroupItem>)}
           </ToggleGroup>
           <Textarea aria-label={i18n._({ id: "Personality notes", message: "Personality notes" })} shape="rounded" maxLength={NOTES_MAX} value={notes} onChange={(e) => setNotes(e.target.value)} placeholder={i18n._({ id: "How should your synth behave, speak, and interact? (Optional)", message: "How should your synth behave, speak, and interact? (Optional)" })} />
+        </DialogSection>
+        <DialogSection title={i18n._({ id: "Style", message: "Style" })}>
+          <div className="flex flex-col gap-3">
+            <p className="text-sm font-medium">{i18n._({ id: "Dials", message: "Dials" })}</p>
+            {dialRows.map(({ key, label, value }) => <div key={key} className="flex items-center justify-between gap-3">
+              <span className="text-sm">{label}: {value ?? ""}</span>
+              <Switch aria-label={i18n._({ id: "Pin dial: {dial}", message: "Pin dial: {dial}", values: { dial: label } })} checked={pins.dials.includes(key)} disabled={!saved.data || saving} onCheckedChange={() => void togglePin("dials", key)} />
+            </div>)}
+            <p className="text-sm font-medium">{i18n._({ id: "Examples", message: "Examples" })}</p>
+            {examples.map((phrase) => <div key={phrase} className="flex items-start justify-between gap-3">
+              <div className="min-w-0"><p className="text-sm">{phrase}</p>{saved.data?.synth?.phrase_sources[phrase] ? <p className="text-xs text-muted-foreground">{saved.data.synth.phrase_sources[phrase]}</p> : null}</div>
+              <Switch aria-label={i18n._({ id: "Pin example: {phrase}", message: "Pin example: {phrase}", values: { phrase } })} checked={pins.examples.includes(phrase)} disabled={!saved.data || saving || phrase.length > 60} onCheckedChange={() => void togglePin("examples", phrase)} />
+              {phrase.length > 60 ? <p className="text-xs text-muted-foreground">{i18n._({ id: "This example is too long to pin. Shorten it to 60 characters or fewer.", message: "This example is too long to pin. Shorten it to 60 characters or fewer." })}</p> : null}
+            </div>)}
+            {pinError ? <p role="alert" className="text-sm text-destructive">{pinError}</p> : null}
+          </div>
         </DialogSection>
         <DialogSection title={i18n._({ id: "Backstory", message: "Backstory" })} icon={<Book aria-hidden="true" />} aside={<Button variant="secondary" shape="pill" disabled={generating || loading} onClick={() => void generate()}><Sparkles aria-hidden="true" />{generating ? i18n._({ id: "Writing", message: "Writing" }) : i18n._({ id: "Generate", message: "Generate" })}</Button>}>
           <Textarea aria-label={i18n._({ id: "Backstory", message: "Backstory" })} shape="rounded" maxLength={BACKSTORY_MAX} value={backstory} onChange={(e) => setBackstory(e.target.value)} placeholder={i18n._({ id: "Who is your synth? Describe their history, experiences, interests, occupation, relationships, and personal story...", message: "Who is your synth? Describe their history, experiences, interests, occupation, relationships, and personal story..." })} />

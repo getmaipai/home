@@ -94,6 +94,23 @@ async function publishFixture(personId: string, role: string, audience: "adult" 
   return { token, id, png, first, second, live };
 }
 
+test("synth style pins save through the companion edit route and reject a non-maker", async () => {
+  const maker = addPerson("person-pinmaker", "owner"), other = addPerson("person-pinother", "adult");
+  const actor = db.select().from(people).where(eq(people.id, "person-pinmaker")).get()!;
+  const timestamp = new Date().toISOString();
+  const made = createHouseholdCompanion({ ...fixture(), display_name: "Moss" }, { display_name: actor.displayName, person_id: actor.id }, "adult", { synth: { based_on: { kind: "none", person_id: null, name: null, refresh: "7d", minor: false }, life: { enabled: false, seed: "" }, subject_id: null, pins: { dials: [], examples: [] }, phrase_sources: {}, forked_from: null, private_to: null, owner_person_id: actor.id, provenance: "home:test", created_at: timestamp, updated_at: timestamp, hlc: "1:0:pinmaker" } });
+  expect(made).toMatchObject({ ok: true });
+  if (!made.ok) return;
+  const id = made.value.id;
+  const pins = { dials: ["warm"], examples: ["A pinned phrase."] };
+  const saved = await request(`companions/${id}`, maker, "PUT", { pins });
+  expect(await saved.json()).toMatchObject({ id });
+  const editable = await request(`companions/${id}/edit`, maker);
+  expect(await editable.json()).toMatchObject({ synth: { pins } });
+  const denied = await request(`companions/${id}`, other, "PUT", { pins: { dials: [], examples: [] } });
+  expect(denied.status).toBe(403);
+});
+
 beforeEach(() => { __setBackstoryCompleteForTests(null); resetDb(); rmSync(companionRoot, { recursive: true, force: true }); __reloadPersonasForTests(); __clearCompanionLookJobsForTests(); __clearCompanionTakeRunsForTests(); __resetCompanionStatesForTests(); __setPicturesFetchForTests(null); __setVideoStatusForTests(undefined); __setVideosFetchForTests(null); __setPictureStatusForTests(undefined); __setCharacterPictureCapabilityForTests(null); __setStackClientForTests(null); });
 afterEach(() => { __setBackstoryCompleteForTests(null); __resetAgeCheckForTests(); __setChildSafetyRunnerForTests(null); __setKeyframesForTests(null); __setImageToolsForTests(undefined); resetDb(); rmSync(companionRoot, { recursive: true, force: true }); __reloadPersonasForTests(); __clearCompanionLookJobsForTests(); __clearCompanionTakeRunsForTests(); __resetCompanionStatesForTests(); __setPicturesFetchForTests(null); __setVideoStatusForTests(undefined); __setVideosFetchForTests(null); __setPictureStatusForTests(undefined); __setCharacterPictureCapabilityForTests(null); __setStackClientForTests(null); });
 

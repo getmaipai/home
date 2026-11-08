@@ -1,9 +1,10 @@
 import { i18n } from "@lingui/core";
-import { useEffect, useId, useRef, useState, type MutableRefObject } from "react";
+import { useContext, useEffect, useId, useRef, useState, type MutableRefObject } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@maipai/ui/src/ui/button";
 import { DialogBody, DialogSection } from "@maipai/ui/src/ui/dialog";
 import { Input } from "@maipai/ui/src/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@maipai/ui/src/ui/select";
 import { Textarea } from "@maipai/ui/src/ui/textarea";
 import { ToggleGroup, ToggleGroupItem } from "@maipai/ui/src/ui/toggle-group";
 import { CharacterTile } from "@maipai/ui/src/primitives/CharacterTile";
@@ -11,6 +12,7 @@ import { GenerationStage } from "@maipai/ui/src/elements/generation-stage";
 import { Progress } from "@maipai/ui/src/primitives/Progress";
 import { getIcon } from "@maipai/ui/src/icons";
 import { api, ApiError, type CompanionLook, type CompanionLookJob } from "@/lib/api";
+import { WakeWordPersonContext } from "@/apps/chat/chatThreadContexts";
 import { useFillCutOff } from "@/lib/imaging/useFillCutOff";
 import { flowErrorText } from "@/shell/pages/companionFlow/errors";
 import { DraggablePicture } from "@/shell/pages/companionFlow/DraggablePicture";
@@ -26,11 +28,15 @@ export function CreateCharacterStep({ creating, companionId, initialName, onDraf
   onDraft: (state: { id: string | null; pictures: number; name: string }) => void; onApproved: (sheetJob: string | null) => void;
 }) {
   const client = useQueryClient();
+  const viewer = useContext(WakeWordPersonContext);
   // ENGINE-STATUS-MEDIA-01: every control here that asks the picture engine for work waits while it cannot take any.
   const making = useMakingAvailability("image");
   const reasonId = useId();
   const [draftId, setDraftId] = useState<string | null>(companionId);
   const [name, setName] = useState(initialName);
+  const [basedKind, setBasedKind] = useState<"none" | "household_member" | "real_person">("none");
+  const [basedPersonId, setBasedPersonId] = useState("");
+  const [basedName, setBasedName] = useState("");
   const [draftName, setDraftName] = useState(companionId ? initialName : "");
   const [mode, setMode] = useState<"describe" | "upload">("describe");
   const [description, setDescription] = useState("");
@@ -56,6 +62,7 @@ export function CreateCharacterStep({ creating, companionId, initialName, onDraf
   const look: CompanionLook | undefined = lookQuery.data;
   // The tiles come from Home for the viewer's age band and need no draft, so they show at once.
   const stylesQuery = useQuery({ queryKey: ["companions", "look-styles"], queryFn: () => api.getCompanionLookStyles(), retry: false, staleTime: 60_000 });
+  const peopleQuery = useQuery({ queryKey: ["people"], queryFn: api.people, retry: false, staleTime: 60_000, enabled: !companionId });
   const jobQuery = useQuery<CompanionLookJob>({
     queryKey: [...lookKey(draftId ?? "none"), "job", jobId], queryFn: () => api.companionLookJob(draftId!, jobId!), enabled: draftId !== null && jobId !== null, retry: false,
     refetchInterval: (q) => running(q.state.data, jobId) ? 1500 : false,
@@ -64,6 +71,11 @@ export function CreateCharacterStep({ creating, companionId, initialName, onDraf
   const generating = running(job, jobId);
   useMakingRecovery(making, generating, MAKING_BACK_LINE.picture);
   const busy = busyKind !== null;
+  const viewerBand = (viewer as (typeof viewer & { age_band?: string }) | null)?.age_band;
+  const adultViewer = viewerBand ? viewerBand === "adult" : ["owner", "admin", "adult"].includes(viewer?.role ?? "");
+  const basedOn = basedKind === "household_member"
+    ? { kind: basedKind, person_id: basedPersonId || null, name: null }
+    : basedKind === "real_person" ? { kind: basedKind, person_id: null, name: basedName.trim() || null } : { kind: "none" as const, person_id: null, name: null };
   const locked = generating || busy;
   // Moving the character stays possible while an earlier placement is being made; only the newest one is shown.
   const placeLocked = generating || (busy && busyKind !== "prepare");
@@ -127,7 +139,8 @@ export function CreateCharacterStep({ creating, companionId, initialName, onDraf
   }
   function ensureDraft(): Promise<string> {
     if (draftId) return Promise.resolve(draftId);
-    creating.current ??= api.createCompanionDraft(name.trim()).then(({ id }) => { setDraftId(id); setDraftName(name.trim()); return id; }).finally(() => { creating.current = null; });
+    const create = api.createCompanion({ name: name.trim(), formality: "neutral", complexity: "standard", engagement: "balanced", filler_density: "light", status: "draft", based_on: basedOn, life: { enabled: true, seed: "" } });
+    creating.current ??= create.then(({ id }) => { setDraftId(id); setDraftName(name.trim()); return id; }).finally(() => { creating.current = null; });
     return creating.current;
   }
   // The draft is made once the name is typed.
@@ -216,6 +229,22 @@ export function CreateCharacterStep({ creating, companionId, initialName, onDraf
     <>
     <DialogBody columns="three">
       <div className="flex flex-col gap-6">
+        {!companionId ? <DialogSection title={i18n._({ id: "Based on", message: "Based on" })}>
+          <Select value={basedKind} onValueChange={(value) => { if (value === "none" || value === "household_member" || value === "real_person") setBasedKind(value); }}>
+            <SelectTrigger shape="pill" width="full" aria-label={i18n._({ id: "Based on", message: "Based on" })}><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="none">{i18n._({ id: "Nobody", message: "Nobody" })}</SelectItem>
+              <SelectItem value="household_member">{i18n._({ id: "A household member", message: "A household member" })}</SelectItem>
+              {adultViewer ? <SelectItem value="real_person">{i18n._({ id: "A real person", message: "A real person" })}</SelectItem> : null}
+            </SelectContent>
+          </Select>
+          {basedKind === "household_member" ? <Select value={basedPersonId} onValueChange={setBasedPersonId}>
+            <SelectTrigger shape="pill" width="full" aria-label={i18n._({ id: "Household member", message: "Household member" })}><SelectValue placeholder={i18n._({ id: "Choose a person", message: "Choose a person" })} /></SelectTrigger>
+            <SelectContent>{(peopleQuery.data ?? []).map((person) => <SelectItem key={person.id} value={person.id}>{person.display_name}</SelectItem>)}</SelectContent>
+          </Select> : null}
+          {basedKind === "real_person" ? <Input aria-label={i18n._({ id: "Real person name", message: "Real person name" })} shape="pill" maxLength={120} value={basedName} onChange={(event) => setBasedName(event.target.value)} placeholder={i18n._({ id: "Enter a real person's name", message: "Enter a real person's name" })} /> : null}
+          {peopleQuery.isError ? <p role="alert" className="text-sm text-destructive">{flowErrorText(peopleQuery.error)}</p> : null}
+        </DialogSection> : null}
         <DialogSection title={i18n._({ id: "Character name", message: "Character name" })}>
           <Input aria-label={i18n._({ id: "Character name", message: "Character name" })} shape="pill" placeholder={i18n._({ id: "Enter character name", message: "Enter character name" })} maxLength={40} value={name} disabled={locked}
             onChange={(e) => setName(e.target.value)} onBlur={nameDone} />

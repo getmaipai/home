@@ -38,7 +38,7 @@ import { activeTakeRun, cancelTakeRun, companionHasTakeRun, publicTakeRun, start
 import { clipPromptPack, picturePromptPack } from "@/lib/companionPromptPack";
 import { portraitPath, readRetainedPortrait, retainCompanionPortrait } from "@/lib/companionPortrait";
 import { checkFinishedAssets, type FinishedAsset } from "@/lib/pictures/finishedCheck";
-import { createSynth, forkSynth, getSynth, shareFork, synthById, maySeeSynth } from "@/lib/synths";
+import { createSynth, forkSynth, getSynth, shareFork, synthById, maySeeSynth, updateSynth } from "@/lib/synths";
 import { activeBeats, rememberBeat } from "@/lib/talent/life";
 import { isResearchingSynth, researchSince, researchSynth } from "@/lib/talent/researcher";
 import { forgetByIds, list as listMemory } from "@/lib/memory";
@@ -374,6 +374,7 @@ function normalizedFields(value: z.infer<typeof fields>) {
 const idPath = idParamSchema("id", "hc-companion");
 const fieldsJson = { content: { "application/json": { schema: fields } } };
 const synthCreateFields = fields.extend({
+  status: z.enum(["draft", "ready"]).optional(),
   based_on: z.object({ kind: z.enum(["none", "household_member", "real_person"]), person_id: z.string().nullable().optional(), name: z.string().max(120).nullable().optional(), refresh: z.enum(["1d", "7d"]).default("7d"), minor: z.boolean().default(false) }).optional(),
   life: z.object({ enabled: z.boolean().default(true), seed: z.string().max(500).default("") }).optional(),
 });
@@ -912,17 +913,26 @@ companionsRoutes.openapi(editRoute, (c) => {
   const actor = c.get("person"), id = c.req.valid("param").id, manifest = getHouseholdCompanion(id);
   if (!manifest?.companion || !mayEdit(actor, id)) return c.json({ error: "No companion you can edit." }, 404);
   const look = readLook(id);
-  return c.json({ id, ...manifest.companion, humor: manifest.companion.social?.humor ?? "medium", warmth: manifest.companion.social?.warmth ?? "medium", initiative: manifest.companion.social?.initiative ?? "medium", clock_style: manifest.companion.clock_style ?? "plain", hedging: manifest.companion.hedging ?? "medium", name: manifest.companion.display_name, audience: manifest.companion.audience ?? "adult", status: manifest.companion.status ?? "ready", review: manifest.companion.review ?? null, can_edit: true, can_copy: speakerAgeBand(actor, new Date()) === "adult" || isOwnerOrAdmin(actor), can_set_audience: isOwnerOrAdmin(actor), look: { versions: look.versions.length, rest: look.rest, sheet_state: look.sheet?.state ?? "empty" }, states: { approved: Object.values(readStates(id).states).filter((s) => s?.approved).length, total: creatorStateRows().length } }, 200);
+  const synth = synthById(id);
+  return c.json({ id, ...manifest.companion, humor: manifest.companion.social?.humor ?? "medium", warmth: manifest.companion.social?.warmth ?? "medium", initiative: manifest.companion.social?.initiative ?? "medium", clock_style: manifest.companion.clock_style ?? "plain", hedging: manifest.companion.hedging ?? "medium", name: manifest.companion.display_name, audience: manifest.companion.audience ?? "adult", status: manifest.companion.status ?? "ready", review: manifest.companion.review ?? null, can_edit: true, can_copy: speakerAgeBand(actor, new Date()) === "adult" || isOwnerOrAdmin(actor), can_set_audience: isOwnerOrAdmin(actor), ...(synth ? { synth: { pins: synth.pins, phrase_sources: synth.phrase_sources } } : {}), look: { versions: look.versions.length, rest: look.rest, sheet_state: look.sheet?.state ?? "empty" }, states: { approved: Object.values(readStates(id).states).filter((s) => s?.approved).length, total: creatorStateRows().length } }, 200);
 });
 
+const updateFields = fields.extend({ pins: z.object({ dials: z.array(z.string().max(60, "A pin must be 60 characters or shorter. Shorten it and try again.")).max(20, "You can pin up to 20 dials. Remove a pin and try again."), examples: z.array(z.string().max(60, "A pin must be 60 characters or shorter. Shorten it and try again.")).max(20, "You can pin up to 20 examples. Remove a pin and try again.") }).optional() });
 const updateRoute = createRoute({ method: "put", path: "/{id}", tags: ["Companions"], summary: "Edit a household companion", middleware: [requireAuth] as const,
-  request: { params: idPath, body: fieldsJson }, responses: { 200: { content: { "application/json": { schema: z.object({ id: z.string() }) } }, description: "Saved." }, 400: companionValidationError, ...errorResponses({ 401: "Not signed in", 403: "Not allowed to edit this companion", 404: "No such companion" }) } });
+  request: { params: idPath, body: { content: { "application/json": { schema: updateFields } } } }, responses: { 200: { content: { "application/json": { schema: z.object({ id: z.string() }) } }, description: "Saved." }, 400: companionValidationError, ...errorResponses({ 401: "Not signed in", 403: "Not allowed to edit this companion", 404: "No such companion" }) } });
 companionsRoutes.openapi(updateRoute, (c) => {
   const actor = c.get("person"), id = c.req.valid("param").id;
   if (PERSONAS.some((p) => p.id === id) && !getHouseholdCompanion(id)) return c.json({ error: "A bundled companion can't be changed. Make a copy to edit it." }, 403);
   if (!getHouseholdCompanion(id)) return c.json({ error: "That household companion could not be found." }, 404);
   if (!mayEdit(actor, id)) return c.json({ error: "Only the author or an admin can edit this companion." }, 403);
-  const result = updateHouseholdCompanion(id, normalizedFields(c.req.valid("json")) as never); if (!result.ok) return c.json({ error: result.error, ...(result.fields ? { fields: result.fields } : {}) }, 400);
+  const body = c.req.valid("json");
+  if (body.pins) {
+    const result = updateSynth(actor, id, { pins: body.pins });
+    if (!result.ok) return c.json({ error: result.error }, result.status ?? 400);
+    if (result.value.companion.status === "ready") reloadPersonas();
+    return c.json({ id }, 200);
+  }
+  const result = updateHouseholdCompanion(id, normalizedFields(body) as never); if (!result.ok) return c.json({ error: result.error, ...(result.fields ? { fields: result.fields } : {}) }, 400);
   if (result.value.companion?.status === "ready") reloadPersonas(); return c.json({ id }, 200);
 });
 

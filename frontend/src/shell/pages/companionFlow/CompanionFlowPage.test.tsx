@@ -4,9 +4,10 @@ import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { api, ApiError, type CompanionLook } from "@/lib/api";
 import { CompanionShellViewer } from "@/lib/companionShells";
+import { WakeWordPersonContext } from "@/apps/chat/chatThreadContexts";
 import { CompanionFlowPage } from "@/shell/pages/companionFlow/CompanionFlowPage";
 
-const methods = ["settingsValues", "companions", "editCompanion", "createCompanionDraft", "companionLook", "generateCompanionLook", "companionLookJob", "uploadCompanionLook", "restyleCompanionLook", "prepareCompanionLook", "approveCompanionLook", "deleteCompanion", "updateCompanion", "cancelCompanionLookJob", "completeCompanionLook", "companionStates", "getCompanionLookStyles"] as const;
+const methods = ["settingsValues", "people", "companions", "editCompanion", "createCompanion", "createCompanionDraft", "companionLook", "generateCompanionLook", "companionLookJob", "uploadCompanionLook", "restyleCompanionLook", "prepareCompanionLook", "approveCompanionLook", "deleteCompanion", "updateCompanion", "cancelCompanionLookJob", "completeCompanionLook", "companionStates", "getCompanionLookStyles"] as const;
 const originals = Object.fromEntries(methods.map((key) => [key, api[key]]));
 afterEach(() => { cleanup(); Object.assign(api, originals); });
 
@@ -16,12 +17,14 @@ const version = (id: string) => ({ id, label: `Picture ${id}`, source: "generate
 const look = (overrides: Partial<CompanionLook> = {}): CompanionLook => ({ versions: [], rest: null, key: `#${"00FF00"}`, sheet: null, ready_for_video: false, start_ready: false, can_generate: true, styles: adultStyles, keep: { id: "keep", label: "Keep as is" }, audience_cap: "all", ...overrides });
 function Where() { return <div data-testid="where">{useLocation().pathname}</div>; }
 
-function open(options: { path?: string; canCreate?: boolean; lookData?: CompanionLook; styles?: typeof adultStyles } = {}) {
-  const calls = { draft: 0, generate: [] as unknown[], deleted: [] as string[], approved: [] as string[], prepare: [] as unknown[] };
+function open(options: { path?: string; canCreate?: boolean; lookData?: CompanionLook; styles?: typeof adultStyles; role?: "adult" | "teen" } = {}) {
+  const calls = { draft: 0, created: [] as unknown[], generate: [] as unknown[], deleted: [] as string[], approved: [] as string[], prepare: [] as unknown[] };
   api.settingsValues = async () => [{ key: "companions.preview_shells", value: true, source: "user", label: "Preview", level: "basic", secret: false }] as never;
   api.companions = async () => ({ allowed: true, can_create: options.canCreate ?? true, can_discover: false, default_id: "x", companions: [], discover: [], robots: null });
   api.editCompanion = async () => ({ id: "hc-one", name: "Marlow" }) as never;
   api.createCompanionDraft = async () => { calls.draft++; return { id: "hc-one" }; };
+  api.createCompanion = async (body) => { calls.created.push(body); return { id: "hc-one" }; };
+  api.people = async () => [];
   api.getCompanionLookStyles = async () => ({ styles: options.styles ?? adultStyles, keep: { id: "keep" as const, label: "Keep as is" } });
   api.companionLook = async () => options.lookData ?? look();
   api.generateCompanionLook = async (_id, body) => { calls.generate.push(body); return { job: "job-1" }; };
@@ -31,11 +34,28 @@ function open(options: { path?: string; canCreate?: boolean; lookData?: Companio
   api.deleteCompanion = async (id) => { calls.deleted.push(id); };
   api.companionStates = async () => ({ sheet_ready: true, start_ready: true, key: "#00FF00", states: [], run: null, counts: { approved: 0, total: 0, required_missing: [] } });
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-  const view = render(<QueryClientProvider client={client}><CompanionShellViewer.Provider value={{ id: "person-sage" } as never}><MemoryRouter initialEntries={[options.path ?? "/companions/create"]}><Routes>
+  const view = render(<QueryClientProvider client={client}><WakeWordPersonContext.Provider value={(options.role ? { role: options.role, age_band: options.role } : null) as never}><CompanionShellViewer.Provider value={{ id: "person-sage" } as never}><MemoryRouter initialEntries={[options.path ?? "/companions/create"]}><Routes>
     <Route path="/companions/create" element={<CompanionFlowPage />} /><Route path="/companions/:id/create" element={<CompanionFlowPage />} /><Route path="/companions" element={<Where />} />
-  </Routes></MemoryRouter></CompanionShellViewer.Provider></QueryClientProvider>);
+  </Routes></MemoryRouter></CompanionShellViewer.Provider></WakeWordPersonContext.Provider></QueryClientProvider>);
   return { view, calls };
 }
+
+test("Based on posts a real person at top level for an adult, and hides the option for a teen", async () => {
+  const { view, calls } = open({ role: "adult" });
+  await view.findByRole("combobox", { name: "Based on" });
+  fireEvent.click(view.getByRole("combobox", { name: "Based on" }));
+  fireEvent.click(await view.findByRole("option", { name: "A real person" }));
+  fireEvent.change(view.getByLabelText("Real person name"), { target: { value: "Ada Lovelace" } });
+  fireEvent.change(view.getByLabelText("Character name"), { target: { value: "Ada" } });
+  fireEvent.blur(view.getByLabelText("Character name"));
+  await waitFor(() => expect(calls.created).toHaveLength(1));
+  expect(calls.created[0]).toMatchObject({ name: "Ada", based_on: { kind: "real_person", person_id: null, name: "Ada Lovelace" } });
+  cleanup();
+  const teen = open({ role: "teen" });
+  await teen.view.findByRole("combobox", { name: "Based on" });
+  fireEvent.click(teen.view.getByRole("combobox", { name: "Based on" }));
+  expect(teen.view.queryByRole("option", { name: "A real person" })).toBeNull();
+});
 const button = (view: ReturnType<typeof open>["view"], name: string) => view.getByRole("button", { name }) as HTMLButtonElement;
 async function nameIt(view: ReturnType<typeof open>["view"], value = "Marlow") {
   const input = await view.findByLabelText("Character name"); fireEvent.change(input, { target: { value } }); fireEvent.blur(input);
@@ -54,7 +74,7 @@ test("the style tiles show at once, before a name or a draft exists", async () =
   const { view, calls } = open();
   for (const label of ["Realistic", "Cartoon", "Anime", "3D", "Pixel", "Custom"]) expect(await view.findByRole("button", { name: label })).toBeTruthy();
   expect(view.queryByText(/Enter a name above/)).toBeNull();
-  expect(calls.draft).toBe(0);
+  expect(calls.created).toHaveLength(0);
 });
 
 test("the draft is created once and the style tiles come from the look response", async () => {
@@ -64,7 +84,9 @@ test("the draft is created once and the style tiles come from the look response"
   fireEvent.change(view.getByLabelText("Describe the character"), { target: { value: "A friendly fox" } });
   await act(async () => { fireEvent.click(button(view, "Generate Character")); });
   await waitFor(() => expect(calls.generate.length).toBe(1));
-  expect(calls.draft).toBe(1); expect(calls.generate[0]).toEqual({ prompt: "A friendly fox", style: "cartoon", count: 1 });
+  expect(calls.created).toHaveLength(1);
+  expect(calls.created[0]).toMatchObject({ name: "Marlow", status: "draft", based_on: { kind: "none", person_id: null, name: null } });
+  expect(calls.generate[0]).toEqual({ prompt: "A friendly fox", style: "cartoon", count: 1 });
 });
 
 test("once the draft exists the address names it, so a reload does not start an empty form", async () => {
@@ -227,7 +249,7 @@ test("when the character could not be made ready, screen 2 says so and Try again
 test("closing with an empty draft asks keep or discard; discard deletes it", async () => {
   const { view, calls } = open(); await nameIt(view); await view.findByRole("button", { name: "Cartoon" });
   // The tiles show before the draft exists, so wait for the draft and its (empty) look before closing.
-  await waitFor(() => expect(calls.draft).toBe(1)); await act(async () => { await Promise.resolve(); });
+  await waitFor(() => expect(calls.created).toHaveLength(1)); await act(async () => { await Promise.resolve(); });
   fireEvent.click(view.getByRole("button", { name: "Close" }));
   expect(await view.findByText("Keep this draft or discard it?")).toBeTruthy();
   fireEvent.click(view.getByRole("button", { name: "Discard" }));
@@ -238,8 +260,8 @@ test("closing with an empty draft asks keep or discard; discard deletes it", asy
 test("closing while the draft is still being made waits for it, then asks keep or discard", async () => {
   const { view, calls } = open();
   let finish: (value: { id: string }) => void = () => {};
-  api.createCompanionDraft = () => { calls.draft++; return new Promise((resolve) => { finish = resolve; }); };
-  await nameIt(view); await waitFor(() => expect(calls.draft).toBe(1));
+  api.createCompanion = () => { calls.created.push("pending"); return new Promise((resolve) => { finish = resolve; }); };
+  await nameIt(view); await waitFor(() => expect(calls.created).toHaveLength(1));
   fireEvent.click(view.getByRole("button", { name: "Close" }));
   await act(async () => { await Promise.resolve(); });
   // Still waiting: it neither left the dialog nor asked yet.

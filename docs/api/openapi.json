@@ -78973,6 +78973,13 @@
                   "look_prompt": {
                     "type": "string"
                   },
+                  "status": {
+                    "type": "string",
+                    "enum": [
+                      "draft",
+                      "ready"
+                    ]
+                  },
                   "based_on": {
                     "type": "object",
                     "properties": {
@@ -80027,6 +80034,31 @@
                   },
                   "look_prompt": {
                     "type": "string"
+                  },
+                  "pins": {
+                    "type": "object",
+                    "properties": {
+                      "dials": {
+                        "type": "array",
+                        "items": {
+                          "type": "string",
+                          "maxLength": 60
+                        },
+                        "maxItems": 20
+                      },
+                      "examples": {
+                        "type": "array",
+                        "items": {
+                          "type": "string",
+                          "maxLength": 60
+                        },
+                        "maxItems": 20
+                      }
+                    },
+                    "required": [
+                      "dials",
+                      "examples"
+                    ]
                   }
                 }
               }
