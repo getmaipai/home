@@ -20,7 +20,7 @@ import { DestructiveConfirm } from "@maipai/ui/src/primitives/DestructiveConfirm
 import { AsyncState } from "@maipai/ui/src/primitives/AsyncState";
 import { EmptyState } from "@maipai/ui/src/primitives/EmptyState";
 import { useToast } from "@maipai/ui/src/primitives/Toast";
-import { SongResult, MAKE_SONG_ADULT_LINE, NO_MUSIC_ENGINE_LINE, makeSongBody, Field } from "./MakeSongPage";
+import { SongResult, NO_MUSIC_ENGINE_LINE, makeSongBody, Field } from "./MakeSongPage";
 import { MusicTrack } from "@maipai/ui/src/elements/music-track";
 import { useMusicTrackProps } from "@/apps/chat/MusicCardView";
 import { CreatePage } from "./MusicStudioPages";
@@ -273,7 +273,6 @@ export function MusicWorkspace({ adult, search }: { adult: boolean; search: stri
     push(on ? i18n._({ id: "{name} taken out of the bar.", message: "{name} taken out of the bar.", values: { name } }) : i18n._({ id: "{name} added to the bar. Describe your song, then press Generate.", message: "{name} added to the bar. Describe your song, then press Generate.", values: { name } }));
     document.getElementById("music-bar")?.scrollIntoView({ behavior: "smooth", block: "center" });
   };
-  if (!adult) return <EmptyState icon="music" text={MAKE_SONG_ADULT_LINE()} />;
   const open = (id: string | null) => navigate(songAddress(id), { replace: true });
   return <>{song && openedCard.data?.sound ? <MusicTrack {...openedTrackProps} /> : null}<AddSoundToSong jobId={addingSound} open={addingSound !== null} onOpenChange={open => { if (!open) setAddingSound(null); }} songs={list.data ?? []} onAdded={id => { void queryClient.invalidateQueries({ queryKey: ["music-songs"] }); void queryClient.invalidateQueries({ queryKey: ["music-song", id] }); }} /><div className="dark flex min-h-0 flex-1 flex-col"><section className="music-surface bg-background text-foreground -mx-4 flex min-h-0 flex-1 flex-col gap-10 overflow-y-auto px-4 py-4 lg:mx-0 lg:rounded-3xl lg:px-6" data-testid="music-workspace">
     {song && openedCard.data?.sound ? <div className="flex shrink-0 flex-col gap-3" data-testid="opened-sound">

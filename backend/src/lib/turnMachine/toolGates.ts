@@ -2,14 +2,14 @@ import type { PersonRow } from "@/types";
 import type { Surface } from "@/lib/turnShared";
 import type { SurfaceClass } from "@/lib/surfaceClass";
 import type { AgeBand } from "@/lib/ageBand";
-import { musicsAllowed } from "@/lib/music/policy";
-import { musicEngineReady } from "@/lib/music/ready";
+import { householdAllowsMusic } from "@/lib/music/policy";
+import { musicEngineReady, musicTranscriptionAvailable } from "@/lib/music/ready";
 import { picturesAllowed } from "@/lib/pictures/policy";
 import { pictureEngineReady } from "@/lib/pictures/ready";
 import { listMediaOps } from "@/lib/mediaOps/registry";
 import { videosAllowed } from "@/lib/videos/policy";
 import { videoEngineReady } from "@/lib/videos/ready";
-import { laneOf } from "@/lib/pictures/lane";
+import { laneOf, kidLaneOn } from "@/lib/pictures/lane";
 import { itemRefsIn } from "@/lib/items/tool";
 import { writingFormatsFor } from "@/lib/writingFormats";
 import { roleHealth } from "@/lib/roleHealth";
@@ -107,7 +107,13 @@ export async function budgetWithTurnToolGates(input: TurnToolGateInput): Promise
   }));
   const pictureEligible = !input.bare && safeGate(() => picturesAllowed(audience));
   const videoEligible = !input.bare && safeGate(() => videosAllowed(audience));
-  const musicEligible = !input.bare && safeGate(() => musicsAllowed(audience));
+  // Read Stack capability as part of readiness before the minor lane decision; otherwise a cold status cache would keep the lane closed forever.
+  const musicEligible = !input.bare && safeGate(() => {
+    const lane = laneOf(audience);
+    if (input.actor.role === "guest" || (lane === "child" && !kidLaneOn(input.actor))) return false;
+    if (input.spoken || input.surfaceClass !== "written" || input.surface !== "chat") return false;
+    return householdAllowsMusic();
+  });
   const [pictureReadyNow, videoReadyNow, musicReadyNow] = await Promise.all([
     pictureEligible ? readiness(pictureEngineReady) : false,
     videoEligible ? readiness(() => videoEngineReady(laneOf(audience) === "adult")) : false,
@@ -122,7 +128,7 @@ export async function budgetWithTurnToolGates(input: TurnToolGateInput): Promise
   const editPictureOk = editPictureOps.length > 0;
   const editPictureIds = editPictureOk && input.conversationId ? pictureIdsInConversation(input.actor, input.conversationId, input.temporary || input.ephemeral) : [];
   const videosOk = videoEligible && (videoReadyNow || latch?.videoEngineReady === true);
-  const musicOk = musicEligible && (musicReadyNow || latch?.musicEngineReady === true);
+  const musicOk = musicEligible && (laneOf(audience) === "adult" || musicTranscriptionAvailable()) && (musicReadyNow || latch?.musicEngineReady === true);
   if (latch) {
     latch.pictureEngineReady ||= pictureEligible && pictureReadyNow;
     latch.videoEngineReady ||= videoEligible && videoReadyNow;

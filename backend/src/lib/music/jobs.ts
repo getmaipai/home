@@ -21,7 +21,9 @@ import { m4aSeconds } from "./m4a";
 import { mixMusicParts } from "./mixParts";
 import { shapeSoundM4a } from "./soundAudio";
 import { readClonedVoiceClip } from "@/lib/clonedVoices";
-import { refuseMusicPrompt } from "./policy";
+import { musicProtections } from "./policy";
+import { routeAudience } from "@/lib/pictures/audience";
+import { laneOf, CHILD_CONTENT_LINE, TEEN_CONTENT_LINE, markKidWithheld, attachKid, releaseKidForJob } from "@/lib/pictures/lane";
 import { jobQueueCopy } from "@/lib/jobQueueCopy";
 import { speakerAgeBand } from "@/lib/ageBand";
 import { slotRun } from "@/lib/tiers";
@@ -109,7 +111,7 @@ function sleep(ms: number, signal: AbortSignal): Promise<void> {
 }
 export interface StartMusicInput {
   actor: PersonRow; conversationId: string; turnId: string; companionId?: string | null; temporary: boolean; task: MusicTask;
-  request: MusicRequest; body: Omit<MusicBody, "timeout_ms">; parentFileId?: string | null;
+  request: MusicRequest; body: Omit<MusicBody, "timeout_ms">; parentFileId?: string | null; kidUsageId?: string | null;
 }
 /** Shared bytes and Stack body for both the edit_music tool and the song card's stems action. */
 export async function prepareStemsJob(actor: PersonRow, source: MusicJob): Promise<{ ok: true; task: "stems"; request: MusicRequest; body: Omit<MusicBody, "timeout_ms"> } | { ok: false; status: 422 | 503; line: string }> {
@@ -174,7 +176,12 @@ export async function startMusicJob(input: StartMusicInput): Promise<MusicJob> {
   // Charge storage before admission, then check actual bytes again when saving. Temporary audio is memory only.
   const cap = checkStorageCap(input.actor.role, input.actor.id, Math.ceil(input.request.seconds * 32_000));
   if (!cap.ok) throw new StackMusicError(403, "storage_full");
-  if (refuseMusicPrompt([input.request.description, input.request.lyrics, input.request.written_lyrics, input.request.title, input.request.key, input.request.language].join(" "))) throw new StackMusicError(422, "minor_sexual");
+  const protections = musicProtections(routeAudience(input.actor));
+  // A teen's or child's song is always transcribed and checked as sung, whatever the caller set (design 18.7).
+  if (protections.lane !== "adult") { input.request.transcribe = true; input.body.transcribe = true; }
+  for (const [text, field] of [[input.request.description, "prompt"], [input.request.lyrics, "lyrics"], [input.request.written_lyrics, "lyrics"], [input.request.title, "title"]] as const) {
+    if (text && protections.checkWords(text, field)) throw new StackMusicError(422, "minor_sexual");
+  }
   if (starting.has(input.actor.id) || activeMusicJobsFor(input.actor)) throw new StackMusicError(429, "already_making");
   starting.add(input.actor.id);
   const priorAt = jobsForConversation(input.actor, input.conversationId, input.temporary).reduce((at, j) => Math.max(at, Date.parse(j.chosenAt ?? j.createdAt)), 0);
@@ -188,6 +195,7 @@ export async function startMusicJob(input: StartMusicInput): Promise<MusicJob> {
   (job.request as MusicRequest & { stackBody?: Omit<MusicBody, "timeout_ms"> }).stackBody = input.body;
   // Reserve before the network await: forgetting the turn during submit can abort admission too.
   liveJobs.set(job.id, job);
+  attachKid(input.kidUsageId ?? null, job.id);
   try {
     saveMusicJob(job);
     void releaseHouseholdQueue();
@@ -196,7 +204,14 @@ export async function startMusicJob(input: StartMusicInput): Promise<MusicJob> {
   finally { starting.delete(input.actor.id); }
 }
 
-function fail(job: MusicJob, code: string): void { job.state = "failed"; job.errorCode = code; job.errorLine = job.request.voiceSwap ? plainMusicFailure("voice_swap") : job.request.parts || job.task === "stems" ? plainMusicFailure("stems_failed") : plainMusicFailure(code); saveMusicJob(job); }
+function fail(job: MusicJob, code: string): void {
+  if (code === "transcript_unavailable") {
+    const actor = db.select().from(people).where(eq(people.id, job.personId)).get() as PersonRow | undefined;
+    if (actor) { withholdMinor(job, actor); return; }
+  }
+  if (job.request.transcribe) releaseKidForJob(job.id);
+  job.state = "failed"; job.errorCode = code; job.errorLine = job.request.voiceSwap ? plainMusicFailure("voice_swap") : job.request.parts || job.task === "stems" ? plainMusicFailure("stems_failed") : plainMusicFailure(code); saveMusicJob(job);
+}
 const stopped = (job: MusicJob): boolean => job.state === "cancelled";
 async function watch(job: MusicJob, actor: PersonRow, early: StackSong[] | null = null): Promise<void> {
   if (!job.stackJob || watching.has(job.id)) return;
@@ -223,7 +238,7 @@ async function watch(job: MusicJob, actor: PersonRow, early: StackSong[] | null 
         if (requeueAfterCritical({ requeues: retries }) === "requeue_head") { request.memoryRequeues = retries + 1; job.state = "queued"; job.stackJob = null; job.stage = "requeued_memory"; job.progress = 0; saveMusicJob(job); return; }
         fail(job, "no_memory"); return;
       }
-      if (status.state === "failed") { fail(job, status.code ?? "failed"); return; }
+      if (status.state === "failed") { if (status.code === "transcript_unavailable") withholdMinor(job, actor); else fail(job, status.code ?? "failed"); return; }
       if (status.state === "cancelled") { job.state = "cancelled"; saveMusicJob(job); return; }
       job.state = status.state === "queued" ? "queued" : "running";
       // Stage labels come from a closed map at the card boundary, never from arbitrary Stack text.
@@ -246,11 +261,20 @@ async function watch(job: MusicJob, actor: PersonRow, early: StackSong[] | null 
 }
 async function finish(job: MusicJob, actor: PersonRow, songs: StackSong[], signal: AbortSignal): Promise<false | void> {
   if (stopped(job)) return;
+  const minorAudience = routeAudience(actor);
+  const minorLane = laneOf(minorAudience) !== "adult";
+  // Stems, parts and voice swaps are never offered to a minor and carry no transcript: withhold if one ever arrives.
+  if (minorLane && (job.request.voiceSwap || job.request.parts || job.task === "stems")) { withholdMinor(job, actor); return; }
   if (job.request.voiceSwap) return finishVoiceSwap(job, actor, songs as unknown as StackStem[], signal);
   if (job.request.parts) return finishParts(job, actor, songs as unknown as StackStem[], signal);
   if (job.task === "stems") return finishStems(job, actor, songs as unknown as StackStem[], signal);
   const song = songs[0];
   if (!song || !Number.isFinite(song.duration_s) || !Number.isFinite(song.seed)) { fail(job, "bad_reply"); return; }
+  if (minorLane || job.request.transcribe) {
+    // Held in a local only: never stored, logged or traced.
+    const transcript = song.transcript;
+    if (!job.request.instrumental && (!transcript?.trim() || musicProtections(minorAudience).checkWords(transcript, "transcript"))) { withholdMinor(job, actor); return; }
+  }
   if (!job.request.retried && ["text2music", "remake", "variation"].includes(job.task) && song.lrc
     && sungLyricsFromLrc(song.lrc, song.duration_s).length < sungLyricsFromLrc(song.lrc, null, { keepSqueezed: true }).length) {
     const ceiling = (await musicEngineStatus())?.limits.max_seconds ?? job.request.max_seconds;
@@ -318,6 +342,13 @@ async function finish(job: MusicJob, actor: PersonRow, songs: StackSong[], signa
     // MUSIC-GEN-20b: word timing runs in the background and never blocks or fails the song.
     void startWordTiming(job, bytes).catch(() => {});
   }
+}
+function withholdMinor(job: MusicJob, actor: PersonRow): void {
+  if (job.stackJob) void cancelOrDeleteMusic(job.stackJob);
+  job.fileId = null;
+  job.state = "failed"; job.stage = "ready"; job.errorCode = "content_withheld";
+  job.errorLine = laneOf(routeAudience(actor)) === "child" ? CHILD_CONTENT_LINE : TEEN_CONTENT_LINE;
+  job.lrc = null; job.timedWords = null; markKidWithheld(job.id); saveMusicJob(job);
 }
 /** SOUNDS-FOLLOW-01: a request for up to three takes runs them one after another (a person has one music job at a time); each take is its own job and Library item. A take that fails or is stopped ends the run. */
 async function startNextSoundTake(job: MusicJob, actor: PersonRow): Promise<void> {
@@ -468,6 +499,7 @@ export async function cancelMusicJob(actor: PersonRow, id: string): Promise<Musi
   if (!job || !["queued", "running"].includes(job.state)) return job;
   // Drop it from the live set first: a submit still in flight sees the stop when it returns and frees the Stack's copy.
   watching.get(job.id)?.abort(); liveJobs.delete(job.id);
+  if (job.request.transcribe) releaseKidForJob(job.id);
   job.state = "cancelled"; job.errorCode = null; job.errorLine = null; saveMusicJob(job);
   if (job.stackJob) await cancelOrDeleteMusic(job.stackJob);
   return job;

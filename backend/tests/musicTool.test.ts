@@ -262,7 +262,7 @@ describe("native music edits, versions and section timing", () => {
     expect(preset.result?.reply?.text).toContain("That voice has no sample to sing with.");
     for (const role of ["teen", "child"] as const) {
       const out = await runEditMusic({ state: { ...state, actor: { ...people.child, role } }, args: { track: parent.fileId, change: "voice_swap", voice: "companion" }, callId: role, spoken: false });
-      expect(out.result?.data).toMatchObject({ refused: "minor" });
+      expect(out.result?.data).toMatchObject({ refused: "minor_edit_source" });
     }
   });
   test("voice conversion down path leaves the plain failure line on the job", async () => {
@@ -364,7 +364,7 @@ describe("native music edits, versions and section timing", () => {
     for (const role of ["teen", "child"] as const) {
       const minor = { ...people.child, role };
       const out = await runEditMusic({ state: { ...state, actor: minor }, args: { track: upload.value.id, change: "instrumental" }, callId: "m", spoken: false });
-      expect(out.result?.data).toMatchObject({ refused: "minor" });
+      expect(out.result?.data).toMatchObject({ refused: "source_not_made_here" });
     }
     expect(fake.submitted).toHaveLength(0);
   });
@@ -387,7 +387,7 @@ describe("native music edits, versions and section timing", () => {
     const state = musicState(people.owner); const source = await generate(state);
     db.update(musicJobs).set({ request: JSON.stringify({ ...source.request, title: "naked child" }) }).where(eq(musicJobs.id, source.id)).run();
     const outcome = await runEditMusic({ state, args: { track: source.fileId, change: "remake" }, callId: "c", spoken: false });
-    expect(JSON.stringify(outcome.result)).toContain("minor_sexual"); expect(fake.submitted).toHaveLength(1);
+    expect(JSON.stringify(outcome.result)).toContain("music_policy"); expect(fake.submitted).toHaveLength(1);
   });
 });
 

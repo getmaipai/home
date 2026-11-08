@@ -17,16 +17,18 @@ export function settleMusicStatus(read: StackMusicStatus | null, previous: { at:
   return read === null && previous && now - previous.at < KEEP_READY_MS ? previous.status : read;
 }
 let forTests: StackMusicStatus | null | undefined;
+let latestTranscribeAvailable: boolean | null = null;
 const TTL_MS = 20_000;
 
 /** Test seam: the Stack's music status (null: no engine), or undefined to read for real. */
-export function __setMusicStatusForTests(status: StackMusicStatus | null | undefined): void { forTests = status; cached = null; }
+export function __setMusicStatusForTests(status: StackMusicStatus | null | undefined): void { forTests = status; latestTranscribeAvailable = status?.transcribe?.available === true; cached = null; }
 
 export async function musicEngineStatus(): Promise<StackMusicStatus | null> {
   if (forTests !== undefined) return forTests;
   if (!isStackConfigured()) return null;
   if (cached && Date.now() - cached.at < TTL_MS) return cached.status;
   const read = await musicStatus();
+  latestTranscribeAvailable = read?.transcribe?.available === true;
   const status = settleMusicStatus(read, lastReady, Date.now());
   if (read && musicStatusReady(read)) lastReady = { at: Date.now(), status: read };
   else if (read) lastReady = null;
@@ -34,7 +36,7 @@ export async function musicEngineStatus(): Promise<StackMusicStatus | null> {
   return status;
 }
 
-export function dropMusicStatusCache(): void { cached = null; lastReady = null; }
+export function dropMusicStatusCache(): void { cached = null; lastReady = null; latestTranscribeAvailable = null; }
 
 /** The engine is installed and able to take a job (setting up, idle or running all count: the job queues). */
 export function musicStatusReady(status: StackMusicStatus | null): boolean {
@@ -42,6 +44,8 @@ export function musicStatusReady(status: StackMusicStatus | null): boolean {
   if (status.state === "unsupported" || status.state === "off" || status.state === "not-installed") return false;
   return status.available === true;
 }
+/** Minors stay closed until the Stack confirms it can return an as-sung transcript. */
+export function musicTranscriptionAvailable(): boolean { return forTests !== undefined ? forTests?.transcribe?.available === true : latestTranscribeAvailable === true; }
 
 export async function musicEngineReady(): Promise<boolean> {
   return musicStatusReady(await musicEngineStatus());
@@ -69,5 +73,5 @@ export const musicTierOf = (quality: MusicRequest["quality"]): "standard" | "boo
 
 /** A ready status for tests. */
 export function readyMusicStatusForTests(overrides: Partial<StackMusicStatus> = {}): StackMusicStatus {
-  return { state: "idle", available: true, limits: { min_seconds: 10, max_seconds: 600 }, quality: ["quick", "detailed"], ...overrides };
+  return { state: "idle", available: true, limits: { min_seconds: 10, max_seconds: 600 }, quality: ["quick", "detailed"], transcribe: { available: true }, ...overrides };
 }

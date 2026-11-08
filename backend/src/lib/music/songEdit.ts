@@ -4,8 +4,11 @@
 import type { PersonRow } from "@/types";
 import { getMusicJobFor, musicVersions, plainMusicFailure, startMusicJob, type MusicJob } from "@/lib/music/jobs";
 import { musicEngineStatus, musicStatusReady } from "@/lib/music/ready";
-import { prepareMusicEdit } from "@/lib/music/tool";
-import { MUSIC_REFUSAL_LINE, refuseMusicPrompt } from "@/lib/music/policy";
+import { prepareMusicEdit, sizeSong } from "@/lib/music/tool";
+import { musicProtections } from "@/lib/music/policy";
+import { routeAudience } from "@/lib/pictures/audience";
+import { laneOf, reserveKid, releaseKid, CHILD_LIMIT_LINE } from "@/lib/pictures/lane";
+import { rewriteForChild } from "@/lib/contentPolicy/rewrite";
 import { likenessRefusal } from "@/lib/likeness";
 import { StackMusicError } from "@/lib/music/stack";
 
@@ -48,19 +51,42 @@ export async function runSongEdit(options: SongEditOptions): Promise<SongEditRes
   const ready = engine!;
   const early = options.beforePlan?.(ready);
   if (early) return refuse(early);
-  const plan = prepareMusicEdit(source, { track: source.fileId!, ...options.input(source) } as EditInput, ready.limits);
+  const editInput = options.input(source);
+  const audience = routeAudience(actor), lane = laneOf(audience);
+  if (lane === "child" && ["make_full", "extend"].includes(editInput.change)) return refuse({ status: 422, error: "Let's keep your song short." });
+  const plan = prepareMusicEdit(source, { track: source.fileId!, ...editInput } as EditInput, ready.limits);
   if (!plan.ok) return refuse({ status: 422, error: plan.line });
   options.patch?.(plan);
+  if (lane !== "adult") {
+    if (source.request.ownedFile || source.conversationId !== root.conversationId) return refuse({ status: 403, error: "You can change only your own song from this chat." });
+    if (lane === "child") {
+      const rewritten = await rewriteForChild({ kind: "song", description: plan.request.description, ...(plan.request.lyrics !== undefined ? { lyrics: plan.request.lyrics } : {}), ...(plan.request.title !== undefined ? { title: plan.request.title } : {}) });
+      if (!rewritten.ok) return refuse({ status: 403, error: rewritten.redirect });
+      plan.request.description = rewritten.description; plan.request.lyrics = rewritten.usedTemplate ? undefined : rewritten.lyrics;
+      plan.request.title = rewritten.title; plan.request.instrumental = rewritten.usedTemplate || plan.request.instrumental;
+      plan.request.length = "quick"; sizeSong(plan.request, plan.request.written_lyrics ?? plan.request.lyrics, { min_seconds: ready.limits.min_seconds, max_seconds: Math.min(60, ready.limits.max_seconds) });
+      plan.body.caption = plan.request.description; plan.body.lyrics = plan.request.lyrics; plan.body.instrumental = plan.request.instrumental;
+    }
+    plan.request.transcribe = true; plan.body.transcribe = true;
+  }
+  const protections = musicProtections(audience);
   const words = [plan.request.description, plan.request.lyrics, plan.request.written_lyrics, plan.request.title, plan.request.key, plan.request.language].filter(Boolean).join(" ");
-  const refusal = refuseMusicPrompt(words);
-  if (refusal) return refuse({ status: 403, error: MUSIC_REFUSAL_LINE[refusal] });
+  const combinedRefusal = protections.checkWords(words, "prompt");
+  if (combinedRefusal) return refuse({ status: 403, error: combinedRefusal });
+  for (const [text, field] of [[plan.request.description, "prompt"], [plan.request.lyrics, "lyrics"], [plan.request.written_lyrics, "lyrics"], [plan.request.title, "title"]] as const) {
+    if (text === undefined) continue;
+    const line = protections.checkWords(text, field);
+    if (line) return refuse({ status: 403, error: line });
+  }
   const likeness = likenessRefusal(actor, [plan.request.description, plan.request.lyrics, plan.request.written_lyrics, plan.request.title].filter(Boolean).join(" "));
   if (likeness) return refuse({ status: 403, error: likeness });
   const late = options.extraChecks?.(plan, ready);
   if (late) return refuse(late);
   plan.request.seconds = Math.min(plan.request.seconds, ready.limits.max_seconds);
   plan.body.duration_s = plan.request.seconds;
-  try { await startMusicJob({ actor, conversationId: source.conversationId, turnId: source.turnId, temporary: source.temporary, task: plan.task, request: plan.request, body: plan.body, parentFileId: source.fileId }); }
-  catch (error) { return refuse({ status: 503, error: plainMusicFailure(error instanceof StackMusicError ? error.code : "failed") }); }
+  const kidSlot = lane === "child" ? reserveKid(actor, "picture", 1, plan.request.description) : null;
+  if (lane === "child" && !kidSlot) return refuse({ status: 422, error: CHILD_LIMIT_LINE });
+  try { await startMusicJob({ actor, conversationId: source.conversationId, turnId: source.turnId, temporary: source.temporary, task: plan.task, request: plan.request, body: plan.body, parentFileId: source.fileId, kidUsageId: kidSlot }); }
+  catch (error) { releaseKid(kidSlot); return refuse({ status: 503, error: plainMusicFailure(error instanceof StackMusicError ? error.code : "failed") }); }
   return { ok: true, root };
 }

@@ -6,7 +6,7 @@ import { listVersions } from "@/lib/imageEdit";
 import { routeAudience } from "@/lib/pictures/audience";
 import { musicViewDenial } from "./policy";
 import { adultStylesAllowed, pictureDenial, refusePrompt } from "@/lib/pictures/policy";
-import { laneOf } from "@/lib/pictures/lane";
+import { laneOf, forceCartoon, CHILD_NEGATIVE_PROMPT } from "@/lib/pictures/lane";
 import { pictureEngineReady } from "@/lib/pictures/ready";
 import { QUICK_MODEL } from "@/lib/pictures/quality";
 import { startPictureJob, getPictureJob, type PictureJob } from "@/lib/pictures/jobs";
@@ -42,7 +42,9 @@ export async function startSongCover(actor: PersonRow, job: MusicJob, options: {
   try {
     const audience = routeAudience(actor);
     if (job.personId !== actor.id || !["queued", "running", "done"].includes(job.state) || job.temporary || !job.conversationId || !job.turnId || musicViewDenial(audience) || pictureDenial(audience)) return;
-    const prompt = options.prompt?.trim() || coverPromptFor(job.request);
+    const child = laneOf(audience) === "child";
+    const rawPrompt = child ? coverPromptFor(job.request) : options.prompt?.trim() || coverPromptFor(job.request);
+    const prompt = child ? forceCartoon(rawPrompt) : rawPrompt;
     if (refusePrompt(prompt, { lane: laneOf(audience) }) || !(await pictureEngineReady())) return;
     const current = getMusicJobFor(actor, job.id);
     if (!current) return;
@@ -53,7 +55,7 @@ export async function startSongCover(actor: PersonRow, job: MusicJob, options: {
     const source = versions.at(-1)?.id;
     // Covers stay conversation attachments so Files shows them like any made picture.
     const picture = await startPictureJob({ actor, conversationId: job.conversationId, turnId: job.turnId, temporary: false,
-      purpose: "cover", kind: "generate", prompt, body: { prompt, model: QUICK_MODEL, size: "1024x1024", n: 1, seed, audience: adultStylesAllowed() ? "adult" : "all-ages" },
+      purpose: "cover", kind: "generate", prompt, body: { prompt, ...(child ? { negative_prompt: CHILD_NEGATIVE_PROMPT } : {}), model: QUICK_MODEL, size: "1024x1024", n: 1, seed, audience: child || laneOf(audience) !== "adult" ? "all-ages" : adultStylesAllowed() ? "adult" : "all-ages" },
       ...(source ? { edit: { sourceId: source, label: "New cover", method: "instruct" as const } } : {}),
     });
     const latest = getMusicJobFor(actor, job.id);

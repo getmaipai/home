@@ -11,7 +11,7 @@ A Mac with 64 GB of memory or more, and the music model. An owner or admin gets 
 
 ## Make a song in Music
 
-Adults can also open **Music**, then **Create**, choose **Song**, and describe the song in the box. Pick **Lyrics** or **Instrumental**, **Quick** or **Full**, and any **Styles**, then press **Generate**. The song lands in **Library** in Music. For bands, albums, sounds and voices, see [Play music](music.md).
+Adults can also open **Music**, then **Create**, choose **Song**, and describe the song in the box. Pick **Lyrics** or **Instrumental**, **Quick** or **Full**, and any **Styles**, then press **Generate**. Teens and children can make songs in their own written chat when their picture lane is on and the music model can check sung words. Children get Quick songs only; Home may soften their request, and holds a song if its sung words cannot be checked. Other Music creation tools have their own access rules. The song lands in **Library** in Music. For bands, albums, sounds and voices, see [Play music](music.md).
 
 ## Quick and full songs
 
@@ -75,7 +75,7 @@ You can split only songs made in Home. Wait for the song to finish first.
 
 ## Who can make songs
 
-Adults can, on their own screen, in a written chat. Children and teens cannot make songs. Spoken answers, the TV and other shared screens never make songs. A guest cannot.
+Adults can make songs in a written chat on their own screen. Teens can too, and children can make short songs, when the picture lane is on and the music model can check sung words. Each child song uses one picture from that day's allowance. Children may get a gentler rewrite of their request. A song is held back if its sung words cannot be checked or do not pass the person's content rules. Spoken turns, the TV and other shared screens never make songs. A guest cannot. Children and teens can change only their own songs made in that chat; they cannot use uploads, stems or voice changes.
 
 Home blocks CSAM. The model decides whether to make other adult content, including music that imitates a real person's voice. Child and teen content filters remain in place. A CSAM candidate is withheld if the check cannot run.
 
@@ -85,12 +85,12 @@ Songs are made with a model whose makers say its songs may be used for money, fo
 
 ## Choose how it works (owner and admin)
 
-- **Settings**, **Pictures, videos and music**: **Adults can make songs**. Turn it off to stop all song making. **Song length** picks full (the default) or short songs when nobody says which.
+- **Settings**, **Pictures, videos and music**: the household song switch can stop song making. The picture lane switches also control songs for children. **Song length** picks full (the default) or short songs when nobody says which; children always get Quick songs.
 - **Settings**, **Models and storage**, **Music**: get the music model, or remove it to free space.
 
 ## Something not working?
 
-- **No song option.** Why: your Mac has less than 64 GB, the music model is not installed, you are not an adult, or music is off. Fix: ask an owner or admin to check Settings.
+- **No song option.** Why: your Mac has less than 64 GB, the music model is not installed or cannot check sung words, your picture lane is off, or music is off. Fix: ask an owner or admin to check Settings.
 - **Your song is waiting.** Why: picture, video and song jobs share a household queue. Fix: wait. Its card shows its place in line and it starts when its turn comes.
 - **"Not enough free memory for music right now".** Why: another big job has the memory. Fix: wait a few minutes, then ask again.
 - **The end of a song has no real words.** Why: the words were shorter than the song. Fix: ask for more words, or a shorter song.

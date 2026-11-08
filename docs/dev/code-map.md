@@ -458,7 +458,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/contentPolicy.ts` | CHILD_UNSAFE_TERMS, CHILD_IP_NAMES, createContentPolicyResolver, contentPolicyFor, filtersFor |
 | `backend/src/lib/contentPolicy/consumers.ts` | CHAT_OUTPUT_POLICY_KEY, SEARCH_POLICY_KEY, policyForConsumer |
 | `backend/src/lib/contentPolicy/dataSchema.ts` | policyWord, lanesSchema, floorsSchema |
-| `backend/src/lib/contentPolicy/rewrite.ts` | __setRewriteCompleteForTests, rewriteForChild, changedNote |
+| `backend/src/lib/contentPolicy/rewrite.ts` | __setRewriteCompleteForTests, CHILD_SONG_TEMPLATE, rewriteForChild, changedNote |
 | `backend/src/lib/continue/providers.ts` | mediaContinueRows |
 | `backend/src/lib/continue/registry.ts` | CONTINUE_BUDGET, registerContinueProvider, continueRows |
 | `backend/src/lib/conversationHistory.ts` | shownPicturesIn, turnOwnerId, applyHeardPrefix, __temporaryReplyForTests, outcomesForConversation, packageLatencyFromRecentOutcomes |
@@ -727,7 +727,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/music/models.ts` | MUSIC_ENGINE, KNOWN_MUSIC_MODELS, modelStampFor |
 | `backend/src/lib/music/objects.ts` | isMusicObjectRef, musicObjectOf, cardProvenance, threadMusicObject, readMusicBand, readMusicAlbum |
 | `backend/src/lib/music/policy.ts` | MUSIC_ENABLED_KEY, MUSIC_DENIAL_LINE, MUSIC_NOT_HERE_LINE, MUSIC_LENGTH_KEY, householdSongLength, householdAllowsMusic |
-| `backend/src/lib/music/ready.ts` | settleMusicStatus, __setMusicStatusForTests, musicEngineStatus, dropMusicStatusCache, musicStatusReady, musicEngineReady |
+| `backend/src/lib/music/ready.ts` | settleMusicStatus, __setMusicStatusForTests, musicEngineStatus, dropMusicStatusCache, musicStatusReady, musicTranscriptionAvailable |
 | `backend/src/lib/music/sections.ts` | resolveMusicSection, replaceMusicSection, secondsForWords, hookOf, sungSecondsFor, fitLyricsToLength |
 | `backend/src/lib/music/songEdit.ts` | SONG_GONE_LINE, runSongEdit |
 | `backend/src/lib/music/sound.ts` | SOUND_NOT_FOUND_LINE, resolveSound |

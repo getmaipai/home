@@ -6,7 +6,7 @@ import { resetDb } from "./reset-db";
 import { createBenchPeople } from "../scripts/bench/conversationRunner";
 import { householdAllowsMusic, musicDenial, musicsAllowed, refuseMusicPrompt, MUSIC_REFUSAL_LINE, type MusicAudience } from "@/lib/music/policy";
 import { musicAudienceOf, musicRefusalFor, runGenerateMusic, runEditMusic } from "@/lib/music/tool";
-import { __setMusicStatusForTests } from "@/lib/music/ready";
+import { __setMusicStatusForTests, readyMusicStatusForTests } from "@/lib/music/ready";
 import { setHouseholdSettingValue } from "@/lib/settings";
 import { policyNode } from "@/lib/turnMachine/nodes/policy";
 import { installFakeMusicStack, musicState } from "./musicFixture";
@@ -27,21 +27,24 @@ describe("the music age and surface gate", () => {
   test("a failed setting read uses the default without allowing a minor", () => {
     const unreadable = () => { throw new Error("unreadable"); };
     expect(householdAllowsMusic(unreadable)).toBe(true);
+    __setMusicStatusForTests(readyMusicStatusForTests({ transcribe: { available: false } }));
     expect(musicDenial(audience(people.child))).toBe("minor");
   });
-  test("children, teens and guests cannot, even with a caller claiming the adult band", () => {
+  test("teens and children inherit the picture lanes, while guests and a closed transcript lane stay denied", () => {
+    setHouseholdSettingValue("generation.kids", true);
     for (const role of ["child", "teen", "guest"] as const) {
       const actor = { ...people.child, role };
-      expect(musicDenial(audience(actor))).toBe(role === "guest" ? "guest" : "minor");
+      expect(musicDenial(audience(actor))).toBe(role === "guest" ? "guest" : null);
     }
-    expect(musicDenial(audience(people.owner, { band: "teen" }))).toBe("minor");
+    expect(musicDenial(audience(people.owner, { band: "teen" }))).toBeNull();
+    __setMusicStatusForTests(readyMusicStatusForTests({ transcribe: { available: false } }));
+    expect(musicDenial(audience(people.child))).toBe("minor");
   });
-  test("the picture lanes that open pictures to teens and children never open music", () => {
-    // Owner ruling 2026-10-17 lets a teen make pictures and a child make cartoons (kid lane on by default); music stays adults only.
+  test("music opens with the same picture lanes when sung-word checking is available", () => {
     setHouseholdSettingValue("generation.kids", true);
     for (const role of ["child", "teen"] as const) {
       const actor = { ...people.child, role };
-      expect(musicDenial(audience(actor, { band: role }))).toBe("minor");
+      expect(musicDenial(audience(actor, { band: role }))).toBeNull();
     }
   });
   test("spoken, glance, shared TV, robot, pod and phone surfaces cannot", () => {
@@ -85,7 +88,7 @@ describe("the absolute lines before a job exists", () => {
       db.update(peopleTable).set({ role: "teen" }).where(eq(peopleTable.id, state.actor.id)).run();
       state.actor = { ...state.actor, role: "teen" };
       result = await policyNode(state, { calls: [{ id: "c", tool, args: { description: "a song" } }] }, new AbortController().signal);
-      expect(result.output.entries[0]?.decision).toEqual({ allow: false, reason: "music_not_here" });
+      expect(result.output.entries[0]?.decision).toEqual({ allow: true });
     }
     expect(fake.submitted).toHaveLength(0);
   });

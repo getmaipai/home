@@ -1,14 +1,18 @@
 // MUSIC-GEN-03: one age and surface gate, inherited from pictures. No setting lifts the minor line.
 import { getHouseholdSettingValue } from "@/lib/settings";
 import { pictureDenial, promptViolatesMinorLine, type PictureAudience } from "@/lib/pictures/policy";
-import { laneOf } from "@/lib/pictures/lane";
+import { laneOf, TEEN_CONTENT_LINE, CHILD_CONTENT_LINE } from "@/lib/pictures/lane";
+import { refusePrompt } from "@/lib/pictures/policy";
+import { contentPolicyFor } from "@/lib/contentPolicy";
+import { musicTranscriptionAvailable } from "./ready";
+import { CHILD_SONG_TEMPLATE } from "@/lib/contentPolicy/rewrite";
 
 export const MUSIC_ENABLED_KEY = "generation.music.enabled";
 export type MusicAudience = PictureAudience;
 export type MusicDenial = "guest" | "minor" | "spoken" | "shared_screen" | "household_off";
 export const MUSIC_DENIAL_LINE: Record<MusicDenial, string> = {
   guest: "Guests can't make songs. Ask someone in the household to sign you in.",
-  minor: "Making songs is off for children and teens for now.",
+  minor: "Songs are not ready for children and teens on this computer yet.",
   spoken: "Songs can only be made in a written chat on your own screen.",
   shared_screen: "Songs can only be made on your own screen, not a shared one.",
   household_off: "Making songs is switched off for adults in this home. An admin can switch it on in Settings, Pictures, videos and music.",
@@ -25,10 +29,8 @@ export function householdAllowsMusic(read: (key: string) => unknown = getHouseho
 /** Who may open songs that already exist (stop, card, play, download): the age and surface lines, never the household switch. */
 export function musicViewDenial(audience: MusicAudience): Exclude<MusicDenial, "household_off"> | null {
   if (audience.actor.role === "guest") return "guest";
-  // Music is for adults only (design note section 9). Pictures and videos now open a teen lane and a child cartoon lane
-  // (owner ruling 2026-10-17); music does not inherit them: the stricter of the turn's band and the person's own must be
-  // adult, whatever any picture setting says. A parent's per-child music switch is MUSIC-GEN-13, not built.
-  if (laneOf(audience) !== "adult") return "minor";
+  const lane = laneOf(audience);
+  if (lane !== "adult" && !musicTranscriptionAvailable()) return "minor";
   const base = pictureDenial(audience);
   return base === "guest" || base === "minor" || base === "spoken" || base === "shared_screen" ? base : null;
 }
@@ -42,6 +44,24 @@ export const MUSIC_REFUSAL_LINE: Record<MusicRefusal, string> = {
   minor_sexual: "I can't make that. Songs with sexual content about children are never allowed.",
 };
 export function refuseMusicPrompt(text: string): MusicRefusal | null {
-  if (promptViolatesMinorLine(text, "adult")) return "minor_sexual";
-  return null;
+  return musicProtections({ actor: { id: "adult-policy", role: "adult" } as MusicAudience["actor"], band: "adult", surface: "chat", surfaceClass: "written", spoken: false }).checkWords(text, "prompt") ? "minor_sexual" : null;
+}
+export function musicProtections(audience: MusicAudience): { lane: ReturnType<typeof laneOf>; checkWords(text: string, field: "prompt" | "lyrics" | "title" | "transcript"): string | null } {
+  let lane: ReturnType<typeof laneOf>;
+  try { lane = laneOf(audience); } catch { lane = audience.actor.role === "adult" || audience.actor.role === "owner" || audience.actor.role === "admin" ? "adult" : "child"; }
+  let policy: ReturnType<typeof contentPolicyFor> | null = null;
+  if (lane !== "adult") { try { policy = contentPolicyFor(audience); } catch { /* closed below */ } }
+  return { lane, checkWords(text, field) {
+    try {
+      if (promptViolatesMinorLine(text, lane)) return MUSIC_REFUSAL_LINE.minor_sexual;
+      if (lane !== "adult") {
+        const floor = lane === "child" && text === CHILD_SONG_TEMPLATE ? null : refusePrompt(text, { lane });
+        if (floor) return floor === "teen_content" ? TEEN_CONTENT_LINE : floor === "child_content" ? CHILD_CONTENT_LINE : MUSIC_REFUSAL_LINE.minor_sexual;
+        if (!policy) return lane === "teen" ? TEEN_CONTENT_LINE : CHILD_CONTENT_LINE;
+        const result = policy.check(text, field);
+        if (result) return result.line;
+      }
+      return null;
+    } catch { return lane === "adult" ? MUSIC_REFUSAL_LINE.minor_sexual : lane === "teen" ? TEEN_CONTENT_LINE : CHILD_CONTENT_LINE; }
+  } };
 }

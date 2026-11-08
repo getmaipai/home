@@ -609,6 +609,10 @@ lookup with its gates, receipts, band re-check and one-per-second bucket (`lib/m
 
 ### 18.7 Teens and children make songs; a child's request is rewritten, not refused (owner, 2026-10-18; MUSIC-GEN-22)
 
+#### As built (2026-11-08)
+
+Minor lanes use the picture audience and switches, written chat surface, the shared music protections seam, child rewrite, Quick-only child generation, Stack transcription availability, and a finished transcript check before release. The Stack must report `transcribe.available: true`; otherwise the minor lane stays closed. Minor songs request transcription, and an unreadable, empty or blocked sung transcript withholds the song with the lane's fixed line. Child covers use the forced cartoon prompt and all-ages audience. The child's song consumes one picture allowance unit. Adults are not transcribed and receive only the absolute CSAM check: the proposed filtered-adult as-sung check is dropped under RULES.md rules 0 and 10.
+
 Jesse: "kids can only make kid friendly content - this applies to everything including music, for example if a kid typed 'make a heavy rock
 song about scary halloween' we just modify that prompt to perhaps 'kid friendly happy light rock wiggles type song about scary halloween (but
 not too scary)'". This replaces section 9's "Children and teens: off" and opens music in the same lanes as pictures and videos, as RULES.md rule 0

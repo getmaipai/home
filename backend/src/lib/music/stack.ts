@@ -3,7 +3,7 @@ import type { MusicRequest } from "./types";
 import { getStackUrl } from "@/lib/stackEngine";
 import { createStackHttp } from "@/lib/stack/http";
 export type MusicState = "queued" | "running" | "done" | "failed" | "cancelled";
-export interface StackSong { url?: string; duration_s: number; seed: number; lrc?: string; bpm?: number; key?: string; model?: string }
+export interface StackSong { url?: string; duration_s: number; seed: number; lrc?: string; transcript?: string | null; bpm?: number; key?: string; model?: string }
 /** What the Stack lists for a finished split: each stem by name, fetched at its url; every stem is as long as the song. */
 export interface StackStem { url: string; stem: "vocals" | "drums" | "bass" | "other" }
 export interface StackStemsStatus { available: boolean; state: string; install?: unknown }
@@ -13,6 +13,7 @@ export interface StackVoiceConvertJob { state: MusicState; stage?: string | null
 export interface StackMusicStatus {
   available: boolean; state: string; limits: { min_seconds: number; max_seconds: number };
   quality: string[]; default_quality?: "quick" | "detailed" | "max"; install?: unknown;
+  transcribe?: { available: boolean };
   /** MUSIC-MAX-01: the Max maker (XL SFT). The Stack lists `max` in `quality` as soon as it offers it; without the models installed it runs the song as Boost. */
   max_model?: { id: string; installed: boolean; models?: unknown[]; remaining_bytes?: number | null } | null;
 }
@@ -24,12 +25,13 @@ export interface MusicBody {
   source?: string; source_sha256?: string; from_s?: number; to_s?: number; add_s?: number; at?: "start" | "end";
   strength?: number; edit?: { op: "trim" | "fade" | "loudness"; from_s?: number; to_s?: number; seconds?: number; where?: "in" | "out" | "both"; lufs?: number };
   /** Stems only: an audio file the person owns, which the Stack may split and nothing else. */ origin?: "owned_file";
+  transcribe?: boolean;
   timeout_ms: number;
 }
 export function musicBody(request: MusicRequest, task: MusicBody["task"]): Omit<MusicBody, "timeout_ms"> {
   return { task, caption: request.description, lyrics: request.lyrics, instrumental: request.instrumental, duration_s: request.seconds,
     bpm: request.bpm, key: request.key, language: request.language, quality: request.quality ?? "quick", seed: request.seed,
-    from_s: request.from_s, to_s: request.to_s, add_s: request.add_s, at: request.at, strength: request.strength, edit: request.edit };
+    from_s: request.from_s, to_s: request.to_s, add_s: request.add_s, at: request.at, strength: request.strength, edit: request.edit, transcribe: request.transcribe };
 }
 
 export interface StackMusicJob {

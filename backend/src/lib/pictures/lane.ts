@@ -142,6 +142,8 @@ export function reserveKid(actor: PersonRow, kind: KidKind, units: number, promp
   });
 }
 export function releaseKid(id: string | null): void { if (id) db.delete(kidUsage).where(eq(kidUsage.id, id)).run(); }
+/** Releases a song allowance reservation when its job fails before delivery. */
+export function releaseKidForJob(ref: string): void { db.delete(kidUsage).where(eq(kidUsage.ref, ref)).run(); }
 /** A teen's edit of a photo they say is of themselves goes in the admins' activity list, allowed or refused (it takes nothing from any allowance: zero units). */
 export function noteTeenPhotoEdit(actor: PersonRow, prompt: string, outcome: "asked" | "withheld", now = new Date()): void {
   try {

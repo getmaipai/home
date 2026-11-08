@@ -9,7 +9,7 @@
     "mode": "conditional",
     "gate": "musicAllowed",
     "bench_row": "music-tool",
-    "reason": "adult on their own written screen with music enabled and an available Stack music model"
+    "reason": "a household member on their own written screen with music enabled and an available Stack music model that can check sung words for minors"
   },
   "author": "MaiPai",
   "license": "AGPL-3.0",
@@ -121,7 +121,7 @@
   "platforms": [
     "home"
   ],
-  "min_role": "adult",
+  "min_role": "child",
   "consequential": false,
   "offline": "full",
   "config": [],

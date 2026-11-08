@@ -69,7 +69,7 @@ test("a successful music start replaces completion claims with only the started 
     });
   }
 });
-test("children, teens, guests, spoken turns, glance screens and TVs never earn the music offer", async () => {
+test("children and teens can earn the music offer only on their own written chat screen", async () => {
   await withStub({ calls: () => undefined, reply: () => "Hello." }, async (seen) => {
     for (const [actor, surface, options] of [
       [people.child, "chat", {}], [{ ...people.owner, role: "teen" }, "chat", {}], [{ ...people.owner, role: "guest" }, "chat", {}],
@@ -78,7 +78,9 @@ test("children, teens, guests, spoken turns, glance screens and TVs never earn t
       const before = seen.length;
       await runTurnNext(actor, surface, "hello", options);
       const offered = seen.slice(before).flatMap(names);
-      expect(offered).not.toContain("generate_music"); expect(offered).not.toContain("edit_music");
+      const minorWritten = actor.role === "child" || actor.role === "teen";
+      expect(offered.includes("generate_music")).toBe(minorWritten && surface === "chat" && !options.spoken);
+      expect(offered).not.toContain("edit_music");
     }
   });
 });

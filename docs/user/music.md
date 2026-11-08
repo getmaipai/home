@@ -12,7 +12,7 @@ description: Play songs from your home library, find music, make playlists, use 
 A column on the left has two groups.
 
 - **Listen:** **Listen now**, **Radio**, **Songs**, **Albums**, **Artists**, **Playlists** and **Liked**.
-- **Create** (adults only): **Create**, **Studio**, **Stems**, **Remix and edit** and **Library**.
+- **Create**: adults, teens and children can make songs in their own written chat when the picture lane is on and this computer can check sung words. Children make short songs; their request may be softened, and songs whose words cannot be checked are held back. Stems and uploaded audio edits are for adults. **Studio**, **Remix and edit** and **Library** have their own access rules.
 
 **Search Music** at the top finds songs, artists, albums, playlists and stations. You can also browse by genre.
 
@@ -58,7 +58,7 @@ Children and teens never see or play songs marked explicit. See [Kids and media]
 
 ## Make a band, an album, a sound or a voice
 
-Adults only. Open **Create**. A row of choices asks what to make: **Song**, **Band**, **Album**, **Style**, **Sound** and **Voice**. For making a song, see [Make songs](songs.md).
+Open **Create**. Adults can use the creation choices. Teens and children can make songs in their own written chat when their picture lane is on and the music model can check sung words; children get Quick songs only. For song rules, see [Make songs](songs.md).
 
 - **Band:** a name, a look and a sound. Home draws the pictures in chat.
 - **Album:** a title, a look for the cover and a sound. Home adds the cover and the songs in chat.
@@ -66,9 +66,9 @@ Adults only. Open **Create**. A row of choices asks what to make: **Song**, **Ba
 - **Sound:** type a sound, such as a wooden door creaking open, and Home makes it. Your sounds show in the same page. See [Sounds](#sounds) for length, takes, loops and adding a sound to a song.
 - **Voice:** make a voiceover from a script, or change the voice in an audio or video file. Pick a household voice with a saved sample.
 
-You can fill the form, or ask in chat, for example "Make an album called Porch Light". Open **Library** to see everything you made. Choose one to change it, or change it right in chat from its card.
+Adults can fill the form, or ask in chat, for example "Make an album called Porch Light". Open **Library** to see everything you made. Choose one to change it, or change it right in chat from its card. Children and teens can change only their own songs made in that chat; upload edits, stems and voice changes are not available to them.
 
-Every change keeps the earlier version, so nothing is lost. Children and teens do not see these pages.
+Every change keeps the earlier version, so nothing is lost. Song access follows the same age and surface checks wherever it is shown.
 
 ### Make a song like this one
 

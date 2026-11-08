@@ -9,7 +9,7 @@
     "mode": "conditional",
     "gate": "musicEditAllowed",
     "bench_row": "music-edit-tool",
-    "reason": "adult on their own written screen with music enabled and an available Stack music model; this conversation has a song or an attached audio file"
+    "reason": "a household member on their own written screen with music enabled and an available Stack music model; minors may edit only their own songs made in this chat"
   },
   "author": "MaiPai",
   "license": "AGPL-3.0",
@@ -183,7 +183,7 @@
   "platforms": [
     "home"
   ],
-  "min_role": "adult",
+  "min_role": "child",
   "consequential": false,
   "offline": "full",
   "config": [],

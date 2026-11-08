@@ -6,7 +6,9 @@ import type { TurnState, ToolExecutionOutcome } from "@/lib/turnMachine/contract
 import { outcomeOf } from "@/lib/turnContext";
 import { MUSIC_STARTED_LINE } from "@/lib/mediaClaims";
 import { turnAgeBand } from "@/lib/turnMachine/speaker";
-import { musicDenial, MUSIC_DENIAL_LINE, MUSIC_REFUSAL_LINE, refuseMusicPrompt, type MusicAudience } from "./policy";
+import { musicDenial, MUSIC_DENIAL_LINE, MUSIC_REFUSAL_LINE, musicProtections, type MusicAudience } from "./policy";
+import { rewriteForChild, changedNote } from "@/lib/contentPolicy/rewrite";
+import { laneOf, reserveKid, releaseKid, CHILD_LIMIT_LINE } from "@/lib/pictures/lane";
 import { musicEngineStatus, musicStatusReady, musicMaxOffered, musicMaxInstalled, musicQualityFor, musicTierOf, MUSIC_MAX_NOT_INSTALLED_LINE } from "./ready";
 import { plainMusicFailure, prepareStemsJob, prepareOwnedStemsJob, readMusicFile, resolveSongSource, startMusicJob } from "./jobs";
 import { resolveMusicSection, replaceMusicSection, fitLyricsToLength, secondsForWords, hookOf } from "./sections";
@@ -65,9 +67,18 @@ export async function startOwnedMusicPartsJob(input: { actor: PersonRow; source:
 export function musicRefusalFor(audience: MusicAudience, args: Record<string, unknown>) {
   const denied = musicDenial(audience);
   if (denied) return { kind: "denied" as const, why: denied, line: MUSIC_DENIAL_LINE[denied] };
-  const text = [args.description, args.lyrics, args.title, args.key, args.language].filter((s) => typeof s === "string").join(" ");
-  const refusal = refuseMusicPrompt(text);
-  return refusal ? { kind: "prompt" as const, why: refusal, line: MUSIC_REFUSAL_LINE[refusal] } : null;
+  const lane = laneOf(audience);
+  if (lane === "child") return null; // rewriteForChild screens hard lines before any child floor.
+  const protections = musicProtections(audience);
+  const combined = [args.description, args.lyrics, args.title, args.key, args.language].filter((value): value is string => typeof value === "string").join(" ");
+  const combinedLine = protections.checkWords(combined, "prompt");
+  if (combinedLine) return { kind: "prompt" as const, why: combinedLine === MUSIC_REFUSAL_LINE.minor_sexual ? "minor_sexual" : "music_policy", line: combinedLine };
+  for (const [value, field] of [[args.description, "prompt"], [args.lyrics, "lyrics"], [args.title, "title"], [args.key, "prompt"], [args.language, "prompt"]] as const) {
+    if (typeof value !== "string") continue;
+    const line = protections.checkWords(value, field);
+    if (line) return { kind: "prompt" as const, why: line === MUSIC_REFUSAL_LINE.minor_sexual ? "minor_sexual" : "music_policy", line };
+  }
+  return null;
 }
 export type MusicToolInput = {
   state: Pick<TurnState, "actor" | "persona" | "surface" | "speakerEvidence" | "deviceId" | "planBasis" | "plan" | "conversationId" | "turnId" | "temporary" | "ephemeral" | "audio">;
@@ -232,15 +243,20 @@ async function runMusic(input: MusicToolInput, editing: boolean): Promise<ToolEx
   const { state, args, callId } = input; const packageId = editing ? EDIT_MUSIC_TOOL_ID : GENERATE_MUSIC_TOOL_ID;
   const failed = (code: string, kind: "bad_arguments" | "unavailable" | "errored") => outcomeOf({ callId, packageId, status: "failed", via: "tool_call", args, errorCode: code, failureKind: kind, durationMs: 0 });
   const refused = (line: string, why: string) => outcomeOf({ callId, packageId, status: "succeeded", via: "tool_call", args, durationMs: 0, result: { reply: { text: `${REFUSED_PREFIX}${line}` }, data: { refused: why }, actions: [] } });
+  await musicEngineStatus();
   const musicAudience = musicAudienceOf(state, input.spoken);
-  const refusal = musicRefusalFor(musicAudience, args) ?? likenessCallRefusal(musicAudience.actor, args);
+  const lane = laneOf(musicAudience);
+  const refusal = (lane === "child" ? null : musicRefusalFor(musicAudience, args)) ?? likenessCallRefusal(musicAudience.actor, args);
   if (refusal) return refused(refusal.line, refusal.why);
   const temporary = state.temporary === true || state.ephemeral === true;
   const actor = state.actor as PersonRow;
   let engine: Awaited<ReturnType<typeof musicEngineStatus>> = null;
+  let childNote = "";
   let request: MusicRequest; let task: MusicTask; let body: Omit<MusicBody, "timeout_ms">; let parentFileId: string | null = null;
   if (editing) {
     const parsed = editMusicArgs.safeParse(args); if (!parsed.success) return failed("bad_arguments", "bad_arguments");
+    if (lane !== "adult" && (parsed.data.track === "attached" || ["stems", "voice_swap", "parts"].includes(parsed.data.change))) return refused("You can change only your own song from this chat.", "minor_edit_source");
+    if (lane === "child" && ["make_full", "extend"].includes(parsed.data.change)) return refused("Let's keep your song short.", "child_length");
     if (parsed.data.change === "parts") {
       const source = resolveSongSource(actor, parsed.data.track === "attached" ? state.audio?.[0]?.id ?? "" : parsed.data.track, state.conversationId, temporary);
       if (!source?.fileId) return refused(plainMusicFailure("source_not_made_here"), "source_not_made_here");
@@ -257,6 +273,7 @@ async function runMusic(input: MusicToolInput, editing: boolean): Promise<ToolEx
     }
     const source = resolveSongSource(actor, parsed.data.track === "attached" ? state.audio![0]!.id : parsed.data.track, state.conversationId, temporary);
     if (!source?.fileId) return refused(plainMusicFailure("source_not_made_here"), "source_not_made_here");
+    if (lane !== "adult" && source.request.ownedFile) return refused("You can change only your own song from this chat.", "source_not_made_here");
     if (parsed.data.change === "voice_swap") {
       const requestedVoice = parsed.data.voice!;
       let voiceId = requestedVoice;
@@ -287,6 +304,16 @@ async function runMusic(input: MusicToolInput, editing: boolean): Promise<ToolEx
     const plan = prepareMusicEdit(source, parsed.data, engine!.limits);
     if (!plan.ok) return refused(plan.line, "section_or_range");
     ({ request, task, body } = plan); parentFileId = source.request.ownedFile ? null : source.fileId;
+    if (lane === "child") {
+      const rewrite = await rewriteForChild({ kind: "song", description: request.description, ...(request.lyrics !== undefined ? { lyrics: request.lyrics } : {}), ...(request.title !== undefined ? { title: request.title } : {}) });
+      if (!rewrite.ok) return refused(rewrite.redirect, "child_content");
+      request.description = rewrite.description; request.lyrics = rewrite.usedTemplate ? undefined : rewrite.lyrics;
+      request.title = rewrite.title; request.instrumental = rewrite.usedTemplate || request.instrumental;
+      childNote = rewrite.usedTemplate ? "The words could not be checked, so this song has music only." : rewrite.changed ? changedNote("song", true, false) : "";
+      request.length = "quick"; sizeSong(request, request.written_lyrics ?? request.lyrics, { min_seconds: engine!.limits.min_seconds, max_seconds: Math.min(60, engine!.limits.max_seconds) });
+      body.caption = request.description; body.lyrics = request.lyrics; body.instrumental = request.instrumental;
+    }
+    if (lane !== "adult") { request.transcribe = true; body.transcribe = true; }
     // Only a task that edits the audio itself sends it; a remake or variation is a fresh text2music job and reads and hashes nothing.
     if (body.task !== "text2music") {
       const file = readMusicFile(actor, source, source.fileId);
@@ -298,9 +325,18 @@ async function runMusic(input: MusicToolInput, editing: boolean): Promise<ToolEx
     engine = await musicEngineStatus();
     if (!musicStatusReady(engine)) return failed("no_engine", "unavailable");
     const parsed = generateMusicArgs.safeParse(args); if (!parsed.success) return failed("bad_arguments", "bad_arguments");
-    const sound = resolveSound(actor, { song_style: parsed.data.song_style, band: parsed.data.band ?? input.band?.id, album: parsed.data.album ?? input.album?.id });
+    let values = parsed.data;
+    if (lane === "child") {
+      const rewrite = await rewriteForChild({ kind: "song", description: values.description, ...(values.lyrics !== undefined ? { lyrics: values.lyrics } : {}), ...(values.title !== undefined ? { title: values.title } : {}) });
+      if (!rewrite.ok) return refused(rewrite.redirect, "child_content");
+      values = { ...values, description: rewrite.description, lyrics: rewrite.usedTemplate ? undefined : rewrite.lyrics, title: rewrite.title, instrumental: rewrite.usedTemplate || values.instrumental };
+      childNote = rewrite.usedTemplate ? "The words could not be checked, so this song has music only." : rewrite.changed ? changedNote("song", true, false) : "";
+      if (values.length === "full" || values.seconds !== undefined && values.seconds >= 150) return refused("Let's make a short song instead.", "child_length");
+      values.length = "quick";
+    }
+    const sound = resolveSound(actor, { song_style: values.song_style, band: values.band ?? input.band?.id, album: values.album ?? input.album?.id });
     if (!sound.ok) return refused(sound.line, "sound_not_available");
-    const value = applySound(parsed.data, sound.value.style);
+    const value = applySound(values, sound.value.style);
     const lyrics = value.instrumental ? "[Instrumental]" : value.lyrics;
     const length: SongLength = value.length ?? (value.seconds !== undefined && value.seconds >= 150 ? "full" : householdSongLength());
     request = { description: value.description, lyrics, title: value.title,
@@ -309,31 +345,36 @@ async function runMusic(input: MusicToolInput, editing: boolean): Promise<ToolEx
     const band = input.band ?? sound.value.band;
     if (band) request.band = band;
     if (sound.value.album) request.album = sound.value.album;
-    sizeSong(request, value.lyrics, engine!.limits, value.seconds);
+    sizeSong(request, value.lyrics, lane === "child" ? { min_seconds: engine!.limits.min_seconds, max_seconds: Math.min(60, engine!.limits.max_seconds) } : engine!.limits, value.seconds);
     task = "text2music"; body = musicBody(request, "text2music");
+    if (lane !== "adult") { request.transcribe = true; body.transcribe = true; }
   }
   // A request stored before the Stack named a default (or an edit of an older song) takes the Stack's default now.
-  request.max_seconds = engine!.limits.max_seconds;
+  request.max_seconds = lane === "child" ? Math.min(60, engine!.limits.max_seconds) : engine!.limits.max_seconds;
   // TIER-HOME-03: the typed tier argument of a new song. Boost is the engine's Detailed maker when it has one; a lowered request says why in one line.
   // MUSIC-MAX-01: Max is the engine's XL SFT maker, granted exactly as Boost is (authorizeTier inside tierArgument); asked while the models are not installed it runs, and says it ran, as Boost.
-  const tierAsked = editing ? null : tierArgument({ person: actor, category: "music", arg: args.tier, band: musicAudienceOf(state, input.spoken).band, maxAvailable: musicMaxOffered(engine) });
+  const tierAsked = editing || lane === "child" ? null : tierArgument({ person: actor, category: "music", arg: args.tier, band: musicAudienceOf(state, input.spoken).band, maxAvailable: musicMaxOffered(engine) });
   if (tierAsked?.tier) request.quality = musicQualityFor(engine, tierAsked.tier);
-  request.quality ??= defaultQualityOf(engine!); body.quality = request.quality;
+  request.quality = lane === "child" ? "quick" : request.quality ?? defaultQualityOf(engine!); body.quality = request.quality;
   request.tier = musicTierOf(request.quality);
   const maxNotInstalled = tierAsked?.tier === "max" && musicMaxOffered(engine) && !musicMaxInstalled(engine);
   const tierLine = [tierAsked?.line, maxNotInstalled ? MUSIC_MAX_NOT_INSTALLED_LINE : null].filter(Boolean).join(" ");
   // Check the effective request, including inherited words and a section replacement, before any job exists.
-  const inherited = refuseMusicPrompt([request.description, request.lyrics, request.written_lyrics, request.title, request.key, request.language].join(" "));
-  if (inherited) return refused(MUSIC_REFUSAL_LINE[inherited], inherited);
+  const protections = musicProtections(musicAudience);
+  const inherited = [ [request.description, "prompt"], [request.lyrics, "lyrics"], [request.written_lyrics, "lyrics"], [request.title, "title"] ] as const;
+  for (const [text, field] of inherited) { const line = text ? protections.checkWords(text, field) : null; if (line) return refused(line, "music_policy"); }
   if ((request.lyrics?.length ?? 0) > 4000 || (request.written_lyrics?.length ?? 0) > 4000) return failed("bad_arguments", "bad_arguments");
   if (request.seconds > engine!.limits.max_seconds || (body.task === "text2music" && request.seconds < Math.max(10, engine!.limits.min_seconds))) return failed("too_long_or_short", "bad_arguments");
+  const kidSlot = lane === "child" ? reserveKid(actor, "picture", 1, request.description) : null;
+  if (lane === "child" && !kidSlot) return refused(CHILD_LIMIT_LINE, "child_limit");
   try {
-    const job = await startMusicJob({ actor, conversationId: state.conversationId, turnId: state.turnId, companionId: state.persona?.id ?? null, temporary, task, request, body, parentFileId });
+    const job = await startMusicJob({ actor, conversationId: state.conversationId, turnId: state.turnId, companionId: state.persona?.id ?? null, temporary, task, request, body, parentFileId, kidUsageId: kidSlot });
     return outcomeOf({ callId, packageId, status: "succeeded", via: "tool_call", args, durationMs: 0, result: {
-      reply: { text: `${songOnItsWay(request)}${tierLine ? ` ${tierLine}` : ""}` },
+      reply: { text: `${songOnItsWay(request)}${childNote ? ` ${childNote}` : ""}${tierLine ? ` ${tierLine}` : ""}` },
       data: { musicJobId: job.id }, actions: [],
     } });
   } catch (error) {
+    releaseKid(kidSlot);
     const code = error instanceof StackMusicError ? error.code : "failed";
     if (code === "already_making") return refused(plainMusicFailure(code), code);
     // Rule 6: no raw Stack text, arguments or user words enter failure details for the model.

@@ -135,9 +135,16 @@ describe("song covers", () => {
     expect(card.cover_versions).toHaveLength(3); expect(card.cover_url).toContain(done.coverFileId!);
     for (const role of ["teen", "child"] as const) {
       db.update(people).set({ role }).where(eq(people.id, actor.id)).run(); invalidateSessionCacheForPerson(actor.id);
-      expect((await client.post(`/api/music/jobs/${job.id}/cover`, {})).status).toBe(403);
+      const count = pictures.submitted.length;
+      expect((await client.post(`/api/music/jobs/${job.id}/cover`, {})).status).toBe(200);
+      await until(() => pictures.submitted.length > count);
+      await until(() => { const current = getMusicJobFor(actor, job.id); const cover = current?.coverJobId ? getPictureJob(actor, current.coverJobId) : null; return !!cover && cover.state !== "queued" && cover.state !== "running"; });
+      if (role === "child") {
+        expect(pictures.submitted.at(-1)?.prompt).toContain("children's cartoon illustration");
+        expect(pictures.submitted.at(-1)?.negative_prompt).toContain("photograph");
+      }
     }
-    expect(pictures.submitted).toHaveLength(2);
+    expect(pictures.submitted).toHaveLength(4);
   });
   test("prompted song edits reuse the music job and keep the original version, title and lyrics", async () => {
     const { actor, client } = await owner(); const original = await song(actor);

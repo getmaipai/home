@@ -282,13 +282,17 @@ describe("music routes", () => {
     expect(unavailable.status).toBe(503);
     expect((await unavailable.json() as { error: string }).error).toContain("Try again");
   });
-  test("every route requires authentication, and refuses a child, teen or guest even when they own the song", async () => {
+  test("read routes follow the minor lane, while guests remain denied", async () => {
     const { client, actor } = await owner(); const { job } = await song(actor);
     for (const route of entrances(job)) expect((await new TestClient().request(route.path, route)).status).toBe(401);
-    for (const role of ["child", "teen", "guest"] as const) {
+    for (const role of ["child", "teen"] as const) {
       db.update(people).set({ role }).where(eq(people.id, actor.id)).run(); invalidateSessionCacheForPerson(actor.id);
-      for (const route of entrances(job)) expect((await client.request(route.path, route)).status).toBe(403);
+      expect((await client.get(`/api/music/jobs/${job.id}`)).status).toBe(200);
+      expect((await client.get(`/api/music/jobs/${job.id}/files/${job.fileId}`)).status).toBe(200);
+      expect((await client.post(`/api/music/jobs/${job.id}/stems`, { file_id: job.fileId })).status).toBe(403);
     }
+    db.update(people).set({ role: "guest" }).where(eq(people.id, actor.id)).run(); invalidateSessionCacheForPerson(actor.id);
+    expect((await client.get(`/api/music/jobs/${job.id}`)).status).toBe(403);
   });
   test("another adult, including an admin, cannot read, stop, select or export the owner's song", async () => {
     const { client, actor } = await owner(); const { job } = await song(actor);
@@ -419,10 +423,11 @@ describe("Make a song page routes", () => {
     expect((await response.json() as { error: string }).error).toContain("No music model is installed");
     __setMusicStatusForTests(undefined);
   });
-  test("a teen cannot make one from the page", async () => {
+  test("a teen can make one from the page when the Stack can transcribe it", async () => {
     const { client, actor } = await owner();
     db.update(people).set({ role: "teen" }).where(eq(people.id, actor.id)).run(); invalidateSessionCacheForPerson(actor.id);
-    expect((await client.post("/api/music/songs", { idea: "a song about rain" })).status).toBe(403);
+    expect((await client.post("/api/music/songs", { idea: "a song about rain" })).status).toBe(201);
+    expect(fake.submitted.at(-1)?.transcribe).toBe(true);
   });
   test("the edit_music chat tool renames a song too (the same change the page's Edit tab makes)", async () => {
     const { actor } = await owner(); const { job } = await song(actor);

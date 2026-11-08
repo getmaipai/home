@@ -49,11 +49,13 @@ export function musicRouteAudience(actor: PersonRow) { return { actor, band: spe
 // Making a song needs the full gate (age, surface and the household switch). A person's own existing song (the card, Stop,
 // play, download, Use this version) needs only the age and surface lines: switching music off never strands a finished song.
 const gate = createMiddleware<AppEnv>(async (c, next) => {
+  await musicEngineStatus();
   const denial = musicDenial(musicRouteAudience(c.get("person")));
   if (denial) return c.json({ error: MUSIC_DENIAL_LINE[denial], code: denial }, 403);
   await next();
 });
 const viewGate = createMiddleware<AppEnv>(async (c, next) => {
+  await musicEngineStatus();
   const denial = musicViewDenial(musicRouteAudience(c.get("person")));
   if (denial) return c.json({ error: MUSIC_DENIAL_LINE[denial], code: denial }, 403);
   await next();
@@ -251,6 +253,7 @@ const reviseRoute = createRoute({ method: "post", path: "/jobs/{id}/revise", tag
   responses: { 200: { content: { "application/json": { schema: cardSchema } }, description: "The card with a new version coming." }, 422: { description: "The requested edit cannot be made." }, ...refusals } });
 musicRoutes.openapi(reviseRoute, async (c) => {
   const actor = c.get("person"); const { change, file_id } = c.req.valid("json");
+  if (laneOf(musicRouteAudience(actor)) !== "adult" && c.req.valid("param").id.startsWith("upload-")) return c.json({ error: "You can change only your own song from this chat." }, 403) as never;
   let description = "";
   const result = await runSongEdit({ actor, jobId: c.req.valid("param").id, fileId: file_id,
     input: (source) => { description = `${source.request.description.trim()}. Change: ${change}`.slice(0, 1200); return { change: "remake", description }; },
@@ -278,7 +281,8 @@ musicRoutes.openapi(makeSongRoute, async (c) => {
     ...(body.title ? { title: body.title } : {}), ...(body.length ? { length: body.length } : {}), ...(body.bpm !== undefined ? { bpm: body.bpm } : {}),
     ...(body.key?.trim() ? { key: body.key.trim() } : {}), ...(body.song_style ? { song_style: body.song_style } : {}), ...(body.band ? { band: body.band } : {}) };
   if (!generateMusicArgs.safeParse(args).success) return c.json({ error: "That song request is not valid. Check the tempo, the key and the style, then try again." }, 422) as never;
-  const refusal = musicRefusalFor(musicRouteAudience(actor), args);
+  const routeAudience_ = musicRouteAudience(actor);
+  const refusal = laneOf(routeAudience_) === "child" ? null : musicRefusalFor(routeAudience_, args);
   if (refusal) return c.json({ error: refusal.line }, 403) as never;
   const sound = resolveSound(actor, { song_style: body.song_style, band: body.band });
   if (!sound.ok) return c.json({ error: sound.line }, 422) as never;
@@ -294,7 +298,7 @@ musicRoutes.openapi(makeSongRoute, async (c) => {
     if (refused) return c.json({ error: (outcome.result?.reply?.text ?? "").replace(REFUSED_PREFIX, "") || plainMusicFailure("failed") }, 422) as never;
     return c.json({ error: plainMusicFailure(outcome.errorCode === "no_engine" ? "not_installed" : outcome.errorCode ?? "failed") }, outcome.failureKind === "bad_arguments" ? 422 : 503) as never;
   }
-  logTurn(actor, "chat", body.title ? `Make a song: ${body.title}` : "Make a song", { reply: { text: "Making your song." }, source: "plugin", plugin_id: "generate_music", routing: { tier: "tool", score: 1 }, safety: { flagged: false, categories: [], action: "allow", notify_parent: false, matched_signals: [], checked_at: new Date().toISOString() }, conversation_id: conversation.value.id, turn_id: turnId });
+  logTurn(actor, "chat", "Make a song", { reply: { text: "Making your song." }, source: "plugin", plugin_id: "generate_music", routing: { tier: "tool", score: 1 }, safety: { flagged: false, categories: [], action: "allow", notify_parent: false, matched_signals: [], checked_at: new Date().toISOString() }, conversation_id: conversation.value.id, turn_id: turnId });
   return c.json(await musicCardView(actor, job), 201);
 });
 const makeSoundRoute = createRoute({ method: "post", path: "/sounds", tags: ["Music"], summary: "Make a sound effect", middleware,
@@ -363,6 +367,7 @@ const stemsRoute = createRoute({ method: "post", path: "/jobs/{id}/stems", tags:
   responses: { 200: { content: { "application/json": { schema: cardSchema } }, description: "The card with stems coming." }, 422: { description: "The source cannot be split." }, ...refusals, ...errorResponses({ 503: "Stem splitting is unavailable" }) } });
 musicRoutes.openapi(stemsRoute, async (c) => {
   const actor = c.get("person"); const root = getMusicJobFor(actor, c.req.valid("param").id); const { file_id } = c.req.valid("json");
+  if (laneOf(musicRouteAudience(actor)) !== "adult") return c.json({ error: "Stems are not available for this song." }, 403) as never;
   const versions = root ? musicVersions(actor, root).filter((j) => j.state === "done" && j.fileId && j.task !== "stems") : [];
   const source = (file_id ? versions.find((j) => j.fileId === file_id) : versions.sort((a, b) => (b.chosenAt ?? b.createdAt).localeCompare(a.chosenAt ?? a.createdAt))[0]) ?? null;
   if (!root || !source || !source.conversationId || !source.turnId) return c.json({ error: "That song isn't available any more. Ask for it again." }, 404) as never;
@@ -399,6 +404,7 @@ const fromFileEditRoute = createRoute({ method: "post", path: "/from-file/edit",
   responses: { 200: { content: { "application/json": { schema: cardSchema } }, description: "The new song card." }, 413: { description: "The file is too big." }, 422: { description: "The edit cannot be made." }, ...refusals, ...errorResponses({ 503: "Music is unavailable" }) } });
 musicRoutes.openapi(fromFileEditRoute, async c => {
   const actor = c.get("person"), args = c.req.valid("json");
+  if (laneOf(musicRouteAudience(actor)) !== "adult") return c.json({ error: "You can change only your own song from this chat." }, 403) as never;
   const source = resolveSongSource(actor, args.file_id, "pending");
   if (!source?.fileId) return c.json({ error: "That file isn't available any more." }, 404) as never;
   const engine = await musicEngineStatus();
