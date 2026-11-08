@@ -207,7 +207,7 @@ export async function musicCardView(actor: PersonRow, input: Omit<MusicJob, "cov
       if (!timed || !language || !shown.fileId) return timed;
       const translated = cachedMadeTranslation(shown.fileId, language, timed.map((line) => line.line));
       if (translated?.length === timed.length) return timed.map((line, index) => ({ ...line, ...(translated[index] ? { secondary: translated[index]! } : {}) }));
-      if (shown.state === "done") void fillMadeTranslation(shown.fileId, language, timed.map((line) => line.line)).catch(() => {});
+      if (shown.state === "done") void fillMadeTranslation(shown.fileId, language, timed.map((line) => line.line), [current?.request.title ?? root.request.title].filter((t): t is string => !!t?.trim())).catch(() => {});
       return timed;
     })(),
     lyrics: cardLyricsOf(shown), duration_s: current?.durationS ?? root.durationS,
