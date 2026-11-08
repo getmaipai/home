@@ -100,6 +100,11 @@ import { cachedFetch, CACHE_NOT_MODIFIED, packageCacheResponse } from "@/lib/pac
 import { backoffSeconds, parseRetryAfter } from "@/lib/httpCachePolicy";
 import { topicMessages } from "@/lib/topicPrompt";
 import { complete as llmComplete, type LlmMessage } from "@/lib/llm";
+import { translateItems, TranslateHeldError } from "@/lib/translate/core";
+import { hubCompleter } from "@/lib/translate/engine";
+import { isKnownLanguage } from "@/lib/translate/languages";
+import { mediaBandOf } from "@/lib/media/band";
+import { evaluateReply } from "@/lib/safety";
 import { runRapidOcr } from "@/lib/documentExtraction";
 import type { PersonRow } from "@/types";
 import { speakerAgeBand, type AgeBand } from "@/lib/ageBand";
@@ -2886,6 +2891,28 @@ export function createHost(actor: PersonRow, manifest: PackageManifest, secrets:
         }
         return { text: result.value.text };
       },
+    },
+    // TRANSLATE-06: the recipe `translate` step. One translation service (lib/translate): names, brand words,
+    // URLs and placeholders stay as written, and the output passes the speaker's band like any reply.
+    async translate(opts: { text: string; to: string; from?: string }): Promise<unknown> {
+      requirePermission("llm:complete");
+      const text = typeof opts?.text === "string" ? opts.text.trim() : "";
+      const to = typeof opts?.to === "string" ? opts.to.trim().toLowerCase() : "";
+      if (!text) throw new HostError("invalid_input", "Nothing to translate. Say what to translate and into which language.");
+      if (!isKnownLanguage(to.split("-")[0]!)) throw new HostError("invalid_input", "That language is not supported yet. Name another language.");
+      const band = mediaBandOf(actor);
+      try {
+        const result = await translateItems({
+          items: [text], from: opts.from?.trim() || "the original language", to, kind: "chat", completer: hubCompleter(),
+          check: (outs) => evaluateReply({ text: outs.join("\n") }, band).effective.action !== "allow" ? "That translation can't be shown." : null,
+        });
+        const out = result.results[0];
+        if (typeof out !== "string" || out.length === 0) throw new HostError("model_unavailable", "The translation did not come back. Check that the language model is running, then try again.");
+        return { text: out };
+      } catch (error) {
+        if (error instanceof TranslateHeldError) throw new HostError("permission_denied", error.message);
+        throw error;
+      }
     },
     camera: {
       still(): unknown {
