@@ -146,7 +146,13 @@ describe("a package app at /apps/<id>", () => {
     rows = [{ ...musicRow, sections: [{ page: "station", label: "Radio", icon: null }] }];
     const view = open("/apps/music/station", 402);
     await view.findByText("Live radio station.");
-    expect(view.container.querySelector('[data-slot="phone-nav"]')).not.toBeNull();
+    const nav = view.container.querySelector('[data-slot="phone-nav"]')!;
+    expect(nav.hasAttribute("data-floating")).toBe(false);
+    expect(nav.className).toContain("inset-x-0");
+    expect(nav.className).toContain("bottom-0");
+    expect(nav.className).toContain("border-t");
+    expect(nav.className).not.toContain("rounded-full");
+    expect(nav.className).not.toContain("shadow-lg");
   });
 
   test("detail pages put Back in the controls row; only video watch has Minimize", async () => {

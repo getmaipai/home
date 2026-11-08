@@ -666,10 +666,10 @@ body {
 
 @media (max-width: 639.98px) {
   html:has([data-slot="phone-nav"]) [data-slot="global-mini-player"] {
-    bottom: calc(5rem + env(safe-area-inset-bottom));
+    bottom: calc(49px + env(safe-area-inset-bottom));
   }
   html:has([data-slot="phone-nav"]):has([data-slot="global-mini-player"]) [data-slot="rail-body"] {
-    padding-bottom: 9rem;
+    padding-bottom: calc(7rem + env(safe-area-inset-bottom));
   }
 }
 
