@@ -95,10 +95,10 @@ function Exposure({ instance }: { instance: HouseInstance }) {
           {editor.isFetching ? <p role="status">{t("Loading…")}</p> : null}
           {editor.isError ? <Alert variant="destructive"><AlertDescription>{errorLine(editor.error, t("Home could not read this Home Assistant."))} {t("Press Test on this connection, fix what it says, then open this list again.")}</AlertDescription></Alert> : null}
           {data ? <>
-            <p className="text-base text-muted-foreground">{unconfigured ? t("Nothing is chosen yet, so Home can see everything the people's access allows. Tick rooms or devices to limit it to only those.") : t("Home sees only what is ticked here. A room ticked here includes every device in it.")}</p>
+            <p className="text-muted-foreground">{unconfigured ? t("Nothing is chosen yet, so Home can see everything the people's access allows. Tick rooms or devices to limit it to only those.") : t("Home sees only what is ticked here. A room ticked here includes every device in it.")}</p>
             {grouped.map((group) => (
               <fieldset key={group.id || "none"} className="flex flex-col gap-2">
-                <legend className="text-base font-semibold text-foreground">{group.name}</legend>
+                <legend className="font-semibold text-foreground">{group.name}</legend>
                 {group.id !== "" ? <label className="flex items-center gap-3"><Checkbox aria-label={t("Whole room {room}", { room: group.name })} checked={areas.has(group.id)} onCheckedChange={(on) => toggle(areas, setAreas, group.id, on === true)} /><span>{t("The whole room")}</span></label> : null}
                 {group.entities.map((entity) => (
                   <label key={entity.id} className="flex items-center gap-3">
@@ -172,12 +172,12 @@ export function HouseConnections() {
   const instances = query.data?.instances ?? [];
   return (
     <section aria-label={t("Connections")} className="flex flex-col gap-4">
-      <h2 className="text-lg font-semibold text-foreground">{t("Connections")}</h2>
-      <p className="text-base text-muted-foreground">{t("Each row is one Home Assistant on your home network. Add a second one for a cabin or a garage.")}</p>
+      <h2 className="font-semibold text-foreground">{t("Connections")}</h2>
+      <p className="text-muted-foreground">{t("Each row is one Home Assistant on your home network. Add a second one for a cabin or a garage.")}</p>
       {query.isError ? <Alert variant="destructive"><AlertDescription>{t("Could not load your connections. Check your connection and try again.")} <Button type="button" variant="outline" onClick={() => void query.refetch()}>{t("Retry")}</Button></AlertDescription></Alert> : null}
       {query.isLoading ? <p>{t("Loading…")}</p> : null}
       {instances.length > 0 ? <ItemGroup variant="card" aria-label={t("Home Assistant connections")}>{instances.map((instance) => <Row key={instance.instance} instance={instance} several={instances.length > 1} />)}</ItemGroup> : null}
-      {query.data && instances.length === 0 && !adding ? <p className="text-base text-muted-foreground">{t("No Home Assistant is connected yet.")}</p> : null}
+      {query.data && instances.length === 0 && !adding ? <p className="text-muted-foreground">{t("No Home Assistant is connected yet.")}</p> : null}
       {adding ? <InstanceForm onDone={() => setAdding(false)} onCancel={() => setAdding(false)} /> : <div><Button type="button" size="lg" disabled={instances.length >= 8} onClick={() => setAdding(true)}>{t("Add a connection")}</Button></div>}
     </section>
   );
