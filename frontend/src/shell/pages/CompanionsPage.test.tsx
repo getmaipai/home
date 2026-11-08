@@ -6,7 +6,7 @@ import { api, ApiError, type CompanionCard, type CompanionDetail, type Companion
 import { CompanionDetailPage, CompanionsPage } from "@/shell/pages/CompanionsPage";
 import { CompanionShellViewer } from "@/lib/companionShells";
 
-const originals = { copyCompanion: api.copyCompanion, forkCompanion: api.forkCompanion, shareCompanion: api.shareCompanion, setCompanionStatus: api.setCompanionStatus, setCompanionAudience: api.setCompanionAudience, editCompanion: api.editCompanion, companions: api.companions, companion: api.companion, companionActivity: api.companionActivity, conversationList: api.conversationList, createConversation: api.createConversation, setDefaultCompanion: api.setDefaultCompanion, addCompanion: api.addCompanion, removeCompanion: api.removeCompanion, deleteCompanion: api.deleteCompanion, stackVoices: api.stackVoices, setSetting: api.setSetting, settingsValues: api.settingsValues };
+const originals = { copyCompanion: api.copyCompanion, forkCompanion: api.forkCompanion, shareCompanion: api.shareCompanion, setCompanionStatus: api.setCompanionStatus, setCompanionAudience: api.setCompanionAudience, editCompanion: api.editCompanion, companions: api.companions, companion: api.companion, companionActivity: api.companionActivity, synthCredits: api.synthCredits, synthLife: api.synthLife, addSynthLife: api.addSynthLife, forgetSynthLife: api.forgetSynthLife, conversationList: api.conversationList, createConversation: api.createConversation, setDefaultCompanion: api.setDefaultCompanion, addCompanion: api.addCompanion, removeCompanion: api.removeCompanion, deleteCompanion: api.deleteCompanion, stackVoices: api.stackVoices, setSetting: api.setSetting, settingsValues: api.settingsValues };
 afterEach(() => { cleanup(); Object.assign(api, originals); });
 
 function card(overrides: Partial<CompanionCard> = {}): CompanionCard {
@@ -208,6 +208,50 @@ test("the household detail shows settings icon and copy actions", async () => {
   expect(view.getByRole("tab", { name: "Tasks 2" })).toBeTruthy();
 });
 
+test("synth page shows show credits with newest episodes and films, omitting empty groups", async () => {
+  api.companion = async () => detail({ id: "atlas", name: "Atlas", synth: { based_on: { kind: "none", name: null }, forked_from: null, forked_from_name: null, yours: false, shows: [] } });
+  api.synthCredits = async () => ({
+    shows: [{ production_id: "show-1", title: "Moon Radio", part: "Host", episodes: [
+      { item_id: "ep-new", title: "The Last Broadcast", aired_at: "2026-11-06T10:00:00Z", duration_s: 1800 },
+      { item_id: "ep-old", title: "First Signal", aired_at: "2026-10-01T10:00:00Z", duration_s: 1600 },
+    ] }],
+    films: [{ production_id: "film-1", title: "Night Sky", part: "Navigator", file_id: "file-1", made_at: "2026-11-01T10:00:00Z" }], bands: [],
+  });
+  api.synthLife = async () => ({ beats: [] });
+  const view = open("/companions/atlas?tab=about");
+  await view.findByRole("button", { name: "Chat with Atlas" });
+  await view.findByText(/Moon Radio/);
+  expect(view.getByRole("heading", { name: "Shows" })).toBeTruthy();
+  expect(view.getByRole("heading", { name: "Films" })).toBeTruthy();
+  expect(view.getByText("The Last Broadcast")).toBeTruthy();
+  expect(view.getByText("First Signal")).toBeTruthy();
+  expect(view.getByText("Night Sky")).toBeTruthy();
+  expect(view.queryByRole("heading", { name: "Bands" })).toBeNull();
+  expect(view.getByText("The Last Broadcast").compareDocumentPosition(view.getByText("First Signal")) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+});
+
+test("synth life lists beats and Forget calls the life API", async () => {
+  api.companion = async () => detail({ id: "mine", synth: { based_on: { kind: "none", name: null }, forked_from: null, forked_from_name: null, yours: true, shows: [] } });
+  api.synthCredits = async () => ({ shows: [], films: [], bands: [] });
+  api.synthLife = async () => ({ beats: [{ id: "beat-1", text: "Moved to the blue house", at: "2026-11-01T00:00:00Z", valid_from: "2026-11-01", valid_to: null, source: "talent.life" }] });
+  const forgotten: string[] = [];
+  api.forgetSynthLife = async (id, recordId) => { forgotten.push(`${id}:${recordId}`); return { deleted: true }; };
+  const view = open("/companions/mine?tab=about");
+  expect(await view.findByText("Moved to the blue house")).toBeTruthy();
+  fireEvent.click(view.getByRole("button", { name: "Forget" }));
+  await waitFor(() => expect(forgotten).toEqual(["mine:beat-1"]));
+});
+
+test("synth page hides Credits and Life when both are empty", async () => {
+  api.companion = async () => detail({ id: "quiet", synth: { based_on: { kind: "none", name: null }, forked_from: null, forked_from_name: null, yours: false, shows: [] } });
+  api.synthCredits = async () => ({ shows: [], films: [], bands: [] });
+  api.synthLife = async () => ({ beats: [] });
+  const view = open("/companions/quiet?tab=about");
+  await view.findByRole("heading", { name: "About" });
+  expect(view.queryByRole("heading", { name: "Credits" })).toBeNull();
+  expect(view.queryByRole("heading", { name: "Life" })).toBeNull();
+});
+
 test("a bundled companion makes editing through a copy clear", async () => {
   api.companion = async () => detail({ is_household: false, can_edit: false, can_copy: true });
   const view = open("/companions/lively-child");
@@ -294,6 +338,7 @@ test("preview cards show real counts and detail activity, and the detail page is
   expect((detailView.getByRole("button", { name: "Chat with Sprout" }) as HTMLButtonElement).disabled).toBe(false);
   expect(await detailView.findByText("Made a picture")).toBeTruthy();
   const created: unknown[][] = [];
+  api.conversationList = async () => [];
   api.createConversation = async (_mode, _carryFrom, _folderId, companionId) => { created.push([_mode, _carryFrom, _folderId, companionId]); return { id: "conversation-new" } as never; };
   fireEvent.click(detailView.getByRole("button", { name: "Chat with Sprout" }));
   await waitFor(() => expect(created.length).toBe(1));

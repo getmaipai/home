@@ -368,6 +368,9 @@ export interface CompanionCard {
   synth?: { based_on: { kind: "none" | "household_member" | "real_person"; name: string | null }; forked_from: string | null; forked_from_name: string | null; yours: boolean; shows: Array<{ production_id: string; title: string; part: string }> } | null;
 }
 export interface CompanionActivity { activity: Array<{ id: string; kind: string; title: string; state: string; created_at: string; updated_at: string; conversation_id?: string | null; placement?: "chat" | "side"; waiting_reason?: string | null; progress?: string | null; result_ref?: string | null; needs_you?: boolean }> }
+export interface SynthCredits { shows: Array<{ production_id: string; title: string; part: string; episodes: Array<{ item_id: string; title: string; aired_at: string; duration_s: number | null }> }>; films: Array<{ production_id: string; title: string; part: string; file_id: string; made_at: string }>; bands: Array<{ made_artist_id: string; name: string; role: string }> }
+export interface SynthLifeBeat { id: string; text: string; at: string; valid_from: string | null; valid_to: string | null; source: string }
+export interface SynthLife { beats: SynthLifeBeat[] }
 export interface CompanionDetail extends CompanionCard {
   about: string; pronouns: string | null; interests: string[]; examples: string[]; voice_value: string; voice_is_own: boolean; voice_setting: string | null;
   used_by: { people: Array<{ id: string; name: string }>; robots: Array<{ id: string; name: string }> } | null;
@@ -1575,6 +1578,10 @@ export const api = {
   companions: () => request<CompanionList>("/api/companions"),
   companion: (id: string) => request<CompanionDetail>(`/api/companions/${encodeURIComponent(id)}`),
   companionActivity: (id: string) => request<CompanionActivity>(`/api/companions/${encodeURIComponent(id)}/activity`),
+  synthCredits: (id: string) => request<SynthCredits>(`/api/talent/synths/${encodeURIComponent(id)}/credits`),
+  synthLife: (id: string) => request<SynthLife>(`/api/companions/${encodeURIComponent(id)}/life`),
+  addSynthLife: (id: string, input: { text: string; date: string }) => request<{ beat: SynthLifeBeat }>(`/api/companions/${encodeURIComponent(id)}/life`, { method: "POST", body: JSON.stringify(input) }),
+  forgetSynthLife: (id: string, recordId: string) => request<{ deleted: boolean }>(`/api/companions/${encodeURIComponent(id)}/life/${encodeURIComponent(recordId)}`, { method: "DELETE" }),
   setDefaultCompanion: (id: string) => request<{ default_id: string }>(`/api/companions/${encodeURIComponent(id)}/default`, { method: "PUT" }),
   addCompanion: (id: string) => request<{ companions: string[] }>(`/api/companions/${encodeURIComponent(id)}/add`, { method: "POST" }),
   removeCompanion: (id: string) => request<{ companions: string[] }>(`/api/companions/${encodeURIComponent(id)}/remove`, { method: "POST" }),

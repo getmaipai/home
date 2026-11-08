@@ -34,6 +34,8 @@ import { TaskBrowser } from "@maipai/ui/src/elements/task-browser";
 import { Card } from "@maipai/ui/src/primitives/Card";
 import { errorLine } from "@/lib/hubReachability";
 import { formatDate, formatList } from "@/lib/format";
+import { MediaHostContext } from "@maipai/ui/src/schema/mediaHost";
+import { VideoPlayer } from "@maipai/ui/src/elements/video-player";
 
 const listKey = ["companions"] as const;
 const ROBOT_SETTINGS = "/settings/apps?tab=robot";
@@ -227,29 +229,23 @@ function DetailSetup({ companion, saved, copy, save }: { companion: CompanionDet
   const stills = useCompanionStills([companion.id]);
   const [chatError, setChatError] = useState<string | null>(null);
   const [startingChat, setStartingChat] = useState(false);
-  const startChat = async () => {
+  const startChat = () => {
     setStartingChat(true);
     setChatError(null);
-    try {
-      const conversation = await api.createConversation(undefined, undefined, undefined, companion.id);
-      navigate(`/chat?conversation=${encodeURIComponent(conversation.id)}`);
-    } catch (error) {
-      setChatError(errorLine(error, i18n._({ id: "Could not start a chat with this synth. Check your connection and try again.", message: "Could not start a chat with this synth. Check your connection and try again." })));
-    } finally {
-      setStartingChat(false);
-    }
+    void openCompanionChat(companion, navigate, setChatError).finally(() => setStartingChat(false));
   };
   return (
     <>
       <CompanionProfileHeader name={companion.name} eyebrow={companion.is_household ? i18n._({ id: "Household synth", message: "Household synth" }) : i18n._({ id: "Built-in synth", message: "Built-in synth" })} line={companion.tagline} back={<Link to="/companions" className="text-sm underline">{i18n._({ id: "All synths", message: "All synths" })}</Link>} media={companion.portrait ? <Avatar size="lg"><AvatarImage src={api.companionPortrait(companion.portrait)} alt={companion.name} /></Avatar> : stills[companion.id] ? <Avatar size="lg"><AvatarImage src={stills[companion.id]} alt={companion.name} /></Avatar> : <SeededAvatar name={companion.name} seed={companion.id} size="profile" />} chips={<><Badge variant="secondary">{companion.who_can_use}</Badge>{saved ? <Badge>{i18n._({ id: "Your companion", message: "Your companion" })}</Badge> : null}<Badge variant="outline">{companion.status === "ready" ? i18n._({ id: "Ready", message: "Ready" }) : companion.status === "draft" ? i18n._({ id: "Draft · needs a portrait", message: "Draft · needs a portrait" }) : companion.status}</Badge></>} actions={<>
 
-              <Button type="button" disabled={startingChat} onClick={() => void startChat()}>{startingChat ? i18n._({ id: "Starting chat…", message: "Starting chat…" }) : i18n._({ id: "Chat with {name}", message: "Chat with {name}", values: { name: companion.name } })}</Button>
+              <Button type="button" disabled={startingChat} onClick={startChat}>{startingChat ? i18n._({ id: "Starting chat…", message: "Starting chat…" }) : i18n._({ id: "Chat with {name}", message: "Chat with {name}", values: { name: companion.name } })}</Button>
           {companion.can_copy ? <Button type="button" variant="outline" disabled={copy.isPending} onClick={() => copy.mutate()}>{i18n._({ id: "Customize a copy", message: "Customize a copy" })}</Button> : null}
           {companion.can_edit ? <Link to={`/companions/${encodeURIComponent(companion.id)}/create`}><Button type="button" variant="outline">{i18n._({ id: "Edit", message: "Edit" })}</Button></Link> : null}
       </>} />
       {save.isError ? <Alert variant="destructive"><AlertDescription>{errorLine(save.error, i18n._({ id: "Could not save this. Check your connection and try again.", message: "Could not save this. Check your connection and try again." }))}</AlertDescription></Alert> : null}
       {chatError ? <Alert variant="destructive"><AlertDescription>{chatError}</AlertDescription></Alert> : null}
       {copy.isError ? <Alert variant="destructive"><AlertDescription>{errorLine(copy.error, i18n._({ id: "Could not reach Home. Check your connection and try again.", message: "Could not reach Home. Check your connection and try again." }))}</AlertDescription></Alert> : null}
+      {companion.synth?.based_on.kind !== "none" && companion.synth?.based_on.name ? <p>{i18n._({ id: "Based on {name}", message: "Based on {name}", values: { name: companion.synth.based_on.name } })}</p> : null}
       {!companion.is_household && companion.can_copy ? <p>{i18n._({ id: "This synth comes with Home, so it can't be changed. Make a copy and edit that.", message: "This synth comes with Home, so it can't be changed. Make a copy and edit that." })}</p> : null}
       <ProfileTabs companion={companion} stills={stills} />
     </>
@@ -258,6 +254,16 @@ function DetailSetup({ companion, saved, copy, save }: { companion: CompanionDet
 
 function ProfileTabs({ companion, stills }: { companion: CompanionDetail; stills: Record<string, string | undefined> }) {
   const [params, setParams] = useSearchParams();
+  const mediaHost = useContext(MediaHostContext);
+  const queryClient = useQueryClient();
+  const creditsQuery = useQuery({ queryKey: ["synth-credits", companion.id], queryFn: () => api.synthCredits(companion.id), enabled: !!companion.synth, retry: false });
+  const lifeQuery = useQuery({ queryKey: ["synth-life", companion.id], queryFn: () => api.synthLife(companion.id), enabled: !!companion.synth, retry: false });
+  const [lifeText, setLifeText] = useState("");
+  const [lifeDate, setLifeDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const [lifeError, setLifeError] = useState<string | null>(null);
+  const mayEditLife = !!companion.synth && (companion.synth.yours || companion.can_edit);
+  const addLife = useMutation({ mutationFn: () => api.addSynthLife(companion.id, { text: lifeText.trim(), date: lifeDate }), onSuccess: () => { setLifeText(""); setLifeError(null); void queryClient.invalidateQueries({ queryKey: ["synth-life", companion.id] }); }, onError: (error) => setLifeError(errorLine(error, i18n._({ id: "Could not add this life beat. Check your connection and try again.", message: "Could not add this life beat. Check your connection and try again." }))) });
+  const forgetLife = useMutation({ mutationFn: (recordId: string) => api.forgetSynthLife(companion.id, recordId), onSuccess: () => { setLifeError(null); void queryClient.invalidateQueries({ queryKey: ["synth-life", companion.id] }); }, onError: (error) => setLifeError(errorLine(error, i18n._({ id: "Could not forget this life beat. Check your connection and try again.", message: "Could not forget this life beat. Check your connection and try again." }))) });
   const tab = params.get("tab") === "tasks" ? "Tasks" : params.get("tab") === "about" ? "About" : "Activity";
   const selectTab = (value: string) => {
     const next = new URLSearchParams(params);
@@ -309,6 +315,18 @@ function ProfileTabs({ companion, stills }: { companion: CompanionDetail; stills
           {activityQuery.isError ? <p>{i18n._({ id: "Could not load tasks. Check your connection and try again.", message: "Could not load tasks. Check your connection and try again." })}</p> : activityQuery.isLoading ? <p>{i18n._({ id: "Loading tasks…", message: "Loading tasks…" })}</p> : <TaskBrowser label={i18n._({ id: "Tasks", message: "Tasks" })} tabs={[{ id: "needs", label: i18n._({ id: "Needs you", message: "Needs you" }), count: needs.length }, { id: "running", label: i18n._({ id: "Running", message: "Running" }), count: running.length }, { id: "completed", label: i18n._({ id: "Completed", message: "Completed" }), count: completed.length }]} activeTab={taskTab} onTabChange={setTaskTab} items={visible.map((row) => ({ id: row.id, title: row.title, line: stateLine(row), meta: formatRelative(row.updated_at), badge: row.needs_you ? <Badge>{i18n._({ id: "Needs you", message: "Needs you" })}</Badge> : undefined }))} selectedId={selected?.id ?? null} onSelect={chooseTask} empty={taskTab === "needs" ? i18n._({ id: "Nothing needs you right now.", message: "Nothing needs you right now." }) : taskTab === "running" ? i18n._({ id: "Nothing is running.", message: "Nothing is running." }) : i18n._({ id: "Nothing has finished yet.", message: "Nothing has finished yet." })} backLabel={i18n._({ id: "Back to tasks", message: "Back to tasks" })} detail={selected ? <><div className="flex flex-col gap-4"><div className="flex items-center gap-3">{companion.portrait ? <Avatar><AvatarImage src={api.companionPortrait(companion.portrait)} alt={companion.name} /></Avatar> : stills[companion.id] ? <Avatar><AvatarImage src={stills[companion.id]} alt={companion.name} /></Avatar> : <SeededAvatar name={companion.name} seed={companion.id} />}<span className="font-medium">{companion.name}</span></div><Badge>{taskStatus}</Badge><h2 className="text-xl font-semibold">{selected.title}</h2>{selected.waiting_reason || selected.progress ? <p>{selected.waiting_reason || selected.progress}</p> : null}<section aria-label={i18n._({ id: "Progress", message: "Progress" })}><h3 className="font-semibold">{i18n._({ id: "Progress", message: "Progress" })}</h3><ul>{progressItems.map((line, index) => <li key={line}>{index === 0 || selected?.state === "done" || selected?.state === "failed" ? "✓ " : "• "}{line}</li>)}</ul></section>{selected.needs_you && selected.conversation_id ? <Link to={`/chat?conversation=${encodeURIComponent(selected.conversation_id)}`}><Button>{i18n._({ id: "Open source conversation", message: "Open source conversation" })}</Button></Link> : null}{selected.state === "done" && ["picture", "video", "music"].includes(selected.kind) ? <Link to={`/media/${encodeURIComponent(selected.result_ref || selected.id)}`}><Button>{i18n._({ id: "Open result", message: "Open result" })}</Button></Link> : null}</div></> : <p>{i18n._({ id: "Choose a task to see its details.", message: "Choose a task to see its details." })}</p>} />}
         </div> : null}
         {tab === "About" ? <section aria-label={i18n._({ id: "About", message: "About" })}>
+      {creditsQuery.isError || lifeQuery.isError ? <Alert variant="destructive"><AlertDescription>{errorLine(creditsQuery.error ?? lifeQuery.error, i18n._({ id: "Could not load synth credits or life. Check your connection and try again.", message: "Could not load synth credits or life. Check your connection and try again." }))}</AlertDescription></Alert> : null}
+      {lifeError ? <Alert variant="destructive"><AlertDescription>{lifeError}</AlertDescription></Alert> : null}
+      {(creditsQuery.data?.shows.length || creditsQuery.data?.films.length || creditsQuery.data?.bands.length) ? <Section heading={i18n._({ id: "Credits", message: "Credits" })}>
+        {creditsQuery.data.shows.length ? <div><h3 className="font-semibold">{i18n._({ id: "Shows", message: "Shows" })}</h3><ul>{creditsQuery.data.shows.map((show) => <li key={show.production_id}><p className="font-medium">{show.title} · {show.part}</p><ul>{[...show.episodes].sort((a, b) => new Date(b.aired_at).getTime() - new Date(a.aired_at).getTime()).map((episode) => <li key={episode.item_id}><Button type="button" variant="link" onClick={() => { if (mediaHost) void mediaHost.onPlay(episode.item_id, {}); }}>{episode.title}</Button></li>)}</ul></li>)}</ul></div> : null}
+        {creditsQuery.data.films.length ? <div><h3 className="font-semibold">{i18n._({ id: "Films", message: "Films" })}</h3><ul>{creditsQuery.data.films.map((film) => <li key={film.production_id}><p>{film.title} · {film.part}</p><VideoPlayer status="ready" prompt={film.title} src={`/api/files/${encodeURIComponent(film.file_id)}/content`} /></li>)}</ul></div> : null}
+        {creditsQuery.data.bands.length ? <div><h3 className="font-semibold">{i18n._({ id: "Bands", message: "Bands" })}</h3><ul>{creditsQuery.data.bands.map((band) => <li key={band.made_artist_id}>{band.name} · {band.role}</li>)}</ul></div> : null}
+      </Section> : null}
+      {(lifeQuery.data?.beats.length || mayEditLife) ? <Section heading={i18n._({ id: "Life", message: "Life" })}>
+        <ul>{lifeQuery.data?.beats.map((beat) => <li key={beat.id}><time dateTime={beat.valid_from ?? beat.at}>{beat.valid_from ?? beat.at.slice(0, 10)}</time><p>{beat.text}</p>{mayEditLife ? <Button type="button" variant="outline" disabled={forgetLife.isPending} onClick={() => forgetLife.mutate(beat.id)}>{i18n._({ id: "Forget", message: "Forget" })}</Button> : null}</li>)}</ul>
+        {mayEditLife ? <form onSubmit={(event) => { event.preventDefault(); addLife.mutate(); }}><Input aria-label={i18n._({ id: "Life beat", message: "Life beat" })} maxLength={200} value={lifeText} onChange={(event) => setLifeText(event.target.value)} required /><Input aria-label={i18n._({ id: "Date", message: "Date" })} type="date" value={lifeDate} onChange={(event) => setLifeDate(event.target.value)} required /><Button type="submit" disabled={addLife.isPending || !lifeText.trim()}>{i18n._({ id: "Add", message: "Add" })}</Button></form> : null}
+      </Section> : null}
+      {companion.synth?.shows.length ? <Section heading={i18n._({ id: "On air", message: "On air" })}><ul>{companion.synth.shows.map((show) => <li key={show.production_id}>{show.title} · {show.part} · {companion.voice}</li>)}</ul></Section> : null}
       <Section heading={i18n._({ id: "About", message: "About" })}>
         <p>{companion.about}</p>
         {companion.pronouns ? <p className="text-sm text-muted-foreground">{i18n._({ id: "Pronouns: {pronouns}", message: "Pronouns: {pronouns}", values: { pronouns: companion.pronouns } })}</p> : null}
