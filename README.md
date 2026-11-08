@@ -15,6 +15,22 @@ Music, pictures, video, films, podcasts, chat, voice and your smart home share o
 
 ## What you can do
 
+### An assistant that does things
+
+- **Ask once, and it gets done.** In one chat Home makes pictures, songs, videos and films, edits them, writes documents, researches questions, sets reminders and controls your house. You never switch apps.
+- **It asks before anything that matters.** Locking a door, restarting a server or cancelling a schedule always shows a confirm step, and house actions and reminders offer **Undo**.
+- **It acts on your house.** Lights, locks and scenes through Home Assistant, scheduled actions, and a check on what is up or down with Uptime Kuma.
+- **It connects to more.** Admins can plug other tools into chat with MCP servers, and decide which tools each person gets.
+- **A failed tool never breaks the answer.** If one step fails, Home says so and carries on with the rest.
+
+### A companion that is yours
+
+- **One companion, everywhere.** Pick a synth as your companion and it is the voice and face of your chat, your music DJ and your robot.
+- **It has a personality and a voice.** Warm or dry, short or chatty, with its own look. Make one, copy one, or base one on a person.
+- **It knows you.** It remembers what you tell it, and carries a life of its own from day to day.
+- **It lives on your robot.** The robot speaks in its voice, shows its face and brings back what it was told.
+- **Ask another one.** Type @ and a name to ask a different companion a single question.
+
 ### Music
 
 - **Create a song.** Describe it or write the lyrics. Choose a short hook or a full three-minute song. The lyrics light up word by word as it plays.
