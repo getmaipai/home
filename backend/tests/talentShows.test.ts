@@ -104,4 +104,19 @@ describe("TALENT-04 shows", () => {
     const kid = await child(client);
     expect(queryItems(kid.row, "podcasts", { limit: 20 }).some((entry) => entry.id === result.item_id)).toBe(false);
   });
+
+  test("a briefing with an unavailable completer still renders a scripted episode", async () => {
+    const { row } = await owner();
+    const made = await createSynth(row, { persona: { display_name: "Moss", formality: "neutral", complexity: "standard", engagement: "balanced", filler_density: "none", audience: "adult" } as never, based_on: { kind: "none", person_id: null, name: null, refresh: "7d", minor: false }, life: { enabled: false, seed: "" } });
+    if (!made.ok) throw new Error("The show synth fixture could not be created.");
+    const show = await createShow(row, { title: "Morning", format_id: "news_briefing", cast: [{ synth_id: made.value.id, part: "anchor" }], audience: "adult", sources: [{ kind: "news", topics: [], file_ids: [], media_item_id: null }, { kind: "weather", topics: [], file_ids: [], media_item_id: null }], schedule: null, length_s: 180 });
+    const stack = { voices: async () => [], submitJob: async ({ kind, input }: { kind: string; input: Record<string, unknown> }) => {
+      const id = `scripted-${kind}`;
+      if (kind === "media.tts") { const lines = input.lines as Array<{ id: string }>; const dir = `/tmp/${id}`; mkdirSync(dir, { recursive: true }); return { id, state: "done", result: { lines: lines.map((line) => { const path = `${dir}/${line.id}.wav`; writeFileSync(path, new Uint8Array([1, 2, 3])); return { id: line.id, path, duration_s: 0.5, sha256: "b".repeat(64) }; }) }, reason: null }; }
+      const dir = `/tmp/${id}`; mkdirSync(dir, { recursive: true }); const path = `${dir}/episode.m4a`; writeFileSync(path, new Uint8Array([1, 2, 3])); return { id, state: "done", result: { path, duration_s: 1 }, reason: null };
+    } } as unknown as StackClient;
+    const result = await makeEpisode(row, show.id, { now: new Date("2026-11-08T12:00:00Z"), complete: (async () => ({ ok: false, unavailable: true, failureKind: "offline" })) as never, stack });
+    expect(result.episode_id).toContain("ep-20261108-");
+    expect(getMediaProduction(row, show.id)?.episodes[0]).toMatchObject({ generated_by: "scripted" });
+  });
 });

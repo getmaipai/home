@@ -15,6 +15,7 @@ import { getHouseholdSettingValue, getPersonSettingValue } from "@/lib/settings"
 import { newMediaSourceId, newMediaItemId, randomSuffix } from "@/lib/id";
 import { nextHlc } from "@/lib/hlc";
 import { completeBackground, type LlmMessage } from "@/lib/llm";
+import { completeWithFallback } from "@/lib/judgeFallback";
 import { loadFormats, formatById } from "./formats";
 import type { Part, Brief, Outline, Script, Line } from "./types";
 import { buildBrief } from "./brief";
@@ -32,6 +33,7 @@ import { localDayKey, hubTimeZone } from "@/lib/news/dayParts";
 import { readFile } from "node:fs/promises";
 import { allowedSources, queryItems, registerProductionSourceGate } from "@/lib/media/appHost";
 import { isPresetVoice } from "@/lib/voiceForSpeech";
+import { buildScriptedBriefing, canScriptBriefing } from "./scriptedBriefing";
 
 export type ShowSource = Show["sources"][number];
 export type Schedule = NonNullable<Show["schedule"]>;
@@ -142,20 +144,38 @@ export async function makeEpisode(actor: PersonRow, productionId: string, opts: 
   let currentStage = old?.stage && old.stage !== "done" && old.stage !== "failed" ? old.stage : "brief";
   try {
     let state = stageCache.get(episodeId) ?? readCache<typeof stageCache extends Map<string, infer V> ? V : never>(productionId, episodeId);
-    let brief = state?.brief, outline = state?.outline, script = state?.script, kept = state?.kept;
+    let brief = state?.brief, outline = state?.outline, script = state?.script, kept = state?.kept, scripted = Boolean((state as (typeof state & { scripted?: boolean }) | null)?.scripted);
+    const fallbackComplete = (async (messages: LlmMessage[], options?: Parameters<typeof completeBackground>[1]) => {
+      const result = await completeWithFallback(messages, options);
+      return result.ok ? { ok: true as const, text: result.text } : { ok: false as const, unavailable: true as const, failureKind: result.failureKind };
+    }) as typeof completeBackground;
+    const stageCompleter = opts.complete ?? fallbackComplete;
     const format = formatById(production.show!.format_id);
     if (!format) throw refusal("That show format does not exist. Pick one from the list.");
     if (currentStage === "brief") { stage(production, episodeId, "brief", now); brief = await buildBrief(actor, production, format, now); stateCache(productionId, episodeId, { brief, madeAt: now.toISOString() }); currentStage = "outline"; stage(production, episodeId, "outline", now); }
-    if (currentStage === "outline") { brief ??= await buildBrief(actor, production, format, now); outline = await writeOutline(brief, complete); stateCache(productionId, episodeId, { brief, outline, madeAt: now.toISOString() }); currentStage = "script"; stage(production, episodeId, "script", now); }
+    if (currentStage === "outline") {
+      brief ??= await buildBrief(actor, production, format, now);
+      try { outline = await writeOutline(brief, stageCompleter); }
+      catch (error) { if (!canScriptBriefing(brief)) throw error; const fallback = buildScriptedBriefing(brief); outline = fallback.outline; script = fallback.script; scripted = true; }
+      stateCache(productionId, episodeId, { brief, outline, ...(script ? { script } : {}), scripted, madeAt: now.toISOString() }); currentStage = "script"; stage(production, episodeId, "script", now);
+    }
     if (currentStage === "script") {
-      brief ??= await buildBrief(actor, production, format, now); outline ??= await writeOutline(brief, complete);
-      const segments: Script["segments"] = []; let previous: Line[] = [];
-      for (let index = 0; index < outline.segments.length; index++) {
-        const plan = outline.segments[index]!;
-        const lines = await writeSegment(brief, outline, index, complete, previous);
-        segments.push({ kind: plan.kind, goal: plan.goal, lines }); previous = [...previous, ...lines].slice(-6);
+      brief ??= await buildBrief(actor, production, format, now);
+      if (!outline) {
+        try { outline = await writeOutline(brief, stageCompleter); }
+        catch (error) { if (!canScriptBriefing(brief)) throw error; const fallback = buildScriptedBriefing(brief); outline = fallback.outline; script = fallback.script; scripted = true; }
       }
-      script = { title: outline.title, segments }; stateCache(productionId, episodeId, { brief, outline, script, madeAt: now.toISOString() }); currentStage = "check"; stage(production, episodeId, "check", now);
+      if (!scripted && !script) {
+        const segments: Script["segments"] = []; let previous: Line[] = [];
+        for (let index = 0; index < outline.segments.length; index++) {
+          const plan = outline.segments[index]!;
+          try { const lines = await writeSegment(brief, outline, index, stageCompleter, previous); segments.push({ kind: plan.kind, goal: plan.goal, lines }); previous = [...previous, ...lines].slice(-6); }
+          catch (error) { if (!canScriptBriefing(brief)) throw error; const fallback = buildScriptedBriefing(brief); outline = fallback.outline; script = fallback.script; scripted = true; break; }
+        }
+        if (!scripted) script = { title: outline.title, segments };
+      }
+      if (!script) throw refusal("The episode script could not be written.");
+      stateCache(productionId, episodeId, { brief, outline, script, scripted, madeAt: now.toISOString() }); currentStage = "check"; stage(production, episodeId, "check", now);
     }
     if (currentStage === "check") {
       if (!script) throw refusal("The saved episode script is missing. Start a new episode to rebuild it.");
@@ -188,13 +208,13 @@ export async function makeEpisode(actor: PersonRow, productionId: string, opts: 
       const source = sourceFor(productionId); if (!source) throw refusal("The show's media source is missing. Reopen the show or create it again.");
       const chapterRows = arranged.chapters.map((chapter) => ({ start_s: chapter.start_ms / 1000, title: chapter.title || "Segment", source: "manual" as const }));
       const stamp = nextHlc(), itemId = newMediaItemId();
-      const record = MediaItem.parse({ id: itemId, kind: "podcast_episode", title: outline.title, subtitle: production.title, description: outline.segments.map((segment) => segment.goal).join(". "), source_id: source.id, location: { file_id: file.value.id }, locator_kind: "none", media_type: "audio/mp4", duration_s: mixed.duration_s, playable: "original", artwork: null, chapters: chapterRows, subtitles: [], previews: null, external: null, advisory: { explicit: production.show!.audience === "adult", source: "platform" }, band_ok: production.show!.audience === "adult" ? "adult" : production.show!.audience === "teen" ? "teen" : "child", verified_by_person_id: null, hidden: false, added_at: now.toISOString(), created_at: now.toISOString(), hlc: stamp, provenance: `show:${episodeId}` });
+      const record = MediaItem.parse({ id: itemId, kind: "podcast_episode", title: outline.title, subtitle: production.title, description: scripted ? "Read from today's headlines and weather" : outline.segments.map((segment) => segment.goal).join(". "), source_id: source.id, location: { file_id: file.value.id }, locator_kind: "none", media_type: "audio/mp4", duration_s: mixed.duration_s, playable: "original", artwork: null, chapters: chapterRows, subtitles: [], previews: null, external: null, advisory: { explicit: production.show!.audience === "adult", source: "platform" }, band_ok: production.show!.audience === "adult" ? "adult" : production.show!.audience === "teen" ? "teen" : "child", verified_by_person_id: null, hidden: false, added_at: now.toISOString(), created_at: now.toISOString(), hlc: stamp, provenance: `show:${episodeId}` });
       db.insert(mediaItems).values(itemToRow(record)).run();
       const durations = new Map(rendered.map((line) => [line.line_id, line.duration_ms])); let cursor = 0;
       const transcriptSegments = script.segments.flatMap((segment, segmentIndex) => segment.lines.map((line, index) => { const id = `${segmentIndex + 1}-${index + 1}`, start = cursor; const duration = durations.get(id) ?? 0; cursor += duration + (line.timing.gap_ms ?? format.gap_ms); return { id, start: start / 1000, end: (start + duration) / 1000, text: line.text, speaker: line.part }; }));
       insertTranscript(actor, { itemId, language: "en", segments: transcriptSegments as never, provenance: { source_kind: "generated", engine: "talent.show", model_id: "home" }, author: actor.id });
       const scenes = script.segments.map((segment, index) => ({ id: `${index + 1}`, title: segment.goal, shots: segment.lines.map((line, lineIndex) => ({ id: `${index + 1}-${lineIndex + 1}`, subject_ids: production!.cast.filter((member) => member.part === line.part).map((member) => member.subject_id) })) }));
-      const updatedEpisodes = [...production.episodes, { id: episodeId, title: outline.title, scenes }];
+      const updatedEpisodes = [...production.episodes, { id: episodeId, title: outline.title, scenes, ...(scripted ? { generated_by: "scripted" } : {}) }];
       const finalState = { episode_id: episodeId, stage: "done" as const, started_at: now.toISOString(), last_make_ms: Date.now() - started, reason: null };
       const { updateMediaProduction } = await import("@/lib/mediaProductions");
       updateMediaProduction(actor, productionId, { episodes: updatedEpisodes, finished_cut_file_ids: [...production.finished_cut_file_ids, file.value.id] });
@@ -223,7 +243,7 @@ export async function makeEpisode(actor: PersonRow, productionId: string, opts: 
     throw error;
   } finally { episodeRunning.delete(productionId); }
 }
-function stateCache(productionId: string, episodeId: string, value: { brief?: Brief; outline?: Outline; script?: Script; kept?: Line[]; madeAt: string; rendered?: Awaited<ReturnType<typeof renderLines>> }) {
+function stateCache(productionId: string, episodeId: string, value: { brief?: Brief; outline?: Outline; script?: Script; kept?: Line[]; scripted?: boolean; madeAt: string; rendered?: Awaited<ReturnType<typeof renderLines>> }) {
   stageCache.set(episodeId, value as never); writeCache(productionId, episodeId, value);
 }
 function cleanup(productionId: string, episodeId: string) { const dir = join(dataDir, "talent", productionId, episodeId); try { rmSync(dir, { recursive: true, force: true }); } catch { /* working files may already be gone */ } try { rmSync(cachePath(productionId, episodeId), { force: true }); } catch { /* cache may already be gone */ } stageCache.delete(episodeId); stageCache.delete(`${episodeId}:rendered`); }
