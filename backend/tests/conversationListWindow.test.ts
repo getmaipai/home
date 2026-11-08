@@ -10,6 +10,7 @@ import { nextHlc } from "@/lib/hlc";
 import { newConversationTurnId } from "@/lib/id";
 import { createConversation, listConversations, buildConversationWindow, windowPreview, logTurn, __windowRowsForTests, __clearWindowRowCacheForTests } from "@/lib/conversationHistory";
 import type { TurnValue } from "@/wire";
+import { explainPlan, waitForForeignWriteLock } from "./openStatements";
 
 const SAFE: TurnValue["safety"] = { flagged: false, categories: [], action: "allow", notify_parent: false, matched_signals: [], checked_at: new Date().toISOString() };
 
@@ -173,6 +174,23 @@ describe("AUDIT-PERF-CONV-01: the conversation list", () => {
   });
 });
 
+// Shard pollution (the lander's safety shard, 2026-11-07): a preview lookup that left an iterate() loop early (bun 1.4.3 then keeps
+// the statement open) pinned a read snapshot on the hub's one connection. The next time another connection wrote, every later
+// write on the hub's connection failed "database is locked", through all the files that followed in the same bun process.
+describe("AUDIT-PERF-CONV-01: the list leaves no statement open", () => {
+  test("after a list that skips a blank turn, the hub connection still waits out another process's write lock", async () => {
+    const actor = await owner();
+    const c = createConversation(actor, {});
+    if (!c.ok) throw new Error(c.error);
+    seedTurns(actor.id, [
+      { conversationId: c.value.id, createdAt: at(1), userText: "real text" },
+      { conversationId: c.value.id, createdAt: at(2), userText: "\u00a0\u00a0" }, // JavaScript trims it, SQLite's trim() does not: the slow path runs
+    ]);
+    expect(listConversations(actor)[0]!.preview).toBe("real text");
+    expect(await waitForForeignWriteLock(sqlite, 250)).toBeGreaterThanOrEqual(150);
+  });
+});
+
 describe("AUDIT-PERF-CONV-01: the chat window", () => {
   function recordStatements(): { sql: string[]; stop(): void } {
     const sql: string[] = [];
@@ -293,7 +311,7 @@ describe("AUDIT-PERF-CONV-01: the chat window", () => {
       const read = recorder.sql.find(isWindowRead)!;
       expect(read).toBeDefined();
       const params = Array.from({ length: (read.match(/\?/g) ?? []).length }, () => conversation.id);
-      const plan = (sqlite.query(`EXPLAIN QUERY PLAN ${read}`).all(...params) as Array<{ detail: string }>).map((row) => row.detail).join(" | ");
+      const plan = explainPlan(sqlite, read, ...params).join(" | ");
       expect(plan).toContain("conversation_turns_conversation_status_created_idx");
       expect(plan).not.toContain("USE TEMP B-TREE");
     }

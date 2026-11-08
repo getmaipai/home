@@ -1784,7 +1784,9 @@ function listAggregates(ids: readonly string[]): { byConversation: Map<string, {
     let turn: PreviewTurn | undefined = previewTurnOf(found);
     if (!turn.userText.trim()) {
       turn = undefined;
-      for (const row of previewTurnsNewestFirstStatement.iterate(id) as Iterable<Record<string, unknown>>) {
+      // .all(), not .iterate() with a break: bun 1.4.3 leaves a statement open when an iterate() loop is left early, and an open
+      // statement on the hub's one connection pins a read snapshot, so every later write there fails "database is locked".
+      for (const row of previewTurnsNewestFirstStatement.all(id) as Array<Record<string, unknown>>) {
         if ((row.userText as string).trim()) { turn = previewTurnOf(row); break; }
       }
       if (!turn) continue;
