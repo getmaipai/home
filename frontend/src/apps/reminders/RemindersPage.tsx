@@ -148,7 +148,7 @@ export function RemindersPage() {
         view={view}
         todayCount={todayCount}
         scheduledCount={scheduledCount}
-        deviceCount={showDevices ? devicesQuery.data?.schedules.length ?? 0 : null}
+        deviceCount={showDevices ? devicesQuery.data?.schedules?.length ?? 0 : null}
         onCreate={() => setSheetOpen(true)}
         onSelect={(next) => {
           setView(next);
