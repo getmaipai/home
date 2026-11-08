@@ -678,10 +678,12 @@ describe("warmPackage weather privacy", () => {
     }) as unknown as typeof fetch;
     try { await warmPackage("weather", { ...weather.value.manifest, warm: { keys: [{ surprise: "Another City" }, { place: "Seattle", extra: "ignored" }] } }); }
     finally { globalThis.fetch = oldFetch; }
-    expect(calls).toHaveLength(2);
-    expect(calls[0]!.url).toContain("name=Portland");
+    // Requests to this machine's own engine are not outbound; only calls that leave the home are held to the two weather requests.
+    const outbound = calls.filter((call) => !/^(127\.0\.0\.1|localhost)(:|$)/.test(new URL(call.url).host));
+    expect(outbound).toHaveLength(2);
+    expect(outbound[0]!.url).toContain("name=Portland");
     expect(calls.map((call) => call.url).join(" ")).not.toMatch(/Seattle|Another%20City|__HOME_PLACE__/);
-    expect(calls.every((call) => call.headers.get("user-agent") === HOME_USER_AGENT)).toBe(true);
+    expect(outbound.every((call) => call.headers.get("user-agent") === HOME_USER_AGENT)).toBe(true);
   });
 
 
