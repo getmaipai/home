@@ -19,7 +19,7 @@ import { jsonBody } from "@/lib/validation";
 import { NEWS_PICTURE_WIDTHS, newsFigurePicture, newsImagesOn, newsPicture, type NewsPictureWidth } from "@/lib/news/pictures";
 import { genericPicture, publisherIconPicture } from "@/lib/news/pictureFallback";
 import { figureAddressesOf } from "@/lib/news/article";
-import { briefingToday } from "@/lib/talent/shows";
+import { briefingToday, ownBriefingShow } from "@/lib/talent/shows";
 import { speakerAgeBand } from "@/lib/ageBand";
 
 export const newsRoutes = new Hono<AppEnv>();
@@ -41,6 +41,8 @@ newsRoutes.post("/data/:dataId", requireAuth, async (c) => {
       const answer = briefingToday(person);
       if (answer.item) return c.json([], 200);
       const band = speakerAgeBand(person, new Date());
+      // The show exists but today's episode is not ready: say so, so a tap visibly does something (and a retry resumes it).
+      if (answer.offer && ownBriefingShow(person)) return c.json([{ id: "offer", title: "Your morning briefing is being made", action_label: "Check", format_id: band === "child" ? "kids_news" : "news_briefing", audience: band === "child" ? "all" : band }], 200);
       return c.json(answer.offer ? [{ id: "offer", title: "Make me a morning briefing", action_label: "Make", format_id: band === "child" ? "kids_news" : "news_briefing", audience: band === "child" ? "all" : band }] : [], 200);
     }
     case "briefing-item": {

@@ -132,13 +132,14 @@ export async function runNewsAction(person: PersonRow, action: NewsActionName, b
     }
     case "make_briefing": {
       // TALENT-04: "Make me a morning briefing" on Today; the format follows the viewer's band (a child gets kids' news).
-      const { createShow } = await import("@/lib/talent/shows");
+      const { createShow, makeEpisode, ownBriefingShow } = await import("@/lib/talent/shows");
       const format = viewer.band === "child" ? "kids_news" : "news_briefing";
       try {
-        const show = await createShow(person, { title: typeof body.title === "string" && body.title.trim() ? body.title.trim().slice(0, 160) : "Morning briefing", format_id: format, cast: "invent", audience: viewer.band === "child" ? "all" : viewer.band, sources: [{ kind: "news", topics: [], file_ids: [], media_item_id: null }, { kind: "weather", topics: [], file_ids: [], media_item_id: null }, { kind: "household", topics: [], file_ids: [], media_item_id: null }], schedule: { every: "1d", at: "07:00", days: [] } });
-        const { makeEpisode } = await import("@/lib/talent/shows");
+        // One briefing show per person: a second tap (or a retry after a slow first try) resumes it, never makes another.
+        const existing = ownBriefingShow(person);
+        const show = existing ?? await createShow(person, { title: typeof body.title === "string" && body.title.trim() ? body.title.trim().slice(0, 160) : "Morning briefing", format_id: format, cast: "invent", audience: viewer.band === "child" ? "all" : viewer.band, sources: [{ kind: "news", topics: [], file_ids: [], media_item_id: null }, { kind: "weather", topics: [], file_ids: [], media_item_id: null }, { kind: "household", topics: [], file_ids: [], media_item_id: null }], schedule: { every: "1d", at: "07:00", days: [] } });
         void makeEpisode(person, show.id).catch(() => {});
-        return ok({ production_id: show.id, label: "Your briefing is being made" });
+        return ok({ production_id: show.id, label: existing ? "Your briefing is still being made" : "Your briefing is being made" });
       } catch (error) { return { ok: false, status: 400, error: error instanceof Error ? error.message : "The briefing could not be set up. Try again in a moment." } as ActionResult; }
     }
     case "follow": return follow(person, viewer, body);

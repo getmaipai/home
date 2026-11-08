@@ -235,6 +235,12 @@ function realPersonHidden(actor: PersonRow, production: Production): boolean {
   const allowed = getPersonSettingValue(actor, "synths.real_people_allowed");
   return production.cast.some((member) => { const synth = member.synth_id ? synthById(member.synth_id) : null; return synth?.based_on.kind === "real_person" && !(mode === "ask" && Array.isArray(allowed) && allowed.includes(synth.id)); });
 }
+/** The person's own briefing show for their band, if one exists: a tap on "Make me a morning briefing" reuses it instead of creating another. */
+export function ownBriefingShow(actor: PersonRow, now = new Date()): Production | null {
+  const band = speakerAgeBand(actor, now), preferred = band === "child" ? "kids_news" : "news_briefing";
+  return listShows(actor).find((show) => show.owner_person_id === actor.id && show.show?.format_id === preferred && show.show.audience === (band === "child" ? "all" : band)) ?? null;
+}
+
 export function briefingToday(actor: PersonRow, now = new Date()): { item: unknown | null; offer: boolean } {
   const band = speakerAgeBand(actor, now), preferred = band === "child" ? "kids_news" : "news_briefing";
   const shows = listShows(actor).filter((show) => show.show?.format_id === preferred && show.show.audience === (band === "child" ? "all" : band));
