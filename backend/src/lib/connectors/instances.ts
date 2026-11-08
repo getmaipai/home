@@ -6,6 +6,10 @@ import { db } from "@/db";
 import { integrations } from "@/db/schema";
 import { createLanFetch, type LanFetchDeps } from "@/lib/lanFetch";
 import { getHouseholdSettingValue } from "@/lib/settings";
+import { isConnectorRef, readConnectorSecret } from "./credentials";
+
+/** Reads a credential reference: instances added in Settings keep theirs in the connector store, the legacy `default` keys stay household settings. */
+function readReference(key: string): unknown { return isConnectorRef(key) ? readConnectorSecret(key) : getHouseholdSettingValue(key); }
 
 export type ConnectorType = "home_assistant" | "uptime_kuma" | "gitea" | "immich" | "unifi" | "plex";
 export const DEFAULT_INSTANCE = "default";
@@ -74,7 +78,7 @@ export function resolveInstance(type: ConnectorType, slug?: string, deps: Instan
 
 /** The same shape `houseLanFetch()` always had, built on this instance's own host and port only. The token is read by reference and only returned inside the success result. */
 export function instanceLanFetch(instance: ConnectorInstance, deps: InstanceDeps = {}): InstanceLanFetchResult {
-  const read = deps.read ?? getHouseholdSettingValue;
+  const read = deps.read ?? readReference;
   const name = NAME[instance.type];
   const baseUrl = instance.address;
   if (typeof baseUrl !== "string" || baseUrl.trim() === "") {

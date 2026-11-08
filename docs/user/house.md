@@ -12,10 +12,16 @@ The **House** page shows your rooms and the devices in them. It needs Home Assis
 An owner or admin does this once.
 
 1. Open **Settings**, then **House**.
-2. Under **Connection**, enter the Home Assistant address and its access token. The same two boxes are under **Settings**, **Apps and devices**, **Integrations**.
-3. Press **Test connection**.
+2. Under **Connections**, press **Add a connection**. Type a name (for example Home), the numeric address of your Home Assistant, and its access token.
+3. Press **Test** on the new row.
 
-You will know it worked when Home says "Connected" and how many rooms and devices it found.
+You will know it worked when Home says "Connected" and how many rooms and devices it found. The token is never shown again; the row says "Token saved".
+
+Each row also has **Edit** (change the name, the address or the token), a switch to turn it off without losing it, and **Remove**. You can add up to 8 connections, for example a cabin with its own Home Assistant.
+
+## Choose what Home can see
+
+Under each connection, **What Home can see** lists its rooms and devices. Tick a whole room or single devices. Home, and the people you share it with, then see only what is ticked. Until you tick something, Home can see everything that each person's access allows. Locks, alarms, garage doors and cameras still need their own permission for each person.
 
 Until then, the House page says "Home Assistant is not set up yet" and offers **Open Settings**.
 

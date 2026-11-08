@@ -1,6 +1,7 @@
 import { DEFAULT_INSTANCE, listInstances } from "@/lib/connectors/instances";
 import { houseInstanceLanFetch } from "./connection";
 import { emitHouseConnected } from "./connectHooks";
+import { applyExposure } from "./exposure";
 import { fetchHouseRegistry, type HouseRegistryResult } from "./registry";
 import type { HouseLanFetchDeps } from "./connection";
 
@@ -31,7 +32,8 @@ export function peekHouseRegistry(instance: string = DEFAULT_INSTANCE): Ok | nul
   if (entry.value && connectionKey(instance) !== entry.key) { entry.value = null; entry.loadedAt = 0; }
   if (!entry.value || Date.now() - entry.loadedAt >= MAX_AGE_MS) return null;
   if (Date.now() - entry.loadedAt >= FRESH_MS) warmHouseRegistry(instance);
-  return entry.value;
+  // The exposure list is the ceiling (HOUSE-02): applied on every read so a saved change takes effect at once.
+  return applyExposure(instance, entry.value);
 }
 
 export function warmHouseRegistry(instance: string = DEFAULT_INSTANCE): void {

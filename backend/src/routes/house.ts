@@ -11,6 +11,7 @@ import { fetchHouseRegistry, type HouseRegistryResult } from "@/lib/house/regist
 import { houseAccess, type HouseActor, type HouseBand, type EffectivePermission } from "@/lib/house/access";
 import { performHouseAction, houseServiceCall, supportedActions, type HouseActionInput, type HouseActionName, type HouseActionResult } from "@/lib/house/act";
 import { visibleHouseEntities } from "@/lib/house/tool";
+import { applyExposure } from "@/lib/house/exposure";
 import { requireRoleOrGrant } from "@/middleware/auth";
 import { listActivePeople } from "@/lib/access";
 import type { HouseEntity } from "@/lib/house/registry";
@@ -32,7 +33,7 @@ let recent: { at: number; value: Promise<HouseRegistryResult> } | null = null;
 function freshRegistry(): Promise<HouseRegistryResult> {
   if (recent && Date.now() - recent.at < 2000) return recent.value;
   const connection = houseLanFetch();
-  const value: Promise<HouseRegistryResult> = connection.ok ? fetchHouseRegistry({ lanFetch: connection.lanFetch, token: connection.token }) : Promise.resolve({ ok: false, kind: "unreachable" });
+  const value: Promise<HouseRegistryResult> = connection.ok ? fetchHouseRegistry({ lanFetch: connection.lanFetch, token: connection.token }).then((result) => result.ok ? applyExposure("default", result) : result) : Promise.resolve({ ok: false, kind: "unreachable" });
   recent = { at: Date.now(), value };
   return value;
 }

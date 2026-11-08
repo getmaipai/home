@@ -787,6 +787,13 @@ function endAdultUnlock(): void {
   revokeAdultBlobs();
 }
 
+export type HouseInstance = { type: string; instance: string; label: string; address: string; enabled: boolean; virtual: boolean; hasToken: boolean };
+export type HouseExposureEditor = {
+  configured: boolean; exposedAreas: string[]; exposedEntities: string[];
+  areas: Array<{ id: string; name: string }>;
+  entities: Array<{ id: string; name: string; kind: string; area: string | null; sensitive: string | null }>;
+};
+
 export async function request<T>(path: string, init?: RequestInit & { timeoutMs?: number }): Promise<T> {
   // An explicit sign-out discards the copies (a shared browser). An expired session never does.
   if (path === "/api/auth/logout") { endAdultUnlock(); await removeAllOfflineMedia(); }
@@ -1367,6 +1374,13 @@ export const api = {
   createGrant: (input: { person: string; action: string; effect: "allow" | "deny" }) => request<CodingGrant>("/api/grants", { method: "POST", body: JSON.stringify(input) }),
   revokeGrant: (id: string) => request<{ id: string }>(`/api/grants/${encodeURIComponent(id)}`, { method: "DELETE" }),
   houseTest: () => request<{ ok: true; rooms: number; devices: number } | { ok: false; kind: string; nextStep: string }>("/api/house/test", { method: "POST" }),
+  houseInstances: () => request<{ instances: HouseInstance[] }>("/api/house/connectors/home_assistant"),
+  houseAddInstance: (input: { label: string; address: string; token: string }) => request<HouseInstance>("/api/house/connectors/home_assistant", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(input) }),
+  houseUpdateInstance: (slug: string, input: { label?: string; address?: string; enabled?: boolean; token?: string }) => request<HouseInstance>(`/api/house/connectors/home_assistant/${encodeURIComponent(slug)}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(input) }),
+  houseRemoveInstance: (slug: string) => request<{ ok: true }>(`/api/house/connectors/home_assistant/${encodeURIComponent(slug)}`, { method: "DELETE" }),
+  houseTestInstance: (slug: string) => request<{ ok: true; rooms: number; devices: number } | { ok: false; kind: string; nextStep: string }>(`/api/house/connectors/home_assistant/${encodeURIComponent(slug)}/test`, { method: "POST" }),
+  houseExposure: (slug: string) => request<HouseExposureEditor>(`/api/house/connectors/home_assistant/${encodeURIComponent(slug)}/exposure`),
+  houseSaveExposure: (slug: string, input: { areas: string[]; entities: string[] }) => request<{ ok: true }>(`/api/house/connectors/home_assistant/${encodeURIComponent(slug)}/exposure`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(input) }),
   houseAdminRegistry: () => request<{ rooms: Array<{ id: string; name: string; entities: Array<{ id: string; name: string; kind: string; sensitive: string | null }> }>; people: Array<{ id: string; name: string; role: string }> }>("/api/house/admin/registry"),
   houseAdminEffective: (personId: string) => request<{ rooms: Record<string, { see: boolean; control: boolean }>; entities: Record<string, { see: boolean; control: boolean; confirm: boolean; sensitive: boolean }> }>(`/api/house/admin/effective?person=${encodeURIComponent(personId)}`),
   wakewordStatus: () => request<{ detectors: { id: string; label: string; file: string }[]; installed: boolean }>("/api/voice/wakewords"),

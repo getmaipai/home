@@ -33,8 +33,29 @@ describe("House settings", () => {
     const { view, restore } = setup("owner");
     await waitFor(() => expect(view.getByText("Front lock")).toBeTruthy());
     expect(view.getAllByText("Locked by rule").length).toBeGreaterThan(0);
-    await act(async () => fireEvent.click(view.getByRole("button", { name: "Test connection" })));
+    await waitFor(() => expect(view.getByRole("button", { name: "Test Home" })).toBeTruthy());
+    await act(async () => fireEvent.click(view.getByRole("button", { name: "Test Home" })));
     await waitFor(() => expect(view.getByText("Connected · 2 rooms · 4 devices")).toBeTruthy());
+    restore();
+  });
+  test("lists the connection with no token shown, and the exposure list loads on open and saves", async () => {
+    const { view, restore } = setup("owner");
+    await waitFor(() => expect(view.getByText(/http:\/\/192\.168\.1\.20:8123 · Token saved/)).toBeTruthy());
+    const saves: unknown[] = [];
+    const base = globalThis.fetch;
+    globalThis.fetch = ((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = (typeof input === "string" ? input : input.toString()).split("?")[0]!;
+      if (url.endsWith("/default/exposure") && init?.method === "PUT") { saves.push(JSON.parse(String(init.body))); return Promise.resolve(Response.json({ ok: true })); }
+      return base(input, init);
+    }) as typeof fetch;
+    await act(async () => fireEvent.click(view.getByRole("button", { name: "What Home can see in Home" })));
+    await waitFor(() => expect(view.getByLabelText("Whole room Kitchen")).toBeTruthy());
+    expect(view.getByText(/Nothing is chosen yet/)).toBeTruthy();
+    expect(view.getByText(/needs its own permission for each person/)).toBeTruthy();
+    await act(async () => fireEvent.click(view.getByLabelText("Whole room Kitchen")));
+    await act(async () => fireEvent.click(view.getByRole("button", { name: "Save what Home can see" })));
+    await waitFor(() => expect(saves).toEqual([{ areas: ["k"], entities: [] }]));
+    globalThis.fetch = base;
     restore();
   });
   test("changing to control writes see and control, then none revokes both", async () => {

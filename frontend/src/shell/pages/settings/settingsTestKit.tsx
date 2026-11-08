@@ -79,6 +79,9 @@ export function mockHome({ robots = false, robotsEnabled = robots, wakeword = fa
     if (route.endsWith("/api/house/admin/effective")) return Promise.resolve(Response.json({ rooms: { k: { see: false, control: false } }, entities: { "light.k": { see: false, control: false, confirm: false, sensitive: false }, "lock.front": { see: false, control: false, confirm: false, sensitive: true } } }));
     if (route.endsWith("/api/grants")) return Promise.resolve(Response.json([]));
     if (route === "/api/house/test" && init?.method === "POST") return Promise.resolve(Response.json({ ok: true, rooms: 2, devices: 4 }));
+    if (route === "/api/house/connectors/home_assistant" && (!init?.method || init.method === "GET")) return Promise.resolve(Response.json({ instances: [{ type: "home_assistant", instance: "default", label: "Home", address: "http://192.168.1.20:8123", enabled: true, virtual: true, hasToken: true }] }));
+    if (route === "/api/house/connectors/home_assistant/default/test" && init?.method === "POST") return Promise.resolve(Response.json({ ok: true, rooms: 2, devices: 4 }));
+    if (route === "/api/house/connectors/home_assistant/default/exposure" && (!init?.method || init.method === "GET")) return Promise.resolve(Response.json({ configured: false, exposedAreas: [], exposedEntities: [], areas: [{ id: "k", name: "Kitchen" }], entities: [{ id: "light.k", name: "Light", kind: "light", area: "k", sensitive: null }, { id: "lock.front", name: "Front lock", kind: "lock", area: null, sensitive: "lock" }] }));
     if (route.endsWith("/api/setup-checklist")) return Promise.resolve(Response.json(setupChecklist));
     if (route.endsWith("/api/engine-link/credentials")) return Promise.resolve(Response.json({ paired: false }));
     if (route.endsWith("/api/search/web")) return Promise.resolve(Response.json({ address: "", works: null, stackOwned: false, sources: ["ddgs"], ddgsReady: true }));

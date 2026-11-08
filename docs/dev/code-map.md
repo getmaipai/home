@@ -313,6 +313,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `frontend/src/shell/pages/settings/ChatSkillsSection.tsx` | ChatSkillsSection |
 | `frontend/src/shell/pages/settings/ClockCardRenderer.tsx` | ClockCardRenderer |
 | `frontend/src/shell/pages/settings/DeviceAppearanceControl.tsx` | DeviceAppearanceControl |
+| `frontend/src/shell/pages/settings/HouseConnections.tsx` | HouseConnections |
 | `frontend/src/shell/pages/settings/HouseSettings.tsx` | HouseSettings |
 | `frontend/src/shell/pages/settings/MediaCardViews.tsx` | STYLES_CARD_KEYS, MediaKidsView, MediaPicturesView, MediaVideosView, MediaMusicView, MediaStylesView |
 | `frontend/src/shell/pages/settings/PersonMultiSelect.tsx` | PersonMultiSelect |
@@ -452,7 +453,9 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/companionsApp.ts` | currentCompanionId, mayUseCompanion, companionAreaOn, canCreateCompanion, cardOf, listCompanionCards |
 | `backend/src/lib/composer.ts` | COMPOSE_FALLBACK_LINE, COMPOSER_MAX_CALLS, COMPOSE_FAILURE_LINE, DEFAULT_MOVES, groundedIn, emptyLookupLine |
 | `backend/src/lib/computerMemory.ts` | describeComputerMemory |
+| `backend/src/lib/connectors/credentials.ts` | CONNECTOR_REF_PREFIX, isConnectorRef, writeConnectorSecret, readConnectorSecret, deleteConnectorSecret |
 | `backend/src/lib/connectors/instances.ts` | DEFAULT_INSTANCE, listInstances, resolveInstance, instanceLanFetch |
+| `backend/src/lib/connectors/manage.ts` | MAX_INSTANCES_PER_TYPE, checkAddress, slugFor, listInstanceViews, addInstance, updateInstance |
 | `backend/src/lib/consentVocab.ts` | CONSENT_WORD, AFFIRMATIVE_RE, NEGATIVE_RE, SHORT_ANSWERS |
 | `backend/src/lib/contentCeiling.ts` | CONTENT_CEILINGS, getCeilingForBand, getMinorCeilingForBand, hasUnrestrictedGrant |
 | `backend/src/lib/contentPolicy.ts` | CHILD_UNSAFE_TERMS, CHILD_IP_NAMES, createContentPolicyResolver, contentPolicyFor, filtersFor |
@@ -529,6 +532,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/house/cache.ts` | peekHouseRegistry, warmHouseRegistry, loadHouseRegistry, peekHouseRegistries, warmHouseRegistries, loadHouseRegistries |
 | `backend/src/lib/house/connectHooks.ts` | onHouseConnected, emitHouseConnected, __clearHouseConnectHooksForTests, onScheduleRecheck, emitScheduleRecheck, __clearScheduleRechecksForTests |
 | `backend/src/lib/house/connection.ts` | houseLanFetch, houseInstanceLanFetch, houseAnyConnected |
+| `backend/src/lib/house/exposure.ts` | getExposure, setExposure, deleteExposure, applyExposure |
 | `backend/src/lib/house/ids.ts` | HOUSE_TOOL_ID |
 | `backend/src/lib/house/registry.ts` | classify, fetchHouseRegistry |
 | `backend/src/lib/house/scheduleTool.ts` | SCHEDULE_ACTIONS, isScheduleAction, SCHEDULE_DO, whenShape, canUseSchedules, describeWhen |

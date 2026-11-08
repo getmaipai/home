@@ -565,7 +565,7 @@ msgid "{hours} h {remainder} min"
 msgstr "{hours} h {remainder} min"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/settings/HouseSettings.tsx:50
+#: src/shell/pages/settings/HouseSettings.tsx:47
 #, needs-review
 msgid "{item} access for {person}"
 msgstr "Acceso a {item} para {person}"
@@ -1289,7 +1289,7 @@ msgid "{roles, plural, one {# role} other {# roles}}, {engines, plural, one {# e
 msgstr "{roles, plural, one {# rol} other {# roles}}, {engines, plural, one {# motor} other {# motores}} -"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/settings/HouseSettings.tsx:49
+#: src/shell/pages/settings/HouseSettings.tsx:46
 #, needs-review
 msgid "{room} access for {person}"
 msgstr "Acceso a {room} para {person}"
@@ -3203,8 +3203,8 @@ msgid "Also on {join}."
 msgstr "También en {join}."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/settings/HouseSettings.tsx:49
-#: src/shell/pages/settings/HouseSettings.tsx:50
+#: src/shell/pages/settings/HouseSettings.tsx:46
+#: src/shell/pages/settings/HouseSettings.tsx:47
 #, needs-review
 msgid "Always allowed"
 msgstr "Siempre permitido"
@@ -6799,7 +6799,7 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/apps/settings/TwoStepSignInSection.tsx:50
 #: src/shell/components/DataTableRowActions.tsx:57
-#: src/shell/pages/settings/HouseSettings.tsx:50
+#: src/shell/pages/settings/HouseSettings.tsx:47
 #: src/shell/pages/settings/SettingsRenderer.tsx:179
 #: src/shell/pages/UpdatesPage.tsx:204
 #, needs-review
@@ -6831,12 +6831,6 @@ msgid "Connect a coding tool"
 msgstr "Conectar una herramienta de código"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/settings/HouseSettings.tsx:22
-#, needs-review
-msgid "Connected · {rooms, plural, one {# room} other {# rooms}} · {devices, plural, one {# device} other {# devices}}"
-msgstr "Conectado · {rooms, plural, one {# habitación} other {# habitaciones}} · {devices, plural, one {# dispositivo} other {# dispositivos}}"
-
-#. js-lingui-explicit-id
 #: src/apps/settings/StackChanInstallDialog.tsx:17
 #: src/shell/GlobalMiniPlayer.tsx:115
 #: src/shell/pages/StatusPage.tsx:25
@@ -6852,8 +6846,6 @@ msgstr "Conectando al StackChan. Esto puede tardar hasta 30 segundos."
 
 #. js-lingui-explicit-id
 #: src/apps/settings/HouseholdRobotsSection.tsx:156
-#: src/shell/pages/settings/HouseSettings.tsx:45
-#: src/shell/pages/settings/HouseSettings.tsx:45
 msgid "Connection"
 msgstr ""
 
@@ -6892,8 +6884,8 @@ msgid "setting.ease.contrast.label"
 msgstr "Contraste"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/settings/HouseSettings.tsx:49
-#: src/shell/pages/settings/HouseSettings.tsx:50
+#: src/shell/pages/settings/HouseSettings.tsx:46
+#: src/shell/pages/settings/HouseSettings.tsx:47
 #, needs-review
 msgid "Control"
 msgstr "Control"
@@ -7338,7 +7330,7 @@ msgid "Could not hide this item. Try again."
 msgstr "No se pudo ocultar este elemento. Intenta de nuevo."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/settings/HouseSettings.tsx:47
+#: src/shell/pages/settings/HouseSettings.tsx:44
 #, needs-review
 msgid "Could not load access rules. Check your connection and try again."
 msgstr "No se pudieron cargar las reglas de acceso. Revisa tu conexión e inténtalo de nuevo."
@@ -7392,7 +7384,7 @@ msgid "Could not load conversations. Check your connection and try again."
 msgstr "No se pudieron cargar las conversaciones. Revisa tu conexión e inténtalo de nuevo."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/settings/HouseSettings.tsx:47
+#: src/shell/pages/settings/HouseSettings.tsx:44
 #, needs-review
 msgid "Could not load effective access. Check your connection and try again."
 msgstr "No se pudo cargar el acceso efectivo. Revisa tu conexión e inténtalo de nuevo."
@@ -7531,7 +7523,7 @@ msgid "Could not load the household."
 msgstr "No se pudo cargar el hogar."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/settings/HouseSettings.tsx:47
+#: src/shell/pages/settings/HouseSettings.tsx:44
 #, needs-review
 msgid "Could not load the household. Check your connection and try again."
 msgstr "No se pudo cargar el hogar. Revisa tu conexión e inténtalo de nuevo."
@@ -13952,7 +13944,7 @@ msgid "It works once and expires at {toLocaleTimeString}. The command prints a c
 msgstr "Funciona una vez y caduca a las {toLocaleTimeString}. El comando muestra un código de verificación. Guárdalo para el siguiente paso."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/settings/HouseSettings.tsx:48
+#: src/shell/pages/settings/HouseSettings.tsx:45
 #, needs-review
 msgid "Item"
 msgstr "Elemento"
@@ -15827,7 +15819,7 @@ msgid "Loading your sounds"
 msgstr "Cargando tus sonidos"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/settings/HouseSettings.tsx:47
+#: src/shell/pages/settings/HouseSettings.tsx:44
 #, needs-review
 msgid "Loading…"
 msgstr "Cargando…"
@@ -15868,7 +15860,7 @@ msgid "Locked after inactivity."
 msgstr "Bloqueado por inactividad."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/settings/HouseSettings.tsx:50
+#: src/shell/pages/settings/HouseSettings.tsx:47
 #, needs-review
 msgid "Locked by rule"
 msgstr "Bloqueado por regla"
@@ -18545,8 +18537,8 @@ msgstr "Nodo"
 #: src/apps/clock/AlarmEditor.tsx:98
 #: src/apps/clock/AlarmRecordRow.tsx:34
 #: src/shell/media/VisualizerMenu.tsx:23
-#: src/shell/pages/settings/HouseSettings.tsx:49
-#: src/shell/pages/settings/HouseSettings.tsx:50
+#: src/shell/pages/settings/HouseSettings.tsx:46
+#: src/shell/pages/settings/HouseSettings.tsx:47
 #, needs-review
 msgid "None"
 msgstr "Ninguna"
@@ -22643,9 +22635,9 @@ msgstr "Retirado. El MaiPai Stack ahora decide qué motor hace cada tarea, así 
 #: src/apps/settings/EngineLinkCredentialSection.tsx:279
 #: src/apps/settings/StackChanInstallDialog.tsx:146
 #: src/shell/GlobalMiniPlayer.tsx:120
-#: src/shell/pages/settings/HouseSettings.tsx:47
-#: src/shell/pages/settings/HouseSettings.tsx:47
-#: src/shell/pages/settings/HouseSettings.tsx:47
+#: src/shell/pages/settings/HouseSettings.tsx:44
+#: src/shell/pages/settings/HouseSettings.tsx:44
+#: src/shell/pages/settings/HouseSettings.tsx:44
 #, needs-review
 msgid "Retry"
 msgstr "Reintentar"
@@ -23301,7 +23293,7 @@ msgid "Save your backup key"
 msgstr "Guardar tu clave de copia de seguridad"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/settings/HouseSettings.tsx:47
+#: src/shell/pages/settings/HouseSettings.tsx:44
 #: src/shell/pages/WikipediaPage.tsx:90
 #: src/shell/pages/WikipediaPage.tsx:91
 #: src/shell/pages/WikipediaPage.tsx:156
@@ -23977,8 +23969,8 @@ msgid "Secure DNS addresses"
 msgstr "Direcciones seguras de DNS"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/settings/HouseSettings.tsx:49
-#: src/shell/pages/settings/HouseSettings.tsx:50
+#: src/shell/pages/settings/HouseSettings.tsx:46
+#: src/shell/pages/settings/HouseSettings.tsx:47
 #, needs-review
 msgid "See"
 msgstr "Ver"
@@ -26788,12 +26780,6 @@ msgid "Test again"
 msgstr "Probar de nuevo"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/settings/HouseSettings.tsx:46
-#, needs-review
-msgid "Test connection"
-msgstr "Probar conexión"
-
-#. js-lingui-explicit-id
 #: src/shell/pages/companionFlow/CustomizeStep.tsx:184
 #, needs-review
 msgid "Test Conversation"
@@ -26812,7 +26798,6 @@ msgstr "Prueba"
 
 #. js-lingui-explicit-id
 #: src/apps/settings/RobotSelfTests.tsx:39
-#: src/shell/pages/settings/HouseSettings.tsx:46
 msgid "Testing…"
 msgstr ""
 
@@ -31477,8 +31462,8 @@ msgid "Who can code"
 msgstr "Quién puede programar"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/settings/HouseSettings.tsx:47
-#: src/shell/pages/settings/HouseSettings.tsx:47
+#: src/shell/pages/settings/HouseSettings.tsx:44
+#: src/shell/pages/settings/HouseSettings.tsx:44
 #, needs-review
 msgid "Who can control what"
 msgstr "Quién puede controlar qué"

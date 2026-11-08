@@ -479,7 +479,7 @@ msgid "{hours} h {remainder} min"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/settings/HouseSettings.tsx:50
+#: src/shell/pages/settings/HouseSettings.tsx:47
 msgid "{item} access for {person}"
 msgstr ""
 
@@ -1091,7 +1091,7 @@ msgid "{roles, plural, one {# role} other {# roles}}, {engines, plural, one {# e
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/settings/HouseSettings.tsx:49
+#: src/shell/pages/settings/HouseSettings.tsx:46
 msgid "{room} access for {person}"
 msgstr ""
 
@@ -2739,8 +2739,8 @@ msgid "Also on {join}."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/settings/HouseSettings.tsx:49
-#: src/shell/pages/settings/HouseSettings.tsx:50
+#: src/shell/pages/settings/HouseSettings.tsx:46
+#: src/shell/pages/settings/HouseSettings.tsx:47
 msgid "Always allowed"
 msgstr ""
 
@@ -5841,7 +5841,7 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/apps/settings/TwoStepSignInSection.tsx:50
 #: src/shell/components/DataTableRowActions.tsx:57
-#: src/shell/pages/settings/HouseSettings.tsx:50
+#: src/shell/pages/settings/HouseSettings.tsx:47
 #: src/shell/pages/settings/SettingsRenderer.tsx:179
 #: src/shell/pages/UpdatesPage.tsx:204
 msgid "Confirm"
@@ -5868,11 +5868,6 @@ msgid "Connect a coding tool"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/settings/HouseSettings.tsx:22
-msgid "Connected · {rooms, plural, one {# room} other {# rooms}} · {devices, plural, one {# device} other {# devices}}"
-msgstr ""
-
-#. js-lingui-explicit-id
 #: src/apps/settings/StackChanInstallDialog.tsx:17
 #: src/shell/GlobalMiniPlayer.tsx:115
 #: src/shell/pages/StatusPage.tsx:25
@@ -5886,8 +5881,6 @@ msgstr ""
 
 #. js-lingui-explicit-id
 #: src/apps/settings/HouseholdRobotsSection.tsx:156
-#: src/shell/pages/settings/HouseSettings.tsx:45
-#: src/shell/pages/settings/HouseSettings.tsx:45
 msgid "Connection"
 msgstr ""
 
@@ -5922,8 +5915,8 @@ msgid "setting.ease.contrast.label"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/settings/HouseSettings.tsx:49
-#: src/shell/pages/settings/HouseSettings.tsx:50
+#: src/shell/pages/settings/HouseSettings.tsx:46
+#: src/shell/pages/settings/HouseSettings.tsx:47
 msgid "Control"
 msgstr ""
 
@@ -6302,7 +6295,7 @@ msgid "Could not hide this item. Try again."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/settings/HouseSettings.tsx:47
+#: src/shell/pages/settings/HouseSettings.tsx:44
 msgid "Could not load access rules. Check your connection and try again."
 msgstr ""
 
@@ -6347,7 +6340,7 @@ msgid "Could not load conversations. Check your connection and try again."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/settings/HouseSettings.tsx:47
+#: src/shell/pages/settings/HouseSettings.tsx:44
 msgid "Could not load effective access. Check your connection and try again."
 msgstr ""
 
@@ -6464,7 +6457,7 @@ msgid "Could not load the household."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/settings/HouseSettings.tsx:47
+#: src/shell/pages/settings/HouseSettings.tsx:44
 msgid "Could not load the household. Check your connection and try again."
 msgstr ""
 
@@ -11951,7 +11944,7 @@ msgid "It works once and expires at {toLocaleTimeString}. The command prints a c
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/settings/HouseSettings.tsx:48
+#: src/shell/pages/settings/HouseSettings.tsx:45
 msgid "Item"
 msgstr ""
 
@@ -13556,7 +13549,7 @@ msgid "Loading your sounds"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/settings/HouseSettings.tsx:47
+#: src/shell/pages/settings/HouseSettings.tsx:44
 msgid "Loading…"
 msgstr ""
 
@@ -13591,7 +13584,7 @@ msgid "Locked after inactivity."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/settings/HouseSettings.tsx:50
+#: src/shell/pages/settings/HouseSettings.tsx:47
 msgid "Locked by rule"
 msgstr ""
 
@@ -15876,8 +15869,8 @@ msgstr ""
 #: src/apps/clock/AlarmEditor.tsx:98
 #: src/apps/clock/AlarmRecordRow.tsx:34
 #: src/shell/media/VisualizerMenu.tsx:23
-#: src/shell/pages/settings/HouseSettings.tsx:49
-#: src/shell/pages/settings/HouseSettings.tsx:50
+#: src/shell/pages/settings/HouseSettings.tsx:46
+#: src/shell/pages/settings/HouseSettings.tsx:47
 msgid "None"
 msgstr ""
 
@@ -19385,9 +19378,9 @@ msgstr ""
 #: src/apps/settings/EngineLinkCredentialSection.tsx:279
 #: src/apps/settings/StackChanInstallDialog.tsx:146
 #: src/shell/GlobalMiniPlayer.tsx:120
-#: src/shell/pages/settings/HouseSettings.tsx:47
-#: src/shell/pages/settings/HouseSettings.tsx:47
-#: src/shell/pages/settings/HouseSettings.tsx:47
+#: src/shell/pages/settings/HouseSettings.tsx:44
+#: src/shell/pages/settings/HouseSettings.tsx:44
+#: src/shell/pages/settings/HouseSettings.tsx:44
 msgid "Retry"
 msgstr ""
 
@@ -19973,7 +19966,7 @@ msgid "Save your backup key"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/settings/HouseSettings.tsx:47
+#: src/shell/pages/settings/HouseSettings.tsx:44
 #: src/shell/pages/WikipediaPage.tsx:90
 #: src/shell/pages/WikipediaPage.tsx:91
 #: src/shell/pages/WikipediaPage.tsx:156
@@ -20552,8 +20545,8 @@ msgid "Secure DNS addresses"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/settings/HouseSettings.tsx:49
-#: src/shell/pages/settings/HouseSettings.tsx:50
+#: src/shell/pages/settings/HouseSettings.tsx:46
+#: src/shell/pages/settings/HouseSettings.tsx:47
 msgid "See"
 msgstr ""
 
@@ -22969,11 +22962,6 @@ msgid "Test again"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/settings/HouseSettings.tsx:46
-msgid "Test connection"
-msgstr ""
-
-#. js-lingui-explicit-id
 #: src/shell/pages/companionFlow/CustomizeStep.tsx:184
 msgid "Test Conversation"
 msgstr ""
@@ -22990,7 +22978,6 @@ msgstr ""
 
 #. js-lingui-explicit-id
 #: src/apps/settings/RobotSelfTests.tsx:39
-#: src/shell/pages/settings/HouseSettings.tsx:46
 msgid "Testing…"
 msgstr ""
 
@@ -26972,8 +26959,8 @@ msgid "Who can code"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/settings/HouseSettings.tsx:47
-#: src/shell/pages/settings/HouseSettings.tsx:47
+#: src/shell/pages/settings/HouseSettings.tsx:44
+#: src/shell/pages/settings/HouseSettings.tsx:44
 msgid "Who can control what"
 msgstr ""
 
