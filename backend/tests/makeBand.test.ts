@@ -125,7 +125,7 @@ describe("who may make a band", () => {
   test("a child is told no band was made, and no band record is written", async () => {
     song(null);
     const result = await makeBand({ state: state(nova), mediaId: "media-song000001", callId: "call-1", spoken: false });
-    expect(result).toEqual({ ok: false, line: BAND_NOT_HERE_LINE });
+    expect(result).toEqual({ ok: false, line: "Bands, albums, sound effects and saved styles are for adults. You can make a song here instead." });
     expect(db.select().from(madeArtists).all()).toHaveLength(0);
   });
   test("a spoken turn makes no band", async () => {
@@ -181,7 +181,8 @@ describe("the band actions", () => {
   test("a missing band is 404 and another person's band is 404 for them, not a leak", async () => {
     expect(await runBandAction(sage, "mband-nothere0000", "keep")).toMatchObject({ ok: false, status: 404 });
     const id = band();
-    expect(await runBandAction(nova, id, "discard")).toMatchObject({ ok: false, status: 404 });
+    // A child is refused as a minor (403) before any band is looked up, so nothing about the band leaks either way.
+    expect(await runBandAction(nova, id, "discard")).toMatchObject({ ok: false, status: 403 });
     expect(db.select().from(madeArtists).all()).toHaveLength(1);
   });
   test("keep with no finished single is pending, not an error", async () => {
