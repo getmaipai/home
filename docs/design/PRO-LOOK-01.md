@@ -876,9 +876,12 @@ and the 16 pt gutter, 34 to 40 pt titles and flat surfaces of sections 4 and 5.
   to the name on desktop. One line of bio, then Edit profile (inverse pill), Share and Settings (quiet pills). A row of round highlights
   (the person's companions, favorites and collections). A four-icon tab strip (all, videos, songs, with family) and an edge-to-edge
   three-column grid on phone (five on desktop) of the person's own creations, square, 2 pt gaps, a corner badge for video and song.
-- **Family page** (`phone-family`; desktop stays `desktop-family`): the household title with a one-line count, a strip of round avatars
-  with an Add tile, a People section of flat cards (avatar, name, role and one count, chevron), the Companions shelf, and a
-  "Shared with everyone" grid.
+- **Family page** (`phone-family`, `desktop-family`): the household title with a one-line count (people, pets, robots, companions), a strip of
+  round avatars (people, then pets, then robots), a People section of flat cards (avatar, name, role, one count, chevron) and a
+  Pets and robots section of the same cards (a paw or robot glyph on the avatar, "lives with everyone" or "online, living room").
+  **Companions are not a separate shelf: each companion appears as a chip inside the card of the family member who has it, with a
+  "Companion" add chip** (Jesse, 2026-11-08). Pets and robots are family members in their own right; a robot is the bot that pairs
+  with the hub (org products table). The old Companions entry in the Family side column goes; a companion's page opens from its chip.
 - **Rules that still hold:** what a teen or child profile shows follows the existing age and surface gates (a parent-set view of a teen is
   limited to what P4a allows; teen settings stay private); the grid uses the kit media shelf and tiles, never a Home wrapper; the counts
   and grid read from existing library records. Slice: PRO-LOOK-SETTINGS-01 gains a sub-slice FAMILY-PROFILE-01 (person profile route

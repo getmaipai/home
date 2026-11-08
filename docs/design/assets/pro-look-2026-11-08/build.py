@@ -545,7 +545,7 @@ write('phone-notifications',phone(body))
 print('create ok')
 
 # ---------- PROFILE + FAMILY (Instagram / TikTok style profile pages) 2026-11-08
-GR={'Sage':'linear-gradient(135deg,#ffb547,#ff5f7e)','Marlow':'linear-gradient(135deg,#2fd4c0,#4aa3ff)','Nova':'linear-gradient(135deg,#b48cff,#ff4fa8)','Tessa':'radial-gradient(circle at 35% 28%,#ffd9a0,#ff9a3c 70%)'}
+GR={'Sage':'linear-gradient(135deg,#ffb547,#ff5f7e)','Marlow':'linear-gradient(135deg,#2fd4c0,#4aa3ff)','Nova':'linear-gradient(135deg,#b48cff,#ff4fa8)','Clover':'radial-gradient(circle at 35% 28%,#ffd9a0,#ff9a3c 70%)'}
 def pav(n,size,ring=False):
     return f'<div class="av {"ring" if ring else ""}" style="width:{size}px;height:{size}px;background:{GR[n]}"></div>'
 def stat(n,l,big=False):
@@ -566,7 +566,7 @@ body=f'''<div class="scroll" style="padding-bottom:110px"><div style="display:fl
 <div style="display:flex;gap:22px;align-items:center;margin-top:14px">{pav("Marlow",92,True)}<div style="flex:1"><div style="font-size:12px;font-weight:700;letter-spacing:.12em;color:var(--fg3)">TEEN</div><div style="display:flex;justify-content:space-between;margin-top:8px">{stat("14","songs")}{stat("9","videos")}{stat("62","pictures")}</div></div></div>
 <div style="margin-top:14px;font-size:15px;color:var(--fg2);line-height:1.4">Makes beats after school. Likes rainy porch songs and slow mornings.</div>
 <div style="display:flex;gap:10px;margin-top:16px"><div class="pill inv" style="flex:1;justify-content:center;height:44px;font-size:16px">Edit profile</div><div class="pill q" style="flex:1;justify-content:center;height:44px;font-size:16px">Share</div><div class="pill q" style="width:48px;height:44px;justify-content:center;padding:0">{ic("settings",20,1.9)}</div></div>
-<div class="strip" style="margin-top:20px;gap:6px">{hl("Tessa","ember",301)}{hl("Favorites","violet",302)}{hl("Porch","forest",303)}{hl("School","ocean",304)}{hl("New","slate",305)}</div>
+<div class="strip" style="margin-top:20px;gap:6px">{hl("Clover","ember",301)}{hl("Favorites","violet",302)}{hl("Porch","forest",303)}{hl("School","ocean",304)}{hl("New","slate",305)}</div>
 {tabs(["grid-2x2","play","music","users"],0)}
 <div style="margin:0 -16px">{grid(3,12)}</div></div>{tabbar("Family",(('house','Home'),('message-circle','Chat'),('play','Media'),('library','Library'),('users','Family')))}'''
 write('phone-profile',phone(body))
@@ -586,8 +586,42 @@ inner=f'''{rail("Family")}{col("FAMILY",[("users","People"),("sparkles","Compani
 <div style="display:flex;gap:44px;margin-top:14px">{stat("14","songs",True)}{stat("9","videos",True)}{stat("62","pictures",True)}</div>
 <div style="margin-top:14px;font-size:16px;color:var(--fg2);max-width:560px;line-height:1.45">Makes beats after school. Likes rainy porch songs and slow mornings.</div>
 <div style="display:flex;gap:10px;margin-top:18px"><span class="pill inv" style="height:44px;padding:0 24px">Edit profile</span><span class="pill q" style="height:44px;padding:0 24px">Share</span><span class="pill q" style="height:44px;width:48px;justify-content:center;padding:0">{ic("settings",20,1.9)}</span></div></div></div>
-<div style="display:flex;gap:10px;margin-top:26px">{hl("Tessa","ember",301,72)}{hl("Favorites","violet",302,72)}{hl("Porch","forest",303,72)}{hl("School","ocean",304,72)}</div>
+<div style="display:flex;gap:10px;margin-top:26px">{hl("Clover","ember",301,72)}{hl("Favorites","violet",302,72)}{hl("Porch","forest",303,72)}{hl("School","ocean",304,72)}</div>
 {tabs(["grid-2x2","play","music","users"],0)}
 <div style="margin-top:3px;width:100%">{grid(5,10)}</div></div></div>'''
 write('desktop-profile',win(inner))
 print('profile ok')
+
+# ---------- FAMILY v2: companions live under the member who has them; pets and robots are family (2026-11-08)
+GR['Bruno']='linear-gradient(135deg,#d9a35b,#8a5a2b)'; GR['Rover']='linear-gradient(135deg,#9fb4d6,#4b5f86)'; GR['Ember']='radial-gradient(circle at 35% 28%,#bfe8ff,#6a86ff 70%)'
+PAW='<svg width="{s}" height="{s}" viewBox="0 0 24 24" fill="currentColor"><ellipse cx="6" cy="11" rx="2" ry="2.6"/><ellipse cx="10" cy="6.5" rx="2" ry="2.6"/><ellipse cx="14" cy="6.5" rx="2" ry="2.6"/><ellipse cx="18" cy="11" rx="2" ry="2.6"/><path d="M12 12c-3 0-5.5 2.6-5.5 5 0 1.6 1.3 2.5 2.7 2.5 1 0 1.7-.5 2.8-.5s1.8.5 2.8.5c1.4 0 2.7-.9 2.7-2.5 0-2.4-2.5-5-5.5-5z"/></svg>'
+BOT='<svg width="{s}" height="{s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="8" width="16" height="11" rx="3"/><path d="M12 8V4M9 13h.01M15 13h.01M2 13v2M22 13v2"/></svg>'
+def kindav(n,kind,size):
+    glyph=(PAW if kind=='pet' else BOT).format(s=int(size*.46))
+    return f'<div class="av" style="width:{size}px;height:{size}px;background:{GR[n]};display:flex;align-items:center;justify-content:center;color:rgba(255,255,255,.92)">{glyph}</div>'
+def cchip(n,sz=34):
+    return f'<div style="display:flex;align-items:center;gap:8px;height:44px;border-radius:999px;padding:0 14px 0 5px;background:var(--s2);box-shadow:inset 0 0 0 1px var(--hair);font-size:14px;font-weight:600;flex:none"><div class="av" style="width:{sz}px;height:{sz}px;background:{GR[n]}"></div>{n}</div>'
+def addc(): return f'<div style="display:flex;align-items:center;gap:6px;height:44px;border-radius:999px;padding:0 14px;color:var(--fg2);font-size:14px;font-weight:600;box-shadow:inset 0 0 0 1px var(--hair);flex:none">{ic("plus",16,2)}Companion</div>'
+def member(n,role,stat,comps,ring=False,kind=None,wide=False):
+    av=kindav(n,kind,64) if kind else pav(n,64,ring)
+    cs=''.join(cchip(c) for c in comps)+(addc() if not kind else '')
+    if kind and not comps: cs=''
+    cr=f'<div style="display:flex;gap:8px;margin-top:14px;flex-wrap:wrap">{cs}</div>' if cs else ''
+    return f'<div style="background:var(--s1);box-shadow:inset 0 0 0 1px var(--hair);padding:14px;border-radius:22px;margin-bottom:10px"><div style="display:flex;gap:14px;align-items:center">{av}<div style="flex:1;min-width:0"><b style="font-size:18px">{n}</b><div style="font-size:14px;color:var(--fg2);margin-top:2px">{role} · {stat}</div></div>{ic("chevron-right",20,2)}</div>{cr}</div>'
+TAB=(('house','Home'),('message-circle','Chat'),('play','Media'),('library','Library'),('users','Family'))
+body=f'''<div class="scroll" style="padding-bottom:110px"><div style="display:flex;justify-content:space-between;align-items:center;height:44px"><div class="circ glass">{ic("panel-left",22,1.8)}</div><div style="display:flex;gap:10px;align-items:center"><div class="circ glass">{ic("plus",22,2)}</div>{companion(36)}</div></div>
+<h1 class="t" style="margin-top:14px">Family</h1><div style="color:var(--fg2);font-size:16px;margin-top:4px">3 people · 1 pet · 1 robot · 2 companions</div>
+<div class="strip" style="margin-top:20px;gap:8px;padding:4px 0 4px 4px">{"".join(f'<div style="text-align:center;width:84px;flex:none">{pav(n,68,n=="Sage")}<div style="font-size:14px;font-weight:600;margin-top:8px">{n}</div></div>' for n in ["Sage","Marlow","Nova"])}<div style="text-align:center;width:84px;flex:none">{kindav("Bruno","pet",68)}<div style="font-size:14px;font-weight:600;margin-top:8px">Bruno</div></div><div style="text-align:center;width:84px;flex:none">{kindav("Rover","bot",68)}<div style="font-size:14px;font-weight:600;margin-top:8px">Rover</div></div></div>
+<div class="sh"><h2>People</h2><a>Manage {ic("chevron-right",16,2)}</a></div>{member("Sage","Owner","112 songs",["Clover"],True)}{member("Marlow","Teen","14 songs",["Ember"])}{member("Nova","Child","6 videos",[])}
+<div class="sh"><h2>Pets and robots</h2><a>Add {ic("plus",16,2)}</a></div>{member("Bruno","Dog","lives with everyone",[],kind="pet")}{member("Rover","Robot","online · living room",[],kind="bot")}</div>{tabbar("Family",TAB)}'''
+write('phone-family',phone(body))
+def dmember(n,role,stat,comps,ring=False,kind=None):
+    av=kindav(n,kind,72) if kind else pav(n,72,ring)
+    cs=''.join(cchip(c) for c in comps)+(addc() if not kind else '')
+    return f'<div class="card" style="padding:18px;border-radius:22px"><div style="display:flex;gap:16px;align-items:center">{av}<div style="flex:1"><b style="font-size:19px">{n}</b><div style="font-size:14px;color:var(--fg2);margin-top:2px">{role} · {stat}</div></div>{ic("chevron-right",20,2)}</div>'+(f'<div style="display:flex;gap:8px;margin-top:16px;flex-wrap:wrap">{cs}</div>' if (cs and not kind) else '')+'</div>'
+inner=f'''{rail("Family")}{col("FAMILY",[("users","People"),("lock","Safety"),("clock","Activity")],"People")}<div class="panel" style="left:332px"><div class="glow"></div><div class="hdr"><div class="ttl">Family</div><div class="btns"><span class="pill inv" style="height:38px;font-size:14px">{ic("plus",16,2.2)}Add to family</span>{companion(38)}</div></div><div style="padding:0 36px;position:absolute;top:68px;left:0;right:0;bottom:0;overflow:hidden">
+<div style="display:flex;gap:26px;align-items:flex-end;margin-top:6px">{pav("Sage",120,True)}<div><div style="font-size:12px;font-weight:700;letter-spacing:.12em;color:var(--fg3)">OWNER</div><h1 style="font-size:52px;font-weight:800;letter-spacing:-.035em;line-height:1.05">Sage</h1><div style="color:var(--fg2);font-size:16px;margin-top:4px">3 people · 1 pet · 1 robot · 2 companions</div></div></div>
+<div class="sh" style="margin:28px 0 12px"><h2>People</h2><a>Manage {ic("chevron-right",16,2)}</a></div><div style="display:grid;grid-template-columns:repeat(3,1fr);gap:14px">{dmember("Sage","Owner","112 songs",["Clover"],True)}{dmember("Marlow","Teen","14 songs",["Ember"])}{dmember("Nova","Child","6 videos",[])}</div>
+<div class="sh" style="margin:28px 0 12px"><h2>Pets and robots</h2><a>Add {ic("plus",16,2)}</a></div><div style="display:grid;grid-template-columns:repeat(3,1fr);gap:14px">{dmember("Bruno","Dog","lives with everyone",[],kind="pet")}{dmember("Rover","Robot","online · living room",[],kind="bot")}</div></div></div>'''
+write('desktop-family',win(inner))
+print('family v2 ok')
