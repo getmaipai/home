@@ -17,11 +17,11 @@ Music, pictures, video, films, podcasts, chat, voice and your smart home share o
 
 ### An assistant that does things
 
-- **Ask once, and it gets done.** In one chat, ask Home to make pictures, songs, videos and short films, change them, write documents, look things up on the web, set reminders and control your lights. Songs, videos and films need the right models on your Mac.
+- **Ask once, and it gets done.** In one chat, ask Home to make pictures, songs, videos and short films, change them, write documents, look things up on the web, set reminders and control your lights.
 - **It asks before it locks a door or cancels a schedule.** After house actions, reminders and timers, an **Undo** button shows for a short time.
 - **It acts on your house.** With Home Assistant connected, turn lights on and off, lock doors and run scenes. Adults can also schedule an action for a set time, and ask Uptime Kuma which of your services are up or down.
 - **A failed step never breaks the answer.** If one tool fails, Home says so and carries on with the rest.
-- **Plug in more tools with MCP servers.** *Planned.* The building blocks are built and not yet turned on.
+- **Plug in more tools with MCP servers.** *Planned.*
 
 ### A companion that is yours
 
@@ -32,44 +32,40 @@ Music, pictures, video, films, podcasts, chat, voice and your smart home share o
 
 ### Music
 
-Making music is for adults, and needs a Mac with 64 GB or more and the music model.
-
-- **Create a song.** Describe it or write the words. Choose a quick hook or a full song, up to 2 minutes on a 64 GB Mac and 4 minutes on a 128 GB Mac. The words light up as it plays.
+- **Create a song.** Describe it or write the words. Choose a quick hook or a full song. The words light up as it plays.
 - **Create a band.** Name it, describe the sound and the look, and Home draws the members.
 - **Create an album.** A title, cover art and the songs, made in chat or in Create.
 - **Make a new song or band like the one playing.** Press **Song like this** or **Band like this** on any song.
 - **Use an existing singer.** **Sing it in another voice** with a household voice that has a saved sample. Quality varies with the sample.
-- **Make a cover or a remix.** Bring your own audio file (under 40 MB) or pick a song you made, then change its style, words, tempo or voice.
-- **Split a song into parts.** Vocals, drums, bass and everything else, in about a minute, on your own computer. Remove the vocals for karaoke.
+- **Make a cover or a remix.** Bring your own audio file or pick a song you made, then change its style, words, tempo or voice.
+- **Split a song into parts.** Vocals, drums, bass and everything else, on your own computer. Remove the vocals for karaoke.
 - **Mix in the Studio.** See each track as a waveform, then mute, solo, set the volume and add EQ.
 - **Make sound effects.** Type "a wooden door creaking open" and pick from up to three takes. Loop one with no click, or add it to a song.
 - **Add music to a video.** Home makes a track and mixes it under the clip.
-- **Play your own library.** Albums, artists, playlists, internet radio and an optional DJ that talks between songs in your companion's voice. If an admin turns it on, Home also shows song facts, artist photos and bios, and translates lyrics.
+- **Play your own library.** Albums, artists, playlists, internet radio and an optional DJ that talks between songs in your companion's voice. Home also shows song facts, artist photos and bios, and translates lyrics.
 - **Create a singer.** *Planned.*
 
 ### Pictures
 
 - **Make a picture.** Describe it, make variations, or start from one of 18 templates.
 - **Change clothes, the background or a smile and keep the original faces.** Home checks that every face still looks like the person, and keeps the old picture if it does not.
-- **Edit in chat.** Crop, adjust or blur the background. Finding and erasing a person or object needs the picture finder installed.
+- **Edit in chat.** Crop, adjust or blur the background.
 - **Edit in the editor.** Remove background, Erase, Upscale, Resize, Markup, or describe the change in words.
 - **Save characters, props and places** to reuse in films.
-- **Ask about a picture.** Attach a photo and chat about it, on a Mac with 32 GB or more.
+- **Ask about a picture.** Attach a photo and chat about it.
 
 ### Video
 
-Making video is for adults, and needs a Mac with 128 GB.
-
-- **Make a video.** Describe it, with picture and sound together, up to 10 seconds a clip, and a camera move such as slow orbit, dolly in, aerial or handheld. Starting from a picture works where your engine supports it.
+- **Make a video.** Describe it or start from a picture. You get picture and sound together, up to 10 seconds a clip, with a camera move such as slow orbit, dolly in, aerial or handheld.
 - **Pick a style.** Choose a Look card (natural, classic cartoon, anime, 3D animated or film), or describe one in words, such as "claymation" or "1980s hand-drawn". An admin can add more styles.
-- **Make it longer.** Ask chat to keep going and the next clip starts where the last one ended. Join 2 to 6 clips with a cut or 20 kinds of blend, and add a title card and rolling credits. Or ask for a film.
+- **Make it longer.** Ask chat to keep going and the next clip starts where the last one ended. Join clips with a cut or 20 kinds of blend, and add a title card and rolling credits. Or ask for a film.
 - **Edit in chat.** Trim, mix, reframe, change speed, slow pan and zoom, reverse, freeze, loop, flip, sharpen, denoise, put one clip inside another, add cinema bars and a film look. The Studio page trims, joins and mixes by hand.
-- **Cut to the beat.** Ask chat to cut your clips to the beat of one of your songs. This needs the beat finder.
+- **Cut to the beat.** Ask chat to cut your clips to the beat of one of your songs.
 - **Make surround sound.** Turn a clip's sound into a 5.1 file. It plays in surround on a surround system or Apple TV, and as stereo elsewhere.
 - **Remove the background.** Replace it with a color, a blur or see-through.
 - **Upscale and sharpen** a clip.
 - **Add a voice-over and music** in the Studio, then export. Ask chat for captions.
-- **Extend, retake or add color to a clip.** In chat, for clips made at the Max level, where your engine supports it.
+- **Extend, retake or add color to a clip.** In chat, for clips made at the Max level.
 
 Try these in chat:
 
@@ -110,15 +106,15 @@ Try these in chat:
 - **Talk like you would to a person.** Speak, and Home answers in a natural voice. Talk over it and it stops and listens.
 - **Hear emotion, not a reading.** Spoken replies can include a laugh, a sigh or a clear throat when they fit. An owner or admin sets it to off, light or natural. It works for adults only.
 - **Get the right tone.** On an emotional message Home works out whether you want advice or someone to listen.
-- **Make a voice from a clip.** Anyone in the home can, from a 6 to 30 second recording. Or make an inspired voice that is based on the clip and is not a copy.
+- **Make a voice from a clip.** Anyone in the home can. Or make an inspired voice that is based on the clip and is not a copy.
 - **Change the voice** in any audio or video file.
 - **Add a voice-over** from a script.
 - **Wake Home with a word.** An adult can turn it on for one device. *Preview.*
 
 ### Chat
 
-- **Choose how hard it thinks.** Instant for quick answers, Thinking for harder ones. Max is for adults and needs an admin to give it to you. Adults see which style answered each reply.
-- **Research a question.** On Thinking or Max, Home searches in several rounds (up to 4 on Thinking, up to 12 on Max), reads the pages and shows its sources. A sentence its sources do not back is marked "not confirmed by the sources".
+- **Choose how hard it thinks.** Instant for quick answers, Thinking for harder ones, Max for the hardest. Adults see which style answered each reply.
+- **Research a question.** On Thinking or Max, Home searches in several rounds, reads the pages and shows its sources. A sentence its sources do not back is marked "not confirmed by the sources".
 - **Search the web.** Adults use DuckDuckGo with no setup. Teens and children use only the Library and your own SearXNG unless an owner allows more.
 - **Connect your own coding tool,** such as OpenCode or Claude Code, to the coding model on your computer with a personal key. An admin turns Coding on first. A built-in code workspace is *Planned*.
 - **Set reminders, lists, alarms and timers** by asking in chat. Undo a reminder or timer change.
@@ -134,12 +130,12 @@ Try these in chat:
 ### Apps
 
 - **News.** Read the topics and sources you follow, laid out like Apple News. Each story has **Key points**, a summary written on your own computer, **Listen**, which reads it to you, and **Discuss**, which opens a chat about it. Discuss and My Mix are for teens and adults.
-- **Wikipedia, kept on your computer.** Search and read English Wikipedia, with or without pictures, save articles, and keep reading with the internet off. An owner or admin downloads it once, and the full set with pictures is about 127 GB.
+- **Wikipedia, kept on your computer.** Search and read English Wikipedia, with or without pictures, save articles, and keep reading with the internet off. An owner or admin downloads it once.
 - **Weather.** An animated sky card with your places and your current location, in Fahrenheit or Celsius. Ask in chat and get the same card. It needs the internet.
 - **Podcasts.** Follow shows, play new episodes at once and pick up where you stopped. Grown-ups can save episodes to listen offline.
 - **Videos, Shows and Films.** Browse your own files, keep a watchlist and play the next episode.
 - **Books.** Read EPUB and PDF books and listen to audiobooks. Your place follows you from screen to screen.
-- **Radio.** Internet stations you can save. Teens and adults can record a station for 15 minutes at a time.
+- **Radio.** Internet stations you can save. Teens and adults can record a station.
 - **Clock.** Alarms, timers, world clocks and a stopwatch.
 - **House.** See your rooms and devices from Home Assistant and control them with one tap. An admin sets up Home Assistant first.
 
@@ -149,7 +145,7 @@ Try these in chat:
 - **Uptime Kuma.** Adults can ask what is up or down. It only looks and never changes anything.
 - **Telegram.** An admin adds a bot token once, then each person links their own chat and picks which alerts to get, in their own language.
 - **MusicBrainz, Cover Art Archive and Wikimedia.** Match your songs and fetch album covers, artist photos and bios. Admins control each one.
-- **Hugging Face and Civitai.** Admins add picture and video styles from Hugging Face. Civitai is off until an admin turns it on.
+- **Hugging Face and Civitai.** Add more picture and video styles from Hugging Face and Civitai.
 
 ### Adults, family and safety
 
@@ -165,11 +161,11 @@ Try these in chat:
 - **Install in one line** on a Mac. A setup wizard in your browser does the rest.
 - **Offload the AI to a second computer.** Keep Home where it is and let a stronger Ubuntu computer on your network run the AI engines. Home keeps your family's settings. You pair the two with a one-time code, and you can reach it from away through Tailscale.
 - **Chat keeps answering during big jobs.** Standard and Boost run beside chat. A Max job may switch chat to a smaller model for a while, a line under the box says so, and chat goes back afterward. Stop a Max job at any time.
-- **Four quality levels.** Standard is the everyday level. Boost is bigger and slower. Max is the biggest, for one job at a time, and an admin sets it up. Reduced is never picked: a Max job brings it in only when it needs more room.
+- **Four quality levels.** Standard is the everyday level. Boost is bigger and slower. Max is the biggest, for one job at a time. Reduced is never picked: a Max job brings it in only when it needs more room.
 - **A fair queue.** Each person gets one big job at a time, taken in turns. A waiting job says why and starts by itself when there is room. If it can only run at a lower level, you can choose **Make it now** or **Wait**.
 - **Three presets for sharing the computer.** Chat first, Balanced or Big jobs first. Free up memory in one press, and tune the Mac with changes you can revert.
 - **See what Home is doing.** A System status page shows each app as working, degraded, waiting for internet or not working, with a 90-day record. Repairs offers a fix for each problem.
-- **Update with a way back.** Home checks every day. Update engine parts with a button and go back one version. Home itself updates and rolls back with the installer.
+- **Update with a way back.** Home checks every day. Update the AI parts with a button and go back one version. Home itself updates and rolls back with the installer.
 - **Back up and restore.** A daily backup and a backup you can download, with a backup key. Only the owner can restore.
 - **Set storage limits per person,** with a Trash, and choose how much offline reference data to keep.
 - **Choose the models.** Pick the model for each level, add styles, and see every outside connection on the Privacy page.
@@ -210,7 +206,9 @@ One install, one memory and one Library for the whole family, with nothing sent 
 
 ## Private by design
 
-Nothing your family says leaves your home. Home makes a few outside requests: a daily check for a new release, hourly weather for your home place, downloads of models and updates, and things you ask for, like a web search. The Privacy page in Settings lists every one and what it sends. There is no tracking, no crash reporting and no training on your family's words.
+What you create, say and remember stays on your own computer. Your conversations, memories, pictures, songs, videos and files are not sent to a cloud service. No company holds your data, so there is nothing for anyone to sell, leak or use to aim ads at you, and nothing trains anyone's AI.
+
+Home does reach out for information it needs from the world: web searches, weather, news and podcast feeds, downloads of models and updates, and a daily check for a new release. Some of that happens in the background, such as refreshing the news. These requests bring information in. The Privacy page in Settings lists each one and what it sends. There is no tracking and no crash reporting.
 
 ## Install
 
