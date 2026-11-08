@@ -709,6 +709,39 @@
         "backend/src/lib/apiErrorCopy.ts",
         "backend/src/lib/notificationCopy*.ts"
       ]
+    },
+    "user/everyday-use/make-a-short-film": {
+      "covers": [
+        "backend/packages/make_film/**",
+        "backend/src/lib/films/**",
+        "backend/src/routes/films.ts",
+        "backend/src/lib/mediaProductions.ts",
+        "frontend/src/apps/chat/chatToolUis.tsx"
+      ]
+    },
+    "user/everyday-use/polish-a-video": {
+      "covers": [
+        "backend/src/lib/videos/editPlan.ts",
+        "backend/src/lib/videos/editTool.ts",
+        "backend/src/lib/videos/spatialStart.ts",
+        "frontend/src/apps/chat/spatialSoundActions.ts"
+      ]
+    },
+    "user/everyday-use/ask-the-assistant-to-act": {
+      "covers": [
+        "backend/packages/house/**",
+        "backend/packages/uptime/**",
+        "backend/src/lib/house/**",
+        "backend/src/lib/uptime/**",
+        "backend/src/lib/toolUndo.ts"
+      ]
+    },
+    "user/media-and-more/synths-of-real-people": {
+      "covers": [
+        "backend/src/lib/synths.ts",
+        "backend/src/lib/talent/researcher.ts",
+        "frontend/src/shell/pages/companionFlow/CreateCharacterStep.tsx"
+      ]
     }
   },
   "shots": {

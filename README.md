@@ -172,6 +172,7 @@ Pictures, videos and songs can be made at different quality levels. Pick one whe
 - **Quality levels that share the computer.** Max is the biggest, for one job at a time. A fourth level, Reduced, is never picked: a Max job brings it in only when it needs more room.
 - **A fair queue.** Each person gets one big job at a time, taken in turns. A waiting job says why and starts by itself when there is room. If it can only run at a lower level, you can choose **Make it now** or **Wait**.
 - **Three presets for sharing the computer.** Chat first, Balanced or Big jobs first. Free up memory in one press, and tune the Mac with changes you can revert.
+- **Keeps the Mac healthy.** A self-check restarts Home if it gets stuck, and one-press tuning keeps memory free for it.
 - **See what Home is doing.** A System status page shows each app as working, degraded, waiting for internet or not working, with a 90-day record. Repairs offers a fix for each problem.
 - **Update with a way back.** Home checks every day. Update the AI parts with a button and go back one version. Home itself updates and rolls back with the installer.
 - **Back up and restore.** A daily backup and a backup you can download, with a backup key. Only the owner can restore.
