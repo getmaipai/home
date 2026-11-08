@@ -43,7 +43,7 @@ export function DashboardPage({ person }: { person: Roster }) {
   const renderBlock = (block: HomeBlockId) => {
     switch (block) {
       case "greeting": return <div key={block} className="lg:col-span-8"><Greeting displayName={person.display_name} familyName={familyName.data?.value} /></div>;
-      case "admin": return admin ? <nav key={block} aria-label={i18n._({ id: "Looking after your hub", message: "Looking after your hub" })} className="flex flex-nowrap gap-2 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden lg:col-span-4"><Chip tone="surface" size="strip"><Link to="/updates">{i18n._({ id: "Updates", message: "Updates" })}</Link></Chip><Chip tone="surface" size="strip"><Link to="/repairs">{i18n._({ id: "Repairs", message: "Repairs" })}</Link></Chip></nav> : null;
+      case "admin": return admin ? <nav key={block} aria-label={i18n._({ id: "Looking after your hub", message: "Looking after your hub" })} className="flex flex-nowrap gap-2 overflow-x-auto [&::-webkit-scrollbar]:hidden lg:col-span-4"><Chip tone="surface" size="strip"><Link to="/updates">{i18n._({ id: "Updates", message: "Updates" })}</Link></Chip><Chip tone="surface" size="strip"><Link to="/repairs">{i18n._({ id: "Repairs", message: "Repairs" })}</Link></Chip></nav> : null;
       case "ask": return <div key={block} className="lg:col-span-8"><AskBox /></div>;
       case "media_continue": return (media.data?.continue.length || continueRows.data?.rows?.length) ? <div key={block} className="lg:col-span-12"><HomeMedia kind="continue" /></div> : null;
       case "media_new": return media.data?.new.length ? <div key={block} className="lg:col-span-12"><HomeMedia kind="new" /></div> : null;

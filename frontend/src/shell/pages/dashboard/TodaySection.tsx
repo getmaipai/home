@@ -88,7 +88,7 @@ export function TodaySection({ home, heroOnly = false, chips = false, role }: { 
     return (
       <section aria-label={i18n._({ id: "Today", message: "Today" })} className="flex flex-col gap-3 lg:col-span-12">
         <h2 className="text-base leading-snug font-medium">{i18n._({ id: "Today", message: "Today" })}</h2>
-        <div className="flex flex-nowrap gap-2 overflow-x-auto [&>*]:shrink-0 [&>*]:whitespace-nowrap [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+        <div className="flex flex-nowrap gap-2 overflow-x-auto [&>*]:shrink-0 [&>*]:whitespace-nowrap [&::-webkit-scrollbar]:hidden">
           {visibleSlots.map((slot) => (
             <Chip key={key(slot)} tone="surface" size="strip" selected={open === key(slot)} selectedTone="inverse" aria-expanded={open === key(slot)} onClick={() => setOpen(open === key(slot) ? null : key(slot))}>{displayTitle(slot.widget)}</Chip>
           ))}
@@ -110,12 +110,12 @@ export function TodaySection({ home, heroOnly = false, chips = false, role }: { 
     {heroSlot ? <section aria-label={i18n._({ id: "Home highlight", message: "Home highlight" })} className="lg:col-span-4"><div data-testid="home-hero"><Card surface="flat"><div className="text-row font-semibold">{heroSlot.widget.title}</div><ItemGroup>{heroSlot.data.items.map((item, index) => <Item key={`${item.title}-${index}`} size="sm"><ItemContent><ItemTitle>{item.title}</ItemTitle>{item.subtitle ? <ItemDescription className="text-supporting">{item.subtitle}</ItemDescription> : null}</ItemContent>{item.value ? <ItemActions>{item.value}</ItemActions> : null}</Item>)}</ItemGroup></Card></div></section> : null}
     <section aria-label={i18n._({ id: "Today", message: "Today" })} className="flex flex-col gap-3 lg:col-span-12">
       <h2 className="text-base leading-snug font-medium">{i18n._({ id: "Today", message: "Today" })}</h2>
-      <div className="flex gap-3 overflow-x-auto [&>*]:w-72 [&>*]:shrink-0 lg:[&>*]:w-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden lg:grid lg:grid-cols-3 lg:flex-wrap lg:overflow-visible">{cards(first)}</div>
+      <div className="flex gap-3 overflow-x-auto [&>*]:w-72 [&>*]:shrink-0 lg:[&>*]:w-auto [&::-webkit-scrollbar]:hidden lg:grid lg:grid-cols-3 lg:flex-wrap lg:overflow-visible">{cards(first)}</div>
       {rest.length === 0 ? null : (
         <Collapsible>
           <CollapsibleTrigger render={<Button variant="outline" size="row" />}>{i18n._({ id: "More", message: "More" })}</CollapsibleTrigger>
           <CollapsibleContent>
-            <div className="flex gap-3 overflow-x-auto pt-3 [&>*]:w-72 [&>*]:shrink-0 lg:[&>*]:w-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden lg:grid lg:grid-cols-3 lg:flex-wrap lg:overflow-visible">{cards(rest)}</div>
+            <div className="flex gap-3 overflow-x-auto pt-3 [&>*]:w-72 [&>*]:shrink-0 lg:[&>*]:w-auto [&::-webkit-scrollbar]:hidden lg:grid lg:grid-cols-3 lg:flex-wrap lg:overflow-visible">{cards(rest)}</div>
           </CollapsibleContent>
         </Collapsible>
       )}

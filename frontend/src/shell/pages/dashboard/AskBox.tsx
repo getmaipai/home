@@ -64,7 +64,7 @@ export function AskBox() {
         </div>
         <Button type="submit" variant="inverse" shape="pill" size="control" aria-disabled={text.trim() === "" || undefined}>{i18n._({ id: "Ask", message: "Ask" })}</Button>
       </form>
-      <div data-testid="home-suggestions" className="flex w-full flex-nowrap gap-2 overflow-x-auto [&>*]:shrink-0 [&>*]:whitespace-nowrap [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+      <div data-testid="home-suggestions" className="flex w-full flex-nowrap gap-2 overflow-x-auto [&>*]:shrink-0 [&>*]:whitespace-nowrap [&::-webkit-scrollbar]:hidden">
         {STARTERS.map((starter) => (
           <Chip
             key={starter.title}
