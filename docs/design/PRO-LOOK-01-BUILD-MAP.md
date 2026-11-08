@@ -15,7 +15,7 @@ builds exactly what the mockups show.
    rule edit are listed in section 1a and are built only by the slice that follows the edit. No slice starts for a screen that has no picture
    (every screen in the note's section 9 now has one).
 2. **Numbers, not only eyes.** Each picture states values (title 34 pt phone and 40 desktop, row 76, thumbnail 64, card radius 20,
-   gutter 16, rail 80 labelled, tab bar 68, avatar 36, pill height 44). A slice writes a test that asserts the values it owns with
+   gutter 16, rail 56 icon-only, tab bar 68, avatar 36, pill height 44). A slice writes a test that asserts the values it owns with
    `getComputedStyle`-style checks or the kit's own tests, so a drift fails `bun test` and not only review.
 3. **One parity procedure per slice** (section 3), run by the author, with captures and measured numbers in the commit message.
 4. **Done means the displayed result,** in light and dark and two Looks, in child mode through Nova, with every state the picture draws
@@ -29,7 +29,7 @@ builds exactly what the mockups show.
 
 | Part drawn | Pictures | Rule it needs changed | Built by | Until then the slice builds |
 |---|---|---|---|---|
-| Labelled 80 px rail | every `desktop-*` picture | S1 (labels, 56 px to about 80 px) | NAV-01 desktop, after the S1 edit | S1's 56 px icon rail as it is |
+| Icon-only 56 px rail (labelled rail dropped by Jesse, 2026-11-08) | every `desktop-*` picture | none: this is S1 as it is | NAV-01 desktop, no rule edit needed | the same |
 | Main apps in a floating phone bar | every `phone-*` picture with a bar at Home, Chat, Media, Library | S1 (phone has no rail, the drawer is the switcher) | NAV-01 phone, after the S1 edit | The app's own sections in the floating bar (P2), the drawer for apps |
 | Large page title below the header row | phone pictures | S2 (title lives in the header row), option (e) | HOME-01 only if Jesse takes (e) | The title in the header row, larger by tokens |
 | Hero art behind the header row | `phone-detail`, `desktop-detail`, hero pages | S2 reserved-row reading | MEDIA-01, after decision 6 | The hero starting below the row |
@@ -105,7 +105,7 @@ These correct or sharpen the note; the note's section 26 records them.
 | 1 | Touch floor: keep 48 hit area behind a 44 visible control, or lower the floor | KIT-01a | Keep 48 behind 44 |
 | 2 | Art tokens fixed light on dark in every Look (changes Player, Billboard, tiles in light Looks today) | TOKENS-01 ART | Yes, it is the stated fix |
 | 3 | Retire `[data-surface="studio"]` (lime, near-black) for `accent-create` and the cream primary | STUDIOS-01 | Retire |
-| 4 | S1 edit: labelled narrow rail, 56 px to about 80 px (his choice 2026-11-08) | NAV-01 desktop | Draft is in audit D section 3.1 |
+| 4 | ~~S1 edit: labelled narrow rail~~ dropped: the rail stays icon-only at 56 px (Jesse, 2026-11-08, later the same day) | NAV-01 desktop | No rule change needed |
 | 5 | S1 edit: main apps in a floating phone bar (option a) | NAV-01 phone | Yes, to match his references |
 | 6 | S2 reading: hero art may sit behind the transparent header row | HOME-01 hero pages | Yes |
 | 7 | S6: progress strip carries the viewer's own generation jobs; bell types; Activity page (option i) | JOB-01, ACTIVITY | Strip and bell yes (architect allowed); Activity when he wants it |
@@ -154,7 +154,7 @@ Sizes are S, M, L.
 | 6 | PRO-LOOK-HOME-01 (L) | Home | Set `data-pro-look`; first-paint palette; front page (greeting, shelves, weather and summary cards, empty shelf removal); shell chrome (36 pt circle companion avatar, header row, menu button glyph, `GlobalMiniPlayer` offset) | `shell/pages/HomePage*`, `HomeShelves`, `shell/Routes.tsx`, `GlobalMiniPlayer.tsx`, `firstPaintPalette.ts` | 5 | phone-home, desktop-home |
 | 7 | PRO-LOOK-JOB-01 (L) | commons + Home + backend | Shared status-card anatomy and state treatment on Alert, JobProgress, VideoPlayer, image-generation and the song card; strip feed (one card, the existing strip); generation notifications; the stack and Activity pictures are not built here | `elements/status-card.tsx`, `lib/jobs.ts` `generationJobsForViewer`, `InstallDock.tsx`, `notificationTypes.ts` | 5, ISOLATION-03 for queue lines | making-now, status-cards, downloads-card, news-job |
 | 8 | PRO-LOOK-ERRORS-01 (L) | Home | Convert 47 files, 81 toasts, 5 raw messages to cards and `failureCopy`; lint | `apps/settings/*`, `ChatPage.tsx`, `FilesPage.tsx` | 4, 7 | status-cards, stacks |
-| 9 | PRO-LOOK-NAV-01 (M, one slice per width) | commons + Home | Labelled narrow rail; phone floating bar with the main apps; delete rail CSS overrides | `AppRail`, `RailEntries`, `PhoneNav`, `shell/Routes.tsx` | decisions 4, 5 and the RULES.md edit | desktop-home, phone-home |
+| 9 | PRO-LOOK-NAV-01 (M, one slice per width) | commons + Home | Icon-only rail kept (56 px, tooltips); phone floating bar with the main apps; delete rail CSS overrides | `AppRail`, `RailEntries`, `PhoneNav`, `shell/Routes.tsx` | decisions 4, 5 and the RULES.md edit | desktop-home, phone-home |
 | 10 | PRO-LOOK-APPS-01 (M) | Home | Launcher (favorites shelf, grid, Edit, move up and down) | `AllAppsPage.tsx`, `usePinnedApps.ts`, `appCatalog.ts` | 9 if taken, else today's rail and drawer; decision 8 | phone-apps |
 | 11 | PRO-LOOK-STUDIOS-01 (L) | Home | Music, Video, Images create pages on `PromptBar`, `accent-create`, tiles and rows; retire the studio surface | `MusicWorkspacePage.tsx`, videos and images `pages/*.json` | 5, 7, decision 3, VIDEO-UI-01 | create and edit pictures |
 | 12 | PRO-LOOK-MEDIA-01 (L) | Home | Media home, Music browse, Videos, Shows and Films, Podcasts, Books, detail pages with the hero header | `MediaHomePage`, package `pages/*.json`, `CreationHeader` | 5, 6, decision 6 for art behind the header row | phone-detail, desktop-detail, phone-videos, phone-video-watch |
@@ -187,8 +187,7 @@ are in `audit/D-backend-process.md` section 2; each slice adds its own row when 
 
 ## 8. Rule edits (proposals; only Jesse changes a rule; the commit carries `Owner-approved: <date>`)
 
-Drafts of the exact RULES.md text are in `audit/D-backend-process.md` section 3: S1 labelled narrow rail (both 56 px figures become about
-80 px, the ease clause and S3 stay); S1 phone floating bar with the main apps; S2 hero art behind the header row; S6 the strip's new feed
+Drafts of the exact RULES.md text are in `audit/D-backend-process.md` section 3: (the labelled-rail edit is dropped, the rail stays 56 px icon-only); S1 phone floating bar with the main apps; S2 hero art behind the header row; S6 the strip's new feed
 and Activity. Each gets its own architect ruling before the commit.
 
 ## 9. Risks and what is not covered
