@@ -2,9 +2,9 @@ import { i18n } from "@lingui/core";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
-import { Button } from "@maipai/ui/src/dashboard/components/ui/button";
-import { InputGroup, InputGroupAddon, InputGroupInput } from "@maipai/ui/src/dashboard/components/ui/input-group";
-import { HitField } from "@maipai/ui/src/settings/HitField";
+import { Button } from "@maipai/ui/src/ui/button";
+import { Input } from "@maipai/ui/src/ui/input";
+import { Chip } from "@maipai/ui/src/primitives/Chip";
 import { useSurface } from "@maipai/ui/src/useSurface";
 import { api, type InstallStatusView } from "@/lib/api";
 import { STARTER_SUGGESTIONS } from "@/apps/chat/chatStarterSuggestions";
@@ -58,36 +58,23 @@ export function AskBox() {
   return (
     <div data-testid="home-ask" className="flex flex-col gap-3">
       {down === undefined ? null : <img src="/setup-art/warming-up.webp" alt="" width={1312} height={1190} className="h-auto w-24 max-w-full sm:w-32" />}
-      <form onSubmit={submit}>
-        <InputGroup>
-          {/* The field sits in the kit's HitField label (a 48 px target for a text input); the button is the
-              kit's row size (28 px box, 48 px hit area). The span keeps the addon's negative end margin off
-              the group's edge (it only applies to a direct button child). The button is aria-disabled, not
-              disabled, while the box is empty: a disabled control fades the whole group (kit has-disabled), and
-              the faded placeholder fails WCAG contrast. An empty submit does nothing (see submit). */}
-          <HitField pad={10} className="flex-1">
-            <InputGroupInput ref={inputRef} value={text} onChange={(event) => setText(event.target.value)} placeholder={placeholder} aria-label={i18n._({ id: "Ask", message: "Ask" })} maxLength={2000} />
-          </HitField>
-          <InputGroupAddon align="inline-end">
-            <span className="flex">
-              <Button type="submit" variant="default" size="row" aria-disabled={text.trim() === "" || undefined}>{i18n._({ id: "Ask", message: "Ask" })}</Button>
-            </span>
-          </InputGroupAddon>
-        </InputGroup>
+      <form onSubmit={submit} className="flex items-center gap-2">
+        <div className="relative min-w-0 flex-1">
+          <Input ref={inputRef} value={text} onChange={(event) => setText(event.target.value)} placeholder={placeholder} aria-label={i18n._({ id: "Ask", message: "Ask" })} maxLength={2000} shape="pill" fill="surface" />
+        </div>
+        <Button type="submit" variant="inverse" shape="pill" size="control" aria-disabled={text.trim() === "" || undefined}>{i18n._({ id: "Ask", message: "Ask" })}</Button>
       </form>
-      <div className="flex flex-wrap gap-x-2 gap-y-5">
+      <div data-testid="home-suggestions" className="flex w-full flex-nowrap gap-2 overflow-x-auto [&>*]:shrink-0 [&>*]:whitespace-nowrap [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         {STARTERS.map((starter) => (
-          <Button
+          <Chip
             key={starter.title}
-            type="button"
-            variant="outline"
-            size="row"
-            disabled={down !== undefined}
-            aria-label={down === undefined ? undefined : `${starter.title} ${starter.label}. ${down}`}
-            onClick={() => navigate(askHref(starter.prompt))}
+            tone="surface"
+            size="strip"
+            onClick={down === undefined ? () => navigate(askHref(starter.prompt)) : undefined}
+            aria-disabled={down !== undefined || undefined}
           >
             {starter.title} {starter.label}
-          </Button>
+          </Chip>
         ))}
       </div>
     </div>

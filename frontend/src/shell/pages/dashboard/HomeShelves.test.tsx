@@ -2,6 +2,7 @@ import { afterEach, describe, expect, test } from "bun:test";
 import { cleanup, render } from "@testing-library/react";
 import type { MediaHomeRow } from "@/lib/api";
 import { tilePicture } from "@/shell/pages/dashboard/HomeShelves";
+import { MediaShelf } from "@maipai/ui/src/primitives/MediaShelf";
 
 afterEach(cleanup);
 
@@ -20,4 +21,10 @@ describe("a Home shelf tile with no picture (AUDIT-UI-01)", () => {
     cleanup();
     expect(iconOf(tilePicture(row({ kind: "song", app: "music" })))).toContain("music");
   });
+});
+
+test("the kit exposes pro square tiles for Home shelves", () => {
+  const view = render(<MediaShelf items={[row({})]} getKey={(item) => item.id} getLabel={(item) => item.title} renderItem={() => <span>art</span>} heading="Continue" variant="plain" tileSize="pro" />);
+  expect(view.container.querySelector('[data-slot="media-shelf"]')?.textContent).toContain("art");
+  expect(view.container.querySelector(".aspect-square")).not.toBeNull();
 });

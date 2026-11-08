@@ -116,6 +116,15 @@ describe("DashboardPage (Home)", () => {
     } finally { restore(); }
   });
 
+  test("the greeting uses the semantic title type", async () => {
+    const { restore } = mockFetch({ layout: "ask" });
+    try {
+      const view = renderHome(makePerson("adult"));
+      const greeting = await view.findByText(/Good .*Nova/);
+      expect(greeting.className).toContain("text-title");
+    } finally { restore(); }
+  });
+
   test("keeps the home block order in one layout function", async () => {
     const { homeBlocks } = await import("@/shell/pages/dashboard/homeBlocks");
     expect(homeBlocks("ask")).toEqual(["greeting", "admin", "ask", "today_chips", "pick_up", "family", "getting_started"]);
@@ -125,10 +134,13 @@ describe("DashboardPage (Home)", () => {
   });
 
   test("Ask first draws Today as chips; a chip opens its card and a second tap closes it", async () => {
-    const { restore } = mockFetch({ layout: "ask", home: { hero: null, cards: [widget("a", "Weather")], more: [] }, widgets: [widget("a", "Weather")], widgetData: { a: data("Row a") } });
+    const weather = { ...widget("a", "Weather"), package: "weather" };
+    const { restore } = mockFetch({ layout: "ask", home: { hero: null, cards: [weather], more: [] }, widgets: [weather], widgetData: { a: data("Row a") } });
     try {
       const view = renderHome(makePerson("adult"));
       const chip = await view.findByRole("button", { name: "Weather" });
+      expect(chip.className).toContain("inline-flex h-10");
+      expect(chip.closest('[data-testid="home-suggestions"]')).toBeNull();
       expect(view.queryByTestId("home-today-card")).toBeNull();
       fireEvent.click(chip);
       await view.findByTestId("home-today-card");
@@ -160,11 +172,22 @@ describe("DashboardPage (Home)", () => {
   });
 
   test("Today board draws the cards themselves, not chips", async () => {
-    const { restore } = mockFetch({ layout: "board", home: { hero: null, cards: [widget("a", "Weather")], more: [] }, widgets: [widget("a", "Weather")], widgetData: { a: data("Row a") } });
+    const weather = { ...widget("a", "Weather"), package: "weather" };
+    const { restore } = mockFetch({ layout: "board", home: { hero: null, cards: [weather], more: [] }, widgets: [weather], widgetData: { a: data("Row a") } });
     try {
       const view = renderHome(makePerson("adult"));
       await view.findByTestId("home-today-card");
       expect(view.queryByRole("button", { name: "Weather" })).toBeNull();
+    } finally { restore(); }
+  });
+
+  test("a sentence-only empty shopping list card is hidden from a non-admin", async () => {
+    const shopping = { ...widget("shopping", "Shopping List"), package: "remind" };
+    const { restore } = mockFetch({ layout: "board", home: { hero: null, cards: [shopping], more: [] }, widgets: [shopping], widgetData: { shopping: { as_of: "2026-10-17T12:00:00.000Z", items: [{ title: "Your shopping list is empty." }] } } });
+    try {
+      const view = renderHome(makePerson("adult"));
+      await waitFor(() => expect(view.queryByTestId("home-today-card")).toBeNull());
+      expect(view.queryByText("Shopping List")).toBeNull();
     } finally { restore(); }
   });
 
@@ -262,9 +285,12 @@ describe("DashboardPage (Home)", () => {
     try {
       const view = renderHome(makePerson("adult"));
       await waitFor(() => expect(view.getByRole("textbox", { name: "Ask" }).getAttribute("placeholder")).toBe("Building the engine"));
-      const starters = view.getAllByRole("button").filter((button) => /^(Plan|Explain|Write|Brainstorm)/.test(button.textContent ?? ""));
+      const starters = Array.from(view.getByTestId("home-suggestions").children);
       expect(starters).toHaveLength(3);
-      for (const starter of starters) expect((starter as HTMLButtonElement).disabled).toBe(true);
+      for (const starter of starters) {
+        expect(starter.getAttribute("role")).toBeNull();
+        expect(starter.querySelector("a")).toBeNull();
+      }
       expect(view.container.querySelector('img[src="/setup-art/warming-up.webp"]')).not.toBeNull();
     } finally {
       restore();
@@ -277,7 +303,7 @@ describe("DashboardPage (Home)", () => {
     widgetData.b = "fail";
     widgetData.c = { ...data("Fallback text"), degraded: true };
     widgetData.d = { as_of: "2026-10-17T12:00:00.000Z", items: [] };
-    const { restore } = mockFetch({ layout: "board", home: { hero: null, cards: ids.slice(0, 4).map((id) => widget(id)), more: ids.slice(4).map((id) => widget(id)) }, widgets: ids.map((id) => widget(id)), widgetData });
+    const { restore } = mockFetch({ layout: "board", home: { hero: null, cards: ids.slice(0, 4).map((id) => ({ ...widget(id), package: "weather" })), more: ids.slice(4).map((id) => ({ ...widget(id), package: "weather" })) }, widgets: ids.map((id) => ({ ...widget(id), package: "weather" })), widgetData });
     try {
       const view = renderHome(makePerson("adult"));
       await waitFor(() => expect(view.getAllByTestId("home-today-card").length).toBe(4));
@@ -289,7 +315,7 @@ describe("DashboardPage (Home)", () => {
       restore();
     }
     const many = ["a", "b", "c", "d", "e", "f"];
-    const second = mockFetch({ layout: "board", home: { hero: null, cards: many.slice(0, 4).map((id) => widget(id)), more: many.slice(4).map((id) => widget(id)) }, widgets: many.map((id) => widget(id)), widgetData: Object.fromEntries(many.map((id) => [id, data(`Row ${id}`)])) });
+    const second = mockFetch({ layout: "board", home: { hero: null, cards: many.slice(0, 4).map((id) => ({ ...widget(id), package: "weather" })), more: many.slice(4).map((id) => ({ ...widget(id), package: "weather" })) }, widgets: many.map((id) => ({ ...widget(id), package: "weather" })), widgetData: Object.fromEntries(many.map((id) => [id, data(`Row ${id}`)])) });
     try {
       const view = renderHome(makePerson("adult"));
       const more = await view.findByRole("button", { name: "More" });
@@ -304,7 +330,7 @@ describe("DashboardPage (Home)", () => {
   test("a weather widget that carries a card draws the compact weather card in place of the text", async () => {
     const card = (await import("@maipai/spec/fixtures/answer-block/valid-weather_card.json")).default;
     const withCard: WidgetData = { ...data("Sunny"), card: card as unknown as Record<string, unknown> };
-    const { restore } = mockFetch({ layout: "board", widgets: [widget("weather", "Weather")], widgetData: { weather: withCard } });
+    const { restore } = mockFetch({ layout: "board", widgets: [{ ...widget("weather", "Weather"), package: "weather" }], widgetData: { weather: withCard } });
     try {
       const view = renderHome(makePerson("adult"));
       await view.findByTestId("home-today-card");
@@ -354,10 +380,12 @@ describe("DashboardPage (Home)", () => {
     try {
       const view = renderHome(makePerson("owner"));
       await view.findByRole("button", { name: "Open Step a" });
-      for (const el of [view.getByRole("button", { name: "Updates" }), view.getByRole("button", { name: "Repairs" }), view.getByRole("button", { name: "Open Step a" }), view.getByRole("button", { name: "Skip Step a" }), view.getByRole("button", { name: "Ask" })]) {
+      for (const el of [view.getByRole("button", { name: "Open Step a" }), view.getByRole("button", { name: "Skip Step a" })]) {
         expect(el.className, el.textContent ?? "").toContain("cn-button-size-row");
       }
-      expect(view.getByLabelText("Ask").closest('[data-slot="hit-field"]')).not.toBeNull();
+      for (const el of [view.getByRole("link", { name: "Updates" }).parentElement, view.getByRole("link", { name: "Repairs" }).parentElement]) expect(el?.className).toContain("h-10");
+      expect(view.getByRole("button", { name: "Ask" }).getAttribute("data-variant")).toBe("inverse");
+      expect(view.getByLabelText("Ask").getAttribute("data-shape")).toBe("pill");
     } finally {
       restore();
     }

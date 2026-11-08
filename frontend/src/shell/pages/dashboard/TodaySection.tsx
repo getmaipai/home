@@ -1,8 +1,10 @@
 import { i18n } from "@lingui/core";
 import { useState } from "react";
 import { useQueries, useQuery } from "@tanstack/react-query";
-import { Card, CardContent, CardHeader, CardTitle } from "@maipai/ui/src/dashboard/components/ui/card";
+import { Card } from "@maipai/ui/src/primitives/Card";
 import { Button } from "@maipai/ui/src/dashboard/components/ui/button";
+import { Chip } from "@maipai/ui/src/primitives/Chip";
+import { isOwnerOrAdminRole, type Roster } from "@/lib/api";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@maipai/ui/src/dashboard/components/ui/collapsible";
 import { Item, ItemActions, ItemContent, ItemDescription, ItemGroup, ItemTitle } from "@maipai/ui/src/dashboard/components/ui/item";
 import { AnswerBlockView } from "@maipai/ui/src/elements/answer-block";
@@ -28,7 +30,7 @@ export function todaySlots(widgets: WidgetDescriptor[], results: Array<{ isPendi
 }
 
 /** HOME-ALIVE-01e: one card per widget the viewer's role clears (the server already filtered by role and age). */
-export function TodaySection({ home, heroOnly = false, chips = false }: { home?: HomeWidgets; heroOnly?: boolean; chips?: boolean }) {
+export function TodaySection({ home, heroOnly = false, chips = false, role }: { home?: HomeWidgets; heroOnly?: boolean; chips?: boolean; role?: Roster["role"] }) {
   const [open, setOpen] = useState<string | null>(null);
   const list = useQuery({ queryKey: ["home-widgets"], queryFn: api.homeWidgets, retry: false, enabled: !home });
   const ordered = home ?? list.data;
@@ -47,7 +49,15 @@ export function TodaySection({ home, heroOnly = false, chips = false }: { home?:
 
   if (!home && list.isPending) return <RouteSkeleton label={i18n._({ id: "Loading Today", message: "Loading Today" })} />;
   if (!home && list.isError) return <p role="alert" className="text-sm text-muted-foreground">{i18n._({ id: "Could not load Today. Refresh Home to try again.", message: "Could not load Today. Refresh Home to try again." })}</p>;
-  if (slots.length === 0) return null;
+  const visibleSlots = slots.filter((slot) => {
+    const item = slot.data.items.length === 1 ? slot.data.items[0] : undefined;
+    const sentenceOnlyEmpty = Boolean(item && !item.value && !item.subtitle && (
+      (slot.widget.package === "news" && item.title.startsWith("No news lists are turned on")) ||
+      (slot.widget.package === "remind" && slot.widget.id === "shopping" && item.title === "Your shopping list is empty.")
+    ));
+    return !sentenceOnlyEmpty || isOwnerOrAdminRole(role ?? "guest");
+  });
+  if (visibleSlots.length === 0) return null;
 
   const cards = (shown: Slot[]) => shown.map((slot) => slot.data.card ? (
     // The kit's compact weather card is its own card; the text Card is the fallback when no block came back.
@@ -55,34 +65,32 @@ export function TodaySection({ home, heroOnly = false, chips = false }: { home?:
       <AnswerBlockView block={slot.data.card} compact />
     </div>
   ) : (
-    <Card key={`${slot.widget.package}/${slot.widget.id}`} size="sm" data-testid="home-today-card">
-      <CardHeader><CardTitle>{displayTitle(slot.widget)}</CardTitle></CardHeader>
-      <CardContent>
+      <div key={`${slot.widget.package}/${slot.widget.id}`} data-testid="home-today-card"><Card surface="flat">
+        <div className="text-row font-semibold">{displayTitle(slot.widget)}</div>
         <ItemGroup>
           {slot.data.items.map((item, index) => (
-            <Item key={`${item.title}-${index}`} size="sm" role="listitem">
+              <Item key={`${item.title}-${index}`} size="sm" role="listitem">
               <ItemContent>
-                <ItemTitle>{item.title}</ItemTitle>
-                {item.subtitle ? <ItemDescription>{item.subtitle}</ItemDescription> : null}
+                <ItemTitle className="text-row font-semibold">{item.title}</ItemTitle>
+                {item.subtitle ? <ItemDescription className="text-supporting">{item.subtitle}</ItemDescription> : null}
               </ItemContent>
               {item.value ? <ItemActions>{item.value}</ItemActions> : null}
             </Item>
           ))}
         </ItemGroup>
-      </CardContent>
-    </Card>
+      </Card></div>
   ));
 
   if (chips) {
     // Ask first: each Today card is one chip; a tap opens that full card under the row, a second tap closes it.
     const key = (slot: Slot) => `${slot.widget.package}/${slot.widget.id}`;
-    const opened = slots.find((slot) => key(slot) === open);
+    const opened = visibleSlots.find((slot) => key(slot) === open);
     return (
       <section aria-label={i18n._({ id: "Today", message: "Today" })} className="flex flex-col gap-3 lg:col-span-12">
         <h2 className="text-base leading-snug font-medium">{i18n._({ id: "Today", message: "Today" })}</h2>
-        <div className="flex flex-wrap gap-2">
-          {slots.map((slot) => (
-            <Button key={key(slot)} variant="outline" size="sm" aria-expanded={open === key(slot)} onClick={() => setOpen(open === key(slot) ? null : key(slot))}>{displayTitle(slot.widget)}</Button>
+        <div className="flex flex-nowrap gap-2 overflow-x-auto [&>*]:shrink-0 [&>*]:whitespace-nowrap [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          {visibleSlots.map((slot) => (
+            <Chip key={key(slot)} tone="surface" size="strip" selected={open === key(slot)} selectedTone="inverse" aria-expanded={open === key(slot)} onClick={() => setOpen(open === key(slot) ? null : key(slot))}>{displayTitle(slot.widget)}</Chip>
           ))}
         </div>
         {opened ? <div className="max-w-xl">{cards([opened])}</div> : null}
@@ -90,24 +98,24 @@ export function TodaySection({ home, heroOnly = false, chips = false }: { home?:
     );
   }
 
-  const first = slots.slice(0, home ? home.cards.length : TODAY_CARD_BUDGET);
-  const rest = slots.slice(TODAY_CARD_BUDGET);
+  const first = visibleSlots.slice(0, home ? home.cards.length : TODAY_CARD_BUDGET);
+  const rest = visibleSlots.slice(TODAY_CARD_BUDGET);
   const heroData: WidgetData | undefined = heroQuery.data;
   const heroSlot = home?.hero && heroData && heroData.items.length > 0 && !heroData.degraded ? { widget: home.hero, data: heroData } : null;
   const showHeroSkeleton = heroOnly && Boolean(home?.hero) && heroQuery.isPending;
   if (showHeroSkeleton) return <RouteSkeleton label={i18n._({ id: "Loading Home highlight", message: "Loading Home highlight" })} />;
-  if (heroOnly) return heroSlot ? <section aria-label={i18n._({ id: "Home highlight", message: "Home highlight" })} className="lg:col-span-4"><Card size="sm" data-testid="home-hero"><CardHeader><CardTitle>{displayTitle(heroSlot.widget)}</CardTitle></CardHeader><CardContent><ItemGroup>{heroSlot.data.items.map((item, index) => <Item key={`${item.title}-${index}`} size="sm"><ItemContent><ItemTitle>{item.title}</ItemTitle>{item.subtitle ? <ItemDescription>{item.subtitle}</ItemDescription> : null}</ItemContent>{item.value ? <ItemActions>{item.value}</ItemActions> : null}</Item>)}</ItemGroup></CardContent></Card></section> : null;
+  if (heroOnly) return heroSlot ? <section aria-label={i18n._({ id: "Home highlight", message: "Home highlight" })} className="lg:col-span-4"><div data-testid="home-hero"><Card surface="flat"><div className="text-row font-semibold">{displayTitle(heroSlot.widget)}</div><ItemGroup>{heroSlot.data.items.map((item, index) => <Item key={`${item.title}-${index}`} size="sm"><ItemContent><ItemTitle>{item.title}</ItemTitle>{item.subtitle ? <ItemDescription className="text-supporting">{item.subtitle}</ItemDescription> : null}</ItemContent>{item.value ? <ItemActions>{item.value}</ItemActions> : null}</Item>)}</ItemGroup></Card></div></section> : null;
   return (
     <>
-    {heroSlot ? <section aria-label={i18n._({ id: "Home highlight", message: "Home highlight" })} className="lg:col-span-4"><Card size="sm" data-testid="home-hero"><CardHeader><CardTitle>{heroSlot.widget.title}</CardTitle></CardHeader><CardContent><ItemGroup>{heroSlot.data.items.map((item, index) => <Item key={`${item.title}-${index}`} size="sm"><ItemContent><ItemTitle>{item.title}</ItemTitle>{item.subtitle ? <ItemDescription>{item.subtitle}</ItemDescription> : null}</ItemContent>{item.value ? <ItemActions>{item.value}</ItemActions> : null}</Item>)}</ItemGroup></CardContent></Card></section> : null}
+    {heroSlot ? <section aria-label={i18n._({ id: "Home highlight", message: "Home highlight" })} className="lg:col-span-4"><div data-testid="home-hero"><Card surface="flat"><div className="text-row font-semibold">{heroSlot.widget.title}</div><ItemGroup>{heroSlot.data.items.map((item, index) => <Item key={`${item.title}-${index}`} size="sm"><ItemContent><ItemTitle>{item.title}</ItemTitle>{item.subtitle ? <ItemDescription className="text-supporting">{item.subtitle}</ItemDescription> : null}</ItemContent>{item.value ? <ItemActions>{item.value}</ItemActions> : null}</Item>)}</ItemGroup></Card></div></section> : null}
     <section aria-label={i18n._({ id: "Today", message: "Today" })} className="flex flex-col gap-3 lg:col-span-12">
       <h2 className="text-base leading-snug font-medium">{i18n._({ id: "Today", message: "Today" })}</h2>
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">{cards(first)}</div>
+      <div className="flex gap-3 overflow-x-auto [&>*]:w-72 [&>*]:shrink-0 lg:[&>*]:w-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden lg:grid lg:grid-cols-3 lg:flex-wrap lg:overflow-visible">{cards(first)}</div>
       {rest.length === 0 ? null : (
         <Collapsible>
           <CollapsibleTrigger render={<Button variant="outline" size="row" />}>{i18n._({ id: "More", message: "More" })}</CollapsibleTrigger>
           <CollapsibleContent>
-            <div className="grid gap-4 pt-3 sm:grid-cols-2 lg:grid-cols-3">{cards(rest)}</div>
+            <div className="flex gap-3 overflow-x-auto pt-3 [&>*]:w-72 [&>*]:shrink-0 lg:[&>*]:w-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden lg:grid lg:grid-cols-3 lg:flex-wrap lg:overflow-visible">{cards(rest)}</div>
           </CollapsibleContent>
         </Collapsible>
       )}

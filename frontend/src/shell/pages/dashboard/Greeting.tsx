@@ -30,11 +30,11 @@ export function Greeting({ displayName, familyName }: { displayName: string; fam
 
   return (
     <div className="flex flex-col items-start">
-      {family ? <p className="text-sm font-normal text-muted-foreground">{family}</p> : null}
-      <h2 className="text-xl flex items-center gap-2 capitalize">
-        {greetingFor(new Date(), displayName)} <span className="flex items-center">{isDaytime ? <SunIcon size={25} color="orange" /> : <MoonIcon size={25} />}</span>
+      {family ? <p className="text-supporting text-muted-foreground">{family}</p> : null}
+      <h2 className="text-title font-bold tracking-tight flex items-center gap-2 capitalize whitespace-nowrap">
+        {greetingFor(new Date(), displayName)} <span className="flex items-center">{isDaytime ? <SunIcon size={25} /> : <MoonIcon size={25} />}</span>
       </h2>
-      <p className="text-sm font-normal text-muted-foreground">{i18n._({ id: "Here is your household today.", message: "Here is your household today." })}</p>
+      <p className="text-supporting text-muted-foreground">{i18n._({ id: "Here is your household today.", message: "Here is your household today." })}</p>
     </div>
   );
 }

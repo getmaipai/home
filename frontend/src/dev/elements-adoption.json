@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-11-08T04:39:44.085Z",
-  "kitTag": "ui-v0.5.529",
+  "generatedAt": "2026-11-08T19:58:23.288Z",
+  "kitTag": "ui-v0.5.547",
   "items": [
     {
       "file": "ActivityCardsShowcase.tsx",
@@ -73,6 +73,14 @@
       "group": "thread/showcase",
       "verdict": "support",
       "verdictReason": "Developer-only story fixture for K02b, covered by the Commons showcase tests; not a standalone Home product surface.",
+      "implemented": false
+    },
+    {
+      "file": "KitGalleryShowcase.tsx",
+      "name": "KitGalleryShowcase",
+      "group": "KitGalleryShowcase",
+      "verdict": "support",
+      "verdictReason": "Developer-only kit gallery (PRO-LOOK-01); not a standalone Home product surface.",
       "implemented": false
     },
     {
@@ -361,6 +369,14 @@
       "implemented": false
     },
     {
+      "file": "climate-tile.tsx",
+      "name": "climate-tile",
+      "group": "climate-tile",
+      "verdict": "later",
+      "verdictReason": "Smart-home tile; no Home surface uses it until the Home Control package is built.",
+      "implemented": false
+    },
+    {
       "file": "code-diff.tsx",
       "name": "code-diff",
       "group": "canvas/artifacts",
@@ -601,6 +617,14 @@
       "implemented": false
     },
     {
+      "file": "cover-tile.tsx",
+      "name": "cover-tile",
+      "group": "cover-tile",
+      "verdict": "later",
+      "verdictReason": "Smart-home tile; no Home surface uses it until the Home Control package is built.",
+      "implemented": false
+    },
+    {
       "file": "creation-header.tsx",
       "name": "creation-header",
       "group": "creation",
@@ -696,6 +720,14 @@
       "verdict": "wire-now",
       "verdictReason": "Selected for current Home UI adoption because the shipped Element fits a current or accepted Home feature.",
       "implemented": true
+    },
+    {
+      "file": "fan-tile.tsx",
+      "name": "fan-tile",
+      "group": "fan-tile",
+      "verdict": "later",
+      "verdictReason": "Smart-home tile; no Home surface uses it until the Home Control package is built.",
+      "implemented": false
     },
     {
       "file": "feedback-dialog.tsx",
@@ -1347,6 +1379,14 @@
       "implemented": true
     },
     {
+      "file": "room-header.tsx",
+      "name": "room-header",
+      "group": "room-header",
+      "verdict": "later",
+      "verdictReason": "Smart-home tile; no Home surface uses it until the Home Control package is built.",
+      "implemented": false
+    },
+    {
       "file": "scene-tile.tsx",
       "name": "scene-tile",
       "group": "scene",
@@ -1468,6 +1508,14 @@
       "verdict": "support",
       "verdictReason": "The WebGL stacked-alpha clip renderer inside the companion avatar; Home does not draw it on its own. The editor's preview still has its own copy until CMEDIA-PLAYER-02 swaps it for this Element.",
       "implemented": true
+    },
+    {
+      "file": "status-card.tsx",
+      "name": "status-card",
+      "group": "status-card",
+      "verdict": "wire-after",
+      "verdictReason": "The shared job and problem card (PRO-LOOK-01 section 20); wired by the JOB-01 and ERRORS-01 slices, after the front page.",
+      "implemented": false
     },
     {
       "file": "stopped-run.tsx",
