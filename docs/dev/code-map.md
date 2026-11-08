@@ -510,6 +510,8 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/gazetteer.ts` | searchLocalPlaces, nearestLocalPlace |
 | `backend/src/lib/genLive.ts` | getLive, clearLive, previewVersionOf, updateLive, liveCardFields |
 | `backend/src/lib/generationFailure.ts` | classifyGenerationFailure, RETRY_BACKOFF_MS |
+| `backend/src/lib/gitea/ids.ts` | GITEA_TOOL_ID |
+| `backend/src/lib/gitea/tool.ts` | GITEA_TOOL_ALLOWLIST, __resetGiteaConnectorsForTests, createGiteaConnector, giteaToolSpec, visibleGiteaInstances, giteaAllowed |
 | `backend/src/lib/grants.ts` | grantActionClassificationIsComplete, createGrant, listGrants, revokeGrant, isGrantActive, personIsGranted |
 | `backend/src/lib/guards.ts` | EMPTIED_LINES, MALFORMED, CLOSER_RE, isCloserSentence, trimClosers, OBJECTION_RE |
 | `backend/src/lib/healthSnapshot.ts` | __resetChatPauseTrackingForTests, collectHealth |
@@ -1132,8 +1134,6 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/uptime/ids.ts` | UPTIME_TOOL_ID |
 | `backend/src/lib/uptime/kuma.ts` | KUMA_SLUG, fetchKumaStatus |
 | `backend/src/lib/uptime/tool.ts` | UPTIME_ACTIONS, safeUptimeAction, visibleUptimeInstances, uptimeAllowed, uptimeToolSpec, runUptimeTool |
-| `backend/src/lib/gitea/ids.ts` | GITEA_TOOL_ID |
-| `backend/src/lib/gitea/tool.ts` | GITEA_TOOL_ALLOWLIST, visibleGiteaInstances, giteaAllowed, giteaToolSpec, createGiteaConnector, runGiteaTool |
 | `backend/src/lib/utteranceShape.ts` | COURTESY_PREFIX, QUESTION_OPENER, commandOpenersFrom, readClauses, utteranceShape, shapeFromReading |
 | `backend/src/lib/validation.ts` | validateDisplayName, validateSecret, jsonBody |
 | `backend/src/lib/videos/adapters.ts` | __resetVideoAdapterCacheForTests, dropVideoAdapterCache, adapterOfLora, allVideoAdapters, loraSurfaceOf, videoAdaptersFor |

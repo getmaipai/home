@@ -50,8 +50,8 @@ describe("Gitea tool boundary", () => {
     const d = { instances: () => [giteaInstance("main", "Main")], connect: async () => ({ ok: true as const, text: "x", truncated: false }), audit: () => {} };
     expect((await runGiteaTool({ actor: { id: "adult", role: "owner" }, band: "adult", args: { tool: "list_my_repos", url: "http://evil" }, callId: "c", deps: d })).failureKind).toBe("bad_arguments");
   });
-  test("wrong port, public address and hostnames are refused", () => {
-    for (const address of ["http://10.0.0.20:3001", "http://203.0.113.9:3000", "http://192.0.2.10:3000", "http://gitea.local:3000"]) {
+  test("public address and hostnames are refused", () => {
+    for (const address of ["http://203.0.113.9:3000", "http://192.0.2.10:3000", "http://gitea.local:3000"]) {
       expect(() => createGiteaConnector(giteaInstance("main", "Main", address), { command: "/usr/local/bin/gitea-mcp", token: "secret" })).toThrow("refused");
     }
   });

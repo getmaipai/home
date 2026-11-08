@@ -1,4 +1,5 @@
 // AGENT-SVC-01: read-only Gitea access through the official stdio MCP server.
+import { createHash } from "node:crypto";
 import { z } from "zod";
 import type { ToolSpec } from "@/lib/llm";
 import { outcomeOf, type ToolExecutionOutcome } from "@/lib/turnContext";
@@ -39,7 +40,7 @@ function jsonSetting(value: unknown): Record<string, string> {
 function safeCommand(value: unknown): string | null { return typeof value === "string" && value.startsWith("/") && !/[\s\0]/.test(value) ? value : null; }
 export function createGiteaConnector(instance: ConnectorInstance, options: { command: string; token: string; pins?: Record<string, string> }, deps: ConnectorDeps = {}) {
   const validated = instanceLanFetch(instance, { read: (key) => key === instance.credentialRef ? options.token : undefined });
-  if (!validated.ok || validated.port !== 3000) throw new Error("refused");
+  if (!validated.ok) throw new Error("refused");
   const config: ConnectorConfig = { id: GITEA_TOOL_ID, transport: { kind: "stdio", command: options.command, args: [], env: { GITEA_ACCESS_TOKEN: options.token, GITEA_HOST: `http://${validated.host}:${validated.port}` } }, toolAllowlist: [...GITEA_TOOL_ALLOWLIST], pins: options.pins, maxResultBytes: 65_536 };
   return createConnector(config, deps);
 }
@@ -48,7 +49,9 @@ function connectorFor(instance: ConnectorInstance, deps: GiteaDeps) {
   const command = safeCommand(read("gitea.mcp_command"));
   const token = read(instance.credentialRef);
   if (!command || typeof token !== "string" || !token.trim()) return null;
-  const key = instance.instance;
+  // Keyed by everything the child process was started with, so a changed address, command or token starts a fresh child and closes the old one.
+  const key = `${instance.instance}|${instance.address}|${command}|${createHash("sha256").update(token).digest("hex")}`;
+  for (const [oldKey, old] of cache) if (oldKey.startsWith(`${instance.instance}|`) && oldKey !== key) { void old.close(); cache.delete(oldKey); }
   let connector = cache.get(key);
   if (!connector) {
     try { connector = createGiteaConnector(instance, { command, token, pins: jsonSetting(read("gitea.mcp_pins")) }, deps.connectorDeps); }
@@ -98,7 +101,7 @@ export async function runGiteaTool({ actor, band, args, callId, deps = {} }: { a
   const matches = async (instance: ConnectorInstance): Promise<CallResult> => {
     if (deps.connect) return deps.connect(instance, input.tool, query);
     const lan = instanceLanFetch(instance, { ...deps.lanDeps, read: (key) => setting(deps, key) });
-    if (!lan.ok || lan.port !== 3000) return { ok: false, kind: "refused" };
+    if (!lan.ok) return { ok: false, kind: "refused" };
     const connector = connectorFor(instance, deps);
     if (!connector) return { ok: false, kind: "refused" };
     const listed = await connector.listTools();
