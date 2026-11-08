@@ -174,29 +174,39 @@ Try these in chat:
 - **Set storage limits per person,** with a Trash, and choose how much offline reference data to keep.
 - **Choose the models.** Pick the model for each level, add styles, and see every outside connection on the Privacy page.
 
-## Similar tools
+## One tool instead of many
+
+Most of what Home does is sold as a separate app, with its own account, its own bill and its own copy of your family's data. Home is one tool. It is free, it runs on your own computer, and everything it makes and remembers stays in your home.
 
 Each row compares one feature, not the whole product.
 
-| Feature in Home | Familiar tool |
+| What you do in Home | Instead of |
 |---|---|
-| Create a song, album or band | Suno, Udio |
-| Stems, remix, cover | LALAL.AI, Moises |
-| Sound effects | ElevenLabs sound effects |
-| Voice clone and voice-over | ElevenLabs |
-| Replace clothes, keep the face | Photoshop generative fill, Midjourney editor |
+| Chat with memory | ChatGPT, Claude, Gemini |
+| Research a question with sources | Perplexity, ChatGPT deep research |
+| Talk with a natural voice, even laughs and sighs | ChatGPT voice mode |
+| Create songs, albums and bands | Suno, Udio |
+| Split songs, remix and make covers | LALAL.AI, Moises |
+| Make sound effects | ElevenLabs sound effects |
+| Clone a voice, add a voice-over | ElevenLabs |
 | Make pictures | Midjourney, DALL-E |
-| Make and edit video, film looks, transitions | Runway, Sora, CapCut |
-| Make a film with a cast | Higgsfield |
-| AI podcasts and news briefings | NotebookLM audio overviews, Google Daily Listen |
-| AI DJ | Spotify DJ |
-| Chat with memory, research | ChatGPT, Claude, Perplexity |
-| Companions | Character.ai |
-| Captions and transcripts | Descript, Otter |
-| Your music, radio, podcasts | Spotify, a podcast app |
-| Books and audiobooks | Audible, Calibre-Web |
-| Library for pictures and files | Google Photos, iCloud |
-| Smart home control | Alexa, Google Home |
+| Erase, upscale, remove backgrounds, swap clothes and keep the face | Photoshop, Canva, remove.bg |
+| Make video, with film looks and styles | Runway, Sora, Kling |
+| Edit video, join with transitions, add captions | CapCut, Descript |
+| Make a film from one sentence | Higgsfield |
+| Spoken AI podcasts and news briefings | NotebookLM audio overviews |
+| An AI DJ | Spotify DJ |
+| Companions | Character.ai, Replika |
+| Your own music, radio and podcasts | Spotify, Apple Music, Apple Podcasts |
+| News with summaries and read-aloud | Apple News |
+| Wikipedia and reference books offline | Kiwix |
+| Books and audiobooks | Kindle, Audible |
+| Pictures, videos and files in one Library | Google Photos, iCloud, Dropbox |
+| Transcripts and captions | Otter, Descript |
+| Lights, locks, reminders and timers | Alexa, Google Home, Siri |
+| Weather | A weather app |
+
+One install, one memory and one Library for the whole family, with nothing sent to a cloud service to make any of it.
 
 ## Private by design
 
