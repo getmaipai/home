@@ -8,6 +8,7 @@ import { resetDb } from "./reset-db";
 import { db } from "@/db";
 import { kidUsage, people as peopleTable, pictureJobs } from "@/db/schema";
 import { setHouseholdSettingValue, setValue } from "@/lib/settings";
+import { __setRewriteCompleteForTests } from "@/lib/contentPolicy/rewrite";
 import { createBenchPeople, type BenchPeople } from "../scripts/bench/conversationRunner";
 import { removeTemporaryChatImages, storeTemporaryChatImage } from "@/lib/attachments";
 import { runGenerateImage } from "@/lib/pictures/tool";
@@ -52,7 +53,7 @@ beforeEach(() => {
   __setAgeCheckRunnerForTests(async (images) => images.map(() => ({ ok: true as const, verdict: { people_count: 0, apparent_min_age_estimate: null, label: "none" as const, is_nude_or_sexual: false, confidence: 1 } })));
   __setChildSafetyRunnerForTests(safeRunner());
 });
-afterEach(() => { __setAgeCheckRunnerForTests(async (images) => images.map(() => ({ ok: true as const, verdict: { people_count: 0, apparent_min_age_estimate: null, label: "none" as const, is_nude_or_sexual: false, confidence: 1 } }))); removeTemporaryChatImages("conv-1"); image.restore(); video.restore(); __setChildSafetyRunnerForTests(null); setHouseholdSettingValue("generation.kids", true); });
+afterEach(() => { __setAgeCheckRunnerForTests(async (images) => images.map(() => ({ ok: true as const, verdict: { people_count: 0, apparent_min_age_estimate: null, label: "none" as const, is_nude_or_sexual: false, confidence: 1 } }))); removeTemporaryChatImages("conv-1"); image.restore(); video.restore(); __setChildSafetyRunnerForTests(null); __setRewriteCompleteForTests(null); setHouseholdSettingValue("generation.kids", true); setHouseholdSettingValue("content.policy.pictures", false); setHouseholdSettingValue("content.policy.videos", false); });
 
 type Img = { id: string; name: string; width: number; height: number; media_type: string };
 async function put(owner: PersonRow, id: string, generated = false): Promise<Img> {
@@ -69,6 +70,36 @@ const jobId = (o: ToolExecutionOutcome) => (o.result?.data as { pictureJobId?: s
 const finish = async (actor: PersonRow, o: ToolExecutionOutcome) => { await until(() => ["done", "failed"].includes(getPictureJob(actor, jobId(o))?.state ?? "")); return getPictureJob(actor, jobId(o))!; };
 
 describe("a child makes cartoon pictures", () => {
+  test("rewrite flags default off and enabled prompts reach the existing tool jobs rewritten", async () => {
+    let calls = 0;
+    __setRewriteCompleteForTests(async (_role, _messages, options) => {
+      calls++;
+      const schema = options?.response_format as { json_schema?: { schema?: { properties?: Record<string, unknown> } } };
+      const song = !!schema.json_schema?.schema?.properties?.lyrics;
+      return { ok: true, value: { text: JSON.stringify(song ? { description: "a joyful dance", changed: true } : { description: "a friendly fox dancing", changed: true }) } } as never;
+    });
+    setHouseholdSettingValue("content.policy.pictures", false);
+    setHouseholdSettingValue("content.policy.videos", false);
+    const plainPic = await pic(kid, { prompt: "a friendly fox" });
+    await finish(kid, plainPic);
+    const plainVid = await vid(kid, { prompt: "a friendly fox" });
+    expect(plainVid.status).toBe("succeeded");
+    await until(() => video.jobs[0]?.state === "done");
+    expect(calls).toBe(0);
+    __resetVideoJobsForTests();
+    setHouseholdSettingValue("content.policy.pictures", true);
+    setHouseholdSettingValue("content.policy.videos", true);
+    const rewrittenPic = await pic(kid, { prompt: "a friendly fox" });
+    await finish(kid, rewrittenPic);
+    const rewrittenVid = await vid(kid, { prompt: "a friendly fox" });
+    expect(rewrittenVid.status).toBe("succeeded");
+    expect(calls).toBe(2);
+    expect(rewrittenVid).toMatchObject({ result: { data: { videoJobId: expect.any(String) } } });
+    expect((image.submitted.at(-1) as { prompt: string }).prompt).toContain("a friendly fox dancing");
+    expect(video.submitted.some(x => String(x.prompt).includes("a friendly fox dancing"))).toBe(true);
+    await until(() => video.jobs[1]?.state === "done");
+  });
+
   test("a friendly dragon works: the cartoon look is forced, Quick only, all-ages, no style, no friction text", async () => {
     expect(laneOf({ actor: kid, band: "child" })).toBe("child");
     const o = await pic(kid, { prompt: "a friendly dragon", style: "Pixel Art", quality: "detailed", count: 4 });

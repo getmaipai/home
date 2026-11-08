@@ -1114,6 +1114,7 @@ First release.
   `@maipai/standards` core.
 
 ### Changed
+- Child picture and video requests can use the shared policy rewrite behind household flags.
 - This repo's history was reset to start fresh on the platform rebuild
   design (`docs/dev.md`); the prior version's history and 21 releases are
   preserved locally, outside GitHub, never migrated.

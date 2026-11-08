@@ -23,6 +23,8 @@ import { startPictureJob, plainFailure } from "./jobs";
 import { pictureEngineStatus } from "./ready";
 import { StackPicturesError, submitEdit, waitPicture, cancelOrDelete } from "./stack";
 import { QUICK_MODEL } from "./quality";
+import { getHouseholdSettingValue } from "@/lib/settings";
+import { rewriteForChild } from "@/lib/contentPolicy/rewrite";
 import { asStackPic, hasProtectableFace, runLikenessEdit, type LikenessScope } from "./likeness/edit";
 
 export const GENERATE_IMAGE_TOOL_ID = "generate_image";
@@ -106,10 +108,18 @@ export async function runEditPicture(input: RunEditInput): Promise<ToolExecution
 async function runEditPictureUnmetered(input: RunEditInput): Promise<ToolExecutionOutcome> {
   const { state, args, callId, audience } = input;
   const actor = state.actor as PersonRow;
-  const instruction = typeof args.prompt === "string" ? args.prompt.trim() : "";
+  let instruction = typeof args.prompt === "string" ? args.prompt.trim() : "";
   const scope = ["clothes", "background", "face", "whole"].includes(String(args.scope)) ? args.scope as LikenessScope : "whole";
   if (instruction.length < 3) return failed(callId, args, "bad_arguments", "bad_arguments");
   const temporary = state.temporary === true || state.ephemeral === true;
+  if (laneOf(audience) === "child") {
+    let enabled = false; try { enabled = getHouseholdSettingValue("content.policy.pictures") === true; } catch { enabled = true; }
+    if (enabled) {
+      const rewrite = await rewriteForChild({ kind: "picture", description: instruction });
+      if (!rewrite.ok) return line(callId, args, rewrite.redirect, { refused: "child_content" });
+      instruction = rewrite.description;
+    }
+  }
   const refused = refusePrompt(instruction, { lane: laneOf(audience) });
   if (refused) return line(callId, args, PROMPT_REFUSAL_LINE[refused], { refused });
   { const likeness = likenessRefusal(actor, instruction); if (likeness) return line(callId, args, likeness, { refused: "household_likeness_off" }); }

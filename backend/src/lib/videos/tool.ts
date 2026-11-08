@@ -32,6 +32,8 @@ import { likenessCallRefusal } from "@/lib/likeness";
 import { videoLookFor, videoRecipeFor, videoVoicesFor, withVideoLook, withVideoRecipe, withVideoVoices } from "./recipes";
 import { subjectsForNames } from "@/lib/mediaSubjects";
 import { getMediaProduction } from "@/lib/mediaProductions";
+import { getHouseholdSettingValue } from "@/lib/settings";
+import { rewriteForChild } from "@/lib/contentPolicy/rewrite";
 
 export const GENERATE_VIDEO_TOOL_ID = "generate_video";
 
@@ -122,10 +124,19 @@ const PHOTO_ATTACH_LINE = "Attach one photo to your message.";
 export async function runGenerateVideo(input: RunGenerateVideoInput): Promise<ToolExecutionOutcome> {
   const { state, args, callId } = input;
   const audience = input.audience ?? videoAudienceOf(state as Parameters<typeof videoAudienceOf>[0], input.spoken);
-  const refusal = videoRefusalFor(audience, args) ?? likenessCallRefusal(audience.actor, args);
-  if (refusal) return refused(callId, args, refusal);
+  let requestArgs = args;
+  if (laneOf(audience) === "child") {
+    let enabled = false; try { enabled = getHouseholdSettingValue("content.policy.videos") === true; } catch { enabled = true; }
+    if (enabled) {
+      const rewrite = await rewriteForChild({ kind: "video", description: String(args.prompt ?? "") });
+      if (!rewrite.ok) return refused(callId, args, { kind: "prompt", why: "child_content", line: rewrite.redirect });
+      requestArgs = { ...args, prompt: rewrite.description };
+    }
+  }
+  const refusal = videoRefusalFor(audience, requestArgs) ?? likenessCallRefusal(audience.actor, requestArgs);
+  if (refusal) return refused(callId, requestArgs, refusal);
 
-  const prompt = typeof args.prompt === "string" ? args.prompt.trim() : "";
+  const prompt = typeof requestArgs.prompt === "string" ? requestArgs.prompt.trim() : "";
   if (prompt.length < 3) return failed(callId, args, "bad_arguments", "bad_arguments");
   const productionId = typeof args.production === "string" ? args.production.trim() : "";
   const shotId = typeof args.shot === "string" ? args.shot.trim() : "";

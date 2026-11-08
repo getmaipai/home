@@ -28,6 +28,8 @@ import { subjectsForNames } from "@/lib/mediaSubjects";
 import { GENERATE_IMAGE_TOOL_ID, runEditPicture, latestPictureId } from "./editTool";
 import { CHILD_LIMIT_LINE, CHILD_NEGATIVE_PROMPT, forceCartoon, kidsDailyPictures, laneOf, picturesMadeToday, releaseKid, reserveKid } from "./lane";
 import { lockedPictureStyleOutcome } from "./lock";
+import { getHouseholdSettingValue } from "@/lib/settings";
+import { rewriteForChild } from "@/lib/contentPolicy/rewrite";
 
 const KID_MAX_COUNT = 2;
 let templateMediaOpRunner = runMediaOp;
@@ -121,16 +123,25 @@ export async function runGenerateImage(input: RunGenerateImageInput): Promise<To
     if (refs.length) normalized.reference = refs[0];
   }
   delete normalized.template;
-  const refusal = refusalFor(audience, normalized) ?? likenessCallRefusal(audience.actor, normalized);
+  let transformed = normalized;
+  if (laneOf(audience) === "child") {
+    let enabled = false; try { enabled = getHouseholdSettingValue("content.policy.pictures") === true; } catch { enabled = true; }
+    if (enabled) {
+      const rewrite = await rewriteForChild({ kind: "picture", description: String(normalized.prompt ?? "") });
+      if (!rewrite.ok) return refused(callId, args, { kind: "prompt", why: "child_content", line: rewrite.redirect });
+      transformed = { ...normalized, prompt: rewrite.description };
+    }
+  }
+  const refusal = refusalFor(audience, transformed) ?? likenessCallRefusal(audience.actor, transformed);
   if (refusal) return refused(callId, args, refusal);
-  const prompt = promptOverride ?? (typeof args.prompt === "string" ? args.prompt.trim() : "");
+  const prompt = typeof transformed.prompt === "string" ? transformed.prompt.trim() : promptOverride ?? "";
   const chosenSubjects = Array.isArray(args.subjects) ? args.subjects.filter((name): name is string => typeof name === "string") : [];
   const resolvedSubjects = subjectsForNames(state.actor as PersonRow, chosenSubjects);
   if (!resolvedSubjects) return outcomeOf({ callId, packageId: GENERATE_IMAGE_TOOL_ID, status: "succeeded", via: "tool_call", args, durationMs: 0, result: { reply: { text: "No picture was made. Say this to the person in your own words: I couldn't use that saved subject. Choose a subject from your available list." }, data: { refused: "unknown_subject" }, actions: [] } });
 
   // IMGEDIT-01: `change` set means the person wants a picture they already have changed, not a new one.
-  if (typeof normalized.change === "string" && normalized.change.trim() !== "") {
-    const mapped = { ...normalized };
+  if (typeof transformed.change === "string" && transformed.change.trim() !== "") {
+    const mapped = { ...transformed };
     if (resolvedSubjects.length) {
       mapped.prompt = [...resolvedSubjects.map(({ subject }) => subject.look), String(mapped.prompt ?? "")].filter(Boolean).join(". ");
       mapped.subjectIds = resolvedSubjects.map(({ subject }) => subject.id);

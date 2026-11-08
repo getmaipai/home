@@ -28,6 +28,8 @@ import { adultStateOf, setItemLock, NOT_READY_LINE, TEMPORARY_LINE } from "@/lib
 import { getCookie } from "hono/cookie";
 import { sessionKeyOf } from "@/lib/adultLock";
 import { isOwnerOrAdmin } from "@/lib/access";
+import { getHouseholdSettingValue } from "@/lib/settings";
+import { rewriteForChild } from "@/lib/contentPolicy/rewrite";
 import { pictureJobs } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { db } from "@/db";
@@ -237,7 +239,7 @@ picturesRoutes.openapi(variationRoute, async (c) => {
   const group = source.turnId ? pictureJobsForTurn(actor, source.turnId) : [source];
   if (group.some((j) => j.state === "queued" || j.state === "running")) return c.json({ error: "A picture is still being made. Wait for it or stop it first.", code: "busy" }, 409) as never;
   const asked = (await c.req.json().catch(() => ({}))) as { quality?: unknown; tier?: unknown; prompt?: unknown };
-  const words = typeof asked.prompt === "string" && asked.prompt.trim() ? asked.prompt.trim().slice(0, 2000) : source.prompt;
+  let words = typeof asked.prompt === "string" && asked.prompt.trim() ? asked.prompt.trim().slice(0, 2000) : source.prompt;
   const adapters = await adaptersFor(adapterAudiencesFor(routeAudience(actor)));
   // Only styles this person may still use ride along (one turned off since is dropped); their trigger words go with them.
   const used = source.request.loras.flatMap((id) => { const a = adapters.find((x) => x.id === id); return a ? [a] : []; });
@@ -246,9 +248,13 @@ picturesRoutes.openapi(variationRoute, async (c) => {
   // Old saved picture jobs may contain four adapters; the current plan uses the first two in their saved order.
   const plan = buildPromptPlan({ words, styles: used.slice(0, 2).flatMap((adapter) => { const record = getLoraRecord(adapter.id); return record ? [record] : []; }), strength: undefined, negativePrompt: "none", media: "picture" });
   if (!plan.ok) return c.json({ error: plan.line, code: plan.code }, 422) as never;
-  const prompt = plan.prompt;
+  let prompt = plan.prompt;
   const lane = laneOf(routeAudience(actor));
   const kid = lane === "child";
+  if (kid) {
+    let enabled = false; try { enabled = getHouseholdSettingValue("content.policy.pictures") === true; } catch { enabled = true; }
+    if (enabled) { const rewrite = await rewriteForChild({ kind: "picture", description: prompt }); if (!rewrite.ok) return c.json({ error: rewrite.redirect, code: "child_content" }, 422) as never; prompt = rewrite.description; words = prompt; }
+  }
   const refused = refusePrompt(`${prompt} ${used.map((a) => a.name).join(" ")}`, { lane });
   if (refused) return c.json({ error: promptRefusalLineFor(refused, "picture", actor, routeAudience(actor).band, prompt, PROMPT_REFUSAL_LINE[refused]), code: refused }, 422) as never;
   { const likeness = likenessRefusal(actor, prompt); if (likeness) return c.json({ error: likeness, code: "household_likeness_off" }, 422) as never; }

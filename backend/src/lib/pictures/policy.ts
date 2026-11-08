@@ -24,6 +24,7 @@ import { QUICK_MODEL } from "@/lib/pictures/quality";
 import { speakerAgeBand } from "@/lib/ageBand";
 import { mentionsSexualWord, minorSexualMatch, mixedScriptMinorCue, normalise } from "@/lib/pictures/minorLine";
 import { CHILD_CONTENT_LINE, TEEN_CONTENT_LINE, childPromptUnsafe, kidLaneOn, laneOf, teenPromptUnsafe, type Lane } from "@/lib/pictures/lane";
+import { contentPolicyFor } from "@/lib/contentPolicy";
 
 
 export const GENERATION_ADULTS_KEY = "generation.adults";
@@ -153,7 +154,8 @@ export function refusePrompt(prompt: string, flags: { lane?: Lane } = {}): Promp
     return null;
   }
   if (flags.lane === "teen") {
-    if (teenPromptUnsafe(prompt) || asksToUndress(prompt)) return "teen_content";
+    const audience = { actor: { id: "policy", role: "teen" } as PersonRow, band: "teen" as const, surface: "chat" as const, surfaceClass: "written" as const, spoken: false };
+    if (teenPromptUnsafe(prompt) || asksToUndress(prompt) || contentPolicyFor(audience).check(prompt, "prompt")) return "teen_content";
   }
   // Adults are held only to CSAM prevention; the model decides other content.
   return null;

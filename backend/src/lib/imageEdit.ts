@@ -28,6 +28,8 @@ import { lockItemOfProvenance, markFields, newItemMark, type MarkSource } from "
 import { createHash, randomBytes } from "node:crypto";
 import sharp, { type OutputInfo } from "sharp";
 import { fileTypeFromBuffer } from "file-type";
+import { getHouseholdSettingValue } from "@/lib/settings";
+import { rewriteForChild } from "@/lib/contentPolicy/rewrite";
 import { and, eq, like } from "drizzle-orm";
 import { db } from "@/db";
 import { attachments, conversations } from "@/db/schema";
@@ -537,7 +539,7 @@ export async function startComment(actor: PersonRow, conversationId: string, id:
   const source = loadSource(actor, conversationId, id, true);
   const denial = pictureDenial(editorAudience(actor));
   if (denial) throw new ImageEditError(403, PICTURE_DENIAL_LINE[denial], `pictures_${denial}`);
-  const prompt = input.prompt.trim();
+  let prompt = input.prompt.trim();
   if (!prompt) throw new ImageEditError(422, "Say what to change, then send it.", "prompt_required");
   // A child changes their own cartoons in words only: no painted area from outside, no second picture, no person named.
   if (laneOf(editorAudience(actor)) === "child" && ((input.references?.length ?? 0) > 0 || input.referenceId || (input.styles?.length ?? 0) > 0 || (input.maskPng && input.maskPng.byteLength > 0))) throw new ImageEditError(422, CHILD_NO_PHOTOS_LINE, "child_cartoons_only");
@@ -549,6 +551,14 @@ export async function startComment(actor: PersonRow, conversationId: string, id:
     const resolvedStyles = input.styles.map((name) => matchAdapter(available, name));
     if (resolvedStyles.some((adapter) => adapter === null)) throw new ImageEditError(422, "That style is not available for this profile.", "style_unavailable");
     throw new ImageEditError(501, "Styles are not available for picture changes yet.", "styles_not_available");
+  }
+  if (laneOf(editorAudience(actor)) === "child") {
+    let enabled = false; try { enabled = getHouseholdSettingValue("content.policy.pictures") === true; } catch { enabled = true; }
+    if (enabled) {
+      const rewrite = await rewriteForChild({ kind: "picture", description: prompt });
+      if (!rewrite.ok) throw new ImageEditError(422, rewrite.redirect, "refused_child_content");
+      prompt = rewrite.description;
+    }
   }
   const refused = refusePrompt(prompt, { lane: laneOf(editorAudience(actor)) });
   if (refused) throw new ImageEditError(422, promptRefusalLineFor(refused, "picture", actor, editorAudience(actor).band, prompt, PROMPT_REFUSAL_LINE[refused]), `refused_${refused}`);

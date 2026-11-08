@@ -264,3 +264,11 @@ when `content.policy.search` is on. Both household flags default off, are owner/
 closes toward protection. Existing minor floors, SafeSearch transport, host lists and search decisions remain in place.
 Adults never get this policy (RULES.md rules 0 and 10, architect ruling 2026-11-08): the consumer returns none for the adult band, read errors included. `content.filters` stays out of the live settings registry until slice 05, so a minor's band defaults apply and a settings read cannot weaken them. Known gaps (review 2026-11-08): News story text, summaries and cards (`news/summary.ts`, `cards.ts`, `enrich.ts` call `gateFor` without a policy) do not yet get the policy, only News headlines in chat do; the 5-minute search cache key has no policy dimension. Both are follow-ups before the flags are turned on. The policy is deliberately not threaded into
 picture, video, music, likeness, minor-line detectors, other package text, or search-provider transport and host resolution.
+
+## Slice 03 as built
+
+`backend/src/lib/contentPolicy/rewrite.ts` provides the bounded child rewrite contract for pictures, videos and the later song slice. It screens original hard lines before the model, validates schema output, runs every child floor on each rewritten field, and falls back to a gentle fixed template when completion or validation fails. The caller stores the rewritten request; the original is not included in logs or trace data. `changedNote` emits fixed child-facing copy.
+
+Known gap for Jesse to rule on: `lanes.v1.json` stores broad child unsafe terms without a kind or intent. A non-graphic pretend fight therefore still redirects instead of becoming a friendly pretend adventure. No second word list was added; making this a rewrite requires shared data to distinguish graphic harm from pretend action.
+
+Household flags `content.policy.pictures` and `content.policy.videos` default off; a settings read error enables the rewrite. Enabled child requests rewrite soft content while preserving cartoon, no-photo, own-edit, quota and finished-item checks. Teen picture and video prompts also use the shared teen floor. Song wiring, lyrics and sung-transcript enforcement remain for slice 04.

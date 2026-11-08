@@ -41,6 +41,8 @@ import { and, eq } from "drizzle-orm";
 import { db } from "@/db";
 import { conversationTurns, videoJobs } from "@/db/schema";
 import { isOwnerOrAdmin } from "@/lib/access";
+import { getHouseholdSettingValue } from "@/lib/settings";
+import { rewriteForChild } from "@/lib/contentPolicy/rewrite";
 import type { PersonRow } from "@/types";
 import { likenessRefusal } from "@/lib/likeness";
 import { serveBytes } from "@/lib/media/serve";
@@ -334,16 +336,20 @@ videosRoutes.openapi(adultMarkRoute, (c) => {
   return c.json({ made_audience: done.made_audience, lock: done.lock }, 200);
 });
 
-async function gateRoute(actor: PersonRow, prompt: string): Promise<{ status: 403 | 422 | 503; body: { error: string; code: string } } | null> {
+async function gateRoute(actor: PersonRow, prompt: string): Promise<{ status: 403 | 422 | 503; body: { error: string; code: string } } | { prompt: string }> {
   const audience = videoRouteAudience(actor);
   const denial = videoDenial(audience);
   if (denial) return { status: 403, body: { error: VIDEO_DENIAL_LINE[denial], code: denial } };
+  if (laneOf(audience) === "child") {
+    let enabled = false; try { enabled = getHouseholdSettingValue("content.policy.videos") === true; } catch { enabled = true; }
+    if (enabled) { const rewrite = await rewriteForChild({ kind: "video", description: prompt }); if (!rewrite.ok) return { status: 422, body: { error: rewrite.redirect, code: "child_content" } }; prompt = rewrite.description; }
+  }
   const refused = refuseVideoPrompt(prompt, { lane: laneOf(audience) });
   if (refused) return { status: 422, body: { error: promptRefusalLineFor(refused, "video", actor, audience.band, prompt, VIDEO_REFUSAL_LINE[refused]), code: refused } };
   { const likeness = likenessRefusal(actor, prompt); if (likeness) return { status: 422, body: { error: likeness, code: "household_likeness_off" } }; }
   if (laneOf(audience) === "child" && videosMadeToday(actor) + 1 > kidsDailyVideos()) return { status: 422, body: { error: CHILD_VIDEO_LIMIT_LINE, code: "daily_limit" } };
   { const engine = await videoEngineStatus(); if (!videoStatusReady(engine, laneOf(audience) === "adult")) return { status: 503, body: { error: videoNotReadyReason(engine), code: "not_installed" } }; }
-  return null;
+  return { prompt };
 }
 
 const anotherRoute = createRoute({
@@ -364,9 +370,10 @@ videosRoutes.openapi(anotherRoute, async (c) => {
     return c.json(videoCardOrLocked(actor, again.job, true, await readyFlags(actor)), 200);
   }
   const asked = (await c.req.json().catch(() => ({}))) as { quality?: unknown; tier?: unknown; prompt?: unknown };
-  const words = typeof asked.prompt === "string" && asked.prompt.trim() ? asked.prompt.trim().slice(0, 2000) : source.prompt;
-  const blocked = await gateRoute(actor, words);
-  if (blocked) return c.json(blocked.body, blocked.status) as never;
+  let words = typeof asked.prompt === "string" && asked.prompt.trim() ? asked.prompt.trim().slice(0, 2000) : source.prompt;
+  const gated = await gateRoute(actor, words);
+  if ("body" in gated) return c.json(gated.body, gated.status) as never;
+  words = gated.prompt;
   if (!source.conversationId) return c.json({ error: "That video isn't available any more." }, 404) as never;
   if (source.turnId && videoJobsForTurn(actor, source.turnId).length >= MAX_CLIPS_PER_CARD) return c.json({ error: "That chat already has eight videos from this request. Ask for a new one in a new message.", code: "too_many" }, 422) as never;
   const audience = videoRouteAudience(actor);
@@ -441,8 +448,9 @@ videosRoutes.openapi(animateRoute, async (c) => {
   const actor = c.get("person");
   const body = c.req.valid("json");
   const prompt = body.prompt ?? "Bring this picture to life with gentle, natural motion.";
-  const blocked = await gateRoute(actor, prompt);
-  if (blocked) return c.json(blocked.body, blocked.status) as never;
+  const gated = await gateRoute(actor, prompt);
+  if ("body" in gated) return c.json(gated.body, gated.status) as never;
+  const rewrittenPrompt = gated.prompt;
   // A child animates only a cartoon made for them: never a photo or a named person.
   const ownTurn = db.select({ id: conversationTurns.id }).from(conversationTurns).where(and(eq(conversationTurns.id, body.turn_id), eq(conversationTurns.conversationId, body.conversation_id), eq(conversationTurns.personId, actor.id))).get();
   if (!ownTurn) return c.json({ error: "That chat isn't available any more. Open it again and try once more.", code: "not_found" }, 404) as never;
@@ -450,16 +458,16 @@ videosRoutes.openapi(animateRoute, async (c) => {
   if (!fileId) return c.json({ error: "I can animate a picture made here or a photo you attach. Attach the photo, then try again.", code: "reference" }, 422) as never;
   const audience = videoRouteAudience(actor);
   const adapters = await videoAdaptersFor(audience);
-  const prep = await prepareVideoRerun({ actor, audience, conversationId: body.conversation_id, temporary: false, prompt, sourceFileId: fileId, adapters, styleIds: [] });
+  const prep = await prepareVideoRerun({ actor, audience, conversationId: body.conversation_id, temporary: false, prompt: rewrittenPrompt, sourceFileId: fileId, adapters, styleIds: [] });
   if (!prep.ok) return c.json({ error: prep.line, code: prep.code }, 422) as never;
   const size = prep.width && prep.height && prep.height > prep.width ? VIDEO_SIZES_BY_QUALITY.quick.portrait : VIDEO_SIZES_BY_QUALITY.quick.landscape;
-  const slot = laneOf(audience) === "child" ? reserveKid(actor, "video", 1, prompt) : null;
+  const slot = laneOf(audience) === "child" ? reserveKid(actor, "video", 1, rewrittenPrompt) : null;
   if (laneOf(audience) === "child" && !slot) return c.json({ error: CHILD_VIDEO_LIMIT_LINE, code: "daily_limit" }, 422) as never;
   try {
     const job = await startVideoJob({
-      actor, conversationId: body.conversation_id, turnId: body.turn_id, temporary: false, kind: "animate", prompt, sourceFileId: fileId,
+      actor, conversationId: body.conversation_id, turnId: body.turn_id, temporary: false, kind: "animate", prompt: rewrittenPrompt, sourceFileId: fileId,
       body: {
-        prompt: laneOf(audience) === "child" ? forceCartoon(prompt) : prompt, size, seconds: laneOf(audience) === "child" ? 3 : 5, audience: stackAudienceFor(audience), image: prep.image!, image_source: prep.imageSource ?? "generated",
+        prompt: laneOf(audience) === "child" ? forceCartoon(rewrittenPrompt) : rewrittenPrompt, size, seconds: laneOf(audience) === "child" ? 3 : 5, audience: stackAudienceFor(audience), image: prep.image!, image_source: prep.imageSource ?? "generated",
         ...(laneOf(audience) === "adult" ? {} : { model: videoModelForLane(laneOf(audience)) }),
         ...(laneOf(audience) === "child" ? { negative_prompt: CHILD_NEGATIVE_PROMPT } : {}),
       },
