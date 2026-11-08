@@ -1,6 +1,6 @@
 import { i18n } from "@lingui/core";
-// The phone menu drawer draws no All apps button and no Companions entry: the kit's rail shows the All apps button from
-// wide screens up, and Companions is a core page, not a package app. The shell adds both here, through the drawer's own
+// The phone menu drawer draws no All apps button and no Synths entry: the kit's rail shows the All apps button from
+// wide screens up, and Synths is a core page, not a package app. The shell adds both here, through the drawer's own
 // `mobileSections` slot, so a phone reaches every app the desktop rail's grid button opens.
 import { Link } from "react-router-dom";
 import { getIcon } from "@maipai/ui/src/icons";
@@ -11,7 +11,7 @@ import { api } from "@/lib/api";
 
 const entries = () => [
   { to: ALL_APPS_PATH, label: i18n._({ id: "All apps", message: "All apps" }), icon: "layout-grid" },
-  { to: "/companions", label: i18n._({ id: "Companions", message: "Synths" }), icon: "bot" },
+  { to: "/companions", label: i18n._({ id: "Synths", message: "Synths" }), icon: "bot" },
 ] as const;
 
 export function PhoneMenuLinks() {
@@ -23,7 +23,7 @@ export function PhoneMenuLinks() {
   </nav>;
 }
 
-/** The header search's Apps group for the core pages (Companions, Memories, Settings, ...). The hub's own search answers
+/** The header search's Apps group for the core pages (Synths, Memories, Settings, ...). The hub's own search answers
  * for installed package apps, whose routes start /apps/, so those are left out here to avoid listing them twice. */
 export function coreAppsGroup(query: string, apps: readonly AppEntry[]): SearchGroup | null {
   const results = filterApps(apps.filter((app) => !app.to.startsWith("/apps/")), query)

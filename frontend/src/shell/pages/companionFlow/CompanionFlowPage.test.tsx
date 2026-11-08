@@ -260,7 +260,7 @@ test("closing with no draft goes straight back to the companions list", async ()
 
 test("a child account gets the not-allowed message, not the dialog", async () => {
   const { view } = open({ canCreate: false });
-  expect(await view.findByText(/Making a companion is for teens and adults/)).toBeTruthy();
+  expect(await view.findByText(/Making a synth is for teens and adults/)).toBeTruthy();
   expect(view.queryByLabelText("Character name")).toBeNull();
 });
 

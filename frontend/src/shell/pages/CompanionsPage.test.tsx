@@ -27,26 +27,26 @@ function open(path: string, preview = false, viewer = { id: "viewer" } as never)
 function LocationProbe() { const location = useLocation(); return <output data-testid="location">{location.pathname}{location.search}</output>; }
 
 async function openCardActions(view: { findByRole: (role: string, opts: { name: string }) => Promise<HTMLElement> }) {
-  const trigger = await view.findByRole("button", { name: "Companion actions" });
+  const trigger = await view.findByRole("button", { name: "Synth actions" });
   act(() => { fireEvent.pointerDown(trigger, { button: 0, ctrlKey: false, pointerId: 1 }); fireEvent.click(trigger); });
 }
 
-test("directory cards show status, meta, actions and the new companion link", async () => {
+test("directory cards show status, meta, actions and the new synth link", async () => {
   api.companions = async (): Promise<CompanionList> => ({ allowed: true, can_create: true, can_discover: true, companions: [card({ is_household: true, status: "draft", portrait: "lively-child/v7" }), card({ id: "lively-teen", name: "Riff", type: "teen", type_label: "Teen companion", is_default: true })], discover: [], robots: null, default_id: "lively-teen" });
   const view = open("/companions");
   await waitFor(() => expect(view.getByRole("heading", { name: "Sprout" })).toBeTruthy());
-  expect(view.getByText("Familiar faces. Different ways to help.")).toBeTruthy();
+  expect(view.getByText("Meet the synths in your home. Chat with one, or pick yours.")).toBeTruthy();
   expect(view.getByText("Draft · needs a portrait")).toBeTruthy();
-  expect(view.getByText("Your default")).toBeTruthy();
+  expect(view.getAllByText("Your companion").length).toBeGreaterThan(0);
   expect(view.getAllByText("A cheerful friend.").length).toBe(2);
-  expect(view.getAllByText("Choose a conversation to get started").length).toBe(2);
+  expect(view.getAllByText("No chats yet").length).toBe(2);
   expect(view.getAllByRole("button", { name: "Chat" }).length).toBe(2);
-  expect(view.getAllByRole("button", { name: "View profile" }).length).toBe(2);
-  expect(view.getByRole("searchbox", { name: "Search companions" })).toBeTruthy();
-  expect(view.getByRole("link", { name: "New companion" }).getAttribute("href")).toBe("/companions/create");
+  expect(view.getAllByRole("button", { name: "View page" }).length).toBe(2);
+  expect(view.getByRole("searchbox", { name: "Search synths" })).toBeTruthy();
+  expect(view.getByRole("link", { name: "New synth" }).getAttribute("href")).toBe("/companions/create");
   // A portrait image only appears once the browser has loaded it, so the pictured card shows no seeded face yet; the card without a picture shows exactly one (never a bare letter).
   expect(view.container.querySelectorAll('img[src^="data:image/svg+xml"]').length).toBe(1);
-  expect(view.getAllByRole("button", { name: "New companion" }).length).toBe(1);
+  expect(view.getAllByRole("button", { name: "New synth" }).length).toBe(1);
   expect(view.queryByText("Robots")).toBeNull();
   // A pictured card uses the large avatar so its face is not smaller than the seeded faces beside it.
   expect(view.container.querySelector('[data-slot="avatar"][data-size="lg"]')).not.toBeNull();
@@ -62,7 +62,7 @@ test("directory own-job and latest-activity meta lines render, and search filter
   expect(view.getByText(/Last active .* · 3 chats/)).toBeTruthy();
   // AUDIT-UI-01: a title is never fed to the time formatter ("Last active undefined NaN NaN").
   expect(view.queryByText(/undefined|NaN/)).toBeNull();
-  fireEvent.change(view.getByRole("searchbox", { name: "Search companions" }), { target: { value: "patient" } });
+  fireEvent.change(view.getByRole("searchbox", { name: "Search synths" }), { target: { value: "patient" } });
   expect(view.queryByRole("heading", { name: "Busy" })).toBeNull();
   const discover = view.getByRole("tab", { name: "Discover" });
   fireEvent.mouseDown(discover, { button: 0 }); fireEvent.click(discover);
@@ -74,16 +74,16 @@ test("preview companion tile selection opens its detail", async () => {
   api.settingsValues = async () => [{ key: "companions.preview_shells", value: true, source: "user", label: "Preview", level: "basic", secret: false }] as never;
   api.companions = async (): Promise<CompanionList> => ({ allowed: true, can_create: false, can_discover: false, companions: [card({ id: "lively-child" })], discover: [], robots: null, default_id: "" });
   const view = open("/companions", true, { id: "viewer" } as never);
-  await waitFor(() => expect(view.getByText("Choose a conversation to get started")).toBeTruthy());
+  await waitFor(() => expect(view.getByText("No chats yet")).toBeTruthy());
   expect(view.getByRole("heading", { name: "Sprout" })).toBeTruthy();
 });
 
-test("View profile opens the companion detail", async () => {
+test("View page opens the companion detail", async () => {
   api.companions = async (): Promise<CompanionList> => ({ allowed: true, can_create: false, can_discover: false, companions: [card()], discover: [], robots: null, default_id: "" });
   api.companion = async () => detail();
   api.companionActivity = async () => ({ activity: [{ id: "work-1", kind: "project", title: "A real project", state: "running", created_at: "2026-10-25T12:00:00Z", updated_at: "2026-10-25T12:00:00Z" }] });
   const view = open("/companions");
-  fireEvent.click(await view.findByRole("button", { name: "View profile" }));
+  fireEvent.click(await view.findByRole("button", { name: "View page" }));
   await waitFor(() => expect(view.getByRole("tab", { name: "Activity" })).toBeTruthy());
   fireEvent.mouseDown(view.getByRole("tab", { name: "About" }), { button: 0 });
   expect(view.getByRole("heading", { name: "Sprout" })).toBeTruthy();
@@ -100,7 +100,7 @@ test("card actions set a default without opening the card", async () => {
   const view = open("/companions");
   await view.findByRole("heading", { name: "Sprout" });
   await openCardActions(view);
-  fireEvent.click(await view.findByRole("menuitem", { name: "Set as my default" }));
+  fireEvent.click(await view.findByRole("menuitem", { name: "Make this my companion" }));
   await waitFor(() => expect(saved).toEqual(["lively-child"]));
   expect(view.getByRole("heading", { name: "Sprout" })).toBeTruthy();
 });
@@ -112,7 +112,7 @@ test("synth cards show whose synth it is and the base", async () => {
   ], discover: [], robots: null, default_id: "atlas" });
   const view = open("/companions");
   await view.findByRole("heading", { name: "Atlas" });
-  expect(view.getByText("Your companion")).toBeTruthy();
+  expect(view.getAllByText("Your companion").length).toBeGreaterThan(0);
   expect(view.getByText("Based on Ada Lovelace")).toBeTruthy();
   expect(view.getByText("Yours, from Atlas")).toBeTruthy();
 });
@@ -201,7 +201,7 @@ test("the household detail shows settings icon and copy actions", async () => {
   
   expect(saved).toEqual([]);
   expect(view.getByRole("button", { name: "Chat with Sprout" })).toBeTruthy();
-  expect(view.getByText("Household companion")).toBeTruthy();
+  expect(view.getByText("Household synth")).toBeTruthy();
   expect(view.getAllByText("Anyone in the family, including kids.").length).toBeGreaterThan(0);
   expect(view.getByRole("tab", { name: "Activity" })).toBeTruthy();
   expect(view.getByRole("tab", { name: "About" })).toBeTruthy();
@@ -214,15 +214,15 @@ test("a bundled companion makes editing through a copy clear", async () => {
   await waitFor(() => expect(view.getByRole("tab", { name: "Activity" })).toBeTruthy());
   fireEvent.mouseDown(view.getByRole("tab", { name: "About" }), { button: 0 });
   expect(view.getByRole("button", { name: "Customize a copy" })).toBeTruthy();
-  expect(view.getByText("This companion comes with Home, so it can't be changed. Make a copy and edit that.")).toBeTruthy();
-  expect(view.queryByRole("link", { name: "Companion settings" })).toBeNull();
+  expect(view.getByText("This synth comes with Home, so it can't be changed. Make a copy and edit that.")).toBeTruthy();
+  expect(view.queryByRole("link", { name: "Synth settings" })).toBeNull();
 });
 
 test("a refused save shows the sentence from the hub", async () => {
   api.companion = async () => detail();
   api.setDefaultCompanion = async () => { throw new ApiError("Companions are turned off for you. Ask an owner or admin to turn them on.", 403); };
   const view = open("/companions/lively-child");
-  expect(view.queryByRole("button", { name: "Set as my default" })).toBeNull();
+  expect(view.queryByRole("button", { name: "Make this my companion" })).toBeNull();
 });
 
 test("an admin's detail lists the people and robots using the companion", async () => {
@@ -249,7 +249,7 @@ test("an admin picks the companion's voice and it saves to the household setting
   const view = render(<QueryClientProvider client={client}><MemoryRouter initialEntries={["/companions/lively-child"]}><Routes><Route path="/companions/:id" element={<CompanionDetailPage />} /></Routes></MemoryRouter></QueryClientProvider>);
   await waitFor(() => expect(view.getByRole("tab", { name: "Activity" })).toBeTruthy());
   fireEvent.mouseDown(view.getByRole("tab", { name: "About" }), { button: 0 });
-  const picker = await view.findByLabelText("Voice for this companion");
+  const picker = await view.findByLabelText("Voice for this synth");
   expect(saved).toEqual([]);
   fireEvent.click(picker);
   fireEvent.click(await view.findByRole("option", { name: "Alba" }));
@@ -262,7 +262,7 @@ test("a person who is not an admin gets no voice picker", async () => {
   await waitFor(() => expect(view.getByRole("tab", { name: "Activity" })).toBeTruthy());
   fireEvent.mouseDown(view.getByRole("tab", { name: "About" }), { button: 0 });
   expect(view.getByRole("heading", { name: "Sprout" })).toBeTruthy();
-  expect(view.queryByLabelText("Voice for this companion")).toBeNull();
+  expect(view.queryByLabelText("Voice for this synth")).toBeNull();
 });
 
 
@@ -271,10 +271,10 @@ test("preview cards show real counts and detail activity, and the detail page is
   api.companions = async () => ({ allowed: true, can_create: true, can_discover: true, default_id: "lively-teen", robots: null,
     companions: [card({ id: "lively-child", name: "Sprout", chats: 2 }), card({ id: "lively-teen", name: "Riff", is_default: true, chats: 0 })], discover: [card({ id: "lively-adult", name: "Pal", type: "adult", tagline: "Research helper" })] });
   const yours = open("/companions", true);
-  await waitFor(() => expect(yours.getAllByText("Choose a conversation to get started").length).toBe(2));
+  await waitFor(() => expect(yours.getAllByText("No chats yet").length).toBe(2));
   expect(yours.queryByRole("button", { name: "Add" })).toBeNull();
-  expect(yours.getAllByRole("button", { name: "New companion" }).length).toBe(1);
-  expect(yours.getByRole("link", { name: "New companion" }).getAttribute("href")).toBe("/companions/create");
+  expect(yours.getAllByRole("button", { name: "New synth" }).length).toBe(1);
+  expect(yours.getByRole("link", { name: "New synth" }).getAttribute("href")).toBe("/companions/create");
   const discover = yours.getByRole("tab", { name: "Discover" });
   fireEvent.mouseDown(discover, { button: 0 });
   fireEvent.click(discover);
@@ -289,7 +289,7 @@ test("preview cards show real counts and detail activity, and the detail page is
   await waitFor(() => expect(detailView.getByRole("tab", { name: "Activity" })).toBeTruthy());
   expect(detailView.getByRole("tab", { name: "Activity" }).getAttribute("data-state")).toBe("active");
   expect(detailView.queryByText(/Coming soon: (tasks|your chats)/)).toBeNull();
-  expect(detailView.getByRole("link", { name: "All companions" }).getAttribute("href")).toBe("/companions");
+  expect(detailView.getByRole("link", { name: "All synths" }).getAttribute("href")).toBe("/companions");
   
   expect((detailView.getByRole("button", { name: "Chat with Sprout" }) as HTMLButtonElement).disabled).toBe(false);
   expect(await detailView.findByText("Made a picture")).toBeTruthy();
@@ -403,7 +403,7 @@ test("the card menu of a draft household companion has Edit, copy, Mark ready, D
   const member = open("/companions", true, { id: "viewer", role: "member" } as never);
   await member.findByText("Sprout");
   const names = await itemNames(member);
-  expect(names).toEqual(["Edit", "Set as my default", "Make a copy", "Mark ready", "Remove from Yours", "Delete"]);
+  expect(names).toEqual(["Edit", "Make this my companion", "Make a copy", "Mark ready", "Remove from Yours", "Delete"]);
   cleanup();
   const admin = open("/companions", true, { id: "viewer", role: "admin" } as never);
   await admin.findByText("Sprout");
@@ -446,12 +446,12 @@ test("Edit opens the three-screen flow for that companion, and the Audience dial
   await waitFor(() => expect(view.getByTestId("location").textContent).toBe("/companions/lively-child/create"));
 });
 
-test("with the preview setting off, New companion and the card menu Edit still open the three-screen flow", async () => {
+test("with the preview setting off, New synth and the card menu Edit still open the three-screen flow", async () => {
   api.settingsValues = async () => [{ key: "companions.preview_shells", value: false, source: "user", label: "Preview", level: "basic", secret: false }] as never;
   api.companions = async (): Promise<CompanionList> => ({ allowed: true, can_create: true, can_discover: false, companions: [card({ is_household: true, can_edit: true, status: "ready" })], discover: [], robots: null, default_id: "" });
   const view = open("/companions");
   await view.findByText("Sprout");
-  expect(view.getByRole("link", { name: "New companion" }).getAttribute("href")).toBe("/companions/create");
+  expect(view.getByRole("link", { name: "New synth" }).getAttribute("href")).toBe("/companions/create");
   await openCardActions(view);
   fireEvent.click(await view.findByRole("menuitem", { name: "Edit" }));
   await waitFor(() => expect(view.getByTestId("location").textContent).toBe("/companions/lively-child/create"));

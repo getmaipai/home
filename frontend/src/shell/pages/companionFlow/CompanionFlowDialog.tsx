@@ -11,9 +11,9 @@ import { CreateCharacterStep } from "@/shell/pages/companionFlow/CreateCharacter
 import { flowErrorText } from "@/shell/pages/companionFlow/errors";
 
 const STEPS = () => ([
-  { title: i18n._({ id: "Create Character", message: "Create Character" }), line: i18n._({ id: "Design your companion's appearance", message: "Design your companion's appearance" }) },
+  { title: i18n._({ id: "Create Character", message: "Create Character" }), line: i18n._({ id: "Design your synth's appearance", message: "Design your synth's appearance" }) },
   { title: i18n._({ id: "Animate Character", message: "Animate Character" }), line: i18n._({ id: "Generate and review your animations", message: "Generate and review your animations" }) },
-  { title: i18n._({ id: "Customize Companion", message: "Customize Companion" }), line: i18n._({ id: "Give your companion a voice, personality, and history", message: "Give your companion a voice, personality, and history" }) },
+  { title: i18n._({ id: "Customize Synth", message: "Customize Synth" }), line: i18n._({ id: "Give your synth a voice, personality, and history", message: "Give your synth a voice, personality, and history" }) },
 ] as const);
 
 /** The three-screen companion dialog. Screen 3 saves and publishes. `initialStep` (editing only) opens on a later screen. */

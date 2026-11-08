@@ -15,7 +15,7 @@ day the hub arrives; the rest are for when you need them.
 - [Chat and talking to MaiPai](chat.md): how to send a message, use voice input, and manage your conversations.
 - [Talking to Home](voice.md): allow the microphone, pick a voice, and turn natural speech sounds on or off.
 - [Weather](weather.md): ask in chat, open the Weather app, and set your places and units.
-- [Companions](companions.md): pick a companion, make your own, and set your default.
+- [Synths](companions.md): meet the synths, make your own, and pick your companion.
 - [Robots](robots.md): add a StackChan robot and choose how it talks.
 - [Turn Home off and on](maipai-command.md): stop Home to free the computer's memory, start it again, and check it is running.
 - [All apps](all-apps.md): find any app, and choose which ones sit in the left rail.

@@ -43,16 +43,16 @@ export function CompanionAudienceDialog({ companionId, name, onClose }: { compan
       <DialogContent>
         <DialogHeader>
           <DialogTitle>{i18n._({ id: "Who is {name} for?", message: "Who is {name} for?", values: { name } })}</DialogTitle>
-          <DialogDescription>{i18n._({ id: "Adults only, teens and adults, or everyone. Home checks the artwork again before it widens who can use a companion.", message: "Adults only, teens and adults, or everyone. Home checks the artwork again before it widens who can use a companion." })}</DialogDescription>
+          <DialogDescription>{i18n._({ id: "Adults only, teens and adults, or everyone. Home checks the artwork again before it widens who can use a synth.", message: "Adults only, teens and adults, or everyone. Home checks the artwork again before it widens who can use a synth." })}</DialogDescription>
         </DialogHeader>
         {saved.isError ? <p role="alert" className="text-sm text-destructive">{flowErrorText(saved.error)}</p> : null}
-        <ToggleGroup type="single" variant="segmented" fill value={audience} onValueChange={(next) => { if (next) setChoice(next as Audience); }} aria-label={i18n._({ id: "Who can use this companion", message: "Who can use this companion" })}>
+        <ToggleGroup type="single" variant="segmented" fill value={audience} onValueChange={(next) => { if (next) setChoice(next as Audience); }} aria-label={i18n._({ id: "Who can use this synth", message: "Who can use this synth" })}>
           <ToggleGroupItem value="adult">{i18n._({ id: "Adults only", message: "Adults only" })}</ToggleGroupItem>
           <ToggleGroupItem value="teen">{i18n._({ id: "Teens and adults", message: "Teens and adults" })}</ToggleGroupItem>
           <ToggleGroupItem value="all">{i18n._({ id: "Everyone", message: "Everyone" })}</ToggleGroupItem>
         </ToggleGroup>
         {everyone ? <div className="flex flex-col gap-3">
-          <p className="text-sm font-medium">{i18n._({ id: "Before this companion is for everyone, check each one.", message: "Before this companion is for everyone, check each one." })}</p>
+          <p className="text-sm font-medium">{i18n._({ id: "Before this synth is for everyone, check each one.", message: "Before this synth is for everyone, check each one." })}</p>
           {CHECKLIST().map((line, index) => <div key={line} className="flex items-start gap-3">
             <Checkbox id={`all-ages-${index}`} checked={checked[index]} onCheckedChange={(value) => setChecked((old) => old.map((item, i) => i === index ? value === true : item))} />
             <Label htmlFor={`all-ages-${index}`}>{line}</Label>

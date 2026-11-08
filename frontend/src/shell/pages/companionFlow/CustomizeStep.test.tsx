@@ -40,16 +40,16 @@ const button = (view: ReturnType<typeof open>["view"], name: string) => view.get
 
 test("screen 3 shows its title, all three bar segments, and the mockup's fields", async () => {
   const { view } = open();
-  expect(await view.findByText("Step 3 of 3 · Give your companion a voice, personality, and history")).toBeTruthy();
-  expect(view.getAllByText("Customize Companion").length).toBeGreaterThan(0);
+  expect(await view.findByText("Step 3 of 3 · Give your synth a voice, personality, and history")).toBeTruthy();
+  expect(view.getAllByText("Customize Synth").length).toBeGreaterThan(0);
   for (const label of ["Choose Voice", "Create / Clone", "Friendly", "Funny", "Calm", "Professional", "Playful", "Custom"]) expect(view.getByRole("radio", { name: label })).toBeTruthy();
-  for (const label of ["Preview", "Generate", "Test Conversation", "Save Companion", "Back"]) expect(view.getByRole("button", { name: label })).toBeTruthy();
-  expect(view.getByPlaceholderText("How should your companion behave, speak, and interact? (Optional)")).toBeTruthy();
+  for (const label of ["Preview", "Generate", "Test Conversation", "Save Synth", "Back"]) expect(view.getByRole("button", { name: label })).toBeTruthy();
+  expect(view.getByPlaceholderText("How should your synth behave, speak, and interact? (Optional)")).toBeTruthy();
   expect(view.getByText("Generate a suggested backstory or write your own. You can edit it anytime.")).toBeTruthy();
   expect(view.getByText("All settings can be changed later.")).toBeTruthy();
   expect((view.getByLabelText("Backstory") as HTMLTextAreaElement).maxLength).toBe(400);
   expect((view.getByLabelText("Personality notes") as HTMLTextAreaElement).maxLength).toBe(300);
-  expect(view.getByAltText("Marlow, companion preview").getAttribute("src")).toBe("/portrait.png");
+  expect(view.getByAltText("Marlow, synth preview").getAttribute("src")).toBe("/portrait.png");
 });
 
 test("chips select one at a time", async () => {
@@ -69,7 +69,7 @@ test("Generate puts the suggested backstory in the box, and Save posts the right
   await act(async () => { fireEvent.click(button(view, "Generate")); });
   await waitFor(() => expect((view.getByLabelText("Backstory") as HTMLTextAreaElement).value).toBe("Marlow grew up beside a quiet lighthouse."));
   expect(calls.backstory).toEqual([{ hint: "Short jokes." }]);
-  await act(async () => { fireEvent.click(button(view, "Save Companion")); });
+  await act(async () => { fireEvent.click(button(view, "Save Synth")); });
   await waitFor(() => expect(calls.saved.length).toBe(1));
   expect(calls.saved[0]).toEqual({ voice_id: "default", personality: "funny", style_notes: "Short jokes.", backstory: "Marlow grew up beside a quiet lighthouse." });
   await waitFor(() => expect(view.getByTestId("where").textContent).toBe("/companions"));
@@ -79,17 +79,17 @@ test("a save blocked with go_back_to look shows the sentence and a button to scr
   const { view } = open();
   await view.findByRole("radio", { name: "Friendly" });
   api.saveCompanion = async () => { throw new ApiError("Go back to the look screen and check the starting picture.", 422, undefined, undefined, undefined, undefined, undefined, undefined, "look"); };
-  await act(async () => { fireEvent.click(button(view, "Save Companion")); });
+  await act(async () => { fireEvent.click(button(view, "Save Synth")); });
   expect((await view.findByRole("alert")).textContent).toBe("Go back to the look screen and check the starting picture.");
   fireEvent.click(button(view, "Go to Create Character"));
-  await view.findByText("Step 1 of 3 · Design your companion's appearance");
+  await view.findByText("Step 1 of 3 · Design your synth's appearance");
 });
 
 test("a save blocked with go_back_to animations jumps to screen 2", async () => {
   const { view } = open();
   await view.findByRole("radio", { name: "Friendly" });
   api.saveCompanion = async () => { throw new ApiError("Go back to animations and check the approved clips.", 409, undefined, undefined, undefined, undefined, undefined, undefined, "animations"); };
-  await act(async () => { fireEvent.click(button(view, "Save Companion")); });
+  await act(async () => { fireEvent.click(button(view, "Save Synth")); });
   await view.findByText("Go back to animations and check the approved clips.");
   fireEvent.click(button(view, "Go to Animate Character"));
   await view.findByText("Step 2 of 3 · Generate and review your animations");

@@ -125,19 +125,19 @@ export function CustomizeStep({ companionId, name, onBack, onGoTo }: { companion
           <ToggleGroup type="single" variant="chip" wrap value={personality} onValueChange={(next) => { if (next) setPersonality(next as CompanionPersonality); }} aria-label={i18n._({ id: "Personality", message: "Personality" })}>
             {PERSONALITIES().map((item) => <ToggleGroupItem key={item.id} value={item.id}>{item.label}</ToggleGroupItem>)}
           </ToggleGroup>
-          <Textarea aria-label={i18n._({ id: "Personality notes", message: "Personality notes" })} shape="rounded" maxLength={NOTES_MAX} value={notes} onChange={(e) => setNotes(e.target.value)} placeholder={i18n._({ id: "How should your companion behave, speak, and interact? (Optional)", message: "How should your companion behave, speak, and interact? (Optional)" })} />
+          <Textarea aria-label={i18n._({ id: "Personality notes", message: "Personality notes" })} shape="rounded" maxLength={NOTES_MAX} value={notes} onChange={(e) => setNotes(e.target.value)} placeholder={i18n._({ id: "How should your synth behave, speak, and interact? (Optional)", message: "How should your synth behave, speak, and interact? (Optional)" })} />
         </DialogSection>
         <DialogSection title={i18n._({ id: "Backstory", message: "Backstory" })} icon={<Book aria-hidden="true" />} aside={<Button variant="secondary" shape="pill" disabled={generating || loading} onClick={() => void generate()}><Sparkles aria-hidden="true" />{generating ? i18n._({ id: "Writing", message: "Writing" }) : i18n._({ id: "Generate", message: "Generate" })}</Button>}>
-          <Textarea aria-label={i18n._({ id: "Backstory", message: "Backstory" })} shape="rounded" maxLength={BACKSTORY_MAX} value={backstory} onChange={(e) => setBackstory(e.target.value)} placeholder={i18n._({ id: "Who is your companion? Describe their history, experiences, interests, occupation, relationships, and personal story...", message: "Who is your companion? Describe their history, experiences, interests, occupation, relationships, and personal story..." })} />
+          <Textarea aria-label={i18n._({ id: "Backstory", message: "Backstory" })} shape="rounded" maxLength={BACKSTORY_MAX} value={backstory} onChange={(e) => setBackstory(e.target.value)} placeholder={i18n._({ id: "Who is your synth? Describe their history, experiences, interests, occupation, relationships, and personal story...", message: "Who is your synth? Describe their history, experiences, interests, occupation, relationships, and personal story..." })} />
           <p className="text-sm text-muted-foreground">{i18n._({ id: "Generate a suggested backstory or write your own. You can edit it anytime.", message: "Generate a suggested backstory or write your own. You can edit it anytime." })}</p>
         </DialogSection>
       </div>
-      <DialogSection title={i18n._({ id: "Companion Preview", message: "Companion Preview" })} aside={name}>
-        <CompanionStage surface="panel" frame="strong" transparency="checker" name={name || "Your companion"} mode="idle" showHeader={false} talk={null}
-          character={portrait ? <img src={portrait} alt={i18n._({ id: "{name}, companion preview", message: "{name}, companion preview", values: { name: name || i18n._({ id: "Your companion", message: "Your companion" }) } })} draggable={false} className="aspect-square max-h-96 w-full object-contain" /> : <p className="p-6 text-center text-muted-foreground">{i18n._({ id: "Your companion will appear here", message: "Your companion will appear here" })}</p>}
+      <DialogSection title={i18n._({ id: "Synth Preview", message: "Synth Preview" })} aside={name}>
+        <CompanionStage surface="panel" frame="strong" transparency="checker" name={name || i18n._({ id: "Your synth", message: "Your synth" })} mode="idle" showHeader={false} talk={null}
+          character={portrait ? <img src={portrait} alt={i18n._({ id: "{name}, synth preview", message: "{name}, synth preview", values: { name: name || i18n._({ id: "Your synth", message: "Your synth" }) } })} draggable={false} className="aspect-square max-h-96 w-full object-contain" /> : <p className="p-6 text-center text-muted-foreground">{i18n._({ id: "Your synth will appear here", message: "Your synth will appear here" })}</p>}
           actions={[
             { id: "test", label: i18n._({ id: "Test Conversation", message: "Test Conversation" }), onSelect: () => { window.open(`/chat?try=${encodeURIComponent(companionId)}`, "_blank", "noopener"); } },
-            { id: "save", label: saving ? i18n._({ id: "Saving", message: "Saving" }) : i18n._({ id: "Save Companion", message: "Save Companion" }), primary: true, disabled: saving || loading, onSelect: () => void save() },
+            { id: "save", label: saving ? i18n._({ id: "Saving", message: "Saving" }) : i18n._({ id: "Save Synth", message: "Save Synth" }), primary: true, disabled: saving || loading, onSelect: () => void save() },
           ]} />
         {error.text ? <div className="flex flex-col gap-2">
           <p role="alert" className="text-sm text-destructive">{error.text}</p>

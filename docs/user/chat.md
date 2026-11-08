@@ -154,7 +154,7 @@ Owners and admins can also view another household member's conversations. This h
 
 ## Choose the companion
 
-A companion picker sits in the chat header. Choose a companion and a line says who will answer next. The choice stays with that chat. See [Companions](companions.md).
+A synth picker sits in the chat header. Choose a synth and a line says who will answer next. The choice stays with that chat. See [Synths](companions.md).
 
 ## Keyboard shortcuts
 

@@ -62,11 +62,11 @@ function companionMenu({ card, discover = false, onDelete, onRemove, onSetDefaul
   const forkedSynth = !!card.synth?.yours && !!card.synth.forked_from;
   const actions = <DropdownMenu>
     <DropdownMenuTrigger asChild>
-      <Button type="button" variant="ghost" size="icon" aria-label={i18n._({ id: "Companion actions", message: "Companion actions" })} onClick={(event) => event.stopPropagation()} onPointerDown={(event) => event.stopPropagation()} onKeyDown={(event) => event.stopPropagation()}><MoreIcon aria-hidden="true" /></Button>
+      <Button type="button" variant="ghost" size="icon" aria-label={i18n._({ id: "Synth actions", message: "Synth actions" })} onClick={(event) => event.stopPropagation()} onPointerDown={(event) => event.stopPropagation()} onKeyDown={(event) => event.stopPropagation()}><MoreIcon aria-hidden="true" /></Button>
     </DropdownMenuTrigger>
     <DropdownMenuContent align="end" onClick={(event) => event.stopPropagation()} onPointerDown={(event) => event.stopPropagation()} onKeyDown={(event) => event.stopPropagation()}>
       {own && onEdit ? <DropdownMenuItem onSelect={() => onEdit(card)}>{i18n._({ id: "Edit", message: "Edit" })}</DropdownMenuItem> : null}
-      {baseSynth && onMakeMine ? <DropdownMenuItem onSelect={() => onMakeMine(card)}>{i18n._({ id: "Make this my companion", message: "Make this my companion" })}</DropdownMenuItem> : <DropdownMenuItem disabled={card.is_default} onSelect={() => onSetDefault(card)}>{i18n._({ id: "Set as my default", message: "Set as my default" })}</DropdownMenuItem>}
+      {baseSynth && onMakeMine ? <DropdownMenuItem onSelect={() => onMakeMine(card)}>{i18n._({ id: "Make this my companion", message: "Make this my companion" })}</DropdownMenuItem> : <DropdownMenuItem disabled={card.is_default} onSelect={() => onSetDefault(card)}>{i18n._({ id: "Make this my companion", message: "Make this my companion" })}</DropdownMenuItem>}
       {forkedSynth && onShare ? <DropdownMenuItem onSelect={() => onShare(card)}>{i18n._({ id: "Share with the household", message: "Share with the household" })}</DropdownMenuItem> : null}
       {forkedSynth && onFresh ? <DropdownMenuItem onSelect={() => onFresh(card)}>{i18n._({ id: "Start fresh from the base", message: "Start fresh from the base" })}</DropdownMenuItem> : null}
       {card.can_copy && onCopy ? <DropdownMenuItem onSelect={() => onCopy(card)}>{i18n._({ id: "Make a copy", message: "Make a copy" })}</DropdownMenuItem> : null}
@@ -92,13 +92,13 @@ function companionCardMeta(card: CompanionCard) {
     ? <Status status={(card.waiting_count ?? 0) > 0 ? "degraded" : "online"}>{i18n._({ id: "{working} working · {waiting} waiting on you", message: "{working} working · {waiting} waiting on you", values: { working: card.working_count ?? 0, waiting: card.waiting_count ?? 0 } })}</Status>
     : formatRelative(card.latest_activity_at)
       ? i18n._({ id: "Last active {when} · {chats, plural, one {# chat} other {# chats}}", message: "Last active {when} · {chats, plural, one {# chat} other {# chats}}", values: { when: formatRelative(card.latest_activity_at), chats: card.chat_count ?? card.chats } })
-      : i18n._({ id: "Choose a conversation to get started", message: "Choose a conversation to get started" });
+      : i18n._({ id: "No chats yet", message: "No chats yet" });
   return <>{lines.map((line, index) => <span key={`${index}-${line}`}>{line}</span>)}{activity}</>;
 }
 
-/** /companions: the companions this person may use, as a card grid. */
+/** /companions: the synths this person may use, as a card grid. */
 function CompanionsDirectory() {
-  useTabItem(i18n._({ id: "Companions", message: "Synths" }));
+  useTabItem(i18n._({ id: "Synths", message: "Synths" }));
   const navigate = useNavigate();
   const query = useQuery<CompanionList>({ queryKey: listKey, queryFn: api.companions, retry: false });
   const [discoverFilter, setDiscoverFilter] = useState("All");
@@ -110,40 +110,40 @@ function CompanionsDirectory() {
   const admin = viewer?.role === "owner" || viewer?.role === "admin";
   const queryClient = useQueryClient();
   const companionStills = useCompanionStills([...(query.data?.companions ?? []), ...(query.data?.discover ?? [])].map(({ id }) => id));
-  const saveDefault = useMutation({ mutationFn: (id: string) => api.setDefaultCompanion(id), onSuccess: () => { void queryClient.invalidateQueries({ queryKey: listKey }); }, onError: (error) => setActionError(errorLine(error, i18n._({ id: "Could not set your default. Check your connection and try again.", message: "Could not set your default. Check your connection and try again." }))) });
-  const remove = useMutation({ mutationFn: (id: string) => api.deleteCompanion(id), onSuccess: () => { setDeleteTarget(null); void queryClient.invalidateQueries({ queryKey: listKey }); }, onError: (error) => setActionError(errorLine(error, i18n._({ id: "Could not delete this companion. Check your connection and try again.", message: "Could not delete this companion. Check your connection and try again." }))) });
-  const addToYours = useMutation({ mutationFn: (id: string) => api.addCompanion(id), onSuccess: () => { setActionError(null); void queryClient.invalidateQueries({ queryKey: listKey }); }, onError: (error) => setActionError(errorLine(error, i18n._({ id: "Could not add this companion. Check your connection and try again.", message: "Could not add this companion. Check your connection and try again." }))) });
-  const removeFromYours = useMutation({ mutationFn: (id: string) => api.removeCompanion(id), onSuccess: () => { setActionError(null); void queryClient.invalidateQueries({ queryKey: listKey }); }, onError: (error) => setActionError(errorLine(error, i18n._({ id: "Could not remove this companion. Check your connection and try again.", message: "Could not remove this companion. Check your connection and try again." }))) });
+  const saveDefault = useMutation({ mutationFn: (id: string) => api.setDefaultCompanion(id), onSuccess: () => { void queryClient.invalidateQueries({ queryKey: listKey }); }, onError: (error) => setActionError(errorLine(error, i18n._({ id: "Could not make this your companion. Check your connection and try again.", message: "Could not make this your companion. Check your connection and try again." }))) });
+  const remove = useMutation({ mutationFn: (id: string) => api.deleteCompanion(id), onSuccess: () => { setDeleteTarget(null); void queryClient.invalidateQueries({ queryKey: listKey }); }, onError: (error) => setActionError(errorLine(error, i18n._({ id: "Could not delete this synth. Check your connection and try again.", message: "Could not delete this synth. Check your connection and try again." }))) });
+  const addToYours = useMutation({ mutationFn: (id: string) => api.addCompanion(id), onSuccess: () => { setActionError(null); void queryClient.invalidateQueries({ queryKey: listKey }); }, onError: (error) => setActionError(errorLine(error, i18n._({ id: "Could not add this synth. Check your connection and try again.", message: "Could not add this synth. Check your connection and try again." }))) });
+  const removeFromYours = useMutation({ mutationFn: (id: string) => api.removeCompanion(id), onSuccess: () => { setActionError(null); void queryClient.invalidateQueries({ queryKey: listKey }); }, onError: (error) => setActionError(errorLine(error, i18n._({ id: "Could not remove this synth. Check your connection and try again.", message: "Could not remove this synth. Check your connection and try again." }))) });
   const makeSynthMine = async (card: CompanionCard) => { try { const fork = await api.forkCompanion(card.id); await api.setDefaultCompanion(fork.id); setActionError(null); void queryClient.invalidateQueries({ queryKey: listKey }); } catch (error) { setActionError(errorLine(error, i18n._({ id: "Could not make this your companion. Try again from the Synths list.", message: "Could not make this your companion. Try again from the Synths list." }))); } };
   const shareSynth = async (card: CompanionCard) => { try { await api.shareCompanion(card.id); setActionError(null); void queryClient.invalidateQueries({ queryKey: listKey }); } catch (error) { setActionError(errorLine(error, i18n._({ id: "Could not share this synth. Try again from the Synths list.", message: "Could not share this synth. Try again from the Synths list." }))); } };
   const startFreshSynth = async (card: CompanionCard) => { try { const baseId = card.synth?.forked_from; if (!baseId) throw new Error(i18n._({ id: "The base synth is missing. Refresh the Synths list and try again.", message: "The base synth is missing. Refresh the Synths list and try again." })); const fork = await api.forkCompanion(baseId); await api.setDefaultCompanion(fork.id); await api.deleteCompanion(card.id); setActionError(null); void queryClient.invalidateQueries({ queryKey: listKey }); } catch (error) { setActionError(errorLine(error, i18n._({ id: "Could not start fresh from the base. Try again from the Synths list.", message: "Could not start fresh from the base. Try again from the Synths list." }))); } };
   const editPath = (id: string) => `/companions/${encodeURIComponent(id)}/create`;
   const copy = useMutation({ mutationFn: (id: string) => api.copyCompanion(id), onSuccess: (result) => { setActionError(null); void queryClient.invalidateQueries({ queryKey: listKey }); navigate(editPath(result.id)); }, onError: (error) => setActionError(errorLine(error, i18n._({ id: "Could not make a copy. Check your connection and try again.", message: "Could not make a copy. Check your connection and try again." }))) });
-  const setStatus = useMutation({ mutationFn: (input: { id: string; next: "draft" | "ready" }) => api.setCompanionStatus(input.id, input.next), onSuccess: () => { setActionError(null); void queryClient.invalidateQueries({ queryKey: listKey }); }, onError: (error) => setActionError(errorLine(error, i18n._({ id: "Could not change this companion's status. Check your connection and try again.", message: "Could not change this companion's status. Check your connection and try again." }))) });
+  const setStatus = useMutation({ mutationFn: (input: { id: string; next: "draft" | "ready" }) => api.setCompanionStatus(input.id, input.next), onSuccess: () => { setActionError(null); void queryClient.invalidateQueries({ queryKey: listKey }); }, onError: (error) => setActionError(errorLine(error, i18n._({ id: "Could not change this synth's status. Check your connection and try again.", message: "Could not change this synth's status. Check your connection and try again." }))) });
   const menuActions: MenuActions = { onDelete: setDeleteTarget, onSetDefault: (item) => saveDefault.mutate(item.id), onEdit: (item) => navigate(editPath(item.id)), onCopy: (item) => copy.mutate(item.id), onStatus: (item, next) => setStatus.mutate({ id: item.id, next }), onMakeMine: (item) => { void makeSynthMine(item); }, onShare: (item) => { void shareSynth(item); }, onFresh: (item) => { void startFreshSynth(item); }, ...(admin ? { onAudience: setAudienceTarget } : {}) };
   return (
     <>
       {actionError ? <Alert variant="destructive"><AlertDescription>{actionError}</AlertDescription></Alert> : null}
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div className="flex min-w-0 flex-col gap-1">
-          <p className="text-sm text-muted-foreground">{i18n._({ id: "Familiar faces. Different ways to help.", message: "Familiar faces. Different ways to help." })}</p>
+          <p className="text-sm text-muted-foreground">{i18n._({ id: "Meet the synths in your home. Chat with one, or pick yours.", message: "Meet the synths in your home. Chat with one, or pick yours." })}</p>
         </div>
-        {query.data?.can_create ? <Link to="/companions/create"><Button>{i18n._({ id: "New companion", message: "New companion" })}</Button></Link> : null}
+        {query.data?.can_create ? <Link to="/companions/create"><Button>{i18n._({ id: "New synth", message: "New synth" })}</Button></Link> : null}
       </div>
       <AsyncState
         data={query.isError ? null : query.data}
         error={query.isError}
         isFetching={query.isFetching}
         onRetry={() => query.refetch()}
-        errorMessage={errorLine(query.error, i18n._({ id: "Could not load the companions. Check your connection and try again.", message: "Could not load the companions. Check your connection and try again." }))}
-        loadingLabel={i18n._({ id: "Loading companions", message: "Loading companions" })}
+        errorMessage={errorLine(query.error, i18n._({ id: "Could not load the synths. Check your connection and try again.", message: "Could not load the synths. Check your connection and try again." }))}
+        loadingLabel={i18n._({ id: "Loading synths", message: "Loading synths" })}
       >
         {(data: CompanionList) => (
           <>
             {!data.allowed ? (
-              <EmptyState icon="user" text={i18n._({ id: "Companions are turned off for you. Ask an owner or admin to turn them on.", message: "Companions are turned off for you. Ask an owner or admin to turn them on." })} />
+              <EmptyState icon="user" text={i18n._({ id: "Synths are turned off for you. Ask an owner or admin to turn them on.", message: "Synths are turned off for you. Ask an owner or admin to turn them on." })} />
             ) : data.companions.length === 0 ? (
-              <EmptyState icon="user" text={i18n._({ id: "No companions are installed yet.", message: "No companions are installed yet." })} />
+              <EmptyState icon="user" text={i18n._({ id: "No synths are installed yet.", message: "No synths are installed yet." })} />
             ) : (
               <Tabs defaultValue="Yours">
                 <div className="flex flex-wrap items-center justify-between gap-3">
@@ -151,11 +151,11 @@ function CompanionsDirectory() {
                     <TabsTrigger value="Yours">{i18n._({ id: "Yours", message: "Yours" })}</TabsTrigger>
                     {data.can_discover ? <TabsTrigger value="Discover">{i18n._({ id: "Discover", message: "Discover" })}</TabsTrigger> : null}
                   </TabsList>
-                  <div className="w-full sm:w-72"><Input aria-label={i18n._({ id: "Search companions", message: "Search companions" })} type="search" placeholder={i18n._({ id: "Search companions", message: "Search companions" })} value={search} onChange={(event) => setSearch(event.target.value)} /></div>
+                  <div className="w-full sm:w-72"><Input aria-label={i18n._({ id: "Search synths", message: "Search synths" })} type="search" placeholder={i18n._({ id: "Search synths", message: "Search synths" })} value={search} onChange={(event) => setSearch(event.target.value)} /></div>
                 </div>
                 <TabsContent value="Yours">
                   <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
-                    {data.companions.filter((card) => `${card.name} ${card.tagline}`.toLowerCase().includes(search.trim().toLowerCase())).map((card) => { const imageUrl = card.portrait ? api.companionPortrait(card.portrait) : companionStills[card.id]; return <CompanionCardElement key={card.id} name={card.name} line={card.tagline} media={imageUrl ? <Avatar size="lg"><AvatarImage src={imageUrl} alt={card.name} /></Avatar> : <SeededAvatar name={card.name} seed={card.id} />} status={card.is_default ? i18n._({ id: "Your default", message: "Your default" }) : card.status === "ready" ? null : card.status === "draft" ? i18n._({ id: "Draft · needs a portrait", message: "Draft · needs a portrait" }) : card.status} menu={companionMenu({ ...menuActions, card, onRemove: (item) => removeFromYours.mutate(item.id) })} meta={companionCardMeta(card)} actions={<><Button type="button" onClick={() => void openCompanionChat(card, navigate, setActionError)}>{(card.chat_count ?? card.chats) > 0 ? i18n._({ id: "Continue", message: "Continue" }) : i18n._({ id: "Chat", message: "Chat" })}</Button><Button type="button" variant="outline" onClick={() => navigate(`/companions/${encodeURIComponent(card.id)}`)}>{i18n._({ id: "View profile", message: "View profile" })}</Button></>} />; })}
+                    {data.companions.filter((card) => `${card.name} ${card.tagline}`.toLowerCase().includes(search.trim().toLowerCase())).map((card) => { const imageUrl = card.portrait ? api.companionPortrait(card.portrait) : companionStills[card.id]; return <CompanionCardElement key={card.id} name={card.name} line={card.tagline} media={imageUrl ? <Avatar size="lg"><AvatarImage src={imageUrl} alt={card.name} /></Avatar> : <SeededAvatar name={card.name} seed={card.id} />} status={card.is_default ? i18n._({ id: "Your companion", message: "Your companion" }) : card.status === "ready" ? null : card.status === "draft" ? i18n._({ id: "Draft · needs a portrait", message: "Draft · needs a portrait" }) : card.status} menu={companionMenu({ ...menuActions, card, onRemove: (item) => removeFromYours.mutate(item.id) })} meta={companionCardMeta(card)} actions={<><Button type="button" onClick={() => void openCompanionChat(card, navigate, setActionError)}>{(card.chat_count ?? card.chats) > 0 ? i18n._({ id: "Continue", message: "Continue" }) : i18n._({ id: "Chat", message: "Chat" })}</Button><Button type="button" variant="outline" onClick={() => navigate(`/companions/${encodeURIComponent(card.id)}`)}>{i18n._({ id: "View page", message: "View page" })}</Button></>} />; })}
                   </div>
                 </TabsContent>
                 {data.can_discover ? <TabsContent value="Discover">
@@ -164,9 +164,9 @@ function CompanionsDirectory() {
                       <Chip key={item} selected={discoverFilter === item} onClick={() => setDiscoverFilter(item)}>{label}</Chip>)}
                   </div>
                   <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
-                    {data.discover.filter((card) => `${card.name} ${card.tagline}`.toLowerCase().includes(search.trim().toLowerCase())).filter((card) => discoverFilter === "All" || card.tagline.toLowerCase().includes(discoverFilter.toLowerCase())).map((card) => { const imageUrl = card.portrait ? api.companionPortrait(card.portrait) : companionStills[card.id]; return <CompanionCardElement key={card.id} name={card.name} line={card.tagline} media={imageUrl ? <Avatar size="lg"><AvatarImage src={imageUrl} alt={card.name} /></Avatar> : <SeededAvatar name={card.name} seed={card.id} />} status={card.is_default ? i18n._({ id: "Your default", message: "Your default" }) : card.status === "ready" ? null : card.status === "draft" ? i18n._({ id: "Draft · needs a portrait", message: "Draft · needs a portrait" }) : card.status} menu={companionMenu({ ...menuActions, card, discover: true, onDelete: setDeleteTarget, onSetDefault: (item) => saveDefault.mutate(item.id), ...(card.can_copy ? { onCopy: menuActions.onCopy! } : {}) })} meta={companionCardMeta(card)} actions={<Button disabled={addToYours.isPending} onClick={() => addToYours.mutate(card.id)}>{i18n._({ id: "Add", message: "Add" })}</Button>} />; })}
+                    {data.discover.filter((card) => `${card.name} ${card.tagline}`.toLowerCase().includes(search.trim().toLowerCase())).filter((card) => discoverFilter === "All" || card.tagline.toLowerCase().includes(discoverFilter.toLowerCase())).map((card) => { const imageUrl = card.portrait ? api.companionPortrait(card.portrait) : companionStills[card.id]; return <CompanionCardElement key={card.id} name={card.name} line={card.tagline} media={imageUrl ? <Avatar size="lg"><AvatarImage src={imageUrl} alt={card.name} /></Avatar> : <SeededAvatar name={card.name} seed={card.id} />} status={card.is_default ? i18n._({ id: "Your companion", message: "Your companion" }) : card.status === "ready" ? null : card.status === "draft" ? i18n._({ id: "Draft · needs a portrait", message: "Draft · needs a portrait" }) : card.status} menu={companionMenu({ ...menuActions, card, discover: true, onDelete: setDeleteTarget, onSetDefault: (item) => saveDefault.mutate(item.id), ...(card.can_copy ? { onCopy: menuActions.onCopy! } : {}) })} meta={companionCardMeta(card)} actions={<Button disabled={addToYours.isPending} onClick={() => addToYours.mutate(card.id)}>{i18n._({ id: "Add", message: "Add" })}</Button>} />; })}
                   </div>
-                  <p className="mt-4 text-sm text-muted-foreground">{i18n._({ id: "More companions from the catalog are coming soon.", message: "More companions from the catalog are coming soon." })}</p>
+                  <p className="mt-4 text-sm text-muted-foreground">{i18n._({ id: "More synths from the catalog are coming soon.", message: "More synths from the catalog are coming soon." })}</p>
                 </TabsContent> : null}
               </Tabs>
             )}
@@ -188,11 +188,11 @@ export function CompanionsPage() {
   return <CompanionsDirectory />;
 }
 
-/** /companions/:id: one companion in full, a voice preview, and Set as my default. */
+/** /companions/:id: one synth in full, a voice preview, and the companion assignment. */
 export function CompanionDetailPage() {
   const { id = "" } = useParams();
   const query = useQuery<CompanionDetail>({ queryKey: [...listKey, id], queryFn: () => api.companion(id), retry: false });
-  useTabItem(query.data?.name ?? i18n._({ id: "Companion", message: "Companion" }));
+  useTabItem(query.data?.name ?? i18n._({ id: "Synth", message: "Synth" }));
   return (
     <div className="flex flex-col gap-6" data-testid="companion-detail">
       <AsyncState
@@ -200,8 +200,8 @@ export function CompanionDetailPage() {
         error={query.isError}
         isFetching={query.isFetching}
         onRetry={() => query.refetch()}
-        errorMessage={query.error instanceof ApiError && query.error.status === 404 ? i18n._({ id: "That companion is not on your list. Go back and pick one from the gallery.", message: "That companion is not on your list. Go back and pick one from the gallery." }) : i18n._({ id: "Could not load this companion. Check your connection and try again.", message: "Could not load this companion. Check your connection and try again." })}
-        loadingLabel={i18n._({ id: "Loading companion", message: "Loading companion" })}
+        errorMessage={query.error instanceof ApiError && query.error.status === 404 ? i18n._({ id: "That synth is not on your list. Go back and pick one from the gallery.", message: "That synth is not on your list. Go back and pick one from the gallery." }) : i18n._({ id: "Could not load this synth. Check your connection and try again.", message: "Could not load this synth. Check your connection and try again." })}
+        loadingLabel={i18n._({ id: "Loading synth", message: "Loading synth" })}
       >
         {(companion: CompanionDetail) => <DetailBody companion={companion} />}
       </AsyncState>
@@ -234,14 +234,14 @@ function DetailSetup({ companion, saved, copy, save }: { companion: CompanionDet
       const conversation = await api.createConversation(undefined, undefined, undefined, companion.id);
       navigate(`/chat?conversation=${encodeURIComponent(conversation.id)}`);
     } catch (error) {
-      setChatError(errorLine(error, i18n._({ id: "Could not start a chat with this companion. Check your connection and try again.", message: "Could not start a chat with this companion. Check your connection and try again." })));
+      setChatError(errorLine(error, i18n._({ id: "Could not start a chat with this synth. Check your connection and try again.", message: "Could not start a chat with this synth. Check your connection and try again." })));
     } finally {
       setStartingChat(false);
     }
   };
   return (
     <>
-      <CompanionProfileHeader name={companion.name} eyebrow={companion.is_household ? i18n._({ id: "Household companion", message: "Household companion" }) : i18n._({ id: "Built-in companion", message: "Built-in companion" })} line={companion.tagline} back={<Link to="/companions" className="text-sm underline">{i18n._({ id: "All companions", message: "All companions" })}</Link>} media={companion.portrait ? <Avatar size="lg"><AvatarImage src={api.companionPortrait(companion.portrait)} alt={companion.name} /></Avatar> : stills[companion.id] ? <Avatar size="lg"><AvatarImage src={stills[companion.id]} alt={companion.name} /></Avatar> : <SeededAvatar name={companion.name} seed={companion.id} size="profile" />} chips={<><Badge variant="secondary">{companion.who_can_use}</Badge>{saved ? <Badge>{i18n._({ id: "Your default", message: "Your default" })}</Badge> : null}<Badge variant="outline">{companion.status === "ready" ? i18n._({ id: "Ready", message: "Ready" }) : companion.status === "draft" ? i18n._({ id: "Draft · needs a portrait", message: "Draft · needs a portrait" }) : companion.status}</Badge></>} actions={<>
+      <CompanionProfileHeader name={companion.name} eyebrow={companion.is_household ? i18n._({ id: "Household synth", message: "Household synth" }) : i18n._({ id: "Built-in synth", message: "Built-in synth" })} line={companion.tagline} back={<Link to="/companions" className="text-sm underline">{i18n._({ id: "All synths", message: "All synths" })}</Link>} media={companion.portrait ? <Avatar size="lg"><AvatarImage src={api.companionPortrait(companion.portrait)} alt={companion.name} /></Avatar> : stills[companion.id] ? <Avatar size="lg"><AvatarImage src={stills[companion.id]} alt={companion.name} /></Avatar> : <SeededAvatar name={companion.name} seed={companion.id} size="profile" />} chips={<><Badge variant="secondary">{companion.who_can_use}</Badge>{saved ? <Badge>{i18n._({ id: "Your companion", message: "Your companion" })}</Badge> : null}<Badge variant="outline">{companion.status === "ready" ? i18n._({ id: "Ready", message: "Ready" }) : companion.status === "draft" ? i18n._({ id: "Draft · needs a portrait", message: "Draft · needs a portrait" }) : companion.status}</Badge></>} actions={<>
 
               <Button type="button" disabled={startingChat} onClick={() => void startChat()}>{startingChat ? i18n._({ id: "Starting chat…", message: "Starting chat…" }) : i18n._({ id: "Chat with {name}", message: "Chat with {name}", values: { name: companion.name } })}</Button>
           {companion.can_copy ? <Button type="button" variant="outline" disabled={copy.isPending} onClick={() => copy.mutate()}>{i18n._({ id: "Customize a copy", message: "Customize a copy" })}</Button> : null}
@@ -250,7 +250,7 @@ function DetailSetup({ companion, saved, copy, save }: { companion: CompanionDet
       {save.isError ? <Alert variant="destructive"><AlertDescription>{errorLine(save.error, i18n._({ id: "Could not save this. Check your connection and try again.", message: "Could not save this. Check your connection and try again." }))}</AlertDescription></Alert> : null}
       {chatError ? <Alert variant="destructive"><AlertDescription>{chatError}</AlertDescription></Alert> : null}
       {copy.isError ? <Alert variant="destructive"><AlertDescription>{errorLine(copy.error, i18n._({ id: "Could not reach Home. Check your connection and try again.", message: "Could not reach Home. Check your connection and try again." }))}</AlertDescription></Alert> : null}
-      {!companion.is_household && companion.can_copy ? <p>{i18n._({ id: "This companion comes with Home, so it can't be changed. Make a copy and edit that.", message: "This companion comes with Home, so it can't be changed. Make a copy and edit that." })}</p> : null}
+      {!companion.is_household && companion.can_copy ? <p>{i18n._({ id: "This synth comes with Home, so it can't be changed. Make a copy and edit that.", message: "This synth comes with Home, so it can't be changed. Make a copy and edit that." })}</p> : null}
       <ProfileTabs companion={companion} stills={stills} />
     </>
   );
@@ -331,7 +331,7 @@ function ProfileTabs({ companion, stills }: { companion: CompanionDetail; stills
       {companion.used_by ? (
         <Section heading={i18n._({ id: "Who uses it", message: "Who uses it" })}>
           <p>{i18n._({ id: "People: {list}.", message: "People: {list}.", values: { list: companion.used_by.people.length ? formatList(companion.used_by.people.map((person) => person.name)) : i18n._({ id: "nobody yet", message: "nobody yet" }) } })}</p>
-          <p>{i18n._({ id: "Robots: {list}.", message: "Robots: {list}.", values: { list: companion.used_by.robots.length ? formatList(companion.used_by.robots.map((robot) => robot.name)) : i18n._({ id: "none yet", message: "none yet" }) } })}{" "}<Link to={ROBOT_SETTINGS} className="underline">{i18n._({ id: "Companion settings", message: "Companion settings" })}</Link></p>
+          <p>{i18n._({ id: "Robots: {list}.", message: "Robots: {list}.", values: { list: companion.used_by.robots.length ? formatList(companion.used_by.robots.map((robot) => robot.name)) : i18n._({ id: "none yet", message: "none yet" }) } })}{" "}<Link to={ROBOT_SETTINGS} className="underline">{i18n._({ id: "Synth settings", message: "Synth settings" })}</Link></p>
         </Section>
       ) : null}
         </section> : null}
@@ -339,7 +339,7 @@ function ProfileTabs({ companion, stills }: { companion: CompanionDetail; stills
   </>;
 }
 
-/** The voice this companion speaks in, with a Test button that plays the same preview Settings uses. */
+/** The voice this synth speaks in, with a Test button that plays the same preview Settings uses. */
 function VoiceRow({ companion }: { companion: CompanionDetail }) {
   const voices = useQuery({ queryKey: ["stack-voices"], queryFn: api.stackVoices, retry: false });
   const [preview, setPreview] = useState<VoicePreviewState>(voicePreviewPlayer.getState());
@@ -369,7 +369,7 @@ function VoiceRow({ companion }: { companion: CompanionDetail }) {
       {picker ? (
         <div className="flex flex-col gap-1">
           <Select
-            aria-label={i18n._({ id: "Voice for this companion", message: "Voice for this companion" })}
+            aria-label={i18n._({ id: "Voice for this synth", message: "Voice for this synth" })}
             value={picker.selected.value}
             options={picker.options.map((option) => option.value)}
             getLabel={(value) => picker.options.find((option) => option.value === value)?.label ?? value}

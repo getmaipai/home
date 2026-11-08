@@ -962,13 +962,13 @@ msgid "{name} will stay closed when the job is done."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/companionFlow/CustomizeStep.tsx:137
-msgid "{name}, companion preview"
+#: src/shell/pages/companionFlow/CreateCharacterStep.tsx:253
+msgid "{name}, preview"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/companionFlow/CreateCharacterStep.tsx:253
-msgid "{name}, preview"
+#: src/shell/pages/companionFlow/CustomizeStep.tsx:137
+msgid "{name}, synth preview"
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -2358,7 +2358,7 @@ msgstr ""
 
 #. js-lingui-explicit-id
 #: src/shell/pages/CompanionAudienceDialog.tsx:46
-msgid "Adults only, teens and adults, or everyone. Home checks the artwork again before it widens who can use a companion."
+msgid "Adults only, teens and adults, or everyone. Home checks the artwork again before it widens who can use a synth."
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -2539,11 +2539,6 @@ msgid "All apps"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/CompanionsPage.tsx:244
-msgid "All companions"
-msgstr ""
-
-#. js-lingui-explicit-id
 #: src/shell/pages/status/statusAppHistory.ts:39
 msgid "all fine."
 msgstr ""
@@ -2569,6 +2564,11 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/shell/library/TranscriptPanel.tsx:357
 msgid "All speakers"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/shell/pages/CompanionsPage.tsx:244
+msgid "All synths"
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -3576,7 +3576,7 @@ msgstr ""
 
 #. js-lingui-explicit-id
 #: src/shell/pages/CompanionAudienceDialog.tsx:55
-msgid "Before this companion is for everyone, check each one."
+msgid "Before this synth is for everyone, check each one."
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -4047,7 +4047,7 @@ msgstr ""
 
 #. js-lingui-explicit-id
 #: src/shell/pages/CompanionsPage.tsx:244
-msgid "Built-in companion"
+msgid "Built-in synth"
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -4894,11 +4894,6 @@ msgid "api.error.companion_choose"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/CompanionsPage.tsx:95
-msgid "Choose a conversation to get started"
-msgstr ""
-
-#. js-lingui-explicit-id
 #: src/shell/pages/status/StatusBoard.tsx:110
 msgid "Choose a date"
 msgstr ""
@@ -5725,13 +5720,7 @@ msgstr ""
 #: src/apps/library/appPresentation.ts:9
 #: src/apps/settings/RobotCompanionChoices.tsx:62
 #: src/apps/settings/RobotCompanionChoices.tsx:64
-#: src/shell/pages/CompanionsPage.tsx:195
 msgid "Companion"
-msgstr ""
-
-#. js-lingui-explicit-id
-#: src/shell/pages/CompanionsPage.tsx:65
-msgid "Companion actions"
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -5750,24 +5739,13 @@ msgid "Companion or bot"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/companionFlow/CustomizeStep.tsx:135
-msgid "Companion Preview"
-msgstr ""
-
-#. js-lingui-explicit-id
 #: src/shell/AmbientCompanionPane.tsx:172
-#: src/shell/pages/CompanionsPage.tsx:334
 msgid "Companion settings"
 msgstr ""
 
 #. js-lingui-explicit-id
 #: src/shell/AmbientCompanionPane.tsx:174
 msgid "Companions in the companion selector"
-msgstr ""
-
-#. js-lingui-explicit-id
-#: src/shell/pages/CompanionsPage.tsx:144
-msgid "Companions are turned off for you. Ask an owner or admin to turn them on."
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -6029,7 +6007,7 @@ msgstr ""
 
 #. js-lingui-explicit-id
 #: src/shell/pages/CompanionsPage.tsx:115
-msgid "Could not add this companion. Check your connection and try again."
+msgid "Could not add this synth. Check your connection and try again."
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -6100,7 +6078,7 @@ msgstr ""
 
 #. js-lingui-explicit-id
 #: src/shell/pages/CompanionsPage.tsx:122
-msgid "Could not change this companion's status. Check your connection and try again."
+msgid "Could not change this synth's status. Check your connection and try again."
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -6209,7 +6187,7 @@ msgstr ""
 
 #. js-lingui-explicit-id
 #: src/shell/pages/CompanionsPage.tsx:114
-msgid "Could not delete this companion. Check your connection and try again."
+msgid "Could not delete this synth. Check your connection and try again."
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -6394,11 +6372,6 @@ msgid "Could not load the clock. Check your connection and try again."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/CompanionsPage.tsx:138
-msgid "Could not load the companions. Check your connection and try again."
-msgstr ""
-
-#. js-lingui-explicit-id
 #: src/apps/settings/HuggingFaceTokenSection.tsx:43
 msgid "Could not load the current status."
 msgstr ""
@@ -6451,13 +6424,13 @@ msgid "Could not load the robots."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/reader/ReaderArticle.tsx:75
-msgid "Could not load this article."
+#: src/shell/pages/CompanionsPage.tsx:138
+msgid "Could not load the synths. Check your connection and try again."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/CompanionsPage.tsx:203
-msgid "Could not load this companion. Check your connection and try again."
+#: src/shell/reader/ReaderArticle.tsx:75
+msgid "Could not load this article."
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -6473,6 +6446,11 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/apps/settings/RobotCompanionChoices.tsx:41
 msgid "Could not load this robot's companion. Check the connection and try again."
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/shell/pages/CompanionsPage.tsx:203
+msgid "Could not load this synth. Check your connection and try again."
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -6592,6 +6570,11 @@ msgid "Could not make this voice. Try again."
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/shell/pages/CompanionsPage.tsx:113
+msgid "Could not make this your companion. Check your connection and try again."
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/shell/pages/CompanionsPage.tsx:117
 msgid "Could not make this your companion. Try again from the Synths list."
 msgstr ""
@@ -6666,11 +6649,6 @@ msgid "Could not remove that person."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/CompanionsPage.tsx:116
-msgid "Could not remove this companion. Check your connection and try again."
-msgstr ""
-
-#. js-lingui-explicit-id
 #: src/apps/settings/CodingSettings.tsx:118
 msgid "Could not remove this piece."
 msgstr ""
@@ -6678,6 +6656,11 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/shell/pages/PackageAppPage.tsx:318
 msgid "Could not remove this place."
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/shell/pages/CompanionsPage.tsx:116
+msgid "Could not remove this synth. Check your connection and try again."
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -6882,11 +6865,6 @@ msgid "Could not send that to {name}. Check that it is switched on, then try aga
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/CompanionsPage.tsx:113
-msgid "Could not set your default. Check your connection and try again."
-msgstr ""
-
-#. js-lingui-explicit-id
 #: src/shell/pages/CompanionsPage.tsx:118
 msgid "Could not share this synth. Try again from the Synths list."
 msgstr ""
@@ -6908,7 +6886,7 @@ msgstr ""
 
 #. js-lingui-explicit-id
 #: src/shell/pages/CompanionsPage.tsx:237
-msgid "Could not start a chat with this companion. Check your connection and try again."
+msgid "Could not start a chat with this synth. Check your connection and try again."
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -7214,7 +7192,7 @@ msgstr ""
 
 #. js-lingui-explicit-id
 #: src/shell/pages/companionFlow/CompanionFlowDialog.tsx:16
-msgid "Customize Companion"
+msgid "Customize Synth"
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -7634,7 +7612,7 @@ msgstr ""
 
 #. js-lingui-explicit-id
 #: src/shell/pages/companionFlow/CompanionFlowDialog.tsx:14
-msgid "Design your companion's appearance"
+msgid "Design your synth's appearance"
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -8867,11 +8845,6 @@ msgid "Fall-through rate"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/CompanionsPage.tsx:129
-msgid "Familiar faces. Different ways to help."
-msgstr ""
-
-#. js-lingui-explicit-id
 #: src/shell/coreLabels.ts:9
 #: src/shell/pageHeaderTitle.tsx:93
 #: src/shell/pages/FamilyPage.tsx:74
@@ -9664,13 +9637,13 @@ msgid "api.error.list_needs_title"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/companionFlow/CompanionFlowDialog.tsx:16
-msgid "Give your companion a voice, personality, and history"
+#: src/apps/reminders/CreateListSheet.tsx:31
+msgid "Give your list a name and an icon."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/reminders/CreateListSheet.tsx:31
-msgid "Give your list a name and an icon."
+#: src/shell/pages/companionFlow/CompanionFlowDialog.tsx:16
+msgid "Give your synth a voice, personality, and history"
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -10840,11 +10813,6 @@ msgid "Household commands"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/CompanionsPage.tsx:244
-msgid "Household companion"
-msgstr ""
-
-#. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:703
 msgid "setting.news.lists.adult.option_label.feeds-household"
 msgstr ""
@@ -10867,6 +10835,11 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:1195
 msgid "setting.storage.household.cap_bytes.label"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/shell/pages/CompanionsPage.tsx:244
+msgid "Household synth"
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -11132,7 +11105,7 @@ msgstr ""
 
 #. js-lingui-explicit-id
 #: src/shell/pages/companionFlow/CustomizeStep.tsx:128
-msgid "How should your companion behave, speak, and interact? (Optional)"
+msgid "How should your synth behave, speak, and interact? (Optional)"
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -13142,20 +13115,6 @@ msgid "Loading Coding setup"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/companionFlow/CompanionFlowPage.tsx:22
-#: src/shell/pages/companionFlow/CompanionFlowPage.tsx:23
-#: src/shell/pages/CompanionsPage.tsx:204
-msgid "Loading companion"
-msgstr ""
-
-#. js-lingui-explicit-id
-#: src/shell/pages/companionFlow/CompanionFlowPage.tsx:18
-#: src/shell/pages/companionFlow/CompanionFlowPage.tsx:19
-#: src/shell/pages/CompanionsPage.tsx:139
-msgid "Loading companions"
-msgstr ""
-
-#. js-lingui-explicit-id
 #: src/shell/AmbientCompanionPane.tsx:315
 msgid "Loading conversations"
 msgstr ""
@@ -13333,6 +13292,20 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/shell/pages/MakeSongPage.tsx:159
 msgid "Loading styles"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/shell/pages/companionFlow/CompanionFlowPage.tsx:22
+#: src/shell/pages/companionFlow/CompanionFlowPage.tsx:23
+#: src/shell/pages/CompanionsPage.tsx:204
+msgid "Loading synth"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/shell/pages/companionFlow/CompanionFlowPage.tsx:18
+#: src/shell/pages/companionFlow/CompanionFlowPage.tsx:19
+#: src/shell/pages/CompanionsPage.tsx:139
+msgid "Loading synths"
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -13986,6 +13959,7 @@ msgstr ""
 
 #. js-lingui-explicit-id
 #: src/shell/pages/CompanionsPage.tsx:69
+#: src/shell/pages/CompanionsPage.tsx:69
 msgid "Make this my companion"
 msgstr ""
 
@@ -14023,11 +13997,6 @@ msgid "Making"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/companionFlow/CompanionFlowPage.tsx:20
-msgid "Making a companion is for teens and adults. Ask an owner or admin if you want one."
-msgstr ""
-
-#. js-lingui-explicit-id
 #: src/shell/pages/MusicWorkspacePage.tsx:157
 msgid "Making a new cover."
 msgstr ""
@@ -14045,6 +14014,11 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/shell/pages/MusicStudioPages.tsx:38
 msgid "Making a song, a band, an album or a style is for adults. Ask a grown-up to make one with you."
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/shell/pages/companionFlow/CompanionFlowPage.tsx:20
+msgid "Making a synth is for teens and adults. Ask an owner or admin if you want one."
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -14346,9 +14320,14 @@ msgid "setting.alarms.volume.option_label.medium"
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/shell/pages/CompanionsPage.tsx:129
+msgid "Meet the synths in your home. Chat with one, or pick yours."
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/shell/coreLabels.ts:27
-msgid "Meet the companions and pick how your assistant sounds."
-msgstr "Meet your household's synths and pick who is your companion."
+msgid "Meet your household's synths and pick who is your companion."
+msgstr ""
 
 #. js-lingui-explicit-id
 #: src/apps/memory/PersonMemories.tsx:84
@@ -14625,11 +14604,6 @@ msgid "More Coding settings"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/CompanionsPage.tsx:169
-msgid "More companions from the catalog are coming soon."
-msgstr ""
-
-#. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:204
 msgid "setting.ease.contrast.help"
 msgstr ""
@@ -14647,6 +14621,11 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/shell/AlarmRinger.tsx:64
 msgid "More snooze options"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/shell/pages/CompanionsPage.tsx:169
+msgid "More synths from the catalog are coming soon."
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -15104,11 +15083,6 @@ msgid "New Coding key"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/CompanionsPage.tsx:131
-msgid "New companion"
-msgstr ""
-
-#. js-lingui-explicit-id
 #: src/shell/AmbientCompanionPane.tsx:322
 #: src/shell/AmbientCompanionPane.tsx:322
 msgid "New conversation"
@@ -15152,6 +15126,11 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/shell/library/TranscriptPanel.tsx:401
 msgid "New speaker name"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/shell/pages/CompanionsPage.tsx:131
+msgid "New synth"
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -15356,13 +15335,13 @@ msgid "No chat turns yet."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/CommandsSection.tsx:186
-msgid "No commands yet."
+#: src/shell/pages/CompanionsPage.tsx:95
+msgid "No chats yet"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/CompanionsPage.tsx:146
-msgid "No companions are installed yet."
+#: src/apps/settings/CommandsSection.tsx:186
+msgid "No commands yet."
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -15658,6 +15637,11 @@ msgstr ""
 #. js-lingui-explicit-id
 #: ../backend/src/lib/apiErrorCopy.ts:27
 msgid "api.error.no_such_session"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/shell/pages/CompanionsPage.tsx:146
+msgid "No synths are installed yet."
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -19778,11 +19762,6 @@ msgid "Save audience"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/companionFlow/CustomizeStep.tsx:140
-msgid "Save Companion"
-msgstr ""
-
-#. js-lingui-explicit-id
 #: src/apps/settings/VoiceManagerSection.tsx:149
 #: src/shell/pages/FilesPage.tsx:402
 msgid "Save name"
@@ -19791,6 +19770,11 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/apps/settings/HouseholdRobotsSection.tsx:189
 msgid "Save name and area"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/shell/pages/companionFlow/CustomizeStep.tsx:140
+msgid "Save Synth"
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -20167,12 +20151,6 @@ msgid "Search cities"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/CompanionsPage.tsx:154
-#: src/shell/pages/CompanionsPage.tsx:154
-msgid "Search companions"
-msgstr ""
-
-#. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:1085
 msgid "setting.search.fetch_cache_gb.label"
 msgstr ""
@@ -20243,6 +20221,12 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/apps/settings/styles/StyleBrowser.tsx:118
 msgid "Search styles, or paste a Hugging Face link"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/shell/pages/CompanionsPage.tsx:154
+#: src/shell/pages/CompanionsPage.tsx:154
+msgid "Search synths"
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -20547,11 +20531,6 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/apps/settings/VoiceManagerSection.tsx:122
 msgid "Set as default"
-msgstr ""
-
-#. js-lingui-explicit-id
-#: src/shell/pages/CompanionsPage.tsx:69
-msgid "Set as my default"
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -22477,20 +22456,45 @@ msgid "setting.generation.video.enabled.does"
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/shell/pages/CompanionsPage.tsx:195
+msgid "Synth"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/shell/pages/CompanionsPage.tsx:65
+msgid "Synth actions"
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:1600
 msgid "area.Synth controls"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/shell/pages/companionFlow/CustomizeStep.tsx:135
+msgid "Synth Preview"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/shell/pages/CompanionsPage.tsx:334
+msgid "Synth settings"
 msgstr ""
 
 #. js-lingui-explicit-id
 #: src/shell/coreLabels.ts:15
 #: src/shell/pages/CompanionsPage.tsx:101
 #: src/shell/phoneMenuLinks.tsx:14
-msgid "Companions"
-msgstr "Synths"
+msgid "Synths"
+msgstr ""
 
 #. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:1601
 msgid "area.Synths"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/shell/pages/CompanionsPage.tsx:144
+msgid "Synths are turned off for you. Ask an owner or admin to turn them on."
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -22865,11 +22869,6 @@ msgid "api.error.companion_unavailable"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/CompanionsPage.tsx:203
-msgid "That companion is not on your list. Go back and pick one from the gallery."
-msgstr ""
-
-#. js-lingui-explicit-id
 #: src/shell/pages/MusicWorkspacePage.tsx:155
 msgid "That could not start. Try again."
 msgstr ""
@@ -23078,6 +23077,11 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/apps/settings/styles/StylesTab.tsx:64
 msgid "That style is not in the list yet. Reload this page and look again."
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/shell/pages/CompanionsPage.tsx:203
+msgid "That synth is not on your list. Go back and pick one from the gallery."
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -24246,11 +24250,6 @@ msgid "setting.generation.kid_enabled.label"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/CompanionsPage.tsx:253
-msgid "This companion comes with Home, so it can't be changed. Make a copy and edit that."
-msgstr ""
-
-#. js-lingui-explicit-id
 #: src/apps/settings/AiGlance.tsx:158
 msgid "this computer"
 msgstr ""
@@ -24499,6 +24498,11 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/shell/GlobalMiniPlayer.tsx:120
 msgid "This station did not start. Check your connection, then press Retry."
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/shell/pages/CompanionsPage.tsx:253
+msgid "This synth comes with Home, so it can't be changed. Make a copy and edit that."
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -25961,7 +25965,7 @@ msgstr ""
 
 #. js-lingui-explicit-id
 #: src/shell/pages/CompanionsPage.tsx:158
-msgid "View profile"
+msgid "View page"
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -26066,7 +26070,7 @@ msgstr ""
 
 #. js-lingui-explicit-id
 #: src/shell/pages/CompanionsPage.tsx:372
-msgid "Voice for this companion"
+msgid "Voice for this synth"
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -26799,13 +26803,13 @@ msgid "Who can use it"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/CompanionAudienceDialog.tsx:49
-msgid "Who can use this companion"
+#: src/apps/settings/styles/StyleEditor.tsx:104
+msgid "Who can use this style"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/styles/StyleEditor.tsx:104
-msgid "Who can use this style"
+#: src/shell/pages/CompanionAudienceDialog.tsx:49
+msgid "Who can use this synth"
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -26820,7 +26824,7 @@ msgstr ""
 
 #. js-lingui-explicit-id
 #: src/shell/pages/companionFlow/CustomizeStep.tsx:131
-msgid "Who is your companion? Describe their history, experiences, interests, occupation, relationships, and personal story..."
+msgid "Who is your synth? Describe their history, experiences, interests, occupation, relationships, and personal story..."
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -27361,15 +27365,12 @@ msgid "Your Coding keys"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/companionFlow/CustomizeStep.tsx:137
 #: src/shell/pages/CompanionsPage.tsx:86
+#: src/shell/pages/CompanionsPage.tsx:158
+#: src/shell/pages/CompanionsPage.tsx:167
+#: src/shell/pages/CompanionsPage.tsx:244
 #: src/shell/VoiceStage.tsx:26
 msgid "Your companion"
-msgstr ""
-
-#. js-lingui-explicit-id
-#: src/shell/pages/companionFlow/CustomizeStep.tsx:137
-msgid "Your companion will appear here"
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -27395,13 +27396,6 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:1623
 msgid "area.Your data and apps"
-msgstr ""
-
-#. js-lingui-explicit-id
-#: src/shell/pages/CompanionsPage.tsx:158
-#: src/shell/pages/CompanionsPage.tsx:167
-#: src/shell/pages/CompanionsPage.tsx:244
-msgid "Your default"
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -27615,6 +27609,17 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/shell/library/LibraryStorage.tsx:28
 msgid "Your storage is almost full. Delete some files, or raise the limit in Settings, Storage."
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/shell/pages/companionFlow/CustomizeStep.tsx:136
+#: src/shell/pages/companionFlow/CustomizeStep.tsx:137
+msgid "Your synth"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/shell/pages/companionFlow/CustomizeStep.tsx:137
+msgid "Your synth will appear here"
 msgstr ""
 
 #. js-lingui-explicit-id

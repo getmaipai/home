@@ -13,8 +13,8 @@ describe("phone menu links", () => {
     expect(getByRole("link", { name: "Synths" }).getAttribute("href")).toBe("/companions");
   });
 
-  test("searching finds Companions among the core apps", () => {
-    const group = coreAppsGroup("companion", APP_CATALOG);
+  test("searching finds Synths among the core apps", () => {
+    const group = coreAppsGroup("synth", APP_CATALOG);
     expect(group?.heading).toBe("Apps");
     expect(group?.results.map((r) => r.href)).toContain("/companions");
   });

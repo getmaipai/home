@@ -12,7 +12,7 @@ export function coreLabel(to: string): string | undefined {
     case "/privacy": return i18n._({ id: "Privacy", message: "Privacy" });
     case "/settings": return i18n._({ id: "Settings", message: "Settings" });
     case "/memory": return i18n._({ id: "Memories", message: "Memories" });
-    case "/companions": return i18n._({ id: "Companions", message: "Synths" });
+    case "/companions": return i18n._({ id: "Synths", message: "Synths" });
     case "/reminders": return i18n._({ id: "Reminders", message: "Reminders" });
     case "/clock": return i18n._({ id: "Clock", message: "Clock" });
     case "/wikipedia": return i18n._({ id: "Wikipedia", message: "Wikipedia" });
@@ -24,7 +24,7 @@ export function coreDescription(to: string): string | undefined {
   switch (to) {
     case "/chat": return i18n._({ id: "Ask, think, and talk things through.", message: "Ask, think, and talk things through." });
     case "/memory": return i18n._({ id: "The details you want MaiPai to remember.", message: "The details you want MaiPai to remember." });
-    case "/companions": return i18n._({ id: "Meet the companions and pick how your assistant sounds.", message: "Meet your household's synths and pick who is your companion." });
+    case "/companions": return i18n._({ id: "Meet your household's synths and pick who is your companion.", message: "Meet your household's synths and pick who is your companion." });
     case "/people": return i18n._({ id: "Everyone who shares your home.", message: "Everyone who shares your home." });
     case "/reminders": return i18n._({ id: "Alarms, timers and things to remember.", message: "Alarms, timers and things to remember." });
     case "/clock": return i18n._({ id: "The time, alarms and timers.", message: "The time, alarms and timers." });
