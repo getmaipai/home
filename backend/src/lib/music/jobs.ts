@@ -61,7 +61,7 @@ export function slotBodyFor(job: MusicJob, base: Omit<MusicBody, "timeout_ms">):
   const body = { ...base }; delete body.tier;
   if (body.task === "edit") return body;
   const owner = db.select().from(people).where(eq(people.id, job.personId)).get() as PersonRow | undefined;
-  const run = slotRun("music", requestTier(job.request), owner ? speakerAgeBand(owner, new Date()) : "child");
+  const run = slotRun("music", owner && laneOf(routeAudience(owner)) === "adult" ? requestTier(job.request) : "standard", owner ? speakerAgeBand(owner, new Date()) : "child");
   // A level switched off since the song was queued is made at the level below it (Max to Boost, then Standard); the request records what it really ran as.
   if (run.lowered) { const quality = run.tier === "standard" ? "quick" : "detailed"; body.quality = quality; const request = job.request as { quality?: string; tier?: string }; request.quality = quality; request.tier = run.tier; }
   if (run.tier === "boost" || run.tier === "max") body.tier = run.tier;
@@ -80,7 +80,7 @@ async function releaseMusic(job: MusicJob): Promise<void> {
     const actor = db.select().from(people).where(eq(people.id, job.personId)).get();
     if (!actor) { await cancelOrDeleteMusic(submitted.job); job.state = "failed"; fail(job, "lost_job"); return; }
     void watch(job, actor, submitted.done);
-    if (job.task !== "stems" && !job.request.sound) void startSongCover(actor, job).catch(() => {});
+    if (job.task !== "stems" && !job.request.sound && laneOf(routeAudience(actor)) === "adult") void startSongCover(actor, job).catch(() => {});
   } catch (error) { if (error instanceof StackMusicError && (error.code === "queue_full" || (error.code === "no_memory" && holdMaxAfterMemoryRefusal(job.request)))) { job.stage = "queued"; persistMusicJob(job); return; } fail(job, error instanceof StackMusicError ? error.code : "failed"); }
 }
 export function plainMusicFailure(code: string): string {
@@ -168,6 +168,10 @@ export async function prepareOwnedStemsJob(actor: PersonRow, fileId: string): Pr
     body: { task: "edit", caption: "", duration_s: owned.seconds, source: Buffer.from(owned.bytes).toString("base64"), source_sha256: owned.sha256, origin: "owned_file" } };
 }
 export async function startMusicJob(input: StartMusicInput): Promise<MusicJob> {
+  if (laneOf(routeAudience(input.actor)) !== "adult") {
+    input.request.quality = "quick"; input.request.tier = "standard";
+    input.body.quality = "quick"; delete input.body.tier;
+  }
   if (input.task === "text2music") {
     if (typeof input.request.description !== "string") throw new StackMusicError(422, "bad_description");
     // The persisted request is authoritative. Keep the submitted caption in sync with it.
@@ -277,6 +281,7 @@ async function finish(job: MusicJob, actor: PersonRow, songs: StackSong[], signa
     const unreadable = typeof transcript !== "string" || (!transcript.trim() && !job.request.instrumental);
     if (unreadable || (transcript!.trim() && musicProtections(minorAudience).checkWords(transcript!, "transcript"))) { withholdMinor(job, actor); return; }
   }
+  if (minorLane && job.state === "done" && !job.coverJobId && !job.request.sound) void startSongCover(actor, job).catch(() => {});
   if (!job.request.retried && ["text2music", "remake", "variation"].includes(job.task) && song.lrc
     && sungLyricsFromLrc(song.lrc, song.duration_s).length < sungLyricsFromLrc(song.lrc, null, { keepSqueezed: true }).length) {
     const ceiling = (await musicEngineStatus())?.limits.max_seconds ?? job.request.max_seconds;
@@ -340,7 +345,7 @@ async function finish(job: MusicJob, actor: PersonRow, songs: StackSong[], signa
   saveMusicJob(job);
   if (job.request.sound) void startNextSoundTake(job, actor).catch(() => {});
   if (!job.request.sound) {
-    void startSongCover(actor, job).catch(() => {});
+    if (!minorLane) void startSongCover(actor, job).catch(() => {});
     // MUSIC-GEN-20b: word timing runs in the background and never blocks or fails the song.
     void startWordTiming(job, bytes).catch(() => {});
   }

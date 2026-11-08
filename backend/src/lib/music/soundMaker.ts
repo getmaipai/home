@@ -4,6 +4,7 @@ import type { PersonRow } from "@/types";
 import { outcomeOf } from "@/lib/turnContext";
 import { MUSIC_STARTED_LINE } from "@/lib/mediaClaims";
 import { musicAudienceOf, musicRefusalFor, REFUSED_PREFIX, type MusicToolInput } from "./tool";
+import { laneOf } from "@/lib/pictures/lane";
 import { musicEngineStatus, musicStatusReady } from "./ready";
 import { plainMusicFailure, startMusicJob } from "./jobs";
 import { StackMusicError, musicBody } from "./stack";
@@ -22,6 +23,7 @@ export async function runMakeSound(input: MusicToolInput): Promise<ToolExecution
   const { state, args, callId } = input;
   const failed = (code: string, kind: "bad_arguments" | "unavailable" | "errored") => outcomeOf({ callId, packageId: MAKE_SOUND_TOOL_ID, status: "failed", via: "tool_call", args, errorCode: code, failureKind: kind, durationMs: 0 });
   const refused = (line: string, why: string) => outcomeOf({ callId, packageId: MAKE_SOUND_TOOL_ID, status: "succeeded", via: "tool_call", args, durationMs: 0, result: { reply: { text: `${REFUSED_PREFIX}${line}` }, data: { refused: why }, actions: [] } });
+  if (laneOf(musicAudienceOf(state, input.spoken)) !== "adult") return refused("You can change only your own song from this chat.", "adult_music_feature");
   const parsed = makeSoundArgs.safeParse(args);
   if (!parsed.success) return failed("bad_arguments", "bad_arguments");
   const refusal = musicRefusalFor(musicAudienceOf(state, input.spoken), { description: parsed.data.description });

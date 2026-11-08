@@ -7,6 +7,7 @@ import { saveBandSingles } from "@/lib/media/appHost";
 import { nextHlc } from "@/lib/hlc";
 import { routeAudience } from "@/lib/pictures/audience";
 import { pictureDenial } from "@/lib/pictures/policy";
+import { laneOf } from "@/lib/pictures/lane";
 import type { PersonRow } from "@/types";
 import { bandBlockFromRecord, startBandPicture } from "./band";
 import { deleteMade, getMade, reviseMade, updateMade } from "./madeRecords";
@@ -37,6 +38,7 @@ function ownTurn(actor: PersonRow, conversationId: string | null, turnId: string
 }
 
 export async function runBandAction(actor: PersonRow, bandId: string, action: BandActionName, where: { conversationId: string | null; turnId: string | null } = { conversationId: null, turnId: null }, patch: BandPatchInput = {}): Promise<BandActionResult> {
+  if (laneOf(routeAudience(actor)) !== "adult") return { ok: false, status: 403, error: "You can change only your own song from this chat." };
   const found = getMade("made_artist", actor, bandId);
   if (!found.ok) return { ok: false, status: 404, error: "That band is not here any more. It may have been discarded." };
   const band = found.value as unknown as Band;

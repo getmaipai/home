@@ -2,7 +2,7 @@ import { createRoute, z } from "@hono/zod-openapi";
 import { SongStyle } from "@maipai/spec/gen/ts/song-style.js";
 import { MadeArtist } from "@maipai/spec/gen/ts/made-artist.js";
 import { apiRouter, errorResponses, idParamSchema, respond } from "@/lib/openapi";
-import { requireAuth } from "@/middleware/auth";
+import { requireAuth, requireRoleOrGrant } from "@/middleware/auth";
 import { MadeAlbum } from "@maipai/spec/gen/ts/made-album.js";
 import { BAND_ACTION_NAMES, runBandAction } from "@/lib/music/bandActions";
 import { ALBUM_ACTION_NAMES, runAlbumAction, syncAlbumTracks } from "@/lib/music/album";
@@ -11,6 +11,13 @@ import { bandBlockFromRecord } from "@/lib/music/band";
 import { pictureEngineReady } from "@/lib/pictures/ready";
 import { albumBlock } from "@/lib/music/album";
 import { createMade, deleteMade, getMade, listMade, listRevisions, restoreRevision, updateMade, type MadeKind, type StoreResult } from "@/lib/music/madeRecords";
+import { laneOf } from "@/lib/pictures/lane";
+import { routeAudience } from "@/lib/pictures/audience";
+const ADULT_MUSIC_ONLY_LINE = "You can change only your own song from this chat.";
+const adultMadeMiddleware = [requireAuth, async (c: import("hono").Context, next: () => Promise<void>) => {
+  if (laneOf(routeAudience(c.get("person"))) !== "adult") return c.json({ error: ADULT_MUSIC_ONLY_LINE }, 403);
+  await next();
+}];
 
 // MUSIC-STUDIO-S2, MUSIC-LISTEN-C5: the saved song styles (/api/music/styles) and the bands the household made (/api/music/bands).
 // Both are the spec records themselves (spec/schemas/song-style.schema.json and made-artist.schema.json); one factory builds both
@@ -28,7 +35,7 @@ function makeRouter(kind: MadeKind, record: z.ZodTypeAny, tag: string, noun: str
     responses: { 200: { content: { "application/json": { schema: z.array(record) } }, description: `The live ${noun}s, newest change first.` }, ...errorResponses({ 401: "Sign in first", 404: "Person not found" }) },
   });
   const create = createRoute({
-    method: "post", path: "/", tags: [tag], summary: `Save a ${noun}`, middleware: [requireAuth] as const,
+    method: "post", path: "/", tags: [tag], summary: `Save a ${noun}`, middleware: kind === "song_style" ? [requireAuth] : adultMadeMiddleware,
     request: { body: { content: { "application/json": { schema: CreateBody } } } },
     responses: { 201: { content: { "application/json": { schema: record } }, description: `The new ${noun}.` }, ...errorResponses({ 400: "A field is missing or not valid, or the text is not allowed for a child or teen", 401: "Sign in first", 403: `A child's ${noun}s are made by a parent`, 404: "Person, file or library item not found" }) },
   });
@@ -37,12 +44,12 @@ function makeRouter(kind: MadeKind, record: z.ZodTypeAny, tag: string, noun: str
     responses: { 200: { content: { "application/json": { schema: record } }, description: `The ${noun}.` }, ...errorResponses({ 401: "Sign in first", 404: `${noun} not found` }) },
   });
   const patch = createRoute({
-    method: "patch", path: "/{id}", tags: [tag], summary: `Change a ${noun}`, middleware: [requireAuth] as const,
+    method: "patch", path: "/{id}", tags: [tag], summary: `Change a ${noun}`, middleware: kind === "song_style" ? [requireAuth] : adultMadeMiddleware,
     request: { params: idParamSchema("id", idExample), body: { content: { "application/json": { schema: Body } } } },
     responses: { 200: { content: { "application/json": { schema: record } }, description: `The changed ${noun}.` }, ...errorResponses({ 400: "Nothing to change, or a field is not valid", 401: "Sign in first", 403: `You can see it, not change it`, 404: `${noun} not found` }) },
   });
   const del = createRoute({
-    method: "delete", path: "/{id}", tags: [tag], summary: `Delete a ${noun}`, middleware: [requireAuth] as const, request: { params: idParamSchema("id", idExample) },
+    method: "delete", path: "/{id}", tags: [tag], summary: `Delete a ${noun}`, middleware: kind === "song_style" ? [requireAuth] : adultMadeMiddleware, request: { params: idParamSchema("id", idExample) },
     responses: { 200: { content: { "application/json": { schema: z.object({ ok: z.literal(true), id: z.string() }) } }, description: "Deleted. The record stays marked deleted so a syncing client drops it." }, ...errorResponses({ 401: "Sign in first", 403: "You can see it, not delete it", 404: `${noun} not found` }) },
   });
 
@@ -124,7 +131,7 @@ const where = { conversation_id: z.string().nullable().optional().describe("For 
 
 // MUSIC-LIKE-01: the band card's buttons. The card sends the band id and, for a new picture, the chat turn it was made in.
 const BandAction = createRoute({
-  method: "post", path: "/{id}/action", tags: ["Music bands"], summary: "Keep, remake or discard a band", middleware: [requireAuth] as const,
+  method: "post", path: "/{id}/action", tags: ["Music bands"], summary: "Keep, remake or discard a band", middleware: adultMadeMiddleware,
   request: {
     params: idParamSchema("id", "mband-example123"),
     body: { content: { "application/json": { schema: z.object({
@@ -148,7 +155,7 @@ madeArtistsRoutes.openapi(BandAction, async (c) => {
 });
 
 const AlbumAction = createRoute({
-  method: "post", path: "/{id}/action", tags: ["Music albums"], summary: "Keep, change, remake the cover of or discard an album", middleware: [requireAuth] as const,
+  method: "post", path: "/{id}/action", tags: ["Music albums"], summary: "Keep, change, remake the cover of or discard an album", middleware: adultMadeMiddleware,
   request: {
     params: idParamSchema("id", "malbum-example123"),
     body: { content: { "application/json": { schema: z.object({

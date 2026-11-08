@@ -128,7 +128,8 @@ export async function budgetWithTurnToolGates(input: TurnToolGateInput): Promise
   const editPictureOk = editPictureOps.length > 0;
   const editPictureIds = editPictureOk && input.conversationId ? pictureIdsInConversation(input.actor, input.conversationId, input.temporary || input.ephemeral) : [];
   const videosOk = videoEligible && (videoReadyNow || latch?.videoEngineReady === true);
-  const musicOk = musicEligible && (laneOf(audience) === "adult" || musicTranscriptionAvailable()) && (musicReadyNow || latch?.musicEngineReady === true);
+  const lane = laneOf(audience);
+  const musicOk = musicEligible && (lane === "adult" || (musicTranscriptionAvailable() && musicReadyNow)) && (musicReadyNow || (lane === "adult" && latch?.musicEngineReady === true));
   if (latch) {
     latch.pictureEngineReady ||= pictureEligible && pictureReadyNow;
     latch.videoEngineReady ||= videoEligible && videoReadyNow;
@@ -158,7 +159,7 @@ export async function budgetWithTurnToolGates(input: TurnToolGateInput): Promise
   const refObject = otherRefInMessage ? null : (() => { const picked = objectRefs.find((ref) => ref.kind !== "track") ?? objectRefs[0]; return picked ? musicObjectOf(picked) : null; })();
   if (latch && otherRefInMessage) latch.itemRefOk = true;
   const itemRefOk = itemRefPermission && (otherRefInMessage || latch?.itemRefOk === true);
-  const objectAllowed = itemRefPermission && musicOk && !itemRefOk;
+  const objectAllowed = itemRefPermission && musicOk && lane === "adult" && !itemRefOk;
   const threadObject = objectAllowed && !refObject ? (() => { try { return input.musicObjectInThread?.() ?? null; } catch { return null; } })() : null;
   const musicObjectRef = objectAllowed ? (refObject ?? threadObject ?? latch?.musicObject ?? null) : null;
   if (latch && objectAllowed && musicObjectRef) { latch.musicObject = musicObjectRef; if (musicObjectRef.kind === "track") latch.musicBandOk = true; }

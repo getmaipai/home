@@ -184,9 +184,9 @@ export async function musicCardView(actor: PersonRow, input: Omit<MusicJob, "cov
   const makingVersion = pending ? { stage_label: musicStageLabel(pending, laneOf(musicRouteAudience(actor)) === "child" ? "child" : "adult"), progress: pending.progress, eta_seconds: pending.etaSeconds, position: pending.position } : null;
   // TIER-HOME-03: the song card offers Boost when the engine has a Detailed maker and this person may use Boost (music has no Max maker yet).
   const engine = await musicEngineStatus();
-  const boostOffered = !!engine?.quality.includes("detailed") && authorizeTier({ person: actor, category: "music", requested: "boost" }).tier === "boost";
+  const boostOffered = laneOf(musicRouteAudience(actor)) === "adult" && !!engine?.quality.includes("detailed") && authorizeTier({ person: actor, category: "music", requested: "boost" }).tier === "boost";
   // MUSIC-MAX-01: Max follows Boost's gate (grant, age band, level switch) and is shown only when the engine lists a Max maker.
-  const maxShown = maxOffered(actor, "music", undefined, musicMaxOffered(engine));
+  const maxShown = laneOf(musicRouteAudience(actor)) === "adult" && maxOffered(actor, "music", undefined, musicMaxOffered(engine));
   return {
     stages: stages.map((label, index) => ({ id: ["queued", "model", "planning", "making", "mixing", "finishing"][index]!, label })),
     stage_index: musicStageIndex(root), started_at: Date.parse(root.createdAt),
@@ -282,7 +282,8 @@ musicRoutes.openapi(makeSongRoute, async (c) => {
     ...(body.key?.trim() ? { key: body.key.trim() } : {}), ...(body.song_style ? { song_style: body.song_style } : {}), ...(body.band ? { band: body.band } : {}) };
   if (!generateMusicArgs.safeParse(args).success) return c.json({ error: "That song request is not valid. Check the tempo, the key and the style, then try again." }, 422) as never;
   const routeAudience_ = musicRouteAudience(actor);
-  const refusal = laneOf(routeAudience_) === "child" ? null : musicRefusalFor(routeAudience_, args);
+  const refusal = musicRefusalFor(routeAudience_, args);
+  if (laneOf(routeAudience_) !== "adult" && (body.song_style || body.band)) return c.json({ error: "You can change only your own song from this chat." }, 403) as never;
   if (refusal) return c.json({ error: refusal.line }, 403) as never;
   const sound = resolveSound(actor, { song_style: body.song_style, band: body.band });
   if (!sound.ok) return c.json({ error: sound.line }, 422) as never;
@@ -306,6 +307,7 @@ const makeSoundRoute = createRoute({ method: "post", path: "/sounds", tags: ["Mu
   responses: { 201: { content: { "application/json": { schema: cardSchema } }, description: "The sound card." }, 422: { description: "The sound cannot be made as asked." }, ...refusals, ...errorResponses({ 503: "No music model is installed or the computer cannot make sounds now" }) } });
 musicRoutes.openapi(makeSoundRoute, async (c) => {
   const actor = c.get("person"), args = c.req.valid("json");
+  if (laneOf(musicRouteAudience(actor)) !== "adult") return c.json({ error: "You can change only your own song from this chat." }, 403) as never;
   const engine = await musicEngineStatus();
   if (!musicStatusReady(engine)) return c.json({ error: plainMusicFailure("not_installed") }, 503) as never;
   const refusal = musicRefusalFor(musicRouteAudience(actor), args);
@@ -345,6 +347,7 @@ const addSoundToSongRoute = createRoute({ method: "post", path: "/sounds/{id}/ad
   responses: { 200: { content: { "application/json": { schema: cardSchema } }, description: "The song's card with the new version shown." }, 422: { description: "The sound cannot be added as asked." }, ...refusals, ...errorResponses({ 503: "This computer cannot mix audio now" }) } });
 musicRoutes.openapi(addSoundToSongRoute, async (c) => {
   const actor = c.get("person"), body = c.req.valid("json");
+  if (laneOf(musicRouteAudience(actor)) !== "adult") return c.json({ error: "You can change only your own song from this chat." }, 403) as never;
   const refusal = musicRefusalFor(musicRouteAudience(actor), { description: "add a sound to a song" });
   if (refusal) return c.json({ error: refusal.line }, 403) as never;
   const result = await addSoundToSong(actor, { soundJobId: c.req.valid("param").id, songId: body.song_id, fileId: body.file_id, startSeconds: body.start_s });
@@ -367,7 +370,7 @@ const stemsRoute = createRoute({ method: "post", path: "/jobs/{id}/stems", tags:
   responses: { 200: { content: { "application/json": { schema: cardSchema } }, description: "The card with stems coming." }, 422: { description: "The source cannot be split." }, ...refusals, ...errorResponses({ 503: "Stem splitting is unavailable" }) } });
 musicRoutes.openapi(stemsRoute, async (c) => {
   const actor = c.get("person"); const root = getMusicJobFor(actor, c.req.valid("param").id); const { file_id } = c.req.valid("json");
-  if (laneOf(musicRouteAudience(actor)) !== "adult") return c.json({ error: "Stems are not available for this song." }, 403) as never;
+  if (laneOf(musicRouteAudience(actor)) !== "adult") return c.json({ error: "You can change only your own song from this chat." }, 403) as never;
   const versions = root ? musicVersions(actor, root).filter((j) => j.state === "done" && j.fileId && j.task !== "stems") : [];
   const source = (file_id ? versions.find((j) => j.fileId === file_id) : versions.sort((a, b) => (b.chosenAt ?? b.createdAt).localeCompare(a.chosenAt ?? a.createdAt))[0]) ?? null;
   if (!root || !source || !source.conversationId || !source.turnId) return c.json({ error: "That song isn't available any more. Ask for it again." }, 404) as never;
@@ -387,6 +390,7 @@ const stemsFromFileRoute = createRoute({ method: "post", path: "/stems/from-file
   responses: { 200: { content: { "application/json": { schema: cardSchema } }, description: "The card with stems coming." }, 413: { description: "The file is too big." }, 422: { description: "The file cannot be split." }, ...refusals, ...errorResponses({ 503: "Stem splitting is unavailable" }) } });
 musicRoutes.openapi(stemsFromFileRoute, async (c) => {
   const actor = c.get("person"); const { file_id, temporary = false } = c.req.valid("json");
+  if (laneOf(musicRouteAudience(actor)) !== "adult") return c.json({ error: "You can change only your own song from this chat." }, 403) as never;
   const prepared = await prepareOwnedStemsJob(actor, file_id);
   if (!prepared.ok) return c.json({ error: prepared.line }, prepared.status) as never;
   const conversation = resolveOrCreateConversation(actor, "chat", undefined, { temporary });
@@ -514,13 +518,14 @@ const qualityRoute = createRoute({ method: "post", path: "/jobs/{id}/quality", t
   responses: { 200: { content: { "application/json": { schema: cardSchema } }, description: "The card with the new version coming." }, 422: { description: "The requested edit cannot be made." }, ...refusals } });
 musicRoutes.openapi(qualityRoute, async (c) => {
   const actor = c.get("person"); const { tier, file_id } = c.req.valid("json");
-  const granted = authorizeTier({ person: actor, category: "music", requested: tier }).tier;
+  const minor = laneOf(musicRouteAudience(actor)) !== "adult";
+  const granted = minor ? "standard" : authorizeTier({ person: actor, category: "music", requested: tier }).tier;
   const result = await runSongEdit({ actor, jobId: c.req.valid("param").id, fileId: file_id, input: () => ({ change: "remake" }),
-    beforePlan: (engine) => tier === "boost" && (granted !== "boost" || !engine.quality.includes("detailed")) ? { status: 422, error: "A better maker is not available for this song. Make it again at Standard." } : null,
+    beforePlan: (engine) => !minor && tier === "boost" && (granted !== "boost" || !engine.quality.includes("detailed")) ? { status: 422, error: "A better maker is not available for this song. Make it again at Standard." } : null,
     extraChecks: (plan, engine) => {
-      if (tier === "max" && (granted !== "max" || !musicMaxOffered(engine))) return { status: 422, error: "Max is not available for this song. Make it again at Boost or Standard." };
-      if (tier === "max" && !musicMaxInstalled(engine)) return { status: 422, error: MUSIC_MAX_NOT_INSTALLED_LINE };
-      plan.request.quality = musicQualityFor(engine, tier); plan.request.tier = musicTierOf(plan.request.quality); plan.body.quality = plan.request.quality;
+      if (!minor && tier === "max" && (granted !== "max" || !musicMaxOffered(engine))) return { status: 422, error: "Max is not available for this song. Make it again at Boost or Standard." };
+      if (!minor && tier === "max" && !musicMaxInstalled(engine)) return { status: 422, error: MUSIC_MAX_NOT_INSTALLED_LINE };
+      plan.request.quality = minor ? "quick" : musicQualityFor(engine, tier); plan.request.tier = minor ? "standard" : musicTierOf(plan.request.quality); plan.body.quality = plan.request.quality;
       return null;
     } });
   return result.ok ? c.json(await musicCardView(actor, result.root), 200) : refuseWith(c, result) as never;

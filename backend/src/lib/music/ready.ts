@@ -17,18 +17,20 @@ export function settleMusicStatus(read: StackMusicStatus | null, previous: { at:
   return read === null && previous && now - previous.at < KEEP_READY_MS ? previous.status : read;
 }
 let forTests: StackMusicStatus | null | undefined;
-let latestTranscribeAvailable: boolean | null = null;
+let latestTranscribeAvailable: { value: boolean; at: number } | null = null;
 const TTL_MS = 20_000;
 
 /** Test seam: the Stack's music status (null: no engine), or undefined to read for real. */
-export function __setMusicStatusForTests(status: StackMusicStatus | null | undefined): void { forTests = status; latestTranscribeAvailable = status?.transcribe?.available === true; cached = null; }
+export function __setMusicStatusForTests(status: StackMusicStatus | null | undefined): void { forTests = status; latestTranscribeAvailable = status === undefined ? null : { value: status?.transcribe?.available === true, at: Date.now() }; cached = null; }
 
 export async function musicEngineStatus(): Promise<StackMusicStatus | null> {
   if (forTests !== undefined) return forTests;
   if (!isStackConfigured()) return null;
   if (cached && Date.now() - cached.at < TTL_MS) return cached.status;
-  const read = await musicStatus();
-  latestTranscribeAvailable = read?.transcribe?.available === true;
+  let read: StackMusicStatus | null;
+  try { read = await musicStatus(); }
+  catch { latestTranscribeAvailable = null; cached = { at: Date.now(), status: settleMusicStatus(null, lastReady, Date.now()) }; return cached.status; }
+  latestTranscribeAvailable = read === null ? null : { value: read.transcribe?.available === true, at: Date.now() };
   const status = settleMusicStatus(read, lastReady, Date.now());
   if (read && musicStatusReady(read)) lastReady = { at: Date.now(), status: read };
   else if (read) lastReady = null;
@@ -45,7 +47,7 @@ export function musicStatusReady(status: StackMusicStatus | null): boolean {
   return status.available === true;
 }
 /** Minors stay closed until the Stack confirms it can return an as-sung transcript. */
-export function musicTranscriptionAvailable(): boolean { return forTests !== undefined ? forTests?.transcribe?.available === true : latestTranscribeAvailable === true; }
+export function musicTranscriptionAvailable(): boolean { return forTests !== undefined ? forTests?.transcribe?.available === true : latestTranscribeAvailable?.value === true && Date.now() - latestTranscribeAvailable.at <= 60_000; }
 
 export async function musicEngineReady(): Promise<boolean> {
   return musicStatusReady(await musicEngineStatus());

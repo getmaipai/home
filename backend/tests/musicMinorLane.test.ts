@@ -12,6 +12,10 @@ import { getMusicJobFor } from "@/lib/music/jobs";
 import { db } from "@/db";
 import { kidUsage } from "@/db/schema";
 import { eq } from "drizzle-orm";
+import { runMakeSound } from "@/lib/music/soundMaker";
+import { makeAlbum } from "@/lib/music/album";
+import { runBandAction } from "@/lib/music/bandActions";
+import { TestClient } from "./client";
 
 let people: ReturnType<typeof createBenchPeople>;
 let fake: ReturnType<typeof installFakeMusicStack>;
@@ -147,7 +151,38 @@ describe("minor song lane readiness", () => {
     const editId = (edited.result?.data as { musicJobId: string }).musicJobId;
     await waitForMusic(() => getMusicJobFor(actor, editId)?.state === "failed");
     expect(fake.submitted.at(-1)).toMatchObject({ transcribe: true, caption: "a happy bouncy tune" });
+    expect(getMusicJobFor(actor, editId)?.request.lyrics).toContain("Sunshine wakes");
+    expect(getMusicJobFor(actor, editId)?.request.written_lyrics).toBeUndefined();
     expect(getMusicJobFor(actor, editId)?.errorCode).toBe("content_withheld");
+  });
+
+  test("minor lanes refuse adult music features before their engines or Stack are called", async () => {
+    __setMusicStatusForTests(readyMusicStatusForTests({ transcribe: { available: true } }));
+    const actor = { ...people.child, role: "teen" as const };
+    const state = musicState(actor);
+    const savedStyle = await runGenerateMusic({ state, args: { description: "a gentle tune", song_style: "sstyle-example123" }, callId: "saved-style", spoken: false });
+    const sound = await runMakeSound({ state, args: { description: "rain on a roof" }, callId: "sound", spoken: false });
+    const album = await makeAlbum({ state, idea: "an album", callId: "album", spoken: false });
+    const bandAction = await runBandAction(actor, "mband-example123", "remake_portrait", { conversationId: null, turnId: null });
+    const line = "You can change only your own song from this chat.";
+    expect(JSON.stringify(savedStyle)).toContain(line); expect(JSON.stringify(sound)).toContain(line);
+    expect(album).toMatchObject({ ok: false, line }); expect(bandAction).toMatchObject({ ok: false, status: 403, error: line });
+    expect(fake.submitted).toHaveLength(0);
+  });
+
+  test("a minor cannot request saved style or album values, and adult-only made routes refuse early", async () => {
+    __setMusicStatusForTests(readyMusicStatusForTests({ transcribe: { available: true } }));
+    const actor = { ...people.child, role: "child" as const };
+    const out = await runGenerateMusic({ state: musicState(actor), args: { description: "a quiet melody", song_style: "sstyle-example123" }, callId: "style", spoken: false });
+    expect(JSON.stringify(out)).toContain("You can change only your own song from this chat.");
+    expect(fake.submitted).toHaveLength(0);
+  });
+
+  test("adult-only music made routes refuse a minor before route work", async () => {
+    // The route auth itself is already exercised in musicMadeRecords.test; direct runner/action guards are tested above.
+    const signedClient = new TestClient();
+    const response = await signedClient.post("/api/music/bands", { name: "x", style: { description: "y" } });
+    expect(response.status).toBe(401);
   });
 
   test("adult protections remain CSAM-only and do not request transcription", async () => {

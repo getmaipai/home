@@ -243,10 +243,12 @@ async function runMusic(input: MusicToolInput, editing: boolean): Promise<ToolEx
   const { state, args, callId } = input; const packageId = editing ? EDIT_MUSIC_TOOL_ID : GENERATE_MUSIC_TOOL_ID;
   const failed = (code: string, kind: "bad_arguments" | "unavailable" | "errored") => outcomeOf({ callId, packageId, status: "failed", via: "tool_call", args, errorCode: code, failureKind: kind, durationMs: 0 });
   const refused = (line: string, why: string) => outcomeOf({ callId, packageId, status: "succeeded", via: "tool_call", args, durationMs: 0, result: { reply: { text: `${REFUSED_PREFIX}${line}` }, data: { refused: why }, actions: [] } });
-  await musicEngineStatus();
   const musicAudience = musicAudienceOf(state, input.spoken);
   const lane = laneOf(musicAudience);
-  const refusal = (lane === "child" ? null : musicRefusalFor(musicAudience, args)) ?? likenessCallRefusal(musicAudience.actor, args);
+  const denied = musicDenial(musicAudience);
+  if (denied) return refused(MUSIC_DENIAL_LINE[denied], denied);
+  await musicEngineStatus();
+  const refusal = musicRefusalFor(musicAudience, args) ?? likenessCallRefusal(musicAudience.actor, args);
   if (refusal) return refused(refusal.line, refusal.why);
   const temporary = state.temporary === true || state.ephemeral === true;
   const actor = state.actor as PersonRow;
@@ -312,7 +314,8 @@ async function runMusic(input: MusicToolInput, editing: boolean): Promise<ToolEx
       request.description = rewrite.description; request.lyrics = rewrite.usedTemplate ? undefined : rewrite.lyrics;
       request.title = rewrite.title; request.instrumental = rewrite.usedTemplate || request.instrumental;
       childNote = rewrite.usedTemplate ? "The words could not be checked, so this song has music only." : rewrite.changed ? changedNote("song", true, false) : "";
-      request.length = "quick"; sizeSong(request, request.written_lyrics ?? request.lyrics, { min_seconds: engine!.limits.min_seconds, max_seconds: Math.min(60, engine!.limits.max_seconds) });
+      request.length = "quick"; delete request.written_lyrics; delete request.cut;
+      sizeSong(request, request.lyrics, { min_seconds: engine!.limits.min_seconds, max_seconds: Math.min(60, engine!.limits.max_seconds) });
       body.caption = request.description; body.lyrics = request.lyrics; body.instrumental = request.instrumental;
     }
     if (lane !== "adult") { request.transcribe = true; body.transcribe = true; }
@@ -328,6 +331,7 @@ async function runMusic(input: MusicToolInput, editing: boolean): Promise<ToolEx
     if (!musicStatusReady(engine)) return failed("no_engine", "unavailable");
     const parsed = generateMusicArgs.safeParse(args); if (!parsed.success) return failed("bad_arguments", "bad_arguments");
     let values = parsed.data;
+    if (lane !== "adult" && (values.song_style || values.band || values.album || input.band || input.album)) return refused("You can change only your own song from this chat.", "adult_music_feature");
     if (lane === "child") {
       const rewrite = await rewriteForChild({ kind: "song", description: values.description, ...(values.lyrics !== undefined ? { lyrics: values.lyrics } : {}), ...(values.title !== undefined ? { title: values.title } : {}) });
       if (!rewrite.ok) return refused(rewrite.redirect, "child_content");
@@ -355,7 +359,7 @@ async function runMusic(input: MusicToolInput, editing: boolean): Promise<ToolEx
   request.max_seconds = lane === "child" ? Math.min(60, engine!.limits.max_seconds) : engine!.limits.max_seconds;
   // TIER-HOME-03: the typed tier argument of a new song. Boost is the engine's Detailed maker when it has one; a lowered request says why in one line.
   // MUSIC-MAX-01: Max is the engine's XL SFT maker, granted exactly as Boost is (authorizeTier inside tierArgument); asked while the models are not installed it runs, and says it ran, as Boost.
-  const tierAsked = editing || lane === "child" ? null : tierArgument({ person: actor, category: "music", arg: args.tier, band: musicAudienceOf(state, input.spoken).band, maxAvailable: musicMaxOffered(engine) });
+  const tierAsked = editing || lane !== "adult" ? null : tierArgument({ person: actor, category: "music", arg: args.tier, band: musicAudienceOf(state, input.spoken).band, maxAvailable: musicMaxOffered(engine) });
   if (tierAsked?.tier) request.quality = musicQualityFor(engine, tierAsked.tier);
   request.quality = lane === "child" ? "quick" : request.quality ?? defaultQualityOf(engine!); body.quality = request.quality;
   request.tier = musicTierOf(request.quality);

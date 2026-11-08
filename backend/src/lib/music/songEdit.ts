@@ -66,7 +66,8 @@ export async function runSongEdit(options: SongEditOptions): Promise<SongEditRes
       if (!rewritten.ok) return refuse({ status: 403, error: rewritten.redirect });
       plan.request.description = rewritten.description; plan.request.lyrics = rewritten.usedTemplate ? undefined : rewritten.lyrics;
       plan.request.title = rewritten.title; plan.request.instrumental = rewritten.usedTemplate || plan.request.instrumental;
-      plan.request.length = "quick"; sizeSong(plan.request, plan.request.written_lyrics ?? plan.request.lyrics, { min_seconds: ready.limits.min_seconds, max_seconds: Math.min(60, ready.limits.max_seconds) });
+      plan.request.length = "quick"; delete plan.request.written_lyrics; delete plan.request.cut;
+      sizeSong(plan.request, plan.request.lyrics, { min_seconds: ready.limits.min_seconds, max_seconds: Math.min(60, ready.limits.max_seconds) });
       plan.body.caption = plan.request.description; plan.body.lyrics = plan.request.lyrics; plan.body.instrumental = plan.request.instrumental;
     }
     plan.request.transcribe = true; plan.body.transcribe = true;
