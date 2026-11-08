@@ -81,6 +81,19 @@ describe("RemindersPage device schedules (HOUSE-04)", () => {
   const row = { id: "sched-porch0001", what: "Porch Lamp light turns on", when: "every day at 6:00 PM", state: "active" as const, note: null };
   const asRole = (role: string) => ({ id: "person-a", role }) as unknown as Roster;
 
+  test("a devices response without a schedules field does not crash the page", async () => {
+    const restore = withLists();
+    const base = globalThis.fetch;
+    globalThis.fetch = mock((input: RequestInfo | URL, init?: RequestInit) => {
+      if (String(input).endsWith("/api/house/schedules")) return Promise.resolve(Response.json({}));
+      return base(input, init);
+    }) as unknown as typeof fetch;
+    try {
+      const view = renderWithQueryClient(<MemoryRouter><WakeWordPersonContext.Provider value={asRole("owner")}><RemindersPage /></WakeWordPersonContext.Provider></MemoryRouter>);
+      expect(await view.findByRole("button", { name: /Device schedules/ })).toBeInTheDocument();
+    } finally { globalThis.fetch = base; restore(); }
+  });
+
   test("an adult sees their own schedules, an admin count, and can cancel one after confirming", async () => {
     const rig = withSchedules([row, { ...row, id: "sched-hall00002", what: "Hall light turns off", state: "paused", note: "Paused because you can no longer control the device." }], 2);
     try {
