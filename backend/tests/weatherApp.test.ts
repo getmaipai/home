@@ -166,7 +166,8 @@ describe("the forecast data call", () => {
     expect((result as { value: { details: { summary?: string } } }).value.details.summary).toBe("It is 41°F and snowy. Today's high is 44° and the low is 33°.");
     expect(blocks[0]!.props.attribution).toBe(""); // the card draws no credit line (owner, 2026-10-28); the manifest still names the source
     const hosts = new Set(urls.map((url) => new URL(url).host));
-    expect([...hosts].every((host) => host === "api.open-meteo.com" || host === "geocoding-api.open-meteo.com")).toBe(true);
+    // The card also asks the hub itself (loopback) for the day's moon; only outside hosts must be the two Open-Meteo ones.
+    expect([...hosts].filter((host) => !host.startsWith("127.0.0.1")).every((host) => host === "api.open-meteo.com" || host === "geocoding-api.open-meteo.com")).toBe(true);
   });
 
   test("Current location rides the request only: two decimals out, nothing kept", async () => {
