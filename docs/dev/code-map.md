@@ -717,7 +717,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/music/jobs.ts` | __setMusicPollMsForTests, slotBodyFor, plainMusicFailure, prepareStemsJob, OWNED_STEMS_MAX_BYTES, resolveSongSource |
 | `backend/src/lib/music/libraryAlign.ts` | QUICK_WINDOW_S, QUICK_LEAD_S, INSTANT_MATCH_S, RETRY_AFTER_MS, LIBRARY_ALIGN_MAX_BYTES, __setLibraryAlignPollMsForTests |
 | `backend/src/lib/music/lyricsAlign.ts` | buildLines, keepOrdered, spaceUnanchored, reconcile |
-| `backend/src/lib/music/lyricsTranslate.ts` | LYRICS_TRANSLATION_PROMPT, sourceHash, translateLines, localTranslate, cachedTranslation, fillTranslation |
+| `backend/src/lib/music/lyricsTranslate.ts` | sourceHash, translateLines, cachedTranslation, fillTranslation, translationLanguage, cachedMadeTranslation |
 | `backend/src/lib/music/m4a.ts` | m4aSeconds |
 | `backend/src/lib/music/madeRecords.ts` | MADE_KINDS, listMade, getMade, createMade, updateMade, deleteMade |
 | `backend/src/lib/music/mixParts.ts` | __setMusicMixRunnerForTests, __setMusicMixToolsForTests, SAMPLE_RATE, parseWav, mixPcmWav, run |
