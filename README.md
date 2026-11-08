@@ -84,6 +84,7 @@ Try these in chat:
 ### Memory
 
 - **Never repeat yourself.** Home remembers your tastes, your routines, your kid's allergy and the trip you are planning, and brings a fact up only when it changes the answer.
+- **Go Incognito.** Turn it on from your profile menu and nothing from that chat is saved or remembered. It is forgotten when you turn it off, after two idle hours, or when the server restarts.
 - **Say "remember that...".** A note you ask for is always saved, with the date.
 - **See, fix or forget.** Look at every memory, forget one, forget several or clear them all. Forgotten means wiped, not hidden.
 - **Share with the house.** An adult chooses who may hear a household memory: everyone, teens and adults, or adults only. Parents can look at a child's memories and export them.
