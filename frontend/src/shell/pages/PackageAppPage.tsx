@@ -59,7 +59,7 @@ function weatherChips(value: unknown): Array<{ id: string; label: string; icon?:
   return Array.isArray(value) ? value.filter((item): item is { id: string; label: string; icon?: string } => !!item && typeof item.id === "string" && typeof item.label === "string") : [];
 }
 
-function weatherLocation(place: { id: string; label: string; geo?: { lat?: number; lon?: number; area?: string | null } | null }, props: Record<string, unknown>): WeatherLocation {
+export function weatherLocation(place: { id: string; label: string; geo?: { lat?: number; lon?: number; area?: string | null } | null }, props: Record<string, unknown>): WeatherLocation {
   const current = (props.current && typeof props.current === "object" ? props.current : {}) as Record<string, unknown>;
   const daily = Array.isArray(props.daily) ? props.daily as Array<Record<string, unknown>> : [];
   const hourly = Array.isArray(props.hourly) ? props.hourly as Array<Record<string, unknown>> : [];
@@ -79,8 +79,10 @@ function weatherLocation(place: { id: string; label: string; geo?: { lat?: numbe
   return { id: place.id, city: place.label.replace(/ \(home\)$/, ""), state: place.geo?.area ?? undefined, latitude: place.geo?.lat, longitude: place.geo?.lon, timezone: string(details, "timezone"), isMyLocation: place.label.endsWith(" (home)"), detail: hasWeather ? {
     temp: number(current, "temp")!, condition: string(current, "condition")!, code: numeric(current, "code") ?? 3, isDay: current.is_day !== false && current.is_day !== 0 && current.is_day !== "0",
     high: number(daily[0] ?? {}, "high"), low: number(daily[0] ?? {}, "low"),
-    hourly: hourly.map((hour) => ({ time: clock(String(hour.time ?? "")), temp: Number(hour.temp ?? 0), pop: number(hour, "pop") })),
-    daily: daily.map((day) => ({ date: String(day.date ?? ""), high: Number(day.high ?? 0), low: Number(day.low ?? 0), code: Number(day.code ?? 3), pop: number(day, "pop") })),
+    hourly: hourly.map((hour) => ({ time: clock(String(hour.time ?? "")), temp: Number(hour.temp ?? 0), pop: number(hour, "pop"), amount: number(hour, "amount") })),
+    daily: daily.map((day) => ({ date: String(day.date ?? ""), high: Number(day.high ?? 0), low: Number(day.low ?? 0), code: Number(day.code ?? 3), pop: number(day, "pop"), amount: number(day, "amount") })),
+    minutely: Array.isArray(props.minutely) ? props.minutely.filter((item): item is { time: string; amount: number } => !!item && typeof item === "object" && typeof (item as Record<string, unknown>).time === "string" && typeof (item as Record<string, unknown>).amount === "number").map((item) => ({ time: clock(item.time), amount: item.amount })) : undefined,
+    precipUnit: props.precip_unit === "mm" || props.precip_unit === "in" ? props.precip_unit : undefined,
     feelsLike: number(details, "feels_like"), humidity: number(details, "humidity"), precipitation: number(details, "precipitation"),
     wind: number(details, "wind_speed") !== undefined ? { speed: number(details, "wind_speed")!, direction: number(details, "wind_direction") ?? 0 } : undefined,
     pressure: number(details, "pressure"), visibility: number(details, "visibility") === undefined ? undefined : number(details, "visibility")! / 1000,

@@ -201,6 +201,7 @@ export function weatherCard(producer: string, provenance: string, data: Record<s
   const dates = Array.isArray(data.block_day_dates) ? data.block_day_dates : [];
   const codes = Array.isArray(data.block_day_codes) ? data.block_day_codes : [];
   const chances = Array.isArray(data.block_day_rain) ? data.block_day_rain : [];
+  const dayAmounts = Array.isArray(data.block_day_amount) ? data.block_day_amount : [];
   const daily: Record<string, unknown>[] = [];
   for (let i = 0; i < dates.length && daily.length < CARD_DAYS_MAX; i++) {
     const date = typeof dates[i] === "string" && /^\d{4}-\d{2}-\d{2}$/.test(dates[i] as string) ? (dates[i] as string) : null;
@@ -209,21 +210,34 @@ export function weatherCard(producer: string, provenance: string, data: Record<s
     const dayCode = wmoCode(codes[i]);
     if (!date || high === null || low === null || dayCode === null) continue;
     const pop = finite(chances[i]);
-    daily.push({ date, high, low, code: dayCode, ...(pop !== null && pop >= 0 && pop <= 100 ? { pop } : {}) });
+    const amount = finite(dayAmounts[i]);
+    daily.push({ date, high, low, code: dayCode, ...(pop !== null && pop >= 0 && pop <= 100 ? { pop } : {}), ...(amount !== null && amount >= 0 ? { amount } : {}) });
   }
   if (daily.length === 0) return null;
 
   const times = Array.isArray(data.block_hour_times) ? data.block_hour_times : [];
   const temps = Array.isArray(data.block_hour_temps) ? data.block_hour_temps : [];
   const pops = Array.isArray(data.block_hour_pop) ? data.block_hour_pop : [];
+  const hourAmounts = Array.isArray(data.block_hour_amount) ? data.block_hour_amount : [];
   const hourly: Record<string, unknown>[] = [];
   for (let i = 0; i < times.length && hourly.length < CARD_HOURS_MAX; i++) {
     const t = typeof times[i] === "string" && times[i] !== "" ? (times[i] as string) : null;
     const hourTemp = finite(temps[i]);
     if (!t || hourTemp === null) continue;
     const pop = finite(pops[i]);
-    hourly.push({ time: t, temp: hourTemp, ...(pop !== null && pop >= 0 && pop <= 100 ? { pop } : {}) });
+    const amount = finite(hourAmounts[i]);
+    hourly.push({ time: t, temp: hourTemp, ...(pop !== null && pop >= 0 && pop <= 100 ? { pop } : {}), ...(amount !== null && amount >= 0 ? { amount } : {}) });
   }
+
+  const minutelyTimes = Array.isArray(data.block_minutely_times) ? data.block_minutely_times : [];
+  const minutelyAmounts = Array.isArray(data.block_minutely_amount) ? data.block_minutely_amount : [];
+  const minutely: Array<{ time: string; amount: number }> = [];
+  for (let i = 0; i < minutelyTimes.length && minutely.length < 12; i++) {
+    const time = typeof minutelyTimes[i] === "string" && minutelyTimes[i] !== "" ? minutelyTimes[i] as string : null;
+    const amount = finite(minutelyAmounts[i]);
+    if (time && amount !== null && amount >= 0) minutely.push({ time, amount });
+  }
+  const precipUnit = data.block_precip_unit === "inch" || data.block_precip_unit === "in" ? "in" : data.block_precip_unit === "mm" ? "mm" : undefined;
 
   const today = daily[0]!;
   const alt = `Weather in ${place} now: ${temp}°${unit} and ${condition}; today's high ${today.high}°${unit}, low ${today.low}°${unit}.`;
@@ -246,6 +260,8 @@ export function weatherCard(producer: string, provenance: string, data: Record<s
     ...(advice.length > 0 ? { advice } : {}),
     ...(alertTitle ? { alert: { title: alertTitle, ...(alertDescription ? { text: alertDescription } : {}), ...(alert?.severity === "info" || alert?.severity === "warn" || alert?.severity === "severe" ? { severity: alert.severity } : {}) } } : {}),
     ...(hourly.length > 0 ? { hourly } : {}),
+    ...(minutely.length > 0 ? { minutely } : {}),
+    ...(precipUnit ? { precip_unit: precipUnit } : {}),
     daily,
     attribution,
   });

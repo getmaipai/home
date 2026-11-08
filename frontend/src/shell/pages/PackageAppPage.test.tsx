@@ -11,12 +11,30 @@ import { TooltipProvider } from "@maipai/ui/src/ui/tooltip";
 import weatherCard from "@maipai/spec/fixtures/answer-block/valid-weather_card.json";
 import { createQueryClient } from "@maipai/ui/src/queryClient";
 import { Routes } from "@/shell/Routes";
+import { weatherLocation } from "@/shell/pages/PackageAppPage";
 import { mockHome, makePerson, type HomeFixture } from "@/shell/pages/settings/settingsTestKit";
 import { render } from "@testing-library/react";
 import type { AppRow } from "@/lib/api";
 
 const originalMatchMedia = window.matchMedia;
 const originalWidth = window.innerWidth;
+
+describe("weather detail mapping", () => {
+  test("carries rain amounts, minutely data and precipitation units", () => {
+    const location = weatherLocation({ id: "p", label: "Cabin" }, {
+      current: { temp: 50, condition: "rain", code: 61 },
+      hourly: [{ time: "2026-10-16T12:00", temp: 50, amount: 0.2 }],
+      daily: [{ date: "2026-10-16", high: 55, low: 40, code: 61, amount: 2.5 }],
+      minutely: [{ time: "12:00", amount: 0 }, { time: "12:01", amount: 0.1 }],
+      precip_unit: "in",
+    });
+    const detail = location.detail as (typeof location.detail & { hourly: Array<{ amount?: number }>; daily: Array<{ amount?: number }>; minutely?: Array<{ time: string; amount: number }>; precipUnit?: string });
+    expect(detail?.hourly?.[0]?.amount).toBe(0.2);
+    expect(detail?.daily?.[0]?.amount).toBe(2.5);
+    expect(detail?.minutely).toEqual([{ time: "12:00", amount: 0 }, { time: "12:01", amount: 0.1 }]);
+    expect(detail?.precipUnit).toBe("in");
+  });
+});
 
 const row: AppRow = {
   package: "demo",

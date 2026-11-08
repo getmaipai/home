@@ -20,8 +20,10 @@ const CardProps = z.object({
   place: z.string().min(1),
   unit: z.enum(["F", "C"]),
   current: z.object({ temp: z.number(), condition: z.string().min(1), code: z.number().int(), is_day: z.boolean() }).strict(),
-  hourly: z.array(z.object({ time: z.string().min(1), temp: z.number(), pop: Pop }).strict()).max(24).optional(),
-  daily: z.array(z.object({ date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/), high: z.number(), low: z.number(), code: z.number().int(), pop: Pop }).strict()).min(1).max(8),
+  hourly: z.array(z.object({ time: z.string().min(1), temp: z.number(), pop: Pop, amount: z.number().min(0).optional() }).strict()).max(24).optional(),
+  daily: z.array(z.object({ date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/), high: z.number(), low: z.number(), code: z.number().int(), pop: Pop, amount: z.number().min(0).optional() }).strict()).min(1).max(8),
+  precip_unit: z.enum(["mm", "in"]).optional(),
+  minutely: z.array(z.object({ time: z.string(), amount: z.number().min(0) }).strict()).max(12).optional(),
   advice: z.array(z.object({ id: z.string().min(1), label: z.string().min(1).max(24), icon: z.string().optional() }).strict()).max(12).optional(),
   attribution: z.string(),
 }).strict();
@@ -120,6 +122,27 @@ describe("WEATHER-CARD-01: weather_card from the recipe's one forecast response"
     expect(weatherCard("weather", "p", undefined)).toBeNull();
     expect(weatherCard("weather", "p", { place: "X", temperature: 50, conditions: "clear", block_code: 0 })).toBeNull();
     expect(weatherCard("weather", "p", { place: "X", conditions: "clear", block_code: 0, block_day_dates: ["2026-10-16"], block_day_highs: [1], block_day_lows: [0], block_day_codes: [0] })).toBeNull();
+  });
+
+  test("rain recipe fields are carried through when valid and dropped when invalid", () => {
+    const base = { place: "X", temperature: 50, conditions: "clear", block_code: 0,
+      block_day_dates: ["2026-10-16"], block_day_highs: [60], block_day_lows: [40], block_day_codes: [0], block_day_amount: [2.5],
+      block_hour_times: ["2026-10-16T12:00"], block_hour_temps: [50], block_hour_amount: [0.2],
+      block_minutely_times: ["12:00", "12:01"], block_minutely_amount: [0, 0.1], block_precip_unit: "inch" };
+    const props = CardProps.parse(weatherCard("weather", "p", base)!.props);
+    expect(props.precip_unit).toBe("in");
+    expect(props.daily[0]!.amount).toBe(2.5);
+    expect(props.hourly![0]!.amount).toBe(0.2);
+    expect(props.minutely).toEqual([{ time: "12:00", amount: 0 }, { time: "12:01", amount: 0.1 }]);
+
+    const invalid = weatherCard("weather", "p", { ...base, block_day_amount: [-1], block_hour_amount: [Infinity], block_minutely_times: ["", "12:01", "12:02"], block_minutely_amount: [1, -1, "bad"], block_precip_unit: "inchy" })!;
+    const invalidProps = CardProps.parse(invalid.props);
+    expect(invalidProps.daily[0]).not.toHaveProperty("amount");
+    expect(invalidProps.hourly![0]).not.toHaveProperty("amount");
+    expect(invalidProps.minutely).toBeUndefined();
+    expect(invalidProps.precip_unit).toBeUndefined();
+    const missing = weatherCard("weather", "p", { ...base, block_day_amount: undefined, block_hour_amount: undefined, block_minutely_times: undefined, block_minutely_amount: undefined, block_precip_unit: undefined })!;
+    expect(CardProps.parse(missing.props).minutely).toBeUndefined();
   });
 
   test("more than 24 hours or 8 days is cut to the contract's maximum", () => {
