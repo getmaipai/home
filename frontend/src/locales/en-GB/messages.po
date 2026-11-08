@@ -3032,23 +3032,23 @@ msgid "Apply"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:207
-msgid "setting.content.policy.pictures.help"
-msgstr ""
-
-#. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:213
-msgid "setting.content.policy.videos.help"
-msgstr ""
-
-#. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:204
 msgid "setting.content.policy.chat_output.help"
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/lib/settingCopy.generated.ts:207
+msgid "setting.content.policy.pictures.help"
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:210
 msgid "setting.content.policy.search.help"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/lib/settingCopy.generated.ts:213
+msgid "setting.content.policy.videos.help"
 msgstr ""
 
 #. js-lingui-explicit-id
