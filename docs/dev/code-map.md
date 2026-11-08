@@ -1077,6 +1077,8 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/translate/engine.ts` | hubCompleter |
 | `backend/src/lib/translate/keep.ts` | loadKeepTerms, findKeepSpans, maskKept, spotKeepTerms |
 | `backend/src/lib/translate/languages.ts` | LANGUAGES, languageName, isKnownLanguage |
+| `backend/src/lib/translate/markdown.ts` | splitMarkdown, joinMarkdown |
+| `backend/src/lib/translate/stack.ts` | stackOnlyFetch, chatReady, StackNotReadyError, stackCompleter |
 | `backend/src/lib/translate/validate.ts` | validateTranslation, isProtected |
 | `backend/src/lib/trash/podcastCopies.ts` | isPodcastCopyTrash, mayManagePodcastCopy, trashPodcastCopy |
 | `backend/src/lib/trash/registry.ts` | registerTrashProvider, trashProvider, listTrash, purgeExpired |

@@ -2,7 +2,7 @@ import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { dirname, join, relative, sep } from "node:path";
 import { translateItems, type Completer } from "../backend/src/lib/translate/core";
-import { stackCompleter, stackOnlyFetch, type Fetch } from "../backend/src/lib/translate/engine";
+import { stackCompleter, stackOnlyFetch, type Fetch } from "../backend/src/lib/translate/stack";
 import { splitMarkdown, joinMarkdown } from "../backend/src/lib/translate/markdown";
 import { parsePo } from "../frontend/scripts/po";
 
