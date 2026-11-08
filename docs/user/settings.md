@@ -49,6 +49,8 @@ Open **Profile and sign-in** and find the **Language** card. Pick **English (Uni
 
 ## Choose your voice
 
+You can make a new voice inspired by your own recording in chat, and it will appear on the Voices page.
+
 Open **Voice and robot**, then the **Voice** tab. Pick a voice from the **Voice for you** list and press **Test** to hear a short sentence. Press **Stop** to end it. Your choice is saved as soon as you pick it, and Home uses that voice in chat and when it reads text aloud.
 
 If you have more than one microphone, the page also has a **Microphone** choice, remembered on this device only.

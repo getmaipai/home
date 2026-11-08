@@ -17,7 +17,7 @@ import { speakerNamedAny } from "@/lib/subjects";
 import { tokenize, wordsOf, isBarePronoun } from "@/lib/text";
 import { READ_ITEM_TOOL_ID, itemRefsIn } from "@/lib/items/tool";
 import { WRITING_FORMAT_TOOL_ID, writingFormatForArgs } from "@/lib/writingFormats";
-import { VOICEOVER_TOOL_ID, CHANGE_VOICE_TOOL_ID } from "@/lib/voiceTools";
+import { VOICEOVER_TOOL_ID, CHANGE_VOICE_TOOL_ID, MAKE_INSPIRED_VOICE_TOOL_ID } from "@/lib/voiceTools";
 import { meetsMinRole } from "@/lib/plugins";
 import { START_PROJECT_TOOL_ID, projectParamsOf, projectTypeForArgs, validateProjectParams, type StartProjectArgs } from "@/lib/projects/tool";
 import { sentenceInitial } from "@/lib/projects/projectTypes";
@@ -437,6 +437,16 @@ export const policyNode: Node<PolicyInput, PolicyOutput> = async (state, input) 
       const args = (call.args ?? {}) as Record<string, unknown>;
       const proposal: ActionProposal = { kind: "read_only", request: { tool: call.tool, args, callId: call.id ?? call.tool } };
       if (!state.voiceoverAllowed) {
+        noteRefusal("format_not_here");
+        entries.push({ proposal, decision: { allow: false, reason: "format_not_here" } });
+      } else entries.push({ proposal, decision: { allow: true } });
+      continue;
+    }
+
+    if (call.tool === MAKE_INSPIRED_VOICE_TOOL_ID) {
+      const args = (call.args ?? {}) as Record<string, unknown>;
+      const proposal: ActionProposal = { kind: "read_only", request: { tool: call.tool, args, callId: call.id ?? call.tool } };
+      if (!state.inspiredVoiceAllowed) {
         noteRefusal("format_not_here");
         entries.push({ proposal, decision: { allow: false, reason: "format_not_here" } });
       } else entries.push({ proposal, decision: { allow: true } });

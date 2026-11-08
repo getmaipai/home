@@ -14,7 +14,7 @@ beforeAll(() => registerFixtureProjectType());
 afterAll(() => __resetProjectTypesForTests());
 
 const PACKAGES_DIR = join(import.meta.dir, "..", "packages");
-const VIRTUAL_TOOLS = ["start_project", "voiceover", "change_voice"];
+const VIRTUAL_TOOLS = ["start_project", "voiceover", "change_voice", "make_inspired_voice"];
 interface BundledManifest { id: string; kind: string; args?: unknown; offer?: { mode: string; reason?: string; gate?: string; bench_row?: string }; }
 function bundled(): BundledManifest[] {
   return readdirSync(PACKAGES_DIR).filter((d) => existsSync(join(PACKAGES_DIR, d, "manifest.json")))

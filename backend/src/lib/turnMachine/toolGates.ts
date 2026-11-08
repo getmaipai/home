@@ -27,6 +27,7 @@ import type { HouseArea, HouseEntity } from "@/lib/house/registry";
 import { getHouseholdSettingValue } from "@/lib/settings";
 import type { HouseBand } from "@/lib/house/access";
 import { uptimeAllowed } from "@/lib/uptime/tool";
+import { mayUseClipVoices } from "@/lib/access";
 
 export interface TurnToolGateInput {
   conversationId?: string;
@@ -86,6 +87,7 @@ export interface TurnToolGateResult {
   /** WRITING-FORMATS-03: a written, non-bare turn and at least one installed format the person's role may use. */
   writingFormatOk: boolean;
   voiceoverOk: boolean;
+  inspiredVoiceOk: boolean;
   houseOk: boolean;
   uptimeOk: boolean;
   houseContext?: { visible: HouseEntity[]; areas: HouseArea[] };
@@ -158,6 +160,7 @@ export async function budgetWithTurnToolGates(input: TurnToolGateInput): Promise
   const musicObject: MusicObjectGate = !objectAllowed ? null : (musicObjectRef?.kind ?? "none");
   const writingFormatOk = !input.bare && input.surfaceClass === "written" && safeGate(() => writingFormatsFor(input.actor.role).length > 0);
   const voiceoverOk = !input.bare && !input.spoken && input.surfaceClass === "written" && speakerAgeBand(input.actor, new Date()) === "adult" && input.actor.role !== "guest" && (await readiness(async () => (await roleHealth("voice")).availability === "ready"));
+  const inspiredVoiceOk = !input.bare && !input.spoken && input.surface === "chat" && input.surfaceClass === "written" && mayUseClipVoices(input.actor);
   let houseContext: { visible: HouseEntity[]; areas: HouseArea[] } | undefined;
   const registry = peekHouseRegistries();
   const houseMode = getHouseholdSettingValue("tools.house.mode");
@@ -173,11 +176,12 @@ export async function budgetWithTurnToolGates(input: TurnToolGateInput): Promise
   const uptimeOk = safeGate(() => uptimeAllowed({ actor: input.actor, band: input.band, surface: input.surface, surfaceClass: input.surfaceClass, spoken: input.spoken, bare: input.bare }));
   // TOOL-OFFER-VOICEOVER-01: `voiceover` is offered by structure alone (an adult, written, non-guest turn with the voice engine ready); the
   // person's wording is never read (rule 1). budget.ts keeps it past the sixteen-tool cap.
-  const gated = withTurnToolGates(input.budget, answerImagesOk, picturesOk, videosOk, musicOk, musicEditOk, itemRefOk, musicBandOk, videoEditOk, musicObject, writingFormatOk, editPictureOk, voiceoverOk, filmOk, houseOk, uptimeOk);
+  const gated = withTurnToolGates(input.budget, answerImagesOk, picturesOk, videosOk, musicOk, musicEditOk, itemRefOk, musicBandOk, videoEditOk, musicObject, writingFormatOk, editPictureOk, voiceoverOk, filmOk, houseOk, uptimeOk, inspiredVoiceOk);
   return {
     budget: gated,
     writingFormatOk,
     voiceoverOk,
+    inspiredVoiceOk,
     houseOk,
     uptimeOk,
     ...(houseContext ? { houseContext } : {}),

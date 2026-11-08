@@ -26,7 +26,7 @@ import { lookupFailureKind } from "./lookupFallback";
 import { pickStatusPhrase } from "@/lib/statusPhrases";
 import { READ_ITEM_TOOL_ID, runReadItemTool } from "@/lib/items/tool";
 import { WRITING_FORMAT_TOOL_ID, runWritingFormatTool } from "@/lib/writingFormats";
-import { VOICEOVER_TOOL_ID, CHANGE_VOICE_TOOL_ID, runVoiceoverTool, runChangeVoiceTool } from "@/lib/voiceTools";
+import { VOICEOVER_TOOL_ID, CHANGE_VOICE_TOOL_ID, MAKE_INSPIRED_VOICE_TOOL_ID, runVoiceoverTool, runChangeVoiceTool, runMakeInspiredVoiceTool } from "@/lib/voiceTools";
 import { START_PROJECT_TOOL_ID, runStartProjectTool, type StartProjectArgs } from "@/lib/projects/tool";
 import { SHOW_IMAGES_TOOL_ID, SHOW_IMAGES_UNAVAILABLE_LINE, answerImageFailureKind, showImagesEmptyResultLine, showImagesMultiResultLine, showImagesNames, showImagesPendingResultLine, showImagesResultLine, startAnswerImages } from "@/lib/answerImages/turn";
 import { GENERATE_IMAGE_TOOL_ID, runGenerateImage } from "@/lib/pictures/tool";
@@ -296,10 +296,12 @@ export const toolNode: Node<ToolInput, ToolOutput> = async (state, input, signal
     // step running, not just its eventual outcome.
     // FORM-CHAT-HUB-01 (rule 6a): a package re-run with a form's values bound as inputs puts no args on the stream, and records none.
     const resumedAsk = proposal.redactArgs === true;
+    const inspiredVoiceArgs = tool === MAKE_INSPIRED_VOICE_TOOL_ID ? (input.proposals.find((p) => p.request.callId === callId)?.request.args as Record<string, unknown> | undefined) : undefined;
     if ((tool === VOICEOVER_TOOL_ID || tool === CHANGE_VOICE_TOOL_ID) && !proposal.redactArgs) args = { voice: args.voice };
+    if (tool === MAKE_INSPIRED_VOICE_TOOL_ID && !proposal.redactArgs) args = { name: args.name, level: args.level };
     // RESEARCH-TIER-01: on a research turn the step row names the search it ran (the model's own query), so the person sees what each round looked into.
     const stepLabel = tool === "websearch" && researchRun !== undefined && typeof (args as { expression?: unknown }).expression === "string" ? (args as { expression: string }).expression.trim().slice(0, 100) : "";
-    if (!resumedAsk) toolEvents.push({ t: "tool_call", package_id: tool, call_id: callId, args: tool === HOUSE_TOOL_ID && isScheduleAction(String(args.action)) ? { action: args.action } : args, ...(stepLabel ? { label: stepLabel } : {}) });
+    if (!resumedAsk) toolEvents.push({ t: "tool_call", package_id: tool, call_id: callId, args: tool === MAKE_INSPIRED_VOICE_TOOL_ID ? { name: args.name, level: args.level } : tool === HOUSE_TOOL_ID && isScheduleAction(String(args.action)) ? { action: args.action } : args, ...(stepLabel ? { label: stepLabel } : {}) });
     // ANSWER-IMG-02: show_images acknowledges at once and never runs a package
     // (the picture pipeline was started above, beside the answer).
     if (tool === SHOW_IMAGES_TOOL_ID) {
@@ -385,14 +387,16 @@ export const toolNode: Node<ToolInput, ToolOutput> = async (state, input, signal
       continue;
     }
 
-    if (tool === VOICEOVER_TOOL_ID || tool === CHANGE_VOICE_TOOL_ID) {
+    if (tool === VOICEOVER_TOOL_ID || tool === CHANGE_VOICE_TOOL_ID || tool === MAKE_INSPIRED_VOICE_TOOL_ID) {
       const voiceArgs = (proposal.request.args ?? {}) as Record<string, unknown>;
       if (tool === VOICEOVER_TOOL_ID) voiceArgs.script = (input.proposals.find((p) => p.request.callId === callId)?.request.args as Record<string, unknown> | undefined)?.script;
-      else voiceArgs.file = (input.proposals.find((p) => p.request.callId === callId)?.request.args as Record<string, unknown> | undefined)?.file;
+      else if (tool === CHANGE_VOICE_TOOL_ID) voiceArgs.file = (input.proposals.find((p) => p.request.callId === callId)?.request.args as Record<string, unknown> | undefined)?.file;
+      if (tool === MAKE_INSPIRED_VOICE_TOOL_ID) Object.assign(voiceArgs, inspiredVoiceArgs ?? {});
       const outcome = tool === VOICEOVER_TOOL_ID
         ? await runVoiceoverTool(state.actor, voiceArgs, callId)
-        : await runChangeVoiceTool(state.actor, voiceArgs, callId);
-      if (outcome.args) outcome.args = { voice: voiceArgs.voice };
+        : tool === CHANGE_VOICE_TOOL_ID ? await runChangeVoiceTool(state.actor, voiceArgs, callId)
+          : await runMakeInspiredVoiceTool(state.actor, voiceArgs, callId, state.conversationId, (state.audio ?? []).map(({ id }) => id));
+      if (outcome.args && tool !== MAKE_INSPIRED_VOICE_TOOL_ID) outcome.args = { voice: voiceArgs.voice };
       outcomes.push(outcome);
       if (outcome.status === "succeeded") toolEvents.push({ t: "tool_result", call_id: callId, package_id: tool, outcome: { text: outcome.result?.reply?.text } });
       else toolEvents.push({ t: "tool_error", call_id: callId, package_id: tool, error: lookupFailureKind(outcome) });

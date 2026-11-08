@@ -23,7 +23,7 @@ import { getProjectType, listProjectTypes, type ProjectType, type ProjectTypePar
 import { start as startProject } from "./runner";
 import { READ_ITEM_TOOL_ID, readItemToolSpec } from "@/lib/items/tool";
 import { WRITING_FORMAT_TOOL_ID, writingFormatToolSpec } from "@/lib/writingFormats";
-import { VOICEOVER_TOOL_ID, CHANGE_VOICE_TOOL_ID, voiceoverToolSpec, changeVoiceToolSpec } from "@/lib/voiceTools";
+import { VOICEOVER_TOOL_ID, CHANGE_VOICE_TOOL_ID, MAKE_INSPIRED_VOICE_TOOL_ID, voiceoverToolSpec, changeVoiceToolSpec, makeInspiredVoiceToolSpec } from "@/lib/voiceTools";
 import { HOUSE_TOOL_ID } from "@/lib/house/ids";
 import { UPTIME_TOOL_ID } from "@/lib/uptime/ids";
 
@@ -49,6 +49,7 @@ export const VIRTUAL_TOOL_REGISTRY: VirtualToolRegistration[] = [
   { id: WRITING_FORMAT_TOOL_ID, offer: { mode: "conditional", gate: "writingFormatAllowed", bench_row: "writing-format", priority: 3 }, spec: writingFormatToolSpec },
   { id: VOICEOVER_TOOL_ID, offer: { mode: "conditional", gate: "voiceoverAllowed", bench_row: "voiceover-tool", priority: 3 }, spec: voiceoverToolSpec },
   { id: CHANGE_VOICE_TOOL_ID, offer: { mode: "conditional", gate: "voiceoverAllowed", bench_row: "change-voice-tool", priority: 3 }, spec: changeVoiceToolSpec },
+  { id: MAKE_INSPIRED_VOICE_TOOL_ID, offer: { mode: "conditional", gate: "inspiredVoiceAllowed", bench_row: "make-inspired-voice-tool", priority: 3 }, spec: makeInspiredVoiceToolSpec },
   { id: HOUSE_TOOL_ID, offer: { mode: "conditional", gate: "houseAllowed", bench_row: "house-tool", priority: 4 }, spec: () => ({ id: HOUSE_TOOL_ID, description: "Find or control permitted home devices.", args: { type: "object", required: ["action"], properties: { action: { type: "string" } } } }) },
   // AGENT-SVC-01: read-only service status over the household's Uptime Kuma instances; adults only (lib/uptime/tool.ts).
   { id: UPTIME_TOOL_ID, offer: { mode: "conditional", gate: "uptimeAllowed", bench_row: "uptime-tool", priority: 4 }, spec: () => ({ id: UPTIME_TOOL_ID, description: "Check whether the household's services are up.", args: { type: "object", required: ["action"], properties: { action: { type: "string" } } } }) },

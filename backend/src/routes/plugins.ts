@@ -4,7 +4,8 @@ import { createRoute, z } from "@hono/zod-openapi";
 import { apiRouter, errorResponses, refuseWith } from "@/lib/openapi";
 import { speakerAgeBand } from "@/lib/ageBand";
 import { roleHealth } from "@/lib/roleHealth";
-import { VOICEOVER_TOOL_ID, CHANGE_VOICE_TOOL_ID } from "@/lib/voiceTools";
+import { VOICEOVER_TOOL_ID, CHANGE_VOICE_TOOL_ID, MAKE_INSPIRED_VOICE_TOOL_ID } from "@/lib/voiceTools";
+import { mayUseClipVoices } from "@/lib/access";
 import { answerImagesAllowed } from "@/lib/answerImages/turn";
 import { resolveTurnBudgetWithStack, toolOfferLabel, withTurnToolGates } from "@/lib/turnMachine/budget";
 import { toolSpecFor } from "@/lib/turnMachine/nodes/model";
@@ -99,6 +100,7 @@ export async function writtenChatToolIds(actor: PersonRow): Promise<Set<string>>
   const band = speakerAgeBand(actor, new Date());
   // VOICE-V1/V2: the same gate a real written turn applies to voiceover and change_voice (adult, not a guest, voice engine ready).
   const voiceoverOk = band === "adult" && actor.role !== "guest" && (await roleHealth("voice").then((h) => h.availability === "ready", () => false));
+  const inspiredVoiceOk = mayUseClipVoices(actor);
   const registry = peekHouseRegistries();
   let houseContext: { visible: import("@/lib/house/registry").HouseEntity[]; areas: import("@/lib/house/registry").HouseArea[] } | undefined;
   const houseEligible = actor.role !== "guest" && getHouseholdSettingValue("tools.house.mode") !== "never" && houseAnyConnected();
@@ -117,8 +119,9 @@ export async function writtenChatToolIds(actor: PersonRow): Promise<Set<string>>
     writingFormatsFor(actor.role).length > 0,
     false, voiceoverOk, false, houseOk,
     uptimeOk,
+    inspiredVoiceOk,
   );
-  return new Set(budget.tools_offered.filter((id) => id === "house" ? Boolean(houseOk && houseContext && houseToolSpec(houseContext)) : id === "uptime" ? uptimeOk : (id === VOICEOVER_TOOL_ID || id === CHANGE_VOICE_TOOL_ID ? voiceoverOk : toolSpecFor(id) !== null)));
+  return new Set(budget.tools_offered.filter((id) => id === "house" ? Boolean(houseOk && houseContext && houseToolSpec(houseContext)) : id === "uptime" ? uptimeOk : (id === VOICEOVER_TOOL_ID || id === CHANGE_VOICE_TOOL_ID ? voiceoverOk : id === MAKE_INSPIRED_VOICE_TOOL_ID ? inspiredVoiceOk : toolSpecFor(id) !== null)));
 }
 
 pluginsRoutes.openapi(skillsRoute, async (c) => {
