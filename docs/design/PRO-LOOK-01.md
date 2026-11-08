@@ -864,3 +864,22 @@ row's width. That is a defect class, not a one-off, and it gets a rule, a gate a
    computed width is at least the floor and that no text node wraps to a one-word line next to a control; slices cite the measured
    numbers (section 3 of the build map). Pictures in the reference set show the stacked forms (`desktop-settings`, `phone-settings`,
    `phone-status-stack`).
+
+## 28. Family and person profile pages (Jesse, 2026-11-08: "more like Instagram or TikTok pages")
+
+A person's page is a profile, not a settings form. The pattern is the social profile every phone user already knows, drawn with kit parts
+and the 16 pt gutter, 34 to 40 pt titles and flat surfaces of sections 4 and 5.
+
+- **Person profile** (`phone-profile`, `desktop-profile`): back button, the name centred (phone) or left (desktop), a menu button. Under it a
+  92 pt avatar on phone (168 pt desktop) with the person's ring when a companion is active, and three large counts beside it (songs,
+  videos, pictures; counts come from the library, never invented). A role chip (OWNER, TEEN, CHILD) sits above the counts on phone and next
+  to the name on desktop. One line of bio, then Edit profile (inverse pill), Share and Settings (quiet pills). A row of round highlights
+  (the person's companions, favorites and collections). A four-icon tab strip (all, videos, songs, with family) and an edge-to-edge
+  three-column grid on phone (five on desktop) of the person's own creations, square, 2 pt gaps, a corner badge for video and song.
+- **Family page** (`phone-family`; desktop stays `desktop-family`): the household title with a one-line count, a strip of round avatars
+  with an Add tile, a People section of flat cards (avatar, name, role and one count, chevron), the Companions shelf, and a
+  "Shared with everyone" grid.
+- **Rules that still hold:** what a teen or child profile shows follows the existing age and surface gates (a parent-set view of a teen is
+  limited to what P4a allows; teen settings stay private); the grid uses the kit media shelf and tiles, never a Home wrapper; the counts
+  and grid read from existing library records. Slice: PRO-LOOK-SETTINGS-01 gains a sub-slice FAMILY-PROFILE-01 (person profile route
+  and the family page restyle); pictures `phone-profile.jpg`, `phone-family.jpg`, `desktop-profile.jpg` in the reference set.

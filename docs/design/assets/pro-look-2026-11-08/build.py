@@ -543,3 +543,51 @@ body=f'''<div class="scroll">{hdr("chevron-left","Notifications","")}<h1 class="
 <div style="display:flex;flex-direction:column;gap:10px;margin-top:18px">{sc('done','music','Rainy porch song is ready','Music · just now',('Open',1),'DONE')}{sc('problem','circle-alert','Your video did not finish','Video · 12 min ago. Nothing was lost.',('Try again',1),'COULD NOT FINISH')}{sc('attn','users','Marlow asked to make a video','2 hours ago',('Review',1),'NEEDS YOUR OK')}{sc('info','sparkles','Weekly summary is ready','Yesterday',('Open',0),'GOOD TO KNOW')}</div></div>{tabbar("Home",(('house','Home'),('message-circle','Chat'),('play','Media'),('library','Library'),('search','Search')))}'''
 write('phone-notifications',phone(body))
 print('create ok')
+
+# ---------- PROFILE + FAMILY (Instagram / TikTok style profile pages) 2026-11-08
+GR={'Sage':'linear-gradient(135deg,#ffb547,#ff5f7e)','Marlow':'linear-gradient(135deg,#2fd4c0,#4aa3ff)','Nova':'linear-gradient(135deg,#b48cff,#ff4fa8)','Tessa':'radial-gradient(circle at 35% 28%,#ffd9a0,#ff9a3c 70%)'}
+def pav(n,size,ring=False):
+    return f'<div class="av {"ring" if ring else ""}" style="width:{size}px;height:{size}px;background:{GR[n]}"></div>'
+def stat(n,l,big=False):
+    return f'<div style="text-align:left"><div style="font-size:{26 if big else 22}px;font-weight:700;letter-spacing:-.02em">{n}</div><div style="font-size:{15 if big else 14}px;color:var(--fg2)">{l}</div></div>'
+KEYS=['teal','ember','violet','forest','rose','ocean','sand','slate']
+def gtile(i,kind,w=None):
+    k=KEYS[i%8]; badge={'v':ic('play',16,2,'currentColor'),'m':ic('music',16,2),'':''}[kind]
+    b=f'<div style="position:absolute;top:8px;right:8px;color:#fff;z-index:2">{badge}</div>' if badge else ''
+    sh=['sun','rings','wave',None][i%4]
+    return f'<div style="position:relative;aspect-ratio:1/1;{A(k,100+i,shape=sh)}">{b}</div>'
+def hl(label,k,sd,size=64):
+    return f'<div style="text-align:center;width:{size+16}px;flex:none"><div style="width:{size}px;height:{size}px;border-radius:50%;margin:0 auto;padding:3px;background:var(--s3)"><div style="width:100%;height:100%;border-radius:50%;{A(k,sd)}"></div></div><div style="font-size:13px;margin-top:7px;color:var(--fg2)">{label}</div></div>'
+kinds=['','v','','m','','v','m','','','v','','m']
+grid=lambda cols,n: f'<div style="display:grid;grid-template-columns:repeat({cols},1fr);gap:2px">'+''.join(gtile(i,kinds[i%12]) for i in range(n))+'</div>'
+tabs=lambda ic_list,on=0,pad=0: '<div style="display:flex;border-bottom:1px solid var(--hair);margin-top:18px">'+''.join(f'<div style="flex:1;height:48px;display:flex;align-items:center;justify-content:center;color:{"#fff" if i==on else "var(--fg3)"};{"box-shadow:inset 0 -2px 0 #fff" if i==on else ""}">{ic(n,24,1.8)}</div>' for i,n in enumerate(ic_list))+'</div>'
+# phone profile
+body=f'''<div class="scroll" style="padding-bottom:110px"><div style="display:flex;justify-content:space-between;align-items:center;height:44px"><div class="circ glass">{ic("chevron-left",24,2.2)}</div><div style="font-weight:700;font-size:20px">Marlow</div><div class="circ glass">{ic("ellipsis",22,2)}</div></div>
+<div style="display:flex;gap:22px;align-items:center;margin-top:14px">{pav("Marlow",92,True)}<div style="flex:1"><div style="font-size:12px;font-weight:700;letter-spacing:.12em;color:var(--fg3)">TEEN</div><div style="display:flex;justify-content:space-between;margin-top:8px">{stat("14","songs")}{stat("9","videos")}{stat("62","pictures")}</div></div></div>
+<div style="margin-top:14px;font-size:15px;color:var(--fg2);line-height:1.4">Makes beats after school. Likes rainy porch songs and slow mornings.</div>
+<div style="display:flex;gap:10px;margin-top:16px"><div class="pill inv" style="flex:1;justify-content:center;height:44px;font-size:16px">Edit profile</div><div class="pill q" style="flex:1;justify-content:center;height:44px;font-size:16px">Share</div><div class="pill q" style="width:48px;height:44px;justify-content:center;padding:0">{ic("settings",20,1.9)}</div></div>
+<div class="strip" style="margin-top:20px;gap:6px">{hl("Tessa","ember",301)}{hl("Favorites","violet",302)}{hl("Porch","forest",303)}{hl("School","ocean",304)}{hl("New","slate",305)}</div>
+{tabs(["grid-2x2","play","music","users"],0)}
+<div style="margin:0 -16px">{grid(3,12)}</div></div>{tabbar("Family",(('house','Home'),('message-circle','Chat'),('play','Media'),('library','Library'),('users','Family')))}'''
+write('phone-profile',phone(body))
+# phone family (the household page)
+def fcard(n,role,stats,k,sd):
+    return f'<div style="background:var(--s1);box-shadow:inset 0 0 0 1px var(--hair);padding:14px;border-radius:22px;display:flex;gap:14px;align-items:center;margin-bottom:10px">{pav(n,64,n=="Sage")}<div style="flex:1;min-width:0"><b style="font-size:18px">{n}</b><div style="font-size:14px;color:var(--fg2);margin-top:2px">{role} · {stats}</div></div>{ic("chevron-right",20,2)}</div>'
+body=f'''<div class="scroll" style="padding-bottom:110px"><div style="display:flex;justify-content:space-between;align-items:center;height:44px"><div class="circ glass">{ic("panel-left",22,1.8)}</div><div style="display:flex;gap:10px;align-items:center"><div class="circ glass">{ic("plus",22,2)}</div>{companion(36)}</div></div>
+<h1 class="t" style="margin-top:14px">Family</h1><div style="color:var(--fg2);font-size:16px;margin-top:4px">4 people · 3 companions</div>
+<div class="strip" style="margin-top:20px;gap:8px;padding:4px 0 4px 4px">{"".join(f'<div style="text-align:center;width:84px;flex:none">{pav(n,68,n=="Sage")}<div style="font-size:14px;font-weight:600;margin-top:8px">{n}</div></div>' for n in ["Sage","Marlow","Nova"])}<div style="text-align:center;width:84px;flex:none"><div class="av" style="width:68px;height:68px;background:var(--s2);display:flex;align-items:center;justify-content:center;box-shadow:inset 0 0 0 1px var(--hair)">{ic("plus",26,1.8)}</div><div style="font-size:14px;font-weight:600;margin-top:8px;color:var(--fg2)">Add</div></div></div>
+<div class="sh"><h2>People</h2><a>Manage {ic("chevron-right",16,2)}</a></div>{fcard("Sage","Owner","112 songs","ember",1)}{fcard("Marlow","Teen","14 songs","teal",2)}{fcard("Nova","Child","6 videos","violet",3)}
+<div class="sh"><h2>Companions</h2><a>See All {ic("chevron-right",16,2)}</a></div><div class="strip">{tile("Tessa","Warm, curious","ember",211,156,156)}{tile("Rover","Playful","ocean",212,156,156)}{tile("Sprout","Calm","forest",213,156,156)}</div>
+<div class="sh"><h2>Shared with everyone</h2><a>See All {ic("chevron-right",16,2)}</a></div><div style="margin:0 -16px">{grid(3,6)}</div></div>{tabbar("Family",(('house','Home'),('message-circle','Chat'),('play','Media'),('library','Library'),('users','Family')))}'''
+write('phone-family',phone(body))
+# desktop profile
+inner=f'''{rail("Family")}{col("FAMILY",[("users","People"),("sparkles","Companions"),("lock","Safety"),("clock","Activity")],"People")}<div class="panel" style="left:332px"><div class="glow"></div><div class="hdr"><div style="display:flex;align-items:center;gap:12px"><div class="circ glass" style="width:38px;height:38px">{ic("chevron-left",22,2.2)}</div><div class="ttl">Marlow</div></div><div class="btns">{companion(38)}</div></div>
+<div style="padding:8px 44px 0;overflow:hidden;position:absolute;top:68px;left:0;right:0;bottom:0"><div style="display:flex;gap:44px;align-items:center">{pav("Marlow",168,True)}<div style="flex:1"><div style="display:flex;align-items:center;gap:16px"><h1 style="font-size:44px;font-weight:800;letter-spacing:-.03em">Marlow</h1><span class="pill q" style="height:30px;font-size:12px;letter-spacing:.1em">TEEN</span></div>
+<div style="display:flex;gap:44px;margin-top:14px">{stat("14","songs",True)}{stat("9","videos",True)}{stat("62","pictures",True)}</div>
+<div style="margin-top:14px;font-size:16px;color:var(--fg2);max-width:560px;line-height:1.45">Makes beats after school. Likes rainy porch songs and slow mornings.</div>
+<div style="display:flex;gap:10px;margin-top:18px"><span class="pill inv" style="height:44px;padding:0 24px">Edit profile</span><span class="pill q" style="height:44px;padding:0 24px">Share</span><span class="pill q" style="height:44px;width:48px;justify-content:center;padding:0">{ic("settings",20,1.9)}</span></div></div></div>
+<div style="display:flex;gap:10px;margin-top:26px">{hl("Tessa","ember",301,72)}{hl("Favorites","violet",302,72)}{hl("Porch","forest",303,72)}{hl("School","ocean",304,72)}</div>
+{tabs(["grid-2x2","play","music","users"],0)}
+<div style="margin-top:3px;width:100%">{grid(5,10)}</div></div></div>'''
+write('desktop-profile',win(inner))
+print('profile ok')

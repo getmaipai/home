@@ -161,7 +161,7 @@ Sizes are S, M, L.
 | 13 | PRO-LOOK-LIBRARY-01 (M) | Home | Library and Photos | `FilesPage.tsx` | 5 | phone-library |
 | 14 | PRO-LOOK-CHAT-01 (M) | Home | Chat by tokens and kit variants only (rule 9) | `apps/chat/*` | 3, 5 | desktop-chat |
 | 15 | PRO-LOOK-NEWS-01 (M) | Home | News and the encyclopedia reader | News and Kiwix pages | 5 | phone-news, phone-news-reader, phone-wiki |
-| 16 | PRO-LOOK-SETTINGS-01 (L) | Home | Settings, account, family, companions, people (kit `SettingsShell` as is) | `apps/settings/*`, `PeoplePage`, `CompanionsPage` | 5, SETTINGS-LOOK-01 | desktop-settings, phone-settings, desktop-family |
+| 16 | PRO-LOOK-SETTINGS-01 (L) | Home | Settings, account, family, companions, people (kit `SettingsShell` as is) | `apps/settings/*`, `PeoplePage`, `CompanionsPage` | 5, SETTINGS-LOOK-01 | desktop-settings, phone-settings, desktop-family, phone-family, phone-profile, desktop-profile (section 28) |
 | 17 | PRO-LOOK-REST-01 (M) | Home | Weather, clock, reminders, notifications, sign-in, setup, admin pages | weather package, clock, reminders, sign-in and setup pages | 5 | phone-weather, phone-reminders, signin, setup, notifications |
 | 18 | PRO-LOOK-ACTIVITY-01 (M) | Home + backend | Activity page, the jobs list and stack, the entry with status dots (option i) | new page, `ui.activity_seen_at` | decision 7 and the RULES.md S6 edit (Owner-approved) | activity-indicator, stacks |
 | 19 | PRO-LOOK-AUDIT-01 (S) | Home + commons | Remove the `html[data-pro-look]` gate and the old type values so one scale remains; final audit script and gate: zero literals, empty baselines, per-screen capture set | `tokens.css`, `frontend/src/dev/*` | all | all |
