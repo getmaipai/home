@@ -7,10 +7,10 @@ import { coreAppsGroup, PhoneMenuLinks } from "@/shell/phoneMenuLinks";
 afterEach(cleanup);
 
 describe("phone menu links", () => {
-  test("the phone drawer offers All apps and Companions", () => {
+  test("the phone drawer offers All apps and Synths", () => {
     const { getByRole } = render(<MemoryRouter><PhoneMenuLinks /></MemoryRouter>);
     expect(getByRole("link", { name: "All apps" }).getAttribute("href")).toBe("/all-apps");
-    expect(getByRole("link", { name: "Companions" }).getAttribute("href")).toBe("/companions");
+    expect(getByRole("link", { name: "Synths" }).getAttribute("href")).toBe("/companions");
   });
 
   test("searching finds Companions among the core apps", () => {
