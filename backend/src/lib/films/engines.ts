@@ -45,7 +45,7 @@ async function poll<T>(read: () => T | null, signal: AbortSignal, timeout: numbe
   throw new Error("The job took too long. Try again.");
 }
 
-function backgroundTurn(actor: PersonRow) {
+export function backgroundTurn(actor: PersonRow) {
   const conversation = resolveOrCreateConversation(actor, "chat");
   if (!conversation.ok) throw new Error(conversation.error);
   const turnId = newConversationTurnId();

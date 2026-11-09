@@ -343,6 +343,19 @@ async function continueFrom(input: { state: GenerateVideoState; args: Record<str
   const { state, args, callId, actor, audience, source, body, temporary } = input;
   const no = (line: string, why: string): ContinueStart => ({ outcome: refused(callId, args, line, why) });
   if (!state.conversationId) return no(CONTINUE_CHAT_LINE, "no_chat");
+  const made = await prepareContinueFrame({ actor, audience, source, body, conversationId: state.conversationId, turnId: state.turnId, temporary });
+  return made.ok ? { prepared: made.prepared, adultOnly: made.adultOnly, adultLock: made.adultLock } : no(made.line, made.why);
+}
+
+/**
+ * The last-frame step of `continue`, with no chat of its own: the caller gives the conversation and turn the picture is kept under (a
+ * long take (LONGTAKE-01) gives its background turn, the way a film does). The checks are the same ones `continue` has always made:
+ * trash, the level's picture start, one clip at a time, the same input-side screening a photo gets, and never lowering an adult-only source.
+ */
+export async function prepareContinueFrame(input: { actor: PersonRow; audience: ReturnType<typeof videoAudienceOf>; source: VideoJob; body: MakeVideoBody; conversationId: string; turnId: string | null; temporary: boolean; allowBusy?: boolean }):
+  Promise<{ ok: true; prepared: NonNullable<RunGenerateVideoInput["prepared"]>; adultOnly: boolean; adultLock: "on" | "off" } | { ok: false; line: string; why: string }> {
+  const { actor, audience, source, body, temporary } = input;
+  const no = (line: string, why: string) => ({ ok: false as const, line, why });
   const file = source.files[0];
   if (file && !source.temporary) {
     const row = db.select().from(attachments).where(eq(attachments.id, file.id)).get();
@@ -352,7 +365,7 @@ async function continueFrom(input: { state: GenerateVideoState; args: Record<str
   const engine = await videoEngineStatus();
   const ready = body.tier === "max" ? ltx25MaxPictureReady(engine) || ltx25PictureReady(engine) : ltx25PictureReady(engine);
   if (!ready) return no(CONTINUE_NOT_READY_LINE, "picture_start_not_ready");
-  if (activeVideoJobsFor(actor) > 0) return no(CONTINUE_BUSY_LINE, "already_making");
+  if (!input.allowBusy && activeVideoJobsFor(actor) > 0) return no(CONTINUE_BUSY_LINE, "already_making");
   const clip = clipFileOf(actor, source);
   if (!clip) return no(NO_CLIP_LINE, "no_clip");
   const framed = await runStackEdit({ inputs: [clip], ops: frameOps(lastFrameAt(file?.seconds ?? source.request.seconds)), name: "frame.png" });
@@ -372,9 +385,9 @@ async function continueFrom(input: { state: GenerateVideoState; args: Record<str
   // Never lower than the source: an adult-only clip makes an adult-only continuation.
   const mark = newItemMark([await clipMarkOf(source)], false);
   const adultOnly = mark.madeAudience === "adult-only";
-  const stored = storeContinueFrame(actor, { conversationId: state.conversationId, turnId: state.turnId, temporary, jpeg, width, height, adultOnly, lock: mark.lock, sourceJobId: source.id });
+  const stored = storeContinueFrame(actor, { conversationId: input.conversationId, turnId: input.turnId, temporary, jpeg, width, height, adultOnly, lock: mark.lock, sourceJobId: source.id });
   if (!stored.ok) return no(stored.line, "frame_not_saved");
-  return { prepared: { image: Buffer.from(jpeg).toString("base64"), imageSource: "generated", sourceFileId: stored.id, width, height }, adultOnly, adultLock: mark.lock };
+  return { ok: true, prepared: { image: Buffer.from(jpeg).toString("base64"), imageSource: "generated", sourceFileId: stored.id, width, height }, adultOnly, adultLock: mark.lock };
 }
 
 // ---------------------------------------------------------------- trim, join and mix (the Stack's media.edit)

@@ -17,6 +17,7 @@ import { promptRefusalLineFor } from "@/lib/pictures/ageCheck";
 import { CHILD_NEGATIVE_PROMPT, CHILD_VIDEO_LIMIT_LINE, forceCartoon, kidsDailyVideos, laneOf, releaseKid, reserveKid, videoModelForLane, videosMadeToday } from "@/lib/pictures/lane";
 import { checkClipFrames } from "@/lib/videos/frameCheck";
 import { extractKeyframes } from "@/lib/pictures/keyframes";
+import { cancelLongTake, resumeLongTake, startLongTake, takeProgress } from "@/lib/videos/longTake";
 import { estimateVideoMinutes } from "@/lib/videos/estimate";
 import { checkVideoPrompt } from "@/lib/videos/promptCheck";
 import { householdAllowsVideo, refuseVideoPrompt, stackAudienceFor, videoDenial, VIDEO_DENIAL_LINE, VIDEO_REFUSAL_LINE, type VideoAudience } from "@/lib/videos/policy";
@@ -475,6 +476,32 @@ const estimateRoute = createRoute({
   responses: { 200: { content: { "application/json": { schema: z.object({ minutes: z.number().nullable().describe("Rounded minutes, or null when too few clips like this have been made here."), samples: z.number(), note: z.string() }) } }, description: "The estimate" }, ...errorResponses({ 401: "Not signed in" }) },
 });
 videosRoutes.openapi(estimateRoute, (c) => c.json(estimateVideoMinutes(c.req.valid("query")), 200));
+
+// LONGTAKE-01: a clip longer than one part's ceiling, made as a chain of parts (design: docs/design/long-clips-2026-11-09.md).
+const takeProgressSchema = z.object({ id: z.string(), state: z.enum(["running", "done", "stopped", "failed"]), parts_done: z.number(), parts_total: z.number(), file_id: z.string().nullable().describe("The finished take's file once it is done."), error_line: z.string().nullable() });
+const takeIdParams = z.object({ id: z.string().min(1).max(80) });
+const longRoute = createRoute({
+  method: "post", path: "/long", tags: ["Videos"], summary: "Start a long take: a clip longer than one part's ceiling, made as parts that continue from each other (adults on their own screen)", middleware: [requireAuth] as const,
+  request: { body: { content: { "application/json": { schema: z.object({
+    prompt: z.string().trim().min(3).max(1200).describe("What the video shows."),
+    seconds: z.number().int().min(2).max(240).describe("The whole length. It must be longer than one part's ceiling at this level."),
+    beats: z.array(z.string().trim().min(1).max(400)).max(12).optional().describe("Optional: what happens in each part, in order."),
+    tier: z.enum(["standard", "boost", "max"]).optional(),
+    orientation: z.enum(["landscape", "portrait"]).optional(),
+  }) } } } },
+  responses: { 200: { content: { "application/json": { schema: z.object({ id: z.string(), parts: z.number(), per_part: z.number().describe("Seconds asked for each part.") }) } }, description: "The take has started; poll GET /long/{id}" }, ...errorResponses({ 401: "Not signed in", 403: "Not for this person", 409: "A long take is already being made", 422: "The words or the length cannot be used" }) },
+});
+videosRoutes.openapi(longRoute, (c) => {
+  const started = startLongTake(c.get("person"), c.req.valid("json"));
+  if (!started.ok) return c.json({ error: started.line }, started.status) as never;
+  return c.json({ id: started.id, parts: started.parts, per_part: started.per_part }, 200);
+});
+const longGetRoute = createRoute({ method: "get", path: "/long/{id}", tags: ["Videos"], summary: "Progress of a long take", middleware: [requireAuth] as const, request: { params: takeIdParams }, responses: { 200: { content: { "application/json": { schema: takeProgressSchema } }, description: "Progress" }, ...errorResponses({ 401: "Not signed in", 404: "No such long take" }) } });
+videosRoutes.openapi(longGetRoute, (c) => { const p = takeProgress(c.get("person"), c.req.valid("param").id); return p ? c.json(p, 200) : c.json({ error: "That long take isn't available." }, 404) as never; });
+const longResumeRoute = createRoute({ method: "post", path: "/long/{id}/resume", tags: ["Videos"], summary: "Carry on a stopped or failed long take from its first missing part", middleware: [requireAuth] as const, request: { params: takeIdParams }, responses: { 200: { content: { "application/json": { schema: takeProgressSchema } }, description: "Progress" }, ...errorResponses({ 401: "Not signed in", 404: "No such long take" }) } });
+videosRoutes.openapi(longResumeRoute, (c) => { const p = resumeLongTake(c.get("person"), c.req.valid("param").id); return p && !("line" in p) ? c.json(p, 200) : c.json({ error: "That long take isn't available." }, 404) as never; });
+const longCancelRoute = createRoute({ method: "post", path: "/long/{id}/cancel", tags: ["Videos"], summary: "Stop a long take after the part being made; the parts already made are kept", middleware: [requireAuth] as const, request: { params: takeIdParams }, responses: { 200: { content: { "application/json": { schema: takeProgressSchema } }, description: "Progress" }, ...errorResponses({ 401: "Not signed in", 404: "No such long take" }) } });
+videosRoutes.openapi(longCancelRoute, (c) => { const p = cancelLongTake(c.get("person"), c.req.valid("param").id); return p ? c.json(p, 200) : c.json({ error: "That long take isn't available." }, 404) as never; });
 
 const animateRoute = createRoute({
   method: "post", path: "/animate", tags: ["Videos"], summary: "Animate a picture", middleware: [requireAuth] as const,
