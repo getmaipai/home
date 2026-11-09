@@ -4,7 +4,6 @@ import { useSearchParams } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { AsyncState } from "@maipai/ui/src/primitives/AsyncState";
 import { EmptyState } from "@maipai/ui/src/primitives/EmptyState";
-import { Card } from "@maipai/ui/src/primitives/Card";
 import { Button } from "@maipai/ui/src/ui/button";
 import { groupSettings, sectionTitle, type SettingsGroup } from "@maipai/ui/src/settings/groupSettings";
 import type { SettingsKey } from "@maipai/spec/gen/ts/settings-key.js";
@@ -222,7 +221,7 @@ export function SettingsRenderer({ scope, scopeValue, only, includeKeys, titleOv
                     else groupRefs.current.delete(group.id);
                   }}
                 >
-                  <Card surface="flat">
+                  <section className="flex flex-col gap-3">
                     <h2 className="text-section font-semibold">{titleOverrides[group.id] ?? sectionTitle(group.id)}</h2>
                     <div className="flex flex-col divide-y divide-border">
                     {group.basic.map((s) => (
@@ -246,7 +245,7 @@ export function SettingsRenderer({ scope, scopeValue, only, includeKeys, titleOv
                       )
                     ) : null}
                     </div>
-                  </Card>
+                  </section>
                 </div>
               ))}
             </>

@@ -336,6 +336,8 @@ describe("DashboardPage (Home)", () => {
       await view.findByTestId("home-today-card");
       expect(document.querySelector('[data-slot="weather-card"]')?.getAttribute("data-variant")).toBe("compact");
       expect(view.queryByText("Sub")).toBeNull();
+      // A tap on the weather card opens the Weather app.
+      expect(view.getByTestId("home-today-link").getAttribute("href")).toBe("/apps/weather");
     } finally {
       restore();
     }
