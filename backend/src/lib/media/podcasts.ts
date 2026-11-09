@@ -504,7 +504,7 @@ function parseTranscriptDocument(input: string, mime: string): Segment[] {
 }
 
 /** Publisher transcript first; otherwise submit one Stack media.fetch job. Search only scans stored episode segments. */
-export async function getPodcastTranscript(actor: PersonRow, itemId: string, deps: PollDeps = routeDeps): Promise<Outcome<{ transcript?: PodcastTranscript; job_id?: string }>> {
+export async function getPodcastTranscript(actor: PersonRow, itemId: string, deps: PollDeps = routeDeps, allowJob = true): Promise<Outcome<{ transcript?: PodcastTranscript; job_id?: string }>> {
   const item = readableItem(actor, itemId);
   const row = item ? itemRow(itemId) : undefined;
   if (!row || row.kind !== "podcast_episode") return { ok: false, status: 404, error: "That episode is not available to you." };
@@ -529,6 +529,8 @@ export async function getPodcastTranscript(actor: PersonRow, itemId: string, dep
       } finally { clearTimeout(timer); }
     } catch { /* publisher failures fall through to the Stack's existing fetch job */ }
   }
+  // APPS-PARITY: the page's transcript reader only reads what is stored or published; starting a Stack job stays with the explicit route.
+  if (!allowJob) return { ok: false, status: 404, error: "This episode has no transcript yet." };
   try {
     if (!row.locUrl) return { ok: false, status: 422, error: "This episode has no audio address to transcribe." };
     if (typeof transcriptRow?.jobId === "string") return { ok: true, value: { job_id: transcriptRow.jobId } };

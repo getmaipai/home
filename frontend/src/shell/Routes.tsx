@@ -54,6 +54,7 @@ import { railApps } from "@/shell/appCatalog";
 import { useAppCatalog } from "@/shell/useAppCatalog";
 import { usePinnedApps } from "@/shell/usePinnedApps";
 import { sidebarItemStatus } from "@/shell/statusApps";
+import { ACTIVITY_PATH, activityItemStatus, useActivityDot } from "@/shell/activity";
 import { TabIdentityProvider } from "@/shell/tabIdentity";
 import { useSessionLocked } from "@/shell/sessionLockContext";
 import { packageAreaApps, usePackageAreas } from "@/shell/pages/settings/packageAreas";
@@ -87,6 +88,7 @@ const PerformancePage = lazyNamed(() => import("@/shell/pages/PerformancePage"),
 const TurnTracePage = lazyNamed(() => import("@/shell/pages/TurnTracePage"), "TurnTracePage");
 const UpdatesPage = lazyNamed(() => import("@/shell/pages/UpdatesPage"), "UpdatesPage");
 const RepairsPage = lazyNamed(() => import("@/shell/pages/RepairsPage"), "RepairsPage");
+const ActivityPage = lazyNamed(() => import("@/shell/pages/ActivityPage"), "ActivityPage");
 const StatusPage = lazyNamed(() => import("@/shell/pages/StatusPage"), "StatusPage");
 // AUDIT-DEAD-01: the chat showcase and the Elements adoption ledger (77 KB of JSON) are developer tools; `import.meta.env.DEV` is a
 // build-time constant, so a production build drops the import, the route and the chunk (bundle.test.ts checks for the ledger).
@@ -189,7 +191,9 @@ function ShellInstallStrip({ person }: { person: Roster }) {
 // can call a hook that reads from it.
 function RoutesInner({ person, onPersonChange, onSignedOut }: { person: Roster; onPersonChange: () => void | Promise<void>; onSignedOut: () => void }) {
   const location = useLocation();
-  const appCatalog = useAppCatalog();
+  const everyApp = useAppCatalog();
+  // ACTIVITY-PAGE-01: a guest has no jobs of their own, so no Activity entry in the rail, the drawer or All apps.
+  const appCatalog = useMemo(() => person.role === "guest" ? everyApp.filter((app) => app.to !== ACTIVITY_PATH) : everyApp, [everyApp, person.role]);
   // The kit's phone layouts keep one column and the larger kid targets for a child (docs/design/phone-minimal-2026-10-25.md P4a):
   // the page says whose band it is, the kit's CSS reads it.
   useEffect(() => {
@@ -234,6 +238,8 @@ function RoutesWithIncognito({ person, onPersonChange, onSignedOut, appCatalog }
   const [wakeIndicator, setWakeIndicator] = useState<AmbientWakeIndicator>(null);
   const selectedAppHref = activeAppHref(location.pathname, packageAreaApps(usePackageAreas().areas));
   const statusAppsQuery = useStatusApps();
+  // ACTIVITY-PAGE-01 (S6, the Activity row): the quiet dot on the Activity entry, read from the hub's own list; no number.
+  const activityDot = useActivityDot(person.role !== "guest");
   // LEFTNAV-APPS-01: the installed package apps this person may open (the hub's list, minus an Incognito-blocked app
   // while Incognito is on), pinned ones in the rail and all of them in the launcher at its foot.
   const { on: incognito, setOn: setIncognito } = useIncognitoContext();
@@ -425,7 +431,7 @@ function RoutesWithIncognito({ person, onPersonChange, onSignedOut, appCatalog }
             Notifications, System status, Incognito, Settings, Help and Log
             out. Pages draw their own slim title bar; chat draws its own
             beside the history column. */}
-        <Route element={<HeaderSearchOptionsContext.Provider value={headerSearchOptions}><FullLayout rail topRight={paneState.open || phoneChat ? undefined : ambientTopRight} topRightBand fallbackTitle={location.pathname.startsWith("/settings") ? i18n._({ id: "Settings", message: "Settings" }) : appName ?? (location.pathname === "/" ? i18n._({ id: "Home", message: "Home" }) : undefined)} rightPane={ambientRightPane} mobileSections={<>{drawerSections}<div className="mt-3 border-t border-border pt-3"><PhoneMenuLinks /></div></>} activeAppHref={selectedAppHref} railApps={railApps(appCatalog, pinnedRoutes)} railCoreDestinations={[{ name: i18n._({ id: "Media", message: "Media" }), url: "/media", icon: "cast" }]} onRailAppPinChange={(url) => togglePin(url)} railAllAppsHref={ALL_APPS_PATH} settingsHref="/settings" headerSearchRemote={(query) => searchWithCoreApps(query, appCatalog)} railTourId="shell.rail" railItemTourId={(item) => item.url === "/chat" ? "rail.chat" : undefined} incognitoTourId="shell.incognito" railProfile={<RailProfile person={person} incognito={incognito} onIncognitoChange={onIncognitoChange} onSignedOut={onSignedOut} helpEntries={helpEntries} />} sidebarItemStatus={(item) => sidebarItemStatus(statusAppsQuery.data ?? [], item)} /></HeaderSearchOptionsContext.Provider>}>
+        <Route element={<HeaderSearchOptionsContext.Provider value={headerSearchOptions}><FullLayout rail topRight={paneState.open || phoneChat ? undefined : ambientTopRight} topRightBand fallbackTitle={location.pathname.startsWith("/settings") ? i18n._({ id: "Settings", message: "Settings" }) : appName ?? (location.pathname === "/" ? i18n._({ id: "Home", message: "Home" }) : undefined)} rightPane={ambientRightPane} mobileSections={<>{drawerSections}<div className="mt-3 border-t border-border pt-3"><PhoneMenuLinks /></div></>} activeAppHref={selectedAppHref} railApps={railApps(appCatalog, pinnedRoutes)} railCoreDestinations={[{ name: i18n._({ id: "Media", message: "Media" }), url: "/media", icon: "cast" }]} onRailAppPinChange={(url) => togglePin(url)} railAllAppsHref={ALL_APPS_PATH} settingsHref="/settings" headerSearchRemote={(query) => searchWithCoreApps(query, appCatalog)} railTourId="shell.rail" railItemTourId={(item) => item.url === "/chat" ? "rail.chat" : undefined} incognitoTourId="shell.incognito" railProfile={<RailProfile person={person} incognito={incognito} onIncognitoChange={onIncognitoChange} onSignedOut={onSignedOut} helpEntries={helpEntries} />} sidebarItemStatus={(item) => item.url === ACTIVITY_PATH ? activityItemStatus(activityDot) : sidebarItemStatus(statusAppsQuery.data ?? [], item)} /></HeaderSearchOptionsContext.Provider>}>
           <Route path="chat" element={<ChatPage person={person} />} />
           <Route path="chat/projects" element={<ProjectsPage person={person} />} />
           <Route path="chat/projects/:id" element={<ChatPage person={person} />} />
@@ -475,6 +481,7 @@ function RoutesWithIncognito({ person, onPersonChange, onSignedOut, appCatalog }
             <Route path="trace/:turnId" element={<TurnTracePage />} />
             <Route path="updates" element={<UpdatesPage person={person} />} />
             <Route path="repairs" element={<RepairsPage person={person} />} />
+            <Route path="activity" element={person.role === "guest" ? <Navigate to="/" replace /> : <Suspense fallback={null}><ActivityPage /></Suspense>} />
             <Route path="setup/review" element={meetsMinRole(person.role, "admin") ? <SetupReviewPage /> : <Navigate to="/" replace />} />
             <Route path="status" element={<StatusPage person={person} />} />
             <Route path="backups" element={<BackupsPage person={person} />} />

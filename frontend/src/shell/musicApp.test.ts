@@ -47,11 +47,11 @@ test("Music pages use the shipped media variants: grids, round artist art, compa
   expect(tracks).toMatchObject({ item_number_field: "track_number", item_meta_field: "duration_s", item_highlight_field: "playing", item_group_field: "disc_label" });
   expect(shelf("songs.json", "Songs")).toMatchObject({ orientation: "vertical", density: "compact", item_highlight_field: "playing" });
   expect(shelf("play.json", "Up next")).toMatchObject({ orientation: "vertical", density: "compact" });
-  // MUSIC-POLISH-01: a playlist's songs are track rows (number, running time, playing ring) with a quiet Remove.
+  // MUSIC-POLISH-01: a playlist's songs are track rows (number, running time, playing ring) with a quiet Remove after Play next and Add to queue (PARITY-01).
   const playlistTracks = nodesOf("playlist.json").find((node) => node.type === "track_rows" && node.label === "Songs")!;
   expect(playlistTracks).toMatchObject({ item_number_field: "track_number", item_meta_field: "duration_s", item_highlight_field: "playing" });
   const remove = (playlistTracks.row_actions as Array<{ label: string }>) ?? [];
-  expect(remove.map((action) => action.label)).toEqual(["Remove"]);
+  expect(remove.map((action) => action.label)).toEqual(["Play next", "Add to queue", "Remove"]);
 });
 
 test("every data id a Music page binds is declared by the manifest, and the manifest stays inside the 16-id cap", () => {

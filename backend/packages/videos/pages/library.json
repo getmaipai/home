@@ -44,7 +44,8 @@
         "source": "package",
         "path": "library",
         "params": {
-          "channel": "$state.channel"
+          "channel": "$state.channel",
+          "sort": "$state.sort"
         }
       },
       "item_key_field": "id",
@@ -78,6 +79,16 @@
               }
             }
           }
+        },
+        {
+          "icon": "share",
+          "label": "Share",
+          "action": {
+            "share": {
+              "to": "/apps/videos/watch?id={id}",
+              "title": "{title}"
+            }
+          }
         }
       ],
       "aspect": "wide",
@@ -99,6 +110,20 @@
           }
         },
         "action_label": "Make a video"
+      },
+      "sort": {
+        "state": "sort",
+        "label": "Sort by",
+        "options": [
+          {
+            "value": "recents",
+            "label": "Recents"
+          },
+          {
+            "value": "a-z",
+            "label": "A to Z"
+          }
+        ]
       }
     }
   ]

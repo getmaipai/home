@@ -28,6 +28,7 @@ import { useTabItem } from "@/shell/tabIdentity";
 import { useDataTableControls } from "@/shell/pages/useDataTableControls";
 import { errorLine } from "@/lib/hubReachability";
 import { formatDateTime } from "@/lib/format";
+import { StatusCard } from "@maipai/ui/src/elements/status-card";
 
 /** /updates: SHELL-07's own row (docs/plans/shell-on-shadcndashboard-
  * 2026-09-21.md's plan row) - `GET /api/updates` through the kit's
@@ -178,10 +179,10 @@ export function UpdatesPage({ person }: { person: Roster }) {
         </AsyncState>
       )}
       {canManage && query.data?.robotsError && (
-        <p className="mt-4 text-base text-destructive">{i18n._({ id: "Couldn't check for robot updates: {robotsError}", message: "Couldn't check for robot updates: {robotsError}", values: { robotsError: query.data.robotsError } })}</p>
+        <StatusCard kind="problem" title={i18n._({ id: "That did not work", message: "That did not work" })} line={i18n._({ id: "Couldn't check for robot updates: {robotsError}", message: "Couldn't check for robot updates: {robotsError}", values: { robotsError: query.data.robotsError } })} />
       )}
       {canManage && query.data?.referenceError && (
-        <p className="mt-4 text-base text-destructive">{i18n._({ id: "Couldn't read installed reference sets for updates: {referenceError}", message: "Couldn't read installed reference sets for updates: {referenceError}", values: { referenceError: query.data.referenceError } })}</p>
+        <StatusCard kind="problem" title={i18n._({ id: "That did not work", message: "That did not work" })} line={i18n._({ id: "Couldn't read installed reference sets for updates: {referenceError}", message: "Couldn't read installed reference sets for updates: {referenceError}", values: { referenceError: query.data.referenceError } })} />
       )}
       <AlertDialog open={pendingRollback !== null} onOpenChange={(open) => { if (!open) setPendingRollback(null); }}>
         <AlertDialogContent>

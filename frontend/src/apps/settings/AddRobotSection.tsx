@@ -10,6 +10,7 @@ import { api, ApiError, type DeviceInfo, type DiscoveredRobotInfo } from "@/lib/
 import { RobotPasswordRow } from "./RobotPasswordSection";
 import { NO_VENDOR_LOGIN } from "./capabilityLabels";
 import { errorLine } from "@/lib/hubReachability";
+import { StatusCard } from "@maipai/ui/src/elements/status-card";
 
 const TOTP_REQUIRED_MESSAGE = "A current TOTP code is required to approve a new device";
 const AWAIT_ROBOT_POLL_MS = 2000;
@@ -207,7 +208,7 @@ export function AddRobotSection({ onClose }: { onClose?: () => void } = {}) {
               maxLength={6}
             />
           ) : null}
-          {error ? <p className="text-base text-destructive">{error}</p> : null}
+          {error ? <StatusCard kind="problem" title={i18n._({ id: "That did not work", message: "That did not work" })} line={error} /> : null}
           {rotationDone ? (
             <div className="flex flex-col gap-2"><p className="text-base text-primary">{i18n._({ id: "Paired and its password is rotated - it's ready to use.", message: "Paired and its password is rotated - it's ready to use." })}</p>{onClose ? <Button onClick={onClose}>{i18n._({ id: "Done", message: "Done" })}</Button> : null}</div>
           ) : null}

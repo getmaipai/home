@@ -13,6 +13,7 @@ import { DestructiveConfirm } from "@maipai/ui/src/primitives/DestructiveConfirm
 import { errorLine } from "@/lib/hubReachability";
 import { useHubMutation } from "@/lib/useHubMutation";
 import { formatTime } from "@/lib/format";
+import { StatusCard } from "@maipai/ui/src/elements/status-card";
 
 // ENGINES-AI-01: pairing is a wizard, one screen per step, with Back and Next, in the kit Dialog as it ships. The step
 // state lives here, in the section; there is no wizard component of its own. The kit's `Wizard` primitive is a
@@ -279,7 +280,7 @@ export function EngineLinkCredentialSection() {
                 )) : error ? <><Button type="button" variant="outline" disabled={busy} onClick={() => { setError(null); setHops(null); void run(checkConnection); }}>{i18n._({ id: "Retry", message: "Retry" })}</Button></> : <RouteSkeleton label={i18n._({ id: "Checking the connection", message: "Checking the connection" })} />}
               </>
             ) : null}
-            {error ? <p role="alert" className="text-sm text-destructive">{error}</p> : null}
+            {error ? <StatusCard kind="problem" title={i18n._({ id: "That did not work", message: "That did not work" })} line={error} /> : null}
           </div>
           <DialogFooter>
             {step > 0 && step < 4 ? <Button type="button" variant="ghost" disabled={busy} onClick={back}>{i18n._({ id: "Back", message: "Back" })}</Button> : null}

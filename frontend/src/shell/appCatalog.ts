@@ -27,6 +27,8 @@ export const APP_CATALOG: readonly AppEntry[] = [
   { to: "/companions", icon: "bot", label: "Synths", description: "Meet your household's synths and pick who is your companion.", category: "Personal", keywords: ["companions", "personality", "persona", "voice", "character", "sprout", "nova", "riff"] },
   { to: "/people", icon: "users", label: "Family", description: "Everyone who shares your home.", category: "Personal", keywords: ["family", "household"] },
   { to: "/reminders", icon: "layout-list", label: "Reminders", description: "Alarms, timers and things to remember.", category: "Everyday", keywords: ["alarm", "timer", "to do", "list", "remind"] },
+  // ACTIVITY-PAGE-01: the viewer's own jobs and status messages across apps (RULES.md S6, the Activity row). A guest has no entry.
+  { to: "/activity", icon: "activity", label: "Activity", description: "What is being made, what finished and what needs a look.", category: "Everyday", keywords: ["jobs", "progress", "making", "status", "finished", "videos", "pictures", "songs", "history"] },
   { to: "/clock", icon: "clock", label: "Clock", description: "The time, alarms and timers.", category: "Everyday", keywords: ["time", "alarm", "timer", "stopwatch"] },
   { to: "/wikipedia", icon: "book", label: "Wikipedia", description: "Read Wikipedia from your own library, no internet needed.", category: "Everyday", keywords: ["encyclopedia", "articles", "reference", "look up", "learn", "kiwix"] },
   { to: "/privacy", icon: "shield-check", label: "Privacy", description: "Understand and control what you share.", category: "System", keywords: ["data", "security"] },
@@ -71,8 +73,8 @@ export function defaultPinnedRoutes(rows: readonly AppRow[] | undefined): string
 
 /** The rail's fixed places are Home, Search, Chat, Media, Library and Family (Jesse, 2026-10-30). Every other app is the person's to
  * star, built-in or package: these built-ins are pinnable, and Reminders and Clock start pinned (they used to be fixed) until the person chooses. */
-export const PINNABLE_BUILTIN_ROUTES: readonly string[] = ["/reminders", "/clock", "/wikipedia"];
-export const DEFAULT_BUILTIN_PINS: readonly string[] = ["/reminders", "/clock"];
+export const PINNABLE_BUILTIN_ROUTES: readonly string[] = ["/reminders", "/clock", "/wikipedia", "/activity"];
+export const DEFAULT_BUILTIN_PINS: readonly string[] = ["/reminders", "/clock", "/activity"];
 export const isPinnableApp = (to: string): boolean => to.startsWith("/apps/") || PINNABLE_BUILTIN_ROUTES.includes(to);
 
 /** The package apps for the left rail and its launcher: pinned ones first in pin order, then the rest by name. The core

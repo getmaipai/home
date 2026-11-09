@@ -20,7 +20,13 @@
           "kind": "audio",
           "autoplay_next": true,
           "details": true,
-          "details_show": ["title", "facts", "description", "chapters"],
+          "details_show": [
+            "title",
+            "facts",
+            "description",
+            "chapters",
+            "transcript"
+          ],
           "actions": [
             {
               "label": "Add to queue",
@@ -137,6 +143,19 @@
                   "file": "{file}"
                 }
               }
+            }
+          },
+          "sleep_timer": true,
+          "skip": {
+            "back": 15,
+            "forward": 30
+          },
+          "transcript_bind": {
+            "source": "package",
+            "path": "directory",
+            "params": {
+              "scope": "transcript",
+              "id": "$state.id"
             }
           }
         }

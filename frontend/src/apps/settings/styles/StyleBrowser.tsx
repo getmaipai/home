@@ -19,6 +19,7 @@ import { ApiError, type Roster } from "@/lib/api";
 import { StyleConfirm } from "@/apps/settings/styles/StyleConfirm";
 import { stylesApi, type BrowseHit, type BrowsePage, type BrowseQuery, type BrowseSource } from "@/apps/settings/styles/stylesApi";
 import { messageOf, StylePicture } from "@/apps/settings/styles/stylesShared";
+import { StatusCard } from "@maipai/ui/src/elements/status-card";
 
 type Tile = BrowseHit | { locked: true };
 const isLockedTile = (tile: Tile): tile is { locked: true } => (tile as { locked?: boolean }).locked === true;
@@ -126,9 +127,9 @@ export function StyleBrowser({ person, civitaiOn, onClose, onInstalled, onOpenSt
               </div>
             ) : null}
             {results.data?.notes.map((note) => <p key={note} className="text-sm text-muted-foreground">{note}</p>)}
-            {linkError ? <p role="alert" className="text-sm text-destructive">{linkError}</p> : null}
+            {linkError ? <StatusCard kind="problem" title={i18n._({ id: "That did not work", message: "That did not work" })} line={linkError} /> : null}
             {link ? null : results.isError && !results.data ? (
-              <div role="alert" className="flex flex-col items-start gap-2 text-sm"><p className="text-destructive">{browseProblem(results.error)}</p><Button type="button" variant="outline" size="sm" onClick={() => void results.refetch()}>{i18n._({ id: "Try again", message: "Try again" })}</Button></div>
+              <div role="alert" className="flex flex-col items-start gap-2 text-sm"><StatusCard kind="problem" title={i18n._({ id: "That did not work", message: "That did not work" })} line={browseProblem(results.error)} /><Button type="button" variant="outline" size="sm" onClick={() => void results.refetch()}>{i18n._({ id: "Try again", message: "Try again" })}</Button></div>
             ) : (
               <AsyncState data={results.data} error={false} isFetching={results.isFetching} onRetry={() => void results.refetch()} loadingLabel={i18n._({ id: "Searching for styles", message: "Searching for styles" })} errorMessage="">
                 {() => empty ? <p className="text-sm text-muted-foreground">{i18n._({ id: "No styles match. Try fewer words.", message: "No styles match. Try fewer words." })}</p> : (

@@ -13,13 +13,14 @@ import "@/lib/media/podcastApp"; // registers the Podcasts data ids and item vie
 import "@/lib/media/musicApp"; // registers the Music lyrics fields with the shared host
 import "@/lib/media/videoCreateApp"; // registers Videos' Create data ids (recipes, making, creations)
 import "@/lib/media/radioRecordings"; // adds the Recordings scope to Music's existing radio data id
-import { podcastRoutes, podcastDirectoryRows, podcastShowRows, podcastShowEpisodeRows, podcastShowSeasonRows } from "./podcastApp";
+import { podcastRoutes, podcastDirectoryRows, podcastShowRows, podcastShowEpisodeRows, podcastShowSeasonRows, podcastTranscriptRows } from "./podcastApp";
 import { radioRoutes, radioDirectoryRows, radioSavedRows, radioStationRow, radioCountryRows, radioGenreRows } from "./radioApp";
 import { fetchRadioArt, radioArtCard } from "@/lib/media/radioArt";
 import { radioDirectoryAllowed, radioDirectoryHasFavicon } from "@/lib/media/radioDirectory";
 import { listSavedStations } from "@/lib/media/radio";
 import { radioRecordingRows } from "@/lib/media/radioRecordings";
 import { mediaBandOf } from "@/lib/media/band";
+import { clearMusicSearches, musicQueueAction, pinMusicItem, recordMusicSearch } from "@/lib/media/musicLibrary";
 import { getHouseholdSettingValue } from "@/lib/settings";
 import { anotherTakeFor, bodyOfVideoJob, makeAudienceOf, makeVideoFor, readMakeBody } from "@/lib/videos/make";
 import { makeItMaxBody } from "@/lib/videos/editTool";
@@ -58,6 +59,8 @@ function paramsOf(body: Body): DataParams {
     year: coerceNumber(body.year),
     view: typeof body.view === "string" && body.view !== "" ? body.view : undefined,
     type: typeof body.type === "string" && body.type !== "" ? body.type : undefined,
+    sort: typeof body.sort === "string" && body.sort !== "" ? body.sort : undefined,
+    kind: typeof body.kind === "string" && body.kind !== "" ? body.kind : undefined,
     favorites: body.favorites === true || body.favorites === "true",
     limit: coerceNumber(body.limit),
   };
@@ -73,7 +76,7 @@ function withLimit<T>(body: Record<string, unknown>, rows: T[]): T[] {
 export function createMediaAppRoutes(appId: MediaAppId) {
   const routes = apiRouter();
   // AUDIT-DUP-ROUTES-01: one gate per path prefix; a person without the app is refused here, never passed to the next router.
-  gateMediaApp(routes, appId, ["/data/*", "/actions/*", "/progress", "/watchlist", "/playlist", "/queue", "/watch-later", "/like", ...(appId === "music" ? ["/library/*", "/radio/*"] : [])]);
+  gateMediaApp(routes, appId, ["/data/*", "/actions/*", "/progress", "/watchlist", "/playlist", "/queue", "/watch-later", "/like", ...(appId === "music" ? ["/library/*", "/radio/*", "/pin", "/recent-searches"] : [])]);
 
   if (appId === "music") {
     const radio = radioRoutes();
@@ -110,8 +113,10 @@ export function createMediaAppRoutes(appId: MediaAppId) {
         return c.json((body.follow === "yes" ? rows.filter((row) => row.followed === true) : body.follow === "no" ? rows.filter((row) => row.followed !== true) : rows) as never, 200);
       }
       if (body.scope === "show-episodes") return c.json(await podcastShowEpisodeRows(person, typeof body.id === "string" ? body.id : "", { sort: body.sort, season: body.season }) as never, 200);
+      // APPS-PARITY: the player's transcript reader (rows {start_s, text}); publisher text is fetched on request, same guard and rate limit as the transcript route.
+      if (body.scope === "transcript") return c.json(await podcastTranscriptRows(person, typeof body.id === "string" ? body.id : "") as never, 200);
       if (body.scope === "show-seasons") return c.json(await podcastShowSeasonRows(person, typeof body.id === "string" ? body.id : "") as never, 200);
-      return c.json(withLimit(body, await podcastDirectoryRows(person, typeof body.q === "string" ? body.q : "", typeof body.scope === "string" ? body.scope : "search")) as never, 200);
+      return c.json(withLimit(body, await podcastDirectoryRows(person, typeof body.q === "string" ? body.q : "", typeof body.scope === "string" ? body.scope : "search", typeof body.shelf === "string" ? body.shelf : undefined, typeof body.kind === "string" ? body.kind : undefined)) as never, 200);
     }
     // RADIO-02: Music's Radio pages. The directory is a network lookup (async); the rest are sync rows. Same gates as the radio routes.
     if (appId === "music") {
@@ -322,9 +327,19 @@ export function createMediaAppRoutes(appId: MediaAppId) {
   routes.post("/queue", requireAuth, async (c, next) => {
     const person = c.get("person");
     if (appId !== "music") return next();
-    const result = startMusicQueue(person, await jsonBody(c));
+    const body = await jsonBody(c);
+    // PARITY-01: an `op` (play_next or add) edits the queue the stage's Up next list reads; without one the queue is started as before.
+    const result = body.op !== undefined ? musicQueueAction(person, body) : startMusicQueue(person, body);
     return respond(c, result);
   });
+
+  if (appId === "music") {
+    routes.post("/pin", requireAuth, async (c) => respond(c, pinMusicItem(c.get("person"), await jsonBody(c))));
+    routes.post("/recent-searches", requireAuth, async (c) => {
+      const body = await jsonBody(c);
+      return respond(c, body.op === "clear" ? clearMusicSearches(c.get("person")) : recordMusicSearch(c.get("person"), body));
+    });
+  }
 
   const lists: ReadonlyArray<readonly [string, "watch_later" | "liked" | "queue"]> = appId === "podcasts" ? [["queue", "queue"]] : [["watch-later", "watch_later"], ["like", "liked"]];
   for (const [path, kind] of lists) {

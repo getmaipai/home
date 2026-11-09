@@ -10,6 +10,7 @@ import { useToast } from "@maipai/ui/src/primitives/Toast";
 import { request } from "@/lib/api";
 import { likeThisMessage } from "@/shell/pages/MusicLikeThisPage";
 import { musicRefOf } from "@/apps/chat/useMusicCard";
+import { errorLine } from "@/lib/hubReachability";
 
 type Band = { id: string; portrait_file_id?: string | null; logo_file_id?: string | null };
 type Done = { action: string; done: string; seed_media_id?: string | null };
@@ -96,7 +97,7 @@ export function useBandCard(block: { kind: string; provenance?: string; props: u
           void refetchBand();
         }
       })
-      .catch((error: unknown) => push(error instanceof Error && error.message ? error.message : "That did not work. Try again."))
+      .catch((error: unknown) => push(errorLine(error, "That did not work. Try again.")))
       .finally(() => setBusy(false));
   }, [bandId, conversationId, turnId, busy, navigate, push, queryClient, refetchBand]);
 

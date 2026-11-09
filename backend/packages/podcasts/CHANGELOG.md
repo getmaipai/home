@@ -2,6 +2,11 @@
 
 All notable changes to the Podcasts package, in [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) format.
 
+## [Unreleased]
+
+- The player has a sleep timer, 15 second back and 30 second forward buttons, and a transcript reader (publisher or stored text only).
+- Episodes open their own page from every list; Listen Now rows can Save an episode; Search has All, Shows and Episodes chips.
+
 ## [0.2.13] - 2026-11-09
 
 - The show page has Latest, Top and Seasons; Top puts the episodes you listened to first.

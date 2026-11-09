@@ -16,6 +16,7 @@ export function coreLabel(to: string): string | undefined {
     case "/reminders": return i18n._({ id: "Reminders", message: "Reminders" });
     case "/clock": return i18n._({ id: "Clock", message: "Clock" });
     case "/wikipedia": return i18n._({ id: "Wikipedia", message: "Wikipedia" });
+    case "/activity": return i18n._({ id: "Activity", message: "Activity" });
     default: return undefined;
   }
 }
@@ -29,6 +30,7 @@ export function coreDescription(to: string): string | undefined {
     case "/reminders": return i18n._({ id: "Alarms, timers and things to remember.", message: "Alarms, timers and things to remember." });
     case "/clock": return i18n._({ id: "The time, alarms and timers.", message: "The time, alarms and timers." });
     case "/wikipedia": return i18n._({ id: "Read Wikipedia from your own library, no internet needed.", message: "Read Wikipedia from your own library, no internet needed." });
+    case "/activity": return i18n._({ id: "What is being made, what finished and what needs a look.", message: "What is being made, what finished and what needs a look." });
     case "/privacy": return i18n._({ id: "Understand and control what you share.", message: "Understand and control what you share." });
     case "/settings": return i18n._({ id: "Make MaiPai feel like yours.", message: "Make MaiPai feel like yours." });
     default: return undefined;

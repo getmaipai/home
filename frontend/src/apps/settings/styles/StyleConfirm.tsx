@@ -16,6 +16,7 @@ import { ApiError, type Roster } from "@/lib/api";
 import { useFreshConfirm } from "@/apps/settings/styles/FreshConfirm";
 import { stylesApi, type BrowseHit, type InstallBody } from "@/apps/settings/styles/stylesApi";
 import { messageOf, sizeWords, StylePicture } from "@/apps/settings/styles/stylesShared";
+import { StatusCard } from "@maipai/ui/src/elements/status-card";
 
 const sourceLine = (): Record<BrowseHit["adult_check"], string> => ({ normal: i18n._({ id: "The source says it is safe.", message: "The source says it is safe." }), adult: i18n._({ id: "The source marks this adult.", message: "The source marks this adult." }), unknown: i18n._({ id: "The source says nothing about age.", message: "The source says nothing about age." }) });
 const licenceLine = (): Record<BrowseHit["licence"]["class"], string> => ({
@@ -135,7 +136,7 @@ export function StyleConfirm({ hit, person, revealed, onClose, onInstalled, onOp
               {changed ? (
                 <Alert><AlertDescription><span className="flex flex-wrap items-center gap-3">{i18n._({ id: "The source changed this file since you installed it.", message: "The source changed this file since you installed it." })}<Button type="button" variant="outline" size="sm" disabled={busy} onClick={() => void install(undefined, true).catch(() => undefined)}>{i18n._({ id: "Install as a separate style", message: "Install as a separate style" })}</Button></span></AlertDescription></Alert>
               ) : null}
-              {error ? <p role="alert" className="text-sm text-destructive">{error}</p> : null}
+              {error ? <StatusCard kind="problem" title={i18n._({ id: "That did not work", message: "That did not work" })} line={error} /> : null}
               <div className="flex flex-col gap-2">
                 <div className="flex flex-wrap gap-2">
                   <Button type="button" disabled={!canInstall} onClick={start}>{busy ? i18n._({ id: "Starting the download…", message: "Starting the download…" }) : i18n._({ id: "Install style", message: "Install style" })}</Button>

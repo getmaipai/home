@@ -95,8 +95,11 @@
       "orientation": "vertical",
       "density": "compact",
       "on_select": {
-        "play": {
-          "media_id": "{id}"
+        "navigate": {
+          "to": "/apps/podcasts/episode",
+          "state": {
+            "id": "{id}"
+          }
         }
       },
       "row_actions": [
@@ -119,6 +122,20 @@
               "args": {
                 "media_id": "{id}",
                 "on": "{queue_next}"
+              }
+            }
+          }
+        },
+        {
+          "icon": "hard-drive",
+          "label": "Save",
+          "label_field": "save_label",
+          "action": {
+            "call": {
+              "target": "/api/plugins/podcasts/save",
+              "args": {
+                "media_id": "{id}",
+                "on": "{save_next}"
               }
             }
           }

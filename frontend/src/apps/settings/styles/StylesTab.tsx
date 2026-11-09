@@ -25,6 +25,7 @@ import { StyleBrowser } from "@/apps/settings/styles/StyleBrowser";
 import { StyleEditor } from "@/apps/settings/styles/StyleEditor";
 import { stylesApi, type SourcesState, type StyleList, type StyleRow, type StyleWho } from "@/apps/settings/styles/stylesApi";
 import { adultCheckLine, filePath, messageOf, sizeWords, StylePicture, stylesCopy, whatItIs } from "@/apps/settings/styles/stylesShared";
+import { StatusCard } from "@maipai/ui/src/elements/status-card";
 
 const DAY = 86_400_000;
 /** A list answer as the view reads it: the rows, and whether the one lock row is needed. */
@@ -80,7 +81,7 @@ export function StylesTab({ person, card, children }: { person: Roster; card?: S
           <Button type="button" variant="outline" onClick={() => setAdding(true)}>{copy.add_file_button}</Button>
         </div>
         <DownloadsNow jobs={running} />
-        {problem ? <p role="alert" className="text-sm text-destructive">{problem}</p> : null}
+        {problem ? <StatusCard kind="problem" title={i18n._({ id: "That did not work", message: "That did not work" })} line={problem} /> : null}
         <AsyncState data={list.data} error={list.isError} isFetching={list.isFetching} onRetry={() => void list.refetch()} errorMessage={i18n._({ id: "Home could not load the styles. Check the Home connection, then reload this page.", message: "Home could not load the styles. Check the Home connection, then reload this page." })} loadingLabel={i18n._({ id: "Loading the styles", message: "Loading the styles" })}>
           {(data) => (
             <>
@@ -159,7 +160,7 @@ function SecretRow({ label, savedLine, emptyLine, placeholder, saved, onSave, on
             {saved ? <Button type="button" variant="ghost" onClick={() => { setEditing(false); setValue(""); }}>{i18n._({ id: "Cancel", message: "Cancel" })}</Button> : null}
           </form>
         ) : null}
-        {error ? <p role="alert" className="text-sm text-destructive">{error}</p> : null}
+        {error ? <StatusCard kind="problem" title={i18n._({ id: "That did not work", message: "That did not work" })} line={error} /> : null}
       </ItemContent>
       {saved && !editing ? (
         <ItemActions>
@@ -191,7 +192,7 @@ function SourcesSection({ copy, state, onChanged }: { copy: ReturnType<typeof st
           emptyLine={i18n._({ id: "Optional. Paste a read token. Home keeps it private and never shows it again.", message: "Optional. Paste a read token. Home keeps it private and never shows it again." })} savedLine={i18n._({ id: "A token is saved. Home keeps it private and never shows it again.", message: "A token is saved. Home keeps it private and never shows it again." })}
           onSave={(v) => after(stylesApi.saveHuggingFaceToken(v))} onRemove={() => after(stylesApi.removeHuggingFaceToken())} />
         <Item>
-          <ItemContent><ItemTitle>{i18n._({ id: "Civitai", message: "Civitai" })}</ItemTitle><ItemDescription clamp={false}>{civitai ? i18n._({ id: "On. This computer contacts civitai.com when you search or install.", message: "On. This computer contacts civitai.com when you search or install." }) : copy.civitai_off_note}</ItemDescription>{error ? <p role="alert" className="text-sm text-destructive">{error}</p> : null}</ItemContent>
+          <ItemContent><ItemTitle>{i18n._({ id: "Civitai", message: "Civitai" })}</ItemTitle><ItemDescription clamp={false}>{civitai ? i18n._({ id: "On. This computer contacts civitai.com when you search or install.", message: "On. This computer contacts civitai.com when you search or install." }) : copy.civitai_off_note}</ItemDescription>{error ? <StatusCard kind="problem" title={i18n._({ id: "That did not work", message: "That did not work" })} line={error} /> : null}</ItemContent>
           <ItemActions><Switch checked={civitai} aria-label={i18n._({ id: "Civitai", message: "Civitai" })} disabled={state === null} onCheckedChange={(on) => { if (on) setNotice(true); else void turn(false); }} /></ItemActions>
         </Item>
         {civitai ? (
@@ -225,7 +226,7 @@ function RemovedList({ copy, onChanged }: { copy: ReturnType<typeof stylesCopy>;
   return (
     <section aria-label={copy.removed_title} className="flex flex-col gap-3">
       <h2 className="text-sm font-medium">{copy.removed_title}</h2>
-      {problem ? <p role="alert" className="text-sm text-destructive">{problem}</p> : null}
+      {problem ? <StatusCard kind="problem" title={i18n._({ id: "That did not work", message: "That did not work" })} line={problem} /> : null}
       <ItemGroup variant="card" aria-label={copy.removed_title}>
         {items.map((row) => {
           const days = row.removed_at ? Math.max(0, Math.floor((now - Date.parse(row.removed_at)) / DAY)) : 0;

@@ -15,6 +15,7 @@ import { useProfileSignIn } from "@/kit/hooks/useProfileSignIn";
 import { api, type Roster } from "@/lib/api";
 import { errorLine, isHubUnreachable, useWhenHubBack } from "@/lib/hubReachability";
 import { useTabItem } from "@/shell/tabIdentity";
+import { StatusCard } from "@maipai/ui/src/elements/status-card";
 
 type MaskedSecretStyle = CSSProperties & { WebkitTextSecurity: "disc" };
 
@@ -204,7 +205,7 @@ export function SignInPage({ onSignedIn }: { onSignedIn: () => void }) {
                       </Button>
                     ))}
                   </div>
-                  {tapError ? <p className="text-sm text-destructive">{tapError}</p> : null}
+                  {tapError ? <StatusCard kind="problem" title={i18n._({ id: "That did not work", message: "That did not work" })} line={tapError} /> : null}
                 </div>
               )
             }

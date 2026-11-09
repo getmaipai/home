@@ -1,11 +1,13 @@
 import { i18n } from "@lingui/core";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { Progress } from "@maipai/ui/src/primitives/Progress";
 import { Button } from "@maipai/ui/src/ui/button";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@maipai/ui/src/ui/collapsible";
 import { getIcon } from "@maipai/ui/src/icons";
-import { api, ApiError, type HomeJobView, type InstallStatusView } from "@/lib/api";
+import { StatusCard } from "@maipai/ui/src/elements/status-card";
+import { api, ApiError, type ActivityListView, type HomeJobView, type InstallStatusView } from "@/lib/api";
+import { ACTIVITY_PATH, useActivity } from "@/shell/activity";
 import { InstallDockRow } from "@/shell/InstallDockRow";
 import { installActive, useInstallStatus, useJobs } from "@/lib/useInstallStatus";
 import { installLabel, installWords, speedLine, timeLeft, type InstallWords } from "@/shell/installWords";
@@ -154,10 +156,12 @@ const dockRows = (rows: HomeJobView[]) => rows.filter((row) => row.kind === "mod
 /** The one install line, pinned to the bottom of the page: what is installing, why it matters and how far
  * along. People who can act on it (owner, admin) open it like an accordion for each install's size, speed,
  * files, Cancel and Try again; everyone else sees the same line, not expandable. */
-export function InstallDock({ admin, read: readProp, readJobs: readJobsProp, retry = api.installRetry, stop = api.stopJob, repairsHref = "/repairs" }: {
+export function InstallDock({ admin, read: readProp, readJobs: readJobsProp, readActivity, retry = api.installRetry, stop = api.stopJob, repairsHref = "/repairs" }: {
   admin: boolean;
   read?: () => Promise<InstallStatusView>;
   readJobs?: () => Promise<HomeJobView[]>;
+  /** The Activity list, read through the shared cache the shell already keeps fresh; a test passes its own. */
+  readActivity?: () => Promise<ActivityListView>;
   retry?: () => Promise<unknown>;
   stop?: (id: string) => Promise<unknown>;
   repairsHref?: string;
@@ -165,6 +169,13 @@ export function InstallDock({ admin, read: readProp, readJobs: readJobsProp, ret
   const status = useInstallStatus(readProp).data ?? null;
   const jobs = useJobs({ read: readJobsProp, fast: (rows) => installActive(status) || (rows ? makingJobs(rows).length > 0 : false), select: dockRows }).data ?? NO_ROWS;
   const [open, setOpen] = useState(false);
+  const navigate = useNavigate();
+  const onActivityPage = useLocation().pathname === ACTIVITY_PATH;
+  // ACTIVITY-PAGE-01 (PRO-LOOK-01 section 23): a making job that ends while the person is here turns into its DONE or COULD NOT FINISH card
+  // for a short time, with Open and Activity, then leaves. It reads the Activity list the shell already keeps (no extra poll).
+  const activity = useActivity(true, readActivity).data;
+  const seenMaking = useRef(new Set<string>());
+  const [dismissed, setDismissed] = useState<ReadonlySet<string>>(new Set());
   const [retryError, setRetryError] = useState<string | null>(null);
   const [announcement, setAnnouncement] = useState("");
   // The strip sits above the phone bar, never over it: measure the bar (docked, floating or PRO) rather than restyle it from CSS.
@@ -188,7 +199,15 @@ export function InstallDock({ admin, read: readProp, readJobs: readJobsProp, ret
 
   const model = buildDock(status, jobs);
   const showing = model.primary !== null;
-  const box = useAnchorBox(showing);
+  useEffect(() => { for (const entry of model.active) if (entry.key.startsWith("make:")) seenMaking.current.add(entry.key.slice(5)); });
+  const ended = activity?.items.find((entry) => seenMaking.current.has(entry.id) && (entry.state === "done" || entry.state === "failed") && !dismissed.has(entry.id) && !model.active.some((live) => live.key === `make:${entry.id}`)) ?? null;
+  const endedId = ended?.id ?? null;
+  useEffect(() => {
+    if (endedId === null) return;
+    const timer = window.setTimeout(() => setDismissed((previous) => new Set(previous).add(endedId)), 12_000);
+    return () => window.clearTimeout(timer);
+  }, [endedId]);
+  const box = useAnchorBox(showing || ended !== null);
 
   // Announce the start and the finish once, never each percent.
   const before = useRef<{ active: boolean; failed: boolean }>({ active: false, failed: false });
@@ -220,6 +239,27 @@ export function InstallDock({ admin, read: readProp, readJobs: readJobsProp, ret
 
   const announcer = <p role="status" aria-live="polite" aria-atomic="true" data-testid="install-announcer" className="sr-only">{announcement}</p>;
   const primary = model.primary;
+  if (!primary && ended) {
+    const sideEnded = { ...(box ? { left: box.left, right: box.right } : { left: 0, right: 0 }), ...(navTop > 0 ? { bottom: navTop } : {}) };
+    const failed = ended.state === "failed";
+    return (
+      <>
+        {announcer}
+        <section aria-label={i18n._({ id: "A job just ended", message: "A job just ended" })} data-testid="install-dock-ended" style={sideEnded} className="pointer-events-none fixed bottom-0 z-40 flex justify-center px-4 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
+          <div className="pointer-events-auto w-full max-w-md">
+            <StatusCard
+              kind={failed ? "problem" : "done"}
+              stateWord={failed ? i18n._({ id: "Could not finish", message: "Could not finish" }) : i18n._({ id: "Done", message: "Done" })}
+              title={ended.title}
+              line={failed ? ended.line ?? undefined : undefined}
+              action={ended.href ? { label: failed ? i18n._({ id: "Try again", message: "Try again" }) : i18n._({ id: "Open", message: "Open" }), onSelect: () => navigate(ended.href!) } : undefined}
+              secondary={{ label: i18n._({ id: "Activity", message: "Activity" }), onSelect: () => navigate(ACTIVITY_PATH) }}
+            />
+          </div>
+        </section>
+      </>
+    );
+  }
   if (!primary) return announcer;
 
   const extra = model.active.length + model.failed.length - 1;
@@ -229,6 +269,7 @@ export function InstallDock({ admin, read: readProp, readJobs: readJobsProp, ret
   const bar = model.percent;
   const side = { ...(box ? { left: box.left, right: box.right } : { left: 0, right: 0 }), ...(navTop > 0 ? { bottom: navTop } : {}) };
 
+  const activityLink = <div className="px-3 pb-2"><Link to={ACTIVITY_PATH} data-testid="install-dock-activity" className="text-supporting text-muted-foreground underline underline-offset-4">{i18n._({ id: "See all activity", message: "See all activity" })}</Link></div>;
   const summary = (
     <>
       <span className="flex items-start gap-2 text-sm text-foreground">
@@ -275,11 +316,13 @@ export function InstallDock({ admin, read: readProp, readJobs: readJobsProp, ret
                 <button type="button" data-testid="install-dock-toggle" aria-label={`${title}. ${open ? "Hide details" : "Show details"}`} className="block w-full rounded-md px-3 pt-2 pb-1 text-left outline-none focus-visible:ring-2 focus-visible:ring-ring">{summary}</button>
               </CollapsibleTrigger>
               {bar !== null && !onlyFailed ? <div className="px-3 pb-2"><Progress mode="determinate" value={bar} label={`${title} progress`} /></div> : <div className="pb-1" />}
+              {makingNow !== null && !onActivityPage ? activityLink : null}
             </Collapsible>
           ) : (
             <div className="px-3 pt-2 pb-2">
               {primary.href && !onlyFailed ? <Link to={primary.href} data-testid="install-dock-link" className="block rounded-md outline-none focus-visible:ring-2 focus-visible:ring-ring">{summary}</Link> : summary}
               {bar !== null && !onlyFailed ? <div className="pt-1"><Progress mode="determinate" value={bar} label={`${title} progress`} /></div> : null}
+              {makingNow !== null && !onActivityPage ? activityLink : null}
             </div>
           )}
         </div>

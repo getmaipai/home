@@ -10,6 +10,10 @@ import { useToast } from "@maipai/ui/src/primitives/Toast";
 import { pauseTvNavForOverlay } from "@maipai/ui/src/tvNav";
 import { NOTIFICATION_COPY } from "@maipai/home-backend/src/lib/notificationCopy";
 import { api, type NotificationDeliveryView } from "@/lib/api";
+import { ACTIVITY_PATH } from "@/shell/activity";
+
+/** ACTIVITY-PAGE-01: a notification that says a job finished opens its result (existing types only; no new notification type). */
+export const NOTIFICATION_RESULT_LINKS: Readonly<Record<string, string>> = { "videos.clip_ready": "/apps/videos/create" };
 
 /** I18N-B1: a typed notification renders from its { typeId, values } in the viewer's language; a row with no values or no template (an older
  * row, a pass-through type, a safety or child line) shows the English text it was stored with. */
@@ -245,7 +249,7 @@ export function NotificationBell({ anchored = false, open: controlledOpen, onOpe
               </div>
               {items.map((n) => (
                 <div key={n.id} className="flex items-start justify-between gap-2 py-2 px-2">
-                  <p className="text-base">{notificationLine(n)}</p>
+                  <p className="text-base">{notificationLine(n)}{NOTIFICATION_RESULT_LINKS[n.typeId] ? <> <Link to={NOTIFICATION_RESULT_LINKS[n.typeId]!} className="text-supporting text-primary underline" onClick={() => setOpen(false)}>{i18n._({ id: "Open", message: "Open" })}</Link></> : null}</p>
                   {/* 48px minimum, not "sm": this is the only way to
                       dismiss a notification, the same accessibility
                       floor docs/UI.md's 2026-09-05 audit already
@@ -264,7 +268,9 @@ export function NotificationBell({ anchored = false, open: controlledOpen, onOpe
               only ever shows what's still pending, never a dismissed or
               already-read row, so "view history" is the one way to reach
               those at all. */}
-          <div className="border-t border-border pt-1">
+          <div className="flex flex-wrap gap-x-4 border-t border-border pt-1">
+            <Link to={ACTIVITY_PATH} className="block px-2 py-2 text-supporting text-primary underline" onClick={() => setOpen(false)}>
+              {i18n._({ id: "Activity", message: "Activity" })}</Link>
             <Link to="/notifications" className="block px-2 py-2 text-sm text-primary underline" onClick={() => setOpen(false)}>
               {i18n._({ id: "View history", message: "View history" })}</Link>
           </div>

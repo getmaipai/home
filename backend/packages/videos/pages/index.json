@@ -42,6 +42,115 @@
       "hide_when_empty": true
     },
     {
+      "type": "picker",
+      "state": "channel",
+      "label": "Channel",
+      "placeholder": "All channels",
+      "bind": {
+        "source": "package",
+        "path": "channels"
+      },
+      "item_key_field": "id",
+      "item_label_field": "label"
+    },
+    {
+      "type": "media_shelf",
+      "heading": "Recently added",
+      "bind": {
+        "source": "package",
+        "path": "recent",
+        "params": {
+          "filter": "$state.vfilter",
+          "channel": "$state.channel"
+        }
+      },
+      "item_key_field": "id",
+      "item_label_field": "title",
+      "item_subtitle_field": "{byline}",
+      "item_media_field": "thumbnail",
+      "item_progress_field": "progress",
+      "item_badge_field": "copy_label",
+      "item_meta_field": "duration_s",
+      "row_actions": [
+        {
+          "icon": "clock",
+          "label": "Watch later",
+          "action": {
+            "call": {
+              "target": "/api/plugins/videos/watch-later",
+              "args": {
+                "media_id": "{id}"
+              }
+            }
+          }
+        },
+        {
+          "icon": "thumbs-up",
+          "label": "Like",
+          "action": {
+            "call": {
+              "target": "/api/plugins/videos/like",
+              "args": {
+                "media_id": "{id}"
+              }
+            }
+          }
+        },
+        {
+          "icon": "share",
+          "label": "Share",
+          "action": {
+            "share": {
+              "to": "/apps/videos/watch?id={id}",
+              "title": "{title}"
+            }
+          }
+        }
+      ],
+      "aspect": "wide",
+      "variant": "plain",
+      "hide_when_empty": true,
+      "see_all": {
+        "label": "See all",
+        "action": {
+          "navigate": {
+            "to": "/apps/videos/library"
+          }
+        }
+      },
+      "on_select": {
+        "play": {
+          "media_id": "{id}"
+        }
+      },
+      "chips": {
+        "state": "vfilter",
+        "label": "Filter videos",
+        "options": [
+          {
+            "value": "all",
+            "label": "All"
+          },
+          {
+            "value": "made",
+            "label": "Made at home"
+          },
+          {
+            "value": "unwatched",
+            "label": "Unwatched"
+          },
+          {
+            "value": "long",
+            "label": "Long"
+          },
+          {
+            "value": "short",
+            "label": "Short"
+          }
+        ]
+      }
+    },
+    {
       "type": "media_shelf",
       "heading": "Made at home",
       "bind": {
@@ -69,7 +178,11 @@
       "heading": "Continue watching",
       "bind": {
         "source": "package",
-        "path": "continue"
+        "path": "continue",
+        "params": {
+          "filter": "$state.vfilter",
+          "channel": "$state.channel"
+        }
       },
       "item_key_field": "id",
       "item_label_field": "title",
@@ -100,6 +213,16 @@
               "args": {
                 "media_id": "{id}"
               }
+            }
+          }
+        },
+        {
+          "icon": "share",
+          "label": "Share",
+          "action": {
+            "share": {
+              "to": "/apps/videos/watch?id={id}",
+              "title": "{title}"
             }
           }
         }
@@ -126,7 +249,11 @@
       "heading": "New from your channels",
       "bind": {
         "source": "package",
-        "path": "new"
+        "path": "new",
+        "params": {
+          "filter": "$state.vfilter",
+          "channel": "$state.channel"
+        }
       },
       "item_key_field": "id",
       "item_label_field": "title",
@@ -159,61 +286,14 @@
               }
             }
           }
-        }
-      ],
-      "aspect": "wide",
-      "variant": "plain",
-      "hide_when_empty": true,
-      "see_all": {
-        "label": "See all",
-        "action": {
-          "navigate": {
-            "to": "/apps/videos/library"
-          }
-        }
-      },
-      "on_select": {
-        "play": {
-          "media_id": "{id}"
-        }
-      }
-    },
-    {
-      "type": "media_shelf",
-      "heading": "Recently added",
-      "bind": {
-        "source": "package",
-        "path": "recent"
-      },
-      "item_key_field": "id",
-      "item_label_field": "title",
-      "item_subtitle_field": "{byline}",
-      "item_media_field": "thumbnail",
-      "item_progress_field": "progress",
-      "item_badge_field": "copy_label",
-      "item_meta_field": "duration_s",
-      "row_actions": [
-        {
-          "icon": "clock",
-          "label": "Watch later",
-          "action": {
-            "call": {
-              "target": "/api/plugins/videos/watch-later",
-              "args": {
-                "media_id": "{id}"
-              }
-            }
-          }
         },
         {
-          "icon": "thumbs-up",
-          "label": "Like",
+          "icon": "share",
+          "label": "Share",
           "action": {
-            "call": {
-              "target": "/api/plugins/videos/like",
-              "args": {
-                "media_id": "{id}"
-              }
+            "share": {
+              "to": "/apps/videos/watch?id={id}",
+              "title": "{title}"
             }
           }
         }
@@ -240,7 +320,11 @@
       "heading": "More from your most watched",
       "bind": {
         "source": "package",
-        "path": "more-from"
+        "path": "more-from",
+        "params": {
+          "filter": "$state.vfilter",
+          "channel": "$state.channel"
+        }
       },
       "item_key_field": "id",
       "item_label_field": "title",
@@ -271,6 +355,16 @@
               "args": {
                 "media_id": "{id}"
               }
+            }
+          }
+        },
+        {
+          "icon": "share",
+          "label": "Share",
+          "action": {
+            "share": {
+              "to": "/apps/videos/watch?id={id}",
+              "title": "{title}"
             }
           }
         }
@@ -297,7 +391,11 @@
       "heading": "Watch again",
       "bind": {
         "source": "package",
-        "path": "again"
+        "path": "again",
+        "params": {
+          "filter": "$state.vfilter",
+          "channel": "$state.channel"
+        }
       },
       "item_key_field": "id",
       "item_label_field": "title",
@@ -328,6 +426,16 @@
               "args": {
                 "media_id": "{id}"
               }
+            }
+          }
+        },
+        {
+          "icon": "share",
+          "label": "Share",
+          "action": {
+            "share": {
+              "to": "/apps/videos/watch?id={id}",
+              "title": "{title}"
             }
           }
         }
@@ -385,6 +493,16 @@
               "args": {
                 "media_id": "{id}"
               }
+            }
+          }
+        },
+        {
+          "icon": "share",
+          "label": "Share",
+          "action": {
+            "share": {
+              "to": "/apps/videos/watch?id={id}",
+              "title": "{title}"
             }
           }
         }

@@ -9,6 +9,7 @@ import { Button } from "@maipai/ui/src/ui/button";
 import { api, type SessionInfo } from "@/lib/api";
 import { errorLine } from "@/lib/hubReachability";
 import { formatDateTime } from "@/lib/format";
+import { StatusCard } from "@maipai/ui/src/elements/status-card";
 
 function whenText(iso: string): string {
   return formatDateTime(iso);
@@ -35,7 +36,7 @@ export function AwaySessionsSection() {
 
   return (
     <Section heading={i18n._({ id: "Signed in away from home", message: "Signed in away from home" })}>
-      {error ? <p className="text-base text-destructive">{error}</p> : null}
+      {error ? <StatusCard kind="problem" title={i18n._({ id: "That did not work", message: "That did not work" })} line={error} /> : null}
       <AsyncState data={query.data} error={query.isError} isFetching={query.isFetching} onRetry={() => query.refetch()} errorMessage={i18n._({ id: "Could not load your away sessions.", message: "Could not load your away sessions." })} loadingLabel={i18n._({ id: "Loading away sessions", message: "Loading away sessions" })}>
         {(rows) => rows.length === 0 ? <EmptyState icon="inbox" text={i18n._({ id: "No devices have signed in away from home.", message: "No devices have signed in away from home." })} /> : (
           <List items={rows} getKey={(session) => session.id} label={i18n._({ id: "Devices signed in away from home", message: "Devices signed in away from home" })} renderItem={(session) => (

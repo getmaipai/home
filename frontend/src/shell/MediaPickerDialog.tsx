@@ -11,6 +11,7 @@ import { AsyncState } from "@maipai/ui/src/primitives/AsyncState";
 import { api, ApiError } from "@/lib/api";
 import { uploadLibraryFile } from "@/lib/libraryUpload";
 import { localizedApiMessage } from "@/lib/apiErrorLines";
+import { StatusCard } from "@maipai/ui/src/elements/status-card";
 
 export interface PickedMedia { id: string; thumb?: string }
 export type PickKind = "picture" | "character" | "place";
@@ -52,7 +53,7 @@ export function MediaPickerBody({ kind, personId, onDone }: { kind: PickKind; pe
         <div className="flex flex-wrap items-center gap-2">
           <input ref={input} type="file" accept={PICTURE_TYPES} hidden data-testid="media-picker-file" onChange={(event) => { void upload(event.target.files?.[0]); event.target.value = ""; }} />
           <Button type="button" variant="secondary" disabled={busy} onClick={() => input.current?.click()}>{busy ? i18n._({ id: "Adding", message: "Adding" }) : i18n._({ id: "Add a picture", message: "Add a picture" })}</Button>
-          {error ? <p role="alert" className="text-sm text-destructive">{error}</p> : null}
+          {error ? <StatusCard kind="problem" title={i18n._({ id: "That did not work", message: "That did not work" })} line={error} /> : null}
         </div>
         <AsyncState data={pictures.data} error={pictures.isError} isFetching={pictures.isFetching} onRetry={() => void pictures.refetch()} errorMessage={i18n._({ id: "Your pictures did not load. Close this and try again.", message: "Your pictures did not load. Close this and try again." })} loadingLabel={i18n._({ id: "Loading your pictures", message: "Loading your pictures" })}>
           {(rows) => rows.length === 0 ? <p className="text-sm text-muted-foreground">{i18n._({ id: "You have no pictures in your Library yet. Add one above.", message: "You have no pictures in your Library yet. Add one above." })}</p> : (

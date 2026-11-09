@@ -4,6 +4,8 @@ All notable changes to the Videos package, in [Keep a Changelog](https://keepach
 
 ## [Unreleased]
 
+- Home has a filter row (All, Made at home, Unwatched, Long, Short) and a Channel picker; Library sorts by Recents or A to Z; Search has Type and length or date chips; every card can be shared; the watch page can be shared and turns on picture in picture, double tap to seek and hold for 2x.
+
 - VIDEOS-PARITY: a Liked videos page, a Watch later and Like menu on each video card, a "Channel, age" line under cards, chapters on clips you made by joining others, and a notice when a video you made finishes.
 
 - SPATIAL-REACH: Spatial sound is on every clip in the Create feed and on the Studio's export card, not only on chat videos. It opens the same edit (adults only), and the new clip shows in the Create feed. A spatial clip's note reads in order: what moved (the headphones sentence once), the 5.1 line, then the quiet back speakers.

@@ -484,7 +484,7 @@ test("Edit opens the three-screen flow for that companion, and the Audience dial
   await view.findByText("Who is Sprout for?");
   fireEvent.click(await view.findByRole("radio", { name: "Teens and adults" }));
   fireEvent.click(view.getByRole("button", { name: "Save audience" }));
-  expect((await view.findByRole("alert")).textContent).toBe("This look is for adults. Pick a cartoon look to make it for everyone.");
+  expect((await view.findByRole("alert")).textContent).toContain("This look is for adults. Pick a cartoon look to make it for everyone.");
   fireEvent.click(view.getByRole("button", { name: "Cancel" }));
   await openCardActions(view);
   fireEvent.click(await view.findByRole("menuitem", { name: "Edit" }));

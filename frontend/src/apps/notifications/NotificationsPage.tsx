@@ -16,6 +16,7 @@ import { cn, FOCUS_RING } from "@maipai/ui/src/utils";
 import { getIcon } from "@maipai/ui/src/icons";
 import { errorLine } from "@/lib/hubReachability";
 import { formatDateTime } from "@/lib/format";
+import { StatusCard } from "@maipai/ui/src/elements/status-card";
 
 /** The page's one icon choice; the header title reads it too. */
 export const NotificationsIcon = getIcon("bell");
@@ -110,7 +111,7 @@ export function NotificationsPage() {
     <Page title={i18n._({ id: "Notifications", message: "Notifications" })} hideTitle>
       {/* eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex -- a keyboard-scrollable region, not a widget (DetailPane.tsx's own precedent). */}
       <div tabIndex={0} className={cn("flex flex-1 flex-col gap-4 overflow-y-auto p-4", FOCUS_RING)}>
-        {actionError ? <p className="text-base text-destructive">{actionError}</p> : null}
+        {actionError ? <StatusCard kind="problem" title={i18n._({ id: "That did not work", message: "That did not work" })} line={actionError} /> : null}
 
         <AsyncState
           data={query.data}

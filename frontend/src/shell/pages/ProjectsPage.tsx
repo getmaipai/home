@@ -4,6 +4,7 @@ import { PageHeaderTitle } from "@/shell/pageHeaderTitle";
 import { Link, Navigate } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
+import { StatusCard } from "@maipai/ui/src/elements/status-card";
 import { ProjectSettingsDialog, type ProjectSettingsValue } from "@maipai/ui/src/elements/project-settings";
 import { EmptyState, EmptyStateGreeting } from "@maipai/ui/src/elements/empty-state";
 import { AsyncState } from "@maipai/ui/src/primitives/AsyncState";
@@ -89,6 +90,7 @@ export function ProjectsPage({ person }: { person: Roster }) {
     memory_mode: editingProject.memory_mode,
   } : emptyValue;
 
+  const [pinProblem, setPinProblem] = useState("");
   const refresh = () => queryClient.invalidateQueries({ queryKey });
   const saveSettings = async (patch: Partial<ProjectSettingsValue>) => {
     if (dialog?.kind === "create") {
@@ -131,6 +133,7 @@ export function ProjectsPage({ person }: { person: Roster }) {
   return (
     <Page title={i18n._({ id: "Projects", message: "Projects" })} hideTitle>
       <div className="flex min-h-0 flex-1 flex-col gap-4 px-4 py-4 sm:px-6">
+        {pinProblem ? <StatusCard kind="problem" title={i18n._({ id: "That did not work", message: "That did not work" })} line={pinProblem} /> : null}
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-end">
           <div className="relative min-w-0 flex-1 sm:max-w-sm">
             <SearchIcon className="text-muted-foreground pointer-events-none absolute end-3 top-1/2 size-4 -translate-y-1/2" />
@@ -181,10 +184,11 @@ export function ProjectsPage({ person }: { person: Roster }) {
                             aria-pressed={project.pinned}
                             onClick={async () => {
                               try {
+                                setPinProblem("");
                                 await api.updateChatFolder(project.id, { pinned: !project.pinned });
                                 await refresh();
                               } catch {
-                                toast.error(i18n._({ id: "Could not update that project. Try again.", message: "Could not update that project. Try again." }));
+                                setPinProblem(i18n._({ id: "Could not update that project. Try again.", message: "Could not update that project. Try again." }));
                               }
                             }}
                           >

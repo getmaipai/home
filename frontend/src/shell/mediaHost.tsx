@@ -25,7 +25,8 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import type Hls from "hls.js";
 import { nextMusicQueueId, useMusicDj } from "@/shell/musicDj";
 import type { PlayerVoiceover } from "@maipai/ui/src/primitives/Player";
-import { chooseNext, getPlayMode, usePlayMode } from "@/shell/media/playMode";
+import { chooseNext, getPlayMode, nextRepeat, setPlayMode, usePlayMode } from "@/shell/media/playMode";
+import { requestStage } from "@/shell/media/stageRequest";
 
 export const hlsPathFor = (src: string, canPlayNative: boolean): "native" | "hls" | "direct" => {
   if (!/[?&]hls=1(?:&|$)/i.test(src) && !/\.m3u8(?:[?#]|$)/i.test(src)) return "direct";
@@ -224,7 +225,18 @@ export function MediaHostProvider({ children, personId, ageBand }: { children: R
   const current = useSyncExternalStore(store.subscribe, store.get, store.get);
   const djFor = useMusicDj(current ? { id: current.id, appId: current.appId, live: liveStationIdOf(current.src) !== null } : null);
   const voiceoverFor = useCallback((ref: MediaItemRef) => ref.id === djFor?.id ? djFor?.voiceover : undefined, [djFor]);
-  const hostWithDj = useMemo(() => ({ ...host, voiceoverFor }), [host, voiceoverFor]);
+  // NOW-PLAYING-01: on the Music app's pages the kit's Now Playing draws shuffle, repeat and the Up next button from the same play mode the
+  // stage uses (media/playMode.ts, kept on this device) and opens the same Up next view the stage has. Other apps' players get neither.
+  const playMode = usePlayMode();
+  const inMusic = mediaAppOfPath(location.pathname) === "music";
+  const hostWithDj = useMemo<MediaHost>(() => ({
+    ...host,
+    voiceoverFor,
+    ...(inMusic ? {
+      playMode: { shuffle: playMode.shuffle, repeat: playMode.repeat, onShuffle: () => setPlayMode({ shuffle: !getPlayMode().shuffle }), onRepeat: () => setPlayMode({ repeat: nextRepeat(getPlayMode().repeat) }) },
+      openQueue: () => requestStage("queue"),
+    } : {}),
+  }), [host, voiceoverFor, inMusic, playMode.shuffle, playMode.repeat]);
   // MEDIA-VIZ-03: the next song of the music queue, for the mini bar's Next and the Media Session's next track (and, when a song ends
   // away from Now playing, the host keeps the same queue moving with it). Null when there is no queue or no next song.
   // MUSIC-STAGE-01: songs played this session, newest last, so Previous can go back.
@@ -269,7 +281,6 @@ export function MediaHostProvider({ children, personId, ageBand }: { children: R
     if (!held || held.appId !== "music" || held.id === id) return;
     try { await playQueued(id, held, true); } catch { /* the song stays as it was */ }
   }, [store, playQueued]);
-  const playMode = usePlayMode();
   // Repeat "one" loops the held song, whichever page is open.
   useEffect(() => {
     if (!current || current.appId !== "music") return;

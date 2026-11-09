@@ -100,12 +100,12 @@ describe("the package documents", () => {
     expect(manifest.contributes.data.length).toBeLessThanOrEqual(16);
     expect(pageOf("liked").body[0].bind.path).toBe("liked");
   });
-  test("home shelves carry the byline and a two-action card menu; made-at-home stays plain", () => {
+  test("home shelves carry the byline and a card menu of Watch later, Like and Share; made-at-home stays plain", () => {
     const shelves = pageOf("index").body.filter((n: { type: string }) => n.type === "media_shelf");
     for (const shelf of shelves) {
       if (shelf.bind.path === "made-at-home") { expect(shelf.row_actions).toBeUndefined(); continue; }
       expect(shelf.item_subtitle_field).toBe("{byline}");
-      expect(shelf.row_actions.map((a: { label: string }) => a.label)).toEqual(["Watch later", "Like"]);
+      expect(shelf.row_actions.map((a: { label: string }) => a.label)).toEqual(["Watch later", "Like", "Share"]);
     }
   });
   test("the watch page lists chapters", () => {
@@ -126,5 +126,94 @@ describe("clip ready notice never names a locked clip", () => {
       expect(JSON.stringify(calls)).not.toContain("secret adult words");
       expect(JSON.stringify(calls)).toContain("Your video");
     } finally { spy.mockRestore(); void original; }
+  });
+});
+
+describe("apps parity: chips, sort and search filters", () => {
+  const pageOf = (id: string) => JSON.parse(readFileSync(join(pkg, "pages", `${id}.json`), "utf8"));
+  async function library() {
+    const { client } = await owner();
+    const { buildMediaTree } = await import("./support/mediaTree");
+    const { scanRoot } = await import("@/lib/media/scan");
+    const added = await client.post("/api/media/sources", { label: "videos", path: buildMediaTree().videos, kinds: ["video"] });
+    await scanRoot(((await added.json()) as { source: { id: string } }).source.id, { prober: null, pruneGraceMs: 0 });
+    const ask = async (id: string, body: Record<string, unknown> = {}) => (await (await client.post(`/api/plugins/videos/data/${id}`, body)).json()) as Array<Record<string, any>>;
+    const rows = await ask("library");
+    const { mediaItems } = await import("@/db/schema");
+    const { eq } = await import("drizzle-orm");
+    const setLength = (title: string, seconds: number) => db.update(mediaItems).set({ durationS: seconds }).where(eq(mediaItems.title, title)).run();
+    return { client, ask, rows, setLength };
+  }
+
+  test("Short and Long split the library by length; Unwatched drops what was started", async () => {
+    const { client, ask, rows, setLength } = await library();
+    const names = rows.map((row) => row.title as string);
+    expect(names.length).toBeGreaterThanOrEqual(3);
+    setLength(names[0]!, 120); setLength(names[1]!, 1500);
+    expect((await ask("library", { filter: "short" })).map((row) => row.title)).toEqual([names[0]]);
+    expect((await ask("library", { filter: "long" })).map((row) => row.title)).toEqual([names[1]]);
+    const started = rows.find((row) => row.title === names[2])!;
+    await client.post("/api/plugins/videos/progress", { media_id: started.id, position_s: 5, duration_s: 100 });
+    const unwatched = (await ask("library", { filter: "unwatched" })).map((row) => row.title);
+    expect(unwatched).not.toContain(names[2]);
+    expect(unwatched.length).toBe(names.length - 1);
+  });
+
+  test("a channel narrows every shelf, the library sorts Recents or A to Z, and a bad chip changes nothing", async () => {
+    const { ask, rows } = await library();
+    const channel = rows[0]!.channel as string;
+    const only = await ask("library", { channel });
+    expect(only.length).toBeGreaterThan(0);
+    expect(only.every((row) => row.channel === channel)).toBe(true);
+    expect((await ask("recent", { channel })).every((row) => row.channel === channel)).toBe(true);
+    const az = (await ask("library", { sort: "a-z" })).map((row) => row.title as string);
+    expect(az).toEqual([...az].sort((a, b) => a.localeCompare(b, undefined, { sensitivity: "base" })));
+    expect((await ask("library", { sort: "recents" })).length).toBe(rows.length);
+    expect((await ask("library", { filter: "nonsense" })).length).toBe(rows.length);
+  });
+
+  test("Made at home empties the saved shelves and a date chip keeps only what is recent", async () => {
+    const { ask, rows } = await library();
+    expect(await ask("continue", { filter: "made" })).toEqual([]);
+    expect(await ask("library", { filter: "made" })).toEqual([]);
+    // Just scanned, so everything counts as this week and nothing is older.
+    expect((await ask("library", { filter: "week" })).length).toBe(rows.length);
+    expect((await ask("library", { filter: "today" })).length).toBe(rows.length);
+  });
+
+  test("search words and the Type chip: All and Saved find saved videos; Made at home finds only made clips", async () => {
+    const { ask, rows } = await library();
+    const word = String(rows[0]!.title).split(" ")[0]!;
+    const all = await ask("library", { query: word, type: "all" });
+    expect(all.map((row) => row.title)).toContain(rows[0]!.title);
+    expect((await ask("library", { query: word, type: "saved" })).map((row) => row.title)).toContain(rows[0]!.title);
+    expect(await ask("library", { query: word, type: "made" })).toEqual([]);
+  });
+
+  test("the pages carry the chips, the sort and the pinned-spec fields", () => {
+    const index = pageOf("index").body as Array<Record<string, any>>;
+    const chipped = index.filter((node) => node.chips);
+    expect(chipped.length).toBe(1);
+    expect(chipped[0]!.chips).toMatchObject({ state: "vfilter" });
+    expect(chipped[0]!.chips.options.map((option: { label: string }) => option.label)).toEqual(["All", "Made at home", "Unwatched", "Long", "Short"]);
+    for (const shelf of index.filter((node) => ["recent", "new", "continue", "again", "more-from"].includes(node.bind?.path))) {
+      expect(shelf.bind.params).toMatchObject({ filter: "$state.vfilter", channel: "$state.channel" });
+    }
+    expect(index.some((node) => node.type === "picker" && node.state === "channel")).toBe(true);
+    const lib = (pageOf("library").body as Array<Record<string, any>>).find((node) => node.heading === "Library")!;
+    expect(lib.sort.options.map((option: { label: string }) => option.label)).toEqual(["Recents", "A to Z"]);
+    expect(lib.bind.params.sort).toBe("$state.sort");
+    const search = pageOf("search").body as Array<Record<string, any>>;
+    expect(search[0]!.type_chips.options.map((option: { label: string }) => option.label)).toEqual(["All", "Made at home", "Saved"]);
+    const results = search.find((node) => node.heading === "Results")!;
+    expect(results.chips.options.map((option: { label: string }) => option.label)).toEqual(["Any time", "Today", "This week", "This month", "Short", "Long"]);
+    expect(results.bind.params).toMatchObject({ filter: "$state.when", type: "$state.kind" });
+  });
+
+  test("the watch page can be shared and turns on picture-in-picture, double tap and long press (the spec default is off)", () => {
+    const player = pageOf("watch").body[0].main[0];
+    expect(player).toMatchObject({ pip: true, double_tap_seek: true, long_press_speed: true });
+    expect(player.actions.map((action: { label: string }) => action.label)).toEqual(["Like", "Watch later", "Share"]);
+    expect(player.actions[2].action.share.to).toBe("/apps/videos/watch?id={id}");
   });
 });

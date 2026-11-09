@@ -11,6 +11,7 @@ import { RadioGroup, RadioGroupItem } from "@maipai/ui/src/dashboard/components/
 import { useLockProof } from "@maipai/ui/src/elements/adult-lock";
 import { stylesApi } from "@/apps/settings/styles/stylesApi";
 import { messageOf } from "@/apps/settings/styles/stylesShared";
+import { StatusCard } from "@maipai/ui/src/elements/status-card";
 
 export function StyleAddFile({ onClose, onAdded }: { onClose: () => void; onAdded: () => void }) {
   const lock = useLockProof();
@@ -62,7 +63,7 @@ export function StyleAddFile({ onClose, onAdded }: { onClose: () => void; onAdde
                 </RadioGroup>
                 <p className="text-sm text-muted-foreground">{i18n._({ id: "A file never says what age it is for. {value}", message: "A file never says what age it is for. {value}", values: { value: lock.unlocked ? "" : i18n._({ id: "Unlock on the Styles page first to choose all ages.", message: "Unlock on the Styles page first to choose all ages." }) } })}</p>
               </DialogSection>
-              {error ? <p role="alert" className="text-sm text-destructive">{error}</p> : null}
+              {error ? <StatusCard kind="problem" title={i18n._({ id: "That did not work", message: "That did not work" })} line={error} /> : null}
               <div className="flex flex-col gap-2">
                 <div className="flex flex-wrap gap-2"><Button type="submit" disabled={busy || !file || !read}>{busy ? i18n._({ id: "Adding…", message: "Adding…" }) : i18n._({ id: "Add style", message: "Add style" })}</Button><Button type="button" variant="outline" onClick={onClose}>{i18n._({ id: "Cancel", message: "Cancel" })}</Button></div>
                 <p className="text-sm text-muted-foreground">{i18n._({ id: "It starts for admins only. You choose who else can use it after you try it.", message: "It starts for admins only. You choose who else can use it after you try it." })}</p>

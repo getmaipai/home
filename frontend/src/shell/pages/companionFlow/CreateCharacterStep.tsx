@@ -18,6 +18,7 @@ import { flowErrorText } from "@/shell/pages/companionFlow/errors";
 import { DraggablePicture } from "@/shell/pages/companionFlow/DraggablePicture";
 import { DEFAULT_FRAME, type PictureFrame } from "@/shell/pages/companionFlow/PreviewControls";
 import { MAKING_BACK_LINE, useMakingAvailability, useMakingRecovery } from "@/apps/chat/useMakingAvailability";
+import { StatusCard } from "@maipai/ui/src/elements/status-card";
 
 export const lookKey = (id: string) => ["companions", id, "look"] as const;
 const running = (job: CompanionLookJob | undefined, jobId: string | null) => jobId !== null && (job === undefined || job.state === "queued" || job.state === "running");
@@ -243,7 +244,7 @@ export function CreateCharacterStep({ creating, companionId, initialName, onDraf
             <SelectContent>{(peopleQuery.data ?? []).map((person) => <SelectItem key={person.id} value={person.id}>{person.display_name}</SelectItem>)}</SelectContent>
           </Select> : null}
           {basedKind === "real_person" ? <Input aria-label={i18n._({ id: "Real person name", message: "Real person name" })} shape="pill" maxLength={120} value={basedName} onChange={(event) => setBasedName(event.target.value)} placeholder={i18n._({ id: "Enter a real person's name", message: "Enter a real person's name" })} /> : null}
-          {peopleQuery.isError ? <p role="alert" className="text-sm text-destructive">{flowErrorText(peopleQuery.error)}</p> : null}
+          {peopleQuery.isError ? <StatusCard kind="problem" title={i18n._({ id: "That did not work", message: "That did not work" })} line={flowErrorText(peopleQuery.error)} /> : null}
         </DialogSection> : null}
         <DialogSection title={i18n._({ id: "Character name", message: "Character name" })}>
           <Input aria-label={i18n._({ id: "Character name", message: "Character name" })} shape="pill" placeholder={i18n._({ id: "Enter character name", message: "Enter character name" })} maxLength={40} value={name} disabled={locked}
@@ -273,7 +274,7 @@ export function CreateCharacterStep({ creating, companionId, initialName, onDraf
           <Button shape="pill" width="full" disabled={!canGenerate || (mode === "upload" && style === "keep")} aria-describedby={making.reason ? reasonId : undefined} title={making.reason ?? undefined} aria-busy={makingCharacter} onClick={() => void generate()}>{makingCharacter ? <><Spinner className="animate-spin" aria-hidden="true" />{i18n._({ id: "Making your character...", message: "Making your character..." })}</> : <><Sparkles aria-hidden="true" />{i18n._({ id: "Generate Character", message: "Generate Character" })}</>}</Button>
           {look && !look.can_generate && look.generate_reason ? <p className="text-sm text-muted-foreground">{look.generate_reason}</p> : null}
           {making.reason ? <p id={reasonId} role="status" className="text-sm text-muted-foreground">{making.reason}</p> : null}
-          {error ? <p role="alert" className="text-sm text-destructive">{error}</p> : null}
+          {error ? <StatusCard kind="problem" title={i18n._({ id: "That did not work", message: "That did not work" })} line={error} /> : null}
         </div>
       </div>
       <DialogSection title={i18n._({ id: "Character Preview", message: "Character Preview" })}>
@@ -300,7 +301,7 @@ export function CreateCharacterStep({ creating, companionId, initialName, onDraf
         <Button shape="pill" width="full" disabled={!picture || locked || making.disabled} aria-describedby={making.reason ? reasonId : undefined} title={making.reason ?? undefined} aria-busy={busyKind === "approve"} onClick={() => void approve()}>
           {busyKind === "approve" ? <><Spinner className="animate-spin" aria-hidden="true" />{i18n._({ id: "Getting your character ready...", message: "Getting your character ready..." })}</> : <>{i18n._({ id: "Approve & Continue", message: "Approve & Continue" })}</>}
         </Button>
-        {previewError ? <p role="alert" className="text-sm text-destructive">{previewError}</p> : null}
+        {previewError ? <StatusCard kind="problem" title={i18n._({ id: "That did not work", message: "That did not work" })} line={previewError} /> : null}
       </DialogSection>
     </DialogBody>
     </>

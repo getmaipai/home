@@ -1,9 +1,9 @@
 import { i18n } from "@lingui/core";
 // MEDIA-VIZ-02/03: what the Music play page adds beside the kit Player (which stays untouched, RULES rule 9), ported from the
-// pre-rebuild hub's Now Playing page: the visualizer moving behind a flat page (PRO look: no gradient wash, no blurred cover), a row of controls (Minimize, visualizer scene, sleep timer, repeat, volume, Full screen), and the same Now
+// pre-rebuild hub's Now Playing page: the visualizer moving behind a flat page (PRO look: no gradient wash, no blurred cover), a row of controls (Minimize, visualizer scene, sleep timer, volume, Full screen; shuffle, repeat and Up next are the kit Now Playing's own, fed by the host), and the same Now
 // playing stage the mini player opens. It reads the media host's element, so it never starts or restarts anything, and it draws
 // only while the host holds this song.
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Button } from "@maipai/ui/src/dashboard/components/ui/button";
 import { Slider } from "@maipai/ui/src/dashboard/components/ui/slider";
 import { getIcon } from "@maipai/ui/src/icons";
@@ -14,6 +14,7 @@ import { NowPlayingStage } from "@/shell/media/NowPlayingStage";
 import { SleepMenu } from "@/shell/media/SleepMenu";
 import { useIsPlaying, useMediaAnalyser, useProgress } from "@/shell/media/useMediaAnalyser";
 import { VisualizerMenu } from "@/shell/media/VisualizerMenu";
+import { useStageRequest, type StageView } from "@/shell/media/stageRequest";
 import { useArtPalette } from "@/lib/media/artPalette";
 
 function useMediaFlags(el: HTMLMediaElement | null): { loop: boolean; volume: number } {
@@ -34,7 +35,16 @@ export function MusicVisualizerSection({ id }: { id: string }) {
   const held = useMediaDock().current;
   const mine = held !== null && held.appId === "music" && held.id === id && held.kind === "audio" ? held : null;
   const [stage, setStage] = useState(false);
-  const [loop, setLoop] = useState(false);
+  const [stageView, setStageView] = useState<StageView>("scene");
+  // NOW-PLAYING-01: the kit's Up next button asks the host, and the host asks here; only an ask made while this section is on screen opens the stage.
+  const asked = useStageRequest();
+  const seen = useRef(asked.seq);
+  useEffect(() => {
+    if (asked.seq === seen.current) return;
+    seen.current = asked.seq;
+    setStageView(asked.view);
+    setStage(true);
+  }, [asked]);
   const variant = useVisualizerPref();
   const vizOn = useVisualizerEnabled();
   const palette = useArtPalette(mine?.poster ?? null);
@@ -43,10 +53,8 @@ export function MusicVisualizerSection({ id }: { id: string }) {
   const progress = useProgress(mine?.el ?? null);
   const { volume } = useMediaFlags(mine?.el ?? null);
   const closeStage = useCallback(() => setStage(false), []);
-  useEffect(() => { setLoop(mine?.el.loop ?? false); }, [mine?.el]);
   if (!mine) return null;
   const FullIcon = getIcon("maximize"), MuteIcon = volume === 0 ? getIcon("volume-x") : getIcon("volume-2");
-  const toggleLoop = () => { mine.el.loop = !mine.el.loop; setLoop(mine.el.loop); };
   return (
     <>
       <div aria-hidden="true" data-testid="music-page-backdrop" className="pointer-events-none fixed inset-x-0 bottom-0 top-13 z-0 overflow-hidden md:start-14">
@@ -56,14 +64,13 @@ export function MusicVisualizerSection({ id }: { id: string }) {
         <MinimizeButton appHome="/apps/music" />
         <VisualizerMenu withLabel />
         <SleepMenu withLabel />
-        <Button size="sm" variant={loop ? "secondary" : "ghost"} aria-pressed={loop} onClick={toggleLoop}>{i18n._({ id: "Repeat", message: "Repeat" })}</Button>
         <span className="flex items-center gap-2 px-2">
           <MuteIcon aria-hidden="true" className="size-4 text-muted-foreground" />
           <div className="w-24"><Slider aria-label={i18n._({ id: "Volume", message: "Volume" })} min={0} max={1} step={0.01} value={[volume]} onValueChange={(value) => { const next = Array.isArray(value) ? value[0] : value; if (typeof next === "number") mine.el.volume = next; }} /></div>
         </span>
         <span aria-hidden="true" className="flex-1" />
-        <Button size="sm" variant="ghost" aria-label={i18n._({ id: "Full screen visualizer", message: "Full screen visualizer" })} onClick={() => setStage(true)}><FullIcon aria-hidden="true" />{i18n._({ id: "Full screen", message: "Full screen" })}</Button>
-        {stage ? <NowPlayingStage media={mine} onClose={closeStage} /> : null}
+        <Button size="sm" variant="ghost" aria-label={i18n._({ id: "Full screen visualizer", message: "Full screen visualizer" })} onClick={() => { setStageView("scene"); setStage(true); }}><FullIcon aria-hidden="true" />{i18n._({ id: "Full screen", message: "Full screen" })}</Button>
+        {stage ? <NowPlayingStage media={mine} initialView={stageView} onClose={closeStage} /> : null}
       </section>
     </>
   );

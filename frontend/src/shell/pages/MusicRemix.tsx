@@ -8,6 +8,8 @@ import { Input } from "@maipai/ui/src/ui/input";
 import { Chip } from "@maipai/ui/src/primitives/Chip";
 import { useToast } from "@maipai/ui/src/primitives/Toast";
 import { musicApi, type MusicCard } from "@/lib/musicApi";
+import { errorLine } from "@/lib/hubReachability";
+import { StatusCard } from "@maipai/ui/src/elements/status-card";
 
 const VOICES = () => ([{ id: "", label: i18n._({ id: "Keep the voice", message: "Keep the voice" }) }, { id: "a female voice", label: i18n._({ id: "Female voice", message: "Female voice" }) }, { id: "a male voice", label: i18n._({ id: "Male voice", message: "Male voice" }) }, { id: "no vocals, instrumental only", label: i18n._({ id: "No vocals", message: "No vocals" }) }]);
 
@@ -26,7 +28,7 @@ export function RemixSong({ card, onClose, onSent }: { card: MusicCard; onClose:
     setSending(true); setProblem("");
     musicApi.revise(card.id, change)
       .then(() => { push(i18n._({ id: "Making your remix. It appears on this song when it is done.", message: "Making your remix. It appears on this song when it is done." })); onSent?.(); onClose(); })
-      .catch((error: unknown) => setProblem(error instanceof Error && error.message ? error.message : i18n._({ id: "The remix could not start. Check your connection and try again.", message: "The remix could not start. Check your connection and try again." })))
+      .catch((error: unknown) => setProblem(errorLine(error, i18n._({ id: "The remix could not start. Check your connection and try again.", message: "The remix could not start. Check your connection and try again." }))))
       .finally(() => setSending(false));
   };
   // The body of the Remix dialog (the dialog itself is drawn by the song page): wide, with room for the lyrics.
@@ -34,7 +36,7 @@ export function RemixSong({ card, onClose, onSent }: { card: MusicCard; onClose:
     {reviewing ? <div className="flex flex-col gap-3" data-testid="music-remix-review">
       <p className="text-sm font-semibold">{i18n._({ id: "This is what will be made:", message: "This is what will be made:" })}</p>
       <p className="bg-muted/50 rounded-xl p-3 text-sm whitespace-pre-wrap">{change}</p>
-      {problem ? <p role="alert" className="text-sm">{problem}</p> : null}
+      {problem ? <StatusCard kind="problem" title={i18n._({ id: "That did not work", message: "That did not work" })} line={problem} /> : null}
       <div className="flex flex-wrap gap-2">
         <Button type="button" disabled={sending} onClick={send}>{sending ? i18n._({ id: "Starting", message: "Starting" }) : i18n._({ id: "Make the remix", message: "Make the remix" })}</Button>
         <Button type="button" variant="secondary" disabled={sending} onClick={() => setReviewing(false)}>{i18n._({ id: "Change the request", message: "Change the request" })}</Button>

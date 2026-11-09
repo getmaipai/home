@@ -42,6 +42,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@maip
 import { Button } from "@maipai/ui/src/dashboard/components/ui/button";
 import { Badge } from "@maipai/ui/src/dashboard/components/ui/badge";
 import { Item, ItemContent, ItemDescription, ItemFooter, ItemGroup, ItemSeparator, ItemTitle } from "@maipai/ui/src/dashboard/components/ui/item";
+import { StatusCard } from "@maipai/ui/src/elements/status-card";
 
 /** The kit's `lg` breakpoint: from here the column and the content sit side
  * by side; below it the shell drills in (the column alone, then a section). */
@@ -279,7 +280,7 @@ function SettingsAreaBody({ area, packageAreas, person, onPersonChange, packageA
               </Item>
             </Fragment>)}
           </ItemGroup>
-          {setupChecklist.dismiss.isError ? <p role="alert" className="text-sm text-destructive">{i18n._({ id: "Could not hide this item. Try again.", message: "Could not hide this item. Try again." })}</p> : null}
+          {setupChecklist.dismiss.isError ? <StatusCard kind="problem" title={i18n._({ id: "That did not work", message: "That did not work" })} line={i18n._({ id: "Could not hide this item. Try again.", message: "Could not hide this item. Try again." })} /> : null}
         </CardContent>
       </Card>
       {content}

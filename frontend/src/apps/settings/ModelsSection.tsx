@@ -21,6 +21,7 @@ import type { FitPlanResponse } from "@/lib/api";
 import { summarizeFits } from "@/lib/fitSummary";
 import { isVisibleModelDownload, modelDownloadProgress, useModelDownloadJobs } from "@/lib/modelDownloadProgress";
 import { errorLine } from "@/lib/hubReachability";
+import { StatusCard } from "@maipai/ui/src/elements/status-card";
 
 // The model-selection wizard, real half (2026-09-04): docs/SETTINGS.md
 // Rule 3 ("One card per role... with the chosen model... and 'change.'
@@ -78,7 +79,7 @@ export function ModelsSection() {
     <>
       {downloads.filter((job) => isVisibleModelDownload(job)).map((job) => <JobProgress presentation="card" key={job.id} {...modelDownloadProgress(job)} variant="full" cancelable={job.actions?.includes("stop")} onCancel={job.actions?.includes("stop") ? () => { void api.stopJob(job.id); } : undefined} />)}
       <div className="flex flex-col gap-4">
-        {error ? <p className="text-base text-destructive">{error}</p> : null}
+        {error ? <StatusCard kind="problem" title={i18n._({ id: "That did not work", message: "That did not work" })} line={error} /> : null}
         {hardware === null ? (
           <Progress mode="spinner" label={i18n._({ id: "Checking this computer", message: "Checking this computer" })} />
         ) : (
@@ -371,7 +372,7 @@ function ChatModelChoices({ fits, selectedModelId, installedIds, downloading, on
           );
         })}
       </ul>
-      {message ? <p className="mt-2 text-base text-destructive">{message}</p> : null}
+      {message ? <StatusCard kind="problem" title={i18n._({ id: "That did not work", message: "That did not work" })} line={message} /> : null}
     </RoleCardShell>
   );
 }

@@ -15,62 +15,136 @@
             "q": "{q}"
           }
         }
+      },
+      "type_chips": {
+        "state": "kind",
+        "label": "Result type",
+        "options": [
+          {
+            "value": "all",
+            "label": "All"
+          },
+          {
+            "value": "shows",
+            "label": "Shows"
+          },
+          {
+            "value": "episodes",
+            "label": "Episodes"
+          }
+        ]
       }
     },
     {
-      "type": "media_shelf",
-      "heading": "Search results",
-      "bind": {
-        "source": "package",
-        "path": "directory",
-        "params": {
-          "q": "$state.q",
-          "scope": "search"
-        }
-      },
-      "item_key_field": "id",
-      "item_label_field": "title",
-      "item_subtitle_field": "{author}",
-      "item_media_field": "thumbnail",
-      "aspect": "square",
-      "variant": "plain",
-      "orientation": "vertical",
-      "density": "compact",
-      "on_select": {
-        "navigate": {
-          "to": "/apps/podcasts/show",
-          "state": {
-            "id": "{feed_url}"
-          }
-        }
-      },
-      "row_actions": [
+      "type": "section",
+      "condition": "!kind == 'episodes'",
+      "children": [
         {
-          "icon": "plus",
-          "label": "Follow",
-          "label_field": "action_label",
-          "action": {
-            "call": {
-              "target": "/api/plugins/podcasts/directory/add",
-              "args": {
-                "url": "{feed_url}"
+          "type": "media_shelf",
+          "heading": "Shows",
+          "bind": {
+            "source": "package",
+            "path": "directory",
+            "params": {
+              "q": "$state.q",
+              "scope": "search",
+              "shelf": "shows",
+              "kind": "$state.kind"
+            }
+          },
+          "item_key_field": "id",
+          "item_label_field": "title",
+          "item_subtitle_field": "{author}",
+          "item_media_field": "thumbnail",
+          "aspect": "square",
+          "variant": "plain",
+          "orientation": "vertical",
+          "density": "compact",
+          "on_select": {
+            "navigate": {
+              "to": "/apps/podcasts/show",
+              "state": {
+                "id": "{feed_url}"
               }
             }
+          },
+          "row_actions": [
+            {
+              "icon": "plus",
+              "label": "Follow",
+              "label_field": "action_label",
+              "action": {
+                "call": {
+                  "target": "/api/plugins/podcasts/directory/add",
+                  "args": {
+                    "url": "{feed_url}"
+                  }
+                }
+              }
+            }
+          ],
+          "hide_when_empty": false,
+          "empty_state": {
+            "type": "empty_state",
+            "icon": "search",
+            "text": "No shows match. Check the spelling, or add a show by its feed address with New show.",
+            "action": {
+              "navigate": {
+                "to": "/apps/podcasts/new-show"
+              }
+            },
+            "action_label": "New show"
           }
         }
-      ],
-      "hide_when_empty": false,
-      "empty_state": {
-        "type": "empty_state",
-        "icon": "search",
-        "text": "No shows match. Check the spelling, or add a show by its feed address with New show.",
-        "action": {
-          "navigate": {
-            "to": "/apps/podcasts/new-show"
-          }
-        },
-        "action_label": "New show"
-      }
+      ]
+    },
+    {
+      "type": "section",
+      "condition": "!kind == 'shows'",
+      "children": [
+        {
+          "type": "media_shelf",
+          "heading": "Episodes",
+          "bind": {
+            "source": "package",
+            "path": "directory",
+            "params": {
+              "q": "$state.q",
+              "scope": "search",
+              "shelf": "episodes",
+              "kind": "$state.kind"
+            }
+          },
+          "item_key_field": "id",
+          "item_label_field": "title",
+          "item_subtitle_field": "{author}",
+          "item_media_field": "thumbnail",
+          "aspect": "square",
+          "variant": "plain",
+          "orientation": "vertical",
+          "density": "compact",
+          "on_select": {
+            "navigate": {
+              "to": "/apps/podcasts/episode",
+              "state": {
+                "id": "{id}"
+              }
+            }
+          },
+          "row_actions": [
+            {
+              "icon": "play",
+              "label": "Play",
+              "action": {
+                "play": {
+                  "media_id": "{id}"
+                }
+              }
+            }
+          ],
+          "hide_when_empty": true
+        }
+      ]
     }
   ]
 }

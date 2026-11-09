@@ -9,6 +9,8 @@ import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "
 import { api, type WorldPlaceView } from "@/lib/api";
 import { CLOCK_ADD_EVENT } from "@/apps/clock/clockHeader";
 import { deviceTimeZone, formatDate, formatDateParts, formatTime } from "@/lib/format";
+import { errorLine } from "@/lib/hubReachability";
+import { StatusCard } from "@maipai/ui/src/elements/status-card";
 
 const worldPlacesKey = ["world-places"];
 
@@ -111,7 +113,7 @@ export function WorldClocksTab({ homeZone: providedZone, enabled = true }: { hom
       setOpen(false);
       await refreshPlaces();
     } catch (error) {
-      setLimitMessage(error instanceof Error ? error.message : i18n._({ id: "You can save up to 12 places.", message: "You can save up to 12 places." }));
+      setLimitMessage(errorLine(error, i18n._({ id: "You can save up to 12 places.", message: "You can save up to 12 places." })));
     }
   }
 
@@ -163,7 +165,7 @@ export function WorldClocksTab({ homeZone: providedZone, enabled = true }: { hom
           <div className="grid gap-3 px-4">
             <Label htmlFor="world-search">{i18n._({ id: "City", message: "City" })}</Label>
             <Input shape="pill" fill="surface" id="world-search" value={search} onChange={(event) => setSearch(event.target.value)} placeholder={i18n._({ id: "Search cities", message: "Search cities" })} />
-            {limitMessage ? <p role="alert">{limitMessage}</p> : null}
+            {limitMessage ? <StatusCard kind="problem" title={i18n._({ id: "That did not work", message: "That did not work" })} line={limitMessage} /> : null}
             <ul className="m-0 list-none p-0">
               {results.map((place) => <li key={`${place.name}-${place.zone}`}>
                 <Button type="button" variant="ghost" align="start" width="full" onClick={() => void addPlace({ name: place.name, country: place.country, zone: place.zone })}>{place.name}, {place.country}</Button>

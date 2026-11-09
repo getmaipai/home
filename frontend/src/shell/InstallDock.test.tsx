@@ -3,7 +3,7 @@ import { cleanup, fireEvent, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { renderWithQueryClient } from "../../tests/renderWithQueryClient";
 import { InstallDock, buildDock } from "./InstallDock";
-import type { HomeJobView, InstallStatusView } from "@/lib/api";
+import type { ActivityItemView, HomeJobView, InstallStatusView } from "@/lib/api";
 
 afterEach(cleanup);
 
@@ -181,5 +181,58 @@ describe("InstallDock finish wording and stacking", () => {
       const dock = await view.findByTestId("install-dock");
       await waitFor(() => expect(dock.style.bottom).toBe("120px"));
     } finally { nav.remove(); mini.remove(); }
+  });
+});
+
+// ACTIVITY-PAGE-01 (PRO-LOOK-01 section 23): a making card links to Activity, and a job that ends while the person is here becomes its DONE or
+// COULD NOT FINISH card for a short time, with Open (or Try again) and Activity.
+describe("InstallDock making jobs end", () => {
+  const running: HomeJobView = { id: "video:v1", kind: "video", state: "running", title: "A dog on a beach", progress: { percent: 40 } };
+  const entry = (over: Partial<ActivityItemView>): ActivityItemView => ({ id: "video:v1", source: "video", state: "done", title: "A dog on a beach", line: null, percent: null, typicalMinutes: null, href: "/apps/videos/create", at: new Date().toISOString(), ...over });
+  const mount = (rows: () => HomeJobView[], activity: () => ActivityItemView[]) => renderWithQueryClient(
+    <MemoryRouter><InstallDock admin={false} read={async () => status({ state: "none", items: [] })} readJobs={async () => rows()} readActivity={async () => ({ items: activity(), seenAt: null, dot: "none" })} /></MemoryRouter>,
+  );
+
+  test("the live making card links to the Activity page", async () => {
+    const view = mount(() => [running], () => []);
+    const link = await view.findByTestId("install-dock-activity");
+    expect(link.getAttribute("href")).toBe("/activity");
+  });
+
+  test("a job that finishes while the person is here shows its DONE card with Open and Activity, and nothing before it started", async () => {
+    let rows: HomeJobView[] = [running];
+    let items: ActivityItemView[] = [entry({ state: "done" })];
+    const view = mount(() => rows, () => items);
+    await view.findByText("Making a video");
+    expect(view.queryByTestId("install-dock-ended")).toBeNull();
+    rows = [];
+    await view.queryClient.invalidateQueries();
+    const card = await view.findByTestId("install-dock-ended", {}, { timeout: 4000 });
+    expect(card.textContent).toContain("Done");
+    expect(card.textContent).toContain("A dog on a beach");
+    expect(card.querySelector("[data-status-kind=done]")).toBeTruthy();
+    expect(view.getByRole("button", { name: "Open" })).toBeTruthy();
+    expect(view.getByRole("button", { name: "Activity" })).toBeTruthy();
+    items = [];
+  });
+
+  test("a job that fails shows COULD NOT FINISH with the next step and Try again", async () => {
+    let rows: HomeJobView[] = [running];
+    const view = mount(() => rows, () => [entry({ state: "failed", line: "I couldn't make that video. Try again, or ask for something simpler." })]);
+    await view.findByText("Making a video");
+    rows = [];
+    await view.queryClient.invalidateQueries();
+    const card = await view.findByTestId("install-dock-ended", {}, { timeout: 4000 });
+    expect(card.querySelector("[data-status-kind=problem]")).toBeTruthy();
+    expect(card.textContent).toContain("Could not finish");
+    expect(card.textContent).toContain("Try again, or ask for something simpler.");
+    expect(view.getByRole("button", { name: "Try again" })).toBeTruthy();
+  });
+
+  test("an old finished job from before this page opened shows no card", async () => {
+    const view = mount(() => [], () => [entry({ state: "done" })]);
+    await waitFor(() => expect(view.container.querySelector("[data-testid=install-dock-announcer], [data-testid=install-announcer]")).toBeTruthy());
+    await new Promise((resolve) => setTimeout(resolve, 150));
+    expect(view.queryByTestId("install-dock-ended")).toBeNull();
   });
 });

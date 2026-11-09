@@ -6,6 +6,7 @@ import { Input } from "@maipai/ui/src/ui/input";
 import { Button } from "@maipai/ui/src/ui/button";
 import { api } from "@/lib/api";
 import { errorLine } from "@/lib/hubReachability";
+import { StatusCard } from "@maipai/ui/src/elements/status-card";
 
 const KEY = "voice.hf_token";
 
@@ -85,7 +86,7 @@ export function HuggingFaceTokenSection() {
       <p className="text-base text-muted-foreground">
         {i18n._({ id: "Needed by the Stack to clone a voice from a recording. Create a read token at huggingface.co/settings/tokens and paste it below.", message: "Needed by the Stack to clone a voice from a recording. Create a read token at huggingface.co/settings/tokens and paste it below." })}
       </p>
-      {loadError ? <p className="text-base text-destructive">{loadError}</p> : null}
+      {loadError ? <StatusCard kind="problem" title={i18n._({ id: "That did not work", message: "That did not work" })} line={loadError} /> : null}
       {isSet !== null ? (
         <p className="text-base text-muted-foreground">
           {isSet ? i18n._({ id: "A token is connected.", message: "A token is connected." }) : i18n._({ id: "No token connected yet.", message: "No token connected yet." })}
@@ -100,7 +101,7 @@ export function HuggingFaceTokenSection() {
           disabled={submitting}
           required
         />
-        {error ? <p className="text-base text-destructive">{error}</p> : null}
+        {error ? <StatusCard kind="problem" title={i18n._({ id: "That did not work", message: "That did not work" })} line={error} /> : null}
         {success ? <p className="text-base text-primary">{i18n._({ id: "Saved.", message: "Saved." })}</p> : null}
         <div className="flex gap-2">
           <Button type="submit" disabled={submitting}>

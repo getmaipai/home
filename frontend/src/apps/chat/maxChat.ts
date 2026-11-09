@@ -8,6 +8,7 @@ import { api, ApiError } from "@/lib/api";
 import { chatLeaseApi, type ChatLeaseView } from "@/lib/chatLeaseApi";
 import type { ChatComposerNoticeValue } from "@/apps/chat/chatThreadContexts";
 import { maxStartLine } from "@/apps/chat/composerModeLines";
+import { errorLine } from "@/lib/hubReachability";
 
 // CHAT-NOTICE-SHORT-01: every line is one short sentence pair (about 40 characters).
 export const MAX_SELF_TEST_LINE = "Max needs a quick test first.";
@@ -72,7 +73,7 @@ async function take(qc: QueryClient): Promise<void> {
     setFlow(qc, IDLE);
   } catch (error) {
     if (error instanceof ApiError && error.code === "not_ready" && error.message === MAX_SELF_TEST_LINE) setFlow(qc, { phase: "self_test_needed", line: error.message });
-    else { setPicked(qc, false); setFlow(qc, { phase: "error", line: error instanceof Error ? error.message : "Max did not start. Try again in a minute." }); }
+    else { setPicked(qc, false); setFlow(qc, { phase: "error", line: errorLine(error, "Max did not start. Try again in a minute.") }); }
     void qc.invalidateQueries({ queryKey: LEASE_KEY });
   }
 }
@@ -89,7 +90,7 @@ async function runSelfTest(qc: QueryClient): Promise<void> {
     }
     setFlow(qc, { phase: "error", line: "Max test did not finish. See Settings, Coding." });
   } catch (error) {
-    setFlow(qc, { phase: "error", line: error instanceof Error ? error.message : "Max test did not run. Try again in a minute." });
+    setFlow(qc, { phase: "error", line: errorLine(error, "Max test did not run. Try again in a minute.") });
   }
 }
 

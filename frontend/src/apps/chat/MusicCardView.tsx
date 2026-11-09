@@ -13,6 +13,7 @@ import { Switch } from "@maipai/ui/src/ui/switch";
 import type { MusicTrackStatus } from "@maipai/ui/src/elements/music-track";
 import { musicApi, type MusicCard } from "@/lib/musicApi";
 import { prepareClip, shareClip } from "@/lib/shareClip";
+import { errorLine } from "@/lib/hubReachability";
 export function musicFileName(title: string | null | undefined): string {
   const base = (title ?? "").replace(/[^\p{L}\p{N} _-]+/gu, " ").replace(/\s+/g, " ").trim().slice(0, 80).trim();
   return `${base || "song"}.m4a`;
@@ -66,7 +67,7 @@ export function useMusicTrackProps({ card, owner = true, onRefresh, onStemsStart
   // The edit dialog covers the card, so it closes once a change is sent and the card shows the new version being made.
   const [editOpen, setEditOpen] = useState(false);
   const refresh = () => { setEditOpen(false); onRefresh?.(); };
-  const editErrorText = (error: unknown) => `${error instanceof Error ? error.message : "Home could not make that change."} Check the request and try again.`;
+  const editErrorText = (error: unknown) => `${errorLine(error, "Home could not make that change.")} Check the request and try again.`;
   const makeFull = () => { if (editing) return; setEditing(true); setEditError(""); void musicApi.setLength(card.id, "full", shown?.id).then(refresh).catch(error => setEditError(editErrorText(error))).finally(() => setEditing(false)); };
   const makeQuick = () => { if (editing) return; setEditing(true); setEditError(""); void musicApi.setLength(card.id, "quick", shown?.id).then(refresh).catch(error => setEditError(editErrorText(error))).finally(() => setEditing(false)); };
   const makeTier = (tier: "standard" | "boost" | "max") => { if (editing) return; setEditing(true); setEditError(""); void musicApi.setTier(card.id, tier, shown?.id).then(refresh).catch(error => setEditError(editErrorText(error))).finally(() => setEditing(false)); };

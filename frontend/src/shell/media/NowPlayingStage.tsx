@@ -42,7 +42,7 @@ export function lyricsOf(song: StageSong | null): { lines?: readonly TimedLyricL
 
 const prefersReducedMotion = (): boolean => typeof window !== "undefined" && !!window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
 
-export function NowPlayingStage({ media, onClose }: { media: HoistedMedia; onClose: () => void }) {
+export function NowPlayingStage({ media, onClose, initialView = "scene" }: { media: HoistedMedia; onClose: () => void; initialView?: "scene" | "lyrics" | "queue" }) {
   const el = media.el;
   const root = useRef<HTMLDivElement>(null);
   const [showScene, setShowScene] = useState(readScene);
@@ -58,7 +58,7 @@ export function NowPlayingStage({ media, onClose }: { media: HoistedMedia; onClo
   const isSong = media.appId === "music" && liveStationIdOf(media.src) === null;
   const [song, setSong] = useState<StageSong | null>(null);
   const [liked, setLiked] = useState(false);
-  const [view, setView] = useState<"scene" | "lyrics" | "queue">("scene");
+  const [view, setView] = useState<"scene" | "lyrics" | "queue">(initialView);
   const [queue, setQueue] = useState<QueueRow[]>([]);
   const reduced = prefersReducedMotion();
 

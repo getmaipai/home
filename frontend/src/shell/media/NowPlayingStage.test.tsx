@@ -26,9 +26,9 @@ afterEach(() => { cleanup(); globalThis.fetch = realFetch; });
 
 const media = (): HoistedMedia => ({ id: "s1", src: "/a.mp3", kind: "audio", title: "First song", subtitle: "Marsh", appId: "music", el: document.createElement("audio"), started: true });
 
-function mount(dock: Partial<MediaDock> = {}) {
+function mount(dock: Partial<MediaDock> = {}, initialView?: "scene" | "lyrics" | "queue") {
   const full: MediaDock = { current: null, clear: () => {}, next: async () => {}, previous: async () => {}, play: async () => {}, ...dock };
-  return render(<MediaDockContext.Provider value={full}><NowPlayingStage media={media()} onClose={() => {}} /></MediaDockContext.Provider>);
+  return render(<MediaDockContext.Provider value={full}><NowPlayingStage media={media()} onClose={() => {}} {...(initialView ? { initialView } : {})} /></MediaDockContext.Provider>);
 }
 
 describe("lyricsOf", () => {
@@ -110,5 +110,13 @@ describe("stage ambient color", () => {
       const view = render(<MediaDockContext.Provider value={{ current: null, clear: () => {}, next: async () => {} }}><NowPlayingStage media={{ ...media(), poster: "/cover.png" }} onClose={() => {}} /></MediaDockContext.Provider>);
       expect(view.getByTestId("stage-ambient").getAttribute("data-motion")).toBe("still");
     } finally { window.matchMedia = real; }
+  });
+});
+
+describe("stage opened from the kit's Up next button", () => {
+  test("opening on the queue view lists Up next at once", async () => {
+    const view = mount({}, "queue");
+    await waitFor(() => expect(view.getByText("Second song")).toBeTruthy());
+    expect(view.getByTestId("stage-queue")).toBeTruthy();
   });
 });

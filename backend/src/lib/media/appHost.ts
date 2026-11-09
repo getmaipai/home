@@ -5,6 +5,7 @@
 // a child is allowlist-only (design section 11): the household's library plus channels an adult followed for them, and no discovery rows.
 import { chaptersForMadeClip } from "@/lib/videos/chapters";
 import { withVideoByline } from "./videoByline";
+import { videoRules, wantsVideoRules } from "./videoFilters";
 import { and, desc, eq, inArray, isNull, like, sql, type SQL } from "drizzle-orm";
 import { db } from "@/db";
 import { attachments, mediaItems, mediaSources, musicJobs, people, videoJobs } from "@/db/schema";
@@ -37,6 +38,7 @@ import { artistProfileFor, creditLines, mostCommon } from "./artistProfiles";
 import { songFactFor } from "./songFacts";
 import { getMade } from "@/lib/music/madeRecords";
 import { MIX_SCOPES, musicMixData } from "./musicMixes";
+import { musicLibraryData } from "./musicLibrary";
 import { albumKey, artistKey, albumOrder, groupTracks, radioTracks, shuffled } from "./music";
 import type { Result } from "@/lib/result";
 
@@ -337,6 +339,9 @@ export interface DataParams {
   show?: string;
   /** VIDEO-UI-06, Videos `recipes` scope `clips`: which My clips tab (all, favorites, uploaded). */
   view?: string;
+  /** PARITY-01, Music `songs` scope `library` and Videos `library`: the sort (recents, a-z, creator) and the kind chip (all, songs, albums, artists, playlists). */
+  sort?: string;
+  kind?: string;
   /** VIDEO-UI-06, Videos `recipes` scope `feed`: the Type filter (all, video, still). */
   type?: string;
   /** VIDEO-UI-06, Videos `recipes` scope `feed`: only the clips the person marked as favorites. */
@@ -686,6 +691,12 @@ export function safeTemplateFields<T>(value: T): T {
 }
 
 export function mediaAppData(person: PersonRow, appId: MediaAppId, dataId: string, params: DataParams): ReturnType<typeof mediaAppDataRaw> {
+  // APPS-PARITY: the Videos chips (filter, type, channel) and the library sort narrow or order the rows the id already builds.
+  if (appId === "videos" && wantsVideoRules(dataId.replace(/_/g, "-"), params)) {
+    const id = dataId.replace(/_/g, "-");
+    const asked = (over: DataParams) => mediaAppDataRaw(person, appId, id, over) as MediaRow[];
+    return safeTemplateFields(withVideoByline(videoRules(person, id, params, asked, Math.min(Math.max(params.limit ?? (id === "library" ? 200 : 20), 1), 200)) as never));
+  }
   const raw = mediaAppDataRaw(person, appId, dataId, params);
   return safeTemplateFields(appId === "videos" && dataId !== "recipes" ? withVideoByline(raw) : raw);
 }
@@ -1125,7 +1136,7 @@ export function albumTile(person: PersonRow, id: string, tracks: readonly MediaI
 /** MUSIC-LISTEN-03 to -05: the Listen pages' rows. Every one reads only the library this person may read and this person's own progress rows. */
 const ARTIST_SHELF = 12;
 const sameText = (a: string, b: string): boolean => a.toLocaleLowerCase() === b.toLocaleLowerCase();
-const tileOfArtist = (person: PersonRow, tracks: readonly MediaItem[]): MediaRow & Record<string, unknown> => {
+export const tileOfArtist = (person: PersonRow, tracks: readonly MediaItem[]): MediaRow & Record<string, unknown> => {
   const pictured = tracks.find((item) => item.artwork) ?? tracks[0]!;
   return { ...rowsOf(person, [pictured])[0]!, id: artistKey(tracks[0]!), title: artistKey(tracks[0]!), channel: songCount(tracks.length), kind: "track", queue_mode: "artist" };
 };
@@ -1226,6 +1237,8 @@ const nameMatches = <T extends { title: string; channel?: string | null }>(rows:
 };
 
 function musicData(person: PersonRow, dataId: string, params: DataParams): unknown | null {
+  const parity = musicLibraryData(person, dataId, params);
+  if (parity !== null) return parity;
   if (dataId === "header" && (params.scope === "creation" || params.scope === "creation-people")) {
     if (!params.id) return [];
     return params.scope === "creation-people" ? musicCreationPeople(person, params.id) : musicCreation(person, params.id);
@@ -1282,7 +1295,7 @@ function musicData(person: PersonRow, dataId: string, params: DataParams): unkno
       creator: { name: artist, href: `/apps/music/artist?id=${encodeURIComponent(artist)}` }, art,
       meta: ["Album", genres.length === 1 && tracks.every((item) => item.genre?.trim() === genres[0]) ? genres[0] : null, years.length === 1 ? String(years[0]) : null].filter(Boolean).join(" · "),
       footer_lines: footerLines, visibility: { mode: "shared", people: [], can_manage: false }, made_at: dates.at(-1) ?? tracks[0]!.added_at,
-      ...(tracks[0]!.description ? { description: tracks[0]!.description } : {}), shuffle_id: `shuffle:${params.id}` }];
+      ...(tracks[0]!.description ? { description: tracks[0]!.description } : {}), shuffle_id: `shuffle:${params.id}`, share_id: encodeURIComponent(params.id!) }];
   }
   if (dataId === "header" && params.scope === "artist") {
     saveBandSingles(person);
@@ -1315,7 +1328,7 @@ function musicData(person: PersonRow, dataId: string, params: DataParams): unkno
     const owner = db.select().from(people).where(eq(people.id, collection.person_id)).get();
     const art = tracks.length ? artworkUrl(tracks.find((item) => item.artwork) ?? tracks[0]!) : null;
     const minutes = durationMinutes(tracks);
-    return [{ ...tile, queue_mode: "playlist", shuffle_id: `shuffle:${collection.id}`, creator: { name: owner?.displayName ?? "Someone" }, art,
+    return [{ ...tile, queue_mode: "playlist", shuffle_id: `shuffle:${collection.id}`, share_id: encodeURIComponent(collection.id), creator: { name: owner?.displayName ?? "Someone" }, art,
       meta: `Playlist · ${songCount(tracks.length)}`, footer_lines: [durationLine(tracks)], visibility: collectionVisibility(collection.shared_to), made_at: collection.created_at }];
   }
   if (dataId === "album") {
@@ -1356,7 +1369,7 @@ function musicData(person: PersonRow, dataId: string, params: DataParams): unkno
   return null;
 }
 
-function playlistTile(person: PersonRow, collection: MediaCollection): MediaRow & Record<string, unknown> {
+export function playlistTile(person: PersonRow, collection: MediaCollection): MediaRow & Record<string, unknown> {
   const tracks = playlistTracks(person, collection);
   const pictured = tracks.find((item) => item.artwork) ?? tracks[0];
   const base = pictured ? rowsOf(person, [pictured])[0]! : { id: collection.id, title: collection.title, channel: null, summary: "", kind: "track" as const, thumbnail: null, backdrop: null, duration_s: null, copy_label: "Saved" };
@@ -1368,7 +1381,7 @@ function playlistTracks(person: PersonRow, collection: MediaCollection): MediaIt
   return itemsInOrder(person, "music", collection.items.map((entry) => entry.media_id), ALL_TRACKS);
 }
 /** The person's own playlists; a minor never sees one whose name trips the floor. */
-function visiblePlaylists(person: PersonRow): MediaCollection[] {
+export function visiblePlaylists(person: PersonRow): MediaCollection[] {
   return listCollections(person.id, "playlist").filter((collection) => mediaBandOf(person) === "adult" || !trips(collection.title));
 }
 

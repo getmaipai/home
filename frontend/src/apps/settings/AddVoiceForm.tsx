@@ -7,6 +7,7 @@ import { Input } from "@maipai/ui/src/ui/input";
 import { Select } from "@maipai/ui/src/primitives/Select";
 import { householdVoicesApi, INSPIRED_LEVELS, inspiredLevelLabel, type InspiredLevel } from "@/lib/householdVoicesApi";
 import { errorLine } from "@/lib/hubReachability";
+import { StatusCard } from "@maipai/ui/src/elements/status-card";
 
 const FIELD = "flex flex-col gap-1";
 const HELP = "text-sm text-muted-foreground";
@@ -79,7 +80,7 @@ export function AddVoiceForm({ onCancel, onMade, onBusyChange, canTune = true, m
     </> : null}
     {inspired ? <p className={HELP}>{i18n._({ id: "This makes a new voice based on the recording. It is not a copy of the voice.", message: "This makes a new voice based on the recording. It is not a copy of the voice." })}</p> : null}
     <p className={HELP}>{minor ? i18n._({ id: "Only use your own voice, or the voice of someone who said yes.", message: "Only use your own voice, or the voice of someone who said yes." }) : i18n._({ id: "You are responsible for having the right to use this voice.", message: "You are responsible for having the right to use this voice." })}</p>
-    {error ? <p role="alert" className="text-base text-destructive">{error}</p> : null}
+    {error ? <StatusCard kind="problem" title={i18n._({ id: "That did not work", message: "That did not work" })} line={error} /> : null}
     {busy ? <div className="flex items-center gap-3"><Progress mode="spinner" label={i18n._({ id: "Making the voice", message: "Making the voice" })} /><p className={HELP}>{i18n._({ id: "Making the voice. This can take up to a minute the first time.", message: "Making the voice. This can take up to a minute the first time." })}</p></div> : null}
     <div className="flex justify-end gap-2">
       <Button type="button" variant="outline" onClick={onCancel} disabled={busy}>{i18n._({ id: "Cancel", message: "Cancel" })}</Button>

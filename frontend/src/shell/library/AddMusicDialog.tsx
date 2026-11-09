@@ -3,7 +3,6 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
-import { toast } from "sonner";
 import { i18n } from "@lingui/core";
 import { api, type Roster } from "@/lib/api";
 import { videosApi } from "@/lib/videosApi";
@@ -17,17 +16,19 @@ export function useAddMusicDialog({ open, onOpenChange, me, clipId }: { open: bo
   const [description, setDescription] = useState("");
   const [level, setLevel] = useState<MusicLevel>("soft");
   const [busy, setBusy] = useState(false);
+  const [problem, setProblem] = useState("");
   const songs = useQuery({ queryKey: ["studio-picker", "audio", me.id], enabled: open, queryFn: async () => (await api.library({ type: "audio", owner: "me", sort: "newest", limit: 60 })).items.filter((item) => item.owner.id === me.id) });
   const ready = choice === NEW_MUSIC ? description.trim().length >= 3 : choice !== "";
   async function submit() {
     if (!ready) return;
     setBusy(true);
+    setProblem("");
     try {
       const result = await videosApi.addMusic(choice === NEW_MUSIC ? { clip: clipId, make_music: description.trim(), level } : { clip: clipId, track: choice, level });
       onOpenChange(false);
       navigate(`/chat?conversation=${encodeURIComponent(result.conversation_id)}`);
-    } catch (error) { console.error(error); toast.error(i18n._({ id: "The music could not be added. Try again in a minute.", message: "The music could not be added. Try again in a minute." })); }
+    } catch (error) { console.error(error); setProblem(i18n._({ id: "The music could not be added. Try again in a minute.", message: "The music could not be added. Try again in a minute." })); }
     finally { setBusy(false); }
   }
-  return { songs: songs.data ?? [], choice, setChoice, description, setDescription, level, setLevel, busy, ready, submit };
+  return { songs: songs.data ?? [], problem, choice, setChoice, description, setDescription, level, setLevel, busy, ready, submit };
 }

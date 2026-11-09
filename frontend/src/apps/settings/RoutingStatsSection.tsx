@@ -5,6 +5,7 @@ import { Progress } from "@maipai/ui/src/primitives/Progress";
 import { EmptyState } from "@maipai/ui/src/primitives/EmptyState";
 import { api, type RoutingStats } from "@/lib/api";
 import { errorLine } from "@/lib/hubReachability";
+import { StatusCard } from "@maipai/ui/src/elements/status-card";
 
 // The plan's own next step after shipping real plugins (4.5): "count
 // fall-throughs to chat using conversation history... and decide on
@@ -29,7 +30,7 @@ export function RoutingStatsSection() {
         {i18n._({ id: "How often a chat message matches a plugin directly versus falling through to the model.", message: "How often a chat message matches a plugin directly versus falling through to the model." })}
       </p>
       {error ? (
-        <p className="text-base text-destructive">{error}</p>
+        <StatusCard kind="problem" title={i18n._({ id: "That did not work", message: "That did not work" })} line={error} />
       ) : stats === null ? (
         <Progress mode="spinner" label={i18n._({ id: "Loading routing stats", message: "Loading routing stats" })} />
       ) : stats.total === 0 ? (

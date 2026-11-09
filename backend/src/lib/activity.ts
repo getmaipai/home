@@ -1,0 +1,213 @@
+// ACTIVITY-PAGE-01 (PRO-LOOK-01 sections 20 to 25; RULES.md S6 "One job's progress" and the Activity row): the viewer's own jobs across
+// apps as one list, read from the job records that already exist (picture_jobs, video_jobs, music_jobs and the unified jobs table). No new
+// table, no new poller. Rule 6a: only the viewer's own rows, an admin included. A locked or adult-only item is left out entirely (the same
+// lock checks as the Library), so this list never names one. A child's titles are the child-safe label, never the prompt.
+import { and, desc, eq, inArray, isNull } from "drizzle-orm";
+import { db } from "@/db";
+import { attachments, musicJobs, pictureJobs, videoJobs } from "@/db/schema";
+import { speakerAgeBand } from "@/lib/ageBand";
+import { jobQueueCopy, plainStageLabel, type JobQueueAudience } from "@/lib/jobQueueCopy";
+import { listJobsForViewer } from "@/lib/jobs";
+import { lockItemOfProvenance, lockState } from "@/lib/adultLock";
+import { getPictureJob } from "@/lib/pictures/jobStore";
+import { pictureJobLockState } from "@/lib/pictures/lock";
+import { getVideoJobFor } from "@/lib/videos/jobs";
+import { phaseLabel } from "@/lib/videos/phaseLabel";
+import { videoJobLockState } from "@/lib/videos/lock";
+import { readLayerRow, writeLayerRow } from "@/lib/settings";
+import type { PersonRow } from "@/types";
+
+/** The five states of the one status card (section 20): WAITING, MAKING NOW, DONE, NEEDS A LOOK, COULD NOT FINISH. */
+export type ActivityState = "waiting" | "making" | "done" | "attention" | "failed";
+export type ActivitySource = "picture" | "video" | "song" | "job";
+
+export interface ActivityItem {
+  id: string;
+  source: ActivitySource;
+  state: ActivityState;
+  /** The person's own prompt or title in one line; a child gets the child-safe label. */
+  title: string;
+  /** One muted line: the waiting line, the stage, or the failure with its next step. Null when there is nothing to add. */
+  line: string | null;
+  /** 0 to 100 while making and a figure is known, else null. */
+  percent: number | null;
+  /** About how many minutes a job of this kind usually takes, for a making job with no percent yet. */
+  typicalMinutes: number | null;
+  /** Where Open goes: the result, or the app's own page. */
+  href: string | null;
+  /** Epoch-ish ISO time of the last change (what the list sorts and groups by). */
+  at: string;
+}
+
+export type ActivityDot = "none" | "running" | "attention" | "finished";
+
+export interface ActivityList {
+  items: ActivityItem[];
+  /** When the person last opened the Activity page (ISO), or null. */
+  seenAt: string | null;
+  dot: ActivityDot;
+}
+
+export const ACTIVITY_SEEN_KEY = "ui.activity_seen_at";
+const WINDOW_MS = 30 * 24 * 3_600_000;
+const PER_SOURCE_LIMIT = 60;
+
+const audienceOf = (actor: PersonRow): JobQueueAudience => (speakerAgeBand(actor, new Date()) === "child" ? "child" : "adult");
+
+function oneLine(text: string, max = 90): string {
+  const clean = text.replace(/\s+/g, " ").trim();
+  return clean.length > max ? `${clean.slice(0, max - 1).trimEnd()}…` : clean;
+}
+
+const CHILD_LABEL: Record<Exclude<ActivitySource, "job">, string> = { picture: "A picture", video: "A video", song: "A song" };
+const CHILD_FAILED_LINE = "That did not work. Try again, or ask a grown-up to help.";
+const TYPICAL_MINUTES: Record<Exclude<ActivitySource, "job">, number> = { picture: 1, video: 3, song: 2 };
+
+function titleFor(actor: PersonRow, source: Exclude<ActivitySource, "job">, text: string, fallback: string): string {
+  if (audienceOf(actor) === "child") return CHILD_LABEL[source];
+  return oneLine(text) || fallback;
+}
+
+function percentOf(value: number | null | undefined): number | null {
+  if (typeof value !== "number" || !Number.isFinite(value) || value <= 0) return null;
+  return Math.max(1, Math.min(99, Math.round(value)));
+}
+
+function recent(at: string): boolean {
+  const time = Date.parse(at);
+  return Number.isFinite(time) && Date.now() - time <= WINDOW_MS;
+}
+
+function fileIsLive(actor: PersonRow, fileId: string): boolean {
+  const row = db.select({ deletedAt: attachments.deletedAt, owner: attachments.ownerPersonId }).from(attachments).where(eq(attachments.id, fileId)).get();
+  return !!row && row.deletedAt === null && row.owner === actor.id;
+}
+
+function fileIsOpenFor(actor: PersonRow, fileId: string): boolean {
+  const row = db.select({ owner: attachments.ownerPersonId, provenance: attachments.provenance }).from(attachments).where(eq(attachments.id, fileId)).get();
+  const item = row ? lockItemOfProvenance(row.owner, row.provenance) : null;
+  return lockState(item, actor) === "open";
+}
+
+function pictureItems(actor: PersonRow): ActivityItem[] {
+  const audience = audienceOf(actor);
+  const ids = db.select({ id: pictureJobs.id }).from(pictureJobs)
+    .where(and(eq(pictureJobs.personId, actor.id), isNull(pictureJobs.purpose))).orderBy(desc(pictureJobs.updatedAt)).limit(PER_SOURCE_LIMIT).all();
+  const out: ActivityItem[] = [];
+  for (const { id } of ids) {
+    const job = getPictureJob(actor, id);
+    if (!job || job.state === "cancelled" || !recent(job.updatedAt)) continue;
+    if (pictureJobLockState(actor, job) !== "open") continue;
+    const href = job.conversationId ? `/chat?conversation=${encodeURIComponent(job.conversationId)}` : "/files";
+    const title = titleFor(actor, "picture", job.prompt, "A picture");
+    const base = { id: `picture:${job.id}`, source: "picture" as const, title, at: job.updatedAt, href };
+    if (job.state === "queued") out.push({ ...base, state: "waiting", line: jobQueueCopy("queued", "queue", job.position, null, audience), percent: null, typicalMinutes: null });
+    else if (job.state === "running") out.push({ ...base, state: "making", line: plainStageLabel(job.phase, audience) ?? "Making your picture.", percent: percentOf(job.percent), typicalMinutes: TYPICAL_MINUTES.picture });
+    else if (job.state === "failed") out.push({ ...base, state: "failed", line: audience === "child" ? CHILD_FAILED_LINE : job.error ?? "The picture did not finish. Try again.", percent: null, typicalMinutes: null });
+    else out.push({ ...base, state: "done", line: null, percent: null, typicalMinutes: null });
+  }
+  return out;
+}
+
+function videoItems(actor: PersonRow): ActivityItem[] {
+  const audience = audienceOf(actor);
+  const ids = db.select({ id: videoJobs.id }).from(videoJobs).where(eq(videoJobs.personId, actor.id)).orderBy(desc(videoJobs.updatedAt)).limit(PER_SOURCE_LIMIT).all();
+  const out: ActivityItem[] = [];
+  for (const { id } of ids) {
+    const job = getVideoJobFor(actor, id);
+    if (!job || job.state === "cancelled" || !recent(job.updatedAt)) continue;
+    if (videoJobLockState(actor, job) !== "open") continue;
+    // A finished clip whose Library file is gone is not a result (the Create feed drops it the same way).
+    if (job.state === "done" && (!job.files[0] || !fileIsLive(actor, job.files[0].id))) continue;
+    const href = job.conversationId ? `/chat?conversation=${encodeURIComponent(job.conversationId)}` : "/apps/videos/create";
+    const title = titleFor(actor, "video", job.prompt, "A video");
+    const base = { id: `video:${job.id}`, source: "video" as const, title, at: job.updatedAt, href };
+    if (job.state === "queued") out.push({ ...base, state: "waiting", line: phaseLabel(job, audience), percent: null, typicalMinutes: null });
+    else if (job.state === "running") out.push({ ...base, state: "making", line: phaseLabel(job, audience), percent: percentOf(job.percent), typicalMinutes: TYPICAL_MINUTES.video });
+    else if (job.state === "failed") out.push({ ...base, state: "failed", line: audience === "child" ? CHILD_FAILED_LINE : job.error ?? "The video did not finish. Try again.", percent: null, typicalMinutes: null });
+    else out.push({ ...base, state: "done", line: null, percent: null, typicalMinutes: null });
+  }
+  return out;
+}
+
+function songItems(actor: PersonRow): ActivityItem[] {
+  const audience = audienceOf(actor);
+  const rows = db.select().from(musicJobs).where(and(eq(musicJobs.personId, actor.id), inArray(musicJobs.task, ["text2music"]))).orderBy(desc(musicJobs.updatedAt)).limit(PER_SOURCE_LIMIT).all();
+  const out: ActivityItem[] = [];
+  for (const row of rows) {
+    if (row.state === "cancelled" || !recent(row.updatedAt)) continue;
+    if (row.fileId && !fileIsOpenFor(actor, row.fileId)) continue;
+    let request: { title?: string; description?: string } = {};
+    try { request = JSON.parse(row.request) as typeof request; } catch { request = {}; }
+    const title = titleFor(actor, "song", request.title ?? request.description ?? "", "A song");
+    const base = { id: `song:${row.id}`, source: "song" as const, title, at: row.updatedAt, href: `/apps/music/create?song=${encodeURIComponent(row.id)}` };
+    if (row.state === "queued") out.push({ ...base, state: "waiting", line: jobQueueCopy("queued", "queue", row.position, null, audience), percent: null, typicalMinutes: null });
+    else if (row.state === "running") out.push({ ...base, state: "making", line: plainStageLabel(row.stage, audience) ?? "Making your song.", percent: percentOf(row.progress * 100), typicalMinutes: TYPICAL_MINUTES.song });
+    else if (row.state === "failed") out.push({ ...base, state: "failed", line: audience === "child" ? CHILD_FAILED_LINE : row.errorLine ?? "The song did not finish. Open it to try again.", percent: null, typicalMinutes: null });
+    else out.push({ ...base, state: "done", line: null, percent: null, typicalMinutes: null });
+  }
+  return out;
+}
+
+const OTHER_JOB_KINDS = new Set(["backup", "import", "chat_plan", "approval", "chat_ask"]);
+
+/** The rest of the viewer's own work from the unified job list (a backup, a chat plan, a question waiting on them). Already per viewer; only
+ * their own rows with a state and a title come through, never a row about someone else and never a reminder or routine. */
+function otherItems(actor: PersonRow): ActivityItem[] {
+  const out: ActivityItem[] = [];
+  for (const row of listJobsForViewer(actor)) {
+    const kind = String(row.kind ?? "");
+    if (!OTHER_JOB_KINDS.has(kind) || row.forPersonName !== undefined || typeof row.title !== "string" || typeof row.state !== "string") continue;
+    if (row.forPerson !== undefined && row.forPerson !== null && row.forPerson !== actor.id) continue;
+    const at = String(row.updatedAt ?? row.createdAt ?? "");
+    if (!recent(at)) continue;
+    const state: ActivityState | null = row.state === "waiting_for_you" ? "attention" : row.state === "queued" ? "waiting" : row.state === "running" || row.state === "paused" ? "making" : row.state === "done" ? "done" : row.state === "failed" ? "failed" : null;
+    if (!state) continue;
+    const conversationId = typeof row.conversationId === "string" ? row.conversationId : null;
+    const href = conversationId ? `/chat?conversation=${encodeURIComponent(conversationId)}` : kind === "backup" || kind === "import" ? "/backups" : null;
+    const line = state === "attention" ? "This is waiting for your answer." : state === "failed" ? "It did not finish. Open it to try again." : null;
+    out.push({ id: `job:${String(row.id)}`, source: "job", state, title: oneLine(row.title), line, percent: null, typicalMinutes: null, href, at });
+  }
+  return out;
+}
+
+/** The dot an Activity entry carries (section 25): needs a look wins, then finished and unopened, then running; no number. */
+export function activityDot(items: readonly ActivityItem[], seenAt: string | null): ActivityDot {
+  const seen = seenAt ? Date.parse(seenAt) : 0;
+  const unseen = (item: ActivityItem) => Date.parse(item.at) > seen;
+  if (items.some((item) => item.state === "attention" || (item.state === "failed" && unseen(item)))) return "attention";
+  if (items.some((item) => item.state === "done" && unseen(item))) return "finished";
+  if (items.some((item) => item.state === "waiting" || item.state === "making")) return "running";
+  return "none";
+}
+
+export function activitySeenAt(actor: PersonRow): string | null {
+  const raw = readLayerRow(actor.id, ACTIVITY_SEEN_KEY);
+  if (!raw) return null;
+  try { const value: unknown = JSON.parse(raw); return typeof value === "string" && Number.isFinite(Date.parse(value)) ? value : null; } catch { return null; }
+}
+
+/** The person opened the Activity page: everything finished so far stops counting as unopened. */
+export function markActivitySeen(actor: PersonRow, now = new Date()): string {
+  const at = now.toISOString();
+  writeLayerRow(actor.id, ACTIVITY_SEEN_KEY, JSON.stringify(at), actor.id);
+  return at;
+}
+
+/** The viewer's own work, newest change first. */
+export function activityForViewer(actor: PersonRow): ActivityList {
+  const items = [...pictureItems(actor), ...videoItems(actor), ...songItems(actor), ...otherItems(actor)].sort((a, b) => b.at.localeCompare(a.at));
+  const seenAt = activitySeenAt(actor);
+  return { items, seenAt, dot: activityDot(items, seenAt) };
+}
+
+/** The viewer's own pictures, clips and songs that are waiting or being made, as rows of the unified job list (`GET /api/jobs`). This is how the
+ * progress strip (`InstallDock`) learns about them without a second poll: the strip already reads that list. Each row is the viewer's own; a
+ * stop is not offered here (the producers own their cancel routes). */
+export function activeGenerationRows(actor: PersonRow): Record<string, unknown>[] {
+  const items = [...pictureItems(actor), ...videoItems(actor), ...songItems(actor)];
+  return items.filter((item) => item.state === "waiting" || item.state === "making").map((item) => ({
+    id: item.id, kind: item.source, startedBy: actor.id, forPerson: actor.id, title: item.title, state: item.state === "waiting" ? "queued" : "running",
+    progress: { percent: item.percent ?? 0, ...(item.line ? { line: item.line } : {}) }, createdAt: item.at, updatedAt: item.at, actions: [],
+  }));
+}

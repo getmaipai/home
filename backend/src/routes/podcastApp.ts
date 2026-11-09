@@ -31,18 +31,28 @@ import { episodeFields, episodeSortOf, followPodcast, isFollowed, orderEpisodes,
 type DirectoryRow = { id: string; title: string; author: string; summary: string; thumbnail: string | null; feed_url: string; action_label?: string };
 
 /** The Find shows rows for the page's shelf: the search when words are typed, else Apple's top list. Not allowed, or no answer, is an empty list (the page says so). */
-export async function podcastDirectoryRows(person: PersonRow, q: string, scope = "search"): Promise<DirectoryRow[]> {
+export async function podcastDirectoryRows(person: PersonRow, q: string, scope = "search", shelf?: string, kind?: string): Promise<DirectoryRow[]> {
+  // APPS-PARITY: the Search page's Shows and Episodes shelves ask separately, and the Shows / Episodes chip (`kind`) switches the other one off.
+  if (scope === "search" && ((shelf === "episodes" && kind === "shows") || (shelf === "shows" && kind === "episodes"))) return [];
   const band = mediaBandOf(person);
   const allowed = directoryAllowed({ band }, { enabled: getHouseholdSettingValue("podcasts.directory.enabled") === true, teens: getHouseholdSettingValue("podcasts.directory.teens") === true });
   const words = q.trim();
   const admin = (isOwnerOrAdmin(person)) && band === "adult";
   const local = words.length >= 2 ? queryItems(person, "podcasts", { limit: 200 }).filter((item) => `${item.title} ${item.subtitle ?? ""} ${item.description ?? ""}`.toLocaleLowerCase().includes(words.toLocaleLowerCase())).slice(0, 12).map((item) => ({ id: item.id, title: item.title, author: item.subtitle ?? "", summary: item.description ?? "", thumbnail: item.artwork ? `/api/media/items/${encodeURIComponent(item.id)}/art` : null, feed_url: "", ...(admin ? { action_label: "Listen" } : {}) })) : [];
   if (scope === "search" && words === "") return [];
+  if (shelf === "episodes") return local;
+  if (shelf === "shows" && (!allowed || minorQueryHit(words, band))) return [];
   if (!allowed || words !== "" && minorQueryHit(words, band)) return local;
   const result = scope === "top" ? await topShows() : words !== "" ? await searchDirectory(words) : { ok: true as const, shows: [] };
   if (!result.ok) return local;
   const directory = result.shows.map((show) => ({ id: show.id, title: show.title, author: show.author, summary: show.genre ?? "", thumbnail: artProxyAddress(show.art), feed_url: show.feed_url, ...(admin ? { action_label: "Follow" } : {}) }));
-  return [...local, ...directory];
+  return shelf === "shows" ? directory : [...local, ...directory];
+}
+
+/** The transcript reader's rows, {start_s, text}: what is stored or published for an episode this person can read; a child, a missing episode or no transcript gives none. */
+export async function podcastTranscriptRows(person: PersonRow, id: string): Promise<Array<{ start_s: number; text: string }>> {
+  const result = await getPodcastTranscript(person, id, undefined, false);
+  return result.ok && result.value.transcript ? result.value.transcript.segments.map((segment) => ({ start_s: segment.start_s, text: segment.text })) : [];
 }
 
 /** One existing directory data id serves both directory previews and followed show details. */

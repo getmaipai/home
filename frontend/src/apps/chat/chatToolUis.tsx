@@ -53,6 +53,8 @@ import { ArtifactOpenContext, ReloadMainThreadContext, ConfirmAskAnswerContext, 
 import { parseTurnAsk, ASK_FORM_SUBMIT_TEXT, type AskAnswerArm, type AskFormValues, type AskSettled } from "@/apps/chat/chatAsk";
 import { faviconUrl } from "@/apps/chat/chatThreadSlots";
 import { formatTime, formatUnit } from "@/lib/format";
+import { StatusCard } from "@maipai/ui/src/elements/status-card";
+import { errorLine } from "@/lib/hubReachability";
 
 // SHELL-02 slice 3, the wiring table's "spec-sheet" row: weather's and
 // almanac-date's own structured result (chatModelAdapter.ts's own
@@ -319,7 +321,7 @@ export const ProjectToolRender: ToolCallMessagePartComponent<Record<string, neve
     // A persistently failing fetch gets a real (if quiet) line, not
     // silence forever - the same isError branch ArtifactCardToolRender/
     // ProjectFinishedArtifact below already have for their own fetch.
-    if (query.isError) return <p className="text-sm text-destructive">{i18n._({ id: "Couldn't check on this project right now.", message: "Couldn't check on this project right now." })}</p>;
+    if (query.isError) return <StatusCard kind="problem" title={i18n._({ id: "That did not work", message: "That did not work" })} line={i18n._({ id: "Couldn't check on this project right now.", message: "Couldn't check on this project right now." })} />;
     // Nothing to show yet on the very first, still-in-flight poll - the
     // reply's own text already told the person the project started
     // (tool.ts's own `runStartProjectTool()` phrasing), so a brief gap
@@ -336,7 +338,7 @@ export const ProjectToolRender: ToolCallMessagePartComponent<Record<string, neve
     return <ProjectFinishedArtifact id={project.posted_artifact.id} />;
   }
   if (project.state === "failed") {
-    return <p className="text-sm text-destructive">{project.error ? i18n._({ id: "{title} didn't finish: {error}", message: "{title} didn't finish: {error}", values: { title: project.title, error: project.error } }) : i18n._({ id: "{title} didn't finish.", message: "{title} didn't finish.", values: { title: project.title } })}</p>;
+    return <StatusCard kind="problem" title={i18n._({ id: "That did not work", message: "That did not work" })} line={project.error ? i18n._({ id: "{title} didn't finish: {error}", message: "{title} didn't finish: {error}", values: { title: project.title, error: project.error } }) : i18n._({ id: "{title} didn't finish.", message: "{title} didn't finish.", values: { title: project.title } })} />;
   }
   if (project.state === "cancelled") {
     return <p className="text-muted-foreground text-sm">{i18n._({ id: "{title} was cancelled.", message: "{title} was cancelled.", values: { title: project.title } })}</p>;
@@ -740,7 +742,7 @@ export const VideoToolRender: ToolCallMessagePartComponent<Record<string, never>
   // SPATIAL-05: Spatial sound in the clip's More menu, for a person who may edit (an adult). Disabled with its reason when the clip has no sound or making is not ready.
   const spatial = clip && card.can_edit === true ? spatialActionItems({
     hasSound: clip.has_sound === true, makingReason: making.reason, busy: spatialBusy,
-    onRun: (surround) => { setSpatialBusy(true); void videosApi.spatialSound(item.id, surround ? { surround: true } : {}).then(refresh).catch((error: unknown) => { toast.error(error instanceof Error ? error.message : "The sound could not be changed. Try again in a minute."); }).finally(() => setSpatialBusy(false)); },
+    onRun: (surround) => { setSpatialBusy(true); void videosApi.spatialSound(item.id, surround ? { surround: true } : {}).then(refresh).catch((error: unknown) => { toast.error(errorLine(error, "The sound could not be changed. Try again in a minute.")); }).finally(() => setSpatialBusy(false)); },
   }) : [];
   const notice = [item.note, adultMark.stateLine].filter((line): line is string => Boolean(line)).join(" ");
   return (

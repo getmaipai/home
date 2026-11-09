@@ -24,6 +24,7 @@ import { toursRoutes } from "@/routes/tours";
 import { commandsRoutes } from "@/routes/commands";
 import { notificationsRoutes } from "@/routes/notifications";
 import { jobsRoutes } from "@/routes/jobs";
+import { activityRoutes } from "@/routes/activity";
 import { schedulerRoutes } from "@/routes/scheduler";
 import { llmRoutes } from "@/routes/llm";
 import { ttsRoutes } from "@/routes/tts";
@@ -249,6 +250,7 @@ app.route("/api/tours", toursRoutes);
 app.route("/api/commands", commandsRoutes);
 app.route("/api/notifications", notificationsRoutes);
 app.route("/api/jobs", jobsRoutes);
+app.route("/api/activity", activityRoutes);
 app.route("/api/scheduler", schedulerRoutes);
 // Needs-the-AI routes wait for the install (setup page B, install strip).
 app.use("/api/llm/chat", chatPauseGate);

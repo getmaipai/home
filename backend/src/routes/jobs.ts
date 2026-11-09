@@ -6,6 +6,7 @@ import { db } from "@/db";
 import { jobs } from "@/db/schema";
 import { isOwnerOrAdmin } from "@/lib/access";
 import { canStopJob, createJob, listJobsForViewerLive } from "@/lib/jobs";
+import { activeGenerationRows } from "@/lib/activity";
 import { trigger } from "@/lib/notifications";
 import { getStackClient, isStackConfigured } from "@/lib/stackEngine";
 
@@ -23,7 +24,12 @@ const HomeJobSchema = z.object({
 });
 
 const listRoute = createRoute({ method: "get", path: "/", tags: ["Jobs"], summary: "List background work visible to the signed-in person", middleware: [requireAuth] as const, responses: { 200: { content: { "application/json": { schema: z.array(HomeJobSchema) } }, description: "Current visible job snapshot." }, ...errorResponses({ 401: "Sign in first" }) } });
-jobsRoutes.openapi(listRoute, async (c) => c.json(await listJobsForViewerLive(c.get("person")) as z.infer<typeof HomeJobSchema>[], 200));
+jobsRoutes.openapi(listRoute, async (c) => {
+  const actor = c.get("person");
+  // ACTIVITY-PAGE-01: the viewer's own pictures, clips and songs being made ride the same list the progress strip already reads.
+  const rows = [...await listJobsForViewerLive(actor), ...activeGenerationRows(actor)];
+  return c.json(rows as z.infer<typeof HomeJobSchema>[], 200);
+});
 
 const createBody = z.object({ id: z.string().min(1), kind: z.string().min(1), startedBy: z.string().min(1), forPerson: z.string().nullable(), title: z.string().min(1), state: z.enum(["queued", "running", "waiting_for_you", "paused", "done", "failed", "cancelled"]), progress: z.record(z.string(), z.unknown()).nullable().default(null), waitingReason: z.string().nullable().default(null), resultRef: z.string().nullable().default(null), conversationId: z.string().nullable().default(null), errorKind: z.enum(["down", "timed_out", "refused", "ran_out_of_space", "interrupted", "failed", "unknown"]).nullable().default(null), raw: z.string().nullable().default(null), provenance: z.record(z.string(), z.unknown()).default({}) }).strict();
 const createRouteDef = createRoute({ method: "post", path: "/", tags: ["Jobs"], summary: "Register visible state for a producer-owned background job", middleware: [requireAuth] as const, request: { body: { content: { "application/json": { schema: createBody } } } }, responses: { 201: { content: { "application/json": { schema: HomeJobSchema } }, description: "Job registered." }, ...errorResponses({ 401: "Sign in first", 403: "Cannot register work for another person", 409: "Job id already exists" }) } });

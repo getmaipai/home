@@ -9,6 +9,7 @@ import { useNavigate } from "react-router-dom";
 import { useToast } from "@maipai/ui/src/primitives/Toast";
 import { MediaHostContext } from "@maipai/ui/src/schema/mediaHost";
 import { request } from "@/lib/api";
+import { errorLine } from "@/lib/hubReachability";
 
 export type MusicCardKind = "album" | "song_style" | "band";
 type Block = { kind: string; provenance?: string; props: unknown };
@@ -99,7 +100,7 @@ export function useMusicCard(block: Block): { props: Record<string, unknown> | n
   }, [cover, readProps, push]);
 
   const play = useCallback((mediaId: string) => {
-    if (host) void Promise.resolve(host.onPlay(mediaId, {})).catch((error: unknown) => push(error instanceof Error && error.message ? error.message : "That song could not play. Try again."));
+    if (host) void Promise.resolve(host.onPlay(mediaId, {})).catch((error: unknown) => push(errorLine(error, "That song could not play. Try again.")));
     else navigate(`/media/${encodeURIComponent(mediaId)}`);
   }, [host, navigate, push]);
 
@@ -120,7 +121,7 @@ export function useMusicCard(block: Block): { props: Record<string, unknown> | n
         if ((action === "play_all" || action === "keep") && done.media_id) play(done.media_id);
         if (action === "remake_cover") { setEdited(null); void refetchCard(); }
       })
-      .catch((error: unknown) => push(error instanceof Error && error.message ? error.message : "That did not work. Try again."))
+      .catch((error: unknown) => push(errorLine(error, "That did not work. Try again.")))
       .finally(() => setBusy(false));
   }, [id, kind, busy, conversationId, turnId, navigate, play, push, refetchCard]);
 

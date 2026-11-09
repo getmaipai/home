@@ -13,6 +13,7 @@ import { api, type BackupInfo, type PendingRestore, type Roster } from "@/lib/ap
 import { formatBytes } from "@maipai/ui/src/format";
 import { errorLine } from "@/lib/hubReachability";
 import { formatDateTime } from "@/lib/format";
+import { StatusCard } from "@maipai/ui/src/elements/status-card";
 
 interface BackupsSectionProps {
   person: Roster;
@@ -92,7 +93,7 @@ function EmergencyBackupKeyRow() {
       ) : (
         <p className="text-base text-muted-foreground">{i18n._({ id: "If this computer breaks, this file brings your Home back on a new one. Keep it somewhere other than this computer.", message: "If this computer breaks, this file brings your Home back on a new one. Keep it somewhere other than this computer." })}</p>
       )}
-      {error ? <p className="text-base text-destructive">{error}</p> : null}
+      {error ? <StatusCard kind="problem" title={i18n._({ id: "That did not work", message: "That did not work" })} line={error} /> : null}
       <div className="flex flex-wrap gap-2">
         <Button variant="secondary" onClick={download} disabled={busy}><DownloadIcon aria-hidden />{i18n._({ id: "Download", message: "Download" })}</Button>
         <Button variant="secondary" onClick={print} disabled={busy}>{i18n._({ id: "Print", message: "Print" })}</Button>
@@ -201,7 +202,7 @@ export function BackupsSection({ person, headed = true }: BackupsSectionProps) {
 
   return (
     <PlainSection {...(headed ? { heading: i18n._({ id: "Backups", message: "Backups" }) } : {})}>
-      {error ? <p className="text-base text-destructive">{error}</p> : null}
+      {error ? <StatusCard kind="problem" title={i18n._({ id: "That did not work", message: "That did not work" })} line={error} /> : null}
 
       {canRestore ? (
         <EmergencyBackupKeyRow />

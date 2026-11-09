@@ -8264,6 +8264,157 @@
         }
       }
     },
+    "/api/activity": {
+      "get": {
+        "tags": [
+          "Activity"
+        ],
+        "summary": "List the signed-in person's own past and current jobs across apps",
+        "responses": {
+          "200": {
+            "description": "Newest change first, with the dot the Activity entry shows.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "source": {
+                            "type": "string",
+                            "enum": [
+                              "picture",
+                              "video",
+                              "song",
+                              "job"
+                            ]
+                          },
+                          "state": {
+                            "type": "string",
+                            "enum": [
+                              "waiting",
+                              "making",
+                              "done",
+                              "attention",
+                              "failed"
+                            ]
+                          },
+                          "title": {
+                            "type": "string"
+                          },
+                          "line": {
+                            "type": "string",
+                            "nullable": true
+                          },
+                          "percent": {
+                            "type": "number",
+                            "nullable": true
+                          },
+                          "typicalMinutes": {
+                            "type": "number",
+                            "nullable": true
+                          },
+                          "href": {
+                            "type": "string",
+                            "nullable": true
+                          },
+                          "at": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "source",
+                          "state",
+                          "title",
+                          "line",
+                          "percent",
+                          "typicalMinutes",
+                          "href",
+                          "at"
+                        ]
+                      }
+                    },
+                    "seenAt": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "dot": {
+                      "type": "string",
+                      "enum": [
+                        "none",
+                        "running",
+                        "attention",
+                        "finished"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "items",
+                    "seenAt",
+                    "dot"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Sign in first",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/activity/seen": {
+      "post": {
+        "tags": [
+          "Activity"
+        ],
+        "summary": "Mark everything finished so far as opened",
+        "responses": {
+          "200": {
+            "description": "The time recorded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "seenAt": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "seenAt"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Sign in first",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/scheduler/jobs": {
       "get": {
         "tags": [

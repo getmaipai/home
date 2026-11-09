@@ -11,6 +11,7 @@ import { Button } from "@maipai/ui/src/ui/button";
 import { Select } from "@maipai/ui/src/primitives/Select";
 import { ROLE_LABELS, ROLE_LADDER, meetsMinRole } from "@/apps/people/roles";
 import { errorLine } from "@/lib/hubReachability";
+import { StatusCard } from "@maipai/ui/src/elements/status-card";
 
 interface CommandsSectionProps {
   person: Roster;
@@ -107,7 +108,7 @@ export function CommandsSection({ person, management = false, headed = true }: C
       </p>
       {management && loadError ? (
         <div className="flex flex-col items-start gap-2">
-          <p className="text-base text-destructive">{loadError}</p>
+          <StatusCard kind="problem" title={i18n._({ id: "That did not work", message: "That did not work" })} line={loadError} />
           <Button variant="secondary" onClick={load}>
             {i18n._({ id: "Try again", message: "Try again" })}
           </Button>
@@ -178,7 +179,7 @@ export function CommandsSection({ person, management = false, headed = true }: C
                   />
                 </>
               )}
-              {createError ? <p className="text-base text-destructive">{createError}</p> : null}
+              {createError ? <StatusCard kind="problem" title={i18n._({ id: "That did not work", message: "That did not work" })} line={createError} /> : null}
               <div className="flex">
                 <Button type="submit" disabled={creating}>
                   {creating ? i18n._({ id: "Creating…", message: "Creating…" }) : i18n._({ id: "Create command", message: "Create command" })}
@@ -186,7 +187,7 @@ export function CommandsSection({ person, management = false, headed = true }: C
               </div>
             </form>
           ) : null}
-          {actionError ? <p className="text-base text-destructive">{actionError}</p> : null}
+          {actionError ? <StatusCard kind="problem" title={i18n._({ id: "That did not work", message: "That did not work" })} line={actionError} /> : null}
           {management && commands === null ? null : management && commands?.length === 0 ? (
             <EmptyState icon="inbox" text={i18n._({ id: "No commands yet.", message: "No commands yet." })} />
           ) : management && commands ? (

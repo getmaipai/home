@@ -4,274 +4,130 @@
   "title": "Your Library",
   "body": [
     {
-      "type": "tabs",
-      "state": "library",
-      "tabs": [
-        {
-          "id": "songs",
-          "label": "Songs",
-          "body": [
-            {
-              "type": "media_shelf",
-              "heading": "Songs",
-              "bind": {
-                "source": "package",
-                "path": "songs"
-              },
-              "item_key_field": "id",
-              "item_label_field": "title",
-              "item_subtitle_field": "{channel}",
-              "item_media_field": "thumbnail",
-              "aspect": "square",
-              "variant": "plain",
-              "orientation": "vertical",
-              "density": "compact",
-              "item_meta_field": "duration_s",
-              "item_highlight_field": "playing",
-              "on_select": {
-                "play": {
-                  "media_id": "{id}"
-                }
-              },
-              "empty_state": {
-                "type": "empty_state",
-                "icon": "music",
-                "text": "No songs yet.",
-                "action": {
-                  "navigate": {
-                    "to": "/apps/music/create"
-                  }
-                },
-                "action_label": "Make a song"
-              },
-              "row_actions": [
-                {
-                  "icon": "plus",
-                  "label": "Add to playlist",
-                  "action": {
-                    "call": {
-                      "target": "/api/plugins/music/playlist",
-                      "args": {
-                        "op": "add",
-                        "media_id": "{id}"
-                      }
-                    }
-                  }
-                }
-              ]
-            }
-          ]
-        },
-        {
-          "id": "albums",
-          "label": "Albums",
-          "body": [
-            {
-              "type": "media_shelf",
-              "heading": "Albums",
-              "bind": {
-                "source": "package",
-                "path": "albums"
-              },
-              "item_key_field": "id",
-              "item_label_field": "title",
-              "item_subtitle_field": "{channel}",
-              "item_media_field": "thumbnail",
-              "aspect": "square",
-              "variant": "plain",
-              "layout": "grid",
-              "size_control": true,
-              "on_select": {
-                "navigate": {
-                  "to": "/apps/music/album",
-                  "state": {
-                    "id": "{id}"
-                  }
-                }
-              },
-              "empty_state": {
-                "type": "empty_state",
-                "icon": "music",
-                "text": "No albums yet.",
-                "action": {
-                  "navigate": {
-                    "to": "/apps/music/create"
-                  }
-                },
-                "action_label": "Make a song"
-              }
-            }
-          ]
-        },
-        {
-          "id": "artists",
-          "label": "Artists",
-          "body": [
-            {
-              "type": "media_shelf",
-              "heading": "Artists",
-              "bind": {
-                "source": "package",
-                "path": "artists"
-              },
-              "item_key_field": "id",
-              "item_label_field": "title",
-              "item_subtitle_field": "{channel}",
-              "item_media_field": "thumbnail",
-              "aspect": "square",
-              "variant": "plain",
-              "layout": "grid",
-              "size_control": true,
-              "art_shape": "circle",
-              "on_select": {
-                "navigate": {
-                  "to": "/apps/music/artist",
-                  "state": {
-                    "id": "{id}"
-                  }
-                }
-              },
-              "empty_state": {
-                "type": "empty_state",
-                "icon": "music",
-                "text": "No artists yet.",
-                "action": {
-                  "navigate": {
-                    "to": "/apps/music/create"
-                  }
-                },
-                "action_label": "Make a song"
-              }
-            }
-          ]
-        },
-        {
-          "id": "playlists",
-          "label": "Playlists",
-          "body": [
-            {
-              "type": "media_shelf",
-              "heading": "Start a playlist",
-              "bind": {
-                "source": "package",
-                "path": "playlists",
-                "params": {
-                  "scope": "new"
-                }
-              },
-              "item_key_field": "id",
-              "item_label_field": "title",
-              "item_subtitle_field": "{channel}",
-              "item_media_field": "thumbnail",
-              "aspect": "square",
-              "variant": "plain",
-              "density": "compact",
-              "on_select": {
-                "call": {
-                  "target": "/api/plugins/music/playlist",
-                  "args": {
-                    "op": "new"
-                  }
-                }
-              },
-              "empty_state": {
-                "type": "empty_state",
-                "icon": "music",
-                "text": "No playlists yet. Add songs to one from Now playing.",
-                "action": {
-                  "call": {
-                    "target": "/api/plugins/music/playlist",
-                    "args": {
-                      "op": "new"
-                    }
-                  }
-                },
-                "action_label": "New playlist"
-              }
-            },
-            {
-              "type": "media_shelf",
-              "heading": "Your playlists",
-              "bind": {
-                "source": "package",
-                "path": "playlists"
-              },
-              "item_key_field": "id",
-              "item_label_field": "title",
-              "item_subtitle_field": "{channel}",
-              "item_media_field": "thumbnail",
-              "aspect": "square",
-              "variant": "plain",
-              "layout": "grid",
-              "size_control": true,
-              "on_select": {
-                "navigate": {
-                  "to": "/apps/music/playlist",
-                  "state": {
-                    "id": "{id}"
-                  }
-                }
-              },
-              "hide_when_empty": true
-            }
-          ]
-        },
-        {
-          "id": "liked",
-          "label": "Liked",
-          "body": [
-            {
-              "type": "media_shelf",
-              "heading": "Liked songs",
-              "bind": {
-                "source": "package",
-                "path": "liked"
-              },
-              "item_key_field": "id",
-              "item_label_field": "title",
-              "item_subtitle_field": "{channel}",
-              "item_media_field": "thumbnail",
-              "aspect": "square",
-              "variant": "plain",
-              "orientation": "vertical",
-              "density": "compact",
-              "item_meta_field": "duration_s",
-              "item_highlight_field": "playing",
-              "on_select": {
-                "play": {
-                  "media_id": "{id}"
-                }
-              },
-              "empty_state": {
-                "type": "empty_state",
-                "icon": "music",
-                "text": "No liked songs yet. Press Like on a song or on Now playing.",
-                "action": {
-                  "navigate": {
-                    "to": "/apps/music/search"
-                  }
-                },
-                "action_label": "Find songs"
-              },
-              "row_actions": [
-                {
-                  "icon": "plus",
-                  "label": "Add to playlist",
-                  "action": {
-                    "call": {
-                      "target": "/api/plugins/music/playlist",
-                      "args": {
-                        "op": "add",
-                        "media_id": "{id}"
-                      }
-                    }
-                  }
-                }
-              ]
-            }
-          ]
+      "type": "media_shelf",
+      "heading": "Your Library",
+      "bind": {
+        "source": "package",
+        "path": "songs",
+        "params": {
+          "scope": "library",
+          "sort": "$state.sort",
+          "kind": "$state.library_kind"
         }
-      ]
+      },
+      "item_key_field": "pin_key",
+      "item_label_field": "title",
+      "item_subtitle_field": "{subtitle_line}",
+      "item_media_field": "thumbnail",
+      "pinned_field": "pinned",
+      "pinned_max": 6,
+      "pinned_heading": "Pinned",
+      "sort": {
+        "state": "sort",
+        "label": "Sort by",
+        "options": [
+          {
+            "value": "recents",
+            "label": "Recents"
+          },
+          {
+            "value": "a-z",
+            "label": "A to Z"
+          },
+          {
+            "value": "creator",
+            "label": "Creator"
+          }
+        ]
+      },
+      "chips": {
+        "state": "library_kind",
+        "label": "Filter",
+        "options": [
+          {
+            "value": "all",
+            "label": "All"
+          },
+          {
+            "value": "songs",
+            "label": "Songs"
+          },
+          {
+            "value": "albums",
+            "label": "Albums"
+          },
+          {
+            "value": "artists",
+            "label": "Artists"
+          },
+          {
+            "value": "playlists",
+            "label": "Playlists"
+          }
+        ]
+      },
+      "aspect": "square",
+      "variant": "plain",
+      "orientation": "vertical",
+      "density": "compact",
+      "on_select": {
+        "play": {
+          "media_id": "{id}"
+        }
+      },
+      "row_actions": [
+        {
+          "icon": "pin",
+          "label": "Pin",
+          "hide_when_field": "pinned",
+          "action": {
+            "call": {
+              "target": "/api/plugins/music/pin",
+              "args": {
+                "op": "pin",
+                "key": "{pin_key}"
+              }
+            }
+          }
+        },
+        {
+          "icon": "pin-off",
+          "label": "Unpin",
+          "show_when_field": "pinned",
+          "action": {
+            "call": {
+              "target": "/api/plugins/music/pin",
+              "args": {
+                "op": "unpin",
+                "key": "{pin_key}"
+              }
+            }
+          }
+        },
+        {
+          "icon": "external-link",
+          "label": "Open",
+          "action": {
+            "navigate": {
+              "to": "/apps/music/{route}",
+              "state": {
+                "id": "{id}"
+              }
+            }
+          }
+        }
+      ],
+      "empty_state": {
+        "type": "empty_state",
+        "icon": "music",
+        "text": "Nothing here yet. Make a song or add music to your library.",
+        "action": {
+          "navigate": {
+            "to": "/apps/music/create"
+          }
+        },
+        "action_label": "Make a song"
+      }
     }
   ]
 }

@@ -13,6 +13,7 @@ import { Button } from "@maipai/ui/src/dashboard/components/ui/button";
 import { getIcon } from "@maipai/ui/src/icons";
 import { api, type MemoryRecordWithDevice as MemoryRecord, type PersonRosterEntry } from "@/lib/api";
 import { errorLine } from "@/lib/hubReachability";
+import { StatusCard } from "@maipai/ui/src/elements/status-card";
 
 const ArchiveIcon = getIcon("archive");
 
@@ -216,7 +217,7 @@ export function OtherPersonMemories({ personId, personName }: { personId: string
 
   return (
     <div className="flex flex-col gap-4">
-      {actionError ? <p className="text-base text-destructive">{actionError}</p> : null}
+      {actionError ? <StatusCard kind="problem" title={i18n._({ id: "That did not work", message: "That did not work" })} line={actionError} /> : null}
 
       <div className="flex min-w-0 flex-col gap-2 sm:flex-row sm:flex-wrap">
         <div className="w-full sm:w-auto"><Button size="row" variant="secondary" onClick={handleExport} disabled={busy}>{i18n._({ id: "Export {personName}'s memories", message: "Export {personName}'s memories", values: { personName } })}</Button></div>
@@ -361,7 +362,7 @@ export function OwnMemories({ filterIds, actorIsAdult }: { filterIds: Set<string
 
   return (
     <div className="flex flex-col gap-4">
-      {actionError ? <p className="text-base text-destructive">{actionError}</p> : null}
+      {actionError ? <StatusCard kind="problem" title={i18n._({ id: "That did not work", message: "That did not work" })} line={actionError} /> : null}
 
       {!filterIds ? (
         <div className="flex flex-wrap items-center gap-2">

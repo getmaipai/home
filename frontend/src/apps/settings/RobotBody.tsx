@@ -12,6 +12,7 @@ import { isOwnerOrAdminRole } from "@/lib/api";
 import type { Role } from "@maipai/ui/src/settings/settingsAudience";
 import { errorLine } from "@/lib/hubReachability";
 import { formatDateTime } from "@/lib/format";
+import { StatusCard } from "@maipai/ui/src/elements/status-card";
 
 const activityLabels = (): Record<RobotDeviceState["activity"], string> => ({
   starting: i18n._({ id: "Starting up", message: "Starting up" }),
@@ -237,7 +238,7 @@ export function RobotBody({
                 {i18n._({ id: "No, leave it", message: "No, leave it" })}
               </Button>
             </div>
-            {rebootError ? <p role="alert" className="text-base text-destructive">{rebootError}</p> : null}
+            {rebootError ? <StatusCard kind="problem" title={i18n._({ id: "That did not work", message: "That did not work" })} line={rebootError} /> : null}
           </div>
         ) : null}
         {liveView && liveView.stream ? (
@@ -248,7 +249,7 @@ export function RobotBody({
             <p className="mt-2 text-sm text-muted-foreground">{i18n._({ id: "Live view stops by itself after 10 minutes. Nothing is recorded.", message: "Live view stops by itself after 10 minutes. Nothing is recorded." })}</p>
           </div>
         ) : null}
-        {liveError ? <p role="alert" className="mt-4 text-base text-destructive">{liveError}</p> : null}
+        {liveError ? <StatusCard kind="problem" title={i18n._({ id: "That did not work", message: "That did not work" })} line={liveError} /> : null}
         {muteError && state !== null ? (
           <ErrorState
             layout="inline"

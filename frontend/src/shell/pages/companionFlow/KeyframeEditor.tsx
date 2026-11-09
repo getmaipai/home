@@ -11,6 +11,7 @@ import { companionStatesKey } from "@/shell/pages/useCompanionStates";
 import { flowErrorText } from "@/shell/pages/companionFlow/errors";
 import { DEFAULT_FRAME, PreviewControls, type PictureFrame } from "@/shell/pages/companionFlow/PreviewControls";
 import { useMakingAvailability } from "@/apps/chat/useMakingAvailability";
+import { StatusCard } from "@maipai/ui/src/elements/status-card";
 
 const running = (job: CompanionLookJob | undefined, jobId: string | null) => jobId !== null && (job === undefined || job.state === "queued" || job.state === "running");
 
@@ -91,7 +92,7 @@ export function KeyframeEditor({ companionId, row, open, onOpenChange }: {
           <PreviewControls idPrefix="keyframe" position frame={frame} disabled={working}
             onFrameChange={setFrame} onFrameCommit={(next) => void prepare(next)} />
         </> : <Button shape="pill" disabled={working || making.disabled} aria-describedby={making.reason ? reasonId : undefined} title={making.reason ?? undefined} onClick={() => void make()}><Sparkles aria-hidden="true" />{i18n._({ id: "Make picture", message: "Make picture" })}</Button>}
-        {error ? <p role="alert" className="text-sm text-destructive">{error}</p> : null}
+        {error ? <StatusCard kind="problem" title={i18n._({ id: "That did not work", message: "That did not work" })} line={error} /> : null}
         <DialogFooter>
           <Button variant="outline" shape="pill" onClick={() => onOpenChange(false)}>{i18n._({ id: "Done", message: "Done" })}</Button>
         </DialogFooter>

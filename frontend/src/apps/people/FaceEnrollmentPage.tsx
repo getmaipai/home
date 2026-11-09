@@ -35,6 +35,7 @@ import { classifyMediaAccessError } from "@/lib/media/getUserMediaErrorState";
 import { useLook } from "@/shell/useLook";
 import { pickAppearance, resolveDark } from "@/shell/appearanceResolve";
 import { readShellCache, writeShellCache } from "@/shell/shellCache";
+import { StatusCard } from "@maipai/ui/src/elements/status-card";
 
 type ProfileEntry = PersonRosterEntry | Roster;
 
@@ -777,7 +778,7 @@ function CompletionContent({
   return (
     <div className="flex flex-col items-center gap-3 py-8 text-center">
       <p className="text-lg font-medium">{i18n._({ id: "The face samples could not be saved.", message: "The face samples could not be saved." })}</p>
-      <p className="text-base text-destructive">{i18n._({ id: "Nothing was changed: any earlier enrollment is still in place.", message: "Nothing was changed: any earlier enrollment is still in place." })}</p>
+      <StatusCard kind="problem" title={i18n._({ id: "That did not work", message: "That did not work" })} line={i18n._({ id: "Nothing was changed: any earlier enrollment is still in place.", message: "Nothing was changed: any earlier enrollment is still in place." })} />
       <Button type="button" variant="outline" onClick={onRetryFailed}>
         {i18n._({ id: "Try saving again", message: "Try saving again" })}
       </Button>

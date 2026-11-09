@@ -7,6 +7,7 @@ import { AsyncState } from "@maipai/ui/src/primitives/AsyncState";
 import { requestJson, type Roster } from "@/lib/api";
 import { canEnrollFace } from "@/apps/people/faceEnrollmentGate";
 import { audioBlobToWav16k } from "@/apps/people/voiceEnrollment";
+import { errorLine } from "@/lib/hubReachability";
 
 interface VoicePrint { id: string; created_at: string }
 
@@ -45,7 +46,7 @@ export function VoiceEnrollmentBody({ viewer, profile }: { viewer: Roster; profi
           await requestJson("/api/voice-prints/enroll", { method: "POST", body: form });
           await queryClient.invalidateQueries({ queryKey: ["voice-prints", profile.id] });
           setMessage(i18n._({ id: "Voice sample saved.", message: "Voice sample saved." }));
-        } catch (error) { setMessage(error instanceof Error ? error.message : i18n._({ id: "Could not save this sample.", message: "Could not save this sample." })); }
+        } catch (error) { setMessage(errorLine(error, i18n._({ id: "Could not save this sample.", message: "Could not save this sample." }))); }
         finally { setBusy(false); }
       };
       recorder.start(); setRecording(true);
@@ -60,7 +61,7 @@ export function VoiceEnrollmentBody({ viewer, profile }: { viewer: Roster; profi
       await requestJson(url, { method: "DELETE" });
       await queryClient.invalidateQueries({ queryKey: ["voice-prints", profile.id] });
       setMessage(id ? i18n._({ id: "Voice sample deleted.", message: "Voice sample deleted." }) : i18n._({ id: "All voice samples deleted.", message: "All voice samples deleted." }));
-    } catch (error) { setMessage(error instanceof Error ? error.message : i18n._({ id: "Could not delete the voice sample.", message: "Could not delete the voice sample." })); }
+    } catch (error) { setMessage(errorLine(error, i18n._({ id: "Could not delete the voice sample.", message: "Could not delete the voice sample." }))); }
     finally { setBusy(false); }
   }
 

@@ -7,6 +7,7 @@ import { Select } from "@maipai/ui/src/primitives/Select";
 import { OptionMatrix } from "@maipai/ui/src/settings/OptionMatrix";
 import { api, type PersonRosterEntry, type SiteBlocksView } from "@/lib/api";
 import { errorLine } from "@/lib/hubReachability";
+import { StatusCard } from "@maipai/ui/src/elements/status-card";
 
 interface SiteBlocksSectionProps {
   /** The people the signed-in owner or admin may open (already filtered by the caller). */
@@ -49,7 +50,7 @@ export function SiteBlocksSection({ roster }: SiteBlocksSectionProps) {
         getLabel={(v) => roster.find((p) => p.id === v)?.display_name ?? v}
         aria-label={i18n._({ id: "Person", message: "Person" })}
       />
-      {error ? <p className="text-base text-destructive">{error}</p> : null}
+      {error ? <StatusCard kind="problem" title={i18n._({ id: "That did not work", message: "That did not work" })} line={error} /> : null}
       <AsyncState
         data={query.data}
         error={query.isError}

@@ -5,10 +5,11 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { eq } from "drizzle-orm";
 import { db } from "@/db";
-import { mediaSources } from "@/db/schema";
+import { mediaSources, people } from "@/db/schema";
 import { __resetRateLimiterForTests } from "@/lib/rateLimiter";
 import { __resetProgressForTests } from "@/lib/media/progress";
 import { __setPodcastFetchDepsForTests } from "@/lib/media/podcasts";
+import { insertTranscript } from "@/lib/transcripts/store";
 import { getFeed } from "@/lib/shelf/feedStore";
 import { pollFeed, type PollDeps } from "@/lib/shelf/shelfPoller";
 import { __resetShelfCountersForTests } from "@/lib/shelf/shelfCounters";
@@ -178,13 +179,13 @@ describe("the pages", () => {
     expect(boards.every((node) => node.hide_when_empty === true)).toBe(true);
   });
 
-  test("Library filters the shows, and Listen Now's Latest episodes are rows with two actions at most", () => {
+  test("Library filters the shows, and Listen Now's Latest episodes are rows with three actions at most", () => {
     const shows = read("shows").body as Array<Record<string, any>>;
     expect(shows[0]!.leading.map((option: { value: string }) => option.value)).toEqual(["followed", "unfollowed", "downloaded"]);
     const latest = (read("index").body as Array<Record<string, any>>).find((node) => node.heading === "Latest episodes")!;
     expect(latest).toMatchObject({ orientation: "vertical", item_badge_field: "badge" });
-    expect(latest.row_actions.length).toBeLessThanOrEqual(2);
-    expect(latest.row_actions.map((action: { label: string }) => action.label)).toEqual(["Play", "Add to queue"]);
+    expect(latest.row_actions.length).toBeLessThanOrEqual(3);
+    expect(latest.row_actions.map((action: { label: string }) => action.label)).toEqual(["Play", "Add to queue", "Save"]);
   });
 
   test("every empty state names a next step", () => {
@@ -200,5 +201,63 @@ describe("the pages", () => {
       expect(empties.length).toBeGreaterThan(0);
       for (const empty of empties) expect(empty.action, `${module}: ${empty.text}`).toBeDefined();
     }
+  });
+});
+
+describe("apps parity: transcript, Save, episode page, search types", () => {
+  const dir = join(import.meta.dir, "../packages/podcasts");
+  const read = (module: string) => JSON.parse(readFileSync(join(dir, "pages", `${module}.json`), "utf8"));
+
+  test("the directory transcript scope answers {start_s, text} rows for a stored transcript, and a child gets none", async () => {
+    const { client, data, directory } = await setup();
+    const id = (await data("episodes"))[0]!.id as string;
+    const data_transcript = (body: Record<string, unknown>) => directory({ scope: "transcript", ...body });
+    expect(await data_transcript({ id })).toEqual([]);
+    const adult = db.select().from(people).where(eq(people.role, "owner")).get() as never;
+    insertTranscript(adult, { itemId: id, language: "en", segments: [{ id: "s1", start: 3, end: 8, text: "Hello there." }, { id: "s2", start: 8, end: 13, text: "Second line." }], provenance: { engine: "podcast-import", model_id: "publisher", source_kind: "imported" } });
+    expect(await data_transcript({ id })).toEqual([{ start_s: 3, text: "Hello there." }, { start_s: 8, text: "Second line." }]);
+    const kid = await child(client);
+    expect(await (await kid.client.post("/api/plugins/podcasts/data/directory", { scope: "transcript", id })).json()).toEqual([]);
+    expect(await data_transcript({ id: "mitem-nothing0001" })).toEqual([]);
+  });
+
+  test("Listen Now rows carry the Save label and next value", async () => {
+    const { data } = await setup();
+    expect((await data("latest"))[0]).toMatchObject({ save_label: "Save", save_next: true });
+  });
+
+  test("search keeps shows and episodes apart, and the chip picks which shelf answers", async () => {
+    const { client, directory } = await setup();
+    const shows = await directory({ scope: "search", q: "Seasons", shelf: "shows", kind: "all" });
+    expect(shows.every((row) => row.feed_url !== "")).toBe(true);
+    const episodes = await directory({ scope: "search", q: "Ep 1", shelf: "episodes", kind: "all" });
+    expect(episodes.map((row) => row.title)).toEqual(["Ep 1"]);
+    expect(episodes[0]!.feed_url).toBe("");
+    expect(await directory({ scope: "search", q: "Ep 1", shelf: "episodes", kind: "shows" })).toEqual([]);
+    expect(await directory({ scope: "search", q: "Ep 1", shelf: "shows", kind: "episodes" })).toEqual([]);
+    expect((await client.post("/api/plugins/podcasts/data/directory", { scope: "search", q: "Ep 1" })).status).toBe(200);
+  });
+
+  test("the play page has the sleep timer, 15 and 30 second skips and a transcript; an episode page exists", () => {
+    for (const module of ["play", "episode"]) {
+      const body = JSON.stringify(read(module));
+      const player = (function find(node: any): any { if (Array.isArray(node)) { for (const n of node) { const f = find(n); if (f) return f; } return null; } if (node && typeof node === "object") { if (node.type === "player") return node; for (const v of Object.values(node)) { const f = find(v); if (f) return f; } } return null; })(read(module));
+      expect(body).toContain("transcript");
+      expect(player).toMatchObject({ sleep_timer: true, skip: { back: 15, forward: 30 }, transcript_bind: { source: "package", path: "directory", params: { scope: "transcript", id: "$state.id" } } });
+      expect(player.details_show).toContain("transcript");
+    }
+    const manifest = JSON.parse(readFileSync(join(dir, "manifest.json"), "utf8"));
+    expect(manifest.contributes.pages.map((entry: { id: string }) => entry.id)).toContain("episode");
+  });
+
+  test("lists open the episode page and search has Shows and Episodes chips", () => {
+    const body = (module: string) => read(module).body as Array<Record<string, any>>;
+    const search = body("search");
+    expect(search[0]!.type_chips).toMatchObject({ state: "kind" });
+    expect(search[0]!.type_chips.options.map((option: { label: string }) => option.label)).toEqual(["All", "Shows", "Episodes"]);
+    const episodes = search.flatMap((node) => node.children ?? [node]).find((node) => node.heading === "Episodes")!;
+    expect(episodes.on_select.navigate.to).toBe("/apps/podcasts/episode");
+    expect(body("episodes").find((node) => node.heading === "Episodes")!.on_select.navigate.to).toBe("/apps/podcasts/episode");
+    expect(body("index").find((node) => node.heading === "Latest episodes")!.on_select.navigate.to).toBe("/apps/podcasts/episode");
   });
 });

@@ -13,6 +13,7 @@ import { Item, ItemContent, ItemTitle } from "@maipai/ui/src/dashboard/component
 import { ItemGroup } from "@maipai/ui/src/dashboard/components/ui/item";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@maipai/ui/src/ui/select";
 import { errorLine } from "@/lib/hubReachability";
+import { StatusCard } from "@maipai/ui/src/elements/status-card";
 
 // ROBOT-DEVICE-01: "the add flow refuses to finish while the unit's
 // published default SSH password stands and rotates it into the
@@ -100,7 +101,7 @@ export function RobotPasswordRow({
             onChange={(e) => setCurrentPassword(e.target.value)}
             disabled={submitting}
           />
-          {error ? <p className="text-sm text-destructive">{error}</p> : null}
+          {error ? <StatusCard kind="problem" title={i18n._({ id: "That did not work", message: "That did not work" })} line={error} /> : null}
           <div className="flex gap-2">
             <Button onClick={handleRotate} disabled={submitting || !host.trim()}>
               {submitting ? i18n._({ id: "Rotating…", message: "Rotating…" }) : i18n._({ id: "Rotate", message: "Rotate" })}

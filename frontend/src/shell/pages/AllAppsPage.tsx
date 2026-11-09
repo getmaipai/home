@@ -10,6 +10,8 @@ import { useAppCatalog } from "@/shell/useAppCatalog";
 import { isPinnableApp } from "@/shell/appCatalog";
 import { usePinnedApps } from "@/shell/usePinnedApps";
 import { useTabItem } from "@/shell/tabIdentity";
+import { STATUS_LEVEL_TONE, STATUS_TONE_BG } from "@maipai/ui/src/ui/status-colors";
+import { ACTIVITY_PATH, activityItemStatus, useActivityDot } from "@/shell/activity";
 
 /** APPS-DIRECTORY-01 / PRO-LOOK-APPS-01: the launcher presents the same
  * ui.pinned_apps setting as the rail, with a favorites shelf and an A to Z grid. */
@@ -23,6 +25,8 @@ export function AllAppsPage({ person }: { person: Roster }) {
   const [query, setQuery] = useState("");
   const [category, setCategory] = useState(i18n._({ id: "All", message: "All" }));
   const [editing, setEditing] = useState(false);
+  // ACTIVITY-PAGE-01: the Activity entry carries the same quiet dot here as in the rail and the drawer (no number).
+  const activityStatus = activityItemStatus(useActivityDot(person.role !== "guest"));
   const apps = useMemo(() => catalog.map((entry) => ({
     id: entry.to,
     name: entry.label,
@@ -54,9 +58,9 @@ export function AllAppsPage({ person }: { person: Roster }) {
     const Down = getIcon("arrow-down");
     const reorder = editing && app.favorite;
     return <li key={app.id} data-slot="app-launcher-cell" className="relative flex min-w-0 flex-col items-center">
-      <Button type="button" variant="ghost" height="auto" width="full" data-launch="" aria-label={app.name} onClick={() => navigate(app.to)}>
+      <Button type="button" variant="ghost" height="auto" width="full" data-launch="" aria-label={app.to === ACTIVITY_PATH && activityStatus ? `${app.name}: ${activityStatus.ariaLabel}` : app.name} onClick={() => navigate(app.to)}>
         <span className="flex min-w-0 flex-col items-center gap-2 py-1">
-          <span data-slot="app-launcher-tile" className="grid size-14 place-items-center rounded-2xl bg-muted text-foreground"><Icon aria-hidden /></span>
+          <span data-slot="app-launcher-tile" className="relative grid size-14 place-items-center rounded-2xl bg-muted text-foreground"><Icon aria-hidden />{app.to === ACTIVITY_PATH && activityStatus ? <span aria-hidden data-slot="app-status-mark" data-status-level={activityStatus.level} className={`absolute right-1 top-1 size-2 rounded-full ${STATUS_TONE_BG[STATUS_LEVEL_TONE[activityStatus.level]]}`} /> : null}</span>
           <span className="line-clamp-2 w-full text-center text-supporting font-medium">{app.name}</span>
         </span>
       </Button>

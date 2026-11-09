@@ -88,7 +88,7 @@ describe("PRO-LOOK-APPS-01 All apps launcher", () => {
     const view = open();
     const add = await view.findByRole("button", { name: "Add App 05 to favorites" });
     await act(async () => { fireEvent.click(add); });
-    await waitFor(() => expect(home.puts.at(-1)).toMatchObject({ key: "ui.pinned_apps", value: JSON.stringify(["/reminders", "/clock", "/apps/app0", "/apps/app5"]) }));
+    await waitFor(() => expect(home.puts.at(-1)).toMatchObject({ key: "ui.pinned_apps", value: JSON.stringify(["/reminders", "/clock", "/activity", "/apps/app0", "/apps/app5"]) }));
     expect(view.queryByRole("heading", { name: "App 05" })).toBeNull();
   });
 

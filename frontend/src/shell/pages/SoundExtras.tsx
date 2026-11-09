@@ -10,6 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { MediaCarousel, MediaTile } from "@maipai/ui/src/ui/media-tiles";
 import { useToast } from "@maipai/ui/src/primitives/Toast";
 import { musicApi, type MusicCard } from "@/lib/musicApi";
+import { StatusCard } from "@maipai/ui/src/elements/status-card";
 
 const errorLine = (error: unknown, fallback: string): string => (error instanceof Error && error.message ? error.message : fallback);
 const play = (src: string, loop: boolean) => { const audio = new Audio(src); audio.loop = loop; void audio.play(); };
@@ -78,7 +79,7 @@ export function AddSoundToSong({ jobId, open, onOpenChange, songs, onAdded }: { 
         </Select></div>
       <div className="flex flex-col gap-2"><Label htmlFor="sound-start">{i18n._({ id: "Starts at (seconds)", message: "Starts at (seconds)" })}</Label>
         <Input id="sound-start" type="number" min={0} max={3600} step={0.5} value={start} onChange={event => setStart(event.currentTarget.value)} /></div>
-      {problem ? <p role="alert" className="text-destructive text-sm">{problem}</p> : null}
+      {problem ? <StatusCard kind="problem" title={i18n._({ id: "That did not work", message: "That did not work" })} line={problem} /> : null}
       <Button type="button" disabled={!valid || working} onClick={add}>{working ? i18n._({ id: "Adding", message: "Adding" }) : i18n._({ id: "Add to the song", message: "Add to the song" })}</Button>
     </div>}
   </DialogContent></Dialog></div>;

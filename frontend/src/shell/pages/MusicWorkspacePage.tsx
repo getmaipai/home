@@ -25,6 +25,7 @@ import { MusicTrack } from "@maipai/ui/src/elements/music-track";
 import { useMusicTrackProps } from "@/apps/chat/MusicCardView";
 import { CreatePage } from "./MusicStudioPages";
 import { Cover, GlassPill, MediaCarousel, MediaTile } from "@maipai/ui/src/ui/media-tiles";
+import { StatusCard } from "@maipai/ui/src/elements/status-card";
 import { RemixSong } from "./MusicRemix";
 import { getIcon } from "@maipai/ui/src/icons";
 import { requestJson } from "@/lib/api";
@@ -68,8 +69,34 @@ function useSongs() {
 }
 
 
+/** ACTIVITY-PAGE-01 (PRO-LOOK-01 sections 20 and 21): a song being made, waiting or not finished is the kit status card, fed by the same job record
+ * as the tile it replaces: WAITING with its place in line, MAKING NOW with the ring and what it is doing (or how long it usually takes), COULD NOT
+ * FINISH with the reason and Try again. The record has no preview, so the ring card is the form. */
+function songStatusCard({ card, onOpen }: { card: MusicCard; onOpen: () => void }) {
+  const failed = card.state === "failed";
+  const waiting = card.state === "queued";
+  const percent = Math.round(card.progress * 100);
+  const minutes = card.eta_seconds ? Math.max(1, Math.round(card.eta_seconds / 60)) : null;
+  const usually = minutes
+    ? i18n._({ id: "About {minutes, plural, one {# minute} other {# minutes}} left.", message: "About {minutes, plural, one {# minute} other {# minutes}} left.", values: { minutes } })
+    : i18n._({ id: "Usually about 2 minutes.", message: "Usually about 2 minutes." });
+  const line = failed ? songLine(card) : waiting ? songLine(card) : [card.stage_label || i18n._({ id: "Making your song", message: "Making your song" }), percent > 0 ? "" : usually].filter(Boolean).join(" ");
+  const Icon = getIcon(failed ? "alert-triangle" : waiting ? "clock" : "loader");
+  return <li key={card.id} className="w-full"><StatusCard
+    kind={failed ? "problem" : waiting ? "waiting" : "progress"}
+    stateWord={failed ? i18n._({ id: "Could not finish", message: "Could not finish" }) : waiting ? i18n._({ id: "Waiting", message: "Waiting" }) : i18n._({ id: "Making now", message: "Making now" })}
+    title={card.title ?? i18n._({ id: "Making your song", message: "Making your song" })}
+    line={line}
+    icon={<Icon aria-hidden className="size-5" />}
+    progress={!failed && !waiting && percent > 0 ? percent : undefined}
+    accent="create"
+    action={{ label: failed ? i18n._({ id: "Try again", message: "Try again" }) : i18n._({ id: "Open", message: "Open" }), onSelect: onOpen, tone: failed ? "primary" : "quiet" }}
+  /></li>;
+}
+
 /** One song as a tile: its cover, glass pills for length and state, and the quick actions as visible buttons. */
 function songTile({ card, selected, onOpen, actions }: { card: MusicCard; selected: boolean; onOpen: () => void; actions: Array<{ label: string; to: string }> }) {
+  if (active(card) || card.state === "failed") return songStatusCard({ card, onOpen });
   const title = card.title ?? (active(card) ? i18n._({ id: "Making your song", message: "Making your song" }) : i18n._({ id: "Untitled song", message: "Untitled song" }));
   const length = card.state === "done" ? clock(card.duration_s) : "";
   return <MediaTile key={card.id} id={card.id} title={title} line={songLine(card)} coverUrl={card.cover_url} selected={selected} busy={active(card)} playable={card.state === "done"} onOpen={onOpen}

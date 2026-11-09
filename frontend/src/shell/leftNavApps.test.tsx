@@ -97,10 +97,10 @@ describe("the rail's apps", () => {
     await rail(view).findByRole("link", { name: "Weather" });
     fireEvent.click(rail(view).getByRole("link", { name: "All apps" }));
     await act(async () => { fireEvent.click(await view.findByRole("button", { name: "Add Notes to favorites" })); });
-    await waitFor(() => expect(home.puts.at(-1)).toMatchObject({ key: "ui.pinned_apps", value: JSON.stringify(["/reminders", "/clock", "/apps/weather", "/apps/notes"]) }));
+    await waitFor(() => expect(home.puts.at(-1)).toMatchObject({ key: "ui.pinned_apps", value: JSON.stringify(["/reminders", "/clock", "/activity", "/apps/weather", "/apps/notes"]) }));
     await rail(view).findByRole("link", { name: "Notes" });
     await act(async () => { fireEvent.click(within(view.container.querySelector('[data-layout="grid"]') as HTMLElement).getByRole("button", { name: "Remove Weather from favorites" })); });
-    await waitFor(() => expect(home.puts.at(-1)).toMatchObject({ value: JSON.stringify(["/reminders", "/clock", "/apps/notes"]) }));
+    await waitFor(() => expect(home.puts.at(-1)).toMatchObject({ value: JSON.stringify(["/reminders", "/clock", "/activity", "/apps/notes"]) }));
     await waitFor(() => expect(rail(view).queryByRole("link", { name: "Weather" })).toBeNull());
   });
 

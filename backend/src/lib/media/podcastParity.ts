@@ -117,6 +117,7 @@ export function episodeFields(person: PersonRow, items: readonly MediaItem[], no
       date: dateLabel(published), played, queued: isQueued,
       queue_label: isQueued ? "Remove from queue" : "Add to queue", queue_next: !isQueued,
       played_label: played ? "Mark unplayed" : "Mark played", played_next: !played,
+      save_label: saved ? "Remove saved copy" : "Save", save_next: !saved,
       badge: played ? "Played" : !heard && fresh ? "New" : saved ? "Saved" : "",
     });
   }

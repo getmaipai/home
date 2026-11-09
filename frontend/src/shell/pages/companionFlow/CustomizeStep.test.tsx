@@ -81,7 +81,7 @@ test("a save blocked with go_back_to look shows the sentence and a button to scr
   await view.findByRole("radio", { name: "Friendly" });
   api.saveCompanion = async () => { throw new ApiError("Go back to the look screen and check the starting picture.", 422, undefined, undefined, undefined, undefined, undefined, undefined, "look"); };
   await act(async () => { fireEvent.click(button(view, "Save Synth")); });
-  expect((await view.findByRole("alert")).textContent).toBe("Go back to the look screen and check the starting picture.");
+  expect((await view.findByRole("alert")).textContent).toContain("Go back to the look screen and check the starting picture.");
   fireEvent.click(button(view, "Go to Create Character"));
   await view.findByText("Step 1 of 3 · Design your synth's appearance");
 });

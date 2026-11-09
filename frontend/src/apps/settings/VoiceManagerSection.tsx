@@ -16,6 +16,7 @@ import { AddVoiceForm } from "@/apps/settings/AddVoiceForm";
 import { errorLine } from "@/lib/hubReachability";
 import { languageName as formatLanguageName } from "@/lib/format";
 import { activeLocale } from "@/lib/activeLocale";
+import { StatusCard } from "@maipai/ui/src/elements/status-card";
 
 const genderLabel = (gender: StackVoice["gender"]): string => gender === "female" ? i18n._({ id: "Female", message: "Female" }) : gender === "male" ? i18n._({ id: "Male", message: "Male" }) : gender === "neutral" ? i18n._({ id: "Neutral", message: "Neutral" }) : i18n._({ id: "Not stated", message: "Not stated" });
 // AUDIT-UI-01: the five columns need about 640 px; the settings content pane is 728 px at most and about 470 px beside the 1024 px column, so
@@ -97,8 +98,8 @@ export function VoiceManagerSection() {
       <div className="flex shrink-0 flex-wrap gap-2"><Button type="button" onClick={() => { setNotice(null); setAddInspired(false); setAdding(true); }}>{i18n._({ id: "Add voice", message: "Add voice" })}</Button><Button type="button" variant="outline" onClick={() => { setNotice(null); setAddInspired(true); setAdding(true); }}>{i18n._({ id: "Add Inspired voice", message: "Add Inspired voice" })}</Button></div>
     </div>
     {notice ? <p role="status" className="text-base text-primary">{notice}</p> : null}
-    {error ? <p role="alert" className="text-base text-destructive">{error}</p> : null}
-    {preview.error ? <p role="alert" className="text-base text-destructive">{preview.error}</p> : null}
+    {error ? <StatusCard kind="problem" title={i18n._({ id: "That did not work", message: "That did not work" })} line={error} /> : null}
+    {preview.error ? <StatusCard kind="problem" title={i18n._({ id: "That did not work", message: "That did not work" })} line={preview.error} /> : null}
     {failed ? <div className="flex min-w-0 flex-col items-start gap-3"><Alert variant="destructive"><AlertDescription>{i18n._({ id: "Home can't reach its voice service. Check Repairs, then come back.", message: "Home can't reach its voice service. Check Repairs, then come back." })}</AlertDescription></Alert><Button type="button" variant="outline" onClick={retry}>{i18n._({ id: "Try again", message: "Try again" })}</Button></div>
       : <AsyncState data={voicesQuery.data && madeQuery.data && homeQuery.data ? voices : undefined} isFetching={voicesQuery.isFetching || madeQuery.isFetching || homeQuery.isFetching} onRetry={retry} loadingLabel={i18n._({ id: "Loading voices", message: "Loading voices" })}>
         {(list) => list.length === 0 ? <p className="text-base text-muted-foreground">{i18n._({ id: "Voices are still getting ready. This takes a minute after setup.", message: "Voices are still getting ready. This takes a minute after setup." })}</p> : <div className="flex flex-col">

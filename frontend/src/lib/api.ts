@@ -970,6 +970,21 @@ export interface HomeJobView {
   forPersonName?: string;
 }
 
+/** ACTIVITY-PAGE-01: one row of GET /api/activity (backend/src/lib/activity.ts): the viewer's own job, already worded by the hub. */
+export interface ActivityItemView {
+  id: string;
+  source: "picture" | "video" | "song" | "job";
+  state: "waiting" | "making" | "done" | "attention" | "failed";
+  title: string;
+  line: string | null;
+  percent: number | null;
+  typicalMinutes: number | null;
+  href: string | null;
+  at: string;
+}
+export type ActivityDotState = "none" | "running" | "attention" | "finished";
+export interface ActivityListView { items: ActivityItemView[]; seenAt: string | null; dot: ActivityDotState }
+
 export interface TailscaleStatus { state: "not_installed" | "stopped" | "running"; dnsName: string | null; ips: string[]; installed: boolean; signedIn: boolean; httpsEnabled: boolean; machineName: string | null; enabled: boolean; url: string | null }
 
 export interface SetupFolderListing { path: string; parent: string | null; freeBytes: number | null; writable: boolean; folders: Array<{ name: string; path: string; writable: boolean }> }
@@ -1545,6 +1560,8 @@ export const api = {
   // ACTIVITY-01d: the Running now panel. One list per viewer (the service
   // already filters by age band); stop, approve and deny act on one row.
   jobs: () => request<HomeJobView[]>("/api/jobs"),
+  activity: () => request<ActivityListView>("/api/activity"),
+  markActivitySeen: () => request<{ seenAt: string }>("/api/activity/seen", { method: "POST" }),
   stopJob: (id: string) => request<{ ok: true }>(`/api/jobs/${encodeURIComponent(id)}/stop`, { method: "POST" }),
   decideApproval: (id: string, decision: "approve" | "deny") =>
     request<{ id: string }>(`/api/approvals/${encodeURIComponent(id)}/${decision}`, { method: "POST" }),

@@ -16,6 +16,7 @@ import { playableVoices, previewIdFor, voiceChoices } from "@/lib/voice/voiceBro
 import { voicePreviewPlayer, type VoicePreviewState } from "@/lib/voice/voicePreviewPlayer";
 import { lookKey } from "@/shell/pages/companionFlow/CreateCharacterStep";
 import { flowErrorText } from "@/shell/pages/companionFlow/errors";
+import { StatusCard } from "@maipai/ui/src/elements/status-card";
 
 const PERSONALITIES: () => Array<{ id: CompanionPersonality; label: string }> = () => ([
   { id: "friendly", label: i18n._({ id: "Friendly", message: "Friendly" }) }, { id: "funny", label: i18n._({ id: "Funny", message: "Funny" }) }, { id: "calm", label: i18n._({ id: "Calm", message: "Calm" }) },
@@ -145,9 +146,9 @@ export function CustomizeStep({ companionId, name, onBack, onGoTo }: { companion
             </Select></div>
             <Button variant="outline" shape="pill" disabled={!previewId || (playing && preview.busy)} onClick={() => playing ? voicePreviewPlayer.stop() : previewId && void voicePreviewPlayer.start(previewId)}>{playing && !preview.busy ? i18n._({ id: "Stop", message: "Stop" }) : i18n._({ id: "Preview", message: "Preview" })}</Button>
           </div>
-          {voices.isError ? <p role="alert" className="text-sm text-destructive">{flowErrorText(voices.error)}</p> : null}
+          {voices.isError ? <StatusCard kind="problem" title={i18n._({ id: "That did not work", message: "That did not work" })} line={flowErrorText(voices.error)} /> : null}
           {choices?.notice ? <p className="text-sm text-muted-foreground">{choices.notice}</p> : null}
-          {preview.error ? <p role="alert" className="text-sm text-destructive">{preview.error}</p> : null}
+          {preview.error ? <StatusCard kind="problem" title={i18n._({ id: "That did not work", message: "That did not work" })} line={preview.error} /> : null}
           {notice ? <p role="status" className="text-sm text-muted-foreground">{notice}</p> : null}
         </DialogSection>
         <DialogSection title={i18n._({ id: "Personality", message: "Personality" })} icon={<Heart aria-hidden="true" />}>
@@ -169,7 +170,7 @@ export function CustomizeStep({ companionId, name, onBack, onGoTo }: { companion
               <Switch aria-label={i18n._({ id: "Pin example: {phrase}", message: "Pin example: {phrase}", values: { phrase } })} checked={pins.examples.includes(phrase)} disabled={!saved.data || saving || phrase.length > 60} onCheckedChange={() => void togglePin("examples", phrase)} />
               {phrase.length > 60 ? <p className="text-xs text-muted-foreground">{i18n._({ id: "This example is too long to pin. Shorten it to 60 characters or fewer.", message: "This example is too long to pin. Shorten it to 60 characters or fewer." })}</p> : null}
             </div>)}
-            {pinError ? <p role="alert" className="text-sm text-destructive">{pinError}</p> : null}
+            {pinError ? <StatusCard kind="problem" title={i18n._({ id: "That did not work", message: "That did not work" })} line={pinError} /> : null}
           </div>
         </DialogSection>
         <DialogSection title={i18n._({ id: "Backstory", message: "Backstory" })} icon={<Book aria-hidden="true" />} aside={<Button variant="secondary" shape="pill" disabled={generating || loading} onClick={() => void generate()}><Sparkles aria-hidden="true" />{generating ? i18n._({ id: "Writing", message: "Writing" }) : i18n._({ id: "Generate", message: "Generate" })}</Button>}>
@@ -185,7 +186,7 @@ export function CustomizeStep({ companionId, name, onBack, onGoTo }: { companion
             { id: "save", label: saving ? i18n._({ id: "Saving", message: "Saving" }) : i18n._({ id: "Save Synth", message: "Save Synth" }), primary: true, disabled: saving || loading, onSelect: () => void save() },
           ]} />
         {error.text ? <div className="flex flex-col gap-2">
-          <p role="alert" className="text-sm text-destructive">{error.text}</p>
+          <StatusCard kind="problem" title={i18n._({ id: "That did not work", message: "That did not work" })} line={error.text} />
           {error.back ? <Button variant="outline" shape="pill" onClick={() => onGoTo(error.back === "look" ? 0 : 1)}>{error.back === "look" ? i18n._({ id: "Go to Create Character", message: "Go to Create Character" }) : i18n._({ id: "Go to Animate Character", message: "Go to Animate Character" })}</Button> : null}
         </div> : null}
       </DialogSection>

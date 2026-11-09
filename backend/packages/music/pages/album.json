@@ -6,6 +6,7 @@
     {
       "type": "creation_header",
       "variant": "collection",
+      "backdrop": "art_gradient",
       "bind": {
         "source": "package",
         "path": "header",
@@ -60,7 +61,19 @@
             "media_id": "{shuffle_id}"
           }
         }
-      }
+      },
+      "more": [
+        {
+          "label": "Share",
+          "icon": "share",
+          "action": {
+            "share": {
+              "to": "/apps/music/album?id={share_id}",
+              "title": "{title}"
+            }
+          }
+        }
+      ]
     },
     {
       "type": "track_rows",
@@ -84,7 +97,47 @@
           "media_id": "{id}"
         }
       },
-      "item_group_field": "disc_label"
+      "item_group_field": "disc_label",
+      "row_actions": [
+        {
+          "icon": "list-plus",
+          "label": "Play next",
+          "action": {
+            "call": {
+              "target": "/api/plugins/music/queue",
+              "args": {
+                "op": "play_next",
+                "media_id": "{id}"
+              }
+            }
+          }
+        },
+        {
+          "icon": "list-end",
+          "label": "Add to queue",
+          "action": {
+            "call": {
+              "target": "/api/plugins/music/queue",
+              "args": {
+                "op": "add",
+                "media_id": "{id}"
+              }
+            }
+          }
+        },
+        {
+          "icon": "user",
+          "label": "Go to artist",
+          "action": {
+            "navigate": {
+              "to": "/apps/music/artist",
+              "state": {
+                "id": "{channel}"
+              }
+            }
+          }
+        }
+      ]
     },
     {
       "type": "creation_header",

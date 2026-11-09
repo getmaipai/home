@@ -94,6 +94,21 @@ describe("NotificationBell", () => {
     }
   });
 
+  // ACTIVITY-PAGE-01: the bell leads to the Activity page, and a "clip ready" row opens its result (existing notification type).
+  test("links to the Activity page, and a finished-clip row opens the Videos page", async () => {
+    const restore = stubFetch({ "/api/notifications": [notification("n1", "Your video is ready.", { typeId: "videos.clip_ready" }), notification("n2", "Model download ready")] });
+    try {
+      const { findByRole, getByRole, getAllByRole } = renderBell();
+      fireEvent.click(await findByRole("button", { name: /Notifications \(2 pending\)/ }));
+      expect(getByRole("link", { name: "Activity" }).getAttribute("href")).toBe("/activity");
+      const open = getAllByRole("link", { name: "Open" });
+      expect(open).toHaveLength(1);
+      expect(open[0]!.getAttribute("href")).toBe("/apps/videos/create");
+    } finally {
+      restore();
+    }
+  });
+
   test("dismissing removes it from the pending list, without waiting for the next poll", async () => {
     // Stateful, not a fixed fixture: dismissMutation's own `onSettled`
     // invalidates and refetches this same query (the standard optimistic-

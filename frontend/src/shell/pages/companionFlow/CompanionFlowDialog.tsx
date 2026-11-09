@@ -9,6 +9,7 @@ import { AnimateStep } from "@/shell/pages/companionFlow/AnimateStep";
 import { CustomizeStep } from "@/shell/pages/companionFlow/CustomizeStep";
 import { CreateCharacterStep } from "@/shell/pages/companionFlow/CreateCharacterStep";
 import { flowErrorText } from "@/shell/pages/companionFlow/errors";
+import { StatusCard } from "@maipai/ui/src/elements/status-card";
 
 const STEPS = () => ([
   { title: i18n._({ id: "Create Character", message: "Create Character" }), line: i18n._({ id: "Design your synth's appearance", message: "Design your synth's appearance" }) },
@@ -63,7 +64,7 @@ export function CompanionFlowDialog({ companionId, initialName, initialStep = 0 
         </DialogHeader>
         <Progress mode="determinate" value={((step + 1) / 3) * 100} segments={3} tone="solid" size="md" label={i18n._({ id: "Step {step} of 3", message: "Step {step} of 3", values: { step: step + 1 } })} />
         {asking ? <DestructiveConfirm message={i18n._({ id: "Keep this draft or discard it?", message: "Keep this draft or discard it?" })} detail={i18n._({ id: "A draft with no picture can wait in your list until you come back.", message: "A draft with no picture can wait in your list until you come back." })} confirmLabel={i18n._({ id: "Discard", message: "Discard" })} busyLabel={i18n._({ id: "Discarding", message: "Discarding" })} cancelLabel={i18n._({ id: "Keep draft", message: "Keep draft" })} busy={discarding} onConfirm={() => void discard()} onCancel={leave} /> : null}
-        {error ? <p role="alert" className="text-sm text-destructive">{error}</p> : null}
+        {error ? <StatusCard kind="problem" title={i18n._({ id: "That did not work", message: "That did not work" })} line={error} /> : null}
         <div hidden={step !== 0}>
           <CreateCharacterStep creating={creating} companionId={companionId} initialName={initialName} onDraft={onDraft} onApproved={(job) => { setSheetJob(job); setJustApproved(true); setStep(1); }} />
         </div>

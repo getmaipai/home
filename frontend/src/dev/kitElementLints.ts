@@ -381,7 +381,8 @@ function boxedElement(roots: ts.Node[], chat: Set<string>): { box: string; eleme
     let element: string | undefined;
     const walk = (n: ts.Node) => {
       if (element) return;
-      if (ts.isJsxOpeningElement(n) || ts.isJsxSelfClosingElement(n)) element = kitTag(n.tagName, chat);
+      // A StatusCard is the status-design card placed where an action failed (RULES S6); a form or card that holds one is not framing it.
+      if (ts.isJsxOpeningElement(n) || ts.isJsxSelfClosingElement(n)) element = kitTag(n.tagName, chat) === "StatusCard" ? undefined : kitTag(n.tagName, chat);
       if (!element) ts.forEachChild(n, walk);
     };
     walk(root);

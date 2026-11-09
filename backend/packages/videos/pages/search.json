@@ -7,7 +7,25 @@
       "type": "search",
       "state": "q",
       "label": "Search Videos",
-      "placeholder": "Search Videos"
+      "placeholder": "Search Videos",
+      "type_chips": {
+        "state": "kind",
+        "label": "Result type",
+        "options": [
+          {
+            "value": "all",
+            "label": "All"
+          },
+          {
+            "value": "made",
+            "label": "Made at home"
+          },
+          {
+            "value": "saved",
+            "label": "Saved"
+          }
+        ]
+      }
     },
     {
       "type": "media_shelf",
@@ -16,7 +34,9 @@
         "source": "package",
         "path": "library",
         "params": {
-          "query": "$state.q"
+          "query": "$state.q",
+          "filter": "$state.when",
+          "type": "$state.kind"
         }
       },
       "item_key_field": "id",
@@ -64,8 +84,48 @@
               }
             }
           }
+        },
+        {
+          "icon": "share",
+          "label": "Share",
+          "action": {
+            "share": {
+              "to": "/apps/videos/watch?id={id}",
+              "title": "{title}"
+            }
+          }
         }
-      ]
+      ],
+      "chips": {
+        "state": "when",
+        "label": "Filter results",
+        "options": [
+          {
+            "value": "any",
+            "label": "Any time"
+          },
+          {
+            "value": "today",
+            "label": "Today"
+          },
+          {
+            "value": "week",
+            "label": "This week"
+          },
+          {
+            "value": "month",
+            "label": "This month"
+          },
+          {
+            "value": "short",
+            "label": "Short"
+          },
+          {
+            "value": "long",
+            "label": "Long"
+          }
+        ]
+      }
     }
   ]
 }

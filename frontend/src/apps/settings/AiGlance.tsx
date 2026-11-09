@@ -33,6 +33,7 @@ import type { AiJobId } from "../../../../shared/aiChoices";
 import type { SettingsViewProps } from "@/shell/pages/settings/settingsViews";
 import { downloadProgress } from "@/lib/downloadProgress";
 import { errorLine } from "@/lib/hubReachability";
+import { StatusCard } from "@maipai/ui/src/elements/status-card";
 
 const GB = 1_000_000_000;
 const messageOf = (error: unknown, fallback: string) => (errorLine(error, fallback));
@@ -267,7 +268,7 @@ function glanceRow({ row, copy, onSwitch, onEdit, onReset, onDownload }: { row: 
         {model && row.offered ? <ItemDescription clamp={false}>{model.details.map((part) => part.name).join(", ")}</ItemDescription> : null}
         {row.job === "wakeword" && row.offered ? <ItemDescription clamp={false}>{copy.wakeword_note}</ItemDescription> : null}
         {progress && busy ? <JobProgress presentation="card" {...downloadProgress({ title: busy.label, state: "running", status: progress.text, percent: progress.percent ?? undefined })} variant="full" /> : null}
-        {failed ? <p className="text-base text-destructive">{failed.failure ?? failed.stateText}</p> : null}
+        {failed ? <StatusCard kind="problem" title={i18n._({ id: "That did not work", message: "That did not work" })} line={failed.failure ?? failed.stateText} /> : null}
       </ItemContent>
       <ItemActions>
         {model && row.offered && row.shownEnabled ? <span className="text-base text-muted-foreground">{sizeGb(model.installedBytes)} · {fill(copy.ram_estimate ?? "", { size: sizeGb(model.ramBytes) })}</span> : null}

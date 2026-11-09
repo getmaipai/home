@@ -173,7 +173,7 @@ test("a refused clip request shows as one plain line", async () => {
   await act(async () => { fireEvent.click(btn(view, "Make another")); });
   const alerts = await view.findAllByRole("alert");
   expect(alerts.length).toBe(1);
-  expect(alerts[0]!.textContent).toBe("The video engine is not ready. Check it, then try again.");
+  expect(alerts[0]!.textContent).toContain("The video engine is not ready. Check it, then try again.");
 });
 
 test("each animation's own clip shows in the preview when its tile is clicked, even when two animations have a take with the same name", async () => {

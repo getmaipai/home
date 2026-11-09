@@ -18,6 +18,7 @@ import { Item, ItemActions, ItemContent, ItemDescription, ItemGroup, ItemTitle }
 import { api, type PersonalApiKey } from "@/lib/api";
 import { errorLine } from "@/lib/hubReachability";
 import { formatDate } from "@/lib/format";
+import { StatusCard } from "@maipai/ui/src/elements/status-card";
 
 const KEYS = ["settings-api-keys"] as const;
 type Kind = "settings" | "diagnose" | "engine";
@@ -70,7 +71,7 @@ export function AssistantKeysSettings() {
           </ItemGroup>
           )}
         </AsyncState>
-        {error ? <p role="alert" className="text-sm text-destructive">{error}</p> : null}
+        {error ? <StatusCard kind="problem" title={i18n._({ id: "That did not work", message: "That did not work" })} line={error} /> : null}
         <div><Button type="button" onClick={() => setCreateOpen(true)}>{i18n._({ id: "Make an assistant key", message: "Make an assistant key" })}</Button></div>
         </div>
       </CardContent>

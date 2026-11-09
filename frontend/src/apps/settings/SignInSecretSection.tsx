@@ -6,6 +6,7 @@ import { Label } from "@maipai/ui/src/dashboard/components/ui/label";
 import { Button } from "@maipai/ui/src/dashboard/components/ui/button";
 import { Tabs, TabsList, TabsTrigger } from "@maipai/ui/src/ui/tabs";
 import { ApiError, api, type Roster } from "@/lib/api";
+import { StatusCard } from "@maipai/ui/src/elements/status-card";
 
 type SecretKind = "pin" | "password";
 type MaskedStyle = React.CSSProperties & { WebkitTextSecurity: "disc" };
@@ -68,7 +69,7 @@ export function SignInSecretSection({ person, onPersonChange }: { person: Roster
       {hasSecret ? field("current-secret", i18n._({ id: "Current PIN or password", message: "Current PIN or password" }), current, setCurrent, true) : null}
       {field("new-secret", isPin ? i18n._({ id: "New PIN", message: "New PIN" }) : i18n._({ id: "New password", message: "New password" }), next, setNext)}
       {field("confirm-secret", i18n._({ id: "Type it again", message: "Type it again" }), again, setAgain)}
-      {error ? <p role="alert" className="text-sm text-destructive">{error}</p> : null}
+      {error ? <StatusCard kind="problem" title={i18n._({ id: "That did not work", message: "That did not work" })} line={error} /> : null}
       {success ? <p role="status" className="text-sm text-muted-foreground">{success}</p> : null}
       <Button type="button" disabled={!canSave} onClick={() => void save()}>{saving ? i18n._({ id: "Saving…", message: "Saving…" }) : hasSecret ? (isPin ? i18n._({ id: "Change PIN", message: "Change PIN" }) : i18n._({ id: "Change password", message: "Change password" })) : (isPin ? i18n._({ id: "Set a PIN", message: "Set a PIN" }) : i18n._({ id: "Set a password", message: "Set a password" }))}</Button>
   </div>;

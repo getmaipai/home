@@ -11,6 +11,7 @@ import { api, type PersonRosterEntry, type Roster } from "@/lib/api";
 import { ACCENT_SELECT_LABELS, ACCENT_SELECT_OPTIONS, NO_ACCENT } from "@/apps/people/roles";
 import { registerRouteLeaveGuard } from "@/shell/routeLeaveGuard";
 import { errorLine } from "@/lib/hubReachability";
+import { StatusCard } from "@maipai/ui/src/elements/status-card";
 
 export type ProfileFormPerson = PersonRosterEntry | Roster;
 
@@ -172,7 +173,7 @@ export function ProfileForm({ person, canEdit, onSaved, onCancel, layout = "dial
         <Label htmlFor="profile-bio">{i18n._({ id: "Bio", message: "Bio" })}</Label>
         <Textarea id="profile-bio" value={bio} onChange={(event) => updateDraft(() => setBio(event.target.value))} maxLength={160} placeholder={i18n._({ id: "A line about you", message: "A line about you" })} disabled={!canEdit || submitting} aria-invalid={bioTooLong} />
         <p className="text-sm text-muted-foreground">{bio.length}/160</p>
-        {bioTooLong ? <p className="text-sm text-destructive">{i18n._({ id: "Bio must be 160 characters or less.", message: "Bio must be 160 characters or less." })}</p> : null}
+        {bioTooLong ? <StatusCard kind="problem" title={i18n._({ id: "That did not work", message: "That did not work" })} line={i18n._({ id: "Bio must be 160 characters or less.", message: "Bio must be 160 characters or less." })} /> : null}
         {!canEdit ? <p className="text-sm text-muted-foreground">{i18n._({ id: "Ask an admin to change this.", message: "Ask an admin to change this." })}</p> : null}
       </div>
       <div className="flex flex-col gap-2">
@@ -183,7 +184,7 @@ export function ProfileForm({ person, canEdit, onSaved, onCancel, layout = "dial
         </Select>
         {!canEdit ? <p className="text-sm text-muted-foreground">{i18n._({ id: "Ask an admin to change this.", message: "Ask an admin to change this." })}</p> : null}
       </div>
-      {error ? <p role="alert" className="text-sm text-destructive">{error}</p> : null}
+      {error ? <StatusCard kind="problem" title={i18n._({ id: "That did not work", message: "That did not work" })} line={error} /> : null}
       {canEdit ? layout === "dialog" ? (
         <DialogFooter>
           <Button type="submit" disabled={!canSave}>{submitting ? i18n._({ id: "Saving…", message: "Saving…" }) : i18n._({ id: "Save", message: "Save" })}</Button>

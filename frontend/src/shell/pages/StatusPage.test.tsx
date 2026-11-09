@@ -55,7 +55,7 @@ describe("StatusPage health checks (CANARY-01)", () => {
     try {
       const view = renderWithQueryClient(<StatusPage person={makePerson("admin")} />);
       fireEvent.click(await view.findByRole("button", { name: "Run checks now" }));
-      expect((await view.findByText("The health checks could not be run. Try again.")).getAttribute("role")).toBe("alert");
+      expect((await view.findByText("The health checks could not be run. Try again.")).closest("[role=alert]")).not.toBeNull();
       expect(view.queryByText("private engine detail")).toBeNull();
     } finally { globalThis.fetch = original; }
   });

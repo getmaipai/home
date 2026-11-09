@@ -49,6 +49,16 @@
                   }
                 }
               }
+            },
+            {
+              "label": "Share",
+              "icon": "share",
+              "action": {
+                "share": {
+                  "to": "/apps/videos/watch?id={id}",
+                  "title": "{title}"
+                }
+              }
             }
           ],
           "on_progress": {
@@ -128,7 +138,10 @@
           "details_show": [
             "facts",
             "chapters"
-          ]
+          ],
+          "pip": true,
+          "double_tap_seek": true,
+          "long_press_speed": true
         },
         {
           "type": "creation_header",

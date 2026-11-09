@@ -25,6 +25,7 @@ import { ROLE_LABELS, canDeletePerson, canManagePerson, creatableRoles } from "@
 import { SettingsRenderer } from "@/shell/pages/settings/SettingsRenderer";
 import { OtherPersonMemories } from "@/apps/memory/PersonMemories";
 import { errorLine } from "@/lib/hubReachability";
+import { StatusCard } from "@maipai/ui/src/elements/status-card";
 
 interface UsersSectionProps {
   person: Roster;
@@ -217,7 +218,7 @@ export function UsersSection({ person, headed = true }: UsersSectionProps) {
 
   return (
     <>
-      {actionError ? <p className="text-base text-destructive">{actionError}</p> : null}
+      {actionError ? <StatusCard kind="problem" title={i18n._({ id: "That did not work", message: "That did not work" })} line={actionError} /> : null}
 
       <AsyncState
         data={roster}
@@ -329,7 +330,7 @@ export function UsersSection({ person, headed = true }: UsersSectionProps) {
                     <p className="text-base text-muted-foreground">
                       {i18n._({ id: "Older backups still hold their data for up to three months, until those backups age out. Restoring a whole older backup would bring them back. The hub's logs still mention them, without anything they said, for 7 days.", message: "Older backups still hold their data for up to three months, until those backups age out. Restoring a whole older backup would bring them back. The hub's logs still mention them, without anything they said, for 7 days." })}
                     </p>
-                    <DeletionFilesNote name={p.display_name} preview={previewQuery.data} failed={previewQuery.isError} />
+                    {previewQuery.isError ? <StatusCard kind="problem" title={i18n._({ id: "That did not work", message: "That did not work" })} line={i18n._({ id: "Could not check {name}'s files. Their files will be deleted with them unless someone else can see them.", message: "Could not check {name}'s files. Their files will be deleted with them unless someone else can see them.", values: { name } })} /> : <DeletionFilesNote name={p.display_name} preview={previewQuery.data} />}
                   </div>
                 );
               }
@@ -463,12 +464,7 @@ export function UsersSection({ person, headed = true }: UsersSectionProps) {
  * offered first (STORE-DELETE-01). Only shown once the preview loads; the
  * download link appears only for someone allowed to export them (yourself,
  * or a parent for a child), never an adult's private files to an admin. */
-function DeletionFilesNote({ name, preview, failed }: { name: string; preview: PersonDeletionPreview | undefined; failed: boolean }) {
-  if (failed) {
-    return (
-      <p className="text-base text-destructive">{i18n._({ id: "Could not check {name}'s files. Their files will be deleted with them unless someone else can see them.", message: "Could not check {name}'s files. Their files will be deleted with them unless someone else can see them.", values: { name } })}</p>
-    );
-  }
+function DeletionFilesNote({ name, preview }: { name: string; preview: PersonDeletionPreview | undefined }) {
   if (!preview) return null;
   const { purged, keptForHousehold } = preview.files;
   if (purged.files === 0 && keptForHousehold.files === 0) return null;

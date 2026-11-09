@@ -17,6 +17,7 @@ import { flowErrorText } from "@/shell/pages/companionFlow/errors";
 import { useSheetWait } from "@/shell/pages/companionFlow/useSheetWait";
 import { KeyframeEditor } from "@/shell/pages/companionFlow/KeyframeEditor";
 import { MAKING_BACK_LINE, useMakingAvailability, useMakingRecovery } from "@/apps/chat/useMakingAvailability";
+import { StatusCard } from "@maipai/ui/src/elements/status-card";
 
 const keyframeSrc = (row: CompanionStateRow) => row.keyframe ? `${row.keyframe.url}${row.keyframe.edited_at ? `?v=${encodeURIComponent(row.keyframe.edited_at)}` : ""}` : null;
 const made = (row: CompanionStateRow) => row.approved !== null;
@@ -127,7 +128,7 @@ export function AnimateStep({ companionId, name, sheetJob = null, autoMake = fal
       </DialogSection>
       <div className="flex flex-col gap-6">
         {sheet.waiting || picturing ? <div role="status" className="flex flex-col gap-2"><p className="text-sm text-foreground">{sheet.waiting || picturing?.kind === "sheet" ? i18n._({ id: "Drawing your character from the sides and with its mouth open, so every animation matches. This takes a few minutes, and your animations start by themselves when it is done.", message: "Drawing your character from the sides and with its mouth open, so every animation matches. This takes a few minutes, and your animations start by themselves when it is done." }) : i18n._({ id: "{what} for your animations...", message: "{what} for your animations...", values: { what: picturing?.label ?? i18n._({ id: "Making a picture", message: "Making a picture" }) } })}</p><Progress mode="determinate" value={sheet.waiting ? sheet.percent : picturing?.percent ?? 0} label={i18n._({ id: "Progress", message: "Progress" })} /></div> : null}
-        {errorLine ? <p role="alert" className="text-sm text-destructive">{errorLine}</p> : null}
+        {errorLine ? <StatusCard kind="problem" title={i18n._({ id: "That did not work", message: "That did not work" })} line={errorLine} /> : null}
         {sheet.failed ? <Button variant="outline" shape="pill" onClick={() => void sheet.retry()}>{i18n._({ id: "Try again", message: "Try again" })}</Button> : null}
         <DialogSection title={i18n._({ id: "Required", message: "Required" })} aside={i18n._({ id: "{count, plural, one {# animation} other {# animations}} · Always included", message: "{count, plural, one {# animation} other {# animations}} · Always included", values: { count: required.length || 4 } })}>
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">

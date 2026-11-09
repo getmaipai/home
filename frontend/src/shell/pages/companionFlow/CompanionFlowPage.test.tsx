@@ -191,7 +191,7 @@ test("Approve shows its busy label while the request is in flight and an error u
   const busy = await view.findByRole("button", { name: "Getting your character ready..." }) as HTMLButtonElement;
   expect(busy.disabled).toBe(true);
   await act(async () => { fail(new ApiError("Home could not save this picture. Try again.", 500)); });
-  expect((await view.findByRole("alert")).textContent).toBe("Home could not save this picture. Try again.");
+  expect((await view.findByRole("alert")).textContent).toContain("Home could not save this picture. Try again.");
   expect(button(view, "Approve & Continue").disabled).toBe(false);
 });
 
@@ -207,7 +207,7 @@ test("a cut-off picture is completed once by itself, with no Fill in button", as
 test("a 409 from the automatic fill-in shows Home's sentence", async () => {
   const { view } = open({ path: "/companions/hc-one/create", lookData: look({ versions: [{ ...version("v-1"), clipped: ["left"] }], rest: null }) });
   api.completeCompanionLook = async () => { throw new ApiError("A picture is already being made for this companion. Wait for it or stop it.", 409); };
-  expect((await view.findByRole("alert")).textContent).toBe("A picture is already being made for this companion. Wait for it or stop it.");
+  expect((await view.findByRole("alert")).textContent).toContain("A picture is already being made for this companion. Wait for it or stop it.");
 });
 
 test("a chosen photo uploads at once, shows a thumbnail and shows on the right as it is, with Generate switched off", async () => {
@@ -241,7 +241,7 @@ test("when the character could not be made ready, screen 2 says so and Try again
   api.companionStates = async () => ({ sheet_ready: false, start_ready: false, key: "#00FF00", states: [], run: null, counts: { approved: 0, total: 0, required_missing: [] } });
   await waitFor(() => expect(button(view, "Approve & Continue").disabled).toBe(false));
   fireEvent.click(await view.findByRole("button", { name: "Approve & Continue" }));
-  expect((await view.findByText("The side view did not work. Try again.")).tagName).toBe("P");
+  expect((await view.findByText("The side view did not work. Try again.")).closest("[role=alert]")).not.toBeNull();
   fireEvent.click(await view.findByRole("button", { name: "Try again" }));
   await waitFor(() => expect(calls.approved).toEqual(["v-1", "v-1"]));
 });
@@ -291,5 +291,5 @@ test("an API error shows as one line under the button", async () => {
   api.generateCompanionLook = async () => { throw new ApiError("That picture was withheld. Change the description and try again.", 422); };
   fireEvent.change(view.getByLabelText("Describe the character"), { target: { value: "A fox" } });
   await act(async () => { fireEvent.click(button(view, "Generate Character")); });
-  expect((await view.findByRole("alert")).textContent).toBe("That picture was withheld. Change the description and try again.");
+  expect((await view.findByRole("alert")).textContent).toContain("That picture was withheld. Change the description and try again.");
 });

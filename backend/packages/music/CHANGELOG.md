@@ -2,6 +2,20 @@
 
 All notable changes to the Music package, in [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) format.
 
+## [0.3.15] - 2026-11-09
+
+### Added
+
+- Your Library is one list of songs, albums, artists and playlists. Sort it by Recents, A to Z or Creator, narrow it with the All, Songs, Albums, Artists and Playlists chips, and pin up to 6 items to the top (Pin and Unpin on each row; Open goes to the page).
+- Search remembers your last 10 searches as chips (Clear removes them) and has Songs, Artists, Albums and Playlists chips that narrow the results.
+- Songs on album, artist and playlist pages have Play next, Add to queue and Go to artist. Album and playlist pages have Share, which copies a link to the page on this hub.
+- Album, artist and playlist headers sit on a soft gradient taken from the cover.
+
+### Changed
+
+- Now playing uses the new layout with shuffle, repeat and the Up next button. The row under the player no longer repeats the Repeat button.
+- Radio: Your stations is one list with Record, Stop recording and Remove station; the separate Manage stations list is gone.
+
 ## [0.3.14] - 2026-11-02
 
 ### Added

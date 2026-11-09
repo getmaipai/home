@@ -6,6 +6,7 @@
     {
       "type": "creation_header",
       "variant": "collection",
+      "backdrop": "art_gradient",
       "bind": {
         "source": "package",
         "path": "header",
@@ -295,7 +296,35 @@
             "play": {
               "media_id": "{id}"
             }
-          }
+          },
+          "row_actions": [
+            {
+              "icon": "list-plus",
+              "label": "Play next",
+              "action": {
+                "call": {
+                  "target": "/api/plugins/music/queue",
+                  "args": {
+                    "op": "play_next",
+                    "media_id": "{id}"
+                  }
+                }
+              }
+            },
+            {
+              "icon": "list-end",
+              "label": "Add to queue",
+              "action": {
+                "call": {
+                  "target": "/api/plugins/music/queue",
+                  "args": {
+                    "op": "add",
+                    "media_id": "{id}"
+                  }
+                }
+              }
+            }
+          ]
         }
       ]
     },

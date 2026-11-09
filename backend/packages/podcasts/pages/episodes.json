@@ -42,8 +42,11 @@
       "variant": "plain",
       "orientation": "vertical",
       "on_select": {
-        "play": {
-          "media_id": "{id}"
+        "navigate": {
+          "to": "/apps/podcasts/episode",
+          "state": {
+            "id": "{id}"
+          }
         }
       },
       "empty_state": {
@@ -58,6 +61,15 @@
         "action_label": "Find shows"
       },
       "row_actions": [
+        {
+          "icon": "play",
+          "label": "Play",
+          "action": {
+            "play": {
+              "media_id": "{id}"
+            }
+          }
+        },
         {
           "icon": "list-video",
           "label": "Add to queue",
