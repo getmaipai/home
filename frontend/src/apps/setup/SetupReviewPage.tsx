@@ -4,7 +4,7 @@ import { getIcon } from "@maipai/ui/src/icons";
 import { Alert, AlertDescription } from "@maipai/ui/src/ui/alert";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@maipai/ui/src/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@maipai/ui/src/dashboard/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@maipai/ui/src/ui/card";
 import { api, ApiError } from "@/lib/api";
 import { renderSetupReviewScreen } from "./SetupWizard";
 import { errorLine } from "@/lib/hubReachability";
@@ -52,7 +52,7 @@ export function SetupReviewPage() {
   }
 
   return <div>
-    <Card>
+    <Card surface="flat">
       <CardHeader><CardTitle>{i18n._({ id: "Setup review", message: "Setup review" })}</CardTitle></CardHeader>
       <CardContent>
         <p>{i18n._({ id: "Review your computers, files, checks, and plan.", message: "Review your computers, files, checks, and plan." })}</p>

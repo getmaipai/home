@@ -42,7 +42,7 @@ export function ListMenu({ title, onRename, onChangeIcon, onDelete }: {
       <DialogContent>
         <DialogHeader><DialogTitle>{i18n._({ id: "Rename list", message: "Rename list" })}</DialogTitle><DialogDescription>{i18n._({ id: "Choose a name for this list.", message: "Choose a name for this list." })}</DialogDescription></DialogHeader>
         <form className="grid gap-4" onSubmit={(event) => void saveRename(event)}>
-          <div className="grid gap-2"><Label htmlFor="rename-list">{i18n._({ id: "Name", message: "Name" })}</Label><Input id="rename-list" value={name} onChange={(event) => setName(event.target.value)} /></div>
+          <div className="grid gap-2"><Label htmlFor="rename-list">{i18n._({ id: "Name", message: "Name" })}</Label><Input shape="pill" fill="surface" id="rename-list" value={name} onChange={(event) => setName(event.target.value)} /></div>
           <DialogFooter><Button type="submit" disabled={!name.trim()}>{i18n._({ id: "Save", message: "Save" })}</Button></DialogFooter>
         </form>
       </DialogContent>

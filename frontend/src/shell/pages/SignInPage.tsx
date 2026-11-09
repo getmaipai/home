@@ -4,11 +4,11 @@ import { Navigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { AsyncState } from "@maipai/ui/src/primitives/AsyncState";
 import { Avatar } from "@maipai/ui/src/primitives/Avatar";
-import { Card, CardContent } from "@maipai/ui/src/dashboard/components/ui/card";
-import { Input } from "@maipai/ui/src/dashboard/components/ui/input";
+import { Card, CardContent } from "@maipai/ui/src/ui/card";
+import { Input } from "@maipai/ui/src/ui/input";
 import { PasscodeInput } from "@maipai/ui/src/ui/passcode-input";
 import { Label } from "@maipai/ui/src/dashboard/components/ui/label";
-import { Button } from "@maipai/ui/src/dashboard/components/ui/button";
+import { Button } from "@maipai/ui/src/ui/button";
 import { Alert, AlertDescription } from "@maipai/ui/src/dashboard/components/ui/alert";
 import FullLogo from "@maipai/ui/src/dashboard/layouts/full/shared/logo/FullLogo";
 import { useProfileSignIn } from "@/kit/hooks/useProfileSignIn";
@@ -70,9 +70,9 @@ export function SignInPage({ onSignedIn }: { onSignedIn: () => void }) {
   const usePassword = passcodeDigits === null;
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-accent px-4">
+    <div className="flex min-h-screen items-center justify-center bg-background px-4">
       <div className="w-full max-w-md">
-      <Card>
+      <Card surface="flat">
         <div className="mx-auto w-fit">
           <FullLogo full />
         </div>
@@ -95,23 +95,25 @@ export function SignInPage({ onSignedIn }: { onSignedIn: () => void }) {
               ) : selected ? (
                 <form onSubmit={pendingToken ? handleTotpSubmit : handleSecretSubmit} className="flex flex-col gap-4">
                   <div className="flex flex-col items-center gap-4">
-                    <Avatar name={selected.display_name} className="size-16 text-xl" />
-                    <h1 className="text-lg font-semibold">{selected.display_name}</h1>
+                    <Avatar name={selected.display_name} className="size-16 text-row" />
+                    <h1 className="text-title font-semibold">{selected.display_name}</h1>
                   </div>
                   {pendingToken ? (
                     <div className="space-y-1.5">
                       <Label htmlFor="totp-code">{i18n._({ id: "Enter your 6-digit code", message: "Enter your 6-digit code" })}</Label>
-                      <Input id="totp-code" inputMode="numeric" autoComplete="one-time-code" maxLength={6} value={totpCode} onChange={(e) => setTotpCode(e.target.value.replace(/\D/g, "").slice(0, 6))} disabled={busy} required />
+                      <Input id="totp-code" shape="pill" fill="surface" inputMode="numeric" autoComplete="one-time-code" maxLength={6} value={totpCode} onChange={(e) => setTotpCode(e.target.value.replace(/\D/g, "").slice(0, 6))} disabled={busy} required />
                     </div>
                   ) : passcodeDigits === null ? (
                     <div className="space-y-1.5">
-                      <Label htmlFor="secret" className="text-sm font-normal text-muted-foreground">
+                      <Label htmlFor="secret" className="text-supporting font-normal text-muted-foreground">
                         {i18n._({ id: "Password", message: "Password" })}</Label>
                       <Input
                         key={attempt}
                         id="secret"
                         name="maipai-secret"
                         type="text"
+                        shape="pill"
+                        fill="surface"
                         // eslint-disable-next-line shadcn/no-inline-styles -- WebkitTextSecurity preserves the masked appearance of this text input.
                         style={{ WebkitTextSecurity: "disc" } as MaskedSecretStyle}
                         autoCapitalize="off"
@@ -188,16 +190,18 @@ export function SignInPage({ onSignedIn }: { onSignedIn: () => void }) {
                 <div className="flex flex-col items-center gap-4">
                   <div className="flex flex-wrap justify-center gap-6">
                     {profiles.map((p) => (
-                      <button
+                      <Button
                         key={p.id}
                         type="button"
                         onClick={() => handleProfileTap(p)}
                         disabled={busy}
-                        className="flex flex-col items-center gap-2 rounded-lg p-3 hover:bg-muted disabled:opacity-50"
+                        variant="ghost"
+                        shape="pill"
+                        size="control"
                       >
-                        <Avatar name={p.display_name} className="size-16 text-xl" />
-                        <span className="text-base">{p.display_name}</span>
-                      </button>
+                        <Avatar name={p.display_name} className="size-16 text-row" />
+                        <span className="text-row">{p.display_name}</span>
+                      </Button>
                     ))}
                   </div>
                   {tapError ? <p className="text-sm text-destructive">{tapError}</p> : null}

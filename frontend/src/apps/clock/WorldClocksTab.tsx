@@ -162,7 +162,7 @@ export function WorldClocksTab({ homeZone: providedZone, enabled = true }: { hom
           </SheetHeader>
           <div className="grid gap-3 px-4">
             <Label htmlFor="world-search">{i18n._({ id: "City", message: "City" })}</Label>
-            <Input id="world-search" value={search} onChange={(event) => setSearch(event.target.value)} placeholder={i18n._({ id: "Search cities", message: "Search cities" })} />
+            <Input shape="pill" fill="surface" id="world-search" value={search} onChange={(event) => setSearch(event.target.value)} placeholder={i18n._({ id: "Search cities", message: "Search cities" })} />
             {limitMessage ? <p role="alert">{limitMessage}</p> : null}
             <ul className="m-0 list-none p-0">
               {results.map((place) => <li key={`${place.name}-${place.zone}`}>

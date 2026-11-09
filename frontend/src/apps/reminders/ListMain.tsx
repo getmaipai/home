@@ -44,7 +44,7 @@ export function ListMain({ list, isPhone, canManage, onBack, onAdd, onToggle, on
     <header className="grid grid-cols-[1fr_auto] items-end gap-3 border-b px-4 py-4">
       <div>
         <p className="m-0 text-base font-medium tracking-wider text-muted-foreground">{i18n._({ id: "YOUR LIST", message: "YOUR LIST" })}</p>
-        <h1 className="m-0 text-3xl font-semibold">{labelFor(list)}</h1>
+        <h1 className="m-0 text-title font-semibold">{labelFor(list)}</h1>
         <p className="m-0 text-muted-foreground">{tagline}</p>
       </div>
       <p className="m-0 text-sm text-muted-foreground">{date}</p>
@@ -57,10 +57,10 @@ export function ListMain({ list, isPhone, canManage, onBack, onAdd, onToggle, on
         <EmptyState icon="inbox" text={i18n._({ id: "Nothing on the list yet", message: "Nothing on the list yet" })} />
         <p className="m-0 text-muted-foreground">{i18n._({ id: "Add the first thing and we'll keep it here for you.", message: "Add the first thing and we'll keep it here for you." })}</p>
       </div> : <ul className="m-0 list-none p-0">
-        {openItems.map((item) => <li key={item.id} className="flex min-h-12 items-center gap-3 border-b py-2">
+        {openItems.map((item) => <li key={item.id} className="flex min-h-12 items-center gap-3 py-3">
           <Checkbox checked={false} onCheckedChange={(checked) => void onToggle(item.id, checked === true)} aria-label={item.text} />
           <span className="flex-1">{item.text}</span>
-          {item.due_at ? <span data-due-chip="true" className="rounded-full bg-muted px-3 py-1 text-sm text-muted-foreground">{dueLabel(item.due_at)}</span> : null}
+          {item.due_at ? <span data-due-chip="true" className="text-supporting text-muted-foreground">{dueLabel(item.due_at)}</span> : null}
         </li>)}
       </ul>}
       {doneItems.length ? <>
@@ -72,9 +72,9 @@ export function ListMain({ list, isPhone, canManage, onBack, onAdd, onToggle, on
         <Button variant="ghost" onClick={() => void onClearDone()}>{i18n._({ id: "Clear done", message: "Clear done" })}</Button>
       </> : null}
     </section>
-    <form className="mt-auto flex items-center gap-2 border-t p-4" onSubmit={(event) => void submit(event)}>
-      <Input aria-label={i18n._({ id: "Add an item", message: "Add an item" })} placeholder={i18n._({ id: "Add an item", message: "Add an item" })} value={text} onChange={(event) => setText(event.target.value)} />
-      <Button type="submit" disabled={!text.trim()}>{i18n._({ id: "Add", message: "Add" })}</Button>
+    <form className="mt-auto flex items-center gap-2 p-4" onSubmit={(event) => void submit(event)}>
+      <Input shape="pill" fill="surface" aria-label={i18n._({ id: "Add an item", message: "Add an item" })} placeholder={i18n._({ id: "Add an item", message: "Add an item" })} value={text} onChange={(event) => setText(event.target.value)} />
+      <Button type="submit" variant="inverse" shape="pill" size="control" disabled={!text.trim()}>{i18n._({ id: "Add", message: "Add" })}</Button>
     </form>
   </section>;
 }

@@ -30,7 +30,7 @@ export function CreateListSheet({ open, onOpenChange, onCreate, isPhone }: {
     <SheetContent side={isPhone ? "bottom" : "right"}>
       <SheetHeader><SheetTitle>{i18n._({ id: "Create a list", message: "Create a list" })}</SheetTitle><SheetDescription>{i18n._({ id: "Give your list a name and an icon.", message: "Give your list a name and an icon." })}</SheetDescription></SheetHeader>
       <form className="grid gap-4 p-4" onSubmit={(event) => void submit(event)}>
-        <div className="grid gap-2"><Label htmlFor="new-list-name">{i18n._({ id: "Name", message: "Name" })}</Label><Input id="new-list-name" value={name} onChange={(event) => setName(event.target.value)} /></div>
+        <div className="grid gap-2"><Label htmlFor="new-list-name">{i18n._({ id: "Name", message: "Name" })}</Label><Input shape="pill" fill="surface" id="new-list-name" value={name} onChange={(event) => setName(event.target.value)} /></div>
         <fieldset className="grid grid-cols-4 gap-2">
           <legend className="mb-2">{i18n._({ id: "Icon", message: "Icon" })}</legend>
           {LIST_ICONS.map((name) => {

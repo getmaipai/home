@@ -110,6 +110,7 @@ export function NotificationsPage() {
     <Page title={i18n._({ id: "Notifications", message: "Notifications" })} hideTitle>
       {/* eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex -- a keyboard-scrollable region, not a widget (DetailPane.tsx's own precedent). */}
       <div tabIndex={0} className={cn("flex flex-1 flex-col gap-4 overflow-y-auto p-4", FOCUS_RING)}>
+        <h1 className="m-0 text-title font-semibold">{i18n._({ id: "Notifications", message: "Notifications" })}</h1>
         {actionError ? <p className="text-base text-destructive">{actionError}</p> : null}
 
         <AsyncState
@@ -129,12 +130,12 @@ export function NotificationsPage() {
             const selectedPending = [...selectMode.selected];
             const allPendingSelected = pendingIds.length > 0 && selectMode.count === pendingIds.length;
             if (recent.length === 0) {
-              return <EmptyState icon="bell" text={i18n._({ id: "Nothing in the last 30 days.", message: "Nothing in the last 30 days." })} />;
+              return <EmptyState icon="bell" variant="tile" text={i18n._({ id: "Nothing in the last 30 days.", message: "Nothing in the last 30 days." })} />;
             }
             return (
               <>
                 <div className="flex flex-wrap items-center justify-between gap-2">
-                  <h2 className="text-sm font-medium text-muted-foreground">{i18n._({ id: "Last 30 days", message: "Last 30 days" })}</h2>
+                  <h2 className="text-section font-semibold">{i18n._({ id: "Last 30 days", message: "Last 30 days" })}</h2>
                   {selectMode.active ? (
                     // Never gated on pending.length - a review caught
                     // the earlier `selectMode && pending.length > 0`
@@ -195,7 +196,7 @@ export function NotificationsPage() {
                           ) : (
                             <Badge>{i18n._({ id: "New", message: "New" })}</Badge>
                           )}
-                          <span className="text-base">{notificationLine(n)}</span>
+                          <span className="text-row">{notificationLine(n)}</span>
                         </div>
                         <span className="text-sm text-muted-foreground">{whenText(n.createdAt)}</span>
                       </div>
