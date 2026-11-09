@@ -300,9 +300,10 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `frontend/src/shell/pages/companionFlow/KeyframeEditor.tsx` | KeyframeEditor |
 | `frontend/src/shell/pages/companionFlow/PreviewControls.tsx` | DEFAULT_FRAME, PreviewControls |
 | `frontend/src/shell/pages/dashboard/AskBox.tsx` | installPlaceholder, askHref, AskBox |
+| `frontend/src/shell/pages/dashboard/Attention.tsx` | updatesWaiting, Attention |
 | `frontend/src/shell/pages/dashboard/GettingStarted.tsx` | GETTING_STARTED_ROWS, openChecklistItems, GettingStarted |
 | `frontend/src/shell/pages/dashboard/Greeting.tsx` | Greeting |
-| `frontend/src/shell/pages/dashboard/HomeShelves.tsx` | tilePicture, ContinueShelf, FamilyShelf, HomeMedia |
+| `frontend/src/shell/pages/dashboard/HomeShelves.tsx` | tilePicture, CONTINUE_SHORTCUTS, ContinueShelf, FamilyShelf, HomeMedia |
 | `frontend/src/shell/pages/dashboard/TodaySection.tsx` | TODAY_CARD_BUDGET, todaySlots, isCardOld, TodaySection |
 | `frontend/src/shell/pages/packageAppHeaderBar.tsx` | publishPackageAppHeader, PackageAppHeaderLeft, PackageAppHeaderActions, sectionsBarEntries |
 | `frontend/src/shell/pages/performance/DiskHardwareBody.tsx` | DiskHardwareBody |
