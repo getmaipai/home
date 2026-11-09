@@ -1,5 +1,5 @@
 import { i18n } from "@lingui/core";
-import { useState, type ReactNode } from "react";
+import { useRef, useState, type ReactNode } from "react";
 import { Link } from "react-router-dom";
 import { useQueries, useQuery } from "@tanstack/react-query";
 import { Card } from "@maipai/ui/src/primitives/Card";
@@ -10,24 +10,49 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@maipai/ui/
 import { Item, ItemActions, ItemContent, ItemDescription, ItemGroup, ItemTitle } from "@maipai/ui/src/dashboard/components/ui/item";
 import { AnswerBlockView } from "@maipai/ui/src/elements/answer-block";
 import { RouteSkeleton } from "@maipai/ui/src/primitives/RouteSkeleton";
+import { formatRelativeLong } from "@/lib/format";
 import { api, type HomeWidgets, type WidgetData, type WidgetDescriptor } from "@/lib/api";
 
 /** Design note section 6: never more than four Today cards before "More". */
 export const TODAY_CARD_BUDGET = 4;
-const displayTitle = (widget: WidgetDescriptor) => widget.package === "almanac-date" && widget.id === "today" ? i18n._({ id: "Coming up", message: "Coming up" }) : widget.title;
+const displayTitle = (widget: WidgetDescriptor) => widget.package === "almanac-date" && widget.id === "today" ? i18n._({ id: "Coming up", message: "Coming up" })
+  : widget.package === "remind" && widget.id === "upcoming" ? i18n._({ id: "Next up", message: "Next up" })
+  : widget.package === "timer" && widget.id === "running" ? i18n._({ id: "Timers", message: "Timers" })
+  : widget.title;
 
-interface Slot { widget: WidgetDescriptor; data: WidgetData }
+interface Slot { widget: WidgetDescriptor; data: WidgetData; stale: boolean }
 
-/** A card with nothing real to say (still loading, a failed read, no items, or a handler's fallback text)
- * is left out quietly: rule 6, a failed tool never fails the page. */
-export function todaySlots(widgets: WidgetDescriptor[], results: Array<{ isPending: boolean; data?: WidgetData }>): Slot[] {
+const slotKey = (widget: WidgetDescriptor) => `${widget.package}/${widget.id}`;
+
+/** A card with nothing real to say (still loading, no items, or a handler's fallback text with no earlier data) is left out
+ * quietly: rule 6, a failed tool never fails the page. A card that had real data before and now fails or comes back
+ * degraded keeps its last data, marked stale, so it does not vanish; `lastGood` holds that data per card. An answer that is
+ * simply empty hides the card and forgets the old data. */
+export function todaySlots(widgets: WidgetDescriptor[], results: Array<{ isPending: boolean; isError?: boolean; data?: WidgetData }>, lastGood: Map<string, WidgetData> = new Map()): Slot[] {
   const slots: Slot[] = [];
   widgets.forEach((widget, index) => {
     const result = results[index];
-    if (!result) return;
-    if (!result.isPending && result.data && result.data.items.length > 0 && !result.data.degraded) slots.push({ widget, data: result.data });
+    if (!result || result.isPending) return;
+    const key = slotKey(widget);
+    const fresh = result.data && !result.data.degraded && result.data.items.length > 0 ? result.data : undefined;
+    if (fresh) {
+      if (!result.isError) lastGood.set(key, fresh);
+      slots.push({ widget, data: fresh, stale: Boolean(result.isError) });
+      return;
+    }
+    const failed = Boolean(result.isError) || !result.data || Boolean(result.data.degraded);
+    if (!failed) { lastGood.delete(key); return; }
+    const before = lastGood.get(key);
+    if (before) slots.push({ widget, data: before, stale: true });
   });
   return slots;
+}
+
+/** A card is "old" once its data is more than three refresh intervals behind (or a refresh just failed). */
+export function isCardOld(widget: WidgetDescriptor, data: WidgetData, stale: boolean, now: number = Date.now()): boolean {
+  if (stale) return true;
+  const age = now - Date.parse(data.as_of);
+  return Number.isFinite(age) && age > 3 * widget.refresh_s * 1000;
 }
 
 /** HOME-ALIVE-01e: one card per widget the viewer's role clears (the server already filtered by role and age). */
@@ -45,7 +70,8 @@ export function TodaySection({ home, heroOnly = false, chips = false, role }: { 
       retry: false,
     })),
   });
-  const slots = todaySlots(widgets, results);
+  const lastGood = useRef(new Map<string, WidgetData>());
+  const slots = todaySlots(widgets, results, lastGood.current);
   const heroQuery = useQuery({ queryKey: ["home-hero"], queryFn: () => home?.hero ? api.widgetData(home.hero.package, home.hero.id) : Promise.resolve(undefined), enabled: Boolean(home?.hero), retry: false });
 
   if (!home && list.isPending) return <RouteSkeleton label={i18n._({ id: "Loading Today", message: "Loading Today" })} />;
@@ -64,10 +90,17 @@ export function TodaySection({ home, heroOnly = false, chips = false, role }: { 
   const opensApp = (slot: Slot, content: ReactNode): ReactNode => slot.widget.package === "weather"
     ? <Link to="/apps/weather" aria-label={i18n._({ id: "Open Weather", message: "Open Weather" })} data-testid="home-today-link" className="block rounded-xl no-underline focus-visible:ring-2 focus-visible:ring-ring">{content}</Link>
     : content;
+  // The quiet freshness line under a card's data: the muted tone, or the status-warning ink when the data is old.
+  const freshness = (slot: Slot): ReactNode => Number.isFinite(Date.parse(slot.data.as_of)) ? (
+    <p data-testid="home-today-updated" data-old={isCardOld(slot.widget, slot.data, slot.stale) ? "true" : undefined} className={`text-supporting ${isCardOld(slot.widget, slot.data, slot.stale) ? "text-status-warning-ink" : "text-muted-foreground"}`}>
+      {i18n._({ id: "Updated {when}", message: "Updated {when}", values: { when: formatRelativeLong(slot.data.as_of) } })}
+    </p>
+  ) : null;
   const cards = (shown: Slot[]) => shown.map((slot) => slot.data.card ? (
     // The kit's compact weather card is its own card; the text Card is the fallback when no block came back.
     <div key={`${slot.widget.package}/${slot.widget.id}`} data-testid="home-today-card">
       {opensApp(slot, <AnswerBlockView block={slot.data.card} compact />)}
+      {freshness(slot)}
     </div>
   ) : (
       <div key={`${slot.widget.package}/${slot.widget.id}`} data-testid="home-today-card">{opensApp(slot, <Card surface="flat">
@@ -79,10 +112,11 @@ export function TodaySection({ home, heroOnly = false, chips = false, role }: { 
                 <ItemTitle className="text-row font-semibold">{item.title}</ItemTitle>
                 {item.subtitle ? <ItemDescription className="text-supporting">{item.subtitle}</ItemDescription> : null}
               </ItemContent>
-              {item.value ? <ItemActions>{item.value}</ItemActions> : null}
+              {item.at || item.value ? <ItemActions>{item.at ? formatRelativeLong(item.at) : item.value}</ItemActions> : null}
             </Item>
           ))}
         </ItemGroup>
+        {freshness(slot)}
       </Card>)}</div>
   ));
 

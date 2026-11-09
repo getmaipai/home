@@ -25,6 +25,8 @@ import { getPackageStatus } from "@/lib/smoke";
 import { householdHomePlaceName } from "@/lib/places";
 import { refusePackageReplyIfUnsafe } from "@/lib/safety";
 import { speakerAgeBand } from "@/lib/ageBand";
+import { listComingUp } from "@/lib/comingUp";
+import { whenText } from "@/lib/alarmChat";
 import type { PersonRow } from "@/types";
 
 export interface WidgetDescriptor {
@@ -55,6 +57,8 @@ export interface WidgetItem {
   icon?: string;
   href?: string;
   image?: string;
+  /** When this item happens or ends (ISO time). The Today card shows it as a relative time in the person's language. */
+  at?: string;
 }
 
 export interface WidgetData {
@@ -147,6 +151,9 @@ export async function getWidgetData(actor: PersonRow, packageId: string, widgetI
   if (!widget) return { ok: false, status: 404, error: "no such widget" };
   if (!meetsMinRole(actor.role, manifest.min_role)) return { ok: false, status: 403, error: `${packageId} needs role ${manifest.min_role} or higher` };
 
+  if (packageId === "remind" && widgetId === "upcoming") return comingUpWidget(actor, "reminder");
+  if (packageId === "timer" && widgetId === "running") return comingUpWidget(actor, "timer");
+
   const inputs = { ...((widget.inputs ?? {}) as Record<string, unknown>) };
   if (packageId === "weather") {
     const place = householdHomePlaceName();
@@ -174,4 +181,25 @@ export async function getWidgetData(actor: PersonRow, packageId: string, widgetI
   const text = (refusePackageReplyIfUnsafe(actor, result.value) ?? result.value).reply?.text ?? "";
   const card = packageId === "weather" ? widgetCardBlock(actor, (result.value as { blocks?: unknown }).blocks) : undefined;
   return { ok: true, status: 200, value: { as_of: new Date().toISOString(), items: [{ title: text }], ...(card ? { card } : {}) } };
+}
+
+/** The most rows a Next up or Timers card shows. */
+const COMING_UP_CARD_ROWS = 3;
+
+/** Next up (reminders) and Timers (running timers) read the person's own scheduled rows through the one coming-up list
+ * the Coming up route already uses: no second reader. Nothing coming means no items, which Home hides. The text meets
+ * the same output boundary as a package reply. */
+function comingUpWidget(actor: PersonRow, kind: "reminder" | "timer"): OpResult<WidgetData> {
+  const now = Date.now();
+  const rows = listComingUp(actor)
+    .filter((row) => row.kind === kind && Date.parse(row.at) > now)
+    .slice(0, COMING_UP_CARD_ROWS);
+  const fallback = kind === "timer" ? "Timer" : "Reminder";
+  const items: WidgetItem[] = rows.map((row) => ({
+    title: row.text.trim() || fallback,
+    ...(kind === "reminder" ? { value: whenText(new Date(row.at)) } : {}),
+    at: row.at,
+  }));
+  const unsafe = items.length > 0 && refusePackageReplyIfUnsafe(actor, { reply: { text: items.map((item) => item.title).join("\n") }, actions: [] }) !== null;
+  return { ok: true, status: 200, value: { as_of: new Date(now).toISOString(), items: unsafe ? [] : items } };
 }

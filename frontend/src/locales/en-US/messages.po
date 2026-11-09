@@ -5784,7 +5784,7 @@ msgid "setting.ease.preset.option_label.comfortable"
 msgstr "Comfortable"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/dashboard/TodaySection.tsx:17
+#: src/shell/pages/dashboard/TodaySection.tsx:18
 msgid "Coming up"
 msgstr "Coming up"
 
@@ -6589,7 +6589,7 @@ msgid "Could not load those memories."
 msgstr "Could not load those memories."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/dashboard/TodaySection.tsx:52
+#: src/shell/pages/dashboard/TodaySection.tsx:78
 msgid "Could not load Today. Refresh Home to try again."
 msgstr "Could not load Today. Refresh Home to try again."
 
@@ -10751,8 +10751,8 @@ msgid "Home goes online for you"
 msgstr "Home goes online for you"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/dashboard/TodaySection.tsx:112
-#: src/shell/pages/dashboard/TodaySection.tsx:115
+#: src/shell/pages/dashboard/TodaySection.tsx:146
+#: src/shell/pages/dashboard/TodaySection.tsx:149
 msgid "Home highlight"
 msgstr "Home highlight"
 
@@ -13388,7 +13388,7 @@ msgid "Loading Home"
 msgstr "Loading Home"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/dashboard/TodaySection.tsx:111
+#: src/shell/pages/dashboard/TodaySection.tsx:145
 msgid "Loading Home highlight"
 msgstr "Loading Home highlight"
 
@@ -13563,7 +13563,7 @@ msgid "Loading the styles"
 msgstr "Loading the styles"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/dashboard/TodaySection.tsx:51
+#: src/shell/pages/dashboard/TodaySection.tsx:77
 msgid "Loading Today"
 msgstr "Loading Today"
 
@@ -14836,7 +14836,7 @@ msgstr "Monthly"
 #: src/apps/clock/TimersTab.tsx:161
 #: src/apps/settings/styles/StyleEditor.tsx:126
 #: src/shell/AlarmRinger.tsx:64
-#: src/shell/pages/dashboard/TodaySection.tsx:121
+#: src/shell/pages/dashboard/TodaySection.tsx:155
 #: src/shell/phoneMenuLinks.tsx:18
 msgid "More"
 msgstr "More"
@@ -15489,6 +15489,11 @@ msgstr "Next"
 #: src/shell/media/NowPlayingStage.tsx:187
 msgid "Next song"
 msgstr "Next song"
+
+#. js-lingui-explicit-id
+#: src/shell/pages/dashboard/TodaySection.tsx:19
+msgid "Next up"
+msgstr "Next up"
 
 #. js-lingui-explicit-id
 #: src/apps/clock/AlarmsTab.tsx:30
@@ -17228,7 +17233,7 @@ msgid "setting.news.reader_open.option.site"
 msgstr "Open the publisher's website."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/dashboard/TodaySection.tsx:65
+#: src/shell/pages/dashboard/TodaySection.tsx:91
 msgid "Open Weather"
 msgstr "Open Weather"
 
@@ -25016,6 +25021,7 @@ msgstr "Timer actions"
 #. js-lingui-explicit-id
 #: src/apps/clock/ClockPage.tsx:43
 #: src/apps/clock/TimersTab.tsx:109
+#: src/shell/pages/dashboard/TodaySection.tsx:20
 msgid "Timers"
 msgstr "Timers"
 
@@ -25063,10 +25069,10 @@ msgstr "To skip SearXNG, leave the address empty and press Continue. That turns 
 #: src/i18n.chain.test.tsx:96
 #: src/i18n.test.tsx:53
 #: src/shell/pages/CompanionsPage.tsx:290
-#: src/shell/pages/dashboard/TodaySection.tsx:94
-#: src/shell/pages/dashboard/TodaySection.tsx:95
-#: src/shell/pages/dashboard/TodaySection.tsx:116
-#: src/shell/pages/dashboard/TodaySection.tsx:117
+#: src/shell/pages/dashboard/TodaySection.tsx:128
+#: src/shell/pages/dashboard/TodaySection.tsx:129
+#: src/shell/pages/dashboard/TodaySection.tsx:150
+#: src/shell/pages/dashboard/TodaySection.tsx:151
 #: src/shell/pages/status/StatusBoard.tsx:129
 #: src/shell/pages/status/StatusBoard.tsx:130
 #: src/shell/pages/status/statusBoardFormat.ts:46
@@ -25922,6 +25928,11 @@ msgstr "Update firmware."
 #: src/shell/pages/ProjectsPage.tsx:157
 msgid "Updated"
 msgstr "Updated"
+
+#. js-lingui-explicit-id
+#: src/shell/pages/dashboard/TodaySection.tsx:96
+msgid "Updated {when}"
+msgstr "Updated {when}"
 
 #. js-lingui-explicit-id
 #: src/shell/pageHeaderTitle.tsx:102

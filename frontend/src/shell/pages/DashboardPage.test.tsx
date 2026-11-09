@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, mock, test } from "bun:test";
 import { cleanup, fireEvent, waitFor } from "@testing-library/react";
 import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
+import { todaySlots } from "@/shell/pages/dashboard/TodaySection";
 import { DashboardPage } from "@/shell/pages/DashboardPage";
 import { renderWithQueryClient } from "../../../tests/renderWithQueryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
@@ -325,6 +326,57 @@ describe("DashboardPage (Home)", () => {
     } finally {
       second.restore();
     }
+  });
+
+  test("a card with data shows a quiet 'Updated ... ago' line, in the warning tone once it is over three refresh intervals old", async () => {
+    const ago = (minutes: number) => new Date(Date.now() - minutes * 60_000).toISOString();
+    const { restore } = mockFetch({ layout: "board", widgets: [{ ...widget("fresh", "Fresh"), package: "weather" }, { ...widget("old", "Old"), package: "weather" }], widgetData: {
+      fresh: { as_of: ago(4), items: [{ title: "Row fresh" }] },
+      old: { as_of: ago(120), items: [{ title: "Row old" }] },
+    } });
+    try {
+      const view = renderHome(makePerson("adult"));
+      await waitFor(() => expect(view.getAllByTestId("home-today-updated").length).toBe(2));
+      const [fresh, old] = view.getAllByTestId("home-today-updated");
+      expect(fresh!.textContent).toBe("Updated 4 minutes ago");
+      expect(fresh!.getAttribute("data-old")).toBeNull();
+      expect(fresh!.className).not.toContain("status-warning");
+      expect(old!.textContent).toBe("Updated 2 hours ago");
+      expect(old!.getAttribute("data-old")).toBe("true");
+      expect(old!.className).toContain("text-status-warning-ink");
+    } finally {
+      restore();
+    }
+  });
+
+  test("an item with a time shows it as a relative time ('in 25 minutes')", async () => {
+    const at = new Date(Date.now() + 25 * 60_000 + 5_000).toISOString();
+    const { restore } = mockFetch({ layout: "board", widgets: [{ ...widget("upcoming", "Next up"), package: "remind" }], widgetData: { upcoming: { as_of: new Date().toISOString(), items: [{ title: "Call Nadia", value: "6:00 PM", at }] } } });
+    try {
+      const view = renderHome(makePerson("adult"));
+      await view.findByText("Call Nadia");
+      expect(document.body.textContent).toContain("in 25 minutes");
+      expect(document.body.textContent).not.toContain("6:00 PM");
+    } finally {
+      restore();
+    }
+  });
+
+  test("a card that had data keeps it, marked stale, when a refresh fails or comes back degraded; one that never had data stays out", () => {
+    const w = (id: string) => ({ ...widget(id), package: "weather" });
+    const good = (title: string): WidgetData => ({ as_of: "2026-10-17T12:00:00.000Z", items: [{ title }] });
+    const last = new Map<string, WidgetData>();
+    const widgets = [w("a"), w("b"), w("c")];
+    const first = todaySlots(widgets, [{ isPending: false, data: good("A") }, { isPending: false, data: good("B") }, { isPending: false, data: good("C") }], last);
+    expect(first.map((slot) => slot.stale)).toEqual([false, false, false]);
+    const later = todaySlots(widgets, [
+      { isPending: false, isError: true, data: undefined },
+      { isPending: false, data: { ...good("Fallback"), degraded: true } },
+      { isPending: false, data: { as_of: "2026-10-17T13:00:00.000Z", items: [] } },
+    ], last);
+    expect(later.map((slot) => [slot.data.items[0]!.title, slot.stale])).toEqual([["A", true], ["B", true]]);
+    const never = todaySlots([w("z")], [{ isPending: false, isError: true }], new Map());
+    expect(never).toEqual([]);
   });
 
   test("a weather widget that carries a card draws the compact weather card in place of the text", async () => {

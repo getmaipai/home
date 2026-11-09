@@ -79,7 +79,9 @@
   ],
   "backup": "exclude",
   "background": false,
-  "contributes": {},
+  "contributes": {
+    "widgets": [{ "id": "running", "title": "Timers", "size": "card", "refresh_s": 30, "inputs": {} }]
+  },
   "min_app": "0.1.0",
   "tier": 0,
   "quality_scale": "bronze",

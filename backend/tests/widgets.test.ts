@@ -10,7 +10,7 @@ import { resetDb } from "./reset-db";
 import { widgetCardBlock, orderHomeCards, type WidgetDescriptor } from "@/lib/widgets";
 import type { PersonRow } from "@/types";
 import { HAS_DENO } from "./support/deno";
-import { settingsValues } from "@/db/schema";
+import { settingsValues, scheduledJobs } from "@/db/schema";
 import { db } from "@/db";
 
 beforeEach(() => resetDb());
@@ -135,6 +135,63 @@ describe("GET /api/widgets/:package/:id/data", () => {
     const client = await owner();
     const res = await client.get("/api/widgets/weather/current/data");
     expect(res.status).toBe(404);
+  });
+});
+
+describe("Next up and Timers widgets", () => {
+  const add = (id: string, personId: string, job: string, at: string, input: Record<string, string | number>) =>
+    db.insert(scheduledJobs).values({ id, kind: "core", packageId: "core", job, personId, inputs: JSON.stringify(input), when: at, recurring: false, nextRunAt: at, status: "pending", createdAt: new Date().toISOString(), lastRunAt: null, lastError: null }).run();
+  const inMin = (n: number) => new Date(Date.now() + n * 60_000).toISOString();
+  const meId = async (c: TestClient) => ((await (await c.get("/api/auth/me")).json()) as { id: string }).id;
+  type Body = { items: Array<{ title: string; value?: string; at?: string }> };
+
+  test("both widgets are declared in their owning packages, as cards, with a short refresh", async () => {
+    const client = await owner();
+    const body = (await (await client.get("/api/widgets")).json()) as Array<{ package: string; id: string; size: string; refresh_s: number }>;
+    expect(body).toContainEqual(expect.objectContaining({ package: "remind", id: "upcoming", size: "card" }));
+    expect(body).toContainEqual(expect.objectContaining({ package: "timer", id: "running", size: "card", refresh_s: 30 }));
+  });
+
+  test("Next up lists the person's own next three reminders, soonest first, with the time", async () => {
+    const client = await owner();
+    const id = await meId(client);
+    const other = await (await client.post("/api/people", { displayName: "Marlow", role: "adult", secret: "0000" })).json() as { id: string };
+    add("r4", id, "reminders.fire", inMin(400), { task: "Fourth" });
+    add("r2", id, "reminders.fire", inMin(60), { task: "Second" });
+    add("r1", id, "reminders.fire", inMin(25), { task: "First" });
+    add("r3", id, "reminders.fire", inMin(120), { task: "Third" });
+    add("x", other.id, "reminders.fire", inMin(5), { task: "Not mine" });
+    add("t", id, "timers.fire", inMin(2), { label: "Tea" });
+    const body = (await (await client.get("/api/widgets/remind/upcoming/data")).json()) as Body;
+    expect(body.items.map((i) => i.title)).toEqual(["First", "Second", "Third"]);
+    expect(body.items[0]!.at).toBeTruthy();
+    expect(body.items[0]!.value).toBeTruthy();
+  });
+
+  test("Next up is empty when nothing is coming, so Home hides the card", async () => {
+    const client = await owner();
+    const body = (await (await client.get("/api/widgets/remind/upcoming/data")).json()) as Body;
+    expect(body.items).toEqual([]);
+  });
+
+  test("Timers shows up to three running timers with the end time, and none when there are none", async () => {
+    const client = await owner();
+    expect(((await (await client.get("/api/widgets/timer/running/data")).json()) as Body).items).toEqual([]);
+    const id = await meId(client);
+    add("a", id, "timers.fire", inMin(5), { label: "Pasta" });
+    add("b", id, "timers.fire", inMin(1), { label: "Tea" });
+    add("c", id, "timers.fire", inMin(9), { label: "Laundry" });
+    add("d", id, "timers.fire", inMin(30), { label: "Oven" });
+    add("e", id, "reminders.fire", inMin(3), { task: "Not a timer" });
+    const body = (await (await client.get("/api/widgets/timer/running/data")).json()) as Body;
+    expect(body.items.map((i) => i.title)).toEqual(["Tea", "Pasta", "Laundry"]);
+    expect(body.items[0]!.at).toBeTruthy();
+  });
+
+  test("a guest is refused by the package's own role floor", async () => {
+    const guestClient = await guest(await owner());
+    expect((await guestClient.get("/api/widgets/remind/upcoming/data")).status).toBe(403);
+    expect((await guestClient.get("/api/widgets/timer/running/data")).status).toBe(403);
   });
 });
 

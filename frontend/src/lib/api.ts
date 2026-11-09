@@ -311,6 +311,8 @@ export interface WidgetItem {
   icon?: string;
   href?: string;
   image?: string;
+  /** When this item happens or ends (ISO time); the Today card shows it as a relative time. */
+  at?: string;
 }
 export interface WidgetData {
   as_of: string;

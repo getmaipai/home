@@ -29,6 +29,7 @@ const WidgetItem = z.object({
   icon: z.string().optional(),
   href: z.string().optional(),
   image: z.string().optional(),
+  at: z.string().optional(),
 });
 
 const WidgetData = z.object({

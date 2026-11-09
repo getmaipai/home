@@ -70,7 +70,10 @@
   "backup": "exclude",
   "background": false,
   "contributes": {
-    "widgets": [{ "id": "shopping", "title": "Shopping List", "size": "card", "refresh_s": 60, "inputs": { "action": "show_list", "expression": "shopping list" } }]
+    "widgets": [
+      { "id": "shopping", "title": "Shopping List", "size": "card", "refresh_s": 60, "inputs": { "action": "show_list", "expression": "shopping list" } },
+      { "id": "upcoming", "title": "Next up", "size": "card", "refresh_s": 60, "inputs": {} }
+    ]
   },
   "min_app": "0.1.0",
   "tier": 0,
