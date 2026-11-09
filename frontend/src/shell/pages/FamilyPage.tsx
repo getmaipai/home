@@ -45,7 +45,7 @@ export function FamilyPage({ person }: { person: Roster }) {
         const ordered = [...roster].sort((a, b) => a.id === person.id ? -1 : b.id === person.id ? 1 : 0);
         return <>
           <header className="flex flex-wrap items-center justify-between gap-4">
-            <div><h1 className="text-title font-bold">{i18n._({ id: "Family", message: "Family" })}</h1><p className="text-supporting text-muted-foreground">{count}</p></div>
+            <div><h1 className="sr-only">{i18n._({ id: "Family", message: "Family" })}</h1><p className="text-supporting text-muted-foreground">{count}</p></div>
           </header>
           {petsQuery.isError ? <div role="alert" className="flex items-center gap-3 text-supporting text-destructive">{i18n._({ id: "Could not load pets.", message: "Could not load pets." })}<Button variant="ghost" size="sm" onClick={() => void petsQuery.refetch()}>{i18n._({ id: "Try again", message: "Try again" })}</Button></div> : null}
           {robotsQuery.isError ? <div role="alert" className="flex items-center gap-3 text-supporting text-destructive">{i18n._({ id: "Could not load robots.", message: "Could not load robots." })}<Button variant="ghost" size="sm" onClick={() => void robotsQuery.refetch()}>{i18n._({ id: "Try again", message: "Try again" })}</Button></div> : null}

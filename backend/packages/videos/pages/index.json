@@ -53,6 +53,8 @@
       "item_subtitle_field": "{channel}",
       "item_media_field": "thumbnail",
       "item_meta_field": "duration_s",
+      "media_loop": true,
+      "item_loop_field": "loop",
       "aspect": "wide",
       "variant": "plain",
       "hide_when_empty": true,

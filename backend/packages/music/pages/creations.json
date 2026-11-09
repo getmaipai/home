@@ -6,7 +6,13 @@
     {
       "type": "empty_state",
       "icon": "library",
-      "text": "Your songs and bands will show up here."
+      "text": "Your songs and bands will show up here.",
+      "action": {
+        "navigate": {
+          "to": "/apps/music/create"
+        }
+      },
+      "action_label": "Make a song"
     }
   ]
 }

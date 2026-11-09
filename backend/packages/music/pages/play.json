@@ -100,7 +100,13 @@
           "empty_state": {
             "type": "empty_state",
             "icon": "film",
-            "text": "This song is not available. Go back to Music and pick another."
+            "text": "This song is not available. Go back to Music and pick another.",
+            "action": {
+              "navigate": {
+                "to": "/apps/music/index"
+              }
+            },
+            "action_label": "Back to Music"
           },
           "layout": "audio",
           "fields": {

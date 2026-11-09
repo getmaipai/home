@@ -110,7 +110,6 @@ export function NotificationsPage() {
     <Page title={i18n._({ id: "Notifications", message: "Notifications" })} hideTitle>
       {/* eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex -- a keyboard-scrollable region, not a widget (DetailPane.tsx's own precedent). */}
       <div tabIndex={0} className={cn("flex flex-1 flex-col gap-4 overflow-y-auto p-4", FOCUS_RING)}>
-        <h1 className="m-0 text-title font-semibold">{i18n._({ id: "Notifications", message: "Notifications" })}</h1>
         {actionError ? <p className="text-base text-destructive">{actionError}</p> : null}
 
         <AsyncState

@@ -36,7 +36,13 @@
       "empty_state": {
         "type": "empty_state",
         "icon": "book-open",
-        "text": "This book could not open. Go back to Books and try another."
+        "text": "This book could not open. Go back to Books and try another.",
+        "action": {
+          "navigate": {
+            "to": "/apps/books/index"
+          }
+        },
+        "action_label": "Back to Books"
       }
     }
   ]

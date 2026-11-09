@@ -25,6 +25,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import type Hls from "hls.js";
 import { nextMusicQueueId, useMusicDj } from "@/shell/musicDj";
 import type { PlayerVoiceover } from "@maipai/ui/src/primitives/Player";
+import { chooseNext, getPlayMode, usePlayMode } from "@/shell/media/playMode";
 
 export const hlsPathFor = (src: string, canPlayNative: boolean): "native" | "hls" | "direct" => {
   if (!/[?&]hls=1(?:&|$)/i.test(src) && !/\.m3u8(?:[?#]|$)/i.test(src)) return "direct";
@@ -45,6 +46,10 @@ export interface MediaDock {
   clear(): void;
   /** Play the next song of the music queue (the mini bar's Next); does nothing when there is none. */
   next(): Promise<void>;
+  /** Go back: restart the song when it has played a few seconds (or nothing came before it), else play the one before. */
+  previous?(): Promise<void>;
+  /** Play a song of the music queue by id (the stage's Up next list). */
+  play?(id: string): Promise<void>;
   /** Start a live station's stream again after it failed to start (the bar's Retry). */
   retry?(): void;
 }
@@ -142,7 +147,7 @@ export function createMediaStore() {
 /** What the shell's Listen is doing right now (which story, starting or speaking, how far). The package app page hands it to the news
  * reader's own context: the reader and the host cannot share one object by package path in the dev server, so the page is the bridge. */
 export const ListenStatusContext = createContext<ListenStatus>({ storyId: null, phase: null, progress: 0 });
-export const MediaDockContext = createContext<MediaDock>({ current: null, clear: () => {}, next: async () => {} });
+export const MediaDockContext = createContext<MediaDock>({ current: null, clear: () => {}, next: async () => {}, previous: async () => {}, play: async () => {} });
 
 /** The item the host holds, for the media app's docked mini bar. */
 export function useMediaDock(): MediaDock {
@@ -222,24 +227,54 @@ export function MediaHostProvider({ children, personId, ageBand }: { children: R
   const hostWithDj = useMemo(() => ({ ...host, voiceoverFor }), [host, voiceoverFor]);
   // MEDIA-VIZ-03: the next song of the music queue, for the mini bar's Next and the Media Session's next track (and, when a song ends
   // away from Now playing, the host keeps the same queue moving with it). Null when there is no queue or no next song.
+  // MUSIC-STAGE-01: songs played this session, newest last, so Previous can go back.
+  const history = useRef<string[]>([]);
+  const playQueued = useCallback(async (wanted: string, held: HoistedMedia, remember: boolean) => {
+    const queued = await request<{ id: string }>("/api/plugins/music/queue", { method: "POST", body: JSON.stringify({ id: wanted }) });
+    type NextItem = { id: string; src: string; title: string; subtitle?: string; poster?: string };
+    const next = await api.appData<NextItem | []>("music", "item", { id: queued.id });
+    if (Array.isArray(next) || store.get()?.id !== held.id) return;
+    if (remember) history.current.push(held.id);
+    const { parkMedia } = await import("@maipai/ui/src/primitives/Player");
+    const el = store.elementFor({ id: next.id, src: next.src, kind: "audio", title: next.title, subtitle: next.subtitle, poster: next.poster }, "music");
+    parkMedia(el);
+    await el.play();
+  }, [store]);
   const advance = useCallback(async () => {
     const held = store.get();
     if (!held || held.appId !== "music") return;
     try {
-      const queuedId = await nextMusicQueueId(held.id);
+      const mode = getPlayMode();
+      const nextId = await nextMusicQueueId(held.id);
+      const ahead = mode.shuffle ? (await api.appData<Array<{ id: string }>>("music", "up-next", { id: held.id })).map((row) => row.id) : [];
+      const queuedId = chooseNext({ nextId, ahead, currentId: held.id, first: history.current[0], mode });
       if (!queuedId || store.get()?.id !== held.id) return;
-      const queued = await request<{ id: string }>("/api/plugins/music/queue", { method: "POST", body: JSON.stringify({ id: queuedId }) });
-      type NextItem = { id: string; src: string; title: string; subtitle?: string; poster?: string };
-      const next = await api.appData<NextItem | []>("music", "item", { id: queued.id });
-      if (Array.isArray(next) || store.get()?.id !== held.id) return;
-      const { parkMedia } = await import("@maipai/ui/src/primitives/Player");
-      const el = store.elementFor({ id: next.id, src: next.src, kind: "audio", title: next.title, subtitle: next.subtitle, poster: next.poster }, "music");
-      parkMedia(el);
-      await el.play();
+      await playQueued(queuedId, held, true);
     } catch {
       // Keep the last item available for Play when a queue read or browser autoplay fails.
     }
-  }, [store]);
+  }, [store, playQueued]);
+  const previous = useCallback(async () => {
+    const held = store.get();
+    if (!held || held.appId !== "music") return;
+    const before = history.current[history.current.length - 1];
+    if (!before || held.el.currentTime > 3) { held.el.currentTime = 0; return; }
+    try {
+      history.current.pop();
+      await playQueued(before, held, false);
+    } catch { history.current.push(before); }
+  }, [store, playQueued]);
+  const playId = useCallback(async (id: string) => {
+    const held = store.get();
+    if (!held || held.appId !== "music" || held.id === id) return;
+    try { await playQueued(id, held, true); } catch { /* the song stays as it was */ }
+  }, [store, playQueued]);
+  const playMode = usePlayMode();
+  // Repeat "one" loops the held song, whichever page is open.
+  useEffect(() => {
+    if (!current || current.appId !== "music") return;
+    current.el.loop = playMode.repeat === "one" && liveStationIdOf(current.src) === null;
+  }, [current, playMode.repeat]);
   // The schema Player advances on Now playing. Away from that page, the host keeps the same queue moving.
   useEffect(() => {
     if (!current || current.appId !== "music") return;
@@ -311,7 +346,7 @@ export function MediaHostProvider({ children, personId, ageBand }: { children: R
     if (hlsRef.current) { hlsRef.current.stopLoad(); hlsRef.current.startLoad(-1); } else held.el.load();
     void held.el.play().catch(() => undefined);
   }, [store]);
-  const dock = useMemo<MediaDock>(() => ({ current, voiceover: current?.id === djFor?.id ? djFor?.voiceover : undefined, clear: store.clear, next: advance, retry }), [current, djFor, store, advance, retry]);
+  const dock = useMemo<MediaDock>(() => ({ current, voiceover: current?.id === djFor?.id ? djFor?.voiceover : undefined, clear: store.clear, next: advance, previous, play: playId, retry }), [current, djFor, store, advance, previous, playId, retry]);
   // The element is unloaded when the person signs out or the shell goes away.
   useEffect(() => () => store.clear(), [store]);
   return (

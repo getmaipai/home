@@ -144,6 +144,41 @@
         "module": "play"
       }
     ],
+    "sidebar": {
+      "search": {
+        "type": "search",
+        "state": "q",
+        "label": "Search Podcasts",
+        "placeholder": "Search Podcasts",
+        "submit": {
+          "navigate": {
+            "to": "/apps/podcasts/search",
+            "state": {
+              "q": "{q}"
+            }
+          }
+        }
+      },
+      "groups": [
+        {
+          "id": "listen",
+          "pages": [
+            "index",
+            "shows",
+            "episodes",
+            "queue",
+            "saved",
+            "filters",
+            "stats"
+          ]
+        }
+      ]
+    },
+    "header": {
+      "search": {
+        "label": "Search Podcasts"
+      }
+    },
     "data": [
       {
         "id": "continue",

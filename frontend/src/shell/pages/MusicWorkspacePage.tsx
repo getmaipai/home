@@ -162,7 +162,7 @@ function SongDetail({ id, onClose, remix }: { id: string; onClose: () => void; r
   const reasonOff = ready ? "" : i18n._({ id: "Available once the song is finished.", message: "Available once the song is finished." });
   return <section ref={top} className="flex shrink-0 flex-col gap-5 py-2" data-testid="music-song-result" aria-label={i18n._({ id: "Open song", message: "Open song" })}>
         <div className="flex items-start justify-between gap-3">
-      <div className="flex flex-col gap-1"><p className="text-muted-foreground text-xs font-semibold tracking-widest uppercase">{i18n._({ id: "Now open", message: "Now open" })}</p><h2 className="text-4xl leading-none font-black tracking-tight uppercase sm:text-6xl">{song?.title ?? i18n._({ id: "Your song", message: "Your song" })}</h2></div>
+      <div className="flex flex-col gap-1"><p className="text-muted-foreground text-sm">{i18n._({ id: "Now open", message: "Now open" })}</p><h2 className="text-title font-semibold tracking-tight">{song?.title ?? i18n._({ id: "Your song", message: "Your song" })}</h2></div>
       <Button type="button" variant="secondary" size="sm" onClick={onClose}>{i18n._({ id: "Close", message: "Close" })}</Button>
     </div>
     <div><SongResult key={id} id={id} onAnother={onClose} inWorkspace /></div>

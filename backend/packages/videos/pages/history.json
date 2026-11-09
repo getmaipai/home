@@ -27,7 +27,13 @@
       "empty_state": {
         "type": "empty_state",
         "icon": "film",
-        "text": "Videos you watch show up here."
+        "text": "Videos you watch show up here.",
+        "action": {
+          "navigate": {
+            "to": "/apps/videos/index"
+          }
+        },
+        "action_label": "Browse videos"
       }
     }
   ]

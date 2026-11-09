@@ -17,6 +17,7 @@
       "aspect": "square",
       "variant": "plain",
       "layout": "grid",
+      "size_control": true,
       "on_select": {
         "navigate": {
           "to": "/apps/music/album",
@@ -28,7 +29,13 @@
       "empty_state": {
         "type": "empty_state",
         "icon": "music",
-        "text": "No albums yet."
+        "text": "No albums yet.",
+        "action": {
+          "navigate": {
+            "to": "/apps/music/create"
+          }
+        },
+        "action_label": "Make a song"
       }
     }
   ]

@@ -353,7 +353,7 @@ export function FilesPage({ person }: { person: Roster }) {
 
         {/* AUDIT-UI-01: shrink-0, or the column squeezes this scrolling strip down to the tops of its chips when the page is taller than the phone. */}
         {!wide ? (
-          <div role="group" aria-label={i18n._({ id: "Library sections", message: "Library sections" })} className="-mx-4 flex shrink-0 flex-nowrap gap-2 overflow-x-auto px-4 pb-1">
+          <div role="group" aria-label={i18n._({ id: "Library sections", message: "Library sections" })} className="-mx-4 flex shrink-0 flex-nowrap gap-2 overflow-x-auto px-4 pb-1 no-scrollbar">
             {sections.map((section) => <Chip key={section.id} tone="surface" selectedTone="inverse" size="strip" selected={view.section === section.id} onClick={() => goSection(section.id)}>{section.label}</Chip>)}
           </div>
         ) : null}

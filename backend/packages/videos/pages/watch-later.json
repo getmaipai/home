@@ -27,7 +27,13 @@
       "empty_state": {
         "type": "empty_state",
         "icon": "film",
-        "text": "Nothing saved for later. Choose Watch later on a video to keep it here."
+        "text": "Nothing saved for later. Choose Watch later on a video to keep it here.",
+        "action": {
+          "navigate": {
+            "to": "/apps/videos/index"
+          }
+        },
+        "action_label": "Browse videos"
       }
     }
   ]

@@ -70,7 +70,13 @@
           "empty_state": {
             "type": "empty_state",
             "icon": "film",
-            "text": "This video is not on the hub. Go back to Videos and pick another."
+            "text": "This video is not on the hub. Go back to Videos and pick another.",
+            "action": {
+              "navigate": {
+                "to": "/apps/videos/index"
+              }
+            },
+            "action_label": "Back to Videos"
           },
           "fields": {
             "description": "description",

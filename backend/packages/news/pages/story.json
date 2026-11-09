@@ -67,7 +67,13 @@
       "empty_state": {
         "type": "empty_state",
         "icon": "newspaper",
-        "text": "This story is not available."
+        "text": "This story is not available.",
+        "action": {
+          "navigate": {
+            "to": "/apps/news/index"
+          }
+        },
+        "action_label": "Back to News"
       }
     },
     {

@@ -103,7 +103,13 @@
       "empty_state": {
         "type": "empty_state",
         "icon": "music",
-        "text": "This playlist is empty. Press Add to playlist on Now playing."
+        "text": "This playlist is empty. Press Add to playlist on Now playing.",
+        "action": {
+          "navigate": {
+            "to": "/apps/music/search"
+          }
+        },
+        "action_label": "Find songs"
       }
     },
     {

@@ -42,20 +42,6 @@
       "hide_when_empty": true
     },
     {
-      "type": "search",
-      "state": "q",
-      "label": "Search podcasts",
-      "placeholder": "Search podcasts",
-      "submit": {
-        "navigate": {
-          "to": "/apps/podcasts/search",
-          "state": {
-            "q": "{q}"
-          }
-        }
-      }
-    },
-    {
       "type": "media_shelf",
       "heading": "Up Next",
       "bind": {

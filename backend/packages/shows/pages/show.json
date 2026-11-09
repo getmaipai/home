@@ -61,7 +61,13 @@
       "empty_state": {
         "type": "empty_state",
         "icon": "film",
-        "text": "This title is not available. Go back to Shows and Films and choose another."
+        "text": "This title is not available. Go back to Shows and Films and choose another.",
+        "action": {
+          "navigate": {
+            "to": "/apps/shows/index"
+          }
+        },
+        "action_label": "Back to Shows"
       }
     },
     {

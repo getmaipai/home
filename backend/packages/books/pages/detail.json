@@ -29,7 +29,13 @@
       "empty_state": {
         "type": "empty_state",
         "icon": "book-open",
-        "text": "This book is not in your library. Go back to Books and choose another."
+        "text": "This book is not in your library. Go back to Books and choose another.",
+        "action": {
+          "navigate": {
+            "to": "/apps/books/index"
+          }
+        },
+        "action_label": "Back to Books"
       },
       "row_actions": [
         {

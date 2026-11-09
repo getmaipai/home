@@ -3435,7 +3435,7 @@ msgid "Back"
 msgstr "Back"
 
 #. js-lingui-explicit-id
-#: src/shell/media/NowPlayingStage.tsx:107
+#: src/shell/media/NowPlayingStage.tsx:196
 msgid "Back 10 seconds"
 msgstr "Back 10 seconds"
 
@@ -4962,7 +4962,7 @@ msgid "setting.person.robot.topics.option_label.chit_chat"
 msgstr "Chit Chat"
 
 #. js-lingui-explicit-id
-#: src/shell/mediaHost.tsx:327
+#: src/shell/mediaHost.tsx:362
 msgid "Choose a clip"
 msgstr "Choose a clip"
 
@@ -5517,7 +5517,7 @@ msgstr "Clear {name}"
 
 #. js-lingui-explicit-id
 #: src/apps/memory/PersonMemories.tsx:379
-#: src/apps/notifications/NotificationsPage.tsx:159
+#: src/apps/notifications/NotificationsPage.tsx:158
 #: src/apps/settings/FreeUpSpaceDialog.tsx:80
 #: src/shell/pages/StoragePage.tsx:191
 #: src/shell/pages/StoragePage.tsx:201
@@ -5628,7 +5628,7 @@ msgid "Close apps for big jobs"
 msgstr "Close apps for big jobs"
 
 #. js-lingui-explicit-id
-#: src/shell/media/NowPlayingStage.tsx:85
+#: src/shell/media/NowPlayingStage.tsx:142
 msgid "Close Now playing"
 msgstr "Close Now playing"
 
@@ -6649,7 +6649,7 @@ msgid "Could not load your memories."
 msgstr "Could not load your memories."
 
 #. js-lingui-explicit-id
-#: src/apps/notifications/NotificationsPage.tsx:121
+#: src/apps/notifications/NotificationsPage.tsx:120
 msgid "Could not load your notification history."
 msgstr "Could not load your notification history."
 
@@ -7134,7 +7134,7 @@ msgid "Count"
 msgstr "Count"
 
 #. js-lingui-explicit-id
-#: src/shell/media/NowPlayingStage.tsx:80
+#: src/shell/media/NowPlayingStage.tsx:137
 msgid "Cover"
 msgstr "Cover"
 
@@ -7980,7 +7980,7 @@ msgstr "Disk space"
 
 #. js-lingui-explicit-id
 #: src/apps/chat/chatThreadSlots.tsx:183
-#: src/apps/notifications/NotificationsPage.tsx:216
+#: src/apps/notifications/NotificationsPage.tsx:215
 #: src/shell/library/LibraryUploads.tsx:75
 #: src/shell/library/LibraryUploads.tsx:76
 #: src/shell/NotificationBell.tsx:258
@@ -7994,7 +7994,7 @@ msgid "Dismiss \"{title}\"?"
 msgstr "Dismiss \"{title}\"?"
 
 #. js-lingui-explicit-id
-#: src/apps/notifications/NotificationsPage.tsx:212
+#: src/apps/notifications/NotificationsPage.tsx:211
 msgid "Dismiss {text}"
 msgstr "Dismiss {text}"
 
@@ -8004,12 +8004,12 @@ msgid "Dismiss all"
 msgstr "Dismiss all"
 
 #. js-lingui-explicit-id
-#: src/apps/notifications/NotificationsPage.tsx:151
+#: src/apps/notifications/NotificationsPage.tsx:150
 msgid "Dismiss selected"
 msgstr "Dismiss selected"
 
 #. js-lingui-explicit-id
-#: src/apps/notifications/NotificationsPage.tsx:193
+#: src/apps/notifications/NotificationsPage.tsx:192
 msgid "Dismissed"
 msgstr "Dismissed"
 
@@ -9436,7 +9436,7 @@ msgid "Formality"
 msgstr "Formality"
 
 #. js-lingui-explicit-id
-#: src/shell/media/NowPlayingStage.tsx:109
+#: src/shell/media/NowPlayingStage.tsx:198
 msgid "Forward 30 seconds"
 msgstr "Forward 30 seconds"
 
@@ -12546,7 +12546,7 @@ msgid "setting.ease.text_size.option.140"
 msgstr "Large."
 
 #. js-lingui-explicit-id
-#: src/apps/notifications/NotificationsPage.tsx:138
+#: src/apps/notifications/NotificationsPage.tsx:137
 msgid "Last 30 days"
 msgstr "Last 30 days"
 
@@ -13073,6 +13073,11 @@ msgid "Lights"
 msgstr "Lights"
 
 #. js-lingui-explicit-id
+#: src/shell/media/NowPlayingStage.tsx:195
+msgid "Like"
+msgstr "Like"
+
+#. js-lingui-explicit-id
 #: src/shell/pages/CompanionsPage.tsx:335
 msgid "Likes: {list}."
 msgstr "Likes: {list}."
@@ -13434,7 +13439,7 @@ msgid "Loading more files"
 msgstr "Loading more files"
 
 #. js-lingui-explicit-id
-#: src/apps/notifications/NotificationsPage.tsx:122
+#: src/apps/notifications/NotificationsPage.tsx:121
 msgid "Loading notifications"
 msgstr "Loading notifications"
 
@@ -13861,6 +13866,8 @@ msgstr "LTX-2.5 and Wan"
 
 #. js-lingui-explicit-id
 #: src/apps/chat/MusicCardView.tsx:84
+#: src/shell/media/NowPlayingStage.tsx:148
+#: src/shell/media/NowPlayingStage.tsx:199
 #: src/shell/pages/MusicWorkspacePage.tsx:219
 #: src/shell/pages/MusicWorkspacePage.tsx:229
 msgid "Lyrics"
@@ -15308,7 +15315,7 @@ msgid "setting.topics.family_stories.option.keep"
 msgstr "Never says a story is real or not, and plays along."
 
 #. js-lingui-explicit-id
-#: src/apps/notifications/NotificationsPage.tsx:197
+#: src/apps/notifications/NotificationsPage.tsx:196
 msgid "New"
 msgstr "New"
 
@@ -15477,6 +15484,11 @@ msgstr "News written for young readers."
 #: src/shell/pages/useDataTableControls.tsx:125
 msgid "Next"
 msgstr "Next"
+
+#. js-lingui-explicit-id
+#: src/shell/media/NowPlayingStage.tsx:187
+msgid "Next song"
+msgstr "Next song"
 
 #. js-lingui-explicit-id
 #: src/apps/clock/AlarmsTab.tsx:30
@@ -16269,7 +16281,7 @@ msgid "Nothing in {label} yet."
 msgstr "Nothing in {label} yet."
 
 #. js-lingui-explicit-id
-#: src/apps/notifications/NotificationsPage.tsx:133
+#: src/apps/notifications/NotificationsPage.tsx:132
 msgid "Nothing in the last 30 days."
 msgstr "Nothing in the last 30 days."
 
@@ -16282,6 +16294,11 @@ msgstr "Nothing in the pictures or the personality would scare or confuse a youn
 #: src/apps/settings/ModelsSection.tsx:301
 msgid "Nothing is loaded right now."
 msgstr "Nothing is loaded right now."
+
+#. js-lingui-explicit-id
+#: src/shell/media/NowPlayingStage.tsx:161
+msgid "Nothing is queued after this song."
+msgstr "Nothing is queued after this song."
 
 #. js-lingui-explicit-id
 #: src/shell/pages/CompanionsPage.tsx:317
@@ -16365,13 +16382,12 @@ msgid "Nothing your family says is used to train anything."
 msgstr "Nothing your family says is used to train anything."
 
 #. js-lingui-explicit-id
-#: src/apps/notifications/NotificationsPage.tsx:179
+#: src/apps/notifications/NotificationsPage.tsx:178
 msgid "Notification history"
 msgstr "Notification history"
 
 #. js-lingui-explicit-id
 #: src/apps/notifications/NotificationsPage.tsx:110
-#: src/apps/notifications/NotificationsPage.tsx:113
 #: src/shell/NotificationBell.tsx:210
 #: src/shell/NotificationBell.tsx:225
 #: src/shell/pageHeaderTitle.tsx:109
@@ -17805,7 +17821,7 @@ msgid "Pick one and it goes into the bar above."
 msgstr "Pick one and it goes into the bar above."
 
 #. js-lingui-explicit-id
-#: src/shell/mediaHost.tsx:328
+#: src/shell/mediaHost.tsx:363
 msgid "Pick one of your own clips to put after this one."
 msgstr "Pick one of your own clips to put after this one."
 
@@ -18406,6 +18422,11 @@ msgid "Previous"
 msgstr "Previous"
 
 #. js-lingui-explicit-id
+#: src/shell/media/NowPlayingStage.tsx:185
+msgid "Previous song"
+msgstr "Previous song"
+
+#. js-lingui-explicit-id
 #: src/apps/settings/BackupsSection.tsx:98
 msgid "Print"
 msgstr "Print"
@@ -18666,7 +18687,7 @@ msgid "setting.engines.stack.remote.allow_tailnet.label"
 msgstr "Reach the engine computer when away from home"
 
 #. js-lingui-explicit-id
-#: src/apps/notifications/NotificationsPage.tsx:195
+#: src/apps/notifications/NotificationsPage.tsx:194
 msgid "Read"
 msgstr "Read"
 
@@ -19226,6 +19247,11 @@ msgid "Repeat"
 msgstr "Repeat"
 
 #. js-lingui-explicit-id
+#: src/shell/media/NowPlayingStage.tsx:125
+msgid "Repeat all songs"
+msgstr "Repeat all songs"
+
+#. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:1016
 msgid "setting.safety.alarm.repeat_seconds.help"
 msgstr "Repeat between 10 and 60 seconds; 20 seconds by default."
@@ -19236,9 +19262,19 @@ msgid "Repeat ends"
 msgstr "Repeat ends"
 
 #. js-lingui-explicit-id
+#: src/shell/media/NowPlayingStage.tsx:125
+msgid "Repeat off"
+msgstr "Repeat off"
+
+#. js-lingui-explicit-id
 #: src/shell/pages/status/StatusBoard.tsx:109
 msgid "Repeat on"
 msgstr "Repeat on"
+
+#. js-lingui-explicit-id
+#: src/shell/media/NowPlayingStage.tsx:125
+msgid "Repeat one song"
+msgstr "Repeat one song"
 
 #. js-lingui-explicit-id
 #: src/shell/pages/status/StatusBoard.tsx:110
@@ -20711,12 +20747,12 @@ msgstr "see the live roster"
 
 #. js-lingui-explicit-id
 #: src/shell/GlobalMiniPlayer.tsx:127
-#: src/shell/media/NowPlayingStage.tsx:103
+#: src/shell/media/NowPlayingStage.tsx:179
 msgid "Seek"
 msgstr "Seek"
 
 #. js-lingui-explicit-id
-#: src/apps/notifications/NotificationsPage.tsx:156
+#: src/apps/notifications/NotificationsPage.tsx:155
 #: src/shell/pages/FilesPage.tsx:371
 msgid "Select"
 msgstr "Select"
@@ -20733,7 +20769,7 @@ msgstr "Select {name}, {minutes} min"
 
 #. js-lingui-explicit-id
 #: src/apps/memory/PersonMemories.tsx:91
-#: src/apps/notifications/NotificationsPage.tsx:186
+#: src/apps/notifications/NotificationsPage.tsx:185
 msgid "Select {text}"
 msgstr "Select {text}"
 
@@ -20743,8 +20779,8 @@ msgid "Select {text}, {displayTime} remaining"
 msgstr "Select {text}, {displayTime} remaining"
 
 #. js-lingui-explicit-id
-#: src/apps/notifications/NotificationsPage.tsx:170
-#: src/apps/notifications/NotificationsPage.tsx:173
+#: src/apps/notifications/NotificationsPage.tsx:169
+#: src/apps/notifications/NotificationsPage.tsx:172
 #: src/apps/settings/FreeUpSpaceDialog.tsx:80
 msgid "Select all"
 msgstr "Select all"
@@ -21394,6 +21430,11 @@ msgid "setting.companions.dock.help"
 msgstr "Shows your companion at the top right of every page. Hover or tap it to open the companion pane. Turn it off to hide the companion everywhere."
 
 #. js-lingui-explicit-id
+#: src/shell/media/NowPlayingStage.tsx:184
+msgid "Shuffle"
+msgstr "Shuffle"
+
+#. js-lingui-explicit-id
 #: src/shell/AmbientCompanionPane.tsx:315
 msgid "Side chat"
 msgstr "Side chat"
@@ -21875,6 +21916,11 @@ msgstr "Something went wrong. Try asking again."
 #: src/shell/pages/SoundExtras.tsx:76
 msgid "Song"
 msgstr "Song"
+
+#. js-lingui-explicit-id
+#: src/shell/media/NowPlayingStage.tsx:183
+msgid "Song controls"
+msgstr "Song controls"
 
 #. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:472
@@ -25710,6 +25756,11 @@ msgid "Unknown browser"
 msgstr "Unknown browser"
 
 #. js-lingui-explicit-id
+#: src/shell/media/NowPlayingStage.tsx:195
+msgid "Unlike"
+msgstr "Unlike"
+
+#. js-lingui-explicit-id
 #: src/apps/settings/FreeUpMemory.tsx:35
 msgid "Unload {count, plural, one {# idle model} other {# idle models}}, about {size} GB. Chat and anything running are left alone. Other apps could free more; see System status."
 msgstr "Unload {count, plural, one {# idle model} other {# idle models}}, about {size} GB. Chat and anything running are left alone. Other apps could free more; see System status."
@@ -25811,6 +25862,12 @@ msgstr "Untitled style"
 #: src/apps/settings/PerformanceCustomize.tsx:57
 msgid "Up"
 msgstr "Up"
+
+#. js-lingui-explicit-id
+#: src/shell/media/NowPlayingStage.tsx:153
+#: src/shell/media/NowPlayingStage.tsx:200
+msgid "Up next"
+msgstr "Up next"
 
 #. js-lingui-explicit-id
 #: src/apps/setup/StorageStep.tsx:27
@@ -26834,7 +26891,7 @@ msgid "What Incognito does"
 msgstr "What Incognito does"
 
 #. js-lingui-explicit-id
-#: src/shell/media/NowPlayingStage.tsx:79
+#: src/shell/media/NowPlayingStage.tsx:136
 msgid "What is on stage"
 msgstr "What is on stage"
 

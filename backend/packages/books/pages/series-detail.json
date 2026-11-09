@@ -32,7 +32,13 @@
       "empty_state": {
         "type": "empty_state",
         "icon": "book-open",
-        "text": "This series is empty. Go back to Books and choose another."
+        "text": "This series is empty. Go back to Books and choose another.",
+        "action": {
+          "navigate": {
+            "to": "/apps/books/index"
+          }
+        },
+        "action_label": "Back to Books"
       }
     }
   ]
