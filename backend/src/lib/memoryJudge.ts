@@ -149,9 +149,11 @@ export type Category = (typeof CATEGORY_VALUES)[number];
 // mapping works. "observation" (this spec's third tier, no legacy
 // counterpart) is never picked by the judge, matching the same call
 // recall()'s own tier-floor code already made for it.
-function categoryToTier(category: Category): "durable" | "episodic" {
+function categoryToTier(category: Category, sensitive = false): "durable" | "episodic" {
+  // A health, legal or other sensitive fact about a person is a standing fact,
+  // not a passing event, so it never decays for lack of recall.
   const durable: Category[] = ["identity", "relationship", "person", "preference", "instruction"];
-  return durable.includes(category) ? "durable" : "episodic";
+  return sensitive || durable.includes(category) ? "durable" : "episodic";
 }
 
 // Session C step 9 (session-c-brain-and-voice.md): "the judge writes
@@ -1850,7 +1852,7 @@ export async function judgeTurn(turn: ConversationTurnRow): Promise<JudgeTurnRes
           valid_to: fact.valid_to,
           subject_id: subject?.id,
           offer_withheld: fact.offer_withheld ? true : null,
-          ...(ownWrite ? { category: fact.category, tier: categoryToTier(fact.category) } : {}),
+          ...(ownWrite ? { category: fact.category, tier: categoryToTier(fact.category, fact.sensitive) } : {}),
         },
         { ...(decision.contradiction ? { closeValidTo: turn.createdAt } : {}), enforcePrivilegedRoute: true },
       );
@@ -1887,7 +1889,7 @@ export async function judgeTurn(turn: ConversationTurnRow): Promise<JudgeTurnRes
         text: fact.text,
         record_kind: recordKind,
         category: fact.category,
-        tier: categoryToTier(fact.category),
+        tier: categoryToTier(fact.category, fact.sensitive),
         scope: fact.scope,
         device_id: robotBound ? robotDeviceId : null,
         created_by: speaker.id,

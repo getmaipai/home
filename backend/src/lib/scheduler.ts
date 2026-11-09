@@ -38,7 +38,7 @@ import { alarms } from "@/db/schema";
 import { getSettingValueForPerson } from "@/lib/settings";
 import { newJobId } from "@/lib/id";
 import { isOwnerOrAdmin } from "@/lib/access";
-import { runMaintenance, drainPendingEmbeddings } from "@/lib/memory";
+import { runMaintenance, repairWronglyArchivedDurables, drainPendingEmbeddings } from "@/lib/memory";
 import { embedPendingEpisodes } from "@/lib/episodes";
 import { pollActiveStackImageJobs } from "@/lib/jobProducers";
 import { reconcileLoraInstalls } from "@/lib/loras/install";
@@ -333,7 +333,9 @@ const CORE_JOBS: Record<string, CoreJobHandler> = {
     return closed.length === 0 && dispatched.sent.length === 0 && views.length === 0 ? IDLE : undefined;
   },
   "memory.maintenance": () => {
-    runMaintenance();
+    const result = runMaintenance();
+    const wronglyArchivedDurables = repairWronglyArchivedDurables();
+    console.log(`memory.maintenance archived=${result.archived} wrongly_archived_durable=${wronglyArchivedDurables}`);
   },
   "talent.life.tick": async () => {
     const [{ listHouseholdCompanionIds }, { allCompanions }, { isCompanionFork, ownerActor, synthById }, { isOnAir, tickLife }] = await Promise.all([

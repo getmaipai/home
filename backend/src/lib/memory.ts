@@ -1487,7 +1487,7 @@ export function runMaintenance(): { archived: number } {
     .from(memoryRecords)
     .where(and(eq(memoryRecords.status, "active"), eq(memoryRecords.pinned, false)))
     .all()
-    .filter((r) => r.tier === "episodic" || r.tier === "observation");
+    .filter((r) => (r.tier === "episodic" || r.tier === "observation") && !DURABLE_CATEGORIES.includes(r.category));
 
   const byScope = new Map<string, MemoryRecordRow[]>();
   for (const row of decaying) {
@@ -1668,6 +1668,8 @@ const NEVER_RECALLED_DEMOTE_DAYS = 30;
  * demote pass leaves them alone. A pinned preference is already exempt
  * through the pinned check. */
 const STANDING_CATEGORIES: readonly string[] = ["identity", "instruction"];
+// Same durable categories as memoryJudge.categoryToTier().
+const DURABLE_CATEGORIES: readonly string[] = ["identity", "relationship", "person", "preference", "instruction"];
 
 /** Demotes every unpinned, never-recalled (uses = 0) durable record
  * older than NEVER_RECALLED_DEMOTE_DAYS to episodic, except the standing
@@ -1684,8 +1686,10 @@ export function demoteNeverRecalledDurables(now: Date = new Date()): number {
         eq(memoryRecords.pinned, false),
         eq(memoryRecords.tier, "durable"),
         eq(memoryRecords.uses, 0),
+        eq(memoryRecords.sensitive, false),
         lt(memoryRecords.createdAt, cutoff),
-        notInArray(memoryRecords.category, [...STANDING_CATEGORIES]),
+        notInArray(memoryRecords.category, [...STANDING_CATEGORIES, ...DURABLE_CATEGORIES]),
+        inArray(memoryRecords.category, ["event", "project", "goal", "fact", "state"]),
       ),
     )
     .all();
@@ -1693,6 +1697,17 @@ export function demoteNeverRecalledDurables(now: Date = new Date()): number {
     db.update(memoryRecords).set({ tier: "episodic", hlc: nextHlc() }).where(eq(memoryRecords.id, row.id)).run();
   }
   return stale.length;
+}
+
+/** Count decay-archived records whose category should have been durable.
+ * This diagnostic does not change or restore any record. */
+export function repairWronglyArchivedDurables(): number {
+  return db
+    .select({ category: memoryRecords.category })
+    .from(memoryRecords)
+    .where(and(eq(memoryRecords.status, "archived"), eq(memoryRecords.archivedReason, "decay")))
+    .all()
+    .filter((row) => DURABLE_CATEGORIES.includes(row.category)).length;
 }
 
 // ==== Step 7, retired: the profile paragraph ====

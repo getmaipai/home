@@ -6,7 +6,7 @@ import { __resetThrottleForTests } from "@/lib/secretThrottle";
 import { eq, and, isNull } from "drizzle-orm";
 import { db, sqlite } from "@/db";
 import { memoryRecords, memoryEmbeddings, pendingEmbeddings, pendingMemoryWork, people } from "@/db/schema";
-import { recall, remember, list, validAt, supersede, bumpUsage, drainPendingEmbeddings, runMaintenance, eventWithinGrace, PROFILE_SOURCE, ENTITY_MIN_COSINE, ENTITY_BOOST, STATE_EXPIRY_DAYS, EVENT_GRACE_DAYS } from "@/lib/memory";
+import { recall, remember, list, validAt, supersede, bumpUsage, drainPendingEmbeddings, runMaintenance, demoteNeverRecalledDurables, repairWronglyArchivedDurables, eventWithinGrace, PROFILE_SOURCE, ENTITY_MIN_COSINE, ENTITY_BOOST, STATE_EXPIRY_DAYS, EVENT_GRACE_DAYS } from "@/lib/memory";
 import { buildProfileCard } from "@/lib/memoryProfile";
 import { ingestMemory, supersedeMemory, drainPendingWork } from "@/lib/memoryIngestion";
 import { CREDENTIAL_SAFE_MESSAGE } from "@/lib/memoryContentPolicy";
@@ -1019,6 +1019,45 @@ describe("batch forget", () => {
 });
 
 describe("POST /api/memory/maintenance/run", () => {
+  test("keeps durable-by-category facts durable and recalled after 90 days, while demoting a mis-tiered observation", async () => {
+    const { ownerRow } = await ownerAndChildRows();
+    const facts = [
+      remember(ownerRow, { text: "Marlow is related to Sage", category: "relationship", tier: "durable", scope: "person", person: ownerRow.id, source: "test", importance: 0.6 }),
+      remember(ownerRow, { text: "Marlow is a person in this household", category: "person", tier: "durable", scope: "person", person: ownerRow.id, source: "test", importance: 0.6 }),
+      remember(ownerRow, { text: "Marlow prefers oat milk", category: "preference", tier: "durable", scope: "person", person: ownerRow.id, source: "test", importance: 0.6 }),
+      remember(ownerRow, { text: "Marlow is allergic to peanuts", category: "fact", tier: "durable", sensitive: true, scope: "person", person: ownerRow.id, source: "test", importance: 0.6 }),
+    ];
+    const misTiered = remember(ownerRow, { text: "A passing observation about the kitchen", category: "event", tier: "episodic", scope: "person", person: ownerRow.id, source: "test", importance: 0.6 });
+    if (facts.some((f) => !f.ok) || !misTiered.ok) throw new Error("memory test setup failed");
+    const factIds = facts.map((f) => (f.ok ? f.value.id : ""));
+    const old = new Date(Date.now() - 90 * 86_400_000).toISOString();
+    for (const id of factIds) db.update(memoryRecords).set({ createdAt: old, lastUsedAt: old, uses: 0 }).where(eq(memoryRecords.id, id)).run();
+    db.update(memoryRecords).set({ tier: "durable", createdAt: old, lastUsedAt: old, uses: 0 }).where(eq(memoryRecords.id, misTiered.value.id)).run();
+
+    expect(demoteNeverRecalledDurables()).toBe(1);
+    runMaintenance();
+    for (const fact of facts) {
+      if (!fact.ok) throw new Error("memory test setup failed");
+      const row = db.select().from(memoryRecords).where(eq(memoryRecords.id, fact.value.id)).get()!;
+      expect(row.status).toBe("active");
+      expect(row.tier).toBe("durable");
+      expect(recall(ownerRow, fact.value.text, { selfOnly: true, bumpUsage: false }).map((m) => m.record.id)).toContain(fact.value.id);
+    }
+    expect(db.select().from(memoryRecords).where(eq(memoryRecords.id, misTiered.value.id)).get()!.tier).toBe("episodic");
+  });
+
+  test("reports decay-archived durable-category rows for repair without restoring them", async () => {
+    const { ownerRow } = await ownerAndChildRows();
+    const archived = remember(ownerRow, { text: "Marlow likes strawberries", category: "preference", tier: "episodic", scope: "person", person: ownerRow.id, source: "test", importance: 0.6 });
+    const unrelated = remember(ownerRow, { text: "A past observation", category: "fact", tier: "episodic", scope: "person", person: ownerRow.id, source: "test", importance: 0.6 });
+    if (!archived.ok || !unrelated.ok) throw new Error("memory test setup failed");
+    db.update(memoryRecords).set({ status: "archived", archivedReason: "decay" }).where(eq(memoryRecords.id, archived.value.id)).run();
+    db.update(memoryRecords).set({ status: "archived", archivedReason: "decay" }).where(eq(memoryRecords.id, unrelated.value.id)).run();
+
+    expect(repairWronglyArchivedDurables()).toBe(1);
+    expect(db.select().from(memoryRecords).where(eq(memoryRecords.id, archived.value.id)).get()!.status).toBe("archived");
+  });
+
   test("requires owner or admin", async () => {
     const { childClient } = await ownerAndChild();
     const res = await childClient.post("/api/memory/maintenance/run", {});
