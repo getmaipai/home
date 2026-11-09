@@ -69719,6 +69719,84 @@
         }
       }
     },
+    "/api/films/{id}/animatic": {
+      "post": {
+        "tags": [
+          "Films"
+        ],
+        "summary": "Make the animatic: the planned stills held with their motion and lines, no clips rendered",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 120
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The animatic file",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "file_id": {
+                      "type": "string"
+                    },
+                    "seconds": {
+                      "type": "number"
+                    },
+                    "shots": {
+                      "type": "number"
+                    }
+                  },
+                  "required": [
+                    "file_id",
+                    "seconds",
+                    "shots"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The stills are not ready or the animatic was withheld",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Film unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/videos/status": {
       "get": {
         "tags": [
