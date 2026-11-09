@@ -148,3 +148,38 @@ describe("InstallDock making jobs", () => {
     view.getByText("40%");
   });
 });
+
+describe("InstallDock finish wording and stacking", () => {
+  test("finishedLine names what was made and falls back to the install sentence", async () => {
+    const { finishedLine } = await import("./InstallDock");
+    expect(finishedLine("a picture")).toBe("Your picture is ready.");
+    expect(finishedLine("a video")).toBe("Your video is ready.");
+    expect(finishedLine("a song")).toBe("Your song is ready.");
+    expect(finishedLine(null)).toBe("The install finished.");
+  });
+
+  test("announces a finished video by name", async () => {
+    let rows: HomeJobView[] = [{ id: "v1", kind: "video", state: "running", title: "x", progress: { percent: 40 } }];
+    const view = renderWithQueryClient(<MemoryRouter><InstallDock admin={false} read={async () => status({ state: "none", items: [] })} readJobs={async () => rows} /></MemoryRouter>);
+    await view.findByText("Making a video");
+    rows = [];
+    await waitFor(() => expect(view.getByTestId("install-announcer").textContent).toBe("Your video is ready."), { timeout: 8000 });
+  }, 12000);
+
+  test("stacks above the mini player when it is taller than the phone bar", async () => {
+    const nav = document.createElement("div");
+    nav.setAttribute("data-slot", "phone-nav");
+    const mini = document.createElement("div");
+    mini.setAttribute("data-slot", "global-mini-player");
+    for (const [node, top] of [[nav, window.innerHeight - 49], [mini, window.innerHeight - 120]] as const) {
+      Object.defineProperty(node, "offsetParent", { value: document.body, configurable: true });
+      node.getBoundingClientRect = () => ({ left: 0, right: 0, top, bottom: 0, width: 0, height: 0, x: 0, y: top, toJSON() {} });
+      document.body.append(node);
+    }
+    try {
+      const view = show(true, status());
+      const dock = await view.findByTestId("install-dock");
+      await waitFor(() => expect(dock.style.bottom).toBe("120px"));
+    } finally { nav.remove(); mini.remove(); }
+  });
+});

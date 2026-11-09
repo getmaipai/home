@@ -6,7 +6,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Switch } from "@maipai/ui/src/ui/switch";
 import { RadioGroup, RadioGroupItem } from "@maipai/ui/src/dashboard/components/ui/radio-group";
 import { Item, ItemActions, ItemContent, ItemDescription, ItemGroup, ItemTitle } from "@maipai/ui/src/dashboard/components/ui/item";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@maipai/ui/src/dashboard/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@maipai/ui/src/ui/card";
 import { STARTER_ALWAYS, STARTER_NEVER, parseList, specKey, type StarterApp } from "@/apps/settings/performanceModel";
 import { useRunningApps } from "@/apps/settings/usePerformanceSettings";
 import { HelperStatusRow } from "@/apps/settings/HelperStatusRow";
@@ -83,7 +83,7 @@ export function CloseAppsSettings({ value, write }: { value: Value; write: Write
   const candidates: StarterApp[] = running.data?.installed ? running.data.apps.map((app) => ({ bundleId: app.bundleId, name: app.name })) : [...STARTER_ALWAYS, ...STARTER_NEVER];
   const [error, setError] = useState<string | null>(null);
   return (
-    <section aria-label={i18n._({ id: "Close apps for big jobs", message: "Close apps for big jobs" })} data-testid="close-apps-card"><Card>
+    <section aria-label={i18n._({ id: "Close apps for big jobs", message: "Close apps for big jobs" })} data-testid="close-apps-card"><Card surface="flat">
       <CardHeader>
         <CardTitle>{i18n._({ id: "Close apps for big jobs", message: "Close apps for big jobs" })}</CardTitle>
         <CardDescription>{specKey(MODE).help}</CardDescription>

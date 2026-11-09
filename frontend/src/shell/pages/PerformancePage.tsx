@@ -5,6 +5,7 @@ import { getIcon } from "@maipai/ui/src/icons";
 import { api, type Performance } from "@/lib/api";
 import { useTabItem } from "@/shell/tabIdentity";
 import { Card, CardHeader, CardContent, CardTitle } from "@maipai/ui/src/dashboard/components/ui/card";
+import { Empty, EmptyDescription } from "@maipai/ui/src/dashboard/components/ui/empty";
 import { TurnsChartBody } from "@/shell/pages/performance/TurnsChartBody";
 import { TurnsByEngineBody } from "@/shell/pages/performance/TurnsByEngineBody";
 import { RoutesBody } from "@/shell/pages/performance/RoutesBody";
@@ -74,7 +75,9 @@ export function PerformancePage() {
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <TurnsChartBody byDay={data.turns.by_day} />
+                  {data.turns.by_day.some((day) => day.median_ttft_ms != null || day.median_total_ms != null)
+                    ? <TurnsChartBody byDay={data.turns.by_day} />
+                    : <Empty><EmptyDescription>{i18n._({ id: "No replies timed yet.", message: "No replies timed yet." })}</EmptyDescription></Empty>}
                 </CardContent>
               </Card>
             </div>

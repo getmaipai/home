@@ -13,3 +13,13 @@
   --border: color-mix(in oklab, var(--weather-ink), transparent 70%);
   --ring: var(--weather-ink);
 }
+
+/* The phone's bottom "Locations" bar floats over the sky, so it reads in the sky's ink too. */
+[data-slot="weather-forecast-page"] [data-slot="weather-mobile-controls"] {
+  --card: color-mix(in oklab, var(--weather-clear-night-top), transparent 15%);
+  --foreground: var(--weather-ink);
+  --accent-foreground: var(--weather-ink);
+  --muted-foreground: color-mix(in oklab, var(--weather-ink), transparent 25%);
+  --border: color-mix(in oklab, var(--weather-ink), transparent 70%);
+  --ring: var(--weather-ink);
+}

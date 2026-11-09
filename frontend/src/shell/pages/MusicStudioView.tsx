@@ -93,7 +93,7 @@ function Row({ track, number, duration, now, muted, solo, volume, onMute, onSolo
 /** One labelled listening control: a name, a value and a slider. */
 function Knob({ label, value, unit, min, max, step, onChange }: { label: string; value: number; unit: string; min: number; max: number; step: number; onChange: (value: number) => void }) {
   return <div className="flex flex-col gap-1.5">
-    <div className="flex items-baseline justify-between text-xs"><span className="text-muted-foreground font-semibold tracking-wide uppercase">{label}</span><span className="tabular-nums">{value}{unit}</span></div>
+    <div className="flex items-baseline justify-between text-xs"><span className="text-muted-foreground font-medium">{label}</span><span className="tabular-nums">{value}{unit}</span></div>
     <Slider aria-label={label} min={min} max={max} step={step} value={[value]} onValueChange={(next) => onChange(next[0] ?? value)} />
   </div>;
 }
@@ -191,9 +191,9 @@ export function MusicStudioView({ adult, search }: { adult: boolean; search: str
   return <div className="flex min-h-0 flex-1 flex-col"><section className="bg-background text-foreground -mx-4 flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-4 py-4 lg:mx-0 lg:rounded-3xl lg:px-6" data-testid="music-studio-view">
     <BringSong mode="stems" adult={adult} />
     <div className="flex shrink-0 flex-wrap items-center gap-4">
-      <div className="size-16 shrink-0 overflow-hidden rounded-xl shadow-2xl sm:size-20"><Cover id={songId} title={song.data?.title ?? i18n._({ id: "Studio", message: "Studio" })} url={song.data?.cover_url ?? null} bare /></div>
-      <div className="flex min-w-0 flex-1 flex-col gap-1"><p className="text-muted-foreground text-xs font-semibold tracking-widest uppercase">{i18n._({ id: "Studio", message: "Studio" })}</p>
-        <h2 className="min-w-0 truncate text-2xl leading-none font-black tracking-tight uppercase sm:text-4xl">{song.data?.title ?? i18n._({ id: "Studio", message: "Studio" })}</h2></div>
+      <div className="size-16 shrink-0 overflow-hidden rounded-xl sm:size-20"><Cover id={songId} title={song.data?.title ?? i18n._({ id: "Studio", message: "Studio" })} url={song.data?.cover_url ?? null} bare /></div>
+      <div className="flex min-w-0 flex-1 flex-col gap-1"><p className="text-muted-foreground text-sm">{i18n._({ id: "Studio", message: "Studio" })}</p>
+        <h2 className="min-w-0 truncate text-title font-semibold">{song.data?.title ?? i18n._({ id: "Studio", message: "Studio" })}</h2></div>
       <div className="flex w-full flex-wrap gap-2 sm:w-auto">
         <Button asChild variant="secondary"><Link to={`/apps/music/create?song=${encodeURIComponent(songId)}`}>{i18n._({ id: "Back to the song", message: "Back to the song" })}</Link></Button>
         <Button type="button" disabled={splitting || !!stemsBusy || tracks.length > 1 || tracks.length === 0} onClick={split}>{stemsBusy || splitting ? i18n._({ id: "Splitting into stems", message: "Splitting into stems" }) : tracks.length > 1 ? i18n._({ id: "Split into stems (done)", message: "Split into stems (done)" }) : i18n._({ id: "Split into stems", message: "Split into stems" })}</Button>
@@ -205,7 +205,7 @@ export function MusicStudioView({ adult, search }: { adult: boolean; search: str
     {tracks.length === 0 ? <p role="status" className="text-muted-foreground text-sm">{song.data?.state === "failed" ? i18n._({ id: "This song could not be made, so there is nothing to open.", message: "This song could not be made, so there is nothing to open." }) : i18n._({ id: "Opening your song. The Studio shows it as soon as it is made.", message: "Opening your song. The Studio shows it as soon as it is made." })}</p> : <div className="flex min-h-0 flex-col gap-4 lg:flex-row">
       <div className="flex min-w-0 flex-1 flex-col gap-3">
         <div className="bg-card grid grid-cols-(--lanes) overflow-hidden rounded-2xl" data-testid="studio-timeline">
-          <div className="flex items-center justify-between gap-2 px-3 py-2"><span className="text-muted-foreground text-xs font-semibold tracking-widest uppercase">{i18n._({ id: "Tracks", message: "Tracks" })}</span>
+          <div className="flex items-center justify-between gap-2 px-3 py-2"><span className="text-muted-foreground text-sm font-medium">{i18n._({ id: "Tracks", message: "Tracks" })}</span>
             <Button type="button" size="sm" variant="outline" disabled={splitting || !!stemsBusy || tracks.length > 1} onClick={split} aria-label={i18n._({ id: "Add tracks by splitting the song into stems", message: "Add tracks by splitting the song into stems" })}><PlusIcon className="size-4" aria-hidden="true" />{i18n._({ id: "Add track", message: "Add track" })}</Button></div>
           <div className="relative h-14" data-testid="studio-ruler">
             {barMarks.map((mark) => <span key={mark.bar} className="text-muted-foreground absolute bottom-0 left-(--at) border-l border-foreground/20 pl-1 text-xs tabular-nums" style={{ "--at": `${mark.at}%` } as CSSProperties}>{mark.bar}</span>)}
@@ -221,7 +221,7 @@ export function MusicStudioView({ adult, search }: { adult: boolean; search: str
             {stemsBusy ? null : <Button type="button" disabled={splitting} onClick={split}>{i18n._({ id: "Split into stems", message: "Split into stems" })}</Button>}
           </div> : null}
         </div>
-        <div className="bg-card sticky bottom-2 flex flex-wrap items-center gap-3 rounded-2xl p-3 shadow-2xl" data-testid="studio-transport">
+        <div className="bg-card sticky bottom-2 flex flex-wrap items-center gap-3 rounded-2xl p-3" data-testid="studio-transport">
           <Button type="button" size="lg" onClick={playing ? pause : play}>{playing ? <PauseIcon className="size-4" aria-hidden="true" /> : <PlayIcon className="size-4" aria-hidden="true" />}{playing ? i18n._({ id: "Pause", message: "Pause" }) : i18n._({ id: "Play", message: "Play" })}</Button>
           <Button type="button" variant="secondary" onClick={() => { pause(); seek(0); }}>{i18n._({ id: "Back to start", message: "Back to start" })}</Button>
           <Button type="button" variant={looping ? "default" : "outline"} aria-pressed={looping} onClick={() => setLooping(!looping)}><LoopIcon className="size-4" aria-hidden="true" />{i18n._({ id: "Loop", message: "Loop" })}</Button>
@@ -231,7 +231,7 @@ export function MusicStudioView({ adult, search }: { adult: boolean; search: str
       </div>
       <aside className="flex w-full shrink-0 flex-col gap-4 lg:w-80" aria-label={i18n._({ id: "Listening effects", message: "Listening effects" })} data-testid="studio-effects">
         <div className="bg-card flex flex-col gap-4 rounded-2xl p-4">
-          <div className="flex items-baseline justify-between"><h3 className="text-sm font-black tracking-wide uppercase">{i18n._({ id: "EQ", message: "EQ" })}</h3><Button type="button" size="sm" variant="ghost" onClick={() => setEq(FLAT)}>{i18n._({ id: "Reset", message: "Reset" })}</Button></div>
+          <div className="flex items-baseline justify-between"><h3 className="text-section font-semibold">{i18n._({ id: "EQ", message: "EQ" })}</h3><Button type="button" size="sm" variant="ghost" onClick={() => setEq(FLAT)}>{i18n._({ id: "Reset", message: "Reset" })}</Button></div>
           <div className="flex justify-between gap-1">
             {EQ_BANDS.map((band, index) => <div key={band.label} className="flex flex-col items-center gap-2">
               <span className="text-xs tabular-nums">{eq[index] ?? 0}</span>
@@ -241,7 +241,7 @@ export function MusicStudioView({ adult, search }: { adult: boolean; search: str
           </div>
         </div>
         <div className="bg-card flex flex-col gap-4 rounded-2xl p-4">
-          <div className="flex items-baseline justify-between"><h3 className="text-sm font-black tracking-wide uppercase">{i18n._({ id: "Compressor", message: "Compressor" })}</h3><Button type="button" size="sm" variant="ghost" onClick={() => setComp(COMP_DEFAULT)}>{i18n._({ id: "Reset", message: "Reset" })}</Button></div>
+          <div className="flex items-baseline justify-between"><h3 className="text-section font-semibold">{i18n._({ id: "Compressor", message: "Compressor" })}</h3><Button type="button" size="sm" variant="ghost" onClick={() => setComp(COMP_DEFAULT)}>{i18n._({ id: "Reset", message: "Reset" })}</Button></div>
           <Knob label={i18n._({ id: "Threshold", message: "Threshold" })} value={comp.threshold} unit=" dB" min={-60} max={0} step={1} onChange={(threshold) => setComp({ ...comp, threshold })} />
           <Knob label={i18n._({ id: "Ratio", message: "Ratio" })} value={comp.ratio} unit=":1" min={1} max={20} step={1} onChange={(ratio) => setComp({ ...comp, ratio })} />
           <Knob label={i18n._({ id: "Attack", message: "Attack" })} value={comp.attack} unit=" ms" min={1} max={100} step={1} onChange={(attack) => setComp({ ...comp, attack })} />
