@@ -46,7 +46,7 @@ import {
 } from "@/db/schema";
 import { clonedVoicesDir, projectsDir } from "@/lib/paths";
 import { nextHlc } from "@/lib/hlc";
-import { TOMBSTONE_TEXT } from "@/lib/memory";
+import { tombstoneMemoryRecord } from "@/lib/memory";
 import { deleteEpisodesForPerson } from "@/lib/episodes";
 import { deleteArtifactsForTurns } from "@/lib/artifacts";
 import { invalidateScopeCache } from "@/lib/settings";
@@ -348,9 +348,7 @@ export function erasePersonData(personId: string, blobsAfterCommit: string[], pr
   sqlite.query("DELETE FROM pending_memory_work WHERE memory_id IN (SELECT id FROM memory_records WHERE scope = 'person' AND person = ?)").run(personId);
   const tombstonedAt = new Date().toISOString();
   for (const row of memoryIds) {
-    sqlite
-      .query("UPDATE memory_records SET status = 'archived', text = ?, embedding_space = NULL, deleted_at = ?, hlc = ? WHERE id = ?")
-      .run(TOMBSTONE_TEXT, tombstonedAt, nextHlc(), row.id);
+    tombstoneMemoryRecord(row.id, tombstonedAt);
   }
   const memories = memoryIds.length;
   // FACE-01: biometric prints are tombstoned the same way, for the same

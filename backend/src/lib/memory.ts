@@ -21,7 +21,7 @@ import { isBareAcknowledgment } from "@/lib/guards";
 import { embed, EMBED_PREPROCESS } from "@/lib/llm";
 import { __hasInjectedStackClientForTests } from "@/lib/stackEngine";
 import { nextHlc } from "@/lib/hlc";
-import { deleteEpisodesForPerson } from "@/lib/episodes";
+import { deleteEpisodesForPerson, deleteEpisodesForTurns } from "@/lib/episodes";
 import { retireOrphanSubjects } from "@/lib/subjects";
 import { MemoryRecord } from "@maipai/spec/gen/ts/memory-record.js";
 import { ingestMemory } from "@/lib/memoryIngestion";
@@ -1277,6 +1277,15 @@ function assertCanForgetOrExport(actor: PersonRow, personId: string): MemoryOpRe
 // nickname/birthdate (personLifecycle.ts's own erasePersonData()).
 export const TOMBSTONE_TEXT = "[forgotten]";
 
+/** Apply the durable erasure shape to one record. The id, tombstone time,
+ * and fresh HLC remain so synced devices cannot restore the erased row. */
+export function tombstoneMemoryRecord(id: string, at = new Date().toISOString()): void {
+  sqlite.query("UPDATE memory_records SET status = 'archived', archived_reason = 'forgotten', text = ?, embedding_space = NULL, deleted_at = ?, source = '', confidence_evidence = '[]', subject_id = NULL, conflicts_with = '[]', hlc = ? WHERE id = ?")
+    .run(TOMBSTONE_TEXT, at, nextHlc(), id);
+  sqlite.query("DELETE FROM memory_embeddings WHERE memory_id = ?").run(id);
+  sqlite.query("DELETE FROM pending_embeddings WHERE memory_id = ?").run(id);
+}
+
 /** The deliberate erasure right (2.2's privacy architecture:
  * "host.data.forget(person) is mandatory for person-scoped storage").
  * Tombstones as of step 10, not a real DELETE: `status` becomes
@@ -1298,21 +1307,6 @@ const forgetTransaction = sqlite.transaction((personId: string): number => {
   // Delete episodes for this person before proceeding with memory deletion.
   deleteEpisodesForPerson(personId);
 
-  // Step 5: memory_embeddings/pending_embeddings both carry a real FK to
-  // memory_records.id; the vector store itself isn't spec-synced
-  // content (memory-record.schema.json's own comment: "the embedding
-  // vector itself is never part of this record and never syncs"), so
-  // it's really gone, not tombstoned, same as before this step.
-  sqlite
-    .query(
-      "DELETE FROM memory_embeddings WHERE memory_id IN (SELECT id FROM memory_records WHERE scope = 'person' AND person = ?)",
-    )
-    .run(personId);
-  sqlite
-    .query(
-      "DELETE FROM pending_embeddings WHERE memory_id IN (SELECT id FROM memory_records WHERE scope = 'person' AND person = ?)",
-    )
-    .run(personId);
   // NAT-07b: a pick-up-thread question names a memory by id and carries its text; it goes with the memories.
   sqlite.query("DELETE FROM open_questions WHERE person = ? AND kind = 'thread'").run(personId);
   const ids = sqlite.query("SELECT id FROM memory_records WHERE scope = 'person' AND person = ?").all(personId) as {
@@ -1326,9 +1320,7 @@ const forgetTransaction = sqlite.transaction((personId: string): number => {
   // 0010's own conversations backfill. Household scale (a person's own
   // memories, not the whole store) keeps this cheap.
   for (const row of ids) {
-    sqlite
-      .query("UPDATE memory_records SET status = 'archived', archived_reason = 'forgotten', text = ?, embedding_space = NULL, deleted_at = ?, hlc = ? WHERE id = ?")
-      .run(TOMBSTONE_TEXT, now, nextHlc(), row.id);
+    tombstoneMemoryRecord(row.id, now);
   }
   // Step 3a: the person's registry rows go with their memories, since
   // the erasure right is total for what is theirs: the entities the
@@ -1366,12 +1358,7 @@ export interface BatchForgetOutcome {
 // and privilege levels - each needs its OWN getWritable()/
 // isPrivilegedRecord() check, so it has to be a per-row loop regardless.
 function tombstone(id: string): void {
-  const now = new Date().toISOString();
-  sqlite
-    .query("UPDATE memory_records SET status = 'archived', archived_reason = 'forgotten', text = ?, embedding_space = NULL, deleted_at = ?, hlc = ? WHERE id = ?")
-    .run(TOMBSTONE_TEXT, now, nextHlc(), id);
-  sqlite.query("DELETE FROM memory_embeddings WHERE memory_id = ?").run(id);
-  sqlite.query("DELETE FROM pending_embeddings WHERE memory_id = ?").run(id);
+  tombstoneMemoryRecord(id);
 }
 
 /** Batch counterpart of forget(), for a list's own "forget selected"/
@@ -1406,7 +1393,26 @@ export function forgetByIds(actor: PersonRow, ids: string[]): BatchForgetOutcome
       outcomes.push({ id, deleted: false, reason: "only owner or admin may forget an entity or pinned memory" });
       continue;
     }
-    tombstone(id);
+    const chain: string[] = [];
+    const seen = new Set<string>();
+    const queue = [id];
+    while (queue.length) {
+      const current = queue.pop()!;
+      if (seen.has(current)) continue;
+      seen.add(current);
+      chain.push(current);
+      const row = sqlite.query("SELECT superseded_by FROM memory_records WHERE id = ?").get(current) as { superseded_by: string | null } | null;
+      if (row?.superseded_by) queue.push(row.superseded_by);
+      const predecessors = sqlite.query("SELECT id FROM memory_records WHERE superseded_by = ?").all(current) as Array<{ id: string }>;
+      for (const predecessor of predecessors) queue.push(predecessor.id);
+    }
+    // The verbatim episodes of the turns that made these records go with them;
+    // the person's other episodes stay. Sources are read before the tombstone clears them.
+    const sourceTurns = chain
+      .map((recordId) => (sqlite.query("SELECT source FROM memory_records WHERE id = ?").get(recordId) as { source: string } | null)?.source ?? "")
+      .filter((source) => source !== "");
+    for (const recordId of chain) tombstone(recordId);
+    deleteEpisodesForTurns(sourceTurns);
     sqlite.query("DELETE FROM open_questions WHERE kind = 'thread' AND subject_id = ?").run(id);
     outcomes.push({ id, deleted: true });
     // Step 3a: the entity and the edges this record brought go with it

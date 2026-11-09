@@ -1,6 +1,6 @@
 import { describe, expect, test, beforeEach } from "bun:test";
 import { db } from "@/db";
-import { people, personCredentials, passkeyCredentials, sessions, deviceTokens, devices, totpSecrets, mediaProductions } from "@/db/schema";
+import { people, personCredentials, passkeyCredentials, sessions, deviceTokens, devices, totpSecrets, mediaProductions, memoryRecords } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { newPersonId } from "@/lib/id";
 import { hashSecret } from "@/lib/secret";
@@ -25,6 +25,29 @@ test("person erasure deletes their media productions", () => {
   // Erasure uses the same transactional deletion path as deletePerson; exercise it directly here.
   erasePersonData(owner.id, []);
   expect(db.select().from(mediaProductions).all()).toEqual([]);
+});
+
+test("person erasure tombstones memories and clears private metadata", () => {
+  const owner = insertPerson({ role: "owner" });
+  const now = new Date().toISOString();
+  db.insert(memoryRecords).values({
+    id: "mem-person-erase", recordKind: "memory", text: "private birthday", category: "fact", tier: "durable", status: "active",
+    scope: "person", person: owner.id, subjectId: "subject-secret", source: "private-source", factConfidence: 0.9,
+    confidenceEvidence: '[{"source":"turn text"}]', conflictsWith: '["other-secret"]', importance: 0.8,
+    createdAt: now, lastUsedAt: now, hlc: "1700000000000:0:testfix",
+  }).run();
+  erasePersonData(owner.id, []);
+  const row = db.select().from(memoryRecords).where(eq(memoryRecords.id, "mem-person-erase")).get()!;
+  expect(row.status).toBe("archived");
+  expect(row.archivedReason).toBe("forgotten");
+  expect(row.text).toBe("[forgotten]");
+  expect(row.deletedAt).not.toBeNull();
+  expect(row.source).toBe("");
+  expect(row.confidenceEvidence).toBe("[]");
+  expect(row.subjectId).toBeNull();
+  expect(row.conflictsWith).toBe("[]");
+  expect(row.id).toBe("mem-person-erase");
+  expect(row.hlc).not.toBe("1700000000000:0:testfix");
 });
 
 function insertPerson(overrides: Partial<typeof people.$inferInsert> = {}): PersonRow {

@@ -784,6 +784,28 @@ describe("forget and export", () => {
     expect(remaining[0]!.deletedAt).not.toBeNull();
   });
 
+  test("forgetting a corrected fact tombstones its superseded predecessor and excludes it from export", async () => {
+    const { childClient, childId } = await ownerAndChild();
+    const first = remember(db.select().from(people).where(eq(people.id, childId)).get()!, {
+      text: "My birthday is June", category: "fact", tier: "durable", scope: "person", person: childId, source: "test", importance: 0.8,
+    });
+    expect(first.ok).toBe(true);
+    if (!first.ok) return;
+    const person = db.select().from(people).where(eq(people.id, childId)).get()!;
+    const corrected = supersede(person, first.value.id, { text: "My birthday is July", source: "test" });
+    expect(corrected.ok).toBe(true);
+    if (!corrected.ok) return;
+
+    const result = await childClient.post("/api/memory/forget", { personId: childId });
+    expect(result.status).toBe(200);
+    const oldRow = db.select().from(memoryRecords).where(eq(memoryRecords.id, first.value.id)).get()!;
+    expect(oldRow.deletedAt).not.toBeNull();
+    expect(oldRow.text).toBe("[forgotten]");
+    expect(oldRow.archivedReason).toBe("forgotten");
+    const exported = await childClient.get(`/api/memory/export?personId=${childId}`);
+    expect((await exported.json() as MemoryRecord[]).some((row) => row.id === first.value.id)).toBe(false);
+  });
+
   test("forgetting another person's memories is refused for a non-admin", async () => {
     const owner = new TestClient();
     await owner.post("/api/auth/setup", { displayName: "Sage", secret: "correcthorse" });
