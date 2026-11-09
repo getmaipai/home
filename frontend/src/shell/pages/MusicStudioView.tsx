@@ -188,7 +188,7 @@ export function MusicStudioView({ adult, search }: { adult: boolean; search: str
   const barMarks = Array.from({ length: Math.ceil(barCount / barStep) }, (_, index) => ({ bar: index * barStep + 1, at: ((index * barStep * barSeconds) / duration) * 100 }));
   const at = duration > 0 ? now / duration : 0;
 
-  return <div className="dark flex min-h-0 flex-1 flex-col"><section className="music-surface bg-background text-foreground -mx-4 flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-4 py-4 lg:mx-0 lg:rounded-3xl lg:px-6" data-testid="music-studio-view">
+  return <div className="flex min-h-0 flex-1 flex-col"><section className="bg-background text-foreground -mx-4 flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-4 py-4 lg:mx-0 lg:rounded-3xl lg:px-6" data-testid="music-studio-view">
     <BringSong mode="stems" adult={adult} />
     <div className="flex shrink-0 flex-wrap items-center gap-4">
       <div className="size-16 shrink-0 overflow-hidden rounded-xl shadow-2xl sm:size-20"><Cover id={songId} title={song.data?.title ?? i18n._({ id: "Studio", message: "Studio" })} url={song.data?.cover_url ?? null} bare /></div>

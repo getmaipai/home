@@ -2,7 +2,6 @@
   "type": "page",
   "id": "videos-studio",
   "title": "Studio",
-  "surface": "studio",
   "body": [
     {
       "type": "creation_header",
