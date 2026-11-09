@@ -6,7 +6,6 @@ import { AsyncState } from "@maipai/ui/src/primitives/AsyncState";
 import { getIcon } from "@maipai/ui/src/icons";
 import { DataTable, type DataTableColumn } from "@maipai/ui/src/elements/data-table";
 import { Button } from "@maipai/ui/src/dashboard/components/ui/button";
-import { Card, CardContent } from "@maipai/ui/src/dashboard/components/ui/card";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -126,11 +125,7 @@ export function UpdatesPage({ person }: { person: Roster }) {
   return (
     <>
       {!canManage ? (
-        <Card>
-          <CardContent>
-            <p className="text-sm text-muted-foreground">{i18n._({ id: "Only an owner or admin can manage updates.", message: "Only an owner or admin can manage updates." })}</p>
-          </CardContent>
-        </Card>
+        <p className="text-base text-muted-foreground">{i18n._({ id: "Only an owner or admin can manage updates.", message: "Only an owner or admin can manage updates." })}</p>
       ) : (
         <AsyncState
           data={query.data}
@@ -183,10 +178,10 @@ export function UpdatesPage({ person }: { person: Roster }) {
         </AsyncState>
       )}
       {canManage && query.data?.robotsError && (
-        <p className="mt-4 text-sm text-destructive">{i18n._({ id: "Couldn't check for robot updates: {robotsError}", message: "Couldn't check for robot updates: {robotsError}", values: { robotsError: query.data.robotsError } })}</p>
+        <p className="mt-4 text-base text-destructive">{i18n._({ id: "Couldn't check for robot updates: {robotsError}", message: "Couldn't check for robot updates: {robotsError}", values: { robotsError: query.data.robotsError } })}</p>
       )}
       {canManage && query.data?.referenceError && (
-        <p className="mt-4 text-sm text-destructive">{i18n._({ id: "Couldn't read installed reference sets for updates: {referenceError}", message: "Couldn't read installed reference sets for updates: {referenceError}", values: { referenceError: query.data.referenceError } })}</p>
+        <p className="mt-4 text-base text-destructive">{i18n._({ id: "Couldn't read installed reference sets for updates: {referenceError}", message: "Couldn't read installed reference sets for updates: {referenceError}", values: { referenceError: query.data.referenceError } })}</p>
       )}
       <AlertDialog open={pendingRollback !== null} onOpenChange={(open) => { if (!open) setPendingRollback(null); }}>
         <AlertDialogContent>

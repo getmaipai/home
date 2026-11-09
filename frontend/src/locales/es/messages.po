@@ -157,7 +157,7 @@ msgid "{category} at {tier}"
 msgstr "{category} en {tier}"
 
 #. js-lingui-explicit-id
-#: src/apps/setup/SetupWizard.tsx:146
+#: src/apps/setup/SetupWizard.tsx:148
 #, needs-review
 msgid "{checksErrorMessage} Refresh this page and try again."
 msgstr "{checksErrorMessage} Recarga esta página e inténtalo de nuevo."
@@ -246,7 +246,7 @@ msgid "{count, plural, one {# file other people can still see will stay, kept by
 msgstr "{count, plural, one {El archivo # que otras personas aún pueden ver se quedará, lo guarda el hogar.} other {Los archivos # que otras personas aún pueden ver se quedarán, los guarda el hogar.}}"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/StoragePage.tsx:82
+#: src/shell/pages/StoragePage.tsx:83
 #, needs-review
 msgid "{count, plural, one {# file} other {# files}}"
 msgstr "{count, plural, one {# archivo} other {# archivos}}"
@@ -339,13 +339,13 @@ msgid "{count, plural, one {# voice sample saved} other {# voice samples saved}}
 msgstr "{count, plural, one {# muestra de voz guardada} other {# muestras de voz guardadas}}"
 
 #. js-lingui-explicit-id
-#: src/apps/setup/SetupWizard.tsx:82
+#: src/apps/setup/SetupWizard.tsx:81
 #, needs-review
 msgid "{count, plural, one {1 thing needs fixing. Fix what is marked Needs fixing, then press Try again.} other {# things need fixing. Fix what is marked Needs fixing, then press Try again.}}"
 msgstr "{count, plural, one {Hay 1 cosa que arreglar. Corrige lo marcado como Hay que arreglar y luego pulsa Inténtalo de nuevo.} other {Hay # cosas que arreglar. Corrige lo marcado como Hay que arreglar y luego pulsa Inténtalo de nuevo.}}"
 
 #. js-lingui-explicit-id
-#: src/apps/setup/SetupWizard.tsx:83
+#: src/apps/setup/SetupWizard.tsx:82
 #, needs-review
 msgid "{count, plural, one {1 thing to look at. You can continue, but it may not work.} other {# things to look at. You can continue, but those parts may not work.}}"
 msgstr "{count, plural, one {Hay 1 cosa por revisar. Puedes continuar, pero puede que no funcione.} other {Hay # cosas por revisar. Puedes continuar, pero esas partes pueden que no funcionen.}}"
@@ -519,7 +519,7 @@ msgstr "{free} libres de {total}"
 
 #. js-lingui-explicit-id
 #: src/apps/setup/PlanStep.tsx:139
-#: src/apps/setup/SetupWizard.tsx:478
+#: src/apps/setup/SetupWizard.tsx:480
 #: src/shell/pages/performance/DiskHardwareBody.tsx:15
 #, needs-review
 msgid "{gb} GB"
@@ -659,7 +659,7 @@ msgid "{kind, select, band {That band was not saved. Try again.} album {That alb
 msgstr "{kind, select, band {Esa banda no se guardó. Intenta de nuevo.} album {Ese álbum no se guardó. Intenta de nuevo.} other {Ese estilo no se guardó. Intenta de nuevo.}}"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/StoragePage.tsx:68
+#: src/shell/pages/StoragePage.tsx:69
 #, needs-review
 msgid "{kind} ({size})"
 msgstr "{kind} ({size})"
@@ -1352,7 +1352,7 @@ msgid "{size} MB"
 msgstr "{size} MB"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/StoragePage.tsx:179
+#: src/shell/pages/StoragePage.tsx:158
 #, needs-review
 msgid "{size} used, no cap set"
 msgstr "{size} usado, sin límite definido"
@@ -1413,7 +1413,7 @@ msgid "{text}: {percent}%"
 msgstr "{text}: {percent}%"
 
 #. js-lingui-explicit-id
-#: src/apps/setup/SetupWizard.tsx:491
+#: src/apps/setup/SetupWizard.tsx:493
 #, needs-review
 msgid "{thingsLeftLine}. You'll find them in Home settings."
 msgstr "{thingsLeftLine}. Las encontrarás en la configuración de Home."
@@ -1594,7 +1594,7 @@ msgid "{working} working · {waiting} waiting on you"
 msgstr "{working} en marcha · {waiting} esperando por ti"
 
 #. js-lingui-explicit-id
-#: src/shell/InstallDock.tsx:219
+#: src/shell/InstallDock.tsx:236
 #, needs-review
 msgid "+{count} more"
 msgstr "+{count} más"
@@ -1663,7 +1663,7 @@ msgid "1 year"
 msgstr "1 año"
 
 #. js-lingui-explicit-id
-#: src/apps/setup/SetupWizard.tsx:484
+#: src/apps/setup/SetupWizard.tsx:486
 #, needs-review
 msgid "1. Install OpenCode on your computer"
 msgstr "1. Instala OpenCode en tu ordenador"
@@ -1717,7 +1717,7 @@ msgid "2 beats"
 msgstr "2 compases"
 
 #. js-lingui-explicit-id
-#: src/apps/setup/SetupWizard.tsx:484
+#: src/apps/setup/SetupWizard.tsx:486
 #, needs-review
 msgid "2. Install Claude Code on your computer"
 msgstr "2. Instala Claude Code en tu ordenador"
@@ -2003,7 +2003,7 @@ msgid "A line about you"
 msgstr "Una línea sobre ti"
 
 #. js-lingui-explicit-id
-#: src/apps/setup/SetupWizard.tsx:123
+#: src/apps/setup/SetupWizard.tsx:122
 #, needs-review
 msgid "A little care goes a long way"
 msgstr "Un poco de cuidado ayuda mucho"
@@ -2846,7 +2846,7 @@ msgid "setting.resources.cooldown_seconds.help"
 msgstr "Después de que se restaure el chat, no se reduce de nuevo durante tantos segundos, a menos que la siguiente tarea sea parte de la misma ventana."
 
 #. js-lingui-explicit-id
-#: src/apps/setup/SetupWizard.tsx:145
+#: src/apps/setup/SetupWizard.tsx:147
 #, needs-review
 msgid "After setup, choose and download AI models in Home settings."
 msgstr "Después de la configuración, elige y descarga modelos de IA en la configuración de Home."
@@ -2870,7 +2870,7 @@ msgid "area.AI and models"
 msgstr "IA y modelos"
 
 #. js-lingui-explicit-id
-#: src/apps/setup/SetupWizard.tsx:121
+#: src/apps/setup/SetupWizard.tsx:120
 #, needs-review
 msgid "AI can be wrong or say the wrong thing"
 msgstr "La IA puede equivocarse o decir algo incorrecto"
@@ -3071,7 +3071,7 @@ msgid "All voice samples deleted."
 msgstr "Todas las muestras de voz se eliminaron."
 
 #. js-lingui-explicit-id
-#: src/apps/setup/SetupWizard.tsx:463
+#: src/apps/setup/SetupWizard.tsx:465
 #, needs-review
 msgid "Allow"
 msgstr "Permitir"
@@ -3423,7 +3423,7 @@ msgid "Answered by the model"
 msgstr "Respondido por el modelo"
 
 #. js-lingui-explicit-id
-#: src/apps/setup/SetupWizard.tsx:121
+#: src/apps/setup/SetupWizard.tsx:120
 #, needs-review
 msgid "Answers can be inaccurate, offensive, or harmful. They are not medical, legal, or professional advice, and you are responsible for how you use them."
 msgstr "Las respuestas pueden ser imprecisas, ofensivas o dañinas. No son consejo médico, legal ni profesional. Tú eres responsable de cómo las usas."
@@ -3456,7 +3456,7 @@ msgid "Answers your conversations."
 msgstr "Responde tus conversaciones."
 
 #. js-lingui-explicit-id
-#: src/apps/setup/SetupWizard.tsx:482
+#: src/apps/setup/SetupWizard.tsx:484
 #, needs-review
 msgid "ANTHROPIC_BASE_URL={codingHome}/code/v1 ANTHROPIC_API_KEY=maipai_key_...{hint} claude"
 msgstr "ANTHROPIC_BASE_URL={codingHome}/code/v1 ANTHROPIC_API_KEY=maipai_key_...{hint} claude"
@@ -3562,7 +3562,7 @@ msgstr "Se aplica a todos en el hogar."
 #: src/apps/settings/ReferenceLibrarySettings.tsx:231
 #: src/apps/setup/HostTuneStep.tsx:128
 #: src/shell/library/TranscriptFindReplace.tsx:109
-#: src/shell/pages/UpdatesPage.tsx:160
+#: src/shell/pages/UpdatesPage.tsx:155
 #, needs-review
 msgid "Apply"
 msgstr "Aplicar"
@@ -3936,7 +3936,7 @@ msgid "available"
 msgstr "disponible"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/UpdatesPage.tsx:52
+#: src/shell/pages/UpdatesPage.tsx:51
 #, needs-review
 msgid "Available"
 msgstr "Disponible"
@@ -3948,7 +3948,7 @@ msgid "Available once the song is finished."
 msgstr "Disponible cuando la canción termine."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/UpdatesPage.tsx:148
+#: src/shell/pages/UpdatesPage.tsx:143
 #, needs-review
 msgid "Available updates"
 msgstr "Actualizaciones disponibles"
@@ -3988,7 +3988,7 @@ msgstr "Azelma"
 #: src/apps/people/FaceEnrollmentPage.tsx:94
 #: src/apps/settings/AiSlotDialog.tsx:151
 #: src/apps/settings/EngineLinkCredentialSection.tsx:285
-#: src/apps/setup/SetupReviewPage.tsx:62
+#: src/apps/setup/SetupReviewPage.tsx:66
 #: src/shell/pages/companionFlow/AnimateStep.tsx:152
 #: src/shell/pages/companionFlow/CustomizeStep.tsx:194
 #: src/shell/pages/packageAppHeaderBar.tsx:94
@@ -4153,7 +4153,7 @@ msgid "setting.resources.preset.option_label.balanced"
 msgstr "Equilibrado"
 
 #. js-lingui-explicit-id
-#: src/apps/setup/SetupWizard.tsx:97
+#: src/apps/setup/SetupWizard.tsx:96
 #, needs-review
 msgid "Balanced is a good start. You can change it any time."
 msgstr "Equilibrado es un buen comienzo. Puedes cambiarlo cuando quieras."
@@ -4249,7 +4249,7 @@ msgid "Before you get {label}"
 msgstr "Antes de obtener {label}"
 
 #. js-lingui-explicit-id
-#: src/apps/setup/SetupWizard.tsx:57
+#: src/apps/setup/SetupWizard.tsx:56
 #, needs-review
 msgid "Before you start"
 msgstr "Antes de empezar"
@@ -4626,7 +4626,7 @@ msgid "Boost"
 msgstr "Impulso"
 
 #. js-lingui-explicit-id
-#: src/apps/setup/SetupWizard.tsx:457
+#: src/apps/setup/SetupWizard.tsx:459
 #, needs-review
 msgid "Boost and Max downloads are offered only where this computer can run them. While a big job runs, chat may get simpler."
 msgstr "Las descargas Boost y Max solo se ofrecen si este ordenador puede ejecutarlas. Mientras corre una tarea grande, el chat puede volverse más simple."
@@ -4902,7 +4902,7 @@ msgstr "¿Puede alguien entrar a tu casa?"
 #: src/apps/settings/UsersSection.tsx:454
 #: src/apps/settings/VoiceManagerSection.tsx:149
 #: src/apps/settings/VoiceManagerSection.tsx:162
-#: src/apps/setup/SetupReviewPage.tsx:64
+#: src/apps/setup/SetupReviewPage.tsx:68
 #: src/apps/setup/StorageStep.tsx:32
 #: src/apps/setup/StorageStep.tsx:190
 #: src/shell/components/DataTableRowActions.tsx:53
@@ -4916,9 +4916,9 @@ msgstr "¿Puede alguien entrar a tu casa?"
 #: src/shell/pages/settings/SettingsRenderer.tsx:169
 #: src/shell/pages/status/StatusBoard.tsx:69
 #: src/shell/pages/status/StatusComponents.tsx:153
-#: src/shell/pages/StoragePage.tsx:212
+#: src/shell/pages/StoragePage.tsx:200
 #: src/shell/pages/TrashPage.tsx:64
-#: src/shell/pages/UpdatesPage.tsx:200
+#: src/shell/pages/UpdatesPage.tsx:195
 msgid "Cancel"
 msgstr ""
 
@@ -4992,7 +4992,7 @@ msgid "Cancelling…"
 msgstr "Cancelando…"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/StoragePage.tsx:154
+#: src/shell/pages/StoragePage.tsx:173
 #, needs-review
 msgid "Cap"
 msgstr "Límite"
@@ -5658,13 +5658,13 @@ msgid "Checking this computer"
 msgstr "Comprobando este equipo"
 
 #. js-lingui-explicit-id
-#: src/apps/setup/SetupWizard.tsx:61
+#: src/apps/setup/SetupWizard.tsx:60
 #, needs-review
 msgid "Checking your computer"
 msgstr "Comprobando tu ordenador"
 
 #. js-lingui-explicit-id
-#: src/apps/setup/SetupWizard.tsx:73
+#: src/apps/setup/SetupWizard.tsx:72
 #, needs-review
 msgid "Checking your computers"
 msgstr "Comprobando tus ordenadores"
@@ -5715,7 +5715,7 @@ msgid "Child controls"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/setup/SetupWizard.tsx:124
+#: src/apps/setup/SetupWizard.tsx:123
 msgid "Child profiles start restricted, and parents choose what they can reach. No protection is perfect, so stay involved."
 msgstr ""
 
@@ -6011,7 +6011,7 @@ msgid "setting.host.guard.mode.help"
 msgstr "Elige off para que nunca vigile ni reinicie, dry para vigilar y registrar pero nunca reiniciar, o live para reiniciar el Mac cuando el sistema deja de responder."
 
 #. js-lingui-explicit-id
-#: src/apps/setup/SetupWizard.tsx:89
+#: src/apps/setup/SetupWizard.tsx:88
 #, needs-review
 msgid "Choose one computer, or add a bigger one for the AI."
 msgstr "Elige un ordenador o añade uno mayor para la IA."
@@ -6131,7 +6131,7 @@ msgid "Choose when this alarm rings."
 msgstr "Elige cuándo suena esta alarma."
 
 #. js-lingui-explicit-id
-#: src/apps/setup/SetupWizard.tsx:59
+#: src/apps/setup/SetupWizard.tsx:58
 #, needs-review
 msgid "Choose where to store data"
 msgstr "Elige dónde guardar los datos"
@@ -6167,7 +6167,7 @@ msgid "setting.person.voice_print.enrollment.help"
 msgstr "Elige si registrar una huella de voz para reconocimiento."
 
 #. js-lingui-explicit-id
-#: src/apps/setup/SetupWizard.tsx:96
+#: src/apps/setup/SetupWizard.tsx:95
 #, needs-review
 msgid "Choose whether to set up Coding on this computer."
 msgstr "Elige si quieres configurar Coding en este ordenador."
@@ -6396,7 +6396,7 @@ msgid "Civitai key"
 msgstr "Clave de Civitai"
 
 #. js-lingui-explicit-id
-#: src/apps/setup/SetupWizard.tsx:482
+#: src/apps/setup/SetupWizard.tsx:484
 #, needs-review
 msgid "Claude Code · same key"
 msgstr "Claude Code · misma clave"
@@ -6409,7 +6409,7 @@ msgid "Clear"
 msgstr "Borrar"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/StoragePage.tsx:201
+#: src/shell/pages/StoragePage.tsx:189
 #, needs-review
 msgid "Clear {name}"
 msgstr "Borrar {name}"
@@ -6418,8 +6418,8 @@ msgstr "Borrar {name}"
 #: src/apps/memory/PersonMemories.tsx:379
 #: src/apps/notifications/NotificationsPage.tsx:159
 #: src/apps/settings/FreeUpSpaceDialog.tsx:80
-#: src/shell/pages/StoragePage.tsx:203
-#: src/shell/pages/StoragePage.tsx:213
+#: src/shell/pages/StoragePage.tsx:191
+#: src/shell/pages/StoragePage.tsx:201
 #, needs-review
 msgid "Clear all"
 msgstr "Borrar todo"
@@ -6431,7 +6431,7 @@ msgid "Clear All"
 msgstr "Borrar todo"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/StoragePage.tsx:208
+#: src/shell/pages/StoragePage.tsx:196
 #, needs-review
 msgid "Clear all saved online data?"
 msgstr "¿Borrar todos los datos guardados en línea?"
@@ -6449,14 +6449,14 @@ msgid "Clear filters"
 msgstr "Borrar filtros"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/StoragePage.tsx:125
+#: src/shell/pages/StoragePage.tsx:126
 #, needs-review
 msgid "Cleared {count, plural, one {# saved copy} other {# saved copies}} ({size}) from {source}."
 msgstr "Se borraron {count, plural, one {# copia guardada} other {# copias guardadas}} ({size}) de {source}."
 
 #. js-lingui-explicit-id
 #: src/shell/pages/AdminPages.es.test.tsx:117
-#: src/shell/pages/StoragePage.tsx:125
+#: src/shell/pages/StoragePage.tsx:126
 #, needs-review
 msgid "Cleared {count, plural, one {# saved copy} other {# saved copies}} ({size}) from all sources."
 msgstr "Se borraron {count, plural, one {# copia guardada} other {# copias guardadas}} ({size}) de todas las fuentes."
@@ -6537,7 +6537,7 @@ msgstr "Cerrar apps para tareas grandes"
 #. js-lingui-explicit-id
 #: src/apps/settings/CloseAppsSettings.tsx:86
 #: src/apps/settings/CloseAppsSettings.tsx:88
-#: src/apps/setup/SetupWizard.tsx:67
+#: src/apps/setup/SetupWizard.tsx:66
 #, needs-review
 msgid "Close apps for big jobs"
 msgstr "Cerrar apps para tareas grandes"
@@ -6585,7 +6585,7 @@ msgid "Coding app"
 msgstr "Aplicación de Coding"
 
 #. js-lingui-explicit-id
-#: src/apps/setup/SetupWizard.tsx:484
+#: src/apps/setup/SetupWizard.tsx:486
 #, needs-review
 msgid "Coding apps you install"
 msgstr "Apps de coding que instalas"
@@ -6627,7 +6627,7 @@ msgid "Coding is waiting for its helper to start. The Status page shows what is 
 msgstr "Coding espera a que su asistente inicie. La página de estado muestra lo que sucede."
 
 #. js-lingui-explicit-id
-#: src/apps/setup/SetupWizard.tsx:477
+#: src/apps/setup/SetupWizard.tsx:479
 #, needs-review
 msgid "Coding mode gives most of this computer's memory to one big coding model, which also answers chat, and pictures, videos and songs wait while it is on."
 msgstr "El modo Coding da la mayor parte de la memoria de este ordenador a un gran modelo de coding. Este también responde al chat. Las imágenes, vídeos y canciones esperan mientras está activo."
@@ -6669,13 +6669,13 @@ msgid "Coding needs these pieces."
 msgstr "Coding necesita estas piezas."
 
 #. js-lingui-explicit-id
-#: src/apps/setup/SetupWizard.tsx:65
+#: src/apps/setup/SetupWizard.tsx:64
 #, needs-review
 msgid "Coding on this Home"
 msgstr "Coding en este Home"
 
 #. js-lingui-explicit-id
-#: src/apps/setup/SetupWizard.tsx:478
+#: src/apps/setup/SetupWizard.tsx:480
 #, needs-review
 msgid "Coding parts to install"
 msgstr "Partes de coding para instalar"
@@ -6846,7 +6846,7 @@ msgstr ""
 #: src/shell/components/DataTableRowActions.tsx:57
 #: src/shell/pages/settings/HouseSettings.tsx:50
 #: src/shell/pages/settings/SettingsRenderer.tsx:179
-#: src/shell/pages/UpdatesPage.tsx:204
+#: src/shell/pages/UpdatesPage.tsx:199
 #, needs-review
 msgid "Confirm"
 msgstr "Confirmar"
@@ -6858,7 +6858,7 @@ msgid "Confirm passcode"
 msgstr "Confirma el código de acceso"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/UpdatesPage.tsx:196
+#: src/shell/pages/UpdatesPage.tsx:191
 #, needs-review
 msgid "Confirm rollback."
 msgstr "Confirma el reverso."
@@ -6905,8 +6905,8 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/apps/setup/AwayFromHome.tsx:185
 #: src/apps/setup/CloseAppsStep.tsx:64
-#: src/apps/setup/SetupReviewPage.tsx:63
-#: src/apps/setup/SetupWizard.tsx:501
+#: src/apps/setup/SetupReviewPage.tsx:67
+#: src/apps/setup/SetupWizard.tsx:503
 #: src/shell/AmbientCompanionPane.tsx:261
 #: src/shell/pages/companionFlow/AnimateStep.tsx:153
 #: src/shell/pages/CompanionsPage.tsx:162
@@ -7017,7 +7017,7 @@ msgstr "Conversaciones"
 #: src/apps/settings/CodingSettings.tsx:232
 #: src/apps/settings/EngineLinkCredentialSection.tsx:74
 #: src/apps/settings/ModelsSection.tsx:280
-#: src/apps/setup/SetupWizard.tsx:482
+#: src/apps/setup/SetupWizard.tsx:484
 #, needs-review
 msgid "Copied"
 msgstr "Copiado"
@@ -7038,7 +7038,7 @@ msgstr "Copias en este navegador"
 #: src/apps/settings/CodingSettings.tsx:232
 #: src/apps/settings/CodingSettings.tsx:232
 #: src/apps/settings/EngineLinkCredentialSection.tsx:74
-#: src/apps/setup/SetupWizard.tsx:482
+#: src/apps/setup/SetupWizard.tsx:484
 #, needs-review
 msgid "Copy"
 msgstr "Copiar"
@@ -7051,7 +7051,7 @@ msgid "Copy details"
 msgstr "Copiar detalles"
 
 #. js-lingui-explicit-id
-#: src/apps/setup/SetupWizard.tsx:482
+#: src/apps/setup/SetupWizard.tsx:484
 #, needs-review
 msgid "Copy is not available in this browser. Select the key and copy it."
 msgstr "Copiar no está disponible en este navegador. Selecciona la clave y cópiala."
@@ -7471,7 +7471,7 @@ msgid "Could not load Media. Check your connection and try again."
 msgstr "No se pudo cargar el contenido multimedia. Revisa tu conexión e inténtalo de nuevo."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/PerformancePage.tsx:62
+#: src/shell/pages/PerformancePage.tsx:63
 #, needs-review
 msgid "Could not load performance."
 msgstr "No se pudo cargar el rendimiento."
@@ -7542,7 +7542,7 @@ msgid "Could not load skills. Try again in a moment."
 msgstr "No se pudieron cargar las habilidades. Vuelve a intentarlo en un momento."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/StoragePage.tsx:138
+#: src/shell/pages/StoragePage.tsx:139
 #, needs-review
 msgid "Could not load storage."
 msgstr "No se pudo cargar el almacenamiento."
@@ -7672,7 +7672,7 @@ msgid "Could not load Today. Refresh Home to try again."
 msgstr "No se pudo cargar Hoy. Actualiza Home para intentarlo de nuevo."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/UpdatesPage.tsx:140
+#: src/shell/pages/UpdatesPage.tsx:135
 #, needs-review
 msgid "Could not load updates."
 msgstr "No se pudieron cargar las actualizaciones."
@@ -8264,7 +8264,7 @@ msgid "api.error.passkey_verify_failed"
 msgstr "No se pudo verificar esta passkey. Inténtalo de nuevo o inicia sesión con tu PIN o contraseña."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/UpdatesPage.tsx:186
+#: src/shell/pages/UpdatesPage.tsx:181
 msgid "Couldn't check for robot updates: {robotsError}"
 msgstr ""
 
@@ -8281,7 +8281,7 @@ msgid "Couldn't forget that - try again."
 msgstr "No pude olvidarlo. Inténtalo de nuevo."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/UpdatesPage.tsx:189
+#: src/shell/pages/UpdatesPage.tsx:184
 #, needs-review
 msgid "Couldn't read installed reference sets for updates: {referenceError}"
 msgstr "No se pudieron leer los conjuntos de referencia instalados para las actualizaciones: {referenceError}"
@@ -8394,14 +8394,14 @@ msgid "Create list"
 msgstr "Crear lista"
 
 #. js-lingui-explicit-id
-#: src/apps/setup/SetupWizard.tsx:481
+#: src/apps/setup/SetupWizard.tsx:483
 #, needs-review
 msgid "Create my key"
 msgstr "Crear mi clave"
 
 #. js-lingui-explicit-id
-#: src/apps/setup/SetupWizard.tsx:471
-#: src/apps/setup/SetupWizard.tsx:501
+#: src/apps/setup/SetupWizard.tsx:473
+#: src/apps/setup/SetupWizard.tsx:503
 #, needs-review
 msgid "Create owner account"
 msgstr "Crear cuenta de propietario"
@@ -8413,13 +8413,13 @@ msgid "Create song"
 msgstr "Crear canción"
 
 #. js-lingui-explicit-id
-#: src/apps/setup/SetupWizard.tsx:95
+#: src/apps/setup/SetupWizard.tsx:94
 #, needs-review
 msgid "Create the account that manages this Home."
 msgstr "Crea la cuenta que gestiona este Home."
 
 #. js-lingui-explicit-id
-#: src/apps/setup/SetupWizard.tsx:64
+#: src/apps/setup/SetupWizard.tsx:63
 #, needs-review
 msgid "Create your owner account"
 msgstr "Crea tu cuenta de propietario"
@@ -8431,7 +8431,7 @@ msgid "Created"
 msgstr "Creada"
 
 #. js-lingui-explicit-id
-#: src/apps/setup/SetupWizard.tsx:481
+#: src/apps/setup/SetupWizard.tsx:483
 #, needs-review
 msgid "Creating"
 msgstr "Creando"
@@ -9424,7 +9424,7 @@ msgstr "No me notifiques sobre compartidos de"
 #: src/apps/settings/StackChanInstallDialog.tsx:150
 #: src/apps/settings/StackChanInstallDialog.tsx:152
 #: src/apps/setup/AwayFromHome.tsx:185
-#: src/apps/setup/SetupReviewPage.tsx:63
+#: src/apps/setup/SetupReviewPage.tsx:67
 #: src/shell/AlarmRinger.tsx:60
 #: src/shell/pages/AllAppsPage.tsx:113
 #: src/shell/pages/companionFlow/KeyframeEditor.tsx:96
@@ -9462,7 +9462,7 @@ msgstr "caído durante {time} ({percent}% de actividad)"
 #. js-lingui-explicit-id
 #: src/apps/chat/chatToolUis.tsx:107
 #: src/apps/settings/BackupsSection.tsx:97
-#: src/apps/setup/SetupWizard.tsx:490
+#: src/apps/setup/SetupWizard.tsx:492
 #: src/shell/library/LibraryItems.tsx:33
 #: src/shell/library/LibraryViewer.tsx:158
 #: src/shell/library/LibraryViewer.tsx:158
@@ -9531,7 +9531,7 @@ msgid "area.Download Wikipedia, health and other offline books"
 msgstr "Descargar Wikipedia, salud y otros libros sin conexión"
 
 #. js-lingui-explicit-id
-#: src/apps/setup/SetupWizard.tsx:490
+#: src/apps/setup/SetupWizard.tsx:492
 #, needs-review
 msgid "Download your backup key to continue."
 msgstr "Descarga tu clave de copia de seguridad para continuar."
@@ -9946,7 +9946,7 @@ msgid "Engine roles"
 msgstr "Roles del motor"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/PerformancePage.tsx:162
+#: src/shell/pages/PerformancePage.tsx:165
 #, needs-review
 msgid "Engines"
 msgstr "Motores"
@@ -10297,7 +10297,7 @@ msgid "Everything is running. Up for {uptime}."
 msgstr "Todo funciona. En línea desde hace {uptime}."
 
 #. js-lingui-explicit-id
-#: src/apps/setup/SetupWizard.tsx:84
+#: src/apps/setup/SetupWizard.tsx:83
 #, needs-review
 msgid "Everything looks ready."
 msgstr "Todo parece listo."
@@ -10749,7 +10749,7 @@ msgid "Fingerprint"
 msgstr "Huella digital"
 
 #. js-lingui-explicit-id
-#: src/apps/setup/SetupWizard.tsx:485
+#: src/apps/setup/SetupWizard.tsx:487
 #, needs-review
 msgid "Finish"
 msgstr "Terminar"
@@ -11536,14 +11536,14 @@ msgid "Go ahead?"
 msgstr "¿Sigo?"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/UpdatesPage.tsx:161
-#: src/shell/pages/UpdatesPage.tsx:194
+#: src/shell/pages/UpdatesPage.tsx:156
+#: src/shell/pages/UpdatesPage.tsx:189
 #, needs-review
 msgid "Go back"
 msgstr "Volver"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/UpdatesPage.tsx:196
+#: src/shell/pages/UpdatesPage.tsx:191
 #, needs-review
 msgid "Go back to {tag}?"
 msgstr "¿Volver a {tag}?"
@@ -11743,7 +11743,7 @@ msgid "setting.person.voice_print.enrollment.does"
 msgstr "Ayuda a Home a distinguir tu voz de otras voces."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/dashboard/Greeting.tsx:37
+#: src/shell/pages/dashboard/Greeting.tsx:32
 #, needs-review
 msgid "Here is your household today."
 msgstr "Así está tu hogar hoy."
@@ -11860,7 +11860,7 @@ msgid "Home address unavailable"
 msgstr "Dirección de Home no disponible"
 
 #. js-lingui-explicit-id
-#: src/apps/setup/SetupWizard.tsx:482
+#: src/apps/setup/SetupWizard.tsx:484
 #, needs-review
 msgid "Home address: {codingHome}/code/v1"
 msgstr "Dirección de Home: {codingHome}/code/v1"
@@ -11976,9 +11976,9 @@ msgid "Home can't reach its voice service. Check Repairs, then come back."
 msgstr "Home no puede conectar con su servicio de voz. Revisa Reparaciones y vuelve."
 
 #. js-lingui-explicit-id
-#: src/apps/setup/SetupWizard.tsx:270
-#: src/apps/setup/SetupWizard.tsx:448
-#: src/apps/setup/SetupWizard.tsx:448
+#: src/apps/setup/SetupWizard.tsx:272
+#: src/apps/setup/SetupWizard.tsx:450
+#: src/apps/setup/SetupWizard.tsx:450
 #, needs-review
 msgid "Home can't read its setup progress. Refresh this page. If it keeps happening, restart MaiPai Home on this computer or run the installer again."
 msgstr "Home no puede leer su progreso de configuración. Recarga esta página. Si sigue pasando, reinicia MaiPai Home en este ordenador o ejecuta el instalador de nuevo."
@@ -12121,7 +12121,7 @@ msgid "Home could not check the drive space"
 msgstr "Home no pudo comprobar el espacio en la unidad"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/StoragePage.tsx:128
+#: src/shell/pages/StoragePage.tsx:129
 #, needs-review
 msgid "Home could not clear the saved copies. Check that Home is running and try again."
 msgstr "Home no pudo borrar las copias guardadas. Comprueba que Home esté activo e inténtalo de nuevo."
@@ -12139,7 +12139,7 @@ msgid "Home could not confirm that. Try again."
 msgstr "Home no pudo confirmar eso. Inténtalo de nuevo."
 
 #. js-lingui-explicit-id
-#: src/apps/setup/SetupWizard.tsx:222
+#: src/apps/setup/SetupWizard.tsx:224
 #, needs-review
 msgid "Home could not create your key. Try again."
 msgstr "Home no pudo crear tu clave. Inténtalo de nuevo."
@@ -12185,7 +12185,7 @@ msgid "Home could not keep that take. Try again."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/setup/SetupWizard.tsx:475
+#: src/apps/setup/SetupWizard.tsx:477
 #, needs-review
 msgid "Home could not load coding setup. Refresh this page and try again."
 msgstr "Home no pudo cargar la configuración de coding. Recarga esta página e inténtalo de nuevo."
@@ -12289,7 +12289,7 @@ msgstr "Home no pudo restaurar este elemento. Actualiza la Papelera y vuelve a i
 
 #. js-lingui-explicit-id
 #: src/apps/settings/CodingSettings.tsx:90
-#: src/apps/setup/SetupWizard.tsx:216
+#: src/apps/setup/SetupWizard.tsx:218
 #, needs-review
 msgid "Home could not run the coding test. Try again."
 msgstr "Home no pudo ejecutar la prueba de código. Intenta de nuevo."
@@ -12329,7 +12329,7 @@ msgid "Home could not save that. Check the Home connection, then try again."
 msgstr "Home no pudo guardar eso. Revisa la conexión de Home e inténtalo de nuevo."
 
 #. js-lingui-explicit-id
-#: src/apps/setup/SetupWizard.tsx:210
+#: src/apps/setup/SetupWizard.tsx:212
 #, needs-review
 msgid "Home could not save this choice. Try again."
 msgstr "Home no pudo guardar esta elección. Inténtalo de nuevo."
@@ -12366,7 +12366,7 @@ msgid "Home could not update coding mode. Try again."
 msgstr "Home no pudo actualizar el modo de código. Intenta de nuevo."
 
 #. js-lingui-explicit-id
-#: src/apps/setup/SetupWizard.tsx:430
+#: src/apps/setup/SetupWizard.tsx:432
 #, needs-review
 msgid "Home couldn't allow Tailscale for the engine link. Sign in as an owner or admin, then try again."
 msgstr "Home no pudo permitir Tailscale para el enlace del motor. Inicia sesión como propietario o administrador y luego inténtalo de nuevo."
@@ -12384,13 +12384,13 @@ msgid "Home couldn't check that folder. Choose it again, or keep the default fol
 msgstr "Home no pudo comprobar esa carpeta. Elígela de nuevo o mantén la carpeta predeterminada."
 
 #. js-lingui-explicit-id
-#: src/apps/setup/SetupWizard.tsx:75
+#: src/apps/setup/SetupWizard.tsx:74
 #, needs-review
 msgid "Home couldn't check these computers."
 msgstr "Home no pudo comprobar estos ordenadores."
 
 #. js-lingui-explicit-id
-#: src/apps/setup/SetupWizard.tsx:76
+#: src/apps/setup/SetupWizard.tsx:75
 #, needs-review
 msgid "Home couldn't check this computer."
 msgstr "Home no pudo comprobar este ordenador."
@@ -12408,20 +12408,20 @@ msgid "Home couldn't check your computers. Check the engine connection, then try
 msgstr "Home no pudo revisar tus computadoras. Revisa la conexión del motor e inténtalo de nuevo."
 
 #. js-lingui-explicit-id
-#: src/apps/setup/SetupReviewPage.tsx:40
+#: src/apps/setup/SetupReviewPage.tsx:44
 #, needs-review
 msgid "Home couldn't load these setup choices. Refresh this page and try again."
 msgstr "Home no pudo cargar estas opciones de configuración. Recarga esta página e inténtalo de nuevo."
 
 #. js-lingui-explicit-id
-#: src/apps/setup/SetupWizard.tsx:491
+#: src/apps/setup/SetupWizard.tsx:493
 #, needs-review
 msgid "Home couldn't make the certificate for your other devices. Phones and tablets can still use Home from this computer's address for now. Open Home settings, Repairs to fix it."
 msgstr "Home no pudo crear el certificado para tus otros dispositivos. Los teléfonos y tabletas aún pueden usar Home desde la dirección de este ordenador por ahora. Abre la configuración de Home, Reparaciones para solucionarlo."
 
 #. js-lingui-explicit-id
 #: src/apps/settings/BackupsSection.tsx:24
-#: src/apps/setup/SetupWizard.tsx:490
+#: src/apps/setup/SetupWizard.tsx:492
 #, needs-review
 msgid "Home couldn't make your backup key. Press Download again. If it fails again, Home will show a fix under Home settings, Repairs."
 msgstr "Home no pudo crear tu clave de copia de seguridad. Pulsa Descargar otra vez. Si falla de nuevo, Home mostrará una solución en Ajustes de Home, Reparaciones."
@@ -12457,19 +12457,19 @@ msgid "Home couldn't read this computer's tuning options. Press Try again, or sk
 msgstr "Home no pudo leer las opciones de ajuste de este equipo. Pulsa Intentar de nuevo o omite este paso. Home funciona sin ello."
 
 #. js-lingui-explicit-id
-#: src/apps/setup/SetupWizard.tsx:490
+#: src/apps/setup/SetupWizard.tsx:492
 #, needs-review
 msgid "Home couldn't save that choice. Try again. If it fails again, Home will show a fix under Home settings, Repairs."
 msgstr "Home no pudo guardar esa elección. Inténtalo de nuevo. Si falla otra vez, Home mostrará una solución en Configuración de Home, Reparaciones."
 
 #. js-lingui-explicit-id
-#: src/apps/setup/SetupReviewPage.tsx:50
+#: src/apps/setup/SetupReviewPage.tsx:54
 #, needs-review
 msgid "Home couldn't save this choice. Check the engine link in Home settings, then try again."
 msgstr "Home no pudo guardar esta opción. Revisa el enlace del motor en la configuración de Home y vuelve a intentarlo."
 
 #. js-lingui-explicit-id
-#: src/apps/setup/SetupWizard.tsx:349
+#: src/apps/setup/SetupWizard.tsx:351
 #, needs-review
 msgid "Home couldn't save this step. Try again."
 msgstr "Home no pudo guardar este paso. Inténtalo de nuevo."
@@ -12481,13 +12481,13 @@ msgid "Home couldn't save your accept. Check that the engine is running, then pr
 msgstr "Home no pudo guardar tu aceptación. Comprueba que el motor está activo y pulsa Aceptar de nuevo."
 
 #. js-lingui-explicit-id
-#: src/apps/setup/SetupWizard.tsx:407
+#: src/apps/setup/SetupWizard.tsx:409
 #, needs-review
 msgid "Home couldn't save your account. Check the name and PIN, then press Create owner account again."
 msgstr "Home no pudo guardar tu cuenta. Revisa el nombre y el PIN, y luego pulsa Crear cuenta de propietario de nuevo."
 
 #. js-lingui-explicit-id
-#: src/apps/setup/SetupWizard.tsx:379
+#: src/apps/setup/SetupWizard.tsx:381
 #, needs-review
 msgid "Home couldn't save your acknowledgement. Press I understand again."
 msgstr "Home no pudo guardar tu confirmación. Pulsa Entendido de nuevo."
@@ -12529,7 +12529,7 @@ msgid "Home couldn't turn on DuckDuckGo search. Press Skip for now again to go o
 msgstr "Home no pudo activar la búsqueda de DuckDuckGo. Pulsa Omitir por ahora para continuar, o configura la búsqueda web más tarde en Ajustes."
 
 #. js-lingui-explicit-id
-#: src/apps/setup/SetupWizard.tsx:122
+#: src/apps/setup/SetupWizard.tsx:121
 #, needs-review
 msgid "Home does not censor content in code. The AI model decides what it will answer or create, including pictures, videos, songs, and companion media. Home still applies account access, age and surface availability, and technical limits."
 msgstr "Home no censura el contenido en código. El modelo de IA decide qué responder o crear, incluidas imágenes, vídeos, canciones y medios de compañía. Home sigue aplicando acceso a la cuenta, edad y disponibilidad de superficie, y límites técnicos."
@@ -12541,13 +12541,13 @@ msgid "Home downloads these parts to this computer. Home does not install a codi
 msgstr "Home descarga estas partes a esta computadora. Home no instala una aplicación de código."
 
 #. js-lingui-explicit-id
-#: src/apps/setup/SetupWizard.tsx:126
+#: src/apps/setup/SetupWizard.tsx:125
 #, needs-review
 msgid "Home fetches downloads, updates, and searches you ask for the way you would. Some sites limit, block, or disallow automated visits, so now and then a site may not work."
 msgstr "Home obtiene descargas, actualizaciones y búsquedas que pides como lo harías tú. Algunos sitios limitan, bloquean o prohíben las visitas automatizadas, así que de vez en cuando un sitio puede no funcionar."
 
 #. js-lingui-explicit-id
-#: src/apps/setup/SetupWizard.tsx:126
+#: src/apps/setup/SetupWizard.tsx:125
 #, needs-review
 msgid "Home goes online for you"
 msgstr "Home sale a internet por ti"
@@ -12572,20 +12572,20 @@ msgid "Home installs no coding tool."
 msgstr "Home no instala ninguna herramienta de código."
 
 #. js-lingui-explicit-id
-#: src/apps/setup/SetupWizard.tsx:349
-#: src/apps/setup/SetupWizard.tsx:407
+#: src/apps/setup/SetupWizard.tsx:351
+#: src/apps/setup/SetupWizard.tsx:409
 #, needs-review
 msgid "Home is already set up. Sign in instead."
 msgstr "Home ya está configurado. Inicia sesión en su lugar."
 
 #. js-lingui-explicit-id
-#: src/apps/setup/SetupWizard.tsx:88
+#: src/apps/setup/SetupWizard.tsx:87
 #, needs-review
 msgid "Home is built to protect your family and your data. Like any AI or online tool, it works best when you know a few things."
 msgstr "Home está diseñado para proteger a tu familia y tus datos. Como cualquier IA o herramienta en línea, funciona mejor cuando sabes algunas cosas."
 
 #. js-lingui-explicit-id
-#: src/apps/setup/SetupWizard.tsx:92
+#: src/apps/setup/SetupWizard.tsx:91
 #, needs-review
 msgid "Home is checking that everything is ready."
 msgstr "Home está comprobando que todo esté listo."
@@ -12698,7 +12698,7 @@ msgid "Home never quits these, even if they are also on the Always close list."
 msgstr "Home nunca cierra estas, aunque también estén en la lista Cerrar siempre."
 
 #. js-lingui-explicit-id
-#: src/apps/setup/SetupWizard.tsx:99
+#: src/apps/setup/SetupWizard.tsx:98
 #, needs-review
 msgid "Home only downloads what fits here."
 msgstr "Home solo descarga lo que cabe aquí."
@@ -12716,7 +12716,7 @@ msgid "setting.coding.engine.option.auto"
 msgstr "Home elige el mejor motor para este ordenador."
 
 #. js-lingui-explicit-id
-#: src/apps/setup/SetupWizard.tsx:143
+#: src/apps/setup/SetupWizard.tsx:144
 #, needs-review
 msgid "Home runs on this computer. The AI runs on a bigger, more powerful computer on your network. You pair it on the last screen of setup."
 msgstr "Home se ejecuta en este ordenador. La IA se ejecuta en un ordenador mayor y más potente de tu red. Lo emparejas en la última pantalla de configuración."
@@ -12752,7 +12752,7 @@ msgid "Home stays up, but other big jobs wait their turn."
 msgstr "Home sigue activo, pero otras tareas grandes esperan su turno."
 
 #. js-lingui-explicit-id
-#: src/apps/setup/SetupWizard.tsx:144
+#: src/apps/setup/SetupWizard.tsx:146
 #, needs-review
 msgid "Home uses its ready-to-use default folder."
 msgstr "Home usa su carpeta predeterminada lista para usar."
@@ -12775,7 +12775,7 @@ msgid "Home will use DuckDuckGo for adults and the Library only for teens and ch
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/setup/SetupWizard.tsx:144
+#: src/apps/setup/SetupWizard.tsx:146
 #, needs-review
 msgid "Home will use its default folder for AI models."
 msgstr "Home usará su carpeta predeterminada para los modelos de IA."
@@ -12905,9 +12905,8 @@ msgid "Household synth"
 msgstr "Synth del hogar"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/StoragePage.tsx:81
-#: src/shell/pages/StoragePage.tsx:165
-#: src/shell/pages/StoragePage.tsx:176
+#: src/shell/pages/StoragePage.tsx:82
+#: src/shell/pages/StoragePage.tsx:149
 #, needs-review
 msgid "Household total"
 msgstr "Total del hogar"
@@ -12920,8 +12919,8 @@ msgstr "Voz del hogar"
 
 #. js-lingui-explicit-id
 #: src/apps/settings/CodingSettings.tsx:137
-#: src/apps/setup/SetupWizard.tsx:484
-#: src/apps/setup/SetupWizard.tsx:484
+#: src/apps/setup/SetupWizard.tsx:486
+#: src/apps/setup/SetupWizard.tsx:486
 #, needs-review
 msgid "How"
 msgstr "Cómo"
@@ -13185,13 +13184,13 @@ msgid "setting.ease.reading_level.help"
 msgstr "Qué tan claro MaiPai redacta sus respuestas y textos de la app: estándar, simple o muy simple. Solo cambia las palabras y la forma de las frases, nunca de qué hablará MaiPai."
 
 #. js-lingui-explicit-id
-#: src/apps/setup/SetupWizard.tsx:58
+#: src/apps/setup/SetupWizard.tsx:57
 #, needs-review
 msgid "How should Home run?"
 msgstr "¿Cómo debe ejecutarse Home?"
 
 #. js-lingui-explicit-id
-#: src/apps/setup/SetupWizard.tsx:66
+#: src/apps/setup/SetupWizard.tsx:65
 #, needs-review
 msgid "How should Home share this computer?"
 msgstr "¿Cómo debe compartir Home este ordenador?"
@@ -13476,7 +13475,7 @@ msgid "failure.composer.memory.child"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/setup/SetupWizard.tsx:501
+#: src/apps/setup/SetupWizard.tsx:503
 #, needs-review
 msgid "I understand"
 msgstr "Entendido"
@@ -13543,7 +13542,7 @@ msgid "If this computer breaks, this file brings your Home back on a new one. Ke
 msgstr "Si este ordenador se rompe, este archivo recupera tu Home en uno nuevo. Guárdalo en otro lugar que no sea este ordenador."
 
 #. js-lingui-explicit-id
-#: src/apps/setup/SetupWizard.tsx:490
+#: src/apps/setup/SetupWizard.tsx:492
 #, needs-review
 msgid "If this computer breaks, this key restores your Home on a new one."
 msgstr "Si este ordenador se rompe, esta clave restaura tu Home en uno nuevo."
@@ -13803,9 +13802,9 @@ msgstr "Instalar sin copia de seguridad."
 #: src/apps/settings/styles/StyleBrowser.tsx:102
 #: src/apps/settings/styles/StyleBrowser.tsx:102
 #: src/apps/setup/PlanStep.tsx:185
-#: src/apps/setup/SetupWizard.tsx:478
+#: src/apps/setup/SetupWizard.tsx:480
 #: src/shell/pages/EnginesPage.tsx:32
-#: src/shell/pages/UpdatesPage.tsx:51
+#: src/shell/pages/UpdatesPage.tsx:50
 #, needs-review
 msgid "Installed"
 msgstr "Instalado"
@@ -13839,10 +13838,10 @@ msgstr "Instalado, necesario"
 #: src/apps/settings/CodingSettings.tsx:163
 #: src/apps/settings/CodingSettings.tsx:164
 #: src/apps/settings/ModelsAndStorageSection.tsx:41
-#: src/apps/setup/SetupWizard.tsx:478
-#: src/apps/setup/SetupWizard.tsx:478
 #: src/apps/setup/SetupWizard.tsx:480
 #: src/apps/setup/SetupWizard.tsx:480
+#: src/apps/setup/SetupWizard.tsx:482
+#: src/apps/setup/SetupWizard.tsx:482
 #, needs-review
 msgid "Installing"
 msgstr "Instalando"
@@ -13860,7 +13859,7 @@ msgid "Installing, this can take a minute or two"
 msgstr "Instalando, esto puede tomar un minuto o dos"
 
 #. js-lingui-explicit-id
-#: src/shell/InstallDock.tsx:231
+#: src/shell/InstallDock.tsx:248
 #, needs-review
 msgid "Installs in progress"
 msgstr "Instalaciones en curso"
@@ -13976,7 +13975,7 @@ msgid "It comes with its maker's licence ({name}). Read these points, then accep
 msgstr "Viene con la licencia de su creador ({name}). Lee estos puntos y acepta para iniciar la descarga de {sizeWords}. Solo necesitas aceptar una vez para este ordenador."
 
 #. js-lingui-explicit-id
-#: src/apps/setup/SetupWizard.tsx:125
+#: src/apps/setup/SetupWizard.tsx:124
 msgid "It is easy to feel close to a chatbot or companion, so keep real relationships first and talk with children about it. In Home settings, under Users, you can turn off AI companions for one person or for the household."
 msgstr ""
 
@@ -14230,7 +14229,7 @@ msgid "Keep the default"
 msgstr "Mantener la predeterminada"
 
 #. js-lingui-explicit-id
-#: src/apps/setup/SetupWizard.tsx:90
+#: src/apps/setup/SetupWizard.tsx:89
 #, needs-review
 msgid "Keep the defaults or pick your own."
 msgstr "Mantén los valores predeterminados o elige los tuyos."
@@ -14504,7 +14503,7 @@ msgid "area.Kids"
 msgstr "Niños"
 
 #. js-lingui-explicit-id
-#: src/apps/setup/SetupWizard.tsx:124
+#: src/apps/setup/SetupWizard.tsx:123
 #, needs-review
 msgid "Kids may still see things they shouldn't"
 msgstr "Los niños aún pueden ver cosas que no deberían"
@@ -14567,7 +14566,7 @@ msgstr "Las exportaciones de etiquetas se crean solo cuando un operador usa la h
 
 #. js-lingui-explicit-id
 #: src/shell/pages/AdminPages.es.test.tsx:115
-#: src/shell/pages/PerformancePage.tsx:150
+#: src/shell/pages/PerformancePage.tsx:153
 #, needs-review
 msgid "Label harvest ({turns, plural, one {# turn} other {# turns}})"
 msgstr "Cosecha de etiquetas ({turns, plural, one {# turno} other {# turnos}})"
@@ -14682,7 +14681,7 @@ msgid "Last active {when} · {chats, plural, one {# chat} other {# chats}}"
 msgstr "Última actividad {when} · {chats, plural, one {# chat} other {# chats}}"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/UpdatesPage.tsx:53
+#: src/shell/pages/UpdatesPage.tsx:52
 #, needs-review
 msgid "Last checked"
 msgstr "Última verificación"
@@ -14769,7 +14768,7 @@ msgid "Layer timing"
 msgstr "Tiempo de capa"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/PerformancePage.tsx:138
+#: src/shell/pages/PerformancePage.tsx:141
 #, needs-review
 msgid "Layers"
 msgstr "Capas"
@@ -15554,8 +15553,8 @@ msgid "Loading Coding access"
 msgstr "Cargando acceso a Coding"
 
 #. js-lingui-explicit-id
-#: src/apps/setup/SetupWizard.tsx:475
-#: src/apps/setup/SetupWizard.tsx:475
+#: src/apps/setup/SetupWizard.tsx:477
+#: src/apps/setup/SetupWizard.tsx:477
 #, needs-review
 msgid "Loading coding setup"
 msgstr "Cargando configuración de coding"
@@ -15680,7 +15679,7 @@ msgid "Loading offline books"
 msgstr "Cargando libros sin conexión"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/PerformancePage.tsx:63
+#: src/shell/pages/PerformancePage.tsx:64
 #, needs-review
 msgid "Loading performance"
 msgstr "Cargando rendimiento"
@@ -15729,7 +15728,7 @@ msgid "Loading routing stats"
 msgstr "Cargando estadísticas de enrutamiento"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/StoragePage.tsx:200
+#: src/shell/pages/StoragePage.tsx:188
 #, needs-review
 msgid "Loading saved data…"
 msgstr "Cargando datos guardados…"
@@ -15767,7 +15766,7 @@ msgid "Loading skills"
 msgstr "Cargando habilidades"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/StoragePage.tsx:139
+#: src/shell/pages/StoragePage.tsx:140
 #, needs-review
 msgid "Loading storage"
 msgstr "Cargando almacenamiento"
@@ -15826,7 +15825,7 @@ msgid "Loading Trash"
 msgstr "Cargando la Papelera"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/UpdatesPage.tsx:141
+#: src/shell/pages/UpdatesPage.tsx:136
 #, needs-review
 msgid "Loading updates"
 msgstr "Cargando actualizaciones"
@@ -16258,7 +16257,7 @@ msgid "MaiPai couldn't get what it needs for face recognition. Check the connect
 msgstr "MaiPai no pudo obtener lo que necesita para el reconocimiento facial. Revisa la conexión e inténtalo de nuevo."
 
 #. js-lingui-explicit-id
-#: src/apps/setup/SetupWizard.tsx:501
+#: src/apps/setup/SetupWizard.tsx:503
 #: src/shell/routeHeader.ts:50
 #, needs-review
 msgid "MaiPai Home"
@@ -16287,7 +16286,7 @@ msgstr "Clave de copia de seguridad de emergencia de MaiPai Home\n"
 ""
 
 #. js-lingui-explicit-id
-#: src/apps/setup/SetupWizard.tsx:312
+#: src/apps/setup/SetupWizard.tsx:314
 #, needs-review
 msgid "MaiPai Home emergency kit\n"
 "Home: {hubName}\n"
@@ -17313,7 +17312,7 @@ msgstr "Más"
 #. js-lingui-explicit-id
 #: src/shell/components/DataTableRowActions.tsx:26
 #: src/shell/pages/EnginesPage.tsx:243
-#: src/shell/pages/UpdatesPage.tsx:167
+#: src/shell/pages/UpdatesPage.tsx:162
 #, needs-review
 msgid "More actions"
 msgstr "Más acciones"
@@ -17551,7 +17550,7 @@ msgid "Muted"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/setup/SetupWizard.tsx:221
+#: src/apps/setup/SetupWizard.tsx:223
 #, needs-review
 msgid "My coding tool"
 msgstr "Mi herramienta de coding"
@@ -17593,7 +17592,7 @@ msgstr "Mi mezcla"
 #: src/apps/settings/styles/StyleEditor.tsx:82
 #: src/shell/pages/FilesPage.tsx:400
 #: src/shell/pages/ProjectsPage.tsx:156
-#: src/shell/pages/UpdatesPage.tsx:50
+#: src/shell/pages/UpdatesPage.tsx:49
 msgid "Name"
 msgstr ""
 
@@ -17707,7 +17706,7 @@ msgstr "Necesita otro intento"
 
 #. js-lingui-explicit-id
 #: src/apps/settings/CodingSettings.tsx:163
-#: src/apps/setup/SetupWizard.tsx:478
+#: src/apps/setup/SetupWizard.tsx:480
 #: src/shell/pages/status/StatusApps.tsx:47
 #: src/shell/pages/status/StatusComponents.tsx:151
 #, needs-review
@@ -17795,7 +17794,7 @@ msgstr "Neutral es el tema estándar en blanco y negro, igual que el tablero pro
 #: src/apps/settings/CodingSettings.tsx:225
 #: src/shell/pages/status/StatusBoard.tsx:110
 #: src/shell/pages/status/StatusBoard.tsx:110
-#: src/shell/pages/UpdatesPage.tsx:73
+#: src/shell/pages/UpdatesPage.tsx:72
 #, needs-review
 msgid "Never"
 msgstr "Nunca"
@@ -18156,7 +18155,7 @@ msgid "No camera found"
 msgstr "No se encontró ninguna cámara"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/StoragePage.tsx:58
+#: src/shell/pages/StoragePage.tsx:59
 #, needs-review
 msgid "No cap set"
 msgstr "Sin límite definido"
@@ -18264,7 +18263,7 @@ msgid "No family members yet."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/StoragePage.tsx:154
+#: src/shell/pages/StoragePage.tsx:173
 #, needs-review
 msgid "No files yet."
 msgstr "Aún no hay archivos."
@@ -18390,10 +18389,15 @@ msgid "No recent use: {count, plural, one {# service} other {# services}}"
 msgstr "Sin uso reciente: {count, plural, one {# servicio} other {# servicios}}"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/UpdatesPage.tsx:61
+#: src/shell/pages/UpdatesPage.tsx:60
 #, needs-review
 msgid "No release published yet"
 msgstr "Aún no hay una versión publicada"
+
+#. js-lingui-explicit-id
+#: src/shell/pages/PerformancePage.tsx:80
+msgid "No replies timed yet."
+msgstr ""
 
 #. js-lingui-explicit-id
 #: src/shell/components/dataTableModel.tsx:51
@@ -18418,7 +18422,7 @@ msgid "No robots yet. An admin adds one in Settings, Home, Devices."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/StoragePage.tsx:200
+#: src/shell/pages/StoragePage.tsx:188
 #, needs-review
 msgid "No saved online data."
 msgstr "No hay datos guardados en línea."
@@ -18581,7 +18585,7 @@ msgid "No turn in this window has recorded its tools yet."
 msgstr "Ninguna interacción de esta ventana ha registrado sus herramientas aún."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/UpdatesPage.tsx:87
+#: src/shell/pages/UpdatesPage.tsx:86
 #, needs-review
 msgid "No updates available."
 msgstr "No hay actualizaciones disponibles."
@@ -18678,7 +18682,7 @@ msgid "none yet"
 msgstr "ninguna todavía"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/StoragePage.tsx:68
+#: src/shell/pages/StoragePage.tsx:69
 #, needs-review
 msgid "None yet"
 msgstr "Ninguno aún"
@@ -18696,7 +18700,7 @@ msgid "Normal"
 msgstr "Normal"
 
 #. js-lingui-explicit-id
-#: src/apps/setup/SetupWizard.tsx:476
+#: src/apps/setup/SetupWizard.tsx:478
 #, needs-review
 msgid "Normal keeps chat and pictures running as usual."
 msgstr "Normal mantiene el chat y las imágenes funcionando como siempre."
@@ -18746,7 +18750,7 @@ msgstr "Sin revisar"
 
 #. js-lingui-explicit-id
 #: src/shell/pages/status/statusChecksFormat.ts:5
-#: src/shell/pages/UpdatesPage.tsx:61
+#: src/shell/pages/UpdatesPage.tsx:60
 #, needs-review
 msgid "Not checked yet"
 msgstr "Aún no se ha revisado"
@@ -18774,7 +18778,7 @@ msgstr "¿No es para ti? Elige el nivel Estándar o desactiva Videos arriba. As�
 #: src/apps/settings/ModelsAndStorageSection.tsx:47
 #: src/apps/settings/ReferenceLibrarySettings.tsx:261
 #: src/apps/settings/styles/StyleBrowser.tsx:102
-#: src/apps/setup/SetupWizard.tsx:478
+#: src/apps/setup/SetupWizard.tsx:480
 #: src/shell/pages/EnginesPage.tsx:31
 #, needs-review
 msgid "Not installed"
@@ -18794,8 +18798,8 @@ msgstr "Aún no se sabe"
 #: src/apps/setup/CloseAppsStep.tsx:56
 #: src/apps/setup/CloseAppsStep.tsx:73
 #: src/apps/setup/CloseAppsStep.tsx:73
-#: src/apps/setup/SetupWizard.tsx:480
-#: src/apps/setup/SetupWizard.tsx:480
+#: src/apps/setup/SetupWizard.tsx:482
+#: src/apps/setup/SetupWizard.tsx:482
 #: src/shell/pages/settings/SettingsAreaPage.tsx:276
 #, needs-review
 msgid "Not now"
@@ -19663,6 +19667,7 @@ msgstr "Una respuesta no encajaba. Revisa cada campo y envía el formulario de n
 
 #. js-lingui-explicit-id
 #: src/apps/setup/SetupWizard.tsx:143
+#: src/apps/setup/SetupWizard.tsx:143
 #, needs-review
 msgid "One computer"
 msgstr "Un ordenador"
@@ -19818,7 +19823,7 @@ msgid "Only an owner or admin can manage repairs."
 msgstr "Solo un propietario o administrador puede gestionar las reparaciones."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/UpdatesPage.tsx:131
+#: src/shell/pages/UpdatesPage.tsx:128
 #, needs-review
 msgid "Only an owner or admin can manage updates."
 msgstr "Solo un propietario o administrador puede gestionar las actualizaciones."
@@ -19975,7 +19980,7 @@ msgid "Open licence. It lets a household use the style at home."
 msgstr "Licencia abierta. Permite que un hogar use el estilo en casa."
 
 #. js-lingui-explicit-id
-#: src/apps/setup/SetupWizard.tsx:501
+#: src/apps/setup/SetupWizard.tsx:503
 #, needs-review
 msgid "Open my Home"
 msgstr "Abrir mi Home"
@@ -20060,25 +20065,25 @@ msgid "Open your settings"
 msgstr "Abre tus ajustes"
 
 #. js-lingui-explicit-id
-#: src/apps/setup/SetupWizard.tsx:482
+#: src/apps/setup/SetupWizard.tsx:484
 #, needs-review
 msgid "OPENAI_BASE_URL={codingHome}/code/v1 OPENAI_API_KEY=maipai_key_...{hint} MODEL=$(curl -s {codingHome}/code/v1/models | jq -r '.data[0].id')"
 msgstr "OPENAI_BASE_URL={codingHome}/code/v1 OPENAI_API_KEY=maipai_key_...{hint} MODEL=$(curl -s {codingHome}/code/v1/models | jq -r '.data[0].id')"
 
 #. js-lingui-explicit-id
-#: src/apps/setup/SetupWizard.tsx:482
+#: src/apps/setup/SetupWizard.tsx:484
 #, needs-review
 msgid "OPENAI_BASE_URL={codingHome}/code/v1 OPENAI_API_KEY=maipai_key_...{hint} opencode"
 msgstr "OPENAI_BASE_URL={codingHome}/code/v1 OPENAI_API_KEY=maipai_key_...{hint} opencode"
 
 #. js-lingui-explicit-id
-#: src/apps/setup/SetupWizard.tsx:482
+#: src/apps/setup/SetupWizard.tsx:484
 #, needs-review
 msgid "OpenAI-compatible · same key"
 msgstr "Compatible con OpenAI · misma clave"
 
 #. js-lingui-explicit-id
-#: src/apps/setup/SetupWizard.tsx:482
+#: src/apps/setup/SetupWizard.tsx:484
 #, needs-review
 msgid "OpenCode · same key"
 msgstr "OpenCode · misma clave"
@@ -20131,7 +20136,7 @@ msgid "Optional"
 msgstr "Opcional"
 
 #. js-lingui-explicit-id
-#: src/apps/setup/SetupWizard.tsx:98
+#: src/apps/setup/SetupWizard.tsx:97
 #, needs-review
 msgid "Optional. Not now is fine."
 msgstr "Opcional. Está bien no hacerlo ahora."
@@ -20155,8 +20160,8 @@ msgid "setting.search.brave_api_key.help"
 msgstr "Opcional. La búsqueda funciona sin ninguna clave. Si añades una clave API de Brave Search, las búsquedas web de un adulto van a Brave Search en lugar de a tu SearXNG, así que las palabras buscadas salen de tu casa. Las de un niño o adolescente nunca salen. La clave se guarda cifrada y no se puede leer de vuelta. Bórrala para volver a la búsqueda sin clave."
 
 #. js-lingui-explicit-id
-#: src/apps/setup/SetupWizard.tsx:91
-#: src/apps/setup/SetupWizard.tsx:94
+#: src/apps/setup/SetupWizard.tsx:90
+#: src/apps/setup/SetupWizard.tsx:93
 #, needs-review
 msgid "Optional. Skip it any time."
 msgstr "Opcional. Omítelo cuando quieras."
@@ -20317,7 +20322,7 @@ msgid "Pair engine computer"
 msgstr "Emparejar equipo del motor"
 
 #. js-lingui-explicit-id
-#: src/apps/setup/SetupWizard.tsx:491
+#: src/apps/setup/SetupWizard.tsx:493
 #, needs-review
 msgid "Pair the computer that runs the AI. You can also do this later in Home settings, Engines and AI."
 msgstr "Empareja el ordenador que ejecuta la IA. También puedes hacer esto más tarde en Configuración de Home, Motores y IA."
@@ -20531,7 +20536,7 @@ msgid "area.People"
 msgstr "Personas"
 
 #. js-lingui-explicit-id
-#: src/apps/setup/SetupWizard.tsx:125
+#: src/apps/setup/SetupWizard.tsx:124
 #, needs-review
 msgid "People can grow attached to AI"
 msgstr "La gente puede sentirse atraída por la IA"
@@ -20562,7 +20567,7 @@ msgstr "Porcentaje del tamaño de texto normal. \"Predeterminado\" sigue tu elec
 
 #. js-lingui-explicit-id
 #: src/shell/pageHeaderTitle.tsx:101
-#: src/shell/pages/PerformancePage.tsx:53
+#: src/shell/pages/PerformancePage.tsx:54
 #: src/shell/Routes.tsx:152
 #, needs-review
 msgid "Performance"
@@ -20576,7 +20581,7 @@ msgstr "Rendimiento"
 
 #. js-lingui-explicit-id
 #: src/apps/settings/SiteBlocksSection.tsx:50
-#: src/shell/pages/StoragePage.tsx:154
+#: src/shell/pages/StoragePage.tsx:173
 #, needs-review
 msgid "Person"
 msgstr "Persona"
@@ -21620,7 +21625,7 @@ msgid "Queue message"
 msgstr "Coloca el mensaje en cola"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/PerformancePage.tsx:86
+#: src/shell/pages/PerformancePage.tsx:89
 #, needs-review
 msgid "Queues"
 msgstr "Colas"
@@ -21837,7 +21842,7 @@ msgstr "Leyendo los detalles…"
 #: src/apps/setup/AwayFromHome.tsx:127
 #: src/apps/setup/AwayFromHome.tsx:139
 #: src/apps/setup/CheckGrid.tsx:31
-#: src/apps/setup/SetupWizard.tsx:478
+#: src/apps/setup/SetupWizard.tsx:480
 #: src/shell/pages/companionFlow/AnimateStep.tsx:29
 #: src/shell/pages/CompanionsPage.tsx:241
 #: src/shell/pages/EnginesPage.tsx:34
@@ -22387,7 +22392,7 @@ msgid "Repair issues"
 msgstr "Problemas de reparación"
 
 #. js-lingui-explicit-id
-#: src/shell/InstallDock.tsx:250
+#: src/shell/InstallDock.tsx:267
 #: src/shell/pageHeaderTitle.tsx:103
 #: src/shell/pages/DashboardPage.tsx:46
 #: src/shell/pages/RepairsPage.tsx:59
@@ -22478,7 +22483,7 @@ msgid "Replies: \"{text}\""
 msgstr "Responde: \"{text}\""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/PerformancePage.tsx:73
+#: src/shell/pages/PerformancePage.tsx:74
 #, needs-review
 msgid "Reply time per day"
 msgstr "Tiempo de respuesta por día"
@@ -22650,7 +22655,7 @@ msgid "Restore the backup from {whenText}?"
 msgstr "¿Restaurar la copia de seguridad de {whenText}?"
 
 #. js-lingui-explicit-id
-#: src/apps/setup/SetupWizard.tsx:452
+#: src/apps/setup/SetupWizard.tsx:454
 #, needs-review
 msgid "Restoring a backup? Finish setup, then open Backups."
 msgstr "¿Restaurando una copia de seguridad? Termina la configuración y luego abre Copias de seguridad."
@@ -22837,13 +22842,13 @@ msgid "Review the remix"
 msgstr "Revisa el remix"
 
 #. js-lingui-explicit-id
-#: src/apps/setup/SetupWizard.tsx:93
+#: src/apps/setup/SetupWizard.tsx:92
 #, needs-review
 msgid "Review the steps Home will complete."
 msgstr "Revisa los pasos que Home completará."
 
 #. js-lingui-explicit-id
-#: src/apps/setup/SetupReviewPage.tsx:58
+#: src/apps/setup/SetupReviewPage.tsx:62
 #, needs-review
 msgid "Review your computers, files, checks, and plan."
 msgstr "Revisa tus computadoras, archivos, comprobaciones y plan."
@@ -23124,7 +23129,7 @@ msgstr ""
 #: src/apps/people/NewPersonForm.tsx:105
 #: src/apps/people/NewPersonForm.tsx:106
 #: src/shell/pages/EnginesPage.tsx:46
-#: src/shell/pages/StoragePage.tsx:154
+#: src/shell/pages/StoragePage.tsx:173
 #, needs-review
 msgid "Role"
 msgstr "Rol"
@@ -23175,7 +23180,7 @@ msgid "Route"
 msgstr "Ruta"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/PerformancePage.tsx:112
+#: src/shell/pages/PerformancePage.tsx:115
 #, needs-review
 msgid "Route taken"
 msgstr "Ruta seguida"
@@ -23237,7 +23242,7 @@ msgstr "Ejecuta la configuración de nuevo"
 
 #. js-lingui-explicit-id
 #: src/apps/settings/CodingSettings.tsx:139
-#: src/apps/setup/SetupWizard.tsx:481
+#: src/apps/setup/SetupWizard.tsx:483
 #, needs-review
 msgid "Run the test"
 msgstr "Ejecutar la prueba"
@@ -23253,7 +23258,7 @@ msgstr "Nivel:"
 #: src/apps/settings/CodingSettings.tsx:132
 #: src/apps/settings/CodingSettings.tsx:139
 #: src/apps/settings/CodingSettings.tsx:139
-#: src/apps/setup/SetupWizard.tsx:481
+#: src/apps/setup/SetupWizard.tsx:483
 #: src/shell/pages/CompanionsPage.tsx:317
 #: src/shell/pages/status/StatusComponents.tsx:39
 #: src/shell/pages/status/StatusComponents.tsx:49
@@ -23389,14 +23394,14 @@ msgid "Save Synth"
 msgstr "Guardar synth"
 
 #. js-lingui-explicit-id
-#: src/apps/setup/SetupWizard.tsx:100
+#: src/apps/setup/SetupWizard.tsx:99
 #, needs-review
 msgid "Save this key somewhere other than this computer."
 msgstr "Guarda esta clave en algún lugar diferente a este ordenador."
 
 #. js-lingui-explicit-id
 #: src/apps/settings/BackupsSection.tsx:89
-#: src/apps/setup/SetupWizard.tsx:69
+#: src/apps/setup/SetupWizard.tsx:68
 #, needs-review
 msgid "Save your backup key"
 msgstr "Guardar tu clave de copia de seguridad"
@@ -23412,25 +23417,25 @@ msgid "Saved"
 msgstr "Guardado"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/StoragePage.tsx:49
+#: src/shell/pages/StoragePage.tsx:50
 #, needs-review
 msgid "Saved copies"
 msgstr "Copias guardadas"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/StoragePage.tsx:193
+#: src/shell/pages/StoragePage.tsx:182
 #, needs-review
 msgid "Saved copies of weather, news and other things Home looked up online. Your own chats, memories and the news shelf stay. Home will fetch cleared data again the next time someone asks."
 msgstr "Copias guardadas del clima, noticias y otras cosas que Home buscó en línea. Tus chats, recuerdos y la estantería de noticias se quedan. Home volverá a buscar los datos borrados la próxima vez que alguien lo pida."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/StoragePage.tsx:53
+#: src/shell/pages/StoragePage.tsx:54
 #, needs-review
 msgid "Saved copies of weather, news and other things Home looked up online. Your own chats, memories and the news shelf stay. Home will fetch it again the next time someone asks."
 msgstr "Copias guardadas del clima, noticias y otras cosas que Home buscó en línea. Tus chats, recuerdos y la estantería de noticias se quedan. Home volverá a buscarlo la próxima vez que alguien lo pida."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/StoragePage.tsx:198
+#: src/shell/pages/StoragePage.tsx:186
 #, needs-review
 msgid "Saved data by source"
 msgstr "Datos guardados por fuente"
@@ -23471,7 +23476,7 @@ msgid "Saved on {whenText}"
 msgstr "Guardado el {whenText}"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/StoragePage.tsx:190
+#: src/shell/pages/StoragePage.tsx:181
 #, needs-review
 msgid "Saved online data"
 msgstr "Datos guardados en línea"
@@ -23504,8 +23509,8 @@ msgid "Saves the StackChan's whole memory, then installs. About 6 minutes longer
 msgstr "Guarda toda la memoria del StackChan y luego instala. Tarda unos 6 minutos más."
 
 #. js-lingui-explicit-id
-#: src/apps/setup/SetupReviewPage.tsx:63
-#: src/apps/setup/SetupWizard.tsx:480
+#: src/apps/setup/SetupReviewPage.tsx:67
+#: src/apps/setup/SetupWizard.tsx:482
 #: src/shell/pages/CompanionAudienceDialog.tsx:64
 #: src/shell/pages/companionFlow/CustomizeStep.tsx:185
 #, needs-review
@@ -24317,7 +24322,7 @@ msgid "Set up away access"
 msgstr "Configurar acceso externo"
 
 #. js-lingui-explicit-id
-#: src/apps/setup/SetupWizard.tsx:480
+#: src/apps/setup/SetupWizard.tsx:482
 #, needs-review
 msgid "Set up coding"
 msgstr "Configurar coding"
@@ -24335,7 +24340,7 @@ msgid "Set up MaiPai Stack to run your own engines and see their health history 
 msgstr "Configura MaiPai Stack para ejecutar tus propios motores y ver su historial de salud aquí."
 
 #. js-lingui-explicit-id
-#: src/apps/setup/SetupWizard.tsx:501
+#: src/apps/setup/SetupWizard.tsx:503
 #, needs-review
 msgid "Set up my Home"
 msgstr "Configurar mi Home"
@@ -24347,7 +24352,7 @@ msgid "Set up on {date}"
 msgstr "Configurado el {date}"
 
 #. js-lingui-explicit-id
-#: src/apps/setup/SetupWizard.tsx:480
+#: src/apps/setup/SetupWizard.tsx:482
 #, needs-review
 msgid "Set up standard coding"
 msgstr "Configurar coding estándar"
@@ -24558,7 +24563,7 @@ msgstr "Elementos de la lista de configuración ocultos"
 #. js-lingui-explicit-id
 #: src/apps/settings/CodingSettings.tsx:229
 #: src/apps/settings/CodingSettings.tsx:232
-#: src/apps/setup/SetupWizard.tsx:482
+#: src/apps/setup/SetupWizard.tsx:484
 #, needs-review
 msgid "Setup lines for your tool"
 msgstr "Líneas de configuración para tu herramienta"
@@ -24570,13 +24575,13 @@ msgid "Setup preview controls"
 msgstr "Controles de vista previa de configuración"
 
 #. js-lingui-explicit-id
-#: src/apps/setup/SetupWizard.tsx:448
+#: src/apps/setup/SetupWizard.tsx:450
 #, needs-review
 msgid "Setup progress unavailable"
 msgstr "Progreso de configuración no disponible"
 
 #. js-lingui-explicit-id
-#: src/apps/setup/SetupReviewPage.tsx:56
+#: src/apps/setup/SetupReviewPage.tsx:60
 #, needs-review
 msgid "Setup review"
 msgstr "Revisión de la configuración"
@@ -24617,7 +24622,7 @@ msgid "Shared"
 msgstr "Compartido"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/StoragePage.tsx:78
+#: src/shell/pages/StoragePage.tsx:79
 #, needs-review
 msgid "Shared by people no longer here"
 msgstr "Compartido por personas que ya no están aquí"
@@ -25112,14 +25117,14 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/apps/settings/styles/StyleEditor.tsx:157
 #: src/shell/pages/performance/DiskHardwareBody.tsx:28
-#: src/shell/pages/StoragePage.tsx:50
+#: src/shell/pages/StoragePage.tsx:51
 #, needs-review
 msgid "Size"
 msgstr "Tamaño"
 
 #. js-lingui-explicit-id
 #: src/apps/settings/CodingSettings.tsx:29
-#: src/apps/setup/SetupWizard.tsx:478
+#: src/apps/setup/SetupWizard.tsx:480
 #, needs-review
 msgid "Size not reported"
 msgstr "Tamaño no reportado"
@@ -25564,7 +25569,7 @@ msgstr "Sonidos que has guardado."
 #: src/apps/settings/styles/StyleBrowser.tsx:103
 #: src/apps/settings/styles/StyleEditor.tsx:154
 #: src/apps/settings/VoiceManagerSection.tsx:105
-#: src/shell/pages/StoragePage.tsx:48
+#: src/shell/pages/StoragePage.tsx:49
 #, needs-review
 msgid "Source"
 msgstr "Fuente"
@@ -26014,8 +26019,8 @@ msgid "starting"
 msgstr "iniciando"
 
 #. js-lingui-explicit-id
-#: src/apps/setup/SetupWizard.tsx:480
-#: src/apps/setup/SetupWizard.tsx:480
+#: src/apps/setup/SetupWizard.tsx:482
+#: src/apps/setup/SetupWizard.tsx:482
 #: src/shell/pages/MusicRemix.tsx:39
 #: src/shell/pages/MusicWorkspacePage.tsx:105
 #: src/shell/pages/MusicWorkspacePage.tsx:239
@@ -26109,7 +26114,7 @@ msgstr ""
 #: src/shell/pages/performance/EnginesHealthBody.tsx:37
 #: src/shell/pages/RepairsPage.tsx:65
 #: src/shell/pages/StatusPage.tsx:32
-#: src/shell/pages/UpdatesPage.tsx:54
+#: src/shell/pages/UpdatesPage.tsx:53
 #: src/shell/Routes.tsx:155
 #, needs-review
 msgid "Status"
@@ -26340,8 +26345,7 @@ msgstr "Cronómetro en marcha"
 #. js-lingui-explicit-id
 #: src/shell/library/LibraryStorage.tsx:24
 #: src/shell/pageHeaderTitle.tsx:99
-#: src/shell/pages/StoragePage.tsx:114
-#: src/shell/pages/StoragePage.tsx:160
+#: src/shell/pages/StoragePage.tsx:115
 #: src/shell/pages/TrashPage.tsx:26
 #: src/shell/pages/TrashPage.tsx:26
 #: src/shell/pages/TrashPage.tsx:55
@@ -26357,7 +26361,7 @@ msgid "area.Storage"
 msgstr "Almacenamiento"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/PerformancePage.tsx:175
+#: src/shell/pages/PerformancePage.tsx:178
 #, needs-review
 msgid "Storage & hardware"
 msgstr "Almacenamiento y hardware"
@@ -26375,7 +26379,7 @@ msgid "Storage areas"
 msgstr "Áreas de almacenamiento"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/StoragePage.tsx:184
+#: src/shell/pages/StoragePage.tsx:177
 #, needs-review
 msgid "Storage usage by person"
 msgstr "Uso de almacenamiento por persona"
@@ -27060,7 +27064,7 @@ msgstr "Eso no funcionó"
 
 #. js-lingui-explicit-id
 #: src/shell/pages/EnginesPage.tsx:129
-#: src/shell/pages/UpdatesPage.tsx:94
+#: src/shell/pages/UpdatesPage.tsx:93
 #, needs-review
 msgid "That didn't work."
 msgstr "Eso no funcionó."
@@ -27363,7 +27367,7 @@ msgid "setting.home.base_url.help"
 msgstr "La dirección de tu instancia de Home Assistant, p. ej. http://homeassistant.local:8123."
 
 #. js-lingui-explicit-id
-#: src/apps/setup/SetupWizard.tsx:122
+#: src/apps/setup/SetupWizard.tsx:121
 #, needs-review
 msgid "The AI decides what it will make"
 msgstr "La IA decide qué hará"
@@ -27737,6 +27741,11 @@ msgstr "Los registros del hub aún los mencionan, sin nada de lo que dijeron, du
 #. js-lingui-explicit-id
 #: src/apps/settings/HouseholdRobotsSection.tsx:135
 msgid "The install could not be cancelled. Check the connection and try again."
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/shell/InstallDock.tsx:118
+msgid "The install finished."
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -28706,7 +28715,7 @@ msgid "This computer needs no changes."
 msgstr "Este equipo no necesita cambios."
 
 #. js-lingui-explicit-id
-#: src/apps/setup/SetupWizard.tsx:480
+#: src/apps/setup/SetupWizard.tsx:482
 #, needs-review
 msgid "This computer needs to be a Mac with 128 GB of memory for Coding mode. You can still use the standard coding setup."
 msgstr "Este ordenador debe ser un Mac con 128 GB de memoria para el modo Coding. Aún puedes usar la configuración de coding estándar."
@@ -29109,7 +29118,7 @@ msgid "To 0:30"
 msgstr "Hasta 0:30"
 
 #. js-lingui-explicit-id
-#: src/apps/setup/SetupWizard.tsx:478
+#: src/apps/setup/SetupWizard.tsx:480
 #, needs-review
 msgid "To install"
 msgstr "Para instalar"
@@ -29199,7 +29208,7 @@ msgstr "Herramientas"
 
 #. js-lingui-explicit-id
 #: src/shell/pages/performance/ToolsOfferedBody.tsx:11
-#: src/shell/pages/PerformancePage.tsx:125
+#: src/shell/pages/PerformancePage.tsx:128
 #, needs-review
 msgid "Tools offered per turn"
 msgstr "Herramientas ofrecidas por interacción"
@@ -29217,7 +29226,7 @@ msgid "Tools using it will no longer connect to Home."
 msgstr "Las herramientas que la usen ya no se conectarán a Home."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/StoragePage.tsx:154
+#: src/shell/pages/StoragePage.tsx:173
 #, needs-review
 msgid "Top kind"
 msgstr "Tipo principal"
@@ -29263,7 +29272,7 @@ msgid "Total on disk"
 msgstr "Total en el disco"
 
 #. js-lingui-explicit-id
-#: src/apps/setup/SetupWizard.tsx:479
+#: src/apps/setup/SetupWizard.tsx:481
 #, needs-review
 msgid "Total: {gb} GB"
 msgstr "Total: {gb} GB"
@@ -29337,7 +29346,7 @@ msgid "Translated"
 msgstr "Traducido"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/StoragePage.tsx:183
+#: src/shell/pages/StoragePage.tsx:160
 #: src/shell/pages/TrashPage.tsx:26
 #: src/shell/pages/TrashPage.tsx:30
 #, needs-review
@@ -29421,12 +29430,12 @@ msgstr "Frase de activación, p. ej. \"noche de cine\""
 #: src/apps/settings/VoiceManagerSection.tsx:102
 #: src/apps/setup/HostTuneStep.tsx:68
 #: src/apps/setup/PlanStep.tsx:126
-#: src/apps/setup/SetupWizard.tsx:448
-#: src/apps/setup/SetupWizard.tsx:501
+#: src/apps/setup/SetupWizard.tsx:450
+#: src/apps/setup/SetupWizard.tsx:503
 #: src/apps/setup/StorageStep.tsx:35
 #: src/apps/setup/WebSearchStep.tsx:74
 #: src/shell/AmbientCompanionPane.tsx:261
-#: src/shell/InstallDock.tsx:249
+#: src/shell/InstallDock.tsx:266
 #: src/shell/InstallStrip.tsx:96
 #: src/shell/library/LibraryUploads.tsx:75
 #: src/shell/pages/companionFlow/AnimateStep.tsx:131
@@ -29500,7 +29509,7 @@ msgstr "Mar"
 
 #. js-lingui-explicit-id
 #: src/apps/settings/HostTuneSettings.tsx:35
-#: src/apps/setup/SetupWizard.tsx:60
+#: src/apps/setup/SetupWizard.tsx:59
 #, needs-review
 msgid "Tune this computer"
 msgstr "Ajustar este equipo"
@@ -29593,7 +29602,7 @@ msgid "Turn on the robot near your Wi-Fi. It will speak a six-digit code (or sho
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/setup/SetupWizard.tsx:63
+#: src/apps/setup/SetupWizard.tsx:62
 #, needs-review
 msgid "Turn on web search"
 msgstr "Activar búsqueda web"
@@ -29702,7 +29711,7 @@ msgstr "Activa la búsqueda y reproducción de emisoras de radio de internet."
 
 #. js-lingui-explicit-id
 #: src/shell/pages/performance/TurnsByEngineBody.tsx:42
-#: src/shell/pages/PerformancePage.tsx:99
+#: src/shell/pages/PerformancePage.tsx:102
 #, needs-review
 msgid "Turns per engine"
 msgstr "Turnos por motor"
@@ -29756,7 +29765,8 @@ msgid "TV"
 msgstr "TV"
 
 #. js-lingui-explicit-id
-#: src/apps/setup/SetupWizard.tsx:143
+#: src/apps/setup/SetupWizard.tsx:144
+#: src/apps/setup/SetupWizard.tsx:144
 #, needs-review
 msgid "Two computers"
 msgstr "Dos ordenadores"
@@ -29922,8 +29932,8 @@ msgstr "desconocido"
 #: src/apps/settings/RobotBody.tsx:208
 #: src/apps/settings/RobotBody.tsx:224
 #: src/apps/settings/RobotBody.tsx:225
+#: src/shell/pages/UpdatesPage.tsx:70
 #: src/shell/pages/UpdatesPage.tsx:71
-#: src/shell/pages/UpdatesPage.tsx:72
 msgid "Unknown"
 msgstr ""
 
@@ -30072,13 +30082,13 @@ msgstr "Hasta {minutes, plural, one {# minuto} other {# minutos}} en este equipo
 #: src/apps/settings/HouseholdRobotsSection.tsx:171
 #: src/apps/settings/HouseholdRobotsSection.tsx:178
 #: src/shell/library/TranscriptCaptionTracks.tsx:121
-#: src/shell/pages/UpdatesPage.tsx:62
-#: src/shell/pages/UpdatesPage.tsx:64
+#: src/shell/pages/UpdatesPage.tsx:61
+#: src/shell/pages/UpdatesPage.tsx:63
 msgid "Up to date"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/UpdatesPage.tsx:153
+#: src/shell/pages/UpdatesPage.tsx:148
 #, needs-review
 msgid "Update actions"
 msgstr "Acciones de actualización"
@@ -30086,13 +30096,13 @@ msgstr "Acciones de actualización"
 #. js-lingui-explicit-id
 #: src/apps/settings/HouseholdRobotsSection.tsx:171
 #: src/shell/pages/EnginesPage.tsx:78
-#: src/shell/pages/UpdatesPage.tsx:59
-#: src/shell/pages/UpdatesPage.tsx:64
+#: src/shell/pages/UpdatesPage.tsx:58
+#: src/shell/pages/UpdatesPage.tsx:63
 msgid "Update available"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/UpdatesPage.tsx:59
+#: src/shell/pages/UpdatesPage.tsx:58
 #, needs-review
 msgid "Update available. {reason}"
 msgstr "Hay una actualización disponible. {reason}"
@@ -30120,7 +30130,7 @@ msgstr "Actualizado"
 #. js-lingui-explicit-id
 #: src/shell/pageHeaderTitle.tsx:102
 #: src/shell/pages/DashboardPage.tsx:46
-#: src/shell/pages/UpdatesPage.tsx:79
+#: src/shell/pages/UpdatesPage.tsx:78
 #: src/shell/Routes.tsx:153
 #, needs-review
 msgid "Updates"
@@ -30175,7 +30185,7 @@ msgid "Use 4 to 128 characters for the PIN or password."
 msgstr "Usa de 4 a 128 caracteres para el PIN o la contraseña."
 
 #. js-lingui-explicit-id
-#: src/apps/setup/SetupWizard.tsx:129
+#: src/apps/setup/SetupWizard.tsx:128
 #, needs-review
 msgid "Use 4 to 128 characters for your PIN or password, then press Create owner account again."
 msgstr "Usa de 4 a 128 caracteres para tu PIN o contraseña, y luego pulsa Crear cuenta de propietario de nuevo."
@@ -30378,7 +30388,7 @@ msgid "setting.person.locale.option.household"
 msgstr "Usa lo que usa el hogar."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/StoragePage.tsx:154
+#: src/shell/pages/StoragePage.tsx:173
 #, needs-review
 msgid "Used"
 msgstr "Usado"
@@ -30524,7 +30534,7 @@ msgid "Version"
 msgstr "Versión"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/UpdatesPage.tsx:60
+#: src/shell/pages/UpdatesPage.tsx:59
 #, needs-review
 msgid "Version unknown"
 msgstr "Versión desconocida"
@@ -31213,7 +31223,7 @@ msgid "Weekly"
 msgstr "Semanal"
 
 #. js-lingui-explicit-id
-#: src/apps/setup/SetupWizard.tsx:56
+#: src/apps/setup/SetupWizard.tsx:55
 #, needs-review
 msgid "Welcome to MaiPai Home"
 msgstr "Bienvenido a MaiPai Home"
@@ -31316,7 +31326,7 @@ msgstr "Lo que hace este comando"
 
 #. js-lingui-explicit-id
 #: src/apps/settings/CapabilityTable.tsx:42
-#: src/apps/setup/SetupWizard.tsx:68
+#: src/apps/setup/SetupWizard.tsx:67
 #, needs-review
 msgid "What this computer can do"
 msgstr "Lo que este ordenador puede hacer"
@@ -31490,7 +31500,7 @@ msgid "setting.search.page_text_cleaning.help"
 msgstr "Si está activado, el texto que MaiPai obtiene de una página web se revisa y limpia antes de que el asistente lo lea. Está activado por defecto para Niños y Adolescentes y desactivado para Adultos. Un administrador puede cambiarlo para todos o para una persona. Un niño o adolescente no puede desactivarlo."
 
 #. js-lingui-explicit-id
-#: src/apps/setup/SetupWizard.tsx:123
+#: src/apps/setup/SetupWizard.tsx:122
 msgid "When you make or share something with Home, please respect other people and their privacy. Make sure you have permission to use someone’s image, video, or voice, and the rights to any material you include. Be mindful of copyright and consent, follow the law, and use what you create kindly—don’t use it to bully, tease, embarrass, or hurt someone."
 msgstr ""
 
@@ -32065,7 +32075,7 @@ msgid "api.error.upload_too_many"
 msgstr "Ya tienes tres subidas en curso. Termina o cancela una e inténtalo de nuevo."
 
 #. js-lingui-explicit-id
-#: src/apps/setup/SetupWizard.tsx:126
+#: src/apps/setup/SetupWizard.tsx:125
 #, needs-review
 msgid "You also accept the licences of the AI models and tools Home installs for you. Each is listed with its terms on the Plan page and in Models and storage."
 msgstr "También aceptas las licencias de los modelos de IA y herramientas que Home instala para ti. Cada una está listada con sus términos en la página Plan y en Modelos y almacenamiento."
@@ -32113,7 +32123,7 @@ msgid "You can save up to 12 places."
 msgstr "Puedes guardar hasta 12 lugares."
 
 #. js-lingui-explicit-id
-#: src/apps/setup/SetupWizard.tsx:491
+#: src/apps/setup/SetupWizard.tsx:493
 #, needs-review
 msgid "You can talk with Home as soon as you open it. Start a chat, add people, or choose apps whenever you're ready. If the AI is still downloading, chat starts answering when the first model finishes. To have Home greet you by face, turn it on in your profile; face data stays on this computer."
 msgstr "Puedes hablar con Home en cuanto lo abras. Comienza un chat, añade personas o elige apps cuando estés listo. Si la IA aún está descargando, el chat empieza a responder cuando el primer modelo termina. Para que Home te salude por rostro, actívalo en tu perfil; los datos faciales se quedan en este ordenador."
@@ -32213,7 +32223,7 @@ msgid "You have no songs in your Library yet. Make one in Music."
 msgstr "No tienes canciones en tu Biblioteca todavía. Crea una en Música."
 
 #. js-lingui-explicit-id
-#: src/apps/setup/SetupWizard.tsx:128
+#: src/apps/setup/SetupWizard.tsx:127
 #, needs-review
 msgid "You manage this Home, its people, files, and backups. Nobody can remove the owner."
 msgstr "Gestionas este Home, sus personas, archivos y copias de seguridad. Nadie puede eliminar al propietario."
@@ -32261,7 +32271,7 @@ msgid "setting.notifications.browser.enabled.help"
 msgstr "Verás una notificación emergente cuando MaiPai necesite atención, mientras MaiPai está abierto. No te llegará cuando MaiPai esté cerrado."
 
 #. js-lingui-explicit-id
-#: src/apps/setup/SetupWizard.tsx:70
+#: src/apps/setup/SetupWizard.tsx:69
 #, needs-review
 msgid "You're all set"
 msgstr "Estás listo"
@@ -32285,7 +32295,7 @@ msgid "Your {noun} did not load. Close this and try again."
 msgstr "Tu {noun} no se cargó. Cierra esto e inténtalo de nuevo."
 
 #. js-lingui-explicit-id
-#: src/apps/setup/SetupWizard.tsx:49
+#: src/apps/setup/SetupWizard.tsx:48
 #, needs-review
 msgid "Your AI"
 msgstr "Tu IA"
@@ -32322,7 +32332,7 @@ msgid "Your chats will show up here."
 msgstr "Tus chats aparecerán aquí."
 
 #. js-lingui-explicit-id
-#: src/apps/setup/SetupWizard.tsx:452
+#: src/apps/setup/SetupWizard.tsx:454
 #, needs-review
 msgid "Your chats, people, and memories stay on your computers. Home goes online only for downloads, updates, and searches you ask for."
 msgstr "Tus chats, personas y recuerdos se quedan en tus ordenadores. Home sale a internet solo para descargas, actualizaciones y búsquedas que pides."
@@ -32393,13 +32403,13 @@ msgid "Your family's chats, people and memories. Small, usually well under 5 GB.
 msgstr "Los chats, personas y recuerdos de tu familia. Son pequeños, normalmente mucho menos de 5 GB."
 
 #. js-lingui-explicit-id
-#: src/apps/setup/SetupWizard.tsx:87
+#: src/apps/setup/SetupWizard.tsx:86
 #, needs-review
 msgid "Your family's private AI, in your own home."
 msgstr "La IA privada de tu familia, en tu propio hogar."
 
 #. js-lingui-explicit-id
-#: src/apps/setup/SetupWizard.tsx:48
+#: src/apps/setup/SetupWizard.tsx:47
 #, needs-review
 msgid "Your Home"
 msgstr "Tu Home"
@@ -32411,7 +32421,7 @@ msgid "Your Home address"
 msgstr "Tu dirección de Home"
 
 #. js-lingui-explicit-id
-#: src/apps/setup/SetupWizard.tsx:101
+#: src/apps/setup/SetupWizard.tsx:100
 #, needs-review
 msgid "Your Home is ready to use."
 msgstr "Tu Home está listo para usar."
@@ -32433,7 +32443,7 @@ msgid "Your key is ready"
 msgstr "Tu clave está lista"
 
 #. js-lingui-explicit-id
-#: src/apps/setup/SetupWizard.tsx:482
+#: src/apps/setup/SetupWizard.tsx:484
 #, needs-review
 msgid "Your key. Save it now; Home will show it only once."
 msgstr "Tu clave. Guárdala ahora; Home solo la mostrará una vez."
@@ -32517,6 +32527,11 @@ msgid "your pick"
 msgstr "tu elección"
 
 #. js-lingui-explicit-id
+#: src/shell/InstallDock.tsx:115
+msgid "Your picture is ready."
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/shell/MediaPickerDialog.tsx:59
 #, needs-review
 msgid "Your pictures"
@@ -32547,7 +32562,7 @@ msgid "api.error.upload_profile_gone"
 msgstr "Tu perfil ya no está disponible. Inicia sesión de nuevo."
 
 #. js-lingui-explicit-id
-#: src/apps/setup/SetupWizard.tsx:62
+#: src/apps/setup/SetupWizard.tsx:61
 #, needs-review
 msgid "Your setup plan"
 msgstr "Tu plan de configuración"
@@ -32564,6 +32579,11 @@ msgstr "Tus programas, música y cosas que hiciste están al frente con el día 
 #, needs-review
 msgid "Your song"
 msgstr "Tu canción"
+
+#. js-lingui-explicit-id
+#: src/shell/InstallDock.tsx:117
+msgid "Your song is ready."
+msgstr ""
 
 #. js-lingui-explicit-id
 #: src/shell/pages/MakeSongPage.tsx:188
@@ -32654,6 +32674,11 @@ msgstr "Tu id de chat de Telegram"
 #, needs-review
 msgid "Your upload"
 msgstr "Tu carga"
+
+#. js-lingui-explicit-id
+#: src/shell/InstallDock.tsx:116
+msgid "Your video is ready."
+msgstr ""
 
 #. js-lingui-explicit-id
 #: src/shell/pages/CompanionsPage.tsx:155

@@ -6,7 +6,7 @@ import { Button } from "@maipai/ui/src/ui/button";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@maipai/ui/src/dashboard/components/ui/collapsible";
 import { RadioGroup, RadioGroupItem } from "@maipai/ui/src/dashboard/components/ui/radio-group";
 import { Item, ItemActions, ItemContent, ItemDescription, ItemGroup, ItemTitle } from "@maipai/ui/src/dashboard/components/ui/item";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@maipai/ui/src/dashboard/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@maipai/ui/src/ui/card";
 import { CapabilityTable } from "@/apps/settings/CapabilityTable";
 import { FreeUpMemory } from "@/apps/settings/FreeUpMemory";
 import { HostTuneSettings } from "@/apps/settings/HostTuneSettings";
@@ -30,7 +30,7 @@ export function PerformanceSettings({ person }: SettingsViewProps) {
   const onCustomize = (changes: Record<string, unknown>) => write({ ...changes, "resources.preset": "custom" });
   return (
     <div data-testid="performance-settings">
-      <Card>
+      <Card surface="flat">
         <CardHeader>
           <CardTitle>{specKey("resources.preset").label}{preset === "custom" ? <> <Badge>{i18n._({ id: "Custom", message: "Custom" })}</Badge></> : null}</CardTitle>
           <CardDescription>{specKey("resources.preset").help}</CardDescription>

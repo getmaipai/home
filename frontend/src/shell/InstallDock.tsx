@@ -110,6 +110,14 @@ export function buildDock(status: InstallStatusView | null, jobs: readonly HomeJ
   return { active: [...ordered, ...making], failed, primary, percent, line, problem: status.problem };
 }
 
+/** What to say when the last active item finishes: a made thing by name, else the plain install sentence. */
+export function finishedLine(made: string | null): string {
+  if (made === "a picture") return i18n._({ id: "Your picture is ready.", message: "Your picture is ready." });
+  if (made === "a video") return i18n._({ id: "Your video is ready.", message: "Your video is ready." });
+  if (made === "a song") return i18n._({ id: "Your song is ready.", message: "Your song is ready." });
+  return i18n._({ id: "The install finished.", message: "The install finished." });
+}
+
 /** "Couldn't finish: a faster chat engine for Muse Glimmer". */
 function failureLine(item: DockItem): string {
   const what = item.words.tail ? `${item.words.what}` : item.words.what;
@@ -163,8 +171,12 @@ export function InstallDock({ admin, read: readProp, readJobs: readJobsProp, ret
   const [navTop, setNavTop] = useState(0);
   useEffect(() => {
     const measure = () => {
-      const nav = document.querySelector('[data-slot="phone-nav"]');
-      const top = nav instanceof HTMLElement && nav.offsetParent !== null ? Math.max(0, window.innerHeight - nav.getBoundingClientRect().top) : 0;
+      // The strip clears the phone bar and, when it shows, the mini player above that bar.
+      const clearance = (selector: string) => {
+        const node = document.querySelector(selector);
+        return node instanceof HTMLElement && node.offsetParent !== null ? Math.max(0, window.innerHeight - node.getBoundingClientRect().top) : 0;
+      };
+      const top = Math.max(clearance('[data-slot="phone-nav"]'), clearance('[data-slot="global-mini-player"]'));
       setNavTop((previous) => (previous === top ? previous : top));
     };
     measure();
@@ -183,14 +195,19 @@ export function InstallDock({ admin, read: readProp, readJobs: readJobsProp, ret
   const activeNow = model.active.length > 0;
   const failedNow = model.failed.length > 0;
   const startLabel = model.primary?.label ?? "";
+  // What the last finished thing was, so the finish line can name it (a picture, a video, a song) instead of "install".
+  const lastMaking = useRef<string | null>(null);
+  const makingNow = activeNow && model.active.every((entry) => entry.key.startsWith("make:")) ? model.active[0]!.words.what : null;
   useEffect(() => {
     if (status === null) return;
     const was = before.current;
+    const made = activeNow ? makingNow : lastMaking.current;
+    lastMaking.current = makingNow;
     if (activeNow && !was.active) setAnnouncement(`${startLabel} has started.`);
-    else if (!activeNow && was.active && !failedNow) setAnnouncement("The install finished.");
+    else if (!activeNow && was.active && !failedNow) setAnnouncement(finishedLine(made));
     if (failedNow && !was.failed) setAnnouncement("An install did not finish. Open it to try again.");
     before.current = { active: activeNow, failed: failedNow };
-  }, [status, activeNow, failedNow, startLabel]);
+  }, [status, activeNow, failedNow, startLabel, makingNow]);
   useEffect(() => { if (!showing) setOpen(false); }, [showing]);
 
   const onRetry = () => {

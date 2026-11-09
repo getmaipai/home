@@ -10,6 +10,10 @@ import { renderSetupReviewScreen } from "./SetupWizard";
 import { errorLine } from "@/lib/hubReachability";
 
 const ErrorIcon = getIcon("alert-triangle");
+const BackIcon = getIcon("arrow-left");
+const NextIcon = getIcon("arrow-right");
+const DoneIcon = getIcon("check");
+const CancelIcon = getIcon("x");
 
 const REVIEW_SCREENS = ["engine_location", "storage", "checks", "plan"] as const;
 type ReviewScreen = (typeof REVIEW_SCREENS)[number];
@@ -58,10 +62,10 @@ export function SetupReviewPage() {
         <p>{i18n._({ id: "Review your computers, files, checks, and plan.", message: "Review your computers, files, checks, and plan." })}</p>
         {renderSetupReviewScreen({ screen, engine, onEngineChange: setEngine, readOnly: screen === "storage", checkRows: rows, checkError, onRetryChecks: () => void refreshChecks() })}
         {error ? <Alert variant="destructive"><ErrorIcon /><AlertDescription>{error}</AlertDescription></Alert> : null}
-        <div className="flex flex-wrap items-center gap-2">
-          <Button type="button" variant="secondary" disabled={screenIndex === 0 || busy} onClick={() => setScreenIndex((index) => index - 1)}>{i18n._({ id: "Back", message: "Back" })}</Button>
-          {screenIndex < REVIEW_SCREENS.length - 1 ? <Button type="button" disabled={busy} onClick={() => setScreenIndex((index) => index + 1)}>{i18n._({ id: "Continue", message: "Continue" })}</Button> : <Button type="button" disabled={busy} onClick={() => void finish()}>{busy ? i18n._({ id: "Saving", message: "Saving" }) : i18n._({ id: "Done", message: "Done" })}</Button>}
-          <Button type="button" variant="link" disabled={busy} onClick={() => navigate("/repairs")}>{i18n._({ id: "Cancel", message: "Cancel" })}</Button>
+        <div className="flex items-center gap-2">
+          <Button type="button" variant="ghost" size="icon" aria-label={i18n._({ id: "Back", message: "Back" })} disabled={screenIndex === 0 || busy} onClick={() => setScreenIndex((index) => index - 1)}><BackIcon aria-hidden="true" /></Button>
+          {screenIndex < REVIEW_SCREENS.length - 1 ? <Button type="button" variant="ghost" size="icon" aria-label={i18n._({ id: "Continue", message: "Continue" })} disabled={busy} onClick={() => setScreenIndex((index) => index + 1)}><NextIcon aria-hidden="true" /></Button> : <Button type="button" variant="ghost" size="icon" aria-label={busy ? i18n._({ id: "Saving", message: "Saving" }) : i18n._({ id: "Done", message: "Done" })} disabled={busy} onClick={() => void finish()}><DoneIcon aria-hidden="true" /></Button>}
+          <Button type="button" variant="ghost" size="icon" aria-label={i18n._({ id: "Cancel", message: "Cancel" })} disabled={busy} onClick={() => navigate("/repairs")}><CancelIcon aria-hidden="true" /></Button>
         </div>
       </CardContent>
     </Card>

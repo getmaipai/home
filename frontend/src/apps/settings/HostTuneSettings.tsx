@@ -3,7 +3,7 @@ import { i18n } from "@lingui/core";
 import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@maipai/ui/src/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@maipai/ui/src/dashboard/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@maipai/ui/src/ui/card";
 import { Item, ItemActions, ItemContent, ItemDescription, ItemGroup, ItemTitle } from "@maipai/ui/src/dashboard/components/ui/item";
 import { api, ApiError, type HostTuneItem } from "@/lib/api";
 
@@ -30,7 +30,7 @@ export function HostTuneSettings() {
 
   return (
     <section data-testid="host-tune-settings">
-      <Card>
+      <Card surface="flat">
         <CardHeader>
           <CardTitle>{i18n._({ id: "Tune this computer", message: "Tune this computer" })}</CardTitle>
           <CardDescription>{i18n._({ id: "Changes that help the AI run well on this computer. Each one can be put back.", message: "Changes that help the AI run well on this computer. Each one can be put back." })}</CardDescription>

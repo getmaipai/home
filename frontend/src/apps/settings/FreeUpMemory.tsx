@@ -3,7 +3,7 @@ import { i18n } from "@lingui/core";
 import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@maipai/ui/src/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@maipai/ui/src/dashboard/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@maipai/ui/src/ui/card";
 import { request } from "@/lib/api";
 
 interface Reclaim { available: boolean; models: number; bytes: number }
@@ -29,7 +29,7 @@ export function FreeUpMemory() {
 
   return (
     <section data-testid="free-up-memory">
-      <Card>
+      <Card surface="flat">
         <CardHeader>
           <CardTitle>{i18n._({ id: "Free up memory", message: "Free up memory" })}</CardTitle>
           <CardDescription>{data.models === 0 ? i18n._({ id: "Nothing idle to unload right now.", message: "Nothing idle to unload right now." }) : i18n._({ id: "Unload {count, plural, one {# idle model} other {# idle models}}, about {size} GB. Chat and anything running are left alone. Other apps could free more; see System status.", message: "Unload {count, plural, one {# idle model} other {# idle models}}, about {size} GB. Chat and anything running are left alone. Other apps could free more; see System status.", values: { count: data.models, size: gb(data.bytes) } })}</CardDescription>

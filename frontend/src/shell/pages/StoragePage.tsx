@@ -6,7 +6,7 @@ import { toast } from "sonner";
 import { AsyncState } from "@maipai/ui/src/primitives/AsyncState";
 import { getIcon } from "@maipai/ui/src/icons";
 import { QuotaBanner } from "@maipai/ui/src/elements/quota-banner";
-import { Card, CardHeader, CardContent, CardTitle } from "@maipai/ui/src/dashboard/components/ui/card";
+import { PlainSection } from "@/apps/settings/PlainSection";
 import { tableColumns, useDataTableModel } from "@/shell/components/dataTableModel";
 import { DataTableControls } from "@/shell/components/DataTableControls";
 import { SettingsRenderer } from "@/shell/pages/settings/SettingsRenderer";
@@ -28,6 +28,7 @@ import { errorLine } from "@/lib/hubReachability";
 // performance/DiskHardwareCard.tsx already uses for the disk/storage
 // concept, not picked independently.
 export const StorageIcon = getIcon("database");
+const TrashIcon = getIcon("trash");
 
 interface PersonUsageRow extends Record<string, unknown> {
   person: string;
@@ -143,6 +144,24 @@ export function StoragePage({ person }: { person: Roster }) {
   );
 }
 
+function HouseholdTotal({ household }: { household: StorageUsageOverview["household"] }) {
+  return (
+    <PlainSection {...(household ? { heading: i18n._({ id: "Household total", message: "Household total" }) } : {})}>
+      {household?.capBytes && household.capBytes > 0 ? (
+        <QuotaBanner
+          used={household.usageBytes}
+          limit={household.capBytes}
+          unit="bytes"
+          formatAmount={formatBytes}
+        />
+      ) : household ? (
+        <p className="text-body text-muted-foreground">{i18n._({ id: "{size} used, no cap set", message: "{size} used, no cap set", values: { size: formatBytes(household.usageBytes) } })}</p>
+      ) : null}
+      <div className="flex justify-end"><Button variant="ghost" nativeButton={false} render={<Link to="/storage/trash" />}><TrashIcon aria-hidden />{i18n._({ id: "Trash", message: "Trash" })}</Button></div>
+    </PlainSection>
+  );
+}
+
 function StorageContent({ data, person, isAdmin, cacheRows, cacheLoading, clearAllOpen, setClearAllOpen, clear }: { data: StorageUsageOverview; person: Roster; isAdmin: boolean; cacheRows: PackageCacheSourceRow[]; cacheLoading: boolean; clearAllOpen: boolean; setClearAllOpen: (open: boolean) => void; clear: (source?: string, label?: string) => Promise<void> }) {
   const rows = [...data.people.map(toRow), ...(data.household && data.household.inherited.files > 0 ? [inheritedRow(data.household.inherited)] : [])];
   const model = useDataTableModel(rows, tableColumns<PersonUsageRow>(["person", "role", "used", "cap", "top kind"], {
@@ -153,45 +172,14 @@ function StorageContent({ data, person, isAdmin, cacheRows, cacheLoading, clearA
     "top kind": 240,
   }, { person: i18n._({ id: "Person", message: "Person" }), role: i18n._({ id: "Role", message: "Role" }), used: i18n._({ id: "Used", message: "Used" }), cap: i18n._({ id: "Cap", message: "Cap" }), "top kind": i18n._({ id: "Top kind", message: "Top kind" }) }), i18n._({ id: "No files yet.", message: "No files yet." }));
   return (
-    <>
-      <CardHeader>
-        <CardTitle><span className="flex items-center gap-2">
-          <StorageIcon size={16} className="text-muted-foreground" />
-          {i18n._({ id: "Storage", message: "Storage" })}
-        </span></CardTitle>
-      </CardHeader>
-      {data.household?.capBytes && data.household.capBytes > 0 ? (
-        <>
-          <CardTitle>{i18n._({ id: "Household total", message: "Household total" })}</CardTitle>
-          <QuotaBanner
-            used={data.household.usageBytes}
-            limit={data.household.capBytes}
-            unit="bytes"
-            formatAmount={formatBytes}
-          />
-        </>
-      ) : data.household ? (
-        <Card>
-          <CardHeader>
-            <CardTitle>{i18n._({ id: "Household total", message: "Household total" })}</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-sm text-muted-foreground">{i18n._({ id: "{size} used, no cap set", message: "{size} used, no cap set", values: { size: formatBytes(data.household.usageBytes) } })}</p>
-          </CardContent>
-        </Card>
-      ) : null}
-      <div className="mb-3 flex justify-end"><Button variant="outline" nativeButton={false} render={<Link to="/storage/trash" />}>{i18n._({ id: "Trash", message: "Trash" })}</Button></div>
+    <PlainSection>
+      <HouseholdTotal household={data.household} />
       <DataTable {...model.tableProps} toolbar={rows.length >= 10 ? <DataTableControls model={model} /> : undefined} caption={i18n._({ id: "Storage usage by person", message: "Storage usage by person" })} getRowId={(row) => row.person} />
       {isAdmin ? <>
         <SettingsRenderer scope="household" scopeValue="household" only={["household.storage"]} />
         <BackupsSection person={person} />
-        <Card>
-          <CardHeader>
-            <CardTitle>{i18n._({ id: "Saved online data", message: "Saved online data" })}</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p>{i18n._({ id: "Saved copies of weather, news and other things Home looked up online. Your own chats, memories and the news shelf stay. Home will fetch cleared data again the next time someone asks.", message: "Saved copies of weather, news and other things Home looked up online. Your own chats, memories and the news shelf stay. Home will fetch cleared data again the next time someone asks." })}</p>
-          </CardContent>
+        <PlainSection heading={i18n._({ id: "Saved online data", message: "Saved online data" })}>
+          <p className="text-body text-muted-foreground">{i18n._({ id: "Saved copies of weather, news and other things Home looked up online. Your own chats, memories and the news shelf stay. Home will fetch cleared data again the next time someone asks.", message: "Saved copies of weather, news and other things Home looked up online. Your own chats, memories and the news shelf stay. Home will fetch cleared data again the next time someone asks." })}</p>
           <DataTable
             columns={cacheColumns()}
             rows={cacheRows.map((row) => ({ source: row.source, label: row.label, entries: String(row.entryCount), size: formatBytes(row.sizeBytes) }))}
@@ -200,8 +188,8 @@ function StorageContent({ data, person, isAdmin, cacheRows, cacheLoading, clearA
             emptyLabel={cacheLoading ? i18n._({ id: "Loading saved data\u2026", message: "Loading saved data\u2026" }) : i18n._({ id: "No saved online data.", message: "No saved online data." })}
             rowActions={(row) => <DataTableRowActions actions={[{ label: i18n._({ id: "Clear {name}", message: "Clear {name}", values: { name: row.label } }), destructive: true, confirmLabel: clearConfirm(), onClick: () => clear(row.source, row.label) }]} />}
           />
-          <Button type="button" variant="destructive" disabled={cacheRows.length === 0} onClick={() => setClearAllOpen(true)}>{i18n._({ id: "Clear all", message: "Clear all" })}</Button>
-        </Card>
+          <div className="flex"><Button type="button" variant="ghost" disabled={cacheRows.length === 0} onClick={() => setClearAllOpen(true)}><TrashIcon aria-hidden />{i18n._({ id: "Clear all", message: "Clear all" })}</Button></div>
+        </PlainSection>
         <AlertDialog open={clearAllOpen} onOpenChange={setClearAllOpen}>
           <AlertDialogContent>
             <AlertDialogHeader>
@@ -215,6 +203,6 @@ function StorageContent({ data, person, isAdmin, cacheRows, cacheLoading, clearA
           </AlertDialogContent>
         </AlertDialog>
       </> : null}
-    </>
+    </PlainSection>
   );
 }

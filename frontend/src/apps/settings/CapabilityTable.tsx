@@ -2,7 +2,7 @@
 import { i18n } from "@lingui/core";
 import { useQuery } from "@tanstack/react-query";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@maipai/ui/src/ui/table";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@maipai/ui/src/dashboard/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@maipai/ui/src/ui/card";
 import { request } from "@/lib/api";
 
 export interface CapabilityData {
@@ -38,7 +38,7 @@ export function CapabilityTable({ path, framed = false }: { path: string; framed
   if (!framed) return table;
   return (
     <section data-testid="capabilities">
-      <Card>
+      <Card surface="flat">
         <CardHeader><CardTitle>{i18n._({ id: "What this computer can do", message: "What this computer can do" })}</CardTitle><CardDescription>{i18n._({ id: "Which of Standard, Boost and Max this computer can ever run for each kind of job.", message: "Which of Standard, Boost and Max this computer can ever run for each kind of job." })}</CardDescription></CardHeader>
         <CardContent>{table}</CardContent>
       </Card>
