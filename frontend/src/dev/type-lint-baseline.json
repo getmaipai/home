@@ -126,7 +126,7 @@
     "apps/chat/chatToolUis.tsx": 3,
     "apps/chat/ChatThread.tsx": 1,
     "apps/chat/branchInNewChatMenuItem.tsx": 1,
-    "apps/chat/chatThreadSlots.tsx": 9,
+    "apps/chat/chatThreadSlots.tsx": 8,
     "apps/chat/chatHeaderBar.tsx": 3,
     "apps/setup/StorageStep.tsx": 13,
     "apps/setup/SetupWizard.tsx": 27,

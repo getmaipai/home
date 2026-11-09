@@ -603,8 +603,8 @@ export function ChatWelcome() {
     <>
       <EngineStartingLoader />
       <EmptyState>
-        <EmptyStateGreeting size="lg">{on ? "Temporary chat" : starterGreeting(person?.display_name ?? "", new Date().getHours(), pick)}</EmptyStateGreeting>
-        {on ? <p className="text-muted-foreground text-center text-sm">{i18n._({ id: "This chat won't be saved to your history.", message: "This chat won't be saved to your history." })}</p> : null}
+        <EmptyStateGreeting size="lg" className="text-title">{on ? "Temporary chat" : starterGreeting(person?.display_name ?? "", new Date().getHours(), pick)}</EmptyStateGreeting>
+        {on ? <p className="text-muted-foreground text-center text-supporting">{i18n._({ id: "This chat won't be saved to your history.", message: "This chat won't be saved to your history." })}</p> : null}
       </EmptyState>
       {/* Room between the greeting and the composer now that the chips no longer sit there. */}
       <div aria-hidden className="h-8" />
@@ -625,6 +625,7 @@ export function ChatStarterPills() {
         <EmptyStateSuggestion
           key={suggestion.title}
           index={index}
+          className="text-supporting"
           disabled={engineDown !== undefined}
           aria-label={engineDown === undefined ? undefined : `${suggestion.title} ${suggestion.label}. ${engineDown}`}
           onClick={() => {

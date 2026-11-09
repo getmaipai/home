@@ -12,3 +12,33 @@
 .dark .aui-shiki-base {
   color-scheme: dark;
 }
+
+/* PRO-LOOK-CHAT-01: tune only the Thread's own design tokens. Its shipped
+   compact composer keeps its attachment and voice affordances while taking
+   the same pill radius and surface step as the rest of the chat controls. */
+html[data-pro-look] .aui-root.aui-thread-root {
+  --thread-max-width: 45rem !important;
+}
+
+html[data-pro-look] [data-slot="chat-pane"] {
+  --shell-user-bubble: var(--surface-2);
+  --shell-composer-bg: var(--surface-1);
+  --shell-composer-border: transparent;
+  --shell-composer-border-focus: color-mix(in oklab, var(--foreground) 18%, transparent);
+  --composer-compact-bg: var(--surface-1);
+  --composer-compact-border: transparent;
+  --composer-compact-border-focus: color-mix(in oklab, var(--foreground) 18%, transparent);
+  --composer-compact-radius: var(--radius-pill);
+  --composer-compact-text-size: var(--font-size-body);
+}
+
+/* EmptyStateSuggestion's shipped `paper` surface reads --background. Scope
+   that existing token to each suggestion so the Element stays a surface-1
+   chip without Home changing its shape or layout. */
+html[data-pro-look] [data-slot="empty-state-suggestion"] {
+  --background: var(--surface-1);
+}
+
+html[data-pro-look] [data-slot="aui_user-message-root"] .aui-user-message-content {
+  --composer-radius: var(--radius-card);
+}

@@ -1268,7 +1268,7 @@ msgid "{title}: which one"
 msgstr "{title}: which one"
 
 #. js-lingui-explicit-id
-#: src/apps/chat/chatThreadSlots.tsx:779
+#: src/apps/chat/chatThreadSlots.tsx:780
 msgid "{tokens} tokens"
 msgstr "{tokens} tokens"
 
@@ -3549,7 +3549,7 @@ msgid "Bare mode is on"
 msgstr "Bare mode is on"
 
 #. js-lingui-explicit-id
-#: src/apps/chat/chatThreadSlots.tsx:823
+#: src/apps/chat/chatThreadSlots.tsx:824
 #: src/shell/pages/ChatPage.tsx:1612
 msgid "Bare model"
 msgstr "Bare model"

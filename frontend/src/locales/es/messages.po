@@ -1500,7 +1500,7 @@ msgid "{title}: which one"
 msgstr "{title}: cuál"
 
 #. js-lingui-explicit-id
-#: src/apps/chat/chatThreadSlots.tsx:779
+#: src/apps/chat/chatThreadSlots.tsx:780
 #, needs-review
 msgid "{tokens} tokens"
 msgstr "{tokens} tokens"
@@ -4145,7 +4145,7 @@ msgid "Bare mode is on"
 msgstr "Modo base activado"
 
 #. js-lingui-explicit-id
-#: src/apps/chat/chatThreadSlots.tsx:823
+#: src/apps/chat/chatThreadSlots.tsx:824
 #: src/shell/pages/ChatPage.tsx:1612
 #, needs-review
 msgid "Bare model"
