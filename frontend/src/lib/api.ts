@@ -1,4 +1,5 @@
 import { isDeviceRevoked, removeAllOfflineMedia } from "@/lib/offlineMedia";
+import { takeEarlyMe } from "@/lib/earlyMe";
 import type { StatusAppsWire, AppRow as AppRowWire } from "@maipai/home-backend/src/wire";
 import type { RobotState } from "@maipai/spec/gen/ts/robot-state.js";
 import type { StackFitPlan } from "@maipai/spec/gen/ts/stack-fit-plan.js";
@@ -1130,7 +1131,7 @@ export const api = {
       method: "POST",
       body: JSON.stringify({ currentSecret, newSecret }),
     }),
-  me: () => request<SignedInPerson>("/api/auth/me"),
+  me: async () => (await takeEarlyMe<SignedInPerson>()) ?? request<SignedInPerson>("/api/auth/me"),
   locale: () => request<{ locale: string }>("/api/auth/locale"),
   logout: () => request<{ success: true }>("/api/auth/logout", { method: "POST" }),
   // Session E step 6: "sessions and devices with revoke" - both scoped

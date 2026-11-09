@@ -6,3 +6,10 @@ try {
   var dark = saved && typeof saved.dark === "boolean" ? saved.dark : matchMedia("(prefers-color-scheme: dark)").matches;
   root.classList.add(dark ? "dark" : "light");
 } catch { /* main.tsx sets the class again */ }
+// Ask who is signed in now, while the app's code is still downloading, instead of after it has run. api.me() takes this answer once
+// (src/lib/earlyMe.ts); any miss, error or old answer falls back to the normal request. Same-origin, cookie only: nothing new is sent.
+try {
+  if (location.pathname.indexOf("/setup") !== 0) {
+    window.__maipaiEarlyMe = { at: Date.now(), answer: fetch("/api/auth/me", { credentials: "include", headers: { "content-type": "application/json" } }).then(function (res) { return res.ok ? res.json() : null; }).catch(function () { return null; }) };
+  }
+} catch { /* api.me() asks again */ }
