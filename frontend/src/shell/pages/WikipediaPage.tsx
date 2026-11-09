@@ -74,7 +74,7 @@ function ExploreGrid({ book }: { book: string }) {
   return (
     <section aria-label={i18n._({ id: "Explore", message: "Explore" })} className="flex flex-col gap-3">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
-        <h2 className="text-xl font-semibold">{i18n._({ id: "Explore", message: "Explore" })}</h2>
+        <h2 className="text-section font-semibold">{i18n._({ id: "Explore", message: "Explore" })}</h2>
         <Button variant="outline" size="sm" disabled={picks.isFetching} onClick={() => setRound((now) => now + 1)}>{i18n._({ id: "Show different articles", message: "Show different articles" })}</Button>
       </div>
       <p className="text-muted-foreground text-sm">{i18n._({ id: "Articles picked at random from the Wikipedia on this computer.", message: "Articles picked at random from the Wikipedia on this computer." })}</p>
@@ -117,7 +117,7 @@ function HomeSections({ book, recent }: { book: string; recent: RecentArticle[] 
       ) : null}
       <section aria-label={i18n._({ id: "Something to read", message: "Something to read" })} className="flex flex-col gap-3">
         <div className="flex flex-wrap items-baseline justify-between gap-2">
-          <h2 className="text-xl font-semibold">{i18n._({ id: "Something to read", message: "Something to read" })}</h2>
+          <h2 className="text-section font-semibold">{i18n._({ id: "Something to read", message: "Something to read" })}</h2>
           <Button variant="outline" size="sm" disabled={picks.isFetching} onClick={() => setRound((now) => now + 1)}>{i18n._({ id: "Show different articles", message: "Show different articles" })}</Button>
         </div>
         <PickGrid picks={picks} empty={i18n._({ id: "Nothing to suggest right now. Try a search.", message: "Nothing to suggest right now. Try a search." })} />

@@ -33,7 +33,7 @@ export function ReaderSearchBox({ book, placeholder, routeFor, onSearch, initial
   const items = open && debounced ? suggestions.data ?? [] : [];
   return (
     <form role="search" onSubmit={(event) => { event.preventDefault(); if (text.trim()) { setOpen(false); onSearch(text.trim()); } }} className="relative mx-auto w-full max-w-2xl">
-      <Input ref={input} aria-label={placeholder} value={text} onChange={(event) => { setText(event.target.value); setOpen(true); }} onFocus={() => setOpen(true)} onBlur={() => window.setTimeout(() => setOpen(false), 150)} placeholder={placeholder} autoComplete="off" />
+      <Input shape="pill" fill="surface" ref={input} aria-label={placeholder} value={text} onChange={(event) => { setText(event.target.value); setOpen(true); }} onFocus={() => setOpen(true)} onBlur={() => window.setTimeout(() => setOpen(false), 150)} placeholder={placeholder} autoComplete="off" />
       {items.length ? (
         <ul aria-label={i18n._({ id: "Suggested articles", message: "Suggested articles" })} className="bg-popover text-popover-foreground absolute inset-x-0 top-full z-20 mt-1 flex max-h-[28rem] flex-col overflow-y-auto rounded-lg border shadow-md">
           {items.map((item) => <li key={`${item.book}:${item.path}`} className="hover:bg-muted border-b last:border-b-0"><ArticleCard variant="row" book={item.book} path={item.path} title={item.title} to={routeFor(item.book, item.path)} onOpen={() => setOpen(false)} /></li>)}

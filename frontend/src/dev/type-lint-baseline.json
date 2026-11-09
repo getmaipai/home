@@ -1,7 +1,7 @@
 {
   "fontSize": {
     "main.tsx": 1,
-    "shell/reader/ArticleCard.tsx": 4,
+    "shell/reader/ArticleCard.tsx": 0,
     "shell/reader/SearchResults.tsx": 3,
     "shell/InstallDockRow.tsx": 3,
     "shell/AlarmRinger.tsx": 3,
@@ -63,7 +63,7 @@
     "shell/pages/PackageAppPage.tsx": 4,
     "shell/pages/CompanionAudienceDialog.tsx": 3,
     "shell/pages/FilesPage.tsx": 3,
-    "shell/pages/WikipediaPage.tsx": 8,
+    "shell/pages/WikipediaPage.tsx": 6,
     "shell/pages/MediaHomePage.tsx": 2,
     "shell/pages/UiShowcasePage.tsx": 1,
     "shell/pages/performance/ToolsOfferedBody.tsx": 2,

@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { Chip } from "@maipai/ui/src/primitives/Chip";
+import { Card } from "@maipai/ui/src/primitives/Card";
 import { getIcon } from "@maipai/ui/src/icons";
 import { api } from "@/lib/api";
 
@@ -48,23 +49,24 @@ export function ArticleCard({ book, path, title, snippet, to, variant = "card", 
   const preview = useArticlePreview(book, path, seen);
   const data = preview.data;
   const row = variant === "row";
-  const size = row ? "size-10 rounded-md" : "h-28 w-24 rounded-lg sm:h-32 sm:w-28";
+  const size = row ? "size-16 rounded-lg" : "h-28 w-24 rounded-lg sm:h-32 sm:w-28";
   const picture = data?.thumbnail
     ? <img src={data.thumbnail.src} alt="" loading="lazy" className={`${size} shrink-0 object-cover`} />
     : preview.isPending && seen ? <div aria-hidden className={`${size} bg-muted shrink-0`} /> : row ? <div aria-hidden className={`${size} bg-muted shrink-0`} /> : null;
   const lines = snippet || data?.lead || data?.summary;
-  const body = (
-    <div ref={ref} data-slot="reader-result" className={row ? "flex w-full min-w-0 items-center gap-3 px-3 py-2" : "bg-card flex w-full min-w-0 items-center gap-4 rounded-xl border p-3"}>
+  const content = (
+    <div className={row ? "flex w-full min-w-0 items-center gap-3" : "flex w-full min-w-0 items-center gap-4"}>
       {picture}
       <div className="min-w-0 flex-1">
-        <p className={row ? "truncate font-semibold" : "text-lg font-semibold"}>{title}</p>
-        {data?.description ? <p className={row ? "text-muted-foreground truncate text-sm" : "text-muted-foreground text-sm"}>{data.description}</p> : null}
+        <p className={row ? "truncate text-row font-semibold" : "text-row font-semibold"}>{title}</p>
+        {data?.description ? <p className={row ? "text-muted-foreground truncate text-supporting" : "text-muted-foreground text-supporting"}>{data.description}</p> : null}
         {!row && data?.kicker ? <div className="my-1.5"><Chip>{data.kicker}</Chip></div> : null}
-        {!row && lines ? <p className="text-muted-foreground line-clamp-2 break-words text-sm">{lines}</p> : null}
+        {!row && lines ? <p className="text-muted-foreground line-clamp-2 break-words text-supporting">{lines}</p> : null}
       </div>
       {action && !to ? action : !action && !row ? <ChevronRight aria-hidden className="text-muted-foreground size-5 shrink-0" /> : null}
     </div>
   );
+  const body = row ? <div ref={ref} data-slot="reader-result" className="py-2">{content}</div> : <div ref={ref} data-slot="reader-result"><Card surface="flat">{content}</Card></div>;
   if (!to) return body;
   const link = <Link to={to} onClick={onOpen} className="block min-w-0 flex-1 rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">{body}</Link>;
   return action ? <div className="flex min-w-0 items-center gap-2">{link}{action}</div> : link;
