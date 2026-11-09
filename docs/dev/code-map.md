@@ -451,7 +451,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/companionTakes.ts` | TAKE_RUN_BUSY_LINE, TAKE_QUICK_NOT_READY_LINE, TAKE_RUN_TIMEOUT_LINE, TAKE_RETRY_WAIT_MS, TAKE_POLL_MS, TAKE_NEGATIVE_PROMPT |
 | `backend/src/lib/companionTalkAnchors.ts` | TALK_ANCHORS_UNAVAILABLE, __setTalkAnchorCompletionForTests, padAnchor, detectTalkAnchors |
 | `backend/src/lib/companionTalkJobs.ts` | talkJobBusy, talkJobFor, startCompanionTalk, publicTalkJob, cancelTalkJob, clearCompanionTalkJobs |
-| `backend/src/lib/companionTalkMaker.ts` | TALK_SHAPES, TALK_EYES, talkCropGeometry, makeTalkPicture, cutTalkCrop |
+| `backend/src/lib/companionTalkMaker.ts` | TALK_SHAPES, TALK_KEEP, TALK_EYES, talkCropGeometry, makeTalkPicture, cutTalkCrop |
 | `backend/src/lib/companions.ts` | companionsAllowed |
 | `backend/src/lib/companionsApp.ts` | currentCompanionId, mayUseCompanion, companionAreaOn, canCreateCompanion, cardOf, listCompanionCards |
 | `backend/src/lib/composer.ts` | COMPOSE_FALLBACK_LINE, COMPOSER_MAX_CALLS, COMPOSE_FAILURE_LINE, DEFAULT_MOVES, groundedIn, emptyLookupLine |
