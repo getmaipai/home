@@ -24,6 +24,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/packages/music/pages/creations.json` | music | My creations |
 | `backend/packages/music/pages/edit.json` | music | Edit |
 | `backend/packages/music/pages/index.json` | music | Listen now |
+| `backend/packages/music/pages/library.json` | music | Your Library |
 | `backend/packages/music/pages/liked.json` | music | Liked |
 | `backend/packages/music/pages/make-album.json` | music | Make an album |
 | `backend/packages/music/pages/make-band.json` | music | Make a band |
@@ -46,6 +47,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/packages/news/pages/saved.json` | news | Saved |
 | `backend/packages/news/pages/search.json` | news | Search |
 | `backend/packages/news/pages/story.json` | news | Story |
+| `backend/packages/podcasts/pages/episode.json` | podcasts | Episode |
 | `backend/packages/podcasts/pages/episodes.json` | podcasts | Episodes |
 | `backend/packages/podcasts/pages/filters.json` | podcasts | Filters |
 | `backend/packages/podcasts/pages/index.json` | podcasts | Podcasts |
@@ -69,6 +71,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/packages/videos/pages/history.json` | videos | History |
 | `backend/packages/videos/pages/index.json` | videos | Videos |
 | `backend/packages/videos/pages/library.json` | videos | Library |
+| `backend/packages/videos/pages/liked.json` | videos | Liked videos |
 | `backend/packages/videos/pages/search.json` | videos | Search |
 | `backend/packages/videos/pages/studio.json` | videos | Studio |
 | `backend/packages/videos/pages/watch-later.json` | videos | Watch later |
@@ -206,7 +209,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `frontend/src/shell/MediaPickerDialog.tsx` | SAY_PREFIX, SAY_MAX_LENGTH, thumbUrlFor, MediaPickerBody, StudioPickerBody |
 | `frontend/src/shell/MediaPlayerRegistration.tsx` | chaptersWithEnds, audioKindOfApp, MediaPlayerRegistration |
 | `frontend/src/shell/MemoriesRedirect.tsx` | MemoriesRedirect, LegacyProfileMemoriesRedirect |
-| `frontend/src/shell/NotificationBell.tsx` | notificationLine, POLL_MS, NOTIFICATIONS_QUERY_KEY, NOTIFICATIONS_HISTORY_QUERY_KEY, useNotificationsQuery, usePendingNotificationCount |
+| `frontend/src/shell/NotificationBell.tsx` | NOTIFICATION_RESULT_LINKS, notificationLine, POLL_MS, NOTIFICATIONS_QUERY_KEY, NOTIFICATIONS_HISTORY_QUERY_KEY, useNotificationsQuery |
 | `frontend/src/shell/RailProfile.tsx` | RailProfile |
 | `frontend/src/shell/Routes.tsx` | Routes |
 | `frontend/src/shell/StatusIndicator.tsx` | useStatusSummary, StatusIndicator |
@@ -240,6 +243,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `frontend/src/shell/mediaHost.tsx` | hlsPathFor, createMediaStore, ListenStatusContext, MediaDockContext, useMediaDock, MAKING_NOT_READY_LINE |
 | `frontend/src/shell/pageContext.tsx` | ambientPageContextForRoute, AmbientPageContextProvider, useAmbientPageContext, useSetPageContext |
 | `frontend/src/shell/pageHeaderTitle.tsx` | headerEntryFor, HeaderTitle, PageHeaderTitle, PageHeaderActions |
+| `frontend/src/shell/pages/ActivityPage.tsx` | groupByDay, ActivityPage |
 | `frontend/src/shell/pages/AllAppsPage.tsx` | AllAppsPage |
 | `frontend/src/shell/pages/BackupsPage.tsx` | BackupsIcon, BackupsPage |
 | `frontend/src/shell/pages/BringSong.tsx` | BRING_SONG_LINE, BringSong |
@@ -347,6 +351,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | File | Exported names |
 |---|---|
 | `backend/src/lib/access.ts` | isOwnerOrAdmin, COMPANION_BAND_LINE, canMakeCompanion, canHaveTemporaryChat, mayUseClipVoices, rolesById |
+| `backend/src/lib/activity.ts` | ACTIVITY_SEEN_KEY, activityDot, activitySeenAt, markActivitySeen, activityForViewer, activeGenerationRows |
 | `backend/src/lib/addModel.ts` | AddModelError, inspectForAdd, addChatModel |
 | `backend/src/lib/addModelRecord.ts` | addedModelId, recordFor |
 | `backend/src/lib/addedModels.ts` | listAddedModels, saveAddedModel, removeAddedModel |
@@ -664,7 +669,8 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/media/mediaEdit.ts` | editMediaItem |
 | `backend/src/lib/media/model.ts` | itemFromRow, itemToRow, MADE_SOURCE_PREFIX, LEGACY_MADE_SOURCE_PREFIX, madeSourceId, sourceFromRow |
 | `backend/src/lib/media/music.ts` | albumKey, artistKey, albumOrder, groupTracks, radioTracks, shuffled |
-| `backend/src/lib/media/musicMixes.ts` | musicGreeting, MIX_SCOPES, musicMixData |
+| `backend/src/lib/media/musicLibrary.ts` | MUSIC_PIN_MAX, MUSIC_SEARCH_MAX, pinMusicItem, musicQueueAction, recordMusicSearch, clearMusicSearches |
+| `backend/src/lib/media/musicMixes.ts` | musicGreeting, daylistRows, replayRows, MIX_SCOPES, musicMixData |
 | `backend/src/lib/media/musicbrainzMatch.ts` | MUSICBRAINZ_HOST, MUSICBRAINZ_MATCH_KEY, MIN_GAP_MS, matchingEnabled, foldName, sameName |
 | `backend/src/lib/media/parsers/audioTags.ts` | explicitFromNative, tagsFromMetadata, readSidecarLyrics, readAudioTags, readEmbeddedCover |
 | `backend/src/lib/media/parsers/epub.ts` | parseOpf, readEpubMeta, readEpubCover |
@@ -676,6 +682,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/media/podcastApp.ts` | showRulesLine, podcastSnipLabel, podcastSnipRowsForRoute |
 | `backend/src/lib/media/podcastDirectory.ts` | __resetDirectoryForTests, directoryShowForFeed, directoryAllowed, searchDirectory, topShows, smallArt |
 | `backend/src/lib/media/podcastFilters.ts` | MAX_FILTERS, parseRules, matchesRules, evaluateFilter, filterSummary, draftRows |
+| `backend/src/lib/media/podcastParity.ts` | episodeSortOf, seasonsOf, orderEpisodes, followPodcast, unfollowPodcast, isFollowed |
 | `backend/src/lib/media/podcastStats.ts` | aggregatePodcastStats, podcastStats, podcastStatsRows |
 | `backend/src/lib/media/podcasts.ts` | previewPodcastFeed, __resetPodcastPreviewForTests, previewEpisodeAddress, previewEpisodeView, __setPodcastFetchDepsForTests, plainNotes |
 | `backend/src/lib/media/prober.ts` | probeResultFrom, createStackProber |
@@ -695,7 +702,9 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/media/sources.ts` | ROOT_KINDS, TRASH_DAYS, pathsOverlap, liveRoots, createRootSource, removeSource |
 | `backend/src/lib/media/templates.ts` | listTemplates, getTemplate |
 | `backend/src/lib/media/textMatch.ts` | titleMatch |
+| `backend/src/lib/media/videoByline.ts` | ageLabel, withVideoByline |
 | `backend/src/lib/media/videoCreateApp.ts` | videoTierSegment, VIDEO_STATUS_WARM_MS, VIDEO_TIME_WORDS |
+| `backend/src/lib/media/videoFilters.ts` | VIDEO_FILTERED_IDS, SHORT_BELOW_S, LONG_FROM_S, videoFilterOf, videoSortOf, wantsVideoRules |
 | `backend/src/lib/media/watchTime.ts` | MEDIA_KID_COPY, TIME_UP_LINE, WRITE_INTERVAL_S, WRITE_SLACK_S, FORWARD_CAP_S, SESSION_ROW_TTL_MS |
 | `backend/src/lib/mediaClaims.ts` | asksForMedia, claimsMedia, MEDIA_NOT_STARTED_LINE, MUSIC_STARTED_LINE, MEDIA_REASK_INSTRUCTION, asksForSong |
 | `backend/src/lib/mediaOps/chatSchema.ts` | editPictureSpec, generateImageSchema |
@@ -1144,6 +1153,8 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/videos/adultStyle.ts` | usesAdultOnlyStyle |
 | `backend/src/lib/videos/audioLength.ts` | wavSeconds, mp4Seconds, mp3Seconds, audioSeconds |
 | `backend/src/lib/videos/beatCut.ts` | planBeatCut |
+| `backend/src/lib/videos/chapters.ts` | chaptersForMadeClip |
+| `backend/src/lib/videos/clipNotice.ts` | CLIP_READY_TYPE, notifyClipReady |
 | `backend/src/lib/videos/createStyles.ts` | styleTiersOf, styleDisabledLine, styleNote, styleChips |
 | `backend/src/lib/videos/editGate.ts` | EDIT_MINOR_LINE, editRefusal, editableClip, clipFileOf, clipMarkOf, ownTrackFile |
 | `backend/src/lib/videos/editPlan.ts` | VIDEO_RESTYLES, restyleBody, MIX_LEVEL_IDS, MIX_LEVELS, DEFAULT_VOICE_LEVEL, DEFAULT_MUSIC_LEVEL |
