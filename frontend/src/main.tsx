@@ -7,6 +7,8 @@ import { applyFirstPaintPalette } from "@/shell/firstPaintPalette";
 import { installPlaybackUnlock } from "@/lib/voice/playbackContext";
 
 window.__setupPreview = __SETUP_PREVIEW__;
+// The main screens are the biggest chunk after the shell. Fetch them now, beside the sign-in and language requests, instead of after.
+if (!__SETUP_PREVIEW__) void import("@/shell/Routes").catch(() => undefined);
 if (!__SETUP_PREVIEW__) installStaleChunkRetry(window, sessionStorage);
 if (!__SETUP_PREVIEW__ && "serviceWorker" in navigator) {
   installHiddenReloadOnNewServiceWorker(navigator.serviceWorker, document, window);
