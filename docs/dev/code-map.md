@@ -234,7 +234,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `frontend/src/shell/media/AudioVisualizer.tsx` | VISUALIZERS, getVisualizerPref, setVisualizerPref, getVisualizerEnabled, setVisualizerEnabled, useVisualizerEnabled |
 | `frontend/src/shell/media/MinimizeButton.tsx` | MinimizeButton |
 | `frontend/src/shell/media/MusicVisualizerSection.tsx` | MusicVisualizerSection |
-| `frontend/src/shell/media/NowPlayingStage.tsx` | clock, NowPlayingStage |
+| `frontend/src/shell/media/NowPlayingStage.tsx` | clock, lyricsOf, NowPlayingStage |
 | `frontend/src/shell/media/SleepMenu.tsx` | SleepMenu |
 | `frontend/src/shell/media/VisualizerMenu.tsx` | VisualizerMenu |
 | `frontend/src/shell/mediaHost.tsx` | hlsPathFor, createMediaStore, ListenStatusContext, MediaDockContext, useMediaDock, MAKING_NOT_READY_LINE |
@@ -664,6 +664,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/media/mediaEdit.ts` | editMediaItem |
 | `backend/src/lib/media/model.ts` | itemFromRow, itemToRow, MADE_SOURCE_PREFIX, LEGACY_MADE_SOURCE_PREFIX, madeSourceId, sourceFromRow |
 | `backend/src/lib/media/music.ts` | albumKey, artistKey, albumOrder, groupTracks, radioTracks, shuffled |
+| `backend/src/lib/media/musicMixes.ts` | musicGreeting, MIX_SCOPES, musicMixData |
 | `backend/src/lib/media/musicbrainzMatch.ts` | MUSICBRAINZ_HOST, MUSICBRAINZ_MATCH_KEY, MIN_GAP_MS, matchingEnabled, foldName, sameName |
 | `backend/src/lib/media/parsers/audioTags.ts` | explicitFromNative, tagsFromMetadata, readSidecarLyrics, readAudioTags, readEmbeddedCover |
 | `backend/src/lib/media/parsers/epub.ts` | parseOpf, readEpubMeta, readEpubCover |
