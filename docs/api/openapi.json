@@ -71994,6 +71994,100 @@
         }
       }
     },
+    "/api/videos/check-prompt": {
+      "post": {
+        "tags": [
+          "Videos"
+        ],
+        "summary": "Check a video prompt for mistakes before making it",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "prompt": {
+                    "type": "string",
+                    "maxLength": 4000,
+                    "description": "The words as typed."
+                  },
+                  "seconds": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 30,
+                    "description": "The length asked for, so spoken lines can be measured against it."
+                  }
+                },
+                "required": [
+                  "prompt"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Findings, errors first; an empty list means nothing to fix",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "findings": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "code": {
+                            "type": "string"
+                          },
+                          "level": {
+                            "type": "string",
+                            "enum": [
+                              "error",
+                              "warn",
+                              "info"
+                            ]
+                          },
+                          "message": {
+                            "type": "string",
+                            "description": "What is wrong, in plain words."
+                          },
+                          "fix": {
+                            "type": "string",
+                            "nullable": true,
+                            "description": "The whole prompt with the one safe edit applied, or null when it needs a person's choice."
+                          }
+                        },
+                        "required": [
+                          "code",
+                          "level",
+                          "message",
+                          "fix"
+                        ]
+                      }
+                    }
+                  },
+                  "required": [
+                    "findings"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/videos/animate": {
       "post": {
         "tags": [

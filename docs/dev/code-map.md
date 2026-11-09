@@ -1153,6 +1153,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/videos/musicBed.ts` | __setMusicBedPollMsForTests, startMusicBed, whenMusicDone, setPendingMix, takePendingMix |
 | `backend/src/lib/videos/phaseLabel.ts` | phaseLabel |
 | `backend/src/lib/videos/policy.ts` | VIDEO_ENABLED_KEY, VIDEO_TIER_KEY, VIDEO_DENIAL_LINE, VIDEO_NOT_HERE_LINE, householdAllowsVideo, householdVideoQuality |
+| `backend/src/lib/videos/promptCheck.ts` | checkVideoPrompt |
 | `backend/src/lib/videos/quality.ts` | QUICK_BASE, DETAILED_BASE, QUICK_MAX_SECONDS, DETAILED_MAX_SECONDS, LTX25_MODEL, LTX25_MAX_MODEL |
 | `backend/src/lib/videos/ready.ts` | __setVideoStatusForTests, __setVideoStatusReaderForTests, videoEngineStatus, peekVideoEngineStatus, dropVideoStatusCache, videoStatusReady |
 | `backend/src/lib/videos/recipes.ts` | VIDEO_RECIPES, videoRecipeFor, withVideoRecipe, VIDEO_STARTERS, VIDEO_LOOKS, videoLookFor |
