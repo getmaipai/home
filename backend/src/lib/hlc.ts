@@ -86,6 +86,7 @@ export const HLC_BEARING_TABLES = [
   "media_progress",
   "media_collections",
   "media_productions",
+  "production_documents",
   "media_subjects",
   "news_interests",
   "news_saves",

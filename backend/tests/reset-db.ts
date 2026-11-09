@@ -64,6 +64,7 @@ import {
   mediaSubjects,
   mediaProductions,
   filmRuns,
+  productionDocuments,
   mediaProgress,
   mediaWatchDays,
   mediaWatchSessions,
@@ -339,6 +340,7 @@ export function resetDb(): void {
   db.delete(madeAlbums).run(); // MUSIC-STUDIO-ALBUM
   db.delete(madeRevisions).run(); // MUSIC-STUDIO-EDIT
   db.delete(mediaProductions).run();
+  db.delete(productionDocuments).run();
   db.delete(filmRuns).run();
   db.delete(mediaSubjects).run(); // IMG-SUBJECT-01: owner_person_id references people
   db.delete(people).run();

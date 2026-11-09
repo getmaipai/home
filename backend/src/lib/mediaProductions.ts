@@ -1,6 +1,6 @@
 import { and, eq, isNull } from "drizzle-orm";
 import { db } from "@/db";
-import { mediaProductions, mediaSubjects, mediaSources, people } from "@/db/schema";
+import { mediaProductions, mediaSubjects, mediaSources, people, productionDocuments, filmRuns } from "@/db/schema";
 import { canUseSubject, getMediaSubject } from "@/lib/mediaSubjects";
 import { randomSuffix } from "@/lib/id";
 import { nextHlc } from "@/lib/hlc";
@@ -161,7 +161,7 @@ export function applyScriptOperation(actor:PersonRow,id:string,operation:{op:"ad
   else {if(!operation.episode||operation.episode.id!==operation.episode_id)throw new Error("The replacement must keep the same episode id.");episodes[index]=operation.episode;}
   return updateMediaProduction(actor,id,{episodes});
 }
-export function deleteMediaProduction(actor:PersonRow,id:string):boolean { const row=raw(id); if(!row||row.ownerPersonId!==actor.id) return false; db.delete(mediaProductions).where(eq(mediaProductions.id,id)).run(); return true; }
+export function deleteMediaProduction(actor:PersonRow,id:string):boolean { const row=raw(id); if(!row||row.ownerPersonId!==actor.id) return false; db.delete(mediaProductions).where(eq(mediaProductions.id,id)).run(); db.delete(productionDocuments).where(eq(productionDocuments.productionId,id)).run(); db.delete(filmRuns).where(eq(filmRuns.productionId,id)).run(); return true; }
 export function shareMediaProduction(actor:PersonRow,id:string,personId:string,shared:boolean):Production|null {
   const row=raw(id); if(!row||row.ownerPersonId!==actor.id)return null;
   const target=db.select({id:people.id,role:people.role}).from(people).where(and(eq(people.id,personId),isNull(people.deletedAt))).get();

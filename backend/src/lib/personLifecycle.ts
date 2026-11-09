@@ -406,6 +406,10 @@ export function erasePersonData(personId: string, blobsAfterCommit: string[], pr
   const projectRows = sqlite.query("DELETE FROM projects WHERE person = ?").run(personId).changes;
   // PRODUCTION-01: productions are private creator data and are erased with their owner.
   sqlite.query("DELETE FROM media_productions WHERE owner_person_id = ?").run(personId);
+  // LONGFORM-01: the documents of a long-form production are erased with their owner.
+  sqlite.query("DELETE FROM production_documents WHERE owner_person_id = ?").run(personId);
+  // The film runs (the story idea, the plan, the scene runs of a long-form production) are the same private creator data.
+  sqlite.query("DELETE FROM film_runs WHERE person_id = ?").run(personId);
   // Lists belong to an individual only when explicitly person-scoped.
   // Household lists can carry an incidental person value and remain.
   sqlite.query("DELETE FROM lists WHERE scope = 'person' AND person = ?").run(personId);

@@ -2427,8 +2427,29 @@ export const filmRuns = sqliteTable("film_runs", {
   state: text("state").notNull(), stage: text("stage"), doneSteps: integer("done_steps").notNull().default(0),
   totalSteps: integer("total_steps").notNull().default(0), filmFileId: text("film_file_id"), note: text("note"),
   errorLine: text("error_line"), goAhead: integer("go_ahead", { mode: "boolean" }).notNull(),
+  /** LONGFORM-01: a scene run belongs to a long-form production's parent run, and a scene may be several runs that share a scene key. */
+  parentId: text("parent_id"), sceneKey: text("scene_key"),
   createdAt: text("created_at").notNull(), updatedAt: text("updated_at").notNull(),
-}, (table) => [index("film_runs_person_idx").on(table.personId), index("film_runs_state_idx").on(table.state)]);
+}, (table) => [index("film_runs_person_idx").on(table.personId), index("film_runs_state_idx").on(table.state), index("film_runs_parent_idx").on(table.parentId)]);
+
+/**
+ * LONGFORM-01: the documents of a long-form production (treatment, bible, outline, scripts, shot lists), one versioned row per kind and key.
+ * Owned by the production's owner; nothing here is shared on its own. `provenance` says how the row came to be (the model, the person, a rewrite).
+ */
+export const productionDocuments = sqliteTable("production_documents", {
+  id: text("id").primaryKey(),
+  productionId: text("production_id").notNull(),
+  ownerPersonId: text("owner_person_id").notNull().references(() => people.id),
+  kind: text("kind").notNull(),
+  key: text("key").notNull(),
+  json: text("json").notNull(),
+  version: integer("version").notNull().default(1),
+  approved: integer("approved", { mode: "boolean" }).notNull().default(false),
+  provenance: text("provenance").notNull(),
+  createdAt: text("created_at").notNull(),
+  updatedAt: text("updated_at").notNull(),
+  hlc: text("hlc").notNull(),
+}, (table) => [uniqueIndex("production_documents_slot").on(table.productionId, table.kind, table.key), index("production_documents_owner_idx").on(table.ownerPersonId)]);
 
 export const newsInterests = sqliteTable(
   "news_interests",
