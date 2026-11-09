@@ -34,7 +34,7 @@ a long take is parts that each continue from the last frame of the one before, m
 **A long take is a production of parts.** Asking for more seconds than the level's ceiling makes a long take instead of cutting the length:
 
 1. **Plan (code, no model).** parts = ceil(seconds / ceiling); each part gets an equal share, at least 3 s. At most 12 parts (about two minutes at
-   Standard). An unbroken take is capped at 40 seconds (drift builds with every part; research on 2026-11-09 found every chained method drifts and the better ones carry more than one frame); anything longer is refused with one plain line that points to a film or scene made from shots with cuts (the show-runner design, SHOWRUNNER-01).
+   Standard). An unbroken take is capped at 40 seconds (drift builds with every part; research on 2026-11-09 found every chained method drifts and the better ones carry more than one frame); anything longer is refused with one plain line that points to a film or scene made from shots with cuts (the long-form productions design, LONGFORM-01).
 2. **Beats.** The person's words stay as written for part 1. For each later part the code adds one continuity sentence ("the same scene, the same
    people and light, a moment later") and, when the person gave beats (one per line, or numbered), that part's beat. With no beats, every part
    gets the whole prompt plus the continuity sentence. The model is not asked to plan camera or timing (the framing rule from the film maker:
@@ -65,7 +65,7 @@ beats.") rather than saved cut off. Progress is the count
    One long take per person at a time and the daily counts are the household queue's existing per-person limits and daily caps (TIER-PRIO-06); a part
    that the queue holds back simply waits. Nothing new locks.
 8. **Where it starts.** `generate_video` with `seconds` past the ceiling in chat; `POST /api/videos/long` for the Create page; the Create
-   page's Length chip lists 15, 20, 30, 45 and 60 s once VIDEO-UI-06 lands (LONGTAKE-02). The estimate for the button is parts times the
+   page's Length dropdown lists 5 s up to the longest unbroken take (built from the level's part ceiling and `MAX_TAKE_SECONDS`, never typed in) once VIDEO-UI-06 lands (LONGTAKE-02); past the maximum the page offers **New production** (the long-form productions design) instead of a longer choice. The estimate for the button is parts times the
    measured minutes per part (VIDEO-ESTIMATE-01).
 
 ## 2a. Upgrades from the 2026-11-09 research (what others do)
@@ -93,6 +93,6 @@ unchanged per part. No new outbound connection. No new store. No resource words 
 
 - **LONGTAKE-01** (M, Home backend): `lib/videos/longTake.ts` (plan, run, resume, cancel), `generate_video` over-length path, `POST /api/videos/long`
   and `GET /api/videos/long/:id`. Tests with the Stack stubbed; one real run on the Studio judged by eye (3 parts).
-- **LONGTAKE-02** (S, after VIDEO-UI-06 and LONGTAKE-01): the Length chip past 10 s, "part N of M" on the card, the estimate on the button.
+- **LONGTAKE-02** (S, after VIDEO-UI-06 and LONGTAKE-01): the Length dropdown past 10 s, "part N of M" on the card, the estimate on the button.
 - **LONGTAKE-03** is folded into VIDEO-EVAL-04 (extend versus direct generation, which already judges the seam): add a six-part chain with and
   without a character style, measured with the frame check and the face match, and decide the part length and cut versus crossfade.
