@@ -181,6 +181,11 @@ msgid "{count, plural, one {# change is waiting} other {# changes are waiting}}"
 msgstr "{count, plural, one {# cambio pendiente} other {# cambios pendientes}}"
 
 #. js-lingui-explicit-id
+#: src/shell/pages/FamilyPage.tsx:39
+msgid "{count, plural, one {# companion} other {# companions}}"
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/shell/pages/FilesPage.tsx:309
 #, needs-review
 msgid "{count, plural, one {# could not be deleted: {reason}.} other {# could not be deleted: {reason}.}}"
@@ -266,7 +271,13 @@ msgstr "{count, plural, one {# se mantiene hasta que lo borres} other {# se mant
 
 #. js-lingui-explicit-id
 #: src/shell/library/LibraryItems.tsx:120
+#: src/shell/pages/FamilyPage.tsx:36
 msgid "{count, plural, one {# person} other {# people}}"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/shell/pages/FamilyPage.tsx:37
+msgid "{count, plural, one {# pet} other {# pets}}"
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -280,6 +291,11 @@ msgstr "{count, plural, one {# foto} other {# fotos}}"
 #, needs-review
 msgid "{count, plural, one {# result} other {# results}}"
 msgstr "{count, plural, one {# resultado} other {# resultados}}"
+
+#. js-lingui-explicit-id
+#: src/shell/pages/FamilyPage.tsx:38
+msgid "{count, plural, one {# robot} other {# robots}}"
+msgstr ""
 
 #. js-lingui-explicit-id
 #: src/apps/reminders/DeviceSchedulesView.tsx:34
@@ -2096,7 +2112,7 @@ msgid "api.minor.grant_teen_max_pictures"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/PersonProfilePage.tsx:74
+#: src/shell/pages/PersonProfilePage.tsx:73
 msgid "A teen&rsquo;s profile is private, even from an admin. Go back to Family to open someone else."
 msgstr ""
 
@@ -3977,8 +3993,8 @@ msgstr "Volver al borrador"
 #. js-lingui-explicit-id
 #: src/apps/people/FaceEnrollmentPage.tsx:242
 #: src/apps/people/FaceEnrollmentPage.tsx:260
-#: src/shell/pages/PersonProfilePage.tsx:66
-#: src/shell/pages/PersonProfilePage.tsx:75
+#: src/shell/pages/PersonProfilePage.tsx:65
+#: src/shell/pages/PersonProfilePage.tsx:74
 #, needs-review
 msgid "Back to Family"
 msgstr "Volver a la familia"
@@ -4640,7 +4656,6 @@ msgstr "Ambos"
 
 #. js-lingui-explicit-id
 #: src/shell/AmbientCompanionPane.tsx:174
-#: src/shell/pages/FamilyPage.tsx:97
 #, needs-review
 msgid "Bots"
 msgstr "Bots"
@@ -6719,6 +6734,7 @@ msgstr ""
 #: src/apps/library/appPresentation.ts:9
 #: src/apps/settings/RobotCompanionChoices.tsx:62
 #: src/apps/settings/RobotCompanionChoices.tsx:64
+#: src/shell/pages/FamilyPage.tsx:73
 msgid "Companion"
 msgstr ""
 
@@ -7397,6 +7413,11 @@ msgid "Could not load conversations. Check your connection and try again."
 msgstr "No se pudieron cargar las conversaciones. Revisa tu conexión e inténtalo de nuevo."
 
 #. js-lingui-explicit-id
+#: src/shell/pages/PersonProfilePage.tsx:162
+msgid "Could not load creations."
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/shell/pages/settings/HouseSettings.tsx:47
 #, needs-review
 msgid "Could not load effective access. Check your connection and try again."
@@ -7427,7 +7448,7 @@ msgid "Could not load performance."
 msgstr "No se pudo cargar el rendimiento."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/FamilyPage.tsx:147
+#: src/shell/pages/FamilyPage.tsx:50
 #, needs-review
 msgid "Could not load pets."
 msgstr "No se pudieron cargar las mascotas."
@@ -7455,6 +7476,11 @@ msgstr "No se pudieron cargar los recordatorios. Revisa tu conexión e inténtal
 #, needs-review
 msgid "Could not load repairs."
 msgstr "No se pudieron cargar las reparaciones."
+
+#. js-lingui-explicit-id
+#: src/shell/pages/FamilyPage.tsx:51
+msgid "Could not load robots."
+msgstr ""
 
 #. js-lingui-explicit-id
 #: src/apps/settings/RoutingStatsSection.tsx:23
@@ -7529,8 +7555,8 @@ msgstr "No se pudo cargar el hogar"
 
 #. js-lingui-explicit-id
 #: src/apps/settings/UsersSection.tsx:221
-#: src/shell/pages/FamilyPage.tsx:105
-#: src/shell/pages/PersonProfilePage.tsx:57
+#: src/shell/pages/FamilyPage.tsx:43
+#: src/shell/pages/PersonProfilePage.tsx:56
 #, needs-review
 msgid "Could not load the household."
 msgstr "No se pudo cargar el hogar."
@@ -7629,7 +7655,7 @@ msgid "Could not load voice samples."
 msgstr "No se pudieron cargar las muestras de voz."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/PersonProfilePage.tsx:150
+#: src/shell/pages/PersonProfilePage.tsx:146
 #, needs-review
 msgid "Could not load what's been shared."
 msgstr "No se pudo cargar lo compartido."
@@ -8388,6 +8414,11 @@ msgid "Creating…"
 msgstr "Creando…"
 
 #. js-lingui-explicit-id
+#: src/shell/pages/PersonProfilePage.tsx:172
+msgid "Creations"
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/shell/pages/CompanionsPage.tsx:320
 msgid "Credits"
 msgstr ""
@@ -8550,7 +8581,7 @@ msgid "setting.allowance.robot_body.daily_minutes.label"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/PersonProfilePage.tsx:120
+#: src/shell/pages/PersonProfilePage.tsx:116
 #, needs-review
 msgid "Daily time limits for {name}."
 msgstr "Límites de tiempo diarios para {name}."
@@ -9661,7 +9692,6 @@ msgstr "Facilidad de uso"
 #: src/shell/library/TranscriptPanel.tsx:554
 #: src/shell/pages/CompanionsPage.tsx:70
 #: src/shell/pages/CompanionsPage.tsx:243
-#: src/shell/pages/PersonProfilePage.tsx:178
 #, needs-review
 msgid "Edit"
 msgstr "Editar"
@@ -9680,7 +9710,7 @@ msgid "Edit {name}"
 msgstr "Editar {name}"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/PersonProfilePage.tsx:91
+#: src/shell/pages/PersonProfilePage.tsx:86
 #, needs-review
 msgid "Edit {name}’s profile"
 msgstr "Editar el perfil de {name}"
@@ -9710,7 +9740,8 @@ msgid "Edit keyframe: {label}"
 msgstr "Editar fotograma clave: {label}"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/PersonProfilePage.tsx:178
+#: src/shell/pages/PersonProfilePage.tsx:204
+#: src/shell/pages/PersonProfilePage.tsx:204
 #, needs-review
 msgid "Edit profile"
 msgstr "Editar perfil"
@@ -10446,8 +10477,8 @@ msgstr "Tasa de desvío"
 #. js-lingui-explicit-id
 #: src/shell/coreLabels.ts:9
 #: src/shell/pageHeaderTitle.tsx:93
-#: src/shell/pages/FamilyPage.tsx:74
-#: src/shell/pages/FamilyPage.tsx:117
+#: src/shell/pages/FamilyPage.tsx:24
+#: src/shell/pages/FamilyPage.tsx:48
 #, needs-review
 msgid "Family"
 msgstr "Familia"
@@ -10463,6 +10494,11 @@ msgstr "Familia"
 #, needs-review
 msgid "setting.generation.household_likeness.label"
 msgstr "La familia puede hacer imágenes, videos y canciones entre sí"
+
+#. js-lingui-explicit-id
+#: src/shell/pages/FamilyPage.tsx:53
+msgid "Family members"
+msgstr ""
 
 #. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:573
@@ -12930,7 +12966,7 @@ msgid "setting.robot.volume.help"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/PersonProfilePage.tsx:130
+#: src/shell/pages/PersonProfilePage.tsx:126
 #, needs-review
 msgid "How MaiPai answers {name} about sensitive subjects. Only you and other admins can change these."
 msgstr "Cómo responde MaiPai a {name} sobre temas sensibles. Solo tú y otros administradores pueden cambiarlos."
@@ -15078,6 +15114,11 @@ msgid "Library"
 msgstr "Biblioteca"
 
 #. js-lingui-explicit-id
+#: src/shell/pages/PersonProfilePage.tsx:199
+msgid "Library counts"
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/shell/library/LibraryItems.tsx:100
 #: src/shell/library/LibraryItems.tsx:139
 #, needs-review
@@ -15176,7 +15217,7 @@ msgid "Likes: {list}."
 msgstr "Le gusta: {list}."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/PersonProfilePage.tsx:108
+#: src/shell/pages/PersonProfilePage.tsx:103
 #, needs-review
 msgid "Limits"
 msgstr "Límites"
@@ -15502,6 +15543,11 @@ msgid "Loading copies"
 msgstr "Cargando copias"
 
 #. js-lingui-explicit-id
+#: src/shell/pages/PersonProfilePage.tsx:162
+msgid "Loading creations"
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/apps/settings/DevicesSection.tsx:95
 #, needs-review
 msgid "Loading devices"
@@ -15533,7 +15579,7 @@ msgstr "Cargando destacado de Home"
 
 #. js-lingui-explicit-id
 #: src/apps/settings/UsersSection.tsx:222
-#: src/shell/pages/FamilyPage.tsx:106
+#: src/shell/pages/FamilyPage.tsx:43
 #: src/shell/pages/SignInPage.tsx:87
 #, needs-review
 msgid "Loading household"
@@ -15604,13 +15650,7 @@ msgid "Loading performance"
 msgstr "Cargando rendimiento"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/FamilyPage.tsx:147
-#, needs-review
-msgid "Loading pets"
-msgstr "Cargando mascotas"
-
-#. js-lingui-explicit-id
-#: src/shell/pages/PersonProfilePage.tsx:58
+#: src/shell/pages/PersonProfilePage.tsx:57
 #, needs-review
 msgid "Loading profile"
 msgstr "Cargando perfil"
@@ -15679,7 +15719,7 @@ msgid "Loading setup status"
 msgstr "Cargando estado de configuración"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/PersonProfilePage.tsx:150
+#: src/shell/pages/PersonProfilePage.tsx:146
 #, needs-review
 msgid "Loading shared media"
 msgstr "Cargando medios compartidos"
@@ -18171,6 +18211,11 @@ msgid "No expiry"
 msgstr "Sin caducidad"
 
 #. js-lingui-explicit-id
+#: src/shell/pages/FamilyPage.tsx:87
+msgid "No family members yet."
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/shell/pages/StoragePage.tsx:154
 #, needs-review
 msgid "No files yet."
@@ -18237,7 +18282,7 @@ msgid "No one in this household has that profile"
 msgstr "Nadie en este hogar tiene ese perfil"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/PersonProfilePage.tsx:65
+#: src/shell/pages/PersonProfilePage.tsx:64
 #, needs-review
 msgid "No one in this household has that profile."
 msgstr "Nadie en este hogar tiene ese perfil."
@@ -18850,12 +18895,6 @@ msgid "Nothing has finished yet."
 msgstr "Nada ha terminado todavía."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/FamilyPage.tsx:148
-#, needs-review
-msgid "Nothing here yet."
-msgstr "Aún no hay nada aquí."
-
-#. js-lingui-explicit-id
 #: src/shell/pages/MediaHomePage.tsx:52
 #, needs-review
 msgid "Nothing here yet. Add music, videos, shows, podcasts or books to your library and they show up here."
@@ -18945,8 +18984,7 @@ msgid "Nothing saved yet. Open an article and press Save to keep it here."
 msgstr "Aún no has guardado nada. Abre un artículo y pulsa Guardar para dejarlo aquí."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/PersonProfilePage.tsx:156
-#: src/shell/pages/PersonProfilePage.tsx:156
+#: src/shell/pages/PersonProfilePage.tsx:152
 #, needs-review
 msgid "Nothing shared yet."
 msgstr "Aún no hay nada compartido."
@@ -19304,6 +19342,7 @@ msgstr ""
 #: src/apps/settings/HouseholdRobotsSection.tsx:151
 #: src/apps/settings/HouseholdRobotsSection.tsx:162
 #: src/shell/pages/EnginesPage.tsx:35
+#: src/shell/pages/FamilyPage.tsx:84
 msgid "Offline"
 msgstr ""
 
@@ -19687,6 +19726,7 @@ msgstr "En curso desde {time} · {duration}"
 #: src/apps/settings/HouseholdRobotsSection.tsx:75
 #: src/apps/settings/HouseholdRobotsSection.tsx:151
 #: src/apps/settings/HouseholdRobotsSection.tsx:162
+#: src/shell/pages/FamilyPage.tsx:84
 msgid "Online"
 msgstr ""
 
@@ -20157,7 +20197,7 @@ msgid "setting.storage.person.cap_bytes.help"
 msgstr "Anula el límite por persona predeterminado del hogar para esta persona concreta. 0 significa sin anulación: esta persona sigue el predeterminado del hogar. Lo establece un propietario o administrador."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/PersonProfilePage.tsx:107
+#: src/shell/pages/PersonProfilePage.tsx:102
 #, needs-review
 msgid "Overview"
 msgstr "Resumen"
@@ -20435,7 +20475,7 @@ msgid "setting.robot.face.color.option_label.peach"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/FamilyPage.tsx:95
+#: src/shell/pages/FamilyPage.tsx:60
 #: src/shell/pages/settings/settingsBackLink.ts:54
 #, needs-review
 msgid "People"
@@ -20548,16 +20588,20 @@ msgid "area.Personalization"
 msgstr "Personalización"
 
 #. js-lingui-explicit-id
+#: src/shell/pages/FamilyPage.tsx:83
+msgid "Pet"
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:1399
 #, needs-review
 msgid "setting.tts.voice_id.option_label.peter_yearsley"
 msgstr "Peter Yearsley"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/FamilyPage.tsx:96
-#, needs-review
-msgid "Pets"
-msgstr "Mascotas"
+#: src/shell/pages/FamilyPage.tsx:81
+msgid "Pets and robots"
+msgstr ""
 
 #. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:1036
@@ -20866,6 +20910,11 @@ msgid "Picture tools"
 msgstr "Herramientas de imágenes"
 
 #. js-lingui-explicit-id
+#: src/shell/pages/PersonProfilePage.tsx:191
+msgid "pictures"
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/apps/settings/ModelsAndStorageSection.tsx:22
 #: src/apps/settings/performanceModel.ts:9
 #: src/shell/pages/settings/MediaCardViews.tsx:56
@@ -20886,7 +20935,7 @@ msgid "setting.resources.strict.image.label"
 msgstr "Las imágenes siempre van primero"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/PersonProfilePage.tsx:123
+#: src/shell/pages/PersonProfilePage.tsx:119
 #, needs-review
 msgid "Pictures and videos can be made in chat."
 msgstr "Puedes hacer fotos y vídeos en el chat."
@@ -21403,7 +21452,7 @@ msgid "Professional"
 msgstr "Profesional"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/PersonProfilePage.tsx:51
+#: src/shell/pages/PersonProfilePage.tsx:194
 #: src/shell/pages/settings/settingsViews.tsx:62
 #, needs-review
 msgid "Profile"
@@ -22843,17 +22892,18 @@ msgid "setting.companion.voice.rivet.label"
 msgstr "Voz de Rivet"
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1581
-msgid "area.Robot"
-msgstr ""
-
-#. js-lingui-explicit-id
 #: src/apps/memory/PersonMemories.tsx:141
 #: src/apps/settings/DevicesSection.tsx:23
 #: src/apps/settings/HouseholdRobotsSection.tsx:143
 #: src/apps/settings/RobotBody.tsx:187
 #: src/apps/settings/RobotPasswordSection.tsx:151
+#: src/shell/pages/FamilyPage.tsx:84
 msgid "Robot"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/lib/settingCopy.generated.ts:1581
+msgid "area.Robot"
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -23989,6 +24039,11 @@ msgid "See"
 msgstr "Ver"
 
 #. js-lingui-explicit-id
+#: src/shell/pages/PersonProfilePage.tsx:177
+msgid "See all"
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/apps/settings/ModelsAndStorageSection.tsx:155
 #, needs-review
 msgid "See the licences"
@@ -24411,6 +24466,7 @@ msgstr "Configurando tu IA"
 #: src/shell/coreLabels.ts:13
 #: src/shell/pageHeaderTitle.tsx:94
 #: src/shell/pages/FilesPage.tsx:284
+#: src/shell/pages/PersonProfilePage.tsx:206
 #: src/shell/pages/settings/SettingsAreaPage.tsx:292
 #: src/shell/Routes.tsx:424
 #, needs-review
@@ -24485,6 +24541,7 @@ msgstr "Sombra"
 #: src/shell/library/LibraryViewer.tsx:156
 #: src/shell/library/LibraryViewer.tsx:156
 #: src/shell/pages/FilesPage.tsx:330
+#: src/shell/pages/PersonProfilePage.tsx:205
 #, needs-review
 msgid "Share"
 msgstr "Compartir"
@@ -24496,7 +24553,7 @@ msgid "Share with the household"
 msgstr "Compartir con el hogar"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/PersonProfilePage.tsx:149
+#: src/shell/pages/PersonProfilePage.tsx:145
 #, needs-review
 msgid "Shared"
 msgstr "Compartido"
@@ -24574,7 +24631,7 @@ msgid "Show {count} more"
 msgstr "Mostrar {count} más"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/settings/SettingsRenderer.tsx:242
+#: src/shell/pages/settings/SettingsRenderer.tsx:238
 #, needs-review
 msgid "Show {length} advanced settings"
 msgstr "Mostrar {length} ajustes avanzados"
@@ -25290,7 +25347,7 @@ msgid "Some parts are starting up"
 msgstr "Algunas partes se están iniciando"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/PersonProfilePage.tsx:132
+#: src/shell/pages/PersonProfilePage.tsx:128
 #, needs-review
 msgid "Some things never change for {name}. Feelings and safety always get care first and a trusted grown-up. Bullying, secrets and sharing where they live are never helped. On religion and politics, MaiPai takes no side. In danger, MaiPai points to a grown-up and the emergency number."
 msgstr "Algunas cosas nunca cambian para {name}. Los sentimientos y la seguridad siempre tienen prioridad y un adulto de confianza. El acoso, los secretos y compartir dónde viven nunca se ayudan. En religión y política, MaiPai no toma partido. En peligro, MaiPai indica a un adulto y al número de emergencia."
@@ -25359,6 +25416,7 @@ msgstr ""
 #: src/shell/library/LibraryViewer.tsx:110
 #: src/shell/pages/FilesPage.tsx:150
 #: src/shell/pages/MusicWorkspacePage.tsx:36
+#: src/shell/pages/PersonProfilePage.tsx:175
 #: src/shell/pages/SoundExtras.tsx:74
 #: src/shell/pages/SoundExtras.tsx:76
 #, needs-review
@@ -25376,6 +25434,11 @@ msgstr "Duración de la canción"
 #, needs-review
 msgid "Song style (optional)"
 msgstr "Estilo de canción (opcional)"
+
+#. js-lingui-explicit-id
+#: src/shell/pages/PersonProfilePage.tsx:189
+msgid "songs"
+msgstr ""
 
 #. js-lingui-explicit-id
 #: src/shell/pages/MusicStudioPages.tsx:147
@@ -29088,7 +29151,7 @@ msgid "Top rated"
 msgstr "Mejor valorados"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/PersonProfilePage.tsx:109
+#: src/shell/pages/PersonProfilePage.tsx:104
 #, needs-review
 msgid "Topics"
 msgstr "Temas"
@@ -29289,6 +29352,8 @@ msgstr "Frase de activación, p. ej. \"noche de cine\""
 #: src/shell/InstallStrip.tsx:96
 #: src/shell/library/LibraryUploads.tsx:75
 #: src/shell/pages/companionFlow/AnimateStep.tsx:131
+#: src/shell/pages/FamilyPage.tsx:50
+#: src/shell/pages/FamilyPage.tsx:51
 #: src/shell/pages/FilesPage.tsx:301
 #: src/shell/pages/settings/WebSearchSettings.tsx:103
 #, needs-review
@@ -29706,7 +29771,7 @@ msgid "area.Uncensored chat AI"
 msgstr "IA de chat sin censura"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/FamilyPage.tsx:150
+#: src/shell/pages/FamilyPage.tsx:83
 #, needs-review
 msgid "Unconfirmed"
 msgstr "Sin confirmar"
@@ -30412,6 +30477,7 @@ msgstr "Muy simple"
 #: src/apps/settings/ModelsAndStorageSection.tsx:23
 #: src/apps/settings/performanceModel.ts:9
 #: src/shell/pages/FilesPage.tsx:150
+#: src/shell/pages/PersonProfilePage.tsx:175
 #, needs-review
 msgid "Video"
 msgstr "Vídeo"
@@ -30475,6 +30541,11 @@ msgstr "Velocidad de vídeo"
 #, needs-review
 msgid "setting.generation.video.adult_adapters.option.restricted"
 msgstr "Los estilos de vídeo con límite de edad no están en las opciones."
+
+#. js-lingui-explicit-id
+#: src/shell/pages/PersonProfilePage.tsx:190
+msgid "videos"
+msgstr ""
 
 #. js-lingui-explicit-id
 #: src/shell/pages/settings/MediaCardViews.tsx:63
@@ -31983,7 +32054,7 @@ msgid "You cannot make a new key with your current Coding access."
 msgstr "No puedes crear una nueva clave con tu acceso actual a Coding."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/PersonProfilePage.tsx:73
+#: src/shell/pages/PersonProfilePage.tsx:72
 #, needs-review
 msgid "You cannot open this profile."
 msgstr "No puedes abrir este perfil."
