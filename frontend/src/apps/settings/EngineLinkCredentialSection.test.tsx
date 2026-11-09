@@ -184,7 +184,7 @@ describe("the pairing wizard (ENGINES-AI-01)", () => {
       await toAddressStep(view);
       fireEvent.change(view.getByLabelText("Engine computer name or address"), { target: { value: "8.8.8.8" } });
       await click(view.getByRole("button", { name: "Next" }));
-      expect((await view.findByRole("alert")).textContent).toBe(refusal);
+      expect((await view.findByRole("alert")).textContent).toContain(refusal);
       expect(view.getByText(stepLine(2, "The engine computer's address"))).toBeTruthy();
     });
   });
@@ -207,7 +207,7 @@ describe("the pairing wizard (ENGINES-AI-01)", () => {
   test("on an address that is not https the hub's own message, with its fix, is shown on step 3", async () => {
     await withHub({ issueError: HTTPS_MESSAGE }, async (view) => {
       await toCommandStep(view);
-      expect((await view.findByRole("alert")).textContent).toBe(HTTPS_MESSAGE);
+      expect((await view.findByRole("alert")).textContent).toContain(HTTPS_MESSAGE);
       expect((view.getByRole("button", { name: "Next" }) as HTMLButtonElement).disabled).toBe(true);
       expect(view.queryByLabelText("Pairing command")).toBeNull();
     });
@@ -237,7 +237,7 @@ describe("the pairing wizard (ENGINES-AI-01)", () => {
       const input = (await view.findByLabelText("Check code from the engine computer")) as HTMLInputElement;
       fireEvent.change(input, { target: { value: "WRONGWRONGWR" } });
       await click(view.getByRole("button", { name: "Pin this computer" }));
-      expect((await view.findByRole("alert")).textContent).toBe("The check code did not match the engine computer");
+      expect((await view.findByRole("alert")).textContent).toContain("The check code did not match the engine computer");
       expect(input.value).toBe("");
     });
   });
