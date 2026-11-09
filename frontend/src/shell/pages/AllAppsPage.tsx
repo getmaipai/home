@@ -4,7 +4,6 @@ import { i18n } from "@lingui/core";
 import { Button } from "@maipai/ui/src/ui/button";
 import { Input } from "@maipai/ui/src/ui/input";
 import { Chip } from "@maipai/ui/src/primitives/Chip";
-import { MediaShelf } from "@maipai/ui/src/primitives/MediaShelf";
 import { getIcon } from "@maipai/ui/src/icons";
 import type { Roster } from "@/lib/api";
 import { useAppCatalog } from "@/shell/useAppCatalog";
@@ -48,22 +47,34 @@ export function AllAppsPage({ person }: { person: Roster }) {
   const starLabel = (app: (typeof apps)[number]) => app.favorite
     ? i18n._({ id: "Remove {name} from favorites", message: "Remove {name} from favorites", values: { name: app.name } })
     : i18n._({ id: "Add {name} to favorites", message: "Add {name} to favorites", values: { name: app.name } });
-  const tile = (app: (typeof apps)[number]) => {
+  const cell = (app: (typeof apps)[number]) => {
     const Icon = getIcon(app.icon);
-    return <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-primary/70 via-accent to-muted text-foreground"><Icon aria-hidden className="size-1/2" /></div>;
+    const Star = getIcon("star");
+    const Up = getIcon("arrow-up");
+    const Down = getIcon("arrow-down");
+    const reorder = editing && app.favorite;
+    return <li key={app.id} data-slot="app-launcher-cell" className="relative flex min-w-0 flex-col items-center">
+      <Button type="button" variant="ghost" height="auto" width="full" data-launch="" aria-label={app.name} onClick={() => navigate(app.to)}>
+        <span className="flex min-w-0 flex-col items-center gap-2 py-1">
+          <span data-slot="app-launcher-tile" className="grid size-14 place-items-center rounded-2xl bg-muted text-foreground"><Icon aria-hidden /></span>
+          <span className="line-clamp-2 w-full text-center text-supporting font-medium">{app.name}</span>
+        </span>
+      </Button>
+      {app.builtIn ? null : <>
+        <span className="absolute right-0 top-0"><Button type="button" variant="ghost" size="icon-sm" aria-label={starLabel(app)} aria-pressed={app.favorite} disabled={isLoading || isSaving} onClick={() => togglePin(app.to)}>
+          <Star aria-hidden fill={app.favorite ? "currentColor" : "none"} />
+        </Button></span>
+        {reorder ? <span className="flex items-center">
+          <Button type="button" variant="ghost" size="icon-sm" aria-label={i18n._({ id: "Move {name} up", message: "Move {name} up", values: { name: app.name } })} disabled={isLoading || isSaving || pinned.indexOf(app.to) === 0} onClick={() => movePin(app.to, -1)}><Up aria-hidden /></Button>
+          <Button type="button" variant="ghost" size="icon-sm" aria-label={i18n._({ id: "Move {name} down", message: "Move {name} down", values: { name: app.name } })} disabled={isLoading || isSaving || pinned.indexOf(app.to) === pinned.length - 1} onClick={() => movePin(app.to, 1)}><Down aria-hidden /></Button>
+        </span> : null}
+      </>}
+    </li>;
   };
-  const actions = (app: (typeof apps)[number]) => app.builtIn ? null : <div className="flex items-center gap-1">
-    <Button type="button" variant="ghost" size="icon-sm" aria-label={starLabel(app)} aria-pressed={app.favorite} disabled={isLoading || isSaving} onClick={() => togglePin(app.to)}>
-      {(() => { const Star = getIcon("star"); return <Star aria-hidden fill={app.favorite ? "currentColor" : "none"} />; })()}
-    </Button>
-    {editing && app.favorite ? <>
-      <Button type="button" variant="ghost" size="icon-sm" aria-label={i18n._({ id: "Move {name} up", message: "Move {name} up", values: { name: app.name } })} disabled={isLoading || isSaving || pinned.indexOf(app.to) === 0} onClick={() => movePin(app.to, -1)}>{(() => { const Up = getIcon("arrow-up"); return <Up aria-hidden />; })()}</Button>
-      <Button type="button" variant="ghost" size="icon-sm" aria-label={i18n._({ id: "Move {name} down", message: "Move {name} down", values: { name: app.name } })} disabled={isLoading || isSaving || pinned.indexOf(app.to) === pinned.length - 1} onClick={() => movePin(app.to, 1)}>{(() => { const Down = getIcon("arrow-down"); return <Down aria-hidden />; })()}</Button>
-    </> : null}
-  </div>;
+  const grid = (items: typeof apps, label: string) => <ul data-layout="grid" aria-label={label} className="grid grid-cols-[repeat(auto-fill,minmax(5.5rem,1fr))] gap-x-2 gap-y-3">{items.map(cell)}</ul>;
   function onGridKeyDown(event: KeyboardEvent<HTMLElement>) {
     const grid = event.currentTarget.querySelector('[data-layout="grid"]');
-    const tiles = [...(grid?.querySelectorAll<HTMLButtonElement>("button[aria-label]") ?? [])].filter((button) => !button.hasAttribute("data-slot"));
+    const tiles = [...(grid?.querySelectorAll<HTMLButtonElement>("button[data-launch]") ?? [])];
     const current = event.target as HTMLElement;
     const index = tiles.indexOf(current.closest("button") as HTMLButtonElement);
     const focus = (next: number) => { if (tiles[next]) { event.preventDefault(); tiles[next]!.focus(); } };
@@ -89,7 +100,7 @@ export function AllAppsPage({ person }: { person: Roster }) {
       <div className="max-w-2xl">
         <Input ref={searchRef} type="search" shape="pill" fill="surface" value={query} onChange={(event) => setQuery(event.target.value)} onKeyDown={(event) => {
           if (event.key === "Escape" && query) { event.preventDefault(); setQuery(""); }
-          if (event.key === "ArrowDown") { event.preventDefault(); searchRef.current?.closest('[data-testid="all-apps-launcher"]')?.querySelector<HTMLButtonElement>('[data-layout="grid"] button[aria-label]:not([data-slot])')?.focus(); }
+          if (event.key === "ArrowDown") { event.preventDefault(); searchRef.current?.closest('[data-testid="all-apps-launcher"]')?.querySelector<HTMLButtonElement>('[data-layout="grid"] button[data-launch]')?.focus(); }
           if (event.key === "Enter" && query.trim() && filtered.length === 1) { event.preventDefault(); navigate(filtered[0]!.to); }
         }} placeholder={i18n._({ id: "Search apps", message: "Search apps" })} aria-label={i18n._({ id: "Search apps", message: "Search apps" })} autoComplete="off" />
       </div>
@@ -101,20 +112,7 @@ export function AllAppsPage({ person }: { person: Roster }) {
           <h2 className="text-section font-semibold">{i18n._({ id: "Favorites", message: "Favorites" })}</h2>
           <Button type="button" variant="quiet-link" size="sm" aria-pressed={editing} onClick={() => setEditing((value) => !value)}>{editing ? i18n._({ id: "Done", message: "Done" }) : i18n._({ id: "Edit", message: "Edit" })}</Button>
         </div>
-        {favorites.length ? <MediaShelf
-          items={favorites}
-          getKey={(app) => app.id}
-          getLabel={(app) => app.name}
-          label={i18n._({ id: "Favorite apps", message: "Favorite apps" })}
-          renderItem={tile}
-          renderCaption={(app) => <span className="flex min-w-0 flex-col items-center gap-1"><span className="text-row font-semibold">{app.name}</span>{actions(app)}</span>}
-          onSelect={(app) => navigate(app.to)}
-          aspect="square"
-          variant="plain"
-          tileSize="pro"
-          bleed
-          hideWhenEmpty
-        /> : <p className="text-supporting text-muted-foreground">{i18n._({ id: "Star an app to keep it here.", message: "Star an app to keep it here." })}</p>}
+        {favorites.length ? grid(favorites, i18n._({ id: "Favorite apps", message: "Favorite apps" })) : <p className="text-supporting text-muted-foreground">{i18n._({ id: "Star an app to keep it here.", message: "Star an app to keep it here." })}</p>}
       </section>
       <div role="presentation" onKeyDown={onGridKeyDown}>
       <section aria-label={i18n._({ id: "All apps", message: "All apps" })} className="flex min-w-0 flex-col gap-3">
@@ -122,18 +120,7 @@ export function AllAppsPage({ person }: { person: Roster }) {
           <h2 className="text-section font-semibold">{i18n._({ id: "All apps", message: "All apps" })}</h2>
           <span className="text-supporting text-muted-foreground">{i18n._({ id: "A to Z", message: "A to Z" })}</span>
         </div>
-        {filtered.length ? <MediaShelf
-          items={filtered}
-          getKey={(app) => app.id}
-          getLabel={(app) => app.name}
-          label={i18n._({ id: "All apps", message: "All apps" })}
-          renderItem={tile}
-          renderCaption={(app) => <span className="flex min-w-0 flex-col items-center gap-1"><span className="text-row font-semibold">{app.name}</span>{actions(app)}</span>}
-          onSelect={(app) => navigate(app.to)}
-          aspect="square"
-          layout="grid"
-          variant="plain"
-        /> : <p className="text-supporting text-muted-foreground" role="status">{i18n._({ id: "No apps match your search.", message: "No apps match your search." })}</p>}
+        {filtered.length ? grid(filtered, i18n._({ id: "All apps", message: "All apps" })) : <p className="text-supporting text-muted-foreground" role="status">{i18n._({ id: "No apps match your search.", message: "No apps match your search." })}</p>}
       </section>
       </div>
     </div>

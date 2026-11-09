@@ -26,6 +26,7 @@ import { useMusicTrackProps } from "@/apps/chat/MusicCardView";
 import { CreatePage } from "./MusicStudioPages";
 import { Cover, GlassPill, MediaCarousel, MediaTile } from "@maipai/ui/src/ui/media-tiles";
 import { RemixSong } from "./MusicRemix";
+import { getIcon } from "@maipai/ui/src/icons";
 import { requestJson } from "@/lib/api";
 import { musicApi, type MusicCard } from "@/lib/musicApi";
 import { BringSong } from "./BringSong";
@@ -73,7 +74,7 @@ function songTile({ card, selected, onOpen, actions }: { card: MusicCard; select
   const length = card.state === "done" ? clock(card.duration_s) : "";
   return <MediaTile key={card.id} id={card.id} title={title} line={songLine(card)} coverUrl={card.cover_url} selected={selected} busy={active(card)} playable={card.state === "done"} onOpen={onOpen}
     progress={active(card) ? card.progress : undefined} pills={<>{length ? <GlassPill>{length}</GlassPill> : null}{active(card) ? <GlassPill>{i18n._({ id: "Making", message: "Making" })}</GlassPill> : null}</>}>
-    {card.state === "done" ? <div className="flex flex-wrap gap-1">{actions.map((one) => <Button key={one.label} asChild size="sm" variant="secondary"><Link to={one.to}>{one.label}</Link></Button>)}</div> : null}
+    {card.state === "done" ? <div className="-ml-2 flex gap-1">{actions.map((one) => { const Icon = getIcon(TILE_ICONS[one.label] ?? "music"); return <Button key={one.label} asChild size="icon-sm" variant="ghost"><Link to={one.to} aria-label={one.label} title={one.label}><Icon aria-hidden="true" /></Link></Button>; })}</div> : null}
   </MediaTile>;
 }
 
@@ -107,6 +108,7 @@ function SoundMaker({ onMade }: { onMade: (id: string) => void }) {
   </div>;
 }
 
+const TILE_ICONS: Record<string, string> = { Studio: "sliders-horizontal", Stems: "audio-waveform", Remix: "shuffle" };
 const TILE_ACTIONS = (card: MusicCard): Array<{ label: string; to: string }> => [
   { label: i18n._({ id: "Studio", message: "Studio" }), to: studioAddress(card.id) }, { label: i18n._({ id: "Stems", message: "Stems" }), to: stemsAddress(card.id) }, { label: i18n._({ id: "Remix", message: "Remix" }), to: remixAddress(card.id) },
 ];
@@ -158,15 +160,13 @@ function SongDetail({ id, onClose, remix }: { id: string; onClose: () => void; r
   const removeSong = () => { setDeleting(true); void musicApi.remove(id).then(() => { push(i18n._({ id: "Moved to Trash. You can bring it back from the Library until the keep time ends.", message: "Moved to Trash. You can bring it back from the Library until the keep time ends." })); void queryClient.invalidateQueries({ queryKey: ["music-songs"] }); onClose(); }).catch((error: unknown) => { setConfirmingDelete(false); push(text(error, i18n._({ id: "That song could not be deleted. Try again.", message: "That song could not be deleted. Try again." }))); }).finally(() => setDeleting(false)); };
   const newCover = () => { void musicApi.newCover(id, `Album cover art for the song "${song?.title ?? "Untitled song"}"`).then(() => { push(i18n._({ id: "Making a new cover.", message: "Making a new cover." })); void queryClient.invalidateQueries({ queryKey: ["music-song", id] }); }).catch((error: unknown) => push(text(error, i18n._({ id: "A new cover could not start. Try again.", message: "A new cover could not start. Try again." })))); };
   const reasonOff = ready ? "" : i18n._({ id: "Available once the song is finished.", message: "Available once the song is finished." });
-  return <section ref={top} className="relative isolate flex shrink-0 flex-col gap-5 overflow-hidden rounded-3xl p-5 sm:p-8" data-testid="music-song-result" aria-label={i18n._({ id: "Open song", message: "Open song" })}>
-    <div aria-hidden="true" className="absolute inset-0 -z-10 scale-125 opacity-60 blur-3xl"><Cover id={id} title={song?.title ?? ""} url={song?.cover_url ?? null} /></div>
-    <div aria-hidden="true" className="from-background/20 to-background absolute inset-0 -z-10 bg-linear-to-b" />
-    <div className="flex items-start justify-between gap-3">
+  return <section ref={top} className="flex shrink-0 flex-col gap-5 py-2" data-testid="music-song-result" aria-label={i18n._({ id: "Open song", message: "Open song" })}>
+        <div className="flex items-start justify-between gap-3">
       <div className="flex flex-col gap-1"><p className="text-muted-foreground text-xs font-semibold tracking-widest uppercase">{i18n._({ id: "Now open", message: "Now open" })}</p><h2 className="text-4xl leading-none font-black tracking-tight uppercase sm:text-6xl">{song?.title ?? i18n._({ id: "Your song", message: "Your song" })}</h2></div>
       <Button type="button" variant="secondary" size="sm" onClick={onClose}>{i18n._({ id: "Close", message: "Close" })}</Button>
     </div>
-    <div className="bg-background/50 rounded-2xl p-4 backdrop-blur-xl"><SongResult key={id} id={id} onAnother={onClose} inWorkspace /></div>
-    {song?.making_version ? <div className="bg-background/50 flex flex-col gap-2 rounded-2xl p-4 backdrop-blur-xl" role="status" data-testid="music-making-version">
+    <div><SongResult key={id} id={id} onAnother={onClose} inWorkspace /></div>
+    {song?.making_version ? <div className="flex flex-col gap-2" role="status" data-testid="music-making-version">
       <p className="text-sm font-semibold">{song.making_version.position ? i18n._({ id: "Your new version is waiting, number {position} in line", message: "Your new version is waiting, number {position} in line", values: { position: song.making_version.position } }) : i18n._({ id: "Making your new version: {stage}{progress}", message: "Making your new version: {stage}{progress}", values: { stage: song.making_version.stage_label || i18n._({ id: "starting", message: "starting" }), progress: song.making_version.progress > 0 ? ` ${Math.round(song.making_version.progress * 100)}%` : "" } })}</p>
       <progress className="w-full" max={1} value={song.making_version.progress > 0 ? song.making_version.progress : undefined} aria-label={i18n._({ id: "New version progress", message: "New version progress" })} />
       <p className="text-muted-foreground text-xs">{i18n._({ id: "It appears on this song when it is done. The earlier version stays.", message: "It appears on this song when it is done. The earlier version stays." })}</p>
@@ -211,8 +211,8 @@ function GlassBar({ styles, onStyles, onMade, stylesOpen, onStylesOpen }: { styl
       .catch((error: unknown) => { const line = text(error, i18n._({ id: "Home could not start the song. Check the request and try again.", message: "Home could not start the song. Check the request and try again." })); setProblem(line); push(line); })
       .finally(() => setMaking(false));
   };
-  return <div className="bg-card mx-auto flex w-full max-w-4xl flex-col gap-3 rounded-3xl p-3 sm:p-4" data-testid="music-docked-bar" id="music-bar">
-    <div className="h-80 min-h-0 overflow-y-auto" data-testid="music-bar-body">
+  return <div className="mx-auto flex w-full max-w-4xl flex-col gap-3 sm:bg-card sm:rounded-3xl sm:p-4" data-testid="music-docked-bar" id="music-bar">
+    <div className={make === "song" ? "h-32 min-h-0 overflow-y-auto" : "h-80 min-h-0 overflow-y-auto"} data-testid="music-bar-body">
     {make === "sound" ? <SoundMaker onMade={onMade} /> : make === "voice" ? <VoiceCreate /> : make !== "song" ? <CreatePage kind={make} adult /> : <div className="flex flex-col gap-2">
       <textarea aria-label={i18n._({ id: "Describe your song", message: "Describe your song" })} rows={2} maxLength={1200} value={idea} onChange={(event) => setIdea(event.currentTarget.value)} placeholder={i18n._({ id: "Describe any song idea: a dreamy indie pop song about new beginnings...", message: "Describe any song idea: a dreamy indie pop song about new beginnings..." })}
         className="placeholder:text-muted-foreground w-full resize-none bg-transparent p-1 text-base outline-none" />
@@ -223,7 +223,7 @@ function GlassBar({ styles, onStyles, onMade, stylesOpen, onStylesOpen }: { styl
     </div> : null}
     </div>}
     </div>
-    <div className="flex items-center gap-2 overflow-x-auto" role="group" aria-label={i18n._({ id: "What to make", message: "What to make" })}>
+    <div className="no-scrollbar -mx-4 flex items-center gap-2 overflow-x-auto px-4 sm:mx-0 sm:px-0" role="group" aria-label={i18n._({ id: "What to make", message: "What to make" })}>
       {MAKES().map((one) => <Chip key={one.id} selected={make === one.id} onClick={() => setMake(one.id)}>{one.label}</Chip>)}
       {make === "song" ? <>
         <Chip selected={withLyrics && !instrumental} onClick={() => { if (!instrumental) setWithLyrics(!withLyrics); }}>{i18n._({ id: "Lyrics", message: "Lyrics" })}</Chip>
@@ -245,8 +245,8 @@ function GlassBar({ styles, onStyles, onMade, stylesOpen, onStylesOpen }: { styl
 function Hero({ styles, onStyles, onMade, stylesOpen, onStylesOpen }: { styles: string[]; onStyles: (next: string[]) => void; onMade: (id: string) => void; stylesOpen: boolean; onStylesOpen: (open: boolean) => void }) {
   return <div className="flex shrink-0 flex-col gap-6 pt-4 sm:pt-8" data-testid="music-hero">
     <div className="mx-auto flex w-full max-w-4xl flex-col gap-2">
-      <h1 className="text-3xl leading-none font-black tracking-tight uppercase sm:text-5xl">{i18n._({ id: "Make any song", message: "Make any song" })}</h1>
-      <p className="text-muted-foreground max-w-xl text-base">{i18n._({ id: "Describe it, pick a sound, press Generate. Your songs, bands and albums stay on this Home.", message: "Describe it, pick a sound, press Generate. Your songs, bands and albums stay on this Home." })}</p>
+      <h1 className="text-title font-semibold tracking-tight">{i18n._({ id: "Make any song", message: "Make any song" })}</h1>
+      <p className="text-supporting text-muted-foreground max-w-xl">{i18n._({ id: "Describe it, pick a sound, press Generate. Your songs, bands and albums stay on this Home.", message: "Describe it, pick a sound, press Generate. Your songs, bands and albums stay on this Home." })}</p>
     </div>
     <GlassBar styles={styles} onStyles={onStyles} onMade={onMade} stylesOpen={stylesOpen} onStylesOpen={onStylesOpen} />
   </div>;
@@ -275,7 +275,7 @@ export function MusicWorkspace({ adult, search }: { adult: boolean; search: stri
   };
   if (!adult) return <EmptyState icon="music" text={MAKE_SONG_ADULT_LINE()} />;
   const open = (id: string | null) => navigate(songAddress(id), { replace: true });
-  return <>{song && openedCard.data?.sound ? <MusicTrack {...openedTrackProps} /> : null}<AddSoundToSong jobId={addingSound} open={addingSound !== null} onOpenChange={open => { if (!open) setAddingSound(null); }} songs={list.data ?? []} onAdded={id => { void queryClient.invalidateQueries({ queryKey: ["music-songs"] }); void queryClient.invalidateQueries({ queryKey: ["music-song", id] }); }} /><div className="flex min-h-0 flex-1 flex-col"><section className="bg-background text-foreground -mx-4 flex min-h-0 flex-1 flex-col gap-10 overflow-y-auto px-4 py-4 lg:mx-0 lg:rounded-3xl lg:px-6" data-testid="music-workspace">
+  return <>{song && openedCard.data?.sound ? <MusicTrack {...openedTrackProps} /> : null}<AddSoundToSong jobId={addingSound} open={addingSound !== null} onOpenChange={open => { if (!open) setAddingSound(null); }} songs={list.data ?? []} onAdded={id => { void queryClient.invalidateQueries({ queryKey: ["music-songs"] }); void queryClient.invalidateQueries({ queryKey: ["music-song", id] }); }} /><div className="flex min-h-0 flex-1 flex-col"><section className="bg-background text-foreground flex min-h-0 flex-1 flex-col gap-10 overflow-y-auto px-4 py-4 lg:rounded-3xl lg:px-6" data-testid="music-workspace">
     {song && openedCard.data?.sound ? <div className="flex shrink-0 flex-col gap-3" data-testid="opened-sound">
       {openedCard.data.state === "done" ? <div className="flex flex-wrap gap-2"><Button type="button" variant="secondary" onClick={() => setAddingSound(openedCard.data!.id)}>{i18n._({ id: "Add to a song", message: "Add to a song" })}</Button></div> : null}
       {openedCard.data.sound.takes ? <SoundTakes group={openedCard.data.sound.takes.group} onChanged={() => { void openedCard.refetch(); }} /> : null}
@@ -284,7 +284,7 @@ export function MusicWorkspace({ adult, search }: { adult: boolean; search: stri
     {song && !openedCard.data?.sound ? <SongDetail key={song} id={song} remix={new URLSearchParams(search).get("remix") === "1"} onClose={() => open(null)} /> : null}
     <Hero styles={styles} onStyles={setStyles} onMade={open} stylesOpen={stylesOpen} onStylesOpen={setStylesOpen} />
     <div className="flex shrink-0 flex-col gap-3" data-testid="music-your-songs">
-      <div className="flex flex-col gap-1"><h2 className="text-2xl font-black tracking-wide uppercase">{i18n._({ id: "Your songs", message: "Your songs" })}</h2><p className="text-muted-foreground text-sm">{i18n._({ id: "Open one to play it and see everything you can do.", message: "Open one to play it and see everything you can do." })}</p></div>
+      <div className="flex flex-col gap-1"><h2 className="text-section font-semibold tracking-tight">{i18n._({ id: "Your songs", message: "Your songs" })}</h2><p className="text-muted-foreground text-sm">{i18n._({ id: "Open one to play it and see everything you can do.", message: "Open one to play it and see everything you can do." })}</p></div>
       {shown.some(card => !card.sound) ? <ul className="flex list-none flex-wrap gap-x-4 gap-y-6 p-0" aria-label={i18n._({ id: "Your songs", message: "Your songs" })}>
         {shown.filter(card => !card.sound).map((card) => songTile({ card, selected: card.id === song, onOpen: () => open(card.id), actions: TILE_ACTIONS(card) }))}
       </ul> : <AsyncState data={list.data} error={list.isError} isFetching={list.isFetching} onRetry={() => void list.refetch()} errorMessage={i18n._({ id: "Your songs could not be loaded. Check your connection and open this page again.", message: "Your songs could not be loaded. Check your connection and open this page again." })} loadingLabel={i18n._({ id: "Loading your songs", message: "Loading your songs" })}>

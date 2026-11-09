@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, test } from "bun:test";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { resetDb } from "./reset-db";
 import { owner, child } from "./support/testAuth";
-import { createShow, dueShows, makeEpisode, __setTalentShowCompleterForTests } from "@/lib/talent/shows";
+import { createShow, dueShows, makeEpisode, __setTalentShowCompleterForTests, __clearTalentStageCacheForTests } from "@/lib/talent/shows";
 import { getMediaProduction, listMediaProductions } from "@/lib/mediaProductions";
 import { setHouseholdSettingValue } from "@/lib/settings";
 import { loadFormats } from "@/lib/talent/formats";
@@ -118,5 +118,26 @@ describe("TALENT-04 shows", () => {
     const result = await makeEpisode(row, show.id, { now: new Date("2026-11-08T12:00:00Z"), complete: (async () => ({ ok: false, unavailable: true, failureKind: "offline" })) as never, stack });
     expect(result.episode_id).toContain("ep-20261108-");
     expect(getMediaProduction(row, show.id)?.episodes[0]).toMatchObject({ generated_by: "scripted" });
+  });
+
+  test("an episode stopped at the mix stage resumes after the hub restarts (memory cleared)", async () => {
+    const { row } = await owner();
+    const made = await createSynth(row, { persona: { display_name: "Moss", formality: "neutral", complexity: "standard", engagement: "balanced", filler_density: "none", audience: "adult" } as never, based_on: { kind: "none", person_id: null, name: null, refresh: "7d", minor: false }, life: { enabled: false, seed: "" } });
+    if (!made.ok) throw new Error("The show synth fixture could not be created.");
+    const show = await createShow(row, { title: "Morning", format_id: "news_briefing", cast: [{ synth_id: made.value.id, part: "anchor" }], audience: "adult", sources: [{ kind: "news", topics: [], file_ids: [], media_item_id: null }], schedule: null, length_s: 180 });
+    let failMix = true;
+    const stack = { voices: async () => [], submitJob: async ({ kind, input }: { kind: string; input: Record<string, unknown> }) => {
+      const id = `restart-${kind}`, dir = `/tmp/${id}`; mkdirSync(dir, { recursive: true });
+      if (kind === "media.tts") { const lines = input.lines as Array<{ id: string }>; return { id, state: "done", result: { lines: lines.map((line) => { const path = `${dir}/${line.id}.wav`; writeFileSync(path, new Uint8Array([1, 2, 3])); return { id: line.id, path, duration_s: 0.5, sha256: "c".repeat(64) }; }) }, reason: null }; }
+      if (failMix) { failMix = false; throw new Error("The mix stopped."); }
+      const path = `${dir}/episode.m4a`; writeFileSync(path, new Uint8Array([1, 2, 3])); return { id, state: "done", result: { path, duration_s: 1 }, reason: null };
+    } } as unknown as StackClient;
+    const offline = (async () => ({ ok: false, unavailable: true, failureKind: "offline" })) as never;
+    const now = new Date("2026-11-09T12:00:00Z");
+    await expect(makeEpisode(row, show.id, { now, complete: offline, stack })).rejects.toThrow("The mix stopped.");
+    __clearTalentStageCacheForTests();
+    const result = await makeEpisode(row, show.id, { now, complete: offline, stack });
+    expect(getMediaProduction(row, show.id)?.show?.state?.stage).toBe("done");
+    expect(result.episode_id).toContain("ep-20261109-");
   });
 });

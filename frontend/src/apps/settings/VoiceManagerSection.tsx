@@ -4,6 +4,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { AsyncState } from "@maipai/ui/src/primitives/AsyncState";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@maipai/ui/src/dashboard/components/ui/alert-dialog";
 import { Badge } from "@maipai/ui/src/ui/badge";
+import { Alert, AlertDescription } from "@maipai/ui/src/ui/alert";
 import { Button } from "@maipai/ui/src/ui/button";
 import { api, type ResolvedSetting, type StackVoice } from "@/lib/api";
 import { householdVoicesApi, inspiredLevelLabel, type HouseholdVoice } from "@/lib/householdVoicesApi";
@@ -90,7 +91,7 @@ export function VoiceManagerSection() {
     finally { setBusyId(null); }
   }
 
-  return <section className="flex flex-col gap-4">
+  return <div className="flex flex-col gap-4">
     <div className="flex items-start justify-between gap-4">
       <p className="min-w-0 flex-1 text-base text-muted-foreground">{i18n._({ id: "Every voice Home can speak with. Home's default voice is used by anyone, and any robot, with no voice of their own.", message: "Every voice Home can speak with. Home's default voice is used by anyone, and any robot, with no voice of their own." })}</p>
       <div className="flex shrink-0 flex-wrap gap-2"><Button type="button" onClick={() => { setNotice(null); setAddInspired(false); setAdding(true); }}>{i18n._({ id: "Add voice", message: "Add voice" })}</Button><Button type="button" variant="outline" onClick={() => { setNotice(null); setAddInspired(true); setAdding(true); }}>{i18n._({ id: "Add Inspired voice", message: "Add Inspired voice" })}</Button></div>
@@ -98,7 +99,7 @@ export function VoiceManagerSection() {
     {notice ? <p role="status" className="text-base text-primary">{notice}</p> : null}
     {error ? <p role="alert" className="text-base text-destructive">{error}</p> : null}
     {preview.error ? <p role="alert" className="text-base text-destructive">{preview.error}</p> : null}
-    {failed ? <p role="alert" className="text-base">{i18n._({ id: "Home can't reach its voice service. Check Repairs, then come back.", message: "Home can't reach its voice service. Check Repairs, then come back." })} <Button type="button" variant="outline" onClick={retry}>{i18n._({ id: "Try again", message: "Try again" })}</Button></p>
+    {failed ? <div className="flex min-w-0 flex-col items-start gap-3"><Alert variant="destructive"><AlertDescription>{i18n._({ id: "Home can't reach its voice service. Check Repairs, then come back.", message: "Home can't reach its voice service. Check Repairs, then come back." })}</AlertDescription></Alert><Button type="button" variant="outline" onClick={retry}>{i18n._({ id: "Try again", message: "Try again" })}</Button></div>
       : <AsyncState data={voicesQuery.data && madeQuery.data && homeQuery.data ? voices : undefined} isFetching={voicesQuery.isFetching || madeQuery.isFetching || homeQuery.isFetching} onRetry={retry} loadingLabel={i18n._({ id: "Loading voices", message: "Loading voices" })}>
         {(list) => list.length === 0 ? <p className="text-base text-muted-foreground">{i18n._({ id: "Voices are still getting ready. This takes a minute after setup.", message: "Voices are still getting ready. This takes a minute after setup." })}</p> : <div className="flex flex-col">
           <div className={`hidden gap-3 border-b border-border pb-2 xl:grid ${COLUMNS} ${MUTED}`}><span>{i18n._({ id: "Voice", message: "Voice" })}</span><span>{i18n._({ id: "Source", message: "Source" })}</span><span>{i18n._({ id: "Gender", message: "Gender" })}</span><span>{i18n._({ id: "Language", message: "Language" })}</span><span className="text-right">{i18n._({ id: "Actions", message: "Actions" })}</span></div>
@@ -163,5 +164,5 @@ export function VoiceManagerSection() {
         </AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>
-  </section>;
+  </div>;
 }

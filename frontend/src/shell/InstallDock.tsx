@@ -25,6 +25,10 @@ export interface DockItem {
   /** The Home job row behind this item (admins only), for file details and Cancel. */
   job?: HomeJobView;
   reason?: string | null;
+  /** A making job (a picture, video or song) reports a percent instead of bytes. */
+  percent?: number | null;
+  /** Where tapping a making job goes: the chat that asked for it, else its app. */
+  href?: string | null;
 }
 export interface DockModel {
   active: DockItem[];
@@ -36,6 +40,27 @@ export interface DockModel {
   problem: string | null;
 }
 
+const MAKING_STATES = new Set(["queued", "running"]);
+const MAKING_WORDS: Record<string, string> = { "image.generate": "a picture", picture: "a picture", image: "a picture", video: "a video", "video.generate": "a video", music: "a song", song: "a song", "music.generate": "a song" };
+
+/** The viewer's own running makes (picture, video, song): a job row about them that is not a model download. Rows about other people carry no state, so they never match. */
+export function makingJobs(rows: readonly HomeJobView[]): HomeJobView[] {
+  return rows.filter((row) => row.kind !== "model_download" && row.forPersonName === undefined && typeof row.state === "string" && MAKING_STATES.has(row.state) && row.progress != null && ["image.generate", "picture", "image", "video", "video.generate", "music", "song", "music.generate"].includes(row.kind));
+}
+
+function makingHref(row: HomeJobView): string | null {
+  if (row.conversationId) return `/chat?conversation=${encodeURIComponent(row.conversationId)}`;
+  return row.kind.startsWith("video") ? "/apps/videos" : row.kind.startsWith("music") || row.kind === "song" ? "/apps/music" : null;
+}
+
+function makingItem(row: HomeJobView): DockItem {
+  const what = MAKING_WORDS[row.kind] ?? "something";
+  const raw = row.progress && typeof row.progress.percent === "number" ? row.progress.percent : null;
+  const percent = raw === null ? null : Math.max(0, Math.min(100, Math.round(raw <= 1 && raw > 0 ? raw * 100 : raw)));
+  const label = row.state === "queued" ? i18n._({ id: "Waiting to make {what}", message: "Waiting to make {what}", values: { what } }) : i18n._({ id: "Making {what}", message: "Making {what}", values: { what } });
+  return { key: `make:${row.id}`, words: { verb: "Making", what, benefit: row.title && row.title !== what ? row.title : "It shows up in its app when it is done." }, label, state: row.state === "queued" ? "queued" : "running", completedBytes: 0, totalBytes: 0, bytesPerSecond: null, percent, href: makingHref(row) };
+}
+
 const ACTIVE = new Set(["queued", "running", "paused", "stalled", "verifying", "waiting_for_you"]);
 
 function dockState(state: string): DockState {
@@ -45,8 +70,12 @@ function dockState(state: string): DockState {
 /** One list of what is installing, from the install status (what and how much) and, for admins, the
  * job rows (speed, files, Cancel). The same download is one entry, never two. */
 export function buildDock(status: InstallStatusView | null, jobs: readonly HomeJobView[] = []): DockModel {
+  const making = makingJobs(jobs).map(makingItem);
   const empty: DockModel = { active: [], failed: [], primary: null, percent: null, line: null, problem: null };
-  if (!status || status.state === "none" || status.state === "ready") return empty;
+  if (!status || status.state === "none" || status.state === "ready") {
+    if (making.length === 0) return empty;
+    return { ...empty, active: making, primary: making[0]!, percent: making.length === 1 ? making[0]!.percent ?? null : null };
+  }
   const active: DockItem[] = [];
   const failed: DockItem[] = [];
   if (status.state === "installing_engine") {
@@ -78,7 +107,7 @@ export function buildDock(status: InstallStatusView | null, jobs: readonly HomeJ
   const stalled = active.some((entry) => entry.state === "stalled") || status.state === "stalled";
   const parts = stalled ? ["Waiting for the internet. It picks up by itself."] : [timeLeft(status.etaSeconds), speedLine(status.bytesPerSecond)].filter((part): part is string => Boolean(part));
   const line = parts.length > 0 ? parts.join(" · ") : primary && active.length > 0 ? primary.words.benefit : null;
-  return { active: ordered, failed, primary, percent, line, problem: status.problem };
+  return { active: [...ordered, ...making], failed, primary, percent, line, problem: status.problem };
 }
 
 /** "Couldn't finish: a faster chat engine for Muse Glimmer". */
@@ -111,7 +140,8 @@ function useAnchorBox(active: boolean): { left: number; right: number } | null {
 }
 
 const NO_ROWS: HomeJobView[] = [];
-const modelDownloadRows = (rows: HomeJobView[]) => rows.filter((row) => row.kind === "model_download");
+// Everyone reads the job list: model downloads for the admin's file details, and each person's own makes. A non-admin never sees a download row.
+const dockRows = (rows: HomeJobView[]) => rows.filter((row) => row.kind === "model_download" || makingJobs([row]).length > 0);
 
 /** The one install line, pinned to the bottom of the page: what is installing, why it matters and how far
  * along. People who can act on it (owner, admin) open it like an accordion for each install's size, speed,
@@ -125,7 +155,7 @@ export function InstallDock({ admin, read: readProp, readJobs: readJobsProp, ret
   repairsHref?: string;
 }) {
   const status = useInstallStatus(readProp).data ?? null;
-  const jobs = useJobs({ read: readJobsProp, enabled: admin, fast: () => installActive(status), select: modelDownloadRows }).data ?? NO_ROWS;
+  const jobs = useJobs({ read: readJobsProp, fast: (rows) => installActive(status) || (rows ? makingJobs(rows).length > 0 : false), select: dockRows }).data ?? NO_ROWS;
   const [open, setOpen] = useState(false);
   const [retryError, setRetryError] = useState<string | null>(null);
   const [announcement, setAnnouncement] = useState("");
@@ -217,7 +247,7 @@ export function InstallDock({ admin, read: readProp, readJobs: readJobsProp, ret
             </Collapsible>
           ) : (
             <div className="px-3 pt-2 pb-2">
-              {summary}
+              {primary.href && !onlyFailed ? <Link to={primary.href} data-testid="install-dock-link" className="block rounded-md outline-none focus-visible:ring-2 focus-visible:ring-ring">{summary}</Link> : summary}
               {bar !== null && !onlyFailed ? <div className="pt-1"><Progress mode="determinate" value={bar} label={`${title} progress`} /></div> : null}
             </div>
           )}

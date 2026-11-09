@@ -78,7 +78,11 @@
           }
         }
       },
-      "hide_when_empty": true
+      "empty_state": {
+        "type": "empty_state",
+        "icon": "book-open",
+        "text": "No books yet. Add EPUB, PDF or audiobook files to the home library and they show up here."
+      }
     },
     {
       "type": "media_shelf",

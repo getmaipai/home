@@ -1,7 +1,11 @@
 import { i18n } from "@lingui/core";
 import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Section } from "@maipai/ui/src/primitives/Section";
+import { PlainSection } from "./PlainSection";
+import { getIcon } from "@maipai/ui/src/icons";
+
+const PencilIcon = getIcon("pencil");
+const TrashIcon = getIcon("trash");
 import { List } from "@maipai/ui/src/primitives/List";
 import { AsyncState } from "@maipai/ui/src/primitives/AsyncState";
 import { Avatar } from "@maipai/ui/src/primitives/Avatar";
@@ -24,6 +28,8 @@ import { errorLine } from "@/lib/hubReachability";
 
 interface UsersSectionProps {
   person: Roster;
+  /** False when the page header already names the page. */
+  headed?: boolean;
 }
 
 // Moved from PeoplePage.tsx (Jesse, 2026-09-06: "the edit part is for
@@ -38,7 +44,7 @@ interface UsersSectionProps {
 // recordings for real (backend/src/lib/personLifecycle.ts). So it gets a
 // confirmation that names them and says what goes, never a bare button,
 // and the batch version names the count.
-export function UsersSection({ person }: UsersSectionProps) {
+export function UsersSection({ person, headed = true }: UsersSectionProps) {
   const queryClient = useQueryClient();
   const rosterQuery = useQuery<PersonRosterEntry[]>({
     queryKey: ["people"],
@@ -222,7 +228,7 @@ export function UsersSection({ person }: UsersSectionProps) {
         loadingLabel={i18n._({ id: "Loading household", message: "Loading household" })}
       >
         {(loadedRoster) => (
-        <Section heading={i18n._({ id: "Users", message: "Users" })}>
+        <PlainSection {...(headed ? { heading: i18n._({ id: "Users", message: "Users" }) } : {})}>
           {companionKey ? <Field>
             <FieldLabel htmlFor="household-companions-allowed"><Switch size="md" id="household-companions-allowed" checked={Boolean(householdCompanionsAllowed)} disabled={companionsSaving} onCheckedChange={(checked) => setHouseholdCompanionsAllowed(checked === true)} />{companionKey.label}</FieldLabel>
             <FieldDescription>{companionKey.help}</FieldDescription>
@@ -390,10 +396,11 @@ export function UsersSection({ person }: UsersSectionProps) {
               const mayDelete = canDeletePerson(actorRole, person.id, { id: p.id, role: p.role as Role });
               if (!mayEdit && !mayDelete) return null;
               return (
-                <div className="flex flex-col items-stretch gap-1">
+                <div className="flex items-center gap-1">
                   {mayEdit ? (
                     <Button
                       variant="ghost"
+                      size="icon"
                       aria-label={i18n._({ id: "Edit {name}", message: "Edit {name}", values: { name: p.display_name } })}
                       onClick={() => {
                         setEditingId(p.id);
@@ -403,30 +410,31 @@ export function UsersSection({ person }: UsersSectionProps) {
                         setEditSessionLockTimeoutMinutes(p.sessionLockTimeoutMinutes);
                       }}
                     >
-                      {i18n._({ id: "Edit", message: "Edit" })}
+                      <PencilIcon aria-hidden />
                     </Button>
                   ) : null}
                   {mayDelete ? (
                     <Button
                       variant="ghost"
+                      size="icon"
                       aria-label={i18n._({ id: "Remove {name}", message: "Remove {name}", values: { name: p.display_name } })}
                       onClick={() => setConfirmingDelete(p.id)}
                     >
-                      {i18n._({ id: "Remove", message: "Remove" })}
+                      <TrashIcon aria-hidden />
                     </Button>
                   ) : null}
                 </div>
               );
             }}
           />
-        </Section>
+        </PlainSection>
         )}
       </AsyncState>
 
       {roster?.filter((p) => p.age_band === "child").map((p) => (
-        <Section key={`memories-${p.id}`} heading={i18n._({ id: "Memories for {name}", message: "Memories for {name}", values: { name: p.display_name } })}>
+        <PlainSection key={`memories-${p.id}`} heading={i18n._({ id: "Memories for {name}", message: "Memories for {name}", values: { name: p.display_name } })}>
           <OtherPersonMemories personId={p.id} personName={p.display_name} />
-        </Section>
+        </PlainSection>
       ))}
 
       {roster ? (
@@ -435,7 +443,7 @@ export function UsersSection({ person }: UsersSectionProps) {
         />
       ) : null}
 
-      <Section heading={i18n._({ id: "Add someone", message: "Add someone" })}>
+      <PlainSection heading={i18n._({ id: "Add someone", message: "Add someone" })}>
         <NewPersonForm actorRole={actorRole} onSubmit={handleAdd} submitLabel={i18n._({ id: "Add to household", message: "Add to household" })} busy={submitting} error={formError} extra={companionKey ? <Field>
           <FieldLabel htmlFor="new-person-companions-allowed"><Checkbox id="new-person-companions-allowed" checked={newPersonCompanionsAllowed ?? Boolean(householdCompanionsAllowed)} disabled={submitting} onCheckedChange={(checked) => { if (checked === true) setNewPersonCompanionsAllowed(true); else setCompanionsConfirm("new-person"); }} />{companionKey.label}</FieldLabel>
           <FieldDescription>{companionKey.help}</FieldDescription>
@@ -446,7 +454,7 @@ export function UsersSection({ person }: UsersSectionProps) {
             <AlertDialogFooter><AlertDialogCancel>{i18n._({ id: "Cancel", message: "Cancel" })}</AlertDialogCancel><AlertDialogAction variant="destructive" onClick={() => { void confirmCompanionsOff(); }}>{i18n._({ id: "Turn off", message: "Turn off" })}</AlertDialogAction></AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
-      </Section>
+      </PlainSection>
     </>
   );
 }

@@ -50,15 +50,9 @@ export function FamilyPage({ person }: { person: Roster }) {
           {petsQuery.isError ? <div role="alert" className="flex items-center gap-3 text-supporting text-destructive">{i18n._({ id: "Could not load pets.", message: "Could not load pets." })}<Button variant="ghost" size="sm" onClick={() => void petsQuery.refetch()}>{i18n._({ id: "Try again", message: "Try again" })}</Button></div> : null}
           {robotsQuery.isError ? <div role="alert" className="flex items-center gap-3 text-supporting text-destructive">{i18n._({ id: "Could not load robots.", message: "Could not load robots." })}<Button variant="ghost" size="sm" onClick={() => void robotsQuery.refetch()}>{i18n._({ id: "Try again", message: "Try again" })}</Button></div> : null}
 
-          <div className="flex gap-4 overflow-x-auto pb-1" aria-label={i18n._({ id: "Family members", message: "Family members" })}>
-            {[...ordered.map((entry) => ({ key: entry.id, label: entry.display_name, avatar: <Avatar name={entry.display_name} seed={entry.avatar_seed} size="profile" accent={entry.accent ?? undefined} /> })),
-              ...pets.map((pet) => ({ key: pet.id, label: pet.name, avatar: <PawIcon aria-hidden className="size-10 text-muted-foreground" /> })),
-              ...robots.map((robot) => ({ key: robot.id, label: robot.name, avatar: <BotIcon aria-hidden className="size-10 text-muted-foreground" /> }))].map((member) => <div key={member.key} className="flex w-20 shrink-0 flex-col items-center gap-2 text-center">{member.avatar}<span className="text-supporting">{member.label}</span></div>)}
-          </div>
-
           <section className="flex flex-col gap-3" aria-labelledby="family-people-heading">
             <div className="flex items-center justify-between"><h2 id="family-people-heading" className="text-section font-semibold">{i18n._({ id: "People", message: "People" })}</h2></div>
-            <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+            <div className="flex flex-col gap-1 md:grid md:grid-cols-2 xl:grid-cols-3">
               {ordered.map((entry) => {
                 const blocked = isProfileClosedTo(person, entry);
                 const profileLinkAllowed = !blocked;
@@ -68,9 +62,9 @@ export function FamilyPage({ person }: { person: Roster }) {
                     <div className="min-w-0 flex-1"><p className="text-row font-semibold">{entry.display_name}</p><p className="text-supporting text-muted-foreground">{ROLE_LABELS[entry.role]}{entry.bio ? ` · ${entry.bio}` : ""}</p></div>
                     <ChevronIcon aria-hidden className="text-muted-foreground" size={20} />
                   </Link> : <div className="flex items-center gap-4"><Avatar name={entry.display_name} seed={entry.avatar_seed} size="profile" accent={entry.accent ?? undefined} /><div className="min-w-0 flex-1"><p className="text-row font-semibold">{entry.display_name}</p><p className="text-supporting text-muted-foreground">{ROLE_LABELS[entry.role]}{entry.bio ? ` · ${entry.bio}` : ""}</p></div></div>}
-                  <div className="mt-4 flex flex-wrap gap-2">
-                    {details.filter((detail) => detail.used_by?.people.some((used) => used.id === entry.id)).map((detail) => <Chip key={detail.id} tone="surface" size="strip" onClick={() => navigate(`/companions/${encodeURIComponent(detail.id)}`)}>{detail.name}</Chip>)}
-                    <Chip tone="surface" size="strip" onClick={() => navigate("/companions")}><PlusIcon aria-hidden size={16} />{i18n._({ id: "Companion", message: "Companion" })}</Chip>
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    {details.filter((detail) => detail.used_by?.people.some((used) => used.id === entry.id)).map((detail) => <Chip key={detail.id} size="strip" onClick={() => navigate(`/companions/${encodeURIComponent(detail.id)}`)}>{detail.name}</Chip>)}
+                    <Chip size="strip" onClick={() => navigate("/companions")}><PlusIcon aria-hidden size={16} />{i18n._({ id: "Companion", message: "Companion" })}</Chip>
                   </div>
                 </Card></div>;
               })}

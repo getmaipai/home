@@ -155,27 +155,31 @@ describe("a package app at /apps/<id>", () => {
     expect(nav.className).not.toContain("shadow-lg");
   });
 
-  test("detail pages put Back in the controls row; only video watch has Minimize", async () => {
+  test("detail pages put Back in the shell header (no empty row); only video watch keeps a controls row with Minimize", async () => {
     rows = [{ ...musicRow, sections: [{ page: "radio", label: "Radio", icon: null }, { page: "albums", label: "Albums", icon: null }] }];
     let view = open("/apps/music/station", 402);
     await view.findByText("Live radio station.");
-    let controls = await view.findByTestId("page-controls");
-    expect(controls.querySelector('button[aria-label="Back"]')).not.toBeNull();
-    expect(controls.querySelector('[aria-label="Minimize to the mini player"]')).toBeNull();
+    expect(view.queryByTestId("page-controls")).toBeNull();
     cleanup();
     view = open("/apps/music/album", 402);
     await view.findByText("Album details.");
-    controls = await view.findByTestId("page-controls");
-    expect(controls.querySelector('button[aria-label="Back"]')).not.toBeNull();
-    expect(controls.querySelector('[aria-label="Minimize to the mini player"]')).toBeNull();
+    expect(view.queryByTestId("page-controls")).toBeNull();
     cleanup();
     rows = [{ ...musicRow, package: "videos", label: "Videos", to: "/apps/videos", sections: [] }];
     view = open("/apps/videos/watch", 402);
     await view.findByText("Video details.");
-    controls = await view.findByTestId("page-controls");
+    let controls = await view.findByTestId("page-controls");
     expect(controls.querySelector('button[aria-label="Back"]')).not.toBeNull();
     expect(controls.getAttribute("data-header-flat")).toBe(""); // the shell bar with the companion is flat on a detail page too
     expect(controls.querySelector('[aria-label="Minimize to the mini player"]')).not.toBeNull();
+    expect(controls.querySelector('[data-testid="play-page-search"]')).toBeNull(); // no search page, no search button
+    cleanup();
+    // The phone bar is hidden on a watch page, so an app with a search page keeps a Search button in the controls row.
+    rows = [{ ...musicRow, package: "videos", label: "Videos", to: "/apps/videos", sections: [{ page: "library", label: "Library", icon: null }, { page: "search", label: "Search", icon: null }] }];
+    view = open("/apps/videos/watch", 402);
+    await view.findByText("Video details.");
+    controls = await view.findByTestId("page-controls");
+    expect(controls.querySelector('[data-testid="play-page-search"]')).not.toBeNull();
   });
 
   test("index and news story pages have no generic controls row", async () => {
@@ -357,6 +361,15 @@ describe("media index empty states", () => {
       };
       walk(page.body);
       if (paths.size === 0) throw new Error(`${packageId} index has no bound shelves`);
+      const lastShelfEmptyText: string[] = [];
+      const findLast = (nodes: unknown[]) => {
+        for (const value of nodes) {
+          const node = value as { type?: string; empty_state?: { text?: string }; main?: unknown[]; aside?: unknown[]; body?: unknown[] };
+          if (node?.type === "media_shelf" && node.empty_state?.text) lastShelfEmptyText.push(node.empty_state.text);
+          findLast(node?.main ?? []); findLast(node?.aside ?? []); findLast(node?.body ?? []);
+        }
+      };
+      findLast(page.body);
       const visiblePath = [...paths][0]!;
       // A Response body reads once, and two bound nodes may ask for the same path (Music binds History twice), so each
       // request gets its own Response built from the one pending payload.
@@ -375,11 +388,15 @@ describe("media index empty states", () => {
 
       const populated = open(`/apps/${packageId}`);
       await waitFor(() => expect([...paths].every((path) => path === visiblePath || document.body.textContent?.includes("Loading") === false)).toBe(true));
-      expect(document.body.textContent).not.toMatch(/No (videos|music|shows or films|new episodes|books) yet\./i);
+      // An app's last shelf (the whole library) carries the app's one empty state, since every other shelf is hidden when empty;
+      // it is the only shelf allowed an empty line.
+      expect(lastShelfEmptyText.reduce((text, line) => text.replace(line, ""), document.body.textContent ?? "")).not.toMatch(/No (videos|music|shows or films|new episodes|books) yet\./i);
       await act(async () => { releaseData([{ id: `${packageId}-item`, title: "Visible item", kind: "video", thumbnail: null }]); });
       // Music shows the same item in its quick tiles and its History shelf, so more than one button is right.
       expect((await populated.findAllByRole("button", { name: /Visible item/ })).length).toBeGreaterThan(0);
-      expect(document.body.textContent).not.toMatch(/No (videos|music|shows or films|new episodes|books) yet\./i);
+      // An app's last shelf (the whole library) carries the app's one empty state, since every other shelf is hidden when empty;
+      // it is the only shelf allowed an empty line.
+      expect(lastShelfEmptyText.reduce((text, line) => text.replace(line, ""), document.body.textContent ?? "")).not.toMatch(/No (videos|music|shows or films|new episodes|books) yet\./i);
       cleanup();
     }
   });

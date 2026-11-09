@@ -1,6 +1,11 @@
 import { i18n } from "@lingui/core";
 import { useCallback, useEffect, useState } from "react";
-import { Section } from "@maipai/ui/src/primitives/Section";
+import { PlainSection } from "./PlainSection";
+import { getIcon } from "@maipai/ui/src/icons";
+
+const DownloadIcon = getIcon("download");
+const ArchiveIcon = getIcon("archive");
+const RestoreIcon = getIcon("rotate-ccw");
 import { EmptyState } from "@maipai/ui/src/primitives/EmptyState";
 import { Progress } from "@maipai/ui/src/primitives/Progress";
 import { Button } from "@maipai/ui/src/ui/button";
@@ -89,7 +94,7 @@ function EmergencyBackupKeyRow() {
       )}
       {error ? <p className="text-base text-destructive">{error}</p> : null}
       <div className="flex flex-wrap gap-2">
-        <Button variant="secondary" onClick={download} disabled={busy}>{i18n._({ id: "Download", message: "Download" })}</Button>
+        <Button variant="secondary" onClick={download} disabled={busy}><DownloadIcon aria-hidden />{i18n._({ id: "Download", message: "Download" })}</Button>
         <Button variant="secondary" onClick={print} disabled={busy}>{i18n._({ id: "Print", message: "Print" })}</Button>
       </div>
     </div>
@@ -195,7 +200,7 @@ export function BackupsSection({ person, headed = true }: BackupsSectionProps) {
   }
 
   return (
-    <Section {...(headed ? { heading: i18n._({ id: "Backups", message: "Backups" }) } : {})}>
+    <PlainSection {...(headed ? { heading: i18n._({ id: "Backups", message: "Backups" }) } : {})}>
       {error ? <p className="text-base text-destructive">{error}</p> : null}
 
       {canRestore ? (
@@ -263,7 +268,7 @@ export function BackupsSection({ person, headed = true }: BackupsSectionProps) {
                       onClick={() => setConfirming(b.filename)}
                       aria-label={i18n._({ id: "Restore the backup from {when}", message: "Restore the backup from {when}", values: { when: whenText(b.createdAt) } })}
                     >
-                      {i18n._({ id: "Restore", message: "Restore" })}
+                      <RestoreIcon aria-hidden />{i18n._({ id: "Restore", message: "Restore" })}
                     </Button>
                   ) : null}
                 </div>
@@ -275,9 +280,9 @@ export function BackupsSection({ person, headed = true }: BackupsSectionProps) {
 
       <div className="flex">
         <Button variant="secondary" onClick={handleRunBackup} disabled={running}>
-          {running ? i18n._({ id: "Backing up…", message: "Backing up…" }) : i18n._({ id: "Back up now", message: "Back up now" })}
+          <ArchiveIcon aria-hidden />{running ? i18n._({ id: "Backing up…", message: "Backing up…" }) : i18n._({ id: "Back up now", message: "Back up now" })}
         </Button>
       </div>
-    </Section>
+    </PlainSection>
   );
 }

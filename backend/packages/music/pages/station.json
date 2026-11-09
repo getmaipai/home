@@ -27,7 +27,7 @@
       "variant": "plain",
       "hide_when_empty": true,
       "row_actions": [
-        { "icon": "circle-record", "label": "Record", "label_field": "record_label", "action": { "call": { "target": "/api/plugins/music/radio/recordings/{id}/start", "args": { "length": "15" } } } },
+        { "icon": "mic", "label": "Record", "label_field": "record_label", "action": { "call": { "target": "/api/plugins/music/radio/recordings/{id}/start", "args": { "length": "15" } } } },
         { "icon": "trash", "label": "Remove", "label_field": "remove_label", "action": { "call": { "target": "/api/plugins/music/radio/stations/{id}", "method": "DELETE" } } }
       ],
       "on_select": { "navigate": { "to": "/apps/music/station", "state": { "id": "{id}" } } }

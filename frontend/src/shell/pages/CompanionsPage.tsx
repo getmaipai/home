@@ -40,6 +40,8 @@ import { VideoPlayer } from "@maipai/ui/src/elements/video-player";
 const listKey = ["companions"] as const;
 const ROBOT_SETTINGS = "/settings/apps?tab=robot";
 const MoreIcon = getIcon("more-horizontal");
+const ChatIcon = getIcon("message-circle");
+const ChevronIcon = getIcon("chevron-right");
 
 async function openCompanionChat(card: CompanionCard, navigate: ReturnType<typeof useNavigate>, onError: (message: string) => void) {
   try {
@@ -157,7 +159,7 @@ function CompanionsDirectory() {
                 </div>
                 <TabsContent value="Yours">
                   <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
-                    {data.companions.filter((card) => `${card.name} ${card.tagline}`.toLowerCase().includes(search.trim().toLowerCase())).map((card) => { const imageUrl = card.portrait ? api.companionPortrait(card.portrait) : companionStills[card.id]; return <CompanionCardElement key={card.id} name={card.name} line={card.tagline} media={imageUrl ? <Avatar size="lg"><AvatarImage src={imageUrl} alt={card.name} /></Avatar> : <SeededAvatar name={card.name} seed={card.id} />} status={card.is_default ? i18n._({ id: "Your companion", message: "Your companion" }) : card.status === "ready" ? null : card.status === "draft" ? i18n._({ id: "Draft · needs a portrait", message: "Draft · needs a portrait" }) : card.status} menu={companionMenu({ ...menuActions, card, onRemove: (item) => removeFromYours.mutate(item.id) })} meta={companionCardMeta(card)} actions={<><Button type="button" onClick={() => void openCompanionChat(card, navigate, setActionError)}>{(card.chat_count ?? card.chats) > 0 ? i18n._({ id: "Continue", message: "Continue" }) : i18n._({ id: "Chat", message: "Chat" })}</Button><Button type="button" variant="outline" onClick={() => navigate(`/companions/${encodeURIComponent(card.id)}`)}>{i18n._({ id: "View page", message: "View page" })}</Button></>} />; })}
+                    {data.companions.filter((card) => `${card.name} ${card.tagline}`.toLowerCase().includes(search.trim().toLowerCase())).map((card) => { const imageUrl = card.portrait ? api.companionPortrait(card.portrait) : companionStills[card.id]; return <CompanionCardElement key={card.id} name={card.name} line={card.tagline} media={imageUrl ? <Avatar size="lg"><AvatarImage src={imageUrl} alt={card.name} /></Avatar> : <SeededAvatar name={card.name} seed={card.id} />} status={card.is_default ? i18n._({ id: "Your companion", message: "Your companion" }) : card.status === "ready" ? null : card.status === "draft" ? i18n._({ id: "Draft · needs a portrait", message: "Draft · needs a portrait" }) : card.status} menu={companionMenu({ ...menuActions, card, onRemove: (item) => removeFromYours.mutate(item.id) })} meta={companionCardMeta(card)} actions={<><Button type="button" onClick={() => void openCompanionChat(card, navigate, setActionError)}><ChatIcon aria-hidden />{(card.chat_count ?? card.chats) > 0 ? i18n._({ id: "Continue", message: "Continue" }) : i18n._({ id: "Chat", message: "Chat" })}</Button><Button type="button" variant="outline" size="icon" aria-label={i18n._({ id: "View page", message: "View page" })} onClick={() => navigate(`/companions/${encodeURIComponent(card.id)}`)}><ChevronIcon aria-hidden /></Button></>} />; })}
                   </div>
                 </TabsContent>
                 {data.can_discover ? <TabsContent value="Discover">

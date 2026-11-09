@@ -66,7 +66,7 @@ describe("PRO-LOOK-APPS-01 All apps launcher", () => {
     expect(view.getByRole("navigation", { name: "App categories" })).toBeTruthy();
     expect(view.getByRole("heading", { name: "Favorites" })).toBeTruthy();
     expect(view.getAllByRole("heading", { name: "All apps" }).length).toBe(2);
-    await waitFor(() => expect(view.container.querySelectorAll('[data-slot="media-shelf"]').length).toBe(2));
+    await waitFor(() => expect(view.container.querySelectorAll('[data-layout="grid"]').length).toBe(2));
     expect(view.getAllByRole("button", { name: "Remove App 00 from favorites" }).length).toBeGreaterThan(0);
   });
 
@@ -96,7 +96,7 @@ describe("PRO-LOOK-APPS-01 All apps launcher", () => {
     start(["/apps/app0", "/apps/app1"]);
     const view = open();
     fireEvent.click(await view.findByRole("button", { name: "Edit" }));
-    const moveUp = within(view.container.querySelector('[data-slot="media-shelf"]') as HTMLElement).getByRole("button", { name: "Move App 01 up" });
+    const moveUp = within(view.getByRole("list", { name: "Favorite apps" })).getByRole("button", { name: "Move App 01 up" });
     await act(async () => { fireEvent.click(moveUp); });
     await waitFor(() => expect(home.puts.at(-1)).toMatchObject({ key: "ui.pinned_apps", value: JSON.stringify(["/apps/app1", "/apps/app0"]) }));
   });

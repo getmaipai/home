@@ -14,7 +14,7 @@ export function UsersPage({ person }: { person: Roster }) {
   return (
     <div className="flex flex-col gap-4">
       {canManage ? (
-        <UsersSection person={person} />
+        <UsersSection person={person} headed={false} />
       ) : (
         <Card>
           <CardContent>

@@ -130,3 +130,21 @@ describe("InstallDock", () => {
     expect(view.queryByTestId("install-dock")).toBeNull();
   });
 });
+
+describe("InstallDock making jobs", () => {
+  const making: HomeJobView = { id: "v1", kind: "video", state: "running", title: "A dog on a beach", progress: { percent: 40 } };
+  test("a running video shows with its percent when nothing is installing, and links to its app", () => {
+    const model = buildDock(null, [making]);
+    expect(model.primary?.label).toBe("Making a video");
+    expect(model.percent).toBe(40);
+    expect(model.primary?.href).toBe("/apps/videos");
+  });
+  test("another person's job row and a finished job are not shown", () => {
+    expect(buildDock(null, [{ id: "x", kind: "video", forPersonName: "Nova" }, { ...making, state: "done" }]).primary).toBeNull();
+  });
+  test("a non-admin sees the strip for their own make", async () => {
+    const view = renderWithQueryClient(<MemoryRouter><InstallDock admin={false} read={async () => status({ state: "none", items: [] })} readJobs={async () => [making]} /></MemoryRouter>);
+    await view.findByText("Making a video");
+    view.getByText("40%");
+  });
+});

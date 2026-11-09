@@ -1,6 +1,9 @@
 import { describe, expect, test } from "bun:test";
 import { render } from "@testing-library/react";
-import { StatusBanner } from "@/shell/pages/status/StatusBanner";
+import { StatusCard } from "@maipai/ui/src/elements/status-card";
+import { statusBannerCard } from "@/shell/pages/status/StatusBanner";
+
+const StatusBanner = (props: Parameters<typeof statusBannerCard>[0]) => <StatusCard {...statusBannerCard(props)} />;
 
 describe("StatusBanner", () => {
   test("renders the online headline and uptime", () => {
@@ -16,18 +19,16 @@ describe("StatusBanner", () => {
     expect(view.getByText("It should be back in a moment.")).toBeTruthy();
   });
 
-  test("renders offline chips", () => {
+  test("renders offline part names", () => {
     const view = render(<StatusBanner summary={{ level: "offline", text: "Something is down", problems: ["Brain", "Memory"] }} />);
     expect(view.getByText("We're having problems")).toBeTruthy();
-    expect(view.getByText("Brain")).toBeTruthy();
-    expect(view.getByText("Memory")).toBeTruthy();
+    expect(view.getByText("Brain and Memory")).toBeTruthy();
     expect(view.getByText("We're looking into it.")).toBeTruthy();
   });
 
-  test("renders maintenance chips and end time", () => {
+  test("renders maintenance part names and end time", () => {
     const view = render(<StatusBanner summary={{ level: "maintenance", text: "Maintenance", problems: ["Voice"] }} maintenanceEndsAt="2026-09-30T16:05:00" />);
     expect(view.getByText("Scheduled maintenance is in progress")).toBeTruthy();
-    expect(view.getByText("Voice")).toBeTruthy();
     expect(view.getByText(/Voice\. Until /)).toBeTruthy();
   });
 });

@@ -17,6 +17,7 @@ import { PageHeaderActions, PageHeaderTitle } from "@/shell/pageHeaderTitle";
 import { DashboardPage } from "@/shell/pages/DashboardPage";
 import { ChatPage } from "@/shell/pages/ChatPage";
 import { ALL_APPS_PATH } from "@/shell/allAppsPath";
+import { useBreakpoint } from "@maipai/ui/src/hooks/useBreakpoint";
 import { PhoneMenuLinks, searchWithCoreApps } from "@/shell/phoneMenuLinks";
 import { CustomizeRedirect, LegacySettingsRedirect, SettingsEntryRedirect } from "@/shell/pages/settings/SettingsEntryRedirect";
 import { meetsMinRole } from "@/apps/people/roles";
@@ -225,6 +226,9 @@ function RoutesWithIncognito({ person, onPersonChange, onSignedOut, appCatalog }
   const chatMatch = useMatch("/chat");
   const projectChatMatch = useMatch("/chat/projects/:id");
   const onChatPage = chatMatch !== null || projectChatMatch !== null;
+  // On a phone the chat header already shows the companion's picture; a second round avatar at the top right repeats it.
+  const onPhone = useBreakpoint().tier === "phone";
+  const phoneChat = onChatPage && onPhone;
   const ambient = useAmbientCompanion(person);
   const [ring, setRing] = useState<AmbientRing>(null);
   const [wakeIndicator, setWakeIndicator] = useState<AmbientWakeIndicator>(null);
@@ -421,7 +425,7 @@ function RoutesWithIncognito({ person, onPersonChange, onSignedOut, appCatalog }
             Notifications, System status, Incognito, Settings, Help and Log
             out. Pages draw their own slim title bar; chat draws its own
             beside the history column. */}
-        <Route element={<HeaderSearchOptionsContext.Provider value={headerSearchOptions}><FullLayout rail topRight={paneState.open ? undefined : ambientTopRight} topRightBand fallbackTitle={location.pathname.startsWith("/settings") ? i18n._({ id: "Settings", message: "Settings" }) : appName ?? (location.pathname === "/" ? i18n._({ id: "Home", message: "Home" }) : undefined)} rightPane={ambientRightPane} mobileSections={<>{drawerSections}<div className="mt-3 border-t border-border pt-3"><PhoneMenuLinks /></div></>} activeAppHref={selectedAppHref} railApps={railApps(appCatalog, pinnedRoutes)} railCoreDestinations={[{ name: i18n._({ id: "Media", message: "Media" }), url: "/media", icon: "cast" }]} onRailAppPinChange={(url) => togglePin(url)} railAllAppsHref={ALL_APPS_PATH} settingsHref="/settings" headerSearchRemote={(query) => searchWithCoreApps(query, appCatalog)} railTourId="shell.rail" railItemTourId={(item) => item.url === "/chat" ? "rail.chat" : undefined} incognitoTourId="shell.incognito" railProfile={<RailProfile person={person} incognito={incognito} onIncognitoChange={onIncognitoChange} onSignedOut={onSignedOut} helpEntries={helpEntries} />} sidebarItemStatus={(item) => sidebarItemStatus(statusAppsQuery.data ?? [], item)} /></HeaderSearchOptionsContext.Provider>}>
+        <Route element={<HeaderSearchOptionsContext.Provider value={headerSearchOptions}><FullLayout rail topRight={paneState.open || phoneChat ? undefined : ambientTopRight} topRightBand fallbackTitle={location.pathname.startsWith("/settings") ? i18n._({ id: "Settings", message: "Settings" }) : appName ?? (location.pathname === "/" ? i18n._({ id: "Home", message: "Home" }) : undefined)} rightPane={ambientRightPane} mobileSections={<>{drawerSections}<div className="mt-3 border-t border-border pt-3"><PhoneMenuLinks /></div></>} activeAppHref={selectedAppHref} railApps={railApps(appCatalog, pinnedRoutes)} railCoreDestinations={[{ name: i18n._({ id: "Media", message: "Media" }), url: "/media", icon: "cast" }]} onRailAppPinChange={(url) => togglePin(url)} railAllAppsHref={ALL_APPS_PATH} settingsHref="/settings" headerSearchRemote={(query) => searchWithCoreApps(query, appCatalog)} railTourId="shell.rail" railItemTourId={(item) => item.url === "/chat" ? "rail.chat" : undefined} incognitoTourId="shell.incognito" railProfile={<RailProfile person={person} incognito={incognito} onIncognitoChange={onIncognitoChange} onSignedOut={onSignedOut} helpEntries={helpEntries} />} sidebarItemStatus={(item) => sidebarItemStatus(statusAppsQuery.data ?? [], item)} /></HeaderSearchOptionsContext.Provider>}>
           <Route path="chat" element={<ChatPage person={person} />} />
           <Route path="chat/projects" element={<ProjectsPage person={person} />} />
           <Route path="chat/projects/:id" element={<ChatPage person={person} />} />

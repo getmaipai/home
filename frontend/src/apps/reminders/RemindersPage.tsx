@@ -8,6 +8,7 @@ import { useBreakpoint } from "@maipai/ui/src/hooks/useBreakpoint";
 import { WakeWordPersonContext } from "@/apps/chat/chatThreadContexts";
 import { useHeaderExtra } from "@maipai/ui/src/dashboard/layouts/full/vertical/header/HeaderExtraContext";
 import { PageHeaderTitle } from "@/shell/pageHeaderTitle";
+import { getIcon } from "@maipai/ui/src/icons";
 import { api } from "@/lib/api";
 import { CreateListSheet } from "./CreateListSheet";
 import { RemindersIcon } from "./remindersIcon";
@@ -18,6 +19,7 @@ import { SmartListView, type SmartItem } from "./SmartListView";
 import { labelFor, type ListIcon, type ReminderView } from "./reminderTypes";
 import { useHubMutation } from "@/lib/useHubMutation";
 
+const PlusIcon = getIcon("plus");
 const LISTS_QUERY_KEY = ["household-lists"];
 const COMING_QUERY_KEY = ["household-coming-up"];
 const DEVICES_QUERY_KEY = ["house-schedules"];
@@ -25,7 +27,7 @@ const DEVICES_QUERY_KEY = ["house-schedules"];
 export { RemindersIcon };
 
 function RemindersHeaderAction() {
-  return <><Button type="button" variant="ghost" size="icon-lg" aria-label={i18n._({ id: "Create list", message: "Create list" })} onClick={() => window.dispatchEvent(new Event("maipai:reminders-add-list"))}>+</Button></>;
+  return <><Button type="button" variant="ghost" size="icon-lg" className="sm:hidden" aria-label={i18n._({ id: "Create list", message: "Create list" })} onClick={() => window.dispatchEvent(new Event("maipai:reminders-add-list"))}><PlusIcon aria-hidden /></Button></>;
 }
 
 function orderLists(input: ListRecord[]): ListRecord[] {

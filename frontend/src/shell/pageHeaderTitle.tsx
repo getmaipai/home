@@ -45,6 +45,10 @@ import { StatusIcon } from "@/shell/pages/StatusPage";
 import { ClockHeaderAdd } from "@/apps/clock/ClockHeaderTitle";
 import { HeaderTitle as KitHeaderTitle } from "@maipai/ui/src/dashboard/layouts/full/vertical/header/HeaderTitle";
 
+// The kit breaks a name anywhere and wraps to two lines ("Vi d.."), which a phone header with a mode switch beside the name cannot
+// afford: keep the name whole on one line, tighten the gap, and let it end in an ellipsis only when it truly cannot fit.
+const HEADER_NAME_ONE_LINE = "max-sm:gap-1.5 max-sm:px-1 [&_[data-slot=header-title]]:line-clamp-none [&_[data-slot=header-title]]:truncate [&_[data-slot=header-title]]:wrap-normal [&_svg]:max-sm:size-5";
+
 interface PageHeaderEntry {
   icon: Icon;
   label: string;
@@ -128,7 +132,9 @@ export function headerEntryFor(pathname: string, apps: readonly AppEntry[] = APP
 /** The icon and name, drawn once, by the kit's `HeaderTitle` (a long or translated name wraps to two lines and shrinks on a phone).
  * `hideInTopRow` marks it for the phone layouts where a page places its own top row. */
 export function HeaderTitle({ entry, hideInTopRow = false, heading = false }: { entry: PageHeaderEntry; hideInTopRow?: boolean; heading?: boolean }) {
-  return <KitHeaderTitle icon={entry.icon} label={entry.label} heading={heading} hideInTopRow={hideInTopRow} />;
+  // The kit hides the icon on a phone when the name is the page's h1; Jesse wants the icon on every page (2026-11-09), so the visible
+  // title is never the heading and an app's h1 is an sr-only copy beside it.
+  return <>{heading ? <h1 className="sr-only">{entry.label}</h1> : null}<KitHeaderTitle icon={entry.icon} label={entry.label} heading={false} hideInTopRow={hideInTopRow} className={HEADER_NAME_ONE_LINE} /></>;
 }
 
 /** Mounted through `useHeaderExtra(PageHeaderTitle)` by every page and app: a stable module-level reference (the hook's own

@@ -94,8 +94,8 @@ export function SettingsAreaPage({ person, onPersonChange }: { person: Roster; o
 const BackIcon = getIcon("arrow-left");
 
 /** COLUMN-UNIFY-01 (owner, 2026-10-19: a settings page had no way back to the app): the settings column's first row returns to the
- * app the person came from, with the column's title under it. The kit draws no title of its own once it is given a back link. */
-function SettingsBackLink({ title, reach }: { title: string; reach: string }) {
+ * app the person came from, with the column's title under it. The kit draws no title of its own once it is given a back link in the docked (desktop) layout; on a phone it does, so the title is drawn here only when docked. */
+function SettingsBackLink({ title, reach, showTitle }: { title: string; reach: string; showTitle: boolean }) {
   const rows = useAppRows();
   const to = lastAppRoute();
   const label = backLabelFor(to, Object.fromEntries((rows ?? []).map((row) => [row.package, row.label])));
@@ -105,7 +105,7 @@ function SettingsBackLink({ title, reach }: { title: string; reach: string }) {
         <BackIcon aria-hidden />
         {label}
       </Button></div>
-      <h2 className="px-2 text-lg leading-7 font-semibold">{title}</h2>
+      {showTitle ? <h2 className="px-2 text-lg leading-7 font-semibold">{title}</h2> : null}
       <Badge variant="secondary">{reach}</Badge>
     </>
   );
@@ -289,7 +289,7 @@ function SettingsAreaBody({ area, packageAreas, person, onPersonChange, packageA
   return (
     <SettingsShell
       layout={desktop ? "docked" : "default"}
-      backLink={<SettingsBackLink title={i18n._({ id: "Settings", message: "Settings" })} reach={active?.scope === "household" ? "Applies to everyone at home" : "Only you"} />}
+      backLink={<SettingsBackLink showTitle={desktop} title={i18n._({ id: "Settings", message: "Settings" })} reach={active?.scope === "household" ? "Applies to everyone at home" : "Only you"} />}
       labels={{ columnTitle: "Settings" }}
       trail={[{ label: area.title, href: packageArea && area.id !== "clock" ? `/settings/${area.id}` : settingsPath() }, ...(active ? [{ label: active.label, href: detailId ? pagePath(active.id, tab) : undefined }] : []), ...(detailId ? [{ label: detailName ?? active?.label ?? detailId }] : [])]}
       contentAs="section"

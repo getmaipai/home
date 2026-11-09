@@ -246,7 +246,17 @@
           "media_id": "{id}"
         }
       },
-      "hide_when_empty": true
+      "empty_state": {
+        "type": "empty_state",
+        "icon": "film",
+        "text": "No videos yet. Make one in Create, and it shows up here.",
+        "action": {
+          "navigate": {
+            "to": "/apps/videos/create"
+          }
+        },
+        "action_label": "Make a video"
+      }
     }
   ]
 }

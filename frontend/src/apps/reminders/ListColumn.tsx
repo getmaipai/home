@@ -5,6 +5,11 @@ import type { List as ListRecord } from "@maipai/spec/gen/ts/list.js";
 import type { ReminderView } from "./reminderTypes";
 import { iconFor, itemCount, labelFor } from "./reminderTypes";
 
+const PlusIcon = getIcon("plus");
+const TodayIcon = getIcon("calendar");
+const ScheduledIcon = getIcon("clock");
+const DevicesIcon = getIcon("cpu");
+
 type Props = {
   lists: ListRecord[];
   view: ReminderView;
@@ -20,17 +25,17 @@ export function ListColumn({ lists, view, todayCount, scheduledCount, deviceCoun
   return <aside className="flex w-full shrink-0 flex-col border-r p-3 sm:w-72" aria-label={i18n._({ id: "Reminder lists", message: "Reminder lists" })}>
     <div className="flex items-center justify-between px-3 py-2">
       <h2 className="text-lg font-semibold">{i18n._({ id: "Lists", message: "Lists" })}</h2>
-      <Button type="button" variant="ghost" size="icon" aria-label={i18n._({ id: "Create list", message: "Create list" })} onClick={onCreate}>+</Button>
+      <Button type="button" variant="ghost" size="icon" className="max-sm:hidden" aria-label={i18n._({ id: "Create list", message: "Create list" })} onClick={onCreate}><PlusIcon aria-hidden /></Button>
     </div>
     <div className="grid gap-1">
       <Button variant={view.kind === "today" ? "secondary" : "ghost"} onClick={() => onSelect({ kind: "today" })}>
-        <span>{i18n._({ id: "Today", message: "Today" })}</span>{todayCount > 0 ? <span>{todayCount}</span> : null}
+        <TodayIcon aria-hidden /><span className="flex-1 text-left">{i18n._({ id: "Today", message: "Today" })}</span>{todayCount > 0 ? <span className="text-muted-foreground">{todayCount}</span> : null}
       </Button>
       <Button variant={view.kind === "scheduled" ? "secondary" : "ghost"} onClick={() => onSelect({ kind: "scheduled" })}>
-        <span>{i18n._({ id: "Scheduled", message: "Scheduled" })}</span>{scheduledCount > 0 ? <span>{scheduledCount}</span> : null}
+        <ScheduledIcon aria-hidden /><span className="flex-1 text-left">{i18n._({ id: "Scheduled", message: "Scheduled" })}</span>{scheduledCount > 0 ? <span className="text-muted-foreground">{scheduledCount}</span> : null}
       </Button>
       {deviceCount !== null ? <Button variant={view.kind === "devices" ? "secondary" : "ghost"} onClick={() => onSelect({ kind: "devices" })}>
-        <span>{i18n._({ id: "Device schedules", message: "Device schedules" })}</span>{deviceCount > 0 ? <span>{deviceCount}</span> : null}
+        <DevicesIcon aria-hidden /><span className="flex-1 text-left">{i18n._({ id: "Device schedules", message: "Device schedules" })}</span>{deviceCount > 0 ? <span className="text-muted-foreground">{deviceCount}</span> : null}
       </Button> : null}
       <hr className="my-2" />
       {lists.map((list, index) => {

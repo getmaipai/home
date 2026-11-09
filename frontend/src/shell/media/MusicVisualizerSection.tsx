@@ -1,7 +1,6 @@
 import { i18n } from "@lingui/core";
 // MEDIA-VIZ-02/03: what the Music play page adds beside the kit Player (which stays untouched, RULES rule 9), ported from the
-// pre-rebuild hub's Now Playing page: the cover's colors and a soft blurred cover over the whole page with the visualizer moving
-// behind everything, a row of controls (Minimize, visualizer scene, sleep timer, repeat, volume, Full screen), and the same Now
+// pre-rebuild hub's Now Playing page: the visualizer moving behind a flat page (PRO look: no gradient wash, no blurred cover), a row of controls (Minimize, visualizer scene, sleep timer, repeat, volume, Full screen), and the same Now
 // playing stage the mini player opens. It reads the media host's element, so it never starts or restarts anything, and it draws
 // only while the host holds this song.
 import { useCallback, useEffect, useState } from "react";
@@ -51,11 +50,9 @@ export function MusicVisualizerSection({ id }: { id: string }) {
   return (
     <>
       <div aria-hidden="true" data-testid="music-page-backdrop" className="pointer-events-none fixed inset-x-0 bottom-0 top-13 z-0 overflow-hidden md:start-14">
-        {mine.poster ? <img src={mine.poster} alt="" className="absolute inset-0 size-full scale-125 object-cover opacity-20 blur-3xl" /> : null}
-        <div className="absolute inset-0 opacity-20 dark:opacity-25" style={{ background: `linear-gradient(135deg, ${palette.corners[0]}, ${palette.corners[1]} 40%, ${palette.corners[2]} 70%, ${palette.corners[3]})` }} />
         {vizOn ? <AudioVisualizer variant={variant} mode="full" getAnalyser={getAnalyser} palette={palette} active={playing} progress={progress} opacity={0.4} className="absolute inset-0 size-full" /> : null}
       </div>
-      <section aria-label={i18n._({ id: "Player options", message: "Player options" })} data-testid="music-visualizer-section" className="relative z-10 flex w-full flex-wrap items-center gap-1 py-2">
+      <section aria-label={i18n._({ id: "Player options", message: "Player options" })} data-testid="music-visualizer-section" className="relative z-10 flex w-full items-center gap-1 overflow-x-auto py-2 [scrollbar-width:none] [&>*]:shrink-0">
         <MinimizeButton appHome="/apps/music" />
         <VisualizerMenu withLabel />
         <SleepMenu withLabel />

@@ -1,7 +1,10 @@
 import { i18n } from "@lingui/core";
 import { useEffect, useState, type FormEvent } from "react";
 import { api, isOwnerOrAdminRole, type Roster, type CommandRow, type CommandAction } from "@/lib/api";
-import { Section } from "@maipai/ui/src/primitives/Section";
+import { PlainSection } from "./PlainSection";
+import { getIcon } from "@maipai/ui/src/icons";
+
+const TrashIcon = getIcon("trash");
 import { EmptyState } from "@maipai/ui/src/primitives/EmptyState";
 import { Input } from "@maipai/ui/src/ui/input";
 import { Button } from "@maipai/ui/src/ui/button";
@@ -12,6 +15,8 @@ import { errorLine } from "@/lib/hubReachability";
 interface CommandsSectionProps {
   person: Roster;
   management?: boolean;
+  /** False when the page header already names the page. */
+  headed?: boolean;
 }
 
 type ActionKind = CommandAction["kind"];
@@ -26,7 +31,7 @@ function summarize(action: CommandAction): string {
 // The management view lists commands in Home settings. Adult members
 // use the separate creation surface; the server keeps MIN_ROLE_TO_CREATE
 // as the floor for creating a command.
-export function CommandsSection({ person, management = false }: CommandsSectionProps) {
+export function CommandsSection({ person, management = false, headed = true }: CommandsSectionProps) {
   const [commands, setCommands] = useState<CommandRow[] | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [pendingId, setPendingId] = useState<string | null>(null);
@@ -96,7 +101,7 @@ export function CommandsSection({ person, management = false }: CommandsSectionP
   }
 
   return (
-    <Section heading={management ? i18n._({ id: "Household commands", message: "Household commands" }) : i18n._({ id: "Commands", message: "Commands" })}>
+    <PlainSection {...(headed ? { heading: management ? i18n._({ id: "Household commands", message: "Household commands" }) : i18n._({ id: "Commands", message: "Commands" }) } : {})}>
       <p className="text-base text-muted-foreground">
         {i18n._({ id: "Teach MaiPai a phrase of your own - \"when I say X, do Y.\" A command always fires on an exact phrase, never a guess.", message: "Teach MaiPai a phrase of your own - \"when I say X, do Y.\" A command always fires on an exact phrase, never a guess." })}
       </p>
@@ -193,8 +198,8 @@ export function CommandsSection({ person, management = false }: CommandsSectionP
                     <span className="text-base text-muted-foreground">{i18n._({ id: "{summarize} - {value} or higher", message: "{summarize} - {value} or higher", values: { summarize: summarize(c.action), value: ROLE_LABELS[c.minRole as keyof typeof ROLE_LABELS] ?? c.minRole } })}</span>
                   </div>
                   {isOwnerOrAdminRole(person.role) || c.creatorId === person.id ? (
-                    <Button variant="secondary" disabled={pendingId === c.id} onClick={() => deleteCommand(c.id)}>
-                      {pendingId === c.id ? i18n._({ id: "Deleting…", message: "Deleting…" }) : i18n._({ id: "Delete", message: "Delete" })}
+                    <Button variant="ghost" disabled={pendingId === c.id} onClick={() => deleteCommand(c.id)}>
+                      <TrashIcon aria-hidden />{pendingId === c.id ? i18n._({ id: "Deleting…", message: "Deleting…" }) : i18n._({ id: "Delete", message: "Delete" })}
                     </Button>
                   ) : null}
                 </li>
@@ -203,6 +208,6 @@ export function CommandsSection({ person, management = false }: CommandsSectionP
           ) : null}
         </>
       )}
-    </Section>
+    </PlainSection>
   );
 }

@@ -17,7 +17,7 @@ const ChatIcon = getIcon("message-circle");
  * which used to give it a film strip), a film for a clip, a note for a song. */
 export function tilePicture(row: MediaHomeRow) {
   return row.kind === "chat"
-    ? <SafeImage src={row.artwork_url} alt="" fallbackContent={<ChatIcon aria-hidden className="size-1/3" />} />
+    ? <SafeImage src={row.artwork_url} alt="" fallbackContent={<ChatIcon aria-hidden className="size-1/3 text-foreground/70" />} />
     : <SafeImage src={row.artwork_url} alt="" kind={FALLBACK[row.app]} />;
 }
 

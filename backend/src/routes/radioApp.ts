@@ -14,7 +14,7 @@ import { findStations, radioDirectoryAllowed, radioDirectoryHasFavicon, remember
 import { checkFeedAddress } from "@/lib/shelf/feedAddresses";
 import { assertNotPrivateHost } from "@maipai/core/src/ssrfGuard";
 import { fetchRadioArt } from "@/lib/media/radioArt";
-import { radioRecordingRows, startRadioRecording, stopRadioRecording } from "@/lib/media/radioRecordings";
+import { isRadioRecording, radioRecordingRows, startRadioRecording, stopRadioRecording } from "@/lib/media/radioRecordings";
 import { MINOR_QUERY_PERSONAL_NOTE, minorQueryHit } from "@/lib/retrieval/minorQueryCheck";
 import { getHouseholdSettingValue } from "@/lib/settings";
 import { apiRouter, respond, refuseWith } from "@/lib/openapi";
@@ -40,14 +40,14 @@ export const radioGenreRows = () => GENRES.map((genre) => ({ id: genre, label: g
 const subtitleOf = (station: { country_code: string | null; tags: string[] }): string =>
   [countryName(station.country_code), station.tags.slice(0, 2).join(", ")].filter(Boolean).join(" · ");
 
-export type RadioRow = { id: string; kind: "station"; title: string; summary: string; thumbnail: string | null; url: string; preview_url?: string; favicon: string; tags_csv: string; country_code: string; codec: string; bitrate_kbps: string; language: string; homepage: string; action_label: string };
+export type RadioRow = { id: string; kind: "station"; title: string; summary: string; thumbnail: string | null; url: string; preview_url?: string; favicon: string; tags_csv: string; country_code: string; codec: string; bitrate_kbps: string; language: string; homepage: string; action_label: string; recording?: string; idle?: string };
 const rowOf = (station: DirectoryStation | SavedStation, label: string): RadioRow => ({
   id: station.id, kind: "station", title: station.name, summary: [subtitleOf(station), station.bitrate_kbps ? `${station.bitrate_kbps} kbps` : "", station.codec?.toUpperCase() ?? ""].filter(Boolean).join(" · "), thumbnail: station.favicon ? `/api/plugins/music/radio/art?u=${encodeURIComponent(station.favicon)}&n=${encodeURIComponent(station.name)}` : `/api/plugins/music/radio/card?n=${encodeURIComponent(station.name)}`, url: station.url, favicon: station.favicon ?? "", tags_csv: station.tags.join(","),
   country_code: station.country_code ?? "", codec: station.codec ?? "", bitrate_kbps: station.bitrate_kbps === null ? "" : String(station.bitrate_kbps), language: "language" in station && station.language ? station.language : "", homepage: "homepage" in station && station.homepage ? station.homepage : "", action_label: label,
 });
 
 /** Saved stations for the page: a child sees exactly what a parent saved for them. */
-export const radioSavedRows = (person: PersonRow): RadioRow[] => listSavedStations(person).map((station) => ({ ...rowOf(station, "Remove"), action_label: "Remove" }));
+export const radioSavedRows = (person: PersonRow): RadioRow[] => listSavedStations(person).map((station) => { const recording = isRadioRecording(person, station.id); return { ...rowOf(station, "Remove"), action_label: "Remove", recording: recording ? "1" : "", idle: recording ? "" : "1" }; });
 
 /** Station page data resolves saved stations first, then only directory stations recently shown to this household. */
 export function radioStationRow(person: PersonRow, id: string): (RadioRow & { description: string; saved: boolean; homepage: string; play_label: string; remove_label: string; record_label: string }) | null {

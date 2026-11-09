@@ -16,7 +16,6 @@
             }
           },
           "kind": "audio",
-          "actions_wrap": true,
           "details": false,
           "autoplay_next": true,
           "actions": [

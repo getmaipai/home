@@ -44,6 +44,8 @@ const INVENT_PROMPT = "Invent the people for a show. For each part you are given
 const episodeRunning = new Set<string>();
 const stageCache = new Map<string, { brief: Brief; outline: Outline; script: Script; kept: Line[]; madeAt: string }>();
 let showCompleter: typeof completeBackground | null = null;
+/** Test hook: simulates a hub restart, which empties the in-memory stage cache while the disk copy stays. */
+export function __clearTalentStageCacheForTests(): void { stageCache.clear(); }
 export function __setTalentShowCompleterForTests(value: typeof completeBackground | null): void { showCompleter = value; }
 function ageAudience(band: AgeBand): Show["audience"] { return band === "child" ? "all" : band; }
 function audienceBand(audience: Show["audience"]): AgeBand { return audience === "all" ? "child" : audience; }
@@ -183,7 +185,10 @@ export async function makeEpisode(actor: PersonRow, productionId: string, opts: 
       if (bySegment.some((segment) => segment.lines.length === 0)) throw refusal("A segment has no lines that fit the show's audience. Change the show or try another episode.");
       kept = bySegment.flatMap((segment) => segment.lines); script = { ...script, segments: bySegment }; currentStage = "voices"; stage(production, episodeId, "voices", now);
     }
-    stateCache(productionId, episodeId, { brief, outline, script, kept, madeAt: now.toISOString() });
+    // Keep the saved speech files when resuming at the mix stage; a stage that finds them missing renders them again.
+    const savedRendered = (state as { rendered?: Awaited<ReturnType<typeof renderLines>> } | null)?.rendered ?? (stageCache.get(`${episodeId}:rendered`) as unknown as Awaited<ReturnType<typeof renderLines>> | undefined);
+    if (currentStage === "mix" && !savedRendered) currentStage = "voices";
+    stateCache(productionId, episodeId, { brief, outline, script, kept, madeAt: now.toISOString(), ...(savedRendered ? { rendered: savedRendered } : {}) });
     if (currentStage === "voices") {
       brief ??= await buildBrief(actor, production, format, now); script ??= { title: "Morning Update", segments: [] };
       const outDir = join(dataDir, "talent", productionId, episodeId); mkdirSync(outDir, { recursive: true });

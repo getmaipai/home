@@ -60,8 +60,8 @@ export const editPath = (kind: Kind, id: string): string => `/apps/music/edit?ki
 
 function Heading({ title, line }: { title: string; line?: string }) {
   return <header className="flex flex-col gap-1 px-4 lg:px-0">
-    <h2 className="text-2xl font-semibold tracking-tight">{title}</h2>
-    {line ? <p className="text-muted-foreground max-w-xl text-sm">{line}</p> : null}
+    <h2 className="text-section font-semibold tracking-tight">{title}</h2>
+    {line ? <p className="text-supporting text-muted-foreground max-w-xl">{line}</p> : null}
   </header>;
 }
 
@@ -144,7 +144,7 @@ function CreationsPage({ adult }: { adult: boolean }) {
   const navigate = useNavigate();
   return <section className="flex flex-col gap-6" data-testid="music-creations">
     <Heading title={i18n._({ id: "Library", message: "Library" })} line={i18n._({ id: "Your songs, bands, albums and song styles. Open one to play it or change it.", message: "Your songs, bands, albums and song styles. Open one to play it or change it." })} />
-    {adult ? <div className="flex flex-col gap-3"><h2 className="text-xl font-semibold">{i18n._({ id: "Songs", message: "Songs" })}</h2><SongGallery selected={null} onOpen={(card) => navigate(`/apps/music/create?song=${encodeURIComponent(card.id)}`)} /></div> : null}
+    {adult ? <div className="flex flex-col gap-3 px-4 lg:px-0"><h2 className="text-body font-semibold">{i18n._({ id: "Songs", message: "Songs" })}</h2><SongGallery selected={null} onOpen={(card) => navigate(`/apps/music/create?song=${encodeURIComponent(card.id)}`)} /></div> : null}
     <Shelf kind="band" title={i18n._({ id: "Bands", message: "Bands" })} makeTo="/apps/music/create" adult={adult} />
     <Shelf kind="album" title={i18n._({ id: "Albums", message: "Albums" })} makeTo="/apps/music/create" adult={adult} />
     <Shelf kind="song_style" title={i18n._({ id: "Styles", message: "Styles" })} makeTo="/apps/music/create" adult={adult} />

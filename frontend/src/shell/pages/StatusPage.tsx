@@ -1,8 +1,9 @@
 import { i18n } from "@lingui/core";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { StatusCard } from "@maipai/ui/src/elements/status-card";
 import { Timeline } from "@maipai/ui/src/elements/timeline";
 import { StatusLegend, StatusPartsBody } from "@/shell/pages/status/StatusComponents";
-import { StatusBanner } from "@/shell/pages/status/StatusBanner";
+import { statusBannerCard } from "@/shell/pages/status/StatusBanner";
 import { StatusIncidentBody, statusIncidentFacts } from "@/shell/pages/status/StatusIncident";
 import { api, isOwnerOrAdminRole, type HealthStatus, type Roster, type StatusHistory } from "@/lib/api";
 import { statusSummary } from "@/shell/statusSummary";
@@ -59,11 +60,13 @@ export function StatusPage({ person }: { person: Roster }) {
   const AlertIcon = getIcon("alert-triangle");
   const admin = isOwnerOrAdminRole(person.role);
 
+  const overallStatus = <StatusCard {...statusBannerCard({ summary, message: summary.message, maintenanceEndsAt: boardData?.maintenance.find((window) => window.status === "in_progress" && window.components.some((part) => maintenance.includes(part)))?.ends_at })} />;
+
   return (
     <>
       <div className="flex flex-col gap-4">
       {boardData?.note || isOwnerOrAdminRole(person.role) ? <StatusBoardNotes person={person} note={boardData?.note ?? null} /> : null}
-      <StatusBanner summary={summary} message={summary.message} maintenanceEndsAt={boardData?.maintenance.find((window) => window.status === "in_progress" && window.components.some((part) => maintenance.includes(part)))?.ends_at} />
+      {overallStatus}
       {engineComputerQuery.data?.configured ? <Card data-engine-computer-status>
         <CardHeader><CardTitle>{i18n._({ id: "Engine computer", message: "Engine computer" })}</CardTitle></CardHeader>
         <CardContent>

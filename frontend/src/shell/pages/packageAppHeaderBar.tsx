@@ -8,6 +8,8 @@ import type { AppRow } from "@/lib/api";
 import { navigateOf } from "@/shell/useAppSidebar";
 import { PageHeaderTitle } from "@/shell/pageHeaderTitle";
 import { getIcon } from "@maipai/ui/src/icons";
+import { i18n } from "@lingui/core";
+import { navigateBack } from "@/shell/media/navigateBack";
 import { iconNames } from "@maipai/ui/src/icons";
 
 // Package app pages publish their title and header action data here for the stable components
@@ -23,13 +25,15 @@ export interface PackageAppHeaderState {
   onMode?: (id: string) => void;
   searchTo?: string;
   detail?: boolean;
+  /** A detail page on a phone: the app address its Back button returns to (drawn in the header row, before the title). */
+  back?: string;
 }
 
 let current: PackageAppHeaderState | null = null;
 const listeners = new Set<() => void>();
 
 export function publishPackageAppHeader(next: PackageAppHeaderState | null): void {
-  const same = current === next || (current !== null && next !== null && current.to === next.to && current.label === next.label && current.title === next.title && current.settingsArea === next.settingsArea && current.header === next.header && current.mode === next.mode && current.onMode === next.onMode && current.searchTo === next.searchTo && current.detail === next.detail);
+  const same = current === next || (current !== null && next !== null && current.to === next.to && current.label === next.label && current.title === next.title && current.settingsArea === next.settingsArea && current.header === next.header && current.mode === next.mode && current.onMode === next.onMode && current.searchTo === next.searchTo && current.detail === next.detail && current.back === next.back);
   if (same) return;
   current = next;
   for (const listener of listeners) listener();
@@ -45,6 +49,7 @@ function snapshot(): PackageAppHeaderState | null {
 }
 
 const GearIcon = getIcon("settings");
+const ArrowLeftIcon = getIcon("arrow-left");
 const MoreIcon = getIcon("more-horizontal");
 
 /** The app's own search: one row that opens the app's search page for the typed words. The palette lists nothing of the shell. */
@@ -65,7 +70,7 @@ function PackageAppHeaderCenter() {
   const { header } = state;
   const modes = header?.modes ?? [];
   return (
-    <div className={`flex shrink-0 items-center gap-2 max-md:-ms-4 md:absolute md:left-1/2 md:top-1/2 md:w-max md:max-w-lg md:-translate-x-1/2 md:-translate-y-1/2 md:justify-center md:gap-3${state.detail ? " max-sm:hidden" : ""}`} data-testid="app-header-center">
+    <div className={`flex shrink-0 items-center gap-2 max-md:-ms-4 max-sm:[&_[role=tab]]:px-2.5 max-sm:[&_[role=tab]]:text-[13px] md:absolute md:left-1/2 md:top-1/2 md:w-max md:max-w-lg md:-translate-x-1/2 md:-translate-y-1/2 md:justify-center md:gap-3${state.detail ? " max-sm:hidden" : ""}`} data-testid="app-header-center">
       {header?.search && state.searchTo ? <div className="hidden sm:block"><AppSearch label={state.label} searchTo={state.searchTo} /></div> : null}
       {modes.length > 1 && state.mode ? (
         <Tabs value={state.mode} onValueChange={(value) => state.onMode?.(String(value))}>
@@ -78,9 +83,17 @@ function PackageAppHeaderCenter() {
   );
 }
 
+function PackageAppHeaderBack() {
+  const state = useSyncExternalStore(subscribe, snapshot, snapshot);
+  const navigate = useNavigate();
+  if (!state?.back) return null;
+  const to = state.back;
+  return <Button type="button" variant="ghost" size="icon" className="-ms-1 shrink-0 sm:hidden" data-testid="header-back" aria-label={i18n._({ id: "Back", message: "Back" })} onClick={() => navigateBack(navigate, to)}><ArrowLeftIcon aria-hidden="true" /></Button>;
+}
+
 /** The header's left slot for a package app: the page title, then the centred search and modes. */
 export function PackageAppHeaderLeft() {
-  return <><PageHeaderTitle /><PackageAppHeaderCenter /></>;
+  return <><PackageAppHeaderBack /><PageHeaderTitle /><PackageAppHeaderCenter /></>;
 }
 
 export function PackageAppHeaderActions() {

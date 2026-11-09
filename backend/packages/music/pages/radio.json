@@ -40,8 +40,8 @@
       "orientation": "vertical",
       "density": "compact",
       "row_actions": [
-        { "icon": "circle-record", "label": "Record", "action": { "call": { "target": "/api/plugins/music/radio/recordings/{id}/start", "args": { "length": "15" } } } },
-        { "icon": "stop", "label": "Stop recording", "action": { "call": { "target": "/api/plugins/music/radio/recordings/{id}/stop" } } }
+        { "icon": "circle-dot", "label": "Record", "show_when_field": "idle", "action": { "call": { "target": "/api/plugins/music/radio/recordings/{id}/start", "args": { "length": "15" } } } },
+        { "icon": "square", "label": "Stop recording", "show_when_field": "recording", "action": { "call": { "target": "/api/plugins/music/radio/recordings/{id}/stop" } } }
       ],
       "empty_state": { "type": "empty_state", "icon": "headphones", "text": "No stations yet. Tap Add on any station to save one here." },
       "on_select": { "navigate": { "to": "/apps/music/station", "state": { "id": "{id}" } } }

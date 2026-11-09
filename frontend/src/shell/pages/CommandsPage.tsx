@@ -10,7 +10,7 @@ export function CommandsPage({ person }: { person: Roster }) {
   useTabItem("Create command");
   return (
     <div className="flex flex-col gap-4">
-      <CommandsSection person={person} />
+      <CommandsSection person={person} headed={false} />
     </div>
   );
 }

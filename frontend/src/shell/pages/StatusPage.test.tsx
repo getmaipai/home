@@ -55,7 +55,7 @@ describe("StatusPage health checks (CANARY-01)", () => {
     try {
       const view = renderWithQueryClient(<StatusPage person={makePerson("admin")} />);
       fireEvent.click(await view.findByRole("button", { name: "Run checks now" }));
-      expect(await view.findByRole("alert")).toHaveTextContent("The health checks could not be run. Try again.");
+      expect((await view.findByText("The health checks could not be run. Try again.")).getAttribute("role")).toBe("alert");
       expect(view.queryByText("private engine detail")).toBeNull();
     } finally { globalThis.fetch = original; }
   });
@@ -147,7 +147,7 @@ describe("StatusPage app-first view", () => {
       expect(await view.findByText("Apps")).toBeTruthy();
       expect(view.getAllByText("Chat isn't working right now.").length).toBeGreaterThan(0);
       for (const name of ["Chat", "Home", "Videos", "Music", "Podcasts"]) expect(view.getAllByText(name).length).toBeGreaterThan(0);
-      expect(view.getAllByText("Chat isn't working right now.").some((line) => line.closest("[data-status-banner]") !== null)).toBe(true);
+      expect(view.getAllByText("Chat isn't working right now.").some((line) => line.closest("[data-status-kind]") !== null)).toBe(true);
       expect(view.queryByText("Needs: Brain (down)")).toBeNull();
       expect(view.queryByText("Behind the scenes")).toBeNull();
       expect(view.queryByText("Brain", { exact: true })).toBeNull();

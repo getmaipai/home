@@ -3,7 +3,10 @@ import { render, cleanup, fireEvent, waitFor, within } from "@testing-library/re
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { ReactElement } from "react";
 import { StatusPartsBody } from "@/shell/pages/status/StatusComponents";
-import { StatusBanner } from "@/shell/pages/status/StatusBanner";
+import { StatusCard } from "@maipai/ui/src/elements/status-card";
+import { statusBannerCard } from "@/shell/pages/status/StatusBanner";
+
+const StatusBanner = (props: Parameters<typeof statusBannerCard>[0]) => <StatusCard {...statusBannerCard(props)} />;
 import { ToastProvider } from "@maipai/ui/src/primitives/Toast";
 import { TooltipProvider } from "@maipai/ui/src/ui/tooltip";
 import { api, type HealthStatus, type Roster } from "@/lib/api";

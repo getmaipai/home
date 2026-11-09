@@ -248,7 +248,7 @@ describe("RemindersPage", () => {
       const view = renderWithQueryClient(<MemoryRouter><RemindersPage /></MemoryRouter>);
       const column = await view.findByLabelText("Reminder lists");
       const buttons = Array.from(column.querySelectorAll("button"));
-      expect(buttons.map((button) => button.textContent?.replace(/\s+/g, " ").trim())).toEqual(["+", "Today", "Scheduled", "Shopping1", "To-do", "Personal"]);
+      expect(buttons.map((button) => button.textContent?.replace(/\s+/g, " ").trim())).toEqual(["", "Today", "Scheduled", "Shopping1", "To-do", "Personal"]);
       expect(await view.findByText("YOUR LIST")).toBeInTheDocument();
       expect(view.getByText("A few things to pick up")).toBeInTheDocument();
       expect(view.getByText(/2026|October|November/)).toBeInTheDocument();

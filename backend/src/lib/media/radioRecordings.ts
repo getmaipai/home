@@ -106,6 +106,11 @@ async function finish(entry: { personId: string; station: SavedStation; jobId: s
   active.delete(entry.jobId);
 }
 
+/** True while this person has a recording running for the station (the Radio page shows Stop instead of Record). */
+export function isRadioRecording(person: PersonRow, stationId: string): boolean {
+  return [...active.values()].some((r) => r.personId === person.id && r.station.id === stationId);
+}
+
 export async function stopRadioRecording(person: PersonRow, stationId: string): Promise<RecordingOutcome<{ stopped: boolean }>> {
   const entry = [...active.values()].find((r) => r.personId === person.id && r.station.id === stationId);
   if (!entry) return error(404, "There is no recording in progress for this station.");

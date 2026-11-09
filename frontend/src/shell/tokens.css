@@ -668,6 +668,13 @@ body {
   html:has([data-slot="phone-nav"]) [data-slot="global-mini-player"] {
     bottom: calc(49px + env(safe-area-inset-bottom));
   }
+  /* The running-job strip (InstallDock) sits above the phone bar, never over it; the floating and PRO bars are taller than the docked one. */
+  html:has([data-slot="phone-nav"]) [data-testid="install-dock"] {
+    bottom: calc(49px + env(safe-area-inset-bottom));
+  }
+  html:has([data-slot="phone-nav"][data-floating]) [data-testid="install-dock"] {
+    bottom: calc(6.5rem + env(safe-area-inset-bottom));
+  }
   html:has([data-slot="phone-nav"]):has([data-slot="global-mini-player"]) [data-slot="rail-body"] {
     padding-bottom: calc(7rem + env(safe-area-inset-bottom));
   }
