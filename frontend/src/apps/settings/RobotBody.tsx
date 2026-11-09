@@ -238,7 +238,7 @@ export function RobotBody({
                 {i18n._({ id: "No, leave it", message: "No, leave it" })}
               </Button>
             </div>
-            {rebootError ? <StatusCard kind="problem" title={i18n._({ id: "That did not work", message: "That did not work" })} line={rebootError} /> : null}
+            {rebootError ? <StatusCard kind="problem" title={i18n._({ id: "Needs a look", message: "Needs a look" })} line={rebootError} /> : null}
           </div>
         ) : null}
         {liveView && liveView.stream ? (
@@ -249,7 +249,7 @@ export function RobotBody({
             <p className="mt-2 text-sm text-muted-foreground">{i18n._({ id: "Live view stops by itself after 10 minutes. Nothing is recorded.", message: "Live view stops by itself after 10 minutes. Nothing is recorded." })}</p>
           </div>
         ) : null}
-        {liveError ? <StatusCard kind="problem" title={i18n._({ id: "That did not work", message: "That did not work" })} line={liveError} /> : null}
+        {liveError ? <StatusCard kind="problem" title={i18n._({ id: "Needs a look", message: "Needs a look" })} line={liveError} /> : null}
         {muteError && state !== null ? (
           <ErrorState
             layout="inline"

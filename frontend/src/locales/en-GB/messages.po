@@ -15212,6 +15212,10 @@ msgid "needs a look"
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/apps/settings/AddRobotSection.tsx:211
+#: src/apps/settings/RobotBody.tsx:241
+#: src/apps/settings/RobotBody.tsx:252
+#: src/apps/settings/RobotPasswordSection.tsx:104
 #: src/shell/pages/ActivityPage.tsx:23
 msgid "Needs a look"
 msgstr ""
@@ -23395,7 +23399,6 @@ msgstr ""
 #: src/apps/people/FaceEnrollmentPage.tsx:781
 #: src/apps/people/ProfileForm.tsx:176
 #: src/apps/people/ProfileForm.tsx:187
-#: src/apps/settings/AddRobotSection.tsx:211
 #: src/apps/settings/AddVoiceForm.tsx:83
 #: src/apps/settings/AiGlance.tsx:226
 #: src/apps/settings/AiGlance.tsx:271
@@ -23418,9 +23421,6 @@ msgstr ""
 #: src/apps/settings/ModelsSection.tsx:82
 #: src/apps/settings/ModelsSection.tsx:375
 #: src/apps/settings/ReferenceLibrarySettings.tsx:224
-#: src/apps/settings/RobotBody.tsx:241
-#: src/apps/settings/RobotBody.tsx:252
-#: src/apps/settings/RobotPasswordSection.tsx:104
 #: src/apps/settings/RoutingStatsSection.tsx:33
 #: src/apps/settings/SignInSecretSection.tsx:72
 #: src/apps/settings/SiteBlocksSection.tsx:53

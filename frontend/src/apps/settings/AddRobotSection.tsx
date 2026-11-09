@@ -208,7 +208,7 @@ export function AddRobotSection({ onClose }: { onClose?: () => void } = {}) {
               maxLength={6}
             />
           ) : null}
-          {error ? <StatusCard kind="problem" title={i18n._({ id: "That did not work", message: "That did not work" })} line={error} /> : null}
+          {error ? <StatusCard kind="problem" title={i18n._({ id: "Needs a look", message: "Needs a look" })} line={error} /> : null}
           {rotationDone ? (
             <div className="flex flex-col gap-2"><p className="text-base text-primary">{i18n._({ id: "Paired and its password is rotated - it's ready to use.", message: "Paired and its password is rotated - it's ready to use." })}</p>{onClose ? <Button onClick={onClose}>{i18n._({ id: "Done", message: "Done" })}</Button> : null}</div>
           ) : null}
