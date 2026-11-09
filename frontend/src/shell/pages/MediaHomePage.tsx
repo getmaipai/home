@@ -38,15 +38,15 @@ export function MediaHomePage() {
         >
           {(data: MediaHome) => {
             const shelves = [
-              { heading: i18n._({ id: "Made at home", message: "Made at home" }), items: data.made_at_home, aspect: "wide" as const, getProgress: undefined },
+              { heading: i18n._({ id: "Made at home", message: "Made at home" }), items: data.made_at_home, aspect: "square" as const, getProgress: undefined },
               {
                 heading: i18n._({ id: "Pick up where you left off", message: "Pick up where you left off" }),
                 items: data.continue,
-                aspect: "wide" as const,
+                aspect: "square" as const,
                 getProgress: (row: MediaHomeRow) => (row.percent === null ? undefined : row.percent / 100),
               },
-              { heading: i18n._({ id: "New in your media", message: "New in your media" }), items: data.new, aspect: "wide" as const, getProgress: undefined },
-              { heading: i18n._({ id: "Recently played", message: "Recently played" }), items: data.recent_music, aspect: "wide" as const, getProgress: undefined },
+              { heading: i18n._({ id: "New in your media", message: "New in your media" }), items: data.new, aspect: "square" as const, getProgress: undefined },
+              { heading: i18n._({ id: "Recently played", message: "Recently played" }), items: data.recent_music, aspect: "square" as const, getProgress: undefined },
             ].filter((shelf) => shelf.items.length > 0);
             if (shelves.length === 0 && data.made_at_home.length === 0) {
               return <EmptyState icon="film" text={i18n._({ id: "Nothing here yet. Add music, videos, shows, podcasts or books to your library and they show up here.", message: "Nothing here yet. Add music, videos, shows, podcasts or books to your library and they show up here." })} />;
@@ -61,13 +61,16 @@ export function MediaHomePage() {
                 renderItem={(row) => <SafeImage src={row.artwork_url} alt="" kind={FALLBACK_KIND[row.app]} />}
                 renderCaption={(row) => (
                   <span className="flex min-w-0 flex-col">
-                    <span className="truncate text-sm font-semibold">{row.title}</span>
-                    {row.subtitle ? <span className="truncate text-sm text-muted-foreground">{row.subtitle}</span> : null}
+                    <span className="truncate text-row font-semibold">{row.title}</span>
+                    {row.subtitle ? <span className="truncate text-supporting text-muted-foreground">{row.subtitle}</span> : null}
                   </span>
                 )}
                 aspect={shelf.aspect}
                 getProgress={shelf.getProgress}
-                variant="card"
+                variant="plain"
+                headingStyle="section"
+                tileSize="pro"
+                bleed
                 onSelect={(row) => navigate(row.href)}
               />
             ));

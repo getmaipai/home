@@ -45,7 +45,7 @@ export function FamilyShelf({ viewer, incognito }: { viewer: Roster; incognito: 
 function MediaRows({ heading, rows }: { heading: string; rows: MediaHomeRow[] }) {
   const navigate = useNavigate();
   if (!rows.length) return null;
-  return <MediaShelf heading={heading} items={rows} getKey={(row) => row.id} getLabel={(row) => row.title} renderItem={tilePicture} renderCaption={(row) => <span className="flex min-w-0 flex-col"><span className="truncate text-row font-semibold">{row.title}</span>{row.subtitle ? <span className="truncate text-supporting text-muted-foreground">{row.subtitle}</span> : null}</span>} aspect="wide" getProgress={(row) => row.percent === null ? undefined : row.percent / 100} variant="plain" headingStyle="section" tileSize="pro" bleed onSelect={(row) => navigate(row.href)} />;
+  return <MediaShelf heading={heading} items={rows} getKey={(row) => row.id} getLabel={(row) => row.title} renderItem={tilePicture} renderCaption={(row) => <span className="flex min-w-0 flex-col"><span className="truncate text-row font-semibold">{row.title}</span>{row.subtitle ? <span className="truncate text-supporting text-muted-foreground">{row.subtitle}</span> : null}</span>} aspect="square" getProgress={(row) => row.percent === null ? undefined : row.percent / 100} variant="plain" headingStyle="section" tileSize="pro" bleed onSelect={(row) => navigate(row.href)} />;
 }
 
 export function HomeMedia({ kind }: { kind: "continue" | "new" | "made_at_home" }) {

@@ -64,7 +64,7 @@
     "shell/pages/CompanionAudienceDialog.tsx": 3,
     "shell/pages/FilesPage.tsx": 3,
     "shell/pages/WikipediaPage.tsx": 6,
-    "shell/pages/MediaHomePage.tsx": 2,
+    "shell/pages/MediaHomePage.tsx": 0,
     "shell/pages/UiShowcasePage.tsx": 1,
     "shell/pages/performance/ToolsOfferedBody.tsx": 2,
     "shell/pages/performance/DiskHardwareBody.tsx": 2,
