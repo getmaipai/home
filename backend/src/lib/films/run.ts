@@ -43,7 +43,7 @@ async function callEngine<T>(stage: FilmStage, shotId: string | undefined, engin
   }
 }
 
-export async function runFilm(input: { actor: PersonRow; productionId: string; plan: FilmPlan; engines: FilmEngines; signal: AbortSignal; faceless?: boolean }): Promise<Production> {
+export async function runFilm(input: { actor: PersonRow; productionId: string; plan: FilmPlan; engines: FilmEngines; signal: AbortSignal; faceless?: boolean; /** FILM-ANIMATIC-01: make the cast and the stills, then stop so the person can play the animatic before any clip is rendered. */ stopAfterStills?: boolean }): Promise<Production> {
   const { actor, productionId, plan, engines, signal } = input;
   const faceless = input.faceless === true;
   let production = getMediaProduction(actor, productionId);
@@ -80,6 +80,7 @@ export async function runFilm(input: { actor: PersonRow; productionId: string; p
     engines.onProgress?.({ stage: "stills", done: i + 1, total: plan.shots.length, shotId: planned.id });
   }
   current = getMediaProduction(actor, productionId)!;
+  if (input.stopAfterStills) return current;
   for (let i = 0; i < plan.shots.length; i++) {
     const planned = plan.shots[i]!;
     const stored = productionShots(current).find((shot) => shot.id === planned.id);

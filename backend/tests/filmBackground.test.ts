@@ -29,4 +29,16 @@ describe("film background runner",()=>{
  });
  test("restart fails interrupted work with a resume instruction",()=>{ const actor=person("film-restart"),run=createFilmRun(actor,{idea:"A crossing",goAhead:true}); updateFilmRun(actor,run.id,{state:"running"}); resumeStoppedFilms(); expect(getFilmRun(actor,run.id)).toMatchObject({state:"failed",error_line:"The hub restarted while this film was being made. Press Resume to continue."}); });
  test("a failed engine leaves the run failed with a plain next step",async()=>{ const actor=person("film-failed"); __setFilmPlanCompleterForTests(async()=>({ok:true,text:JSON.stringify(plan)})); __setFilmEnginesForTests(()=>({waitForIdle:async()=>{},ensureSubject:async()=>{throw new Error("private backend detail");},makeStill:async()=>"",makeClip:async()=>"",makeMusic:async()=>"",assemble:async()=>""})); const created=startFilm({actor,idea:"A crossing",goAhead:true}); expect("id" in created).toBe(true); if(!("id" in created))return; await until(()=>getFilmRun(actor,created.id)?.state==="failed"); expect(getFilmRun(actor,created.id)?.error_line).toContain("try again"); });
+ test("FILM-ANIMATIC-01: stills first makes the pictures, makes no clip, waits, and Go then finishes the film",async()=>{
+  const actor=person("film-stills-first"), calls:string[]=[];
+  __setFilmPlanCompleterForTests(async()=>({ok:true,text:JSON.stringify(plan)}));
+  __setFilmEnginesForTests(({actor,productionId})=>({waitForIdle:async()=>{},ensureSubject:async({name,kind,locked})=>{calls.push("cast");return createMediaSubject(actor,{name,kind,look:locked}).id;},makeStill:async({shot})=>{calls.push(`still:${shot.id}`);return `pic:${shot.id}`;},makeClip:async({shot})=>{calls.push(`clip:${shot.id}`);return `clip:${shot.id}`;},makeMusic:async()=>{calls.push("music");return "music";},assemble:async()=>{calls.push("assemble");return "cut";}}));
+  const created=startFilm({actor,idea:"A crossing",goAhead:true,stillsFirst:true}); expect("id" in created).toBe(true); if(!("id" in created))return;
+  await until(()=>getFilmRun(actor,created.id)?.state==="waiting_for_go");
+  expect(calls.some(c=>c.startsWith("still:"))).toBe(true); expect(calls.some(c=>c.startsWith("clip:")||c==="music"||c==="assemble")).toBe(false);
+  expect(getFilmRun(actor,created.id)).toMatchObject({stage:"Stills",note:expect.stringContaining("animatic")});
+  const {goFilm}=await import("@/lib/films/background"); goFilm(actor,created.id);
+  await until(()=>getFilmRun(actor,created.id)?.state==="done");
+  expect(calls.some(c=>c.startsWith("clip:"))).toBe(true);
+ });
 });
