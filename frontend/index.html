@@ -17,9 +17,20 @@
     <meta name="format-detection" content="telephone=no" />
     <script src="/first-paint.js"></script>
     <title>MaiPai Home</title>
+    <!-- Shown until the app draws (React replaces #root's contents): a logo and a spinner instead of a white page. Theme tokens only. -->
+    <style>
+      #root > .first-paint { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1.5rem; min-height: 100vh; min-height: 100dvh; background: var(--page, var(--background)); }
+      .first-paint img { width: 4rem; height: 4rem; border-radius: 1rem; }
+      .first-paint .fp-dark { display: none; }
+      html.dark .first-paint .fp-light { display: none; }
+      html.dark .first-paint .fp-dark { display: block; }
+      .first-paint .fp-spin { width: 1.5rem; height: 1.5rem; border-radius: 9999px; border: 2px solid var(--border); border-top-color: var(--muted-foreground); animation: fp-spin 0.9s linear infinite; }
+      @keyframes fp-spin { to { transform: rotate(360deg); } }
+      @media (prefers-reduced-motion: reduce) { .first-paint .fp-spin { animation: none; } }
+    </style>
   </head>
   <body>
-    <div id="root"></div>
+    <div id="root"><div class="first-paint" role="status" aria-label="Loading MaiPai Home"><img class="fp-light" src="/brand/maipai-home-icon-light.png" alt="" width="64" height="64" /><img class="fp-dark" src="/brand/maipai-home-icon-dark.png" alt="" width="64" height="64" /><div class="fp-spin" aria-hidden="true"></div></div></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

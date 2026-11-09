@@ -34,7 +34,7 @@ type Row = typeof attachments.$inferSelect;
 // ADULT-LOCK-02: a locked item answers exactly like a missing one (the same 404) until the viewer holds a proof.
 function allowed(actor: PersonRow, row: Row | undefined): row is Row { return !!row && canAccessFile(actor,row.ownerPersonId,row.id) && lockState(lockItemOfProvenance(row.ownerPersonId,row.provenance),actor) === "open"; }
 /** An adult-only item's preview is never cached, even after an unlock (the proof is per page visit). */
-function previewCache(row: Row): string { return lockItemOfProvenance(row.ownerPersonId,row.provenance)?.madeAudience === "adult-only" ? "private, no-store" : "private, no-cache"; }
+function previewCache(row: Row): string { return lockItemOfProvenance(row.ownerPersonId,row.provenance)?.madeAudience === "adult-only" ? "private, no-store" : "private, max-age=3600"; }
 function sourceFor(actor: PersonRow, row: Row): Row | undefined {
   if (row.mediaType.startsWith("image/")) return row;
   const meta = libraryProvenance(row.provenance);
