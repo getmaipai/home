@@ -3988,7 +3988,7 @@ msgstr "Azelma"
 #: src/apps/people/FaceEnrollmentPage.tsx:94
 #: src/apps/settings/AiSlotDialog.tsx:151
 #: src/apps/settings/EngineLinkCredentialSection.tsx:285
-#: src/apps/setup/SetupReviewPage.tsx:66
+#: src/apps/setup/SetupReviewPage.tsx:65
 #: src/shell/pages/companionFlow/AnimateStep.tsx:152
 #: src/shell/pages/companionFlow/CustomizeStep.tsx:194
 #: src/shell/pages/packageAppHeaderBar.tsx:94
@@ -4902,7 +4902,7 @@ msgstr "¿Puede alguien entrar a tu casa?"
 #: src/apps/settings/UsersSection.tsx:454
 #: src/apps/settings/VoiceManagerSection.tsx:149
 #: src/apps/settings/VoiceManagerSection.tsx:162
-#: src/apps/setup/SetupReviewPage.tsx:68
+#: src/apps/setup/SetupReviewPage.tsx:67
 #: src/apps/setup/StorageStep.tsx:32
 #: src/apps/setup/StorageStep.tsx:190
 #: src/shell/components/DataTableRowActions.tsx:53
@@ -4913,7 +4913,7 @@ msgstr "¿Puede alguien entrar a tu casa?"
 #: src/shell/pages/FilesPage.tsx:402
 #: src/shell/pages/settings/SettingField.tsx:149
 #: src/shell/pages/settings/SettingField.tsx:268
-#: src/shell/pages/settings/SettingsRenderer.tsx:169
+#: src/shell/pages/settings/SettingsRenderer.tsx:168
 #: src/shell/pages/status/StatusBoard.tsx:69
 #: src/shell/pages/status/StatusComponents.tsx:153
 #: src/shell/pages/StoragePage.tsx:200
@@ -6729,7 +6729,7 @@ msgid "setting.ease.preset.option_label.comfortable"
 msgstr "Cómodo"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/dashboard/TodaySection.tsx:16
+#: src/shell/pages/dashboard/TodaySection.tsx:17
 #, needs-review
 msgid "Coming up"
 msgstr "Próximamente"
@@ -6845,7 +6845,7 @@ msgstr ""
 #: src/apps/settings/TwoStepSignInSection.tsx:50
 #: src/shell/components/DataTableRowActions.tsx:57
 #: src/shell/pages/settings/HouseSettings.tsx:50
-#: src/shell/pages/settings/SettingsRenderer.tsx:179
+#: src/shell/pages/settings/SettingsRenderer.tsx:178
 #: src/shell/pages/UpdatesPage.tsx:199
 #, needs-review
 msgid "Confirm"
@@ -6905,7 +6905,7 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/apps/setup/AwayFromHome.tsx:185
 #: src/apps/setup/CloseAppsStep.tsx:64
-#: src/apps/setup/SetupReviewPage.tsx:67
+#: src/apps/setup/SetupReviewPage.tsx:66
 #: src/apps/setup/SetupWizard.tsx:503
 #: src/shell/AmbientCompanionPane.tsx:261
 #: src/shell/pages/companionFlow/AnimateStep.tsx:153
@@ -7518,7 +7518,7 @@ msgid "Could not load routing stats."
 msgstr "No se pudieron cargar las estadísticas de enrutamiento."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/settings/SettingsRenderer.tsx:192
+#: src/shell/pages/settings/SettingsRenderer.tsx:191
 #, needs-review
 msgid "Could not load settings."
 msgstr "No se pudieron cargar los ajustes."
@@ -7666,7 +7666,7 @@ msgid "Could not load those memories."
 msgstr "No se pudieron cargar esas memorias."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/dashboard/TodaySection.tsx:51
+#: src/shell/pages/dashboard/TodaySection.tsx:52
 #, needs-review
 msgid "Could not load Today. Refresh Home to try again."
 msgstr "No se pudo cargar Hoy. Actualiza Home para intentarlo de nuevo."
@@ -7997,8 +7997,8 @@ msgid "Could not save that answer. Try again."
 msgstr "No se pudo guardar esa respuesta. Inténtalo de nuevo."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/settings/SettingsRenderer.tsx:120
-#: src/shell/pages/settings/SettingsRenderer.tsx:177
+#: src/shell/pages/settings/SettingsRenderer.tsx:119
+#: src/shell/pages/settings/SettingsRenderer.tsx:176
 #, needs-review
 msgid "Could not save that change."
 msgstr "No se pudo guardar el cambio."
@@ -9424,7 +9424,7 @@ msgstr "No me notifiques sobre compartidos de"
 #: src/apps/settings/StackChanInstallDialog.tsx:150
 #: src/apps/settings/StackChanInstallDialog.tsx:152
 #: src/apps/setup/AwayFromHome.tsx:185
-#: src/apps/setup/SetupReviewPage.tsx:67
+#: src/apps/setup/SetupReviewPage.tsx:66
 #: src/shell/AlarmRinger.tsx:60
 #: src/shell/pages/AllAppsPage.tsx:113
 #: src/shell/pages/companionFlow/KeyframeEditor.tsx:96
@@ -12408,7 +12408,7 @@ msgid "Home couldn't check your computers. Check the engine connection, then try
 msgstr "Home no pudo revisar tus computadoras. Revisa la conexión del motor e inténtalo de nuevo."
 
 #. js-lingui-explicit-id
-#: src/apps/setup/SetupReviewPage.tsx:44
+#: src/apps/setup/SetupReviewPage.tsx:43
 #, needs-review
 msgid "Home couldn't load these setup choices. Refresh this page and try again."
 msgstr "Home no pudo cargar estas opciones de configuración. Recarga esta página e inténtalo de nuevo."
@@ -12463,7 +12463,7 @@ msgid "Home couldn't save that choice. Try again. If it fails again, Home will s
 msgstr "Home no pudo guardar esa elección. Inténtalo de nuevo. Si falla otra vez, Home mostrará una solución en Configuración de Home, Reparaciones."
 
 #. js-lingui-explicit-id
-#: src/apps/setup/SetupReviewPage.tsx:54
+#: src/apps/setup/SetupReviewPage.tsx:53
 #, needs-review
 msgid "Home couldn't save this choice. Check the engine link in Home settings, then try again."
 msgstr "Home no pudo guardar esta opción. Revisa el enlace del motor en la configuración de Home y vuelve a intentarlo."
@@ -12553,8 +12553,8 @@ msgid "Home goes online for you"
 msgstr "Home sale a internet por ti"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/dashboard/TodaySection.tsx:107
-#: src/shell/pages/dashboard/TodaySection.tsx:110
+#: src/shell/pages/dashboard/TodaySection.tsx:112
+#: src/shell/pages/dashboard/TodaySection.tsx:115
 #, needs-review
 msgid "Home highlight"
 msgstr "Destacado de Home"
@@ -15607,7 +15607,7 @@ msgid "Loading Home"
 msgstr "Cargando Home"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/dashboard/TodaySection.tsx:106
+#: src/shell/pages/dashboard/TodaySection.tsx:111
 #, needs-review
 msgid "Loading Home highlight"
 msgstr "Cargando destacado de Home"
@@ -15742,7 +15742,7 @@ msgstr "Cargando sesiones"
 #. js-lingui-explicit-id
 #: src/shell/pages/settings/SettingsAreaPage.tsx:66
 #: src/shell/pages/settings/SettingsAreaPage.tsx:179
-#: src/shell/pages/settings/SettingsRenderer.tsx:193
+#: src/shell/pages/settings/SettingsRenderer.tsx:192
 #, needs-review
 msgid "Loading settings"
 msgstr "Cargando ajustes"
@@ -15813,7 +15813,7 @@ msgid "Loading the styles"
 msgstr "Cargando los estilos"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/dashboard/TodaySection.tsx:50
+#: src/shell/pages/dashboard/TodaySection.tsx:51
 #, needs-review
 msgid "Loading Today"
 msgstr "Cargando Hoy"
@@ -17297,7 +17297,7 @@ msgstr "Mensual"
 #: src/apps/clock/TimersTab.tsx:161
 #: src/apps/settings/styles/StyleEditor.tsx:126
 #: src/shell/AlarmRinger.tsx:64
-#: src/shell/pages/dashboard/TodaySection.tsx:116
+#: src/shell/pages/dashboard/TodaySection.tsx:121
 #: src/shell/phoneMenuLinks.tsx:18
 #, needs-review
 msgid "More"
@@ -18440,7 +18440,7 @@ msgid "No settings match that search."
 msgstr "Ningún ajuste coincide con esa búsqueda."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/settings/SettingsRenderer.tsx:208
+#: src/shell/pages/settings/SettingsRenderer.tsx:207
 #, needs-review
 msgid "No settings yet."
 msgstr "Aún no hay ajustes."
@@ -20056,6 +20056,11 @@ msgstr "Abre el razonamiento del modelo bajo cada respuesta del chat en lugar de
 #, needs-review
 msgid "setting.news.reader_open.option.site"
 msgstr "Abre el sitio web del editor."
+
+#. js-lingui-explicit-id
+#: src/shell/pages/dashboard/TodaySection.tsx:65
+msgid "Open Weather"
+msgstr ""
 
 #. js-lingui-explicit-id
 #: src/shell/pages/settings/SettingsAreaPage.tsx:76
@@ -22848,7 +22853,7 @@ msgid "Review the steps Home will complete."
 msgstr "Revisa los pasos que Home completará."
 
 #. js-lingui-explicit-id
-#: src/apps/setup/SetupReviewPage.tsx:62
+#: src/apps/setup/SetupReviewPage.tsx:61
 #, needs-review
 msgid "Review your computers, files, checks, and plan."
 msgstr "Revisa tus computadoras, archivos, comprobaciones y plan."
@@ -23509,7 +23514,7 @@ msgid "Saves the StackChan's whole memory, then installs. About 6 minutes longer
 msgstr "Guarda toda la memoria del StackChan y luego instala. Tarda unos 6 minutos más."
 
 #. js-lingui-explicit-id
-#: src/apps/setup/SetupReviewPage.tsx:67
+#: src/apps/setup/SetupReviewPage.tsx:66
 #: src/apps/setup/SetupWizard.tsx:482
 #: src/shell/pages/CompanionAudienceDialog.tsx:64
 #: src/shell/pages/companionFlow/CustomizeStep.tsx:185
@@ -24581,7 +24586,7 @@ msgid "Setup progress unavailable"
 msgstr "Progreso de configuración no disponible"
 
 #. js-lingui-explicit-id
-#: src/apps/setup/SetupReviewPage.tsx:60
+#: src/apps/setup/SetupReviewPage.tsx:59
 #, needs-review
 msgid "Setup review"
 msgstr "Revisión de la configuración"
@@ -24694,7 +24699,7 @@ msgid "Show {count} more"
 msgstr "Mostrar {count} más"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/settings/SettingsRenderer.tsx:238
+#: src/shell/pages/settings/SettingsRenderer.tsx:237
 #, needs-review
 msgid "Show {length} advanced settings"
 msgstr "Mostrar {length} ajustes avanzados"
@@ -29135,10 +29140,10 @@ msgstr ""
 #: src/i18n.chain.test.tsx:96
 #: src/i18n.test.tsx:53
 #: src/shell/pages/CompanionsPage.tsx:290
-#: src/shell/pages/dashboard/TodaySection.tsx:89
-#: src/shell/pages/dashboard/TodaySection.tsx:90
-#: src/shell/pages/dashboard/TodaySection.tsx:111
-#: src/shell/pages/dashboard/TodaySection.tsx:112
+#: src/shell/pages/dashboard/TodaySection.tsx:94
+#: src/shell/pages/dashboard/TodaySection.tsx:95
+#: src/shell/pages/dashboard/TodaySection.tsx:116
+#: src/shell/pages/dashboard/TodaySection.tsx:117
 #: src/shell/pages/status/StatusBoard.tsx:129
 #: src/shell/pages/status/StatusBoard.tsx:130
 #: src/shell/pages/status/statusBoardFormat.ts:46
@@ -29626,7 +29631,7 @@ msgid "setting.news.shelf.enabled.help"
 msgstr "Activa o desactiva el estante de noticias del hogar."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/settings/SettingsRenderer.tsx:165
+#: src/shell/pages/settings/SettingsRenderer.tsx:164
 #, needs-review
 msgid "Turn this feature off?"
 msgstr "¿Apagar esta función?"

@@ -1,5 +1,6 @@
 import { i18n } from "@lingui/core";
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
+import { Link } from "react-router-dom";
 import { useQueries, useQuery } from "@tanstack/react-query";
 import { Card } from "@maipai/ui/src/primitives/Card";
 import { Button } from "@maipai/ui/src/dashboard/components/ui/button";
@@ -59,13 +60,17 @@ export function TodaySection({ home, heroOnly = false, chips = false, role }: { 
   });
   if (visibleSlots.length === 0) return null;
 
+  // A tap on the weather card opens the Weather app.
+  const opensApp = (slot: Slot, content: ReactNode): ReactNode => slot.widget.package === "weather"
+    ? <Link to="/apps/weather" aria-label={i18n._({ id: "Open Weather", message: "Open Weather" })} data-testid="home-today-link" className="block rounded-xl no-underline focus-visible:ring-2 focus-visible:ring-ring">{content}</Link>
+    : content;
   const cards = (shown: Slot[]) => shown.map((slot) => slot.data.card ? (
     // The kit's compact weather card is its own card; the text Card is the fallback when no block came back.
     <div key={`${slot.widget.package}/${slot.widget.id}`} data-testid="home-today-card">
-      <AnswerBlockView block={slot.data.card} compact />
+      {opensApp(slot, <AnswerBlockView block={slot.data.card} compact />)}
     </div>
   ) : (
-      <div key={`${slot.widget.package}/${slot.widget.id}`} data-testid="home-today-card"><Card surface="flat">
+      <div key={`${slot.widget.package}/${slot.widget.id}`} data-testid="home-today-card">{opensApp(slot, <Card surface="flat">
         <div className="text-row font-semibold">{displayTitle(slot.widget)}</div>
         <ItemGroup>
           {slot.data.items.map((item, index) => (
@@ -78,7 +83,7 @@ export function TodaySection({ home, heroOnly = false, chips = false, role }: { 
             </Item>
           ))}
         </ItemGroup>
-      </Card></div>
+      </Card>)}</div>
   ));
 
   if (chips) {

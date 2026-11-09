@@ -4,7 +4,6 @@ import { getIcon } from "@maipai/ui/src/icons";
 import { Alert, AlertDescription } from "@maipai/ui/src/ui/alert";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@maipai/ui/src/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@maipai/ui/src/ui/card";
 import { api, ApiError } from "@/lib/api";
 import { renderSetupReviewScreen } from "./SetupWizard";
 import { errorLine } from "@/lib/hubReachability";
@@ -56,9 +55,9 @@ export function SetupReviewPage() {
   }
 
   return <div>
-    <Card surface="flat">
-      <CardHeader><CardTitle>{i18n._({ id: "Setup review", message: "Setup review" })}</CardTitle></CardHeader>
-      <CardContent>
+    <section className="flex flex-col gap-4">
+      <h1 className="text-section font-semibold">{i18n._({ id: "Setup review", message: "Setup review" })}</h1>
+      <div className="flex flex-col gap-4">
         <p>{i18n._({ id: "Review your computers, files, checks, and plan.", message: "Review your computers, files, checks, and plan." })}</p>
         {renderSetupReviewScreen({ screen, engine, onEngineChange: setEngine, readOnly: screen === "storage", checkRows: rows, checkError, onRetryChecks: () => void refreshChecks() })}
         {error ? <Alert variant="destructive"><ErrorIcon /><AlertDescription>{error}</AlertDescription></Alert> : null}
@@ -67,7 +66,7 @@ export function SetupReviewPage() {
           {screenIndex < REVIEW_SCREENS.length - 1 ? <Button type="button" variant="ghost" size="icon" aria-label={i18n._({ id: "Continue", message: "Continue" })} disabled={busy} onClick={() => setScreenIndex((index) => index + 1)}><NextIcon aria-hidden="true" /></Button> : <Button type="button" variant="ghost" size="icon" aria-label={busy ? i18n._({ id: "Saving", message: "Saving" }) : i18n._({ id: "Done", message: "Done" })} disabled={busy} onClick={() => void finish()}><DoneIcon aria-hidden="true" /></Button>}
           <Button type="button" variant="ghost" size="icon" aria-label={i18n._({ id: "Cancel", message: "Cancel" })} disabled={busy} onClick={() => navigate("/repairs")}><CancelIcon aria-hidden="true" /></Button>
         </div>
-      </CardContent>
-    </Card>
+      </div>
+    </section>
   </div>;
 }
