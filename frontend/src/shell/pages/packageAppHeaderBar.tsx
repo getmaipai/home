@@ -27,13 +27,15 @@ export interface PackageAppHeaderState {
   detail?: boolean;
   /** A detail page on a phone: the app address its Back button returns to (drawn in the header row, before the title). */
   back?: string;
+  /** A phone app with a search page: the Search button sits in the header, beside the companion. */
+  phoneSearchTo?: string;
 }
 
 let current: PackageAppHeaderState | null = null;
 const listeners = new Set<() => void>();
 
 export function publishPackageAppHeader(next: PackageAppHeaderState | null): void {
-  const same = current === next || (current !== null && next !== null && current.to === next.to && current.label === next.label && current.title === next.title && current.settingsArea === next.settingsArea && current.header === next.header && current.mode === next.mode && current.onMode === next.onMode && current.searchTo === next.searchTo && current.detail === next.detail && current.back === next.back);
+  const same = current === next || (current !== null && next !== null && current.to === next.to && current.label === next.label && current.title === next.title && current.settingsArea === next.settingsArea && current.header === next.header && current.mode === next.mode && current.onMode === next.onMode && current.searchTo === next.searchTo && current.detail === next.detail && current.back === next.back && current.phoneSearchTo === next.phoneSearchTo);
   if (same) return;
   current = next;
   for (const listener of listeners) listener();
@@ -51,6 +53,7 @@ function snapshot(): PackageAppHeaderState | null {
 const GearIcon = getIcon("settings");
 const ArrowLeftIcon = getIcon("arrow-left");
 const MoreIcon = getIcon("more-horizontal");
+const SearchIcon = getIcon("search");
 
 /** The app's own search: one row that opens the app's search page for the typed words. The palette lists nothing of the shell. */
 function AppSearch({ label, searchTo }: { label: string; searchTo: string }) {
@@ -63,7 +66,7 @@ function AppSearch({ label, searchTo }: { label: string; searchTo: string }) {
 }
 
 /** The app's search and mode switch, centred on the whole header row (the sticky header is its positioning parent), so it sits over the
- * middle of the right pane whatever the title and the buttons weigh. Below 768 px there is no room to centre it over the title: it sits in the row after the title (MUSIC-POLISH-01), and below 640 px the search icon steps aside because the phone bar already has a Search tab. Registered in the header's left slot; the right group only holds what sits beside the avatar. */
+ * middle of the right pane whatever the title and the buttons weigh. Below 768 px there is no room to centre it over the title: it sits in the row after the title (MUSIC-POLISH-01), and below 640 px the search icon steps aside because the right group carries its own Search button beside the avatar. Registered in the header's left slot; the right group only holds what sits beside the avatar. */
 function PackageAppHeaderCenter() {
   const state = useSyncExternalStore(subscribe, snapshot, snapshot);
   if (!state) return null;
@@ -99,7 +102,9 @@ export function PackageAppHeaderActions() {
   const open = (action: unknown) => { const target = navigateOf(action); if (target) navigate(target.to, { state: { pageState: target.state } }); };
   const primary = header?.actions?.primary;
   const more = header?.actions?.more ?? [];
+  const searchTo = state.phoneSearchTo;
   return <>
+    {searchTo ? <Button type="button" variant="ghost" size="icon-lg" className="sm:hidden" data-testid="header-search" aria-label={i18n._({ id: "Search {name}", message: "Search {name}", values: { name: state.label } })} onClick={() => navigate(searchTo)}><SearchIcon aria-hidden="true" /></Button> : null}
     {primary ? <Button type="button" onClick={() => open(primary.open)}>{primary.label}</Button> : null}
     {more.length > 0 ? (
       <DropdownMenu>
@@ -112,7 +117,7 @@ export function PackageAppHeaderActions() {
 }
 
 // The sections of an app as the kit's phone bar entries (phone-minimal-2026-10-25 P2): the app's own index first (active only on its
-// own address), then each section, and a trailing Search item when the app has a search page. An icon the hub did not name falls back
+// own address), then each section, and, when the app has a search page, where it is (the header's Search button, not a bar item). An icon the hub did not name falls back
 // to one of the kit's own.
 const SECTION_ICONS: Record<string, string> = { mix: "sparkles", following: "heart", saved: "bookmark", library: "folder", history: "history", "watch-later": "clock", search: "search", channel: "layout-grid", albums: "disc-3", artists: "mic-vocal", songs: "music", playlists: "list-music" };
 // An app whose own icon is also a section's icon (Music: the note is Songs) names its index tab differently.
@@ -120,7 +125,8 @@ const HOME_ICONS: Record<string, string> = { "/apps/music": "headphones" };
 const iconOrNull = (name: string | null | undefined): string | null => (name && (iconNames as string[]).includes(name) ? name : null);
 export interface SectionsBarEntries {
   entries: Array<{ to: string; icon: string; label: string; exact?: boolean }>;
-  trailing?: { to: string; icon: string; label: string };
+  /** Where the app's search page is; it has no bar item, the header carries a Search button instead. */
+  searchTo?: string;
   more: Array<{ to: string; icon: string; label: string }>;
 }
 export function sectionsBarEntries(app: { to: string; label?: string; icon?: string | null; settings_area?: { id: string } | null; sections: ReadonlyArray<{ page: string; label: string; icon?: string | null }> }, homeLabel: string, hasSearchPage: boolean): SectionsBarEntries {
@@ -130,5 +136,5 @@ export function sectionsBarEntries(app: { to: string; label?: string; icon?: str
   ];
   // The last item is always the three-dot More button: the app's settings live under it, with anything that did not fit.
   const more = app.settings_area?.id ? [{ to: `/settings/${app.settings_area.id}`, icon: "settings", label: `${app.label ?? "App"} settings` }] : [];
-  return hasSearchPage ? { entries, trailing: { to: `${app.to}/search`, icon: "search", label: "Search" }, more } : { entries, more };
+  return hasSearchPage ? { entries, searchTo: `${app.to}/search`, more } : { entries, more };
 }

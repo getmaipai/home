@@ -217,7 +217,7 @@ export function PackageAppPage({ person }: { person: Roster }) {
   const phone = useIsPhoneLayout();
   const inShellBar = phone && app !== undefined;
   useHeaderExtra(PackageAppHeaderLeft, PackageAppHeaderActions);
-  // An app with sections shows them in the kit's floating bottom bar on a phone (not as a row of pills), with Search last when the
+  // An app with sections shows them in the kit's floating bottom bar on a phone (not as a row of pills), with Back first; Search sits in the header beside the companion when the
   // app has a search page; a page that plays something (a video, a book) draws no bar.
   const sectionsBar = inShellBar && app && app.sections.length > 0 && !isMediaPlayPage(packageId, pageId) ? sectionsBarEntries(app, appHomeLabel(packageId, media), pagesOf(app).includes("search")) : null;
   // The reader draws its own Back and action pill, so on a phone the shell bar shrinks to the menu button and the pill sits beside it
@@ -266,7 +266,7 @@ export function PackageAppPage({ person }: { person: Roster }) {
   const activeLabel = sidebarProps?.groups?.flatMap((group) => group.items).find((item) => item.active)?.label;
   const contextTitle = sidebarProps ? contextTitleFor(activeLabel, pageDoc?.title) : undefined;
   useEffect(() => {
-    publishPackageAppHeader(app ? { to: app.to, label: app.label, detail, ...(detail && !controlsRow ? { back: app.to } : {}), ...(contextTitle ? { title: contextTitle } : {}), ...(app.settings_area?.id ? { settingsArea: app.settings_area.id } : {}), ...(app.header ? { header: app.header, ...(mode ? { mode, onMode } : {}), ...(searchTo ? { searchTo } : {}) } : {}) } : null);
+    publishPackageAppHeader(app ? { to: app.to, label: app.label, detail, ...(detail && !controlsRow && !sectionsBar ? { back: app.to } : {}), ...(sectionsBar?.searchTo ? { phoneSearchTo: sectionsBar.searchTo } : {}), ...(contextTitle ? { title: contextTitle } : {}), ...(app.settings_area?.id ? { settingsArea: app.settings_area.id } : {}), ...(app.header ? { header: app.header, ...(mode ? { mode, onMode } : {}), ...(searchTo ? { searchTo } : {}) } : {}) } : null);
     return () => publishPackageAppHeader(null);
   }, [app?.to, app?.label, app?.settings_area?.id, app?.header, contextTitle, mode, onMode, searchTo, detail, controlsRow]); // eslint-disable-line react-hooks/exhaustive-deps -- app is read through its own fields
 
@@ -278,7 +278,7 @@ export function PackageAppPage({ person }: { person: Roster }) {
   const content = (
     <div className={cn("flex min-h-0 min-w-0 flex-1 flex-col", packageId === "music" && pageId === "play" && "relative z-10", !readingStory && "gap-2", (sidebarProps || media) && !readingStory && "lg:p-4 lg:ps-6", (sidebarProps || media) && !sectionsBar && !readingStory && "py-4")} data-testid="package-app" data-package={packageId}>
       {controlsRow ? <div data-slot="page-controls" data-testid="page-controls" data-header-flat="" className="sm:hidden"><Button type="button" variant="ghost" size="icon-lg" aria-label={i18n._({ id: "Back", message: "Back" })} onClick={() => navigateBack(navigate, app?.to ?? `/apps/${packageId}`)}><ArrowLeftIcon aria-hidden="true" /></Button><span className="ms-auto flex items-center gap-2">{app && pagesOf(app).includes("search") ? <Button type="button" variant="ghost" size="icon-lg" data-testid="play-page-search" aria-label={i18n._({ id: "Search {name}", message: "Search {name}", values: { name: app.label } })} onClick={() => navigate(`${app.to}/search`)}><SearchIcon aria-hidden="true" /></Button> : null}<MinimizeButton appHome={`/apps/${packageId}`} /></span></div> : null}
-      {sectionsBar ? <PhoneNav variant="docked" label={i18n._({ id: "{name} sections", message: "{name} sections", values: { name: app?.label ?? i18n._({ id: "App", message: "App" }) } })} entries={sectionsBar.entries} more={sectionsBar.more} {...(sectionsBar.trailing ? { trailing: sectionsBar.trailing } : {})} /> : null}
+      {sectionsBar ? <PhoneNav variant="docked" label={i18n._({ id: "{name} sections", message: "{name} sections", values: { name: app?.label ?? i18n._({ id: "App", message: "App" }) } })} entries={sectionsBar.entries} more={sectionsBar.more} leading={{ label: i18n._({ id: "Back", message: "Back" }), onClick: () => navigateBack(navigate, app?.to ?? `/apps/${packageId}`), disabled: pageId === "index" && ((window.history.state as { idx?: number } | null)?.idx ?? 0) === 0 }} /> : null}
       {app ? <AppToolbar inShellBar={inShellBar} sectionsInBar={sectionsBar !== null} hideSectionsOnWide={sidebar !== undefined} to={app.to} homeLabel={appHomeLabel(packageId, media)} sections={app.sections} current={pageId} familyHeader={familyHeader} /> : null}
       <AsyncState
         data={page.isError ? null : page.data}
@@ -288,7 +288,7 @@ export function PackageAppPage({ person }: { person: Roster }) {
         errorMessage={i18n._({ id: "Could not open this app. Check your connection and try again.", message: "Could not open this app. Check your connection and try again." })}
         loadingLabel={i18n._({ id: "Opening the app", message: "Opening the app" })}
       >
-        {(shown) => { const doc = sectionsBar?.trailing && pageId !== "search" ? withoutSearchBox(shown) : shown; return (hasQuery && !sameQuery ? null : <>
+        {(shown) => { const doc = sectionsBar?.searchTo && pageId !== "search" ? withoutSearchBox(shown) : shown; return (hasQuery && !sameQuery ? null : <>
           {isStudioPage(packageId, pageId) ? <MusicStudioPage pageId={pageId} search={location.search} adult={person.age_band === "adult"} /> : packageId === "weather" && pageId === "index" ? null : <ArticleSpeechBridge><SchemaPage key={`${packageId}/${pageId}`} page={doc} packageId={packageId} hideTitle sidebar={sidebarProps !== null} floatingBar={sectionsBar !== null} /></ArticleSpeechBridge>}
           {media && packageId !== "music" && isMediaPlayPage(packageId, pageId) ? <div className="flex max-sm:hidden"><MinimizeButton appHome={`/apps/${packageId}`} /></div> : null}
           {packageId === "videos" && pageId === "watch" ? <VideoDetails id={new URLSearchParams(location.search).get("id") ?? String((location.state as { pageState?: { id?: string } } | null)?.pageState?.id ?? "")} /> : null}
@@ -344,7 +344,7 @@ function navigateTo(search: unknown): string | undefined {
   return target?.to;
 }
 
-/** A page document without its search box: on a phone the sections bar's Search item takes its place. */
+/** A page document without its search box: on a phone the header's Search button takes its place. */
 function withoutSearchBox(doc: unknown): unknown {
   const page = doc as { body?: Array<{ type?: string }> };
   return Array.isArray(page.body) ? { ...page, body: page.body.filter((node) => node.type !== "search") } : doc;
