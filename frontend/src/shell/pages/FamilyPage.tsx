@@ -1,160 +1,92 @@
 import { i18n } from "@lingui/core";
-import { useQuery } from "@tanstack/react-query";
-import { Link, useSearchParams } from "react-router-dom";
+import { useQueries, useQuery } from "@tanstack/react-query";
+import { Link, useNavigate } from "react-router-dom";
 import { AsyncState } from "@maipai/ui/src/primitives/AsyncState";
 import { EmptyState } from "@maipai/ui/src/primitives/EmptyState";
 import { Avatar } from "@maipai/ui/src/primitives/Avatar";
-import { Card, CardContent, CardHeader, CardTitle } from "@maipai/ui/src/dashboard/components/ui/card";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@maipai/ui/src/ui/tabs";
-import { Badge } from "@maipai/ui/src/dashboard/components/ui/badge";
+import { Card } from "@maipai/ui/src/primitives/Card";
+import { Chip } from "@maipai/ui/src/primitives/Chip";
+import { Badge } from "@maipai/ui/src/ui/badge";
+import { Button } from "@maipai/ui/src/ui/button";
 import { getIcon } from "@maipai/ui/src/icons";
-import type { Icon } from "@maipai/ui/src/icons";
-import { GRID_COLUMNS } from "@maipai/ui/src/responsive";
-import { ROLE_LABELS, ACCENT_RING_CLASS, isProfileClosedTo } from "@/apps/people/roles";
-import { api, isOwnerOrAdminRole, type DeviceInfo, type Entity, type PersonRosterEntry, type Roster } from "@/lib/api";
-import { RobotCards, fetchFamilyBots, familyBotsQueryKey } from "@/apps/settings/RobotCards";
+import { ROLE_LABELS, isProfileClosedTo } from "@/apps/people/roles";
+import { api, type DeviceInfo, type Entity, type PersonRosterEntry, type Roster, type CompanionList, type CompanionDetail } from "@/lib/api";
 import { useTabItem } from "@/shell/tabIdentity";
 import { errorLine } from "@/lib/hubReachability";
 
-const PetIcon = getIcon("box");
+const PawIcon = getIcon("paw-print");
+const BotIcon = getIcon("bot");
+const ChevronIcon = getIcon("chevron-right");
+const PlusIcon = getIcon("plus");
 
-/** The inside of one directory card: the kit's own `Avatar` or icon, name,
- * role/area, bio and a small badge, centered. The page owns the `Card`
- * (`docs/plans/people-profile-2026-09-26.md`'s "The directory: a grid, not
- * a table"). Photo-in-place-of-initial (`avatar_file_id`) and real
- * DiceBear rendering are `AVATAR-RENDER-01`; `Avatar` still only renders
- * the initial-on-tint fallback. Every card gets the same shape (photo,
- * name, bio) regardless of role, the child-view rule this row's acceptance
- * names: nothing here is sensitive. A person's accent shows as the ring on
- * their `Avatar` alone, since a ring on the Card itself would be a
- * className override on a kit Element. */
-interface FamilyBodyProps {
-  title: string;
-  subtitle?: string | null;
-  detail?: string | null;
-  badge?: string;
-  icon?: Icon;
-  avatarName?: string;
-  avatarClassName?: string;
-}
-
-function FamilyBody({ title, subtitle, detail, badge, icon: IconComponent, avatarName, avatarClassName }: FamilyBodyProps) {
-  return (
-    <div className="flex flex-col items-center gap-3 text-center">
-      {IconComponent ? <IconComponent size={32} className="text-muted-foreground" /> : avatarName ? <Avatar name={avatarName} className={avatarClassName ?? "size-16 text-xl"} tourId="people.directory-avatar" /> : null}
-      <div className="flex flex-col gap-1">
-        <h2 className="text-base font-semibold">{title}</h2>
-        {subtitle ? <p className="text-sm text-muted-foreground">{subtitle}</p> : null}
-        {detail ? <p className="text-sm text-muted-foreground">{detail}</p> : null}
-        {/* deliberate type-floor exception: compact role badge */}
-        {badge ? <span className="self-center rounded-full bg-muted px-1.5 py-0.5 text-xs">{badge}</span> : null}
-      </div>
-    </div>
-  );
-}
-
-function personAvatarClass(entry: PersonRosterEntry): string {
-  const accentClass = entry.accent ? ACCENT_RING_CLASS[entry.accent] : null;
-  return accentClass ? `size-16 text-xl ring-2 ring-offset-2 ring-offset-card ${accentClass}` : "size-16 text-xl";
-}
-
-/** /people: the household directory as a card grid (`PEOPLE-GRID-01`,
- * `docs/plans/people-profile-2026-09-26.md`), retiring the roster table
- * SHELL-04's own stand-up left here ("the honest placeholder for a
- * stand-up, not a design," the design record's own words). `GET /api/
- * people` is still the same plain, unscoped directory (`PeoplePage.tsx`'s
- * own header comment: readable by anyone signed in) - the signed-in
- * person's own entry is already in that list, so it leads the grid
- * (`ordered` below) instead of sitting in a separate profile block above
- * it, which is what the old stacked layout's double avatar came from
- * (the design record: "their name shows twice today: once above the
- * table, once as a row in it"). Tapping a card, including your own,
- * opens `/people/:id`; an owner's or admin's view of a teen's card is not a link (ruling 2026-09-30). */
+/** /people: people, pets and robots are presented together as the household. */
 export function FamilyPage({ person }: { person: Roster }) {
   useTabItem(i18n._({ id: "Family", message: "Family" }));
-  const [params, setParams] = useSearchParams();
-  const requestedTab = params.get("tab");
-  const botsQuery = useQuery<DeviceInfo[]>({ queryKey: familyBotsQueryKey(person), queryFn: () => fetchFamilyBots(person) });
-  const activeTab = requestedTab === "pets" ? "pets" : requestedTab === "bots" ? "bots" : "people";
-  const query = useQuery<PersonRosterEntry[]>({ queryKey: ["people"], queryFn: () => api.people() });
+  const navigate = useNavigate();
+  const peopleQuery = useQuery<PersonRosterEntry[]>({ queryKey: ["people"], queryFn: () => api.people() });
   const petsQuery = useQuery<Entity[]>({ queryKey: ["entities", "pet"], queryFn: () => api.entities("pet") });
+  const robotsQuery = useQuery<DeviceInfo[]>({ queryKey: ["family-robots"], queryFn: async () => (await api.robotDevices()).filter((device) => device.kind === "robot") });
+  const companionsQuery = useQuery<CompanionList>({ queryKey: ["companions"], queryFn: api.companions, retry: false });
+  const companionDetails = useQueries({ queries: (companionsQuery.data?.companions ?? []).map((companion) => ({ queryKey: ["companions", companion.id], queryFn: () => api.companion(companion.id), enabled: companionsQuery.isSuccess })) });
+  const details = companionDetails.map((query) => query.data).filter((entry): entry is CompanionDetail => Boolean(entry));
+  const people = peopleQuery.data ?? [];
+  const pets = petsQuery.data ?? [];
+  const robots = robotsQuery.data ?? [];
+  const count = [
+    i18n._({ id: "{count, plural, one {# person} other {# people}}", message: "{count, plural, one {# person} other {# people}}", values: { count: people.length } }),
+    i18n._({ id: "{count, plural, one {# pet} other {# pets}}", message: "{count, plural, one {# pet} other {# pets}}", values: { count: pets.length } }),
+    i18n._({ id: "{count, plural, one {# robot} other {# robots}}", message: "{count, plural, one {# robot} other {# robots}}", values: { count: robots.length } }),
+    i18n._({ id: "{count, plural, one {# companion} other {# companions}}", message: "{count, plural, one {# companion} other {# companions}}", values: { count: details.length } }),
+  ].join(" · ");
 
-  function onTabChange(value: string) {
-    setParams((previous) => {
-      const next = new URLSearchParams(previous);
-      if (value === "people") next.delete("tab");
-      else next.set("tab", value);
-      return next;
-    }, { replace: true });
-  }
+  return <div className="flex min-h-0 w-full flex-1 flex-col gap-8 overflow-y-auto p-4 md:p-6" data-testid="family-page">
+    <AsyncState data={peopleQuery.data} error={peopleQuery.isError} isFetching={peopleQuery.isFetching} onRetry={() => peopleQuery.refetch()} errorMessage={errorLine(peopleQuery.error, i18n._({ id: "Could not load the household.", message: "Could not load the household." }))} loadingLabel={i18n._({ id: "Loading household", message: "Loading household" })}>
+      {(roster) => {
+        const ordered = [...roster].sort((a, b) => a.id === person.id ? -1 : b.id === person.id ? 1 : 0);
+        return <>
+          <header className="flex flex-wrap items-center justify-between gap-4">
+            <div><h1 className="text-title font-bold">{i18n._({ id: "Family", message: "Family" })}</h1><p className="text-supporting text-muted-foreground">{count}</p></div>
+          </header>
+          {petsQuery.isError ? <div role="alert" className="flex items-center gap-3 text-supporting text-destructive">{i18n._({ id: "Could not load pets.", message: "Could not load pets." })}<Button variant="ghost" size="sm" onClick={() => void petsQuery.refetch()}>{i18n._({ id: "Try again", message: "Try again" })}</Button></div> : null}
+          {robotsQuery.isError ? <div role="alert" className="flex items-center gap-3 text-supporting text-destructive">{i18n._({ id: "Could not load robots.", message: "Could not load robots." })}<Button variant="ghost" size="sm" onClick={() => void robotsQuery.refetch()}>{i18n._({ id: "Try again", message: "Try again" })}</Button></div> : null}
 
-  return (
-    <>
-    <Tabs value={activeTab} onValueChange={onTabChange}>
-      <TabsList>
-        <TabsTrigger value="people">{i18n._({ id: "People", message: "People" })}{query.data ? <> <Badge>{query.data.length}</Badge></> : null}</TabsTrigger>
-        <TabsTrigger value="pets">{i18n._({ id: "Pets", message: "Pets" })}{petsQuery.data && petsQuery.data.length > 0 ? <> <Badge>{petsQuery.data.length}</Badge></> : null}</TabsTrigger>
-        <TabsTrigger value="bots">{i18n._({ id: "Bots", message: "Bots" })}{botsQuery.data && botsQuery.data.length > 0 ? <> <Badge>{botsQuery.data.length}</Badge></> : null}</TabsTrigger>
-      </TabsList>
-      <TabsContent value="people">
-    <AsyncState
-      data={query.data}
-      error={query.isError}
-      isFetching={query.isFetching}
-      onRetry={() => query.refetch()}
-      errorMessage={errorLine(query.error, i18n._({ id: "Could not load the household.", message: "Could not load the household." }))}
-      loadingLabel={i18n._({ id: "Loading household", message: "Loading household" })}
-    >
-      {(roster: PersonRosterEntry[]) => {
-        const ordered = [...roster].sort((a, b) => {
-          if (a.id === person.id) return -1;
-          if (b.id === person.id) return 1;
-          return 0;
-        });
-        return (
-          <div className="flex flex-col gap-4">
-            <CardHeader>
-              <CardTitle>{i18n._({ id: "Family", message: "Family" })}</CardTitle>
-            </CardHeader>
-            <div className={`grid gap-4 ${GRID_COLUMNS.default}`}>
+          <div className="flex gap-4 overflow-x-auto pb-1" aria-label={i18n._({ id: "Family members", message: "Family members" })}>
+            {[...ordered.map((entry) => ({ key: entry.id, label: entry.display_name, avatar: <Avatar name={entry.display_name} seed={entry.avatar_seed} size="profile" accent={entry.accent ?? undefined} /> })),
+              ...pets.map((pet) => ({ key: pet.id, label: pet.name, avatar: <PawIcon aria-hidden className="size-10 text-muted-foreground" /> })),
+              ...robots.map((robot) => ({ key: robot.id, label: robot.name, avatar: <BotIcon aria-hidden className="size-10 text-muted-foreground" /> }))].map((member) => <div key={member.key} className="flex w-20 shrink-0 flex-col items-center gap-2 text-center">{member.avatar}<span className="text-supporting">{member.label}</span></div>)}
+          </div>
+
+          <section className="flex flex-col gap-3" aria-labelledby="family-people-heading">
+            <div className="flex items-center justify-between"><h2 id="family-people-heading" className="text-section font-semibold">{i18n._({ id: "People", message: "People" })}</h2></div>
+            <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
               {ordered.map((entry) => {
-                const familyBody = <FamilyBody title={entry.display_name} subtitle={ROLE_LABELS[entry.role]} detail={entry.bio} avatarName={entry.display_name} avatarClassName={personAvatarClass(entry)} />;
-                if (isOwnerOrAdminRole(person.role)) {
-                  return <Card key={entry.id}><CardContent>{isProfileClosedTo(person, entry) ? familyBody : <Link to={`/people/${entry.id}`} className="block rounded-xl transition-shadow hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">{familyBody}</Link>}</CardContent></Card>;
-                }
-                const card = (
-                  <Card>
-                    <CardContent>
-                      {familyBody}
-                    </CardContent>
-                  </Card>
-                );
-                // Owners and admins reach only a child's profile, never a teen's (ruling 2026-09-30).
-                if (isProfileClosedTo(person, entry)) return <div key={entry.id}>{card}</div>;
-                return (
-                  <Link key={entry.id} to={`/people/${entry.id}`} className="block rounded-xl transition-shadow hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
-                    {card}
-                  </Link>
-                );
+                const blocked = isProfileClosedTo(person, entry);
+                const profileLinkAllowed = !blocked;
+                return <div key={entry.id} data-testid={`family-person-${entry.id}`}><Card surface="flat">
+                  {profileLinkAllowed ? <Link to={`/people/${entry.id}`} className="flex items-center gap-4 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                    <Avatar name={entry.display_name} seed={entry.avatar_seed} size="profile" accent={entry.accent ?? undefined} />
+                    <div className="min-w-0 flex-1"><p className="text-row font-semibold">{entry.display_name}</p><p className="text-supporting text-muted-foreground">{ROLE_LABELS[entry.role]}{entry.bio ? ` · ${entry.bio}` : ""}</p></div>
+                    <ChevronIcon aria-hidden className="text-muted-foreground" size={20} />
+                  </Link> : <div className="flex items-center gap-4"><Avatar name={entry.display_name} seed={entry.avatar_seed} size="profile" accent={entry.accent ?? undefined} /><div className="min-w-0 flex-1"><p className="text-row font-semibold">{entry.display_name}</p><p className="text-supporting text-muted-foreground">{ROLE_LABELS[entry.role]}{entry.bio ? ` · ${entry.bio}` : ""}</p></div></div>}
+                  <div className="mt-4 flex flex-wrap gap-2">
+                    {details.filter((detail) => detail.used_by?.people.some((used) => used.id === entry.id)).map((detail) => <Chip key={detail.id} tone="surface" size="strip" onClick={() => navigate(`/companions/${encodeURIComponent(detail.id)}`)}>{detail.name}</Chip>)}
+                    <Chip tone="surface" size="strip" onClick={() => navigate("/companions")}><PlusIcon aria-hidden size={16} />{i18n._({ id: "Companion", message: "Companion" })}</Chip>
+                  </div>
+                </Card></div>;
               })}
             </div>
-          </div>
-        );
+          </section>
+
+          {(pets.length > 0 || robots.length > 0) ? <section className="flex flex-col gap-3" aria-labelledby="family-pets-heading">
+            <h2 id="family-pets-heading" className="text-section font-semibold">{i18n._({ id: "Pets and robots", message: "Pets and robots" })}</h2>
+            <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+              {pets.map((pet) => <div key={pet.id} data-testid={`family-pet-${pet.id}`}><Card surface="flat"><div className="flex items-center gap-4"><PawIcon aria-hidden className="size-10 text-muted-foreground" /><div><p className="text-row font-semibold">{pet.name}</p><p className="text-supporting text-muted-foreground">{pet.description || i18n._({ id: "Pet", message: "Pet" })}</p>{pet.source === "inferred" && !pet.confirmed_by_person_id ? <Badge variant="secondary">{i18n._({ id: "Unconfirmed", message: "Unconfirmed" })}</Badge> : null}</div></div></Card></div>)}
+              {robots.map((robot) => <Link key={robot.id} to={`/settings/devices/${encodeURIComponent(robot.id)}?tab=overview`} className="block focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"><div data-testid={`family-robot-${robot.id}`}><Card surface="flat"><div className="flex items-center gap-4"><BotIcon aria-hidden className="size-10 text-muted-foreground" /><div><p className="text-row font-semibold">{robot.name}</p><p className="text-supporting text-muted-foreground">{[i18n._({ id: "Robot", message: "Robot" }), robot.online ? i18n._({ id: "Online", message: "Online" }) : i18n._({ id: "Offline", message: "Offline" }), robot.area].filter(Boolean).join(" · ")}</p></div></div></Card></div></Link>)}
+            </div>
+          </section> : null}
+          {ordered.length === 0 && pets.length === 0 && robots.length === 0 ? <EmptyState icon="users" text={i18n._({ id: "No family members yet.", message: "No family members yet." })} /> : null}
+        </>;
       }}
     </AsyncState>
-      </TabsContent>
-      <TabsContent value="pets">
-        <AsyncState data={petsQuery.data} error={petsQuery.isError} isFetching={petsQuery.isFetching} onRetry={() => petsQuery.refetch()} errorMessage={i18n._({ id: "Could not load pets.", message: "Could not load pets." })} loadingLabel={i18n._({ id: "Loading pets", message: "Loading pets" })}>
-          {(pets: Entity[]) => pets.length === 0 ? <EmptyState icon="inbox" text={i18n._({ id: "Nothing here yet.", message: "Nothing here yet." })} /> : <div className={`grid gap-4 ${GRID_COLUMNS.default}`}>{pets.map((pet) => {
-            const unconfirmed = pet.source === "inferred" && !pet.confirmed_by_person_id;
-            return <Card key={pet.id}><CardContent><FamilyBody title={pet.name} detail={pet.description} icon={PetIcon} badge={unconfirmed ? i18n._({ id: "Unconfirmed", message: "Unconfirmed" }) : undefined} /></CardContent></Card>;
-          })}</div>}
-        </AsyncState>
-      </TabsContent>
-      <TabsContent value="bots">
-        <RobotCards person={person} />
-      </TabsContent>
-    </Tabs>
-    </>
-  );
+  </div>;
 }

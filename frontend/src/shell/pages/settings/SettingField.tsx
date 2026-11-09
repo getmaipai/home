@@ -243,9 +243,9 @@ export function SettingField({ setting, onChange, onReset, disabled, selfPersonI
 
   return (
     <>
-    <div className="flex flex-col items-start gap-2 py-3 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
+    <div className="flex min-h-14 flex-col items-start gap-2 py-3 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
       <div className="flex min-w-0 flex-col gap-0.5">
-        {def.key === "companions.allowed" ? <span className="flex min-h-12 items-center text-sm">{settingLabel(def)}</span> : <span className="text-sm">{def.key === "storage.household.cap_bytes" ? i18n._({ id: "Household storage cap", message: "Household storage cap" }) : settingLabel(def)}</span>}
+        {def.key === "companions.allowed" ? <span className="flex min-h-12 items-center text-row">{settingLabel(def)}</span> : <span className="text-row">{def.key === "storage.household.cap_bytes" ? i18n._({ id: "Household storage cap", message: "Household storage cap" }) : settingLabel(def)}</span>}
         {def.key === "storage.household.cap_bytes" && typeof resolved.value === "number" ? <ItemDescription clamp={false}>{formatBytes(resolved.value)}</ItemDescription> : null}
         {resolved.does ? <ItemDescription clamp={false}>{settingDoes(def, resolved.does)}</ItemDescription> : null}
         {resolved.state ? <ItemDescription clamp={false}>{settingState(resolved.state)}</ItemDescription> : null}

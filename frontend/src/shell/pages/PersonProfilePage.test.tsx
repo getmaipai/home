@@ -37,6 +37,8 @@ function stubFetch(byPath: Record<string, unknown>) {
     if (url.includes("/api/settings/api-keys/people/")) return Promise.resolve(Response.json({ keys: [{ id: "key_abcd1234", person_id: "person-bramble", scopes: ["code"], status: "active", created_at: "2026-10-01T00:00:00.000Z", expires_at: "2027-01-01T00:00:00.000Z", revoked_at: null, hint: "QWER" }] }));
     if (url.includes("/api/people")) return Promise.resolve(Response.json(people));
     if (url.includes("/api/files")) return Promise.resolve(Response.json([]));
+    if (url.includes("/api/library?") && !url.includes("/summary")) return Promise.resolve(Response.json({ items: [], next_cursor: null }));
+    if (url.includes("/api/library/summary")) return Promise.resolve(Response.json({ items: 0, bytes: 0, per_kind: {}, trash: { items: 0, bytes: 0 }, expiring: { items: 0, bytes: 0 } }));
     if (url.includes("/api/biometric-prints")) return Promise.resolve(Response.json([]));
     if (url.includes("/api/memory")) {
       const matched = Object.entries(byPath).find(([path]) => path !== "/api/people" && url.includes(path));
@@ -89,6 +91,8 @@ function stubProfileAndLimitsFetch(puts: Array<{ url: string; method: string; bo
     const url = String(input);
     if (url.includes("/api/people")) return Promise.resolve(Response.json(people));
     if (url.includes("/api/files")) return Promise.resolve(Response.json([]));
+    if (url.includes("/api/library?") && !url.includes("/summary")) return Promise.resolve(Response.json({ items: [], next_cursor: null }));
+    if (url.includes("/api/library/summary")) return Promise.resolve(Response.json({ items: 0, bytes: 0, per_kind: {}, trash: { items: 0, bytes: 0 }, expiring: { items: 0, bytes: 0 } }));
     if (url.includes("/api/biometric-prints")) return Promise.resolve(Response.json([]));
     if (url.includes("/api/settings/registry")) return Promise.resolve(Response.json(registry));
     if (url.includes("/api/settings?scope=")) return Promise.resolve(Response.json(values));
@@ -342,7 +346,7 @@ describe("PersonProfilePage", () => {
       expect(self.getAllByRole("link").filter((link) => link.getAttribute("href") === "/settings/profile?tab=profile")).toHaveLength(1);
       cleanup();
       const other = renderProfile("/people/person-bramble", viewer({ role: "owner" }));
-      expect(await other.findByRole("button", { name: "Edit" })).toBeTruthy();
+      expect(await other.findByRole("button", { name: "Edit profile" })).toBeTruthy();
       expect(other.queryByText("Face recognition")).toBeNull();
       expect(other.queryByRole("link", { name: "Edit profile" })).toBeNull();
       expect(other.queryByRole("link", { name: "Manage in Settings" })).toBeNull();
@@ -363,11 +367,13 @@ describe("PersonProfilePage", () => {
       }
       if (url.endsWith("/api/people")) return Promise.resolve(Response.json(currentPeople));
       if (url.includes("/api/files")) return Promise.resolve(Response.json([]));
+      if (url.includes("/api/library?") && !url.includes("/summary")) return Promise.resolve(Response.json({ items: [], next_cursor: null }));
+      if (url.includes("/api/library/summary")) return Promise.resolve(Response.json({ items: 0, bytes: 0, per_kind: {}, trash: { items: 0, bytes: 0 }, expiring: { items: 0, bytes: 0 } }));
       throw new Error(`unstubbed fetch: ${url}`);
     }) as unknown as typeof fetch;
     try {
       const view = renderProfile("/people/person-bramble", viewer({ role: "owner" }));
-      fireEvent.click(await view.findByRole("button", { name: "Edit" }));
+      fireEvent.click(await view.findByRole("button", { name: "Edit profile" }));
       fireEvent.change(view.getByLabelText("Name"), { target: { value: "Bram" } });
       fireEvent.change(view.getByLabelText("Bio"), { target: { value: "Loves the beach" } });
       await act(async () => { fireEvent.click(view.getByRole("combobox", { name: "Accent color" })); });
@@ -399,7 +405,7 @@ describe("PersonProfilePage", () => {
 describe("PersonProfilePage (ported from the retired old-shell page)", () => {
   function stubByPath(byPath: Record<string, unknown>): () => void {
     const original = globalThis.fetch;
-    const withDefaults: Record<string, unknown> = { "/api/people": people, "/api/files": [], "/api/biometric-prints": [], ...byPath };
+    const withDefaults: Record<string, unknown> = { "/api/people": people, "/api/files": [], "/api/library?": { items: [], next_cursor: null }, "/api/library/summary": { items: 0, bytes: 0, per_kind: {}, trash: { items: 0, bytes: 0 }, expiring: { items: 0, bytes: 0 } }, "/api/biometric-prints": [], ...byPath };
     globalThis.fetch = mock((input: RequestInfo | URL) => {
       const url = String(input);
       const match = Object.entries(withDefaults).filter(([path]) => url.includes(path)).sort((a, b) => b[0].length - a[0].length)[0];
@@ -431,7 +437,7 @@ describe("PersonProfilePage (ported from the retired old-shell page)", () => {
       const restore = stubByPath({});
       try {
         const view = renderProfile("/people/person-bramble", owner());
-        expect(await view.findByRole("button", { name: "Edit" })).toBeTruthy();
+        expect(await view.findByRole("button", { name: "Edit profile" })).toBeTruthy();
       } finally { restore(); }
     });
 
@@ -440,7 +446,7 @@ describe("PersonProfilePage (ported from the retired old-shell page)", () => {
       try {
         const view = renderProfile("/people/person-nova", viewer({ id: "person-sage", role: "adult" }));
         await view.findByText("Nova");
-        expect(view.queryByRole("button", { name: "Edit" })).toBeNull();
+        expect(view.queryByRole("button", { name: "Edit profile" })).toBeNull();
       } finally { restore(); }
     });
   });
@@ -471,11 +477,12 @@ describe("PersonProfilePage (ported from the retired old-shell page)", () => {
       } finally { restore(); }
     });
 
-    test("shows the plain empty line when nothing's been shared", async () => {
+    test("hides the shared shelf when nothing's been shared", async () => {
       const restore = stubByPath({});
       try {
         const view = renderProfile("/people/person-bramble", owner());
-        expect(await view.findByText("Nothing shared yet.")).toBeTruthy();
+        await view.findByText("Bramble");
+        expect(view.queryByText("Nothing shared yet.")).toBeNull();
       } finally { restore(); }
     });
 
@@ -483,7 +490,8 @@ describe("PersonProfilePage (ported from the retired old-shell page)", () => {
       const restore = stubByPath({ "/api/files": [visibleFile({ id: "file-owned", kind: "image", shared: false })] });
       try {
         const view = renderProfile("/people/person-sage", owner());
-        expect(await view.findByText("Nothing shared yet.")).toBeTruthy();
+        await view.findByText("Sage");
+        expect(view.queryByText("Nothing shared yet.")).toBeNull();
       } finally { restore(); }
     });
 

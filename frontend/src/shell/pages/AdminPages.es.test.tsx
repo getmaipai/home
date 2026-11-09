@@ -89,7 +89,7 @@ describe("admin and system pages in Spanish", () => {
     ["Updates", () => <UpdatesPage person={person("adult")} />, "Only an owner or admin can manage updates."],
     ["Repairs", () => <RepairsPage person={person("adult")} />, "Only an owner or admin can manage repairs."],
     ["Engines", () => <EnginesConsole person={person("adult")} />, "Only an owner or admin can manage engines."],
-    ["Family", () => <MemoryRouter><FamilyPage person={person("owner")} /></MemoryRouter>, "Pets"],
+    ["Family", () => <MemoryRouter><FamilyPage person={person("owner")} /></MemoryRouter>, "People"],
     ["Storage", () => <MemoryRouter><StoragePage person={person("adult")} /></MemoryRouter>, "Household total"],
   ];
   for (const [name, page, anchor] of cases) {

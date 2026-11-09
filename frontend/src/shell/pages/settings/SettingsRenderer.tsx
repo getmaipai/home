@@ -4,7 +4,7 @@ import { useSearchParams } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { AsyncState } from "@maipai/ui/src/primitives/AsyncState";
 import { EmptyState } from "@maipai/ui/src/primitives/EmptyState";
-import { Card, CardContent, CardHeader, CardTitle } from "@maipai/ui/src/dashboard/components/ui/card";
+import { Card } from "@maipai/ui/src/primitives/Card";
 import { Button } from "@maipai/ui/src/ui/button";
 import { groupSettings, sectionTitle, type SettingsGroup } from "@maipai/ui/src/settings/groupSettings";
 import type { SettingsKey } from "@maipai/spec/gen/ts/settings-key.js";
@@ -214,20 +214,16 @@ export function SettingsRenderer({ scope, scopeValue, only, includeKeys, titleOv
                   {group.advanced.map((s) => <SettingField key={s.def.key} setting={s} onChange={(v) => handleChange(s.def.key, v)} onReset={() => handleReset(s.def.key)} disabled={pendingKey === s.def.key} selfPersonId={selfPersonId} optionsFrom={optionsFrom} />)}
                 </div>
               ) : (
-                <Card
+                <div
                   key={group.id}
-                  // Scroll target named "settings-<group id>", so a test
-                  // can stub scrollIntoView and assert on `this.id`.
                   id={`settings-${group.id}`}
                   ref={(el) => {
                     if (el) groupRefs.current.set(group.id, el);
                     else groupRefs.current.delete(group.id);
                   }}
                 >
-                  <CardHeader>
-                    <CardTitle>{titleOverrides[group.id] ?? sectionTitle(group.id)}</CardTitle>
-                  </CardHeader>
-                  <CardContent>
+                  <Card surface="flat">
+                    <h2 className="text-section font-semibold">{titleOverrides[group.id] ?? sectionTitle(group.id)}</h2>
                     <div className="flex flex-col divide-y divide-border">
                     {group.basic.map((s) => (
                       <SettingField key={s.def.key} setting={s} onChange={(v) => handleChange(s.def.key, v)} onReset={() => handleReset(s.def.key)} disabled={pendingKey === s.def.key} selfPersonId={selfPersonId} optionsFrom={optionsFrom} />
@@ -250,8 +246,8 @@ export function SettingsRenderer({ scope, scopeValue, only, includeKeys, titleOv
                       )
                     ) : null}
                     </div>
-                  </CardContent>
-                </Card>
+                  </Card>
+                </div>
               ))}
             </>
           );

@@ -1,365 +1,105 @@
-import { afterEach, describe, expect, mock, test } from "bun:test";
-import { cleanup, fireEvent, waitFor } from "@testing-library/react";
-import { MemoryRouter, useLocation } from "react-router-dom";
+import { afterEach, expect, mock, test } from "bun:test";
+import { cleanup, waitFor } from "@testing-library/react";
+import { MemoryRouter } from "react-router-dom";
 import { FamilyPage } from "@/shell/pages/FamilyPage";
 import { renderWithQueryClient } from "../../../tests/renderWithQueryClient";
 import type { PersonRosterEntry, Roster } from "@/lib/api";
 import { Tour } from "@maipai/spec/gen/ts/tour.js";
 import defaultManifest from "../../../../backend/packages/default/manifest.json";
 
-afterEach(() => {
-  cleanup();
-});
+afterEach(cleanup);
 
 function makePerson(overrides: Partial<Roster> = {}): Roster {
-  return {
-    id: "person-abc123",
-    display_name: "Nova",
-    nickname: null,
-    role: "owner",
-    avatar_seed: "person-abc123",
-    bio: null,
-    accent: null,
-    source: "hub",
-    local_only: false,
-    created_at: "2026-09-04T00:00:00.000Z",
-    updated_at: "2026-09-04T00:00:00.000Z",
-    deleted_at: null,
-    enabled: true,
-    guest_expires_at: null,
-    memorialized_at: null,
-    hlc: "1788000000000:0:test",
-    hasSecret: true,
-    ...overrides,
-  } as Roster;
+  return { id: "p1", display_name: "Sage", nickname: null, role: "owner", avatar_seed: "p1", bio: null, accent: null, source: "hub", local_only: false, created_at: "2026-09-04T00:00:00.000Z", updated_at: "2026-09-04T00:00:00.000Z", deleted_at: null, enabled: true, guest_expires_at: null, memorialized_at: null, hlc: "1788000000000:0:test", hasSecret: true, ...overrides } as Roster;
 }
 
-function makeRosterEntry(overrides: Partial<PersonRosterEntry> = {}): PersonRosterEntry {
-  const person = makePerson(overrides);
-  const rest: Partial<Roster> = { ...person };
-  delete rest.hasSecret;
-  return rest as PersonRosterEntry;
+function entry(overrides: Partial<PersonRosterEntry> = {}): PersonRosterEntry {
+  return { ...makePerson(), sessionLockRequired: false, sessionLockTimeoutMinutes: 0, age_band: "adult", ...overrides } as PersonRosterEntry;
 }
 
-function mockFamilyFetch(people: PersonRosterEntry[], pets: unknown[] = [], devices: unknown[] = [], robots: unknown[] = []) {
-  const originalFetch = globalThis.fetch;
+function mockFamilyFetch(people: PersonRosterEntry[], pets: unknown[] = [], robots: unknown[] = [], companions: unknown[] = [], detail: unknown = null) {
+  const original = globalThis.fetch;
   globalThis.fetch = mock((input: RequestInfo | URL) => {
-    const url = typeof input === "string" ? input : input.toString();
-    if (url.includes("/api/people")) return Promise.resolve(Response.json(people));
+    const url = String(input);
+    if (url.endsWith("/api/people")) return Promise.resolve(Response.json(people));
     if (url.includes("/api/entities?kind=pet")) return Promise.resolve(Response.json(pets));
     if (url.includes("/api/devices/robots")) return Promise.resolve(Response.json(robots));
-    if (url.includes("/api/devices")) return Promise.resolve(Response.json(devices));
-    return Promise.resolve(new Response("{}", { status: 200 }));
+    if (url.endsWith("/api/companions")) return Promise.resolve(Response.json({ allowed: true, can_create: false, can_discover: false, default_id: "", companions, discover: [], robots: [] }));
+    if (url.endsWith("/api/companions/c1")) return Promise.resolve(Response.json(detail));
+    return Promise.resolve(Response.json([]));
   }) as unknown as typeof fetch;
-  return () => {
-    globalThis.fetch = originalFetch;
-  };
+  return () => { globalThis.fetch = original; };
 }
 
-function renderFamilyPage(person: Roster, path = "/people") {
-  return renderWithQueryClient(
-    <MemoryRouter initialEntries={[path]}>
-      <FamilyPage person={person} />
-    </MemoryRouter>,
-  );
+function render(person: Roster, path = "/people") {
+  return renderWithQueryClient(<MemoryRouter initialEntries={[path]}><FamilyPage person={person} /></MemoryRouter>);
 }
 
-describe("FamilyPage", () => {
-  test("the People tour validates and opens on the real family directory", async () => {
-    const tour = defaultManifest.contributes.tours[2]!;
-    expect(Tour.safeParse(tour).success).toBe(true);
-    expect(tour.steps[0]?.placement).toBe("center");
-    const restore = mockFamilyFetch([makeRosterEntry({ id: "p1", display_name: "Nova", role: "owner" })]);
-    try {
-      const view = renderFamilyPage(makePerson({ id: "p1", display_name: "Nova", role: "owner" }));
-      await waitFor(() => expect(view.getByText("Family")).toBeVisible());
-      expect(view.getByText("Nova")).toBeVisible();
-    } finally {
-      restore();
-    }
-  });
-
-  test("the directory is a card grid: every household member gets a card with their real name and role", async () => {
-    const restore = mockFamilyFetch([
-      makeRosterEntry({ id: "p1", display_name: "Nova", role: "owner" }),
-      makeRosterEntry({ id: "p2", display_name: "Marlow", role: "teen" }),
-      makeRosterEntry({ id: "p3", display_name: "Sage", role: "child" }),
-    ]);
-    try {
-      renderFamilyPage(makePerson({ id: "p1", display_name: "Nova", role: "owner" }));
-      await waitFor(() => expect(document.body.textContent).toContain("Sage"));
-      expect(document.body.textContent).toContain("Nova");
-      expect(document.body.textContent).toContain("Marlow");
-      expect(document.body.textContent).toContain("Owner");
-      expect(document.body.textContent).toContain("Teen");
-      expect(document.body.textContent).toContain("Child");
-      const cards = document.querySelectorAll('[data-slot="card"]');
-      expect(cards.length).toBe(3);
-    } finally {
-      restore();
-    }
-  });
-
-  test("an admin sees the family row without Coding access controls", async () => {
-    const original = globalThis.fetch;
-    const deleted: string[] = [];
-    const roster = [makeRosterEntry({ id: "p1", display_name: "Nova", role: "owner" })];
-    globalThis.fetch = mock((input: RequestInfo | URL, init?: RequestInit) => {
-      const url = String(input);
-      if (url.includes("/api/people")) return Promise.resolve(Response.json(roster));
-      if (url.includes("/api/entities?kind=pet")) return Promise.resolve(Response.json([]));
-      if (url.includes("/api/devices/robots")) return Promise.resolve(Response.json([]));
-      if (url.endsWith("/api/settings/api-keys/people/p1") && init?.method === "DELETE") { deleted.push(url); return Promise.resolve(Response.json({ revoked: 1 })); }
-      if (url.includes("/api/settings/api-keys/people/")) return Promise.resolve(Response.json({ keys: [{ id: "key_abcd1234", person_id: "p1", scopes: ["code"], status: "active", created_at: "2026-10-01T00:00:00.000Z", expires_at: "2027-01-01T00:00:00.000Z", revoked_at: null, hint: "QWER" }] }));
-      if (url.endsWith("/api/settings/api-keys/people/p1/key_abcd1234") && init?.method === "DELETE") { deleted.push(url); return Promise.resolve(Response.json({ success: true })); }
-      return Promise.resolve(Response.json([]));
-    }) as unknown as typeof fetch;
-    try {
-      const view = renderFamilyPage(makePerson({ id: "p1", display_name: "Nova", role: "owner" }));
-      await view.findByText("Nova");
-      expect(view.queryByText(/Hint •••• QWER/)).toBeNull();
-      expect(view.queryByRole("button", { name: "Revoke all" })).toBeNull();
-      expect(view.queryByText("private key name")).toBeNull();
-      expect(view.queryByText(/last used|host/i)).toBeNull();
-      expect(deleted).toEqual([]);
-    } finally { globalThis.fetch = original; }
-  });
-
-  test("the signed-in person's own card leads the grid, not a separate profile block", async () => {
-    const restore = mockFamilyFetch([
-      makeRosterEntry({ id: "p1", display_name: "Nova", role: "owner" }),
-      makeRosterEntry({ id: "p2", display_name: "Marlow", role: "teen" }),
-    ]);
-    try {
-      renderFamilyPage(makePerson({ id: "p2", display_name: "Marlow", role: "teen" }));
-      await waitFor(() => expect(document.body.textContent).toContain("Nova"));
-      const cards = document.querySelectorAll('[data-slot="card"]');
-      expect(cards.length).toBe(2);
-      expect(cards[0]?.textContent).toContain("Marlow");
-      expect(cards[1]?.textContent).toContain("Nova");
-      // Marlow's own name now shows exactly once (the old stacked layout
-      // duplicated it: once in the profile block, once as a table row).
-      expect(document.body.textContent?.match(/Marlow/g)?.length).toBe(1);
-    } finally {
-      restore();
-    }
-  });
-
-  test("a card shows the bio line only when the person set one", async () => {
-    const restore = mockFamilyFetch([
-      makeRosterEntry({ id: "p1", display_name: "Nova", role: "owner", bio: "Runs this house." }),
-      makeRosterEntry({ id: "p2", display_name: "Marlow", role: "teen", bio: null }),
-    ]);
-    try {
-      renderFamilyPage(makePerson({ id: "p1", display_name: "Nova", role: "owner" }));
-      await waitFor(() => expect(document.body.textContent).toContain("Runs this house."));
-      const cards = Array.from(document.querySelectorAll('[data-slot="card"]'));
-      const marlowCard = cards.find((card) => card.textContent?.includes("Marlow"));
-      expect(marlowCard?.textContent).not.toContain("Runs this house.");
-    } finally {
-      restore();
-    }
-  });
-
-  test("a card links to that person's profile page", async () => {
-    const restore = mockFamilyFetch([makeRosterEntry({ id: "p1", display_name: "Nova", role: "owner" })]);
-    try {
-      renderFamilyPage(makePerson({ id: "p1", display_name: "Nova", role: "owner" }));
-      await waitFor(() => expect(document.body.textContent).toContain("Nova"));
-      const link = document.querySelector('a[href="/people/p1"]');
-      expect(link).not.toBeNull();
-    } finally {
-      restore();
-    }
-  });
-
-  test("an owner or admin gets a link to a child's card but not a teen's; the teen's own card still links", async () => {
-    const roster = [
-      makeRosterEntry({ id: "p1", display_name: "Nova", role: "owner" }),
-      makeRosterEntry({ id: "p2", display_name: "Marlow", role: "teen" }),
-      makeRosterEntry({ id: "p3", display_name: "Sage", role: "child" }),
-    ];
-    for (const role of ["owner", "admin"] as const) {
-      const restore = mockFamilyFetch(roster);
-      try {
-        renderFamilyPage(makePerson({ id: "p1", display_name: "Nova", role }));
-        await waitFor(() => expect(document.body.textContent).toContain("Marlow"));
-        expect(document.querySelector('a[href="/people/p3"]')).not.toBeNull();
-        expect(document.querySelector('a[href="/people/p2"]')).toBeNull();
-        expect(document.querySelector('a[href="/people/p1"]')).not.toBeNull();
-      } finally {
-        restore();
-        cleanup();
-      }
-    }
-    const restore = mockFamilyFetch(roster);
-    try {
-      renderFamilyPage(makePerson({ id: "p2", display_name: "Marlow", role: "teen" }));
-      await waitFor(() => expect(document.body.textContent).toContain("Nova"));
-      expect(document.querySelector('a[href="/people/p2"]')).not.toBeNull();
-    } finally {
-      restore();
-    }
-  });
-
-  test("a failed household fetch shows an error and a retry button, never a stuck loading state", async () => {
-    const originalFetch = globalThis.fetch;
-    globalThis.fetch = mock(() => Promise.resolve(new Response(JSON.stringify({ error: "Something broke" }), { status: 500 }))) as unknown as typeof fetch;
-    try {
-      renderFamilyPage(makePerson());
-      await waitFor(() => expect(document.body.textContent).toContain("Something broke"));
-      expect(document.body.textContent).toContain("Try again");
-    } finally {
-      globalThis.fetch = originalFetch;
-    }
-  });
-
-  test("no data table anywhere on the page, and no vendored demo data", async () => {
-    const restore = mockFamilyFetch([makeRosterEntry()]);
-    try {
-      renderFamilyPage(makePerson());
-      await waitFor(() => expect(document.body.textContent).toContain("Nova"));
-      const titles = Array.from(document.querySelectorAll('[data-slot="card-title"]')).map((el) => el.textContent);
-      expect(titles.some((t) => t?.includes("Family"))).toBe(true);
-      expect(document.body.textContent).not.toContain("Employee Data Table");
-      expect(document.querySelector('[data-slot="table"]')).toBeNull();
-      expect(document.body.textContent).not.toContain("Address Details");
-      expect(document.body.textContent).not.toContain("Personal Information");
-      expect(document.body.textContent).not.toContain("mathew.anderson@gmail.com");
-    } finally {
-      restore();
-    }
-  });
-
-  test("Pets shows confirmed and inferred pets, labeling only the unconfirmed one", async () => {
-    const restore = mockFamilyFetch([], [
-      { id: "ent-cat001", kind: "pet", name: "Miso", description: "Orange cat", source: "hub", confirmed_by_person_id: "person-abc123" },
-      { id: "ent-dog001", kind: "pet", name: "Maybe Dog", description: null, source: "inferred", confirmed_by_person_id: null },
-    ]);
-    try {
-      renderFamilyPage(makePerson(), "/people?tab=pets");
-      await waitFor(() => expect(document.body.textContent).toContain("Maybe Dog"));
-      expect(document.body.textContent).toContain("Miso");
-      const cards = Array.from(document.querySelectorAll('[data-slot="card"]'));
-      expect(cards.find((card) => card.textContent?.includes("Miso"))?.textContent).not.toContain("Unconfirmed");
-      expect(cards.find((card) => card.textContent?.includes("Maybe Dog"))?.textContent).toContain("Unconfirmed");
-      expect(document.body.textContent).toContain("Orange cat");
-    } finally { restore(); }
-  });
-
-  test("tab badges show the fetched household counts", async () => {
-    const restore = mockFamilyFetch(
-      [makeRosterEntry({ id: "p1" }), makeRosterEntry({ id: "p2", display_name: "Marlow", role: "teen" })],
-      [
-        { id: "ent-cat001", kind: "pet", name: "Miso", description: null, source: "hub", confirmed_by_person_id: "p1" },
-        { id: "ent-dog001", kind: "pet", name: "Pip", description: null, source: "hub", confirmed_by_person_id: "p1" },
-      ],
-      [],
-      [{ id: "robot-1", kind: "robot", name: "Bramble", area: "Kitchen", capabilities: [] }],
-    );
-    try {
-      const view = renderFamilyPage(makePerson());
-      await waitFor(() => expect(view.getByRole("tab", { name: /Pets\s*2/ })).toBeTruthy());
-      expect(view.getByRole("tab", { name: /People\s*2/ })).toBeTruthy();
-      expect(view.getByRole("tab", { name: /Bots\s*1/ })).toBeTruthy();
-    } finally { restore(); }
-  });
-
-  test("Pets shows the shared empty state when no pets exist", async () => {
-    const restore = mockFamilyFetch([], []);
-    try {
-      renderFamilyPage(makePerson(), "/people?tab=pets");
-      await waitFor(() => expect(document.body.textContent).toContain("Nothing here yet."));
-    } finally { restore(); }
-  });
-
-  test("Bots uses the household robot endpoint for an admin", async () => {
-    const restore = mockFamilyFetch([], [], [], [{ id: "robot-1", kind: "robot", name: "Bramble", area: "Kitchen", capabilities: [] }]);
-    const fetchMock = globalThis.fetch as unknown as ReturnType<typeof mock>;
-    try {
-      renderFamilyPage(makePerson({ role: "admin" }), "/people?tab=bots");
-      await waitFor(() => expect(document.body.textContent).toContain("Bramble"));
-      expect(document.body.textContent).toContain("Kitchen");
-      expect(fetchMock).toHaveBeenCalledWith(expect.stringContaining("/api/devices/robots"), expect.anything());
-      expect(fetchMock).not.toHaveBeenCalledWith(expect.stringContaining("/api/devices\""), expect.anything());
-    } finally { restore(); }
-  });
-
-  test("Bots shows the shared empty state when no robots exist", async () => {
-    const restore = mockFamilyFetch([], [], [], []);
-    try {
-      renderFamilyPage(makePerson(), "/people?tab=bots");
-      await waitFor(() => expect(document.body.textContent).toContain("No robots yet."));
-    } finally { restore(); }
-  });
-
-  test("everyone sees every robot and who it belongs to, and an adult has no management control", async () => {
-    const restore = mockFamilyFetch([], [], [], [
-      { id: "robot-1", kind: "robot", name: "Bramble", area: null, capabilities: [], ownerName: "Sage", ownerId: "p-owner", state: { activity: "idle", muted: false, tracking: false, reachable: true, unreachableSince: null } },
-    ]);
-    try {
-      const view = renderFamilyPage(makePerson({ role: "adult" }), "/people?tab=bots");
-      await waitFor(() => expect(view.getByText("Bramble")).toBeTruthy());
-      expect(view.getByText(/Belongs to Sage/)).toBeTruthy();
-      for (const name of ["Settings", "Forget this robot", "Cancel install", "Remove Bramble"]) expect(view.queryByRole("button", { name })).toBeNull();
-      expect(view.getByRole("button", { name: "Mute microphone" })).toBeTruthy();
-    } finally { restore(); }
-  });
-
-  test("a child sees the robot and its owner but has no controls", async () => {
-    const restore = mockFamilyFetch([], [], [], [
-      { id: "robot-1", kind: "robot", name: "Bramble", area: null, capabilities: [], ownerName: "Sage", ownerId: "p-owner", state: { activity: "idle", muted: false, tracking: false, reachable: true, unreachableSince: null } },
-    ]);
-    try {
-      const view = renderFamilyPage(makePerson({ role: "child" }), "/people?tab=bots");
-      await waitFor(() => expect(view.getByText("Bramble")).toBeTruthy());
-      expect(view.getByText(/Belongs to Sage/)).toBeTruthy();
-      expect(view.queryByRole("button", { name: "Mute microphone" })).toBeNull();
-      expect(view.queryByRole("button", { name: "Live view" })).toBeNull();
-    } finally { restore(); }
-  });
-
+test("the People tour validates and opens on the family directory", async () => {
+  const tour = defaultManifest.contributes.tours[2]!;
+  expect(Tour.safeParse(tour).success).toBe(true);
+  const restore = mockFamilyFetch([entry()]);
+  try {
+    const view = render(makePerson());
+    await waitFor(() => expect(view.getByRole("heading", { name: "Family" })).toBeTruthy());
+    expect(view.getByTestId("family-person-p1")).toBeTruthy();
+  } finally { restore(); }
 });
 
-// NEXT-RETIRE-02C: the "tab lives in the URL" cases from the retired old-shell
-// apps/people/PeoplePage.test.tsx, restated for the live ?tab= parameter.
-describe("FamilyPage tab lives in the URL", () => {
-  function Location() {
-    const location = useLocation();
-    return <div data-testid="location">{location.pathname + location.search}</div>;
-  }
+test("the family page shows each person and their assigned companion chip", async () => {
+  const companion = { id: "c1", name: "Clover", type: "adult", type_label: "Adult", tagline: "A friend", who_can_use: "Everyone", dials: [], voice: "", is_default: true, is_household: true, portrait: null, status: "ready", chats: 0, can_edit: false, can_copy: false };
+  const detail = { ...companion, about: "", pronouns: null, interests: [], examples: [], voice_value: "", voice_is_own: false, voice_setting: null, used_by: { people: [{ id: "p1", name: "Sage" }], robots: [] } };
+  const restore = mockFamilyFetch([entry(), entry({ id: "p2", display_name: "Marlow", role: "teen", age_band: "teen" })], [], [], [companion], detail);
+  try {
+    const view = render(makePerson());
+    await waitFor(() => expect(view.getByText("Clover")).toBeTruthy());
+    expect(view.getByTestId("family-person-p1").textContent).toContain("Companion");
+    expect(view.getByTestId("family-person-p2").textContent).toContain("Marlow");
+    expect(view.queryByRole("link", { name: /companions/i })).toBeNull();
+  } finally { restore(); }
+});
 
-  function renderWithLocation(path: string) {
-    return renderWithQueryClient(
-      <MemoryRouter initialEntries={[path]}>
-        <Location />
-        <FamilyPage person={makePerson()} />
-      </MemoryRouter>,
-    );
-  }
+test("owners cannot open a teen profile, while the teen can open their own", async () => {
+  const roster = [entry(), entry({ id: "p2", display_name: "Marlow", role: "teen", age_band: "teen" }), entry({ id: "p3", display_name: "Nova", role: "child", age_band: "child" })];
+  const restore = mockFamilyFetch(roster);
+  try {
+    render(makePerson());
+    await waitFor(() => expect(document.querySelector('[data-testid="family-person-p2"]')).toBeTruthy());
+    expect(document.querySelector('a[href="/people/p3"]')).not.toBeNull();
+    expect(document.querySelector('a[href="/people/p2"]')).toBeNull();
+  } finally { restore(); cleanup(); }
+  const restoreTeen = mockFamilyFetch(roster);
+  try {
+    render(makePerson({ id: "p2", display_name: "Marlow", role: "teen" }));
+    await waitFor(() => expect(document.querySelector('a[href="/people/p2"]')).toBeTruthy());
+  } finally { restoreTeen(); }
+});
 
-  test("a stray or unknown ?tab= value falls back to People, not a blank tab", async () => {
-    const restore = mockFamilyFetch([makeRosterEntry()]);
-    try {
-      const view = renderWithLocation("/people?tab=nonsense");
-      await waitFor(() => expect(view.getByRole("tab", { name: /^People/ }).getAttribute("aria-selected")).toBe("true"));
-    } finally {
-      restore();
-    }
-  });
+test("pets and robots appear as family members only when the household has them", async () => {
+  const restore = mockFamilyFetch([entry()], [
+    { id: "pet1", kind: "pet", name: "Miso", description: "Orange cat", source: "hub", confirmed_by_person_id: "p1" },
+  ], [{ id: "robot1", kind: "robot", name: "Rover", area: "Living room", online: true, capabilities: [] }]);
+  try {
+    const view = render(makePerson());
+    await waitFor(() => expect(view.getByTestId("family-pet-pet1")).toBeTruthy());
+    expect(view.getByTestId("family-robot-robot1").textContent).toContain("Online");
+    expect(view.getByText("Pets and robots")).toBeTruthy();
+  } finally { restore(); }
+  cleanup();
+  const restoreEmpty = mockFamilyFetch([entry()]);
+  try {
+    const view = render(makePerson());
+    await waitFor(() => expect(view.getByTestId("family-person-p1")).toBeTruthy());
+    await waitFor(() => expect(view.queryByText("Loading family members")).toBeNull());
+    expect(view.queryByText("Pets and robots")).toBeNull();
+  } finally { restoreEmpty(); }
+});
 
-  test("switching tabs updates the URL, and returning to People clears it", async () => {
-    const restore = mockFamilyFetch([makeRosterEntry()]);
-    try {
-      const view = renderWithLocation("/people");
-      fireEvent.mouseDown(await view.findByRole("tab", { name: /^Pets/ }), { button: 0 });
-      fireEvent.click(view.getByRole("tab", { name: /^Pets/ }));
-      await waitFor(() => expect(view.getByTestId("location").textContent).toBe("/people?tab=pets"));
-      fireEvent.mouseDown(view.getByRole("tab", { name: /^People/ }), { button: 0 });
-      fireEvent.click(view.getByRole("tab", { name: /^People/ }));
-      await waitFor(() => expect(view.getByTestId("location").textContent).toBe("/people"));
-    } finally {
-      restore();
-    }
-  });
+test("a failed household fetch offers retry", async () => {
+  const original = globalThis.fetch;
+  globalThis.fetch = mock(() => Promise.resolve(new Response(JSON.stringify({ error: "Something broke" }), { status: 500 }))) as unknown as typeof fetch;
+  try {
+    render(makePerson());
+    await waitFor(() => expect(document.body.textContent).toContain("Try again"));
+  } finally { globalThis.fetch = original; }
 });
