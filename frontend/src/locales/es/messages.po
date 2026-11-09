@@ -3991,8 +3991,9 @@ msgstr "Azelma"
 #: src/apps/setup/SetupReviewPage.tsx:62
 #: src/shell/pages/companionFlow/AnimateStep.tsx:152
 #: src/shell/pages/companionFlow/CustomizeStep.tsx:194
-#: src/shell/pages/packageAppHeaderBar.tsx:91
+#: src/shell/pages/packageAppHeaderBar.tsx:94
 #: src/shell/pages/PackageAppPage.tsx:280
+#: src/shell/pages/PackageAppPage.tsx:281
 #: src/shell/pages/settings/settingsBackLink.ts:51
 #: src/shell/pages/settings/settingsBackLink.ts:56
 #: src/shell/pages/SignInPage.tsx:187
@@ -23784,6 +23785,7 @@ msgid "area.Search"
 msgstr "Búsqueda"
 
 #. js-lingui-explicit-id
+#: src/shell/pages/packageAppHeaderBar.tsx:107
 #: src/shell/pages/PackageAppPage.tsx:280
 msgid "Search {name}"
 msgstr ""
