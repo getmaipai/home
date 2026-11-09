@@ -439,7 +439,7 @@ export const contextNode: Node<ContextInput, ContextOutput> = async (state, inpu
     memoryTrace = {
       profile: card ? card.lines.map((line) => line.id) : [],
       injected: matches.map((m) => ({ id: m.record.id, score: Math.round(m.score * 1000) / 1000 })),
-      ...(synth ? { companion: companionTrace } : {}),
+      ...(companionTrace.length > 0 ? { companion: companionTrace } : {}),
     };
 
     // THIN-0F (rules 4 and 12, ported from the old engine file's episode
