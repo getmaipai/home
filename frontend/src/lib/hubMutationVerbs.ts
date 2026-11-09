@@ -3,6 +3,7 @@ import { i18n } from "@lingui/core";
 /** I18N-B2: the "Could not ${verb}." sentence of useHubMutation, one catalog message per verb. Every `verb:` a screen passes has a row
  * here (hubMutationVerbs.test.ts walks the source); a verb with no row falls back to the English sentence, so a new call site never breaks. */
 const COULD_NOT: Record<string, () => string> = {
+  "cancel the schedule": () => i18n._({ id: "Could not cancel the schedule.", message: "Could not cancel the schedule." }),
   "change the timer": () => i18n._({ id: "Could not change the timer.", message: "Could not change the timer." }),
   "change this chat's companion": () => i18n._({ id: "Could not change this chat's companion.", message: "Could not change this chat's companion." }),
   "complete engine setup": () => i18n._({ id: "Could not complete engine setup.", message: "Could not complete engine setup." }),
