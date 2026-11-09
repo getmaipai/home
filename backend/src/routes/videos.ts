@@ -15,6 +15,7 @@ import { cancelVideoJob, clipUrl, getVideoJobFor, getVideoJobByFileFor, plainVid
 import { plainStageLabel } from "@/lib/jobQueueCopy";
 import { promptRefusalLineFor } from "@/lib/pictures/ageCheck";
 import { CHILD_NEGATIVE_PROMPT, CHILD_VIDEO_LIMIT_LINE, forceCartoon, kidsDailyVideos, laneOf, releaseKid, reserveKid, videoModelForLane, videosMadeToday } from "@/lib/pictures/lane";
+import { estimateVideoMinutes } from "@/lib/videos/estimate";
 import { checkVideoPrompt } from "@/lib/videos/promptCheck";
 import { householdAllowsVideo, refuseVideoPrompt, stackAudienceFor, videoDenial, VIDEO_DENIAL_LINE, VIDEO_REFUSAL_LINE, type VideoAudience } from "@/lib/videos/policy";
 import { laneOfPerson } from "@/lib/pictures/laneGate";
@@ -448,6 +449,14 @@ videosRoutes.openapi(checkPromptRoute, (c) => {
   const body = c.req.valid("json");
   return c.json({ findings: checkVideoPrompt(body.prompt, { seconds: body.seconds }) }, 200);
 });
+
+// VIDEO-ESTIMATE-01: the "about N min" under the Length and Level choices; this home's own finished clips only.
+const estimateRoute = createRoute({
+  method: "get", path: "/estimate", tags: ["Videos"], summary: "About how long a clip like this takes in this home", middleware: [requireAuth] as const,
+  request: { query: z.object({ seconds: z.coerce.number().int().min(1).max(30), tier: z.enum(["standard", "boost", "max"]).default("standard") }) },
+  responses: { 200: { content: { "application/json": { schema: z.object({ minutes: z.number().nullable().describe("Rounded minutes, or null when too few clips like this have been made here."), samples: z.number(), note: z.string() }) } }, description: "The estimate" }, ...errorResponses({ 401: "Not signed in" }) },
+});
+videosRoutes.openapi(estimateRoute, (c) => c.json(estimateVideoMinutes(c.req.valid("query")), 200));
 
 const animateRoute = createRoute({
   method: "post", path: "/animate", tags: ["Videos"], summary: "Animate a picture", middleware: [requireAuth] as const,
