@@ -199,7 +199,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `frontend/src/shell/AmbientCompanionPane.tsx` | AMBIENT_QUICK_ACTIONS, ambientQuickActionsForApp, ambientQuickActionPrompt, readAmbientPaneState, isProtectedReply, ambientHistoryItems |
 | `frontend/src/shell/BrowserAlerts.tsx` | shouldShowBrowserAlert, requestBrowserAlertPermission, BrowserAlerts |
 | `frontend/src/shell/GlobalMiniPlayer.tsx` | onPlayPageOf, GlobalMiniPlayer |
-| `frontend/src/shell/InstallDock.tsx` | makingJobs, buildDock, InstallDock |
+| `frontend/src/shell/InstallDock.tsx` | makingJobs, buildDock, finishedLine, InstallDock |
 | `frontend/src/shell/InstallDockRow.tsx` | InstallDockRow |
 | `frontend/src/shell/InstallStrip.tsx` | installTitle, InstallStrip |
 | `frontend/src/shell/MediaHubFrame.tsx` | MediaHubFrame |
