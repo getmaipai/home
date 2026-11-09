@@ -15,10 +15,9 @@ import { Label } from "@maipai/ui/src/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@maipai/ui/src/dashboard/components/ui/select";
 import { Textarea } from "@maipai/ui/src/ui/textarea";
 import { getIcon } from "@maipai/ui/src/icons";
-import { toast } from "sonner";
+import { StatusCard } from "@maipai/ui/src/elements/status-card";
 import { api, isOwnerOrAdminRole, type Roster, type StatusBoard as StatusBoardData, type StatusMaintenance } from "@/lib/api";
 import { formatMaintenanceRange, relativePostedTime, statusParts } from "@/shell/pages/status/statusBoardFormat";
-import { StatusCard } from "@maipai/ui/src/elements/status-card";
 import { errorLine } from "@/lib/hubReachability";
 
 export const STATUS_BOARD_QUERY_KEY = ["status-board"];
@@ -36,9 +35,10 @@ function dateOnly(date: Date): string {
 export function StatusBoardNotes({ person, note }: { person: Roster; note: StatusBoardData["note"] }) {
   const admin = isOwnerOrAdminRole(person.role);
   const client = useQueryClient();
-  const clear = useMutation({ mutationFn: () => api.clearStatusNote(), onSuccess: async () => { await client.invalidateQueries({ queryKey: STATUS_BOARD_QUERY_KEY }); }, onError: (error) => toast.error(errorLine(error, i18n._({ id: "Could not clear the note.", message: "Could not clear the note." }))) });
+  const clear = useMutation({ mutationFn: () => api.clearStatusNote(), onSuccess: async () => { await client.invalidateQueries({ queryKey: STATUS_BOARD_QUERY_KEY }); }, });
   const InfoIcon = getIcon("info");
   return <div className="flex flex-col gap-4">
+    {clear.isError ? <StatusCard kind="problem" title={i18n._({ id: "That did not work", message: "That did not work" })} line={errorLine(clear.error, i18n._({ id: "Could not clear the note.", message: "Could not clear the note." }))} /> : null}
     {note ? <Alert>
       <InfoIcon className="size-5 text-primary" aria-hidden="true" />
       <div className="min-w-0"><AlertTitle>{note.body}</AlertTitle><AlertDescription>{i18n._({ id: "Posted by {name}, {when}", message: "Posted by {name}, {when}", values: { name: note.posted_by_name, when: relativePostedTime(note.posted_at) } })}</AlertDescription></div>
@@ -58,13 +58,14 @@ export function StatusMaintenanceBody({ admin, windows }: { admin: boolean; wind
 function MaintenanceRow({ window, admin }: { window: StatusMaintenance; admin: boolean }) {
   const [confirm, setConfirm] = useState(false);
   const client = useQueryClient();
-  const cancel = useMutation({ mutationFn: () => api.cancelMaintenance(window.id), onSuccess: async () => { await client.invalidateQueries({ queryKey: STATUS_BOARD_QUERY_KEY }); setConfirm(false); }, onError: (error) => toast.error(errorLine(error, i18n._({ id: "Could not cancel maintenance.", message: "Could not cancel maintenance." }))) });
+  const cancel = useMutation({ mutationFn: () => api.cancelMaintenance(window.id), onSuccess: async () => { await client.invalidateQueries({ queryKey: STATUS_BOARD_QUERY_KEY }); setConfirm(false); }, onError: () => setConfirm(false) });
   const names = window.components.map((id) => statusParts().find((part) => part.id === id)?.name).filter((name) => name !== undefined);
   return <div className="flex flex-col gap-2 py-4 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
     <div className="min-w-0 flex-1">
       <div className="flex flex-wrap items-center gap-2"><h3 className="font-medium">{window.title}</h3><Badge variant={window.status === "cancelled" ? "outline" : window.status === "in_progress" ? "default" : "secondary"}>{statusLabel(window.status)}</Badge></div>
       {window.description ? <p className="truncate text-sm text-muted-foreground">{window.description}</p> : null}
       <p className="text-sm text-muted-foreground">{names.join(", ")}</p>
+      {cancel.isError ? <StatusCard kind="problem" title={i18n._({ id: "That did not work", message: "That did not work" })} line={errorLine(cancel.error, i18n._({ id: "Could not cancel maintenance.", message: "Could not cancel maintenance." }))} /> : null}
       <p className="text-sm">{formatMaintenanceRange(window.starts_at, window.ends_at)}</p>
       {window.rrule ? <p className="text-sm text-muted-foreground">{window.until ? i18n._({ id: "Repeats until {date}", message: "Repeats until {date}", values: { date: window.until } }) : i18n._({ id: "Repeats with no end date", message: "Repeats with no end date" })}</p> : null}
     </div>

@@ -12,6 +12,7 @@ import { api, ApiError, type ResolvedSetting } from "@/lib/api";
 import type { KitSettingsKey } from "@/shell/pages/settings/settingsViewer";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@maipai/ui/src/dashboard/components/ui/alert-dialog";
 import { errorLine } from "@/lib/hubReachability";
+import { StatusCard } from "@maipai/ui/src/elements/status-card";
 
 interface SettingsRendererProps {
   scope: "household" | "person" | "device";
@@ -179,7 +180,7 @@ export function SettingsRenderer({ scope, scopeValue, only, includeKeys, titleOv
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-      {writeError ? <div className="rounded-lg bg-muted px-3 py-2 text-sm text-destructive">{writeError}</div> : null}
+      {writeError ? <StatusCard kind="problem" title={i18n._({ id: "That did not work", message: "That did not work" })} line={writeError} /> : null}
       <AsyncState
         data={data}
         error={error}

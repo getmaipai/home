@@ -1,6 +1,7 @@
 // VIDEO-LORA-08 (settings-media 5.5): the style editor, a kit Dialog (flow) so an unlocked page is never left. About, Try this style and Remove, Who can use it
 // (and the Adults only switch), Added to the prompt, Avoid with Say instead, Strength, Details. Every change saves at once and says so. Turning Adults only on
 // is free; turning it off asks, and asks for the passcode again when the source said adult (design 15.1).
+import { StatusCard } from "@maipai/ui/src/elements/status-card";
 import { i18n } from "@lingui/core";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
@@ -74,7 +75,7 @@ export function StyleEditor({ row, person, onClose, onChanged }: { row: StyleRow
             <DialogTitle size="xl">{row.name}</DialogTitle>
             <DialogDescription id="style-editor-desc">{i18n._({ id: "Changes save as you make them.", message: "Changes save as you make them." })}</DialogDescription>
           </DialogHeader>
-          <div role="status" aria-live="polite" className={status && !status.ok ? "text-sm text-destructive" : "text-sm text-muted-foreground"}>{status?.text ?? ""}</div>
+          {status && !status.ok ? <StatusCard kind="problem" title={i18n._({ id: "That did not work", message: "That did not work" })} line={status.text} /> : <div role="status" aria-live="polite" className="text-sm text-muted-foreground">{status?.text ?? ""}</div>}
           <DialogBody columns="two">
             <div className="flex flex-col gap-6">
               <DialogSection title={i18n._({ id: "About", message: "About" })}>

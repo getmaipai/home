@@ -231,7 +231,8 @@ describe("StoragePage", () => {
         return button!;
       });
       fireEvent.click(confirmButton);
-      await waitFor(() => expect(toastError).toHaveBeenCalledWith("Home could not clear the saved copies. Check that Home is running and try again."));
+      await waitFor(() => expect(document.body.textContent).toContain("Home could not clear the saved copies. Check that Home is running and try again."));
+      expect(toastError).not.toHaveBeenCalled();
     } finally { globalThis.fetch = originalFetch; }
   });
 

@@ -3,7 +3,6 @@ import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import { PageHeaderTitle } from "@/shell/pageHeaderTitle";
 import { Link, Navigate } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { toast } from "sonner";
 import { StatusCard } from "@maipai/ui/src/elements/status-card";
 import { ProjectSettingsDialog, type ProjectSettingsValue } from "@maipai/ui/src/elements/project-settings";
 import { EmptyState, EmptyStateGreeting } from "@maipai/ui/src/elements/empty-state";
@@ -93,6 +92,7 @@ export function ProjectsPage({ person }: { person: Roster }) {
   const [pinProblem, setPinProblem] = useState("");
   const refresh = () => queryClient.invalidateQueries({ queryKey });
   const saveSettings = async (patch: Partial<ProjectSettingsValue>) => {
+    setPinProblem("");
     if (dialog?.kind === "create") {
       try {
         await api.createChatProject({
@@ -104,7 +104,7 @@ export function ProjectsPage({ person }: { person: Roster }) {
         });
         await refresh();
       } catch (error) {
-        toast.error(i18n._({ id: "Could not make that project. Try again.", message: "Could not make that project. Try again." }));
+        setPinProblem(i18n._({ id: "Could not make that project. Try again.", message: "Could not make that project. Try again." }));
         throw error;
       }
       return;
@@ -114,16 +114,17 @@ export function ProjectsPage({ person }: { person: Roster }) {
       await api.updateChatFolder(editingProject.id, patch);
       await refresh();
     } catch (error) {
-      toast.error(i18n._({ id: "Could not save that project. Try again.", message: "Could not save that project. Try again." }));
+      setPinProblem(i18n._({ id: "Could not save that project. Try again.", message: "Could not save that project. Try again." }));
       throw error;
     }
   };
   const deleteProject = editingProject?.access === "manage" ? async () => {
+    setPinProblem("");
     try {
       await api.deleteChatFolder(editingProject.id);
       await refresh();
     } catch (error) {
-      toast.error(i18n._({ id: "Could not delete that project. Try again.", message: "Could not delete that project. Try again." }));
+      setPinProblem(i18n._({ id: "Could not delete that project. Try again.", message: "Could not delete that project. Try again." }));
       throw error;
     }
   } : undefined;

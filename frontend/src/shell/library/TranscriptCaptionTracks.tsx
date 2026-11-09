@@ -1,3 +1,5 @@
+import { StatusCard } from "@maipai/ui/src/elements/status-card";
+import { errorLine } from "@/lib/hubReachability";
 import { i18n } from "@lingui/core";
 // The caption tracks of a transcript, on the Export tab: which are up to date and which need refreshing.
 import { useEffect, useState } from "react";
@@ -23,7 +25,9 @@ export function CaptionTracks({ transcript }: { transcript: Transcript }) {
   const [languages, setLanguages] = useState<Array<{ code: string; name: string }>>([]);
   const [target, setTarget] = useState("es");
   const [busy, setBusy] = useState(false);
-  const [message, setMessage] = useState("");
+  const [message, setMessageRaw] = useState("");
+  const [problem, setProblem] = useState("");
+  const setMessage = (text: string) => { setProblem(""); setMessageRaw(text); };
 
   // A revision change (an edit, an undo) can make a track stale, so the list is read again each time.
   useEffect(() => {
@@ -53,7 +57,8 @@ export function CaptionTracks({ transcript }: { transcript: Transcript }) {
       }
       setMessage(job.state === "done" ? "Done. The video with captions is a new file in your Library." : job.error ?? BURN_FAILED);
     } catch (error) {
-      setMessage(error instanceof ApiError && [400, 404, 413].includes(error.status) ? error.message : BURN_FAILED);
+      setMessage("");
+      setProblem(error instanceof ApiError && [400, 404, 413].includes(error.status) ? errorLine(error, BURN_FAILED) : BURN_FAILED);
     } finally {
       setBusy(false);
     }
@@ -106,7 +111,8 @@ export function CaptionTracks({ transcript }: { transcript: Transcript }) {
         setMessage(job.error ?? TRANSLATE_FAILED);
       }
     } catch (error) {
-      setMessage(error instanceof ApiError && [400, 403, 404, 413].includes(error.status) ? error.message : TRANSLATE_FAILED);
+      setMessage("");
+      setProblem(error instanceof ApiError && [400, 403, 404, 413].includes(error.status) ? errorLine(error, TRANSLATE_FAILED) : TRANSLATE_FAILED);
     } finally {
       setBusy(false);
     }
@@ -174,6 +180,7 @@ export function CaptionTracks({ transcript }: { transcript: Transcript }) {
             {i18n._({ id: "Translate", message: "Translate" })}</Button>
         </div>
       ) : null}
+      {problem ? <StatusCard kind="problem" title={i18n._({ id: "That did not work", message: "That did not work" })} line={problem} /> : null}
       <p role="status" className="text-sm text-muted-foreground">
         {message}
       </p>

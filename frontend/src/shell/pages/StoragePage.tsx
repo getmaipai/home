@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
+import { StatusCard } from "@maipai/ui/src/elements/status-card";
 import { AsyncState } from "@maipai/ui/src/primitives/AsyncState";
 import { getIcon } from "@maipai/ui/src/icons";
 import { QuotaBanner } from "@maipai/ui/src/elements/quota-banner";
@@ -118,15 +119,18 @@ export function StoragePage({ person }: { person: Roster }) {
   const cacheQuery = useQuery<PackageCacheSourceRow[]>({ queryKey: ["storage-package-cache"], queryFn: () => api.packageCacheSources(), enabled: isAdmin });
   const client = useQueryClient();
   const [clearAllOpen, setClearAllOpen] = useState(false);
+  const [clearProblem, setClearProblem] = useState("");
 
   async function clear(source?: string, label?: string) {
+    setClearProblem("");
     try {
       const result = await api.clearPackageCache(source);
       await client.invalidateQueries({ queryKey: ["storage-package-cache"] });
       toast.success(label ? i18n._({ id: "Cleared {count, plural, one {# saved copy} other {# saved copies}} ({size}) from {source}.", message: "Cleared {count, plural, one {# saved copy} other {# saved copies}} ({size}) from {source}.", values: { count: result.removed, size: formatBytes(result.bytes), source: label } }) : i18n._({ id: "Cleared {count, plural, one {# saved copy} other {# saved copies}} ({size}) from all sources.", message: "Cleared {count, plural, one {# saved copy} other {# saved copies}} ({size}) from all sources.", values: { count: result.removed, size: formatBytes(result.bytes) } }));
       setClearAllOpen(false);
     } catch {
-      toast.error(i18n._({ id: "Home could not clear the saved copies. Check that Home is running and try again.", message: "Home could not clear the saved copies. Check that Home is running and try again." }));
+      setClearAllOpen(false);
+      setClearProblem(i18n._({ id: "Home could not clear the saved copies. Check that Home is running and try again.", message: "Home could not clear the saved copies. Check that Home is running and try again." }));
     }
   }
 
@@ -139,7 +143,7 @@ export function StoragePage({ person }: { person: Roster }) {
       errorMessage={errorLine(query.error, i18n._({ id: "Could not load storage.", message: "Could not load storage." }))}
       loadingLabel={i18n._({ id: "Loading storage", message: "Loading storage" })}
     >
-      {(data: StorageUsageOverview) => <StorageContent data={data} person={person} isAdmin={isAdmin} cacheRows={cacheQuery.data ?? []} cacheLoading={cacheQuery.isLoading} clearAllOpen={clearAllOpen} setClearAllOpen={setClearAllOpen} clear={clear} />}
+      {(data: StorageUsageOverview) => <StorageContent data={data} person={person} isAdmin={isAdmin} cacheRows={cacheQuery.data ?? []} cacheLoading={cacheQuery.isLoading} clearAllOpen={clearAllOpen} setClearAllOpen={setClearAllOpen} clear={clear} clearProblem={clearProblem} />}
     </AsyncState>
   );
 }
@@ -162,7 +166,7 @@ function HouseholdTotal({ household }: { household: StorageUsageOverview["househ
   );
 }
 
-function StorageContent({ data, person, isAdmin, cacheRows, cacheLoading, clearAllOpen, setClearAllOpen, clear }: { data: StorageUsageOverview; person: Roster; isAdmin: boolean; cacheRows: PackageCacheSourceRow[]; cacheLoading: boolean; clearAllOpen: boolean; setClearAllOpen: (open: boolean) => void; clear: (source?: string, label?: string) => Promise<void> }) {
+function StorageContent({ data, person, isAdmin, cacheRows, cacheLoading, clearAllOpen, setClearAllOpen, clear, clearProblem }: { data: StorageUsageOverview; person: Roster; isAdmin: boolean; cacheRows: PackageCacheSourceRow[]; cacheLoading: boolean; clearAllOpen: boolean; setClearAllOpen: (open: boolean) => void; clear: (source?: string, label?: string) => Promise<void>; clearProblem: string }) {
   const rows = [...data.people.map(toRow), ...(data.household && data.household.inherited.files > 0 ? [inheritedRow(data.household.inherited)] : [])];
   const model = useDataTableModel(rows, tableColumns<PersonUsageRow>(["person", "role", "used", "cap", "top kind"], {
     person: 180,
@@ -179,6 +183,7 @@ function StorageContent({ data, person, isAdmin, cacheRows, cacheLoading, clearA
         <SettingsRenderer scope="household" scopeValue="household" only={["household.storage"]} />
         <BackupsSection person={person} />
         <PlainSection heading={i18n._({ id: "Saved online data", message: "Saved online data" })}>
+          {clearProblem ? <StatusCard kind="problem" title={i18n._({ id: "That did not work", message: "That did not work" })} line={clearProblem} /> : null}
           <p className="text-body text-muted-foreground">{i18n._({ id: "Saved copies of weather, news and other things Home looked up online. Your own chats, memories and the news shelf stay. Home will fetch cleared data again the next time someone asks.", message: "Saved copies of weather, news and other things Home looked up online. Your own chats, memories and the news shelf stay. Home will fetch cleared data again the next time someone asks." })}</p>
           <DataTable
             columns={cacheColumns()}

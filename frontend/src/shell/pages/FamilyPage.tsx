@@ -7,12 +7,12 @@ import { Avatar } from "@maipai/ui/src/primitives/Avatar";
 import { Card } from "@maipai/ui/src/primitives/Card";
 import { Chip } from "@maipai/ui/src/primitives/Chip";
 import { Badge } from "@maipai/ui/src/ui/badge";
-import { Button } from "@maipai/ui/src/ui/button";
 import { getIcon } from "@maipai/ui/src/icons";
 import { ROLE_LABELS, isProfileClosedTo } from "@/apps/people/roles";
 import { api, type DeviceInfo, type Entity, type PersonRosterEntry, type Roster, type CompanionList, type CompanionDetail } from "@/lib/api";
 import { useTabItem } from "@/shell/tabIdentity";
 import { errorLine } from "@/lib/hubReachability";
+import { StatusCard } from "@maipai/ui/src/elements/status-card";
 
 const PawIcon = getIcon("paw-print");
 const BotIcon = getIcon("bot");
@@ -47,8 +47,8 @@ export function FamilyPage({ person }: { person: Roster }) {
           <header className="flex flex-wrap items-center justify-between gap-4">
             <div><h1 className="sr-only">{i18n._({ id: "Family", message: "Family" })}</h1><p className="text-supporting text-muted-foreground">{count}</p></div>
           </header>
-          {petsQuery.isError ? <div role="alert" className="flex items-center gap-3 text-supporting text-destructive">{i18n._({ id: "Could not load pets.", message: "Could not load pets." })}<Button variant="ghost" size="sm" onClick={() => void petsQuery.refetch()}>{i18n._({ id: "Try again", message: "Try again" })}</Button></div> : null}
-          {robotsQuery.isError ? <div role="alert" className="flex items-center gap-3 text-supporting text-destructive">{i18n._({ id: "Could not load robots.", message: "Could not load robots." })}<Button variant="ghost" size="sm" onClick={() => void robotsQuery.refetch()}>{i18n._({ id: "Try again", message: "Try again" })}</Button></div> : null}
+          {petsQuery.isError ? <StatusCard kind="problem" title={i18n._({ id: "That did not work", message: "That did not work" })} line={i18n._({ id: "Could not load pets.", message: "Could not load pets." })} action={{ label: i18n._({ id: "Try again", message: "Try again" }), onSelect: () => void petsQuery.refetch() }} /> : null}
+          {robotsQuery.isError ? <StatusCard kind="problem" title={i18n._({ id: "That did not work", message: "That did not work" })} line={i18n._({ id: "Could not load robots.", message: "Could not load robots." })} action={{ label: i18n._({ id: "Try again", message: "Try again" }), onSelect: () => void robotsQuery.refetch() }} /> : null}
 
           <section className="flex flex-col gap-3" aria-labelledby="family-people-heading">
             <div className="flex items-center justify-between"><h2 id="family-people-heading" className="text-section font-semibold">{i18n._({ id: "People", message: "People" })}</h2></div>

@@ -1,7 +1,6 @@
 import { i18n } from "@lingui/core";
 import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { toast } from "sonner";
 import { AsyncState } from "@maipai/ui/src/primitives/AsyncState";
 import { getIcon } from "@maipai/ui/src/icons";
 import { DataTable, type DataTableColumn } from "@maipai/ui/src/elements/data-table";
@@ -80,6 +79,7 @@ export function UpdatesPage({ person }: { person: Roster }) {
   const canManage = isOwnerOrAdminRole(person.role);
   const query = useQuery<UpdateProjection>({ queryKey: ["updates"], queryFn: () => api.updates(), enabled: canManage });
   const queryClient = useQueryClient();
+  const [problem, setProblem] = useState("");
   const [busyIds, setBusyIds] = useState<ReadonlySet<string>>(new Set());
   const [rollbackTargets, setRollbackTargets] = useState<Record<string, string>>({});
   const [pendingRollback, setPendingRollback] = useState<{ name: string; tag: string } | null>(null);
@@ -88,10 +88,11 @@ export function UpdatesPage({ person }: { person: Roster }) {
 
   async function withBusy(id: string, run: () => Promise<void>) {
     setBusyIds((previous) => new Set(previous).add(id));
+    setProblem("");
     try {
       await run();
     } catch (error) {
-      toast.error(errorLine(error, i18n._({ id: "That didn't work.", message: "That didn't work." })));
+      setProblem(errorLine(error, i18n._({ id: "That didn't work. Try again.", message: "That didn't work. Try again." })));
     } finally {
       setBusyIds((previous) => {
         const next = new Set(previous);
@@ -125,6 +126,7 @@ export function UpdatesPage({ person }: { person: Roster }) {
 
   return (
     <>
+      {problem ? <StatusCard kind="problem" title={i18n._({ id: "That did not work", message: "That did not work" })} line={problem} /> : null}
       {!canManage ? (
         <p className="text-base text-muted-foreground">{i18n._({ id: "Only an owner or admin can manage updates.", message: "Only an owner or admin can manage updates." })}</p>
       ) : (

@@ -14,6 +14,7 @@ import { installTitle } from "@/shell/InstallStrip";
 
 const PLACEHOLDER = () => i18n._({ id: "Ask anything", message: "Ask anything" });
 const SparklesIcon = getIcon("sparkles");
+const SendIcon = getIcon("arrow-up");
 const STARTERS = STARTER_SUGGESTIONS.slice(0, 3);
 
 /** The install strip's own line while an install is moving, else null (one wording, InstallStrip.tsx). */
@@ -59,10 +60,10 @@ export function AskBox() {
 
   return (
     <div data-testid="home-ask" className="flex flex-col gap-3">
-      {down === undefined ? null : <img src="/setup-art/warming-up.webp" alt="" width={1312} height={1190} className="h-auto w-24 max-w-full sm:w-32" />}
+      {down === undefined ? null : <img src="/setup-art/warming-up.webp" alt="" width={1312} height={1190} className="h-auto w-16 max-w-full sm:w-20" />}
       <form onSubmit={submit} className="flex items-center gap-2">
         <Input ref={inputRef} value={text} onChange={(event) => setText(event.target.value)} placeholder={placeholder} aria-label={i18n._({ id: "Ask", message: "Ask" })} maxLength={2000} shape="pill" fill="surface" leading={<SparklesIcon />} />
-        <Button type="submit" variant="inverse" shape="pill" size="control" aria-disabled={text.trim() === "" || undefined}>{i18n._({ id: "Ask", message: "Ask" })}</Button>
+        <Button type="submit" variant="ghost" shape="pill" size="icon-control" aria-label={i18n._({ id: "Send", message: "Send" })} aria-disabled={text.trim() === "" || undefined}><SendIcon aria-hidden /></Button>
       </form>
       <div data-testid="home-suggestions" className="flex w-full flex-nowrap gap-2 overflow-x-auto [&>*]:shrink-0 [&>*]:whitespace-nowrap [&::-webkit-scrollbar]:hidden">
         {STARTERS.map((starter) => (

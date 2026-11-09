@@ -2,15 +2,14 @@ import { i18n } from "@lingui/core";
 import { useSharedReads } from "@/lib/sharedReads";
 import { useQuery } from "@tanstack/react-query";
 
-import { Link } from "react-router-dom";
 import { useIncognitoContext } from "@/shell/incognitoContext";
-import { Chip } from "@maipai/ui/src/primitives/Chip";
 import { RouteSkeleton } from "@maipai/ui/src/primitives/RouteSkeleton";
 import { isOwnerOrAdminRole, type Roster } from "@/lib/api";
 import { api } from "@/lib/api";
 import { Greeting } from "@/shell/pages/dashboard/Greeting";
 import { AskBox } from "@/shell/pages/dashboard/AskBox";
 import { TodaySection } from "@/shell/pages/dashboard/TodaySection";
+import { Attention } from "@/shell/pages/dashboard/Attention";
 import { GettingStarted } from "@/shell/pages/dashboard/GettingStarted";
 import { useTabItem } from "@/shell/tabIdentity";
 import { ContinueShelf, FamilyShelf, HomeMedia } from "@/shell/pages/dashboard/HomeShelves";
@@ -42,26 +41,26 @@ export function DashboardPage({ person }: { person: Roster }) {
 
   const renderBlock = (block: HomeBlockId) => {
     switch (block) {
-      case "greeting": return <div key={block} className="lg:col-span-8"><Greeting displayName={person.display_name} familyName={familyName.data?.value} /></div>;
-      case "admin": return admin ? <nav key={block} aria-label={i18n._({ id: "Looking after your hub", message: "Looking after your hub" })} className="flex flex-nowrap gap-2 overflow-x-auto [&::-webkit-scrollbar]:hidden lg:col-span-4"><Chip tone="surface" size="strip"><Link to="/updates">{i18n._({ id: "Updates", message: "Updates" })}</Link></Chip><Chip tone="surface" size="strip"><Link to="/repairs">{i18n._({ id: "Repairs", message: "Repairs" })}</Link></Chip></nav> : null;
-      case "ask": return <div key={block} className="lg:col-span-8"><AskBox /></div>;
-      case "media_continue": return (media.data?.continue.length || continueRows.data?.rows?.length) ? <div key={block} className="lg:col-span-12"><HomeMedia kind="continue" /></div> : null;
-      case "media_new": return media.data?.new.length ? <div key={block} className="lg:col-span-12"><HomeMedia kind="new" /></div> : null;
-      case "media_made": return media.data?.made_at_home.length ? <div key={block} className="lg:col-span-12"><HomeMedia kind="made_at_home" /></div> : null;
+      case "greeting": return <div key={block} className="md:col-span-2 lg:col-span-12"><Greeting displayName={person.display_name} familyName={familyName.data?.value} /></div>;
+      case "admin": return admin ? <div key={block} className="md:col-span-2 lg:col-span-12"><Attention /></div> : null;
+      case "ask": return <div key={block} className="lg:col-span-8 md:col-span-2"><AskBox /></div>;
+      case "media_continue": return (media.data?.continue.length || continueRows.data?.rows?.length) ? <div key={block} className="md:col-span-2 lg:col-span-12"><HomeMedia kind="continue" /></div> : null;
+      case "media_new": return media.data?.new.length ? <div key={block} className="md:col-span-2 lg:col-span-12"><HomeMedia kind="new" /></div> : null;
+      case "media_made": return media.data?.made_at_home.length ? <div key={block} className="md:col-span-2 lg:col-span-12"><HomeMedia kind="made_at_home" /></div> : null;
       case "hero": return widgets.data?.hero ? <TodaySection home={widgets.data} heroOnly role={person.role} key={block} /> : null;
       case "pick_up": return incognito || person.role === "guest" ? null : <div key={block} className="lg:col-span-6"><ContinueShelf /></div>;
       case "today_chips": return widgets.data ? <TodaySection key={block} home={widgets.data} chips role={person.role} /> : null;
       case "today": return widgets.data ? <TodaySection key={block} home={widgets.data} role={person.role} /> : null;
       case "family": return incognito || person.role === "guest" || !people.data?.length ? null : <div key={block} className="lg:col-span-6"><FamilyShelf viewer={person} incognito={incognito} /></div>;
-      case "getting_started": return admin ? <div key={block} className="lg:col-span-12"><GettingStarted person={person} /></div> : null;
+      case "getting_started": return admin ? <div key={block} className="md:col-span-2 lg:col-span-12"><GettingStarted person={person} /></div> : null;
     }
   };
 
   return (
-    <div className="flex flex-col gap-8 pb-4 lg:gap-10">
-      <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-12">
+    <div className="flex flex-col pb-4">
+      <div className="grid grid-cols-1 gap-x-6 gap-y-8 md:grid-cols-2 lg:grid-cols-12 lg:gap-y-10">
       {!widgets.data && !widgets.isError ? <div className="md:col-span-2 lg:col-span-12"><RouteSkeleton label={i18n._({ id: "Loading Home", message: "Loading Home" })} /></div> : null}
-      {widgets.isError ? <p role="alert" className="md:col-span-2 lg:col-span-12 text-sm text-muted-foreground">{i18n._({ id: "Could not load Home cards. Refresh Home to try again.", message: "Could not load Home cards. Refresh Home to try again." })}</p> : null}
+      {widgets.isError ? <p role="alert" className="md:col-span-2 lg:col-span-12 text-supporting text-muted-foreground">{i18n._({ id: "Could not load Home cards. Refresh Home to try again.", message: "Could not load Home cards. Refresh Home to try again." })}</p> : null}
       {blocks.map(renderBlock)}
       </div>
     </div>

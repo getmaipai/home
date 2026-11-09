@@ -9,6 +9,7 @@ import { isOwnerOrAdminRole, type Roster } from "@/lib/api";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@maipai/ui/src/dashboard/components/ui/collapsible";
 import { Item, ItemActions, ItemContent, ItemDescription, ItemGroup, ItemTitle } from "@maipai/ui/src/dashboard/components/ui/item";
 import { AnswerBlockView } from "@maipai/ui/src/elements/answer-block";
+import { Section } from "@maipai/ui/src/primitives/Section";
 import { RouteSkeleton } from "@maipai/ui/src/primitives/RouteSkeleton";
 import { formatRelativeLong } from "@/lib/format";
 import { api, type HomeWidgets, type WidgetData, type WidgetDescriptor } from "@/lib/api";
@@ -19,6 +20,9 @@ const displayTitle = (widget: WidgetDescriptor) => widget.package === "almanac-d
   : widget.package === "remind" && widget.id === "upcoming" ? i18n._({ id: "Next up", message: "Next up" })
   : widget.package === "timer" && widget.id === "running" ? i18n._({ id: "Timers", message: "Timers" })
   : widget.title;
+
+/** A value too long to sit beside its title (a headline digest) is drawn as a line under it instead. */
+const longValue = (value: unknown): boolean => typeof value === "string" && value.length > 24;
 
 interface Slot { widget: WidgetDescriptor; data: WidgetData; stale: boolean }
 
@@ -75,7 +79,7 @@ export function TodaySection({ home, heroOnly = false, chips = false, role }: { 
   const heroQuery = useQuery({ queryKey: ["home-hero"], queryFn: () => home?.hero ? api.widgetData(home.hero.package, home.hero.id) : Promise.resolve(undefined), enabled: Boolean(home?.hero), retry: false });
 
   if (!home && list.isPending) return <RouteSkeleton label={i18n._({ id: "Loading Today", message: "Loading Today" })} />;
-  if (!home && list.isError) return <p role="alert" className="text-sm text-muted-foreground">{i18n._({ id: "Could not load Today. Refresh Home to try again.", message: "Could not load Today. Refresh Home to try again." })}</p>;
+  if (!home && list.isError) return <p role="alert" className="text-supporting text-muted-foreground">{i18n._({ id: "Could not load Today. Refresh Home to try again.", message: "Could not load Today. Refresh Home to try again." })}</p>;
   const visibleSlots = slots.filter((slot) => {
     const item = slot.data.items.length === 1 ? slot.data.items[0] : undefined;
     const sentenceOnlyEmpty = Boolean(item && !item.value && !item.subtitle && (
@@ -111,8 +115,9 @@ export function TodaySection({ home, heroOnly = false, chips = false, role }: { 
               <ItemContent>
                 <ItemTitle className="text-row font-semibold">{item.title}</ItemTitle>
                 {item.subtitle ? <ItemDescription className="text-supporting">{item.subtitle}</ItemDescription> : null}
+                {longValue(item.value) && !item.at ? <ItemDescription className="text-supporting">{item.value}</ItemDescription> : null}
               </ItemContent>
-              {item.at || item.value ? <ItemActions>{item.at ? formatRelativeLong(item.at) : item.value}</ItemActions> : null}
+              {item.at || (item.value && !longValue(item.value)) ? <ItemActions>{item.at ? formatRelativeLong(item.at) : item.value}</ItemActions> : null}
             </Item>
           ))}
         </ItemGroup>
@@ -125,14 +130,15 @@ export function TodaySection({ home, heroOnly = false, chips = false, role }: { 
     const key = (slot: Slot) => `${slot.widget.package}/${slot.widget.id}`;
     const opened = visibleSlots.find((slot) => key(slot) === open);
     return (
-      <section aria-label={i18n._({ id: "Today", message: "Today" })} className="flex flex-col gap-3 lg:col-span-12">
-        <h2 className="text-base leading-snug font-medium">{i18n._({ id: "Today", message: "Today" })}</h2>
+      <section aria-label={i18n._({ id: "Today", message: "Today" })} className="md:col-span-2 lg:col-span-12">
+        <Section variant="flat" heading={i18n._({ id: "Today", message: "Today" })}>
         <div className="flex flex-nowrap gap-2 overflow-x-auto [&>*]:shrink-0 [&>*]:whitespace-nowrap [&::-webkit-scrollbar]:hidden">
           {visibleSlots.map((slot) => (
             <Chip key={key(slot)} tone="surface" size="strip" selected={open === key(slot)} selectedTone="inverse" aria-expanded={open === key(slot)} onClick={() => setOpen(open === key(slot) ? null : key(slot))}>{displayTitle(slot.widget)}</Chip>
           ))}
         </div>
         {opened ? <div className="max-w-xl">{cards([opened])}</div> : null}
+        </Section>
       </section>
     );
   }
@@ -147,9 +153,9 @@ export function TodaySection({ home, heroOnly = false, chips = false, role }: { 
   return (
     <>
     {heroSlot ? <section aria-label={i18n._({ id: "Home highlight", message: "Home highlight" })} className="lg:col-span-4"><div data-testid="home-hero"><Card surface="flat"><div className="text-row font-semibold">{heroSlot.widget.title}</div><ItemGroup>{heroSlot.data.items.map((item, index) => <Item key={`${item.title}-${index}`} size="sm"><ItemContent><ItemTitle>{item.title}</ItemTitle>{item.subtitle ? <ItemDescription className="text-supporting">{item.subtitle}</ItemDescription> : null}</ItemContent>{item.value ? <ItemActions>{item.value}</ItemActions> : null}</Item>)}</ItemGroup></Card></div></section> : null}
-    <section aria-label={i18n._({ id: "Today", message: "Today" })} className="flex flex-col gap-3 lg:col-span-12">
-      <h2 className="text-base leading-snug font-medium">{i18n._({ id: "Today", message: "Today" })}</h2>
-      <div className="flex gap-3 overflow-x-auto [&>*]:w-72 [&>*]:shrink-0 lg:[&>*]:w-auto [&::-webkit-scrollbar]:hidden lg:grid lg:grid-cols-3 lg:flex-wrap lg:overflow-visible">{cards(first)}</div>
+    <section aria-label={i18n._({ id: "Today", message: "Today" })} className="md:col-span-2 lg:col-span-12">
+      <Section variant="flat" heading={i18n._({ id: "Today", message: "Today" })}>
+      <div className="flex snap-x gap-3 overflow-x-auto [&>*]:w-72 [&>*]:shrink-0 [&>*]:snap-start lg:[&>*]:w-auto [&::-webkit-scrollbar]:hidden lg:grid lg:grid-cols-3 lg:flex-wrap lg:overflow-visible">{cards(first)}</div>
       {rest.length === 0 ? null : (
         <Collapsible>
           <CollapsibleTrigger render={<Button variant="outline" size="row" />}>{i18n._({ id: "More", message: "More" })}</CollapsibleTrigger>
@@ -158,6 +164,7 @@ export function TodaySection({ home, heroOnly = false, chips = false, role }: { 
           </CollapsibleContent>
         </Collapsible>
       )}
+      </Section>
     </section>
     </>
   );

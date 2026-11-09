@@ -5,7 +5,6 @@ import { i18n } from "@lingui/core";
 import { useMemo, useState, type ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link, useNavigate } from "react-router-dom";
-import { toast } from "sonner";
 import { CreationHeader } from "@maipai/ui/src/elements/creation-header";
 import { MediaViewer, type MediaViewerItem } from "@maipai/ui/src/elements/media-viewer";
 import { MusicTrack } from "@maipai/ui/src/elements/music-track";
@@ -62,6 +61,7 @@ function Details({ item, me, actions }: { item: LibraryItem; me: Roster; actions
   const [panelOpen, setPanelOpen] = useState(false);
   const navigate = useNavigate();
   const [splitting, setSplitting] = useState(false);
+  const [stemsProblem, setStemsProblem] = useState("");
   const [cutOpen, setCutOpen] = useState(false);
   const cut = useCutToBeatDialog({ open: cutOpen, onOpenChange: setCutOpen, me, seed: item.kind === "audio" ? { trackId: item.id } : { clipId: item.id } });
   const [musicOpen, setMusicOpen] = useState(false);
@@ -95,12 +95,13 @@ function Details({ item, me, actions }: { item: LibraryItem; me: Roster; actions
         <div className="flex flex-wrap gap-2">
           <Button type="button" variant="secondary" onClick={() => actions.rename(item)}>{i18n._({ id: "Rename", message: "Rename" })}</Button>
           {!kept ? <Button type="button" variant="secondary" onClick={() => actions.keep(item)}>{i18n._({ id: "Keep", message: "Keep" })}</Button> : null}
-          {isAdultRole(me) && item.kind === "audio" && !record.data?.music ? <Button type="button" variant="secondary" disabled={splitting} onClick={() => { setSplitting(true); void musicApi.stemsFromFile(item.id).then((card) => { if (card.conversation_id) navigate(`/chat?conversation=${encodeURIComponent(card.conversation_id)}`); }).catch((error: unknown) => toast.error(errorLine(error, "The stems could not be made. Try again in a minute."))).finally(() => setSplitting(false)); }}>{i18n._({ id: "Split into stems", message: "Split into stems" })}</Button> : null}
+          {isAdultRole(me) && item.kind === "audio" && !record.data?.music ? <Button type="button" variant="secondary" disabled={splitting} onClick={() => { setSplitting(true); setStemsProblem(""); void musicApi.stemsFromFile(item.id).then((card) => { if (card.conversation_id) navigate(`/chat?conversation=${encodeURIComponent(card.conversation_id)}`); }).catch((error: unknown) => setStemsProblem(errorLine(error, i18n._({ id: "The stems could not be made. Try again in a minute.", message: "The stems could not be made. Try again in a minute." })))).finally(() => setSplitting(false)); }}>{i18n._({ id: "Split into stems", message: "Split into stems" })}</Button> : null}
           {isAdultRole(me) && (item.kind === "audio" || item.kind === "video") ? <Button type="button" variant="secondary" onClick={() => setCutOpen(true)}>{i18n._({ id: "Cut to the beat", message: "Cut to the beat" })}</Button> : null}
           {isAdultRole(me) && item.kind === "video" && item.origin === "made" && item.chat_id ? <Button type="button" variant="secondary" onClick={() => setMusicOpen(true)}>{i18n._({ id: "Add music", message: "Add music" })}</Button> : null}
           {isAdultRole(me) && item.kind === "image" && item.audience === "adult-only" ? <Button type="button" variant="secondary" onClick={() => actions.recheck(item)}>{i18n._({ id: "Mark all-ages", message: "Mark all-ages" })}</Button> : null}
         </div>
       ) : null}
+      {stemsProblem ? <StatusCard kind="problem" title={i18n._({ id: "That did not work", message: "That did not work" })} line={stemsProblem} /> : null}
       {mine && isAdultRole(me) && item.kind === "audio" ? <p className="text-sm text-muted-foreground">{i18n._({ id: "Cuts your videos on the beat of this song. Everything stays on this home server.", message: "Cuts your videos on the beat of this song. Everything stays on this home server." })}</p> : null}
       <Dialog open={musicOpen} onOpenChange={setMusicOpen}><DialogContent><DialogHeader><DialogTitle>{i18n._({ id: "Add music", message: "Add music" })}</DialogTitle></DialogHeader>
         <div className="flex flex-col gap-2"><KitLabel htmlFor="music-choice">{i18n._({ id: "Music", message: "Music" })}</KitLabel><Select value={addMusic.choice} onValueChange={(value) => addMusic.setChoice(value ?? NEW_MUSIC)}><SelectTrigger id="music-choice"><SelectValue /></SelectTrigger><SelectContent><SelectItem value={NEW_MUSIC}>{i18n._({ id: "Make new music for this video", message: "Make new music for this video" })}</SelectItem>{addMusic.songs.map((song) => <SelectItem key={song.id} value={song.id}>{song.name}</SelectItem>)}</SelectContent></Select></div>

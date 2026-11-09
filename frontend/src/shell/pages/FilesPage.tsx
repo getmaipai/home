@@ -1,3 +1,4 @@
+import { errorLine } from "@/lib/hubReachability";
 import { i18n } from "@lingui/core";
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore, type CSSProperties } from "react";
 import { PageHeaderTitle } from "@/shell/pageHeaderTitle";
@@ -16,6 +17,7 @@ import { Select } from "@maipai/ui/src/primitives/Select";
 import { Button } from "@maipai/ui/src/ui/button";
 import { Input } from "@maipai/ui/src/ui/input";
 import { Alert, AlertDescription } from "@maipai/ui/src/ui/alert";
+import { StatusCard } from "@maipai/ui/src/elements/status-card";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@maipai/ui/src/ui/dialog";
 import { api, ApiError, type LibraryItem, type LibraryQuery, type Roster } from "@/lib/api";
 import { useTabItem } from "@/shell/tabIdentity";
@@ -126,6 +128,8 @@ export function FilesPage({ person }: { person: Roster }) {
   const [selecting, setSelecting] = useState(false);
   const [confirm, setConfirm] = useState<LibraryItem[] | null>(null);
   const [renaming, setRenaming] = useState<LibraryItem | null>(null);
+  const [problem, setProblem] = useState("");
+  const [renameProblem, setRenameProblem] = useState("");
   const [renameText, setRenameText] = useState("");
   const [sharing, setSharing] = useState<LibraryItem[] | null>(null);
   const [busy, setBusy] = useState(false);
@@ -156,7 +160,7 @@ export function FilesPage({ person }: { person: Roster }) {
   const viewerList = useMemo(() => (deepItem && !loaded ? [deepItem, ...items] : items), [deepItem, loaded, items]);
   useEffect(() => {
     if (deep.isError && deepId) {
-      toast.error(deep.error instanceof ApiError && deep.error.message ? deep.error.message : i18n._({ id: "That file is not available to you. Ask the person who added it to share it again.", message: "That file is not available to you. Ask the person who added it to share it again." }));
+      setProblem(errorLine(deep.error, i18n._({ id: "That file is not available to you. Ask the person who added it to share it again.", message: "That file is not available to you. Ask the person who added it to share it again." })));
       update({ file: null });
     }
   }, [deep.isError, deep.error, deepId, update]);
@@ -171,14 +175,14 @@ export function FilesPage({ person }: { person: Roster }) {
       if (result.done.includes(view.file ?? "")) closeViewer();
       const sentence = batchSentence(result, (count) => count === 1 ? i18n._({ id: "‘{name}’ moved to Trash. Kept 30 days", message: "‘{name}’ moved to Trash. Kept 30 days", values: { name: targets.find((item) => item.id === result.done[0])?.name ?? i18n._({ id: "File", message: "File" }) } }) : i18n._({ id: "{count} files moved to Trash. Kept 30 days", message: "{count} files moved to Trash. Kept 30 days", values: { count } }), (count, reason) => result.done.length ? i18n._({ id: "{count, plural, one {# could not be moved: {reason}.} other {# could not be moved: {reason}.}}", message: "{count, plural, one {# could not be moved: {reason}.} other {# could not be moved: {reason}.}}", values: { count, reason } }) : i18n._({ id: "{count, plural, one {# could not be moved to Trash: {reason}.} other {# could not be moved to Trash: {reason}.}}", message: "{count, plural, one {# could not be moved to Trash: {reason}.} other {# could not be moved to Trash: {reason}.}}", values: { count, reason } }));
       const done = [...result.done];
-      if (done.length > 0) toast(sentence, { action: { label: i18n._({ id: "Undo", message: "Undo" }), onClick: () => { void actions.restore(done).then((back) => { if (back.refused.length) toast.error(batchSentence(back, (count) => i18n._({ id: "{count} restored", message: "{count} restored", values: { count } }), restoreFailed)); }); } } });
-      else toast.error(sentence);
+      if (done.length > 0) toast(sentence, { action: { label: i18n._({ id: "Undo", message: "Undo" }), onClick: () => { void actions.restore(done).then((back) => { if (back.refused.length) setProblem(batchSentence(back, (count) => i18n._({ id: "{count} restored", message: "{count} restored", values: { count } }), restoreFailed)); }); } } });
+      else setProblem(sentence);
     } finally { setBusy(false); }
   }, [actions, closeViewer, leaveSelection, view.file]);
 
   const requestTrash = useCallback((targets: readonly LibraryItem[]) => {
     const own = targets.filter((item) => item.owner.id === person.id);
-    if (own.length === 0) { toast.error(i18n._({ id: "That file is not yours to delete. Ask the person who added it.", message: "That file is not yours to delete. Ask the person who added it." })); return; }
+    if (own.length === 0) { setProblem(i18n._({ id: "That file is not yours to delete. Ask the person who added it.", message: "That file is not yours to delete. Ask the person who added it." })); return; }
     const sharedOne = own.length === 1 && (own[0]!.shared_with.count > 0 || own[0]!.shared_with.household);
     if (own.length === 1 && !sharedOne && targets.length === 1) void doTrash(own);
     else setConfirm([...targets]);
@@ -186,13 +190,13 @@ export function FilesPage({ person }: { person: Roster }) {
 
   const itemActions: ItemActions = useMemo(() => ({
     open: (item) => update({ file: item.id }, false),
-    rename: (item) => { setRenaming(item); setRenameText(item.name); },
-    keep: (item) => { void actions.keep([item]).then((result) => result.refused.length ? toast.error(batchSentence(result, () => "", keepFailed)) : toast(i18n._({ id: "‘{name}’ is kept until you delete it.", message: "‘{name}’ is kept until you delete it.", values: { name: item.name } }))); },
+    rename: (item) => { setRenameProblem(""); setRenaming(item); setRenameText(item.name); },
+    keep: (item) => { void actions.keep([item]).then((result) => result.refused.length ? setProblem(batchSentence(result, () => "", keepFailed)) : toast(i18n._({ id: "‘{name}’ is kept until you delete it.", message: "‘{name}’ is kept until you delete it.", values: { name: item.name } }))); },
     share: (item) => setSharing([item]),
     trash: (item) => requestTrash([item]),
     recheck: (item) => {
       toast(i18n._({ id: "Checking the picture. This can take a minute.", message: "Checking the picture. This can take a minute." }));
-      void actions.recheck(item.id).then(() => toast.success(i18n._({ id: "‘{name}’ is now marked all-ages.", message: "‘{name}’ is now marked all-ages.", values: { name: item.name } }))).catch((error: unknown) => toast.error(actions.reason(error)));
+      void actions.recheck(item.id).then(() => toast.success(i18n._({ id: "‘{name}’ is now marked all-ages.", message: "‘{name}’ is now marked all-ages.", values: { name: item.name } }))).catch((error: unknown) => setProblem(actions.reason(error)));
     },
   }), [actions, requestTrash, update]);
 
@@ -205,7 +209,7 @@ export function FilesPage({ person }: { person: Roster }) {
     return () => window.removeEventListener(LIBRARY_UPLOAD_EVENT, openUpload);
   }, [canAdd]);
   const [dragging, setDragging] = useState(false);
-  const addFiles = (files: readonly File[]) => { if (!canAdd) toast.error(CHILD_ADD()); else uploads.add(files); };
+  const addFiles = (files: readonly File[]) => { if (!canAdd) setProblem(CHILD_ADD()); else uploads.add(files); };
   useEffect(() => {
     const onPaste = (event: ClipboardEvent) => {
       if (editable(event.target)) return;
@@ -383,6 +387,7 @@ export function FilesPage({ person }: { person: Roster }) {
 
         <UploadTray cards={uploads.cards} onCancel={uploads.cancel} onRetry={uploads.retry} onDismiss={uploads.dismiss} />
         {dragging ? <div role="status" className="rounded-lg border-2 border-dashed border-primary p-6 text-center text-base">{i18n._({ id: "Drop to add to your Library", message: "Drop to add to your Library" })}</div> : null}
+        {problem ? <StatusCard kind="problem" title={i18n._({ id: "That did not work", message: "That did not work" })} line={problem} /> : null}
         {status}
         {!wide ? <div className="max-w-xl"><LibraryStorage me={person} /></div> : null}
       </div>
@@ -394,9 +399,10 @@ export function FilesPage({ person }: { person: Roster }) {
           <form onSubmit={(event) => {
             event.preventDefault();
             const target = renaming; if (!target) return;
-            void actions.rename(target.id, renameText).then(() => { setRenaming(null); toast.success(i18n._({ id: "Renamed.", message: "Renamed." })); }).catch((error: unknown) => toast.error(actions.reason(error)));
+            void actions.rename(target.id, renameText).then(() => { setRenaming(null); toast.success(i18n._({ id: "Renamed.", message: "Renamed." })); }).catch((error: unknown) => setRenameProblem(actions.reason(error)));
           }}>
             <DialogHeader><DialogTitle>{i18n._({ id: "Rename file", message: "Rename file" })}</DialogTitle><DialogDescription>{i18n._({ id: "Leave it empty to go back to the name Home chose.", message: "Leave it empty to go back to the name Home chose." })}</DialogDescription></DialogHeader>
+            {renameProblem ? <StatusCard kind="problem" title={i18n._({ id: "That did not work", message: "That did not work" })} line={renameProblem} /> : null}
             <label htmlFor="library-rename" className="text-base font-medium">{i18n._({ id: "Name", message: "Name" })}</label>
             <Input id="library-rename" value={renameText} maxLength={1000} onChange={(event) => setRenameText(event.target.value)} />
             <DialogFooter><Button type="button" variant="ghost" onClick={() => setRenaming(null)}>{i18n._({ id: "Cancel", message: "Cancel" })}</Button><Button type="submit">{i18n._({ id: "Save name", message: "Save name" })}</Button></DialogFooter>

@@ -242,28 +242,9 @@ export function AddRobotSection({ onClose }: { onClose?: () => void } = {}) {
           )}
         </div>
       ) : robotsQuery.isError ? (
-        <div className="flex max-w-sm flex-col gap-2">
-          <p className="text-base text-destructive">
-            {i18n._({ id: "Approved, but checking whether it finished pairing failed. It may still be paired - check the robot list below, or try again.", message: "Approved, but checking whether it finished pairing failed. It may still be paired - check the robot list below, or try again." })}
-          </p>
-          <div className="flex gap-2">
-            <Button variant="outline" onClick={() => robotsQuery.refetch()}>
-              {i18n._({ id: "Check again", message: "Check again" })}
-            </Button>
-            <Button variant="ghost" onClick={startOver}>
-              {i18n._({ id: "Start over", message: "Start over" })}
-            </Button>
-          </div>
-        </div>
+        <StatusCard kind="problem" title={i18n._({ id: "Needs a look", message: "Needs a look" })} line={i18n._({ id: "Approved, but checking whether it finished pairing failed. It may still be paired - check the robot list below, or try again.", message: "Approved, but checking whether it finished pairing failed. It may still be paired - check the robot list below, or try again." })} action={{ label: i18n._({ id: "Check again", message: "Check again" }), onSelect: () => void robotsQuery.refetch() }} secondary={{ label: i18n._({ id: "Start over", message: "Start over" }), onSelect: startOver }} />
       ) : presumedExpired ? (
-        <div className="flex max-w-sm flex-col items-start gap-2">
-          <p className="text-base text-destructive">
-            {i18n._({ id: "The robot hasn't finished pairing and the code has likely expired. Turn the robot's Wi-Fi setup back on so it speaks a fresh code, then try again.", message: "The robot hasn't finished pairing and the code has likely expired. Turn the robot's Wi-Fi setup back on so it speaks a fresh code, then try again." })}
-          </p>
-          <Button variant="outline" onClick={startOver}>
-            {i18n._({ id: "Start over", message: "Start over" })}
-          </Button>
-        </div>
+        <StatusCard kind="problem" title={i18n._({ id: "Needs a look", message: "Needs a look" })} line={i18n._({ id: "The robot hasn't finished pairing and the code has likely expired. Turn the robot's Wi-Fi setup back on so it speaks a fresh code, then try again.", message: "The robot hasn't finished pairing and the code has likely expired. Turn the robot's Wi-Fi setup back on so it speaks a fresh code, then try again." })} action={{ label: i18n._({ id: "Start over", message: "Start over" }), onSelect: startOver }} />
       ) : (
         <div className="flex max-w-sm flex-col items-start gap-2">
           <p className="text-base text-muted-foreground">

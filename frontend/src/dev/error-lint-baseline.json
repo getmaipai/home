@@ -1,18 +1,9 @@
 {
   "toastError": {
     "shell/RailProfile.tsx": 1,
-    "shell/AmbientCompanionPane.tsx": 5,
-    "shell/library/LibraryViewer.tsx": 1,
+    "shell/AmbientCompanionPane.tsx": 3,
     "shell/Routes.tsx": 2,
     "shell/useSideChat.tsx": 1,
-    "shell/pages/RepairsPage.tsx": 3,
-    "shell/pages/ProjectsPage.tsx": 3,
-    "shell/pages/status/StatusComponents.tsx": 2,
-    "shell/pages/status/StatusBoard.tsx": 2,
-    "shell/pages/FilesPage.tsx": 8,
-    "shell/pages/StoragePage.tsx": 1,
-    "shell/pages/UpdatesPage.tsx": 1,
-    "shell/pages/EnginesPage.tsx": 1,
     "lib/fitAsk.ts": 1,
     "lib/useHubMutation.ts": 1,
     "dev/i18n-codemod.fixture.tsx": 1,
@@ -31,22 +22,14 @@
     "shell/AmbientCompanionPane.tsx": 1,
     "shell/InstallDock.tsx": 1,
     "shell/GlobalMiniPlayer.tsx": 1,
-    "shell/pages/settings/SettingsRenderer.tsx": 1,
     "shell/pages/StatusPage.tsx": 1,
-    "shell/pages/FamilyPage.tsx": 2,
-    "apps/settings/EngineLinkCredentialSection.tsx": 2,
-    "apps/settings/AddRobotSection.tsx": 2,
-    "apps/settings/styles/StyleEditor.tsx": 1,
-    "apps/reminders/RemindersPage.tsx": 1,
-    "apps/clock/AlarmsTab.tsx": 2
+    "apps/settings/EngineLinkCredentialSection.tsx": 2
   },
   "rawErrorMessage": {
-    "shell/library/TranscriptCaptionTracks.tsx": 2,
     "shell/pages/MusicStudioView.tsx": 4,
     "shell/pages/MusicStudioPages.tsx": 2,
     "shell/pages/PackageAppPage.tsx": 1,
     "lib/voice/voicePreviewPlayer.ts": 1,
-    "apps/settings/StackChanInstallDialog.tsx": 1,
     "apps/chat/maxChat.ts": 2
   }
 }

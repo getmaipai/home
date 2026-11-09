@@ -9,6 +9,7 @@ import { TooltipIconButton } from "@maipai/ui/src/elements/tooltip-icon-button";
 import { getIcon } from "@maipai/ui/src/icons";
 import { AlertDialog, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@maipai/ui/src/dashboard/components/ui/alert-dialog";
 import { toast } from "sonner";
+import { StatusCard } from "@maipai/ui/src/elements/status-card";
 import { api, isOwnerOrAdminRole, request, type EngineComputerStatus as EngineComputerStatusData, type HealthStatus, type Roster, type EngineHealthEntry, type StatusHistory } from "@/lib/api";
 import { dayData, statusStripSummary } from "@/shell/pages/status/statusHistoryFormat";
 import "@/shell/pages/status/statusLegend.css";
@@ -79,19 +80,23 @@ export function StatusPartsBody({ person, health: initialHealth, maintenance = [
   // MEM-SPACE-03: other apps using memory, for admins only; one source per install state (the Mac app helper, else the Stack).
   const otherApps = useQuery({ queryKey: ["performance-other-apps"], enabled: canRestart && Boolean(history?.memory_ledger), refetchInterval: 30_000, queryFn: () => request<{ source: string; apps: { name: string; bytes: number }[] }>("/api/performance/other-apps").catch(() => ({ source: "none", apps: [] })) });
 
+  const [problem, setProblem] = useState("");
+
   async function handleRestart() {
     if (!pendingRole) return;
     const role = pendingRole;
     const row = engineRows().find((candidate) => candidate.key === role);
     if (!row) return;
     setRestartingRole(role);
+    setProblem("");
     try {
       await api.restartEngineRole(role);
       toast.success(i18n._({ id: "{name} restarted.", message: "{name} restarted.", values: { name: row.label } }));
       await query.refetch();
       setPendingRole(null);
     } catch (e) {
-      toast.error(errorLine(e, i18n._({ id: "Could not restart {name}.", message: "Could not restart {name}.", values: { name: row.label } })));
+      setPendingRole(null);
+      setProblem(errorLine(e, i18n._({ id: "Could not restart {name}.", message: "Could not restart {name}.", values: { name: row.label } })));
     } finally { setRestartingRole(null); }
   }
 
@@ -99,13 +104,14 @@ export function StatusPartsBody({ person, health: initialHealth, maintenance = [
     const row = engineRows().find((candidate) => candidate.key === role);
     if (!row) return;
     setChangingRole(role);
+    setProblem("");
     try {
       if (action === "stop") await api.stopEngineRole(role);
       else await api.startEngineRole(role);
       toast.success(action === "stop" ? i18n._({ id: "{name} stopped.", message: "{name} stopped.", values: { name: row.label } }) : i18n._({ id: "{name} started.", message: "{name} started.", values: { name: row.label } }));
       await query.refetch();
     } catch (e) {
-      toast.error(errorLine(e, action === "stop" ? i18n._({ id: "Could not stop {name}.", message: "Could not stop {name}.", values: { name: row.label } }) : i18n._({ id: "Could not start {name}.", message: "Could not start {name}.", values: { name: row.label } })));
+      setProblem(errorLine(e, action === "stop" ? i18n._({ id: "Could not stop {name}.", message: "Could not stop {name}.", values: { name: row.label } }) : i18n._({ id: "Could not start {name}.", message: "Could not start {name}.", values: { name: row.label } })));
     } finally { setChangingRole(null); }
   }
 
@@ -116,6 +122,7 @@ export function StatusPartsBody({ person, health: initialHealth, maintenance = [
   ];
 
   return <>
+      {problem ? <StatusCard kind="problem" title={i18n._({ id: "That did not work", message: "That did not work" })} line={problem} /> : null}
       {health.engines.chat.context_message ? <p className="py-2 text-sm text-muted-foreground">{health.engines.chat.context_message}</p> : null}
       {health.engines.chat.context_per_slot ? <p className="py-2 text-sm text-muted-foreground">{i18n._({ id: "Chat window: {tokens} tokens per slot ({slots, plural, one {# slot} other {# slots}}).", message: "Chat window: {tokens} tokens per slot ({slots, plural, one {# slot} other {# slots}}).", values: { tokens: formatNumber(health.engines.chat.context_per_slot), slots: health.engines.chat.context_slots } })}</p> : null}
       {rows.map((row) => {

@@ -34,7 +34,7 @@ msgid " · Pinned"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/status/StatusComponents.tsx:153
+#: src/shell/pages/status/StatusComponents.tsx:160
 msgid " A reply being written right now will be cut off."
 msgstr ""
 
@@ -60,12 +60,12 @@ msgid ", {size} free"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/styles/StyleEditor.tsx:155
+#: src/apps/settings/styles/StyleEditor.tsx:156
 msgid ", confirmed by an admin"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/styles/StyleEditor.tsx:155
+#: src/apps/settings/styles/StyleEditor.tsx:156
 msgid ", not confirmed yet"
 msgstr ""
 
@@ -75,17 +75,17 @@ msgid ", or cancel to leave things as they are"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/FilesPage.tsx:190
+#: src/shell/pages/FilesPage.tsx:194
 msgid "‘{name}’ is kept until you delete it."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/FilesPage.tsx:195
+#: src/shell/pages/FilesPage.tsx:199
 msgid "‘{name}’ is now marked all-ages."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/FilesPage.tsx:172
+#: src/shell/pages/FilesPage.tsx:176
 msgid "‘{name}’ moved to Trash. Kept 30 days"
 msgstr ""
 
@@ -125,7 +125,7 @@ msgid "{activeLabel}, {displayTime} remaining"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/styles/StyleEditor.tsx:118
+#: src/apps/settings/styles/StyleEditor.tsx:119
 msgid "{adultCheckLine} People under 18 never see styles."
 msgstr ""
 
@@ -160,27 +160,27 @@ msgid "{count, plural, one {# companion} other {# companions}}"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/FilesPage.tsx:309
+#: src/shell/pages/FilesPage.tsx:313
 msgid "{count, plural, one {# could not be deleted: {reason}.} other {# could not be deleted: {reason}.}}"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/FilesPage.tsx:73
+#: src/shell/pages/FilesPage.tsx:75
 msgid "{count, plural, one {# could not be kept: {reason}.} other {# could not be kept: {reason}.}}"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/FilesPage.tsx:172
+#: src/shell/pages/FilesPage.tsx:176
 msgid "{count, plural, one {# could not be moved to Trash: {reason}.} other {# could not be moved to Trash: {reason}.}}"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/FilesPage.tsx:172
+#: src/shell/pages/FilesPage.tsx:176
 msgid "{count, plural, one {# could not be moved: {reason}.} other {# could not be moved: {reason}.}}"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/FilesPage.tsx:72
+#: src/shell/pages/FilesPage.tsx:74
 msgid "{count, plural, one {# could not be restored: {reason}.} other {# could not be restored: {reason}.}}"
 msgstr ""
 
@@ -210,12 +210,12 @@ msgid "{count, plural, one {# file other people can still see will stay, kept by
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/StoragePage.tsx:83
+#: src/shell/pages/StoragePage.tsx:84
 msgid "{count, plural, one {# file} other {# files}}"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/FilesPage.tsx:67
+#: src/shell/pages/FilesPage.tsx:69
 msgid "{count, plural, one {# item} other {# items}}"
 msgstr ""
 
@@ -225,7 +225,7 @@ msgid "{count, plural, one {# kept because it is in use. } other {# kept because
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/FilesPage.tsx:331
+#: src/shell/pages/FilesPage.tsx:335
 msgid "{count, plural, one {# kept until you delete it} other {# kept until you delete them}}"
 msgstr ""
 
@@ -306,12 +306,12 @@ msgid "{count, plural, one {Delete # file forever?} other {Delete # files foreve
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/FilesPage.tsx:309
+#: src/shell/pages/FilesPage.tsx:313
 msgid "{count, plural, one {File deleted forever} other {# files deleted forever}}"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/FilesPage.tsx:308
+#: src/shell/pages/FilesPage.tsx:312
 msgid "{count, plural, one {File restored} other {# files restored}}"
 msgstr ""
 
@@ -326,7 +326,7 @@ msgid "{count, plural, one {Forget your memory? This cannot be undone.} other {F
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/reminders/RemindersPage.tsx:184
+#: src/apps/reminders/RemindersPage.tsx:185
 msgid "{count, plural, one {Its # item goes too.} other {Its # items go too.}}"
 msgstr ""
 
@@ -351,7 +351,7 @@ msgid "{count} did not finish. Try again. "
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/FilesPage.tsx:172
+#: src/shell/pages/FilesPage.tsx:176
 msgid "{count} files moved to Trash. Kept 30 days"
 msgstr ""
 
@@ -366,7 +366,7 @@ msgid "{count} of {total} could not be forgotten: {reason}"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/FilesPage.tsx:174
+#: src/shell/pages/FilesPage.tsx:178
 msgid "{count} restored"
 msgstr ""
 
@@ -397,12 +397,12 @@ msgid "{detail} ({took_ms} ms)"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/StackChanInstallDialog.tsx:98
+#: src/apps/settings/StackChanInstallDialog.tsx:99
 msgid "{detail} Check the USB cable and try again."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/StackChanInstallDialog.tsx:98
+#: src/apps/settings/StackChanInstallDialog.tsx:99
 msgid "{detail} Use Cancel install on the robot card before starting again."
 msgstr ""
 
@@ -560,7 +560,7 @@ msgid "{kind, select, band {That band was not saved. Try again.} album {That alb
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/StoragePage.tsx:69
+#: src/shell/pages/StoragePage.tsx:70
 msgid "{kind} ({size})"
 msgstr ""
 
@@ -636,7 +636,7 @@ msgid "notification.alarm.due"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/styles/StyleEditor.tsx:86
+#: src/apps/settings/styles/StyleEditor.tsx:87
 msgid "{length} of 140 characters"
 msgstr ""
 
@@ -707,20 +707,20 @@ msgid "{motors} switched off after a failed recovery"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/status/StatusComponents.tsx:55
+#: src/shell/pages/status/StatusComponents.tsx:56
 #: src/shell/pages/status/statusHistoryFormat.ts:12
 msgid "{n, plural, one {# day} other {# days}}"
 msgstr ""
 
 #. js-lingui-explicit-id
 #: src/shell/pages/status/statusAppHistory.ts:29
-#: src/shell/pages/status/StatusComponents.tsx:56
+#: src/shell/pages/status/StatusComponents.tsx:57
 msgid "{n, plural, one {# hour} other {# hours}}"
 msgstr ""
 
 #. js-lingui-explicit-id
 #: src/shell/pages/status/statusAppHistory.ts:30
-#: src/shell/pages/status/StatusComponents.tsx:57
+#: src/shell/pages/status/StatusComponents.tsx:58
 msgid "{n, plural, one {# minute} other {# minutes}}"
 msgstr ""
 
@@ -762,12 +762,12 @@ msgid "{name} comes with this part. You accepted its licence at the start; the t
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/AmbientCompanionPane.tsx:327
+#: src/shell/AmbientCompanionPane.tsx:333
 msgid "{name} companion pane"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/AmbientCompanionPane.tsx:320
+#: src/shell/AmbientCompanionPane.tsx:326
 msgid "{name} conversations"
 msgstr ""
 
@@ -837,7 +837,7 @@ msgid "{name} is thinking"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/status/StatusComponents.tsx:148
+#: src/shell/pages/status/StatusComponents.tsx:155
 msgid "{name} is using {gb} GB. Closing it gives big jobs more room."
 msgstr ""
 
@@ -888,7 +888,7 @@ msgid "{name} needs attention."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/status/StatusComponents.tsx:90
+#: src/shell/pages/status/StatusComponents.tsx:94
 msgid "{name} restarted."
 msgstr ""
 
@@ -903,17 +903,17 @@ msgid "{name} settings"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/AmbientCompanionPane.tsx:175
+#: src/shell/AmbientCompanionPane.tsx:179
 msgid "{name} speaks with {voice}"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/status/StatusComponents.tsx:105
+#: src/shell/pages/status/StatusComponents.tsx:111
 msgid "{name} started."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/status/StatusComponents.tsx:105
+#: src/shell/pages/status/StatusComponents.tsx:111
 msgid "{name} stopped."
 msgstr ""
 
@@ -1046,7 +1046,7 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/shell/pages/status/StatusApps.tsx:81
 #: src/shell/pages/status/StatusApps.tsx:94
-#: src/shell/pages/status/StatusComponents.tsx:129
+#: src/shell/pages/status/StatusComponents.tsx:136
 msgid "{percent}% uptime"
 msgstr ""
 
@@ -1122,12 +1122,12 @@ msgid "{running}. Ready: {available}."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/StackChanInstallDialog.tsx:106
+#: src/apps/settings/StackChanInstallDialog.tsx:107
 msgid "{saved} of {total} MB saved. The backup takes about 6 minutes; keep the cable in and this tab open."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/FilesPage.tsx:379
+#: src/shell/pages/FilesPage.tsx:383
 msgid "{shared}{access}You can get it back from Trash for 30 days."
 msgstr ""
 
@@ -1147,7 +1147,7 @@ msgid "{size} MB"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/StoragePage.tsx:158
+#: src/shell/pages/StoragePage.tsx:162
 msgid "{size} used, no cap set"
 msgstr ""
 
@@ -1274,7 +1274,7 @@ msgid "{title} was cancelled."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/status/StatusBoard.tsx:72
+#: src/shell/pages/status/StatusBoard.tsx:73
 msgid "{title} will be marked as cancelled."
 msgstr ""
 
@@ -1380,25 +1380,25 @@ msgid "0.1 to 2. Higher is livelier and also raises the pitch."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/library/LibraryViewer.tsx:114
+#: src/shell/library/LibraryViewer.tsx:115
 msgid "1 beat"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/status/StatusBoard.tsx:131
 #: src/shell/pages/status/StatusBoard.tsx:132
+#: src/shell/pages/status/StatusBoard.tsx:133
 msgid "1 day"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/status/StatusBoard.tsx:131
 #: src/shell/pages/status/StatusBoard.tsx:132
+#: src/shell/pages/status/StatusBoard.tsx:133
 msgid "1 hour"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/status/StatusBoard.tsx:131
 #: src/shell/pages/status/StatusBoard.tsx:132
+#: src/shell/pages/status/StatusBoard.tsx:133
 msgid "1 week"
 msgstr ""
 
@@ -1438,7 +1438,7 @@ msgid "setting.alarms.snooze_minutes.option_label.15"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/library/LibraryViewer.tsx:115
+#: src/shell/library/LibraryViewer.tsx:116
 msgid "15 seconds"
 msgstr ""
 
@@ -1448,7 +1448,7 @@ msgid "setting.ease.text_size.option_label.160"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/library/LibraryViewer.tsx:114
+#: src/shell/library/LibraryViewer.tsx:115
 msgid "2 beats"
 msgstr ""
 
@@ -1469,12 +1469,12 @@ msgid "30 days"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/library/LibraryViewer.tsx:115
+#: src/shell/library/LibraryViewer.tsx:116
 msgid "30 seconds"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/library/LibraryViewer.tsx:114
+#: src/shell/library/LibraryViewer.tsx:115
 msgid "4 beats (one bar)"
 msgstr ""
 
@@ -1494,7 +1494,7 @@ msgid "setting.alarms.snooze_minutes.option_label.60"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/library/LibraryViewer.tsx:115
+#: src/shell/library/LibraryViewer.tsx:116
 msgid "60 seconds"
 msgstr ""
 
@@ -1505,7 +1505,7 @@ msgid "7 days"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/library/LibraryViewer.tsx:114
+#: src/shell/library/LibraryViewer.tsx:115
 msgid "8 beats"
 msgstr ""
 
@@ -1586,7 +1586,7 @@ msgid "A file never says what age it is for. {value}"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/styles/StyleEditor.tsx:154
+#: src/apps/settings/styles/StyleEditor.tsx:155
 msgid "A file you added"
 msgstr ""
 
@@ -1841,7 +1841,7 @@ msgid "A wooden door creaking open in a quiet house"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/styles/StyleEditor.tsx:80
+#: src/apps/settings/styles/StyleEditor.tsx:81
 #: src/shell/pages/CompanionsPage.tsx:312
 #: src/shell/pages/CompanionsPage.tsx:319
 #: src/shell/pages/CompanionsPage.tsx:332
@@ -1889,7 +1889,7 @@ msgid "about {n} seconds left"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/status/StatusComponents.tsx:128
+#: src/shell/pages/status/StatusComponents.tsx:135
 msgid "About {name}"
 msgstr ""
 
@@ -1977,7 +1977,7 @@ msgid "Add {name} to favorites"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/styles/StyleEditor.tsx:137
+#: src/apps/settings/styles/StyleEditor.tsx:138
 msgid "Add a pair"
 msgstr ""
 
@@ -1987,7 +1987,7 @@ msgid "Add a person…"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/styles/StyleEditor.tsx:124
+#: src/apps/settings/styles/StyleEditor.tsx:125
 msgid "Add a phrase"
 msgstr ""
 
@@ -2008,8 +2008,8 @@ msgid "Add a robot"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/StackChanInstallDialog.tsx:118
-#: src/apps/settings/StackChanInstallDialog.tsx:122
+#: src/apps/settings/StackChanInstallDialog.tsx:119
+#: src/apps/settings/StackChanInstallDialog.tsx:123
 msgid "Add a StackChan"
 msgstr ""
 
@@ -2024,7 +2024,7 @@ msgid "Add a timer with the plus button."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/status/StatusBoard.tsx:94
+#: src/shell/pages/status/StatusBoard.tsx:95
 msgid "Add a title."
 msgstr ""
 
@@ -2035,7 +2035,7 @@ msgid "Add a voice"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/styles/StyleEditor.tsx:123
+#: src/apps/settings/styles/StyleEditor.tsx:124
 msgid "Add a word"
 msgstr ""
 
@@ -2098,7 +2098,7 @@ msgstr ""
 
 #. js-lingui-explicit-id
 #: src/shell/library/LibraryViewer.tsx:100
-#: src/shell/library/LibraryViewer.tsx:105
+#: src/shell/library/LibraryViewer.tsx:106
 msgid "Add music"
 msgstr ""
 
@@ -2134,7 +2134,7 @@ msgid "Add the first thing and we'll keep it here for you."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/library/LibraryViewer.tsx:110
+#: src/shell/library/LibraryViewer.tsx:111
 msgid "Add the music"
 msgstr ""
 
@@ -2201,7 +2201,7 @@ msgid "Added by {name}"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/styles/StyleEditor.tsx:122
+#: src/apps/settings/styles/StyleEditor.tsx:123
 msgid "Added to the prompt"
 msgstr ""
 
@@ -2415,8 +2415,8 @@ msgstr ""
 
 #. js-lingui-explicit-id
 #: src/apps/memory/PersonMemories.tsx:45
-#: src/apps/settings/styles/StyleEditor.tsx:114
-#: src/apps/settings/styles/StyleEditor.tsx:116
+#: src/apps/settings/styles/StyleEditor.tsx:115
+#: src/apps/settings/styles/StyleEditor.tsx:117
 #: src/apps/settings/styles/StylesTab.tsx:121
 #: src/shell/pages/CompanionAudienceDialog.tsx:51
 msgid "Adults only"
@@ -2591,7 +2591,7 @@ msgid "setting.synths.real_people.option_label.all"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/styles/StyleEditor.tsx:105
+#: src/apps/settings/styles/StyleEditor.tsx:106
 #: src/apps/settings/styles/StylesTab.tsx:128
 msgid "All adults"
 msgstr ""
@@ -2776,7 +2776,7 @@ msgid "Already set."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/styles/StyleEditor.tsx:124
+#: src/apps/settings/styles/StyleEditor.tsx:125
 msgid "Also add"
 msgstr ""
 
@@ -2893,6 +2893,11 @@ msgid "notification.engines.update_available"
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/shell/pages/dashboard/Attention.tsx:26
+msgid "An update is ready"
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/shell/pages/companionFlow/CompanionFlowDialog.tsx:16
 msgid "Animate Character"
 msgstr ""
@@ -2978,7 +2983,7 @@ msgid "setting.search.web.teen_mode.option.off"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/status/StatusComponents.tsx:26
+#: src/shell/pages/status/StatusComponents.tsx:27
 msgid "Answers your conversations."
 msgstr ""
 
@@ -3009,7 +3014,7 @@ msgid "Anyone, and any robot, using it goes back to Home's default voice. The re
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/status/StatusComponents.tsx:153
+#: src/shell/pages/status/StatusComponents.tsx:160
 msgid "Anything using it will pause for a moment.{value}"
 msgstr ""
 
@@ -3039,7 +3044,7 @@ msgid "App folders keep whatever an installed app saved until that app is remove
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/AmbientCompanionPane.tsx:177
+#: src/shell/AmbientCompanionPane.tsx:181
 msgid "Appearance"
 msgstr ""
 
@@ -3074,7 +3079,7 @@ msgstr ""
 #: src/apps/settings/ReferenceLibrarySettings.tsx:231
 #: src/apps/setup/HostTuneStep.tsx:128
 #: src/shell/library/TranscriptFindReplace.tsx:109
-#: src/shell/pages/UpdatesPage.tsx:156
+#: src/shell/pages/UpdatesPage.tsx:158
 msgid "Apply"
 msgstr ""
 
@@ -3116,12 +3121,12 @@ msgid "setting.media.allowlist_only.label"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/AddRobotSection.tsx:247
+#: src/apps/settings/AddRobotSection.tsx:245
 msgid "Approved, but checking whether it finished pairing failed. It may still be paired - check the robot list below, or try again."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/AddRobotSection.tsx:270
+#: src/apps/settings/AddRobotSection.tsx:251
 msgid "Approved. Waiting for the robot to finish pairing on its own end…"
 msgstr ""
 
@@ -3176,7 +3181,6 @@ msgid "Articles picked at random from the Wikipedia on this computer."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/dashboard/AskBox.tsx:64
 #: src/shell/pages/dashboard/AskBox.tsx:65
 msgid "Ask"
 msgstr ""
@@ -3212,7 +3216,7 @@ msgid "api.minor.upload_not_allowed_minor"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/FilesPage.tsx:68
+#: src/shell/pages/FilesPage.tsx:70
 msgid "Ask a grown-up to add this file. Adding files to the Library is turned off for your profile."
 msgstr ""
 
@@ -3264,7 +3268,7 @@ msgid "Ask one of them to finish this setup for your Home."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/FilesPage.tsx:48
+#: src/shell/pages/FilesPage.tsx:50
 msgid "Ask to add a file"
 msgstr ""
 
@@ -3310,12 +3314,12 @@ msgid "setting.robot.initiative.max_offers_per_hour.help"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/styles/StyleEditor.tsx:131
+#: src/apps/settings/styles/StyleEditor.tsx:132
 msgid "At the end"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/styles/StyleEditor.tsx:131
+#: src/apps/settings/styles/StyleEditor.tsx:132
 msgid "At the start"
 msgstr ""
 
@@ -3398,7 +3402,7 @@ msgid "available"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/UpdatesPage.tsx:52
+#: src/shell/pages/UpdatesPage.tsx:51
 msgid "Available"
 msgstr ""
 
@@ -3408,18 +3412,18 @@ msgid "Available once the song is finished."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/UpdatesPage.tsx:144
+#: src/shell/pages/UpdatesPage.tsx:146
 msgid "Available updates"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/styles/StyleEditor.tsx:136
 #: src/apps/settings/styles/StyleEditor.tsx:137
+#: src/apps/settings/styles/StyleEditor.tsx:138
 msgid "Avoid"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/styles/StyleEditor.tsx:137
+#: src/apps/settings/styles/StyleEditor.tsx:138
 msgid "Avoid, and say this instead"
 msgstr ""
 
@@ -3508,12 +3512,12 @@ msgid "Back to the song"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/StackChanInstallDialog.tsx:149
+#: src/apps/settings/StackChanInstallDialog.tsx:150
 msgid "Back up first, then install"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/StackChanInstallDialog.tsx:135
+#: src/apps/settings/StackChanInstallDialog.tsx:136
 msgid "Back up first, then install."
 msgstr ""
 
@@ -3523,7 +3527,7 @@ msgid "Back up now"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/StackChanInstallDialog.tsx:18
+#: src/apps/settings/StackChanInstallDialog.tsx:19
 msgid "Backing up"
 msgstr ""
 
@@ -3573,7 +3577,7 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/apps/settings/PerformanceSettings.tsx:19
 #: src/apps/setup/PerformanceStep.tsx:11
-#: src/shell/library/LibraryViewer.tsx:108
+#: src/shell/library/LibraryViewer.tsx:109
 msgid "Balanced"
 msgstr ""
 
@@ -3718,7 +3722,7 @@ msgid "area.Better voice"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/styles/StyleEditor.tsx:150
+#: src/apps/settings/styles/StyleEditor.tsx:151
 msgid "Between 0 and 2. The Create screen offers Less, Normal and More inside this range."
 msgstr ""
 
@@ -3795,7 +3799,7 @@ msgid "Blend with (optional)"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/status/StatusComponents.tsx:38
+#: src/shell/pages/status/StatusComponents.tsx:39
 msgid "Blocked"
 msgstr ""
 
@@ -4024,7 +4028,7 @@ msgid "setting.companions.ambient_bot.label"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/AmbientCompanionPane.tsx:177
+#: src/shell/AmbientCompanionPane.tsx:181
 msgid "Bot options"
 msgstr ""
 
@@ -4044,7 +4048,7 @@ msgid "Both"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/AmbientCompanionPane.tsx:176
+#: src/shell/AmbientCompanionPane.tsx:180
 msgid "Bots"
 msgstr ""
 
@@ -4054,7 +4058,7 @@ msgid "BPM"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/status/StatusComponents.tsx:26
+#: src/shell/pages/status/StatusComponents.tsx:27
 msgid "Brain"
 msgstr ""
 
@@ -4133,7 +4137,7 @@ msgid "Built-in synth"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/library/TranscriptCaptionTracks.tsx:141
+#: src/shell/library/TranscriptCaptionTracks.tsx:147
 msgid "Burn into video"
 msgstr ""
 
@@ -4221,8 +4225,8 @@ msgstr ""
 #: src/apps/chat/chatThreadSlots.tsx:271
 #: src/apps/people/ProfileForm.tsx:191
 #: src/apps/people/ProfileForm.tsx:196
-#: src/apps/reminders/RemindersPage.tsx:187
-#: src/apps/settings/AddRobotSection.tsx:277
+#: src/apps/reminders/RemindersPage.tsx:188
+#: src/apps/settings/AddRobotSection.tsx:258
 #: src/apps/settings/AddVoiceForm.tsx:86
 #: src/apps/settings/AiSlotDialog.tsx:151
 #: src/apps/settings/AssistantKeysSettings.tsx:98
@@ -4246,15 +4250,15 @@ msgstr ""
 #: src/shell/pages/ChatPage.tsx:1681
 #: src/shell/pages/CompanionAudienceDialog.tsx:64
 #: src/shell/pages/CompanionsPage.tsx:181
-#: src/shell/pages/FilesPage.tsx:402
+#: src/shell/pages/FilesPage.tsx:408
 #: src/shell/pages/settings/SettingField.tsx:149
 #: src/shell/pages/settings/SettingField.tsx:268
-#: src/shell/pages/settings/SettingsRenderer.tsx:168
-#: src/shell/pages/status/StatusBoard.tsx:71
-#: src/shell/pages/status/StatusComponents.tsx:153
-#: src/shell/pages/StoragePage.tsx:200
+#: src/shell/pages/settings/SettingsRenderer.tsx:169
+#: src/shell/pages/status/StatusBoard.tsx:72
+#: src/shell/pages/status/StatusComponents.tsx:160
+#: src/shell/pages/StoragePage.tsx:205
 #: src/shell/pages/TrashPage.tsx:64
-#: src/shell/pages/UpdatesPage.tsx:196
+#: src/shell/pages/UpdatesPage.tsx:198
 msgid "Cancel"
 msgstr ""
 
@@ -4270,7 +4274,7 @@ msgid "Cancel install"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/status/StatusBoard.tsx:72
+#: src/shell/pages/status/StatusBoard.tsx:73
 msgid "Cancel maintenance"
 msgstr ""
 
@@ -4301,7 +4305,7 @@ msgid "Cancel the install and forget {name}?"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/status/StatusBoard.tsx:72
+#: src/shell/pages/status/StatusBoard.tsx:73
 msgid "Cancel this maintenance?"
 msgstr ""
 
@@ -4311,17 +4315,17 @@ msgid "Cancel this schedule?"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/status/StatusBoard.tsx:27
+#: src/shell/pages/status/StatusBoard.tsx:26
 msgid "Cancelled"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/status/StatusBoard.tsx:72
+#: src/shell/pages/status/StatusBoard.tsx:73
 msgid "Cancelling…"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/StoragePage.tsx:173
+#: src/shell/pages/StoragePage.tsx:177
 msgid "Cap"
 msgstr ""
 
@@ -4371,18 +4375,18 @@ msgid "setting.coding.person.daily_tokens.does"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/library/TranscriptCaptionTracks.tsx:80
+#: src/shell/library/TranscriptCaptionTracks.tsx:85
 msgid "Caption track made."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/library/TranscriptCaptionTracks.tsx:87
+#: src/shell/library/TranscriptCaptionTracks.tsx:92
 msgid "Caption track refreshed. Captions you fixed by hand were kept."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/library/TranscriptCaptionTracks.tsx:116
-#: src/shell/library/TranscriptCaptionTracks.tsx:117
+#: src/shell/library/TranscriptCaptionTracks.tsx:122
+#: src/shell/library/TranscriptCaptionTracks.tsx:123
 msgid "Caption tracks"
 msgstr ""
 
@@ -4485,7 +4489,7 @@ msgid "setting.ui.home_layout.does"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/styles/StyleEditor.tsx:75
+#: src/apps/settings/styles/StyleEditor.tsx:76
 msgid "Changes save as you make them."
 msgstr ""
 
@@ -4507,7 +4511,7 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/apps/settings/styles/StyleBrowser.tsx:101
 #: src/apps/settings/styles/StyleConfirm.tsx:109
-#: src/apps/settings/styles/StyleEditor.tsx:92
+#: src/apps/settings/styles/StyleEditor.tsx:93
 #: src/apps/settings/styles/stylesShared.tsx:45
 msgid "Character"
 msgstr ""
@@ -4537,7 +4541,7 @@ msgstr ""
 #: src/apps/settings/ModelsSection.tsx:138
 #: src/apps/settings/ModelsSection.tsx:143
 #: src/apps/settings/performanceModel.ts:9
-#: src/shell/AmbientCompanionPane.tsx:315
+#: src/shell/AmbientCompanionPane.tsx:321
 #: src/shell/coreLabels.ts:8
 #: src/shell/pageHeaderTitle.tsx:96
 #: src/shell/pages/ChatPage.tsx:1735
@@ -4640,7 +4644,7 @@ msgid "Chat history"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/status/StatusComponents.tsx:147
+#: src/shell/pages/status/StatusComponents.tsx:154
 msgid "Chat is being paged out to disk. Close big apps, or stop a big job."
 msgstr ""
 
@@ -4729,7 +4733,7 @@ msgid "notification.engines.chat_engine_changed"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/status/StatusComponents.tsx:120
+#: src/shell/pages/status/StatusComponents.tsx:127
 msgid "Chat window: {tokens} tokens per slot ({slots, plural, one {# slot} other {# slots}})."
 msgstr ""
 
@@ -4754,7 +4758,7 @@ msgid "Check a model"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/AddRobotSection.tsx:251
+#: src/apps/settings/AddRobotSection.tsx:245
 #: src/apps/setup/PlanStep.tsx:127
 #: src/apps/setup/PlanStep.tsx:168
 msgid "Check again"
@@ -4771,7 +4775,7 @@ msgid "Check code from the engine computer"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/RepairsPage.tsx:120
+#: src/shell/pages/RepairsPage.tsx:126
 msgid "Check my computers again"
 msgstr ""
 
@@ -4812,7 +4816,7 @@ msgid "failure.advice.unreachable.next_step"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/EnginesPage.tsx:153
+#: src/shell/pages/EnginesPage.tsx:156
 msgid "Check the connection"
 msgstr ""
 
@@ -4849,13 +4853,13 @@ msgstr ""
 
 #. js-lingui-explicit-id
 #: src/apps/settings/RobotPasswordSection.tsx:152
-#: src/apps/settings/StackChanInstallDialog.tsx:20
-#: src/shell/pages/status/StatusComponents.tsx:151
+#: src/apps/settings/StackChanInstallDialog.tsx:21
+#: src/shell/pages/status/StatusComponents.tsx:158
 msgid "Checking"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/EnginesPage.tsx:153
+#: src/shell/pages/EnginesPage.tsx:156
 msgid "Checking connection…"
 msgstr ""
 
@@ -4875,7 +4879,7 @@ msgid "Checking the MaiPai Stack"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/FilesPage.tsx:194
+#: src/shell/pages/FilesPage.tsx:198
 msgid "Checking the picture. This can take a minute."
 msgstr ""
 
@@ -4992,7 +4996,7 @@ msgid "api.error.companion_choose"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/status/StatusBoard.tsx:112
+#: src/shell/pages/status/StatusBoard.tsx:113
 msgid "Choose a date"
 msgstr ""
 
@@ -5052,7 +5056,7 @@ msgid "Choose a PNG, JPEG or WebP picture."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/library/LibraryViewer.tsx:113
+#: src/shell/library/LibraryViewer.tsx:114
 #: src/shell/pages/SoundExtras.tsx:77
 msgid "Choose a song"
 msgstr ""
@@ -5063,7 +5067,7 @@ msgid "Choose a speaker"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/status/StatusBoard.tsx:95
+#: src/shell/pages/status/StatusBoard.tsx:96
 msgid "Choose a start and end time."
 msgstr ""
 
@@ -5115,7 +5119,7 @@ msgid "Choose an audio or video file or drop it here"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/status/StatusBoard.tsx:99
+#: src/shell/pages/status/StatusBoard.tsx:100
 msgid "Choose an end date on or after the first maintenance date."
 msgstr ""
 
@@ -5125,22 +5129,22 @@ msgid "Choose an icon for {title}."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/status/StatusBoard.tsx:98
+#: src/shell/pages/status/StatusBoard.tsx:99
 msgid "Choose at least one day for the weekly schedule."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/status/StatusBoard.tsx:97
+#: src/shell/pages/status/StatusBoard.tsx:98
 msgid "Choose at least one part."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/AmbientCompanionPane.tsx:176
+#: src/shell/AmbientCompanionPane.tsx:180
 msgid "Choose companion"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/FilesPage.tsx:351
+#: src/shell/pages/FilesPage.tsx:355
 msgid "Choose files to add"
 msgstr ""
 
@@ -5270,7 +5274,7 @@ msgid "setting.engines.wakeword.choice.help"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/library/LibraryViewer.tsx:113
+#: src/shell/library/LibraryViewer.tsx:114
 msgid "Choose up to six videos, in the order you pick them."
 msgstr ""
 
@@ -5480,8 +5484,8 @@ msgid "Choosing all ages asks for your passcode again."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/styles/StyleEditor.tsx:105
-#: src/apps/settings/styles/StyleEditor.tsx:111
+#: src/apps/settings/styles/StyleEditor.tsx:106
+#: src/apps/settings/styles/StyleEditor.tsx:112
 #: src/apps/settings/styles/StylesTab.tsx:128
 msgid "Chosen people"
 msgstr ""
@@ -5531,7 +5535,7 @@ msgid "Clear"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/StoragePage.tsx:189
+#: src/shell/pages/StoragePage.tsx:194
 msgid "Clear {name}"
 msgstr ""
 
@@ -5539,8 +5543,8 @@ msgstr ""
 #: src/apps/memory/PersonMemories.tsx:380
 #: src/apps/notifications/NotificationsPage.tsx:159
 #: src/apps/settings/FreeUpSpaceDialog.tsx:80
-#: src/shell/pages/StoragePage.tsx:191
-#: src/shell/pages/StoragePage.tsx:201
+#: src/shell/pages/StoragePage.tsx:196
+#: src/shell/pages/StoragePage.tsx:206
 msgid "Clear all"
 msgstr ""
 
@@ -5550,7 +5554,7 @@ msgid "Clear All"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/StoragePage.tsx:196
+#: src/shell/pages/StoragePage.tsx:201
 msgid "Clear all saved online data?"
 msgstr ""
 
@@ -5560,18 +5564,18 @@ msgid "Clear done"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/FilesPage.tsx:314
+#: src/shell/pages/FilesPage.tsx:318
 msgid "Clear filters"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/StoragePage.tsx:126
+#: src/shell/pages/StoragePage.tsx:129
 msgid "Cleared {count, plural, one {# saved copy} other {# saved copies}} ({size}) from {source}."
 msgstr ""
 
 #. js-lingui-explicit-id
 #: src/shell/pages/AdminPages.es.test.tsx:117
-#: src/shell/pages/StoragePage.tsx:126
+#: src/shell/pages/StoragePage.tsx:129
 msgid "Cleared {count, plural, one {# saved copy} other {# saved copies}} ({size}) from all sources."
 msgstr ""
 
@@ -5619,19 +5623,19 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/apps/settings/EngineLinkCredentialSection.tsx:289
 #: src/apps/settings/FreeUpSpaceDialog.tsx:97
-#: src/apps/settings/StackChanInstallDialog.tsx:152
+#: src/apps/settings/StackChanInstallDialog.tsx:153
 #: src/apps/setup/AwayFromHome.tsx:175
-#: src/shell/AmbientCompanionPane.tsx:259
-#: src/shell/AmbientCompanionPane.tsx:261
+#: src/shell/AmbientCompanionPane.tsx:265
+#: src/shell/AmbientCompanionPane.tsx:267
 #: src/shell/pages/ChatPage.tsx:1707
 #: src/shell/pages/MusicWorkspacePage.tsx:193
-#: src/shell/pages/status/StatusBoard.tsx:113
-#: src/shell/pages/status/StatusBoard.tsx:132
+#: src/shell/pages/status/StatusBoard.tsx:114
+#: src/shell/pages/status/StatusBoard.tsx:133
 msgid "Close"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/AmbientCompanionPane.tsx:259
+#: src/shell/AmbientCompanionPane.tsx:265
 msgid "Close {name}"
 msgstr ""
 
@@ -5804,7 +5808,7 @@ msgid "setting.ease.preset.option_label.comfortable"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/dashboard/TodaySection.tsx:18
+#: src/shell/pages/dashboard/TodaySection.tsx:19
 msgid "Coming up"
 msgstr ""
 
@@ -5844,22 +5848,22 @@ msgid "Companion and controls"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/AmbientCompanionPane.tsx:177
+#: src/shell/AmbientCompanionPane.tsx:181
 msgid "Companion options"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/AmbientCompanionPane.tsx:176
+#: src/shell/AmbientCompanionPane.tsx:180
 msgid "Companion or bot"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/AmbientCompanionPane.tsx:174
+#: src/shell/AmbientCompanionPane.tsx:177
 msgid "Companion settings"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/AmbientCompanionPane.tsx:176
+#: src/shell/AmbientCompanionPane.tsx:180
 msgid "Companions in the companion selector"
 msgstr ""
 
@@ -5907,8 +5911,8 @@ msgstr ""
 #: src/apps/settings/TwoStepSignInSection.tsx:50
 #: src/shell/components/DataTableRowActions.tsx:57
 #: src/shell/pages/settings/HouseSettings.tsx:50
-#: src/shell/pages/settings/SettingsRenderer.tsx:178
-#: src/shell/pages/UpdatesPage.tsx:200
+#: src/shell/pages/settings/SettingsRenderer.tsx:179
+#: src/shell/pages/UpdatesPage.tsx:202
 msgid "Confirm"
 msgstr ""
 
@@ -5918,12 +5922,12 @@ msgid "Confirm passcode"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/UpdatesPage.tsx:192
+#: src/shell/pages/UpdatesPage.tsx:194
 msgid "Confirm rollback."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/styles/StyleEditor.tsx:102
+#: src/apps/settings/styles/StyleEditor.tsx:103
 msgid "Confirmed."
 msgstr ""
 
@@ -5938,14 +5942,14 @@ msgid "Connected · {rooms, plural, one {# room} other {# rooms}} · {devices, p
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/StackChanInstallDialog.tsx:17
+#: src/apps/settings/StackChanInstallDialog.tsx:18
 #: src/shell/GlobalMiniPlayer.tsx:115
 #: src/shell/pages/StatusPage.tsx:26
 msgid "Connecting"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/StackChanInstallDialog.tsx:105
+#: src/apps/settings/StackChanInstallDialog.tsx:106
 msgid "Connecting to the StackChan. This takes up to 30 seconds."
 msgstr ""
 
@@ -5961,17 +5965,18 @@ msgstr ""
 #: src/apps/setup/CloseAppsStep.tsx:64
 #: src/apps/setup/SetupReviewPage.tsx:66
 #: src/apps/setup/SetupWizard.tsx:503
-#: src/shell/AmbientCompanionPane.tsx:261
+#: src/shell/AmbientCompanionPane.tsx:267
 #: src/shell/pages/companionFlow/AnimateStep.tsx:154
 #: src/shell/pages/CompanionsPage.tsx:162
-#: src/shell/pages/dashboard/HomeShelves.tsx:63
+#: src/shell/pages/dashboard/HomeShelves.tsx:45
+#: src/shell/pages/dashboard/HomeShelves.tsx:83
 #: src/shell/pages/SignInPage.tsx:164
 msgid "Continue"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/AmbientCompanionPane.tsx:327
-#: src/shell/AmbientCompanionPane.tsx:327
+#: src/shell/AmbientCompanionPane.tsx:333
+#: src/shell/AmbientCompanionPane.tsx:333
 msgid "Continue in Chat"
 msgstr ""
 
@@ -6041,12 +6046,12 @@ msgid "setting.household.conversation_retention_days.label"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/AmbientCompanionPane.tsx:261
+#: src/shell/AmbientCompanionPane.tsx:267
 msgid "Conversation with {name}"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/AmbientCompanionPane.tsx:314
+#: src/shell/AmbientCompanionPane.tsx:320
 #: src/shell/pages/ChatPage.tsx:1493
 #: src/shell/pages/ChatPage.tsx:1900
 #: src/shell/pages/ChatPage.tsx:1903
@@ -6162,7 +6167,7 @@ msgid "Could not be made"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/status/StatusBoard.tsx:61
+#: src/shell/pages/status/StatusBoard.tsx:68
 msgid "Could not cancel maintenance."
 msgstr ""
 
@@ -6187,7 +6192,7 @@ msgid "Could not change the chat model. Try again."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/AmbientCompanionPane.tsx:170
+#: src/shell/AmbientCompanionPane.tsx:173
 msgid "Could not change the companion. Check your connection and try again."
 msgstr ""
 
@@ -6232,7 +6237,7 @@ msgid "Could not check that link."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/EnginesPage.tsx:166
+#: src/shell/pages/EnginesPage.tsx:169
 msgid "Could not check the connection."
 msgstr ""
 
@@ -6242,7 +6247,7 @@ msgid "Could not check two-step sign-in. Check your connection and try again."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/status/StatusBoard.tsx:39
+#: src/shell/pages/status/StatusBoard.tsx:41
 msgid "Could not clear the note."
 msgstr ""
 
@@ -6257,7 +6262,7 @@ msgid "Could not complete engine setup."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/AmbientCompanionPane.tsx:298
+#: src/shell/AmbientCompanionPane.tsx:304
 msgid "Could not continue this side chat. Try again."
 msgstr ""
 
@@ -6291,7 +6296,7 @@ msgstr ""
 #: src/apps/chat/chatProjects.tsx:92
 #: src/apps/chat/chatProjects.tsx:150
 #: src/shell/pages/ChatPage.tsx:1225
-#: src/shell/pages/ProjectsPage.tsx:126
+#: src/shell/pages/ProjectsPage.tsx:127
 msgid "Could not delete that project. Try again."
 msgstr ""
 
@@ -6336,7 +6341,7 @@ msgid "Could not dismiss that notification."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/RepairsPage.tsx:89
+#: src/shell/pages/RepairsPage.tsx:93
 msgid "Could not dismiss that repair."
 msgstr ""
 
@@ -6353,7 +6358,7 @@ msgid "Could not finish"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/RepairsPage.tsx:73
+#: src/shell/pages/RepairsPage.tsx:76
 msgid "Could not fix that repair."
 msgstr ""
 
@@ -6419,7 +6424,7 @@ msgid "Could not load commands."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/AmbientCompanionPane.tsx:320
+#: src/shell/AmbientCompanionPane.tsx:326
 msgid "Could not load conversations. Check your connection and try again."
 msgstr ""
 
@@ -6434,12 +6439,12 @@ msgid "Could not load effective access. Check your connection and try again."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/EnginesPage.tsx:175
+#: src/shell/pages/EnginesPage.tsx:178
 msgid "Could not load engines."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/DashboardPage.tsx:64
+#: src/shell/pages/DashboardPage.tsx:63
 msgid "Could not load Home cards. Refresh Home to try again."
 msgstr ""
 
@@ -6459,7 +6464,7 @@ msgid "Could not load pets."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/ProjectsPage.tsx:149
+#: src/shell/pages/ProjectsPage.tsx:150
 msgid "Could not load projects. Try again."
 msgstr ""
 
@@ -6469,12 +6474,12 @@ msgid "Could not load quick timers. Check your connection and try again."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/reminders/RemindersPage.tsx:192
+#: src/apps/reminders/RemindersPage.tsx:193
 msgid "Could not load reminders. Check your connection and try again."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/RepairsPage.tsx:128
+#: src/shell/pages/RepairsPage.tsx:134
 msgid "Could not load repairs."
 msgstr ""
 
@@ -6489,7 +6494,7 @@ msgid "Could not load routing stats."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/settings/SettingsRenderer.tsx:191
+#: src/shell/pages/settings/SettingsRenderer.tsx:192
 msgid "Could not load settings."
 msgstr ""
 
@@ -6504,7 +6509,7 @@ msgid "Could not load skills."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/StoragePage.tsx:139
+#: src/shell/pages/StoragePage.tsx:143
 msgid "Could not load storage."
 msgstr ""
 
@@ -6611,12 +6616,12 @@ msgid "Could not load those memories."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/dashboard/TodaySection.tsx:78
+#: src/shell/pages/dashboard/TodaySection.tsx:82
 msgid "Could not load Today. Refresh Home to try again."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/UpdatesPage.tsx:136
+#: src/shell/pages/UpdatesPage.tsx:138
 msgid "Could not load updates."
 msgstr ""
 
@@ -6646,7 +6651,7 @@ msgid "Could not load your devices."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/dashboard/HomeShelves.tsx:37
+#: src/shell/pages/dashboard/HomeShelves.tsx:57
 msgid "Could not load your family. Refresh Home to try again."
 msgstr ""
 
@@ -6661,7 +6666,7 @@ msgid "Could not load your library."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/dashboard/HomeShelves.tsx:54
+#: src/shell/pages/dashboard/HomeShelves.tsx:74
 msgid "Could not load your library. Refresh Home to try again."
 msgstr ""
 
@@ -6676,7 +6681,7 @@ msgid "Could not load your notification history."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/dashboard/HomeShelves.tsx:26
+#: src/shell/pages/dashboard/HomeShelves.tsx:47
 msgid "Could not load your recent items. Refresh Home to try again."
 msgstr ""
 
@@ -6737,7 +6742,7 @@ msgid "Could not open a chat. Check your connection and try again."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/AmbientCompanionPane.tsx:326
+#: src/shell/AmbientCompanionPane.tsx:332
 msgid "Could not open that conversation. Check your connection and try again."
 msgstr ""
 
@@ -6763,12 +6768,12 @@ msgid "Could not play a sample. Try again."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/status/StatusBoard.tsx:123
+#: src/shell/pages/status/StatusBoard.tsx:124
 msgid "Could not post the note."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/AmbientCompanionPane.tsx:303
+#: src/shell/AmbientCompanionPane.tsx:309
 #: src/shell/Routes.tsx:315
 msgid "Could not reach {name}. Try again."
 msgstr ""
@@ -6836,7 +6841,7 @@ msgid "Could not rename this voice. Try again."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/status/StatusComponents.tsx:94
+#: src/shell/pages/status/StatusComponents.tsx:99
 msgid "Could not restart {name}."
 msgstr ""
 
@@ -6891,8 +6896,8 @@ msgid "Could not save that answer. Try again."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/settings/SettingsRenderer.tsx:119
-#: src/shell/pages/settings/SettingsRenderer.tsx:176
+#: src/shell/pages/settings/SettingsRenderer.tsx:120
+#: src/shell/pages/settings/SettingsRenderer.tsx:177
 msgid "Could not save that change."
 msgstr ""
 
@@ -6987,7 +6992,7 @@ msgid "Could not save your appearance."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/status/StatusBoard.tsx:89
+#: src/shell/pages/status/StatusBoard.tsx:90
 msgid "Could not schedule maintenance."
 msgstr ""
 
@@ -7032,7 +7037,7 @@ msgid "Could not skip the next alarm."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/status/StatusComponents.tsx:108
+#: src/shell/pages/status/StatusComponents.tsx:114
 msgid "Could not start {name}."
 msgstr ""
 
@@ -7072,7 +7077,7 @@ msgid "Could not start this install."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/status/StatusComponents.tsx:108
+#: src/shell/pages/status/StatusComponents.tsx:114
 msgid "Could not stop {name}."
 msgstr ""
 
@@ -7100,7 +7105,7 @@ msgstr ""
 #: src/apps/chat/chatProjects.tsx:103
 #: src/shell/pages/ChatPage.tsx:1206
 #: src/shell/pages/ChatPage.tsx:1216
-#: src/shell/pages/ProjectsPage.tsx:191
+#: src/shell/pages/ProjectsPage.tsx:192
 msgid "Could not update that project. Try again."
 msgstr ""
 
@@ -7120,7 +7125,7 @@ msgid "api.error.passkey_verify_failed"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/UpdatesPage.tsx:182
+#: src/shell/pages/UpdatesPage.tsx:184
 msgid "Couldn't check for robot updates: {robotsError}"
 msgstr ""
 
@@ -7135,7 +7140,7 @@ msgid "Couldn't forget that - try again."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/UpdatesPage.tsx:185
+#: src/shell/pages/UpdatesPage.tsx:187
 msgid "Couldn't read installed reference sets for updates: {referenceError}"
 msgstr ""
 
@@ -7172,7 +7177,7 @@ msgstr ""
 
 #. js-lingui-explicit-id
 #: src/shell/pages/MusicStudioPages.tsx:188
-#: src/shell/pages/ProjectsPage.tsx:40
+#: src/shell/pages/ProjectsPage.tsx:39
 msgid "Create"
 msgstr ""
 
@@ -7225,7 +7230,7 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/apps/reminders/CreateListSheet.tsx:41
 #: src/apps/reminders/ListColumn.tsx:28
-#: src/apps/reminders/RemindersPage.tsx:30
+#: src/apps/reminders/RemindersPage.tsx:31
 msgid "Create list"
 msgstr ""
 
@@ -7353,24 +7358,24 @@ msgid "Customize Synth"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/library/LibraryViewer.tsx:114
+#: src/shell/library/LibraryViewer.tsx:115
 msgid "Cut every"
 msgstr ""
 
 #. js-lingui-explicit-id
 #: src/shell/library/LibraryViewer.tsx:99
-#: src/shell/library/LibraryViewer.tsx:112
+#: src/shell/library/LibraryViewer.tsx:113
 msgid "Cut to the beat"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/library/LibraryViewer.tsx:104
+#: src/shell/library/LibraryViewer.tsx:105
 msgid "Cuts your videos on the beat of this song. Everything stays on this home server."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/status/StatusBoard.tsx:110
-#: src/shell/pages/status/StatusBoard.tsx:110
+#: src/shell/pages/status/StatusBoard.tsx:111
+#: src/shell/pages/status/StatusBoard.tsx:111
 msgid "Daily"
 msgstr ""
 
@@ -7572,24 +7577,24 @@ msgstr ""
 #: src/apps/settings/CommandsSection.tsx:203
 #: src/apps/settings/VoiceManagerSection.tsx:126
 #: src/shell/library/LibraryItems.tsx:38
-#: src/shell/library/LibraryViewer.tsx:163
-#: src/shell/library/LibraryViewer.tsx:163
+#: src/shell/library/LibraryViewer.tsx:164
+#: src/shell/library/LibraryViewer.tsx:164
 #: src/shell/pages/CompanionsPage.tsx:81
 #: src/shell/pages/CompanionsPage.tsx:181
-#: src/shell/pages/FilesPage.tsx:332
+#: src/shell/pages/FilesPage.tsx:336
 #: src/shell/pages/MusicStudioPages.tsx:194
 #: src/shell/pages/SoundExtras.tsx:47
 msgid "Delete"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/FilesPage.tsx:378
+#: src/shell/pages/FilesPage.tsx:382
 msgid "Delete ‘{name}’?"
 msgstr ""
 
 #. js-lingui-explicit-id
 #: src/apps/clock/TimersTab.tsx:184
-#: src/apps/reminders/RemindersPage.tsx:183
+#: src/apps/reminders/RemindersPage.tsx:184
 #: src/shell/pages/CompanionsPage.tsx:180
 msgid "Delete {name}?"
 msgstr ""
@@ -7628,7 +7633,7 @@ msgid "Delete forever?"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/reminders/RemindersPage.tsx:188
+#: src/apps/reminders/RemindersPage.tsx:189
 msgid "Delete list"
 msgstr ""
 
@@ -7688,8 +7693,8 @@ msgid "setting.notifications.time_sensitive.robot.help"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/status/StatusComponents.tsx:37
-#: src/shell/pages/status/StatusComponents.tsx:49
+#: src/shell/pages/status/StatusComponents.tsx:38
+#: src/shell/pages/status/StatusComponents.tsx:50
 msgid "Demo mode"
 msgstr ""
 
@@ -7768,7 +7773,7 @@ msgid "area.Describing pictures"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/status/StatusBoard.tsx:107
+#: src/shell/pages/status/StatusBoard.tsx:108
 msgid "Description"
 msgstr ""
 
@@ -7783,7 +7788,7 @@ msgid "Desktop"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/RepairsPage.tsx:65
+#: src/shell/pages/RepairsPage.tsx:67
 msgid "Detail"
 msgstr ""
 
@@ -7810,7 +7815,7 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/apps/chat/chatThreadSlots.tsx:332
 #: src/apps/settings/ModelsSection.tsx:154
-#: src/apps/settings/styles/StyleEditor.tsx:152
+#: src/apps/settings/styles/StyleEditor.tsx:153
 #: src/shell/components/SearchTestResultBody.tsx:23
 #: src/shell/InstallStrip.tsx:122
 msgid "Details"
@@ -8006,12 +8011,12 @@ msgstr ""
 #: src/shell/library/LibraryUploads.tsx:75
 #: src/shell/library/LibraryUploads.tsx:76
 #: src/shell/NotificationBell.tsx:262
-#: src/shell/pages/RepairsPage.tsx:154
+#: src/shell/pages/RepairsPage.tsx:160
 msgid "Dismiss"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/RepairsPage.tsx:156
+#: src/shell/pages/RepairsPage.tsx:162
 msgid "Dismiss \"{title}\"?"
 msgstr ""
 
@@ -8062,7 +8067,7 @@ msgstr ""
 
 #. js-lingui-explicit-id
 #: src/shell/pages/ChatPage.tsx:1919
-#: src/shell/pages/FilesPage.tsx:150
+#: src/shell/pages/FilesPage.tsx:154
 msgid "Document"
 msgstr ""
 
@@ -8077,8 +8082,8 @@ msgid "setting.storage.library.documents.threshold_percent.label"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/status/StatusBoard.tsx:110
-#: src/shell/pages/status/StatusBoard.tsx:110
+#: src/shell/pages/status/StatusBoard.tsx:111
+#: src/shell/pages/status/StatusBoard.tsx:111
 msgid "Does not repeat"
 msgstr ""
 
@@ -8106,8 +8111,8 @@ msgstr ""
 #: src/apps/settings/AiJobSummary.tsx:86
 #: src/apps/settings/CodingSettings.tsx:233
 #: src/apps/settings/EngineLinkCredentialSection.tsx:23
-#: src/apps/settings/StackChanInstallDialog.tsx:150
-#: src/apps/settings/StackChanInstallDialog.tsx:152
+#: src/apps/settings/StackChanInstallDialog.tsx:151
+#: src/apps/settings/StackChanInstallDialog.tsx:153
 #: src/apps/setup/AwayFromHome.tsx:185
 #: src/apps/setup/SetupReviewPage.tsx:66
 #: src/shell/AlarmRinger.tsx:60
@@ -8116,7 +8121,7 @@ msgstr ""
 #: src/shell/pages/AllAppsPage.tsx:117
 #: src/shell/pages/companionFlow/KeyframeEditor.tsx:97
 #: src/shell/pages/settings/SettingsAreaPage.tsx:275
-#: src/shell/pages/status/StatusBoard.tsx:27
+#: src/shell/pages/status/StatusBoard.tsx:26
 msgid "Done"
 msgstr ""
 
@@ -8128,7 +8133,7 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/apps/people/FaceEnrollmentPage.tsx:72
 #: src/apps/settings/PerformanceCustomize.tsx:58
-#: src/shell/pages/status/StatusComponents.tsx:68
+#: src/shell/pages/status/StatusComponents.tsx:69
 msgid "Down"
 msgstr ""
 
@@ -8147,8 +8152,8 @@ msgstr ""
 #: src/apps/settings/BackupsSection.tsx:98
 #: src/apps/setup/SetupWizard.tsx:492
 #: src/shell/library/LibraryItems.tsx:33
-#: src/shell/library/LibraryViewer.tsx:162
-#: src/shell/library/LibraryViewer.tsx:162
+#: src/shell/library/LibraryViewer.tsx:163
+#: src/shell/library/LibraryViewer.tsx:163
 #: src/shell/pages/MusicWorkspacePage.tsx:208
 #: src/shell/pages/MusicWorkspacePage.tsx:208
 msgid "Download"
@@ -8176,7 +8181,7 @@ msgstr ""
 
 #. js-lingui-explicit-id
 #: src/shell/components/DataTableControls.tsx:29
-#: src/shell/pages/RepairsPage.tsx:139
+#: src/shell/pages/RepairsPage.tsx:145
 #: src/shell/pages/useDataTableControls.tsx:107
 msgid "Download CSV"
 msgstr ""
@@ -8193,7 +8198,7 @@ msgstr ""
 
 #. js-lingui-explicit-id
 #: src/shell/components/DataTableControls.tsx:29
-#: src/shell/pages/RepairsPage.tsx:139
+#: src/shell/pages/RepairsPage.tsx:145
 #: src/shell/pages/useDataTableControls.tsx:104
 msgid "Download table as CSV"
 msgstr ""
@@ -8287,7 +8292,7 @@ msgid "Drawing your character..."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/FilesPage.tsx:385
+#: src/shell/pages/FilesPage.tsx:389
 msgid "Drop to add to your Library"
 msgstr ""
 
@@ -8384,7 +8389,7 @@ msgstr ""
 
 #. js-lingui-explicit-id
 #: src/apps/settings/UsersSection.tsx:405
-#: src/shell/pages/ProjectsPage.tsx:199
+#: src/shell/pages/ProjectsPage.tsx:200
 msgid "Edit {name}"
 msgstr ""
 
@@ -8399,7 +8404,7 @@ msgid "Edit alarm"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/library/LibraryViewer.tsx:119
+#: src/shell/library/LibraryViewer.tsx:120
 msgid "Edit in its chat"
 msgstr ""
 
@@ -8475,12 +8480,12 @@ msgid "setting.search.source_mode.wikimedia.label"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/AmbientCompanionPane.tsx:258
+#: src/shell/AmbientCompanionPane.tsx:264
 msgid "End call"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/AmbientCompanionPane.tsx:258
+#: src/shell/AmbientCompanionPane.tsx:264
 msgid "End the call"
 msgstr ""
 
@@ -8490,7 +8495,7 @@ msgid "Ended {time} · {duration}"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/status/StatusBoard.tsx:109
+#: src/shell/pages/status/StatusBoard.tsx:110
 msgid "Ends"
 msgstr ""
 
@@ -8506,7 +8511,7 @@ msgid "Engine"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/EnginesPage.tsx:229
+#: src/shell/pages/EnginesPage.tsx:232
 msgid "Engine actions"
 msgstr ""
 
@@ -8552,12 +8557,12 @@ msgid "Engine default"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/EnginesPage.tsx:270
+#: src/shell/pages/EnginesPage.tsx:273
 msgid "Engine health"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/EnginesPage.tsx:205
+#: src/shell/pages/EnginesPage.tsx:208
 msgid "Engine roles"
 msgstr ""
 
@@ -8809,7 +8814,7 @@ msgid "Everyone"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/status/StatusBoard.tsx:105
+#: src/shell/pages/status/StatusBoard.tsx:106
 msgid "Everyone in the home can see this plan."
 msgstr ""
 
@@ -8824,7 +8829,7 @@ msgid "Everyone the age gates allow"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/styles/StyleEditor.tsx:190
+#: src/apps/settings/styles/StyleEditor.tsx:191
 msgid "Everyone who can use it will see its name and picture without a passcode. Clips already made with it stay locked until the person who made each one unlocks them for good. People under 18 still never see styles."
 msgstr ""
 
@@ -8901,7 +8906,7 @@ msgid "Expires"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/status/StatusBoard.tsx:132
+#: src/shell/pages/status/StatusBoard.tsx:133
 msgid "Expiry"
 msgstr ""
 
@@ -9015,12 +9020,12 @@ msgid "FAIL"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/EnginesPage.tsx:161
+#: src/shell/pages/EnginesPage.tsx:164
 msgid "FAIL hop {id} — Fix: {fix}"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/EnginesPage.tsx:161
+#: src/shell/pages/EnginesPage.tsx:164
 msgid "FAIL hop {id}: {detail} — Fix: {fix}"
 msgstr ""
 
@@ -9089,7 +9094,7 @@ msgid "area.Faster on Apple chips"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/StackChanInstallDialog.tsx:136
+#: src/apps/settings/StackChanInstallDialog.tsx:137
 msgid "Faster, about 1 to 2 minutes. The firmware now on the StackChan is replaced and cannot be restored from Home."
 msgstr ""
 
@@ -9120,8 +9125,8 @@ msgid "setting.music.album_art_online.label"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/FilesPage.tsx:150
-#: src/shell/pages/FilesPage.tsx:172
+#: src/shell/pages/FilesPage.tsx:154
+#: src/shell/pages/FilesPage.tsx:176
 msgid "File"
 msgstr ""
 
@@ -9181,7 +9186,7 @@ msgid "Filter results by book"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/FilesPage.tsx:364
+#: src/shell/pages/FilesPage.tsx:368
 msgid "Filters"
 msgstr ""
 
@@ -9203,7 +9208,7 @@ msgid "Find anything across your household."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/AmbientCompanionPane.tsx:261
+#: src/shell/AmbientCompanionPane.tsx:267
 #: src/shell/Routes.tsx:315
 msgid "Find me"
 msgstr ""
@@ -9229,7 +9234,7 @@ msgid "fine"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/status/StatusComponents.tsx:68
+#: src/shell/pages/status/StatusComponents.tsx:69
 msgid "Fine"
 msgstr ""
 
@@ -9244,7 +9249,7 @@ msgid "area.Finer stem splitter"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/styles/StyleEditor.tsx:158
+#: src/apps/settings/styles/StyleEditor.tsx:159
 msgid "Fingerprint"
 msgstr ""
 
@@ -9281,7 +9286,7 @@ msgid "setting.robot.firmware.installed.help"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/StackChanInstallDialog.tsx:98
+#: src/apps/settings/StackChanInstallDialog.tsx:99
 msgid "Firmware was written, but Home could not record its version. {detail}"
 msgstr ""
 
@@ -9297,7 +9302,7 @@ msgid "Fit details"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/RepairsPage.tsx:65
+#: src/shell/pages/RepairsPage.tsx:67
 msgid "Fix"
 msgstr ""
 
@@ -9475,7 +9480,7 @@ msgid "failure.tool.found_nothing.verb"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/status/StatusComponents.tsx:143
+#: src/shell/pages/status/StatusComponents.tsx:150
 msgid "Free for jobs: {gb} GB"
 msgstr ""
 
@@ -9556,7 +9561,7 @@ msgid "Freeing"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/status/StatusBoard.tsx:29
+#: src/shell/pages/status/StatusBoard.tsx:28
 msgid "Fri"
 msgstr ""
 
@@ -9804,7 +9809,7 @@ msgstr ""
 
 #. js-lingui-explicit-id
 #: src/shell/pages/dashboard/GettingStarted.tsx:24
-#: src/shell/pages/dashboard/GettingStarted.tsx:26
+#: src/shell/pages/dashboard/GettingStarted.tsx:25
 msgid "Getting started"
 msgstr ""
 
@@ -9919,13 +9924,13 @@ msgid "Go ahead?"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/UpdatesPage.tsx:157
-#: src/shell/pages/UpdatesPage.tsx:190
+#: src/shell/pages/UpdatesPage.tsx:159
+#: src/shell/pages/UpdatesPage.tsx:192
 msgid "Go back"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/UpdatesPage.tsx:192
+#: src/shell/pages/UpdatesPage.tsx:194
 msgid "Go back to {tag}?"
 msgstr ""
 
@@ -10001,7 +10006,7 @@ msgid "Granted by an admin. Their protections stay on."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/FilesPage.tsx:368
+#: src/shell/pages/FilesPage.tsx:372
 msgid "Grid view"
 msgstr ""
 
@@ -10051,7 +10056,7 @@ msgid "setting.news.lists.teen.option.feeds-household"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/EnginesPage.tsx:264
+#: src/shell/pages/EnginesPage.tsx:267
 msgid "Health"
 msgstr ""
 
@@ -10163,7 +10168,7 @@ msgid "setting.alarms.volume.option_label.high"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/styles/StyleEditor.tsx:144
+#: src/apps/settings/styles/StyleEditor.tsx:145
 msgid "Highest"
 msgstr ""
 
@@ -10173,7 +10178,7 @@ msgid "Hint"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/AmbientCompanionPane.tsx:320
+#: src/shell/AmbientCompanionPane.tsx:326
 msgid "History"
 msgstr ""
 
@@ -10187,9 +10192,9 @@ msgstr ""
 #: src/shell/coreLabels.ts:7
 #: src/shell/pageHeaderTitle.tsx:95
 #: src/shell/pages/ActivityPage.tsx:39
-#: src/shell/pages/DashboardPage.tsx:25
+#: src/shell/pages/DashboardPage.tsx:24
 #: src/shell/pages/settings/settingsBackLink.ts:55
-#: src/shell/pages/status/StatusComponents.tsx:31
+#: src/shell/pages/status/StatusComponents.tsx:32
 #: src/shell/pages/WikipediaPage.tsx:154
 #: src/shell/pages/WikipediaPage.tsx:178
 #: src/shell/routeHeader.ts:23
@@ -10213,7 +10218,7 @@ msgid "Home address: {home}/code/v1. Get the model name from GET /code/v1/models
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/styles/StyleEditor.tsx:123
+#: src/apps/settings/styles/StyleEditor.tsx:124
 msgid "Home adds these to the person's words when they pick this style."
 msgstr ""
 
@@ -10340,7 +10345,7 @@ msgid "failure.voice.microphone_blocked.adultNoRepairs"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/RepairsPage.tsx:103
+#: src/shell/pages/RepairsPage.tsx:108
 msgid "Home checked your computers and updated Health."
 msgstr ""
 
@@ -10390,9 +10395,9 @@ msgid "Home could not change that voice. Try again."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/styles/StyleEditor.tsx:65
-#: src/apps/settings/styles/StyleEditor.tsx:67
-#: src/apps/settings/styles/StyleEditor.tsx:115
+#: src/apps/settings/styles/StyleEditor.tsx:66
+#: src/apps/settings/styles/StyleEditor.tsx:68
+#: src/apps/settings/styles/StyleEditor.tsx:116
 #: src/apps/settings/styles/StylesTab.tsx:184
 msgid "Home could not change that. Try again."
 msgstr ""
@@ -10423,7 +10428,7 @@ msgid "Home could not check the drive space"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/StoragePage.tsx:129
+#: src/shell/pages/StoragePage.tsx:133
 msgid "Home could not clear the saved copies. Check that Home is running and try again."
 msgstr ""
 
@@ -10433,7 +10438,7 @@ msgid "Home could not close a test app, so Close apps stays Off. You can try aga
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/styles/StyleEditor.tsx:102
+#: src/apps/settings/styles/StyleEditor.tsx:103
 msgid "Home could not confirm that. Try again."
 msgstr ""
 
@@ -10483,7 +10488,7 @@ msgid "Home could not load coding setup. Refresh this page and try again."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/FilesPage.tsx:322
+#: src/shell/pages/FilesPage.tsx:326
 msgid "Home could not load more files. Check that Home is running, then try again."
 msgstr ""
 
@@ -10508,12 +10513,12 @@ msgid "Home could not load Trash. Try again."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/FilesPage.tsx:311
+#: src/shell/pages/FilesPage.tsx:315
 msgid "Home could not load your Library. Check that Home is running, then try again."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/FilesPage.tsx:306
+#: src/shell/pages/FilesPage.tsx:310
 msgid "Home could not load your Trash. Check that Home is running, then try again."
 msgstr ""
 
@@ -10548,7 +10553,7 @@ msgid "Home could not read your storage. Reload the page to try again."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/styles/StyleEditor.tsx:182
+#: src/apps/settings/styles/StyleEditor.tsx:183
 #: src/apps/settings/styles/StylesTab.tsx:168
 msgid "Home could not remove it. Try again."
 msgstr ""
@@ -10594,7 +10599,7 @@ msgid "Home could not save that. Check it, then try again."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/styles/StyleEditor.tsx:50
+#: src/apps/settings/styles/StyleEditor.tsx:51
 msgid "Home could not save that. Check the Home connection, then try again."
 msgstr ""
 
@@ -10660,7 +10665,7 @@ msgid "Home couldn't check your choice"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/RepairsPage.tsx:105
+#: src/shell/pages/RepairsPage.tsx:110
 msgid "Home couldn't check your computers. Check the engine connection, then try again."
 msgstr ""
 
@@ -10786,8 +10791,8 @@ msgid "Home goes online for you"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/dashboard/TodaySection.tsx:146
-#: src/shell/pages/dashboard/TodaySection.tsx:149
+#: src/shell/pages/dashboard/TodaySection.tsx:152
+#: src/shell/pages/dashboard/TodaySection.tsx:155
 msgid "Home highlight"
 msgstr ""
 
@@ -10868,7 +10873,7 @@ msgid "setting.household.home.label"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/library/LibraryViewer.tsx:107
+#: src/shell/library/LibraryViewer.tsx:108
 msgid "Home makes music about as long as the video, then puts it under the video as a new version. Your first video is kept."
 msgstr ""
 
@@ -11086,8 +11091,8 @@ msgid "Household synth"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/StoragePage.tsx:82
-#: src/shell/pages/StoragePage.tsx:149
+#: src/shell/pages/StoragePage.tsx:83
+#: src/shell/pages/StoragePage.tsx:153
 msgid "Household total"
 msgstr ""
 
@@ -11160,7 +11165,7 @@ msgid "How long they keep it:"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/library/LibraryViewer.tsx:108
+#: src/shell/library/LibraryViewer.tsx:109
 msgid "How loud"
 msgstr ""
 
@@ -11559,7 +11564,7 @@ msgid "I have read the licence and it lets us use this style at home"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/styles/StyleEditor.tsx:102
+#: src/apps/settings/styles/StyleEditor.tsx:103
 msgid "I have read them"
 msgstr ""
 
@@ -11684,7 +11689,7 @@ msgid "In a band's sound (optional)"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/status/StatusBoard.tsx:27
+#: src/shell/pages/status/StatusBoard.tsx:26
 msgid "In maintenance"
 msgstr ""
 
@@ -11778,7 +11783,7 @@ msgstr ""
 #: src/apps/settings/CodingSettings.tsx:140
 #: src/apps/settings/CodingSettings.tsx:165
 #: src/apps/settings/ModelsAndStorageSection.tsx:91
-#: src/shell/pages/EnginesPage.tsx:239
+#: src/shell/pages/EnginesPage.tsx:242
 msgid "Install"
 msgstr ""
 
@@ -11848,12 +11853,12 @@ msgid "Install the Tailscale app to continue."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/StackChanInstallDialog.tsx:148
+#: src/apps/settings/StackChanInstallDialog.tsx:149
 msgid "Install without a backup"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/StackChanInstallDialog.tsx:136
+#: src/apps/settings/StackChanInstallDialog.tsx:137
 msgid "Install without a backup."
 msgstr ""
 
@@ -11866,7 +11871,7 @@ msgstr ""
 #: src/apps/setup/PlanStep.tsx:185
 #: src/apps/setup/SetupWizard.tsx:480
 #: src/shell/pages/EnginesPage.tsx:32
-#: src/shell/pages/UpdatesPage.tsx:51
+#: src/shell/pages/UpdatesPage.tsx:50
 msgid "Installed"
 msgstr ""
 
@@ -11876,8 +11881,8 @@ msgid "Installed {version}, recorded {date}. Ready to install: {available}."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/EnginesPage.tsx:217
-#: src/shell/pages/EnginesPage.tsx:224
+#: src/shell/pages/EnginesPage.tsx:220
+#: src/shell/pages/EnginesPage.tsx:227
 msgid "Installed engines"
 msgstr ""
 
@@ -11905,7 +11910,7 @@ msgid "Installing"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/StackChanInstallDialog.tsx:12
+#: src/apps/settings/StackChanInstallDialog.tsx:13
 msgid "Installing needs Chrome or Edge on a computer, with Home opened at its https address. Open Home there and try again."
 msgstr ""
 
@@ -12021,7 +12026,7 @@ msgid "It is easy to feel close to a chatbot or companion, so keep real relation
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/FilesPage.tsx:379
+#: src/shell/pages/FilesPage.tsx:383
 msgid "It is shared with everyone in the home."
 msgstr ""
 
@@ -12067,17 +12072,17 @@ msgid "Item"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/library/LibraryViewer.tsx:119
+#: src/shell/library/LibraryViewer.tsx:120
 msgid "Its chat was deleted, so it cannot be edited here."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/ProjectsPage.tsx:223
+#: src/shell/pages/ProjectsPage.tsx:224
 msgid "Its chats stay."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/styles/StyleEditor.tsx:178
+#: src/apps/settings/styles/StyleEditor.tsx:179
 msgid "Its file moves to Recently removed for 30 days, then it is deleted. Clips already made with it stay."
 msgstr ""
 
@@ -12136,7 +12141,7 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/shell/library/LibraryItems.tsx:36
 #: src/shell/library/LibraryViewer.tsx:97
-#: src/shell/pages/FilesPage.tsx:331
+#: src/shell/pages/FilesPage.tsx:335
 msgid "Keep"
 msgstr ""
 
@@ -12146,7 +12151,7 @@ msgid "Keep {media}"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/styles/StyleEditor.tsx:193
+#: src/apps/settings/styles/StyleEditor.tsx:194
 msgid "Keep adults only"
 msgstr ""
 
@@ -12199,12 +12204,12 @@ msgstr ""
 #: src/apps/settings/DevicesSection.tsx:222
 #: src/apps/settings/HouseholdRobotsSection.tsx:190
 #: src/apps/settings/ModelsAndStorageSection.tsx:123
-#: src/apps/settings/styles/StyleEditor.tsx:181
-#: src/shell/pages/FilesPage.tsx:380
+#: src/apps/settings/styles/StyleEditor.tsx:182
+#: src/shell/pages/FilesPage.tsx:384
 #: src/shell/pages/MusicStudioPages.tsx:194
 #: src/shell/pages/MusicWorkspacePage.tsx:212
 #: src/shell/pages/settings/WebSearchSettings.tsx:129
-#: src/shell/pages/status/StatusBoard.tsx:72
+#: src/shell/pages/status/StatusBoard.tsx:73
 msgid "Keep it"
 msgstr ""
 
@@ -12409,7 +12414,7 @@ msgid "Kept in your Library"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/status/StatusComponents.tsx:141
+#: src/shell/pages/status/StatusComponents.tsx:148
 msgid "Kept ready for pictures and tools: {gb} GB"
 msgstr ""
 
@@ -12477,7 +12482,7 @@ msgstr ""
 
 #. js-lingui-explicit-id
 #: src/apps/settings/styles/StyleConfirm.tsx:106
-#: src/apps/settings/styles/StyleEditor.tsx:89
+#: src/apps/settings/styles/StyleEditor.tsx:90
 #: src/shell/pages/performance/LabelsBody.tsx:28
 msgid "Kind"
 msgstr ""
@@ -12586,7 +12591,7 @@ msgid "Last 30 days"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/status/StatusComponents.tsx:68
+#: src/shell/pages/status/StatusComponents.tsx:69
 msgid "Last 90 days"
 msgstr ""
 
@@ -12616,7 +12621,7 @@ msgid "Last active {when} · {chats, plural, one {# chat} other {# chats}}"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/UpdatesPage.tsx:53
+#: src/shell/pages/UpdatesPage.tsx:52
 msgid "Last checked"
 msgstr ""
 
@@ -12696,12 +12701,12 @@ msgid "Layers"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/FilesPage.tsx:367
+#: src/shell/pages/FilesPage.tsx:371
 msgid "Layout"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/FilesPage.tsx:399
+#: src/shell/pages/FilesPage.tsx:404
 msgid "Leave it empty to go back to the name Home chose."
 msgstr ""
 
@@ -12738,7 +12743,7 @@ msgid "setting.robot.face.color.option_label.lemon"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/library/LibraryViewer.tsx:115
+#: src/shell/library/LibraryViewer.tsx:116
 #: src/shell/pages/MakeSongPage.tsx:164
 #: src/shell/pages/MakeSongPage.tsx:165
 msgid "Length"
@@ -13015,10 +13020,10 @@ msgid "Levels and models"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/FilesPage.tsx:77
+#: src/shell/pages/FilesPage.tsx:79
 #: src/shell/pages/MusicStudioPages.tsx:146
 #: src/shell/pages/settings/settingsBackLink.ts:53
-#: src/shell/pages/status/StatusComponents.tsx:30
+#: src/shell/pages/status/StatusComponents.tsx:31
 msgid "Library"
 msgstr ""
 
@@ -13039,7 +13044,7 @@ msgid "Library only"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/FilesPage.tsx:356
+#: src/shell/pages/FilesPage.tsx:360
 msgid "Library sections"
 msgstr ""
 
@@ -13052,7 +13057,7 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/apps/settings/styles/StyleAddFile.tsx:53
 #: src/apps/settings/styles/StyleConfirm.tsx:114
-#: src/apps/settings/styles/StyleEditor.tsx:155
+#: src/apps/settings/styles/StyleEditor.tsx:156
 msgid "Licence"
 msgstr ""
 
@@ -13173,7 +13178,7 @@ msgid "Lines that would change"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/reminders/RemindersPage.tsx:183
+#: src/apps/reminders/RemindersPage.tsx:184
 msgid "list"
 msgstr ""
 
@@ -13188,7 +13193,7 @@ msgid "List options"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/FilesPage.tsx:369
+#: src/shell/pages/FilesPage.tsx:373
 msgid "List view"
 msgstr ""
 
@@ -13393,7 +13398,7 @@ msgid "Loading Coding setup"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/AmbientCompanionPane.tsx:320
+#: src/shell/AmbientCompanionPane.tsx:326
 msgid "Loading conversations"
 msgstr ""
 
@@ -13413,7 +13418,7 @@ msgid "Loading devices"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/EnginesPage.tsx:176
+#: src/shell/pages/EnginesPage.tsx:179
 msgid "Loading engines"
 msgstr ""
 
@@ -13423,12 +13428,12 @@ msgid "Loading folders"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/DashboardPage.tsx:63
+#: src/shell/pages/DashboardPage.tsx:62
 msgid "Loading Home"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/dashboard/TodaySection.tsx:145
+#: src/shell/pages/dashboard/TodaySection.tsx:151
 msgid "Loading Home highlight"
 msgstr ""
 
@@ -13474,7 +13479,7 @@ msgid "Loading memories"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/FilesPage.tsx:323
+#: src/shell/pages/FilesPage.tsx:327
 msgid "Loading more files"
 msgstr ""
 
@@ -13504,13 +13509,13 @@ msgid "Loading profile…"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/ProjectsPage.tsx:149
-#: src/shell/pages/ProjectsPage.tsx:149
+#: src/shell/pages/ProjectsPage.tsx:150
+#: src/shell/pages/ProjectsPage.tsx:150
 msgid "Loading projects"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/RepairsPage.tsx:129
+#: src/shell/pages/RepairsPage.tsx:135
 msgid "Loading repairs"
 msgstr ""
 
@@ -13531,7 +13536,7 @@ msgid "Loading routing stats"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/StoragePage.tsx:188
+#: src/shell/pages/StoragePage.tsx:193
 msgid "Loading saved data…"
 msgstr ""
 
@@ -13543,7 +13548,7 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/shell/pages/settings/SettingsAreaPage.tsx:67
 #: src/shell/pages/settings/SettingsAreaPage.tsx:180
-#: src/shell/pages/settings/SettingsRenderer.tsx:192
+#: src/shell/pages/settings/SettingsRenderer.tsx:193
 msgid "Loading settings"
 msgstr ""
 
@@ -13563,7 +13568,7 @@ msgid "Loading skills"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/StoragePage.tsx:140
+#: src/shell/pages/StoragePage.tsx:144
 msgid "Loading storage"
 msgstr ""
 
@@ -13603,7 +13608,7 @@ msgid "Loading the styles"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/dashboard/TodaySection.tsx:77
+#: src/shell/pages/dashboard/TodaySection.tsx:81
 msgid "Loading Today"
 msgstr ""
 
@@ -13613,7 +13618,7 @@ msgid "Loading Trash"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/UpdatesPage.tsx:137
+#: src/shell/pages/UpdatesPage.tsx:139
 msgid "Loading updates"
 msgstr ""
 
@@ -13645,8 +13650,8 @@ msgid "Loading your AI setup"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/FilesPage.tsx:307
-#: src/shell/pages/FilesPage.tsx:312
+#: src/shell/pages/FilesPage.tsx:311
+#: src/shell/pages/FilesPage.tsx:316
 msgid "Loading your files"
 msgstr ""
 
@@ -13656,7 +13661,7 @@ msgid "Loading your keys"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/dashboard/HomeShelves.tsx:54
+#: src/shell/pages/dashboard/HomeShelves.tsx:74
 msgid "Loading your library"
 msgstr ""
 
@@ -13666,7 +13671,7 @@ msgid "Loading your pictures"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/dashboard/HomeShelves.tsx:26
+#: src/shell/pages/dashboard/HomeShelves.tsx:47
 msgid "Loading your recent items"
 msgstr ""
 
@@ -13767,7 +13772,7 @@ msgid "setting.search.dictionary_fallback.label"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/DashboardPage.tsx:46
+#: src/shell/pages/dashboard/Attention.tsx:24
 msgid "Looking after your hub"
 msgstr ""
 
@@ -13849,7 +13854,7 @@ msgid "Loops without a seam"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/library/LibraryViewer.tsx:108
+#: src/shell/library/LibraryViewer.tsx:109
 msgid "Loud"
 msgstr ""
 
@@ -13889,13 +13894,13 @@ msgid "Lower without asking"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/styles/StyleEditor.tsx:144
+#: src/apps/settings/styles/StyleEditor.tsx:145
 msgid "Lowest"
 msgstr ""
 
 #. js-lingui-explicit-id
 #: src/apps/settings/styles/StyleConfirm.tsx:100
-#: src/apps/settings/styles/StyleEditor.tsx:165
+#: src/apps/settings/styles/StyleEditor.tsx:166
 msgid "LTX-2.5"
 msgstr ""
 
@@ -13919,7 +13924,7 @@ msgid "Lyrics (optional)"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/dashboard/HomeShelves.tsx:63
+#: src/shell/pages/dashboard/HomeShelves.tsx:83
 #: src/shell/pages/MediaHomePage.tsx:41
 msgid "Made at home"
 msgstr ""
@@ -13932,7 +13937,7 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/apps/settings/styles/StyleBrowser.tsx:102
 #: src/apps/settings/styles/StyleConfirm.tsx:93
-#: src/apps/settings/styles/StyleEditor.tsx:156
+#: src/apps/settings/styles/StyleEditor.tsx:157
 msgid "Made for"
 msgstr ""
 
@@ -13968,7 +13973,7 @@ msgstr ""
 
 #. js-lingui-explicit-id
 #: src/shell/pages/status/StatusBanner.tsx:22
-#: src/shell/pages/status/StatusComponents.tsx:68
+#: src/shell/pages/status/StatusComponents.tsx:69
 #: src/shell/pages/StatusPage.tsx:56
 #: src/shell/StatusIndicator.tsx:29
 #: src/shell/statusSummary.ts:18
@@ -14139,8 +14144,8 @@ msgstr ""
 
 #. js-lingui-explicit-id
 #: src/apps/settings/styles/StyleConfirm.tsx:66
-#: src/apps/settings/styles/StyleEditor.tsx:64
-#: src/apps/settings/styles/StyleEditor.tsx:194
+#: src/apps/settings/styles/StyleEditor.tsx:65
+#: src/apps/settings/styles/StyleEditor.tsx:195
 msgid "Make all ages"
 msgstr ""
 
@@ -14173,7 +14178,7 @@ msgid "Make any song"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/library/TranscriptCaptionTracks.tsx:158
+#: src/shell/library/TranscriptCaptionTracks.tsx:164
 msgid "Make caption track"
 msgstr ""
 
@@ -14218,7 +14223,7 @@ msgid "Make new cover"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/library/LibraryViewer.tsx:106
+#: src/shell/library/LibraryViewer.tsx:107
 msgid "Make new music for this video"
 msgstr ""
 
@@ -14233,7 +14238,7 @@ msgid "Make picture"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/library/LibraryViewer.tsx:117
+#: src/shell/library/LibraryViewer.tsx:118
 msgid "Make the cut"
 msgstr ""
 
@@ -14250,8 +14255,8 @@ msgstr ""
 
 #. js-lingui-explicit-id
 #: src/apps/settings/styles/StyleConfirm.tsx:65
-#: src/apps/settings/styles/StyleEditor.tsx:63
-#: src/apps/settings/styles/StyleEditor.tsx:189
+#: src/apps/settings/styles/StyleEditor.tsx:64
+#: src/apps/settings/styles/StyleEditor.tsx:190
 msgid "Make this style all ages?"
 msgstr ""
 
@@ -14489,7 +14494,7 @@ msgid "Matched a plugin but failed to run"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/status/StatusComponents.tsx:27
+#: src/shell/pages/status/StatusComponents.tsx:28
 msgid "Matches what you say to skills and memories."
 msgstr ""
 
@@ -14639,13 +14644,13 @@ msgid "Memories for {name}"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/status/StatusComponents.tsx:28
-#: src/shell/pages/status/StatusComponents.tsx:138
+#: src/shell/pages/status/StatusComponents.tsx:29
+#: src/shell/pages/status/StatusComponents.tsx:145
 msgid "Memory"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/status/StatusComponents.tsx:140
+#: src/shell/pages/status/StatusComponents.tsx:147
 msgid "Memory in use by chat and voice: {gb} GB"
 msgstr ""
 
@@ -14670,7 +14675,7 @@ msgid "Memory used"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/status/StatusComponents.tsx:138
+#: src/shell/pages/status/StatusComponents.tsx:145
 msgid "Memory used by the whole system."
 msgstr ""
 
@@ -14712,7 +14717,7 @@ msgid "Microphone access is unavailable. Check your browser permission and try a
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/AmbientCompanionPane.tsx:261
+#: src/shell/AmbientCompanionPane.tsx:267
 #: src/shell/pages/ChatPage.tsx:1694
 msgid "Microphone help"
 msgstr ""
@@ -14729,7 +14734,7 @@ msgid "Microphone test results"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/FilesPage.tsx:364
+#: src/shell/pages/FilesPage.tsx:368
 msgid "Mine"
 msgstr ""
 
@@ -14864,22 +14869,22 @@ msgid "setting.search.safe_search.option_label.moderate"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/status/StatusBoard.tsx:29
+#: src/shell/pages/status/StatusBoard.tsx:28
 msgid "Mon"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/status/StatusBoard.tsx:110
-#: src/shell/pages/status/StatusBoard.tsx:110
+#: src/shell/pages/status/StatusBoard.tsx:111
+#: src/shell/pages/status/StatusBoard.tsx:111
 msgid "Monthly"
 msgstr ""
 
 #. js-lingui-explicit-id
 #: src/apps/chat/chatToolUis.tsx:103
 #: src/apps/clock/TimersTab.tsx:161
-#: src/apps/settings/styles/StyleEditor.tsx:126
+#: src/apps/settings/styles/StyleEditor.tsx:127
 #: src/shell/AlarmRinger.tsx:64
-#: src/shell/pages/dashboard/TodaySection.tsx:155
+#: src/shell/pages/dashboard/TodaySection.tsx:161
 #: src/shell/phoneMenuLinks.tsx:18
 msgid "More"
 msgstr ""
@@ -14891,8 +14896,8 @@ msgstr ""
 
 #. js-lingui-explicit-id
 #: src/shell/components/DataTableRowActions.tsx:26
-#: src/shell/pages/EnginesPage.tsx:243
-#: src/shell/pages/UpdatesPage.tsx:163
+#: src/shell/pages/EnginesPage.tsx:246
+#: src/shell/pages/UpdatesPage.tsx:165
 msgid "More actions"
 msgstr ""
 
@@ -14937,7 +14942,7 @@ msgid "setting.host.guard.max_reboots_per_12h.label"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/styles/StyleEditor.tsx:92
+#: src/apps/settings/styles/StyleEditor.tsx:93
 #: src/apps/settings/styles/stylesShared.tsx:45
 msgid "Motion"
 msgstr ""
@@ -14963,7 +14968,7 @@ msgid "motors"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/FilesPage.tsx:378
+#: src/shell/pages/FilesPage.tsx:382
 msgid "Move {count} files to Trash?"
 msgstr ""
 
@@ -14982,7 +14987,7 @@ msgid "Move {name} up"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/FilesPage.tsx:380
+#: src/shell/pages/FilesPage.tsx:384
 msgid "Move to Trash"
 msgstr ""
 
@@ -15002,7 +15007,7 @@ msgid "setting.news.default_topics.teen.option.entertainment"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/FilesPage.tsx:380
+#: src/shell/pages/FilesPage.tsx:384
 msgid "Moving"
 msgstr ""
 
@@ -15019,7 +15024,7 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/apps/settings/ModelsAndStorageSection.tsx:23
 #: src/apps/settings/performanceModel.ts:9
-#: src/shell/library/LibraryViewer.tsx:106
+#: src/shell/library/LibraryViewer.tsx:107
 #: src/shell/pages/ActivityPage.tsx:38
 #: src/shell/pages/settings/MediaCardViews.tsx:79
 msgid "Music"
@@ -15087,8 +15092,8 @@ msgstr ""
 
 #. js-lingui-explicit-id
 #: src/apps/settings/RobotBody.tsx:283
-#: src/shell/AmbientCompanionPane.tsx:258
-#: src/shell/AmbientCompanionPane.tsx:258
+#: src/shell/AmbientCompanionPane.tsx:264
+#: src/shell/AmbientCompanionPane.tsx:264
 msgid "Mute microphone"
 msgstr ""
 
@@ -15134,10 +15139,10 @@ msgstr ""
 #: src/apps/settings/HouseholdRobotsSection.tsx:189
 #: src/apps/settings/styles/StyleAddFile.tsx:52
 #: src/apps/settings/styles/StyleConfirm.tsx:85
-#: src/apps/settings/styles/StyleEditor.tsx:82
-#: src/shell/pages/FilesPage.tsx:400
-#: src/shell/pages/ProjectsPage.tsx:159
-#: src/shell/pages/UpdatesPage.tsx:50
+#: src/apps/settings/styles/StyleEditor.tsx:83
+#: src/shell/pages/FilesPage.tsx:406
+#: src/shell/pages/ProjectsPage.tsx:160
+#: src/shell/pages/UpdatesPage.tsx:49
 msgid "Name"
 msgstr ""
 
@@ -15213,6 +15218,8 @@ msgstr ""
 
 #. js-lingui-explicit-id
 #: src/apps/settings/AddRobotSection.tsx:211
+#: src/apps/settings/AddRobotSection.tsx:245
+#: src/apps/settings/AddRobotSection.tsx:247
 #: src/apps/settings/RobotBody.tsx:241
 #: src/apps/settings/RobotBody.tsx:252
 #: src/apps/settings/RobotPasswordSection.tsx:104
@@ -15249,7 +15256,7 @@ msgstr ""
 #: src/apps/settings/CodingSettings.tsx:164
 #: src/apps/setup/SetupWizard.tsx:480
 #: src/shell/pages/status/StatusApps.tsx:47
-#: src/shell/pages/status/StatusComponents.tsx:151
+#: src/shell/pages/status/StatusComponents.tsx:158
 msgid "Needs attention"
 msgstr ""
 
@@ -15259,7 +15266,7 @@ msgid "Needs fixing"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/library/TranscriptCaptionTracks.tsx:121
+#: src/shell/library/TranscriptCaptionTracks.tsx:127
 msgid "Needs refreshing"
 msgstr ""
 
@@ -15321,9 +15328,9 @@ msgstr ""
 #: src/apps/settings/CodingSettings.tsx:31
 #: src/apps/settings/CodingSettings.tsx:32
 #: src/apps/settings/CodingSettings.tsx:226
-#: src/shell/pages/status/StatusBoard.tsx:112
-#: src/shell/pages/status/StatusBoard.tsx:112
-#: src/shell/pages/UpdatesPage.tsx:73
+#: src/shell/pages/status/StatusBoard.tsx:113
+#: src/shell/pages/status/StatusBoard.tsx:113
+#: src/shell/pages/UpdatesPage.tsx:72
 msgid "Never"
 msgstr ""
 
@@ -15398,8 +15405,8 @@ msgid "New Coding key"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/AmbientCompanionPane.tsx:327
-#: src/shell/AmbientCompanionPane.tsx:327
+#: src/shell/AmbientCompanionPane.tsx:333
+#: src/shell/AmbientCompanionPane.tsx:333
 msgid "New conversation"
 msgstr ""
 
@@ -15414,7 +15421,7 @@ msgid "New folder"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/dashboard/HomeShelves.tsx:63
+#: src/shell/pages/dashboard/HomeShelves.tsx:83
 msgid "New in your library"
 msgstr ""
 
@@ -15538,7 +15545,7 @@ msgstr ""
 #: src/apps/settings/EngineLinkCredentialSection.tsx:288
 #: src/apps/settings/styles/StyleBrowser.tsx:159
 #: src/shell/components/DataTableControls.tsx:34
-#: src/shell/pages/RepairsPage.tsx:142
+#: src/shell/pages/RepairsPage.tsx:148
 #: src/shell/pages/useDataTableControls.tsx:125
 msgid "Next"
 msgstr ""
@@ -15549,7 +15556,7 @@ msgid "Next song"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/dashboard/TodaySection.tsx:19
+#: src/shell/pages/dashboard/TodaySection.tsx:20
 msgid "Next up"
 msgstr ""
 
@@ -15644,7 +15651,7 @@ msgid "No camera found"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/StoragePage.tsx:59
+#: src/shell/pages/StoragePage.tsx:60
 msgid "No cap set"
 msgstr ""
 
@@ -15680,7 +15687,7 @@ msgid "No connection details reported."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/AmbientCompanionPane.tsx:320
+#: src/shell/AmbientCompanionPane.tsx:326
 msgid "No conversations with {name} yet."
 msgstr ""
 
@@ -15696,7 +15703,7 @@ msgid "No data available."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/status/StatusComponents.tsx:129
+#: src/shell/pages/status/StatusComponents.tsx:136
 msgid "No data yet"
 msgstr ""
 
@@ -15726,8 +15733,8 @@ msgid "No devices paired to your profile yet."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/status/StatusBoard.tsx:131
 #: src/shell/pages/status/StatusBoard.tsx:132
+#: src/shell/pages/status/StatusBoard.tsx:133
 msgid "No expiry"
 msgstr ""
 
@@ -15737,7 +15744,7 @@ msgid "No family members yet."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/StoragePage.tsx:173
+#: src/shell/pages/StoragePage.tsx:177
 msgid "No files yet."
 msgstr ""
 
@@ -15757,7 +15764,7 @@ msgid "No matches for \"{q}\". Try another word."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/FilesPage.tsx:314
+#: src/shell/pages/FilesPage.tsx:318
 msgid "No matches. Try a different word or clear a filter."
 msgstr ""
 
@@ -15767,7 +15774,7 @@ msgid "No matching article titles."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/ProjectsPage.tsx:151
+#: src/shell/pages/ProjectsPage.tsx:152
 msgid "No matching projects"
 msgstr ""
 
@@ -15822,7 +15829,7 @@ msgid "No problems"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/ProjectsPage.tsx:151
+#: src/shell/pages/ProjectsPage.tsx:152
 msgid "No projects yet"
 msgstr ""
 
@@ -15843,7 +15850,7 @@ msgid "No recent use: {count, plural, one {# service} other {# services}}"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/UpdatesPage.tsx:61
+#: src/shell/pages/UpdatesPage.tsx:60
 msgid "No release published yet"
 msgstr ""
 
@@ -15874,7 +15881,7 @@ msgid "No robots yet. An admin adds one in Settings, Home, Devices."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/StoragePage.tsx:188
+#: src/shell/pages/StoragePage.tsx:193
 msgid "No saved online data."
 msgstr ""
 
@@ -15889,7 +15896,7 @@ msgid "No settings match that search."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/settings/SettingsRenderer.tsx:207
+#: src/shell/pages/settings/SettingsRenderer.tsx:208
 msgid "No settings yet."
 msgstr ""
 
@@ -15929,7 +15936,7 @@ msgid "no Stack configured"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/EnginesPage.tsx:187
+#: src/shell/pages/EnginesPage.tsx:190
 #: src/shell/pages/performance/EnginesHealthBody.tsx:44
 msgid "No Stack configured"
 msgstr ""
@@ -16095,7 +16102,7 @@ msgid "none yet"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/StoragePage.tsx:69
+#: src/shell/pages/StoragePage.tsx:70
 msgid "None yet"
 msgstr ""
 
@@ -16105,7 +16112,7 @@ msgid "setting.coding.home_mode.option_label.normal"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/styles/StyleEditor.tsx:144
+#: src/apps/settings/styles/StyleEditor.tsx:145
 msgid "Normal"
 msgstr ""
 
@@ -16152,7 +16159,7 @@ msgstr ""
 
 #. js-lingui-explicit-id
 #: src/shell/pages/status/statusChecksFormat.ts:5
-#: src/shell/pages/UpdatesPage.tsx:61
+#: src/shell/pages/UpdatesPage.tsx:60
 msgid "Not checked yet"
 msgstr ""
 
@@ -16233,8 +16240,8 @@ msgstr ""
 
 #. js-lingui-explicit-id
 #: src/apps/settings/HouseholdRobotsSection.tsx:178
-#: src/shell/pages/status/StatusComponents.tsx:40
-#: src/shell/pages/status/StatusComponents.tsx:42
+#: src/shell/pages/status/StatusComponents.tsx:41
+#: src/shell/pages/status/StatusComponents.tsx:43
 msgid "Not running"
 msgstr ""
 
@@ -16277,7 +16284,7 @@ msgid "setting.ease.word_help.option.off"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/styles/StyleEditor.tsx:155
+#: src/apps/settings/styles/StyleEditor.tsx:156
 #: src/apps/settings/VoiceManagerSection.tsx:21
 #: src/apps/settings/VoiceManagerSection.tsx:28
 msgid "Not stated"
@@ -16314,7 +16321,7 @@ msgid "Not working"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/status/StatusBoard.tsx:132
+#: src/shell/pages/status/StatusBoard.tsx:133
 msgid "Note"
 msgstr ""
 
@@ -16334,7 +16341,7 @@ msgid "Nothing here yet. Add music, videos, shows, podcasts or books to your lib
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/FilesPage.tsx:315
+#: src/shell/pages/FilesPage.tsx:319
 msgid "Nothing here yet. Pictures, videos and songs you make in chat land here, along with files you upload. Drop a file anywhere on this page to add it."
 msgstr ""
 
@@ -16344,7 +16351,7 @@ msgid "Nothing idle to unload right now."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/FilesPage.tsx:316
+#: src/shell/pages/FilesPage.tsx:320
 msgid "Nothing in {label} yet."
 msgstr ""
 
@@ -16424,6 +16431,11 @@ msgid "Nothing to download: everything you ticked is already installed."
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/shell/pages/dashboard/HomeShelves.tsx:50
+msgid "Nothing to pick up yet. Chats and things you play show up here."
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/shell/pages/WikipediaPage.tsx:81
 #: src/shell/pages/WikipediaPage.tsx:123
 msgid "Nothing to suggest right now. Try a search."
@@ -16479,13 +16491,13 @@ msgid "setting.companion.voice.lively_adult.label"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/styles/StyleEditor.tsx:115
+#: src/apps/settings/styles/StyleEditor.tsx:116
 msgid "Now adults only."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/styles/StyleEditor.tsx:64
-#: src/apps/settings/styles/StyleEditor.tsx:67
+#: src/apps/settings/styles/StyleEditor.tsx:65
+#: src/apps/settings/styles/StyleEditor.tsx:68
 msgid "Now all ages."
 msgstr ""
 
@@ -16530,7 +16542,7 @@ msgstr ""
 #: src/apps/settings/ReferenceLibrarySettings.tsx:286
 #: src/apps/settings/RobotBody.tsx:213
 #: src/lib/settingCopy.ts:42
-#: src/shell/pages/status/StatusComponents.tsx:151
+#: src/shell/pages/status/StatusComponents.tsx:158
 msgid "Off"
 msgstr ""
 
@@ -16768,7 +16780,7 @@ msgid "area.Offline data"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/status/StatusComponents.tsx:30
+#: src/shell/pages/status/StatusComponents.tsx:31
 msgid "Offline reference library."
 msgstr ""
 
@@ -16870,13 +16882,13 @@ msgid "On {titles}"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/AmbientCompanionPane.tsx:258
+#: src/shell/AmbientCompanionPane.tsx:264
 msgid "On a call with {name}"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/StackChanInstallDialog.tsx:124
-#: src/apps/settings/StackChanInstallDialog.tsx:139
+#: src/apps/settings/StackChanInstallDialog.tsx:125
+#: src/apps/settings/StackChanInstallDialog.tsx:140
 msgid "On a phone, join the robot's Wi-Fi hotspot and choose your home Wi-Fi. Home never asks for the Wi-Fi password."
 msgstr ""
 
@@ -17081,7 +17093,7 @@ msgid "Only a parent or admin can change these settings. Ask the person who set 
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/styles/StyleEditor.tsx:105
+#: src/apps/settings/styles/StyleEditor.tsx:106
 #: src/apps/settings/styles/StylesTab.tsx:128
 msgid "Only admins"
 msgstr ""
@@ -17092,17 +17104,17 @@ msgid "Only an owner or admin can enroll {display_name} for face recognition."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/EnginesPage.tsx:148
+#: src/shell/pages/EnginesPage.tsx:151
 msgid "Only an owner or admin can manage engines."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/RepairsPage.tsx:114
+#: src/shell/pages/RepairsPage.tsx:119
 msgid "Only an owner or admin can manage repairs."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/UpdatesPage.tsx:129
+#: src/shell/pages/UpdatesPage.tsx:131
 msgid "Only an owner or admin can manage updates."
 msgstr ""
 
@@ -17159,7 +17171,7 @@ msgstr ""
 
 #. js-lingui-explicit-id
 #: src/apps/chat/chatToolUis.tsx:108
-#: src/shell/AmbientCompanionPane.tsx:318
+#: src/shell/AmbientCompanionPane.tsx:324
 #: src/shell/InstallDock.tsx:255
 #: src/shell/library/LibraryItems.tsx:32
 #: src/shell/NotificationBell.tsx:252
@@ -17307,7 +17319,7 @@ msgid "setting.news.reader_open.option.site"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/dashboard/TodaySection.tsx:91
+#: src/shell/pages/dashboard/TodaySection.tsx:95
 msgid "Open Weather"
 msgstr ""
 
@@ -17490,7 +17502,7 @@ msgstr ""
 
 #. js-lingui-explicit-id
 #: src/shell/components/DataTableControls.tsx:36
-#: src/shell/pages/RepairsPage.tsx:143
+#: src/shell/pages/RepairsPage.tsx:149
 msgid "Page {page} of {pages}"
 msgstr ""
 
@@ -17587,7 +17599,7 @@ msgid "setting.companion.voice.pal.label"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/status/StatusComponents.tsx:153
+#: src/shell/pages/status/StatusComponents.tsx:160
 msgid "part"
 msgstr ""
 
@@ -17598,7 +17610,7 @@ msgid "Parts"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/status/StatusBoard.tsx:108
+#: src/shell/pages/status/StatusBoard.tsx:109
 msgid "Parts affected"
 msgstr ""
 
@@ -17614,12 +17626,12 @@ msgid "PASS"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/EnginesPage.tsx:160
+#: src/shell/pages/EnginesPage.tsx:163
 msgid "PASS hop {id}"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/EnginesPage.tsx:160
+#: src/shell/pages/EnginesPage.tsx:163
 msgid "PASS hop {id}: {detail}"
 msgstr ""
 
@@ -17758,7 +17770,7 @@ msgstr ""
 
 #. js-lingui-explicit-id
 #: src/apps/settings/SiteBlocksSection.tsx:51
-#: src/shell/pages/StoragePage.tsx:173
+#: src/shell/pages/StoragePage.tsx:177
 msgid "Person"
 msgstr ""
 
@@ -17849,7 +17861,7 @@ msgid "Photo"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/styles/StyleEditor.tsx:124
+#: src/apps/settings/styles/StyleEditor.tsx:125
 msgid "Phrases added to the person's words, never replacing them."
 msgstr ""
 
@@ -17890,7 +17902,7 @@ msgstr ""
 
 #. js-lingui-explicit-id
 #: src/apps/settings/styles/StyleConfirm.tsx:99
-#: src/apps/settings/styles/StyleEditor.tsx:164
+#: src/apps/settings/styles/StyleEditor.tsx:165
 msgid "Pick one"
 msgstr ""
 
@@ -17910,8 +17922,6 @@ msgid "setting.chat.pick_up_threads.label"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/dashboard/HomeShelves.tsx:29
-#: src/shell/pages/dashboard/HomeShelves.tsx:29
 #: src/shell/pages/MediaHomePage.tsx:43
 msgid "Pick up where you left off"
 msgstr ""
@@ -18047,7 +18057,7 @@ msgid "setting.engines.stack.where.does"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/FilesPage.tsx:150
+#: src/shell/pages/FilesPage.tsx:154
 msgid "Picture"
 msgstr ""
 
@@ -18155,7 +18165,7 @@ msgid "Pictures, videos and songs you make show up here while they are made and 
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/ProjectsPage.tsx:183
+#: src/shell/pages/ProjectsPage.tsx:184
 msgid "Pin"
 msgstr ""
 
@@ -18358,13 +18368,13 @@ msgid "portrait"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/status/StatusBoard.tsx:132
-#: src/shell/pages/status/StatusBoard.tsx:132
+#: src/shell/pages/status/StatusBoard.tsx:133
+#: src/shell/pages/status/StatusBoard.tsx:133
 msgid "Post a note"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/status/StatusBoard.tsx:132
+#: src/shell/pages/status/StatusBoard.tsx:133
 msgid "Post note"
 msgstr ""
 
@@ -18374,13 +18384,13 @@ msgid "Posted by {name}, {when}"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/status/StatusBoard.tsx:132
+#: src/shell/pages/status/StatusBoard.tsx:133
 msgid "Posting…"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/StackChanInstallDialog.tsx:138
-#: src/apps/settings/StackChanInstallDialog.tsx:138
+#: src/apps/settings/StackChanInstallDialog.tsx:139
+#: src/apps/settings/StackChanInstallDialog.tsx:139
 msgid "Preparing"
 msgstr ""
 
@@ -18390,7 +18400,7 @@ msgid "Preparing the voice test"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/AmbientCompanionPane.tsx:177
+#: src/shell/AmbientCompanionPane.tsx:181
 msgid "Presence"
 msgstr ""
 
@@ -18501,7 +18511,7 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/apps/settings/styles/StyleBrowser.tsx:157
 #: src/shell/components/DataTableControls.tsx:33
-#: src/shell/pages/RepairsPage.tsx:142
+#: src/shell/pages/RepairsPage.tsx:148
 #: src/shell/pages/useDataTableControls.tsx:118
 msgid "Previous"
 msgstr ""
@@ -18577,18 +18587,18 @@ msgid "Progress"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/ProjectsPage.tsx:161
+#: src/shell/pages/ProjectsPage.tsx:162
 msgid "Project actions"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/ProjectsPage.tsx:60
-#: src/shell/pages/ProjectsPage.tsx:134
+#: src/shell/pages/ProjectsPage.tsx:59
+#: src/shell/pages/ProjectsPage.tsx:135
 msgid "Projects"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/ProjectsPage.tsx:152
+#: src/shell/pages/ProjectsPage.tsx:153
 msgid "Projects keep related chats together."
 msgstr ""
 
@@ -18711,7 +18721,7 @@ msgid "Quick timers"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/library/LibraryViewer.tsx:108
+#: src/shell/library/LibraryViewer.tsx:109
 msgid "Quiet"
 msgstr ""
 
@@ -18782,7 +18792,7 @@ msgid "setting.ease.read_aloud.label"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/AmbientCompanionPane.tsx:321
+#: src/shell/AmbientCompanionPane.tsx:327
 msgid "Read aloud is unavailable because voice output is not ready. Check Voice settings and try again."
 msgstr ""
 
@@ -18794,13 +18804,13 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/apps/chat/chatHeaderBar.tsx:223
 #: src/apps/chat/chatHeaderBar.tsx:321
-#: src/shell/AmbientCompanionPane.tsx:323
-#: src/shell/AmbientCompanionPane.tsx:323
+#: src/shell/AmbientCompanionPane.tsx:329
+#: src/shell/AmbientCompanionPane.tsx:329
 msgid "Read replies aloud"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/styles/StyleEditor.tsx:102
+#: src/apps/settings/styles/StyleEditor.tsx:103
 msgid "Read the licence and fingerprint under Details, then confirm them. Until you do, only admins can use this style."
 msgstr ""
 
@@ -18995,7 +19005,7 @@ msgid "setting.reference.update.max_mbps.label"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/library/TranscriptCaptionTracks.tsx:152
+#: src/shell/library/TranscriptCaptionTracks.tsx:158
 msgid "Refresh"
 msgstr ""
 
@@ -19016,12 +19026,12 @@ msgid "Release"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/status/StatusComponents.tsx:28
+#: src/shell/pages/status/StatusComponents.tsx:29
 msgid "Remembers and organizes what matters."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/reminders/RemindersPage.tsx:82
+#: src/apps/reminders/RemindersPage.tsx:83
 msgid "Reminder"
 msgstr ""
 
@@ -19079,8 +19089,8 @@ msgstr ""
 #: src/apps/settings/FreeUpSpaceDialog.tsx:114
 #: src/apps/settings/HouseholdRobotsSection.tsx:190
 #: src/apps/settings/HuggingFaceTokenSection.tsx:112
-#: src/apps/settings/styles/StyleEditor.tsx:97
-#: src/apps/settings/styles/StyleEditor.tsx:182
+#: src/apps/settings/styles/StyleEditor.tsx:98
+#: src/apps/settings/styles/StyleEditor.tsx:183
 #: src/apps/settings/styles/stylesShared.tsx:27
 #: src/shell/pages/MusicWorkspacePage.tsx:325
 #: src/shell/pages/WikipediaPage.tsx:99
@@ -19194,7 +19204,7 @@ msgid "Remove this robot from the household."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/styles/StyleEditor.tsx:177
+#: src/apps/settings/styles/StyleEditor.tsx:178
 msgid "Remove this style?"
 msgstr ""
 
@@ -19266,7 +19276,7 @@ msgid "Rename conversation"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/FilesPage.tsx:399
+#: src/shell/pages/FilesPage.tsx:404
 msgid "Rename file"
 msgstr ""
 
@@ -19286,7 +19296,7 @@ msgid "Rename quick timer"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/FilesPage.tsx:397
+#: src/shell/pages/FilesPage.tsx:402
 msgid "Renamed."
 msgstr ""
 
@@ -19306,15 +19316,15 @@ msgid "setting.resources.close_apps.reopen.does"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/RepairsPage.tsx:134
+#: src/shell/pages/RepairsPage.tsx:140
 msgid "Repair issues"
 msgstr ""
 
 #. js-lingui-explicit-id
 #: src/shell/InstallDock.tsx:308
 #: src/shell/pageHeaderTitle.tsx:103
-#: src/shell/pages/DashboardPage.tsx:46
-#: src/shell/pages/RepairsPage.tsx:59
+#: src/shell/pages/dashboard/Attention.tsx:25
+#: src/shell/pages/RepairsPage.tsx:60
 #: src/shell/Routes.tsx:156
 msgid "Repairs"
 msgstr ""
@@ -19325,8 +19335,13 @@ msgid "area.Repairs"
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/shell/pages/dashboard/Attention.tsx:25
+msgid "Repairs lists what to do."
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/apps/clock/AlarmEditor.tsx:81
-#: src/shell/pages/status/StatusBoard.tsx:110
+#: src/shell/pages/status/StatusBoard.tsx:111
 msgid "Repeat"
 msgstr ""
 
@@ -19341,7 +19356,7 @@ msgid "setting.safety.alarm.repeat_seconds.help"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/status/StatusBoard.tsx:112
+#: src/shell/pages/status/StatusBoard.tsx:113
 msgid "Repeat ends"
 msgstr ""
 
@@ -19351,7 +19366,7 @@ msgid "Repeat off"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/status/StatusBoard.tsx:111
+#: src/shell/pages/status/StatusBoard.tsx:112
 msgid "Repeat on"
 msgstr ""
 
@@ -19361,17 +19376,17 @@ msgid "Repeat one song"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/status/StatusBoard.tsx:112
+#: src/shell/pages/status/StatusBoard.tsx:113
 msgid "Repeat until"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/status/StatusBoard.tsx:69
+#: src/shell/pages/status/StatusBoard.tsx:70
 msgid "Repeats until {date}"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/status/StatusBoard.tsx:69
+#: src/shell/pages/status/StatusBoard.tsx:70
 msgid "Repeats with no end date"
 msgstr ""
 
@@ -19488,9 +19503,9 @@ msgstr ""
 
 #. js-lingui-explicit-id
 #: src/apps/setup/preview/SetupPreviewBar.tsx:43
-#: src/shell/pages/EnginesPage.tsx:237
-#: src/shell/pages/status/StatusComponents.tsx:129
-#: src/shell/pages/status/StatusComponents.tsx:153
+#: src/shell/pages/EnginesPage.tsx:240
+#: src/shell/pages/status/StatusComponents.tsx:136
+#: src/shell/pages/status/StatusComponents.tsx:160
 msgid "Restart"
 msgstr ""
 
@@ -19500,7 +19515,7 @@ msgid "Restart {name}'s {join} {value}?"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/status/StatusComponents.tsx:153
+#: src/shell/pages/status/StatusComponents.tsx:160
 msgid "Restart {value}?"
 msgstr ""
 
@@ -19515,14 +19530,14 @@ msgid "setting.host.guard.mode.label"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/StackChanInstallDialog.tsx:21
-#: src/shell/pages/status/StatusComponents.tsx:41
+#: src/apps/settings/StackChanInstallDialog.tsx:22
+#: src/shell/pages/status/StatusComponents.tsx:42
 msgid "Restarting"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/status/StatusComponents.tsx:129
-#: src/shell/pages/status/StatusComponents.tsx:153
+#: src/shell/pages/status/StatusComponents.tsx:136
+#: src/shell/pages/status/StatusComponents.tsx:160
 msgid "Restarting…"
 msgstr ""
 
@@ -19624,10 +19639,9 @@ msgstr ""
 #: src/apps/clock/AlarmsTab.tsx:71
 #: src/apps/clock/AlarmsTab.tsx:72
 #: src/apps/clock/TimersTab.tsx:148
-#: src/apps/reminders/RemindersPage.tsx:192
-#: src/apps/reminders/RemindersPage.tsx:192
+#: src/apps/reminders/RemindersPage.tsx:193
 #: src/apps/settings/EngineLinkCredentialSection.tsx:280
-#: src/apps/settings/StackChanInstallDialog.tsx:146
+#: src/apps/settings/StackChanInstallDialog.tsx:147
 #: src/shell/GlobalMiniPlayer.tsx:120
 #: src/shell/pages/settings/HouseSettings.tsx:47
 #: src/shell/pages/settings/HouseSettings.tsx:47
@@ -19892,7 +19906,7 @@ msgid "setting.robot.brightness.label"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/AmbientCompanionPane.tsx:177
+#: src/shell/AmbientCompanionPane.tsx:181
 msgid "Robot settings"
 msgstr ""
 
@@ -19980,7 +19994,7 @@ msgstr ""
 #: src/apps/people/NewPersonForm.tsx:105
 #: src/apps/people/NewPersonForm.tsx:106
 #: src/shell/pages/EnginesPage.tsx:46
-#: src/shell/pages/StoragePage.tsx:173
+#: src/shell/pages/StoragePage.tsx:177
 msgid "Role"
 msgstr ""
 
@@ -19990,7 +20004,7 @@ msgid "Role for {name}"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/EnginesPage.tsx:199
+#: src/shell/pages/EnginesPage.tsx:202
 msgid "Roles"
 msgstr ""
 
@@ -20046,7 +20060,7 @@ msgstr ""
 
 #. js-lingui-explicit-id
 #: src/shell/components/DataTableControls.tsx:38
-#: src/shell/pages/RepairsPage.tsx:144
+#: src/shell/pages/RepairsPage.tsx:150
 msgid "Rows per page:"
 msgstr ""
 
@@ -20071,7 +20085,7 @@ msgid "Run one command on the engine computer"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/RepairsPage.tsx:121
+#: src/shell/pages/RepairsPage.tsx:127
 msgid "Run setup again"
 msgstr ""
 
@@ -20093,15 +20107,15 @@ msgstr ""
 #: src/apps/settings/CodingSettings.tsx:140
 #: src/apps/setup/SetupWizard.tsx:483
 #: src/shell/pages/CompanionsPage.tsx:317
-#: src/shell/pages/status/StatusComponents.tsx:39
-#: src/shell/pages/status/StatusComponents.tsx:49
-#: src/shell/pages/status/StatusComponents.tsx:114
-#: src/shell/pages/status/StatusComponents.tsx:115
+#: src/shell/pages/status/StatusComponents.tsx:40
+#: src/shell/pages/status/StatusComponents.tsx:50
+#: src/shell/pages/status/StatusComponents.tsx:120
+#: src/shell/pages/status/StatusComponents.tsx:121
 msgid "Running"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/status/StatusComponents.tsx:142
+#: src/shell/pages/status/StatusComponents.tsx:149
 msgid "Running a big job: {gb} GB"
 msgstr ""
 
@@ -20161,7 +20175,7 @@ msgid "setting.topics.family_stories.label"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/status/StatusBoard.tsx:29
+#: src/shell/pages/status/StatusBoard.tsx:28
 msgid "Sat"
 msgstr ""
 
@@ -20193,7 +20207,7 @@ msgstr ""
 
 #. js-lingui-explicit-id
 #: src/apps/settings/VoiceManagerSection.tsx:151
-#: src/shell/pages/FilesPage.tsx:402
+#: src/shell/pages/FilesPage.tsx:408
 msgid "Save name"
 msgstr ""
 
@@ -20228,22 +20242,22 @@ msgid "Saved"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/StoragePage.tsx:50
+#: src/shell/pages/StoragePage.tsx:51
 msgid "Saved copies"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/StoragePage.tsx:182
+#: src/shell/pages/StoragePage.tsx:187
 msgid "Saved copies of weather, news and other things Home looked up online. Your own chats, memories and the news shelf stay. Home will fetch cleared data again the next time someone asks."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/StoragePage.tsx:54
+#: src/shell/pages/StoragePage.tsx:55
 msgid "Saved copies of weather, news and other things Home looked up online. Your own chats, memories and the news shelf stay. Home will fetch it again the next time someone asks."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/StoragePage.tsx:186
+#: src/shell/pages/StoragePage.tsx:191
 msgid "Saved data by source"
 msgstr ""
 
@@ -20278,7 +20292,7 @@ msgid "Saved on {whenText}"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/StoragePage.tsx:181
+#: src/shell/pages/StoragePage.tsx:185
 msgid "Saved online data"
 msgstr ""
 
@@ -20290,18 +20304,18 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/apps/people/ProfileForm.tsx:166
 #: src/apps/settings/HuggingFaceTokenSection.tsx:105
-#: src/apps/settings/styles/StyleEditor.tsx:47
+#: src/apps/settings/styles/StyleEditor.tsx:48
 #: src/apps/settings/VoiceBrowserSection.tsx:105
 msgid "Saved."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/styles/StyleEditor.tsx:59
+#: src/apps/settings/styles/StyleEditor.tsx:60
 msgid "Saved. Choose who below."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/StackChanInstallDialog.tsx:135
+#: src/apps/settings/StackChanInstallDialog.tsx:136
 msgid "Saves the StackChan's whole memory, then installs. About 6 minutes longer."
 msgstr ""
 
@@ -20333,7 +20347,7 @@ msgstr ""
 #: src/apps/settings/HuggingFaceTokenSection.tsx:108
 #: src/apps/settings/SignInSecretSection.tsx:74
 #: src/shell/pages/settings/SettingField.tsx:138
-#: src/shell/pages/status/StatusBoard.tsx:113
+#: src/shell/pages/status/StatusBoard.tsx:114
 msgid "Saving…"
 msgstr ""
 
@@ -20343,7 +20357,7 @@ msgid "Say a line"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/styles/StyleEditor.tsx:137
+#: src/apps/settings/styles/StyleEditor.tsx:138
 msgid "Say instead"
 msgstr ""
 
@@ -20455,20 +20469,20 @@ msgid "Scenarios"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/status/StatusBoard.tsx:113
+#: src/shell/pages/status/StatusBoard.tsx:114
 msgid "Schedule"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/status/StatusBoard.tsx:105
-#: src/shell/pages/status/StatusBoard.tsx:105
+#: src/shell/pages/status/StatusBoard.tsx:106
+#: src/shell/pages/status/StatusBoard.tsx:106
 msgid "Schedule maintenance"
 msgstr ""
 
 #. js-lingui-explicit-id
 #: src/apps/reminders/ListColumn.tsx:35
 #: src/apps/reminders/SmartListView.tsx:14
-#: src/shell/pages/status/StatusBoard.tsx:27
+#: src/shell/pages/status/StatusBoard.tsx:26
 msgid "Scheduled"
 msgstr ""
 
@@ -20623,8 +20637,8 @@ msgid "Search offline city data for a time zone."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/ProjectsPage.tsx:141
 #: src/shell/pages/ProjectsPage.tsx:142
+#: src/shell/pages/ProjectsPage.tsx:143
 msgid "Search projects"
 msgstr ""
 
@@ -20645,7 +20659,7 @@ msgstr ""
 
 #. js-lingui-explicit-id
 #: src/shell/components/DataTableControls.tsx:28
-#: src/shell/pages/RepairsPage.tsx:138
+#: src/shell/pages/RepairsPage.tsx:144
 #: src/shell/pages/useDataTableControls.tsx:99
 msgid "Search rows…"
 msgstr ""
@@ -20673,7 +20687,7 @@ msgstr ""
 
 #. js-lingui-explicit-id
 #: src/shell/components/DataTableControls.tsx:28
-#: src/shell/pages/RepairsPage.tsx:138
+#: src/shell/pages/RepairsPage.tsx:144
 #: src/shell/pages/useDataTableControls.tsx:96
 msgid "Search table rows"
 msgstr ""
@@ -20694,9 +20708,9 @@ msgid "Search Wikipedia"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/FilesPage.tsx:294
-#: src/shell/pages/FilesPage.tsx:294
-#: src/shell/pages/FilesPage.tsx:343
+#: src/shell/pages/FilesPage.tsx:298
+#: src/shell/pages/FilesPage.tsx:298
+#: src/shell/pages/FilesPage.tsx:347
 msgid "Search your Library"
 msgstr ""
 
@@ -20843,7 +20857,7 @@ msgstr ""
 
 #. js-lingui-explicit-id
 #: src/apps/notifications/NotificationsPage.tsx:156
-#: src/shell/pages/FilesPage.tsx:371
+#: src/shell/pages/FilesPage.tsx:375
 msgid "Select"
 msgstr ""
 
@@ -20906,8 +20920,9 @@ msgid "Semitones, -12 to 12. A negative number lowers the voice."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/library/LibraryViewer.tsx:161
-#: src/shell/library/LibraryViewer.tsx:161
+#: src/shell/library/LibraryViewer.tsx:162
+#: src/shell/library/LibraryViewer.tsx:162
+#: src/shell/pages/dashboard/AskBox.tsx:66
 msgid "Send"
 msgstr ""
 
@@ -21017,7 +21032,7 @@ msgid "Set up coding"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/EnginesPage.tsx:188
+#: src/shell/pages/EnginesPage.tsx:191
 msgid "Set up MaiPai Stack in Settings to run your own engines and see their roles, versions and health here."
 msgstr ""
 
@@ -21182,10 +21197,10 @@ msgid "Setting up your AI"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/AmbientCompanionPane.tsx:323
+#: src/shell/AmbientCompanionPane.tsx:329
 #: src/shell/coreLabels.ts:13
 #: src/shell/pageHeaderTitle.tsx:98
-#: src/shell/pages/FilesPage.tsx:284
+#: src/shell/pages/FilesPage.tsx:288
 #: src/shell/pages/PersonProfilePage.tsx:206
 #: src/shell/pages/settings/SettingsAreaPage.tsx:293
 #: src/shell/Routes.tsx:434
@@ -21247,9 +21262,9 @@ msgstr ""
 
 #. js-lingui-explicit-id
 #: src/shell/library/LibraryItems.tsx:34
-#: src/shell/library/LibraryViewer.tsx:160
-#: src/shell/library/LibraryViewer.tsx:160
-#: src/shell/pages/FilesPage.tsx:330
+#: src/shell/library/LibraryViewer.tsx:161
+#: src/shell/library/LibraryViewer.tsx:161
+#: src/shell/pages/FilesPage.tsx:334
 #: src/shell/pages/PersonProfilePage.tsx:205
 msgid "Share"
 msgstr ""
@@ -21265,7 +21280,7 @@ msgid "Shared"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/StoragePage.tsx:79
+#: src/shell/pages/StoragePage.tsx:80
 msgid "Shared by people no longer here"
 msgstr ""
 
@@ -21321,12 +21336,12 @@ msgid "setting.ease.reading_level.option.plain"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/dashboard/GettingStarted.tsx:39
+#: src/shell/pages/dashboard/GettingStarted.tsx:37
 msgid "Show {count} more"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/settings/SettingsRenderer.tsx:237
+#: src/shell/pages/settings/SettingsRenderer.tsx:238
 msgid "Show {length} advanced settings"
 msgstr ""
 
@@ -21347,7 +21362,7 @@ msgid "setting.notifications.browser.enabled.label"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/FilesPage.tsx:316
+#: src/shell/pages/FilesPage.tsx:320
 msgid "Show all files"
 msgstr ""
 
@@ -21357,7 +21372,7 @@ msgid "Show conversations"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/StackChanInstallDialog.tsx:142
+#: src/apps/settings/StackChanInstallDialog.tsx:143
 #: src/shell/pages/status/StatusApps.tsx:98
 msgid "Show details"
 msgstr ""
@@ -21400,7 +21415,7 @@ msgid "Show me around"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/FilesPage.tsx:323
+#: src/shell/pages/FilesPage.tsx:327
 msgid "Show more files"
 msgstr ""
 
@@ -21525,7 +21540,7 @@ msgid "Shuffle"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/AmbientCompanionPane.tsx:315
+#: src/shell/AmbientCompanionPane.tsx:321
 msgid "Side chat"
 msgstr ""
 
@@ -21689,9 +21704,9 @@ msgid "Six-digit code"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/styles/StyleEditor.tsx:157
+#: src/apps/settings/styles/StyleEditor.tsx:158
 #: src/shell/pages/performance/DiskHardwareBody.tsx:28
-#: src/shell/pages/StoragePage.tsx:51
+#: src/shell/pages/StoragePage.tsx:52
 msgid "Size"
 msgstr ""
 
@@ -21737,7 +21752,7 @@ msgid "Skills added to this home"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/dashboard/GettingStarted.tsx:34
+#: src/shell/pages/dashboard/GettingStarted.tsx:32
 msgid "Skip"
 msgstr ""
 
@@ -21811,7 +21826,7 @@ msgid "setting.ease.preset.option.comfortable"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/status/StatusComponents.tsx:68
+#: src/shell/pages/status/StatusComponents.tsx:69
 msgid "Slow"
 msgstr ""
 
@@ -21890,7 +21905,7 @@ msgid "setting.alarms.snooze_minutes.label"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/library/LibraryViewer.tsx:108
+#: src/shell/library/LibraryViewer.tsx:109
 msgid "Soft"
 msgstr ""
 
@@ -21900,7 +21915,7 @@ msgid "setting.ease.motion.option.calm"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/library/LibraryViewer.tsx:107
+#: src/shell/library/LibraryViewer.tsx:108
 msgid "Soft piano, slow and warm"
 msgstr ""
 
@@ -21930,7 +21945,7 @@ msgid "Some downloads need a free Civitai key. Home keeps it private and never s
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/FilesPage.tsx:379
+#: src/shell/pages/FilesPage.tsx:383
 msgid "Some of it is shared with people in your home."
 msgstr ""
 
@@ -21961,7 +21976,7 @@ msgid "setting.synths.real_people.does_teen"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/FilesPage.tsx:152
+#: src/shell/pages/FilesPage.tsx:156
 msgid "Someone in your home"
 msgstr ""
 
@@ -21997,6 +22012,11 @@ msgid "Something needs a look."
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/shell/pages/dashboard/Attention.tsx:25
+msgid "Something needs fixing"
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/shell/pages/WikipediaPage.tsx:118
 #: src/shell/pages/WikipediaPage.tsx:120
 msgid "Something to read"
@@ -22023,8 +22043,8 @@ msgid "failure.other.minor"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/library/LibraryViewer.tsx:113
-#: src/shell/pages/FilesPage.tsx:150
+#: src/shell/library/LibraryViewer.tsx:114
+#: src/shell/pages/FilesPage.tsx:154
 #: src/shell/pages/MusicWorkspacePage.tsx:38
 #: src/shell/pages/PersonProfilePage.tsx:175
 #: src/shell/pages/SoundExtras.tsx:75
@@ -22083,7 +22103,7 @@ msgid "Sort"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/FilesPage.tsx:365
+#: src/shell/pages/FilesPage.tsx:369
 msgid "Sort by"
 msgstr ""
 
@@ -22106,9 +22126,9 @@ msgstr ""
 
 #. js-lingui-explicit-id
 #: src/apps/settings/styles/StyleBrowser.tsx:104
-#: src/apps/settings/styles/StyleEditor.tsx:154
+#: src/apps/settings/styles/StyleEditor.tsx:155
 #: src/apps/settings/VoiceManagerSection.tsx:106
-#: src/shell/pages/StoragePage.tsx:49
+#: src/shell/pages/StoragePage.tsx:50
 msgid "Source"
 msgstr ""
 
@@ -22170,7 +22190,7 @@ msgid "setting.tts.voice_id.label"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/status/StatusComponents.tsx:29
+#: src/shell/pages/status/StatusComponents.tsx:30
 msgid "Speaks the replies."
 msgstr ""
 
@@ -22320,7 +22340,7 @@ msgid "Stack contract:"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/StackChanInstallDialog.tsx:138
+#: src/apps/settings/StackChanInstallDialog.tsx:139
 msgid "StackChan"
 msgstr ""
 
@@ -22419,8 +22439,8 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/apps/clock/StopwatchTab.tsx:68
 #: src/apps/clock/TimersTab.tsx:124
-#: src/shell/pages/EnginesPage.tsx:236
-#: src/shell/pages/status/StatusComponents.tsx:129
+#: src/shell/pages/EnginesPage.tsx:239
+#: src/shell/pages/status/StatusComponents.tsx:136
 msgid "Start"
 msgstr ""
 
@@ -22440,10 +22460,10 @@ msgid "Start now"
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/apps/settings/AddRobotSection.tsx:245
+#: src/apps/settings/AddRobotSection.tsx:247
 #: src/apps/settings/AddRobotSection.tsx:254
-#: src/apps/settings/AddRobotSection.tsx:264
-#: src/apps/settings/AddRobotSection.tsx:273
-#: src/apps/settings/StackChanInstallDialog.tsx:144
+#: src/apps/settings/StackChanInstallDialog.tsx:145
 #: src/shell/pages/MakeSongPage.tsx:102
 msgid "Start over"
 msgstr ""
@@ -22506,9 +22526,9 @@ msgstr ""
 #: src/shell/pages/MusicRemix.tsx:41
 #: src/shell/pages/MusicWorkspacePage.tsx:132
 #: src/shell/pages/MusicWorkspacePage.tsx:266
-#: src/shell/pages/status/StatusComponents.tsx:43
-#: src/shell/pages/status/StatusComponents.tsx:45
-#: src/shell/pages/status/StatusComponents.tsx:114
+#: src/shell/pages/status/StatusComponents.tsx:44
+#: src/shell/pages/status/StatusComponents.tsx:46
+#: src/shell/pages/status/StatusComponents.tsx:120
 msgid "Starting"
 msgstr ""
 
@@ -22563,12 +22583,12 @@ msgid "Starting your song"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/status/StatusComponents.tsx:129
+#: src/shell/pages/status/StatusComponents.tsx:136
 msgid "Starting…"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/status/StatusBoard.tsx:109
+#: src/shell/pages/status/StatusBoard.tsx:110
 msgid "Starts"
 msgstr ""
 
@@ -22583,9 +22603,9 @@ msgstr ""
 #: src/shell/pages/EnginesPage.tsx:47
 #: src/shell/pages/EnginesPage.tsx:71
 #: src/shell/pages/performance/EnginesHealthBody.tsx:37
-#: src/shell/pages/RepairsPage.tsx:65
+#: src/shell/pages/RepairsPage.tsx:67
 #: src/shell/pages/StatusPage.tsx:32
-#: src/shell/pages/UpdatesPage.tsx:54
+#: src/shell/pages/UpdatesPage.tsx:53
 #: src/shell/Routes.tsx:157
 msgid "Status"
 msgstr ""
@@ -22665,7 +22685,7 @@ msgstr ""
 
 #. js-lingui-explicit-id
 #: src/apps/clock/StopwatchTab.tsx:66
-#: src/apps/settings/StackChanInstallDialog.tsx:145
+#: src/apps/settings/StackChanInstallDialog.tsx:146
 #: src/apps/settings/VoiceBrowserSection.tsx:99
 #: src/apps/settings/VoiceManagerSection.tsx:123
 #: src/shell/pages/companionFlow/AnimateStep.tsx:138
@@ -22673,8 +22693,8 @@ msgstr ""
 #: src/shell/pages/companionFlow/CreateCharacterStep.tsx:297
 #: src/shell/pages/companionFlow/CustomizeStep.tsx:147
 #: src/shell/pages/CompanionsPage.tsx:386
-#: src/shell/pages/EnginesPage.tsx:236
-#: src/shell/pages/status/StatusComponents.tsx:129
+#: src/shell/pages/EnginesPage.tsx:239
+#: src/shell/pages/status/StatusComponents.tsx:136
 #: src/shell/pages/UiShowcasePage.tsx:96
 msgid "Stop"
 msgstr ""
@@ -22730,8 +22750,8 @@ msgstr ""
 #: src/shell/pages/CompanionsPage.tsx:309
 #: src/shell/pages/MusicWorkspacePage.tsx:60
 #: src/shell/pages/SoundExtras.tsx:43
-#: src/shell/pages/status/StatusComponents.tsx:44
-#: src/shell/pages/status/StatusComponents.tsx:114
+#: src/shell/pages/status/StatusComponents.tsx:45
+#: src/shell/pages/status/StatusComponents.tsx:120
 msgid "Stopped"
 msgstr ""
 
@@ -22741,7 +22761,7 @@ msgid "Stopped at {formatElapsed}"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/status/StatusComponents.tsx:129
+#: src/shell/pages/status/StatusComponents.tsx:136
 msgid "Stopping…"
 msgstr ""
 
@@ -22784,7 +22804,7 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/shell/library/LibraryStorage.tsx:24
 #: src/shell/pageHeaderTitle.tsx:99
-#: src/shell/pages/StoragePage.tsx:115
+#: src/shell/pages/StoragePage.tsx:116
 #: src/shell/pages/TrashPage.tsx:26
 #: src/shell/pages/TrashPage.tsx:26
 #: src/shell/pages/TrashPage.tsx:55
@@ -22813,7 +22833,7 @@ msgid "Storage areas"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/StoragePage.tsx:177
+#: src/shell/pages/StoragePage.tsx:181
 msgid "Storage usage by person"
 msgstr ""
 
@@ -22833,7 +22853,7 @@ msgid "setting.coding.max_streams_per_person.label"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/styles/StyleEditor.tsx:140
+#: src/apps/settings/styles/StyleEditor.tsx:141
 msgid "Strength"
 msgstr ""
 
@@ -22866,7 +22886,7 @@ msgstr ""
 #: src/apps/chat/MusicCardView.tsx:85
 #: src/apps/settings/styles/StyleBrowser.tsx:101
 #: src/apps/settings/styles/StyleConfirm.tsx:109
-#: src/apps/settings/styles/StyleEditor.tsx:92
+#: src/apps/settings/styles/StyleEditor.tsx:93
 #: src/apps/settings/styles/stylesShared.tsx:45
 #: src/shell/pages/companionFlow/CustomizeStep.tsx:160
 #: src/shell/pages/MusicRemix.tsx:45
@@ -22942,7 +22962,7 @@ msgid "Summary to copy"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/status/StatusBoard.tsx:29
+#: src/shell/pages/status/StatusBoard.tsx:28
 msgid "Sun"
 msgstr ""
 
@@ -23045,12 +23065,12 @@ msgid "Takes"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/AmbientCompanionPane.tsx:326
+#: src/shell/AmbientCompanionPane.tsx:332
 msgid "Talk"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/AmbientCompanionPane.tsx:259
+#: src/shell/AmbientCompanionPane.tsx:265
 msgid "Talk to {name}..."
 msgstr ""
 
@@ -23392,6 +23412,8 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/apps/chat/chatToolUis.tsx:324
 #: src/apps/chat/chatToolUis.tsx:341
+#: src/apps/clock/AlarmsTab.tsx:71
+#: src/apps/clock/AlarmsTab.tsx:72
 #: src/apps/clock/WorldClocksTab.tsx:168
 #: src/apps/memory/PersonMemories.tsx:220
 #: src/apps/memory/PersonMemories.tsx:365
@@ -23399,6 +23421,7 @@ msgstr ""
 #: src/apps/people/FaceEnrollmentPage.tsx:781
 #: src/apps/people/ProfileForm.tsx:176
 #: src/apps/people/ProfileForm.tsx:187
+#: src/apps/reminders/RemindersPage.tsx:193
 #: src/apps/settings/AddVoiceForm.tsx:83
 #: src/apps/settings/AiGlance.tsx:226
 #: src/apps/settings/AiGlance.tsx:271
@@ -23424,10 +23447,12 @@ msgstr ""
 #: src/apps/settings/RoutingStatsSection.tsx:33
 #: src/apps/settings/SignInSecretSection.tsx:72
 #: src/apps/settings/SiteBlocksSection.tsx:53
+#: src/apps/settings/StackChanInstallDialog.tsx:128
 #: src/apps/settings/styles/StyleAddFile.tsx:66
 #: src/apps/settings/styles/StyleBrowser.tsx:130
 #: src/apps/settings/styles/StyleBrowser.tsx:132
 #: src/apps/settings/styles/StyleConfirm.tsx:139
+#: src/apps/settings/styles/StyleEditor.tsx:78
 #: src/apps/settings/styles/StylesTab.tsx:84
 #: src/apps/settings/styles/StylesTab.tsx:163
 #: src/apps/settings/styles/StylesTab.tsx:195
@@ -23436,8 +23461,12 @@ msgstr ""
 #: src/apps/settings/UsersSection.tsx:333
 #: src/apps/settings/VoiceManagerSection.tsx:101
 #: src/apps/settings/VoiceManagerSection.tsx:102
-#: src/shell/library/LibraryViewer.tsx:109
-#: src/shell/library/LibraryViewer.tsx:116
+#: src/shell/AmbientCompanionPane.tsx:178
+#: src/shell/AmbientCompanionPane.tsx:262
+#: src/shell/library/LibraryViewer.tsx:104
+#: src/shell/library/LibraryViewer.tsx:110
+#: src/shell/library/LibraryViewer.tsx:117
+#: src/shell/library/TranscriptCaptionTracks.tsx:183
 #: src/shell/MediaPickerDialog.tsx:56
 #: src/shell/pages/CompanionAudienceDialog.tsx:49
 #: src/shell/pages/CompanionAudienceDialog.tsx:62
@@ -23451,16 +23480,28 @@ msgstr ""
 #: src/shell/pages/companionFlow/CustomizeStep.tsx:173
 #: src/shell/pages/companionFlow/CustomizeStep.tsx:189
 #: src/shell/pages/companionFlow/KeyframeEditor.tsx:95
+#: src/shell/pages/EnginesPage.tsx:147
+#: src/shell/pages/FamilyPage.tsx:50
+#: src/shell/pages/FamilyPage.tsx:51
+#: src/shell/pages/FilesPage.tsx:390
+#: src/shell/pages/FilesPage.tsx:405
 #: src/shell/pages/MusicRemix.tsx:39
-#: src/shell/pages/ProjectsPage.tsx:136
+#: src/shell/pages/ProjectsPage.tsx:137
+#: src/shell/pages/RepairsPage.tsx:124
 #: src/shell/pages/settings/SettingsAreaPage.tsx:283
+#: src/shell/pages/settings/SettingsRenderer.tsx:183
 #: src/shell/pages/SignInPage.tsx:208
 #: src/shell/pages/SoundExtras.tsx:82
-#: src/shell/pages/status/StatusBoard.tsx:113
-#: src/shell/pages/status/StatusBoard.tsx:132
+#: src/shell/pages/status/StatusBoard.tsx:41
+#: src/shell/pages/status/StatusBoard.tsx:68
+#: src/shell/pages/status/StatusBoard.tsx:114
+#: src/shell/pages/status/StatusBoard.tsx:133
+#: src/shell/pages/status/StatusComponents.tsx:125
 #: src/shell/pages/StatusPage.tsx:92
-#: src/shell/pages/UpdatesPage.tsx:182
-#: src/shell/pages/UpdatesPage.tsx:185
+#: src/shell/pages/StoragePage.tsx:186
+#: src/shell/pages/UpdatesPage.tsx:129
+#: src/shell/pages/UpdatesPage.tsx:184
+#: src/shell/pages/UpdatesPage.tsx:187
 msgid "That did not work"
 msgstr ""
 
@@ -23470,9 +23511,9 @@ msgid "That didn't work"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/EnginesPage.tsx:129
-#: src/shell/pages/UpdatesPage.tsx:94
-msgid "That didn't work."
+#: src/shell/pages/EnginesPage.tsx:131
+#: src/shell/pages/UpdatesPage.tsx:95
+msgid "That didn't work. Try again."
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -23496,7 +23537,7 @@ msgid "api.error.upload_file_empty"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/FilesPage.tsx:159
+#: src/shell/pages/FilesPage.tsx:163
 msgid "That file is not available to you. Ask the person who added it to share it again."
 msgstr ""
 
@@ -23506,7 +23547,7 @@ msgid "api.error.file_not_in_library"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/FilesPage.tsx:181
+#: src/shell/pages/FilesPage.tsx:185
 msgid "That file is not yours to delete. Ask the person who added it."
 msgstr ""
 
@@ -23799,7 +23840,7 @@ msgid "The audio could not start. Press play again."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/StackChanInstallDialog.tsx:128
+#: src/apps/settings/StackChanInstallDialog.tsx:129
 msgid "The backup did not work with this computer or cable. Press Start over, unplug and replug the StackChan, then choose Install without a backup. The firmware now on it will be replaced and cannot be restored from Home."
 msgstr ""
 
@@ -23894,7 +23935,7 @@ msgid "failure.advice.memory.cause"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/status/StatusComponents.tsx:133
+#: src/shell/pages/status/StatusComponents.tsx:140
 msgid "the connection is unavailable."
 msgstr ""
 
@@ -23944,7 +23985,7 @@ msgid "The download failed. Cancel it, then switch the book on again to retry."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/status/StatusBoard.tsx:96
+#: src/shell/pages/status/StatusBoard.tsx:97
 msgid "The end time must be after the start time."
 msgstr ""
 
@@ -23974,7 +24015,7 @@ msgid "The face samples could not be saved."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/StackChanInstallDialog.tsx:124
+#: src/apps/settings/StackChanInstallDialog.tsx:125
 msgid "The firmware is written. If the StackChan has not restarted within 10 seconds, unplug its USB cable and plug it back in (the reset from this page does not restart every unit). It then reconnects within a minute, with its name, Wi-Fi and pairing unchanged."
 msgstr ""
 
@@ -24126,7 +24167,7 @@ msgid "The microphone choice is remembered on this device only."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/AmbientCompanionPane.tsx:259
+#: src/shell/AmbientCompanionPane.tsx:265
 msgid "The microphone writes a transcript in the talk box. Use Call for a live voice conversation."
 msgstr ""
 
@@ -24384,17 +24425,17 @@ msgid "api.error.robot_no_answer"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/StackChanInstallDialog.tsx:14
+#: src/apps/settings/StackChanInstallDialog.tsx:15
 msgid "The robot did not reach Home. Check it joined the same Wi-Fi as this hub, then press Retry."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/AddRobotSection.tsx:261
+#: src/apps/settings/AddRobotSection.tsx:247
 msgid "The robot hasn't finished pairing and the code has likely expired. Turn the robot's Wi-Fi setup back on so it speaks a fresh code, then try again."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/StackChanInstallDialog.tsx:141
+#: src/apps/settings/StackChanInstallDialog.tsx:142
 msgid "The robot is online."
 msgstr ""
 
@@ -24474,7 +24515,7 @@ msgid "The source does not state a licence. Read its page before you install."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/styles/StyleEditor.tsx:63
+#: src/apps/settings/styles/StyleEditor.tsx:64
 msgid "The source marked this style adult. Enter your passcode again to make it all ages."
 msgstr ""
 
@@ -24511,7 +24552,7 @@ msgid "The Stack has nothing loaded."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/StackChanInstallDialog.tsx:97
+#: src/apps/settings/StackChanInstallDialog.tsx:98
 msgid "The StackChan install stopped."
 msgstr ""
 
@@ -24528,6 +24569,11 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/apps/settings/CloseAppsSettings.tsx:48
 msgid "The starter apps will be closed when a big job needs room. Review the list, then turn Automatic on."
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/shell/library/LibraryViewer.tsx:98
+msgid "The stems could not be made. Try again in a minute."
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -24732,12 +24778,12 @@ msgid "These change what you hear in the Studio. The saved song is not changed."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/ProjectsPage.tsx:223
+#: src/shell/pages/ProjectsPage.tsx:224
 msgid "These instructions shape answers in this project."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/FilesPage.tsx:379
+#: src/shell/pages/FilesPage.tsx:383
 msgid "They lose access now."
 msgstr ""
 
@@ -24974,7 +25020,7 @@ msgid "This key is shown once."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/status/StatusComponents.tsx:31
+#: src/shell/pages/status/StatusComponents.tsx:32
 msgid "This MaiPai Home itself."
 msgstr ""
 
@@ -24989,7 +25035,7 @@ msgid "This may run slowly on this computer."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/status/StatusComponents.tsx:133
+#: src/shell/pages/status/StatusComponents.tsx:140
 msgid "This part cannot reach the engine computer: {value}"
 msgstr ""
 
@@ -25054,7 +25100,7 @@ msgid "This removes the piece from this computer. You can install it again later
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/status/StatusBoard.tsx:132
+#: src/shell/pages/status/StatusBoard.tsx:133
 msgid "This replaces the note everyone can see now."
 msgstr ""
 
@@ -25135,7 +25181,7 @@ msgid "Through your Tailscale network"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/status/StatusBoard.tsx:29
+#: src/shell/pages/status/StatusBoard.tsx:28
 msgid "Thu"
 msgstr ""
 
@@ -25160,7 +25206,7 @@ msgid "setting.robot.initiative.tiers_spoken.help"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/FilesPage.tsx:366
+#: src/shell/pages/FilesPage.tsx:370
 msgid "Tile size"
 msgstr ""
 
@@ -25198,7 +25244,7 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/apps/clock/ClockPage.tsx:43
 #: src/apps/clock/TimersTab.tsx:109
-#: src/shell/pages/dashboard/TodaySection.tsx:20
+#: src/shell/pages/dashboard/TodaySection.tsx:21
 msgid "Timers"
 msgstr ""
 
@@ -25209,8 +25255,8 @@ msgstr ""
 
 #. js-lingui-explicit-id
 #: src/apps/chat/MusicCardView.tsx:85
-#: src/shell/pages/RepairsPage.tsx:65
-#: src/shell/pages/status/StatusBoard.tsx:106
+#: src/shell/pages/RepairsPage.tsx:67
+#: src/shell/pages/status/StatusBoard.tsx:107
 msgid "Title"
 msgstr ""
 
@@ -25246,12 +25292,12 @@ msgstr ""
 #: src/i18n.chain.test.tsx:96
 #: src/i18n.test.tsx:53
 #: src/shell/pages/CompanionsPage.tsx:290
-#: src/shell/pages/dashboard/TodaySection.tsx:128
-#: src/shell/pages/dashboard/TodaySection.tsx:129
-#: src/shell/pages/dashboard/TodaySection.tsx:150
-#: src/shell/pages/dashboard/TodaySection.tsx:151
-#: src/shell/pages/status/StatusBoard.tsx:131
+#: src/shell/pages/dashboard/TodaySection.tsx:133
+#: src/shell/pages/dashboard/TodaySection.tsx:134
+#: src/shell/pages/dashboard/TodaySection.tsx:156
+#: src/shell/pages/dashboard/TodaySection.tsx:157
 #: src/shell/pages/status/StatusBoard.tsx:132
+#: src/shell/pages/status/StatusBoard.tsx:133
 #: src/shell/pages/status/statusBoardFormat.ts:46
 msgid "Today"
 msgstr "Today"
@@ -25324,7 +25370,7 @@ msgid "Tools using it will no longer connect to Home."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/StoragePage.tsx:173
+#: src/shell/pages/StoragePage.tsx:177
 msgid "Top kind"
 msgstr ""
 
@@ -25394,8 +25440,8 @@ msgid "Tracks, waveforms, mute and solo for any song."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/library/LibraryViewer.tsx:159
-#: src/shell/library/LibraryViewer.tsx:159
+#: src/shell/library/LibraryViewer.tsx:160
+#: src/shell/library/LibraryViewer.tsx:160
 #: src/shell/library/TranscriptPanel.tsx:114
 #: src/shell/library/TranscriptPanel.tsx:550
 msgid "Transcript"
@@ -25407,12 +25453,12 @@ msgid "Transcript tools"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/library/TranscriptCaptionTracks.tsx:174
+#: src/shell/library/TranscriptCaptionTracks.tsx:180
 msgid "Translate"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/library/TranscriptCaptionTracks.tsx:163
+#: src/shell/library/TranscriptCaptionTracks.tsx:169
 msgid "Translate captions to"
 msgstr ""
 
@@ -25422,12 +25468,12 @@ msgid "setting.music.lyrics_translate.label"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/library/TranscriptCaptionTracks.tsx:121
+#: src/shell/library/TranscriptCaptionTracks.tsx:127
 msgid "Translated"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/StoragePage.tsx:160
+#: src/shell/pages/StoragePage.tsx:164
 #: src/shell/pages/TrashPage.tsx:26
 #: src/shell/pages/TrashPage.tsx:30
 msgid "Trash"
@@ -25493,7 +25539,7 @@ msgstr ""
 #: src/apps/people/FaceEnrollmentPage.tsx:690
 #: src/apps/settings/CommandsSection.tsx:113
 #: src/apps/settings/ModelsAndStorageSection.tsx:91
-#: src/apps/settings/StackChanInstallDialog.tsx:151
+#: src/apps/settings/StackChanInstallDialog.tsx:152
 #: src/apps/settings/styles/StyleBrowser.tsx:132
 #: src/apps/settings/VoiceBrowserSection.tsx:95
 #: src/apps/settings/VoiceManagerSection.tsx:103
@@ -25503,7 +25549,7 @@ msgstr ""
 #: src/apps/setup/SetupWizard.tsx:503
 #: src/apps/setup/StorageStep.tsx:35
 #: src/apps/setup/WebSearchStep.tsx:74
-#: src/shell/AmbientCompanionPane.tsx:261
+#: src/shell/AmbientCompanionPane.tsx:267
 #: src/shell/InstallDock.tsx:255
 #: src/shell/InstallDock.tsx:307
 #: src/shell/InstallStrip.tsx:96
@@ -25512,7 +25558,7 @@ msgstr ""
 #: src/shell/pages/companionFlow/AnimateStep.tsx:132
 #: src/shell/pages/FamilyPage.tsx:50
 #: src/shell/pages/FamilyPage.tsx:51
-#: src/shell/pages/FilesPage.tsx:301
+#: src/shell/pages/FilesPage.tsx:305
 #: src/shell/pages/MusicWorkspacePage.tsx:93
 #: src/shell/pages/settings/WebSearchSettings.tsx:103
 msgid "Try again"
@@ -25554,7 +25600,7 @@ msgid "Try saving again"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/styles/StyleEditor.tsx:96
+#: src/apps/settings/styles/StyleEditor.tsx:97
 msgid "Try this style"
 msgstr ""
 
@@ -25564,7 +25610,7 @@ msgid "setting.engines.tts.choice.label"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/status/StatusBoard.tsx:29
+#: src/shell/pages/status/StatusBoard.tsx:28
 msgid "Tue"
 msgstr ""
 
@@ -25669,7 +25715,7 @@ msgid "setting.news.shelf.enabled.help"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/settings/SettingsRenderer.tsx:164
+#: src/shell/pages/settings/SettingsRenderer.tsx:165
 msgid "Turn this feature off?"
 msgstr ""
 
@@ -25872,7 +25918,7 @@ msgid "Unconfirmed"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/status/StatusComponents.tsx:124
+#: src/shell/pages/status/StatusComponents.tsx:131
 msgid "Under maintenance"
 msgstr ""
 
@@ -25887,7 +25933,7 @@ msgid "Understand and control what you share."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/status/StatusComponents.tsx:27
+#: src/shell/pages/status/StatusComponents.tsx:28
 msgid "Understanding"
 msgstr ""
 
@@ -25898,7 +25944,7 @@ msgstr ""
 
 #. js-lingui-explicit-id
 #: src/shell/library/TranscriptPanel.tsx:428
-#: src/shell/pages/FilesPage.tsx:174
+#: src/shell/pages/FilesPage.tsx:178
 msgid "Undo"
 msgstr ""
 
@@ -25929,8 +25975,8 @@ msgstr ""
 #: src/apps/settings/RobotBody.tsx:209
 #: src/apps/settings/RobotBody.tsx:225
 #: src/apps/settings/RobotBody.tsx:226
+#: src/shell/pages/UpdatesPage.tsx:70
 #: src/shell/pages/UpdatesPage.tsx:71
-#: src/shell/pages/UpdatesPage.tsx:72
 msgid "Unknown"
 msgstr ""
 
@@ -25997,7 +26043,7 @@ msgid "Unmute microphone"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/ProjectsPage.tsx:183
+#: src/shell/pages/ProjectsPage.tsx:184
 msgid "Unpin"
 msgstr ""
 
@@ -26012,8 +26058,8 @@ msgid "Until {time}"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/status/StatusBoard.tsx:112
-#: src/shell/pages/status/StatusBoard.tsx:112
+#: src/shell/pages/status/StatusBoard.tsx:113
+#: src/shell/pages/status/StatusBoard.tsx:113
 msgid "Until a date"
 msgstr ""
 
@@ -26068,56 +26114,56 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/apps/settings/HouseholdRobotsSection.tsx:171
 #: src/apps/settings/HouseholdRobotsSection.tsx:178
-#: src/shell/library/TranscriptCaptionTracks.tsx:121
-#: src/shell/pages/UpdatesPage.tsx:62
-#: src/shell/pages/UpdatesPage.tsx:64
+#: src/shell/library/TranscriptCaptionTracks.tsx:127
+#: src/shell/pages/UpdatesPage.tsx:61
+#: src/shell/pages/UpdatesPage.tsx:63
 msgid "Up to date"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/UpdatesPage.tsx:149
+#: src/shell/pages/UpdatesPage.tsx:151
 msgid "Update actions"
 msgstr ""
 
 #. js-lingui-explicit-id
 #: src/apps/settings/HouseholdRobotsSection.tsx:171
 #: src/shell/pages/EnginesPage.tsx:78
-#: src/shell/pages/UpdatesPage.tsx:59
-#: src/shell/pages/UpdatesPage.tsx:64
+#: src/shell/pages/UpdatesPage.tsx:58
+#: src/shell/pages/UpdatesPage.tsx:63
 msgid "Update available"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/UpdatesPage.tsx:59
+#: src/shell/pages/UpdatesPage.tsx:58
 msgid "Update available. {reason}"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/StackChanInstallDialog.tsx:118
-#: src/apps/settings/StackChanInstallDialog.tsx:122
-#: src/apps/settings/StackChanInstallDialog.tsx:147
+#: src/apps/settings/StackChanInstallDialog.tsx:119
+#: src/apps/settings/StackChanInstallDialog.tsx:123
+#: src/apps/settings/StackChanInstallDialog.tsx:148
 msgid "Update firmware"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/StackChanInstallDialog.tsx:131
+#: src/apps/settings/StackChanInstallDialog.tsx:132
 msgid "Update firmware."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/ProjectsPage.tsx:160
+#: src/shell/pages/ProjectsPage.tsx:161
 msgid "Updated"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/dashboard/TodaySection.tsx:96
+#: src/shell/pages/dashboard/TodaySection.tsx:100
 msgid "Updated {when}"
 msgstr ""
 
 #. js-lingui-explicit-id
 #: src/shell/pageHeaderTitle.tsx:102
-#: src/shell/pages/DashboardPage.tsx:46
-#: src/shell/pages/UpdatesPage.tsx:79
+#: src/shell/pages/dashboard/Attention.tsx:26
+#: src/shell/pages/UpdatesPage.tsx:78
 #: src/shell/Routes.tsx:155
 msgid "Updates"
 msgstr ""
@@ -26128,7 +26174,12 @@ msgid "area.Updates"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/FilesPage.tsx:48
+#: src/shell/pages/dashboard/Attention.tsx:26
+msgid "Updates lets you review and apply it."
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/shell/pages/FilesPage.tsx:50
 msgid "Upload"
 msgstr ""
 
@@ -26335,7 +26386,7 @@ msgid "setting.person.locale.option.household"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/StoragePage.tsx:173
+#: src/shell/pages/StoragePage.tsx:177
 msgid "Used"
 msgstr ""
 
@@ -26468,7 +26519,7 @@ msgid "Version"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/UpdatesPage.tsx:60
+#: src/shell/pages/UpdatesPage.tsx:59
 msgid "Version unknown"
 msgstr ""
 
@@ -26495,7 +26546,7 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/apps/settings/ModelsAndStorageSection.tsx:23
 #: src/apps/settings/performanceModel.ts:9
-#: src/shell/pages/FilesPage.tsx:150
+#: src/shell/pages/FilesPage.tsx:154
 #: src/shell/pages/PersonProfilePage.tsx:175
 msgid "Video"
 msgstr ""
@@ -26572,7 +26623,7 @@ msgid "setting.resources.strict.video.label"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/styles/StyleEditor.tsx:137
+#: src/apps/settings/styles/StyleEditor.tsx:138
 msgid "Videos at Standard and Boost cannot use avoid words. Say the opposite instead."
 msgstr ""
 
@@ -26637,7 +26688,7 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/apps/settings/ModelsAndStorageSection.tsx:22
 #: src/apps/settings/VoiceManagerSection.tsx:106
-#: src/shell/AmbientCompanionPane.tsx:177
+#: src/shell/AmbientCompanionPane.tsx:181
 #: src/shell/pages/companionFlow/CustomizeStep.tsx:137
 #: src/shell/pages/companionFlow/CustomizeStep.tsx:144
 #: src/shell/pages/CompanionsPage.tsx:350
@@ -26647,7 +26698,7 @@ msgstr ""
 #: src/shell/pages/MusicVoiceCreate.tsx:143
 #: src/shell/pages/MusicWorkspacePage.tsx:38
 #: src/shell/pages/settings/settingsViews.tsx:172
-#: src/shell/pages/status/StatusComponents.tsx:29
+#: src/shell/pages/status/StatusComponents.tsx:30
 msgid "Voice"
 msgstr ""
 
@@ -26825,7 +26876,7 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/shell/pages/ActivityPage.tsx:20
 #: src/shell/pages/MusicWorkspacePage.tsx:87
-#: src/shell/pages/status/StatusComponents.tsx:151
+#: src/shell/pages/status/StatusComponents.tsx:158
 msgid "Waiting"
 msgstr ""
 
@@ -26876,7 +26927,7 @@ msgid "Waiting for your choice"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/status/StatusComponents.tsx:144
+#: src/shell/pages/status/StatusComponents.tsx:151
 msgid "Waiting in line: chat and voice {reserved}, pictures and tools {warm}, big jobs {burst}"
 msgstr ""
 
@@ -26932,7 +26983,7 @@ msgstr ""
 
 #. js-lingui-explicit-id
 #: src/apps/settings/styles/StyleConfirm.tsx:100
-#: src/apps/settings/styles/StyleEditor.tsx:165
+#: src/apps/settings/styles/StyleEditor.tsx:166
 msgid "Wan"
 msgstr ""
 
@@ -26962,7 +27013,7 @@ msgid "Warning"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/status/StatusComponents.tsx:151
+#: src/shell/pages/status/StatusComponents.tsx:158
 msgid "Watching"
 msgstr ""
 
@@ -27039,7 +27090,7 @@ msgid "setting.search.source_mode.web.label"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/status/StatusBoard.tsx:29
+#: src/shell/pages/status/StatusBoard.tsx:28
 msgid "Wed"
 msgstr ""
 
@@ -27054,8 +27105,8 @@ msgid "Weekends"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/status/StatusBoard.tsx:110
-#: src/shell/pages/status/StatusBoard.tsx:110
+#: src/shell/pages/status/StatusBoard.tsx:111
+#: src/shell/pages/status/StatusBoard.tsx:111
 msgid "Weekly"
 msgstr ""
 
@@ -27110,7 +27161,7 @@ msgid "What it can do"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/styles/StyleEditor.tsx:84
+#: src/apps/settings/styles/StyleEditor.tsx:85
 msgid "What it does"
 msgstr ""
 
@@ -27140,7 +27191,7 @@ msgid "What needs doing"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/library/LibraryViewer.tsx:107
+#: src/shell/library/LibraryViewer.tsx:108
 msgid "What should it sound like?"
 msgstr ""
 
@@ -27167,7 +27218,7 @@ msgstr ""
 
 #. js-lingui-explicit-id
 #: src/apps/settings/styles/StyleConfirm.tsx:97
-#: src/apps/settings/styles/StyleEditor.tsx:162
+#: src/apps/settings/styles/StyleEditor.tsx:163
 msgid "What was this style made for?"
 msgstr ""
 
@@ -27194,7 +27245,7 @@ msgid "When a Max job needs more room than is free, chat switches to a simpler m
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/StackChanInstallDialog.tsx:13
+#: src/apps/settings/StackChanInstallDialog.tsx:14
 msgid "When Chrome asks which port to use, choose \"USB JTAG/serial debug unit\" (it may be listed as usbmodem). Do not choose a Bluetooth entry."
 msgstr ""
 
@@ -27341,7 +27392,7 @@ msgid "setting.reference.library_dir.help"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/styles/StyleEditor.tsx:128
+#: src/apps/settings/styles/StyleEditor.tsx:129
 msgid "Where the words go"
 msgstr ""
 
@@ -27453,12 +27504,12 @@ msgstr ""
 
 #. js-lingui-explicit-id
 #: src/apps/settings/AiSlotDialog.tsx:130
-#: src/apps/settings/styles/StyleEditor.tsx:100
+#: src/apps/settings/styles/StyleEditor.tsx:101
 msgid "Who can use it"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/styles/StyleEditor.tsx:104
+#: src/apps/settings/styles/StyleEditor.tsx:105
 msgid "Who can use this style"
 msgstr ""
 
@@ -27571,7 +27622,7 @@ msgid "Word meanings, origins and translations."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/styles/StyleEditor.tsx:123
+#: src/apps/settings/styles/StyleEditor.tsx:124
 msgid "Words that switch it on"
 msgstr ""
 
@@ -27591,7 +27642,7 @@ msgstr ""
 #: src/shell/pages/CompanionsPage.tsx:309
 #: src/shell/pages/CompanionsPage.tsx:314
 #: src/shell/pages/status/StatusApps.tsx:51
-#: src/shell/pages/status/StatusComponents.tsx:151
+#: src/shell/pages/status/StatusComponents.tsx:158
 #: src/shell/pages/StatusPage.tsx:26
 #: src/shell/statusApps.ts:6
 msgid "Working"
@@ -27611,7 +27662,7 @@ msgstr ""
 #: src/apps/settings/DevicesSection.tsx:138
 #: src/apps/settings/DevicesSection.tsx:219
 #: src/apps/settings/HouseholdRobotsSection.tsx:190
-#: src/shell/library/TranscriptCaptionTracks.tsx:66
+#: src/shell/library/TranscriptCaptionTracks.tsx:71
 #: src/shell/library/TranscriptFindReplace.tsx:45
 #: src/shell/library/TranscriptFindReplace.tsx:60
 msgid "Working…"
@@ -27650,7 +27701,7 @@ msgid "Worth knowing"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/status/StatusBoard.tsx:126
+#: src/shell/pages/status/StatusBoard.tsx:127
 msgid "Write a note first."
 msgstr ""
 
@@ -27675,18 +27726,18 @@ msgid "Write your own words with [Verse] and [Chorus] tags, or leave this empty 
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/StackChanInstallDialog.tsx:131
+#: src/apps/settings/StackChanInstallDialog.tsx:132
 msgid "Writes the newest MaiPai firmware, about 1 to 2 minutes. The StackChan keeps its name, Wi-Fi and pairing, so you do not set up its Wi-Fi again."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/StackChanInstallDialog.tsx:19
+#: src/apps/settings/StackChanInstallDialog.tsx:20
 #: src/shell/pages/companionFlow/CustomizeStep.tsx:176
 msgid "Writing"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/StackChanInstallDialog.tsx:107
+#: src/apps/settings/StackChanInstallDialog.tsx:108
 msgid "Writing the MaiPai firmware. Do not unplug the StackChan."
 msgstr ""
 
@@ -27898,7 +27949,7 @@ msgid "You have no finished songs yet. Make a song first, then add the sound to 
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/library/LibraryViewer.tsx:113
+#: src/shell/library/LibraryViewer.tsx:114
 msgid "You have no finished videos to cut yet. Make a video in chat first, then come back."
 msgstr ""
 
@@ -27928,7 +27979,7 @@ msgid "api.error.share_remove_forbidden"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/StackChanInstallDialog.tsx:124
+#: src/apps/settings/StackChanInstallDialog.tsx:125
 msgid "You need Chrome or Edge on a computer, Home opened at its https address, and the StackChan plugged into this computer with a USB-C data cable."
 msgstr ""
 
@@ -28059,8 +28110,8 @@ msgid "Your earlier version stays on this card."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/dashboard/HomeShelves.tsx:40
-#: src/shell/pages/dashboard/HomeShelves.tsx:40
+#: src/shell/pages/dashboard/HomeShelves.tsx:60
+#: src/shell/pages/dashboard/HomeShelves.tsx:60
 msgid "Your family"
 msgstr ""
 
@@ -28262,7 +28313,7 @@ msgid "Your sounds could not be loaded."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/StackChanInstallDialog.tsx:124
+#: src/apps/settings/StackChanInstallDialog.tsx:125
 msgid "Your StackChan is online and ready."
 msgstr ""
 

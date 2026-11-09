@@ -24,12 +24,12 @@ export function Greeting({ displayName, familyName }: { displayName: string; fam
   const family = familyLabel(familyName);
 
   return (
-    <div className="flex flex-col items-start">
+    <div className="flex flex-col items-start gap-1">
       {family ? <p className="text-supporting text-muted-foreground">{family}</p> : null}
-      <h2 className="text-title font-bold tracking-tight capitalize whitespace-nowrap">
+      <h2 className="text-title font-bold tracking-tight">
         {greetingFor(new Date(), displayName)}
       </h2>
-      <p className="text-supporting text-muted-foreground">{i18n._({ id: "Here is your household today.", message: "Here is your household today." })}</p>
+      <p className="text-body text-muted-foreground">{i18n._({ id: "Here is your household today.", message: "Here is your household today." })}</p>
     </div>
   );
 }

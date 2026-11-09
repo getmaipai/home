@@ -1,7 +1,7 @@
 import { i18n } from "@lingui/core";
 import { useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { toast } from "sonner";
+import { StatusCard } from "@maipai/ui/src/elements/status-card";
 import { AsyncState } from "@maipai/ui/src/primitives/AsyncState";
 import { getIcon } from "@maipai/ui/src/icons";
 import { DataTable, type DataTableColumn } from "@maipai/ui/src/elements/data-table";
@@ -106,6 +106,7 @@ export function EnginesConsole({ person }: { person: Roster }) {
   const overviewQuery = useQuery<EnginesOverview>({ queryKey: ["engines"], queryFn: () => api.engines(), enabled: canManage });
   const healthQuery = useQuery<EnginesHealth>({ queryKey: ["engines-health"], queryFn: () => api.enginesHealth(), enabled: canManage });
   const queryClient = useQueryClient();
+  const [problem, setProblem] = useState("");
   const [busyNames, setBusyNames] = useState<ReadonlySet<string>>(new Set());
   const doctor = useMutation({ mutationFn: api.engineConnectionCheck });
   // Tolerant of an answer with no lists: this console now draws inside the settings page, which must open whatever
@@ -119,6 +120,7 @@ export function EnginesConsole({ person }: { person: Roster }) {
 
   async function runAction(name: string, action: "start" | "stop" | "restart" | "install") {
     setBusyNames((previous) => new Set(previous).add(name));
+    setProblem("");
     try {
       await api.engineAction(name, action);
       await Promise.all([
@@ -126,7 +128,7 @@ export function EnginesConsole({ person }: { person: Roster }) {
         queryClient.invalidateQueries({ queryKey: ["engines-health"] }),
       ]);
     } catch (error) {
-      toast.error(errorLine(error, i18n._({ id: "That didn't work.", message: "That didn't work." })));
+      setProblem(errorLine(error, i18n._({ id: "That didn't work. Try again.", message: "That didn't work. Try again." })));
     } finally {
       setBusyNames((previous) => {
         const next = new Set(previous);
@@ -142,6 +144,7 @@ export function EnginesConsole({ person }: { person: Roster }) {
 
   return (
     <>
+      {problem ? <StatusCard kind="problem" title={i18n._({ id: "That did not work", message: "That did not work" })} line={problem} /> : null}
       {!canManage ? (
         <Card>
           <CardContent>

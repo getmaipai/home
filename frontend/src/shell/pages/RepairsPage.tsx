@@ -2,6 +2,7 @@ import { i18n } from "@lingui/core";
 import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
+import { StatusCard } from "@maipai/ui/src/elements/status-card";
 import { AsyncState } from "@maipai/ui/src/primitives/AsyncState";
 import { getIcon } from "@maipai/ui/src/icons";
 import { DataTable } from "@maipai/ui/src/elements/data-table";
@@ -60,17 +61,19 @@ export function RepairsPage({ person }: { person: Roster }) {
   const canManage = isOwnerOrAdminRole(person.role);
   const query = useQuery<Issue[]>({ queryKey: ["repairs"], queryFn: () => api.repairs(), enabled: canManage });
   const queryClient = useQueryClient();
+  const [problem, setProblem] = useState("");
   const [pendingIds, setPendingIds] = useState<ReadonlySet<string>>(new Set());
   const tableRows = (query.data ?? []).map(toRow);
   const model = useDataTableModel(tableRows, tableColumns<Row>(["title", "status", "detail", "fix"], { title: 220, status: 120, detail: 320, fix: 180 }, { title: i18n._({ id: "Title", message: "Title" }), status: i18n._({ id: "Status", message: "Status" }), detail: i18n._({ id: "Detail", message: "Detail" }), fix: i18n._({ id: "Fix", message: "Fix" }) }));
 
   async function runFix(id: string) {
     setPendingIds((previous) => new Set(previous).add(id));
+    setProblem("");
     try {
       await api.fixIssue(id);
       await queryClient.invalidateQueries({ queryKey: ["repairs"] });
     } catch (error) {
-      toast.error(errorLine(error, i18n._({ id: "Could not fix that repair.", message: "Could not fix that repair." })));
+      setProblem(errorLine(error, i18n._({ id: "Could not fix that repair.", message: "Could not fix that repair." })));
     } finally {
       setPendingIds((previous) => {
         const next = new Set(previous);
@@ -82,11 +85,12 @@ export function RepairsPage({ person }: { person: Roster }) {
 
   async function dismissIssue(id: string) {
     setPendingIds((previous) => new Set(previous).add(id));
+    setProblem("");
     try {
       await api.dismissIssue(id);
       await queryClient.invalidateQueries({ queryKey: ["repairs"] });
     } catch (error) {
-      toast.error(errorLine(error, i18n._({ id: "Could not dismiss that repair.", message: "Could not dismiss that repair." })));
+      setProblem(errorLine(error, i18n._({ id: "Could not dismiss that repair.", message: "Could not dismiss that repair." })));
     } finally {
       setPendingIds((previous) => {
         const next = new Set(previous);
@@ -97,12 +101,13 @@ export function RepairsPage({ person }: { person: Roster }) {
   }
 
   async function checkComputersAgain() {
+    setProblem("");
     try {
       await api.repairsChecks();
       await queryClient.invalidateQueries({ queryKey: ["repairs"] });
       toast.success(i18n._({ id: "Home checked your computers and updated Health.", message: "Home checked your computers and updated Health." }));
     } catch (error) {
-      toast.error(errorLine(error, i18n._({ id: "Home couldn't check your computers. Check the engine connection, then try again.", message: "Home couldn't check your computers. Check the engine connection, then try again." })));
+      setProblem(errorLine(error, i18n._({ id: "Home couldn't check your computers. Check the engine connection, then try again.", message: "Home couldn't check your computers. Check the engine connection, then try again." })));
     }
   }
 
@@ -116,6 +121,7 @@ export function RepairsPage({ person }: { person: Roster }) {
         </Card>
       ) : (
         <>
+        {problem ? <StatusCard kind="problem" title={i18n._({ id: "That did not work", message: "That did not work" })} line={problem} /> : null}
         <div className="flex flex-wrap gap-2">
           <KitButton type="button" variant="secondary" onClick={() => void checkComputersAgain()}>{i18n._({ id: "Check my computers again", message: "Check my computers again" })}</KitButton>
           <KitButton type="button" variant="secondary" onClick={() => { window.location.assign("/setup/review"); }}>{i18n._({ id: "Run setup again", message: "Run setup again" })}</KitButton>

@@ -1,3 +1,4 @@
+import { StatusCard } from "@maipai/ui/src/elements/status-card";
 import { i18n } from "@lingui/core";
 import { useEffect, useRef, useState } from "react";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@maipai/ui/src/ui/dialog";
@@ -94,7 +95,7 @@ export function StackChanInstallDialog({ updateOf, install = installStackChan, r
       setStage(null);
     } catch (error) {
       setStalledInBackup(error instanceof Error && error.message === STALL_TIMEOUT_MESSAGE);
-      const detail = errorLine(error, error instanceof Error ? error.message : i18n._({ id: "The StackChan install stopped.", message: "The StackChan install stopped." }));
+      const detail = errorLine(error, i18n._({ id: "The StackChan install stopped.", message: "The StackChan install stopped." }));
       setMessage(flashComplete ? i18n._({ id: "Firmware was written, but Home could not record its version. {detail}", message: "Firmware was written, but Home could not record its version. {detail}", values: { detail } }) : hostCreated ? i18n._({ id: "{detail} Use Cancel install on the robot card before starting again.", message: "{detail} Use Cancel install on the robot card before starting again.", values: { detail } }) : i18n._({ id: "{detail} Check the USB cable and try again.", message: "{detail} Check the USB cable and try again.", values: { detail } }));
     } finally { transportRef.current = null; setWorking(false); }
   }
@@ -124,7 +125,7 @@ export function StackChanInstallDialog({ updateOf, install = installStackChan, r
               {updateDone ? i18n._({ id: "The firmware is written. If the StackChan has not restarted within 10 seconds, unplug its USB cable and plug it back in (the reset from this page does not restart every unit). It then reconnects within a minute, with its name, Wi-Fi and pairing unchanged.", message: "The firmware is written. If the StackChan has not restarted within 10 seconds, unplug its USB cable and plug it back in (the reset from this page does not restart every unit). It then reconnects within a minute, with its name, Wi-Fi and pairing unchanged." }) : !installFinished ? i18n._({ id: "You need Chrome or Edge on a computer, Home opened at its https address, and the StackChan plugged into this computer with a USB-C data cable.", message: "You need Chrome or Edge on a computer, Home opened at its https address, and the StackChan plugged into this computer with a USB-C data cable." }) : online ? i18n._({ id: "Your StackChan is online and ready.", message: "Your StackChan is online and ready." }) : i18n._({ id: "On a phone, join the robot's Wi-Fi hotspot and choose your home Wi-Fi. Home never asks for the Wi-Fi password.", message: "On a phone, join the robot's Wi-Fi hotspot and choose your home Wi-Fi. Home never asks for the Wi-Fi password." })}
             </DialogDescription>
           </DialogHeader>
-          {message ? <Alert variant="destructive"><AlertDescription>{message}</AlertDescription></Alert> : null}
+          {message ? <StatusCard kind="problem" title={i18n._({ id: "That did not work", message: "That did not work" })} line={message} /> : null}
           {stalledInBackup && !working ? <p>{i18n._({ id: "The backup did not work with this computer or cable. Press Start over, unplug and replug the StackChan, then choose Install without a backup. The firmware now on it will be replaced and cannot be restored from Home.", message: "The backup did not work with this computer or cable. Press Start over, unplug and replug the StackChan, then choose Install without a backup. The firmware now on it will be replaced and cannot be restored from Home." })}</p> : null}
           {choosing && updating ? <>
             <p>{portHelp()}</p>

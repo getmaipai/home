@@ -95,7 +95,7 @@ describe("StackChan install browser check", () => {
     fireEvent.click(view.getByRole("button", { name: "Update firmware" }));
     const buttons = view.getAllByRole("button", { name: "Update firmware" });
     fireEvent.click(buttons[buttons.length - 1]!);
-    await waitFor(() => expect(view.getByText(/flash failed/)).toBeTruthy());
+    await waitFor(() => expect(view.getByText(/The StackChan install stopped/)).toBeTruthy());
     expect(recorded).toEqual([]);
   });
 });

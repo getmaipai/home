@@ -47,6 +47,9 @@ interface Mocks {
   chat?: "ready" | "starting";
   layout?: "ask" | "board" | "shelves";
   family?: string;
+  repairs?: unknown[];
+  updates?: unknown;
+  continue?: unknown[];
 }
 
 function mockFetch(mocks: Mocks = {}) {
@@ -59,6 +62,8 @@ function mockFetch(mocks: Mocks = {}) {
       ...(mocks.layout ? [{ key: "ui.home_layout", value: mocks.layout, layer: "person", source: "user" }] : []),
       ...(mocks.family !== undefined ? [{ key: "household.family_name", value: mocks.family, layer: "household", source: "user" }] : []),
     ]));
+    if (url.includes("/api/repairs")) return Promise.resolve(Response.json(mocks.repairs ?? []));
+    if (url.includes("/api/updates")) return Promise.resolve(Response.json(mocks.updates ?? { installed: "1.0.0", latest: "1.0.0", checkedAt: null, summary: null, error: null }));
     if (url.includes("/api/setup-checklist")) return Promise.resolve(Response.json(mocks.checklist ?? []));
     if (url.includes("/api/install")) return Promise.resolve(Response.json({ state: "none", ...mocks.install }));
     if (url.includes("/api/widgets/") && url.endsWith("/data")) {
@@ -70,7 +75,7 @@ function mockFetch(mocks: Mocks = {}) {
     if (url.includes("/api/widgets/home")) return Promise.resolve(Response.json(mocks.home ?? { hero: null, cards: mocks.widgets ?? [], more: [] }));
     if (url.includes("/api/widgets")) return Promise.resolve(Response.json(mocks.widgets ?? []));
     if (url.includes("/api/people")) return Promise.resolve(Response.json([{ id: "person-abc123", display_name: "Nova", role: "owner" }]));
-    if (url.includes("/api/continue")) return Promise.resolve(Response.json({ rows: [] }));
+    if (url.includes("/api/continue")) return Promise.resolve(Response.json({ rows: mocks.continue ?? [] }));
     if (url.includes("/api/health")) {
       return Promise.resolve(Response.json({ ok: true, engines: { chat: mocks.chat === "starting" ? { state: "down", kind: "starting", reason: "ai_installing" } : { state: "up" } } }));
     }
@@ -243,7 +248,7 @@ describe("DashboardPage (Home)", () => {
       const view = renderHome(makePerson("adult"));
       const box = await view.findByRole("textbox", { name: "Ask" });
       fireEvent.change(box, { target: { value: "What is for dinner?" } });
-      fireEvent.click(view.getByRole("button", { name: "Ask" }));
+      fireEvent.click(view.getByRole("button", { name: "Send" }));
       await waitFor(() => expect(view.getByTestId("where").textContent).toBe("/chat?ask=What%20is%20for%20dinner%3F"));
     } finally {
       restore();
@@ -255,7 +260,7 @@ describe("DashboardPage (Home)", () => {
     try {
       const view = renderHome(makePerson("adult"));
       await view.findByRole("textbox", { name: "Ask" });
-      const ask = view.getByRole("button", { name: "Ask" }) as HTMLButtonElement;
+      const ask = view.getByRole("button", { name: "Send" }) as HTMLButtonElement;
       expect(ask.disabled).toBe(false);
       expect(ask.getAttribute("aria-disabled")).toBe("true");
       fireEvent.click(ask);
@@ -413,8 +418,6 @@ describe("DashboardPage (Home)", () => {
     const { restore } = mockFetch({ checklist: ["a", "b", "c", "d", "e"].map((id) => checklistItem(id, id === "a")) });
     try {
       const view = renderHome(makePerson("owner"));
-      expect(hrefOf("Updates")).toBe("/updates");
-      expect(hrefOf("Repairs")).toBe("/repairs");
       await view.findByText("Getting started");
       await view.findByRole("button", { name: "Open Step b" });
       // Each row is a list item whose buttons name their step, so three rows never read as three identical "Open" / "Skip" pairs.
@@ -437,8 +440,7 @@ describe("DashboardPage (Home)", () => {
       for (const el of [view.getByRole("button", { name: "Open Step a" }), view.getByRole("button", { name: "Skip Step a" })]) {
         expect(el.className, el.textContent ?? "").toContain("cn-button-size-row");
       }
-      for (const el of [view.getByRole("link", { name: "Updates" }).parentElement, view.getByRole("link", { name: "Repairs" }).parentElement]) expect(el?.className).toContain("h-10");
-      expect(view.getByRole("button", { name: "Ask" }).getAttribute("data-variant")).toBe("inverse");
+      expect(view.getByRole("button", { name: "Send" }).getAttribute("data-variant")).toBe("ghost");
       expect(view.getByLabelText("Ask").getAttribute("data-shape")).toBe("pill");
     } finally {
       restore();
@@ -455,5 +457,61 @@ describe("DashboardPage (Home)", () => {
     } finally {
       restore();
     }
+  });
+
+  test("owner: Repairs and Updates show as status cards only while something is waiting", async () => {
+    const quiet = mockFetch({ layout: "ask" });
+    try {
+      const view = renderHome(makePerson("owner"));
+      await view.findByRole("textbox", { name: "Ask" });
+      await new Promise((resolve) => setTimeout(resolve, 50));
+      expect(view.queryByRole("navigation", { name: "Looking after your hub" })).toBeNull();
+      cleanup();
+    } finally { quiet.restore(); }
+    const busy = mockFetch({ layout: "ask", repairs: [{ id: "i1" }], updates: { installed: "1.0.0", latest: "1.1.0", checkedAt: null, summary: null, error: null } });
+    try {
+      const view = renderHome(makePerson("owner"));
+      await view.findByText("Something needs fixing");
+      await view.findByText("An update is ready");
+      fireEvent.click(view.getByRole("button", { name: "Repairs" }));
+      expect(document.body.textContent).not.toContain("An update is ready");
+    } finally { busy.restore(); }
+  });
+
+  test("an adult sees no status cards even when repairs are open", async () => {
+    const { restore } = mockFetch({ layout: "ask", repairs: [{ id: "i1" }] });
+    try {
+      const view = renderHome(makePerson("adult"));
+      await view.findByRole("textbox", { name: "Ask" });
+      await new Promise((resolve) => setTimeout(resolve, 50));
+      expect(view.queryByText("Something needs fixing")).toBeNull();
+    } finally { restore(); }
+  });
+
+  test("Continue is compact shortcuts, and an empty one is a single quiet sentence", async () => {
+    const rows = [{ source: "chat", kind: "chat", id: "c1", title: "Plan the trip", subtitle: null, href: "/chat?conversation=c1", at: "2026-11-09T00:00:00Z", percent: null, media_kind: null, artwork_url: null }];
+    const full = mockFetch({ layout: "ask", continue: rows });
+    try {
+      const view = renderHome(makePerson("adult"));
+      const link = await view.findByRole("link", { name: "Plan the trip" });
+      expect(link.getAttribute("href")).toBe("/chat?conversation=c1");
+      expect(view.getByRole("region", { name: "Continue" })).toBeDefined();
+      cleanup();
+    } finally { full.restore(); }
+    const empty = mockFetch({ layout: "ask" });
+    try {
+      const view = renderHome(makePerson("adult"));
+      await view.findByText("Nothing to pick up yet. Chats and things you play show up here.");
+    } finally { empty.restore(); }
+  });
+
+  test("the greeting is sentence case with one muted line", async () => {
+    const { restore } = mockFetch({ layout: "ask" });
+    try {
+      const view = renderHome(makePerson("adult"));
+      const greeting = await view.findByText(/Good .*Nova/);
+      expect(greeting.className).not.toContain("capitalize");
+      expect(view.getByText("Here is your household today.").className).toContain("text-muted-foreground");
+    } finally { restore(); }
   });
 });

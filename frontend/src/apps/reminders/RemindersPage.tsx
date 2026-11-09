@@ -18,6 +18,7 @@ import { DeviceSchedulesView } from "./DeviceSchedulesView";
 import { SmartListView, type SmartItem } from "./SmartListView";
 import { labelFor, type ListIcon, type ReminderView } from "./reminderTypes";
 import { useHubMutation } from "@/lib/useHubMutation";
+import { StatusCard } from "@maipai/ui/src/elements/status-card";
 
 const PlusIcon = getIcon("plus");
 const LISTS_QUERY_KEY = ["household-lists"];
@@ -189,6 +190,6 @@ export function RemindersPage() {
         </AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>
-    {listsQuery.isError || comingQuery.isError ? <div role="alert" className="p-4 text-destructive"><p>{i18n._({ id: "Could not load reminders. Check your connection and try again.", message: "Could not load reminders. Check your connection and try again." })}</p>{listsQuery.isError ? <Button variant="outline" onClick={() => void listsQuery.refetch()}>{i18n._({ id: "Retry", message: "Retry" })}</Button> : null}{comingQuery.isError ? <Button variant="outline" onClick={() => void comingQuery.refetch()}>{i18n._({ id: "Retry", message: "Retry" })}</Button> : null}</div> : null}
+    {listsQuery.isError || comingQuery.isError ? <StatusCard kind="problem" title={i18n._({ id: "That did not work", message: "That did not work" })} line={i18n._({ id: "Could not load reminders. Check your connection and try again.", message: "Could not load reminders. Check your connection and try again." })} action={{ label: i18n._({ id: "Retry", message: "Retry" }), onSelect: () => { if (listsQuery.isError) void listsQuery.refetch(); if (comingQuery.isError) void comingQuery.refetch(); } }} /> : null}
   </div>;
 }

@@ -8,10 +8,10 @@ import { ComingUpRow } from "@/apps/reminders/ComingUpRow";
 import { AlarmEditor } from "@/apps/clock/AlarmEditor";
 import { Sheet, SheetContent } from "@maipai/ui/src/ui/sheet";
 import { CLOCK_ADD_ALARM_EVENT } from "@/apps/clock/clockHeader";
-import { Button } from "@maipai/ui/src/ui/button";
 import { EmptyState } from "@maipai/ui/src/primitives/EmptyState";
 import { useHubMutation } from "@/lib/useHubMutation";
 import { formatDate, formatTime } from "@/lib/format";
+import { StatusCard } from "@maipai/ui/src/elements/status-card";
 
 const comingUpKey = ["household-coming-up"];
 const alarmsKey = ["household-alarms"];
@@ -68,8 +68,8 @@ export function AlarmsTab() {
 
   return (
     <section aria-label={i18n._({ id: "Alarms", message: "Alarms" })}>
-      {query.isError ? <div role="alert" className="py-4 text-destructive"><p>{i18n._({ id: "Could not load the clock. Check your connection and try again.", message: "Could not load the clock. Check your connection and try again." })}</p><Button variant="outline" onClick={() => void query.refetch()}>{i18n._({ id: "Retry", message: "Retry" })}</Button></div> : null}
-      {alarmQuery.isError ? <div role="alert" className="py-4 text-destructive"><p>{i18n._({ id: "Could not load alarms. Check your connection and try again.", message: "Could not load alarms. Check your connection and try again." })}</p><Button variant="outline" onClick={() => void alarmQuery.refetch()}>{i18n._({ id: "Retry", message: "Retry" })}</Button></div> : null}
+      {query.isError ? <StatusCard kind="problem" title={i18n._({ id: "That did not work", message: "That did not work" })} line={i18n._({ id: "Could not load the clock. Check your connection and try again.", message: "Could not load the clock. Check your connection and try again." })} action={{ label: i18n._({ id: "Retry", message: "Retry" }), onSelect: () => void query.refetch() }} /> : null}
+      {alarmQuery.isError ? <StatusCard kind="problem" title={i18n._({ id: "That did not work", message: "That did not work" })} line={i18n._({ id: "Could not load alarms. Check your connection and try again.", message: "Could not load alarms. Check your connection and try again." })} action={{ label: i18n._({ id: "Retry", message: "Retry" }), onSelect: () => void alarmQuery.refetch() }} /> : null}
       {nextAlarmAt ? <p className="m-0 py-4 text-sm text-muted-foreground">{nextLabel(nextAlarmAt, now)}</p> : null}
       {records.length === 0 && alarms.length === 0 && !query.isLoading && !alarmQuery.isLoading && !query.isError && !alarmQuery.isError
         ? <div className="py-4"><EmptyState icon="clock" variant="tile" text={i18n._({ id: "No alarms", message: "No alarms" })} actionLabel={i18n._({ id: "Add an alarm", message: "Add an alarm" })} onAction={() => window.dispatchEvent(new Event(CLOCK_ADD_ALARM_EVENT))} /></div>

@@ -1,7 +1,7 @@
 import { i18n } from "@lingui/core";
 import { Link } from "react-router-dom";
 import { Button } from "@maipai/ui/src/dashboard/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@maipai/ui/src/dashboard/components/ui/card";
+import { Section } from "@maipai/ui/src/primitives/Section";
 import { Item, ItemActions, ItemContent, ItemGroup, ItemTitle } from "@maipai/ui/src/dashboard/components/ui/item";
 import type { Roster, SetupChecklistItem } from "@/lib/api";
 import { useSetupChecklist } from "@/shell/useSetupChecklist";
@@ -22,9 +22,7 @@ export function GettingStarted({ person }: { person: Roster }) {
   const rows = open.slice(0, GETTING_STARTED_ROWS);
   return (
     <section aria-label={i18n._({ id: "Getting started", message: "Getting started" })}>
-      <Card size="sm">
-        <CardHeader><CardTitle>{i18n._({ id: "Getting started", message: "Getting started" })}</CardTitle></CardHeader>
-        <CardContent>
+      <Section variant="flat" heading={i18n._({ id: "Getting started", message: "Getting started" })}>
           <ItemGroup>
             {rows.map((item) => (
               <Item key={item.id} size="sm" role="listitem">
@@ -37,8 +35,7 @@ export function GettingStarted({ person }: { person: Roster }) {
             ))}
           </ItemGroup>
           {open.length > rows.length ? <Button variant="link" size="row" nativeButton={false} render={<Link to="/settings/household?tab=general" />}>{i18n._({ id: "Show {count} more", message: "Show {count} more", values: { count: open.length - rows.length } })}</Button> : null}
-        </CardContent>
-      </Card>
+      </Section>
     </section>
   );
 }
