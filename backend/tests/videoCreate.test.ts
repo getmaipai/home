@@ -105,6 +105,16 @@ describe("POST /api/videos/make", () => {
     expect(fake.submitted).toHaveLength(0);
   });
 
+  test("IVY-CHECK-01: the clip is still made, and the response lists what the prompt check found", async () => {
+    const { adult } = await household();
+    const res = await adult.client.post("/api/videos/make", { prompt: `${BOAT}, no blur`, seconds: 5 });
+    expect(res.status).toBe(200);
+    const body = await res.json() as { prompt_notes: string[] };
+    expect(body.prompt_notes).toHaveLength(1);
+    expect(body.prompt_notes[0]).toContain("no blur");
+    expect(fake.submitted).toHaveLength(1);
+  });
+
   test("an adult starts a clip from words: the card is returned, the recipe wording goes to the Stack and not onto the card, portrait changes the size", async () => {
     const { adult } = await household();
     const res = await adult.client.post("/api/videos/make", { prompt: BOAT, orientation: "portrait", recipe: "dolly-in" });

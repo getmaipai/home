@@ -422,13 +422,14 @@ const makeRoute = createRoute({
     styles: z.array(z.string().trim().min(1).max(80)).max(2).optional().describe("The ids of up to two styles from `/api/loras/available`, at most one character. Each is checked against what you may use; a style that is locked, gone or not yours stops the clip with one plain line."),
     strength: z.enum(["less", "normal", "more"]).optional().describe("How strongly the styles apply (0.75, 1 or 1.25 of each style's own default, held to its range)."),
   }) } } } },
-  responses: { 200: { content: { "application/json": { schema: z.union([CardSchema, LockedCardSchema]).and(z.object({ notice: z.string().nullable().describe("One plain line when the length was cut to fit the level, else null.") })) } }, description: "The card for the new clip." }, ...refusals },
+  responses: { 200: { content: { "application/json": { schema: z.union([CardSchema, LockedCardSchema]).and(z.object({ prompt_notes: z.array(z.string()).describe("IVY-CHECK-01: what the prompt check found in the words (errors and warnings only), one plain line each; the clip was still made. Empty when nothing is wrong."), notice: z.string().nullable().describe("One plain line when the length was cut to fit the level, else null.") })) } }, description: "The card for the new clip." }, ...refusals },
 });
 videosRoutes.openapi(makeRoute, async (c) => {
   const actor = c.get("person");
-  const result = await makeVideoFor(actor, c.req.valid("json"));
+  const body = c.req.valid("json");
+  const result = await makeVideoFor(actor, body);
   if (!result.ok) return c.json({ error: result.error, code: result.code }, result.status) as never;
-  return c.json({ ...videoCardOrLocked(actor, result.job, true, await readyFlags(actor)), notice: result.notice } as never, 200);
+  return c.json({ ...videoCardOrLocked(actor, result.job, true, await readyFlags(actor)), notice: result.notice, prompt_notes: checkVideoPrompt(body.prompt, { seconds: body.seconds }).filter((f) => f.level !== "info").map((f) => f.message) } as never, 200);
 });
 
 // IVY-CHECK-01: the prompt check the Create page shows under the words, before any render. Pure code; it reads and gates nothing.
