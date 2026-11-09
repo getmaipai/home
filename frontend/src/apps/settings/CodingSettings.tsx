@@ -68,7 +68,7 @@ export function CodingAdminSettings() {
   // The poll is scheduled from the options of the render that follows the start, so ask once more after that render.
   useEffect(() => { if (testStartedAt !== null) void mode.refetch(); }, [testStartedAt, mode]);
   const downloading = pieces.data?.pieces.filter((piece) => piece.state === "installing") ?? [];
-  const pieceCard = (piece: CodingPiece) => <JobProgress key={piece.id} {...downloadProgress({ title: piece.label, state: "running", status: i18n._({ id: "Downloading and installing", message: "Downloading and installing" }), percent: piece.percent ?? undefined })} variant="full" />;
+  const pieceCard = (piece: CodingPiece) => <JobProgress presentation="card" key={piece.id} {...downloadProgress({ title: piece.label, state: "running", status: i18n._({ id: "Downloading and installing", message: "Downloading and installing" }), percent: piece.percent ?? undefined })} variant="full" />;
   const downloadCards = downloading.map(pieceCard);
   const [pieceError, setPieceError] = useState<string | null>(null);
   const [modeActionBusy, setModeActionBusy] = useState<CodingModeReadinessItemId | null>(null);

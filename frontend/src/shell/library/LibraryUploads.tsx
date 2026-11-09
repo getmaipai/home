@@ -60,6 +60,7 @@ export function UploadTray({ cards, onCancel, onRetry, onDismiss }: { cards: rea
       {cards.map((card) => (
         <Fragment key={card.key}>
           <JobProgress
+            presentation="card"
             title={card.file.name}
             stages={STAGES}
             stageIndex={card.state === "done" ? 1 : 0}

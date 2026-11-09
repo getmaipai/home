@@ -76,7 +76,7 @@ export function ModelsSection() {
 
   return (
     <>
-      {downloads.filter((job) => isVisibleModelDownload(job)).map((job) => <JobProgress key={job.id} {...modelDownloadProgress(job)} variant="full" cancelable={job.actions?.includes("stop")} onCancel={job.actions?.includes("stop") ? () => { void api.stopJob(job.id); } : undefined} />)}
+      {downloads.filter((job) => isVisibleModelDownload(job)).map((job) => <JobProgress presentation="card" key={job.id} {...modelDownloadProgress(job)} variant="full" cancelable={job.actions?.includes("stop")} onCancel={job.actions?.includes("stop") ? () => { void api.stopJob(job.id); } : undefined} />)}
       <div className="flex flex-col gap-4">
         {error ? <p className="text-base text-destructive">{error}</p> : null}
         {hardware === null ? (

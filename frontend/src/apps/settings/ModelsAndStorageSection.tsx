@@ -83,7 +83,7 @@ function Row({ row, refresh, setError }: { row: ComponentRow; refresh: () => voi
         <ItemContent>
           <ItemTitle>{row.label} <Badge variant={badge.variant}>{badge.text}</Badge></ItemTitle>
           <ItemDescription clamp={false}>{row.summary}{facts ? ` ${facts}` : ""}</ItemDescription>
-          {row.state === "installing" ? <JobProgress {...downloadProgress({ title: row.label, state: "running", status: i18n._({ id: "Downloading and installing", message: "Downloading and installing" }), percent: row.percent ?? undefined })} variant="full" /> : null}
+          {row.state === "installing" ? <JobProgress presentation="card" {...downloadProgress({ title: row.label, state: "running", status: i18n._({ id: "Downloading and installing", message: "Downloading and installing" }), percent: row.percent ?? undefined })} variant="full" /> : null}
           {reason ? <p className="text-sm text-muted-foreground">{reason}</p> : null}
         </ItemContent>
         <ItemActions>

@@ -107,7 +107,7 @@ export function StylesTab({ person, card, children }: { person: Roster; card?: S
 
 /** The running downloads, each the kit's JobProgress card with no name (an adult-only style is never named). */
 function DownloadsNow({ jobs }: { jobs: Array<{ job: string; title: string; percent: number | null }> }) {
-  return jobs.map((job) => <JobProgress key={job.job} {...downloadProgress({ title: job.title, state: "running", status: i18n._({ id: "Downloading and checking the file", message: "Downloading and checking the file" }), percent: job.percent ?? undefined })} variant="full" />);
+  return jobs.map((job) => <JobProgress presentation="card" key={job.job} {...downloadProgress({ title: job.title, state: "running", status: i18n._({ id: "Downloading and checking the file", message: "Downloading and checking the file" }), percent: job.percent ?? undefined })} variant="full" />);
 }
 
 function StyleListRow({ row, onWho, onEdit }: { row: StyleRow; onWho: (who: StyleWho) => void; onEdit: () => void }) {

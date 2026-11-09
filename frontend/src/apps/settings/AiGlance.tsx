@@ -266,7 +266,7 @@ function glanceRow({ row, copy, onSwitch, onEdit, onReset, onDownload }: { row: 
         <ItemDescription clamp={false}>{model && row.offered ? `${model.label}. ` : ""}{line}</ItemDescription>
         {model && row.offered ? <ItemDescription clamp={false}>{model.details.map((part) => part.name).join(", ")}</ItemDescription> : null}
         {row.job === "wakeword" && row.offered ? <ItemDescription clamp={false}>{copy.wakeword_note}</ItemDescription> : null}
-        {progress && busy ? <JobProgress {...downloadProgress({ title: busy.label, state: "running", status: progress.text, percent: progress.percent ?? undefined })} variant="full" /> : null}
+        {progress && busy ? <JobProgress presentation="card" {...downloadProgress({ title: busy.label, state: "running", status: progress.text, percent: progress.percent ?? undefined })} variant="full" /> : null}
         {failed ? <p className="text-base text-destructive">{failed.failure ?? failed.stateText}</p> : null}
       </ItemContent>
       <ItemActions>
