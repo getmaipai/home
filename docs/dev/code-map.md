@@ -440,8 +440,8 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/commands.ts` | __resetCommandsCacheForTests, createCommand, listCommands, deleteCommand, matchCommand, runCommand |
 | `backend/src/lib/companionArt.ts` | COMPANION_STILL_MODEL_MISSING_LINE, COMPANION_CLIP_MODEL_MISSING_LINE, COMPANION_MODEL_MISMATCH_LINE, COMPANION_EDIT_MODEL, __setCompanionArtStatusReadersForTests, promptHash |
 | `backend/src/lib/companionArtCheck.ts` | ArtWithheldError, audienceLane, companionAudience, checkCompanionArt, requireCompanionPictureOk, takeAssets |
-| `backend/src/lib/companionLook.ts` | LookSchema, EMPTY_LOOK, PROMPT_MAX_CHARS, LOOK_LIMIT_LINE, lookPromptFor, KEY_ALPHA_START |
-| `backend/src/lib/companionLookJobs.ts` | LOOK_JOB_BUSY_LINE, LOOK_PICTURE_UNREAD_LINE, LOOK_PROMPT_REQUIRED_LINE, LOOK_EDIT_PROMPT_LINE, LOOK_ENGINE_NOT_READY_LINE, runningSheetJob |
+| `backend/src/lib/companionLook.ts` | TalkAnchor, TalkRecordSchema, LookSchema, EMPTY_LOOK, PROMPT_MAX_CHARS, LOOK_LIMIT_LINE |
+| `backend/src/lib/companionLookJobs.ts` | LOOK_JOB_BUSY_LINE, LOOK_PICTURE_UNREAD_LINE, LOOK_PROMPT_REQUIRED_LINE, LOOK_EDIT_PROMPT_LINE, LOOK_ENGINE_NOT_READY_LINE, busyLineFor |
 | `backend/src/lib/companionLookStyles.ts` | LOOK_STYLES, LOOK_STYLE_IDS, DEFAULT_LOOK_STYLE, stylesForBand, capOfStyle, lookStylePhrase |
 | `backend/src/lib/companionPersonality.ts` | COMPANION_PERSONALITIES, cleanStyleNotes, backstoryTagline, safeExamples |
 | `backend/src/lib/companionPersonalityDials.ts` | COMPANION_DIAL_OPTIONS |
@@ -449,6 +449,9 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/companionPromptPack.ts` | picturePromptPack, clipPromptPack |
 | `backend/src/lib/companionStates.ts` | TAKE_LIMIT_LINE, CLIP_MISSING_LINE, FINISH_POLL_MS, MEDIA_ROOT_REMOTE_LINE, keyframePath, keyframeMetaPath |
 | `backend/src/lib/companionTakes.ts` | TAKE_RUN_BUSY_LINE, TAKE_QUICK_NOT_READY_LINE, TAKE_RUN_TIMEOUT_LINE, TAKE_RETRY_WAIT_MS, TAKE_POLL_MS, TAKE_NEGATIVE_PROMPT |
+| `backend/src/lib/companionTalkAnchors.ts` | TALK_ANCHORS_UNAVAILABLE, __setTalkAnchorCompletionForTests, padAnchor, detectTalkAnchors |
+| `backend/src/lib/companionTalkJobs.ts` | talkJobBusy, talkJobFor, startCompanionTalk, publicTalkJob, cancelTalkJob, clearCompanionTalkJobs |
+| `backend/src/lib/companionTalkMaker.ts` | TALK_SHAPES, TALK_EYES, talkCropGeometry, makeTalkPicture, cutTalkCrop |
 | `backend/src/lib/companions.ts` | companionsAllowed |
 | `backend/src/lib/companionsApp.ts` | currentCompanionId, mayUseCompanion, companionAreaOn, canCreateCompanion, cardOf, listCompanionCards |
 | `backend/src/lib/composer.ts` | COMPOSE_FALLBACK_LINE, COMPOSER_MAX_CALLS, COMPOSE_FAILURE_LINE, DEFAULT_MOVES, groundedIn, emptyLookupLine |
