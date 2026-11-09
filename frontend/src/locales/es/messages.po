@@ -575,7 +575,7 @@ msgid "{hours} h {minutes} min"
 msgstr "{hours} h {minutes} min"
 
 #. js-lingui-explicit-id
-#: src/apps/clock/AlarmsTab.tsx:22
+#: src/apps/clock/AlarmsTab.tsx:23
 #, needs-review
 msgid "{hours} h {remainder} min"
 msgstr "{hours} h {remainder} min"
@@ -1268,7 +1268,7 @@ msgid "{problem} Select Retry, or open Engines and AI and select Check the conne
 msgstr "{problem} Selecciona Reintentar o abre Motores e IA y selecciona Comprobar la conexión."
 
 #. js-lingui-explicit-id
-#: src/apps/clock/AlarmsTab.tsx:22
+#: src/apps/clock/AlarmsTab.tsx:23
 #, needs-review
 msgid "{remainder} min"
 msgstr "{remainder} min"
@@ -2380,6 +2380,11 @@ msgid "Add alarm"
 msgstr "Añadir alarma"
 
 #. js-lingui-explicit-id
+#: src/apps/clock/AlarmsTab.tsx:75
+msgid "Add an alarm"
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/apps/clock/ClockPage.tsx:15
 #, needs-review
 msgid "Add an alarm with the plus button."
@@ -2934,7 +2939,7 @@ msgid "setting.safety.alarm.volume.help"
 msgstr "El volumen de alarma tiene un límite inferior fijo de 70; Home aplica ese límite."
 
 #. js-lingui-explicit-id
-#: src/apps/clock/AlarmsTab.tsx:69
+#: src/apps/clock/AlarmsTab.tsx:70
 #: src/apps/clock/ClockPage.tsx:42
 #: src/shell/AlarmRinger.tsx:200
 #, needs-review
@@ -3973,7 +3978,7 @@ msgstr "Azelma"
 #: src/shell/pages/PackageAppPage.tsx:275
 #: src/shell/pages/settings/settingsBackLink.ts:51
 #: src/shell/pages/settings/settingsBackLink.ts:56
-#: src/shell/pages/SignInPage.tsx:185
+#: src/shell/pages/SignInPage.tsx:187
 #, needs-review
 msgid "Back"
 msgstr "Atrás"
@@ -6393,7 +6398,7 @@ msgstr "Borrar {name}"
 
 #. js-lingui-explicit-id
 #: src/apps/memory/PersonMemories.tsx:379
-#: src/apps/notifications/NotificationsPage.tsx:158
+#: src/apps/notifications/NotificationsPage.tsx:159
 #: src/apps/settings/FreeUpSpaceDialog.tsx:80
 #: src/shell/pages/StoragePage.tsx:203
 #: src/shell/pages/StoragePage.tsx:213
@@ -6882,7 +6887,7 @@ msgstr ""
 #: src/shell/pages/companionFlow/AnimateStep.tsx:153
 #: src/shell/pages/CompanionsPage.tsx:160
 #: src/shell/pages/dashboard/HomeShelves.tsx:63
-#: src/shell/pages/SignInPage.tsx:161
+#: src/shell/pages/SignInPage.tsx:163
 #, needs-review
 msgid "Continue"
 msgstr "Continuar"
@@ -7371,7 +7376,7 @@ msgid "Could not load activity. Check your connection and try again."
 msgstr "No se pudo cargar la actividad. Revisa tu conexión e inténtalo de nuevo."
 
 #. js-lingui-explicit-id
-#: src/apps/clock/AlarmsTab.tsx:71
+#: src/apps/clock/AlarmsTab.tsx:72
 #, needs-review
 msgid "Could not load alarms. Check your connection and try again."
 msgstr "No se pudieron cargar las alarmas. Revisa tu conexión e inténtalo de nuevo."
@@ -7530,7 +7535,7 @@ msgid "Could not load tasks. Check your connection and try again."
 msgstr "No se pudieron cargar las tareas. Revisa tu conexión e inténtalo de nuevo."
 
 #. js-lingui-explicit-id
-#: src/apps/clock/AlarmsTab.tsx:70
+#: src/apps/clock/AlarmsTab.tsx:71
 #, needs-review
 msgid "Could not load the clock. Check your connection and try again."
 msgstr "No se pudo cargar el reloj. Revisa tu conexión e inténtalo de nuevo."
@@ -7709,7 +7714,7 @@ msgid "Could not load your memories."
 msgstr "No se pudieron cargar tus memorias."
 
 #. js-lingui-explicit-id
-#: src/apps/notifications/NotificationsPage.tsx:120
+#: src/apps/notifications/NotificationsPage.tsx:121
 #, needs-review
 msgid "Could not load your notification history."
 msgstr "No se pudo cargar tu historial de notificaciones."
@@ -9270,7 +9275,7 @@ msgstr "Espacio en disco"
 
 #. js-lingui-explicit-id
 #: src/apps/chat/chatThreadSlots.tsx:183
-#: src/apps/notifications/NotificationsPage.tsx:215
+#: src/apps/notifications/NotificationsPage.tsx:216
 #: src/shell/library/LibraryUploads.tsx:75
 #: src/shell/library/LibraryUploads.tsx:76
 #: src/shell/NotificationBell.tsx:258
@@ -9286,7 +9291,7 @@ msgid "Dismiss \"{title}\"?"
 msgstr "¿Descartar \"{title}\"?"
 
 #. js-lingui-explicit-id
-#: src/apps/notifications/NotificationsPage.tsx:211
+#: src/apps/notifications/NotificationsPage.tsx:212
 #, needs-review
 msgid "Dismiss {text}"
 msgstr "Descartar {text}"
@@ -9298,13 +9303,13 @@ msgid "Dismiss all"
 msgstr "Descartar todo"
 
 #. js-lingui-explicit-id
-#: src/apps/notifications/NotificationsPage.tsx:150
+#: src/apps/notifications/NotificationsPage.tsx:151
 #, needs-review
 msgid "Dismiss selected"
 msgstr "Descartar seleccionadas"
 
 #. js-lingui-explicit-id
-#: src/apps/notifications/NotificationsPage.tsx:192
+#: src/apps/notifications/NotificationsPage.tsx:193
 #, needs-review
 msgid "Dismissed"
 msgstr "Descartada"
@@ -10023,7 +10028,7 @@ msgid "Enter the engine computer's name or its home network address, for example
 msgstr "Introduce el nombre del equipo del motor o su dirección en la red local, por ejemplo, 192.168.1.20."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/SignInPage.tsx:139
+#: src/shell/pages/SignInPage.tsx:141
 #, needs-review
 msgid "Enter your {digits}-digit passcode"
 msgstr "Introduce tu código de {digits} dígitos"
@@ -14604,7 +14609,7 @@ msgid "setting.ease.text_size.option.140"
 msgstr "Grande."
 
 #. js-lingui-explicit-id
-#: src/apps/notifications/NotificationsPage.tsx:137
+#: src/apps/notifications/NotificationsPage.tsx:138
 #, needs-review
 msgid "Last 30 days"
 msgstr "Últimos 30 días"
@@ -15632,7 +15637,7 @@ msgid "Loading more files"
 msgstr "Cargando más archivos"
 
 #. js-lingui-explicit-id
-#: src/apps/notifications/NotificationsPage.tsx:121
+#: src/apps/notifications/NotificationsPage.tsx:122
 #, needs-review
 msgid "Loading notifications"
 msgstr "Cargando notificaciones"
@@ -17811,7 +17816,7 @@ msgid "setting.topics.family_stories.option.keep"
 msgstr "Nunca dice si una historia es real o no, y juega el rol."
 
 #. js-lingui-explicit-id
-#: src/apps/notifications/NotificationsPage.tsx:196
+#: src/apps/notifications/NotificationsPage.tsx:197
 #, needs-review
 msgid "New"
 msgstr "Nueva"
@@ -18008,7 +18013,7 @@ msgid "Next"
 msgstr "Siguiente"
 
 #. js-lingui-explicit-id
-#: src/apps/clock/AlarmsTab.tsx:29
+#: src/apps/clock/AlarmsTab.tsx:30
 #, needs-review
 msgid "Next: {day} {time}, in {untilText}"
 msgstr "Próximo: {day} {time}, en {untilText}"
@@ -18049,7 +18054,7 @@ msgid "No activity for {name} yet."
 msgstr "Aún no hay actividad para {name}."
 
 #. js-lingui-explicit-id
-#: src/apps/clock/AlarmsTab.tsx:74
+#: src/apps/clock/AlarmsTab.tsx:75
 #, needs-review
 msgid "No alarms"
 msgstr "Sin alarmas"
@@ -18919,7 +18924,7 @@ msgid "Nothing in {label} yet."
 msgstr "Aún no hay nada en {label}."
 
 #. js-lingui-explicit-id
-#: src/apps/notifications/NotificationsPage.tsx:132
+#: src/apps/notifications/NotificationsPage.tsx:133
 #, needs-review
 msgid "Nothing in the last 30 days."
 msgstr "Nada en los últimos 30 días."
@@ -19033,13 +19038,14 @@ msgid "Nothing your family says is used to train anything."
 msgstr "Nada de lo que dice tu familia se usa para entrenar algo."
 
 #. js-lingui-explicit-id
-#: src/apps/notifications/NotificationsPage.tsx:178
+#: src/apps/notifications/NotificationsPage.tsx:179
 #, needs-review
 msgid "Notification history"
 msgstr "Historial de notificaciones"
 
 #. js-lingui-explicit-id
 #: src/apps/notifications/NotificationsPage.tsx:110
+#: src/apps/notifications/NotificationsPage.tsx:113
 #: src/shell/NotificationBell.tsx:210
 #: src/shell/NotificationBell.tsx:225
 #: src/shell/pageHeaderTitle.tsx:105
@@ -21718,7 +21724,7 @@ msgid "setting.engines.stack.remote.allow_tailnet.label"
 msgstr "Alcanzar el equipo motor cuando estás fuera de casa"
 
 #. js-lingui-explicit-id
-#: src/apps/notifications/NotificationsPage.tsx:194
+#: src/apps/notifications/NotificationsPage.tsx:195
 #, needs-review
 msgid "Read"
 msgstr "Leída"
@@ -22689,8 +22695,8 @@ msgid "setting.engines.stack.use_tts.help"
 msgstr "Retirado. El MaiPai Stack ahora decide qué motor hace cada tarea, así que este interruptor no hace nada. La clave se conserva para que un valor guardado se siga leyendo y una escritura siga funcionando."
 
 #. js-lingui-explicit-id
-#: src/apps/clock/AlarmsTab.tsx:70
 #: src/apps/clock/AlarmsTab.tsx:71
+#: src/apps/clock/AlarmsTab.tsx:72
 #: src/apps/clock/TimersTab.tsx:148
 #: src/apps/reminders/RemindersPage.tsx:190
 #: src/apps/reminders/RemindersPage.tsx:190
@@ -24063,7 +24069,7 @@ msgid "Seek"
 msgstr "Buscar"
 
 #. js-lingui-explicit-id
-#: src/apps/notifications/NotificationsPage.tsx:155
+#: src/apps/notifications/NotificationsPage.tsx:156
 #: src/shell/pages/FilesPage.tsx:371
 #, needs-review
 msgid "Select"
@@ -24083,7 +24089,7 @@ msgstr "Selecciona {name}, {minutes} min"
 
 #. js-lingui-explicit-id
 #: src/apps/memory/PersonMemories.tsx:91
-#: src/apps/notifications/NotificationsPage.tsx:185
+#: src/apps/notifications/NotificationsPage.tsx:186
 #, needs-review
 msgid "Select {text}"
 msgstr "Seleccionar {text}"
@@ -24095,8 +24101,8 @@ msgid "Select {text}, {displayTime} remaining"
 msgstr "Selecciona {text}, quedan {displayTime}"
 
 #. js-lingui-explicit-id
-#: src/apps/notifications/NotificationsPage.tsx:169
-#: src/apps/notifications/NotificationsPage.tsx:172
+#: src/apps/notifications/NotificationsPage.tsx:170
+#: src/apps/notifications/NotificationsPage.tsx:173
 #: src/apps/settings/FreeUpSpaceDialog.tsx:80
 #, needs-review
 msgid "Select all"
@@ -24874,7 +24880,7 @@ msgid "Sidebar"
 msgstr "Barra lateral"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/SignInPage.tsx:161
+#: src/shell/pages/SignInPage.tsx:163
 #, needs-review
 msgid "Sign in"
 msgstr "Iniciar sesión"
@@ -24942,7 +24948,7 @@ msgid "Signed-in sessions"
 msgstr "Sesiones iniciadas"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/SignInPage.tsx:161
+#: src/shell/pages/SignInPage.tsx:163
 #, needs-review
 msgid "Signing in…"
 msgstr "Iniciando sesión…"
@@ -30114,14 +30120,14 @@ msgid "setting.robot.greetings.mode.help"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/SignInPage.tsx:173
+#: src/shell/pages/SignInPage.tsx:175
 #: src/shell/sessionLockContext.tsx:141
 #, needs-review
 msgid "Use a password instead"
 msgstr "Usa una contraseña en su lugar"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/SignInPage.tsx:173
+#: src/shell/pages/SignInPage.tsx:175
 #: src/shell/sessionLockContext.tsx:141
 #, needs-review
 msgid "Use a PIN instead"
@@ -30428,7 +30434,7 @@ msgid "setting.news.my_mix.does"
 msgstr "Usa tu lectura en este hub para elegir historias para My Mix."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/SignInPage.tsx:157
+#: src/shell/pages/SignInPage.tsx:159
 #, needs-review
 msgid "Using a password? Tap \"Use a password instead\"."
 msgstr "¿Usas una contraseña? Toca \"Usa una contraseña en su lugar\"."
