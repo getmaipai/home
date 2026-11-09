@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
+import { i18n } from "@lingui/core";
 import { api, type Roster } from "@/lib/api";
 import { videosApi } from "@/lib/videosApi";
 
@@ -28,7 +29,7 @@ export function useCutToBeatDialog({ open, onOpenChange, me, seed }: { open: boo
     try {
       const card = await videosApi.cutToBeat({ clips: picked, track, beats_per_cut: Number(beats) as 1 | 2 | 4 | 8, length_s: Number(length) as 15 | 30 | 60 });
       if (card.conversation_id) { onOpenChange(false); navigate(`/chat?conversation=${encodeURIComponent(card.conversation_id)}`); }
-    } catch (error) { toast.error(error instanceof Error ? error.message : "The cut could not be made. Try again in a minute."); }
+    } catch (error) { console.error(error); toast.error(i18n._({ id: "The cut could not be made. Try again in a minute.", message: "The cut could not be made. Try again in a minute." })); }
     finally { setBusy(false); }
   }
   return { clips, tracks, picked, track, setTrack, beats, setBeats, length, setLength, busy, toggle, submit, seededSong: Boolean(seed.trackId) };

@@ -28,7 +28,7 @@ export function BringSong({ mode = "edit", adult = false }: { mode?: "edit" | "s
     if (!/\.(mp3|m4a|wav|aac|ogg|flac)$/i.test(picked.name) || picked.size > 40 * 1024 * 1024) { setProblem(BRING_SONG_LINE()); return; }
     setUploading(true);
     try { const form = new FormData(); form.append("file", picked, picked.name); const result = await request<{ id: string; name: string }>("/api/library/upload", { method: "POST", body: form }); setFile({ id: result.id, name: result.name }); }
-    catch (error) { setProblem(error instanceof Error && error.message ? error.message : ERROR_LINE()); }
+    catch (error) { console.error(error); setProblem(ERROR_LINE()); }
     finally { setUploading(false); }
   };
   const start = async (change: "restyle" | "parts" | "stems" | "voice_swap") => {
@@ -37,7 +37,7 @@ export function BringSong({ mode = "edit", adult = false }: { mode?: "edit" | "s
     try {
       const card: MusicCard = await musicApi.editFromFile({ file_id: file.id, change, ...(change === "voice_swap" ? { voice } : {}), ...(change === "restyle" ? { style: style.trim() } : {}), ...(change === "parts" ? { parts: { drop: ["vocals"] } } : {}) });
       navigate(change === "stems" ? stemsAddress(card.id) : songAddress(card.id));
-    } catch (error) { setProblem(error instanceof Error && error.message ? error.message : ERROR_LINE()); }
+    } catch (error) { console.error(error); setProblem(ERROR_LINE()); }
     finally { setBusy(false); }
   };
   return <section aria-label={i18n._({ id: "Bring a song", message: "Bring a song" })} data-testid="bring-song" className="flex flex-col gap-2">

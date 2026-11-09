@@ -1382,7 +1382,7 @@ msgid "{source} · part of how the hub runs"
 msgstr "{source} · parte de cómo funciona el hub"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/MusicVoiceCreate.tsx:96
+#: src/shell/pages/MusicVoiceCreate.tsx:98
 #, needs-review
 msgid "{sourceKind, select, video {The new voice is {amount} seconds longer than the video, so the end was cut.} other {The new voice is {amount} seconds longer than the audio, so the end was cut.}}"
 msgstr "{sourceKind, select, video {La nueva voz dura {amount} segundos más que el video, así que se cortó el final.} other {La nueva voz dura {amount} segundos más que el audio, así que se cortó el final.}}"
@@ -2583,7 +2583,7 @@ msgid "Adding"
 msgstr "Añadiendo"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/MusicVoiceCreate.tsx:137
+#: src/shell/pages/MusicVoiceCreate.tsx:139
 #, needs-review
 msgid "Adding your file…"
 msgstr "Agregando tu archivo…"
@@ -5165,14 +5165,14 @@ msgid "Change the style"
 msgstr "Cambia el estilo"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/MusicVoiceCreate.tsx:113
-#: src/shell/pages/MusicVoiceCreate.tsx:146
+#: src/shell/pages/MusicVoiceCreate.tsx:115
+#: src/shell/pages/MusicVoiceCreate.tsx:148
 #, needs-review
 msgid "Change voice"
 msgstr "Cambiar voz"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/MusicVoiceCreate.tsx:105
+#: src/shell/pages/MusicVoiceCreate.tsx:107
 #, needs-review
 msgid "Changed voice"
 msgstr "Voz cambiada"
@@ -5208,7 +5208,7 @@ msgid "area.Changing pictures"
 msgstr "Cambiar imágenes"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/MusicVoiceCreate.tsx:92
+#: src/shell/pages/MusicVoiceCreate.tsx:94
 #, needs-review
 msgid "Changing the voice…"
 msgstr "Cambiando la voz…"
@@ -5797,7 +5797,7 @@ msgid "api.error.list_move_same"
 msgstr "Elige otra lista para mover estos elementos."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/MusicVoiceCreate.tsx:92
+#: src/shell/pages/MusicVoiceCreate.tsx:94
 #, needs-review
 msgid "Choose a file first."
 msgstr "Elige un archivo primero."
@@ -5888,8 +5888,8 @@ msgstr "Elige una zona horaria válida."
 
 #. js-lingui-explicit-id
 #: src/shell/pages/BringSong.tsx:54
-#: src/shell/pages/MusicVoiceCreate.tsx:120
-#: src/shell/pages/MusicVoiceCreate.tsx:141
+#: src/shell/pages/MusicVoiceCreate.tsx:122
+#: src/shell/pages/MusicVoiceCreate.tsx:143
 #, needs-review
 msgid "Choose a voice"
 msgstr "Elige una voz"
@@ -5907,7 +5907,7 @@ msgid "Choose a voice for {who}"
 msgstr "Elige una voz para {who}"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/MusicVoiceCreate.tsx:92
+#: src/shell/pages/MusicVoiceCreate.tsx:94
 #, needs-review
 msgid "Choose a voice."
 msgstr "Elige una voz."
@@ -5919,7 +5919,7 @@ msgid "Choose an audio file or drop it here"
 msgstr "Elige un archivo de audio o suéltalo aquí"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/MusicVoiceCreate.tsx:137
+#: src/shell/pages/MusicVoiceCreate.tsx:139
 #, needs-review
 msgid "Choose an audio or video file or drop it here"
 msgstr "Elige un archivo de audio o video o suéltalo aquí"
@@ -12063,7 +12063,7 @@ msgid "api.error.house_controls_unavailable"
 msgstr "Los controles de Home no están disponibles para este altavoz. Inicia sesión como miembro del hogar."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/MusicVoiceCreate.tsx:78
+#: src/shell/pages/MusicVoiceCreate.tsx:80
 #, needs-review
 msgid "Home could not add that file. Try again."
 msgstr "Home no pudo agregar ese archivo. Vuelve a intentarlo."
@@ -12080,7 +12080,7 @@ msgid "Home could not change that setting. Try again."
 msgstr "Home no pudo cambiar esa configuración. Intenta de nuevo."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/MusicVoiceCreate.tsx:88
+#: src/shell/pages/MusicVoiceCreate.tsx:90
 #, needs-review
 msgid "Home could not change that voice. Try again."
 msgstr "Home no pudo cambiar esa voz. Vuelve a intentarlo."
@@ -12237,7 +12237,7 @@ msgid "Home could not load your Trash. Check that Home is running, then try agai
 msgstr "Home no pudo cargar tu Papelera. Comprueba que Home está activo y vuelve a intentarlo."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/MusicVoiceCreate.tsx:62
+#: src/shell/pages/MusicVoiceCreate.tsx:63
 #, needs-review
 msgid "Home could not make that voiceover. Try again."
 msgstr "Home no pudo crear ese doblaje. Vuelve a intentarlo."
@@ -16434,7 +16434,7 @@ msgid "Make a voice from a WAV, MP3 or FLAC recording of 6 to 30 seconds. Everyo
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/MusicVoiceCreate.tsx:116
+#: src/shell/pages/MusicVoiceCreate.tsx:118
 #, needs-review
 msgid "Make a voiceover"
 msgstr "Crear un doblaje"
@@ -16590,7 +16590,7 @@ msgid "Make voice"
 msgstr "Crear voz"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/MusicVoiceCreate.tsx:132
+#: src/shell/pages/MusicVoiceCreate.tsx:134
 #, needs-review
 msgid "Make voiceover"
 msgstr "Crear doblaje"
@@ -19929,8 +19929,8 @@ msgstr "Abre Home en http://localhost:3000 o en una dirección https para usar e
 
 #. js-lingui-explicit-id
 #: src/shell/pages/MakeSongPage.tsx:98
-#: src/shell/pages/MusicVoiceCreate.tsx:102
-#: src/shell/pages/MusicVoiceCreate.tsx:108
+#: src/shell/pages/MusicVoiceCreate.tsx:104
+#: src/shell/pages/MusicVoiceCreate.tsx:110
 #, needs-review
 msgid "Open in Library"
 msgstr "Abrir en Biblioteca"
@@ -23763,8 +23763,8 @@ msgid "Scope:"
 msgstr "Alcance:"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/MusicVoiceCreate.tsx:125
-#: src/shell/pages/MusicVoiceCreate.tsx:126
+#: src/shell/pages/MusicVoiceCreate.tsx:127
+#: src/shell/pages/MusicVoiceCreate.tsx:128
 #, needs-review
 msgid "Script"
 msgstr "Guion"
@@ -25748,8 +25748,8 @@ msgid "setting.safety.alarm.child_line.help"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/MusicVoiceCreate.tsx:101
-#: src/shell/pages/MusicVoiceCreate.tsx:106
+#: src/shell/pages/MusicVoiceCreate.tsx:103
+#: src/shell/pages/MusicVoiceCreate.tsx:108
 msgid "Spoken by {engine}"
 msgstr ""
 
@@ -27563,6 +27563,11 @@ msgid "the connection is unavailable."
 msgstr "la conexión no está disponible."
 
 #. js-lingui-explicit-id
+#: src/shell/library/CutToBeatDialog.tsx:32
+msgid "The cut could not be made. Try again in a minute."
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:56
 #, needs-review
 msgid "setting.backups.emergency_kit_saved_at.help"
@@ -27682,6 +27687,11 @@ msgstr "El guardia nunca vigila ni reinicia el Mac."
 #, needs-review
 msgid "setting.host.guard.mode.option.dry"
 msgstr "El guardia vigila y registra fallos, pero nunca reinicia el Mac."
+
+#. js-lingui-explicit-id
+#: src/shell/pages/StatusPage.tsx:89
+msgid "The health checks could not be run. Try again."
+msgstr ""
 
 #. js-lingui-explicit-id
 #: src/apps/setup/CloseAppsStep.tsx:63
@@ -27956,6 +27966,11 @@ msgid "The model link did not open. Check the link, then try again."
 msgstr "El enlace del modelo no se abrió. Revisa el enlace y vuelve a intentarlo."
 
 #. js-lingui-explicit-id
+#: src/shell/library/AddMusicDialog.tsx:29
+msgid "The music could not be added. Try again in a minute."
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/shell/pages/MusicWorkspacePage.tsx:100
 msgid "The music model makes at least {min} seconds, so Home cuts it to this length."
 msgstr ""
@@ -27973,7 +27988,7 @@ msgid "setting.engines.stack.remote.host.help"
 msgstr "El nombre del ordenador que ejecuta el motor, tal como lo conoce tu red. Solo un administrador puede cambiarlo. Se muestra solo mientras el motor funciona en otro ordenador."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/MusicVoiceCreate.tsx:96
+#: src/shell/pages/MusicVoiceCreate.tsx:98
 #, needs-review
 msgid "The new voice is {amount} seconds shorter, so the end is quiet."
 msgstr "La nueva voz es {amount} segundos más corta, así que el final está en silencio."
@@ -28354,7 +28369,7 @@ msgid "setting.ease.reading_level.option.standard"
 msgstr "La redacción habitual."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/MusicVoiceCreate.tsx:150
+#: src/shell/pages/MusicVoiceCreate.tsx:152
 #, needs-review
 msgid "The video's own sound is replaced. The original file is not changed."
 msgstr "Se reemplaza el sonido del video. El archivo original no cambia."
@@ -30711,10 +30726,10 @@ msgstr "Voces"
 #: src/shell/pages/companionFlow/CustomizeStep.tsx:136
 #: src/shell/pages/companionFlow/CustomizeStep.tsx:143
 #: src/shell/pages/CompanionsPage.tsx:348
-#: src/shell/pages/MusicVoiceCreate.tsx:118
 #: src/shell/pages/MusicVoiceCreate.tsx:120
-#: src/shell/pages/MusicVoiceCreate.tsx:139
+#: src/shell/pages/MusicVoiceCreate.tsx:122
 #: src/shell/pages/MusicVoiceCreate.tsx:141
+#: src/shell/pages/MusicVoiceCreate.tsx:143
 #: src/shell/pages/MusicWorkspacePage.tsx:36
 #: src/shell/pages/settings/settingsViews.tsx:172
 #: src/shell/pages/status/StatusComponents.tsx:29
@@ -30800,7 +30815,7 @@ msgid "Voice input needs a one-time download that hasn't finished on this hub ye
 msgstr "La entrada de voz necesita una descarga única que aún no termina en este hub."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/MusicVoiceCreate.tsx:112
+#: src/shell/pages/MusicVoiceCreate.tsx:114
 #, needs-review
 msgid "Voice mode"
 msgstr "Modo de voz"
@@ -30854,14 +30869,14 @@ msgid "Voice source"
 msgstr "Fuente de voz"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/MusicVoiceCreate.tsx:128
+#: src/shell/pages/MusicVoiceCreate.tsx:130
 #, needs-review
 msgid "Voice tags"
 msgstr "Etiquetas de voz"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/MusicVoiceCreate.tsx:100
-#: src/shell/pages/MusicVoiceCreate.tsx:113
+#: src/shell/pages/MusicVoiceCreate.tsx:102
+#: src/shell/pages/MusicVoiceCreate.tsx:115
 #, needs-review
 msgid "Voiceover"
 msgstr "Doblaje"

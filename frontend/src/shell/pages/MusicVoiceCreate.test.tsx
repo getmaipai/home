@@ -64,7 +64,7 @@ describe("Voice Create", () => {
     expect(button.disabled).toBe(true);
     fireEvent.change(await view.findByLabelText("Script"), { target: { value: "Hello." } });
     fireEvent.click(button);
-    expect(await view.findByRole("alert")).toHaveTextContent("That script could not be spoken.");
+    expect(await view.findByRole("alert")).toHaveTextContent("Home could not make that voiceover. Try again.");
   });
 
   test("a voice with no tags has no chip row", async () => {
@@ -115,6 +115,6 @@ describe("Voice Create", () => {
     fireEvent.change(picker, { target: { files: [new File(["clip"], "clip.mp4", { type: "video/mp4" })] } });
     await view.findByText("clip.mp4");
     fireEvent.click(button);
-    expect(await view.findByRole("alert")).toHaveTextContent("That file could not be changed.");
+    expect(await view.findByRole("alert")).toHaveTextContent("Home could not change that voice. Try again.");
   });
 });

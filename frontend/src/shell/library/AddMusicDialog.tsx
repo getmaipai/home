@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
+import { i18n } from "@lingui/core";
 import { api, type Roster } from "@/lib/api";
 import { videosApi } from "@/lib/videosApi";
 
@@ -25,7 +26,7 @@ export function useAddMusicDialog({ open, onOpenChange, me, clipId }: { open: bo
       const result = await videosApi.addMusic(choice === NEW_MUSIC ? { clip: clipId, make_music: description.trim(), level } : { clip: clipId, track: choice, level });
       onOpenChange(false);
       navigate(`/chat?conversation=${encodeURIComponent(result.conversation_id)}`);
-    } catch (error) { toast.error(error instanceof Error ? error.message : "The music could not be added. Try again in a minute."); }
+    } catch (error) { console.error(error); toast.error(i18n._({ id: "The music could not be added. Try again in a minute.", message: "The music could not be added. Try again in a minute." })); }
     finally { setBusy(false); }
   }
   return { songs: songs.data ?? [], choice, setChoice, description, setDescription, level, setLevel, busy, ready, submit };

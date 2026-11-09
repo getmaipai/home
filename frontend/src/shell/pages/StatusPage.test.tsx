@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, mock, test } from "bun:test";
-import { cleanup } from "@testing-library/react";
+import { cleanup, fireEvent } from "@testing-library/react";
 import { StatusPage } from "@/shell/pages/StatusPage";
 import { renderWithQueryClient } from "../../../tests/renderWithQueryClient";
 import type { EngineComputerStatus, Roster, StatusAppsResponse, StatusHistory } from "@/lib/api";
@@ -39,6 +39,27 @@ function mockStatus(includeNeeds: boolean, history: StatusHistory = { generated_
 }
 
 describe("StatusPage health checks (CANARY-01)", () => {
+  test("shows the fixed sentence when running checks fails", async () => {
+    const original = globalThis.fetch;
+    globalThis.fetch = mock((input: RequestInfo | URL) => {
+      const url = typeof input === "string" ? input : input.toString();
+      if (url.includes("/api/health-checks/run")) return Promise.resolve(Response.json({ error: "private engine detail" }, { status: 500 }));
+      if (url.includes("/api/status/apps")) return Promise.resolve(Response.json(apps));
+      if (url.includes("/api/health-checks")) return Promise.resolve(Response.json({ running: false, last_checked_at: new Date().toISOString(), groups: [], checks: [] }));
+      if (url.includes("/api/health")) return Promise.resolve(Response.json({ engines: { chat: { kind: "selection", pid: null, alive: true }, embed: { kind: "spawned", pid: null, alive: true }, background: { kind: "spawned", pid: null, alive: true }, voice: { kind: "spawned", pid: null, alive: true } }, brain: "selection", voice: "spawned", ok: true, uptimeSeconds: 60, sidecars: [] }));
+      if (url.includes("/api/status/engine-computer")) return Promise.resolve(Response.json({ configured: false, state: "not_reachable", reason: null }));
+      if (url.includes("/api/status/board")) return Promise.resolve(Response.json({ note: null, maintenance: [] }));
+      if (url.includes("/api/status/history")) return Promise.resolve(Response.json({ generated_at: new Date().toISOString(), days: 90, components: [], incidents: [] }));
+      return Promise.resolve(Response.json({}));
+    }) as unknown as typeof fetch;
+    try {
+      const view = renderWithQueryClient(<StatusPage person={makePerson("admin")} />);
+      fireEvent.click(await view.findByRole("button", { name: "Run checks now" }));
+      expect(await view.findByRole("alert")).toHaveTextContent("The health checks could not be run. Try again.");
+      expect(view.queryByText("private engine detail")).toBeNull();
+    } finally { globalThis.fetch = original; }
+  });
+
   test("admins see when it last checked and a pass or fail per group; members see no row", async () => {
     const { restore } = mockStatus(true);
     const base = globalThis.fetch;

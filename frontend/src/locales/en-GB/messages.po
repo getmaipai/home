@@ -1172,7 +1172,7 @@ msgid "{source} · part of how the hub runs"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/MusicVoiceCreate.tsx:96
+#: src/shell/pages/MusicVoiceCreate.tsx:98
 msgid "{sourceKind, select, video {The new voice is {amount} seconds longer than the video, so the end was cut.} other {The new voice is {amount} seconds longer than the audio, so the end was cut.}}"
 msgstr ""
 
@@ -2203,7 +2203,7 @@ msgid "Adding"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/MusicVoiceCreate.tsx:137
+#: src/shell/pages/MusicVoiceCreate.tsx:139
 msgid "Adding your file…"
 msgstr ""
 
@@ -4448,13 +4448,13 @@ msgid "Change the style"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/MusicVoiceCreate.tsx:113
-#: src/shell/pages/MusicVoiceCreate.tsx:146
+#: src/shell/pages/MusicVoiceCreate.tsx:115
+#: src/shell/pages/MusicVoiceCreate.tsx:148
 msgid "Change voice"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/MusicVoiceCreate.tsx:105
+#: src/shell/pages/MusicVoiceCreate.tsx:107
 msgid "Changed voice"
 msgstr ""
 
@@ -4484,7 +4484,7 @@ msgid "area.Changing pictures"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/MusicVoiceCreate.tsx:92
+#: src/shell/pages/MusicVoiceCreate.tsx:94
 msgid "Changing the voice…"
 msgstr ""
 
@@ -4991,7 +4991,7 @@ msgid "api.error.list_move_same"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/MusicVoiceCreate.tsx:92
+#: src/shell/pages/MusicVoiceCreate.tsx:94
 msgid "Choose a file first."
 msgstr ""
 
@@ -5068,8 +5068,8 @@ msgstr ""
 
 #. js-lingui-explicit-id
 #: src/shell/pages/BringSong.tsx:54
-#: src/shell/pages/MusicVoiceCreate.tsx:120
-#: src/shell/pages/MusicVoiceCreate.tsx:141
+#: src/shell/pages/MusicVoiceCreate.tsx:122
+#: src/shell/pages/MusicVoiceCreate.tsx:143
 msgid "Choose a voice"
 msgstr ""
 
@@ -5084,7 +5084,7 @@ msgid "Choose a voice for {who}"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/MusicVoiceCreate.tsx:92
+#: src/shell/pages/MusicVoiceCreate.tsx:94
 msgid "Choose a voice."
 msgstr ""
 
@@ -5094,7 +5094,7 @@ msgid "Choose an audio file or drop it here"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/MusicVoiceCreate.tsx:137
+#: src/shell/pages/MusicVoiceCreate.tsx:139
 msgid "Choose an audio or video file or drop it here"
 msgstr ""
 
@@ -10339,7 +10339,7 @@ msgid "api.error.house_controls_unavailable"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/MusicVoiceCreate.tsx:78
+#: src/shell/pages/MusicVoiceCreate.tsx:80
 msgid "Home could not add that file. Try again."
 msgstr ""
 
@@ -10354,7 +10354,7 @@ msgid "Home could not change that setting. Try again."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/MusicVoiceCreate.tsx:88
+#: src/shell/pages/MusicVoiceCreate.tsx:90
 msgid "Home could not change that voice. Try again."
 msgstr ""
 
@@ -10487,7 +10487,7 @@ msgid "Home could not load your Trash. Check that Home is running, then try agai
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/MusicVoiceCreate.tsx:62
+#: src/shell/pages/MusicVoiceCreate.tsx:63
 msgid "Home could not make that voiceover. Try again."
 msgstr ""
 
@@ -14086,7 +14086,7 @@ msgid "Make a voice from a WAV, MP3 or FLAC recording of 6 to 30 seconds. Everyo
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/MusicVoiceCreate.tsx:116
+#: src/shell/pages/MusicVoiceCreate.tsx:118
 msgid "Make a voiceover"
 msgstr ""
 
@@ -14219,7 +14219,7 @@ msgid "Make voice"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/MusicVoiceCreate.tsx:132
+#: src/shell/pages/MusicVoiceCreate.tsx:134
 msgid "Make voiceover"
 msgstr ""
 
@@ -17093,8 +17093,8 @@ msgstr ""
 
 #. js-lingui-explicit-id
 #: src/shell/pages/MakeSongPage.tsx:98
-#: src/shell/pages/MusicVoiceCreate.tsx:102
-#: src/shell/pages/MusicVoiceCreate.tsx:108
+#: src/shell/pages/MusicVoiceCreate.tsx:104
+#: src/shell/pages/MusicVoiceCreate.tsx:110
 msgid "Open in Library"
 msgstr ""
 
@@ -20389,8 +20389,8 @@ msgid "Scope:"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/MusicVoiceCreate.tsx:125
-#: src/shell/pages/MusicVoiceCreate.tsx:126
+#: src/shell/pages/MusicVoiceCreate.tsx:127
+#: src/shell/pages/MusicVoiceCreate.tsx:128
 msgid "Script"
 msgstr ""
 
@@ -22088,8 +22088,8 @@ msgid "setting.safety.alarm.child_line.help"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/MusicVoiceCreate.tsx:101
-#: src/shell/pages/MusicVoiceCreate.tsx:106
+#: src/shell/pages/MusicVoiceCreate.tsx:103
+#: src/shell/pages/MusicVoiceCreate.tsx:108
 msgid "Spoken by {engine}"
 msgstr ""
 
@@ -23652,6 +23652,11 @@ msgid "the connection is unavailable."
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/shell/library/CutToBeatDialog.tsx:32
+msgid "The cut could not be made. Try again in a minute."
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:56
 msgid "setting.backups.emergency_kit_saved_at.help"
 msgstr ""
@@ -23750,6 +23755,11 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:566
 msgid "setting.host.guard.mode.option.dry"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/shell/pages/StatusPage.tsx:89
+msgid "The health checks could not be run. Try again."
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -23984,6 +23994,11 @@ msgid "The model link did not open. Check the link, then try again."
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/shell/library/AddMusicDialog.tsx:29
+msgid "The music could not be added. Try again in a minute."
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/shell/pages/MusicWorkspacePage.tsx:100
 msgid "The music model makes at least {min} seconds, so Home cuts it to this length."
 msgstr ""
@@ -23999,7 +24014,7 @@ msgid "setting.engines.stack.remote.host.help"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/MusicVoiceCreate.tsx:96
+#: src/shell/pages/MusicVoiceCreate.tsx:98
 msgid "The new voice is {amount} seconds shorter, so the end is quiet."
 msgstr ""
 
@@ -24329,7 +24344,7 @@ msgid "setting.ease.reading_level.option.standard"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/MusicVoiceCreate.tsx:150
+#: src/shell/pages/MusicVoiceCreate.tsx:152
 msgid "The video's own sound is replaced. The original file is not changed."
 msgstr ""
 
@@ -26342,10 +26357,10 @@ msgstr ""
 #: src/shell/pages/companionFlow/CustomizeStep.tsx:136
 #: src/shell/pages/companionFlow/CustomizeStep.tsx:143
 #: src/shell/pages/CompanionsPage.tsx:348
-#: src/shell/pages/MusicVoiceCreate.tsx:118
 #: src/shell/pages/MusicVoiceCreate.tsx:120
-#: src/shell/pages/MusicVoiceCreate.tsx:139
+#: src/shell/pages/MusicVoiceCreate.tsx:122
 #: src/shell/pages/MusicVoiceCreate.tsx:141
+#: src/shell/pages/MusicVoiceCreate.tsx:143
 #: src/shell/pages/MusicWorkspacePage.tsx:36
 #: src/shell/pages/settings/settingsViews.tsx:172
 #: src/shell/pages/status/StatusComponents.tsx:29
@@ -26419,7 +26434,7 @@ msgid "Voice input needs a one-time download that hasn't finished on this hub ye
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/MusicVoiceCreate.tsx:112
+#: src/shell/pages/MusicVoiceCreate.tsx:114
 msgid "Voice mode"
 msgstr ""
 
@@ -26464,13 +26479,13 @@ msgid "Voice source"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/MusicVoiceCreate.tsx:128
+#: src/shell/pages/MusicVoiceCreate.tsx:130
 msgid "Voice tags"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/MusicVoiceCreate.tsx:100
-#: src/shell/pages/MusicVoiceCreate.tsx:113
+#: src/shell/pages/MusicVoiceCreate.tsx:102
+#: src/shell/pages/MusicVoiceCreate.tsx:115
 msgid "Voiceover"
 msgstr ""
 

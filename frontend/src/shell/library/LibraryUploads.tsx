@@ -31,7 +31,7 @@ export function useLibraryUploads(onFinished: () => void) {
         .then(() => { patch(key, { state: "done", sent: file.size }); onFinished(); })
         .catch((error: unknown) => {
           if (error instanceof DOMException && error.name === "AbortError") setCards((current) => current.filter((card) => card.key !== key));
-          else patch(key, { state: "failed", error: error instanceof Error && error.message ? error.message : "Home could not add that file. Check your connection and try again." });
+          else { console.error(error); patch(key, { state: "failed", error: "Home could not add that file. Check your connection and try again." }); }
         })
         .finally(() => { running.current -= 1; controllers.current.delete(key); pump(); });
     }

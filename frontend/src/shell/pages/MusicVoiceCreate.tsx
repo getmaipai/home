@@ -59,7 +59,8 @@ export function VoiceCreate() {
       });
       setResults((current) => [{ operation: "voiceover", value: { ...result, key: Date.now() } }, ...current]);
     } catch (error) {
-      setProblem(error instanceof Error && error.message ? error.message : i18n._({ id: "Home could not make that voiceover. Try again.", message: "Home could not make that voiceover. Try again." }));
+      console.error(error);
+      setProblem(i18n._({ id: "Home could not make that voiceover. Try again.", message: "Home could not make that voiceover. Try again." }));
     } finally {
       setMaking(false);
     }
@@ -75,7 +76,8 @@ export function VoiceCreate() {
       const result = await request<{ id: string; name: string }>("/api/library/upload", { method: "POST", body: form });
       setSource({ id: result.id, name: result.name });
     } catch (error) {
-      setChangeProblem(error instanceof Error && error.message ? error.message : i18n._({ id: "Home could not add that file. Try again.", message: "Home could not add that file. Try again." }));
+      console.error(error);
+      setChangeProblem(i18n._({ id: "Home could not add that file. Try again.", message: "Home could not add that file. Try again." }));
     } finally { setUploading(false); }
   };
 
@@ -85,7 +87,7 @@ export function VoiceCreate() {
     try {
       const result = await requestJson<ChangeResult>("/api/voiceover/change", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ file_id: source.id, voice: selectedId }) });
       setResults((current) => [{ operation: "change", value: { ...result, key: Date.now() } }, ...current]);
-    } catch (error) { setChangeProblem(error instanceof Error && error.message ? error.message : i18n._({ id: "Home could not change that voice. Try again.", message: "Home could not change that voice. Try again." })); }
+    } catch (error) { console.error(error); setChangeProblem(i18n._({ id: "Home could not change that voice. Try again.", message: "Home could not change that voice. Try again." })); }
     finally { setMaking(false); }
   };
 
