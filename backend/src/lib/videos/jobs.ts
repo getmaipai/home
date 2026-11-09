@@ -7,6 +7,7 @@ import { and, desc, eq, inArray, like } from "drizzle-orm";
 import { db } from "@/db";
 import { attachments, conversationTurns, people, videoJobs } from "@/db/schema";
 import { createAttachment, getTemporaryChatImage, latestGeneratedTemporaryImage, readAttachment, readAttachmentForConversation, registerTemporaryMedia, storeFile, purgeFileRecord, removeFileBlobs } from "@/lib/attachments";
+import { notifyClipReady } from "./clipNotice";
 import { newFileId, newVideoJobId } from "@/lib/id";
 import { nextHlc } from "@/lib/hlc";
 import { setShotClip } from "@/lib/mediaProductions";
@@ -664,6 +665,7 @@ async function settleClip(job: VideoJob, actor: PersonRow, video: Uint8Array, po
   job.phase = "ready";
   job.error = null;
   saveVideoJob(job);
+  void notifyClipReady(job, actor);
   if (writer === "video-gen" && job.files[0] && job.request.production_id && job.request.shot_id) setShotClip(actor.id, job.request.production_id, job.request.shot_id, job.files[0].id);
 }
 

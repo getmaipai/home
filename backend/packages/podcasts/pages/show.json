@@ -5,14 +5,26 @@
   "body": [
     {
       "type": "list",
-      "bind": { "source": "package", "path": "directory", "params": { "scope": "show", "id": "$state.id" } },
+      "bind": {
+        "source": "package",
+        "path": "directory",
+        "params": {
+          "scope": "show",
+          "id": "$state.id"
+        }
+      },
       "item_key_field": "id",
       "item_label_field": "description",
       "item_badge_field": "action_label",
       "row_action": {
         "icon": "play",
         "label": "{action_label}",
-        "action": { "call": { "target": "/api/plugins/podcasts/shows/{production_id}/episodes", "args": {} } }
+        "action": {
+          "call": {
+            "target": "/api/plugins/podcasts/shows/{production_id}/episodes",
+            "args": {}
+          }
+        }
       }
     },
     {
@@ -22,7 +34,8 @@
         "path": "directory",
         "params": {
           "scope": "show",
-          "id": "$state.id"
+          "id": "$state.id",
+          "follow": "no"
         }
       },
       "label": "Podcasts",
@@ -44,7 +57,45 @@
           }
         }
       },
-      "hide_when_empty": false,
+      "hide_when_empty": true,
+      "secondary": []
+    },
+    {
+      "type": "billboard",
+      "bind": {
+        "source": "package",
+        "path": "directory",
+        "params": {
+          "scope": "show",
+          "id": "$state.id",
+          "follow": "yes"
+        }
+      },
+      "label": "Podcasts",
+      "size": "hero",
+      "autoplay": false,
+      "item_key_field": "id",
+      "item_title_field": "title",
+      "item_subtitle_field": "{author} · {genre}",
+      "item_art_field": "thumbnail",
+      "primary": {
+        "label": "Following",
+        "icon": "check",
+        "action": {
+          "confirm": {
+            "prompt": "Stop following {title}? Saved episodes stay on the hub and the show moves to Unfollowed in Shows.",
+            "on_confirm": {
+              "call": {
+                "target": "/api/plugins/podcasts/directory/remove",
+                "args": {
+                  "source_id": "{id}"
+                }
+              }
+            }
+          }
+        }
+      },
+      "hide_when_empty": true,
       "secondary": []
     },
     {
@@ -68,14 +119,60 @@
       "density": "compact"
     },
     {
+      "type": "picker",
+      "state": "order",
+      "label": "Order",
+      "variant": "pill",
+      "placeholder": "Latest",
+      "leading": [
+        {
+          "value": "latest",
+          "label": "Latest"
+        },
+        {
+          "value": "top",
+          "label": "Top"
+        },
+        {
+          "value": "seasons",
+          "label": "Seasons"
+        }
+      ]
+    },
+    {
+      "type": "section",
+      "condition": "order == 'seasons'",
+      "children": [
+        {
+          "type": "picker",
+          "state": "season",
+          "label": "Season",
+          "variant": "pill",
+          "placeholder": "Newest season",
+          "bind": {
+            "source": "package",
+            "path": "directory",
+            "params": {
+              "scope": "show-seasons",
+              "id": "$state.id"
+            }
+          },
+          "item_key_field": "id",
+          "item_label_field": "label"
+        }
+      ]
+    },
+    {
       "type": "media_shelf",
-      "heading": "Recent episodes",
+      "heading": "Episodes",
       "bind": {
         "source": "package",
         "path": "directory",
         "params": {
           "scope": "show-episodes",
-          "id": "$state.id"
+          "id": "$state.id",
+          "sort": "$state.order",
+          "season": "$state.season"
         }
       },
       "item_key_field": "id",
@@ -83,7 +180,7 @@
       "item_subtitle_field": "{date} · {description}",
       "item_media_field": "thumbnail",
       "item_meta_field": "duration_s",
-      "item_badge_field": "action_label",
+      "item_badge_field": "badge",
       "aspect": "wide",
       "variant": "plain",
       "orientation": "vertical",
@@ -95,8 +192,46 @@
       "empty_state": {
         "type": "empty_state",
         "icon": "headphones",
-        "text": "No recent episodes."
-      }
+        "text": "No episodes here yet. A followed show checks for new ones about every hour; Latest shows every episode it has.",
+        "action": {
+          "navigate": {
+            "to": "/apps/podcasts/shows"
+          }
+        },
+        "action_label": "Open Shows"
+      },
+      "row_actions": [
+        {
+          "icon": "list-video",
+          "label": "Add to queue",
+          "label_field": "queue_label",
+          "show_when_field": "can_act",
+          "action": {
+            "call": {
+              "target": "/api/plugins/podcasts/queue",
+              "args": {
+                "media_id": "{id}",
+                "on": "{queue_next}"
+              }
+            }
+          }
+        },
+        {
+          "icon": "check",
+          "label": "Mark played",
+          "label_field": "played_label",
+          "show_when_field": "can_act",
+          "action": {
+            "call": {
+              "target": "/api/plugins/podcasts/played",
+              "args": {
+                "media_id": "{id}",
+                "on": "{played_next}"
+              }
+            }
+          }
+        }
+      ]
     }
   ]
 }

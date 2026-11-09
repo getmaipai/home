@@ -11,6 +11,7 @@ import { getProgress, getProgressMany, recentProgress } from "./progress";
 import type { MediaItem, MediaSource } from "./model";
 import { draftRows, filterEpisodes, personFilters, viewOf } from "./podcastFilters";
 import { podcastStatsRows } from "./podcastStats";
+import { isFollowed, showFilterOf, showMatches, withEpisodeFields, type ShowFilter } from "./podcastParity";
 import { podcastSummaryFor, searchPodcastTranscripts } from "./podcasts";
 import { podcastDirectoryRows } from "@/routes/podcastApp";
 import { loadFormats } from "@/lib/talent/formats";
@@ -29,15 +30,17 @@ export function showRulesLine(source: MediaSource): string {
   return parts.join(" · ");
 }
 
-function showRows(person: PersonRow): MediaRow[] {
+function showRows(person: PersonRow, filter: ShowFilter = "all"): MediaRow[] {
   const rows: MediaRow[] = [];
   for (const source of allowedSources(person).filter((candidate) => candidate.kind === "feed" || candidate.kind === "production")) {
     const items = queryItems(person, APP, { where: eq(mediaItems.sourceId, source.id), limit: 500 });
     if (items.length === 0 && source.kind !== "production") continue; // a child's followed-feed list has no show with nothing child-cleared in it
+    const saved = items.filter((item) => !(item.location as { url?: string }).url).length;
+    if (!showMatches(filter, source, saved)) continue;
     const art = items.find((item) => item.artwork);
     const made = source.kind === "production";
     rows.push({
-      id: source.id, title: source.label, channel: made ? source.label : items[0]?.artist ?? `${items.length} episodes`, summary: made ? "Made here" : showRulesLine(source), kind: "podcast_episode",
+      id: source.id, title: source.label, channel: made ? source.label : items[0]?.artist ?? `${items.length} episodes`, summary: made ? "Made here" : isFollowed(source) ? showRulesLine(source) : saved > 0 ? `Not following · ${saved} saved` : "Not following", kind: "podcast_episode",
       thumbnail: art ? artworkUrl(art) : null, backdrop: art ? artworkUrl(art) : null, duration_s: null, copy_label: made ? "Made here" : "",
     });
   }
@@ -116,10 +119,17 @@ const clock = (seconds: number): string => {
 registerMediaAppData(APP, (person, dataId, params) => {
   const limit = Math.min(Math.max(params.limit ?? 40, 1), 200);
   switch (dataId) {
-    case "shows": return params.scope === "new" ? [{ id: "new-show", title: "New show" }] : showRows(person);
+    case "shows": return params.scope === "new" ? [{ id: "new-show", title: "New show" }] : showRows(person, showFilterOf(params.scope));
+    // PODCAST-PARITY-01: Listen Now's Latest episodes, newest first, not yet played; each row carries the date, queue and played fields its actions read.
+    case "latest": {
+      const items = queryItems(person, APP, { followedOnly: true, limit: 60 }).sort((a, b) => publishedOf(b).localeCompare(publishedOf(a)));
+      const unplayed = items.filter((item) => !getProgress(person.id, item.id)?.completed).slice(0, limit);
+      return withEpisodeFields(person, unplayed, episodeRows(person, unplayed));
+    }
     case "directory": return params.scope === "talent-formats" ? [...loadFormats().values()].filter((format) => ["news_briefing", "kids_news", "round_table"].includes(format.id)).map((format) => ({ id: format.id, label: format.label })) : podcastDirectoryRows(person, params.query ?? "", params.scope ?? "search");
     case "episodes": {
-      const rows = episodeRows(person, episodesOf(person, params, limit));
+      const items = episodesOf(person, params, limit);
+      const rows = withEpisodeFields(person, items, episodeRows(person, items));
       const q = params.query?.trim();
       if (!q || q.length < 2) return rows;
       // A transcript search row carries the second its phrase starts, so selecting it seeks there.
@@ -131,7 +141,7 @@ registerMediaAppData(APP, (person, dataId, params) => {
     // PODCAST-PORT-03: the person's own saved filters, and the episodes one of them shows now.
     case "filters": return personFilters(person).map((collection) => { const view = viewOf(person, collection); return { id: view.id, title: view.title, summary: view.summary }; });
     case "filter-options": return params.scope === "shows"
-      ? { as_of: new Date().toISOString(), rows: showRows(person).map((row) => ({ id: row.id, label: row.title })) }
+      ? { as_of: new Date().toISOString(), rows: showRows(person, "all").map((row) => ({ id: row.id, label: row.title })) }
       : { as_of: new Date().toISOString(), rows: personFilters(person).map((collection) => ({ id: collection.id, label: collection.title })) };
     case "filter-draft": return draftRows(person, params);
     case "filter-episodes": return episodeRows(person, filterEpisodes(person, params.filter ?? "", limit));

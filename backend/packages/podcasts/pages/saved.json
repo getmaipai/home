@@ -6,7 +6,13 @@
     {
       "type": "media_shelf",
       "heading": "Snips",
-      "bind": { "source": "package", "path": "saved", "params": { "scope": "snips" } },
+      "bind": {
+        "source": "package",
+        "path": "saved",
+        "params": {
+          "scope": "snips"
+        }
+      },
       "item_key_field": "id",
       "item_label_field": "title",
       "item_subtitle_field": "{summary}",
@@ -15,7 +21,12 @@
       "variant": "plain",
       "orientation": "vertical",
       "hide_when_empty": true,
-      "on_select": { "play": { "media_id": "{media_id}", "position_s": "{start_s}" } },
+      "on_select": {
+        "play": {
+          "media_id": "{media_id}",
+          "position_s": "{start_s}"
+        }
+      },
       "row_actions": [
         {
           "icon": "trash",
@@ -24,7 +35,11 @@
             "call": {
               "target": "/api/plugins/podcasts/snips",
               "method": "DELETE",
-              "args": { "media_id": "{media_id}", "start_s": "{start_s}", "snip_label": "{snip_label}" }
+              "args": {
+                "media_id": "{media_id}",
+                "start_s": "{start_s}",
+                "snip_label": "{snip_label}"
+              }
             }
           }
         }
@@ -55,7 +70,13 @@
       "empty_state": {
         "type": "empty_state",
         "icon": "hard-drive",
-        "text": "Nothing saved yet. Choose Save on the hub on an episode to keep a copy that plays without the internet."
+        "text": "Nothing saved yet. Choose Save on the hub on an episode to keep a copy that plays without the internet.",
+        "action": {
+          "navigate": {
+            "to": "/apps/podcasts/search"
+          }
+        },
+        "action_label": "Find shows"
       }
     },
     {

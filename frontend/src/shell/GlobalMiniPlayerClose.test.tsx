@@ -43,3 +43,23 @@ test("live station and video mini players each show one close button", () => {
   }
 });
 
+
+test("the music mini player turns on swipe to skip, wired to the host's next and previous, and draws the hairline", () => {
+  let nexts = 0, previouses = 0;
+  const current = held("music", "m1");
+  const view = render(<QueryClientProvider client={createQueryClient()}><TooltipProvider><ToastProvider><MemoryRouter><MediaDockContext.Provider value={{ current, clear: () => {}, next: async () => { nexts++; }, previous: async () => { previouses++; } }}><GlobalMiniPlayer /></MediaDockContext.Provider></MemoryRouter></ToastProvider></TooltipProvider></QueryClientProvider>);
+  const bar = view.container.querySelector("[data-slot=player]")!;
+  expect(bar.getAttribute("data-swipe-skip")).toBe("true");
+  expect(bar.querySelector("[data-slot=player-hairline]")).not.toBeNull();
+  const drag = (x0: number, x1: number) => {
+    for (const [type, x] of [["pointerdown", x0], ["pointerup", x1]] as const) {
+      const event = new Event(type, { bubbles: true }) as Event & Record<string, unknown>;
+      Object.assign(event, { clientX: x, clientY: 100, pointerId: 1, pointerType: "touch" });
+      bar.dispatchEvent(event);
+    }
+  };
+  drag(200, 100);
+  drag(100, 200);
+  expect([nexts, previouses]).toEqual([1, 1]);
+  cleanup();
+});

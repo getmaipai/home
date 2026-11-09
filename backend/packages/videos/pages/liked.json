@@ -1,0 +1,54 @@
+{
+  "type": "page",
+  "id": "liked",
+  "title": "Liked videos",
+  "body": [
+    {
+      "type": "media_shelf",
+      "bind": {
+        "source": "package",
+        "path": "liked"
+      },
+      "item_key_field": "id",
+      "item_label_field": "title",
+      "item_subtitle_field": "{byline}",
+      "item_media_field": "thumbnail",
+      "item_progress_field": "progress",
+      "item_badge_field": "copy_label",
+      "item_meta_field": "duration_s",
+      "row_actions": [
+        {
+          "icon": "thumbs-down",
+          "label": "Unlike",
+          "action": {
+            "call": {
+              "target": "/api/plugins/videos/like",
+              "args": {
+                "media_id": "{id}"
+              }
+            }
+          }
+        }
+      ],
+      "aspect": "wide",
+      "variant": "plain",
+      "orientation": "vertical",
+      "on_select": {
+        "play": {
+          "media_id": "{id}"
+        }
+      },
+      "empty_state": {
+        "type": "empty_state",
+        "icon": "film",
+        "text": "No liked videos yet. Choose Like on a video to keep it here.",
+        "action": {
+          "navigate": {
+            "to": "/apps/videos/index"
+          }
+        },
+        "action_label": "Browse videos"
+      }
+    }
+  ]
+}

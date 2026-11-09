@@ -8,12 +8,26 @@
       "state": "q",
       "label": "Search podcasts",
       "placeholder": "Search podcasts",
-      "submit": { "navigate": { "to": "/apps/podcasts/search", "state": { "q": "{q}" } } }
+      "submit": {
+        "navigate": {
+          "to": "/apps/podcasts/search",
+          "state": {
+            "q": "{q}"
+          }
+        }
+      }
     },
     {
       "type": "media_shelf",
       "heading": "Search results",
-      "bind": { "source": "package", "path": "directory", "params": { "q": "$state.q", "scope": "search" } },
+      "bind": {
+        "source": "package",
+        "path": "directory",
+        "params": {
+          "q": "$state.q",
+          "scope": "search"
+        }
+      },
       "item_key_field": "id",
       "item_label_field": "title",
       "item_subtitle_field": "{author}",
@@ -22,16 +36,41 @@
       "variant": "plain",
       "orientation": "vertical",
       "density": "compact",
-      "on_select": { "navigate": { "to": "/apps/podcasts/show", "state": { "id": "{feed_url}" } } },
+      "on_select": {
+        "navigate": {
+          "to": "/apps/podcasts/show",
+          "state": {
+            "id": "{feed_url}"
+          }
+        }
+      },
       "row_actions": [
         {
           "icon": "plus",
           "label": "Follow",
           "label_field": "action_label",
-          "action": { "call": { "target": "/api/plugins/podcasts/directory/add", "args": { "url": "{feed_url}" } } }
+          "action": {
+            "call": {
+              "target": "/api/plugins/podcasts/directory/add",
+              "args": {
+                "url": "{feed_url}"
+              }
+            }
+          }
         }
       ],
-      "hide_when_empty": true
+      "hide_when_empty": false,
+      "empty_state": {
+        "type": "empty_state",
+        "icon": "search",
+        "text": "No shows match. Check the spelling, or add a show by its feed address with New show.",
+        "action": {
+          "navigate": {
+            "to": "/apps/podcasts/new-show"
+          }
+        },
+        "action_label": "New show"
+      }
     }
   ]
 }

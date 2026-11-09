@@ -13,7 +13,7 @@ import "@/lib/media/podcastApp"; // registers the Podcasts data ids and item vie
 import "@/lib/media/musicApp"; // registers the Music lyrics fields with the shared host
 import "@/lib/media/videoCreateApp"; // registers Videos' Create data ids (recipes, making, creations)
 import "@/lib/media/radioRecordings"; // adds the Recordings scope to Music's existing radio data id
-import { podcastRoutes, podcastDirectoryRows, podcastShowRows, podcastShowEpisodeRows } from "./podcastApp";
+import { podcastRoutes, podcastDirectoryRows, podcastShowRows, podcastShowEpisodeRows, podcastShowSeasonRows } from "./podcastApp";
 import { radioRoutes, radioDirectoryRows, radioSavedRows, radioStationRow, radioCountryRows, radioGenreRows } from "./radioApp";
 import { fetchRadioArt, radioArtCard } from "@/lib/media/radioArt";
 import { radioDirectoryAllowed, radioDirectoryHasFavicon } from "@/lib/media/radioDirectory";
@@ -104,8 +104,13 @@ export function createMediaAppRoutes(appId: MediaAppId) {
     // PODCAST-PORT-01: the directory is a network lookup, so it is answered here (async) beside the sync host data. Same gates as its routes.
     if (appId === "podcasts" && c.req.param("dataId") === "directory") {
       const body = await jsonBody(c);
-      if (body.scope === "show") return c.json(await podcastShowRows(person, typeof body.id === "string" ? body.id : "", "show") as never, 200);
-      if (body.scope === "show-episodes") return c.json(await podcastShowEpisodeRows(person, typeof body.id === "string" ? body.id : "") as never, 200);
+      if (body.scope === "show") {
+        const rows = await podcastShowRows(person, typeof body.id === "string" ? body.id : "", "show") as Array<{ followed?: boolean }>;
+        // PODCAST-PARITY-01: the page's Follow and Following billboards each ask for their own state; the other draws nothing.
+        return c.json((body.follow === "yes" ? rows.filter((row) => row.followed === true) : body.follow === "no" ? rows.filter((row) => row.followed !== true) : rows) as never, 200);
+      }
+      if (body.scope === "show-episodes") return c.json(await podcastShowEpisodeRows(person, typeof body.id === "string" ? body.id : "", { sort: body.sort, season: body.season }) as never, 200);
+      if (body.scope === "show-seasons") return c.json(await podcastShowSeasonRows(person, typeof body.id === "string" ? body.id : "") as never, 200);
       return c.json(withLimit(body, await podcastDirectoryRows(person, typeof body.q === "string" ? body.q : "", typeof body.scope === "string" ? body.scope : "search")) as never, 200);
     }
     // RADIO-02: Music's Radio pages. The directory is a network lookup (async); the rest are sync rows. Same gates as the radio routes.

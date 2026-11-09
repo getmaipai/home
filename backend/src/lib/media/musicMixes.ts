@@ -14,6 +14,10 @@ import type { MediaItem } from "./model";
 const MAX_MIXES = 4;
 const MOST_PLAYED = 10;
 const JUMP_BACK = 8;
+const DAYLIST_SIZE = 12;
+const DAYLIST_MIN = 3;
+const REPLAY_SIZE = 25;
+const YEAR_MS = 365 * 24 * 3600 * 1000;
 
 /** Same boundaries as Home's greeting (before 12 morning, before 17 afternoon), read in the person's own time zone. */
 export function musicGreeting(person: PersonRow, now: Date = new Date(), zone?: string): { id: string; title: string; channel: string; summary: string; kind: "track"; thumbnail: null; backdrop: null; duration_s: null; copy_label: string } {
@@ -70,12 +74,44 @@ function madeForYou(person: PersonRow) {
   });
 }
 
+type DayPart = "morning" | "afternoon" | "evening" | "night";
+function dayPartOf(hour: number): DayPart {
+  return hour >= 5 && hour < 12 ? "morning" : hour >= 12 && hour < 17 ? "afternoon" : hour >= 17 && hour < 22 ? "evening" : "night";
+}
+
+/**
+ * A "Daylist": the songs this person tends to play at this time of day, ranked by their own plays. A song counts toward a part of the
+ * day by the hour (in their own time zone) it was last played. Needs a few songs to feel like a mix; none for a child or guest.
+ */
+export function daylistRows(person: PersonRow, now: Date = new Date(), zone?: string) {
+  if (noDiscovery(person)) return [];
+  const setting = getSettingValueForPerson(person.id, "time.time_zone");
+  const tz = zone ?? (validTimeZone(setting) ? setting : hubTimeZone());
+  const part = dayPartOf(wallClockParts(now, tz).hour);
+  const inPart = new Set(recentProgress(person.id, 1000).filter((progress) => dayPartOf(wallClockParts(new Date(progress.updated_at), tz).hour) === part).map((progress) => progress.media_id));
+  const plays = ownPlays(person);
+  const ranked = musicLibrary(person).filter((item) => inPart.has(item.id)).sort((a, b) => plays.get(b.id)! - plays.get(a.id)! || a.title.localeCompare(b.title) || a.id.localeCompare(b.id)).slice(0, DAYLIST_SIZE);
+  return ranked.length >= DAYLIST_MIN ? trackRows(person, ranked) : [];
+}
+
+/** A "Replay": the songs this person played most over the past year, from their own play counts only; none for a child or guest. */
+export function replayRows(person: PersonRow, now: Date = new Date()) {
+  if (noDiscovery(person)) return [];
+  const since = now.getTime() - YEAR_MS;
+  const recent = new Set(recentProgress(person.id, 1000).filter((progress) => Date.parse(progress.updated_at) >= since).map((progress) => progress.media_id));
+  const plays = ownPlays(person);
+  const ranked = musicLibrary(person).filter((item) => recent.has(item.id)).sort((a, b) => plays.get(b.id)! - plays.get(a.id)! || a.title.localeCompare(b.title) || a.id.localeCompare(b.id)).slice(0, REPLAY_SIZE);
+  return trackRows(person, ranked);
+}
+
 /** The Listen now rows, asked as the history data with one of these scopes (the manifest has no room for another data id). */
-export const MIX_SCOPES = ["greeting", "jump-back", "most-played", "made"] as const;
+export const MIX_SCOPES = ["greeting", "jump-back", "most-played", "made", "daylist", "replay"] as const;
 export function musicMixData(person: PersonRow, scope: string | undefined): unknown[] | null {
   if (scope === "greeting") return [musicGreeting(person)];
   if (scope === "jump-back") return jumpBackIn(person);
   if (scope === "most-played") return mostPlayed(person);
   if (scope === "made") return madeForYou(person);
+  if (scope === "daylist") return daylistRows(person);
+  if (scope === "replay") return replayRows(person);
   return null;
 }

@@ -4,6 +4,8 @@ All notable changes to the Videos package, in [Keep a Changelog](https://keepach
 
 ## [Unreleased]
 
+- VIDEOS-PARITY: a Liked videos page, a Watch later and Like menu on each video card, a "Channel, age" line under cards, chapters on clips you made by joining others, and a notice when a video you made finishes.
+
 - SPATIAL-REACH: Spatial sound is on every clip in the Create feed and on the Studio's export card, not only on chat videos. It opens the same edit (adults only), and the new clip shows in the Create feed. A spatial clip's note reads in order: what moved (the headphones sentence once), the 5.1 line, then the quiet back speakers.
 
 ## [0.3.0] - 2026-11-02

@@ -4,11 +4,35 @@
   "title": "Shows",
   "body": [
     {
+      "type": "picker",
+      "state": "follow",
+      "label": "Shows",
+      "variant": "pill",
+      "placeholder": "Followed",
+      "leading": [
+        {
+          "value": "followed",
+          "label": "Followed"
+        },
+        {
+          "value": "unfollowed",
+          "label": "Unfollowed"
+        },
+        {
+          "value": "downloaded",
+          "label": "Downloaded"
+        }
+      ]
+    },
+    {
       "type": "media_shelf",
       "heading": "Shows",
       "bind": {
         "source": "package",
-        "path": "shows"
+        "path": "shows",
+        "params": {
+          "scope": "$state.follow"
+        }
       },
       "item_key_field": "id",
       "item_label_field": "title",
@@ -31,7 +55,7 @@
       "empty_state": {
         "type": "empty_state",
         "icon": "mic",
-        "text": "No shows yet. Add one with New show.",
+        "text": "No shows here. Follow a show from Podcasts, or make your own with New show.",
         "action": {
           "navigate": {
             "to": "/apps/podcasts/new-show"

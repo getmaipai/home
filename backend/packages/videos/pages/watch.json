@@ -190,7 +190,7 @@
           },
           "item_key_field": "id",
           "item_label_field": "title",
-          "item_subtitle_field": "{channel}",
+          "item_subtitle_field": "{byline}",
           "item_media_field": "thumbnail",
           "item_progress_field": "progress",
           "item_badge_field": "copy_label",

@@ -1,6 +1,6 @@
 {
   "id": "podcasts",
-  "version": "0.2.12",
+  "version": "0.2.13",
   "kind": "app",
   "category": "Media",
   "display": "Podcasts",
@@ -197,7 +197,7 @@
         "rows": "list"
       },
       {
-        "id": "new",
+        "id": "latest",
         "rows": "list"
       },
       {

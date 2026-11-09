@@ -36,7 +36,7 @@
       "item_subtitle_field": "{channel}",
       "item_media_field": "thumbnail",
       "item_progress_field": "progress",
-      "item_badge_field": "copy_label",
+      "item_badge_field": "badge",
       "item_meta_field": "duration_s",
       "aspect": "square",
       "variant": "plain",
@@ -49,8 +49,44 @@
       "empty_state": {
         "type": "empty_state",
         "icon": "headphones",
-        "text": "No episodes yet."
-      }
+        "text": "No episodes yet. Follow a show and its episodes appear here.",
+        "action": {
+          "navigate": {
+            "to": "/apps/podcasts/search"
+          }
+        },
+        "action_label": "Find shows"
+      },
+      "row_actions": [
+        {
+          "icon": "list-video",
+          "label": "Add to queue",
+          "label_field": "queue_label",
+          "action": {
+            "call": {
+              "target": "/api/plugins/podcasts/queue",
+              "args": {
+                "media_id": "{id}",
+                "on": "{queue_next}"
+              }
+            }
+          }
+        },
+        {
+          "icon": "check",
+          "label": "Mark played",
+          "label_field": "played_label",
+          "action": {
+            "call": {
+              "target": "/api/plugins/podcasts/played",
+              "args": {
+                "media_id": "{id}",
+                "on": "{played_next}"
+              }
+            }
+          }
+        }
+      ]
     },
     {
       "type": "media_shelf",

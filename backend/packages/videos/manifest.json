@@ -1,6 +1,6 @@
 {
   "id": "videos",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "kind": "app",
   "category": "Media",
   "display": "Videos",
@@ -29,7 +29,18 @@
   "config": [],
   "data_sources": [],
   "permissions": [],
-  "notifications": [],
+  "notifications": [
+    {
+      "id": "videos.clip_ready",
+      "level": "passive",
+      "audience": "person",
+      "template": "Your video is ready: {title}",
+      "configurable": true,
+      "default_channels": [
+        "in_app"
+      ]
+    }
+  ],
   "backup": "exclude",
   "background": false,
   "contributes": {
@@ -56,7 +67,8 @@
             "index",
             "library",
             "history",
-            "watch-later"
+            "watch-later",
+            "liked"
           ]
         },
         {
@@ -110,6 +122,14 @@
         "nav": true,
         "kind": "schema",
         "module": "watch-later"
+      },
+      {
+        "id": "liked",
+        "label": "Liked videos",
+        "icon": "thumbs-up",
+        "nav": true,
+        "kind": "schema",
+        "module": "liked"
       },
       {
         "id": "history",
@@ -213,11 +233,11 @@
         "rows": "list"
       },
       {
-        "id": "item-actions",
+        "id": "recipes",
         "rows": "list"
       },
       {
-        "id": "recipes",
+        "id": "liked",
         "rows": "list"
       }
     ],

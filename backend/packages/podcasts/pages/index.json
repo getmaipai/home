@@ -5,10 +5,24 @@
   "body": [
     {
       "type": "list",
-      "bind": { "source": "package", "path": "shows", "params": { "scope": "new" } },
+      "bind": {
+        "source": "package",
+        "path": "shows",
+        "params": {
+          "scope": "new"
+        }
+      },
       "item_key_field": "id",
       "item_label_field": "title",
-      "row_action": { "icon": "plus", "label": "New show", "action": { "navigate": { "to": "/apps/podcasts/new-show" } } }
+      "row_action": {
+        "icon": "plus",
+        "label": "New show",
+        "action": {
+          "navigate": {
+            "to": "/apps/podcasts/new-show"
+          }
+        }
+      }
     },
     {
       "type": "billboard",
@@ -64,24 +78,64 @@
     },
     {
       "type": "media_shelf",
-      "heading": "New episodes",
+      "heading": "Latest episodes",
       "bind": {
         "source": "package",
-        "path": "new"
+        "path": "latest"
       },
       "item_key_field": "id",
       "item_label_field": "title",
       "item_subtitle_field": "{channel}",
       "item_media_field": "thumbnail",
+      "item_progress_field": "progress",
+      "item_badge_field": "badge",
       "item_meta_field": "duration_s",
       "aspect": "square",
       "variant": "plain",
+      "orientation": "vertical",
+      "density": "compact",
       "on_select": {
         "play": {
           "media_id": "{id}"
         }
       },
-      "hide_when_empty": true
+      "row_actions": [
+        {
+          "icon": "play",
+          "label": "Play",
+          "action": {
+            "play": {
+              "media_id": "{id}"
+            }
+          }
+        },
+        {
+          "icon": "list-video",
+          "label": "Add to queue",
+          "label_field": "queue_label",
+          "action": {
+            "call": {
+              "target": "/api/plugins/podcasts/queue",
+              "args": {
+                "media_id": "{id}",
+                "on": "{queue_next}"
+              }
+            }
+          }
+        }
+      ],
+      "empty_state": {
+        "type": "empty_state",
+        "icon": "headphones",
+        "text": "No new episodes. Follow a show below and its newest episodes appear here.",
+        "action": {
+          "navigate": {
+            "to": "/apps/podcasts/search"
+          }
+        },
+        "action_label": "Find shows"
+      },
+      "hide_when_empty": false
     },
     {
       "type": "media_shelf",

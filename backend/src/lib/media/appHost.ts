@@ -3,6 +3,8 @@
 // (access.ts, progress.ts, collections.ts) so no app keeps a store of its own. Rows are shaped for the kit's `media_shelf`, `billboard`
 // and `player` nodes (docs/dev/media-library.md, "Media apps"). Every read goes through the person's band and each source's `visible_to`;
 // a child is allowlist-only (design section 11): the household's library plus channels an adult followed for them, and no discovery rows.
+import { chaptersForMadeClip } from "@/lib/videos/chapters";
+import { withVideoByline } from "./videoByline";
 import { and, desc, eq, inArray, isNull, like, sql, type SQL } from "drizzle-orm";
 import { db } from "@/db";
 import { attachments, mediaItems, mediaSources, musicJobs, people, videoJobs } from "@/db/schema";
@@ -651,7 +653,7 @@ function mediaAppDataRaw(person: PersonRow, appId: MediaAppId, dataId: string, p
       }
       if (params.id && (appId === "music" || appId === "videos")) {
         const file = madeFileFor(person, appId, params.id);
-        if (file) return madeFileItemView(file, appId);
+        if (file) { const view = madeFileItemView(file, appId); return appId === "videos" ? { ...view, chapters: chaptersForMadeClip(person, file.id) } : view; }
       }
       const item = params.id ? readableIn(person, appId, params.id) : null;
       return item ? (appId === "books" ? bookItemView(person, item) : itemView(person, appId, item)) : [];
@@ -684,7 +686,8 @@ export function safeTemplateFields<T>(value: T): T {
 }
 
 export function mediaAppData(person: PersonRow, appId: MediaAppId, dataId: string, params: DataParams): ReturnType<typeof mediaAppDataRaw> {
-  return safeTemplateFields(mediaAppDataRaw(person, appId, dataId, params));
+  const raw = mediaAppDataRaw(person, appId, dataId, params);
+  return safeTemplateFields(appId === "videos" && dataId !== "recipes" ? withVideoByline(raw) : raw);
 }
 
 /** What to play after `item`: the person's watch-later queue first, then the rest of the channel in order, then the newest others. */

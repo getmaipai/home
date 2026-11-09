@@ -223,8 +223,8 @@ test("podcast manifest and all referenced schema pages validate at boot", () => 
   for (const entry of manifest.contributes.pages) expect(ajv.validate(UI_SCHEMA, read(entry.module))).toBe(true);
   expect(manifest.contributes.pages.some((page: { id: string }) => page.id === "find")).toBe(false);
   const show = read("show");
-  const billboard = show.body.find((node: { type: string }) => node.type === "billboard");
-  expect(billboard.primary.label).toBe("Follow");
-  expect(billboard.secondary).toEqual([]);
+  const billboards = show.body.filter((node: { type: string }) => node.type === "billboard");
+  expect(billboards.map((node: { primary: { label: string } }) => node.primary.label)).toEqual(["Follow", "Following"]);
+  expect(billboards.every((node: { secondary: unknown[] }) => node.secondary.length === 0)).toBe(true);
   expect(show.body.some((node: { type: string; item_label_field?: string }) => (node.type === "list" || node.type === "media_shelf") && node.item_label_field === "description")).toBe(true);
 });

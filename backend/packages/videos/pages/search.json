@@ -21,7 +21,7 @@
       },
       "item_key_field": "id",
       "item_label_field": "title",
-      "item_subtitle_field": "{channel}",
+      "item_subtitle_field": "{byline}",
       "item_media_field": "thumbnail",
       "aspect": "wide",
       "variant": "plain",
@@ -39,7 +39,33 @@
             "id": "{id}"
           }
         }
-      }
+      },
+      "row_actions": [
+        {
+          "icon": "clock",
+          "label": "Watch later",
+          "action": {
+            "call": {
+              "target": "/api/plugins/videos/watch-later",
+              "args": {
+                "media_id": "{id}"
+              }
+            }
+          }
+        },
+        {
+          "icon": "thumbs-up",
+          "label": "Like",
+          "action": {
+            "call": {
+              "target": "/api/plugins/videos/like",
+              "args": {
+                "media_id": "{id}"
+              }
+            }
+          }
+        }
+      ]
     }
   ]
 }

@@ -150,10 +150,18 @@
         "module": "index"
       },
       {
+        "id": "library",
+        "label": "Library",
+        "icon": "library",
+        "nav": true,
+        "kind": "schema",
+        "module": "library"
+      },
+      {
         "id": "albums",
         "label": "Albums",
         "icon": "music",
-        "nav": true,
+        "nav": false,
         "kind": "schema",
         "module": "albums"
       },
@@ -169,7 +177,7 @@
         "id": "artists",
         "label": "Artists",
         "icon": "music",
-        "nav": true,
+        "nav": false,
         "kind": "schema",
         "module": "artists"
       },
@@ -185,7 +193,7 @@
         "id": "songs",
         "label": "Songs",
         "icon": "music",
-        "nav": true,
+        "nav": false,
         "kind": "schema",
         "module": "songs"
       },
@@ -193,7 +201,7 @@
         "id": "playlists",
         "label": "Playlists",
         "icon": "music",
-        "nav": true,
+        "nav": false,
         "kind": "schema",
         "module": "playlists"
       },
@@ -209,7 +217,7 @@
         "id": "liked",
         "label": "Liked",
         "icon": "music",
-        "nav": true,
+        "nav": false,
         "kind": "schema",
         "module": "liked"
       },
@@ -297,7 +305,7 @@
       },
       {
         "id": "creations",
-        "label": "Library",
+        "label": "My creations",
         "icon": "folder",
         "nav": true,
         "kind": "schema",

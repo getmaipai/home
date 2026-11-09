@@ -2,6 +2,13 @@
 
 All notable changes to the Podcasts package, in [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) format.
 
+## [0.2.13] - 2026-11-09
+
+- The show page has Latest, Top and Seasons; Top puts the episodes you listened to first.
+- Follow becomes Following; stopping to follow moves the show to Unfollowed in Shows, and Follow brings it back. Saved episodes stay.
+- Shows has Followed, Unfollowed and Downloaded; Listen Now has Latest episodes as rows with Play and Add to queue.
+- Episodes can be marked played or unplayed, with New and Played badges, and empty pages say what to do next.
+
 ## [0.2.12] - 2026-10-28
 
 - The front page opens on a rotating Featured shows banner of six top shows; each opens its show page.

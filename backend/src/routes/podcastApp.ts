@@ -25,6 +25,7 @@ import { mediaSources, mediaProductions } from "@/db/schema";
 import { db } from "@/db";
 import { eq } from "drizzle-orm";
 import { isOwnerOrAdmin } from "@/lib/access";
+import { episodeFields, episodeSortOf, followPodcast, isFollowed, orderEpisodes, seasonsOf, setPlayed, unfollowPodcast, type SortableEpisode } from "@/lib/media/podcastParity";
 
 
 type DirectoryRow = { id: string; title: string; author: string; summary: string; thumbnail: string | null; feed_url: string; action_label?: string };
@@ -55,7 +56,7 @@ export async function podcastShowRows(person: PersonRow, id: string, scope: stri
     const production = source.kind === "production" && source.production_id ? db.select().from(mediaProductions).where(eq(mediaProductions.id, source.production_id)).get() : null;
     const show = production?.show ? JSON.parse(production.show) as { schedule?: { every: string; at: string } | null; state?: { stage?: string } | null } : null;
     const scheduleLabel = show?.schedule ? ` · ${show.schedule.every === "1d" ? "Daily" : "Weekly"} at ${show.schedule.at}` : "";
-    return [{ id: source.id, title: source.label, author: source.kind === "production" ? "Made here" : first?.artist ?? "", genre: first?.genre ?? "", description: `${source.kind === "production" ? `Made here${scheduleLabel}` : first?.description ?? ""}`, thumbnail: first ? `/api/media/items/${encodeURIComponent(first.id)}/art` : null, followed: true, can_follow: source.kind === "feed" && canFollow, feed_url: source.url ?? "", ...(source.kind === "production" ? { production_id: source.production_id, stage: show?.state?.stage ?? null, action_label: production?.ownerPersonId === person.id ? show?.state?.stage && show.state.stage !== "done" ? "Making today's episode" : "Make today's episode" : undefined } : {}) }];
+    return [{ id: source.id, title: source.label, author: source.kind === "production" ? "Made here" : first?.artist ?? "", genre: first?.genre ?? "", description: `${source.kind === "production" ? `Made here${scheduleLabel}` : first?.description ?? ""}`, thumbnail: first ? `/api/media/items/${encodeURIComponent(first.id)}/art` : null, followed: isFollowed(source), can_follow: source.kind === "feed" && canFollow, feed_url: source.url ?? "", ...(source.kind === "production" ? { production_id: source.production_id, stage: show?.state?.stage ?? null, action_label: production?.ownerPersonId === person.id ? show?.state?.stage && show.state.stage !== "done" ? "Making today's episode" : "Make today's episode" : undefined } : {}) }];
   }
   if (mediaBandOf(person) === "child") return [];
   const address = id;
@@ -73,24 +74,48 @@ function podcastDate(value: string | null | undefined): string {
   return Number.isNaN(date.getTime()) ? "" : new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" }).format(date);
 }
 
-export async function podcastShowEpisodeRows(person: PersonRow, id: string): Promise<unknown[]> {
+export interface ShowEpisodeOptions { sort?: unknown; season?: unknown }
+
+type Shown = SortableEpisode & { row: Record<string, unknown> };
+
+/** The show's episodes for the page, ordered by Latest, Top or Seasons (PODCAST-PARITY-01). A followed show's rows carry the queue and played fields; a preview's do not. */
+async function showEpisodes(person: PersonRow, id: string): Promise<Shown[]> {
   const source = allowedSources(person).find((row) => row.id === id && (row.kind === "feed" || row.kind === "production"));
   if (source) {
-    const items = queryItems(person, "podcasts", { where: eq(mediaItems.sourceId, source.id), limit: 200 }).sort((a, b) => (b.external?.published_at ?? "").localeCompare(a.external?.published_at ?? ""));
-    const showArt = items[0]?.artwork ? `/api/media/items/${encodeURIComponent(items[0].id)}/art` : null;
-    return items.map((item) => ({ id: item.id, title: item.title, summary: source.kind === "production" ? item.added_at.slice(0, 10) : podcastDate(item.external?.published_at), description: item.description?.slice(0, 140) ?? "", date: source.kind === "production" ? item.added_at.slice(0, 10) : podcastDate(item.external?.published_at), duration_s: item.duration_s, thumbnail: item.artwork ? `/api/media/items/${encodeURIComponent(item.id)}/art` : showArt, followed: true, ...(source.kind === "production" ? { action_label: "Made here" } : {}) }));
+    const items = queryItems(person, "podcasts", { where: eq(mediaItems.sourceId, source.id), limit: 200 });
+    const newest = items.slice().sort((x, y) => (y.external?.published_at ?? "").localeCompare(x.external?.published_at ?? ""))[0];
+    const showArt = newest?.artwork ? `/api/media/items/${encodeURIComponent(newest.id)}/art` : null;
+    const fields = episodeFields(person, items);
+    return items.map((item) => ({
+      id: item.id, published: item.external?.published_at ?? item.added_at, season: item.season, episode: item.episode,
+      row: { ...fields.get(item.id), id: item.id, title: item.title, summary: source.kind === "production" ? item.added_at.slice(0, 10) : podcastDate(item.external?.published_at), description: item.description?.slice(0, 140) ?? "", date: source.kind === "production" ? item.added_at.slice(0, 10) : podcastDate(item.external?.published_at), duration_s: item.duration_s, thumbnail: item.artwork ? `/api/media/items/${encodeURIComponent(item.id)}/art` : showArt, followed: true, can_act: true, ...(source.kind === "production" ? { action_label: "Made here" } : {}) },
+    }));
   }
   if (mediaBandOf(person) === "child" || !directoryShowForFeed(id)) return [];
   const result = await previewPodcastFeed(person, id);
   if (!result.ok) return [];
   const directory = directoryShowForFeed(id);
   const artwork = directory?.art ? artProxyAddress(directory.art) : null;
-  return result.value.show.episodes.map((episode, index) => ({ id: `${encodeURIComponent(id)}#${index}`, title: episode.title, summary: podcastDate(episode.publishedAt), description: episode.description.slice(0, 140), date: podcastDate(episode.publishedAt), duration_s: episode.durationS, thumbnail: artwork, followed: false, kind: "podcast_episode" }));
+  return result.value.show.episodes.map((episode, index) => ({
+    id: `${encodeURIComponent(id)}#${index}`, published: episode.publishedAt ?? "", season: episode.season, episode: episode.episode,
+    row: { id: `${encodeURIComponent(id)}#${index}`, title: episode.title, summary: podcastDate(episode.publishedAt), description: episode.description.slice(0, 140), date: podcastDate(episode.publishedAt), duration_s: episode.durationS, thumbnail: artwork, followed: false, can_act: false, kind: "podcast_episode" },
+  }));
+}
+
+export async function podcastShowEpisodeRows(person: PersonRow, id: string, options: ShowEpisodeOptions = {}): Promise<unknown[]> {
+  const shown = await showEpisodes(person, id);
+  const ordered = orderEpisodes(person.id, shown, episodeSortOf(options.sort), options.season);
+  return ordered.map((entry) => entry.row);
+}
+
+/** The seasons a show names, newest first, for the Seasons picker. A show with none gives none. */
+export async function podcastShowSeasonRows(person: PersonRow, id: string): Promise<Array<{ id: string; label: string }>> {
+  return seasonsOf(await showEpisodes(person, id));
 }
 
 export function podcastRoutes() {
   const routes = apiRouter();
-  gateMediaApp(routes, "podcasts", ["/data/directory", "/preview/*", "/transcript/*", "/save", "/bookmark", "/snips", "/subscribe", "/source", "/filters", "/filters/*", "/directory/*", "/shows", "/shows/*"]);
+  gateMediaApp(routes, "podcasts", ["/data/directory", "/preview/*", "/transcript/*", "/save", "/bookmark", "/snips", "/subscribe", "/source", "/filters", "/filters/*", "/directory/*", "/played", "/shows", "/shows/*"]);
 
   // TALENT-04: the package's own doors to the show maker (a package page may only call routes under /api/plugins/podcasts/).
   routes.post("/shows", requireAuth, async (c) => {
@@ -271,10 +296,22 @@ const lookupPreferringV4: DnsLookup = async (hostname) => {
 
   routes.post("/directory/add", requireAuth, async (c, next) => {
     const body = await jsonBody(c);
-    const result = subscribePodcast(c.get("person"), { url: typeof body.url === "string" ? body.url : "" });
+    const result = followPodcast(c.get("person"), typeof body.url === "string" ? body.url : "");
     if (!result.ok) return refuseWith(c, result);
-    void pollPodcastNow(result.value.feed.id);
-    return c.json({ ok: true as const, source_id: result.value.source.id, label: "Added to Shows" }, 200);
+    return c.json({ ok: true as const, source_id: result.value.source_id, label: "Following" }, 200);
+  });
+
+  // PODCAST-PARITY-01: Following > Stop following. The show moves to Unfollowed; saved copies and history stay, and Follow brings it back.
+  routes.post("/directory/remove", requireAuth, async (c, next) => {
+    const body = await jsonBody(c);
+    const result = unfollowPodcast(c.get("person"), typeof body.source_id === "string" ? body.source_id : "");
+    return result.ok ? c.json({ ok: true as const, source_id: result.value.source_id, label: "Stopped following" }, 200) : refuseWith(c, result);
+  });
+
+  routes.post("/played", requireAuth, async (c, next) => {
+    const body = await jsonBody(c);
+    const result = setPlayed(c.get("person"), body.media_id, body.on);
+    return result.ok ? c.json({ ok: true as const, ...result.value }, 200) : refuseWith(c, result);
   });
 
   routes.get("/directory/art", requireAuth, async (c, next) => {
