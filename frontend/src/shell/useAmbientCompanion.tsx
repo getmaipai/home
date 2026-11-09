@@ -60,6 +60,7 @@ export function useAmbientCompanion(person: Roster) {
     kind: "companion" as const,
     companion,
     clips: states,
+    mouthStill: avatar.data?.avatar?.mouth_still ?? null,
     portrait: avatar.data?.avatar?.portrait ?? undefined,
     still,
     action: row ? { label: "Review", onClick: () => navigate(`/companions/${encodeURIComponent(companion.id)}?tab=tasks&task=${encodeURIComponent(row.id)}`) } : undefined,

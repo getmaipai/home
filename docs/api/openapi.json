@@ -79498,6 +79498,10 @@
                           "type": "string",
                           "nullable": true
                         },
+                        "mouth_still": {
+                          "type": "string",
+                          "nullable": true
+                        },
                         "states": {
                           "type": "object",
                           "additionalProperties": {
@@ -79540,6 +79544,7 @@
                         "name",
                         "key",
                         "version",
+                        "mouth_still",
                         "states"
                       ]
                     }
@@ -79556,6 +79561,59 @@
           },
           "401": {
             "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/companions/{id}/mouth": {
+      "get": {
+        "tags": [
+          "Companions"
+        ],
+        "summary": "Read an approved companion mouth PNG",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 80
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The approved mouth picture.",
+            "content": {
+              "image/png": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "That companion has no mouth picture yet.",
             "content": {
               "application/json": {
                 "schema": {

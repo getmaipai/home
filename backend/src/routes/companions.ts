@@ -167,7 +167,7 @@ const avatarRoute = createRoute({
   middleware: [requireAuth] as const,
   request: { query: z.object({ companion: z.string().optional().describe("A companion id to read instead of the person's own pick (the chat's pick).") }) },
   responses: {
-    200: { content: { "application/json": { schema: z.object({ avatar: z.object({ id: z.string(), name: z.string(), key: z.string(), version: z.string(), portrait: z.string().nullable().optional(), states: z.record(z.string(), AvatarState) }).nullable() }) } }, description: "The usable active companion's approved animation, or null when it has none." },
+    200: { content: { "application/json": { schema: z.object({ avatar: z.object({ id: z.string(), name: z.string(), key: z.string(), version: z.string(), portrait: z.string().nullable().optional(), mouth_still: z.string().nullable(), states: z.record(z.string(), AvatarState) }).nullable() }) } }, description: "The usable active companion's approved animation, or null when it has none." },
     304: { description: "The animation has not changed." },
     ...errorResponses({ 401: "Not signed in" }),
   },
@@ -178,7 +178,12 @@ companionsRoutes.openapi(avatarRoute, (c) => {
   const household = getHouseholdCompanion(persona.id), loaded = household ? null : loadManifestOnly(persona.id), manifest = household ?? (loaded?.ok ? loaded.value : null);
   const animation = manifest?.companion?.animation;
   if (!animation || (manifest.companion?.status && manifest.companion.status !== "ready") || !animation.states.idle) return c.json({ avatar: null }, 200);
-  const version = createHash("sha256").update(JSON.stringify(animation)).digest("hex").slice(0, 12);
+  let mouthVersion: string | null = null;
+  try {
+    const look = readLook(persona.id);
+    if (look.sheet?.state === "approved") mouthVersion = look.sheet.views.mouth;
+  } catch { /* Package companions do not have a household look store. */ }
+  const version = createHash("sha256").update(JSON.stringify({ animation, mouthVersion })).digest("hex").slice(0, 12);
   const etag = `"${version}"`;
   const headers = { "cache-control": "private, max-age=0, must-revalidate", etag };
   if (matchesEtag(c.req.header("if-none-match"), etag)) return new Response(null, { status: 304, headers });
@@ -192,7 +197,26 @@ companionsRoutes.openapi(avatarRoute, (c) => {
     },
   }]));
   const portrait = animation.sheet?.rest ? `/api/companions/${encodeURIComponent(persona.id)}/animation/${encodeURIComponent(animation.sheet.rest)}` : null;
-  return c.json({ avatar: { id: persona.id, name: manifest?.companion?.display_name ?? persona.display_name, key: animation.key, version, portrait, states } }, 200, headers);
+  const mouth_still = mouthVersion ? `/api/companions/${encodeURIComponent(persona.id)}/mouth` : null;
+  return c.json({ avatar: { id: persona.id, name: manifest?.companion?.display_name ?? persona.display_name, key: animation.key, version, portrait, mouth_still, states } }, 200, headers);
+});
+
+const mouthParams = z.object({ id: z.string().min(1).max(80) });
+const mouthRoute = createRoute({ method: "get", path: "/{id}/mouth", tags: ["Companions"], summary: "Read an approved companion mouth PNG", middleware: [requireAuth] as const,
+  request: { params: mouthParams }, responses: { 200: { content: { "image/png": { schema: z.string().openapi({ format: "binary" }) } }, description: "The approved mouth picture." }, ...errorResponses({ 401: "Not signed in", 404: "That companion has no mouth picture yet." }) } });
+companionsRoutes.openapi(mouthRoute, (c) => {
+  const { id } = c.req.valid("param"), actor = c.get("person"), persona = PERSONAS.find((candidate) => candidate.id === id);
+  if (!persona || !mayUseCompanion(actor, persona)) return c.json({ error: "That companion has no mouth picture yet." }, 404);
+  let look;
+  try { look = readLook(id); } catch { return c.json({ error: "That companion has no mouth picture yet." }, 404); }
+  const versionId = look.sheet?.state === "approved" ? look.sheet.views.mouth : null;
+  const path = versionId ? versionPath(id, versionId) : null;
+  if (!versionId || !path || !look.versions.some((item) => item.id === versionId)) return c.json({ error: "That companion has no mouth picture yet." }, 404);
+  try {
+    const metadata = statSync(path), etag = `"${metadata.size}-${metadata.mtimeMs}"`;
+    if (matchesEtag(c.req.header("if-none-match"), etag)) return new Response(null, { status: 304, headers: { etag, "cache-control": "private, max-age=0, must-revalidate" } });
+    return new Response(readFileSync(path), { headers: { "content-type": "image/png", etag, "cache-control": "private, max-age=0, must-revalidate" } });
+  } catch { return c.json({ error: "That companion has no mouth picture yet." }, 404); }
 });
 
 const animationParams = z.object({ id: z.string().min(1).max(80), file: z.string().min(1).max(80) });

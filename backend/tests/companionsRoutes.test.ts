@@ -1092,13 +1092,15 @@ describe("household companion routes", () => {
     const adult = addPerson("person-avatar-adult", "adult"), child = addPerson("person-avatar-child", "child"), admin = addPerson("person-avatar-admin", "admin");
     const animation = { kind: "video" as const, spec_version: 1, key: "#00FF00", states: { idle: { h264: "idle.h264.mp4", still: "idle.png", loop: true }, listening: { h264: "listening.h264.mp4", av1: "listening.av1.mp4", still: "listening.png", loop: false } } };
     const ready = createHouseholdCompanion({ ...fixture(), display_name: "Avatar fox" }, { display_name: "Author", person_id: "person-avatar-adult" }); if (!ready.ok) throw new Error(ready.error);
+    const mouthVersion = addVersion(ready.value.id, await transparentPng(), { source: "upload", label: "mouth", width: 1024, height: 1024, from: null });
+    updateSheet(ready.value.id, { views: { left: null, right: null, mouth: mouthVersion.id }, card: { text: "fox", species: "fox", colours: ["#CC3322"] }, key: "#00FF00", state: "needs_review", approved_by: null, approved_at: null }); approveSheet(ready.value.id, "Author");
     setHouseholdCompanionAudience(ready.value.id, "all", { display_name: "Admin" }); setHouseholdCompanionStatus(ready.value.id, "ready"); setHouseholdCompanionAnimation(ready.value.id, animation); __reloadPersonasForTests();
     const animationFolder = join(householdCompanionFolder(ready.value.id)!, "animation"); mkdirSync(animationFolder, { recursive: true });
     writeFileSync(join(animationFolder, "idle.h264.mp4"), "0123456789"); writeFileSync(join(animationFolder, "idle.png"), "png");
     const picked = await request(`companions/${ready.value.id}/default`, adult, "PUT"); expect(picked.status).toBe(200);
     const response = await request("companions/avatar", adult); expect(response.status).toBe(200);
     const body = await response.json() as { avatar: { id: string; name: string; key: string; version: string; states: Record<string, { loop: boolean; urls: { h264: string; av1: string | null; still: string } }> } | null };
-    expect(body.avatar).toMatchObject({ id: ready.value.id, name: "Avatar fox", key: "#00FF00", version: expect.stringMatching(/^[a-f0-9]{12}$/) });
+    expect(body.avatar).toMatchObject({ id: ready.value.id, name: "Avatar fox", key: "#00FF00", mouth_still: `/api/companions/${ready.value.id}/mouth`, version: expect.stringMatching(/^[a-f0-9]{12}$/) });
     expect(body.avatar?.states.idle?.urls.av1).toBeNull();
     expect(body.avatar?.states.listening?.urls.av1).toBe(`/api/companions/${ready.value.id}/animation/listening.av1.mp4`);
     const explicit = await request(`companions/avatar?companion=${encodeURIComponent(ready.value.id)}`, adult);
@@ -1108,6 +1110,7 @@ describe("household companion routes", () => {
     const cached = await app.request("http://localhost/api/companions/avatar", { headers: { cookie: `session=${adult}`, "if-none-match": etag } }); expect(cached.status).toBe(304);
     const childPick = await request(`companions/${ready.value.id}/default`, child, "PUT"); expect(childPick.status).toBe(200);
     const childAvatar = await request("companions/avatar", child); expect((await childAvatar.json() as { avatar: { id: string } | null }).avatar?.id).toBe(ready.value.id);
+    const mouth = await request(`companions/${ready.value.id}/mouth`, child); expect(mouth.status).toBe(200); expect(mouth.headers.get("content-type")).toContain("image/png"); expect(mouth.headers.get("cache-control")).toBe("private, max-age=0, must-revalidate");
 
     const adultOnly = createHouseholdCompanion({ ...fixture(), display_name: "Adult avatar" }, { display_name: "Author", person_id: "person-avatar-adult" }); if (!adultOnly.ok) throw new Error(adultOnly.error);
     setHouseholdCompanionStatus(adultOnly.value.id, "ready"); setHouseholdCompanionAnimation(adultOnly.value.id, animation); __reloadPersonasForTests();
@@ -1123,6 +1126,18 @@ describe("household companion routes", () => {
     db.insert(settingsValues).values({ scope: "person:person-avatar-adult", key: "persona.active_id", value: JSON.stringify(draft.value.id), hlc: "2:0:test", source: "user", updatedAt: now }).run();
     expect((await (await request("companions/avatar", adult)).json() as { avatar: unknown }).avatar).toBeNull();
     const bundled = await request("companions/avatar", admin); expect((await bundled.json() as { avatar: { id: string } | null }).avatar?.id).toBe("tessa");
+  });
+
+  test("mouth picture is absent without an approved sheet or mouth view", async () => {
+    const author = addPerson("person-mouth-author", "adult"), reader = addPerson("person-mouth-reader", "adult");
+    const made = createHouseholdCompanion({ ...fixture(), display_name: "Mouth companion" }, { display_name: "Author", person_id: "person-mouth-author" }); if (!made.ok) throw new Error(made.error);
+    setHouseholdCompanionAudience(made.value.id, "all", { display_name: "Author" }); __reloadPersonasForTests();
+    const absent = await request(`companions/${made.value.id}/mouth`, reader); expect(absent.status).toBe(404); expect(await absent.json()).toMatchObject({ error: "That companion has no mouth picture yet." });
+    const version = addVersion(made.value.id, await transparentPng(), { source: "upload", label: "mouth", width: 1024, height: 1024, from: null });
+    updateSheet(made.value.id, { views: { left: null, right: null, mouth: version.id }, card: { text: "fox", species: "fox", colours: ["#CC3322"] }, key: "#00FF00", state: "needs_review", approved_by: null, approved_at: null });
+    expect((await request(`companions/${made.value.id}/mouth`, reader)).status).toBe(404);
+    setHouseholdCompanionStatus(made.value.id, "ready"); setHouseholdCompanionAnimation(made.value.id, { kind: "video", spec_version: 1, key: "#00FF00", states: { idle: { h264: "idle.mp4", still: "idle.png", loop: true } } }); __reloadPersonasForTests();
+    const avatar = await request(`companions/avatar?companion=${encodeURIComponent(made.value.id)}`, author); expect((await avatar.json() as { avatar: { mouth_still: string | null } | null }).avatar?.mouth_still).toBeNull();
   });
 
   test("Tessa's four still-only animation states return null video URLs and only listed stills are served", async () => {
