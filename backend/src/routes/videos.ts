@@ -15,6 +15,7 @@ import { cancelVideoJob, clipUrl, getVideoJobFor, getVideoJobByFileFor, plainVid
 import { plainStageLabel } from "@/lib/jobQueueCopy";
 import { promptRefusalLineFor } from "@/lib/pictures/ageCheck";
 import { CHILD_NEGATIVE_PROMPT, CHILD_VIDEO_LIMIT_LINE, forceCartoon, kidsDailyVideos, laneOf, releaseKid, reserveKid, videoModelForLane, videosMadeToday } from "@/lib/pictures/lane";
+import { checkVideoPrompt } from "@/lib/videos/promptCheck";
 import { householdAllowsVideo, refuseVideoPrompt, stackAudienceFor, videoDenial, VIDEO_DENIAL_LINE, VIDEO_REFUSAL_LINE, type VideoAudience } from "@/lib/videos/policy";
 import { laneOfPerson } from "@/lib/pictures/laneGate";
 import { getLive, liveCardFields } from "@/lib/genLive";
@@ -428,6 +429,23 @@ videosRoutes.openapi(makeRoute, async (c) => {
   const result = await makeVideoFor(actor, c.req.valid("json"));
   if (!result.ok) return c.json({ error: result.error, code: result.code }, result.status) as never;
   return c.json({ ...videoCardOrLocked(actor, result.job, true, await readyFlags(actor)), notice: result.notice } as never, 200);
+});
+
+// IVY-CHECK-01: the prompt check the Create page shows under the words, before any render. Pure code; it reads and gates nothing.
+const checkPromptRoute = createRoute({
+  method: "post", path: "/check-prompt", tags: ["Videos"], summary: "Check a video prompt for mistakes before making it", middleware: [requireAuth] as const,
+  request: { body: { content: { "application/json": { schema: z.object({
+    prompt: z.string().max(4000).describe("The words as typed."),
+    seconds: z.number().int().min(1).max(30).optional().describe("The length asked for, so spoken lines can be measured against it."),
+  }) } } } },
+  responses: { 200: { content: { "application/json": { schema: z.object({ findings: z.array(z.object({
+    code: z.string(), level: z.enum(["error", "warn", "info"]), message: z.string().describe("What is wrong, in plain words."),
+    fix: z.string().nullable().describe("The whole prompt with the one safe edit applied, or null when it needs a person's choice."),
+  })) }) } }, description: "Findings, errors first; an empty list means nothing to fix" }, ...errorResponses({ 401: "Not signed in" }) },
+});
+videosRoutes.openapi(checkPromptRoute, (c) => {
+  const body = c.req.valid("json");
+  return c.json({ findings: checkVideoPrompt(body.prompt, { seconds: body.seconds }) }, 200);
 });
 
 const animateRoute = createRoute({
