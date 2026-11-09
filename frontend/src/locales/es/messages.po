@@ -369,16 +369,10 @@ msgid "{count, plural, one {File restored} other {# files restored}}"
 msgstr "{count, plural, one {Archivo restaurado} other {# archivos restaurados}}"
 
 #. js-lingui-explicit-id
-#: src/apps/memory/PersonMemories.tsx:388
+#: src/apps/memory/PersonMemories.tsx:422
 #, needs-review
 msgid "{count, plural, one {Forget # memory? This cannot be undone.} other {Forget # memories? This cannot be undone.}}"
 msgstr "{count, plural, one {¿Olvidar # memoria? No se puede deshacer.} other {¿Olvidar # memorias? No se puede deshacer.}}"
-
-#. js-lingui-explicit-id
-#: src/apps/memory/PersonMemories.tsx:400
-#, needs-review
-msgid "{count, plural, one {Forget your memory? This cannot be undone.} other {Forget every one of your # memories? This cannot be undone.}}"
-msgstr "{count, plural, one {¿Olvidar tu memoria? No se puede deshacer.} other {¿Olvidar todas tus # memorias? No se puede deshacer.}}"
 
 #. js-lingui-explicit-id
 #: src/apps/reminders/RemindersPage.tsx:185
@@ -417,13 +411,18 @@ msgid "{count} files moved to Trash. Kept 30 days"
 msgstr "{count} archivos se movieron a la Papelera. Se guardan 30 días"
 
 #. js-lingui-explicit-id
+#: src/apps/memory/PersonMemories.tsx:443
+msgid "{count} memories could not be forgotten: {reason}"
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/apps/notifications/NotificationsPage.tsx:93
 #, needs-review
 msgid "{count} of {total} could be cleared - the rest were already gone."
 msgstr "Se pudieron borrar {count} de {total}. Las demás ya no estaban."
 
 #. js-lingui-explicit-id
-#: src/apps/memory/PersonMemories.tsx:339
+#: src/apps/memory/PersonMemories.tsx:358
 #, needs-review
 msgid "{count} of {total} could not be forgotten: {reason}"
 msgstr "{count} de {total} no se pudieron olvidar: {reason}"
@@ -6438,7 +6437,7 @@ msgid "Clear {name}"
 msgstr "Borrar {name}"
 
 #. js-lingui-explicit-id
-#: src/apps/memory/PersonMemories.tsx:380
+#: src/apps/memory/PersonMemories.tsx:414
 #: src/apps/notifications/NotificationsPage.tsx:159
 #: src/apps/settings/FreeUpSpaceDialog.tsx:80
 #: src/shell/pages/StoragePage.tsx:196
@@ -7146,7 +7145,7 @@ msgstr ""
 
 #. js-lingui-explicit-id
 #: src/apps/memory/PersonMemories.tsx:212
-#: src/apps/memory/PersonMemories.tsx:357
+#: src/apps/memory/PersonMemories.tsx:376
 #, needs-review
 msgid "Could not archive that memory. Check your connection and try again."
 msgstr "No se pudo archivar esa memoria. Revisa tu conexión e inténtalo de nuevo."
@@ -7222,7 +7221,7 @@ msgid "Could not change this synth's status. Check your connection and try again
 msgstr "No se pudo cambiar el estado de este synth. Revisa tu conexión e inténtalo de nuevo."
 
 #. js-lingui-explicit-id
-#: src/apps/memory/PersonMemories.tsx:318
+#: src/apps/memory/PersonMemories.tsx:337
 #, needs-review
 msgid "Could not change who may hear that memory. Check your connection and try again."
 msgstr "No se pudo cambiar quién puede escuchar esa memoria. Revisa tu conexión e inténtalo de nuevo."
@@ -7401,7 +7400,8 @@ msgstr ""
 
 #. js-lingui-explicit-id
 #: src/apps/memory/PersonMemories.tsx:199
-#: src/apps/memory/PersonMemories.tsx:344
+#: src/apps/memory/PersonMemories.tsx:363
+#: src/apps/memory/PersonMemories.tsx:445
 #, needs-review
 msgid "Could not forget those memories. Check your connection and try again."
 msgstr "No se pudieron olvidar esas memorias. Revisa tu conexión e inténtalo de nuevo."
@@ -7490,6 +7490,11 @@ msgid "Could not load engines."
 msgstr "No se pudieron cargar los motores."
 
 #. js-lingui-explicit-id
+#: src/apps/memory/PersonMemories.tsx:492
+msgid "Could not load faded memories. Check your connection and try again."
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/shell/pages/DashboardPage.tsx:63
 #, needs-review
 msgid "Could not load Home cards. Refresh Home to try again."
@@ -7500,6 +7505,11 @@ msgstr "No se pudieron cargar las tarjetas de Home. Actualiza Home para intentar
 #, needs-review
 msgid "Could not load Media. Check your connection and try again."
 msgstr "No se pudo cargar el contenido multimedia. Revisa tu conexión e inténtalo de nuevo."
+
+#. js-lingui-explicit-id
+#: src/apps/memory/PersonMemories.tsx:326
+msgid "Could not load more memories. Check your connection and try again."
+msgstr ""
 
 #. js-lingui-explicit-id
 #: src/shell/pages/PerformancePage.tsx:63
@@ -7757,7 +7767,7 @@ msgid "Could not load your library. Refresh Home to try again."
 msgstr "No pudimos cargar tu Biblioteca. Recarga Home para intentarlo de nuevo."
 
 #. js-lingui-explicit-id
-#: src/apps/memory/PersonMemories.tsx:415
+#: src/apps/memory/PersonMemories.tsx:458
 #, needs-review
 msgid "Could not load your memories."
 msgstr "No se pudieron cargar tus memorias."
@@ -7961,6 +7971,11 @@ msgstr "No se pudo cambiar el nombre de esta voz. Inténtalo de nuevo."
 #, needs-review
 msgid "Could not restart {name}."
 msgstr "No se pudo reiniciar {name}."
+
+#. js-lingui-explicit-id
+#: src/apps/memory/PersonMemories.tsx:392
+msgid "Could not restore that memory. Check your connection and try again."
+msgstr ""
 
 #. js-lingui-explicit-id
 #: src/apps/chat/chatThreadListAdapter.ts:192
@@ -9893,6 +9908,11 @@ msgid "Ended {time} · {duration}"
 msgstr "Terminó {time} · {duration}"
 
 #. js-lingui-explicit-id
+#: src/apps/memory/PersonMemories.tsx:399
+msgid "Ending"
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/shell/pages/status/StatusBoard.tsx:110
 #, needs-review
 msgid "Ends"
@@ -10494,6 +10514,11 @@ msgid "Facts about every country."
 msgstr "Datos sobre todos los países."
 
 #. js-lingui-explicit-id
+#: src/apps/memory/PersonMemories.tsx:487
+msgid "Faded ({count})"
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:1467
 #, needs-review
 msgid "setting.weather.unit.option_label.fahrenheit"
@@ -10996,6 +11021,11 @@ msgid "Forget {name}?"
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/apps/memory/PersonMemories.tsx:434
+msgid "Forget all {total} memories, including those not loaded yet? This cannot be undone."
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/apps/memory/PersonMemories.tsx:224
 #, needs-review
 msgid "Forget everything about {personName}"
@@ -11008,7 +11038,7 @@ msgid "Forget everything MaiPai remembers about {personName}?"
 msgstr "¿Olvidar todo lo que MaiPai recuerda sobre {personName}?"
 
 #. js-lingui-explicit-id
-#: src/apps/memory/PersonMemories.tsx:372
+#: src/apps/memory/PersonMemories.tsx:406
 #, needs-review
 msgid "Forget selected"
 msgstr "Olvidar seleccionadas"
@@ -11021,8 +11051,8 @@ msgstr ""
 
 #. js-lingui-explicit-id
 #: src/apps/memory/PersonMemories.tsx:232
-#: src/apps/memory/PersonMemories.tsx:390
-#: src/apps/memory/PersonMemories.tsx:402
+#: src/apps/memory/PersonMemories.tsx:424
+#: src/apps/memory/PersonMemories.tsx:436
 #, needs-review
 msgid "Forgetting…"
 msgstr "Olvidando…"
@@ -14291,8 +14321,8 @@ msgid "Keep the voice"
 msgstr "Mantén la voz"
 
 #. js-lingui-explicit-id
-#: src/apps/memory/PersonMemories.tsx:394
-#: src/apps/memory/PersonMemories.tsx:406
+#: src/apps/memory/PersonMemories.tsx:428
+#: src/apps/memory/PersonMemories.tsx:449
 #: src/apps/settings/FreeUpSpaceDialog.tsx:113
 #: src/apps/settings/UsersSection.tsx:267
 #: src/apps/settings/UsersSection.tsx:390
@@ -15541,6 +15571,11 @@ msgid "setting.coding.engine.option_label.llama-server"
 msgstr "Llama-server"
 
 #. js-lingui-explicit-id
+#: src/apps/memory/PersonMemories.tsx:483
+msgid "Load more"
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:693
 #, needs-review
 msgid "setting.news.full_text_prefetch.label"
@@ -15643,6 +15678,11 @@ msgid "Loading engines"
 msgstr "Cargando motores"
 
 #. js-lingui-explicit-id
+#: src/apps/memory/PersonMemories.tsx:491
+msgid "Loading faded memories…"
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/apps/setup/StorageStep.tsx:36
 #, needs-review
 msgid "Loading folders"
@@ -15703,7 +15743,7 @@ msgstr "Cargando contenido multimedia"
 
 #. js-lingui-explicit-id
 #: src/apps/memory/PersonMemories.tsx:248
-#: src/apps/memory/PersonMemories.tsx:419
+#: src/apps/memory/PersonMemories.tsx:462
 #, needs-review
 msgid "Loading memories"
 msgstr "Cargando memorias"
@@ -15955,6 +15995,7 @@ msgid "Loading your sounds"
 msgstr "Cargando tus sonidos"
 
 #. js-lingui-explicit-id
+#: src/apps/memory/PersonMemories.tsx:483
 #: src/shell/pages/settings/HouseSettings.tsx:47
 #, needs-review
 msgid "Loading…"
@@ -18348,6 +18389,11 @@ msgid "No expiry"
 msgstr "Sin caducidad"
 
 #. js-lingui-explicit-id
+#: src/apps/memory/PersonMemories.tsx:501
+msgid "No faded memories."
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/shell/pages/FamilyPage.tsx:81
 msgid "No family members yet."
 msgstr ""
@@ -18814,7 +18860,7 @@ msgid "setting.ease.text_size.option.100"
 msgstr "Tamaño normal."
 
 #. js-lingui-explicit-id
-#: src/apps/memory/PersonMemories.tsx:339
+#: src/apps/memory/PersonMemories.tsx:358
 #: src/apps/settings/UsersSection.tsx:208
 #, needs-review
 msgid "not allowed"
@@ -19124,7 +19170,7 @@ msgid "Nothing remembered about {personName} yet."
 msgstr "Aún no hay nada recordado sobre {personName}."
 
 #. js-lingui-explicit-id
-#: src/apps/memory/PersonMemories.tsx:418
+#: src/apps/memory/PersonMemories.tsx:461
 #, needs-review
 msgid "Nothing remembered yet."
 msgstr "Aún no hay nada recordado."
@@ -22785,6 +22831,11 @@ msgid "Restore"
 msgstr "Restaurar"
 
 #. js-lingui-explicit-id
+#: src/apps/memory/PersonMemories.tsx:497
+msgid "Restore \"{text}\""
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/shell/library/TranscriptPanel.tsx:437
 #, needs-review
 msgid "Restore {n}"
@@ -24331,7 +24382,7 @@ msgid "Select Check the engine computer. Home reads its security key. Then type 
 msgstr "Selecciona Comprobar el equipo del motor. Home lee su clave de seguridad. Luego escribe el código de verificación que imprimió el equipo del motor."
 
 #. js-lingui-explicit-id
-#: src/apps/memory/PersonMemories.tsx:376
+#: src/apps/memory/PersonMemories.tsx:410
 #, needs-review
 msgid "Select memories"
 msgstr "Seleccionar memorias"
@@ -24970,6 +25021,11 @@ msgstr "Mostrar alertas meteorológicas"
 #, needs-review
 msgid "Show: {title}"
 msgstr "Mostrar: {title}"
+
+#. js-lingui-explicit-id
+#: src/apps/memory/PersonMemories.tsx:399
+msgid "Showing {shown} of {total} memories"
+msgstr ""
 
 #. js-lingui-explicit-id
 #: src/shell/library/TranscriptFindReplace.tsx:131
@@ -27248,7 +27304,7 @@ msgstr "No se envió. Inténtalo de nuevo."
 #: src/apps/clock/AlarmsTab.tsx:72
 #: src/apps/clock/WorldClocksTab.tsx:168
 #: src/apps/memory/PersonMemories.tsx:220
-#: src/apps/memory/PersonMemories.tsx:365
+#: src/apps/memory/PersonMemories.tsx:398
 #: src/apps/notifications/NotificationsPage.tsx:114
 #: src/apps/people/FaceEnrollmentPage.tsx:781
 #: src/apps/people/ProfileForm.tsx:176
@@ -32303,16 +32359,15 @@ msgid "Yes, cancel install"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/memory/PersonMemories.tsx:389
+#: src/apps/memory/PersonMemories.tsx:423
 #, needs-review
 msgid "Yes, forget {count}"
 msgstr "Sí, olvidar {count}"
 
 #. js-lingui-explicit-id
-#: src/apps/memory/PersonMemories.tsx:401
-#, needs-review
-msgid "Yes, forget all"
-msgstr "Sí, olvidar todo"
+#: src/apps/memory/PersonMemories.tsx:435
+msgid "Yes, forget all {total}"
+msgstr ""
 
 #. js-lingui-explicit-id
 #: src/apps/memory/PersonMemories.tsx:231
