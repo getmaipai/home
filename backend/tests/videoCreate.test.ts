@@ -215,7 +215,7 @@ describe("the Create page and the make action", () => {
     expect(promptBarOf(again.body)!.chips).toHaveLength(5);
     // VIDEO-UI-06: two panes, the panel on the left, and nothing of the old three pages.
     // VIDEO-STUDIO-08: the page takes the Music Studio look: the studio surface, a studio header (eyebrow CREATE, title from the bound row) above the two panes.
-    expect((page as Record<string, any>).surface).toBe("studio");
+    expect((page as Record<string, any>).surface).toBeUndefined(); // PRO-LOOK-STUDIOS-01: the studio surface is retired
     const header = page.body[0] as Record<string, any>;
     expect(header).toMatchObject({ type: "creation_header", variant: "studio", eyebrow: "Create", bind: { source: "package", path: "recipes", params: { scope: "header" } } });
     expect(header.primary).toBeUndefined();
