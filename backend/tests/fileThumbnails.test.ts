@@ -40,7 +40,7 @@ test("owner gets bounded webp, cache is reused, ETag revalidates and invalid wid
       const url = `/api/files/${image.id}/thumb?w=${w}`;
       const res = await f.client.get(url); expect(res.status).toBe(200);
       expect(res.headers.get("content-type")).toBe("image/webp");
-      expect(res.headers.get("cache-control")).toBe("private, no-cache");
+      expect(res.headers.get("cache-control")).toBe("private, max-age=3600");
       expect(res.headers.get("etag")).toBe(`"${image.sha256}-${w}"`);
       expect((await sharp(Buffer.from(await res.arrayBuffer())).metadata()).width).toBe(w);
       const calls = encode.mock.calls.length;

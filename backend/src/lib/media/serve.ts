@@ -6,6 +6,7 @@ import { createHash } from "node:crypto";
 import { realpathSync, statSync } from "node:fs";
 import { resolve, sep } from "node:path";
 import { eq } from "drizzle-orm";
+import sharp from "sharp";
 import { db } from "@/db";
 import { attachments, mediaSources } from "@/db/schema";
 import { attachmentFilePath, getAttachment, readAttachment } from "@/lib/attachments";
@@ -19,6 +20,32 @@ import { readEpubCover } from "./parsers/epub";
 import { extensionOf } from "./parsers/text";
 
 const BASE_HEADERS = { "accept-ranges": "bytes", "x-content-type-options": "nosniff", "cache-control": "private, no-store" } as const;
+
+// A phone showed every cover at the size it was saved (a 3000 px scan is megabytes) and asked again after five minutes. A picture over
+// ART_FULL_BYTES goes out at most ART_MAX_PX wide as WebP, remembered in memory by its content; a small one is sent as it is.
+const ART_FULL_BYTES = 150_000;
+const ART_MAX_PX = 800;
+const ART_CACHE_MAX = 300;
+const artCache = new Map<string, Buffer>();
+export async function lightArt(bytes: Uint8Array, type: string): Promise<{ body: Uint8Array; type: string }> {
+  if (bytes.byteLength <= ART_FULL_BYTES) return { body: bytes, type };
+  const key = createHash("sha1").update(bytes).digest("hex");
+  let small = artCache.get(key);
+  if (!small) {
+    try {
+      small = await sharp(bytes, { failOn: "none", limitInputPixels: 64_000_000 }).rotate().resize({ width: ART_MAX_PX, height: ART_MAX_PX, fit: "inside", withoutEnlargement: true }).webp({ quality: 78 }).toBuffer();
+    } catch { return { body: bytes, type }; }
+    if (small.byteLength >= bytes.byteLength) return { body: bytes, type };
+    if (artCache.size >= ART_CACHE_MAX) artCache.delete(artCache.keys().next().value as string);
+    artCache.set(key, small);
+  }
+  return { body: small, type: "image/webp" };
+}
+const ART_HEADERS = { ...{ "accept-ranges": "bytes", "x-content-type-options": "nosniff" }, "cache-control": "private, max-age=3600" } as const;
+async function artResponse(bytes: Uint8Array, type: string): Promise<Response> {
+  const art = await lightArt(bytes, type);
+  return new Response(art.body as never, { status: 200, headers: { ...ART_HEADERS, "content-type": art.type } });
+}
 
 export interface ByteRange {
   start: number;
@@ -145,22 +172,21 @@ export async function serveItemArtwork(actor: PersonRow, item: MediaItem): Promi
     if (fetched) return new Response(fetched.file, { headers: { ...BASE_HEADERS, "content-type": fetched.mediaType } });
     const read = readAttachment(actor, art.file_id);
     if (!read.ok) return { error: "That picture is not available to you.", status: 404 };
-    return new Response(read.value.bytes as never, { status: 200, headers: { ...BASE_HEADERS, "cache-control": "private, max-age=300", "content-type": read.value.record.media_type } });
+    return artResponse(read.value.bytes, read.value.record.media_type);
   }
   if (art.path?.startsWith(COVER_PATH_PREFIX)) {
     // MUSIC-DATA-01: the kept Cover Art Archive cover; a cleared cache gives a 404 and the page shows the generated cover.
     const cover = item.musicbrainz_release_group_id && art.path === `${COVER_PATH_PREFIX}${item.musicbrainz_release_group_id}` ? albumCoverFile(item.musicbrainz_release_group_id) : null;
     if (!cover) return { error: "No picture for this item.", status: 404 };
-    return new Response(Bun.file(cover.path), { status: 200, headers: { ...BASE_HEADERS, "cache-control": "private, max-age=300", "content-type": cover.mime } });
+    return artResponse(new Uint8Array(await Bun.file(cover.path).arrayBuffer()), cover.mime);
   }
   if (art.path) {
     const abs = resolveUnderRoot(item.source_id, art.path);
     if (!abs) return { error: "No picture for this item.", status: 404 };
     const ext = extensionOf(abs);
-    const headers = { ...BASE_HEADERS, "cache-control": "private, max-age=300" };
-    if (ext in IMAGE_TYPES) return new Response(Bun.file(abs), { status: 200, headers: { ...headers, "content-type": IMAGE_TYPES[ext]! } });
+    if (ext in IMAGE_TYPES) return artResponse(new Uint8Array(await Bun.file(abs).arrayBuffer()), IMAGE_TYPES[ext]!);
     const embedded = ext === "epub" ? await readEpubCover(abs) : await readEmbeddedCover(abs);
-    if (embedded) return new Response(embedded.data as never, { status: 200, headers: { ...headers, "content-type": embedded.mediaType } });
+    if (embedded) return artResponse(embedded.data as never, embedded.mediaType);
   }
   return { error: "No picture for this item.", status: 404 };
 }

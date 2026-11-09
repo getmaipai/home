@@ -119,7 +119,7 @@ function Tile({ kind, item }: { kind: Kind; item: Made }) {
   const line = kind === "album" ? i18n._({ id: "{count, plural, one {# song} other {# songs}}", message: "{count, plural, one {# song} other {# songs}}", values: { count: item.track_media_ids?.length ?? 0 } }) : genres.slice(0, 2).join(" · ") || (item.origin === "starter" ? i18n._({ id: "Starter style", message: "Starter style" }) : "");
   return <Link to={editPath(kind, item.id)} className="group flex w-36 shrink-0 flex-col gap-2 sm:w-40" data-testid="music-made-tile">
     <div className="bg-muted text-muted-foreground relative flex aspect-square w-full items-center justify-center overflow-hidden rounded-2xl text-4xl font-semibold shadow-sm transition-transform group-hover:scale-105">
-      {picture ? <img src={picture} alt="" className="size-full object-cover" /> : <span aria-hidden="true">{name.slice(0, 1).toUpperCase()}</span>}
+      {picture ? <img src={picture} alt="" loading="lazy" decoding="async" className="size-full object-cover" /> : <span aria-hidden="true">{name.slice(0, 1).toUpperCase()}</span>}
     </div>
     <div className="min-w-0"><p className="truncate text-sm font-medium">{name}</p>{line ? <p className="text-muted-foreground truncate text-xs">{line}</p> : null}</div>
   </Link>;

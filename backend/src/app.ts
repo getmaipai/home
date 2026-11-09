@@ -4,6 +4,7 @@ import { transcriptRoutes } from "@/routes/transcripts";
 import { musicRoutes } from "@/routes/music";
 import { madeAlbumsRoutes, madeArtistsRoutes, songStylesRoutes } from "@/routes/musicMade";
 import { serveStatic } from "hono/bun";
+import { compressAssets, hashedAssetCache } from "@/middleware/assetCache";
 import { apiReference } from "@scalar/hono-api-reference";
 import { existsSync } from "node:fs";
 import { join, dirname } from "node:path";
@@ -381,6 +382,8 @@ const indexPath = join(distDir, "index.html");
 
 // PI-RENDER-01: the app page and its assets carry the Content-Security-Policy.
 app.use("/*", pageCsp);
+app.use("/assets/*", compressAssets);
+app.use("/assets/*", hashedAssetCache);
 app.use("/*", serveStatic({ root: distDir }));
 
 // SPA fallback: any GET that isn't an API route and didn't match a
