@@ -280,27 +280,27 @@ html.dark body {
  * markdown headings at 22, 19 and 17; user messages are compact filled
  * bubbles at most 70% of the column. */
 [data-slot="chat-pane"] [data-slot="aui_assistant-message-content"] {
-  font-size: 15px;
-  line-height: 24px;
+  font-size: 0.9375rem;
+  line-height: 1.5rem;
 }
 [data-slot="chat-pane"] [data-slot="aui_assistant-message-content"] h1 {
-  font-size: 22px;
-  line-height: 30px;
+  font-size: 1.375rem;
+  line-height: 1.875rem;
 }
 [data-slot="chat-pane"] [data-slot="aui_assistant-message-content"] h2 {
-  font-size: 19px;
-  line-height: 26px;
+  font-size: 1.1875rem;
+  line-height: 1.625rem;
 }
 [data-slot="chat-pane"] [data-slot="aui_assistant-message-content"] h3 {
-  font-size: 17px;
-  line-height: 24px;
+  font-size: 1.0625rem;
+  line-height: 1.5rem;
 }
 [data-slot="chat-pane"] .aui-user-message-content {
   max-width: min(560px, 100%);
   padding: 8px 14px;
   border-radius: 18px;
-  font-size: 15px;
-  line-height: 24px;
+  font-size: 0.9375rem;
+  line-height: 1.5rem;
   background: var(--shell-user-bubble);
 }
 

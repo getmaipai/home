@@ -17,6 +17,7 @@
       "aspect": "square",
       "variant": "plain",
       "layout": "grid",
+      "size_control": true,
       "art_shape": "circle",
       "on_select": {
         "navigate": {
@@ -29,7 +30,13 @@
       "empty_state": {
         "type": "empty_state",
         "icon": "music",
-        "text": "No artists yet."
+        "text": "No artists yet.",
+        "action": {
+          "navigate": {
+            "to": "/apps/music/create"
+          }
+        },
+        "action_label": "Make a song"
       }
     }
   ]

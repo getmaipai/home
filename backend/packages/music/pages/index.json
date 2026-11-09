@@ -4,6 +4,32 @@
   "title": "Listen now",
   "body": [
     {
+      "type": "billboard",
+      "bind": {
+        "source": "package",
+        "path": "history",
+        "params": {
+          "scope": "greeting"
+        }
+      },
+      "label": "Greeting",
+      "size": "banner",
+      "autoplay": false,
+      "item_key_field": "id",
+      "item_title_field": "title",
+      "item_subtitle_field": "{channel}",
+      "primary": {
+        "label": "Browse songs",
+        "icon": "music",
+        "action": {
+          "navigate": {
+            "to": "/apps/music/songs"
+          }
+        }
+      },
+      "secondary": []
+    },
+    {
       "type": "quick_tiles",
       "label": "Pick up where you left off",
       "bind": {
@@ -64,6 +90,103 @@
         }
       },
       "play_label": "Play {title}"
+    },
+    {
+      "type": "media_shelf",
+      "heading": "Jump back in",
+      "bind": {
+        "source": "package",
+        "path": "history",
+        "params": {
+          "scope": "jump-back"
+        }
+      },
+      "item_key_field": "id",
+      "item_label_field": "title",
+      "item_subtitle_field": "{channel}",
+      "item_media_field": "thumbnail",
+      "aspect": "square",
+      "variant": "plain",
+      "hide_when_empty": true,
+      "card_radius": "tight",
+      "press_scale": true,
+      "on_select": {
+        "navigate": {
+          "to": "/apps/music/album",
+          "state": {
+            "id": "{id}"
+          }
+        }
+      },
+      "on_play": {
+        "play": {
+          "media_id": "{id}"
+        }
+      },
+      "play_label": "Play {title}"
+    },
+    {
+      "type": "media_shelf",
+      "heading": "Made for you",
+      "bind": {
+        "source": "package",
+        "path": "history",
+        "params": {
+          "scope": "made"
+        }
+      },
+      "item_key_field": "id",
+      "item_label_field": "title",
+      "item_subtitle_field": "{channel}",
+      "item_media_field": "thumbnail",
+      "aspect": "square",
+      "variant": "plain",
+      "hide_when_empty": true,
+      "card_radius": "tight",
+      "press_scale": true,
+      "on_select": {
+        "play": {
+          "media_id": "{id}"
+        }
+      },
+      "on_play": {
+        "play": {
+          "media_id": "{id}"
+        }
+      },
+      "play_label": "Play {title}"
+    },
+    {
+      "type": "media_shelf",
+      "heading": "Your most played",
+      "bind": {
+        "source": "package",
+        "path": "history",
+        "params": {
+          "scope": "most-played"
+        }
+      },
+      "item_key_field": "id",
+      "item_label_field": "title",
+      "item_subtitle_field": "{channel}",
+      "item_media_field": "thumbnail",
+      "aspect": "square",
+      "variant": "plain",
+      "hide_when_empty": true,
+      "card_radius": "tight",
+      "press_scale": true,
+      "on_select": {
+        "play": {
+          "media_id": "{id}"
+        }
+      },
+      "on_play": {
+        "play": {
+          "media_id": "{id}"
+        }
+      },
+      "play_label": "Play {title}",
+      "density": "compact"
     },
     {
       "type": "media_shelf",

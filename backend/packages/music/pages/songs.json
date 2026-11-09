@@ -28,7 +28,13 @@
       "empty_state": {
         "type": "empty_state",
         "icon": "music",
-        "text": "No songs yet."
+        "text": "No songs yet.",
+        "action": {
+          "navigate": {
+            "to": "/apps/music/create"
+          }
+        },
+        "action_label": "Make a song"
       }
     }
   ]

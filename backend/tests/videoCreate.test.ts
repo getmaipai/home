@@ -249,8 +249,9 @@ describe("the Create page and the make action", () => {
     expect(section.heading).toBe("Your clips");
     const feedNode = section.children[0] as Record<string, any>;
     expect(feedNode.type).toBe("result_feed");
-    expect(feedNode.heading_style).toBe("eyebrow");
-    expect((split.main as Array<Record<string, any>>)[0]).toMatchObject({ type: "media_shelf", heading: "Try this", heading_style: "eyebrow" });
+    expect(feedNode.heading_style).toBeUndefined(); // sentence-case headings, no all-caps eyebrow (pro look)
+    expect((split.main as Array<Record<string, any>>)[0]).toMatchObject({ type: "media_shelf", heading: "Try this" });
+    expect((split.main as Array<Record<string, any>>)[0]!.heading_style).toBeUndefined();
     expect(feedNode).toMatchObject({ look: "media", filters_presentation: "popover" });
     expect(feedNode.poll_while).toEqual({ statuses: ["queued", "generating"], record: { path: "recipes", params: { scope: "job", id: "{id}" } } });
     expect(feedNode.bind.params.scope).toBe("feed");

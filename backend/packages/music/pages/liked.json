@@ -28,7 +28,13 @@
       "empty_state": {
         "type": "empty_state",
         "icon": "music",
-        "text": "No liked songs yet. Press Like on a song or on Now playing."
+        "text": "No liked songs yet. Press Like on a song or on Now playing.",
+        "action": {
+          "navigate": {
+            "to": "/apps/music/search"
+          }
+        },
+        "action_label": "Find songs"
       }
     }
   ]

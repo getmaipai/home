@@ -58,7 +58,13 @@
               "empty_state": {
                 "type": "empty_state",
                 "icon": "film",
-                "text": "Your clips will show up here. Choose Create to make one."
+                "text": "Your clips will show up here. Choose Create to make one.",
+                "action": {
+                  "navigate": {
+                    "to": "/apps/videos/create"
+                  }
+                },
+                "action_label": "Make a video"
               }
             }
           ]
@@ -155,7 +161,13 @@
               "empty_state": {
                 "type": "empty_state",
                 "icon": "camera",
-                "text": "Pictures you add to start a video from show up here."
+                "text": "Pictures you add to start a video from show up here.",
+                "action": {
+                  "navigate": {
+                    "to": "/apps/videos/create"
+                  }
+                },
+                "action_label": "Make a video"
               }
             }
           ]

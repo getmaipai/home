@@ -60,7 +60,13 @@
       "empty_state": {
         "type": "empty_state",
         "icon": "bookmark",
-        "text": "No saved stories yet. Save a story to find it here."
+        "text": "No saved stories yet. Save a story to find it here.",
+        "action": {
+          "navigate": {
+            "to": "/apps/news/index"
+          }
+        },
+        "action_label": "Read the news"
       }
     }
   ]

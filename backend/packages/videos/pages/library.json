@@ -56,7 +56,8 @@
       "item_meta_field": "duration_s",
       "aspect": "wide",
       "variant": "plain",
-      "orientation": "vertical",
+      "layout": "grid",
+      "size_control": true,
       "on_select": {
         "play": {
           "media_id": "{id}"
@@ -65,7 +66,13 @@
       "empty_state": {
         "type": "empty_state",
         "icon": "film",
-        "text": "No videos in the library yet."
+        "text": "No videos in the library yet.",
+        "action": {
+          "navigate": {
+            "to": "/apps/videos/create"
+          }
+        },
+        "action_label": "Make a video"
       }
     }
   ]

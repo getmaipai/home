@@ -34,6 +34,7 @@ import { speakerAgeBand } from "@/lib/ageBand";
 import { artistProfileFor, creditLines, mostCommon } from "./artistProfiles";
 import { songFactFor } from "./songFacts";
 import { getMade } from "@/lib/music/madeRecords";
+import { MIX_SCOPES, musicMixData } from "./musicMixes";
 import { albumKey, artistKey, albumOrder, groupTracks, radioTracks, shuffled } from "./music";
 import type { Result } from "@/lib/result";
 
@@ -202,7 +203,7 @@ export function madeFiles(person: PersonRow, appId: "music" | "videos"): MadeLib
 
 /** One made clip as a shelf row (Made at home, and the Create page's creations). */
 export function madeVideoRow(file: MadeLibraryFile) {
-  return { id: file.id, title: file.name, channel: file.owner.display_name || "Made at home", summary: "", kind: "video" as const, thumbnail: file.thumb_url, backdrop: file.thumb_url, duration_s: file.duration_seconds, copy_label: "Saved" };
+  return { id: file.id, title: file.name, channel: file.owner.display_name || "Made at home", summary: "", kind: "video" as const, thumbnail: file.thumb_url, backdrop: file.thumb_url, duration_s: file.duration_seconds, copy_label: "Saved", loop: `/api/files/${encodeURIComponent(file.id)}/content` };
 }
 
 export function madeFileFor(person: PersonRow, appId: "music" | "videos", id: string): MadeLibraryFile | null {
@@ -945,7 +946,7 @@ export function setListed(person: PersonRow, appId: MediaAppId, kind: "liked" | 
 
 
 // Music uses the same read gate and collections as every other media app. No album or artist store.
-function musicLibrary(person: PersonRow): MediaItem[] {
+export function musicLibrary(person: PersonRow): MediaItem[] {
   // No page-sized cap before grouping: every readable track belongs to its derived album.
   return queryItems(person, "music", { all: true, order: [sql`lower(${mediaItems.title})`] });
 }
@@ -1102,7 +1103,7 @@ function queueCurrent(person: PersonRow): string | null {
 }
 
 /** Track rows for the compact list: the media row plus the album track number, the playing flag and the Like label the row actions read. */
-function trackRows(person: PersonRow, items: readonly MediaItem[], extra?: (item: MediaItem) => Record<string, unknown>): Array<MediaRow & Record<string, unknown>> {
+export function trackRows(person: PersonRow, items: readonly MediaItem[], extra?: (item: MediaItem) => Record<string, unknown>): Array<MediaRow & Record<string, unknown>> {
   const base = rowsOf(person, items);
   const liked = new Set(collectionIds(person, "liked"));
   const current = queueCurrent(person);
@@ -1112,7 +1113,7 @@ function trackRows(person: PersonRow, items: readonly MediaItem[], extra?: (item
 }
 
 /** An album or artist tile: the first track's picture, the derived id (the group key) and the page it opens. */
-function albumTile(person: PersonRow, id: string, tracks: readonly MediaItem[]): MediaRow & Record<string, unknown> {
+export function albumTile(person: PersonRow, id: string, tracks: readonly MediaItem[]): MediaRow & Record<string, unknown> {
   const first = albumOrder(tracks)[0]!;
   const pictured = albumOrder(tracks).find((item) => item.artwork) ?? first;
   return { ...rowsOf(person, [pictured])[0]!, id, title: first.album ?? "Unknown album", channel: first.album_artist ?? artistOf(first), kind: "track", queue_mode: "album" };
@@ -1230,6 +1231,7 @@ function musicData(person: PersonRow, dataId: string, params: DataParams): unkno
   if (dataId === "songs" && params.scope === "top") return topResult(person, params.query);
   if (dataId === "songs" && params.scope === "categories") return categoryRows(person);
   if (dataId === "history" && params.scope === "quick") return quickAlbums(person, 6);
+  if (dataId === "history" && params.scope && (MIX_SCOPES as readonly string[]).includes(params.scope)) return musicMixData(person, params.scope) as never;
   if (dataId === "artists" && params.scope === "recent") return recentArtists(person);
   if (dataId === "artists" && params.scope === "similar") return similarArtists(person, params.id ?? "");
   if (dataId === "artists" && params.query !== undefined) return nameMatches([...groupTracks(musicLibrary(person), "artist")].map(([, tracks]) => tileOfArtist(person, tracks)), params.query).sort((a, b) => a.title.localeCompare(b.title)).slice(0, 12);

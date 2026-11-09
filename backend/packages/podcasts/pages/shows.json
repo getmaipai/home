@@ -31,7 +31,13 @@
       "empty_state": {
         "type": "empty_state",
         "icon": "mic",
-        "text": "No shows yet. Add one with New show."
+        "text": "No shows yet. Add one with New show.",
+        "action": {
+          "navigate": {
+            "to": "/apps/podcasts/new-show"
+          }
+        },
+        "action_label": "New show"
       }
     }
   ]
