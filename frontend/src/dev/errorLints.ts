@@ -12,6 +12,7 @@ export const EXEMPT: Record<string, string> = {
   "shell/pages/TurnErrorDetails.tsx": "Admin-only raw tool error details indicator.",
   "shell/pages/ChatPage.tsx": "Chat turn failures and shipped error parts are governed by RULES.md.",
   "apps/chat/ChatThread.tsx": "Chat turn errors render through the shipped chat Elements.",
+  "shell/library/LibraryUploads.tsx": "The hub answers an upload with its own plain sentence (for example the storage-full line); the row shows it as the person-facing text.",
   "apps/chat/chatErrorSlot.tsx": "Chat turn errors render through the shipped chat Elements.",
 };
 const SHARED_COMPONENTS = new Set(["src/elements/", "src/ui/", "src/dashboard/components/ui/"]);
