@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-11-09T13:40:15.502Z",
-  "kitTag": "ui-v0.5.554",
+  "generatedAt": "2026-11-09T19:53:54.582Z",
+  "kitTag": "ui-v0.5.559",
   "items": [
     {
       "file": "ActivityCardsShowcase.tsx",
@@ -406,6 +406,14 @@
       "group": "companion",
       "verdict": "support",
       "verdictReason": "The pure state machine behind the companion avatar (priorities, loop points, one-shots); not a visible Element and not used by Home directly.",
+      "implemented": true
+    },
+    {
+      "file": "companion-avatar-motion.ts",
+      "name": "companion-avatar-motion",
+      "group": "companion",
+      "verdict": "support",
+      "verdictReason": "The motion helper behind companion-avatar (idle life and expression timing, TALK work); Home uses it only through that element and passes props.",
       "implemented": true
     },
     {
