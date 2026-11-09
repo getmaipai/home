@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-11-09T03:57:38.466Z",
-  "kitTag": "ui-v0.5.551",
+  "generatedAt": "2026-11-09T12:12:55.015Z",
+  "kitTag": "ui-v0.5.553",
   "items": [
     {
       "file": "ActivityCardsShowcase.tsx",
@@ -1515,7 +1515,7 @@
       "group": "status-card",
       "verdict": "wire-after",
       "verdictReason": "The shared job and problem card (PRO-LOOK-01 section 20); wired by the JOB-01 and ERRORS-01 slices, after the front page.",
-      "implemented": false
+      "implemented": true
     },
     {
       "file": "stopped-run.tsx",

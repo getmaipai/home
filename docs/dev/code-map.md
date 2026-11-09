@@ -159,6 +159,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `frontend/src/apps/settings/ModelsSection.tsx` | ModelsSection, describeHardware |
 | `frontend/src/apps/settings/PerformanceCustomize.tsx` | PerformanceCustomize |
 | `frontend/src/apps/settings/PerformanceSettings.tsx` | PerformanceSettings |
+| `frontend/src/apps/settings/PlainSection.tsx` | PlainSection |
 | `frontend/src/apps/settings/ReferenceLibrarySettings.tsx` | referenceDownload, ReferenceLibrarySettings |
 | `frontend/src/apps/settings/RobotBody.tsx` | bodyHealthText, didPutDownCountIncrease, RobotBody |
 | `frontend/src/apps/settings/RobotCards.tsx` | fetchFamilyBots, familyBotsQueryKey, RobotCards |
@@ -198,7 +199,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `frontend/src/shell/AmbientCompanionPane.tsx` | AMBIENT_QUICK_ACTIONS, ambientQuickActionsForApp, ambientQuickActionPrompt, readAmbientPaneState, isProtectedReply, ambientHistoryItems |
 | `frontend/src/shell/BrowserAlerts.tsx` | shouldShowBrowserAlert, requestBrowserAlertPermission, BrowserAlerts |
 | `frontend/src/shell/GlobalMiniPlayer.tsx` | onPlayPageOf, GlobalMiniPlayer |
-| `frontend/src/shell/InstallDock.tsx` | buildDock, InstallDock |
+| `frontend/src/shell/InstallDock.tsx` | makingJobs, buildDock, InstallDock |
 | `frontend/src/shell/InstallDockRow.tsx` | InstallDockRow |
 | `frontend/src/shell/InstallStrip.tsx` | installTitle, InstallStrip |
 | `frontend/src/shell/MediaHubFrame.tsx` | MediaHubFrame |
@@ -327,7 +328,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `frontend/src/shell/pages/settings/settingsTestKit.tsx` | REGISTRY, makePerson, mockHome |
 | `frontend/src/shell/pages/settings/settingsViews.tsx` | SETTINGS_VIEWS, SettingsView |
 | `frontend/src/shell/pages/status/StatusApps.tsx` | StatusApps |
-| `frontend/src/shell/pages/status/StatusBanner.tsx` | StatusBanner |
+| `frontend/src/shell/pages/status/StatusBanner.tsx` | statusBannerCard |
 | `frontend/src/shell/pages/status/StatusBoard.tsx` | STATUS_BOARD_QUERY_KEY, StatusBoardNotes, StatusMaintenanceBody, MaintenanceDialog, PostNoteControl |
 | `frontend/src/shell/pages/status/StatusComponents.tsx` | engineRows, engineState, formatUptime, StatusLegend, StatusPartsBody |
 | `frontend/src/shell/pages/status/StatusIncident.tsx` | statusIncidentFacts, StatusIncidentBody |
@@ -680,7 +681,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/media/radioHls.ts` | openHlsResource, decodeHlsResource |
 | `backend/src/lib/media/radioIcy.ts` | usableMetaint, parseStreamTitle, IcyDemuxer |
 | `backend/src/lib/media/radioName.ts` | STATION_NAME_MAX, cleanStationName |
-| `backend/src/lib/media/radioRecordings.ts` | startRadioRecording, stopRadioRecording, radioRecordingRows, radioRecordingItem, __resetRadioRecordingsForTests |
+| `backend/src/lib/media/radioRecordings.ts` | startRadioRecording, isRadioRecording, stopRadioRecording, radioRecordingRows, radioRecordingItem, __resetRadioRecordingsForTests |
 | `backend/src/lib/media/radioStream.ts` | MAX_REDIRECTS, CONNECT_TIMEOUT_MS, publicRecordingAddress, MAX_STREAMS_PER_HOME, unplayable, __resetRadioStreamsForTests |
 | `backend/src/lib/media/scan.ts` | DEFAULT_PRUNE_GRACE_MS, probePending, scanRoot, isScanning, syncMediaScanner, startMediaScanner |
 | `backend/src/lib/media/search.ts` | searchMedia |
@@ -1046,7 +1047,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/talent/life.ts` | LIFE_SOURCE, ORIGIN_SCHEMA, TICK_SCHEMA, ORIGIN_PROMPT, TICK_PROMPT, __setTalentLifeCompleterForTests |
 | `backend/src/lib/talent/researcher.ts` | RESEARCH_SOURCE, RESEARCH_PROMPT, RESEARCH_SCHEMA, __setResearchCompleterForTests, __setResearchSearchForTests, __setResearchReferenceForTests |
 | `backend/src/lib/talent/scriptedBriefing.ts` | canScriptBriefing, buildScriptedBriefing |
-| `backend/src/lib/talent/shows.ts` | __setTalentShowCompleterForTests, inventCast, createShow, listShows, getShow, dueShows |
+| `backend/src/lib/talent/shows.ts` | __clearTalentStageCacheForTests, __setTalentShowCompleterForTests, inventCast, createShow, listShows, getShow |
 | `backend/src/lib/talent/studio.ts` | speakableText, splitAtWord, renderLines, layout, mixEpisode |
 | `backend/src/lib/talent/types.ts` | OutlineSchema, LineSchema, SegmentScriptSchema |
 | `backend/src/lib/talent/writer.ts` | TalentWriteError, __setTalentWriterSafetyForTests, __setTalentWriterMinorCheckForTests, OUTLINE_PROMPT, SEGMENT_PROMPT, checkText |
