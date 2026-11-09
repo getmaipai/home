@@ -1,0 +1,15 @@
+/* The weather screen draws every tile and chart on a sky that is always dark
+   (the kit sets --weather-ink to white). The kit's chart parts use the
+   ordinary page tokens (primary, muted, border), which are dark in the light
+   theme and unreadable on the sky. Re-point those tokens to the sky's own ink
+   inside the weather screen only, so every part stays readable in both themes. */
+[data-slot="weather-forecast-page"] [data-slot="weather-location-detail"],
+[data-slot="weather-forecast-page"] [data-slot="weather-tile"] {
+  --card-foreground: var(--weather-ink);
+  --primary: var(--weather-ink);
+  --primary-foreground: var(--weather-clear-night-top);
+  --muted-foreground: color-mix(in oklab, var(--weather-ink), transparent 25%);
+  --muted: color-mix(in oklab, var(--weather-ink), transparent 80%);
+  --border: color-mix(in oklab, var(--weather-ink), transparent 70%);
+  --ring: var(--weather-ink);
+}

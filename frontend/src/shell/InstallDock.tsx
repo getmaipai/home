@@ -159,6 +159,20 @@ export function InstallDock({ admin, read: readProp, readJobs: readJobsProp, ret
   const [open, setOpen] = useState(false);
   const [retryError, setRetryError] = useState<string | null>(null);
   const [announcement, setAnnouncement] = useState("");
+  // The strip sits above the phone bar, never over it: measure the bar (docked, floating or PRO) rather than restyle it from CSS.
+  const [navTop, setNavTop] = useState(0);
+  useEffect(() => {
+    const measure = () => {
+      const nav = document.querySelector('[data-slot="phone-nav"]');
+      const top = nav instanceof HTMLElement && nav.offsetParent !== null ? Math.max(0, window.innerHeight - nav.getBoundingClientRect().top) : 0;
+      setNavTop((previous) => (previous === top ? previous : top));
+    };
+    measure();
+    window.addEventListener("resize", measure);
+    const timer = window.setInterval(measure, 1000);
+    return () => { window.removeEventListener("resize", measure); window.clearInterval(timer); };
+  }, []);
+
 
   const model = buildDock(status, jobs);
   const showing = model.primary !== null;
@@ -196,7 +210,7 @@ export function InstallDock({ admin, read: readProp, readJobs: readJobsProp, ret
   const title = onlyFailed ? (admin ? failureLine(primary) : "Part of your AI did not finish installing") : primary.label;
   const second = onlyFailed ? (admin ? "Open to try again." : "Ask an owner or admin to open Repairs.") : model.line;
   const bar = model.percent;
-  const side = box ? { left: box.left, right: box.right } : { left: 0, right: 0 };
+  const side = { ...(box ? { left: box.left, right: box.right } : { left: 0, right: 0 }), ...(navTop > 0 ? { bottom: navTop } : {}) };
 
   const summary = (
     <>

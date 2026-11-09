@@ -10,15 +10,6 @@
 
 /* Settings switches use the active look's primary token by default. */
 
-/* On a phone the settings column is the whole page when no section is open.
- * It sizes to its rows, so the rest of the shell showed as a blank white box
- * under it. Let the column fill the screen instead. */
-@media (max-width: 1023px) {
-  [data-slot="settings-shell"] > [data-slot="settings-column"] {
-    flex: 1 1 auto;
-  }
-}
-
 /* The page title follows the semantic type scale on a phone (the kit's own
  * 28px token is a desktop size). */
 @media (max-width: 1023px) {

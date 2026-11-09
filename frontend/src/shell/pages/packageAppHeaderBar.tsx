@@ -70,7 +70,7 @@ function PackageAppHeaderCenter() {
   const { header } = state;
   const modes = header?.modes ?? [];
   return (
-    <div className={`flex shrink-0 items-center gap-2 max-md:-ms-4 max-sm:[&_[role=tab]]:px-2.5 max-sm:[&_[role=tab]]:text-[13px] md:absolute md:left-1/2 md:top-1/2 md:w-max md:max-w-lg md:-translate-x-1/2 md:-translate-y-1/2 md:justify-center md:gap-3${state.detail ? " max-sm:hidden" : ""}`} data-testid="app-header-center">
+    <div className={`flex shrink-0 items-center gap-2 max-md:-ms-4 md:absolute md:left-1/2 md:top-1/2 md:w-max md:max-w-lg md:-translate-x-1/2 md:-translate-y-1/2 md:justify-center md:gap-3${state.detail ? " max-sm:hidden" : ""}`} data-testid="app-header-center">
       {header?.search && state.searchTo ? <div className="hidden sm:block"><AppSearch label={state.label} searchTo={state.searchTo} /></div> : null}
       {modes.length > 1 && state.mode ? (
         <Tabs value={state.mode} onValueChange={(value) => state.onMode?.(String(value))}>
@@ -83,17 +83,12 @@ function PackageAppHeaderCenter() {
   );
 }
 
-function PackageAppHeaderBack() {
-  const state = useSyncExternalStore(subscribe, snapshot, snapshot);
-  const navigate = useNavigate();
-  if (!state?.back) return null;
-  const to = state.back;
-  return <Button type="button" variant="ghost" size="icon" className="-ms-1 shrink-0 sm:hidden" data-testid="header-back" aria-label={i18n._({ id: "Back", message: "Back" })} onClick={() => navigateBack(navigate, to)}><ArrowLeftIcon aria-hidden="true" /></Button>;
-}
-
 /** The header's left slot for a package app: the page title, then the centred search and modes. */
 export function PackageAppHeaderLeft() {
-  return <><PackageAppHeaderBack /><PageHeaderTitle /><PackageAppHeaderCenter /></>;
+  const state = useSyncExternalStore(subscribe, snapshot, snapshot);
+  const navigate = useNavigate();
+  const back = state?.back;
+  return <>{back ? <Button type="button" variant="ghost" size="icon" className="shrink-0 sm:hidden" data-testid="header-back" aria-label={i18n._({ id: "Back", message: "Back" })} onClick={() => navigateBack(navigate, back)}><ArrowLeftIcon aria-hidden="true" /></Button> : null}<PageHeaderTitle /><PackageAppHeaderCenter /></>;
 }
 
 export function PackageAppHeaderActions() {
