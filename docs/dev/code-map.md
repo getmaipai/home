@@ -1147,6 +1147,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/videos/editGate.ts` | EDIT_MINOR_LINE, editRefusal, editableClip, clipFileOf, clipMarkOf, ownTrackFile |
 | `backend/src/lib/videos/editPlan.ts` | VIDEO_RESTYLES, restyleBody, MIX_LEVEL_IDS, MIX_LEVELS, DEFAULT_VOICE_LEVEL, DEFAULT_MUSIC_LEVEL |
 | `backend/src/lib/videos/editTool.ts` | EDIT_VIDEO_TOOL_ID, editVideoArgs, NO_CLIP_LINE, WHAT_TO_CHANGE_LINE, NO_STYLE_LINE, NO_PICTURE_LINE |
+| `backend/src/lib/videos/estimate.ts` | ESTIMATE_MIN_SAMPLES, medianMinutes, estimateVideoMinutes |
 | `backend/src/lib/videos/favorites.ts` | favoriteFileIds, isFavoriteFile, setFavoriteFile |
 | `backend/src/lib/videos/feed.ts` | FEED_LIMIT, levelOfJob, feedRowOf, feedRows, feedRowById |
 | `backend/src/lib/videos/jobs.ts` | VIDEO_FAILED_PREFIX, MEMORY_CANCELLED_CODE, plainVideoFailure, getVideoJobFor, doneVideoJobsFor, sourceVideoJob |

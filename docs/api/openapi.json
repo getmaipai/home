@@ -72174,6 +72174,80 @@
         }
       }
     },
+    "/api/videos/estimate": {
+      "get": {
+        "tags": [
+          "Videos"
+        ],
+        "summary": "About how long a clip like this takes in this home",
+        "parameters": [
+          {
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 30
+            },
+            "required": true,
+            "name": "seconds",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "standard",
+                "boost",
+                "max"
+              ],
+              "default": "standard"
+            },
+            "required": false,
+            "name": "tier",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The estimate",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "minutes": {
+                      "type": "number",
+                      "nullable": true,
+                      "description": "Rounded minutes, or null when too few clips like this have been made here."
+                    },
+                    "samples": {
+                      "type": "number"
+                    },
+                    "note": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "minutes",
+                    "samples",
+                    "note"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/videos/animate": {
       "post": {
         "tags": [
