@@ -71,7 +71,7 @@ export function AllAppsPage({ person }: { person: Roster }) {
       </>}
     </li>;
   };
-  const grid = (items: typeof apps, label: string) => <ul data-layout="grid" aria-label={label} className="grid grid-cols-[repeat(auto-fill,minmax(5.5rem,1fr))] gap-x-2 gap-y-3">{items.map(cell)}</ul>;
+  const grid = (items: typeof apps, label: string) => <ul data-layout="grid" aria-label={label} className="grid grid-cols-3 sm:grid-cols-5 lg:grid-cols-8 gap-x-2 gap-y-3">{items.map(cell)}</ul>;
   function onGridKeyDown(event: KeyboardEvent<HTMLElement>) {
     const grid = event.currentTarget.querySelector('[data-layout="grid"]');
     const tiles = [...(grid?.querySelectorAll<HTMLButtonElement>("button[data-launch]") ?? [])];
