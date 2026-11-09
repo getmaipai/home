@@ -179,6 +179,7 @@ const EXEMPT: Record<string, string> = {
   "lib/news/summary.ts": "Key points for a stored article, one per story and age band; a minor's text passes the minor floor, and a child's also the child gate sentence by sentence, before storage and again at release; gives no advice",
   "lib/conversationHistory.ts": "retention summaries kept as records; never sent to the person as a reply",
   "lib/companionLook.ts": "describes a companion's own character picture as a JSON card for its editor; no text reaches a person as a reply",
+  "lib/companionTalkAnchors.ts": "asks the picture reader for the mouth and eye boxes of a companion's own picture as JSON numbers; no text reaches a person as a reply",
   "lib/pictures/ageCheck.ts": "labels a picture as a possible minor in JSON; no text reaches the person, a doubt withholds the picture",
   "lib/pictures/laneGate.ts": "labels a picture child-safe or not in JSON; no text reaches the person, a doubt withholds the picture",
   "lib/robotVision.ts": "describes one robot camera picture in a single sentence kept for 90 seconds as background data in that robot's own turn; it is never shown to the person, and the turn that reads it carries the topic block and passes the output gate",

@@ -5,13 +5,16 @@ import { submitEdit, waitPicture } from "@/lib/pictures/stack";
 type Anchor = { x: number; y: number; w: number; h: number };
 
 export const TALK_SHAPES = {
-  A: "lips pressed flat, closed",
-  B: "slightly open, teeth lightly together",
-  C: "open medium, relaxed, as saying EH",
-  D: "wide open, as saying AH",
-  E: "lips rounded into a small circle with the teeth hidden, as saying the O in go",
+  A: "mouth fully closed, lips together in a small closed smile, no teeth showing",
+  B: "mouth slightly open, a thin gap between the lips, a hint of teeth",
+  C: "mouth open medium, relaxed, as saying EH, upper teeth visible",
+  D: "mouth wide open as saying AH, a tall open oval, teeth and tongue visible",
+  E: "lips rounded into a small circle as saying OH, teeth hidden",
   F: "lips pushed forward and puckered, as saying OO",
 } as const;
+
+/** Appended to every talk edit. It names no beard on purpose: a cartoon face given one grows a moustache. */
+export const TALK_KEEP = "Keep the exact same character, face, skin, hair, art style, colours, lighting and background. Do not add a moustache, beard or any hair on the face.";
 
 export const TALK_EYES = {
   closed: "both eyes gently closed as in a relaxed blink",
@@ -93,10 +96,8 @@ export async function makeTalkPicture(input: {
   const edited = await sharp(result.bytes).flatten({ background: BACKDROP }).resize(g.side, g.side).removeAlpha().raw().toBuffer();
   const localCx = Math.round(g.cx);
   const localCy = Math.round(g.cy);
-  if (!input.eyes) {
-    const base = await sharp(flat).extract(region).removeAlpha().raw().toBuffer();
-    await matchRing(edited, base, g.side, localCx, localCy, Math.round(pasteRx * 1.15), Math.round(pasteRy * 1.15));
-  }
+  const base = await sharp(flat).extract(region).removeAlpha().raw().toBuffer();
+  await matchRing(edited, base, g.side, localCx, localCy, Math.round(pasteRx * 1.15), Math.round(pasteRy * 1.15));
 
   // Feather: a Gaussian whose reach (3 sigma) stays inside the anchor box, so the crop served for the
   // anchor box carries every changed pixel.
@@ -117,27 +118,31 @@ export async function makeTalkPicture(input: {
   return new Uint8Array(await sharp(flat).composite([{ input: piece, left: g.left, top: g.top }]).png().toBuffer());
 }
 
-/** Moves the edited picture's average colour in a ring below the mouth to the rest picture's, in place. */
+/**
+ * Shifts the edited cut-out's colour so it matches the rest picture just outside the edited area. The engine re-encodes the
+ * whole cut-out, which tints it a little; without this a paler disc shows around the mouth. The reference is a thin ring of
+ * untouched pixels all around the edit mask (not only below it), and the shift is the per-channel median difference there, so a
+ * stray hand or strand of hair in the ring cannot pull it.
+ */
 async function matchRing(edited: Buffer, base: Buffer, side: number, cx: number, cy: number, rx: number, ry: number): Promise<void> {
-  const ringSvg = `<svg width="${side}" height="${side}" xmlns="http://www.w3.org/2000/svg"><rect width="100%" height="100%" fill="white"/>` +
-    `<ellipse cx="${cx}" cy="${cy}" rx="${rx + 40}" ry="${ry + 40}" fill="black"/></svg>`;
+  const inner = 1.25;
+  const outer = 1.9;
+  const ringSvg = `<svg width="${side}" height="${side}" xmlns="http://www.w3.org/2000/svg"><rect width="100%" height="100%" fill="black"/>` +
+    `<ellipse cx="${cx}" cy="${cy}" rx="${rx * outer + 6}" ry="${ry * outer + 6}" fill="white"/>` +
+    `<ellipse cx="${cx}" cy="${cy}" rx="${rx * inner + 4}" ry="${ry * inner + 4}" fill="black"/></svg>`;
   const ring = await sharp(Buffer.from(ringSvg)).greyscale().raw().toBuffer();
-  const before = [0, 0, 0];
-  const after = [0, 0, 0];
-  const firstRow = Math.max(0, cy - ry * 2);
-  let count = 0;
+  const diffs: number[][] = [[], [], []];
   for (let p = 0; p < ring.length; p++) {
-    if (ring[p]! <= 127 || Math.floor(p / side) <= firstRow) continue;
-    count++;
-    for (let c = 0; c < 3; c++) {
-      before[c]! += base[p * 3 + c]!;
-      after[c]! += edited[p * 3 + c]!;
-    }
+    if (ring[p]! <= 127) continue;
+    for (let c = 0; c < 3; c++) diffs[c]!.push(base[p * 3 + c]! - edited[p * 3 + c]!);
   }
-  if (!count) return;
+  if (diffs[0]!.length < 50) return;
+  const shift = diffs.map((list) => {
+    list.sort((a, b) => a - b);
+    return list[Math.floor(list.length / 2)]!;
+  });
   for (let p = 0; p < edited.length; p++) {
-    const shift = Math.round(before[p % 3]! / count - after[p % 3]! / count);
-    edited[p] = Math.max(0, Math.min(255, edited[p]! + shift));
+    edited[p] = Math.max(0, Math.min(255, edited[p]! + shift[p % 3]!));
   }
 }
 

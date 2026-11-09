@@ -4,7 +4,7 @@ import type { PersonRow } from "@/types";
 import { ArtWithheldError, requireCompanionPictureOk } from "@/lib/companionArtCheck";
 import { addVersion, deleteVersion, readLook, updateSheet, versionPath } from "@/lib/companionLook";
 import type { CompanionTalk } from "@/lib/companionLook";
-import { makeTalkPicture, TALK_SHAPES, TALK_EYES } from "@/lib/companionTalkMaker";
+import { makeTalkPicture, TALK_SHAPES, TALK_EYES, TALK_KEEP } from "@/lib/companionTalkMaker";
 import { resolveCompanionEdit, promptHash } from "@/lib/companionArt";
 import { pictureDenial, PICTURE_DENIAL_LINE } from "@/lib/pictures/policy";
 import { routeAudience } from "@/lib/pictures/audience";
@@ -48,9 +48,9 @@ export function talkJobFor(id: string, actor: PersonRow, companionId: string): T
 
 function stepInstruction(step: (typeof talkSteps)[number]): string {
   if (step.kind === "eyes") {
-    return `Change only the eyes: ${step.words}. Keep the exact same person, face, skin, lighting and background.`;
+    return `Change only the eyes: ${step.words}. ${TALK_KEEP}`;
   }
-  return `Change only the mouth: ${step.words}. Keep the exact same person, face, skin, beard, lighting and background.`;
+  return `Change only the mouth: ${step.words}. ${TALK_KEEP}`;
 }
 
 /** The same gates as `startLookSheet`: picture policy, prompt screen, engine ready, nothing else running. */
