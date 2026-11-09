@@ -31,6 +31,7 @@ export function usePinnedApps(personId: string): {
   pinned: string[];
   isPinned: (navTo: string) => boolean;
   togglePin: (navTo: string) => void;
+  movePin: (navTo: string, offset: -1 | 1) => void;
   isLoading: boolean;
   isSaving: boolean;
   error: string | null;
@@ -85,5 +86,15 @@ export function usePinnedApps(personId: string): {
     mutation.mutate(isPinned(navTo) ? pinned.filter((id) => id !== navTo) : [...pinned, navTo]);
   }
 
-  return { pinned, isPinned, togglePin, isLoading: query.isLoading, isSaving: savingCount > 0, error: query.isError ? "Could not load your favorites. Refresh to try again." : mutation.isError ? "Could not save your favorites. Please try again." : null };
+  function movePin(navTo: string, offset: -1 | 1): void {
+    if (query.isLoading || savingCount > 0) return;
+    const from = pinned.indexOf(navTo);
+    const to = from + offset;
+    if (from < 0 || to < 0 || to >= pinned.length) return;
+    const next = [...pinned];
+    [next[from], next[to]] = [next[to]!, next[from]!];
+    mutation.mutate(next);
+  }
+
+  return { pinned, isPinned, togglePin, movePin, isLoading: query.isLoading, isSaving: savingCount > 0, error: query.isError ? "Could not load your favorites. Refresh to try again." : mutation.isError ? "Could not save your favorites. Please try again." : null };
 }

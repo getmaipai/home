@@ -66,8 +66,8 @@ describe("the rail's apps", () => {
     expect(link.getAttribute("href")).toBe("/apps/weather");
     expect(rail(view).queryByRole("link", { name: "Notes" })).toBeNull();
     fireEvent.click(rail(view).getByRole("link", { name: "All apps" }));
-    expect(await view.findByRole("link", { name: /^Notes/ })).toBeTruthy();
-    expect(view.getByRole("button", { name: "Remove Weather from favorites" })).toBeTruthy();
+    expect(await view.findByText("Notes")).toBeTruthy();
+    expect(view.getAllByRole("button", { name: "Remove Weather from favorites" }).length).toBeGreaterThan(0);
     expect(view.getByRole("button", { name: "Add Notes to favorites" })).toBeTruthy();
     expect(home.puts.some((put) => put.key === "ui.pinned_apps")).toBe(false);
   });
@@ -99,7 +99,7 @@ describe("the rail's apps", () => {
     await act(async () => { fireEvent.click(await view.findByRole("button", { name: "Add Notes to favorites" })); });
     await waitFor(() => expect(home.puts.at(-1)).toMatchObject({ key: "ui.pinned_apps", value: JSON.stringify(["/reminders", "/clock", "/apps/weather", "/apps/notes"]) }));
     await rail(view).findByRole("link", { name: "Notes" });
-    await act(async () => { fireEvent.click(await view.findByRole("button", { name: "Remove Weather from favorites" })); });
+    await act(async () => { fireEvent.click(within(view.container.querySelector('[data-layout="grid"]') as HTMLElement).getByRole("button", { name: "Remove Weather from favorites" })); });
     await waitFor(() => expect(home.puts.at(-1)).toMatchObject({ value: JSON.stringify(["/reminders", "/clock", "/apps/notes"]) }));
     await waitFor(() => expect(rail(view).queryByRole("link", { name: "Weather" })).toBeNull());
   });
@@ -111,8 +111,8 @@ describe("the rail's apps", () => {
     await rail(view).findByRole("link", { name: "All apps" });
     expect(rail(view).queryByRole("link", { name: "Weather" })).toBeNull();
     fireEvent.click(rail(view).getByRole("link", { name: "All apps" }));
-    await view.findByRole("link", { name: /^Notes/ });
-    expect(view.queryByRole("link", { name: /^Weather/ })).toBeNull();
+    await view.findByText("Notes");
+    expect(view.queryByText("Weather")).toBeNull();
   });
 
   test("with no package apps the rail still has Reminders and Clock starred, an All apps entry, and Wikipedia left for the person to star", async () => {

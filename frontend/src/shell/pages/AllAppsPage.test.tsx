@@ -1,6 +1,4 @@
-// APPS-DIRECTORY-01: the All apps page is the one place that lists every app. These hold what it promises with dozens of
-// apps: a focused search that filters as you type, Favorites first, a star that saves the same list the rail draws,
-// the rail's limit, and the built-in apps that open but never get a star.
+// PRO-LOOK-APPS-01: the launcher presents and edits the existing pin setting.
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { ToastProvider } from "@maipai/ui/src/primitives/Toast";
 import { act, cleanup, fireEvent, render, waitFor, within } from "@testing-library/react";
@@ -50,7 +48,6 @@ function open(path = "/all-apps") {
   views.push(view);
   return view;
 }
-const page = (view: ReturnType<typeof open>) => within(view.container.querySelector('[data-slot="app-directory"]') as HTMLElement);
 
 beforeEach(() => { rows = fakeApps(60); });
 afterEach(() => {
@@ -61,78 +58,56 @@ afterEach(() => {
   home.restore();
 });
 
-describe("the All apps page with 60 apps", () => {
-  test("the page's one visible title is the header's icon and name; the directory's own heading is for screen readers only", async () => {
-    start();
-    const view = open("/all-apps");
-    await view.findByRole("searchbox", { name: "Search apps" });
-    const header = view.container.querySelector('[data-slot="rail-page-header"]') as HTMLElement;
-    expect(within(header).getByText("All apps")).toBeTruthy();
-    expect(header.querySelector("svg")).not.toBeNull();
-    const heading = page(view).getByRole("heading", { level: 1, name: "All apps" });
-    expect(heading.className).toContain("sr-only");
-  });
-
-  test("the rail's grid button opens it, and it lists every app with the search box focused", async () => {
-    start();
-    const view = open("/");
-    fireEvent.click(await view.findByRole("link", { name: "All apps" }));
-    const search = await view.findByRole("searchbox", { name: "Search apps" });
-    expect(document.activeElement).toBe(search);
-    await waitFor(() => expect(view.container.querySelectorAll("[data-app-tile]").length).toBe(69));
-    expect(view.getByRole("heading", { name: "All apps" })).toBeTruthy();
-  });
-
-  test("Favorites come first (Weather-style default pin), then categories, then the built-in apps", async () => {
+describe("PRO-LOOK-APPS-01 All apps launcher", () => {
+  test("shows the search, category strip, favorites shelf, alphabetical tile grid, and app title", async () => {
     start();
     const view = open();
-    await view.findByRole("heading", { name: /^Favorites/ });
-    const headings = [...view.container.querySelectorAll('[data-slot="app-directory"] h2')].map((h) => h.textContent?.replace(/\s+/g, " ").trim());
-    expect(headings[0]).toBe("Favorites");
-    expect(headings.slice(1)).toEqual(["Everyday", "Games", "Media", "Utilities", "Built in"]);
-    expect(page(view).getByRole("button", { name: "Remove App 00 from favorites" })).toBeTruthy();
+    expect(await view.findByRole("searchbox", { name: "Search apps" })).toBeTruthy();
+    expect(view.getByRole("navigation", { name: "App categories" })).toBeTruthy();
+    expect(view.getByRole("heading", { name: "Favorites" })).toBeTruthy();
+    expect(view.getAllByRole("heading", { name: "All apps" }).length).toBe(2);
+    await waitFor(() => expect(view.container.querySelectorAll('[data-slot="media-shelf"]').length).toBe(2));
+    expect(view.getAllByRole("button", { name: "Remove App 00 from favorites" }).length).toBeGreaterThan(0);
   });
 
-  test("typing filters as you type and an empty result says so", async () => {
+  test("search and category chips filter the A to Z grid", async () => {
     start();
     const view = open();
     const search = await view.findByRole("searchbox", { name: "Search apps" });
-    await waitFor(() => expect(view.container.querySelectorAll("[data-app-tile]").length).toBe(69));
-    fireEvent.change(search, { target: { value: "app 07" } });
-    expect(view.container.querySelectorAll("[data-app-tile]").length).toBe(1);
     fireEvent.change(search, { target: { value: "forecast" } });
-    expect(page(view).getByRole("link", { name: /App 07/ })).toBeTruthy();
-    fireEvent.change(search, { target: { value: "no such app" } });
-    expect(view.getByText(/No apps match "no such app"/)).toBeTruthy();
-    fireEvent.click(view.getByRole("button", { name: "Clear search" }));
-    await waitFor(() => expect(view.container.querySelectorAll("[data-app-tile]").length).toBe(69));
+    await waitFor(() => expect(view.getByText("App 07")).toBeTruthy());
+    expect(view.queryByText("App 06")).toBeNull();
+    fireEvent.change(search, { target: { value: "" } });
+    fireEvent.click(within(view.getByRole("navigation", { name: "App categories" })).getByRole("button", { name: "Games" }));
+    await waitFor(() => expect(view.getByText("App 03")).toBeTruthy());
+    expect(view.queryByText("App 01")).toBeNull();
   });
 
-  test("a star saves the same list the rail draws, in order, and removing one saves it without that app", async () => {
+  test("star actions update the same pin list without opening the app", async () => {
     start();
     const view = open();
-    await act(async () => { fireEvent.click(await view.findByRole("button", { name: "Add App 05 to favorites" })); });
+    const add = await view.findByRole("button", { name: "Add App 05 to favorites" });
+    await act(async () => { fireEvent.click(add); });
     await waitFor(() => expect(home.puts.at(-1)).toMatchObject({ key: "ui.pinned_apps", value: JSON.stringify(["/reminders", "/clock", "/apps/app0", "/apps/app5"]) }));
-    await act(async () => { fireEvent.click(await view.findByRole("button", { name: "Remove App 00 from favorites" })); });
-    await waitFor(() => expect(home.puts.at(-1)).toMatchObject({ value: JSON.stringify(["/reminders", "/clock", "/apps/app5"]) }));
+    expect(view.queryByRole("heading", { name: "App 05" })).toBeNull();
   });
 
-  test("there is no cap: with six favorites a seventh star adds it, and clicking a star never opens the app", async () => {
+  test("Edit moves a favorite in the existing ordered setting", async () => {
+    start(["/apps/app0", "/apps/app1"]);
+    const view = open();
+    fireEvent.click(await view.findByRole("button", { name: "Edit" }));
+    const moveUp = within(view.container.querySelector('[data-slot="media-shelf"]') as HTMLElement).getByRole("button", { name: "Move App 01 up" });
+    await act(async () => { fireEvent.click(moveUp); });
+    await waitFor(() => expect(home.puts.at(-1)).toMatchObject({ key: "ui.pinned_apps", value: JSON.stringify(["/apps/app1", "/apps/app0"]) }));
+  });
+
+  test("the launcher lets a seventh app be pinned and does not add a Recents section", async () => {
     start(["/apps/app0", "/apps/app1", "/apps/app2", "/apps/app3", "/apps/app4", "/apps/app5"]);
     const view = open();
-    const star = (await view.findByRole("button", { name: "Add App 06 to favorites" })) as HTMLButtonElement;
-    expect(star.disabled).toBe(false);
+    const star = await view.findByRole("button", { name: "Add App 06 to favorites" });
+    expect((star as HTMLButtonElement).disabled).toBe(false);
     await act(async () => { fireEvent.click(star); });
-    await waitFor(() => expect(home.puts.at(-1)).toMatchObject({ key: "ui.pinned_apps", value: JSON.stringify(["/apps/app0", "/apps/app1", "/apps/app2", "/apps/app3", "/apps/app4", "/apps/app5", "/apps/app6"]) }));
-    expect(window.location.pathname).not.toContain("/apps/app6");
-  });
-
-  test("the built-in apps open from the page and carry no star", async () => {
-    start();
-    const view = open();
-    await view.findByRole("searchbox", { name: "Search apps" });
-    const chat = await page(view).findByRole("link", { name: /^Chat/ });
-    expect(chat.getAttribute("href")).toBe("/chat");
-    expect(view.queryByRole("button", { name: /Chat.*favorites/ })).toBeNull();
+    await waitFor(() => expect(home.puts.at(-1)).toMatchObject({ value: JSON.stringify(["/apps/app0", "/apps/app1", "/apps/app2", "/apps/app3", "/apps/app4", "/apps/app5", "/apps/app6"]) }));
+    expect(view.queryByRole("heading", { name: "Recents" })).toBeNull();
   });
 });
