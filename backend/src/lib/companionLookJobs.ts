@@ -1,3 +1,4 @@
+import { clearCompanionTalkJobs } from "@/lib/companionTalkJobs";
 import { ArtWithheldError, checkCompanionArt, requireCompanionPictureOk } from "@/lib/companionArtCheck";
 import sharp from "sharp";
 import media from "@maipai/spec/vocab/companion-media.json";
@@ -29,7 +30,7 @@ export const LOOK_PROMPT_REQUIRED_LINE = "Write a look prompt first: say what th
 export const LOOK_EDIT_PROMPT_LINE = "Say what to change, then send it.";
 export const LOOK_ENGINE_NOT_READY_LINE = "Picture creation isn't set up yet. An admin can add a picture model in Settings, Pictures and videos.";
 
-function busyLineFor(companionId: string): string {
+export function busyLineFor(companionId: string): string {
   return companionHasFinishingJob(companionId) || companionHasTakeRun(companionId) ? TAKE_RUN_BUSY_LINE : LOOK_JOB_BUSY_LINE;
 }
 
@@ -66,7 +67,6 @@ const SHEET_VIEWS = [
   { slot: "mouth" as const, label: "Mouth open", prompt: "Keep the exact same character and pose, but open the mouth as if speaking. Same colours, same face, same nose, same clothes. Keep a plain solid light grey background." },
 ];
 const sheetJobs = new Map<string, SheetJob>();
-
 /** The character sheet job still being made for this companion, so a second Approve joins it instead of starting another. */
 export function runningSheetJob(companionId: string): string | null {
   const id = activeByCompanion.get(companionId), job = id ? sheetJobs.get(id) : undefined;
@@ -75,7 +75,7 @@ export function runningSheetJob(companionId: string): string | null {
 
 const cutOut = (actor: PersonRow, png: Uint8Array, key: string) => cutOutBackground(png, { remove: (bytes) => removeBackground(actor, bytes), key: { rgb: keyRgb(key), strip: (bytes) => keyOut(bytes, key) } });
 
-export function __clearCompanionLookJobsForTests(): void { jobs.clear(); sheetJobs.clear(); activeByCompanion.clear(); startingCompanions.clear(); }
+export function __clearCompanionLookJobsForTests(): void { jobs.clear(); sheetJobs.clear(); clearCompanionTalkJobs(); activeByCompanion.clear(); startingCompanions.clear(); }
 /** What a picture job is doing for this companion right now, for screens that must not offer a second one. */
 export function activeLookInfo(companionId: string): { kind: "sheet" | "picture"; label: string; percent: number } | null {
   const id = activeByCompanion.get(companionId), job = id ? jobs.get(id) : undefined, sheetJob = id ? sheetJobs.get(id) : undefined;

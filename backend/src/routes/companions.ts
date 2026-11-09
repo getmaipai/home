@@ -24,11 +24,15 @@ import { PERSONAS, reloadPersonas, resolvePersona } from "@/lib/persona";
 import { loadManifestOnly } from "@/lib/plugins";
 import { resolvePackageDir } from "@/lib/packageResolve";
 import { createHouseholdCompanion, copyBundledCompanion, copyHouseholdCompanion, getHouseholdCompanion, updateHouseholdCompanion, saveHouseholdCompanionPersonality, deleteHouseholdCompanion, setHouseholdCompanionAudience, setHouseholdCompanionStatus, householdCompanionAuthorId } from "@/lib/householdCompanions";
-import { addVersion, approveSheet, deleteVersion, readLook, setRest, setSheetCard, setSheetKey, unapproveSheet, versionOriginalPath, versionPath, normalizePicture, uploadLabel } from "@/lib/companionLook";
+import { addVersion, approveSheet, deleteVersion, readLook, setRest, setSheetCard, setSheetKey, unapproveSheet, updateSheet, versionOriginalPath, versionPath, normalizePicture, uploadLabel, TalkRecordSchema } from "@/lib/companionLook";
 import { LOOK_STYLE_IDS, stylesForBand, capOfStyle, type LookStyleId } from "@/lib/companionLookStyles";
 import { LOOK_EDIT_PROMPT_LINE, LOOK_JOB_BUSY_LINE, LOOK_PROMPT_REQUIRED_LINE, activeLookJob, canGenerateLook, cancelLookJob, activeLookInfo, pollLookJob, runningSheetJob, startLookEdit, startLookGeneration, startLookSheet } from "@/lib/companionLookJobs";
 import { fileTypeFromBuffer } from "file-type";
 import { readFileSync, writeFileSync, copyFileSync, mkdirSync, rmSync, existsSync, renameSync } from "node:fs";
+import { detectTalkAnchors, TALK_ANCHORS_UNAVAILABLE } from "@/lib/companionTalkAnchors";
+import type { CompanionTalk } from "@/lib/companionLook";
+import { cutTalkCrop } from "@/lib/companionTalkMaker";
+import { cancelTalkJob, publicTalkJob, startCompanionTalk, talkJobBusy } from "@/lib/companionTalkJobs";
 import { join } from "node:path";
 import { removeBackground, upscale } from "@/lib/imaging/tools";
 import media from "@maipai/spec/vocab/companion-media.json";
@@ -162,12 +166,35 @@ setMembershipRoute("add");
 setMembershipRoute("remove");
 
 const AvatarState = z.object({ loop: z.boolean(), urls: z.object({ h264: z.string().nullable(), av1: z.string().nullable(), still: z.string() }) });
+const avatarTalkAnchor = z.object({ x: z.number(), y: z.number(), w: z.number(), h: z.number() });
+const avatarTalkSchema = z.object({
+  anchor: avatarTalkAnchor,
+  shapes: z.record(z.string(), z.string()),
+  eyes: z.object({ anchor: avatarTalkAnchor, closed: z.string(), half: z.string().optional() }).optional(),
+});
+/** The avatar's `talk` block: present only when approved with all six shapes. The record itself is the etag input. */
+function avatarTalkBlock(companionId: string) {
+  const none = { talk: null, talkVersion: null };
+  try {
+    const record = readLook(companionId).sheet?.talk;
+    if (!record || record.state !== "approved" || !TALK_SHAPE_IDS.every((shape) => record.shapes[shape])) return none;
+    const base = `/api/companions/${encodeURIComponent(companionId)}/talk`;
+    const shapes = Object.fromEntries(TALK_SHAPE_IDS.map((shape) => [shape, `${base}/${shape}`]));
+    const eyes = record.eyes.closed
+      ? { anchor: record.eyes_anchor, closed: `${base}/eyes/closed`, ...(record.eyes.half ? { half: `${base}/eyes/half` } : {}) }
+      : undefined;
+    return { talk: { anchor: record.anchor, shapes, eyes }, talkVersion: record };
+  } catch {
+    return none;
+  }
+}
+
 const avatarRoute = createRoute({
   method: "get", path: "/avatar", tags: ["Companions"], summary: "Read the signed-in person's active video avatar",
   middleware: [requireAuth] as const,
   request: { query: z.object({ companion: z.string().optional().describe("A companion id to read instead of the person's own pick (the chat's pick).") }) },
   responses: {
-    200: { content: { "application/json": { schema: z.object({ avatar: z.object({ id: z.string(), name: z.string(), key: z.string(), version: z.string(), portrait: z.string().nullable().optional(), mouth_still: z.string().nullable(), states: z.record(z.string(), AvatarState) }).nullable() }) } }, description: "The usable active companion's approved animation, or null when it has none." },
+    200: { content: { "application/json": { schema: z.object({ avatar: z.object({ id: z.string(), name: z.string(), key: z.string(), version: z.string(), portrait: z.string().nullable().optional(), mouth_still: z.string().nullable(), talk: avatarTalkSchema.nullable().optional(), states: z.record(z.string(), AvatarState) }).nullable() }) } }, description: "The usable active companion's approved animation, or null when it has none." },
     304: { description: "The animation has not changed." },
     ...errorResponses({ 401: "Not signed in" }),
   },
@@ -183,7 +210,8 @@ companionsRoutes.openapi(avatarRoute, (c) => {
     const look = readLook(persona.id);
     if (look.sheet?.state === "approved") mouthVersion = look.sheet.views.mouth;
   } catch { /* Package companions do not have a household look store. */ }
-  const version = createHash("sha256").update(JSON.stringify({ animation, mouthVersion })).digest("hex").slice(0, 12);
+  const { talk, talkVersion } = avatarTalkBlock(persona.id);
+  const version = createHash("sha256").update(JSON.stringify({ animation, mouthVersion, talkVersion })).digest("hex").slice(0, 12);
   const etag = `"${version}"`;
   const headers = { "cache-control": "private, max-age=0, must-revalidate", etag };
   if (matchesEtag(c.req.header("if-none-match"), etag)) return new Response(null, { status: 304, headers });
@@ -198,10 +226,208 @@ companionsRoutes.openapi(avatarRoute, (c) => {
   }]));
   const portrait = animation.sheet?.rest ? `/api/companions/${encodeURIComponent(persona.id)}/animation/${encodeURIComponent(animation.sheet.rest)}` : null;
   const mouth_still = mouthVersion ? `/api/companions/${encodeURIComponent(persona.id)}/mouth` : null;
-  return c.json({ avatar: { id: persona.id, name: manifest?.companion?.display_name ?? persona.display_name, key: animation.key, version, portrait, mouth_still, states } }, 200, headers);
+  return c.json({ avatar: { id: persona.id, name: manifest?.companion?.display_name ?? persona.display_name, key: animation.key, version, portrait, mouth_still, talk, states } }, 200, headers);
 });
 
 const mouthParams = z.object({ id: z.string().min(1).max(80) });
+const talkAnchor = z.object({ x: z.number().min(0).max(1), y: z.number().min(0).max(1), w: z.number().positive().max(1), h: z.number().positive().max(1) });
+const talkResponse = z.object({ talk: TalkRecordSchema.nullable() });
+const talkError = z.object({ error: z.string() });
+const talkErrorBody = (description: string) => ({ content: { "application/json": { schema: talkError } }, description });
+const TALK_NOT_APPROVED_LINE = "That talk picture is not approved.";
+const TALK_SIX_SHAPES_LINE = "Make all six mouth shapes before approving the talk pictures.";
+const TALK_SHAPE_IDS = ["A", "B", "C", "D", "E", "F"] as const;
+const talkNotApproved = () => Response.json({ error: TALK_NOT_APPROVED_LINE }, { status: 404 });
+const talkCacheHeaders = (etag: string) => ({ etag, "cache-control": "private, max-age=0, must-revalidate" });
+
+const talkStartRoute = createRoute({
+  method: "post",
+  path: "/{id}/look/talk",
+  tags: ["Companions"],
+  summary: "Make talking mouth and eye pictures",
+  middleware: [requireAuth] as const,
+  request: {
+    params: idParamSchema("id", "hc-companion"),
+    body: { content: { "application/json": { schema: z.object({ anchor: talkAnchor.optional(), eyes_anchor: talkAnchor.optional() }) } } },
+  },
+  responses: {
+    202: { content: { "application/json": { schema: z.object({ job: z.string() }) } }, description: "Talk picture job started." },
+    400: talkErrorBody("A rest picture is required."),
+    403: talkErrorBody("Picture making is unavailable."),
+    409: talkErrorBody("Another picture job is running."),
+    422: talkErrorBody("Picture input could not be read."),
+    503: talkErrorBody("Picture engine unavailable."),
+    ...errorResponses({ 401: "Not signed in", 404: "No household companion" }),
+  },
+});
+companionsRoutes.openapi(talkStartRoute, async (c) => {
+  const { id } = c.req.valid("param");
+  const actor = c.get("person");
+  const denied = lookAccess(actor, id);
+  if (denied) return refuseWith(c, denied);
+  const body = c.req.valid("json");
+  let anchors: { anchor: z.infer<typeof talkAnchor>; eyes_anchor: z.infer<typeof talkAnchor> };
+  if (body.anchor && body.eyes_anchor) {
+    anchors = { anchor: body.anchor, eyes_anchor: body.eyes_anchor };
+  } else {
+    const look = readLook(id);
+    const path = look.rest && versionPath(id, look.rest);
+    if (!path) return c.json({ error: "Choose a rest picture before making talk pictures." }, 400);
+    try {
+      const detected = await detectTalkAnchors(new Uint8Array(readFileSync(path)));
+      anchors = { anchor: body.anchor ?? detected.anchor, eyes_anchor: body.eyes_anchor ?? detected.eyes_anchor };
+    } catch {
+      return c.json({ error: TALK_ANCHORS_UNAVAILABLE }, 422);
+    }
+  }
+  try {
+    return c.json({ job: await startCompanionTalk({ actor, companionId: id, anchors }) }, 202);
+  } catch (error) {
+    const status = (error as { status?: 400 | 403 | 409 | 503 }).status ?? 503;
+    return c.json({ error: error instanceof Error ? error.message : "Talk picture job could not start." }, status);
+  }
+});
+
+const talkGetRoute = createRoute({
+  method: "get",
+  path: "/{id}/look/talk",
+  tags: ["Companions"],
+  summary: "Read a companion talk set",
+  middleware: [requireAuth] as const,
+  request: { params: idParamSchema("id", "hc-companion") },
+  responses: {
+    200: { content: { "application/json": { schema: talkResponse } }, description: "The talk set." },
+    ...errorResponses({ 401: "Not signed in", 403: "Only the author or an admin can read this companion's pictures", 404: "No household companion" }),
+  },
+});
+companionsRoutes.openapi(talkGetRoute, (c) => {
+  const { id } = c.req.valid("param");
+  const denied = lookAccess(c.get("person"), id);
+  if (denied) return refuseWith(c, denied);
+  return c.json({ talk: readLook(id).sheet?.talk ?? null }, 200);
+});
+
+const talkAnchorsRoute = createRoute({
+  method: "put",
+  path: "/{id}/look/talk/anchors",
+  tags: ["Companions"],
+  summary: "Set talk picture anchors",
+  middleware: [requireAuth] as const,
+  request: {
+    params: idParamSchema("id", "hc-companion"),
+    body: { content: { "application/json": { schema: z.object({ anchor: talkAnchor, eyes_anchor: talkAnchor }) } } },
+  },
+  responses: {
+    200: { content: { "application/json": { schema: z.object({ talk: TalkRecordSchema }) } }, description: "Talk anchors saved." },
+    400: talkErrorBody("Make the talk pictures first."),
+    ...errorResponses({ 401: "Not signed in", 403: "Only the author or an admin can edit this companion", 404: "No household companion" }),
+  },
+});
+companionsRoutes.openapi(talkAnchorsRoute, (c) => {
+  const { id } = c.req.valid("param");
+  const denied = lookAccess(c.get("person"), id);
+  if (denied) return refuseWith(c, denied);
+  const body = c.req.valid("json");
+  const look = readLook(id);
+  const old = look.sheet?.talk;
+  if (!look.sheet || !old) return c.json({ error: "Make talk pictures before setting their anchors." }, 400);
+  const talk = { ...old, ...body, state: "needs_review" as const, approved_by: undefined, approved_at: undefined };
+  updateSheet(id, { ...look.sheet, talk });
+  return c.json({ talk }, 200);
+});
+
+const talkApproveRoute = (action: "approve" | "unapprove") =>
+  createRoute({
+    method: "post",
+    path: `/{id}/look/talk/${action}`,
+    tags: ["Companions"],
+    summary: `${action} companion talk pictures`,
+    middleware: [requireAuth] as const,
+    request: { params: idParamSchema("id", "hc-companion") },
+    responses: {
+      200: { content: { "application/json": { schema: z.object({ talk: TalkRecordSchema }) } }, description: "Talk review state updated." },
+      400: talkErrorBody("All six mouth shapes are required."),
+      ...errorResponses({ 401: "Not signed in", 403: "Only the author or an admin can edit this companion", 404: "No household companion" }),
+    },
+  });
+companionsRoutes.openapi(talkApproveRoute("approve"), (c) => {
+  const { id } = c.req.valid("param");
+  const actor = c.get("person");
+  const denied = lookAccess(actor, id);
+  if (denied) return refuseWith(c, denied);
+  const look = readLook(id);
+  const talk = look.sheet?.talk;
+  if (!look.sheet || !talk || !TALK_SHAPE_IDS.every((shape) => Boolean(talk.shapes[shape]))) {
+    return c.json({ error: TALK_SIX_SHAPES_LINE }, 400);
+  }
+  const approved = { ...talk, state: "approved" as const, approved_by: actor.displayName, approved_at: new Date().toISOString() };
+  updateSheet(id, { ...look.sheet, talk: approved });
+  return c.json({ talk: approved }, 200);
+});
+companionsRoutes.openapi(talkApproveRoute("unapprove"), (c) => {
+  const { id } = c.req.valid("param");
+  const denied = lookAccess(c.get("person"), id);
+  if (denied) return refuseWith(c, denied);
+  const look = readLook(id);
+  const talk = look.sheet?.talk;
+  if (!look.sheet || !talk) return c.json({ error: "There is no talk set to review." }, 400);
+  const reviewed = { ...talk, state: "needs_review" as const, approved_by: undefined, approved_at: undefined };
+  updateSheet(id, { ...look.sheet, talk: reviewed });
+  return c.json({ talk: reviewed }, 200);
+});
+
+/** Serves one approved talk picture cut to its anchor box (same auth as `/mouth`), or the plain 404 sentence. */
+async function serveTalkCrop(actor: import("@/types").PersonRow, ifNoneMatch: string | undefined, id: string, pick: (talk: CompanionTalk) => { versionId?: string; anchor: z.infer<typeof talkAnchor>; eyes: boolean }) {
+  const persona = PERSONAS.find((candidate) => candidate.id === id);
+  if (!persona || !mayUseCompanion(actor, persona)) return talkNotApproved();
+  const talk = readLook(id).sheet?.talk;
+  if (!talk || talk.state !== "approved") return talkNotApproved();
+  const choice = pick(talk);
+  const path = choice.versionId && versionPath(id, choice.versionId);
+  if (!path) return talkNotApproved();
+  try {
+    const crop = await cutTalkCrop(new Uint8Array(readFileSync(path)), choice.anchor, choice.eyes);
+    const etag = `"${createHash("sha256").update(crop).digest("hex").slice(0, 24)}"`;
+    if (matchesEtag(ifNoneMatch, etag)) return new Response(null, { status: 304, headers: talkCacheHeaders(etag) });
+    return new Response(crop, { headers: { "content-type": "image/png", ...talkCacheHeaders(etag) } });
+  } catch {
+    return talkNotApproved();
+  }
+}
+
+const talkCropRoute = createRoute({
+  method: "get",
+  path: "/{id}/talk/{shape}",
+  tags: ["Companions"],
+  summary: "Read an approved talk mouth crop",
+  middleware: [requireAuth] as const,
+  request: { params: z.object({ id: z.string(), shape: z.enum(TALK_SHAPE_IDS) }) },
+  responses: {
+    200: { content: { "image/png": { schema: z.string().openapi({ format: "binary" }) } }, description: "Talk crop PNG." },
+    ...errorResponses({ 401: "Not signed in", 404: TALK_NOT_APPROVED_LINE }),
+  },
+});
+companionsRoutes.openapi(talkCropRoute, async (c) => {
+  const { id, shape } = c.req.valid("param");
+  return serveTalkCrop(c.get("person"), c.req.header("if-none-match"), id, (talk) => ({ versionId: talk.shapes[shape], anchor: talk.anchor, eyes: false }));
+});
+
+const talkEyesRoute = createRoute({
+  method: "get",
+  path: "/{id}/talk/eyes/{state}",
+  tags: ["Companions"],
+  summary: "Read an approved talk eye crop",
+  middleware: [requireAuth] as const,
+  request: { params: z.object({ id: z.string(), state: z.enum(["closed", "half"]) }) },
+  responses: {
+    200: { content: { "image/png": { schema: z.string().openapi({ format: "binary" }) } }, description: "Talk eye crop PNG." },
+    ...errorResponses({ 401: "Not signed in", 404: TALK_NOT_APPROVED_LINE }),
+  },
+});
+companionsRoutes.openapi(talkEyesRoute, async (c) => {
+  const { id, state } = c.req.valid("param");
+  return serveTalkCrop(c.get("person"), c.req.header("if-none-match"), id, (talk) => ({ versionId: talk.eyes[state], anchor: talk.eyes_anchor, eyes: true }));
+});
 const mouthRoute = createRoute({ method: "get", path: "/{id}/mouth", tags: ["Companions"], summary: "Read an approved companion mouth PNG", middleware: [requireAuth] as const,
   request: { params: mouthParams }, responses: { 200: { content: { "image/png": { schema: z.string().openapi({ format: "binary" }) } }, description: "The approved mouth picture." }, ...errorResponses({ 401: "Not signed in", 404: "That companion has no mouth picture yet." }) } });
 companionsRoutes.openapi(mouthRoute, (c) => {
@@ -574,6 +800,8 @@ function driven(actor: import("@/types").PersonRow, companionId: string, job: st
 }
 companionsRoutes.openapi(pollLookRoute, async (c) => {
   const { id, job } = c.req.valid("param"), denied = lookAccess(c.get("person"), id); if (denied) return refuseWith(c, denied);
+  const talkCard = publicTalkJob(job, c.get("person"), id);
+  if (talkCard) return c.json({ ...talkCard, versions: [] }, 200);
   const result = await readLookJob(job, c.get("person"), id);
   return result ? c.json(result, 200) : c.json({ error: "That picture job could not be found. Start it again." }, 404);
 });
@@ -583,6 +811,7 @@ const cancelLookRoute = createRoute({ method: "delete", path: "/{id}/look/jobs/{
   request: { params: lookJobParam }, responses: { 204: { description: "Picture job stopped." }, ...errorResponses({ 401: "Not signed in", 403: "Only the author or an admin can stop this companion's pictures", 404: "No such companion or job" }) } });
 companionsRoutes.openapi(cancelLookRoute, async (c) => {
   const { id, job } = c.req.valid("param"), denied = lookAccess(c.get("person"), id); if (denied) return refuseWith(c, denied);
+  if (cancelTalkJob(job, c.get("person"), id)) return c.body(null, 204);
   return await cancelLookJob(job, c.get("person"), id) ? c.body(null, 204) : c.json({ error: "That picture job could not be found. Start it again." }, 404);
 });
 

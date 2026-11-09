@@ -13,11 +13,16 @@ import { imagingTargets } from "@/lib/imaging/targets";
 
 const Source = z.enum(["upload", "generated", "edit"]);
 const Version = z.object({ id: z.string().regex(/^v-[0-9]+$/), created_at: z.string().datetime(), source: Source, label: z.string().max(80), width: z.number().int().positive(), height: z.number().int().positive(), from: z.string().nullable(), style: z.string().optional(), steps: z.array(z.string()).optional(), clipped: z.array(z.enum(["left", "right", "top", "bottom"])).optional(), has_original: z.boolean().optional(), model: z.string().nullable().optional(), quality: z.enum(["quick", "detailed"]).nullable().optional(), prompt_hash: z.string().regex(/^[a-f0-9]{64}$/).nullable().optional(), model_reported: z.string().nullable().optional() });
-const Sheet = z.object({ views: z.object({ left: z.string().nullable(), right: z.string().nullable(), mouth: z.string().nullable() }), card: z.object({ text: z.string().max(600), colours: z.array(z.string().regex(/^#[0-9A-F]{6}$/)).max(8), species: z.string().max(60) }).nullable(), key: z.enum([media.key.default, media.key.alternate]), state: z.enum(["empty", "making", "needs_review", "approved"]), approved_by: z.string().nullable(), approved_at: z.string().datetime().nullable() });
+// matches spec animation.mouth anchor (spec 0.1.348)
+export const TalkAnchor = z.object({ x: z.number().min(0).max(1), y: z.number().min(0).max(1), w: z.number().positive().max(1), h: z.number().positive().max(1) });
+export const TalkRecordSchema = z.object({ state: z.enum(["needs_review", "approved"]), maker: z.enum(["crop-edit", "liveportrait"]), anchor: TalkAnchor, eyes_anchor: TalkAnchor, shapes: z.object({ A: z.string().optional(), B: z.string().optional(), C: z.string().optional(), D: z.string().optional(), E: z.string().optional(), F: z.string().optional() }).partial(), eyes: z.object({ closed: z.string().optional(), half: z.string().optional() }), approved_by: z.string().optional(), approved_at: z.string().datetime().optional() });
+const Talk = TalkRecordSchema;
+const Sheet = z.object({ views: z.object({ left: z.string().nullable(), right: z.string().nullable(), mouth: z.string().nullable() }), card: z.object({ text: z.string().max(600), colours: z.array(z.string().regex(/^#[0-9A-F]{6}$/)).max(8), species: z.string().max(60) }).nullable(), key: z.enum([media.key.default, media.key.alternate]), state: z.enum(["empty", "making", "needs_review", "approved"]), approved_by: z.string().nullable(), approved_at: z.string().datetime().nullable(), talk: Talk.optional() });
 export const LookSchema = z.object({ version: z.literal(1), versions: z.array(Version), rest: z.string().nullable(), key: z.enum([media.key.default, media.key.alternate]), sheet: Sheet.nullable().optional() });
 export type LookVersion = z.infer<typeof Version>;
 export type CompanionLook = z.infer<typeof LookSchema>;
 export type CompanionSheet = z.infer<typeof Sheet>;
+export type CompanionTalk = z.infer<typeof Talk>;
 export const EMPTY_LOOK: CompanionLook = { version: 1, versions: [], rest: null, key: media.key.default, sheet: null };
 /** The longest description of a character Home accepts and sends on; the picture engine itself reads about this much and no more. */
 export const PROMPT_MAX_CHARS = 20_000;

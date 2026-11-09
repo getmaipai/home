@@ -79596,6 +79596,83 @@
                           "type": "string",
                           "nullable": true
                         },
+                        "talk": {
+                          "type": "object",
+                          "nullable": true,
+                          "properties": {
+                            "anchor": {
+                              "type": "object",
+                              "properties": {
+                                "x": {
+                                  "type": "number"
+                                },
+                                "y": {
+                                  "type": "number"
+                                },
+                                "w": {
+                                  "type": "number"
+                                },
+                                "h": {
+                                  "type": "number"
+                                }
+                              },
+                              "required": [
+                                "x",
+                                "y",
+                                "w",
+                                "h"
+                              ]
+                            },
+                            "shapes": {
+                              "type": "object",
+                              "additionalProperties": {
+                                "type": "string"
+                              }
+                            },
+                            "eyes": {
+                              "type": "object",
+                              "properties": {
+                                "anchor": {
+                                  "type": "object",
+                                  "properties": {
+                                    "x": {
+                                      "type": "number"
+                                    },
+                                    "y": {
+                                      "type": "number"
+                                    },
+                                    "w": {
+                                      "type": "number"
+                                    },
+                                    "h": {
+                                      "type": "number"
+                                    }
+                                  },
+                                  "required": [
+                                    "x",
+                                    "y",
+                                    "w",
+                                    "h"
+                                  ]
+                                },
+                                "closed": {
+                                  "type": "string"
+                                },
+                                "half": {
+                                  "type": "string"
+                                }
+                              },
+                              "required": [
+                                "anchor",
+                                "closed"
+                              ]
+                            }
+                          },
+                          "required": [
+                            "anchor",
+                            "shapes"
+                          ]
+                        },
                         "states": {
                           "type": "object",
                           "additionalProperties": {
@@ -79655,6 +79732,1296 @@
           },
           "401": {
             "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/companions/{id}/look/talk": {
+      "post": {
+        "tags": [
+          "Companions"
+        ],
+        "summary": "Make talking mouth and eye pictures",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "hc-companion"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "anchor": {
+                    "type": "object",
+                    "properties": {
+                      "x": {
+                        "type": "number",
+                        "minimum": 0,
+                        "maximum": 1
+                      },
+                      "y": {
+                        "type": "number",
+                        "minimum": 0,
+                        "maximum": 1
+                      },
+                      "w": {
+                        "type": "number",
+                        "minimum": 0,
+                        "exclusiveMinimum": true,
+                        "maximum": 1
+                      },
+                      "h": {
+                        "type": "number",
+                        "minimum": 0,
+                        "exclusiveMinimum": true,
+                        "maximum": 1
+                      }
+                    },
+                    "required": [
+                      "x",
+                      "y",
+                      "w",
+                      "h"
+                    ]
+                  },
+                  "eyes_anchor": {
+                    "type": "object",
+                    "properties": {
+                      "x": {
+                        "type": "number",
+                        "minimum": 0,
+                        "maximum": 1
+                      },
+                      "y": {
+                        "type": "number",
+                        "minimum": 0,
+                        "maximum": 1
+                      },
+                      "w": {
+                        "type": "number",
+                        "minimum": 0,
+                        "exclusiveMinimum": true,
+                        "maximum": 1
+                      },
+                      "h": {
+                        "type": "number",
+                        "minimum": 0,
+                        "exclusiveMinimum": true,
+                        "maximum": 1
+                      }
+                    },
+                    "required": [
+                      "x",
+                      "y",
+                      "w",
+                      "h"
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Talk picture job started.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "job": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "job"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "A rest picture is required.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Picture making is unavailable.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No household companion",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Another picture job is running.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Picture input could not be read.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Picture engine unavailable.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "Companions"
+        ],
+        "summary": "Read a companion talk set",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "hc-companion"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The talk set.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "talk": {
+                      "type": "object",
+                      "nullable": true,
+                      "properties": {
+                        "state": {
+                          "type": "string",
+                          "enum": [
+                            "needs_review",
+                            "approved"
+                          ]
+                        },
+                        "maker": {
+                          "type": "string",
+                          "enum": [
+                            "crop-edit",
+                            "liveportrait"
+                          ]
+                        },
+                        "anchor": {
+                          "type": "object",
+                          "properties": {
+                            "x": {
+                              "type": "number",
+                              "minimum": 0,
+                              "maximum": 1
+                            },
+                            "y": {
+                              "type": "number",
+                              "minimum": 0,
+                              "maximum": 1
+                            },
+                            "w": {
+                              "type": "number",
+                              "minimum": 0,
+                              "exclusiveMinimum": true,
+                              "maximum": 1
+                            },
+                            "h": {
+                              "type": "number",
+                              "minimum": 0,
+                              "exclusiveMinimum": true,
+                              "maximum": 1
+                            }
+                          },
+                          "required": [
+                            "x",
+                            "y",
+                            "w",
+                            "h"
+                          ]
+                        },
+                        "eyes_anchor": {
+                          "type": "object",
+                          "properties": {
+                            "x": {
+                              "type": "number",
+                              "minimum": 0,
+                              "maximum": 1
+                            },
+                            "y": {
+                              "type": "number",
+                              "minimum": 0,
+                              "maximum": 1
+                            },
+                            "w": {
+                              "type": "number",
+                              "minimum": 0,
+                              "exclusiveMinimum": true,
+                              "maximum": 1
+                            },
+                            "h": {
+                              "type": "number",
+                              "minimum": 0,
+                              "exclusiveMinimum": true,
+                              "maximum": 1
+                            }
+                          },
+                          "required": [
+                            "x",
+                            "y",
+                            "w",
+                            "h"
+                          ]
+                        },
+                        "shapes": {
+                          "type": "object",
+                          "properties": {
+                            "A": {
+                              "type": "string"
+                            },
+                            "B": {
+                              "type": "string"
+                            },
+                            "C": {
+                              "type": "string"
+                            },
+                            "D": {
+                              "type": "string"
+                            },
+                            "E": {
+                              "type": "string"
+                            },
+                            "F": {
+                              "type": "string"
+                            }
+                          }
+                        },
+                        "eyes": {
+                          "type": "object",
+                          "properties": {
+                            "closed": {
+                              "type": "string"
+                            },
+                            "half": {
+                              "type": "string"
+                            }
+                          }
+                        },
+                        "approved_by": {
+                          "type": "string"
+                        },
+                        "approved_at": {
+                          "type": "string",
+                          "format": "date-time"
+                        }
+                      },
+                      "required": [
+                        "state",
+                        "maker",
+                        "anchor",
+                        "eyes_anchor",
+                        "shapes",
+                        "eyes"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "talk"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Only the author or an admin can read this companion's pictures",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No household companion",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/companions/{id}/look/talk/anchors": {
+      "put": {
+        "tags": [
+          "Companions"
+        ],
+        "summary": "Set talk picture anchors",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "hc-companion"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "anchor": {
+                    "type": "object",
+                    "properties": {
+                      "x": {
+                        "type": "number",
+                        "minimum": 0,
+                        "maximum": 1
+                      },
+                      "y": {
+                        "type": "number",
+                        "minimum": 0,
+                        "maximum": 1
+                      },
+                      "w": {
+                        "type": "number",
+                        "minimum": 0,
+                        "exclusiveMinimum": true,
+                        "maximum": 1
+                      },
+                      "h": {
+                        "type": "number",
+                        "minimum": 0,
+                        "exclusiveMinimum": true,
+                        "maximum": 1
+                      }
+                    },
+                    "required": [
+                      "x",
+                      "y",
+                      "w",
+                      "h"
+                    ]
+                  },
+                  "eyes_anchor": {
+                    "type": "object",
+                    "properties": {
+                      "x": {
+                        "type": "number",
+                        "minimum": 0,
+                        "maximum": 1
+                      },
+                      "y": {
+                        "type": "number",
+                        "minimum": 0,
+                        "maximum": 1
+                      },
+                      "w": {
+                        "type": "number",
+                        "minimum": 0,
+                        "exclusiveMinimum": true,
+                        "maximum": 1
+                      },
+                      "h": {
+                        "type": "number",
+                        "minimum": 0,
+                        "exclusiveMinimum": true,
+                        "maximum": 1
+                      }
+                    },
+                    "required": [
+                      "x",
+                      "y",
+                      "w",
+                      "h"
+                    ]
+                  }
+                },
+                "required": [
+                  "anchor",
+                  "eyes_anchor"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Talk anchors saved.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "talk": {
+                      "type": "object",
+                      "properties": {
+                        "state": {
+                          "type": "string",
+                          "enum": [
+                            "needs_review",
+                            "approved"
+                          ]
+                        },
+                        "maker": {
+                          "type": "string",
+                          "enum": [
+                            "crop-edit",
+                            "liveportrait"
+                          ]
+                        },
+                        "anchor": {
+                          "type": "object",
+                          "properties": {
+                            "x": {
+                              "type": "number",
+                              "minimum": 0,
+                              "maximum": 1
+                            },
+                            "y": {
+                              "type": "number",
+                              "minimum": 0,
+                              "maximum": 1
+                            },
+                            "w": {
+                              "type": "number",
+                              "minimum": 0,
+                              "exclusiveMinimum": true,
+                              "maximum": 1
+                            },
+                            "h": {
+                              "type": "number",
+                              "minimum": 0,
+                              "exclusiveMinimum": true,
+                              "maximum": 1
+                            }
+                          },
+                          "required": [
+                            "x",
+                            "y",
+                            "w",
+                            "h"
+                          ]
+                        },
+                        "eyes_anchor": {
+                          "type": "object",
+                          "properties": {
+                            "x": {
+                              "type": "number",
+                              "minimum": 0,
+                              "maximum": 1
+                            },
+                            "y": {
+                              "type": "number",
+                              "minimum": 0,
+                              "maximum": 1
+                            },
+                            "w": {
+                              "type": "number",
+                              "minimum": 0,
+                              "exclusiveMinimum": true,
+                              "maximum": 1
+                            },
+                            "h": {
+                              "type": "number",
+                              "minimum": 0,
+                              "exclusiveMinimum": true,
+                              "maximum": 1
+                            }
+                          },
+                          "required": [
+                            "x",
+                            "y",
+                            "w",
+                            "h"
+                          ]
+                        },
+                        "shapes": {
+                          "type": "object",
+                          "properties": {
+                            "A": {
+                              "type": "string"
+                            },
+                            "B": {
+                              "type": "string"
+                            },
+                            "C": {
+                              "type": "string"
+                            },
+                            "D": {
+                              "type": "string"
+                            },
+                            "E": {
+                              "type": "string"
+                            },
+                            "F": {
+                              "type": "string"
+                            }
+                          }
+                        },
+                        "eyes": {
+                          "type": "object",
+                          "properties": {
+                            "closed": {
+                              "type": "string"
+                            },
+                            "half": {
+                              "type": "string"
+                            }
+                          }
+                        },
+                        "approved_by": {
+                          "type": "string"
+                        },
+                        "approved_at": {
+                          "type": "string",
+                          "format": "date-time"
+                        }
+                      },
+                      "required": [
+                        "state",
+                        "maker",
+                        "anchor",
+                        "eyes_anchor",
+                        "shapes",
+                        "eyes"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "talk"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Make the talk pictures first.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Only the author or an admin can edit this companion",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No household companion",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/companions/{id}/look/talk/approve": {
+      "post": {
+        "tags": [
+          "Companions"
+        ],
+        "summary": "approve companion talk pictures",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "hc-companion"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Talk review state updated.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "talk": {
+                      "type": "object",
+                      "properties": {
+                        "state": {
+                          "type": "string",
+                          "enum": [
+                            "needs_review",
+                            "approved"
+                          ]
+                        },
+                        "maker": {
+                          "type": "string",
+                          "enum": [
+                            "crop-edit",
+                            "liveportrait"
+                          ]
+                        },
+                        "anchor": {
+                          "type": "object",
+                          "properties": {
+                            "x": {
+                              "type": "number",
+                              "minimum": 0,
+                              "maximum": 1
+                            },
+                            "y": {
+                              "type": "number",
+                              "minimum": 0,
+                              "maximum": 1
+                            },
+                            "w": {
+                              "type": "number",
+                              "minimum": 0,
+                              "exclusiveMinimum": true,
+                              "maximum": 1
+                            },
+                            "h": {
+                              "type": "number",
+                              "minimum": 0,
+                              "exclusiveMinimum": true,
+                              "maximum": 1
+                            }
+                          },
+                          "required": [
+                            "x",
+                            "y",
+                            "w",
+                            "h"
+                          ]
+                        },
+                        "eyes_anchor": {
+                          "type": "object",
+                          "properties": {
+                            "x": {
+                              "type": "number",
+                              "minimum": 0,
+                              "maximum": 1
+                            },
+                            "y": {
+                              "type": "number",
+                              "minimum": 0,
+                              "maximum": 1
+                            },
+                            "w": {
+                              "type": "number",
+                              "minimum": 0,
+                              "exclusiveMinimum": true,
+                              "maximum": 1
+                            },
+                            "h": {
+                              "type": "number",
+                              "minimum": 0,
+                              "exclusiveMinimum": true,
+                              "maximum": 1
+                            }
+                          },
+                          "required": [
+                            "x",
+                            "y",
+                            "w",
+                            "h"
+                          ]
+                        },
+                        "shapes": {
+                          "type": "object",
+                          "properties": {
+                            "A": {
+                              "type": "string"
+                            },
+                            "B": {
+                              "type": "string"
+                            },
+                            "C": {
+                              "type": "string"
+                            },
+                            "D": {
+                              "type": "string"
+                            },
+                            "E": {
+                              "type": "string"
+                            },
+                            "F": {
+                              "type": "string"
+                            }
+                          }
+                        },
+                        "eyes": {
+                          "type": "object",
+                          "properties": {
+                            "closed": {
+                              "type": "string"
+                            },
+                            "half": {
+                              "type": "string"
+                            }
+                          }
+                        },
+                        "approved_by": {
+                          "type": "string"
+                        },
+                        "approved_at": {
+                          "type": "string",
+                          "format": "date-time"
+                        }
+                      },
+                      "required": [
+                        "state",
+                        "maker",
+                        "anchor",
+                        "eyes_anchor",
+                        "shapes",
+                        "eyes"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "talk"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "All six mouth shapes are required.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Only the author or an admin can edit this companion",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No household companion",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/companions/{id}/look/talk/unapprove": {
+      "post": {
+        "tags": [
+          "Companions"
+        ],
+        "summary": "unapprove companion talk pictures",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "hc-companion"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Talk review state updated.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "talk": {
+                      "type": "object",
+                      "properties": {
+                        "state": {
+                          "type": "string",
+                          "enum": [
+                            "needs_review",
+                            "approved"
+                          ]
+                        },
+                        "maker": {
+                          "type": "string",
+                          "enum": [
+                            "crop-edit",
+                            "liveportrait"
+                          ]
+                        },
+                        "anchor": {
+                          "type": "object",
+                          "properties": {
+                            "x": {
+                              "type": "number",
+                              "minimum": 0,
+                              "maximum": 1
+                            },
+                            "y": {
+                              "type": "number",
+                              "minimum": 0,
+                              "maximum": 1
+                            },
+                            "w": {
+                              "type": "number",
+                              "minimum": 0,
+                              "exclusiveMinimum": true,
+                              "maximum": 1
+                            },
+                            "h": {
+                              "type": "number",
+                              "minimum": 0,
+                              "exclusiveMinimum": true,
+                              "maximum": 1
+                            }
+                          },
+                          "required": [
+                            "x",
+                            "y",
+                            "w",
+                            "h"
+                          ]
+                        },
+                        "eyes_anchor": {
+                          "type": "object",
+                          "properties": {
+                            "x": {
+                              "type": "number",
+                              "minimum": 0,
+                              "maximum": 1
+                            },
+                            "y": {
+                              "type": "number",
+                              "minimum": 0,
+                              "maximum": 1
+                            },
+                            "w": {
+                              "type": "number",
+                              "minimum": 0,
+                              "exclusiveMinimum": true,
+                              "maximum": 1
+                            },
+                            "h": {
+                              "type": "number",
+                              "minimum": 0,
+                              "exclusiveMinimum": true,
+                              "maximum": 1
+                            }
+                          },
+                          "required": [
+                            "x",
+                            "y",
+                            "w",
+                            "h"
+                          ]
+                        },
+                        "shapes": {
+                          "type": "object",
+                          "properties": {
+                            "A": {
+                              "type": "string"
+                            },
+                            "B": {
+                              "type": "string"
+                            },
+                            "C": {
+                              "type": "string"
+                            },
+                            "D": {
+                              "type": "string"
+                            },
+                            "E": {
+                              "type": "string"
+                            },
+                            "F": {
+                              "type": "string"
+                            }
+                          }
+                        },
+                        "eyes": {
+                          "type": "object",
+                          "properties": {
+                            "closed": {
+                              "type": "string"
+                            },
+                            "half": {
+                              "type": "string"
+                            }
+                          }
+                        },
+                        "approved_by": {
+                          "type": "string"
+                        },
+                        "approved_at": {
+                          "type": "string",
+                          "format": "date-time"
+                        }
+                      },
+                      "required": [
+                        "state",
+                        "maker",
+                        "anchor",
+                        "eyes_anchor",
+                        "shapes",
+                        "eyes"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "talk"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "All six mouth shapes are required.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Only the author or an admin can edit this companion",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No household companion",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/companions/{id}/talk/{shape}": {
+      "get": {
+        "tags": [
+          "Companions"
+        ],
+        "summary": "Read an approved talk mouth crop",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "A",
+                "B",
+                "C",
+                "D",
+                "E",
+                "F"
+              ]
+            },
+            "required": true,
+            "name": "shape",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Talk crop PNG.",
+            "content": {
+              "image/png": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "That talk picture is not approved.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/companions/{id}/talk/eyes/{state}": {
+      "get": {
+        "tags": [
+          "Companions"
+        ],
+        "summary": "Read an approved talk eye crop",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "closed",
+                "half"
+              ]
+            },
+            "required": true,
+            "name": "state",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Talk eye crop PNG.",
+            "content": {
+              "image/png": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "That talk picture is not approved.",
             "content": {
               "application/json": {
                 "schema": {
