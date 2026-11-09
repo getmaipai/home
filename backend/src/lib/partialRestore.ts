@@ -144,8 +144,8 @@ export async function restorePersonFromBackup(filename: string, personId: string
         const restoredMemoryIds = sqlite
           .query(
             `INSERT OR IGNORE INTO memory_records
-               (id, record_kind, text, category, tier, status, scope, person, source, importance, pinned, sensitive, uses, created_at, last_used_at, valid_from, valid_to, expired_at, superseded_by, embedding_space, hlc, deleted_at)
-             SELECT id, record_kind, text, category, tier, status, scope, person, source, importance, pinned, sensitive, uses, created_at, last_used_at, valid_from, valid_to, expired_at, superseded_by, NULL, ?, deleted_at
+               (id, record_kind, text, category, tier, status, scope, person, companion_id, subject_id, source, fact_confidence, confidence_evidence, conflicts_with, importance, pinned, sensitive, offer_withheld, archived_reason, child_disclosure, child_disclosure_set_by, child_disclosure_set_at, uses, created_at, last_used_at, valid_from, valid_to, expired_at, superseded_by, embedding_space, hlc, deleted_at, device_id, created_by)
+             SELECT id, record_kind, text, category, tier, status, scope, person, companion_id, subject_id, source, fact_confidence, confidence_evidence, conflicts_with, importance, pinned, sensitive, offer_withheld, archived_reason, child_disclosure, child_disclosure_set_by, child_disclosure_set_at, uses, created_at, last_used_at, valid_from, valid_to, expired_at, superseded_by, NULL, ?, deleted_at, device_id, created_by
              FROM restore_src.memory_records WHERE scope = 'person' AND person = ?
              RETURNING id`,
           )

@@ -1279,11 +1279,30 @@ export const TOMBSTONE_TEXT = "[forgotten]";
 
 /** Apply the durable erasure shape to one record. The id, tombstone time,
  * and fresh HLC remain so synced devices cannot restore the erased row. */
-export function tombstoneMemoryRecord(id: string, at = new Date().toISOString()): void {
+function tombstoneMemoryRecordInTransaction(id: string, at: string): void {
   sqlite.query("UPDATE memory_records SET status = 'archived', archived_reason = 'forgotten', text = ?, embedding_space = NULL, deleted_at = ?, source = '', confidence_evidence = '[]', subject_id = NULL, conflicts_with = '[]', hlc = ? WHERE id = ?")
     .run(TOMBSTONE_TEXT, at, nextHlc(), id);
   sqlite.query("DELETE FROM memory_embeddings WHERE memory_id = ?").run(id);
   sqlite.query("DELETE FROM pending_embeddings WHERE memory_id = ?").run(id);
+  sqlite.query("DELETE FROM pending_memory_work WHERE memory_id = ?").run(id);
+  // memory_records.device_id has ON DELETE CASCADE. Retain the binding on
+  // the tombstone itself so device revocation cannot erase the sync marker.
+  sqlite.query("UPDATE memory_records SET device_id = NULL WHERE id = ? AND deleted_at IS NOT NULL").run(id);
+}
+
+const tombstoneMemoryRecordTransaction = sqlite.transaction((id: string, at: string) => tombstoneMemoryRecordInTransaction(id, at));
+
+/** Apply the durable erasure shape to one record. Safe inside or outside a
+ * larger SQLite transaction; related work queues and vectors are cleared
+ * with the row so no retry can rehydrate erased content. */
+export function tombstoneMemoryRecord(id: string, at = new Date().toISOString()): void {
+  tombstoneMemoryRecordTransaction(id, at);
+}
+
+/** Tombstone a set selected by a trusted lifecycle predicate. Caller owns
+ * the surrounding transaction when this is part of a larger deletion. */
+export function tombstoneMemoryRecords(ids: string[], at = new Date().toISOString()): void {
+  for (const id of ids) tombstoneMemoryRecordInTransaction(id, at);
 }
 
 /** The deliberate erasure right (2.2's privacy architecture:

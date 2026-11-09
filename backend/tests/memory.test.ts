@@ -6,7 +6,7 @@ import { __resetThrottleForTests } from "@/lib/secretThrottle";
 import { eq, and, isNull } from "drizzle-orm";
 import { db, sqlite } from "@/db";
 import { memoryRecords, memoryEmbeddings, pendingEmbeddings, pendingMemoryWork, people } from "@/db/schema";
-import { recall, remember, list, validAt, supersede, bumpUsage, drainPendingEmbeddings, runMaintenance, demoteNeverRecalledDurables, repairWronglyArchivedDurables, eventWithinGrace, PROFILE_SOURCE, ENTITY_MIN_COSINE, ENTITY_BOOST, STATE_EXPIRY_DAYS, EVENT_GRACE_DAYS } from "@/lib/memory";
+import { recall, remember, list, validAt, supersede, bumpUsage, drainPendingEmbeddings, runMaintenance, demoteNeverRecalledDurables, repairWronglyArchivedDurables, eventWithinGrace, PROFILE_SOURCE, ENTITY_MIN_COSINE, ENTITY_BOOST, STATE_EXPIRY_DAYS, EVENT_GRACE_DAYS, forgetByIds } from "@/lib/memory";
 import { buildProfileCard } from "@/lib/memoryProfile";
 import { ingestMemory, supersedeMemory, drainPendingWork } from "@/lib/memoryIngestion";
 import { CREDENTIAL_SAFE_MESSAGE } from "@/lib/memoryContentPolicy";
@@ -15,6 +15,9 @@ import { compareHlc } from "@/lib/hlc";
 import type { PersonRow, MemoryRecordRow } from "@/types";
 import { issueDeviceToken } from "@/lib/deviceTokens";
 import { injectVector } from "./fixtures/injectVector";
+import { createHouseholdCompanion, deleteHouseholdCompanion } from "@/lib/householdCompanions";
+import { deleteDevice } from "@/lib/devices";
+import { loadManifestOnly } from "@/lib/plugins";
 
 beforeEach(() => {
   resetDb();
@@ -41,6 +44,40 @@ async function ownerAndChildRows(): Promise<{ ownerRow: PersonRow; childId: stri
 }
 
 describe("POST /api/memory (remember)", () => {
+  test("deleting a companion tombstones its records and embeddings only", async () => {
+    const { ownerRow } = await ownerAndChildRows();
+    const fixture = loadManifestOnly("rivet");
+    if (!fixture.ok || !fixture.value.companion) throw new Error("companion fixture missing");
+    const companion = createHouseholdCompanion({ ...fixture.value.companion, display_name: "Memory cleanup" }, { display_name: "Sage" });
+    if (!companion.ok) throw new Error(companion.error);
+    const record = db.insert(memoryRecords).values({ id: "mem-companion-delete", recordKind: "memory", text: "life beat", category: "fact", tier: "durable", status: "active", scope: "companion", person: null, companionId: companion.value.id, source: "test", importance: 0.8, createdAt: new Date().toISOString(), lastUsedAt: new Date().toISOString(), embeddingSpace: "stub", hlc: nextHlc() }).run();
+    db.insert(memoryEmbeddings).values({ memoryId: "mem-companion-delete", space: "stub", dims: 1, vector: Buffer.from(new Float32Array([1]).buffer), hlc: nextHlc(), preprocess: "v1" }).run();
+    db.insert(memoryRecords).values({ id: "mem-other-companion", recordKind: "memory", text: "other beat", category: "fact", tier: "durable", status: "active", scope: "companion", companionId: "hc-other", source: "test", importance: 0.8, createdAt: new Date().toISOString(), lastUsedAt: new Date().toISOString(), hlc: nextHlc() }).run();
+    db.insert(memoryEmbeddings).values({ memoryId: "mem-other-companion", space: "stub", dims: 1, vector: Buffer.from(new Float32Array([1]).buffer), hlc: nextHlc(), preprocess: "v1" }).run();
+    expect(deleteHouseholdCompanion(companion.value.id)).toBe(true);
+    expect(db.select().from(memoryRecords).where(eq(memoryRecords.id, "mem-companion-delete")).get()).toMatchObject({ status: "archived", text: "[forgotten]" });
+    expect(db.select().from(memoryEmbeddings).where(eq(memoryEmbeddings.memoryId, "mem-companion-delete")).get()).toBeUndefined();
+    expect(db.select().from(memoryRecords).where(eq(memoryRecords.id, "mem-other-companion")).get()?.status).toBe("active");
+    expect(db.select().from(memoryEmbeddings).where(eq(memoryEmbeddings.memoryId, "mem-other-companion")).get()).toBeDefined();
+  });
+
+  test("deleting a device tombstones its bound memories", async () => {
+    const { ownerRow } = await ownerAndChildRows();
+    const device = issueDeviceToken(ownerRow.id, "robot", "Forgetful robot");
+    db.insert(memoryRecords).values({ id: "mem-device-delete", recordKind: "memory", text: "robot fact", category: "fact", tier: "durable", status: "active", scope: "household", person: null, deviceId: device.deviceId, source: "test", importance: 0.8, createdAt: new Date().toISOString(), lastUsedAt: new Date().toISOString(), hlc: nextHlc() }).run();
+    expect(deleteDevice(device.deviceId, ownerRow.id)).toBe(true);
+    expect(db.select().from(memoryRecords).where(eq(memoryRecords.id, "mem-device-delete")).get()).toMatchObject({ status: "archived", text: "[forgotten]" });
+  });
+
+  test("deleting a person tombstones household memories bound to their robot", async () => {
+    const { owner } = await ownerAndChild();
+    const child = db.select().from(people).where(eq(people.displayName, "Bramble")).get()!;
+    const device = issueDeviceToken(child.id, "robot", "Bramble bot");
+    db.insert(memoryRecords).values({ id: "mem-person-device-delete", recordKind: "memory", text: "bound fact", category: "fact", tier: "durable", status: "active", scope: "household", person: null, deviceId: device.deviceId, source: "test", importance: 0.8, createdAt: new Date().toISOString(), lastUsedAt: new Date().toISOString(), hlc: nextHlc() }).run();
+    const response = await owner.request(`/api/people/${child.id}`, { method: "DELETE" });
+    expect(response.status).toBe(200);
+    expect(db.select().from(memoryRecords).where(eq(memoryRecords.id, "mem-person-device-delete")).get()).toMatchObject({ status: "archived", text: "[forgotten]" });
+  });
   test("remember defaults child disclosure and accepts adult-only override", async () => {
     const { ownerRow } = await ownerAndChildRows();
     const ordinary = remember(ownerRow, { text: "we got a puppy", category: "thing", tier: "durable", scope: "household", source: "test", importance: 0.5 });

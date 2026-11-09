@@ -12,6 +12,9 @@ import { logTurn, resolveOrCreateConversation } from "@/lib/conversationHistory"
 import { setValue } from "@/lib/settings";
 import { sqlite, db } from "@/db";
 import { pendingEmbeddings } from "@/db/schema";
+import { newMemoryRecordId } from "@/lib/memoryId";
+import { nextHlc } from "@/lib/hlc";
+import { issueDeviceToken } from "@/lib/deviceTokens";
 import { backupDir } from "@/lib/paths";
 import type { PersonRow } from "@/types";
 import type { TurnValue } from "@/wire";
@@ -41,6 +44,21 @@ function toPersonRow(id: string): PersonRow {
 }
 
 describe("restorePersonFromBackup()", () => {
+  test("preserves companion and device bindings in restored memory rows", async () => {
+    const owner = new TestClient();
+    await owner.post("/api/auth/setup", { displayName: "Sage", secret: "correcthorse" });
+    const personRes = await owner.post("/api/people", { displayName: "Bramble", role: "teen" });
+    const person = (await personRes.json()) as { id: string };
+    const device = issueDeviceToken(person.id, "robot", "Memory bot");
+    const id = newMemoryRecordId("memory");
+    const now = new Date().toISOString();
+    sqlite.query(`INSERT INTO memory_records (id, record_kind, text, category, tier, status, scope, person, companion_id, device_id, source, importance, created_at, last_used_at, hlc) VALUES (?, 'memory', 'bound fact', 'fact', 'durable', 'active', 'person', ?, 'hc-rivet', ?, 'test', 0.7, ?, ?, ?)`).run(id, person.id, device.deviceId, now, now, nextHlc());
+    const backup = await runBackup();
+    sqlite.query("DELETE FROM memory_records WHERE id = ?").run(id);
+    await restorePersonFromBackup(backup.filename, person.id);
+    expect(sqlite.query("SELECT companion_id, device_id FROM memory_records WHERE id = ?").get(id)).toEqual({ companion_id: "hc-rivet", device_id: device.deviceId });
+  });
+
   test("brings back memories, conversation history and settings, then loses everything live, then restores it", async () => {
     const owner = new TestClient();
     await owner.post("/api/auth/setup", { displayName: "Sage", secret: "correcthorse" });

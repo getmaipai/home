@@ -6,6 +6,8 @@ import { listPackageIds, loadManifestOnly } from "@/lib/plugins";
 import { deleteLook } from "@/lib/companionLook";
 import type { Synth } from "@maipai/spec/gen/ts/synth.js";
 import { nextHlc } from "@/lib/hlc";
+import { sqlite } from "@/db";
+import { tombstoneMemoryRecords } from "@/lib/memory";
 
 function root(): string { return join(process.env.MAIPAI_DATA_DIR || dataDir, "companions"); }
 type Companion = NonNullable<Manifest["companion"]>;
@@ -150,7 +152,16 @@ export function saveHouseholdCompanionPersonality(id: string, patch: Partial<Com
 }
 export function deleteHouseholdCompanion(id: string): boolean {
   const dir = folder(id); if (!dir || !read(id)) return false;
-  try { deleteLook(id); rmSync(dir, { recursive: true, force: true }); return true; } catch { return false; }
+  try {
+    const remove = sqlite.transaction(() => {
+      const rows = sqlite.query("SELECT id FROM memory_records WHERE scope = 'companion' AND companion_id = ? AND status = 'active'").all(id) as Array<{ id: string }>;
+      tombstoneMemoryRecords(rows.map((row) => row.id));
+      deleteLook(id);
+      rmSync(dir, { recursive: true, force: true });
+    });
+    remove();
+    return true;
+  } catch { return false; }
 }
 export function copyBundledCompanion(bundledId: string, author: CompanionAuthor, options: CompanionCopyOptions = {}): { ok: true; value: Manifest } | { ok: false; error: string } {
   const loaded = loadManifestOnly(bundledId);

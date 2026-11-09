@@ -4,13 +4,14 @@
 // device management feature on its own - just the record shape Wave 3's
 // link will pair a robot into, laid now because device tokens and Quick
 // Connect both need somewhere to hang a name/kind/area.
-import { and, eq, inArray, ne } from "drizzle-orm";
-import { db } from "@/db";
-import { devices, deviceTokens, sessions, memoryRecords, memoryEmbeddings, pendingEmbeddings, pendingMemoryWork } from "@/db/schema";
+import { and, eq, ne } from "drizzle-orm";
+import { db, sqlite } from "@/db";
+import { devices, deviceTokens, sessions } from "@/db/schema";
 import { newDeviceId } from "@/lib/id";
 import { nextHlc } from "@/lib/hlc";
 import { deleteReceivedBackupsForDevice } from "@/lib/receivedBackups";
 import { invalidateSessionCacheForPerson } from "@/middleware/auth";
+import { tombstoneMemoryRecords } from "@/lib/memory";
 
 export type DeviceKind = "robot" | "pod" | "tv" | "phone" | "desktop" | "browser";
 
@@ -155,40 +156,36 @@ export function listDevicesByKind(kind: DeviceKind): Device[] {
 export function deleteDevice(id: string, personId: string): boolean {
   const row = db.select({ personId: devices.personId }).from(devices).where(eq(devices.id, id)).get();
   if (!row || row.personId !== personId) return false;
-  db.delete(deviceTokens).where(eq(deviceTokens.deviceId, id)).run();
-  // Step 8: received_backups.device_id references this row with no
-  // cascade - a code review (2026-09-06) found the delete below throwing
-  // a foreign-key violation the moment a device that had ever pushed a
-  // backup (POST /api/backups/received) was revoked, since nothing
-  // cleared this table first.
-  deleteReceivedBackupsForDevice(id);
-  // FACE-03: a revoked device's already-issued sessions must not keep
-  // authenticating for up to 7 more days (sessions.expiresAt's own TTL) -
-  // a real gap for a device whose whole reason to be revoked might be
-  // "it's compromised," found while wiring the device-gated biometric
-  // sync route. Deleting the rows here isn't enough on its own while the
-  // 10s in-memory session cache (middleware/auth.ts) could still hand
-  // back a cached hit for one of them - invalidateSessionCacheForPerson()
-  // covers that, the same "DB delete alone doesn't propagate fast
-  // enough" gap its own doc comment already names for the `enabled` flag.
-  db.delete(sessions).where(eq(sessions.deviceId, id)).run();
-  // Robot memories are private to this device. Delete explicitly as well
-  // as relying on the FK cascade so this remains correct for every DB path.
-  // Embedding and pending-work rows reference the record, so they go first.
-  const boundIds = db.select({ id: memoryRecords.id }).from(memoryRecords).where(eq(memoryRecords.deviceId, id)).all().map((r) => r.id);
-  if (boundIds.length > 0) {
-    db.delete(memoryEmbeddings).where(inArray(memoryEmbeddings.memoryId, boundIds)).run();
-    db.delete(pendingEmbeddings).where(inArray(pendingEmbeddings.memoryId, boundIds)).run();
-    db.delete(pendingMemoryWork).where(inArray(pendingMemoryWork.memoryId, boundIds)).run();
-    db.delete(memoryRecords).where(inArray(memoryRecords.id, boundIds)).run();
-  }
-  invalidateSessionCacheForPerson(personId);
-  // robot_credentials.device_id is deliberately NOT a foreign key (a code
-  // review, 2026-09-28): a rotated password needs to survive its device
-  // row's own deletion so a re-pair of the same physical unit can find
-  // it again by host (robotCredentials.ts's own comment has the story).
-  // Nothing to clear here - that row staying behind is the whole point.
-  db.delete(devices).where(eq(devices.id, id)).run();
+  const boundIds = sqlite.query("SELECT id FROM memory_records WHERE device_id = ?").all(id) as Array<{ id: string }>;
+  tombstoneMemoryRecords(boundIds.map((item) => item.id));
+  const remove = sqlite.transaction(() => {
+    db.delete(deviceTokens).where(eq(deviceTokens.deviceId, id)).run();
+    // Step 8: received_backups.device_id references this row with no
+    // cascade - a code review (2026-09-06) found the delete below throwing
+    // a foreign-key violation the moment a device that had ever pushed a
+    // backup (POST /api/backups/received) was revoked, since nothing
+    // cleared this table first.
+    deleteReceivedBackupsForDevice(id);
+    // FACE-03: a revoked device's already-issued sessions must not keep
+    // authenticating for up to 7 more days (sessions.expiresAt's own TTL) -
+    // a real gap for a device whose whole reason to be revoked might be
+    // "it's compromised," found while wiring the device-gated biometric
+    // sync route. Deleting the rows here isn't enough on its own while the
+    // 10s in-memory session cache (middleware/auth.ts) could still hand
+    // back a cached hit for one of them - invalidateSessionCacheForPerson()
+    // covers that, the same "DB delete alone doesn't propagate fast
+    // enough" gap its own doc comment already names for the `enabled` flag.
+    db.delete(sessions).where(eq(sessions.deviceId, id)).run();
+    // A revoked/offline robot must receive a tombstone to prevent a later sync restoring its memories.
+    invalidateSessionCacheForPerson(personId);
+    // robot_credentials.device_id is deliberately NOT a foreign key (a code
+    // review, 2026-09-28): a rotated password needs to survive its device
+    // row's own deletion so a re-pair of the same physical unit can find
+    // it again by host (robotCredentials.ts's own comment has the story).
+    // Nothing to clear here - that row staying behind is the whole point.
+    db.delete(devices).where(eq(devices.id, id)).run();
+  });
+  remove();
   return true;
 }
 

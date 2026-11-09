@@ -46,7 +46,7 @@ import {
 } from "@/db/schema";
 import { clonedVoicesDir, projectsDir } from "@/lib/paths";
 import { nextHlc } from "@/lib/hlc";
-import { tombstoneMemoryRecord } from "@/lib/memory";
+import { tombstoneMemoryRecords } from "@/lib/memory";
 import { deleteEpisodesForPerson } from "@/lib/episodes";
 import { deleteArtifactsForTurns } from "@/lib/artifacts";
 import { invalidateScopeCache } from "@/lib/settings";
@@ -347,9 +347,7 @@ export function erasePersonData(personId: string, blobsAfterCommit: string[], pr
     .all(personId) as { id: string }[];
   sqlite.query("DELETE FROM pending_memory_work WHERE memory_id IN (SELECT id FROM memory_records WHERE scope = 'person' AND person = ?)").run(personId);
   const tombstonedAt = new Date().toISOString();
-  for (const row of memoryIds) {
-    tombstoneMemoryRecord(row.id, tombstonedAt);
-  }
+  tombstoneMemoryRecords(memoryIds.map((row) => row.id), tombstonedAt);
   const memories = memoryIds.length;
   // FACE-01: biometric prints are tombstoned the same way, for the same
   // reason (docs/dev.md's own design record): the print's metadata (which
@@ -617,6 +615,8 @@ function revokeAllCredentialsAndSessions(personId: string): { sessions: number }
   db.delete(passkeyCredentials).where(eq(passkeyCredentials.personId, personId)).run();
   const ownDevices = db.select({ id: devices.id }).from(devices).where(eq(devices.personId, personId)).all();
   for (const device of ownDevices) {
+    const deviceMemoryIds = sqlite.query("SELECT id FROM memory_records WHERE device_id = ?").all(device.id) as Array<{ id: string }>;
+    tombstoneMemoryRecords(deviceMemoryIds.map((row) => row.id));
     db.delete(deviceTokens).where(eq(deviceTokens.deviceId, device.id)).run();
     // Step 8: same foreign-key gap a code review (2026-09-06) found in
     // lib/devices.ts's deleteDevice() - received_backups.device_id has
