@@ -15,6 +15,8 @@ import { cancelVideoJob, clipUrl, getVideoJobFor, getVideoJobByFileFor, plainVid
 import { plainStageLabel } from "@/lib/jobQueueCopy";
 import { promptRefusalLineFor } from "@/lib/pictures/ageCheck";
 import { CHILD_NEGATIVE_PROMPT, CHILD_VIDEO_LIMIT_LINE, forceCartoon, kidsDailyVideos, laneOf, releaseKid, reserveKid, videoModelForLane, videosMadeToday } from "@/lib/pictures/lane";
+import { checkClipFrames } from "@/lib/videos/frameCheck";
+import { extractKeyframes } from "@/lib/pictures/keyframes";
 import { estimateVideoMinutes } from "@/lib/videos/estimate";
 import { checkVideoPrompt } from "@/lib/videos/promptCheck";
 import { householdAllowsVideo, refuseVideoPrompt, stackAudienceFor, videoDenial, VIDEO_DENIAL_LINE, VIDEO_REFUSAL_LINE, type VideoAudience } from "@/lib/videos/policy";
@@ -285,6 +287,22 @@ videosRoutes.openapi(messagesRoute, async (c) => {
   }
   const name = generic ? "video.mp4" : videoFileName(job.prompt);
   return new Response(bytes, { status: 200, headers: { "content-type": "video/mp4", "content-length": String(bytes.byteLength), "content-disposition": `attachment; filename="${name}"`, "cache-control": "private, no-store", "x-content-type-options": "nosniff" } }) as never;
+});
+
+// IVY-QC-01: what a quick measured look at the finished clip's frames found (black, nothing moves, a much softer stretch). Local only; says nothing about the words.
+const checkClipRoute = createRoute({
+  method: "get", path: "/jobs/{id}/check", tags: ["Videos"], summary: "A quick measured check of a finished clip", middleware: [requireAuth] as const,
+  request: { params: idParams },
+  responses: { 200: { content: { "application/json": { schema: z.object({ checked: z.boolean().describe("False when the frames could not be read on this computer; then there are no findings and nothing is claimed."), frames: z.number(), findings: z.array(z.object({ code: z.enum(["black", "frozen", "soft"]), level: z.enum(["serious", "warning"]), message: z.string() })) }) } }, description: "The check" }, ...errorResponses({ 401: "Not signed in", 404: "No such finished video" }) },
+});
+videosRoutes.openapi(checkClipRoute, async (c) => {
+  const actor = c.get("person");
+  const job = getVideoJobFor(actor, c.req.valid("param").id);
+  const first = job?.state === "done" ? job.files[0] : undefined;
+  const file = job && first && videoJobLockState(actor, job) === "open" ? readVideoFile(actor, job, first.id) : null;
+  if (!job || !first || !file) return c.json({ error: "That video isn't available any more." }, 404, NO_STORE) as never;
+  const seconds = job.request.seconds ?? null;
+  return c.json(await checkClipFrames(await extractKeyframes(file.bytes, seconds), seconds), 200, NO_STORE);
 });
 
 const cancelRoute = createRoute({
