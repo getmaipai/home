@@ -2167,7 +2167,7 @@ msgid "Add world clock"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/library/LibraryUploads.tsx:72
+#: src/shell/library/LibraryUploads.tsx:73
 msgid "Added"
 msgstr ""
 
@@ -3162,7 +3162,7 @@ msgid "Articles picked at random from the Wikipedia on this computer."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/dashboard/AskBox.tsx:63
+#: src/shell/pages/dashboard/AskBox.tsx:64
 #: src/shell/pages/dashboard/AskBox.tsx:65
 msgid "Ask"
 msgstr ""
@@ -3230,7 +3230,7 @@ msgid "api.minor.guest_stay_ask_adult"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/dashboard/AskBox.tsx:14
+#: src/shell/pages/dashboard/AskBox.tsx:15
 msgid "Ask anything"
 msgstr ""
 
@@ -7979,8 +7979,8 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/apps/chat/chatThreadSlots.tsx:183
 #: src/apps/notifications/NotificationsPage.tsx:216
-#: src/shell/library/LibraryUploads.tsx:75
 #: src/shell/library/LibraryUploads.tsx:76
+#: src/shell/library/LibraryUploads.tsx:77
 #: src/shell/NotificationBell.tsx:258
 #: src/shell/pages/RepairsPage.tsx:154
 msgid "Dismiss"
@@ -25238,7 +25238,7 @@ msgstr ""
 #: src/shell/AmbientCompanionPane.tsx:256
 #: src/shell/InstallDock.tsx:205
 #: src/shell/InstallStrip.tsx:96
-#: src/shell/library/LibraryUploads.tsx:75
+#: src/shell/library/LibraryUploads.tsx:76
 #: src/shell/pages/companionFlow/AnimateStep.tsx:131
 #: src/shell/pages/FamilyPage.tsx:50
 #: src/shell/pages/FamilyPage.tsx:51
