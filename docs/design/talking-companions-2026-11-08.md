@@ -23,7 +23,7 @@ Move a companion's mouth with its spoken voice. The body remains the approved re
 ## Reuse check
 
 - Speech level meter: reuse it as the mouth driver input.
-- `mouth` sheet view and `edit_masked`: reuse both for the first edit and the six approved shapes.
+- `mouth` sheet view and `edit_masked`: reuse for the first edit. For the six approved shapes the spike changed the maker: photos use LivePortrait (ratio retargeting, same pixels every frame; new Stack pin, downloaded not vendored, with a licence-clean face detector in place of the bundled non-commercial one); stylised characters use the mouth-crop masked edit until LivePortrait is benched on one. Both start from LIKENESS-01's face scope (`likeness/edit.ts`: ellipse mask, Stack feathering, seeds, identity check) and keep `prepareEditSource` and the age and child screens.
 - `ring` prop precedent: add an additive prop to `CompanionAvatar` in commons first.
 - Loki Doki scheduler: port its amplitude fallback and `VisemeScheduler`.
 - Rhubarb Lip Sync: new Stack pin, downloaded like ffmpeg, never vendored. Use for timed mouth shapes.
@@ -34,7 +34,7 @@ Move a companion's mouth with its spoken voice. The body remains the approved re
 
 1. **P1 talking still (S; commons ui, then Home).** While speaking, the kit crossfades the keyed rest still to the keyed `mouth` view by level. Add `mouthLevel: () => number` to `CompanionAvatar`; poll it per frame like `useMediaAnalyser.ts:4-5`, fed from the scheduler's meter. No new art and no model. Risk: the `mouth` edit changed more than the mouth and flickers. If so, redo it with `edit_masked`.
 2. **P2-spike, first step of P2 (S; Home dev hub).** Make the six shapes for the dev seed companion with `edit_masked`, flip them at 12 fps on the dev hub and look. This is the early check for whether the edits preserve the character and change only its mouth. Do this before the full P2 work.
-3. **P2 six mouth shapes (M; commons spec, commons ui, Home; after TALK-02-SPIKE passes).** Define `animation.mouth` in spec as an anchor box and shapes A to F, with X as rest. Add a "Mouth shapes" sheet step that makes six masked edits with fixed prompts per shape. Status rides the existing surfaces (RULE S6): each edit's own job card under "One job's progress", and the Make button is disabled through `useMakingAvailability` on the `image` row when pictures are not ready. No new surface. Review and approve each. Key and crop each shape to the anchor; the kit draws the crop over the still. Keep amplitude as the driver, using Loki Doki syllable rotation. Shared record change: spec first, then hub.
+3. **P2 six mouth shapes (M; commons spec, commons ui, Home; after TALK-02-SPIKE passes).** Define `animation.mouth` in spec as an anchor box and shapes A to F, with X as rest. Add a "Mouth shapes" sheet step whose maker is LivePortrait for photos and the mouth-crop masked edit for stylised characters (see the Reuse check and the P2-spike result), plus an eye-closed picture for blinks. Status rides the existing surfaces (RULE S6): each edit's own job card under "One job's progress", and the Make button is disabled through `useMakingAvailability` on the `image` row when pictures are not ready. No new surface. Review and approve each. Key and crop each shape to the anchor; the kit draws the crop over the still. Keep amplitude as the driver, using Loki Doki syllable rotation. Shared record change: spec first, then hub.
 4. **P3 timed shapes (M; Stack, then Home; after P2).** Pin Rhubarb Lip Sync (MIT, CPU, macOS) behind `POST /v1/audio/mouth-shapes`. Input is WAV plus optional dialog text; output is shapes A to H plus X. Home `/api/tts` gains an additive per-sentence timings channel. Port `VisemeScheduler` onto the AudioContext clock. The first sentence stays on amplitude so there is no delay to first sound. Any failure falls back to amplitude and never fails the answer. Add no status surface, per RULE S6. The ported scheduler is covered by Elements ledger row ED-001 (`docs/design/ELEMENTS-DECISIONS.md`, speech scheduling with the spoken cue). Any crop drawn over the still is drawn inside the kit Element, never as an overlay `div` in Home.
 5. **P4 MuseTalk bench (L; bench; folded into LOCAL-BENCH-02, no new id).** Bench MLX port `mlx-community/MuseTalk-1.5-fp16` (MIT, 256 px face, about 34 faces/s, 7 GB peak). It was trained on human faces; stylised animals are unproven. 7 GB during chat breaks the resource order (chat > images > video) and the rule that nothing is generated at play time. This is a bench with a verdict row, not a build. LatentSync 1.6 needs 18 GB and CUDA, so exclude it. Ask the owner before downloading the model.
 
@@ -60,7 +60,21 @@ Move a companion's mouth with its spoken voice. The body remains the approved re
 
 ## Biggest unknown
 
+Answered 2026-11-09, see the P2-spike result below.
+
 Can masked edits of the rest picture give six stills that are the same character with only the mouth changed? The one check is the P2-spike: make the six shapes for the dev seed companion with `edit_masked`, flip them at 12 fps on the dev hub and look.
+
+## P2-spike result (2026-11-09)
+
+Run on a real-person photo companion (the plan said the dev seed companion; the "Open" line below still asks for a stylised character before the sheet step is approved).
+
+- **Home's normal edit route cannot make a mouth shape.** `startLookEdit` with a mask runs a head swap (`faceRef`, `swapHead`) that copies the rest picture's face back over the edit, and it appends the version's style phrase ("cartoon"), which redraws the mouth as a cartoon. Its fit and key steps also rescale the picture, so the result no longer lines up with the rest. Six shapes through it showed no mouth change.
+- **One full-frame masked edit drifts.** The mouth changes but the eyes and expression change too (smile creases lost).
+- **A mouth-only crop edit works.** Crop a 384 px square on the mouth, upscale to 1024, masked-edit it with no face swap, no fit, style "keep" and one fixed seed, and paste back only a feathered ellipse onto the untouched rest, taking the edited crop from the engine's raw output (the `.orig.png`), not the keyed version. Measured: the raw crop lines up with the rest at offset 0 and scale 1. Shapes A, B, C, D and F were distinct and the same man. Moustache edges are still soft and shape E ("oh") came back as a smile.
+- **LivePortrait beats the crop method on a real photo (bench, same day).** One photo in, a mouth-open ratio and an eye-open ratio out. Same pixels in every frame, so teeth, lips and identity stay put; five mouth steps and a blink each took about half a second on this Mac's GPU. Its code and weights are MIT, but its bundled face detector (InsightFace buffalo_l) is non-commercial: a shipped version needs a licence-clean detector (MediaPipe) first. Stylised characters are untested. A first bench run produced garbage because the zoom argument was passed as 0; its default is 1.
+- **Open:** a better prompt for E, and a check on several faces and one stylised character before the sheet step is approved.
+- **Eyes:** blinking is the same technique on the eyes (one closed-eyes picture, optionally half closed). It is added to TALK-02's scope as a finding to verify, not a decided design.
+- **Design of the job is left to TALK-02's own reuse check.** That check must start from LIKENESS-01's face scope (`backend/src/lib/pictures/likeness/edit.ts`: ellipse mask, `editMasked` with Stack feathering and paste-back, several seeds, identity check) and say what it reuses and what is new. Any new route must keep `prepareEditSource` and the age and child screens that `startLookEdit` applies.
 
 ## Not doing
 
