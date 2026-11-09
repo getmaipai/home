@@ -672,7 +672,7 @@ describe("warmPackage weather privacy", () => {
     const calls: Array<{ url: string; headers: Headers }> = [];
     const oldFetch = globalThis.fetch;
     globalThis.fetch = (async (input: URL | Request | string, init?: RequestInit) => {
-      const url = String(input); calls.push({ url, headers: new Headers(init?.headers) });
+      const url = String(input); if (!url.startsWith("http://127.0.0.1")) calls.push({ url, headers: new Headers(init?.headers) }); // the hub's own moon call is loopback, not an outside request
       if (url.includes("geocoding-api.open-meteo.com")) return Response.json({ results: [{ latitude: 45.52, longitude: -122.68, name: "Portland", admin1: "Oregon", country: "United States" }] });
       return Response.json({ current: { temperature_2m: 60, weather_code: 0 }, hourly: { time: [], temperature_2m: [] }, daily: { time: [], temperature_2m_max: [], temperature_2m_min: [], precipitation_probability_max: [] } });
     }) as unknown as typeof fetch;
