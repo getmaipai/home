@@ -685,7 +685,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/media/radioStream.ts` | MAX_REDIRECTS, CONNECT_TIMEOUT_MS, publicRecordingAddress, MAX_STREAMS_PER_HOME, unplayable, __resetRadioStreamsForTests |
 | `backend/src/lib/media/scan.ts` | DEFAULT_PRUNE_GRACE_MS, probePending, scanRoot, isScanning, syncMediaScanner, startMediaScanner |
 | `backend/src/lib/media/search.ts` | searchMedia |
-| `backend/src/lib/media/serve.ts` | parseRange, resolveUnderRoot, serveBytes, serveItemBytes, serveItemArtwork, itemByteMetadata |
+| `backend/src/lib/media/serve.ts` | lightArt, parseRange, resolveUnderRoot, serveBytes, serveItemBytes, serveItemArtwork |
 | `backend/src/lib/media/songFacts.ts` | SONG_WIKIMEDIA_KEY, lookupSongFact, songFactFor, runSongFactPass, kickSongFacts |
 | `backend/src/lib/media/sources.ts` | ROOT_KINDS, TRASH_DAYS, pathsOverlap, liveRoots, createRootSource, removeSource |
 | `backend/src/lib/media/templates.ts` | listTemplates, getTemplate |
