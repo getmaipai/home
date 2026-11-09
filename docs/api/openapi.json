@@ -45590,6 +45590,9 @@
                           },
                           "image": {
                             "type": "string"
+                          },
+                          "at": {
+                            "type": "string"
                           }
                         },
                         "required": [
