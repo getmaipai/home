@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-11-09T03:57:38.466Z",
-  "kitTag": "ui-v0.5.551",
+  "generatedAt": "2026-11-09T19:46:40.127Z",
+  "kitTag": "ui-v0.5.559",
   "items": [
     {
       "file": "ActivityCardsShowcase.tsx",
@@ -406,6 +406,14 @@
       "group": "companion",
       "verdict": "support",
       "verdictReason": "The pure state machine behind the companion avatar (priorities, loop points, one-shots); not a visible Element and not used by Home directly.",
+      "implemented": true
+    },
+    {
+      "file": "companion-avatar-motion.ts",
+      "name": "companion-avatar-motion",
+      "group": "companion",
+      "verdict": "support",
+      "verdictReason": "The motion helper behind companion-avatar (idle life and expression timing, TALK work); Home uses it only through that element and passes props.",
       "implemented": true
     },
     {
@@ -1515,7 +1523,7 @@
       "group": "status-card",
       "verdict": "wire-after",
       "verdictReason": "The shared job and problem card (PRO-LOOK-01 section 20); wired by the JOB-01 and ERRORS-01 slices, after the front page.",
-      "implemented": false
+      "implemented": true
     },
     {
       "file": "stopped-run.tsx",

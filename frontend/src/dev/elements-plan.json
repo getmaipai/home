@@ -3976,6 +3976,25 @@
       "realTurnToday": true
     },
     {
+      "file": "companion-avatar-motion.ts",
+      "name": "companion-avatar-motion",
+      "group": "companion",
+      "verdict": "support",
+      "verdictReason": "The motion helper behind companion-avatar (idle life and expression timing, TALK work); Home uses it only through that element and passes props.",
+      "backendNeeded": null,
+      "effort": null,
+      "specTagNeeded": false,
+      "newDependency": false,
+      "bindings": [
+        "chat companion avatar"
+      ],
+      "size": "M",
+      "showcaseScenario": null,
+      "batch": null,
+      "replacesHandBuilt": [],
+      "realTurnToday": true
+    },
+    {
       "file": "stacked-alpha-video.tsx",
       "name": "stacked-alpha-video",
       "group": "stacked",
