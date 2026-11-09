@@ -5,6 +5,7 @@ import { hasDeclaredCredentialField, CREDENTIAL_SAFE_MESSAGE } from "@/lib/memor
 import {
   remember,
   list,
+  listPage,
   archive,
   forget,
   forgetByIds,
@@ -161,43 +162,75 @@ memoryRoutes.post("/", requireAuth, async (c) => {
 // historical read can show what the record looked like before it was
 // replaced - a current read (no `as_of`) never shows superseded records.
 const MemoryListQuerySchema = z.object({
-  scope: z.enum(["household", "person", "self"]).optional(),
+  scope: z.enum(["household", "person", "self", "companion"]).optional(),
   person: z.string().optional(),
+  companion_id: z.string().optional(),
+  limit: z.coerce.number().int().min(1).max(500).optional(),
+  cursor: z.string().optional(),
   as_of: z.string().optional(),
   include_superseded: z.enum(["true", "false"]).optional(),
 });
+const MemoryWithDevice = MemoryRecord.extend({ device_name: z.string().optional().describe("The robot's current name, present when device_id is set.") });
 const memoryListRoute = createRoute({
   method: "get",
   path: "/",
   tags: ["Memory"],
   summary: "List this person's memory records, optionally as of a given moment",
   middleware: [requireAuth] as const,
-  request: { query: MemoryListQuerySchema },
+  request: { query: MemoryListQuerySchema.omit({ limit: true, cursor: true }) },
   responses: {
-    200: { content: { "application/json": { schema: z.array(MemoryRecord.extend({ device_name: z.string().optional().describe("The robot's current name, present when device_id is set.") })) } }, description: "The visible memory records, in the usual list shape; robot-bound ones carry device_id and device_name." },
+    200: { content: { "application/json": { schema: z.array(MemoryWithDevice) } }, description: "The first 100 visible memory records, in the usual list shape; robot-bound ones carry device_id and device_name. Use /page to read past 100." },
     400: { content: { "application/json": { schema: ErrorSchema } }, description: "as_of must be an ISO date-time" },
     401: { content: { "application/json": { schema: ErrorSchema } }, description: "Not signed in" },
   },
 });
-memoryRoutes.openapi(memoryListRoute, (c): ReturnType<typeof memoryListRoute extends never ? never : any> => {
+const memoryPageRoute = createRoute({
+  method: "get",
+  path: "/page",
+  tags: ["Memory"],
+  summary: "List this person's memory records one page at a time, with the total",
+  middleware: [requireAuth] as const,
+  request: { query: MemoryListQuerySchema },
+  responses: {
+    200: { content: { "application/json": { schema: z.object({ records: z.array(MemoryWithDevice), total: z.number(), next_cursor: z.string().nullable() }) } }, description: "One page of visible memories, the total count, and the cursor for the next page." },
+    400: { content: { "application/json": { schema: ErrorSchema } }, description: "as_of must be an ISO date-time, or companion_id is missing for scope=companion" },
+    401: { content: { "application/json": { schema: ErrorSchema } }, description: "Not signed in" },
+  },
+});
+function readMemoryPage(c: any): { error: string } | { records: ReturnType<typeof list>; total: number; nextCursor: string | null } {
   const actor = c.get("person");
-  const { scope, person, as_of, include_superseded } = c.req.valid("query");
-  const opts: ListOptions = {};
+  const { scope, person, companion_id, limit, cursor, as_of, include_superseded } = c.req.valid("query") as z.infer<typeof MemoryListQuerySchema>;
+  const opts: ListOptions = { limit, cursor, robotBound: "all" };
   if (scope) opts.scope = scope;
+  else opts.scopes = ["person", "household"];
   if (person) opts.person = person;
+  if (scope === "companion") {
+    if (!companion_id) return { error: "companion_id is required when scope=companion. Add the companion id and try again." };
+    opts.companionId = companion_id;
+  }
   let asOf: Date | undefined;
   if (as_of !== undefined) {
     const parsed = Date.parse(as_of);
-    if (Number.isNaN(parsed)) {
-      return c.json({ error: "as_of must be an ISO date-time" }, 400) as any;
-    }
+    if (Number.isNaN(parsed)) return { error: "as_of must be an ISO date-time" };
     asOf = new Date(parsed);
   }
   if (asOf !== undefined && include_superseded === "true") opts.includeSuperseded = true;
-  const records = list(actor, { ...opts, asOf, robotBound: "all" });
+  return listPage(actor, { ...opts, asOf });
+}
+function withDeviceNames(records: ReturnType<typeof list>) {
   const robotIds = [...new Set(records.flatMap((r) => r.device_id ? [r.device_id] : []))];
   const names = new Map(db.select({ id: devices.id, name: devices.name }).from(devices).where(robotIds.length ? inArray(devices.id, robotIds) : eq(devices.id, "")).all().map((d) => [d.id, d.name]));
-  return c.json(records.map((r) => ({ ...r, ...(r.device_id ? { device_name: names.get(r.device_id) ?? "Robot" } : {}) }))) as any;
+  return records.map((r) => ({ ...r, ...(r.device_id ? { device_name: names.get(r.device_id) ?? "Robot" } : {}) }));
+}
+memoryRoutes.openapi(memoryListRoute, (c): ReturnType<typeof memoryListRoute extends never ? never : any> => {
+  const page = readMemoryPage(c);
+  if ("error" in page) return c.json({ error: page.error }, 400) as any;
+  return c.json(withDeviceNames(page.records)) as any;
+});
+memoryRoutes.openapi(memoryPageRoute, (c): ReturnType<typeof memoryPageRoute extends never ? never : any> => {
+  const page = readMemoryPage(c);
+  if ("error" in page) return c.json({ error: page.error }, 400) as any;
+  return c.json({ records: withDeviceNames(page.records), total: page.total, next_cursor: page.nextCursor }) as any;
 });
 
 memoryRoutes.get("/export", requireAuth, async (c) => {
@@ -231,7 +264,7 @@ const batchForgetRoute = createRoute({
   summary: "Forget (tombstone) several memories at once",
   middleware: [requireAuth] as const,
   request: {
-    body: { content: { "application/json": { schema: z.object({ ids: z.array(z.string()) }) } } },
+    body: { content: { "application/json": { schema: z.object({ ids: z.array(z.string()).optional(), all: z.boolean().optional() }) } } },
   },
   responses: {
     200: {
@@ -249,7 +282,18 @@ const batchForgetRoute = createRoute({
 });
 memoryRoutes.openapi(batchForgetRoute, (c) => {
   const actor = c.get("person");
-  const { ids } = c.req.valid("json");
+  const { ids = [], all } = c.req.valid("json");
+  if (all) {
+    const ids: string[] = [];
+    for (let cursor: string | undefined; ;) {
+      const page = listPage(actor, { scopes: ["person", "household"], robotBound: "all", limit: 500, cursor });
+      ids.push(...page.records.map((r) => r.id));
+      if (!page.nextCursor) break;
+      cursor = page.nextCursor;
+    }
+    const result = forgetByIds(actor, ids);
+    return c.json({ outcomes: result }, 200);
+  }
   if (ids.length === 0) return c.json({ error: "no memories were selected" }, 400);
   return c.json({ outcomes: forgetByIds(actor, ids) }, 200);
 });

@@ -56,6 +56,9 @@ function record(overrides: Partial<MemoryRecord> = {}): MemoryRecord {
   };
 }
 
+// The Memory page reads /api/memory/page: records, the total, and the next cursor.
+const page = (records: unknown[]) => ({ records, total: records.length, next_cursor: null });
+
 describe("OwnMemories", () => {
   test("archiving a memory removes it from the list", async () => {
     // Stateful, not a fixed fixture (same convention PeopleAndThings.test.tsx's
@@ -72,7 +75,7 @@ describe("OwnMemories", () => {
         return Promise.resolve(new Response(JSON.stringify({ ...record(), status: "archived" }), { status: 200 }));
       }
       if (url.includes("/api/memory")) {
-        return Promise.resolve(new Response(JSON.stringify(archived ? [] : [record()]), { status: 200 }));
+        return Promise.resolve(new Response(JSON.stringify(page(archived ? [] : [record()])), { status: 200 }));
       }
       throw new Error(`unstubbed fetch: ${url}`);
     }) as unknown as typeof fetch;
@@ -95,7 +98,7 @@ describe("OwnMemories", () => {
     globalThis.fetch = mock((input: RequestInfo | URL) => {
       const url = typeof input === "string" ? input : input.toString();
       if (url.includes("/api/people")) return Promise.resolve(new Response(JSON.stringify([{ id: "person-sage01", display_name: "Sage" }]), { status: 200 }));
-      if (url.includes("/api/memory")) return Promise.resolve(new Response(JSON.stringify(rows), { status: 200 }));
+      if (url.includes("/api/memory")) return Promise.resolve(new Response(JSON.stringify(page(rows)), { status: 200 }));
       throw new Error(`unstubbed fetch: ${url}`);
     }) as unknown as typeof fetch;
     try {
@@ -117,7 +120,7 @@ describe("OwnMemories", () => {
     const original = globalThis.fetch;
     globalThis.fetch = mock((input: RequestInfo | URL) => {
       const url = typeof input === "string" ? input : input.toString();
-      if (url.includes("/api/memory")) return Promise.resolve(new Response(JSON.stringify(rows), { status: 200 }));
+      if (url.includes("/api/memory")) return Promise.resolve(new Response(JSON.stringify(page(rows)), { status: 200 }));
       throw new Error(`unstubbed fetch: ${url}`);
     }) as unknown as typeof fetch;
     try {

@@ -25,6 +25,8 @@ import type { TurnState } from "@/lib/turnMachine/contract";
 import { withTurnDefaults } from "./turnStateDefaults";
 import { __drainBackgroundWorkForTests } from "@/lib/backgroundWork";
 import { injectVector } from "../fixtures/injectVector";
+import { createSynth } from "@/lib/synths";
+import "@/lib/talent/life";
 import { useDefaultScriptedStack } from "../stackFixture";
 
 let people: BenchPeople;
@@ -154,7 +156,7 @@ describe("contextNode: CONTEXT-RECALL-01, recall like the old path, tier-floor g
     const { output } = await contextNode(stateFor(people.owner), { utterance: "how's it going" }, SIGNAL);
     expect(output.items.filter((item) => item.source === "memory").length).toBe(0);
     expect(output.items.filter((item) => item.source === "profile").length).toBe(0);
-    expect(output.memoryTrace).toEqual({ profile: [], injected: [] });
+    expect(output.memoryTrace).toMatchObject({ profile: [], injected: [] });
   });
 
   // MEM-AUDIT-01 and 03 (decision 9): the jacket case at the context
@@ -203,6 +205,20 @@ describe("contextNode: CONTEXT-RECALL-01, recall like the old path, tier-floor g
     expect(sharedItem?.about).toBe("the household");
     expect(output.memoryTrace?.injected.map((m) => m.id).sort()).toEqual([a.value.id, b.value.id].sort());
     for (const m of output.memoryTrace?.injected ?? []) expect(m.score).toBeGreaterThanOrEqual(MEMORY_CONTEXT_MIN_SCORE);
+  });
+
+  test("companion life beats and the Synth card are represented in the trace", async () => {
+    const made = await createSynth(people.owner, { persona: { display_name: "Mica", formality: "neutral", complexity: "standard", engagement: "balanced", filler_density: "light", audience: "all" } as never, based_on: { kind: "none", person_id: null, name: null, refresh: "7d", minor: false }, life: { enabled: false, seed: "" } });
+    if (!made.ok) throw new Error("companion setup failed");
+    const synth = made.value.manifest;
+    const seeded = remember(people.owner, { text: "Mica remembers the blue kite", category: "fact", tier: "durable", scope: "companion", companion_id: synth.id, source: "talent.life.test", importance: 0.9 });
+    if (!seeded.ok) throw new Error("setup failed");
+    await embedMemoryRecordSafely(seeded.value.id, "Mica remembers the blue kite");
+    const state = stateFor(people.owner);
+    state.persona = { ...state.persona, id: synth.id } as typeof state.persona;
+    const { output } = await contextNode(state, { utterance: "what do you remember about the blue kite" }, SIGNAL);
+    expect(output.memoryTrace?.companion).toContainEqual(expect.objectContaining({ id: "synth-card", source: "companion" }));
+    expect(output.memoryTrace?.companion).toEqual(expect.arrayContaining([expect.objectContaining({ id: "synth-card", source: "companion" }), expect.objectContaining({ id: seeded.value.id, source: "companion" })]));
   });
 
   test("caps at MAX_MEMORY_SNIPPETS (5) even when more than five records clear the floor", async () => {

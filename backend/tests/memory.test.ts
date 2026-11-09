@@ -341,7 +341,7 @@ describe("POST /api/memory (remember)", () => {
     await owner.post("/api/auth/setup", { displayName: "Sage", secret: "correcthorse" });
     const res = await owner.post("/api/memory", {
       text: "test",
-      category: "fact",
+      category: "event",
       tier: "durable",
       scope: "person",
       person: "person-doesnotexist",
@@ -363,7 +363,7 @@ describe("POST /api/memory (remember)", () => {
 
     const res = await owner.post("/api/memory", {
       text: "test",
-      category: "fact",
+      category: "event",
       tier: "durable",
       scope: "person",
       person: childId,
@@ -375,6 +375,27 @@ describe("POST /api/memory (remember)", () => {
 });
 
 describe("GET /api/memory (list) and visibility", () => {
+  test("list is cursor paged and defaults to person and household scopes, excluding companion rows", async () => {
+    const { owner, childClient, childId } = await ownerAndChild();
+    for (let i = 0; i < 105; i++) await owner.post("/api/memory", { text: `Paged ${i}`, category: "fact", tier: "durable", scope: "household", importance: 0.5 });
+    await childClient.post("/api/memory", { text: "companion-only secret", category: "fact", tier: "durable", scope: "companion", person: childId, importance: 0.5 });
+    const first = await childClient.get("/api/memory/page?limit=100");
+    const firstBody = await first.json() as { records: MemoryRecord[]; total: number; next_cursor: string | null };
+    expect(firstBody.records).toHaveLength(100);
+    expect(firstBody.total).toBe(105);
+    expect(firstBody.next_cursor).toBeTruthy();
+    expect(firstBody.records.some((m) => m.text === "companion-only secret")).toBe(false);
+    const second = await childClient.get(`/api/memory/page?limit=100&cursor=${encodeURIComponent(firstBody.next_cursor!)}`);
+    expect((await second.json() as { records: MemoryRecord[] }).records).toHaveLength(5);
+  });
+
+  test("person's list includes recently ended events that recall still accepts", async () => {
+    const owner = new TestClient(); await owner.post("/api/auth/setup", { displayName: "Sage", secret: "correcthorse" });
+    const end = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+    await owner.post("/api/memory", { text: "Yesterday's appointment", category: "event", tier: "episodic", scope: "household", importance: 0.5, valid_to: end });
+    const body = await (await owner.get("/api/memory")).json() as MemoryRecord[];
+    expect(body.some((m) => m.text === "Yesterday's appointment")).toBe(true);
+  });
   test("household memories are visible to any signed-in person", async () => {
     const { owner, childClient } = await ownerAndChild();
     await owner.post("/api/memory", {
@@ -504,10 +525,10 @@ describe("GET /api/memory (list) and visibility", () => {
     });
     expect(created.status).toBe(201);
 
-    const during = ((await (await owner.get("/api/memory?as_of=2019-06-01T00:00:00.000Z")).json()) as MemoryRecord[]);
+    const during = ((await (await owner.get("/api/memory?scope=household&as_of=2019-06-01T00:00:00.000Z")).json()) as MemoryRecord[]);
     expect(during.some((m) => m.text.includes("garden shed"))).toBe(true);
 
-    const after = ((await (await owner.get("/api/memory?as_of=2020-06-01T00:00:00.000Z")).json()) as MemoryRecord[]);
+    const after = ((await (await owner.get("/api/memory?scope=household&as_of=2020-06-01T00:00:00.000Z")).json()) as MemoryRecord[]);
     expect(after.some((m) => m.text.includes("garden shed"))).toBe(false);
   });
 
@@ -516,7 +537,7 @@ describe("GET /api/memory (list) and visibility", () => {
     await owner.post("/api/auth/setup", { displayName: "Sage", secret: "correcthorse" });
     await owner.post("/api/memory", {
       text: "the future roof replacement",
-      category: "event",
+      category: "fact",
       tier: "episodic",
       scope: "household",
       source: "test",
@@ -524,10 +545,10 @@ describe("GET /api/memory (list) and visibility", () => {
       valid_from: "2025-01-01T00:00:00.000Z",
     });
 
-    const before = ((await (await owner.get("/api/memory?as_of=2024-06-01T00:00:00.000Z")).json()) as MemoryRecord[]);
+    const before = ((await (await owner.get("/api/memory?scope=household&as_of=2024-06-01T00:00:00.000Z")).json()) as MemoryRecord[]);
     expect(before.some((m) => m.text.includes("roof replacement"))).toBe(false);
 
-    const after = ((await (await owner.get("/api/memory?as_of=2025-06-01T00:00:00.000Z")).json()) as MemoryRecord[]);
+    const after = ((await (await owner.get("/api/memory?scope=household&as_of=2025-06-01T00:00:00.000Z")).json()) as MemoryRecord[]);
     expect(after.some((m) => m.text.includes("roof replacement"))).toBe(true);
   });
 
@@ -543,7 +564,7 @@ describe("GET /api/memory (list) and visibility", () => {
     await owner.post("/api/auth/setup", { displayName: "Sage", secret: "correcthorse" });
     const created = await owner.post("/api/memory", {
       text: "the house we used to live in on Cedar Street",
-      category: "fact",
+      category: "event",
       tier: "durable",
       scope: "household",
       source: "test",
@@ -558,19 +579,19 @@ describe("GET /api/memory (list) and visibility", () => {
     const sup = supersede(sage, old.id, { text: "the house we live in on Birch Street", category: "fact", tier: "durable", importance: 0.5, source: "test" });
     expect(sup.ok).toBe(true);
 
-    const current = ((await (await owner.get("/api/memory")).json()) as MemoryRecord[]);
+    const current = ((await (await owner.get("/api/memory?scope=household")).json()) as MemoryRecord[]);
     expect(current.some((m) => m.text.includes("Cedar"))).toBe(false);
     expect(current.some((m) => m.text.includes("Birch"))).toBe(true);
 
-    const historicalNoSuperseded = ((await (await owner.get("/api/memory?as_of=2020-01-01T00:00:00.000Z")).json()) as MemoryRecord[]);
+    const historicalNoSuperseded = ((await (await owner.get("/api/memory?scope=household&as_of=2020-01-01T00:00:00.000Z")).json()) as MemoryRecord[]);
     expect(historicalNoSuperseded.some((m) => m.text.includes("Cedar"))).toBe(false);
     expect(historicalNoSuperseded.some((m) => m.text.includes("Birch"))).toBe(true);
 
-    const historical = ((await (await owner.get("/api/memory?as_of=2020-01-01T00:00:00.000Z&include_superseded=true")).json()) as MemoryRecord[]);
+    const historical = ((await (await owner.get("/api/memory?scope=household&as_of=2020-01-01T00:00:00.000Z&include_superseded=true")).json()) as MemoryRecord[]);
     expect(historical.some((m) => m.text.includes("Cedar"))).toBe(true);
     expect(historical.some((m) => m.text.includes("Birch"))).toBe(true);
 
-    const includeOnly = ((await (await owner.get("/api/memory?include_superseded=true")).json()) as MemoryRecord[]);
+    const includeOnly = ((await (await owner.get("/api/memory?scope=household&include_superseded=true")).json()) as MemoryRecord[]);
     expect(includeOnly.some((m) => m.text.includes("Cedar"))).toBe(false);
   });
 });

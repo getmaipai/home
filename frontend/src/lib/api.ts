@@ -448,6 +448,7 @@ export interface CompanionStateRun { state: "queued" | "running" | "done" | "fai
 export interface CompanionStateJob { state: "running" | "done" | "failed"; label: string; report?: { ok: boolean; reasons: string[]; seconds: number; bytes: { h264: number; av1: number | null }; colour_distance: number | null; area_ratio: number; loop_gap: number; opaque_share: { min: number; max: number } }; failure?: string }
 
 export type MemoryRecordWithDevice = MemoryRecord & { device_name?: string };
+export type MemoryPage = { records: MemoryRecordWithDevice[]; total: number; next_cursor: string | null };
 // ROBOT-CARD-01: the robot's last reported frame plus the hub's derived
 // reachability, hand-typed to match backend/src/routes/devices.ts's
 // DeviceSchema.state.
@@ -1717,6 +1718,8 @@ export const api = {
   // this app already relies on server-side, not re-implemented here.
   memories: (personId?: string) =>
     request<MemoryRecordWithDevice[]>(`/api/memory${personId ? `?person=${encodeURIComponent(personId)}` : ""}`),
+  memoryPage: (personId?: string, cursor?: string) =>
+    request<MemoryPage>(`/api/memory/page?${new URLSearchParams({ ...(personId ? { scope: "person", person: personId } : {}), ...(cursor ? { cursor } : {}) })}`),
   forgetPersonMemories: (personId: string) =>
     request<{ deleted: number }>("/api/memory/forget", { method: "POST", body: JSON.stringify({ personId }) }),
   // Distinct from forgetPersonMemories above (that erases every record
@@ -1727,6 +1730,8 @@ export const api = {
       method: "POST",
       body: JSON.stringify({ ids }),
     }),
+  forgetAllVisibleMemories: () =>
+    request<{ outcomes: Array<{ id: string; deleted: boolean; reason?: string }> }>("/api/memory/batch-forget", { method: "POST", body: JSON.stringify({ all: true }) }),
   exportPersonMemories: (personId: string) =>
     request<MemoryRecord[]>(`/api/memory/export?personId=${encodeURIComponent(personId)}`),
   archiveMemory: (id: string) =>

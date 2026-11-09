@@ -398,6 +398,7 @@ export async function drainPendingEmbeddings(): Promise<{ embedded: number; stil
 
 export interface ListOptions {
   scope?: "household" | "person" | "self" | "companion";
+  scopes?: Array<"household" | "person" | "self" | "companion">;
   person?: string;
   companionId?: string;
   /** See canRead()'s own comment: turn-scoped recall only, never the
@@ -424,6 +425,11 @@ export interface ListOptions {
    * RecallOptions.includeSuperseded, honoured here in list() the way
    * recall() honours it. */
   includeSuperseded?: boolean;
+  limit?: number;
+  cursor?: string;
+  offset?: number;
+  /** Include recently ended dated events in the page, matching recall(). */
+  includeEndingEvents?: boolean;
 }
 
 /** Browsing: sorted, filtered, but never touches uses/last_used_at (that's
@@ -436,9 +442,11 @@ export function list(actor: PersonRow, opts: ListOptions = {}): MemoryRecord[] {
       ? or(eq(memoryRecords.status, "active"), eq(memoryRecords.status, "superseded"))
       : eq(memoryRecords.status, "active")).all();
   if (opts.scope) rows = rows.filter((r) => r.scope === opts.scope);
+  else if (opts.scopes) rows = rows.filter((r) => opts.scopes!.includes(r.scope as "household" | "person" | "self" | "companion"));
+  else rows = rows.filter((r) => r.scope === "person" || r.scope === "household");
   if (opts.person) rows = rows.filter((r) => r.person === opts.person);
   if (opts.scope === "companion" && opts.companionId) rows = rows.filter((r) => r.companionId === opts.companionId);
-  rows = rows.filter((r) => validAt(r, asOf));
+  rows = rows.filter((r) => opts.asOf ? validAt(r, asOf) : validAt(r, asOf) || (opts.includeEndingEvents !== false && eventWithinGrace(r, asOf)));
   rows = rows.filter((r) => r.deviceId === null || (opts.robotBound === "all" && opts.deviceId == null) || (opts.deviceId != null && r.deviceId === opts.deviceId && (opts.robotBound === "all" || opts.surface === "robot")));
   rows = rows.filter((r) => canRead(actor, r, roleOf, opts.selfOnly));
   rows.sort((a, b) => {
@@ -446,7 +454,21 @@ export function list(actor: PersonRow, opts: ListOptions = {}): MemoryRecord[] {
     if (a.importance !== b.importance) return b.importance - a.importance;
     return b.lastUsedAt.localeCompare(a.lastUsedAt);
   });
-  return rows.slice(0, 100).map(toMemoryRecord);
+  const start = opts.cursor ? Math.max(0, rows.findIndex((r) => r.id === opts.cursor) + 1) : opts.offset ?? 0;
+  const limit = Math.min(500, Math.max(1, opts.limit ?? 100));
+  return rows.slice(start, start + limit).map((row) => ({ ...toMemoryRecord(row), ...(opts.includeEndingEvents !== false && !validAt(row, asOf) && eventWithinGrace(row, asOf) ? { ending: true } : {}) } as MemoryRecord));
+}
+
+export function countList(actor: PersonRow, opts: ListOptions = {}): number {
+  return list(actor, { ...opts, cursor: undefined, offset: undefined, limit: 500 }).length;
+}
+
+export function listPage(actor: PersonRow, opts: ListOptions = {}): { records: MemoryRecord[]; total: number; nextCursor: string | null } {
+  const limit = Math.min(500, Math.max(1, opts.limit ?? 100));
+  const total = countList(actor, opts);
+  const offset = opts.cursor ? Math.max(0, list(actor, { ...opts, cursor: undefined, offset: undefined, limit: 500 }).findIndex((r) => r.id === opts.cursor) + 1) : 0;
+  const records = list(actor, { ...opts, cursor: undefined, offset, limit });
+  return { records, total, nextCursor: offset + records.length < total ? records.at(-1)?.id ?? null : null };
 }
 
 export interface RecallMatch {
@@ -849,6 +871,7 @@ export function recall(actor: PersonRow, query: string, opts: RecallOptions = {}
   ]);
 
   const scored: RecallMatch[] = [];
+  const vectorRowsById = new Map(vectorRows.map((v) => [v.memoryId, v]));
   for (const row of rows) {
     const words = tokenize(row.text);
     const isEntityMatch = matchedEntityNameWords.some((nameWords) => [...nameWords].every((w) => words.has(w))) || (row.subjectId !== null && subjectIds.has(row.subjectId));
@@ -884,7 +907,7 @@ export function recall(actor: PersonRow, query: string, opts: RecallOptions = {}
     const forceInclude = row.pinned && queryEligibleForRecall;
 
     let score: number;
-    const vectorRow = vectorRows.find((v) => v.memoryId === row.id);
+    const vectorRow = vectorRowsById.get(row.id);
     const identityMatch = vectorRow && opts.queryVector && vectorRow.space === opts.queryVector.space && vectorRow.dims === opts.queryVector.dims && vectorRow.preprocess === opts.queryVector.preprocess;
     let entityBoost = false;
     if (opts.queryVector && storedVector && identityMatch) {
@@ -1008,12 +1031,13 @@ export function similarByVector(
           .all()
       : [];
   const vectorsByMemoryId = new Map(vectorRows.map((v) => [v.memoryId, bufferToVector(v.vector)]));
+  const vectorRowsById = new Map(vectorRows.map((v) => [v.memoryId, v]));
 
   const scored: SimilarMatch[] = [];
   for (const row of rows) {
     const stored = vectorsByMemoryId.get(row.id);
     if (!stored) continue;
-    const vectorRow = vectorRows.find((v) => v.memoryId === row.id);
+    const vectorRow = vectorRowsById.get(row.id);
     const identityMatch =
       vectorRow &&
       vectorRow.space === vector.space &&

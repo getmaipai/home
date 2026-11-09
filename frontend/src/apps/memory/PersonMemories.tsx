@@ -294,11 +294,11 @@ export function OtherPersonMemories({ personId, personName }: { personId: string
 export function OwnMemories({ filterIds, actorIsAdult }: { filterIds: Set<string> | null; actorIsAdult: boolean }) {
   const queryClient = useQueryClient();
   const roster = useQuery<PersonRosterEntry[]>({ queryKey: ["people"], queryFn: () => api.people() });
-  const query = useQuery<MemoryRecord[]>({
+  const query = useQuery<Awaited<ReturnType<typeof api.memoryPage>>>({
     queryKey: ["memory-list", ME],
-    queryFn: () => api.memories(),
+    queryFn: () => api.memoryPage(),
   });
-  const all = Array.isArray(query.data) ? query.data : [];
+  const all = query.data?.records ?? [];
   const records = filterIds ? all.filter((m) => filterIds.has(m.id)) : all;
 
   const selectMode = useSelectMode(records.map((m) => m.id));
@@ -307,6 +307,18 @@ export function OwnMemories({ filterIds, actorIsAdult }: { filterIds: Set<string
   const [actionError, setActionError] = useState<string | null>(null);
   const [archivingId, setArchivingId] = useState<string | null>(null);
   const [audienceId, setAudienceId] = useState<string | null>(null);
+  const [loadingMore, setLoadingMore] = useState(false);
+
+  async function loadMore() {
+    if (!query.data?.next_cursor || loadingMore) return;
+    setLoadingMore(true);
+    try {
+      const page = await api.memoryPage(undefined, query.data.next_cursor);
+      queryClient.setQueryData(["memory-list", ME], { ...page, records: [...all, ...page.records] });
+    } catch (err) {
+      setActionError(errorLine(err, i18n._({ id: "Could not load more memories. Check your connection and try again.", message: "Could not load more memories. Check your connection and try again." })));
+    } finally { setLoadingMore(false); }
+  }
 
   async function handleSetAudience(id: string, value: "child_ok" | "teen_ok" | "adult_only") {
     setAudienceId(id);
@@ -363,6 +375,7 @@ export function OwnMemories({ filterIds, actorIsAdult }: { filterIds: Set<string
   return (
     <div className="flex flex-col gap-4">
       {actionError ? <StatusCard kind="problem" title={i18n._({ id: "That did not work", message: "That did not work" })} line={actionError} /> : null}
+      <p>{i18n._({ id: "Showing {shown} of {total} memories", message: "Showing {shown} of {total} memories", values: { shown: all.length, total: query.data?.total ?? 0 } })}{all.some((m) => (m as MemoryRecord & { ending?: boolean }).ending) ? ` · ${i18n._({ id: "Ending", message: "Ending" })}` : ""}</p>
 
       {!filterIds ? (
         <div className="flex flex-wrap items-center gap-2">
@@ -397,18 +410,27 @@ export function OwnMemories({ filterIds, actorIsAdult }: { filterIds: Set<string
 
       {confirmingForget === "clear" ? (
         <DestructiveConfirm
-          message={i18n._({ id: "{count, plural, one {Forget your memory? This cannot be undone.} other {Forget every one of your # memories? This cannot be undone.}}", message: "{count, plural, one {Forget your memory? This cannot be undone.} other {Forget every one of your # memories? This cannot be undone.}}", values: { count: all.length } })}
-          confirmLabel={i18n._({ id: "Yes, forget all", message: "Yes, forget all" })}
+          message={i18n._({ id: "Forget all {total} memories, including those not loaded yet? This cannot be undone.", message: "Forget all {total} memories, including those not loaded yet? This cannot be undone.", values: { total: query.data?.total ?? all.length } })}
+          confirmLabel={i18n._({ id: "Yes, forget all {total}", message: "Yes, forget all {total}", values: { total: query.data?.total ?? all.length } })}
           busyLabel={i18n._({ id: "Forgetting…", message: "Forgetting…" })}
           busy={busy}
-          onConfirm={() => forgetIds(all.map((m) => m.id))}
+          onConfirm={async () => {
+            setBusy(true); setActionError(null);
+            try {
+              const { outcomes } = await api.forgetAllVisibleMemories();
+              const refused = outcomes.filter((o) => !o.deleted);
+              if (refused.length) setActionError(i18n._({ id: "{count} memories could not be forgotten: {reason}", message: "{count} memories could not be forgotten: {reason}", values: { count: refused.length, reason: refused[0]?.reason ?? "not allowed" } }));
+              setConfirmingForget(null); await queryClient.invalidateQueries({ queryKey: ["memory-list", ME] });
+            } catch (err) { setActionError(errorLine(err, i18n._({ id: "Could not forget those memories. Check your connection and try again.", message: "Could not forget those memories. Check your connection and try again." }))); }
+            finally { setBusy(false); }
+          }}
           onCancel={() => setConfirmingForget(null)}
           cancelLabel={i18n._({ id: "Keep them", message: "Keep them" })}
         />
       ) : null}
 
       <AsyncState
-        data={query.data}
+        data={all}
         error={query.isError}
         isFetching={query.isFetching}
         onRetry={() => query.refetch()}
@@ -437,6 +459,7 @@ export function OwnMemories({ filterIds, actorIsAdult }: { filterIds: Set<string
           </MemoryGroups>
         )}
       </AsyncState>
+      {query.data?.next_cursor ? <Button variant="secondary" disabled={loadingMore} onClick={loadMore}>{loadingMore ? i18n._({ id: "Loading…", message: "Loading…" }) : i18n._({ id: "Load more", message: "Load more" })}</Button> : null}
     </div>
   );
 }

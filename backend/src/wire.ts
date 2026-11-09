@@ -174,6 +174,7 @@ export interface TurnStats {
 export interface MemoryTraceStats {
   profile: string[];
   injected: { id: string; score: number }[];
+  companion?: { id: string; score?: number; source: "companion" }[];
 }
 
 /** Shared vocabulary for measured turn context segments. */
