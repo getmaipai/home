@@ -75,17 +75,17 @@ msgid ", or cancel to leave things as they are"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/FilesPage.tsx:190
+#: src/shell/pages/FilesPage.tsx:191
 msgid "‘{name}’ is kept until you delete it."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/FilesPage.tsx:195
+#: src/shell/pages/FilesPage.tsx:196
 msgid "‘{name}’ is now marked all-ages."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/FilesPage.tsx:172
+#: src/shell/pages/FilesPage.tsx:173
 msgid "‘{name}’ moved to Trash. Kept 30 days"
 msgstr ""
 
@@ -155,27 +155,27 @@ msgid "{count, plural, one {# change is waiting} other {# changes are waiting}}"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/FilesPage.tsx:309
+#: src/shell/pages/FilesPage.tsx:310
 msgid "{count, plural, one {# could not be deleted: {reason}.} other {# could not be deleted: {reason}.}}"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/FilesPage.tsx:73
+#: src/shell/pages/FilesPage.tsx:74
 msgid "{count, plural, one {# could not be kept: {reason}.} other {# could not be kept: {reason}.}}"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/FilesPage.tsx:172
+#: src/shell/pages/FilesPage.tsx:173
 msgid "{count, plural, one {# could not be moved to Trash: {reason}.} other {# could not be moved to Trash: {reason}.}}"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/FilesPage.tsx:172
+#: src/shell/pages/FilesPage.tsx:173
 msgid "{count, plural, one {# could not be moved: {reason}.} other {# could not be moved: {reason}.}}"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/FilesPage.tsx:72
+#: src/shell/pages/FilesPage.tsx:73
 msgid "{count, plural, one {# could not be restored: {reason}.} other {# could not be restored: {reason}.}}"
 msgstr ""
 
@@ -210,7 +210,7 @@ msgid "{count, plural, one {# file} other {# files}}"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/FilesPage.tsx:67
+#: src/shell/pages/FilesPage.tsx:68
 msgid "{count, plural, one {# item} other {# items}}"
 msgstr ""
 
@@ -220,7 +220,7 @@ msgid "{count, plural, one {# kept because it is in use. } other {# kept because
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/FilesPage.tsx:331
+#: src/shell/pages/FilesPage.tsx:332
 msgid "{count, plural, one {# kept until you delete it} other {# kept until you delete them}}"
 msgstr ""
 
@@ -290,12 +290,12 @@ msgid "{count, plural, one {Delete # file forever?} other {Delete # files foreve
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/FilesPage.tsx:309
+#: src/shell/pages/FilesPage.tsx:310
 msgid "{count, plural, one {File deleted forever} other {# files deleted forever}}"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/FilesPage.tsx:308
+#: src/shell/pages/FilesPage.tsx:309
 msgid "{count, plural, one {File restored} other {# files restored}}"
 msgstr ""
 
@@ -335,7 +335,7 @@ msgid "{count} did not finish. Try again. "
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/FilesPage.tsx:172
+#: src/shell/pages/FilesPage.tsx:173
 msgid "{count} files moved to Trash. Kept 30 days"
 msgstr ""
 
@@ -350,7 +350,7 @@ msgid "{count} of {total} could not be forgotten: {reason}"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/FilesPage.tsx:174
+#: src/shell/pages/FilesPage.tsx:175
 msgid "{count} restored"
 msgstr ""
 
@@ -1111,7 +1111,7 @@ msgid "{saved} of {total} MB saved. The backup takes about 6 minutes; keep the c
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/FilesPage.tsx:379
+#: src/shell/pages/FilesPage.tsx:380
 msgid "{shared}{access}You can get it back from Trash for 30 days."
 msgstr ""
 
@@ -3155,7 +3155,7 @@ msgid "api.minor.upload_not_allowed_minor"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/FilesPage.tsx:68
+#: src/shell/pages/FilesPage.tsx:69
 msgid "Ask a grown-up to add this file. Adding files to the Library is turned off for your profile."
 msgstr ""
 
@@ -3207,7 +3207,7 @@ msgid "Ask one of them to finish this setup for your Home."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/FilesPage.tsx:48
+#: src/shell/pages/FilesPage.tsx:49
 msgid "Ask to add a file"
 msgstr ""
 
@@ -4188,7 +4188,7 @@ msgstr ""
 #: src/shell/pages/ChatPage.tsx:1681
 #: src/shell/pages/CompanionAudienceDialog.tsx:63
 #: src/shell/pages/CompanionsPage.tsx:179
-#: src/shell/pages/FilesPage.tsx:402
+#: src/shell/pages/FilesPage.tsx:403
 #: src/shell/pages/settings/SettingField.tsx:149
 #: src/shell/pages/settings/SettingField.tsx:268
 #: src/shell/pages/settings/SettingsRenderer.tsx:169
@@ -4817,7 +4817,7 @@ msgid "Checking the MaiPai Stack"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/FilesPage.tsx:194
+#: src/shell/pages/FilesPage.tsx:195
 msgid "Checking the picture. This can take a minute."
 msgstr ""
 
@@ -5082,7 +5082,7 @@ msgid "Choose companion"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/FilesPage.tsx:351
+#: src/shell/pages/FilesPage.tsx:352
 msgid "Choose files to add"
 msgstr ""
 
@@ -5502,7 +5502,7 @@ msgid "Clear done"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/FilesPage.tsx:314
+#: src/shell/pages/FilesPage.tsx:315
 msgid "Clear filters"
 msgstr ""
 
@@ -7494,14 +7494,14 @@ msgstr ""
 #: src/shell/library/LibraryViewer.tsx:159
 #: src/shell/pages/CompanionsPage.tsx:79
 #: src/shell/pages/CompanionsPage.tsx:179
-#: src/shell/pages/FilesPage.tsx:332
+#: src/shell/pages/FilesPage.tsx:333
 #: src/shell/pages/MusicStudioPages.tsx:194
 #: src/shell/pages/SoundExtras.tsx:46
 msgid "Delete"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/FilesPage.tsx:378
+#: src/shell/pages/FilesPage.tsx:379
 msgid "Delete ‘{name}’?"
 msgstr ""
 
@@ -7980,7 +7980,7 @@ msgstr ""
 
 #. js-lingui-explicit-id
 #: src/shell/pages/ChatPage.tsx:1919
-#: src/shell/pages/FilesPage.tsx:150
+#: src/shell/pages/FilesPage.tsx:151
 msgid "Document"
 msgstr ""
 
@@ -8202,7 +8202,7 @@ msgid "Drawing your character..."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/FilesPage.tsx:385
+#: src/shell/pages/FilesPage.tsx:386
 msgid "Drop to add to your Library"
 msgstr ""
 
@@ -9019,8 +9019,8 @@ msgid "setting.music.album_art_online.label"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/FilesPage.tsx:150
-#: src/shell/pages/FilesPage.tsx:172
+#: src/shell/pages/FilesPage.tsx:151
+#: src/shell/pages/FilesPage.tsx:173
 msgid "File"
 msgstr ""
 
@@ -9080,7 +9080,7 @@ msgid "Filter results by book"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/FilesPage.tsx:364
+#: src/shell/pages/FilesPage.tsx:365
 msgid "Filters"
 msgstr ""
 
@@ -9895,7 +9895,7 @@ msgid "Granted by an admin. Their protections stay on."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/FilesPage.tsx:368
+#: src/shell/pages/FilesPage.tsx:369
 msgid "Grid view"
 msgstr ""
 
@@ -10376,7 +10376,7 @@ msgid "Home could not load coding setup. Refresh this page and try again."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/FilesPage.tsx:322
+#: src/shell/pages/FilesPage.tsx:323
 msgid "Home could not load more files. Check that Home is running, then try again."
 msgstr ""
 
@@ -10401,12 +10401,12 @@ msgid "Home could not load Trash. Try again."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/FilesPage.tsx:311
+#: src/shell/pages/FilesPage.tsx:312
 msgid "Home could not load your Library. Check that Home is running, then try again."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/FilesPage.tsx:306
+#: src/shell/pages/FilesPage.tsx:307
 msgid "Home could not load your Trash. Check that Home is running, then try again."
 msgstr ""
 
@@ -11915,7 +11915,7 @@ msgid "It is easy to feel close to a chatbot or companion, so keep real relation
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/FilesPage.tsx:379
+#: src/shell/pages/FilesPage.tsx:380
 msgid "It is shared with everyone in the home."
 msgstr ""
 
@@ -12030,7 +12030,7 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/shell/library/LibraryItems.tsx:36
 #: src/shell/library/LibraryViewer.tsx:95
-#: src/shell/pages/FilesPage.tsx:331
+#: src/shell/pages/FilesPage.tsx:332
 msgid "Keep"
 msgstr ""
 
@@ -12094,7 +12094,7 @@ msgstr ""
 #: src/apps/settings/HouseholdRobotsSection.tsx:190
 #: src/apps/settings/ModelsAndStorageSection.tsx:123
 #: src/apps/settings/styles/StyleEditor.tsx:181
-#: src/shell/pages/FilesPage.tsx:380
+#: src/shell/pages/FilesPage.tsx:381
 #: src/shell/pages/MusicStudioPages.tsx:194
 #: src/shell/pages/MusicWorkspacePage.tsx:185
 #: src/shell/pages/settings/WebSearchSettings.tsx:129
@@ -12590,12 +12590,12 @@ msgid "Layers"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/FilesPage.tsx:367
+#: src/shell/pages/FilesPage.tsx:368
 msgid "Layout"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/FilesPage.tsx:399
+#: src/shell/pages/FilesPage.tsx:400
 msgid "Leave it empty to go back to the name Home chose."
 msgstr ""
 
@@ -12909,7 +12909,7 @@ msgid "Levels and models"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/FilesPage.tsx:77
+#: src/shell/pages/FilesPage.tsx:78
 #: src/shell/pages/MusicStudioPages.tsx:146
 #: src/shell/pages/settings/settingsBackLink.ts:53
 #: src/shell/pages/status/StatusComponents.tsx:30
@@ -12928,7 +12928,7 @@ msgid "Library only"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/FilesPage.tsx:356
+#: src/shell/pages/FilesPage.tsx:357
 msgid "Library sections"
 msgstr ""
 
@@ -13072,7 +13072,7 @@ msgid "List options"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/FilesPage.tsx:369
+#: src/shell/pages/FilesPage.tsx:370
 msgid "List view"
 msgstr ""
 
@@ -13348,7 +13348,7 @@ msgid "Loading memories"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/FilesPage.tsx:323
+#: src/shell/pages/FilesPage.tsx:324
 msgid "Loading more files"
 msgstr ""
 
@@ -13524,8 +13524,8 @@ msgid "Loading your AI setup"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/FilesPage.tsx:307
-#: src/shell/pages/FilesPage.tsx:312
+#: src/shell/pages/FilesPage.tsx:308
+#: src/shell/pages/FilesPage.tsx:313
 msgid "Loading your files"
 msgstr ""
 
@@ -14588,7 +14588,7 @@ msgid "Microphone test results"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/FilesPage.tsx:364
+#: src/shell/pages/FilesPage.tsx:365
 msgid "Mine"
 msgstr ""
 
@@ -14822,7 +14822,7 @@ msgid "motors"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/FilesPage.tsx:378
+#: src/shell/pages/FilesPage.tsx:379
 msgid "Move {count} files to Trash?"
 msgstr ""
 
@@ -14839,7 +14839,7 @@ msgid "Move {name} up"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/FilesPage.tsx:380
+#: src/shell/pages/FilesPage.tsx:381
 msgid "Move to Trash"
 msgstr ""
 
@@ -14859,7 +14859,7 @@ msgid "setting.news.default_topics.teen.option.entertainment"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/FilesPage.tsx:380
+#: src/shell/pages/FilesPage.tsx:381
 msgid "Moving"
 msgstr ""
 
@@ -14991,7 +14991,7 @@ msgstr ""
 #: src/apps/settings/styles/StyleAddFile.tsx:51
 #: src/apps/settings/styles/StyleConfirm.tsx:84
 #: src/apps/settings/styles/StyleEditor.tsx:82
-#: src/shell/pages/FilesPage.tsx:400
+#: src/shell/pages/FilesPage.tsx:401
 #: src/shell/pages/ProjectsPage.tsx:156
 #: src/shell/pages/UpdatesPage.tsx:50
 msgid "Name"
@@ -15579,7 +15579,7 @@ msgid "No matches for \"{q}\". Try another word."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/FilesPage.tsx:314
+#: src/shell/pages/FilesPage.tsx:315
 msgid "No matches. Try a different word or clear a filter."
 msgstr ""
 
@@ -16151,7 +16151,7 @@ msgid "Nothing here yet. Add music, videos, shows, podcasts or books to your lib
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/FilesPage.tsx:315
+#: src/shell/pages/FilesPage.tsx:316
 msgid "Nothing here yet. Pictures, videos and songs you make in chat land here, along with files you upload. Drop a file anywhere on this page to add it."
 msgstr ""
 
@@ -16161,7 +16161,7 @@ msgid "Nothing idle to unload right now."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/FilesPage.tsx:316
+#: src/shell/pages/FilesPage.tsx:317
 msgid "Nothing in {label} yet."
 msgstr ""
 
@@ -17841,7 +17841,7 @@ msgid "setting.engines.stack.where.does"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/FilesPage.tsx:150
+#: src/shell/pages/FilesPage.tsx:151
 msgid "Picture"
 msgstr ""
 
@@ -19041,7 +19041,7 @@ msgid "Rename conversation"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/FilesPage.tsx:399
+#: src/shell/pages/FilesPage.tsx:400
 msgid "Rename file"
 msgstr ""
 
@@ -19061,7 +19061,7 @@ msgid "Rename quick timer"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/FilesPage.tsx:397
+#: src/shell/pages/FilesPage.tsx:398
 msgid "Renamed."
 msgstr ""
 
@@ -19952,7 +19952,7 @@ msgstr ""
 
 #. js-lingui-explicit-id
 #: src/apps/settings/VoiceManagerSection.tsx:149
-#: src/shell/pages/FilesPage.tsx:402
+#: src/shell/pages/FilesPage.tsx:403
 msgid "Save name"
 msgstr ""
 
@@ -20441,9 +20441,9 @@ msgid "Search Wikipedia"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/FilesPage.tsx:294
-#: src/shell/pages/FilesPage.tsx:294
-#: src/shell/pages/FilesPage.tsx:343
+#: src/shell/pages/FilesPage.tsx:295
+#: src/shell/pages/FilesPage.tsx:295
+#: src/shell/pages/FilesPage.tsx:344
 msgid "Search your Library"
 msgstr ""
 
@@ -20580,7 +20580,7 @@ msgstr ""
 
 #. js-lingui-explicit-id
 #: src/apps/notifications/NotificationsPage.tsx:155
-#: src/shell/pages/FilesPage.tsx:371
+#: src/shell/pages/FilesPage.tsx:372
 msgid "Select"
 msgstr ""
 
@@ -20922,7 +20922,7 @@ msgstr ""
 #: src/shell/AmbientCompanionPane.tsx:318
 #: src/shell/coreLabels.ts:13
 #: src/shell/pageHeaderTitle.tsx:94
-#: src/shell/pages/FilesPage.tsx:284
+#: src/shell/pages/FilesPage.tsx:285
 #: src/shell/pages/settings/SettingsAreaPage.tsx:292
 #: src/shell/Routes.tsx:424
 msgid "Settings"
@@ -20985,7 +20985,7 @@ msgstr ""
 #: src/shell/library/LibraryItems.tsx:34
 #: src/shell/library/LibraryViewer.tsx:156
 #: src/shell/library/LibraryViewer.tsx:156
-#: src/shell/pages/FilesPage.tsx:330
+#: src/shell/pages/FilesPage.tsx:331
 msgid "Share"
 msgstr ""
 
@@ -21082,7 +21082,7 @@ msgid "setting.notifications.browser.enabled.label"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/FilesPage.tsx:316
+#: src/shell/pages/FilesPage.tsx:317
 msgid "Show all files"
 msgstr ""
 
@@ -21135,7 +21135,7 @@ msgid "Show me around"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/FilesPage.tsx:323
+#: src/shell/pages/FilesPage.tsx:324
 msgid "Show more files"
 msgstr ""
 
@@ -21660,7 +21660,7 @@ msgid "Some downloads need a free Civitai key. Home keeps it private and never s
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/FilesPage.tsx:379
+#: src/shell/pages/FilesPage.tsx:380
 msgid "Some of it is shared with people in your home."
 msgstr ""
 
@@ -21691,7 +21691,7 @@ msgid "setting.synths.real_people.does_teen"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/FilesPage.tsx:152
+#: src/shell/pages/FilesPage.tsx:153
 msgid "Someone in your home"
 msgstr ""
 
@@ -21729,7 +21729,7 @@ msgstr ""
 
 #. js-lingui-explicit-id
 #: src/shell/library/LibraryViewer.tsx:110
-#: src/shell/pages/FilesPage.tsx:150
+#: src/shell/pages/FilesPage.tsx:151
 #: src/shell/pages/MusicWorkspacePage.tsx:36
 #: src/shell/pages/SoundExtras.tsx:74
 #: src/shell/pages/SoundExtras.tsx:76
@@ -21777,7 +21777,7 @@ msgid "Sort"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/FilesPage.tsx:365
+#: src/shell/pages/FilesPage.tsx:366
 msgid "Sort by"
 msgstr ""
 
@@ -23119,7 +23119,7 @@ msgid "api.error.upload_file_empty"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/FilesPage.tsx:159
+#: src/shell/pages/FilesPage.tsx:160
 msgid "That file is not available to you. Ask the person who added it to share it again."
 msgstr ""
 
@@ -23129,7 +23129,7 @@ msgid "api.error.file_not_in_library"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/FilesPage.tsx:181
+#: src/shell/pages/FilesPage.tsx:182
 msgid "That file is not yours to delete. Ask the person who added it."
 msgstr ""
 
@@ -24340,7 +24340,7 @@ msgid "These instructions shape answers in this project."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/FilesPage.tsx:379
+#: src/shell/pages/FilesPage.tsx:380
 msgid "They lose access now."
 msgstr ""
 
@@ -24763,7 +24763,7 @@ msgid "setting.robot.initiative.tiers_spoken.help"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/FilesPage.tsx:366
+#: src/shell/pages/FilesPage.tsx:367
 msgid "Tile size"
 msgstr ""
 
@@ -25110,7 +25110,7 @@ msgstr ""
 #: src/shell/InstallStrip.tsx:96
 #: src/shell/library/LibraryUploads.tsx:75
 #: src/shell/pages/companionFlow/AnimateStep.tsx:131
-#: src/shell/pages/FilesPage.tsx:301
+#: src/shell/pages/FilesPage.tsx:302
 #: src/shell/pages/settings/WebSearchSettings.tsx:103
 msgid "Try again"
 msgstr ""
@@ -25494,7 +25494,7 @@ msgstr ""
 
 #. js-lingui-explicit-id
 #: src/shell/library/TranscriptPanel.tsx:428
-#: src/shell/pages/FilesPage.tsx:174
+#: src/shell/pages/FilesPage.tsx:175
 msgid "Undo"
 msgstr ""
 
@@ -25708,7 +25708,7 @@ msgid "area.Updates"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/FilesPage.tsx:48
+#: src/shell/pages/FilesPage.tsx:49
 msgid "Upload"
 msgstr ""
 
@@ -26065,7 +26065,7 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/apps/settings/ModelsAndStorageSection.tsx:23
 #: src/apps/settings/performanceModel.ts:9
-#: src/shell/pages/FilesPage.tsx:150
+#: src/shell/pages/FilesPage.tsx:151
 msgid "Video"
 msgstr ""
 

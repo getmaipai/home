@@ -4,7 +4,6 @@ import { PageHeaderTitle } from "@/shell/pageHeaderTitle";
 import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
 import { useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
-import { HitField } from "@maipai/ui/src/settings/HitField";
 import { formatBytes } from "@maipai/ui/src/format";
 import { useIsPhoneLayout } from "@maipai/ui/src/dashboard/layouts/full/FullLayout";
 import { SectionSidebar, SectionSidebarDrawerSections, SectionSidebarShowButton, type SectionSidebarGroup, type SectionSidebarItem } from "@maipai/ui/src/primitives/SectionSidebar";
@@ -35,6 +34,7 @@ import { LibraryTrash } from "@/shell/library/LibraryTrash";
 import { LibraryStorage } from "@/shell/library/LibraryStorage";
 import { UploadTray, useLibraryUploads } from "@/shell/library/LibraryUploads";
 import { getIcon } from "@maipai/ui/src/icons";
+import { Chip } from "@maipai/ui/src/primitives/Chip";
 
 const UploadIcon = getIcon("upload-cloud");
 const LIBRARY_UPLOAD_EVENT = "maipai:library-upload";
@@ -291,7 +291,7 @@ export function FilesPage({ person }: { person: Roster }) {
   const headline = trashView ? (trashRows.length > 0 || trash.data ? itemsWord(trashRows.length) : "") : current ? `${itemsWord(current.items)} · ${formatBytes(current.bytes)}` : "";
   const filtersOn = view.q.trim() !== "" || view.filter !== "any";
   const searchField = (
-    <Input type="search" aria-label={i18n._({ id: "Search your Library", message: "Search your Library" })} placeholder={i18n._({ id: "Search your Library", message: "Search your Library" })} value={searchText} onChange={(event) => setSearchText(event.target.value)}
+    <Input type="search" shape="pill" fill="surface" aria-label={i18n._({ id: "Search your Library", message: "Search your Library" })} placeholder={i18n._({ id: "Search your Library", message: "Search your Library" })} value={searchText} onChange={(event) => setSearchText(event.target.value)}
       onKeyDown={(event) => { if (event.key === "Escape" && searchText) { event.preventDefault(); setSearchText(""); } }} />
   );
 
@@ -311,9 +311,9 @@ export function FilesPage({ person }: { person: Roster }) {
     if (list.isError && !list.isFetchNextPageError) return loadError(list.error instanceof ApiError && list.error.message ? list.error.message : i18n._({ id: "Home could not load your Library. Check that Home is running, then try again.", message: "Home could not load your Library. Check that Home is running, then try again." }), () => void list.refetch());
     if (list.isPending) return <RouteSkeleton label={i18n._({ id: "Loading your files", message: "Loading your files" })} />;
     if (items.length === 0) {
-      if (filtersOn) return <EmptyState icon="search" text={i18n._({ id: "No matches. Try a different word or clear a filter.", message: "No matches. Try a different word or clear a filter." })} actionLabel={i18n._({ id: "Clear filters", message: "Clear filters" })} onAction={() => { setSearchText(""); update({ q: "", filter: "any" }); }} />;
-      if (view.section === "all") return <EmptyState icon="folder" text={i18n._({ id: "Nothing here yet. Pictures, videos and songs you make in chat land here, along with files you upload. Drop a file anywhere on this page to add it.", message: "Nothing here yet. Pictures, videos and songs you make in chat land here, along with files you upload. Drop a file anywhere on this page to add it." })} />;
-      return <EmptyState icon={sectionOf(view.section).icon} text={i18n._({ id: "Nothing in {label} yet.", message: "Nothing in {label} yet.", values: { label: sectionOf(view.section).label } })} actionLabel={i18n._({ id: "Show all files", message: "Show all files" })} onAction={() => goSection("all")} />;
+      if (filtersOn) return <EmptyState variant="tile" icon="search" text={i18n._({ id: "No matches. Try a different word or clear a filter.", message: "No matches. Try a different word or clear a filter." })} actionLabel={i18n._({ id: "Clear filters", message: "Clear filters" })} onAction={() => { setSearchText(""); update({ q: "", filter: "any" }); }} />;
+      if (view.section === "all") return <EmptyState variant="tile" icon="folder" text={i18n._({ id: "Nothing here yet. Pictures, videos and songs you make in chat land here, along with files you upload. Drop a file anywhere on this page to add it.", message: "Nothing here yet. Pictures, videos and songs you make in chat land here, along with files you upload. Drop a file anywhere on this page to add it." })} />;
+      return <EmptyState variant="tile" icon={sectionOf(view.section).icon} text={i18n._({ id: "Nothing in {label} yet.", message: "Nothing in {label} yet.", values: { label: sectionOf(view.section).label } })} actionLabel={i18n._({ id: "Show all files", message: "Show all files" })} onAction={() => goSection("all")} />;
     }
     return (
       <div className="flex flex-col gap-4" style={{ "--maipai-card-size": `${cardSize}px` } as CSSProperties}>
@@ -345,23 +345,23 @@ export function FilesPage({ person }: { person: Roster }) {
         <div className="flex flex-wrap items-center gap-3">
           {wide && collapsed ? <SectionSidebarShowButton onClick={() => setCollapsed(false)} controls="library-sidebar" /> : null}
           <div className="min-w-0 flex-1">
-            <h1 className="truncate text-2xl font-semibold tracking-tight">{sectionOf(view.section).label}</h1>
-            <p className="text-base text-muted-foreground" aria-live="polite">{headline}</p>
+            <h1 className="truncate text-title font-bold tracking-tight">{sectionOf(view.section).label}</h1>
+            <p className="text-supporting text-muted-foreground" aria-live="polite">{headline}</p>
           </div>
           <input ref={fileInput} type="file" multiple hidden aria-label={i18n._({ id: "Choose files to add", message: "Choose files to add" })} onChange={(event) => { const files = Array.from(event.target.files ?? []); event.target.value = ""; if (files.length > 0) addFiles(files); }} />
         </div>
 
         {/* AUDIT-UI-01: shrink-0, or the column squeezes this scrolling strip down to the tops of its chips when the page is taller than the phone. */}
         {!wide ? (
-          <div role="group" aria-label={i18n._({ id: "Library sections", message: "Library sections" })} className="-mx-4 flex shrink-0 gap-2 overflow-x-auto px-4 pb-1">
-            {sections.map((section) => <div key={section.id} className="shrink-0"><Button type="button" variant={view.section === section.id ? "secondary" : "outline"} aria-pressed={view.section === section.id} onClick={() => goSection(section.id)}>{section.label}</Button></div>)}
+          <div role="group" aria-label={i18n._({ id: "Library sections", message: "Library sections" })} className="-mx-4 flex shrink-0 flex-nowrap gap-2 overflow-x-auto px-4 pb-1">
+            {sections.map((section) => <Chip key={section.id} tone="surface" selectedTone="inverse" size="strip" selected={view.section === section.id} onClick={() => goSection(section.id)}>{section.label}</Chip>)}
           </div>
         ) : null}
-        {!wide && !trashView ? <HitField pad={10}>{searchField}</HitField> : null}
+        {!wide && !trashView ? searchField : null}
 
         {!trashView ? (
           <div className="flex flex-wrap items-center gap-3">
-            {filterAllowed(view.section, "mine") ? <div role="group" aria-label={i18n._({ id: "Filters", message: "Filters" })}><Button type="button" variant={view.filter === "mine" ? "secondary" : "outline"} aria-pressed={view.filter === "mine"} onClick={() => update({ filter: view.filter === "mine" ? "any" : "mine" })}>{i18n._({ id: "Mine", message: "Mine" })}</Button></div> : null}
+            {filterAllowed(view.section, "mine") ? <div role="group" aria-label={i18n._({ id: "Filters", message: "Filters" })}><Chip tone="surface" selectedTone="inverse" size="strip" selected={view.filter === "mine"} onClick={() => update({ filter: view.filter === "mine" ? "any" : "mine" })}>{i18n._({ id: "Mine", message: "Mine" })}</Chip></div> : null}
             <div className="sm:ml-auto"><Select aria-label={i18n._({ id: "Sort by", message: "Sort by" })} value={view.sort} onValueChange={(value) => update({ sort: value as SortId })} options={Object.keys(SORT_LABELS)} getLabel={(value) => SORT_LABELS[value as SortId]} /></div>
             {view.layout === "grid" && !phone ? <CardSizeSlider size={cardSize} onChange={setCardSize} label={i18n._({ id: "Tile size", message: "Tile size" })} /> : null}
             <div role="group" aria-label={i18n._({ id: "Layout", message: "Layout" })} className="flex gap-1">
