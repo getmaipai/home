@@ -60,6 +60,25 @@ function record(overrides: Partial<MemoryRecord> = {}): MemoryRecord {
 const page = (records: unknown[]) => ({ records, total: records.length, next_cursor: null });
 
 describe("OwnMemories", () => {
+  test("faded memories show their count up front and restore refreshes both lists", async () => {
+    let restored = false;
+    const original = globalThis.fetch;
+    globalThis.fetch = mock((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = typeof input === "string" ? input : input.toString();
+      if (init?.method === "POST" && url.includes("/faded-id/restore")) { restored = true; return Promise.resolve(new Response(JSON.stringify(record({ id: "faded-id", text: "Old memory", status: "active" })), { status: 200 })); }
+      if (url.includes("state=faded")) return Promise.resolve(new Response(JSON.stringify(page(restored ? [] : [record({ id: "faded-id", text: "Old memory", status: "archived" })])), { status: 200 }));
+      if (url.includes("/api/memory")) return Promise.resolve(new Response(JSON.stringify(page([])), { status: 200 }));
+      throw new Error(`unstubbed fetch: ${url}`);
+    }) as unknown as typeof fetch;
+    try {
+      const { findByRole, findByText, queryByText } = renderWithQueryClient(<OwnMemories filterIds={null} actorIsAdult={false} />);
+      expect(queryByText("Old memory")).toBeNull();
+      fireEvent.click(await findByRole("button", { name: /Faded/ }));
+      await findByText("Old memory");
+      fireEvent.click(await findByRole("button", { name: 'Restore "Old memory"' }));
+      await waitForGone(() => queryByText("Old memory"));
+    } finally { globalThis.fetch = original; }
+  });
   test("archiving a memory removes it from the list", async () => {
     // Stateful, not a fixed fixture (same convention PeopleAndThings.test.tsx's
     // "tapping Confirm..." test uses): handleArchive() invalidates

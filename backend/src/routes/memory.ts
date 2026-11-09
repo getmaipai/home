@@ -7,6 +7,7 @@ import {
   list,
   listPage,
   archive,
+  restore,
   forget,
   forgetByIds,
   exportPerson,
@@ -169,6 +170,7 @@ const MemoryListQuerySchema = z.object({
   cursor: z.string().optional(),
   as_of: z.string().optional(),
   include_superseded: z.enum(["true", "false"]).optional(),
+  state: z.enum(["active", "faded"]).optional(),
 });
 const MemoryWithDevice = MemoryRecord.extend({ device_name: z.string().optional().describe("The robot's current name, present when device_id is set.") });
 const memoryListRoute = createRoute({
@@ -197,10 +199,11 @@ const memoryPageRoute = createRoute({
     401: { content: { "application/json": { schema: ErrorSchema } }, description: "Not signed in" },
   },
 });
-function readMemoryPage(c: any): { error: string } | { records: ReturnType<typeof list>; total: number; nextCursor: string | null } {
+function readMemoryPage(c: any, allowState = false): { error: string } | { records: ReturnType<typeof list>; total: number; nextCursor: string | null } {
   const actor = c.get("person");
-  const { scope, person, companion_id, limit, cursor, as_of, include_superseded } = c.req.valid("query") as z.infer<typeof MemoryListQuerySchema>;
+  const { scope, person, companion_id, limit, cursor, as_of, include_superseded, state } = c.req.valid("query") as z.infer<typeof MemoryListQuerySchema>;
   const opts: ListOptions = { limit, cursor, robotBound: "all" };
+  if (allowState && state === "faded") opts.faded = true;
   if (scope) opts.scope = scope;
   else opts.scopes = ["person", "household"];
   if (person) opts.person = person;
@@ -228,7 +231,7 @@ memoryRoutes.openapi(memoryListRoute, (c): ReturnType<typeof memoryListRoute ext
   return c.json(withDeviceNames(page.records)) as any;
 });
 memoryRoutes.openapi(memoryPageRoute, (c): ReturnType<typeof memoryPageRoute extends never ? never : any> => {
-  const page = readMemoryPage(c);
+  const page = readMemoryPage(c, true);
   if ("error" in page) return c.json({ error: page.error }, 400) as any;
   return c.json({ records: withDeviceNames(page.records), total: page.total, next_cursor: page.nextCursor }) as any;
 });
@@ -305,6 +308,12 @@ memoryRoutes.post("/maintenance/run", requireRole("owner", "admin"), async (c) =
 memoryRoutes.post("/:id/archive", requireAuth, async (c) => {
   const actor = c.get("person");
   const result = archive(actor, c.req.param("id"));
+  if (!result.ok) return refuseWith(c, result);
+  return c.json(result.value);
+});
+
+memoryRoutes.post("/:id/restore", requireAuth, async (c) => {
+  const result = restore(c.get("person"), c.req.param("id"));
   if (!result.ok) return refuseWith(c, result);
   return c.json(result.value);
 });

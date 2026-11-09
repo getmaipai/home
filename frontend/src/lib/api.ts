@@ -1718,8 +1718,8 @@ export const api = {
   // this app already relies on server-side, not re-implemented here.
   memories: (personId?: string) =>
     request<MemoryRecordWithDevice[]>(`/api/memory${personId ? `?person=${encodeURIComponent(personId)}` : ""}`),
-  memoryPage: (personId?: string, cursor?: string) =>
-    request<MemoryPage>(`/api/memory/page?${new URLSearchParams({ ...(personId ? { scope: "person", person: personId } : {}), ...(cursor ? { cursor } : {}) })}`),
+  memoryPage: (personId?: string, cursor?: string, state?: "active" | "faded") =>
+    request<MemoryPage>(`/api/memory/page?${new URLSearchParams({ ...(personId ? { scope: "person", person: personId } : {}), ...(cursor ? { cursor } : {}), ...(state ? { state } : {}) })}`),
   forgetPersonMemories: (personId: string) =>
     request<{ deleted: number }>("/api/memory/forget", { method: "POST", body: JSON.stringify({ personId }) }),
   // Distinct from forgetPersonMemories above (that erases every record
@@ -1736,6 +1736,8 @@ export const api = {
     request<MemoryRecord[]>(`/api/memory/export?personId=${encodeURIComponent(personId)}`),
   archiveMemory: (id: string) =>
     request<MemoryRecord>(`/api/memory/${encodeURIComponent(id)}/archive`, { method: "POST" }),
+  restoreMemory: (id: string) =>
+    request<MemoryRecord>(`/api/memory/${encodeURIComponent(id)}/restore`, { method: "POST" }),
   setAudience: (id: string, childDisclosure: "child_ok" | "teen_ok" | "adult_only") =>
     request<MemoryRecord>(`/api/memory/${encodeURIComponent(id)}/audience`, {
       method: "POST",

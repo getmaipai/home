@@ -308,6 +308,13 @@ export function OwnMemories({ filterIds, actorIsAdult }: { filterIds: Set<string
   const [archivingId, setArchivingId] = useState<string | null>(null);
   const [audienceId, setAudienceId] = useState<string | null>(null);
   const [loadingMore, setLoadingMore] = useState(false);
+  const [fadedOpen, setFadedOpen] = useState(false);
+  const fadedQuery = useQuery<Awaited<ReturnType<typeof api.memoryPage>>>({
+    queryKey: ["memory-list", ME, "faded"],
+    queryFn: () => api.memoryPage(undefined, undefined, "faded"),
+    enabled: !filterIds,
+  });
+  const [restoringId, setRestoringId] = useState<string | null>(null);
 
   async function loadMore() {
     if (!query.data?.next_cursor || loadingMore) return;
@@ -370,6 +377,20 @@ export function OwnMemories({ filterIds, actorIsAdult }: { filterIds: Set<string
     } finally {
       setArchivingId(null);
     }
+  }
+
+  async function handleRestore(id: string) {
+    setRestoringId(id);
+    setActionError(null);
+    try {
+      await api.restoreMemory(id);
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["memory-list", ME] }),
+        queryClient.invalidateQueries({ queryKey: ["memory-list", ME, "faded"] }),
+      ]);
+    } catch (err) {
+      setActionError(errorLine(err, i18n._({ id: "Could not restore that memory. Check your connection and try again.", message: "Could not restore that memory. Check your connection and try again." })));
+    } finally { setRestoringId(null); }
   }
 
   return (
@@ -460,6 +481,28 @@ export function OwnMemories({ filterIds, actorIsAdult }: { filterIds: Set<string
         )}
       </AsyncState>
       {query.data?.next_cursor ? <Button variant="secondary" disabled={loadingMore} onClick={loadMore}>{loadingMore ? i18n._({ id: "Loading…", message: "Loading…" }) : i18n._({ id: "Load more", message: "Load more" })}</Button> : null}
+      {!filterIds ? (
+        <section>
+          <Button variant="ghost" aria-expanded={fadedOpen} onClick={() => setFadedOpen((open) => !open)}>
+            {i18n._({ id: "Faded ({count})", message: "Faded ({count})", values: { count: fadedQuery.data?.total ?? 0 } })}
+          </Button>
+          {fadedOpen ? (
+            <div className="flex flex-col gap-3">
+              {fadedQuery.isLoading ? <p>{i18n._({ id: "Loading faded memories…", message: "Loading faded memories…" })}</p> : null}
+              {fadedQuery.isError ? <p>{i18n._({ id: "Could not load faded memories. Check your connection and try again.", message: "Could not load faded memories. Check your connection and try again." })}</p> : null}
+              {(fadedQuery.data?.records ?? []).map((memory) => (
+                <div key={memory.id} className="flex flex-wrap items-center justify-between gap-2">
+                  <p>{memory.text}</p>
+                  <Button size="row" variant="secondary" disabled={restoringId === memory.id} onClick={() => handleRestore(memory.id)}>
+                    {i18n._({ id: "Restore \"{text}\"", message: "Restore \"{text}\"", values: { text: memory.text } })}
+                  </Button>
+                </div>
+              ))}
+              {fadedQuery.data?.records.length === 0 ? <p>{i18n._({ id: "No faded memories.", message: "No faded memories." })}</p> : null}
+            </div>
+          ) : null}
+        </section>
+      ) : null}
     </div>
   );
 }

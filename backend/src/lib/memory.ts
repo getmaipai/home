@@ -25,7 +25,6 @@ import { deleteEpisodesForPerson, deleteEpisodesForTurns } from "@/lib/episodes"
 import { retireOrphanSubjects } from "@/lib/subjects";
 import { MemoryRecord } from "@maipai/spec/gen/ts/memory-record.js";
 import { ingestMemory } from "@/lib/memoryIngestion";
-import { synthById } from "@/lib/synths";
 import type { PersonRow, MemoryRecordRow } from "@/types";
 import type { Result } from "@/lib/result";
 
@@ -53,6 +52,16 @@ let companionReadGate: CompanionReadGate = () => false;
 
 export function registerCompanionReadGate(gate: CompanionReadGate): void {
   companionReadGate = gate;
+}
+
+// Who may change a companion's life records. Registered by lib/talent/life.ts
+// (a gate, not an import of the synth registry, which would make a load cycle
+// with the video and attachment code). Until it registers, only an owner or
+// admin may.
+let companionWriteGate: CompanionReadGate = (actor) => isOwnerOrAdmin(actor);
+
+export function registerCompanionWriteGate(gate: CompanionReadGate): void {
+  companionWriteGate = gate;
 }
 
 function canRead(actor: PersonRow, record: MemoryRecordRow, roleOf: Map<string, string>, selfOnly = false, withholdSensitive = false, anonymous = false): boolean {
@@ -177,8 +186,7 @@ function assertCanWrite(
   if (scope === "companion") {
     if (!source.startsWith("talent.")) return { ok: false, status: 403, error: "Companion scope requires a source starting with talent. Use a talent source before saving." };
     if (!companionId) return { ok: false, status: 400, error: "Companion scope requires a companion id. Set companion_id before saving." };
-    const synth = synthById(companionId);
-    if (!synth || (actor.id !== synth.owner_person_id && !isOwnerOrAdmin(actor))) return { ok: false, status: 403, error: "Only the synth's maker or an admin can change its life." };
+    if (!companionWriteGate(actor, companionId)) return { ok: false, status: 403, error: "Only the synth's maker or an admin can change its life." };
     return { ok: true, value: true };
   }
   return { ok: false, status: 400, error: `unknown scope: ${scope}` };
@@ -430,6 +438,8 @@ export interface ListOptions {
   offset?: number;
   /** Include recently ended dated events in the page, matching recall(). */
   includeEndingEvents?: boolean;
+  /** Memory page's explicit faded view. Always restricted to the actor's own person records. */
+  faded?: boolean;
 }
 
 /** Browsing: sorted, filtered, but never touches uses/last_used_at (that's
@@ -438,9 +448,16 @@ export function list(actor: PersonRow, opts: ListOptions = {}): MemoryRecord[] {
   const roleOf = rolesById();
   const asOf = opts.asOf ?? new Date();
   let rows = db.select().from(memoryRecords)
-    .where(opts.includeSuperseded
+    .where(opts.faded
+      ? and(eq(memoryRecords.status, "archived"), eq(memoryRecords.scope, "person"), eq(memoryRecords.person, actor.id), isNull(memoryRecords.deletedAt), inArray(memoryRecords.archivedReason, ["decay", "end_date", "event_passed", "person"]))
+      : opts.includeSuperseded
       ? or(eq(memoryRecords.status, "active"), eq(memoryRecords.status, "superseded"))
       : eq(memoryRecords.status, "active")).all();
+  if (opts.faded) {
+    rows.sort((a, b) => (b.expiredAt ?? "").localeCompare(a.expiredAt ?? "") || b.createdAt.localeCompare(a.createdAt));
+    const start = opts.cursor ? Math.max(0, rows.findIndex((r) => r.id === opts.cursor) + 1) : opts.offset ?? 0;
+    return rows.slice(start, start + Math.min(500, Math.max(1, opts.limit ?? 100))).map(toMemoryRecord);
+  }
   if (opts.scope) rows = rows.filter((r) => r.scope === opts.scope);
   else if (opts.scopes) rows = rows.filter((r) => opts.scopes!.includes(r.scope as "household" | "person" | "self" | "companion"));
   else rows = rows.filter((r) => r.scope === "person" || r.scope === "household");
@@ -1084,6 +1101,17 @@ export function archive(actor: PersonRow, id: string): MemoryOpResult<MemoryReco
   db.update(memoryRecords).set({ status: "archived", archivedReason: "person", expiredAt: now, hlc: nextHlc() }).where(eq(memoryRecords.id, id)).run();
   const updated = db.select().from(memoryRecords).where(eq(memoryRecords.id, id)).get()!;
   return { ok: true, value: toMemoryRecord(updated) };
+}
+
+export function restore(actor: PersonRow, id: string): MemoryOpResult<MemoryRecord> {
+  const row = db.select().from(memoryRecords).where(eq(memoryRecords.id, id)).get();
+  if (!row) return { ok: false, status: 404, error: "Memory not found. Check the memory id and try again." };
+  if (row.deletedAt !== null || row.text === "[forgotten]") return { ok: false, status: 400, error: "This memory was forgotten and cannot be restored. Add it again if you still want it saved." };
+  if (row.scope !== "person" || row.person !== actor.id) return { ok: false, status: 403, error: "Only the person this memory belongs to can restore it. Sign in as that person and try again." };
+  if (row.status !== "archived" || !["decay", "end_date", "event_passed", "person"].includes(row.archivedReason ?? "")) return { ok: false, status: 400, error: "This memory was not archived by maintenance or you. Choose a faded memory and try again." };
+  const now = new Date().toISOString();
+  db.update(memoryRecords).set({ status: "active", archivedReason: null, expiredAt: null, lastUsedAt: now, hlc: nextHlc() }).where(eq(memoryRecords.id, id)).run();
+  return { ok: true, value: toMemoryRecord(db.select().from(memoryRecords).where(eq(memoryRecords.id, id)).get()!) };
 }
 
 /** AGE-01 (c): an adult chooses who may hear a household memory. The

@@ -2,7 +2,7 @@ import { z } from "zod";
 import { and, eq, isNull } from "drizzle-orm";
 import { completeBackground, type LlmCompleteOptions } from "@/lib/llm";
 import { evaluateReply } from "@/lib/safety";
-import { remember, list, recall, embedQueryForRecall, similarByVector, registerCompanionReadGate, type MemoryOpResult } from "@/lib/memory";
+import { remember, list, recall, embedQueryForRecall, similarByVector, registerCompanionReadGate, registerCompanionWriteGate, type MemoryOpResult } from "@/lib/memory";
 import { renderProfileCard, PROFILE_CARD_MAX_CHARS, PROFILE_CARD_MAX_LINES, type ProfileCard } from "@/lib/memoryProfile";
 import { synthById, synthFloor, synthPersona, maySeeSynth, type SynthRecord } from "@/lib/synths";
 import { localDayKey, hubTimeZone } from "@/lib/news/dayParts";
@@ -56,6 +56,7 @@ export function rememberBeat(synthId: string, actor: PersonRow, beat: { text: st
 }
 
 registerCompanionReadGate((actor, id) => { const synth = synthById(id); return !!synth && maySeeSynth(actor, synth); });
+registerCompanionWriteGate((actor, id) => { const synth = synthById(id); return !!synth && (actor.id === synth.owner_person_id || actor.role === "owner" || actor.role === "admin"); });
 
 function promptData(synth: SynthRecord) {
   return { name: synth.persona.display_name, backstory: synth.persona.backstory ?? "", interests: synth.persona.interests ?? [], audience: synth.persona.audience ?? "adult" };

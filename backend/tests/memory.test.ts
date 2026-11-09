@@ -44,6 +44,32 @@ async function ownerAndChildRows(): Promise<{ ownerRow: PersonRow; childId: stri
 }
 
 describe("POST /api/memory (remember)", () => {
+  test("restore permits only the memory's own person and refuses tombstones", async () => {
+    const { owner, childClient, childId } = await ownerAndChild();
+    const ownerId = db.select().from(people).where(eq(people.displayName, "Sage")).get()!.id;
+    const own = await owner.post("/api/memory", { text: "Restore me", category: "fact", tier: "episodic", scope: "person", person: ownerId, importance: 0.5 });
+    const ownId = (await own.json() as MemoryRecord).id;
+    expect(db.select().from(memoryRecords).where(eq(memoryRecords.id, ownId)).get()).toBeDefined();
+    db.update(memoryRecords).set({ status: "archived", archivedReason: "decay", expiredAt: new Date().toISOString() }).where(eq(memoryRecords.id, ownId)).run();
+    const restored = await owner.post(`/api/memory/${ownId}/restore`, {});
+    expect(restored.status, await restored.clone().text()).toBe(200);
+    expect(await restored.json()).toMatchObject({ status: "active", tier: "episodic", archived_reason: null, expired_at: null });
+    db.update(memoryRecords).set({ status: "archived", archivedReason: "person", expiredAt: new Date().toISOString() }).where(eq(memoryRecords.id, ownId)).run();
+    expect((await owner.post(`/api/memory/${ownId}/restore`, {})).status).toBe(200);
+    const secondAdult = await owner.post("/api/people", { displayName: "Rowan", role: "adult", secret: "rowanpass123" });
+    const secondAdultId = (await secondAdult.json() as { id: string }).id;
+    const secondAdultClient = new TestClient();
+    await secondAdultClient.post("/api/auth/verify-secret", { personId: secondAdultId, secret: "rowanpass123" });
+    expect((await secondAdultClient.post(`/api/memory/${ownId}/restore`, {})).status).toBe(403);
+    const childMemory = await owner.post("/api/memory", { text: "Child memory", category: "fact", tier: "durable", scope: "person", person: childId, importance: 0.5 });
+    const childIdMemory = (await childMemory.json() as MemoryRecord).id;
+    db.update(memoryRecords).set({ status: "archived", archivedReason: "decay" }).where(eq(memoryRecords.id, childIdMemory)).run();
+    expect((await owner.post(`/api/memory/${childIdMemory}/restore`, {})).status).toBe(403);
+    expect((await childClient.post(`/api/memory/${ownId}/restore`, {})).status).toBe(403);
+    db.update(memoryRecords).set({ status: "archived", archivedReason: "person", text: "[forgotten]", deletedAt: new Date().toISOString() }).where(eq(memoryRecords.id, ownId)).run();
+    expect((await owner.post(`/api/memory/${ownId}/restore`, {})).status).toBe(400);
+    expect((await owner.post("/api/memory/mem-missing/restore", {})).status).toBe(404);
+  });
   test("deleting a companion tombstones its records and embeddings only", async () => {
     const { ownerRow } = await ownerAndChildRows();
     const fixture = loadManifestOnly("rivet");
@@ -375,6 +401,22 @@ describe("POST /api/memory (remember)", () => {
 });
 
 describe("GET /api/memory (list) and visibility", () => {
+  test("faded page returns only the actor's non-tombstoned archived memories", async () => {
+    const { owner } = await ownerAndChild();
+    const ownerId = db.select().from(people).where(eq(people.displayName, "Sage")).get()!.id;
+    const active = await owner.post("/api/memory", { text: "Active", category: "fact", tier: "durable", scope: "person", person: ownerId, importance: 0.5 });
+    const archived = await owner.post("/api/memory", { text: "Faded", category: "fact", tier: "durable", scope: "person", person: ownerId, importance: 0.5 });
+    const forgotten = await owner.post("/api/memory", { text: "Forgotten", category: "fact", tier: "durable", scope: "person", person: ownerId, importance: 0.5 });
+    const a = await archived.json() as MemoryRecord; const f = await forgotten.json() as MemoryRecord;
+    db.update(memoryRecords).set({ status: "archived", archivedReason: "decay", expiredAt: new Date().toISOString() }).where(eq(memoryRecords.id, a.id)).run();
+    db.update(memoryRecords).set({ status: "archived", archivedReason: "person", text: "[forgotten]", deletedAt: new Date().toISOString() }).where(eq(memoryRecords.id, f.id)).run();
+    const response = await owner.get("/api/memory/page?state=faded");
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({ total: 1, records: [{ id: a.id, status: "archived" }], next_cursor: null });
+    expect((await owner.get("/api/memory/page")).status).toBe(200);
+    expect((await owner.get("/api/memory?state=faded").then((res) => res.json()) as MemoryRecord[]).some((record) => record.id === a.id)).toBe(false);
+    expect((await active.json() as MemoryRecord).status).toBe("active");
+  });
   test("list is cursor paged and defaults to person and household scopes, excluding companion rows", async () => {
     const { owner, childClient, childId } = await ownerAndChild();
     for (let i = 0; i < 105; i++) await owner.post("/api/memory", { text: `Paged ${i}`, category: "fact", tier: "durable", scope: "household", importance: 0.5 });
