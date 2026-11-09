@@ -104,7 +104,7 @@ export function AllAppsPage({ person }: { person: Roster }) {
           if (event.key === "Enter" && query.trim() && filtered.length === 1) { event.preventDefault(); navigate(filtered[0]!.to); }
         }} placeholder={i18n._({ id: "Search apps", message: "Search apps" })} aria-label={i18n._({ id: "Search apps", message: "Search apps" })} autoComplete="off" />
       </div>
-      <nav aria-label={i18n._({ id: "App categories", message: "App categories" })} className="flex flex-nowrap gap-2 overflow-x-auto">
+      <nav aria-label={i18n._({ id: "App categories", message: "App categories" })} className="flex flex-nowrap gap-2 overflow-x-auto no-scrollbar">
         {categories.map((item) => <Chip key={item} tone="surface" selectedTone="inverse" size="strip" selected={category === item} onClick={() => setCategory(item)}>{item}</Chip>)}
       </nav>
       <section aria-label={i18n._({ id: "Favorites", message: "Favorites" })} className="flex min-w-0 flex-col gap-3">

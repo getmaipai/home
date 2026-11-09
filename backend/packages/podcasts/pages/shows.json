@@ -31,7 +31,7 @@
       "empty_state": {
         "type": "empty_state",
         "icon": "mic",
-        "text": "No shows yet.."
+        "text": "No shows yet. Add one with New show."
       }
     }
   ]

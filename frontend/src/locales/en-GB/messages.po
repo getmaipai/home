@@ -5518,7 +5518,7 @@ msgstr ""
 
 #. js-lingui-explicit-id
 #: src/apps/memory/PersonMemories.tsx:379
-#: src/apps/notifications/NotificationsPage.tsx:159
+#: src/apps/notifications/NotificationsPage.tsx:158
 #: src/apps/settings/FreeUpSpaceDialog.tsx:80
 #: src/shell/pages/StoragePage.tsx:191
 #: src/shell/pages/StoragePage.tsx:201
@@ -6650,7 +6650,7 @@ msgid "Could not load your memories."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/notifications/NotificationsPage.tsx:121
+#: src/apps/notifications/NotificationsPage.tsx:120
 msgid "Could not load your notification history."
 msgstr ""
 
@@ -7981,7 +7981,7 @@ msgstr ""
 
 #. js-lingui-explicit-id
 #: src/apps/chat/chatThreadSlots.tsx:183
-#: src/apps/notifications/NotificationsPage.tsx:216
+#: src/apps/notifications/NotificationsPage.tsx:215
 #: src/shell/library/LibraryUploads.tsx:75
 #: src/shell/library/LibraryUploads.tsx:76
 #: src/shell/NotificationBell.tsx:258
@@ -7995,7 +7995,7 @@ msgid "Dismiss \"{title}\"?"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/notifications/NotificationsPage.tsx:212
+#: src/apps/notifications/NotificationsPage.tsx:211
 msgid "Dismiss {text}"
 msgstr ""
 
@@ -8005,12 +8005,12 @@ msgid "Dismiss all"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/notifications/NotificationsPage.tsx:151
+#: src/apps/notifications/NotificationsPage.tsx:150
 msgid "Dismiss selected"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/notifications/NotificationsPage.tsx:193
+#: src/apps/notifications/NotificationsPage.tsx:192
 msgid "Dismissed"
 msgstr ""
 
@@ -12547,7 +12547,7 @@ msgid "setting.ease.text_size.option.140"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/notifications/NotificationsPage.tsx:138
+#: src/apps/notifications/NotificationsPage.tsx:137
 msgid "Last 30 days"
 msgstr ""
 
@@ -13435,7 +13435,7 @@ msgid "Loading more files"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/notifications/NotificationsPage.tsx:122
+#: src/apps/notifications/NotificationsPage.tsx:121
 msgid "Loading notifications"
 msgstr ""
 
@@ -15299,7 +15299,7 @@ msgid "setting.topics.family_stories.option.keep"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/notifications/NotificationsPage.tsx:197
+#: src/apps/notifications/NotificationsPage.tsx:196
 msgid "New"
 msgstr ""
 
@@ -16260,7 +16260,7 @@ msgid "Nothing in {label} yet."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/notifications/NotificationsPage.tsx:133
+#: src/apps/notifications/NotificationsPage.tsx:132
 msgid "Nothing in the last 30 days."
 msgstr ""
 
@@ -16356,13 +16356,12 @@ msgid "Nothing your family says is used to train anything."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/notifications/NotificationsPage.tsx:179
+#: src/apps/notifications/NotificationsPage.tsx:178
 msgid "Notification history"
 msgstr ""
 
 #. js-lingui-explicit-id
 #: src/apps/notifications/NotificationsPage.tsx:110
-#: src/apps/notifications/NotificationsPage.tsx:113
 #: src/shell/NotificationBell.tsx:210
 #: src/shell/NotificationBell.tsx:225
 #: src/shell/pageHeaderTitle.tsx:109
@@ -18657,7 +18656,7 @@ msgid "setting.engines.stack.remote.allow_tailnet.label"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/notifications/NotificationsPage.tsx:195
+#: src/apps/notifications/NotificationsPage.tsx:194
 msgid "Read"
 msgstr ""
 
@@ -20707,7 +20706,7 @@ msgid "Seek"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/notifications/NotificationsPage.tsx:156
+#: src/apps/notifications/NotificationsPage.tsx:155
 #: src/shell/pages/FilesPage.tsx:371
 msgid "Select"
 msgstr ""
@@ -20724,7 +20723,7 @@ msgstr ""
 
 #. js-lingui-explicit-id
 #: src/apps/memory/PersonMemories.tsx:91
-#: src/apps/notifications/NotificationsPage.tsx:186
+#: src/apps/notifications/NotificationsPage.tsx:185
 msgid "Select {text}"
 msgstr ""
 
@@ -20734,8 +20733,8 @@ msgid "Select {text}, {displayTime} remaining"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/notifications/NotificationsPage.tsx:170
-#: src/apps/notifications/NotificationsPage.tsx:173
+#: src/apps/notifications/NotificationsPage.tsx:169
+#: src/apps/notifications/NotificationsPage.tsx:172
 #: src/apps/settings/FreeUpSpaceDialog.tsx:80
 msgid "Select all"
 msgstr ""

@@ -86,8 +86,8 @@ export function StatusPage({ person }: { person: Roster }) {
           <div className="mt-2 flex flex-wrap items-center gap-2">
             {checks.groups.map((g) => <Status key={g.group} status={g.state === "fail" ? "offline" : g.state === "pass" ? "online" : "maintenance"}>{g.label}: {groupWord(g.state)}</Status>)}
           </div>
-          <ul className="mt-2 flex flex-col gap-1 text-sm text-muted-foreground">
-            {checks.checks.filter((c) => c.state === "fail" || c.state === "skipped").map((c) => <li key={c.id}>{c.name}: {c.note}</li>)}
+          <ul className="mt-3 flex flex-col divide-y divide-border text-supporting text-muted-foreground">
+            {checks.checks.filter((c) => c.state === "fail" || c.state === "skipped").map((c) => <li key={c.id} className="py-2">{c.name}: {c.note}</li>)}
           </ul>
           {runChecks.error instanceof Error ? <p role="alert" className="mt-2 text-sm text-destructive">{i18n._({ id: "The health checks could not be run. Try again.", message: "The health checks could not be run. Try again." })}</p> : null}
           <div className="mt-3"><Button variant="outline" disabled={runChecks.isPending || checks.running} onClick={() => runChecks.mutate()}>{runChecks.isPending || checks.running ? i18n._({ id: "Checking...", message: "Checking..." }) : i18n._({ id: "Run checks now", message: "Run checks now" })}</Button></div>

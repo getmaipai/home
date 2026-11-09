@@ -6416,7 +6416,7 @@ msgstr "Borrar {name}"
 
 #. js-lingui-explicit-id
 #: src/apps/memory/PersonMemories.tsx:379
-#: src/apps/notifications/NotificationsPage.tsx:159
+#: src/apps/notifications/NotificationsPage.tsx:158
 #: src/apps/settings/FreeUpSpaceDialog.tsx:80
 #: src/shell/pages/StoragePage.tsx:191
 #: src/shell/pages/StoragePage.tsx:201
@@ -7738,7 +7738,7 @@ msgid "Could not load your memories."
 msgstr "No se pudieron cargar tus memorias."
 
 #. js-lingui-explicit-id
-#: src/apps/notifications/NotificationsPage.tsx:121
+#: src/apps/notifications/NotificationsPage.tsx:120
 #, needs-review
 msgid "Could not load your notification history."
 msgstr "No se pudo cargar tu historial de notificaciones."
@@ -9299,7 +9299,7 @@ msgstr "Espacio en disco"
 
 #. js-lingui-explicit-id
 #: src/apps/chat/chatThreadSlots.tsx:183
-#: src/apps/notifications/NotificationsPage.tsx:216
+#: src/apps/notifications/NotificationsPage.tsx:215
 #: src/shell/library/LibraryUploads.tsx:75
 #: src/shell/library/LibraryUploads.tsx:76
 #: src/shell/NotificationBell.tsx:258
@@ -9315,7 +9315,7 @@ msgid "Dismiss \"{title}\"?"
 msgstr "¿Descartar \"{title}\"?"
 
 #. js-lingui-explicit-id
-#: src/apps/notifications/NotificationsPage.tsx:212
+#: src/apps/notifications/NotificationsPage.tsx:211
 #, needs-review
 msgid "Dismiss {text}"
 msgstr "Descartar {text}"
@@ -9327,13 +9327,13 @@ msgid "Dismiss all"
 msgstr "Descartar todo"
 
 #. js-lingui-explicit-id
-#: src/apps/notifications/NotificationsPage.tsx:151
+#: src/apps/notifications/NotificationsPage.tsx:150
 #, needs-review
 msgid "Dismiss selected"
 msgstr "Descartar seleccionadas"
 
 #. js-lingui-explicit-id
-#: src/apps/notifications/NotificationsPage.tsx:193
+#: src/apps/notifications/NotificationsPage.tsx:192
 #, needs-review
 msgid "Dismissed"
 msgstr "Descartada"
@@ -14639,7 +14639,7 @@ msgid "setting.ease.text_size.option.140"
 msgstr "Grande."
 
 #. js-lingui-explicit-id
-#: src/apps/notifications/NotificationsPage.tsx:138
+#: src/apps/notifications/NotificationsPage.tsx:137
 #, needs-review
 msgid "Last 30 days"
 msgstr "Últimos 30 días"
@@ -15667,7 +15667,7 @@ msgid "Loading more files"
 msgstr "Cargando más archivos"
 
 #. js-lingui-explicit-id
-#: src/apps/notifications/NotificationsPage.tsx:122
+#: src/apps/notifications/NotificationsPage.tsx:121
 #, needs-review
 msgid "Loading notifications"
 msgstr "Cargando notificaciones"
@@ -17853,7 +17853,7 @@ msgid "setting.topics.family_stories.option.keep"
 msgstr "Nunca dice si una historia es real o no, y juega el rol."
 
 #. js-lingui-explicit-id
-#: src/apps/notifications/NotificationsPage.tsx:197
+#: src/apps/notifications/NotificationsPage.tsx:196
 #, needs-review
 msgid "New"
 msgstr "Nueva"
@@ -18971,7 +18971,7 @@ msgid "Nothing in {label} yet."
 msgstr "Aún no hay nada en {label}."
 
 #. js-lingui-explicit-id
-#: src/apps/notifications/NotificationsPage.tsx:133
+#: src/apps/notifications/NotificationsPage.tsx:132
 #, needs-review
 msgid "Nothing in the last 30 days."
 msgstr "Nada en los últimos 30 días."
@@ -19085,14 +19085,13 @@ msgid "Nothing your family says is used to train anything."
 msgstr "Nada de lo que dice tu familia se usa para entrenar algo."
 
 #. js-lingui-explicit-id
-#: src/apps/notifications/NotificationsPage.tsx:179
+#: src/apps/notifications/NotificationsPage.tsx:178
 #, needs-review
 msgid "Notification history"
 msgstr "Historial de notificaciones"
 
 #. js-lingui-explicit-id
 #: src/apps/notifications/NotificationsPage.tsx:110
-#: src/apps/notifications/NotificationsPage.tsx:113
 #: src/shell/NotificationBell.tsx:210
 #: src/shell/NotificationBell.tsx:225
 #: src/shell/pageHeaderTitle.tsx:109
@@ -21770,7 +21769,7 @@ msgid "setting.engines.stack.remote.allow_tailnet.label"
 msgstr "Alcanzar el equipo motor cuando estás fuera de casa"
 
 #. js-lingui-explicit-id
-#: src/apps/notifications/NotificationsPage.tsx:195
+#: src/apps/notifications/NotificationsPage.tsx:194
 #, needs-review
 msgid "Read"
 msgstr "Leída"
@@ -24131,7 +24130,7 @@ msgid "Seek"
 msgstr "Buscar"
 
 #. js-lingui-explicit-id
-#: src/apps/notifications/NotificationsPage.tsx:156
+#: src/apps/notifications/NotificationsPage.tsx:155
 #: src/shell/pages/FilesPage.tsx:371
 #, needs-review
 msgid "Select"
@@ -24151,7 +24150,7 @@ msgstr "Selecciona {name}, {minutes} min"
 
 #. js-lingui-explicit-id
 #: src/apps/memory/PersonMemories.tsx:91
-#: src/apps/notifications/NotificationsPage.tsx:186
+#: src/apps/notifications/NotificationsPage.tsx:185
 #, needs-review
 msgid "Select {text}"
 msgstr "Seleccionar {text}"
@@ -24163,8 +24162,8 @@ msgid "Select {text}, {displayTime} remaining"
 msgstr "Selecciona {text}, quedan {displayTime}"
 
 #. js-lingui-explicit-id
-#: src/apps/notifications/NotificationsPage.tsx:170
-#: src/apps/notifications/NotificationsPage.tsx:173
+#: src/apps/notifications/NotificationsPage.tsx:169
+#: src/apps/notifications/NotificationsPage.tsx:172
 #: src/apps/settings/FreeUpSpaceDialog.tsx:80
 #, needs-review
 msgid "Select all"
