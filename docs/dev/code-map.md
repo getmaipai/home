@@ -501,7 +501,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/fileThumbnails.ts` | thumbnailsDir, previewStats, clearPreviews, fileThumbnail, trashedFileThumbnail |
 | `backend/src/lib/films/animatic.ts` | animaticShotOps, makeFilmAnimatic |
 | `backend/src/lib/films/background.ts` | __setFilmEnginesForTests, startFilm, getFilmProgress, goFilm, cancelFilm, resumeFilmRun |
-| `backend/src/lib/films/engines.ts` | realFilmEngines, makeFilm, resumeFilm, redoFilmShot, changeFilmMusic |
+| `backend/src/lib/films/engines.ts` | backgroundTurn, realFilmEngines, makeFilm, resumeFilm, redoFilmShot, changeFilmMusic |
 | `backend/src/lib/films/plan.ts` | filmPlanShotSchema, filmPlanSchema, facelessFilmPlanSchema, FILM_PLAN_RESPONSE_FORMAT, FACELESS_FILM_PLAN_RESPONSE_FORMAT, FILM_PLAN_PROMPT |
 | `backend/src/lib/films/run.ts` | FilmStepError, runFilm, redoShot, changeMusic |
 | `backend/src/lib/films/store.ts` | createFilmRun, getFilmRun, updateFilmRun, listFilmRunsInStates, failInterruptedFilmRuns |
@@ -1154,6 +1154,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/videos/frameCheck.ts` | sharpness, checkClipFrames |
 | `backend/src/lib/videos/jobs.ts` | VIDEO_FAILED_PREFIX, MEMORY_CANCELLED_CODE, plainVideoFailure, getVideoJobFor, doneVideoJobsFor, sourceVideoJob |
 | `backend/src/lib/videos/lock.ts` | videoJobLockItem, videoJobLockState, lockedJobView, LOCKED_START_LINE, lockedVideoTile, LOCKED_RESULT_TEXT |
+| `backend/src/lib/videos/longTake.ts` | MAX_PARTS, MIN_PART_SECONDS, SUMMARY_LIMIT, CONTINUITY, TAKE_TOO_MUCH_LINE, ceilingFor |
 | `backend/src/lib/videos/loraWire.ts` | LORAS_UNSUPPORTED_LINE, ltx25LorasSupported, wireLoras |
 | `backend/src/lib/videos/make.ts` | MINOR_MAKE_LINE, makeAudienceOf, readMakeBody, makeVideoFor, bodyOfVideoJob, anotherTakeFor |
 | `backend/src/lib/videos/messagesCopy.ts` | videoFileName, videoTitle, hasAudioTrack, messagesCopyOf, __resetMessagesCopiesForTests |

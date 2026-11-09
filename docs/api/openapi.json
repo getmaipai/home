@@ -72348,6 +72348,402 @@
         }
       }
     },
+    "/api/videos/long": {
+      "post": {
+        "tags": [
+          "Videos"
+        ],
+        "summary": "Start a long take: a clip longer than one part's ceiling, made as parts that continue from each other (adults on their own screen)",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "prompt": {
+                    "type": "string",
+                    "minLength": 3,
+                    "maxLength": 1200,
+                    "description": "What the video shows."
+                  },
+                  "seconds": {
+                    "type": "integer",
+                    "minimum": 2,
+                    "maximum": 240,
+                    "description": "The whole length. It must be longer than one part's ceiling at this level."
+                  },
+                  "beats": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 400
+                    },
+                    "maxItems": 12,
+                    "description": "Optional: what happens in each part, in order."
+                  },
+                  "tier": {
+                    "type": "string",
+                    "enum": [
+                      "standard",
+                      "boost",
+                      "max"
+                    ]
+                  },
+                  "orientation": {
+                    "type": "string",
+                    "enum": [
+                      "landscape",
+                      "portrait"
+                    ]
+                  }
+                },
+                "required": [
+                  "prompt",
+                  "seconds"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The take has started; poll GET /long/{id}",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "parts": {
+                      "type": "number"
+                    },
+                    "per_part": {
+                      "type": "number",
+                      "description": "Seconds asked for each part."
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "parts",
+                    "per_part"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not for this person",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "A long take is already being made",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The words or the length cannot be used",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/videos/long/{id}": {
+      "get": {
+        "tags": [
+          "Videos"
+        ],
+        "summary": "Progress of a long take",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 80
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Progress",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "state": {
+                      "type": "string",
+                      "enum": [
+                        "running",
+                        "done",
+                        "stopped",
+                        "failed"
+                      ]
+                    },
+                    "parts_done": {
+                      "type": "number"
+                    },
+                    "parts_total": {
+                      "type": "number"
+                    },
+                    "file_id": {
+                      "type": "string",
+                      "nullable": true,
+                      "description": "The finished take's file once it is done."
+                    },
+                    "error_line": {
+                      "type": "string",
+                      "nullable": true
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "state",
+                    "parts_done",
+                    "parts_total",
+                    "file_id",
+                    "error_line"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such long take",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/videos/long/{id}/resume": {
+      "post": {
+        "tags": [
+          "Videos"
+        ],
+        "summary": "Carry on a stopped or failed long take from its first missing part",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 80
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Progress",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "state": {
+                      "type": "string",
+                      "enum": [
+                        "running",
+                        "done",
+                        "stopped",
+                        "failed"
+                      ]
+                    },
+                    "parts_done": {
+                      "type": "number"
+                    },
+                    "parts_total": {
+                      "type": "number"
+                    },
+                    "file_id": {
+                      "type": "string",
+                      "nullable": true,
+                      "description": "The finished take's file once it is done."
+                    },
+                    "error_line": {
+                      "type": "string",
+                      "nullable": true
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "state",
+                    "parts_done",
+                    "parts_total",
+                    "file_id",
+                    "error_line"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such long take",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/videos/long/{id}/cancel": {
+      "post": {
+        "tags": [
+          "Videos"
+        ],
+        "summary": "Stop a long take after the part being made; the parts already made are kept",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 80
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Progress",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "state": {
+                      "type": "string",
+                      "enum": [
+                        "running",
+                        "done",
+                        "stopped",
+                        "failed"
+                      ]
+                    },
+                    "parts_done": {
+                      "type": "number"
+                    },
+                    "parts_total": {
+                      "type": "number"
+                    },
+                    "file_id": {
+                      "type": "string",
+                      "nullable": true,
+                      "description": "The finished take's file once it is done."
+                    },
+                    "error_line": {
+                      "type": "string",
+                      "nullable": true
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "state",
+                    "parts_done",
+                    "parts_total",
+                    "file_id",
+                    "error_line"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such long take",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/videos/animate": {
       "post": {
         "tags": [
