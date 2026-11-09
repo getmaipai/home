@@ -71994,6 +71994,13 @@
                     {
                       "type": "object",
                       "properties": {
+                        "prompt_notes": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          },
+                          "description": "IVY-CHECK-01: what the prompt check found in the words (errors and warnings only), one plain line each; the clip was still made. Empty when nothing is wrong."
+                        },
                         "notice": {
                           "type": "string",
                           "nullable": true,
@@ -72001,6 +72008,7 @@
                         }
                       },
                       "required": [
+                        "prompt_notes",
                         "notice"
                       ]
                     }
