@@ -444,9 +444,8 @@ export interface ListOptions {
 
 /** Browsing: sorted, filtered, but never touches uses/last_used_at (that's
  * recall's job, see below: only an actual query "recalls" a memory). */
-export function list(actor: PersonRow, opts: ListOptions = {}): MemoryRecord[] {
+function listRows(actor: PersonRow, opts: ListOptions, asOf: Date): MemoryRecordRow[] {
   const roleOf = rolesById();
-  const asOf = opts.asOf ?? new Date();
   let rows = db.select().from(memoryRecords)
     .where(opts.faded
       ? and(eq(memoryRecords.status, "archived"), eq(memoryRecords.scope, "person"), eq(memoryRecords.person, actor.id), isNull(memoryRecords.deletedAt), inArray(memoryRecords.archivedReason, ["decay", "end_date", "event_passed", "person"]))
@@ -454,9 +453,7 @@ export function list(actor: PersonRow, opts: ListOptions = {}): MemoryRecord[] {
       ? or(eq(memoryRecords.status, "active"), eq(memoryRecords.status, "superseded"))
       : eq(memoryRecords.status, "active")).all();
   if (opts.faded) {
-    rows.sort((a, b) => (b.expiredAt ?? "").localeCompare(a.expiredAt ?? "") || b.createdAt.localeCompare(a.createdAt));
-    const start = opts.cursor ? Math.max(0, rows.findIndex((r) => r.id === opts.cursor) + 1) : opts.offset ?? 0;
-    return rows.slice(start, start + Math.min(500, Math.max(1, opts.limit ?? 100))).map(toMemoryRecord);
+    return rows.sort((a, b) => (b.expiredAt ?? "").localeCompare(a.expiredAt ?? "") || b.createdAt.localeCompare(a.createdAt));
   }
   if (opts.scope) rows = rows.filter((r) => r.scope === opts.scope);
   else if (opts.scopes) rows = rows.filter((r) => opts.scopes!.includes(r.scope as "household" | "person" | "self" | "companion"));
@@ -466,26 +463,31 @@ export function list(actor: PersonRow, opts: ListOptions = {}): MemoryRecord[] {
   rows = rows.filter((r) => opts.asOf ? validAt(r, asOf) : validAt(r, asOf) || (opts.includeEndingEvents !== false && eventWithinGrace(r, asOf)));
   rows = rows.filter((r) => r.deviceId === null || (opts.robotBound === "all" && opts.deviceId == null) || (opts.deviceId != null && r.deviceId === opts.deviceId && (opts.robotBound === "all" || opts.surface === "robot")));
   rows = rows.filter((r) => canRead(actor, r, roleOf, opts.selfOnly));
-  rows.sort((a, b) => {
+  return rows.sort((a, b) => {
     if (a.pinned !== b.pinned) return a.pinned ? -1 : 1;
     if (a.importance !== b.importance) return b.importance - a.importance;
     return b.lastUsedAt.localeCompare(a.lastUsedAt);
   });
+}
+
+function pageOf(rows: MemoryRecordRow[], opts: ListOptions, asOf: Date): MemoryRecord[] {
   const start = opts.cursor ? Math.max(0, rows.findIndex((r) => r.id === opts.cursor) + 1) : opts.offset ?? 0;
   const limit = Math.min(500, Math.max(1, opts.limit ?? 100));
-  return rows.slice(start, start + limit).map((row) => ({ ...toMemoryRecord(row), ...(opts.includeEndingEvents !== false && !validAt(row, asOf) && eventWithinGrace(row, asOf) ? { ending: true } : {}) } as MemoryRecord));
+  return rows.slice(start, start + limit).map((row) => ({ ...toMemoryRecord(row), ...(!opts.faded && opts.includeEndingEvents !== false && !validAt(row, asOf) && eventWithinGrace(row, asOf) ? { ending: true } : {}) } as MemoryRecord));
 }
 
-export function countList(actor: PersonRow, opts: ListOptions = {}): number {
-  return list(actor, { ...opts, cursor: undefined, offset: undefined, limit: 500 }).length;
+export function list(actor: PersonRow, opts: ListOptions = {}): MemoryRecord[] {
+  const asOf = opts.asOf ?? new Date();
+  return pageOf(listRows(actor, opts, asOf), opts, asOf);
 }
 
+/** One filtered, sorted pass: the page, the true total, and the cursor for the next page. */
 export function listPage(actor: PersonRow, opts: ListOptions = {}): { records: MemoryRecord[]; total: number; nextCursor: string | null } {
-  const limit = Math.min(500, Math.max(1, opts.limit ?? 100));
-  const total = countList(actor, opts);
-  const offset = opts.cursor ? Math.max(0, list(actor, { ...opts, cursor: undefined, offset: undefined, limit: 500 }).findIndex((r) => r.id === opts.cursor) + 1) : 0;
-  const records = list(actor, { ...opts, cursor: undefined, offset, limit });
-  return { records, total, nextCursor: offset + records.length < total ? records.at(-1)?.id ?? null : null };
+  const asOf = opts.asOf ?? new Date();
+  const rows = listRows(actor, opts, asOf);
+  const records = pageOf(rows, opts, asOf);
+  const start = opts.cursor ? Math.max(0, rows.findIndex((r) => r.id === opts.cursor) + 1) : opts.offset ?? 0;
+  return { records, total: rows.length, nextCursor: start + records.length < rows.length ? records.at(-1)?.id ?? null : null };
 }
 
 export interface RecallMatch {
@@ -1110,7 +1112,9 @@ export function restore(actor: PersonRow, id: string): MemoryOpResult<MemoryReco
   if (row.scope !== "person" || row.person !== actor.id) return { ok: false, status: 403, error: "Only the person this memory belongs to can restore it. Sign in as that person and try again." };
   if (row.status !== "archived" || !["decay", "end_date", "event_passed", "person"].includes(row.archivedReason ?? "")) return { ok: false, status: 400, error: "This memory was not archived by maintenance or you. Choose a faded memory and try again." };
   const now = new Date().toISOString();
-  db.update(memoryRecords).set({ status: "active", archivedReason: null, expiredAt: null, lastUsedAt: now, hlc: nextHlc() }).where(eq(memoryRecords.id, id)).run();
+  // Restoring a record that ended by date says it is still true, so the end date goes too; otherwise the next maintenance run would archive it again.
+  const endedByDate = row.archivedReason === "end_date" || row.archivedReason === "event_passed";
+  db.update(memoryRecords).set({ status: "active", archivedReason: null, expiredAt: null, ...(endedByDate ? { validTo: null } : {}), lastUsedAt: now, hlc: nextHlc() }).where(eq(memoryRecords.id, id)).run();
   return { ok: true, value: toMemoryRecord(db.select().from(memoryRecords).where(eq(memoryRecords.id, id)).get()!) };
 }
 

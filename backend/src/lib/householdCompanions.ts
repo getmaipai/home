@@ -154,7 +154,7 @@ export function deleteHouseholdCompanion(id: string): boolean {
   const dir = folder(id); if (!dir || !read(id)) return false;
   try {
     const remove = sqlite.transaction(() => {
-      const rows = sqlite.query("SELECT id FROM memory_records WHERE scope = 'companion' AND companion_id = ? AND status = 'active'").all(id) as Array<{ id: string }>;
+      const rows = sqlite.query("SELECT id FROM memory_records WHERE scope = 'companion' AND companion_id = ? AND deleted_at IS NULL").all(id) as Array<{ id: string }>;
       tombstoneMemoryRecords(rows.map((row) => row.id));
       deleteLook(id);
       rmSync(dir, { recursive: true, force: true });

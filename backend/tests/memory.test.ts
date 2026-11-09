@@ -6,7 +6,7 @@ import { __resetThrottleForTests } from "@/lib/secretThrottle";
 import { eq, and, isNull } from "drizzle-orm";
 import { db, sqlite } from "@/db";
 import { memoryRecords, memoryEmbeddings, pendingEmbeddings, pendingMemoryWork, people } from "@/db/schema";
-import { recall, remember, list, validAt, supersede, bumpUsage, drainPendingEmbeddings, runMaintenance, demoteNeverRecalledDurables, repairWronglyArchivedDurables, eventWithinGrace, PROFILE_SOURCE, ENTITY_MIN_COSINE, ENTITY_BOOST, STATE_EXPIRY_DAYS, EVENT_GRACE_DAYS, forgetByIds } from "@/lib/memory";
+import { recall, remember, list, validAt, supersede, bumpUsage, drainPendingEmbeddings, runMaintenance, demoteNeverRecalledDurables, repairWronglyArchivedDurables, eventWithinGrace, PROFILE_SOURCE, ENTITY_MIN_COSINE, ENTITY_BOOST, STATE_EXPIRY_DAYS, EVENT_GRACE_DAYS, forgetByIds, listPage, restore } from "@/lib/memory";
 import { buildProfileCard } from "@/lib/memoryProfile";
 import { ingestMemory, supersedeMemory, drainPendingWork } from "@/lib/memoryIngestion";
 import { CREDENTIAL_SAFE_MESSAGE } from "@/lib/memoryContentPolicy";
@@ -44,6 +44,48 @@ async function ownerAndChildRows(): Promise<{ ownerRow: PersonRow; childId: stri
 }
 
 describe("POST /api/memory (remember)", () => {
+  test("restoring a memory that ended by date clears the end date so maintenance does not archive it again", async () => {
+    const { ownerRow } = await ownerAndChildRows();
+    const made = remember(ownerRow, { text: "Sage lives in Ohio", category: "fact", tier: "durable", scope: "person", person: ownerRow.id, source: "test", importance: 0.5 });
+    if (!made.ok) throw new Error("setup failed");
+    db.update(memoryRecords).set({ validTo: "2020-01-01" }).where(eq(memoryRecords.id, made.value.id)).run();
+    runMaintenance();
+    expect(db.select().from(memoryRecords).where(eq(memoryRecords.id, made.value.id)).get()!.status).toBe("archived");
+    expect(restore(ownerRow, made.value.id).ok).toBe(true);
+    runMaintenance();
+    expect(db.select().from(memoryRecords).where(eq(memoryRecords.id, made.value.id)).get()).toMatchObject({ status: "active", validTo: null });
+  });
+
+  test("a page past 500 memories keeps its true total and can be walked to the end", async () => {
+    const { ownerRow } = await ownerAndChildRows();
+    const now = new Date().toISOString();
+    for (let i = 0; i < 620; i++) db.insert(memoryRecords).values({ id: `mem${1000 + i}-bulk0a`, recordKind: "memory", text: `bulk ${i}`, category: "fact", tier: "durable", status: "active", scope: "person", person: ownerRow.id, source: "test", importance: 0.5, createdAt: now, lastUsedAt: now, hlc: nextHlc() }).run();
+    const seen = new Set<string>();
+    let cursor: string | undefined;
+    let total = 0;
+    for (let guard = 0; guard < 10; guard++) {
+      const page = listPage(ownerRow, { scopes: ["person"], limit: 100, cursor });
+      total = page.total;
+      for (const r of page.records) seen.add(r.id);
+      if (!page.nextCursor) break;
+      cursor = page.nextCursor;
+    }
+    expect(total).toBe(620);
+    expect(seen.size).toBe(620);
+  });
+
+  test("deleting a companion also erases its superseded and archived beats", async () => {
+    await ownerAndChildRows();
+    const fixture = loadManifestOnly("rivet");
+    if (!fixture.ok || !fixture.value.companion) throw new Error("companion fixture missing");
+    const companion = createHouseholdCompanion({ ...fixture.value.companion, display_name: "Old beats" }, { display_name: "Sage" });
+    if (!companion.ok) throw new Error(companion.error);
+    const now = new Date().toISOString();
+    for (const status of ["superseded", "archived"] as const) db.insert(memoryRecords).values({ id: `mem-old-${status}`, recordKind: "memory", text: `old ${status} beat`, category: "fact", tier: "durable", status, scope: "companion", companionId: companion.value.id, source: "test", importance: 0.5, createdAt: now, lastUsedAt: now, hlc: nextHlc() }).run();
+    expect(deleteHouseholdCompanion(companion.value.id)).toBe(true);
+    for (const status of ["superseded", "archived"]) expect(db.select().from(memoryRecords).where(eq(memoryRecords.id, `mem-old-${status}`)).get()).toMatchObject({ text: "[forgotten]" });
+  });
+
   test("restore permits only the memory's own person and refuses tombstones", async () => {
     const { owner, childClient, childId } = await ownerAndChild();
     const ownerId = db.select().from(people).where(eq(people.displayName, "Sage")).get()!.id;

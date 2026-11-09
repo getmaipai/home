@@ -156,9 +156,9 @@ export function listDevicesByKind(kind: DeviceKind): Device[] {
 export function deleteDevice(id: string, personId: string): boolean {
   const row = db.select({ personId: devices.personId }).from(devices).where(eq(devices.id, id)).get();
   if (!row || row.personId !== personId) return false;
-  const boundIds = sqlite.query("SELECT id FROM memory_records WHERE device_id = ?").all(id) as Array<{ id: string }>;
-  tombstoneMemoryRecords(boundIds.map((item) => item.id));
   const remove = sqlite.transaction(() => {
+    const boundIds = sqlite.query("SELECT id FROM memory_records WHERE device_id = ?").all(id) as Array<{ id: string }>;
+    tombstoneMemoryRecords(boundIds.map((item) => item.id));
     db.delete(deviceTokens).where(eq(deviceTokens.deviceId, id)).run();
     // Step 8: received_backups.device_id references this row with no
     // cascade - a code review (2026-09-06) found the delete below throwing
