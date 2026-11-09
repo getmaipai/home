@@ -1801,6 +1801,11 @@ msgid "A teen&rsquo;s profile is private, even from an admin. Go back to Family 
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/shell/pages/AllAppsPage.tsx:123
+msgid "A to Z"
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/apps/settings/HuggingFaceTokenSection.tsx:91
 msgid "A token is connected."
 msgstr ""
@@ -1945,6 +1950,11 @@ msgstr ""
 #: src/shell/pages/CompanionsPage.tsx:169
 #: src/shell/pages/CompanionsPage.tsx:327
 msgid "Add"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/shell/pages/AllAppsPage.tsx:50
+msgid "Add {name} to favorites"
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -2548,6 +2558,9 @@ msgstr ""
 
 #. js-lingui-explicit-id
 #: src/apps/settings/styles/StyleBrowser.tsx:101
+#: src/shell/pages/AllAppsPage.tsx:25
+#: src/shell/pages/AllAppsPage.tsx:38
+#: src/shell/pages/AllAppsPage.tsx:40
 #: src/shell/pages/CompanionsPage.tsx:165
 #: src/shell/reader/SearchResults.tsx:40
 msgid "All"
@@ -2571,6 +2584,10 @@ msgstr ""
 
 #. js-lingui-explicit-id
 #: src/shell/pageHeaderTitle.tsx:110
+#: src/shell/pages/AllAppsPage.tsx:88
+#: src/shell/pages/AllAppsPage.tsx:120
+#: src/shell/pages/AllAppsPage.tsx:122
+#: src/shell/pages/AllAppsPage.tsx:129
 #: src/shell/phoneMenuLinks.tsx:13
 msgid "All apps"
 msgstr ""
@@ -2995,6 +3012,11 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/shell/pages/PackageAppPage.tsx:276
 msgid "App"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/shell/pages/AllAppsPage.tsx:96
+msgid "App categories"
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -8065,6 +8087,7 @@ msgstr ""
 #: src/apps/setup/AwayFromHome.tsx:185
 #: src/apps/setup/SetupReviewPage.tsx:63
 #: src/shell/AlarmRinger.tsx:60
+#: src/shell/pages/AllAppsPage.tsx:102
 #: src/shell/pages/companionFlow/KeyframeEditor.tsx:96
 #: src/shell/pages/settings/SettingsAreaPage.tsx:274
 #: src/shell/pages/status/StatusBoard.tsx:25
@@ -8318,6 +8341,7 @@ msgstr ""
 #: src/apps/settings/UsersSection.tsx:406
 #: src/shell/library/TranscriptPanel.tsx:288
 #: src/shell/library/TranscriptPanel.tsx:554
+#: src/shell/pages/AllAppsPage.tsx:102
 #: src/shell/pages/CompanionsPage.tsx:70
 #: src/shell/pages/CompanionsPage.tsx:243
 msgid "Edit"
@@ -9042,6 +9066,17 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/apps/settings/StackChanInstallDialog.tsx:136
 msgid "Faster, about 1 to 2 minutes. The firmware now on the StackChan is replaced and cannot be restored from Home."
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/shell/pages/AllAppsPage.tsx:108
+msgid "Favorite apps"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/shell/pages/AllAppsPage.tsx:99
+#: src/shell/pages/AllAppsPage.tsx:101
+msgid "Favorites"
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -14875,12 +14910,14 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/apps/clock/WorldClocksTab.tsx:151
 #: src/apps/settings/PerformanceCustomize.tsx:58
+#: src/shell/pages/AllAppsPage.tsx:61
 msgid "Move {name} down"
 msgstr ""
 
 #. js-lingui-explicit-id
 #: src/apps/clock/WorldClocksTab.tsx:150
 #: src/apps/settings/PerformanceCustomize.tsx:57
+#: src/shell/pages/AllAppsPage.tsx:60
 msgid "Move {name} up"
 msgstr ""
 
@@ -15479,6 +15516,11 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/apps/settings/CloseAppsSettings.tsx:56
 msgid "No apps added. The built-in protected apps are never closed either way."
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/shell/pages/AllAppsPage.tsx:136
+msgid "No apps match your search."
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -18966,6 +19008,11 @@ msgid "Remove {name}"
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/shell/pages/AllAppsPage.tsx:49
+msgid "Remove {name} from favorites"
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/apps/settings/DevicesSection.tsx:112
 msgid "Remove {name}? It will need to be paired again to reconnect."
 msgstr ""
@@ -20380,6 +20427,12 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:1585
 msgid "area.Search and web"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/shell/pages/AllAppsPage.tsx:94
+#: src/shell/pages/AllAppsPage.tsx:94
+msgid "Search apps"
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -22175,6 +22228,11 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/apps/settings/aiTierSlots.ts:85
 msgid "Standard: {model}"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/shell/pages/AllAppsPage.tsx:117
+msgid "Star an app to keep it here."
 msgstr ""
 
 #. js-lingui-explicit-id

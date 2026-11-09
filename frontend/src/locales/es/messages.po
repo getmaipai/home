@@ -2117,6 +2117,11 @@ msgid "A teen&rsquo;s profile is private, even from an admin. Go back to Family 
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/shell/pages/AllAppsPage.tsx:123
+msgid "A to Z"
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/apps/settings/HuggingFaceTokenSection.tsx:91
 #, needs-review
 msgid "A token is connected."
@@ -2286,6 +2291,11 @@ msgstr "Actividad"
 #, needs-review
 msgid "Add"
 msgstr "Añadir"
+
+#. js-lingui-explicit-id
+#: src/shell/pages/AllAppsPage.tsx:50
+msgid "Add {name} to favorites"
+msgstr ""
 
 #. js-lingui-explicit-id
 #: src/apps/settings/styles/StyleEditor.tsx:137
@@ -2984,6 +2994,9 @@ msgstr "Alertas"
 
 #. js-lingui-explicit-id
 #: src/apps/settings/styles/StyleBrowser.tsx:101
+#: src/shell/pages/AllAppsPage.tsx:25
+#: src/shell/pages/AllAppsPage.tsx:38
+#: src/shell/pages/AllAppsPage.tsx:40
 #: src/shell/pages/CompanionsPage.tsx:165
 #: src/shell/reader/SearchResults.tsx:40
 #, needs-review
@@ -3009,6 +3022,10 @@ msgstr "Todos los adultos"
 
 #. js-lingui-explicit-id
 #: src/shell/pageHeaderTitle.tsx:110
+#: src/shell/pages/AllAppsPage.tsx:88
+#: src/shell/pages/AllAppsPage.tsx:120
+#: src/shell/pages/AllAppsPage.tsx:122
+#: src/shell/pages/AllAppsPage.tsx:129
 #: src/shell/phoneMenuLinks.tsx:13
 #, needs-review
 msgid "All apps"
@@ -3497,6 +3514,11 @@ msgstr "Claves API"
 #, needs-review
 msgid "App"
 msgstr "App"
+
+#. js-lingui-explicit-id
+#: src/shell/pages/AllAppsPage.tsx:96
+msgid "App categories"
+msgstr ""
 
 #. js-lingui-explicit-id
 #: src/shell/pages/PrivacyPage.tsx:116
@@ -9402,6 +9424,7 @@ msgstr "No me notifiques sobre compartidos de"
 #: src/apps/setup/AwayFromHome.tsx:185
 #: src/apps/setup/SetupReviewPage.tsx:63
 #: src/shell/AlarmRinger.tsx:60
+#: src/shell/pages/AllAppsPage.tsx:102
 #: src/shell/pages/companionFlow/KeyframeEditor.tsx:96
 #: src/shell/pages/settings/SettingsAreaPage.tsx:274
 #: src/shell/pages/status/StatusBoard.tsx:25
@@ -9695,6 +9718,7 @@ msgstr "Facilidad de uso"
 #: src/apps/settings/UsersSection.tsx:406
 #: src/shell/library/TranscriptPanel.tsx:288
 #: src/shell/library/TranscriptPanel.tsx:554
+#: src/shell/pages/AllAppsPage.tsx:102
 #: src/shell/pages/CompanionsPage.tsx:70
 #: src/shell/pages/CompanionsPage.tsx:243
 #, needs-review
@@ -10546,6 +10570,17 @@ msgstr "Más rápido en chips de Apple"
 #, needs-review
 msgid "Faster, about 1 to 2 minutes. The firmware now on the StackChan is replaced and cannot be restored from Home."
 msgstr "Más rápido, entre 1 y 2 minutos. El firmware actual del StackChan se reemplaza y no se puede restaurar desde Home."
+
+#. js-lingui-explicit-id
+#: src/shell/pages/AllAppsPage.tsx:108
+msgid "Favorite apps"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/shell/pages/AllAppsPage.tsx:99
+#: src/shell/pages/AllAppsPage.tsx:101
+msgid "Favorites"
+msgstr ""
 
 #. js-lingui-explicit-id
 #: src/apps/settings/VoiceManagerSection.tsx:19
@@ -17368,6 +17403,7 @@ msgstr "¿Mover {count} archivos a la Papelera?"
 #. js-lingui-explicit-id
 #: src/apps/clock/WorldClocksTab.tsx:151
 #: src/apps/settings/PerformanceCustomize.tsx:58
+#: src/shell/pages/AllAppsPage.tsx:61
 #, needs-review
 msgid "Move {name} down"
 msgstr "Mover {name} abajo"
@@ -17375,6 +17411,7 @@ msgstr "Mover {name} abajo"
 #. js-lingui-explicit-id
 #: src/apps/clock/WorldClocksTab.tsx:150
 #: src/apps/settings/PerformanceCustomize.tsx:57
+#: src/shell/pages/AllAppsPage.tsx:60
 #, needs-review
 msgid "Move {name} up"
 msgstr "Mover {name} arriba"
@@ -18070,6 +18107,11 @@ msgstr "Aún no hay animación"
 #, needs-review
 msgid "No apps added. The built-in protected apps are never closed either way."
 msgstr "No hay apps añadidas. Las apps protegidas integradas nunca se cierran de ninguna manera."
+
+#. js-lingui-explicit-id
+#: src/shell/pages/AllAppsPage.tsx:136
+msgid "No apps match your search."
+msgstr ""
 
 #. js-lingui-explicit-id
 #: src/apps/settings/CloseAppsSettings.tsx:56
@@ -22137,6 +22179,11 @@ msgid "Remove {name}"
 msgstr "Quitar {name}"
 
 #. js-lingui-explicit-id
+#: src/shell/pages/AllAppsPage.tsx:49
+msgid "Remove {name} from favorites"
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/apps/settings/DevicesSection.tsx:112
 #, needs-review
 msgid "Remove {name}? It will need to be paired again to reconnect."
@@ -23760,6 +23807,12 @@ msgstr "Búsqueda y memoria"
 #, needs-review
 msgid "area.Search and web"
 msgstr "Búsqueda y web"
+
+#. js-lingui-explicit-id
+#: src/shell/pages/AllAppsPage.tsx:94
+#: src/shell/pages/AllAppsPage.tsx:94
+msgid "Search apps"
+msgstr ""
 
 #. js-lingui-explicit-id
 #: src/shell/pages/ReferencePage.tsx:47
@@ -25857,6 +25910,11 @@ msgstr "Voz estándar"
 #, needs-review
 msgid "Standard: {model}"
 msgstr "Standard: {model}"
+
+#. js-lingui-explicit-id
+#: src/shell/pages/AllAppsPage.tsx:117
+msgid "Star an app to keep it here."
+msgstr ""
 
 #. js-lingui-explicit-id
 #: src/apps/clock/StopwatchTab.tsx:68
