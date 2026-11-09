@@ -70618,6 +70618,103 @@
         }
       }
     },
+    "/api/videos/jobs/{id}/check": {
+      "get": {
+        "tags": [
+          "Videos"
+        ],
+        "summary": "A quick measured check of a finished clip",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 80
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The check",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "checked": {
+                      "type": "boolean",
+                      "description": "False when the frames could not be read on this computer; then there are no findings and nothing is claimed."
+                    },
+                    "frames": {
+                      "type": "number"
+                    },
+                    "findings": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "code": {
+                            "type": "string",
+                            "enum": [
+                              "black",
+                              "frozen",
+                              "soft"
+                            ]
+                          },
+                          "level": {
+                            "type": "string",
+                            "enum": [
+                              "serious",
+                              "warning"
+                            ]
+                          },
+                          "message": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "code",
+                          "level",
+                          "message"
+                        ]
+                      }
+                    }
+                  },
+                  "required": [
+                    "checked",
+                    "frames",
+                    "findings"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such finished video",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/videos/jobs/{id}/cancel": {
       "post": {
         "tags": [
