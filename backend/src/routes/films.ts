@@ -1,6 +1,8 @@
 import { createRoute, z } from "@hono/zod-openapi";
 import { apiRouter, errorResponses } from "@/lib/openapi";
 import { requireAuth } from "@/middleware/auth";
+import { makeFilmAnimatic } from "@/lib/films/animatic";
+import { getFilmRun } from "@/lib/films/store";
 import { cancelFilm, changeFilmRunMusic, getFilmProgress, goFilm, redoFilmRunShot, resumeFilmRun } from "@/lib/films/background";
 
 export const filmsRoutes=apiRouter();
@@ -19,3 +21,6 @@ filmsRoutes.openapi(cancel,c=>{const actor=c.get("person"),id=c.req.valid("param
 filmsRoutes.openapi(resume,c=>{const actor=c.get("person"),id=c.req.valid("param").id,r=resumeFilmRun(actor,id);if(!r)return c.json({error:"Film unavailable"},404);if("line" in r)return c.json({error:r.line},400);const data=response(actor,id);return data?c.json(data,200):c.json({error:"Film unavailable"},404)});
 filmsRoutes.openapi(redo,c=>{const actor=c.get("person"),id=c.req.valid("param").id,r=redoFilmRunShot(actor,id,c.req.valid("json").shot_id);if(!r)return c.json({error:"Film unavailable"},404);if("line" in r)return c.json({error:r.line},400);const data=response(actor,id);return data?c.json(data,200):c.json({error:"Film unavailable"},404)});
 filmsRoutes.openapi(music,c=>{const actor=c.get("person"),id=c.req.valid("param").id,r=changeFilmRunMusic(actor,id);if(!r)return c.json({error:"Film unavailable"},404);if("line" in r)return c.json({error:r.line},400);const data=response(actor,id);return data?c.json(data,200):c.json({error:"Film unavailable"},404)});
+
+const animatic=createRoute({method:"post",path:"/{id}/animatic",tags:["Films"],summary:"Make the animatic: the planned stills held with their motion and lines, no clips rendered",middleware:[requireAuth] as const,request:{params},responses:{200:{description:"The animatic file",content:{"application/json":{schema:z.object({file_id:z.string(),seconds:z.number(),shots:z.number()})}}},...errorResponses({400:"The stills are not ready or the animatic was withheld",401:"Not signed in",404:"Film unavailable"})}});
+filmsRoutes.openapi(animatic,async c=>{const actor=c.get("person"),run=getFilmRun(actor,c.req.valid("param").id);if(!run||!run.plan||!run.production_id)return c.json({error:"Film unavailable"},404);const r=await makeFilmAnimatic({actor,productionId:run.production_id,plan:run.plan});if(!r.ok)return c.json({error:r.line},400);return c.json({file_id:r.fileId,seconds:r.seconds,shots:r.shots},200)});
