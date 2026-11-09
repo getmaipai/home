@@ -72370,7 +72370,7 @@
                     "type": "integer",
                     "minimum": 2,
                     "maximum": 240,
-                    "description": "The whole length. It must be longer than one part's ceiling at this level."
+                    "description": "The whole length, longer than one part's ceiling and at most 40 seconds; longer than that is a film or a scene with cuts."
                   },
                   "beats": {
                     "type": "array",
@@ -72396,6 +72396,16 @@
                       "landscape",
                       "portrait"
                     ]
+                  },
+                  "styles": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 80
+                    },
+                    "maxItems": 2,
+                    "description": "Up to two style ids (a character style holds a face across parts); each is read again through your own access."
                   }
                 },
                 "required": [
