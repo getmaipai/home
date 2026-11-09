@@ -61,6 +61,7 @@
 // defaults to ADD, matching legacy's own catch block) - dedupe deciding
 // "keep both" safely is never wrong enough to burn a turn's whole budget
 // over.
+import { speakerAgeBand } from "@/lib/ageBand";
 import { eq, and, or, isNull, isNotNull, notInArray, inArray, ne, asc, lt, desc, sql } from "drizzle-orm";
 import { hasEligibleClause, isEligibleClause } from "@/lib/turnSignal";
 import type { TurnSignal } from "@maipai/spec/gen/ts/turn-signal.js";
@@ -225,6 +226,7 @@ const EXTRACTION_SCHEMA = {
             text: { type: "string" },
             category: { type: "string", enum: CATEGORY_VALUES as unknown as string[] },
             scope: { type: "string", enum: ["person", "household"] },
+            sensitive: { type: "boolean" },
             robot_memory: { type: "string", enum: ["shared", "rapport", "own"] },
             importance: { type: "number" },
             valid_from: { type: ["string", "null"] },
@@ -407,6 +409,8 @@ Examples (these exact names never recur in a real household; never copy them int
 - "im still programming the robot" -> {"text": "${speakerName} is programming a robot", "category": "project", "scope": "person", "importance": 0.5, "subject": null}
 - "what should I get my daughter Nova for her birthday, she loves horses" -> {"text": "${questionExampleText(speakerName)}", "category": "relationship", "scope": "person", "importance": 0.9, "subject": {"name": "Nova", "kind": "person"}}
 
+For each fact, set sensitive true when it concerns health, medical care, mental health, sexuality, religion, legal matters, or financial hardship. Otherwise set false. Treat this as a careful judgment about the fact, not a keyword match.
+
 Return only a JSON object: {"facts": [...]}. An empty list is a valid answer. At most ${MAX_FACTS_PER_TURN} facts.`;
 }
 
@@ -417,6 +421,7 @@ export interface ExtractedFact {
   scope: "person" | "household";
   robot_memory: "shared" | "rapport" | "own";
   importance: number;
+  sensitive: boolean;
   valid_from: string | null;
   valid_to: string | null;
   /** Step 3a: who or what the fact is about, when the model could name
@@ -480,6 +485,7 @@ function normalizeFact(raw: unknown): ExtractedFact | null {
     category: r.category,
     scope,
     importance,
+    sensitive: r.sensitive === true,
     valid_from: validFrom,
     valid_to: validTo,
     subject,
@@ -1659,8 +1665,13 @@ export async function judgeTurn(turn: ConversationTurnRow): Promise<JudgeTurnRes
   const writtenIds: string[] = [];
   for (const fact of shaped) {
     const robotBound = robotDeviceId !== null && fact.robot_memory !== "shared";
-    if (robotBound) {
-      fact.scope = fact.robot_memory === "rapport" ? "person" : "household";
+    // PI-MEM-00: turn-derived facts are personal until a household confirmation
+    // exists, so the extractor cannot create shared household writes. The one
+    // exception is a robot's own fact (device-bound), and only from an adult.
+    if (robotBound && fact.robot_memory === "own" && speakerAgeBand(speaker, new Date()) === "adult") {
+      fact.scope = "household";
+    } else {
+      fact.scope = "person";
     }
     const notAName = subjectNotAName(speaker, fact);
     if (notAName) {
@@ -1872,9 +1883,6 @@ export async function judgeTurn(turn: ConversationTurnRow): Promise<JudgeTurnRes
       // person-scope entities are unaffected - that's the speaker's own
       // memory to keep however they like.
       let recordKind = categoryToRecordKind(fact.category);
-      if (fact.scope === "household" && isPrivilegedRecordKind(recordKind) && !isOwnerOrAdmin(speaker)) {
-        recordKind = "memory";
-      }
       const result = remember(speaker, {
         text: fact.text,
         record_kind: recordKind,
@@ -1886,7 +1894,8 @@ export async function judgeTurn(turn: ConversationTurnRow): Promise<JudgeTurnRes
         person: fact.scope === "person" ? speaker.id : undefined,
         source: turn.id,
         importance: fact.importance,
-        child_disclosure: defaultChildDisclosure(fact.text, { sensitive: false, scope: fact.scope }),
+        sensitive: fact.sensitive,
+        child_disclosure: defaultChildDisclosure(fact.text, { sensitive: fact.sensitive, scope: fact.scope }),
         offer_withheld: fact.offer_withheld ? true : null,
         valid_from: fact.valid_from,
         valid_to: fact.valid_to,

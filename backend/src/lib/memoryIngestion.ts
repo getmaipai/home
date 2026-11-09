@@ -10,7 +10,7 @@ import { nextHlc } from "@/lib/hlc";
 import { newMemoryRecordId } from "@/lib/memoryId";
 import { MemoryRecord } from "@maipai/spec/gen/ts/memory-record.js";
 import { detectCredential, CREDENTIAL_SAFE_MESSAGE } from "@/lib/memoryContentPolicy";
-import { isOwnerOrAdmin } from "@/lib/access";
+import { isOwnerOrAdmin, canWritePersonMemory } from "@/lib/access";
 import { embed, type EmbedOpResult } from "@/lib/llm";
 import { trackBackgroundWork } from "@/lib/backgroundWork";
 
@@ -200,6 +200,8 @@ export type IngestInput = {
   sensitive?: boolean;
   offerWithheld?: boolean | null;
   childDisclosure?: "child_ok" | "teen_ok" | "adult_only";
+  childDisclosureSetBy?: string | null;
+  childDisclosureSetAt?: string | null;
   validFrom?: string | null;
   validTo?: string | null;
   precomputedEmbedding?: { space: string; vector: readonly number[]; preprocess: string };
@@ -228,15 +230,13 @@ export function ingestMemory(input: IngestInput): IngestResult {
   }
   if (scope === "person") {
     if (!person) return { ok: false, status: 400, error: "person is required when scope is person" };
-    if (person !== input.actor.id && !isOwnerOrAdmin(input.actor)) {
-      return { ok: false, status: 403, error: "cannot write a memory scoped to another person" };
-    }
     const exists = db
       .select({ id: people.id })
       .from(people)
       .where(and(eq(people.id, person), isNull(people.deletedAt)))
       .get();
     if (!exists) return { ok: false, status: 400, error: `person not found: ${person}` };
+    if (!canWritePersonMemory(input.actor, person)) return { ok: false, status: 403, error: "Only the person can change their person-scope memories." };
   }
 
   if (scope === "companion") {
@@ -275,8 +275,8 @@ export function ingestMemory(input: IngestInput): IngestResult {
     sensitive: input.sensitive ?? false,
     offer_withheld: input.offerWithheld ?? null,
     child_disclosure: input.childDisclosure ?? "child_ok",
-    child_disclosure_set_by: null,
-    child_disclosure_set_at: null,
+    child_disclosure_set_by: input.childDisclosureSetBy ?? null,
+    child_disclosure_set_at: input.childDisclosureSetAt ?? null,
     uses: 0,
     created_at: now,
     last_used_at: now,

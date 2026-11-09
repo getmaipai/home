@@ -133,13 +133,14 @@ describe("POST /api/memory (remember)", () => {
 
   test("a person cannot write a memory scoped to someone else", async () => {
     const { owner, childClient, childId } = await ownerAndChild();
-    void owner;
+    const other = await owner.post("/api/people", { displayName: "Marlow", role: "adult", secret: "marlowpass123" });
+    const otherId = (await other.json() as { id: string }).id;
     const res = await childClient.post("/api/memory", {
       text: "Sage likes tea",
       category: "preference",
       tier: "durable",
       scope: "person",
-      person: "person-someoneelse",
+      person: otherId,
       source: "test",
       importance: 0.3,
     });
@@ -538,6 +539,53 @@ describe("GET /api/memory (list) and visibility", () => {
 });
 
 describe("supersede and archive", () => {
+  test("superseding an adult-only record keeps its audience and setter metadata", async () => {
+    const { owner, childClient } = await ownerAndChild();
+    const created = await owner.post("/api/memory", { text: "private household fact", category: "fact", tier: "durable", scope: "household", importance: 0.5 });
+    const original = await created.json() as MemoryRecord;
+    await owner.post(`/api/memory/${original.id}/audience`, { child_disclosure: "adult_only" });
+    const row = db.select().from(people).where(eq(people.displayName, "Sage")).get()!;
+    const result = supersede(row, original.id, { text: "corrected private fact", source: "test" });
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.value.created.child_disclosure).toBe("adult_only");
+    expect(result.value.created.child_disclosure_set_by).toBe(row.id);
+    expect(result.value.created.child_disclosure_set_at).not.toBeNull();
+    const visible = await childClient.get("/api/memory");
+    expect((await visible.json() as MemoryRecord[]).some((record) => record.id === result.value.created.id)).toBe(false);
+  });
+
+  test("owner and admin cannot mutate a teen's person memory, while the teen can", async () => {
+    const owner = new TestClient();
+    await owner.post("/api/auth/setup", { displayName: "Sage", secret: "correcthorse" });
+    const teenRes = await owner.post("/api/people", { displayName: "Marlow", role: "teen", secret: "teenpass123" });
+    const teenId = (await teenRes.json() as { id: string }).id;
+    const adminRes = await owner.post("/api/people", { displayName: "Nova", role: "admin", secret: "adminpass123" });
+    const adminId = (await adminRes.json() as { id: string }).id;
+    const admin = new TestClient();
+    await admin.post("/api/auth/verify-secret", { personId: adminId, secret: "adminpass123" });
+    const teen = new TestClient();
+    await teen.post("/api/auth/verify-secret", { personId: teenId, secret: "teenpass123" });
+    const saved = await teen.post("/api/memory", { text: "Marlow likes tea", category: "preference", tier: "durable", scope: "person", person: teenId, importance: 0.5 });
+    const id = (await saved.json() as MemoryRecord).id;
+    expect((await owner.post(`/api/memory/${id}/archive`, {})).status).toBe(403);
+    expect((await admin.post(`/api/memory/${id}/archive`, {})).status).toBe(403);
+    expect(supersede(db.select().from(people).where(eq(people.id, adminId)).get()!, id, { text: "Marlow likes coffee", source: "test" }).ok).toBe(false);
+    expect((await teen.post(`/api/memory/${id}/archive`, {})).status).toBe(200);
+  });
+
+  test("a child cannot archive, supersede, or batch-forget a teen's memory", async () => {
+    const { owner, childClient } = await ownerAndChild();
+    const teenRes = await owner.post("/api/people", { displayName: "Marlow", role: "teen" });
+    const teenId = (await teenRes.json() as { id: string }).id;
+    const teenRow = db.select().from(people).where(eq(people.id, teenId)).get()!;
+    const made = remember(teenRow, { text: "Marlow likes tea", category: "preference", tier: "durable", scope: "person", person: teenId, source: "test", importance: 0.5 });
+    if (!made.ok) throw new Error(made.error);
+    expect((await childClient.post(`/api/memory/${made.value.id}/archive`, {})).status).toBe(403);
+    expect(supersede(db.select().from(people).where(eq(people.displayName, "Sage")).get()!, made.value.id, { text: "Marlow likes coffee", source: "test" }).ok).toBe(false);
+    const result = await childClient.post("/api/memory/batch-forget", { ids: [made.value.id] });
+    expect((await result.json() as { outcomes: Array<{ deleted: boolean }> }).outcomes[0]?.deleted).toBe(false);
+  });
   test("archive tombstones without deleting the row", async () => {
     const owner = new TestClient();
     await owner.post("/api/auth/setup", { displayName: "Sage", secret: "correcthorse" });
@@ -680,7 +728,7 @@ describe("POST /api/memory/:id/audience (set child disclosure)", () => {
 
     const res = await owner.post(`/api/memory/${original.id}/audience`, { child_disclosure: "adult_only" });
     expect(res.status).toBe(400);
-    expect(((await res.json()) as { error: string }).error).toBe("audience applies to household records only");
+    expect(((await res.json()) as { error: string }).error).toBe("Audience changes apply to household records only. Choose a household record.");
   });
 
   test("an invalid audience value is refused with 400", async () => {

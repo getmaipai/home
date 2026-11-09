@@ -313,9 +313,12 @@ describe("the review's cases", () => {
       () => judgeTurn(turn),
       [1, 0, 0, 0],
     );
-    const ravens = db.select().from(entities).where(eq(entities.name, "Raven")).all();
-    expect(ravens.length).toBe(1);
-    expect(ravens[0]!.deletedAt).not.toBeNull();
+    // PI-MEM-00: the child's fact is now person-scoped, so it never reaches the
+    // pinned household record and leaves no orphan entity behind.
+    const pinnedAfter = db.select().from(memoryRecords).where(eq(memoryRecords.id, pinned.value.id)).get()!;
+    expect([pinnedAfter.status, pinnedAfter.text]).toEqual(["active", "Raven is the family's dentist"]);
+    const childRows = db.select().from(memoryRecords).where(eq(memoryRecords.person, child.id)).all();
+    expect(childRows.map((r) => r.scope)).toEqual(["person"]);
   });
 
   test("a confirmed entity survives the forgetting of the fact that made it", async () => {

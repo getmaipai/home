@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, test } from "bun:test";
 import { db } from "@/db";
-import { people } from "@/db/schema";
+import { memoryRecords, people } from "@/db/schema";
 import { list, registerCompanionReadGate, remember } from "@/lib/memory";
 import { resetDb } from "./reset-db";
 import { child, owner } from "./support/testAuth";
@@ -48,6 +48,7 @@ describe("synth life memory scope", () => {
     expect(list(ownerRow, { scope: "companion", companionId: "moss" })).toHaveLength(1);
     expect(list(ownerRow, { scope: "companion" })).toHaveLength(2);
   });
+
 
   test("a child reads only child_ok companion records when the companion gate allows it", async () => {
     const { client: ownerClient, row: ownerRow } = await owner();

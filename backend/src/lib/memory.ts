@@ -14,7 +14,7 @@ import { db, sqlite } from "@/db";
 import { memoryRecords, memoryEmbeddings, pendingEmbeddings, people, conversationTurns, entities } from "@/db/schema";
 import { newMemoryRecordId } from "@/lib/memoryId";
 import { toMemoryRecord } from "@/lib/memoryShape";
-import { isOwnerOrAdmin, rolesById, canAccessPerson } from "@/lib/access";
+import { isOwnerOrAdmin, rolesById, canAccessPerson, canWritePersonMemory } from "@/lib/access";
 import { speakerAgeBand } from "@/lib/ageBand";
 import { tokenize } from "@/lib/text";
 import { isBareAcknowledgment } from "@/lib/guards";
@@ -25,6 +25,7 @@ import { deleteEpisodesForPerson } from "@/lib/episodes";
 import { retireOrphanSubjects } from "@/lib/subjects";
 import { MemoryRecord } from "@maipai/spec/gen/ts/memory-record.js";
 import { ingestMemory } from "@/lib/memoryIngestion";
+import { synthById } from "@/lib/synths";
 import type { PersonRow, MemoryRecordRow } from "@/types";
 import type { Result } from "@/lib/result";
 
@@ -167,7 +168,7 @@ function assertCanWrite(
   }
   if (scope === "person") {
     if (!person) return { ok: false, status: 400, error: "person is required when scope is person" };
-    if (actor.id !== person && !isOwnerOrAdmin(actor)) {
+    if (!canWritePersonMemory(actor, person)) {
       return { ok: false, status: 403, error: "cannot write a memory scoped to another person" };
     }
     return { ok: true, value: true };
@@ -176,6 +177,8 @@ function assertCanWrite(
   if (scope === "companion") {
     if (!source.startsWith("talent.")) return { ok: false, status: 403, error: "Companion scope requires a source starting with talent. Use a talent source before saving." };
     if (!companionId) return { ok: false, status: 400, error: "Companion scope requires a companion id. Set companion_id before saving." };
+    const synth = synthById(companionId);
+    if (!synth || (actor.id !== synth.owner_person_id && !isOwnerOrAdmin(actor))) return { ok: false, status: 403, error: "Only the synth's maker or an admin can change its life." };
     return { ok: true, value: true };
   }
   return { ok: false, status: 400, error: `unknown scope: ${scope}` };
@@ -218,6 +221,8 @@ export interface RememberInput {
   /** NAT-07c: the judge's opening-thread withholding tag; it can only add withholding. */
   offer_withheld?: boolean | null;
   child_disclosure?: "child_ok" | "teen_ok" | "adult_only";
+  child_disclosure_set_by?: string | null;
+  child_disclosure_set_at?: string | null;
   embedding_space?: string | null;
   /** When the fact became/stopped being true (step 6, session-a-
    * intelligence.md: "trips and states stored as dated `state` with
@@ -258,6 +263,8 @@ export function remember(actor: PersonRow, input: RememberInput): MemoryOpResult
     sensitive: input.sensitive,
     offerWithheld: input.offer_withheld,
     childDisclosure: input.child_disclosure,
+    childDisclosureSetBy: input.child_disclosure_set_by,
+    childDisclosureSetAt: input.child_disclosure_set_at,
     validFrom: input.valid_from,
     validTo: input.valid_to,
     precomputedEmbedding: input.precomputed_embedding,
@@ -1048,6 +1055,7 @@ export function archive(actor: PersonRow, id: string): MemoryOpResult<MemoryReco
   if (!isOwnerOrAdmin(actor) && isPrivilegedRecord(found.value)) {
     return { ok: false, status: 403, error: "only owner or admin may archive an entity or pinned memory" };
   }
+  if (found.value.scope === "person" && !canWritePersonMemory(actor, found.value.person ?? "")) return { ok: false, status: 403, error: "Only the person can change their person-scope memories." };
   const now = new Date().toISOString();
   db.update(memoryRecords).set({ status: "archived", archivedReason: "person", expiredAt: now, hlc: nextHlc() }).where(eq(memoryRecords.id, id)).run();
   const updated = db.select().from(memoryRecords).where(eq(memoryRecords.id, id)).get()!;
@@ -1064,9 +1072,8 @@ export function setChildDisclosure(
 ): MemoryOpResult<MemoryRecord> {
   const row = db.select().from(memoryRecords).where(eq(memoryRecords.id, id)).get();
   if (!row) return { ok: false, status: 404, error: "memory record not found" };
-  if (row.scope !== "household" || row.status === "deleted") {
-    return { ok: false, status: 400, error: "audience applies to household records only" };
-  }
+  if (row.scope !== "household") return { ok: false, status: 400, error: "Audience changes apply to household records only. Choose a household record." };
+  if (row.status === "deleted") return { ok: false, status: 400, error: "This memory was deleted and its audience cannot be changed." };
   if (speakerAgeBand(actor, new Date()) !== "adult") {
     return { ok: false, status: 403, error: "only an adult can change who may hear this" };
   }
@@ -1144,6 +1151,7 @@ export interface SupersedeInput {
   importance?: number;
   pinned?: boolean;
   sensitive?: boolean;
+  child_disclosure?: "child_ok" | "teen_ok" | "adult_only";
   offer_withheld?: boolean | null;
   source: string;
   fact_confidence?: number | null;
@@ -1217,6 +1225,9 @@ export function supersede(
     tier: input.tier ?? old.tier,
     scope: old.scope,
     person: old.person,
+    child_disclosure: input.child_disclosure ?? old.childDisclosure as "child_ok" | "teen_ok" | "adult_only",
+    child_disclosure_set_by: old.childDisclosureSetBy,
+    child_disclosure_set_at: old.childDisclosureSetAt,
     companion_id: old.companionId,
     subject_id: input.subject_id ?? old.subjectId ?? null,
     source: input.source,
@@ -1385,6 +1396,10 @@ export function forgetByIds(actor: PersonRow, ids: string[]): BatchForgetOutcome
     const found = getWritable(actor, id);
     if (!found.ok) {
       outcomes.push({ id, deleted: false, reason: found.error });
+      continue;
+    }
+    if (found.value.scope === "person" && !canWritePersonMemory(actor, found.value.person ?? "")) {
+      outcomes.push({ id, deleted: false, reason: "Only the person can change their person-scope memories." });
       continue;
     }
     if (!isOwnerOrAdmin(actor) && isPrivilegedRecord(found.value)) {

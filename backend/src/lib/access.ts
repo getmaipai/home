@@ -80,6 +80,13 @@ export function canAccessPerson(actor: PersonRow, personId: string, roleOf?: Map
   return role === "child";
 }
 
+/** The write side follows the read boundary for person-scoped memories. */
+export function canWritePersonMemory(actor: PersonRow, personId: string, roleOf?: Map<string, string>): boolean {
+  if (actor.id === personId) return true;
+  const targetRole = roleOf?.get(personId) ?? getPersonRole(personId);
+  return targetRole !== "teen" && canAccessPerson(actor, personId, roleOf);
+}
+
 // Every active (non-deleted) person in the household - the retired turn engine's
 // household block (session-a-intelligence.md step 1, platform plan 4.5's
 // "who lives here" volatile-zone content) needs the whole roster, not one
