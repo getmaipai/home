@@ -34,7 +34,7 @@ a long take is parts that each continue from the last frame of the one before, m
 **A long take is a production of parts.** Asking for more seconds than the level's ceiling makes a long take instead of cutting the length:
 
 1. **Plan (code, no model).** parts = ceil(seconds / ceiling); each part gets an equal share, at least 3 s. At most 12 parts (about two minutes at
-   Standard). Anything longer is refused with one plain line naming the limit.
+   Standard). An unbroken take is capped at 40 seconds (drift builds with every part; research on 2026-11-09 found every chained method drifts and the better ones carry more than one frame); anything longer is refused with one plain line that points to a film or scene made from shots with cuts (the show-runner design, SHOWRUNNER-01).
 2. **Beats.** The person's words stay as written for part 1. For each later part the code adds one continuity sentence ("the same scene, the same
    people and light, a moment later") and, when the person gave beats (one per line, or numbered), that part's beat. With no beats, every part
    gets the whole prompt plus the continuity sentence. The model is not asked to plan camera or timing (the framing rule from the film maker:
@@ -67,6 +67,16 @@ beats.") rather than saved cut off. Progress is the count
 8. **Where it starts.** `generate_video` with `seconds` past the ceiling in chat; `POST /api/videos/long` for the Create page; the Create
    page's Length chip lists 15, 20, 30, 45 and 60 s once VIDEO-UI-06 lands (LONGTAKE-02). The estimate for the button is parts times the
    measured minutes per part (VIDEO-ESTIMATE-01).
+
+## 2a. Upgrades from the 2026-11-09 research (what others do)
+
+Carrying only the last frame is the common baseline and the weakest form of it. Better systems also (a) condition on the last second or
+several frames (Veo, LTX's extend sampler with a frame-overlap setting, Helios' last three frames), (b) re-anchor identity on every chunk
+(Infinite Talk feeds the reference picture plus the last frame), and (c) keep real work to short shots with cuts. Done in this note: the
+40-second cap, and a character style (`styles`, at most two, read again through the person's own access) passed to every part so the
+face is held by the style. Not yet done: multi-frame conditioning needs a Stack input that does not exist for the non-Max levels (Max has
+the engine's own `extend`, VIDEO-EVAL-04 measures it); a short audio crossfade at each join needs a Stack step for audio alone (`crossfade`
+dissolves the picture too). Both are rows under VIDEO-EVAL-04.
 
 ## 3. What it will not do (stated plainly in the product)
 

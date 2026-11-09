@@ -10,7 +10,7 @@ import { __setAgeCheckRunnerForTests } from "@/lib/pictures/ageCheck";
 import { __setKeyframesForTests } from "@/lib/pictures/keyframes";
 import { __setVideoStatusForTests, readyVideoStatusForTests } from "@/lib/videos/ready";
 import { __resetVideoAdapterCacheForTests } from "@/lib/videos/adapters";
-import { CONTINUITY, TAKE_TOO_MUCH_LINE, MAX_PARTS, decodeParams, encodeParams, partPrompt, planParts, startLongTake, takeProgress } from "@/lib/videos/longTake";
+import { CONTINUITY, TAKE_TOO_MUCH_LINE, MAX_TAKE_SECONDS, decodeParams, encodeParams, partPrompt, planParts, startLongTake, takeProgress } from "@/lib/videos/longTake";
 import { installFakeVideoStack, testJpeg, type FakeVideoStack } from "./videoFixture";
 import { installFakeEditStack, type FakeEditStack } from "./videoEditStackFixture";
 import { until } from "./pictureFixture";
@@ -26,9 +26,10 @@ describe("planParts and partPrompt", () => {
     expect(planParts(25, "standard")).toEqual({ ok: true, parts: 3, perPart: 8 });
     expect(planParts(30, "boost")).toEqual({ ok: true, parts: 6, perPart: 5 });
   });
-  test("more than the part limit is refused with the limit named", () => {
-    const r = planParts(MAX_PARTS * 10 + 1, "standard"); expect(r.ok).toBe(false);
-    if (!r.ok) expect(r.line).toContain(String(MAX_PARTS * 10));
+  test("more than one unbroken take allows is refused and points to a film", () => {
+    const r = planParts(MAX_TAKE_SECONDS + 1, "standard"); expect(r.ok).toBe(false);
+    if (!r.ok) { expect(r.line).toContain(String(MAX_TAKE_SECONDS)); expect(r.line).toContain("film"); }
+    expect(planParts(MAX_TAKE_SECONDS, "standard")).toEqual({ ok: true, parts: 4, perPart: 10 });
   });
   test("part 1 is the words as written; later parts add the continuity sentence and their beat", () => {
     const p = { prompt: "A fox walks through snow.", beats: ["It stops at a frozen stream.", "It drinks."] };

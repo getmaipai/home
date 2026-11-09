@@ -484,10 +484,11 @@ const longRoute = createRoute({
   method: "post", path: "/long", tags: ["Videos"], summary: "Start a long take: a clip longer than one part's ceiling, made as parts that continue from each other (adults on their own screen)", middleware: [requireAuth] as const,
   request: { body: { content: { "application/json": { schema: z.object({
     prompt: z.string().trim().min(3).max(1200).describe("What the video shows."),
-    seconds: z.number().int().min(2).max(240).describe("The whole length. It must be longer than one part's ceiling at this level."),
+    seconds: z.number().int().min(2).max(240).describe("The whole length, longer than one part's ceiling and at most 40 seconds; longer than that is a film or a scene with cuts."),
     beats: z.array(z.string().trim().min(1).max(400)).max(12).optional().describe("Optional: what happens in each part, in order."),
     tier: z.enum(["standard", "boost", "max"]).optional(),
     orientation: z.enum(["landscape", "portrait"]).optional(),
+    styles: z.array(z.string().trim().min(1).max(80)).max(2).optional().describe("Up to two style ids (a character style holds a face across parts); each is read again through your own access."),
   }) } } } },
   responses: { 200: { content: { "application/json": { schema: z.object({ id: z.string(), parts: z.number(), per_part: z.number().describe("Seconds asked for each part.") }) } }, description: "The take has started; poll GET /long/{id}" }, ...errorResponses({ 401: "Not signed in", 403: "Not for this person", 409: "A long take is already being made", 422: "The words or the length cannot be used" }) },
 });

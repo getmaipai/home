@@ -27,13 +27,15 @@ import { laneOf } from "@/lib/pictures/lane";
 import { refuseVideoPrompt, videoDenial, VIDEO_DENIAL_LINE, VIDEO_REFUSAL_LINE } from "./policy";
 
 export const MAX_PARTS = 12;
+/** A continuous take is capped here (drift builds with every part); a longer ask is a scene with cuts, which the Film maker makes. */
+export const MAX_TAKE_SECONDS = 40;
 export const MIN_PART_SECONDS = 3;
 export const SUMMARY_LIMIT = 2000;
 export const CONTINUITY = "The same scene, the same people and light, a moment later.";
 export const TAKE_TOO_MUCH_LINE = "That is too much to say in one take. Shorten the words or the beats.";
 
 export type TakeTier = "standard" | "boost" | "max";
-export interface TakeParams { v: 1; prompt: string; beats: string[]; tier: TakeTier; orientation?: "landscape" | "portrait"; parts: number; per_part: number; seed?: number }
+export interface TakeParams { v: 1; prompt: string; beats: string[]; tier: TakeTier; orientation?: "landscape" | "portrait"; parts: number; per_part: number; seed?: number; styles?: string[] }
 
 /** One part's ceiling at a level (a Stack profile that lowers it makes that part shorter, never longer). */
 export function ceilingFor(tier: TakeTier): number {
@@ -44,8 +46,9 @@ export function ceilingFor(tier: TakeTier): number {
 export function planParts(seconds: number, tier: TakeTier): { ok: true; parts: number; perPart: number } | { ok: false; line: string } {
   const ceiling = ceilingFor(tier);
   if (!Number.isFinite(seconds) || seconds <= ceiling) return { ok: false, line: `A clip up to ${ceiling} seconds is made as one piece. Ask for a longer length to make a long take.` };
+  if (seconds > MAX_TAKE_SECONDS) return { ok: false, line: `One unbroken take is at most ${MAX_TAKE_SECONDS} seconds, because a face or a room drifts a little with every part. For something longer, ask for a film or a scene, which is made from shots with cuts.` };
   const parts = Math.ceil(seconds / ceiling);
-  if (parts > MAX_PARTS) return { ok: false, line: `A long take is at most ${MAX_PARTS * ceiling} seconds at this level (${MAX_PARTS} parts). Ask for a shorter length.` };
+  if (parts > MAX_PARTS) return { ok: false, line: `A long take is at most ${MAX_PARTS} parts at this level. Ask for a shorter length.` };
   const perPart = Math.max(MIN_PART_SECONDS, Math.round(seconds / parts));
   return { ok: true, parts, perPart: Math.min(perPart, ceiling) };
 }
@@ -91,7 +94,7 @@ export function takeProgress(actor: PersonRow, id: string): TakeProgress | null 
 
 export type StartTake = { ok: true; id: string; parts: number; per_part: number } | { ok: false; status: 403 | 409 | 422; line: string };
 
-export function startLongTake(actor: PersonRow, input: { prompt: string; seconds: number; beats?: string[]; tier?: TakeTier; orientation?: "landscape" | "portrait" }): StartTake {
+export function startLongTake(actor: PersonRow, input: { prompt: string; seconds: number; beats?: string[]; tier?: TakeTier; orientation?: "landscape" | "portrait"; styles?: string[] }): StartTake {
   const audience = makeAudienceOf(actor);
   if (laneOf(audience) !== "adult") return { ok: false, status: 403, line: MINOR_MAKE_LINE };
   const denial = videoDenial(audience); if (denial) return { ok: false, status: 403, line: VIDEO_DENIAL_LINE[denial] };
@@ -104,7 +107,8 @@ export function startLongTake(actor: PersonRow, input: { prompt: string; seconds
   const tier = input.tier ?? "standard";
   const plan = planParts(input.seconds, tier); if (!plan.ok) return { ok: false, status: 422, line: plan.line };
   if ([...running.keys()].some((key) => ownTake(actor, key))) return { ok: false, status: 409, line: "A long take is already being made. Wait for it to finish or stop it first." };
-  const params: TakeParams = { v: 1, prompt, beats, tier, ...(input.orientation ? { orientation: input.orientation } : {}), parts: plan.parts, per_part: plan.perPart };
+  const styles = (input.styles ?? []).map((x) => x.trim()).filter(Boolean).slice(0, 2);
+  const params: TakeParams = { v: 1, prompt, beats, tier, ...(styles.length ? { styles } : {}), ...(input.orientation ? { orientation: input.orientation } : {}), parts: plan.parts, per_part: plan.perPart };
   const encoded = encodeParams(params); if (!encoded.ok) return { ok: false, status: 422, line: encoded.line };
   const made = createMediaProduction(actor, { title: "Long take", summary: encoded.summary }, "long-take");
   const shots = Array.from({ length: plan.parts }, (_, n) => ({ id: partId(n), subject_ids: [] as string[] }));
@@ -159,7 +163,7 @@ async function makePart(input: { actor: PersonRow; id: string; shot: string; par
   const result = await runGenerateVideo({
     state: { actor, persona: null, conversationId: turn.conversationId, turnId: turn.turnId, temporary: false },
     args: { prompt, production: input.id, shot: input.shot, seconds: params.per_part, tier: params.tier, ...(params.orientation ? { orientation: params.orientation } : {}), ...(input.seed ? { seed: input.seed } : {}) },
-    callId: `take-${input.id}-${input.shot}`, spoken: false, audience,
+    callId: `take-${input.id}-${input.shot}`, spoken: false, audience, ...(params.styles?.length ? { styleIds: params.styles } : {}),
     ...(prepared?.ok ? { prepared: prepared.prepared, adultOnly: prepared.adultOnly, ...(prepared.adultLock ? { adultLock: prepared.adultLock } : {}) } : {}),
   });
   const jobId = (result.result?.data as { videoJobId?: string } | undefined)?.videoJobId;
