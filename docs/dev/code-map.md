@@ -714,7 +714,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/mediaProductions.ts` | registerCastSynthGate, canSeeProduction, listMediaProductions, getMediaProduction, setShowState, createMediaProduction |
 | `backend/src/lib/mediaSubjectSheet.ts` | sheetPromptFor, makeSubjectSheet |
 | `backend/src/lib/mediaSubjects.ts` | isSheetReference, canUseSubject, listMediaSubjects, getMediaSubject, createMediaSubject, updateMediaSubject |
-| `backend/src/lib/memory.ts` | registerCompanionReadGate, validAt, EVENT_GRACE_DAYS, eventWithinGrace, isPrivilegedRecordKind, isPrivilegedRecord |
+| `backend/src/lib/memory.ts` | registerCompanionReadGate, registerCompanionWriteGate, validAt, EVENT_GRACE_DAYS, eventWithinGrace, isPrivilegedRecordKind |
 | `backend/src/lib/memoryContentPolicy.ts` | CREDENTIAL_SAFE_MESSAGE, CREDENTIAL_REDACTION, detectCredential, hasDeclaredCredentialField, redactCredentials |
 | `backend/src/lib/memoryFraming.ts` | MEMORY_SECTION_HEADER, MEMORY_TRUST_REMINDER, NOTHING_STORED_LINE |
 | `backend/src/lib/memoryId.ts` | newMemoryRecordId |
