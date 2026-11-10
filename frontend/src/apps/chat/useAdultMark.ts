@@ -19,9 +19,10 @@ export interface AdultMarkApi {
 export interface AdultMarkItem { id: string; adult?: { can_clear: boolean; can_mark: boolean; line: string | null } | null }
 export interface AdultMarkAction { id: "adult-unmark" | "adult-mark"; label: string; hint: string | undefined; disabled: boolean; onSelect: () => void }
 
-export function useAdultMark<T>(api: AdultMarkApi, item: AdultMarkItem | null, refresh: () => void, toAction: (action: AdultMarkAction) => T): { actions: T[]; dialog: ReactNode; stateLine: string | null } {
+export function useAdultMark<T>(api: AdultMarkApi, item: AdultMarkItem | null, refresh: () => void, toAction: (action: AdultMarkAction) => T, options: { startOpen?: boolean; onClosed?: () => void } = {}): { actions: T[]; dialog: ReactNode; stateLine: string | null } {
   const me = useContext(WakeWordPersonContext);
-  const [open, setOpen] = useState(false);
+  const [open, setOpenState] = useState(options.startOpen ?? false);
+  const setOpen = (value: boolean) => { setOpenState(value); if (!value) options.onClosed?.(); };
   const [busy, setBusy] = useState(false);
   const [problem, setProblem] = useState<string | null>(null);
   const [passkeyEnabled, setPasskeyEnabled] = useState(false);

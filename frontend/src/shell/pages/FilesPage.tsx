@@ -31,6 +31,7 @@ import {
 import { batchSentence, useLibraryActions } from "@/shell/library/useLibraryActions";
 import { LibraryItems, type ItemActions } from "@/shell/library/LibraryItems";
 import { LibraryViewer } from "@/shell/library/LibraryViewer";
+import { useAdultMark } from "@/apps/chat/useAdultMark";
 import { LibraryShareDialog } from "@/shell/library/LibraryShareDialog";
 import { LibraryTrash } from "@/shell/library/LibraryTrash";
 import { LibraryStorage } from "@/shell/library/LibraryStorage";
@@ -74,6 +75,12 @@ const CHILD_ADD = () => i18n._({ id: "Ask a grown-up to add this file. Adding fi
 const restoreFailed = (count: number, reason: string) => i18n._({ id: "{count, plural, one {# could not be restored: {reason}.} other {# could not be restored: {reason}.}}", message: "{count, plural, one {# could not be restored: {reason}.} other {# could not be restored: {reason}.}}", values: { count, reason } });
 const keepFailed = (count: number, reason: string) => i18n._({ id: "{count, plural, one {# could not be kept: {reason}.} other {# could not be kept: {reason}.}}", message: "{count, plural, one {# could not be kept: {reason}.} other {# could not be kept: {reason}.}}", values: { count, reason } });
 
+/** The adult-lock removal dialog for one Library item, opened from the item's menu; it asks for the person's passcode, password or passkey. */
+function UnmarkDialogHost({ item, refresh, onClosed }: { item: LibraryItem; refresh: () => void; onClosed: () => void }) {
+  const host = useAdultMark({ confirmUnmark: api.confirmLibraryUnmark, adultMark: api.libraryAdultMark }, item, refresh, () => null, { startOpen: true, onClosed });
+  return <>{host.dialog}</>;
+}
+
 export function FilesPage({ person }: { person: Roster }) {
   useHeaderExtra(PageHeaderTitle, LibraryHeaderAction);
   useTabItem(i18n._({ id: "Library", message: "Library" }));
@@ -83,6 +90,7 @@ export function FilesPage({ person }: { person: Roster }) {
   const phone = useIsPhoneLayout();
   const [cardSize, setCardSize] = useCardSize("library");
   const actions = useLibraryActions(person.id);
+  const [unmarkItem, setUnmarkItem] = useState<LibraryItem | null>(null);
   const canAdd = canAddFiles(person);
   useEffect(() => { publishLibraryCanAdd(canAdd); return () => publishLibraryCanAdd(false); }, [canAdd]);
   const canShare = canShareFiles(person);
@@ -198,6 +206,10 @@ export function FilesPage({ person }: { person: Roster }) {
       toast(i18n._({ id: "Checking the picture. This can take a minute.", message: "Checking the picture. This can take a minute." }));
       void actions.recheck(item.id).then(() => toast.success(i18n._({ id: "‘{name}’ is now marked all-ages.", message: "‘{name}’ is now marked all-ages.", values: { name: item.name } }))).catch((error: unknown) => setProblem(actions.reason(error)));
     },
+    adultMark: (item) => {
+      void api.libraryAdultMark(item.id, { action: "mark" }).then(() => actions.refresh()).then(() => toast.success(i18n._({ id: "‘{name}’ is marked NSFW and locked.", message: "‘{name}’ is marked NSFW and locked.", values: { name: item.name } }))).catch((error: unknown) => setProblem(actions.reason(error)));
+    },
+    adultUnmark: (item) => setUnmarkItem(item),
   }), [actions, requestTrash, update]);
 
   // Upload: the button, a dropped file, a pasted picture.
@@ -392,6 +404,7 @@ export function FilesPage({ person }: { person: Roster }) {
         {!wide ? <div className="max-w-xl"><LibraryStorage me={person} /></div> : null}
       </div>
 
+      {unmarkItem ? <UnmarkDialogHost key={unmarkItem.id} item={unmarkItem} refresh={() => { void actions.refresh(); }} onClosed={() => setUnmarkItem(null)} /> : null}
       <LibraryViewer phone={phone} items={viewerList} me={person} currentId={view.file} onCurrentIdChange={(id) => update({ file: id })} onClose={closeViewer} actions={itemActions} />
       {sharing ? <LibraryShareDialog items={sharing} me={person} open onOpenChange={(open) => { if (!open) setSharing(null); }} /> : null}
       <Dialog open={renaming !== null} onOpenChange={(open) => { if (!open) setRenaming(null); }}>

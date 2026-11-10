@@ -17,7 +17,7 @@ const item = {
 } as unknown as LibraryItem;
 const adult = { id: "owner-1", role: "owner", age_band: "adult", pinDigits: 4, hasSecret: true } as unknown as Roster;
 const other = { ...adult, id: "person-2" } as Roster;
-const actions = { open: () => {}, rename: () => {}, keep: () => {}, share: () => {}, trash: () => {}, recheck: () => {} };
+const actions = { open: () => {}, rename: () => {}, keep: () => {}, share: () => {}, trash: () => {}, recheck: () => {}, adultMark: () => {}, adultUnmark: () => {} };
 function mount(me: Roster, state: { can_clear: boolean; can_mark: boolean }) {
   const target = { ...item, adult: { ...item.adult!, ...state, line: "Adult only." } } as LibraryItem;
   globalThis.fetch = mock((input: RequestInfo | URL) => {

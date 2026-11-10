@@ -22,6 +22,8 @@ export interface ItemActions {
   share(item: LibraryItem): void;
   trash(item: LibraryItem): void;
   recheck(item: LibraryItem): void;
+  adultMark(item: LibraryItem): void;
+  adultUnmark(item: LibraryItem): void;
 }
 
 /** What the menu offers. The hub refuses the rest again, so this only keeps the menu short. */
@@ -35,6 +37,8 @@ export function itemMenu(item: LibraryItem, me: Roster, actions: ItemActions) {
       {mine ? <DropdownMenuItem onSelect={() => actions.rename(item)}>{i18n._({ id: "Rename", message: "Rename" })}</DropdownMenuItem> : null}
       {mine && item.retention !== "kept" ? <DropdownMenuItem onSelect={() => actions.keep(item)}>{i18n._({ id: "Keep", message: "Keep" })}</DropdownMenuItem> : null}
       {mine && isAdultRole(me) && item.kind === "image" && item.audience === "adult-only" ? <DropdownMenuItem onSelect={() => actions.recheck(item)}>{i18n._({ id: "Mark all-ages", message: "Mark all-ages" })}</DropdownMenuItem> : null}
+      {mine && item.adult?.can_mark ? <DropdownMenuItem onSelect={() => actions.adultMark(item)}>{i18n._({ id: "Mark as NSFW", message: "Mark as NSFW" })}</DropdownMenuItem> : null}
+      {mine && item.adult?.can_clear ? <DropdownMenuItem onSelect={() => actions.adultUnmark(item)}>{i18n._({ id: "Unmark as NSFW", message: "Unmark as NSFW" })}</DropdownMenuItem> : null}
       {mine ? <><DropdownMenuSeparator /><DropdownMenuItem variant="destructive" onSelect={() => actions.trash(item)}>{i18n._({ id: "Delete", message: "Delete" })}</DropdownMenuItem></> : null}
     </DropdownMenuContent>
   );
