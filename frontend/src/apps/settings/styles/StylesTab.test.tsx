@@ -179,6 +179,18 @@ describe("the browser", () => {
     restore();
   });
 
+  test("switching Pictures / Videos never leaves the other kind's tiles on screen while the new search loads", async () => {
+    const browse = mock((query: BrowseQuery) => (query.media === "picture" ? new Promise<never>(() => undefined) : Promise.resolve(page())));
+    const restore = stub({ browse: browse as never });
+    const view = mountBrowser();
+    await view.findByText("Clay look");
+    fireEvent.click(view.getByRole("combobox", { name: "Pictures / Videos" }));
+    fireEvent.click(await view.findByRole("option", { name: "Pictures" }));
+    await waitFor(() => expect(browse.mock.calls.at(-1)![0].media).toBe("picture"));
+    expect(view.queryByText("Clay look")).toBeNull();
+    restore();
+  });
+
   test("a filter and a sort go to the hub, paging keeps each page's cursor, and an installed hit opens that style instead of starting a download", async () => {
     const browse = mock(async (_query: BrowseQuery) => page());
     const restore = stub({ browse: browse as never });

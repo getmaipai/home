@@ -61,6 +61,35 @@ describe("Civitai video styles", () => {
   });
 });
 
+describe("Civitai links and picture search", () => {
+  const model = (over: Record<string, unknown>, images: unknown[], label = "LTXV 2.5") => ({
+    id: 11, name: "Breast Expansion LTX 2 i2v", type: "LORA", nsfw: false, nsfwLevel: 1, allowCommercialUse: ["Sell"], tags: [], stats: {}, creator: { username: "quill" }, ...over,
+    modelVersions: [{ id: Number(over.id ?? 11) * 10, name: "v1", baseModel: label, publishedAt: "2026-10-01T00:00:00.000Z", trainedWords: [], files: [{ id: 1, name: "a.safetensors", type: "Model", sizeKB: 1, hashes: { SHA256: String(over.id ?? 11).padEnd(64, "a") }, primary: true }], images }],
+  });
+  const clip = { url: "https://image.civitai.com/key/uuid/original=true/1.mp4", nsfwLevel: 1, type: "video" };
+  test("an adult model's page link is on civitai.red, an all-ages one stays on civitai.com", async () => {
+    const { __setSourceTestHooks: setHooks } = await import("@/lib/loras/source");
+    const { setHouseholdSettingValue } = await import("@/lib/settings");
+    setHouseholdSettingValue("generation.styles.civitai", true);
+    setHooks({ gapMs: 0, fetch: (async () => Response.json({ items: [model({ nsfw: true, nsfwLevel: 60 }, [{ ...clip, nsfwLevel: 32 }]), model({ id: 12 }, [clip])], metadata: {} })) as unknown as typeof fetch });
+    const out = await browseHits(params({ source: "civitai", q: "x", nsfw: true }));
+    const adult = out.hits.find((h) => h.remote_id === "11")!;
+    expect(adult.page_url).toBe("https://civitai.red/models/11/breast-expansion-ltx-2-i2v?modelVersionId=110");
+    expect(out.hits.find((h) => h.remote_id === "12")!.page_url).toBe("https://civitai.com/models/12?modelVersionId=120");
+    setHouseholdSettingValue("generation.styles.civitai", false);
+  });
+  test("a picture search drops a style whose examples are all clips", async () => {
+    const { __setSourceTestHooks: setHooks } = await import("@/lib/loras/source");
+    const { setHouseholdSettingValue } = await import("@/lib/settings");
+    setHouseholdSettingValue("generation.styles.civitai", true);
+    const still = { url: "https://image.civitai.com/key/uuid/original=true/1.jpeg", nsfwLevel: 1, type: "image" };
+    setHooks({ gapMs: 0, fetch: (async () => Response.json({ items: [model({ id: 21 }, [clip], "ZImageTurbo"), model({ id: 22 }, [still], "ZImageTurbo")], metadata: {} })) as unknown as typeof fetch });
+    const out = await browseHits({ ...params({ source: "civitai", q: "x" }), media: "picture" });
+    expect(out.hits.map((h) => h.remote_id)).toEqual(["22"]);
+    setHouseholdSettingValue("generation.styles.civitai", false);
+  });
+});
+
 describe("plainSummary", () => {
   test("the maker's title is dropped from the front, so the first line says what the style does", () => {
     const html = "<p>Kiss the Viewer</p><p>A video + audio LoRA for LTX-2 that creates an intimate kiss-the-camera effect.</p>";

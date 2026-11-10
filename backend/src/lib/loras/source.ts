@@ -261,10 +261,16 @@ function civitaiHit(modelRaw: unknown, bases: readonly string[], wantVersion?: s
   const stillClip = stillImage ? undefined : images.find((i) => onSite(i) && String(i.type) === "video" && String(i.url).includes("/original=true/"));
   const preview = stillImage ?? (stillClip ? { ...stillClip, url: still(String(stillClip.url)) } : undefined);
   const versionId = String(chosen.id);
+  // A picture search shows styles for pictures: a style whose every example is a clip is a video style (its base label can be generic or missing).
+  if (media === "picture" && images.length > 0 && images.every((i) => String(i.type ?? "image") === "video")) return null;
+  const adult_check = classifyCivitai({ nsfw: m.nsfw, nsfwLevel: m.nsfwLevel, imageLevels: images.map((i) => i.nsfwLevel), malformed: !file && images.length === 0 && m.mode !== undefined });
+  // Adult models live on civitai.red (as in Loki Doki's search); civitai.com does not open them. Downloads and the API stay on civitai.com.
+  const slug = (str(m.name) ?? "").toLowerCase().normalize("NFKD").replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+  const page = adult_check.state === "normal" ? `https://civitai.com/models/${id}` : `https://civitai.red/models/${id}${slug ? `/${slug}` : ""}`;
   return {
     site: "civitai", remote_id: String(id), version_id: versionId,
-    adult_check: classifyCivitai({ nsfw: m.nsfw, nsfwLevel: m.nsfwLevel, imageLevels: images.map((i) => i.nsfwLevel), malformed: !file && images.length === 0 && m.mode !== undefined }),
-    title: str(m.name) ?? `Model ${id}`, creator: str(rec(m.creator).username), page_url: `https://civitai.com/models/${id}?modelVersionId=${versionId}`,
+    adult_check,
+    title: str(m.name) ?? `Model ${id}`, creator: str(rec(m.creator).username), page_url: `${page}?modelVersionId=${versionId}`,
     file_url: file ? `https://civitai.com/api/download/models/${versionId}` : null, file_name: str(file?.name),
     bytes: file && typeof file.sizeKB === "number" ? Math.round(file.sizeKB * 1024) : null, sha256: sha && /^[0-9a-f]{64}$/.test(sha) ? sha : null,
     base_label: baseLabel, base_model: base, base_unstated: unstated,

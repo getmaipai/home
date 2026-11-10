@@ -98,7 +98,8 @@ export function StyleBrowser({ person, civitaiOn, onClose, onInstalled, onOpenSt
   const query: BrowseQuery = { source, q, media, kind, base, installed, sort, cursor: cursors[page] ?? null, adult: adult && lock.unlocked };
   const results = useQuery<BrowsePage>({
     queryKey: ["style-browse", query, lock.unlocked], queryFn: () => stylesApi.browse(query), enabled: !link, staleTime: 5 * 60_000, retry: false,
-    placeholderData: (previous) => previous,
+    // Keep the last page while the next loads, but never across Pictures / Videos: those tiles are the other kind of style.
+    placeholderData: (previous, previousQuery) => ((previousQuery?.queryKey[1] as BrowseQuery | undefined)?.media === media ? previous : undefined),
   });
   // The Made for choices come from the engines this install has, never from a search: they are there before, and whether or not, a search works.
   const choices = useQuery({ queryKey: ["style-bases", media], queryFn: () => stylesApi.bases(media), staleTime: 60_000, retry: 1 });
