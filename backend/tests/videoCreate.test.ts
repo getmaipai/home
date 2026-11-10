@@ -225,14 +225,14 @@ describe("the Create page and the make action", () => {
     expect(promptBarOf(again.body)!.chips).toHaveLength(5);
     // VIDEO-UI-06: the compact Create page keeps the prompt first with no oversized studio heading.
     expect((page as Record<string, any>).surface).toBeUndefined(); // PRO-LOOK-STUDIOS-01: the studio surface is retired
-    expect(page.body[0]).toMatchObject({ type: "prompt_bar", placement: "inline" });
+    expect(page.body[0]).toMatchObject({ type: "prompt_bar", placement: "inline", layout: "composer" });
     expect(bar.field_size).toBeUndefined();
     expect(chip("look")).toMatchObject({ group: "Style", presentation: "popover" });
     if (bar.tier) expect(bar.tier.presentation).toBe("segment");
     expect(bar.placement).toBe("inline");
     expect(bar.starts).toBe("video");
     expect(bar.submit_label).toBe("Generate");
-    expect(bar.references).toEqual([{ state: "start_frame", label: "Start frame", hint: "Optional. Begin from a picture.", kind: "picture", placement: "row" }]);
+    expect(bar.references).toEqual([{ state: "start_frame", label: "Start frame", kind: "picture", placement: "in_field" }]);
     expect(bar.suggestions).toBeUndefined();
     expect(chip("look")).toMatchObject({ presentation: "popover", group: "Style" });
     expect(chip("camera")).toMatchObject({ presentation: "popover", group: "Style" });

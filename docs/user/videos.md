@@ -31,12 +31,12 @@ Children and teens always get Standard. They do not choose a level, and their cl
 
 ## Make a video in the Videos app
 
-Open **Videos**, then **Create**. Create is for adults. The page opens directly to the prompt composer with compact controls. A small **Inspiration** row with four examples sits below it, followed by **Your clips**, newest first.
+Open **Videos**, then **Create**. Create is for adults. The prompt, optional start frame, choices and Generate button sit together in one composer. Shape, Length, Style, Camera, Voices and the available quality levels are visible with the prompt. A small **Inspiration** row with four examples sits below it, followed by **Your clips**, newest first. If video generation is unavailable, you can still type and choose settings; Generate shows why it cannot start.
 
 In the maker:
 
 - **Describe a video.** Write what you want to see. Put each person's line in quotes. As you type, Home may show up to two small style suggestions under the box. Leave one on to use it, or press its **x** to drop it.
-- **Start frame.** A small optional control below the prompt. Pick a picture from your Library or add a new one to use as the video’s first frame.
+- **Start frame.** Use the picture control inside the composer to pick a picture from your Library or add a new one as the video’s first frame.
 - **Length.** 5 seconds, or the longest the level you picked can make.
 - **Style.** A compact control opens the **Look** choices. The same menu includes **Camera** moves. Your **Look** is natural, classic cartoon, anime, 3D animated or film. Camera moves include dolly in, slow orbit, handheld, slow motion, time-lapse, aerial and close-up. **Auto** is the first choice in each, and it is what you get if you pick nothing: Home keeps the look natural and lets the words decide the camera. If an admin has added styles you may use, the same window also has **Styles**, **Characters** and **Strength** (**Less**, **Normal** or **More**). A style works at some levels only, and the window says which.
 - **Level.** Choose Standard ("Fast, with sound"), Boost ("Sharper picture") or Max from a compact selector. You see only the levels you may use. If Max is not installed yet, its card is greyed and says what to do.

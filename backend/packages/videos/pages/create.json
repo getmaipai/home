@@ -6,6 +6,7 @@
     {
       "type": "prompt_bar",
       "placement": "inline",
+      "layout": "composer",
       "label": "Describe a video",
       "placeholder": "Describe your video. Put each person's line in quotes.",
       "prompt_state": "prompt",
@@ -30,8 +31,7 @@
           "state": "start_frame",
           "label": "Start frame",
           "kind": "picture",
-          "placement": "row",
-          "hint": "Optional. Begin from a picture."
+          "placement": "in_field"
         }
       ],
       "chips": [
