@@ -5867,7 +5867,7 @@ msgid "setting.person.robot.topics.option_label.chit_chat"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/mediaHost.tsx:476
+#: src/shell/mediaHost.tsx:478
 #, needs-review
 msgid "Choose a clip"
 msgstr "Elige un clip"
@@ -21152,7 +21152,7 @@ msgid "Pick one and it goes into the bar above."
 msgstr "Elige uno y se pone en la barra de arriba."
 
 #. js-lingui-explicit-id
-#: src/shell/mediaHost.tsx:477
+#: src/shell/mediaHost.tsx:479
 #, needs-review
 msgid "Pick one of your own clips to put after this one."
 msgstr "Elige uno de tus clips para ponerlo después de este."
