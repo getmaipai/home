@@ -70945,6 +70945,597 @@
         }
       }
     },
+    "/api/productions/long": {
+      "post": {
+        "tags": [
+          "Productions"
+        ],
+        "summary": "Pitch a long-form production and write its treatment",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "idea": {
+                    "type": "string",
+                    "minLength": 3,
+                    "maxLength": 4000
+                  },
+                  "seconds": {
+                    "type": "integer",
+                    "minimum": 20,
+                    "maximum": 14400
+                  },
+                  "look": {
+                    "type": "string",
+                    "maxLength": 160
+                  }
+                },
+                "required": [
+                  "idea",
+                  "seconds"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The production's documents",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "production_id": {
+                      "type": "string"
+                    },
+                    "documents": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "kind": {
+                            "type": "string"
+                          },
+                          "key": {
+                            "type": "string"
+                          },
+                          "version": {
+                            "type": "number"
+                          },
+                          "approved": {
+                            "type": "boolean"
+                          },
+                          "json": {
+                            "nullable": true
+                          }
+                        },
+                        "required": [
+                          "kind",
+                          "key",
+                          "version",
+                          "approved"
+                        ]
+                      }
+                    },
+                    "may_render": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "production_id",
+                    "documents",
+                    "may_render"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Refused, with the reason",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not available",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/productions/long/{id}": {
+      "get": {
+        "tags": [
+          "Productions"
+        ],
+        "summary": "Read a production's documents",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 120
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The production's documents",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "production_id": {
+                      "type": "string"
+                    },
+                    "documents": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "kind": {
+                            "type": "string"
+                          },
+                          "key": {
+                            "type": "string"
+                          },
+                          "version": {
+                            "type": "number"
+                          },
+                          "approved": {
+                            "type": "boolean"
+                          },
+                          "json": {
+                            "nullable": true
+                          }
+                        },
+                        "required": [
+                          "kind",
+                          "key",
+                          "version",
+                          "approved"
+                        ]
+                      }
+                    },
+                    "may_render": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "production_id",
+                    "documents",
+                    "may_render"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Refused, with the reason",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not available",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/productions/long/{id}/bible": {
+      "post": {
+        "tags": [
+          "Productions"
+        ],
+        "summary": "Write the bible from the approved treatment",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 120
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The production's documents",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "production_id": {
+                      "type": "string"
+                    },
+                    "documents": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "kind": {
+                            "type": "string"
+                          },
+                          "key": {
+                            "type": "string"
+                          },
+                          "version": {
+                            "type": "number"
+                          },
+                          "approved": {
+                            "type": "boolean"
+                          },
+                          "json": {
+                            "nullable": true
+                          }
+                        },
+                        "required": [
+                          "kind",
+                          "key",
+                          "version",
+                          "approved"
+                        ]
+                      }
+                    },
+                    "may_render": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "production_id",
+                    "documents",
+                    "may_render"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Refused, with the reason",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not available",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/productions/long/{id}/outline": {
+      "post": {
+        "tags": [
+          "Productions"
+        ],
+        "summary": "Write the outline from the approved bible",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 120
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The production's documents",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "production_id": {
+                      "type": "string"
+                    },
+                    "documents": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "kind": {
+                            "type": "string"
+                          },
+                          "key": {
+                            "type": "string"
+                          },
+                          "version": {
+                            "type": "number"
+                          },
+                          "approved": {
+                            "type": "boolean"
+                          },
+                          "json": {
+                            "nullable": true
+                          }
+                        },
+                        "required": [
+                          "kind",
+                          "key",
+                          "version",
+                          "approved"
+                        ]
+                      }
+                    },
+                    "may_render": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "production_id",
+                    "documents",
+                    "may_render"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Refused, with the reason",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not available",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/productions/long/{id}/approve": {
+      "post": {
+        "tags": [
+          "Productions"
+        ],
+        "summary": "Approve a document",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 120
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "kind": {
+                    "type": "string",
+                    "enum": [
+                      "treatment",
+                      "bible",
+                      "outline"
+                    ]
+                  }
+                },
+                "required": [
+                  "kind"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The production's documents",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "production_id": {
+                      "type": "string"
+                    },
+                    "documents": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "kind": {
+                            "type": "string"
+                          },
+                          "key": {
+                            "type": "string"
+                          },
+                          "version": {
+                            "type": "number"
+                          },
+                          "approved": {
+                            "type": "boolean"
+                          },
+                          "json": {
+                            "nullable": true
+                          }
+                        },
+                        "required": [
+                          "kind",
+                          "key",
+                          "version",
+                          "approved"
+                        ]
+                      }
+                    },
+                    "may_render": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "production_id",
+                    "documents",
+                    "may_render"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Refused, with the reason",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not available",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/videos/status": {
       "get": {
         "tags": [

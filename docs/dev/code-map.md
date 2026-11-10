@@ -507,7 +507,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/fileRecordObject.ts` | FileObject |
 | `backend/src/lib/fileThumbnails.ts` | thumbnailsDir, previewStats, clearPreviews, fileThumbnail, trashedFileThumbnail |
 | `backend/src/lib/films/animatic.ts` | animaticShotOps, makeFilmAnimatic |
-| `backend/src/lib/films/background.ts` | __setFilmEnginesForTests, startFilm, getFilmProgress, goFilm, cancelFilm, resumeFilmRun |
+| `backend/src/lib/films/background.ts` | __setFilmEnginesForTests, allowed, startFilm, getFilmProgress, goFilm, cancelFilm |
 | `backend/src/lib/films/engines.ts` | backgroundTurn, realFilmEngines, makeFilm, resumeFilm, redoFilmShot, changeFilmMusic |
 | `backend/src/lib/films/plan.ts` | filmPlanShotSchema, filmPlanSchema, facelessFilmPlanSchema, FILM_PLAN_RESPONSE_FORMAT, FACELESS_FILM_PLAN_RESPONSE_FORMAT, FILM_PLAN_PROMPT |
 | `backend/src/lib/films/run.ts` | FilmStepError, runFilm, redoShot, changeMusic |
@@ -633,6 +633,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/locale.ts` | resolveLocale, resolveLocaleFromValues, householdLocale, isSafeAutoTranslation |
 | `backend/src/lib/log.ts` | appendLogLine, installConsoleFileMirror, installFatalErrorHandlers |
 | `backend/src/lib/longform/documents.ts` | DOCUMENT_KINDS, MAX_DOCUMENT_CHARS, saveDocument, getDocument, listDocuments, approveDocument |
+| `backend/src/lib/longform/stages.ts` | treatmentSchema, bibleSchema, outlineSchema, __setStageCompleterForTests, startProduction, writeBible |
 | `backend/src/lib/longform/structure.ts` | SCENE_TARGET_SECONDS, SCENE_MIN_SECONDS, SCENE_MAX_SECONDS, AVG_SHOT_SECONDS, MAX_SHOTS_PER_RUN, MIN_PRODUCTION_SECONDS |
 | `backend/src/lib/loras/access.ts` | isAdult, availableTo, loraAccess, runsOnBases, runsOn, isUnofferedOldBase |
 | `backend/src/lib/loras/admin.ts` | NOT_ADMIN_LINE, NOT_HERE_LINE, NOT_CONFIRMED_LINE, TRASH_DAYS, patchLora, confirmLora |
