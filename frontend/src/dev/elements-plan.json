@@ -4812,6 +4812,25 @@
       "group": "room-header",
       "verdict": "later",
       "verdictReason": "Smart-home tile; no Home surface uses it until the Home Control package is built."
+    },
+    {
+      "file": "device-tiles.tsx",
+      "name": "device-tiles",
+      "group": "device",
+      "verdict": "wire-now",
+      "verdictReason": "The house Devices widget on Home draws its device tiles through this kit node (widget_tiles, size tiles); Home passes data only.",
+      "backendNeeded": null,
+      "effort": null,
+      "specTagNeeded": false,
+      "newDependency": false,
+      "bindings": [
+        "home devices widget"
+      ],
+      "size": "M",
+      "showcaseScenario": null,
+      "batch": null,
+      "replacesHandBuilt": [],
+      "realTurnToday": true
     }
   ]
 }

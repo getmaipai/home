@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-11-10T00:42:26.798Z",
-  "kitTag": "ui-v0.5.565",
+  "generatedAt": "2026-11-10T02:54:00.885Z",
+  "kitTag": "ui-v0.5.566",
   "items": [
     {
       "file": "ActivityCardsShowcase.tsx",
@@ -655,6 +655,14 @@
       "verdict": "wire-now",
       "verdictReason": "Selected for current Home UI adoption because the shipped Element fits a current or accepted Home feature.",
       "implemented": true
+    },
+    {
+      "file": "device-tiles.tsx",
+      "name": "device-tiles",
+      "group": "device",
+      "verdict": "wire-now",
+      "verdictReason": "The house Devices widget on Home draws its device tiles through this kit node (widget_tiles, size tiles); Home passes data only.",
+      "implemented": false
     },
     {
       "file": "diagram.tsx",
