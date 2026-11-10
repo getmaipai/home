@@ -19,6 +19,7 @@ import { ApiError, type Roster } from "@/lib/api";
 import { StyleConfirm } from "@/apps/settings/styles/StyleConfirm";
 import { stylesApi, type BrowseHit, type BrowsePage, type BrowseQuery, type BrowseSource } from "@/apps/settings/styles/stylesApi";
 import { formatBytes } from "@maipai/ui/src/format";
+import { formatNumber } from "@/lib/format";
 import { messageOf, StylePicture } from "@/apps/settings/styles/stylesShared";
 import { StatusCard } from "@maipai/ui/src/elements/status-card";
 
@@ -30,7 +31,7 @@ const alreadyHave = (hit: BrowseHit): boolean => hit.installed !== null || hit.r
 
 const BASE_PILL: Record<string, string> = { "ltx-2.5": "LTX 2.5", "ltx-2.3": "LTX 2.3" };
 const basePill = (hit: BrowseHit): string => (hit.base_unstated ? "LTX 2" : BASE_PILL[hit.base_model] ?? (hit.base_label.trim() || i18n._({ id: "Other base", message: "Other base" })));
-const compact = (n: number): string => new Intl.NumberFormat("en-US", { notation: "compact", maximumFractionDigits: 1 }).format(n);
+const compact = (n: number): string => formatNumber(n, { notation: "compact", maximumFractionDigits: 1 });
 /** The pills drawn over a tile's picture: what it is made for, what kind it is, how big, how popular, and the licence. */
 function TilePills({ hit }: { hit: BrowseHit }) {
   const pills = [
