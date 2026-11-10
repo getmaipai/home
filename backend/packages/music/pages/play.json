@@ -40,7 +40,10 @@
               "action": {
                 "navigate": {
                   "to": "/apps/music/like-this",
-                  "state": { "id": "{id}", "op": "band" }
+                  "state": {
+                    "id": "{id}",
+                    "op": "band"
+                  }
                 }
               }
             },
@@ -50,7 +53,10 @@
               "action": {
                 "navigate": {
                   "to": "/apps/music/like-this",
-                  "state": { "id": "{id}", "op": "song" }
+                  "state": {
+                    "id": "{id}",
+                    "op": "song"
+                  }
                 }
               }
             },
@@ -76,7 +82,8 @@
                   "args": {
                     "op": "add",
                     "media_id": "{id}"
-                  }
+                  },
+                  "success_label": "Saved to the playlist"
                 }
               }
             }

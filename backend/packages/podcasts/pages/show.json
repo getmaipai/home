@@ -13,6 +13,7 @@
           "id": "$state.id"
         }
       },
+      "hide_when_empty": true,
       "item_key_field": "id",
       "item_label_field": "description",
       "item_badge_field": "action_label",
@@ -163,7 +164,8 @@
               "args": {
                 "source_id": "{id}",
                 "on": true
-              }
+              },
+              "success_label": "Marked all as played"
             }
           }
         },
@@ -176,7 +178,8 @@
               "args": {
                 "source_id": "{id}",
                 "on": false
-              }
+              },
+              "success_label": "Marked all as unplayed"
             }
           }
         }

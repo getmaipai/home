@@ -115,7 +115,8 @@
               "args": {
                 "op": "play_next",
                 "media_id": "{id}"
-              }
+              },
+              "success_label": "Playing next"
             }
           }
         },
@@ -128,7 +129,8 @@
               "args": {
                 "op": "add",
                 "media_id": "{id}"
-              }
+              },
+              "success_label": "Added to the queue"
             }
           }
         },

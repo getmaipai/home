@@ -46,7 +46,8 @@
               "args": {
                 "op": "add",
                 "media_id": "{id}"
-              }
+              },
+              "success_label": "Saved to the playlist"
             }
           }
         }

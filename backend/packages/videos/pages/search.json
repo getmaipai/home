@@ -95,7 +95,8 @@
               "target": "/api/plugins/videos/playlists/save",
               "args": {
                 "media_id": "{id}"
-              }
+              },
+              "success_label": "Saved to the playlist"
             }
           }
         },
