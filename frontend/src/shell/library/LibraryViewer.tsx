@@ -27,6 +27,7 @@ import { prepareClip, saveClip, shareClip } from "@/lib/shareClip";
 import { canShareFiles, creationOf, fileKind, isAdultRole, kindWord } from "./libraryModel";
 import { libraryOrigin } from "./libraryOrigin";
 import type { ItemActions } from "./LibraryItems";
+import { useAdultMark } from "@/apps/chat/useAdultMark";
 import { useTranscriptWorkspace } from "./TranscriptPanel";
 import { seekViewerMedia, useViewerMediaTime } from "./viewerMedia";
 import { formatDate } from "@/lib/format";
@@ -77,6 +78,7 @@ function Details({ item, me, actions }: { item: LibraryItem; me: Roster; actions
     timed_lyrics: song.timed_lyrics, duration_s: item.duration_seconds, started_at: Date.parse(item.created_at),
   } : { id: "", task: "text2music", state: "queued", stage: null, stage_label: "", stages: [{ id: "queued", label: "Queued" }, { id: "model", label: "Loading" }, { id: "planning", label: "Planning" }, { id: "making", label: "Making" }, { id: "mixing", label: "Mixing" }, { id: "finishing", label: "Finishing" }], stage_index: 0, progress: 0, eta_seconds: null, position: null, error_line: null, cover_url: null, cover_versions: [], cover_pending: false, versions: [], current_id: null, length: "full", quality: "quick", boost_offered: false, cut: null, max_seconds: null, title: null, description: null, lyrics: null, timed_lyrics: null, duration_s: null, started_at: 0 };
   const songTrackProps = useMusicTrackProps({ card: songCard, owner: song?.owner ?? false, onRefresh: () => { void record.refetch(); } });
+  const adultMark = useAdultMark({ confirmUnmark: api.confirmLibraryUnmark, adultMark: api.libraryAdultMark }, mine ? item : null, () => { void record.refetch(); }, (action) => <Button key={action.id} type="button" variant="secondary" disabled={action.disabled} onClick={action.onSelect}>{action.label}</Button>);
   return (
     <>
       {song ? <MusicTrack {...songTrackProps} /> : null}
@@ -95,12 +97,14 @@ function Details({ item, me, actions }: { item: LibraryItem; me: Roster; actions
         <div className="flex flex-wrap gap-2">
           <Button type="button" variant="secondary" onClick={() => actions.rename(item)}>{i18n._({ id: "Rename", message: "Rename" })}</Button>
           {!kept ? <Button type="button" variant="secondary" onClick={() => actions.keep(item)}>{i18n._({ id: "Keep", message: "Keep" })}</Button> : null}
+          {adultMark.actions}
           {isAdultRole(me) && item.kind === "audio" && !record.data?.music ? <Button type="button" variant="secondary" disabled={splitting} onClick={() => { setSplitting(true); setStemsProblem(""); void musicApi.stemsFromFile(item.id).then((card) => { if (card.conversation_id) navigate(`/chat?conversation=${encodeURIComponent(card.conversation_id)}`); }).catch((error: unknown) => setStemsProblem(errorLine(error, i18n._({ id: "The stems could not be made. Try again in a minute.", message: "The stems could not be made. Try again in a minute." })))).finally(() => setSplitting(false)); }}>{i18n._({ id: "Split into stems", message: "Split into stems" })}</Button> : null}
           {isAdultRole(me) && (item.kind === "audio" || item.kind === "video") ? <Button type="button" variant="secondary" onClick={() => setCutOpen(true)}>{i18n._({ id: "Cut to the beat", message: "Cut to the beat" })}</Button> : null}
           {isAdultRole(me) && item.kind === "video" && item.origin === "made" && item.chat_id ? <Button type="button" variant="secondary" onClick={() => setMusicOpen(true)}>{i18n._({ id: "Add music", message: "Add music" })}</Button> : null}
           {isAdultRole(me) && item.kind === "image" && item.audience === "adult-only" ? <Button type="button" variant="secondary" onClick={() => actions.recheck(item)}>{i18n._({ id: "Mark all-ages", message: "Mark all-ages" })}</Button> : null}
         </div>
       ) : null}
+      {adultMark.dialog}
       {stemsProblem ? <StatusCard kind="problem" title={i18n._({ id: "That did not work", message: "That did not work" })} line={stemsProblem} /> : null}
       {mine && isAdultRole(me) && item.kind === "audio" ? <p className="text-sm text-muted-foreground">{i18n._({ id: "Cuts your videos on the beat of this song. Everything stays on this home server.", message: "Cuts your videos on the beat of this song. Everything stays on this home server." })}</p> : null}
       <Dialog open={musicOpen} onOpenChange={setMusicOpen}><DialogContent><DialogHeader><DialogTitle>{i18n._({ id: "Add music", message: "Add music" })}</DialogTitle></DialogHeader>

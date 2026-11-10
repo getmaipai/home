@@ -3,7 +3,7 @@ import { i18n } from "@lingui/core";
 // docs/dev/adult-lock.md "Frontend"). The kit draws the lock tile, the dialog and the live region; this file is only what the host owes it:
 // the real `/api/adult-lock/unlock` call, the proof held in memory (lib/adultLock.ts), the relock clocks, the playback guards, and a refetch of
 // every page list when the lock changes. Nothing here draws a lock tile or a dialog of its own (RULES 9b).
-import { useCallback, useEffect, useMemo, useRef, type ComponentProps } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ComponentProps } from "react";
 import { useLocation } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import { getIcon } from "@maipai/ui/src/icons";
@@ -13,10 +13,12 @@ import { ADULT_PROOF_HEADER, adultClocks, adultCredential, forgetOpenIds, instal
 import { installAdultPlaybackGuard } from "@/shell/adultPlaybackGuard";
 import { useMediaDock } from "@/shell/mediaHost";
 import type { Roster } from "@/lib/api";
+import { getPasskeyAssertion, passkeysAvailable } from "@/lib/passkeyAssertion";
 
 /** The check of the person's own passcode, against the hub's route. Maps the route's answers to the kit's three results; anything else rejects ("could not check"). */
-export async function unlockRequest(secret: string, visit: string, fetcher: typeof fetch = fetch): Promise<UnlockResult> {
-  const res = await fetcher("/api/adult-lock/unlock", { method: "POST", credentials: "include", headers: { "content-type": "application/json" }, body: JSON.stringify({ secret, visit }) });
+export async function unlockRequest(credential: string | { secret: string } | { passkey_assertion: unknown }, visit: string, fetcher: typeof fetch = fetch): Promise<UnlockResult> {
+  const bodyPayload = typeof credential === "string" ? { secret: credential } : credential;
+  const res = await fetcher("/api/adult-lock/unlock", { method: "POST", credentials: "include", headers: { "content-type": "application/json" }, body: JSON.stringify({ ...bodyPayload, visit }) });
   const body = await res.json().catch(() => ({})) as { proof?: unknown; attemptsLeft?: unknown; retryAfter?: unknown };
   if (res.ok && typeof body.proof === "string") return { status: "ok", proof: body.proof };
   if (res.status === 429) return { status: "locked_out", retryAfterSeconds: typeof body.retryAfter === "number" ? body.retryAfter : 60 };
@@ -108,7 +110,11 @@ export function useAdultLockProps(person: Pick<Roster, "pinDigits" | "hasSecret"
   }, []);
   const visit = useMemo(() => (typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : String(Math.random()).slice(2)), []);
   const credential = adultCredential(person);
-  const unlock = useCallback((secret: string) => unlockRequest(secret, visit), [visit]);
+  const unlock = useCallback((secret: string) => unlockRequest({ secret }, visit), [visit]);
+  const onPasskey = useCallback(async (): Promise<UnlockResult> => {
+    const assertion = await getPasskeyAssertion();
+    return unlockRequest({ passkey_assertion: assertion }, visit);
+  }, [visit]);
   const onUnlocked = useCallback((proof: string | null) => {
     setAdultProof(proof);
     forgetOpenIds();
@@ -127,5 +133,7 @@ export function useAdultLockProps(person: Pick<Roster, "pinDigits" | "hasSecret"
   }, [queryClient]);
   // The kit's dialog draws digit boxes for a PIN and a masked password field for a password (ADULT-LOCK-07); with no secret set it says where to set one.
   const hasCredential = person.hasSecret !== false;
-  return { unlock, ...credential, hasCredential, onUnlocked, onRelock };
+  const [passkeyEnabled, setPasskeyEnabled] = useState(false);
+  useEffect(() => { let live = true; void passkeysAvailable().then((value) => { if (live) setPasskeyEnabled(value); }); return () => { live = false; }; }, []);
+  return { unlock, ...(passkeyEnabled ? { onPasskey } : {}), ...credential, hasCredential, onUnlocked, onRelock };
 }

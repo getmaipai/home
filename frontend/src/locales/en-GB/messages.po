@@ -1380,7 +1380,7 @@ msgid "0.1 to 2. Higher is livelier and also raises the pitch."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/library/LibraryViewer.tsx:115
+#: src/shell/library/LibraryViewer.tsx:119
 msgid "1 beat"
 msgstr ""
 
@@ -1438,7 +1438,7 @@ msgid "setting.alarms.snooze_minutes.option_label.15"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/library/LibraryViewer.tsx:116
+#: src/shell/library/LibraryViewer.tsx:120
 msgid "15 seconds"
 msgstr ""
 
@@ -1448,7 +1448,7 @@ msgid "setting.ease.text_size.option_label.160"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/library/LibraryViewer.tsx:115
+#: src/shell/library/LibraryViewer.tsx:119
 msgid "2 beats"
 msgstr ""
 
@@ -1469,12 +1469,12 @@ msgid "30 days"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/library/LibraryViewer.tsx:116
+#: src/shell/library/LibraryViewer.tsx:120
 msgid "30 seconds"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/library/LibraryViewer.tsx:115
+#: src/shell/library/LibraryViewer.tsx:119
 msgid "4 beats (one bar)"
 msgstr ""
 
@@ -1494,7 +1494,7 @@ msgid "setting.alarms.snooze_minutes.option_label.60"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/library/LibraryViewer.tsx:116
+#: src/shell/library/LibraryViewer.tsx:120
 msgid "60 seconds"
 msgstr ""
 
@@ -1505,7 +1505,7 @@ msgid "7 days"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/library/LibraryViewer.tsx:115
+#: src/shell/library/LibraryViewer.tsx:119
 msgid "8 beats"
 msgstr ""
 
@@ -2112,8 +2112,8 @@ msgid "Add Inspired voice"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/library/LibraryViewer.tsx:100
-#: src/shell/library/LibraryViewer.tsx:106
+#: src/shell/library/LibraryViewer.tsx:103
+#: src/shell/library/LibraryViewer.tsx:110
 msgid "Add music"
 msgstr ""
 
@@ -2149,7 +2149,7 @@ msgid "Add the first thing and we'll keep it here for you."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/library/LibraryViewer.tsx:111
+#: src/shell/library/LibraryViewer.tsx:115
 msgid "Add the music"
 msgstr ""
 
@@ -3628,7 +3628,7 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/apps/settings/PerformanceSettings.tsx:19
 #: src/apps/setup/PerformanceStep.tsx:11
-#: src/shell/library/LibraryViewer.tsx:109
+#: src/shell/library/LibraryViewer.tsx:113
 msgid "Balanced"
 msgstr ""
 
@@ -5068,7 +5068,7 @@ msgid "setting.person.robot.topics.option_label.chit_chat"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/mediaHost.tsx:461
+#: src/shell/mediaHost.tsx:476
 msgid "Choose a clip"
 msgstr ""
 
@@ -5138,7 +5138,7 @@ msgid "Choose a PNG, JPEG or WebP picture."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/library/LibraryViewer.tsx:114
+#: src/shell/library/LibraryViewer.tsx:118
 #: src/shell/pages/SoundExtras.tsx:77
 msgid "Choose a song"
 msgstr ""
@@ -5356,7 +5356,7 @@ msgid "setting.engines.wakeword.choice.help"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/library/LibraryViewer.tsx:114
+#: src/shell/library/LibraryViewer.tsx:118
 msgid "Choose up to six videos, in the order you pick them."
 msgstr ""
 
@@ -7514,18 +7514,18 @@ msgid "Customize Synth"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/library/LibraryViewer.tsx:115
+#: src/shell/library/LibraryViewer.tsx:119
 msgid "Cut every"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/library/LibraryViewer.tsx:99
-#: src/shell/library/LibraryViewer.tsx:113
+#: src/shell/library/LibraryViewer.tsx:102
+#: src/shell/library/LibraryViewer.tsx:117
 msgid "Cut to the beat"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/library/LibraryViewer.tsx:105
+#: src/shell/library/LibraryViewer.tsx:109
 msgid "Cuts your videos on the beat of this song. Everything stays on this home server."
 msgstr ""
 
@@ -7733,8 +7733,8 @@ msgstr ""
 #: src/apps/settings/CommandsSection.tsx:203
 #: src/apps/settings/VoiceManagerSection.tsx:126
 #: src/shell/library/LibraryItems.tsx:38
-#: src/shell/library/LibraryViewer.tsx:164
-#: src/shell/library/LibraryViewer.tsx:164
+#: src/shell/library/LibraryViewer.tsx:168
+#: src/shell/library/LibraryViewer.tsx:168
 #: src/shell/pages/CompanionsPage.tsx:81
 #: src/shell/pages/CompanionsPage.tsx:181
 #: src/shell/pages/FilesPage.tsx:336
@@ -8308,8 +8308,8 @@ msgstr ""
 #: src/apps/settings/BackupsSection.tsx:98
 #: src/apps/setup/SetupWizard.tsx:492
 #: src/shell/library/LibraryItems.tsx:33
-#: src/shell/library/LibraryViewer.tsx:163
-#: src/shell/library/LibraryViewer.tsx:163
+#: src/shell/library/LibraryViewer.tsx:167
+#: src/shell/library/LibraryViewer.tsx:167
 #: src/shell/pages/MusicWorkspacePage.tsx:208
 #: src/shell/pages/MusicWorkspacePage.tsx:208
 msgid "Download"
@@ -8560,7 +8560,7 @@ msgid "Edit alarm"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/library/LibraryViewer.tsx:120
+#: src/shell/library/LibraryViewer.tsx:124
 msgid "Edit in its chat"
 msgstr ""
 
@@ -11074,7 +11074,7 @@ msgid "setting.household.home.label"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/library/LibraryViewer.tsx:108
+#: src/shell/library/LibraryViewer.tsx:112
 msgid "Home makes music about as long as the video, then puts it under the video as a new version. Your first video is kept."
 msgstr ""
 
@@ -11366,7 +11366,7 @@ msgid "How long they keep it:"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/library/LibraryViewer.tsx:109
+#: src/shell/library/LibraryViewer.tsx:113
 msgid "How loud"
 msgstr ""
 
@@ -12288,7 +12288,7 @@ msgid "Item"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/library/LibraryViewer.tsx:120
+#: src/shell/library/LibraryViewer.tsx:124
 msgid "Its chat was deleted, so it cannot be edited here."
 msgstr ""
 
@@ -12356,7 +12356,7 @@ msgstr ""
 
 #. js-lingui-explicit-id
 #: src/shell/library/LibraryItems.tsx:36
-#: src/shell/library/LibraryViewer.tsx:97
+#: src/shell/library/LibraryViewer.tsx:99
 #: src/shell/pages/FilesPage.tsx:335
 msgid "Keep"
 msgstr ""
@@ -12959,7 +12959,7 @@ msgid "setting.robot.face.color.option_label.lemon"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/library/LibraryViewer.tsx:116
+#: src/shell/library/LibraryViewer.tsx:120
 #: src/shell/pages/MakeSongPage.tsx:164
 #: src/shell/pages/MakeSongPage.tsx:165
 msgid "Length"
@@ -13944,7 +13944,7 @@ msgid "setting.news.default_topics.teen.option_label.local"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/AdultLockHost.tsx:94
+#: src/shell/AdultLockHost.tsx:96
 msgid "Lock now"
 msgstr ""
 
@@ -14086,7 +14086,7 @@ msgid "Loops without a seam"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/library/LibraryViewer.tsx:109
+#: src/shell/library/LibraryViewer.tsx:113
 msgid "Loud"
 msgstr ""
 
@@ -14455,7 +14455,7 @@ msgid "Make new cover"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/library/LibraryViewer.tsx:107
+#: src/shell/library/LibraryViewer.tsx:111
 msgid "Make new music for this video"
 msgstr ""
 
@@ -14470,7 +14470,7 @@ msgid "Make picture"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/library/LibraryViewer.tsx:118
+#: src/shell/library/LibraryViewer.tsx:122
 msgid "Make the cut"
 msgstr ""
 
@@ -14681,7 +14681,7 @@ msgstr ""
 
 #. js-lingui-explicit-id
 #: src/shell/library/LibraryItems.tsx:37
-#: src/shell/library/LibraryViewer.tsx:101
+#: src/shell/library/LibraryViewer.tsx:104
 msgid "Mark all-ages"
 msgstr ""
 
@@ -15286,7 +15286,7 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/apps/settings/ModelsAndStorageSection.tsx:23
 #: src/apps/settings/performanceModel.ts:9
-#: src/shell/library/LibraryViewer.tsx:107
+#: src/shell/library/LibraryViewer.tsx:111
 #: src/shell/pages/ActivityPage.tsx:43
 #: src/shell/pages/settings/MediaCardViews.tsx:79
 msgid "Music"
@@ -18199,7 +18199,7 @@ msgid "Pick one and it goes into the bar above."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/mediaHost.tsx:462
+#: src/shell/mediaHost.tsx:477
 msgid "Pick one of your own clips to put after this one."
 msgstr ""
 
@@ -19013,7 +19013,7 @@ msgid "Quick timers"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/library/LibraryViewer.tsx:109
+#: src/shell/library/LibraryViewer.tsx:113
 msgid "Quiet"
 msgstr ""
 
@@ -19582,7 +19582,7 @@ msgstr ""
 #: src/apps/settings/CodingSettings.tsx:226
 #: src/apps/settings/VoiceManagerSection.tsx:125
 #: src/shell/library/LibraryItems.tsx:35
-#: src/shell/library/LibraryViewer.tsx:96
+#: src/shell/library/LibraryViewer.tsx:98
 #: src/shell/library/TranscriptPanel.tsx:395
 msgid "Rename"
 msgstr ""
@@ -21258,8 +21258,8 @@ msgid "Semitones, -12 to 12. A negative number lowers the voice."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/library/LibraryViewer.tsx:162
-#: src/shell/library/LibraryViewer.tsx:162
+#: src/shell/library/LibraryViewer.tsx:166
+#: src/shell/library/LibraryViewer.tsx:166
 #: src/shell/pages/dashboard/AskBox.tsx:66
 msgid "Send"
 msgstr ""
@@ -21606,8 +21606,8 @@ msgstr ""
 
 #. js-lingui-explicit-id
 #: src/shell/library/LibraryItems.tsx:34
-#: src/shell/library/LibraryViewer.tsx:161
-#: src/shell/library/LibraryViewer.tsx:161
+#: src/shell/library/LibraryViewer.tsx:165
+#: src/shell/library/LibraryViewer.tsx:165
 #: src/shell/pages/FilesPage.tsx:334
 #: src/shell/pages/PersonProfilePage.tsx:205
 msgid "Share"
@@ -22259,7 +22259,7 @@ msgid "setting.alarms.snooze_minutes.label"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/library/LibraryViewer.tsx:109
+#: src/shell/library/LibraryViewer.tsx:113
 msgid "Soft"
 msgstr ""
 
@@ -22269,7 +22269,7 @@ msgid "setting.ease.motion.option.calm"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/library/LibraryViewer.tsx:108
+#: src/shell/library/LibraryViewer.tsx:112
 msgid "Soft piano, slow and warm"
 msgstr ""
 
@@ -22397,7 +22397,7 @@ msgid "failure.other.minor"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/library/LibraryViewer.tsx:114
+#: src/shell/library/LibraryViewer.tsx:118
 #: src/shell/pages/FilesPage.tsx:154
 #: src/shell/pages/MusicWorkspacePage.tsx:38
 #: src/shell/pages/PersonProfilePage.tsx:175
@@ -22590,7 +22590,7 @@ msgstr ""
 
 #. js-lingui-explicit-id
 #: src/apps/chat/MusicCardView.tsx:91
-#: src/shell/library/LibraryViewer.tsx:98
+#: src/shell/library/LibraryViewer.tsx:101
 #: src/shell/pages/BringSong.tsx:51
 #: src/shell/pages/MusicStudioView.tsx:201
 #: src/shell/pages/MusicStudioView.tsx:223
@@ -23826,9 +23826,9 @@ msgstr ""
 #: src/shell/AmbientCompanionPane.tsx:262
 #: src/shell/AmbientCompanionPane.tsx:330
 #: src/shell/InstallDock.tsx:312
-#: src/shell/library/LibraryViewer.tsx:104
-#: src/shell/library/LibraryViewer.tsx:110
-#: src/shell/library/LibraryViewer.tsx:117
+#: src/shell/library/LibraryViewer.tsx:108
+#: src/shell/library/LibraryViewer.tsx:114
+#: src/shell/library/LibraryViewer.tsx:121
 #: src/shell/library/TranscriptCaptionTracks.tsx:183
 #: src/shell/MediaPickerDialog.tsx:56
 #: src/shell/pages/CompanionAudienceDialog.tsx:49
@@ -24956,7 +24956,7 @@ msgid "The starter apps will be closed when a big job needs room. Review the lis
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/library/LibraryViewer.tsx:98
+#: src/shell/library/LibraryViewer.tsx:101
 msgid "The stems could not be made. Try again in a minute."
 msgstr ""
 
@@ -25835,8 +25835,8 @@ msgid "Tracks, waveforms, mute and solo for any song."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/library/LibraryViewer.tsx:160
-#: src/shell/library/LibraryViewer.tsx:160
+#: src/shell/library/LibraryViewer.tsx:164
+#: src/shell/library/LibraryViewer.tsx:164
 #: src/shell/library/TranscriptPanel.tsx:114
 #: src/shell/library/TranscriptPanel.tsx:550
 msgid "Transcript"
@@ -27612,7 +27612,7 @@ msgid "What needs doing"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/library/LibraryViewer.tsx:108
+#: src/shell/library/LibraryViewer.tsx:112
 msgid "What should it sound like?"
 msgstr ""
 
@@ -28375,7 +28375,7 @@ msgid "You have no finished songs yet. Make a song first, then add the sound to 
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/library/LibraryViewer.tsx:114
+#: src/shell/library/LibraryViewer.tsx:118
 msgid "You have no finished videos to cut yet. Make a video in chat first, then come back."
 msgstr ""
 

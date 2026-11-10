@@ -53,7 +53,7 @@ export const videosApi = {
   stop: (id: string) => requestJson<VideoCard>(`/api/videos/jobs/${encodeURIComponent(id)}/cancel`, { method: "POST" }),
   another: (id: string, quality?: "quick" | "detailed", prompt?: string, tier?: "standard" | "boost" | "max") => requestJson<VideoCard>(`/api/videos/jobs/${encodeURIComponent(id)}/another`, { method: "POST", ...(quality || prompt || tier ? { headers: { "content-type": "application/json" }, body: JSON.stringify({ ...(quality ? { quality } : {}), ...(prompt ? { prompt } : {}), ...(tier ? { tier } : {}) }) } : {}) }),
   /** A fresh passcode for one action on one clip: a single-use ticket valid 30 seconds (an unlock proof does not replace it). */
-  confirmUnmark: (item: string, secret: string) => requestJson<{ ticket: string; expires_in: number }>("/api/adult-lock/confirm", json({ secret, action: "unmark", item })),
+  confirmUnmark: (item: string, credential: string | { passkey_assertion: unknown }) => requestJson<{ ticket: string; expires_in: number }>("/api/adult-lock/confirm", json({ ...(typeof credential === "string" ? { secret: credential } : credential), action: "unmark", item })),
   /** Clear the lock (with the ticket) or mark the clip NSFW again (no passcode). */
   adultMark: (id: string, body: { action: "clear" | "mark"; ticket?: string }) => requestJson<{ made_audience: "all-ages" | "adult-only"; lock: "on" | "off" }>(`/api/videos/jobs/${encodeURIComponent(id)}/adult-mark`, json(body)),
   animate: (input: { conversation_id: string; turn_id: string; file_id?: string; prompt?: string }) => requestJson<VideoCard>("/api/videos/animate", json(input)),

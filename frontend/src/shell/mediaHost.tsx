@@ -9,7 +9,11 @@ import { i18n } from "@lingui/core";
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
 import { Navigate, useLocation, useNavigate, useParams } from "react-router-dom";
 import { ADULT_ONLY_PAGE_ONLY, MediaHostContext, refuseAdultOnly, type MediaHost, type MediaItemRef } from "@maipai/ui/src/schema/mediaHost";
-import { api, request, type Roster } from "@/lib/api";
+import { api, request, ApiError, type Roster } from "@/lib/api";
+import { AdultLockDialog, type UnlockResult } from "@maipai/ui/src/elements/adult-lock";
+import { adultCredential } from "@/lib/adultLock";
+import { getPasskeyAssertion, passkeysAvailable } from "@/lib/passkeyAssertion";
+import { WakeWordPersonContext } from "@/apps/chat/chatThreadContexts";
 import { mediaAppOfPath, playIsAlreadyOpen, playRoute } from "@/shell/mediaApps";
 import { MediaPlayerRegistration } from "@/shell/MediaPlayerRegistration";
 import { useToast } from "@maipai/ui/src/primitives/Toast";
@@ -185,6 +189,7 @@ export const MAKING_NOT_READY_LINE = { picture: "Pictures are not ready yet. Try
 /** `personId` lets the picker (VIDEO-CREATE-02: `pickMedia`) list only the signed-in person's own Library pictures; without it no picker is offered.
  * `ageBand` picks the words of the not-ready line (K8 `makingNotice`, read from the same ["health"] query `useMakingAvailability` reads). */
 export function MediaHostProvider({ children, personId, ageBand }: { children: ReactNode; personId?: string; ageBand?: Roster["age_band"] }) {
+  const person = useContext(WakeWordPersonContext);
   const navigate = useNavigate();
   const location = useLocation();
   const [store] = useState(createMediaStore);
@@ -200,6 +205,10 @@ export function MediaHostProvider({ children, personId, ageBand }: { children: R
   const [status] = useState(createListenStatus);
   // VIDEO-CREATE-02 (U3): one picker at a time; a second request while one is open resolves the first with null.
   const [pick, setPick] = useState<{ kind: PickKind | "audio" | "video"; start: "voice" | "music"; resolve: (picked: PickedMedia | null) => void } | null>(null);
+  const [fresh, setFresh] = useState<{ id: string; title?: string; description?: string; actionLabel?: string; resolve: (value: { ticket: string } | null) => void } | null>(null);
+  const freshRef = useRef(fresh); freshRef.current = fresh;
+  const [passkeyEnabled, setPasskeyEnabled] = useState(false);
+  useEffect(() => { let live = true; void passkeysAvailable().then((value) => { if (live) setPasskeyEnabled(value); }); return () => { live = false; }; }, []);
   const pickRef = useRef(pick);
   pickRef.current = pick;
   const pickMedia = useCallback((kind: PickKind | "audio" | "video") => new Promise<PickedMedia | null>((resolve) => {
@@ -220,6 +229,12 @@ export function MediaHostProvider({ children, personId, ageBand }: { children: R
   const host = useMemo<MediaHost>(
     () => ({
       playback: store.playback,
+      confirmFresh: (item, opts) => new Promise((resolve) => {
+        freshRef.current?.resolve(null);
+        const pending = { id: item.id, ...opts, resolve };
+        freshRef.current = pending;
+        setFresh(pending);
+      }),
       async onPlay(mediaId, item) {
         if (mediaId === "story" && typeof item.story_id === "string") return listener.listen(item.story_id);
         // MEDIA-PARITY-02: a Library row's Save for offline arrives as a play with the media id `offline:<song id>`; it keeps or removes the copy and says which.
@@ -467,6 +482,18 @@ export function MediaHostProvider({ children, personId, ageBand }: { children: R
             </DialogContent>
           </Dialog>
         ) : null}
+      {fresh ? <AdultLockDialog open onOpenChange={(open) => { if (!open) { fresh.resolve(null); freshRef.current = null; setFresh(null); } }}
+        {...adultCredential(person)} hasCredential={person?.hasSecret !== false}
+        title={fresh.title} description={fresh.description} actionLabel={fresh.actionLabel}
+        unlock={async (secret): Promise<UnlockResult> => {
+          try { const result = await request<{ ticket: string }>("/api/adult-lock/confirm", { method: "POST", body: JSON.stringify({ secret, action: "unmark", item: fresh.id }) }); fresh.resolve(result); freshRef.current = null; setFresh(null); return { status: "ok" }; }
+          catch (error) { if (error instanceof ApiError && error.status === 401) return { status: "failed" }; if (error instanceof ApiError && error.status === 429) return { status: "locked_out", retryAfterSeconds: error.retryAfter ?? 60 }; throw error; }
+        }}
+        {...(passkeyEnabled ? { onPasskey: async (): Promise<UnlockResult> => {
+          try { const passkey_assertion = await getPasskeyAssertion(); const result = await request<{ ticket: string }>("/api/adult-lock/confirm", { method: "POST", body: JSON.stringify({ passkey_assertion, action: "unmark", item: fresh.id }) }); fresh.resolve(result); freshRef.current = null; setFresh(null); return { status: "ok" }; }
+          catch (error) { if (error instanceof ApiError && error.status === 401) return { status: "failed" }; if (error instanceof ApiError && error.status === 429) return { status: "locked_out", retryAfterSeconds: error.retryAfter ?? 60 }; throw error; }
+        } } : {})}
+        onUnlocked={() => {}} /> : null}
        </ListenStatusContext.Provider>
       </MediaDockContext.Provider>
     </MediaHostContext.Provider>
