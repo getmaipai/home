@@ -254,7 +254,7 @@ describe("the limiter", () => {
     expect(sourceRequestCount()).toBe(after);                        // stopped: no request
     now += 61_000;
     expect((await post(owner, "/api/loras/browse", { source: "huggingface", q: "other" })).status).toBe(200);
-    for (let i = 0; i < 70; i += 1) { now += 1; await post(owner, "/api/loras/browse", { source: "huggingface", q: `q${i}` }); }
+    for (let i = 0; i < 310; i += 1) { now += 1; await post(owner, "/api/loras/browse", { source: "huggingface", q: `q${i}` }); }
     expect((await post(owner, "/api/loras/browse", { source: "huggingface", q: "last" })).status).toBe(429);
   });
 });

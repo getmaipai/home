@@ -120,7 +120,7 @@ const previews = new Map<string, { at: number; url: string }>();
 const knownSha = new Map<string, string>();
 const CACHE_MS = 5 * 60_000;
 const PREVIEW_MS = 24 * 3_600_000;
-const HOURLY_BUDGET = 60;
+const HOURLY_BUDGET = 300;
 
 export function __resetSourceForTests(): void {
   hosts.clear(); hourly = []; cache.clear(); previews.clear(); knownSha.clear();
