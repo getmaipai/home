@@ -185,6 +185,21 @@ describe("the browser", () => {
     restore();
   });
 
+  test("unlocking in the browser turns Show adult results on, so the person sees everything they unlocked for", async () => {
+    const browse = mock(async (_query: BrowseQuery) => page());
+    const restore = stub({ browse: browse as never });
+    const view = mountBrowser();
+    await waitFor(() => expect(browse.mock.calls.length).toBeGreaterThan(0));
+    expect(browse.mock.calls[0]![0].adult).toBe(false);
+    fireEvent.click((await view.findAllByRole("button", { name: TILE }))[0]!);
+    const field = (await within(document.body).findByRole("dialog", { name: /unlock|locked|passcode/i })).querySelector("input")!;
+    fireEvent.change(field, { target: { value: "1234" } });
+    const sw = await view.findByRole("switch", { name: "Show adult results" });
+    await waitFor(() => expect(sw.getAttribute("aria-checked")).toBe("true"));
+    await waitFor(() => expect(browse.mock.calls.at(-1)![0].adult).toBe(true));
+    restore();
+  });
+
   test("no match says what to do; a failure says what went wrong and offers Try again; unlocked offers Show adult results", async () => {
     const restore = stub({ browse: mock(async () => ({ items: [], locked: false, next_cursor: null, notes: [] })) as never });
     const view = mountBrowser();
