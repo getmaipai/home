@@ -160,7 +160,7 @@ msgid "{count, plural, one {# change is waiting} other {# changes are waiting}}"
 msgstr "{count, plural, one {# change is waiting} other {# changes are waiting}}"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/FamilyPage.tsx:39
+#: src/shell/pages/FamilyPage.tsx:38
 msgid "{count, plural, one {# companion} other {# companions}}"
 msgstr "{count, plural, one {# companion} other {# companions}}"
 
@@ -236,12 +236,12 @@ msgstr "{count, plural, one {# kept until you delete it} other {# kept until you
 
 #. js-lingui-explicit-id
 #: src/shell/library/LibraryItems.tsx:124
-#: src/shell/pages/FamilyPage.tsx:36
+#: src/shell/pages/FamilyPage.tsx:35
 msgid "{count, plural, one {# person} other {# people}}"
 msgstr "{count, plural, one {# person} other {# people}}"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/FamilyPage.tsx:37
+#: src/shell/pages/FamilyPage.tsx:36
 msgid "{count, plural, one {# pet} other {# pets}}"
 msgstr "{count, plural, one {# pet} other {# pets}}"
 
@@ -256,7 +256,7 @@ msgid "{count, plural, one {# result} other {# results}}"
 msgstr "{count, plural, one {# result} other {# results}}"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/FamilyPage.tsx:38
+#: src/shell/pages/FamilyPage.tsx:37
 msgid "{count, plural, one {# robot} other {# robots}}"
 msgstr "{count, plural, one {# robot} other {# robots}}"
 
@@ -1816,7 +1816,7 @@ msgid "api.minor.grant_teen_max_pictures"
 msgstr "A teen can be given Max only for pictures. Chat, video and music stay Standard for them."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/PersonProfilePage.tsx:73
+#: src/shell/pages/PersonProfilePage.tsx:74
 msgid "A teen&rsquo;s profile is private, even from an admin. Go back to Family to open someone else."
 msgstr "A teen&rsquo;s profile is private, even from an admin. Go back to Family to open someone else."
 
@@ -2621,7 +2621,7 @@ msgid "All adults"
 msgstr "All adults"
 
 #. js-lingui-explicit-id
-#: src/shell/pageHeaderTitle.tsx:117
+#: src/shell/pageHeaderTitle.tsx:114
 #: src/shell/pages/AllAppsPage.tsx:103
 #: src/shell/pages/AllAppsPage.tsx:122
 #: src/shell/pages/AllAppsPage.tsx:124
@@ -3505,7 +3505,7 @@ msgstr "Azelma"
 #: src/apps/settings/AiSlotDialog.tsx:151
 #: src/apps/settings/EngineLinkCredentialSection.tsx:285
 #: src/apps/setup/SetupReviewPage.tsx:65
-#: src/shell/pageHeaderTitle.tsx:151
+#: src/shell/pageHeaderTitle.tsx:148
 #: src/shell/pages/companionFlow/AnimateStep.tsx:153
 #: src/shell/pages/companionFlow/CustomizeStep.tsx:195
 #: src/shell/pages/packageAppHeaderBar.tsx:94
@@ -3530,8 +3530,8 @@ msgstr "Back to draft"
 #. js-lingui-explicit-id
 #: src/apps/people/FaceEnrollmentPage.tsx:243
 #: src/apps/people/FaceEnrollmentPage.tsx:261
-#: src/shell/pages/PersonProfilePage.tsx:65
-#: src/shell/pages/PersonProfilePage.tsx:74
+#: src/shell/pages/PersonProfilePage.tsx:66
+#: src/shell/pages/PersonProfilePage.tsx:75
 msgid "Back to Family"
 msgstr "Back to Family"
 
@@ -3613,7 +3613,7 @@ msgstr "Backup storage limit (GB)"
 
 #. js-lingui-explicit-id
 #: src/apps/settings/BackupsSection.tsx:204
-#: src/shell/pageHeaderTitle.tsx:106
+#: src/shell/pageHeaderTitle.tsx:103
 #: src/shell/Routes.tsx:159
 msgid "Backups"
 msgstr "Backups"
@@ -4629,7 +4629,7 @@ msgstr "Charles"
 #: src/apps/settings/performanceModel.ts:9
 #: src/shell/AmbientCompanionPane.tsx:323
 #: src/shell/coreLabels.ts:8
-#: src/shell/pageHeaderTitle.tsx:98
+#: src/shell/pageHeaderTitle.tsx:95
 #: src/shell/pages/ChatPage.tsx:1735
 #: src/shell/pages/CompanionsPage.tsx:162
 #: src/shell/pages/CompanionsPage.tsx:167
@@ -5714,7 +5714,7 @@ msgstr "Climate, weather, nature, wildlife, energy and conservation."
 
 #. js-lingui-explicit-id
 #: src/shell/coreLabels.ts:17
-#: src/shell/pageHeaderTitle.tsx:113
+#: src/shell/pageHeaderTitle.tsx:110
 msgid "Clock"
 msgstr "Clock"
 
@@ -5932,7 +5932,7 @@ msgstr "Coming up"
 
 #. js-lingui-explicit-id
 #: src/apps/settings/CommandsSection.tsx:105
-#: src/shell/pageHeaderTitle.tsx:108
+#: src/shell/pageHeaderTitle.tsx:105
 #: src/shell/Routes.tsx:160
 msgid "Commands"
 msgstr "Commands"
@@ -5956,7 +5956,7 @@ msgstr "Companies, markets, jobs, prices, the economy and personal money."
 #: src/apps/library/appPresentation.ts:9
 #: src/apps/settings/RobotCompanionChoices.tsx:62
 #: src/apps/settings/RobotCompanionChoices.tsx:64
-#: src/shell/pages/FamilyPage.tsx:67
+#: src/shell/pages/FamilyPage.tsx:66
 msgid "Companion"
 msgstr "Companion"
 
@@ -6559,7 +6559,7 @@ msgid "Could not load conversations. Check your connection and try again."
 msgstr "Could not load conversations. Check your connection and try again."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/PersonProfilePage.tsx:162
+#: src/shell/pages/PersonProfilePage.tsx:163
 msgid "Could not load creations."
 msgstr "Could not load creations."
 
@@ -6599,7 +6599,7 @@ msgid "Could not load performance."
 msgstr "Could not load performance."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/FamilyPage.tsx:50
+#: src/shell/pages/FamilyPage.tsx:49
 msgid "Could not load pets."
 msgstr "Could not load pets."
 
@@ -6624,7 +6624,7 @@ msgid "Could not load repairs."
 msgstr "Could not load repairs."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/FamilyPage.tsx:51
+#: src/shell/pages/FamilyPage.tsx:50
 msgid "Could not load robots."
 msgstr "Could not load robots."
 
@@ -6685,8 +6685,8 @@ msgstr "Could not load the household"
 
 #. js-lingui-explicit-id
 #: src/apps/settings/UsersSection.tsx:228
-#: src/shell/pages/FamilyPage.tsx:43
-#: src/shell/pages/PersonProfilePage.tsx:56
+#: src/shell/pages/FamilyPage.tsx:42
+#: src/shell/pages/PersonProfilePage.tsx:57
 msgid "Could not load the household."
 msgstr "Could not load the household."
 
@@ -6771,7 +6771,7 @@ msgid "Could not load voice samples."
 msgstr "Could not load voice samples."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/PersonProfilePage.tsx:146
+#: src/shell/pages/PersonProfilePage.tsx:147
 msgid "Could not load what's been shared."
 msgstr "Could not load what's been shared."
 
@@ -7431,7 +7431,7 @@ msgid "Creating…"
 msgstr "Creating…"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/PersonProfilePage.tsx:172
+#: src/shell/pages/PersonProfilePage.tsx:173
 msgid "Creations"
 msgstr "Creations"
 
@@ -7585,7 +7585,7 @@ msgid "setting.allowance.robot_body.daily_minutes.label"
 msgstr "Daily Robot body minutes"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/PersonProfilePage.tsx:116
+#: src/shell/pages/PersonProfilePage.tsx:117
 msgid "Daily time limits for {name}."
 msgstr "Daily time limits for {name}."
 
@@ -8559,7 +8559,7 @@ msgid "Edit {name}"
 msgstr "Edit {name}"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/PersonProfilePage.tsx:86
+#: src/shell/pages/PersonProfilePage.tsx:87
 msgid "Edit {name}’s profile"
 msgstr "Edit {name}’s profile"
 
@@ -8584,8 +8584,8 @@ msgid "Edit keyframe: {label}"
 msgstr "Edit keyframe: {label}"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/PersonProfilePage.tsx:204
-#: src/shell/pages/PersonProfilePage.tsx:204
+#: src/shell/pages/PersonProfilePage.tsx:205
+#: src/shell/pages/PersonProfilePage.tsx:205
 msgid "Edit profile"
 msgstr "Edit profile"
 
@@ -9233,9 +9233,9 @@ msgstr "Fall-through rate"
 
 #. js-lingui-explicit-id
 #: src/shell/coreLabels.ts:9
-#: src/shell/pageHeaderTitle.tsx:99
-#: src/shell/pages/FamilyPage.tsx:24
-#: src/shell/pages/FamilyPage.tsx:48
+#: src/shell/pageHeaderTitle.tsx:96
+#: src/shell/pages/FamilyPage.tsx:23
+#: src/shell/pages/FamilyPage.tsx:47
 msgid "Family"
 msgstr "Family"
 
@@ -10401,7 +10401,7 @@ msgstr "Holds what some downloads ask for before they start."
 #. js-lingui-explicit-id
 #: src/apps/clock/WorldClocksTab.tsx:72
 #: src/shell/coreLabels.ts:7
-#: src/shell/pageHeaderTitle.tsx:97
+#: src/shell/pageHeaderTitle.tsx:94
 #: src/shell/pages/ActivityPage.tsx:44
 #: src/shell/pages/DashboardPage.tsx:24
 #: src/shell/pages/settings/settingsBackLink.ts:55
@@ -11074,11 +11074,6 @@ msgid "Home keeps working normally while this runs. It is the floor, so it stays
 msgstr "Home keeps working normally while this runs. It is the floor, so it stays on."
 
 #. js-lingui-explicit-id
-#: src/shell/pageHeaderTitle.tsx:164
-msgid "Home layout"
-msgstr "Home layout"
-
-#. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:1453
 msgid "setting.ui.home_layout.label"
 msgstr "Home layout"
@@ -11235,7 +11230,7 @@ msgstr "Hot: gestures paused"
 
 #. js-lingui-explicit-id
 #: src/shell/coreLabels.ts:10
-#: src/shell/pageHeaderTitle.tsx:114
+#: src/shell/pageHeaderTitle.tsx:111
 #: src/shell/pages/HousePage.tsx:21
 #: src/shell/pages/HousePage.tsx:45
 msgid "House"
@@ -11391,7 +11386,7 @@ msgid "setting.robot.volume.help"
 msgstr "How loud this robot speaks by default, from 20 to 100 percent. You can also tell it 'volume to 60'. At night it plays quieter and goes back to this level in the morning."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/PersonProfilePage.tsx:126
+#: src/shell/pages/PersonProfilePage.tsx:127
 msgid "How MaiPai answers {name} about sensitive subjects. Only you and other admins can change these."
 msgstr "How MaiPai answers {name} about sensitive subjects. Only you and other admins can change these."
 
@@ -13259,7 +13254,7 @@ msgid "Library"
 msgstr "Library"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/PersonProfilePage.tsx:199
+#: src/shell/pages/PersonProfilePage.tsx:200
 msgid "Library counts"
 msgstr "Library counts"
 
@@ -13354,7 +13349,7 @@ msgid "Likes: {list}."
 msgstr "Likes: {list}."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/PersonProfilePage.tsx:103
+#: src/shell/pages/PersonProfilePage.tsx:104
 msgid "Limits"
 msgstr "Limits"
 
@@ -13644,7 +13639,7 @@ msgid "Loading copies"
 msgstr "Loading copies"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/PersonProfilePage.tsx:162
+#: src/shell/pages/PersonProfilePage.tsx:163
 msgid "Loading creations"
 msgstr "Loading creations"
 
@@ -13680,7 +13675,7 @@ msgstr "Loading Home highlight"
 
 #. js-lingui-explicit-id
 #: src/apps/settings/UsersSection.tsx:229
-#: src/shell/pages/FamilyPage.tsx:43
+#: src/shell/pages/FamilyPage.tsx:42
 #: src/shell/pages/SignInPage.tsx:88
 msgid "Loading household"
 msgstr "Loading household"
@@ -13740,7 +13735,7 @@ msgid "Loading performance"
 msgstr "Loading performance"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/PersonProfilePage.tsx:57
+#: src/shell/pages/PersonProfilePage.tsx:58
 msgid "Loading profile"
 msgstr "Loading profile"
 
@@ -13799,7 +13794,7 @@ msgid "Loading setup status"
 msgstr "Loading setup status"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/PersonProfilePage.tsx:146
+#: src/shell/pages/PersonProfilePage.tsx:147
 msgid "Loading shared media"
 msgstr "Loading shared media"
 
@@ -14827,7 +14822,7 @@ msgstr "Maximum speed used for automatic reference library updates."
 
 #. js-lingui-explicit-id
 #: src/apps/settings/DevicesSection.tsx:164
-#: src/shell/pageHeaderTitle.tsx:116
+#: src/shell/pageHeaderTitle.tsx:113
 #: src/shell/pages/MediaHomePage.tsx:24
 #: src/shell/pages/MediaSearchPage.tsx:17
 #: src/shell/Routes.tsx:436
@@ -16041,7 +16036,7 @@ msgid "No faded memories."
 msgstr "No faded memories."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/FamilyPage.tsx:81
+#: src/shell/pages/FamilyPage.tsx:80
 msgid "No family members yet."
 msgstr "No family members yet."
 
@@ -16101,7 +16096,7 @@ msgid "No one in this household has that profile"
 msgstr "No one in this household has that profile"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/PersonProfilePage.tsx:64
+#: src/shell/pages/PersonProfilePage.tsx:65
 msgid "No one in this household has that profile."
 msgstr "No one in this household has that profile."
 
@@ -16723,7 +16718,7 @@ msgid "Nothing saved yet. Open an article and press Save to keep it here."
 msgstr "Nothing saved yet. Open an article and press Save to keep it here."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/PersonProfilePage.tsx:152
+#: src/shell/pages/PersonProfilePage.tsx:153
 msgid "Nothing shared yet."
 msgstr "Nothing shared yet."
 
@@ -16777,7 +16772,7 @@ msgstr "Notification history"
 #: src/apps/notifications/NotificationsPage.tsx:111
 #: src/shell/NotificationBell.tsx:214
 #: src/shell/NotificationBell.tsx:229
-#: src/shell/pageHeaderTitle.tsx:111
+#: src/shell/pageHeaderTitle.tsx:108
 #: src/shell/routeHeader.ts:25
 msgid "Notifications"
 msgstr "Notifications"
@@ -17037,7 +17032,7 @@ msgstr "Offer acceptance phrases"
 #: src/apps/settings/HouseholdRobotsSection.tsx:151
 #: src/apps/settings/HouseholdRobotsSection.tsx:162
 #: src/shell/pages/EnginesPage.tsx:35
-#: src/shell/pages/FamilyPage.tsx:78
+#: src/shell/pages/FamilyPage.tsx:77
 msgid "Offline"
 msgstr "Offline"
 
@@ -17385,7 +17380,7 @@ msgstr "Ongoing since {time} · {duration}"
 #: src/apps/settings/HouseholdRobotsSection.tsx:75
 #: src/apps/settings/HouseholdRobotsSection.tsx:151
 #: src/apps/settings/HouseholdRobotsSection.tsx:162
-#: src/shell/pages/FamilyPage.tsx:78
+#: src/shell/pages/FamilyPage.tsx:77
 msgid "Online"
 msgstr "Online"
 
@@ -17794,7 +17789,7 @@ msgid "setting.storage.person.cap_bytes.help"
 msgstr "Overrides the household's default per-person cap for this one person. 0 means no override: this person follows the household default. Set by an owner or admin."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/PersonProfilePage.tsx:102
+#: src/shell/pages/PersonProfilePage.tsx:103
 msgid "Overview"
 msgstr "Overview"
 
@@ -18034,7 +18029,7 @@ msgid "setting.robot.face.color.option_label.peach"
 msgstr "Peach"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/FamilyPage.tsx:54
+#: src/shell/pages/FamilyPage.tsx:53
 #: src/shell/pages/settings/settingsBackLink.ts:54
 msgid "People"
 msgstr "People"
@@ -18070,7 +18065,7 @@ msgid "setting.ease.text_size.help"
 msgstr "Percent of the normal text size. \"Preset\" follows your ease of use choice."
 
 #. js-lingui-explicit-id
-#: src/shell/pageHeaderTitle.tsx:103
+#: src/shell/pageHeaderTitle.tsx:100
 #: src/shell/pages/PerformancePage.tsx:54
 #: src/shell/Routes.tsx:155
 msgid "Performance"
@@ -18129,7 +18124,7 @@ msgid "area.Personalization"
 msgstr "Personalization"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/FamilyPage.tsx:77
+#: src/shell/pages/FamilyPage.tsx:76
 msgid "Pet"
 msgstr "Pet"
 
@@ -18139,7 +18134,7 @@ msgid "setting.tts.voice_id.option_label.peter_yearsley"
 msgstr "Peter Yearsley"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/FamilyPage.tsx:75
+#: src/shell/pages/FamilyPage.tsx:74
 msgid "Pets and robots"
 msgstr "Pets and robots"
 
@@ -18400,7 +18395,7 @@ msgid "Picture tools"
 msgstr "Picture tools"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/PersonProfilePage.tsx:191
+#: src/shell/pages/PersonProfilePage.tsx:192
 msgid "pictures"
 msgstr "pictures"
 
@@ -18429,7 +18424,7 @@ msgid "setting.resources.strict.image.label"
 msgstr "Pictures always go first"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/PersonProfilePage.tsx:119
+#: src/shell/pages/PersonProfilePage.tsx:120
 msgid "Pictures and videos can be made in chat."
 msgstr "Pictures and videos can be made in chat."
 
@@ -18852,7 +18847,7 @@ msgstr "Print"
 
 #. js-lingui-explicit-id
 #: src/shell/coreLabels.ts:12
-#: src/shell/pageHeaderTitle.tsx:109
+#: src/shell/pageHeaderTitle.tsx:106
 #: src/shell/pages/PrivacyPage.tsx:45
 msgid "Privacy"
 msgstr "Privacy"
@@ -18883,7 +18878,7 @@ msgid "Professional"
 msgstr "Professional"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/PersonProfilePage.tsx:194
+#: src/shell/pages/PersonProfilePage.tsx:195
 #: src/shell/pages/settings/settingsViews.tsx:62
 msgid "Profile"
 msgstr "Profile"
@@ -19305,7 +19300,7 @@ msgstr "Reduced"
 
 #. js-lingui-explicit-id
 #: src/shell/coreLabels.ts:11
-#: src/shell/pageHeaderTitle.tsx:118
+#: src/shell/pageHeaderTitle.tsx:115
 #: src/shell/pages/ReferencePage.tsx:28
 #: src/shell/pages/ReferencePage.tsx:37
 #: src/shell/pages/ReferencePage.tsx:37
@@ -19401,7 +19396,7 @@ msgstr "Reminder: {task}"
 
 #. js-lingui-explicit-id
 #: src/shell/coreLabels.ts:16
-#: src/shell/pageHeaderTitle.tsx:112
+#: src/shell/pageHeaderTitle.tsx:109
 msgid "Reminders"
 msgstr "Reminders"
 
@@ -19676,7 +19671,7 @@ msgstr "Repair issues"
 
 #. js-lingui-explicit-id
 #: src/shell/InstallDock.tsx:308
-#: src/shell/pageHeaderTitle.tsx:105
+#: src/shell/pageHeaderTitle.tsx:102
 #: src/shell/pages/dashboard/Attention.tsx:25
 #: src/shell/pages/RepairsPage.tsx:60
 #: src/shell/Routes.tsx:157
@@ -20174,7 +20169,7 @@ msgstr "Rivet's voice"
 #: src/apps/settings/HouseholdRobotsSection.tsx:143
 #: src/apps/settings/RobotBody.tsx:188
 #: src/apps/settings/RobotPasswordSection.tsx:152
-#: src/shell/pages/FamilyPage.tsx:78
+#: src/shell/pages/FamilyPage.tsx:77
 msgid "Robot"
 msgstr "Robot"
 
@@ -21200,7 +21195,7 @@ msgid "See"
 msgstr "See"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/PersonProfilePage.tsx:177
+#: src/shell/pages/PersonProfilePage.tsx:178
 msgid "See all"
 msgstr "See all"
 
@@ -21569,9 +21564,9 @@ msgstr "Setting up your AI"
 #. js-lingui-explicit-id
 #: src/shell/AmbientCompanionPane.tsx:332
 #: src/shell/coreLabels.ts:13
-#: src/shell/pageHeaderTitle.tsx:100
+#: src/shell/pageHeaderTitle.tsx:97
 #: src/shell/pages/FilesPage.tsx:300
-#: src/shell/pages/PersonProfilePage.tsx:206
+#: src/shell/pages/PersonProfilePage.tsx:207
 #: src/shell/pages/settings/SettingsAreaPage.tsx:293
 #: src/shell/Routes.tsx:436
 msgid "Settings"
@@ -21616,7 +21611,7 @@ msgstr "Setup progress unavailable"
 
 #. js-lingui-explicit-id
 #: src/apps/setup/SetupReviewPage.tsx:59
-#: src/shell/pageHeaderTitle.tsx:115
+#: src/shell/pageHeaderTitle.tsx:112
 msgid "Setup review"
 msgstr "Setup review"
 
@@ -21641,7 +21636,7 @@ msgstr "Shapes the music sound. Flat leaves it as recorded; the others lift bass
 #: src/shell/library/LibraryViewer.tsx:165
 #: src/shell/library/LibraryViewer.tsx:165
 #: src/shell/pages/FilesPage.tsx:346
-#: src/shell/pages/PersonProfilePage.tsx:205
+#: src/shell/pages/PersonProfilePage.tsx:206
 msgid "Share"
 msgstr "Share"
 
@@ -21651,7 +21646,7 @@ msgid "Share with the household"
 msgstr "Share with the household"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/PersonProfilePage.tsx:145
+#: src/shell/pages/PersonProfilePage.tsx:146
 msgid "Shared"
 msgstr "Shared"
 
@@ -22341,7 +22336,7 @@ msgid "Some parts are starting up"
 msgstr "Some parts are starting up"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/PersonProfilePage.tsx:128
+#: src/shell/pages/PersonProfilePage.tsx:129
 msgid "Some things never change for {name}. Feelings and safety always get care first and a trusted grown-up. Bullying, secrets and sharing where they live are never helped. On religion and politics, MaiPai takes no side. In danger, MaiPai points to a grown-up and the emergency number."
 msgstr "Some things never change for {name}. Feelings and safety always get care first and a trusted grown-up. Bullying, secrets and sharing where they live are never helped. On religion and politics, MaiPai takes no side. In danger, MaiPai points to a grown-up and the emergency number."
 
@@ -22432,7 +22427,7 @@ msgstr "Something went wrong. Try asking again."
 #: src/shell/library/LibraryViewer.tsx:118
 #: src/shell/pages/FilesPage.tsx:162
 #: src/shell/pages/MusicWorkspacePage.tsx:38
-#: src/shell/pages/PersonProfilePage.tsx:175
+#: src/shell/pages/PersonProfilePage.tsx:176
 #: src/shell/pages/SoundExtras.tsx:75
 #: src/shell/pages/SoundExtras.tsx:77
 msgid "Song"
@@ -22454,7 +22449,7 @@ msgid "Song style (optional)"
 msgstr "Song style (optional)"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/PersonProfilePage.tsx:189
+#: src/shell/pages/PersonProfilePage.tsx:190
 msgid "songs"
 msgstr "songs"
 
@@ -22990,7 +22985,7 @@ msgstr "Starts at (seconds)"
 
 #. js-lingui-explicit-id
 #: src/apps/settings/CodingSettings.tsx:226
-#: src/shell/pageHeaderTitle.tsx:102
+#: src/shell/pageHeaderTitle.tsx:99
 #: src/shell/pages/EnginesPage.tsx:47
 #: src/shell/pages/EnginesPage.tsx:71
 #: src/shell/pages/performance/EnginesHealthBody.tsx:37
@@ -23194,7 +23189,7 @@ msgstr "Stopwatch running"
 
 #. js-lingui-explicit-id
 #: src/shell/library/LibraryStorage.tsx:24
-#: src/shell/pageHeaderTitle.tsx:101
+#: src/shell/pageHeaderTitle.tsx:98
 #: src/shell/pages/StoragePage.tsx:116
 #: src/shell/pages/TrashPage.tsx:27
 #: src/shell/pages/TrashPage.tsx:27
@@ -23877,8 +23872,8 @@ msgstr "That did not send. Try again."
 #: src/shell/pages/companionFlow/CustomizeStep.tsx:189
 #: src/shell/pages/companionFlow/KeyframeEditor.tsx:95
 #: src/shell/pages/EnginesPage.tsx:147
+#: src/shell/pages/FamilyPage.tsx:49
 #: src/shell/pages/FamilyPage.tsx:50
-#: src/shell/pages/FamilyPage.tsx:51
 #: src/shell/pages/FilesPage.tsx:402
 #: src/shell/pages/FilesPage.tsx:418
 #: src/shell/pages/MusicRemix.tsx:39
@@ -25808,7 +25803,7 @@ msgid "Top rated"
 msgstr "Top rated"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/PersonProfilePage.tsx:104
+#: src/shell/pages/PersonProfilePage.tsx:105
 msgid "Topics"
 msgstr "Topics"
 
@@ -25995,8 +25990,8 @@ msgstr "Trigger phrase, e.g. \"movie night\""
 #: src/shell/pages/ActivityPage.tsx:37
 #: src/shell/pages/companionFlow/AnimateStep.tsx:132
 #: src/shell/pages/dashboard/ArrangeHome.tsx:71
+#: src/shell/pages/FamilyPage.tsx:49
 #: src/shell/pages/FamilyPage.tsx:50
-#: src/shell/pages/FamilyPage.tsx:51
 #: src/shell/pages/FilesPage.tsx:317
 #: src/shell/pages/MusicWorkspacePage.tsx:93
 #: src/shell/pages/settings/WebSearchSettings.tsx:103
@@ -26352,7 +26347,7 @@ msgid "area.Uncensored chat AI"
 msgstr "Uncensored chat AI"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/FamilyPage.tsx:77
+#: src/shell/pages/FamilyPage.tsx:76
 msgid "Unconfirmed"
 msgstr "Unconfirmed"
 
@@ -26605,7 +26600,7 @@ msgid "Updated {when}"
 msgstr "Updated {when}"
 
 #. js-lingui-explicit-id
-#: src/shell/pageHeaderTitle.tsx:104
+#: src/shell/pageHeaderTitle.tsx:101
 #: src/shell/pages/dashboard/Attention.tsx:26
 #: src/shell/pages/UpdatesPage.tsx:78
 #: src/shell/Routes.tsx:156
@@ -26871,7 +26866,7 @@ msgstr "Used yesterday"
 
 #. js-lingui-explicit-id
 #: src/apps/settings/UsersSection.tsx:232
-#: src/shell/pageHeaderTitle.tsx:110
+#: src/shell/pageHeaderTitle.tsx:107
 #: src/shell/pages/UsersPage.tsx:11
 #: src/shell/Routes.tsx:161
 msgid "Users"
@@ -26991,7 +26986,7 @@ msgstr "Very Simple"
 #: src/apps/settings/ModelsAndStorageSection.tsx:23
 #: src/apps/settings/performanceModel.ts:9
 #: src/shell/pages/FilesPage.tsx:162
-#: src/shell/pages/PersonProfilePage.tsx:175
+#: src/shell/pages/PersonProfilePage.tsx:176
 msgid "Video"
 msgstr "Video"
 
@@ -27051,7 +27046,7 @@ msgid "setting.generation.video.adult_adapters.option.restricted"
 msgstr "Video styles with an age limit are left out of the choices."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/PersonProfilePage.tsx:190
+#: src/shell/pages/PersonProfilePage.tsx:191
 msgid "videos"
 msgstr "videos"
 
@@ -27285,7 +27280,7 @@ msgid "Voiceover"
 msgstr "Voiceover"
 
 #. js-lingui-explicit-id
-#: src/shell/pageHeaderTitle.tsx:107
+#: src/shell/pageHeaderTitle.tsx:104
 #: src/shell/pages/settings/settingsViews.tsx:96
 #: src/shell/pages/VoicesPage.tsx:14
 #: src/shell/pages/VoicesPage.tsx:18
@@ -28375,7 +28370,7 @@ msgid "You cannot make a new key with your current Coding access."
 msgstr "You cannot make a new key with your current Coding access."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/PersonProfilePage.tsx:72
+#: src/shell/pages/PersonProfilePage.tsx:73
 msgid "You cannot open this profile."
 msgstr "You cannot open this profile."
 
