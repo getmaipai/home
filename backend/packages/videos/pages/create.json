@@ -4,46 +4,6 @@
   "title": "Create",
   "body": [
     {
-      "type": "creation_header",
-      "variant": "studio",
-      "eyebrow": "Create",
-      "bind": {
-        "source": "package",
-        "path": "recipes",
-        "params": {
-          "scope": "header"
-        }
-      },
-      "share_change": {
-        "add": {
-          "call": {
-            "target": "/api/plugins/videos/actions/share-add",
-            "args": {
-              "id": "{id}",
-              "person_id": "{person_id}"
-            }
-          }
-        },
-        "remove": {
-          "call": {
-            "target": "/api/plugins/videos/actions/share-remove",
-            "args": {
-              "id": "{id}",
-              "person_id": "{person_id}"
-            }
-          }
-        },
-        "make_private": {
-          "call": {
-            "target": "/api/plugins/videos/actions/share-private",
-            "args": {
-              "id": "{id}"
-            }
-          }
-        }
-      }
-    },
-    {
       "type": "prompt_bar",
       "placement": "inline",
       "label": "Describe a video",
@@ -88,8 +48,7 @@
               "value": "portrait",
               "label": "Portrait"
             }
-          ],
-          "fold": true
+          ]
         }
       ],
       "submit": {
@@ -114,20 +73,20 @@
     },
     {
       "type": "media_shelf",
-      "heading": "Start with an idea",
+      "heading": "Inspiration",
       "bind": {
         "source": "package",
         "path": "recipes",
         "params": {
           "scope": "showcase",
-          "limit": 8
+          "limit": 4
         }
       },
       "item_key_field": "id",
       "item_label_field": "title",
       "item_subtitle_field": "{subtitle}",
       "item_media_field": "thumbnail",
-      "aspect": "poster",
+      "aspect": "wide",
       "layout": "rail",
       "variant": "plain",
       "card_radius": "tight",

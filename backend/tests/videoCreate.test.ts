@@ -202,7 +202,7 @@ describe("POST /api/videos/make", () => {
 });
 
 describe("the Create page and the make action", () => {
-  test("the served Create page holds the panel prompt bar with the recipes, lengths and only the levels this person may use, and the feed beside it", async () => {
+  test("the served Create page leads with a compact prompt bar and offers the recipes, lengths and allowed levels", async () => {
     const { adult } = await household();
     const page = await (await adult.client.get("/api/plugins/videos/pages/create")).json() as { body: Array<Record<string, any>> };
     const bar = promptBarOf(page.body)!;
@@ -223,14 +223,9 @@ describe("the Create page and the make action", () => {
     // The page document itself is not changed by serving it: a second request gets one set of chips, not two.
     const again = await (await adult.client.get("/api/plugins/videos/pages/create")).json() as { body: Array<Record<string, any>> };
     expect(promptBarOf(again.body)!.chips).toHaveLength(5);
-    // VIDEO-UI-06: two panes, the panel on the left, and nothing of the old three pages.
-    // VIDEO-STUDIO-08: the page takes the Music Studio look: the studio surface, a studio header (eyebrow CREATE, title from the bound row) above the two panes.
+    // VIDEO-UI-06: the compact Create page keeps the prompt first with no oversized studio heading.
     expect((page as Record<string, any>).surface).toBeUndefined(); // PRO-LOOK-STUDIOS-01: the studio surface is retired
-    const header = page.body[0] as Record<string, any>;
-    expect(header).toMatchObject({ type: "creation_header", variant: "studio", eyebrow: "Create", bind: { source: "package", path: "recipes", params: { scope: "header" } } });
-    expect(header.primary).toBeUndefined();
-    expect(await (await adult.client.post("/api/plugins/videos/data/recipes", { scope: "header" })).json()).toEqual([{ title: "Make any video" }]);
-    expect(page.body[1]).toMatchObject({ type: "prompt_bar", placement: "inline" });
+    expect(page.body[0]).toMatchObject({ type: "prompt_bar", placement: "inline" });
     expect(bar.field_size).toBeUndefined();
     expect(chip("look")).toMatchObject({ group: "Style", presentation: "popover" });
     if (bar.tier) expect(bar.tier.presentation).toBe("segment");
@@ -241,7 +236,8 @@ describe("the Create page and the make action", () => {
     expect(bar.suggestions).toBeUndefined();
     expect(chip("look")).toMatchObject({ presentation: "popover", group: "Style" });
     expect(chip("camera")).toMatchObject({ presentation: "popover", group: "Style" });
-    expect(chip("voices").fold).toBe(true);
+    expect(chip("voices").fold).toBeUndefined();
+    expect(chip("orientation").fold).toBeUndefined();
     // The time under Generate is plain words per level, never credits, memory or a model name.
     const detail = bar.submit_detail as { state: string; labels: Record<string, string> };
     expect(detail.state).toBe(bar.tier ? "tier" : "seconds");
@@ -254,8 +250,8 @@ describe("the Create page and the make action", () => {
     const feedNode = section.children[0] as Record<string, any>;
     expect(feedNode.type).toBe("result_feed");
     expect(feedNode.heading_style).toBeUndefined(); // sentence-case headings, no all-caps eyebrow (pro look)
-    expect((page.body[2] as Record<string, any>)).toMatchObject({ type: "media_shelf", heading: "Start with an idea", bind: { params: { limit: 8 } } });
-    expect((page.body[2] as Record<string, any>).heading_style).toBeUndefined();
+    expect((page.body[1] as Record<string, any>)).toMatchObject({ type: "media_shelf", heading: "Inspiration", aspect: "wide", bind: { params: { limit: 4 } } });
+    expect((page.body[1] as Record<string, any>).heading_style).toBeUndefined();
     expect(feedNode).toMatchObject({ look: "media", filters_presentation: "popover" });
     expect(feedNode.poll_while).toEqual({ statuses: ["queued", "generating"], record: { path: "recipes", params: { scope: "job", id: "{id}" } } });
     expect(feedNode.bind.params.scope).toBe("feed");

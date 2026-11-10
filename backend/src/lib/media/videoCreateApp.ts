@@ -108,7 +108,7 @@ registerAppPageFill("videos", "create", (person, page) => {
     { state: "look", label: "Look", variant: "cards", presentation: "popover", group: "Style", default: VIDEO_LOOKS[0]!.id, options: VIDEO_LOOKS.map(({ id, label, loop }) => ({ value: id, label: id === VIDEO_LOOKS[0]!.id ? "Auto" : label, ...media(loop) })) },
     // Auto is the start for both: Look's Auto is `natural` (adds no words; a clip's tag still says "Natural"), Camera's Auto is "none" (the route reads it as not given).
     { state: "camera", label: "Camera", variant: "cards", presentation: "popover", group: "Style", default: "none", options: [{ value: "none", label: "Auto" }, ...VIDEO_RECIPES.map(({ id, label, loop }) => ({ value: id, label, ...media(loop) }))] },
-    { state: "voices", label: "Voices", fold: true, default: DEFAULT_VIDEO_VOICES, options: VIDEO_VOICES.map(({ id, label }) => ({ value: id, label })) },
+    { state: "voices", label: "Voices", default: DEFAULT_VIDEO_VOICES, options: VIDEO_VOICES.map(({ id, label }) => ({ value: id, label })) },
     // VIDEO-LORA-09: Styles, Characters and Strength join the Style popover; the person's own access and the Stack's LoRA report decide what shows and when it is disabled.
     ...styleChips({ person, engine: peekVideoEngineStatus(), offered: ((videoTierSegment(person)?.tiers as Array<{ id: StyleTier }> | undefined)?.map((t) => t.id)) ?? ["standard"] }),
   ];
@@ -223,7 +223,7 @@ registerMediaAppData("videos", (person, dataId, params) => {
     case "short": return shortClipRows(person);
     case undefined: return VIDEO_RECIPES.map(({ id, label, hint }) => ({ id, label, hint }));
     case "showcase": return showcaseRows(params.limit);
-    // VIDEO-STUDIO-08: the page header row (the studio `creation_header` reads its title from a bound row). The same for everyone who may open the page.
+    // VIDEO-STUDIO-08: shared header data for the Studio surface. The same for everyone who may open the page.
     case "header": return [{ title: "Make any video" }];
     // STYLES-04: up to two styles for the words typed so far. The matcher reads the person's own access (a locked or minor list never holds an adult style).
     case "style-suggestions": return suggestStyles({ person, media: "video", text: params.query ?? "", surface: "own_written", proof: requestProof() }).items.map((l) => ({ id: l.id, name: l.name, kind: l.kind === "character" ? "character" : "style" }));

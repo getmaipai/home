@@ -400,13 +400,13 @@ describe("scope showcase: the Try this rail (VIDEO-UI-11)", () => {
   test("the served Create page puts the rail above the feed: a plain poster shelf whose press only navigates with prompt, look and camera; the empty feed keeps its one line", async () => {
     const { adult } = await household();
     const page = await (await adult.client.get("/api/plugins/videos/pages/create")).json() as { body: Array<Row> };
-    expect(page.body.map((node) => node.type)).toEqual(["creation_header", "prompt_bar", "media_shelf", "section"]);
-    expect(page.body[1]).toMatchObject({ type: "prompt_bar", placement: "inline" });
-    const shelf = page.body[2]!;
-    expect(shelf).toMatchObject({ heading: "Start with an idea", aspect: "poster", layout: "rail", variant: "plain", press_scale: true, item_media_field: "thumbnail", media_loop: true, item_loop_field: "loop", bind: { path: "recipes", params: { scope: "showcase", limit: 8 } } });
+    expect(page.body.map((node) => node.type)).toEqual(["prompt_bar", "media_shelf", "section"]);
+    expect(page.body[0]).toMatchObject({ type: "prompt_bar", placement: "inline" });
+    const shelf = page.body[1]!;
+    expect(shelf).toMatchObject({ heading: "Inspiration", aspect: "wide", layout: "rail", variant: "plain", press_scale: true, item_media_field: "thumbnail", media_loop: true, item_loop_field: "loop", bind: { path: "recipes", params: { scope: "showcase", limit: 4 } } });
     expect(shelf.on_select).toEqual({ navigate: { to: "/apps/videos/create", state: { prompt: "{prompt}", look: "{look}", camera: "{camera}" } } });
     expect(JSON.stringify(shelf)).not.toContain("call");
-    expect(page.body[3]!.children[0].empty_state.text).toBe("Your clips show here. Pick an idea below or describe a video above and press Generate.");
+    expect(page.body[2]!.children[0].empty_state.text).toBe("Your clips show here. Pick an idea below or describe a video above and press Generate.");
   });
 });
 

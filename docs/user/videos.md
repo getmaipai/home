@@ -31,7 +31,7 @@ Children and teens always get Standard. They do not choose a level, and their cl
 
 ## Make a video in the Videos app
 
-Open **Videos**, then **Create**. Create is for adults. The page starts with the full-width maker. Below it is a row of **Start with an idea** pictures that move, followed by **Your clips**, newest first. At the top is the title **Make any video**.
+Open **Videos**, then **Create**. Create is for adults. The page opens directly to the prompt composer with compact controls. A small **Inspiration** row with four examples sits below it, followed by **Your clips**, newest first.
 
 In the maker:
 
@@ -40,10 +40,10 @@ In the maker:
 - **Length.** 5 seconds, or the longest the level you picked can make.
 - **Style.** A compact control opens the **Look** choices. The same menu includes **Camera** moves. Your **Look** is natural, classic cartoon, anime, 3D animated or film. Camera moves include dolly in, slow orbit, handheld, slow motion, time-lapse, aerial and close-up. **Auto** is the first choice in each, and it is what you get if you pick nothing: Home keeps the look natural and lets the words decide the camera. If an admin has added styles you may use, the same window also has **Styles**, **Characters** and **Strength** (**Less**, **Normal** or **More**). A style works at some levels only, and the window says which.
 - **Level.** Choose Standard ("Fast, with sound"), Boost ("Sharper picture") or Max from a compact selector. You see only the levels you may use. If Max is not installed yet, its card is greyed and says what to do.
-- **More settings.** **Shape**: **Landscape** or **Portrait**. **Voices**: **Keep it clean** or **With music and effects**.
+- **Shape** and **Voices** stay visible beside **Length** and **Style**; no extra settings fold is needed.
 - **Generate.** Press it to start. The button says about how long it takes, for example "Boost, about a minute". Your words stay as you typed them. Home adds the wording for the look and camera behind the scenes.
 
-**Video ideas.** Each picture in **Start with an idea** includes a prompt, look and camera move, for example "Paper boat". Press a picture and its prompt and choices fill into the maker above. Nothing starts until you press **Generate**, so you can change the words first. With no clips yet, these ideas show above the line "Your clips show here. Pick an idea below or describe a video above and press Generate."
+**Inspiration.** Each picture includes a prompt, look and camera move, for example "Paper boat". Press a picture and its prompt and choices fill into the composer above. Nothing starts until you press **Generate**, so you can change the words first. With no clips yet, examples show above the line "Your clips show here. Pick an idea below or describe a video above and press Generate."
 
 On a phone, the maker stacks into the page above the idea row. **Your clips** are below the ideas. The **View** button holds the filters: **Favorites only**, **Group by words** and **Type**. The newest clip is big and the picture comes first. On a wide screen the older clips sit two to a row. The buttons for a clip show when you point at it, and always show on a phone.
 
