@@ -15,6 +15,7 @@ import { getHouseholdSettingValue } from "@/lib/settings";
 import { minorQueryHit } from "@/lib/retrieval/minorQueryCheck";
 import { deleteCollection, resolveCollection } from "@/lib/media/collections";
 import { personFilters, saveFilter, viewOf } from "@/lib/media/podcastFilters";
+import { setShowRate, showRateOf } from "@/lib/media/podcastRates";
 import { artProxyAddress, directoryAllowed, fetchDirectoryArt, searchDirectory, topShows, directoryShowForFeed } from "@/lib/media/podcastDirectory";
 import { podcastSnipLabel, podcastSnipRowsForRoute } from "@/lib/media/podcastApp";
 import { previewEpisodeAddress, previewPodcastFeed } from "@/lib/media/podcasts";
@@ -316,6 +317,20 @@ const lookupPreferringV4: DnsLookup = async (hostname) => {
     const body = await jsonBody(c);
     const result = unfollowPodcast(c.get("person"), typeof body.source_id === "string" ? body.source_id : "");
     return result.ok ? c.json({ ok: true as const, source_id: result.value.source_id, label: "Stopped following" }, 200) : refuseWith(c, result);
+  });
+
+  // PODCAST-RATE-01: the person's own listening speed for one show (0.5 to 2). A show they cannot see is a 404.
+  routes.patch("/shows/:id/rate", requireAuth, async (c) => {
+    const body = await jsonBody(c);
+    const result = setShowRate(c.get("person"), c.req.param("id"), body.rate);
+    return result.ok ? c.json({ ok: true as const, ...result.value }, 200) : refuseWith(c, result);
+  });
+
+  routes.get("/shows/:id/rate", requireAuth, async (c) => {
+    const person = c.get("person");
+    const id = c.req.param("id");
+    if (!allowedSources(person).some((source) => source.id === id)) return c.json({ error: "That show is not in your podcasts. Open Shows and pick it again.", code: "no_such_show" }, 404);
+    return c.json({ ok: true as const, show_id: id, rate: showRateOf(person, id) }, 200);
   });
 
   routes.post("/played-all", requireAuth, async (c, next) => {
