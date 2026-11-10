@@ -34,6 +34,7 @@ import { studioAdd } from "@/lib/videos/studio";
 import { startStudioExport } from "@/lib/videos/studioExport";
 import { setFavoriteFile } from "@/lib/videos/favorites";
 import { meetsMinRole } from "@/lib/plugins";
+import { adultMarkJobBody } from "@/lib/adultMarkRoute";
 import { videoJobLockState, LOCKED_START_LINE } from "@/lib/videos/lock";
 import { cancelVideoJob, getVideoJobByFileFor, getVideoJobFor } from "@/lib/videos/jobs";
 import { editMediaItem } from "@/lib/media/mediaEdit";
@@ -232,6 +233,17 @@ export function createMediaAppRoutes(appId: MediaAppId) {
     if (!job || job.conversationId || videoJobLockState(person, job) !== "open") return c.json({ error: "That video isn't available any more.", code: "gone" }, 404);
     const stopped = await cancelVideoJob(person, job.id);
     return c.json({ ok: true as const, id: job.id, state: stopped?.state ?? job.state }, 200);
+  });
+
+  routes.post("/actions/adult-mark", requireAuth, async (c, next) => {
+    const person = c.get("person");
+    if (appId !== "videos") return next();
+    if (!appRouteAllowed(person, appId, "actions", "adult-mark")) return next();
+    const body = await jsonBody(c);
+    if (typeof body.id !== "string" || (body.action !== "clear" && body.action !== "mark") || (body.ticket !== undefined && typeof body.ticket !== "string")) return c.json({ error: "Invalid action." }, 400);
+    const result = adultMarkJobBody(c, person, { id: body.id, action: body.action, ...(typeof body.ticket === "string" ? { ticket: body.ticket } : {}) });
+    if (!result.ok) return refuseWith(c, result);
+    return c.json({ made_audience: result.made_audience, lock: result.lock }, 200);
   });
 
   // VIDEO-UI-06: Make it Max on a finished Create clip. The checks and the body are the ones the chat tool's make_it_max uses (makeItMaxBody), and the make is

@@ -6,6 +6,13 @@ import { assertLibraryUploadAllowed, beginLibraryUpload, appendLibraryUpload, fi
 import { MAX_LIBRARY_UPLOAD_BYTES } from "@/lib/libraryUpload";
 import { libraryMultipart } from "@/lib/libraryMultipart";
 import { apiError } from "@/lib/apiErrorCopy";
+import { setItemLock } from "@/lib/adultMarks";
+import { sessionKeyOf } from "@/lib/adultLock";
+import { getCookie } from "hono/cookie";
+import { db } from "@/db";
+import { attachments } from "@/db/schema";
+import { eq } from "drizzle-orm";
+import { canReadFileAudience } from "@/lib/access";
 
 /** An upload refusal as the response body: coded when the error names a table code, else the bare message (storage-cap text). */
 const uploadBody = (error: UploadError): { error: string; code?: string; next?: string } => (error.code ? apiError(error.code) : { error: error.message });
@@ -21,8 +28,23 @@ const totals = z.object({ items: z.number(), bytes: z.number() });
 const item = z.object({
   id: z.string(), kind, name: z.string(), media_type: z.string(), size_bytes: z.number(), created_at: z.string(),
   owner: z.object({ id: z.string(), display_name: z.string() }), shared_with: z.object({ count: z.number(), household: z.boolean() }),
-  retention: z.string(), origin: z.enum(["made", "sent", "fetched"]), chat_id: z.string().nullable().describe("The chat that made or received this item, while it exists and only for the owner."), turn_id: z.string().nullable(), chat_title: z.string().nullable(), chat_deleted: z.boolean(), can_edit: z.boolean().describe("A picture the owner can open in the picture editor (it lives in its chat); false once the chat is gone."), audience: z.enum(["all-ages", "adult-only"]).nullable(), duration_seconds: z.number().nullable(),
+  retention: z.string(), origin: z.enum(["made", "sent", "fetched"]), chat_id: z.string().nullable().describe("The chat that made or received this item, while it exists and only for the owner."), turn_id: z.string().nullable(), chat_title: z.string().nullable(), chat_deleted: z.boolean(), can_edit: z.boolean().describe("A picture the owner can open in the picture editor (it lives in its chat); false once the chat is gone."), audience: z.enum(["all-ages", "adult-only"]).nullable(), adult: z.object({ made_audience: z.enum(["all-ages", "adult-only"]), lock: z.enum(["on", "off"]), can_clear: z.boolean(), can_mark: z.boolean(), line: z.string().nullable(), history: z.array(z.object({ action: z.enum(["clear", "mark"]), via: z.enum(["creator_passcode", "creator", "admin", "auto"]), at: z.string() })) }).nullable(), duration_seconds: z.number().nullable(),
   thumb_url: z.string().describe("Same-origin thumbnail URL served by the file thumbnail route."), expires_at: z.string().nullable(), version_count: z.number(),
+});
+
+const adultMarkParams = z.object({ id: z.string().min(1).max(80).openapi({ param: { name: "id", in: "path" } }) });
+const adultMarkBody = z.object({ action: z.enum(["clear", "mark"]), ticket: z.string().min(1).max(200).optional() });
+libraryRoutes.openapi(createRoute({ method: "post", path: "/files/{id}/adult-mark", tags: ["Library"], summary: "Mark a Library file NSFW or remove its Adult lock with a fresh ticket", middleware: [requireAuth] as const,
+  request: { params: adultMarkParams, body: { content: { "application/json": { schema: adultMarkBody } } } },
+  responses: { 200: { content: { "application/json": { schema: z.object({ made_audience: z.enum(["all-ages", "adult-only"]), lock: z.enum(["on", "off"]) }) } }, description: "The state now." }, ...errorResponses({ 403: "Not an adult's own screen, or a fresh ticket is missing", 404: "No such file", 409: "Nothing to change" }) },
+}), (c) => {
+  const actor = c.get("person");
+  const { id } = c.req.valid("param");
+  const row = db.select().from(attachments).where(eq(attachments.id, id)).get();
+  if (!row || row.deletedAt !== null || row.ownerPersonId !== actor.id || !canReadFileAudience(actor, row)) return c.json({ error: "That item is not here." }, 404);
+  const result = setItemLock({ actor, fileId: id, action: c.req.valid("json").action, ticket: c.req.valid("json").ticket ?? null, ticketItem: id, sessionKey: sessionKeyOf(getCookie(c, "session")) });
+  if (!result.ok) return respond(c, result);
+  return c.json({ made_audience: result.made_audience, lock: result.lock }, 200);
 });
 libraryRoutes.openapi(createRoute({ method: "get", path: "/", tags: ["Library"], summary: "Visible Library items, paged and filtered",
   middleware: [requireAuth] as const, request: { query }, responses: {

@@ -7,6 +7,7 @@ import { trashTotals } from "@/lib/libraryTrash";
 import { expiringLibraryFiles } from "@/lib/libraryRetention";
 import type { PersonRow } from "@/types";
 import { apiError } from "@/lib/apiErrorCopy";
+import { adultStateOf } from "@/lib/adultMarks";
 
 export interface LibraryQuery { limit?: number; cursor?: string; type?: string; origin?: "made" | "sent" | "fetched"; owner?: string; shared?: "with-me" | "by-me" | "none"; search?: string; sort?: "newest" | "oldest" | "name" | "size" }
 interface Cursor { v: 1; key: string | number; created: string; id: string; scope: string }
@@ -102,7 +103,7 @@ export function listLibrary(actor: PersonRow, q: LibraryQuery) {
     chat_title: row.owner_person_id === actor.id && row.chat_id ? row.chat_title : null,
     chat_deleted: row.owner_person_id === actor.id && row.source_chat_id !== null && row.chat_id === null,
     can_edit: row.owner_person_id === actor.id && row.chat_id !== null && row.turn_id !== null && row.kind === "image" && ['picture-gen','image-edit'].includes(String((libraryProvenance(row.provenance) as { writer?: string }).writer ?? '')),
-    audience: fileAudience(row.provenance), duration_seconds: row.kind === "audio" || row.kind === "video" ? row.duration : null,
+    audience: fileAudience(row.provenance), adult: adultStateOf(actor, row.id), duration_seconds: row.kind === "audio" || row.kind === "video" ? row.duration : null,
     thumb_url: `/api/files/${row.thumbnail}/thumb?w=320`, expires_at: expiring.get(row.id)?.expiresAt ?? null, version_count: row.versions })),
     next_cursor: more && last ? Buffer.from(JSON.stringify({ v: 1, key: sort === "name" ? last.name : sort === "size" ? last.size : last.created_at, created: last.created_at, id: last.id, scope: scope(q) })).toString("base64url") : null };
 }

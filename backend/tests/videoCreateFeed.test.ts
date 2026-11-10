@@ -62,7 +62,7 @@ describe("scope feed: the person's own clips in the result_feed shape", () => {
     const { adult, row } = await household();
     const { jobId, fileId } = await makeClip(adult.client, row("Marlow"), { prompt: BOAT, orientation: "portrait", look: "anime", recipe: "handheld", seconds: 5 });
     const [first] = await data(adult.client, { scope: "feed" });
-    expect(Object.keys(first!).sort()).toEqual(["camera", "created_at", "error", "favorite", "height", "id", "kind", "look", "orientation", "percent", "phase", "prompt", "queue_position", "references", "seconds", "src", "start_frame", "started_at", "state", "status", "still", "tags", "tier", "width"]);
+    expect(Object.keys(first!).sort()).toEqual(["camera", "can_mark", "can_unmark", "created_at", "error", "favorite", "height", "id", "kind", "look", "orientation", "percent", "phase", "prompt", "queue_position", "references", "seconds", "src", "start_frame", "started_at", "state", "status", "still", "tags", "tier", "width"]);
     expect(first).toMatchObject({ id: jobId, prompt: BOAT, status: "ready", state: "done", percent: 100, phase: null, queue_position: null, error: null, favorite: false, orientation: "portrait", look: "anime", camera: "handheld", tier: "standard", references: [], start_frame: "" });
     expect(first!.src).toBe(`/api/videos/jobs/${jobId}/files/${fileId}`);
     expect(first!.tags.slice(0, 3)).toEqual(["Anime", "Handheld", "Standard"]);
@@ -220,7 +220,7 @@ describe("scope clips: My clips", () => {
     const b = await makeClip(adult.client, actor, { prompt: "Sunrise over a misty green valley, birds crossing the sky" });
     const all = await data(adult.client, { scope: "clips", view: "all" });
     expect(all.map((r) => r.id)).toEqual([b.fileId, a.fileId]);
-    expect(Object.keys(all[0]!).sort()).toEqual(["created_at", "duration_s", "favorite", "id", "kind", "subtitle", "thumbnail", "title"]);
+    expect(Object.keys(all[0]!).sort()).toEqual(["can_mark", "can_unmark", "created_at", "duration_s", "favorite", "id", "kind", "subtitle", "thumbnail", "title"]);
     expect(all[0]).toMatchObject({ favorite: false, kind: "video" });
     expect(all[0]!.subtitle).toMatch(/^Standard, \d+ s$/);
     expect(all[0]!.thumbnail).toContain("/thumb");

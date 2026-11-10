@@ -12,6 +12,7 @@ import { favoriteFileIds } from "@/lib/videos/favorites";
 import { phaseLabel } from "@/lib/videos/phaseLabel";
 import { videoLookFor, videoRecipeFor } from "@/lib/videos/recipes";
 import { videoJobLockItem, videoJobLockState, lockedJobView } from "@/lib/videos/lock";
+import { adultStateOf } from "@/lib/adultMarks";
 import type { PersonRow } from "@/types";
 
 /** The newest rows the feed shows. My clips is the library of everything. */
@@ -57,6 +58,7 @@ export function feedRowOf(person: PersonRow, job: VideoJob, favorites: ReadonlyS
   const edited = job.kind === "edit";
   const tags = [edited ? "Edited" : look?.label, edited ? undefined : camera?.label, edited ? undefined : LEVEL_LABEL[level], `${file?.seconds ?? job.request.seconds ?? 0} s`, file?.audio === true ? "With sound" : undefined].filter((tag): tag is string => !!tag);
   const live = job.state === "running" ? liveCardFields(job.id, (version) => `/api/videos/jobs/${encodeURIComponent(job.id)}/preview?v=${version}`) : null;
+  const adult = file && !job.temporary ? adultStateOf(person, file.id) : null;
   return {
     id: job.id,
     prompt: job.prompt,
@@ -72,6 +74,7 @@ export function feedRowOf(person: PersonRow, job: VideoJob, favorites: ReadonlyS
     still: file ? posterUrl(job, file) : live?.preview_url ?? null,
     src: file ? clipUrl(job, file) : null,
     favorite: file ? favorites.has(file.id) : false,
+    ...(file ? { can_unmark: adult?.can_clear ?? false, can_mark: adult?.can_mark ?? false } : {}),
     created_at: job.createdAt,
     // Remix and the like fill `{look}` into the page's state; an absent value is "" (a null would leave the placeholder text in place).
     look: create.look ?? "",

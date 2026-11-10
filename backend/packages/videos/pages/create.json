@@ -58,7 +58,14 @@
           "submit_label": "Generate",
           "starts": "video",
           "style_suggest": {
-            "rows": { "source": "package", "path": "recipes", "params": { "scope": "style-suggestions", "q": "$state.prompt" } },
+            "rows": {
+              "source": "package",
+              "path": "recipes",
+              "params": {
+                "scope": "style-suggestions",
+                "q": "$state.prompt"
+              }
+            },
             "style_state": "style",
             "character_state": "character",
             "max": 2
@@ -208,48 +215,6 @@
                 "width": "width",
                 "height": "height"
               },
-              "handlers": {
-                "stop": {
-                  "call": {
-                    "target": "/api/plugins/videos/actions/cancel",
-                    "method": "POST",
-                    "args": {
-                      "id": "{id}"
-                    }
-                  }
-                },
-                "retry": {
-                  "starts": "video",
-                  "call": {
-                    "target": "/api/plugins/videos/actions/another",
-                    "method": "POST",
-                    "args": {
-                      "id": "{id}"
-                    }
-                  }
-                },
-                "make_another": {
-                  "starts": "video",
-                  "call": {
-                    "target": "/api/plugins/videos/actions/another",
-                    "method": "POST",
-                    "args": {
-                      "id": "{id}"
-                    }
-                  }
-                },
-                "favorite": {
-                  "call": {
-                    "target": "/api/plugins/videos/actions/favorite",
-                    "method": "POST",
-                    "args": {
-                      "id": "{id}"
-                    }
-                  }
-                }
-              },
-              "actions_variant": "icons",
-              "actions_inline": 4,
               "actions": [
                 {
                   "label": "Remix",
@@ -323,8 +288,86 @@
                       }
                     }
                   }
+                },
+                {
+                  "label": "Unmark as NSFW",
+                  "icon": "key-round",
+                  "show_when": "can_unmark",
+                  "action": {
+                    "call": {
+                      "target": "/api/plugins/videos/actions/adult-mark",
+                      "method": "POST",
+                      "args": {
+                        "id": "{id}",
+                        "action": "clear",
+                        "ticket": "{ticket}"
+                      },
+                      "fresh_confirm": {
+                        "title": "Remove the adult lock?",
+                        "description": "This changes who can see it. It will show with its title and thumbnail in your feeds and lists, to anyone looking at your screen. People under 18 still never see it. Enter your passcode to continue.",
+                        "action_label": "Remove lock"
+                      }
+                    }
+                  }
+                },
+                {
+                  "label": "Mark as NSFW",
+                  "icon": "lock",
+                  "show_when": "can_mark",
+                  "action": {
+                    "call": {
+                      "target": "/api/plugins/videos/actions/adult-mark",
+                      "method": "POST",
+                      "args": {
+                        "id": "{id}",
+                        "action": "mark"
+                      }
+                    }
+                  }
                 }
               ],
+              "handlers": {
+                "stop": {
+                  "call": {
+                    "target": "/api/plugins/videos/actions/cancel",
+                    "method": "POST",
+                    "args": {
+                      "id": "{id}"
+                    }
+                  }
+                },
+                "retry": {
+                  "starts": "video",
+                  "call": {
+                    "target": "/api/plugins/videos/actions/another",
+                    "method": "POST",
+                    "args": {
+                      "id": "{id}"
+                    }
+                  }
+                },
+                "make_another": {
+                  "starts": "video",
+                  "call": {
+                    "target": "/api/plugins/videos/actions/another",
+                    "method": "POST",
+                    "args": {
+                      "id": "{id}"
+                    }
+                  }
+                },
+                "favorite": {
+                  "call": {
+                    "target": "/api/plugins/videos/actions/favorite",
+                    "method": "POST",
+                    "args": {
+                      "id": "{id}"
+                    }
+                  }
+                }
+              },
+              "actions_variant": "icons",
+              "actions_inline": 4,
               "poll_while": {
                 "statuses": [
                   "queued",
