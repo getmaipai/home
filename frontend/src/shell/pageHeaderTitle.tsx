@@ -79,6 +79,7 @@ const MANAGE_PAGE_ENTRIES: Record<string, PageHeaderEntry> = {
   "/reminders": { icon: RemindersIcon, label: "Reminders" },
   "/clock": { icon: getIcon("clock"), label: "Clock" },
   "/house": { icon: getIcon("house"), label: "House" },
+  "/setup/review": { icon: getIcon("settings"), label: "Setup review" },
 };
 
 // Core destinations the app catalog and the sidebar do not list (they sit in the rail's own core group): one row each, the same
@@ -110,6 +111,7 @@ function translatedLabel(label: string): string {
     "Reminders": i18n._({ id: "Reminders", message: "Reminders" }),
     "Clock": i18n._({ id: "Clock", message: "Clock" }),
     "House": i18n._({ id: "House", message: "House" }),
+    "Setup review": i18n._({ id: "Setup review", message: "Setup review" }),
     "Media": i18n._({ id: "Media", message: "Media" }),
     "All apps": i18n._({ id: "All apps", message: "All apps" }),
     "Reference": i18n._({ id: "Reference", message: "Reference" }),

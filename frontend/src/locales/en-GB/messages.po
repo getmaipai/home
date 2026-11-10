@@ -2597,7 +2597,7 @@ msgid "All adults"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pageHeaderTitle.tsx:114
+#: src/shell/pageHeaderTitle.tsx:116
 #: src/shell/pages/AllAppsPage.tsx:103
 #: src/shell/pages/AllAppsPage.tsx:122
 #: src/shell/pages/AllAppsPage.tsx:124
@@ -3554,7 +3554,7 @@ msgstr ""
 
 #. js-lingui-explicit-id
 #: src/apps/settings/BackupsSection.tsx:204
-#: src/shell/pageHeaderTitle.tsx:104
+#: src/shell/pageHeaderTitle.tsx:105
 #: src/shell/Routes.tsx:158
 msgid "Backups"
 msgstr ""
@@ -4257,7 +4257,7 @@ msgstr ""
 #: src/shell/pages/status/StatusBoard.tsx:72
 #: src/shell/pages/status/StatusComponents.tsx:160
 #: src/shell/pages/StoragePage.tsx:205
-#: src/shell/pages/TrashPage.tsx:64
+#: src/shell/pages/TrashPage.tsx:67
 #: src/shell/pages/UpdatesPage.tsx:198
 msgid "Cancel"
 msgstr ""
@@ -4543,7 +4543,7 @@ msgstr ""
 #: src/apps/settings/performanceModel.ts:9
 #: src/shell/AmbientCompanionPane.tsx:321
 #: src/shell/coreLabels.ts:8
-#: src/shell/pageHeaderTitle.tsx:96
+#: src/shell/pageHeaderTitle.tsx:97
 #: src/shell/pages/ChatPage.tsx:1735
 #: src/shell/pages/CompanionsPage.tsx:162
 #: src/shell/pages/CompanionsPage.tsx:167
@@ -5601,7 +5601,7 @@ msgstr ""
 
 #. js-lingui-explicit-id
 #: src/shell/coreLabels.ts:17
-#: src/shell/pageHeaderTitle.tsx:111
+#: src/shell/pageHeaderTitle.tsx:112
 msgid "Clock"
 msgstr ""
 
@@ -5814,7 +5814,7 @@ msgstr ""
 
 #. js-lingui-explicit-id
 #: src/apps/settings/CommandsSection.tsx:105
-#: src/shell/pageHeaderTitle.tsx:106
+#: src/shell/pageHeaderTitle.tsx:107
 #: src/shell/Routes.tsx:159
 msgid "Commands"
 msgstr ""
@@ -7638,13 +7638,13 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/shell/library/LibraryTrash.tsx:25
 #: src/shell/library/LibraryTrash.tsx:44
-#: src/shell/pages/TrashPage.tsx:60
-#: src/shell/pages/TrashPage.tsx:64
+#: src/shell/pages/TrashPage.tsx:63
+#: src/shell/pages/TrashPage.tsx:67
 msgid "Delete forever"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/TrashPage.tsx:64
+#: src/shell/pages/TrashPage.tsx:67
 msgid "Delete forever?"
 msgstr ""
 
@@ -9073,7 +9073,7 @@ msgstr ""
 
 #. js-lingui-explicit-id
 #: src/shell/coreLabels.ts:9
-#: src/shell/pageHeaderTitle.tsx:97
+#: src/shell/pageHeaderTitle.tsx:98
 #: src/shell/pages/FamilyPage.tsx:24
 #: src/shell/pages/FamilyPage.tsx:48
 msgid "Family"
@@ -10221,7 +10221,7 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/apps/clock/WorldClocksTab.tsx:72
 #: src/shell/coreLabels.ts:7
-#: src/shell/pageHeaderTitle.tsx:95
+#: src/shell/pageHeaderTitle.tsx:96
 #: src/shell/pages/ActivityPage.tsx:39
 #: src/shell/pages/DashboardPage.tsx:24
 #: src/shell/pages/settings/settingsBackLink.ts:55
@@ -10484,7 +10484,7 @@ msgid "Home could not delete that take. Try again."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/TrashPage.tsx:47
+#: src/shell/pages/TrashPage.tsx:50
 msgid "Home could not delete this item forever. Refresh Trash and try again."
 msgstr ""
 
@@ -10539,7 +10539,7 @@ msgid "Home could not load the styles. Check the Home connection, then reload th
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/TrashPage.tsx:57
+#: src/shell/pages/TrashPage.tsx:60
 msgid "Home could not load Trash. Try again."
 msgstr ""
 
@@ -10595,7 +10595,7 @@ msgid "Home could not restore that style. Try again."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/TrashPage.tsx:47
+#: src/shell/pages/TrashPage.tsx:50
 msgid "Home could not restore this item. Refresh Trash and try again."
 msgstr ""
 
@@ -10889,7 +10889,7 @@ msgid "Home keeps working normally while this runs. It is the floor, so it stays
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pageHeaderTitle.tsx:159
+#: src/shell/pageHeaderTitle.tsx:161
 msgid "Home layout"
 msgstr ""
 
@@ -11050,7 +11050,7 @@ msgstr ""
 
 #. js-lingui-explicit-id
 #: src/shell/coreLabels.ts:10
-#: src/shell/pageHeaderTitle.tsx:112
+#: src/shell/pageHeaderTitle.tsx:113
 #: src/shell/pages/HousePage.tsx:21
 #: src/shell/pages/HousePage.tsx:45
 msgid "House"
@@ -12455,7 +12455,7 @@ msgid "Kept that take and deleted the others."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/TrashPage.tsx:59
+#: src/shell/pages/TrashPage.tsx:62
 msgid "Kept until {date}"
 msgstr ""
 
@@ -13654,7 +13654,7 @@ msgid "Loading Today"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/TrashPage.tsx:57
+#: src/shell/pages/TrashPage.tsx:60
 msgid "Loading Trash"
 msgstr ""
 
@@ -14612,7 +14612,7 @@ msgstr ""
 
 #. js-lingui-explicit-id
 #: src/apps/settings/DevicesSection.tsx:164
-#: src/shell/pageHeaderTitle.tsx:113
+#: src/shell/pageHeaderTitle.tsx:115
 #: src/shell/pages/MediaHomePage.tsx:24
 #: src/shell/pages/MediaSearchPage.tsx:17
 #: src/shell/Routes.tsx:434
@@ -15796,7 +15796,7 @@ msgid "No files yet."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/TrashPage.tsx:57
+#: src/shell/pages/TrashPage.tsx:60
 msgid "No items match your search."
 msgstr ""
 
@@ -16517,7 +16517,7 @@ msgstr ""
 #: src/apps/notifications/NotificationsPage.tsx:111
 #: src/shell/NotificationBell.tsx:214
 #: src/shell/NotificationBell.tsx:229
-#: src/shell/pageHeaderTitle.tsx:109
+#: src/shell/pageHeaderTitle.tsx:110
 #: src/shell/routeHeader.ts:25
 msgid "Notifications"
 msgstr ""
@@ -17804,7 +17804,7 @@ msgid "setting.ease.text_size.help"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pageHeaderTitle.tsx:101
+#: src/shell/pageHeaderTitle.tsx:102
 #: src/shell/pages/PerformancePage.tsx:54
 #: src/shell/Routes.tsx:154
 msgid "Performance"
@@ -18575,7 +18575,7 @@ msgstr ""
 
 #. js-lingui-explicit-id
 #: src/shell/coreLabels.ts:12
-#: src/shell/pageHeaderTitle.tsx:107
+#: src/shell/pageHeaderTitle.tsx:108
 #: src/shell/pages/PrivacyPage.tsx:45
 msgid "Privacy"
 msgstr ""
@@ -19018,7 +19018,7 @@ msgstr ""
 
 #. js-lingui-explicit-id
 #: src/shell/coreLabels.ts:11
-#: src/shell/pageHeaderTitle.tsx:115
+#: src/shell/pageHeaderTitle.tsx:117
 #: src/shell/pages/ReferencePage.tsx:28
 #: src/shell/pages/ReferencePage.tsx:37
 #: src/shell/pages/ReferencePage.tsx:37
@@ -19057,7 +19057,7 @@ msgid "Refresh"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/TrashPage.tsx:56
+#: src/shell/pages/TrashPage.tsx:59
 msgid "Refresh Trash"
 msgstr ""
 
@@ -19099,7 +19099,7 @@ msgstr ""
 
 #. js-lingui-explicit-id
 #: src/shell/coreLabels.ts:16
-#: src/shell/pageHeaderTitle.tsx:110
+#: src/shell/pageHeaderTitle.tsx:111
 msgid "Reminders"
 msgstr ""
 
@@ -19369,7 +19369,7 @@ msgstr ""
 
 #. js-lingui-explicit-id
 #: src/shell/InstallDock.tsx:308
-#: src/shell/pageHeaderTitle.tsx:103
+#: src/shell/pageHeaderTitle.tsx:104
 #: src/shell/pages/dashboard/Attention.tsx:25
 #: src/shell/pages/RepairsPage.tsx:60
 #: src/shell/Routes.tsx:156
@@ -19592,7 +19592,7 @@ msgstr ""
 #: src/apps/settings/BackupsSection.tsx:272
 #: src/apps/settings/styles/stylesShared.tsx:30
 #: src/shell/library/LibraryTrash.tsx:43
-#: src/shell/pages/TrashPage.tsx:60
+#: src/shell/pages/TrashPage.tsx:63
 msgid "Restore"
 msgstr ""
 
@@ -21251,7 +21251,7 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/shell/AmbientCompanionPane.tsx:329
 #: src/shell/coreLabels.ts:13
-#: src/shell/pageHeaderTitle.tsx:98
+#: src/shell/pageHeaderTitle.tsx:99
 #: src/shell/pages/FilesPage.tsx:288
 #: src/shell/pages/PersonProfilePage.tsx:206
 #: src/shell/pages/settings/SettingsAreaPage.tsx:293
@@ -21298,6 +21298,7 @@ msgstr ""
 
 #. js-lingui-explicit-id
 #: src/apps/setup/SetupReviewPage.tsx:59
+#: src/shell/pageHeaderTitle.tsx:114
 msgid "Setup review"
 msgstr ""
 
@@ -22656,7 +22657,7 @@ msgstr ""
 
 #. js-lingui-explicit-id
 #: src/apps/settings/CodingSettings.tsx:226
-#: src/shell/pageHeaderTitle.tsx:100
+#: src/shell/pageHeaderTitle.tsx:101
 #: src/shell/pages/EnginesPage.tsx:47
 #: src/shell/pages/EnginesPage.tsx:71
 #: src/shell/pages/performance/EnginesHealthBody.tsx:37
@@ -22860,11 +22861,11 @@ msgstr ""
 
 #. js-lingui-explicit-id
 #: src/shell/library/LibraryStorage.tsx:24
-#: src/shell/pageHeaderTitle.tsx:99
+#: src/shell/pageHeaderTitle.tsx:100
 #: src/shell/pages/StoragePage.tsx:116
-#: src/shell/pages/TrashPage.tsx:26
-#: src/shell/pages/TrashPage.tsx:26
-#: src/shell/pages/TrashPage.tsx:55
+#: src/shell/pages/TrashPage.tsx:27
+#: src/shell/pages/TrashPage.tsx:27
+#: src/shell/pages/TrashPage.tsx:58
 #: src/shell/Routes.tsx:153
 msgid "Storage"
 msgstr ""
@@ -25147,7 +25148,7 @@ msgid "This removes it for the whole home."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/TrashPage.tsx:64
+#: src/shell/pages/TrashPage.tsx:67
 msgid "This removes the item from Home for good. You cannot undo this."
 msgstr ""
 
@@ -25531,8 +25532,8 @@ msgstr ""
 
 #. js-lingui-explicit-id
 #: src/shell/pages/StoragePage.tsx:164
-#: src/shell/pages/TrashPage.tsx:26
-#: src/shell/pages/TrashPage.tsx:30
+#: src/shell/pages/TrashPage.tsx:27
+#: src/shell/pages/TrashPage.tsx:33
 msgid "Trash"
 msgstr ""
 
@@ -25547,7 +25548,7 @@ msgid "Trash is empty. Files you delete wait here for 30 days, then they are gon
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/TrashPage.tsx:57
+#: src/shell/pages/TrashPage.tsx:60
 msgid "Trash is empty. Things you delete stay here for 30 days."
 msgstr ""
 
@@ -26218,7 +26219,7 @@ msgid "Updated {when}"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pageHeaderTitle.tsx:102
+#: src/shell/pageHeaderTitle.tsx:103
 #: src/shell/pages/dashboard/Attention.tsx:26
 #: src/shell/pages/UpdatesPage.tsx:78
 #: src/shell/Routes.tsx:155
@@ -26484,7 +26485,7 @@ msgstr ""
 
 #. js-lingui-explicit-id
 #: src/apps/settings/UsersSection.tsx:232
-#: src/shell/pageHeaderTitle.tsx:108
+#: src/shell/pageHeaderTitle.tsx:109
 #: src/shell/pages/UsersPage.tsx:11
 #: src/shell/Routes.tsx:160
 msgid "Users"
@@ -26882,7 +26883,7 @@ msgid "Voiceover"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pageHeaderTitle.tsx:105
+#: src/shell/pageHeaderTitle.tsx:106
 #: src/shell/pages/settings/settingsViews.tsx:96
 #: src/shell/pages/VoicesPage.tsx:14
 #: src/shell/pages/VoicesPage.tsx:18
@@ -26959,7 +26960,7 @@ msgid "Waiting for internet"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/TrashPage.tsx:59
+#: src/shell/pages/TrashPage.tsx:62
 msgid "Waiting for removal"
 msgstr ""
 

@@ -99,7 +99,7 @@
           },
           "empty_state": {
             "type": "empty_state",
-            "icon": "film",
+            "icon": "music",
             "text": "This song is not available. Go back to Music and pick another.",
             "action": {
               "navigate": {

@@ -56,7 +56,7 @@ export function SetupReviewPage() {
 
   return <div>
     <section className="flex flex-col gap-4">
-      <h1 className="text-section font-semibold">{i18n._({ id: "Setup review", message: "Setup review" })}</h1>
+      <h1 className="sr-only">{i18n._({ id: "Setup review", message: "Setup review" })}</h1>
       <div className="flex flex-col gap-4">
         <p>{i18n._({ id: "Review your computers, files, checks, and plan.", message: "Review your computers, files, checks, and plan." })}</p>
         {renderSetupReviewScreen({ screen, engine, onEngineChange: setEngine, readOnly: screen === "storage", checkRows: rows, checkError, onRetryChecks: () => void refreshChecks() })}

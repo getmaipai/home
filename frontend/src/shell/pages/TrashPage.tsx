@@ -4,6 +4,7 @@ import { useHeaderExtra } from "@maipai/ui/src/dashboard/layouts/full/vertical/h
 import { PageHeaderTitle } from "@/shell/pageHeaderTitle";
 import { Link, useNavigate } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useBreakpoint } from "@maipai/ui/src/hooks/useBreakpoint";
 import { SettingsShell } from "@maipai/ui/src/settings/SettingsShell";
 import type { SettingsAreaDef } from "@maipai/ui/src/settings/settingsAudience";
 import { Item, ItemActions, ItemContent, ItemDescription, ItemGroup, ItemTitle } from "@maipai/ui/src/dashboard/components/ui/item";
@@ -27,6 +28,8 @@ const trashArea = (): SettingsAreaDef => ({
 });
 export function TrashPage({ person }: { person: Roster }) {
   useHeaderExtra(PageHeaderTitle);
+  // The docked panel is fixed beside the desktop rail; on a phone it would cover the header and leave a strip where the rail is not.
+  const isPhone = useBreakpoint().width < 640;
   useTabItem(i18n._({ id: "Trash", message: "Trash" }));
   const navigate = useNavigate();
   const client = useQueryClient();
@@ -49,7 +52,7 @@ export function TrashPage({ person }: { person: Roster }) {
   }
   const rows = query.data?.rows.filter((row) => row.title.toLocaleLowerCase().includes(search.toLocaleLowerCase())) ?? [];
   return <>
-    <SettingsShell area={trashArea()} viewer={baseViewer(person)} activeSection="trash" layout="docked" contentAs="section"
+    <SettingsShell area={trashArea()} viewer={baseViewer(person)} activeSection="trash" layout={isPhone ? "default" : "docked"} contentAs="section"
       sectionHref={() => "/storage/trash"} onNavigate={() => navigate("/storage/trash")}
       searchQuery={search} onSearchChange={setSearch} onBack={() => navigate("/storage")}
       backLink={<Button variant="link" nativeButton={false} render={<Link to="/storage" />}>{i18n._({ id: "Storage", message: "Storage" })}</Button>}>
