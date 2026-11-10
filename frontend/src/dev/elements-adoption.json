@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-11-10T04:03:39.221Z",
-  "kitTag": "ui-v0.5.567",
+  "generatedAt": "2026-11-10T05:56:42.851Z",
+  "kitTag": "ui-v0.5.569",
   "items": [
     {
       "file": "ActivityCardsShowcase.tsx",
@@ -374,6 +374,14 @@
       "group": "climate-tile",
       "verdict": "later",
       "verdictReason": "Smart-home tile; no Home surface uses it until the Home Control package is built.",
+      "implemented": false
+    },
+    {
+      "file": "clip-feed.tsx",
+      "name": "clip-feed",
+      "group": "clip",
+      "verdict": "wire-now",
+      "verdictReason": "The Videos Clips view draws the household's own short clips through this kit node (clip_feed, built from the vertical carousel and VideoPlayer); Home passes data and the making notice only.",
       "implemented": false
     },
     {
