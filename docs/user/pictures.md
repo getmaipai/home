@@ -65,7 +65,7 @@ Open **Settings**, **Pictures, videos and music**.
 ### Add a style
 
 1. Open **Settings**, **Pictures, videos and music**, **Styles**.
-2. Press **Browse styles** to search Hugging Face, or **Add from a file** to use a file from this computer. Civitai is off until you turn it on under **Where styles come from**, and it asks you to read a short notice first.
+2. Press **Browse styles** to search Hugging Face, or **Add from a file** to use a file from this computer. Civitai is on by default under **Where styles come from**. This computer contacts civitai.com only when an admin searches or installs; an admin can switch it off there.
 3. Open a style to read what it is, its licence and its size. Say if it is for adults only. If a source marks it adult, it stays locked until you unlock the tab.
 4. Press **Add**. The progress shows on the strip at the top of the page.
 5. Choose who can use it: **Only admins**, **All adults** or **Chosen people**. Children and teens never see styles.

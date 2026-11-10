@@ -1,6 +1,6 @@
 // VIDEO-LORA-08 (settings-media 4.4 and 5): the Styles tab of Settings, Pictures, videos and music. The household's styles with who can use each (one click), the
 // plain Adult label after the unlock, ONE kit lock row for every adult-only or unknown style (no name, count or size until the person's own passcode), the Browse styles
-// and Add from a file buttons, a download's progress (the kit JobProgress, never a name), where styles come from (Hugging Face, Civitai off by default, the two
+// and Add from a file buttons, a download's progress (the kit JobProgress, never a name), where styles come from (Hugging Face, Civitai on by default, the two
 // credentials write-only) and Recently removed. The server redacts; this view only draws what it is sent. Words come from the spec card's copy (rule S5).
 import { i18n } from "@lingui/core";
 import { useEffect, useRef, useState, type ReactNode } from "react";
@@ -192,7 +192,7 @@ function SourcesSection({ copy, state, onChanged }: { copy: ReturnType<typeof st
           emptyLine={i18n._({ id: "Optional. Paste a read token. Home keeps it private and never shows it again.", message: "Optional. Paste a read token. Home keeps it private and never shows it again." })} savedLine={i18n._({ id: "A token is saved. Home keeps it private and never shows it again.", message: "A token is saved. Home keeps it private and never shows it again." })}
           onSave={(v) => after(stylesApi.saveHuggingFaceToken(v))} onRemove={() => after(stylesApi.removeHuggingFaceToken())} />
         <Item>
-          <ItemContent><ItemTitle>{i18n._({ id: "Civitai", message: "Civitai" })}</ItemTitle><ItemDescription clamp={false}>{civitai ? i18n._({ id: "On. This computer contacts civitai.com when you search or install.", message: "On. This computer contacts civitai.com when you search or install." }) : copy.civitai_off_note}</ItemDescription>{error ? <StatusCard kind="problem" title={i18n._({ id: "That did not work", message: "That did not work" })} line={error} /> : null}</ItemContent>
+          <ItemContent><ItemTitle>{i18n._({ id: "Civitai", message: "Civitai" })}</ItemTitle><ItemDescription clamp={false}>{civitai ? i18n._({ id: "On by default. This computer contacts civitai.com only when an admin searches or installs a style.", message: "On by default. This computer contacts civitai.com only when an admin searches or installs a style." }) : copy.civitai_off_note}</ItemDescription>{error ? <StatusCard kind="problem" title={i18n._({ id: "That did not work", message: "That did not work" })} line={error} /> : null}</ItemContent>
           <ItemActions><Switch checked={civitai} aria-label={i18n._({ id: "Civitai", message: "Civitai" })} disabled={state === null} onCheckedChange={(on) => { if (on) setNotice(true); else void turn(false); }} /></ItemActions>
         </Item>
         {civitai ? (

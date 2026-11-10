@@ -2586,7 +2586,8 @@ msgid "area.Alerts"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/styles/StyleBrowser.tsx:102
+#: src/apps/settings/styles/StyleBrowser.tsx:103
+#: src/apps/settings/styles/StyleBrowser.tsx:103
 #: src/shell/pages/AllAppsPage.tsx:26
 #: src/shell/pages/AllAppsPage.tsx:41
 #: src/shell/pages/AllAppsPage.tsx:43
@@ -2790,7 +2791,7 @@ msgid "setting.videos.library_sort.option.az"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/styles/StyleBrowser.tsx:147
+#: src/apps/settings/styles/StyleBrowser.tsx:149
 msgid "Already added as {name}. Press to open it."
 msgstr ""
 
@@ -2806,7 +2807,7 @@ msgid "Also add"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/styles/StyleBrowser.tsx:148
+#: src/apps/settings/styles/StyleBrowser.tsx:150
 msgid "Also on {join}"
 msgstr ""
 
@@ -2908,7 +2909,7 @@ msgid "An owner or admin can download it in Settings, Offline data (pick Minimum
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/styles/stylesApi.ts:77
+#: src/apps/settings/styles/stylesApi.ts:78
 msgid "an unknown base"
 msgstr ""
 
@@ -3018,8 +3019,8 @@ msgid "ANTHROPIC_BASE_URL={codingHome}/code/v1 ANTHROPIC_API_KEY=maipai_key_...{
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/styles/StyleBrowser.tsx:101
-#: src/apps/settings/styles/StyleBrowser.tsx:103
+#: src/apps/settings/styles/StyleBrowser.tsx:102
+#: src/apps/settings/styles/StyleBrowser.tsx:104
 msgid "Any"
 msgstr ""
 
@@ -4109,7 +4110,7 @@ msgid "setting.person.robot.topics.option_label.both"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/styles/StyleBrowser.tsx:104
+#: src/apps/settings/styles/StyleBrowser.tsx:105
 msgid "Both"
 msgstr ""
 
@@ -4155,7 +4156,7 @@ msgid "Bring a song to change its style, remove vocals, split stems, or sing it 
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/styles/StyleBrowser.tsx:114
+#: src/apps/settings/styles/StyleBrowser.tsx:115
 #: src/apps/settings/styles/stylesShared.tsx:13
 msgid "Browse styles"
 msgstr ""
@@ -4586,7 +4587,7 @@ msgid "Changing the voice…"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/styles/StyleBrowser.tsx:101
+#: src/apps/settings/styles/StyleBrowser.tsx:102
 #: src/apps/settings/styles/StyleConfirm.tsx:109
 #: src/apps/settings/styles/StyleEditor.tsx:93
 #: src/apps/settings/styles/stylesShared.tsx:45
@@ -5583,7 +5584,7 @@ msgid "City"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/styles/StyleBrowser.tsx:104
+#: src/apps/settings/styles/StyleBrowser.tsx:105
 #: src/apps/settings/styles/StyleConfirm.tsx:89
 #: src/apps/settings/styles/StylesTab.tsx:195
 #: src/apps/settings/styles/StylesTab.tsx:196
@@ -5591,7 +5592,7 @@ msgid "Civitai"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/styles/StyleBrowser.tsx:104
+#: src/apps/settings/styles/StyleBrowser.tsx:105
 msgid "Civitai (off)"
 msgstr ""
 
@@ -10739,7 +10740,7 @@ msgid "failure.advice.engine_computer.cause"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/styles/StyleBrowser.tsx:91
+#: src/apps/settings/styles/StyleBrowser.tsx:92
 msgid "Home could not read that link. Check it, then paste it again."
 msgstr ""
 
@@ -11139,7 +11140,7 @@ msgid "Home saves your pick, but for now downloads the AI models to its default 
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/styles/StyleBrowser.tsx:115
+#: src/apps/settings/styles/StyleBrowser.tsx:116
 msgid "Home searches for you. Nothing is downloaded until you press Install style."
 msgstr ""
 
@@ -12082,8 +12083,8 @@ msgstr ""
 #: src/apps/settings/CodingSettings.tsx:164
 #: src/apps/settings/ModelsAndStorageSection.tsx:43
 #: src/apps/settings/ReferenceLibrarySettings.tsx:261
-#: src/apps/settings/styles/StyleBrowser.tsx:103
-#: src/apps/settings/styles/StyleBrowser.tsx:103
+#: src/apps/settings/styles/StyleBrowser.tsx:104
+#: src/apps/settings/styles/StyleBrowser.tsx:104
 #: src/apps/setup/PlanStep.tsx:185
 #: src/apps/setup/SetupWizard.tsx:480
 #: src/shell/pages/EnginesPage.tsx:32
@@ -13959,7 +13960,7 @@ msgid "Locked by rule"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/styles/StyleBrowser.tsx:139
+#: src/apps/settings/styles/StyleBrowser.tsx:141
 msgid "Locked items"
 msgstr ""
 
@@ -14137,11 +14138,6 @@ msgid "LTX-2.5"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/styles/StyleBrowser.tsx:102
-msgid "LTX-2.5 and Wan"
-msgstr ""
-
-#. js-lingui-explicit-id
 #: src/apps/chat/MusicCardView.tsx:85
 #: src/shell/media/NowPlayingStage.tsx:149
 #: src/shell/media/NowPlayingStage.tsx:200
@@ -14167,7 +14163,7 @@ msgid "Made by {name}"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/styles/StyleBrowser.tsx:102
+#: src/apps/settings/styles/StyleBrowser.tsx:103
 #: src/apps/settings/styles/StyleConfirm.tsx:93
 #: src/apps/settings/styles/StyleEditor.tsx:157
 msgid "Made for"
@@ -15174,7 +15170,7 @@ msgid "More synths from the catalog are coming soon."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/styles/StyleBrowser.tsx:105
+#: src/apps/settings/styles/StyleBrowser.tsx:106
 msgid "Most downloaded"
 msgstr ""
 
@@ -15733,7 +15729,7 @@ msgid "New version progress"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/styles/StyleBrowser.tsx:105
+#: src/apps/settings/styles/StyleBrowser.tsx:106
 msgid "Newest"
 msgstr ""
 
@@ -15815,7 +15811,7 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/apps/settings/EngineLinkCredentialSection.tsx:286
 #: src/apps/settings/EngineLinkCredentialSection.tsx:287
-#: src/apps/settings/styles/StyleBrowser.tsx:159
+#: src/apps/settings/styles/StyleBrowser.tsx:161
 #: src/shell/components/DataTableControls.tsx:34
 #: src/shell/pages/RepairsPage.tsx:148
 #: src/shell/pages/useDataTableControls.tsx:125
@@ -16219,7 +16215,7 @@ msgid "No Stack configured"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/styles/StyleBrowser.tsx:135
+#: src/apps/settings/styles/StyleBrowser.tsx:137
 msgid "No styles match. Try fewer words."
 msgstr ""
 
@@ -16459,7 +16455,7 @@ msgstr ""
 #: src/apps/settings/CodingSettings.tsx:164
 #: src/apps/settings/ModelsAndStorageSection.tsx:47
 #: src/apps/settings/ReferenceLibrarySettings.tsx:261
-#: src/apps/settings/styles/StyleBrowser.tsx:103
+#: src/apps/settings/styles/StyleBrowser.tsx:104
 #: src/apps/setup/SetupWizard.tsx:480
 #: src/shell/pages/EnginesPage.tsx:31
 msgid "Not installed"
@@ -16989,11 +16985,6 @@ msgid "setting.generation.styles.civitai.help"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/styles/stylesShared.tsx:20
-msgid "Off until you turn it on. This computer only contacts civitai.com when you search or install."
-msgstr ""
-
-#. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:369
 msgid "setting.engines.stack.remote.allow_tailnet.help"
 msgstr ""
@@ -17083,7 +17074,7 @@ msgid "Old colour film"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/styles/StyleBrowser.tsx:120
+#: src/apps/settings/styles/StyleBrowser.tsx:121
 msgid "old film, clay, anime"
 msgstr ""
 
@@ -17200,6 +17191,12 @@ msgid "setting.person.vision.gestures.help"
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/apps/settings/styles/stylesShared.tsx:20
+#: src/apps/settings/styles/StylesTab.tsx:195
+msgid "On by default. This computer contacts civitai.com only when an admin searches or installs a style."
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:1030
 msgid "setting.robot.sleep.auto.help"
 msgstr ""
@@ -17224,11 +17221,6 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/apps/settings/styles/stylesShared.tsx:19
 msgid "On. Search and download styles from Hugging Face. A token is only needed for styles that ask you to accept terms. Home sends it only for those files."
-msgstr ""
-
-#. js-lingui-explicit-id
-#: src/apps/settings/styles/StylesTab.tsx:195
-msgid "On. This computer contacts civitai.com when you search or install."
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -17809,7 +17801,7 @@ msgid "setting.search.page_text_cleaning.label"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/styles/StyleBrowser.tsx:156
+#: src/apps/settings/styles/StyleBrowser.tsx:158
 msgid "Pages of results"
 msgstr ""
 
@@ -18381,6 +18373,7 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/apps/settings/ModelsAndStorageSection.tsx:22
 #: src/apps/settings/performanceModel.ts:9
+#: src/apps/settings/styles/StyleBrowser.tsx:123
 #: src/shell/pages/ActivityPage.tsx:41
 #: src/shell/pages/settings/MediaCardViews.tsx:56
 msgid "Pictures"
@@ -18389,6 +18382,11 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:1616
 msgid "area.Pictures"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/settings/styles/StyleBrowser.tsx:123
+msgid "Pictures / Videos"
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -18801,7 +18799,7 @@ msgid "Preview. Nothing is downloaded, installed or saved."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/styles/StyleBrowser.tsx:157
+#: src/apps/settings/styles/StyleBrowser.tsx:159
 #: src/shell/components/DataTableControls.tsx:33
 #: src/shell/pages/RepairsPage.tsx:148
 #: src/shell/pages/useDataTableControls.tsx:118
@@ -19934,7 +19932,7 @@ msgid "Resume coding?"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/styles/stylesApi.ts:77
+#: src/apps/settings/styles/stylesApi.ts:78
 msgid "Retired video model, no longer available"
 msgstr ""
 
@@ -21013,7 +21011,7 @@ msgid "setting.search.source_mode.label"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/styles/StyleBrowser.tsx:119
+#: src/apps/settings/styles/StyleBrowser.tsx:120
 msgid "Search styles, or paste a Hugging Face link"
 msgstr ""
 
@@ -21064,7 +21062,7 @@ msgid "Searches may be limited right now."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/styles/StyleBrowser.tsx:134
+#: src/apps/settings/styles/StyleBrowser.tsx:136
 msgid "Searching for styles"
 msgstr ""
 
@@ -21695,8 +21693,8 @@ msgid "Show {title} on Home"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/styles/StyleBrowser.tsx:125
-#: src/apps/settings/styles/StyleBrowser.tsx:126
+#: src/apps/settings/styles/StyleBrowser.tsx:127
+#: src/apps/settings/styles/StyleBrowser.tsx:128
 msgid "Show adult results"
 msgstr ""
 
@@ -22452,7 +22450,7 @@ msgid "setting.storage.library.songs.threshold_percent.label"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/styles/StyleBrowser.tsx:105
+#: src/apps/settings/styles/StyleBrowser.tsx:106
 msgid "Sort"
 msgstr ""
 
@@ -22484,7 +22482,7 @@ msgid "Sounds you have saved."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/styles/StyleBrowser.tsx:104
+#: src/apps/settings/styles/StyleBrowser.tsx:105
 #: src/apps/settings/styles/StyleEditor.tsx:155
 #: src/apps/settings/VoiceManagerSection.tsx:106
 #: src/shell/pages/StoragePage.tsx:50
@@ -23243,7 +23241,7 @@ msgstr ""
 
 #. js-lingui-explicit-id
 #: src/apps/chat/MusicCardView.tsx:85
-#: src/apps/settings/styles/StyleBrowser.tsx:101
+#: src/apps/settings/styles/StyleBrowser.tsx:102
 #: src/apps/settings/styles/StyleConfirm.tsx:109
 #: src/apps/settings/styles/StyleEditor.tsx:93
 #: src/apps/settings/styles/stylesShared.tsx:45
@@ -23285,7 +23283,7 @@ msgid "Styles could not be loaded. Open this page again."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/styles/StyleBrowser.tsx:137
+#: src/apps/settings/styles/StyleBrowser.tsx:139
 msgid "Styles from the source"
 msgstr ""
 
@@ -23810,8 +23808,8 @@ msgstr ""
 #: src/apps/settings/SiteBlocksSection.tsx:53
 #: src/apps/settings/StackChanInstallDialog.tsx:128
 #: src/apps/settings/styles/StyleAddFile.tsx:66
-#: src/apps/settings/styles/StyleBrowser.tsx:130
 #: src/apps/settings/styles/StyleBrowser.tsx:132
+#: src/apps/settings/styles/StyleBrowser.tsx:134
 #: src/apps/settings/styles/StyleConfirm.tsx:139
 #: src/apps/settings/styles/StyleEditor.tsx:78
 #: src/apps/settings/styles/StylesTab.tsx:84
@@ -25770,7 +25768,7 @@ msgid "Top kind"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/styles/StyleBrowser.tsx:105
+#: src/apps/settings/styles/StyleBrowser.tsx:106
 msgid "Top rated"
 msgstr ""
 
@@ -25945,7 +25943,7 @@ msgstr ""
 #: src/apps/settings/CommandsSection.tsx:113
 #: src/apps/settings/ModelsAndStorageSection.tsx:91
 #: src/apps/settings/StackChanInstallDialog.tsx:152
-#: src/apps/settings/styles/StyleBrowser.tsx:132
+#: src/apps/settings/styles/StyleBrowser.tsx:134
 #: src/apps/settings/VoiceBrowserSection.tsx:95
 #: src/apps/settings/VoiceManagerSection.tsx:103
 #: src/apps/setup/HostTuneStep.tsx:68
@@ -26261,7 +26259,7 @@ msgid "Two-step sign-in is on."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/styles/StyleBrowser.tsx:101
+#: src/apps/settings/styles/StyleBrowser.tsx:102
 msgid "Type"
 msgstr ""
 
@@ -27018,6 +27016,7 @@ msgid "videos"
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/apps/settings/styles/StyleBrowser.tsx:123
 #: src/shell/pages/ActivityPage.tsx:42
 #: src/shell/pages/settings/MediaCardViews.tsx:63
 msgid "Videos"
@@ -28260,7 +28259,7 @@ msgid "You already have this as {name}."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/styles/StyleBrowser.tsx:147
+#: src/apps/settings/styles/StyleBrowser.tsx:149
 msgid "You already have this style. Press to open it."
 msgstr ""
 

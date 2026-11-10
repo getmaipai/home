@@ -7,10 +7,11 @@
 // was `pending` (added, not yet confirmed) keeps its pending state as an unacknowledged licence until an admin opens it.
 import { eq } from "drizzle-orm";
 import { db } from "@/db";
-import { people, pictureAdapterPrefs, videoAdapterPrefs } from "@/db/schema";
+import { attachments, people, pictureAdapterPrefs, videoAdapterPrefs } from "@/db/schema";
 import { ALL_BASE_IDS, type BaseId } from "@/lib/loras/baseFamilies";
 import { deleteLoraRecord, getLoraRecord, listLoraRecords, saveLora, type Lora } from "@/lib/loras/store";
 import { clipsUsingStyle } from "@/lib/loras/usage";
+import { purgeFileRecord, removeFileBlobs } from "@/lib/attachments";
 import { patchLora, type StackLora } from "@/lib/pictures/stack";
 import { StackVideoError, listVideoLoras, removeVideoLora, updateVideoLora, type StackVideoLora } from "@/lib/videos/stack";
 
@@ -147,7 +148,14 @@ async function run(): Promise<void> {
       if (clipsUsingStyle(r.id, ["queued", "running"]).length > 0) continue;
       // The record goes only when the file is gone (or was already): a Stack that could not delete it keeps the record, and the purge tries again.
       const gone = await removeVideoLora(r.id).then(() => true, (error: unknown) => error instanceof StackVideoError && error.status === 404);
-      if (gone) deleteLoraRecord(r.id);
+      if (gone) {
+        const previewId = live.preview?.file_id;
+        if (previewId) {
+          const preview = db.select().from(attachments).where(eq(attachments.id, previewId)).get();
+          if (preview) { const blob = purgeFileRecord(preview); if (blob) removeFileBlobs([blob]); }
+        }
+        deleteLoraRecord(r.id);
+      }
     }
   }
 }
@@ -182,8 +190,13 @@ export async function adoptPictureLoras(stack: readonly StackLora[], addedBy: st
           saveLora(made, "migration");
           db.delete(pictureAdapterPrefs).where(eq(pictureAdapterPrefs.adapterId, s.id)).run();
         } catch (error) { console.warn(`[loras] picture style ${s.id} could not be adopted and stays unlisted: ${(error as Error).message}`); }
-      } else if (have.media === "picture" && have.audience === "adult-only" && s.classification === "all-ages") {
-        await patchLora(s.id, { classification: "adult-only" }).catch(() => undefined);
+      } else {
+        // Stack facts may raise classification, but Home's preview reference and other record fields remain Home-owned.
+        if (have.media === "picture" && have.audience === "adult-only" && s.classification === "all-ages") await patchLora(s.id, { classification: "adult-only" }).catch(() => undefined);
+        if (have.media === "picture" && !have.preview) {
+          const made = recordFromStack(s as unknown as StackVideoLora, null, have.added_by, have.added_at, "picture");
+          if (made) { try { saveLora({ ...have, file: made.file, preview: have.preview }, "migration"); } catch { /* keep the Home record */ } }
+        }
       }
     }
   })();

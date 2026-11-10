@@ -6,7 +6,7 @@
 // opaque to the job list. A failure raises one Repairs item with Try again (plain cause, no name). On completion the `Lora` record is written (admin-only availability).
 import { and, eq, inArray } from "drizzle-orm";
 import { db } from "@/db";
-import { jobs } from "@/db/schema";
+import { jobs, people } from "@/db/schema";
 import { consumeTicket, unlockedFor, type AdultProof } from "@/lib/adultLock";
 import { decryptSecret, encryptSecret } from "@/lib/secrets";
 import { raiseIssue, registerFixHandler, resolveIssue } from "@/lib/issues";
@@ -14,10 +14,12 @@ import { createJob, updateJob } from "@/lib/jobs";
 import { readLora } from "@/lib/loras/access";
 import { cleanTriggerWords, type AdultCheck } from "@/lib/loras/adultCheck";
 import { installableBaseIds, isSupportedBase, mediaOfBase, supportedFamilyWords, type AnyBaseId, type Media } from "@/lib/loras/baseFamilies";
-import { fetchHit, hitKey, installedAs, MAX_INSTALL_BYTES, SourceError, civitaiEnabled, tokenFor, parseHfLink, type Hit, type LoraSite } from "@/lib/loras/source";
+import { fetchHit, hitKey, installedAs, MAX_INSTALL_BYTES, SourceError, civitaiEnabled, tokenFor, parseHfLink, previewOf, type Hit, type LoraSite } from "@/lib/loras/source";
 import { getLoraRecord, listLoraRecords, saveLora, type Lora } from "@/lib/loras/store";
 import { adoptPictureLoras, recordFromStack, syncLoras } from "@/lib/loras/sync";
 import { getStackInstallJob, installStackLora, StackInstallRefused, StackVideoError, type StackLoraInstallBody, type StackVideoLora } from "@/lib/videos/stack";
+import { storeFile } from "@/lib/attachments";
+import { markFields } from "@/lib/adultLock";
 import type { StackLora } from "@/lib/pictures/stack";
 import type { PersonRow } from "@/types";
 
@@ -54,6 +56,7 @@ interface Ctx {
   site: LoraSite; remote_id: string; version_id: string | null; page_url: string; name: string; kind: "style" | "character"; audience: "all-ages" | "adult-only"; media?: Media;
   adult_check: AdultCheck; licence_id: string | null; commercial_use: "yes" | "no" | "unknown"; trigger_words: string[]; added_by: string;
   file_url: string; sha256: string | null; base_model: AnyBaseId; licence_text: string;
+  preview_key?: string;
 }
 const sealCtx = (ctx: Ctx): string => encryptSecret(JSON.stringify(ctx));
 function openCtx(provenance: string): { ctx: Ctx; stackJobId: string } | null {
@@ -125,7 +128,7 @@ export async function startLoraInstall(actor: InstallActor, body: InstallBody): 
   }
   const ctx: Ctx = {
     site: hit.site, remote_id: hit.remote_id, version_id: hit.version_id, page_url: hit.page_url, name: (body.name?.trim() || hit.title).slice(0, 80), kind: body.kind ?? hit.kind ?? "style",
-    audience: body.audience, adult_check: hit.adult_check, licence_id: hit.licence_id?.slice(0, 80) ?? null, commercial_use: hit.commercial_use, trigger_words: cleanTriggerWords(hit.trigger_words),
+    audience: body.audience, adult_check: hit.adult_check, licence_id: hit.licence_id?.slice(0, 80) ?? null, commercial_use: hit.commercial_use, trigger_words: cleanTriggerWords(hit.trigger_words), preview_key: hitKey(hit),
     added_by: actor.admin.id, file_url: hit.file_url, sha256: hit.sha256, base_model: base, licence_text: hit.licence_id ?? "Not stated by the source", media,
   };
   return submit(ctx);
@@ -173,13 +176,28 @@ export async function finishInstall(ctx: Ctx, stackLora: StackVideoLora): Promis
   const have = getLoraRecord(stackLora.id) ?? recordFromStack(stackLora, null, ctx.added_by, now, media);
   if (!have) throw new Error("The style downloaded but could not be added to the library.");
   const adult = ctx.audience === "adult-only" || stackLora.classification !== "all-ages";
+  let preview = have.preview;
+  if (!preview && ctx.preview_key) {
+    try {
+      const refreshed = await fetchHit(ctx.site, ctx.remote_id, ctx.version_id);
+      const picture = await previewOf(hitKey(refreshed));
+      if (picture) {
+        const owner = db.select().from(people).where(eq(people.id, ctx.added_by)).get();
+        if (owner) {
+          const marked = markFields({ madeAudience: adult ? "adult-only" : "all-ages", lock: adult ? "on" : "off" });
+          const saved = storeFile(owner, { conversationId: null, turnId: null, mediaType: picture.type, bytes: picture.bytes, provenance: `picture-gen:${JSON.stringify({ v: 1, ...marked, job: `lora-preview:${stackLora.id}`, index: 0 })}`, retention: "kept", name: null, deduplicate: false });
+          if (saved.ok) preview = { file_id: saved.value.id };
+        }
+      }
+    } catch { /* A preview is optional and never holds up a successful style install. */ }
+  }
   const next: Lora = {
     ...have, media, ...(media === "picture" ? { base_model: "unknown" as const, compatible_with: [] } : {}),
     name: ctx.name, kind: ctx.kind, source: { site: ctx.site, url: ctx.page_url.slice(0, 2048), remote_id: ctx.remote_id, version_id: ctx.version_id, token_ref: null },
     trigger_words: ctx.trigger_words.length ? ctx.trigger_words : have.trigger_words, adult_check: ctx.adult_check,
     audience: adult ? "adult-only" : "all-ages", audience_set_by: adult ? null : ctx.added_by, audience_set_at: adult ? null : now,
     availability: { who: "admins", people: [] }, added_by: ctx.added_by, licence: { ...have.licence, id: ctx.licence_id, commercial_use: ctx.commercial_use, acknowledged_by: ctx.added_by, acknowledged_at: now },
-    provenance: { origin: "install", job_id: null },
+    preview, provenance: { origin: "install", job_id: null },
   };
   return saveLora(next, ctx.added_by);
 }

@@ -43,7 +43,7 @@ afterEach(() => { __resetSourceForTests(); setInstalledBasesProvider(null); setH
 const baseModels = (): string[] => new URL(urls[urls.length - 1]!).searchParams.getAll("baseModels");
 
 describe("LTXV2 and the base check", () => {
-  test("the default search asks only for supported LTXV 2.5 and LTXV2", async () => {
+  test("the default supported-base search asks only for supported LTXV 2.5 and LTXV2", async () => {
     await browseHits(params());
     expect(baseModels()).toEqual(["LTXV 2.5", "LTXV2"]);
   });
@@ -57,8 +57,8 @@ describe("LTXV2 and the base check", () => {
     const { hits } = await browseHits(params({ base: "all" }));
     const by = (title: string) => hits.find((h) => h.title === title)!;
     expect(by("Clay")).toMatchObject({ base_model: "ltx-2.5", base_unstated: false });
-    expect(by("Mystery Look")).toBeUndefined();
-    expect(by("Both Versions")).toBeUndefined();
+    expect(by("Mystery Look")).toMatchObject({ base_model: "unknown", base_unstated: true });
+    expect(by("Both Versions")).toMatchObject({ base_model: "unknown", base_unstated: true });
     expect(by("Paper Boat")).toMatchObject({ base_model: "ltx-2.5", base_unstated: false });
     expect(ltxBaseFromText("(LTX-2.3 Lora) - Pose Helper (I2V)")).toBe("ltx-2.3");
     expect(by("(LTX-2.3 Lora) - Pose Helper (I2V)")).toMatchObject({ base_model: "ltx-2.3", base_unstated: false });
@@ -82,6 +82,23 @@ describe("LTXV2 and the base check", () => {
     expect(BASE_UNSTATED_LINE).toBe("This style does not say which LTX 2 version it is for. Ask its maker, or pick the version yourself.");
     const noWan = await startLoraInstall(actor, { ...body, base_model: "wan2.2-ti2v-5b" });
     expect(noWan).toMatchObject({ ok: false, code: "base_unstated" });
+  });
+});
+
+describe("filtered browse pages", () => {
+  test("keeps paging past an unsupported first page until it finds supported hits", async () => {
+    const page1 = Array.from({ length: 20 }, (_, index) => model(100 + index, `Unsupported ${index}`, "Other model"));
+    const page2 = [model(200, "Supported LTX style", "LTXV 2.5")];
+    __resetSourceForTests(); urls = [];
+    __setSourceTestHooks({ gapMs: 0, fetch: (async (input: string | URL | Request) => {
+      const url = new URL(typeof input === "string" ? input : input instanceof URL ? input.href : input.url);
+      urls.push(url.href);
+      if (url.searchParams.get("cursor") === "page2") return new Response(JSON.stringify({ items: page2, metadata: {} }), { headers: { "content-type": "application/json" } });
+      return new Response(JSON.stringify({ items: page1, metadata: { nextCursor: "page2" } }), { headers: { "content-type": "application/json" } });
+    }) as typeof fetch });
+    const { hits } = await browseHits(params({ base: "ltx-2.5" }));
+    expect(hits.map((hit) => hit.title)).toEqual(["Supported LTX style"]);
+    expect(urls).toHaveLength(2);
   });
 });
 

@@ -141,7 +141,7 @@ describe("who may use the routes", () => {
   });
 });
 
-describe("Civitai is off by default", () => {
+describe("an explicit Civitai opt-out", () => {
   test("browse and install refuse, nothing goes out", async () => {
     const { owner } = await household();
     expect((await browse(owner)).status).toBe(403);

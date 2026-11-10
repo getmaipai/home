@@ -2,10 +2,10 @@ import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { eq } from "drizzle-orm";
 import { resetDb } from "./reset-db";
 import { db } from "@/db";
-import { jobs } from "@/db/schema";
+import { attachments, jobs } from "@/db/schema";
 import { encryptSecret, decryptSecret } from "@/lib/secrets";
 import { __resetAdultLockForTests } from "@/lib/adultLock";
-import { __resetSourceForTests, __setSourceTestHooks } from "@/lib/loras/source";
+import { __resetSourceForTests, __setSourceTestHooks, sourceRequestCount } from "@/lib/loras/source";
 import { reconcileLoraInstalls } from "@/lib/loras/install";
 import { listLoraRecords } from "@/lib/loras/store";
 import { putLora } from "./fixtures/lora";
@@ -21,7 +21,7 @@ const HASH = "a".repeat(64);
 const TOKEN = "picture-civitai-test-token";
 const model = (over: Record<string, unknown> = {}) => ({
   id: 901, name: "Soft Z Image", type: "LORA", nsfw: false, nsfwLevel: 1, allowCommercialUse: ["Image"], tags: [{ name: "style" }],
-  modelVersions: [{ id: 9011, name: "v1", baseModel: "ZImageTurbo", trainedWords: ["soft z"], downloadUrl: "https://civitai.com/api/download/models/9011", files: [{ id: 901, name: "soft.safetensors", type: "Model", sizeKB: 1024, hashes: { SHA256: HASH }, primary: true }], images: [{ url: "https://image.civitai.com/test.jpg", nsfwLevel: 1 }], ...over }],
+  modelVersions: [{ id: 9011, name: "v1", baseModel: "ZImageTurbo", trainedWords: ["soft z"], downloadUrl: "https://civitai.com/api/download/models/9011", files: [{ id: 901, name: "soft.safetensors", type: "Model", sizeKB: 1024, hashes: { SHA256: HASH }, primary: true }], images: [{ url: "https://image.civitai.com/test.jpg", nsfwLevel: 1, type: "image" }], ...over }],
 });
 let fake: ReturnType<typeof installFakeVideoStack>;
 let install: ReturnType<typeof installFakeLoraJobs>;
@@ -30,6 +30,7 @@ function sourceFixture(over: Record<string, unknown> = {}): void {
   __setSourceTestHooks({ gapMs: 0, fetch: (async (input: string | URL | Request) => {
     const url = new URL(typeof input === "string" ? input : input instanceof URL ? input.href : input.url);
     if (url.hostname === "civitai.com" && url.pathname === "/api/v1/models/901") return new Response(JSON.stringify(model(over)), { headers: { "content-type": "application/json" } });
+    if (url.hostname === "image.civitai.com") return new Response(new Uint8Array([0xff, 0xd8, 0xff, 0xd9]), { headers: { "content-type": "image/jpeg" } });
     return new Response("missing", { status: 404 });
   }) as typeof fetch });
 }
@@ -72,7 +73,30 @@ describe("picture LoRA install", () => {
     install.state = "done";
     await reconcileLoraInstalls();
     expect(listLoraRecords()).toHaveLength(1);
-    expect(listLoraRecords()[0]).toMatchObject({ media: "picture", base_model: "unknown", audience: "all-ages", availability: { who: "admins", people: [] }, added_by: row("Sage").id });
+    const record = listLoraRecords()[0]!;
+    expect(record.preview).not.toBeNull();
+    expect(sourceRequestCount()).toBeGreaterThan(0);
+    expect(db.select().from(attachments).all()).toHaveLength(1);
+    expect(record).toMatchObject({ media: "picture", base_model: "unknown", audience: "all-ages", availability: { who: "admins", people: [] }, added_by: row("Sage").id });
+    expect(typeof record.preview!.file_id).toBe("string");
+    const preview = db.select().from(attachments).all()[0]!;
+    expect(String(preview.id)).toBe(String(record.preview!.file_id));
+    expect(preview).toMatchObject({ ownerPersonId: row("Sage").id, retention: "kept", origin: "sent" });
+    expect(preview.provenance).toContain('"audience":"all-ages"');
+  });
+
+  test("an adult-only install stores an adult locked preview", async () => {
+    const { owner, row } = await household();
+    const started = await post(owner, installBody({ audience: "adult-only" }));
+    expect(started.status).toBe(202);
+    install.state = "done";
+    await reconcileLoraInstalls();
+    const record = listLoraRecords()[0]!;
+    const preview = db.select().from(attachments).where(eq(attachments.id, record.preview!.file_id)).get()!;
+    expect(preview.id).toBe(record.preview!.file_id);
+    expect(preview.provenance).toContain('"audience":"adult-only"');
+    expect(preview.provenance).toContain('"lock":"on"');
+    expect(row("Sage").id).toBe(preview.ownerPersonId);
   });
 
   test("rejects a video base for pictures and a picture base for video before Stack", async () => {
