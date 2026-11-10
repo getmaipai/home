@@ -154,6 +154,23 @@ describe("playback speed per kind", () => {
     expect(session.speedFor("podcast")).toBe(2);
   });
 
+  test("a player whose page owns the rate keeps it: the kind's speed is neither applied nor written", () => {
+    const writes: Array<[string, number]> = [];
+    session.setSpeedWriter((kind, rate) => writes.push([kind, rate]));
+    session.setSpeeds({ podcast: 1.5 });
+    const a = media(); const b = media();
+    a.playbackRate = 1.25;
+    session.registerElement(asEl(a), { kind: "podcast", item: { title: "a" }, ownRate: true });
+    session.registerElement(asEl(b), { kind: "podcast", item: { title: "b" } });
+    expect(a.playbackRate).toBe(1.25);
+    a.setRate(2);
+    expect(writes).toEqual([]);
+    expect(session.speedFor("podcast")).toBe(1.5);
+    expect(b.playbackRate).toBe(1.5);
+    session.setSpeeds({ podcast: 1.1 });
+    expect(a.playbackRate).toBe(2);
+  });
+
   test("applying the saved speed does not write it back", () => {
     const writes: unknown[] = [];
     session.setSpeedWriter((kind, rate) => writes.push([kind, rate]));

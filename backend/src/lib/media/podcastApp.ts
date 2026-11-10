@@ -9,6 +9,7 @@ import { liveSourceById } from "./access";
 import { allowedSources, readableIn, artworkUrl, collectionIds, contextFor, copyLabelOf, queryItems, registerItemView, registerMediaAppData, rowOf, rowsOf, type DataParams, type MediaItemView, type MediaRow } from "./appHost";
 import { getProgress, getProgressMany, recentProgress } from "./progress";
 import { showRateOf } from "./podcastRates";
+import { getPersonSettingValue } from "@/lib/settings";
 import type { MediaItem, MediaSource } from "./model";
 import { draftRows, filterEpisodes, personFilters, viewOf } from "./podcastFilters";
 import { podcastStatsRows } from "./podcastStats";
@@ -165,6 +166,8 @@ registerItemView(APP, (person, item, view) => {
   const progress = getProgress(person.id, item.id);
   if (out.position_s === undefined && !progress && source.skip_intro_s > 0) out.position_s = source.skip_intro_s;
   // PODCAST-RATE-01: the speed this person last picked for the show, else the show's own speed; the play page's `player.rate` reads `show_rate`, and calls the route with `show_id`.
-  const rate = showRateOf(person, source.id) ?? (source.speed || null);
+  // The Podcast speed setting is the start for a show with neither (the player no longer writes the setting: each show keeps its own).
+  const kindSpeed = getPersonSettingValue(person, "audio.speed.podcast");
+  const rate = showRateOf(person, source.id) ?? (source.speed || null) ?? (typeof kindSpeed === "number" && kindSpeed > 0 && kindSpeed !== 1 ? kindSpeed : null);
   return { ...out, show_id: source.id, ...(rate ? { show_rate: rate } : {}), ...(source.speed ? { speed: source.speed } : {}), skip_intro_s: source.skip_intro_s, skip_outro_s: source.skip_outro_s, ...(summaryFacts ? { facts: summaryFacts } : {}) } as MediaItemView;
 });

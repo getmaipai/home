@@ -28,7 +28,7 @@ const deps: PollDeps = {
 beforeEach(() => { clock = Date.parse("2026-10-30T12:00:00Z"); resetDb(); __resetRateLimiterForTests(); __resetShelfCountersForTests(); __resetProgressForTests(); __setPodcastFetchDepsForTests(deps); });
 
 async function setup() {
-  const { client } = await owner();
+  const { client, row } = await owner();
   __setPodcastFetchDepsForTests({ ...deps, fetch: (() => Promise.reject(new Error("offline"))) as unknown as typeof fetch });
   const res = await client.post("/api/plugins/podcasts/subscribe", { url: `${HOST}/feed.xml` });
   await new Promise((resolve) => setTimeout(resolve, 20));
@@ -40,7 +40,7 @@ async function setup() {
   const episodes = (await (await client.post("/api/plugins/podcasts/data/episodes", {})).json()) as Array<{ id: string }>;
   const item = async (who: TestClient) => (await (await who.post("/api/plugins/podcasts/data/item", { scope: "item", id: episodes[0]!.id })).json()) as Record<string, unknown>;
   const rate = (who: TestClient, show: string, body: unknown) => who.request(`/api/plugins/podcasts/shows/${encodeURIComponent(show)}/rate`, { method: "PATCH", body });
-  return { client, sourceId: source_id, episodeId: episodes[0]!.id, item, rate };
+  return { client, personId: row.id, sourceId: source_id, episodeId: episodes[0]!.id, item, rate };
 }
 
 describe("per-show speed memory", () => {
@@ -55,6 +55,14 @@ describe("per-show speed memory", () => {
     await rate(client, sourceId, { rate: 0.5 });
     expect((await item(client)).show_rate).toBe(0.5);
     expect(await (await client.get("/api/plugins/podcasts/shows/" + encodeURIComponent(sourceId) + "/rate")).json()).toMatchObject({ rate: 0.5 });
+  });
+
+  test("a show with no saved speed starts at the Podcast speed setting, and its own saved speed wins", async () => {
+    const { client, personId, sourceId, item, rate } = await setup();
+    expect((await client.put("/api/settings", { scope: `person:${personId}`, key: "audio.speed.podcast", value: 1.25 })).status).toBe(200);
+    expect((await item(client)).show_rate).toBe(1.25);
+    await rate(client, sourceId, { rate: 0.75 });
+    expect((await item(client)).show_rate).toBe(0.75);
   });
 
   test("the range is 0.5 to 2; anything else is refused with a plain line and nothing is stored", async () => {

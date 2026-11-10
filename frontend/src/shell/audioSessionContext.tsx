@@ -70,6 +70,7 @@ export interface UseAudioRegistrationOptions {
   item: AudioItem;
   previous?: () => void;
   next?: () => void;
+  ownRate?: boolean;
 }
 
 /** Registers a media element with the session for as long as it is mounted. Pass the element (from a callback ref or
@@ -82,11 +83,13 @@ export function useAudioRegistration(element: HTMLMediaElement | null, options: 
   const { kind } = options;
   const hasPrevious = Boolean(options.previous);
   const hasNext = Boolean(options.next);
+  const ownRate = options.ownRate === true;
   useEffect(() => {
     if (!element) return;
     const registered = session.registerElement(element, {
       kind,
       item: latest.current.item,
+      ...(ownRate ? { ownRate } : {}),
       ...(hasPrevious ? { previous: () => latest.current.previous?.() } : {}),
       ...(hasNext ? { next: () => latest.current.next?.() } : {}),
     });
@@ -95,7 +98,7 @@ export function useAudioRegistration(element: HTMLMediaElement | null, options: 
       registered.release();
       handle.current = null;
     };
-  }, [session, element, kind, hasPrevious, hasNext]);
+  }, [session, element, kind, hasPrevious, hasNext, ownRate]);
   const { item } = options;
   useEffect(() => { handle.current?.updateItem(item); }, [item]);
   return handle;

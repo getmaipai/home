@@ -42,6 +42,8 @@ export interface RegisterOptions {
   /** Media Session previoustrack / nexttrack, when the app has a queue. */
   previous?: () => void;
   next?: () => void;
+  /** The page that plays this element sets its rate itself (a podcast show's own speed): the session neither applies nor saves the kind's speed for it. */
+  ownRate?: boolean;
 }
 
 export interface AudioHandle {
@@ -97,6 +99,8 @@ interface Entry {
   next: (() => void) | undefined;
   /** The rate the session last set; a different rate on `ratechange` is the person's choice. */
   appliedRate: number;
+  /** The page owns this element's rate (RegisterOptions.ownRate). */
+  ownRate: boolean;
   playing: boolean;
   detach: () => void;
 }
@@ -243,7 +247,7 @@ export function createAudioSession() {
     speeds = { ...next };
     for (const entry of entries) {
       const rate = speedFor(entry.kind);
-      if (isSpeedKind(entry.kind) && rate !== entry.appliedRate) applyRate(entry, rate);
+      if (isSpeedKind(entry.kind) && !entry.ownRate && rate !== entry.appliedRate) applyRate(entry, rate);
     }
     publish();
   }
@@ -251,6 +255,8 @@ export function createAudioSession() {
   function onRateChange(entry: Entry): void {
     const el = entry.el;
     if (!el || !isSpeedKind(entry.kind)) return;
+    // PODCAST-RATE-01: a page that owns the rate (the show's own speed) keeps it per show; it is not the person's speed for the whole kind.
+    if (entry.ownRate) { entry.appliedRate = el.playbackRate; publish(); return; }
     const rate = clampRate(el.playbackRate);
     if (el.playbackRate === entry.appliedRate) return;
     // The person changed the rate (the Player's menu, a key): it becomes their speed for this kind.
@@ -259,7 +265,7 @@ export function createAudioSession() {
       speeds = { ...speeds, [entry.kind]: rate };
       el.defaultPlaybackRate = el.playbackRate;
       for (const other of entries) {
-        if (other !== entry && other.kind === entry.kind && other.appliedRate !== rate) applyRate(other, rate);
+        if (other !== entry && other.kind === entry.kind && !other.ownRate && other.appliedRate !== rate) applyRate(other, rate);
       }
       writer?.(entry.kind, rate);
     }
@@ -308,6 +314,7 @@ export function createAudioSession() {
       previous: opts.previous,
       next: opts.next,
       appliedRate: 1,
+      ownRate: opts.ownRate === true,
       playing: false,
       detach: () => {},
     };
@@ -327,7 +334,7 @@ export function createAudioSession() {
 
   function registerElement(el: HTMLMediaElement, opts: RegisterOptions): AudioHandle {
     const { entry, handle } = makeEntry(opts, el, null);
-    if (isSpeedKind(opts.kind)) applyRate(entry, speedFor(opts.kind));
+    if (isSpeedKind(opts.kind) && !entry.ownRate) applyRate(entry, speedFor(opts.kind));
     else entry.appliedRate = el.playbackRate || 1;
     entry.playing = !el.paused && !el.ended;
     const on = (type: string, listener: () => void): (() => void) => {
@@ -347,7 +354,7 @@ export function createAudioSession() {
         if (focused === entry) publish();
       }),
       on("ratechange", () => onRateChange(entry)),
-      on("loadedmetadata", () => { if (isSpeedKind(entry.kind)) applyRate(entry, speedFor(entry.kind)); publishTime(entry); }),
+      on("loadedmetadata", () => { if (isSpeedKind(entry.kind) && !entry.ownRate) applyRate(entry, speedFor(entry.kind)); publishTime(entry); }),
       on("durationchange", () => publishTime(entry)),
       on("seeked", () => publishTime(entry)),
       on("timeupdate", () => { publishTime(entry); if (focused === entry) checkEndOfItem(entry); }),

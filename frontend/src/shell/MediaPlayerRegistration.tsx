@@ -65,7 +65,7 @@ function RegisteredPlayer({ appId, mediaId, element, next, liveSubtitle }: Omit<
     }),
     [played, appId, liveSubtitle],
   );
-  useAudioRegistration(played ? element : null, { kind: audioKindOfApp(appId), item: audioItem, ...(next ? { next } : {}) });
+  useAudioRegistration(played ? element : null, { kind: audioKindOfApp(appId), item: audioItem, ...(appId === "podcasts" ? { ownRate: true } : {}), ...(next ? { next } : {}) });
   useEffect(() => {
     if (appId !== "books" || !element || !mediaId || !played || played.kind !== "chapter") return;
     const report = (reason: string) => { if (Number.isFinite(element.currentTime)) void api.mediaProgress(appId, { media_id: mediaId, position_s: element.currentTime, duration_s: Number.isFinite(element.duration) ? element.duration : played.duration_s ?? 0, reason }, reason === "unload").catch(() => {}); };
