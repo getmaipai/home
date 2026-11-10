@@ -42,7 +42,7 @@ function TilePills({ hit }: { hit: BrowseHit }) {
   ];
   return (
     <span className="flex flex-wrap gap-1 bg-gradient-to-b from-foreground/50 to-transparent p-2 pb-6">
-      <Badge>{pills[0]}</Badge>
+      <Badge>{i18n._({ id: "For {base}", message: "For {base}", values: { base: pills[0] } })}</Badge>
       {pills.slice(1).map((pill) => <Badge key={pill} variant="secondary">{pill}</Badge>)}
       <Badge variant="secondary">{licenceBadge()[hit.licence.class]}</Badge>
     </span>
@@ -122,7 +122,7 @@ export function StyleBrowser({ person, civitaiOn, onClose, onInstalled, onOpenSt
   const filters = (
     <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
       <Pick id="style-filter-type" label={i18n._({ id: "Type", message: "Type" })} value={kind} onChange={(v) => setKind(v as typeof kind)} options={[["any", i18n._({ id: "Any", message: "Any" })], ["style", i18n._({ id: "Style", message: "Style" })], ["character", i18n._({ id: "Character", message: "Character" })]]} />
-      <Pick id="style-filter-base" wide label={i18n._({ id: "Made for", message: "Made for" })} value={base} onChange={(v) => setBase(v as typeof base)} options={media === "video" ? [["default", i18n._({ id: "Works here", message: "Works here" })], ["ltx-2.5", "LTX-2.5"], ["wan", "Wan"], ["all", i18n._({ id: "Everything", message: "Everything" })]] : [["default", i18n._({ id: "Works here", message: "Works here" })], ["flux2-klein-4b", "Flux.2 Klein 4B"], ["z-image-turbo", "Z-Image Turbo"], ["ernie-image-turbo", "ERNIE"], ["all", i18n._({ id: "Everything", message: "Everything" })]]} />
+      <Pick id="style-filter-base" wide label={i18n._({ id: "Made for", message: "Made for" })} value={base} onChange={(v) => setBase(v as typeof base)} options={[["default", i18n._({ id: "Any", message: "Any" })], ...(results.data?.bases ?? []).map((b): [string, string] => [b.id, b.label])]} />
       <Pick id="style-filter-installed" label={i18n._({ id: "Installed", message: "Installed" })} value={installed} onChange={(v) => setInstalled(v as typeof installed)} options={[["any", i18n._({ id: "Any", message: "Any" })], ["not_installed", i18n._({ id: "Not installed", message: "Not installed" })], ["installed", i18n._({ id: "Installed", message: "Installed" })]]} />
       <Pick id="style-filter-source" label={i18n._({ id: "Source", message: "Source" })} value={source} onChange={(v) => setSource(v as BrowseSource)} options={[["huggingface", "Hugging Face"], ["civitai", civitaiOn ? i18n._({ id: "Civitai", message: "Civitai" }) : i18n._({ id: "Civitai (off)", message: "Civitai (off)" }), !civitaiOn], ["both", i18n._({ id: "Both", message: "Both" }), !civitaiOn]]} />
       <Pick id="style-filter-sort" label={i18n._({ id: "Sort", message: "Sort" })} value={sort} onChange={(v) => setSort(v as typeof sort)} options={[["downloads", i18n._({ id: "Most downloaded", message: "Most downloaded" })], ["rating", i18n._({ id: "Top rated", message: "Top rated" })], ["newest", i18n._({ id: "Newest", message: "Newest" })]]} />
@@ -152,11 +152,13 @@ export function StyleBrowser({ person, civitaiOn, onClose, onInstalled, onOpenSt
             ) : null}
             {results.data?.notes.map((note) => <p key={note} className="text-sm text-muted-foreground">{note}</p>)}
             {linkError ? <StatusCard kind="problem" title={i18n._({ id: "That did not work", message: "That did not work" })} line={linkError} /> : null}
+            {results.isFetching && results.data ? <p role="status" className="font-medium text-muted-foreground">{i18n._({ id: "Searching for styles…", message: "Searching for styles…" })}</p> : null}
             {link ? null : results.isError && !results.data ? (
               <div role="alert" className="flex flex-col items-start gap-2 text-sm"><StatusCard kind="problem" title={i18n._({ id: "That did not work", message: "That did not work" })} line={browseProblem(results.error)} /><Button type="button" variant="outline" size="sm" onClick={() => void results.refetch()}>{i18n._({ id: "Try again", message: "Try again" })}</Button></div>
             ) : (
               <AsyncState data={results.data} error={false} isFetching={results.isFetching} onRetry={() => void results.refetch()} loadingLabel={i18n._({ id: "Searching for styles", message: "Searching for styles" })} errorMessage="">
                 {() => empty ? <p className="text-sm text-muted-foreground">{i18n._({ id: "No styles match. Try fewer words.", message: "No styles match. Try fewer words." })}</p> : (
+                  <div aria-busy={results.isFetching} className={results.isFetching ? "pointer-events-none opacity-50 transition-opacity" : "transition-opacity"}>
                   <MediaShelf<Tile>
                     label={i18n._({ id: "Styles from the source", message: "Styles from the source" })} items={tiles} variant="plain" layout="grid" aspect="poster" density="compact"
                     getKey={(tile) => (isLockedTile(tile) ? "locked" : tile.key)} isLocked={isLockedTile} onUnlock={() => lock.requestUnlock()}
@@ -168,12 +170,13 @@ export function StyleBrowser({ person, civitaiOn, onClose, onInstalled, onOpenSt
                       <span className="flex min-w-0 flex-col gap-0.5">
                         <span className="truncate text-sm font-semibold">{tile.title}</span>
                         {tile.creator ? <span className="truncate text-sm text-muted-foreground">{tile.creator}</span> : null}
-                        <span className="line-clamp-4 text-sm text-muted-foreground">{alreadyHave(tile) ? (tile.installed ? i18n._({ id: "Already added as {name}. Press to open it.", message: "Already added as {name}. Press to open it.", values: { name: tile.installed.name } }) : i18n._({ id: "You already have this style. Press to open it.", message: "You already have this style. Press to open it." })) : tile.reason ? `${tile.summary} ${tile.reason}` : tile.summary}</span>
+                        <span className="line-clamp-4 text-sm text-muted-foreground">{alreadyHave(tile) ? (tile.installed ? i18n._({ id: "Already added as {name}. Press to open it.", message: "Already added as {name}. Press to open it.", values: { name: tile.installed.name } }) : i18n._({ id: "You already have this style. Press to open it.", message: "You already have this style. Press to open it." })) : tile.summary}</span>
                         
                         {tile.also_on.length ? <span className="text-sm text-muted-foreground">{i18n._({ id: "Also on {join}", message: "Also on {join}", values: { join: tile.also_on.join(" and ") } })}</span> : null}
                       </span>
                     ))}
                   />
+                  </div>
                 )}
               </AsyncState>
             )}

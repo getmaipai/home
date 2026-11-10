@@ -158,15 +158,15 @@ describe("the browser", () => {
     restore();
   });
 
-  test("Made for starts at Works here (the household's own bases) and has no retired base option", async () => {
-    const restore = stub({ browse: mock(async () => page()) as never });
+  test("Made for starts at Any and lists only the bases this install can use (no Everything, no Wan)", async () => {
+    const restore = stub({ browse: mock(async () => ({ ...page(), bases: [{ id: "ltx-2.5", label: "LTX-2.5" }] })) as never });
     const view = mountBrowser();
-    expect(view.getByRole("combobox", { name: "Made for" })).toHaveTextContent("Works here");
-    fireEvent.click(await view.findByRole("combobox", { name: "Made for" }));
-    expect(view.getByRole("option", { name: "Everything" })).toBeTruthy();
-    expect(view.queryByRole("option", { name: "LTX-2.3" })).toBeNull();
+    expect(view.getByRole("combobox", { name: "Made for" })).toHaveTextContent("Any");
+    await view.findByText("Clay look");
+    fireEvent.click(view.getByRole("combobox", { name: "Made for" }));
+    expect(view.queryByRole("option", { name: "Everything" })).toBeNull();
+    expect(view.queryByRole("option", { name: "Wan" })).toBeNull();
     expect(view.getByRole("option", { name: "LTX-2.5" })).toBeTruthy();
-    expect(view.getByRole("option", { name: "Wan" })).toBeTruthy();
     restore();
   });
 
@@ -283,7 +283,7 @@ describe("the browser", () => {
     const restore = stub({ browse: mock(async () => page()) as never });
     const view = mountBrowser();
     expect(await view.findByText("Turns any clip into a soft claymation look.")).toBeTruthy();
-    expect(view.getAllByText("LTX 2.5").length).toBeGreaterThan(0);
+    expect(view.getAllByText("For LTX 2.5").length).toBeGreaterThan(0);
     expect(view.getAllByText("Style").length).toBeGreaterThan(0);
     expect(view.getAllByText("8.3K downloads").length).toBeGreaterThan(0);
     expect(view.queryByText(/Made for LTX 2.5, 412 MB/)).toBeNull();

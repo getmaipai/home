@@ -168,7 +168,7 @@ describe("browse redaction while locked", () => {
     const all = JSON.stringify(body) + JSON.stringify([...res.headers.entries()]);
     for (const s of [ADULT_TITLE, UNKNOWN_TITLE, "Zebraquill", "Plumwren", sha("b"), sha("c"), "adult.safetensors", "-2-", "/2-0", "/3-"]) expect(all).not.toContain(s);
     expect(new URL(up.urls[0]!).searchParams.get("nsfw")).toBe("false");
-    expect(Object.keys(body).sort()).toEqual(["items", "locked", "next_cursor", "notes"]);
+    expect(Object.keys(body).sort()).toEqual(["bases", "items", "locked", "next_cursor", "notes"]);
   });
   test("a proof alone, or the switch alone, reveals nothing; both together do, and then a locked call after it still leaks nothing", async () => {
     const { owner } = await household();

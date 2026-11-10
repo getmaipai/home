@@ -136,3 +136,8 @@ export function searchWordFor(browse: "default" | "all" | BrowseBase, media: Med
   const family = BASE_FAMILIES.find((f) => f.media === media && f.bases.some((b) => ids.includes(b.id) && (browse !== "default" || supportedBaseIds(media).includes(b.id))));
   return family ? family.name.toLowerCase().split(/\s+/)[0]! : null;
 }
+
+/** The Made for dropdown's choices: one per base this install can use styles for, with its short name. "Any" is every one of them. */
+export function supportedBaseChoices(media: Media = "video"): Array<{ id: BrowseBase; label: string }> {
+  return ROWS.filter((r) => r.media === media && (supportedBaseIds(media) as string[]).includes(r.id)).map((r) => ({ id: r.browse, label: r.short }));
+}

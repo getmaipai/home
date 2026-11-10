@@ -22,7 +22,7 @@ import { listLoraRecords } from "@/lib/loras/store";
 import { setHouseholdSettingValue } from "@/lib/settings";
 import { MAX_INSTALL_BYTES } from "@/lib/loras/source";
 import { BASE_UNSTATED_LINE, NOT_LTX_LINE } from "@/lib/loras/install";
-import { ALL_BASE_IDS, baseWords, BROWSE_BASES, isSupportedBase, mediaOfBase, supportedBaseIds, type AnyBaseId, type Media } from "@/lib/loras/baseFamilies";
+import { ALL_BASE_IDS, baseWords, BROWSE_BASES, isSupportedBase, mediaOfBase, supportedBaseChoices, supportedBaseIds, type AnyBaseId, type Media } from "@/lib/loras/baseFamilies";
 import { videoEngineStatus } from "@/lib/videos/ready";
 import { pictureEngineStatus } from "@/lib/pictures/ready";
 import type { PersonRow } from "@/types";
@@ -67,11 +67,15 @@ function lineAndReason(hit: Hit, admin: PersonRow, browsed: Media = "video"): { 
 /** What the style does: the maker's own words when the source has them, else one fixed sentence built from the fields (never a model). */
 function summaryOf(hit: Hit): string {
   if (hit.summary) return hit.summary;
-  const word = hit.kind === "character" ? "character" : "style";
-  const made = hit.base_unstated ? "LTX 2" : baseWords(hit.base_model);
-  const use = hit.trigger_words.length ? ` Say ${hit.trigger_words.slice(0, 2).map((w) => `"${w}"`).join(" or ")} in your prompt to use it.` : "";
-  return `A ${word} made for ${made}.${use}`;
+  // No "made for" sentence: the base is a label over the picture. Without the maker's words, say what we do know: the maker's tags and trigger words.
+  const tags = (hit.tags ?? []).filter((t) => !/^(lora|style|character|concept|base model)$/i.test(t)).slice(0, 4);
+  const use = hit.trigger_words.length ? `Say ${hit.trigger_words.slice(0, 2).map((w) => `"${w}"`).join(" or ")} in your prompt to use it.` : "";
+  const about = tags.length ? `Tagged ${tags.join(", ")}.` : "";
+  return [about, use].filter(Boolean).join(" ") || "The maker wrote no description.";
 }
+
+/** The bases this install can use styles for, as dropdown choices: the one list the Made for filter is built from. */
+const baseChoices = (media: Media) => supportedBaseChoices(media);
 
 function view(hit: Hit, admin: PersonRow, browsed: Media = "video") {
   const { line, reason, installed } = lineAndReason(hit, admin, browsed);
@@ -106,7 +110,7 @@ const BrowseBody = z.object({
 const browseRoute = createRoute({
   method: "post", path: "/browse", tags: ["LoRAs"], summary: "Search the style sources (owner or admin)", middleware: [requireAuth, requireRole("owner", "admin")] as const,
   request: { body: { content: { "application/json": { schema: BrowseBody } } } },
-  responses: { 200: { content: { "application/json": { schema: z.object({ items: z.array(HitView), locked: z.boolean().describe("One tile for every hit that is adult or unknown: no title, picture, id or count."), next_cursor: z.string().nullable(), notes: z.array(z.string()) }) } }, description: "Adult and unknown hits are not in `items`." }, ...errorResponses({ 401: "Not signed in", 403: "Admins only, or Civitai is off", 429: "Too many searches this hour", 502: "The source did not answer", 503: "The source asked us to slow down" }) },
+  responses: { 200: { content: { "application/json": { schema: z.object({ items: z.array(HitView), locked: z.boolean().describe("One tile for every hit that is adult or unknown: no title, picture, id or count."), next_cursor: z.string().nullable(), notes: z.array(z.string()), bases: z.array(z.object({ id: z.string(), label: z.string() })) }) } }, description: "Adult and unknown hits are not in `items`." }, ...errorResponses({ 401: "Not signed in", 403: "Admins only, or Civitai is off", 429: "Too many searches this hour", 502: "The source did not answer", 503: "The source asked us to slow down" }) },
 });
 lorasSourceRoutes.openapi(browseRoute, async (c) => {
   const admin = c.get("person");
@@ -116,7 +120,7 @@ lorasSourceRoutes.openapi(browseRoute, async (c) => {
   const notes: string[] = [];
   if (supportedBaseIds(body.media).length === 0) {
     notes.push(body.media === "video" ? "This computer has no video model that can use styles yet." : "This computer has no picture model that can use styles yet.");
-    return c.json({ items: [], locked: false, next_cursor: null, notes }, 200);
+    return c.json({ items: [], locked: false, next_cursor: null, notes, bases: [] }, 200);
   }
   let source = body.source;
   if (source === "both" && !civitaiEnabled()) { source = "huggingface"; notes.push("Civitai is off, so only Hugging Face was searched."); }
@@ -127,7 +131,7 @@ lorasSourceRoutes.openapi(browseRoute, async (c) => {
     const wanted = browsed.hits.filter((h) => (body.installed === "any" ? true : (installedAs(h, records, body.media) !== null) === (body.installed === "installed")));
     const shown = wanted.filter((h) => h.adult_check.state === "normal" || reveal);
     const locked = wanted.length > shown.length;
-    return c.json({ items: shown.map((h) => view(h, admin, body.media)), locked, next_cursor: browsed.next, notes }, 200);
+    return c.json({ items: shown.map((h) => view(h, admin, body.media)), locked, next_cursor: browsed.next, notes, bases: baseChoices(body.media) }, 200);
   } catch (error) { const f = sourceFailure(error); return c.json(f.body, f.status) as never; }
 });
 

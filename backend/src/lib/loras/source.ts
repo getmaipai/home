@@ -62,6 +62,8 @@ export interface Hit {
   gated: boolean;
   /** What the style does, in the maker's own words (first sentences of the source's description, plain text); null when the source says nothing useful. */
   summary: string | null;
+  /** The maker's own tags (Civitai), used for the line under a title when the maker wrote no description. */
+  tags?: string[];
   /** Where the preview lives (never sent to a client). */
   preview_url: string | null;
   also_on: LoraSite[];
@@ -69,9 +71,10 @@ export interface Hit {
 
 const ENTITIES: Record<string, string> = { amp: "&", lt: "<", gt: ">", quot: "\"", apos: "'", nbsp: " " };
 /** The first sentences of a source's description as plain words: no markup or links, no settings lists or begging, at most `max` characters, cut at a sentence end. Null when nothing readable is left. */
-export function plainSummary(texts: readonly (string | null)[], max = 200): string | null {
-  for (const text of texts) {
-    if (!text) continue;
+export function plainSummary(texts: readonly (string | null)[], max = 200, title?: string | null): string | null {
+  for (const raw of texts) {
+    if (!raw) continue;
+    const text = title ? raw.split(title).join(" ") : raw;
     const lines = text.replace(/<\s*(br|\/p|\/li|\/h\d|\/div)\s*\/?>/gi, "\n").replace(/<[^>]*>/g, " ")
       .replace(/&(#\d+|#x[0-9a-f]+|\w+);/gi, (m, e: string) => (e[0] === "#" ? String.fromCodePoint(e[1]?.toLowerCase() === "x" ? parseInt(e.slice(2), 16) : parseInt(e.slice(1), 10)) : (ENTITIES[e.toLowerCase()] ?? " ")))
       .split(/\n+/).map((l) => l.replace(/https?:\/\/\S+/g, "").replace(/[*_#>`~]+/g, "").replace(/\s+/g, " ").trim());
@@ -100,7 +103,7 @@ export const tokenFor = (site: LoraSite): string | null => (site === "civitai" ?
 
 let clock: () => number = () => Date.now();
 let sleeper: (ms: number) => Promise<void> = (ms) => new Promise((r) => setTimeout(r, ms));
-let gapMs = 2000;
+let gapMs = 400;
 let fetchImpl: typeof fetch | null = null;
 export function __setSourceTestHooks(h: { now?: () => number; sleep?: (ms: number) => Promise<void>; gapMs?: number; fetch?: typeof fetch | null }): void {
   if (h.now) clock = h.now;
@@ -121,7 +124,7 @@ const HOURLY_BUDGET = 60;
 
 export function __resetSourceForTests(): void {
   hosts.clear(); hourly = []; cache.clear(); previews.clear(); knownSha.clear();
-  clock = () => Date.now(); sleeper = (ms) => new Promise((r) => setTimeout(r, ms)); gapMs = 2000; fetchImpl = null;
+  clock = () => Date.now(); sleeper = (ms) => new Promise((r) => setTimeout(r, ms)); gapMs = 400; fetchImpl = null;
 }
 /** Test-only: how many remote requests actually went out. */
 export const sourceRequestCount = (): number => requests;
@@ -269,7 +272,7 @@ function civitaiHit(modelRaw: unknown, bases: readonly string[], wantVersion?: s
     licence_id: lic.id, licence_class: lic.cls, commercial_use: lic.commercial,
     downloads: numOr(stats.downloadCount, 0), rating: typeof stats.rating === "number" ? stats.rating : null, created_at: str(chosen.publishedAt),
     trigger_words: cleanTriggerWords(arr(chosen.trainedWords).filter((w): w is string => typeof w === "string")), gated: false,
-    summary: plainSummary([str(chosen.description), str(m.description)]),
+    summary: plainSummary([str(m.description), str(chosen.description)], 200, str(m.name)), tags: tags.filter(Boolean).slice(0, 5),
     preview_url: typeof preview?.url === "string" ? String(preview.url) : null, also_on: [],
   };
 }
@@ -385,7 +388,7 @@ export async function browseHits(p: BrowseParams): Promise<Browsed> {
     return p.kind === "any" ? combined.length : combined.filter((h) => h.kind === null || h.kind === p.kind).length;
   };
   let extra = 0;
-  while (extra < 3 && acceptedCount() < PAGE_SIZE && (hf.next || cv.next)) {
+  while (extra < 2 && acceptedCount() < PAGE_SIZE && (hf.next || cv.next)) {
     extra += 1;
     const [hn, cn] = await Promise.all([
       hf.next ? browseHf(p, hf.next, false) : Promise.resolve({ hits: [] as Hit[], next: null }),

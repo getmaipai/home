@@ -34,7 +34,7 @@ export interface BrowseHit {
   adult_check: AdultCheckState; installed: { id: string; name: string } | null; reason: string | null; line: string; confirm_item: string;
   /** What the style does, in plain words: the maker's own first sentences, or one fixed sentence from the fields. */ summary: string;
 }
-export interface BrowsePage { items: BrowseHit[]; locked: boolean; next_cursor: string | null; notes: string[] }
+export interface BrowsePage { items: BrowseHit[]; locked: boolean; next_cursor: string | null; notes: string[]; bases?: Array<{ id: string; label: string }> }
 
 export interface SourcesState { huggingface: { on: true; token_saved: boolean }; civitai: { on: boolean; key_saved: boolean } }
 export interface InstallJob { job: string; state: string; title: string; percent: number | null }

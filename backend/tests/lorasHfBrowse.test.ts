@@ -62,6 +62,10 @@ describe("Civitai video styles", () => {
 });
 
 describe("plainSummary", () => {
+  test("the maker's title is dropped from the front, so the first line says what the style does", () => {
+    const html = "<p>Kiss the Viewer</p><p>A video + audio LoRA for LTX-2 that creates an intimate kiss-the-camera effect.</p>";
+    expect(plainSummary([html], 200, "Kiss the Viewer")).toBe("A video + audio LoRA for LTX-2 that creates an intimate kiss-the-camera effect.");
+  });
   test("keeps the first sentences of the maker's words, without markup, links or settings lists", () => {
     const html = "<p>Turns any clip into a soft <b>claymation</b> look with chunky fingerprints and warm light. Great for pets &amp; toys.</p><p>Trigger word: claymo</p><p>Support me on Patreon https://patreon.com/x</p>";
     expect(plainSummary([html])).toBe("Turns any clip into a soft claymation look with chunky fingerprints and warm light. Great for pets & toys.");

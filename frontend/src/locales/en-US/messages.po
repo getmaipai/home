@@ -2799,7 +2799,7 @@ msgid "setting.videos.library_sort.option.az"
 msgstr "Alphabetical by title."
 
 #. js-lingui-explicit-id
-#: src/apps/settings/styles/StyleBrowser.tsx:171
+#: src/apps/settings/styles/StyleBrowser.tsx:173
 msgid "Already added as {name}. Press to open it."
 msgstr "Already added as {name}. Press to open it."
 
@@ -2815,7 +2815,7 @@ msgid "Also add"
 msgstr "Also add"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/styles/StyleBrowser.tsx:173
+#: src/apps/settings/styles/StyleBrowser.tsx:175
 msgid "Also on {join}"
 msgstr "Also on {join}"
 
@@ -3028,6 +3028,7 @@ msgstr "ANTHROPIC_BASE_URL={codingHome}/code/v1 ANTHROPIC_API_KEY=maipai_key_...
 
 #. js-lingui-explicit-id
 #: src/apps/settings/styles/StyleBrowser.tsx:124
+#: src/apps/settings/styles/StyleBrowser.tsx:125
 #: src/apps/settings/styles/StyleBrowser.tsx:126
 msgid "Any"
 msgstr "Any"
@@ -9019,12 +9020,6 @@ msgid "Everyone who shares your home."
 msgstr "Everyone who shares your home."
 
 #. js-lingui-explicit-id
-#: src/apps/settings/styles/StyleBrowser.tsx:125
-#: src/apps/settings/styles/StyleBrowser.tsx:125
-msgid "Everything"
-msgstr "Everything"
-
-#. js-lingui-explicit-id
 #: src/apps/settings/ReferenceLibrarySettings.tsx:175
 msgid "Everything else"
 msgstr "Everything else"
@@ -9601,6 +9596,11 @@ msgstr "Follows the household choice for where answers come from."
 #: src/lib/settingCopy.generated.ts:495
 msgid "setting.generation.picture_quick_model.option.ernie"
 msgstr "Follows your words closely."
+
+#. js-lingui-explicit-id
+#: src/apps/settings/styles/StyleBrowser.tsx:45
+msgid "For {base}"
+msgstr "For {base}"
 
 #. js-lingui-explicit-id
 #: src/apps/settings/ReferenceLibrarySettings.tsx:268
@@ -13969,7 +13969,7 @@ msgid "Locked by rule"
 msgstr "Locked by rule"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/styles/StyleBrowser.tsx:163
+#: src/apps/settings/styles/StyleBrowser.tsx:165
 msgid "Locked items"
 msgstr "Locked items"
 
@@ -15835,7 +15835,7 @@ msgstr "News written for young readers."
 #. js-lingui-explicit-id
 #: src/apps/settings/EngineLinkCredentialSection.tsx:286
 #: src/apps/settings/EngineLinkCredentialSection.tsx:287
-#: src/apps/settings/styles/StyleBrowser.tsx:184
+#: src/apps/settings/styles/StyleBrowser.tsx:187
 #: src/shell/components/DataTableControls.tsx:34
 #: src/shell/pages/RepairsPage.tsx:148
 #: src/shell/pages/useDataTableControls.tsx:125
@@ -16239,7 +16239,7 @@ msgid "No Stack configured"
 msgstr "No Stack configured"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/styles/StyleBrowser.tsx:159
+#: src/apps/settings/styles/StyleBrowser.tsx:160
 msgid "No styles match. Try fewer words."
 msgstr "No styles match. Try fewer words."
 
@@ -17830,7 +17830,7 @@ msgid "setting.search.page_text_cleaning.label"
 msgstr "Page text check"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/styles/StyleBrowser.tsx:181
+#: src/apps/settings/styles/StyleBrowser.tsx:184
 msgid "Pages of results"
 msgstr "Pages of results"
 
@@ -18828,7 +18828,7 @@ msgid "Preview. Nothing is downloaded, installed or saved."
 msgstr "Preview. Nothing is downloaded, installed or saved."
 
 #. js-lingui-explicit-id
-#: src/apps/settings/styles/StyleBrowser.tsx:182
+#: src/apps/settings/styles/StyleBrowser.tsx:185
 #: src/shell/components/DataTableControls.tsx:33
 #: src/shell/pages/RepairsPage.tsx:148
 #: src/shell/pages/useDataTableControls.tsx:118
@@ -21091,9 +21091,14 @@ msgid "Searches may be limited right now."
 msgstr "Searches may be limited right now."
 
 #. js-lingui-explicit-id
-#: src/apps/settings/styles/StyleBrowser.tsx:158
+#: src/apps/settings/styles/StyleBrowser.tsx:159
 msgid "Searching for styles"
 msgstr "Searching for styles"
+
+#. js-lingui-explicit-id
+#: src/apps/settings/styles/StyleBrowser.tsx:155
+msgid "Searching for styles…"
+msgstr "Searching for styles…"
 
 #. js-lingui-explicit-id
 #: src/shell/pages/MediaSearchPage.tsx:28
@@ -23313,7 +23318,7 @@ msgid "Styles could not be loaded. Open this page again."
 msgstr "Styles could not be loaded. Open this page again."
 
 #. js-lingui-explicit-id
-#: src/apps/settings/styles/StyleBrowser.tsx:161
+#: src/apps/settings/styles/StyleBrowser.tsx:163
 msgid "Styles from the source"
 msgstr "Styles from the source"
 
@@ -23839,7 +23844,7 @@ msgstr "That did not send. Try again."
 #: src/apps/settings/StackChanInstallDialog.tsx:128
 #: src/apps/settings/styles/StyleAddFile.tsx:66
 #: src/apps/settings/styles/StyleBrowser.tsx:154
-#: src/apps/settings/styles/StyleBrowser.tsx:156
+#: src/apps/settings/styles/StyleBrowser.tsx:157
 #: src/apps/settings/styles/StyleConfirm.tsx:139
 #: src/apps/settings/styles/StyleEditor.tsx:78
 #: src/apps/settings/styles/StylesTab.tsx:84
@@ -25973,7 +25978,7 @@ msgstr "Trigger phrase, e.g. \"movie night\""
 #: src/apps/settings/CommandsSection.tsx:113
 #: src/apps/settings/ModelsAndStorageSection.tsx:91
 #: src/apps/settings/StackChanInstallDialog.tsx:152
-#: src/apps/settings/styles/StyleBrowser.tsx:156
+#: src/apps/settings/styles/StyleBrowser.tsx:157
 #: src/apps/settings/VoiceBrowserSection.tsx:95
 #: src/apps/settings/VoiceManagerSection.tsx:103
 #: src/apps/setup/HostTuneStep.tsx:68
@@ -28134,12 +28139,6 @@ msgid "Works at Standard, Boost and Max"
 msgstr "Works at Standard, Boost and Max"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/styles/StyleBrowser.tsx:125
-#: src/apps/settings/styles/StyleBrowser.tsx:125
-msgid "Works here"
-msgstr "Works here"
-
-#. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:669
 msgid "setting.news.default_topics.adult.option_label.world"
 msgstr "World"
@@ -28300,7 +28299,7 @@ msgid "You already have this as {name}."
 msgstr "You already have this as {name}."
 
 #. js-lingui-explicit-id
-#: src/apps/settings/styles/StyleBrowser.tsx:171
+#: src/apps/settings/styles/StyleBrowser.tsx:173
 msgid "You already have this style. Press to open it."
 msgstr "You already have this style. Press to open it."
 
