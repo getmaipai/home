@@ -17,6 +17,7 @@ import { useMediaDock, type HoistedMedia } from "@/shell/mediaHost";
 import { liveStationIdOf } from "@/shell/radioLive";
 import { nextRepeat, setPlayMode, usePlayMode } from "@/shell/media/playMode";
 import { AudioVisualizer, VISUALIZERS, setVisualizerPref, useVisualizerPref } from "@/shell/media/AudioVisualizer";
+import { EqualizerMenu } from "@/shell/media/EqualizerMenu";
 import { useMediaAnalyser } from "@/shell/media/useMediaAnalyser";
 import { accentOf, useArtPalette } from "@/lib/media/artPalette";
 
@@ -197,6 +198,7 @@ export function NowPlayingStage({ media, onClose, initialView = "scene" }: { med
           {isSong ? null : <Button size="icon" aria-label={playing ? "Pause" : "Play"} onClick={toggle} style={{ background: accent }}>{playing ? <PauseIcon aria-hidden="true" /> : <PlayIcon aria-hidden="true" />}</Button>}
           <Button variant="ghost" size="icon" aria-label={i18n._({ id: "Forward 30 seconds", message: "Forward 30 seconds" })} onClick={() => { el.currentTime = Math.min(Number.isFinite(el.duration) ? el.duration : el.currentTime + 30, el.currentTime + 30); }}><Fwd30Icon aria-hidden="true" /></Button>
           {isSong && lyrics ? <Button variant={view === "lyrics" ? "secondary" : "ghost"} size="icon" aria-label={i18n._({ id: "Lyrics", message: "Lyrics" })} aria-pressed={view === "lyrics"} onClick={() => pick("lyrics")}><LyricsIcon aria-hidden="true" /></Button> : null}
+          {isSong ? <EqualizerMenu /> : null}
           {isSong ? <Button variant={view === "queue" ? "secondary" : "ghost"} size="icon" aria-label={i18n._({ id: "Up next", message: "Up next" })} aria-pressed={view === "queue"} onClick={() => pick("queue")}><QueueIcon aria-hidden="true" /></Button> : null}
         </div>
       </div>

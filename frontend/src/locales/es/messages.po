@@ -3043,7 +3043,7 @@ msgid "All adults"
 msgstr "Todos los adultos"
 
 #. js-lingui-explicit-id
-#: src/shell/pageHeaderTitle.tsx:116
+#: src/shell/pageHeaderTitle.tsx:117
 #: src/shell/pages/AllAppsPage.tsx:103
 #: src/shell/pages/AllAppsPage.tsx:122
 #: src/shell/pages/AllAppsPage.tsx:124
@@ -4056,6 +4056,7 @@ msgstr "Azelma"
 #: src/apps/settings/AiSlotDialog.tsx:151
 #: src/apps/settings/EngineLinkCredentialSection.tsx:286
 #: src/apps/setup/SetupReviewPage.tsx:65
+#: src/shell/pageHeaderTitle.tsx:151
 #: src/shell/pages/companionFlow/AnimateStep.tsx:153
 #: src/shell/pages/companionFlow/CustomizeStep.tsx:195
 #: src/shell/pages/packageAppHeaderBar.tsx:94
@@ -4069,7 +4070,7 @@ msgid "Back"
 msgstr "Atrás"
 
 #. js-lingui-explicit-id
-#: src/shell/media/NowPlayingStage.tsx:196
+#: src/shell/media/NowPlayingStage.tsx:197
 #, needs-review
 msgid "Back 10 seconds"
 msgstr "Retroceder 10 segundos"
@@ -4181,7 +4182,7 @@ msgstr "Límite de almacenamiento de copias de seguridad (GB)"
 
 #. js-lingui-explicit-id
 #: src/apps/settings/BackupsSection.tsx:204
-#: src/shell/pageHeaderTitle.tsx:105
+#: src/shell/pageHeaderTitle.tsx:106
 #: src/shell/Routes.tsx:158
 #, needs-review
 msgid "Backups"
@@ -4273,6 +4274,11 @@ msgstr "Basado en {name}"
 #. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:625
 msgid "setting.music.eq_preset.option_label.bass"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/shell/media/EqualizerMenu.tsx:10
+msgid "Bass boost"
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -5336,7 +5342,7 @@ msgstr "Charles"
 #: src/apps/settings/performanceModel.ts:9
 #: src/shell/AmbientCompanionPane.tsx:321
 #: src/shell/coreLabels.ts:8
-#: src/shell/pageHeaderTitle.tsx:97
+#: src/shell/pageHeaderTitle.tsx:98
 #: src/shell/pages/ChatPage.tsx:1735
 #: src/shell/pages/CompanionsPage.tsx:162
 #: src/shell/pages/CompanionsPage.tsx:167
@@ -5850,7 +5856,7 @@ msgid "setting.person.robot.topics.option_label.chit_chat"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/mediaHost.tsx:373
+#: src/shell/mediaHost.tsx:461
 #, needs-review
 msgid "Choose a clip"
 msgstr "Elige un clip"
@@ -6583,7 +6589,7 @@ msgstr ""
 
 #. js-lingui-explicit-id
 #: src/shell/coreLabels.ts:17
-#: src/shell/pageHeaderTitle.tsx:112
+#: src/shell/pageHeaderTitle.tsx:113
 #, needs-review
 msgid "Clock"
 msgstr "Reloj"
@@ -6640,7 +6646,7 @@ msgid "Close apps for big jobs"
 msgstr "Cerrar apps para tareas grandes"
 
 #. js-lingui-explicit-id
-#: src/shell/media/NowPlayingStage.tsx:142
+#: src/shell/media/NowPlayingStage.tsx:143
 #, needs-review
 msgid "Close Now playing"
 msgstr "Cerrar Ahora suena"
@@ -6838,7 +6844,7 @@ msgstr "Próximamente"
 
 #. js-lingui-explicit-id
 #: src/apps/settings/CommandsSection.tsx:105
-#: src/shell/pageHeaderTitle.tsx:107
+#: src/shell/pageHeaderTitle.tsx:108
 #: src/shell/Routes.tsx:159
 #, needs-review
 msgid "Commands"
@@ -8446,7 +8452,7 @@ msgid "Count"
 msgstr "Cantidad"
 
 #. js-lingui-explicit-id
-#: src/shell/media/NowPlayingStage.tsx:137
+#: src/shell/media/NowPlayingStage.tsx:138
 #, needs-review
 msgid "Cover"
 msgstr "Portada"
@@ -10279,6 +10285,11 @@ msgid "EQ"
 msgstr "EC"
 
 #. js-lingui-explicit-id
+#: src/shell/media/EqualizerMenu.tsx:20
+msgid "Equalizer: {name}"
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:497
 #, needs-review
 msgid "setting.generation.picture_quick_model.option_label.ernie"
@@ -10673,7 +10684,7 @@ msgstr "Tasa de desvío"
 
 #. js-lingui-explicit-id
 #: src/shell/coreLabels.ts:9
-#: src/shell/pageHeaderTitle.tsx:98
+#: src/shell/pageHeaderTitle.tsx:99
 #: src/shell/pages/FamilyPage.tsx:24
 #: src/shell/pages/FamilyPage.tsx:48
 #, needs-review
@@ -10984,6 +10995,11 @@ msgid "setting.chat.flash_attention_override.label"
 msgstr "Anulación de atención flash"
 
 #. js-lingui-explicit-id
+#: src/shell/media/EqualizerMenu.tsx:13
+msgid "Flat"
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:624
 msgid "setting.music.eq_preset.option_label.flat"
 msgstr ""
@@ -11183,7 +11199,7 @@ msgid "Formality"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/media/NowPlayingStage.tsx:198
+#: src/shell/media/NowPlayingStage.tsx:199
 #, needs-review
 msgid "Forward 30 seconds"
 msgstr "Avanzar 30 segundos"
@@ -11358,14 +11374,14 @@ msgstr ""
 
 #. js-lingui-explicit-id
 #: src/shell/GlobalMiniPlayer.tsx:136
-#: src/shell/media/MusicVisualizerSection.tsx:72
+#: src/shell/media/MusicVisualizerSection.tsx:74
 #, needs-review
 msgid "Full screen"
 msgstr "Pantalla completa"
 
 #. js-lingui-explicit-id
 #: src/shell/GlobalMiniPlayer.tsx:134
-#: src/shell/media/MusicVisualizerSection.tsx:72
+#: src/shell/media/MusicVisualizerSection.tsx:74
 #, needs-review
 msgid "Full screen visualizer"
 msgstr "Visualizador a pantalla completa"
@@ -12033,7 +12049,7 @@ msgstr "Guarda lo que algunos descargados piden antes de comenzar."
 #. js-lingui-explicit-id
 #: src/apps/clock/WorldClocksTab.tsx:72
 #: src/shell/coreLabels.ts:7
-#: src/shell/pageHeaderTitle.tsx:96
+#: src/shell/pageHeaderTitle.tsx:97
 #: src/shell/pages/ActivityPage.tsx:39
 #: src/shell/pages/DashboardPage.tsx:24
 #: src/shell/pages/settings/settingsBackLink.ts:55
@@ -12830,7 +12846,7 @@ msgid "Home keeps working normally while this runs. It is the floor, so it stays
 msgstr "Home sigue funcionando bien mientras esto corre. Es la base, así que se queda activado."
 
 #. js-lingui-explicit-id
-#: src/shell/pageHeaderTitle.tsx:161
+#: src/shell/pageHeaderTitle.tsx:164
 #, needs-review
 msgid "Home layout"
 msgstr "Diseño de Home"
@@ -13020,7 +13036,7 @@ msgstr ""
 
 #. js-lingui-explicit-id
 #: src/shell/coreLabels.ts:10
-#: src/shell/pageHeaderTitle.tsx:113
+#: src/shell/pageHeaderTitle.tsx:114
 #: src/shell/pages/HousePage.tsx:21
 #: src/shell/pages/HousePage.tsx:45
 #, needs-review
@@ -15459,7 +15475,7 @@ msgid "Lights"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/media/NowPlayingStage.tsx:195
+#: src/shell/media/NowPlayingStage.tsx:196
 msgid "Like"
 msgstr ""
 
@@ -16408,8 +16424,8 @@ msgstr "LTX-2.5 y Wan"
 
 #. js-lingui-explicit-id
 #: src/apps/chat/MusicCardView.tsx:85
-#: src/shell/media/NowPlayingStage.tsx:148
-#: src/shell/media/NowPlayingStage.tsx:199
+#: src/shell/media/NowPlayingStage.tsx:149
+#: src/shell/media/NowPlayingStage.tsx:200
 #: src/shell/pages/MusicWorkspacePage.tsx:246
 #: src/shell/pages/MusicWorkspacePage.tsx:256
 #, needs-review
@@ -17181,7 +17197,7 @@ msgstr "Velocidad máxima usada para actualizaciones automáticas de la bibliote
 
 #. js-lingui-explicit-id
 #: src/apps/settings/DevicesSection.tsx:164
-#: src/shell/pageHeaderTitle.tsx:115
+#: src/shell/pageHeaderTitle.tsx:116
 #: src/shell/pages/MediaHomePage.tsx:24
 #: src/shell/pages/MediaSearchPage.tsx:17
 #: src/shell/Routes.tsx:434
@@ -18361,7 +18377,7 @@ msgid "Next"
 msgstr "Siguiente"
 
 #. js-lingui-explicit-id
-#: src/shell/media/NowPlayingStage.tsx:187
+#: src/shell/media/NowPlayingStage.tsx:188
 msgid "Next song"
 msgstr ""
 
@@ -19319,7 +19335,7 @@ msgid "Nothing is loaded right now."
 msgstr "Ahora mismo no hay nada cargado."
 
 #. js-lingui-explicit-id
-#: src/shell/media/NowPlayingStage.tsx:161
+#: src/shell/media/NowPlayingStage.tsx:162
 msgid "Nothing is queued after this song."
 msgstr ""
 
@@ -19440,7 +19456,7 @@ msgstr "Historial de notificaciones"
 #: src/apps/notifications/NotificationsPage.tsx:111
 #: src/shell/NotificationBell.tsx:214
 #: src/shell/NotificationBell.tsx:229
-#: src/shell/pageHeaderTitle.tsx:110
+#: src/shell/pageHeaderTitle.tsx:111
 #: src/shell/routeHeader.ts:25
 #, needs-review
 msgid "Notifications"
@@ -20932,7 +20948,7 @@ msgid "setting.ease.text_size.help"
 msgstr "Porcentaje del tamaño de texto normal. \"Predeterminado\" sigue tu elección de facilidad de uso."
 
 #. js-lingui-explicit-id
-#: src/shell/pageHeaderTitle.tsx:102
+#: src/shell/pageHeaderTitle.tsx:103
 #: src/shell/pages/PerformancePage.tsx:54
 #: src/shell/Routes.tsx:154
 #, needs-review
@@ -21112,7 +21128,7 @@ msgid "Pick one and it goes into the bar above."
 msgstr "Elige uno y se pone en la barra de arriba."
 
 #. js-lingui-explicit-id
-#: src/shell/mediaHost.tsx:374
+#: src/shell/mediaHost.tsx:462
 #, needs-review
 msgid "Pick one of your own clips to put after this one."
 msgstr "Elige uno de tus clips para ponerlo después de este."
@@ -21546,7 +21562,7 @@ msgid "setting.ui.enrollment_sounds.help"
 msgstr "Reproduce sonidos suaves durante el registro facial mientras la cámara encuentra tu cara, y luego un timbre cuando se toma una foto."
 
 #. js-lingui-explicit-id
-#: src/shell/media/MusicVisualizerSection.tsx:63
+#: src/shell/media/MusicVisualizerSection.tsx:64
 #, needs-review
 msgid "Player options"
 msgstr "Opciones del reproductor"
@@ -21830,7 +21846,7 @@ msgid "Previous"
 msgstr "Anterior"
 
 #. js-lingui-explicit-id
-#: src/shell/media/NowPlayingStage.tsx:185
+#: src/shell/media/NowPlayingStage.tsx:186
 msgid "Previous song"
 msgstr ""
 
@@ -21842,7 +21858,7 @@ msgstr "Imprimir"
 
 #. js-lingui-explicit-id
 #: src/shell/coreLabels.ts:12
-#: src/shell/pageHeaderTitle.tsx:108
+#: src/shell/pageHeaderTitle.tsx:109
 #: src/shell/pages/PrivacyPage.tsx:45
 #, needs-review
 msgid "Privacy"
@@ -22373,7 +22389,7 @@ msgstr "Reducido"
 
 #. js-lingui-explicit-id
 #: src/shell/coreLabels.ts:11
-#: src/shell/pageHeaderTitle.tsx:117
+#: src/shell/pageHeaderTitle.tsx:118
 #: src/shell/pages/ReferencePage.tsx:28
 #: src/shell/pages/ReferencePage.tsx:37
 #: src/shell/pages/ReferencePage.tsx:37
@@ -22484,7 +22500,7 @@ msgstr "Recordatorio: {task}"
 
 #. js-lingui-explicit-id
 #: src/shell/coreLabels.ts:16
-#: src/shell/pageHeaderTitle.tsx:111
+#: src/shell/pageHeaderTitle.tsx:112
 #, needs-review
 msgid "Reminders"
 msgstr "Recordatorios"
@@ -22677,6 +22693,11 @@ msgid "Removed {days} days ago. Deleted for good in {left} days."
 msgstr "Eliminado hace {days} días. Se borrará por completo en {left} días."
 
 #. js-lingui-explicit-id
+#: src/shell/media/keptTracks.ts:34
+msgid "Removed from this device."
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/shell/library/libraryModel.ts:112
 #, needs-review
 msgid "Removed in {count, plural, one {# day} other {# days}}"
@@ -22798,7 +22819,7 @@ msgstr "Problemas de reparación"
 
 #. js-lingui-explicit-id
 #: src/shell/InstallDock.tsx:308
-#: src/shell/pageHeaderTitle.tsx:104
+#: src/shell/pageHeaderTitle.tsx:105
 #: src/shell/pages/dashboard/Attention.tsx:25
 #: src/shell/pages/RepairsPage.tsx:60
 #: src/shell/Routes.tsx:156
@@ -22825,7 +22846,7 @@ msgid "Repeat"
 msgstr "Repetir"
 
 #. js-lingui-explicit-id
-#: src/shell/media/NowPlayingStage.tsx:125
+#: src/shell/media/NowPlayingStage.tsx:126
 msgid "Repeat all songs"
 msgstr ""
 
@@ -22842,7 +22863,7 @@ msgid "Repeat ends"
 msgstr "Fin de la repetición"
 
 #. js-lingui-explicit-id
-#: src/shell/media/NowPlayingStage.tsx:125
+#: src/shell/media/NowPlayingStage.tsx:126
 msgid "Repeat off"
 msgstr ""
 
@@ -22853,7 +22874,7 @@ msgid "Repeat on"
 msgstr "Repetir en"
 
 #. js-lingui-explicit-id
-#: src/shell/media/NowPlayingStage.tsx:125
+#: src/shell/media/NowPlayingStage.tsx:126
 msgid "Repeat one song"
 msgstr ""
 
@@ -23906,6 +23927,11 @@ msgid "Saved on {whenText}"
 msgstr "Guardado el {whenText}"
 
 #. js-lingui-explicit-id
+#: src/shell/media/keptTracks.ts:39
+msgid "Saved on this device. It plays here without a connection."
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/shell/pages/StoragePage.tsx:185
 #, needs-review
 msgid "Saved online data"
@@ -24560,7 +24586,7 @@ msgstr "ver la lista en vivo"
 
 #. js-lingui-explicit-id
 #: src/shell/GlobalMiniPlayer.tsx:127
-#: src/shell/media/NowPlayingStage.tsx:179
+#: src/shell/media/NowPlayingStage.tsx:180
 #, needs-review
 msgid "Seek"
 msgstr "Buscar"
@@ -24968,7 +24994,7 @@ msgstr "Configurando tu IA"
 #. js-lingui-explicit-id
 #: src/shell/AmbientCompanionPane.tsx:329
 #: src/shell/coreLabels.ts:13
-#: src/shell/pageHeaderTitle.tsx:99
+#: src/shell/pageHeaderTitle.tsx:100
 #: src/shell/pages/FilesPage.tsx:288
 #: src/shell/pages/PersonProfilePage.tsx:206
 #: src/shell/pages/settings/SettingsAreaPage.tsx:293
@@ -25023,7 +25049,7 @@ msgstr "Progreso de configuración no disponible"
 
 #. js-lingui-explicit-id
 #: src/apps/setup/SetupReviewPage.tsx:59
-#: src/shell/pageHeaderTitle.tsx:114
+#: src/shell/pageHeaderTitle.tsx:115
 #, needs-review
 msgid "Setup review"
 msgstr "Revisión de la configuración"
@@ -25381,7 +25407,7 @@ msgid "setting.companions.dock.help"
 msgstr "Muestra a tu compañero arriba a la derecha de cada página. Pasa el cursor o tócalo para abrir el panel del compañero. Apágalo para ocultar al compañero en todas partes."
 
 #. js-lingui-explicit-id
-#: src/shell/media/NowPlayingStage.tsx:184
+#: src/shell/media/NowPlayingStage.tsx:185
 msgid "Shuffle"
 msgstr ""
 
@@ -25979,7 +26005,7 @@ msgid "Song"
 msgstr "Canción"
 
 #. js-lingui-explicit-id
-#: src/shell/media/NowPlayingStage.tsx:183
+#: src/shell/media/NowPlayingStage.tsx:184
 msgid "Song controls"
 msgstr ""
 
@@ -26610,7 +26636,7 @@ msgstr ""
 
 #. js-lingui-explicit-id
 #: src/apps/settings/CodingSettings.tsx:226
-#: src/shell/pageHeaderTitle.tsx:101
+#: src/shell/pageHeaderTitle.tsx:102
 #: src/shell/pages/EnginesPage.tsx:47
 #: src/shell/pages/EnginesPage.tsx:71
 #: src/shell/pages/performance/EnginesHealthBody.tsx:37
@@ -26846,7 +26872,7 @@ msgstr "Cronómetro en marcha"
 
 #. js-lingui-explicit-id
 #: src/shell/library/LibraryStorage.tsx:24
-#: src/shell/pageHeaderTitle.tsx:100
+#: src/shell/pageHeaderTitle.tsx:101
 #: src/shell/pages/StoragePage.tsx:116
 #: src/shell/pages/TrashPage.tsx:27
 #: src/shell/pages/TrashPage.tsx:27
@@ -30023,6 +30049,11 @@ msgid "setting.music.eq_preset.option_label.treble"
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/shell/media/EqualizerMenu.tsx:11
+msgid "Treble boost"
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:1158
 #, needs-review
 msgid "setting.search.source_mode.option.live"
@@ -30571,7 +30602,7 @@ msgid "Unknown browser"
 msgstr "Navegador desconocido"
 
 #. js-lingui-explicit-id
-#: src/shell/media/NowPlayingStage.tsx:195
+#: src/shell/media/NowPlayingStage.tsx:196
 msgid "Unlike"
 msgstr ""
 
@@ -30697,8 +30728,8 @@ msgid "Up"
 msgstr "Arriba"
 
 #. js-lingui-explicit-id
-#: src/shell/media/NowPlayingStage.tsx:153
-#: src/shell/media/NowPlayingStage.tsx:200
+#: src/shell/media/NowPlayingStage.tsx:154
+#: src/shell/media/NowPlayingStage.tsx:202
 msgid "Up next"
 msgstr ""
 
@@ -30769,7 +30800,7 @@ msgid "Updated {when}"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pageHeaderTitle.tsx:103
+#: src/shell/pageHeaderTitle.tsx:104
 #: src/shell/pages/dashboard/Attention.tsx:26
 #: src/shell/pages/UpdatesPage.tsx:78
 #: src/shell/Routes.tsx:155
@@ -31083,7 +31114,7 @@ msgstr "Usado ayer"
 
 #. js-lingui-explicit-id
 #: src/apps/settings/UsersSection.tsx:232
-#: src/shell/pageHeaderTitle.tsx:109
+#: src/shell/pageHeaderTitle.tsx:110
 #: src/shell/pages/UsersPage.tsx:11
 #: src/shell/Routes.tsx:160
 #, needs-review
@@ -31384,6 +31415,11 @@ msgid "Visualizer: {name}"
 msgstr "Visualizador: {name}"
 
 #. js-lingui-explicit-id
+#: src/shell/media/EqualizerMenu.tsx:12
+msgid "Vocal"
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:627
 msgid "setting.music.eq_preset.option_label.vocal"
 msgstr ""
@@ -31558,7 +31594,7 @@ msgid "Voiceover"
 msgstr "Doblaje"
 
 #. js-lingui-explicit-id
-#: src/shell/pageHeaderTitle.tsx:106
+#: src/shell/pageHeaderTitle.tsx:107
 #: src/shell/pages/settings/settingsViews.tsx:96
 #: src/shell/pages/VoicesPage.tsx:14
 #: src/shell/pages/VoicesPage.tsx:18
@@ -31580,7 +31616,7 @@ msgid "Voices are still getting ready. This takes a minute after setup."
 msgstr "Las voces aún se están preparando. Esto toma un minuto después de la configuración."
 
 #. js-lingui-explicit-id
-#: src/shell/media/MusicVisualizerSection.tsx:69
+#: src/shell/media/MusicVisualizerSection.tsx:71
 #, needs-review
 msgid "Volume"
 msgstr "Volumen"
@@ -31939,7 +31975,7 @@ msgid "What is being made, what finished and what needs a look."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/media/NowPlayingStage.tsx:136
+#: src/shell/media/NowPlayingStage.tsx:137
 #, needs-review
 msgid "What is on stage"
 msgstr "Qué está en el escenario"

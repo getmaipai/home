@@ -1,0 +1,83 @@
+{
+  "type": "page",
+  "id": "channel",
+  "title": "Channel",
+  "body": [
+    {
+      "type": "media_shelf",
+      "heading": "Videos from this channel",
+      "bind": {
+        "source": "package",
+        "path": "library",
+        "params": {
+          "channel": "$state.channel"
+        }
+      },
+      "item_key_field": "id",
+      "item_label_field": "title",
+      "item_subtitle_field": "{byline}",
+      "item_media_field": "thumbnail",
+      "item_progress_field": "progress",
+      "item_badge_field": "copy_label",
+      "item_meta_field": "duration_s",
+      "item_avatar_field": "channel_avatar",
+      "row_actions": [
+        {
+          "icon": "clock",
+          "label": "Watch later",
+          "action": {
+            "call": {
+              "target": "/api/plugins/videos/watch-later",
+              "args": {
+                "media_id": "{id}"
+              }
+            }
+          }
+        },
+        {
+          "icon": "list-plus",
+          "label": "Save to playlist",
+          "action": {
+            "call": {
+              "target": "/api/plugins/videos/playlists/save",
+              "args": {
+                "media_id": "{id}"
+              }
+            }
+          }
+        },
+        {
+          "icon": "share",
+          "label": "Share",
+          "action": {
+            "share": {
+              "to": "/apps/videos/watch?id={id}",
+              "title": "{title}"
+            }
+          }
+        }
+      ],
+      "aspect": "wide",
+      "variant": "plain",
+      "layout": "grid",
+      "size_control": true,
+      "card_radius": "soft",
+      "on_select": {
+        "play": {
+          "media_id": "{id}"
+        }
+      },
+      "empty_state": {
+        "type": "empty_state",
+        "icon": "film",
+        "text": "No videos from this channel yet.",
+        "action": {
+          "navigate": {
+            "to": "/apps/videos/index"
+          }
+        },
+        "action_label": "Browse videos"
+      }
+    }
+  ]
+}

@@ -14,7 +14,7 @@ import { pictureJobLockState } from "@/lib/pictures/lock";
 import { getVideoJobFor } from "@/lib/videos/jobs";
 import { phaseLabel } from "@/lib/videos/phaseLabel";
 import { videoJobLockState } from "@/lib/videos/lock";
-import { readLayerRow, writeLayerRow } from "@/lib/settings";
+import { getPersonSettingValue, readLayerRow, setValue } from "@/lib/settings";
 import type { PersonRow } from "@/types";
 
 /** The five states of the one status card (section 20): WAITING, MAKING NOW, DONE, NEEDS A LOOK, COULD NOT FINISH. */
@@ -181,16 +181,26 @@ export function activityDot(items: readonly ActivityItem[], seenAt: string | nul
   return "none";
 }
 
+/** The registry key `ui.activity_seen_at` (a text setting, person scope), read through the settings API like `ui.home_order`.
+ * A value an older build stored as a JSON string in the same row is read once and rewritten as the plain registry value. */
 export function activitySeenAt(actor: PersonRow): string | null {
-  const raw = readLayerRow(actor.id, ACTIVITY_SEEN_KEY);
-  if (!raw) return null;
-  try { const value: unknown = JSON.parse(raw); return typeof value === "string" && Number.isFinite(Date.parse(value)) ? value : null; } catch { return null; }
+  const valid = (value: unknown): value is string => typeof value === "string" && Number.isFinite(Date.parse(value));
+  const current = getPersonSettingValue(actor, ACTIVITY_SEEN_KEY);
+  if (valid(current)) return current;
+  const legacy = readLayerRow(actor.id, ACTIVITY_SEEN_KEY);
+  if (!legacy) return null;
+  try {
+    const value: unknown = JSON.parse(legacy);
+    if (!valid(value)) return null;
+    setValue(actor, `person:${actor.id}`, ACTIVITY_SEEN_KEY, value);
+    return value;
+  } catch { return null; }
 }
 
 /** The person opened the Activity page: everything finished so far stops counting as unopened. */
 export function markActivitySeen(actor: PersonRow, now = new Date()): string {
   const at = now.toISOString();
-  writeLayerRow(actor.id, ACTIVITY_SEEN_KEY, JSON.stringify(at), actor.id);
+  setValue(actor, `person:${actor.id}`, ACTIVITY_SEEN_KEY, at);
   return at;
 }
 

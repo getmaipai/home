@@ -21,6 +21,7 @@ import { i18n } from "@lingui/core";
 import { useContext } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { Button } from "@maipai/ui/src/ui/button";
+import { navigateBack } from "@/shell/media/navigateBack";
 import { WakeWordPersonContext } from "@/apps/chat/chatThreadContexts";
 import { settingsPath } from "@/shell/pages/settings/settingsAreas";
 import { getIcon } from "@maipai/ui/src/icons";
@@ -143,13 +144,15 @@ export function HeaderTitle({ entry, hideInTopRow = false, heading = false }: { 
  * requirement) that reads the current route itself. A route no table covers reads as a blank slot, never a crash. */
 export function PageHeaderTitle() {
   const { pathname } = useLocation();
+  const navigate = useNavigate();
   const entry = headerEntryFor(pathname, useAppCatalog());
   // A package app has no other page heading, so its title is the page's h1; shell pages carry their own (sr-only) one.
   const isApp = pathname.startsWith("/apps/");
-  return entry ? <><HeaderTitle entry={entry} hideInTopRow={isApp} heading={isApp} />{pathname === "/clock" ? <ClockHeaderAdd /> : null}</> : null;
+  return entry ? <>{pathname === "/clock" ? <Button type="button" variant="ghost" size="icon" className="shrink-0 sm:hidden" data-testid="header-back" aria-label={i18n._({ id: "Back", message: "Back" })} onClick={() => navigateBack(navigate, "/")}><ArrowLeftIcon aria-hidden="true" /></Button> : null}<HeaderTitle entry={entry} hideInTopRow={isApp} heading={isApp} />{pathname === "/clock" ? <ClockHeaderAdd /> : null}</> : null;
 }
 
 const GearIcon = getIcon("settings");
+const ArrowLeftIcon = getIcon("arrow-left");
 
 /** The shell pages' header buttons, by route (a stable module-level reference, as `useHeaderExtra` requires). A section's settings
  * button always sits on the header's right side, just left of the companion avatar: a page never draws its own. */

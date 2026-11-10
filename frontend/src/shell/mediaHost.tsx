@@ -27,6 +27,11 @@ import { nextMusicQueueId, useMusicDj } from "@/shell/musicDj";
 import type { PlayerVoiceover } from "@maipai/ui/src/primitives/Player";
 import { chooseNext, getPlayMode, nextRepeat, setPlayMode, usePlayMode } from "@/shell/media/playMode";
 import { requestStage } from "@/shell/media/stageRequest";
+import { attachCrossfade, crossfadeSeconds, handedOff } from "@/shell/media/crossfade";
+import { analyserFor, eqSupported, isIos } from "@/lib/media/audioGraph";
+import { offlineIdOf, reportKeptSongs, toggleKeptSong } from "@/shell/media/keptTracks";
+import { seedEqPreset, setEqWriter, useEqPreset } from "@/shell/media/eqPreset";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 
 export const hlsPathFor = (src: string, canPlayNative: boolean): "native" | "hls" | "direct" => {
   if (!/[?&]hls=1(?:&|$)/i.test(src) && !/\.m3u8(?:[?#]|$)/i.test(src)) return "direct";
@@ -63,6 +68,9 @@ export function createMediaStore() {
   // the next render; that element must not start by itself (it would restart the station they just stopped). It plays only when the
   // person presses Play (`allowAutoplay`, or the element's own play event), and the mark ends when another item is requested.
   let closedId: string | null = null;
+  // MEDIA-PARITY-02: a crossfade starts the next song in its own element before the held one ends; `elementFor` for that same song takes
+  // that element (already playing) instead of making a new one, so the song carries on without a restart.
+  let primed: { id: string; src: string; el: HTMLMediaElement } | null = null;
   const listeners = new Set<() => void>();
   const notify = () => queueMicrotask(() => listeners.forEach((listener) => listener()));
   const playback = {
@@ -99,10 +107,15 @@ export function createMediaStore() {
       if (current) drop(current);
       const wasClosed = closedId === ref.id;
       if (!wasClosed) closedId = null;
-      const el = document.createElement(ref.kind === "audio" ? "audio" : "video");
-      if (wasClosed) el.preload = "none";
-      el.setAttribute("src", ref.src);
-      el.autoplay = appId === "music" && !wasClosed;
+      const taken = primed && primed.id === ref.id && primed.src === ref.src && ref.kind === "audio" ? primed.el : null;
+      if (primed && !taken) { primed.el.pause(); primed.el.removeAttribute("src"); primed.el.load(); primed.el.remove(); }
+      primed = null;
+      const el = taken ?? document.createElement(ref.kind === "audio" ? "audio" : "video");
+      if (!taken) {
+        if (wasClosed) el.preload = "none";
+        el.setAttribute("src", ref.src);
+        el.autoplay = appId === "music" && !wasClosed;
+      }
       // The Player that asked for it adopts it in the same commit, and parks it in the kit's hidden spot when it goes. This file does
       // not import the Player (it stays out of the shell's main chunk; PackageAppPage loads it on demand).
       el.addEventListener("play", () => {
@@ -114,9 +127,20 @@ export function createMediaStore() {
       });
       for (const event of ["play", "pause", "ended", "emptied"] as const) el.addEventListener(event, notify);
       // A live station is asked for by the person's press on Play, so its bar opens at once and shows Connecting until sound arrives.
-      current = { ...ref, appId, el, started: el.autoplay && liveStationIdOf(ref.src) !== null };
+      current = { ...ref, appId, el, started: taken ? !el.paused : el.autoplay && liveStationIdOf(ref.src) !== null };
       notify();
       return el;
+    },
+    /** MEDIA-PARITY-02: hold an element that is already playing this song until `elementFor` asks for it. A second call replaces the first. */
+    prime(ref: Pick<MediaItemRef, "id" | "src">, el: HTMLMediaElement) {
+      if (primed && primed.el !== el) { primed.el.pause(); primed.el.removeAttribute("src"); primed.el.load(); primed.el.remove(); }
+      primed = { id: ref.id, src: ref.src, el };
+    },
+    /** Drop a primed element nobody took (the fade was cancelled). */
+    unprime(el: HTMLMediaElement) {
+      if (primed?.el !== el) return;
+      el.pause(); el.removeAttribute("src"); el.load(); el.remove();
+      primed = null;
     },
     /** RADIO-03: the song a live station reports replaces the bar's subtitle (the element and the source stay as they are). */
     setSubtitle(el: HTMLMediaElement, subtitle: string) {
@@ -198,6 +222,9 @@ export function MediaHostProvider({ children, personId, ageBand }: { children: R
       playback: store.playback,
       async onPlay(mediaId, item) {
         if (mediaId === "story" && typeof item.story_id === "string") return listener.listen(item.story_id);
+        // MEDIA-PARITY-02: a Library row's Save for offline arrives as a play with the media id `offline:<song id>`; it keeps or removes the copy and says which.
+        const offline = offlineIdOf(mediaId);
+        if (offline !== null) { pushRef.current(await toggleKeptSong(offline)); return; }
         // A row from a media app carries its kind; any other caller names only the id, and the hub says what it is.
         const kind = typeof item.kind === "string" ? item.kind : (await api.mediaItem(mediaId)).item.kind;
         if (kind === "track") {
@@ -252,20 +279,24 @@ export function MediaHostProvider({ children, personId, ageBand }: { children: R
     parkMedia(el);
     await el.play();
   }, [store]);
+  /** The song that follows `heldId`: the queue's own next song, or any later one with shuffle; null when there is none. */
+  const nextAfter = useCallback(async (heldId: string): Promise<string | null> => {
+    const mode = getPlayMode();
+    const nextId = await nextMusicQueueId(heldId);
+    const ahead = mode.shuffle ? (await api.appData<Array<{ id: string }>>("music", "up-next", { id: heldId })).map((row) => row.id) : [];
+    return chooseNext({ nextId, ahead, currentId: heldId, first: history.current[0], mode });
+  }, []);
   const advance = useCallback(async () => {
     const held = store.get();
     if (!held || held.appId !== "music") return;
     try {
-      const mode = getPlayMode();
-      const nextId = await nextMusicQueueId(held.id);
-      const ahead = mode.shuffle ? (await api.appData<Array<{ id: string }>>("music", "up-next", { id: held.id })).map((row) => row.id) : [];
-      const queuedId = chooseNext({ nextId, ahead, currentId: held.id, first: history.current[0], mode });
+      const queuedId = await nextAfter(held.id);
       if (!queuedId || store.get()?.id !== held.id) return;
       await playQueued(queuedId, held, true);
     } catch {
       // Keep the last item available for Play when a queue read or browser autoplay fails.
     }
-  }, [store, playQueued]);
+  }, [store, playQueued, nextAfter]);
   const previous = useCallback(async () => {
     const held = store.get();
     if (!held || held.appId !== "music") return;
@@ -289,10 +320,67 @@ export function MediaHostProvider({ children, personId, ageBand }: { children: R
   // The schema Player advances on Now playing. Away from that page, the host keeps the same queue moving.
   useEffect(() => {
     if (!current || current.appId !== "music") return;
-    const ended = () => { if (pathRef.current !== "/apps/music/play") void advance(); };
+    const ended = () => { if (handedOff.has(current.el)) return; if (pathRef.current !== "/apps/music/play") void advance(); };
     current.el.addEventListener("ended", ended);
     return () => current.el.removeEventListener("ended", ended);
   }, [current, advance]);
+  // MEDIA-PARITY-02: tell the hub which songs this device keeps for offline play, once per start and whenever the browser comes back online.
+  useEffect(() => {
+    if (!personId) return;
+    void reportKeptSongs();
+    const again = () => { void reportKeptSongs(); };
+    window.addEventListener("online", again);
+    return () => window.removeEventListener("online", again);
+  }, [personId]);
+  // MEDIA-PARITY-02: the person's Music sound settings. Crossfade is read here; the Equalizer preset is seeded into its store (which the menu and the
+  // audio graph read) and its writer saves a choice back to the setting.
+  const queryClient = useQueryClient();
+  const soundScope = personId ? `person:${personId}` : null;
+  const sound = useQuery({ queryKey: ["settings-values", soundScope], queryFn: () => api.settingsValues(soundScope!), enabled: soundScope !== null });
+  const soundRows = Array.isArray(sound.data) ? sound.data : null;
+  const crossfadeS = crossfadeSeconds(soundRows?.find((entry) => entry.key === "music.crossfade_s")?.value);
+  const savedEq = soundRows?.find((entry) => entry.key === "music.eq_preset")?.value;
+  const haveSound = soundRows !== null;
+  useEffect(() => { if (haveSound) seedEqPreset(savedEq); }, [haveSound, savedEq]);
+  useEffect(() => {
+    if (!soundScope) return;
+    setEqWriter((preset) => { api.setSetting(soundScope, "music.eq_preset", preset).then(() => queryClient.invalidateQueries({ queryKey: ["settings-values", soundScope] })).catch(() => {}); });
+    return () => setEqWriter(null);
+  }, [soundScope, queryClient]);
+  const eq = useEqPreset();
+  const heldEl = current?.el ?? null;
+  const heldMusic = current?.appId === "music" && current.kind === "audio" && current.src ? current : null;
+  const heldLive = heldMusic ? liveStationIdOf(heldMusic.src) !== null : false;
+  // A tone preset needs the element routed through Web Audio (tapped once, when it plays). Not on iOS, where that would end background playback.
+  useEffect(() => {
+    if (!heldEl || !heldMusic || heldLive || eq === "flat" || !eqSupported()) return;
+    const tap = () => { analyserFor(heldEl); };
+    const events = ["play", "playing", "timeupdate"] as const;
+    events.forEach((name) => heldEl.addEventListener(name, tap));
+    if (!heldEl.paused) tap();
+    return () => events.forEach((name) => heldEl.removeEventListener(name, tap));
+  }, [heldEl, heldMusic?.id, heldLive, eq]);
+  // Crossfade: the end of this song fades into the start of the next (never a station, podcast or audiobook, and never when no next song is there).
+  useEffect(() => {
+    if (!heldMusic || heldLive || crossfadeS <= 0) return;
+    const readNext = async (id: string) => {
+      const item = await api.appData<{ id: string; src: string; title: string; subtitle?: string; poster?: string } | []>("music", "item", { id });
+      return Array.isArray(item) ? null : item;
+    };
+    return attachCrossfade({ id: heldMusic.id, appId: heldMusic.appId, kind: heldMusic.kind, src: heldMusic.src, el: heldMusic.el, live: false }, {
+      seconds: crossfadeS, ios: isIos(), store,
+      pickNext: (held) => nextAfter(held.id),
+      readNext,
+      makeElement: () => document.createElement("audio"),
+      afterHandOff: ({ from, next, el }) => {
+        history.current.push(from.id);
+        void import("@maipai/ui/src/primitives/Player").then(({ parkMedia }) => parkMedia(el));
+        void request("/api/plugins/music/queue", { method: "POST", body: JSON.stringify({ id: next.id }) }).catch(() => undefined);
+        const to = pathRef.current === "/apps/music/play" ? playRoute("track", next.id) : null;
+        if (to) navigate(to, { state: { pageState: { id: next.id } } });
+      },
+    });
+  }, [heldMusic?.id, heldMusic?.el, heldLive, crossfadeS, store, nextAfter, navigate]);
   // MEDIA-KID-01: the daily media minutes pause the host's element (every media app, the mini bar, audio and video alike).
   // The words go through the shell's one toast (the kit ToastProvider in App.tsx, the same one the notification bell uses).
   const element = current?.el ?? null;

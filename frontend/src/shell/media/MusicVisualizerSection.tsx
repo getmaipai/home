@@ -11,6 +11,7 @@ import { useMediaDock } from "@/shell/mediaHost";
 import { AudioVisualizer, useVisualizerEnabled, useVisualizerPref } from "@/shell/media/AudioVisualizer";
 import { MinimizeButton } from "@/shell/media/MinimizeButton";
 import { NowPlayingStage } from "@/shell/media/NowPlayingStage";
+import { EqualizerMenu } from "@/shell/media/EqualizerMenu";
 import { SleepMenu } from "@/shell/media/SleepMenu";
 import { useIsPlaying, useMediaAnalyser, useProgress } from "@/shell/media/useMediaAnalyser";
 import { VisualizerMenu } from "@/shell/media/VisualizerMenu";
@@ -64,6 +65,7 @@ export function MusicVisualizerSection({ id }: { id: string }) {
         <MinimizeButton appHome="/apps/music" />
         <VisualizerMenu withLabel />
         <SleepMenu withLabel />
+        <EqualizerMenu withLabel />
         <span className="flex items-center gap-2 px-2">
           <MuteIcon aria-hidden="true" className="size-4 text-muted-foreground" />
           <div className="w-24"><Slider aria-label={i18n._({ id: "Volume", message: "Volume" })} min={0} max={1} step={0.01} value={[volume]} onValueChange={(value) => { const next = Array.isArray(value) ? value[0] : value; if (typeof next === "number") mine.el.volume = next; }} /></div>

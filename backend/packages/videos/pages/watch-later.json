@@ -28,6 +28,28 @@
               }
             }
           }
+        },
+        {
+          "icon": "list-plus",
+          "label": "Save to playlist",
+          "action": {
+            "call": {
+              "target": "/api/plugins/videos/playlists/save",
+              "args": {
+                "media_id": "{id}"
+              }
+            }
+          }
+        },
+        {
+          "icon": "share",
+          "label": "Share",
+          "action": {
+            "share": {
+              "to": "/apps/videos/watch?id={id}",
+              "title": "{title}"
+            }
+          }
         }
       ],
       "aspect": "wide",
@@ -48,7 +70,9 @@
           }
         },
         "action_label": "Browse videos"
-      }
+      },
+      "card_radius": "soft",
+      "item_avatar_field": "channel_avatar"
     }
   ]
 }

@@ -6,6 +6,11 @@ import { getHouseholdSettingValue } from "@/lib/settings";
 import { mediaBandOf, bandAllows } from "./band";
 import { startLibraryAlign } from "@/lib/music/libraryAlign";
 import { registerItemView } from "./appHost";
+import { registerAppPageFill } from "@/lib/apps";
+import { fillLibraryPage } from "./musicLibrary";
+
+// PARITY-02: the Library opens on the order this person chose last time.
+registerAppPageFill("music", "library", fillLibraryPage);
 
 registerItemView("music", (person, item, view) => {
   const allowed = bandAllows(person, item);

@@ -4,6 +4,8 @@
 // and `player` nodes (docs/dev/media-library.md, "Media apps"). Every read goes through the person's band and each source's `visible_to`;
 // a child is allowlist-only (design section 11): the household's library plus channels an adult followed for them, and no discovery rows.
 import { chaptersForMadeClip } from "@/lib/videos/chapters";
+import { videoScopedData, withChannelAvatars } from "@/lib/videos/playlistData";
+import { librarySortFor } from "@/lib/videos/librarySort";
 import { withVideoByline } from "./videoByline";
 import { videoRules, wantsVideoRules } from "./videoFilters";
 import { and, desc, eq, inArray, isNull, like, sql, type SQL } from "drizzle-orm";
@@ -39,6 +41,7 @@ import { songFactFor } from "./songFacts";
 import { getMade } from "@/lib/music/madeRecords";
 import { MIX_SCOPES, musicMixData } from "./musicMixes";
 import { musicLibraryData } from "./musicLibrary";
+import { memberCandidates, memberPlaylists, ownPlaylists, playlistFor, playlistVisibility } from "./musicPlaylists";
 import { albumKey, artistKey, albumOrder, groupTracks, radioTracks, shuffled } from "./music";
 import type { Result } from "@/lib/result";
 
@@ -342,6 +345,8 @@ export interface DataParams {
   /** PARITY-01, Music `songs` scope `library` and Videos `library`: the sort (recents, a-z, creator) and the kind chip (all, songs, albums, artists, playlists). */
   sort?: string;
   kind?: string;
+  /** MEDIA-PARITY-02, Music: which browser or device is asking (set by the route from its session, never from the body); a Library row says whether this device keeps it for offline play. */
+  device?: string;
   /** VIDEO-UI-06, Videos `recipes` scope `feed`: the Type filter (all, video, still). */
   type?: string;
   /** VIDEO-UI-06, Videos `recipes` scope `feed`: only the clips the person marked as favorites. */
@@ -692,13 +697,20 @@ export function safeTemplateFields<T>(value: T): T {
 
 export function mediaAppData(person: PersonRow, appId: MediaAppId, dataId: string, params: DataParams): ReturnType<typeof mediaAppDataRaw> {
   // APPS-PARITY: the Videos chips (filter, type, channel) and the library sort narrow or order the rows the id already builds.
+  if (appId === "videos") {
+    // MEDIA-PARITY-02: playlists, the channel strip and search suggestions answer by scope (lib/videos/playlistData.ts).
+    const scoped = videoScopedData(person, dataId.replace(/_/g, "-"), params);
+    if (scoped !== null) return safeTemplateFields(scoped as never);
+  }
   if (appId === "videos" && wantsVideoRules(dataId.replace(/_/g, "-"), params)) {
     const id = dataId.replace(/_/g, "-");
+    // MEDIA-PARITY-02: the Library's sort is the person's saved one unless the page names one (and a new choice is saved).
+    const ruled = id === "library" && params.query === undefined ? { ...params, sort: librarySortFor(person, params.sort) } : params;
     const asked = (over: DataParams) => mediaAppDataRaw(person, appId, id, over) as MediaRow[];
-    return safeTemplateFields(withVideoByline(videoRules(person, id, params, asked, Math.min(Math.max(params.limit ?? (id === "library" ? 200 : 20), 1), 200)) as never));
+    return safeTemplateFields(withChannelAvatars(person, withVideoByline(videoRules(person, id, ruled, asked, Math.min(Math.max(params.limit ?? (id === "library" ? 200 : 20), 1), 200)) as never)));
   }
   const raw = mediaAppDataRaw(person, appId, dataId, params);
-  return safeTemplateFields(appId === "videos" && dataId !== "recipes" ? withVideoByline(raw) : raw);
+  return safeTemplateFields(appId === "videos" && dataId !== "recipes" ? withChannelAvatars(person, withVideoByline(raw)) : raw);
 }
 
 /** What to play after `item`: the person's watch-later queue first, then the rest of the channel in order, then the newest others. */
@@ -1321,15 +1333,15 @@ function musicData(person: PersonRow, dataId: string, params: DataParams): unkno
       ...(years.length === 1 ? { year: years[0] } : {}), ...(genres.length === 1 ? { genre: genres[0] } : {}) }];
   }
   if (dataId === "header" && params.scope === "playlist") {
-    const collection = resolveCollection(person.id, params.id ?? "");
-    if (collection?.kind !== "playlist" || !visiblePlaylists(person).some((entry) => entry.id === collection.id)) return [];
+    const collection = playlistFor(person, params.id ?? "")?.collection;
+    if (!collection || !visiblePlaylists(person).some((entry) => entry.id === collection.id)) return [];
     const tracks = playlistTracks(person, collection);
     const tile = playlistTile(person, collection);
     const owner = db.select().from(people).where(eq(people.id, collection.person_id)).get();
     const art = tracks.length ? artworkUrl(tracks.find((item) => item.artwork) ?? tracks[0]!) : null;
     const minutes = durationMinutes(tracks);
     return [{ ...tile, queue_mode: "playlist", shuffle_id: `shuffle:${collection.id}`, share_id: encodeURIComponent(collection.id), creator: { name: owner?.displayName ?? "Someone" }, art,
-      meta: `Playlist · ${songCount(tracks.length)}`, footer_lines: [durationLine(tracks)], visibility: collectionVisibility(collection.shared_to), made_at: collection.created_at }];
+      meta: `Playlist · ${songCount(tracks.length)}`, footer_lines: [durationLine(tracks)], visibility: playlistVisibility(person, collection), candidates: memberCandidates(person, collection), made_at: collection.created_at }];
   }
   if (dataId === "album") {
     const tracks = albumOrder(groupTracks(musicLibrary(person), "album").get(params.id ?? "") ?? []);
@@ -1358,11 +1370,11 @@ function musicData(person: PersonRow, dataId: string, params: DataParams): unkno
   if (dataId === "playlists") return visiblePlaylists(person).map((collection) => playlistTile(person, collection));
   if (dataId === "playlist-new") return [{ id: "new", title: "New playlist", channel: "Start an empty playlist", kind: "track" }];
   if (dataId === "playlist") {
-    const collection = resolveCollection(person.id, params.id ?? "");
-    if (collection?.kind !== "playlist" || !visiblePlaylists(person).some((entry) => entry.id === collection.id)) return [];
+    const collection = playlistFor(person, params.id ?? "")?.collection;
+    if (!collection || !visiblePlaylists(person).some((entry) => entry.id === collection.id)) return [];
     const tracks = playlistTracks(person, collection);
-    // The index column is the place in this list, not the song's number on its album.
-    return trackRows(person, tracks, (item) => ({ playlist_id: collection.id, track_number: tracks.indexOf(item) + 1 }));
+    // The index column is the place in this list, not the song's number on its album. `reorder_key` names the playlist too: the kit sends only the keys when rows are dragged.
+    return trackRows(person, tracks, (item) => ({ playlist_id: collection.id, reorder_key: `${collection.id}:${item.id}`, track_number: tracks.indexOf(item) + 1 }));
   }
   if (dataId === "liked") return trackRows(person, itemsInOrder(person, "music", [...collectionIds(person, "liked")].reverse(), Math.min(Math.max(params.limit ?? 20, 1), 200)));
   if (dataId === "history") return trackRows(person, itemsInOrder(person, "music", recentProgress(person.id, 120).map((progress) => progress.media_id), 60));
@@ -1380,26 +1392,26 @@ const ALL_TRACKS = 1_000_000;
 function playlistTracks(person: PersonRow, collection: MediaCollection): MediaItem[] {
   return itemsInOrder(person, "music", collection.items.map((entry) => entry.media_id), ALL_TRACKS);
 }
-/** The person's own playlists; a minor never sees one whose name trips the floor. */
+/** The person's own music playlists and the ones they are a member of; a minor never sees one whose name trips the floor. */
 export function visiblePlaylists(person: PersonRow): MediaCollection[] {
-  return listCollections(person.id, "playlist").filter((collection) => mediaBandOf(person) === "adult" || !trips(collection.title));
+  return [...ownPlaylists(person), ...memberPlaylists(person)].filter((collection) => mediaBandOf(person) === "adult" || !trips(collection.title));
 }
 
 /** The Playlists page's two buttons. "new" makes an empty playlist; "add" puts a song on the newest playlist (a first one is made if there is none). */
 export function musicPlaylistAction(person: PersonRow, args: Record<string, unknown>): ActionResult<{ id: string; title: string }> {
   if (args.op === "new") {
-    const made = createCollection(person.id, "playlist", `Playlist ${listCollections(person.id, "playlist").length + 1}`);
+    const made = createCollection(person.id, "playlist", `Playlist ${visiblePlaylists(person).length + 1}`);
     return { ok: true, value: { id: made.id, title: made.title } };
   }
   if (args.op === "remove") {
     const own = typeof args.playlist_id === "string" ? resolveCollection(person.id, args.playlist_id) : null;
-    if (own?.kind !== "playlist" || typeof args.media_id !== "string") return { ok: false, status: 404, error: "That playlist is not available. Go back to Playlists and choose another." };
+    if (own?.kind !== "playlist" || own.media_kind !== "music" || typeof args.media_id !== "string") return { ok: false, status: 404, error: "That playlist is not available. Go back to Playlists and choose another." };
     removeItemFrom(own, args.media_id);
     return { ok: true, value: { id: own.id, title: own.title } };
   }
   const item = typeof args.media_id === "string" ? readableIn(person, "music", args.media_id) : null;
   if (!item) return { ok: false, status: 404, error: "That song is not available. Go back to the library and choose another." };
-  const playlist = visiblePlaylists(person).sort((a, b) => b.created_at.localeCompare(a.created_at))[0] ?? createCollection(person.id, "playlist", "My playlist");
+  const playlist = ownPlaylists(person).filter((collection) => mediaBandOf(person) === "adult" || !trips(collection.title)).sort((a, b) => b.created_at.localeCompare(a.created_at))[0] ?? createCollection(person.id, "playlist", "My playlist");
   if (!playlist.items.some((entry) => entry.media_id === item.id)) addItem(playlist, item.id);
   return { ok: true, value: { id: playlist.id, title: playlist.title } };
 }
@@ -1422,8 +1434,8 @@ export function startMusicQueue(person: PersonRow, args: Record<string, unknown>
   } else if (mode === "artist") tracks = albumOrder(library.filter((item) => artistKey(item) === id)).sort((a, b) => (a.album ?? "").localeCompare(b.album ?? ""));
   else if (mode === "album") tracks = albumOrder(library.filter((item) => albumKey(item) === id));
   else if (mode === "playlist") {
-    const collection = resolveCollection(person.id, id);
-    if (collection?.kind === "playlist") tracks = playlistTracks(person, collection);
+    const collection = playlistFor(person, id)?.collection;
+    if (collection) tracks = playlistTracks(person, collection);
   } else {
     const item = library.find((item) => item.id === id) ?? (id ? promoteMadeMusicFile(person, id) : null);
     if (item) {

@@ -51,6 +51,18 @@
               }
             },
             {
+              "label": "Save to playlist",
+              "icon": "list-plus",
+              "action": {
+                "call": {
+                  "target": "/api/plugins/videos/playlists/save",
+                  "args": {
+                    "media_id": "{id}"
+                  }
+                }
+              }
+            },
+            {
               "label": "Share",
               "icon": "share",
               "action": {
@@ -216,7 +228,8 @@
             "play": {
               "media_id": "{id}"
             }
-          }
+          },
+          "card_radius": "soft"
         }
       ],
       "aside_sheet": "phone"

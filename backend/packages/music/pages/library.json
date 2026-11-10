@@ -31,7 +31,7 @@
             "label": "Recents"
           },
           {
-            "value": "a-z",
+            "value": "az",
             "label": "A to Z"
           },
           {
@@ -63,6 +63,10 @@
           {
             "value": "playlists",
             "label": "Playlists"
+          },
+          {
+            "value": "downloaded",
+            "label": "Downloaded"
           }
         ]
       },
@@ -79,28 +83,25 @@
         {
           "icon": "pin",
           "label": "Pin",
-          "hide_when_field": "pinned",
+          "label_field": "pin_label",
           "action": {
             "call": {
               "target": "/api/plugins/music/pin",
               "args": {
-                "op": "pin",
+                "op": "toggle",
                 "key": "{pin_key}"
               }
             }
           }
         },
         {
-          "icon": "pin-off",
-          "label": "Unpin",
-          "show_when_field": "pinned",
+          "icon": "download",
+          "label": "Save for offline",
+          "label_field": "offline_label",
+          "show_when_field": "is_song",
           "action": {
-            "call": {
-              "target": "/api/plugins/music/pin",
-              "args": {
-                "op": "unpin",
-                "key": "{pin_key}"
-              }
+            "play": {
+              "media_id": "offline:{id}"
             }
           }
         },
@@ -120,7 +121,7 @@
       "empty_state": {
         "type": "empty_state",
         "icon": "music",
-        "text": "Nothing here yet. Make a song or add music to your library.",
+        "text": "Nothing here yet. Make a song, add music to your library, or save songs for offline.",
         "action": {
           "navigate": {
             "to": "/apps/music/create"

@@ -8,11 +8,15 @@ import { addItem, createCollection, listCollections, removeItemFrom, resolveColl
 import { artistKey, groupTracks } from "./music";
 import type { MediaCollection, MediaItem } from "./model";
 import { recentProgress } from "./progress";
+import { getPersonSettingValue, setValue } from "@/lib/settings";
 import { albumTile, musicLibrary, playlistTile, readableIn, trackRows, tileOfArtist, visiblePlaylists, type ActionResult, type DataParams } from "./appHost";
 
 export const MUSIC_PIN_MAX = 6;
 export const MUSIC_SEARCH_MAX = 10;
 const PINS_TITLE = "music:pins";
+/** MEDIA-PARITY-02: the song ids this browser or phone says it keeps for offline play, one private list per device (a hashed session or a paired device). */
+const KEPT_TITLE_PREFIX = "music:kept:";
+export const MUSIC_KEPT_MAX = 500;
 const SEARCHES_TITLE = "music:recent-searches";
 
 /** The person's own private collection with this title, made the first time it is written. */
@@ -44,8 +48,10 @@ function pinTargetExists(person: PersonRow, key: string): boolean {
 /** Pin or unpin one library entry. At most six pins per person; pinning a seventh asks the person to unpin one. */
 export function pinMusicItem(person: PersonRow, args: Record<string, unknown>): ActionResult<{ key: string; on: boolean }> {
   const key = typeof args.key === "string" ? args.key : "";
-  const on = args.on === true || args.on === "true" || args.op === "pin";
-  const off = args.on === false || args.on === "false" || args.op === "unpin";
+  // `toggle` is the Library row's one Pin button: it pins what is not pinned and unpins what is.
+  const toggled = args.op === "toggle" ? !pinKeys(person).includes(key) : null;
+  const on = toggled === true || args.on === true || args.on === "true" || args.op === "pin";
+  const off = toggled === false || args.on === false || args.on === "false" || args.op === "unpin";
   if (!on && !off) return { ok: false, status: 400, error: "Choose Pin or Unpin." };
   if (off) {
     saveKeys(person, PINS_TITLE, pinKeys(person).filter((have) => have !== key));
@@ -61,6 +67,7 @@ export function pinMusicItem(person: PersonRow, args: Record<string, unknown>): 
 
 /** Play next puts a song right after the one playing; Add to queue puts it at the end. Only this person's queue changes. */
 export function musicQueueAction(person: PersonRow, args: Record<string, unknown>): ActionResult<{ id: string; label: string }> {
+  if (args.op === "reorder") return reorderMusicQueue(person, args);
   if (args.op !== "play_next" && args.op !== "add") return { ok: false, status: 400, error: "Choose Play next or Add to queue." };
   const item = typeof args.media_id === "string" ? readableIn(person, "music", args.media_id) : null;
   if (!item || item.kind !== "track") return { ok: false, status: 404, error: "That song is not available. Go back to the library and choose another." };
@@ -71,6 +78,25 @@ export function musicQueueAction(person: PersonRow, args: Record<string, unknown
   if (args.op === "add") addItem(without, item.id);
   else addItem(without, item.id, { at: without.pointer === null ? 0 : without.pointer + 1 });
   return { ok: true, value: { id: item.id, label: args.op === "add" ? "Added to Up next" : "Playing next" } };
+}
+
+/** The Up next list was dragged: `ids` is the new order of the songs shown (the ones after the playing song). The playing song and what came before it stay put. */
+function reorderMusicQueue(person: PersonRow, args: Record<string, unknown>): ActionResult<{ id: string; label: string }> {
+  const ids = Array.isArray(args.ids) && args.ids.every((entry) => typeof entry === "string") ? (args.ids as string[]) : null;
+  if (!ids) return { ok: false, status: 400, error: "Drag the songs into the order you want, then try again." };
+  const queue = resolveCollection(person.id, "queue")!;
+  const inQueue = new Set(queue.items.map((entry) => entry.media_id));
+  const named = [...new Set(ids)].filter((id) => inQueue.has(id));
+  if (named.length === 0) return { ok: false, status: 404, error: "Those songs are no longer in Up next. Open Now playing and look at the list again." };
+  const upTo = queue.pointer === null ? -1 : queue.pointer;
+  const played = queue.items.slice(0, upTo + 1).filter((entry) => !named.includes(entry.media_id));
+  const rest = queue.items.slice(upTo + 1).filter((entry) => !named.includes(entry.media_id));
+  const byId = new Map(queue.items.map((entry) => [entry.media_id, entry]));
+  const items = [...played, ...named.map((id) => byId.get(id)!), ...rest];
+  const current = queue.pointer === null ? undefined : queue.items[queue.pointer]?.media_id;
+  const pointer = current === undefined ? null : items.findIndex((entry) => entry.media_id === current);
+  setItems(queue, items, pointer === -1 ? null : pointer);
+  return { ok: true, value: { id: named[0]!, label: "Up next reordered" } };
 }
 
 /** Remember one search the person ran: newest first, once each, the latest ten. */
@@ -94,27 +120,64 @@ function recentSearchRows(person: PersonRow): { as_of: string; rows: Array<{ key
   return { as_of: new Date().toISOString(), rows };
 }
 
+/** The device told us which songs it keeps for offline play (only songs this person may read, at most 500). The list replaces the device's last one. */
+export function reportKeptSongs(person: PersonRow, device: string, args: Record<string, unknown>): ActionResult<{ count: number }> {
+  if (!Array.isArray(args.ids) || args.ids.some((id) => typeof id !== "string")) return { ok: false, status: 400, error: "Say which songs this device keeps, then try again." };
+  const ids = [...new Set(args.ids as string[])].slice(0, MUSIC_KEPT_MAX).filter((id) => readableIn(person, "music", id)?.kind === "track");
+  saveKeys(person, `${KEPT_TITLE_PREFIX}${device}`, ids);
+  return { ok: true, value: { count: ids.length } };
+}
+const keptOn = (person: PersonRow, device: string | undefined): Set<string> => new Set(device ? keysOf(person, `${KEPT_TITLE_PREFIX}${device}`) : []);
+
 type Entry = { row: Record<string, unknown>; title: string; creator: string; rank: number; added: string };
-const SORTS = ["recents", "a-z", "creator"] as const;
-const KINDS = ["all", "songs", "albums", "artists", "playlists"] as const;
+const SORTS = ["recents", "az", "creator"] as const;
+type LibrarySort = (typeof SORTS)[number];
+/** The page says `az`; an older page or caller may still say `a-z`. Anything else is not a sort. */
+const asSort = (value: unknown): LibrarySort | null => (value === "a-z" ? "az" : (SORTS as readonly unknown[]).includes(value) ? (value as LibrarySort) : null);
+
+/** The person's saved Library order (setting `music.library_sort`), Recents until they choose one. */
+export function savedLibrarySort(person: PersonRow): LibrarySort {
+  return asSort(getPersonSettingValue(person, "music.library_sort")) ?? "recents";
+}
+
+/** The sort chip wrote a new choice: keep it for this person so the Library opens the same way next time. */
+function rememberLibrarySort(person: PersonRow, sort: LibrarySort): void {
+  if (savedLibrarySort(person) !== sort) setValue(person, `person:${person.id}`, "music.library_sort", sort);
+}
+
+/** The Library page opens on the person's saved order: their choice is moved to the front of the sort options, and the first option is the page's default. */
+export function fillLibraryPage(person: PersonRow, page: Record<string, unknown>): void {
+  const shelf = (page.body as Array<Record<string, unknown>> | undefined)?.find((node) => node.type === "media_shelf");
+  const options = (shelf?.sort as { options?: Array<{ value: string }> } | undefined)?.options;
+  if (!options) return;
+  const saved = savedLibrarySort(person);
+  const at = options.findIndex((option) => option.value === saved);
+  if (at > 0) options.unshift(...options.splice(at, 1));
+}
+const KINDS = ["all", "songs", "albums", "artists", "playlists", "downloaded"] as const;
 
 /** The Library's one list. `sort` is recents (played last, then added last), a-z (title) or creator; `kind` narrows to one kind. Pinned rows carry `pinned: true`. */
 function libraryRows(person: PersonRow, params: DataParams): Array<Record<string, unknown>> {
-  const sort = (SORTS as readonly string[]).includes(params.sort ?? "") ? params.sort! : "recents";
+  const asked = asSort(params.sort);
+  if (asked) rememberLibrarySort(person, asked);
+  const sort = asked ?? savedLibrarySort(person);
   const kind = (KINDS as readonly string[]).includes(params.kind ?? "") ? params.kind! : "all";
   const library = musicLibrary(person);
   const rankOf = new Map(recentProgress(person.id, 1000).map((progress, index) => [progress.media_id, index]));
   const best = (tracks: readonly MediaItem[]) => tracks.reduce((low, item) => Math.min(low, rankOf.get(item.id) ?? Number.POSITIVE_INFINITY), Number.POSITIVE_INFINITY);
   const newest = (tracks: readonly MediaItem[]) => tracks.reduce((latest, item) => (item.added_at > latest ? item.added_at : latest), "");
   const pins = new Set(pinKeys(person));
+  const kept = keptOn(person, params.device);
   const albums = groupTracks(library, "album"), artists = groupTracks(library, "artist");
   const entries: Entry[] = [];
   const push = (route: string, label: string, pinKey: string, tile: Record<string, unknown>, creator: string, line: string, tracks: readonly MediaItem[], extra: Record<string, unknown> = {}, added = newest(tracks)) => {
-    entries.push({ title: String(tile.title), creator, rank: best(tracks), added, row: { ...tile, ...extra, route, kind_label: label, pin_key: pinKey, pinned: pins.has(pinKey), is_song: route === "play", subtitle_line: line } });
+    entries.push({ title: String(tile.title), creator, rank: best(tracks), added, row: { ...tile, ...extra, route, kind_label: label, pin_key: pinKey, pinned: pins.has(pinKey), pin_label: pins.has(pinKey) ? "Unpin" : "Pin", is_song: route === "play",
+      downloaded: route === "play" && kept.has(String(tile.id)), offline_label: kept.has(String(tile.id)) ? "Remove download" : "Save for offline", subtitle_line: line } });
   };
-  if (kind === "all" || kind === "songs") {
+  if (kind === "all" || kind === "songs" || kind === "downloaded") {
     const rows = trackRows(person, library);
     library.forEach((item, index) => {
+      if (kind === "downloaded" && !kept.has(item.id)) return;
       const artist = artistKey(item);
       push("play", "Song", `track:${item.id}`, rows[index]!, artist, `Song · ${artist}`, [item], { artist_id: artist });
     });
@@ -136,7 +199,7 @@ function libraryRows(person: PersonRow, params: DataParams): Array<Record<string
     }
   }
   const byTitle = (a: Entry, b: Entry) => a.title.localeCompare(b.title);
-  entries.sort(sort === "a-z" ? byTitle : sort === "creator" ? (a, b) => a.creator.localeCompare(b.creator) || byTitle(a, b) : (a, b) => (a.rank === b.rank ? b.added.localeCompare(a.added) || byTitle(a, b) : a.rank - b.rank));
+  entries.sort(sort === "az" ? byTitle : sort === "creator" ? (a, b) => a.creator.localeCompare(b.creator) || byTitle(a, b) : (a, b) => (a.rank === b.rank ? b.added.localeCompare(a.added) || byTitle(a, b) : a.rank - b.rank));
   return entries.map((entry) => entry.row);
 }
 

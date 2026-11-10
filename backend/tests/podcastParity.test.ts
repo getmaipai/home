@@ -183,7 +183,7 @@ describe("the pages", () => {
     const shows = read("shows").body as Array<Record<string, any>>;
     expect(shows[0]!.leading.map((option: { value: string }) => option.value)).toEqual(["followed", "unfollowed", "downloaded"]);
     const latest = (read("index").body as Array<Record<string, any>>).find((node) => node.heading === "Latest episodes")!;
-    expect(latest).toMatchObject({ orientation: "vertical", item_badge_field: "badge" });
+    expect(latest).toMatchObject({ orientation: "vertical", item_badge_field: "unplayed", item_badge_presentation: "dot" });
     expect(latest.row_actions.length).toBeLessThanOrEqual(3);
     expect(latest.row_actions.map((action: { label: string }) => action.label)).toEqual(["Play", "Add to queue", "Save"]);
   });

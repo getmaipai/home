@@ -3,19 +3,20 @@
 // Listen Now's Latest episode rows with their queue and played fields, and Mark played. Everything is read from this hub's own data;
 // nothing here makes a request. Unfollowing PAUSES the show (its saved copies and history stay, no new episodes arrive), so a show
 // the household stops following is listed as Unfollowed and Follow brings it back.
-import { and, eq, isNull } from "drizzle-orm";
+import { and, eq, isNotNull, isNull } from "drizzle-orm";
 import { db } from "@/db";
-import { mediaSources } from "@/db/schema";
+import { mediaItems, mediaSources } from "@/db/schema";
 import type { PersonRow } from "@/types";
 import { findFeedByUrl } from "@/lib/shelf/feedStore";
 import { checkFeedAddress } from "@/lib/shelf/feedAddresses";
-import { collectionIds, readableIn, type MediaRow } from "./appHost";
+import { allowedSources, collectionIds, queryItems, readableIn, type MediaRow } from "./appHost";
 import { isMediaAdmin } from "./access";
 import { mediaBandOf } from "./band";
 import { correctedStamp, getProgress, getProgressMany, writeProgress } from "./progress";
 import { removeItemFrom, resolveCollection } from "./collections";
 import type { MediaItem, MediaSource } from "./model";
-import { pollPodcastNow, sourceRowForFeed, subscribePodcast, updatePodcastSource, type Outcome } from "./podcasts";
+import { AUTO_DOWNLOAD_PER_REFRESH, mayManageSaves, pollPodcastNow, queuePodcastAutoRules, sourceRowForFeed, subscribePodcast, updatePodcastSource, type Outcome } from "./podcasts";
+import { getSettingValueForPerson } from "@/lib/settings";
 
 export type EpisodeSort = "latest" | "top" | "seasons";
 export const episodeSortOf = (value: unknown): EpisodeSort => (value === "top" || value === "seasons" ? value : "latest");
@@ -118,6 +119,8 @@ export function episodeFields(person: PersonRow, items: readonly MediaItem[], no
       queue_label: isQueued ? "Remove from queue" : "Add to queue", queue_next: !isQueued,
       played_label: played ? "Mark unplayed" : "Mark played", played_next: !played,
       save_label: saved ? "Remove saved copy" : "Save", save_next: !saved,
+      // PODCAST-DOT-01: the unplayed dot is drawn when this field is not empty (its text is the dot's accessible name).
+      unplayed: played ? "" : "Unplayed",
       badge: played ? "Played" : !heard && fresh ? "New" : saved ? "Saved" : "",
     });
   }
@@ -148,4 +151,49 @@ export function setPlayed(person: PersonRow, mediaId: unknown, on: unknown): Out
     if (queue?.items.some((entry) => entry.media_id === item.id)) removeItemFrom(queue, item.id);
   }
   return { ok: true, value: { on: want, label: want ? "Marked played" : "Marked unplayed" } };
+}
+
+// ---- mark a whole show played or unplayed ----
+
+/** Mark every episode of a show this person can read played or unplayed (their own record only), for the show page. */
+export function setShowPlayed(person: PersonRow, sourceId: unknown, on: unknown): Outcome<{ on: boolean; count: number; label: string }> {
+  const source = typeof sourceId === "string" ? allowedSources(person).find((row) => row.id === sourceId && (row.kind === "feed" || row.kind === "production")) : undefined;
+  if (!source) return { ok: false, status: 404, error: "That show is not in your podcasts. Open Shows and try again." };
+  const want = !(on === false || on === "false");
+  let count = 0;
+  for (const item of queryItems(person, "podcasts", { where: eq(mediaItems.sourceId, source.id), limit: 500 })) {
+    const done = setPlayed(person, item.id, want);
+    if (!done.ok) return { ok: false, status: 422, error: "Some episodes could not be updated. Try again." };
+    count++;
+  }
+  return { ok: true, value: { on: want, count, label: want ? `Marked ${count} played` : `Marked ${count} unplayed` } };
+}
+
+// ---- saving a show's new episodes on the hub ----
+
+/** The per-show switch. On is the show's own keep rule (the newest few saved, which overrides the person's Automatic podcast saving); off clears it. */
+export function setShowAutoSave(actor: PersonRow, sourceId: unknown, on: unknown): Outcome<{ on: boolean; label: string }> {
+  const want = !(on === false || on === "false");
+  const done = updatePodcastSource(actor, typeof sourceId === "string" ? sourceId : "", { auto: want ? { save: "audio", keep_latest: AUTO_DOWNLOAD_PER_REFRESH } : { save: "none" } });
+  if (!done.ok) return done;
+  queuePodcastAutoRules(done.value.id);
+  return { ok: true, value: { on: want, label: want ? "New episodes will be saved" : "New episodes will stream" } };
+}
+
+const megabytes = (bytes: number): string => (bytes >= 1024 ** 3 ? `${(bytes / 1024 ** 3).toFixed(1)} GB` : `${Math.max(1, Math.round(bytes / 1024 ** 2))} MB`);
+
+/** One row for the show page: what is saved and the three controls. Only a followed show has one. */
+export function showSaveRows(person: PersonRow, sourceId: string): Array<Record<string, unknown>> {
+  const row = db.select().from(mediaSources).where(and(eq(mediaSources.id, sourceId), eq(mediaSources.kind, "feed"), isNull(mediaSources.deletedAt))).get();
+  const source = row && allowedSources(person).find((entry) => entry.id === row.id);
+  if (!row || !source || !isFollowed(source)) return [];
+  const art = db.select({ id: mediaItems.id }).from(mediaItems).where(and(eq(mediaItems.sourceId, row.id), isNull(mediaItems.deletedAt), isNotNull(mediaItems.artwork))).limit(1).get();
+  const saved = db.select({ size: mediaItems.size }).from(mediaItems).where(and(eq(mediaItems.sourceId, row.id), isNull(mediaItems.deletedAt), isNotNull(mediaItems.locFileId))).all();
+  const bytes = saved.reduce((sum, entry) => sum + (entry.size ?? 0), 0);
+  const have = saved.length === 0 ? "No episodes of this show are saved on the hub." : `${saved.length} ${saved.length === 1 ? "episode is" : "episodes are"} saved on the hub (${megabytes(bytes)}).`;
+  const own = source.auto.save !== "none";
+  const global = getSettingValueForPerson(source.owner_person_id ?? person.id, "podcasts.auto_download") === "followed";
+  const rule = own ? `New episodes are saved automatically, the newest ${source.auto.keep_latest ?? 1} kept.` : global ? "New episodes are saved automatically because Automatic podcast saving is on in your settings." : "New episodes stream until you save them.";
+  const manage = isMediaAdmin(person) && mediaBandOf(person) === "adult" && mayManageSaves(person);
+  return [{ id: row.id, title: "Saved episodes", thumbnail: art ? `/api/media/items/${encodeURIComponent(art.id)}/art` : null, description: `${have} ${rule}`, can_manage: manage, auto_label: own ? "Stop saving new episodes" : "Save new episodes", auto_next: !own }];
 }

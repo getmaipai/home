@@ -8,11 +8,15 @@ import { apiRouter, respond, refuseWith } from "@/lib/openapi";
 import { appRouteAllowed } from "@/lib/apps";
 import { requireAuth } from "@/middleware/auth";
 import { getCookie } from "hono/cookie";
+import type { Context } from "hono";
 import { hashSessionToken } from "@/lib/session";
 import "@/lib/media/podcastApp"; // registers the Podcasts data ids and item view with the shared host
 import "@/lib/media/musicApp"; // registers the Music lyrics fields with the shared host
 import "@/lib/media/videoCreateApp"; // registers Videos' Create data ids (recipes, making, creations)
 import "@/lib/media/radioRecordings"; // adds the Recordings scope to Music's existing radio data id
+import { showSaveRows } from "@/lib/media/podcastParity";
+import { videoPlaylistRoutes } from "./videoPlaylists";
+import { changeVideoPlaylistMembers, videoPlaylistFor } from "@/lib/videos/playlists";
 import { podcastRoutes, podcastDirectoryRows, podcastShowRows, podcastShowEpisodeRows, podcastShowSeasonRows, podcastTranscriptRows } from "./podcastApp";
 import { radioRoutes, radioDirectoryRows, radioSavedRows, radioStationRow, radioCountryRows, radioGenreRows } from "./radioApp";
 import { fetchRadioArt, radioArtCard } from "@/lib/media/radioArt";
@@ -20,7 +24,8 @@ import { radioDirectoryAllowed, radioDirectoryHasFavicon } from "@/lib/media/rad
 import { listSavedStations } from "@/lib/media/radio";
 import { radioRecordingRows } from "@/lib/media/radioRecordings";
 import { mediaBandOf } from "@/lib/media/band";
-import { clearMusicSearches, musicQueueAction, pinMusicItem, recordMusicSearch } from "@/lib/media/musicLibrary";
+import { changePlaylistMembers, musicPlaylistOps, playlistFor } from "@/lib/media/musicPlaylists";
+import { reportKeptSongs, clearMusicSearches, musicQueueAction, pinMusicItem, recordMusicSearch } from "@/lib/media/musicLibrary";
 import { getHouseholdSettingValue } from "@/lib/settings";
 import { anotherTakeFor, bodyOfVideoJob, makeAudienceOf, makeVideoFor, readMakeBody } from "@/lib/videos/make";
 import { makeItMaxBody } from "@/lib/videos/editTool";
@@ -40,6 +45,12 @@ type Body = Record<string, unknown>;
 
 /** VIDEO-STUDIO-07: Another take and Make it Max on a clip the Studio exported. */
 const EDITED_CLIP_LINE = "This clip was made by editing others, so it has no words to make again. Open the original clip and try there.";
+
+/** Which browser or device is asking: the paired device, else the hashed session (the key progress already uses). */
+function deviceKeyOf(c: Context): string {
+  const deviceId = c.get("deviceId") as string | undefined;
+  return deviceId ? `d:${deviceId}` : `s:${hashSessionToken(getCookie(c, "session") ?? "-")}`;
+}
 
 function paramsOf(body: Body): DataParams {
   return {
@@ -76,7 +87,7 @@ function withLimit<T>(body: Record<string, unknown>, rows: T[]): T[] {
 export function createMediaAppRoutes(appId: MediaAppId) {
   const routes = apiRouter();
   // AUDIT-DUP-ROUTES-01: one gate per path prefix; a person without the app is refused here, never passed to the next router.
-  gateMediaApp(routes, appId, ["/data/*", "/actions/*", "/progress", "/watchlist", "/playlist", "/queue", "/watch-later", "/like", ...(appId === "music" ? ["/library/*", "/radio/*", "/pin", "/recent-searches"] : [])]);
+  gateMediaApp(routes, appId, ["/data/*", "/actions/*", "/progress", "/watchlist", "/playlist", "/queue", "/watch-later", "/like", ...(appId === "music" ? ["/library/*", "/radio/*", "/pin", "/recent-searches", "/offline"] : []), ...(appId === "videos" ? ["/playlists/*", "/history/*"] : [])]);
 
   if (appId === "music") {
     const radio = radioRoutes();
@@ -115,6 +126,7 @@ export function createMediaAppRoutes(appId: MediaAppId) {
       if (body.scope === "show-episodes") return c.json(await podcastShowEpisodeRows(person, typeof body.id === "string" ? body.id : "", { sort: body.sort, season: body.season }) as never, 200);
       // APPS-PARITY: the player's transcript reader (rows {start_s, text}); publisher text is fetched on request, same guard and rate limit as the transcript route.
       if (body.scope === "transcript") return c.json(await podcastTranscriptRows(person, typeof body.id === "string" ? body.id : "") as never, 200);
+      if (body.scope === "show-saved") return c.json(showSaveRows(person, typeof body.id === "string" ? body.id : "") as never, 200);
       if (body.scope === "show-seasons") return c.json(await podcastShowSeasonRows(person, typeof body.id === "string" ? body.id : "") as never, 200);
       return c.json(withLimit(body, await podcastDirectoryRows(person, typeof body.q === "string" ? body.q : "", typeof body.scope === "string" ? body.scope : "search", typeof body.shelf === "string" ? body.shelf : undefined, typeof body.kind === "string" ? body.kind : undefined)) as never, 200);
     }
@@ -140,7 +152,7 @@ export function createMediaAppRoutes(appId: MediaAppId) {
         if (scope === "genres") return c.json({ as_of: new Date().toISOString(), rows: radioGenreRows() } as never, 200);
       }
     }
-    const value = mediaAppData(person, appId, c.req.param("dataId"), paramsOf(await jsonBody(c)));
+    const value = mediaAppData(person, appId, c.req.param("dataId"), { ...paramsOf(await jsonBody(c)), ...(appId === "music" ? { device: deviceKeyOf(c) } : {}) });
     if (value === null) return next();
     return c.json(value as never, 200);
   });
@@ -153,7 +165,8 @@ export function createMediaAppRoutes(appId: MediaAppId) {
       const body = await jsonBody(c);
       const id = typeof body.id === "string" ? body.id : "";
       const target = typeof body.person_id === "string" ? body.person_id : undefined;
-      const result = appId === "videos" ? changeVideoCreationShare(person, op, id, target) : changeMusicCreationShare(person, op, id, target);
+      // MEDIA-PARITY-02: on a playlist's page the same share panel adds and removes its members.
+      const result = appId === "videos" ? (videoPlaylistFor(person, id) ? changeVideoPlaylistMembers(person, op, id, target) : changeVideoCreationShare(person, op, id, target)) : (playlistFor(person, id) ? changePlaylistMembers(person, op, id, target) : changeMusicCreationShare(person, op, id, target));
       return respond(c, result);
     });
   }
@@ -320,7 +333,8 @@ export function createMediaAppRoutes(appId: MediaAppId) {
   routes.post("/playlist", requireAuth, async (c, next) => {
     const person = c.get("person");
     if (appId !== "music") return next();
-    const result = musicPlaylistAction(person, await jsonBody(c));
+    const body = await jsonBody(c);
+    const result = musicPlaylistOps(person, body) ?? musicPlaylistAction(person, body);
     return result.ok ? c.json({ ok: true as const, ...result.value }, 200) : refuseWith(c, result);
   });
 
@@ -334,6 +348,7 @@ export function createMediaAppRoutes(appId: MediaAppId) {
   });
 
   if (appId === "music") {
+    routes.post("/offline", requireAuth, async (c) => respond(c, reportKeptSongs(c.get("person"), deviceKeyOf(c), await jsonBody(c))));
     routes.post("/pin", requireAuth, async (c) => respond(c, pinMusicItem(c.get("person"), await jsonBody(c))));
     routes.post("/recent-searches", requireAuth, async (c) => {
       const body = await jsonBody(c);
@@ -352,6 +367,7 @@ export function createMediaAppRoutes(appId: MediaAppId) {
   }
 
   if (appId === "podcasts") routes.route("/", podcastRoutes());
+  if (appId === "videos") routes.route("/", videoPlaylistRoutes());
 
   return routes;
 }

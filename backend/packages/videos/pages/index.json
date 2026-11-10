@@ -55,6 +55,34 @@
     },
     {
       "type": "media_shelf",
+      "heading": "Channels",
+      "bind": {
+        "source": "package",
+        "path": "channels",
+        "params": {
+          "scope": "strip"
+        }
+      },
+      "item_key_field": "id",
+      "item_label_field": "title",
+      "item_subtitle_field": "{channel}",
+      "item_media_field": "thumbnail",
+      "aspect": "square",
+      "art_shape": "circle",
+      "variant": "plain",
+      "hide_when_empty": true,
+      "on_select": {
+        "navigate": {
+          "to": "/apps/videos/channel",
+          "state": {
+            "channel": "{id}"
+          }
+        }
+      },
+      "card_radius": "soft"
+    },
+    {
+      "type": "media_shelf",
       "heading": "Recently added",
       "bind": {
         "source": "package",
@@ -85,11 +113,11 @@
           }
         },
         {
-          "icon": "thumbs-up",
-          "label": "Like",
+          "icon": "list-plus",
+          "label": "Save to playlist",
           "action": {
             "call": {
-              "target": "/api/plugins/videos/like",
+              "target": "/api/plugins/videos/playlists/save",
               "args": {
                 "media_id": "{id}"
               }
@@ -148,7 +176,9 @@
             "label": "Short"
           }
         ]
-      }
+      },
+      "card_radius": "soft",
+      "item_avatar_field": "channel_avatar"
     },
     {
       "type": "media_shelf",
@@ -171,7 +201,8 @@
         "play": {
           "media_id": "{id}"
         }
-      }
+      },
+      "card_radius": "soft"
     },
     {
       "type": "media_shelf",
@@ -205,11 +236,11 @@
           }
         },
         {
-          "icon": "thumbs-up",
-          "label": "Like",
+          "icon": "list-plus",
+          "label": "Save to playlist",
           "action": {
             "call": {
-              "target": "/api/plugins/videos/like",
+              "target": "/api/plugins/videos/playlists/save",
               "args": {
                 "media_id": "{id}"
               }
@@ -242,7 +273,9 @@
         "play": {
           "media_id": "{id}"
         }
-      }
+      },
+      "card_radius": "soft",
+      "item_avatar_field": "channel_avatar"
     },
     {
       "type": "media_shelf",
@@ -276,11 +309,11 @@
           }
         },
         {
-          "icon": "thumbs-up",
-          "label": "Like",
+          "icon": "list-plus",
+          "label": "Save to playlist",
           "action": {
             "call": {
-              "target": "/api/plugins/videos/like",
+              "target": "/api/plugins/videos/playlists/save",
               "args": {
                 "media_id": "{id}"
               }
@@ -313,7 +346,9 @@
         "play": {
           "media_id": "{id}"
         }
-      }
+      },
+      "card_radius": "soft",
+      "item_avatar_field": "channel_avatar"
     },
     {
       "type": "media_shelf",
@@ -347,11 +382,11 @@
           }
         },
         {
-          "icon": "thumbs-up",
-          "label": "Like",
+          "icon": "list-plus",
+          "label": "Save to playlist",
           "action": {
             "call": {
-              "target": "/api/plugins/videos/like",
+              "target": "/api/plugins/videos/playlists/save",
               "args": {
                 "media_id": "{id}"
               }
@@ -384,7 +419,9 @@
         "play": {
           "media_id": "{id}"
         }
-      }
+      },
+      "card_radius": "soft",
+      "item_avatar_field": "channel_avatar"
     },
     {
       "type": "media_shelf",
@@ -418,11 +455,11 @@
           }
         },
         {
-          "icon": "thumbs-up",
-          "label": "Like",
+          "icon": "list-plus",
+          "label": "Save to playlist",
           "action": {
             "call": {
-              "target": "/api/plugins/videos/like",
+              "target": "/api/plugins/videos/playlists/save",
               "args": {
                 "media_id": "{id}"
               }
@@ -455,7 +492,9 @@
         "play": {
           "media_id": "{id}"
         }
-      }
+      },
+      "card_radius": "soft",
+      "item_avatar_field": "channel_avatar"
     },
     {
       "type": "media_shelf",
@@ -485,11 +524,11 @@
           }
         },
         {
-          "icon": "thumbs-up",
-          "label": "Like",
+          "icon": "list-plus",
+          "label": "Save to playlist",
           "action": {
             "call": {
-              "target": "/api/plugins/videos/like",
+              "target": "/api/plugins/videos/playlists/save",
               "args": {
                 "media_id": "{id}"
               }
@@ -532,7 +571,9 @@
           }
         },
         "action_label": "Make a video"
-      }
+      },
+      "card_radius": "soft",
+      "item_avatar_field": "channel_avatar"
     }
   ]
 }

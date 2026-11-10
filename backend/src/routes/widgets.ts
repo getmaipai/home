@@ -14,7 +14,7 @@ const WidgetDescriptor = z.object({
   package: z.string(),
   id: z.string(),
   title: z.string(),
-  size: z.enum(["card", "row"]),
+  size: z.enum(["card", "row", "tiles"]),
   refresh_s: z.number().int(),
   min_role: z.string(), priority: z.number().int(), hero: z.boolean(), data: z.string().optional(),
   surfaces: z.array(z.enum(["home", "tv", "robot"])), inputs: z.record(z.string(), z.unknown()).optional(), installed_at: z.string(),
@@ -39,6 +39,7 @@ const WidgetData = z.object({
   // showing a Tier 1 handler's own fallback_reply text, not real data -
   // see lib/widgets.ts's WidgetData for why this exists.
   degraded: z.literal(true).optional(),
+  tiles: z.array(z.object({ id: z.string(), name: z.string(), state: z.string(), icon: z.string(), on: z.boolean() })).optional(),
 });
 
 const listRoute = createRoute({

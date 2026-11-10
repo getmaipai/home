@@ -25,6 +25,20 @@
             "label": "Saved"
           }
         ]
+      },
+      "suggest": {
+        "bind": {
+          "source": "package",
+          "path": "library",
+          "params": {
+            "scope": "suggest",
+            "q": "$state.q"
+          }
+        },
+        "item_key_field": "key",
+        "item_label_field": "label",
+        "max": 8,
+        "min_chars": 2
       }
     },
     {
@@ -74,11 +88,11 @@
           }
         },
         {
-          "icon": "thumbs-up",
-          "label": "Like",
+          "icon": "list-plus",
+          "label": "Save to playlist",
           "action": {
             "call": {
-              "target": "/api/plugins/videos/like",
+              "target": "/api/plugins/videos/playlists/save",
               "args": {
                 "media_id": "{id}"
               }
@@ -125,7 +139,9 @@
             "label": "Long"
           }
         ]
-      }
+      },
+      "card_radius": "soft",
+      "item_avatar_field": "channel_avatar"
     }
   ]
 }

@@ -36,7 +36,7 @@
       "item_subtitle_field": "{channel}",
       "item_media_field": "thumbnail",
       "item_progress_field": "progress",
-      "item_badge_field": "badge",
+      "item_badge_field": "unplayed",
       "item_meta_field": "duration_s",
       "aspect": "square",
       "variant": "plain",
@@ -98,7 +98,8 @@
             }
           }
         }
-      ]
+      ],
+      "item_badge_presentation": "dot"
     },
     {
       "type": "media_shelf",

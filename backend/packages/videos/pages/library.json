@@ -5,6 +5,42 @@
   "body": [
     {
       "type": "media_shelf",
+      "heading": "Playlists",
+      "bind": {
+        "source": "package",
+        "path": "library",
+        "params": {
+          "scope": "playlists"
+        }
+      },
+      "item_key_field": "id",
+      "item_label_field": "title",
+      "item_subtitle_field": "{channel}",
+      "item_media_field": "thumbnail",
+      "item_meta_field": "duration_s",
+      "aspect": "wide",
+      "variant": "plain",
+      "card_radius": "soft",
+      "hide_when_empty": true,
+      "see_all": {
+        "label": "See all",
+        "action": {
+          "navigate": {
+            "to": "/apps/videos/playlists"
+          }
+        }
+      },
+      "on_select": {
+        "navigate": {
+          "to": "/apps/videos/playlist",
+          "state": {
+            "id": "{id}"
+          }
+        }
+      }
+    },
+    {
+      "type": "media_shelf",
       "heading": "Made at home",
       "bind": {
         "source": "package",
@@ -23,7 +59,8 @@
           "media_id": "{id}"
         }
       },
-      "hide_when_empty": true
+      "hide_when_empty": true,
+      "card_radius": "soft"
     },
     {
       "type": "picker",
@@ -69,11 +106,11 @@
           }
         },
         {
-          "icon": "thumbs-up",
-          "label": "Like",
+          "icon": "list-plus",
+          "label": "Save to playlist",
           "action": {
             "call": {
-              "target": "/api/plugins/videos/like",
+              "target": "/api/plugins/videos/playlists/save",
               "args": {
                 "media_id": "{id}"
               }
@@ -124,7 +161,9 @@
             "label": "A to Z"
           }
         ]
-      }
+      },
+      "card_radius": "soft",
+      "item_avatar_field": "channel_avatar"
     }
   ]
 }

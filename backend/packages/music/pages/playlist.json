@@ -85,7 +85,7 @@
           "id": "$state.id"
         }
       },
-      "item_key_field": "id",
+      "item_key_field": "reorder_key",
       "item_label_field": "title",
       "item_subtitle_field": "{channel}",
       "item_number_field": "track_number",
@@ -149,6 +149,17 @@
           }
         },
         "action_label": "Find songs"
+      },
+      "reorder": {
+        "call": {
+          "call": {
+            "target": "/api/plugins/music/playlist",
+            "args": {
+              "op": "reorder"
+            }
+          }
+        },
+        "id_param": "ids"
       }
     },
     {

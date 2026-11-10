@@ -53,13 +53,13 @@ export function saveFilterRules(collection: MediaCollection, rules: object): Med
   return save(collection.id, { rules: JSON.stringify(rules) });
 }
 
-export function createCollection(personId: string, kind: (typeof MADE_KINDS)[number], title: string): MediaCollection {
+export function createCollection(personId: string, kind: (typeof MADE_KINDS)[number], title: string, mediaKind: "music" | "video" = "music"): MediaCollection {
   const id = newMediaCollectionId();
-  db.insert(mediaCollections).values({ id, personId, kind, title: title.trim() || "Untitled", createdAt: new Date().toISOString(), hlc: nextHlc(), provenance: `person:${personId}` }).run();
+  db.insert(mediaCollections).values({ id, personId, kind, mediaKind, title: title.trim() || "Untitled", createdAt: new Date().toISOString(), hlc: nextHlc(), provenance: `person:${personId}` }).run();
   return collectionFromRow(db.select().from(mediaCollections).where(eq(mediaCollections.id, id)).get()!);
 }
 
-function save(id: string, patch: Partial<typeof mediaCollections.$inferInsert>): MediaCollection {
+export function save(id: string, patch: Partial<typeof mediaCollections.$inferInsert>): MediaCollection {
   db.update(mediaCollections).set({ ...patch, hlc: nextHlc() }).where(eq(mediaCollections.id, id)).run();
   return collectionFromRow(db.select().from(mediaCollections).where(eq(mediaCollections.id, id)).get()!);
 }
@@ -114,6 +114,17 @@ export function renameCollection(collection: MediaCollection, title: string): Me
 
 export function setPointer(collection: MediaCollection, pointer: number | null): MediaCollection {
   return save(collection.id, { pointer: pointer === null ? null : Math.min(Math.max(pointer, 0), Math.max(collection.items.length - 1, 0)) });
+}
+
+/** MEDIA-PARITY-02: the people, besides the owner, who may add to and remove from a playlist. */
+export function setPlaylistMembers(collection: MediaCollection, members: readonly string[]): MediaCollection {
+  return save(collection.id, { members: JSON.stringify([...new Set(members)]) });
+}
+
+/** Playlists other people own that name this person as a member. */
+export function playlistsWithMember(personId: string): MediaCollection[] {
+  return db.select().from(mediaCollections).where(and(eq(mediaCollections.kind, "playlist"), isNull(mediaCollections.deletedAt))).all()
+    .map(collectionFromRow).filter((c) => c.person_id !== personId && c.members.includes(personId));
 }
 
 export function setSharedTo(collection: MediaCollection, sharedTo: MediaCollection["shared_to"]): MediaCollection {

@@ -28,6 +28,17 @@ function renderAt(pathname: string) {
   );
 }
 
+describe("PageHeaderTitle on the Clock page", () => {
+  test("draws a phone Back button before the title, and no other page gets one", () => {
+    const clock = renderAt("/clock");
+    const back = clock.getByRole("button", { name: "Back" });
+    expect(back.className).toContain("sm:hidden");
+    expect(back.compareDocumentPosition(clock.getByText("Clock")) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    cleanup();
+    expect(renderAt("/storage").queryByRole("button", { name: "Back" })).toBeNull();
+  });
+});
+
 describe("PageHeaderTitle", () => {
   const cases: Array<[pathname: string, label: string, iconClass: string]> = [
     ["/", "Home", "lucide-house"],

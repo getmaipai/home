@@ -119,6 +119,70 @@
       "density": "compact"
     },
     {
+      "type": "media_shelf",
+      "heading": "On the hub",
+      "bind": {
+        "source": "package",
+        "path": "directory",
+        "params": {
+          "scope": "show-saved",
+          "id": "$state.id"
+        }
+      },
+      "item_key_field": "id",
+      "item_label_field": "title",
+      "item_media_field": "thumbnail",
+      "item_subtitle_field": "description",
+      "aspect": "square",
+      "variant": "plain",
+      "orientation": "vertical",
+      "density": "compact",
+      "hide_when_empty": true,
+      "row_actions": [
+        {
+          "icon": "download",
+          "label": "Save new episodes",
+          "label_field": "auto_label",
+          "show_when_field": "can_manage",
+          "action": {
+            "call": {
+              "target": "/api/plugins/podcasts/show-auto",
+              "args": {
+                "source_id": "{id}",
+                "on": "{auto_next}"
+              }
+            }
+          }
+        },
+        {
+          "icon": "check",
+          "label": "Mark all played",
+          "action": {
+            "call": {
+              "target": "/api/plugins/podcasts/played-all",
+              "args": {
+                "source_id": "{id}",
+                "on": true
+              }
+            }
+          }
+        },
+        {
+          "icon": "circle-dot",
+          "label": "Mark all unplayed",
+          "action": {
+            "call": {
+              "target": "/api/plugins/podcasts/played-all",
+              "args": {
+                "source_id": "{id}",
+                "on": false
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
       "type": "picker",
       "state": "order",
       "label": "Order",
@@ -180,7 +244,7 @@
       "item_subtitle_field": "{date} · {description}",
       "item_media_field": "thumbnail",
       "item_meta_field": "duration_s",
-      "item_badge_field": "badge",
+      "item_badge_field": "unplayed",
       "aspect": "wide",
       "variant": "plain",
       "orientation": "vertical",
@@ -243,7 +307,8 @@
             }
           }
         }
-      ]
+      ],
+      "item_badge_presentation": "dot"
     }
   ]
 }

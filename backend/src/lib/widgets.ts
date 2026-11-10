@@ -25,6 +25,7 @@ import { getPackageStatus } from "@/lib/smoke";
 import { householdHomePlaceName } from "@/lib/places";
 import { refusePackageReplyIfUnsafe } from "@/lib/safety";
 import { speakerAgeBand } from "@/lib/ageBand";
+import { deviceTilesFor } from "@/lib/house/widgetTiles";
 import { listComingUp } from "@/lib/comingUp";
 import { whenText } from "@/lib/alarmChat";
 import type { PersonRow } from "@/types";
@@ -33,7 +34,7 @@ export interface WidgetDescriptor {
   package: string;
   id: string;
   title: string;
-  size: "card" | "row";
+  size: "card" | "row" | "tiles";
   refresh_s: number;
   min_role: string;
   priority: number;
@@ -74,6 +75,8 @@ export interface WidgetData {
    * on a genuine success - the common case stays exactly as small as it
    * was. */
   degraded?: true;
+  /** The Devices widget's tiles (name, plain state, kind, on); `items` carries the same devices as text rows for a client without a tiles view. */
+  tiles?: Array<{ id: string; name: string; state: string; icon: string; on: boolean }>;
   /** One answer block (today only `weather_card`) the Today row may draw in place of `items` for an adult; `items`
    * stays the text fallback for every other viewer and client (additive, HOME-PAGE-01 card block). */
   card?: Record<string, unknown>;
@@ -203,6 +206,7 @@ export async function getWidgetData(actor: PersonRow, packageId: string, widgetI
 
   if (packageId === "remind" && widgetId === "upcoming") return comingUpWidget(actor, "reminder");
   if (packageId === "timer" && widgetId === "running") return comingUpWidget(actor, "timer");
+  if (packageId === "house" && widgetId === "devices") return devicesWidget(actor);
 
   const inputs = { ...((widget.inputs ?? {}) as Record<string, unknown>) };
   if (packageId === "weather") {
@@ -252,4 +256,11 @@ function comingUpWidget(actor: PersonRow, kind: "reminder" | "timer"): OpResult<
   }));
   const unsafe = items.length > 0 && refusePackageReplyIfUnsafe(actor, { reply: { text: items.map((item) => item.title).join("\n") }, actions: [] }) !== null;
   return { ok: true, status: 200, value: { as_of: new Date(now).toISOString(), items: unsafe ? [] : items } };
+}
+
+/** Devices: the house tool's own visible devices as tiles. Nothing visible means no items, which Home hides. */
+function devicesWidget(actor: PersonRow): OpResult<WidgetData> {
+  const tiles = deviceTilesFor(actor);
+  const items: WidgetItem[] = tiles.map((tile) => ({ title: tile.name, value: tile.state, icon: tile.icon }));
+  return { ok: true, status: 200, value: { as_of: new Date().toISOString(), items, ...(tiles.length ? { tiles } : {}) } };
 }

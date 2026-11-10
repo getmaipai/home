@@ -149,6 +149,13 @@ export function checkPersonQuota(personId: string, additionalBytes: number): { o
   return { ok: true };
 }
 
+/** The same test checkDiskFull() raises its Repairs item on: free space is below the household's critical threshold. Background savers ask this before they write. */
+export function diskIsLow(): boolean {
+  const criticalGb = (getHouseholdSettingValue("storage.critical_free_gb") as number | undefined) ?? 2;
+  const { freeBytes } = diskUsage();
+  return freeBytes !== Number.POSITIVE_INFINITY && freeBytes < criticalGb * 1024 * 1024 * 1024;
+}
+
 const ISSUE_SOURCE = "storage";
 const ISSUE_KEY = "disk_full";
 

@@ -2356,6 +2356,9 @@ export const mediaCollections = sqliteTable(
     pointer: integer("pointer"),
     sharedTo: text("shared_to"), // JSON: null (private), "household" or a list of person ids
     rules: text("rules"), // reserved for smart playlists, null today
+    mediaKind: text("media_kind").notNull().default("music"), // MEDIA-PARITY-02: what a playlist holds, music | video
+    members: text("members").notNull().default("[]"), // JSON person ids, besides the owner, who may add items to a shared playlist
+    coverFileId: text("cover_file_id"), // a household file used as the playlist cover; null draws from the first items
     deletedAt: text("deleted_at"),
     trashUntil: text("trash_until"),
     createdAt: text("created_at").notNull(),

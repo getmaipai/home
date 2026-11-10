@@ -17,7 +17,7 @@ const DAY_MS = 86_400_000;
 export type VideoFilter = "made" | "unwatched" | "long" | "short" | "today" | "week" | "month";
 const FILTERS = new Set<string>(["made", "unwatched", "long", "short", "today", "week", "month"]);
 export const videoFilterOf = (value: unknown): VideoFilter | null => (typeof value === "string" && FILTERS.has(value) ? (value as VideoFilter) : null);
-export const videoSortOf = (value: unknown): "recents" | "a-z" => (value === "a-z" ? "a-z" : "recents");
+export const videoSortOf = (value: unknown): "recents" | "a-z" => (value === "a-z" || value === "az" ? "a-z" : "recents");
 
 /** True when the page asked for anything these rules act on. */
 export function wantsVideoRules(dataId: string, params: DataParams): boolean {

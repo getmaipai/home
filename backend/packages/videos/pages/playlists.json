@@ -1,0 +1,115 @@
+{
+  "type": "page",
+  "id": "playlists",
+  "title": "Playlists",
+  "body": [
+    {
+      "type": "media_shelf",
+      "heading": "Start a playlist",
+      "bind": {
+        "source": "package",
+        "path": "library",
+        "params": {
+          "scope": "new-playlist"
+        }
+      },
+      "item_key_field": "id",
+      "item_label_field": "title",
+      "item_subtitle_field": "{channel}",
+      "item_media_field": "thumbnail",
+      "aspect": "wide",
+      "variant": "plain",
+      "card_radius": "soft",
+      "on_select": {
+        "call": {
+          "target": "/api/plugins/videos/playlists/new",
+          "args": {},
+          "then": {
+            "navigate": {
+              "to": "/apps/videos/playlist",
+              "state": {
+                "id": "{id}"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "type": "media_shelf",
+      "heading": "Your playlists",
+      "bind": {
+        "source": "package",
+        "path": "library",
+        "params": {
+          "scope": "playlists"
+        }
+      },
+      "item_key_field": "id",
+      "item_label_field": "title",
+      "item_subtitle_field": "{channel}",
+      "item_media_field": "thumbnail",
+      "aspect": "wide",
+      "variant": "plain",
+      "card_radius": "soft",
+      "layout": "grid",
+      "size_control": true,
+      "on_select": {
+        "navigate": {
+          "to": "/apps/videos/playlist",
+          "state": {
+            "id": "{id}"
+          }
+        }
+      },
+      "empty_state": {
+        "type": "empty_state",
+        "icon": "film",
+        "text": "No playlists yet. Save a video to a playlist from its menu, or start one above.",
+        "action": {
+          "call": {
+            "target": "/api/plugins/videos/playlists/new",
+            "args": {},
+            "then": {
+              "navigate": {
+                "to": "/apps/videos/playlist",
+                "state": {
+                  "id": "{id}"
+                }
+              }
+            }
+          }
+        },
+        "action_label": "New playlist"
+      }
+    },
+    {
+      "type": "media_shelf",
+      "heading": "Shared with you",
+      "bind": {
+        "source": "package",
+        "path": "library",
+        "params": {
+          "scope": "shared-playlists"
+        }
+      },
+      "item_key_field": "id",
+      "item_label_field": "title",
+      "item_subtitle_field": "{channel}",
+      "item_media_field": "thumbnail",
+      "aspect": "wide",
+      "variant": "plain",
+      "card_radius": "soft",
+      "layout": "grid",
+      "on_select": {
+        "navigate": {
+          "to": "/apps/videos/playlist",
+          "state": {
+            "id": "{id}"
+          }
+        }
+      },
+      "hide_when_empty": true
+    }
+  ]
+}

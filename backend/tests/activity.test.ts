@@ -3,7 +3,8 @@
 import { beforeEach, describe, expect, test } from "bun:test";
 import { db } from "@/db";
 import { musicJobs, people, pictureJobs, videoJobs } from "@/db/schema";
-import { activeGenerationRows, activityDot, activityForViewer, markActivitySeen, type ActivityItem } from "@/lib/activity";
+import { activeGenerationRows, activityDot, activityForViewer, activitySeenAt, markActivitySeen, type ActivityItem } from "@/lib/activity";
+import { getPersonSettingValue, writeLayerRow } from "@/lib/settings";
 import { TestClient } from "./client";
 import { resetDb } from "./reset-db";
 
@@ -103,6 +104,23 @@ describe("ACTIVITY-PAGE-01: the dot", () => {
     expect(activityDot([item("done", t1), item("attention", t0), item("making", t1)], t0)).toBe("attention");
     expect(activityDot([item("failed", t1)], t0)).toBe("attention");
     expect(activityDot([item("failed", t0)], t1)).toBe("none");
+  });
+});
+
+describe("ui.activity_seen_at registry key", () => {
+  test("the opened time is read and written through the settings API", async () => {
+    const { ownerRow } = await household();
+    expect(activitySeenAt(ownerRow)).toBeNull();
+    const at = markActivitySeen(ownerRow, new Date("2026-11-01T10:00:00.000Z"));
+    expect(getPersonSettingValue(ownerRow, "ui.activity_seen_at")).toBe(at);
+    expect(activitySeenAt(ownerRow)).toBe(at);
+  });
+
+  test("a value an older build stored in the per-person store is still read and kept", async () => {
+    const { ownerRow } = await household();
+    writeLayerRow(ownerRow.id, "ui.activity_seen_at", JSON.stringify("2026-10-01T08:00:00.000Z"), ownerRow.id);
+    expect(activitySeenAt(ownerRow)).toBe("2026-10-01T08:00:00.000Z");
+    expect(getPersonSettingValue(ownerRow, "ui.activity_seen_at")).toBe("2026-10-01T08:00:00.000Z");
   });
 });
 

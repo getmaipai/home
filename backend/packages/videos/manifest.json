@@ -68,7 +68,8 @@
             "library",
             "history",
             "watch-later",
-            "liked"
+            "liked",
+            "playlists"
           ]
         },
         {
@@ -130,6 +131,30 @@
         "nav": true,
         "kind": "schema",
         "module": "liked"
+      },
+      {
+        "id": "playlists",
+        "label": "Playlists",
+        "icon": "list-video",
+        "nav": true,
+        "kind": "schema",
+        "module": "playlists"
+      },
+      {
+        "id": "playlist",
+        "label": "Playlist",
+        "icon": "list-video",
+        "nav": false,
+        "kind": "schema",
+        "module": "playlist"
+      },
+      {
+        "id": "channel",
+        "label": "Channel",
+        "icon": "film",
+        "nav": false,
+        "kind": "schema",
+        "module": "channel"
       },
       {
         "id": "history",

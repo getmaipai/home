@@ -296,7 +296,7 @@ export interface WidgetDescriptor {
   package: string;
   id: string;
   title: string;
-  size: "card" | "row";
+  size: "card" | "row" | "tiles";
   refresh_s: number;
 }
 export interface ArrangeCard extends WidgetDescriptor { key: string; hidden: boolean; hero?: boolean }

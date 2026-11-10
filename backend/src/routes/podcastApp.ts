@@ -25,7 +25,7 @@ import { mediaSources, mediaProductions } from "@/db/schema";
 import { db } from "@/db";
 import { eq } from "drizzle-orm";
 import { isOwnerOrAdmin } from "@/lib/access";
-import { episodeFields, episodeSortOf, followPodcast, isFollowed, orderEpisodes, seasonsOf, setPlayed, unfollowPodcast, type SortableEpisode } from "@/lib/media/podcastParity";
+import { setShowAutoSave, setShowPlayed, showSaveRows, episodeFields, episodeSortOf, followPodcast, isFollowed, orderEpisodes, seasonsOf, setPlayed, unfollowPodcast, type SortableEpisode } from "@/lib/media/podcastParity";
 
 
 type DirectoryRow = { id: string; title: string; author: string; summary: string; thumbnail: string | null; feed_url: string; action_label?: string };
@@ -125,7 +125,7 @@ export async function podcastShowSeasonRows(person: PersonRow, id: string): Prom
 
 export function podcastRoutes() {
   const routes = apiRouter();
-  gateMediaApp(routes, "podcasts", ["/data/directory", "/preview/*", "/transcript/*", "/save", "/bookmark", "/snips", "/subscribe", "/source", "/filters", "/filters/*", "/directory/*", "/played", "/shows", "/shows/*"]);
+  gateMediaApp(routes, "podcasts", ["/data/directory", "/preview/*", "/transcript/*", "/save", "/bookmark", "/snips", "/subscribe", "/source", "/filters", "/filters/*", "/directory/*", "/played", "/played-all", "/show-auto", "/shows", "/shows/*"]);
 
   // TALENT-04: the package's own doors to the show maker (a package page may only call routes under /api/plugins/podcasts/).
   routes.post("/shows", requireAuth, async (c) => {
@@ -316,6 +316,18 @@ const lookupPreferringV4: DnsLookup = async (hostname) => {
     const body = await jsonBody(c);
     const result = unfollowPodcast(c.get("person"), typeof body.source_id === "string" ? body.source_id : "");
     return result.ok ? c.json({ ok: true as const, source_id: result.value.source_id, label: "Stopped following" }, 200) : refuseWith(c, result);
+  });
+
+  routes.post("/played-all", requireAuth, async (c, next) => {
+    const body = await jsonBody(c);
+    const result = setShowPlayed(c.get("person"), body.source_id, body.on);
+    return result.ok ? c.json({ ok: true as const, ...result.value }, 200) : refuseWith(c, result);
+  });
+
+  routes.post("/show-auto", requireAuth, async (c, next) => {
+    const body = await jsonBody(c);
+    const result = setShowAutoSave(c.get("person"), body.source_id, body.on);
+    return result.ok ? c.json({ ok: true as const, ...result.value }, 200) : refuseWith(c, result);
   });
 
   routes.post("/played", requireAuth, async (c, next) => {

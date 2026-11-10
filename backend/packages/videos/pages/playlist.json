@@ -1,0 +1,185 @@
+{
+  "type": "page",
+  "id": "playlist",
+  "title": "Playlist",
+  "body": [
+    {
+      "type": "creation_header",
+      "variant": "collection",
+      "backdrop": "art_gradient",
+      "bind": {
+        "source": "package",
+        "path": "library",
+        "params": {
+          "id": "$state.id",
+          "scope": "playlist-header"
+        }
+      },
+      "candidates_bind": {
+        "source": "package",
+        "path": "library",
+        "params": {
+          "id": "$state.id",
+          "scope": "playlist-people"
+        }
+      },
+      "share_change": {
+        "add": {
+          "call": {
+            "target": "/api/plugins/videos/actions/share-add",
+            "args": {
+              "id": "{id}",
+              "person_id": "{person_id}"
+            }
+          }
+        },
+        "remove": {
+          "call": {
+            "target": "/api/plugins/videos/actions/share-remove",
+            "args": {
+              "id": "{id}",
+              "person_id": "{person_id}"
+            }
+          }
+        },
+        "make_private": {
+          "call": {
+            "target": "/api/plugins/videos/actions/share-private",
+            "args": {
+              "id": "{id}"
+            }
+          }
+        }
+      },
+      "primary": {
+        "label": "Play",
+        "icon": "play",
+        "action": {
+          "play": {
+            "media_id": "{play_id}"
+          }
+        }
+      },
+      "more": [
+        {
+          "label": "Share",
+          "icon": "share",
+          "action": {
+            "share": {
+              "to": "/apps/videos/playlist?id={share_id}",
+              "title": "{title}"
+            }
+          }
+        },
+        {
+          "label": "Delete playlist",
+          "icon": "trash",
+          "action": {
+            "confirm": {
+              "prompt": "Delete {title}? The videos stay in your library.",
+              "on_confirm": {
+                "call": {
+                  "target": "/api/plugins/videos/playlists/delete",
+                  "args": {
+                    "playlist_id": "{id}"
+                  },
+                  "then": {
+                    "navigate": {
+                      "to": "/apps/videos/playlists"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "type": "media_shelf",
+      "heading": "Videos",
+      "bind": {
+        "source": "package",
+        "path": "library",
+        "params": {
+          "id": "$state.id",
+          "scope": "playlist"
+        }
+      },
+      "item_key_field": "id",
+      "item_label_field": "title",
+      "item_subtitle_field": "{channel}",
+      "item_media_field": "thumbnail",
+      "item_progress_field": "progress",
+      "item_meta_field": "duration_s",
+      "aspect": "wide",
+      "variant": "plain",
+      "orientation": "vertical",
+      "card_radius": "soft",
+      "reorder": {
+        "call": {
+          "call": {
+            "target": "/api/plugins/videos/playlists/reorder",
+            "args": {
+              "playlist_id": "{playlist_id}"
+            }
+          }
+        },
+        "id_param": "ids"
+      },
+      "row_actions": [
+        {
+          "icon": "x",
+          "label": "Remove from playlist",
+          "action": {
+            "call": {
+              "target": "/api/plugins/videos/playlists/remove",
+              "args": {
+                "playlist_id": "{playlist_id}",
+                "media_id": "{id}"
+              }
+            }
+          }
+        },
+        {
+          "icon": "clock",
+          "label": "Watch later",
+          "action": {
+            "call": {
+              "target": "/api/plugins/videos/watch-later",
+              "args": {
+                "media_id": "{id}"
+              }
+            }
+          }
+        },
+        {
+          "icon": "share",
+          "label": "Share",
+          "action": {
+            "share": {
+              "to": "/apps/videos/watch?id={id}",
+              "title": "{title}"
+            }
+          }
+        }
+      ],
+      "on_select": {
+        "play": {
+          "media_id": "{id}"
+        }
+      },
+      "empty_state": {
+        "type": "empty_state",
+        "icon": "film",
+        "text": "This playlist is empty. Use Save to playlist on a video.",
+        "action": {
+          "navigate": {
+            "to": "/apps/videos/index"
+          }
+        },
+        "action_label": "Browse videos"
+      }
+    }
+  ]
+}

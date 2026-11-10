@@ -100,12 +100,12 @@ describe("the package documents", () => {
     expect(manifest.contributes.data.length).toBeLessThanOrEqual(16);
     expect(pageOf("liked").body[0].bind.path).toBe("liked");
   });
-  test("home shelves carry the byline and a card menu of Watch later, Like and Share; made-at-home stays plain", () => {
+  test("home shelves carry the byline and a card menu of Watch later, Save to playlist and Share; made-at-home and the channel strip stay plain", () => {
     const shelves = pageOf("index").body.filter((n: { type: string }) => n.type === "media_shelf");
     for (const shelf of shelves) {
-      if (shelf.bind.path === "made-at-home") { expect(shelf.row_actions).toBeUndefined(); continue; }
+      if (shelf.bind.path === "made-at-home" || shelf.bind.path === "channels") { expect(shelf.row_actions).toBeUndefined(); continue; }
       expect(shelf.item_subtitle_field).toBe("{byline}");
-      expect(shelf.row_actions.map((a: { label: string }) => a.label)).toEqual(["Watch later", "Like", "Share"]);
+      expect(shelf.row_actions.map((a: { label: string }) => a.label)).toEqual(["Watch later", "Save to playlist", "Share"]);
     }
   });
   test("the watch page lists chapters", () => {
@@ -213,7 +213,7 @@ describe("apps parity: chips, sort and search filters", () => {
   test("the watch page can be shared and turns on picture-in-picture, double tap and long press (the spec default is off)", () => {
     const player = pageOf("watch").body[0].main[0];
     expect(player).toMatchObject({ pip: true, double_tap_seek: true, long_press_speed: true });
-    expect(player.actions.map((action: { label: string }) => action.label)).toEqual(["Like", "Watch later", "Share"]);
-    expect(player.actions[2].action.share.to).toBe("/apps/videos/watch?id={id}");
+    expect(player.actions.map((action: { label: string }) => action.label)).toEqual(["Like", "Watch later", "Save to playlist", "Share"]);
+    expect(player.actions[3].action.share.to).toBe("/apps/videos/watch?id={id}");
   });
 });

@@ -3,7 +3,7 @@
 // feed's body to `ingestPodcastFeed`, which turns the episodes into `media-item` rows (kind podcast_episode, stream-only `{url}` until
 // saved) under a `media-source` of kind `feed`. Nothing here opens its own connection: the enclosure download for Save and the show's
 // picture go through the poller's `guardedGet`, so the guard, the pacing and the honest user agent are the same.
-import { and, eq, isNull } from "drizzle-orm";
+import { and, eq, inArray, isNull } from "drizzle-orm";
 import { generateOpml, parseFeed, parseOpml } from "feedsmith";
 import { db } from "@/db";
 import { syncFileReferences } from "@/lib/fileContent";
@@ -24,6 +24,8 @@ import { createFetchedFile, createFetchedFileFromResponse, removeFetchedFile } f
 import { mediaTypeOfExtension } from "./kinds";
 import { itemFromRow, itemToRow, MediaItem, sourceFromRow, type MediaItemRow, type MediaSource } from "./model";
 import { checkStorageCap } from "@/lib/storage/usage";
+import { diskIsLow } from "@/lib/storage";
+import { getSettingValueForPerson } from "@/lib/settings";
 import { mayManagePodcastCopy, trashPodcastCopy } from "@/lib/trash/podcastCopies";
 import { trackBackgroundWork } from "@/lib/backgroundWork";
 import { reportShelfEvent } from "@/lib/shelf/shelfEvents";
@@ -416,6 +418,7 @@ export async function ingestPodcastFeed(feed: FeedRecord, body: string, deps: Po
   const archive = new Set(source.archive);
   let artFileId = db.select({ artwork: mediaItems.artwork }).from(mediaItems).where(and(eq(mediaItems.sourceId, source.id), isNull(mediaItems.deletedAt))).all().map((item) => (item.artwork ? (JSON.parse(item.artwork) as { file_id?: string }).file_id : undefined)).find((id) => id) ?? null;
   if (!artFileId && show.imageUrl) artFileId = await fetchShowArt(source, show.imageUrl, deps, nowMs);
+  const freshIds: string[] = [];
   for (const episode of show.episodes) {
     if (archive.has(episode.guid)) continue; // deleted stays gone
     const existing = rowFor(source.id, episode.guid);
@@ -426,7 +429,7 @@ export async function ingestPodcastFeed(feed: FeedRecord, body: string, deps: Po
     values.locUrl = episode.enclosureUrl;
     values.locFileId = existing?.locFileId ?? null;
     if (existing) db.update(mediaItems).set({ ...values, id: existing.id }).where(eq(mediaItems.id, existing.id)).run();
-    else db.insert(mediaItems).values(values).run();
+    else { db.insert(mediaItems).values(values).run(); freshIds.push(record.id); }
     if (episode.transcriptUrl) {
       // The transcript text lives in the shared Transcript record (CAPTION-01h); this row keeps the publisher address, the Stack job, the summary and takeaways.
       const hlc = nextHlc();
@@ -435,7 +438,7 @@ export async function ingestPodcastFeed(feed: FeedRecord, body: string, deps: Po
     }
   }
   db.update(mediaSources).set({ lastCheckedAt: nowIso, lastStatus: "ok", failures: 0, backoffUntil: null }).where(eq(mediaSources.id, source.id)).run();
-  queuePodcastAutoRules(source.id, deps, nowMs);
+  queuePodcastAutoRules(source.id, deps, nowMs, freshIds);
 }
 
 export interface TranscriptSegment { start_s: number; text: string }
@@ -720,13 +723,14 @@ function completedByEveryone(itemId: string): boolean {
 /** Runs after each poll: save the newest N, and remove auto-saved copies that fell outside the newest N or that everyone has played. */
 type AutoOutcome = { saved: number; removed: number };
 const autoInFlight = new Map<string, Promise<AutoOutcome>>();
-const autoQueue = new Map<string, { deps: PollDeps; nowMs: number }>();
+const autoQueue = new Map<string, { deps: PollDeps; nowMs: number; freshIds: string[] }>();
 let autoWorker: Promise<void> | null = null;
 
 /** One bounded, serial background lane. Polling only enqueues; downloads start on a later event-loop turn. A request for a source
  * whose run is in progress is queued again, so a rule change made during a download still applies once that run ends. */
-export function queuePodcastAutoRules(sourceId: string, deps: PollDeps = routeDeps, nowMs = Date.now()): void {
-  autoQueue.set(sourceId, { deps, nowMs });
+export function queuePodcastAutoRules(sourceId: string, deps: PollDeps = routeDeps, nowMs = Date.now(), freshIds: readonly string[] = []): void {
+  // Episodes this refresh brought in are kept across a merged request, so a rule change queued meanwhile does not lose them.
+  autoQueue.set(sourceId, { deps, nowMs, freshIds: [...new Set([...(autoQueue.get(sourceId)?.freshIds ?? []), ...freshIds])] });
   if (autoWorker) return;
   autoWorker = trackBackgroundWork(runAutoQueue());
 }
@@ -740,7 +744,7 @@ async function runAutoQueue(): Promise<void> {
     autoQueue.delete(id);
     try {
       await autoInFlight.get(id)?.catch(() => undefined);
-      await applyAutoRules(id, job.deps, job.nowMs);
+      await applyAutoRules(id, job.deps, job.nowMs, job.freshIds);
     } catch { reportShelfEvent("podcast_keep_failed"); }
   }
 }
@@ -749,19 +753,21 @@ export async function drainPodcastAutoRules(): Promise<void> {
 }
 
 /** Coalesce callers for a source, including a rule change during a queued download. */
-export function applyAutoRules(sourceId: string, deps: PollDeps = routeDeps, nowMs = Date.now()): Promise<AutoOutcome> {
+export function applyAutoRules(sourceId: string, deps: PollDeps = routeDeps, nowMs = Date.now(), freshIds: readonly string[] = []): Promise<AutoOutcome> {
   const active = autoInFlight.get(sourceId);
   if (active) return active;
-  const work = runAutoRules(sourceId, deps, nowMs).finally(() => { autoInFlight.delete(sourceId); });
+  const work = runAutoRules(sourceId, deps, nowMs, freshIds).finally(() => { autoInFlight.delete(sourceId); });
   autoInFlight.set(sourceId, work);
   return work;
 }
-async function runAutoRules(sourceId: string, deps: PollDeps, nowMs: number): Promise<AutoOutcome> {
+async function runAutoRules(sourceId: string, deps: PollDeps, nowMs: number, freshIds: readonly string[]): Promise<AutoOutcome> {
   const source = liveSourceById(sourceId);
   const outcome = { saved: 0, removed: 0 };
-  if (!source || source.kind !== "feed" || (source.auto.save === "none" && !source.auto.remove_watched)) return outcome;
+  if (!source || source.kind !== "feed") return outcome;
   const owner = personById(source.owner_person_id);
   if (!owner || !mayManageSaves(owner)) return outcome;
+  const autoDownload = autoDownloadFor(owner, source);
+  if (source.auto.save === "none" && !source.auto.remove_watched && !autoDownload) return outcome;
   const rows = db.select().from(mediaItems).where(and(eq(mediaItems.sourceId, sourceId), isNull(mediaItems.deletedAt), eq(mediaItems.hidden, false))).all()
     .sort((a, b) => publishedOf(b).localeCompare(publishedOf(a)));
   const keep = source.auto.keep_latest ?? (source.auto.save === "audio" ? 1 : 0);
@@ -775,6 +781,17 @@ async function runAutoRules(sourceId: string, deps: PollDeps, nowMs: number): Pr
       else break; // a failing server or a full disk: stop here, the next poll tries again
     }
   }
+  if (autoDownload && freshIds.length > 0) {
+    // PODCAST-AUTO-01: the person's "Automatic podcast saving" saves the newest few episodes this refresh brought in.
+    const fresh = new Set(freshIds);
+    for (const row of rows.filter((entry) => fresh.has(entry.id) && !entry.locFileId).slice(0, AUTO_DOWNLOAD_PER_REFRESH)) {
+      if (diskIsLow()) break; // the hub's own low-space guard: save nothing more until there is room
+      const result = await saveEpisode(owner, row.id, { auto: true, deps, now: () => nowMs });
+      if (!result.ok) break; // a failing server or a full store: the next refresh brings the next episodes
+      outcome.saved++;
+    }
+    outcome.removed += trimAutoSaved(owner);
+  }
   // Never prune a copy a person saved by hand: only files the keep rules made.
   for (const row of rows) {
     if (!row.locFileId) continue;
@@ -785,6 +802,37 @@ async function runAutoRules(sourceId: string, deps: PollDeps, nowMs: number): Pr
     if (outside || played) { releaseCopy(row); outcome.removed++; }
   }
   return outcome;
+}
+
+export const AUTO_DOWNLOAD_PER_REFRESH = 3;
+
+/** Whether the show's new episodes are saved by the person's Automatic podcast saving: it is `followed`, the show is followed, and the show has no
+ * keep rule of its own (a show with its own "save" rule is governed by that rule, which is the per-show override). */
+function autoDownloadFor(owner: PersonRow, source: MediaSource): boolean {
+  return getSettingValueForPerson(owner.id, "podcasts.auto_download") === "followed" && !source.paused && source.auto.save === "none";
+}
+
+/** Oldest first: removes this person's automatic copies until they fit `podcasts.auto_download_max_gb`. Restorable (household Trash), like any removed copy. */
+export function trimAutoSaved(owner: PersonRow): number {
+  const capGb = Number(getSettingValueForPerson(owner.id, "podcasts.auto_download_max_gb") ?? 10);
+  const capBytes = (Number.isFinite(capGb) && capGb >= 1 ? capGb : 10) * 1024 ** 3;
+  const files = db.select({ id: attachments.id, size: attachments.size }).from(attachments)
+    .where(and(eq(attachments.ownerPersonId, owner.id), eq(attachments.origin, "fetched"), eq(attachments.provenance, "podcast:auto"), isNull(attachments.deletedAt))).all();
+  if (files.length === 0) return 0;
+  const sizes = new Map(files.map((file) => [file.id, file.size]));
+  // Only copies a live episode still holds count: a removed copy waits in the household Trash and no longer uses the person's allowance.
+  const holders = db.select().from(mediaItems).where(and(isNull(mediaItems.deletedAt), inArray(mediaItems.locFileId, [...sizes.keys()]))).all()
+    .sort((a, b) => publishedOf(a).localeCompare(publishedOf(b)));
+  let total = holders.reduce((sum, row) => sum + (sizes.get(row.locFileId!) ?? 0), 0);
+  if (total <= capBytes) return 0;
+  let removed = 0;
+  for (const row of holders) {
+    if (total <= capBytes) break;
+    total -= sizes.get(row.locFileId!) ?? 0;
+    releaseCopy(row);
+    removed++;
+  }
+  return removed;
 }
 
 const publishedOf = (row: MediaItemRow): string => (row.external ? ((JSON.parse(row.external) as { published_at?: string | null }).published_at ?? row.addedAt) : row.addedAt);

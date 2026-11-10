@@ -267,6 +267,17 @@
           "density": "compact",
           "item_meta_field": "duration_s",
           "item_highlight_field": "playing",
+          "reorder": {
+            "call": {
+              "call": {
+                "target": "/api/plugins/music/queue",
+                "args": {
+                  "op": "reorder"
+                }
+              }
+            },
+            "id_param": "ids"
+          },
           "on_select": {
             "play": {
               "media_id": "{id}"
