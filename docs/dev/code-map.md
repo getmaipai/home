@@ -363,6 +363,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/addedModels.ts` | listAddedModels, saveAddedModel, removeAddedModel |
 | `backend/src/lib/addressFallback.ts` | ADDRESS_ATTEMPT_MS, ipv4First, isConnectFailure, fetchTryingEachAddress |
 | `backend/src/lib/adultLock.ts` | PROOF_IDLE_MS, PROOF_ABSOLUTE_MS, TICKET_MS, PROOF_HEADER, LOCKED_WRITERS, __setAdultLockClockForTests |
+| `backend/src/lib/adultMarkRoute.ts` | adultMarkJobBody |
 | `backend/src/lib/adultMarks.ts` | SHARED_SCREEN_MARK_LINE, NEED_PASSCODE_LINE, NOT_FOUND_LINE, NOT_READY_LINE, TEMPORARY_LINE, NOT_MARKED_LINE |
 | `backend/src/lib/ageBand.ts` | speakerAgeBand |
 | `backend/src/lib/aiChoicesState.ts` | readAiSettings, SETUP_CHOICE_KEYS, writeChoiceSetting, setupCards |
@@ -977,7 +978,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/searchTestSummary.ts` | summarizeSearchStatus, SearchTestSummarySchema |
 | `backend/src/lib/searxngHealth.ts` | lastSearxngCanaryResult, __setLastSearxngCanaryResultForTests, __resetSearxngHealthThrottleForTests, checkSearxngHealth |
 | `backend/src/lib/secret.ts` | ensureSecretPepperReady, secretDigitsOf, hashSecret, verifySecret, __resetPepperCacheForTests, hashApiKeySecret |
-| `backend/src/lib/secretCheck.ts` | verifyAgainstRecord |
+| `backend/src/lib/secretCheck.ts` | recordCredentialFailure, verifyAgainstRecord |
 | `backend/src/lib/secretPaths.ts` | protectSecretPath, protectExistingSecretPaths |
 | `backend/src/lib/secretThrottle.ts` | throttleCheck, throttleFail, throttleReset, __resetThrottleForTests, getClientIp |
 | `backend/src/lib/secrets.ts` | SECRETS_KEY_NAME, SECRETS_KEY_ENV, householdKeyBytes, encryptSecret, decryptSecret, __resetSecretsKeyCacheForTests |
