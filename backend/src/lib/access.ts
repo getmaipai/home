@@ -80,11 +80,15 @@ export function canAccessPerson(actor: PersonRow, personId: string, roleOf?: Map
   return role === "child";
 }
 
-/** The write side follows the read boundary for person-scoped memories. */
+/** Who may write or change a person-scoped memory: the person themself, or an
+ * owner or admin for anyone except a teen (a teen's memories are private to
+ * them, as on the read side). Owner and admin writes for other adults stay
+ * allowed: the legacy import and the household tools rely on them. */
 export function canWritePersonMemory(actor: PersonRow, personId: string, roleOf?: Map<string, string>): boolean {
   if (actor.id === personId) return true;
+  if (!isOwnerOrAdmin(actor)) return false;
   const targetRole = roleOf?.get(personId) ?? getPersonRole(personId);
-  return targetRole !== "teen" && canAccessPerson(actor, personId, roleOf);
+  return targetRole !== "teen";
 }
 
 // Every active (non-deleted) person in the household - the retired turn engine's
