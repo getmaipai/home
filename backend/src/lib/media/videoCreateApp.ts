@@ -53,7 +53,7 @@ export function videoTierSegment(person: PersonRow): Record<string, unknown> | n
   const boostOffered = allowedQuality(person, "video", "detailed", band) === "detailed";
   const tiers = [
     { id: "standard", label: "Standard", hint: ltx25 ? `Fast · sound · up to ${maxSecondsFor("quick", "ltx25", engine)} seconds` : engine === null ? "Fast · sound · up to 10 seconds when available" : `Silent · up to ${QUICK_MAX_SECONDS} seconds · fastest` },
-    ...(boostOffered ? [{ id: "boost", label: "Boost", hint: ltx25 ? `Sharper picture · sound · up to ${maxSecondsFor("detailed", "ltx25", engine)} seconds` : "Needs the newer video model for sharper picture and sound", ...(!ltx25 ? { disabled_reason: "Boost needs the newer video model. An admin can add it in Settings, Models and storage." } : {}) }] : []),
+    ...(boostOffered ? [{ id: "boost", label: "Boost", hint: ltx25 ? `Sharper picture · sound · up to ${maxSecondsFor("detailed", "ltx25", engine)} seconds` : "Needs a video engine for sharper picture and sound", ...(!ltx25 ? { disabled_reason: "Boost's sharper picture and sound require an optional video engine. Ask an admin to enable it in Settings." } : {}) }] : []),
     ...maxTierEntry(person, band, engine),
   ];
   return tiers.length > 1 ? { state: "tier", label: "Level", default: "standard", tiers } : null;

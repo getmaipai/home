@@ -61,8 +61,7 @@
             "voices": "{voices}",
             "style": "{style}",
             "character": "{character}",
-            "strength": "{strength}",
-            "start_frame": "{start_frame}"
+            "strength": "{strength}"
           }
         }
       },

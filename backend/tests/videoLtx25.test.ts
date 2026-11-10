@@ -200,11 +200,11 @@ describe("minors and Max", () => {
     const { ownerRow } = await household();
     const segment = videoTierSegment(ownerRow) as { tiers: Array<{ id: string; hint: string }> };
     expect(segment.tiers.map((t) => t.id)).toEqual(["standard", "boost"]);
-    expect(segment.tiers[0]!.hint).toBe("Fast, with sound");
-    expect(segment.tiers[1]!.hint).toBe("Sharper picture");
+    expect(segment.tiers[0]!.hint).toBe("Fast · sound · up to 10 seconds");
+    expect(segment.tiers[1]!.hint).toBe("Sharper picture · sound · up to 5 seconds");
     __setVideoStatusForTests(NOT_READY());
     const old = videoTierSegment(ownerRow) as { tiers: Array<{ id: string; hint: string }> };
-    expect(old.tiers.map((t) => t.hint)).toEqual(["Fast", "Sharper picture"]);
+    expect(old.tiers.map((t) => t.hint)).toEqual(["Silent · up to 5 seconds · fastest", "Needs a video engine for sharper picture and sound"]);
   });
 
   test("/api/videos/status reports each level", async () => {
