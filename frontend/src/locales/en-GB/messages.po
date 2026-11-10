@@ -16773,11 +16773,6 @@ msgid "off"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:842
-msgid "setting.podcasts.auto_download.option_label.off"
-msgstr ""
-
-#. js-lingui-explicit-id
 #: src/apps/clock/AlarmRecordRow.tsx:50
 #: src/apps/settings/AiJobSummary.tsx:38
 #: src/apps/settings/AiJobSummary.tsx:74
@@ -16856,6 +16851,11 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:814
 msgid "setting.person.vision.watch.option_label.off"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/lib/settingCopy.generated.ts:842
+msgid "setting.podcasts.auto_download.option_label.off"
 msgstr ""
 
 #. js-lingui-explicit-id
