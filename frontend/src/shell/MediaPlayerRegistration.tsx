@@ -2,7 +2,7 @@
 // across media and chat voice, the person's video speed applies, the sleep timer reaches it and the Media Session shows its title.
 // MEDIA-POLISH-01: the element is the media host's own (mediaHost.tsx), registered for as long as the host holds the item, on the
 // watch page, in the docked mini bar and while the person is in another app. It draws nothing.
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { useAudioRegistration } from "@/shell/audioSessionContext";
@@ -15,6 +15,8 @@ interface PlayedItem {
   poster: string | null;
   duration_s: number | null;
   kind?: string;
+  show_id?: string;
+  show_rate?: number;
   chapters: Array<{ start_s: number; title: string }>;
 }
 
@@ -66,6 +68,22 @@ function RegisteredPlayer({ appId, mediaId, element, next, liveSubtitle }: Omit<
     [played, appId, liveSubtitle],
   );
   useAudioRegistration(played ? element : null, { kind: audioKindOfApp(appId), item: audioItem, ...(appId === "podcasts" ? { ownRate: true } : {}), ...(next ? { next } : {}) });
+  // PODCAST-RATE-01: a speed picked while the show is docked (no play page mounted to save it) is saved for the show too. The play page saves its own picks; this
+  // covers the rest, and a speed equal to the last one saved or applied is not sent again.
+  const savedRate = useRef<number | null>(null);
+  const showId = appId === "podcasts" ? played?.show_id ?? null : null;
+  useEffect(() => { savedRate.current = played?.show_rate ?? null; }, [showId, played?.show_rate]);
+  useEffect(() => {
+    if (!element || !showId) return;
+    const onRate = () => {
+      const rate = Math.round(element.playbackRate * 100) / 100;
+      if (!Number.isFinite(rate) || rate < 0.5 || rate > 2 || rate === savedRate.current) return;
+      savedRate.current = rate;
+      void api.patchShowRate(showId, rate).catch(() => { savedRate.current = null; });
+    };
+    element.addEventListener("ratechange", onRate);
+    return () => element.removeEventListener("ratechange", onRate);
+  }, [element, showId]);
   useEffect(() => {
     if (appId !== "books" || !element || !mediaId || !played || played.kind !== "chapter") return;
     const report = (reason: string) => { if (Number.isFinite(element.currentTime)) void api.mediaProgress(appId, { media_id: mediaId, position_s: element.currentTime, duration_s: Number.isFinite(element.duration) ? element.duration : played.duration_s ?? 0, reason }, reason === "unload").catch(() => {}); };

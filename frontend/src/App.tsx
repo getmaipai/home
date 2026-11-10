@@ -4,6 +4,7 @@ import { BrowserRouter, Routes as RouterRoutes, Route, Navigate, useLocation } f
 import { I18nProvider, useLingui } from "@lingui/react";
 import { i18n } from "@/i18n";
 import { createQueryClient } from "@/lib/queryClient";
+import { installQueryCacheSaver, restoreQueryCache } from "@/lib/queryPersist";
 import { aliasTarget } from "@/shell/pages/settings/settingsRedirects";
 import type { SignedInPerson } from "@/lib/api";
 import { usePersonLocale } from "@/shell/usePersonLocale";
@@ -89,7 +90,7 @@ export function App() {
   function loadPerson() {
     return api
       .me()
-      .then((me) => { setPerson(me); setMediaOwnerId((previous) => nextMediaOwner(previous, { person: me })); })
+      .then((me) => { restoreQueryCache(queryClient, me.id); setPerson(me); setMediaOwnerId((previous) => nextMediaOwner(previous, { person: me })); })
       .catch((error) => { setPerson(null); setMediaOwnerId((previous) => nextMediaOwner(previous, { error })); });
   }
 
@@ -103,6 +104,8 @@ export function App() {
   function revalidatePerson() {
     return api.me().then(setPerson).catch(() => {});
   }
+
+  useEffect(() => (person ? installQueryCacheSaver(queryClient, person.id) : undefined), [person?.id]);
 
   useEffect(() => {
     if (__SETUP_PREVIEW__) setPerson(null);

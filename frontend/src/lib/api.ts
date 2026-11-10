@@ -1,5 +1,6 @@
 import { isDeviceRevoked, removeAllOfflineMedia } from "@/lib/offlineMedia";
 import { takeEarlyMe } from "@/lib/earlyMe";
+import { clearQueryCache } from "@/lib/queryPersist";
 import type { StatusAppsWire, AppRow as AppRowWire } from "@maipai/home-backend/src/wire";
 import type { RobotState } from "@maipai/spec/gen/ts/robot-state.js";
 import type { StackFitPlan } from "@maipai/spec/gen/ts/stack-fit-plan.js";
@@ -796,7 +797,7 @@ function endAdultUnlock(): void {
 
 export async function request<T>(path: string, init?: RequestInit & { timeoutMs?: number }): Promise<T> {
   // An explicit sign-out discards the copies (a shared browser). An expired session never does.
-  if (path === "/api/auth/logout") { endAdultUnlock(); await removeAllOfflineMedia(); }
+  if (path === "/api/auth/logout") { clearQueryCache(); endAdultUnlock(); await removeAllOfflineMedia(); }
   const { timeoutMs, ...rest } = init ?? {};
   const { signal, clear } = withTimeout(timeoutMs);
   try {
@@ -1688,6 +1689,9 @@ export const api = {
   // MEDIA-POLISH-01: the docked mini bar's progress report (POST /api/plugins/:id/progress, the media app host's own action).
   mediaProgress: (pkg: string, body: { media_id: string; position_s?: number; duration_s?: number; reason: string; locator?: unknown; percent?: number }, keepalive = false) =>
     request<{ ok: true }>(`/api/plugins/${encodeURIComponent(pkg)}/progress`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body), keepalive }),
+  // PODCAST-RATE-01: the speed the person picked for one show while it plays in the docked bar (the play page saves its own picks through the package page).
+  patchShowRate: (showId: string, rate: number) =>
+    request<{ ok: true; show_id: string; rate: number }>(`/api/plugins/podcasts/shows/${encodeURIComponent(showId)}/rate`, { method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify({ rate }) }),
   appPage: (pkg: string, page: string) => request<unknown>(`/api/plugins/${encodeURIComponent(pkg)}/pages/${encodeURIComponent(page)}`),
   // GET /api/repairs (backend/src/routes/repairs.ts): real and fully
   // landed (F step 1), unlike widgets/lists above - no graceful-404
