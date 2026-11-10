@@ -13,13 +13,22 @@ export function askFromSearch(search: string): string | null {
   return text ? text : null;
 }
 
+/** Package actions hand longer prompts through router state so they don't need to encode them in a URL. */
+function askFromPageState(value: unknown): string | null {
+  if (!value || typeof value !== "object") return null;
+  const pageState = (value as { pageState?: unknown }).pageState;
+  if (!pageState || typeof pageState !== "object") return null;
+  const ask = (pageState as { ask?: unknown }).ask;
+  return typeof ask === "string" ? ask.trim().slice(0, ASK_HANDOFF_MAX) || null : null;
+}
+
 /** Puts Home's words in the composer, unsent and editable. It reads the
  * address once, on the first render, before ChatPage rewrites the query to
  * the open conversation, and sends nothing. */
 export function AskHandoff() {
   const aui = useAui();
   const location = useLocation();
-  const [ask] = useState(() => askFromSearch(location.search));
+  const [ask] = useState(() => askFromSearch(location.search) ?? askFromPageState(location.state));
   useEffect(() => {
     if (ask === null) return;
     aui.composer().setText(ask);

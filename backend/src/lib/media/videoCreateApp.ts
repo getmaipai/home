@@ -52,8 +52,8 @@ export function videoTierSegment(person: PersonRow): Record<string, unknown> | n
   const ltx25 = ltx25VideoReady(engine);
   const boostOffered = allowedQuality(person, "video", "detailed", band) === "detailed";
   const tiers = [
-    { id: "standard", label: "Standard", hint: ltx25 ? "Fast, with sound" : "Fast" },
-    ...(boostOffered ? [{ id: "boost", label: "Boost", hint: "Sharper picture" }] : []),
+    { id: "standard", label: "Standard", hint: ltx25 ? `Fast · sound · up to ${maxSecondsFor("quick", "ltx25", engine)} seconds` : engine === null ? "Fast · sound · up to 10 seconds when available" : `Silent · up to ${QUICK_MAX_SECONDS} seconds · fastest` },
+    ...(boostOffered ? [{ id: "boost", label: "Boost", hint: ltx25 ? `Sharper picture · sound · up to ${maxSecondsFor("detailed", "ltx25", engine)} seconds` : "Needs the newer video model for sharper picture and sound", ...(!ltx25 ? { disabled_reason: "Boost needs the newer video model. An admin can add it in Settings, Models and storage." } : {}) }] : []),
     ...maxTierEntry(person, band, engine),
   ];
   return tiers.length > 1 ? { state: "tier", label: "Level", default: "standard", tiers } : null;
@@ -62,9 +62,12 @@ export function videoTierSegment(person: PersonRow): Record<string, unknown> | n
 /** The lengths the Length chip offers: five seconds and the longest available level makes here now. A level that makes less is cut to fit and says so. */
 function lengthOptions(): number[] {
   const engine = peekVideoEngineStatus();
+  // With no Stack answer yet, show the Standard ceiling as a choice instead of trapping the draft at Quick's five seconds.
+  // Once a Stack answers, its real installed model limits the list.
+  if (engine === null) return [QUICK_MAX_SECONDS, 10];
   const longest = Math.max(
     ltx25VideoReady(engine) ? maxSecondsFor("quick", "ltx25", engine) : QUICK_MAX_SECONDS,
-    ltx25VideoReady(engine) ? maxSecondsFor("quick", "ltx25", engine) : DETAILED_MAX_SECONDS,
+    ltx25VideoReady(engine) ? maxSecondsFor("detailed", "ltx25", engine) : DETAILED_MAX_SECONDS,
   );
   return [...new Set([QUICK_MAX_SECONDS, longest])];
 }
@@ -104,11 +107,11 @@ registerAppPageFill("videos", "create", (person, page) => {
   // Look, Camera (and Voices, folded under More settings) are the Style control: two thumbnails that open one popover (a sheet on a phone).
   bar.chips = [
     ...chips,
-    { state: "seconds", label: "Length", default: QUICK_MAX_SECONDS, options: lengths.map((value) => ({ value, label: `${value} seconds` })) },
+    { state: "seconds", label: "Length", align: "end", default: QUICK_MAX_SECONDS, options: lengths.map((value) => ({ value, label: `${value}s` })) },
     { state: "look", label: "Look", variant: "cards", presentation: "popover", group: "Style", default: VIDEO_LOOKS[0]!.id, options: VIDEO_LOOKS.map(({ id, label, loop }) => ({ value: id, label: id === VIDEO_LOOKS[0]!.id ? "Auto" : label, ...media(loop) })) },
     // Auto is the start for both: Look's Auto is `natural` (adds no words; a clip's tag still says "Natural"), Camera's Auto is "none" (the route reads it as not given).
     { state: "camera", label: "Camera", variant: "cards", presentation: "popover", group: "Style", default: "none", options: [{ value: "none", label: "Auto" }, ...VIDEO_RECIPES.map(({ id, label, loop }) => ({ value: id, label, ...media(loop) }))] },
-    { state: "voices", label: "Voices", default: DEFAULT_VIDEO_VOICES, options: VIDEO_VOICES.map(({ id, label }) => ({ value: id, label })) },
+    { state: "voices", label: "Sound", align: "end", icon_only: true, default: DEFAULT_VIDEO_VOICES, options: VIDEO_VOICES.map(({ id }) => id === "clean" ? ({ value: id, label: "No music or effects", icon: "volume-x" }) : ({ value: id, label: "Music and effects", icon: "volume-2" })) },
     // VIDEO-LORA-09: Styles, Characters and Strength join the Style popover; the person's own access and the Stack's LoRA report decide what shows and when it is disabled.
     ...styleChips({ person, engine: peekVideoEngineStatus(), offered: ((videoTierSegment(person)?.tiers as Array<{ id: StyleTier }> | undefined)?.map((t) => t.id)) ?? ["standard"] }),
   ];
@@ -118,12 +121,10 @@ registerAppPageFill("videos", "create", (person, page) => {
   if (feed && Array.isArray(feed.actions) && !maxOfferedNow(person)) feed.actions = (feed.actions as Array<{ action?: { call?: { target?: string } } }>).filter((entry) => !entry.action?.call?.target?.endsWith("/actions/max"));
   const tier = videoTierSegment(person);
   if (tier) {
-    bar.tier = { ...tier, presentation: "segment" };
-    const ids = (tier.tiers as Array<{ id: keyof typeof VIDEO_TIME_WORDS }>).map((entry) => entry.id);
-    bar.submit_detail = { state: "tier", placement: "in_button", labels: Object.fromEntries(ids.map((id) => [id, VIDEO_TIME_WORDS[id]])) };
+    bar.tier = { ...tier, label: "Quality", presentation: "dropdown" };
+    delete bar.submit_detail;
   } else {
-    // Standard alone: no segment, so the line follows the length.
-    bar.submit_detail = { state: "seconds", placement: "in_button", labels: Object.fromEntries(lengths.map((value) => [String(value), VIDEO_TIME_WORDS.standard])) };
+    delete bar.submit_detail;
   }
 });
 

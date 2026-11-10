@@ -7,6 +7,7 @@
       "type": "prompt_bar",
       "placement": "inline",
       "layout": "chat",
+      "chat_distribution": "start_end",
       "label": "Describe a video",
       "placeholder": "Describe your video. Put each person's line in quotes.",
       "prompt_state": "prompt",
@@ -26,14 +27,6 @@
         "character_state": "character",
         "max": 2
       },
-      "references": [
-        {
-          "state": "start_frame",
-          "label": "Start frame",
-          "kind": "picture",
-          "placement": "in_field"
-        }
-      ],
       "chips": [
         {
           "state": "orientation",
@@ -42,13 +35,16 @@
           "options": [
             {
               "value": "landscape",
-              "label": "Landscape"
+              "label": "Landscape",
+              "icon": "rectangle-horizontal"
             },
             {
               "value": "portrait",
-              "label": "Portrait"
+              "label": "Portrait",
+              "icon": "rectangle-vertical"
             }
-          ]
+          ],
+          "icon_only": true
         }
       ],
       "submit": {
@@ -67,6 +63,31 @@
             "character": "{character}",
             "strength": "{strength}",
             "start_frame": "{start_frame}"
+          }
+        }
+      },
+      "mode_selector": {
+        "state": "media_mode",
+        "label": "Create",
+        "default": "video",
+        "options": [
+          {
+            "value": "image",
+            "label": "Image",
+            "icon": "image"
+          },
+          {
+            "value": "video",
+            "label": "Video",
+            "icon": "film"
+          }
+        ]
+      },
+      "mode_actions": {
+        "image": {
+          "ask": {
+            "prompt": "{prompt}\n\nPlease create an image using the image generation tool.",
+            "expects": "An image created in this chat."
           }
         }
       }

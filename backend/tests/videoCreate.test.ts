@@ -202,6 +202,13 @@ describe("POST /api/videos/make", () => {
 });
 
 describe("the Create page and the make action", () => {
+  test("shows Standard's ten-second choice while the Stack has not answered yet", async () => {
+    const { adult } = await household();
+    __setVideoStatusForTests(null);
+    const page = await (await adult.client.get("/api/plugins/videos/pages/create")).json() as { body: Array<Record<string, any>> };
+    expect(promptBarOf(page.body)!.chips.find((chip: { state: string }) => chip.state === "seconds")!.options.map((option: { value: number }) => option.value)).toEqual([QUICK_MAX_SECONDS, 10]);
+  });
+
   test("the served Create page leads with a compact prompt bar and offers the recipes, lengths and allowed levels", async () => {
     const { adult } = await household();
     const page = await (await adult.client.get("/api/plugins/videos/pages/create")).json() as { body: Array<Record<string, any>> };
@@ -217,9 +224,9 @@ describe("the Create page and the make action", () => {
     if (expected.length === 1) expect(bar.tier).toBeUndefined();
     else expect(bar.tier.tiers.map((t: { id: string }) => t.id)).toEqual(expected);
     expect(bar.tier?.tiers.map((t: { id: string }) => t.id) ?? []).not.toContain("max");
-    // VIDEO-UI-15: the segment is drawn as three cards (the one definition stays `videoTierSegment`).
+    // VIDEO-COMPOSER-03: the quality dropdown reuses the one per-person tier list.
     const segment = videoTierSegment({ ...adultRow, role: "adult" });
-    expect(segment ? { ...segment, presentation: "segment" } : null).toEqual(bar.tier ?? null);
+    expect(segment ? { ...segment, label: "Quality", presentation: "dropdown" } : null).toEqual(bar.tier ?? null);
     // The page document itself is not changed by serving it: a second request gets one set of chips, not two.
     const again = await (await adult.client.get("/api/plugins/videos/pages/create")).json() as { body: Array<Record<string, any>> };
     expect(promptBarOf(again.body)!.chips).toHaveLength(5);
@@ -228,21 +235,17 @@ describe("the Create page and the make action", () => {
     expect(page.body[0]).toMatchObject({ type: "prompt_bar", placement: "inline", layout: "chat" });
     expect(bar.field_size).toBeUndefined();
     expect(chip("look")).toMatchObject({ group: "Style", presentation: "popover" });
-    if (bar.tier) expect(bar.tier.presentation).toBe("segment");
+    if (bar.tier) expect(bar.tier.presentation).toBe("dropdown");
     expect(bar.placement).toBe("inline");
     expect(bar.starts).toBe("video");
     expect(bar.submit_label).toBe("Generate");
-    expect(bar.references).toEqual([{ state: "start_frame", label: "Start frame", kind: "picture", placement: "in_field" }]);
+    expect(bar.references).toBeUndefined();
     expect(bar.suggestions).toBeUndefined();
     expect(chip("look")).toMatchObject({ presentation: "popover", group: "Style" });
     expect(chip("camera")).toMatchObject({ presentation: "popover", group: "Style" });
     expect(chip("voices").fold).toBeUndefined();
     expect(chip("orientation").fold).toBeUndefined();
-    // The time under Generate is plain words per level, never credits, memory or a model name.
-    const detail = bar.submit_detail as { state: string; labels: Record<string, string> };
-    expect(detail.state).toBe(bar.tier ? "tier" : "seconds");
-    expect((bar.submit_detail as { placement: string }).placement).toBe("in_button");
-    for (const line of Object.values(detail.labels)) expect(line).toMatch(/under a minute|about a minute|about four minutes/);
+    expect(bar.submit_detail).toBeUndefined();
     expect(JSON.stringify(page.body)).not.toMatch(/\b(GB|RAM|memory|model|credits?|pack)\b/i);
     // The feed sits in a "Your clips" section (the kit's feed has no heading of its own), in the media look with the filters behind one View button.
     const section = page.body.find((node) => node.type === "section") as Record<string, any>;
@@ -540,8 +543,9 @@ describe("U3: Camera and Look cards from the one lists, with their loops", () =>
     expect(chip("camera").variant).toBe("cards");
     expect(chip("camera").default).toBe("none");
     expect(chip("camera").options).toEqual([{ value: "none", label: "Auto" }, ...VIDEO_RECIPES.map((r) => ({ value: r.id, label: r.label, ...(shipped(r.loop) ? { media: r.loop } : {}) }))]);
-    expect(bar.references).toEqual([{ state: "start_frame", label: "Start frame", kind: "picture", placement: "in_field" }]);
-    expect(bar.submit.call.args).toMatchObject({ camera: "{camera}", start_frame: "{start_frame}", look: "{look}" });
+    expect(bar.references).toBeUndefined();
+    expect(bar.submit.call.args).toMatchObject({ camera: "{camera}", look: "{look}" });
+    expect(bar.submit.call.args).not.toHaveProperty("start_frame");
     const source = await Bun.file(join(PACKAGES_DIR, "videos", "pages", "create.json")).text();
     expect(source).not.toContain(".mp4");
     expect(VIDEO_RECIPES).toHaveLength(8);
