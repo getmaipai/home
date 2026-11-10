@@ -8,6 +8,7 @@ import { forgetMediaRefusal, rememberMediaRefusal } from "@/lib/stackEngine";
 import { createStackHttp } from "@/lib/stack/http";
 import type { StackLiveFields } from "@/lib/genLive";
 import type { FullView } from "@/lib/stack/fullView";
+import sharp from "sharp";
 
 export type StackVideoState = "queued" | "running" | "done" | "failed" | "cancelled";
 
@@ -184,9 +185,36 @@ function failure(res: Response): Promise<never> {
   });
 }
 
+/** The longest side a start or end picture keeps, and the most bytes it may weigh, before Home fits it for the Stack (which refuses a file over 20 MB). */
+export const START_PICTURE_MAX_SIDE = 2560;
+export const START_PICTURE_MAX_BYTES = 8 * 1024 * 1024;
+
+/** True when a base64 picture weighs more than Home sends as it is (decided from its length alone, so a normal picture costs nothing). */
+export const pictureNeedsFit = (base64: string | undefined): boolean => base64 !== undefined && Math.floor(base64.length * 0.75) > START_PICTURE_MAX_BYTES;
+
+/**
+ * Any picture can start or end a clip: a huge photo is shrunk (its rotation applied) so the Stack never refuses it for weight, and a picture that is
+ * already small enough, in a format the Stack reads, goes through byte for byte. The Stack fits the picture to the clip's size itself, and nothing here
+ * touches the clip's length. A file sharp cannot read goes through unchanged, so the Stack's own plain line says what is wrong.
+ */
+export async function fitPictureForStack(base64: string): Promise<string> {
+  try {
+    const bytes = Buffer.from(base64, "base64");
+    const meta = await sharp(bytes).metadata();
+    const longest = Math.max(meta.width ?? 0, meta.height ?? 0);
+    const readable = meta.format === "png" || meta.format === "jpeg" || meta.format === "webp";
+    if (readable && bytes.length <= START_PICTURE_MAX_BYTES && longest <= START_PICTURE_MAX_SIDE && (meta.orientation ?? 1) === 1) return base64;
+    const fit = await sharp(bytes).rotate().resize({ width: START_PICTURE_MAX_SIDE, height: START_PICTURE_MAX_SIDE, fit: "inside", withoutEnlargement: true }).flatten({ background: "#ffffff" }).jpeg({ quality: 92 }).toBuffer();
+    return fit.toString("base64");
+  } catch { return base64; }
+}
+
 /** Starts a clip and returns the job id at once (`timeout_ms` 1: the Stack answers 202 with the job; a clip takes over two minutes). */
 export async function submitVideo(body: VideoBody): Promise<{ job: string; done: StackClip[] | null; warnings: StackLoraWarning[] }> {
-  const res = await request("/v1/videos/generations", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body), timeoutMs: 60_000 });
+  // Only a picture the Stack would refuse for weight is touched; every other picture, whatever its size, shape or rotation, goes as it is (the Stack fits it to the clip itself).
+  const fitted: VideoBody = !pictureNeedsFit(body.image) && !pictureNeedsFit(body.end_image) ? body
+    : { ...body, ...(body.image ? { image: await fitPictureForStack(body.image) } : {}), ...(body.end_image ? { end_image: await fitPictureForStack(body.end_image) } : {}) };
+  const res = await request("/v1/videos/generations", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(fitted), timeoutMs: 60_000 });
   if (res.status === 202 || res.status === 200) {
     forgetMediaRefusal("video");
     const parsed = await res.json() as { job?: string; data?: StackClip[]; lora_warnings?: unknown };
