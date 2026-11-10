@@ -77284,7 +77284,7 @@
                       "ernie-image-turbo",
                       "all"
                     ],
-                    "default": "default"
+                    "default": "all"
                   },
                   "installed": {
                     "type": "string",
