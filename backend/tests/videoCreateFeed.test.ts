@@ -368,6 +368,13 @@ describe("scope showcase: the Try this rail (VIDEO-UI-11)", () => {
     expect((await data(owner, { scope: "showcase" })).length).toBe(rows.length);
   });
 
+  test("the featured idea scope honors its page limit so the billboard stays one slide", async () => {
+    const { adult } = await household();
+    const rows = await data(adult.client, { scope: "showcase", limit: 1 });
+    expect(rows).toHaveLength(1);
+    expect(rows[0]!.id).toBe("paper-boat-anime");
+  });
+
   test("every loop has a small poster beside it, and the rows never name a resource, a model or a credit", async () => {
     const { adult } = await household();
     for (const loop of [...VIDEO_LOOKS, ...VIDEO_RECIPES].map((entry) => entry.loop)) {
@@ -393,13 +400,13 @@ describe("scope showcase: the Try this rail (VIDEO-UI-11)", () => {
   test("the served Create page puts the rail above the feed: a plain poster shelf whose press only navigates with prompt, look and camera; the empty feed keeps its one line", async () => {
     const { adult } = await household();
     const page = await (await adult.client.get("/api/plugins/videos/pages/create")).json() as { body: Array<Row> };
-    const main = page.body.find((node) => node.type === "split_view")!.main as Row[];
-    expect(main.map((node) => node.type)).toEqual(["media_shelf", "section"]);
-    const shelf = main[0]!;
-    expect(shelf).toMatchObject({ heading: "Try this", aspect: "poster", layout: "rail", variant: "plain", press_scale: true, item_media_field: "thumbnail", media_loop: true, item_loop_field: "loop", bind: { path: "recipes", params: { scope: "showcase" } } });
+    expect(page.body.map((node) => node.type)).toEqual(["creation_header", "prompt_bar", "media_shelf", "section"]);
+    expect(page.body[1]).toMatchObject({ type: "prompt_bar", placement: "inline" });
+    const shelf = page.body[2]!;
+    expect(shelf).toMatchObject({ heading: "Start with an idea", aspect: "poster", layout: "rail", variant: "plain", press_scale: true, item_media_field: "thumbnail", media_loop: true, item_loop_field: "loop", bind: { path: "recipes", params: { scope: "showcase", limit: 8 } } });
     expect(shelf.on_select).toEqual({ navigate: { to: "/apps/videos/create", state: { prompt: "{prompt}", look: "{look}", camera: "{camera}" } } });
     expect(JSON.stringify(shelf)).not.toContain("call");
-    expect(main[1]!.children[0].empty_state.text).toBe("Your clips show here. Pick a tile or describe a video on the left and press Generate.");
+    expect(page.body[3]!.children[0].empty_state.text).toBe("Your clips show here. Pick an idea below or describe a video above and press Generate.");
   });
 });
 

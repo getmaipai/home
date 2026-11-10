@@ -44,355 +44,345 @@
       }
     },
     {
-      "type": "split_view",
-      "aside_side": "start",
-      "aside_label": "Make a video",
-      "aside": [
+      "type": "prompt_bar",
+      "placement": "inline",
+      "label": "Describe a video",
+      "placeholder": "Describe your video. Put each person's line in quotes.",
+      "prompt_state": "prompt",
+      "max_length": 1200,
+      "submit_label": "Generate",
+      "starts": "video",
+      "style_suggest": {
+        "rows": {
+          "source": "package",
+          "path": "recipes",
+          "params": {
+            "scope": "style-suggestions",
+            "q": "$state.prompt"
+          }
+        },
+        "style_state": "style",
+        "character_state": "character",
+        "max": 2
+      },
+      "references": [
         {
-          "type": "prompt_bar",
-          "placement": "panel",
-          "label": "Describe a video",
-          "placeholder": "Describe your video. Put each person's line in quotes.",
-          "prompt_state": "prompt",
-          "max_length": 1200,
-          "submit_label": "Generate",
-          "starts": "video",
-          "style_suggest": {
-            "rows": {
-              "source": "package",
-              "path": "recipes",
-              "params": {
-                "scope": "style-suggestions",
-                "q": "$state.prompt"
-              }
-            },
-            "style_state": "style",
-            "character_state": "character",
-            "max": 2
-          },
-          "references": [
-            {
-              "state": "start_frame",
-              "label": "Start frame",
-              "kind": "picture",
-              "placement": "tile",
-              "hint": "Optional. Begin from a picture."
-            }
-          ],
-          "chips": [
-            {
-              "state": "orientation",
-              "label": "Shape",
-              "default": "landscape",
-              "options": [
-                {
-                  "value": "landscape",
-                  "label": "Landscape"
-                },
-                {
-                  "value": "portrait",
-                  "label": "Portrait"
-                }
-              ]
-            }
-          ],
-          "submit": {
-            "call": {
-              "target": "/api/plugins/videos/actions/make",
-              "method": "POST",
-              "args": {
-                "prompt": "{prompt}",
-                "orientation": "{orientation}",
-                "seconds": "{seconds}",
-                "tier": "{tier}",
-                "look": "{look}",
-                "camera": "{camera}",
-                "voices": "{voices}",
-                "style": "{style}",
-                "character": "{character}",
-                "strength": "{strength}",
-                "start_frame": "{start_frame}"
-              }
-            }
-          },
-          "field_size": "large"
+          "state": "start_frame",
+          "label": "Start frame",
+          "kind": "picture",
+          "placement": "row",
+          "hint": "Optional. Begin from a picture."
         }
       ],
-      "main": [
+      "chips": [
         {
-          "type": "media_shelf",
-          "heading": "Try this",
+          "state": "orientation",
+          "label": "Shape",
+          "default": "landscape",
+          "options": [
+            {
+              "value": "landscape",
+              "label": "Landscape"
+            },
+            {
+              "value": "portrait",
+              "label": "Portrait"
+            }
+          ],
+          "fold": true
+        }
+      ],
+      "submit": {
+        "call": {
+          "target": "/api/plugins/videos/actions/make",
+          "method": "POST",
+          "args": {
+            "prompt": "{prompt}",
+            "orientation": "{orientation}",
+            "seconds": "{seconds}",
+            "tier": "{tier}",
+            "look": "{look}",
+            "camera": "{camera}",
+            "voices": "{voices}",
+            "style": "{style}",
+            "character": "{character}",
+            "strength": "{strength}",
+            "start_frame": "{start_frame}"
+          }
+        }
+      }
+    },
+    {
+      "type": "media_shelf",
+      "heading": "Start with an idea",
+      "bind": {
+        "source": "package",
+        "path": "recipes",
+        "params": {
+          "scope": "showcase",
+          "limit": 8
+        }
+      },
+      "item_key_field": "id",
+      "item_label_field": "title",
+      "item_subtitle_field": "{subtitle}",
+      "item_media_field": "thumbnail",
+      "aspect": "poster",
+      "layout": "rail",
+      "variant": "plain",
+      "card_radius": "tight",
+      "press_scale": true,
+      "hide_when_empty": true,
+      "on_select": {
+        "navigate": {
+          "to": "/apps/videos/create",
+          "state": {
+            "prompt": "{prompt}",
+            "look": "{look}",
+            "camera": "{camera}"
+          }
+        }
+      },
+      "media_loop": true,
+      "item_loop_field": "loop"
+    },
+    {
+      "type": "section",
+      "heading": "Your clips",
+      "children": [
+        {
+          "type": "result_feed",
           "bind": {
             "source": "package",
             "path": "recipes",
             "params": {
-              "scope": "showcase"
+              "scope": "feed",
+              "favorites": "$state.favorites_only",
+              "type": "$state.type"
             }
           },
-          "item_key_field": "id",
-          "item_label_field": "title",
-          "item_subtitle_field": "{subtitle}",
-          "item_media_field": "thumbnail",
-          "aspect": "poster",
-          "layout": "rail",
-          "variant": "plain",
-          "density": "compact",
-          "card_radius": "tight",
-          "press_scale": true,
-          "hide_when_empty": true,
-          "on_select": {
-            "navigate": {
-              "to": "/apps/videos/create",
-              "state": {
-                "prompt": "{prompt}",
-                "look": "{look}",
-                "camera": "{camera}"
-              }
-            }
-          },
-          "media_loop": true,
-          "item_loop_field": "loop"
-        },
-        {
-          "type": "section",
-          "heading": "Your clips",
-          "children": [
+          "filters": [
             {
-              "type": "result_feed",
-              "bind": {
-                "source": "package",
-                "path": "recipes",
-                "params": {
-                  "scope": "feed",
-                  "favorites": "$state.favorites_only",
-                  "type": "$state.type"
+              "kind": "toggle",
+              "state": "favorites_only",
+              "label": "Favorites only"
+            },
+            {
+              "kind": "toggle",
+              "state": "group_by_words",
+              "label": "Group by words",
+              "group": true
+            },
+            {
+              "kind": "select",
+              "state": "type",
+              "label": "Type",
+              "options": [
+                {
+                  "value": "all",
+                  "label": "All"
+                },
+                {
+                  "value": "video",
+                  "label": "Videos"
                 }
-              },
-              "filters": [
-                {
-                  "kind": "toggle",
-                  "state": "favorites_only",
-                  "label": "Favorites only"
-                },
-                {
-                  "kind": "toggle",
-                  "state": "group_by_words",
-                  "label": "Group by words",
-                  "group": true
-                },
-                {
-                  "kind": "select",
-                  "state": "type",
-                  "label": "Type",
-                  "options": [
-                    {
-                      "value": "all",
-                      "label": "All"
-                    },
-                    {
-                      "value": "video",
-                      "label": "Videos"
-                    }
-                  ]
-                }
-              ],
-              "fields": {
-                "locked": "locked",
-                "making": "making",
-                "words": "prompt",
-                "tags": "tags",
-                "references": "references",
-                "status": "status",
-                "progress": "percent",
-                "phase": "phase",
-                "queue_position": "queue_position",
-                "started_at": "started_at",
-                "error": "error",
-                "poster": "still",
-                "src": "src",
-                "favorite": "favorite",
-                "created_at": "created_at",
-                "width": "width",
-                "height": "height"
-              },
-              "actions": [
-                {
-                  "label": "Remix",
-                  "icon": "pencil",
-                  "action": {
-                    "navigate": {
-                      "to": "/apps/videos/create",
-                      "state": {
-                        "prompt": "{prompt}",
-                        "look": "{look}",
-                        "camera": "{camera}",
-                        "seconds": "{seconds}",
-                        "tier": "{tier}",
-                        "orientation": "{orientation}",
-                        "start_frame": "{start_frame}"
-                      }
-                    }
-                  }
-                },
-                {
-                  "label": "Make it Max",
-                  "icon": "sparkles",
-                  "starts": "video",
-                  "action": {
-                    "call": {
-                      "target": "/api/plugins/videos/actions/max",
-                      "method": "POST",
-                      "args": {
-                        "id": "{id}"
-                      }
-                    }
-                  }
-                },
-                {
-                  "label": "Spatial sound",
-                  "icon": "headphones",
-                  "starts": "video",
-                  "action": {
-                    "call": {
-                      "target": "/api/plugins/videos/actions/spatial-sound",
-                      "method": "POST",
-                      "args": {
-                        "id": "{id}"
-                      }
-                    }
-                  }
-                },
-                {
-                  "label": "Spatial sound with 5.1 file",
-                  "icon": "headphones",
-                  "starts": "video",
-                  "action": {
-                    "call": {
-                      "target": "/api/plugins/videos/actions/spatial-sound",
-                      "method": "POST",
-                      "args": {
-                        "id": "{id}",
-                        "surround": true
-                      }
-                    }
-                  }
-                },
-                {
-                  "label": "Open in Studio",
-                  "icon": "audio-waveform",
-                  "action": {
-                    "navigate": {
-                      "to": "/apps/videos/studio",
-                      "state": {
-                        "clip": "{id}"
-                      }
-                    }
-                  }
-                },
-                {
-                  "label": "Unmark as NSFW",
-                  "icon": "key-round",
-                  "show_when": "can_unmark",
-                  "action": {
-                    "call": {
-                      "target": "/api/plugins/videos/actions/adult-mark",
-                      "method": "POST",
-                      "args": {
-                        "id": "{id}",
-                        "action": "clear",
-                        "ticket": "{ticket}"
-                      },
-                      "fresh_confirm": {
-                        "title": "Remove the adult lock?",
-                        "description": "This changes who can see it. It will show with its title and thumbnail in your feeds and lists, to anyone looking at your screen. People under 18 still never see it. Enter your passcode to continue.",
-                        "action_label": "Remove lock"
-                      }
-                    }
-                  }
-                },
-                {
-                  "label": "Mark as NSFW",
-                  "icon": "lock",
-                  "show_when": "can_mark",
-                  "action": {
-                    "call": {
-                      "target": "/api/plugins/videos/actions/adult-mark",
-                      "method": "POST",
-                      "args": {
-                        "id": "{id}",
-                        "action": "mark"
-                      }
-                    }
+              ]
+            }
+          ],
+          "fields": {
+            "locked": "locked",
+            "making": "making",
+            "words": "prompt",
+            "tags": "tags",
+            "references": "references",
+            "status": "status",
+            "progress": "percent",
+            "phase": "phase",
+            "queue_position": "queue_position",
+            "started_at": "started_at",
+            "error": "error",
+            "poster": "still",
+            "src": "src",
+            "favorite": "favorite",
+            "created_at": "created_at",
+            "width": "width",
+            "height": "height"
+          },
+          "actions": [
+            {
+              "label": "Remix",
+              "icon": "pencil",
+              "action": {
+                "navigate": {
+                  "to": "/apps/videos/create",
+                  "state": {
+                    "prompt": "{prompt}",
+                    "look": "{look}",
+                    "camera": "{camera}",
+                    "seconds": "{seconds}",
+                    "tier": "{tier}",
+                    "orientation": "{orientation}",
+                    "start_frame": "{start_frame}"
                   }
                 }
-              ],
-              "handlers": {
-                "stop": {
-                  "call": {
-                    "target": "/api/plugins/videos/actions/cancel",
-                    "method": "POST",
-                    "args": {
-                      "id": "{id}"
-                    }
-                  }
-                },
-                "retry": {
-                  "starts": "video",
-                  "call": {
-                    "target": "/api/plugins/videos/actions/another",
-                    "method": "POST",
-                    "args": {
-                      "id": "{id}"
-                    }
-                  }
-                },
-                "make_another": {
-                  "starts": "video",
-                  "call": {
-                    "target": "/api/plugins/videos/actions/another",
-                    "method": "POST",
-                    "args": {
-                      "id": "{id}"
-                    }
-                  }
-                },
-                "favorite": {
-                  "call": {
-                    "target": "/api/plugins/videos/actions/favorite",
-                    "method": "POST",
-                    "args": {
-                      "id": "{id}"
-                    }
-                  }
-                }
-              },
-              "actions_variant": "icons",
-              "actions_inline": 4,
-              "poll_while": {
-                "statuses": [
-                  "queued",
-                  "generating"
-                ],
-                "record": {
-                  "path": "recipes",
-                  "params": {
-                    "scope": "job",
+              }
+            },
+            {
+              "label": "Make it Max",
+              "icon": "sparkles",
+              "starts": "video",
+              "action": {
+                "call": {
+                  "target": "/api/plugins/videos/actions/max",
+                  "method": "POST",
+                  "args": {
                     "id": "{id}"
                   }
                 }
-              },
-              "empty_state": {
-                "type": "empty_state",
-                "icon": "film",
-                "text": "Your clips show here. Pick a tile or describe a video on the left and press Generate."
-              },
-              "look": "media",
-              "filters_presentation": "popover"
+              }
+            },
+            {
+              "label": "Spatial sound",
+              "icon": "headphones",
+              "starts": "video",
+              "action": {
+                "call": {
+                  "target": "/api/plugins/videos/actions/spatial-sound",
+                  "method": "POST",
+                  "args": {
+                    "id": "{id}"
+                  }
+                }
+              }
+            },
+            {
+              "label": "Spatial sound with 5.1 file",
+              "icon": "headphones",
+              "starts": "video",
+              "action": {
+                "call": {
+                  "target": "/api/plugins/videos/actions/spatial-sound",
+                  "method": "POST",
+                  "args": {
+                    "id": "{id}",
+                    "surround": true
+                  }
+                }
+              }
+            },
+            {
+              "label": "Open in Studio",
+              "icon": "audio-waveform",
+              "action": {
+                "navigate": {
+                  "to": "/apps/videos/studio",
+                  "state": {
+                    "clip": "{id}"
+                  }
+                }
+              }
+            },
+            {
+              "label": "Unmark as NSFW",
+              "icon": "key-round",
+              "show_when": "can_unmark",
+              "action": {
+                "call": {
+                  "target": "/api/plugins/videos/actions/adult-mark",
+                  "method": "POST",
+                  "args": {
+                    "id": "{id}",
+                    "action": "clear",
+                    "ticket": "{ticket}"
+                  },
+                  "fresh_confirm": {
+                    "title": "Remove the adult lock?",
+                    "description": "This changes who can see it. It will show with its title and thumbnail in your feeds and lists, to anyone looking at your screen. People under 18 still never see it. Enter your passcode to continue.",
+                    "action_label": "Remove lock"
+                  }
+                }
+              }
+            },
+            {
+              "label": "Mark as NSFW",
+              "icon": "lock",
+              "show_when": "can_mark",
+              "action": {
+                "call": {
+                  "target": "/api/plugins/videos/actions/adult-mark",
+                  "method": "POST",
+                  "args": {
+                    "id": "{id}",
+                    "action": "mark"
+                  }
+                }
+              }
             }
-          ]
+          ],
+          "handlers": {
+            "stop": {
+              "call": {
+                "target": "/api/plugins/videos/actions/cancel",
+                "method": "POST",
+                "args": {
+                  "id": "{id}"
+                }
+              }
+            },
+            "retry": {
+              "starts": "video",
+              "call": {
+                "target": "/api/plugins/videos/actions/another",
+                "method": "POST",
+                "args": {
+                  "id": "{id}"
+                }
+              }
+            },
+            "make_another": {
+              "starts": "video",
+              "call": {
+                "target": "/api/plugins/videos/actions/another",
+                "method": "POST",
+                "args": {
+                  "id": "{id}"
+                }
+              }
+            },
+            "favorite": {
+              "call": {
+                "target": "/api/plugins/videos/actions/favorite",
+                "method": "POST",
+                "args": {
+                  "id": "{id}"
+                }
+              }
+            }
+          },
+          "actions_variant": "icons",
+          "actions_inline": 2,
+          "poll_while": {
+            "statuses": [
+              "queued",
+              "generating"
+            ],
+            "record": {
+              "path": "recipes",
+              "params": {
+                "scope": "job",
+                "id": "{id}"
+              }
+            }
+          },
+          "empty_state": {
+            "type": "empty_state",
+            "icon": "film",
+            "text": "Your clips show here. Pick an idea below or describe a video above and press Generate."
+          },
+          "look": "media",
+          "filters_presentation": "popover"
         }
-      ],
-      "aside_width": "wide"
+      ]
     }
   ]
 }

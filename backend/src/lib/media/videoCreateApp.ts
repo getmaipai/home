@@ -14,7 +14,7 @@ import { listLibrary } from "@/lib/library";
 import { suggestStyles } from "@/lib/loras/suggest";
 import { requestProof } from "@/lib/adultLock";
 import { adultStateOf } from "@/lib/adultMarks";
-import { DEFAULT_VIDEO_VOICES, VIDEO_LOOKS, VIDEO_RECIPES, VIDEO_SHOWCASE, VIDEO_STARTERS, VIDEO_VOICES, videoLookFor, videoRecipeFor } from "@/lib/videos/recipes";
+import { DEFAULT_VIDEO_VOICES, VIDEO_LOOKS, VIDEO_RECIPES, VIDEO_SHOWCASE, VIDEO_VOICES, videoLookFor, videoRecipeFor } from "@/lib/videos/recipes";
 import { speakerAgeBand } from "@/lib/ageBand";
 import { styleChips, type StyleTier } from "@/lib/videos/createStyles";
 import { syncLoras } from "@/lib/loras/sync";
@@ -82,7 +82,7 @@ function findNode(nodes: unknown, type: string): Record<string, unknown> | undef
 }
 
 /** The Create page's lists, each from its one source: lengths from the engine ceilings (quality.ts), Look and Camera cards (with each card's loop)
- * from recipes.ts, levels from tiers.ts, the idea chips from VIDEO_STARTERS. The page JSON holds none of them. */
+ * from recipes.ts, levels from tiers.ts, the look, camera, length and tier choices from the one lists. The page JSON holds none of them. */
 /** The level segment reads the Stack's video status without waiting (`peekVideoEngineStatus`), which is empty on the first page after Home starts and
  * left Max out of the segment until a reload. The page awaits one real read first, for at most this long, so a slow Stack costs the page a moment, never the page. */
 export const VIDEO_STATUS_WARM_MS = 1500;
@@ -105,7 +105,7 @@ registerAppPageFill("videos", "create", (person, page) => {
   bar.chips = [
     ...chips,
     { state: "seconds", label: "Length", default: QUICK_MAX_SECONDS, options: lengths.map((value) => ({ value, label: `${value} seconds` })) },
-    { state: "look", label: "Look", variant: "cards", presentation: "popover", group: "Style", trigger: "banner", popover_size: "wide", default: VIDEO_LOOKS[0]!.id, options: VIDEO_LOOKS.map(({ id, label, loop }) => ({ value: id, label: id === VIDEO_LOOKS[0]!.id ? "Auto" : label, ...media(loop) })) },
+    { state: "look", label: "Look", variant: "cards", presentation: "popover", group: "Style", default: VIDEO_LOOKS[0]!.id, options: VIDEO_LOOKS.map(({ id, label, loop }) => ({ value: id, label: id === VIDEO_LOOKS[0]!.id ? "Auto" : label, ...media(loop) })) },
     // Auto is the start for both: Look's Auto is `natural` (adds no words; a clip's tag still says "Natural"), Camera's Auto is "none" (the route reads it as not given).
     { state: "camera", label: "Camera", variant: "cards", presentation: "popover", group: "Style", default: "none", options: [{ value: "none", label: "Auto" }, ...VIDEO_RECIPES.map(({ id, label, loop }) => ({ value: id, label, ...media(loop) }))] },
     { state: "voices", label: "Voices", fold: true, default: DEFAULT_VIDEO_VOICES, options: VIDEO_VOICES.map(({ id, label }) => ({ value: id, label })) },
@@ -116,10 +116,9 @@ registerAppPageFill("videos", "create", (person, page) => {
   // action is not drawn, so nobody presses a button whose answer is a refusal.
   const feed = findNode(page.body, "result_feed");
   if (feed && Array.isArray(feed.actions) && !maxOfferedNow(person)) feed.actions = (feed.actions as Array<{ action?: { call?: { target?: string } } }>).filter((entry) => !entry.action?.call?.target?.endsWith("/actions/max"));
-  bar.suggestions = VIDEO_STARTERS.map(({ title, prompt }) => ({ label: title, text: prompt }));
   const tier = videoTierSegment(person);
   if (tier) {
-    bar.tier = { ...tier, presentation: "cards" };
+    bar.tier = { ...tier, presentation: "segment" };
     const ids = (tier.tiers as Array<{ id: keyof typeof VIDEO_TIME_WORDS }>).map((entry) => entry.id);
     bar.submit_detail = { state: "tier", placement: "in_button", labels: Object.fromEntries(ids.map((id) => [id, VIDEO_TIME_WORDS[id]])) };
   } else {
@@ -205,8 +204,8 @@ const levelWords = (job: Parameters<typeof feedRowOf>[1]): string => ({ standard
 
 /** VIDEO-UI-11: the "Try this" rail rows. A tile whose poster is not in the package is left out, never a broken picture. `look` and `camera` are the ids the Create panel's chips use
  * (a camera of "none" is the Auto card). Never a clip of the person's, so the rows are the same for everyone who may open the page (adults; appRouteAllowed refuses the rest). */
-function showcaseRows(): Array<Record<string, unknown>> {
-  return VIDEO_SHOWCASE.flatMap((tile) => {
+function showcaseRows(limit = VIDEO_SHOWCASE.length): Array<Record<string, unknown>> {
+  return VIDEO_SHOWCASE.slice(0, Math.min(Math.max(limit, 1), VIDEO_SHOWCASE.length)).flatMap((tile) => {
     const poster = tile.poster.replace(/\.mp4$/, ".jpg");
     if (!packageAssetFile("videos", poster)) return [];
     const look = videoLookFor(tile.look)!;
@@ -223,7 +222,7 @@ registerMediaAppData("videos", (person, dataId, params) => {
   switch (params.scope) {
     case "short": return shortClipRows(person);
     case undefined: return VIDEO_RECIPES.map(({ id, label, hint }) => ({ id, label, hint }));
-    case "showcase": return showcaseRows();
+    case "showcase": return showcaseRows(params.limit);
     // VIDEO-STUDIO-08: the page header row (the studio `creation_header` reads its title from a bound row). The same for everyone who may open the page.
     case "header": return [{ title: "Make any video" }];
     // STYLES-04: up to two styles for the words typed so far. The matcher reads the person's own access (a locked or minor list never holds an adult style).
