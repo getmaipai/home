@@ -513,11 +513,11 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/fileRecordObject.ts` | FileObject |
 | `backend/src/lib/fileThumbnails.ts` | thumbnailsDir, previewStats, clearPreviews, fileThumbnail, trashedFileThumbnail |
 | `backend/src/lib/films/animatic.ts` | animaticShotOps, makeFilmAnimatic |
-| `backend/src/lib/films/background.ts` | __setFilmEnginesForTests, allowed, startFilm, getFilmProgress, goFilm, cancelFilm |
+| `backend/src/lib/films/background.ts` | __setFilmEnginesForTests, allowed, startPlannedFilm, startFilm, getFilmProgress, goFilm |
 | `backend/src/lib/films/engines.ts` | backgroundTurn, realFilmEngines, makeFilm, resumeFilm, redoFilmShot, changeFilmMusic |
 | `backend/src/lib/films/plan.ts` | filmPlanShotSchema, filmPlanSchema, facelessFilmPlanSchema, FILM_PLAN_RESPONSE_FORMAT, FACELESS_FILM_PLAN_RESPONSE_FORMAT, FILM_PLAN_PROMPT |
 | `backend/src/lib/films/run.ts` | FilmStepError, runFilm, redoShot, changeMusic |
-| `backend/src/lib/films/store.ts` | createFilmRun, getFilmRun, updateFilmRun, listFilmRunsInStates, failInterruptedFilmRuns |
+| `backend/src/lib/films/store.ts` | createFilmRun, getFilmRun, updateFilmRun, listFilmRunsInStates, failInterruptedFilmRuns, listFilmRunsByParent |
 | `backend/src/lib/films/tool.ts` | MAKE_FILM_TOOL_ID, makeFilmArgs, __setStartFilmForTests, runMakeFilm |
 | `backend/src/lib/fitWording.ts` | fitWording, fitUnavailableWording, fitNoStackWording, fitNotFoundWording |
 | `backend/src/lib/folderBrowse.ts` | refusedReason, resolveFolder, listFolder, validateFolderName, createFolder, validateProposedPath |
@@ -640,7 +640,9 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/locale.ts` | resolveLocale, resolveLocaleFromValues, householdLocale, isSafeAutoTranslation |
 | `backend/src/lib/log.ts` | appendLogLine, installConsoleFileMirror, installFatalErrorHandlers |
 | `backend/src/lib/longform/documents.ts` | DOCUMENT_KINDS, MAX_DOCUMENT_CHARS, saveDocument, getDocument, listDocuments, approveDocument |
-| `backend/src/lib/longform/stages.ts` | treatmentSchema, bibleSchema, outlineSchema, __setStageCompleterForTests, startProduction, writeBible |
+| `backend/src/lib/longform/runner.ts` | isProducing, stopProducing, renderScene, produce, progressOf |
+| `backend/src/lib/longform/scripts.ts` | scriptSchema, SHOT_MIN_SECONDS, buildShotList, writeScene |
+| `backend/src/lib/longform/stages.ts` | treatmentSchema, bibleSchema, outlineSchema, __setStageCompleterForTests, askStage, startProduction |
 | `backend/src/lib/longform/structure.ts` | SCENE_TARGET_SECONDS, SCENE_MIN_SECONDS, SCENE_MAX_SECONDS, AVG_SHOT_SECONDS, MAX_SHOTS_PER_RUN, MIN_PRODUCTION_SECONDS |
 | `backend/src/lib/longform/tool.ts` | MAKE_PRODUCTION_TOOL_ID, FILM_MAX_SECONDS, isProductionCall, makeProductionArgs, runMakeProduction |
 | `backend/src/lib/loras/access.ts` | isAdult, availableTo, loraAccess, runsOnBases, runsOn, isUnofferedOldBase |

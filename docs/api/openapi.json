@@ -71886,6 +71886,354 @@
         }
       }
     },
+    "/api/productions/long/{id}/produce": {
+      "post": {
+        "tags": [
+          "Productions"
+        ],
+        "summary": "Make every scene of an approved production in the background (safe to call again to resume)",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 120
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "How far the production has come",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "producing": {
+                      "type": "boolean"
+                    },
+                    "scenes_total": {
+                      "type": "number"
+                    },
+                    "scenes_done": {
+                      "type": "number"
+                    },
+                    "seconds_left": {
+                      "type": "number",
+                      "nullable": true
+                    },
+                    "runs": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "scene_key": {
+                            "type": "string"
+                          },
+                          "state": {
+                            "type": "string"
+                          },
+                          "done_steps": {
+                            "type": "number"
+                          },
+                          "total_steps": {
+                            "type": "number"
+                          }
+                        },
+                        "required": [
+                          "scene_key",
+                          "state",
+                          "done_steps",
+                          "total_steps"
+                        ]
+                      }
+                    }
+                  },
+                  "required": [
+                    "producing",
+                    "scenes_total",
+                    "scenes_done",
+                    "seconds_left",
+                    "runs"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Refused, with the reason",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not available",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/productions/long/{id}/progress": {
+      "get": {
+        "tags": [
+          "Productions"
+        ],
+        "summary": "Read how far the scenes have come",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 120
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "How far the production has come",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "producing": {
+                      "type": "boolean"
+                    },
+                    "scenes_total": {
+                      "type": "number"
+                    },
+                    "scenes_done": {
+                      "type": "number"
+                    },
+                    "seconds_left": {
+                      "type": "number",
+                      "nullable": true
+                    },
+                    "runs": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "scene_key": {
+                            "type": "string"
+                          },
+                          "state": {
+                            "type": "string"
+                          },
+                          "done_steps": {
+                            "type": "number"
+                          },
+                          "total_steps": {
+                            "type": "number"
+                          }
+                        },
+                        "required": [
+                          "scene_key",
+                          "state",
+                          "done_steps",
+                          "total_steps"
+                        ]
+                      }
+                    }
+                  },
+                  "required": [
+                    "producing",
+                    "scenes_total",
+                    "scenes_done",
+                    "seconds_left",
+                    "runs"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Refused, with the reason",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not available",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/productions/long/{id}/stop": {
+      "post": {
+        "tags": [
+          "Productions"
+        ],
+        "summary": "Stop making scenes after the current step",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 120
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "How far the production has come",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "producing": {
+                      "type": "boolean"
+                    },
+                    "scenes_total": {
+                      "type": "number"
+                    },
+                    "scenes_done": {
+                      "type": "number"
+                    },
+                    "seconds_left": {
+                      "type": "number",
+                      "nullable": true
+                    },
+                    "runs": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "scene_key": {
+                            "type": "string"
+                          },
+                          "state": {
+                            "type": "string"
+                          },
+                          "done_steps": {
+                            "type": "number"
+                          },
+                          "total_steps": {
+                            "type": "number"
+                          }
+                        },
+                        "required": [
+                          "scene_key",
+                          "state",
+                          "done_steps",
+                          "total_steps"
+                        ]
+                      }
+                    }
+                  },
+                  "required": [
+                    "producing",
+                    "scenes_total",
+                    "scenes_done",
+                    "seconds_left",
+                    "runs"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Refused, with the reason",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not available",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/videos/status": {
       "get": {
         "tags": [
