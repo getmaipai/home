@@ -41,7 +41,7 @@ libraryRoutes.openapi(createRoute({ method: "post", path: "/files/{id}/adult-mar
   const actor = c.get("person");
   const { id } = c.req.valid("param");
   const row = db.select().from(attachments).where(eq(attachments.id, id)).get();
-  if (!row || row.deletedAt !== null || row.ownerPersonId !== actor.id || !canReadFileAudience(actor, row)) return c.json({ error: "That item is not here." }, 404);
+  if (!row || row.deletedAt !== null || row.ownerPersonId !== actor.id || !canReadFileAudience(actor, row)) return c.json(apiError("file_not_in_library"), 404);
   const result = setItemLock({ actor, fileId: id, action: c.req.valid("json").action, ticket: c.req.valid("json").ticket ?? null, ticketItem: id, sessionKey: sessionKeyOf(getCookie(c, "session")) });
   if (!result.ok) return respond(c, result);
   return c.json({ made_audience: result.made_audience, lock: result.lock }, 200);
