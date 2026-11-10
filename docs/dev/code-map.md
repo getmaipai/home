@@ -67,6 +67,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/packages/shows/pages/watch.json` | shows | Watch |
 | `backend/packages/shows/pages/watchlist.json` | shows | Watchlist |
 | `backend/packages/videos/pages/channel.json` | videos | Channel |
+| `backend/packages/videos/pages/clips-feed.json` | videos | Clips |
 | `backend/packages/videos/pages/clips.json` | videos | My clips |
 | `backend/packages/videos/pages/create.json` | videos | Create |
 | `backend/packages/videos/pages/history.json` | videos | History |
@@ -695,6 +696,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/media/podcastDirectory.ts` | __resetDirectoryForTests, directoryShowForFeed, directoryAllowed, searchDirectory, topShows, smallArt |
 | `backend/src/lib/media/podcastFilters.ts` | MAX_FILTERS, parseRules, matchesRules, evaluateFilter, filterSummary, draftRows |
 | `backend/src/lib/media/podcastParity.ts` | episodeSortOf, seasonsOf, orderEpisodes, followPodcast, unfollowPodcast, isFollowed |
+| `backend/src/lib/media/podcastRates.ts` | RATE_MIN, RATE_MAX, RATE_LINE, showRateOf, setShowRate |
 | `backend/src/lib/media/podcastStats.ts` | aggregatePodcastStats, podcastStats, podcastStatsRows |
 | `backend/src/lib/media/podcasts.ts` | previewPodcastFeed, __resetPodcastPreviewForTests, previewEpisodeAddress, previewEpisodeView, __setPodcastFetchDepsForTests, plainNotes |
 | `backend/src/lib/media/prober.ts` | probeResultFrom, createStackProber |
@@ -715,7 +717,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/media/templates.ts` | listTemplates, getTemplate |
 | `backend/src/lib/media/textMatch.ts` | titleMatch |
 | `backend/src/lib/media/videoByline.ts` | ageLabel, withVideoByline |
-| `backend/src/lib/media/videoCreateApp.ts` | videoTierSegment, VIDEO_STATUS_WARM_MS, VIDEO_TIME_WORDS |
+| `backend/src/lib/media/videoCreateApp.ts` | videoTierSegment, VIDEO_STATUS_WARM_MS, VIDEO_TIME_WORDS, SHORT_CLIP_MAX_S, isShortClip, shortClipRows |
 | `backend/src/lib/media/videoFilters.ts` | VIDEO_FILTERED_IDS, SHORT_BELOW_S, LONG_FROM_S, videoFilterOf, videoSortOf, wantsVideoRules |
 | `backend/src/lib/media/watchTime.ts` | MEDIA_KID_COPY, TIME_UP_LINE, WRITE_INTERVAL_S, WRITE_SLACK_S, FORWARD_CAP_S, SESSION_ROW_TTL_MS |
 | `backend/src/lib/mediaClaims.ts` | asksForMedia, claimsMedia, MEDIA_NOT_STARTED_LINE, MUSIC_STARTED_LINE, MEDIA_REASK_INSTRUCTION, asksForSong |
