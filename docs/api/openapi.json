@@ -46401,6 +46401,281 @@
         }
       }
     },
+    "/api/widgets/home/arrange": {
+      "get": {
+        "tags": [
+          "Widgets"
+        ],
+        "summary": "Every Home card I may see, hidden ones included, in my current order, for the Arrange screen",
+        "responses": {
+          "200": {
+            "description": "My cards with hidden flags.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "cards": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "package": {
+                            "type": "string"
+                          },
+                          "id": {
+                            "type": "string"
+                          },
+                          "title": {
+                            "type": "string"
+                          },
+                          "size": {
+                            "type": "string",
+                            "enum": [
+                              "card",
+                              "row"
+                            ]
+                          },
+                          "refresh_s": {
+                            "type": "integer"
+                          },
+                          "min_role": {
+                            "type": "string"
+                          },
+                          "priority": {
+                            "type": "integer"
+                          },
+                          "hero": {
+                            "type": "boolean"
+                          },
+                          "data": {
+                            "type": "string"
+                          },
+                          "surfaces": {
+                            "type": "array",
+                            "items": {
+                              "type": "string",
+                              "enum": [
+                                "home",
+                                "tv",
+                                "robot"
+                              ]
+                            }
+                          },
+                          "inputs": {
+                            "type": "object",
+                            "additionalProperties": {
+                              "nullable": true
+                            }
+                          },
+                          "installed_at": {
+                            "type": "string"
+                          },
+                          "key": {
+                            "type": "string"
+                          },
+                          "hidden": {
+                            "type": "boolean"
+                          }
+                        },
+                        "required": [
+                          "package",
+                          "id",
+                          "title",
+                          "size",
+                          "refresh_s",
+                          "min_role",
+                          "priority",
+                          "hero",
+                          "surfaces",
+                          "installed_at",
+                          "key",
+                          "hidden"
+                        ]
+                      }
+                    }
+                  },
+                  "required": [
+                    "cards"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "Widgets"
+        ],
+        "summary": "Save my Home card order and hidden list (empty lists restore the default)",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "order": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    },
+                    "maxItems": 200
+                  },
+                  "hidden": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    },
+                    "maxItems": 200
+                  }
+                },
+                "required": [
+                  "order",
+                  "hidden"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Saved; my cards as they now stand.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "cards": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "package": {
+                            "type": "string"
+                          },
+                          "id": {
+                            "type": "string"
+                          },
+                          "title": {
+                            "type": "string"
+                          },
+                          "size": {
+                            "type": "string",
+                            "enum": [
+                              "card",
+                              "row"
+                            ]
+                          },
+                          "refresh_s": {
+                            "type": "integer"
+                          },
+                          "min_role": {
+                            "type": "string"
+                          },
+                          "priority": {
+                            "type": "integer"
+                          },
+                          "hero": {
+                            "type": "boolean"
+                          },
+                          "data": {
+                            "type": "string"
+                          },
+                          "surfaces": {
+                            "type": "array",
+                            "items": {
+                              "type": "string",
+                              "enum": [
+                                "home",
+                                "tv",
+                                "robot"
+                              ]
+                            }
+                          },
+                          "inputs": {
+                            "type": "object",
+                            "additionalProperties": {
+                              "nullable": true
+                            }
+                          },
+                          "installed_at": {
+                            "type": "string"
+                          },
+                          "key": {
+                            "type": "string"
+                          },
+                          "hidden": {
+                            "type": "boolean"
+                          }
+                        },
+                        "required": [
+                          "package",
+                          "id",
+                          "title",
+                          "size",
+                          "refresh_s",
+                          "min_role",
+                          "priority",
+                          "hero",
+                          "surfaces",
+                          "installed_at",
+                          "key",
+                          "hidden"
+                        ]
+                      }
+                    }
+                  },
+                  "required": [
+                    "cards"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "A card is not available to me",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not allowed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/widgets/{package}/{id}/data": {
       "get": {
         "tags": [
