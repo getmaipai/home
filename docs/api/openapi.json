@@ -89908,6 +89908,798 @@
         }
       }
     },
+    "/api/companions/{id}/pack-job": {
+      "post": {
+        "tags": [
+          "Companions"
+        ],
+        "summary": "Start making a companion pack",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 80
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "still_id": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 120
+                  },
+                  "shapes": {
+                    "type": "string",
+                    "default": "photo"
+                  },
+                  "restart": {
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "still_id"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "The pack job started or continued.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "job": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "string",
+                      "enum": [
+                        "running",
+                        "waiting_approval",
+                        "failed",
+                        "cancelled",
+                        "done"
+                      ]
+                    },
+                    "stage": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "waiting_for": {
+                      "type": "string",
+                      "nullable": true,
+                      "enum": [
+                        "A",
+                        "B",
+                        "C",
+                        null
+                      ]
+                    },
+                    "error": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "interrupted": {
+                      "type": "boolean"
+                    },
+                    "still_id": {
+                      "type": "string"
+                    },
+                    "shapes": {
+                      "type": "string",
+                      "enum": [
+                        "photo"
+                      ]
+                    },
+                    "approvals": {
+                      "type": "object",
+                      "additionalProperties": {
+                        "type": "object",
+                        "nullable": true,
+                        "properties": {
+                          "by": {
+                            "type": "string"
+                          },
+                          "at": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "by",
+                          "at"
+                        ]
+                      }
+                    },
+                    "stages": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "name": {
+                            "type": "string"
+                          },
+                          "status": {
+                            "type": "string",
+                            "enum": [
+                              "pending",
+                              "running",
+                              "done",
+                              "failed"
+                            ]
+                          },
+                          "reasons": {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            }
+                          },
+                          "report": {
+                            "type": "object",
+                            "nullable": true,
+                            "additionalProperties": {
+                              "nullable": true
+                            }
+                          },
+                          "stack_jobs": {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            }
+                          }
+                        },
+                        "required": [
+                          "name",
+                          "status",
+                          "reasons",
+                          "report",
+                          "stack_jobs"
+                        ]
+                      }
+                    }
+                  },
+                  "required": [
+                    "job",
+                    "status",
+                    "stage",
+                    "waiting_for",
+                    "error",
+                    "interrupted",
+                    "still_id",
+                    "shapes",
+                    "approvals",
+                    "stages"
+                  ]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not allowed to make a pack",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No household companion",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "A pack is being made, or the picture is not the approved starting picture",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "No starting picture, or a character kind that is not supported yet",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "The picture or video role or the face tools are not ready",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "Companions"
+        ],
+        "summary": "Read the companion pack job",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 80
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The stage list with each stage's status and measured reports.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "job": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "string",
+                      "enum": [
+                        "running",
+                        "waiting_approval",
+                        "failed",
+                        "cancelled",
+                        "done"
+                      ]
+                    },
+                    "stage": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "waiting_for": {
+                      "type": "string",
+                      "nullable": true,
+                      "enum": [
+                        "A",
+                        "B",
+                        "C",
+                        null
+                      ]
+                    },
+                    "error": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "interrupted": {
+                      "type": "boolean"
+                    },
+                    "still_id": {
+                      "type": "string"
+                    },
+                    "shapes": {
+                      "type": "string",
+                      "enum": [
+                        "photo"
+                      ]
+                    },
+                    "approvals": {
+                      "type": "object",
+                      "additionalProperties": {
+                        "type": "object",
+                        "nullable": true,
+                        "properties": {
+                          "by": {
+                            "type": "string"
+                          },
+                          "at": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "by",
+                          "at"
+                        ]
+                      }
+                    },
+                    "stages": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "name": {
+                            "type": "string"
+                          },
+                          "status": {
+                            "type": "string",
+                            "enum": [
+                              "pending",
+                              "running",
+                              "done",
+                              "failed"
+                            ]
+                          },
+                          "reasons": {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            }
+                          },
+                          "report": {
+                            "type": "object",
+                            "nullable": true,
+                            "additionalProperties": {
+                              "nullable": true
+                            }
+                          },
+                          "stack_jobs": {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            }
+                          }
+                        },
+                        "required": [
+                          "name",
+                          "status",
+                          "reasons",
+                          "report",
+                          "stack_jobs"
+                        ]
+                      }
+                    }
+                  },
+                  "required": [
+                    "job",
+                    "status",
+                    "stage",
+                    "waiting_for",
+                    "error",
+                    "interrupted",
+                    "still_id",
+                    "shapes",
+                    "approvals",
+                    "stages"
+                  ]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Only the author or an admin can read this",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No pack job",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/companions/{id}/pack-job/approve": {
+      "post": {
+        "tags": [
+          "Companions"
+        ],
+        "summary": "Approve a pack job stage",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 80
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "stage": {
+                    "type": "string",
+                    "enum": [
+                      "A",
+                      "B",
+                      "C"
+                    ]
+                  }
+                },
+                "required": [
+                  "stage"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Approved; the job continues.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "job": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "string",
+                      "enum": [
+                        "running",
+                        "waiting_approval",
+                        "failed",
+                        "cancelled",
+                        "done"
+                      ]
+                    },
+                    "stage": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "waiting_for": {
+                      "type": "string",
+                      "nullable": true,
+                      "enum": [
+                        "A",
+                        "B",
+                        "C",
+                        null
+                      ]
+                    },
+                    "error": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "interrupted": {
+                      "type": "boolean"
+                    },
+                    "still_id": {
+                      "type": "string"
+                    },
+                    "shapes": {
+                      "type": "string",
+                      "enum": [
+                        "photo"
+                      ]
+                    },
+                    "approvals": {
+                      "type": "object",
+                      "additionalProperties": {
+                        "type": "object",
+                        "nullable": true,
+                        "properties": {
+                          "by": {
+                            "type": "string"
+                          },
+                          "at": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "by",
+                          "at"
+                        ]
+                      }
+                    },
+                    "stages": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "name": {
+                            "type": "string"
+                          },
+                          "status": {
+                            "type": "string",
+                            "enum": [
+                              "pending",
+                              "running",
+                              "done",
+                              "failed"
+                            ]
+                          },
+                          "reasons": {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            }
+                          },
+                          "report": {
+                            "type": "object",
+                            "nullable": true,
+                            "additionalProperties": {
+                              "nullable": true
+                            }
+                          },
+                          "stack_jobs": {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            }
+                          }
+                        },
+                        "required": [
+                          "name",
+                          "status",
+                          "reasons",
+                          "report",
+                          "stack_jobs"
+                        ]
+                      }
+                    }
+                  },
+                  "required": [
+                    "job",
+                    "status",
+                    "stage",
+                    "waiting_for",
+                    "error",
+                    "interrupted",
+                    "still_id",
+                    "shapes",
+                    "approvals",
+                    "stages"
+                  ]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Only the author or an admin can approve, or this person may not make pictures or videos",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No pack job",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The job is not waiting for that approval",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "The picture or video role or the face tools are not ready",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/companions/{id}/pack-job/cancel": {
+      "post": {
+        "tags": [
+          "Companions"
+        ],
+        "summary": "Stop the companion pack job",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 80
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Stopped. The source picture is kept; the clips and the steps after them are made again if the job is started again.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "job": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "string",
+                      "enum": [
+                        "running",
+                        "waiting_approval",
+                        "failed",
+                        "cancelled",
+                        "done"
+                      ]
+                    },
+                    "stage": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "waiting_for": {
+                      "type": "string",
+                      "nullable": true,
+                      "enum": [
+                        "A",
+                        "B",
+                        "C",
+                        null
+                      ]
+                    },
+                    "error": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "interrupted": {
+                      "type": "boolean"
+                    },
+                    "still_id": {
+                      "type": "string"
+                    },
+                    "shapes": {
+                      "type": "string",
+                      "enum": [
+                        "photo"
+                      ]
+                    },
+                    "approvals": {
+                      "type": "object",
+                      "additionalProperties": {
+                        "type": "object",
+                        "nullable": true,
+                        "properties": {
+                          "by": {
+                            "type": "string"
+                          },
+                          "at": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "by",
+                          "at"
+                        ]
+                      }
+                    },
+                    "stages": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "name": {
+                            "type": "string"
+                          },
+                          "status": {
+                            "type": "string",
+                            "enum": [
+                              "pending",
+                              "running",
+                              "done",
+                              "failed"
+                            ]
+                          },
+                          "reasons": {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            }
+                          },
+                          "report": {
+                            "type": "object",
+                            "nullable": true,
+                            "additionalProperties": {
+                              "nullable": true
+                            }
+                          },
+                          "stack_jobs": {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            }
+                          }
+                        },
+                        "required": [
+                          "name",
+                          "status",
+                          "reasons",
+                          "report",
+                          "stack_jobs"
+                        ]
+                      }
+                    }
+                  },
+                  "required": [
+                    "job",
+                    "status",
+                    "stage",
+                    "waiting_for",
+                    "error",
+                    "interrupted",
+                    "still_id",
+                    "shapes",
+                    "approvals",
+                    "stages"
+                  ]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Only the author or an admin can stop this",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No pack job",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/companions/{id}/states/{state}/{take}/{file}": {
       "get": {
         "tags": [

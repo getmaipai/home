@@ -4,14 +4,14 @@ import { join } from "node:path";
 import media from "@maipai/spec/vocab/companion-media.json";
 import { loadManifestOnly } from "@/lib/plugins";
 import { createHouseholdCompanion, getHouseholdCompanion, householdCompanionFolder, setHouseholdCompanionAnimation, setHouseholdCompanionAudience } from "@/lib/householdCompanions";
-import { addTake, finishTake, readStates, takePath, __resetCompanionStatesForTests } from "@/lib/companionStates";
+import { addTake, finishTake, readStates, saveStates, takePath, __resetCompanionStatesForTests } from "@/lib/companionStates";
 import { addVersion, approveSheet, setRest, updateSheet } from "@/lib/companionLook";
 import { __setStackClientForTests } from "@/lib/stackEngine";
 import { __setAgeCheckRunnerForTests, __resetAgeCheckForTests, type AgeVerdict, type ImageCheck } from "@/lib/pictures/ageCheck";
 import { __setChildSafetyRunnerForTests, type ChildSafetyCheck } from "@/lib/pictures/laneGate";
 import { __setKeyframesForTests } from "@/lib/pictures/keyframes";
 import { checkFinishedAssets, stricterLane } from "@/lib/pictures/finishedCheck";
-import { checkCompanionArt, sweepLiveCompanionArt } from "@/lib/companionArtCheck";
+import { checkCompanionArt, sweepLiveCompanionArt, __setCompanionArtCheckThrowForTests } from "@/lib/companionArtCheck";
 
 const dataRoot = process.env.MAIPAI_DATA_DIR!;
 const root = join(dataRoot, "companions");
@@ -103,7 +103,35 @@ describe("companion art", () => {
     const row = readStates(id).states.idle!.takes[0]!;
     expect(row.report).toBeNull();
     expect(row.failure?.length ?? 0).toBeGreaterThan(10);
+    expect(row.failure_kind).toBe("art"); // MAKER-D: the pack maker closes on an art refusal and re-rolls only measured-quality failures
   });
+  test("a refusal removes the clip files even when the take record is already gone (MAKER-D item A)", async () => {
+    const id = companion();
+    const rest = addVersion(id, new Uint8Array([1]), { source: "upload", label: "rest", width: 1024, height: 1024, from: null }); setRest(id, rest.id);
+    updateSheet(id, { views: { left: null, right: null, mouth: null }, card: { text: "red fox", species: "fox", colours: ["#CC3322"] }, key: "#FF00FF", state: "needs_review", approved_by: null, approved_at: null } as never); approveSheet(id, "Author");
+    const take = addTake(id, "idle", { source: "upload", label: "idle" }); writeFileSync(takePath(id, "idle", take.id, "source.mp4")!, "source");
+    __setKeyframesForTests(async () => [new Uint8Array([7])]);
+    __setAgeCheckRunnerForTests(async (images) => images.map(() => verdict({ label: "child", apparent_min_age_estimate: 8, is_nude_or_sexual: true })));
+    __setStackClientForTests({ mediaRoots: async () => ({ read: [root], write: [root] }), setMediaRoots: async () => ({ read: [root], write: [root] }), submitJob: async (job: any) => { { const gone = readStates(id); gone.states.idle!.takes = []; gone.states.idle!.approved = null; saveStates(id, gone); } const out = join(job.input.output_dir, job.input.output_name); mkdirSync(out, { recursive: true }); writeFileSync(join(out, "clip.h264.mp4"), "h264"); writeFileSync(join(out, "still.png"), "png"); return { id: "j", state: "done", result: { ok: true, reasons: [], seconds: 3, files: [{ name: "clip.h264.mp4", bytes: 4 }], av1: false } }; }, job: async () => { throw Error("unexpected poll"); } } as never);
+    await expect(finishTake(id, "idle", take.id, { alpha: false })).rejects.toThrow();
+    expect(existsSync(takePath(id, "idle", take.id, "still.png")!)).toBe(false);
+    expect(existsSync(takePath(id, "idle", take.id, "clip.h264.mp4")!)).toBe(false);
+  });
+
+  test("a check that throws is an art refusal, not a quality failure (MAKER-D item E)", async () => {
+    const id = companion();
+    const rest = addVersion(id, new Uint8Array([1]), { source: "upload", label: "rest", width: 1024, height: 1024, from: null }); setRest(id, rest.id);
+    updateSheet(id, { views: { left: null, right: null, mouth: null }, card: { text: "red fox", species: "fox", colours: ["#CC3322"] }, key: "#FF00FF", state: "needs_review", approved_by: null, approved_at: null } as never); approveSheet(id, "Author");
+    const take = addTake(id, "idle", { source: "upload", label: "idle" }); writeFileSync(takePath(id, "idle", take.id, "source.mp4")!, "source");
+    __setKeyframesForTests(async () => [new Uint8Array([7])]);
+    __setAgeCheckRunnerForTests(async (images) => images.map(() => verdict())); __setCompanionArtCheckThrowForTests(() => new Error("no reader"));
+    __setStackClientForTests({ mediaRoots: async () => ({ read: [root], write: [root] }), setMediaRoots: async () => ({ read: [root], write: [root] }), submitJob: async (job: any) => { const out = join(job.input.output_dir, job.input.output_name); mkdirSync(out, { recursive: true }); writeFileSync(join(out, "clip.h264.mp4"), "h264"); writeFileSync(join(out, "still.png"), "png"); return { id: "j", state: "done", result: { ok: true, reasons: [], seconds: 3, files: [{ name: "clip.h264.mp4", bytes: 4 }], av1: false } }; }, job: async () => { throw Error("unexpected poll"); } } as never);
+    await expect(finishTake(id, "idle", take.id, { alpha: false })).rejects.toThrow();
+    __setCompanionArtCheckThrowForTests(null);
+    expect(readStates(id).states.idle!.takes[0]!.failure_kind).toBe("art");
+    expect(existsSync(takePath(id, "idle", take.id, "clip.h264.mp4")!)).toBe(false);
+  });
+
 });
 
 describe("the one-time check of live art", () => {

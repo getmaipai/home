@@ -30,7 +30,7 @@ export interface TakeRun {
   id: string; companionId: string; personId: string; states: string[];
   current: { state: string; take: number; index: number; of: number } | null;
   state: TakeRunState; phase: string; percent: number; label: string;
-  cancelled: boolean; error: string | null; takesMade: number; stackJob: string | null;
+  cancelled: boolean; error: string | null; takesMade: number; stackJob: string | null; pack?: boolean; packJob?: string; /** Resolves when the run is fully settled: every finishing job done, after a cancel or a failure too. */ settled?: Promise<void>;
 }
 const runs = new Map<string, TakeRun>();
 const activeByCompanion = new Map<string, string>();
@@ -56,6 +56,10 @@ export function activeTakeRun(companionId: string): TakeRun | null {
 export function companionHasTakeRun(companionId: string): boolean { const id = activeByCompanion.get(companionId), run = id ? runs.get(id) : null; return starting.has(companionId) || Boolean(run && ["queued", "running", "cancelled"].includes(run.state)); }
 export function __clearCompanionTakeRunsForTests(): void { runs.clear(); activeByCompanion.clear(); starting.clear(); takeRetryWaitMs = TAKE_RETRY_WAIT_MS; }
 export function __setTakeRetryWaitMsForTests(value: number): void { takeRetryWaitMs = value; }
+/** Waits until a take run has nothing left running (the finishing jobs included). */
+export async function takeRunSettled(id: string): Promise<void> { await runs.get(id)?.settled; }
+/** Test seam: registers a run record. */
+export function __addTakeRunForTests(run: TakeRun): void { runs.set(run.id, run); }
 export function takeRunFor(id: string, actor: PersonRow, companionId: string): TakeRun | null { const run = runs.get(id); return run?.personId === actor.id && run.companionId === companionId ? run : null; }
 
 function readySheet(companionId: string): { look: ReturnType<typeof readLook>; restPath: string; originalPath: string | null; card: NonNullable<NonNullable<ReturnType<typeof readLook>["sheet"]>["card"]> } {
@@ -100,7 +104,7 @@ async function runTakes(run: TakeRun, count: number, actor: PersonRow, motionOve
           let seed = Math.floor(Math.random() * 2_147_483_647);
           const art = await resolveCompanionClip(laneOfPerson(actor) === "adult" ? "detailed" : "quick");
           const seconds = Math.min(media.generate.seconds, maxSecondsFor(art.quality));
-          take = addTake(run.companionId, state, { source: "generated", seed, label: `Candidate ${index}`, model: art.model, quality: art.quality, prompt_hash: promptHash(prompt) });
+          take = addTake(run.companionId, state, { source: "generated", seed, label: `Candidate ${index}`, model: art.model, quality: art.quality, prompt_hash: promptHash(prompt), ...(run.packJob ? { pack_job: run.packJob } : {}) });
           let done: Awaited<ReturnType<typeof submitVideo>>["done"] = null;
           for (let attempt = 0; attempt < 2; attempt++) {
             try {
@@ -143,7 +147,7 @@ async function runTakes(run: TakeRun, count: number, actor: PersonRow, motionOve
           writeFileSync(sourcePath, clip);
           await cancelOrDeleteVideo(completedStackJob); run.stackJob = null; stackJob = null;
           // finishTake records its own failure on the take; a finishing failure never stops the run.
-          finishing.push(finishTake(run.companionId, state, take.id, { alpha: false, actor }).catch(() => undefined));
+          finishing.push(finishTake(run.companionId, state, take.id, { alpha: false, actor, ...(run.pack ? { pack: true } : {}) }).catch(() => undefined));
           consecutiveEngineFailures = 0;
         } catch (error) {
           if (stackJob && !run.cancelled) await cancelOrDeleteVideo(stackJob);
@@ -180,7 +184,7 @@ async function runTakes(run: TakeRun, count: number, actor: PersonRow, motionOve
 
 function stateLabel(state: string): string { return state.split("_").map((part) => part[0]!.toUpperCase() + part.slice(1)).join(" "); }
 
-export async function startStateTakes(input: { actor: PersonRow; companionId: string; states: string[]; count: number; motion?: string }): Promise<string> {
+export async function startStateTakes(input: { actor: PersonRow; companionId: string; states: string[]; count: number; motion?: string; pack?: { job: string } }): Promise<string> {
   const promptText = input.states.map((state) => {
     const current = readStates(input.companionId).states[state], motion = input.motion ?? current?.motion ?? stateRows.find((row) => row.id === state)?.motion ?? "";
     const card = readLook(input.companionId).sheet?.card;
@@ -208,9 +212,9 @@ export async function startStateTakes(input: { actor: PersonRow; companionId: st
   try {
     if (!quickVideoReady(engineStatus)) throw Object.assign(new Error(TAKE_QUICK_NOT_READY_LINE), { status: 503 });
     const id = crypto.randomUUID();
-    const run: TakeRun = { id, companionId: input.companionId, personId: input.actor.id, states: input.states, current: null, state: "queued", phase: "queued", percent: 0, label: "Getting ready to make animations", cancelled: false, error: null, takesMade: 0, stackJob: null };
+    const run: TakeRun = { id, companionId: input.companionId, personId: input.actor.id, states: input.states, current: null, state: "queued", phase: "queued", percent: 0, label: "Getting ready to make animations", cancelled: false, error: null, takesMade: 0, stackJob: null, ...(input.pack ? { pack: true, packJob: input.pack.job } : {}) };
     runs.set(id, run); activeByCompanion.set(input.companionId, id);
-    void runTakes(run, input.count, input.actor, input.motion).catch(() => undefined);
+    run.settled = runTakes(run, input.count, input.actor, input.motion).catch(() => undefined).then(() => undefined);
     return id;
   } finally { starting.delete(input.companionId); }
 }

@@ -111,6 +111,10 @@ export interface StackImageToolsStatus {
   operations: string[];
   reason: string | null;
 }
+/** The face landmarks of one picture, `[x, y]` pairs in that picture's pixels (MAKER-B2); `points` holds all 203. */
+export interface StackFaceLandmarks { outerLips: number[][]; innerLips: number[][]; nose: number[][]; contour: number[][]; points: number[][]; [more: string]: unknown }
+export interface StackTalkFramesBody { job: string; sourceEye?: number; sourceLip?: number; sourceLandmarks?: StackFaceLandmarks | null; frames?: Array<{ kind: string; ratio: number; landmarks?: StackFaceLandmarks | null }> }
+export type StackTalkFramesReply = { kind: "done"; body: StackTalkFramesBody } | { kind: "running"; job: string };
 /** One finished edit as POST /v1/images/edits states it: a PNG with no metadata. */
 export interface StackImageEditItem { b64_json: string; width: number; height: number; content_type: string; operation: string; engine?: string; model?: string; ms?: number }
 export type StackImageEditReply = { kind: "done"; job: string; item: StackImageEditItem } | { kind: "running"; job: string };
@@ -169,6 +173,10 @@ export interface StackClient {
   imageEdit(form: FormData, opts?: { signal?: AbortSignal }): Promise<StackImageEditReply>;
   /** GET /v1/images/edits/{job}: the PNG a finished edit made (the Stack keeps it in memory a few minutes). */
   imageEditResult(job: string, opts?: { signal?: AbortSignal }): Promise<Uint8Array>;
+  /** POST /v1/images/talk-frames (TALK-06, landmarks MAKER-B2): `lip` ratios in, one still per ratio out. 200 carries the frames; 202 a job to poll (`job()`, its result carries the same fields). Optional so an older Stack or a test double without it still type-checks. */
+  talkFrames?(form: FormData, opts?: { signal?: AbortSignal }): Promise<StackTalkFramesReply>;
+  /** GET /v1/images/talk-frames/{job}/{index}: one frame's PNG (kept ten minutes). */
+  talkFramePicture?(job: string, index: number, opts?: { signal?: AbortSignal }): Promise<Uint8Array>;
   submitJob(request: { kind: string; role?: string | null; input?: Record<string, unknown> }, opts?: { signal?: AbortSignal }): Promise<StackJob>;
   job(id: string, opts?: { signal?: AbortSignal }): Promise<StackJob>;
   jobs(opts?: { signal?: AbortSignal }): Promise<StackJob[]>;
@@ -506,6 +514,11 @@ export function createStackClient(options: StackClientOptions = {}): StackClient
       const item = res.status === 200 ? body.data?.[0] : undefined;
       return item ? { kind: "done" as const, job: body.job, item } : { kind: "running" as const, job: body.job };
     }, opts),
+    talkFrames: (form, opts) => call("/v1/images/talk-frames", formInit(form), async (res) => {
+      const body = await json<StackTalkFramesBody>(res);
+      return res.status === 200 ? { kind: "done" as const, body } : { kind: "running" as const, job: body.job };
+    }, opts),
+    talkFramePicture: (job, index, opts) => call(`/v1/images/talk-frames/${encodeURIComponent(job)}/${index}`, { method: "GET" }, async (res) => new Uint8Array(await res.arrayBuffer()), opts),
     imageEditResult: (job, opts) => call(`/v1/images/edits/${encodeURIComponent(job)}`, { method: "GET" }, async (res) => new Uint8Array(await res.arrayBuffer()), opts),
     submitJob: (request, opts) => call("/stack/v1/jobs", jsonInit(request), async (res) => StackJobSchema.parse((await json<{ job: unknown }>(res)).job), opts),
     job: (id, opts) => call(`/stack/v1/jobs/${encodeURIComponent(id)}`, { method: "GET" }, async (res) => StackJobSchema.parse((await json<{ job: unknown }>(res)).job), opts),

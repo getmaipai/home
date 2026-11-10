@@ -1,5 +1,5 @@
 // PACK-06: a companion may carry a pack folder (data/companions/<id>/pack/, layout in scripts/pack/README.md). Validated once per mtime.
-import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
+import { existsSync, lstatSync, readdirSync, readFileSync, realpathSync, statSync } from "node:fs";
 import { join, relative, resolve, sep } from "node:path";
 import { validateCompanionPack } from "@maipai/spec/companion/ts/validateCompanionPack";
 import { householdCompanionFolder } from "@/lib/householdCompanions";
@@ -17,6 +17,7 @@ export function packFolderProblems(dir: string, pack: any): string[] {
   const all = walk(dir);
   for (const f of all) if (f !== "build-report.json") files[f] = statSync(join(dir, f)).size;
   const problems = [...validateCompanionPack(pack, files)];
+  for (const f of all) if (lstatSync(join(dir, f)).isSymbolicLink()) problems.push(`${f} is a link; packs hold plain files only.`);
   const named = [pack.rest, ...Object.values<any[]>(pack.states ?? {}).flatMap((clips) => clips.flatMap((c) => [c.file, c.trackFile, c.phone]))];
   for (const f of named) if (typeof f === "string" && !existsSync(join(dir, f))) problems.push(`${f} is named in pack.json but is not in the folder; add the file.`);
   for (const f of all) if (f.toLowerCase().endsWith(".webm")) problems.push(`${f} is a WebM file; packs never hold WebM.`);
@@ -55,6 +56,7 @@ export function packFile(id: string, rel: string): string | null {
   const dir = packFolder(id);
   if (!dir || !rel || rel.includes("\0")) return null;
   const path = resolve(dir, rel);
-  if (!path.startsWith(resolve(dir) + sep) || !existsSync(path) || !statSync(path).isFile()) return null;
+  if (!path.startsWith(resolve(dir) + sep) || !existsSync(path) || lstatSync(path).isSymbolicLink() || !statSync(path).isFile()) return null;
+  try { if (!realpathSync(path).startsWith(realpathSync(dir) + sep)) return null; } catch { return null; }
   return path;
 }

@@ -12,7 +12,7 @@ import { laneOfPerson } from "@/lib/pictures/laneGate";
 import { extractKeyframes } from "@/lib/pictures/keyframes";
 import type { CheckedKind } from "@/lib/pictures/ageCheck";
 import type { Lane } from "@/lib/pictures/lane";
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
 import media from "@maipai/spec/vocab/companion-media.json";
 import { dirname, join } from "node:path";
 import { dataDir } from "@/lib/paths";
@@ -29,7 +29,10 @@ export function audienceLane(audience: CompanionAudience): Lane { return audienc
 export function companionAudience(companionId: string): CompanionAudience { return getHouseholdCompanion(companionId)?.companion?.audience ?? "adult"; }
 
 /** Checks art for a companion for the person asking (null: a sweep with no one asking, held to the companion's audience alone). */
+let throwForTests: (() => Error) | null = null;
+export function __setCompanionArtCheckThrowForTests(fn: (() => Error) | null): void { throwForTests = fn; }
 export async function checkCompanionArt(companionId: string, actor: PersonRow | null, assets: readonly FinishedAsset[], kind: CheckedKind = "picture", audience: CompanionAudience = companionAudience(companionId)): Promise<FinishedCheckResult> {
+  if (throwForTests) throw throwForTests();
   const lane = actor ? stricterLane(audienceLane(audience), laneOfPerson(actor)) : audienceLane(audience);
   const cache = { ...(readStates(companionId).checks ?? {}) };
   const result = await checkFinishedAssets({ assets, lane, adultOnly: audience === "adult", kind, cache, ...(actor ? { report: { personId: actor.id, jobId: `companion:${companionId}` } } : {}) });
@@ -49,12 +52,37 @@ export async function requireCompanionPictureOk(companionId: string, actor: Pers
 /** A finished take: its still and the frames of its clip. */
 export async function takeAssets(companionId: string, state: string, takeId: string, seconds: number | null): Promise<FinishedAsset[]> {
   const assets: FinishedAsset[] = [];
+  const phonePath = takePath(companionId, state, takeId, "clip.phone.h264.mp4");
+  if (phonePath && existsSync(phonePath)) { let phone: Uint8Array[] | null = null; try { phone = await extractKeyframes(new Uint8Array(readFileSync(phonePath)), seconds); } catch { phone = null; } if (!phone?.length) assets.push({ label: `The ${state} phone clip frames` }); else for (const bytes of phone) assets.push({ label: `The ${state} phone clip frames`, bytes }); }
   const stillPath = takePath(companionId, state, takeId, "still.png"), clipPath = takePath(companionId, state, takeId, "clip.h264.mp4");
   try { assets.push({ label: `The ${state} still`, bytes: new Uint8Array(readFileSync(stillPath!)) }); } catch { assets.push({ label: `The ${state} still` }); }
   let frames: Uint8Array[] | null = null;
   try { frames = await extractKeyframes(new Uint8Array(readFileSync(clipPath!)), seconds); } catch { frames = null; }
   if (!frames) assets.push({ label: `The ${state} clip frames` }); else for (const bytes of frames) assets.push({ label: `The ${state} clip frames`, bytes });
   return assets;
+}
+
+const IMAGE_EXT = /\.(png|webp|jpe?g|avif)$/i, VIDEO_EXT = /\.(mp4|webm|mov)$/i, DATA_EXT = /\.(json|z|bin)$/i;
+/** Every file under a folder as assets for the check: images as they are, videos as their frames, data files skipped, and any other file (or a video whose frames cannot be read) as an asset with no bytes, which fails closed. `files` counts every file found. */
+export async function dirAssets(dir: string, label: string, seconds: number | null | ((name: string) => number | null) = null): Promise<{ assets: FinishedAsset[]; files: number }> {
+  const assets: FinishedAsset[] = []; let files = 0;
+  let entries: import("node:fs").Dirent[] = [];
+  if (!existsSync(dir)) return { assets, files };
+  try { entries = readdirSync(dir, { recursive: true, withFileTypes: true }); } catch { return { assets: [{ label: `${label} (a folder the safety check cannot read)` }], files: 1 }; } // an unreadable folder fails closed, never "nothing there"
+  for (const entry of entries) {
+    if (entry.isDirectory() && !entry.isSymbolicLink()) continue;
+    files++;
+    const path = join(entry.parentPath, entry.name), name = `${label}: ${entry.name}`;
+    // A link or any other special entry is never followed or served: it counts as unreadable.
+    if (!entry.isFile()) { assets.push({ label: `${name} (a link or special file the safety check will not follow)` }); continue; }
+    if (IMAGE_EXT.test(entry.name)) { try { assets.push({ label: name, bytes: new Uint8Array(readFileSync(path)) }); } catch { assets.push({ label: name }); } }
+    else if (VIDEO_EXT.test(entry.name)) {
+      let frames: Uint8Array[] | null = null;
+      try { frames = await extractKeyframes(new Uint8Array(readFileSync(path)), typeof seconds === "function" ? seconds(entry.name) : seconds); } catch { frames = null; }
+      if (!frames?.length) assets.push({ label: name }); else for (const bytes of frames) assets.push({ label: name, bytes });
+    } else if (!DATA_EXT.test(entry.name)) assets.push({ label: `${name} (a file type the safety check cannot read)` });
+  }
+  return { assets, files };
 }
 
 /** Clip lengths are not recorded for a live clip, so frames are taken within the shortest length the state allows. */
@@ -64,6 +92,9 @@ function clipSeconds(state: string): number { return media.states.find((row) => 
 export async function collectLiveAssets(companionId: string): Promise<FinishedAsset[]> {
   const assets: FinishedAsset[] = [], add = (label: string, path: string | null) => { try { assets.push({ label, bytes: new Uint8Array(readFileSync(path!)) }); } catch { assets.push({ label }); } };
   for (const version of readLook(companionId).versions) add(`Look picture ${version.id}`, versionPath(companionId, version.id));
+  // MAKER-D: an installed pack and a pack job in progress are art the person may be shown too.
+  const folderPath = householdCompanionFolder(companionId);
+  if (folderPath) for (const [sub, name] of [["pack", "The pack"], [join("pack-job", "work"), "The pack in progress"]] as const) { const found = await dirAssets(join(folderPath, sub), name); assets.push(...found.assets); }
   const animation = getHouseholdCompanion(companionId)?.companion?.animation;
   if (!animation) return assets;
   const root = join(householdCompanionFolder(companionId)!, "animation");

@@ -4,6 +4,7 @@ import { resumeMusicJobs } from "@/lib/music/jobs";
 // later import (app, db, keystore) can open the database.
 import { instanceLock } from "@/lib/bootGuard";
 import { startLiveArtSweep } from "@/lib/companionArtCheck";
+import { reconcileInterruptedPackJobs } from "@/lib/companionPackMaker";
 import { sweepAbandonedDrafts } from "@/lib/sweepAbandonedDrafts";
 import { sweepStaleDownloads } from "@/lib/modelDownload";
 import { startTrashSweeper } from "@/lib/trash/sweep";
@@ -134,6 +135,7 @@ void warmStack();
 warmSpokenPrefixAtBoot(() => turnWarmupRequest("spoken"));
 // COMPANION-ART-CHECK-01: companion art that was live before art was checked is checked once; what fails is narrowed to the audience it does pass.
 startLiveArtSweep();
+try { reconcileInterruptedPackJobs(); } catch (error) { console.warn(`[pack-maker] could not reconcile interrupted jobs: ${(error as Error).message}`); }
 try { sweepAbandonedDrafts(); } catch { /* maintenance sweep is disposable */ }
 setInterval(() => { try { sweepAbandonedDrafts(); } catch { /* maintenance sweep is disposable */ } }, 60 * 60 * 1000).unref();
 function sweepDownloads(): void {
