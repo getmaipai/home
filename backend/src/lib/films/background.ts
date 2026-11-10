@@ -14,7 +14,7 @@ let engineFactory: EngineFactory = realFilmEngines;
 export function __setFilmEnginesForTests(factory: EngineFactory | null): void { engineFactory = factory ?? realFilmEngines; }
 const stageName: Record<FilmStage, FilmRun["stage"]> = { cast:"Cast", stills:"Stills", clips:"Clips", music:"Music", assemble:"Assemble", keep:"Assemble" };
 const plainFailure = "The film could not be finished. Press Resume to try the unfinished steps again.";
-function allowed(actor: PersonRow): boolean { return actor.role !== "guest" && laneOfPerson(actor) === "adult"; }
+export function allowed(actor: PersonRow): boolean { return actor.role !== "guest" && laneOfPerson(actor) === "adult"; }
 function total(plan: FilmPlan, faceless = false): number { return plan.cast.length + plan.shots.length * (faceless ? 3 : 2) + 3; }
 function onProgress(actor: PersonRow, id: string) { return (p: {stage:FilmStage;done:number;total:number}) => {
   const row=getFilmRun(actor,id); if(!row || row.state!=="running") return;
