@@ -15,7 +15,7 @@ Built 2026-11-03 for VIDEO-LORA-07. Design: [video-loras-2026-11-02.md](../desig
 ## Who and what
 
 Every route is owner or admin only (a minor, a guest or another adult gets 403). Install also needs the person's own screen (a browser session).
-Civitai is off by default (`generation.styles.civitai`); with it off, browse and install of a Civitai style answer 403 and nothing goes out, and `source: "both"` quietly searches only Hugging Face and says so.
+Civitai is on by default (`generation.styles.civitai`); an explicit off setting makes browse and install of a Civitai style answer 403 and sends nothing, and `source: "both"` searches only Hugging Face and says so. The setting remains separate from the write-only key. This computer contacts civitai.com only when an admin searches or installs a style.
 
 ## The adult check (design 15.1)
 
@@ -35,7 +35,7 @@ answer 404 with the body of a missing one. The `installed` filter runs before th
 
 - The licence step must be `licence_confirmed: true` (422 otherwise).
 - Duplicates: a live record with the same source version id, or the same sha256, answers 409 `duplicate` ("You already have this as <name>.", or "You already have this style." when that record is locked, with no id). The same version with a different hash is 409 `changed_file` until `as_separate: true`.
-- Only LTX 2.3 and 2.5 styles install. A Hugging Face repo whose base cannot be read needs `base_model` in the body.
+- Installable bases depend on the selected media and installed engines. A Hugging Face repo whose base cannot be read needs `base_model` in the body.
 - `audience` is the admin's click. All ages from `unknown` needs a live unlock proof; from `adult` it needs a single-use ticket from `/api/adult-lock/confirm` whose `item` is the hit's `confirm_item`. Adult-only is always allowed. The Stack's own class can only raise it.
 - The Home job row is named "Downloading a style" and has no file name. What finishing needs is encrypted in its provenance. A failure raises one Repairs item "A style did not download" (plain cause) with Try again.
 - On completion the record is written: admin-only availability, `adult_check`, trigger words cleaned, source ids, the licence acknowledged by the installing admin.
@@ -54,7 +54,7 @@ A result set filtered for the viewer's region cannot be detected from the respon
 
 ## Tests
 
-`backend/tests/loras07.test.ts`: the classifier table, trigger words, dedupe, who may call, Civitai off, redaction while locked (route sweep of strings, proof alone, switch alone, another person's proof,
+`backend/tests/loras07.test.ts`: the classifier table, trigger words, dedupe, who may call, Civitai explicit opt-out, redaction while locked (route sweep of strings, proof alone, switch alone, another person's proof,
 cache after a reveal), the limiter, the credentials, and the install flow against a fake Stack (job list, record, lowering rules, duplicates, Repairs and Try again).
 
 ## The Styles tab (VIDEO-LORA-08)
@@ -64,8 +64,8 @@ Settings, Pictures, videos and music, tab Styles (`frontend/src/apps/settings/st
 | Piece | File | What it does |
 |---|---|---|
 | Tab | `StylesTab.tsx` | The list (one-click Only admins / All adults / Chosen people, the plain Adults only label and the three-state age check after the unlock), ONE kit `LockedSettingRow`, the running download as the kit `JobProgress` (never a name), where styles come from, Recently removed. Which dialog is open is kept in the router state (never the URL), because the unlock resets every query and reloads the page behind the tab. |
-| Sources | same file | Hugging Face token and Civitai key are write only (saved, Replace, Remove; no value is ever drawn). Civitai is off by default; turning it on shows the notice first. |
-| Browser | `StyleBrowser.tsx` | Search (300 ms pause), Type, Made for, Installed, Source, Sort, Previous / numbered / Next paging with each page's cursor kept, a licence badge and one reason line per tile, ONE lock tile for adult and unknown hits, Show adult results only while unlocked (off at each visit). A pasted Hugging Face link opens the confirm panel. An installed hit opens its style instead of starting a download. |
+| Sources | same file | Hugging Face token and Civitai key are write only (saved, Replace, Remove; no value is ever drawn). Civitai is on by default; an admin can turn it off, and turning it on from off shows the notice first. |
+| Browser | `StyleBrowser.tsx` | Search (300 ms pause), Pictures or Videos, Made for (All by default), Installed, Source, Sort, Previous / numbered / Next paging with each page's cursor kept, a licence badge and one reason line per tile, ONE lock tile for adult and unknown hits, Show adult results only while unlocked (off at each visit). A pasted Hugging Face link opens the confirm panel. An installed hit opens its style instead of starting a download. |
 | Confirm | `StyleConfirm.tsx` | Name, source link, made for, the licence line (a checkbox unless the licence is open), and Is this style for adults only?, pre-set from the source's check (safe: No; unknown or adult: Yes). All ages from an adult hit asks for a fresh passcode (`/api/adult-lock/confirm`, item = the hit's `confirm_item`) and sends the ticket. A changed file offers Install as a separate style. |
 | Editor | `StyleEditor.tsx` | About, Try this style (router state, no id in the URL), Remove, Who can use it, Adults only, Added to the prompt, Avoid with Say instead, Strength, Details. Every change saves at once. Adults only off asks, and asks for the passcode again when the check is `adult` (`POST /api/loras/{id}/all-ages` takes the ticket, item = the style id). |
 | Add from a file | `StyleAddFile.tsx` | The existing multipart add (`POST /api/videos/adapters`), the same licence and adults-only questions; choosing All ages needs the unlock. |

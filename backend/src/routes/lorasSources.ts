@@ -86,7 +86,7 @@ function sourceFailure(error: unknown): { body: { error: string; code: string };
 
 const BrowseBody = z.object({
   source: z.enum(["huggingface", "civitai", "both"]).default("huggingface"), q: z.string().max(200).default(""), media: z.enum(["video", "picture"]).default("video"),
-  kind: z.enum(["any", "style", "character"]).default("any"), base: z.enum(["default", ...BROWSE_BASES.video, ...BROWSE_BASES.picture, "all"]).default("default"),
+  kind: z.enum(["any", "style", "character"]).default("any"), base: z.enum(["default", ...BROWSE_BASES.video, ...BROWSE_BASES.picture, "all"]).default("all"),
   installed: z.enum(["any", "not_installed", "installed"]).default("any"), sort: z.enum(["downloads", "rating", "newest"]).default("downloads"),
   cursor: z.string().max(2000).nullable().default(null), adult: z.boolean().default(false),
 }).superRefine((body, ctx) => {

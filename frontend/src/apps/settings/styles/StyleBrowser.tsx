@@ -48,9 +48,10 @@ export function StyleBrowser({ person, civitaiOn, onClose, onInstalled, onOpenSt
   const lock = useLockProof();
   const [typed, setTyped] = useState("");
   const [q, setQ] = useState("");
-  const [source, setSource] = useState<BrowseSource>("huggingface");
+  const [source, setSource] = useState<BrowseSource>(civitaiOn ? "both" : "huggingface");
+  const [media, setMedia] = useState<BrowseQuery["media"]>("video");
   const [kind, setKind] = useState<BrowseQuery["kind"]>("any");
-  const [base, setBase] = useState<BrowseQuery["base"]>("default");
+  const [base, setBase] = useState<BrowseQuery["base"]>("all");
   const [installed, setInstalled] = useState<BrowseQuery["installed"]>("any");
   const [sort, setSort] = useState<BrowseQuery["sort"]>("downloads");
   const [adult, setAdult] = useState(false);
@@ -69,10 +70,10 @@ export function StyleBrowser({ person, civitaiOn, onClose, onInstalled, onOpenSt
     return () => window.clearTimeout(timer);
   }, [typed]);
   // Any change of what is asked starts again at page one.
-  useEffect(() => { setCursors([null]); setPage(0); }, [q, source, kind, base, installed, sort, adult]);
+  useEffect(() => { setCursors([null]); setPage(0); }, [q, source, media, kind, base, installed, sort, adult]);
 
   const link = HF_LINK.exec(q);
-  const query: BrowseQuery = { source, q, kind, base, installed, sort, cursor: cursors[page] ?? null, adult: adult && lock.unlocked };
+  const query: BrowseQuery = { source, q, media, kind, base, installed, sort, cursor: cursors[page] ?? null, adult: adult && lock.unlocked };
   const results = useQuery<BrowsePage>({
     queryKey: ["style-browse", query, lock.unlocked], queryFn: () => stylesApi.browse(query), enabled: !link, staleTime: 5 * 60_000, retry: false,
     placeholderData: (previous) => previous,
@@ -99,7 +100,7 @@ export function StyleBrowser({ person, civitaiOn, onClose, onInstalled, onOpenSt
   const filters = (
     <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
       <Pick id="style-filter-type" label={i18n._({ id: "Type", message: "Type" })} value={kind} onChange={(v) => setKind(v as typeof kind)} options={[["any", i18n._({ id: "Any", message: "Any" })], ["style", i18n._({ id: "Style", message: "Style" })], ["character", i18n._({ id: "Character", message: "Character" })]]} />
-      <Pick id="style-filter-base" wide label={i18n._({ id: "Made for", message: "Made for" })} value={base} onChange={(v) => setBase(v as typeof base)} options={[["default", i18n._({ id: "LTX-2.5 and Wan", message: "LTX-2.5 and Wan" })], ["ltx-2.5", "LTX-2.5"], ["wan", "Wan"], ["all", i18n._({ id: "All", message: "All" })]]} />
+      <Pick id="style-filter-base" wide label={i18n._({ id: "Made for", message: "Made for" })} value={base} onChange={(v) => setBase(v as typeof base)} options={media === "video" ? [["ltx-2.5", "LTX-2.5"], ["wan", "Wan"], ["all", i18n._({ id: "All", message: "All" })]] : [["flux2-klein-4b", "Flux.2 Klein 4B"], ["z-image-turbo", "Z-Image Turbo"], ["ernie-image-turbo", "ERNIE"], ["all", i18n._({ id: "All", message: "All" })]]} />
       <Pick id="style-filter-installed" label={i18n._({ id: "Installed", message: "Installed" })} value={installed} onChange={(v) => setInstalled(v as typeof installed)} options={[["any", i18n._({ id: "Any", message: "Any" })], ["not_installed", i18n._({ id: "Not installed", message: "Not installed" })], ["installed", i18n._({ id: "Installed", message: "Installed" })]]} />
       <Pick id="style-filter-source" label={i18n._({ id: "Source", message: "Source" })} value={source} onChange={(v) => setSource(v as BrowseSource)} options={[["huggingface", "Hugging Face"], ["civitai", civitaiOn ? i18n._({ id: "Civitai", message: "Civitai" }) : i18n._({ id: "Civitai (off)", message: "Civitai (off)" }), !civitaiOn], ["both", i18n._({ id: "Both", message: "Both" }), !civitaiOn]]} />
       <Pick id="style-filter-sort" label={i18n._({ id: "Sort", message: "Sort" })} value={sort} onChange={(v) => setSort(v as typeof sort)} options={[["downloads", i18n._({ id: "Most downloaded", message: "Most downloaded" })], ["rating", i18n._({ id: "Top rated", message: "Top rated" })], ["newest", i18n._({ id: "Newest", message: "Newest" })]]} />
@@ -119,6 +120,7 @@ export function StyleBrowser({ person, civitaiOn, onClose, onInstalled, onOpenSt
               <Label htmlFor="style-search">{i18n._({ id: "Search styles, or paste a Hugging Face link", message: "Search styles, or paste a Hugging Face link" })}</Label>
               <Input id="style-search" type="search" value={typed} onChange={(e) => setTyped(e.target.value)} placeholder={i18n._({ id: "old film, clay, anime", message: "old film, clay, anime" })} />
             </div>
+            <Pick id="style-filter-media" label={i18n._({ id: "Pictures / Videos", message: "Pictures / Videos" })} value={media} onChange={(v) => { const next = v as typeof media; setMedia(next); setBase("all"); }} options={[["picture", i18n._({ id: "Pictures", message: "Pictures" })], ["video", i18n._({ id: "Videos", message: "Videos" })]]} />
             {filters}
             {lock.unlocked ? (
               <div className="flex items-center gap-3">
@@ -162,7 +164,7 @@ export function StyleBrowser({ person, civitaiOn, onClose, onInstalled, onOpenSt
           </div>
         </DialogContent>
       </Dialog>
-      {picked ? <StyleConfirm hit={picked} person={person} revealed={picked.adult_check !== "normal"} onClose={() => setPicked(null)} onInstalled={() => { setPicked(null); onInstalled(); }} onOpenInstalled={(id) => { setPicked(null); onOpenStyle(id); }} /> : null}
+      {picked ? <StyleConfirm hit={picked} person={person} media={media} revealed={picked.adult_check !== "normal"} onClose={() => setPicked(null)} onInstalled={() => { setPicked(null); onInstalled(); }} onOpenInstalled={(id) => { setPicked(null); onOpenStyle(id); }} /> : null}
     </>
   );
 }

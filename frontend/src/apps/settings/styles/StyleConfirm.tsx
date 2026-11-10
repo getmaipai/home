@@ -26,8 +26,8 @@ const licenceLine = (): Record<BrowseHit["licence"]["class"], string> => ({
   unknown: i18n._({ id: "The source does not state a licence. Read its page before you install.", message: "The source does not state a licence. Read its page before you install." }),
 });
 
-export function StyleConfirm({ hit, person, revealed, onClose, onInstalled, onOpenInstalled }: {
-  hit: BrowseHit; person: Roster; revealed: boolean; onClose: () => void; onInstalled: () => void; onOpenInstalled: (id: string | null) => void;
+export function StyleConfirm({ hit, person, revealed, media = "video", onClose, onInstalled, onOpenInstalled }: {
+  hit: BrowseHit; person: Roster; revealed: boolean; media?: "video" | "picture"; onClose: () => void; onInstalled: () => void; onOpenInstalled: (id: string | null) => void;
 }) {
   const client = useQueryClient();
   const [name, setName] = useState(hit.title.slice(0, 80));
@@ -45,7 +45,7 @@ export function StyleConfirm({ hit, person, revealed, onClose, onInstalled, onOp
   const canInstall = !busy && !blocked && !hit.installed && name.trim().length > 0 && (open || read) && (!needsBase || base !== "");
 
   const body = (ticket?: string, separate?: boolean): InstallBody => ({
-    source: hit.site, remote_id: hit.remote_id, version_id: hit.version_id, name: name.trim(), kind, audience: adultsOnly === "yes" ? "adult-only" : "all-ages", licence_confirmed: true,
+    source: hit.site, remote_id: hit.remote_id, version_id: hit.version_id, name: name.trim(), kind, media, audience: adultsOnly === "yes" ? "adult-only" : "all-ages", licence_confirmed: true,
     ...(needsBase && base ? { base_model: base } : {}), ...(ticket ? { confirm_ticket: ticket } : {}), ...(separate ? { as_separate: true } : {}),
   });
   async function install(ticket?: string, separate?: boolean) {

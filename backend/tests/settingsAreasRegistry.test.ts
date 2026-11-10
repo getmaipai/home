@@ -21,6 +21,10 @@ describe("settings registry and the spec's areas", () => {
     expect(key?.help).toContain("key itself is never stored");
   });
 
+  test("Civitai search is on by default and names its on-demand contact", () => {
+    expect(getRegistry().find((entry) => entry.key === "generation.styles.civitai")).toMatchObject({ default: true, help: expect.stringContaining("only when an admin searches or installs") });
+  });
+
   test("every key's group is the one the pinned spec's keys.json carries", () => {
     const spec = JSON.parse(readFileSync(join(SPEC_DIR, "settings", "keys.json"), "utf-8")) as { key: string; scope: string; lives_in: string }[];
     const home = new Map(getRegistry().map((k) => [`${k.scope}:${k.key}`, k.lives_in]));

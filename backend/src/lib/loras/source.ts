@@ -155,10 +155,10 @@ async function guardedGet(site: LoraSite, url: string, opts: { accept?: string; 
   return result;
 }
 
-async function getJson(site: LoraSite, url: string): Promise<{ body: unknown; headers: Headers }> {
+async function getJson(site: LoraSite, url: string, budget = true): Promise<{ body: unknown; headers: Headers }> {
   const hit = cache.get(url);
   if (hit && clock() - hit.at < CACHE_MS) return hit.value as { body: unknown; headers: Headers };
-  const res = await guardedGet(site, url);
+  const res = await guardedGet(site, url, { budget });
   let body: unknown;
   try { body = await res.json(); } catch { throw new SourceError("bad_response", `${SITE_LABEL[site]} sent something Home can't read. Try again later.`, 502); }
   const value = { body, headers: res.headers };
@@ -288,9 +288,9 @@ const mediaOf = (p: BrowseParams): Media => p.media ?? "video";
 const basesFor = (p: BrowseParams): string[] => civitaiLabelsFor(p.base, mediaOf(p));
 /** Whether a hit belongs in this search. A generic-label hit with no stated version is kept in the default search only (it is shown, not installable). */
 const baseWanted = (p: BrowseParams, hit: Pick<Hit, "base_model" | "base_unstated">): boolean =>
-  (hit.base_model !== "unknown" && (p.base === "all" || wantedBaseIds(p.base, mediaOf(p)).includes(hit.base_model))) || (hit.base_unstated && p.base === "default");
+  p.base === "all" || (hit.base_model !== "unknown" && wantedBaseIds(p.base, mediaOf(p)).includes(hit.base_model)) || (hit.base_unstated && p.base === "default");
 
-async function browseHf(p: BrowseParams, cursor: string | null): Promise<{ hits: Hit[]; next: string | null }> {
+async function browseHf(p: BrowseParams, cursor: string | null, budget = true): Promise<{ hits: Hit[]; next: string | null }> {
   let url: string;
   if (cursor) {
     // The cursor is the `Link: rel=next` address HF gave us; only an address on its own host is followed.
@@ -302,26 +302,26 @@ async function browseHf(p: BrowseParams, cursor: string | null): Promise<{ hits:
     if (p.q.trim()) q.set("search", p.q.trim());
     url = `https://huggingface.co/api/models?${q}`;
   }
-  const { body, headers } = await getJson("huggingface", url);
+  const { body, headers } = await getJson("huggingface", url, budget);
   if (!Array.isArray(body)) throw new SourceError("bad_response", "Hugging Face sent something Home can't read. Try again later.", 502);
   const hits = body.map(hfHit).filter((h): h is Hit => h !== null).filter((h) => baseWanted(p, h));
   const next = /<([^>]+)>;\s*rel="next"/.exec(headers.get("link") ?? "")?.[1] ?? null;
   return { hits, next };
 }
 
-async function browseCivitai(p: BrowseParams, cursor: string | null): Promise<{ hits: Hit[]; next: string | null }> {
+async function browseCivitai(p: BrowseParams, cursor: string | null, budget = true): Promise<{ hits: Hit[]; next: string | null }> {
   if (!civitaiEnabled()) throw new SourceError("off", "Civitai is off. An owner or admin can turn it on in settings.", 403);
   const q = new URLSearchParams({ limit: String(PAGE_SIZE), types: "LORA", sort: p.sort === "downloads" ? "Most Downloaded" : p.sort === "rating" ? "Highest Rated" : "Newest", nsfw: p.nsfw ? "true" : "false" });
   if (p.q.trim()) q.set("query", p.q.trim());
-  const labels = basesFor(p);
+  const labels = p.base === "all" ? [] : basesFor(p);
   // A search that wants a base but has no label to ask for (no supported engine) asks Civitai nothing: an empty list would mean "every base".
   if (p.base !== "all" && !labels.length) return { hits: [], next: null };
-  for (const b of labels) q.append("baseModels", b);
+    for (const b of labels) q.append("baseModels", b);
   if (cursor) q.set("cursor", cursor);
-  const { body } = await getJson("civitai", `https://civitai.com/api/v1/models?${q}`);
+  const { body } = await getJson("civitai", `https://civitai.com/api/v1/models?${q}`, budget);
   const b = rec(body);
   if (!Array.isArray(b.items)) throw new SourceError("bad_response", "Civitai sent something Home can't read. Try again later.", 502);
-  const hits = b.items.map((m) => civitaiHit(m, basesFor(p), undefined, mediaOf(p))).filter((h): h is Hit => h !== null).filter((h) => baseWanted(p, h));
+  const hits = b.items.map((m) => civitaiHit(m, p.base === "all" ? [] : basesFor(p), undefined, mediaOf(p))).filter((h): h is Hit => h !== null).filter((h) => baseWanted(p, h));
   return { hits, next: str(rec(b.metadata).nextCursor) };
 }
 
@@ -333,10 +333,26 @@ export async function browseHits(p: BrowseParams): Promise<Browsed> {
   const cur = decodeCursor(p.cursor);
   const useHf = p.source !== "civitai", useCv = p.source !== "huggingface";
   if (useCv && !civitaiEnabled()) { if (p.source === "civitai") throw new SourceError("off", "Civitai is off. An owner or admin can turn it on in settings.", 403); }
-  const [hf, cv] = await Promise.all([
+  const [hf0, cv0] = await Promise.all([
     useHf && (p.cursor === null || cur.h) ? browseHf(p, cur.h) : Promise.resolve({ hits: [] as Hit[], next: null }),
     useCv && civitaiEnabled() && (p.cursor === null || cur.c) ? browseCivitai(p, cur.c) : Promise.resolve({ hits: [] as Hit[], next: null }),
   ]);
+  let hf = hf0;
+  let cv = cv0;
+  const acceptedCount = () => {
+    const combined = dedupeHits([...hf.hits, ...cv.hits]);
+    return p.kind === "any" ? combined.length : combined.filter((h) => h.kind === null || h.kind === p.kind).length;
+  };
+  let extra = 0;
+  while (extra < 3 && acceptedCount() < PAGE_SIZE && (hf.next || cv.next)) {
+    extra += 1;
+    const [hn, cn] = await Promise.all([
+      hf.next ? browseHf(p, hf.next, false) : Promise.resolve({ hits: [] as Hit[], next: null }),
+      cv.next ? browseCivitai(p, cv.next, false) : Promise.resolve({ hits: [] as Hit[], next: null }),
+    ]);
+    hf = { hits: [...hf.hits, ...hn.hits], next: hn.next };
+    cv = { hits: [...cv.hits, ...cn.hits], next: cn.next };
+  }
   let hits = dedupeHits([...hf.hits, ...cv.hits]);
   if (p.kind !== "any") hits = hits.filter((h) => h.kind === null || h.kind === p.kind);
   const key = sortKey(p);

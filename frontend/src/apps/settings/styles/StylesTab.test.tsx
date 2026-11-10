@@ -1,5 +1,5 @@
 // VIDEO-LORA-08: the Styles tab as rendered. The list (open rows, ONE kit lock row, the plain Adult label and the three-state check after the unlock, one-click availability),
-// the sources (Civitai off with its reason, the notice before it turns on, write-only credentials), the browser (filters, paging, locked tile, reason lines, "already added, open it")
+// the sources (Civitai's on-by-default note, the notice before re-enabling, write-only credentials), the browser (filters, paging, locked tile, reason lines, "already added, open it")
 // and the confirm panel (pre-set from the source's check, the licence step, the fresh passcode before an adult hit is made all ages) and the editor (turning Adults only off).
 import type { ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, mock, test } from "bun:test";
@@ -105,10 +105,10 @@ describe("the list and the lock", () => {
 });
 
 describe("where styles come from", () => {
-  test("Civitai is off with its reason; turning it on shows the notice first; the key row never shows a saved value", async () => {
+  test("Civitai is on by default; the key row never shows a saved value", async () => {
     const restore = stub();
     const view = renderWithQueryClient(<Page><StylesTab person={person} /></Page>);
-    expect(await view.findByText(STYLES_COPY_DEFAULTS.civitai_off_note)).toBeTruthy();
+    expect(await view.findByText(/On by default/)).toBeTruthy();
     expect(view.queryByLabelText("Civitai key")).toBeNull();
     fireEvent.click(view.getByRole("switch", { name: "Civitai" }));
     expect(await view.findByText(STYLES_COPY_DEFAULTS.civitai_notice_title)).toBeTruthy();
@@ -139,8 +139,14 @@ describe("the browser", () => {
   const mountBrowser = (opened: Array<string | null> = []) => renderWithQueryClient(<Page><StyleBrowser person={person} civitaiOn={false} onClose={() => undefined} onInstalled={() => undefined} onOpenStyle={(id) => opened.push(id)} /></Page>);
 
   test("tiles carry one reason line, a licence badge; adult and unknown hits are ONE lock tile with no title; Civitai stays off in the Source filter", async () => {
-    const restore = stub({ browse: mock(async () => page()) as never });
+    const browse = mock(async (_query: BrowseQuery) => page());
+    const restore = stub({ browse: browse as never });
     const view = mountBrowser();
+    await waitFor(() => expect(browse.mock.calls.length).toBeGreaterThan(0));
+    expect(browse.mock.calls[0]![0]).toMatchObject({ base: "all", media: "video", q: "" });
+    fireEvent.click(view.getByRole("combobox", { name: "Pictures / Videos" }));
+    fireEvent.click(await view.findByRole("option", { name: "Pictures" }));
+    await waitFor(() => expect(browse.mock.calls.at(-1)![0].media).toBe("picture"));
     expect(await view.findByText("Made for LTX 2.5, 412 MB, open licence, 8,300 downloads")).toBeTruthy();
     expect(view.getByText("Already added as Clay look. Press to open it.")).toBeTruthy();
     expect(view.getAllByText("Open licence").length).toBeGreaterThan(0);
@@ -152,12 +158,14 @@ describe("the browser", () => {
     restore();
   });
 
-  test("the Made for filter has no retired base option", async () => {
+  test("Made for starts at All and has no retired base option", async () => {
     const restore = stub({ browse: mock(async () => page()) as never });
     const view = mountBrowser();
+    expect(view.getByRole("combobox", { name: "Made for" })).toHaveTextContent("All");
     fireEvent.click(await view.findByRole("combobox", { name: "Made for" }));
     expect(view.queryByRole("option", { name: "LTX-2.3" })).toBeNull();
-    expect(view.getByRole("option", { name: "LTX-2.5 and Wan" })).toBeTruthy();
+    expect(view.getByRole("option", { name: "LTX-2.5" })).toBeTruthy();
+    expect(view.getByRole("option", { name: "Wan" })).toBeTruthy();
     restore();
   });
 

@@ -155,8 +155,8 @@ describe("the browse route", () => {
     const { owner } = await household();
     const res = await owner.request("/api/loras/browse", { method: "POST", body: { source: "civitai", media: "picture" } });
     expect(res.status).toBe(200);
-    expect((await res.json() as { items: unknown[] }).items.length).toBe(3);
-    expect(labelsAsked()).toEqual(PICTURE_LABELS);
+    expect((await res.json() as { items: unknown[] }).items.length).toBe(7);
+    expect(labelsAsked()).toEqual([]);
   });
 
   test("a picture search through the route lists picture hits with picture wording", async () => {
@@ -164,7 +164,8 @@ describe("the browse route", () => {
     const res = await owner.request("/api/loras/browse", { method: "POST", body: { source: "civitai", media: "picture" } });
     expect(res.status).toBe(200);
     const body = await res.json() as { items: Array<{ title: string; line: string; reason: string | null }> };
-    expect(body.items.map((i) => i.title).sort()).toEqual(["Clay Look", "Pen Sketch", "Watercolor"]);
+    expect(body.items.map((i) => i.title).sort()).toEqual(["Clay Look", "Flux Dev Look", "Klein Nine", "Paper Boat", "Pen Sketch", "Watercolor", "Z Base Look"]);
+    expect(body.items.filter((i) => ["Flux Dev Look", "Klein Nine", "Z Base Look"].includes(i.title)).every((i) => i.reason !== null)).toBe(true);
     expect(body.items.find((i) => i.title === "Clay Look")!.line).toContain("Made for Flux");
   });
 

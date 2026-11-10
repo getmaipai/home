@@ -22,7 +22,7 @@ export interface StyleList { items: StyleRow[]; locked: boolean }
 
 export type BrowseSource = "huggingface" | "civitai" | "both";
 export interface BrowseQuery {
-  source: BrowseSource; q: string; kind: "any" | "style" | "character"; base: "default" | "ltx-2.5" | "wan" | "all";
+  source: BrowseSource; q: string; media: "video" | "picture"; kind: "any" | "style" | "character"; base: "default" | "ltx-2.5" | "wan" | "flux2-klein-4b" | "z-image-turbo" | "ernie-image-turbo" | "all";
   installed: "any" | "not_installed" | "installed"; sort: "downloads" | "rating" | "newest"; cursor: string | null; adult: boolean;
 }
 /** A hit the caller may see. Adult and unknown hits never appear here: they are the response's one `locked` flag. */
@@ -40,6 +40,7 @@ export interface InstallJob { job: string; state: string; title: string; percent
 
 export interface InstallBody {
   source: "huggingface" | "civitai"; remote_id?: string; version_id?: string | null; url?: string; name?: string; kind?: "style" | "character";
+  media?: "video" | "picture";
   audience: "all-ages" | "adult-only"; licence_confirmed: boolean; base_model?: "ltx-2.5" | "wan2.2-ti2v-5b"; confirm_ticket?: string; as_separate?: boolean;
 }
 export interface StylePatch {
@@ -58,7 +59,7 @@ export const stylesApi = {
   markAllAges: (id: string, ticket?: string) => post<StyleRow>(`/api/loras/${encodeURIComponent(id)}/all-ages`, { confirm: true, ...(ticket ? { ticket } : {}) }),
   remove: (id: string) => post<StyleRow>(`/api/loras/${encodeURIComponent(id)}/remove`),
   restore: (id: string) => post<StyleRow>(`/api/loras/${encodeURIComponent(id)}/restore`),
-  browse: (query: BrowseQuery) => post<BrowsePage>("/api/loras/browse", { ...query, media: "video" }),
+  browse: (query: BrowseQuery) => post<BrowsePage>("/api/loras/browse", query),
   hit: (site: string, id: string, version: string | null) => requestJson<BrowseHit>(`/api/loras/browse/${site}/${encodeURIComponent(id)}${version ? `?version=${encodeURIComponent(version)}` : ""}`),
   install: (body: InstallBody) => post<{ job: string }>("/api/loras/install", body),
   installs: () => requestJson<{ items: InstallJob[] }>("/api/loras/install"),
