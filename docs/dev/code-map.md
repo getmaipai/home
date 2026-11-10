@@ -1202,7 +1202,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/videos/rerun.ts` | prepareVideoRerun |
 | `backend/src/lib/videos/slotBody.ts` | qualityOfSlotModel, videoBodyForSlot |
 | `backend/src/lib/videos/spatialStart.ts` | startSpatialSound |
-| `backend/src/lib/videos/stack.ts` | StackVideoError, __setVideosFetchForTests, submitVideo, submitVideoRestyle, convertForMessages, getVideoJob |
+| `backend/src/lib/videos/stack.ts` | StackVideoError, __setVideosFetchForTests, START_PICTURE_MAX_SIDE, START_PICTURE_MAX_BYTES, pictureNeedsFit, fitPictureForStack |
 | `backend/src/lib/videos/stackEdit.ts` | EDIT_UNAVAILABLE_LINE, EDIT_REMOTE_LINE, EDIT_FAILED_LINE, EDIT_TIMEOUT_LINE, EDIT_MISSING_LINE, __setStackEditTimingForTests |
 | `backend/src/lib/videos/studio.ts` | STUDIO_TITLE, STUDIO_NO_CLIP_LINE, STUDIO_LOCKED_LINE, STUDIO_NO_SONG_LINE, STUDIO_SPEECH_LINE, STUDIO_SAY_LINE |
 | `backend/src/lib/videos/studioExport.ts` | STUDIO_VOICE_GONE_LINE, studioRun, startStudioExport |
