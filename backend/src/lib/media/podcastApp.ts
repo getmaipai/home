@@ -8,6 +8,7 @@ import type { PersonRow } from "@/types";
 import { liveSourceById } from "./access";
 import { allowedSources, readableIn, artworkUrl, collectionIds, contextFor, copyLabelOf, queryItems, registerItemView, registerMediaAppData, rowOf, rowsOf, type DataParams, type MediaItemView, type MediaRow } from "./appHost";
 import { getProgress, getProgressMany, recentProgress } from "./progress";
+import { showRateOf } from "./podcastRates";
 import type { MediaItem, MediaSource } from "./model";
 import { draftRows, filterEpisodes, personFilters, viewOf } from "./podcastFilters";
 import { podcastStatsRows } from "./podcastStats";
@@ -163,5 +164,7 @@ registerItemView(APP, (person, item, view) => {
   // The show's "skip the first N seconds": a first listen starts there. (A resume keeps the person's own place.)
   const progress = getProgress(person.id, item.id);
   if (out.position_s === undefined && !progress && source.skip_intro_s > 0) out.position_s = source.skip_intro_s;
-  return { ...out, ...(source.speed ? { speed: source.speed } : {}), skip_intro_s: source.skip_intro_s, skip_outro_s: source.skip_outro_s, ...(summaryFacts ? { facts: summaryFacts } : {}) } as MediaItemView;
+  // PODCAST-RATE-01: the speed this person last picked for the show, else the show's own speed; the play page's `player.rate` reads `show_rate`, and calls the route with `show_id`.
+  const rate = showRateOf(person, source.id) ?? (source.speed || null);
+  return { ...out, show_id: source.id, ...(rate ? { show_rate: rate } : {}), ...(source.speed ? { speed: source.speed } : {}), skip_intro_s: source.skip_intro_s, skip_outro_s: source.skip_outro_s, ...(summaryFacts ? { facts: summaryFacts } : {}) } as MediaItemView;
 });

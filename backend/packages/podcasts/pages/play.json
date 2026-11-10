@@ -150,6 +150,19 @@
             "back": 15,
             "forward": 30
           },
+          "rate": {
+            "field": "show_rate",
+            "value": 1,
+            "on_change": {
+              "call": {
+                "target": "/api/plugins/podcasts/shows/{show_id}/rate",
+                "method": "PATCH",
+                "args": {
+                  "rate": "{rate}"
+                }
+              }
+            }
+          },
           "transcript_bind": {
             "source": "package",
             "path": "directory",

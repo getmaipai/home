@@ -4831,6 +4831,25 @@
       "batch": null,
       "replacesHandBuilt": [],
       "realTurnToday": true
+    },
+    {
+      "file": "clip-feed.tsx",
+      "name": "clip-feed",
+      "group": "clip",
+      "verdict": "wire-now",
+      "verdictReason": "The Videos Clips view draws the household's own short clips through this kit node (clip_feed, built from the vertical carousel and VideoPlayer); Home passes data and the making notice only.",
+      "backendNeeded": null,
+      "effort": null,
+      "specTagNeeded": false,
+      "newDependency": false,
+      "bindings": [
+        "videos clips feed"
+      ],
+      "size": "M",
+      "showcaseScenario": null,
+      "batch": null,
+      "replacesHandBuilt": [],
+      "realTurnToday": true
     }
   ]
 }

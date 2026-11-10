@@ -66,6 +66,7 @@
           "pages": [
             "index",
             "library",
+            "clips-feed",
             "history",
             "watch-later",
             "liked",
@@ -115,6 +116,20 @@
         "nav": false,
         "kind": "schema",
         "module": "watch"
+      },
+      {
+        "id": "clips-feed",
+        "label": "Clips",
+        "icon": "clapperboard",
+        "nav": true,
+        "kind": "schema",
+        "module": "clips-feed",
+        "keywords": [
+          "clips",
+          "shorts",
+          "short videos",
+          "scroll"
+        ]
       },
       {
         "id": "watch-later",

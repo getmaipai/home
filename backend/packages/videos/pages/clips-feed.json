@@ -1,0 +1,65 @@
+{
+  "type": "page",
+  "id": "videos-clips-feed",
+  "title": "Clips",
+  "body": [
+    {
+      "type": "clip_feed",
+      "bind": {
+        "source": "package",
+        "path": "recipes",
+        "params": {
+          "scope": "short"
+        }
+      },
+      "item_fields": {
+        "src": "src",
+        "poster": "poster",
+        "title": "title",
+        "subtitle": "subtitle",
+        "duration_s": "duration_s",
+        "id": "id",
+        "liked": "liked"
+      },
+      "actions": {
+        "like": {
+          "call": {
+            "target": "/api/plugins/videos/actions/favorite",
+            "method": "POST",
+            "args": {
+              "id": "{id}",
+              "favorite": "{liked}"
+            }
+          }
+        },
+        "remake": {
+          "starts": "video",
+          "navigate": {
+            "to": "/apps/videos/create",
+            "state": {
+              "prompt": "{prompt}"
+            }
+          }
+        }
+      },
+      "empty_state": {
+        "type": "empty_state",
+        "icon": "film",
+        "text": "No short clips yet. Make a video and it shows up here.",
+        "action": {
+          "navigate": {
+            "to": "/apps/videos"
+          }
+        },
+        "action_label": "Back to Videos"
+      },
+      "on_close": {
+        "navigate": {
+          "to": "/apps/videos"
+        }
+      },
+      "autoplay": true,
+      "autoplay_field": "autoplay"
+    }
+  ]
+}

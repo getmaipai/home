@@ -58,6 +58,7 @@ import {
   pictureAdapterPrefs,
   videoJobs,
   videoFavorites,
+  podcastShowRates,
   adultMarkLog,
   loras,
   mediaCollections,
@@ -239,6 +240,7 @@ export function resetDb(): void {
   __resetMusicJobsForTests();
   db.delete(musicJobs).run();
   db.delete(videoFavorites).run(); // VIDEO-UI-06: references people
+  db.delete(podcastShowRates).run(); // PODCAST-RATE-01: references people
   db.delete(adultMarkLog).run(); // ADULT-LOCK-06
   db.delete(videoJobs).run(); // VIDEO-GEN-05: references people
   db.delete(videoAdapterPrefs).run();

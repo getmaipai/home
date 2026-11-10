@@ -1988,6 +1988,24 @@ export const videoFavorites = sqliteTable(
   (table) => [uniqueIndex("video_favorites_person_file_idx").on(table.personId, table.fileId)],
 );
 
+// PODCAST-RATE-01: the listening speed a person chose for one show. One row per person and show (`media_sources.id`), private to that person and
+// read and written only for them. A speed between 0.5 and 2; the play page's `player.rate` reads it and writes it when the person changes speed.
+export const podcastShowRates = sqliteTable(
+  "podcast_show_rates",
+  {
+    id: text("id").primaryKey(),
+    personId: text("person_id")
+      .notNull()
+      .references(() => people.id),
+    sourceId: text("source_id").notNull(),
+    rate: real("rate").notNull(),
+    updatedAt: text("updated_at").notNull(),
+    hlc: text("hlc").notNull(),
+    provenance: text("provenance").notNull(),
+  },
+  (table) => [uniqueIndex("podcast_show_rates_person_source_idx").on(table.personId, table.sourceId)],
+);
+
 // ADULT-LOCK-06 (docs/design/video-loras-2026-11-02.md 3.10): the record of every change to an item's Adult lock: who, when, which item, and how. It holds no
 // content (no title, prompt, words or file name). It is a record, not a log: no admin page or Status page shows it, and only the creator sees their own
 // rows, in the item's menu. `item_id` is the Library file (attachments.id). `action` is `clear` or `mark`; `via` is `creator_passcode`, `creator`, `admin` or `auto`.

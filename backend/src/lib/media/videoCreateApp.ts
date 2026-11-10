@@ -22,6 +22,7 @@ import { QUICK_MAX_SECONDS, DETAILED_MAX_SECONDS, ltx25MaxReady, ltx25VideoReady
 import { peekVideoEngineStatus, videoEngineStatus, videoMaxNotReadyReason } from "@/lib/videos/ready";
 import { registerAppPageFill, registerAppPageWarm } from "@/lib/apps";
 import { packageAssetFile } from "@/lib/packageAssets";
+import { meetsMinRole } from "@/lib/plugins";
 import type { PersonRow } from "@/types";
 import { madeFiles, registerMediaAppData } from "./appHost";
 
@@ -126,6 +127,14 @@ registerAppPageFill("videos", "create", (person, page) => {
   }
 });
 
+/** CLIPS-FEED-01: Make another opens the Create page, which is for adults; a person below that floor gets the feed without the button. */
+registerAppPageFill("videos", "clips-feed", (person, page) => {
+  if (meetsMinRole(person.role, "adult")) return;
+  const feed = findNode(page.body, "clip_feed");
+  const actions = feed?.actions as Record<string, unknown> | undefined;
+  if (actions) delete actions.remake;
+});
+
 /** VIDEO-STUDIO-07: Export is offered only where the Stack can take an edit job: Home runs the AI on this computer and the Stack is set up. One plain line
  * where the person acts (the page shows it beside the button), never a raw error after a press. */
 registerAppPageFill("videos", "studio", (_person, page) => {
@@ -166,6 +175,29 @@ function clipRows(person: PersonRow, view: string | undefined, limit: number): A
   return locked && (!view || view === "all") ? [locked, ...rows] : rows;
 }
 
+/** CLIPS-FEED-01: a short clip is one of 60 seconds or less (a clip with no known length is not drawn in the feed). */
+export const SHORT_CLIP_MAX_S = 60;
+export const isShortClip = (seconds: number | null | undefined): boolean => typeof seconds === "number" && seconds > 0 && seconds <= SHORT_CLIP_MAX_S;
+/** The most clips one Clips feed loads. */
+const SHORT_CLIP_LIMIT = 60;
+
+/** CLIPS-FEED-01: the Clips view's rows (`recipes` scope `short`): the short Library clips made at home that this person sees, newest first, exactly as the
+ * Library lists them (own and shared; a locked or age-held clip is not in the list, so it is not here). No new store: the heart is the Favorite mark.
+ * `prompt` (the clip's own words, for Make another on the Create page) goes only to a person who may open Create and only for their own jobs. A child's first
+ * row says `autoplay: false`, so nothing plays or scrolls on its own for a child (docs/design/kid-mode-app-voice-2026-10-17.md section 8). */
+export function shortClipRows(person: PersonRow): Array<Record<string, unknown>> {
+  const files = madeFiles(person, "videos").filter((file) => isShortClip(file.duration_seconds)).slice(0, SHORT_CLIP_LIMIT);
+  const favorites = favoriteFileIds(person, files.map((file) => file.id));
+  const mayCreate = meetsMinRole(person.role, "adult");
+  const jobOf = mayCreate ? new Map(doneVideoJobsFor(person, null, false).flatMap((job) => job.files.map((file) => [file.id, job] as const))) : new Map<string, never>();
+  const rows = files.map((file) => {
+    const prompt = jobOf.get(file.id)?.prompt;
+    return { id: file.id, title: file.name, subtitle: file.owner.display_name || "Made at home", src: `/api/files/${encodeURIComponent(file.id)}/content`, poster: file.thumb_url, duration_s: file.duration_seconds, liked: favorites.has(file.id), ...(prompt ? { prompt } : {}) } as Record<string, unknown>;
+  });
+  if (rows.length > 0 && speakerAgeBand(person, new Date()) === "child") rows[0] = { ...rows[0], autoplay: false };
+  return rows;
+}
+
 const levelWords = (job: Parameters<typeof feedRowOf>[1]): string => ({ standard: "Standard", boost: "Boost", max: "Max" })[levelOfJob(job)];
 
 /** VIDEO-UI-11: the "Try this" rail rows. A tile whose poster is not in the package is left out, never a broken picture. `look` and `camera` are the ids the Create panel's chips use
@@ -182,7 +214,11 @@ function showcaseRows(): Array<Record<string, unknown>> {
 
 registerMediaAppData("videos", (person, dataId, params) => {
   if (dataId !== "recipes") return null;
+  // CLIPS-FEED-01: the Clips page is open to every role, and it binds `recipes`, so the page-level gate no longer keeps a child or teen out of the other scopes
+  // (the Create pages' feed, jobs, Studio): they answer nothing unless the person holds the Create pages' adult floor.
+  if (params.scope !== "short" && !meetsMinRole(person.role, "adult")) return null;
   switch (params.scope) {
+    case "short": return shortClipRows(person);
     case undefined: return VIDEO_RECIPES.map(({ id, label, hint }) => ({ id, label, hint }));
     case "showcase": return showcaseRows();
     // VIDEO-STUDIO-08: the page header row (the studio `creation_header` reads its title from a bound row). The same for everyone who may open the page.

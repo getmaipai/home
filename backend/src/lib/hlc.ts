@@ -68,6 +68,7 @@ export const HLC_BEARING_TABLES = [
   "picture_jobs",
   "video_jobs",
   "video_favorites",
+  "podcast_show_rates",
   "adult_mark_log",
   "quick_timers",
   "world_places",

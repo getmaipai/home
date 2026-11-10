@@ -33,6 +33,7 @@ import { startSpatialSound } from "@/lib/videos/spatialStart";
 import { studioAdd } from "@/lib/videos/studio";
 import { startStudioExport } from "@/lib/videos/studioExport";
 import { setFavoriteFile } from "@/lib/videos/favorites";
+import { meetsMinRole } from "@/lib/plugins";
 import { videoJobLockState, LOCKED_START_LINE } from "@/lib/videos/lock";
 import { cancelVideoJob, getVideoJobByFileFor, getVideoJobFor } from "@/lib/videos/jobs";
 import { editMediaItem } from "@/lib/media/mediaEdit";
@@ -152,6 +153,9 @@ export function createMediaAppRoutes(appId: MediaAppId) {
         if (scope === "genres") return c.json({ as_of: new Date().toISOString(), rows: radioGenreRows() } as never, 200);
       }
     }
+    // CLIPS-FEED-01: the Clips page is open to every role and binds `recipes`; a null from the hook would fall through to the package runner (a 502), so a person below
+    // the Create floor asking for any scope but `short` is answered 404 here.
+    if (appId === "videos" && c.req.param("dataId") === "recipes" && !meetsMinRole(person.role, "adult") && (await jsonBody(c)).scope !== "short") return c.json({ error: "no such data" }, 404);
     const value = mediaAppData(person, appId, c.req.param("dataId"), { ...paramsOf(await jsonBody(c)), ...(appId === "music" ? { device: deviceKeyOf(c) } : {}) });
     if (value === null) return next();
     return c.json(value as never, 200);

@@ -293,6 +293,9 @@ export function newMediaProgressId(): string {
 export function newMediaCollectionId(): string {
   return `mcol-${randomSuffix(10)}`;
 }
+export function newPodcastShowRateId(): string {
+  return `psr-${randomSuffix(10)}`;
+}
 export function newVideoFavoriteId(): string {
   return `vfav-${randomSuffix(10)}`;
 }
