@@ -9134,6 +9134,141 @@
         }
       }
     },
+    "/api/activity/clear": {
+      "post": {
+        "tags": [
+          "Activity"
+        ],
+        "summary": "Clear finished rows from the signed-in person's own Activity list",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "keys": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "maxLength": 200
+                    },
+                    "maxItems": 500
+                  },
+                  "all": {
+                    "type": "boolean"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The list after clearing. Only the list row is hidden: the picture, video or song and its files stay. Waiting and making rows are never cleared.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "source": {
+                            "type": "string",
+                            "enum": [
+                              "picture",
+                              "video",
+                              "song",
+                              "job"
+                            ]
+                          },
+                          "state": {
+                            "type": "string",
+                            "enum": [
+                              "waiting",
+                              "making",
+                              "done",
+                              "attention",
+                              "failed"
+                            ]
+                          },
+                          "title": {
+                            "type": "string"
+                          },
+                          "line": {
+                            "type": "string",
+                            "nullable": true
+                          },
+                          "percent": {
+                            "type": "number",
+                            "nullable": true
+                          },
+                          "typicalMinutes": {
+                            "type": "number",
+                            "nullable": true
+                          },
+                          "href": {
+                            "type": "string",
+                            "nullable": true
+                          },
+                          "at": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "source",
+                          "state",
+                          "title",
+                          "line",
+                          "percent",
+                          "typicalMinutes",
+                          "href",
+                          "at"
+                        ]
+                      }
+                    },
+                    "seenAt": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "dot": {
+                      "type": "string",
+                      "enum": [
+                        "none",
+                        "running",
+                        "attention",
+                        "finished"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "items",
+                    "seenAt",
+                    "dot"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Sign in first",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/scheduler/jobs": {
       "get": {
         "tags": [
