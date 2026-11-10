@@ -10,6 +10,14 @@ import { throttleFail, throttleReset } from "@/lib/secretThrottle";
 
 export type SecretCheckFailure = { ok: false; status: 401 | 429; body: { error: string; retryAfter?: number; attemptsLeft?: number } };
 
+/** Apply the same failure bookkeeping to another credential ceremony (for example a passkey). */
+export function recordCredentialFailure(ip: string, personId: string, message: string, purpose: LockoutPurpose = "signin"): SecretCheckFailure {
+  throttleFail(ip);
+  const { failedAttempts } = recordFailedAttempt(personId, purpose);
+  const attemptsLeft = purpose === "signin" ? failSigninAddress(ip, personId) : Math.max(0, LOCKOUT_THRESHOLD - failedAttempts);
+  return { ok: false, status: 401, body: { error: message, attemptsLeft } };
+}
+
 /** Serialize slow proofs per purpose and profile, closing the gap between lockout read and failed-attempt write. */
 const proofInFlight = new Set<string>();
 
@@ -34,15 +42,8 @@ export async function verifyAgainstRecord(
   let valid: boolean;
   try { valid = await verifySecret(providedSecret, record.secretHash); } finally { proofInFlight.delete(flightKey); }
   if (!valid) {
-    throttleFail(ip);
     // Atomic re-read-and-increment (lib/credentialLockout.ts): concurrent requests for one profile must not undercount real attempts.
-    const { failedAttempts } = recordFailedAttempt(personId, purpose);
-    const attemptsLeft = purpose === "signin" ? failSigninAddress(ip, personId) : Math.max(0, LOCKOUT_THRESHOLD - failedAttempts);
-    return {
-      ok: false,
-      status: 401,
-      body: { error: wrongSecretMessage, attemptsLeft },
-    };
+    return recordCredentialFailure(ip, personId, wrongSecretMessage, purpose);
   }
 
   throttleReset(ip);
