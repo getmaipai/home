@@ -62,7 +62,8 @@ export function StyleBrowser({ person, civitaiOn, onClose, onInstalled, onOpenSt
   const first = useRef(true);
 
   // The adult switch is off at each visit and ends with the unlock.
-  useEffect(() => { if (!lock.unlocked) setAdult(false); }, [lock.unlocked]);
+  // Unlocking is the person's own choice to see everything, so the switch turns on with the unlock (they can turn it off); relocking turns it off.
+  useEffect(() => { setAdult(lock.unlocked); }, [lock.unlocked]);
   // A search box pause of 300 ms before the first page (Loki Doki's LoraManager).
   useEffect(() => {
     if (first.current) { first.current = false; setQ(typed.trim()); return; }
