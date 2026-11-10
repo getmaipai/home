@@ -39,7 +39,8 @@ import { allowedQuality, jobTier, maxOffered, tierArgument } from "@/lib/tiers";
 import { LTX25_MAX_MODEL, LTX25_MODEL, chooseVideoQuality, ltx25MaxReady, isVideoQuality, ltx25VideoReady, maxSecondsFor, quickVideoReady, videoSizeFor, VIDEO_SIZES_BY_QUALITY } from "@/lib/videos/quality";
 import { videoJobLockItem, videoJobLockState, LOCKED_START_LINE } from "@/lib/videos/lock";
 import { lockedView, sessionKeyOf } from "@/lib/adultLock";
-import { adultStateOf, setItemLock, NOT_READY_LINE, TEMPORARY_LINE } from "@/lib/adultMarks";
+import { adultStateOf } from "@/lib/adultMarks";
+import { adultMarkJobBody } from "@/lib/adultMarkRoute";
 import { getCookie } from "hono/cookie";
 import { householdVideoQuality } from "@/lib/videos/policy";
 import { and, eq } from "drizzle-orm";
@@ -338,19 +339,7 @@ videosRoutes.openapi(adultMarkRoute, (c) => {
   const actor = c.get("person");
   const { id } = c.req.valid("param");
   const { action, ticket } = c.req.valid("json");
-  const own = getVideoJobFor(actor, id);
-  let fileId: string | undefined;
-  if (own) {
-    if (own.temporary) return c.json({ error: TEMPORARY_LINE }, 409) as never;
-    if (own.state !== "done" || !own.files[0]) return c.json({ error: NOT_READY_LINE }, 409) as never;
-    fileId = own.files[0].id;
-  } else if (action === "mark" && isOwnerOrAdmin(actor)) {
-    // An admin may mark more of the household's items adult-only without seeing them; nothing of the item is answered.
-    const row = db.select({ files: videoJobs.files, state: videoJobs.state }).from(videoJobs).where(eq(videoJobs.id, id)).get();
-    try { fileId = row?.state === "done" ? (JSON.parse(row.files) as Array<{ id?: string }>)[0]?.id : undefined; } catch { fileId = undefined; }
-  }
-  if (!fileId) return c.json({ error: "That video isn't available any more." }, 404) as never;
-  const done = setItemLock({ actor, fileId, action, ticket: ticket ?? null, ticketItem: id, sessionKey: sessionKeyOf(getCookie(c, "session")) });
+  const done = adultMarkJobBody(c, actor, { id, action, ticket });
   if (!done.ok) return refuseWith(c, done) as never;
   return c.json({ made_audience: done.made_audience, lock: done.lock }, 200);
 });

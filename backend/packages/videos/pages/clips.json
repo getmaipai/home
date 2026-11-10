@@ -65,7 +65,45 @@
                   }
                 },
                 "action_label": "Make a video"
-              }
+              },
+              "row_actions": [
+                {
+                  "label": "Unmark as NSFW",
+                  "icon": "key-round",
+                  "action": {
+                    "call": {
+                      "target": "/api/plugins/videos/actions/adult-mark",
+                      "method": "POST",
+                      "args": {
+                        "id": "{id}",
+                        "action": "clear",
+                        "ticket": "{ticket}"
+                      },
+                      "fresh_confirm": {
+                        "title": "Remove the adult lock?",
+                        "description": "This changes who can see it. It will show with its title and thumbnail in your feeds and lists, to anyone looking at your screen. People under 18 still never see it. Enter your passcode to continue.",
+                        "action_label": "Remove lock"
+                      }
+                    }
+                  },
+                  "show_when_field": "can_unmark"
+                },
+                {
+                  "label": "Mark as NSFW",
+                  "icon": "lock",
+                  "action": {
+                    "call": {
+                      "target": "/api/plugins/videos/actions/adult-mark",
+                      "method": "POST",
+                      "args": {
+                        "id": "{id}",
+                        "action": "mark"
+                      }
+                    }
+                  },
+                  "show_when_field": "can_mark"
+                }
+              ]
             }
           ]
         },

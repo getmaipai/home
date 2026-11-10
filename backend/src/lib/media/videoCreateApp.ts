@@ -13,6 +13,7 @@ import { EDIT_REMOTE_LINE, EDIT_UNAVAILABLE_LINE } from "@/lib/videos/stackEdit"
 import { listLibrary } from "@/lib/library";
 import { suggestStyles } from "@/lib/loras/suggest";
 import { requestProof } from "@/lib/adultLock";
+import { adultStateOf } from "@/lib/adultMarks";
 import { DEFAULT_VIDEO_VOICES, VIDEO_LOOKS, VIDEO_RECIPES, VIDEO_SHOWCASE, VIDEO_STARTERS, VIDEO_VOICES, videoLookFor, videoRecipeFor } from "@/lib/videos/recipes";
 import { speakerAgeBand } from "@/lib/ageBand";
 import { styleChips, type StyleTier } from "@/lib/videos/createStyles";
@@ -158,7 +159,9 @@ function clipRows(person: PersonRow, view: string | undefined, limit: number): A
     const job = jobOf.get(file.id);
     const seconds = job?.files[0]?.seconds ?? file.duration_seconds;
     const level = job ? levelWords(job) : null;
-    return { id: file.id, title: file.name, subtitle: job ? [level, seconds ? `${Math.round(seconds)} s` : null].filter(Boolean).join(", ") : file.owner.display_name || "Made at home", thumbnail: file.thumb_url, duration_s: file.duration_seconds, created_at: file.created_at, favorite: favorites.has(file.id), kind: "video", ...(file.audience === "adult-only" ? { adult_only: true } : {}) };
+    const adult = adultStateOf(person, file.id);
+    const actionFlags = file.owner.id === person.id ? { can_unmark: adult?.can_clear ?? false, can_mark: adult?.can_mark ?? false } : {};
+    return { id: file.id, title: file.name, subtitle: job ? [level, seconds ? `${Math.round(seconds)} s` : null].filter(Boolean).join(", ") : file.owner.display_name || "Made at home", thumbnail: file.thumb_url, duration_s: file.duration_seconds, created_at: file.created_at, favorite: favorites.has(file.id), kind: "video", ...actionFlags, ...(file.audience === "adult-only" ? { adult_only: true } : {}) };
   });
   // ADULT-LOCK-02: locked clips are not in the list (the Library query leaves them out); one tile stands for all of them, leading the list.
   const locked = lockedVideoTile(person);
