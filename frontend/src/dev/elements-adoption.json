@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-11-10T05:10:23.384Z",
+  "generatedAt": "2026-11-10T05:10:51.224Z",
   "kitTag": "ui-v0.5.569",
   "items": [
     {
@@ -380,8 +380,8 @@
       "file": "clip-feed.tsx",
       "name": "clip-feed",
       "group": "clip",
-      "verdict": "unassessed",
-      "verdictReason": "Recorded unassessed verdict in elements-plan.json; see the plan entry for its dependency or scope.",
+      "verdict": "wire-now",
+      "verdictReason": "The Videos Clips view draws the household's own short clips through this kit node (clip_feed, built from the vertical carousel and VideoPlayer); Home passes data and the making notice only.",
       "implemented": false
     },
     {
