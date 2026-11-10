@@ -631,6 +631,8 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/localStackService.ts` | installRoot, stackDataDir, stopLocalStackService, startLocalStackService, __setStackServiceRunnerForTests |
 | `backend/src/lib/locale.ts` | resolveLocale, resolveLocaleFromValues, householdLocale, isSafeAutoTranslation |
 | `backend/src/lib/log.ts` | appendLogLine, installConsoleFileMirror, installFatalErrorHandlers |
+| `backend/src/lib/longform/documents.ts` | DOCUMENT_KINDS, MAX_DOCUMENT_CHARS, saveDocument, getDocument, listDocuments, approveDocument |
+| `backend/src/lib/longform/structure.ts` | SCENE_TARGET_SECONDS, SCENE_MIN_SECONDS, SCENE_MAX_SECONDS, AVG_SHOT_SECONDS, MAX_SHOTS_PER_RUN, MIN_PRODUCTION_SECONDS |
 | `backend/src/lib/loras/access.ts` | isAdult, availableTo, loraAccess, runsOnBases, runsOn, isUnofferedOldBase |
 | `backend/src/lib/loras/admin.ts` | NOT_ADMIN_LINE, NOT_HERE_LINE, NOT_CONFIRMED_LINE, TRASH_DAYS, patchLora, confirmLora |
 | `backend/src/lib/loras/adultCheck.ts` | CIVITAI_ADULT_LEVEL, classifyCivitai, classifyHuggingFace, cleanTriggerWords |
