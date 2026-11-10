@@ -66,6 +66,7 @@ import { topicMessages } from "@/lib/topicPrompt";
 import { COMPANION_PERSONALITIES, cleanStyleNotes, backstoryTagline } from "@/lib/companionPersonality";
 import { evaluateSafety, forOutput, carriesCrisisSignal } from "@/lib/safety";
 import { serveBytes } from "@/lib/media/serve";
+import { PACK_TYPES, packFile, readCompanionPack } from "@/lib/companionPack";
 import { listMediaProductions } from "@/lib/mediaProductions";
 import type { PersonRow } from "@/types";
 
@@ -194,7 +195,7 @@ const avatarRoute = createRoute({
   middleware: [requireAuth] as const,
   request: { query: z.object({ companion: z.string().optional().describe("A companion id to read instead of the person's own pick (the chat's pick).") }) },
   responses: {
-    200: { content: { "application/json": { schema: z.object({ avatar: z.object({ id: z.string(), name: z.string(), key: z.string(), version: z.string(), portrait: z.string().nullable().optional(), mouth_still: z.string().nullable(), talk: avatarTalkSchema.nullable().optional(), states: z.record(z.string(), AvatarState) }).nullable() }) } }, description: "The usable active companion's approved animation, or null when it has none." },
+    200: { content: { "application/json": { schema: z.object({ avatar: z.object({ id: z.string(), name: z.string(), key: z.string(), version: z.string(), portrait: z.string().nullable().optional(), mouth_still: z.string().nullable(), talk: avatarTalkSchema.nullable().optional(), pack: z.object({ url: z.string(), manifest: z.record(z.string(), z.unknown()) }).nullable().optional(), states: z.record(z.string(), AvatarState) }).nullable() }) } }, description: "The usable active companion's approved animation, or null when it has none." },
     304: { description: "The animation has not changed." },
     ...errorResponses({ 401: "Not signed in" }),
   },
@@ -203,15 +204,16 @@ companionsRoutes.openapi(avatarRoute, (c) => {
   const person = c.get("person"), asked = c.req.valid("query").companion, persona = resolvePersona(asked ?? getPersonSettingValue(person, "persona.active_id"));
   if (!mayUseCompanion(person, persona)) return c.json({ avatar: null }, 200);
   const household = getHouseholdCompanion(persona.id), loaded = household ? null : loadManifestOnly(persona.id), manifest = household ?? (loaded?.ok ? loaded.value : null);
-  const animation = manifest?.companion?.animation;
-  if (!animation || (manifest.companion?.status && manifest.companion.status !== "ready") || !animation.states.idle) return c.json({ avatar: null }, 200);
+  const packManifest = manifest?.companion?.status && manifest.companion.status !== "ready" ? null : readCompanionPack(persona.id);
+  const animation = manifest?.companion?.animation ?? (packManifest ? { key: "pack", states: {} as Record<string, never>, sheet: undefined } : undefined);
+  if (!animation || (manifest?.companion?.status && manifest.companion.status !== "ready") || (!packManifest && !animation.states.idle)) return c.json({ avatar: null }, 200);
   let mouthVersion: string | null = null;
   try {
     const look = readLook(persona.id);
     if (look.sheet?.state === "approved") mouthVersion = look.sheet.views.mouth;
   } catch { /* Package companions do not have a household look store. */ }
   const { talk, talkVersion } = avatarTalkBlock(persona.id);
-  const version = createHash("sha256").update(JSON.stringify({ animation, mouthVersion, talkVersion })).digest("hex").slice(0, 12);
+  const version = createHash("sha256").update(JSON.stringify({ animation, mouthVersion, talkVersion, pack: packManifest ? (packManifest as { id?: unknown; version?: unknown; budget?: unknown }) : null })).digest("hex").slice(0, 12);
   const etag = `"${version}"`;
   const headers = { "cache-control": "private, max-age=0, must-revalidate", etag };
   if (matchesEtag(c.req.header("if-none-match"), etag)) return new Response(null, { status: 304, headers });
@@ -224,9 +226,9 @@ companionsRoutes.openapi(avatarRoute, (c) => {
       still: `/api/companions/${encodeURIComponent(persona.id)}/animation/${encodeURIComponent(files.still)}`,
     },
   }]));
-  const portrait = animation.sheet?.rest ? `/api/companions/${encodeURIComponent(persona.id)}/animation/${encodeURIComponent(animation.sheet.rest)}` : null;
+  const portrait = animation.sheet?.rest ? `/api/companions/${encodeURIComponent(persona.id)}/animation/${encodeURIComponent(animation.sheet.rest)}` : packManifest && typeof packManifest.rest === "string" ? `/api/companions/${encodeURIComponent(persona.id)}/pack/${packManifest.rest}` : null;
   const mouth_still = mouthVersion ? `/api/companions/${encodeURIComponent(persona.id)}/mouth` : null;
-  return c.json({ avatar: { id: persona.id, name: manifest?.companion?.display_name ?? persona.display_name, key: animation.key, version, portrait, mouth_still, talk, states } }, 200, headers);
+  return c.json({ avatar: { id: persona.id, name: manifest?.companion?.display_name ?? persona.display_name, key: animation.key, version, portrait, mouth_still, talk, pack: packManifest ? { url: `/api/companions/${encodeURIComponent(persona.id)}/pack/`, manifest: packManifest } : null, states } }, 200, headers);
 });
 
 const mouthParams = z.object({ id: z.string().min(1).max(80) });
@@ -443,6 +445,23 @@ companionsRoutes.openapi(mouthRoute, (c) => {
     if (matchesEtag(c.req.header("if-none-match"), etag)) return new Response(null, { status: 304, headers: { etag, "cache-control": "private, max-age=0, must-revalidate" } });
     return new Response(readFileSync(path), { headers: { "content-type": "image/png", etag, "cache-control": "private, max-age=0, must-revalidate" } });
   } catch { return c.json({ error: "That companion has no mouth picture yet." }, 404); }
+});
+
+// Pack paths are nested (clips/idle-1.mp4), so this is a wildcard route rather than an OpenAPI-declared one.
+companionsRoutes.get("/:id/pack/:file{.+}", requireAuth, (c) => {
+  const id = c.req.param("id"), file = c.req.param("file"), actor = c.get("person"), household = getHouseholdCompanion(id);
+  const missing = () => c.json({ error: "That pack file could not be found for this person. Check the companion and file name." }, 404);
+  const persona = PERSONAS.find((candidate) => candidate.id === id);
+  const editor = Boolean(household?.companion && (isOwnerOrAdmin(actor) || householdCompanionAuthorId(id) === actor.id));
+  const ready = !household?.companion?.status || household.companion.status === "ready";
+  if (!household || (!editor && (!persona || !ready || !mayUseCompanion(actor, persona)))) return missing();
+  if (!readCompanionPack(id)) return missing();
+  const ext = file.slice(file.lastIndexOf(".")).toLowerCase(), type = PACK_TYPES[ext];
+  const path = type ? packFile(id, file) : null;
+  if (!path || !type) return missing();
+  const metadata = statSync(path), etag = `"${metadata.size}-${metadata.mtimeMs}"`;
+  if (matchesEtag(c.req.header("if-none-match"), etag)) return new Response(null, { status: 304, headers: { etag, "cache-control": "private, max-age=0, must-revalidate" } });
+  return rangeResponse(readFileSync(path), type, c.req.header("range"), { etag, cacheControl: "private, max-age=0, must-revalidate" });
 });
 
 const animationParams = z.object({ id: z.string().min(1).max(80), file: z.string().min(1).max(80) });

@@ -17,6 +17,9 @@ import { toast } from "sonner";
 import { StatusCard } from "@maipai/ui/src/elements/status-card";
 import { CompanionStage, type CompanionStageHistoryItem, type StageMode } from "@maipai/ui/src/elements/companion-stage";
 import { CompanionAvatar } from "@maipai/ui/src/elements/companion-avatar";
+import { CompanionPackPlayer } from "@maipai/ui/src/elements/companion-pack";
+import type { CompanionPackData } from "@maipai/ui/src/elements/companion-pack";
+import { packStateFor, usePackSpeech, type AvatarPack } from "@/shell/companionPack";
 import { RobotFace, ROBOT_FACE_COLORS, type RobotFaceColor, type RobotFaceExpression } from "@maipai/ui/src/elements/robot-face";
 import { Avatar as SeededAvatar } from "@maipai/ui/src/primitives/Avatar";
 import { MarkdownText } from "@maipai/ui/src/elements/markdown-text";
@@ -195,9 +198,9 @@ function RuntimeControls({ register, registerCall, side }: { register: (actions:
   return null;
 }
 
-function SideChat({ person, companionName, clips, still, mouthStill, bot, incognito, onRing, register, registerCall, side, ask, finding, findMe, onClose }: {
+function SideChat({ person, companionName, clips, still, mouthStill, pack, bot, incognito, onRing, register, registerCall, side, ask, finding, findMe, onClose }: {
   onClose: () => void;
-  person: Roster; companionName: string; clips?: CompanionClips; still?: string; mouthStill?: string | null; bot?: DeviceInfo; incognito: boolean; finding: boolean; findMe: () => void;
+  person: Roster; companionName: string; clips?: CompanionClips; still?: string; pack?: AvatarPack | null; mouthStill?: string | null; bot?: DeviceInfo; incognito: boolean; finding: boolean; findMe: () => void;
   onRing: (ring: AmbientRing | undefined) => void;
   register: (actions: Pick<AmbientPaneControl, "ask"> | null) => void; registerCall: (start: (() => void) | null) => void;
   side: ReturnType<typeof useSideChat>;
@@ -209,14 +212,14 @@ function SideChat({ person, companionName, clips, still, mouthStill, bot, incogn
           <TemporaryChatContext.Provider value={{ on: incognito }}>
             <RuntimeControls register={register} registerCall={registerCall} side={side} />
             <ThreadSignal onRing={onRing} />
-            <StageBody person={person} personId={person.id} companionName={companionName} clips={clips} still={still} mouthStill={mouthStill} bot={bot} registerCall={registerCall} side={side} ask={ask} finding={finding} findMe={findMe} onClose={onClose} />
+            <StageBody person={person} personId={person.id} companionName={companionName} clips={clips} still={still} mouthStill={mouthStill} pack={pack} bot={bot} registerCall={registerCall} side={side} ask={ask} finding={finding} findMe={findMe} onClose={onClose} />
           </TemporaryChatContext.Provider>
         </AdminContext.Provider>
       </ChatAgeBandContext.Provider>
   </AssistantRuntimeProvider>;
 }
 
-function StageBody({ person, personId, companionName, clips, still, mouthStill, bot, registerCall, side, ask, finding, findMe, onClose }: { onClose: () => void; person: Roster; personId: string; companionName: string; clips?: CompanionClips; still?: string; mouthStill?: string | null; bot?: DeviceInfo; registerCall: (start: (() => void) | null) => void; side: ReturnType<typeof useSideChat>; ask(text: string): void; finding: boolean; findMe: () => void }) {
+function StageBody({ person, personId, companionName, clips, still, mouthStill, pack, bot, registerCall, side, ask, finding, findMe, onClose }: { onClose: () => void; person: Roster; personId: string; companionName: string; clips?: CompanionClips; still?: string; pack?: AvatarPack | null; mouthStill?: string | null; bot?: DeviceInfo; registerCall: (start: (() => void) | null) => void; side: ReturnType<typeof useSideChat>; ask(text: string): void; finding: boolean; findMe: () => void }) {
   const aui = useAui();
   const phone = useBreakpoint().tier === "phone";
   const messages = useAuiState((state) => state.thread.messages) as unknown as Array<Record<string, unknown>>;
@@ -250,8 +253,11 @@ function StageBody({ person, personId, companionName, clips, still, mouthStill, 
   const clipKey = mode === "idle" ? "idle" : mode;
   const characterState: StateId = clips?.[clipKey] ? clipKey : "idle";
   const mouth = useMemo(() => mouthStill ? { still: mouthStill, level: () => side.turnSchedulerRef.current?.readLevel() ?? 0 } : null, [mouthStill, side.turnSchedulerRef]);
+  const packSpeech = usePackSpeech();
   const character = bot
     ? <RobotFace size="stage" color={(bot.face_color ?? "mint") as RobotFaceColor} night={bot.night ?? false} expression={(bot.online ? bot.state?.presence ?? bot.state?.activity ?? "idle" : "offline") as RobotFaceExpression} name={bot.name} />
+    : pack
+    ? <CompanionPackPlayer pack={pack.manifest as unknown as CompanionPackData} baseUrl={pack.url} state={packStateFor(mode)} tier="auto" {...packSpeech} />
     : clips
     ? <CompanionAvatar name={companionName} clips={clips} size="fill" state={mouthStill && mode === "speaking" ? "speaking" : characterState} animated mouth={mouth} />
     : still ? <img src={still} alt={companionName} className="h-full w-full object-contain" /> : <SeededAvatar name={companionName} seed={companionName} />;
@@ -276,9 +282,9 @@ function StageCitationLink({ href, children, ...props }: React.ComponentProps<"a
   return <a href={href} {...props}>{children}</a>;
 }
 
-export function useAmbientCompanionPane({ person, companionName, companionId, avatar, clips, still, mouthStill, bot, action, incognito, state, onStateChange, onContinue, side, onRing, wake }: {
+export function useAmbientCompanionPane({ person, companionName, companionId, avatar, clips, still, mouthStill, pack, bot, action, incognito, state, onStateChange, onContinue, side, onRing, wake }: {
   wake?: AmbientWakeIndicator;
-  person: Roster; companionName: string; companionId: string; avatar: ReactNode; clips?: CompanionClips; still?: string; mouthStill?: string | null; bot?: DeviceInfo; action?: { label: string; onClick: () => void }; incognito: boolean;
+  person: Roster; companionName: string; companionId: string; avatar: ReactNode; clips?: CompanionClips; still?: string; pack?: AvatarPack | null; mouthStill?: string | null; bot?: DeviceInfo; action?: { label: string; onClick: () => void }; incognito: boolean;
   state: AmbientPaneState; onStateChange: (state: AmbientPaneState) => void;
   onContinue: (id: string) => void; onRing: (ring: AmbientRing | undefined) => void;
   side: ReturnType<typeof useSideChat>;
@@ -332,6 +338,6 @@ export function useAmbientCompanionPane({ person, companionName, companionId, av
   const settingsTab = { id: "settings", label: i18n._({ id: "Settings", message: "Settings" }), content: <>{paneCard}<div className="flex items-center justify-between gap-3 px-4 py-3"><span>{i18n._({ id: "Read replies aloud", message: "Read replies aloud" })}</span><TooltipIconButton tooltip={side.readAloud ? "Turn off read replies aloud" : "Read replies aloud"} aria-label={i18n._({ id: "Read replies aloud", message: "Read replies aloud" })} aria-pressed={side.readAloud} onClick={toggleReadAloud}><ReadIcon aria-hidden="true" /></TooltipIconButton></div><CompanionSettings person={person} companionId={companionId} bot={bot} /></> };
   const roomLine = bot ? (bot.online ? bot.area ? `In the ${bot.area.toLowerCase()}${bot.state?.battery_level != null ? `, on battery ${formatUnit(bot.state.battery_level, "percent")}` : bot.state?.on_battery === false ? ", plugged in" : ""}` : "Online" : `Offline since ${formatTime(bot.lastSeenAt ?? bot.createdAt, { hour: "numeric", minute: "2-digit" })}`) : undefined;
   const paneTitle = companionName;
-  const companionTab = { id: "companion", label: i18n._({ id: "Talk", message: "Talk" }), content: companionId ? <>{paneCard}{openError ? <p role="alert">{i18n._({ id: "Could not open that conversation. Check your connection and try again.", message: "Could not open that conversation. Check your connection and try again." })}</p> : null}{roomLine ? <p className="px-4 py-2 text-sm text-muted-foreground">{roomLine}</p> : null}<SideChat person={person} companionName={companionName} clips={clips} still={still} mouthStill={mouthStill} bot={bot} incognito={incognito} onRing={onRing} register={register} registerCall={(start) => askQueueRef.current?.registerCall(start)} side={side} ask={ask} finding={finding} findMe={findMe} onClose={() => onStateChange({ ...state, open: false })} /></> : null };
+  const companionTab = { id: "companion", label: i18n._({ id: "Talk", message: "Talk" }), content: companionId ? <>{paneCard}{openError ? <p role="alert">{i18n._({ id: "Could not open that conversation. Check your connection and try again.", message: "Could not open that conversation. Check your connection and try again." })}</p> : null}{roomLine ? <p className="px-4 py-2 text-sm text-muted-foreground">{roomLine}</p> : null}<SideChat person={person} companionName={companionName} clips={clips} still={still} mouthStill={mouthStill} pack={pack} bot={bot} incognito={incognito} onRing={onRing} register={register} registerCall={(start) => askQueueRef.current?.registerCall(start)} side={side} ask={ask} finding={finding} findMe={findMe} onClose={() => onStateChange({ ...state, open: false })} /></> : null };
   return { open: state.open, onOpenChange: (open: boolean) => onStateChange({ ...state, open }), pinned: state.pinned, onPinnedChange: (pinned: boolean) => onStateChange({ ...state, pinned }), companionTab, tabs: [historyTab, settingsTab], activeTab: tab, onActiveTabChange: setTab, title: paneTitle, control: { ask, newChat, load, continueInChat, startCall: () => { openCompanionPane(); askQueueRef.current?.startCall(); } } satisfies AmbientPaneControl, headerActions: <>{wake ? <Button type="button" variant="ghost" size="icon-sm" aria-label={`${wake.listening}. Turn off`} title={`${wake.listening}. Turn off`} onClick={wake.onTurnOff}><MicIcon aria-hidden="true" /></Button> : null}{action ? <Button type="button" variant="ghost" size="icon-sm" onClick={action.onClick}>{action.label}</Button> : null}<Button type="button" variant="ghost" size="icon-sm" aria-label={i18n._({ id: "New conversation", message: "New conversation" })} title={i18n._({ id: "New conversation", message: "New conversation" })} onClick={newChat}><PlusIcon aria-hidden="true" /></Button><Button type="button" variant="ghost" size="icon-sm" aria-label={i18n._({ id: "Continue in Chat", message: "Continue in Chat" })} title={i18n._({ id: "Continue in Chat", message: "Continue in Chat" })} onClick={continueInChat}><ContinueIcon aria-hidden="true" /></Button></>, avatar, pinLabel: "Pin pane", closeLabel: "Close pane", label: i18n._({ id: "{name} companion pane", message: "{name} companion pane", values: { name: companionName } }) };
 }

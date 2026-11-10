@@ -24,7 +24,7 @@ export function useCompanionAvatar(companionId?: string | null) {
     staleTime: 5 * 60_000,
   });
   const avatar = query.data?.avatar ?? null;
-  return { avatar: query.isLoading || query.isPending ? null : avatar, clips: avatar ? mapCompanionClips(avatar.states) : null, loading: query.isLoading || query.isPending };
+  return { avatar: query.isLoading || query.isPending ? null : avatar, clips: avatar && Object.keys(avatar.states).length ? mapCompanionClips(avatar.states) : null, loading: query.isLoading || query.isPending };
 }
 
 /** The idle still (else the first state's) of each companion, by id. Shares the avatar query cache. */
@@ -60,6 +60,6 @@ export function useReplyCompanionClips(ids: string[]): Record<string, CompanionC
   });
   return Object.fromEntries(ids.map((id, index) => {
     const avatar = results[index]?.data?.avatar;
-    return [id, avatar ? mapCompanionClips(avatar.states) : undefined];
+    return [id, avatar && Object.keys(avatar.states).length ? mapCompanionClips(avatar.states) : undefined];
   }));
 }

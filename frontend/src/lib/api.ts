@@ -417,6 +417,7 @@ export interface CompanionAvatarView {
     version: number;
     portrait?: string | null;
     mouth_still?: string | null;
+    pack?: { url: string; manifest: Record<string, unknown> } | null;
     states: Record<string, { loop: boolean; urls: { h264: string | null; av1: string | null; still: string } }>;
   };
 }

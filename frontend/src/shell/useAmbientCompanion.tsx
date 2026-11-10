@@ -53,13 +53,14 @@ export function useAmbientCompanion(person: Roster) {
     };
   }
   if (!companion) return null;
-  const states = avatar.data?.avatar ? mapCompanionClips(avatar.data.avatar.states) : undefined;
+  const states = avatar.data?.avatar && Object.keys(avatar.data.avatar.states).length ? mapCompanionClips(avatar.data.avatar.states) : undefined;
   const still = companion.portrait ? api.companionPortrait(companion.portrait) : (avatar.data?.avatar?.portrait ?? (states?.idle ?? Object.values(states ?? {})[0])?.still);
   const row = (activity.data?.activity ?? []).find((item) => item.needs_you && item.kind !== "chat");
   return {
     kind: "companion" as const,
     companion,
     clips: states,
+    pack: avatar.data?.avatar?.pack ?? null,
     mouthStill: avatar.data?.avatar?.mouth_still ?? null,
     portrait: avatar.data?.avatar?.portrait ?? undefined,
     still,
