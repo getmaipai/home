@@ -18,6 +18,7 @@ import { useLockProof } from "@maipai/ui/src/elements/adult-lock";
 import { ApiError, type Roster } from "@/lib/api";
 import { StyleConfirm } from "@/apps/settings/styles/StyleConfirm";
 import { stylesApi, type BrowseHit, type BrowsePage, type BrowseQuery, type BrowseSource } from "@/apps/settings/styles/stylesApi";
+import { formatBytes } from "@maipai/ui/src/format";
 import { messageOf, StylePicture } from "@/apps/settings/styles/stylesShared";
 import { StatusCard } from "@maipai/ui/src/elements/status-card";
 
@@ -27,6 +28,25 @@ const isLockedTile = (tile: Tile): tile is { locked: true } => (tile as { locked
 /** A hit the household already has (by source version or fingerprint): the tile opens that style instead of starting another download (design 15.4). */
 const alreadyHave = (hit: BrowseHit): boolean => hit.installed !== null || hit.reason?.startsWith("Already installed") === true;
 
+const BASE_PILL: Record<string, string> = { "ltx-2.5": "LTX 2.5", "ltx-2.3": "LTX 2.3" };
+const basePill = (hit: BrowseHit): string => (hit.base_unstated ? "LTX 2" : BASE_PILL[hit.base_model] ?? (hit.base_label.trim() || i18n._({ id: "Other base", message: "Other base" })));
+const compact = (n: number): string => new Intl.NumberFormat("en-US", { notation: "compact", maximumFractionDigits: 1 }).format(n);
+/** The pills drawn over a tile's picture: what it is made for, what kind it is, how big, how popular, and the licence. */
+function TilePills({ hit }: { hit: BrowseHit }) {
+  const pills = [
+    basePill(hit),
+    hit.kind === "character" ? i18n._({ id: "Character", message: "Character" }) : i18n._({ id: "Style", message: "Style" }),
+    ...(hit.bytes ? [formatBytes(hit.bytes)] : []),
+    ...(hit.downloads > 0 ? [i18n._({ id: "{count} downloads", message: "{count} downloads", values: { count: compact(hit.downloads) } })] : []),
+  ];
+  return (
+    <span className="flex flex-wrap gap-1 bg-gradient-to-b from-foreground/50 to-transparent p-2 pb-6">
+      <Badge>{pills[0]}</Badge>
+      {pills.slice(1).map((pill) => <Badge key={pill} variant="secondary">{pill}</Badge>)}
+      <Badge variant="secondary">{licenceBadge()[hit.licence.class]}</Badge>
+    </span>
+  );
+}
 const licenceBadge = (): Record<BrowseHit["licence"]["class"], string> => ({ open: i18n._({ id: "Open licence", message: "Open licence" }), non_commercial: i18n._({ id: "No selling", message: "No selling" }), custom: i18n._({ id: "Custom licence", message: "Custom licence" }), unknown: i18n._({ id: "Licence not stated", message: "Licence not stated" }) });
 const HF_LINK = /^https?:\/\/(?:www\.)?huggingface\.co\/([^/\s?#]+)\/([^/\s?#]+)/i;
 
@@ -51,7 +71,7 @@ export function StyleBrowser({ person, civitaiOn, onClose, onInstalled, onOpenSt
   const [source, setSource] = useState<BrowseSource>(civitaiOn ? "both" : "huggingface");
   const [media, setMedia] = useState<BrowseQuery["media"]>("video");
   const [kind, setKind] = useState<BrowseQuery["kind"]>("any");
-  const [base, setBase] = useState<BrowseQuery["base"]>("all");
+  const [base, setBase] = useState<BrowseQuery["base"]>("default");
   const [installed, setInstalled] = useState<BrowseQuery["installed"]>("any");
   const [sort, setSort] = useState<BrowseQuery["sort"]>("downloads");
   const [adult, setAdult] = useState(false);
@@ -101,7 +121,7 @@ export function StyleBrowser({ person, civitaiOn, onClose, onInstalled, onOpenSt
   const filters = (
     <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
       <Pick id="style-filter-type" label={i18n._({ id: "Type", message: "Type" })} value={kind} onChange={(v) => setKind(v as typeof kind)} options={[["any", i18n._({ id: "Any", message: "Any" })], ["style", i18n._({ id: "Style", message: "Style" })], ["character", i18n._({ id: "Character", message: "Character" })]]} />
-      <Pick id="style-filter-base" wide label={i18n._({ id: "Made for", message: "Made for" })} value={base} onChange={(v) => setBase(v as typeof base)} options={media === "video" ? [["ltx-2.5", "LTX-2.5"], ["wan", "Wan"], ["all", i18n._({ id: "All", message: "All" })]] : [["flux2-klein-4b", "Flux.2 Klein 4B"], ["z-image-turbo", "Z-Image Turbo"], ["ernie-image-turbo", "ERNIE"], ["all", i18n._({ id: "All", message: "All" })]]} />
+      <Pick id="style-filter-base" wide label={i18n._({ id: "Made for", message: "Made for" })} value={base} onChange={(v) => setBase(v as typeof base)} options={media === "video" ? [["default", i18n._({ id: "Works here", message: "Works here" })], ["ltx-2.5", "LTX-2.5"], ["wan", "Wan"], ["all", i18n._({ id: "Everything", message: "Everything" })]] : [["default", i18n._({ id: "Works here", message: "Works here" })], ["flux2-klein-4b", "Flux.2 Klein 4B"], ["z-image-turbo", "Z-Image Turbo"], ["ernie-image-turbo", "ERNIE"], ["all", i18n._({ id: "Everything", message: "Everything" })]]} />
       <Pick id="style-filter-installed" label={i18n._({ id: "Installed", message: "Installed" })} value={installed} onChange={(v) => setInstalled(v as typeof installed)} options={[["any", i18n._({ id: "Any", message: "Any" })], ["not_installed", i18n._({ id: "Not installed", message: "Not installed" })], ["installed", i18n._({ id: "Installed", message: "Installed" })]]} />
       <Pick id="style-filter-source" label={i18n._({ id: "Source", message: "Source" })} value={source} onChange={(v) => setSource(v as BrowseSource)} options={[["huggingface", "Hugging Face"], ["civitai", civitaiOn ? i18n._({ id: "Civitai", message: "Civitai" }) : i18n._({ id: "Civitai (off)", message: "Civitai (off)" }), !civitaiOn], ["both", i18n._({ id: "Both", message: "Both" }), !civitaiOn]]} />
       <Pick id="style-filter-sort" label={i18n._({ id: "Sort", message: "Sort" })} value={sort} onChange={(v) => setSort(v as typeof sort)} options={[["downloads", i18n._({ id: "Most downloaded", message: "Most downloaded" })], ["rating", i18n._({ id: "Top rated", message: "Top rated" })], ["newest", i18n._({ id: "Newest", message: "Newest" })]]} />
@@ -121,7 +141,7 @@ export function StyleBrowser({ person, civitaiOn, onClose, onInstalled, onOpenSt
               <Label htmlFor="style-search">{i18n._({ id: "Search styles, or paste a Hugging Face link", message: "Search styles, or paste a Hugging Face link" })}</Label>
               <Input id="style-search" type="search" value={typed} onChange={(e) => setTyped(e.target.value)} placeholder={i18n._({ id: "old film, clay, anime", message: "old film, clay, anime" })} />
             </div>
-            <Pick id="style-filter-media" label={i18n._({ id: "Pictures / Videos", message: "Pictures / Videos" })} value={media} onChange={(v) => { const next = v as typeof media; setMedia(next); setBase("all"); }} options={[["picture", i18n._({ id: "Pictures", message: "Pictures" })], ["video", i18n._({ id: "Videos", message: "Videos" })]]} />
+            <Pick id="style-filter-media" label={i18n._({ id: "Pictures / Videos", message: "Pictures / Videos" })} value={media} onChange={(v) => { const next = v as typeof media; setMedia(next); setBase("default"); }} options={[["picture", i18n._({ id: "Pictures", message: "Pictures" })], ["video", i18n._({ id: "Videos", message: "Videos" })]]} />
             {filters}
             {lock.unlocked ? (
               <div className="flex items-center gap-3">
@@ -137,17 +157,18 @@ export function StyleBrowser({ person, civitaiOn, onClose, onInstalled, onOpenSt
               <AsyncState data={results.data} error={false} isFetching={results.isFetching} onRetry={() => void results.refetch()} loadingLabel={i18n._({ id: "Searching for styles", message: "Searching for styles" })} errorMessage="">
                 {() => empty ? <p className="text-sm text-muted-foreground">{i18n._({ id: "No styles match. Try fewer words.", message: "No styles match. Try fewer words." })}</p> : (
                   <MediaShelf<Tile>
-                    label={i18n._({ id: "Styles from the source", message: "Styles from the source" })} items={tiles} variant="plain" layout="grid" aspect="wide" density="compact"
+                    label={i18n._({ id: "Styles from the source", message: "Styles from the source" })} items={tiles} variant="plain" layout="grid" aspect="poster" density="compact"
                     getKey={(tile) => (isLockedTile(tile) ? "locked" : tile.key)} isLocked={isLockedTile} onUnlock={() => lock.requestUnlock()}
                     getLabel={(tile) => (isLockedTile(tile)  ? i18n._({ id: "Locked items", message: "Locked items" }) : tile.title)}
                     onSelect={(tile) => { if (isLockedTile(tile)) return; if (alreadyHave(tile)) onOpenStyle(tile.installed?.id ?? null); else setPicked(tile); }}
                     renderItem={(tile) => (isLockedTile(tile) ? null : <StylePicture path={tile.preview} proof={tile.adult_check !== "normal"} />)}
-                    renderBadge={(tile) => (isLockedTile(tile) ? null : <Badge variant="secondary">{licenceBadge()[tile.licence.class]}</Badge>)}
+                    renderBadge={(tile) => (isLockedTile(tile) ? null : <TilePills hit={tile} />)}
                     renderCaption={(tile) => (isLockedTile(tile) ? null : (
                       <span className="flex min-w-0 flex-col gap-0.5">
                         <span className="truncate text-sm font-semibold">{tile.title}</span>
                         {tile.creator ? <span className="truncate text-sm text-muted-foreground">{tile.creator}</span> : null}
-                        <span className="text-sm text-muted-foreground">{alreadyHave(tile) ? (tile.installed ? i18n._({ id: "Already added as {name}. Press to open it.", message: "Already added as {name}. Press to open it.", values: { name: tile.installed.name } }) : i18n._({ id: "You already have this style. Press to open it.", message: "You already have this style. Press to open it." })) : tile.reason ?? tile.line}</span>
+                        <span className="line-clamp-4 text-sm text-muted-foreground">{alreadyHave(tile) ? (tile.installed ? i18n._({ id: "Already added as {name}. Press to open it.", message: "Already added as {name}. Press to open it.", values: { name: tile.installed.name } }) : i18n._({ id: "You already have this style. Press to open it.", message: "You already have this style. Press to open it." })) : tile.reason ? `${tile.summary} ${tile.reason}` : tile.summary}</span>
+                        
                         {tile.also_on.length ? <span className="text-sm text-muted-foreground">{i18n._({ id: "Also on {join}", message: "Also on {join}", values: { join: tile.also_on.join(" and ") } })}</span> : null}
                       </span>
                     ))}

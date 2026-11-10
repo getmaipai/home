@@ -111,7 +111,7 @@ describe("adult_check classifier: every row of section 15.1", () => {
 });
 
 describe("dedupe", () => {
-  const hit = (site: "huggingface" | "civitai", id: string, version: string | null, sha256: string | null): Hit => ({ site, remote_id: id, version_id: version, adult_check: classifyHuggingFace([]), title: id, creator: null, page_url: "", file_url: null, file_name: null, bytes: null, sha256, base_label: null, base_model: "ltx-2.5", base_unstated: false, kind: null, licence_id: null, licence_class: "unknown", commercial_use: "unknown", downloads: 0, rating: null, created_at: null, trigger_words: [], gated: false, preview_url: null, also_on: [] });
+  const hit = (site: "huggingface" | "civitai", id: string, version: string | null, sha256: string | null): Hit => ({ site, remote_id: id, version_id: version, adult_check: classifyHuggingFace([]), title: id, creator: null, page_url: "", file_url: null, file_name: null, bytes: null, sha256, base_label: null, base_model: "ltx-2.5", base_unstated: false, kind: null, licence_id: null, licence_class: "unknown", commercial_use: "unknown", downloads: 0, rating: null, created_at: null, trigger_words: [], gated: false, summary: null, preview_url: null, also_on: [] });
   test("same site, model and version collapse; the same sha256 across sources keeps Hugging Face and notes Civitai", () => {
     const out = dedupeHits([hit("civitai", "9", "90", sha("f")), hit("civitai", "9", "90", sha("f")), hit("huggingface", "a/b", "x.safetensors", sha("f")), hit("civitai", "10", "100", null)]);
     expect(out.map((h) => `${h.site}:${h.remote_id}`)).toEqual(["huggingface:a/b", "civitai:10"]);

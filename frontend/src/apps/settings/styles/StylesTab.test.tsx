@@ -31,7 +31,7 @@ const row = (over: Partial<StyleRow> = {}): StyleRow => ({
 const hit = (over: Partial<BrowseHit> = {}): BrowseHit => ({
   key: "huggingface:x/clay", site: "huggingface", remote_id: "x/clay", version_id: null, title: "Clay look", creator: "x", page_url: "https://huggingface.co/x/clay", preview: null, base_label: "LTX 2.5", base_model: "ltx-2.5",
   kind: "style", bytes: 412_000_000, sha256: null, licence: { id: "apache-2.0", class: "open", commercial_use: "yes" }, downloads: 8300, rating: null, created_at: null, trigger_words: [], also_on: [], gated: false,
-  adult_check: "normal", installed: null, reason: null, line: "Made for LTX 2.5, 412 MB, open licence, 8,300 downloads", confirm_item: "hf-x-clay", ...over,
+  adult_check: "normal", installed: null, reason: null, line: "Made for LTX 2.5, 412 MB, open licence, 8,300 downloads", confirm_item: "hf-x-clay", summary: "Turns any clip into a soft claymation look.", ...over,
 });
 const sources = (over: Partial<SourcesState["civitai"]> = {}, token = false): SourcesState => ({ huggingface: { on: true, token_saved: token }, civitai: { on: false, key_saved: false, ...over } });
 
@@ -143,11 +143,11 @@ describe("the browser", () => {
     const restore = stub({ browse: browse as never });
     const view = mountBrowser();
     await waitFor(() => expect(browse.mock.calls.length).toBeGreaterThan(0));
-    expect(browse.mock.calls[0]![0]).toMatchObject({ base: "all", media: "video", q: "" });
+    expect(browse.mock.calls[0]![0]).toMatchObject({ base: "default", media: "video", q: "" });
     fireEvent.click(view.getByRole("combobox", { name: "Pictures / Videos" }));
     fireEvent.click(await view.findByRole("option", { name: "Pictures" }));
     await waitFor(() => expect(browse.mock.calls.at(-1)![0].media).toBe("picture"));
-    expect(await view.findByText("Made for LTX 2.5, 412 MB, open licence, 8,300 downloads")).toBeTruthy();
+    expect(await view.findByText("Turns any clip into a soft claymation look.")).toBeTruthy();
     expect(view.getByText("Already added as Clay look. Press to open it.")).toBeTruthy();
     expect(view.getAllByText("Open licence").length).toBeGreaterThan(0);
     expect((await view.findAllByRole("button", { name: TILE })).length).toBe(1);
@@ -158,11 +158,12 @@ describe("the browser", () => {
     restore();
   });
 
-  test("Made for starts at All and has no retired base option", async () => {
+  test("Made for starts at Works here (the household's own bases) and has no retired base option", async () => {
     const restore = stub({ browse: mock(async () => page()) as never });
     const view = mountBrowser();
-    expect(view.getByRole("combobox", { name: "Made for" })).toHaveTextContent("All");
+    expect(view.getByRole("combobox", { name: "Made for" })).toHaveTextContent("Works here");
     fireEvent.click(await view.findByRole("combobox", { name: "Made for" }));
+    expect(view.getByRole("option", { name: "Everything" })).toBeTruthy();
     expect(view.queryByRole("option", { name: "LTX-2.3" })).toBeNull();
     expect(view.getByRole("option", { name: "LTX-2.5" })).toBeTruthy();
     expect(view.getByRole("option", { name: "Wan" })).toBeTruthy();
@@ -277,6 +278,16 @@ describe("the browser", () => {
     expect(second.getByRole("button", { name: "Install style" })).toBeDisabled();
     fireEvent.click(second.getByRole("button", { name: "Open it" }));
     expect(opened).toEqual(["lora-a"]);
+  });
+  test("a tile shows what the style does and draws the metadata as pills over the picture", async () => {
+    const restore = stub({ browse: mock(async () => page()) as never });
+    const view = mountBrowser();
+    expect(await view.findByText("Turns any clip into a soft claymation look.")).toBeTruthy();
+    expect(view.getAllByText("LTX 2.5").length).toBeGreaterThan(0);
+    expect(view.getAllByText("Style").length).toBeGreaterThan(0);
+    expect(view.getAllByText("8.3K downloads").length).toBeGreaterThan(0);
+    expect(view.queryByText(/Made for LTX 2.5, 412 MB/)).toBeNull();
+    restore();
   });
 });
 

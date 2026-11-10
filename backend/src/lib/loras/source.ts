@@ -9,7 +9,7 @@
 import { listLoraRecords, type Lora } from "@/lib/loras/store";
 import { classifyCivitai, classifyHuggingFace, cleanTriggerWords, type AdultCheck } from "@/lib/loras/adultCheck";
 import { getHouseholdSettingValue } from "@/lib/settings";
-import { baseFromText, basesNamedIn, civitaiLabel, civitaiLabelsFor, mediaOfBase, wantedBaseIds, type AnyBaseId, type BrowseBase, type Media } from "@/lib/loras/baseFamilies";
+import { baseFromText, basesNamedIn, civitaiLabel, civitaiLabelsFor, mediaOfBase, searchWordFor, wantedBaseIds, type AnyBaseId, type BrowseBase, type Media } from "@/lib/loras/baseFamilies";
 
 export type LoraSite = "huggingface" | "civitai";
 export type SourceChoice = LoraSite | "both";
@@ -60,9 +60,30 @@ export interface Hit {
   created_at: string | null;
   trigger_words: string[];
   gated: boolean;
+  /** What the style does, in the maker's own words (first sentences of the source's description, plain text); null when the source says nothing useful. */
+  summary: string | null;
   /** Where the preview lives (never sent to a client). */
   preview_url: string | null;
   also_on: LoraSite[];
+}
+
+const ENTITIES: Record<string, string> = { amp: "&", lt: "<", gt: ">", quot: "\"", apos: "'", nbsp: " " };
+/** The first sentences of a source's description as plain words: no markup or links, no settings lists or begging, at most `max` characters, cut at a sentence end. Null when nothing readable is left. */
+export function plainSummary(texts: readonly (string | null)[], max = 200): string | null {
+  for (const text of texts) {
+    if (!text) continue;
+    const lines = text.replace(/<\s*(br|\/p|\/li|\/h\d|\/div)\s*\/?>/gi, "\n").replace(/<[^>]*>/g, " ")
+      .replace(/&(#\d+|#x[0-9a-f]+|\w+);/gi, (m, e: string) => (e[0] === "#" ? String.fromCodePoint(e[1]?.toLowerCase() === "x" ? parseInt(e.slice(2), 16) : parseInt(e.slice(1), 10)) : (ENTITIES[e.toLowerCase()] ?? " ")))
+      .split(/\n+/).map((l) => l.replace(/https?:\/\/\S+/g, "").replace(/[*_#>`~]+/g, "").replace(/\s+/g, " ").trim());
+    const keep = lines.filter((l) => l.length >= 25 && !/^(trigger|activation|recommended|settings?|strength|weight|sampler|steps|cfg|clip|resolution|negative|prompt|tip|support|donat|buy me|patreon|ko-?fi|join|follow|discord|license|licence|changelog|version|v\d)/i.test(l) && !/(patreon|ko-fi|buymeacoffee|discord|donat)/i.test(l));
+    if (!keep.length) continue;
+    const joined = keep.join(" ");
+    if (joined.length <= max) return joined;
+    const cut = joined.slice(0, max);
+    const end = Math.max(cut.lastIndexOf(". "), cut.lastIndexOf("! "), cut.lastIndexOf("? "));
+    return end >= 60 ? cut.slice(0, end + 1) : `${cut.slice(0, cut.lastIndexOf(" ")).replace(/[,;:]$/, "")}…`;
+  }
+  return null;
 }
 
 export const hitKey = (h: Pick<Hit, "site" | "remote_id" | "version_id">): string => `${h.site}:${h.remote_id}:${h.version_id ?? ""}`;
@@ -116,10 +137,11 @@ function hostState(host: string): HostState {
 }
 
 /** One guarded GET: honours a stop, the hourly budget and the per-host gap (requests queue, one at a time per host), and starts the exponential stop on a 429 or 5xx. */
-async function guardedGet(site: LoraSite, url: string, opts: { accept?: string; budget?: boolean } = {}): Promise<Response> {
+async function guardedGet(site: LoraSite, url: string, opts: { accept?: string; budget?: boolean; follow?: boolean } = {}): Promise<Response> {
   const host = HOST_NAME[site];
   if (new URL(url).hostname !== host && !new URL(url).hostname.endsWith(`.${host}`) && !(site === "civitai" && new URL(url).hostname === "image.civitai.com")) throw new SourceError("bad_response", "That address is not on the source's own site.", 502);
-  const s = hostState(host);
+  // A picture comes from the source's image storage, not its search service: it queues on its own address and takes no search gap or hourly count.
+  const s = hostState(opts.follow ? new URL(url).hostname : host);
   const run = async (): Promise<Response> => {
     const now = clock();
     if (s.blockedUntil > now) throw new SourceError("busy", `${SITE_LABEL[site]} asked us to slow down. Try again in ${Math.max(1, Math.ceil((s.blockedUntil - now) / 60_000))} minutes.`, 503);
@@ -128,7 +150,7 @@ async function guardedGet(site: LoraSite, url: string, opts: { accept?: string; 
       if (hourly.length >= HOURLY_BUDGET) throw new SourceError("budget", "That is a lot of searching for one hour. Try again a little later.", 429);
       hourly.push(now);
     }
-    const wait = s.lastAt + gapMs - now;
+    const wait = opts.follow ? 0 : s.lastAt + gapMs - now;
     if (wait > 0) await sleeper(wait);
     s.lastAt = clock();
     const headers: Record<string, string> = { accept: opts.accept ?? "application/json", "user-agent": "MaiPai-Home (self-hosted; admin-initiated)" };
@@ -146,6 +168,14 @@ async function guardedGet(site: LoraSite, url: string, opts: { accept?: string; 
     s.failures = 0;
     if (res.status === 401 || res.status === 403) throw new SourceError("token_refused", `${SITE_LABEL[site]} would not answer. Check the saved key or token in settings.`, 502);
     if (res.status === 404) throw new SourceError("not_found", "That style isn't there any more.", 404);
+    if (opts.follow && res.status >= 300 && res.status < 400) {
+      // A picture file is served from the source's own storage hosts; follow one hop there, with no token.
+      const next = new URL(res.headers.get("location") ?? "", url);
+      const own = site === "civitai" ? ["civitai.com"] : ["huggingface.co", "hf.co"];
+      if (next.protocol !== "https:" || !own.some((h) => next.hostname === h || next.hostname.endsWith(`.${h}`))) throw new SourceError("bad_response", "That address is not on the source's own site.", 502);
+      try { res = await (fetchImpl ?? fetch)(next.href, { headers: { accept: opts.accept ?? "image/*", "user-agent": "MaiPai-Home (self-hosted; admin-initiated)" }, redirect: "manual", signal: AbortSignal.timeout(15_000) }); }
+      catch { throw new SourceError("unreachable", `Home could not reach ${SITE_LABEL[site]}. Check this computer's internet, then try again.`, 502); }
+    }
     if (res.status >= 300) throw new SourceError("bad_response", `${SITE_LABEL[site]} answered in a way Home can't read. Try again later.`, 502);
     return res;
   };
@@ -221,7 +251,12 @@ function civitaiHit(modelRaw: unknown, bases: readonly string[], wantVersion?: s
   const baseLabel = str(chosen.baseModel);
   const { base, unstated } = civitaiBase(baseLabel, [str(m.name), str(chosen.name), str(m.description), str(chosen.description)], media);
   const tags = arr(m.tags).map((t) => (typeof t === "string" ? t : str(rec(t).name) ?? ""));
-  const preview = images.find((i) => typeof i.url === "string" && String(i.type ?? "image") === "image" && /^https:\/\/image\.civitai\.com\//.test(String(i.url)));
+  const onSite = (i: Record<string, unknown>): boolean => typeof i.url === "string" && /^https:\/\/image\.civitai\.com\//.test(String(i.url));
+  // A video style's examples are all clips: Civitai serves a still of a clip from the same address with `anim=false` in place of `original=true`.
+  const still = (u: string): string => u.replace("/original=true/", "/anim=false,width=450/");
+  const stillImage = images.find((i) => onSite(i) && String(i.type ?? "image") === "image");
+  const stillClip = stillImage ? undefined : images.find((i) => onSite(i) && String(i.type) === "video" && String(i.url).includes("/original=true/"));
+  const preview = stillImage ?? (stillClip ? { ...stillClip, url: still(String(stillClip.url)) } : undefined);
   const versionId = String(chosen.id);
   return {
     site: "civitai", remote_id: String(id), version_id: versionId,
@@ -234,6 +269,7 @@ function civitaiHit(modelRaw: unknown, bases: readonly string[], wantVersion?: s
     licence_id: lic.id, licence_class: lic.cls, commercial_use: lic.commercial,
     downloads: numOr(stats.downloadCount, 0), rating: typeof stats.rating === "number" ? stats.rating : null, created_at: str(chosen.publishedAt),
     trigger_words: cleanTriggerWords(arr(chosen.trainedWords).filter((w): w is string => typeof w === "string")), gated: false,
+    summary: plainSummary([str(chosen.description), str(m.description)]),
     preview_url: typeof preview?.url === "string" ? String(preview.url) : null, also_on: [],
   };
 }
@@ -254,9 +290,12 @@ function hfHit(raw: unknown): Hit | null {
     base_label: base === "unknown" ? (baseText.replace(/base_model:(?:adapter:|finetune:|quantized:)?/g, "").trim().slice(0, 60) || null) : base, base_model: base, base_unstated: false, kind: null,
     licence_id: licenceId, licence_class: lc, commercial_use: lc === "open" ? "yes" : lc === "non_commercial" ? "no" : "unknown",
     downloads: numOr(m.downloads, 0), rating: typeof m.likes === "number" ? m.likes : null, created_at: str(m.createdAt), trigger_words: [], gated: m.gated === "auto" || m.gated === "manual" || m.gated === true,
+    summary: plainSummary([typeof card.description === "string" ? card.description : null]),
     preview_url: null, also_on: [],
   };
   const siblings = arr(m.siblings).map(rec);
+  const picture = siblings.map((x) => String(x.rfilename ?? "")).filter((f) => /\.(png|jpe?g|webp|gif)$/i.test(f) && !f.includes("..")).sort((a, b) => Number(/example|sample|preview|assets|images?\//i.test(b)) - Number(/example|sample|preview|assets|images?\//i.test(a)))[0];
+  if (picture) hit.preview_url = `https://huggingface.co/${id}/resolve/main/${picture.split("/").map(encodeURIComponent).join("/")}`;
   if (siblings.length) {
     const files = siblings.filter((s) => String(s.rfilename ?? "").toLowerCase().endsWith(".safetensors"));
     const pick = (files.length === 1 ? files[0] : files.find((s) => /lora/i.test(String(s.rfilename))) ) ?? files.sort((a, b) => numOr(b.size, 0) - numOr(a.size, 0))[0];
@@ -298,8 +337,10 @@ async function browseHf(p: BrowseParams, cursor: string | null, budget = true): 
     if (u.protocol !== "https:" || u.hostname !== "huggingface.co" || !u.pathname.startsWith("/api/models")) throw new SourceError("bad_response", "That page is not available any more. Search again.", 400);
     url = u.href;
   } else {
-    const q = new URLSearchParams({ filter: "lora", limit: String(PAGE_SIZE), sort: p.sort === "downloads" ? "downloads" : p.sort === "rating" ? "likes" : "createdAt", direction: "-1" });
-    if (p.q.trim()) q.set("search", p.q.trim());
+    const q = new URLSearchParams({ filter: "lora", full: "true", limit: String(PAGE_SIZE), sort: p.sort === "downloads" ? "downloads" : p.sort === "rating" ? "likes" : "createdAt", direction: "-1" });
+    // With no words typed, ask for this household's family by name: the newest "lora" models are mostly other bases.
+    const word = p.q.trim() || searchWordFor(p.base, mediaOf(p));
+    if (word) q.set("search", word);
     url = `https://huggingface.co/api/models?${q}`;
   }
   const { body, headers } = await getJson("huggingface", url, budget);
@@ -400,7 +441,7 @@ export async function previewOf(key: string): Promise<{ type: string; bytes: Uin
   if (held && clock() - held.at < PREVIEW_MS) return held;
   const known = previews.get(key);
   if (!known || clock() - known.at > PREVIEW_MS) return null;
-  const res = await guardedGet("civitai", known.url, { accept: "image/*", budget: false });
+  const res = await guardedGet(key.startsWith("huggingface:") ? "huggingface" : "civitai", known.url, { accept: "image/*", budget: false, follow: true });
   const type = res.headers.get("content-type") ?? "";
   if (!type.startsWith("image/")) return null;
   const bytes = new Uint8Array(await res.arrayBuffer());

@@ -32,6 +32,7 @@ export interface BrowseHit {
   licence: { id: string | null; class: "open" | "non_commercial" | "custom" | "unknown"; commercial_use: string };
   downloads: number; rating: number | null; created_at: string | null; trigger_words: string[]; also_on: string[]; gated: boolean;
   adult_check: AdultCheckState; installed: { id: string; name: string } | null; reason: string | null; line: string; confirm_item: string;
+  /** What the style does, in plain words: the maker's own first sentences, or one fixed sentence from the fields. */ summary: string;
 }
 export interface BrowsePage { items: BrowseHit[]; locked: boolean; next_cursor: string | null; notes: string[] }
 

@@ -64,6 +64,15 @@ function lineAndReason(hit: Hit, admin: PersonRow, browsed: Media = "video"): { 
   return { line: parts.join(", "), reason, installed };
 }
 
+/** What the style does: the maker's own words when the source has them, else one fixed sentence built from the fields (never a model). */
+function summaryOf(hit: Hit): string {
+  if (hit.summary) return hit.summary;
+  const word = hit.kind === "character" ? "character" : "style";
+  const made = hit.base_unstated ? "LTX 2" : baseWords(hit.base_model);
+  const use = hit.trigger_words.length ? ` Say ${hit.trigger_words.slice(0, 2).map((w) => `"${w}"`).join(" or ")} in your prompt to use it.` : "";
+  return `A ${word} made for ${made}.${use}`;
+}
+
 function view(hit: Hit, admin: PersonRow, browsed: Media = "video") {
   const { line, reason, installed } = lineAndReason(hit, admin, browsed);
   return {
@@ -71,7 +80,7 @@ function view(hit: Hit, admin: PersonRow, browsed: Media = "video") {
     preview: hit.preview_url ? `/api/loras/browse/${hit.site}/${encodeURIComponent(hit.remote_id)}/preview${hit.version_id && hit.site === "civitai" ? `?version=${encodeURIComponent(hit.version_id)}` : ""}` : null,
     base_label: hit.base_label, base_model: hit.base_model, base_unstated: hit.base_unstated, kind: hit.kind, bytes: hit.bytes, sha256: hit.sha256, licence: { id: hit.licence_id, class: hit.licence_class, commercial_use: hit.commercial_use },
     downloads: hit.downloads, rating: hit.rating, created_at: hit.created_at, trigger_words: hit.trigger_words, also_on: hit.also_on, gated: hit.gated,
-    adult_check: hit.adult_check.state, installed, reason, line, confirm_item: confirmItemOf(hit),
+    adult_check: hit.adult_check.state, installed, reason, line, confirm_item: confirmItemOf(hit), summary: summaryOf(hit),
   };
 }
 const HitView = z.object({}).passthrough();

@@ -128,3 +128,11 @@ export function supportedFamilyWords(media: Media = "video"): string {
   const names = BASE_FAMILIES.filter((f) => f.media === media && f.bases.some((b) => supported.includes(b.id))).map((f) => f.name);
   return names.length ? names.join(" or ") : media === "video" ? "no video model" : "no picture model";
 }
+
+/** A Hugging Face search word for what this search wants: the first supported family's name ("ltx"), or null for "all" or when none is supported. */
+export function searchWordFor(browse: "default" | "all" | BrowseBase, media: Media = "video"): string | null {
+  if (browse === "all") return null;
+  const ids = wantedBaseIds(browse, media) as string[];
+  const family = BASE_FAMILIES.find((f) => f.media === media && f.bases.some((b) => ids.includes(b.id) && (browse !== "default" || supportedBaseIds(media).includes(b.id))));
+  return family ? family.name.toLowerCase().split(/\s+/)[0]! : null;
+}
