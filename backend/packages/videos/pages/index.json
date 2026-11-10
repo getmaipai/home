@@ -207,6 +207,39 @@
     },
     {
       "type": "media_shelf",
+      "heading": "Clips",
+      "bind": {
+        "source": "package",
+        "path": "recipes",
+        "params": {
+          "scope": "short"
+        }
+      },
+      "item_key_field": "id",
+      "item_label_field": "title",
+      "item_subtitle_field": "{subtitle}",
+      "item_media_field": "poster",
+      "item_meta_field": "duration_s",
+      "aspect": "wide",
+      "variant": "plain",
+      "hide_when_empty": true,
+      "see_all": {
+        "label": "Open Clips",
+        "action": {
+          "navigate": {
+            "to": "/apps/videos/clips-feed"
+          }
+        }
+      },
+      "on_select": {
+        "navigate": {
+          "to": "/apps/videos/clips-feed"
+        }
+      },
+      "card_radius": "soft"
+    },
+    {
+      "type": "media_shelf",
       "heading": "Continue watching",
       "bind": {
         "source": "package",

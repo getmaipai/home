@@ -100,10 +100,10 @@ describe("the package documents", () => {
     expect(manifest.contributes.data.length).toBeLessThanOrEqual(16);
     expect(pageOf("liked").body[0].bind.path).toBe("liked");
   });
-  test("home shelves carry the byline and a card menu of Watch later, Save to playlist and Share; made-at-home and the channel strip stay plain", () => {
+  test("home shelves carry the byline and a card menu of Watch later, Save to playlist and Share; made-at-home, the channel strip and the Clips shelf stay plain", () => {
     const shelves = pageOf("index").body.filter((n: { type: string }) => n.type === "media_shelf");
     for (const shelf of shelves) {
-      if (shelf.bind.path === "made-at-home" || shelf.bind.path === "channels") { expect(shelf.row_actions).toBeUndefined(); continue; }
+      if (shelf.bind.path === "made-at-home" || shelf.bind.path === "channels" || shelf.bind.params?.scope === "short") { expect(shelf.row_actions).toBeUndefined(); continue; }
       expect(shelf.item_subtitle_field).toBe("{byline}");
       expect(shelf.row_actions.map((a: { label: string }) => a.label)).toEqual(["Watch later", "Save to playlist", "Share"]);
     }

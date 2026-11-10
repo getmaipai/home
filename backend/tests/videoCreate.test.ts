@@ -334,7 +334,7 @@ describe("Create is adult-only; Browse is unchanged", () => {
     for (const other of [teen, child]) {
       const row = await appRow(other.client);
       expect(row.sidebar.groups.map((g: { id: string }) => g.id)).toEqual(["play"]);
-      expect(row.sidebar.groups[0].pages.map((p: { page: string }) => p.page)).toEqual(["index", "library", "history", "watch-later", "liked", "playlists"]);
+      expect(row.sidebar.groups[0].pages.map((p: { page: string }) => p.page)).toEqual(["index", "library", "clips-feed", "history", "watch-later", "liked", "playlists"]);
       expect(row.header.modes.map((m: { id: string }) => m.id)).toEqual(["play"]);
       for (const page of [...PAGES, "make-video", "creations"]) expect((await other.client.get(`/api/plugins/videos/pages/${page}`)).status).toBe(404);
       expect((await other.client.get("/api/plugins/videos/pages/index")).status).toBe(200);

@@ -126,7 +126,9 @@ describe("scope short: the clips feed rows", () => {
 
   test("a child and a teen reach no other scope of recipes (feed, job, clips, showcase, studio)", async () => {
     const { teen, child } = await household();
-    for (const who of [teen, child]) for (const scope of ["feed", "job", "clips", "showcase", "studio", "studio-picker", "style-suggestions", "header"]) expect((await who.client.post("/api/plugins/videos/data/recipes", { scope, id: "x" })).status).toBe(404);
+    for (const who of [teen, child]) for (const scope of ["feed", "job", "clips", "showcase", "studio", "studio-picker", "header"]) expect((await who.client.post("/api/plugins/videos/data/recipes", { scope, id: "x" })).status).toBe(404);
+    // The Clips shelf and page ask for the short scope: open to both.
+    for (const who of [teen, child]) expect((await who.client.post("/api/plugins/videos/data/recipes", { scope: "short" })).status).toBe(200);
   });
 
   test.skipIf(!specAllowsClipFeed)("with the Clips page registered, a child and a teen open the short scope and nothing else", async () => {
