@@ -6,7 +6,7 @@
     {
       "type": "prompt_bar",
       "placement": "inline",
-      "layout": "composer",
+      "layout": "chat",
       "label": "Describe a video",
       "placeholder": "Describe your video. Put each person's line in quotes.",
       "prompt_state": "prompt",

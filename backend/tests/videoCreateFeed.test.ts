@@ -401,7 +401,7 @@ describe("scope showcase: the Try this rail (VIDEO-UI-11)", () => {
     const { adult } = await household();
     const page = await (await adult.client.get("/api/plugins/videos/pages/create")).json() as { body: Array<Row> };
     expect(page.body.map((node) => node.type)).toEqual(["prompt_bar", "media_shelf", "section"]);
-    expect(page.body[0]).toMatchObject({ type: "prompt_bar", placement: "inline", layout: "composer" });
+    expect(page.body[0]).toMatchObject({ type: "prompt_bar", placement: "inline", layout: "chat" });
     const shelf = page.body[1]!;
     expect(shelf).toMatchObject({ heading: "Inspiration", aspect: "wide", layout: "rail", variant: "plain", press_scale: true, item_media_field: "thumbnail", media_loop: true, item_loop_field: "loop", bind: { path: "recipes", params: { scope: "showcase", limit: 4 } } });
     expect(shelf.on_select).toEqual({ navigate: { to: "/apps/videos/create", state: { prompt: "{prompt}", look: "{look}", camera: "{camera}" } } });
