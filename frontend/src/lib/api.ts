@@ -642,6 +642,7 @@ export interface LibraryItem {
   retention: string; origin?: "made" | "sent" | "fetched"; chat_id: string | null; turn_id?: string | null; chat_title?: string | null; chat_deleted?: boolean; can_edit: boolean;
   audience: "all-ages" | "adult-only" | null; duration_seconds: number | null;
   thumb_url: string; expires_at: string | null; version_count: number;
+  adult?: { made_audience: "all-ages" | "adult-only"; lock: "on" | "off"; can_clear: boolean; can_mark: boolean; line: string | null; history: Array<{ action: "clear" | "mark"; via: "creator_passcode" | "creator" | "admin" | "auto"; at: string }> } | null;
 }
 export interface LibrarySongDetails {
   id: string; title: string | null; description: string | null; lyrics: string | null;
@@ -1796,6 +1797,8 @@ export const api = {
   updateLibraryFile: (id: string, change: { name?: string | null; keep?: boolean }) => request<{ id: string; name: string | null; retention: string }>(`/api/files/${encodeURIComponent(id)}`, { method: "PATCH", body: JSON.stringify(change) }),
   trashLibraryFile: (id: string) => request<{ id: string; deleted_at: string; trash_until: string }>(`/api/files/${encodeURIComponent(id)}`, { method: "DELETE" }),
   recheckLibraryAudience: (id: string) => request<{ audience: "all-ages" }>(`/api/files/${encodeURIComponent(id)}/recheck-audience`, { method: "POST" }),
+  confirmLibraryUnmark: (id: string, credential: string | { passkey_assertion: unknown }) => request<{ ticket: string }>("/api/adult-lock/confirm", { method: "POST", body: JSON.stringify({ ...(typeof credential === "string" ? { secret: credential } : credential), action: "unmark", item: id }) }),
+  libraryAdultMark: (id: string, body: { action: "clear" | "mark"; ticket?: string }) => request<{ made_audience: "all-ages" | "adult-only"; lock: "on" | "off" }>(`/api/library/files/${encodeURIComponent(id)}/adult-mark`, { method: "POST", body: JSON.stringify(body) }),
   libraryTrash: () => request<{ rows: LibraryTrashItem[] }>("/api/trash"),
   restoreLibraryFile: (id: string) => request<{ success: boolean }>(`/api/trash/file/${encodeURIComponent(id)}/restore`, { method: "POST" }),
   purgeLibraryFile: (id: string) => request<{ success: boolean }>(`/api/trash/file/${encodeURIComponent(id)}`, { method: "DELETE" }),

@@ -1,8 +1,8 @@
 // ADULT-LOCK-03b (docs/design/video-loras-2026-11-02.md section 11, tests 2 to 4): the shell host of the kit's AdultLockProvider. The fake hub answers
 // like the real one: a page-data request without the proof header is the one tile, with it the clip (adult_only, so its picture is fetched into a blob).
-import { afterEach, beforeEach, describe, expect, mock, test } from "bun:test";
+import { afterEach, beforeEach, describe, expect, mock, spyOn, test } from "bun:test";
 import type { ReactNode } from "react";
-import { act, cleanup, fireEvent, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, renderHook, waitFor } from "@testing-library/react";
 import { MemoryRouter, useNavigate } from "react-router-dom";
 import { NodeRenderer } from "@maipai/ui/src/schema/NodeRenderer";
 import { PackageScopeContext, PageStateContext } from "@maipai/ui/src/schema/packageScope";
@@ -11,8 +11,11 @@ import { AdultLockProvider } from "@maipai/ui/src/elements/adult-lock";
 import { AdultLockController, unlockRequest, useAdultLockProps } from "@/shell/AdultLockHost";
 import { adultClocks, adultResponse, getAdultProof, setAdultProof, revokeAdultBlobs } from "@/lib/adultLock";
 import { renderWithQueryClient } from "../../tests/renderWithQueryClient";
+import { createQueryClient } from "@maipai/ui/src/queryClient";
+import { QueryClientProvider } from "@tanstack/react-query";
 import { stubMatchMedia } from "../../tests/stubMatchMedia";
 import type { Roster } from "@/lib/api";
+import * as passkeyAssertion from "@/lib/passkeyAssertion";
 
 const TILE = "Locked items. Press to enter your passcode.";
 const TITLE = "Zebraquill velvet cabaret dancer";
@@ -108,6 +111,24 @@ describe("while locked", () => {
     expect(document.documentElement.outerHTML.includes("Zebraquill")).toBe(false);
     expect(document.title.includes("Zebraquill")).toBe(false);
     expect(getAdultProof()).toBeNull();
+  });
+});
+
+describe("passkey availability", () => {
+  test("offers onPasskey only when passkeys are available", async () => {
+    const available = spyOn(passkeyAssertion, "passkeysAvailable");
+    try {
+      available.mockResolvedValue(false);
+      const wrapper = ({ children }: { children: ReactNode }) => <MemoryRouter><QueryClientProvider client={createQueryClient()}>{children}</QueryClientProvider></MemoryRouter>;
+      const without = renderHook(() => useAdultLockProps(person), { wrapper });
+      await waitFor(() => expect(without.result.current.onPasskey).toBeUndefined());
+      without.unmount();
+      available.mockResolvedValue(true);
+      const withKey = renderHook(() => useAdultLockProps(person), { wrapper });
+      await waitFor(() => expect(withKey.result.current.onPasskey).toBeDefined());
+      expect(withKey.result.current.onPasskey).toBeFunction();
+      expect(withKey.result.current.onPasskey).toBeDefined();
+    } finally { available.mockRestore(); }
   });
 });
 
