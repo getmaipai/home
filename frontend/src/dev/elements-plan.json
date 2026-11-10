@@ -4852,11 +4852,18 @@
       "realTurnToday": true
     },
     {
-      "file": "companion-pack/README.md",
-      "name": "companion-pack/README",
+      "file": "companion-pack/canvas-util.ts",
+      "name": "companion-pack/canvas-util",
       "group": "companion-pack",
       "verdict": "support",
-      "verdictReason": "Documentation for the companion-pack implementation; not a standalone Home Element."
+      "verdictReason": "Internal implementation used by CompanionPackPlayer; not a standalone Home Element."
+    },
+    {
+      "file": "companion-pack/compositor.ts",
+      "name": "companion-pack/compositor",
+      "group": "companion-pack",
+      "verdict": "support",
+      "verdictReason": "Internal implementation used by CompanionPackPlayer; not a standalone Home Element."
     },
     {
       "file": "companion-pack/constants.ts",
@@ -4873,6 +4880,13 @@
       "verdictReason": "Speech-to-mouth cue builder used by CompanionPackPlayer; internal implementation, not a standalone Home Element."
     },
     {
+      "file": "companion-pack/emotion.ts",
+      "name": "companion-pack/emotion",
+      "group": "companion-pack",
+      "verdict": "support",
+      "verdictReason": "Internal implementation used by CompanionPackPlayer; not a standalone Home Element."
+    },
+    {
       "file": "companion-pack/fixtures/golden-fast-lines.json",
       "name": "companion-pack/fixtures/golden-fast-lines",
       "group": "companion-pack",
@@ -4880,11 +4894,39 @@
       "verdictReason": "Golden cue fixture for CompanionPackPlayer's fast-speech tests; not a standalone Home Element."
     },
     {
+      "file": "companion-pack/geometry.ts",
+      "name": "companion-pack/geometry",
+      "group": "companion-pack",
+      "verdict": "support",
+      "verdictReason": "Internal implementation used by CompanionPackPlayer; not a standalone Home Element."
+    },
+    {
+      "file": "companion-pack/head.ts",
+      "name": "companion-pack/head",
+      "group": "companion-pack",
+      "verdict": "support",
+      "verdictReason": "Internal implementation used by CompanionPackPlayer; not a standalone Home Element."
+    },
+    {
       "file": "companion-pack/index.ts",
       "name": "companion-pack/index",
       "group": "companion-pack",
       "verdict": "support",
       "verdictReason": "Exports for the companion-pack player and its internal modules; not a standalone Home Element."
+    },
+    {
+      "file": "companion-pack/lids.ts",
+      "name": "companion-pack/lids",
+      "group": "companion-pack",
+      "verdict": "support",
+      "verdictReason": "Internal implementation used by CompanionPackPlayer; not a standalone Home Element."
+    },
+    {
+      "file": "companion-pack/life-runtime.ts",
+      "name": "companion-pack/life-runtime",
+      "group": "companion-pack",
+      "verdict": "support",
+      "verdictReason": "Internal implementation used by CompanionPackPlayer; not a standalone Home Element."
     },
     {
       "file": "companion-pack/life.ts",
@@ -4901,6 +4943,20 @@
       "verdictReason": "Loud-speech cue handling used inside CompanionPackPlayer; internal implementation, not a standalone Home Element."
     },
     {
+      "file": "companion-pack/mouth.ts",
+      "name": "companion-pack/mouth",
+      "group": "companion-pack",
+      "verdict": "support",
+      "verdictReason": "Internal implementation used by CompanionPackPlayer; not a standalone Home Element."
+    },
+    {
+      "file": "companion-pack/pack-loader.ts",
+      "name": "companion-pack/pack-loader",
+      "group": "companion-pack",
+      "verdict": "support",
+      "verdictReason": "Internal implementation used by CompanionPackPlayer; not a standalone Home Element."
+    },
+    {
       "file": "companion-pack/player.tsx",
       "name": "companion-pack/player",
       "group": "companion-pack",
@@ -4908,11 +4964,32 @@
       "verdictReason": "New CompanionPackPlayer Element from PACK-03; Home has not wired it yet. Future integration belongs in CompanionStage's character slot, without a Home wrapper."
     },
     {
+      "file": "companion-pack/profile.ts",
+      "name": "companion-pack/profile",
+      "group": "companion-pack",
+      "verdict": "support",
+      "verdictReason": "Internal implementation used by CompanionPackPlayer; not a standalone Home Element."
+    },
+    {
+      "file": "companion-pack/README.md",
+      "name": "companion-pack/README",
+      "group": "companion-pack",
+      "verdict": "support",
+      "verdictReason": "Documentation for the companion-pack implementation; not a standalone Home Element."
+    },
+    {
       "file": "companion-pack/sequencer.ts",
       "name": "companion-pack/sequencer",
       "group": "companion-pack",
       "verdict": "support",
       "verdictReason": "Clip selection and sequencing used inside CompanionPackPlayer; internal implementation, not a standalone Home Element."
+    },
+    {
+      "file": "companion-pack/speech.ts",
+      "name": "companion-pack/speech",
+      "group": "companion-pack",
+      "verdict": "support",
+      "verdictReason": "Internal implementation used by CompanionPackPlayer; not a standalone Home Element."
     },
     {
       "file": "companion-pack/stacked-alpha.ts",
