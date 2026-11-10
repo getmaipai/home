@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-11-10T20:48:02.488Z",
-  "kitTag": "ui-v0.5.578",
+  "generatedAt": "2026-11-10T23:01:42.339Z",
+  "kitTag": "ui-v0.5.582",
   "items": [
     {
       "file": "ActivityCardsShowcase.tsx",
@@ -457,6 +457,22 @@
       "implemented": false
     },
     {
+      "file": "companion-pack/canvas-util.ts",
+      "name": "companion-pack/canvas-util",
+      "group": "companion-pack",
+      "verdict": "support",
+      "verdictReason": "Internal module of the CompanionPackPlayer (PACK-05: speaking layers drawn by the player itself); not a standalone Home Element.",
+      "implemented": false
+    },
+    {
+      "file": "companion-pack/compositor.ts",
+      "name": "companion-pack/compositor",
+      "group": "companion-pack",
+      "verdict": "support",
+      "verdictReason": "Internal module of the CompanionPackPlayer (PACK-05: speaking layers drawn by the player itself); not a standalone Home Element.",
+      "implemented": false
+    },
+    {
       "file": "companion-pack/constants.ts",
       "name": "companion-pack/constants",
       "group": "companion-pack",
@@ -473,6 +489,14 @@
       "implemented": false
     },
     {
+      "file": "companion-pack/emotion.ts",
+      "name": "companion-pack/emotion",
+      "group": "companion-pack",
+      "verdict": "support",
+      "verdictReason": "Internal module of the CompanionPackPlayer (PACK-05: speaking layers drawn by the player itself); not a standalone Home Element.",
+      "implemented": false
+    },
+    {
       "file": "companion-pack/fixtures/golden-fast-lines.json",
       "name": "companion-pack/fixtures/golden-fast-lines",
       "group": "companion-pack",
@@ -481,11 +505,43 @@
       "implemented": false
     },
     {
+      "file": "companion-pack/geometry.ts",
+      "name": "companion-pack/geometry",
+      "group": "companion-pack",
+      "verdict": "support",
+      "verdictReason": "Internal module of the CompanionPackPlayer (PACK-05: speaking layers drawn by the player itself); not a standalone Home Element.",
+      "implemented": false
+    },
+    {
+      "file": "companion-pack/head.ts",
+      "name": "companion-pack/head",
+      "group": "companion-pack",
+      "verdict": "support",
+      "verdictReason": "Internal module of the CompanionPackPlayer (PACK-05: speaking layers drawn by the player itself); not a standalone Home Element.",
+      "implemented": false
+    },
+    {
       "file": "companion-pack/index.ts",
       "name": "companion-pack/index",
       "group": "companion-pack",
       "verdict": "support",
       "verdictReason": "Exports for the companion-pack player and its internal modules; not a standalone Home Element.",
+      "implemented": false
+    },
+    {
+      "file": "companion-pack/lids.ts",
+      "name": "companion-pack/lids",
+      "group": "companion-pack",
+      "verdict": "support",
+      "verdictReason": "Internal module of the CompanionPackPlayer (PACK-05: speaking layers drawn by the player itself); not a standalone Home Element.",
+      "implemented": false
+    },
+    {
+      "file": "companion-pack/life-runtime.ts",
+      "name": "companion-pack/life-runtime",
+      "group": "companion-pack",
+      "verdict": "support",
+      "verdictReason": "Internal module of the CompanionPackPlayer (PACK-05: speaking layers drawn by the player itself); not a standalone Home Element.",
       "implemented": false
     },
     {
@@ -505,6 +561,22 @@
       "implemented": false
     },
     {
+      "file": "companion-pack/mouth.ts",
+      "name": "companion-pack/mouth",
+      "group": "companion-pack",
+      "verdict": "support",
+      "verdictReason": "Internal module of the CompanionPackPlayer (PACK-05: speaking layers drawn by the player itself); not a standalone Home Element.",
+      "implemented": false
+    },
+    {
+      "file": "companion-pack/pack-loader.ts",
+      "name": "companion-pack/pack-loader",
+      "group": "companion-pack",
+      "verdict": "support",
+      "verdictReason": "Internal module of the CompanionPackPlayer (PACK-05: speaking layers drawn by the player itself); not a standalone Home Element.",
+      "implemented": false
+    },
+    {
       "file": "companion-pack/player.tsx",
       "name": "companion-pack/player",
       "group": "companion-pack",
@@ -513,11 +585,27 @@
       "implemented": false
     },
     {
+      "file": "companion-pack/profile.ts",
+      "name": "companion-pack/profile",
+      "group": "companion-pack",
+      "verdict": "support",
+      "verdictReason": "Internal module of the CompanionPackPlayer (PACK-05: speaking layers drawn by the player itself); not a standalone Home Element.",
+      "implemented": false
+    },
+    {
       "file": "companion-pack/sequencer.ts",
       "name": "companion-pack/sequencer",
       "group": "companion-pack",
       "verdict": "support",
       "verdictReason": "Clip selection and sequencing used inside CompanionPackPlayer; internal implementation, not a standalone Home Element.",
+      "implemented": false
+    },
+    {
+      "file": "companion-pack/speech.ts",
+      "name": "companion-pack/speech",
+      "group": "companion-pack",
+      "verdict": "support",
+      "verdictReason": "Internal module of the CompanionPackPlayer (PACK-05: speaking layers drawn by the player itself); not a standalone Home Element.",
       "implemented": false
     },
     {

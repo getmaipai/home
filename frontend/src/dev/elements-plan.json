@@ -291,7 +291,7 @@
       "batch": null,
       "replacesHandBuilt": [],
       "realTurnToday": null,
-      "verdictReason": "No current Home feature needs this Element’s specific data and interaction; the audit records the current scope decision."
+      "verdictReason": "No current Home feature needs this Element\u2019s specific data and interaction; the audit records the current scope decision."
     },
     {
       "file": "agent-handoff.tsx",
@@ -308,7 +308,7 @@
       "batch": null,
       "replacesHandBuilt": [],
       "realTurnToday": null,
-      "verdictReason": "No current Home feature needs this Element’s specific data and interaction; the audit records the current scope decision."
+      "verdictReason": "No current Home feature needs this Element\u2019s specific data and interaction; the audit records the current scope decision."
     },
     {
       "file": "agent-plan.tsx",
@@ -325,7 +325,7 @@
       "batch": null,
       "replacesHandBuilt": [],
       "realTurnToday": null,
-      "verdictReason": "No current Home feature needs this Element’s specific data and interaction; the audit records the current scope decision."
+      "verdictReason": "No current Home feature needs this Element\u2019s specific data and interaction; the audit records the current scope decision."
     },
     {
       "file": "agent-status.tsx",
@@ -491,7 +491,7 @@
       "batch": null,
       "replacesHandBuilt": [],
       "realTurnToday": null,
-      "verdictReason": "No current Home feature needs this Element’s specific data and interaction; the audit records the current scope decision."
+      "verdictReason": "No current Home feature needs this Element\u2019s specific data and interaction; the audit records the current scope decision."
     },
     {
       "file": "checkpoint-history.tsx",
@@ -508,7 +508,7 @@
       "batch": null,
       "replacesHandBuilt": [],
       "realTurnToday": null,
-      "verdictReason": "No current Home feature needs this Element’s specific data and interaction; the audit records the current scope decision."
+      "verdictReason": "No current Home feature needs this Element\u2019s specific data and interaction; the audit records the current scope decision."
     },
     {
       "file": "code-diff.tsx",
@@ -525,7 +525,7 @@
       "batch": null,
       "replacesHandBuilt": [],
       "realTurnToday": null,
-      "verdictReason": "No current Home feature needs this Element’s specific data and interaction; the audit records the current scope decision."
+      "verdictReason": "No current Home feature needs this Element\u2019s specific data and interaction; the audit records the current scope decision."
     },
     {
       "file": "code-runner.tsx",
@@ -593,7 +593,7 @@
       "batch": null,
       "replacesHandBuilt": [],
       "realTurnToday": null,
-      "verdictReason": "No current Home feature needs this Element’s specific data and interaction; the audit records the current scope decision."
+      "verdictReason": "No current Home feature needs this Element\u2019s specific data and interaction; the audit records the current scope decision."
     },
     {
       "file": "composer-attachments.aui.tsx",
@@ -816,7 +816,7 @@
       "batch": null,
       "replacesHandBuilt": [],
       "realTurnToday": null,
-      "verdictReason": "No current Home feature needs this Element’s specific data and interaction; the audit records the current scope decision."
+      "verdictReason": "No current Home feature needs this Element\u2019s specific data and interaction; the audit records the current scope decision."
     },
     {
       "file": "confidence-marker.tsx",
@@ -833,7 +833,7 @@
       "batch": null,
       "replacesHandBuilt": [],
       "realTurnToday": null,
-      "verdictReason": "No current Home feature needs this Element’s specific data and interaction; the audit records the current scope decision."
+      "verdictReason": "No current Home feature needs this Element\u2019s specific data and interaction; the audit records the current scope decision."
     },
     {
       "file": "connection-state.tsx",
@@ -935,7 +935,7 @@
       "batch": null,
       "replacesHandBuilt": [],
       "realTurnToday": null,
-      "verdictReason": "No current Home feature needs this Element’s specific data and interaction; the audit records the current scope decision."
+      "verdictReason": "No current Home feature needs this Element\u2019s specific data and interaction; the audit records the current scope decision."
     },
     {
       "file": "data-table.tsx",
@@ -1200,7 +1200,7 @@
       "batch": null,
       "replacesHandBuilt": [],
       "realTurnToday": null,
-      "verdictReason": "No current Home feature needs this Element’s specific data and interaction; the audit records the current scope decision."
+      "verdictReason": "No current Home feature needs this Element\u2019s specific data and interaction; the audit records the current scope decision."
     },
     {
       "file": "file.tsx",
@@ -1234,7 +1234,7 @@
       "batch": null,
       "replacesHandBuilt": [],
       "realTurnToday": null,
-      "verdictReason": "No current Home feature needs this Element’s specific data and interaction; the audit records the current scope decision."
+      "verdictReason": "No current Home feature needs this Element\u2019s specific data and interaction; the audit records the current scope decision."
     },
     {
       "file": "follow-up-suggestions.aui.tsx",
@@ -1268,7 +1268,7 @@
       "batch": null,
       "replacesHandBuilt": [],
       "realTurnToday": null,
-      "verdictReason": "No current Home feature needs this Element’s specific data and interaction; the audit records the current scope decision."
+      "verdictReason": "No current Home feature needs this Element\u2019s specific data and interaction; the audit records the current scope decision."
     },
     {
       "file": "globals.css",
@@ -1617,7 +1617,7 @@
       "batch": null,
       "replacesHandBuilt": [],
       "realTurnToday": null,
-      "verdictReason": "No current Home feature needs this Element’s specific data and interaction; the audit records the current scope decision."
+      "verdictReason": "No current Home feature needs this Element\u2019s specific data and interaction; the audit records the current scope decision."
     },
     {
       "file": "loading-state.tsx",
@@ -1880,7 +1880,7 @@
       "batch": null,
       "replacesHandBuilt": [],
       "realTurnToday": null,
-      "verdictReason": "No current Home feature needs this Element’s specific data and interaction; the audit records the current scope decision."
+      "verdictReason": "No current Home feature needs this Element\u2019s specific data and interaction; the audit records the current scope decision."
     },
     {
       "file": "message-queue.tsx",
@@ -1951,7 +1951,7 @@
       "batch": null,
       "replacesHandBuilt": [],
       "realTurnToday": null,
-      "verdictReason": "No current Home feature needs this Element’s specific data and interaction; the audit records the current scope decision."
+      "verdictReason": "No current Home feature needs this Element\u2019s specific data and interaction; the audit records the current scope decision."
     },
     {
       "file": "model-selector.tsx",
@@ -2312,7 +2312,7 @@
       "batch": null,
       "replacesHandBuilt": [],
       "realTurnToday": null,
-      "verdictReason": "No current Home feature needs this Element’s specific data and interaction; the audit records the current scope decision."
+      "verdictReason": "No current Home feature needs this Element\u2019s specific data and interaction; the audit records the current scope decision."
     },
     {
       "file": "reasoning-panel.tsx",
@@ -2329,7 +2329,7 @@
       "batch": null,
       "replacesHandBuilt": [],
       "realTurnToday": null,
-      "verdictReason": "No current Home feature needs this Element’s specific data and interaction; the audit records the current scope decision."
+      "verdictReason": "No current Home feature needs this Element\u2019s specific data and interaction; the audit records the current scope decision."
     },
     {
       "file": "reasoning.aui.tsx",
@@ -2380,7 +2380,7 @@
       "batch": null,
       "replacesHandBuilt": [],
       "realTurnToday": null,
-      "verdictReason": "No current Home feature needs this Element’s specific data and interaction; the audit records the current scope decision."
+      "verdictReason": "No current Home feature needs this Element\u2019s specific data and interaction; the audit records the current scope decision."
     },
     {
       "file": "regenerate-menu.tsx",
@@ -2414,7 +2414,7 @@
       "batch": null,
       "replacesHandBuilt": [],
       "realTurnToday": null,
-      "verdictReason": "No current Home feature needs this Element’s specific data and interaction; the audit records the current scope decision."
+      "verdictReason": "No current Home feature needs this Element\u2019s specific data and interaction; the audit records the current scope decision."
     },
     {
       "file": "retrieval-chunks.tsx",
@@ -2448,7 +2448,7 @@
       "batch": null,
       "replacesHandBuilt": [],
       "realTurnToday": null,
-      "verdictReason": "No current Home feature needs this Element’s specific data and interaction; the audit records the current scope decision."
+      "verdictReason": "No current Home feature needs this Element\u2019s specific data and interaction; the audit records the current scope decision."
     },
     {
       "file": "schedule-card.tsx",
@@ -2485,7 +2485,7 @@
       "batch": null,
       "replacesHandBuilt": [],
       "realTurnToday": null,
-      "verdictReason": "No current Home feature needs this Element’s specific data and interaction; the audit records the current scope decision."
+      "verdictReason": "No current Home feature needs this Element\u2019s specific data and interaction; the audit records the current scope decision."
     },
     {
       "file": "scroll-anchor.tsx",
@@ -2520,7 +2520,7 @@
       "batch": null,
       "replacesHandBuilt": [],
       "realTurnToday": null,
-      "verdictReason": "No current Home feature needs this Element’s specific data and interaction; the audit records the current scope decision."
+      "verdictReason": "No current Home feature needs this Element\u2019s specific data and interaction; the audit records the current scope decision."
     },
     {
       "file": "shared-conversation.tsx",
@@ -2680,7 +2680,7 @@
       "batch": null,
       "replacesHandBuilt": [],
       "realTurnToday": null,
-      "verdictReason": "No current Home feature needs this Element’s specific data and interaction; the audit records the current scope decision."
+      "verdictReason": "No current Home feature needs this Element\u2019s specific data and interaction; the audit records the current scope decision."
     },
     {
       "file": "subagent-list.tsx",
@@ -2697,7 +2697,7 @@
       "batch": null,
       "replacesHandBuilt": [],
       "realTurnToday": null,
-      "verdictReason": "No current Home feature needs this Element’s specific data and interaction; the audit records the current scope decision."
+      "verdictReason": "No current Home feature needs this Element\u2019s specific data and interaction; the audit records the current scope decision."
     },
     {
       "file": "suggestions.tsx",
@@ -2765,7 +2765,7 @@
       "batch": null,
       "replacesHandBuilt": [],
       "realTurnToday": null,
-      "verdictReason": "No current Home feature needs this Element’s specific data and interaction; the audit records the current scope decision."
+      "verdictReason": "No current Home feature needs this Element\u2019s specific data and interaction; the audit records the current scope decision."
     },
     {
       "file": "task.ts",
@@ -2799,7 +2799,7 @@
       "batch": null,
       "replacesHandBuilt": [],
       "realTurnToday": null,
-      "verdictReason": "No current Home feature needs this Element’s specific data and interaction; the audit records the current scope decision."
+      "verdictReason": "No current Home feature needs this Element\u2019s specific data and interaction; the audit records the current scope decision."
     },
     {
       "file": "thinking-indicator.test.tsx",
@@ -2935,7 +2935,7 @@
       "batch": null,
       "replacesHandBuilt": [],
       "realTurnToday": null,
-      "verdictReason": "No current Home feature needs this Element’s specific data and interaction; the audit records the current scope decision."
+      "verdictReason": "No current Home feature needs this Element\u2019s specific data and interaction; the audit records the current scope decision."
     },
     {
       "file": "thread-search.test.tsx",
@@ -3063,7 +3063,7 @@
       "batch": null,
       "replacesHandBuilt": [],
       "realTurnToday": null,
-      "verdictReason": "No current Home feature needs this Element’s specific data and interaction; the audit records the current scope decision."
+      "verdictReason": "No current Home feature needs this Element\u2019s specific data and interaction; the audit records the current scope decision."
     },
     {
       "file": "timeline.tsx",
@@ -3185,7 +3185,7 @@
       "batch": null,
       "replacesHandBuilt": [],
       "realTurnToday": null,
-      "verdictReason": "No current Home feature needs this Element’s specific data and interaction; the audit records the current scope decision."
+      "verdictReason": "No current Home feature needs this Element\u2019s specific data and interaction; the audit records the current scope decision."
     },
     {
       "file": "tool-timeline.tsx",
@@ -3255,7 +3255,7 @@
       "batch": null,
       "replacesHandBuilt": [],
       "realTurnToday": null,
-      "verdictReason": "No current Home feature needs this Element’s specific data and interaction; the audit records the current scope decision."
+      "verdictReason": "No current Home feature needs this Element\u2019s specific data and interaction; the audit records the current scope decision."
     },
     {
       "file": "ui/avatar.tsx",
@@ -3595,7 +3595,7 @@
       "batch": null,
       "replacesHandBuilt": [],
       "realTurnToday": null,
-      "verdictReason": "No current Home feature needs this Element’s specific data and interaction; the audit records the current scope decision."
+      "verdictReason": "No current Home feature needs this Element\u2019s specific data and interaction; the audit records the current scope decision."
     },
     {
       "file": "weather-advice.tsx",
@@ -4934,6 +4934,83 @@
       "group": "companion-pack",
       "verdict": "support",
       "verdictReason": "Types for CompanionPackPlayer's internal runtime; not a standalone Home Element."
+    },
+    {
+      "file": "companion-pack/canvas-util.ts",
+      "name": "companion-pack/canvas-util",
+      "group": "companion-pack",
+      "verdict": "support",
+      "verdictReason": "Internal module of the CompanionPackPlayer (PACK-05: speaking layers drawn by the player itself); not a standalone Home Element."
+    },
+    {
+      "file": "companion-pack/compositor.ts",
+      "name": "companion-pack/compositor",
+      "group": "companion-pack",
+      "verdict": "support",
+      "verdictReason": "Internal module of the CompanionPackPlayer (PACK-05: speaking layers drawn by the player itself); not a standalone Home Element."
+    },
+    {
+      "file": "companion-pack/emotion.ts",
+      "name": "companion-pack/emotion",
+      "group": "companion-pack",
+      "verdict": "support",
+      "verdictReason": "Internal module of the CompanionPackPlayer (PACK-05: speaking layers drawn by the player itself); not a standalone Home Element."
+    },
+    {
+      "file": "companion-pack/geometry.ts",
+      "name": "companion-pack/geometry",
+      "group": "companion-pack",
+      "verdict": "support",
+      "verdictReason": "Internal module of the CompanionPackPlayer (PACK-05: speaking layers drawn by the player itself); not a standalone Home Element."
+    },
+    {
+      "file": "companion-pack/head.ts",
+      "name": "companion-pack/head",
+      "group": "companion-pack",
+      "verdict": "support",
+      "verdictReason": "Internal module of the CompanionPackPlayer (PACK-05: speaking layers drawn by the player itself); not a standalone Home Element."
+    },
+    {
+      "file": "companion-pack/lids.ts",
+      "name": "companion-pack/lids",
+      "group": "companion-pack",
+      "verdict": "support",
+      "verdictReason": "Internal module of the CompanionPackPlayer (PACK-05: speaking layers drawn by the player itself); not a standalone Home Element."
+    },
+    {
+      "file": "companion-pack/life-runtime.ts",
+      "name": "companion-pack/life-runtime",
+      "group": "companion-pack",
+      "verdict": "support",
+      "verdictReason": "Internal module of the CompanionPackPlayer (PACK-05: speaking layers drawn by the player itself); not a standalone Home Element."
+    },
+    {
+      "file": "companion-pack/mouth.ts",
+      "name": "companion-pack/mouth",
+      "group": "companion-pack",
+      "verdict": "support",
+      "verdictReason": "Internal module of the CompanionPackPlayer (PACK-05: speaking layers drawn by the player itself); not a standalone Home Element."
+    },
+    {
+      "file": "companion-pack/pack-loader.ts",
+      "name": "companion-pack/pack-loader",
+      "group": "companion-pack",
+      "verdict": "support",
+      "verdictReason": "Internal module of the CompanionPackPlayer (PACK-05: speaking layers drawn by the player itself); not a standalone Home Element."
+    },
+    {
+      "file": "companion-pack/profile.ts",
+      "name": "companion-pack/profile",
+      "group": "companion-pack",
+      "verdict": "support",
+      "verdictReason": "Internal module of the CompanionPackPlayer (PACK-05: speaking layers drawn by the player itself); not a standalone Home Element."
+    },
+    {
+      "file": "companion-pack/speech.ts",
+      "name": "companion-pack/speech",
+      "group": "companion-pack",
+      "verdict": "support",
+      "verdictReason": "Internal module of the CompanionPackPlayer (PACK-05: speaking layers drawn by the player itself); not a standalone Home Element."
     }
   ]
 }
