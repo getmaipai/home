@@ -55,7 +55,7 @@ function parse<T>(raw: string, schema: z.ZodType<T>): { ok: true; value: T } | {
 }
 
 /** One model call with one repair attempt, the same shape as planFilm. */
-async function ask<T>(system: string, payload: unknown, schema: z.ZodType<T>, extra?: (value: T) => string | null): Promise<{ ok: true; value: T } | { ok: false; line: string }> {
+export async function askStage<T>(system: string, payload: unknown, schema: z.ZodType<T>, extra?: (value: T) => string | null): Promise<{ ok: true; value: T } | { ok: false; line: string }> {
   const complete = testCompleter ?? completeBackground;
   const options: LlmCompleteOptions = { temperature: 0.5, max_tokens: 6000, dropReasoning: true };
   let errors = "";
@@ -78,7 +78,7 @@ export async function startProduction(actor: PersonRow, input: { idea: string; s
   if (refusal) return { ok: false, line: VIDEO_REFUSAL_LINE[refusal] };
   const structure = planStructure(input.seconds);
   if (!structure.ok) return { ok: false, line: structure.line };
-  const treatment = await ask(
+  const treatment = await askStage(
     "Write a treatment for a production from the idea: a title, a one-sentence logline, a look in plain words (for example 35mm, overcast, muted), a tone, and a summary of the whole story from start to finish.",
     { idea: input.idea, look: input.look, length_seconds: input.seconds, acts: structure.plan.acts, scenes: structure.plan.scenes.length },
     treatmentSchema,
@@ -102,7 +102,7 @@ function need(actor: PersonRow, productionId: string, kind: "treatment" | "bible
 export async function writeBible(actor: PersonRow, productionId: string): Promise<StageResult> {
   const t = need(actor, productionId, "treatment"); if (!t.ok) return t;
   const length = lengthOf(actor, productionId); if (!length.ok) return length;
-  const bible = await ask(
+  const bible = await askStage(
     "Write the bible for this production from its approved treatment: every recurring character (with a fixed look described as positive facts and, if they speak, a voice), every location, the music moods, and a few rules that keep it consistent. Include only what the story needs.",
     { treatment: t.doc.json, length_seconds: length.seconds },
     bibleSchema,
@@ -119,7 +119,7 @@ export async function writeOutline(actor: PersonRow, productionId: string): Prom
   const length = lengthOf(actor, productionId); if (!length.ok) return length;
   const keys = length.structure.scenes.map((s) => s.key);
   const castNames = new Set(((b.doc.json as Bible).cast ?? []).map((c) => c.name));
-  const outline = await ask(
+  const outline = await askStage(
     "Write the outline: exactly one entry per scene key given, in order, each with a title, one location from the bible, the bible characters in it, and a beat saying what happens. Use only bible names.",
     { treatment: t?.json, bible: b.doc.json, scene_keys: keys, scene_seconds: length.structure.scenes.map((s) => s.seconds) },
     outlineSchema,

@@ -21,9 +21,9 @@ function onProgress(actor: PersonRow, id: string) { return (p: {stage:FilmStage;
   const cast=row.plan?.cast.length ?? 0, shots=row.plan?.shots.length ?? 0, clipSteps=shots*(row.faceless?2:1); const stage=stageName[p.stage]; const prior={Cast:0,Stills:cast,Clips:cast+shots,Music:cast+shots+clipSteps,Assemble:cast+shots+clipSteps+1} as Record<string,number>;
   updateFilmRun(actor,id,{stage,done_steps:Math.min(row.total_steps,prior[stage ?? ""] ?? 0)+p.done,total_steps:row.total_steps});
 }; }
-function launch(actor: PersonRow, run: FilmRun, mode: "plan" | "run" | "redo" | "music" | "stills", shotId?: string, planInput?: PlanFilmInput): void {
+function launch(actor: PersonRow, run: FilmRun, mode: "plan" | "run" | "redo" | "music" | "stills", shotId?: string, planInput?: PlanFilmInput): Promise<void> {
   const controller=new AbortController(); active.set(run.id,controller);
-  void (async()=>{
+  return (async()=>{
     try {
       let current=getFilmRun(actor,run.id); if(!current) return;
       let plan=current.plan;
@@ -64,6 +64,16 @@ function launch(actor: PersonRow, run: FilmRun, mode: "plan" | "run" | "redo" | 
       updateFilmRun(actor,run.id,{state:"failed",error_line:error instanceof FilmStepError ? error.message : plainFailure});
     } finally { if(active.get(run.id)===controller) active.delete(run.id); }
   })();
+}
+/** LONGFORM-03: starts a run from a plan that is already written (one chunk of a scene) and resolves when the run ends. */
+export function startPlannedFilm(input: {actor:PersonRow;idea:string;plan:FilmPlan;parentId:string;sceneKey:string}): {id:string;done:Promise<FilmRun|null>} | {line:string} {
+  const {actor}=input;
+  if(!allowed(actor)) return {line:"Making a film is for adults on their own written screen."};
+  const run=createFilmRun(actor,{idea:input.idea,goAhead:true,parentId:input.parentId,sceneKey:input.sceneKey});
+  const production=createMediaProduction(actor,{title:input.plan.title,summary:input.plan.summary},"film");
+  updateFilmRun(actor,run.id,{plan:input.plan,production_id:production.id,total_steps:total(input.plan),stage:"Plan",done_steps:1});
+  const done=launch(actor,getFilmRun(actor,run.id)!,"run").then(()=>getFilmRun(actor,run.id));
+  return {id:run.id,done};
 }
 export type StartFilmResult = {id:string} | {line:string};
 export function startFilm(input: {actor:PersonRow;idea:string;shots?:number;seconds?:number;look?:string;castHints?:string[];faceless?:boolean;goAhead:boolean;stillsFirst?:boolean}): StartFilmResult {

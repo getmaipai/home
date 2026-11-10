@@ -33,3 +33,5 @@ export function updateFilmRun(actor: PersonRow, id: string, patch: Partial<Omit<
 }
 export function listFilmRunsInStates(states: FilmRunState[]): FilmRun[] { return db.select().from(filmRuns).where(inArray(filmRuns.state,states)).all().map(decode); }
 export function failInterruptedFilmRuns(): void { db.update(filmRuns).set({ state:"failed", errorLine:"The hub restarted while this film was being made. Press Resume to continue.", updatedAt:new Date().toISOString() }).where(inArray(filmRuns.state,["planning","running"])).run(); }
+/** LONGFORM-03: the film runs of one long-form production, oldest first. */
+export function listFilmRunsByParent(actor: PersonRow, parentId: string): FilmRun[] { return db.select().from(filmRuns).where(and(eq(filmRuns.parentId, parentId), eq(filmRuns.personId, actor.id))).all().map(decode); }

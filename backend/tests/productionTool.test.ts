@@ -1,3 +1,5 @@
+import { isProducing } from "@/lib/longform/runner";
+import { __setFilmEnginesForTests } from "@/lib/films/background";
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
@@ -56,7 +58,10 @@ describe("make_production", () => {
     const outlineStep = await run(a, { production_id: id, approve: true });
     expect(outlineStep.result?.data).toMatchObject({ stage: "outline" });
     expect(getDocument(a, id, "bible")?.approved).toBe(true);
-    expect((await run(a, { production_id: id, approve: true })).result?.data).toMatchObject({ approved: true });
+    __setFilmEnginesForTests(() => ({ waitForIdle: async () => {}, ensureSubject: async () => "s", makeStill: async () => "p", makeClip: async () => "c", makeMusic: async () => "m", assemble: async () => "cut" }));
+    expect((await run(a, { production_id: id, approve: true })).result?.data).toMatchObject({ approved: true, stage: "producing" });
+    for (let i = 0; i < 200 && isProducing(id); i++) await new Promise((r) => setTimeout(r, 10));
+    __setFilmEnginesForTests(null);
   });
   test("a teen is refused and a made-up production id is unknown", async () => {
     expect((await run(person("teen"), { idea: "a boat", seconds: 100 })).result?.data).toMatchObject({ refused: "not_allowed" });

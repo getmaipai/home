@@ -30,6 +30,13 @@ describe("long-form production routes", () => {
     expect((await client.post(`/api/productions/long/${id}/outline`, {})).status).toBe(200);
     const read = await client.get(`/api/productions/long/${id}`); expect(((await read.json()) as { documents: unknown[] }).documents.length).toBe(3);
   });
+  test("produce refuses before the outline is approved, and progress reads", async () => {
+    fake(60); const { client } = await owner();
+    const id = ((await (await client.post("/api/productions/long", { idea: "a keeper finds a boat", seconds: 60 })).json()) as { production_id: string }).production_id;
+    expect((await client.post(`/api/productions/long/${id}/produce`, {})).status).toBe(400);
+    const p = await client.get(`/api/productions/long/${id}/progress`); expect(p.status).toBe(200);
+    expect(await p.json()).toMatchObject({ producing: false, scenes_total: 1, scenes_done: 0 });
+  });
   test("a teen is refused and an unknown production is 404", async () => {
     fake(300); const { client } = await owner(); const t = await teen(client);
     expect((await t.post("/api/productions/long", { idea: "a boat", seconds: 300 })).status).toBe(400);

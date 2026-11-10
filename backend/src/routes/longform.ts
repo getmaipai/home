@@ -4,6 +4,7 @@ import { requireAuth } from "@/middleware/auth";
 import { allowed } from "@/lib/films/background";
 import { listDocuments } from "@/lib/longform/documents";
 import { approveStage, mayRender, startProduction, writeBible, writeOutline } from "@/lib/longform/stages";
+import { isProducing, produce, progressOf, stopProducing } from "@/lib/longform/runner";
 import { MAX_PRODUCTION_SECONDS, MIN_PRODUCTION_SECONDS } from "@/lib/longform/structure";
 import type { PersonRow } from "@/types";
 
@@ -31,6 +32,12 @@ const bible = createRoute({ ...base, method: "post", path: "/{id}/bible", summar
 const outline = createRoute({ ...base, method: "post", path: "/{id}/outline", summary: "Write the outline from the approved bible", request: { params } });
 const approve = createRoute({ ...base, method: "post", path: "/{id}/approve", summary: "Approve a document",
   request: { params, ...body(z.object({ kind: z.enum(["treatment", "bible", "outline"]) })) } });
+
+const progressView = z.object({ producing: z.boolean(), scenes_total: z.number(), scenes_done: z.number(), seconds_left: z.number().nullable(), runs: z.array(z.object({ scene_key: z.string(), state: z.string(), done_steps: z.number(), total_steps: z.number() })) });
+const progressResponses = { ...responses, 200: { description: "How far the production has come", content: { "application/json": { schema: progressView } } } };
+const produceRoute = createRoute({ ...base, responses: progressResponses, method: "post", path: "/{id}/produce", summary: "Make every scene of an approved production in the background (safe to call again to resume)", request: { params } });
+const progressRoute = createRoute({ ...base, responses: progressResponses, method: "get", path: "/{id}/progress", summary: "Read how far the scenes have come", request: { params } });
+const stopRoute = createRoute({ ...base, responses: progressResponses, method: "post", path: "/{id}/stop", summary: "Stop making scenes after the current step", request: { params } });
 
 function viewOf(actor: PersonRow, productionId: string) {
   return {
@@ -71,4 +78,23 @@ longformRoutes.openapi(approve, (c) => {
   if (!allowed(actor)) return c.json({ error: NOT_HERE }, 404);
   const d = approveStage(actor, id, c.req.valid("json").kind);
   return d ? c.json(viewOf(actor, id), 200) : c.json({ error: "Nothing to approve yet." }, 400);
+});
+longformRoutes.openapi(produceRoute, (c) => {
+  const actor = c.get("person") as PersonRow, id = c.req.valid("param").id;
+  if (!allowed(actor)) return c.json({ error: NOT_HERE }, 404);
+  if (!mayRender(actor, id)) return c.json({ error: "Approve the bible and the outline before anything is made." }, 400);
+  if (isProducing(id)) return c.json({ error: "This production is already being made." }, 400);
+  void produce(actor, id).catch((e) => console.error("[longform] produce failed", id, e));
+  return c.json(progressOf(actor, id), 200);
+});
+longformRoutes.openapi(progressRoute, (c) => {
+  const actor = c.get("person") as PersonRow, id = c.req.valid("param").id;
+  if (!allowed(actor)) return c.json({ error: NOT_HERE }, 404);
+  return viewOf(actor, id).documents.length ? c.json(progressOf(actor, id), 200) : c.json({ error: NOT_HERE }, 404);
+});
+longformRoutes.openapi(stopRoute, (c) => {
+  const actor = c.get("person") as PersonRow, id = c.req.valid("param").id;
+  if (!allowed(actor)) return c.json({ error: NOT_HERE }, 404);
+  stopProducing(id);
+  return c.json(progressOf(actor, id), 200);
 });

@@ -3,6 +3,7 @@ import type { PersonRow } from "@/types";
 import type { ToolExecutionOutcome, TurnState } from "@/lib/turnMachine/contract";
 import { outcomeOf } from "@/lib/turnContext";
 import { allowed } from "@/lib/films/background";
+import { isProducing, produce, progressOf } from "./runner";
 import { getDocument } from "./documents";
 import { approveStage, startProduction, writeBible, writeOutline, type Bible, type Outline, type StageResult, type Treatment } from "./stages";
 
@@ -41,7 +42,7 @@ function describe(actor: PersonRow, productionId: string, stage: "treatment" | "
 const NEXT: Record<string, string> = {
   treatment: "Tell the person the treatment in a few sentences and ask if it is good or what to change. When they say go on, call this tool again with production_id and approve true.",
   bible: "Tell the person the cast, places and music in a few sentences and ask if they are good. Nothing is made into pictures until they approve this.",
-  outline: "Tell the person the scenes in a few sentences. The written plan is done; making the scenes comes in a later step that is not built yet, so say so plainly.",
+  outline: "Tell the person the scenes in a few sentences and ask if they are good. When they approve, every scene is written and made in the background.",
 };
 
 export async function runMakeProduction(input: { state: ProductionState; args: Record<string, unknown>; callId: string; spoken: boolean }): Promise<ToolExecutionOutcome> {
@@ -72,6 +73,11 @@ export async function runMakeProduction(input: { state: ProductionState; args: R
   let result: StageResult | null = null; let stage: "treatment" | "bible" | "outline";
   if (!have("bible")) { approveStage(actor, id, "treatment"); result = await writeBible(actor, id); stage = "bible"; }
   else if (!have("outline")) { approveStage(actor, id, "bible"); result = await writeOutline(actor, id); stage = "outline"; }
-  else { approveStage(actor, id, "outline"); return reply(callId, args, "The outline is approved. The written plan is complete; making the scenes is a later step that is not built yet, so say so plainly.", { productionId: id, stage: "outline", approved: true }); }
+  else {
+    approveStage(actor, id, "outline");
+    if (isProducing(id)) { const p = progressOf(actor, id); return reply(callId, args, `Already being made: ${p.scenes_done} of ${p.scenes_total} scenes done.${p.seconds_left === null ? "" : ` About ${Math.ceil(p.seconds_left / 60)} minutes left.`}`, { productionId: id, stage: "producing", ...p }); }
+    void produce(actor, id).catch((e) => console.error("[longform] produce failed", id, e));
+    return reply(callId, args, "The outline is approved and the scenes are being written and made now, one after another. Tell the person it runs in the background, can take a long time, and they can ask how far along it is by naming the production.", { productionId: id, stage: "producing", approved: true });
+  }
   return result.ok ? reply(callId, args, `${describe(actor, id, stage)} ${NEXT[stage]}`, { productionId: id, stage }) : refused(callId, args, result.line, "stage_failed");
 }
