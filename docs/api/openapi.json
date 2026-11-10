@@ -77782,6 +77782,84 @@
         }
       }
     },
+    "/api/loras/bases": {
+      "get": {
+        "tags": [
+          "LoRAs"
+        ],
+        "summary": "The bases this install can use styles for (the Made for choices)",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "video",
+                "picture"
+              ],
+              "default": "video"
+            },
+            "required": false,
+            "name": "media",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "One entry per base; never needs the sources.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "bases": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "label": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "label"
+                        ]
+                      }
+                    }
+                  },
+                  "required": [
+                    "bases"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Admins only",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/loras/browse/{source}/{id}": {
       "get": {
         "tags": [
