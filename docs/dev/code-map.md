@@ -66,12 +66,15 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/packages/shows/pages/shows.json` | shows | Shows |
 | `backend/packages/shows/pages/watch.json` | shows | Watch |
 | `backend/packages/shows/pages/watchlist.json` | shows | Watchlist |
+| `backend/packages/videos/pages/channel.json` | videos | Channel |
 | `backend/packages/videos/pages/clips.json` | videos | My clips |
 | `backend/packages/videos/pages/create.json` | videos | Create |
 | `backend/packages/videos/pages/history.json` | videos | History |
 | `backend/packages/videos/pages/index.json` | videos | Videos |
 | `backend/packages/videos/pages/library.json` | videos | Library |
 | `backend/packages/videos/pages/liked.json` | videos | Liked videos |
+| `backend/packages/videos/pages/playlist.json` | videos | Playlist |
+| `backend/packages/videos/pages/playlists.json` | videos | Playlists |
 | `backend/packages/videos/pages/search.json` | videos | Search |
 | `backend/packages/videos/pages/studio.json` | videos | Studio |
 | `backend/packages/videos/pages/watch-later.json` | videos | Watch later |
@@ -235,6 +238,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `frontend/src/shell/library/TranscriptFindReplace.tsx` | FindReplace |
 | `frontend/src/shell/library/TranscriptPanel.tsx` | timeLabel, parseClock, useTranscriptWorkspace |
 | `frontend/src/shell/media/AudioVisualizer.tsx` | VISUALIZERS, getVisualizerPref, setVisualizerPref, getVisualizerEnabled, setVisualizerEnabled, useVisualizerEnabled |
+| `frontend/src/shell/media/EqualizerMenu.tsx` | eqLabel, EqualizerMenu |
 | `frontend/src/shell/media/MinimizeButton.tsx` | MinimizeButton |
 | `frontend/src/shell/media/MusicVisualizerSection.tsx` | MusicVisualizerSection |
 | `frontend/src/shell/media/NowPlayingStage.tsx` | clock, lyricsOf, NowPlayingStage |
@@ -546,6 +550,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/house/scheduleTool.ts` | SCHEDULE_ACTIONS, isScheduleAction, SCHEDULE_DO, whenShape, canUseSchedules, describeWhen |
 | `backend/src/lib/house/tool.ts` | safeHouseAction, HOUSE_ACTIONS, normalizeHouseArgs, houseToolSpec, visibleInstances, visibleHouseEntities |
 | `backend/src/lib/house/undoRunner.ts` | undoDataIsSafe, houseUndoRunner |
+| `backend/src/lib/house/widgetTiles.ts` | DEVICE_TILE_LIMIT, deviceTiles, deviceTilesFor |
 | `backend/src/lib/householdCa.ts` | onLeafRenewed, __notifyLeafRenewedForTests, __clearLeafRenewedListenersForTests, ensureHouseholdCa, registerRenewFixHandler, ensureHouseholdLeaf |
 | `backend/src/lib/householdCompanions.ts` | householdCompanionFolder, getHouseholdCompanion, householdCompanionAuthorId, migrateOwnerJsonAll, listHouseholdCompanionIds, createHouseholdCompanion |
 | `backend/src/lib/householdVoiceCheck.ts` | HOUSEHOLD_PREVIEW_SENTENCE, renderHouseholdVoice, cacheHouseholdPreview, dropHouseholdPreview, householdPreviewAudio |
@@ -675,8 +680,9 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/media/mediaEdit.ts` | editMediaItem |
 | `backend/src/lib/media/model.ts` | itemFromRow, itemToRow, MADE_SOURCE_PREFIX, LEGACY_MADE_SOURCE_PREFIX, madeSourceId, sourceFromRow |
 | `backend/src/lib/media/music.ts` | albumKey, artistKey, albumOrder, groupTracks, radioTracks, shuffled |
-| `backend/src/lib/media/musicLibrary.ts` | MUSIC_PIN_MAX, MUSIC_SEARCH_MAX, pinMusicItem, musicQueueAction, recordMusicSearch, clearMusicSearches |
+| `backend/src/lib/media/musicLibrary.ts` | MUSIC_PIN_MAX, MUSIC_SEARCH_MAX, MUSIC_KEPT_MAX, pinMusicItem, musicQueueAction, recordMusicSearch |
 | `backend/src/lib/media/musicMixes.ts` | musicGreeting, daylistRows, replayRows, MIX_SCOPES, musicMixData |
+| `backend/src/lib/media/musicPlaylists.ts` | ownPlaylists, memberPlaylists, playlistFor, memberCandidates, playlistVisibility, changePlaylistMembers |
 | `backend/src/lib/media/musicbrainzMatch.ts` | MUSICBRAINZ_HOST, MUSICBRAINZ_MATCH_KEY, MIN_GAP_MS, matchingEnabled, foldName, sameName |
 | `backend/src/lib/media/parsers/audioTags.ts` | explicitFromNative, tagsFromMetadata, readSidecarLyrics, readAudioTags, readEmbeddedCover |
 | `backend/src/lib/media/parsers/epub.ts` | parseOpf, readEpubMeta, readEpubCover |
@@ -1042,7 +1048,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/statusChannel.ts` | StatusChannel |
 | `backend/src/lib/statusHistory.ts` | buildStatusHistory, componentStatesFrom, chatPauseSummary, __setStatusHistoryHealthForTests, recordStatusSample, recordBootGap |
 | `backend/src/lib/statusPhrases.ts` | pickStatusPhrase |
-| `backend/src/lib/storage.ts` | walkFiles, diskUsage, storageSummary, storageImpact, checkPersonQuota, checkDiskFull |
+| `backend/src/lib/storage.ts` | walkFiles, diskUsage, storageSummary, storageImpact, checkPersonQuota, diskIsLow |
 | `backend/src/lib/storage/personFiles.ts` | personFilesFate, releaseFilesOfDeletedPerson, exportPersonFiles |
 | `backend/src/lib/storage/usage.ts` | kindForMediaType, personUsageBytes, householdUsageBytes, householdInheritedUsage, personUsageByKind, storageUsageOverview |
 | `backend/src/lib/store.ts` | fetchVerifiedIndex, install, rollback, uninstall, setChannel |
@@ -1169,7 +1175,9 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/videos/favorites.ts` | favoriteFileIds, isFavoriteFile, setFavoriteFile |
 | `backend/src/lib/videos/feed.ts` | FEED_LIMIT, levelOfJob, feedRowOf, feedRows, feedRowById |
 | `backend/src/lib/videos/frameCheck.ts` | sharpness, checkClipFrames |
+| `backend/src/lib/videos/history.ts` | removeFromHistory |
 | `backend/src/lib/videos/jobs.ts` | VIDEO_FAILED_PREFIX, MEMORY_CANCELLED_CODE, plainVideoFailure, getVideoJobFor, doneVideoJobsFor, sourceVideoJob |
+| `backend/src/lib/videos/librarySort.ts` | LIBRARY_SORT_KEY, savedLibrarySort, librarySortFor |
 | `backend/src/lib/videos/lock.ts` | videoJobLockItem, videoJobLockState, lockedJobView, LOCKED_START_LINE, lockedVideoTile, LOCKED_RESULT_TEXT |
 | `backend/src/lib/videos/longTake.ts` | MAX_PARTS, MAX_TAKE_SECONDS, MIN_PART_SECONDS, SUMMARY_LIMIT, CONTINUITY, TAKE_TOO_MUCH_LINE |
 | `backend/src/lib/videos/loraWire.ts` | LORAS_UNSUPPORTED_LINE, ltx25LorasSupported, wireLoras |
@@ -1177,6 +1185,8 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/videos/messagesCopy.ts` | videoFileName, videoTitle, hasAudioTrack, messagesCopyOf, __resetMessagesCopiesForTests |
 | `backend/src/lib/videos/musicBed.ts` | __setMusicBedPollMsForTests, startMusicBed, whenMusicDone, setPendingMix, takePendingMix |
 | `backend/src/lib/videos/phaseLabel.ts` | phaseLabel |
+| `backend/src/lib/videos/playlistData.ts` | SUGGEST_MAX, SUGGEST_MIN_CHARS, videoSuggestions, channelStrip, withChannelAvatars, videoScopedData |
+| `backend/src/lib/videos/playlists.ts` | GONE, VIDEO_GONE, ownVideoPlaylists, memberVideoPlaylists, videoPlaylistFor, resolveEntries |
 | `backend/src/lib/videos/policy.ts` | VIDEO_ENABLED_KEY, VIDEO_TIER_KEY, VIDEO_DENIAL_LINE, VIDEO_NOT_HERE_LINE, householdAllowsVideo, householdVideoQuality |
 | `backend/src/lib/videos/promptCheck.ts` | checkVideoPrompt |
 | `backend/src/lib/videos/quality.ts` | QUICK_BASE, DETAILED_BASE, QUICK_MAX_SECONDS, DETAILED_MAX_SECONDS, LTX25_MODEL, LTX25_MAX_MODEL |

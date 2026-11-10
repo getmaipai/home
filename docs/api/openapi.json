@@ -46068,7 +46068,8 @@
                         "type": "string",
                         "enum": [
                           "card",
-                          "row"
+                          "row",
+                          "tiles"
                         ]
                       },
                       "refresh_s": {
@@ -46184,7 +46185,8 @@
                           "type": "string",
                           "enum": [
                             "card",
-                            "row"
+                            "row",
+                            "tiles"
                           ]
                         },
                         "refresh_s": {
@@ -46254,7 +46256,8 @@
                             "type": "string",
                             "enum": [
                               "card",
-                              "row"
+                              "row",
+                              "tiles"
                             ]
                           },
                           "refresh_s": {
@@ -46325,7 +46328,8 @@
                             "type": "string",
                             "enum": [
                               "card",
-                              "row"
+                              "row",
+                              "tiles"
                             ]
                           },
                           "refresh_s": {
@@ -46433,7 +46437,8 @@
                             "type": "string",
                             "enum": [
                               "card",
-                              "row"
+                              "row",
+                              "tiles"
                             ]
                           },
                           "refresh_s": {
@@ -46574,7 +46579,8 @@
                             "type": "string",
                             "enum": [
                               "card",
-                              "row"
+                              "row",
+                              "tiles"
                             ]
                           },
                           "refresh_s": {
@@ -46750,6 +46756,36 @@
                       "enum": [
                         true
                       ]
+                    },
+                    "tiles": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "name": {
+                            "type": "string"
+                          },
+                          "state": {
+                            "type": "string"
+                          },
+                          "icon": {
+                            "type": "string"
+                          },
+                          "on": {
+                            "type": "boolean"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "name",
+                          "state",
+                          "icon",
+                          "on"
+                        ]
+                      }
                     }
                   },
                   "required": [
@@ -99290,6 +99326,42 @@
                           "additionalProperties": false
                         }
                       },
+                      "media_kind": {
+                        "type": "string",
+                        "enum": [
+                          "music",
+                          "video"
+                        ],
+                        "default": "music",
+                        "description": "MEDIA-PARITY-02. What a playlist holds. A record without it is a music playlist."
+                      },
+                      "members": {
+                        "type": "array",
+                        "items": {
+                          "type": "string",
+                          "pattern": "^person-[a-z0-9]{6,}$"
+                        },
+                        "default": [],
+                        "description": "MEDIA-PARITY-02. People other than the owner who may add items to a shared playlist. The owner always may. Empty by default; it grants adding only, and who can see the playlist stays with shared_to."
+                      },
+                      "cover_file_id": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "pattern": "^file-[a-z0-9]{6,}$",
+                            "description": "MEDIA-PARITY-02. A household file used as the playlist's cover picture. Null draws the cover from the first items."
+                          },
+                          {
+                            "nullable": true,
+                            "description": "MEDIA-PARITY-02. A household file used as the playlist's cover picture. Null draws the cover from the first items."
+                          },
+                          {
+                            "nullable": true
+                          }
+                        ],
+                        "default": null,
+                        "description": "MEDIA-PARITY-02. A household file used as the playlist's cover picture. Null draws the cover from the first items."
+                      },
                       "pointer": {
                         "anyOf": [
                           {
@@ -99520,6 +99592,42 @@
                         "additionalProperties": false
                       }
                     },
+                    "media_kind": {
+                      "type": "string",
+                      "enum": [
+                        "music",
+                        "video"
+                      ],
+                      "default": "music",
+                      "description": "MEDIA-PARITY-02. What a playlist holds. A record without it is a music playlist."
+                    },
+                    "members": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "pattern": "^person-[a-z0-9]{6,}$"
+                      },
+                      "default": [],
+                      "description": "MEDIA-PARITY-02. People other than the owner who may add items to a shared playlist. The owner always may. Empty by default; it grants adding only, and who can see the playlist stays with shared_to."
+                    },
+                    "cover_file_id": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "pattern": "^file-[a-z0-9]{6,}$",
+                          "description": "MEDIA-PARITY-02. A household file used as the playlist's cover picture. Null draws the cover from the first items."
+                        },
+                        {
+                          "nullable": true,
+                          "description": "MEDIA-PARITY-02. A household file used as the playlist's cover picture. Null draws the cover from the first items."
+                        },
+                        {
+                          "nullable": true
+                        }
+                      ],
+                      "default": null,
+                      "description": "MEDIA-PARITY-02. A household file used as the playlist's cover picture. Null draws the cover from the first items."
+                    },
                     "pointer": {
                       "anyOf": [
                         {
@@ -99724,6 +99832,42 @@
                           ],
                           "additionalProperties": false
                         }
+                      },
+                      "media_kind": {
+                        "type": "string",
+                        "enum": [
+                          "music",
+                          "video"
+                        ],
+                        "default": "music",
+                        "description": "MEDIA-PARITY-02. What a playlist holds. A record without it is a music playlist."
+                      },
+                      "members": {
+                        "type": "array",
+                        "items": {
+                          "type": "string",
+                          "pattern": "^person-[a-z0-9]{6,}$"
+                        },
+                        "default": [],
+                        "description": "MEDIA-PARITY-02. People other than the owner who may add items to a shared playlist. The owner always may. Empty by default; it grants adding only, and who can see the playlist stays with shared_to."
+                      },
+                      "cover_file_id": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "pattern": "^file-[a-z0-9]{6,}$",
+                            "description": "MEDIA-PARITY-02. A household file used as the playlist's cover picture. Null draws the cover from the first items."
+                          },
+                          {
+                            "nullable": true,
+                            "description": "MEDIA-PARITY-02. A household file used as the playlist's cover picture. Null draws the cover from the first items."
+                          },
+                          {
+                            "nullable": true
+                          }
+                        ],
+                        "default": null,
+                        "description": "MEDIA-PARITY-02. A household file used as the playlist's cover picture. Null draws the cover from the first items."
                       },
                       "pointer": {
                         "anyOf": [
@@ -99940,6 +100084,42 @@
                         ],
                         "additionalProperties": false
                       }
+                    },
+                    "media_kind": {
+                      "type": "string",
+                      "enum": [
+                        "music",
+                        "video"
+                      ],
+                      "default": "music",
+                      "description": "MEDIA-PARITY-02. What a playlist holds. A record without it is a music playlist."
+                    },
+                    "members": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "pattern": "^person-[a-z0-9]{6,}$"
+                      },
+                      "default": [],
+                      "description": "MEDIA-PARITY-02. People other than the owner who may add items to a shared playlist. The owner always may. Empty by default; it grants adding only, and who can see the playlist stays with shared_to."
+                    },
+                    "cover_file_id": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "pattern": "^file-[a-z0-9]{6,}$",
+                          "description": "MEDIA-PARITY-02. A household file used as the playlist's cover picture. Null draws the cover from the first items."
+                        },
+                        {
+                          "nullable": true,
+                          "description": "MEDIA-PARITY-02. A household file used as the playlist's cover picture. Null draws the cover from the first items."
+                        },
+                        {
+                          "nullable": true
+                        }
+                      ],
+                      "default": null,
+                      "description": "MEDIA-PARITY-02. A household file used as the playlist's cover picture. Null draws the cover from the first items."
                     },
                     "pointer": {
                       "anyOf": [
@@ -100204,6 +100384,42 @@
                         ],
                         "additionalProperties": false
                       }
+                    },
+                    "media_kind": {
+                      "type": "string",
+                      "enum": [
+                        "music",
+                        "video"
+                      ],
+                      "default": "music",
+                      "description": "MEDIA-PARITY-02. What a playlist holds. A record without it is a music playlist."
+                    },
+                    "members": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "pattern": "^person-[a-z0-9]{6,}$"
+                      },
+                      "default": [],
+                      "description": "MEDIA-PARITY-02. People other than the owner who may add items to a shared playlist. The owner always may. Empty by default; it grants adding only, and who can see the playlist stays with shared_to."
+                    },
+                    "cover_file_id": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "pattern": "^file-[a-z0-9]{6,}$",
+                          "description": "MEDIA-PARITY-02. A household file used as the playlist's cover picture. Null draws the cover from the first items."
+                        },
+                        {
+                          "nullable": true,
+                          "description": "MEDIA-PARITY-02. A household file used as the playlist's cover picture. Null draws the cover from the first items."
+                        },
+                        {
+                          "nullable": true
+                        }
+                      ],
+                      "default": null,
+                      "description": "MEDIA-PARITY-02. A household file used as the playlist's cover picture. Null draws the cover from the first items."
                     },
                     "pointer": {
                       "anyOf": [
@@ -100532,6 +100748,42 @@
                         "additionalProperties": false
                       }
                     },
+                    "media_kind": {
+                      "type": "string",
+                      "enum": [
+                        "music",
+                        "video"
+                      ],
+                      "default": "music",
+                      "description": "MEDIA-PARITY-02. What a playlist holds. A record without it is a music playlist."
+                    },
+                    "members": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "pattern": "^person-[a-z0-9]{6,}$"
+                      },
+                      "default": [],
+                      "description": "MEDIA-PARITY-02. People other than the owner who may add items to a shared playlist. The owner always may. Empty by default; it grants adding only, and who can see the playlist stays with shared_to."
+                    },
+                    "cover_file_id": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "pattern": "^file-[a-z0-9]{6,}$",
+                          "description": "MEDIA-PARITY-02. A household file used as the playlist's cover picture. Null draws the cover from the first items."
+                        },
+                        {
+                          "nullable": true,
+                          "description": "MEDIA-PARITY-02. A household file used as the playlist's cover picture. Null draws the cover from the first items."
+                        },
+                        {
+                          "nullable": true
+                        }
+                      ],
+                      "default": null,
+                      "description": "MEDIA-PARITY-02. A household file used as the playlist's cover picture. Null draws the cover from the first items."
+                    },
                     "pointer": {
                       "anyOf": [
                         {
@@ -100776,6 +101028,42 @@
                         "additionalProperties": false
                       }
                     },
+                    "media_kind": {
+                      "type": "string",
+                      "enum": [
+                        "music",
+                        "video"
+                      ],
+                      "default": "music",
+                      "description": "MEDIA-PARITY-02. What a playlist holds. A record without it is a music playlist."
+                    },
+                    "members": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "pattern": "^person-[a-z0-9]{6,}$"
+                      },
+                      "default": [],
+                      "description": "MEDIA-PARITY-02. People other than the owner who may add items to a shared playlist. The owner always may. Empty by default; it grants adding only, and who can see the playlist stays with shared_to."
+                    },
+                    "cover_file_id": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "pattern": "^file-[a-z0-9]{6,}$",
+                          "description": "MEDIA-PARITY-02. A household file used as the playlist's cover picture. Null draws the cover from the first items."
+                        },
+                        {
+                          "nullable": true,
+                          "description": "MEDIA-PARITY-02. A household file used as the playlist's cover picture. Null draws the cover from the first items."
+                        },
+                        {
+                          "nullable": true
+                        }
+                      ],
+                      "default": null,
+                      "description": "MEDIA-PARITY-02. A household file used as the playlist's cover picture. Null draws the cover from the first items."
+                    },
                     "pointer": {
                       "anyOf": [
                         {
@@ -101008,6 +101296,42 @@
                         ],
                         "additionalProperties": false
                       }
+                    },
+                    "media_kind": {
+                      "type": "string",
+                      "enum": [
+                        "music",
+                        "video"
+                      ],
+                      "default": "music",
+                      "description": "MEDIA-PARITY-02. What a playlist holds. A record without it is a music playlist."
+                    },
+                    "members": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "pattern": "^person-[a-z0-9]{6,}$"
+                      },
+                      "default": [],
+                      "description": "MEDIA-PARITY-02. People other than the owner who may add items to a shared playlist. The owner always may. Empty by default; it grants adding only, and who can see the playlist stays with shared_to."
+                    },
+                    "cover_file_id": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "pattern": "^file-[a-z0-9]{6,}$",
+                          "description": "MEDIA-PARITY-02. A household file used as the playlist's cover picture. Null draws the cover from the first items."
+                        },
+                        {
+                          "nullable": true,
+                          "description": "MEDIA-PARITY-02. A household file used as the playlist's cover picture. Null draws the cover from the first items."
+                        },
+                        {
+                          "nullable": true
+                        }
+                      ],
+                      "default": null,
+                      "description": "MEDIA-PARITY-02. A household file used as the playlist's cover picture. Null draws the cover from the first items."
                     },
                     "pointer": {
                       "anyOf": [
