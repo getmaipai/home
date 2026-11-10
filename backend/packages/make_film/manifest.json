@@ -1,34 +1,119 @@
 {
   "id": "make_film",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "kind": "plugin",
   "category": "Media",
   "display": "Make a Film",
-  "description": "Plan and start a short film from an idea, scene or script.",
+  "description": "Plan and start a short film from an idea, scene or script; for longer than two minutes, write a production step by step.",
   "offer": {
     "mode": "conditional",
     "gate": "filmAllowed",
     "bench_row": "make-film-tool",
-    "reason": "offered only when the person asks for a film, movie or short with several shots; adult on their own written screen with video on"
+    "reason": "offered only when the person asks for a film, movie, episode or long video; adult on their own written screen with video on"
   },
   "author": "MaiPai",
   "license": "AGPL-3.0",
   "homepage": "https://github.com/getmaipai/home",
-  "routing": { "examples": ["Make a 40 second film of a paper boat in the rain", "Make a short movie about two cats finding a garden", "Turn this scene into a film with six shots", "Create a 90 second film from this script", "Make a cartoon short about a fox and a moonlit forest"], "patterns": [] },
+  "routing": {
+    "examples": [
+      "Make a 40 second film of a paper boat in the rain",
+      "Make a short movie about two cats finding a garden",
+      "Turn this scene into a film with six shots",
+      "Create a 90 second film from this script",
+      "Make a cartoon short about a fox and a moonlit forest",
+      "Make a 3 minute video about a lighthouse keeper",
+      "Write me a sitcom episode about two roommates",
+      "I want a feature-length movie about a heist",
+      "Yes, that is good, go on"
+    ],
+    "patterns": []
+  },
   "args": {
     "type": "object",
-    "required": ["idea"],
+    "required": [],
     "properties": {
-      "idea": { "type": "string", "minLength": 3, "maxLength": 4000, "grounded": false, "description": "The story, scene or script in the person's own words. Keep their meaning and details." },
-      "shots": { "type": "integer", "minimum": 4, "maximum": 12, "grounded": false, "description": "Optional number of shots, from 4 to 12. Set only when the person asks for a number." },
-      "seconds": { "type": "integer", "minimum": 10, "maximum": 300, "grounded": false, "description": "The total length in seconds the person asked for; set it only when they named a length." },
-      "look": { "type": "string", "maxLength": 160, "grounded": false, "description": "Optional look in plain words, such as 1975 35mm, overcast, muted, or cartoon. Set only when the person asks for a look." },
-      "characters": { "type": "array", "maxItems": 8, "items": { "type": "string", "maxLength": 80 }, "grounded": false, "description": "Optional names of saved characters to use, only when the person names them." },
-      "go_ahead": { "type": "boolean", "grounded": false, "description": "Set true only when the person asked to skip checking the plan first. Otherwise leave out or set false; the person reviews the plan and presses Go." },
-      "faceless": { "type": "boolean", "default": false, "grounded": false, "description": "a narrated film of pictures with slow zoom and pan, no characters moving" }
+      "idea": {
+        "type": "string",
+        "minLength": 3,
+        "maxLength": 4000,
+        "grounded": false,
+        "description": "The story in the person's own words. Keep their meaning and details."
+      },
+      "shots": {
+        "type": "integer",
+        "minimum": 4,
+        "maximum": 12,
+        "grounded": false,
+        "description": "Optional number of shots, from 4 to 12. Set only when the person asks for a number."
+      },
+      "seconds": {
+        "type": "integer",
+        "minimum": 10,
+        "maximum": 14400,
+        "grounded": false,
+        "description": "Total length in seconds the person asked for. Over 120 starts a production written in steps; ask once if a long one has no length."
+      },
+      "look": {
+        "type": "string",
+        "maxLength": 160,
+        "grounded": false,
+        "description": "Optional look in plain words, such as 1975 35mm, overcast, muted, or cartoon. Set only when the person asks for a look."
+      },
+      "characters": {
+        "type": "array",
+        "maxItems": 8,
+        "items": {
+          "type": "string",
+          "maxLength": 80
+        },
+        "grounded": false,
+        "description": "Optional names of saved characters to use, only when the person names them."
+      },
+      "go_ahead": {
+        "type": "boolean",
+        "grounded": false,
+        "description": "Set true only when the person asked to skip checking the plan first. Otherwise leave out or set false; the person reviews the plan and presses Go."
+      },
+      "faceless": {
+        "type": "boolean",
+        "default": false,
+        "grounded": false,
+        "description": "a narrated film of pictures with slow zoom and pan, no characters moving"
+      },
+      "production_id": {
+        "type": "string",
+        "maxLength": 120,
+        "grounded": false,
+        "description": "A production being continued, from the earlier result."
+      },
+      "approve": {
+        "type": "boolean",
+        "grounded": false,
+        "description": "True, with production_id, only when the person said the last step is good and to go on."
+      }
     }
   },
-  "incognito": "ephemeral", "requires": [], "optional": [], "platforms": ["home"], "min_role": "adult", "consequential": false,
-  "offline": "full", "config": [], "data_sources": [], "permissions": [], "notifications": [], "backup": "exclude", "background": false,
-  "contributes": {}, "min_app": "0.1.0", "tier": 0, "quality_scale": "bronze", "smoke": { "kind": "recipe_fixture", "fixture": "tests/smoke.json" }
+  "incognito": "ephemeral",
+  "requires": [],
+  "optional": [],
+  "platforms": [
+    "home"
+  ],
+  "min_role": "adult",
+  "consequential": false,
+  "offline": "full",
+  "config": [],
+  "data_sources": [],
+  "permissions": [],
+  "notifications": [],
+  "backup": "exclude",
+  "background": false,
+  "contributes": {},
+  "min_app": "0.1.0",
+  "tier": 0,
+  "quality_scale": "bronze",
+  "smoke": {
+    "kind": "recipe_fixture",
+    "fixture": "tests/smoke.json"
+  }
 }

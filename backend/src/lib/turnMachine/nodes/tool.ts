@@ -37,6 +37,7 @@ import { GENERATE_VIDEO_TOOL_ID, runGenerateVideo } from "@/lib/videos/tool";
 import { redactLockedVideoOutcome } from "@/lib/videos/lock";
 import { EDIT_VIDEO_TOOL_ID, runEditVideo } from "@/lib/videos/editTool";
 import { MAKE_FILM_TOOL_ID, runMakeFilm } from "@/lib/films/tool";
+import { isProductionCall, runMakeProduction } from "@/lib/longform/tool";
 import { speakerIsAnonymous, turnAgeBand } from "../speaker";
 import type { Node, ActionProposal, ToolExecutionOutcome } from "../contract";
 import { TOOL_RESULT_SITES_MAX, type TurnStreamEvent as ToolStreamEvent } from "@maipai/spec/stack/ts/turn-stream-event.js";
@@ -468,7 +469,8 @@ export const toolNode: Node<ToolInput, ToolOutput> = async (state, input, signal
     }
 
     if (tool === MAKE_FILM_TOOL_ID) {
-      const outcome = runMakeFilm({ state, args: args as Record<string, unknown>, callId, spoken: (state.planBasis?.surfaceClass ?? "spoken") !== "written" });
+      const filmInput = { state, args: args as Record<string, unknown>, callId, spoken: (state.planBasis?.surfaceClass ?? "spoken") !== "written" };
+      const outcome = isProductionCall(filmInput.args) ? await runMakeProduction(filmInput) : runMakeFilm(filmInput);
       outcomes.push(outcome);
       if (outcome.status === "succeeded") toolEvents.push({ t: "tool_result", call_id: callId, package_id: tool, outcome: { text: outcome.result?.reply?.text } });
       else toolEvents.push({ t: "tool_error", call_id: callId, package_id: tool, error: lookupFailureKind(outcome) });

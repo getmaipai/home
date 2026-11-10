@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.4.0] - 2026-11-10
+
+### Added
+
+- A request longer than two minutes (or naming a production) writes a long production in steps: treatment, then cast and places, then scenes, each approved before the next. The length is never fixed to particular values.
+
 ## [0.3.0] - 2026-11-06
 
 ### Added

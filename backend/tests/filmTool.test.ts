@@ -28,9 +28,9 @@ describe("FILM-04 make_film", () => {
   test("manifest declares the adult conditional film tool and its arguments", () => {
     const manifest = JSON.parse(readFileSync(join(import.meta.dir, "../packages/make_film/manifest.json"), "utf8"));
     expect(manifest).toMatchObject({ id: MAKE_FILM_TOOL_ID, kind: "plugin", min_role: "adult", offer: { mode: "conditional", gate: "filmAllowed", bench_row: "make-film-tool" } });
-    expect(manifest.args.required).toEqual(["idea"]);
-    expect(Object.keys(manifest.args.properties)).toEqual(["idea", "shots", "seconds", "look", "characters", "go_ahead", "faceless"]);
-    expect(manifest.version).toBe("0.3.0");
+    expect(manifest.args.required).toEqual([]);
+    expect(Object.keys(manifest.args.properties)).toEqual(["idea", "shots", "seconds", "look", "characters", "go_ahead", "faceless", "production_id", "approve"]);
+    expect(manifest.version).toBe("0.4.0");
   });
   test("passes arguments through and returns immediately with the run id", () => {
     let received: Record<string, unknown> | undefined;
