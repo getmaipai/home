@@ -540,7 +540,7 @@ describe("U3: Camera and Look cards from the one lists, with their loops", () =>
     expect(chip("camera").variant).toBe("cards");
     expect(chip("camera").default).toBe("none");
     expect(chip("camera").options).toEqual([{ value: "none", label: "Auto" }, ...VIDEO_RECIPES.map((r) => ({ value: r.id, label: r.label, ...(shipped(r.loop) ? { media: r.loop } : {}) }))]);
-    expect(bar.references).toEqual([{ state: "start_frame", label: "Start frame", hint: "Optional. Begin from a picture.", kind: "picture", placement: "row" }]);
+    expect(bar.references).toEqual([{ state: "start_frame", label: "Start frame", kind: "picture", placement: "in_field" }]);
     expect(bar.submit.call.args).toMatchObject({ camera: "{camera}", start_frame: "{start_frame}", look: "{look}" });
     const source = await Bun.file(join(PACKAGES_DIR, "videos", "pages", "create.json")).text();
     expect(source).not.toContain(".mp4");
