@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-11-10T04:03:39.221Z",
-  "kitTag": "ui-v0.5.567",
+  "generatedAt": "2026-11-10T05:10:23.384Z",
+  "kitTag": "ui-v0.5.569",
   "items": [
     {
       "file": "ActivityCardsShowcase.tsx",
@@ -374,6 +374,14 @@
       "group": "climate-tile",
       "verdict": "later",
       "verdictReason": "Smart-home tile; no Home surface uses it until the Home Control package is built.",
+      "implemented": false
+    },
+    {
+      "file": "clip-feed.tsx",
+      "name": "clip-feed",
+      "group": "clip",
+      "verdict": "unassessed",
+      "verdictReason": "Recorded unassessed verdict in elements-plan.json; see the plan entry for its dependency or scope.",
       "implemented": false
     },
     {
