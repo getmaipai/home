@@ -52,6 +52,21 @@ describe("Adult lock passkey credentials", () => {
     expect(await locked.json()).toMatchObject({ error: "Too many attempts", retryAfter: expect.any(Number) });
   });
 
+  test("an expired or overwritten challenge is not a wrong guess and never locks the person out", async () => {
+    const { adult, person } = await passkeyOnlyAdult();
+    for (const code of ["passkey_signin_expired", "passkey_not_registered_here"] as const) {
+      verifySpy!.mockResolvedValue({ ok: false, code });
+      for (let i = 0; i < LOCKOUT_THRESHOLD + 2; i++) {
+        const res = await adult.client.post("/api/adult-lock/unlock", { passkey_assertion: { id: "adult-key" } });
+        expect(res.status).toBe(401);
+      }
+    }
+    expect(currentLockout(person.id, "adult_unlock")?.failedAttempts ?? 0).toBe(0);
+    verifySpy!.mockResolvedValue({ ok: true });
+    await adult.client.post("/api/adult-lock/unlock/options");
+    expect((await adult.client.post("/api/adult-lock/unlock", { passkey_assertion: { id: "adult-key" }, visit: "t" })).status).toBe(200);
+  });
+
   test("shared or minor screens cannot request options or unlock", async () => {
     const { adult, teen, person } = await passkeyOnlyAdult();
     const deviceToken = issueDeviceToken(person.id, "tv", "Shared screen").token;

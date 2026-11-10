@@ -35,6 +35,7 @@ const UnlockBody = CredentialBody.extend({ visit: z.string().min(1).max(80).opti
 const ConfirmBody = CredentialBody.extend({ action: z.literal("unmark"), item: z.string().min(1).max(80) })
   .refine((body) => Boolean(body.secret) !== Boolean(body.passkey_assertion), "Provide exactly one credential");
 const passkeyFailureMessage = "Invalid PIN or password";
+const PASSKEY_RETRY_LINE = "That passkey check timed out. Press Use a passkey and try again.";
 
 const optionsRoute = createRoute({
   method: "post", path: "/unlock/options", tags: ["Adult lock"], summary: "Passkey options for unlocking on this adult's own screen", middleware: [requireAuth] as const,
@@ -73,6 +74,8 @@ adultLockRoutes.openapi(unlockRoute, async (c) => {
     if (!hasPasskey) return c.json({ error: NO_SECRET_LINE }, 400);
     const result = await verifyAuthentication(actor.id, passkey_assertion as AuthenticationResponseJSON);
     if (!result.ok) {
+      // An expired or unknown challenge is not a wrong guess (another request can overwrite the person's pending challenge): it counts toward nothing.
+      if (result.code !== "passkey_verify_failed") return c.json({ error: PASSKEY_RETRY_LINE }, 401);
       ensureCredentialRowExists(actor.id);
       const failure = recordCredentialFailure(ip, actor.id, passkeyFailureMessage, "adult_unlock");
       countUnlock("wrong"); return c.json(failure.body, 401);
@@ -134,6 +137,8 @@ adultLockRoutes.openapi(confirmRoute, async (c) => {
     if (!hasPasskey) return c.json({ error: NO_SECRET_LINE }, 400);
     const result = await verifyAuthentication(actor.id, passkey_assertion as AuthenticationResponseJSON);
     if (!result.ok) {
+      // An expired or unknown challenge is not a wrong guess (another request can overwrite the person's pending challenge): it counts toward nothing.
+      if (result.code !== "passkey_verify_failed") return c.json({ error: PASSKEY_RETRY_LINE }, 401);
       ensureCredentialRowExists(actor.id);
       const failure = recordCredentialFailure(ip, actor.id, passkeyFailureMessage, "adult_unlock");
       countUnlock("wrong"); return c.json(failure.body, 401);

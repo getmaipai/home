@@ -207,6 +207,8 @@ export function MediaHostProvider({ children, personId, ageBand }: { children: R
   const [pick, setPick] = useState<{ kind: PickKind | "audio" | "video"; start: "voice" | "music"; resolve: (picked: PickedMedia | null) => void } | null>(null);
   const [fresh, setFresh] = useState<{ id: string; title?: string; description?: string; actionLabel?: string; resolve: (value: { ticket: string } | null) => void } | null>(null);
   const freshRef = useRef(fresh); freshRef.current = fresh;
+  // A dialog still open when the host goes away answers null, so no caller waits forever.
+  useEffect(() => () => { freshRef.current?.resolve(null); }, []);
   const [passkeyEnabled, setPasskeyEnabled] = useState(false);
   useEffect(() => { let live = true; void passkeysAvailable().then((value) => { if (live) setPasskeyEnabled(value); }); return () => { live = false; }; }, []);
   const pickRef = useRef(pick);
@@ -482,15 +484,15 @@ export function MediaHostProvider({ children, personId, ageBand }: { children: R
             </DialogContent>
           </Dialog>
         ) : null}
-      {fresh ? <AdultLockDialog open onOpenChange={(open) => { if (!open) { fresh.resolve(null); freshRef.current = null; setFresh(null); } }}
+      {fresh ? <AdultLockDialog open onOpenChange={(open) => { if (!open && freshRef.current === fresh) { fresh.resolve(null); freshRef.current = null; setFresh(null); } }}
         {...adultCredential(person)} hasCredential={person?.hasSecret !== false}
         title={fresh.title} description={fresh.description} actionLabel={fresh.actionLabel}
         unlock={async (secret): Promise<UnlockResult> => {
-          try { const result = await request<{ ticket: string }>("/api/adult-lock/confirm", { method: "POST", body: JSON.stringify({ secret, action: "unmark", item: fresh.id }) }); fresh.resolve(result); freshRef.current = null; setFresh(null); return { status: "ok" }; }
+          try { const result = await request<{ ticket: string }>("/api/adult-lock/confirm", { method: "POST", body: JSON.stringify({ secret, action: "unmark", item: fresh.id }) }); if (freshRef.current !== fresh) return { status: "ok" }; fresh.resolve(result); freshRef.current = null; setFresh(null); return { status: "ok" }; }
           catch (error) { if (error instanceof ApiError && error.status === 401) return { status: "failed" }; if (error instanceof ApiError && error.status === 429) return { status: "locked_out", retryAfterSeconds: error.retryAfter ?? 60 }; throw error; }
         }}
         {...(passkeyEnabled ? { onPasskey: async (): Promise<UnlockResult> => {
-          try { const passkey_assertion = await getPasskeyAssertion(); const result = await request<{ ticket: string }>("/api/adult-lock/confirm", { method: "POST", body: JSON.stringify({ passkey_assertion, action: "unmark", item: fresh.id }) }); fresh.resolve(result); freshRef.current = null; setFresh(null); return { status: "ok" }; }
+          try { const passkey_assertion = await getPasskeyAssertion(); const result = await request<{ ticket: string }>("/api/adult-lock/confirm", { method: "POST", body: JSON.stringify({ passkey_assertion, action: "unmark", item: fresh.id }) }); if (freshRef.current !== fresh) return { status: "ok" }; fresh.resolve(result); freshRef.current = null; setFresh(null); return { status: "ok" }; }
           catch (error) { if (error instanceof ApiError && error.status === 401) return { status: "failed" }; if (error instanceof ApiError && error.status === 429) return { status: "locked_out", retryAfterSeconds: error.retryAfter ?? 60 }; throw error; }
         } } : {})}
         onUnlocked={() => {}} /> : null}
