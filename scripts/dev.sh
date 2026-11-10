@@ -25,6 +25,8 @@ action="${1:-}"
 shift || true
 port_override="${MAIPAI_DEV_PORT:-}"
 stack_override="${MAIPAI_DEV_STACK_URL:-}"
+vite_host="${MAIPAI_DEV_HOST:-127.0.0.1}"
+vite_allowed_hosts="${VITE_ALLOWED_HOSTS:-}"
 no_stack=0
 while (($#)); do
   case "$1" in
@@ -126,6 +128,9 @@ live_vite() {
 }
 print_urls() {
   echo "Home: http://localhost:$vite_port"
+  if [[ "$vite_host" != 127.0.0.1 && "$vite_host" != localhost ]]; then
+    echo "Tailnet: http://$vite_host:$vite_port"
+  fi
   echo "API: http://127.0.0.1:$backend_port"
 }
 process_status() {
@@ -273,7 +278,9 @@ case "$action" in
 
     (
       cd "$root/frontend"
-      VITE_BACKEND_PORT="$backend_port" nohup bun run dev -- --port "$vite_port" --strictPort </dev/null >"$vite_log" 2>&1 &
+      vite_env=(env "VITE_BACKEND_PORT=$backend_port")
+      [[ -z "$vite_allowed_hosts" ]] || vite_env+=("VITE_ALLOWED_HOSTS=$vite_allowed_hosts")
+      "${vite_env[@]}" nohup bun run dev -- --host "$vite_host" --port "$vite_port" --strictPort </dev/null >"$vite_log" 2>&1 &
       echo $! > "$vite_pid_file"
     )
     frontend_ready=0

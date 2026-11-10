@@ -82,11 +82,9 @@ export function TodaySection({ home, heroOnly = false, chips = false, role }: { 
   if (!home && list.isError) return <p role="alert" className="text-supporting text-muted-foreground">{i18n._({ id: "Could not load Today. Refresh Home to try again.", message: "Could not load Today. Refresh Home to try again." })}</p>;
   const visibleSlots = slots.filter((slot) => {
     const item = slot.data.items.length === 1 ? slot.data.items[0] : undefined;
-    const sentenceOnlyEmpty = Boolean(item && !item.value && !item.subtitle && (
-      (slot.widget.package === "news" && item.title.startsWith("No news lists are turned on")) ||
-      (slot.widget.package === "remind" && slot.widget.id === "shopping" && item.title === "Your shopping list is empty.")
-    ));
-    return !sentenceOnlyEmpty || isOwnerOrAdminRole(role ?? "guest");
+    const emptyShopping = Boolean(item && !item.value && !item.subtitle && slot.widget.package === "remind" && slot.widget.id === "shopping" && item.title === "Your shopping list is empty.");
+    const emptyNews = Boolean(item && !item.value && !item.subtitle && slot.widget.package === "news" && item.title.startsWith("No news lists are turned on"));
+    return !emptyShopping && (!emptyNews || isOwnerOrAdminRole(role ?? "guest"));
   });
   if (visibleSlots.length === 0) {
     if (!home || heroOnly || chips || !anyHidden) return null;

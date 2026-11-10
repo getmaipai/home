@@ -367,7 +367,7 @@
                 }
               },
               "actions_variant": "icons",
-              "actions_inline": 4,
+              "actions_inline": 2,
               "poll_while": {
                 "statuses": [
                   "queued",
