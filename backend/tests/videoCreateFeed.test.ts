@@ -394,12 +394,16 @@ describe("scope showcase: the Try this rail (VIDEO-UI-11)", () => {
     const { adult } = await household();
     const page = await (await adult.client.get("/api/plugins/videos/pages/create")).json() as { body: Array<Row> };
     const main = page.body.find((node) => node.type === "split_view")!.main as Row[];
-    expect(main.map((node) => node.type)).toEqual(["media_shelf", "section"]);
-    const shelf = main[0]!;
-    expect(shelf).toMatchObject({ heading: "Try this", aspect: "poster", layout: "rail", variant: "plain", press_scale: true, item_media_field: "thumbnail", media_loop: true, item_loop_field: "loop", bind: { path: "recipes", params: { scope: "showcase" } } });
+    expect(main.map((node) => node.type)).toEqual(["billboard", "media_shelf", "section"]);
+    const featured = main[0]!;
+    expect(featured).toMatchObject({ label: "Ideas for your next video", size: "banner", autoplay: false, item_title_field: "title", item_subtitle_field: "{subtitle}", item_art_field: "thumbnail", bind: { path: "recipes", params: { scope: "showcase" } } });
+    expect(featured.primary.action).toEqual({ navigate: { to: "/apps/videos/create", state: { prompt: "{prompt}", look: "{look}", camera: "{camera}" } } });
+    expect(JSON.stringify(featured)).not.toContain("call");
+    const shelf = main[1]!;
+    expect(shelf).toMatchObject({ heading: "More ideas", aspect: "poster", layout: "rail", variant: "plain", press_scale: true, item_media_field: "thumbnail", media_loop: true, item_loop_field: "loop", bind: { path: "recipes", params: { scope: "showcase" } } });
     expect(shelf.on_select).toEqual({ navigate: { to: "/apps/videos/create", state: { prompt: "{prompt}", look: "{look}", camera: "{camera}" } } });
     expect(JSON.stringify(shelf)).not.toContain("call");
-    expect(main[1]!.children[0].empty_state.text).toBe("Your clips show here. Pick a tile or describe a video on the left and press Generate.");
+    expect(main[2]!.children[0].empty_state.text).toBe("Your clips show here. Pick a tile or describe a video on the left and press Generate.");
   });
 });
 

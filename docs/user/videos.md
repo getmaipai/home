@@ -31,7 +31,7 @@ Children and teens always get Standard. They do not choose a level, and their cl
 
 ## Make a video in the Videos app
 
-Open **Videos**, then **Create**. Create is for adults. The page has two sides. The left side is where you describe a video. The right side starts with a row of **Try this** pictures that move, then **Your clips**, newest first. At the top is the title **Make any video**.
+Open **Videos**, then **Create**. Create is for adults. The left side is where you describe a video. The right side opens with a featured video idea, then a row of **More ideas** pictures that move, followed by **Your clips**, newest first. At the top is the title **Make any video**.
 
 On the left:
 
@@ -44,7 +44,7 @@ On the left:
 - **More settings.** **Voices**: **Keep it clean**, or **With music and effects**.
 - **Generate.** Press it to start. The button says about how long it takes, for example "Boost, about a minute". Your words stay as you typed them. Home adds the wording for the look and camera behind the scenes.
 
-**Try this.** Each picture is a ready idea with a look and a camera move already chosen, for example "Paper boat". Press one and the words, the look and the camera fill in on the left. Nothing starts until you press **Generate**, so you can change the words first. With no clips yet, the pictures show above the line "Your clips show here. Pick a tile or describe a video on the left and press Generate."
+**Video ideas.** The featured idea and each picture in **More ideas** include a prompt, look and camera move, for example "Paper boat". Choose **Use this idea** or press a picture and those choices fill in on the left. Nothing starts until you press **Generate**, so you can change the words first. With no clips yet, these ideas show above the line "Your clips show here. Pick a tile or describe a video on the left and press Generate."
 
 On a phone, the left side is a bar at the bottom with your words and a round **Generate** button. Press the round button with the sliders on it to open the **Options**.
 

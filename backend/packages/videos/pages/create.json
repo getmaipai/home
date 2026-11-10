@@ -120,8 +120,41 @@
       ],
       "main": [
         {
+          "type": "billboard",
+          "bind": {
+            "source": "package",
+            "path": "recipes",
+            "params": {
+              "scope": "showcase"
+            }
+          },
+          "label": "Ideas for your next video",
+          "size": "banner",
+          "autoplay": false,
+          "item_key_field": "id",
+          "item_title_field": "title",
+          "item_subtitle_field": "{subtitle}",
+          "item_eyebrow_field": "A ready-to-make idea",
+          "item_art_field": "thumbnail",
+          "primary": {
+            "label": "Use this idea",
+            "icon": "sparkles",
+            "action": {
+              "navigate": {
+                "to": "/apps/videos/create",
+                "state": {
+                  "prompt": "{prompt}",
+                  "look": "{look}",
+                  "camera": "{camera}"
+                }
+              }
+            }
+          },
+          "hide_when_empty": true
+        },
+        {
           "type": "media_shelf",
-          "heading": "Try this",
+          "heading": "More ideas",
           "bind": {
             "source": "package",
             "path": "recipes",
@@ -136,7 +169,6 @@
           "aspect": "poster",
           "layout": "rail",
           "variant": "plain",
-          "density": "compact",
           "card_radius": "tight",
           "press_scale": true,
           "hide_when_empty": true,
