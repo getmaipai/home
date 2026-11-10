@@ -309,7 +309,7 @@ export function InstallDock({ admin, read: readProp, readJobs: readJobsProp, rea
                       </div>
                     </div>
                   ))}
-                  {retryError ? <p role="alert" className="text-sm text-destructive">{retryError}</p> : null}
+                  {retryError ? <StatusCard kind="problem" title={i18n._({ id: "That did not work", message: "That did not work" })} line={retryError} /> : null}
                 </div>
               </CollapsibleContent>
               <CollapsibleTrigger asChild>

@@ -3,7 +3,6 @@ import { useContext, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import { useAuiState } from "@assistant-ui/react";
-import { toast } from "sonner";
 import type { BackgroundRun } from "@maipai/ui/src/elements/background-inbox";
 import { api, type HomeJobView } from "@/lib/api";
 import { WakeWordPersonContext } from "@/apps/chat/chatThreadContexts";
@@ -57,6 +56,7 @@ export function useChatActivity() {
   const navigate = useNavigate();
   const conversationId = useAuiState((s) => s.threadListItem.remoteId);
   const [dismissed, setDismissed] = useState<ReadonlySet<string>>(() => new Set());
+  const [problem, setProblem] = useState("");
   const jobs = useQuery<HomeJobView[]>({
     queryKey: JOBS_QUERY_KEY,
     enabled: person !== null,
@@ -77,12 +77,14 @@ export function useChatActivity() {
   ]);
   const stop = useMutation({
     mutationFn: (id: string) => api.stopJob(id),
-    onError: () => toast.error(i18n._({ id: "Could not stop that. Try again.", message: "Could not stop that. Try again." })),
+    onMutate: () => setProblem(""),
+    onError: () => setProblem(i18n._({ id: "Could not stop that. Try again.", message: "Could not stop that. Try again." })),
     onSettled: refresh,
   });
   const decide = useMutation({
     mutationFn: ({ id, decision }: { id: string; decision: "approve" | "deny" }) => api.decideApproval(id, decision),
-    onError: () => toast.error(i18n._({ id: "Could not save that answer. Try again.", message: "Could not save that answer. Try again." })),
+    onMutate: () => setProblem(""),
+    onError: () => setProblem(i18n._({ id: "Could not save that answer. Try again.", message: "Could not save that answer. Try again." })),
     onSettled: refresh,
   });
 
@@ -110,7 +112,7 @@ export function useChatActivity() {
 
   const conversationRows = view ? [...view.running, ...view.waiting, ...view.done].filter((row) => row.conversationId === conversationId) : [];
   return {
-    pick, backgroundRuns, busy, act, dismiss,
+    pick, backgroundRuns, busy, act, dismiss, problem,
     conversationRunning: conversationRows.some((row) => row.tone === "running"),
     conversationWaiting: conversationRows.some((row) => row.tone === "waiting"),
     conversationRunningIds: new Set(conversationRows.filter((row) => row.tone === "running").map((row) => row.id)),

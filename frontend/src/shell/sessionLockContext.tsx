@@ -7,6 +7,7 @@ import { Label } from "@maipai/ui/src/dashboard/components/ui/label";
 import { Button } from "@maipai/ui/src/dashboard/components/ui/button";
 import { useIdleTimer } from "@/shell/useIdleTimer";
 import { PasscodeInput } from "@maipai/ui/src/ui/passcode-input";
+import { StatusCard } from "@maipai/ui/src/elements/status-card";
 import { usePinAutoSubmit } from "@/kit/hooks/usePinAutoSubmit";
 import { usePasscodeAttempt } from "@/kit/hooks/usePasscodeAttempt";
 import { api, type SignedInPerson } from "@/lib/api";
@@ -120,9 +121,7 @@ export function SessionLockGate({ person, children }: { person: SignedInPerson |
                       </div>
                     )}
                     {error ? (
-                      <p role="alert" className="text-center text-sm text-destructive">
-                        {error}
-                      </p>
+                      <StatusCard kind="problem" title={i18n._({ id: "That did not work", message: "That did not work" })} line={error} />
                     ) : null}
                     {pinDigits === null ? (
                       <Button type="submit" size="lg" disabled={busy || attemptState.locked}>

@@ -60,6 +60,7 @@ import { messageText } from "@/apps/chat/chatMessageText";
 import { useStoppedRun } from "@/apps/chat/chatStoppedRun";
 import { useTurnActivity } from "@/apps/chat/chatTurnActivity";
 import { BranchInNewChatMenuItem } from "@/apps/chat/branchInNewChatMenuItem";
+import { StatusCard } from "@maipai/ui/src/elements/status-card";
 import { useChatActivity } from "@/apps/chat/chatActivity";
 import { ComposerVoiceControls } from "@/apps/chat/composerVoiceControls";
 import { AdminContext, ChatAgeBandContext, ChatComposerNoticeContext, CompareOpenContext, SourcesOpenContext, DetailsOpenContext, ThinkingModeContext, ThinkingModeCapabilityContext, BareModeContext, TemporaryChatContext, WakeWordPersonContext } from "@/apps/chat/chatThreadContexts";
@@ -164,7 +165,7 @@ function ChatQueueRow() {
 
 /** The ComposerQueue footer slot holds activity Elements and queued messages. */
 export function ChatMessageQueue() {
-  const { pick, backgroundRuns, busy, act, dismiss } = useChatActivity();
+  const { pick, backgroundRuns, busy, act, dismiss, problem } = useChatActivity();
   const row = pick?.row;
   const actions = row ? [
     ...row.actions.map((key) => (
@@ -199,6 +200,7 @@ export function ChatMessageQueue() {
             : undefined;
   return (
     <>
+      {problem ? <StatusCard kind="problem" title={i18n._({ id: "That did not work", message: "That did not work" })} line={problem} /> : null}
       {pick && row && state ? (
         <TaskCard
           role="status"

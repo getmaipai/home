@@ -4,6 +4,8 @@
 // they save through the same routes as the edit tools, so a change made here or in chat is one change to one record.
 // A page cannot be a schema page: the schema has no node for an editor card, so (like the Now playing page) it is drawn here, inside
 // the app's own sidebar chrome. Pictures are made in chat, songs on the Make a song page; each page says so and opens chat with the right ask.
+import { StatusCard } from "@maipai/ui/src/elements/status-card";
+import { errorLine } from "@/lib/hubReachability";
 import { i18n } from "@lingui/core";
 import { useMemo, useState, type ComponentProps, type ReactNode } from "react";
 import { Link, Navigate, useNavigate } from "react-router-dom";
@@ -87,17 +89,20 @@ export function CreatePage({ kind, adult }: { kind: Kind; adult: boolean }) {
   const navigate = useNavigate();
   const { push } = useToast();
   const queryClient = useQueryClient();
+  const [problem, setProblem] = useState("");
   if (!adult) return <EmptyState icon="music" text={ADULT_ONLY_LINE()} />;
   const save = (patch: BandPatch & AlbumPatch & SongStylePatch) => {
+    setProblem("");
     request<{ id: string }>(`/api/music/${COLLECTION[kind]}`, { method: "POST", body: JSON.stringify(createBody(kind, patch)) })
       .then((made) => { void queryClient.invalidateQueries({ queryKey: ["music-made"] }); push(i18n._({ id: "{kind, select, band {Saved. Your band is in My creations.} album {Saved. Your album is in My creations.} other {Saved. Your style is in My creations.}}", message: "{kind, select, band {Saved. Your band is in My creations.} album {Saved. Your album is in My creations.} other {Saved. Your style is in My creations.}}", values: { kind } })); navigate(editPath(kind, made.id)); })
-      .catch((error: unknown) => push(error instanceof Error && error.message ? error.message : i18n._({ id: "{kind, select, band {That band was not saved. Try again.} album {That album was not saved. Try again.} other {That style was not saved. Try again.}}", message: "{kind, select, band {That band was not saved. Try again.} album {That album was not saved. Try again.} other {That style was not saved. Try again.}}", values: { kind } })));
+      .catch((error: unknown) => setProblem(errorLine(error, i18n._({ id: "{kind, select, band {That band was not saved. Try again.} album {That album was not saved. Try again.} other {That style was not saved. Try again.}}", message: "{kind, select, band {That band was not saved. Try again.} album {That album was not saved. Try again.} other {That style was not saved. Try again.}}", values: { kind } }))));
   };
   const heading = kind === "band" ? i18n._({ id: "Make a band", message: "Make a band" }) : kind === "album" ? i18n._({ id: "Make an album", message: "Make an album" }) : i18n._({ id: "Make a song style", message: "Make a song style" });
   const line = kind === "band" ? i18n._({ id: "Name your band and say how it sounds. Add the pictures later in chat.", message: "Name your band and say how it sounds. Add the pictures later in chat." })
     : kind === "album" ? i18n._({ id: "Name the album and say how it sounds. Home adds the cover and the songs in chat.", message: "Name the album and say how it sounds. Home adds the cover and the songs in chat." })
       : i18n._({ id: "A style is a sound you can reuse. Words only, never lyrics.", message: "A style is a sound you can reuse. Words only, never lyrics." });
   return <Frame testId={`music-${PAGE_OF[kind]}`} title={heading} line={line} footer={<AskHome kind={kind} />}>
+    {problem ? <StatusCard kind="problem" title={i18n._({ id: "That did not work", message: "That did not work" })} line={problem} /> : null}
     {kind === "band" ? <Band key="new" name="" actions={[]} editable defaultEditing onEdit={save} />
       : kind === "album" ? <Album key="new" title="" actions={[]} editable defaultEditing onEdit={save} />
         : <SongStyleCard key="new" title="" sound="" actions={[]} editable defaultEditing onEdit={save} />}

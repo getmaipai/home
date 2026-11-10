@@ -37,6 +37,7 @@ import { InstallDock } from "@/shell/InstallDock";
 import { CompanionPreview } from "@maipai/ui/src/elements/companion-preview";
 import { WakeWordPersonContext } from "@/apps/chat/chatThreadContexts";
 import { CompanionAvatar } from "@maipai/ui/src/elements/companion-avatar";
+import { StatusCard } from "@maipai/ui/src/elements/status-card";
 import { Avatar, AvatarImage } from "@maipai/ui/src/elements/ui/avatar";
 import { Avatar as SeededAvatar } from "@maipai/ui/src/primitives/Avatar";
 import { Button } from "@maipai/ui/src/elements/ui/button";
@@ -235,6 +236,7 @@ function RoutesWithIncognito({ person, onPersonChange, onSignedOut, appCatalog }
   const phoneChat = onChatPage && onPhone;
   const ambient = useAmbientCompanion(person);
   const [ring, setRing] = useState<AmbientRing>(null);
+  const [findProblem, setFindProblem] = useState("");
   const [wakeIndicator, setWakeIndicator] = useState<AmbientWakeIndicator>(null);
   const selectedAppHref = activeAppHref(location.pathname, packageAreaApps(usePackageAreas().areas));
   const statusAppsQuery = useStatusApps();
@@ -312,7 +314,7 @@ function RoutesWithIncognito({ person, onPersonChange, onSignedOut, appCatalog }
     onAsk={(text) => {
       paneControlRef.current?.ask(text);
     }}
-    action={ambient.action ? <Button type="button" onClick={ambient.action.onClick}>{ambient.action.label}</Button> : ambient.kind === "bot" ? <Button type="button" onClick={() => { void api.findRobot(ambient.device.id).then(() => toast.success(ambient.online ? `${ambient.name} is chirping` : `Queued for when ${ambient.name} is back`)).catch(() => toast.error(i18n._({ id: "Could not reach {name}. Try again.", message: "Could not reach {name}. Try again.", values: { name: ambient.name } }))); }}>{i18n._({ id: "Find me", message: "Find me" })}</Button> : undefined}
+    action={ambient.action ? <Button type="button" onClick={ambient.action.onClick}>{ambient.action.label}</Button> : ambient.kind === "bot" ? <>{findProblem ? <StatusCard kind="problem" title={i18n._({ id: "That did not work", message: "That did not work" })} line={findProblem} /> : null}<Button type="button" onClick={() => { setFindProblem(""); void api.findRobot(ambient.device.id).then(() => toast.success(ambient.online ? `${ambient.name} is chirping` : `Queued for when ${ambient.name} is back`)).catch(() => setFindProblem(i18n._({ id: "Could not reach {name}. Try again.", message: "Could not reach {name}. Try again.", values: { name: ambient.name } }))); }}>{i18n._({ id: "Find me", message: "Find me" })}</Button></> : undefined}
     listeningLine={wakeIndicator?.listening}
     onTurnOff={wakeIndicator?.onTurnOff}
     open={lastLine ? previewOpen : coarse ? (wakeIndicator ? true : previewOpen) : undefined}

@@ -241,11 +241,10 @@ export function EngineLinkCredentialSection() {
               <>
                 <p className="text-base">{i18n._({ id: "Enter the engine computer's name or its home network address, and the port Home uses to reach it securely.", message: "Enter the engine computer's name or its home network address, and the port Home uses to reach it securely." })}</p>
                 <Label htmlFor="pair-host">{i18n._({ id: "Engine computer name or address", message: "Engine computer name or address" })}</Label>
-                <Input id="pair-host" value={host} onChange={(event) => setHost(event.target.value)} disabled={busy} autoComplete="off" spellCheck={false} aria-invalid={problems.host ? true : undefined} aria-describedby="pair-host-problem" />
-                <p id="pair-host-problem" className="text-sm text-destructive">{host !== "" ? problems.host : null}</p>
+                <Input id="pair-host" value={host} onChange={(event) => setHost(event.target.value)} disabled={busy} autoComplete="off" spellCheck={false} aria-invalid={problems.host ? true : undefined} />
                 <Label htmlFor="pair-port">{i18n._({ id: "Secure connection port", message: "Secure connection port" })}</Label>
-                <Input id="pair-port" value={port} onChange={(event) => setPort(event.target.value)} disabled={busy} inputMode="numeric" autoComplete="off" aria-invalid={problems.port ? true : undefined} aria-describedby="pair-port-problem" />
-                <p id="pair-port-problem" className="text-sm text-destructive">{problems.port}</p>
+                <Input id="pair-port" value={port} onChange={(event) => setPort(event.target.value)} disabled={busy} inputMode="numeric" autoComplete="off" aria-invalid={problems.port ? true : undefined} />
+                {(host !== "" ? problems.host : null) ?? problems.port ? <StatusCard kind="problem" title={i18n._({ id: "That did not work", message: "That did not work" })} line={(host !== "" ? problems.host : null) ?? problems.port} /> : null}
               </>
             ) : null}
             {step === 2 ? (

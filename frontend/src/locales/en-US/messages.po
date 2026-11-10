@@ -261,7 +261,7 @@ msgid "{count, plural, one {# schedule belongs to another person.} other {# sche
 msgstr "{count, plural, one {# schedule belongs to another person.} other {# schedules belong to other people.}}"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/MusicStudioPages.tsx:119
+#: src/shell/pages/MusicStudioPages.tsx:124
 msgid "{count, plural, one {# song} other {# songs}}"
 msgstr "{count, plural, one {# song} other {# songs}}"
 
@@ -510,52 +510,52 @@ msgid "{joinNames} work entirely on this computer and connect to nothing at all.
 msgstr "{joinNames} work entirely on this computer and connect to nothing at all. So does everything MaiPai remembers, every conversation, and every profile in your household."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/MusicStudioPages.tsx:136
+#: src/shell/pages/MusicStudioPages.tsx:141
 msgid "{kind, select, band {Bands could not be loaded. Check your connection and open this page again.} album {Albums could not be loaded. Check your connection and open this page again.} other {Styles could not be loaded. Check your connection and open this page again.}}"
 msgstr "{kind, select, band {Bands could not be loaded. Check your connection and open this page again.} album {Albums could not be loaded. Check your connection and open this page again.} other {Styles could not be loaded. Check your connection and open this page again.}}"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/MusicStudioPages.tsx:194
+#: src/shell/pages/MusicStudioPages.tsx:199
 msgid "{kind, select, band {Delete this band?} album {Delete this album?} other {Delete this style?}}"
 msgstr "{kind, select, band {Delete this band?} album {Delete this album?} other {Delete this style?}}"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/MusicStudioPages.tsx:190
+#: src/shell/pages/MusicStudioPages.tsx:195
 msgid "{kind, select, band {Edit your band} album {Edit your album} other {Edit your style}}"
 msgstr "{kind, select, band {Edit your band} album {Edit your album} other {Edit your style}}"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/MusicStudioPages.tsx:136
+#: src/shell/pages/MusicStudioPages.tsx:141
 msgid "{kind, select, band {Loading bands} album {Loading albums} other {Loading styles}}"
 msgstr "{kind, select, band {Loading bands} album {Loading albums} other {Loading styles}}"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/MusicStudioPages.tsx:137
+#: src/shell/pages/MusicStudioPages.tsx:142
 msgid "{kind, select, band {No bands yet.} album {No albums yet.} other {No styles yet.}}"
 msgstr "{kind, select, band {No bands yet.} album {No albums yet.} other {No styles yet.}}"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/MusicStudioPages.tsx:176
+#: src/shell/pages/MusicStudioPages.tsx:181
 msgid "{kind, select, band {Opening your band} album {Opening your album} other {Opening your style}}"
 msgstr "{kind, select, band {Opening your band} album {Opening your album} other {Opening your style}}"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/MusicStudioPages.tsx:93
+#: src/shell/pages/MusicStudioPages.tsx:97
 msgid "{kind, select, band {Saved. Your band is in My creations.} album {Saved. Your album is in My creations.} other {Saved. Your style is in My creations.}}"
 msgstr "{kind, select, band {Saved. Your band is in My creations.} album {Saved. Your album is in My creations.} other {Saved. Your style is in My creations.}}"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/MusicStudioPages.tsx:174
+#: src/shell/pages/MusicStudioPages.tsx:179
 msgid "{kind, select, band {That band is gone. Your songs are still in your library.} album {That album is gone. Your songs are still in your library.} other {That style is gone. Your songs are still in your library.}}"
 msgstr "{kind, select, band {That band is gone. Your songs are still in your library.} album {That album is gone. Your songs are still in your library.} other {That style is gone. Your songs are still in your library.}}"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/MusicStudioPages.tsx:175
+#: src/shell/pages/MusicStudioPages.tsx:180
 msgid "{kind, select, band {That band is not here. It may have been discarded.} album {That album is not here. It may have been discarded.} other {That style is not here. It may have been discarded.}}"
 msgstr "{kind, select, band {That band is not here. It may have been discarded.} album {That album is not here. It may have been discarded.} other {That style is not here. It may have been discarded.}}"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/MusicStudioPages.tsx:94
+#: src/shell/pages/MusicStudioPages.tsx:98
 msgid "{kind, select, band {That band was not saved. Try again.} album {That album was not saved. Try again.} other {That style was not saved. Try again.}}"
 msgstr "{kind, select, band {That band was not saved. Try again.} album {That album was not saved. Try again.} other {That style was not saved. Try again.}}"
 
@@ -762,12 +762,12 @@ msgid "{name} comes with this part. You accepted its licence at the start; the t
 msgstr "{name} comes with this part. You accepted its licence at the start; the terms are in Models and storage."
 
 #. js-lingui-explicit-id
-#: src/shell/AmbientCompanionPane.tsx:333
+#: src/shell/AmbientCompanionPane.tsx:336
 msgid "{name} companion pane"
 msgstr "{name} companion pane"
 
 #. js-lingui-explicit-id
-#: src/shell/AmbientCompanionPane.tsx:326
+#: src/shell/AmbientCompanionPane.tsx:328
 msgid "{name} conversations"
 msgstr "{name} conversations"
 
@@ -893,7 +893,7 @@ msgid "{name} restarted."
 msgstr "{name} restarted."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/PackageAppPage.tsx:281
+#: src/shell/pages/PackageAppPage.tsx:284
 msgid "{name} sections"
 msgstr "{name} sections"
 
@@ -943,12 +943,12 @@ msgid "{name} was moved."
 msgstr "{name} was moved."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/MusicStudioView.tsx:85
+#: src/shell/pages/MusicStudioView.tsx:87
 msgid "{name} waveform"
 msgstr "{name} waveform"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/MusicStudioView.tsx:81
+#: src/shell/pages/MusicStudioView.tsx:83
 msgid "{name} waveform; click to move the playhead"
 msgstr "{name} waveform; click to move the playhead"
 
@@ -1056,17 +1056,17 @@ msgid "{pictures} and {videos}"
 msgstr "{pictures} and {videos}"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/PackageAppPage.tsx:305
+#: src/shell/pages/PackageAppPage.tsx:308
 msgid "{place} is already in your list."
 msgstr "{place} is already in your list."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/PackageAppPage.tsx:316
+#: src/shell/pages/PackageAppPage.tsx:319
 msgid "{place} is your home place. Change it in Settings, Weather."
 msgstr "{place} is your home place. Change it in Settings, Weather."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/PackageAppPage.tsx:322
+#: src/shell/pages/PackageAppPage.tsx:326
 msgid "{place} removed from your list."
 msgstr "{place} removed from your list."
 
@@ -1284,7 +1284,7 @@ msgid "{title}: which one"
 msgstr "{title}: which one"
 
 #. js-lingui-explicit-id
-#: src/apps/chat/chatThreadSlots.tsx:780
+#: src/apps/chat/chatThreadSlots.tsx:782
 msgid "{tokens} tokens"
 msgstr "{tokens} tokens"
 
@@ -1796,7 +1796,7 @@ msgid "A stronger pick when someone asks for more. Other big jobs wait their tur
 msgstr "A stronger pick when someone asks for more. Other big jobs wait their turn."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/MusicStudioPages.tsx:99
+#: src/shell/pages/MusicStudioPages.tsx:103
 msgid "A style is a sound you can reuse. Words only, never lyrics."
 msgstr "A style is a sound you can reuse. Words only, never lyrics."
 
@@ -2176,12 +2176,12 @@ msgid "Add to the song"
 msgstr "Add to the song"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/MusicStudioView.tsx:209
+#: src/shell/pages/MusicStudioView.tsx:211
 msgid "Add track"
 msgstr "Add track"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/MusicStudioView.tsx:209
+#: src/shell/pages/MusicStudioView.tsx:211
 msgid "Add tracks by splitting the song into stems"
 msgstr "Add tracks by splitting the song into stems"
 
@@ -2571,7 +2571,7 @@ msgid "Album"
 msgstr "Album"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/MusicStudioPages.tsx:149
+#: src/shell/pages/MusicStudioPages.tsx:154
 msgid "Albums"
 msgstr "Albums"
 
@@ -2923,7 +2923,7 @@ msgid "Animate Character"
 msgstr "Animate Character"
 
 #. js-lingui-explicit-id
-#: src/apps/chat/chatThreadSlots.tsx:492
+#: src/apps/chat/chatThreadSlots.tsx:494
 msgid "Animate this picture"
 msgstr "Animate this picture"
 
@@ -3049,7 +3049,7 @@ msgid "setting.coding.person.api_keys.label"
 msgstr "Api keys"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/PackageAppPage.tsx:281
+#: src/shell/pages/PackageAppPage.tsx:284
 msgid "App"
 msgstr "App"
 
@@ -3152,7 +3152,7 @@ msgstr "Approved. Waiting for the robot to finish pairing on its own end…"
 
 #. js-lingui-explicit-id
 #: src/apps/chat/composerAddMenu.tsx:260
-#: src/shell/pages/PackageAppPage.tsx:195
+#: src/shell/pages/PackageAppPage.tsx:198
 #: src/shell/pages/status/StatusApps.tsx:114
 #: src/shell/phoneMenuLinks.tsx:31
 msgid "Apps"
@@ -3353,7 +3353,7 @@ msgid "At the start"
 msgstr "At the start"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/MusicStudioView.tsx:247
+#: src/shell/pages/MusicStudioView.tsx:249
 msgid "Attack"
 msgstr "Attack"
 
@@ -3489,14 +3489,14 @@ msgstr "Azelma"
 #. js-lingui-explicit-id
 #: src/apps/people/FaceEnrollmentPage.tsx:95
 #: src/apps/settings/AiSlotDialog.tsx:151
-#: src/apps/settings/EngineLinkCredentialSection.tsx:286
+#: src/apps/settings/EngineLinkCredentialSection.tsx:285
 #: src/apps/setup/SetupReviewPage.tsx:65
 #: src/shell/pageHeaderTitle.tsx:151
 #: src/shell/pages/companionFlow/AnimateStep.tsx:153
 #: src/shell/pages/companionFlow/CustomizeStep.tsx:195
 #: src/shell/pages/packageAppHeaderBar.tsx:94
-#: src/shell/pages/PackageAppPage.tsx:280
-#: src/shell/pages/PackageAppPage.tsx:281
+#: src/shell/pages/PackageAppPage.tsx:283
+#: src/shell/pages/PackageAppPage.tsx:284
 #: src/shell/pages/settings/settingsBackLink.ts:51
 #: src/shell/pages/settings/settingsBackLink.ts:56
 #: src/shell/pages/SignInPage.tsx:188
@@ -3522,7 +3522,7 @@ msgid "Back to Family"
 msgstr "Back to Family"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/MusicStudioPages.tsx:188
+#: src/shell/pages/MusicStudioPages.tsx:193
 msgid "Back to My creations"
 msgstr "Back to My creations"
 
@@ -3542,7 +3542,7 @@ msgid "Back to Settings"
 msgstr "Back to Settings"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/MusicStudioView.tsx:226
+#: src/shell/pages/MusicStudioView.tsx:228
 msgid "Back to start"
 msgstr "Back to start"
 
@@ -3552,7 +3552,7 @@ msgid "Back to tasks"
 msgstr "Back to tasks"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/MusicStudioView.tsx:198
+#: src/shell/pages/MusicStudioView.tsx:200
 msgid "Back to the song"
 msgstr "Back to the song"
 
@@ -3600,7 +3600,7 @@ msgstr "Backup storage limit (GB)"
 #. js-lingui-explicit-id
 #: src/apps/settings/BackupsSection.tsx:204
 #: src/shell/pageHeaderTitle.tsx:106
-#: src/shell/Routes.tsx:158
+#: src/shell/Routes.tsx:159
 msgid "Backups"
 msgstr "Backups"
 
@@ -3643,7 +3643,7 @@ msgstr "Band"
 
 #. js-lingui-explicit-id
 #: src/shell/pages/CompanionsPage.tsx:325
-#: src/shell/pages/MusicStudioPages.tsx:148
+#: src/shell/pages/MusicStudioPages.tsx:153
 msgid "Bands"
 msgstr "Bands"
 
@@ -3658,7 +3658,7 @@ msgid "Bare mode is on"
 msgstr "Bare mode is on"
 
 #. js-lingui-explicit-id
-#: src/apps/chat/chatThreadSlots.tsx:824
+#: src/apps/chat/chatThreadSlots.tsx:826
 #: src/shell/pages/ChatPage.tsx:1612
 msgid "Bare model"
 msgstr "Bare model"
@@ -4113,7 +4113,7 @@ msgid "Bots"
 msgstr "Bots"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/MusicStudioView.tsx:228
+#: src/shell/pages/MusicStudioView.tsx:230
 msgid "BPM"
 msgstr "BPM"
 
@@ -4282,7 +4282,7 @@ msgid "Can someone reach into your house?"
 msgstr "Can someone reach into your house?"
 
 #. js-lingui-explicit-id
-#: src/apps/chat/chatThreadSlots.tsx:271
+#: src/apps/chat/chatThreadSlots.tsx:273
 #: src/apps/people/ProfileForm.tsx:191
 #: src/apps/people/ProfileForm.tsx:196
 #: src/apps/reminders/RemindersPage.tsx:188
@@ -4611,7 +4611,7 @@ msgstr "Charles"
 #: src/apps/settings/ModelsSection.tsx:138
 #: src/apps/settings/ModelsSection.tsx:143
 #: src/apps/settings/performanceModel.ts:9
-#: src/shell/AmbientCompanionPane.tsx:321
+#: src/shell/AmbientCompanionPane.tsx:323
 #: src/shell/coreLabels.ts:8
 #: src/shell/pageHeaderTitle.tsx:98
 #: src/shell/pages/ChatPage.tsx:1735
@@ -4793,7 +4793,7 @@ msgstr "Chat settings"
 #: src/shell/pages/UiShowcasePage.tsx:132
 #: src/shell/pages/UiShowcasePage.tsx:167
 #: src/shell/pages/UiShowcasePage.tsx:170
-#: src/shell/Routes.tsx:161
+#: src/shell/Routes.tsx:162
 msgid "Chat showcase"
 msgstr "Chat showcase"
 
@@ -4835,12 +4835,12 @@ msgid "Check again"
 msgstr "Check again"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/EngineLinkCredentialSection.tsx:269
+#: src/apps/settings/EngineLinkCredentialSection.tsx:268
 msgid "Check code"
 msgstr "Check code"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/EngineLinkCredentialSection.tsx:268
+#: src/apps/settings/EngineLinkCredentialSection.tsx:267
 msgid "Check code from the engine computer"
 msgstr "Check code from the engine computer"
 
@@ -4892,7 +4892,7 @@ msgstr "Check the connection"
 
 #. js-lingui-explicit-id
 #: src/apps/settings/EngineLinkCredentialSection.tsx:23
-#: src/apps/settings/EngineLinkCredentialSection.tsx:265
+#: src/apps/settings/EngineLinkCredentialSection.tsx:264
 msgid "Check the engine computer"
 msgstr "Check the engine computer"
 
@@ -4939,7 +4939,7 @@ msgid "Checking that Home can use your choice"
 msgstr "Checking that Home can use your choice"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/EngineLinkCredentialSection.tsx:280
+#: src/apps/settings/EngineLinkCredentialSection.tsx:279
 msgid "Checking the connection"
 msgstr "Checking the connection"
 
@@ -5701,7 +5701,7 @@ msgid "Clock style"
 msgstr "Clock style"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/EngineLinkCredentialSection.tsx:289
+#: src/apps/settings/EngineLinkCredentialSection.tsx:288
 #: src/apps/settings/FreeUpSpaceDialog.tsx:97
 #: src/apps/settings/StackChanInstallDialog.tsx:153
 #: src/apps/setup/AwayFromHome.tsx:175
@@ -5900,7 +5900,7 @@ msgstr "Coming up"
 #. js-lingui-explicit-id
 #: src/apps/settings/CommandsSection.tsx:105
 #: src/shell/pageHeaderTitle.tsx:108
-#: src/shell/Routes.tsx:159
+#: src/shell/Routes.tsx:160
 msgid "Commands"
 msgstr "Commands"
 
@@ -5973,7 +5973,7 @@ msgid "Complexity"
 msgstr "Complexity"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/MusicStudioView.tsx:244
+#: src/shell/pages/MusicStudioView.tsx:246
 msgid "Compressor"
 msgstr "Compressor"
 
@@ -6060,8 +6060,8 @@ msgid "Continue"
 msgstr "Continue"
 
 #. js-lingui-explicit-id
-#: src/shell/AmbientCompanionPane.tsx:333
-#: src/shell/AmbientCompanionPane.tsx:333
+#: src/shell/AmbientCompanionPane.tsx:336
+#: src/shell/AmbientCompanionPane.tsx:336
 msgid "Continue in Chat"
 msgstr "Continue in Chat"
 
@@ -6141,7 +6141,7 @@ msgid "Conversation with {name}"
 msgstr "Conversation with {name}"
 
 #. js-lingui-explicit-id
-#: src/shell/AmbientCompanionPane.tsx:320
+#: src/shell/AmbientCompanionPane.tsx:322
 #: src/shell/pages/ChatPage.tsx:1493
 #: src/shell/pages/ChatPage.tsx:1900
 #: src/shell/pages/ChatPage.tsx:1903
@@ -6352,7 +6352,7 @@ msgid "Could not complete engine setup."
 msgstr "Could not complete engine setup."
 
 #. js-lingui-explicit-id
-#: src/shell/AmbientCompanionPane.tsx:304
+#: src/shell/AmbientCompanionPane.tsx:305
 msgid "Could not continue this side chat. Try again."
 msgstr "Could not continue this side chat. Try again."
 
@@ -6421,7 +6421,7 @@ msgid "Could not delete this voice. Try again."
 msgstr "Could not delete this voice. Try again."
 
 #. js-lingui-explicit-id
-#: src/shell/Routes.tsx:374
+#: src/shell/Routes.tsx:376
 msgid "Could not discard Incognito chats. Try again."
 msgstr "Could not discard Incognito chats. Try again."
 
@@ -6520,7 +6520,7 @@ msgid "Could not load commands."
 msgstr "Could not load commands."
 
 #. js-lingui-explicit-id
-#: src/shell/AmbientCompanionPane.tsx:326
+#: src/shell/AmbientCompanionPane.tsx:328
 msgid "Could not load conversations. Check your connection and try again."
 msgstr "Could not load conversations. Check your connection and try again."
 
@@ -6848,7 +6848,7 @@ msgid "Could not open a chat. Check your connection and try again."
 msgstr "Could not open a chat. Check your connection and try again."
 
 #. js-lingui-explicit-id
-#: src/shell/AmbientCompanionPane.tsx:332
+#: src/shell/AmbientCompanionPane.tsx:335
 msgid "Could not open that conversation. Check your connection and try again."
 msgstr "Could not open that conversation. Check your connection and try again."
 
@@ -6858,7 +6858,7 @@ msgid "Could not open the live view of {name}. Check that it is switched on, the
 msgstr "Could not open the live view of {name}. Check that it is switched on, then try again."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/PackageAppPage.tsx:288
+#: src/shell/pages/PackageAppPage.tsx:291
 msgid "Could not open this app. Check your connection and try again."
 msgstr "Could not open this app. Check your connection and try again."
 
@@ -6879,8 +6879,8 @@ msgid "Could not post the note."
 msgstr "Could not post the note."
 
 #. js-lingui-explicit-id
-#: src/shell/AmbientCompanionPane.tsx:309
-#: src/shell/Routes.tsx:315
+#: src/shell/AmbientCompanionPane.tsx:311
+#: src/shell/Routes.tsx:317
 msgid "Could not reach {name}. Try again."
 msgstr "Could not reach {name}. Try again."
 
@@ -6917,7 +6917,7 @@ msgid "Could not remove this piece."
 msgstr "Could not remove this piece."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/PackageAppPage.tsx:323
+#: src/shell/pages/PackageAppPage.tsx:327
 msgid "Could not remove this place."
 msgstr "Could not remove this place."
 
@@ -7007,7 +7007,7 @@ msgid "Could not save Home's default voice. Try again."
 msgstr "Could not save Home's default voice. Try again."
 
 #. js-lingui-explicit-id
-#: src/apps/chat/chatActivity.ts:85
+#: src/apps/chat/chatActivity.ts:87
 msgid "Could not save that answer. Try again."
 msgstr "Could not save that answer. Try again."
 
@@ -7203,7 +7203,7 @@ msgid "Could not stop {name}."
 msgstr "Could not stop {name}."
 
 #. js-lingui-explicit-id
-#: src/apps/chat/chatActivity.ts:80
+#: src/apps/chat/chatActivity.ts:81
 msgid "Could not stop that. Try again."
 msgstr "Could not stop that. Try again."
 
@@ -7297,7 +7297,7 @@ msgid "Cover with a new voice"
 msgstr "Cover with a new voice"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/MusicStudioPages.tsx:188
+#: src/shell/pages/MusicStudioPages.tsx:193
 #: src/shell/pages/ProjectsPage.tsx:39
 msgid "Create"
 msgstr "Create"
@@ -7713,7 +7713,7 @@ msgstr "Degrees Fahrenheit, like 72 F."
 #: src/shell/pages/CompanionsPage.tsx:81
 #: src/shell/pages/CompanionsPage.tsx:181
 #: src/shell/pages/FilesPage.tsx:336
-#: src/shell/pages/MusicStudioPages.tsx:194
+#: src/shell/pages/MusicStudioPages.tsx:199
 #: src/shell/pages/SoundExtras.tsx:47
 msgid "Delete"
 msgstr "Delete"
@@ -7808,7 +7808,7 @@ msgstr "Delete voice"
 #: src/apps/clock/AlarmEditor.tsx:119
 #: src/apps/clock/TimersTab.tsx:184
 #: src/shell/library/LibraryTrash.tsx:26
-#: src/shell/pages/MusicStudioPages.tsx:194
+#: src/shell/pages/MusicStudioPages.tsx:199
 #: src/shell/pages/MusicWorkspacePage.tsx:212
 msgid "Deleting"
 msgstr "Deleting"
@@ -7944,7 +7944,7 @@ msgid "area.Detailed pictures"
 msgstr "Detailed pictures"
 
 #. js-lingui-explicit-id
-#: src/apps/chat/chatThreadSlots.tsx:332
+#: src/apps/chat/chatThreadSlots.tsx:334
 #: src/apps/settings/ModelsSection.tsx:154
 #: src/apps/settings/styles/StyleEditor.tsx:153
 #: src/shell/components/SearchTestResultBody.tsx:23
@@ -8137,7 +8137,7 @@ msgid "Disk space"
 msgstr "Disk space"
 
 #. js-lingui-explicit-id
-#: src/apps/chat/chatThreadSlots.tsx:183
+#: src/apps/chat/chatThreadSlots.tsx:184
 #: src/apps/notifications/NotificationsPage.tsx:216
 #: src/shell/library/LibraryUploads.tsx:75
 #: src/shell/library/LibraryUploads.tsx:76
@@ -8398,17 +8398,17 @@ msgid "Drag the character to move it. Use the mouse wheel to zoom. Change the de
 msgstr "Drag the character to move it. Use the mouse wheel to zoom. Change the description or style and generate again until you're happy."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/MusicStudioPages.tsx:179
+#: src/shell/pages/MusicStudioPages.tsx:184
 msgid "Draw a new logo for this band."
 msgstr "Draw a new logo for this band."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/MusicStudioPages.tsx:179
+#: src/shell/pages/MusicStudioPages.tsx:184
 msgid "Draw a new picture of this band."
 msgstr "Draw a new picture of this band."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/MusicStudioView.tsx:86
+#: src/shell/pages/MusicStudioView.tsx:88
 msgid "Drawing the waveform"
 msgstr "Drawing the waveform"
 
@@ -8798,7 +8798,7 @@ msgid "Enter your {digits}-digit passcode"
 msgstr "Enter your {digits}-digit passcode"
 
 #. js-lingui-explicit-id
-#: src/shell/sessionLockContext.tsx:78
+#: src/shell/sessionLockContext.tsx:79
 msgid "Enter your {digits}-digit passcode to continue."
 msgstr "Enter your {digits}-digit passcode to continue."
 
@@ -8808,7 +8808,7 @@ msgid "Enter your 6-digit code"
 msgstr "Enter your 6-digit code"
 
 #. js-lingui-explicit-id
-#: src/shell/sessionLockContext.tsx:78
+#: src/shell/sessionLockContext.tsx:79
 msgid "Enter your PIN or password to continue."
 msgstr "Enter your PIN or password to continue."
 
@@ -8843,7 +8843,7 @@ msgid "setting.tts.voice_id.option_label.eponine"
 msgstr "Eponine"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/MusicStudioView.tsx:234
+#: src/shell/pages/MusicStudioView.tsx:236
 msgid "EQ"
 msgstr "EQ"
 
@@ -8889,7 +8889,7 @@ msgid "setting.tts.voice_id.option_label.eve"
 msgstr "Eve"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/MusicStudioPages.tsx:190
+#: src/shell/pages/MusicStudioPages.tsx:195
 msgid "Every change keeps the earlier version, so nothing is lost."
 msgstr "Every change keeps the earlier version, so nothing is lost."
 
@@ -8904,7 +8904,7 @@ msgid "Every day"
 msgstr "Every day"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/MusicStudioPages.tsx:194
+#: src/shell/pages/MusicStudioPages.tsx:199
 msgid "Every earlier version is kept, so it can be brought back."
 msgstr "Every earlier version is kept, so it can be brought back."
 
@@ -9355,7 +9355,7 @@ msgstr "Find anything across your household."
 
 #. js-lingui-explicit-id
 #: src/shell/AmbientCompanionPane.tsx:267
-#: src/shell/Routes.tsx:315
+#: src/shell/Routes.tsx:317
 msgid "Find me"
 msgstr "Find me"
 
@@ -9796,7 +9796,7 @@ msgstr "Full screen visualizer"
 
 #. js-lingui-explicit-id
 #: src/apps/chat/MusicCardView.tsx:89
-#: src/shell/pages/MusicStudioView.tsx:40
+#: src/shell/pages/MusicStudioView.tsx:42
 msgid "Full song"
 msgstr "Full song"
 
@@ -9944,7 +9944,7 @@ msgid "setting.robot.greetings.mode.option_label.gesture"
 msgstr "Gesture"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/EngineLinkCredentialSection.tsx:259
+#: src/apps/settings/EngineLinkCredentialSection.tsx:258
 msgid "Get a one-time code"
 msgstr "Get a one-time code"
 
@@ -10349,7 +10349,7 @@ msgid "Hint"
 msgstr "Hint"
 
 #. js-lingui-explicit-id
-#: src/shell/AmbientCompanionPane.tsx:326
+#: src/shell/AmbientCompanionPane.tsx:328
 msgid "History"
 msgstr "History"
 
@@ -10369,7 +10369,7 @@ msgstr "Holds what some downloads ask for before they start."
 #: src/shell/pages/WikipediaPage.tsx:154
 #: src/shell/pages/WikipediaPage.tsx:178
 #: src/shell/routeHeader.ts:23
-#: src/shell/Routes.tsx:434
+#: src/shell/Routes.tsx:436
 msgid "Home"
 msgstr "Home"
 
@@ -12253,7 +12253,7 @@ msgid "It will need to be paired again. This also deletes the robot's memories a
 msgstr "It will need to be paired again. This also deletes the robot's memories and its saved firmware backup."
 
 #. js-lingui-explicit-id
-#: src/apps/settings/EngineLinkCredentialSection.tsx:256
+#: src/apps/settings/EngineLinkCredentialSection.tsx:255
 msgid "It works once and expires at {toLocaleTimeString}. The command prints a check code. Keep it for the next step."
 msgstr "It works once and expires at {toLocaleTimeString}. The command prints a check code. Keep it for the next step."
 
@@ -12397,7 +12397,7 @@ msgstr "Keep installing"
 #: src/apps/settings/ModelsAndStorageSection.tsx:123
 #: src/apps/settings/styles/StyleEditor.tsx:182
 #: src/shell/pages/FilesPage.tsx:384
-#: src/shell/pages/MusicStudioPages.tsx:194
+#: src/shell/pages/MusicStudioPages.tsx:199
 #: src/shell/pages/MusicWorkspacePage.tsx:212
 #: src/shell/pages/settings/WebSearchSettings.tsx:129
 #: src/shell/pages/status/StatusBoard.tsx:73
@@ -13212,7 +13212,7 @@ msgstr "Levels and models"
 
 #. js-lingui-explicit-id
 #: src/shell/pages/FilesPage.tsx:79
-#: src/shell/pages/MusicStudioPages.tsx:146
+#: src/shell/pages/MusicStudioPages.tsx:151
 #: src/shell/pages/settings/settingsBackLink.ts:53
 #: src/shell/pages/status/StatusComponents.tsx:31
 msgid "Library"
@@ -13400,7 +13400,7 @@ msgid "Listening"
 msgstr "Listening"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/MusicStudioView.tsx:232
+#: src/shell/pages/MusicStudioView.tsx:234
 msgid "Listening effects"
 msgstr "Listening effects"
 
@@ -13594,7 +13594,7 @@ msgid "Loading Coding setup"
 msgstr "Loading Coding setup"
 
 #. js-lingui-explicit-id
-#: src/shell/AmbientCompanionPane.tsx:326
+#: src/shell/AmbientCompanionPane.tsx:328
 msgid "Loading conversations"
 msgstr "Loading conversations"
 
@@ -13836,7 +13836,7 @@ msgid "Loading voices"
 msgstr "Loading voices"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/PackageAppPage.tsx:298
+#: src/shell/pages/PackageAppPage.tsx:301
 msgid "Loading weather"
 msgstr "Loading weather"
 
@@ -13924,7 +13924,7 @@ msgid "Lock now"
 msgstr "Lock now"
 
 #. js-lingui-explicit-id
-#: src/shell/sessionLockContext.tsx:78
+#: src/shell/sessionLockContext.tsx:79
 msgid "Locked after inactivity."
 msgstr "Locked after inactivity."
 
@@ -14020,12 +14020,12 @@ msgstr "Looks things up online, with the safeguards described above."
 
 #. js-lingui-explicit-id
 #: src/apps/chat/MusicCardView.tsx:105
-#: src/shell/pages/MusicStudioView.tsx:227
+#: src/shell/pages/MusicStudioView.tsx:229
 msgid "Loop"
 msgstr "Loop"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/MusicStudioView.tsx:213
+#: src/shell/pages/MusicStudioView.tsx:215
 msgid "Loop end"
 msgstr "Loop end"
 
@@ -14041,7 +14041,7 @@ msgid "Loop it"
 msgstr "Loop it"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/MusicStudioView.tsx:213
+#: src/shell/pages/MusicStudioView.tsx:215
 msgid "Loop start"
 msgstr "Loop start"
 
@@ -14281,7 +14281,7 @@ msgstr "MaiPai's voice"
 
 #. js-lingui-explicit-id
 #: src/shell/pages/MakeSongPage.tsx:161
-#: src/shell/pages/MusicStudioPages.tsx:96
+#: src/shell/pages/MusicStudioPages.tsx:100
 msgid "Make a band"
 msgstr "Make a band"
 
@@ -14291,7 +14291,7 @@ msgid "Make a copy"
 msgstr "Make a copy"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/MusicStudioPages.tsx:179
+#: src/shell/pages/MusicStudioPages.tsx:184
 msgid "Make a new cover for this album."
 msgstr "Make a new cover for this album."
 
@@ -14323,12 +14323,12 @@ msgstr "Make a song"
 
 #. js-lingui-explicit-id
 #: src/shell/pages/MakeSongPage.tsx:159
-#: src/shell/pages/MusicStudioPages.tsx:96
+#: src/shell/pages/MusicStudioPages.tsx:100
 msgid "Make a song style"
 msgstr "Make a song style"
 
 #. js-lingui-explicit-id
-#: src/apps/chat/chatThreadSlots.tsx:451
+#: src/apps/chat/chatThreadSlots.tsx:453
 msgid "Make a variation"
 msgstr "Make a variation"
 
@@ -14367,7 +14367,7 @@ msgid "Make all ages"
 msgstr "Make all ages"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/MusicStudioPages.tsx:96
+#: src/shell/pages/MusicStudioPages.tsx:100
 msgid "Make an album"
 msgstr "Make an album"
 
@@ -14410,7 +14410,7 @@ msgid "Make it"
 msgstr "Make it"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/MusicStudioPages.tsx:81
+#: src/shell/pages/MusicStudioPages.tsx:83
 msgid "Make it in chat"
 msgstr "Make it in chat"
 
@@ -14425,12 +14425,12 @@ msgid "Make MaiPai feel like yours."
 msgstr "Make MaiPai feel like yours."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/MusicStudioPages.tsx:34
+#: src/shell/pages/MusicStudioPages.tsx:36
 msgid "Make me a band, with a back story, a look and a first song. Ask me what sound I want if you need to."
 msgstr "Make me a band, with a back story, a look and a first song. Ask me what sound I want if you need to."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/MusicStudioPages.tsx:35
+#: src/shell/pages/MusicStudioPages.tsx:37
 msgid "Make me an album, with a cover and a first song. Ask me what sound I want if you need to."
 msgstr "Make me an album, with a cover and a first song. Ask me what sound I want if you need to."
 
@@ -14445,7 +14445,7 @@ msgid "Make new music for this video"
 msgstr "Make new music for this video"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/MusicStudioPages.tsx:134
+#: src/shell/pages/MusicStudioPages.tsx:139
 msgid "Make one"
 msgstr "Make one"
 
@@ -14524,7 +14524,7 @@ msgid "Making a song is for adults. Ask a grown-up to make one with you."
 msgstr "Making a song is for adults. Ask a grown-up to make one with you."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/MusicStudioPages.tsx:38
+#: src/shell/pages/MusicStudioPages.tsx:40
 msgid "Making a song, a band, an album or a style is for adults. Ask a grown-up to make one with you."
 msgstr "Making a song, a band, an album or a style is for adults. Ask a grown-up to make one with you."
 
@@ -14790,7 +14790,7 @@ msgstr "Maximum speed used for automatic reference library updates."
 #: src/shell/pageHeaderTitle.tsx:116
 #: src/shell/pages/MediaHomePage.tsx:24
 #: src/shell/pages/MediaSearchPage.tsx:17
-#: src/shell/Routes.tsx:434
+#: src/shell/Routes.tsx:436
 msgid "Media"
 msgstr "Media"
 
@@ -15338,7 +15338,7 @@ msgid "mute"
 msgstr "mute"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/MusicStudioView.tsx:75
+#: src/shell/pages/MusicStudioView.tsx:77
 msgid "Mute {name}"
 msgstr "Mute {name}"
 
@@ -15361,8 +15361,8 @@ msgid "My coding tool"
 msgstr "My coding tool"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/MusicStudioPages.tsx:174
-#: src/shell/pages/MusicStudioPages.tsx:175
+#: src/shell/pages/MusicStudioPages.tsx:179
+#: src/shell/pages/MusicStudioPages.tsx:180
 msgid "My creations"
 msgstr "My creations"
 
@@ -15414,7 +15414,7 @@ msgid "Name it for the assistant that will use it. You see the key once."
 msgstr "Name it for the assistant that will use it. You see the key once."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/MusicStudioPages.tsx:98
+#: src/shell/pages/MusicStudioPages.tsx:102
 msgid "Name the album and say how it sounds. Home adds the cover and the songs in chat."
 msgstr "Name the album and say how it sounds. Home adds the cover and the songs in chat."
 
@@ -15424,7 +15424,7 @@ msgid "area.Name things in a picture"
 msgstr "Name things in a picture"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/MusicStudioPages.tsx:97
+#: src/shell/pages/MusicStudioPages.tsx:101
 msgid "Name your band and say how it sounds. Add the pictures later in chat."
 msgstr "Name your band and say how it sounds. Add the pictures later in chat."
 
@@ -15657,8 +15657,8 @@ msgid "New Coding key"
 msgstr "New Coding key"
 
 #. js-lingui-explicit-id
-#: src/shell/AmbientCompanionPane.tsx:333
-#: src/shell/AmbientCompanionPane.tsx:333
+#: src/shell/AmbientCompanionPane.tsx:336
+#: src/shell/AmbientCompanionPane.tsx:336
 msgid "New conversation"
 msgstr "New conversation"
 
@@ -15798,8 +15798,8 @@ msgid "setting.news.lists.child.option.feeds-children"
 msgstr "News written for young readers."
 
 #. js-lingui-explicit-id
+#: src/apps/settings/EngineLinkCredentialSection.tsx:286
 #: src/apps/settings/EngineLinkCredentialSection.tsx:287
-#: src/apps/settings/EngineLinkCredentialSection.tsx:288
 #: src/apps/settings/styles/StyleBrowser.tsx:159
 #: src/shell/components/DataTableControls.tsx:34
 #: src/shell/pages/RepairsPage.tsx:148
@@ -15944,7 +15944,7 @@ msgid "No connection details reported."
 msgstr "No connection details reported."
 
 #. js-lingui-explicit-id
-#: src/shell/AmbientCompanionPane.tsx:326
+#: src/shell/AmbientCompanionPane.tsx:328
 msgid "No conversations with {name} yet."
 msgstr "No conversations with {name} yet."
 
@@ -17190,7 +17190,7 @@ msgid "setting.robot.sleep.auto.help"
 msgstr "On by default. This robot goes to sleep after 10 minutes of darkness and no speech, and during household quiet hours. A face, speech or a knock wakes it, and the wake word still works. Turn off to keep it awake. Only an admin changes this, for each robot on its own."
 
 #. js-lingui-explicit-id
-#: src/apps/settings/EngineLinkCredentialSection.tsx:254
+#: src/apps/settings/EngineLinkCredentialSection.tsx:253
 msgid "On the engine computer, open a terminal and run this one command. Copy it with the button."
 msgstr "On the engine computer, open a terminal and run this one command. Copy it with the button."
 
@@ -17335,7 +17335,7 @@ msgid "failure.voice.listening_lost.adultNoRepairs"
 msgstr "One moment. Voice listening will be back in about a minute; then tap the waveform to start again."
 
 #. js-lingui-explicit-id
-#: src/apps/settings/EngineLinkCredentialSection.tsx:256
+#: src/apps/settings/EngineLinkCredentialSection.tsx:255
 msgid "One-time code:"
 msgstr "One-time code:"
 
@@ -17443,7 +17443,7 @@ msgstr "Only when I ask"
 
 #. js-lingui-explicit-id
 #: src/apps/chat/chatToolUis.tsx:108
-#: src/shell/AmbientCompanionPane.tsx:324
+#: src/shell/AmbientCompanionPane.tsx:326
 #: src/shell/InstallDock.tsx:255
 #: src/shell/library/LibraryItems.tsx:32
 #: src/shell/NotificationBell.tsx:252
@@ -17456,7 +17456,7 @@ msgid "Open"
 msgstr "Open"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/MusicStudioView.tsx:160
+#: src/shell/pages/MusicStudioView.tsx:162
 msgid "Open a song from your list, then choose Studio."
 msgstr "Open a song from your list, then choose Studio."
 
@@ -17466,8 +17466,8 @@ msgid "Open chat"
 msgstr "Open chat"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/MusicStudioView.tsx:160
-#: src/shell/pages/MusicStudioView.tsx:161
+#: src/shell/pages/MusicStudioView.tsx:162
+#: src/shell/pages/MusicStudioView.tsx:163
 msgid "Open Create"
 msgstr "Open Create"
 
@@ -17622,7 +17622,7 @@ msgid "OpenCode · same key"
 msgstr "OpenCode · same key"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/PackageAppPage.tsx:289
+#: src/shell/pages/PackageAppPage.tsx:292
 msgid "Opening the app"
 msgstr "Opening the app"
 
@@ -17642,7 +17642,7 @@ msgid "Opening your song"
 msgstr "Opening your song"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/MusicStudioView.tsx:205
+#: src/shell/pages/MusicStudioView.tsx:207
 msgid "Opening your song. The Studio shows it as soon as it is made."
 msgstr "Opening your song. The Studio shows it as soon as it is made."
 
@@ -17708,7 +17708,7 @@ msgid "Order of importance"
 msgstr "Order of importance"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/MusicStudioPages.tsx:44
+#: src/shell/pages/MusicStudioPages.tsx:46
 msgid "original songs"
 msgstr "original songs"
 
@@ -17836,12 +17836,12 @@ msgid "Paired and its password is rotated - it's ready to use."
 msgstr "Paired and its password is rotated - it's ready to use."
 
 #. js-lingui-explicit-id
-#: src/apps/settings/EngineLinkCredentialSection.tsx:277
+#: src/apps/settings/EngineLinkCredentialSection.tsx:276
 msgid "Paired. Home now trusts this engine computer."
 msgstr "Paired. Home now trusts this engine computer."
 
 #. js-lingui-explicit-id
-#: src/apps/settings/EngineLinkCredentialSection.tsx:255
+#: src/apps/settings/EngineLinkCredentialSection.tsx:254
 msgid "Pairing command"
 msgstr "Pairing command"
 
@@ -17956,7 +17956,7 @@ msgstr "Paul"
 
 #. js-lingui-explicit-id
 #: src/apps/settings/ReferenceLibrarySettings.tsx:276
-#: src/shell/pages/MusicStudioView.tsx:225
+#: src/shell/pages/MusicStudioView.tsx:227
 msgid "Pause"
 msgstr "Pause"
 
@@ -18031,7 +18031,7 @@ msgstr "Percent of the normal text size. \"Preset\" follows your ease of use cho
 #. js-lingui-explicit-id
 #: src/shell/pageHeaderTitle.tsx:103
 #: src/shell/pages/PerformancePage.tsx:54
-#: src/shell/Routes.tsx:154
+#: src/shell/Routes.tsx:155
 msgid "Performance"
 msgstr "Performance"
 
@@ -18153,17 +18153,17 @@ msgid "Pick a song and the second where the sound starts. Home makes a new versi
 msgstr "Pick a song and the second where the sound starts. Home makes a new version of the song and keeps the first one."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/MusicStudioPages.tsx:208
+#: src/shell/pages/MusicStudioPages.tsx:213
 msgid "Pick a song to open its tracks."
 msgstr "Pick a song to open its tracks."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/MusicStudioPages.tsx:209
+#: src/shell/pages/MusicStudioPages.tsx:214
 msgid "Pick a song to split into vocals, drums, bass and other. The rows open in the Studio."
 msgstr "Pick a song to split into vocals, drums, bass and other. The rows open in the Studio."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/MusicStudioPages.tsx:210
+#: src/shell/pages/MusicStudioPages.tsx:215
 msgid "Pick a song, then say what to change: the style, the words, the tempo or the voice. You see the request before anything is made."
 msgstr "Pick a song, then say what to change: the style, the words, the tempo or the voice. You see the request before anything is made."
 
@@ -18387,7 +18387,7 @@ msgid "Pictures and videos can be made in chat."
 msgstr "Pictures and videos can be made in chat."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/MusicStudioPages.tsx:188
+#: src/shell/pages/MusicStudioPages.tsx:193
 msgid "Pictures are made in chat; songs are made on"
 msgstr "Pictures are made in chat; songs are made on"
 
@@ -18459,7 +18459,7 @@ msgstr "Pin example: {phrase}"
 #. js-lingui-explicit-id
 #: src/apps/people/NewPersonForm.tsx:121
 #: src/shell/pages/settings/settingsViews.tsx:72
-#: src/shell/sessionLockContext.tsx:98
+#: src/shell/sessionLockContext.tsx:99
 msgid "PIN or password"
 msgstr "PIN or password"
 
@@ -18469,7 +18469,7 @@ msgid "PIN or password (required for {role})"
 msgstr "PIN or password (required for {role})"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/EngineLinkCredentialSection.tsx:270
+#: src/apps/settings/EngineLinkCredentialSection.tsx:269
 msgid "Pin this computer"
 msgstr "Pin this computer"
 
@@ -18494,7 +18494,7 @@ msgid "Pitch {value}"
 msgstr "Pitch {value}"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/PackageAppPage.tsx:322
+#: src/shell/pages/PackageAppPage.tsx:326
 msgid "Place"
 msgstr "Place"
 
@@ -18530,7 +18530,7 @@ msgstr "planned maintenance for {time}"
 
 #. js-lingui-explicit-id
 #: src/shell/pages/companionFlow/AnimateStep.tsx:44
-#: src/shell/pages/MusicStudioView.tsx:225
+#: src/shell/pages/MusicStudioView.tsx:227
 msgid "Play"
 msgstr "Play"
 
@@ -18936,8 +18936,8 @@ msgid "Queue"
 msgstr "Queue"
 
 #. js-lingui-explicit-id
-#: src/apps/chat/chatThreadSlots.tsx:92
-#: src/apps/chat/chatThreadSlots.tsx:92
+#: src/apps/chat/chatThreadSlots.tsx:93
+#: src/apps/chat/chatThreadSlots.tsx:93
 msgid "Queue message"
 msgstr "Queue message"
 
@@ -19044,7 +19044,7 @@ msgid "Random article"
 msgstr "Random article"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/MusicStudioView.tsx:246
+#: src/shell/pages/MusicStudioView.tsx:248
 msgid "Ratio"
 msgstr "Ratio"
 
@@ -19069,7 +19069,7 @@ msgid "setting.ease.read_aloud.label"
 msgstr "Read aloud"
 
 #. js-lingui-explicit-id
-#: src/shell/AmbientCompanionPane.tsx:327
+#: src/shell/AmbientCompanionPane.tsx:329
 msgid "Read aloud is unavailable because voice output is not ready. Check Voice settings and try again."
 msgstr "Read aloud is unavailable because voice output is not ready. Check Voice settings and try again."
 
@@ -19081,8 +19081,8 @@ msgstr "Read diagnostics only"
 #. js-lingui-explicit-id
 #: src/apps/chat/chatHeaderBar.tsx:223
 #: src/apps/chat/chatHeaderBar.tsx:321
-#: src/shell/AmbientCompanionPane.tsx:329
-#: src/shell/AmbientCompanionPane.tsx:329
+#: src/shell/AmbientCompanionPane.tsx:332
+#: src/shell/AmbientCompanionPane.tsx:332
 msgid "Read replies aloud"
 msgstr "Read replies aloud"
 
@@ -19308,7 +19308,7 @@ msgid "Related searches"
 msgstr "Related searches"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/MusicStudioView.tsx:248
+#: src/shell/pages/MusicStudioView.tsx:250
 msgid "Release"
 msgstr "Release"
 
@@ -19368,7 +19368,7 @@ msgid "Remix"
 msgstr "Remix"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/MusicStudioPages.tsx:210
+#: src/shell/pages/MusicStudioPages.tsx:215
 msgid "Remix and edit"
 msgstr "Remix and edit"
 
@@ -19632,7 +19632,7 @@ msgstr "Repair issues"
 #: src/shell/pageHeaderTitle.tsx:105
 #: src/shell/pages/dashboard/Attention.tsx:25
 #: src/shell/pages/RepairsPage.tsx:60
-#: src/shell/Routes.tsx:156
+#: src/shell/Routes.tsx:157
 msgid "Repairs"
 msgstr "Repairs"
 
@@ -19782,8 +19782,8 @@ msgstr "Research, discoveries, space, physics, chemistry, biology and how things
 #: src/apps/clock/StopwatchTab.tsx:69
 #: src/apps/clock/TimersTab.tsx:126
 #: src/apps/clock/TimersTab.tsx:138
-#: src/shell/pages/MusicStudioView.tsx:234
-#: src/shell/pages/MusicStudioView.tsx:244
+#: src/shell/pages/MusicStudioView.tsx:236
+#: src/shell/pages/MusicStudioView.tsx:246
 #: src/shell/pages/settings/DeviceAppearanceControl.tsx:37
 msgid "Reset"
 msgstr "Reset"
@@ -19953,7 +19953,7 @@ msgstr "Off, Home's own engine does this. Turn on only after the Stack has been 
 #: src/apps/clock/AlarmsTab.tsx:72
 #: src/apps/clock/TimersTab.tsx:148
 #: src/apps/reminders/RemindersPage.tsx:193
-#: src/apps/settings/EngineLinkCredentialSection.tsx:280
+#: src/apps/settings/EngineLinkCredentialSection.tsx:279
 #: src/apps/settings/StackChanInstallDialog.tsx:147
 #: src/shell/GlobalMiniPlayer.tsx:120
 #: src/shell/pages/settings/HouseSettings.tsx:47
@@ -19973,7 +19973,7 @@ msgid "failure.advice.engine_computer.next_step"
 msgstr "Retry when the connection is back. If it stays down, check Repairs."
 
 #. js-lingui-explicit-id
-#: src/apps/chat/chatThreadSlots.tsx:528
+#: src/apps/chat/chatThreadSlots.tsx:530
 msgid "Retry with current companion"
 msgstr "Retry with current companion"
 
@@ -20509,7 +20509,7 @@ msgid "Save"
 msgstr "Save"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/MusicStudioPages.tsx:36
+#: src/shell/pages/MusicStudioPages.tsx:38
 msgid "Save a song style for me. Ask me what sound I want if you need to."
 msgstr "Save a song style for me. Ask me what sound I want if you need to."
 
@@ -20888,7 +20888,7 @@ msgstr "Search"
 
 #. js-lingui-explicit-id
 #: src/shell/pages/packageAppHeaderBar.tsx:107
-#: src/shell/pages/PackageAppPage.tsx:280
+#: src/shell/pages/PackageAppPage.tsx:283
 msgid "Search {name}"
 msgstr "Search {name}"
 
@@ -21130,14 +21130,14 @@ msgid "Seconds"
 msgstr "Seconds"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/PackageAppPage.tsx:363
-#: src/shell/pages/PackageAppPage.tsx:381
-#: src/shell/pages/PackageAppPage.tsx:396
+#: src/shell/pages/PackageAppPage.tsx:367
+#: src/shell/pages/PackageAppPage.tsx:385
+#: src/shell/pages/PackageAppPage.tsx:400
 msgid "Sections"
 msgstr "Sections"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/EngineLinkCredentialSection.tsx:246
+#: src/apps/settings/EngineLinkCredentialSection.tsx:245
 msgid "Secure connection port"
 msgstr "Secure connection port"
 
@@ -21218,7 +21218,7 @@ msgid "Select All"
 msgstr "Select All"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/EngineLinkCredentialSection.tsx:264
+#: src/apps/settings/EngineLinkCredentialSection.tsx:263
 msgid "Select Check the engine computer. Home reads its security key. Then type the check code the engine computer printed."
 msgstr "Select Check the engine computer. Home reads its security key. Then type the check code the engine computer printed."
 
@@ -21520,13 +21520,13 @@ msgid "Setting up your AI"
 msgstr "Setting up your AI"
 
 #. js-lingui-explicit-id
-#: src/shell/AmbientCompanionPane.tsx:329
+#: src/shell/AmbientCompanionPane.tsx:332
 #: src/shell/coreLabels.ts:13
 #: src/shell/pageHeaderTitle.tsx:100
 #: src/shell/pages/FilesPage.tsx:288
 #: src/shell/pages/PersonProfilePage.tsx:206
 #: src/shell/pages/settings/SettingsAreaPage.tsx:293
-#: src/shell/Routes.tsx:434
+#: src/shell/Routes.tsx:436
 msgid "Settings"
 msgstr "Settings"
 
@@ -21744,7 +21744,7 @@ msgid "Show in the sidebar"
 msgstr "Show in the sidebar"
 
 #. js-lingui-explicit-id
-#: src/shell/Routes.tsx:350
+#: src/shell/Routes.tsx:352
 msgid "Show me around"
 msgstr "Show me around"
 
@@ -21879,7 +21879,7 @@ msgid "Shuffle"
 msgstr "Shuffle"
 
 #. js-lingui-explicit-id
-#: src/shell/AmbientCompanionPane.tsx:321
+#: src/shell/AmbientCompanionPane.tsx:323
 msgid "Side chat"
 msgstr "Side chat"
 
@@ -22264,7 +22264,7 @@ msgid "Software"
 msgstr "Software"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/MusicStudioView.tsx:77
+#: src/shell/pages/MusicStudioView.tsx:79
 msgid "Solo {name}"
 msgstr "Solo {name}"
 
@@ -22412,7 +22412,7 @@ msgid "songs"
 msgstr "songs"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/MusicStudioPages.tsx:147
+#: src/shell/pages/MusicStudioPages.tsx:152
 msgid "Songs"
 msgstr "Songs"
 
@@ -22577,13 +22577,13 @@ msgstr "Split a song into vocals, drums, bass and the rest."
 #: src/apps/chat/MusicCardView.tsx:91
 #: src/shell/library/LibraryViewer.tsx:98
 #: src/shell/pages/BringSong.tsx:51
-#: src/shell/pages/MusicStudioView.tsx:199
-#: src/shell/pages/MusicStudioView.tsx:221
+#: src/shell/pages/MusicStudioView.tsx:201
+#: src/shell/pages/MusicStudioView.tsx:223
 msgid "Split into stems"
 msgstr "Split into stems"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/MusicStudioView.tsx:199
+#: src/shell/pages/MusicStudioView.tsx:201
 msgid "Split into stems (done)"
 msgstr "Split into stems (done)"
 
@@ -22593,7 +22593,7 @@ msgid "area.Split songs into stems"
 msgstr "Split songs into stems"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/MusicStudioView.tsx:220
+#: src/shell/pages/MusicStudioView.tsx:222
 msgid "Split the song to get a row for the vocals, the drums, the bass and the rest. Each one gets its own volume, mute and solo."
 msgstr "Split the song to get a row for the vocals, the drums, the bass and the rest. Each one gets its own volume, mute and solo."
 
@@ -22608,17 +22608,17 @@ msgid "Splitting a song into stems may not be available on this Home yet."
 msgstr "Splitting a song into stems may not be available on this Home yet."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/MusicStudioView.tsx:199
+#: src/shell/pages/MusicStudioView.tsx:201
 msgid "Splitting into stems"
 msgstr "Splitting into stems"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/MusicStudioView.tsx:220
+#: src/shell/pages/MusicStudioView.tsx:222
 msgid "Splitting the song into vocals, drums, bass and other. The rows appear here when it is done."
 msgstr "Splitting the song into vocals, drums, bass and other. The rows appear here when it is done."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/MusicStudioView.tsx:202
+#: src/shell/pages/MusicStudioView.tsx:204
 msgid "Splitting the song into vocals, drums, bass and other{progress, select, none {} other {: {progress} percent}}. This takes a minute or two. The rows appear here when it is done."
 msgstr "Splitting the song into vocals, drums, bass and other{progress, select, none {} other {: {progress} percent}}. This takes a minute or two. The rows appear here when it is done."
 
@@ -22854,7 +22854,7 @@ msgid "Starter sounds"
 msgstr "Starter sounds"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/MusicStudioPages.tsx:119
+#: src/shell/pages/MusicStudioPages.tsx:124
 msgid "Starter style"
 msgstr "Starter style"
 
@@ -22917,7 +22917,7 @@ msgid "failure.composer.starting.teen"
 msgstr "Starting up. Send in a moment."
 
 #. js-lingui-explicit-id
-#: src/apps/chat/chatThreadSlots.tsx:592
+#: src/apps/chat/chatThreadSlots.tsx:594
 msgid "Starting your AI…"
 msgstr "Starting your AI…"
 
@@ -22950,7 +22950,7 @@ msgstr "Starts at (seconds)"
 #: src/shell/pages/RepairsPage.tsx:67
 #: src/shell/pages/StatusPage.tsx:32
 #: src/shell/pages/UpdatesPage.tsx:53
-#: src/shell/Routes.tsx:157
+#: src/shell/Routes.tsx:158
 msgid "Status"
 msgstr "Status"
 
@@ -22966,7 +22966,7 @@ msgstr "Status page"
 
 #. js-lingui-explicit-id
 #: src/apps/settings/ModelsAndStorageSection.tsx:23
-#: src/shell/pages/MusicStudioPages.tsx:209
+#: src/shell/pages/MusicStudioPages.tsx:214
 #: src/shell/pages/MusicWorkspacePage.tsx:140
 #: src/shell/pages/MusicWorkspacePage.tsx:164
 msgid "Stems"
@@ -23152,7 +23152,7 @@ msgstr "Stopwatch running"
 #: src/shell/pages/TrashPage.tsx:27
 #: src/shell/pages/TrashPage.tsx:27
 #: src/shell/pages/TrashPage.tsx:58
-#: src/shell/Routes.tsx:153
+#: src/shell/Routes.tsx:154
 msgid "Storage"
 msgstr "Storage"
 
@@ -23217,10 +23217,10 @@ msgid "setting.tts.voice_id.option_label.stuart_bell"
 msgstr "Stuart Bell"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/MusicStudioPages.tsx:208
-#: src/shell/pages/MusicStudioView.tsx:194
-#: src/shell/pages/MusicStudioView.tsx:195
+#: src/shell/pages/MusicStudioPages.tsx:213
 #: src/shell/pages/MusicStudioView.tsx:196
+#: src/shell/pages/MusicStudioView.tsx:197
+#: src/shell/pages/MusicStudioView.tsx:198
 #: src/shell/pages/MusicWorkspacePage.tsx:140
 #: src/shell/pages/MusicWorkspacePage.tsx:163
 msgid "Studio"
@@ -23242,7 +23242,7 @@ msgstr "Style"
 #: src/apps/settings/styles/StylesTab.tsx:77
 #: src/shell/pages/MakeSongPage.tsx:144
 #: src/shell/pages/MakeSongPage.tsx:145
-#: src/shell/pages/MusicStudioPages.tsx:150
+#: src/shell/pages/MusicStudioPages.tsx:155
 #: src/shell/pages/MusicWorkspacePage.tsx:248
 #: src/shell/pages/MusicWorkspacePage.tsx:260
 #: src/shell/pages/settings/MediaCardViews.tsx:86
@@ -23409,7 +23409,7 @@ msgid "Takes"
 msgstr "Takes"
 
 #. js-lingui-explicit-id
-#: src/shell/AmbientCompanionPane.tsx:332
+#: src/shell/AmbientCompanionPane.tsx:335
 msgid "Talk"
 msgstr "Talk"
 
@@ -23754,6 +23754,7 @@ msgid "That did not send. Try again."
 msgstr "That did not send. Try again."
 
 #. js-lingui-explicit-id
+#: src/apps/chat/chatThreadSlots.tsx:203
 #: src/apps/chat/chatToolUis.tsx:324
 #: src/apps/chat/chatToolUis.tsx:341
 #: src/apps/clock/AlarmsTab.tsx:71
@@ -23780,7 +23781,8 @@ msgstr "That did not send. Try again."
 #: src/apps/settings/CommandsSection.tsx:111
 #: src/apps/settings/CommandsSection.tsx:182
 #: src/apps/settings/CommandsSection.tsx:190
-#: src/apps/settings/EngineLinkCredentialSection.tsx:283
+#: src/apps/settings/EngineLinkCredentialSection.tsx:247
+#: src/apps/settings/EngineLinkCredentialSection.tsx:282
 #: src/apps/settings/FreeUpSpaceDialog.tsx:66
 #: src/apps/settings/HuggingFaceTokenSection.tsx:89
 #: src/apps/settings/HuggingFaceTokenSection.tsx:104
@@ -23807,6 +23809,8 @@ msgstr "That did not send. Try again."
 #: src/apps/settings/VoiceManagerSection.tsx:102
 #: src/shell/AmbientCompanionPane.tsx:178
 #: src/shell/AmbientCompanionPane.tsx:262
+#: src/shell/AmbientCompanionPane.tsx:330
+#: src/shell/InstallDock.tsx:312
 #: src/shell/library/LibraryViewer.tsx:104
 #: src/shell/library/LibraryViewer.tsx:110
 #: src/shell/library/LibraryViewer.tsx:117
@@ -23830,6 +23834,10 @@ msgstr "That did not send. Try again."
 #: src/shell/pages/FilesPage.tsx:390
 #: src/shell/pages/FilesPage.tsx:405
 #: src/shell/pages/MusicRemix.tsx:39
+#: src/shell/pages/MusicStudioPages.tsx:105
+#: src/shell/pages/MusicStudioView.tsx:205
+#: src/shell/pages/MusicStudioView.tsx:206
+#: src/shell/pages/PackageAppPage.tsx:300
 #: src/shell/pages/ProjectsPage.tsx:137
 #: src/shell/pages/RepairsPage.tsx:124
 #: src/shell/pages/settings/SettingsAreaPage.tsx:283
@@ -23846,6 +23854,8 @@ msgstr "That did not send. Try again."
 #: src/shell/pages/UpdatesPage.tsx:129
 #: src/shell/pages/UpdatesPage.tsx:184
 #: src/shell/pages/UpdatesPage.tsx:187
+#: src/shell/Routes.tsx:317
+#: src/shell/sessionLockContext.tsx:124
 msgid "That did not work"
 msgstr "That did not work"
 
@@ -23961,7 +23971,7 @@ msgid "That page does not exist. The link may be old or mistyped. Go to Home and
 msgstr "That page does not exist. The link may be old or mistyped. Go to Home and pick it from the menu."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/MusicStudioPages.tsx:215
+#: src/shell/pages/MusicStudioPages.tsx:220
 msgid "That page needs a band, an album or a style. Open it from My creations."
 msgstr "That page needs a band, an album or a style. Open it from My creations."
 
@@ -24028,7 +24038,7 @@ msgstr "That song could not be deleted. Try again."
 
 #. js-lingui-explicit-id
 #: src/shell/pages/MakeSongPage.tsx:89
-#: src/shell/pages/MusicStudioView.tsx:161
+#: src/shell/pages/MusicStudioView.tsx:163
 msgid "That song is not here any more. It may have been removed from your Library."
 msgstr "That song is not here any more. It may have been removed from your Library."
 
@@ -24179,7 +24189,7 @@ msgid "The assistant using it loses that access at once."
 msgstr "The assistant using it loses that access at once."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/MusicStudioView.tsx:174
+#: src/shell/pages/MusicStudioView.tsx:176
 msgid "The audio could not start. Press play again."
 msgstr "The audio could not start. Press play again."
 
@@ -25137,7 +25147,7 @@ msgid "These are the licences that come with parts Home installs for you. Accept
 msgstr "These are the licences that come with parts Home installs for you. Accepting covers all of them."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/MusicStudioView.tsx:250
+#: src/shell/pages/MusicStudioView.tsx:252
 msgid "These change what you hear in the Studio. The saved song is not changed."
 msgstr "These change what you hear in the Studio. The saved song is not changed."
 
@@ -25157,7 +25167,7 @@ msgid "Things it might say"
 msgstr "Things it might say"
 
 #. js-lingui-explicit-id
-#: src/apps/chat/chatThreadSlots.tsx:247
+#: src/apps/chat/chatThreadSlots.tsx:249
 #: src/apps/settings/RobotBody.tsx:21
 msgid "Thinking"
 msgstr "Thinking"
@@ -25193,7 +25203,7 @@ msgid "This app is also on the Never close list, so it stays open."
 msgstr "This app is also on the Never close list, so it stays open."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/PackageAppPage.tsx:119
+#: src/shell/pages/PackageAppPage.tsx:121
 msgid "This app's page is not valid."
 msgstr "This app's page is not valid."
 
@@ -25203,7 +25213,7 @@ msgid "This article is not available."
 msgstr "This article is not available."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/MusicStudioView.tsx:86
+#: src/shell/pages/MusicStudioView.tsx:88
 msgid "This audio could not be drawn. It still plays."
 msgstr "This audio could not be drawn. It still plays."
 
@@ -25243,7 +25253,7 @@ msgid "This chat made {media}. Delete them too, or keep them in your Library? De
 msgstr "This chat made {media}. Delete them too, or keep them in your Library? Deleted files wait in Trash for 30 days."
 
 #. js-lingui-explicit-id
-#: src/apps/chat/chatThreadSlots.tsx:607
+#: src/apps/chat/chatThreadSlots.tsx:609
 msgid "This chat won't be saved to your history."
 msgstr "This chat won't be saved to your history."
 
@@ -25284,7 +25294,7 @@ msgid "failure.voice.microphone_missing.adultNoRepairs"
 msgstr "This computer has no microphone. Plug in a microphone, or a display or headset with one, then tap the waveform again."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/MusicStudioView.tsx:34
+#: src/shell/pages/MusicStudioView.tsx:36
 msgid "This computer has no stem model installed, so the song cannot be split. An admin can add one in Settings. The full song still plays here."
 msgstr "This computer has no stem model installed, so the song cannot be split. An admin can add one in Settings. The full song still plays here."
 
@@ -25424,7 +25434,7 @@ msgid "setting.storage.person_quota_gb.label"
 msgstr "This person's storage quota (GB)"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/PackageAppPage.tsx:316
+#: src/shell/pages/PackageAppPage.tsx:319
 msgid "This place"
 msgstr "This place"
 
@@ -25494,7 +25504,7 @@ msgid "api.error.passkey_signin_expired"
 msgstr "This sign-in attempt has expired. Try again."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/MusicStudioView.tsx:205
+#: src/shell/pages/MusicStudioView.tsx:207
 msgid "This song could not be made, so there is nothing to open."
 msgstr "This song could not be made, so there is nothing to open."
 
@@ -25530,7 +25540,7 @@ msgid "Those motors"
 msgstr "Those motors"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/MusicStudioView.tsx:245
+#: src/shell/pages/MusicStudioView.tsx:247
 msgid "Threshold"
 msgstr "Threshold"
 
@@ -25795,7 +25805,7 @@ msgid "Tracking"
 msgstr "Tracking"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/MusicStudioView.tsx:208
+#: src/shell/pages/MusicStudioView.tsx:210
 msgid "Tracks"
 msgstr "Tracks"
 
@@ -26096,8 +26106,8 @@ msgid "Turn this feature off?"
 msgstr "Turn this feature off?"
 
 #. js-lingui-explicit-id
-#: src/apps/chat/chatThreadSlots.tsx:383
-#: src/shell/Routes.tsx:170
+#: src/apps/chat/chatThreadSlots.tsx:385
+#: src/shell/Routes.tsx:171
 msgid "Turn trace"
 msgstr "Turn trace"
 
@@ -26389,7 +26399,7 @@ msgid "setting.coding.keep_warm_minutes.does"
 msgstr "Unloads the model after this many quiet minutes."
 
 #. js-lingui-explicit-id
-#: src/shell/sessionLockContext.tsx:129
+#: src/shell/sessionLockContext.tsx:128
 msgid "Unlock"
 msgstr "Unlock"
 
@@ -26404,7 +26414,7 @@ msgid "Unlocked on this page only. It locks again when you leave or after 2 minu
 msgstr "Unlocked on this page only. It locks again when you leave or after 2 minutes without a touch."
 
 #. js-lingui-explicit-id
-#: src/shell/sessionLockContext.tsx:129
+#: src/shell/sessionLockContext.tsx:128
 msgid "Unlocking…"
 msgstr "Unlocking…"
 
@@ -26445,7 +26455,7 @@ msgid "Until storage runs low"
 msgstr "Until storage runs low"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/MusicStudioPages.tsx:116
+#: src/shell/pages/MusicStudioPages.tsx:121
 msgid "Untitled"
 msgstr "Untitled"
 
@@ -26540,7 +26550,7 @@ msgstr "Updated {when}"
 #: src/shell/pageHeaderTitle.tsx:104
 #: src/shell/pages/dashboard/Attention.tsx:26
 #: src/shell/pages/UpdatesPage.tsx:78
-#: src/shell/Routes.tsx:155
+#: src/shell/Routes.tsx:156
 msgid "Updates"
 msgstr "Updates"
 
@@ -26606,13 +26616,13 @@ msgstr "Use a gesture by default; spoken greeting remains subject to person and 
 
 #. js-lingui-explicit-id
 #: src/shell/pages/SignInPage.tsx:176
-#: src/shell/sessionLockContext.tsx:141
+#: src/shell/sessionLockContext.tsx:140
 msgid "Use a password instead"
 msgstr "Use a password instead"
 
 #. js-lingui-explicit-id
 #: src/shell/pages/SignInPage.tsx:176
-#: src/shell/sessionLockContext.tsx:141
+#: src/shell/sessionLockContext.tsx:140
 msgid "Use a PIN instead"
 msgstr "Use a PIN instead"
 
@@ -26642,7 +26652,7 @@ msgid "setting.coding.engine.option.llama-server"
 msgstr "Use llama-server, an engine that works on more computers."
 
 #. js-lingui-explicit-id
-#: src/apps/chat/chatThreadSlots.tsx:272
+#: src/apps/chat/chatThreadSlots.tsx:274
 msgid "Use Max"
 msgstr "Use Max"
 
@@ -26805,7 +26815,7 @@ msgstr "Used yesterday"
 #: src/apps/settings/UsersSection.tsx:232
 #: src/shell/pageHeaderTitle.tsx:110
 #: src/shell/pages/UsersPage.tsx:11
-#: src/shell/Routes.tsx:160
+#: src/shell/Routes.tsx:161
 msgid "Users"
 msgstr "Users"
 
@@ -27240,7 +27250,7 @@ msgid "Volume"
 msgstr "Volume"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/MusicStudioView.tsx:79
+#: src/shell/pages/MusicStudioView.tsx:81
 msgid "Volume of {name}"
 msgstr "Volume of {name}"
 
@@ -27379,7 +27389,7 @@ msgid "Wan"
 msgstr "Wan"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/MusicStudioPages.tsx:80
+#: src/shell/pages/MusicStudioPages.tsx:82
 msgid "Want Home to write it and draw the pictures?"
 msgstr "Want Home to write it and draw the pictures?"
 
@@ -28703,7 +28713,7 @@ msgid "Your songs could not be loaded. Check your connection and open this page 
 msgstr "Your songs could not be loaded. Check your connection and open this page again."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/MusicStudioPages.tsx:146
+#: src/shell/pages/MusicStudioPages.tsx:151
 msgid "Your songs, bands, albums and song styles. Open one to play it or change it."
 msgstr "Your songs, bands, albums and song styles. Open one to play it or change it."
 

@@ -1,4 +1,5 @@
 import { api } from "@/lib/api";
+import { errorLine } from "@/lib/hubReachability";
 import { StreamingWavPlayer } from "@/lib/streamingWavPlayer";
 
 export interface VoicePreviewState { voiceId: string | null; busy: boolean; error: string | null }
@@ -54,7 +55,7 @@ export class VoicePreviewController {
     } catch (error) {
       if (generation !== this.generation) return;
       player.stop(); this.player = null; this.reader = null; this.abort = null;
-      this.update({ voiceId: null, busy: false, error: error instanceof Error ? error.message : "Could not play this voice." });
+      this.update({ voiceId: null, busy: false, error: errorLine(error, "Could not play this voice.") });
     }
   }
 }

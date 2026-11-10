@@ -4,6 +4,8 @@
 // action (the same one the chat card uses), so nothing here is a second path. The side panel is a live listening EQ (six bands) and compressor
 // built on the browser's Web Audio: they change what you hear in the Studio, never the saved file. Not built yet: the MIDI piano roll, warp
 // markers and the floating "ask me to add a part" bar; they need an engine that edits audio, which Home does not have.
+import { StatusCard } from "@maipai/ui/src/elements/status-card";
+import { errorLine } from "@/lib/hubReachability";
 import { i18n } from "@lingui/core";
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { Link, useNavigate } from "react-router-dom";
@@ -152,7 +154,7 @@ export function MusicStudioView({ adult, search }: { adult: boolean; search: str
     asked.current = true;
     setSplitting(true);
     musicApi.stems(songId).then((card) => navigate(`/apps/music/studio?song=${encodeURIComponent(songId)}&stems=${encodeURIComponent(card.id)}`, { replace: true }))
-      .catch((error: unknown) => setStemsProblem(error instanceof Error && error.message ? error.message : STEMS_UNAVAILABLE_LINE()))
+      .catch((error: unknown) => setStemsProblem(errorLine(error, STEMS_UNAVAILABLE_LINE())))
       .finally(() => setSplitting(false));
   }, [autoSplit, songId, navigate]);
 
@@ -178,7 +180,7 @@ export function MusicStudioView({ adult, search }: { adult: boolean; search: str
   const split = () => {
     setSplitting(true); setStemsProblem("");
     musicApi.stems(songId).then((card) => navigate(`/apps/music/studio?song=${encodeURIComponent(songId)}&stems=${encodeURIComponent(card.id)}`, { replace: true }))
-      .catch((error: unknown) => setStemsProblem(error instanceof Error && error.message ? error.message : STEMS_UNAVAILABLE_LINE()))
+      .catch((error: unknown) => setStemsProblem(errorLine(error, STEMS_UNAVAILABLE_LINE())))
       .finally(() => setSplitting(false));
   };
   const stemsBusy = stems.data && (stems.data.state === "queued" || stems.data.state === "running");
@@ -200,8 +202,8 @@ export function MusicStudioView({ adult, search }: { adult: boolean; search: str
       </div>
     </div>
     {stemsBusy || splitting ? <p role="status" data-testid="music-stems-progress" className="bg-card rounded-xl p-3 text-sm">{i18n._({ id: "Splitting the song into vocals, drums, bass and other{progress, select, none {} other {: {progress} percent}}. This takes a minute or two. The rows appear here when it is done.", message: "Splitting the song into vocals, drums, bass and other{progress, select, none {} other {: {progress} percent}}. This takes a minute or two. The rows appear here when it is done.", values: { progress: stems.data && stems.data.progress > 0 ? String(Math.round(stems.data.progress * 100)) : "none" } })}</p> : null}
-    {stems.data?.state === "failed" ? <p role="alert" data-testid="music-stems-failed" className="bg-card rounded-xl p-3 text-sm">{stems.data.error_line || STEMS_UNAVAILABLE_LINE()}</p> : null}
-    {stemsProblem ? <p role="alert" className="text-muted-foreground bg-card rounded-xl p-3 text-sm">{stemsProblem}</p> : null}
+    {stems.data?.state === "failed" ? <StatusCard kind="problem" title={i18n._({ id: "That did not work", message: "That did not work" })} line={stems.data.error_line || STEMS_UNAVAILABLE_LINE()} /> : null}
+    {stemsProblem ? <StatusCard kind="problem" title={i18n._({ id: "That did not work", message: "That did not work" })} line={stemsProblem} /> : null}
     {tracks.length === 0 ? <p role="status" className="text-muted-foreground text-sm">{song.data?.state === "failed" ? i18n._({ id: "This song could not be made, so there is nothing to open.", message: "This song could not be made, so there is nothing to open." }) : i18n._({ id: "Opening your song. The Studio shows it as soon as it is made.", message: "Opening your song. The Studio shows it as soon as it is made." })}</p> : <div className="flex min-h-0 flex-col gap-4 lg:flex-row">
       <div className="flex min-w-0 flex-1 flex-col gap-3">
         <div className="bg-card grid grid-cols-(--lanes) overflow-hidden rounded-2xl" data-testid="studio-timeline">

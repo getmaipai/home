@@ -1,8 +1,7 @@
 {
   "toastError": {
     "shell/RailProfile.tsx": 1,
-    "shell/AmbientCompanionPane.tsx": 3,
-    "shell/Routes.tsx": 2,
+    "shell/Routes.tsx": 1,
     "shell/useSideChat.tsx": 1,
     "lib/fitAsk.ts": 1,
     "lib/useHubMutation.ts": 1,
@@ -13,23 +12,15 @@
     "apps/chat/chatToolUis.tsx": 1,
     "apps/chat/branchInNewChatMenuItem.tsx": 1,
     "apps/chat/chatThreadListAdapter.ts": 2,
-    "apps/chat/chatActivity.ts": 2,
     "apps/chat/chatProjects.tsx": 5,
     "apps/chat/chatMemoryChips.ts": 1
   },
   "destructiveClass": {
-    "shell/sessionLockContext.tsx": 1,
     "shell/AmbientCompanionPane.tsx": 1,
-    "shell/InstallDock.tsx": 1,
     "shell/GlobalMiniPlayer.tsx": 1,
-    "shell/pages/StatusPage.tsx": 1,
-    "apps/settings/EngineLinkCredentialSection.tsx": 2
+    "shell/pages/StatusPage.tsx": 1
   },
   "rawErrorMessage": {
-    "shell/pages/MusicStudioView.tsx": 4,
-    "shell/pages/MusicStudioPages.tsx": 2,
-    "shell/pages/PackageAppPage.tsx": 1,
-    "lib/voice/voicePreviewPlayer.ts": 1,
-    "apps/chat/maxChat.ts": 2
+    "apps/chat/maxChat.ts": 1
   }
 }

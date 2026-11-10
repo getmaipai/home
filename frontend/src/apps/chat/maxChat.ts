@@ -72,7 +72,7 @@ async function take(qc: QueryClient): Promise<void> {
     qc.setQueryData(LEASE_KEY, await chatLeaseApi.take());
     setFlow(qc, IDLE);
   } catch (error) {
-    if (error instanceof ApiError && error.code === "not_ready" && error.message === MAX_SELF_TEST_LINE) setFlow(qc, { phase: "self_test_needed", line: error.message });
+    if (error instanceof ApiError && error.code === "not_ready" && error.message === MAX_SELF_TEST_LINE) setFlow(qc, { phase: "self_test_needed", line: MAX_SELF_TEST_LINE });
     else { setPicked(qc, false); setFlow(qc, { phase: "error", line: errorLine(error, "Max did not start. Try again in a minute.") }); }
     void qc.invalidateQueries({ queryKey: LEASE_KEY });
   }

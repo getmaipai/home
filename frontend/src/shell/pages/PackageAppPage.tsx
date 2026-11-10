@@ -1,4 +1,6 @@
 import { i18n } from "@lingui/core";
+import { StatusCard } from "@maipai/ui/src/elements/status-card";
+import { errorLine } from "@/lib/hubReachability";
 import { useQueries, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useContext, useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
@@ -164,6 +166,7 @@ export function PackageAppPage({ person }: { person: Roster }) {
   const [weatherSelectedId, setWeatherSelectedId] = useState("");
   const [weatherSearch, setWeatherSearch] = useState("");
   const [weatherMessage, setWeatherMessage] = useState("");
+  const [weatherProblem, setWeatherProblem] = useState("");
   const [weatherResults, setWeatherResults] = useState<Array<{ name: string; area: string | null; lat: number; lon: number }>>([]);
   const weatherPlaces = useQuery({ queryKey: ["weather-places", person.id], queryFn: () => api.appData<{ rows: Array<{ id: string; label: string }> }>("weather", "places"), staleTime: PAGE_FRESH_MS, enabled: packageId === "weather" && pageId === "index" });
   const weatherEntities = useQuery({ queryKey: ["weather-place-entities", person.id], queryFn: () => api.entities("place"), enabled: packageId === "weather" && pageId === "index" });
@@ -294,7 +297,7 @@ export function PackageAppPage({ person }: { person: Roster }) {
           {packageId === "videos" && pageId === "watch" ? <VideoDetails id={new URLSearchParams(location.search).get("id") ?? String((location.state as { pageState?: { id?: string } } | null)?.pageState?.id ?? "")} /> : null}
           {packageId === "music" && pageId === "play" ? <MusicVisualizerSection id={new URLSearchParams(location.search).get("id") ?? String((location.state as { pageState?: { id?: string } } | null)?.pageState?.id ?? "")} /> : null}
           {packageId === "weather" && pageId === "index" ? <>
-            {weatherMessage ? <p role="status" className="text-sm text-muted-foreground">{weatherMessage}</p> : null}
+            {weatherProblem ? <StatusCard kind="problem" title={i18n._({ id: "That did not work", message: "That did not work" })} line={weatherProblem} /> : null}{weatherMessage ? <p role="status" className="text-sm text-muted-foreground">{weatherMessage}</p> : null}
             {weatherLoading ? <RouteSkeleton label={i18n._({ id: "Loading weather", message: "Loading weather" })} /> : <WeatherForecastPage locations={weatherLocations} selectedId={weatherSelectedPlace?.id} onSelect={(id: string) => { if (id) setWeatherSelectedId(id); }} onSearch={(value: string) => { setWeatherSearch(value); setWeatherResults([]); setWeatherMessage(""); }} searchResults={(weatherSearchQuery.data ?? weatherResults).map((r) => ({ id: `${r.lat.toFixed(2)},${r.lon.toFixed(2)}`, city: r.name, state: r.area ?? undefined, latitude: r.lat, longitude: r.lon }))} onSelectResult={async (result) => {
               setWeatherMessage("");
               const latitude = Number(result.latitude!.toFixed(2)); const longitude = Number(result.longitude!.toFixed(2));
@@ -316,11 +319,12 @@ export function PackageAppPage({ person }: { person: Roster }) {
                 setWeatherMessage(i18n._({ id: "{place} is your home place. Change it in Settings, Weather.", message: "{place} is your home place. Change it in Settings, Weather.", values: { place: location?.city ?? i18n._({ id: "This place", message: "This place" }) } })); return;
               }
               setWeatherMessage("");
+              setWeatherProblem("");
               void api.deleteEntity(id).then(async () => {
                 await queryClient.invalidateQueries({ queryKey: ["weather-places", person.id] });
                 await queryClient.invalidateQueries({ queryKey: ["weather-place-entities", person.id] });
                 setWeatherMessage(i18n._({ id: "{place} removed from your list.", message: "{place} removed from your list.", values: { place: location?.city ?? i18n._({ id: "Place", message: "Place" }) } }));
-              }).catch((error: unknown) => setWeatherMessage(error instanceof Error ? error.message : i18n._({ id: "Could not remove this place.", message: "Could not remove this place." })));
+              }).catch((error: unknown) => setWeatherProblem(errorLine(error, i18n._({ id: "Could not remove this place.", message: "Could not remove this place." }))));
             }} locale={navigator.language} unit={weatherUnit === "celsius" ? "C" : "F"} advice={weatherSelectedAdvice} summary={weatherSelectedForecast?.summary} />}
           </> : null}
         </>); }}

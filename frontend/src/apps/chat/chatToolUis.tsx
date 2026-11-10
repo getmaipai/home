@@ -2,6 +2,7 @@ import { i18n } from "@lingui/core";
 // The chat thread's tool-call renderers (spec sheet, artifact card, confirm,
 // project, tool timeline), moved verbatim out of ChatPage.tsx
 // (SHARED-THREAD-01). elementBindings.ts maps tool ids to these.
+import { toast } from "sonner";
 import { useMakingAvailability } from "@/apps/chat/useMakingAvailability";
 import { createElement, useCallback, useContext, useEffect, useState, type MutableRefObject, type ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
@@ -23,7 +24,6 @@ import { fitAskActions } from "@/lib/fitAsk";
 import { etaLabel } from "@/lib/etaLabel";
 import { VideoPlayer } from "@maipai/ui/src/elements/video-player";
 import { videosApi, type VideoItem } from "@/lib/videosApi";
-import { toast } from "sonner";
 import { spatialActionItems } from "./spatialSoundActions";
 import { filmsApi } from "@/lib/filmsApi";
 import { askRemix } from "@/apps/chat/chatRemix";
