@@ -3256,7 +3256,7 @@ msgid "setting.videos.library_sort.option.az"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/styles/StyleBrowser.tsx:173
+#: src/apps/settings/styles/StyleBrowser.tsx:175
 #, needs-review
 msgid "Already added as {name}. Press to open it."
 msgstr "Ya se agregó como {name}. Pulsa para abrirlo."
@@ -3275,7 +3275,7 @@ msgid "Also add"
 msgstr "También añadir"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/styles/StyleBrowser.tsx:175
+#: src/apps/settings/styles/StyleBrowser.tsx:177
 #, needs-review
 msgid "Also on {join}"
 msgstr "También en {join}"
@@ -3392,7 +3392,7 @@ msgid "An owner or admin can download it in Settings, Offline data (pick Minimum
 msgstr "Un dueño o un administrador puede descargarlo en Ajustes, Datos sin conexión (elige Mínimo, Moderado o Completo, o activa libros sueltos). Se descarga una vez y luego funciona sin internet."
 
 #. js-lingui-explicit-id
-#: src/apps/settings/styles/stylesApi.ts:79
+#: src/apps/settings/styles/stylesApi.ts:80
 #, needs-review
 msgid "an unknown base"
 msgstr "una base desconocida"
@@ -3519,9 +3519,9 @@ msgid "ANTHROPIC_BASE_URL={codingHome}/code/v1 ANTHROPIC_API_KEY=maipai_key_...{
 msgstr "ANTHROPIC_BASE_URL={codingHome}/code/v1 ANTHROPIC_API_KEY=maipai_key_...{hint} claude"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/styles/StyleBrowser.tsx:124
-#: src/apps/settings/styles/StyleBrowser.tsx:125
 #: src/apps/settings/styles/StyleBrowser.tsx:126
+#: src/apps/settings/styles/StyleBrowser.tsx:127
+#: src/apps/settings/styles/StyleBrowser.tsx:128
 #, needs-review
 msgid "Any"
 msgstr "Cualquiera"
@@ -4770,7 +4770,7 @@ msgid "setting.person.robot.topics.option_label.both"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/styles/StyleBrowser.tsx:127
+#: src/apps/settings/styles/StyleBrowser.tsx:129
 #, needs-review
 msgid "Both"
 msgstr "Ambos"
@@ -4825,7 +4825,7 @@ msgid "Bring a song to change its style, remove vocals, split stems, or sing it 
 msgstr "Trae una canción para cambiar su estilo, quitar las voces, separar los elementos o cantarla con otra voz del hogar."
 
 #. js-lingui-explicit-id
-#: src/apps/settings/styles/StyleBrowser.tsx:137
+#: src/apps/settings/styles/StyleBrowser.tsx:139
 #: src/apps/settings/styles/stylesShared.tsx:13
 #, needs-review
 msgid "Browse styles"
@@ -5320,7 +5320,7 @@ msgstr "Cambiando la voz…"
 
 #. js-lingui-explicit-id
 #: src/apps/settings/styles/StyleBrowser.tsx:39
-#: src/apps/settings/styles/StyleBrowser.tsx:124
+#: src/apps/settings/styles/StyleBrowser.tsx:126
 #: src/apps/settings/styles/StyleConfirm.tsx:109
 #: src/apps/settings/styles/StyleEditor.tsx:93
 #: src/apps/settings/styles/stylesShared.tsx:45
@@ -6483,7 +6483,7 @@ msgid "City"
 msgstr "Ciudad"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/styles/StyleBrowser.tsx:127
+#: src/apps/settings/styles/StyleBrowser.tsx:129
 #: src/apps/settings/styles/StyleConfirm.tsx:89
 #: src/apps/settings/styles/StylesTab.tsx:195
 #: src/apps/settings/styles/StylesTab.tsx:196
@@ -6492,7 +6492,7 @@ msgid "Civitai"
 msgstr "Civitai"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/styles/StyleBrowser.tsx:127
+#: src/apps/settings/styles/StyleBrowser.tsx:129
 #, needs-review
 msgid "Civitai (off)"
 msgstr "Civitai (desactivado)"
@@ -12505,7 +12505,7 @@ msgid "failure.advice.engine_computer.cause"
 msgstr "Home no pudo llegar al ordenador del motor."
 
 #. js-lingui-explicit-id
-#: src/apps/settings/styles/StyleBrowser.tsx:114
+#: src/apps/settings/styles/StyleBrowser.tsx:116
 #, needs-review
 msgid "Home could not read that link. Check it, then paste it again."
 msgstr "Home no pudo leer ese enlace. Revísalo y pégalo de nuevo."
@@ -12976,7 +12976,7 @@ msgid "Home saves your pick, but for now downloads the AI models to its default 
 msgstr "Home guarda tu elección, pero por ahora descarga los modelos de IA en su carpeta predeterminada."
 
 #. js-lingui-explicit-id
-#: src/apps/settings/styles/StyleBrowser.tsx:138
+#: src/apps/settings/styles/StyleBrowser.tsx:140
 #, needs-review
 msgid "Home searches for you. Nothing is downloaded until you press Install style."
 msgstr "Home busca por ti. No se descarga nada hasta que pulses Instalar estilo."
@@ -14062,8 +14062,8 @@ msgstr "Instalar sin copia de seguridad."
 #: src/apps/settings/CodingSettings.tsx:164
 #: src/apps/settings/ModelsAndStorageSection.tsx:43
 #: src/apps/settings/ReferenceLibrarySettings.tsx:261
-#: src/apps/settings/styles/StyleBrowser.tsx:126
-#: src/apps/settings/styles/StyleBrowser.tsx:126
+#: src/apps/settings/styles/StyleBrowser.tsx:128
+#: src/apps/settings/styles/StyleBrowser.tsx:128
 #: src/apps/setup/PlanStep.tsx:185
 #: src/apps/setup/SetupWizard.tsx:480
 #: src/shell/pages/EnginesPage.tsx:32
@@ -16243,7 +16243,7 @@ msgid "Locked by rule"
 msgstr "Bloqueado por regla"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/styles/StyleBrowser.tsx:165
+#: src/apps/settings/styles/StyleBrowser.tsx:167
 #, needs-review
 msgid "Locked items"
 msgstr "Elementos bloqueados"
@@ -16480,7 +16480,7 @@ msgid "Made by {name}"
 msgstr "Creado por {name}"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/styles/StyleBrowser.tsx:125
+#: src/apps/settings/styles/StyleBrowser.tsx:127
 #: src/apps/settings/styles/StyleConfirm.tsx:93
 #: src/apps/settings/styles/StyleEditor.tsx:157
 #, needs-review
@@ -17667,7 +17667,7 @@ msgid "More synths from the catalog are coming soon."
 msgstr "Pronto llegarán más synths del catálogo."
 
 #. js-lingui-explicit-id
-#: src/apps/settings/styles/StyleBrowser.tsx:128
+#: src/apps/settings/styles/StyleBrowser.tsx:130
 #, needs-review
 msgid "Most downloaded"
 msgstr "Más descargados"
@@ -18310,7 +18310,7 @@ msgid "New version progress"
 msgstr "Progreso de la nueva versión"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/styles/StyleBrowser.tsx:128
+#: src/apps/settings/styles/StyleBrowser.tsx:130
 #, needs-review
 msgid "Newest"
 msgstr "Más recientes"
@@ -18401,7 +18401,7 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/apps/settings/EngineLinkCredentialSection.tsx:286
 #: src/apps/settings/EngineLinkCredentialSection.tsx:287
-#: src/apps/settings/styles/StyleBrowser.tsx:187
+#: src/apps/settings/styles/StyleBrowser.tsx:189
 #: src/shell/components/DataTableControls.tsx:34
 #: src/shell/pages/RepairsPage.tsx:148
 #: src/shell/pages/useDataTableControls.tsx:125
@@ -18870,7 +18870,7 @@ msgid "No Stack configured"
 msgstr "Stack no configurado"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/styles/StyleBrowser.tsx:160
+#: src/apps/settings/styles/StyleBrowser.tsx:162
 #, needs-review
 msgid "No styles match. Try fewer words."
 msgstr "Ningún estilo coincide. Prueba con menos palabras."
@@ -19152,7 +19152,7 @@ msgstr "¿No es para ti? Elige el nivel Estándar o desactiva Videos arriba. As�
 #: src/apps/settings/CodingSettings.tsx:164
 #: src/apps/settings/ModelsAndStorageSection.tsx:47
 #: src/apps/settings/ReferenceLibrarySettings.tsx:261
-#: src/apps/settings/styles/StyleBrowser.tsx:126
+#: src/apps/settings/styles/StyleBrowser.tsx:128
 #: src/apps/setup/SetupWizard.tsx:480
 #: src/shell/pages/EnginesPage.tsx:31
 #, needs-review
@@ -19853,7 +19853,7 @@ msgid "Old colour film"
 msgstr "Película de color antigua"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/styles/StyleBrowser.tsx:143
+#: src/apps/settings/styles/StyleBrowser.tsx:145
 #, needs-review
 msgid "old film, clay, anime"
 msgstr "película antigua, arcilla, anime"
@@ -20708,7 +20708,7 @@ msgid "setting.search.page_text_cleaning.label"
 msgstr "Comprobación del texto de la página"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/styles/StyleBrowser.tsx:184
+#: src/apps/settings/styles/StyleBrowser.tsx:186
 #, needs-review
 msgid "Pages of results"
 msgstr "Páginas de resultados"
@@ -21377,7 +21377,7 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/apps/settings/ModelsAndStorageSection.tsx:22
 #: src/apps/settings/performanceModel.ts:9
-#: src/apps/settings/styles/StyleBrowser.tsx:145
+#: src/apps/settings/styles/StyleBrowser.tsx:147
 #: src/shell/pages/ActivityPage.tsx:41
 #: src/shell/pages/settings/MediaCardViews.tsx:56
 #, needs-review
@@ -21391,7 +21391,7 @@ msgid "area.Pictures"
 msgstr "Imágenes"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/styles/StyleBrowser.tsx:145
+#: src/apps/settings/styles/StyleBrowser.tsx:147
 msgid "Pictures / Videos"
 msgstr ""
 
@@ -21875,7 +21875,7 @@ msgid "Preview. Nothing is downloaded, installed or saved."
 msgstr "Vista previa. No se descarga, instala ni guarda nada."
 
 #. js-lingui-explicit-id
-#: src/apps/settings/styles/StyleBrowser.tsx:185
+#: src/apps/settings/styles/StyleBrowser.tsx:187
 #: src/shell/components/DataTableControls.tsx:33
 #: src/shell/pages/RepairsPage.tsx:148
 #: src/shell/pages/useDataTableControls.tsx:118
@@ -23193,7 +23193,7 @@ msgid "Resume coding?"
 msgstr "¿Reanudar código?"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/styles/stylesApi.ts:79
+#: src/apps/settings/styles/stylesApi.ts:80
 #, needs-review
 msgid "Retired video model, no longer available"
 msgstr "Modelo de video retirado, ya no disponible"
@@ -24418,7 +24418,7 @@ msgid "setting.search.source_mode.label"
 msgstr "Fuentes de búsqueda"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/styles/StyleBrowser.tsx:142
+#: src/apps/settings/styles/StyleBrowser.tsx:144
 #, needs-review
 msgid "Search styles, or paste a Hugging Face link"
 msgstr "Busca estilos o pega un enlace de Hugging Face"
@@ -24478,13 +24478,13 @@ msgid "Searches may be limited right now."
 msgstr "Las búsquedas pueden estar limitadas ahora mismo."
 
 #. js-lingui-explicit-id
-#: src/apps/settings/styles/StyleBrowser.tsx:159
+#: src/apps/settings/styles/StyleBrowser.tsx:161
 #, needs-review
 msgid "Searching for styles"
 msgstr "Buscando estilos"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/styles/StyleBrowser.tsx:155
+#: src/apps/settings/styles/StyleBrowser.tsx:157
 msgid "Searching for styles…"
 msgstr ""
 
@@ -25221,8 +25221,8 @@ msgid "Show {title} on Home"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/styles/StyleBrowser.tsx:149
-#: src/apps/settings/styles/StyleBrowser.tsx:150
+#: src/apps/settings/styles/StyleBrowser.tsx:151
+#: src/apps/settings/styles/StyleBrowser.tsx:152
 #, needs-review
 msgid "Show adult results"
 msgstr "Mostrar resultados para adultos"
@@ -26100,7 +26100,7 @@ msgid "setting.storage.library.songs.threshold_percent.label"
 msgstr "Aviso de almacenamiento de canciones (%)"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/styles/StyleBrowser.tsx:128
+#: src/apps/settings/styles/StyleBrowser.tsx:130
 #, needs-review
 msgid "Sort"
 msgstr "Ordenar"
@@ -26137,7 +26137,7 @@ msgid "Sounds you have saved."
 msgstr "Sonidos que has guardado."
 
 #. js-lingui-explicit-id
-#: src/apps/settings/styles/StyleBrowser.tsx:127
+#: src/apps/settings/styles/StyleBrowser.tsx:129
 #: src/apps/settings/styles/StyleEditor.tsx:155
 #: src/apps/settings/VoiceManagerSection.tsx:106
 #: src/shell/pages/StoragePage.tsx:50
@@ -27011,7 +27011,7 @@ msgstr "Studio"
 #. js-lingui-explicit-id
 #: src/apps/chat/MusicCardView.tsx:85
 #: src/apps/settings/styles/StyleBrowser.tsx:39
-#: src/apps/settings/styles/StyleBrowser.tsx:124
+#: src/apps/settings/styles/StyleBrowser.tsx:126
 #: src/apps/settings/styles/StyleConfirm.tsx:109
 #: src/apps/settings/styles/StyleEditor.tsx:93
 #: src/apps/settings/styles/stylesShared.tsx:45
@@ -27059,7 +27059,7 @@ msgid "Styles could not be loaded. Open this page again."
 msgstr "No se pudieron cargar los estilos. Abre esta página de nuevo."
 
 #. js-lingui-explicit-id
-#: src/apps/settings/styles/StyleBrowser.tsx:163
+#: src/apps/settings/styles/StyleBrowser.tsx:165
 #, needs-review
 msgid "Styles from the source"
 msgstr "Estilos de la fuente"
@@ -27661,8 +27661,8 @@ msgstr "No se envió. Inténtalo de nuevo."
 #: src/apps/settings/SiteBlocksSection.tsx:53
 #: src/apps/settings/StackChanInstallDialog.tsx:128
 #: src/apps/settings/styles/StyleAddFile.tsx:66
-#: src/apps/settings/styles/StyleBrowser.tsx:154
-#: src/apps/settings/styles/StyleBrowser.tsx:157
+#: src/apps/settings/styles/StyleBrowser.tsx:156
+#: src/apps/settings/styles/StyleBrowser.tsx:159
 #: src/apps/settings/styles/StyleConfirm.tsx:139
 #: src/apps/settings/styles/StyleEditor.tsx:78
 #: src/apps/settings/styles/StylesTab.tsx:84
@@ -29933,7 +29933,7 @@ msgid "Top kind"
 msgstr "Tipo principal"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/styles/StyleBrowser.tsx:128
+#: src/apps/settings/styles/StyleBrowser.tsx:130
 #, needs-review
 msgid "Top rated"
 msgstr "Mejor valorados"
@@ -30136,7 +30136,7 @@ msgstr "Frase de activación, p. ej. \"noche de cine\""
 #: src/apps/settings/CommandsSection.tsx:113
 #: src/apps/settings/ModelsAndStorageSection.tsx:91
 #: src/apps/settings/StackChanInstallDialog.tsx:152
-#: src/apps/settings/styles/StyleBrowser.tsx:157
+#: src/apps/settings/styles/StyleBrowser.tsx:159
 #: src/apps/settings/VoiceBrowserSection.tsx:95
 #: src/apps/settings/VoiceManagerSection.tsx:103
 #: src/apps/setup/HostTuneStep.tsx:68
@@ -30505,7 +30505,7 @@ msgid "Two-step sign-in is on."
 msgstr "La verificación en dos pasos está activada."
 
 #. js-lingui-explicit-id
-#: src/apps/settings/styles/StyleBrowser.tsx:124
+#: src/apps/settings/styles/StyleBrowser.tsx:126
 #, needs-review
 msgid "Type"
 msgstr "Tipo"
@@ -31392,7 +31392,7 @@ msgid "videos"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/styles/StyleBrowser.tsx:145
+#: src/apps/settings/styles/StyleBrowser.tsx:147
 #: src/shell/pages/ActivityPage.tsx:42
 #: src/shell/pages/settings/MediaCardViews.tsx:63
 #, needs-review
@@ -32842,7 +32842,7 @@ msgid "You already have this as {name}."
 msgstr "Ya tienes esto como {name}."
 
 #. js-lingui-explicit-id
-#: src/apps/settings/styles/StyleBrowser.tsx:173
+#: src/apps/settings/styles/StyleBrowser.tsx:175
 #, needs-review
 msgid "You already have this style. Press to open it."
 msgstr "Ya tienes este estilo. Pulsa para abrirlo."

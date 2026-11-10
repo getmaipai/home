@@ -100,6 +100,8 @@ export function StyleBrowser({ person, civitaiOn, onClose, onInstalled, onOpenSt
     queryKey: ["style-browse", query, lock.unlocked], queryFn: () => stylesApi.browse(query), enabled: !link, staleTime: 5 * 60_000, retry: false,
     placeholderData: (previous) => previous,
   });
+  // The Made for choices come from the engines this install has, never from a search: they are there before, and whether or not, a search works.
+  const choices = useQuery({ queryKey: ["style-bases", media], queryFn: () => stylesApi.bases(media), staleTime: 60_000, retry: 1 });
   // Remember where the next page starts.
   useEffect(() => {
     const next = results.data?.next_cursor;
@@ -122,7 +124,7 @@ export function StyleBrowser({ person, civitaiOn, onClose, onInstalled, onOpenSt
   const filters = (
     <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
       <Pick id="style-filter-type" label={i18n._({ id: "Type", message: "Type" })} value={kind} onChange={(v) => setKind(v as typeof kind)} options={[["any", i18n._({ id: "Any", message: "Any" })], ["style", i18n._({ id: "Style", message: "Style" })], ["character", i18n._({ id: "Character", message: "Character" })]]} />
-      <Pick id="style-filter-base" wide label={i18n._({ id: "Made for", message: "Made for" })} value={base} onChange={(v) => setBase(v as typeof base)} options={[["default", i18n._({ id: "Any", message: "Any" })], ...(results.data?.bases ?? []).map((b): [string, string] => [b.id, b.label])]} />
+      <Pick id="style-filter-base" wide label={i18n._({ id: "Made for", message: "Made for" })} value={base} onChange={(v) => setBase(v as typeof base)} options={[["default", i18n._({ id: "Any", message: "Any" })], ...(choices.data?.bases ?? []).map((b): [string, string] => [b.id, b.label])]} />
       <Pick id="style-filter-installed" label={i18n._({ id: "Installed", message: "Installed" })} value={installed} onChange={(v) => setInstalled(v as typeof installed)} options={[["any", i18n._({ id: "Any", message: "Any" })], ["not_installed", i18n._({ id: "Not installed", message: "Not installed" })], ["installed", i18n._({ id: "Installed", message: "Installed" })]]} />
       <Pick id="style-filter-source" label={i18n._({ id: "Source", message: "Source" })} value={source} onChange={(v) => setSource(v as BrowseSource)} options={[["huggingface", "Hugging Face"], ["civitai", civitaiOn ? i18n._({ id: "Civitai", message: "Civitai" }) : i18n._({ id: "Civitai (off)", message: "Civitai (off)" }), !civitaiOn], ["both", i18n._({ id: "Both", message: "Both" }), !civitaiOn]]} />
       <Pick id="style-filter-sort" label={i18n._({ id: "Sort", message: "Sort" })} value={sort} onChange={(v) => setSort(v as typeof sort)} options={[["downloads", i18n._({ id: "Most downloaded", message: "Most downloaded" })], ["rating", i18n._({ id: "Top rated", message: "Top rated" })], ["newest", i18n._({ id: "Newest", message: "Newest" })]]} />

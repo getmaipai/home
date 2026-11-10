@@ -64,6 +64,7 @@ export const stylesApi = {
   hit: (site: string, id: string, version: string | null) => requestJson<BrowseHit>(`/api/loras/browse/${site}/${encodeURIComponent(id)}${version ? `?version=${encodeURIComponent(version)}` : ""}`),
   install: (body: InstallBody) => post<{ job: string }>("/api/loras/install", body),
   installs: () => requestJson<{ items: InstallJob[] }>("/api/loras/install"),
+  bases: (media: "video" | "picture") => requestJson<{ bases: Array<{ id: string; label: string }> }>(`/api/loras/bases?media=${media}`),
   sources: () => requestJson<SourcesState>("/api/loras/sources"),
   setCivitai: (on: boolean) => requestJson<SourcesState>("/api/loras/sources/civitai", { method: "PUT", body: JSON.stringify({ on }) }),
   saveCivitaiKey: (key: string) => post<SourcesState>("/api/loras/sources/civitai-key", { key }),

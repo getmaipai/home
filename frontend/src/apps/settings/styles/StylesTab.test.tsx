@@ -51,7 +51,7 @@ function stub(over: Partial<typeof stylesApi> = {}) {
   Object.assign(stylesApi, {
     list: mock(async (removed = false) => (removed ? { items: [], locked: false } : { items: [row(), ...(unlocked ? [row({ id: "lora-h", name: HIDDEN_NAME, audience: "adult-only", adult_check: "unknown", trigger_words: ["hxword"] })] : [])], locked: !unlocked })),
     sources: mock(async () => sources()), installs: mock(async () => ({ items: [] })), patch: mock(async (id: string) => row({ id })),
-    setCivitai: mock(async (on: boolean) => sources({ on })), ...over,
+    setCivitai: mock(async (on: boolean) => sources({ on })), bases: mock(async () => ({ bases: [{ id: "ltx-2.5", label: "LTX-2.5" }] })), ...over,
   });
   return () => { Object.assign(stylesApi, original); };
 }
@@ -159,7 +159,7 @@ describe("the browser", () => {
   });
 
   test("Made for starts at Any and lists only the bases this install can use (no Everything, no Wan)", async () => {
-    const restore = stub({ browse: mock(async () => ({ ...page(), bases: [{ id: "ltx-2.5", label: "LTX-2.5" }] })) as never });
+    const restore = stub({ browse: mock(async () => page()) as never, bases: mock(async () => ({ bases: [{ id: "ltx-2.5", label: "LTX-2.5" }] })) as never });
     const view = mountBrowser();
     expect(view.getByRole("combobox", { name: "Made for" })).toHaveTextContent("Any");
     await view.findByText("Clay look");
@@ -167,6 +167,15 @@ describe("the browser", () => {
     expect(view.queryByRole("option", { name: "Everything" })).toBeNull();
     expect(view.queryByRole("option", { name: "Wan" })).toBeNull();
     expect(view.getByRole("option", { name: "LTX-2.5" })).toBeTruthy();
+    restore();
+  });
+
+  test("the Made for choices are there even when the search fails", async () => {
+    const restore = stub({ browse: mock(async () => { throw new ApiError("That is a lot of searching for one hour. Try again a little later.", 429); }) as never, bases: mock(async () => ({ bases: [{ id: "ltx-2.5", label: "LTX-2.5" }] })) as never });
+    const view = mountBrowser();
+    await view.findByText(/Searching too fast/);
+    fireEvent.click(view.getByRole("combobox", { name: "Made for" }));
+    expect(await view.findByRole("option", { name: "LTX-2.5" })).toBeTruthy();
     restore();
   });
 

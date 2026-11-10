@@ -156,6 +156,18 @@ describe("an explicit Civitai opt-out", () => {
   });
 });
 
+describe("the Made for choices", () => {
+  test("come from the install's own engines, answer with no source asked, and are never empty", async () => {
+    const { owner } = await household();
+    const before = sourceRequestCount();
+    const res = await owner.request("/api/loras/bases?media=video", { method: "GET" });
+    expect(res.status).toBe(200);
+    const body = await res.json() as { bases: Array<{ id: string; label: string }> };
+    expect(body.bases.map((b) => b.id)).toContain("ltx-2.5");
+    expect(sourceRequestCount()).toBe(before);
+  });
+});
+
 describe("browse redaction while locked", () => {
   test("adult and unknown hits are one flag; no secret string anywhere; nsfw=false goes upstream", async () => {
     const { owner } = await household();

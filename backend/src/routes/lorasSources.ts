@@ -135,6 +135,18 @@ lorasSourceRoutes.openapi(browseRoute, async (c) => {
   } catch (error) { const f = sourceFailure(error); return c.json(f.body, f.status) as never; }
 });
 
+const basesRoute = createRoute({
+  method: "get", path: "/bases", tags: ["LoRAs"], summary: "The bases this install can use styles for (the Made for choices)", middleware: [requireAuth, requireRole("owner", "admin")] as const,
+  request: { query: z.object({ media: z.enum(["video", "picture"]).default("video") }) },
+  responses: { 200: { content: { "application/json": { schema: z.object({ bases: z.array(z.object({ id: z.string(), label: z.string() })) }) } }, description: "One entry per base; never needs the sources." }, ...errorResponses({ 401: "Not signed in", 403: "Admins only" }) },
+});
+lorasSourceRoutes.openapi(basesRoute, async (c) => {
+  const { media } = c.req.valid("query");
+  // Read the engine first so the answer is current; an engine that does not answer leaves every installable base (the table), so the list is never empty.
+  if (media === "video") await videoEngineStatus(); else await pictureEngineStatus();
+  return c.json({ bases: baseChoices(media) }, 200);
+});
+
 async function visibleHit(c: Ctx, site: LoraSite, id: string, version: string | null): Promise<Hit | null> {
   const hit = await fetchHit(site, id, version);
   const admin = c.get("person");
