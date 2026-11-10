@@ -144,6 +144,7 @@ describe("who may use the routes", () => {
 describe("an explicit Civitai opt-out", () => {
   test("browse and install refuse, nothing goes out", async () => {
     const { owner } = await household();
+    setHouseholdSettingValue("generation.styles.civitai", false);
     expect((await browse(owner)).status).toBe(403);
     expect((await post(owner, "/api/loras/install", { source: "civitai", remote_id: "1", audience: "adult-only", licence_confirmed: true })).status).toBe(403);
     expect(up.urls).toEqual([]);
@@ -269,11 +270,11 @@ describe("credentials", () => {
     }
     const status = await text(await owner.get("/api/loras/sources"));
     expect(status).not.toContain("zq81f0aa");
-    expect(JSON.parse(status.slice(0, status.indexOf("[[")))).toEqual({ huggingface: { on: true, token_saved: true }, civitai: { on: false, key_saved: true } });
+    expect(JSON.parse(status.slice(0, status.indexOf("[[")))).toEqual({ huggingface: { on: true, token_saved: true }, civitai: { on: true, key_saved: true } });
     expect(await text(await owner.get("/api/settings?scope=household"))).not.toContain("zq81f0aa");
     await post(owner, "/api/loras/sources/civitai-key/remove", {});
     await post(owner, "/api/loras/sources/huggingface-token/remove", {});
-    expect(JSON.parse((await text(await owner.get("/api/loras/sources"))).split("[[")[0]!)).toEqual({ huggingface: { on: true, token_saved: false }, civitai: { on: false, key_saved: false } });
+    expect(JSON.parse((await text(await owner.get("/api/loras/sources"))).split("[[")[0]!)).toEqual({ huggingface: { on: true, token_saved: false }, civitai: { on: true, key_saved: false } });
   });
   test("each token goes only to its own host's requests, in a header, never a URL", async () => {
     const { owner } = await household();
