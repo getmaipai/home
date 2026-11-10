@@ -20,7 +20,7 @@
 // reasoning the org's own standards state outright.
 import { listPackageIds, loadManifestOnly, meetsMinRole, runPlugin } from "@/lib/plugins";
 import { getActiveInstall } from "@/lib/packageResolve";
-import { getPersonSettingValue } from "@/lib/settings";
+import { getPersonSettingValue, setValue } from "@/lib/settings";
 import { getPackageStatus } from "@/lib/smoke";
 import { householdHomePlaceName } from "@/lib/places";
 import { refusePackageReplyIfUnsafe } from "@/lib/safety";
@@ -109,15 +109,22 @@ export function listWidgets(actor: { role: string }): WidgetDescriptor[] {
   return out;
 }
 
-/** Orders the actor's visible Home widgets. Package installs without a store
- * timestamp use the empty timestamp, which keeps the sort stable for the
- * bundled default set. */
-export function orderHomeCards(widgets: WidgetDescriptor[], person: PersonRow, surface: "home" | "tv" | "robot"): OrderedHomeCards {
-  const hiddenValue = getPersonSettingValue(person, "ui.home_hidden");
-  let hidden: Set<string>;
-  try { hidden = new Set(typeof hiddenValue === "string" ? JSON.parse(hiddenValue) as string[] : []); }
-  catch { hidden = new Set(); }
-  const eligible = widgets.filter((widget) => {
+export const widgetKey = (widget: { package: string; id: string }) => `${widget.package}/${widget.id}`;
+
+/** A person setting that holds a JSON list of card ids; anything else reads as an empty list. */
+function personIdList(person: PersonRow, key: "ui.home_hidden" | "ui.home_order"): string[] {
+  const value = getPersonSettingValue(person, key);
+  try {
+    const parsed: unknown = typeof value === "string" ? JSON.parse(value) : [];
+    return Array.isArray(parsed) ? parsed.filter((id): id is string => typeof id === "string") : [];
+  } catch { return []; }
+}
+
+const byPriority = (a: WidgetDescriptor, b: WidgetDescriptor) => b.priority - a.priority || a.installed_at.localeCompare(b.installed_at) || a.id.localeCompare(b.id);
+
+/** Widgets the person's role, the package state and the surface allow, before their own hidden list. */
+function allowedWidgets(widgets: WidgetDescriptor[], person: PersonRow, surface: "home" | "tv" | "robot"): WidgetDescriptor[] {
+  return widgets.filter((widget) => {
     const loaded = loadManifestOnly(widget.package);
     if (!meetsMinRole(person.role, widget.min_role)) return false;
     if (loaded.ok && !meetsMinRole(person.role, loaded.value.min_role)) return false;
@@ -125,13 +132,56 @@ export function orderHomeCards(widgets: WidgetDescriptor[], person: PersonRow, s
     if (!widget.surfaces.includes(surface)) return false;
     if (surface !== "home" && Object.keys(widget.inputs ?? {}).some((key) => /person|people|user|profile/i.test(key))) return false;
     if (surface === "home" && loaded.ok && loaded.value.incognito === "blocked") return false;
-    return !hidden.has(`${widget.package}/${widget.id}`);
+    return true;
   });
-  const byOrder = (a: WidgetDescriptor, b: WidgetDescriptor) => b.priority - a.priority || a.installed_at.localeCompare(b.installed_at) || a.id.localeCompare(b.id);
-  const heroes = eligible.filter((widget) => widget.hero).sort(byOrder);
-  const hero = heroes[0] ?? null;
-  const rest = eligible.filter((widget) => widget !== hero).sort(byOrder);
+}
+
+/** The person's own order first (unknown ids ignored), every other widget after it in package priority order. */
+function applyPersonOrder(widgets: WidgetDescriptor[], order: string[]): WidgetDescriptor[] {
+  const rest = [...widgets].sort(byPriority);
+  const placed: WidgetDescriptor[] = [];
+  for (const id of order) {
+    const at = rest.findIndex((widget) => widgetKey(widget) === id);
+    if (at >= 0) placed.push(...rest.splice(at, 1));
+  }
+  return [...placed, ...rest];
+}
+
+/** Orders the actor's visible Home widgets. Package installs without a store
+ * timestamp use the empty timestamp, which keeps the sort stable for the
+ * bundled default set. The hero is still chosen by priority (unless hidden);
+ * the person's `ui.home_order` arranges everything else. */
+export function orderHomeCards(widgets: WidgetDescriptor[], person: PersonRow, surface: "home" | "tv" | "robot"): OrderedHomeCards {
+  const hidden = new Set(personIdList(person, "ui.home_hidden"));
+  const eligible = allowedWidgets(widgets, person, surface).filter((widget) => !hidden.has(widgetKey(widget)));
+  const hero = eligible.filter((widget) => widget.hero).sort(byPriority)[0] ?? null;
+  const rest = applyPersonOrder(eligible.filter((widget) => widget !== hero), personIdList(person, "ui.home_order"));
   return { hero, cards: rest.slice(0, 4), more: rest.slice(4) };
+}
+
+export interface ArrangeCard extends WidgetDescriptor { key: string; hidden: boolean }
+
+/** Every Home card this person may see, hidden ones included, in their current order, for the Arrange screen. */
+export function arrangeHomeCards(widgets: WidgetDescriptor[], person: PersonRow): ArrangeCard[] {
+  const hidden = new Set(personIdList(person, "ui.home_hidden"));
+  const allowed = allowedWidgets(widgets, person, "home");
+  // Same order Home uses: the hero (by priority, among visible heroes) leads, then the person's order.
+  const hero = allowed.filter((widget) => widget.hero && !hidden.has(widgetKey(widget))).sort(byPriority)[0];
+  const rest = applyPersonOrder(allowed.filter((widget) => widget !== hero), personIdList(person, "ui.home_order"));
+  return [...(hero ? [hero] : []), ...rest].map((widget) => ({ ...widget, key: widgetKey(widget), hidden: hidden.has(widgetKey(widget)) }));
+}
+
+/** Saves the person's order and hidden list through the settings write path. Only cards this person may already see can be named. */
+export function saveHomeArrangement(person: PersonRow, widgets: WidgetDescriptor[], order: string[], hidden: string[]): OpResult<ArrangeCard[]> {
+  const allowed = new Set(allowedWidgets(widgets, person, "home").map(widgetKey));
+  const unknown = [...order, ...hidden].find((id) => !allowed.has(id));
+  if (unknown !== undefined) return { ok: false, status: 400, error: "That card is not available to you. Reopen Arrange and try again." };
+  const scope = `person:${person.id}`;
+  for (const [key, ids] of [["ui.home_order", order], ["ui.home_hidden", hidden]] as const) {
+    const written = setValue(person, scope, key, JSON.stringify([...new Set(ids)]));
+    if (!written.ok) return { ok: false, status: written.status === 403 ? 403 : 400, error: written.error };
+  }
+  return { ok: true, status: 200, value: arrangeHomeCards(widgets, person) };
 }
 
 /** Runs the declared widget's own package recipe with its own declared

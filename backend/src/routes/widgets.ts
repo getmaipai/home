@@ -5,7 +5,7 @@
 import { createRoute, z } from "@hono/zod-openapi";
 import { apiRouter, errorResponses, respond } from "@/lib/openapi";
 import { requireAuth } from "@/middleware/auth";
-import { listWidgets, getWidgetData, orderHomeCards } from "@/lib/widgets";
+import { listWidgets, getWidgetData, orderHomeCards, arrangeHomeCards, saveHomeArrangement } from "@/lib/widgets";
 import type { WidgetDescriptor } from "@/lib/widgets";
 
 export const widgetsRoutes = apiRouter();
@@ -69,6 +69,45 @@ const homeRoute = createRoute({
 widgetsRoutes.openapi(homeRoute, (c) => {
   const actor = c.get("person");
   return c.json(orderHomeCards(listWidgets(actor), actor, c.req.valid("query").surface), 200);
+});
+
+const ArrangeCard = WidgetDescriptor.extend({ key: z.string(), hidden: z.boolean() });
+const ArrangeList = z.object({ cards: z.array(ArrangeCard) });
+
+const arrangeGetRoute = createRoute({
+  method: "get",
+  path: "/home/arrange",
+  tags: ["Widgets"],
+  summary: "Every Home card I may see, hidden ones included, in my current order, for the Arrange screen",
+  middleware: [requireAuth] as const,
+  responses: {
+    200: { content: { "application/json": { schema: ArrangeList } }, description: "My cards with hidden flags." },
+    ...errorResponses({ 401: "Not signed in" }),
+  },
+});
+widgetsRoutes.openapi(arrangeGetRoute, (c) => {
+  const actor = c.get("person");
+  return c.json({ cards: arrangeHomeCards(listWidgets(actor), actor) }, 200);
+});
+
+const arrangePutRoute = createRoute({
+  method: "put",
+  path: "/home/arrange",
+  tags: ["Widgets"],
+  summary: "Save my Home card order and hidden list (empty lists restore the default)",
+  middleware: [requireAuth] as const,
+  request: { body: { content: { "application/json": { schema: z.object({ order: z.array(z.string()).max(200), hidden: z.array(z.string()).max(200) }) } } } },
+  responses: {
+    200: { content: { "application/json": { schema: ArrangeList } }, description: "Saved; my cards as they now stand." },
+    ...errorResponses({ 400: "A card is not available to me", 401: "Not signed in", 403: "Not allowed" }),
+  },
+});
+widgetsRoutes.openapi(arrangePutRoute, (c) => {
+  const actor = c.get("person");
+  const body = c.req.valid("json");
+  const result = saveHomeArrangement(actor, listWidgets(actor), body.order, body.hidden);
+  if (!result.ok) return respond(c, result);
+  return c.json({ cards: result.value }, 200);
 });
 
 const dataRoute = createRoute({

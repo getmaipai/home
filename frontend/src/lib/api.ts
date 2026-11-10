@@ -299,6 +299,7 @@ export interface WidgetDescriptor {
   size: "card" | "row";
   refresh_s: number;
 }
+export interface ArrangeCard extends WidgetDescriptor { key: string; hidden: boolean; hero?: boolean }
 export interface HomeWidgets {
   hero: WidgetDescriptor | null;
   cards: WidgetDescriptor[];
@@ -1591,6 +1592,8 @@ export const api = {
       throw e;
     }),
   homeWidgets: () => request<HomeWidgets>("/api/widgets/home?surface=home"),
+  homeArrange: () => request<{ cards: ArrangeCard[] }>("/api/widgets/home/arrange"),
+  saveHomeArrange: (order: string[], hidden: string[]) => request<{ cards: ArrangeCard[] }>("/api/widgets/home/arrange", { method: "PUT", body: JSON.stringify({ order, hidden }) }),
   widgetData: (pkg: string, id: string) =>
     request<WidgetData>(`/api/widgets/${encodeURIComponent(pkg)}/${encodeURIComponent(id)}/data`).catch(
       (e: unknown) => {

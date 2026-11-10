@@ -94,6 +94,88 @@ describe("orderHomeCards", () => {
   });
 });
 
+describe("ui.home_order", () => {
+  const who = (id: string) => ({ id, role: "owner", birthdate: null }) as unknown as PersonRow;
+  const widget = (id: string, changes: Partial<WidgetDescriptor> = {}): WidgetDescriptor => ({ package: "weather", id, title: id, size: "card", refresh_s: 10, min_role: "guest", priority: 50, hero: false, surfaces: ["home"], installed_at: "", ...changes });
+  const setOrder = (person: string, ids: string[]) => db.insert(settingsValues).values({ scope: `person:${person}`, key: "ui.home_order", value: JSON.stringify(JSON.stringify(ids)), hlc: "1:0:test", source: "test", updatedAt: new Date().toISOString() }).run();
+
+  test("the person's ids come first, new widgets after, unknown ids ignored", () => {
+    setOrder("ord", ["weather/c", "weather/gone", "weather/a"]);
+    const ordered = orderHomeCards([widget("a", { priority: 90 }), widget("b", { priority: 80 }), widget("c", { priority: 10 })], who("ord"), "home");
+    expect(ordered.cards.map((w) => w.id)).toEqual(["c", "a", "b"]);
+  });
+
+  test("the hero stays decided by priority and is not moved by the order", () => {
+    setOrder("ord2", ["weather/b", "weather/h"]);
+    const ordered = orderHomeCards([widget("h", { hero: true, priority: 99 }), widget("b"), widget("a", { priority: 60 })], who("ord2"), "home");
+    expect(ordered.hero?.id).toBe("h");
+    expect(ordered.cards.map((w) => w.id)).toEqual(["b", "a"]);
+  });
+
+  test("a malformed order is ignored", () => {
+    db.insert(settingsValues).values({ scope: "person:bad", key: "ui.home_order", value: JSON.stringify("not json"), hlc: "1:0:test", source: "test", updatedAt: new Date().toISOString() }).run();
+    const ordered = orderHomeCards([widget("a", { priority: 90 }), widget("b")], who("bad"), "home");
+    expect(ordered.cards.map((w) => w.id)).toEqual(["a", "b"]);
+  });
+});
+
+describe("GET and PUT /api/widgets/home/arrange", () => {
+  const keys = async (client: TestClient) => ((await (await client.get("/api/widgets/home/arrange")).json()) as { cards: Array<{ key: string; hidden: boolean }> }).cards;
+
+  test("requires auth", async () => {
+    expect((await new TestClient().get("/api/widgets/home/arrange")).status).toBe(401);
+    expect((await new TestClient().put("/api/widgets/home/arrange", { order: [], hidden: [] })).status).toBe(401);
+  });
+
+  test("saves order and hidden, returns hidden cards flagged, and Home follows", async () => {
+    const client = await owner();
+    const before = await keys(client);
+    expect(before.length).toBeGreaterThan(2);
+    const reversed = before.map((c) => c.key).reverse();
+    const res = await client.put("/api/widgets/home/arrange", { order: reversed, hidden: [reversed[0]] });
+    expect(res.status).toBe(200);
+    const after = await keys(client);
+    expect(after.map((c) => c.key)).toEqual(reversed);
+    expect(after.find((c) => c.key === reversed[0])?.hidden).toBe(true);
+    const home = (await (await client.get("/api/widgets/home")).json()) as { hero: { package: string; id: string } | null; cards: Array<{ package: string; id: string }>; more: Array<{ package: string; id: string }> };
+    const shown = [home.hero, ...home.cards, ...home.more].filter(Boolean).map((w) => `${w!.package}/${w!.id}`);
+    expect(shown).not.toContain(reversed[0]);
+    await client.put("/api/widgets/home/arrange", { order: [], hidden: [] });
+    expect((await keys(client)).map((c) => c.key)).toEqual(before.map((c) => c.key));
+  });
+
+  test("an id the person cannot see is refused and nothing is saved", async () => {
+    const client = await owner();
+    const before = await keys(client);
+    const res = await client.put("/api/widgets/home/arrange", { order: ["nope/none", before[0]!.key], hidden: [] });
+    expect(res.status).toBe(400);
+    expect((await keys(client)).map((c) => c.key)).toEqual(before.map((c) => c.key));
+  });
+
+  test("a person below a widget's role never sees it and cannot name it", async () => {
+    const ownerClient = await owner();
+    const ownerKeys = (await keys(ownerClient)).map((c) => c.key);
+    const guestClient = await guest(ownerClient);
+    expect(await keys(guestClient)).toEqual([]);
+    const res = await guestClient.put("/api/widgets/home/arrange", { order: [ownerKeys[0]], hidden: [ownerKeys[1]] });
+    expect(res.status).toBe(400);
+    expect(await keys(guestClient)).toEqual([]);
+  });
+
+  test("a child arranges only the cards already allowed to them", async () => {
+    const ownerClient = await owner();
+    const created = await ownerClient.post("/api/people", { displayName: "Pippa", role: "child" });
+    const person = (await created.json()) as { id: string };
+    const child = new TestClient();
+    await child.post("/api/auth/select", { personId: person.id });
+    const childKeys = (await keys(child)).map((c) => c.key);
+    expect(childKeys.length).toBeGreaterThan(0);
+    expect((await child.put("/api/widgets/home/arrange", { order: [...childKeys].reverse(), hidden: [childKeys[0]] })).status).toBe(200);
+    expect((await child.put("/api/widgets/home/arrange", { order: ["nope/none"], hidden: [] })).status).toBe(400);
+    expect((await keys(child)).map((c) => c.key)).toEqual([...childKeys].reverse());
+  });
+});
+
 describe("GET /api/widgets/:package/:id/data", () => {
   test("404s on an unknown package", async () => {
     const client = await owner();

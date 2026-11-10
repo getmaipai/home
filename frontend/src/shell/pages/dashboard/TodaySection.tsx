@@ -12,15 +12,11 @@ import { AnswerBlockView } from "@maipai/ui/src/elements/answer-block";
 import { Section } from "@maipai/ui/src/primitives/Section";
 import { RouteSkeleton } from "@maipai/ui/src/primitives/RouteSkeleton";
 import { formatRelativeLong } from "@/lib/format";
+import { ArrangeHome, ARRANGE_KEY, displayTitle } from "@/shell/pages/dashboard/ArrangeHome";
 import { api, type HomeWidgets, type WidgetData, type WidgetDescriptor } from "@/lib/api";
 
 /** Design note section 6: never more than four Today cards before "More". */
 export const TODAY_CARD_BUDGET = 4;
-const displayTitle = (widget: WidgetDescriptor) => widget.package === "almanac-date" && widget.id === "today" ? i18n._({ id: "Coming up", message: "Coming up" })
-  : widget.package === "remind" && widget.id === "upcoming" ? i18n._({ id: "Next up", message: "Next up" })
-  : widget.package === "timer" && widget.id === "running" ? i18n._({ id: "Timers", message: "Timers" })
-  : widget.title;
-
 /** A value too long to sit beside its title (a headline digest) is drawn as a line under it instead. */
 const longValue = (value: unknown): boolean => typeof value === "string" && value.length > 24;
 
@@ -78,6 +74,10 @@ export function TodaySection({ home, heroOnly = false, chips = false, role }: { 
   const slots = todaySlots(widgets, results, lastGood.current);
   const heroQuery = useQuery({ queryKey: ["home-hero"], queryFn: () => home?.hero ? api.widgetData(home.hero.package, home.hero.id) : Promise.resolve(undefined), enabled: Boolean(home?.hero), retry: false });
 
+  // When every card is hidden the section would vanish with its Arrange button; keep the button while any card is hidden.
+  const arranged = useQuery({ queryKey: ARRANGE_KEY, queryFn: api.homeArrange, retry: false, enabled: Boolean(home) && !heroOnly && !chips });
+  const anyHidden = Boolean(arranged.data?.cards.some((card) => card.hidden));
+
   if (!home && list.isPending) return <RouteSkeleton label={i18n._({ id: "Loading Today", message: "Loading Today" })} />;
   if (!home && list.isError) return <p role="alert" className="text-supporting text-muted-foreground">{i18n._({ id: "Could not load Today. Refresh Home to try again.", message: "Could not load Today. Refresh Home to try again." })}</p>;
   const visibleSlots = slots.filter((slot) => {
@@ -88,7 +88,10 @@ export function TodaySection({ home, heroOnly = false, chips = false, role }: { 
     ));
     return !sentenceOnlyEmpty || isOwnerOrAdminRole(role ?? "guest");
   });
-  if (visibleSlots.length === 0) return null;
+  if (visibleSlots.length === 0) {
+    if (!home || heroOnly || chips || !anyHidden) return null;
+    return <section aria-label={i18n._({ id: "Today", message: "Today" })} className="md:col-span-2 lg:col-span-12"><div className="flex justify-end"><ArrangeHome /></div></section>;
+  }
 
   // A tap on the weather card opens the Weather app.
   const opensApp = (slot: Slot, content: ReactNode): ReactNode => slot.widget.package === "weather"
@@ -132,6 +135,7 @@ export function TodaySection({ home, heroOnly = false, chips = false, role }: { 
     return (
       <section aria-label={i18n._({ id: "Today", message: "Today" })} className="md:col-span-2 lg:col-span-12">
         <Section variant="flat" heading={i18n._({ id: "Today", message: "Today" })}>
+        {home ? <div className="flex justify-end"><ArrangeHome /></div> : null}
         <div className="flex flex-nowrap gap-2 overflow-x-auto [&>*]:shrink-0 [&>*]:whitespace-nowrap [&::-webkit-scrollbar]:hidden">
           {visibleSlots.map((slot) => (
             <Chip key={key(slot)} tone="surface" size="strip" selected={open === key(slot)} selectedTone="inverse" aria-expanded={open === key(slot)} onClick={() => setOpen(open === key(slot) ? null : key(slot))}>{displayTitle(slot.widget)}</Chip>
@@ -155,6 +159,7 @@ export function TodaySection({ home, heroOnly = false, chips = false, role }: { 
     {heroSlot ? <section aria-label={i18n._({ id: "Home highlight", message: "Home highlight" })} className="lg:col-span-4"><div data-testid="home-hero"><Card surface="flat"><div className="text-row font-semibold">{heroSlot.widget.title}</div><ItemGroup>{heroSlot.data.items.map((item, index) => <Item key={`${item.title}-${index}`} size="sm"><ItemContent><ItemTitle>{item.title}</ItemTitle>{item.subtitle ? <ItemDescription className="text-supporting">{item.subtitle}</ItemDescription> : null}</ItemContent>{item.value ? <ItemActions>{item.value}</ItemActions> : null}</Item>)}</ItemGroup></Card></div></section> : null}
     <section aria-label={i18n._({ id: "Today", message: "Today" })} className="md:col-span-2 lg:col-span-12">
       <Section variant="flat" heading={i18n._({ id: "Today", message: "Today" })}>
+      {home ? <div className="flex justify-end"><ArrangeHome /></div> : null}
       <div className="flex snap-x gap-3 overflow-x-auto [&>*]:w-72 [&>*]:shrink-0 [&>*]:snap-start lg:[&>*]:w-auto [&::-webkit-scrollbar]:hidden lg:grid lg:grid-cols-3 lg:flex-wrap lg:overflow-visible">{cards(first)}</div>
       {rest.length === 0 ? null : (
         <Collapsible>
