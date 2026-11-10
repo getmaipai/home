@@ -61,7 +61,8 @@
             "voices": "{voices}",
             "style": "{style}",
             "character": "{character}",
-            "strength": "{strength}"
+            "strength": "{strength}",
+            "start_frame": "{start_frame}"
           }
         }
       },
@@ -89,7 +90,15 @@
             "expects": "An image created in this chat."
           }
         }
-      }
+      },
+      "references": [
+        {
+          "state": "start_frame",
+          "label": "Image",
+          "kind": "picture",
+          "placement": "in_field"
+        }
+      ]
     },
     {
       "type": "media_shelf",

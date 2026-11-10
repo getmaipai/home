@@ -59,6 +59,14 @@ export function videoTierSegment(person: PersonRow): Record<string, unknown> | n
   return tiers.length > 1 ? { state: "tier", label: "Level", default: "standard", tiers } : null;
 }
 
+/** VIDEO-COMPOSER-04: the levels that make sound. Where the engine makes sound at every level the Sound chip is always open; where Standard is silent the chip is
+ * disabled (and shows no sound) at Standard, so choosing a level turns the choice on or off. */
+function soundTiers(): Record<string, unknown> {
+  const engine = peekVideoEngineStatus();
+  if (engine === null || ltx25VideoReady(engine)) return {};
+  return { enabled_tiers: ["boost", "max"], disabled_reason: "This level makes silent clips. Choose Boost or Max for sound." };
+}
+
 /** The lengths the Length chip offers: five seconds and the longest available level makes here now. A level that makes less is cut to fit and says so. */
 function lengthOptions(): number[] {
   const engine = peekVideoEngineStatus();
@@ -111,7 +119,7 @@ registerAppPageFill("videos", "create", (person, page) => {
     { state: "look", label: "Look", variant: "cards", presentation: "popover", group: "Style", default: VIDEO_LOOKS[0]!.id, options: VIDEO_LOOKS.map(({ id, label, loop }) => ({ value: id, label: id === VIDEO_LOOKS[0]!.id ? "Auto" : label, ...media(loop) })) },
     // Auto is the start for both: Look's Auto is `natural` (adds no words; a clip's tag still says "Natural"), Camera's Auto is "none" (the route reads it as not given).
     { state: "camera", label: "Camera", variant: "cards", presentation: "popover", group: "Style", default: "none", options: [{ value: "none", label: "Auto" }, ...VIDEO_RECIPES.map(({ id, label, loop }) => ({ value: id, label, ...media(loop) }))] },
-    { state: "voices", label: "Sound", align: "end", icon_only: true, default: DEFAULT_VIDEO_VOICES, options: VIDEO_VOICES.map(({ id }) => id === "clean" ? ({ value: id, label: "No music or effects", icon: "volume-x" }) : ({ value: id, label: "Music and effects", icon: "volume-2" })) },
+    { state: "voices", label: "Sound", align: "end", icon_only: true, default: DEFAULT_VIDEO_VOICES, quiet_value: DEFAULT_VIDEO_VOICES, ...soundTiers(), options: VIDEO_VOICES.map(({ id }) => id === "clean" ? ({ value: id, label: "No music or effects", icon: "volume-x" }) : ({ value: id, label: "Music and effects", icon: "volume-2" })) },
     // VIDEO-LORA-09: Styles, Characters and Strength join the Style popover; the person's own access and the Stack's LoRA report decide what shows and when it is disabled.
     ...styleChips({ person, engine: peekVideoEngineStatus(), offered: ((videoTierSegment(person)?.tiers as Array<{ id: StyleTier }> | undefined)?.map((t) => t.id)) ?? ["standard"] }),
   ];

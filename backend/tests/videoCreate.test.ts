@@ -239,7 +239,8 @@ describe("the Create page and the make action", () => {
     expect(bar.placement).toBe("inline");
     expect(bar.starts).toBe("video");
     expect(bar.submit_label).toBe("Generate");
-    expect(bar.references).toBeUndefined();
+    expect(bar.references).toEqual([{ state: "start_frame", label: "Image", kind: "picture", placement: "in_field" }]);
+    expect(bar.submit.call.args.start_frame).toBe("{start_frame}");
     expect(bar.suggestions).toBeUndefined();
     expect(chip("look")).toMatchObject({ presentation: "popover", group: "Style" });
     expect(chip("camera")).toMatchObject({ presentation: "popover", group: "Style" });
@@ -543,9 +544,8 @@ describe("U3: Camera and Look cards from the one lists, with their loops", () =>
     expect(chip("camera").variant).toBe("cards");
     expect(chip("camera").default).toBe("none");
     expect(chip("camera").options).toEqual([{ value: "none", label: "Auto" }, ...VIDEO_RECIPES.map((r) => ({ value: r.id, label: r.label, ...(shipped(r.loop) ? { media: r.loop } : {}) }))]);
-    expect(bar.references).toBeUndefined();
-    expect(bar.submit.call.args).toMatchObject({ camera: "{camera}", look: "{look}" });
-    expect(bar.submit.call.args).not.toHaveProperty("start_frame");
+    expect(bar.references).toHaveLength(1);
+    expect(bar.submit.call.args).toMatchObject({ camera: "{camera}", look: "{look}", start_frame: "{start_frame}" });
     const source = await Bun.file(join(PACKAGES_DIR, "videos", "pages", "create.json")).text();
     expect(source).not.toContain(".mp4");
     expect(VIDEO_RECIPES).toHaveLength(8);
