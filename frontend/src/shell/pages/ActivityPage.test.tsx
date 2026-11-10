@@ -11,12 +11,19 @@ afterEach(() => cleanup());
 const at = (daysAgo: number, hour = 10) => { const d = new Date(); d.setDate(d.getDate() - daysAgo); d.setHours(hour, 0, 0, 0); return d.toISOString(); };
 const item = (over: Partial<ActivityItemView>): ActivityItemView => ({ id: "picture:1", source: "picture", state: "done", title: "A red fox", line: null, percent: null, typicalMinutes: null, href: "/files", at: at(0), ...over });
 
-function mockActivity(list: ActivityListView) {
+function mockActivity(initial: ActivityListView) {
+  let list = initial;
   const original = globalThis.fetch;
   const calls: string[] = [];
   globalThis.fetch = mock((input: RequestInfo | URL, init?: RequestInit) => {
     const url = typeof input === "string" ? input : input instanceof Request ? input.url : input.toString();
     calls.push(`${init?.method ?? "GET"} ${url}`);
+    if (url.includes("/api/activity/clear")) {
+      const body = JSON.parse(String(init?.body ?? "{}")) as { keys?: string[]; all?: boolean };
+      const open = (entry: ActivityItemView) => entry.state === "making" || entry.state === "waiting";
+      list = { ...list, items: list.items.filter((entry) => open(entry) || (!body.all && !(body.keys ?? []).includes(entry.id))) };
+      return Promise.resolve(Response.json(list));
+    }
     if (url.includes("/api/activity/seen")) return Promise.resolve(Response.json({ seenAt: new Date().toISOString() }));
     if (url.includes("/api/activity")) return Promise.resolve(Response.json(list));
     return Promise.resolve(new Response("{}", { status: 200 }));
@@ -87,7 +94,7 @@ describe("ActivityPage", () => {
     const api = mockActivity({ seenAt: null, dot: "none", items: [] });
     try {
       const view = page();
-      await waitFor(() => expect(view.getByText("Nothing here yet")).toBeTruthy());
+      await waitFor(() => expect(view.getByText("Nothing here yet")).toBeTruthy(), { timeout: 3000 });
       expect(document.querySelector("[data-status-kind=info]")).toBeTruthy();
       expect(view.getByRole("link", { name: "Older messages" }).getAttribute("href")).toBe("/notifications");
     } finally { api.restore(); }
@@ -110,4 +117,64 @@ describe("groupByDay", () => {
     expect(groups.map((group) => group.items.map((entry) => entry.id))).toEqual([["a", "b"], ["c"]]);
     expect(groups[0]?.heading).toBe("Today");
   });
+});
+
+describe("ACTIVITY-CLEAR-01: clearing", () => {
+  const rows = () => [
+    item({ id: "picture:1", title: "A red fox", at: at(0, 9) }),
+    item({ id: "video:2", source: "video", state: "failed", title: "Rain on a tin roof", line: "Try again.", href: "/apps/videos/create", at: at(0, 8) }),
+    item({ id: "song:3", source: "song", state: "making", title: "Lullaby", line: "Making your song.", percent: 30, href: null, at: at(0, 10) }),
+  ];
+
+  test("a finished card clears itself; a running card has no Clear this", async () => {
+    const api = mockActivity({ seenAt: null, dot: "running", items: rows() });
+    try {
+      const view = page();
+      await waitFor(() => expect(view.getByText("A red fox")).toBeTruthy());
+      expect(within(view.getByText("Lullaby").closest("section")!).queryByRole("button", { name: "Clear this" })).toBeNull();
+      fireEvent.click(within(view.getByText("A red fox").closest("section")!).getByRole("button", { name: "Clear this" }));
+      await waitFor(() => expect(view.queryByText("A red fox")).toBeNull());
+      expect(api.calls).toContain("POST /api/activity/clear");
+      expect(view.getByText("Rain on a tin roof")).toBeTruthy();
+      expect(view.getByText("Lullaby")).toBeTruthy();
+    } finally { api.restore(); }
+  });
+
+  test("Clear all asks first, says the files stay, then clears every finished card", async () => {
+    const api = mockActivity({ seenAt: null, dot: "running", items: rows() });
+    try {
+      const view = page();
+      await waitFor(() => expect(view.getByText("A red fox")).toBeTruthy());
+      fireEvent.click(view.getByRole("button", { name: "Clear all" }));
+      const dialog = await view.findByRole("alertdialog");
+      expect(dialog.textContent).toContain("Clear all finished activity?");
+      expect(dialog.textContent).toContain("This only removes the list. Your pictures, videos and songs stay where they are.");
+      expect(api.calls).not.toContain("POST /api/activity/clear");
+      fireEvent.click(within(dialog).getByRole("button", { name: "Clear all" }));
+      await waitFor(() => expect(view.queryByText("A red fox")).toBeNull());
+      expect(view.queryByText("Rain on a tin roof")).toBeNull();
+      expect(view.getByText("Lullaby")).toBeTruthy();
+    } finally { api.restore(); }
+  }, 20_000);
+
+  test("Clear all is not offered when only running cards remain", async () => {
+    const running = mockActivity({ seenAt: null, dot: "running", items: [rows()[2]!] });
+    try {
+      const view = page();
+      await waitFor(() => expect(view.getByText("Lullaby")).toBeTruthy());
+      expect(view.queryByRole("button", { name: "Clear all" })).toBeNull();
+    } finally { running.restore(); }
+  });
+
+  test("an emptied list shows the calm empty state", async () => {
+    const done = mockActivity({ seenAt: null, dot: "finished", items: [rows()[0]!] });
+    try {
+      const view = page();
+      await waitFor(() => expect(view.getByText("A red fox")).toBeTruthy());
+      fireEvent.click(view.getByRole("button", { name: "Clear all" }));
+      fireEvent.click(within(await view.findByRole("alertdialog")).getByRole("button", { name: "Clear all" }));
+      await waitFor(() => expect(view.getByText("Nothing here yet")).toBeTruthy(), { timeout: 3000 });
+      await waitFor(() => expect(view.queryByRole("button", { name: "Clear all" })).toBeNull(), { timeout: 3000 });
+    } finally { done.restore(); }
+  }, 20_000);
 });

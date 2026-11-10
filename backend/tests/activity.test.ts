@@ -2,7 +2,7 @@
 // and computes the entry's dot (needs a look, finished and unopened, running) without a number.
 import { beforeEach, describe, expect, test } from "bun:test";
 import { db } from "@/db";
-import { musicJobs, people, pictureJobs, videoJobs } from "@/db/schema";
+import { activityDismissals, musicJobs, people, pictureJobs, videoJobs } from "@/db/schema";
 import { activeGenerationRows, activityDot, activityForViewer, activitySeenAt, markActivitySeen, type ActivityItem } from "@/lib/activity";
 import { getPersonSettingValue, writeLayerRow } from "@/lib/settings";
 import { TestClient } from "./client";
@@ -153,5 +153,71 @@ describe("ACTIVITY-PAGE-01: the routes", () => {
     video("v1", ownerRow.id);
     const rows = (await (await owner.get("/api/jobs")).json()) as Array<{ id: string; kind: string }>;
     expect(rows.find((row) => row.id === "video:v1")?.kind).toBe("video");
+  });
+});
+
+describe("ACTIVITY-CLEAR-01: clearing finished rows", () => {
+  const ids = (list: { items: Array<{ id: string }> }) => list.items.map((entry) => entry.id).sort();
+  const clear = (client: TestClient, body: unknown) => client.post("/api/activity/clear", body);
+
+  test("clears named finished and failed rows; running and waiting rows stay; the files stay", async () => {
+    const { owner, ownerRow } = await household();
+    picture("done1", ownerRow.id, { state: "done" });
+    video("failed1", ownerRow.id, { state: "failed", phase: null });
+    picture("run1", ownerRow.id);
+    video("wait1", ownerRow.id);
+    const res = await clear(owner, { keys: ["picture:done1", "picture:run1", "video:wait1"] });
+    expect(res.status).toBe(200);
+    expect(ids((await res.json()) as never)).toEqual(["picture:run1", "video:failed1", "video:wait1"]);
+    expect(db.select().from(pictureJobs).all().map((row) => row.id).sort()).toEqual(["done1", "run1"]);
+  });
+
+  test("all clears every finished row and leaves the running one", async () => {
+    const { owner, ownerRow } = await household();
+    picture("done1", ownerRow.id, { state: "done" });
+    song("s-failed", ownerRow.id, { state: "failed", errorLine: "x" });
+    song("s-run", ownerRow.id);
+    const body = (await (await clear(owner, { all: true })).json()) as { items: Array<{ id: string }>; dot: string };
+    expect(ids(body)).toEqual(["song:s-run"]);
+    expect(body.dot).toBe("running");
+  });
+
+  test("the dot ignores cleared rows, and a new job appears normally afterwards", async () => {
+    const { owner, ownerRow } = await household();
+    picture("failed1", ownerRow.id, { state: "failed" });
+    expect(activityForViewer(ownerRow).dot).toBe("attention");
+    await clear(owner, { all: true });
+    expect(activityForViewer(ownerRow).dot).toBe("none");
+    picture("done2", ownerRow.id, { state: "done" });
+    const list = activityForViewer(ownerRow);
+    expect(ids(list)).toEqual(["picture:done2"]);
+    expect(list.dot).toBe("finished");
+  });
+
+  test("a person cannot clear another person's rows", async () => {
+    const { owner, ownerRow, childRow, childClient } = await household();
+    picture("mine", ownerRow.id, { state: "done" });
+    picture("kids", childRow.id, { state: "done" });
+    await clear(owner, { keys: ["picture:kids"] });
+    expect(ids(activityForViewer(childRow))).toEqual(["picture:kids"]);
+    await clear(childClient, { keys: ["picture:mine"] });
+    expect(ids(activityForViewer(ownerRow))).toEqual(["picture:mine"]);
+    expect(db.select().from(activityDismissals).all()).toEqual([]);
+  });
+
+  test("a locked adult row stays out of the list and is not stored when named", async () => {
+    const { owner, ownerRow } = await household();
+    picture("locked-p", ownerRow.id, { state: "done", request: JSON.stringify({ size: "1024x1024", n: 1, seed: null, loras: [], source_file_id: null, audience: "adult", adultLock: "on" }) });
+    const body = (await (await clear(owner, { keys: ["picture:locked-p"] })).json()) as { items: unknown[] };
+    expect(body.items).toEqual([]);
+    expect(db.select().from(activityDismissals).all()).toEqual([]);
+  });
+
+  test("a child can clear their own finished rows; nothing to clear or no keys is a plain 200; signed out is refused", async () => {
+    const { owner, childRow, childClient } = await household();
+    picture("c1", childRow.id, { state: "done" });
+    expect(ids((await (await clear(childClient, { all: true })).json()) as never)).toEqual([]);
+    expect((await clear(owner, {})).status).toBe(200);
+    expect((await clear(new TestClient(), { all: true })).status).toBe(401);
   });
 });

@@ -2292,7 +2292,7 @@ msgstr "Activa"
 #: src/shell/coreLabels.ts:19
 #: src/shell/InstallDock.tsx:256
 #: src/shell/NotificationBell.tsx:273
-#: src/shell/pages/ActivityPage.tsx:69
+#: src/shell/pages/ActivityPage.tsx:74
 #: src/shell/pages/CompanionsPage.tsx:312
 #: src/shell/pages/CompanionsPage.tsx:314
 #, needs-review
@@ -2300,13 +2300,18 @@ msgid "Activity"
 msgstr "Actividad"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/ActivityPage.tsx:90
+#: src/shell/pages/ActivityPage.tsx:118
 msgid "Activity could not load. Check that this computer is online, then try again."
 msgstr ""
 
 #. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:1440
 msgid "setting.ui.activity_seen_at.label"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/shell/pages/ActivityPage.tsx:111
+msgid "Activity was not cleared"
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -4989,6 +4994,7 @@ msgstr "¿Puede alguien entrar a tu casa?"
 #: src/apps/setup/StorageStep.tsx:32
 #: src/apps/setup/StorageStep.tsx:190
 #: src/shell/components/DataTableRowActions.tsx:53
+#: src/shell/pages/ActivityPage.tsx:156
 #: src/shell/pages/ChatPage.tsx:1665
 #: src/shell/pages/ChatPage.tsx:1681
 #: src/shell/pages/CompanionAudienceDialog.tsx:64
@@ -5661,6 +5667,11 @@ msgstr "Asegúrate de que el motor esté funcionando e inténtalo de nuevo."
 #, needs-review
 msgid "failure.advice.unreachable.next_step"
 msgstr "Comprueba que el Stack de MaiPai se ejecuta en Reparaciones."
+
+#. js-lingui-explicit-id
+#: src/shell/pages/ActivityPage.tsx:111
+msgid "Check that this computer is online, then try again."
+msgstr ""
 
 #. js-lingui-explicit-id
 #: src/shell/pages/EnginesPage.tsx:156
@@ -6516,6 +6527,8 @@ msgstr "Borrar {name}"
 #: src/apps/memory/PersonMemories.tsx:414
 #: src/apps/notifications/NotificationsPage.tsx:159
 #: src/apps/settings/FreeUpSpaceDialog.tsx:80
+#: src/shell/pages/ActivityPage.tsx:107
+#: src/shell/pages/ActivityPage.tsx:157
 #: src/shell/pages/StoragePage.tsx:196
 #: src/shell/pages/StoragePage.tsx:206
 #, needs-review
@@ -6527,6 +6540,11 @@ msgstr "Borrar todo"
 #, needs-review
 msgid "Clear All"
 msgstr "Borrar todo"
+
+#. js-lingui-explicit-id
+#: src/shell/pages/ActivityPage.tsx:152
+msgid "Clear all finished activity?"
+msgstr ""
 
 #. js-lingui-explicit-id
 #: src/shell/pages/StoragePage.tsx:201
@@ -6545,6 +6563,11 @@ msgstr "Borrar hechos"
 #, needs-review
 msgid "Clear filters"
 msgstr "Borrar filtros"
+
+#. js-lingui-explicit-id
+#: src/shell/pages/ActivityPage.tsx:138
+msgid "Clear this"
+msgstr ""
 
 #. js-lingui-explicit-id
 #: src/shell/pages/StoragePage.tsx:129
@@ -7473,7 +7496,8 @@ msgstr "No se pudieron exportar esas memorias. Revisa tu conexión e inténtalo 
 
 #. js-lingui-explicit-id
 #: src/shell/InstallDock.tsx:252
-#: src/shell/pages/ActivityPage.tsx:24
+#: src/shell/pages/ActivityPage.tsx:29
+#: src/shell/pages/ActivityPage.tsx:111
 #: src/shell/pages/MusicWorkspacePage.tsx:87
 msgid "Could not finish"
 msgstr ""
@@ -9583,7 +9607,7 @@ msgstr "No me notifiques sobre compartidos de"
 #: src/apps/setup/SetupReviewPage.tsx:66
 #: src/shell/AlarmRinger.tsx:60
 #: src/shell/InstallDock.tsx:252
-#: src/shell/pages/ActivityPage.tsx:22
+#: src/shell/pages/ActivityPage.tsx:27
 #: src/shell/pages/AllAppsPage.tsx:117
 #: src/shell/pages/companionFlow/KeyframeEditor.tsx:97
 #: src/shell/pages/settings/SettingsAreaPage.tsx:275
@@ -9867,7 +9891,7 @@ msgid "Each row is a big job. Each column says what that category does while the
 msgstr "Cada fila es una tarea grande. Cada columna indica qué hace esa categoría mientras corre la tarea. El chat nunca se pausa, solo se simplifica."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/ActivityPage.tsx:63
+#: src/shell/pages/ActivityPage.tsx:68
 msgid "Earlier"
 msgstr ""
 
@@ -11802,7 +11826,7 @@ msgid "Good morning, {displayName}"
 msgstr "Buenos días, {displayName}"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/ActivityPage.tsx:94
+#: src/shell/pages/ActivityPage.tsx:122
 msgid "Good to know"
 msgstr ""
 
@@ -12050,7 +12074,7 @@ msgstr "Guarda lo que algunos descargados piden antes de comenzar."
 #: src/apps/clock/WorldClocksTab.tsx:72
 #: src/shell/coreLabels.ts:7
 #: src/shell/pageHeaderTitle.tsx:97
-#: src/shell/pages/ActivityPage.tsx:39
+#: src/shell/pages/ActivityPage.tsx:44
 #: src/shell/pages/DashboardPage.tsx:24
 #: src/shell/pages/settings/settingsBackLink.ts:55
 #: src/shell/pages/status/StatusComponents.tsx:32
@@ -15756,7 +15780,7 @@ msgid "Loading"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/ActivityPage.tsx:91
+#: src/shell/pages/ActivityPage.tsx:119
 msgid "Loading activity"
 msgstr ""
 
@@ -16470,7 +16494,7 @@ msgid "Made for the engine behind children's videos, so Home cannot use it"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/ActivityPage.tsx:47
+#: src/shell/pages/ActivityPage.tsx:52
 msgid "Made in {app}."
 msgstr ""
 
@@ -16906,7 +16930,7 @@ msgid "Making animations"
 msgstr "Creando animaciones"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/ActivityPage.tsx:21
+#: src/shell/pages/ActivityPage.tsx:26
 #: src/shell/pages/MusicWorkspacePage.tsx:87
 msgid "Making now"
 msgstr ""
@@ -17760,7 +17784,7 @@ msgstr ""
 #: src/apps/settings/ModelsAndStorageSection.tsx:23
 #: src/apps/settings/performanceModel.ts:9
 #: src/shell/library/LibraryViewer.tsx:107
-#: src/shell/pages/ActivityPage.tsx:38
+#: src/shell/pages/ActivityPage.tsx:43
 #: src/shell/pages/settings/MediaCardViews.tsx:79
 #, needs-review
 msgid "Music"
@@ -17992,7 +18016,7 @@ msgstr ""
 #: src/apps/settings/RobotBody.tsx:241
 #: src/apps/settings/RobotBody.tsx:252
 #: src/apps/settings/RobotPasswordSection.tsx:104
-#: src/shell/pages/ActivityPage.tsx:23
+#: src/shell/pages/ActivityPage.tsx:28
 msgid "Needs a look"
 msgstr ""
 
@@ -19289,7 +19313,7 @@ msgid "Nothing has finished yet."
 msgstr "Nada ha terminado todavía."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/ActivityPage.tsx:94
+#: src/shell/pages/ActivityPage.tsx:122
 msgid "Nothing here yet"
 msgstr ""
 
@@ -19851,7 +19875,7 @@ msgid "Older backups still hold their data for up to three months, until those b
 msgstr "Las copias de seguridad antiguas aún conservan sus datos durante hasta tres meses, hasta que esas copias caduquen. Restaurar una copia antigua completa los devolvería. Los registros del hub aún los mencionan, sin nada de lo que dijeron, durante 7 días."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/ActivityPage.tsx:121
+#: src/shell/pages/ActivityPage.tsx:162
 msgid "Older messages"
 msgstr ""
 
@@ -20264,9 +20288,9 @@ msgstr ""
 #: src/shell/InstallDock.tsx:255
 #: src/shell/library/LibraryItems.tsx:32
 #: src/shell/NotificationBell.tsx:252
-#: src/shell/pages/ActivityPage.tsx:28
-#: src/shell/pages/ActivityPage.tsx:29
-#: src/shell/pages/ActivityPage.tsx:30
+#: src/shell/pages/ActivityPage.tsx:33
+#: src/shell/pages/ActivityPage.tsx:34
+#: src/shell/pages/ActivityPage.tsx:35
 #: src/shell/pages/MusicWorkspacePage.tsx:93
 #: src/shell/pages/performance/EnginesHealthBody.tsx:30
 #, needs-review
@@ -21345,7 +21369,7 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/apps/settings/ModelsAndStorageSection.tsx:22
 #: src/apps/settings/performanceModel.ts:9
-#: src/shell/pages/ActivityPage.tsx:36
+#: src/shell/pages/ActivityPage.tsx:41
 #: src/shell/pages/settings/MediaCardViews.tsx:56
 #, needs-review
 msgid "Pictures"
@@ -21424,7 +21448,7 @@ msgid "area.Pictures, videos and music"
 msgstr "Imágenes, videos y música"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/ActivityPage.tsx:94
+#: src/shell/pages/ActivityPage.tsx:122
 msgid "Pictures, videos and songs you make show up here while they are made and after."
 msgstr ""
 
@@ -23274,7 +23298,7 @@ msgid "Reverting"
 msgstr "Des haciendo"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/ActivityPage.tsx:31
+#: src/shell/pages/ActivityPage.tsx:36
 #: src/shell/pages/CompanionsPage.tsx:300
 #, needs-review
 msgid "Review"
@@ -29489,6 +29513,11 @@ msgid "This may run slowly on this computer."
 msgstr "Esto puede ir lento en este equipo."
 
 #. js-lingui-explicit-id
+#: src/shell/pages/ActivityPage.tsx:153
+msgid "This only removes the list. Your pictures, videos and songs stay where they are."
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/shell/pages/status/StatusComponents.tsx:140
 #, needs-review
 msgid "This part cannot reach the engine computer: {value}"
@@ -30101,7 +30130,7 @@ msgstr "Frase de activación, p. ej. \"noche de cine\""
 #: src/shell/InstallDock.tsx:307
 #: src/shell/InstallStrip.tsx:96
 #: src/shell/library/LibraryUploads.tsx:75
-#: src/shell/pages/ActivityPage.tsx:32
+#: src/shell/pages/ActivityPage.tsx:37
 #: src/shell/pages/companionFlow/AnimateStep.tsx:132
 #: src/shell/pages/dashboard/ArrangeHome.tsx:71
 #: src/shell/pages/FamilyPage.tsx:50
@@ -31209,7 +31238,7 @@ msgid "Using a password? Tap \"Use a password instead\"."
 msgstr "¿Usas una contraseña? Toca \"Usa una contraseña en su lugar\"."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/ActivityPage.tsx:45
+#: src/shell/pages/ActivityPage.tsx:50
 msgid "Usually about {minutes, plural, one {# minute} other {# minutes}}."
 msgstr ""
 
@@ -31338,7 +31367,7 @@ msgid "videos"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/ActivityPage.tsx:37
+#: src/shell/pages/ActivityPage.tsx:42
 #: src/shell/pages/settings/MediaCardViews.tsx:63
 #, needs-review
 msgid "Videos"
@@ -31662,7 +31691,7 @@ msgid "setting.stack.engines.stt.smart_turn.label"
 msgstr "Esperar al final de una frase antes de responder"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/ActivityPage.tsx:20
+#: src/shell/pages/ActivityPage.tsx:25
 #: src/shell/pages/MusicWorkspacePage.tsx:87
 #: src/shell/pages/status/StatusComponents.tsx:158
 #, needs-review

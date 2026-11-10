@@ -1564,6 +1564,7 @@ export const api = {
   jobs: () => request<HomeJobView[]>("/api/jobs"),
   activity: () => request<ActivityListView>("/api/activity"),
   markActivitySeen: () => request<{ seenAt: string }>("/api/activity/seen", { method: "POST" }),
+  clearActivity: (body: { keys?: string[]; all?: boolean }) => request<ActivityListView>("/api/activity/clear", { method: "POST", body: JSON.stringify(body) }),
   stopJob: (id: string) => request<{ ok: true }>(`/api/jobs/${encodeURIComponent(id)}/stop`, { method: "POST" }),
   decideApproval: (id: string, decision: "approve" | "deny") =>
     request<{ id: string }>(`/api/approvals/${encodeURIComponent(id)}/${decision}`, { method: "POST" }),

@@ -62,6 +62,7 @@ import {
   loras,
   mediaCollections,
   mediaSubjects,
+  activityDismissals,
   mediaProductions,
   filmRuns,
   productionDocuments,
@@ -343,5 +344,6 @@ export function resetDb(): void {
   db.delete(productionDocuments).run();
   db.delete(filmRuns).run();
   db.delete(mediaSubjects).run(); // IMG-SUBJECT-01: owner_person_id references people
+  db.delete(activityDismissals).run(); // ACTIVITY-CLEAR-01: person_id references people
   db.delete(people).run();
 }

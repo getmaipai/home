@@ -1,9 +1,11 @@
 import { i18n } from "@lingui/core";
-import { useEffect, useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import { StatusCard, type StatusCardKind } from "@maipai/ui/src/elements/status-card";
 import { getIcon } from "@maipai/ui/src/icons";
+import { Button } from "@maipai/ui/src/ui/button";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@maipai/ui/src/dashboard/components/ui/alert-dialog";
 import { AsyncState } from "@maipai/ui/src/primitives/AsyncState";
 import { dayHeading, dayKey } from "@maipai/ui/src/relativeTime";
 import { api, type ActivityItemView } from "@/lib/api";
@@ -13,6 +15,9 @@ import { useTabItem } from "@/shell/tabIdentity";
 // ACTIVITY-PAGE-01 (PRO-LOOK-01 sections 20 to 25; RULES.md S6, the Activity row): the viewer's own jobs and status messages across
 // apps, newest first, grouped by day, each drawn as the kit StatusCard. The hub words every line (`GET /api/activity`), so this page
 // writes no sentence of its own beyond the state words and the one action's label. Opening the page marks what finished as seen.
+
+/** Only a finished card can be cleared; a waiting or making one is still running. */
+const isFinished = (item: ActivityItemView): boolean => item.state === "done" || item.state === "failed" || item.state === "attention";
 
 const KIND: Record<ActivityItemView["state"], StatusCardKind> = { waiting: "waiting", making: "progress", done: "done", attention: "attention", failed: "problem" };
 
@@ -73,6 +78,21 @@ export function ActivityPage() {
   const marked = useRef(false);
   const groups = useMemo(() => groupByDay(query.data?.items ?? []), [query.data]);
 
+  const [confirming, setConfirming] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [clearFailed, setClearFailed] = useState(false);
+  const clearable = (query.data?.items ?? []).some(isFinished);
+
+  // ACTIVITY-CLEAR-01: clearing only hides the list rows for this person; the hub never touches the pictures, videos or songs.
+  async function clear(body: { keys?: string[]; all?: boolean }) {
+    setBusy(true);
+    setClearFailed(false);
+    try {
+      client.setQueryData(ACTIVITY_KEY, await api.clearActivity(body));
+      void client.invalidateQueries({ queryKey: ACTIVITY_KEY });
+    } catch { setClearFailed(true); } finally { setBusy(false); setConfirming(false); }
+  }
+
   // Opening the page clears the "finished, not opened" dot: record it once the list has been read.
   useEffect(() => {
     if (!query.data || marked.current) return;
@@ -82,6 +102,14 @@ export function ActivityPage() {
 
   return (
     <div className="flex flex-col gap-4" data-testid="activity-page">
+      {clearable ? (
+        <div className="flex justify-end">
+          <Button type="button" size="xs" shape="pill" variant="outline" disabled={busy} onClick={() => setConfirming(true)}>{i18n._({ id: "Clear all", message: "Clear all" })}</Button>
+        </div>
+      ) : null}
+      {clearFailed ? (
+        <StatusCard kind="problem" stateWord={i18n._({ id: "Could not finish", message: "Could not finish" })} title={i18n._({ id: "Activity was not cleared", message: "Activity was not cleared" })} line={i18n._({ id: "Check that this computer is online, then try again.", message: "Check that this computer is online, then try again." })} icon={leadIcon("failed")} />
+      ) : null}
       <AsyncState
         data={query.data}
         error={query.isError}
@@ -107,6 +135,7 @@ export function ActivityPage() {
                         line={lineOf(item)}
                         icon={leadIcon(item.state)}
                         progress={item.state === "making" && item.percent !== null ? item.percent : undefined}
+                        secondary={isFinished(item) ? { label: i18n._({ id: "Clear this", message: "Clear this" }), onSelect: () => { void clear({ keys: [item.id] }); } } : undefined}
                         action={item.href ? { label: actionLabel(item.state), onSelect: () => navigate(item.href!), tone: item.state === "waiting" || item.state === "making" ? "quiet" : "primary" } : undefined}
                       />
                     </li>
@@ -117,6 +146,18 @@ export function ActivityPage() {
           </>
         )}
       </AsyncState>
+      <AlertDialog open={confirming} onOpenChange={(open) => { if (!open && !busy) setConfirming(false); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{i18n._({ id: "Clear all finished activity?", message: "Clear all finished activity?" })}</AlertDialogTitle>
+            <AlertDialogDescription>{i18n._({ id: "This only removes the list. Your pictures, videos and songs stay where they are.", message: "This only removes the list. Your pictures, videos and songs stay where they are." })}</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={busy}>{i18n._({ id: "Cancel", message: "Cancel" })}</AlertDialogCancel>
+            <AlertDialogAction disabled={busy} onClick={(event) => { event.preventDefault(); void clear({ all: true }); }}>{i18n._({ id: "Clear all", message: "Clear all" })}</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
       <p className="text-supporting text-muted-foreground">
         <Link to="/notifications" className="underline underline-offset-4">{i18n._({ id: "Older messages", message: "Older messages" })}</Link>
       </p>

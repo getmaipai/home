@@ -2571,6 +2571,13 @@ export const musicJobs = sqliteTable("music_jobs", {
 }, (table) => [index("music_jobs_person_id_idx").on(table.personId), index("music_jobs_turn_id_idx").on(table.turnId),
   index("music_jobs_person_conversation_idx").on(table.personId, table.conversationId), index("music_jobs_file_id_idx").on(table.fileId)]);
 
+// ACTIVITY-CLEAR-01: rows a person cleared from their own Activity list. Only hides the list row; the job and its files are untouched.
+export const activityDismissals = sqliteTable("activity_dismissals", {
+  personId: text("person_id").notNull().references(() => people.id),
+  rowKey: text("row_key").notNull(),
+  dismissedAt: text("dismissed_at").notNull(),
+}, (table) => [primaryKey({ columns: [table.personId, table.rowKey] })]);
+
 // CODE-API-01: durable daily usage for each person's coding allowance.
 export const codingTokenUsage = sqliteTable("coding_token_usage", {
   personId: text("person_id").notNull().references(() => people.id),

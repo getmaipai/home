@@ -2,9 +2,9 @@
 // apps as one list, read from the job records that already exist (picture_jobs, video_jobs, music_jobs and the unified jobs table). No new
 // table, no new poller. Rule 6a: only the viewer's own rows, an admin included. A locked or adult-only item is left out entirely (the same
 // lock checks as the Library), so this list never names one. A child's titles are the child-safe label, never the prompt.
-import { and, desc, eq, inArray, isNull } from "drizzle-orm";
+import { and, desc, eq, inArray, isNull, lt } from "drizzle-orm";
 import { db } from "@/db";
-import { attachments, musicJobs, pictureJobs, videoJobs } from "@/db/schema";
+import { activityDismissals, attachments, musicJobs, pictureJobs, videoJobs } from "@/db/schema";
 import { speakerAgeBand } from "@/lib/ageBand";
 import { jobQueueCopy, plainStageLabel, type JobQueueAudience } from "@/lib/jobQueueCopy";
 import { listJobsForViewer } from "@/lib/jobs";
@@ -204,11 +204,39 @@ export function markActivitySeen(actor: PersonRow, now = new Date()): string {
   return at;
 }
 
-/** The viewer's own work, newest change first. */
+/** ACTIVITY-CLEAR-01: the row keys this person cleared from their own list. */
+function dismissedKeys(actor: PersonRow): Set<string> {
+  return new Set(db.select({ key: activityDismissals.rowKey }).from(activityDismissals).where(eq(activityDismissals.personId, actor.id)).all().map((row) => row.key));
+}
+
+function allItems(actor: PersonRow): ActivityItem[] {
+  return [...pictureItems(actor), ...videoItems(actor), ...songItems(actor), ...otherItems(actor)].sort((a, b) => b.at.localeCompare(a.at));
+}
+
+/** The viewer's own work, newest change first, without the rows they cleared. */
 export function activityForViewer(actor: PersonRow): ActivityList {
-  const items = [...pictureItems(actor), ...videoItems(actor), ...songItems(actor), ...otherItems(actor)].sort((a, b) => b.at.localeCompare(a.at));
+  const hidden = dismissedKeys(actor);
+  const items = allItems(actor).filter((item) => !hidden.has(item.id));
   const seenAt = activitySeenAt(actor);
   return { items, seenAt, dot: activityDot(items, seenAt) };
+}
+
+/** Only a finished row can be cleared: done, could not finish, or needs a look. Waiting and making rows never are. */
+export const isClearable = (item: ActivityItem): boolean => item.state === "done" || item.state === "failed" || item.state === "attention";
+
+const DISMISSAL_KEEP_MS = 60 * 24 * 3_600_000;
+
+/** Hide finished rows from this person's Activity list only. Names a key (or `all`); a key that is not one of the person's own visible
+ * finished rows is ignored, so nothing about another person's work or a locked item is stored. The job and its files are never touched. */
+export function clearActivity(actor: PersonRow, request: { keys?: string[]; all?: boolean }, now = new Date()): ActivityList {
+  const hidden = dismissedKeys(actor);
+  const wanted = request.all ? null : new Set(request.keys ?? []);
+  const keys = allItems(actor).filter((item) => isClearable(item) && !hidden.has(item.id) && (wanted === null || wanted.has(item.id))).map((item) => item.id);
+  const at = now.toISOString();
+  if (keys.length) db.insert(activityDismissals).values(keys.map((rowKey) => ({ personId: actor.id, rowKey, dismissedAt: at }))).onConflictDoNothing().run();
+  // A cleared key only matters while its job can still be listed (30 days), so old ones are dropped.
+  db.delete(activityDismissals).where(and(eq(activityDismissals.personId, actor.id), lt(activityDismissals.dismissedAt, new Date(now.getTime() - DISMISSAL_KEEP_MS).toISOString()))).run();
+  return activityForViewer(actor);
 }
 
 /** The viewer's own pictures, clips and songs that are waiting or being made, as rows of the unified job list (`GET /api/jobs`). This is how the
