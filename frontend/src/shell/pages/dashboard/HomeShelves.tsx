@@ -18,7 +18,7 @@ const ChatIcon = getIcon("message-circle");
 export function tilePicture(row: MediaHomeRow, small = false) {
   return row.kind === "chat"
     ? <SafeImage src={row.artwork_url} alt="" fallbackContent={<ChatIcon aria-hidden className={small ? "size-4 text-foreground/70" : "size-1/3 text-foreground/70"} />} />
-    : <SafeImage src={row.artwork_url} alt="" kind={FALLBACK[row.app]} />;
+    : <SafeImage src={row.artwork_url} alt="" kind={FALLBACK[row.app]} tintSeed={row.title} />;
 }
 
 /** The most shortcuts Continue shows: two columns of three on a phone, one row of six on a wide screen. */

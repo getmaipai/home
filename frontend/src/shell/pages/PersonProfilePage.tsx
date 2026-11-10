@@ -1,3 +1,4 @@
+import { SafeImage } from "@maipai/ui/src/primitives/SafeImage";
 import { i18n } from "@lingui/core";
 import { useState } from "react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
@@ -171,7 +172,7 @@ function CreationsSection({ profile }: { profile: ProfileEntry }) {
         variant="plain"
         heading={i18n._({ id: "Creations", message: "Creations" })}
         headingStyle="section"
-        renderItem={(item) => <img src={item.thumb_url} alt="" loading="lazy" decoding="async" className="size-full object-cover" />}
+        renderItem={(item) => <SafeImage src={item.thumb_url} alt="" kind={item.kind === "audio" ? "music" : item.kind === "video" ? "video" : "picture"} tintSeed={item.name} className="size-full object-cover" />}
         renderBadge={(item) => item.kind === "video" || item.kind === "audio" ? <Badge variant="secondary">{item.kind === "video" ? i18n._({ id: "Video", message: "Video" }) : i18n._({ id: "Song", message: "Song" })}</Badge> : null}
         onSelect={(item) => navigate(`/library?file=${encodeURIComponent(item.id)}`)}
         seeAll={{ label: i18n._({ id: "See all", message: "See all" }), onSelect: () => navigate("/library") }}

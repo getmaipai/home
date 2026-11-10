@@ -197,7 +197,7 @@ describe("DashboardPage (Home)", () => {
     } finally { restore(); }
   });
 
-  test("the Home layout gear sits in the header row (PageHeaderActions), not in the page body", async () => {
+  test("the Home page has no layout gear in its body or header", async () => {
     const { restore } = mockFetch();
     try {
       const view = renderHome(makePerson("owner"));

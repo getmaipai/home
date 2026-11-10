@@ -16,7 +16,6 @@ import { StatusCard } from "@maipai/ui/src/elements/status-card";
 
 const PawIcon = getIcon("paw-print");
 const BotIcon = getIcon("bot");
-const ChevronIcon = getIcon("chevron-right");
 const PlusIcon = getIcon("plus");
 
 /** /people: people, pets and robots are presented together as the household. */
@@ -52,17 +51,17 @@ export function FamilyPage({ person }: { person: Roster }) {
 
           <section className="flex flex-col gap-3" aria-labelledby="family-people-heading">
             <div className="flex items-center justify-between"><h2 id="family-people-heading" className="text-section font-semibold">{i18n._({ id: "People", message: "People" })}</h2></div>
-            <div className="flex flex-col gap-1 md:grid md:grid-cols-2 xl:grid-cols-3">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
               {ordered.map((entry) => {
                 const blocked = isProfileClosedTo(person, entry);
                 const profileLinkAllowed = !blocked;
+                const who = <>
+                  <Avatar name={entry.display_name} seed={entry.avatar_seed} size="hero" accent={entry.accent ?? undefined} />
+                  <div className="flex min-w-0 flex-col items-center gap-1 text-center"><p className="text-section font-semibold">{entry.display_name}</p><Badge variant="secondary">{ROLE_LABELS[entry.role]}</Badge>{entry.bio ? <p className="line-clamp-2 text-supporting text-muted-foreground">{entry.bio}</p> : null}</div>
+                </>;
                 return <div key={entry.id} data-testid={`family-person-${entry.id}`}><Card surface="flat">
-                  {profileLinkAllowed ? <Link to={`/people/${entry.id}`} className="flex items-center gap-4 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
-                    <Avatar name={entry.display_name} seed={entry.avatar_seed} size="profile" accent={entry.accent ?? undefined} />
-                    <div className="min-w-0 flex-1"><p className="text-row font-semibold">{entry.display_name}</p><p className="text-supporting text-muted-foreground">{ROLE_LABELS[entry.role]}{entry.bio ? ` · ${entry.bio}` : ""}</p></div>
-                    <ChevronIcon aria-hidden className="text-muted-foreground" size={20} />
-                  </Link> : <div className="flex items-center gap-4"><Avatar name={entry.display_name} seed={entry.avatar_seed} size="profile" accent={entry.accent ?? undefined} /><div className="min-w-0 flex-1"><p className="text-row font-semibold">{entry.display_name}</p><p className="text-supporting text-muted-foreground">{ROLE_LABELS[entry.role]}{entry.bio ? ` · ${entry.bio}` : ""}</p></div></div>}
-                  <div className="mt-3 flex flex-wrap gap-2">
+                  {profileLinkAllowed ? <Link to={`/people/${entry.id}`} className="flex flex-col items-center gap-3 py-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">{who}</Link> : <div className="flex flex-col items-center gap-3 py-2">{who}</div>}
+                  <div className="mt-3 flex flex-wrap justify-center gap-2">
                     {details.filter((detail) => detail.used_by?.people.some((used) => used.id === entry.id)).map((detail) => <Chip key={detail.id} size="strip" onClick={() => navigate(`/companions/${encodeURIComponent(detail.id)}`)}>{detail.name}</Chip>)}
                     <Chip size="strip" onClick={() => navigate("/companions")}><PlusIcon aria-hidden size={16} />{i18n._({ id: "Companion", message: "Companion" })}</Chip>
                   </div>

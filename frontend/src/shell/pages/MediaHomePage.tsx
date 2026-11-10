@@ -58,7 +58,7 @@ export function MediaHomePage() {
                 items={shelf.items}
                 getKey={(row) => row.id}
                 getLabel={(row) => row.title}
-                renderItem={(row) => <SafeImage src={row.artwork_url} alt="" kind={FALLBACK_KIND[row.app]} />}
+                renderItem={(row) => <SafeImage src={row.artwork_url} alt="" kind={FALLBACK_KIND[row.app]} tintSeed={row.title} />}
                 renderCaption={(row) => (
                   <span className="flex min-w-0 flex-col">
                     <span className="truncate text-row font-semibold">{row.title}</span>

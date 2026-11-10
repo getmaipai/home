@@ -110,10 +110,8 @@ describe("PageHeaderActions", () => {
   function actionsAt(pathname: string, role: "owner" | "guest") {
     return renderWithQueryClient(<MemoryRouter initialEntries={[pathname]}><WakeWordPersonContext.Provider value={makePerson(role)}><PageHeaderActions /></WakeWordPersonContext.Provider></MemoryRouter>);
   }
-  test("Home carries its layout gear in the header for everyone but a guest", () => {
-    expect(actionsAt("/", "owner").getByRole("button", { name: "Home layout" })).toBeTruthy();
-    cleanup();
-    expect(actionsAt("/", "guest").queryByRole("button", { name: "Home layout" })).toBeNull();
+  test("Home draws no gear in the header (its layout is the page's Arrange sheet)", () => {
+    expect(actionsAt("/", "owner").queryByRole("button", { name: "Home layout" })).toBeNull();
   });
   test("a page with no settings draws no button", () => {
     expect(actionsAt("/people", "owner").container).toBeEmptyDOMElement();

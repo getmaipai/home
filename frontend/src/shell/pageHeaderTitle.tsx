@@ -18,12 +18,9 @@ import { i18n } from "@lingui/core";
 // instead (`EnginesIcon`, `SettingsIcon`, `PerformanceIcon`,
 // `UpdatesIcon`, `RepairsIcon`, `BackupsIcon`), imported here directly -
 // one definition, that page's own, not a copy of it.
-import { useContext } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { Button } from "@maipai/ui/src/ui/button";
 import { navigateBack } from "@/shell/media/navigateBack";
-import { WakeWordPersonContext } from "@/apps/chat/chatThreadContexts";
-import { settingsPath } from "@/shell/pages/settings/settingsAreas";
 import { getIcon } from "@maipai/ui/src/icons";
 import { isActiveNavPath } from "@maipai/ui/src/nav";
 import { APP_CATALOG, type AppEntry } from "@/shell/appCatalog";
@@ -151,15 +148,10 @@ export function PageHeaderTitle() {
   return entry ? <>{pathname === "/clock" ? <Button type="button" variant="ghost" size="icon" className="shrink-0 sm:hidden" data-testid="header-back" aria-label={i18n._({ id: "Back", message: "Back" })} onClick={() => navigateBack(navigate, "/")}><ArrowLeftIcon aria-hidden="true" /></Button> : null}<HeaderTitle entry={entry} hideInTopRow={isApp} heading={isApp} />{pathname === "/clock" ? <ClockHeaderAdd /> : null}</> : null;
 }
 
-const GearIcon = getIcon("settings");
 const ArrowLeftIcon = getIcon("arrow-left");
 
-/** The shell pages' header buttons, by route (a stable module-level reference, as `useHeaderExtra` requires). A section's settings
- * button always sits on the header's right side, just left of the companion avatar: a page never draws its own. */
+/** The shell pages' header buttons, by route (a stable module-level reference, as `useHeaderExtra` requires). Home draws none: its layout is the
+ * page's own Arrange sheet, and a gear to the Settings page beside the companion avatar read as an old control. */
 export function PageHeaderActions() {
-  const { pathname } = useLocation();
-  const navigate = useNavigate();
-  const person = useContext(WakeWordPersonContext);
-  if (pathname !== "/" || !person || person.role === "guest") return null;
-  return <><Button type="button" variant="ghost" size="icon" aria-label={i18n._({ id: "Home layout", message: "Home layout" })} onClick={() => navigate(settingsPath("appearance", "appearance", "ui.home_layout"))}><GearIcon aria-hidden="true" /></Button></>;
+  return null;
 }

@@ -30,7 +30,7 @@ export function MediaSearchPage() {
               ? <EmptyState icon="search" text={i18n._({ id: "No matches for \"{q}\". Try another word.", message: "No matches for \"{q}\". Try another word.", values: { q } })} />
               : data.groups.map((group) => (
                 <MediaShelf key={group.app} heading={group.heading} items={group.rows} getKey={(row) => row.id} getLabel={(row) => row.title}
-                  renderItem={(row) => <SafeImage src={row.artwork_url} alt="" kind={FALLBACK_KIND[row.app]} />}
+                  renderItem={(row) => <SafeImage src={row.artwork_url} alt="" kind={FALLBACK_KIND[row.app]} tintSeed={row.title} />}
                   renderCaption={(row) => <span className="flex min-w-0 flex-col"><span className="truncate text-row font-semibold">{row.title}</span>{row.subtitle ? <span className="truncate text-supporting text-muted-foreground">{row.subtitle}</span> : null}</span>}
                   aspect="square" variant="plain" headingStyle="section" tileSize="pro" bleed onSelect={(row) => navigate(row.href)} />
               ))}
