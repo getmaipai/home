@@ -456,6 +456,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/companionLook.ts` | TalkAnchor, TalkRecordSchema, LookSchema, EMPTY_LOOK, PROMPT_MAX_CHARS, LOOK_LIMIT_LINE |
 | `backend/src/lib/companionLookJobs.ts` | LOOK_JOB_BUSY_LINE, LOOK_PICTURE_UNREAD_LINE, LOOK_PROMPT_REQUIRED_LINE, LOOK_EDIT_PROMPT_LINE, LOOK_ENGINE_NOT_READY_LINE, busyLineFor |
 | `backend/src/lib/companionLookStyles.ts` | LOOK_STYLES, LOOK_STYLE_IDS, DEFAULT_LOOK_STYLE, stylesForBand, capOfStyle, lookStylePhrase |
+| `backend/src/lib/companionPack.ts` | PACK_TYPES, packFolderProblems, packFolder, readCompanionPack, packFile |
 | `backend/src/lib/companionPersonality.ts` | COMPANION_PERSONALITIES, cleanStyleNotes, backstoryTagline, safeExamples |
 | `backend/src/lib/companionPersonalityDials.ts` | COMPANION_DIAL_OPTIONS |
 | `backend/src/lib/companionPortrait.ts` | portraitPath, readRetainedPortrait, retainCompanionPortrait, voiceVersion, companionVoiceVersion |

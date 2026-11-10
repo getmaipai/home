@@ -82911,6 +82911,25 @@
                             "shapes"
                           ]
                         },
+                        "pack": {
+                          "type": "object",
+                          "nullable": true,
+                          "properties": {
+                            "url": {
+                              "type": "string"
+                            },
+                            "manifest": {
+                              "type": "object",
+                              "additionalProperties": {
+                                "nullable": true
+                              }
+                            }
+                          },
+                          "required": [
+                            "url",
+                            "manifest"
+                          ]
+                        },
                         "states": {
                           "type": "object",
                           "additionalProperties": {
