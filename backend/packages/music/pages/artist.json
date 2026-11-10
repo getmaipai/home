@@ -312,7 +312,7 @@
               }
             },
             {
-              "icon": "list-end",
+              "icon": "list-music",
               "label": "Add to queue",
               "action": {
                 "call": {

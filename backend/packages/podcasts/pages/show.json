@@ -132,7 +132,7 @@
       "item_key_field": "id",
       "item_label_field": "title",
       "item_media_field": "thumbnail",
-      "item_subtitle_field": "description",
+      "item_subtitle_field": "{description}",
       "aspect": "square",
       "variant": "plain",
       "orientation": "vertical",

@@ -65,22 +65,7 @@
       "empty_state": {
         "type": "empty_state",
         "icon": "film",
-        "text": "No playlists yet. Save a video to a playlist from its menu, or start one above.",
-        "action": {
-          "call": {
-            "target": "/api/plugins/videos/playlists/new",
-            "args": {},
-            "then": {
-              "navigate": {
-                "to": "/apps/videos/playlist",
-                "state": {
-                  "id": "{id}"
-                }
-              }
-            }
-          }
-        },
-        "action_label": "New playlist"
+        "text": "No playlists yet. Save a video to a playlist from its menu, or start one above."
       }
     },
     {

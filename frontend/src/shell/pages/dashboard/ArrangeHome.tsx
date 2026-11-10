@@ -79,8 +79,8 @@ export function ArrangeHome() {
                     <Item key={card.key} size="sm" role="listitem" data-testid="home-arrange-row" data-hidden={card.hidden ? "true" : undefined}>
                       <ItemContent><ItemTitle>{title}</ItemTitle></ItemContent>
                       <ItemActions>
-                        <Button variant="ghost" size="icon-sm" aria-label={i18n._({ id: "Move {title} up", message: "Move {title} up", values: { title } })} disabled={index === 0 || isPinned(cards, index - 1) || save.isPending} onClick={() => submit(moveCard(cards, index, -1))}><ArrowUp aria-hidden /></Button>
-                        <Button variant="ghost" size="icon-sm" aria-label={i18n._({ id: "Move {title} down", message: "Move {title} down", values: { title } })} disabled={index === cards.length - 1 || isPinned(cards, index) || save.isPending} onClick={() => submit(moveCard(cards, index, 1))}><ArrowDown aria-hidden /></Button>
+                        <Button variant="ghost" size="row" aria-label={i18n._({ id: "Move {title} up", message: "Move {title} up", values: { title } })} disabled={index === 0 || isPinned(cards, index - 1) || save.isPending} onClick={() => submit(moveCard(cards, index, -1))}><ArrowUp aria-hidden /></Button>
+                        <Button variant="ghost" size="row" aria-label={i18n._({ id: "Move {title} down", message: "Move {title} down", values: { title } })} disabled={index === cards.length - 1 || isPinned(cards, index) || save.isPending} onClick={() => submit(moveCard(cards, index, 1))}><ArrowDown aria-hidden /></Button>
                         <Switch aria-label={i18n._({ id: "Show {title} on Home", message: "Show {title} on Home", values: { title } })} checked={!card.hidden} disabled={save.isPending} onCheckedChange={(shown) => submit(cards.map((c) => c.key === card.key ? { ...c, hidden: !shown } : c))} />
                       </ItemActions>
                     </Item>

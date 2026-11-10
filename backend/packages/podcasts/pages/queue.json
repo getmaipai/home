@@ -27,7 +27,7 @@
       },
       "empty_state": {
         "type": "empty_state",
-        "icon": "list",
+        "icon": "layout-list",
         "text": "Your queue is empty. Choose Add to queue on an episode and it waits here.",
         "action": {
           "navigate": {

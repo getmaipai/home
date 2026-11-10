@@ -15,6 +15,14 @@
           "scope": "playlist"
         }
       },
+      "candidates_bind": {
+        "source": "package",
+        "path": "header",
+        "params": {
+          "id": "$state.id",
+          "scope": "playlist-people"
+        }
+      },
       "share_change": {
         "add": {
           "call": {
@@ -112,7 +120,7 @@
           }
         },
         {
-          "icon": "list-end",
+          "icon": "list-music",
           "label": "Add to queue",
           "action": {
             "call": {
@@ -172,6 +180,14 @@
         "params": {
           "id": "$state.id",
           "scope": "playlist"
+        }
+      },
+      "candidates_bind": {
+        "source": "package",
+        "path": "header",
+        "params": {
+          "id": "$state.id",
+          "scope": "playlist-people"
         }
       },
       "share_change": {

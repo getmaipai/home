@@ -113,7 +113,7 @@
       },
       "item_key_field": "id",
       "item_label_field": "title",
-      "item_subtitle_field": "summary",
+      "item_subtitle_field": "{summary}",
       "item_media_field": "thumbnail",
       "item_meta_field": "duration_s",
       "aspect": "square",

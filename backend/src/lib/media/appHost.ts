@@ -1332,6 +1332,10 @@ function musicData(person: PersonRow, dataId: string, params: DataParams): unkno
       footer_lines: about,
       ...(years.length === 1 ? { year: years[0] } : {}), ...(genres.length === 1 ? { genre: genres[0] } : {}) }];
   }
+  if (dataId === "header" && params.scope === "playlist-people") {
+    const collection = playlistFor(person, params.id ?? "")?.collection;
+    return collection && visiblePlaylists(person).some((entry) => entry.id === collection.id) ? memberCandidates(person, collection) : [];
+  }
   if (dataId === "header" && params.scope === "playlist") {
     const collection = playlistFor(person, params.id ?? "")?.collection;
     if (!collection || !visiblePlaylists(person).some((entry) => entry.id === collection.id)) return [];

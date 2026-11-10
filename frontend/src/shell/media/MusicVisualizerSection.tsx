@@ -61,7 +61,7 @@ export function MusicVisualizerSection({ id }: { id: string }) {
       <div aria-hidden="true" data-testid="music-page-backdrop" className="pointer-events-none fixed inset-x-0 bottom-0 top-13 z-0 overflow-hidden md:start-14">
         {vizOn ? <AudioVisualizer variant={variant} mode="full" getAnalyser={getAnalyser} palette={palette} active={playing} progress={progress} opacity={0.4} className="absolute inset-0 size-full" /> : null}
       </div>
-      <section aria-label={i18n._({ id: "Player options", message: "Player options" })} data-testid="music-visualizer-section" className="relative z-10 flex w-full items-center gap-1 overflow-x-auto py-2 [scrollbar-width:none] [&>*]:shrink-0">
+      <section aria-label={i18n._({ id: "Player options", message: "Player options" })} data-testid="music-visualizer-section" className="relative z-10 flex w-full shrink-0 items-center gap-1 overflow-x-auto py-2 [scrollbar-width:none] [&>*]:shrink-0">
         <MinimizeButton appHome="/apps/music" />
         <VisualizerMenu withLabel />
         <SleepMenu withLabel />

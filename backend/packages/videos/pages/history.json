@@ -5,6 +5,7 @@
   "body": [
     {
       "type": "media_shelf",
+      "heading": "History",
       "bind": {
         "source": "package",
         "path": "history"

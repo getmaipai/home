@@ -34,7 +34,7 @@ function ContinueGrid({ rows }: { rows: MediaHomeRow[] }) {
       {rows.slice(0, CONTINUE_SHORTCUTS).map((row) => (
         <Item key={`${row.app}/${row.id}`} size="sm" variant="muted" render={<Link to={row.href} />}>
           <ItemMedia variant="image">{tilePicture(row, true)}</ItemMedia>
-          <ItemContent><ItemTitle><span className="truncate">{row.title}</span></ItemTitle></ItemContent>
+          <ItemContent><ItemTitle><span className="line-clamp-2 break-words">{row.title}</span></ItemTitle></ItemContent>
         </Item>
       ))}
     </div>
