@@ -4831,6 +4831,13 @@
       "batch": null,
       "replacesHandBuilt": [],
       "realTurnToday": true
+    },
+    {
+      "file": "clip-feed.tsx",
+      "name": "clip-feed",
+      "group": "clip-feed",
+      "verdict": "later",
+      "verdictReason": "Full-screen vertical clip feed (CLIPS-FEED-01); no Home page uses it until the Videos clips feed row adopts it."
     }
   ]
 }
