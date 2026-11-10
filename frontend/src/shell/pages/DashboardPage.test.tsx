@@ -122,12 +122,12 @@ describe("DashboardPage (Home)", () => {
     } finally { restore(); }
   });
 
-  test("the greeting uses the semantic title type", async () => {
+  test("the greeting uses the semantic hero type", async () => {
     const { restore } = mockFetch({ layout: "ask" });
     try {
       const view = renderHome(makePerson("adult"));
       const greeting = await view.findByText(/Good .*Nova/);
-      expect(greeting.className).toContain("text-title");
+      expect(greeting.className).toContain("text-hero");
     } finally { restore(); }
   });
 
@@ -505,13 +505,13 @@ describe("DashboardPage (Home)", () => {
     } finally { empty.restore(); }
   });
 
-  test("the greeting is sentence case with one muted line", async () => {
+  test("the greeting is sentence case with a theme-readable supporting line", async () => {
     const { restore } = mockFetch({ layout: "ask" });
     try {
       const view = renderHome(makePerson("adult"));
       const greeting = await view.findByText(/Good .*Nova/);
       expect(greeting.className).not.toContain("capitalize");
-      expect(view.getByText("Here is your household today.").className).toContain("text-muted-foreground");
+      expect(view.getByText("Here is your household today.").className).toContain("text-primary-foreground/80");
     } finally { restore(); }
   });
 });

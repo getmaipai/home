@@ -16,6 +16,9 @@ import { api, type Roster } from "@/lib/api";
 import { errorLine, isHubUnreachable, useWhenHubBack } from "@/lib/hubReachability";
 import { useTabItem } from "@/shell/tabIdentity";
 import { StatusCard } from "@maipai/ui/src/elements/status-card";
+import { getIcon } from "@maipai/ui/src/icons";
+
+const ChevronRightIcon = getIcon("chevron-right");
 
 type MaskedSecretStyle = CSSProperties & { WebkitTextSecurity: "disc" };
 
@@ -71,8 +74,9 @@ export function SignInPage({ onSignedIn }: { onSignedIn: () => void }) {
   const usePassword = passcodeDigits === null;
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-background px-4">
-      <div className="w-full max-w-md">
+    <div className="relative flex min-h-screen items-center justify-center overflow-hidden bg-background px-4 py-10">
+      <div aria-hidden="true" className="pointer-events-none absolute inset-0 bg-gradient-to-br from-primary/5 via-background to-muted/30" />
+      <div className="relative w-full max-w-lg">
       <Card surface="flat">
         <div className="mx-auto w-fit">
           <FullLogo full />
@@ -188,20 +192,28 @@ export function SignInPage({ onSignedIn }: { onSignedIn: () => void }) {
                     {i18n._({ id: "Back", message: "Back" })}</Button>
                 </form>
               ) : (
-                <div className="flex flex-col items-center gap-4">
-                  <div className="flex flex-wrap justify-center gap-6">
+                <div className="flex flex-col gap-5">
+                  <div className="flex flex-col gap-1 text-center">
+                    <h1 className="text-title font-bold tracking-tight">{i18n._({ id: "Welcome home", message: "Welcome home" })}</h1>
+                    <p className="text-body text-muted-foreground">{i18n._({ id: "Choose your profile to continue.", message: "Choose your profile to continue." })}</p>
+                  </div>
+                  <div className="flex flex-col gap-2">
                     {profiles.map((p) => (
                       <Button
                         key={p.id}
                         type="button"
                         onClick={() => handleProfileTap(p)}
                         disabled={busy}
-                        variant="ghost"
+                        variant="secondary"
                         shape="pill"
-                        size="control"
+                        size="lg"
+                        width="full"
+                        align="start"
+                        height="auto"
                       >
-                        <Avatar name={p.display_name} className="size-16 text-row" />
-                        <span className="text-row">{p.display_name}</span>
+                        <Avatar name={p.display_name} size="profile" />
+                        <span className="min-w-0 flex-1 truncate text-row font-semibold">{p.display_name}</span>
+                        <ChevronRightIcon aria-hidden className="size-5 text-muted-foreground" />
                       </Button>
                     ))}
                   </div>
