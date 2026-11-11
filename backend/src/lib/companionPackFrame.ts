@@ -28,6 +28,37 @@ export function frameOfBox(box: { minX: number; minY: number; maxX: number; maxY
   return clampSquare({ x: cx - size / 2, y: cy - size / 2, size }, width, height);
 }
 
+/** The aspect (width over height) the pack's clips are made at: LTX-2.5's measured 768x448. The start picture of a clip is a band of the rest picture of this aspect, so there are no bars round it. */
+export const PACK_CLIP_ASPECT = 768 / 448;
+/** How far above the head the band starts, as a share of the band height. */
+export const PACK_HEADSHOT_TOP = 0.1;
+
+/**
+ * The pack frame as a HEADSHOT: the band across the whole picture at the clips' aspect, starting a little above the head, and the square in its
+ * middle (the band's height on each side). Clips are made from this band without bars (a square picture sitting in a wide frame made the video
+ * model zoom in and out, found on the first real pack), so the frame is exactly the middle of every clip. The band reaches from the head to the
+ * upper chest: nothing below it is ever shown. No opaque pixel gives the largest centred square.
+ */
+export function headshotFrame(box: { minX: number; minY: number; maxX: number; maxY: number } | null, width: number, height: number): PackFrame {
+  if (!box) return frameOfBox(null, width, height);
+  const size = Math.max(1, Math.min(Math.round(width / PACK_CLIP_ASPECT), height, width));
+  const cx = (box.minX + box.maxX + 1) / 2;
+  return clampSquare({ x: cx - size / 2, y: box.minY - PACK_HEADSHOT_TOP * size, size }, width, height);
+}
+
+/** The band of a picture a clip is made from: the frame's height, as wide as the clip's aspect needs, centred on the frame and kept inside the picture. */
+export function bandOfFrame(frame: PackFrame, source: Dims, clip: Dims): { x: number; y: number; width: number; height: number } {
+  const width = Math.min(source.width, Math.max(frame.size, Math.round(frame.size * clip.width / clip.height)));
+  const height = Math.min(source.height, Math.round(width * clip.height / clip.width));
+  return { x: Math.max(0, Math.min(Math.round(frame.x + frame.size / 2 - width / 2), source.width - width)), y: Math.max(0, Math.min(Math.round(frame.y), source.height - height)), width, height };
+}
+
+/** The pack frame in the clip's pixels when the clip was made from `bandOfFrame` scaled to the clip: the square in the middle of the clip. */
+export function frameInBand(frame: PackFrame, band: { x: number; y: number; width: number; height: number }, clip: Dims): PackFrame {
+  const sx = clip.width / band.width, sy = clip.height / band.height;
+  return clampSquare({ x: (frame.x - band.x) * sx, y: (frame.y - band.y) * sy, size: frame.size * sy }, clip.width, clip.height);
+}
+
 /** The bounding box of the opaque pixels of an RGBA buffer. */
 export function opaqueBox(rgba: Uint8Array, width: number, height: number): { minX: number; minY: number; maxX: number; maxY: number } | null {
   let minX = width, minY = height, maxX = -1, maxY = -1;
@@ -39,7 +70,7 @@ export function opaqueBox(rgba: Uint8Array, width: number, height: number): { mi
 export async function packFrameOfSource(png: Uint8Array, keyHex: string): Promise<{ frame: PackFrame; size: Dims }> {
   const keyed = await keyOut(png, keyHex);
   const raw = await sharp(keyed).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
-  return { frame: frameOfBox(opaqueBox(raw.data, raw.info.width, raw.info.height), raw.info.width, raw.info.height), size: { width: raw.info.width, height: raw.info.height } };
+  return { frame: headshotFrame(opaqueBox(raw.data, raw.info.width, raw.info.height), raw.info.width, raw.info.height), size: { width: raw.info.width, height: raw.info.height } };
 }
 
 /**

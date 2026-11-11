@@ -20,7 +20,7 @@ describe("the pack frame of the rest picture (the Stack's companionCrop rule: sq
     expect(opaqueBox(raw, 8, 8)).toEqual({ minX: 3, minY: 2, maxX: 6, maxY: 6 });
     const picture = Buffer.alloc(64 * 64 * 4); for (let y = 0; y < 64; y++) for (let x = 0; x < 64; x++) { const o = (y * 64 + x) * 4, inside = x >= 16 && x < 48 && y >= 8 && y < 56; picture[o] = inside ? 128 : 0; picture[o + 1] = inside ? 128 : 255; picture[o + 2] = inside ? 128 : 0; picture[o + 3] = 255; }
     const png = new Uint8Array(await sharp(picture, { raw: { width: 64, height: 64, channels: 4 } }).png().toBuffer());
-    expect(await packFrameOfSource(png, "#00FF00")).toEqual({ frame: { x: 7, y: 7, size: 51 }, size: { width: 64, height: 64 } });
+    expect(await packFrameOfSource(png, "#00FF00")).toEqual({ frame: { x: 14, y: 4, size: 37 }, size: { width: 64, height: 64 } });
   });
 });
 
@@ -71,5 +71,23 @@ describe("points, landmarks and pictures into the pack frame", () => {
     expect([px[0], px[2], px[3]]).toEqual([0, 200, 255]); // the red strip (x < 16) and the clear strip (y < 16) are outside the crop
     const whole = sharp(await cropToPack(png, { x: 0, y: 0, size: 64 }, dims)); const all = await whole.raw().toBuffer();
     expect(all[3]).toBe(0); expect(all[(300 * 480) * 4]).toBe(255); // top row clear; left strip red lower down
+  });
+});
+
+import { bandOfFrame, frameInBand, headshotFrame, PACK_CLIP_ASPECT } from "@/lib/companionPackFrame";
+describe("the headshot frame (clips start from a bar-free band of the picture: found on the first real pack)", () => {
+  test("the frame is the square in the middle of a full-width band at the clip aspect, starting 10 percent above the head", () => {
+    const f = headshotFrame({ minX: 256, minY: 128, maxX: 767, maxY: 895 }, 1024, 1024);
+    expect(f).toEqual({ x: 214, y: 68, size: 597 }); expect(f.size).toBe(Math.round(1024 / PACK_CLIP_ASPECT));
+  });
+  test("the band is as wide as the clip needs and the pack frame is exactly the middle square of the clip made from it", () => {
+    const f = { x: 214, y: 68, size: 597 }, band = bandOfFrame(f, { width: 1024, height: 1024 }, { width: 768, height: 448 });
+    expect(band).toEqual({ x: 1, y: 68, width: 1023, height: 597 }); // the band is as wide as the clip aspect needs (rounded), inside the 1024 picture
+    expect(frameInBand(f, band, { width: 768, height: 448 })).toEqual({ x: 160, y: 0, size: 448 });
+  });
+  test("a head near the top of the picture or a picture shorter than the band stay inside the picture", () => {
+    expect(headshotFrame({ minX: 300, minY: 0, maxX: 700, maxY: 900 }, 1024, 1024).y).toBe(0);
+    const f = headshotFrame({ minX: 100, minY: 10, maxX: 300, maxY: 400 }, 1000, 500);
+    expect(f.y + f.size).toBeLessThanOrEqual(500); expect(f.x).toBeGreaterThanOrEqual(0);
   });
 });

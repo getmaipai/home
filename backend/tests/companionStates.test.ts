@@ -168,6 +168,19 @@ describe("companion states store", () => {
     expect(submitted.input).not.toHaveProperty("crop"); expect(submitted.input).not.toHaveProperty("pin_rest"); // a normal clip is unchanged
   });
 
+  test("a pack clip made from the headshot band pins to that same band picture and crops its middle square", async () => {
+    __setKeyframesForTests(async () => [new Uint8Array([7])]);
+    const id = companion(), rest = addVersion(id, new Uint8Array([1, 2, 3]), { source: "upload", label: "rest", width: 1024, height: 1024, from: null }); setRest(id, rest.id);
+    updateSheet(id, { views: { left: null, right: null, mouth: null }, card: { text: "fox", species: "fox", colours: ["#CC3322"] }, key: "#00FF00", state: "needs_review", approved_by: null, approved_at: null }); approveSheet(id, "Author");
+    const take = addTake(id, "idle", { source: "upload", label: "idle" }); writeFileSync(takePath(id, "idle", take.id, "source.mp4")!, "source");
+    let submitted: any;
+    __setStackClientForTests({ mediaRoots: async () => ({ read: [root], write: [root] }), setMediaRoots: async () => ({ read: [root], write: [root] }), submitJob: async (job: any) => { submitted = job; const out = join(job.input.output_dir, job.input.output_name); mkdirSync(out, { recursive: true }); writeFileSync(join(out, "clip.h264.mp4"), "h264"); writeFileSync(join(out, "still.png"), "png"); return { id: "job-band", state: "done", result: { ok: true, reasons: [], seconds: 3, files: [{ name: "clip.h264.mp4", bytes: 123 }], av1: false } }; } } as never);
+    const { finishTake } = await import("@/lib/companionStates");
+    await finishTake(id, "idle", take.id, { alpha: false, pack: { crop: { x: 160, y: 0, size: 448 }, restReference: Buffer.from([9, 9]).toString("base64") } });
+    expect(submitted.input.rest_reference).toBe(Buffer.from([9, 9]).toString("base64")); expect(submitted.input.crop).toEqual({ x: 160, y: 0, size: 448 });
+    expect(submitted.input.palette_reference).toBe(Buffer.from([1, 2, 3]).toString("base64")); // the colours still come from the starting picture
+  });
+
   test("finish requires an approved sheet and keeps the Stack failure message on the take", async () => {
     const id = companion(), take = addTake(id, "thinking", { source: "upload", label: "thinking" });
     writeFileSync(takePath(id, "thinking", take.id, "source.mp4")!, "source");

@@ -52,9 +52,25 @@ describe("a pack clip's prompt (the generic mascot prompt made a hand appear and
     for (const state of ["idle", "listening", "thinking", "speaking"]) {
       const prompt = packTakePrompt({ text: "A knight holding a sword, full body, riding a horse." }, state, "green");
       expect(prompt).not.toMatch(/knight|sword|full body|horse/i); // the character text is never used for a pack clip
-      expect(prompt).toContain("nothing shown below the chest"); expect(prompt).toContain("Eyes stay wide open except for one quick blink"); expect(prompt).toContain("No sighing"); expect(PACK_MOTIONS[state]).not.toMatch(/breath|sigh|exhale/i); expect(PACK_MOTIONS[state]).toMatch(/eyes (wide )?open/); expect(prompt).toContain("Hands are never shown"); expect(prompt).toContain("final frame matches the first");
+      expect(prompt).toContain("Only the head, neck and upper chest are in frame"); expect(prompt).toContain("The eyes stay open and look straight at the camera");
+      // the words name what the video model does: none of the forbidden things may appear in the positive prompt (they live in the negative prompt)
+      expect(prompt).not.toMatch(/sigh|exhale|deep breath|head drop|looking down|look down|eye roll|rolling|no hands|never shown/i);
+      expect(PACK_MOTIONS[state]).toMatch(/eyes fully open/); expect(PACK_MOTIONS[state]).not.toMatch(/blink|breath|sigh|exhale|look(s|ing)? down/i);
       expect(prompt).not.toMatch(/head to feet|fist|lightbulb/i);
       expect(PACK_MOTIONS[state]).toBeTruthy();
     }
+  });
+});
+
+import sharp from "sharp";
+import { restBandReference } from "@/lib/companionTakes";
+describe("a pack clip's pin picture is a band of the character's own rest picture (pinning to the green start picture leaked green; a hand-keyed band came out magenta)", () => {
+  test("it keeps the rest picture's transparency, is the clip's size, and takes the band's region", async () => {
+    const N = 64, raw = Buffer.alloc(N * N * 4); for (let i = 0; i < N * N; i++) { const x = i % N, y = Math.floor(i / N), inside = x >= 16 && x < 48 && y >= 16 && y < 48; raw[i * 4] = 200; raw[i * 4 + 1] = 120; raw[i * 4 + 2] = 90; raw[i * 4 + 3] = inside ? 255 : 0; }
+    const png = new Uint8Array(await sharp(raw, { raw: { width: N, height: N, channels: 4 } }).png().toBuffer());
+    const out = await sharp(Buffer.from(await restBandReference(png, { x: 0, y: 8, width: 64, height: 37 }, { width: 64, height: 64 }, { width: 768, height: 448 }), "base64")).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
+    expect([out.info.width, out.info.height]).toEqual([768, 448]);
+    expect(out.data[3]).toBe(0); // the corner stays transparent, its colour is never made green
+    const o = (224 * 768 + 384) * 4; expect([out.data[o], out.data[o + 1], out.data[o + 2], out.data[o + 3]]).toEqual([200, 120, 90, 255]); // the middle keeps the figure's own colour
   });
 });

@@ -15,7 +15,7 @@ import { ltx25EndPictureReady, maxSecondsFor, quickVideoReady } from "@/lib/vide
 import { resolveCompanionClip, stackVideoModel, promptHash, reportedVideoModelMatches, reportedVideoQualityMatches, COMPANION_MODEL_MISMATCH_LINE } from "@/lib/companionArt";
 import { cancelOrDeleteVideo, fetchClip, getVideoJob, StackVideoError, submitVideo } from "@/lib/videos/stack";
 import { takeClipSize } from "@/lib/companionClipSize";
-import { frameForImage, frameInClip, type Dims, type PackFrame } from "@/lib/companionPackFrame";
+import { bandOfFrame, frameForImage, frameInBand, type Dims, type PackFrame } from "@/lib/companionPackFrame";
 import { activeLookJob } from "@/lib/companionLookJobs";
 import type { CompanionTake } from "@/lib/companionStates";
 
@@ -27,7 +27,7 @@ export const TAKE_RETRY_WAIT_MS = 60_000;
 export const TAKE_POLL_MS = 500;
 export const TAKE_NEGATIVE_PROMPT = "different character, changed colours, changed face, extra limbs, text, watermark, camera movement, background change, shadows";
 /** A pack clip is a headshot: no hands, arms or lower body ever. */
-export const PACK_TAKE_NEGATIVE_PROMPT = `${TAKE_NEGATIVE_PROMPT}, hands, fingers, arms, gestures, lower body, zoom, closed eyes, sigh, exhale, eye roll, head drop`;
+export const PACK_TAKE_NEGATIVE_PROMPT = `${TAKE_NEGATIVE_PROMPT}, hands, fingers, arms, gestures, lower body, zoom, blinking, blink, closed eyes, half closed eyes, lowered eyes, looking down, sleepy, sigh, exhale, eye roll, head drop`;
 export const TAKE_NO_REST_LINE = "Choose and approve a starting picture first.";
 export type TakeRunState = "queued" | "running" | "done" | "failed" | "cancelled";
 export interface TakeRun {
@@ -49,6 +49,35 @@ const chosenMotion = (state: string, own: string | null | undefined): string => 
   return variants[Math.floor(Math.random() * variants.length)]!;
 };
 
+/** The crop (the pack frame in the clip's own pixels) sent with the finishing of a pack clip: the middle square of the band the clip was made from. */
+function packCrop(run: TakeRun, image: Dims, clip: Dims): PackFrame {
+  const frame = frameForImage(run.packFrame!, run.packFrameSource ?? image, image);
+  return frameInBand(frame, bandOfFrame(frame, image, clip), clip);
+}
+/**
+ * The picture a pack clip's first and last frames are pinned to: the same band the clip started from, cut from the character's own rest picture
+ * (which already has its background removed), sized to the clip. Pinning to the green start picture leaked green into the pinned frames, and a band
+ * keyed out of it by hand came out magenta; the rest picture's own transparency is what the pin was built for.
+ */
+export async function restBandReference(restPng: Uint8Array, band: { x: number; y: number; width: number; height: number }, source: Dims, clip: Dims): Promise<string> {
+  const meta = await sharp(restPng).metadata(), kx = (meta.width ?? source.width) / source.width, ky = (meta.height ?? source.height) / source.height;
+  const left = Math.max(0, Math.round(band.x * kx)), top = Math.max(0, Math.round(band.y * ky));
+  const width = Math.min((meta.width ?? 0) - left, Math.round(band.width * kx)), height = Math.min((meta.height ?? 0) - top, Math.round(band.height * ky));
+  return (await sharp(restPng).ensureAlpha().extract({ left, top, width, height }).resize(clip.width, clip.height, { fit: "fill", kernel: "lanczos3" }).png().toBuffer()).toString("base64");
+}
+async function packRestReference(run: TakeRun, image: Dims, clip: Dims): Promise<string | undefined> {
+  const rest = readLook(run.companionId).rest, path = rest ? versionPath(run.companionId, rest) : null;
+  if (!run.packFrame || !path || !existsSync(path)) return undefined;
+  const source = run.packFrameSource ?? image, frame = frameForImage(run.packFrame, source, image);
+  return restBandReference(readFileSync(path), bandOfFrame(frame, image, clip), image, clip);
+}
+/** The band of the keyframe a pack clip is made from, in the keyframe's own pixels (null when the pack has no frame yet). */
+async function packBand(run: TakeRun, picture: ReturnType<typeof sharp>, clip: Dims): Promise<{ x: number; y: number; width: number; height: number } | null> {
+  if (!run.packFrame) return null;
+  const meta = await picture.clone().metadata(), image = { width: meta.width ?? 0, height: meta.height ?? 0 };
+  if (!image.width || !image.height) return null;
+  return bandOfFrame(frameForImage(run.packFrame, run.packFrameSource ?? image, image), image, clip);
+}
 export function takePrompt(card: { text: string }, motion: string, keyName: "green" | "magenta"): string {
   return `Static shot, the camera never moves. ${card.text.slice(0, 600)}. The character stays exactly this size and in exactly this place in the frame, whole body always visible from head to feet, the same picture in every frame. The character keeps the same face, the same colours and the same flat drawn style in every frame, with a calm closed-mouth smile. Plain solid ${keyName} background with nothing on it; the character floats on it with nothing under it. Action: ${motion}. One single smooth motion from start to end, one prop only.`;
 }
@@ -59,15 +88,17 @@ export function takePrompt(card: { text: string }, motion: string, keyName: "gre
  * hand appear and the face change on the first real run.
  */
 export const PACK_MOTIONS: Record<string, string> = {
-  idle: "stays still and alert with eyes wide open, looking straight at the viewer, one quick natural blink, a tiny slow head drift, a soft friendly expression, mouth closed",
-  listening: "listens attentively with eyes wide open and steady on the viewer, one small slow nod, one quick natural blink, a warm slight smile, mouth closed",
-  thinking: "thinks quietly with eyes open, glancing a little up and to one side and back, a slight thoughtful brow, one quick blink, head nearly still, mouth closed",
-  speaking: "talks calmly to the viewer with eyes open, the mouth moving naturally, small head movements, one quick natural blink, shoulders still",
+  idle: "looks steadily into the camera lens with eyes fully open the whole time, a soft friendly expression, mouth closed, only the tiniest head movement",
+  listening: "listens with eyes fully open and steady on the camera lens, one small slow nod, a warm slight smile, mouth closed",
+  thinking: "keeps eyes fully open and bright, glances slightly up and to one side and back, head nearly still, mouth closed",
+  speaking: "talks calmly to the camera with eyes fully open, the mouth moving naturally, small head movements, shoulders still",
 };
 /** The person's own character text is never part of a pack clip prompt: the start picture carries the look, and free text could ask for a wider shot, hands or a body. */
 export function packTakePrompt(_card: { text: string }, state: string, keyName: "green" | "magenta"): string {
   const motion = PACK_MOTIONS[state] ?? PACK_MOTIONS.idle!;
-  return `Static locked shot, fixed framing, the camera never moves. A headshot framed from the top of the head to the upper chest, nothing shown below the chest, the same person with exactly the same face, skin, hair and clothes in every frame, the same size and place in the frame. The face shape, skin tone and lighting stay exactly the same in every frame. Eyes stay wide open except for one quick blink. No sighing, no deep breath, no exhale, no eye rolling, no head dropping, no looking down. Plain solid ${keyName} background with nothing on it. Action: the person ${motion}. Hands are never shown, no arms, no gestures, no props. One calm continuous motion; the final frame matches the first frame.`;
+  // Positive wording only: the video model does what the words name, so "no sighing", "no head dropping" or "never looks down" in this text make it sigh, drop its head and look down.
+  // What must not appear goes in the negative prompt (PACK_TAKE_NEGATIVE_PROMPT).
+  return `Static locked shot, fixed framing, the camera never moves. A headshot from the top of the head to the upper chest, the same person with exactly the same face, skin, hair and clothes in every frame, the same size and place in the frame. Plain solid ${keyName} background. Action: the person ${motion}. The eyes stay open and look straight at the camera throughout. The face shape, skin tone and lighting stay exactly the same in every frame. Only the head, neck and upper chest are in frame. One calm continuous motion; the final frame matches the first frame.`;
 }
 
 export function activeTakeRun(companionId: string): TakeRun | null {
@@ -119,7 +150,12 @@ async function runTakes(run: TakeRun, count: number, actor: PersonRow, motionOve
         const name = `${size.width}x${size.height}`;
         const cached = pictures.get(name);
         if (cached) return cached;
-        const made = Buffer.from(await sharp(readFileSync(keyframePath(run.companionId, state))).flatten({ background: { r: keyR, g: keyG, b: keyB } }).resize(size.width, size.height, { fit: "contain", background: { r: keyR, g: keyG, b: keyB }, kernel: "lanczos3" }).sharpen({ sigma: 1.2, m1: 1, m2: 2 }).png().toBuffer()).toString("base64");
+        const flat = sharp(readFileSync(keyframePath(run.companionId, state))).flatten({ background: { r: keyR, g: keyG, b: keyB } });
+        // A pack clip starts from the headshot band of the picture (the frame's height, as wide as the clip needs), with no bars: a whole square picture in a wide frame made the video model zoom in and out.
+        let start = flat;
+        const band = run.pack && run.packFrame ? await packBand(run, flat, size) : null;
+        if (band) start = sharp(await flat.png().toBuffer()).extract({ left: band.x, top: band.y, width: band.width, height: band.height });
+        const made = Buffer.from(await start.resize(size.width, size.height, band ? { fit: "fill", kernel: "lanczos3" } : { fit: "contain", background: { r: keyR, g: keyG, b: keyB }, kernel: "lanczos3" }).sharpen({ sigma: 1.2, m1: 1, m2: 2 }).png().toBuffer()).toString("base64");
         pictures.set(name, made);
         return made;
       };
@@ -141,7 +177,7 @@ async function runTakes(run: TakeRun, count: number, actor: PersonRow, motionOve
           const art = await resolveCompanionClip(laneOfPerson(actor) === "adult" ? "detailed" : "quick");
           const shape = await sharp(readFileSync(keyframePath(run.companionId, state))).metadata();
           const engineNow = await videoEngineStatus().catch(() => null);
-          const clipSize = takeClipSize(art.model, art.quality, (shape.height ?? 0) > (shape.width ?? 0), engineNow), pictureB64 = await pictureFor(clipSize);
+          const clipSize = takeClipSize(art.model, art.quality, run.pack ? false : (shape.height ?? 0) > (shape.width ?? 0), engineNow), pictureB64 = await pictureFor(clipSize);
           // A pack clip is a loop of one picture: the same picture is its last frame too (LTX-2.5 guides frame 0 and the last frame), which stops the face drifting away from the rest picture. Only when the engine says it can.
           const endPicture = run.pack && art.model.startsWith("ltx25") && ltx25EndPictureReady(engineNow, art.model === "ltx25-max");
           const seconds = Math.min(run.pack ? PACK_TAKE_SECONDS : media.generate.seconds, maxSecondsFor(art.quality));
@@ -189,7 +225,7 @@ async function runTakes(run: TakeRun, count: number, actor: PersonRow, motionOve
           writeFileSync(sourcePath, clip);
           await cancelOrDeleteVideo(completedStackJob); run.stackJob = null; stackJob = null;
           // finishTake records its own failure on the take; a finishing failure never stops the run.
-          finishing.push(finishTake(run.companionId, state, take.id, { alpha: false, actor, ...(run.pack ? { pack: run.packFrame ? { crop: frameInClip(frameForImage(run.packFrame, run.packFrameSource ?? { width: shape.width ?? 0, height: shape.height ?? 0 }, { width: shape.width ?? 0, height: shape.height ?? 0 }), { width: shape.width ?? 0, height: shape.height ?? 0 }, clipSize) } : true } : {}) }).catch(() => undefined));
+          finishing.push(finishTake(run.companionId, state, take.id, { alpha: false, actor, ...(run.pack ? { pack: run.packFrame ? { crop: packCrop(run, { width: shape.width ?? 0, height: shape.height ?? 0 }, clipSize), restReference: await packRestReference(run, { width: shape.width ?? 0, height: shape.height ?? 0 }, clipSize) } : true } : {}) }).catch(() => undefined));
           consecutiveEngineFailures = 0;
         } catch (error) {
           if (stackJob && !run.cancelled) await cancelOrDeleteVideo(stackJob);
