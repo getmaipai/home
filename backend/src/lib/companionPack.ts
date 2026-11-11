@@ -1,6 +1,8 @@
 // PACK-06: a companion may carry a pack folder (data/companions/<id>/pack/, layout in scripts/pack/README.md). Validated once per mtime.
 import { existsSync, lstatSync, readdirSync, readFileSync, realpathSync, statSync } from "node:fs";
 import { join, relative, resolve, sep } from "node:path";
+import Ajv2020 from "ajv/dist/2020.js";
+import packSchema from "@maipai/spec/schemas/companion-pack.schema.json";
 import { validateCompanionPack } from "@maipai/spec/companion/ts/validateCompanionPack";
 import { householdCompanionFolder } from "@/lib/householdCompanions";
 
@@ -11,12 +13,19 @@ function walk(dir: string, base = dir): string[] {
   return readdirSync(dir, { withFileTypes: true }).flatMap((e) => e.isDirectory() ? walk(join(dir, e.name), base) : [relative(base, join(dir, e.name))]);
 }
 
-/** The plain reasons a pack folder is unusable (empty when it is fine). Mirrors scripts/pack/validate_pack.ts without the schema pass. */
+let schemaCheck: ReturnType<Ajv2020["compile"]> | null = null;
+/** The JSON schema pass: the spec's cross checks alone passed a pack with state names the schema rejects (found on the first real pack), so the maker and the installer run both. */
+function schemaProblems(pack: unknown): string[] {
+  schemaCheck ??= new Ajv2020({ strict: false, allErrors: true, validateFormats: false }).compile(packSchema as object);
+  return schemaCheck(pack) ? [] : (schemaCheck.errors ?? []).map((e) => `schema: ${e.instancePath || "/"} ${e.message}`);
+}
+
+/** The plain reasons a pack folder is unusable (empty when it is fine). Mirrors scripts/pack/validate_pack.ts, schema pass included. */
 export function packFolderProblems(dir: string, pack: any): string[] {
   const files: Record<string, number> = {};
   const all = walk(dir);
   for (const f of all) if (f !== "build-report.json") files[f] = statSync(join(dir, f)).size;
-  const problems = [...validateCompanionPack(pack, files)];
+  const problems = [...validateCompanionPack(pack, files), ...schemaProblems(pack)];
   for (const f of all) if (lstatSync(join(dir, f)).isSymbolicLink()) problems.push(`${f} is a link; packs hold plain files only.`);
   const named = [pack.rest, ...Object.values<any[]>(pack.states ?? {}).flatMap((clips) => clips.flatMap((c) => [c.file, c.trackFile, c.phone]))];
   for (const f of named) if (typeof f === "string" && !existsSync(join(dir, f))) problems.push(`${f} is named in pack.json but is not in the folder; add the file.`);

@@ -10,7 +10,7 @@ type Pack = Record<string, any>;
 export type Files = Record<string, number>;
 type Spec = { dir: string; validate: (pack: any, files?: Files) => string[] };
 
-const SPEC_TAG = "spec-spec-v0.1.360";
+const SPEC_TAG = "spec-spec-v0.1.365";
 
 /** The spec package root: MAIPAI_SPEC_DIR, the pinned @maipai/spec when it has companion-pack, else the commons-tags checkout. */
 function specDir(): string {

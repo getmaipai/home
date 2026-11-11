@@ -344,6 +344,7 @@ describe("MAKER-D2: previews and the stylised path", () => {
     expect(calls.find((c) => c.kind === "media.companion_shapes")!.input).toMatchObject({ mouth_box: [188, 281, 94, 47], face_height_px: 328 }); // scaled by 0.5 into the 512 source, then by 480/512 (no figure to key out: the frame is the whole picture)
     expect(calls.find((c) => c.kind === "media.companion_emotion")!.input.landmarks.leftEye[0]).toEqual([140.625, 140.625]);
     expect(calls.find((c) => c.kind === "media.companion_pack")!.input.descriptor.mouth.anchor).toMatchObject({ x: 187.5 / 480, w: 93.75 / 480 });
+    expect(calls.find((c) => c.kind === "media.companion_pack")!.input.descriptor.tile).toEqual({ desktop: 480, phone: 320 }); // named, so the Stack declares every phone twin
   });
 
   test("an oversize or wrong-length box or eyes request is refused at the route with a plain message", async () => {
@@ -961,5 +962,19 @@ describe("one shared pack frame (the clips, rest, mouth pictures and poses all u
       await TakeClipMaker.makeTakes({ actor: person("maker-owner"), companionId: id, state: "idle", count: 1, job: "k", signal: new AbortController().signal, onRun: () => undefined, onJob: () => undefined });
     } finally { takeDeps.start = original; }
     expect(seen).toEqual([{ job: "j", frame: EXPECTED_FRAME, frameSource: { width: 64, height: 64 } }, { job: "k" }]);
+  });
+});
+
+import { packFolderProblems } from "@/lib/companionPack";
+import { tmpdir } from "node:os";
+describe("the pack check runs the spec's JSON schema too (the first real pack used state names the schema rejects and still passed)", () => {
+  test("household state names (listening, thinking, speaking) and an unknown provenance source are refused; the spec's own names pass", () => {
+    const dir = join(tmpdir(), `pack-schema-${Date.now()}`); writePack(dir);
+    const good = JSON.parse(readFileSync(join(dir, "pack.json"), "utf8"));
+    expect(packFolderProblems(dir, good)).toEqual([]);
+    const bad = JSON.parse(JSON.stringify(good)); bad.states.listening = bad.states.listen; delete bad.states.listen; bad.provenance = { ...bad.provenance, source: "MaiPai Home pack maker" };
+    const problems = packFolderProblems(dir, bad).join("\n");
+    expect(problems).toContain("schema:"); expect(problems).toMatch(/listen/); expect(problems).toMatch(/provenance/);
+    rmSync(dir, { recursive: true, force: true });
   });
 });

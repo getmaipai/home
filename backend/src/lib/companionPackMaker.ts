@@ -618,9 +618,11 @@ async function ensureFrame(ctx: Ctx): Promise<{ frame: PackFrame; source: Dims }
 }
 const packOut = (id: string): string => join(workDir(id), "pack-out", "pack");
 /** The clips in the order they were made, each with the name it carries in the staging folder (idle-1, idle-2, listening-1, ...). */
+/** The pack spec's state names (`listen`, `think`, `speak`) for the household synth's states; the player maps its modes to the same names. The first real pack used the household names and failed the spec. */
+export const PACK_STATE: Record<string, string> = { idle: "idle", listening: "listen", thinking: "think", speaking: "speak" };
 function clipNames(rec: PackJobRecord): Array<{ state: string; take: string; name: string }> {
   const seen: Record<string, number> = {};
-  return rec.clips.map(({ state, take }) => ({ state, take, name: `${state}-${(seen[state] = (seen[state] ?? 0) + 1)}` }));
+  return rec.clips.map(({ state, take }) => { const pack = PACK_STATE[state] ?? state; return { state, take, name: `${pack}-${(seen[pack] = (seen[pack] ?? 0) + 1)}` }; });
 }
 
 /** The starting picture's pixels to the green source's pixels (the edit may return another size). */
@@ -811,9 +813,9 @@ const STAGE_RUNNERS: Record<PackStage, (ctx: Ctx) => Promise<Record<string, unkn
     else lips = (JSON.parse(readFileSync(join(workDir(ctx.id), "landmarks.json"), "utf8")) as { outerLips?: number[][] } | null)?.outerLips ?? [];
     const xs = lips.map((p) => p[0]!), ys = lips.map((p) => p[1]!);
     const names = clipNames(ctx.rec), states: Record<string, string[]> = {};
-    for (const { state, name } of names) (states[state] ??= []).push(name);
-    // MAKER-H: { rest, staging, descriptor, output_dir } -> <output_dir>/pack/ (pack.json, files, build-report.json).
-    const descriptor = { id: ctx.id, name: getHouseholdCompanion(ctx.id)?.companion?.display_name ?? ctx.id, provenance: { source: "MaiPai Home pack maker", maker: "MaiPai Home", created: new Date().toISOString() }, ...(lips.length ? { mouth: { anchor: { x: Math.min(...xs) / w, y: Math.min(...ys) / h, w: (Math.max(...xs) - Math.min(...xs)) / w, h: (Math.max(...ys) - Math.min(...ys)) / h } } } : {}), states };
+    for (const { state, name } of names) (states[PACK_STATE[state] ?? state] ??= []).push(name);
+    // MAKER-H: { rest, staging, descriptor, output_dir } -> <output_dir>/pack/ (pack.json, files, build-report.json). The tile is named so the Stack declares every clip's phone twin in pack.json (it writes a default tile but declares the twins only when the descriptor names one; found on the first real pack).
+    const descriptor = { id: ctx.id, name: getHouseholdCompanion(ctx.id)?.companion?.display_name ?? ctx.id, tile: { desktop: 480, phone: 320 }, provenance: { source: ctx.rec.shapes === "stylised" ? "stylised" : "photo", maker: "MaiPai Home", created: new Date().toISOString() }, ...(lips.length ? { mouth: { anchor: { x: Math.min(...xs) / w, y: Math.min(...ys) / h, w: (Math.max(...xs) - Math.min(...xs)) / w, h: (Math.max(...ys) - Math.min(...ys)) / h } } } : {}), states };
     // The Stack has no op for the head and eyes layers yet; the pack is built without them (they are optional in the spec).
     ctx.rec.notes = [...new Set([...(ctx.rec.notes ?? []), PACK_NOTE_HEAD_EYES, PACK_NOTE_SHOUT])]; save(ctx.rec);
     const result = await deps.ops.run("media.companion_pack", { rest: restPackPath(ctx.id), staging, descriptor, output_dir: out }, hooks(ctx));
