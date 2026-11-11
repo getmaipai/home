@@ -5025,6 +5025,23 @@
       "group": "companion-pack",
       "verdict": "wire-after",
       "verdictReason": "New StillPartsPlayer Element (MAKER-G); Home has not wired it yet. Future integration belongs in CompanionStage's character slot, without a Home wrapper."
+    },
+    {
+      "file": "activity-popover.tsx",
+      "name": "activity-popover",
+      "group": "activity",
+      "verdict": "later",
+      "backendNeeded": null,
+      "effort": null,
+      "specTagNeeded": false,
+      "newDependency": false,
+      "bindings": [],
+      "size": "S",
+      "showcaseScenario": null,
+      "batch": null,
+      "replacesHandBuilt": [],
+      "realTurnToday": null,
+      "verdictReason": "New in ui-v0.5.600 and not drawn by any Home page yet; assess and wire when the Activity page or dock uses it (the pro-design session owns that wiring)."
     }
   ]
 }

@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-11-11T19:40:57.491Z",
-  "kitTag": "ui-v0.5.594",
+  "generatedAt": "2026-11-11T23:46:10.764Z",
+  "kitTag": "ui-v0.5.600",
   "items": [
     {
       "file": "ActivityCardsShowcase.tsx",
@@ -211,6 +211,14 @@
       "group": "charts/data",
       "verdict": "later",
       "verdictReason": "Deferred until admin usage endpoint.",
+      "implemented": false
+    },
+    {
+      "file": "activity-popover.tsx",
+      "name": "activity-popover",
+      "group": "activity",
+      "verdict": "later",
+      "verdictReason": "New in ui-v0.5.600 and not drawn by any Home page yet; assess and wire when the Activity page or dock uses it (the pro-design session owns that wiring).",
       "implemented": false
     },
     {
@@ -1448,7 +1456,7 @@
       "group": "prompt",
       "verdict": "later",
       "verdictReason": "Added to the kit for generation prompts; no Home screen draws it yet. Wire it when a generation screen takes a prompt with options.",
-      "implemented": false
+      "implemented": true
     },
     {
       "file": "prompt-library.tsx",
