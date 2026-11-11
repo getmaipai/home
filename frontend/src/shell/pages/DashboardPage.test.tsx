@@ -134,8 +134,8 @@ describe("DashboardPage (Home)", () => {
   test("keeps the home block order in one layout function", async () => {
     const { homeBlocks } = await import("@/shell/pages/dashboard/homeBlocks");
     expect(homeBlocks("ask")).toEqual(["greeting", "ask", "today_chips", "actions", "admin", "pick_up", "family", "getting_started"]);
-    expect(homeBlocks("board")).toEqual(["greeting", "admin", "hero", "ask", "actions", "pick_up", "today", "family", "getting_started"]);
-    expect(homeBlocks("shelves")).toEqual(["greeting", "admin", "ask", "actions", "media_continue", "today", "media_new", "media_made", "getting_started"]);
+    expect(homeBlocks("board")).toEqual(["greeting", "hero", "ask", "actions", "admin", "pick_up", "today", "family", "getting_started"]);
+    expect(homeBlocks("shelves")).toEqual(["greeting", "ask", "actions", "admin", "media_continue", "today", "media_new", "media_made", "getting_started"]);
     expect(homeBlocks("shelves", false)).toEqual(homeBlocks("ask"));
   });
 
