@@ -5,6 +5,7 @@
 // answer puts it back in the engine's prompt cache before the person speaks. Nothing is stored on disk, no
 // text reaches anyone, and a person with no recorded prefix yet is left to the boot warm-up.
 import { complete, type LlmMessage, type ToolSpec } from "@/lib/llm";
+import { recordPrewarmTiming } from "@/lib/voiceTiming";
 
 interface RecordedPrefix { system: LlmMessage; tools: ToolSpec[]; model?: string; at: number }
 const MAX_PEOPLE = 64;
@@ -49,13 +50,15 @@ export async function prewarmConversation(actorId: string, surfaceClass: string,
   if (!prefix || conversationWarms.has(actorId) || window.length === 0) return false;
   const controller = new AbortController();
   conversationWarms.set(actorId, controller);
+  const started = Date.now();
   try {
     const result = await complete("chat", [prefix.system, ...window], {
       model: prefix.model, tools: prefix.tools.length > 0 ? prefix.tools : undefined,
       max_tokens: 1, exactCeiling: true, thinking: false, dropReasoning: true, signal: controller.signal,
     });
+    recordPrewarmTiming(actorId, controller.signal.aborted ? "aborted" : result.ok ? "done" : "failed", Date.now() - started, result.ok ? result.value.prompt_n : undefined, result.ok ? result.value.cache_n : undefined);
     return result.ok;
-  } catch { return false; }
+  } catch { recordPrewarmTiming(actorId, controller.signal.aborted ? "aborted" : "failed", Date.now() - started); return false; }
   finally { if (conversationWarms.get(actorId) === controller) conversationWarms.delete(actorId); }
 }
 

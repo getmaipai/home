@@ -1,6 +1,8 @@
 /** Counts-only timings for recent spoken turns. No utterance or reply content is accepted here. */
 import { mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
+import { createHash } from "node:crypto";
+import { z } from "zod";
 import { dataDir } from "./paths";
 
 export interface VoiceTimingRecord {
@@ -11,18 +13,34 @@ export interface VoiceTimingRecord {
   first_sentence_ms: number | null;
   first_audio_ms: number | null;
   first_playback_ms: number | null;
+  speech_enqueue_ms?: number | null;
+  speech_head_ms?: number | null;
+  speech_offer_ms?: number | null;
+  speech_emit_ms?: number | null;
+  audio_state_enqueue?: string | null;
+  audio_state_emit?: string | null;
 }
+
+export interface PrewarmTimingRecord { actor_hash: string; outcome: "done" | "aborted" | "failed"; prompt_n?: number; cache_n?: number; elapsed_ms: number }
+type VoiceTimingStage = "stt_ms" | "turn_start_ms" | "first_token_ms" | "first_sentence_ms" | "first_audio_ms" | "first_playback_ms";
+export const VoiceTimingMessageSchema = z.object({ t: z.literal("timing"), turn_id: z.string(), stt_ms: z.number().finite().nonnegative(), first_playback_ms: z.number().finite().nonnegative().optional(), first_sentence_ms: z.number().finite().nonnegative().optional(), head_ms: z.number().finite().nonnegative().optional(), offer_ms: z.number().finite().nonnegative().optional(), emit_ms: z.number().finite().nonnegative().optional(), ctx_enqueue: z.string().max(20).optional(), ctx_emit: z.string().max(20).optional() }).strict();
 
 const CAPACITY = 200;
 const storePath = join(dataDir, "local-app", "voice-timing.json");
 let records: VoiceTimingRecord[] = loadRecords();
+let prewarms: PrewarmTimingRecord[] = loadPrewarms();
 let nextId = 1;
 
 function loadRecords(): VoiceTimingRecord[] {
   try {
     const parsed: unknown = JSON.parse(readFileSync(storePath, "utf8"));
-    return Array.isArray(parsed) ? parsed.filter((row): row is VoiceTimingRecord => Boolean(row) && typeof row === "object" && typeof (row as VoiceTimingRecord).turn_id === "string").slice(-CAPACITY) : [];
+    const rows = Array.isArray(parsed) ? parsed : (parsed && typeof parsed === "object" && Array.isArray((parsed as { records?: unknown }).records) ? (parsed as { records: unknown[] }).records : []);
+    return rows.filter((row): row is VoiceTimingRecord => Boolean(row) && typeof row === "object" && typeof (row as VoiceTimingRecord).turn_id === "string").slice(-CAPACITY);
   } catch { return []; }
+}
+
+function loadPrewarms(): PrewarmTimingRecord[] {
+  try { const parsed: unknown = JSON.parse(readFileSync(storePath, "utf8")); return parsed && typeof parsed === "object" && Array.isArray((parsed as { prewarms?: unknown }).prewarms) ? (parsed as { prewarms: PrewarmTimingRecord[] }).prewarms.slice(-CAPACITY) : []; } catch { return []; }
 }
 
 function persist(): void {
@@ -30,10 +48,16 @@ function persist(): void {
     mkdirSync(dirname(storePath), { recursive: true, mode: 0o700 });
     const temp = `${storePath}.tmp`;
     // Counts only (no text, no audio, no ids of people), so the report command can read it without the hub's account; the folder above is 0700 only where the hub makes it.
-    writeFileSync(temp, JSON.stringify(records), { mode: 0o644 });
+    writeFileSync(temp, JSON.stringify({ records, prewarms }), { mode: 0o644 });
     renameSync(temp, storePath);
   } catch { /* timing is best effort and never affects the turn */ }
 }
+
+export function recordPrewarmTiming(actorId: string, outcome: PrewarmTimingRecord["outcome"], elapsedMs: number, promptN?: number, cacheN?: number): void {
+  const row: PrewarmTimingRecord = { actor_hash: createHash("sha256").update(actorId).digest("hex").slice(0, 12), outcome, elapsed_ms: Math.round(Math.max(0, elapsedMs)), ...(Number.isFinite(promptN) ? { prompt_n: promptN } : {}), ...(Number.isFinite(cacheN) ? { cache_n: cacheN } : {}) };
+  prewarms.push(row); if (prewarms.length > CAPACITY) prewarms.shift(); persist();
+}
+export function voicePrewarmRecords(limit = CAPACITY): readonly PrewarmTimingRecord[] { try { const parsed = JSON.parse(readFileSync(storePath, "utf8")) as { prewarms?: PrewarmTimingRecord[] }; if (Array.isArray(parsed.prewarms)) prewarms = parsed.prewarms.slice(-CAPACITY); } catch {} return prewarms.slice(-Math.max(0, Math.min(CAPACITY, Math.floor(limit)))); }
 
 export function beginVoiceTiming(): VoiceTimingRecord {
   const record: VoiceTimingRecord = { turn_id: `voice-${nextId++}`, stt_ms: null, turn_start_ms: null, first_token_ms: null, first_sentence_ms: null, first_audio_ms: null, first_playback_ms: null };
@@ -43,21 +67,29 @@ export function beginVoiceTiming(): VoiceTimingRecord {
   return record;
 }
 
+export function attachSpeechTiming(turnId: string, stamps: { enqueue_ms?: number; head_ms?: number; offer_ms?: number; emit_ms?: number; ctx_enqueue?: string; ctx_emit?: string }): void {
+  const record = findVoiceTiming(turnId); if (!record) return;
+  for (const [key, value] of Object.entries({ speech_enqueue_ms: stamps.enqueue_ms, speech_head_ms: stamps.head_ms, speech_offer_ms: stamps.offer_ms, speech_emit_ms: stamps.emit_ms, audio_state_enqueue: stamps.ctx_enqueue, audio_state_emit: stamps.ctx_emit })) {
+    if (value !== undefined && (typeof value === "string" || Number.isFinite(value))) (record as unknown as Record<string, unknown>)[key] = typeof value === "number" ? Math.round(value) : value;
+  }
+  persist();
+}
+
 export function beginVoiceTimingFor(turnId: string, sttMs: number | null, startedAtMs = Date.now()): VoiceTimingRecord {
   const record: VoiceTimingRecord = { turn_id: turnId, stt_ms: null, turn_start_ms: null, first_token_ms: null, first_sentence_ms: null, first_audio_ms: null, first_playback_ms: null };
   markVoiceTiming(record, "stt_ms", sttMs ?? -1);
-  markVoiceTiming(record, "turn_start_ms", 0);
+  markVoiceTiming(record, "turn_start_ms", startedAtMs);
   records.push(record);
   if (records.length > CAPACITY) records.shift();
   persist();
   return record;
 }
 
-export function markVoiceTiming(record: VoiceTimingRecord | undefined, stage: keyof Omit<VoiceTimingRecord, "turn_id">, elapsedMs: number): void {
+export function markVoiceTiming(record: VoiceTimingRecord | undefined, stage: VoiceTimingStage, elapsedMs: number): void {
   if (record && record[stage] === null && Number.isFinite(elapsedMs) && elapsedMs >= 0) { record[stage] = Math.round(elapsedMs); persist(); }
 }
 
-export function setVoiceTiming(record: VoiceTimingRecord | undefined, stage: keyof Omit<VoiceTimingRecord, "turn_id">, elapsedMs: number): void {
+export function setVoiceTiming(record: VoiceTimingRecord | undefined, stage: VoiceTimingStage, elapsedMs: number): void {
   if (record && Number.isFinite(elapsedMs) && elapsedMs >= 0 && (record[stage] === null || stage === "first_sentence_ms" || stage === "first_playback_ms")) { record[stage] = Math.round(elapsedMs); persist(); }
 }
 
@@ -84,5 +116,9 @@ export function voiceTimingReport(limit = 50): string {
     return String(values[Math.ceil(values.length * 0.9) - 1]);
   };
   const stages = ["stt_ms", "turn_start_ms", "first_token_ms", "first_sentence_ms", "first_audio_ms", "first_playback_ms"] as const;
-  return [`spoken turns: ${rows.length}`, `end to first playback median: ${median(rows.flatMap((r) => r.first_playback_ms === null ? [] : [r.first_playback_ms]))} ms`, `end to first playback p90: ${p90(rows.flatMap((r) => r.first_playback_ms === null ? [] : [r.first_playback_ms]))} ms`, ...stages.map((stage) => `${stage}: ${median(rows.flatMap((r) => r[stage] === null ? [] : [r[stage]!]))} ms median`)].join("\n");
+  const prewarmRows = voicePrewarmRecords(limit);
+  const promptDeltas = prewarmRows.flatMap((r) => r.prompt_n !== undefined && r.cache_n !== undefined ? [r.prompt_n - r.cache_n] : []);
+  const ctxRows = rows.filter((r) => r.audio_state_enqueue !== undefined);
+  const notRunning = ctxRows.filter((r) => r.audio_state_enqueue !== "running" || (r.audio_state_emit !== undefined && r.audio_state_emit !== "running")).length;
+  return [`spoken turns: ${rows.length}`, `end to first playback median: ${median(rows.flatMap((r) => r.first_playback_ms === null ? [] : [r.first_playback_ms]))} ms`, `end to first playback p90: ${p90(rows.flatMap((r) => r.first_playback_ms === null ? [] : [r.first_playback_ms]))} ms`, ...stages.map((stage) => `${stage}: ${median(rows.flatMap((r) => r[stage] === null ? [] : [r[stage]!]))} ms median`), `speech head median: ${median(rows.flatMap((r) => r.speech_head_ms == null ? [] : [r.speech_head_ms]))} ms`, `speech offer median: ${median(rows.flatMap((r) => r.speech_offer_ms == null ? [] : [r.speech_offer_ms]))} ms`, `speech emit median: ${median(rows.flatMap((r) => r.speech_emit_ms == null ? [] : [r.speech_emit_ms]))} ms`, `audio context not running (enqueue or emit): ${ctxRows.length ? `${Math.round(notRunning / ctxRows.length * 100)}%` : "n/a"}`, `prewarms done: ${prewarmRows.filter((r) => r.outcome === "done").length}`, `prewarms aborted: ${prewarmRows.filter((r) => r.outcome === "aborted").length}`, `prewarm prompt_n minus cache_n median: ${median(promptDeltas)}`].join("\n");
 }

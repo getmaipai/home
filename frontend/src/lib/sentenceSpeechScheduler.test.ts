@@ -9,6 +9,7 @@ class FakeAudioContext {
   currentTime = 0;
   suspended = 0;
   resumed = 0;
+  state: AudioContextState = "running";
   async suspend() { this.suspended++; }
   async resume() { this.resumed++; }
   createGain() { return { connect: () => {}, gain: { value: 1 } } as unknown as GainNode; }
@@ -173,6 +174,26 @@ describe("sentence speech scheduler", () => {
     (scheduler as unknown as Internals).scheduleBuffer({ duration: 0.2 } as AudioBuffer, undefined, {});
     expect(times).toHaveLength(1);
     expect(Number.isFinite(times[0])).toBe(true);
+    scheduler.stop();
+  });
+
+  test("first sentence timing orders response head, offered buffer, and scheduled emit with context states", async () => {
+    const context = new StreamingFakeAudioContext();
+    context.state = "suspended";
+    const bytes = new Uint8Array(44 + 6000); bytes.set(wavHeader());
+    const scheduler = new SentenceSpeechScheduler(context as unknown as AudioContext, async () => new Response(bytes));
+    const updates: Array<{ head_ms?: number; offer_ms?: number; emit_ms?: number; ctx_enqueue: string; ctx_emit?: string }> = [];
+    scheduler.onFirstSentenceTiming = (stamp) => updates.push(stamp);
+    scheduler.enqueueSentence("first sentence");
+    for (let i = 0; i < 8; i++) await settle();
+    const final = updates.at(-1)!;
+    expect(final.ctx_enqueue).toBe("suspended");
+    expect(final.ctx_emit).toBe("suspended");
+    expect(final.head_ms).toBeDefined();
+    expect(final.offer_ms).toBeDefined();
+    expect(final.emit_ms).toBeDefined();
+    expect(final.head_ms!).toBeLessThanOrEqual(final.offer_ms!);
+    expect(final.offer_ms!).toBeLessThanOrEqual(final.emit_ms!);
     scheduler.stop();
   });
 

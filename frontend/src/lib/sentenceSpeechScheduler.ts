@@ -29,6 +29,7 @@ import { publishSpeechTap, speechTapActive, type SpeechSource } from "@/lib/spee
 const MAX_PARALLEL_FETCHES = 2;
 
 export interface SpeechSentenceMeta { turnId?: string; generation?: number; visibleEnd?: number; voice?: string }
+export interface FirstSentencePlaybackTiming { enqueue_ms: number; head_ms?: number; offer_ms?: number; emit_ms?: number; ctx_enqueue: string; ctx_emit?: string }
 interface ScheduledSentence { visibleEnd?: number; startTime: number; endTime: number; complete: boolean }
 /** About how fast the voice speaks, used to guess a sentence's length while its audio is still arriving. */
 const CHARS_PER_SECOND = 14;
@@ -89,6 +90,10 @@ export class SentenceSpeechScheduler implements SpeechSource {
    * play - the real "time to first audio" signal. */
   onFirstAudio?: () => void;
   onFirstPlayback?: (at: number) => void;
+  onFirstSentenceTiming?: (timing: FirstSentencePlaybackTiming) => void;
+  private firstTiming?: FirstSentencePlaybackTiming;
+  private readonly firstEnqueueAt = new WeakMap<object, number>();
+  private firstSentenceRecorded = false;
   /** Fires once every enqueued sentence has finished playing AND finish()
    * has been called (no more sentences are coming). */
   onEnded?: () => void;
@@ -228,6 +233,7 @@ export class SentenceSpeechScheduler implements SpeechSource {
       resolveThis = resolve;
     });
     const track: { entry?: ScheduledSentence; id: number } = { id: this.sentenceCount++ };
+    if (!this.firstSentenceRecorded) { this.firstSentenceRecorded = true; this.firstEnqueueAt.set(track, performance.now()); this.firstTiming = { enqueue_ms: 0, ctx_enqueue: this.audioContext.state }; this.onFirstSentenceTiming?.({ ...this.firstTiming }); }
     if (speechTapActive()) publishSpeechTap({ type: "sentence", source: this, sentence: track.id, text });
     void this.fetchAndSchedule(text, predecessorDone, meta, track).finally(() => {
       if (track.entry) track.entry.complete = true;
@@ -247,11 +253,14 @@ export class SentenceSpeechScheduler implements SpeechSource {
     void predecessorDone.then(() => { predecessorFinished = true; });
     const pending: AudioBuffer[] = [];
     let scheduledAny = false;
+    const noteFirstOffer = () => { if (this.firstTiming && track.id === 0 && this.firstTiming.offer_ms === undefined) { this.firstTiming.offer_ms = performance.now() - (this.firstEnqueueAt.get(track) ?? performance.now()); this.onFirstSentenceTiming?.({ ...this.firstTiming }); } };
     const emit = (buffer: AudioBuffer) => {
+      if (this.firstTiming && track.id === 0 && this.firstTiming.emit_ms === undefined) { this.firstTiming.emit_ms = performance.now() - (this.firstEnqueueAt.get(track) ?? performance.now()); this.firstTiming.ctx_emit = this.audioContext.state; this.onFirstSentenceTiming?.({ ...this.firstTiming }); }
       this.scheduleBuffer(buffer, scheduledAny ? undefined : meta, track);
       scheduledAny = true;
     };
     const offer = (buffer: AudioBuffer) => {
+      noteFirstOffer();
       if (predecessorFinished && pending.length === 0) emit(buffer);
       else pending.push(buffer);
     };
@@ -259,6 +268,7 @@ export class SentenceSpeechScheduler implements SpeechSource {
     try {
       if (this.stopped) return;
       const response = await this.speechStream(text, this.abortController.signal, meta?.turnId && meta.generation !== undefined ? { turnId: meta.turnId, generation: meta.generation, ...(meta.voice ? { voice: meta.voice } : {}) } : meta?.voice ? { turnId: "", generation: 0, voice: meta.voice } : undefined);
+      if (this.firstTiming && track.id === 0 && this.firstTiming.head_ms === undefined) { this.firstTiming.head_ms = performance.now() - (this.firstEnqueueAt.get(track) ?? performance.now()); this.onFirstSentenceTiming?.({ ...this.firstTiming }); }
       const reader = typeof this.audioContext.createBuffer === "function" ? response.body?.getReader() : undefined;
       if (!reader) {
         const bytes = new Uint8Array(await response.arrayBuffer());
@@ -268,6 +278,7 @@ export class SentenceSpeechScheduler implements SpeechSource {
       } else {
         whole = await this.readStreamed(reader, offer);
       }
+      if (whole) noteFirstOffer();
     } catch (error) {
       if (!this.stopped && !(error instanceof DOMException && error.name === "AbortError") && !(error instanceof ApiError && error.code === "turn_cancelled")) this.onError?.();
       // A failed sentence just doesn't speak - the reply's TEXT already

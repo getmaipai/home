@@ -5,6 +5,7 @@ import { __resetStackEngineForTests, __setStackClientForTests, getStackClient, i
 import { __setEngineLinkForTests, EngineLink } from "@/lib/stack/link";
 import { StackError } from "@/lib/stack/errors";
 import { getDefaultScriptedStack } from "./stackFixture";
+import { completeViaStackRequest } from "@/lib/llm";
 
 const roles: StackRole[] = ["chat", "embeddings", "stt", "tts"];
 
@@ -43,6 +44,19 @@ describe("Stack role routing", () => {
     recordStackChatIdentity(identity);
     expect(getActiveChatEngineIdentity()).toEqual(identity);
     expect(getActiveChatEngineIdentity()).toEqual(identity);
+  });
+
+  test("only chat-role non-streaming replies update the active chat identity", async () => {
+    const baseline = { host: "local" as const, build: "baseline", model: "qwen3-8b", healthy: true };
+    const chatIdentity = { ...baseline, build: "chat-build", model: "qwen3-27b" };
+    const judgeIdentity = { ...baseline, build: "judge-build", model: "qwen3-4b" };
+    recordStackChatIdentity(baseline);
+    __setStackClientForTests({ chat: async (request: { model?: string }) => ({ data: { choices: [{ message: { content: "ok" } }] }, identity: request.model === "judge" ? judgeIdentity : chatIdentity }) } as never);
+    await completeViaStackRequest("judge", { model: "judge", messages: [{ role: "user", content: "x" }], max_tokens: 4 }, undefined, { exactCeiling: true });
+    expect(getActiveChatEngineIdentity()).toEqual(baseline);
+    const result = await completeViaStackRequest("chat", { model: "chat", messages: [{ role: "user", content: "x" }], max_tokens: 4 }, undefined, { exactCeiling: true });
+    expect(result.ok).toBe(true);
+    expect(getActiveChatEngineIdentity()).toEqual(chatIdentity);
   });
 
   test("a cleared test client resolves the scripted fixture instead of a network client", () => {

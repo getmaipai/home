@@ -585,6 +585,7 @@ function useChatRuntime(person: Roster, closeSheet: () => void, temporaryNext: b
             const finalAt = voiceFinalAtRef.current;
             if (finalAt !== undefined && voiceTimingTurnIdRef.current) { voiceTimingSocketRef.current?.sendTiming?.(voiceTimingTurnIdRef.current, voiceSttMsRef.current ?? 0, Math.max(0, at - finalAt)); voiceFinalAtRef.current = undefined; }
           },
+          onFirstSentencePlaybackTiming: (timing) => { const turnId = voiceTimingTurnIdRef.current; if (turnId) voiceTimingSocketRef.current?.sendTiming?.(turnId, voiceSttMsRef.current ?? 0, undefined, undefined, { head_ms: timing.head_ms, offer_ms: timing.offer_ms, emit_ms: timing.emit_ms, ctx_enqueue: timing.ctx_enqueue, ctx_emit: timing.ctx_emit }); },
           onTurnId: (turnId) => { voiceTimingTurnIdRef.current = turnId; },
           onFirstSentence: () => { const finalAt = voiceFinalAtRef.current; if (finalAt !== undefined && voiceTimingTurnIdRef.current) voiceTimingSocketRef.current?.sendTiming?.(voiceTimingTurnIdRef.current, voiceSttMsRef.current ?? 0, undefined, Math.max(0, performance.now() - finalAt)); },
           // APPROVE-CARD-01: armed once, right before ConfirmTool's own

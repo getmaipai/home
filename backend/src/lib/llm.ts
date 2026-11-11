@@ -346,6 +346,9 @@ export interface LlmCompleteValue {
    * none, or when the request set `dropReasoning`. */
   reasoning?: string;
   model: string;
+  /** Native engine usage counters when a non-streaming response includes them. */
+  prompt_n?: number;
+  cache_n?: number;
   /** Only set (even to `[]`) when `tools` was offered for this call.
    * `undefined` means tools weren't offered at all; `[]` is the model's
    * own real decision that nothing offered fit - both `complete()` and
@@ -538,7 +541,7 @@ async function stackRequestOnce(role: string, request: RoleRequest, signal?: Abo
       // than silently reading `undefined` fields below.
       return { ok: false, failure: { ok: false, status: 503, code: "unavailable", error: "chat model unavailable: the Stack streamed a non-streaming request" } };
     }
-    recordStackChatIdentity(result.identity);
+    if (role === "chat") recordStackChatIdentity(result.identity);
     resolveStackOffline(role);
     return { ok: true, data: result.data };
   } catch (err) {
@@ -615,7 +618,11 @@ async function completeViaStack(role: LlmRole, messages: LlmMessage[], opts: Llm
     const choice = data.choices?.[0];
     if (!choice) return { ok: false, status: 503, code: "unavailable", error: "chat model returned no choices" };
     const tool_calls = offering ? (choice.message.tool_calls ?? []).map(toolCallFromWire) : undefined;
-    return { ok: true, value: { text: stripChatTemplateTokens(choice.message.content ?? ""), finish_reason: choice.finish_reason, ...reasoningField(choice.message.reasoning_content, opts), model: data.model ?? role, ...(tool_calls !== undefined ? { tool_calls } : {}) } };
+    const countData = data as typeof data & { usage?: { prompt_tokens?: unknown; prompt_tokens_details?: { cached_tokens?: unknown } }; timings?: { prompt_n?: unknown; cache_n?: unknown } };
+    const count = (v: unknown) => typeof v === "number" && Number.isFinite(v) ? v : undefined;
+    const promptN = count(countData.usage?.prompt_tokens) ?? count(countData.timings?.prompt_n);
+    const cacheN = count(countData.usage?.prompt_tokens_details?.cached_tokens) ?? count(countData.timings?.cache_n);
+    return { ok: true, value: { text: stripChatTemplateTokens(choice.message.content ?? ""), finish_reason: choice.finish_reason, ...reasoningField(choice.message.reasoning_content, opts), model: data.model ?? role, ...(promptN !== undefined ? { prompt_n: promptN } : {}), ...(cacheN !== undefined ? { cache_n: cacheN } : {}), ...(tool_calls !== undefined ? { tool_calls } : {}) } };
 }
 
 async function completeOnce(

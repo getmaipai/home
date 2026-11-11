@@ -5,7 +5,7 @@ import { offerCarry, withdrawCarry } from "./chatCarry";
 import { MAX_CHAT_IMAGES, CHAT_IMAGE_REFUSAL } from "@maipai/home-backend/src/wire";
 import { api, ApiError } from "@/lib/api";
 import { readAssistantTurnStream } from "@/lib/assistantTurnStream";
-import { SentenceSpeechScheduler } from "@/lib/sentenceSpeechScheduler";
+import { SentenceSpeechScheduler, type FirstSentencePlaybackTiming } from "@/lib/sentenceSpeechScheduler";
 import { splitReadyChunks } from "@/lib/sentenceChunker";
 import { normalizeForSpeech } from "@maipai/spec/voice/ts/normalizeForSpeech.js";
 import { TurnStreamEvent as ToolTurnStreamEvent } from "@maipai/spec/stack/ts/turn-stream-event.js";
@@ -171,6 +171,7 @@ export interface ChatModelAdapterDeps {
   consumeSpoken?(): boolean | undefined;
   consumeVoiceTiming?(): number | undefined;
   onFirstPlayback?(at: number): void;
+  onFirstSentencePlaybackTiming?(timing: FirstSentencePlaybackTiming): void;
   onTurnId?(turnId: string): void;
   onFirstSentence?(): void;
   consumeRetryWithCurrentCompanion?(): boolean;
@@ -294,6 +295,7 @@ export function createChatModelAdapter(deps: ChatModelAdapterDeps): ChatModelAda
       scheduler.messageId = unstable_assistantMessageId;
       scheduler.onFirstAudio = () => deps.onSpeakingChange?.(true);
       scheduler.onFirstPlayback = (at) => deps.onFirstPlayback?.(at);
+      scheduler.onFirstSentenceTiming = (timing) => deps.onFirstSentencePlaybackTiming?.(timing);
       scheduler.onError = () => deps.onSpeechError?.();
       // The reply is cut in on while it is still being SPOKEN, which is long after it finished generating: the turn stays "active" until
       // its voice ends, so a cut-in can still tell the server how much was heard (what lets the companion pick the story back up).

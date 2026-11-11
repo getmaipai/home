@@ -21,3 +21,12 @@
 // contract and the server has never read it.
 export type SttServerMessage = import("@maipai/spec/voice/ts/sttTypes.js").SttWireEvent | { t: "timing"; speech_end_to_final_ms: number; silence_wait_ms: number };
 export type SttServerMessageWithTiming = SttServerMessage;
+import { z } from "zod";
+
+/** Additive client timing report; all playback fields remain optional for older clients. */
+export const SttTimingReportSchema = z.object({
+  t: z.literal("timing"), turn_id: z.string(), stt_ms: z.number().finite().nonnegative(),
+  first_playback_ms: z.number().finite().nonnegative().optional(), first_sentence_ms: z.number().finite().nonnegative().optional(),
+  head_ms: z.number().finite().nonnegative().optional(), offer_ms: z.number().finite().nonnegative().optional(), emit_ms: z.number().finite().nonnegative().optional(),
+  ctx_enqueue: z.string().max(20).optional(), ctx_emit: z.string().max(20).optional(),
+}).strict();
