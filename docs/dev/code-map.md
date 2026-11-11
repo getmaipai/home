@@ -648,7 +648,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/longform/documents.ts` | DOCUMENT_KINDS, MAX_DOCUMENT_CHARS, saveDocument, getDocument, listDocuments, approveDocument |
 | `backend/src/lib/longform/runner.ts` | isProducing, stopProducing, renderScene, produce, progressOf |
 | `backend/src/lib/longform/scripts.ts` | scriptSchema, SHOT_MIN_SECONDS, buildShotList, writeScene |
-| `backend/src/lib/longform/stages.ts` | treatmentSchema, bibleSchema, outlineSchema, __setStageCompleterForTests, askStage, startProduction |
+| `backend/src/lib/longform/stages.ts` | treatmentSchema, bibleSchema, outlineSchema, __setStageCompleterForTests, spoiledReply, askStage |
 | `backend/src/lib/longform/structure.ts` | SCENE_TARGET_SECONDS, SCENE_MIN_SECONDS, SCENE_MAX_SECONDS, AVG_SHOT_SECONDS, MAX_SHOTS_PER_RUN, MIN_PRODUCTION_SECONDS |
 | `backend/src/lib/longform/tool.ts` | MAKE_PRODUCTION_TOOL_ID, FILM_MAX_SECONDS, isProductionCall, makeProductionArgs, runMakeProduction |
 | `backend/src/lib/loras/access.ts` | isAdult, availableTo, loraAccess, runsOnBases, runsOn, isUnofferedOldBase |
