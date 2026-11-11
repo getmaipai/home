@@ -77,7 +77,10 @@ export interface PackOpResult { ok: boolean; reasons: string[]; report: Record<s
 export interface PackOpHooks { onJob(id: string): void; signal?: AbortSignal }
 export type FaceLandmarks = Record<string, unknown>;
 /** The lip openness (0 closed to 1 wide) asked of the engine for each letter; talk-frames takes at most 12 per call. */
-export const LETTER_LIP: Record<string, number> = { A: 0, B: 0.1, C: 0.25, D: 0.4, E: 0.55, F: 0.7, G: 0.85, H: 0.92, wide: 1 };
+export const LETTER_LIP: Record<string, number> = { A: 0, B: 0.01, C: 0.025, D: 0.04, E: 0.055, F: 0.07, G: 0.085, H: 0.092, wide: 1 };
+/** The calm set's widest opening must be 2 to 6.5 percent of the face height (the Stack's check). Measured on the first real face: the opening is about 3 + 33 x the lip ratio, so the calm ratios above peak near 6; a face that measures differently is asked again once, scaled by this target over its measured peak. */
+export const CALM_OPENING_RANGE: [number, number] = [2, 6.5];
+export const CALM_OPENING_TARGET = 5.5;
 export const TALK_LETTERS = ["A", "B", "C", "D", "E", "F", "G", "H", "wide"] as const;
 export const EMOTIONS = ["angry", "excited", "alarmed", "sad"] as const;
 
@@ -85,7 +88,7 @@ export interface PackOpsClient {
   /** One picture edit (POST /v1/images/edits); returns the PNG. */
   imageEdit(input: { image: Uint8Array; instruction: string; seed: number; imageSource: "generated" | "uploaded" } & PackOpHooks): Promise<Uint8Array>;
   /** `POST /v1/images/talk-frames`: one still per letter (its lip ratio, `LETTER_LIP`) from the rest picture, with the face landmarks (MAKER-B2). */
-  talkFrames(input: { image: Uint8Array; letters: readonly string[] } & PackOpHooks): Promise<{ frames: Record<string, Uint8Array>; sourceLandmarks: FaceLandmarks | null; landmarks: Record<string, FaceLandmarks | null> }>;
+  talkFrames(input: { image: Uint8Array; letters: readonly string[]; /** Multiplies every lip ratio (the calm set is asked again, smaller or larger, when its measured opening is outside the range). */ lipScale?: number } & PackOpHooks): Promise<{ frames: Record<string, Uint8Array>; sourceLandmarks: FaceLandmarks | null; landmarks: Record<string, FaceLandmarks | null> }>;
   /** A media op that reads and writes files in the companion's folder; `report.json` with `ok` and `reasons` comes back as the result. */
   run(kind: PackOpKind, input: Record<string, unknown>, hooks: PackOpHooks): Promise<PackOpResult>;
   cancel(jobId: string): Promise<void>;
@@ -122,8 +125,10 @@ export const StackPackOps: PackOpsClient = {
     if (!client.talkFrames || !client.talkFramePicture) throw new Error("The face tools are not available on this Stack. Update the Stack and try again.");
     const form = new FormData();
     form.append("image", new File([new Uint8Array(input.image)], "rest.png", { type: "image/png" }));
-    form.append("lip", input.letters.map((l) => LETTER_LIP[l] ?? 0).join(","));
-    const reply = await client.talkFrames(form, input.signal ? { signal: input.signal } : undefined);
+    form.append("lip", input.letters.map((l) => String(Number(((LETTER_LIP[l] ?? 0) * (l === "wide" ? 1 : input.lipScale ?? 1)).toFixed(4)))).join(","));
+    // The Stack answers with the frames AND the face landmarks in this one reply; a polled job keeps counts only. So the call waits as long as the Stack does (it holds 120 s by default; Home's own limit is 30 s).
+    form.append("timeout_ms", String(TALK_WAIT_MS));
+    const reply = await client.talkFrames(form, { timeoutMs: TALK_WAIT_MS + 10_000, ...(input.signal ? { signal: input.signal } : {}) });
     const job = reply.kind === "done" ? reply.body.job : reply.job;
     input.onJob(job);
     let body: { sourceLandmarks?: FaceLandmarks | null; frames?: Array<{ landmarks?: FaceLandmarks | null }> } | null = reply.kind === "done" ? reply.body : null;
@@ -132,6 +137,7 @@ export const StackPackOps: PackOpsClient = {
       while (ACTIVE.includes(status.state)) { if (input.signal?.aborted) throw new DOMException("Aborted", "AbortError"); await sleep(PACK_POLL_MS); status = await client.job(job); }
       if (status.state !== "done") throw new Error(jobFailure(status, "The mouth pictures could not be made. Try again."));
       body = (status.result ?? {}) as NonNullable<typeof body>;
+      if (!(body as { sourceLandmarks?: unknown }).sourceLandmarks) throw new Error("The face tools took too long to answer. Try again in a minute.");
     }
     const frames: Record<string, Uint8Array> = {}, landmarks: Record<string, FaceLandmarks | null> = {};
     for (let i = 0; i < input.letters.length; i++) { const letter = input.letters[i]!; frames[letter] = await client.talkFramePicture(job, i, input.signal ? { signal: input.signal } : undefined); landmarks[letter] = body?.frames?.[i]?.landmarks ?? null; }
@@ -196,6 +202,8 @@ export const TakeClipMaker: ClipMaker = {
   },
 };
 
+/** How long one talk-frames call waits for the engine (the Stack's own default is 120 s). */
+const TALK_WAIT_MS = 120_000;
 const defaultDeps: PackDeps = {
   ops: StackPackOps,
   clips: TakeClipMaker,
@@ -707,10 +715,14 @@ const STAGE_RUNNERS: Record<PackStage, (ctx: Ctx) => Promise<Record<string, unkn
   async track(ctx) {
     await ensureFrame(ctx);
     const reports: Record<string, unknown>[] = [], staging = join(workDir(ctx.id), "staging", "clips"); rmSync(join(workDir(ctx.id), "track"), { recursive: true, force: true }); mkdirSync(staging, { recursive: true });
+    // The tracker turns the rest's transparent pixels into mid grey, while the clip's colour half has a black background, so the silhouette edge flips sign and the
+    // correlation collapses (every frame under the confidence, found on the first real track run). It gets the rest flattened over black, like the clip. Other ops keep the RGBA rest.
+    const trackRest = join(workDir(ctx.id), "rest_track_480.png");
+    writeFileSync(trackRest, await sharp(restPackPath(ctx.id)).flatten({ background: { r: 0, g: 0, b: 0 } }).png().toBuffer());
     for (const { state, take, name } of clipNames(ctx.rec)) {
       const clip = takePath(ctx.id, state, take, "clip.h264.mp4")!, out = join(workDir(ctx.id), "track", name); mkdirSync(out, { recursive: true });
       // MAKER-H: { rest, clip, output_dir } -> track.json and report.json in output_dir.
-      const result = await deps.ops.run("media.companion_track", { rest: restPackPath(ctx.id), clip, clip_stacked: true, output_dir: out }, hooks(ctx));
+      const result = await deps.ops.run("media.companion_track", { rest: trackRest, clip, clip_stacked: true, output_dir: out }, hooks(ctx));
       reports.push({ state, take, ok: result.ok, reasons: result.reasons });
       if (!result.ok) opFailed(`The ${state} head track`, result);
       // The staging folder the pack op reads: clips/<name>.mp4, .track.json and the phone twin when the clip op made one.
@@ -724,27 +736,37 @@ const STAGE_RUNNERS: Record<PackStage, (ctx: Ctx) => Promise<Record<string, unkn
     if (ctx.rec.shapes === "stylised") return stylisedShapes(ctx);
     if (ctx.rec.shapes !== "photo") throw new Error(PACK_NOT_SUPPORTED_LINE);
     const { frame: packFrameOf, source: frameSource } = await ensureFrame(ctx);
-    const frames = await deps.ops.talkFrames({ image: bytesOf(sourcePath(ctx.id)), letters: TALK_LETTERS, ...hooks(ctx) });
-    const dir = join(workDir(ctx.id), "shapes-in"); rmSync(dir, { recursive: true, force: true }); mkdirSync(join(dir, "calm"), { recursive: true });
-    let outputs = 0;
-    const lm: Record<string, unknown> = {};
-    for (const letter of TALK_LETTERS) {
-      const frame = frames.frames[letter];
-      if (!frame) throw Object.assign(new Error(`The mouth picture ${letter} was not made. Try again.`), { reasons: [`The mouth picture ${letter} was not made. Try again.`] });
-      await guard(ctx, [{ label: `The mouth picture ${letter}`, bytes: frame }], "picture"); outputs++;
-      // The baker reads calm/B.png to H.png; A (closed, the rest) and wide are kept beside, not sent.
-      // The LivePortrait frames and their landmarks are in the green source's pixels: both go into the pack frame (crop, 480x480) before the op reads them.
-      const packed = await cropToPack(frame, packFrameOf, frameSource);
-      if (/^[B-H]$/.test(letter)) { writeFileSync(join(dir, "calm", `${letter}.png`), packed); const marks = frames.landmarks[letter]; lm[letter] = marks ? packLandmarks(marks, packFrameOf, frameSource, await sizeOf(frame)) : marks; }
-      else writeFileSync(join(workDir(ctx.id), `mouth-${letter}.png`), packed);
+    let scale = 1, outputs = 0, out = "", result: PackOpResult;
+    for (let attempt = 0; ; attempt++) {
+      const frames = await deps.ops.talkFrames({ image: bytesOf(sourcePath(ctx.id)), letters: TALK_LETTERS, lipScale: scale, ...hooks(ctx) });
+      const dir = join(workDir(ctx.id), "shapes-in"); rmSync(dir, { recursive: true, force: true }); mkdirSync(join(dir, "calm"), { recursive: true });
+      outputs = 0;
+      const lm: Record<string, unknown> = {};
+      for (const letter of TALK_LETTERS) {
+        const frame = frames.frames[letter];
+        if (!frame) throw Object.assign(new Error(`The mouth picture ${letter} was not made. Try again.`), { reasons: [`The mouth picture ${letter} was not made. Try again.`] });
+        await guard(ctx, [{ label: `The mouth picture ${letter}`, bytes: frame }], "picture"); outputs++;
+        // The baker reads calm/B.png to H.png; A (closed, the rest) and wide are kept beside, not sent.
+        // The LivePortrait frames and their landmarks are in the green source's pixels: both go into the pack frame (crop, 480x480) before the op reads them.
+        const packed = await cropToPack(frame, packFrameOf, frameSource);
+        if (/^[B-H]$/.test(letter)) { writeFileSync(join(dir, "calm", `${letter}.png`), packed); const marks = frames.landmarks[letter]; lm[letter] = marks ? packLandmarks(marks, packFrameOf, frameSource, await sizeOf(frame)) : marks; }
+        else writeFileSync(join(workDir(ctx.id), `mouth-${letter}.png`), packed);
+      }
+      const missing = ["rest", ...Object.keys(lm)].filter((k) => (k === "rest" ? !frames.sourceLandmarks : !lm[k]));
+      if (missing.length) throw Object.assign(new Error("The face tools did not find the face in every mouth picture. Choose a starting picture where the face is clear."), { reasons: ["The face tools did not find the face in every mouth picture. Choose a starting picture where the face is clear."] });
+      // landmarks.json holds the rest picture's landmarks in the pack frame (480x480 pixels): the emotion eyes and the mouth anchor read it.
+      writeFileSync(join(workDir(ctx.id), "landmarks.json"), JSON.stringify(packLandmarks(frames.sourceLandmarks!, packFrameOf, frameSource, frameSource)));
+      out = join(workDir(ctx.id), "shapes-out"); rmSync(out, { recursive: true, force: true }); mkdirSync(out, { recursive: true });
+      // MAKER-H: { rest, frames_dir, landmarks: { rest, calm: { B..H } }, sets, output_dir } -> <output_dir>/shapes/calm/..., report.json.
+      result = await deps.ops.run("media.companion_shapes", { rest: restPackPath(ctx.id), frames_dir: dir, landmarks: { rest: packLandmarks(frames.sourceLandmarks!, packFrameOf, frameSource, frameSource), calm: lm }, sets: ["calm"], output_dir: out }, hooks(ctx));
+
+      if (result.ok || attempt >= 1) break;
+      // The Stack measured the calm set outside 2 to 6.5 percent: ask the engine again with the lip ratios scaled to its target (once).
+      let peak = Number.NaN;
+      try { peak = Number((JSON.parse(readFileSync(join(out, "shapes", "report.json"), "utf8")) as { sets?: { calm?: { opening_peak_pct?: unknown } } }).sets?.calm?.opening_peak_pct); } catch { /* no per-letter report: the failure stands */ }
+      if (!(peak > 0) || (peak >= CALM_OPENING_RANGE[0] && peak <= CALM_OPENING_RANGE[1])) break;
+      scale *= Math.min(4, Math.max(0.1, CALM_OPENING_TARGET / peak));
     }
-    const missing = ["rest", ...Object.keys(lm)].filter((k) => (k === "rest" ? !frames.sourceLandmarks : !lm[k]));
-    if (missing.length) throw Object.assign(new Error("The face tools did not find the face in every mouth picture. Choose a starting picture where the face is clear."), { reasons: ["The face tools did not find the face in every mouth picture. Choose a starting picture where the face is clear."] });
-    // landmarks.json holds the rest picture's landmarks in the pack frame (480x480 pixels): the emotion eyes and the mouth anchor read it.
-    writeFileSync(join(workDir(ctx.id), "landmarks.json"), JSON.stringify(packLandmarks(frames.sourceLandmarks!, packFrameOf, frameSource, frameSource)));
-    const out = join(workDir(ctx.id), "shapes-out"); rmSync(out, { recursive: true, force: true }); mkdirSync(out, { recursive: true });
-    // MAKER-H: { rest, frames_dir, landmarks: { rest, calm: { B..H } }, sets, output_dir } -> <output_dir>/shapes/calm/..., report.json.
-    const result = await deps.ops.run("media.companion_shapes", { rest: restPackPath(ctx.id), frames_dir: dir, landmarks: { rest: packLandmarks(frames.sourceLandmarks!, packFrameOf, frameSource, frameSource), calm: lm }, sets: ["calm"], output_dir: out }, hooks(ctx));
     if (!result.ok) opFailed("The mouth shapes", result);
     outputs += await guardDir(ctx, join(out, "shapes"), "A mouth shape tile");
     return { frames: outputs, ...result.report };

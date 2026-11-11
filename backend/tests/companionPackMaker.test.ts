@@ -569,7 +569,7 @@ describe("StackPackOps against the documented MAKER-H and talk-frames shapes (St
   test("talk-frames posts image and lip ratios (letters in order) and reads frames, sourceLandmarks and per-frame landmarks", async () => {
     const { forms } = client({});
     const talk = await StackPackOps.talkFrames({ image: new Uint8Array([1]), letters: ["A", "wide"], onJob: () => undefined });
-    const form = forms.talk![0]!; expect(form.get("lip")).toBe("0,1"); expect(form.get("operation")).toBeNull();
+    const form = forms.talk![0]!; expect(form.get("lip")).toBe("0,1"); expect(form.get("timeout_ms")).toBe("120000"); expect(form.get("operation")).toBeNull();
     expect([...talk.frames.A!]).toEqual([0, 9]); expect([...talk.frames.wide!]).toEqual([1, 9]);
     expect(talk.sourceLandmarks).toEqual(face); expect(talk.landmarks.A).toEqual(face); expect(talk.landmarks.wide).toBeNull();
   });
@@ -896,14 +896,33 @@ describe("one shared pack frame (the clips, rest, mouth pictures and poses all u
     expect([meta.width, meta.height, meta.channels]).toEqual([480, 480, 4]); // the keyed rest, with alpha
   });
 
+  test("a calm mouth set measured outside 2 to 6.5 percent is asked again once with the lip ratios scaled to the target (found on the first real face: 33.4 percent)", async () => {
+    const f = fakes(id); const scales: Array<number | undefined> = []; let shapesRuns = 0;
+    const tf = f.ops.talkFrames; f.ops.talkFrames = async (input) => { scales.push(input.lipScale); return tf(input); };
+    const run = f.ops.run; f.ops.run = async (kind, input, hooks) => {
+      if (kind !== "media.companion_shapes") return run(kind, input, hooks);
+      shapesRuns++;
+      if (shapesRuns === 1) { const out = String(input.output_dir); mkdirSync(join(out, "shapes"), { recursive: true }); writeFileSync(join(out, "shapes", "report.json"), JSON.stringify({ sets: { calm: { opening_peak_pct: 33.4 } } })); return { ok: false, reasons: ["The calm set's widest mouth opening is 33.4 percent of the face height; it should be 2 to 6.5."], report: {} }; }
+      return run(kind, input, hooks);
+    };
+    await startAndRun(f); await approvePackStage(id, person("maker-owner"), "B"); await runTo(null, "waiting_approval");
+    expect(shapesRuns).toBe(2); expect(scales[0]).toBe(1); expect(scales[1]).toBeCloseTo(5.5 / 33.4, 5);
+  });
+  test("a calm mouth set that fails for another reason, or is already in range, is not asked again", async () => {
+    const f = fakes(id); let shapesRuns = 0;
+    const run = f.ops.run; f.ops.run = async (kind, input, hooks) => { if (kind === "media.companion_shapes") { shapesRuns++; return { ok: false, reasons: ["The face is turned too far."], report: {} }; } return run(kind, input, hooks); };
+    await startAndRun(f); await approvePackStage(id, person("maker-owner"), "B"); await runTo(null, "failed");
+    expect(shapesRuns).toBe(1);
+  });
   test("the track op gets the 480x480 rest and clip_stacked; shapes and emotion get pictures and landmarks in the pack frame", async () => {
     const f = fakes(id); await startAndRun(f);
     await approvePackStage(id, person("maker-owner"), "B"); await runTo(null, "waiting_approval");
     const tracks = f.ops.inputs.filter((c) => c.kind === "media.companion_track");
     expect(tracks.length).toBe(5);
-    for (const t of tracks) { expect(t.input.clip_stacked).toBe(true); expect(String(t.input.rest)).toEndWith("/work/rest_480.png"); }
-    // every op that got a rest read the 480x480 RGBA one
-    expect(f.ops.restSizes.every((s) => s[0] === 480 && s[1] === 480 && s[2] === 4)).toBe(true);
+    for (const t of tracks) { expect(t.input.clip_stacked).toBe(true); expect(String(t.input.rest)).toEndWith("/work/rest_track_480.png"); }
+    // every op that got a rest read a 480x480 one: the track op an opaque one flattened over black (the clip's own background), the others the RGBA one
+    expect(f.ops.restSizes.every((s) => s[0] === 480 && s[1] === 480)).toBe(true);
+    expect(f.ops.restSizes.slice(0, 5).every((s) => s[2] === 3)).toBe(true); expect(f.ops.restSizes.slice(5).every((s) => s[2] === 4)).toBe(true);
     expect(f.ops.restSizes.length).toBe(5 + 3); // track x5, shapes, emotion, pack
     const shapes = f.ops.inputs.find((c) => c.kind === "media.companion_shapes")!.input;
     const at = (3 * 480) / 51; // the fake face has its first outer-lip point at (10, 10); the frame starts at (7, 7) and is 51 wide

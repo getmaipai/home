@@ -177,7 +177,7 @@ export interface StackClient {
   /** GET /v1/images/edits/{job}: the PNG a finished edit made (the Stack keeps it in memory a few minutes). */
   imageEditResult(job: string, opts?: { signal?: AbortSignal }): Promise<Uint8Array>;
   /** POST /v1/images/talk-frames (TALK-06, landmarks MAKER-B2): `lip` ratios in, one still per ratio out. 200 carries the frames; 202 a job to poll (`job()`, its result carries the same fields). Optional so an older Stack or a test double without it still type-checks. */
-  talkFrames?(form: FormData, opts?: { signal?: AbortSignal }): Promise<StackTalkFramesReply>;
+  talkFrames?(form: FormData, opts?: { signal?: AbortSignal; timeoutMs?: number }): Promise<StackTalkFramesReply>;
   /** GET /v1/images/talk-frames/{job}/{index}: one frame's PNG (kept ten minutes). */
   talkFramePicture?(job: string, index: number, opts?: { signal?: AbortSignal }): Promise<Uint8Array>;
   submitJob(request: { kind: string; role?: string | null; input?: Record<string, unknown> }, opts?: { signal?: AbortSignal }): Promise<StackJob>;
