@@ -4,7 +4,7 @@
   "kind": "plugin",
   "category": "Media",
   "display": "Make a Film",
-  "description": "Make a film, commercial, ad or story video from an idea, a script or the person's attached pictures (a product, an actor, a set); longer than two minutes is written step by step.",
+  "description": "Make a film, commercial or story video from an idea, script or attached pictures, and write long ones step by step.",
   "offer": {
     "mode": "conditional",
     "gate": "filmAllowed",

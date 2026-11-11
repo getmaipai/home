@@ -4,7 +4,7 @@
   "kind": "plugin",
   "category": "Media",
   "display": "Make a Video",
-  "description": "Make one short clip from words or from one picture (a commercial, a story or several pictures is make_film); call before saying one exists.",
+  "description": "Make one short clip from words or one picture; films and commercials use make_film; call before saying it exists.",
   "offer": {
     "mode": "conditional",
     "gate": "videosAllowed",
@@ -36,19 +36,19 @@
         "minLength": 3,
         "maxLength": 1200,
         "grounded": false,
-        "description": "Scene description; spoken lines in quotes, one speaker at a time."
+        "description": "Scene and dialogue; one speaker at a time."
       },
       "from_picture": {
         "type": "string",
         "maxLength": 80,
         "grounded": false,
-        "description": "latest or attached."
+        "description": "Latest or attached picture."
       },
       "end_frame": {
         "type": "string",
         "maxLength": 80,
         "grounded": false,
-        "description": "Needs from_picture."
+        "description": "Requires from_picture."
       },
       "orientation": {
         "type": "string",
@@ -66,7 +66,7 @@
           "3d-animated",
           "film"
         ],
-        "description": "Cartoon: name the character, era, style in the prompt."
+        "description": "For cartoons, name character, era and style in prompt."
       },
       "camera": {
         "type": "string",
@@ -92,7 +92,7 @@
         "type": "integer",
         "minimum": 1,
         "maximum": 10,
-        "description": "Default 5; 5 max from a picture."
+        "description": "Default 5; picture max 5."
       },
       "tier": {
         "type": "string",
@@ -110,7 +110,7 @@
           "minLength": 1,
           "maxLength": 60
         },
-        "description": "Saved style names, if named."
+        "description": "Named saved styles."
       },
       "subjects": {
         "type": "array",
