@@ -229,10 +229,11 @@ export class SttSession {
       this.speechLen += samples.length;
       this.silenceSamples += samples.length;
       if (firstSilenceFrame) {
-        if (!this.cfg.endpointing) {
-          if (this.partialInFlight) this.redecodeAtEdge = true;
-          else void this.emitPartial();
-        }
+        // DUPLEX-EDGE (2026-11-11): transcribe at the first silent frame whether or not the end-of-turn check is on, so the text is ready by
+        // the time the turn ends (finalize reuses it when no voice followed). It used to be skipped with the check on, which put the whole
+        // transcription after the pause.
+        if (this.partialInFlight) this.redecodeAtEdge = true;
+        else void this.emitPartial();
       }
       const endpointing = this.cfg.endpointing;
       const baseSamples = this.cfg.silenceTimeoutS * this.cfg.sampleRate;

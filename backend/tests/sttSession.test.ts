@@ -245,8 +245,8 @@ describe("SttSession - RMS fallback VAD (no Silero model installed in tests)", (
 
     expect(finals(events)).toEqual([{ t: "final", v: "the whole resumed utterance" }]);
     expect(events.filter((event) => event.t === "no_speech" || event.t === "error")).toHaveLength(0);
-    expect(receivedSamples).toHaveLength(1);
-    expect(receivedSamples[0]).toBeGreaterThan(30 * FRAME * 2);
+    expect(receivedSamples).toHaveLength(2); // the edge partial of the first fragment, then the whole utterance (DUPLEX-EDGE)
+    expect(receivedSamples[1]).toBeGreaterThan(30 * FRAME * 2); // the final decode carries the whole utterance
     session.close();
   });
 
@@ -288,7 +288,7 @@ describe("SttSession - RMS fallback VAD (no Silero model installed in tests)", (
     await flush();
 
     expect(finals(events)).toEqual([{ t: "final", v: "whole utterance, not the fragment" }]);
-    expect(transcriptionCalls()).toBe(1);
+    expect(transcriptionCalls()).toBe(2); // edge partial of the fragment, then the whole utterance (DUPLEX-EDGE)
     session.close();
   });
 
@@ -328,7 +328,7 @@ describe("SttSession - RMS fallback VAD (no Silero model installed in tests)", (
 
     expect(endpointCalls).toBe(2);
     expect(finals(events)).toHaveLength(1);
-    expect(transcriptionCalls()).toBe(1);
+    expect(transcriptionCalls()).toBe(2); // edge partial of the fragment, then the whole utterance (DUPLEX-EDGE)
     session.close();
   });
 
@@ -407,6 +407,22 @@ describe("SttSession - RMS fallback VAD (no Silero model installed in tests)", (
     expect(events.some((e) => e.t === "vad" && e.speaking === false)).toBe(false);
     await pushPause(session, 200);
     expect(events.some((e) => e.t === "vad" && e.speaking === false)).toBe(true);
+    session.close();
+  });
+
+  test("DUPLEX-EDGE: with the end-of-turn check on, the first silent frame already transcribes, and the final reuses that text", async () => {
+    scriptTranscript("edge words");
+    const events: SttTestEvent[] = [];
+    const session = new SttSession(endpointConfig({ isComplete: async () => true }, 0.2), (e) => events.push(e));
+    for (let i = 0; i < 30; i++) session.pushPcm(loudFrame());
+    await flush();
+    session.pushPcm(silenceFrame());
+    await flush();
+    expect(transcriptionCalls()).toBe(1);
+    await pushPause(session, 800);
+    await flush();
+    expect(finals(events)).toEqual([{ t: "final", v: "edge words" }]);
+    expect(transcriptionCalls()).toBe(1);
     session.close();
   });
 
