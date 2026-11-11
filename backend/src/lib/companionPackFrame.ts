@@ -28,8 +28,8 @@ export function frameOfBox(box: { minX: number; minY: number; maxX: number; maxY
   return clampSquare({ x: cx - size / 2, y: cy - size / 2, size }, width, height);
 }
 
-/** The aspect (width over height) the pack's clips are made at: LTX-2.5's measured 768x448. The start picture of a clip is a band of the rest picture of this aspect, so there are no bars round it. */
-export const PACK_CLIP_ASPECT = 768 / 448;
+/** The aspect (width over height) the pack's clips are made at: LTX-2.5 Max's 1024x576 (the standard model's 768x448 is within 4 percent, and the band is cut from the frame's height, so either clip size fits). The start picture of a clip is a band of the rest picture of this aspect, so there are no bars round it. */
+export const PACK_CLIP_ASPECT = 1024 / 576;
 /** How far above the head the band starts, as a share of the band height. */
 export const PACK_HEADSHOT_TOP = 0.1;
 

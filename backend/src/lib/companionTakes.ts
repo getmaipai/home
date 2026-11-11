@@ -14,6 +14,7 @@ import { videoEngineReady, videoEngineStatus } from "@/lib/videos/ready";
 import { ltx25EndPictureReady, maxSecondsFor, quickVideoReady } from "@/lib/videos/quality";
 import { resolveCompanionClip, stackVideoModel, promptHash, reportedVideoModelMatches, reportedVideoQualityMatches, COMPANION_MODEL_MISMATCH_LINE } from "@/lib/companionArt";
 import { cancelOrDeleteVideo, fetchClip, getVideoJob, StackVideoError, submitVideo } from "@/lib/videos/stack";
+import { makingStateOf } from "@/lib/pictures/plainLine";
 import { takeClipSize } from "@/lib/companionClipSize";
 import { bandOfFrame, frameForImage, frameInBand, type Dims, type PackFrame } from "@/lib/companionPackFrame";
 import { activeLookJob } from "@/lib/companionLookJobs";
@@ -87,18 +88,19 @@ export function takePrompt(card: { text: string }, motion: string, keyName: "gre
  * matching the first, hands out of frame). The generic `takePrompt` is written for a whole drawn mascot with props and gestures, which made a
  * hand appear and the face change on the first real run.
  */
-export const PACK_MOTIONS: Record<string, string> = {
-  idle: "looks steadily into the camera lens with eyes fully open the whole time, a soft friendly expression, mouth closed, only the tiniest head movement",
-  listening: "listens with eyes fully open and steady on the camera lens, one small slow nod, a warm slight smile, mouth closed",
-  thinking: "keeps eyes fully open and bright, glances slightly up and to one side and back, head nearly still, mouth closed",
-  speaking: "talks calmly to the camera with eyes fully open, the mouth moving naturally, small head movements, shoulders still",
+export const PACK_MOTIONS: Record<string, string[]> = {
+  // Fable review 2026-11-11: the distilled model smears any "blink" into a long closure, and "breathing", "calm" and "relaxed" read as drowsy; no blink words, eyes-only motion, light named. The negative prompt is inert on this model.
+  idle: ["awake and attentive, eyes open and bright, holding steady eye contact with the camera, the face evenly lit by the same soft front light, a tiny slow nod of the head and back", "attentive, eyes open, the eyes glance briefly to one side and back to the camera, the head stays still, the face evenly lit"],
+  listening: ["listening attentively, eyes open and bright, gives one slight friendly nod and returns upright"],
+  thinking: ["thoughtful, eyes open, the eyes glance a little to the side for a moment then return to the camera, the gaze stays level, the head and shoulders stay still, the face evenly lit by the same soft front light"],
+  speaking: ["head makes small natural talking movements with tiny nods and tilts, lips stay gently closed, eyes open and bright"],
 };
 /** The person's own character text is never part of a pack clip prompt: the start picture carries the look, and free text could ask for a wider shot, hands or a body. */
-export function packTakePrompt(_card: { text: string }, state: string, keyName: "green" | "magenta"): string {
-  const motion = PACK_MOTIONS[state] ?? PACK_MOTIONS.idle!;
+export function packTakePrompt(_card: { text: string }, state: string, keyName: "green" | "magenta", variant = 0): string {
+  const motions = PACK_MOTIONS[state] ?? PACK_MOTIONS.idle!, motion = motions[variant % motions.length]!;
   // Positive wording only: the video model does what the words name, so "no sighing", "no head dropping" or "never looks down" in this text make it sigh, drop its head and look down.
   // What must not appear goes in the negative prompt (PACK_TAKE_NEGATIVE_PROMPT).
-  return `Static locked shot, fixed framing, the camera never moves. A headshot from the top of the head to the upper chest, the same person with exactly the same face, skin, hair and clothes in every frame, the same size and place in the frame. Plain solid ${keyName} background. Action: the person ${motion}. The eyes stay open and look straight at the camera throughout. The face shape, skin tone and lighting stay exactly the same in every frame. Only the head, neck and upper chest are in frame. One calm continuous motion; the final frame matches the first frame.`;
+  return `Static locked shot, fixed framing, the camera never moves. A headshot from the top of the head to the upper chest, the same person with exactly the same face, skin, hair and clothes in every frame, the same size and place in the frame. Plain solid ${keyName} background. Action: the person is facing the camera with lips gently closed, ${motion}. The face shape, skin tone and lighting stay exactly the same in every frame. Only the head, neck and upper chest are in frame. One calm continuous motion; the final frame matches the first frame.`;
 }
 
 export function activeTakeRun(companionId: string): TakeRun | null {
@@ -164,7 +166,7 @@ async function runTakes(run: TakeRun, count: number, actor: PersonRow, motionOve
       const stored = readStates(run.companionId).states[state];
       for (let index = 1; index <= count; index++) {
         if (run.cancelled) break;
-        const prompt = run.pack ? packTakePrompt(sheet.card, state, keyName) : takePrompt(sheet.card, chosenMotion(state, stored?.motion), keyName);
+        const prompt = run.pack ? packTakePrompt(sheet.card, state, keyName, index - 1) : takePrompt(sheet.card, chosenMotion(state, stored?.motion), keyName);
         run.current = { state, take: index, index: stateIndex + 1, of: run.states.length };
         run.phase = "generating"; run.percent = Math.round(((run.takesMade) / (run.states.length * count)) * 100);
         const makingLabel = `Making the ${stateLabel(state)} animation${count > 1 ? ` (try ${index} of ${count})` : ""}`;
@@ -174,7 +176,9 @@ async function runTakes(run: TakeRun, count: number, actor: PersonRow, motionOve
         let engineFailure = false;
         try {
           let seed = Math.floor(Math.random() * 2_147_483_647);
-          const art = await resolveCompanionClip(laneOfPerson(actor) === "adult" ? "detailed" : "quick");
+          const lane = laneOfPerson(actor) === "adult" ? "detailed" : "quick";
+          // A pack clip is made on the Max model when the engine has it (the demo's clips were, and it moves more naturally); the standard one otherwise.
+          const art = run.pack && lane === "detailed" && process.env.MAIPAI_PACK_MAX !== "0" ? await resolveCompanionClip(lane, true).catch(() => resolveCompanionClip(lane)) : await resolveCompanionClip(lane);
           const shape = await sharp(readFileSync(keyframePath(run.companionId, state))).metadata();
           const engineNow = await videoEngineStatus().catch(() => null);
           const clipSize = takeClipSize(art.model, art.quality, run.pack ? false : (shape.height ?? 0) > (shape.width ?? 0), engineNow), pictureB64 = await pictureFor(clipSize);
@@ -201,7 +205,8 @@ async function runTakes(run: TakeRun, count: number, actor: PersonRow, motionOve
               }
               break;
             } catch (error) {
-              if (!(error as { cancelled?: boolean })?.cancelled || attempt >= maxAttempts - 1 || run.cancelled) throw error;
+              const memoryBusy = run.pack && error instanceof StackVideoError && (["memory", "restarting"].includes(makingStateOf(error.code) ?? "") || error.code === "unknown_job");
+              if (!((error as { cancelled?: boolean })?.cancelled || memoryBusy) || attempt >= maxAttempts - 1 || run.cancelled) throw error;
               if (stackJob) await cancelOrDeleteVideo(stackJob);
               run.stackJob = null; stackJob = null;
               run.phase = "waiting"; run.label = "Waiting for memory, then trying again";
@@ -226,6 +231,8 @@ async function runTakes(run: TakeRun, count: number, actor: PersonRow, motionOve
           await cancelOrDeleteVideo(completedStackJob); run.stackJob = null; stackJob = null;
           // finishTake records its own failure on the take; a finishing failure never stops the run.
           finishing.push(finishTake(run.companionId, state, take.id, { alpha: false, actor, ...(run.pack ? { pack: run.packFrame ? { crop: packCrop(run, { width: shape.width ?? 0, height: shape.height ?? 0 }, clipSize), restReference: await packRestReference(run, { width: shape.width ?? 0, height: shape.height ?? 0 }, clipSize) } : true } : {}) }).catch(() => undefined));
+          // Pack clips finish (vision check, picture tools) one at a time: the Stack was killed when a vision load paused a running clip (getmaipai/stack#11), so the next clip never starts while this one is still being checked.
+          if (run.pack) await finishing[finishing.length - 1];
           consecutiveEngineFailures = 0;
         } catch (error) {
           if (stackJob && !run.cancelled) await cancelOrDeleteVideo(stackJob);

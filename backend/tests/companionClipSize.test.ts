@@ -50,14 +50,14 @@ import { PACK_MOTIONS, packTakePrompt } from "@/lib/companionTakes";
 describe("a pack clip's prompt (the generic mascot prompt made a hand appear and the face change on the first real run)", () => {
   test("is a locked headshot loop with nothing below the chest and hands never shown, for every pack state", () => {
     for (const state of ["idle", "listening", "thinking", "speaking"]) {
-      const prompt = packTakePrompt({ text: "A knight holding a sword, full body, riding a horse." }, state, "green");
+      const prompt = packTakePrompt({ text: "A knight holding a sword, full body, riding a horse." }, state, "green"); const second = packTakePrompt({ text: "" }, state, "green", 1); expect(typeof second).toBe("string");
       expect(prompt).not.toMatch(/knight|sword|full body|horse/i); // the character text is never used for a pack clip
-      expect(prompt).toContain("Only the head, neck and upper chest are in frame"); expect(prompt).toContain("The eyes stay open and look straight at the camera");
+      expect(prompt).toContain("Only the head, neck and upper chest are in frame");
       // the words name what the video model does: none of the forbidden things may appear in the positive prompt (they live in the negative prompt)
-      expect(prompt).not.toMatch(/sigh|exhale|deep breath|head drop|looking down|look down|eye roll|rolling|no hands|never shown/i);
-      expect(PACK_MOTIONS[state]).toMatch(/eyes fully open/); expect(PACK_MOTIONS[state]).not.toMatch(/blink|breath|sigh|exhale|look(s|ing)? down/i);
+      expect(prompt).not.toMatch(/sigh|exhale|deep breath|head drop|looking down|look down|eye roll|rolling|no hands|never shown|never close/i);
       expect(prompt).not.toMatch(/head to feet|fist|lightbulb/i);
-      expect(PACK_MOTIONS[state]).toBeTruthy();
+      for (const motion of PACK_MOTIONS[state]!) expect(motion).not.toMatch(/sigh|exhale|deep breath|head drop|look(s|ing)? down|eye roll|never|\bno\b/i);
+      expect(PACK_MOTIONS[state]!.length).toBeGreaterThan(0);
     }
   });
 });
@@ -72,5 +72,14 @@ describe("a pack clip's pin picture is a band of the character's own rest pictur
     expect([out.info.width, out.info.height]).toEqual([768, 448]);
     expect(out.data[3]).toBe(0); // the corner stays transparent, its colour is never made green
     const o = (224 * 768 + 384) * 4; expect([out.data[o], out.data[o + 1], out.data[o + 2], out.data[o + 3]]).toEqual([200, 120, 90, 255]); // the middle keeps the figure's own colour
+  });
+});
+
+describe("the two idle takes use different motions (the demo's breathing and the glance aside)", () => {
+  test("variant 0 and 1 of idle differ, a state with one motion repeats it, and the Max model is asked for", () => {
+    expect(packTakePrompt({ text: "" }, "idle", "green", 0)).not.toBe(packTakePrompt({ text: "" }, "idle", "green", 1));
+    expect(packTakePrompt({ text: "" }, "speaking", "green", 0)).toBe(packTakePrompt({ text: "" }, "speaking", "green", 3));
+    expect(PACK_MOTIONS.idle![0]).toMatch(/eyes open/); expect(PACK_MOTIONS.idle![1]).toMatch(/glance briefly/);
+    for (const list of Object.values(PACK_MOTIONS)) for (const m of list) expect(m).not.toMatch(/blink|breath|sigh|calm|relaxed|tilt?s? slightly/i);
   });
 });

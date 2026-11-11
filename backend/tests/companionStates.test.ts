@@ -178,7 +178,7 @@ describe("companion states store", () => {
     const { finishTake } = await import("@/lib/companionStates");
     await finishTake(id, "idle", take.id, { alpha: false, pack: { crop: { x: 160, y: 0, size: 448 }, restReference: Buffer.from([9, 9]).toString("base64") } });
     expect(submitted.input.rest_reference).toBe(Buffer.from([9, 9]).toString("base64")); expect(submitted.input.crop).toEqual({ x: 160, y: 0, size: 448 });
-    expect(submitted.input.palette_reference).toBe(Buffer.from([1, 2, 3]).toString("base64")); // the colours still come from the starting picture
+    expect(submitted.input.palette_reference).toBe(Buffer.from([9, 9]).toString("base64")); // the colour and brightness match the same band the clip is pinned to
   });
 
   test("finish requires an approved sheet and keeps the Stack failure message on the take", async () => {

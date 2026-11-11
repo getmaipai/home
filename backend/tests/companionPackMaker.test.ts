@@ -51,7 +51,7 @@ async function figure(size = 64): Promise<Uint8Array> {
   raw[2] = ++n % 200;
   return new Uint8Array(await sharp(raw, { raw: { width: w, height: h, channels: 4 } }).png().toBuffer());
 }
-const EXPECTED_FRAME = { x: 14, y: 4, size: 37 }; // the headshot frame of the fake 64x64 figure (x 16..47, y 8..55): band 37 high, centred on the figure, 10 percent above its top
+const EXPECTED_FRAME = { x: 14, y: 4, size: 36 }; // the headshot frame of the fake 64x64 figure (x 16..47, y 8..55): band 36 high, centred on the figure, 10 percent above its top
 
 function addPerson(id: string, role: string, birthdate?: string) {
   db.insert(people).values({ id, displayName: id, role, avatarSeed: id, source: "local", createdAt: now, updatedAt: now, hlc: "1:0:test", ...(birthdate ? { birthdate } : {}) } as never).run();
@@ -173,7 +173,7 @@ describe("the pack job state machine", () => {
     rec = await runTo(null, "done");
     expect(Object.values(rec.stages).every((s) => s.status === "done")).toBe(true);
     expect(f.ops.calls).toEqual(["media.companion_track", "media.companion_track", "media.companion_track", "media.companion_track", "media.companion_track", "media.companion_shapes", "media.companion_emotion", "media.companion_pack"]);
-    expect(f.ops.eyes!.slice(0, 2)).toEqual([24, 24]); expect(f.ops.eyes![2]).toBeCloseTo((0 - 14) * 480 / 37, 3); expect(f.ops.eyes![3]).toBeCloseTo((24 - 14) * 480 / 37, 3); // leftEye = points 0..23, rightEye = 24..47, in the pack frame
+    expect(f.ops.eyes!.slice(0, 2)).toEqual([24, 24]); expect(f.ops.eyes![2]).toBeCloseTo((0 - 14) * 480 / 36, 3); expect(f.ops.eyes![3]).toBeCloseTo((24 - 14) * 480 / 36, 3); // leftEye = points 0..23, rightEye = 24..47, in the pack frame
     expect(rec.notes).toContain("head and eyes layers: skipped, not supported yet");
     expect(readCompanionPack(id)).not.toBeNull(); // validateCompanionPack through packFolderProblems on the installed folder
     expect(existsSync(join(packFolder(id)!, "pack.json"))).toBe(true);
@@ -391,8 +391,8 @@ describe("MAKER-D2: previews and the stylised path", () => {
     const rec = await runTo(null, "waiting_approval");
     expect(rec.shapes).toBe("stylised"); expect(rec.box).toEqual([400, 600, 200, 100]); expect(talk).toBe(0); // no face tools
     const shapes = calls.find((c) => c.kind === "media.companion_shapes")!.input;
-    // a 1024 source with the figure from x 256..767, y 128..895: the headshot frame is {x: 214, y: 68, size: 597}; the box is moved into it and scaled to 480
-    const g = { x: 214, y: 68, size: 597 }, pk = 480 / g.size;
+    // a 1024 source with the figure from x 256..767, y 128..895: the headshot frame is {x: 224, y: 70, size: 576}; the box is moved into it and scaled to 480
+    const g = { x: 224, y: 70, size: 576 }, pk = 480 / g.size;
     expect(rec.frame).toEqual(g);
     expect(shapes).toMatchObject({ path: "stylised", mouth_box: [Math.round((400 - g.x) * pk), Math.round((600 - g.y) * pk), Math.round(200 * pk), Math.round(100 * pk)], face_height_px: Math.round(700 * pk), sets: ["calm"] });
     expect(shapes.landmarks).toBeUndefined();
@@ -926,16 +926,16 @@ describe("one shared pack frame (the clips, rest, mouth pictures and poses all u
     expect(f.ops.restSizes.slice(0, 5).every((s) => s[2] === 3)).toBe(true); expect(f.ops.restSizes.slice(5).every((s) => s[2] === 4)).toBe(true);
     expect(f.ops.restSizes.length).toBe(5 + 3); // track x5, shapes, emotion, pack
     const shapes = f.ops.inputs.find((c) => c.kind === "media.companion_shapes")!.input;
-    const atX = ((10 - 14) * 480) / 37, atY = ((10 - 4) * 480) / 37; // the fake face has its first outer-lip point at (10, 10); the frame starts at (14, 4) and is 37 wide
+    const atX = ((10 - 14) * 480) / 36, atY = ((10 - 4) * 480) / 36; // the fake face has its first outer-lip point at (10, 10); the frame starts at (14, 4) and is 36 wide
     expect(shapes.landmarks.calm.B.outerLips[0][0]).toBeCloseTo(atX, 3); expect(shapes.landmarks.calm.B.outerLips[0][1]).toBeCloseTo(atY, 3);
-    expect(shapes.landmarks.calm.H.outerLips[1][0]).toBeCloseTo((30 - 14) * 480 / 37, 3); expect(shapes.landmarks.calm.H.outerLips[1][1]).toBeCloseTo((18 - 4) * 480 / 37, 3);
-    expect(shapes.landmarks.rest.points[1][0]).toBeCloseTo((1 - 14) * 480 / 37, 3); // the rest's own landmarks too (a point left of the frame goes negative)
+    expect(shapes.landmarks.calm.H.outerLips[1][0]).toBeCloseTo((30 - 14) * 480 / 36, 3); expect(shapes.landmarks.calm.H.outerLips[1][1]).toBeCloseTo((18 - 4) * 480 / 36, 3);
+    expect(shapes.landmarks.rest.points[1][0]).toBeCloseTo((1 - 14) * 480 / 36, 3); // the rest's own landmarks too (a point left of the frame goes negative)
     for (const letter of ["B", "H"]) { const m = await sharp(workFile("shapes-in", "calm", `${letter}.png`)).metadata(); expect([m.width, m.height]).toEqual([480, 480]); }
     for (const emotion of EMOTIONS) { const m = await sharp(workFile("emotion-in", `${emotion}.png`)).metadata(); expect([m.width, m.height]).toEqual([480, 480]); }
     const pack = f.ops.inputs.find((c) => c.kind === "media.companion_pack")!.input;
     expect(String(pack.rest)).toEndWith("/work/rest_480.png");
-    expect(pack.descriptor.mouth.anchor.x).toBeCloseTo((10 - 14) / 37, 3); // lips [10,10]..[30,18] -> x -4/37 (left of the frame), width 20/37 of the 480 frame
-    expect(pack.descriptor.mouth.anchor.w).toBeCloseTo(20 / 37, 3);
+    expect(pack.descriptor.mouth.anchor.x).toBeCloseTo((10 - 14) / 36, 3); // lips [10,10]..[30,18] -> x -4/36 (left of the frame), width 20/36 of the 480 frame
+    expect(pack.descriptor.mouth.anchor.w).toBeCloseTo(20 / 36, 3);
     expect(JSON.parse(readFileSync(workFile("landmarks.json"), "utf8")).outerLips[0][0]).toBeCloseTo(atX, 3);
   });
 

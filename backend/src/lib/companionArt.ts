@@ -44,8 +44,8 @@ export async function resolveCompanionStill(): Promise<CompanionArtChoice> { ret
 export function resolveCompanionEdit(): CompanionArtChoice { return { model: COMPANION_EDIT_MODEL, quality: "quick" }; }
 
 /** Adult companions ask for sound; picture starts use Quick until LTX-2.5 reports picture support. */
-export function resolveCompanionClipFromStatus(engine: StackVideoStatus | null, requested: "quick" | "detailed" = "quick"): CompanionArtChoice {
-  const choice = chooseVideoQuality({ engine, hasPicture: true, requested, adultLane: true });
+export function resolveCompanionClipFromStatus(engine: StackVideoStatus | null, requested: "quick" | "detailed" = "quick", max = false): CompanionArtChoice {
+  const choice = chooseVideoQuality({ engine, hasPicture: true, requested, adultLane: true, ...(max ? { max: true } : {}) });
   const model = choice.maker === "ltx25max" ? "ltx25-max" : choice.maker === "ltx25" ? "ltx25-q8" : engine?.qualities?.quick.id ?? engine?.model?.id ?? QUICK_BASE;
   const q = choice.maker === "ltx25max" ? engine?.qualities?.ltx25max : choice.maker === "ltx25" ? engine?.qualities?.ltx25 : engine?.qualities?.quick;
   if (engine?.qualities ? (!q || ("ready" in q && q.ready !== true) || !q.installed || !q.available) : choice.quality !== "quick" || !engine?.model?.installed || engine.model.id !== model) refusal(COMPANION_CLIP_MODEL_MISSING_LINE);
@@ -61,4 +61,4 @@ export const reportedVideoModelMatches = (reported: string, art: CompanionArtCho
 export const reportedVideoQualityMatches = (reported: string, art: CompanionArtChoice): boolean =>
   reported === art.quality || (reported === "ltx25" && art.model === "ltx25-q8") || (reported === "ltx25max" && art.model === "ltx25-max");
 export const stackVideoModel = (art: CompanionArtChoice): string => (art.model === "ltx25-q8" || art.model === "ltx25-max" ? art.model : WAN_QUICK_VIDEO_MODEL);
-export async function resolveCompanionClip(requested: "quick" | "detailed" = "quick"): Promise<CompanionArtChoice> { return resolveCompanionClipFromStatus(await (statusReaders?.video ?? videoEngineStatus)(), requested); }
+export async function resolveCompanionClip(requested: "quick" | "detailed" = "quick", max = false): Promise<CompanionArtChoice> { return resolveCompanionClipFromStatus(await (statusReaders?.video ?? videoEngineStatus)(), requested, max); }
