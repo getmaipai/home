@@ -617,7 +617,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/layeredScalar.ts` | SELF_STAMP, isLayeredScalar, isSelfService, isLockStamp, resolveLayeredScalar, assertCanWriteSelfService |
 | `backend/src/lib/legacyHubLogPurge.ts` | purgeLegacyHubLogs |
 | `backend/src/lib/legacyImport.ts` | LegacyImportError, ORPHANED_REPLY_TEXT, runLegacyImport |
-| `backend/src/lib/library.ts` | LibraryCursorError, listLibrary, librarySummary |
+| `backend/src/lib/library.ts` | LibraryCursorError, hasLockedLibraryItems, listLibrary, librarySummary |
 | `backend/src/lib/libraryAudience.ts` | recheckFileAudience |
 | `backend/src/lib/libraryEdit.ts` | cleanFileName, updateLibraryFile |
 | `backend/src/lib/libraryMultipart.ts` | libraryMultipart |

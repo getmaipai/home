@@ -57280,6 +57280,10 @@
                           },
                           "version_count": {
                             "type": "number"
+                          },
+                          "unlocked": {
+                            "type": "boolean",
+                            "description": "An adult-only item whose lock is on and that is open right now because the viewer holds an unlock proof. The card shows an open lock."
                           }
                         },
                         "required": [
@@ -57303,18 +57307,24 @@
                           "duration_seconds",
                           "thumb_url",
                           "expires_at",
-                          "version_count"
+                          "version_count",
+                          "unlocked"
                         ]
                       }
                     },
                     "next_cursor": {
                       "type": "string",
                       "nullable": true
+                    },
+                    "locked": {
+                      "type": "boolean",
+                      "description": "First page only: an adult with no unlock proof has locked items in this view, so the page shows one Locked items tile. It carries no count or name."
                     }
                   },
                   "required": [
                     "items",
-                    "next_cursor"
+                    "next_cursor",
+                    "locked"
                   ]
                 }
               }
@@ -72667,11 +72677,11 @@
                                   },
                                   "can_clear": {
                                     "type": "boolean",
-                                    "description": "Show 'Unmark as NSFW': the creator, the item is adult-only and locked. Needs the confirm dialog and a fresh passcode (POST /api/adult-lock/confirm, then adult-mark)."
+                                    "description": "Show 'Remove lock': the creator, the item is adult-only and locked. Needs the confirm dialog and a fresh passcode (POST /api/adult-lock/confirm, then adult-mark)."
                                   },
                                   "can_mark": {
                                     "type": "boolean",
-                                    "description": "Show 'Mark as NSFW': the creator, the item is not locked."
+                                    "description": "Show 'Lock': the creator, the item is not locked."
                                   },
                                   "line": {
                                     "type": "string",
@@ -73409,11 +73419,11 @@
                                   },
                                   "can_clear": {
                                     "type": "boolean",
-                                    "description": "Show 'Unmark as NSFW': the creator, the item is adult-only and locked. Needs the confirm dialog and a fresh passcode (POST /api/adult-lock/confirm, then adult-mark)."
+                                    "description": "Show 'Remove lock': the creator, the item is adult-only and locked. Needs the confirm dialog and a fresh passcode (POST /api/adult-lock/confirm, then adult-mark)."
                                   },
                                   "can_mark": {
                                     "type": "boolean",
-                                    "description": "Show 'Mark as NSFW': the creator, the item is not locked."
+                                    "description": "Show 'Lock': the creator, the item is not locked."
                                   },
                                   "line": {
                                     "type": "string",
@@ -73601,7 +73611,7 @@
         "tags": [
           "Videos"
         ],
-        "summary": "Mark a clip NSFW again, or (the creator only, with a fresh passcode ticket) remove its Adult lock",
+        "summary": "Lock a clip again, or (the creator only, with a fresh passcode ticket) remove its Adult lock",
         "parameters": [
           {
             "schema": {
@@ -73959,11 +73969,11 @@
                                   },
                                   "can_clear": {
                                     "type": "boolean",
-                                    "description": "Show 'Unmark as NSFW': the creator, the item is adult-only and locked. Needs the confirm dialog and a fresh passcode (POST /api/adult-lock/confirm, then adult-mark)."
+                                    "description": "Show 'Remove lock': the creator, the item is adult-only and locked. Needs the confirm dialog and a fresh passcode (POST /api/adult-lock/confirm, then adult-mark)."
                                   },
                                   "can_mark": {
                                     "type": "boolean",
-                                    "description": "Show 'Mark as NSFW': the creator, the item is not locked."
+                                    "description": "Show 'Lock': the creator, the item is not locked."
                                   },
                                   "line": {
                                     "type": "string",
@@ -74441,11 +74451,11 @@
                                       },
                                       "can_clear": {
                                         "type": "boolean",
-                                        "description": "Show 'Unmark as NSFW': the creator, the item is adult-only and locked. Needs the confirm dialog and a fresh passcode (POST /api/adult-lock/confirm, then adult-mark)."
+                                        "description": "Show 'Remove lock': the creator, the item is adult-only and locked. Needs the confirm dialog and a fresh passcode (POST /api/adult-lock/confirm, then adult-mark)."
                                       },
                                       "can_mark": {
                                         "type": "boolean",
-                                        "description": "Show 'Mark as NSFW': the creator, the item is not locked."
+                                        "description": "Show 'Lock': the creator, the item is not locked."
                                       },
                                       "line": {
                                         "type": "string",
@@ -75468,11 +75478,11 @@
                                   },
                                   "can_clear": {
                                     "type": "boolean",
-                                    "description": "Show 'Unmark as NSFW': the creator, the item is adult-only and locked. Needs the confirm dialog and a fresh passcode (POST /api/adult-lock/confirm, then adult-mark)."
+                                    "description": "Show 'Remove lock': the creator, the item is adult-only and locked. Needs the confirm dialog and a fresh passcode (POST /api/adult-lock/confirm, then adult-mark)."
                                   },
                                   "can_mark": {
                                     "type": "boolean",
-                                    "description": "Show 'Mark as NSFW': the creator, the item is not locked."
+                                    "description": "Show 'Lock': the creator, the item is not locked."
                                   },
                                   "line": {
                                     "type": "string",
@@ -75931,11 +75941,11 @@
                                   },
                                   "can_clear": {
                                     "type": "boolean",
-                                    "description": "Show 'Unmark as NSFW': the creator, the item is adult-only and locked. Needs the confirm dialog and a fresh passcode (POST /api/adult-lock/confirm, then adult-mark)."
+                                    "description": "Show 'Remove lock': the creator, the item is adult-only and locked. Needs the confirm dialog and a fresh passcode (POST /api/adult-lock/confirm, then adult-mark)."
                                   },
                                   "can_mark": {
                                     "type": "boolean",
-                                    "description": "Show 'Mark as NSFW': the creator, the item is not locked."
+                                    "description": "Show 'Lock': the creator, the item is not locked."
                                   },
                                   "line": {
                                     "type": "string",
@@ -76504,11 +76514,11 @@
                                   },
                                   "can_clear": {
                                     "type": "boolean",
-                                    "description": "Show 'Unmark as NSFW': the creator, the item is adult-only and locked. Needs the confirm dialog and a fresh passcode (POST /api/adult-lock/confirm, then adult-mark)."
+                                    "description": "Show 'Remove lock': the creator, the item is adult-only and locked. Needs the confirm dialog and a fresh passcode (POST /api/adult-lock/confirm, then adult-mark)."
                                   },
                                   "can_mark": {
                                     "type": "boolean",
-                                    "description": "Show 'Mark as NSFW': the creator, the item is not locked."
+                                    "description": "Show 'Lock': the creator, the item is not locked."
                                   },
                                   "line": {
                                     "type": "string",
