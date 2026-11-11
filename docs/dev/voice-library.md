@@ -13,3 +13,9 @@ Before adding a collection, confirm its licence and provenance against `docs/des
 Only CC0 and CC-BY collections are eligible. CC-BY requires attribution. Exclude non-commercial licences, any collection whose licence is unconfirmed, and recordings that identify a named real person.
 
 Measured labels and flags-as-kit-images are later work. Current names use source metadata, and country values are plain codes and names; this first backend slice does not add measured voice traits or UI flags. Measured labels and non-English voices are the next step.
+
+## The box
+
+The Voices manager has one owner/admin **+ Add voice** button. Its kit flow dialog has Download, Clone and Inspired tabs in that order. Download reads `GET /api/voice/library` through the `voice-library` query, applies the same name/detail/country/language search fields as `searchVoiceLibrary`, and previews only after a person presses Play. Add posts the catalog path to `/api/voice/catalog/select` and refreshes the installed voice queries. The clone and inspired tabs reuse `AddVoiceForm` and its existing API calls. In a dev seed without network access, the library query shows the ordinary retryable error state.
+
+Country flags use regional indicator emoji and subdivision tag sequences in `frontend/src/lib/voice/countryFlag.ts` until the kit ships its round-flag image Element (design record section 4).

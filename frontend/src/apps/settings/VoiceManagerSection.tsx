@@ -10,9 +10,9 @@ import { api, type ResolvedSetting, type StackVoice } from "@/lib/api";
 import { householdVoicesApi, inspiredLevelLabel, type HouseholdVoice } from "@/lib/householdVoicesApi";
 import { playableVoices, presetNameForVoice, voiceDisplayName } from "@/lib/voice/voiceBrowserRows";
 import { voicePreviewPlayer, type VoicePreviewState } from "@/lib/voice/voicePreviewPlayer";
+import { AddVoiceBox } from "@/apps/settings/AddVoiceBox";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@maipai/ui/src/ui/dialog";
 import { Input } from "@maipai/ui/src/ui/input";
-import { AddVoiceForm } from "@/apps/settings/AddVoiceForm";
 import { errorLine } from "@/lib/hubReachability";
 import { languageName as formatLanguageName } from "@/lib/format";
 import { activeLocale } from "@/lib/activeLocale";
@@ -39,9 +39,6 @@ export function VoiceManagerSection() {
   const madeQuery = useQuery({ queryKey: ["household-voices"], queryFn: householdVoicesApi.list });
   const homeQuery = useQuery<ResolvedSetting[]>({ queryKey: ["settings-values", "household"], queryFn: () => api.settingsValues("household") });
   const [preview, setPreview] = useState<VoicePreviewState>(voicePreviewPlayer.getState());
-  const [adding, setAdding] = useState(false);
-  const [addInspired, setAddInspired] = useState(false);
-  const [addBusy, setAddBusy] = useState(false);
   const [removing, setRemoving] = useState<StackVoice | null>(null);
   const [renaming, setRenaming] = useState<StackVoice | null>(null);
   const [newName, setNewName] = useState("");
@@ -95,7 +92,7 @@ export function VoiceManagerSection() {
   return <div className="flex flex-col gap-4">
     <div className="flex items-start justify-between gap-4">
       <p className="min-w-0 flex-1 text-base text-muted-foreground">{i18n._({ id: "Every voice Home can speak with. Home's default voice is used by anyone, and any robot, with no voice of their own.", message: "Every voice Home can speak with. Home's default voice is used by anyone, and any robot, with no voice of their own." })}</p>
-      <div className="flex shrink-0 flex-wrap gap-2"><Button type="button" onClick={() => { setNotice(null); setAddInspired(false); setAdding(true); }}>{i18n._({ id: "Add voice", message: "Add voice" })}</Button><Button type="button" variant="outline" onClick={() => { setNotice(null); setAddInspired(true); setAdding(true); }}>{i18n._({ id: "Add Inspired voice", message: "Add Inspired voice" })}</Button></div>
+      <div className="flex shrink-0 flex-wrap gap-2"><AddVoiceBox onNotice={(line) => setNotice(line)} /></div>
     </div>
     {notice ? <p role="status" className="text-base text-primary">{notice}</p> : null}
     {error ? <StatusCard kind="problem" title={i18n._({ id: "That did not work", message: "That did not work" })} line={error} /> : null}
@@ -129,15 +126,6 @@ export function VoiceManagerSection() {
           })}</ul>
         </div>}
       </AsyncState>}
-    <Dialog open={adding} onOpenChange={(open) => { if (!addBusy) setAdding(open); }}>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>{addInspired ? i18n._({ id: "Add an Inspired voice", message: "Add an Inspired voice" }) : i18n._({ id: "Add a voice", message: "Add a voice" })}</DialogTitle>
-          <DialogDescription>{addInspired ? i18n._({ id: "Make a new voice based on a WAV, MP3 or FLAC recording of 6 to 30 seconds. It is not a copy. Everyone in the home can pick it, and so can a robot.", message: "Make a new voice based on a WAV, MP3 or FLAC recording of 6 to 30 seconds. It is not a copy. Everyone in the home can pick it, and so can a robot." }) : i18n._({ id: "Make a voice from a WAV, MP3 or FLAC recording of 6 to 30 seconds. Everyone in the home can pick it, and so can a robot.", message: "Make a voice from a WAV, MP3 or FLAC recording of 6 to 30 seconds. Everyone in the home can pick it, and so can a robot." })}</DialogDescription>
-        </DialogHeader>
-        <AddVoiceForm inspired={addInspired} onBusyChange={setAddBusy} onCancel={() => setAdding(false)} onMade={(name) => { setAdding(false); setNotice(i18n._({ id: "{name} is ready. Test it here, then pick it for a person or a robot.", message: "{name} is ready. Test it here, then pick it for a person or a robot.", values: { name } })); }} />
-      </DialogContent>
-    </Dialog>
     <Dialog open={renaming !== null} onOpenChange={(open) => { if (!open) setRenaming(null); }}>
       <DialogContent>
         <DialogHeader>

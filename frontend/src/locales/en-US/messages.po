@@ -391,6 +391,11 @@ msgid "{count} to remove (frees {size})."
 msgstr "{count} to remove (frees {size})."
 
 #. js-lingui-explicit-id
+#: src/apps/settings/AddVoiceBox.tsx:61
+msgid "{count} voices"
+msgstr "{count} voices"
+
+#. js-lingui-explicit-id
 #: src/apps/chat/chatDateDivider.tsx:34
 msgid "{day} {time}"
 msgstr "{day} {time}"
@@ -661,16 +666,6 @@ msgid "{made} is ready. Pick it from the list and press Preview to hear it."
 msgstr "{made} is ready. Pick it from the list and press Preview to hear it."
 
 #. js-lingui-explicit-id
-#: src/apps/settings/VoiceBrowserSection.tsx:107
-msgid "{madeName} is ready. Ask a parent to pick it for you."
-msgstr "{madeName} is ready. Ask a parent to pick it for you."
-
-#. js-lingui-explicit-id
-#: src/apps/settings/VoiceBrowserSection.tsx:107
-msgid "{madeName} is ready. Choose it in the list above."
-msgstr "{madeName} is ready. Choose it in the list above."
-
-#. js-lingui-explicit-id
 #: src/shell/library/TranscriptFindReplace.tsx:50
 msgid "{matches, plural, one {# match} other {# matches}} on {lines, plural, one {# line} other {# lines}}."
 msgstr "{matches, plural, one {# match} other {# matches}} on {lines, plural, one {# line} other {# lines}}."
@@ -822,12 +817,18 @@ msgid "{name} is listening"
 msgstr "{name} is listening"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/VoiceManagerSection.tsx:69
+#: src/apps/settings/VoiceManagerSection.tsx:66
 msgid "{name} is now Home's default voice."
 msgstr "{name} is now Home's default voice."
 
 #. js-lingui-explicit-id
-#: src/apps/settings/VoiceManagerSection.tsx:138
+#: src/apps/settings/AddVoiceBox.tsx:40
+msgid "{name} is now your voice. You can change it any time."
+msgstr "{name} is now your voice. You can change it any time."
+
+#. js-lingui-explicit-id
+#: src/apps/settings/AddVoiceBox.tsx:74
+#: src/apps/settings/AddVoiceBox.tsx:75
 msgid "{name} is ready. Test it here, then pick it for a person or a robot."
 msgstr "{name} is ready. Test it here, then pick it for a person or a robot."
 
@@ -943,7 +944,7 @@ msgid "notification.engines.update_applied"
 msgstr "{name} updated to {tag}."
 
 #. js-lingui-explicit-id
-#: src/apps/settings/VoiceManagerSection.tsx:90
+#: src/apps/settings/VoiceManagerSection.tsx:87
 msgid "{name} was deleted."
 msgstr "{name} was deleted."
 
@@ -1089,6 +1090,11 @@ msgstr "{place} removed from your list."
 #: src/apps/settings/EngineLinkCredentialSection.tsx:192
 msgid "{problem} Select Retry, or open Engines and AI and select Check the connection."
 msgstr "{problem} Select Retry, or open Engines and AI and select Check the connection."
+
+#. js-lingui-explicit-id
+#: src/apps/settings/AddVoiceBox.tsx:68
+msgid "{quality} quality"
+msgstr "{quality} quality"
 
 #. js-lingui-explicit-id
 #: src/apps/clock/AlarmsTab.tsx:23
@@ -1363,6 +1369,11 @@ msgstr "{what} for your animations..."
 #: src/shell/pages/CompanionsPage.tsx:96
 msgid "{working} working · {waiting} waiting on you"
 msgstr "{working} working · {waiting} waiting on you"
+
+#. js-lingui-explicit-id
+#: src/apps/settings/AddVoiceBox.tsx:45
+msgid "+ Add voice"
+msgstr "+ Add voice"
 
 #. js-lingui-explicit-id
 #: src/shell/InstallDock.tsx:277
@@ -1961,7 +1972,7 @@ msgstr "Access"
 
 #. js-lingui-explicit-id
 #: src/apps/settings/CodingSettings.tsx:226
-#: src/apps/settings/VoiceManagerSection.tsx:106
+#: src/apps/settings/VoiceManagerSection.tsx:103
 #: src/shell/components/DataTableRowActions.tsx:28
 msgid "Actions"
 msgstr "Actions"
@@ -2001,6 +2012,7 @@ msgstr "Activity was not cleared"
 #: src/apps/chat/composerAddMenu.tsx:306
 #: src/apps/chat/composerAddMenu.tsx:315
 #: src/apps/reminders/ListMain.tsx:77
+#: src/apps/settings/AddVoiceBox.tsx:69
 #: src/shell/pages/CompanionsPage.tsx:171
 #: src/shell/pages/CompanionsPage.tsx:329
 msgid "Add"
@@ -2064,7 +2076,6 @@ msgid "Add a title."
 msgstr "Add a title."
 
 #. js-lingui-explicit-id
-#: src/apps/settings/VoiceManagerSection.tsx:135
 #: src/shell/pages/companionFlow/CustomizeStep.tsx:201
 msgid "Add a voice"
 msgstr "Add a voice"
@@ -2110,11 +2121,6 @@ msgid "Add an app to {title}"
 msgstr "Add an app to {title}"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/VoiceManagerSection.tsx:135
-msgid "Add an Inspired voice"
-msgstr "Add an Inspired voice"
-
-#. js-lingui-explicit-id
 #: src/apps/reminders/ListMain.tsx:76
 #: src/apps/reminders/ListMain.tsx:76
 msgid "Add an item"
@@ -2125,11 +2131,6 @@ msgstr "Add an item"
 #: src/apps/settings/styles/stylesShared.tsx:14
 msgid "Add from a file"
 msgstr "Add from a file"
-
-#. js-lingui-explicit-id
-#: src/apps/settings/VoiceManagerSection.tsx:98
-msgid "Add Inspired voice"
-msgstr "Add Inspired voice"
 
 #. js-lingui-explicit-id
 #: src/shell/library/LibraryViewer.tsx:103
@@ -2211,9 +2212,14 @@ msgid "Add tracks by splitting the song into stems"
 msgstr "Add tracks by splitting the song into stems"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/VoiceManagerSection.tsx:98
+#: src/apps/settings/AddVoiceBox.tsx:48
 msgid "Add voice"
 msgstr "Add voice"
+
+#. js-lingui-explicit-id
+#: src/apps/settings/AddVoiceBox.tsx:50
+msgid "Add voice method"
+msgstr "Add voice method"
 
 #. js-lingui-explicit-id
 #: src/apps/clock/ClockHeaderTitle.tsx:23
@@ -2221,6 +2227,7 @@ msgid "Add world clock"
 msgstr "Add world clock"
 
 #. js-lingui-explicit-id
+#: src/apps/settings/AddVoiceBox.tsx:69
 #: src/shell/library/LibraryUploads.tsx:72
 msgid "Added"
 msgstr "Added"
@@ -3054,7 +3061,7 @@ msgid "Anyone with this key can use Coding as you. If an admin turns Coding off,
 msgstr "Anyone with this key can use Coding as you. If an admin turns Coding off, this key stops working."
 
 #. js-lingui-explicit-id
-#: src/apps/settings/VoiceManagerSection.tsx:160
+#: src/apps/settings/VoiceManagerSection.tsx:148
 msgid "Anyone, and any robot, using it goes back to Home's default voice. The recording is deleted from Home."
 msgstr "Anyone, and any robot, using it goes back to Home's default voice. The recording is deleted from Home."
 
@@ -3286,7 +3293,7 @@ msgid "api.minor.list_child_delete_household"
 msgstr "Ask a grown-up to delete a household list. Children can't delete them."
 
 #. js-lingui-explicit-id
-#: src/apps/settings/VoiceBrowserSection.tsx:91
+#: src/apps/settings/VoiceBrowserSection.tsx:83
 msgid "Ask a parent to choose your voice."
 msgstr "Ask a parent to choose your voice."
 
@@ -4216,8 +4223,8 @@ msgid "Buffering"
 msgstr "Buffering"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/VoiceManagerSection.tsx:112
-#: src/apps/settings/VoiceManagerSection.tsx:119
+#: src/apps/settings/VoiceManagerSection.tsx:109
+#: src/apps/settings/VoiceManagerSection.tsx:116
 msgid "Built in"
 msgstr "Built in"
 
@@ -4330,8 +4337,8 @@ msgstr "Can someone reach into your house?"
 #: src/apps/settings/styles/StylesTab.tsx:160
 #: src/apps/settings/UsersSection.tsx:372
 #: src/apps/settings/UsersSection.tsx:455
-#: src/apps/settings/VoiceManagerSection.tsx:150
-#: src/apps/settings/VoiceManagerSection.tsx:163
+#: src/apps/settings/VoiceManagerSection.tsx:138
+#: src/apps/settings/VoiceManagerSection.tsx:151
 #: src/apps/setup/SetupReviewPage.tsx:67
 #: src/apps/setup/StorageStep.tsx:32
 #: src/apps/setup/StorageStep.tsx:190
@@ -5206,14 +5213,19 @@ msgid "Choose a voice"
 msgstr "Choose a voice"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/VoiceBrowserSection.tsx:90
+#: src/apps/settings/VoiceBrowserSection.tsx:82
 msgid "Choose a voice for"
 msgstr "Choose a voice for"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/VoiceBrowserSection.tsx:94
+#: src/apps/settings/VoiceBrowserSection.tsx:86
 msgid "Choose a voice for {who}"
 msgstr "Choose a voice for {who}"
+
+#. js-lingui-explicit-id
+#: src/apps/settings/AddVoiceBox.tsx:48
+msgid "Choose a voice to download, clone or make inspired by a recording."
+msgstr "Choose a voice to download, clone or make inspired by a recording."
 
 #. js-lingui-explicit-id
 #: src/shell/pages/MusicVoiceCreate.tsx:94
@@ -5646,6 +5658,8 @@ msgid "Claude Code · same key"
 msgstr "Claude Code · same key"
 
 #. js-lingui-explicit-id
+#: src/apps/settings/AddVoiceBox.tsx:61
+#: src/apps/settings/AddVoiceBox.tsx:66
 #: src/shell/pages/status/StatusBoard.tsx:45
 #: src/shell/pages/UiShowcasePage.tsx:97
 msgid "Clear"
@@ -5753,6 +5767,11 @@ msgstr "Clock sections"
 #: src/shell/pages/companionFlow/CustomizeStep.tsx:89
 msgid "Clock style"
 msgstr "Clock style"
+
+#. js-lingui-explicit-id
+#: src/apps/settings/AddVoiceBox.tsx:52
+msgid "Clone"
+msgstr "Clone"
 
 #. js-lingui-explicit-id
 #: src/apps/settings/EngineLinkCredentialSection.tsx:288
@@ -5932,7 +5951,7 @@ msgid "setting.coding.yield_to_chat.does"
 msgstr "Coding waits while chat is answering"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/VoiceManagerSection.tsx:116
+#: src/apps/settings/VoiceManagerSection.tsx:113
 msgid "Comes with Home."
 msgstr "Comes with Home."
 
@@ -6285,6 +6304,11 @@ msgid "Could not add this synth. Check your connection and try again."
 msgstr "Could not add this synth. Check your connection and try again."
 
 #. js-lingui-explicit-id
+#: src/apps/settings/AddVoiceBox.tsx:41
+msgid "Could not add this voice. Try again."
+msgstr "Could not add this voice. Try again."
+
+#. js-lingui-explicit-id
 #: src/apps/settings/AiGlance.tsx:135
 msgid "Could not apply the changes. Check that the engine is running, then try again."
 msgstr "Could not apply the changes. Check that the engine is running, then try again."
@@ -6470,7 +6494,7 @@ msgid "Could not delete this synth. Check your connection and try again."
 msgstr "Could not delete this synth. Check your connection and try again."
 
 #. js-lingui-explicit-id
-#: src/apps/settings/VoiceManagerSection.tsx:91
+#: src/apps/settings/VoiceManagerSection.tsx:88
 msgid "Could not delete this voice. Try again."
 msgstr "Could not delete this voice. Try again."
 
@@ -6792,6 +6816,11 @@ msgid "Could not load voice samples."
 msgstr "Could not load voice samples."
 
 #. js-lingui-explicit-id
+#: src/apps/settings/AddVoiceBox.tsx:65
+msgid "Could not load voices. Try again."
+msgstr "Could not load voices. Try again."
+
+#. js-lingui-explicit-id
 #: src/shell/pages/PersonProfilePage.tsx:147
 msgid "Could not load what's been shared."
 msgstr "Could not load what's been shared."
@@ -6997,7 +7026,7 @@ msgid "Could not rename this key."
 msgstr "Could not rename this key."
 
 #. js-lingui-explicit-id
-#: src/apps/settings/VoiceManagerSection.tsx:80
+#: src/apps/settings/VoiceManagerSection.tsx:77
 msgid "Could not rename this voice. Try again."
 msgstr "Could not rename this voice. Try again."
 
@@ -7057,7 +7086,7 @@ msgid "Could not save access."
 msgstr "Could not save access."
 
 #. js-lingui-explicit-id
-#: src/apps/settings/VoiceManagerSection.tsx:70
+#: src/apps/settings/VoiceManagerSection.tsx:67
 msgid "Could not save Home's default voice. Try again."
 msgstr "Could not save Home's default voice. Try again."
 
@@ -7337,6 +7366,12 @@ msgid "Count"
 msgstr "Count"
 
 #. js-lingui-explicit-id
+#: src/apps/settings/AddVoiceBox.tsx:59
+#: src/apps/settings/AddVoiceBox.tsx:59
+msgid "Country"
+msgstr "Country"
+
+#. js-lingui-explicit-id
 #: src/shell/media/NowPlayingStage.tsx:138
 msgid "Cover"
 msgstr "Cover"
@@ -7501,8 +7536,8 @@ msgstr "Current work"
 #: src/apps/settings/AiJobSummary.tsx:74
 #: src/apps/settings/PerformanceSettings.tsx:35
 #: src/apps/settings/ReferenceLibrarySettings.tsx:206
-#: src/apps/settings/VoiceManagerSection.tsx:112
-#: src/apps/settings/VoiceManagerSection.tsx:119
+#: src/apps/settings/VoiceManagerSection.tsx:109
+#: src/apps/settings/VoiceManagerSection.tsx:116
 #: src/shell/pages/companionFlow/CustomizeStep.tsx:23
 msgid "Custom"
 msgstr "Custom"
@@ -7761,7 +7796,7 @@ msgstr "Degrees Fahrenheit, like 72 F."
 #: src/apps/people/VoiceEnrollmentBody.tsx:77
 #: src/apps/reminders/ListMenu.tsx:38
 #: src/apps/settings/CommandsSection.tsx:203
-#: src/apps/settings/VoiceManagerSection.tsx:126
+#: src/apps/settings/VoiceManagerSection.tsx:123
 #: src/shell/library/LibraryItems.tsx:43
 #: src/shell/library/LibraryViewer.tsx:168
 #: src/shell/library/LibraryViewer.tsx:168
@@ -7786,7 +7821,7 @@ msgid "Delete {name}?"
 msgstr "Delete {name}?"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/VoiceManagerSection.tsx:159
+#: src/apps/settings/VoiceManagerSection.tsx:147
 msgid "Delete {value}?"
 msgstr "Delete {value}?"
 
@@ -7855,7 +7890,7 @@ msgid "Delete timer"
 msgstr "Delete timer"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/VoiceManagerSection.tsx:164
+#: src/apps/settings/VoiceManagerSection.tsx:152
 msgid "Delete voice"
 msgstr "Delete voice"
 
@@ -8340,6 +8375,7 @@ msgstr "down for {time} ({percent}% up)"
 
 #. js-lingui-explicit-id
 #: src/apps/chat/chatToolUis.tsx:109
+#: src/apps/settings/AddVoiceBox.tsx:51
 #: src/apps/settings/BackupsSection.tsx:98
 #: src/apps/setup/SetupWizard.tsx:492
 #: src/shell/library/LibraryItems.tsx:36
@@ -8426,7 +8462,7 @@ msgid "Downloading and installing {name}"
 msgstr "Downloading and installing {name}"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/VoiceBrowserSection.tsx:102
+#: src/apps/settings/VoiceBrowserSection.tsx:94
 msgid "Downloading this voice, one moment."
 msgstr "Downloading this voice, one moment."
 
@@ -8999,7 +9035,7 @@ msgid "Every song you make lands in your Library. Keep pins it so storage clean-
 msgstr "Every song you make lands in your Library. Keep pins it so storage clean-up never removes it. Open Edit above to change the title, words or style; your earlier version stays."
 
 #. js-lingui-explicit-id
-#: src/apps/settings/VoiceManagerSection.tsx:97
+#: src/apps/settings/VoiceManagerSection.tsx:94
 msgid "Every voice Home can speak with. Home's default voice is used by anyone, and any robot, with no voice of their own."
 msgstr "Every voice Home can speak with. Home's default voice is used by anyone, and any robot, with no voice of their own."
 
@@ -9906,7 +9942,9 @@ msgid "setting.news.default_topics.teen.option.sports"
 msgstr "Games, teams, athletes, scores, seasons and tournaments."
 
 #. js-lingui-explicit-id
-#: src/apps/settings/VoiceManagerSection.tsx:106
+#: src/apps/settings/AddVoiceBox.tsx:58
+#: src/apps/settings/AddVoiceBox.tsx:58
+#: src/apps/settings/VoiceManagerSection.tsx:103
 msgid "Gender"
 msgstr "Gender"
 
@@ -10540,8 +10578,8 @@ msgid "failure.voice.listening_engine.adult"
 msgstr "Home can't hear you right now. Type your message instead, or open Repairs to check it."
 
 #. js-lingui-explicit-id
-#: src/apps/settings/VoiceBrowserSection.tsx:95
-#: src/apps/settings/VoiceManagerSection.tsx:103
+#: src/apps/settings/VoiceBrowserSection.tsx:87
+#: src/apps/settings/VoiceManagerSection.tsx:100
 #: src/shell/pages/CompanionsPage.tsx:402
 msgid "Home can't reach its voice service. Check Repairs, then come back."
 msgstr "Home can't reach its voice service. Check Repairs, then come back."
@@ -10836,7 +10874,7 @@ msgid "Home could not save that choice. Check your connection and try again; you
 msgstr "Home could not save that choice. Check your connection and try again; you can also change it later under Settings, then AI and models, then Performance."
 
 #. js-lingui-explicit-id
-#: src/apps/settings/VoiceBrowserSection.tsx:66
+#: src/apps/settings/VoiceBrowserSection.tsx:58
 msgid "Home could not save that voice. Try again."
 msgstr "Home could not save that voice. Try again."
 
@@ -11235,7 +11273,7 @@ msgid "Home's data"
 msgstr "Home's data"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/VoiceManagerSection.tsx:115
+#: src/apps/settings/VoiceManagerSection.tsx:112
 msgid "Home's default"
 msgstr "Home's default"
 
@@ -12032,7 +12070,12 @@ msgid "Initiative"
 msgstr "Initiative"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/VoiceManagerSection.tsx:116
+#: src/apps/settings/AddVoiceBox.tsx:53
+msgid "Inspired"
+msgstr "Inspired"
+
+#. js-lingui-explicit-id
+#: src/apps/settings/VoiceManagerSection.tsx:113
 msgid "Inspired voice ({level})"
 msgstr "Inspired voice ({level})"
 
@@ -12798,7 +12841,7 @@ msgid "setting.network.lan_exposure.option_label.lan"
 msgstr "Lan"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/VoiceManagerSection.tsx:106
+#: src/apps/settings/VoiceManagerSection.tsx:103
 #: src/shell/pages/settings/settingsViews.tsx:68
 msgid "Language"
 msgstr "Language"
@@ -13563,7 +13606,7 @@ msgid "Liveliness (optional)"
 msgstr "Liveliness (optional)"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/VoiceManagerSection.tsx:116
+#: src/apps/settings/VoiceManagerSection.tsx:113
 msgid "Liveliness {value}"
 msgstr "Liveliness {value}"
 
@@ -13896,8 +13939,9 @@ msgid "Loading voice samples"
 msgstr "Loading voice samples"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/VoiceBrowserSection.tsx:95
-#: src/apps/settings/VoiceManagerSection.tsx:104
+#: src/apps/settings/AddVoiceBox.tsx:65
+#: src/apps/settings/VoiceBrowserSection.tsx:87
+#: src/apps/settings/VoiceManagerSection.tsx:101
 #: src/shell/pages/companionFlow/CustomizeStep.tsx:145
 msgid "Loading voices"
 msgstr "Loading voices"
@@ -14209,7 +14253,7 @@ msgid "Made at home"
 msgstr "Made at home"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/VoiceManagerSection.tsx:116
+#: src/apps/settings/VoiceManagerSection.tsx:113
 msgid "Made by {name}"
 msgstr "Made by {name}"
 
@@ -14383,16 +14427,6 @@ msgid "Make a new version"
 msgstr "Make a new version"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/VoiceBrowserSection.tsx:112
-msgid "Make a new voice based on a WAV, MP3 or FLAC recording of 6 to 30 seconds. It is not a copy. A parent can see it, listen to it and delete it."
-msgstr "Make a new voice based on a WAV, MP3 or FLAC recording of 6 to 30 seconds. It is not a copy. A parent can see it, listen to it and delete it."
-
-#. js-lingui-explicit-id
-#: src/apps/settings/VoiceManagerSection.tsx:136
-msgid "Make a new voice based on a WAV, MP3 or FLAC recording of 6 to 30 seconds. It is not a copy. Everyone in the home can pick it, and so can a robot."
-msgstr "Make a new voice based on a WAV, MP3 or FLAC recording of 6 to 30 seconds. It is not a copy. Everyone in the home can pick it, and so can a robot."
-
-#. js-lingui-explicit-id
 #: src/shell/pages/MakeSongPage.tsx:89
 #: src/shell/pages/MakeSongPage.tsx:187
 msgid "Make a song"
@@ -14415,23 +14449,6 @@ msgid "Make a variation"
 msgstr "Make a variation"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/VoiceBrowserSection.tsx:111
-msgid "Make a voice"
-msgstr "Make a voice"
-
-#. js-lingui-explicit-id
-#: src/apps/settings/VoiceBrowserSection.tsx:106
-msgid "Make a voice from a recording"
-msgstr "Make a voice from a recording"
-
-#. js-lingui-explicit-id
-#: src/apps/settings/VoiceBrowserSection.tsx:112
-msgid "Make a voice from a WAV, MP3 or FLAC recording of 6 to 30 seconds. A parent can see it, listen to it and delete it."
-msgstr "Make a voice from a WAV, MP3 or FLAC recording of 6 to 30 seconds. A parent can see it, listen to it and delete it."
-
-#. js-lingui-explicit-id
-#: src/apps/settings/VoiceBrowserSection.tsx:112
-#: src/apps/settings/VoiceManagerSection.tsx:136
 #: src/shell/pages/companionFlow/CustomizeStep.tsx:202
 msgid "Make a voice from a WAV, MP3 or FLAC recording of 6 to 30 seconds. Everyone in the home can pick it, and so can a robot."
 msgstr "Make a voice from a WAV, MP3 or FLAC recording of 6 to 30 seconds. Everyone in the home can pick it, and so can a robot."
@@ -14458,12 +14475,6 @@ msgstr "Make an album"
 #: src/apps/settings/AssistantKeysSettings.tsx:82
 msgid "Make an assistant key"
 msgstr "Make an assistant key"
-
-#. js-lingui-explicit-id
-#: src/apps/settings/VoiceBrowserSection.tsx:106
-#: src/apps/settings/VoiceBrowserSection.tsx:111
-msgid "Make an Inspired voice"
-msgstr "Make an Inspired voice"
 
 #. js-lingui-explicit-id
 #: src/shell/pages/companionFlow/AnimateStep.tsx:124
@@ -14745,6 +14756,11 @@ msgstr "Malware sites"
 #: src/lib/settingCopy.generated.ts:1111
 msgid "setting.search.blocklists.teen.option_label.blp-malware"
 msgstr "Malware sites"
+
+#. js-lingui-explicit-id
+#: src/apps/settings/AddVoiceBox.tsx:58
+msgid "Man"
+msgstr "Man"
 
 #. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:1598
@@ -16396,6 +16412,11 @@ msgid "No vocals"
 msgstr "No vocals"
 
 #. js-lingui-explicit-id
+#: src/apps/settings/AddVoiceBox.tsx:66
+msgid "No voices match. Clear a filter or try another word."
+msgstr "No voices match. Clear a filter or try another word."
+
+#. js-lingui-explicit-id
 #: src/apps/settings/styles/StyleConfirm.tsx:24
 msgid "No-selling licence. You may use it at home, but not sell what you make with it."
 msgstr "No-selling licence. You may use it at home, but not sell what you make with it."
@@ -17509,7 +17530,7 @@ msgid "Only if an adult sets it up on purpose, for a specific app or device you 
 msgstr "Only if an adult sets it up on purpose, for a specific app or device you choose."
 
 #. js-lingui-explicit-id
-#: src/apps/settings/VoiceManagerSection.tsx:145
+#: src/apps/settings/VoiceManagerSection.tsx:133
 msgid "Only the name changes. The recording stays the same, and everyone and every robot using this voice keeps it."
 msgstr "Only the name changes. The recording stays the same, and everyone and every robot using this voice keeps it."
 
@@ -18256,7 +18277,7 @@ msgid "Pick a level to change its model or who can use it."
 msgstr "Pick a level to change its model or who can use it."
 
 #. js-lingui-explicit-id
-#: src/apps/settings/VoiceBrowserSection.tsx:90
+#: src/apps/settings/VoiceBrowserSection.tsx:82
 msgid "Pick a person to see or change their voice."
 msgstr "Pick a person to see or change their voice."
 
@@ -18608,7 +18629,7 @@ msgid "Pitch (optional)"
 msgstr "Pitch (optional)"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/VoiceManagerSection.tsx:116
+#: src/apps/settings/VoiceManagerSection.tsx:113
 msgid "Pitch {value}"
 msgstr "Pitch {value}"
 
@@ -18648,6 +18669,7 @@ msgid "planned maintenance for {time}"
 msgstr "planned maintenance for {time}"
 
 #. js-lingui-explicit-id
+#: src/apps/settings/AddVoiceBox.tsx:69
 #: src/shell/pages/companionFlow/AnimateStep.tsx:45
 #: src/shell/pages/MusicStudioView.tsx:227
 msgid "Play"
@@ -18791,7 +18813,7 @@ msgid "Preparing"
 msgstr "Preparing"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/VoiceBrowserSection.tsx:98
+#: src/apps/settings/VoiceBrowserSection.tsx:90
 msgid "Preparing the voice test"
 msgstr "Preparing the voice test"
 
@@ -19041,6 +19063,8 @@ msgstr "QR code for your Home address away from home"
 #. js-lingui-explicit-id
 #: src/apps/chat/chatToolUis.tsx:773
 #: src/apps/chat/MusicCardView.tsx:90
+#: src/apps/settings/AddVoiceBox.tsx:60
+#: src/apps/settings/AddVoiceBox.tsx:60
 msgid "Quality"
 msgstr "Quality"
 
@@ -19694,7 +19718,7 @@ msgstr "Removing…"
 #: src/apps/clock/TimersTab.tsx:164
 #: src/apps/reminders/ListMenu.tsx:36
 #: src/apps/settings/CodingSettings.tsx:226
-#: src/apps/settings/VoiceManagerSection.tsx:125
+#: src/apps/settings/VoiceManagerSection.tsx:122
 #: src/shell/library/LibraryItems.tsx:38
 #: src/shell/library/LibraryViewer.tsx:98
 #: src/shell/library/TranscriptPanel.tsx:395
@@ -19702,7 +19726,7 @@ msgid "Rename"
 msgstr "Rename"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/VoiceManagerSection.tsx:144
+#: src/apps/settings/VoiceManagerSection.tsx:132
 msgid "Rename {value}"
 msgstr "Rename {value}"
 
@@ -20648,7 +20672,7 @@ msgid "Save audience"
 msgstr "Save audience"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/VoiceManagerSection.tsx:151
+#: src/apps/settings/VoiceManagerSection.tsx:139
 #: src/shell/pages/FilesPage.tsx:427
 msgid "Save name"
 msgstr "Save name"
@@ -20752,7 +20776,7 @@ msgstr "Saved place"
 #: src/apps/people/ProfileForm.tsx:166
 #: src/apps/settings/HuggingFaceTokenSection.tsx:105
 #: src/apps/settings/styles/StyleEditor.tsx:48
-#: src/apps/settings/VoiceBrowserSection.tsx:105
+#: src/apps/settings/VoiceBrowserSection.tsx:97
 msgid "Saved."
 msgstr "Saved."
 
@@ -21084,6 +21108,11 @@ msgid "Search lines"
 msgstr "Search lines"
 
 #. js-lingui-explicit-id
+#: src/apps/settings/AddVoiceBox.tsx:56
+msgid "Search name, detail, country or language"
+msgstr "Search name, detail, country or language"
+
+#. js-lingui-explicit-id
 #: src/apps/clock/WorldClocksTab.tsx:163
 msgid "Search offline city data for a time zone."
 msgstr "Search offline city data for a time zone."
@@ -21153,6 +21182,11 @@ msgstr "Search the web"
 #: src/shell/library/TranscriptPanel.tsx:138
 msgid "Search transcript"
 msgstr "Search transcript"
+
+#. js-lingui-explicit-id
+#: src/apps/settings/AddVoiceBox.tsx:56
+msgid "Search voices"
+msgstr "Search voices"
 
 #. js-lingui-explicit-id
 #: src/shell/pages/WikipediaPage.tsx:176
@@ -21453,7 +21487,7 @@ msgid "Set a PIN"
 msgstr "Set a PIN"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/VoiceManagerSection.tsx:124
+#: src/apps/settings/VoiceManagerSection.tsx:121
 msgid "Set as default"
 msgstr "Set as default"
 
@@ -22605,7 +22639,7 @@ msgstr "Sounds you have saved."
 #. js-lingui-explicit-id
 #: src/apps/settings/styles/StyleBrowser.tsx:130
 #: src/apps/settings/styles/StyleEditor.tsx:155
-#: src/apps/settings/VoiceManagerSection.tsx:106
+#: src/apps/settings/VoiceManagerSection.tsx:103
 #: src/shell/pages/StoragePage.tsx:50
 msgid "Source"
 msgstr "Source"
@@ -23163,9 +23197,10 @@ msgstr "Stone"
 
 #. js-lingui-explicit-id
 #: src/apps/clock/StopwatchTab.tsx:66
+#: src/apps/settings/AddVoiceBox.tsx:69
 #: src/apps/settings/StackChanInstallDialog.tsx:146
-#: src/apps/settings/VoiceBrowserSection.tsx:99
-#: src/apps/settings/VoiceManagerSection.tsx:123
+#: src/apps/settings/VoiceBrowserSection.tsx:91
+#: src/apps/settings/VoiceManagerSection.tsx:120
 #: src/shell/pages/companionFlow/AnimateStep.tsx:139
 #: src/shell/pages/companionFlow/AnimateStep.tsx:148
 #: src/shell/pages/companionFlow/CreateCharacterStep.tsx:297
@@ -23773,10 +23808,10 @@ msgid "setting.companion.voice.tessa.label"
 msgstr "Tessa's voice"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/VoiceBrowserSection.tsx:95
-#: src/apps/settings/VoiceBrowserSection.tsx:96
-#: src/apps/settings/VoiceBrowserSection.tsx:99
-#: src/apps/settings/VoiceManagerSection.tsx:123
+#: src/apps/settings/VoiceBrowserSection.tsx:87
+#: src/apps/settings/VoiceBrowserSection.tsx:88
+#: src/apps/settings/VoiceBrowserSection.tsx:91
+#: src/apps/settings/VoiceManagerSection.tsx:120
 #: src/apps/setup/WebSearchStep.tsx:74
 #: src/shell/pages/settings/WebSearchSettings.tsx:103
 msgid "Test"
@@ -23946,8 +23981,8 @@ msgstr "That did not send. Try again."
 #: src/apps/settings/styles/StylesTab.tsx:229
 #: src/apps/settings/UsersSection.tsx:221
 #: src/apps/settings/UsersSection.tsx:333
-#: src/apps/settings/VoiceManagerSection.tsx:101
-#: src/apps/settings/VoiceManagerSection.tsx:102
+#: src/apps/settings/VoiceManagerSection.tsx:98
+#: src/apps/settings/VoiceManagerSection.tsx:99
 #: src/shell/AmbientCompanionPane.tsx:181
 #: src/shell/AmbientCompanionPane.tsx:268
 #: src/shell/AmbientCompanionPane.tsx:336
@@ -25173,7 +25208,7 @@ msgid "setting.companion.voice.buddy.help"
 msgstr "The voice Buddy speaks with on a robot that has no voice of its own. \"default\" is Home's default voice."
 
 #. js-lingui-explicit-id
-#: src/apps/settings/VoiceManagerSection.tsx:116
+#: src/apps/settings/VoiceManagerSection.tsx:113
 msgid "The voice built into Home's speech engine."
 msgstr "The voice built into Home's speech engine."
 
@@ -25183,12 +25218,12 @@ msgid "setting.tts.home_voice.help"
 msgstr "The voice Home and its robots speak with for anyone who has not chosen their own. \"default\" is the voice built into the speech engine now in use."
 
 #. js-lingui-explicit-id
-#: src/apps/settings/VoiceBrowserSection.tsx:94
+#: src/apps/settings/VoiceBrowserSection.tsx:86
 msgid "The voice Home speaks with when it talks to {who}."
 msgstr "The voice Home speaks with when it talks to {who}."
 
 #. js-lingui-explicit-id
-#: src/apps/settings/VoiceManagerSection.tsx:79
+#: src/apps/settings/VoiceManagerSection.tsx:76
 msgid "The voice is now called {label}."
 msgstr "The voice is now called {label}."
 
@@ -25686,8 +25721,8 @@ msgid "This takes the computer. Everything big waits."
 msgstr "This takes the computer. Everything big waits."
 
 #. js-lingui-explicit-id
-#: src/apps/settings/VoiceManagerSection.tsx:144
-#: src/apps/settings/VoiceManagerSection.tsx:159
+#: src/apps/settings/VoiceManagerSection.tsx:132
+#: src/apps/settings/VoiceManagerSection.tsx:147
 msgid "this voice"
 msgstr "this voice"
 
@@ -26088,8 +26123,8 @@ msgstr "Trigger phrase, e.g. \"movie night\""
 #: src/apps/settings/ModelsAndStorageSection.tsx:91
 #: src/apps/settings/StackChanInstallDialog.tsx:152
 #: src/apps/settings/styles/StyleBrowser.tsx:160
-#: src/apps/settings/VoiceBrowserSection.tsx:95
-#: src/apps/settings/VoiceManagerSection.tsx:103
+#: src/apps/settings/VoiceBrowserSection.tsx:87
+#: src/apps/settings/VoiceManagerSection.tsx:100
 #: src/apps/setup/HostTuneStep.tsx:68
 #: src/apps/setup/PlanStep.tsx:126
 #: src/apps/setup/SetupWizard.tsx:450
@@ -27262,7 +27297,7 @@ msgstr "Vocals"
 
 #. js-lingui-explicit-id
 #: src/apps/settings/ModelsAndStorageSection.tsx:22
-#: src/apps/settings/VoiceManagerSection.tsx:106
+#: src/apps/settings/VoiceManagerSection.tsx:103
 #: src/shell/AmbientCompanionPane.tsx:184
 #: src/shell/pages/companionFlow/CustomizeStep.tsx:137
 #: src/shell/pages/companionFlow/CustomizeStep.tsx:144
@@ -27328,7 +27363,7 @@ msgid "Voice conversation"
 msgstr "Voice conversation"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/VoiceBrowserSection.tsx:97
+#: src/apps/settings/VoiceBrowserSection.tsx:89
 msgid "Voice for {who}"
 msgstr "Voice for {who}"
 
@@ -27349,7 +27384,7 @@ msgid "Voice mode"
 msgstr "Voice mode"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/VoiceManagerSection.tsx:148
+#: src/apps/settings/VoiceManagerSection.tsx:136
 msgid "Voice name"
 msgstr "Voice name"
 
@@ -27413,8 +27448,8 @@ msgid "area.Voices"
 msgstr "Voices"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/VoiceBrowserSection.tsx:96
-#: src/apps/settings/VoiceManagerSection.tsx:105
+#: src/apps/settings/VoiceBrowserSection.tsx:88
+#: src/apps/settings/VoiceManagerSection.tsx:102
 msgid "Voices are still getting ready. This takes a minute after setup."
 msgstr "Voices are still getting ready. This takes a minute after setup."
 
@@ -28129,7 +28164,7 @@ msgid "Whole word"
 msgstr "Whole word"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/VoiceBrowserSection.tsx:90
+#: src/apps/settings/VoiceBrowserSection.tsx:82
 msgid "Whose voice"
 msgstr "Whose voice"
 
@@ -28185,6 +28220,11 @@ msgstr "Will remove"
 #: src/lib/settingCopy.generated.ts:862
 msgid "setting.reference.download.when.option_label.window"
 msgstr "Window"
+
+#. js-lingui-explicit-id
+#: src/apps/settings/AddVoiceBox.tsx:58
+msgid "Woman"
+msgstr "Woman"
 
 #. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:299
@@ -28399,12 +28439,12 @@ msgid "Yesterday {time}"
 msgstr "Yesterday {time}"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/VoiceBrowserSection.tsx:56
+#: src/apps/settings/VoiceBrowserSection.tsx:48
 msgid "you"
 msgstr "you"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/VoiceBrowserSection.tsx:90
+#: src/apps/settings/VoiceBrowserSection.tsx:82
 msgid "You"
 msgstr "You"
 

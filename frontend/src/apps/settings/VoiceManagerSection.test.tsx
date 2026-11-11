@@ -20,10 +20,13 @@ function render(voices: StackVoice[], household: HouseholdVoice[] = [], home: un
   spyOn(api, "stackVoices").mockResolvedValue({ voices });
   spyOn(householdVoicesApi, "list").mockResolvedValue({ voices: household });
   spyOn(api, "settingsValues").mockResolvedValue([setting(home)]);
+  spyOn(api, "voiceLibrary").mockResolvedValue({ voices: [], attribution: "" });
   return renderWithQueryClient(<I18nProvider i18n={testI18n}><VoiceManagerSection /></I18nProvider>);
 }
 const builtIn = stackVoice("chatterbox-turbo-voice-default", { name: "Chatterbox default", gender: "unknown" });
 const cutey = stackVoice("voice-cutey1234", { name: "Cutey", source: "cloned", gender: "unknown" });
+
+function openCloneTab(dialog: HTMLElement) { const tab = within(dialog).getByRole("tab", { name: "Clone" }); fireEvent.mouseDown(tab); fireEvent.click(tab); }
 
 describe("VoiceManagerSection", () => {
   test("lists each voice with its source, gender and language, and never calls a voice 'Default voice'", async () => {
@@ -92,8 +95,9 @@ describe("VoiceManagerSection", () => {
   test("Add voice opens a dialog: Make voice needs a name and a recording, then sends the numbers as numbers", async () => {
     const make = spyOn(householdVoicesApi, "make").mockResolvedValue(made("voice-new", { label: "Fresh" }));
     const view = render([builtIn]);
-    fireEvent.click(await view.findByRole("button", { name: "Add voice" }));
+    fireEvent.click(await view.findByRole("button", { name: "+ Add voice" }));
     const dialog = await view.findByRole("dialog");
+    openCloneTab(dialog);
     const button = within(dialog).getByRole("button", { name: "Make voice" }) as HTMLButtonElement;
     expect(button.disabled).toBe(true);
     fireEvent.change(within(dialog).getByLabelText("Name"), { target: { value: "Fresh" } });
@@ -111,8 +115,9 @@ describe("VoiceManagerSection", () => {
   test("a refused recording shows the reason inside the dialog and keeps what was typed", async () => {
     spyOn(householdVoicesApi, "make").mockRejectedValue(new ApiError("The reference recording must be 6 to 30 seconds long; this one is 4.0 seconds.", 400));
     const view = render([builtIn]);
-    fireEvent.click(await view.findByRole("button", { name: "Add voice" }));
+    fireEvent.click(await view.findByRole("button", { name: "+ Add voice" }));
     const dialog = await view.findByRole("dialog");
+    openCloneTab(dialog);
     fireEvent.change(within(dialog).getByLabelText("Name"), { target: { value: "Keep me" } });
     fireEvent.change(within(dialog).getByLabelText("Recording"), { target: { files: [new File(["a"], "c.wav", { type: "audio/wav" })] } });
     fireEvent.submit(document.getElementById("add-voice-form")!);
@@ -128,8 +133,9 @@ describe("VoiceManagerSection", () => {
 
   test("the dialog states the responsibility sentence without a checkbox", async () => {
     const view = render([builtIn]);
-    fireEvent.click(await view.findByRole("button", { name: "Add voice" }));
+    fireEvent.click(await view.findByRole("button", { name: "+ Add voice" }));
     const dialog = await view.findByRole("dialog");
+    openCloneTab(dialog);
     within(dialog).getByText("You are responsible for having the right to use this voice.");
     expect(within(dialog).queryAllByRole("checkbox")).toHaveLength(0);
   });
@@ -140,5 +146,48 @@ describe("VoiceManagerSection", () => {
     view.getByText("Made by Poppy");
     expect(view.getAllByRole("button", { name: "Test" }).length).toBeGreaterThan(1);
     expect(view.getAllByRole("button", { name: "Delete" })).toHaveLength(1);
+  });
+});
+
+describe("Add voice box: Download tab", () => {
+  const voices = [
+    { id: "vctk/p225_023_enhanced.wav", name: "Southern England woman", detail: "Woman, England, 20s", gender: "woman", language: "en", languageName: "English", country: "GB", countryName: "England", quality: "best", sizeMb: null, attribution: "VCTK", licence: "CC BY 4.0", sampleUrl: "/api/voice/library/sample?path=a" },
+    { id: "vctk/p226_023_enhanced.wav", name: "Surrey man", detail: "Man, England, 20s", gender: "man", language: "en", languageName: "English", country: "GB", countryName: "England", quality: "best", sizeMb: null, attribution: "VCTK", licence: "CC BY 4.0", sampleUrl: "/api/voice/library/sample?path=b" },
+    { id: "vctk/p234_023.wav", name: "Scottish woman", detail: "Woman, Scotland, 20s", gender: "woman", language: "en", languageName: "English", country: "GB-SCT", countryName: "Scotland", quality: "good", sizeMb: null, attribution: "VCTK", licence: "CC BY 4.0", sampleUrl: "/api/voice/library/sample?path=c" },
+  ] as const;
+  function open() {
+    spyOn(api, "stackVoices").mockResolvedValue({ voices: [builtIn] });
+    spyOn(householdVoicesApi, "list").mockResolvedValue({ voices: [] });
+    spyOn(api, "settingsValues").mockResolvedValue([setting("default")]);
+    spyOn(api, "voiceLibrary").mockResolvedValue({ voices: voices as never, attribution: "Voice Cloning Toolkit, CC BY 4.0." });
+    return renderWithQueryClient(<I18nProvider i18n={testI18n}><VoiceManagerSection /></I18nProvider>);
+  }
+
+  test("three tabs with Download first, plain names, search narrows, Clear resets", async () => {
+    const view = open();
+    fireEvent.click(await view.findByRole("button", { name: "+ Add voice" }));
+    const dialog = await view.findByRole("dialog");
+    expect(within(dialog).getAllByRole("tab").map((t) => t.textContent)).toEqual(["Download", "Clone", "Inspired"]);
+    await within(dialog).findByText("Surrey man");
+    expect(dialog.textContent).not.toMatch(/\.wav|p225/);
+    fireEvent.change(within(dialog).getByLabelText("Search voices"), { target: { value: "scot" } });
+    expect(within(dialog).queryByText("Surrey man")).toBeNull();
+    within(dialog).getByText("Scottish woman");
+    fireEvent.change(within(dialog).getByLabelText("Search voices"), { target: { value: "zzz" } });
+    within(dialog).getByText("No voices match. Clear a filter or try another word.");
+    fireEvent.click(within(dialog).getAllByRole("button", { name: "Clear" })[0]!);
+    await within(dialog).findByText("Surrey man");
+  });
+
+  test("Add sends the voice id to the select endpoint and the card shows Added", async () => {
+    const select = spyOn(api, "selectCatalogVoice").mockResolvedValue(undefined as never);
+    const view = open();
+    fireEvent.click(await view.findByRole("button", { name: "+ Add voice" }));
+    const dialog = await view.findByRole("dialog");
+    await within(dialog).findByText("Surrey man");
+    const card = within(dialog).getByText("Surrey man").closest("li")!;
+    fireEvent.click(within(card).getByRole("button", { name: "Add" }));
+    await waitFor(() => expect(select).toHaveBeenCalledWith("vctk/p226_023_enhanced.wav"));
+    await within(card).findByRole("button", { name: "Added" });
   });
 });

@@ -1417,6 +1417,8 @@ export const api = {
       body: JSON.stringify({ scope, key, value, ...(confirmRemoval ? { confirmRemoval } : {}) }),
     }),
   stackVoices: () => request<{ voices: StackVoice[] }>("/api/voice/voices"),
+  voiceLibrary: () => request<{ voices: import("@/lib/voice/voiceLibraryFilter").LibraryVoice[]; attribution: string }>("/api/voice/library"),
+  selectCatalogVoice: (path: string) => request<{ success: true }>("/api/voice/catalog/select", { method: "POST", body: JSON.stringify({ path }) }),
   // Dedicated routes, not the generic setSetting/resetSetting: saving or
   // removing voice.hf_token updates the Stack speech service (see
   // routes/voice.ts's own comment on why the generic PUT route has no
