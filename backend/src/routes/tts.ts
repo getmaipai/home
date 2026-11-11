@@ -10,6 +10,7 @@ import type { AppEnv } from "@/types";
 import { apiRouter, errorResponses } from "@/lib/openapi";
 import { isOwnedStaleTurnGeneration, turnAllowsVoiceCues, turnUtterance, voiceForTurn } from "@/routes/turn";
 import { chooseDelivery } from "@/lib/deliveryChoice";
+import { abortConversationPrewarm } from "@/lib/prefixPrewarm";
 
 export const ttsRoutes = apiRouter();
 
@@ -59,6 +60,7 @@ const ttsSynthesizeRoute = createRoute({
 ttsRoutes.openapi(ttsSynthesizeRoute, async (c) => {
   const actor = c.get("person");
   const body = c.req.valid("json");
+  if (body.turn_id) abortConversationPrewarm(actor.id);
   if (body.turn_id && body.generation !== undefined && isOwnedStaleTurnGeneration(body.turn_id, actor.id, body.generation)) return c.json({ error: "That reply was stopped, so this sentence was not spoken. Ask again to hear a new answer.", code: "turn_cancelled" }, 409);
   const voiceId = body.voice ?? (body.turn_id ? voiceForTurn(body.turn_id, actor.id) : undefined) ?? voiceForSpeech({ actor, deviceId: c.get("deviceId") });
   const startedAt = Date.now();
@@ -79,6 +81,7 @@ ttsRoutes.openapi(ttsSynthesizeRoute, async (c) => {
   if (result.ok && body.turn_id) {
     const turn = await import("@/routes/turn");
     turn.markTurnFirstAudio(body.turn_id, actor.id, Date.now() - startedAt);
+    turn.noteSpokenAudioHandedOff(body.turn_id, actor.id, body.text);
   }
   if (!result.ok) {
     return c.json({ error: result.error, code: result.code }, result.status);

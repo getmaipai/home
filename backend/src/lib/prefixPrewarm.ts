@@ -11,6 +11,7 @@ const MAX_PEOPLE = 64;
 const MIN_GAP_MS = 20_000;
 const recorded = new Map<string, RecordedPrefix>();
 const lastWarm = new Map<string, number>();
+const conversationWarms = new Map<string, AbortController>();
 
 const keyFor = (actorId: string, surfaceClass: string) => `${actorId}:${surfaceClass}`;
 
@@ -40,6 +41,29 @@ export async function prewarmPrefix(actorId: string, surfaceClass: string, now =
   }
 }
 
+/** Warms the persisted conversation prefix after its final spoken audio was handed off. */
+export async function prewarmConversation(actorId: string, surfaceClass: string, window: readonly LlmMessage[]): Promise<boolean> {
+  if (surfaceClass !== "spoken") return false;
+  const key = keyFor(actorId, surfaceClass);
+  const prefix = recorded.get(key);
+  if (!prefix || conversationWarms.has(actorId) || window.length === 0) return false;
+  const controller = new AbortController();
+  conversationWarms.set(actorId, controller);
+  try {
+    const result = await complete("chat", [prefix.system, ...window], {
+      model: prefix.model, tools: prefix.tools.length > 0 ? prefix.tools : undefined,
+      max_tokens: 1, exactCeiling: true, thinking: false, dropReasoning: true, signal: controller.signal,
+    });
+    return result.ok;
+  } catch { return false; }
+  finally { if (conversationWarms.get(actorId) === controller) conversationWarms.delete(actorId); }
+}
+
+/** A new utterance or real turn supersedes any quiet-period cache warm. */
+export function abortConversationPrewarm(actorId: string): void {
+  conversationWarms.get(actorId)?.abort();
+}
+
 /** A hub that just started has recorded nothing, so the first spoken turn after every restart read the whole prompt cold (3 s to the first word,
  * measured 2026-10-29). Warm the shared start of the spoken prompt (tools block and persona text) with the default prompt, retrying while the Stack loads. */
 const BOOT_WARM_TRIES = 6;
@@ -57,4 +81,4 @@ export function warmSpokenPrefixAtBoot(build: () => Promise<{ system: string; to
   (first as { unref?: () => void }).unref?.();
 }
 
-export function __resetPrefixPrewarmForTests(): void { recorded.clear(); lastWarm.clear(); }
+export function __resetPrefixPrewarmForTests(): void { recorded.clear(); lastWarm.clear(); for (const c of conversationWarms.values()) c.abort(); conversationWarms.clear(); }

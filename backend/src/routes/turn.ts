@@ -26,7 +26,9 @@ import type { TurnStreamEvent as ToolStreamEvent } from "@maipai/spec/stack/ts/t
 import type { AppEnv, PersonRow } from "@/types";
 import { streamEventForViewer, valueForViewer } from "@/lib/turnErrorDetail";
 import { apiRouter, errorResponses, idParamSchema } from "@/lib/openapi";
-import { turnOwnerId, isTemporaryConversation, packageLatencyFromRecentOutcomes, applyHeardPrefix, getConversation } from "@/lib/conversationHistory";
+import { turnOwnerId, isTemporaryConversation, packageLatencyFromRecentOutcomes, applyHeardPrefix, getConversation, buildConversationWindow } from "@/lib/conversationHistory";
+import { abortConversationPrewarm, prewarmConversation } from "@/lib/prefixPrewarm";
+import { activeTurnCount } from "@/lib/turnActivity";
 import { surfaceClassOf } from "@/lib/surfaceClass";
 import { attachments, conversationTurns } from "@/db/schema";
 import { db } from "@/db";
@@ -142,6 +144,26 @@ interface ResumeSession {
 
 const resumeSessions = new Map<string, ResumeSession>();
 const inFlightTurns = new Map<string, ResumeSession>();
+
+/** Called by TTS only after a live spoken turn's final sentence audio has synthesized successfully. */
+export function noteSpokenAudioHandedOff(turnId: string, actorId: string, text: string): void {
+  const session = inFlightTurns.get(turnId);
+  if (!session || session.ownerId !== actorId || !session.spokenTurn || !session.terminal || session.expired || !text.trim()) return;
+  const released = session.releasedText.trim();
+  if (!released || !normalizeForSpeech(released).trim().endsWith(normalizeForSpeech(text).trim())) return;
+  if (activeTurnCount() > 0) return;
+  const conversation = getConversation(session.viewer, session.conversationId);
+  if (!conversation.ok) return;
+  const task = async () => {
+    try {
+      const window = await buildConversationWindow(conversation.value);
+      if (activeTurnCount() > 0) return;
+      void prewarmConversation(actorId, "spoken", window.messages);
+    } catch { /* best effort */ }
+  };
+  const timer = setTimeout(() => { void task(); }, 0);
+  (timer as { unref?: () => void }).unref?.();
+}
 
 export function isStaleTurnGeneration(turnId: string, generation: number | undefined): boolean {
   const session = inFlightTurns.get(turnId);
@@ -370,6 +392,7 @@ turnRoutes.post("/prewarm", requireAuth, async (c) => {
 
 turnRoutes.post("/", requireAuth, bodyLimit({ maxSize: TURN_BODY_LIMIT }), async (c) => {
   const actor = c.get("person");
+  abortConversationPrewarm(actor.id);
   if (!personWithinTurnBudget(actor.id)) {
     return c.json(RATE_LIMIT_RESPONSE, 429);
   }
