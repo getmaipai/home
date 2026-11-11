@@ -1,5 +1,5 @@
 import { i18n } from "@lingui/core";
-import { useRef, useState } from "react";
+import { useRef } from "react";
 import { useSharedReads } from "@/lib/sharedReads";
 import { useQuery } from "@tanstack/react-query";
 
@@ -9,13 +9,15 @@ import { isOwnerOrAdminRole, type Roster } from "@/lib/api";
 import { api } from "@/lib/api";
 import { Greeting } from "@/shell/pages/dashboard/Greeting";
 import { AskBox } from "@/shell/pages/dashboard/AskBox";
-import { ActionCards } from "@/shell/pages/dashboard/ActionCards";
 import { TodaySection } from "@/shell/pages/dashboard/TodaySection";
 import { Attention } from "@/shell/pages/dashboard/Attention";
 import { GettingStarted } from "@/shell/pages/dashboard/GettingStarted";
 import { useTabItem } from "@/shell/tabIdentity";
 import { ContinueShelf, FamilyShelf, HomeMedia } from "@/shell/pages/dashboard/HomeShelves";
 import { homeBlocks, type HomeBlockId } from "@/shell/pages/dashboard/homeBlocks";
+import { HomeHero, chooseHomeHero } from "@/shell/pages/dashboard/HomeHero";
+import { MakeShelf } from "@/shell/pages/dashboard/MakeShelf";
+import { useAmbientCompanion } from "@/shell/useAmbientCompanion";
 
 
 /** Home (docs/design/home-page-2026-10-17.md, option C): the greeting, then the ask box, then a short
@@ -23,7 +25,6 @@ import { homeBlocks, type HomeBlockId } from "@/shell/pages/dashboard/homeBlocks
  * Today (01e), Getting started (01g) and the admin links (01b). The server filters Today by the viewer's
  * role and age; Home adds no gate and removes none. Nothing here shows another person's activity. */
 export function DashboardPage({ person }: { person: Roster }) {
-  const [focusAsk, setFocusAsk] = useState(0);
   const askRef = useRef<HTMLDivElement>(null);
   useTabItem(i18n._({ id: "Home", message: "Home" }));
   const admin = isOwnerOrAdminRole(person.role);
@@ -37,7 +38,8 @@ export function DashboardPage({ person }: { person: Roster }) {
   const rawLayout = layoutSetting.data?.value;
   const layout = (layoutSetting.data?.layer === "band" && layoutSetting.data?.source === "default" ? "ask" : rawLayout === "ask" || rawLayout === "board" || rawLayout === "shelves" ? rawLayout : "shelves");
   const familyName = useQuery({ queryKey: ["settings", "household", "household.family_name"], queryFn: async () => (await reads.settingsValues("household")).find((row) => row.key === "household.family_name"), retry: false });
-  const media = useQuery({ queryKey: ["home-media"], queryFn: api.mediaHome, retry: false, enabled: layout === "shelves" });
+  const media = useQuery({ queryKey: ["home-media"], queryFn: api.mediaHome, retry: false });
+  const companion = useAmbientCompanion(person);
   const continueRows = useQuery({ queryKey: ["home-continue"], queryFn: api.continueRows, retry: false, enabled: layout === "shelves" });
   const people = useQuery({ queryKey: ["home-family"], queryFn: api.people, retry: false, enabled: !incognito && person.role !== "guest" });
   const hasShelfData = Boolean(media.data?.continue?.length || media.data?.new?.length || media.data?.made_at_home?.length || continueRows.data?.rows?.length);
@@ -47,12 +49,17 @@ export function DashboardPage({ person }: { person: Roster }) {
     switch (block) {
       case "greeting": return <div key={block} className="md:col-span-2 lg:col-span-12"><Greeting displayName={person.display_name} familyName={familyName.data?.value} /></div>;
       case "admin": return admin ? <div key={block} className="md:col-span-2 lg:col-span-12"><Attention /></div> : null;
-      case "ask": return <div key={block} ref={askRef} className="mx-auto w-full max-w-2xl md:col-span-2 lg:col-span-12"><AskBox focusOnRequest={focusAsk} /></div>;
-      case "actions": return <div key={block} className="mx-auto w-full max-w-2xl md:col-span-2 lg:col-span-12"><ActionCards onFocusAsk={() => { setFocusAsk((value) => value + 1); askRef.current?.scrollIntoView({ behavior: "smooth", block: "center" }); }} /></div>;
+      case "ask": return <div key={block} ref={askRef} className="mx-auto w-full max-w-2xl md:col-span-2 lg:col-span-12"><AskBox role={person.role} /></div>;
+      case "make": return <div key={block} className="md:col-span-2 lg:col-span-12"><MakeShelf role={person.role} /></div>;
+      case "actions": return null;
       case "media_continue": return (media.data?.continue.length || continueRows.data?.rows?.length) ? <div key={block} className="md:col-span-2 lg:col-span-12"><HomeMedia kind="continue" /></div> : null;
       case "media_new": return media.data?.new.length ? <div key={block} className="md:col-span-2 lg:col-span-12"><HomeMedia kind="new" /></div> : null;
       case "media_made": return media.data?.made_at_home.length ? <div key={block} className="md:col-span-2 lg:col-span-12"><HomeMedia kind="made_at_home" /></div> : null;
-      case "hero": return widgets.data?.hero ? <TodaySection home={widgets.data} heroOnly role={person.role} key={block} /> : null;
+      case "hero": {
+        const bot = companion?.kind === "companion" ? companion.companion : undefined;
+        const choice = chooseHomeHero(media.data?.made_at_home, bot ? { id: bot.id, name: bot.name, portrait: bot.portrait } : null, person.role === "child");
+        return choice ? <div key={block} className="md:col-span-2 lg:col-span-12"><HomeHero choice={choice} /></div> : null;
+      }
       case "pick_up": return incognito || person.role === "guest" ? null : <div key={block} className="lg:col-span-6"><ContinueShelf /></div>;
       case "today_chips": return widgets.data ? <TodaySection key={block} home={widgets.data} chips role={person.role} /> : null;
       case "today": return widgets.data ? <TodaySection key={block} home={widgets.data} role={person.role} /> : null;

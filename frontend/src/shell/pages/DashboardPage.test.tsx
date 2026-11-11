@@ -133,9 +133,9 @@ describe("DashboardPage (Home)", () => {
 
   test("keeps the home block order in one layout function", async () => {
     const { homeBlocks } = await import("@/shell/pages/dashboard/homeBlocks");
-    expect(homeBlocks("ask")).toEqual(["greeting", "ask", "today_chips", "actions", "admin", "pick_up", "family", "getting_started"]);
-    expect(homeBlocks("board")).toEqual(["greeting", "hero", "ask", "actions", "admin", "pick_up", "today", "family", "getting_started"]);
-    expect(homeBlocks("shelves")).toEqual(["greeting", "ask", "actions", "admin", "media_continue", "today", "media_new", "media_made", "getting_started"]);
+    expect(homeBlocks("ask")).toEqual(["greeting", "hero", "ask", "make", "today_chips", "pick_up", "family", "getting_started", "admin"]);
+    expect(homeBlocks("board")).toEqual(["greeting", "hero", "ask", "make", "pick_up", "today", "family", "getting_started", "admin"]);
+    expect(homeBlocks("shelves")).toEqual(["greeting", "hero", "ask", "make", "media_continue", "today", "media_new", "media_made", "family", "getting_started", "admin"]);
     expect(homeBlocks("shelves", false)).toEqual(homeBlocks("ask"));
   });
 
@@ -472,7 +472,7 @@ describe("DashboardPage (Home)", () => {
       const view = renderHome(makePerson("owner"));
       await view.findByText("Something needs fixing");
       await view.findByText("An update is ready");
-      const actions = view.getByRole("list", { name: "Things to do" });
+      const actions = view.getByRole("heading", { name: "Make" });
       const attention = view.getByRole("navigation", { name: "Looking after your hub" });
       expect(actions.compareDocumentPosition(attention) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
       fireEvent.click(view.getByRole("button", { name: "Repairs" }));

@@ -33732,3 +33732,28 @@ msgstr "Sin resultados en esta ventana, apto para retiro: {rules}"
 #, needs-review
 msgid "setting.ui.look.option_label.zinc"
 msgstr "Zinc"
+
+#. js-lingui-explicit-id
+#: src/shell/pages/dashboard/MakeShelf.tsx:10
+msgid "Ask or plan"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/shell/pages/dashboard/MakeShelf.tsx:14
+msgid "Find something to watch"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/shell/pages/dashboard/MakeShelf.tsx:33
+msgid "Make"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/shell/pages/dashboard/AskBox.tsx:70
+msgid "Make song"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/shell/pages/dashboard/AskBox.tsx:69
+msgid "Make video"
+msgstr ""

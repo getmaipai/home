@@ -29096,3 +29096,28 @@ msgstr "Zero hits this window, retire-eligible: {rules}"
 #: src/lib/settingCopy.generated.ts:1470
 msgid "setting.ui.look.option_label.zinc"
 msgstr "Zinc"
+
+#. js-lingui-explicit-id
+#: src/shell/pages/dashboard/MakeShelf.tsx:10
+msgid "Ask or plan"
+msgstr "Ask or plan"
+
+#. js-lingui-explicit-id
+#: src/shell/pages/dashboard/MakeShelf.tsx:14
+msgid "Find something to watch"
+msgstr "Find something to watch"
+
+#. js-lingui-explicit-id
+#: src/shell/pages/dashboard/MakeShelf.tsx:33
+msgid "Make"
+msgstr "Make"
+
+#. js-lingui-explicit-id
+#: src/shell/pages/dashboard/AskBox.tsx:70
+msgid "Make song"
+msgstr "Make song"
+
+#. js-lingui-explicit-id
+#: src/shell/pages/dashboard/AskBox.tsx:69
+msgid "Make video"
+msgstr "Make video"
