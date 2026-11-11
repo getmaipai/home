@@ -57,6 +57,35 @@ test("made at home rows show their shelf and navigate to the app href", async ()
   await waitFor(() => expect(view.getByTestId("where").textContent).toBe("/apps/music/play"));
 });
 
+test("the hero uses the newest made item and its Play action opens it", async () => {
+  const view = open(async () => ({ continue: [], new: [row({ id: "newest-library", title: "Library Find" })], recent_music: [], made_at_home: [
+    row({ id: "made-newest", title: "Newest Creation", subtitle: "Nova", href: "/play/newest" }),
+    row({ id: "made-older", title: "Older Creation", href: "/play/older" }),
+  ] }));
+  const billboard = await view.findByLabelText("Media");
+  expect(billboard.textContent).toContain("Newest Creation");
+  expect(billboard.textContent).not.toContain("Library Find");
+  fireEvent.click(view.getByRole("button", { name: "Play" }));
+  await waitFor(() => expect(view.getByTestId("where").textContent).toBe("/play/newest"));
+});
+
+test("the hero falls back to New and shelf tiles have no caption", async () => {
+  const view = open(async () => ({ continue: [], new: [row({ title: "A New Item", subtitle: "Artist Name" })], recent_music: [], made_at_home: [] }));
+  const billboard = await view.findByLabelText("Media");
+  expect(billboard.textContent).toContain("A New Item");
+  expect(billboard.querySelector("[data-slot=media-tile-label]")).toBeNull();
+  expect(view.getByRole("button", { name: "A New Item" }).textContent).not.toContain("Artist Name");
+  const tileLabels = view.container.querySelectorAll("[data-slot=media-tile-label]");
+  expect(tileLabels.length).toBeGreaterThan(0);
+  expect(view.container.querySelectorAll("[data-slot=safe-image-label]").length).toBe(0);
+});
+
+test("an empty library renders no hero", async () => {
+  const view = open(async () => ({ continue: [], new: [], recent_music: [], made_at_home: [] }));
+  await waitFor(() => expect(view.getByText("Nothing here yet. Add music, videos, shows, podcasts or books to your library and they show up here.")).toBeTruthy());
+  expect(view.queryByLabelText("Media")).toBeNull();
+});
+
 test("a failed load shows the retry message", async () => {
   const view = open(() => Promise.reject(new Error("down")));
   await waitFor(() => expect(view.getByText("Could not load Media. Check your connection and try again.")).toBeTruthy());

@@ -17,8 +17,8 @@ const ChatIcon = getIcon("message-circle");
  * which used to give it a film strip), a film for a clip, a note for a song. */
 export function tilePicture(row: MediaHomeRow, small = false) {
   return row.kind === "chat"
-    ? <SafeImage src={row.artwork_url} alt="" kind="picture" tintSeed={row.title} label={small ? undefined : row.title} fallbackContent={<ChatIcon aria-hidden className={small ? "size-4 text-foreground/70" : "size-1/3 text-foreground/70"} />} />
-    : <SafeImage src={row.artwork_url} alt="" kind={FALLBACK[row.app]} tintSeed={row.title} label={small ? undefined : row.title} />;
+    ? <SafeImage src={row.artwork_url} alt="" kind="picture" tintSeed={row.title} fallbackContent={<ChatIcon aria-hidden className={small ? "size-4 text-foreground/70" : "size-1/3 text-foreground/70"} />} />
+    : <SafeImage src={row.artwork_url} alt="" kind={FALLBACK[row.app]} tintSeed={row.title} />;
 }
 
 /** The most shortcuts Continue shows: two columns of three on a phone, one row of six on a wide screen. */
@@ -65,7 +65,7 @@ export function FamilyShelf({ viewer, incognito }: { viewer: Roster; incognito: 
 function MediaRows({ heading, rows }: { heading: string; rows: MediaHomeRow[] }) {
   const navigate = useNavigate();
   if (!rows.length) return null;
-  return <MediaShelf heading={heading} items={rows} getKey={(row) => row.id} getLabel={(row) => row.title} renderItem={(row) => tilePicture(row)} renderCaption={(row) => row.subtitle ? <span className="truncate text-supporting text-muted-foreground">{row.subtitle}</span> : null} aspect="square" getProgress={(row) => row.percent === null ? undefined : row.percent / 100} variant="plain" headingStyle="section" tileSize="pro" bleed onSelect={(row) => navigate(row.href)} />;
+  return <MediaShelf heading={heading} items={rows} getKey={(row) => row.id} getLabel={(row) => row.title} renderItem={(row) => tilePicture(row)} aspect="square" getProgress={(row) => row.percent === null ? undefined : row.percent / 100} variant="plain" headingStyle="section" tileSize="pro" bleed onSelect={(row) => navigate(row.href)} />;
 }
 
 export function HomeMedia({ kind }: { kind: "continue" | "new" | "made_at_home" }) {

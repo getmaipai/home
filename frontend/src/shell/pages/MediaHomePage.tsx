@@ -4,6 +4,7 @@ import { useNavigate } from "react-router-dom";
 import { AsyncState } from "@maipai/ui/src/primitives/AsyncState";
 import { EmptyState } from "@maipai/ui/src/primitives/EmptyState";
 import { MediaShelf } from "@maipai/ui/src/primitives/MediaShelf";
+import { Billboard } from "@maipai/ui/src/primitives/Billboard";
 import { SafeImage, type ImageFallbackKind } from "@maipai/ui/src/primitives/SafeImage";
 import { api, type MediaHome, type MediaHomeRow } from "@/lib/api";
 import { MediaHubFrame } from "@/shell/MediaHubFrame";
@@ -48,18 +49,32 @@ export function MediaHomePage() {
               { heading: i18n._({ id: "New in your media", message: "New in your media" }), items: data.new, aspect: "square" as const, getProgress: undefined },
               { heading: i18n._({ id: "Recently played", message: "Recently played" }), items: data.recent_music, aspect: "square" as const, getProgress: undefined },
             ].filter((shelf) => shelf.items.length > 0);
+            const heroItem = data.made_at_home[0] ?? data.new[0];
             if (shelves.length === 0 && data.made_at_home.length === 0) {
               return <EmptyState icon="film" text={i18n._({ id: "Nothing here yet. Add music, videos, shows, podcasts or books to your library and they show up here.", message: "Nothing here yet. Add music, videos, shows, podcasts or books to your library and they show up here." })} />;
             }
-            return shelves.map((shelf) => (
+            return <>
+              {heroItem ? <Billboard
+                label={i18n._({ id: "Media", message: "Media" })}
+                size="hero"
+                autoplay={false}
+                slides={[{
+                  id: heroItem.id,
+                  art: heroItem.artwork_url ?? undefined,
+                  kind: FALLBACK_KIND[heroItem.app],
+                  title: heroItem.title,
+                  subtitle: [heroItem.kind, heroItem.subtitle].filter(Boolean).join(" · "),
+                  primary: { label: i18n._({ id: "Play", message: "Play" }), onSelect: () => navigate(heroItem.href) },
+                }]}
+              /> : null}
+              {shelves.map((shelf) => (
               <MediaShelf
                 key={shelf.heading}
                 heading={shelf.heading}
                 items={shelf.items}
                 getKey={(row) => row.id}
                 getLabel={(row) => row.title}
-                renderItem={(row) => <SafeImage src={row.artwork_url} alt="" kind={FALLBACK_KIND[row.app]} tintSeed={row.title} label={row.title} />}
-                renderCaption={(row) => row.subtitle ? <span className="truncate text-supporting text-muted-foreground">{row.subtitle}</span> : null}
+                renderItem={(row) => <SafeImage src={row.artwork_url} alt="" kind={FALLBACK_KIND[row.app]} tintSeed={row.title} />}
                 aspect={shelf.aspect}
                 getProgress={shelf.getProgress}
                 variant="plain"
@@ -68,7 +83,8 @@ export function MediaHomePage() {
                 bleed
                 onSelect={(row) => navigate(row.href)}
               />
-            ));
+              ))}
+            </>;
           }}
         </AsyncState>
       </div>
