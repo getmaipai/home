@@ -3,6 +3,7 @@ import { OpenAPIHono } from "@hono/zod-openapi";
 import { createHash } from "node:crypto";
 import { dirname, join } from "node:path";
 import { mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import sharp from "sharp";
 import { db } from "@/db";
 import { people, sessions } from "@/db/schema";
 import { companionsRoutes } from "@/routes/companions";
@@ -57,6 +58,17 @@ describe("companion pack routes", () => {
     const body = await (await get(`companions/avatar?companion=${id}`, owner)).json() as { avatar: { pack: { url: string; manifest: { id: string } } | null } | null };
     expect(body.avatar?.pack?.url).toBe(`/api/companions/${id}/pack/`);
     expect(body.avatar?.pack?.manifest.id).toBe(pack.id);
+  });
+
+  test("the small avatar still is a square tile, never the wide rest frame squashed into a square", async () => {
+    const wide = await sharp({ create: { width: 1024, height: 576, channels: 3, background: "#888888" } }).webp().toBuffer();
+    writeFileSync(join(householdCompanionFolder(id)!, "pack", pack.rest), wide);
+    const body = await (await get(`companions/avatar?companion=${id}`, owner)).json() as { avatar: { portrait: string | null } };
+    expect(body.avatar.portrait).toBe(`/api/companions/${id}/pack-still`);
+    const res = await get(`companions/${id}/pack-still`, owner);
+    expect(res.status).toBe(200);
+    const meta = await sharp(Buffer.from(await res.arrayBuffer())).metadata();
+    expect([meta.width, meta.height]).toEqual([256, 256]);
   });
 
   test("an invalid pack gives pack null", async () => {

@@ -228,7 +228,7 @@ companionsRoutes.openapi(avatarRoute, (c) => {
       still: `/api/companions/${encodeURIComponent(persona.id)}/animation/${encodeURIComponent(files.still)}`,
     },
   }]));
-  const portrait = animation.sheet?.rest ? `/api/companions/${encodeURIComponent(persona.id)}/animation/${encodeURIComponent(animation.sheet.rest)}` : packManifest && typeof packManifest.rest === "string" ? `/api/companions/${encodeURIComponent(persona.id)}/pack/${packManifest.rest}` : null;
+  const portrait = animation.sheet?.rest ? `/api/companions/${encodeURIComponent(persona.id)}/animation/${encodeURIComponent(animation.sheet.rest)}` : packManifest && typeof packManifest.rest === "string" ? `/api/companions/${encodeURIComponent(persona.id)}/pack-still` : null;
   const mouth_still = mouthVersion ? `/api/companions/${encodeURIComponent(persona.id)}/mouth` : null;
   return c.json({ avatar: { id: persona.id, name: manifest?.companion?.display_name ?? persona.display_name, key: animation.key, version, portrait, mouth_still, talk, pack: packManifest ? { url: `/api/companions/${encodeURIComponent(persona.id)}/pack/`, manifest: packManifest } : null, states } }, 200, headers);
 });
@@ -447,6 +447,27 @@ companionsRoutes.openapi(mouthRoute, (c) => {
     if (matchesEtag(c.req.header("if-none-match"), etag)) return new Response(null, { status: 304, headers: { etag, "cache-control": "private, max-age=0, must-revalidate" } });
     return new Response(readFileSync(path), { headers: { "content-type": "image/png", etag, "cache-control": "private, max-age=0, must-revalidate" } });
   } catch { return c.json({ error: "That companion has no mouth picture yet." }, 404); }
+});
+
+// The small round avatars draw a still into a square box: the demo packs keep their rest picture in a wide 1024x576 frame (tile at x0 224), which a square box squashes, so this returns the square tile of the pack's rest picture.
+companionsRoutes.get("/:id/pack-still", requireAuth, async (c) => {
+  const id = c.req.param("id"), actor = c.get("person"), household = getHouseholdCompanion(id);
+  const missing = () => c.json({ error: "That synth has no picture yet. Check the synth and try again." }, 404);
+  const persona = PERSONAS.find((candidate) => candidate.id === id);
+  const editor = Boolean(household?.companion && (isOwnerOrAdmin(actor) || householdCompanionAuthorId(id) === actor.id));
+  const ready = !household?.companion?.status || household.companion.status === "ready";
+  if (!household || (!editor && (!persona || !ready || !mayUseCompanion(actor, persona)))) return missing();
+  const pack = readCompanionPack(id) as { rest?: unknown; source?: { x0?: number; size?: number } } | null;
+  const path = pack && typeof pack.rest === "string" ? packFile(id, pack.rest) : null;
+  if (!path) return missing();
+  try {
+    const metadata = statSync(path), etag = `"still-${metadata.size}-${metadata.mtimeMs}"`;
+    if (matchesEtag(c.req.header("if-none-match"), etag)) return new Response(null, { status: 304, headers: { etag, "cache-control": "private, max-age=0, must-revalidate" } });
+    const image = sharp(readFileSync(path)), { width = 0, height = 0 } = await image.metadata();
+    const x0 = Math.max(0, Math.min(width - 1, pack?.source?.x0 ?? (width > height ? 224 : 0))), size = Math.max(1, Math.min(pack?.source?.size ?? (width > height ? 576 : width), width - x0, height));
+    const square = await image.extract({ left: x0, top: 0, width: size, height: Math.min(size, height) }).resize(256, 256, { fit: "cover" }).webp({ quality: 88 }).toBuffer();
+    return new Response(square, { headers: { "content-type": "image/webp", etag, "cache-control": "private, max-age=0, must-revalidate" } });
+  } catch { return missing(); }
 });
 
 // Pack paths are nested (clips/idle-1.mp4), so this is a wildcard route rather than an OpenAPI-declared one.
