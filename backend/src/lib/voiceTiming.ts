@@ -29,7 +29,8 @@ function persist(): void {
   try {
     mkdirSync(dirname(storePath), { recursive: true, mode: 0o700 });
     const temp = `${storePath}.tmp`;
-    writeFileSync(temp, JSON.stringify(records), { mode: 0o600 });
+    // Counts only (no text, no audio, no ids of people), so the report command can read it without the hub's account; the folder above is 0700 only where the hub makes it.
+    writeFileSync(temp, JSON.stringify(records), { mode: 0o644 });
     renameSync(temp, storePath);
   } catch { /* timing is best effort and never affects the turn */ }
 }
