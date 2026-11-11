@@ -259,7 +259,7 @@ export function __ageCheckStateForTests(): { runner: boolean; vision: boolean; d
 
 function sleep(ms: number): Promise<void> { return new Promise((resolve) => setTimeout(resolve, ms)); }
 
-/** The Stack role that reads the pictures of a safety check: the resident chat model when it is up and declares picture input, else the separate vision role when it is installed and declares it (Splash chat loads no projector, so the vision role keeps chat fast). null means no reader, and the check fails closed. Any failure to read the Stack reads as null. */
+/** The Stack role that reads the pictures of a safety check: the resident chat model when it is up and declares picture input, else the separate vision role when it is installed and declares it, or when the Stack set it `offline` because its memory guard gave up (a request wakes it; any other offline reason is no reader) (Splash chat loads no projector, so the vision role keeps chat fast). null means no reader, and the check fails closed. Any failure to read the Stack reads as null. */
 export type PictureReader = "chat" | "vision";
 /**
  * The Stack's chat row can say `imageInput: true` while the running chat process cannot read a picture (2026-10-29: the live hub's chat
@@ -279,8 +279,9 @@ export async function pictureReader(): Promise<PictureReader | null> {
       const state = row?.state.state;
       if ((state === "ready" || state === "loaded" || state === "installed") && row?.model?.imageInput === true) return id;
       // The vision role is set `offline` when the Stack's memory guard gave up on loading it, and it comes back only when something asks for it: skipping it
-      // here meant nothing asked, so every check failed closed for good (found on the first real pack run). Ask it; a request that fails still fails closed.
-      if (id === "vision" && state === "offline" && row?.model?.imageInput === true) return id;
+      // here meant nothing asked, so every check failed closed for good (found on the first real pack run). Ask it, but only for that reason (a mode change or
+      // a restart keeps it out on purpose); a request that fails still fails closed, and a reason the Stack words differently is no reader, as before.
+      if (id === "vision" && state === "offline" && row?.model?.imageInput === true && /memory/i.test(String((row.state as { reason?: unknown }).reason ?? ""))) return id;
     }
     return null;
   } catch {
