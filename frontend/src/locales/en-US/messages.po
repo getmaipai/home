@@ -145,12 +145,12 @@ msgid "{checksErrorMessage} Refresh this page and try again."
 msgstr "{checksErrorMessage} Refresh this page and try again."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/companionFlow/AnimateStep.tsx:133
+#: src/shell/pages/companionFlow/AnimateStep.tsx:134
 msgid "{count, plural, one {# animation} other {# animations}} · Always included"
 msgstr "{count, plural, one {# animation} other {# animations}} · Always included"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/companionFlow/AnimateStep.tsx:142
+#: src/shell/pages/companionFlow/AnimateStep.tsx:143
 msgid "{count, plural, one {# animation} other {# animations}} · Select the ones you want"
 msgstr "{count, plural, one {# animation} other {# animations}} · Select the ones you want"
 
@@ -580,17 +580,22 @@ msgid "{kind}, Videos, {base}"
 msgstr "{kind}, Videos, {base}"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/companionFlow/AnimateStep.tsx:116
+#: src/shell/pages/companionFlow/AnimateStep.tsx:117
 msgid "{label} · Character"
 msgstr "{label} · Character"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/companionFlow/AnimateStep.tsx:102
+#: src/shell/pages/companionFlow/AnimateStep.tsx:103
 msgid "{label} animation"
 msgstr "{label} animation"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/companionFlow/AnimateStep.tsx:119
+#: src/shell/pages/companionFlow/PackSection.tsx:86
+msgid "{label} clip"
+msgstr "{label} clip"
+
+#. js-lingui-explicit-id
+#: src/shell/pages/companionFlow/AnimateStep.tsx:120
 #: src/shell/pages/companionFlow/KeyframeEditor.tsx:79
 msgid "{label} keyframe"
 msgstr "{label} keyframe"
@@ -606,12 +611,12 @@ msgid "{label} must be a whole number of {unit} from {min}."
 msgstr "{label} must be a whole number of {unit} from {min}."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/companionFlow/AnimateStep.tsx:104
+#: src/shell/pages/companionFlow/AnimateStep.tsx:105
 msgid "{label} progress"
 msgstr "{label} progress"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/companionFlow/AnimateStep.tsx:41
+#: src/shell/pages/companionFlow/AnimateStep.tsx:42
 msgid "{label} still"
 msgstr "{label} still"
 
@@ -772,12 +777,12 @@ msgid "{name} comes with this part. You accepted its licence at the start; the t
 msgstr "{name} comes with this part. You accepted its licence at the start; the terms are in Models and storage."
 
 #. js-lingui-explicit-id
-#: src/shell/AmbientCompanionPane.tsx:336
+#: src/shell/AmbientCompanionPane.tsx:342
 msgid "{name} companion pane"
 msgstr "{name} companion pane"
 
 #. js-lingui-explicit-id
-#: src/shell/AmbientCompanionPane.tsx:328
+#: src/shell/AmbientCompanionPane.tsx:334
 msgid "{name} conversations"
 msgstr "{name} conversations"
 
@@ -913,7 +918,7 @@ msgid "{name} settings"
 msgstr "{name} settings"
 
 #. js-lingui-explicit-id
-#: src/shell/AmbientCompanionPane.tsx:179
+#: src/shell/AmbientCompanionPane.tsx:182
 msgid "{name} speaks with {voice}"
 msgstr "{name} speaks with {voice}"
 
@@ -1350,7 +1355,7 @@ msgid "{value}Ends {dateText}. Last used {dateText2}. Ends in …{hint}"
 msgstr "{value}Ends {dateText}. Last used {dateText2}. Ends in …{hint}"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/companionFlow/AnimateStep.tsx:130
+#: src/shell/pages/companionFlow/AnimateStep.tsx:131
 msgid "{what} for your animations..."
 msgstr "{what} for your animations..."
 
@@ -3079,7 +3084,7 @@ msgid "App folders keep whatever an installed app saved until that app is remove
 msgstr "App folders keep whatever an installed app saved until that app is removed."
 
 #. js-lingui-explicit-id
-#: src/shell/AmbientCompanionPane.tsx:181
+#: src/shell/AmbientCompanionPane.tsx:184
 msgid "Appearance"
 msgstr "Appearance"
 
@@ -3139,6 +3144,11 @@ msgstr "Applying…"
 #: src/shell/pages/companionFlow/CreateCharacterStep.tsx:302
 msgid "Approve & Continue"
 msgstr "Approve & Continue"
+
+#. js-lingui-explicit-id
+#: src/shell/pages/companionFlow/PackSection.tsx:73
+msgid "Approve a picture on the first screen before making a talking character."
+msgstr "Approve a picture on the first screen before making a talking character."
 
 #. js-lingui-explicit-id
 #: src/apps/settings/AddRobotSection.tsx:238
@@ -3507,7 +3517,7 @@ msgstr "Azelma"
 #: src/apps/settings/EngineLinkCredentialSection.tsx:285
 #: src/apps/setup/SetupReviewPage.tsx:65
 #: src/shell/pageHeaderTitle.tsx:148
-#: src/shell/pages/companionFlow/AnimateStep.tsx:153
+#: src/shell/pages/companionFlow/AnimateStep.tsx:155
 #: src/shell/pages/companionFlow/CustomizeStep.tsx:195
 #: src/shell/pages/packageAppHeaderBar.tsx:94
 #: src/shell/pages/PackageAppPage.tsx:283
@@ -4103,7 +4113,7 @@ msgid "setting.companions.ambient_bot.label"
 msgstr "Bot in the companion spot"
 
 #. js-lingui-explicit-id
-#: src/shell/AmbientCompanionPane.tsx:181
+#: src/shell/AmbientCompanionPane.tsx:184
 msgid "Bot options"
 msgstr "Bot options"
 
@@ -4123,7 +4133,7 @@ msgid "Both"
 msgstr "Both"
 
 #. js-lingui-explicit-id
-#: src/shell/AmbientCompanionPane.tsx:180
+#: src/shell/AmbientCompanionPane.tsx:183
 msgid "Bots"
 msgstr "Bots"
 
@@ -4628,7 +4638,7 @@ msgstr "Charles"
 #: src/apps/settings/ModelsSection.tsx:138
 #: src/apps/settings/ModelsSection.tsx:143
 #: src/apps/settings/performanceModel.ts:9
-#: src/shell/AmbientCompanionPane.tsx:323
+#: src/shell/AmbientCompanionPane.tsx:329
 #: src/shell/coreLabels.ts:8
 #: src/shell/pageHeaderTitle.tsx:95
 #: src/shell/pages/ChatPage.tsx:1735
@@ -4956,6 +4966,11 @@ msgid "Checking connection…"
 msgstr "Checking connection…"
 
 #. js-lingui-explicit-id
+#: src/shell/pages/companionFlow/PackSection.tsx:23
+msgid "Checking it"
+msgstr "Checking it"
+
+#. js-lingui-explicit-id
 #: src/apps/setup/StorageStep.tsx:204
 msgid "Checking that Home can use your choice"
 msgstr "Checking that Home can use your choice"
@@ -5231,7 +5246,7 @@ msgid "Choose at least one part."
 msgstr "Choose at least one part."
 
 #. js-lingui-explicit-id
-#: src/shell/AmbientCompanionPane.tsx:180
+#: src/shell/AmbientCompanionPane.tsx:183
 msgid "Choose companion"
 msgstr "Choose companion"
 
@@ -5648,7 +5663,7 @@ msgid "Clear all"
 msgstr "Clear all"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/companionFlow/AnimateStep.tsx:141
+#: src/shell/pages/companionFlow/AnimateStep.tsx:142
 msgid "Clear All"
 msgstr "Clear All"
 
@@ -5739,8 +5754,8 @@ msgstr "Clock style"
 #: src/apps/settings/FreeUpSpaceDialog.tsx:97
 #: src/apps/settings/StackChanInstallDialog.tsx:153
 #: src/apps/setup/AwayFromHome.tsx:175
-#: src/shell/AmbientCompanionPane.tsx:265
-#: src/shell/AmbientCompanionPane.tsx:267
+#: src/shell/AmbientCompanionPane.tsx:271
+#: src/shell/AmbientCompanionPane.tsx:273
 #: src/shell/pages/ChatPage.tsx:1707
 #: src/shell/pages/MusicWorkspacePage.tsx:193
 #: src/shell/pages/status/StatusBoard.tsx:114
@@ -5749,7 +5764,7 @@ msgid "Close"
 msgstr "Close"
 
 #. js-lingui-explicit-id
-#: src/shell/AmbientCompanionPane.tsx:265
+#: src/shell/AmbientCompanionPane.tsx:271
 msgid "Close {name}"
 msgstr "Close {name}"
 
@@ -5967,22 +5982,22 @@ msgid "Companion and controls"
 msgstr "Companion and controls"
 
 #. js-lingui-explicit-id
-#: src/shell/AmbientCompanionPane.tsx:181
+#: src/shell/AmbientCompanionPane.tsx:184
 msgid "Companion options"
 msgstr "Companion options"
 
 #. js-lingui-explicit-id
-#: src/shell/AmbientCompanionPane.tsx:180
+#: src/shell/AmbientCompanionPane.tsx:183
 msgid "Companion or bot"
 msgstr "Companion or bot"
 
 #. js-lingui-explicit-id
-#: src/shell/AmbientCompanionPane.tsx:177
+#: src/shell/AmbientCompanionPane.tsx:180
 msgid "Companion settings"
 msgstr "Companion settings"
 
 #. js-lingui-explicit-id
-#: src/shell/AmbientCompanionPane.tsx:180
+#: src/shell/AmbientCompanionPane.tsx:183
 msgid "Companions in the companion selector"
 msgstr "Companions"
 
@@ -6084,8 +6099,8 @@ msgstr "Connection"
 #: src/apps/setup/CloseAppsStep.tsx:64
 #: src/apps/setup/SetupReviewPage.tsx:66
 #: src/apps/setup/SetupWizard.tsx:503
-#: src/shell/AmbientCompanionPane.tsx:267
-#: src/shell/pages/companionFlow/AnimateStep.tsx:154
+#: src/shell/AmbientCompanionPane.tsx:273
+#: src/shell/pages/companionFlow/AnimateStep.tsx:156
 #: src/shell/pages/CompanionsPage.tsx:162
 #: src/shell/pages/dashboard/HomeShelves.tsx:45
 #: src/shell/pages/dashboard/HomeShelves.tsx:83
@@ -6094,8 +6109,8 @@ msgid "Continue"
 msgstr "Continue"
 
 #. js-lingui-explicit-id
-#: src/shell/AmbientCompanionPane.tsx:336
-#: src/shell/AmbientCompanionPane.tsx:336
+#: src/shell/AmbientCompanionPane.tsx:342
+#: src/shell/AmbientCompanionPane.tsx:342
 msgid "Continue in Chat"
 msgstr "Continue in Chat"
 
@@ -6170,12 +6185,12 @@ msgid "setting.household.conversation_retention_days.label"
 msgstr "Conversation history retention"
 
 #. js-lingui-explicit-id
-#: src/shell/AmbientCompanionPane.tsx:267
+#: src/shell/AmbientCompanionPane.tsx:273
 msgid "Conversation with {name}"
 msgstr "Conversation with {name}"
 
 #. js-lingui-explicit-id
-#: src/shell/AmbientCompanionPane.tsx:322
+#: src/shell/AmbientCompanionPane.tsx:328
 #: src/shell/pages/ChatPage.tsx:1493
 #: src/shell/pages/ChatPage.tsx:1900
 #: src/shell/pages/ChatPage.tsx:1903
@@ -6316,7 +6331,7 @@ msgid "Could not change the chat model. Try again."
 msgstr "Could not change the chat model. Try again."
 
 #. js-lingui-explicit-id
-#: src/shell/AmbientCompanionPane.tsx:173
+#: src/shell/AmbientCompanionPane.tsx:176
 msgid "Could not change the companion. Check your connection and try again."
 msgstr "Could not change the companion. Check your connection and try again."
 
@@ -6386,7 +6401,7 @@ msgid "Could not complete engine setup."
 msgstr "Could not complete engine setup."
 
 #. js-lingui-explicit-id
-#: src/shell/AmbientCompanionPane.tsx:305
+#: src/shell/AmbientCompanionPane.tsx:311
 msgid "Could not continue this side chat. Try again."
 msgstr "Could not continue this side chat. Try again."
 
@@ -6555,7 +6570,7 @@ msgid "Could not load commands."
 msgstr "Could not load commands."
 
 #. js-lingui-explicit-id
-#: src/shell/AmbientCompanionPane.tsx:328
+#: src/shell/AmbientCompanionPane.tsx:334
 msgid "Could not load conversations. Check your connection and try again."
 msgstr "Could not load conversations. Check your connection and try again."
 
@@ -6883,7 +6898,7 @@ msgid "Could not open a chat. Check your connection and try again."
 msgstr "Could not open a chat. Check your connection and try again."
 
 #. js-lingui-explicit-id
-#: src/shell/AmbientCompanionPane.tsx:335
+#: src/shell/AmbientCompanionPane.tsx:341
 msgid "Could not open that conversation. Check your connection and try again."
 msgstr "Could not open that conversation. Check your connection and try again."
 
@@ -6914,7 +6929,7 @@ msgid "Could not post the note."
 msgstr "Could not post the note."
 
 #. js-lingui-explicit-id
-#: src/shell/AmbientCompanionPane.tsx:311
+#: src/shell/AmbientCompanionPane.tsx:317
 #: src/shell/Routes.tsx:317
 msgid "Could not reach {name}. Try again."
 msgstr "Could not reach {name}. Try again."
@@ -8297,6 +8312,11 @@ msgid "Done ({count})"
 msgstr "Done ({count})"
 
 #. js-lingui-explicit-id
+#: src/shell/pages/companionFlow/PackSection.tsx:107
+msgid "Done. Your talking character is installed and shows in the chat pane."
+msgstr "Done. Your talking character is installed and shows in the chat pane."
+
+#. js-lingui-explicit-id
 #: src/apps/people/FaceEnrollmentPage.tsx:72
 #: src/apps/settings/PerformanceCustomize.tsx:58
 #: src/shell/pages/status/StatusComponents.tsx:69
@@ -8448,12 +8468,12 @@ msgid "Drawing the waveform"
 msgstr "Drawing the waveform"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/companionFlow/AnimateStep.tsx:130
+#: src/shell/pages/companionFlow/AnimateStep.tsx:131
 msgid "Drawing your character from the sides and with its mouth open, so every animation matches. This takes a few minutes, and your animations start by themselves when it is done."
 msgstr "Drawing your character from the sides and with its mouth open, so every animation matches. This takes a few minutes, and your animations start by themselves when it is done."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/companionFlow/AnimateStep.tsx:80
+#: src/shell/pages/companionFlow/AnimateStep.tsx:81
 msgid "Drawing your character..."
 msgstr "Drawing your character..."
 
@@ -8575,7 +8595,7 @@ msgid "Edit in its chat"
 msgstr "Edit in its chat"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/companionFlow/AnimateStep.tsx:124
+#: src/shell/pages/companionFlow/AnimateStep.tsx:125
 msgid "Edit keyframe"
 msgstr "Edit keyframe"
 
@@ -8646,12 +8666,12 @@ msgid "setting.search.source_mode.wikimedia.label"
 msgstr "Encyclopedia lookups"
 
 #. js-lingui-explicit-id
-#: src/shell/AmbientCompanionPane.tsx:264
+#: src/shell/AmbientCompanionPane.tsx:270
 msgid "End call"
 msgstr "End call"
 
 #. js-lingui-explicit-id
-#: src/shell/AmbientCompanionPane.tsx:264
+#: src/shell/AmbientCompanionPane.tsx:270
 msgid "End the call"
 msgstr "End the call"
 
@@ -9389,7 +9409,7 @@ msgid "Find anything across your household."
 msgstr "Find anything across your household."
 
 #. js-lingui-explicit-id
-#: src/shell/AmbientCompanionPane.tsx:267
+#: src/shell/AmbientCompanionPane.tsx:273
 #: src/shell/Routes.tsx:317
 msgid "Find me"
 msgstr "Find me"
@@ -9451,7 +9471,7 @@ msgid "Finish these steps before anyone can pick Max for chat or a coding app. H
 msgstr "Finish these steps before anyone can pick Max for chat or a coding app. Home loads the big model for them and gives it back by itself."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/companionFlow/AnimateStep.tsx:149
+#: src/shell/pages/companionFlow/AnimateStep.tsx:151
 msgid "Finish your character on the first screen before making animations."
 msgstr "Finish your character on the first screen before making animations."
 
@@ -9918,12 +9938,12 @@ msgid "Generate Character"
 msgstr "Generate Character"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/companionFlow/AnimateStep.tsx:146
+#: src/shell/pages/companionFlow/AnimateStep.tsx:147
 msgid "Generate Optional ({count})"
 msgstr "Generate Optional ({count})"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/companionFlow/AnimateStep.tsx:137
+#: src/shell/pages/companionFlow/AnimateStep.tsx:138
 msgid "Generate Required"
 msgstr "Generate Required"
 
@@ -10014,6 +10034,7 @@ msgid "failure.composer.mode_change.child"
 msgstr "Getting ready. Back in about a minute."
 
 #. js-lingui-explicit-id
+#: src/shell/pages/companionFlow/PackSection.tsx:25
 #: src/shell/pages/dashboard/GettingStarted.tsx:24
 #: src/shell/pages/dashboard/GettingStarted.tsx:25
 msgid "Getting started"
@@ -10317,6 +10338,11 @@ msgid "setting.person.voice_print.enrollment.does"
 msgstr "Helps Home tell your voice apart from other voices."
 
 #. js-lingui-explicit-id
+#: src/shell/pages/companionFlow/PackSection.tsx:83
+msgid "Here are the short clips it will move with. Do they look right?"
+msgstr "Here are the short clips it will move with. Do they look right?"
+
+#. js-lingui-explicit-id
 #: src/shell/pages/dashboard/Greeting.tsx:32
 msgid "Here is your household today."
 msgstr "Here is your household today."
@@ -10389,7 +10415,7 @@ msgid "Hint"
 msgstr "Hint"
 
 #. js-lingui-explicit-id
-#: src/shell/AmbientCompanionPane.tsx:328
+#: src/shell/AmbientCompanionPane.tsx:334
 msgid "History"
 msgstr "History"
 
@@ -12132,6 +12158,7 @@ msgstr "Installed, needed"
 #: src/apps/setup/SetupWizard.tsx:480
 #: src/apps/setup/SetupWizard.tsx:482
 #: src/apps/setup/SetupWizard.tsx:482
+#: src/shell/pages/companionFlow/PackSection.tsx:24
 msgid "Installing"
 msgstr "Installing"
 
@@ -13629,7 +13656,7 @@ msgid "Loading Coding setup"
 msgstr "Loading Coding setup"
 
 #. js-lingui-explicit-id
-#: src/shell/AmbientCompanionPane.tsx:328
+#: src/shell/AmbientCompanionPane.tsx:334
 msgid "Loading conversations"
 msgstr "Loading conversations"
 
@@ -14044,6 +14071,11 @@ msgid "setting.search.dictionary_fallback.does"
 msgstr "Looks a word up on Wiktionary when the offline library has no entry for it."
 
 #. js-lingui-explicit-id
+#: src/shell/pages/companionFlow/PackSection.tsx:90
+msgid "Looks good, continue"
+msgstr "Looks good, continue"
+
+#. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:1198
 msgid "setting.search.web.child_mode.option.on"
 msgstr "Looks things up online, with the safeguards described above."
@@ -14316,6 +14348,11 @@ msgid "Make a band"
 msgstr "Make a band"
 
 #. js-lingui-explicit-id
+#: src/shell/pages/companionFlow/PackSection.tsx:68
+msgid "Make a character that moves its mouth and face when it talks. It starts from your approved picture, shown above."
+msgstr "Make a character that moves its mouth and face when it talks. It starts from your approved picture, shown above."
+
+#. js-lingui-explicit-id
 #: src/shell/pages/CompanionsPage.tsx:76
 msgid "Make a copy"
 msgstr "Make a copy"
@@ -14356,6 +14393,11 @@ msgstr "Make a song"
 #: src/shell/pages/MusicStudioPages.tsx:100
 msgid "Make a song style"
 msgstr "Make a song style"
+
+#. js-lingui-explicit-id
+#: src/shell/pages/companionFlow/PackSection.tsx:72
+msgid "Make a talking character"
+msgstr "Make a talking character"
 
 #. js-lingui-explicit-id
 #: src/apps/chat/chatThreadSlots.tsx:453
@@ -14414,7 +14456,7 @@ msgid "Make an Inspired voice"
 msgstr "Make an Inspired voice"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/companionFlow/AnimateStep.tsx:123
+#: src/shell/pages/companionFlow/AnimateStep.tsx:124
 #: src/shell/pages/MakeSongPage.tsx:99
 msgid "Make another"
 msgstr "Make another"
@@ -14438,6 +14480,11 @@ msgstr "Make Inspired voice"
 #: src/shell/pages/ChatPage.tsx:1682
 msgid "Make it"
 msgstr "Make it"
+
+#. js-lingui-explicit-id
+#: src/shell/pages/companionFlow/PackSection.tsx:91
+msgid "Make it again"
+msgstr "Make it again"
 
 #. js-lingui-explicit-id
 #: src/shell/pages/MusicStudioPages.tsx:83
@@ -14528,7 +14575,7 @@ msgid "Makes the song sound like one of the bands you made."
 msgstr "Makes the song sound like one of the bands you made."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/companionFlow/AnimateStep.tsx:27
+#: src/shell/pages/companionFlow/AnimateStep.tsx:28
 #: src/shell/pages/MusicWorkspacePage.tsx:103
 msgid "Making"
 msgstr "Making"
@@ -14544,7 +14591,7 @@ msgid "Making a new cover."
 msgstr "Making a new cover."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/companionFlow/AnimateStep.tsx:130
+#: src/shell/pages/companionFlow/AnimateStep.tsx:131
 msgid "Making a picture"
 msgstr "Making a picture"
 
@@ -14564,7 +14611,7 @@ msgid "Making a synth is for teens and adults. Ask an owner or admin if you want
 msgstr "Making a synth is for teens and adults. Ask an owner or admin if you want one."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/companionFlow/AnimateStep.tsx:82
+#: src/shell/pages/companionFlow/AnimateStep.tsx:83
 msgid "Making animations"
 msgstr "Making animations"
 
@@ -14575,9 +14622,29 @@ msgid "Making now"
 msgstr "Making now"
 
 #. js-lingui-explicit-id
+#: src/shell/pages/companionFlow/PackSection.tsx:18
+msgid "Making the clips"
+msgstr "Making the clips"
+
+#. js-lingui-explicit-id
+#: src/shell/pages/companionFlow/PackSection.tsx:21
+msgid "Making the expressions"
+msgstr "Making the expressions"
+
+#. js-lingui-explicit-id
 #: src/shell/pages/MusicWorkspacePage.tsx:186
 msgid "Making the full version. It appears on this song."
 msgstr "Making the full version. It appears on this song."
+
+#. js-lingui-explicit-id
+#: src/shell/pages/companionFlow/PackSection.tsx:20
+msgid "Making the mouth shapes"
+msgstr "Making the mouth shapes"
+
+#. js-lingui-explicit-id
+#: src/shell/pages/companionFlow/PackSection.tsx:17
+msgid "Making the picture"
+msgstr "Making the picture"
 
 #. js-lingui-explicit-id
 #: src/shell/pages/MusicWorkspacePage.tsx:186
@@ -14969,7 +15036,7 @@ msgid "Microphone access is unavailable. Check your browser permission and try a
 msgstr "Microphone access is unavailable. Check your browser permission and try again."
 
 #. js-lingui-explicit-id
-#: src/shell/AmbientCompanionPane.tsx:267
+#: src/shell/AmbientCompanionPane.tsx:273
 #: src/shell/pages/ChatPage.tsx:1694
 msgid "Microphone help"
 msgstr "Microphone help"
@@ -15379,8 +15446,8 @@ msgstr "Mute {name}"
 
 #. js-lingui-explicit-id
 #: src/apps/settings/RobotBody.tsx:283
-#: src/shell/AmbientCompanionPane.tsx:264
-#: src/shell/AmbientCompanionPane.tsx:264
+#: src/shell/AmbientCompanionPane.tsx:270
+#: src/shell/AmbientCompanionPane.tsx:270
 msgid "Mute microphone"
 msgstr "Mute microphone"
 
@@ -15535,7 +15602,7 @@ msgid "Needs an admin grant. Their protections stay on."
 msgstr "Needs an admin grant. Their protections stay on."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/companionFlow/AnimateStep.tsx:31
+#: src/shell/pages/companionFlow/AnimateStep.tsx:32
 msgid "Needs another try"
 msgstr "Needs another try"
 
@@ -15692,8 +15759,8 @@ msgid "New Coding key"
 msgstr "New Coding key"
 
 #. js-lingui-explicit-id
-#: src/shell/AmbientCompanionPane.tsx:336
-#: src/shell/AmbientCompanionPane.tsx:336
+#: src/shell/AmbientCompanionPane.tsx:342
+#: src/shell/AmbientCompanionPane.tsx:342
 msgid "New conversation"
 msgstr "New conversation"
 
@@ -15893,7 +15960,7 @@ msgid "No alarms"
 msgstr "No alarms"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/companionFlow/AnimateStep.tsx:32
+#: src/shell/pages/companionFlow/AnimateStep.tsx:33
 msgid "No animation yet"
 msgstr "No animation yet"
 
@@ -15979,7 +16046,7 @@ msgid "No connection details reported."
 msgstr "No connection details reported."
 
 #. js-lingui-explicit-id
-#: src/shell/AmbientCompanionPane.tsx:328
+#: src/shell/AmbientCompanionPane.tsx:334
 msgid "No conversations with {name} yet."
 msgstr "No conversations with {name} yet."
 
@@ -16618,6 +16685,11 @@ msgid "Not working"
 msgstr "Not working"
 
 #. js-lingui-explicit-id
+#: src/shell/pages/companionFlow/PackSection.tsx:101
+msgid "Not yet"
+msgstr "Not yet"
+
+#. js-lingui-explicit-id
 #: src/shell/pages/status/StatusBoard.tsx:133
 msgid "Note"
 msgstr "Note"
@@ -17179,7 +17251,7 @@ msgid "On {titles}"
 msgstr "On {titles}"
 
 #. js-lingui-explicit-id
-#: src/shell/AmbientCompanionPane.tsx:264
+#: src/shell/AmbientCompanionPane.tsx:270
 msgid "On a call with {name}"
 msgstr "On a call with {name}"
 
@@ -17474,7 +17546,7 @@ msgstr "Only when I ask"
 
 #. js-lingui-explicit-id
 #: src/apps/chat/chatToolUis.tsx:108
-#: src/shell/AmbientCompanionPane.tsx:326
+#: src/shell/AmbientCompanionPane.tsx:332
 #: src/shell/InstallDock.tsx:255
 #: src/shell/library/LibraryItems.tsx:34
 #: src/shell/NotificationBell.tsx:252
@@ -17688,7 +17760,7 @@ msgid "Operational"
 msgstr "Operational"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/companionFlow/AnimateStep.tsx:141
+#: src/shell/pages/companionFlow/AnimateStep.tsx:142
 msgid "Optional"
 msgstr "Optional"
 
@@ -17774,7 +17846,7 @@ msgid "Ours"
 msgstr "Ours"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/companionFlow/AnimateStep.tsx:29
+#: src/shell/pages/companionFlow/AnimateStep.tsx:30
 msgid "Out of date"
 msgstr "Out of date"
 
@@ -18571,7 +18643,7 @@ msgid "planned maintenance for {time}"
 msgstr "planned maintenance for {time}"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/companionFlow/AnimateStep.tsx:44
+#: src/shell/pages/companionFlow/AnimateStep.tsx:45
 #: src/shell/pages/MusicStudioView.tsx:227
 msgid "Play"
 msgstr "Play"
@@ -18682,7 +18754,7 @@ msgid "area.Port"
 msgstr "Port"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/companionFlow/AnimateStep.tsx:119
+#: src/shell/pages/companionFlow/AnimateStep.tsx:120
 msgid "portrait"
 msgstr "portrait"
 
@@ -18719,7 +18791,7 @@ msgid "Preparing the voice test"
 msgstr "Preparing the voice test"
 
 #. js-lingui-explicit-id
-#: src/shell/AmbientCompanionPane.tsx:181
+#: src/shell/AmbientCompanionPane.tsx:184
 msgid "Presence"
 msgstr "Presence"
 
@@ -18806,14 +18878,14 @@ msgstr "Pretend the next Tailscale step is done"
 #. js-lingui-explicit-id
 #: src/apps/settings/AddVoiceForm.tsx:70
 #: src/shell/library/TranscriptFindReplace.tsx:107
-#: src/shell/pages/companionFlow/AnimateStep.tsx:114
+#: src/shell/pages/companionFlow/AnimateStep.tsx:115
 #: src/shell/pages/companionFlow/CustomizeStep.tsx:147
 #: src/shell/pages/settings/ClockCardRenderer.tsx:20
 msgid "Preview"
 msgstr "Preview"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/companionFlow/AnimateStep.tsx:43
+#: src/shell/pages/companionFlow/AnimateStep.tsx:44
 msgid "Preview not available in this browser."
 msgstr "Preview not available in this browser."
 
@@ -18899,7 +18971,7 @@ msgid "api.error.profile_not_found"
 msgstr "Profile not found"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/companionFlow/AnimateStep.tsx:130
+#: src/shell/pages/companionFlow/AnimateStep.tsx:131
 #: src/shell/pages/CompanionsPage.tsx:317
 #: src/shell/pages/CompanionsPage.tsx:317
 msgid "Progress"
@@ -18950,6 +19022,11 @@ msgstr "Puts songs ahead of every other big job."
 #: src/lib/settingCopy.generated.ts:956
 msgid "setting.resources.strict.video.does"
 msgstr "Puts videos ahead of every other big job."
+
+#. js-lingui-explicit-id
+#: src/shell/pages/companionFlow/PackSection.tsx:22
+msgid "Putting it together"
+msgstr "Putting it together"
 
 #. js-lingui-explicit-id
 #: src/apps/setup/AwayFromHome.tsx:157
@@ -19111,7 +19188,7 @@ msgid "setting.ease.read_aloud.label"
 msgstr "Read aloud"
 
 #. js-lingui-explicit-id
-#: src/shell/AmbientCompanionPane.tsx:329
+#: src/shell/AmbientCompanionPane.tsx:335
 msgid "Read aloud is unavailable because voice output is not ready. Check Voice settings and try again."
 msgstr "Read aloud is unavailable because voice output is not ready. Check Voice settings and try again."
 
@@ -19123,8 +19200,8 @@ msgstr "Read diagnostics only"
 #. js-lingui-explicit-id
 #: src/apps/chat/chatHeaderBar.tsx:223
 #: src/apps/chat/chatHeaderBar.tsx:321
-#: src/shell/AmbientCompanionPane.tsx:332
-#: src/shell/AmbientCompanionPane.tsx:332
+#: src/shell/AmbientCompanionPane.tsx:338
+#: src/shell/AmbientCompanionPane.tsx:338
 msgid "Read replies aloud"
 msgstr "Read replies aloud"
 
@@ -19168,7 +19245,7 @@ msgstr "Reading the details…"
 #: src/apps/setup/AwayFromHome.tsx:139
 #: src/apps/setup/CheckGrid.tsx:31
 #: src/apps/setup/SetupWizard.tsx:480
-#: src/shell/pages/companionFlow/AnimateStep.tsx:30
+#: src/shell/pages/companionFlow/AnimateStep.tsx:31
 #: src/shell/pages/CompanionsPage.tsx:241
 #: src/shell/pages/EnginesPage.tsx:34
 msgid "Ready"
@@ -19791,7 +19868,7 @@ msgid "Require session lock for {name}"
 msgstr "Require session lock for {name}"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/companionFlow/AnimateStep.tsx:133
+#: src/shell/pages/companionFlow/AnimateStep.tsx:134
 msgid "Required"
 msgstr "Required"
 
@@ -20261,7 +20338,7 @@ msgid "setting.robot.brightness.label"
 msgstr "Robot screen brightness"
 
 #. js-lingui-explicit-id
-#: src/shell/AmbientCompanionPane.tsx:181
+#: src/shell/AmbientCompanionPane.tsx:184
 msgid "Robot settings"
 msgstr "Robot settings"
 
@@ -21260,7 +21337,7 @@ msgid "Select all"
 msgstr "Select all"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/companionFlow/AnimateStep.tsx:141
+#: src/shell/pages/companionFlow/AnimateStep.tsx:142
 msgid "Select All"
 msgstr "Select All"
 
@@ -21567,7 +21644,7 @@ msgid "Setting up your AI"
 msgstr "Setting up your AI"
 
 #. js-lingui-explicit-id
-#: src/shell/AmbientCompanionPane.tsx:332
+#: src/shell/AmbientCompanionPane.tsx:338
 #: src/shell/coreLabels.ts:13
 #: src/shell/pageHeaderTitle.tsx:97
 #: src/shell/pages/FilesPage.tsx:300
@@ -21926,7 +22003,7 @@ msgid "Shuffle"
 msgstr "Shuffle"
 
 #. js-lingui-explicit-id
-#: src/shell/AmbientCompanionPane.tsx:323
+#: src/shell/AmbientCompanionPane.tsx:329
 msgid "Side chat"
 msgstr "Side chat"
 
@@ -23079,10 +23156,11 @@ msgstr "Stone"
 #: src/apps/settings/StackChanInstallDialog.tsx:146
 #: src/apps/settings/VoiceBrowserSection.tsx:99
 #: src/apps/settings/VoiceManagerSection.tsx:123
-#: src/shell/pages/companionFlow/AnimateStep.tsx:138
-#: src/shell/pages/companionFlow/AnimateStep.tsx:147
+#: src/shell/pages/companionFlow/AnimateStep.tsx:139
+#: src/shell/pages/companionFlow/AnimateStep.tsx:148
 #: src/shell/pages/companionFlow/CreateCharacterStep.tsx:297
 #: src/shell/pages/companionFlow/CustomizeStep.tsx:147
+#: src/shell/pages/companionFlow/PackSection.tsx:79
 #: src/shell/pages/CompanionsPage.tsx:386
 #: src/shell/pages/EnginesPage.tsx:239
 #: src/shell/pages/status/StatusComponents.tsx:136
@@ -23457,14 +23535,19 @@ msgid "Takes"
 msgstr "Takes"
 
 #. js-lingui-explicit-id
-#: src/shell/AmbientCompanionPane.tsx:335
+#: src/shell/AmbientCompanionPane.tsx:341
 msgid "Talk"
 msgstr "Talk"
 
 #. js-lingui-explicit-id
-#: src/shell/AmbientCompanionPane.tsx:265
+#: src/shell/AmbientCompanionPane.tsx:271
 msgid "Talk to {name}..."
 msgstr "Talk to {name}..."
+
+#. js-lingui-explicit-id
+#: src/shell/pages/companionFlow/PackSection.tsx:67
+msgid "Talking character"
+msgstr "Talking character"
 
 #. js-lingui-explicit-id
 #: src/shell/AlarmRinger.tsx:58
@@ -23855,9 +23938,9 @@ msgstr "That did not send. Try again."
 #: src/apps/settings/UsersSection.tsx:333
 #: src/apps/settings/VoiceManagerSection.tsx:101
 #: src/apps/settings/VoiceManagerSection.tsx:102
-#: src/shell/AmbientCompanionPane.tsx:178
-#: src/shell/AmbientCompanionPane.tsx:262
-#: src/shell/AmbientCompanionPane.tsx:330
+#: src/shell/AmbientCompanionPane.tsx:181
+#: src/shell/AmbientCompanionPane.tsx:268
+#: src/shell/AmbientCompanionPane.tsx:336
 #: src/shell/InstallDock.tsx:312
 #: src/shell/library/LibraryViewer.tsx:108
 #: src/shell/library/LibraryViewer.tsx:114
@@ -23866,7 +23949,7 @@ msgstr "That did not send. Try again."
 #: src/shell/MediaPickerDialog.tsx:56
 #: src/shell/pages/CompanionAudienceDialog.tsx:49
 #: src/shell/pages/CompanionAudienceDialog.tsx:62
-#: src/shell/pages/companionFlow/AnimateStep.tsx:131
+#: src/shell/pages/companionFlow/AnimateStep.tsx:132
 #: src/shell/pages/companionFlow/CompanionFlowDialog.tsx:67
 #: src/shell/pages/companionFlow/CreateCharacterStep.tsx:247
 #: src/shell/pages/companionFlow/CreateCharacterStep.tsx:277
@@ -23876,6 +23959,7 @@ msgstr "That did not send. Try again."
 #: src/shell/pages/companionFlow/CustomizeStep.tsx:173
 #: src/shell/pages/companionFlow/CustomizeStep.tsx:189
 #: src/shell/pages/companionFlow/KeyframeEditor.tsx:95
+#: src/shell/pages/companionFlow/PackSection.tsx:69
 #: src/shell/pages/EnginesPage.tsx:147
 #: src/shell/pages/FamilyPage.tsx:49
 #: src/shell/pages/FamilyPage.tsx:50
@@ -24422,6 +24506,11 @@ msgid "The face samples could not be saved."
 msgstr "The face samples could not be saved."
 
 #. js-lingui-explicit-id
+#: src/shell/pages/companionFlow/PackSection.tsx:98
+msgid "The finished character could not be shown yet. Wait a moment and reload this page."
+msgstr "The finished character could not be shown yet. Wait a moment and reload this page."
+
+#. js-lingui-explicit-id
 #: src/apps/settings/StackChanInstallDialog.tsx:125
 msgid "The firmware is written. If the StackChan has not restarted within 10 seconds, unplug its USB cable and plug it back in (the reset from this page does not restart every unit). It then reconnects within a minute, with its name, Wi-Fi and pairing unchanged."
 msgstr "The firmware is written. If the StackChan has not restarted within 10 seconds, unplug its USB cable and plug it back in (the reset from this page does not restart every unit). It then reconnects within a minute, with its name, Wi-Fi and pairing unchanged."
@@ -24574,7 +24663,7 @@ msgid "The microphone choice is remembered on this device only."
 msgstr "The microphone choice is remembered on this device only."
 
 #. js-lingui-explicit-id
-#: src/shell/AmbientCompanionPane.tsx:265
+#: src/shell/AmbientCompanionPane.tsx:271
 msgid "The microphone writes a transcript in the talk box. Use Call for a live voice conversation."
 msgstr "The microphone writes a transcript in the talk box. Use Call for a live voice conversation."
 
@@ -25012,6 +25101,11 @@ msgstr "The style could not be added. Check that the engine is running, then try
 #: src/lib/settingCopy.generated.ts:1304
 msgid "setting.synths.real_people_allowed.help"
 msgstr "The synths based on real people that a parent said yes to for this person. A yes is added when a parent allows an ask; it can be removed here."
+
+#. js-lingui-explicit-id
+#: src/shell/pages/companionFlow/PackSection.tsx:63
+msgid "The talking character could not be made. Try again."
+msgstr "The talking character could not be made. Try again."
 
 #. js-lingui-explicit-id
 #: src/shell/coreLabels.ts:31
@@ -25858,6 +25952,11 @@ msgid "Tracking"
 msgstr "Tracking"
 
 #. js-lingui-explicit-id
+#: src/shell/pages/companionFlow/PackSection.tsx:19
+msgid "Tracking the head"
+msgstr "Tracking the head"
+
+#. js-lingui-explicit-id
 #: src/shell/pages/MusicStudioView.tsx:210
 msgid "Tracks"
 msgstr "Tracks"
@@ -25987,13 +26086,14 @@ msgstr "Trigger phrase, e.g. \"movie night\""
 #: src/apps/setup/SetupWizard.tsx:503
 #: src/apps/setup/StorageStep.tsx:35
 #: src/apps/setup/WebSearchStep.tsx:74
-#: src/shell/AmbientCompanionPane.tsx:267
+#: src/shell/AmbientCompanionPane.tsx:273
 #: src/shell/InstallDock.tsx:255
 #: src/shell/InstallDock.tsx:307
 #: src/shell/InstallStrip.tsx:96
 #: src/shell/library/LibraryUploads.tsx:75
 #: src/shell/pages/ActivityPage.tsx:37
-#: src/shell/pages/companionFlow/AnimateStep.tsx:132
+#: src/shell/pages/companionFlow/AnimateStep.tsx:133
+#: src/shell/pages/companionFlow/PackSection.tsx:105
 #: src/shell/pages/dashboard/ArrangeHome.tsx:71
 #: src/shell/pages/FamilyPage.tsx:49
 #: src/shell/pages/FamilyPage.tsx:50
@@ -26805,6 +26905,11 @@ msgid "Use the starter list"
 msgstr "Use the starter list"
 
 #. js-lingui-explicit-id
+#: src/shell/pages/companionFlow/PackSection.tsx:100
+msgid "Use this character"
+msgstr "Use this character"
+
+#. js-lingui-explicit-id
 #: src/apps/setup/StorageStep.tsx:28
 msgid "Use this folder"
 msgstr "Use this folder"
@@ -27148,7 +27253,7 @@ msgstr "Vocals"
 #. js-lingui-explicit-id
 #: src/apps/settings/ModelsAndStorageSection.tsx:22
 #: src/apps/settings/VoiceManagerSection.tsx:106
-#: src/shell/AmbientCompanionPane.tsx:181
+#: src/shell/AmbientCompanionPane.tsx:184
 #: src/shell/pages/companionFlow/CustomizeStep.tsx:137
 #: src/shell/pages/companionFlow/CustomizeStep.tsx:144
 #: src/shell/pages/CompanionsPage.tsx:350
@@ -27392,7 +27497,7 @@ msgid "Waiting in line: chat and voice {reserved}, pictures and tools {warm}, bi
 msgstr "Waiting in line: chat and voice {reserved}, pictures and tools {warm}, big jobs {burst}"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/companionFlow/AnimateStep.tsx:28
+#: src/shell/pages/companionFlow/AnimateStep.tsx:29
 msgid "Waiting its turn"
 msgstr "Waiting its turn"
 
@@ -28519,7 +28624,7 @@ msgid "Your change was not saved"
 msgstr "Your change was not saved"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/companionFlow/AnimateStep.tsx:77
+#: src/shell/pages/companionFlow/AnimateStep.tsx:78
 #: src/shell/pages/companionFlow/CreateCharacterStep.tsx:283
 msgid "Your character"
 msgstr "Your character"
@@ -28818,6 +28923,11 @@ msgstr "Your synth will appear here"
 #: src/shell/pages/SoundExtras.tsx:40
 msgid "Your takes"
 msgstr "Your takes"
+
+#. js-lingui-explicit-id
+#: src/shell/pages/companionFlow/PackSection.tsx:96
+msgid "Your talking character is ready. Watch it move, then decide."
+msgstr "Your talking character is ready. Watch it move, then decide."
 
 #. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:775
