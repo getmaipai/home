@@ -139,6 +139,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `frontend/src/apps/reminders/SmartListView.tsx` | SmartListView |
 | `frontend/src/apps/settings/AddChatModel.tsx` | AddChatModel |
 | `frontend/src/apps/settings/AddRobotSection.tsx` | AddRobotSection |
+| `frontend/src/apps/settings/AddVoiceBox.tsx` | AddVoiceBox |
 | `frontend/src/apps/settings/AddVoiceForm.tsx` | AddVoiceForm |
 | `frontend/src/apps/settings/AdminGatedContent.tsx` | AdminGatedContent |
 | `frontend/src/apps/settings/AiGlance.tsx` | AiGlance |
