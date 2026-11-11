@@ -118,6 +118,7 @@ function styleRefusal(callId: string, args: Record<string, unknown>, line: strin
 }
 
 const PHOTO_ATTACH_LINE = "Attach one photo to your message.";
+const SEVERAL_PHOTOS_LINE = "A single clip starts from one photo. With several photos I can make it as a film instead: tell the person that, and call make_film with their idea (the attached photos are used there).";
 
 export async function runGenerateVideo(input: RunGenerateVideoInput): Promise<ToolExecutionOutcome> {
   const { state, args, callId } = input;
@@ -170,6 +171,7 @@ export async function runGenerateVideo(input: RunGenerateVideoInput): Promise<To
   } else if (from && !state.conversationId) return refuseWith("A picture can start a video from a chat. Open a chat, then ask for it there.");
   else if (isAttached(from)) {
     const attached = state.images ?? [];
+    if (attached.length > 1) return refuseWith(SEVERAL_PHOTOS_LINE);
     if (attached.length !== 1) return refuseWith(PHOTO_ATTACH_LINE);
     const photo = loadUploadedPhoto(actor, state.conversationId!, attached[0]!.id, temporary);
     if (!photo.ok) return refuseWith(photo.line);

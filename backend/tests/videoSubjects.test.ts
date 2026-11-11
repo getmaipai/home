@@ -47,6 +47,19 @@ describe("generate_video saved subjects", () => {
     expect(result.status).toBe("succeeded");
     expect(fake.submitted).toHaveLength(0);
   });
+  test("several attached photos send the model to make_film instead of asking for one photo", async () => {
+    const conversation = resolveOrCreateConversation(owner, "chat");
+    if (!conversation.ok) throw new Error("conversation");
+    const turnId = newConversationTurnId();
+    db.insert(conversationTurns).values({ id: turnId, personId: owner.id, surface: "chat", conversationId: conversation.value.id, userText: "hi", replyText: "ok", source: "model", safetyAction: "allow", createdAt: new Date().toISOString(), hlc: "1:0:test" }).run();
+    const bytes = new Uint8Array(await sharp({ create: { width: 32, height: 32, channels: 3, background: "red" } }).png().toBuffer());
+    const a = createAttachment(owner, { conversationId: conversation.value.id, turnId, mediaType: "image/png", bytes }), b = createAttachment(owner, { conversationId: conversation.value.id, turnId, mediaType: "image/png", bytes });
+    if (!a.ok || !b.ok) throw new Error("upload");
+    const result = await runGenerateVideo({ state: { actor: owner, temporary: false, conversationId: conversation.value.id, turnId, images: [{ id: a.value.id }, { id: b.value.id }] as never }, args: { prompt: "A commercial for a mug", from_picture: "attached" }, callId: "c", spoken: false, audience: { actor: owner, band: "adult", surface: "chat", surfaceClass: "written", spoken: false } as never });
+    expect(result.status).toBe("succeeded");
+    expect(JSON.stringify(result.result?.reply)).toContain("make_film");
+    expect(fake.submitted).toHaveLength(0);
+  });
   test("explicit from_picture takes precedence over subject reference", async () => {
     await subject();
     const conversation = resolveOrCreateConversation(owner, "chat");

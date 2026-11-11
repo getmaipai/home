@@ -4,7 +4,7 @@
   "kind": "plugin",
   "category": "Media",
   "display": "Make a Video",
-  "description": "Make a short video; call before saying one exists.",
+  "description": "Make one short clip from words or from one picture (a commercial, a story or several pictures is make_film); call before saying one exists.",
   "offer": {
     "mode": "conditional",
     "gate": "videosAllowed",

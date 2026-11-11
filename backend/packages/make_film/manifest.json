@@ -4,7 +4,7 @@
   "kind": "plugin",
   "category": "Media",
   "display": "Make a Film",
-  "description": "Plan and start a short film from an idea, scene or script; for longer than two minutes, write a production step by step.",
+  "description": "Make a film, commercial, ad or story video from an idea, a script or the person's attached pictures (a product, an actor, a set); longer than two minutes is written step by step.",
   "offer": {
     "mode": "conditional",
     "gate": "filmAllowed",
@@ -24,7 +24,7 @@
       "Make a 3 minute video about a lighthouse keeper",
       "Write me a sitcom episode about two roommates",
       "I want a feature-length movie about a heist",
-      "Yes, that is good, go on"
+      "Make a 30-second commercial for this coffee mug", "Use these photos to make an ad for my product", "Make a video from these pictures", "Yes, that is good, go on"
     ],
     "patterns": []
   },
