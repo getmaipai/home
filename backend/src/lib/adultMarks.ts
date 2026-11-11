@@ -29,6 +29,7 @@ export const NOT_FOUND_LINE = "That item is not here.";
 export const NOT_READY_LINE = "Wait until it is made, then try again.";
 export const TEMPORARY_LINE = "A video made in a temporary chat is not saved, so it cannot be marked.";
 export const NOT_MARKED_LINE = "This item is not locked.";
+export const SHARED_NO_LOCK_LINE = "A shared item cannot be locked. Stop sharing it first, then lock it.";
 /** The plain words of an item's state, for the person who may see it (the item's menu). */
 export const STATE_LINES = {
   locked: "Locked. It opens only with your passcode, and people under 18 never see it.",
@@ -47,6 +48,11 @@ export function markHistory(actor: PersonRow, itemId: string, ownerPersonId: str
 }
 
 interface ItemRow { id: string; ownerPersonId: string; provenance: string; deletedAt: string | null }
+/** True while anyone (a person or the household) can open the file through a share. A shared item cannot be locked. */
+function isShared(fileId: string): boolean {
+  return sqlite.query<{ n: number }, [string]>("SELECT count(*) AS n FROM shares WHERE file_id = ?").get(fileId)!.n > 0;
+}
+
 function itemRow(fileId: string): ItemRow | null {
   const row = db.select({ id: attachments.id, ownerPersonId: attachments.ownerPersonId, provenance: attachments.provenance, deletedAt: attachments.deletedAt }).from(attachments).where(eq(attachments.id, fileId)).get();
   if (!row) return null;
@@ -74,7 +80,7 @@ export function adultStateOf(actor: PersonRow, fileId: string): AdultStateView |
     made_audience: item.madeAudience,
     lock: adultOnly ? item.lock : "off",
     can_clear: adultOnly && item.lock === "on",
-    can_mark: !adultOnly || item.lock === "off",
+    can_mark: (!adultOnly || item.lock === "off") && !isShared(row.id),
     line: adultOnly ? (item.lock === "on" ? STATE_LINES.locked : STATE_LINES.cleared) : null,
     history: adultOnly ? markHistory(actor, row.id, row.ownerPersonId) : [],
   };
@@ -127,6 +133,7 @@ export function setItemLock(input: { actor: PersonRow; fileId: string; action: M
   if (!owner && !isOwnerOrAdmin(actor)) return { ok: false, status: 404, error: NOT_FOUND_LINE };
   if (!adultActor) return { ok: false, status: owner ? 403 : 404, error: owner ? SHARED_SCREEN_MARK_LINE : NOT_FOUND_LINE };
   if (item.madeAudience === "adult-only" && item.lock === "on") return { ok: true, made_audience: "adult-only", lock: "on", changed: false };
+  if (isShared(row.id)) return { ok: false, status: 409, error: SHARED_NO_LOCK_LINE };
   sqlite.transaction(() => { writeLock(row, "on", true); logMark({ itemId: row.id, action: "mark", actorId: actor.id, via: owner ? "creator" : "admin" }); })();
   return { ok: true, made_audience: "adult-only", lock: "on", changed: true };
 }

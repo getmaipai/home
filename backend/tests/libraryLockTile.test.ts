@@ -4,7 +4,7 @@ import { createHash } from "node:crypto";
 import { beforeEach, expect, test } from "bun:test";
 import { eq } from "drizzle-orm";
 import { db } from "@/db";
-import { attachments, people } from "@/db/schema";
+import { attachments, people, shares } from "@/db/schema";
 import { nextHlc } from "@/lib/hlc";
 import { listLibrary } from "@/lib/library";
 import { __resetAdultLockForTests, __unlockedForTests } from "@/lib/adultLock";
@@ -24,7 +24,7 @@ async function owner() {
     db.insert(attachments).values({ id: key, ownerPersonId: person.id, conversationId: null, turnId: null, mediaType: "image/png", size: n + 1, sha256: createHash("sha256").update(key).digest("hex"), storagePath: `people/${person.id}/attachments/${key}`, provenance, createdAt: new Date(2026, 0, n).toISOString(), hlc: nextHlc() }).run();
     return key;
   };
-  return { person, file };
+  return { client, person, file };
 }
 
 test("a locked item leaves the list and the page says so with one flag, no count", async () => {
@@ -71,4 +71,19 @@ test("the flag follows the view: a search that matches no locked item shows no t
   file('picture-gen:{"audience":"all-ages","prompt":"giraffe"}');
   expect(listLibrary(person, { search: "giraffe" }).locked).toBe(false);
   expect(listLibrary(person, { search: "zebra" }).locked).toBe(true);
+});
+
+test("a shared item cannot be locked: no Lock button, and the hub refuses with a plain line; it locks again once the share is gone", async () => {
+  const { client, person, file } = await owner();
+  const id = file('picture-gen:{"audience":"all-ages"}');
+  expect(listLibrary(person, {}).items[0]!.adult).toMatchObject({ can_mark: true });
+  db.insert(shares).values({ id: "share-1", fileId: id, fromPersonId: person.id, to: "household", provenance: "fixture", createdAt: "2026-11-10", hlc: nextHlc() }).run();
+  expect(listLibrary(person, {}).items[0]!.adult).toMatchObject({ can_mark: false });
+  const refused = await client.post(`/api/library/files/${id}/adult-mark`, { action: "mark" });
+  expect(refused.status).toBe(409);
+  expect((await refused.json() as { error: string }).error).toBe("A shared item cannot be locked. Stop sharing it first, then lock it.");
+  db.delete(shares).where(eq(shares.id, "share-1")).run();
+  const ok = await client.post(`/api/library/files/${id}/adult-mark`, { action: "mark" });
+  expect(ok.status).toBe(200);
+  expect(await ok.json()).toEqual({ made_audience: "adult-only", lock: "on" });
 });

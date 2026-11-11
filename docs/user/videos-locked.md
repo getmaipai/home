@@ -20,7 +20,7 @@ People under 18 never see an adults-only video, locked or not. The TV and other 
 
 After that, the video says "Lock removed." Anyone under 18 still cannot see it. Only the person who made the video can take the lock off. An admin cannot take it off another person's video.
 
-**Lock it again.** Press **Lock** on any of your videos. It locks at once, and you do not need your passcode. An admin can also lock more videos.
+**Lock it again.** Press **Lock** on any of your videos. It locks at once, and you do not need your passcode. A video you have shared cannot be locked: stop sharing it first. An admin can also lock more videos.
 
 **Changing a video.** A trimmed, joined or mixed video follows the videos it came from. If the video you changed had its lock removed, the new one has no lock. If any video you used is still locked, the new one is locked. A new take that uses an adults-only style again is locked.
 
