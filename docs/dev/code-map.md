@@ -642,6 +642,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/localStackService.ts` | installRoot, stackDataDir, stopLocalStackService, startLocalStackService, __setStackServiceRunnerForTests |
 | `backend/src/lib/locale.ts` | resolveLocale, resolveLocaleFromValues, householdLocale, isSafeAutoTranslation |
 | `backend/src/lib/log.ts` | appendLogLine, installConsoleFileMirror, installFatalErrorHandlers |
+| `backend/src/lib/longform/characters.ts` | prepareCharacters, savedCharacters |
 | `backend/src/lib/longform/documents.ts` | DOCUMENT_KINDS, MAX_DOCUMENT_CHARS, saveDocument, getDocument, listDocuments, approveDocument |
 | `backend/src/lib/longform/runner.ts` | isProducing, stopProducing, renderScene, produce, progressOf |
 | `backend/src/lib/longform/scripts.ts` | scriptSchema, SHOT_MIN_SECONDS, buildShotList, writeScene |
