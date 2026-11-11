@@ -37,6 +37,9 @@ const filmPlanShape = {
   look: z.enum(FILM_LOOK_PRESETS).optional(),
   letterbox: z.enum(LETTERBOX_RATIOS).optional(),
   credits: z.array(z.object({ role: z.string().min(1).max(80), name: z.string().min(1).max(80) })).max(20),
+  /** LONGFORM: false leaves out the title card or the credits (a middle run of a long production). Absent means shown. */
+  title_card: z.boolean().optional(),
+  credits_card: z.boolean().optional(),
 };
 export const filmPlanSchema = z.object({ ...filmPlanShape, cast: filmPlanShape.cast.min(1) });
 export const facelessFilmPlanSchema = z.object({

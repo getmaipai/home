@@ -16,13 +16,14 @@ const stops = new Map<string, AbortController>();
 export const isProducing = (productionId: string) => working.has(productionId);
 export function stopProducing(productionId: string): boolean { const c = stops.get(productionId); if (!c) return false; c.abort(); return true; }
 
-function planFor(chunk: ShotList["shots"], t: Treatment, bible: Bible, scene: Outline["scenes"][number], part: string): FilmPlan {
+/** Only the very first run of a production has the title card and only the very last has the credits. */
+function planFor(chunk: ShotList["shots"], t: Treatment, bible: Bible, scene: Outline["scenes"][number], part: string, ends: { first: boolean; last: boolean }): FilmPlan {
   const named = bible.cast.filter((c) => chunk.some((s) => s.still.includes(c.name))).slice(0, 6);
   const cast = (named.length ? named : bible.cast.slice(0, 1)).map((c) => ({ name: c.name, kind: "character" as const, locked: c.description.slice(0, 400) }));
   return {
     title: `${t.title}: ${scene.title}${part}`.slice(0, 80), summary: scene.beat.slice(0, 400), cast,
     shots: chunk.map((s) => ({ id: s.id, subject_ids: [], framing: s.framing, still: `${s.still} ${t.look}`.slice(0, 600), motion: s.motion, seconds: s.seconds, ...(s.line ? { line: s.line.slice(0, 160) } : {}) })),
-    music: bible.music[0]?.mood.slice(0, 300) ?? "soft underscore", credits: [],
+    music: bible.music[0]?.mood.slice(0, 300) ?? "soft underscore", credits: [], title_card: ends.first, credits_card: ends.last,
   };
 }
 
@@ -45,7 +46,7 @@ export async function renderScene(actor: PersonRow, productionId: string, sceneK
     const idea = `${productionId}:${sceneKey}:${i}`;
     if (finished.has(idea)) continue;
     if (signal?.aborted) return { ok: false, line: "Stopped. Press Resume to continue." };
-    const started = startPlannedFilm({ actor, idea, plan: planFor(chunk, tDoc.json as Treatment, bibleDoc.json as Bible, entry, part), parentId: productionId, sceneKey });
+    const started = startPlannedFilm({ actor, idea, plan: planFor(chunk, tDoc.json as Treatment, bibleDoc.json as Bible, entry, part, { first: sceneKey === structure.plan.scenes[0]!.key && i === 0, last: sceneKey === structure.plan.scenes[structure.plan.scenes.length - 1]!.key && i === scene.runs.length - 1 }), parentId: productionId, sceneKey });
     if ("line" in started) return { ok: false, line: started.line };
     ids.push(started.id);
     const end = await started.done;

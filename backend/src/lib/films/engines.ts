@@ -170,8 +170,9 @@ export function realFilmEngines(input: { actor: PersonRow; signal: AbortSignal; 
         const baseLength = videoSeconds.every((seconds): seconds is number => seconds !== null)
           ? videoSeconds.reduce<number>((sum, seconds) => sum + seconds, 0) - transitionCount * 0.5
           : videoSeconds.reduce<number>((sum, seconds) => sum + (seconds ?? 0), 0);
-        const creditLines = [...plan.credits.filter((entry) => !/^(unnamed|unknown|n\/a|none|tbd)$/i.test(entry.name.trim()) && entry.name.trim().length > 0), { role: "Made with", name: "MaiPai" }];
-        const added = (plan.title ? 3 : 0) + Math.max(3, Math.ceil(creditLines.length * 2 / 2));
+        const creditLines = plan.credits_card === false ? [] : [...plan.credits.filter((entry) => !/^(unnamed|unknown|n\/a|none|tbd)$/i.test(entry.name.trim()) && entry.name.trim().length > 0), { role: "Made with", name: "MaiPai" }];
+        const showTitle = plan.title_card !== false, showCredits = plan.credits_card !== false;
+        const added = (showTitle ? 3 : 0) + (showCredits ? Math.max(3, Math.ceil(creditLines.length * 2 / 2)) : 0);
         const totalSeconds = baseLength + added;
         if (totalSeconds > MAX_EDIT_SECONDS) throw new Error("That film would be longer than 10 minutes. Use shorter videos or fewer title and credit lines.");
         const clips = clipIds.map((id) => readAttachment(actor, id));
@@ -182,7 +183,7 @@ export function realFilmEngines(input: { actor: PersonRow; signal: AbortSignal; 
         const ops: import("@/lib/videos/stackEdit").EditOp[] = [];
         if (transitions.length) ops.push(...filmOps({ transition: transitions[0], includeJoin: true }));
         for (let i = 1; i < transitions.length; i++) ops.push(...filmOps({ transition: transitions[i], includeJoin: true }));
-        ops.push(...filmOps({ includeJoin: false, title: plan.title, summary: plan.summary, credits, look: plan.look, letterbox: plan.letterbox }));
+        ops.push(...filmOps({ includeJoin: false, title: showTitle ? plan.title : undefined, summary: plan.summary, credits: showCredits ? credits : undefined, look: plan.look, letterbox: plan.letterbox }));
         ops.push(overlayOp(clipIds.length, { gain_db: -12, clip_gain_db: 0, fade_out_s: 2 }, 0, false));
         if (ops.length > MAX_EDIT_OPS) throw new Error("That film needs too many editing steps.");
         const editInputs = clips.map((item) => {
@@ -200,7 +201,7 @@ export function realFilmEngines(input: { actor: PersonRow; signal: AbortSignal; 
         if (!saved.ok) throw new Error(saved.error);
         return saved.value.id;
       }
-      const film = await runEditVideo({ state, args: { change: "film", production: productionId, ...(plan.look ? { look: plan.look } : {}), ...(plan.letterbox ? { letterbox: plan.letterbox } : {}) }, callId: "film-assemble", spoken: false });
+      const film = await runEditVideo({ state, args: { change: "film", production: productionId, ...(plan.title_card === false ? { no_title: true } : {}), ...(plan.credits_card === false ? { no_credits: true } : {}), ...(plan.look ? { look: plan.look } : {}), ...(plan.letterbox ? { letterbox: plan.letterbox } : {}) }, callId: "film-assemble", spoken: false });
       let id = (film.result?.data as { videoJobId?: string } | undefined)?.videoJobId;
       if (!id) { console.error("[film] assemble refused", JSON.stringify(film.result?.reply ?? film).slice(0, 600)); throw new Error("The film could not be assembled."); }
       let job = await poll(() => getVideoJobFor(actor, id!), signal, 25 * 60_000, (value) => value.state === "failed" || value.state === "cancelled" ? "The film could not be assembled." : null);

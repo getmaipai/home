@@ -89,6 +89,9 @@ export const editVideoArgs = z.object({
   subtitle: z.string().trim().max(160).optional(),
   credits: z.array(z.object({ role: z.string().trim().max(40).optional(), name: z.string().trim().min(1).max(60) })).min(1).max(60).optional(),
   credits_title: z.string().trim().max(120).optional(),
+  /** LONGFORM: the runs inside a long production leave out the title card and the credits; only the first run has the title and the last the credits. */
+  no_title: z.boolean().optional(),
+  no_credits: z.boolean().optional(),
   preset: z.enum(FILM_LOOK_PRESETS).optional(),
   ratio: z.enum(LETTERBOX_RATIOS).optional(),
   letterbox: z.enum(LETTERBOX_RATIOS).optional(),
@@ -600,9 +603,9 @@ async function editFinishedClips(input: RunEditVideoInput, value: EditArgs, acto
     }
     const videoSeconds = sources.map((job) => job.files[0]?.seconds ?? job.request.seconds ?? null);
     const baseLength = videoSeconds.every((n) => n !== null) ? videoSeconds.reduce((sum, n) => sum + (n ?? 0), 0) - (transition === "cut" ? 0 : (sources.length - 1) * duration) : videoSeconds.reduce<number>((sum, n) => sum + (n ?? 0), 0);
-    const title = film?.production.title ?? value.title;
-    const subtitle = film ? titleSubtitle(film.production.summary) : value.subtitle;
-    const creditLines = film?.credits ?? value.credits;
+    const title = value.no_title ? undefined : film?.production.title ?? value.title;
+    const subtitle = value.no_title ? undefined : film ? titleSubtitle(film.production.summary) : value.subtitle;
+    const creditLines = value.no_credits ? undefined : film?.credits ?? value.credits;
     const added = (title ? 3 : 0) + (creditLines ? Math.max(3, Math.ceil((creditLines.length * 2 + (value.credits_title ? 2 : 0)) / 2)) : 0);
     if (baseLength + added > MAX_EDIT_SECONDS) return refused(callId, args, "That film would be longer than 10 minutes. Use shorter videos or fewer title and credit lines.", "film_too_long");
     inputs = clipFiles; ops = filmOps({ title, summary: subtitle, credits: creditLines, creditsTitle: value.credits_title, look: value.look as (typeof FILM_LOOK_PRESETS)[number] | undefined, letterbox: value.letterbox, transition, duration });

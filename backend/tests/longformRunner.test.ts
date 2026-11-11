@@ -17,10 +17,11 @@ function person(id: string): PersonRow {
 }
 const bible = { cast: [{ name: "Marlow", description: "a keeper in a yellow coat" }], locations: [{ name: "Tower", description: "a white tower" }], music: [{ name: "Theme", mood: "slow strings" }], rules: [] };
 let clips: string[] = [];
+let plans: Array<{ title_card?: boolean; credits_card?: boolean }> = [];
 function engines(failOn?: string) {
   __setFilmEnginesForTests(({ actor }) => ({ waitForIdle: async () => {}, ensureSubject: async ({ name, kind, locked }) => createMediaSubject(actor, { name, kind, look: locked }).id,
     makeStill: async ({ shot }) => `pic:${shot.id}`, makeClip: async ({ shot }) => { if (failOn && shot.id === failOn) throw new Error("boom"); clips.push(shot.id); return `clip:${shot.id}`; },
-    makeMusic: async () => "music", assemble: async () => "cut" }));
+    makeMusic: async () => "music", assemble: async ({ plan }) => { plans.push({ title_card: plan.title_card, credits_card: plan.credits_card }); return "cut"; } }));
 }
 function writer(seconds: number) {
   const p = planStructure(seconds); const keys = p.ok ? p.plan.scenes.map((s) => s.key) : [];
@@ -32,7 +33,7 @@ function writer(seconds: number) {
     return { ok: true, text: JSON.stringify({ items: [{ kind: "action", text: "Marlow climbs." }, { kind: "line", who: "Marlow", text: "Mind the step." }] }) };
   });
 }
-beforeEach(() => { resetDb(); clips = []; });
+beforeEach(() => { resetDb(); clips = []; plans = []; });
 afterEach(() => { __setStageCompleterForTests(null); __setFilmEnginesForTests(null); });
 
 async function ready(owner: PersonRow, seconds: number, approveAll = true) {
@@ -66,5 +67,14 @@ describe("the scene runner", () => {
     const again = await produce(owner, s.productionId);
     expect(again.ok).toBe(true); expect(clips.length).toBe(s.structure.totalShots); expect(done1).toBeLessThan(clips.length);
     expect(listFilmRunsByParent(owner, s.productionId).filter((x) => x.state === "done").length).toBeGreaterThanOrEqual(s.structure.totalRuns);
+  });
+  test("only the first run has a title card and only the last has the credits", async () => {
+    writer(400); engines();
+    const owner = person("r4"); const s = await ready(owner, 400);
+    expect(s.structure.totalRuns).toBeGreaterThan(2);
+    expect((await produce(owner, s.productionId)).ok).toBe(true);
+    expect(plans.length).toBe(s.structure.totalRuns);
+    expect(plans.map((p) => p.title_card)).toEqual(plans.map((_, i) => i === 0));
+    expect(plans.map((p) => p.credits_card)).toEqual(plans.map((_, i) => i === plans.length - 1));
   });
 });
