@@ -4,6 +4,7 @@
 
 ### Added
 
+- The finished film now lands within a second or two of the length you ask: the title card and the credits count toward it, shot lengths are worked out in code, and a film that still comes out off says so.
 - Attach several pictures and the film works out what each is for: a person plays a part, a product is shown off, a room is the set, a building is the closing wide shot. Each picture is saved as a character, prop or place, and every shot starts from the picture of what it is about.
 - A synth of yours can play a part in a long production: name it in the cast and its saved picture and look are used, like a saved character.
 - A long production no longer adds a title card and credits to every scene: only the first part has the title and only the last has the credits, so the length matches the ask.

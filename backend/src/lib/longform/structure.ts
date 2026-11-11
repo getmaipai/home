@@ -10,6 +10,8 @@ export const MAX_SHOTS_PER_RUN = 12;
 export const MIN_PRODUCTION_SECONDS = 20;
 export const MAX_PRODUCTION_SECONDS = 4 * 60 * 60;
 
+import { filmOverhead } from "@/lib/videos/editPlan";
+
 export interface ScenePlan { key: string; act: number; seconds: number; shots: number; runs: number[] }
 export interface StructurePlan { seconds: number; acts: number; scenes: ScenePlan[]; totalShots: number; totalRuns: number }
 export type StructureResult = { ok: true; plan: StructurePlan } | { ok: false; line: string };
@@ -40,10 +42,11 @@ export function runsFor(shots: number): number[] {
 export function planStructure(seconds: number): StructureResult {
   if (!Number.isFinite(seconds) || seconds < MIN_PRODUCTION_SECONDS) return { ok: false, line: `A production is at least ${MIN_PRODUCTION_SECONDS} seconds. For something shorter, ask for a film or a single clip.` };
   if (seconds > MAX_PRODUCTION_SECONDS) return { ok: false, line: `A production is at most ${MAX_PRODUCTION_SECONDS / 3600} hours. Ask for a shorter length, or make it in parts.` };
-  const total = Math.round(seconds);
+  // LENGTH-01: the title card and the credits are part of the ask, so the scenes hold the rest (they are on the first and last run only).
+  const total = Math.round(seconds), content = Math.max(1, total - filmOverhead(true, true));
   const count = sceneCountFor(total);
   const acts = actsFor(count);
-  const base = Math.floor(total / count), extra = total % count;
+  const base = Math.floor(content / count), extra = content % count;
   const scenes: ScenePlan[] = acts.map((act, i) => {
     const sceneSeconds = base + (i < extra ? 1 : 0);
     const shots = Math.max(1, Math.round(sceneSeconds / AVG_SHOT_SECONDS));

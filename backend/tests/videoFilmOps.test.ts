@@ -52,7 +52,7 @@ describe("film finishing ops", () => {
     expect(stack.jobs[0]!.input.ops).toEqual([
       { op: "transition", kind: "wipeleft", duration_s: 0.7 },
       { op: "title_card", text: "Summer at the Lake", subtitle: "August", duration_s: 3, position: "center", background: "black", text_color: "white", fade_in_s: 0.5, fade_out_s: 0.5, place: "start" },
-      { op: "credits", lines: [{ role: "Camera", name: "Ari" }], background: "black", text_color: "white", title: "Thanks" },
+      { op: "credits", lines: [{ role: "Camera", name: "Ari" }], duration_s: 4, background: "black", text_color: "white", title: "Thanks" },
     ]);
     expect(getVideoJobFor(actor, first.job.id)?.state).toBe("done"); expect(getVideoJobFor(actor, second.job.id)?.state).toBe("done");
   });

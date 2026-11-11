@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, test } from "bun:test";
+import { filmOverhead, SEAM_SECONDS } from "@/lib/videos/editPlan";
 import { z } from "zod";
-import { __setFilmPlanCompleterForTests, FILM_PLAN_PROMPT, FILM_PLAN_RESPONSE_FORMAT, filmPlanSchema, planFilm, type FilmPlan } from "@/lib/films/plan";
+import { __setFilmPlanCompleterForTests, FILM_PLAN_PROMPT, FILM_PLAN_RESPONSE_FORMAT, filmPlanSchema, fitPlanToLength, planFilm, shotsFor, type FilmPlan } from "@/lib/films/plan";
 
 const productionShot = z.object({ id: z.string().min(1).max(80), subject_ids: z.array(z.string()), clip_file_id: z.string().nullable().optional(), picture_file_id: z.string().nullable().optional(), music_line_id: z.string().nullable().optional(), voice_line_id: z.string().nullable().optional() });
 const goodPlan: FilmPlan = {
@@ -23,11 +24,12 @@ describe("film planner", () => {
     expect(seenFormat).toEqual(FILM_PLAN_RESPONSE_FORMAT);
   });
 
-  test("sends the target length in planner data and accepts a fitting plan untouched", async () => {
+  test("sends the target length in planner data and accepts a plan in one call", async () => {
     let calls = 0;
     let userMessage = "";
     __setFilmPlanCompleterForTests(async (messages) => { calls++; userMessage = messages[1]?.content ?? ""; return { ok: true, text: JSON.stringify(goodPlan) }; });
-    expect(await planFilm({ idea: "A sailor crosses the sea", targetSeconds: 30 })).toMatchObject({ ok: true, plan: goodPlan });
+    const planned = await planFilm({ idea: "A sailor crosses the sea", targetSeconds: 30 });
+    expect(planned.ok).toBe(true);
     expect(calls).toBe(1);
     expect(JSON.parse(userMessage)).toMatchObject({ target_seconds: 30 });
   });
@@ -86,6 +88,16 @@ describe("film planner", () => {
     }
     const jsonSchema = FILM_PLAN_RESPONSE_FORMAT.json_schema.schema as { properties: Record<string, unknown>; required: string[] };
     expect(Object.keys(jsonSchema.properties).sort()).toEqual(Object.keys(filmPlanSchema.shape).sort());
-    expect(jsonSchema.required).toEqual(Object.keys(filmPlanSchema.shape).filter((key) => key !== "look" && key !== "letterbox" && key !== "title_card" && key !== "credits_card"));
+    expect(jsonSchema.required).toEqual(Object.keys(filmPlanSchema.shape).filter((key) => key !== "look" && key !== "letterbox" && key !== "title_card" && key !== "credits_card" && key !== "target_seconds"));
+  });
+
+  test("a plan is fitted to the asked length in code: shots plus overlaps plus the title and credits", async () => {
+    for (const target of [13, 20, 30, 60, 120]) {
+      const fitted = fitPlanToLength({ ...goodPlan, shots: Array.from({ length: shotsFor(target) }, (_, i) => ({ ...goodPlan.shots[i % 2]!, id: `s-${i}`, seconds: 7 })) }, target);
+      const total = fitted.shots.reduce((n, s) => n + s.seconds, 0) - SEAM_SECONDS * (fitted.shots.length - 1) + filmOverhead(true, true, fitted.cast.length + 1);
+      expect(Math.abs(total - target), `${target} s asked, ${total} s planned`).toBeLessThanOrEqual(1.5);
+      expect(fitted.shots.every((s) => s.seconds >= 3 && s.seconds <= 10)).toBe(true);
+      expect(fitted.shots[0]!.id).toBe("s-0"); expect(fitted.shots.at(-1)!.id).toBe(`s-${shotsFor(target) - 1}`);
+    }
   });
 });

@@ -107,11 +107,28 @@ export function joinOps(transition: JoinTransition = "cut", duration: number = D
   return [{ op: "concat" }];
 }
 
+/** LENGTH-01: the fixed parts of a finished film, defined once. The title card and the credits are sent with these exact lengths (the Stack would otherwise
+ *  size the credits from the picture height, 6 to 12 s for one line), and each seam between two clips overlaps by SEAM_SECONDS. */
+export const TITLE_CARD_SECONDS = 3;
+export const CREDITS_SECONDS = 4;
+export const SEAM_SECONDS = DEFAULT_CROSSFADE_S;
+/** How long the credits roll: four seconds, and one second per line past three so a long list stays readable. */
+export function creditsSecondsFor(lines: number): number { return Math.min(120, Math.max(CREDITS_SECONDS, Math.ceil(lines) + 1)); }
+/** Seconds a film adds around its shots: the title card and the credits (a middle run of a long production has neither). */
+export function filmOverhead(title = true, credits = true, creditLines = 1): number { return (title ? TITLE_CARD_SECONDS : 0) + (credits ? creditsSecondsFor(creditLines) : 0); }
+/** Whole-second lengths for `shots` clips whose joined length is `content` seconds: the clips add up to content plus the overlap of every seam. */
+export function shotSecondsFor(content: number, shots: number): number[] {
+  const n = Math.max(1, Math.floor(shots));
+  const total = Math.max(n, Math.round(content + SEAM_SECONDS * (n - 1)));
+  const base = Math.floor(total / n), extra = total % n;
+  return Array.from({ length: n }, (_, i) => base + (i < extra ? 1 : 0));
+}
+
 export function titleCardOp(text: string, subtitle?: string, place: "start" | "end" = "start"): EditOp {
-  return { op: "title_card", text, ...(subtitle ? { subtitle } : {}), duration_s: 3, position: "center", background: "black", text_color: "white", fade_in_s: 0.5, fade_out_s: 0.5, place };
+  return { op: "title_card", text, ...(subtitle ? { subtitle } : {}), duration_s: TITLE_CARD_SECONDS, position: "center", background: "black", text_color: "white", fade_in_s: 0.5, fade_out_s: 0.5, place };
 }
 export function creditsOp(lines: Array<{ role?: string; name: string }>, title?: string): EditOp {
-  return { op: "credits", lines, background: "black", text_color: "white", ...(title ? { title } : {}) };
+  return { op: "credits", lines, duration_s: creditsSecondsFor(lines.length + (title ? 1 : 0)), background: "black", text_color: "white", ...(title ? { title } : {}) };
 }
 
 /** The shared sequence used by the `film` change and faceless film assembly. */

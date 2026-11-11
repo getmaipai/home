@@ -84,6 +84,8 @@ allowance from the dailies' measured retake rate. The estimate is shown before t
 the household queue at normal video priority, so chat is never blocked. The limits that matter are consistency of faces, voices and rooms across
 many shots, and dialogue lip-sync, not render time; the approval card says so in plain words, and cartoon and stylised looks are expected to hold up best.
 
+**Length (2026-11-11).** The finished file lands within a second or two of the ask. The title card (3 s) and the credits (4 s, one more second per line past three) are part of the ask, defined once in `videos/editPlan.ts` (`filmOverhead`); the scenes hold the rest, each seam between two clips overlaps by half a second (`shotSecondsFor`), and the title sits on the first run and the credits on the last. A short film is fitted in code after the planner answers (`fitPlanToLength`), and a film that still comes out more than 1.5 s off says so in its note.
+
 ## 5. Gates and rules
 
 Adults only, on the adult's own written screen; never a spoken turn, a shared screen or a robot (the FILM-04 wording and gate, `videosAllowed`).

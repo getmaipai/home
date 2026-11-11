@@ -26,7 +26,7 @@ import { refuseVideoPrompt } from "@/lib/videos/policy";
 import { audioSeconds } from "@/lib/videos/audioLength";
 import { extractKeyframes } from "@/lib/pictures/keyframes";
 import { runStackEdit } from "@/lib/videos/stackEdit";
-import { filmOps, MAX_EDIT_OPS, MAX_EDIT_SECONDS, overlayOp, type JoinTransition } from "@/lib/videos/editPlan";
+import { filmOps, filmOverhead, MAX_EDIT_OPS, MAX_EDIT_SECONDS, overlayOp, type JoinTransition } from "@/lib/videos/editPlan";
 import { planFilm, type FilmPlan, type PlanFilmInput } from "./plan";
 import { changeMusic, redoShot, runFilm, type FilmEngines, type FilmStage } from "./run";
 
@@ -173,7 +173,7 @@ export function realFilmEngines(input: { actor: PersonRow; signal: AbortSignal; 
           : videoSeconds.reduce<number>((sum, seconds) => sum + (seconds ?? 0), 0);
         const creditLines = plan.credits_card === false ? [] : [...plan.credits.filter((entry) => !/^(unnamed|unknown|n\/a|none|tbd)$/i.test(entry.name.trim()) && entry.name.trim().length > 0), { role: "Made with", name: "MaiPai" }];
         const showTitle = plan.title_card !== false, showCredits = plan.credits_card !== false;
-        const added = (showTitle ? 3 : 0) + (showCredits ? Math.max(3, Math.ceil(creditLines.length * 2 / 2)) : 0);
+        const added = filmOverhead(showTitle, showCredits, creditLines.length);
         const totalSeconds = baseLength + added;
         if (totalSeconds > MAX_EDIT_SECONDS) throw new Error("That film would be longer than 10 minutes. Use shorter videos or fewer title and credit lines.");
         const clips = clipIds.map((id) => readAttachment(actor, id));
@@ -208,6 +208,8 @@ export function realFilmEngines(input: { actor: PersonRow; signal: AbortSignal; 
       let job = await poll(() => getVideoJobFor(actor, id!), signal, 25 * 60_000, (value) => value.state === "failed" || value.state === "cancelled" ? "The film could not be assembled." : null);
       const cut = job.files[0]?.id;
       if (!cut) throw new Error("The assembled film is unavailable.");
+      const made = job.files[0]?.seconds;
+      if (plan.target_seconds && typeof made === "number" && Math.abs(made - plan.target_seconds) > 1.5) engines.note = `It came out about ${Math.round(made)} seconds; you asked for ${plan.target_seconds}.`;
       const mixed = await runEditVideo({ state, args: { change: "mix", clip: job.id, sound: "music", track: musicFileId }, callId: "film-mix", spoken: false });
       id = (mixed.result?.data as { videoJobId?: string } | undefined)?.videoJobId;
       if (!id) { engines.note = "The film is ready, but I couldn't add its music."; return cut; }

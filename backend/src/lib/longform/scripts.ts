@@ -3,7 +3,8 @@
 import { z } from "zod";
 import type { PersonRow } from "@/types";
 import { getDocument, saveDocument, type ProductionDocument } from "./documents";
-import { planStructure, type ScenePlan } from "./structure";
+import { planStructure, runsFor, type ScenePlan } from "./structure";
+import { shotSecondsFor } from "@/lib/videos/editPlan";
 import { askStage, type Bible, type Outline } from "./stages";
 import { toSpokenText } from "@/lib/spokenText";
 
@@ -35,14 +36,15 @@ export function buildShotList(scene: ScenePlan, outline: Outline["scenes"][numbe
     if (beats[i - 1]!.line && beats[i - 1]!.kind === "item") { beats.splice(i, 0, { kind: "reaction", text: `a reaction to what was just said`, cast: outline.cast.filter((n) => n !== beats[i - 1]!.who).slice(0, 1) }); i++; }
   }
   while (beats.length < scene.shots) beats.push({ kind: "item", text: `${outline.location}, the moment holds`, cast: outline.cast });
-  const each = Math.min(SHOT_MAX_SECONDS, Math.max(SHOT_MIN_SECONDS, Math.round(scene.seconds / beats.length)));
+  // LENGTH-01: each run is its own film, so a seam overlaps only inside a run; the shots of a run add up to its share of the scene plus those overlaps.
+  const seconds = runsFor(beats.length).flatMap((count) => shotSecondsFor(scene.seconds * count / beats.length, count)).map((n) => Math.min(SHOT_MAX_SECONDS, Math.max(SHOT_MIN_SECONDS, n)));
   let last = "";
   const shots = beats.map((b, i): ShotSpec => {
     let framing = b.kind === "establish" ? "wide establishing" : b.kind === "reaction" ? "reaction shot" : frames[i % frames.length]!;
     if (framing === last) framing = frames[(i + 1) % frames.length]!;
     last = framing;
     const cast = looks(b.cast);
-    return { id: `${scene.key}-shot-${i + 1}`, framing, still: `${framing}, ${place}${cast.length ? `, ${cast.join("; ")}` : ""}. ${b.text}`.slice(0, 600), motion: MOTIONS[i % MOTIONS.length]!, seconds: each, line: b.line ? speak(b.line) : undefined, who: b.who };
+    return { id: `${scene.key}-shot-${i + 1}`, framing, still: `${framing}, ${place}${cast.length ? `, ${cast.join("; ")}` : ""}. ${b.text}`.slice(0, 600), motion: MOTIONS[i % MOTIONS.length]!, seconds: seconds[i]!, line: b.line ? speak(b.line) : undefined, who: b.who };
   });
   return { scene_key: scene.key, shots };
 }

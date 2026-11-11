@@ -43,7 +43,7 @@ describe("film a Production", () => {
       { op: "film_look", preset: "noir" },
       { op: "letterbox", ratio: "2:1" },
       { op: "title_card", text: "Summer at the Lake", subtitle: "A quiet August", duration_s: 3, position: "center", background: "black", text_color: "white", fade_in_s: 0.5, fade_out_s: 0.5, place: "start" },
-      { op: "credits", lines: [{ role: "Mira", name: "Mira" }, { role: "Guest", name: "Secret" }, { role: "Made with", name: "MaiPai" }], background: "black", text_color: "white" },
+      { op: "credits", lines: [{ role: "Mira", name: "Mira" }, { role: "Guest", name: "Secret" }, { role: "Made with", name: "MaiPai" }], duration_s: 4, background: "black", text_color: "white" },
     ]);
     expect(stack.jobs[0]!.staged.map((input) => input.bytes)).toEqual([first.files[0]!.bytes, second.files[0]!.bytes, third.files[0]!.bytes]);
     expect(getMediaProduction(owner, production.id)?.finished_cut_file_ids).toContain(ownerCut.files[0]!.id);

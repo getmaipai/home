@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { completeBackground, type LlmCompleteOptions, type LlmMessage } from "@/lib/llm";
-import { FILM_LOOK_PRESETS, LETTERBOX_RATIOS } from "@/lib/videos/editPlan";
+import { FILM_LOOK_PRESETS, filmOverhead, LETTERBOX_RATIOS, SEAM_SECONDS, shotSecondsFor } from "@/lib/videos/editPlan";
 
 // Keep this shape aligned with the production shot validator in routes/mediaProductions.ts.
 const productionShotSchema = z.object({
@@ -14,6 +14,7 @@ const productionShotSchema = z.object({
 
 const transitionKinds = ["cut", "fade", "dissolve", "speckle", "wipeleft", "wiperight", "wipeup", "wipedown", "slideleft", "slideright", "slideup", "slidedown", "circleopen", "circleclose", "radial", "smoothleft", "smoothright", "fadeblack", "fadewhite", "zoomin", "pixelize"] as const;
 
+const SHOT_FLOOR = 3, SHOT_CEILING = 10;
 const filmPlanShotShape = {
   framing: z.string().min(1),
   still: z.string().min(1).max(600),
@@ -40,6 +41,8 @@ const filmPlanShape = {
   /** LONGFORM: false leaves out the title card or the credits (a middle run of a long production). Absent means shown. */
   title_card: z.boolean().optional(),
   credits_card: z.boolean().optional(),
+  /** LENGTH-01: the length the person asked for; the finished film is measured against it and says so when it is off by more than a second or two. */
+  target_seconds: z.number().int().min(1).optional(),
 };
 export const filmPlanSchema = z.object({ ...filmPlanShape, cast: filmPlanShape.cast.min(1) });
 export const facelessFilmPlanSchema = z.object({
@@ -70,7 +73,7 @@ Name what is in the picture and never what is absent; describe an empty horizon 
 Repeat the locked description of every character in every shot's still text, including colours, markings and clothing. Write each locked description as positive facts only; never write the words no, not, without or other in it. Use kind character for people and animals, place for a setting and prop for an object (a lighthouse is a place).
 Name the art style the person asked for (for example cartoon, photoreal, claymation) in every shot's still text and motion text, and repeat it in each locked description.
 Name the film stock look in words, such as “shot on 35mm, overcast, muted colours, heavy grain”, not a colour grade.
-When target_seconds is present, choose the shot count and every shot's seconds to fit it. Title and credits take about 8 seconds together and are not counted in the shots. When no length was asked, make 4 to 8 shots of 5 to 7 seconds.
+When target_seconds is present, choose the shot count and every shot's seconds to fit it. Title and credits take about 7 seconds together and are not counted in the shots; Home sets each shot's final seconds to fit. When no length was asked, make 4 to 8 shots of 5 to 7 seconds.
 Use these named shot types and describe them: wide establishing; medium with the character facing the camera and the creature behind the shoulder; extreme close-up of detail; face close-up with the background stretching (dolly zoom); wide retreat; reaction shot; calm closing wide.
 Cast hints that read "Name (use): look" describe pictures the person attached. Give each one a cast entry with exactly that Name, its look as the locked description, and the kind that fits (actor: character; product, prop: prop; set and closing wide shot: place). Use every one: an actor plays the part, a product is shown clearly and is what the film is about, a set is where scenes happen, and a closing wide shot picture is the last shot, pulling back to reveal it. Write the picture's Name first in the still text of the shots it is the subject of.
 A real person's name is just a name in the prompt.
@@ -98,7 +101,7 @@ export function __setFilmPlanCompleterForTests(fn: PlannerCompleter | null): voi
 function planMessages(input: PlanFilmInput, errors?: string): LlmMessage[] {
   return [
     { role: "system", content: (input.faceless ? FACELESS_FILM_PLAN_PROMPT : FILM_PLAN_PROMPT) + (errors ? `\nRepair the plan to satisfy these validation errors: ${errors}` : "") },
-    { role: "user", content: JSON.stringify({ idea: input.idea, requested_shots: input.shots, target_seconds: input.targetSeconds, look: input.look, cast_hints: input.castHints }) },
+    { role: "user", content: JSON.stringify({ idea: input.idea, requested_shots: input.shots ?? (input.targetSeconds !== undefined && !input.faceless ? shotsFor(input.targetSeconds) : undefined), target_seconds: input.targetSeconds, look: input.look, cast_hints: input.castHints }) },
   ];
 }
 
@@ -114,6 +117,8 @@ export async function planFilm(input: PlanFilmInput, complete: PlannerCompleter 
     const first = await complete(planMessages(input), options);
     if (!first.ok) return { ok: false, line: REFUSAL_LINE };
     const parsed = safeParsePlan(first.text, schema);
+    const fits = input.targetSeconds !== undefined && !input.faceless;
+    if (parsed.success && fits) return { ok: true, plan: fitPlanToLength(parsed.data, input.targetSeconds!) };
     const firstDurationError = parsed.success ? durationError(parsed.data, input) : undefined;
     if (parsed.success && !firstDurationError) return { ok: true, plan: parsed.data };
 
@@ -121,11 +126,29 @@ export async function planFilm(input: PlanFilmInput, complete: PlannerCompleter 
     if (!repaired.ok) return { ok: false, line: REFUSAL_LINE };
     const second = safeParsePlan(repaired.text, schema);
     if (!second.success) return { ok: false, line: REFUSAL_LINE };
+    if (fits) return { ok: true, plan: fitPlanToLength(second.data, input.targetSeconds!) };
     if (input.targetSeconds !== undefined && planDuration(second.data, input.faceless === true) > input.targetSeconds * 1.6) return { ok: false, line: REFUSAL_LINE };
     return { ok: true, plan: second.data };
   } catch {
     return { ok: false, line: REFUSAL_LINE };
   }
+}
+
+/** LENGTH-01: a film with a length asked fits it in code, not by the model's arithmetic: the shots (their count when it cannot fit, then their seconds) add up to
+ *  the asked length minus the title card and credits, with every seam's overlap counted. The first and last shots are kept when shots must go. */
+export function fitPlanToLength(plan: FilmPlan, targetSeconds: number): FilmPlan {
+  const budget = Math.max(2 * (SHOT_FLOOR - SEAM_SECONDS), targetSeconds - filmOverhead(true, true, plan.cast.length + 1));
+  const most = Math.max(2, Math.floor((budget - SEAM_SECONDS) / (SHOT_FLOOR - SEAM_SECONDS)));
+  const fewest = Math.max(2, Math.ceil((budget - SEAM_SECONDS) / (SHOT_CEILING - SEAM_SECONDS)));
+  const count = Math.min(Math.max(plan.shots.length, fewest), most);
+  const kept = plan.shots.length > count ? [...plan.shots.slice(0, count - 1), plan.shots[plan.shots.length - 1]!] : plan.shots;
+  const seconds = shotSecondsFor(budget, kept.length);
+  return { ...plan, target_seconds: Math.round(targetSeconds), shots: kept.map((shot, i) => ({ ...shot, seconds: Math.min(SHOT_CEILING, Math.max(SHOT_FLOOR, seconds[i]!)) })) };
+}
+
+/** How many shots a film of this length asks the planner for: about one per six seconds of what is left after the title and credits (2 to 12). */
+export function shotsFor(targetSeconds: number): number {
+  return Math.min(12, Math.max(2, Math.round((targetSeconds - filmOverhead(true, true)) / 6)));
 }
 
 function planDuration(plan: FilmPlan, faceless: boolean): number {

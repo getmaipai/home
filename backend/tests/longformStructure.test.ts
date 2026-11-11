@@ -1,3 +1,4 @@
+import { filmOverhead } from "@/lib/videos/editPlan";
 import { beforeEach, describe, expect, test } from "bun:test";
 import { eq } from "drizzle-orm";
 import { db } from "@/db";
@@ -14,7 +15,7 @@ describe("the structure is set by code from any length", () => {
     for (const seconds of [20, 59, 60, 90, 119, 120, 180, 181, 240, 600, 1234, 3600, 5400, 7000, MAX_PRODUCTION_SECONDS]) {
       const r = planStructure(seconds); expect(r.ok).toBe(true); if (!r.ok) continue;
       const { plan } = r;
-      expect(plan.scenes.reduce((n, s) => n + s.seconds, 0)).toBe(seconds);
+      expect(plan.scenes.reduce((n, s) => n + s.seconds, 0)).toBe(seconds - filmOverhead());
       for (const s of plan.scenes) {
         expect(s.runs.reduce((a, b) => a + b, 0)).toBe(s.shots);
         for (const run of s.runs) { expect(run).toBeGreaterThanOrEqual(1); expect(run).toBeLessThanOrEqual(MAX_SHOTS_PER_RUN); }
