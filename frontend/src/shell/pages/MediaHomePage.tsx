@@ -58,13 +58,8 @@ export function MediaHomePage() {
                 items={shelf.items}
                 getKey={(row) => row.id}
                 getLabel={(row) => row.title}
-                renderItem={(row) => <SafeImage src={row.artwork_url} alt="" kind={FALLBACK_KIND[row.app]} tintSeed={row.title} />}
-                renderCaption={(row) => (
-                  <span className="flex min-w-0 flex-col">
-                    <span className="truncate text-row font-semibold">{row.title}</span>
-                    {row.subtitle ? <span className="truncate text-supporting text-muted-foreground">{row.subtitle}</span> : null}
-                  </span>
-                )}
+                renderItem={(row) => <SafeImage src={row.artwork_url} alt="" kind={FALLBACK_KIND[row.app]} tintSeed={row.title} label={row.title} />}
+                renderCaption={(row) => row.subtitle ? <span className="truncate text-supporting text-muted-foreground">{row.subtitle}</span> : null}
                 aspect={shelf.aspect}
                 getProgress={shelf.getProgress}
                 variant="plain"

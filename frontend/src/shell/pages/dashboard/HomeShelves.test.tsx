@@ -21,6 +21,11 @@ describe("a Home shelf tile with no picture (AUDIT-UI-01)", () => {
     cleanup();
     expect(iconOf(tilePicture(row({ kind: "song", app: "music" })))).toContain("music");
   });
+  test("the missing art is a seeded picture with the title on the art", () => {
+    const view = render(tilePicture(row({ title: "Lantern Road" })));
+    expect(view.container.querySelector('[data-slot="safe-image-fallback"]')?.getAttribute("data-tinted")).toBe("");
+    expect(view.getByText("Lantern Road").getAttribute("data-slot")).toBe("safe-image-label");
+  });
 });
 
 test("the kit exposes pro square tiles for Home shelves", () => {

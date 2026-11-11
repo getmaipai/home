@@ -25,6 +25,8 @@ test("groups render in shelves and a tile opens its href", async () => {
   const view = open(async () => result);
   await waitFor(() => expect(view.getByText("Videos")).toBeTruthy());
   const tile = await view.findByRole("button", { name: "Garden Road" });
+  expect(tile.querySelector('[data-slot="safe-image-label"]')?.textContent).toBe("Garden Road");
+  expect(tile.querySelector('[data-slot="safe-image-fallback"]')?.getAttribute("data-tinted")).toBe("");
   fireEvent.click(tile);
   await waitFor(() => expect(view.getByTestId("where").textContent).toBe("/apps/videos/watch?id=file-one"));
 });
