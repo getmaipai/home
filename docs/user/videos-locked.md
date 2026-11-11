@@ -45,3 +45,5 @@ Home locks them again by itself when you:
 You can also press **Lock now**, the button at the bottom left of the screen. Signing out locks them too.
 
 If you type a wrong passcode too many times, unlocking waits for a short while. Signing in is not affected. Try again when the timer ends.
+
+Songs can be locked from the Library with **Lock**, just like videos and pictures. A locked song is hidden everywhere until you unlock it with your passcode.

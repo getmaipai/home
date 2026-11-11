@@ -10,6 +10,7 @@ import { complete, type LlmMessage } from "@/lib/llm";
 import { visibleText } from "@/lib/wellFormed";
 import { nextHlc } from "@/lib/hlc";
 import { readableItem } from "@/lib/media/access";
+import { fileLockState } from "@/lib/adultLock";
 import { promoteMadeMusicFile } from "@/lib/media/appHost";
 import { routeAudience } from "@/lib/pictures/audience";
 import { laneOf } from "@/lib/pictures/lane";
@@ -125,7 +126,7 @@ type AlbumBody = { id: string; title: string; blurb?: string | null; look?: stri
 export function albumBlock(actor: PersonRow, album: AlbumBody, where: { conversationId: string | null; turnId: string | null }): Record<string, unknown> {
   const tracks = (album.track_media_ids ?? []).flatMap((id) => {
     const item = readableItem(actor, id);
-    return item ? [{ media_id: id, title: item.title.slice(0, 120), ...(item.duration_s ? { length_s: Math.round(item.duration_s) } : {}) }] : [];
+    return item && (!item.location.file_id || fileLockState(actor, item.location.file_id) === "open") ? [{ media_id: id, title: item.title.slice(0, 120), ...(item.duration_s ? { length_s: Math.round(item.duration_s) } : {}) }] : [];
   });
   const band = album.made_artist_id ? getMade("made_artist", actor, album.made_artist_id) : null;
   const props: Record<string, unknown> = { title: album.title, genres: album.style?.genres ?? [], tracks, editable: true, actions: [...ALBUM_ACTIONS], sound: album.style?.description ?? "", look: album.look ?? "" };
@@ -136,14 +137,14 @@ export function albumBlock(actor: PersonRow, album: AlbumBody, where: { conversa
 }
 
 /** The finished songs made for an album, oldest first. The query names the album, so it reads only that album's songs (newest 100) and never every finished song. */
-function albumJobs(personId: string, albumId: string): Array<{ fileId: string }> {
+function albumJobs(personId: string, albumId: string, actor: PersonRow): Array<{ fileId: string }> {
   if (!/^malbum-[a-z0-9]+$/.test(albumId)) return [];
   const rows = db.select({ fileId: musicJobs.fileId, request: musicJobs.request }).from(musicJobs)
     .where(and(eq(musicJobs.personId, personId), eq(musicJobs.state, "done"), like(musicJobs.request, `%"album":{"id":"${albumId}"%`)))
     .orderBy(desc(musicJobs.createdAt)).limit(100).all();
   const out: Array<{ fileId: string }> = [];
   for (const row of rows) {
-    if (!row.fileId) continue;
+    if (!row.fileId || fileLockState(actor, row.fileId) !== "open") continue;
     try { if ((JSON.parse(row.request) as { album?: { id?: string } }).album?.id === albumId) out.push({ fileId: row.fileId }); } catch { /* A job row that does not parse belongs to no album. */ }
   }
   return out.reverse();
@@ -157,7 +158,8 @@ export function syncAlbumTracks(actor: PersonRow, albumId: string): void {
   const album = found.value as unknown as AlbumBody;
   if (album.owner_person_id !== actor.id) return;
   const added: string[] = [];
-  for (const job of albumJobs(actor.id, albumId)) {
+  for (const job of albumJobs(actor.id, albumId, actor)) {
+    if (fileLockState(actor, job.fileId) !== "open") continue;
     // A song saved or played before the album read it has an item already; it joins while it names no album, and one the person removed keeps its album name and stays out.
     const existing = db.select().from(mediaItems).where(eq(mediaItems.locFileId, job.fileId)).get();
     if (existing && existing.album) continue;

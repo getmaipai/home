@@ -33,7 +33,7 @@ export const TICKET_MS = 30 * 1000;
 export const PROOF_HEADER = "x-adult-unlock";
 
 /** The writers whose file items the lock covers. Pictures join the video writers in ADULT-LOCK-07 slice 1; songs follow later. */
-export const LOCKED_WRITERS: readonly string[] = ["video-gen", "video-edit", "video-poster", "picture-gen", "image-edit"];
+export const LOCKED_WRITERS: readonly string[] = ["video-gen", "video-edit", "video-poster", "picture-gen", "image-edit", "music-gen"];
 
 let clock: () => number = () => Date.now();
 /** Test-only: a movable clock for the idle and absolute lifetimes. */
@@ -279,6 +279,12 @@ export function lockedView(making = false): { locked: true; making: boolean } { 
 export function fileLockState(actor: PersonRow, fileId: string, proof: AdultProof = requestProof()): LockResult {
   const row = db.select({ owner: attachments.ownerPersonId, provenance: attachments.provenance }).from(attachments).where(eq(attachments.id, fileId)).get();
   return row ? lockState(lockItemOfProvenance(row.owner, row.provenance), actor, proof) : "open";
+}
+
+/** A promoted media row inherits the lock of the Library file it points to. */
+export function mediaItemLocked(actor: PersonRow, item: { loc_file_id?: string | null; location?: { file_id?: string | null } | null }, proof: AdultProof = requestProof()): boolean {
+  const id = item.loc_file_id ?? item.location?.file_id;
+  return id ? fileLockState(actor, id, proof) !== "open" : false;
 }
 
 /** Whether a stored Library file is adult-only (the machine fact, whatever the creator's lock setting): playback of it keeps no place, history or mark. */

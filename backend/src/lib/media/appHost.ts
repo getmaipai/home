@@ -11,7 +11,7 @@ import { videoRules, wantsVideoRules } from "./videoFilters";
 import { and, desc, eq, inArray, isNull, like, sql, type SQL } from "drizzle-orm";
 import { db } from "@/db";
 import { attachments, mediaItems, mediaSources, musicJobs, people, videoJobs } from "@/db/schema";
-import { fileIsAdultOnly } from "@/lib/adultLock";
+import { fileIsAdultOnly, fileLockState, mediaItemLocked } from "@/lib/adultLock";
 import { loadManifestOnly } from "@/lib/plugins";
 import { appIndexFloorOk, appVisibleTo } from "@/lib/apps";
 import type { PersonRow } from "@/types";
@@ -184,7 +184,7 @@ export function queryItems(person: PersonRow, appId: MediaAppId, filter: ItemFil
       console.warn("[media] skipped a row that no longer parses:", row.id, error instanceof Error ? error.message.slice(0, 200) : String(error));
       continue;
     }
-    if (bandAllows(person, item) && (appId !== "shows" || showWordsAllowed(person, item))) items.push(item);
+    if (bandAllows(person, item) && !mediaItemLocked(person, item) && (appId !== "shows" || showWordsAllowed(person, item))) items.push(item);
     if (!filter.all && items.length >= limit) break;
   }
   return items;
@@ -203,9 +203,12 @@ export function madeFiles(person: PersonRow, appId: "music" | "videos"): MadeLib
     files.push(...page.items);
     cursor = page.next_cursor ?? undefined;
   } while (cursor);
-  return files.filter((file) => !savedFileIds.has(file.id) && (appId !== "music" || !db.select({ request: musicJobs.request }).from(musicJobs).where(eq(musicJobs.fileId, file.id)).all().some((row) => {
-    try { return !!(JSON.parse(row.request) as { sound?: unknown }).sound; } catch { return false; }
-  })));
+  return files.filter((file) => {
+    if (savedFileIds.has(file.id)) return false;
+    const jobs = appId === "music" ? db.select({ request: musicJobs.request }).from(musicJobs).where(eq(musicJobs.fileId, file.id)).all() : [];
+    if (appId === "music" && jobs.length && fileLockState(person, file.id) !== "open") return false;
+    return !jobs.some((row) => { try { return !!(JSON.parse(row.request) as { sound?: unknown }).sound; } catch { return false; } });
+  });
 }
 
 /** One made clip as a shelf row (Made at home, and the Create page's creations). */
@@ -1090,6 +1093,7 @@ export function saveBandSingles(person: PersonRow, bandId?: string): string | nu
     // A discarded or remade band is gone: its unsaved singles must not come back as plain tracks.
     if (!live.has(single.bandId)) live.set(single.bandId, getMade("made_artist", person, single.bandId).ok);
     if (!live.get(single.bandId)) continue;
+    if (mediaItemLocked(person, { loc_file_id: single.fileId })) continue;
     const item = promoteMadeMusicFile(person, single.fileId);
     if (item && !first) first = item.id;
   }

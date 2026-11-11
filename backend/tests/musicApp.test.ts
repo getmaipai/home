@@ -10,6 +10,7 @@ import { __resetProgressForTests } from "@/lib/media/progress";
 import { albumKey } from "@/lib/media/music";
 import { itemFromRow, sourceFromRow } from "@/lib/media/model";
 import { storeFile } from "@/lib/attachments";
+import { __unlockedForTests } from "@/lib/adultLock";
 let atlas: PersonRow, sprout: PersonRow;
 const id = (n: number) => `media-song00000${n}`;
 beforeEach(() => {
@@ -159,7 +160,8 @@ test("playing a visible made Library song promotes it into the shared media queu
 test("a child cannot see an adult-only made track", () => {
   const adultOnly = storeFile(atlas, { conversationId: null, turnId: null, mediaType: "audio/mp4", bytes: new Uint8Array([9, 9, 9]), provenance: 'music-gen:{"title":"Adults only","audience":"adult-only"}', deduplicate: false });
   if (!adultOnly.ok) throw new Error(adultOnly.error);
-  expect(rows(atlas, "songs", undefined, "made").map((row) => row.id)).toContain(adultOnly.value.id);
+  expect(rows(atlas, "songs", undefined, "made").map((row) => row.id)).not.toContain(adultOnly.value.id);
+  expect(__unlockedForTests(atlas.id, () => rows(atlas, "songs", undefined, "made").map((row) => row.id))).toContain(adultOnly.value.id);
   expect(rows(sprout, "songs", undefined, "made").map((row) => row.id)).not.toContain(adultOnly.value.id);
 });
 test("artist header, artist albums and more albums read from the same derived groups", () => {

@@ -23,6 +23,7 @@ import { canAccessFile } from "@/lib/access";
 import { serveBytes } from "@/lib/media/serve";
 import { refusalBody } from "@/lib/result";
 import { apiError } from "@/lib/apiErrorCopy";
+import { fileLockState } from "@/lib/adultLock";
 
 export const filesRoutes = apiRouter();
 // A share is its own addressable resource (share.schema.json), so its
@@ -84,11 +85,11 @@ filesRoutes.openapi(getRoute, (c) => {
   if (!result.ok) return c.json(refusalBody(result), 404);
   const songRow = db.select().from(musicJobs).where(eq(musicJobs.fileId, c.req.valid("param").id)).get();
   let music: { id: string; title: string | null; description: string | null; lyrics: string | null; timed_lyrics: TimedWordLine[] | null; cover_url: string | null; versions: { id: string; label: string; url: string }[]; current_id: string | null; owner: boolean } | undefined;
-  if (songRow && songRow.state === "done") {
+  if (songRow && songRow.state === "done" && fileLockState(actor, c.req.valid("param").id) === "open") {
     const ownerPerson = db.select().from(people).where(eq(people.id, songRow.personId)).get();
     const root = ownerPerson ? getMusicJobFor(ownerPerson, songRow.id) : null;
     if (ownerPerson && root) {
-      const versions = (musicVersions(ownerPerson, root).length ? musicVersions(ownerPerson, root) : [root]).filter(version => version.fileId && canAccessFile(actor, ownerPerson.id, version.fileId));
+      const versions = (musicVersions(ownerPerson, root).length ? musicVersions(ownerPerson, root) : [root]).filter(version => version.fileId && canAccessFile(actor, ownerPerson.id, version.fileId) && fileLockState(actor, version.fileId) === "open");
       const current = [...versions].sort((a, b) => (b.chosenAt ?? b.createdAt).localeCompare(a.chosenAt ?? a.createdAt) || b.id.localeCompare(a.id))[0];
       const request = current?.request ?? root.request;
       let lyrics = request.instrumental ? null : request.lyrics ?? null;

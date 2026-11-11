@@ -9,6 +9,7 @@ import { MEDIA_ALLOWLIST_KEY } from "@/settings/mediaKeys";
 import { bandAllows, mediaBandOf } from "./band";
 import { itemFromRow, sourceFromRow, type MediaItem, type MediaSource } from "./model";
 import { isOwnerOrAdmin } from "@/lib/access";
+import { mediaItemLocked } from "@/lib/adultLock";
 
 export function isMediaAdmin(actor: PersonRow): boolean {
   return isOwnerOrAdmin(actor);
@@ -56,7 +57,7 @@ export function readableItem(actor: PersonRow, id: string): MediaItem | null {
   if (!source || !sourceVisibleTo(source, actor)) return null;
   try {
     const item = itemFromRow(row);
-    return bandAllows(actor, item) ? item : null;
+    return bandAllows(actor, item) && !mediaItemLocked(actor, item) ? item : null;
   } catch {
     return null; // a row that no longer has the spec shape is not served
   }

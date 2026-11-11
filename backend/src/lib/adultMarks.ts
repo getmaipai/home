@@ -11,7 +11,7 @@
 //   mark            the creator or an admin, no passcode; raises `made_audience` to adult-only if it was not, and turns the lock on. Never lowers anything.
 import { and, desc, eq, like } from "drizzle-orm";
 import { db, sqlite } from "@/db";
-import { adultMarkLog, attachments } from "@/db/schema";
+import { adultMarkLog, attachments, musicJobs } from "@/db/schema";
 import { isOwnerOrAdmin } from "@/lib/access";
 import { speakerAgeBand } from "@/lib/ageBand";
 import { LOCKED_WRITERS, consumeTicket, lockItemOfProvenance, withMark, type LockItem } from "@/lib/adultLock";
@@ -97,6 +97,18 @@ function writeLock(row: ItemRow, lock: "on" | "off", raise: boolean): void {
   if (meta.writer === "picture-gen") {
     const descendants = db.select({ id: attachments.id, provenance: attachments.provenance }).from(attachments).where(and(eq(attachments.ownerPersonId, row.ownerPersonId), like(attachments.provenance, `image-edit:%"root":"${row.id}"%`))).all();
     for (const descendant of descendants) if (libraryProvenance(descendant.provenance).root === row.id) apply(descendant.id, descendant.provenance);
+    return;
+  }
+  if (meta.writer === "music-gen") {
+    const jobs = db.select({ id: musicJobs.id, coverFileId: musicJobs.coverFileId }).from(musicJobs).where(and(eq(musicJobs.personId, row.ownerPersonId), eq(musicJobs.fileId, row.id))).all();
+    for (const job of jobs) {
+      if (job.coverFileId) {
+        const cover = db.select({ id: attachments.id, provenance: attachments.provenance }).from(attachments).where(and(eq(attachments.id, job.coverFileId), eq(attachments.ownerPersonId, row.ownerPersonId))).get();
+        if (cover) apply(cover.id, cover.provenance);
+      }
+      const siblings = db.select({ id: attachments.id, provenance: attachments.provenance }).from(attachments).where(and(eq(attachments.ownerPersonId, row.ownerPersonId), like(attachments.provenance, `%"job":"${job.id}"%`))).all();
+      for (const sibling of siblings) if (libraryProvenance(sibling.provenance).job === job.id) apply(sibling.id, sibling.provenance);
+    }
     return;
   }
   if (!jobId) return;
