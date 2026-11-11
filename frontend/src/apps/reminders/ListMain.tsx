@@ -44,7 +44,7 @@ export function ListMain({ list, isPhone, canManage, onBack, onAdd, onToggle, on
     <header className="grid grid-cols-[1fr_auto] items-end gap-3 border-b px-4 py-4">
       <div>
         <p className="m-0 text-base font-medium tracking-wider text-muted-foreground">{i18n._({ id: "YOUR LIST", message: "YOUR LIST" })}</p>
-        <h1 className="m-0 text-title font-semibold">{labelFor(list)}</h1>
+        <h1 className="m-0 text-title">{labelFor(list)}</h1>
         <p className="m-0 text-muted-foreground">{tagline}</p>
       </div>
       <p className="m-0 text-sm text-muted-foreground">{date}</p>

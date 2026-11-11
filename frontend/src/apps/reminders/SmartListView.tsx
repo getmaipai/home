@@ -15,7 +15,7 @@ export function SmartListView({ view, items, onChanged }: {
   return <section className="flex min-h-0 min-w-0 flex-1 flex-col">
     <header className="border-b px-4 py-4">
       <p className="m-0 text-base tracking-wider text-muted-foreground">{i18n._({ id: "SMART LIST", message: "SMART LIST" })}</p>
-      <h1 className="m-0 text-title font-semibold">{title}</h1>
+      <h1 className="m-0 text-title">{title}</h1>
     </header>
     <ul className="m-0 list-none overflow-y-auto p-4">
       {items.map((item) => item.label === "Reminder" && view.kind === "scheduled"

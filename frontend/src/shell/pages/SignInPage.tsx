@@ -97,7 +97,7 @@ export function SignInPage({ onSignedIn }: { onSignedIn: () => void }) {
                 <form onSubmit={pendingToken ? handleTotpSubmit : handleSecretSubmit} className="flex flex-col gap-4">
                   <div className="flex flex-col items-center gap-4">
                     <Avatar name={selected.display_name} className="size-16 text-row" />
-                    <h1 className="text-title font-semibold">{selected.display_name}</h1>
+                    <h1 className="text-title">{selected.display_name}</h1>
                   </div>
                   {pendingToken ? (
                     <div className="space-y-1.5">
