@@ -11,7 +11,7 @@ import { routeAudience } from "@/lib/pictures/audience";
 import { laneOfPerson } from "@/lib/pictures/laneGate";
 import { videoDenial, VIDEO_DENIAL_LINE, VIDEO_NOT_HERE_LINE, refuseVideoPrompt, VIDEO_REFUSAL_LINE } from "@/lib/videos/policy";
 import { videoEngineReady, videoEngineStatus } from "@/lib/videos/ready";
-import { maxSecondsFor, quickVideoReady } from "@/lib/videos/quality";
+import { ltx25EndPictureReady, maxSecondsFor, quickVideoReady } from "@/lib/videos/quality";
 import { resolveCompanionClip, stackVideoModel, promptHash, reportedVideoModelMatches, reportedVideoQualityMatches, COMPANION_MODEL_MISMATCH_LINE } from "@/lib/companionArt";
 import { cancelOrDeleteVideo, fetchClip, getVideoJob, StackVideoError, submitVideo } from "@/lib/videos/stack";
 import { takeClipSize } from "@/lib/companionClipSize";
@@ -27,7 +27,7 @@ export const TAKE_RETRY_WAIT_MS = 60_000;
 export const TAKE_POLL_MS = 500;
 export const TAKE_NEGATIVE_PROMPT = "different character, changed colours, changed face, extra limbs, text, watermark, camera movement, background change, shadows";
 /** A pack clip is a headshot: no hands, arms or lower body ever. */
-export const PACK_TAKE_NEGATIVE_PROMPT = `${TAKE_NEGATIVE_PROMPT}, hands, fingers, arms, gestures, lower body, zoom`;
+export const PACK_TAKE_NEGATIVE_PROMPT = `${TAKE_NEGATIVE_PROMPT}, hands, fingers, arms, gestures, lower body, zoom, closed eyes, sigh, exhale, eye roll, head drop`;
 export const TAKE_NO_REST_LINE = "Choose and approve a starting picture first.";
 export type TakeRunState = "queued" | "running" | "done" | "failed" | "cancelled";
 export interface TakeRun {
@@ -59,15 +59,15 @@ export function takePrompt(card: { text: string }, motion: string, keyName: "gre
  * hand appear and the face change on the first real run.
  */
 export const PACK_MOTIONS: Record<string, string> = {
-  idle: "sits calmly and breathes gently, a tiny slow head drift, natural blinks, a soft relaxed expression, mouth closed",
-  listening: "listens attentively with steady eyes on the viewer, one small slow nod, natural blinks, a warm slight smile, mouth closed",
-  thinking: "thinks quietly, eyes drifting a little up and to one side, a slight thoughtful brow, one slow blink, head nearly still, mouth closed",
-  speaking: "talks calmly to the viewer, the mouth moving naturally, small head movements, natural blinks, shoulders still",
+  idle: "stays still and alert with eyes wide open, looking straight at the viewer, one quick natural blink, a tiny slow head drift, a soft friendly expression, mouth closed",
+  listening: "listens attentively with eyes wide open and steady on the viewer, one small slow nod, one quick natural blink, a warm slight smile, mouth closed",
+  thinking: "thinks quietly with eyes open, glancing a little up and to one side and back, a slight thoughtful brow, one quick blink, head nearly still, mouth closed",
+  speaking: "talks calmly to the viewer with eyes open, the mouth moving naturally, small head movements, one quick natural blink, shoulders still",
 };
 /** The person's own character text is never part of a pack clip prompt: the start picture carries the look, and free text could ask for a wider shot, hands or a body. */
 export function packTakePrompt(_card: { text: string }, state: string, keyName: "green" | "magenta"): string {
   const motion = PACK_MOTIONS[state] ?? PACK_MOTIONS.idle!;
-  return `Static locked shot, fixed framing, the camera never moves. A headshot framed from the top of the head to the upper chest, nothing shown below the chest, the same person with exactly the same face, skin, hair and clothes in every frame, the same size and place in the frame. Lighting stays constant and even. Plain solid ${keyName} background with nothing on it. Action: the person ${motion}. Hands are never shown, no arms, no gestures, no props. One calm continuous motion; the final frame matches the first frame.`;
+  return `Static locked shot, fixed framing, the camera never moves. A headshot framed from the top of the head to the upper chest, nothing shown below the chest, the same person with exactly the same face, skin, hair and clothes in every frame, the same size and place in the frame. The face shape, skin tone and lighting stay exactly the same in every frame. Eyes stay wide open except for one quick blink. No sighing, no deep breath, no exhale, no eye rolling, no head dropping, no looking down. Plain solid ${keyName} background with nothing on it. Action: the person ${motion}. Hands are never shown, no arms, no gestures, no props. One calm continuous motion; the final frame matches the first frame.`;
 }
 
 export function activeTakeRun(companionId: string): TakeRun | null {
@@ -140,14 +140,17 @@ async function runTakes(run: TakeRun, count: number, actor: PersonRow, motionOve
           let seed = Math.floor(Math.random() * 2_147_483_647);
           const art = await resolveCompanionClip(laneOfPerson(actor) === "adult" ? "detailed" : "quick");
           const shape = await sharp(readFileSync(keyframePath(run.companionId, state))).metadata();
-          const clipSize = takeClipSize(art.model, art.quality, (shape.height ?? 0) > (shape.width ?? 0), await videoEngineStatus().catch(() => null)), pictureB64 = await pictureFor(clipSize);
+          const engineNow = await videoEngineStatus().catch(() => null);
+          const clipSize = takeClipSize(art.model, art.quality, (shape.height ?? 0) > (shape.width ?? 0), engineNow), pictureB64 = await pictureFor(clipSize);
+          // A pack clip is a loop of one picture: the same picture is its last frame too (LTX-2.5 guides frame 0 and the last frame), which stops the face drifting away from the rest picture. Only when the engine says it can.
+          const endPicture = run.pack && art.model.startsWith("ltx25") && ltx25EndPictureReady(engineNow, art.model === "ltx25-max");
           const seconds = Math.min(run.pack ? PACK_TAKE_SECONDS : media.generate.seconds, maxSecondsFor(art.quality));
           take = addTake(run.companionId, state, { source: "generated", seed, label: `Candidate ${index}`, model: art.model, quality: art.quality, prompt_hash: promptHash(prompt), ...(run.packJob ? { pack_job: run.packJob } : {}) });
           let done: Awaited<ReturnType<typeof submitVideo>>["done"] = null;
           const maxAttempts = run.pack ? PACK_MEMORY_ATTEMPTS : 2;
           for (let attempt = 0; attempt < maxAttempts; attempt++) {
             try {
-              const submitted = await submitVideo({ prompt, negative_prompt: run.pack ? PACK_TAKE_NEGATIVE_PROMPT : TAKE_NEGATIVE_PROMPT, size: `${clipSize.width}x${clipSize.height}`, seconds, ...(run.pack ? PACK_QUIET : {}), model: stackVideoModel(art), seed, image: pictureB64, image_source: sheet.originalPath || readKeyframeMeta(run.companionId, state)?.model ? "generated" : "uploaded", audience: "all-ages", timeout_ms: 1 });
+              const submitted = await submitVideo({ prompt, negative_prompt: run.pack ? PACK_TAKE_NEGATIVE_PROMPT : TAKE_NEGATIVE_PROMPT, size: `${clipSize.width}x${clipSize.height}`, seconds, ...(run.pack ? PACK_QUIET : {}), ...(endPicture ? { end_image: pictureB64 } : {}), model: stackVideoModel(art), seed, image: pictureB64, image_source: sheet.originalPath || readKeyframeMeta(run.companionId, state)?.model ? "generated" : "uploaded", audience: "all-ages", timeout_ms: 1 });
               stackJob = submitted.job; run.stackJob = stackJob; done = submitted.done;
               const deadline = Date.now() + 15 * 60_000;
               while (!done) {

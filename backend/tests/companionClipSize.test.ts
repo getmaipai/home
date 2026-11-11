@@ -52,7 +52,7 @@ describe("a pack clip's prompt (the generic mascot prompt made a hand appear and
     for (const state of ["idle", "listening", "thinking", "speaking"]) {
       const prompt = packTakePrompt({ text: "A knight holding a sword, full body, riding a horse." }, state, "green");
       expect(prompt).not.toMatch(/knight|sword|full body|horse/i); // the character text is never used for a pack clip
-      expect(prompt).toContain("nothing shown below the chest"); expect(prompt).toContain("Hands are never shown"); expect(prompt).toContain("final frame matches the first");
+      expect(prompt).toContain("nothing shown below the chest"); expect(prompt).toContain("Eyes stay wide open except for one quick blink"); expect(prompt).toContain("No sighing"); expect(PACK_MOTIONS[state]).not.toMatch(/breath|sigh|exhale/i); expect(PACK_MOTIONS[state]).toMatch(/eyes (wide )?open/); expect(prompt).toContain("Hands are never shown"); expect(prompt).toContain("final frame matches the first");
       expect(prompt).not.toMatch(/head to feet|fist|lightbulb/i);
       expect(PACK_MOTIONS[state]).toBeTruthy();
     }
