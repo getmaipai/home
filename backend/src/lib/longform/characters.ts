@@ -16,7 +16,7 @@ export const MAX_CHARACTER_PICTURES = 8;
 
 /** names[i] names the i-th attached picture. A name repeated gives that character several pictures (the first makes the character, the others are added
  *  to it, up to MAX_CHARACTER_PICTURES); a name with no picture must already be a saved subject. Returns every name that is now a saved subject. */
-export async function prepareCharacters(actor: PersonRow, input: { names: string[]; images: AttachedPicture[]; conversationId?: string }): Promise<CharacterResult> {
+export async function prepareCharacters(actor: PersonRow, input: { names: string[]; images: AttachedPicture[]; conversationId?: string; kinds?: Record<string, "character" | "prop" | "place">; looks?: Record<string, string> }): Promise<CharacterResult> {
   const used: string[] = [];
   const pictures = new Map<string, { name: string; ids: string[] }>();
   for (const [i, raw] of input.names.entries()) {
@@ -43,7 +43,7 @@ export async function prepareCharacters(actor: PersonRow, input: { names: string
     try {
       let rest = ids;
       if (!saved) {
-        await runMediaOp(actor, "picture.save_subject", { source: { kind: "picture", via: "chat", id: ids[0]!, conversationId: input.conversationId }, args: { name, kind: "character", look: `${name}, as shown in the attached pictures` } });
+        await runMediaOp(actor, "picture.save_subject", { source: { kind: "picture", via: "chat", id: ids[0]!, conversationId: input.conversationId }, args: { name, kind: input.kinds?.[name.toLocaleLowerCase()] ?? "character", look: input.looks?.[name.toLocaleLowerCase()] ?? `${name}, as shown in the attached pictures` } });
         saved = listMediaSubjects(actor).find((s) => s.name.toLocaleLowerCase() === name.toLocaleLowerCase());
         rest = ids.slice(1);
       }

@@ -8,6 +8,7 @@ import { submitGeneration, getGenerationJob, fetchPicture, cancelOrDelete } from
 import { fullViewForJob } from "@/lib/stack/fullView";
 import { createMediaProduction } from "@/lib/mediaProductions";
 import { createMediaSubject, listMediaSubjects, subjectsForNames } from "@/lib/mediaSubjects";
+import { pickStarter } from "./pictures";
 import { resolveOrCreateConversation, logTurn } from "@/lib/conversationHistory";
 import { newConversationTurnId } from "@/lib/id";
 import { runGenerateMusic } from "@/lib/music/tool";
@@ -75,7 +76,7 @@ export function realFilmEngines(input: { actor: PersonRow; signal: AbortSignal; 
       const seed = createHash("sha256").update(shot.id).digest().readUInt32BE(0);
       const view = fullViewForJob("adult", actor);
       // A character the person supplied pictures for starts the still from that picture, so the face carries through (retry from words alone if the Stack declines it).
-      const starter = castLocked.map((line) => line.split(":")[0]!.trim()).flatMap((name) => subjectsForNames(actor, [name])?.[0]?.references[0] ?? [])[0];
+      const starter = pickStarter(shot.still, castLocked.map((line) => line.split(":")[0]!.trim()).flatMap((name) => { const picture = subjectsForNames(actor, [name])?.[0]?.references[0]; return picture ? [{ name, picture }] : []; }))?.picture;
       const body = { prompt, size: "1024x576", n: 1, seed, audience: "adult" as const, timeout_ms: 1 };
       const submitted = starter
         ? await submitGeneration({ ...body, init_image: Buffer.from(starter.bytes).toString("base64"), image_source: "uploaded", strength: REFERENCE_STILL_STRENGTH }).catch(() => submitGeneration(body))

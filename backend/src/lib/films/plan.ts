@@ -72,6 +72,7 @@ Name the art style the person asked for (for example cartoon, photoreal, claymat
 Name the film stock look in words, such as “shot on 35mm, overcast, muted colours, heavy grain”, not a colour grade.
 When target_seconds is present, choose the shot count and every shot's seconds to fit it. Title and credits take about 8 seconds together and are not counted in the shots. When no length was asked, make 4 to 8 shots of 5 to 7 seconds.
 Use these named shot types and describe them: wide establishing; medium with the character facing the camera and the creature behind the shoulder; extreme close-up of detail; face close-up with the background stretching (dolly zoom); wide retreat; reaction shot; calm closing wide.
+Cast hints that read "Name (use): look" describe pictures the person attached. Give each one a cast entry with exactly that Name, its look as the locked description, and the kind that fits (actor: character; product, prop: prop; set and closing wide shot: place). Use every one: an actor plays the part, a product is shown clearly and is what the film is about, a set is where scenes happen, and a closing wide shot picture is the last shot, pulling back to reveal it. Write the picture's Name first in the still text of the shots it is the subject of.
 A real person's name is just a name in the prompt.
 Put spoken lines in quotes, let one person speak at a time, and keep each line under 12 words.
 At most one character speaks per shot.

@@ -3,6 +3,8 @@ import type { PersonRow } from "@/types";
 import type { ToolExecutionOutcome, TurnState } from "@/lib/turnMachine/contract";
 import { outcomeOf } from "@/lib/turnContext";
 import { allowed } from "@/lib/films/background";
+import { prepareFilmPictures } from "@/lib/films/pictures";
+import { listMediaSubjects } from "@/lib/mediaSubjects";
 import { prepareCharacters } from "./characters";
 import { isProducing, produce, progressOf } from "./runner";
 import { getDocument } from "./documents";
@@ -63,6 +65,12 @@ export async function runMakeProduction(input: { state: ProductionState; args: R
       const prepared = await prepareCharacters(actor, { names: a.characters, images: state.images ?? [], conversationId: state.conversationId ?? undefined });
       if (!prepared.ok) return refused(callId, args, prepared.line, "characters");
       characters = prepared.names;
+    } else if (state.images?.length) {
+      // Pictures with no names given: each is read for what it is for. People become the cast of the production; places and objects are kept as saved subjects.
+      const prepared = await prepareFilmPictures(actor, { images: state.images, conversationId: state.conversationId });
+      if (!prepared.ok) return refused(callId, args, prepared.line, "pictures");
+      const people = new Set(listMediaSubjects(actor).filter((s) => s.kind === "character").map((s) => s.name));
+      characters = prepared.names.filter((n) => people.has(n));
     }
     const r = await startProduction(actor, { idea: a.idea, seconds: a.seconds, look: a.look, characters });
     return r.ok
