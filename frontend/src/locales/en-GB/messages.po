@@ -590,7 +590,7 @@ msgid "{label} animation"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/companionFlow/PackSection.tsx:86
+#: src/shell/pages/companionFlow/PackSection.tsx:87
 msgid "{label} clip"
 msgstr ""
 
@@ -1813,6 +1813,11 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/shell/pages/MusicStudioPages.tsx:103
 msgid "A style is a sound you can reuse. Words only, never lyrics."
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/shell/pages/companionFlow/PackSection.tsx:69
+msgid "A talking character is a headshot: the clips show the head to the upper chest, never hands or the body, and your own wording is not used for these clips."
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -3146,7 +3151,7 @@ msgid "Approve & Continue"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/companionFlow/PackSection.tsx:73
+#: src/shell/pages/companionFlow/PackSection.tsx:74
 msgid "Approve a picture on the first screen before making a talking character."
 msgstr ""
 
@@ -8313,7 +8318,7 @@ msgid "Done ({count})"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/companionFlow/PackSection.tsx:107
+#: src/shell/pages/companionFlow/PackSection.tsx:108
 msgid "Done. Your talking character is installed and shows in the chat pane."
 msgstr ""
 
@@ -10339,7 +10344,7 @@ msgid "setting.person.voice_print.enrollment.does"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/companionFlow/PackSection.tsx:83
+#: src/shell/pages/companionFlow/PackSection.tsx:84
 msgid "Here are the short clips it will move with. Do they look right?"
 msgstr ""
 
@@ -14077,7 +14082,7 @@ msgid "setting.search.dictionary_fallback.does"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/companionFlow/PackSection.tsx:90
+#: src/shell/pages/companionFlow/PackSection.tsx:91
 msgid "Looks good, continue"
 msgstr ""
 
@@ -14391,7 +14396,7 @@ msgid "Make a song style"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/companionFlow/PackSection.tsx:72
+#: src/shell/pages/companionFlow/PackSection.tsx:73
 msgid "Make a talking character"
 msgstr ""
 
@@ -14478,7 +14483,7 @@ msgid "Make it"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/companionFlow/PackSection.tsx:91
+#: src/shell/pages/companionFlow/PackSection.tsx:92
 msgid "Make it again"
 msgstr ""
 
@@ -16676,7 +16681,7 @@ msgid "Not working"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/companionFlow/PackSection.tsx:101
+#: src/shell/pages/companionFlow/PackSection.tsx:102
 msgid "Not yet"
 msgstr ""
 
@@ -23156,7 +23161,7 @@ msgstr ""
 #: src/shell/pages/companionFlow/AnimateStep.tsx:148
 #: src/shell/pages/companionFlow/CreateCharacterStep.tsx:297
 #: src/shell/pages/companionFlow/CustomizeStep.tsx:147
-#: src/shell/pages/companionFlow/PackSection.tsx:79
+#: src/shell/pages/companionFlow/PackSection.tsx:80
 #: src/shell/pages/CompanionsPage.tsx:386
 #: src/shell/pages/EnginesPage.tsx:239
 #: src/shell/pages/status/StatusComponents.tsx:136
@@ -23955,7 +23960,7 @@ msgstr ""
 #: src/shell/pages/companionFlow/CustomizeStep.tsx:173
 #: src/shell/pages/companionFlow/CustomizeStep.tsx:189
 #: src/shell/pages/companionFlow/KeyframeEditor.tsx:95
-#: src/shell/pages/companionFlow/PackSection.tsx:69
+#: src/shell/pages/companionFlow/PackSection.tsx:70
 #: src/shell/pages/EnginesPage.tsx:147
 #: src/shell/pages/FamilyPage.tsx:49
 #: src/shell/pages/FamilyPage.tsx:50
@@ -24502,7 +24507,7 @@ msgid "The face samples could not be saved."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/companionFlow/PackSection.tsx:98
+#: src/shell/pages/companionFlow/PackSection.tsx:99
 msgid "The finished character could not be shown yet. Wait a moment and reload this page."
 msgstr ""
 
@@ -26089,7 +26094,7 @@ msgstr ""
 #: src/shell/library/LibraryUploads.tsx:75
 #: src/shell/pages/ActivityPage.tsx:37
 #: src/shell/pages/companionFlow/AnimateStep.tsx:133
-#: src/shell/pages/companionFlow/PackSection.tsx:105
+#: src/shell/pages/companionFlow/PackSection.tsx:106
 #: src/shell/pages/dashboard/ArrangeHome.tsx:71
 #: src/shell/pages/FamilyPage.tsx:49
 #: src/shell/pages/FamilyPage.tsx:50
@@ -26901,7 +26906,7 @@ msgid "Use the starter list"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/companionFlow/PackSection.tsx:100
+#: src/shell/pages/companionFlow/PackSection.tsx:101
 msgid "Use this character"
 msgstr ""
 
@@ -28921,7 +28926,7 @@ msgid "Your takes"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/companionFlow/PackSection.tsx:96
+#: src/shell/pages/companionFlow/PackSection.tsx:97
 msgid "Your talking character is ready. Watch it move, then decide."
 msgstr ""
 

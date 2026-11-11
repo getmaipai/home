@@ -12,8 +12,9 @@ import { laneOfPerson } from "@/lib/pictures/laneGate";
 import { videoDenial, VIDEO_DENIAL_LINE, VIDEO_NOT_HERE_LINE, refuseVideoPrompt, VIDEO_REFUSAL_LINE } from "@/lib/videos/policy";
 import { videoEngineReady, videoEngineStatus } from "@/lib/videos/ready";
 import { maxSecondsFor, quickVideoReady } from "@/lib/videos/quality";
-import { resolveCompanionClip, stackVideoModel, promptHash, COMPANION_MODEL_MISMATCH_LINE } from "@/lib/companionArt";
+import { resolveCompanionClip, stackVideoModel, promptHash, reportedVideoModelMatches, reportedVideoQualityMatches, COMPANION_MODEL_MISMATCH_LINE } from "@/lib/companionArt";
 import { cancelOrDeleteVideo, fetchClip, getVideoJob, StackVideoError, submitVideo } from "@/lib/videos/stack";
+import { takeClipSize } from "@/lib/companionClipSize";
 import { activeLookJob } from "@/lib/companionLookJobs";
 import type { CompanionTake } from "@/lib/companionStates";
 
@@ -24,6 +25,8 @@ export const TAKE_RETRY_WAIT_MS = 60_000;
 /** How often Home asks the engine about a running video job (a quick clip takes about 70 seconds; the old two second wait added up to two seconds per take). */
 export const TAKE_POLL_MS = 500;
 export const TAKE_NEGATIVE_PROMPT = "different character, changed colours, changed face, extra limbs, text, watermark, camera movement, background change, shadows";
+/** A pack clip is a headshot: no hands, arms or lower body ever. */
+export const PACK_TAKE_NEGATIVE_PROMPT = `${TAKE_NEGATIVE_PROMPT}, hands, fingers, arms, gestures, lower body, zoom`;
 export const TAKE_NO_REST_LINE = "Choose and approve a starting picture first.";
 export type TakeRunState = "queued" | "running" | "done" | "failed" | "cancelled";
 export interface TakeRun {
@@ -47,6 +50,23 @@ const chosenMotion = (state: string, own: string | null | undefined): string => 
 
 export function takePrompt(card: { text: string }, motion: string, keyName: "green" | "magenta"): string {
   return `Static shot, the camera never moves. ${card.text.slice(0, 600)}. The character stays exactly this size and in exactly this place in the frame, whole body always visible from head to feet, the same picture in every frame. The character keeps the same face, the same colours and the same flat drawn style in every frame, with a calm closed-mouth smile. Plain solid ${keyName} background with nothing on it; the character floats on it with nothing under it. Action: ${motion}. One single smooth motion from start to end, one prop only.`;
+}
+
+/**
+ * A pack clip is a locked head-and-shoulders loop (the calm-idle research: positive wording, one small motion, constant light, the last frame
+ * matching the first, hands out of frame). The generic `takePrompt` is written for a whole drawn mascot with props and gestures, which made a
+ * hand appear and the face change on the first real run.
+ */
+export const PACK_MOTIONS: Record<string, string> = {
+  idle: "sits calmly and breathes gently, a tiny slow head drift, natural blinks, a soft relaxed expression, mouth closed",
+  listening: "listens attentively with steady eyes on the viewer, one small slow nod, natural blinks, a warm slight smile, mouth closed",
+  thinking: "thinks quietly, eyes drifting a little up and to one side, a slight thoughtful brow, one slow blink, head nearly still, mouth closed",
+  speaking: "talks calmly to the viewer, the mouth moving naturally, small head movements, natural blinks, shoulders still",
+};
+/** The person's own character text is never part of a pack clip prompt: the start picture carries the look, and free text could ask for a wider shot, hands or a body. */
+export function packTakePrompt(_card: { text: string }, state: string, keyName: "green" | "magenta"): string {
+  const motion = PACK_MOTIONS[state] ?? PACK_MOTIONS.idle!;
+  return `Static locked shot, fixed framing, the camera never moves. A headshot framed from the top of the head to the upper chest, nothing shown below the chest, the same person with exactly the same face, skin, hair and clothes in every frame, the same size and place in the frame. Lighting stays constant and even. Plain solid ${keyName} background with nothing on it. Action: the person ${motion}. Hands are never shown, no arms, no gestures, no props. One calm continuous motion; the final frame matches the first frame.`;
 }
 
 export function activeTakeRun(companionId: string): TakeRun | null {
@@ -75,6 +95,12 @@ function engineShouldStop(error: unknown): boolean {
 }
 function isEngineFailure(error: unknown): boolean { return error instanceof StackVideoError && (error.status >= 500 || ["generation_failed", "engine_error"].includes(error.code)); }
 
+/** A pack clip is generated at the longest length the standard model makes: the loop finishing trims the start and end, and the pack's idle loop is about 4.9 seconds (117 frames). */
+export const PACK_TAKE_SECONDS = 5;
+/** A pack run makes several clips on a computer that may be busy: the Stack's memory guard can pause video making for a minute, so it waits and tries again this many times (other flows try once more). */
+export const PACK_MEMORY_ATTEMPTS = 6;
+/** A pack job was asked for by a person and takes many clips, so it does not wait behind chat: chat's window shrinks at once for the length of the job (the Stack's own rule) and the clip resumes 20 seconds after chat goes quiet. */
+export const PACK_QUIET = { quiet_seconds: 20, quiet_max_wait_seconds: 0 } as const;
 async function runTakes(run: TakeRun, count: number, actor: PersonRow, motionOverride?: string, pass = 1): Promise<void> {
   run.state = "running";
   let consecutiveEngineFailures = 0;
@@ -86,13 +112,22 @@ async function runTakes(run: TakeRun, count: number, actor: PersonRow, motionOve
       const state = run.states[stateIndex]!;
       // The video model starts from the picture on the key colour it is told to keep, so the clip can be keyed out afterwards; a transparent picture would arrive on black. It is shrunk to the clip size here and sharpened there, because the model smooths fine detail and sharpening before the shrink is mostly lost.
       const [keyR, keyG, keyB] = keyRgb(sheet.look.sheet!.key);
-      const pictureB64 = Buffer.from(await sharp(readFileSync(keyframePath(run.companionId, state))).flatten({ background: { r: keyR, g: keyG, b: keyB } }).resize(media.generate.width, media.generate.height, { fit: "fill", kernel: "lanczos3" }).sharpen({ sigma: 1.2, m1: 1, m2: 2 }).png().toBuffer()).toString("base64");
+      // The picture is fitted to the size the model makes (takeClipSize): the whole picture is kept and the key colour fills the rest, never stretched or cropped.
+      const pictures = new Map<string, string>();
+      const pictureFor = async (size: { width: number; height: number }): Promise<string> => {
+        const name = `${size.width}x${size.height}`;
+        const cached = pictures.get(name);
+        if (cached) return cached;
+        const made = Buffer.from(await sharp(readFileSync(keyframePath(run.companionId, state))).flatten({ background: { r: keyR, g: keyG, b: keyB } }).resize(size.width, size.height, { fit: "contain", background: { r: keyR, g: keyG, b: keyB }, kernel: "lanczos3" }).sharpen({ sigma: 1.2, m1: 1, m2: 2 }).png().toBuffer()).toString("base64");
+        pictures.set(name, made);
+        return made;
+      };
       if (run.cancelled) break;
       if (motionOverride !== undefined && run.states.length === 1) setMotion(run.companionId, state, motionOverride);
       const stored = readStates(run.companionId).states[state];
       for (let index = 1; index <= count; index++) {
         if (run.cancelled) break;
-        const prompt = takePrompt(sheet.card, chosenMotion(state, stored?.motion), keyName);
+        const prompt = run.pack ? packTakePrompt(sheet.card, state, keyName) : takePrompt(sheet.card, chosenMotion(state, stored?.motion), keyName);
         run.current = { state, take: index, index: stateIndex + 1, of: run.states.length };
         run.phase = "generating"; run.percent = Math.round(((run.takesMade) / (run.states.length * count)) * 100);
         const makingLabel = `Making the ${stateLabel(state)} animation${count > 1 ? ` (try ${index} of ${count})` : ""}`;
@@ -103,12 +138,15 @@ async function runTakes(run: TakeRun, count: number, actor: PersonRow, motionOve
         try {
           let seed = Math.floor(Math.random() * 2_147_483_647);
           const art = await resolveCompanionClip(laneOfPerson(actor) === "adult" ? "detailed" : "quick");
-          const seconds = Math.min(media.generate.seconds, maxSecondsFor(art.quality));
+          const shape = await sharp(readFileSync(keyframePath(run.companionId, state))).metadata();
+          const clipSize = takeClipSize(art.model, art.quality, (shape.height ?? 0) > (shape.width ?? 0), await videoEngineStatus().catch(() => null)), pictureB64 = await pictureFor(clipSize);
+          const seconds = Math.min(run.pack ? PACK_TAKE_SECONDS : media.generate.seconds, maxSecondsFor(art.quality));
           take = addTake(run.companionId, state, { source: "generated", seed, label: `Candidate ${index}`, model: art.model, quality: art.quality, prompt_hash: promptHash(prompt), ...(run.packJob ? { pack_job: run.packJob } : {}) });
           let done: Awaited<ReturnType<typeof submitVideo>>["done"] = null;
-          for (let attempt = 0; attempt < 2; attempt++) {
+          const maxAttempts = run.pack ? PACK_MEMORY_ATTEMPTS : 2;
+          for (let attempt = 0; attempt < maxAttempts; attempt++) {
             try {
-              const submitted = await submitVideo({ prompt, negative_prompt: TAKE_NEGATIVE_PROMPT, size: `${media.generate.width}x${media.generate.height}`, seconds, model: stackVideoModel(art), seed, image: pictureB64, image_source: sheet.originalPath || readKeyframeMeta(run.companionId, state)?.model ? "generated" : "uploaded", audience: "all-ages", timeout_ms: 1 });
+              const submitted = await submitVideo({ prompt, negative_prompt: run.pack ? PACK_TAKE_NEGATIVE_PROMPT : TAKE_NEGATIVE_PROMPT, size: `${clipSize.width}x${clipSize.height}`, seconds, ...(run.pack ? PACK_QUIET : {}), model: stackVideoModel(art), seed, image: pictureB64, image_source: sheet.originalPath || readKeyframeMeta(run.companionId, state)?.model ? "generated" : "uploaded", audience: "all-ages", timeout_ms: 1 });
               stackJob = submitted.job; run.stackJob = stackJob; done = submitted.done;
               const deadline = Date.now() + 15 * 60_000;
               while (!done) {
@@ -123,7 +161,7 @@ async function runTakes(run: TakeRun, count: number, actor: PersonRow, motionOve
               }
               break;
             } catch (error) {
-              if (!(error as { cancelled?: boolean })?.cancelled || attempt > 0 || run.cancelled) throw error;
+              if (!(error as { cancelled?: boolean })?.cancelled || attempt >= maxAttempts - 1 || run.cancelled) throw error;
               if (stackJob) await cancelOrDeleteVideo(stackJob);
               run.stackJob = null; stackJob = null;
               run.phase = "waiting"; run.label = "Waiting for memory, then trying again";
@@ -137,7 +175,7 @@ async function runTakes(run: TakeRun, count: number, actor: PersonRow, motionOve
           if (run.cancelled) break;
           const reported = done?.find((clip) => typeof clip.model === "string")?.model ?? null;
           const reportedQuality = done?.find((clip) => clip.quality)?.quality ?? null;
-          if ((reportedQuality && reportedQuality !== art.quality) || (reported && reported !== take.model && reported !== stackVideoModel(art))) throw new Error(COMPANION_MODEL_MISMATCH_LINE);
+          if ((reportedQuality && !reportedVideoQualityMatches(reportedQuality, art)) || (reported && !reportedVideoModelMatches(reported, art, take.model ?? ""))) throw new Error(COMPANION_MODEL_MISMATCH_LINE);
           recordTakeModelReported(run.companionId, state, take.id, reported);
           run.phase = "finishing"; run.label = `Finishing the ${stateLabel(state)} animation${count > 1 ? ` (try ${index} of ${count})` : ""}`; run.percent = Math.min(99, run.percent + 1);
           const completedStackJob = stackJob!;

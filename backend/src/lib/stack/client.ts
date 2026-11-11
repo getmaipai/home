@@ -111,6 +111,7 @@ export interface StackImageToolsStatus {
   operations: string[];
   reason: string | null;
 }
+export interface StackTalkFramesStatus { state: "unsupported" | "needs-setup" | "building" | "idle" | "running"; installed?: boolean; environmentReady?: boolean; models?: Record<string, boolean>; modelsVerified?: boolean; reason?: string | null }
 /** The face landmarks of one picture, `[x, y]` pairs in that picture's pixels (MAKER-B2); `points` holds all 203. */
 export interface StackFaceLandmarks { outerLips: number[][]; innerLips: number[][]; nose: number[][]; contour: number[][]; points: number[][]; [more: string]: unknown }
 export interface StackTalkFramesBody { job: string; sourceEye?: number; sourceLip?: number; sourceLandmarks?: StackFaceLandmarks | null; frames?: Array<{ kind: string; ratio: number; landmarks?: StackFaceLandmarks | null }> }
@@ -166,6 +167,8 @@ export interface StackClient {
   imageJob(request: RoleRequest, opts?: { signal?: AbortSignal }): Promise<StackJob>;
   /** GET /stack/v1/image-tools. */
   imageTools(opts?: { signal?: AbortSignal }): Promise<StackImageToolsStatus>;
+  /** The `talk_frames` block of GET /stack/v1/image-tools (the Talking pictures engine: state, whether its weights are all present). */
+  talkFramesStatus?(opts?: { signal?: AbortSignal }): Promise<StackTalkFramesStatus>;
   /** POST /v1/images/looks (LOOK-01): one JPEG in, the Stack's look out (objects, scene, cost). The reply is returned as the Stack sent it;
    * lib/robotVision.ts reads the fields it keeps. Refusals are StackErrors (413, 415, 422 detail_unavailable, 429, 503, 500). */
   look(form: FormData, opts?: { signal?: AbortSignal }): Promise<unknown>;
@@ -508,6 +511,7 @@ export function createStackClient(options: StackClientOptions = {}): StackClient
       throw new Error("unreachable");
     },
     imageTools: (opts) => call("/stack/v1/image-tools", { method: "GET" }, async (res) => (await json<{ image_tools: StackImageToolsStatus }>(res)).image_tools, opts),
+    talkFramesStatus: (opts) => call("/stack/v1/image-tools", { method: "GET" }, async (res) => (await json<{ talk_frames: StackTalkFramesStatus }>(res)).talk_frames, opts),
     look: (form, opts) => call("/v1/images/looks", formInit(form), (res) => json<unknown>(res), opts),
     imageEdit: (form, opts) => call("/v1/images/edits", formInit(form), async (res) => {
       const body = await json<{ job: string; data: StackImageEditItem[] }>(res);

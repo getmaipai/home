@@ -156,6 +156,9 @@ export interface VideoBody {
   model?: string;
   /** TIER-HOME-04: the level the job runs at, from the slot (`lib/videos/slotBody.ts`); left out at Standard. */
   tier?: "boost" | "max";
+  /** How long chat must be quiet before the job resumes (the Stack's minimum is 20) and the longest the job waits for that before it shrinks chat's window and starts anyway (0 starts at once). Left out, the household's resource settings apply. */
+  quiet_seconds?: number;
+  quiet_max_wait_seconds?: number | null;
   timeout_ms: number;
 }
 

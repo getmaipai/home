@@ -278,6 +278,9 @@ export async function pictureReader(): Promise<PictureReader | null> {
       const row = roles.find((role) => role.id === id);
       const state = row?.state.state;
       if ((state === "ready" || state === "loaded" || state === "installed") && row?.model?.imageInput === true) return id;
+      // The vision role is set `offline` when the Stack's memory guard gave up on loading it, and it comes back only when something asks for it: skipping it
+      // here meant nothing asked, so every check failed closed for good (found on the first real pack run). Ask it; a request that fails still fails closed.
+      if (id === "vision" && state === "offline" && row?.model?.imageInput === true) return id;
     }
     return null;
   } catch {

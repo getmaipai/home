@@ -66,6 +66,7 @@ export function PackSection({ companionId, stillId, reasonId }: { companionId: s
     <>
     <DialogSection title={i18n._({ id: "Talking character", message: "Talking character" })}>
       <p className="text-body text-muted-foreground">{i18n._({ id: "Make a character that moves its mouth and face when it talks. It starts from your approved picture, shown above.", message: "Make a character that moves its mouth and face when it talks. It starts from your approved picture, shown above." })}</p>
+      <p className="text-body text-muted-foreground">{i18n._({ id: "A talking character is a headshot: the clips show the head to the upper chest, never hands or the body, and your own wording is not used for these clips.", message: "A talking character is a headshot: the clips show the head to the upper chest, never hands or the body, and your own wording is not used for these clips." })}</p>
       {problem ? <StatusCard kind="problem" title={i18n._({ id: "That did not work", message: "That did not work" })} line={problem} /> : null}
       {!open || job === null || job.status === "cancelled" ? (
         <>

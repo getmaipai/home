@@ -26,6 +26,7 @@ import { packFolderProblems } from "@/lib/companionPack";
 import { createJob, updateJob } from "@/lib/jobs";
 import { getStackClient } from "@/lib/stackEngine";
 import { prepareEditSource } from "@/lib/pictures/editSources";
+import { fetchPicture } from "@/lib/pictures/stack";
 import { routeAudience } from "@/lib/pictures/audience";
 import { pictureDenial, PICTURE_DENIAL_LINE } from "@/lib/pictures/policy";
 import { videoDenial, VIDEO_DENIAL_LINE } from "@/lib/videos/policy";
@@ -55,6 +56,12 @@ export const STYLISED_LETTER_SHAPE: Record<(typeof STYLISED_LETTERS)[number], st
 };
 export const stylisedLetterInstruction = (letter: (typeof STYLISED_LETTERS)[number]): string => `Change only the mouth: ${STYLISED_LETTER_SHAPE[letter]}. ${TALK_KEEP} Keep the flat chroma key background exactly as it is.`;
 export const PACK_NO_VIDEO_LINE = "Making a pack needs the video model. An admin can check Settings, Pictures and videos.";
+/** The Talking pictures engine can serve a job when the Stack supports it and every weights file is present; its own environment is built by the first job (state `needs-setup` is normal until then). */
+export function faceToolsReady(status: { state: string; models?: Record<string, boolean>; modelsVerified?: boolean } | null | undefined): boolean {
+  if (!status || status.state === "unsupported") return false;
+  const models = Object.values(status.models ?? {});
+  return status.modelsVerified === true || (models.length > 0 && models.every(Boolean));
+}
 export const PACK_NO_TALK_FRAMES_LINE = "Making a talking pack needs the face tools, which are not ready on this computer yet. An admin can check Settings, Pictures and videos.";
 export const PACK_CHECK_CLOSED_LINE = "The safety check could not look at a picture, so the pack was stopped and nothing was kept. Try again when the picture check is ready.";
 export const PACK_APPROVAL_NOT_WAITING_LINE = "The pack is not waiting for that approval right now.";
@@ -105,7 +112,9 @@ export const StackPackOps: PackOpsClient = {
     let job = await client.job(reply.job);
     while (ACTIVE.includes(job.state)) { if (input.signal?.aborted) throw new DOMException("Aborted", "AbortError"); await sleep(PACK_POLL_MS); job = await client.job(reply.job); }
     if (job.state !== "done") throw new Error(jobFailure(job, "The picture could not be made. Try again."));
-    return await client.imageEditResult(reply.job);
+    // A generative edit (the picture model) keeps its picture as the job's file; the in-memory result route is for the picture tools only.
+    const generative = job.kind === "image_edit_generative" || Array.isArray((job.result as { images?: unknown } | null | undefined)?.images);
+    return generative ? await fetchPicture(reply.job, 0) : await client.imageEditResult(reply.job);
   },
   async talkFrames(input) {
     const client = getStackClient();
@@ -196,8 +205,8 @@ const defaultDeps: PackDeps = {
     if (shapes === "stylised") return null; // the stylised path makes its mouth pictures with the picture edit and needs no face tools
     // The face tools report on the image-tools status; their readiness never changes the image role itself.
     try {
-      const tools = await getStackClient().imageTools();
-      if (!(tools.operations ?? []).includes("talk_frames") && tools.models?.talk_frames !== true) return { status: 503, error: PACK_NO_TALK_FRAMES_LINE };
+      const client = getStackClient();
+      if (!client.talkFramesStatus || !faceToolsReady(await client.talkFramesStatus())) return { status: 503, error: PACK_NO_TALK_FRAMES_LINE };
     } catch { return { status: 503, error: PACK_NO_TALK_FRAMES_LINE }; }
     return null;
   },

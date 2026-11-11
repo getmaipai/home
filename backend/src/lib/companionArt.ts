@@ -52,5 +52,13 @@ export function resolveCompanionClipFromStatus(engine: StackVideoStatus | null, 
   return { model, quality: choice.quality };
 }
 /** The value the Stack's video `model` field takes (lib/pictures/lane.ts): LTX-2.5 q8 or the Quick model name. */
+/** The names the Stack reports for the LTX-2.5 models, by the alias Home asks for them with (the model id its components list uses). */
+export const LTX25_REPORTED_NAMES: Record<string, string> = { "ltx25-q8": "ltx-2-5-q8-distilled-mlx", "ltx25-max": "ltx-2-5-bf16-distilled-mlx-max" };
+/** Whether the model a finished clip reports is the one that was asked for: its alias, its take's recorded model or the Stack's own name for it. */
+export const reportedVideoModelMatches = (reported: string, art: CompanionArtChoice, takeModel: string): boolean =>
+  reported === takeModel || reported === stackVideoModel(art) || reported === LTX25_REPORTED_NAMES[stackVideoModel(art)];
+/** Whether the quality a finished clip reports is the one asked for: the Stack names the LTX-2.5 makers `ltx25` and `ltx25max`, Home's lanes are `quick` and `detailed`. */
+export const reportedVideoQualityMatches = (reported: string, art: CompanionArtChoice): boolean =>
+  reported === art.quality || (reported === "ltx25" && art.model === "ltx25-q8") || (reported === "ltx25max" && art.model === "ltx25-max");
 export const stackVideoModel = (art: CompanionArtChoice): string => (art.model === "ltx25-q8" || art.model === "ltx25-max" ? art.model : WAN_QUICK_VIDEO_MODEL);
 export async function resolveCompanionClip(requested: "quick" | "detailed" = "quick"): Promise<CompanionArtChoice> { return resolveCompanionClipFromStatus(await (statusReaders?.video ?? videoEngineStatus)(), requested); }

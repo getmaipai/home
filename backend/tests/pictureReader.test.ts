@@ -25,6 +25,12 @@ describe("pictureReader", () => {
     stack([row("chat", "ready", false), row("vision", "ready", false)]);
     expect(await pictureReader()).toBeNull();
   });
+  test("vision offline after a memory pause is still asked (nothing else wakes it); chat that cannot read pictures is not", async () => {
+    stack([row("chat", "ready", false), row("vision", "offline", true)]);
+    expect(await pictureReader()).toBe("vision");
+    stack([row("chat", "ready", false), row("vision", "offline", false)]);
+    expect(await pictureReader()).toBeNull();
+  });
   test("an unreadable Stack is no reader", async () => {
     __setStackClientForTests({ roles: async () => { throw new Error("down"); } } as never);
     expect(await pictureReader()).toBeNull();

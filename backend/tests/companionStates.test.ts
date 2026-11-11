@@ -113,10 +113,10 @@ describe("companion states store", () => {
     expect(existsSync(join(dir, "animation"))).toBe(true); expect(existsSync(join(dir, "animation.next"))).toBe(false);
   });
 
-  test("declares the companion media root once, preserves other roots, and retries a failed put", async () => {
+  test("declares the companion media root once, preserves other roots that exist, drops ones that no longer exist, and retries a failed put", async () => {
     const { ensureCompanionMediaRoot } = await import("@/lib/companionStates");
-    const expected = join(dataRoot, "companions"); let reads = 0, writes = 0; let fail = true;
-    __setStackClientForTests({ mediaRoots: async () => { reads++; return { read: ["/other/read"], write: ["/other/write"] }; }, setMediaRoots: async (roots: { read: string[]; write: string[] }) => { writes++; expect(roots.read).toContain("/other/read"); expect(roots.write).toContain("/other/write"); expect(roots.read).toContain(expected); expect(roots.write).toContain(expected); if (fail) throw Error("offline"); return roots; } } as never);
+    const expected = join(dataRoot, "companions"); let reads = 0, writes = 0; let fail = true; const otherRead = join(dataRoot, "other-read"), otherWrite = join(dataRoot, "other-write"), gone = join(dataRoot, "removed-worktree", "video-edit"); mkdirSync(otherRead, { recursive: true }); mkdirSync(otherWrite, { recursive: true });
+    __setStackClientForTests({ mediaRoots: async () => { reads++; return { read: [otherRead, gone], write: [otherWrite, gone] }; }, setMediaRoots: async (roots: { read: string[]; write: string[] }) => { writes++; expect(roots.read).toContain(otherRead); expect(roots.write).toContain(otherWrite); expect(roots.read).not.toContain(gone); expect(roots.write).not.toContain(gone); expect(roots.read).toContain(expected); expect(roots.write).toContain(expected); if (fail) throw Error("offline"); return roots; } } as never);
     expect((await ensureCompanionMediaRoot()).ok).toBe(false); fail = false;
     expect(await ensureCompanionMediaRoot()).toEqual({ ok: true }); expect(await ensureCompanionMediaRoot()).toEqual({ ok: true });
     expect(reads).toBe(2); expect(writes).toBe(2);
@@ -145,6 +145,20 @@ describe("companion states store", () => {
     __setStackClientForTests({ mediaRoots: async () => ({ read: [root], write: [root] }), setMediaRoots: async () => ({ read: [root], write: [root] }), submitJob: async (job: any) => { submitted = job; const out = join(job.input.output_dir, job.input.output_name); mkdirSync(out, { recursive: true }); writeFileSync(join(out, "clip.h264.mp4"), "h264"); writeFileSync(join(out, "still.png"), "png"); return { id: "job-no-palette", state: "done", result: { ok: true, reasons: [], seconds: 3, files: [{ name: "clip.h264.mp4", bytes: 123 }], av1: false } }; } } as never);
     await finishTake(id, "idle", take.id, { alpha: false });
     expect(submitted.input).not.toHaveProperty("palette_reference");
+  });
+
+  test("a pack clip sends the rest picture as base64 bytes (found on the first real run: a file path was refused by the Stack)", async () => {
+    __setKeyframesForTests(async () => [new Uint8Array([7])]);
+    const id = companion(), rest = addVersion(id, new Uint8Array([1, 2, 3]), { source: "upload", label: "rest", width: 1024, height: 1024, from: null }); setRest(id, rest.id);
+    updateSheet(id, { views: { left: null, right: null, mouth: null }, card: { text: "fox", species: "fox", colours: ["#CC3322"] }, key: "#00FF00", state: "needs_review", approved_by: null, approved_at: null }); approveSheet(id, "Author");
+    const take = addTake(id, "idle", { source: "upload", label: "idle" }); writeFileSync(takePath(id, "idle", take.id, "source.mp4")!, "source");
+    let submitted: any;
+    __setStackClientForTests({ mediaRoots: async () => ({ read: [root], write: [root] }), setMediaRoots: async () => ({ read: [root], write: [root] }), submitJob: async (job: any) => { submitted = job; const out = join(job.input.output_dir, job.input.output_name); mkdirSync(out, { recursive: true }); writeFileSync(join(out, "clip.h264.mp4"), "h264"); writeFileSync(join(out, "still.png"), "png"); return { id: "job-pack", state: "done", result: { ok: true, reasons: [], seconds: 3, files: [{ name: "clip.h264.mp4", bytes: 123 }], av1: false } }; } } as never);
+    const { finishTake } = await import("@/lib/companionStates");
+    await finishTake(id, "idle", take.id, { alpha: false, pack: true });
+    expect(submitted.input.rest_reference).toBe(Buffer.from([1, 2, 3]).toString("base64"));
+    expect(submitted.input).toMatchObject({ pin_rest: true, light_flatten: true, phone: true });
+    expect(submitted.input).toMatchObject({ min_seconds: 4, max_seconds: 5 }); // a pack idle loop is about 4.9 s; the generic 3 to 4 s state length trimmed to under its minimum on the first real run
   });
 
   test("finish requires an approved sheet and keeps the Stack failure message on the take", async () => {

@@ -855,3 +855,15 @@ describe("item I: interrupted activity rows are reconciled at server start", () 
     expect(db.select().from(jobs).all().find((j) => j.kind === "companion_pack_job")).toMatchObject({ state: "failed", errorKind: "interrupted" });
   });
 });
+
+import { faceToolsReady } from "@/lib/companionPackMaker";
+describe("faceToolsReady (the real Stack talk_frames status shape, found on the first real run)", () => {
+  test("weights present and environment not built yet is ready (the first job builds it)", () => {
+    expect(faceToolsReady({ state: "needs-setup", modelsVerified: true, models: { landmark: true, appearance: true } })).toBe(true);
+  });
+  test("a missing weights file, an unsupported machine or no status is not ready", () => {
+    expect(faceToolsReady({ state: "needs-setup", modelsVerified: false, models: { landmark: false, appearance: true } })).toBe(false);
+    expect(faceToolsReady({ state: "unsupported", modelsVerified: true })).toBe(false);
+    expect(faceToolsReady(undefined)).toBe(false);
+  });
+});
