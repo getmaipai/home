@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-11-10T22:59:13.994Z",
-  "kitTag": "ui-v0.5.581",
+  "generatedAt": "2026-11-11T00:30:34.495Z",
+  "kitTag": "ui-v0.5.585",
   "items": [
     {
       "file": "ActivityCardsShowcase.tsx",
@@ -630,6 +630,22 @@
       "group": "companion-pack",
       "verdict": "support",
       "verdictReason": "Types for CompanionPackPlayer's internal runtime; not a standalone Home Element.",
+      "implemented": false
+    },
+    {
+      "file": "companion-pack/voice-layer.ts",
+      "name": "companion-pack/voice-layer",
+      "group": "companion",
+      "verdict": "unassessed",
+      "verdictReason": "Recorded unassessed verdict in elements-plan.json; see the plan entry for its dependency or scope.",
+      "implemented": false
+    },
+    {
+      "file": "companion-pack/voice-player.tsx",
+      "name": "companion-pack/voice-player",
+      "group": "companion",
+      "verdict": "unassessed",
+      "verdictReason": "Recorded unassessed verdict in elements-plan.json; see the plan entry for its dependency or scope.",
       "implemented": false
     },
     {

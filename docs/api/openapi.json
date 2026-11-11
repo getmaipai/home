@@ -9573,6 +9573,43 @@
         }
       }
     },
+    "/api/speech/cmu": {
+      "get": {
+        "tags": [
+          "Voice"
+        ],
+        "summary": "Pronouncing dictionary for companion mouth cues",
+        "description": "Returns a JSON object of word to phonemes. Served gzip-compressed when the browser accepts it, with an ETag and a long private cache.",
+        "responses": {
+          "200": {
+            "description": "The dictionary.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          },
+          "304": {
+            "description": "The browser's cached copy is current."
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/voiceover/options": {
       "get": {
         "tags": [

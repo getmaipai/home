@@ -1022,6 +1022,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/skills.ts` | listSkillIds, __resetSkillCacheForTests, loadSkill, loadAllSkills |
 | `backend/src/lib/smoke.ts` | setDenoLookupForTest, runDenoTestSmoke, runSmoke, runAllSmokeTests, getPackageStatus, allPackageStatuses |
 | `backend/src/lib/specDir.ts` | SPEC_DIR |
+| `backend/src/lib/speechDictionary.ts` | speechDictionary |
 | `backend/src/lib/spokenArg.ts` | wantsSpoken |
 | `backend/src/lib/spokenText.ts` | toSpokenText |
 | `backend/src/lib/spokenTextEs.ts` | spanishNumber, spanishSpoken, SPOKEN_LINES_ES |
