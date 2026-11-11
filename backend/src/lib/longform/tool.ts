@@ -3,6 +3,7 @@ import type { PersonRow } from "@/types";
 import type { ToolExecutionOutcome, TurnState } from "@/lib/turnMachine/contract";
 import { outcomeOf } from "@/lib/turnContext";
 import { allowed } from "@/lib/films/background";
+import { prepareCharacters } from "./characters";
 import { isProducing, produce, progressOf } from "./runner";
 import { getDocument } from "./documents";
 import { approveStage, startProduction, writeBible, writeOutline, type Bible, type Outline, type StageResult, type Treatment } from "./stages";
@@ -20,10 +21,11 @@ export const makeProductionArgs = z.object({
   seconds: z.number().int().min(20).max(14400).optional(),
   look: z.string().trim().min(1).max(160).optional(),
   production_id: z.string().trim().min(1).max(120).optional(),
+  characters: z.array(z.string().trim().min(1).max(80)).max(8).optional(),
   approve: z.boolean().optional(),
 });
 
-type ProductionState = Pick<TurnState, "actor" | "surface" | "planBasis" | "temporary">;
+type ProductionState = Pick<TurnState, "actor" | "surface" | "planBasis" | "temporary"> & Partial<Pick<TurnState, "images" | "conversationId">>;
 
 function reply(callId: string, args: Record<string, unknown>, text: string, data: Record<string, unknown>): ToolExecutionOutcome {
   return outcomeOf({ callId, packageId: MAKE_PRODUCTION_TOOL_ID, status: "succeeded", via: "tool_call", args, durationMs: 0, result: { reply: { text }, data, actions: [] } });
@@ -56,7 +58,13 @@ export async function runMakeProduction(input: { state: ProductionState; args: R
   if (!a.production_id) {
     if (!a.idea) return refused(callId, args, "Ask what the story is about.", "needs_idea");
     if (!a.seconds) return refused(callId, args, "Ask how long it should be.", "needs_length");
-    const r = await startProduction(actor, { idea: a.idea, seconds: a.seconds, look: a.look });
+    let characters: string[] | undefined;
+    if (a.characters?.length) {
+      const prepared = await prepareCharacters(actor, { names: a.characters, images: state.images ?? [], conversationId: state.conversationId ?? undefined });
+      if (!prepared.ok) return refused(callId, args, prepared.line, "characters");
+      characters = prepared.names;
+    }
+    const r = await startProduction(actor, { idea: a.idea, seconds: a.seconds, look: a.look, characters });
     return r.ok
       ? reply(callId, args, `${describe(actor, r.productionId, "treatment")} ${NEXT.treatment}`, { productionId: r.productionId, stage: "treatment", scenes: r.structure.scenes.length })
       : refused(callId, args, r.line, "not_started");

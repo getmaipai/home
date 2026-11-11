@@ -7,6 +7,7 @@ import { createMediaProduction, getMediaProduction } from "@/lib/mediaProduction
 import { refuseVideoPrompt, VIDEO_REFUSAL_LINE } from "@/lib/videos/policy";
 import type { PersonRow } from "@/types";
 import { approveDocument, getDocument, saveDocument, type ProductionDocument } from "./documents";
+import { savedCharacters } from "./characters";
 import { planStructure, type StructurePlan } from "./structure";
 
 const name = z.string().trim().min(1).max(80);
@@ -73,7 +74,7 @@ export async function askStage<T>(system: string, payload: unknown, schema: z.Zo
 export type StageResult = { ok: true; document: ProductionDocument; productionId: string; structure: StructurePlan } | { ok: false; line: string };
 
 /** Starts a production and writes its treatment. The structure (acts, scenes, shots) comes from the length alone. */
-export async function startProduction(actor: PersonRow, input: { idea: string; seconds: number; look?: string }): Promise<StageResult> {
+export async function startProduction(actor: PersonRow, input: { idea: string; seconds: number; look?: string; characters?: string[] }): Promise<StageResult> {
   const refusal = refuseVideoPrompt(input.idea, { lane: "adult" });
   if (refusal) return { ok: false, line: VIDEO_REFUSAL_LINE[refusal] };
   const structure = planStructure(input.seconds);
@@ -85,7 +86,7 @@ export async function startProduction(actor: PersonRow, input: { idea: string; s
   );
   if (!treatment.ok) return treatment;
   const production = createMediaProduction(actor, { title: treatment.value.title, summary: treatment.value.logline }, "long-form");
-  const saved = saveDocument(actor, { productionId: production.id, kind: "treatment", json: { ...treatment.value, length_seconds: input.seconds }, source: "model" });
+  const saved = saveDocument(actor, { productionId: production.id, kind: "treatment", json: { ...treatment.value, length_seconds: input.seconds, ...(input.characters?.length ? { characters: input.characters } : {}) }, source: "model" });
   if (!saved.ok) return saved;
   return { ok: true, document: saved.document, productionId: production.id, structure: structure.plan };
 }
@@ -102,10 +103,12 @@ function need(actor: PersonRow, productionId: string, kind: "treatment" | "bible
 export async function writeBible(actor: PersonRow, productionId: string): Promise<StageResult> {
   const t = need(actor, productionId, "treatment"); if (!t.ok) return t;
   const length = lengthOf(actor, productionId); if (!length.ok) return length;
+  const given = savedCharacters(actor, ((t.doc.json as { characters?: string[] }).characters) ?? []);
   const bible = await askStage(
-    "Write the bible for this production from its approved treatment: every recurring character (with a fixed look described as positive facts and, if they speak, a voice), every location, the music moods, and a few rules that keep it consistent. Include only what the story needs.",
-    { treatment: t.doc.json, length_seconds: length.seconds },
+    "Write the bible for this production from its approved treatment: every recurring character (with a fixed look described as positive facts and, if they speak, a voice), every location, the music moods, and a few rules that keep it consistent. Include only what the story needs." + (given.length ? " The saved_characters are real pictures the person supplied: keep every one of them in the cast under exactly that name, and write their look from the given look plus the story." : ""),
+    { treatment: t.doc.json, length_seconds: length.seconds, ...(given.length ? { saved_characters: given } : {}) },
     bibleSchema,
+    (b) => { const missing = given.find((g) => !b.cast.some((c) => c.name === g.name)); return missing ? `the cast must include the saved character "${missing.name}" under that exact name` : null; },
   );
   if (!bible.ok) return bible;
   const saved = saveDocument(actor, { productionId, kind: "bible", json: bible.value, source: "model" });

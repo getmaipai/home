@@ -1,5 +1,11 @@
 # Changelog
 
+## [Unreleased]
+
+### Added
+
+- Pictures attached to a long production become its named characters (one name per picture, in order); saved characters can be named too. Their pictures start the stills so the face carries through.
+
 ## [0.4.0] - 2026-11-10
 
 ### Added

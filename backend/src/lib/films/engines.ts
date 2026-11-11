@@ -7,7 +7,7 @@ import { gateFinished } from "@/lib/pictures/laneGate";
 import { submitGeneration, getGenerationJob, fetchPicture, cancelOrDelete } from "@/lib/pictures/stack";
 import { fullViewForJob } from "@/lib/stack/fullView";
 import { createMediaProduction } from "@/lib/mediaProductions";
-import { createMediaSubject, listMediaSubjects } from "@/lib/mediaSubjects";
+import { createMediaSubject, listMediaSubjects, subjectsForNames } from "@/lib/mediaSubjects";
 import { resolveOrCreateConversation, logTurn } from "@/lib/conversationHistory";
 import { newConversationTurnId } from "@/lib/id";
 import { runGenerateMusic } from "@/lib/music/tool";
@@ -53,6 +53,8 @@ export function backgroundTurn(actor: PersonRow) {
   return { conversationId: conversation.value.id, turnId };
 }
 
+/** How far a still may move away from a supplied character picture (0 keeps it, 1 ignores it). */
+const REFERENCE_STILL_STRENGTH = 0.6;
 export function realFilmEngines(input: { actor: PersonRow; signal: AbortSignal; productionId: string; faceless?: boolean }): FilmEngines {
   const { actor, signal, productionId, faceless = false } = input;
   let turn: ReturnType<typeof backgroundTurn> | null = null;
@@ -70,7 +72,12 @@ export function realFilmEngines(input: { actor: PersonRow; signal: AbortSignal; 
       const prompt = [shot.still, ...castLocked].filter(Boolean).join(" ");
       const seed = createHash("sha256").update(shot.id).digest().readUInt32BE(0);
       const view = fullViewForJob("adult", actor);
-      const submitted = await submitGeneration({ prompt, size: "1024x576", n: 1, seed, audience: "adult", timeout_ms: 1 });
+      // A character the person supplied pictures for starts the still from that picture, so the face carries through (retry from words alone if the Stack declines it).
+      const starter = castLocked.map((line) => line.split(":")[0]!.trim()).flatMap((name) => subjectsForNames(actor, [name])?.[0]?.references[0] ?? [])[0];
+      const body = { prompt, size: "1024x576", n: 1, seed, audience: "adult" as const, timeout_ms: 1 };
+      const submitted = starter
+        ? await submitGeneration({ ...body, init_image: Buffer.from(starter.bytes).toString("base64"), image_source: "uploaded", strength: REFERENCE_STILL_STRENGTH }).catch(() => submitGeneration(body))
+        : await submitGeneration(body);
       try {
         let finished = !!submitted.done?.length;
         const deadline = Date.now() + 8 * 60_000;
