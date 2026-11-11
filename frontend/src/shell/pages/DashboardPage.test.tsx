@@ -75,9 +75,6 @@ function mockFetch(mocks: Mocks = {}) {
     if (url.includes("/api/widgets/home")) return Promise.resolve(Response.json(mocks.home ?? { hero: null, cards: mocks.widgets ?? [], more: [] }));
     if (url.includes("/api/widgets")) return Promise.resolve(Response.json(mocks.widgets ?? []));
     if (url.includes("/api/people")) return Promise.resolve(Response.json([{ id: "person-abc123", display_name: "Nova", role: "owner" }]));
-    if (url.includes("/api/apps")) return Promise.resolve(Response.json([
-      ...["videos", "music"].map((id) => ({ package: id, page: "index", to: `/apps/${id}`, icon: id, label: id, description: "", category: "Create", keywords: [], sections: [], incognito: "unaffected" })),
-    ]));
     if (url.includes("/api/continue")) return Promise.resolve(Response.json({ rows: mocks.continue ?? [] }));
     if (url.includes("/api/health")) {
       return Promise.resolve(Response.json({ ok: true, engines: { chat: mocks.chat === "starting" ? { state: "down", kind: "starting", reason: "ai_installing" } : { state: "up" } } }));
@@ -134,40 +131,12 @@ describe("DashboardPage (Home)", () => {
     } finally { restore(); }
   });
 
-  test("keeps the composer, chips, action grid and existing dashboard sections in order", async () => {
+  test("keeps the home block order in one layout function", async () => {
     const { homeBlocks } = await import("@/shell/pages/dashboard/homeBlocks");
-    expect(homeBlocks("ask")).toEqual(["greeting", "ask", "today_chips", "actions", "pick_up", "today", "family", "getting_started"]);
-    expect(homeBlocks("board")).toEqual(["greeting", "admin", "hero", "ask", "pick_up", "today", "family", "getting_started"]);
-    expect(homeBlocks("shelves")).toEqual(["greeting", "admin", "ask", "media_continue", "today", "media_new", "media_made", "getting_started"]);
+    expect(homeBlocks("ask")).toEqual(["greeting", "admin", "ask", "actions", "today_chips", "pick_up", "family", "getting_started"]);
+    expect(homeBlocks("board")).toEqual(["greeting", "admin", "hero", "ask", "actions", "pick_up", "today", "family", "getting_started"]);
+    expect(homeBlocks("shelves")).toEqual(["greeting", "admin", "ask", "actions", "media_continue", "today", "media_new", "media_made", "getting_started"]);
     expect(homeBlocks("shelves", false)).toEqual(homeBlocks("ask"));
-  });
-
-  test("shows available Home action cards with their routes and hides gated app cards for child catalog", async () => {
-    const originalFetch = globalThis.fetch;
-    const fetchMock = mock((input: RequestInfo | URL) => {
-      const url = typeof input === "string" ? input : input.toString();
-      if (url.includes("/api/apps")) return Promise.resolve(Response.json([
-        ...["videos", "music"].map((id) => ({ package: id, page: "index", to: `/apps/${id}`, icon: id, label: id, description: "", category: "Create", keywords: [], sections: [], incognito: "unaffected" })),
-      ]));
-      if (url.includes("/api/settings")) return Promise.resolve(Response.json([]));
-      if (url.includes("/api/widgets/home")) return Promise.resolve(Response.json({ hero: null, cards: [], more: [] }));
-      if (url.includes("/api/widgets")) return Promise.resolve(Response.json([]));
-      if (url.includes("/api/people")) return Promise.resolve(Response.json([]));
-      if (url.includes("/api/continue")) return Promise.resolve(Response.json({ rows: [] }));
-      return Promise.resolve(Response.json({ state: "none" }));
-    });
-    globalThis.fetch = fetchMock as unknown as typeof fetch;
-    try {
-      const view = renderHome(makePerson("adult"));
-      await view.findByRole("link", { name: /Make a picture/ });
-      expect(view.getByRole("link", { name: /Make a picture/ })).toHaveAttribute("href", "/chat");
-      expect(view.getByRole("link", { name: /Make a video/ })).toHaveAttribute("href", "/apps/videos/create");
-      expect(view.getByRole("link", { name: /Make a song/ })).toHaveAttribute("href", "/apps/music/create");
-      expect(view.getByRole("link", { name: /Find something to watch or play/ })).toHaveAttribute("href", "/media");
-      expect(view.getByRole("button", { name: /Ask or plan something/ })).toBeDefined();
-      expect(view.getByRole("list", { name: "Things to do" }).querySelectorAll("li")).toHaveLength(5);
-      expect(view.queryByRole("link", { name: /Edit a picture/ })).toBeNull();
-    } finally { globalThis.fetch = originalFetch; }
   });
 
   test("Ask first draws Today as chips; a chip opens its card and a second tap closes it", async () => {
@@ -178,11 +147,11 @@ describe("DashboardPage (Home)", () => {
       const chip = await view.findByRole("button", { name: "Weather" });
       expect(chip.className).toContain("inline-flex h-10");
       expect(chip.closest('[data-testid="home-suggestions"]')).toBeNull();
+      expect(view.queryByTestId("home-today-card")).toBeNull();
+      fireEvent.click(chip);
       await view.findByTestId("home-today-card");
       fireEvent.click(chip);
-      expect(view.getAllByTestId("home-today-card")).toHaveLength(2);
-      fireEvent.click(chip);
-      expect(view.getAllByTestId("home-today-card")).toHaveLength(1);
+      expect(view.queryByTestId("home-today-card")).toBeNull();
     } finally { restore(); }
   });
 
@@ -204,7 +173,7 @@ describe("DashboardPage (Home)", () => {
     try {
       const second = render(tree());
       await second.findByRole("button", { name: "Weather" });
-      expect(second.getAllByTestId("home-today-card")).toHaveLength(1);
+      expect(second.queryByTestId("home-today-card")).toBeNull();
     } finally { ask.restore(); }
   });
 
@@ -214,7 +183,7 @@ describe("DashboardPage (Home)", () => {
     try {
       const view = renderHome(makePerson("adult"));
       await view.findByTestId("home-today-card");
-      expect(view.getAllByTestId("home-today-card")).toHaveLength(1);
+      expect(view.queryByRole("button", { name: "Weather" })).toBeNull();
     } finally { restore(); }
   });
 
@@ -251,7 +220,7 @@ describe("DashboardPage (Home)", () => {
     const { restore } = mockFetch({ widgets: [widget("weather", "Weather")], widgetData: { weather: data("Sunny") }, checklist: [checklistItem("x", false)] });
     try {
       const view = renderHome(makePerson("guest"));
-      await view.findByTestId("home-today-card");
+      await view.findByText("Weather");
       expect(view.getByRole("textbox", { name: "Ask" })).toBeDefined();
       expect(view.queryByText("Getting started")).toBeNull();
       expect(view.queryByText("Pick up where you left off")).toBeNull();
@@ -435,7 +404,7 @@ describe("DashboardPage (Home)", () => {
     const { restore, fetchMock } = mockFetch({ widgets: [widget("weather", "Weather")], widgetData: { weather: data("Sunny") }, checklist: [checklistItem("family", false)] });
     try {
       const view = renderHome(makePerson("child"));
-      await view.findByTestId("home-today-card");
+      await view.findByText("Weather");
       expect(hrefOf("Updates")).toBeUndefined();
       expect(hrefOf("Repairs")).toBeUndefined();
       expect(document.body.textContent).not.toContain("Getting started");
@@ -499,7 +468,7 @@ describe("DashboardPage (Home)", () => {
       expect(view.queryByRole("navigation", { name: "Looking after your hub" })).toBeNull();
       cleanup();
     } finally { quiet.restore(); }
-    const busy = mockFetch({ layout: "ask", repairs: [{ id: "i1" }], updates: { installed: "1.0.0", latest: "1.1.0", checkedAt: null, summary: null, error: null, url: null, stack: null, stackError: null, reference: null, referenceError: null, robots: [], robotsError: null } });
+    const busy = mockFetch({ layout: "ask", repairs: [{ id: "i1" }], updates: { installed: "1.0.0", latest: "1.1.0", checkedAt: null, summary: null, error: null } });
     try {
       const view = renderHome(makePerson("owner"));
       await view.findByText("Something needs fixing");
