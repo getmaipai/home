@@ -213,6 +213,38 @@ describe("sentence speech scheduler", () => {
     scheduler.stop();
   });
 
+  test("a later sentence's speech request waits until the previous sentence's audio head arrived (DUPLEX-TTS-SERIAL-01)", async () => {
+    const context = new StreamingFakeAudioContext();
+    const bytes = new Uint8Array(44 + 6000); bytes.set(wavHeader());
+    const calls: string[] = [];
+    const resolvers: Array<(r: Response) => void> = [];
+    const scheduler = new SentenceSpeechScheduler(context as unknown as AudioContext, (text: string) => { calls.push(text); return new Promise<Response>((resolve) => resolvers.push(resolve)); });
+    scheduler.enqueueSentence("first");
+    scheduler.enqueueSentence("second");
+    scheduler.enqueueSentence("third");
+    for (let i = 0; i < 6; i++) await settle();
+    expect(calls).toEqual(["first"]);
+    resolvers[0]!(new Response(bytes));
+    for (let i = 0; i < 8; i++) await settle();
+    expect(calls).toEqual(["first", "second"]);
+    resolvers[1]!(new Response(bytes));
+    for (let i = 0; i < 8; i++) await settle();
+    expect(calls).toEqual(["first", "second", "third"]);
+    scheduler.stop();
+  });
+
+  test("a failed first speech request still lets the next sentence start", async () => {
+    const context = new StreamingFakeAudioContext();
+    const bytes = new Uint8Array(44 + 6000); bytes.set(wavHeader());
+    const calls: string[] = [];
+    const scheduler = new SentenceSpeechScheduler(context as unknown as AudioContext, async (text: string) => { calls.push(text); if (text === "first") throw new Error("down"); return new Response(bytes); });
+    scheduler.enqueueSentence("first");
+    scheduler.enqueueSentence("second");
+    for (let i = 0; i < 10; i++) await settle();
+    expect(calls).toEqual(["first", "second"]);
+    scheduler.stop();
+  });
+
   test("isPaused follows pause and resume and is false once stopped", () => {
     const scheduler = new SentenceSpeechScheduler(new FakeAudioContext() as unknown as AudioContext, async () => new Response(new Uint8Array(44)));
     expect(scheduler.isPaused()).toBe(false);

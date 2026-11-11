@@ -66,6 +66,8 @@ export class SentenceSpeechScheduler implements SpeechSource {
   private nextStartTime = 0;
   private scheduledCount = 0;
   private sentenceCount = 0;
+  /** DUPLEX-TTS-SERIAL-01: a sentence's speech request starts only after the previous sentence's audio has begun (its response head arrived), so the sentence the person is waiting for never queues behind later ones on the voice engine (measured 2026-11-11: first byte 0.4 s idle, 2 to 3.5 s with overlapping requests). */
+  private headTail: Promise<void> = Promise.resolve();
   private finishedCount = 0;
   private streamDone = false;
   private stopped = false;
@@ -235,7 +237,9 @@ export class SentenceSpeechScheduler implements SpeechSource {
     this.dispatchTail = new Promise<void>((resolve) => {
       resolveThis = resolve;
     });
-    const track: { entry?: ScheduledSentence; id: number; cue?: boolean; first?: boolean } = { id: this.sentenceCount++, ...(meta?.cue ? { cue: true } : {}) };
+    const track: { entry?: ScheduledSentence; id: number; cue?: boolean; first?: boolean; predecessorHead?: Promise<void>; releaseHead?: () => void } = { id: this.sentenceCount++, ...(meta?.cue ? { cue: true } : {}) };
+    track.predecessorHead = this.headTail;
+    this.headTail = new Promise<void>((resolve) => { track.releaseHead = resolve; });
     if (!this.firstSentenceRecorded && !meta?.cue) { this.firstSentenceRecorded = true; track.first = true; this.firstEnqueueAt.set(track, performance.now()); this.firstTiming = { enqueue_ms: 0, ctx_enqueue: this.audioContext.state }; this.onFirstSentenceTiming?.({ ...this.firstTiming }); }
     if (speechTapActive()) publishSpeechTap({ type: "sentence", source: this, sentence: track.id, text });
     void this.fetchAndSchedule(text, predecessorDone, meta, track).finally(() => {
@@ -245,7 +249,9 @@ export class SentenceSpeechScheduler implements SpeechSource {
     });
   }
 
-  private async fetchAndSchedule(text: string, predecessorDone: Promise<void>, meta: SpeechSentenceMeta | undefined, track: { entry?: ScheduledSentence; id: number; cue?: boolean; first?: boolean }): Promise<void> {
+  private async fetchAndSchedule(text: string, predecessorDone: Promise<void>, meta: SpeechSentenceMeta | undefined, track: { entry?: ScheduledSentence; id: number; cue?: boolean; first?: boolean; predecessorHead?: Promise<void>; releaseHead?: () => void }): Promise<void> {
+    await track.predecessorHead;
+    if (this.stopped) { track.releaseHead?.(); return; }
     await this.acquireFetchSlot();
     // Streamed playback (Jesse, 2026-09-04: "streaming responses as you get them instead of generating the entire wav and then
     // just playing that"): the sentence's PCM is cut into small buffers and scheduled as it arrives, so the first sound plays
@@ -272,6 +278,7 @@ export class SentenceSpeechScheduler implements SpeechSource {
       if (this.stopped) return;
       const response = await this.speechStream(text, this.abortController.signal, meta?.turnId && meta.generation !== undefined ? { turnId: meta.turnId, generation: meta.generation, ...(meta.voice ? { voice: meta.voice } : {}) } : meta?.voice ? { turnId: "", generation: 0, voice: meta.voice } : undefined);
       if (this.firstTiming && track.first && this.firstTiming.head_ms === undefined) { this.firstTiming.head_ms = performance.now() - (this.firstEnqueueAt.get(track) ?? performance.now()); this.onFirstSentenceTiming?.({ ...this.firstTiming }); }
+      track.releaseHead?.();
       const reader = typeof this.audioContext.createBuffer === "function" ? response.body?.getReader() : undefined;
       if (!reader) {
         const bytes = new Uint8Array(await response.arrayBuffer());
@@ -290,6 +297,7 @@ export class SentenceSpeechScheduler implements SpeechSource {
       // of the reply's speech.
       return;
     } finally {
+      track.releaseHead?.();
       this.releaseFetchSlot();
     }
     await predecessorDone;
@@ -392,7 +400,7 @@ export class SentenceSpeechScheduler implements SpeechSource {
     this.sessionHandle.requestFocus();
   }
 
-  private scheduleBuffer(audioBuffer: AudioBuffer, meta: SpeechSentenceMeta | undefined, track: { entry?: ScheduledSentence; id: number; cue?: boolean; first?: boolean }): void {
+  private scheduleBuffer(audioBuffer: AudioBuffer, meta: SpeechSentenceMeta | undefined, track: { entry?: ScheduledSentence; id: number; cue?: boolean; first?: boolean; predecessorHead?: Promise<void>; releaseHead?: () => void }): void {
     this.joinAudioSession();
     const rate = audioSession.speedFor("spoken_reply");
     const source = this.audioContext.createBufferSource();
