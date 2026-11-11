@@ -4,7 +4,7 @@
   "kind": "plugin",
   "category": "Media",
   "display": "Make a Video",
-  "description": "Make one short clip from words or one picture; films and commercials use make_film; call before saying it exists.",
+  "description": "Make one short clip from words or a picture; films and ads use make_film; call before saying it exists.",
   "offer": {
     "mode": "conditional",
     "gate": "videosAllowed",
@@ -66,7 +66,7 @@
           "3d-animated",
           "film"
         ],
-        "description": "For cartoons, name character, era and style in prompt."
+        "description": "Cartoons: name character, era, style."
       },
       "camera": {
         "type": "string",
