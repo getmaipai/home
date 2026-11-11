@@ -521,10 +521,11 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/films/animatic.ts` | animaticShotOps, makeFilmAnimatic |
 | `backend/src/lib/films/background.ts` | __setFilmEnginesForTests, allowed, startPlannedFilm, startFilm, getFilmProgress, goFilm |
 | `backend/src/lib/films/engines.ts` | backgroundTurn, realFilmEngines, makeFilm, resumeFilm, redoFilmShot, changeFilmMusic |
+| `backend/src/lib/films/pictures.ts` | prepareFilmPictures, pickStarter |
 | `backend/src/lib/films/plan.ts` | filmPlanShotSchema, filmPlanSchema, facelessFilmPlanSchema, FILM_PLAN_RESPONSE_FORMAT, FACELESS_FILM_PLAN_RESPONSE_FORMAT, FILM_PLAN_PROMPT |
 | `backend/src/lib/films/run.ts` | FilmStepError, runFilm, redoShot, changeMusic |
 | `backend/src/lib/films/store.ts` | createFilmRun, getFilmRun, updateFilmRun, listFilmRunsInStates, failInterruptedFilmRuns, listFilmRunsByParent |
-| `backend/src/lib/films/tool.ts` | MAKE_FILM_TOOL_ID, makeFilmArgs, __setStartFilmForTests, runMakeFilm |
+| `backend/src/lib/films/tool.ts` | MAKE_FILM_TOOL_ID, makeFilmArgs, __setStartFilmForTests, runMakeFilmTurn, runMakeFilm |
 | `backend/src/lib/fitWording.ts` | fitWording, fitUnavailableWording, fitNoStackWording, fitNotFoundWording |
 | `backend/src/lib/folderBrowse.ts` | refusedReason, resolveFolder, listFolder, validateFolderName, createFolder, validateProposedPath |
 | `backend/src/lib/followUpSuggestions.ts` | canGenerateFollowUpSuggestions, generateFollowUpSuggestions |
@@ -871,6 +872,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/pictures/policy.ts` | GENERATION_ADULTS_KEY, GENERATION_ADULT_STYLES_KEY, PICTURE_STARTED_CONFIRM_NOTE, GENERATION_PICTURE_TIER_KEY, PICTURE_DENIAL_LINE, PICTURE_NOT_HERE_LINE |
 | `backend/src/lib/pictures/quality.ts` | QUICK_MODEL, ERNIE_MODEL, DETAILED_MODEL, qualityOfModel, isPictureQuality, quickModelFor |
 | `backend/src/lib/pictures/ready.ts` | __setPictureStatusForTests, __setPictureStatusReaderForTests, pictureEngineStatus, peekPictureEngineStatus, dropPictureStatusCache, pictureEngineReady |
+| `backend/src/lib/pictures/roles.ts` | PICTURE_ROLES, __setRolesVisionForTests, parseReading, readPictureRoles, kindOfRole |
 | `backend/src/lib/pictures/stack.ts` | StackPicturesError, __setPicturesFetchForTests, submitGeneration, submitEdit, waitPicture, getGenerationJob |
 | `backend/src/lib/pictures/tool.ts` | __setTemplateMediaOpRunnerForTests, __setPictureToolLoraReaderForTests, PICTURE_SIZES, audienceOf, refusalFor, runGenerateImage |
 | `backend/src/lib/placePrivacy.ts` | childSafeAreaLabel |
