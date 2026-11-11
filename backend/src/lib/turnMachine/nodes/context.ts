@@ -12,7 +12,7 @@
 // never left to the model").
 import { householdHomePlaceName } from "@/lib/places";
 import { minorSearchGate } from "@/lib/searchAssist/minorGate";
-import { resolveOrCreateConversation, buildConversationWindow, isTemporaryConversation, windowPreview, type ConversationWindow } from "@/lib/conversationHistory";
+import { resolveOrCreateConversation, buildConversationWindow, isTemporaryConversation, windowPreview, windowReplayMessages, type ConversationWindow } from "@/lib/conversationHistory";
 import { and, eq, isNull } from "drizzle-orm";
 import { db } from "@/db";
 import { chatFolders } from "@/db/schema";
@@ -167,6 +167,23 @@ export function datesText(input: { now: Date; locale: string; modelCutoff: strin
 
 let windowItemSeq = 0;
 
+/** CONVO-PREWARM-02: the window as prompt items, from the one replay shape conversationHistory.ts's windowReplayMessages()
+ * gives the cache warm too, so the warm and the next turn share the prefix byte for byte. THIN-3F step 3: the summary
+ * (labelled data) sits right after the stable prefix, ahead of the verbatim window; it changes only at a checkpoint, so the
+ * prefix the cache reuses holds between them. ContextItem has no role field (the contract's own shape); the window's real
+ * user/assistant/tool ordering is real signal messages.ts's contextToMessages() must not lose, so it rides in the id, the one
+ * place a source-specific detail can travel without widening the contract for every other source. Parsed back out by
+ * windowRoleFromId() in messages.ts - the two stay paired on purpose. */
+export function windowContextItems(window: ConversationWindow, nextSeq: () => number): ContextItem[] {
+  return windowReplayMessages(window).map((message, index): ContextItem => ({
+    id: index === 0 && window.summaryLine ? "window-system-summary" : `window-${message.role}-${nextSeq()}`,
+    text: message.content,
+    ...(message.tool_calls ? { toolCalls: message.tool_calls } : {}),
+    ...(message.tool_call_id ? { toolCallId: message.tool_call_id } : {}),
+    source: "window", subjects: [], disclosure: "child_ok",
+  }));
+}
+
 export const contextNode: Node<ContextInput, ContextOutput> = async (state, input) => {
   const resolved = resolveOrCreateConversation(state.actor, state.surface, state.conversationId || undefined, { temporary: input.temporary, deviceId: state.surface === "robot" ? state.deviceId : null });
   if (!resolved.ok) {
@@ -234,23 +251,7 @@ export const contextNode: Node<ContextInput, ContextOutput> = async (state, inpu
   // the name resolution needs from it is read now.
   const windowOpts = { supersedes: state.supersedes, excludeTurnId: state.continuation?.fromTurnId };
   const preview = windowPreview(conversation, windowOpts);
-  const pushWindow = (window: ConversationWindow) => {
-    // THIN-3F step 3: the summary (labelled data) sits right after the
-    // stable prefix, ahead of the verbatim window; it changes only at a
-    // checkpoint, so the prefix the cache reuses holds between them.
-    if (window.summaryLine) {
-      items.push({ id: `window-system-summary`, text: window.summaryLine, source: "window", subjects: [], disclosure: "child_ok" });
-    }
-    for (const message of window.messages) {
-      // ContextItem has no role field (the contract's own shape); the
-      // window's real user/assistant/tool ordering is real signal
-      // messages.ts's contextToMessages() must not lose, so it rides in
-      // the id, the one place a source-specific detail can travel without
-      // widening the contract for every other source. Parsed back out by
-      // windowRoleFromId() in messages.ts - the two stay paired on purpose.
-      items.push({ id: `window-${message.role}-${++windowItemSeq}`, text: typeof message.content === "string" ? message.content : JSON.stringify(message.content), ...(message.tool_calls ? { toolCalls: message.tool_calls } : {}), ...(message.tool_call_id ? { toolCallId: message.tool_call_id } : {}), source: "window", subjects: [], disclosure: "child_ok" });
-    }
-  };
+  const pushWindow = (window: ConversationWindow) => { items.push(...windowContextItems(window, () => ++windowItemSeq)); };
 
   // THIN-7C (bare mode): the raw model sees the conversation and nothing the
   // household's own data adds: no memory, profile, episode, clock or roster.

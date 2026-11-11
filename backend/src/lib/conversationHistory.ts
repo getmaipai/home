@@ -2880,6 +2880,29 @@ const lastHistoryBudgets = new Map<string, number | null>();
  * refused it) does the window keep the newest turns that fit rather than
  * fail the turn, and log it; the turns it skips stay in episode recall
  * (droppedOlder) and enter the summary at the next stored fold. */
+/** CONVO-PREWARM-02: the messages the next turn replays after the stable system message: the summary line first, as the
+ * context node's own `window-system-summary` item (role system; systemFold.ts folds it into the first system message on the
+ * wire), then the window's turns in their own roles with their tool call fields. One shape for the context node and the
+ * cache warm, so the engine sees one prefix byte for byte. */
+export function windowReplayMessages(window: ConversationWindow): LlmMessage[] {
+  const turns = window.messages.map((message): LlmMessage => ({
+    role: message.role,
+    content: typeof message.content === "string" ? message.content : JSON.stringify(message.content),
+    ...(message.tool_calls ? { tool_calls: message.tool_calls } : {}),
+    ...(message.tool_call_id ? { tool_call_id: message.tool_call_id } : {}),
+  }));
+  return window.summaryLine ? [{ role: "system", content: window.summaryLine }, ...turns] : turns;
+}
+
+/** CONVO-PREWARM-02: the window the next turn will replay, built the way the context node builds it: the same options,
+ * the history budget the last turn was sized against (a different budget keeps a different set of turns, and the engine
+ * then reads the whole window again: 3 of 8 live warms re-read 2,300 to 2,600 tokens, 2026-11-11), and never a fold (a warm
+ * writes nothing). With no recorded budget (the first turn after a restart) it takes the default, as the first pass does. */
+export async function nextTurnReplayMessages(conversation: Conversation, opts: { supersedes?: string | null; excludeTurnId?: string | null } = {}): Promise<LlmMessage[]> {
+  const window = await buildConversationWindow(conversation, { ...opts, ...(lastHistoryBudgets.has(conversation.id) ? { historyBudgetTokens: lastHistoryBudgets.get(conversation.id)! } : {}), foldWhenOver: false });
+  return windowReplayMessages(window);
+}
+
 export async function buildConversationWindow(conversation: Conversation, opts: { supersedes?: string | null; excludeTurnId?: string | null; beforeCreatedAt?: string | null; historyBudgetTokens?: number | null; foldWhenOver?: boolean } = {}): Promise<ConversationWindow> {
   const { liveRows, uncovered, anchored } = windowRows(conversation, opts);
   // CHAT-03 (#89): the stored summary is model-written from rows that

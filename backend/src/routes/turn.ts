@@ -26,7 +26,7 @@ import type { TurnStreamEvent as ToolStreamEvent } from "@maipai/spec/stack/ts/t
 import type { AppEnv, PersonRow } from "@/types";
 import { streamEventForViewer, valueForViewer } from "@/lib/turnErrorDetail";
 import { apiRouter, errorResponses, idParamSchema } from "@/lib/openapi";
-import { turnOwnerId, isTemporaryConversation, packageLatencyFromRecentOutcomes, applyHeardPrefix, getConversation, buildConversationWindow } from "@/lib/conversationHistory";
+import { turnOwnerId, isTemporaryConversation, packageLatencyFromRecentOutcomes, applyHeardPrefix, getConversation, nextTurnReplayMessages } from "@/lib/conversationHistory";
 import { abortConversationPrewarm, prewarmConversation } from "@/lib/prefixPrewarm";
 import { activeTurnCount } from "@/lib/turnActivity";
 import { surfaceClassOf } from "@/lib/surfaceClass";
@@ -156,9 +156,10 @@ export function noteSpokenAudioHandedOff(turnId: string, actorId: string, text: 
   if (!conversation.ok) return;
   const task = async () => {
     try {
-      const window = await buildConversationWindow(conversation.value);
+      // CONVO-PREWARM-02: the window exactly as the next turn replays it (its budget, its summary line), never the default build.
+      const messages = await nextTurnReplayMessages(conversation.value);
       if (activeTurnCount() > 0) return;
-      void prewarmConversation(actorId, "spoken", window.messages);
+      void prewarmConversation(actorId, "spoken", messages);
     } catch { /* best effort */ }
   };
   const timer = setTimeout(() => { void task(); }, 0);
