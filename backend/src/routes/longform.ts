@@ -84,7 +84,7 @@ longformRoutes.openapi(produceRoute, (c) => {
   if (!allowed(actor)) return c.json({ error: NOT_HERE }, 404);
   if (!mayRender(actor, id)) return c.json({ error: "Approve the bible and the outline before anything is made." }, 400);
   if (isProducing(id)) return c.json({ error: "This production is already being made." }, 400);
-  void produce(actor, id).catch((e) => console.error("[longform] produce failed", id, e));
+  void produce(actor, id).then((r) => { if (!r.ok) console.warn("[longform] production stopped:", id, r.line); else console.info("[longform] production finished:", id); }).catch((e) => console.error("[longform] produce failed", id, e));
   return c.json(progressOf(actor, id), 200);
 });
 longformRoutes.openapi(progressRoute, (c) => {

@@ -84,7 +84,7 @@ export async function runMakeProduction(input: { state: ProductionState; args: R
   else {
     approveStage(actor, id, "outline");
     if (isProducing(id)) { const p = progressOf(actor, id); return reply(callId, args, `Already being made: ${p.scenes_done} of ${p.scenes_total} scenes done.${p.seconds_left === null ? "" : ` About ${Math.ceil(p.seconds_left / 60)} minutes left.`}`, { productionId: id, stage: "producing", ...p }); }
-    void produce(actor, id).catch((e) => console.error("[longform] produce failed", id, e));
+    void produce(actor, id).then((r) => { if (!r.ok) console.warn("[longform] production stopped:", id, r.line); else console.info("[longform] production finished:", id); }).catch((e) => console.error("[longform] produce failed", id, e));
     return reply(callId, args, "The outline is approved and the scenes are being written and made now, one after another. Tell the person it runs in the background, can take a long time, and they can ask how far along it is by naming the production.", { productionId: id, stage: "producing", approved: true });
   }
   return result.ok ? reply(callId, args, `${describe(actor, id, stage)} ${NEXT[stage]}`, { productionId: id, stage }) : refused(callId, args, result.line, "stage_failed");

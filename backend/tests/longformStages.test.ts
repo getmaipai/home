@@ -66,3 +66,12 @@ describe("treatment, bible and outline run in order, each after approval", () =>
     expect(r.ok).toBe(false);
   });
 });
+
+describe("a spoiled model reply is caught before it is saved", () => {
+  test("thinking tags and one phrase repeated are refused; ordinary prose passes", async () => {
+    const { spoiledReply } = await import("@/lib/longform/stages");
+    expect(spoiledReply('{"a":"fine</think> text"}')).not.toBeNull();
+    expect(spoiledReply(`{"a":"${"clear sky next hours get better ".repeat(6)}"}`)).not.toBeNull();
+    expect(spoiledReply('{"title":"The Lighthouse","summary":"A keeper finds a boat on the rocks and returns it to its owner."}')).toBeNull();
+  });
+});
