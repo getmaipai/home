@@ -4,6 +4,7 @@
 
 ### Added
 
+- A synth of yours can play a part in a long production: name it in the cast and its saved picture and look are used, like a saved character.
 - A long production no longer adds a title card and credits to every scene: only the first part has the title and only the last has the credits, so the length matches the ask.
 - Pictures attached to a long production become its named characters (one name per picture, in order); saved characters can be named too. Their pictures start the stills so the face carries through.
 

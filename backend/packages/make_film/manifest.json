@@ -67,7 +67,7 @@
           "maxLength": 80
         },
         "grounded": false,
-        "description": "Optional names of saved characters to use, only when the person names them. For a production with pictures attached, one name per attached picture in the order attached; repeat a name to give that character several pictures (up to 8)."
+        "description": "Optional names of saved characters or of the person's own synths to use, only when the person names them. For a production with pictures attached, one name per attached picture in the order attached; repeat a name to give that character several pictures (up to 8)."
       },
       "go_ahead": {
         "type": "boolean",

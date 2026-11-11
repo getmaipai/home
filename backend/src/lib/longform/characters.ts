@@ -6,6 +6,7 @@ import { runMediaOp } from "@/lib/mediaOps/registry";
 import { listMediaSubjects, updateMediaSubject } from "@/lib/mediaSubjects";
 import { loadSource } from "@/lib/imageEdit";
 import { storeFile } from "@/lib/attachments";
+import { ensureSubject, listSynths, ownerActor } from "@/lib/synths";
 
 export interface AttachedPicture { id: string }
 export type CharacterResult = { ok: true; names: string[] } | { ok: false; line: string };
@@ -27,6 +28,14 @@ export async function prepareCharacters(actor: PersonRow, input: { names: string
   }
   for (const { name, ids } of pictures.values()) {
     let saved = listMediaSubjects(actor).find((s) => s.name.toLocaleLowerCase() === name.toLocaleLowerCase());
+    if (!saved && !ids.length) {
+      // A synth of this person's can play a part: its saved picture and look become the character, the same as a saved subject.
+      const synth = listSynths(actor).find((x) => x.persona.display_name.toLocaleLowerCase() === name.toLocaleLowerCase() && ownerActor(x)?.id === actor.id);
+      if (synth) {
+        try { await ensureSubject(synth); } catch (error) { return { ok: false, line: error instanceof Error && error.message ? error.message : `I couldn't use ${name} as a character. Try again.` }; }
+        saved = listMediaSubjects(actor).find((s) => s.name.toLocaleLowerCase() === name.toLocaleLowerCase());
+      }
+    }
     if (!saved && !ids.length) return { ok: false, line: `I have no picture for ${name}. Attach one, or name a character you already saved.` };
     if (ids.length && !input.conversationId) return { ok: false, line: "Pictures can be used from a chat. Open a chat and attach them there." };
     try {
