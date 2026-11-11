@@ -19294,6 +19294,11 @@ msgid "Read the licence and fingerprint under Details, then confirm them. Until 
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/shell/pages/dashboard/ActionCards.tsx:23
+msgid "Read the news"
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:745
 msgid "setting.news.reader_open.option.reader"
 msgstr ""

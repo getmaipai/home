@@ -11,11 +11,12 @@ test("the Home ask box has focus on arrival", async () => {
   await waitFor(() => expect(document.activeElement).toBe(view.getByLabelText("Ask")));
 });
 
-test("starter suggestions are kit strip chips in one horizontal rail", async () => {
+test("starter suggestions wrap in a centered row", async () => {
   const view = renderWithQueryClient(<MemoryRouter><AskBox /></MemoryRouter>);
   await waitFor(() => expect(view.getByTestId("home-suggestions").querySelectorAll("[role=button]").length).toBeGreaterThan(0));
   const rail = view.getByTestId("home-suggestions");
-  expect(rail.className).toContain("flex-nowrap");
+  expect(rail.className).toContain("justify-center");
   for (const chip of rail.querySelectorAll("[role=button]")) expect(chip.className).toContain("h-10");
-  expect(view.getByLabelText("Ask").getAttribute("data-shape")).toBe("pill");
+  expect(view.getByTestId("home-ask").querySelector('[data-slot="prompt-bar"]')?.getAttribute("data-layout")).toBe("chat");
+  expect(view.getByLabelText("Ask").tagName).toBe("TEXTAREA");
 });

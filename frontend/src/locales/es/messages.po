@@ -22402,6 +22402,11 @@ msgid "Read the licence and fingerprint under Details, then confirm them. Until 
 msgstr "Lee la licencia y la huella digital en Detalles y luego confírmalas. Hasta que lo hagas, solo los administradores pueden usar este estilo."
 
 #. js-lingui-explicit-id
+#: src/shell/pages/dashboard/ActionCards.tsx:23
+msgid "Read the news"
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:745
 #, needs-review
 msgid "setting.news.reader_open.option.reader"

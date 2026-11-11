@@ -47,8 +47,8 @@ export function DashboardPage({ person }: { person: Roster }) {
     switch (block) {
       case "greeting": return <div key={block} className="md:col-span-2 lg:col-span-12"><Greeting displayName={person.display_name} familyName={familyName.data?.value} /></div>;
       case "admin": return admin ? <div key={block} className="md:col-span-2 lg:col-span-12"><Attention /></div> : null;
-      case "ask": return <div key={block} ref={askRef} className="lg:col-span-8 md:col-span-2"><AskBox focusOnRequest={focusAsk} /></div>;
-      case "actions": return <div key={block} className="lg:col-span-8 md:col-span-2"><ActionCards onFocusAsk={() => { setFocusAsk((value) => value + 1); askRef.current?.scrollIntoView({ behavior: "smooth", block: "center" }); }} /></div>;
+      case "ask": return <div key={block} ref={askRef} className="mx-auto w-full max-w-2xl md:col-span-2 lg:col-span-12"><AskBox focusOnRequest={focusAsk} /></div>;
+      case "actions": return <div key={block} className="mx-auto w-full max-w-2xl md:col-span-2 lg:col-span-12"><ActionCards onFocusAsk={() => { setFocusAsk((value) => value + 1); askRef.current?.scrollIntoView({ behavior: "smooth", block: "center" }); }} /></div>;
       case "media_continue": return (media.data?.continue.length || continueRows.data?.rows?.length) ? <div key={block} className="md:col-span-2 lg:col-span-12"><HomeMedia kind="continue" /></div> : null;
       case "media_new": return media.data?.new.length ? <div key={block} className="md:col-span-2 lg:col-span-12"><HomeMedia kind="new" /></div> : null;
       case "media_made": return media.data?.made_at_home.length ? <div key={block} className="md:col-span-2 lg:col-span-12"><HomeMedia kind="made_at_home" /></div> : null;

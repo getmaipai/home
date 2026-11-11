@@ -1,4 +1,3 @@
-import { i18n } from "@lingui/core";
 import { familyLabel, greetingFor } from "@/apps/home/greeting";
 
 /** Mirrors `@maipai/ui/src/dashboard/components/dashboards/modern/overview-tab.tsx`:
@@ -24,12 +23,11 @@ export function Greeting({ displayName, familyName }: { displayName: string; fam
   const family = familyLabel(familyName);
 
   return (
-    <div className="flex flex-col items-start gap-1">
+    <div className="flex flex-col items-center gap-1 text-center">
       {family ? <p className="text-supporting text-muted-foreground">{family}</p> : null}
       <h2 className="text-title">
         {greetingFor(new Date(), displayName)}
       </h2>
-      <p className="text-body text-muted-foreground">{i18n._({ id: "Here is your household today.", message: "Here is your household today." })}</p>
     </div>
   );
 }

@@ -133,7 +133,7 @@ describe("DashboardPage (Home)", () => {
 
   test("keeps the home block order in one layout function", async () => {
     const { homeBlocks } = await import("@/shell/pages/dashboard/homeBlocks");
-    expect(homeBlocks("ask")).toEqual(["greeting", "admin", "ask", "actions", "today_chips", "pick_up", "family", "getting_started"]);
+    expect(homeBlocks("ask")).toEqual(["greeting", "ask", "today_chips", "actions", "admin", "pick_up", "family", "getting_started"]);
     expect(homeBlocks("board")).toEqual(["greeting", "admin", "hero", "ask", "actions", "pick_up", "today", "family", "getting_started"]);
     expect(homeBlocks("shelves")).toEqual(["greeting", "admin", "ask", "actions", "media_continue", "today", "media_new", "media_made", "getting_started"]);
     expect(homeBlocks("shelves", false)).toEqual(homeBlocks("ask"));
@@ -234,7 +234,7 @@ describe("DashboardPage (Home)", () => {
     try {
       const view = renderHome(makePerson("adult"));
       await waitFor(() => expect(document.body.textContent).toContain("Nova"));
-      expect(document.body.textContent).toContain("Here is your household today.");
+      expect(document.body.textContent).not.toContain("Here is your household today.");
       expect(view.getByRole("textbox", { name: "Ask" })).toBeDefined();
       expect(document.body.textContent).not.toMatch(/Recent activity|People|Up to date|\b(Turns|Engines|Stack)\b/);
     } finally {
@@ -255,19 +255,18 @@ describe("DashboardPage (Home)", () => {
     }
   });
 
-  test("an empty Ask does nothing and never disables the group (a disabled control fades the placeholder below WCAG contrast)", async () => {
+  test("an empty Ask does nothing and the composer enables Send when words are entered", async () => {
     const { restore } = mockFetch();
     try {
       const view = renderHome(makePerson("adult"));
       await view.findByRole("textbox", { name: "Ask" });
       const ask = view.getByRole("button", { name: "Send" }) as HTMLButtonElement;
-      expect(ask.disabled).toBe(false);
-      expect(ask.getAttribute("aria-disabled")).toBe("true");
+      expect(ask.disabled).toBe(true);
       fireEvent.click(ask);
       await new Promise((resolve) => setTimeout(resolve, 20));
       expect(view.queryByTestId("where")).toBeNull();
       fireEvent.change(view.getByRole("textbox", { name: "Ask" }), { target: { value: "Hi" } });
-      expect(ask.getAttribute("aria-disabled")).toBeNull();
+      expect(ask.disabled).toBe(false);
     } finally {
       restore();
     }
@@ -440,8 +439,8 @@ describe("DashboardPage (Home)", () => {
       for (const el of [view.getByRole("button", { name: "Open Step a" }), view.getByRole("button", { name: "Skip Step a" })]) {
         expect(el.className, el.textContent ?? "").toContain("cn-button-size-row");
       }
-      expect(view.getByRole("button", { name: "Send" }).getAttribute("data-variant")).toBe("ghost");
-      expect(view.getByLabelText("Ask").getAttribute("data-shape")).toBe("pill");
+      expect(view.getByRole("button", { name: "Send" }).getAttribute("data-slot")).toBe("button");
+      expect(view.getByLabelText("Ask").tagName).toBe("TEXTAREA");
     } finally {
       restore();
     }
@@ -473,6 +472,9 @@ describe("DashboardPage (Home)", () => {
       const view = renderHome(makePerson("owner"));
       await view.findByText("Something needs fixing");
       await view.findByText("An update is ready");
+      const actions = view.getByRole("list", { name: "Things to do" });
+      const attention = view.getByRole("navigation", { name: "Looking after your hub" });
+      expect(actions.compareDocumentPosition(attention) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
       fireEvent.click(view.getByRole("button", { name: "Repairs" }));
       expect(document.body.textContent).not.toContain("An update is ready");
     } finally { busy.restore(); }
@@ -505,13 +507,13 @@ describe("DashboardPage (Home)", () => {
     } finally { empty.restore(); }
   });
 
-  test("the greeting is sentence case with one muted line", async () => {
+  test("the greeting is a single centered title line", async () => {
     const { restore } = mockFetch({ layout: "ask" });
     try {
       const view = renderHome(makePerson("adult"));
       const greeting = await view.findByText(/Good .*Nova/);
       expect(greeting.className).not.toContain("capitalize");
-      expect(view.getByText("Here is your household today.").className).toContain("text-muted-foreground");
+      expect(view.queryByText("Here is your household today.")).toBeNull();
     } finally { restore(); }
   });
 });

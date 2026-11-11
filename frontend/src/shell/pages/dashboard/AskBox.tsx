@@ -1,10 +1,8 @@
 import { i18n } from "@lingui/core";
-import { useEffect, useRef, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
-import { Button } from "@maipai/ui/src/ui/button";
-import { Input } from "@maipai/ui/src/ui/input";
-import { getIcon } from "@maipai/ui/src/icons";
+import { PromptBar } from "@maipai/ui/src/elements/prompt-bar";
 import { Chip } from "@maipai/ui/src/primitives/Chip";
 import { useSurface } from "@maipai/ui/src/useSurface";
 import { api, type InstallStatusView } from "@/lib/api";
@@ -13,8 +11,6 @@ import { engineDownReason, useChatAvailability } from "@/apps/chat/useChatAvaila
 import { installTitle } from "@/shell/InstallStrip";
 
 const PLACEHOLDER = () => i18n._({ id: "Ask anything", message: "Ask anything" });
-const SparklesIcon = getIcon("sparkles");
-const SendIcon = getIcon("arrow-up");
 const STARTERS = STARTER_SUGGESTIONS.slice(0, 3);
 
 /** The install strip's own line while an install is moving, else null (one wording, InstallStrip.tsx). */
@@ -28,18 +24,18 @@ export function askHref(text: string): string {
   return `/chat?ask=${encodeURIComponent(text)}`;
 }
 
-/** HOME-ALIVE-01h: the ask box and three starters, built from kit primitives only (rule 9b). */
+/** HOME-ALIVE-01h: the single kit composer and its three starter chips. */
 export function AskBox({ focusOnRequest }: { focusOnRequest?: number }) {
   const navigate = useNavigate();
-  const inputRef = useRef<HTMLInputElement>(null);
+  const composerRef = useRef<HTMLDivElement>(null);
   const fine = useSurface().pointer === "fine";
   // Arriving on Home puts the cursor in the box (not on a touch screen, where it would pop the keyboard).
   useEffect(() => {
     const active = document.activeElement;
-    if (fine && !(active instanceof HTMLElement && active.matches("input, textarea, select, [contenteditable='true']"))) inputRef.current?.focus({ preventScroll: true });
+    if (fine && !(active instanceof HTMLElement && active.matches("input, textarea, select, [contenteditable='true']"))) composerRef.current?.querySelector<HTMLElement>("textarea, input")?.focus({ preventScroll: true });
   }, [fine]);
   useEffect(() => {
-    if (focusOnRequest) inputRef.current?.focus({ preventScroll: true });
+    if (focusOnRequest) composerRef.current?.querySelector<HTMLElement>("textarea, input")?.focus({ preventScroll: true });
   }, [focusOnRequest]);
   const [text, setText] = useState("");
   const availability = useChatAvailability();
@@ -55,20 +51,18 @@ export function AskBox({ focusOnRequest }: { focusOnRequest?: number }) {
   });
   const placeholder = installPlaceholder(install.data) ?? PLACEHOLDER();
 
-  const submit = (event: FormEvent) => {
-    event.preventDefault();
+  const submit = () => {
     const words = text.trim();
     if (words) navigate(askHref(words));
   };
 
   return (
-    <div data-testid="home-ask" className="flex flex-col gap-3">
+    <div data-testid="home-ask" className="mx-auto flex w-full max-w-2xl flex-col items-center gap-3">
       {down === undefined ? null : <img src="/setup-art/warming-up.webp" alt="" width={1312} height={1190} className="h-auto w-16 max-w-full sm:w-20" />}
-      <form onSubmit={submit} className="flex items-center gap-2">
-        <Input ref={inputRef} value={text} onChange={(event) => setText(event.target.value)} placeholder={placeholder} aria-label={i18n._({ id: "Ask", message: "Ask" })} maxLength={2000} shape="pill" fill="surface" leading={<SparklesIcon />} />
-        <Button type="submit" variant="ghost" shape="pill" size="icon-control" aria-label={i18n._({ id: "Send", message: "Send" })} aria-disabled={text.trim() === "" || undefined}><SendIcon aria-hidden /></Button>
-      </form>
-      <div data-testid="home-suggestions" className="flex w-full flex-nowrap gap-2 overflow-x-auto [&>*]:shrink-0 [&>*]:whitespace-nowrap [&::-webkit-scrollbar]:hidden">
+      <div ref={composerRef} className="w-full">
+        <PromptBar label={i18n._({ id: "Ask", message: "Ask" })} value={text} onValueChange={setText} placeholder={placeholder} maxLength={2000} fieldSize="large" layout="chat" shape="pill" submitLabel={i18n._({ id: "Send", message: "Send" })} onSubmit={submit} />
+      </div>
+      <div data-testid="home-suggestions" className="flex w-full flex-wrap justify-center gap-2">
         {STARTERS.map((starter) => (
           <Chip
             key={starter.title}
