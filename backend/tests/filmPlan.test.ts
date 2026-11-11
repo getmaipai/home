@@ -86,6 +86,6 @@ describe("film planner", () => {
     }
     const jsonSchema = FILM_PLAN_RESPONSE_FORMAT.json_schema.schema as { properties: Record<string, unknown>; required: string[] };
     expect(Object.keys(jsonSchema.properties).sort()).toEqual(Object.keys(filmPlanSchema.shape).sort());
-    expect(jsonSchema.required).toEqual(Object.keys(filmPlanSchema.shape).filter((key) => key !== "look" && key !== "letterbox"));
+    expect(jsonSchema.required).toEqual(Object.keys(filmPlanSchema.shape).filter((key) => key !== "look" && key !== "letterbox" && key !== "title_card" && key !== "credits_card"));
   });
 });
