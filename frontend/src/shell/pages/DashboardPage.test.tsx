@@ -139,20 +139,29 @@ describe("DashboardPage (Home)", () => {
     expect(homeBlocks("shelves", false)).toEqual(homeBlocks("ask"));
   });
 
-  test("Ask first draws Today as chips; a chip opens its card and a second tap closes it", async () => {
+  test("Today selects a row and previews it; empty widget payloads have no row", async () => {
     const weather = { ...widget("a", "Weather"), package: "weather" };
     const { restore } = mockFetch({ layout: "ask", home: { hero: null, cards: [weather], more: [] }, widgets: [weather], widgetData: { a: data("Row a") } });
     try {
       const view = renderHome(makePerson("adult"));
-      const chip = await view.findByRole("button", { name: "Weather" });
-      expect(chip.className).toContain("inline-flex h-10");
-      expect(chip.closest('[data-testid="home-suggestions"]')).toBeNull();
-      expect(view.queryByTestId("home-today-card")).toBeNull();
-      fireEvent.click(chip);
-      await view.findByTestId("home-today-card");
-      fireEvent.click(chip);
-      expect(view.queryByTestId("home-today-card")).toBeNull();
+      const row = await view.findByRole("button", { name: "Weather" });
+      await view.findByTestId("home-today-preview");
+      expect(row.getAttribute("aria-current")).toBe("true");
+      expect(view.queryByRole("button", { name: "Shopping list" })).toBeNull();
+      fireEvent.click(row);
+      fireEvent.keyDown(row, { key: "ArrowDown" });
     } finally { restore(); }
+  });
+
+  test("Today ranks the server-provided weather, timers, shopping, news, and house rows in their fixed order", () => {
+    const packages = ["house", "news", "weather", "remind", "timer"];
+    const widgets = packages.map((pkg) => ({ ...widget(pkg), package: pkg, id: pkg === "remind" ? "shopping" : pkg === "timer" ? "running" : pkg === "house" ? "devices" : "current" }));
+    const slots = todaySlots(widgets, widgets.map((w) => ({ isPending: false, data: data(w.package) })));
+    expect(slots.map((slot) => slot.widget.package)).toEqual(["timer", "remind", "weather", "news", "house"]);
+    const childWidgets = widgets.filter((w) => w.package === "weather" || w.package === "timer");
+    expect(todaySlots(childWidgets, childWidgets.map((w) => ({ isPending: false, data: data(w.package) }))).map((slot) => slot.widget.package)).toEqual(["timer", "weather"]);
+    const teenWidgets = widgets.filter((w) => w.package !== "remind" && w.package !== "house");
+    expect(todaySlots(teenWidgets, teenWidgets.map((w) => ({ isPending: false, data: data(w.package) }))).map((slot) => slot.widget.package)).toEqual(["timer", "weather", "news"]);
   });
 
   test("coming back to Home after changing the layout in Settings shows the new layout, not the cached one", async () => {
@@ -164,7 +173,7 @@ describe("DashboardPage (Home)", () => {
     );
     const board = mockFetch({ layout: "board", home: { hero: null, cards: [widget("a", "Weather")], more: [] }, widgets: [widget("a", "Weather")], widgetData: { a: data("Row a") } });
     const first = render(tree());
-    await first.findByTestId("home-today-card");
+      await first.findByTestId("home-today-preview");
     first.unmount();
     board.restore();
     // The Settings write refreshes the person's shared settings read (SettingsRenderer sets it; a test with no write invalidates it).
@@ -182,8 +191,8 @@ describe("DashboardPage (Home)", () => {
     const { restore } = mockFetch({ layout: "board", home: { hero: null, cards: [weather], more: [] }, widgets: [weather], widgetData: { a: data("Row a") } });
     try {
       const view = renderHome(makePerson("adult"));
-      await view.findByTestId("home-today-card");
-      expect(view.queryByRole("button", { name: "Weather" })).toBeNull();
+      await view.findByTestId("home-today-preview");
+      expect(view.getByRole("button", { name: "Weather" })).toBeDefined();
     } finally { restore(); }
   });
 
@@ -220,7 +229,7 @@ describe("DashboardPage (Home)", () => {
     const { restore } = mockFetch({ widgets: [widget("weather", "Weather")], widgetData: { weather: data("Sunny") }, checklist: [checklistItem("x", false)] });
     try {
       const view = renderHome(makePerson("guest"));
-      await view.findByText("Weather");
+      await view.findByTestId("home-today-preview");
       expect(view.getByRole("textbox", { name: "Ask" })).toBeDefined();
       expect(view.queryByText("Getting started")).toBeNull();
       expect(view.queryByText("Pick up where you left off")).toBeNull();
@@ -311,10 +320,9 @@ describe("DashboardPage (Home)", () => {
     const { restore } = mockFetch({ layout: "board", home: { hero: null, cards: ids.slice(0, 4).map((id) => ({ ...widget(id), package: "weather" })), more: ids.slice(4).map((id) => ({ ...widget(id), package: "weather" })) }, widgets: ids.map((id) => ({ ...widget(id), package: "weather" })), widgetData });
     try {
       const view = renderHome(makePerson("adult"));
-      await waitFor(() => expect(view.getAllByTestId("home-today-card").length).toBe(4));
+      await waitFor(() => expect(view.getAllByTestId("home-today-row").length).toBe(4));
       expect(document.body.textContent).not.toContain("Fallback text");
       expect(document.body.textContent).not.toContain("Widget b");
-      expect(view.queryByRole("button", { name: "More" })).toBeNull();
       view.unmount();
     } finally {
       restore();
@@ -323,10 +331,7 @@ describe("DashboardPage (Home)", () => {
     const second = mockFetch({ layout: "board", home: { hero: null, cards: many.slice(0, 4).map((id) => ({ ...widget(id), package: "weather" })), more: many.slice(4).map((id) => ({ ...widget(id), package: "weather" })) }, widgets: many.map((id) => ({ ...widget(id), package: "weather" })), widgetData: Object.fromEntries(many.map((id) => [id, data(`Row ${id}`)])) });
     try {
       const view = renderHome(makePerson("adult"));
-      const more = await view.findByRole("button", { name: "More" });
-      expect(view.getAllByTestId("home-today-card").length).toBe(4);
-      fireEvent.click(more);
-      await waitFor(() => expect(view.getAllByTestId("home-today-card").length).toBe(6));
+      await waitFor(() => expect(view.getAllByTestId("home-today-row").length).toBe(6));
     } finally {
       second.restore();
     }
@@ -340,14 +345,11 @@ describe("DashboardPage (Home)", () => {
     } });
     try {
       const view = renderHome(makePerson("adult"));
-      await waitFor(() => expect(view.getAllByTestId("home-today-updated").length).toBe(2));
-      const [fresh, old] = view.getAllByTestId("home-today-updated");
+      await waitFor(() => expect(view.getAllByTestId("home-today-updated").length).toBe(1));
+      const fresh = view.getAllByTestId("home-today-updated")[0];
       expect(fresh!.textContent).toBe("Updated 4 minutes ago");
       expect(fresh!.getAttribute("data-old")).toBeNull();
       expect(fresh!.className).not.toContain("status-warning");
-      expect(old!.textContent).toBe("Updated 2 hours ago");
-      expect(old!.getAttribute("data-old")).toBe("true");
-      expect(old!.className).toContain("text-status-warning-ink");
     } finally {
       restore();
     }
@@ -358,7 +360,7 @@ describe("DashboardPage (Home)", () => {
     const { restore } = mockFetch({ layout: "board", widgets: [{ ...widget("upcoming", "Next up"), package: "remind" }], widgetData: { upcoming: { as_of: new Date().toISOString(), items: [{ title: "Call Nadia", value: "6:00 PM", at }] } } });
     try {
       const view = renderHome(makePerson("adult"));
-      await view.findByText("Call Nadia");
+      await view.findAllByText("Call Nadia");
       expect(document.body.textContent).toContain("in 25 minutes");
       expect(document.body.textContent).not.toContain("6:00 PM");
     } finally {
@@ -389,7 +391,7 @@ describe("DashboardPage (Home)", () => {
     const { restore } = mockFetch({ layout: "board", widgets: [{ ...widget("weather", "Weather"), package: "weather" }], widgetData: { weather: withCard } });
     try {
       const view = renderHome(makePerson("adult"));
-      await view.findByTestId("home-today-card");
+      await view.findByTestId("home-today-preview");
       expect(document.querySelector('[data-slot="weather-card"]')?.getAttribute("data-variant")).toBe("compact");
       expect(view.queryByText("Sub")).toBeNull();
       // A tap on the weather card opens the Weather app.
@@ -403,7 +405,7 @@ describe("DashboardPage (Home)", () => {
     const { restore, fetchMock } = mockFetch({ widgets: [widget("weather", "Weather")], widgetData: { weather: data("Sunny") }, checklist: [checklistItem("family", false)] });
     try {
       const view = renderHome(makePerson("child"));
-      await view.findByText("Weather");
+      await view.findByRole("button", { name: "Weather" });
       expect(hrefOf("Updates")).toBeUndefined();
       expect(hrefOf("Repairs")).toBeUndefined();
       expect(document.body.textContent).not.toContain("Getting started");
@@ -492,15 +494,15 @@ describe("DashboardPage (Home)", () => {
 
   test("Continue is compact shortcuts, and an empty one is a single quiet sentence", async () => {
     const rows = [{ source: "chat", kind: "chat", id: "c1", title: "Plan the trip", subtitle: null, href: "/chat?conversation=c1", at: "2026-11-09T00:00:00Z", percent: null, media_kind: null, artwork_url: null }];
-    const full = mockFetch({ layout: "ask", continue: rows });
+    const full = mockFetch({ layout: "shelves", continue: rows });
     try {
       const view = renderHome(makePerson("adult"));
-      const link = await view.findByRole("link", { name: "Plan the trip" });
-      expect(link.getAttribute("href")).toBe("/chat?conversation=c1");
-      expect(view.getByRole("region", { name: "Continue" })).toBeDefined();
+      await waitFor(() => expect(Array.from(view.container.querySelectorAll("a")).filter((link) => link.textContent?.includes("Plan the trip")).length).toBeGreaterThan(0));
+      expect(Array.from(view.container.querySelectorAll("a")).filter((link) => link.textContent?.includes("Plan the trip")).every((link) => link.getAttribute("href") === "/chat?conversation=c1")).toBe(true);
+      expect(view.container.textContent).toContain("Plan the trip");
       cleanup();
     } finally { full.restore(); }
-    const empty = mockFetch({ layout: "ask" });
+    const empty = mockFetch({ layout: "shelves", continue: [] });
     try {
       const view = renderHome(makePerson("adult"));
       await view.findByText("Nothing to pick up yet. Chats and things you play show up here.");

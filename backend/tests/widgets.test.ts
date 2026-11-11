@@ -144,6 +144,24 @@ describe("GET and PUT /api/widgets/home/arrange", () => {
     expect((await keys(client)).map((c) => c.key)).toEqual(before.map((c) => c.key));
   });
 
+  test("persists section preferences additively and keeps old widget-order lists readable", async () => {
+    const client = await owner();
+    const before = await keys(client);
+    const legacy = before.map((card) => card.key).reverse();
+    const roster = (await (await client.get("/api/people")).json()) as Array<{ id: string }>;
+    await client.put("/api/settings", { scope: `person:${roster[0]!.id}`, key: "ui.home_order", value: JSON.stringify(legacy) });
+    const legacyRead = await keys(client);
+    expect(legacyRead.map((card) => card.key)).toEqual(legacy);
+    const sections = { order: ["today", "composer", "hero"], hidden: ["admin"], heroSource: "companion" } as const;
+    const saved = await client.put("/api/widgets/home/arrange", { order: legacy, hidden: [], sections });
+    expect(saved.status).toBe(200);
+    expect((await saved.json() as { sections: typeof sections }).sections).toEqual(sections);
+    expect(((await (await client.get("/api/widgets/home/arrange")).json()) as { sections: typeof sections }).sections).toEqual(sections);
+    const reset = await client.put("/api/widgets/home/arrange", { order: [], hidden: [], sections: { order: ["hero", "composer", "make", "continue", "today", "new", "made", "family", "admin"], hidden: ["admin"], heroSource: "made" } });
+    expect(reset.status).toBe(200);
+    expect(((await reset.json()) as { sections: { heroSource: string } }).sections.heroSource).toBe("made");
+  });
+
   test("an id the person cannot see is refused and nothing is saved", async () => {
     const client = await owner();
     const before = await keys(client);

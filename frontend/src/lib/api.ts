@@ -301,6 +301,8 @@ export interface WidgetDescriptor {
   refresh_s: number;
 }
 export interface ArrangeCard extends WidgetDescriptor { key: string; hidden: boolean; hero?: boolean }
+export interface HomeSectionLayout { order?: string[]; hidden?: string[]; heroSource?: "made" | "companion" | "weather" | "off" }
+export interface HomeArrange { cards: ArrangeCard[]; sections: HomeSectionLayout | null }
 export interface HomeWidgets {
   hero: WidgetDescriptor | null;
   cards: WidgetDescriptor[];
@@ -1612,8 +1614,8 @@ export const api = {
       throw e;
     }),
   homeWidgets: () => request<HomeWidgets>("/api/widgets/home?surface=home"),
-  homeArrange: () => request<{ cards: ArrangeCard[] }>("/api/widgets/home/arrange"),
-  saveHomeArrange: (order: string[], hidden: string[]) => request<{ cards: ArrangeCard[] }>("/api/widgets/home/arrange", { method: "PUT", body: JSON.stringify({ order, hidden }) }),
+  homeArrange: () => request<HomeArrange>("/api/widgets/home/arrange"),
+  saveHomeArrange: (order: string[], hidden: string[], sections?: HomeSectionLayout) => request<HomeArrange>("/api/widgets/home/arrange", { method: "PUT", body: JSON.stringify({ order, hidden, ...(sections ? { sections } : {}) }) }),
   widgetData: (pkg: string, id: string) =>
     request<WidgetData>(`/api/widgets/${encodeURIComponent(pkg)}/${encodeURIComponent(id)}/data`).catch(
       (e: unknown) => {

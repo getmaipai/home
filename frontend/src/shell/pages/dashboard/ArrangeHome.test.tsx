@@ -1,7 +1,7 @@
 // Arrange Home: show, hide, reorder and reset the person's Home cards.
 import { afterEach, describe, expect, mock, test } from "bun:test";
 import { cleanup, fireEvent, waitFor, within } from "@testing-library/react";
-import { ArrangeHome, moveCard } from "@/shell/pages/dashboard/ArrangeHome";
+import { ArrangeHome, defaultSectionLayout, moveCard, moveSection } from "@/shell/pages/dashboard/ArrangeHome";
 import { renderWithQueryClient } from "../../../../tests/renderWithQueryClient";
 import type { ArrangeCard } from "@/lib/api";
 
@@ -11,18 +11,20 @@ const card = (id: string, over: Partial<ArrangeCard> = {}): ArrangeCard => ({ pa
 
 function mockApi(initial: ArrangeCard[]) {
   const original = globalThis.fetch;
-  const puts: Array<{ order: string[]; hidden: string[] }> = [];
+  const puts: Array<{ order: string[]; hidden: string[]; sections?: { order?: string[]; hidden?: string[]; heroSource?: string } }> = [];
+  let sections: { order?: string[]; hidden?: string[]; heroSource?: "made" | "companion" | "weather" | "off" } | null = null;
   let cards = initial;
   globalThis.fetch = mock((input: RequestInfo | URL, init?: RequestInit) => {
     const url = typeof input === "string" ? input : input instanceof Request ? input.url : input.toString();
     if (url.includes("/api/widgets/home/arrange")) {
       if (init?.method === "PUT") {
-        const body = JSON.parse(String(init.body)) as { order: string[]; hidden: string[] };
+        const body = JSON.parse(String(init.body)) as { order: string[]; hidden: string[]; sections?: { order?: string[]; hidden?: string[]; heroSource?: string } };
         puts.push(body);
+        if (body.sections) sections = body.sections as typeof sections;
         const byKey = new Map(initial.map((c) => [c.key, c]));
         cards = (body.order.length ? body.order : initial.map((c) => c.key)).map((key) => ({ ...byKey.get(key)!, hidden: body.hidden.includes(key) }));
       }
-      return Promise.resolve(Response.json({ cards }));
+      return Promise.resolve(Response.json({ cards, sections }));
     }
     return Promise.resolve(Response.json({}));
   }) as unknown as typeof fetch;
@@ -44,13 +46,22 @@ describe("moveCard", () => {
   });
 });
 
+describe("section layout", () => {
+  test("moves sections and provides band defaults", () => {
+    expect(moveSection(["hero", "today", "make"], 0, 1)).toEqual(["today", "hero", "make"]);
+    expect(defaultSectionLayout("adult", "shelves").heroSource).toBe("made");
+    expect(defaultSectionLayout("teen", "board").heroSource).toBe("companion");
+    expect(defaultSectionLayout("child", "ask").hidden).toContain("admin");
+  });
+});
+
 describe("Arrange Home sheet", () => {
   test("lists the cards and saves a hide at once", async () => {
     const api = mockApi([card("a"), card("b")]);
     await open();
     await waitFor(() => expect(within(document.body).getAllByTestId("home-arrange-row").length).toBe(2));
     fireEvent.click(within(document.body).getByRole("switch", { name: "Show B on Home" }));
-    await waitFor(() => expect(api.puts).toEqual([{ order: ["a/x", "b/x"], hidden: ["b/x"] }]));
+    await waitFor(() => expect(api.puts[0]?.hidden).toEqual(["b/x"]));
     await waitFor(() => expect(within(document.body).getByRole("switch", { name: "Show B on Home" }).getAttribute("aria-checked")).toBe("false"));
     api.restore();
   });
@@ -62,8 +73,20 @@ describe("Arrange Home sheet", () => {
     expect((within(document.body).getByRole("button", { name: "Move A up" }) as HTMLButtonElement).disabled).toBe(true);
     expect((within(document.body).getByRole("button", { name: "Move B down" }) as HTMLButtonElement).disabled).toBe(true);
     fireEvent.click(within(document.body).getByRole("button", { name: "Move A down" }));
-    await waitFor(() => expect(api.puts).toEqual([{ order: ["b/x", "a/x"], hidden: [] }]));
+    await waitFor(() => expect(api.puts[0]?.order).toEqual(["b/x", "a/x"]));
     await waitFor(() => expect(within(document.body).getAllByTestId("home-arrange-row")[0]!.textContent).toContain("B"));
+    api.restore();
+  });
+
+  test("section move and hide persist in the arrange response", async () => {
+    const api = mockApi([card("a")]);
+    await open();
+    const original = within(document.body).getAllByTestId("home-arrange-section");
+    fireEvent.click(within(document.body).getByRole("button", { name: "Move section Hero down" }));
+    await waitFor(() => expect(api.puts[0]?.sections?.order?.slice(0, 2)).toEqual(["composer", "hero"]));
+    fireEvent.click(within(document.body).getByRole("switch", { name: "Show section Admin" }));
+    await waitFor(() => expect(api.puts[1]?.sections?.hidden).toContain("admin"));
+    expect(original.length).toBe(9);
     api.restore();
   });
 
@@ -81,14 +104,15 @@ describe("Arrange Home sheet", () => {
     await open();
     await waitFor(() => expect(within(document.body).getAllByTestId("home-arrange-row").length).toBe(2));
     fireEvent.click(within(document.body).getByTestId("home-arrange-reset"));
-    await waitFor(() => expect(api.puts).toEqual([{ order: [], hidden: [] }]));
+    await waitFor(() => expect(api.puts[0]?.order).toEqual([]));
+    expect(api.puts[0]?.sections?.heroSource).toBe("made");
     api.restore();
   });
 
-  test("no cards shows a plain empty state", async () => {
+  test("sections remain arrangeable when no widget cards are present", async () => {
     const api = mockApi([]);
     await open();
-    await waitFor(() => expect(within(document.body).getByTestId("home-arrange-empty")).toBeTruthy());
+    await waitFor(() => expect(within(document.body).getAllByTestId("home-arrange-section").length).toBeGreaterThan(0));
     api.restore();
   });
 

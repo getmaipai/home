@@ -74,12 +74,12 @@ export function HomeMedia({ kind }: { kind: "continue" | "new" | "made_at_home" 
   if (query.isPending || query.isError) return <AsyncState data={query.data} error={query.isError} isFetching={query.isFetching} onRetry={() => void query.refetch()} errorMessage={i18n._({ id: "Could not load your library. Refresh Home to try again.", message: "Could not load your library. Refresh Home to try again." })} loadingLabel={i18n._({ id: "Loading your library", message: "Loading your library" })}>{() => null}</AsyncState>;
   const data: MediaHome = query.data;
   const rows = kind === "continue" ? [
-    ...data.continue,
+    ...(data.continue ?? []),
     ...(continuing.data?.rows ?? []).filter((row) => row.media_kind === null).map((row) => ({
       id: row.id, app: "videos" as const, kind: "chat", title: row.title, subtitle: row.subtitle,
       artwork_url: row.artwork_url, href: row.href, percent: row.percent, at: row.at,
     })),
-  ] : data[kind];
+  ] : data[kind] ?? [];
   const heading = kind === "continue" ? i18n._({ id: "Continue", message: "Continue" }) : kind === "new" ? i18n._({ id: "New in your library", message: "New in your library" }) : i18n._({ id: "Made at home", message: "Made at home" });
   if (kind === "continue") return rows.length ? <section aria-label={heading}><Section variant="flat" heading={heading}><ContinueGrid rows={rows} /></Section></section> : null;
   return <MediaRows heading={heading} rows={rows} />;

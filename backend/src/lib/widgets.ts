@@ -119,8 +119,18 @@ function personIdList(person: PersonRow, key: "ui.home_hidden" | "ui.home_order"
   const value = getPersonSettingValue(person, key);
   try {
     const parsed: unknown = typeof value === "string" ? JSON.parse(value) : [];
-    return Array.isArray(parsed) ? parsed.filter((id): id is string => typeof id === "string") : [];
+    const list = Array.isArray(parsed) ? parsed : parsed && typeof parsed === "object" && "widgets" in parsed && Array.isArray(parsed.widgets) ? parsed.widgets : [];
+    return list.filter((id): id is string => typeof id === "string");
   } catch { return []; }
+}
+
+export interface HomeSectionLayout { order?: string[]; hidden?: string[]; heroSource?: "made" | "companion" | "weather" | "off" }
+function personSectionLayout(person: PersonRow): HomeSectionLayout | undefined {
+  try {
+    const value = getPersonSettingValue(person, "ui.home_order");
+    const parsed: unknown = typeof value === "string" ? JSON.parse(value) : null;
+    return parsed && typeof parsed === "object" && !Array.isArray(parsed) && ("sections" in parsed) ? (parsed.sections as HomeSectionLayout) : undefined;
+  } catch { return undefined; }
 }
 
 const byPriority = (a: WidgetDescriptor, b: WidgetDescriptor) => b.priority - a.priority || a.installed_at.localeCompare(b.installed_at) || a.id.localeCompare(b.id);
@@ -174,17 +184,22 @@ export function arrangeHomeCards(widgets: WidgetDescriptor[], person: PersonRow)
   return [...(hero ? [hero] : []), ...rest].map((widget) => ({ ...widget, key: widgetKey(widget), hidden: hidden.has(widgetKey(widget)) }));
 }
 
+export function arrangeHomeSections(person: PersonRow): HomeSectionLayout | null { return personSectionLayout(person) ?? null; }
+
 /** Saves the person's order and hidden list through the settings write path. Only cards this person may already see can be named. */
-export function saveHomeArrangement(person: PersonRow, widgets: WidgetDescriptor[], order: string[], hidden: string[]): OpResult<ArrangeCard[]> {
+export function saveHomeArrangement(person: PersonRow, widgets: WidgetDescriptor[], order: string[], hidden: string[], sections?: HomeSectionLayout): OpResult<{ cards: ArrangeCard[]; sections: HomeSectionLayout | null }> {
   const allowed = new Set(allowedWidgets(widgets, person, "home").map(widgetKey));
   const unknown = [...order, ...hidden].find((id) => !allowed.has(id));
   if (unknown !== undefined) return { ok: false, status: 400, error: "That card is not available to you. Reopen Arrange and try again." };
   const scope = `person:${person.id}`;
-  for (const [key, ids] of [["ui.home_order", order], ["ui.home_hidden", hidden]] as const) {
-    const written = setValue(person, scope, key, JSON.stringify([...new Set(ids)]));
+  const existingOrder = getPersonSettingValue(person, "ui.home_order");
+  let previousSections: HomeSectionLayout | undefined;
+  try { const parsed = typeof existingOrder === "string" ? JSON.parse(existingOrder) as { sections?: HomeSectionLayout } : null; previousSections = parsed && !Array.isArray(parsed) ? parsed.sections : undefined; } catch { /* old or malformed values remain readable */ }
+  for (const [key, ids] of [["ui.home_order", JSON.stringify({ widgets: [...new Set(order)], sections: sections ?? previousSections })], ["ui.home_hidden", JSON.stringify([...new Set(hidden)])]] as const) {
+    const written = setValue(person, scope, key, ids);
     if (!written.ok) return { ok: false, status: written.status === 403 ? 403 : 400, error: written.error };
   }
-  return { ok: true, status: 200, value: arrangeHomeCards(widgets, person) };
+  return { ok: true, status: 200, value: { cards: arrangeHomeCards(widgets, person), sections: sections ?? previousSections ?? null } };
 }
 
 /** Runs the declared widget's own package recipe with its own declared

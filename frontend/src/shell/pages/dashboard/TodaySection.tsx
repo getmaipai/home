@@ -1,12 +1,11 @@
 import { i18n } from "@lingui/core";
-import { useRef, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Link } from "react-router-dom";
 import { useQueries, useQuery } from "@tanstack/react-query";
 import { Card } from "@maipai/ui/src/primitives/Card";
-import { Button } from "@maipai/ui/src/dashboard/components/ui/button";
+import { List } from "@maipai/ui/src/primitives/List";
 import { Chip } from "@maipai/ui/src/primitives/Chip";
 import { isOwnerOrAdminRole, type Roster } from "@/lib/api";
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@maipai/ui/src/dashboard/components/ui/collapsible";
 import { Item, ItemActions, ItemContent, ItemDescription, ItemGroup, ItemTitle } from "@maipai/ui/src/dashboard/components/ui/item";
 import { AnswerBlockView } from "@maipai/ui/src/elements/answer-block";
 import { Section } from "@maipai/ui/src/primitives/Section";
@@ -45,7 +44,17 @@ export function todaySlots(widgets: WidgetDescriptor[], results: Array<{ isPendi
     const before = lastGood.get(key);
     if (before) slots.push({ widget, data: before, stale: true });
   });
-  return slots;
+  const rank = (slot: Slot) => {
+    const key = `${slot.widget.package}/${slot.widget.id}`;
+    if ((slot.widget.package === "remind" && slot.widget.id === "upcoming") || slot.widget.package === "calendar" || slot.widget.package === "almanac-date") return 0;
+    if (slot.widget.package === "timer") return 1;
+    if (slot.widget.package === "remind" && slot.widget.id === "shopping") return 2;
+    if (slot.widget.package === "weather") return 3;
+    if (slot.widget.package === "news") return 4;
+    if (slot.widget.package === "house") return 5;
+    return 6 + widgets.findIndex((w) => `${w.package}/${w.id}` === key);
+  };
+  return slots.sort((a, b) => rank(a) - rank(b));
 }
 
 /** A card is "old" once its data is more than three refresh intervals behind (or a refresh just failed). */
@@ -72,14 +81,15 @@ export function TodaySection({ home, heroOnly = false, chips = false, role }: { 
   });
   const lastGood = useRef(new Map<string, WidgetData>());
   const slots = todaySlots(widgets, results, lastGood.current);
+  const [selectedKey, setSelectedKey] = useState<string | null>(null);
   const heroQuery = useQuery({ queryKey: ["home-hero"], queryFn: () => home?.hero ? api.widgetData(home.hero.package, home.hero.id) : Promise.resolve(undefined), enabled: Boolean(home?.hero), retry: false });
 
   // When every card is hidden the section would vanish with its Arrange button; keep the button while any card is hidden.
   const arranged = useQuery({ queryKey: ARRANGE_KEY, queryFn: api.homeArrange, retry: false, enabled: Boolean(home) && !heroOnly && !chips });
   const anyHidden = Boolean(arranged.data?.cards.some((card) => card.hidden));
 
-  if (!home && list.isPending) return <RouteSkeleton label={i18n._({ id: "Loading Today", message: "Loading Today" })} />;
-  if (!home && list.isError) return <p role="alert" className="text-supporting text-muted-foreground">{i18n._({ id: "Could not load Today. Refresh Home to try again.", message: "Could not load Today. Refresh Home to try again." })}</p>;
+  const loadingHome = !home && list.isPending;
+  const homeError = !home && list.isError;
   const visibleSlots = slots.filter((slot) => {
     const item = slot.data.items.length === 1 ? slot.data.items[0] : undefined;
     const sentenceOnlyEmpty = Boolean(item && !item.value && !item.subtitle && (
@@ -88,6 +98,25 @@ export function TodaySection({ home, heroOnly = false, chips = false, role }: { 
     ));
     return !sentenceOnlyEmpty || isOwnerOrAdminRole(role ?? "guest");
   });
+  const selectedIndex = Math.max(0, visibleSlots.findIndex((slot) => `${slot.widget.package}/${slot.widget.id}` === selectedKey));
+  const selected = visibleSlots[selectedIndex] ?? visibleSlots[0];
+  const visibleKeys = visibleSlots.map((slot) => `${slot.widget.package}/${slot.widget.id}`).join("|");
+  useEffect(() => { if (selectedKey && !visibleKeys.split("|").includes(selectedKey)) setSelectedKey(null); }, [selectedKey, visibleKeys]);
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== "ArrowDown" && event.key !== "ArrowUp") return;
+      const target = event.target;
+      if (!(target instanceof Element) || !target.closest('[aria-label="Today\'s items"]')) return;
+      event.preventDefault();
+      const current = selectedIndex;
+      const next = Math.max(0, Math.min(visibleSlots.length - 1, current + (event.key === "ArrowDown" ? 1 : -1)));
+      const slot = visibleSlots[next]; if (slot) setSelectedKey(`${slot.widget.package}/${slot.widget.id}`);
+    };
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
+  }, [selectedKey, visibleKeys, visibleSlots, selectedIndex]);
+  if (loadingHome) return <RouteSkeleton label={i18n._({ id: "Loading Today", message: "Loading Today" })} />;
+  if (homeError) return <p role="alert" className="text-supporting text-muted-foreground">{i18n._({ id: "Could not load Today. Refresh Home to try again.", message: "Could not load Today. Refresh Home to try again." })}</p>;
   if (visibleSlots.length === 0) {
     if (!home || heroOnly || chips || !anyHidden) return null;
     return <section aria-label={i18n._({ id: "Today", message: "Today" })} className="md:col-span-2 lg:col-span-12"><div className="flex justify-end"><ArrangeHome /></div></section>;
@@ -132,6 +161,7 @@ export function TodaySection({ home, heroOnly = false, chips = false, role }: { 
     // Ask first: each Today card is one chip; a tap opens that full card under the row, a second tap closes it.
     const key = (slot: Slot) => `${slot.widget.package}/${slot.widget.id}`;
     const opened = visibleSlots.find((slot) => key(slot) === open);
+    const first = visibleSlots[0];
     return (
       <section aria-label={i18n._({ id: "Today", message: "Today" })} className="md:col-span-2 lg:col-span-12">
         <Section variant="flat" heading={i18n._({ id: "Today", message: "Today" })}>
@@ -141,34 +171,32 @@ export function TodaySection({ home, heroOnly = false, chips = false, role }: { 
             <Chip key={key(slot)} tone="surface" size="strip" selected={open === key(slot)} selectedTone="inverse" aria-expanded={open === key(slot)} onClick={() => setOpen(open === key(slot) ? null : key(slot))}>{displayTitle(slot.widget)}</Chip>
           ))}
         </div>
-        {opened ? <div className="max-w-xl">{cards([opened])}</div> : null}
+        {opened ? <div className="max-w-xl">{cards([opened])}</div> : first ? <div className="max-w-xl">{cards([first])}</div> : null}
         </Section>
       </section>
     );
   }
 
-  const first = visibleSlots.slice(0, home ? home.cards.length : TODAY_CARD_BUDGET);
-  const rest = visibleSlots.slice(TODAY_CARD_BUDGET);
   const heroData: WidgetData | undefined = heroQuery.data;
   const heroSlot = home?.hero && heroData && heroData.items.length > 0 && !heroData.degraded ? { widget: home.hero, data: heroData } : null;
   const showHeroSkeleton = heroOnly && Boolean(home?.hero) && heroQuery.isPending;
   if (showHeroSkeleton) return <RouteSkeleton label={i18n._({ id: "Loading Home highlight", message: "Loading Home highlight" })} />;
   if (heroOnly) return heroSlot ? <section aria-label={i18n._({ id: "Home highlight", message: "Home highlight" })} className="lg:col-span-4"><div data-testid="home-hero"><Card surface="flat"><div className="text-row font-semibold">{displayTitle(heroSlot.widget)}</div><ItemGroup>{heroSlot.data.items.map((item, index) => <Item key={`${item.title}-${index}`} size="sm"><ItemContent><ItemTitle>{item.title}</ItemTitle>{item.subtitle ? <ItemDescription className="text-supporting">{item.subtitle}</ItemDescription> : null}</ItemContent>{item.value ? <ItemActions>{item.value}</ItemActions> : null}</Item>)}</ItemGroup></Card></div></section> : null;
+  const preview = (slot: Slot): ReactNode => slot.data.card ? <AnswerBlockView block={slot.data.card} compact /> : <Card surface="flat">
+    <div className="text-row font-semibold">{displayTitle(slot.widget)}</div>
+    <ItemGroup>{slot.data.items.map((item, index) => <Item key={`${item.title}-${index}`} size="sm"><ItemContent><ItemTitle>{item.title}</ItemTitle>{item.subtitle ? <ItemDescription className="text-supporting">{item.subtitle}</ItemDescription> : null}{item.image ? <img src={item.image} alt="" /> : null}</ItemContent>{item.at || item.value ? <ItemActions>{item.at ? formatRelativeLong(item.at) : item.value}</ItemActions> : null}</Item>)}</ItemGroup>
+    {freshness(slot)}
+  </Card>;
   return (
     <>
     {heroSlot ? <section aria-label={i18n._({ id: "Home highlight", message: "Home highlight" })} className="lg:col-span-4"><div data-testid="home-hero"><Card surface="flat"><div className="text-row font-semibold">{heroSlot.widget.title}</div><ItemGroup>{heroSlot.data.items.map((item, index) => <Item key={`${item.title}-${index}`} size="sm"><ItemContent><ItemTitle>{item.title}</ItemTitle>{item.subtitle ? <ItemDescription className="text-supporting">{item.subtitle}</ItemDescription> : null}</ItemContent>{item.value ? <ItemActions>{item.value}</ItemActions> : null}</Item>)}</ItemGroup></Card></div></section> : null}
     <section aria-label={i18n._({ id: "Today", message: "Today" })} className="md:col-span-2 lg:col-span-12">
       <Section variant="flat" heading={i18n._({ id: "Today", message: "Today" })}>
       {home ? <div className="flex justify-end"><ArrangeHome /></div> : null}
-      <div className="flex snap-x gap-3 overflow-x-auto [&>*]:w-72 [&>*]:shrink-0 [&>*]:snap-start lg:[&>*]:w-auto [&::-webkit-scrollbar]:hidden lg:grid lg:grid-cols-3 lg:flex-wrap lg:overflow-visible">{cards(first)}</div>
-      {rest.length === 0 ? null : (
-        <Collapsible>
-          <CollapsibleTrigger render={<Button variant="outline" size="row" />}>{i18n._({ id: "More", message: "More" })}</CollapsibleTrigger>
-          <CollapsibleContent>
-            <div className="flex gap-3 overflow-x-auto pt-3 [&>*]:w-72 [&>*]:shrink-0 lg:[&>*]:w-auto [&::-webkit-scrollbar]:hidden lg:grid lg:grid-cols-3 lg:flex-wrap lg:overflow-visible">{cards(rest)}</div>
-          </CollapsibleContent>
-        </Collapsible>
-      )}
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+        <List items={visibleSlots} getKey={(slot) => `${slot.widget.package}/${slot.widget.id}`} getLabel={(slot) => displayTitle(slot.widget)} label={i18n._({ id: "Today's items", message: "Today's items" })} onSelect={(slot) => setSelectedKey(`${slot.widget.package}/${slot.widget.id}`)} isSelected={(slot) => selected === slot} renderItem={(slot) => <ItemContent><span className="text-supporting text-muted-foreground">{visibleSlots.indexOf(slot) + 1}.</span><ItemTitle data-testid="home-today-row">{displayTitle(slot.widget)}</ItemTitle><ItemDescription className="text-supporting">{slot.data.items[0]?.title ?? i18n._({ id: "Details", message: "Details" })}</ItemDescription></ItemContent>} />
+        {selected ? <div data-testid="home-today-preview">{opensApp(selected, preview(selected))}</div> : null}
+      </div>
       </Section>
     </section>
     </>

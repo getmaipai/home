@@ -5,7 +5,7 @@
 import { createRoute, z } from "@hono/zod-openapi";
 import { apiRouter, errorResponses, respond } from "@/lib/openapi";
 import { requireAuth } from "@/middleware/auth";
-import { listWidgets, getWidgetData, orderHomeCards, arrangeHomeCards, saveHomeArrangement } from "@/lib/widgets";
+import { listWidgets, getWidgetData, orderHomeCards, arrangeHomeCards, arrangeHomeSections, saveHomeArrangement } from "@/lib/widgets";
 import type { WidgetDescriptor } from "@/lib/widgets";
 
 export const widgetsRoutes = apiRouter();
@@ -73,7 +73,8 @@ widgetsRoutes.openapi(homeRoute, (c) => {
 });
 
 const ArrangeCard = WidgetDescriptor.extend({ key: z.string(), hidden: z.boolean() });
-const ArrangeList = z.object({ cards: z.array(ArrangeCard) });
+const HomeSectionLayout = z.object({ order: z.array(z.string()).max(100).optional(), hidden: z.array(z.string()).max(100).optional(), heroSource: z.enum(["made", "companion", "weather", "off"]).optional() });
+const ArrangeList = z.object({ cards: z.array(ArrangeCard), sections: HomeSectionLayout.nullable() });
 
 const arrangeGetRoute = createRoute({
   method: "get",
@@ -88,7 +89,7 @@ const arrangeGetRoute = createRoute({
 });
 widgetsRoutes.openapi(arrangeGetRoute, (c) => {
   const actor = c.get("person");
-  return c.json({ cards: arrangeHomeCards(listWidgets(actor), actor) }, 200);
+  return c.json({ cards: arrangeHomeCards(listWidgets(actor), actor), sections: arrangeHomeSections(actor) }, 200);
 });
 
 const arrangePutRoute = createRoute({
@@ -97,7 +98,7 @@ const arrangePutRoute = createRoute({
   tags: ["Widgets"],
   summary: "Save my Home card order and hidden list (empty lists restore the default)",
   middleware: [requireAuth] as const,
-  request: { body: { content: { "application/json": { schema: z.object({ order: z.array(z.string()).max(200), hidden: z.array(z.string()).max(200) }) } } } },
+  request: { body: { content: { "application/json": { schema: z.object({ order: z.array(z.string()).max(200), hidden: z.array(z.string()).max(200), sections: HomeSectionLayout.optional() }) } } } },
   responses: {
     200: { content: { "application/json": { schema: ArrangeList } }, description: "Saved; my cards as they now stand." },
     ...errorResponses({ 400: "A card is not available to me", 401: "Not signed in", 403: "Not allowed" }),
@@ -106,9 +107,9 @@ const arrangePutRoute = createRoute({
 widgetsRoutes.openapi(arrangePutRoute, (c) => {
   const actor = c.get("person");
   const body = c.req.valid("json");
-  const result = saveHomeArrangement(actor, listWidgets(actor), body.order, body.hidden);
+  const result = saveHomeArrangement(actor, listWidgets(actor), body.order, body.hidden, body.sections);
   if (!result.ok) return respond(c, result);
-  return c.json({ cards: result.value }, 200);
+  return c.json(result.value, 200);
 });
 
 const dataRoute = createRoute({
