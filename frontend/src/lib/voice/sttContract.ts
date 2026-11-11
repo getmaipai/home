@@ -27,6 +27,7 @@ import { z } from "zod";
 export const SttTimingReportSchema = z.object({
   t: z.literal("timing"), turn_id: z.string(), stt_ms: z.number().finite().nonnegative(),
   first_playback_ms: z.number().finite().nonnegative().optional(), first_sentence_ms: z.number().finite().nonnegative().optional(),
+  cue_playback_ms: z.number().finite().nonnegative().optional(),
   head_ms: z.number().finite().nonnegative().optional(), offer_ms: z.number().finite().nonnegative().optional(), emit_ms: z.number().finite().nonnegative().optional(),
   ctx_enqueue: z.string().max(20).optional(), ctx_emit: z.string().max(20).optional(),
 }).strict();

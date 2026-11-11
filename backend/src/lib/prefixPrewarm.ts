@@ -4,8 +4,9 @@
 // byte for byte) is kept in memory; when a voice session opens, one request with that prefix and a one-token
 // answer puts it back in the engine's prompt cache before the person speaks. Nothing is stored on disk, no
 // text reaches anyone, and a person with no recorded prefix yet is left to the boot warm-up.
-import { complete, type LlmMessage, type ToolSpec } from "@/lib/llm";
+import { complete, StackStreamError, type LlmMessage, type ToolSpec } from "@/lib/llm";
 import { recordPrewarmTiming } from "@/lib/voiceTiming";
+import { StackError } from "@/lib/stack/errors";
 
 interface RecordedPrefix { system: LlmMessage; tools: ToolSpec[]; model?: string; at: number }
 const MAX_PEOPLE = 64;
@@ -15,6 +16,13 @@ const lastWarm = new Map<string, number>();
 const conversationWarms = new Map<string, AbortController>();
 
 const keyFor = (actorId: string, surfaceClass: string) => `${actorId}:${surfaceClass}`;
+export function prewarmFailureReason(error?: unknown): "engine_busy" | "engine_error" | "timeout" | "other" {
+  const detail = error instanceof Error ? error.message.toLowerCase() : "";
+  if (error instanceof StackError && error.kind === "timeout" || detail.includes("timeout") || detail.includes("timed out")) return "timeout";
+  if (error instanceof StackError && error.status === 429 || error instanceof StackStreamError && error.facts.http_status === 429 || detail.includes("busy") || detail.includes("locked") || detail.includes("in use")) return "engine_busy";
+  if (error instanceof StackStreamError || detail.includes("engine") || detail.includes("stack")) return "engine_error";
+  return "other";
+}
 
 export function notePrefix(actorId: string, surfaceClass: string, messages: readonly LlmMessage[], tools: readonly ToolSpec[], model?: string, now = Date.now()): void {
   const system = messages[0];
@@ -36,8 +44,10 @@ export async function prewarmPrefix(actorId: string, surfaceClass: string, now =
     const result = await complete("chat", [prefix.system, { role: "user", content: "hi" }], {
       model: prefix.model, tools: prefix.tools.length > 0 ? prefix.tools : undefined, max_tokens: 1, exactCeiling: true, thinking: false, dropReasoning: true,
     });
+    if (!result.ok) recordPrewarmTiming(actorId, "failed", Date.now() - now, undefined, undefined, prewarmFailureReason(new Error(result.reason ?? "engine error")));
     return result.ok;
-  } catch {
+  } catch (error) {
+    recordPrewarmTiming(actorId, "failed", Date.now() - now, undefined, undefined, prewarmFailureReason(error));
     return false;
   }
 }
@@ -56,9 +66,9 @@ export async function prewarmConversation(actorId: string, surfaceClass: string,
       model: prefix.model, tools: prefix.tools.length > 0 ? prefix.tools : undefined,
       max_tokens: 1, exactCeiling: true, thinking: false, dropReasoning: true, signal: controller.signal,
     });
-    recordPrewarmTiming(actorId, controller.signal.aborted ? "aborted" : result.ok ? "done" : "failed", Date.now() - started, result.ok ? result.value.prompt_n : undefined, result.ok ? result.value.cache_n : undefined);
+    recordPrewarmTiming(actorId, controller.signal.aborted ? "aborted" : result.ok ? "done" : "failed", Date.now() - started, result.ok ? result.value.prompt_n : undefined, result.ok ? result.value.cache_n : undefined, result.ok || controller.signal.aborted ? undefined : prewarmFailureReason(new Error(result.reason ?? "engine error")));
     return result.ok;
-  } catch { recordPrewarmTiming(actorId, controller.signal.aborted ? "aborted" : "failed", Date.now() - started); return false; }
+  } catch (error) { recordPrewarmTiming(actorId, controller.signal.aborted ? "aborted" : "failed", Date.now() - started, undefined, undefined, controller.signal.aborted ? undefined : prewarmFailureReason(error)); return false; }
   finally { if (conversationWarms.get(actorId) === controller) conversationWarms.delete(actorId); }
 }
 

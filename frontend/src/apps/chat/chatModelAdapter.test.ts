@@ -657,11 +657,15 @@ describe("createChatModelAdapter streaming", () => {
       ],
     );
     const env = stubEnvironment(stream);
+    const firstAnswer = mock(() => undefined);
+    const cuePlayback = mock(() => undefined);
     try {
       const adapter = createChatModelAdapter({
         consumeThinking: () => false,
         consumeSupersedes: () => undefined,
         turnSchedulerRef: { current: null },
+        onFirstSentence: firstAnswer,
+        onCuePlayback: cuePlayback,
       });
       const abortSignal = new AbortController().signal;
       const options = {
@@ -695,6 +699,8 @@ describe("createChatModelAdapter streaming", () => {
       expect(yields[2]).toEqual({ content: [{ type: "text", text: "The real answer." }] });
       await new Promise((resolve) => setTimeout(resolve, 20));
       expect(env.ttsCalls).toEqual(["One sec.", "The real answer."]);
+      expect(cuePlayback).toHaveBeenCalledTimes(1);
+      expect(firstAnswer).toHaveBeenCalledTimes(1);
     } finally {
       env.restore();
     }

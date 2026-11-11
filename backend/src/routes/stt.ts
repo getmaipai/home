@@ -16,7 +16,7 @@ import { getDeviceById } from "@/lib/devices";
 import { getCookie } from "hono/cookie";
 import { resolveSessionDeviceId } from "@/middleware/auth";
 import { apiRouter, errorResponses } from "@/lib/openapi";
-import { attachSpeechTiming, findVoiceTiming, setVoiceTiming, VoiceTimingMessageSchema } from "@/lib/voiceTiming";
+import { attachSpeechTiming, findVoiceTiming, setCuePlaybackTiming, setVoiceTiming, VoiceTimingMessageSchema } from "@/lib/voiceTiming";
 
 export const sttRoutes = apiRouter();
 
@@ -72,7 +72,7 @@ sttRoutes.get(
         if (!session) return;
         if (typeof evt.data === "string") {
           try {
-            const parsed = JSON.parse(evt.data) as { t?: string; reply_id?: unknown; ms?: unknown; stt_ms?: unknown; first_playback_ms?: unknown; first_sentence_ms?: unknown; head_ms?: unknown; offer_ms?: unknown; emit_ms?: unknown; ctx_enqueue?: unknown; ctx_emit?: unknown; turn_id?: unknown };
+            const parsed = JSON.parse(evt.data) as { t?: string; reply_id?: unknown; ms?: unknown; stt_ms?: unknown; first_playback_ms?: unknown; first_sentence_ms?: unknown; cue_playback_ms?: unknown; head_ms?: unknown; offer_ms?: unknown; emit_ms?: unknown; ctx_enqueue?: unknown; ctx_emit?: unknown; turn_id?: unknown };
             if (parsed.t === "end") session.end();
             else if (parsed.t === "played_ms" && typeof parsed.reply_id === "string" && parsed.reply_id.trim().length > 0 && typeof parsed.ms === "number" && Number.isFinite(parsed.ms) && parsed.ms >= 0 && Object.keys(parsed).length === 3) {
               session.notePlayback(parsed.reply_id, parsed.ms, Date.now());
@@ -84,6 +84,7 @@ sttRoutes.get(
                 const record = findVoiceTiming(value.turn_id);
                 if (value.first_sentence_ms !== undefined) setVoiceTiming(record, "first_sentence_ms", value.first_sentence_ms);
                 if (value.first_playback_ms !== undefined) setVoiceTiming(record, "first_playback_ms", value.first_playback_ms);
+                if (value.cue_playback_ms !== undefined) setCuePlaybackTiming(record, value.cue_playback_ms);
                 attachSpeechTiming(value.turn_id, { head_ms: value.head_ms, offer_ms: value.offer_ms, emit_ms: value.emit_ms, ctx_enqueue: value.ctx_enqueue, ctx_emit: value.ctx_emit });
               }
             }

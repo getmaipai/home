@@ -13,6 +13,11 @@ export interface VoiceTimingRecord {
   first_sentence_ms: number | null;
   first_audio_ms: number | null;
   first_playback_ms: number | null;
+  cue_playback_ms?: number | null;
+  prompt_n?: number | null;
+  cache_n?: number | null;
+  time_to_first_token_ms?: number | null;
+  context_node_ms?: number | null;
   speech_enqueue_ms?: number | null;
   speech_head_ms?: number | null;
   speech_offer_ms?: number | null;
@@ -21,9 +26,9 @@ export interface VoiceTimingRecord {
   audio_state_emit?: string | null;
 }
 
-export interface PrewarmTimingRecord { actor_hash: string; outcome: "done" | "aborted" | "failed"; prompt_n?: number; cache_n?: number; elapsed_ms: number }
+export interface PrewarmTimingRecord { actor_hash: string; outcome: "done" | "aborted" | "failed"; reason?: "engine_busy" | "engine_error" | "timeout" | "other"; prompt_n?: number; cache_n?: number; elapsed_ms: number }
 type VoiceTimingStage = "stt_ms" | "turn_start_ms" | "first_token_ms" | "first_sentence_ms" | "first_audio_ms" | "first_playback_ms";
-export const VoiceTimingMessageSchema = z.object({ t: z.literal("timing"), turn_id: z.string(), stt_ms: z.number().finite().nonnegative(), first_playback_ms: z.number().finite().nonnegative().optional(), first_sentence_ms: z.number().finite().nonnegative().optional(), head_ms: z.number().finite().nonnegative().optional(), offer_ms: z.number().finite().nonnegative().optional(), emit_ms: z.number().finite().nonnegative().optional(), ctx_enqueue: z.string().max(20).optional(), ctx_emit: z.string().max(20).optional() }).strict();
+export const VoiceTimingMessageSchema = z.object({ t: z.literal("timing"), turn_id: z.string(), stt_ms: z.number().finite().nonnegative(), first_playback_ms: z.number().finite().nonnegative().optional(), first_sentence_ms: z.number().finite().nonnegative().optional(), cue_playback_ms: z.number().finite().nonnegative().optional(), head_ms: z.number().finite().nonnegative().optional(), offer_ms: z.number().finite().nonnegative().optional(), emit_ms: z.number().finite().nonnegative().optional(), ctx_enqueue: z.string().max(20).optional(), ctx_emit: z.string().max(20).optional() }).strict();
 
 const CAPACITY = 200;
 const storePath = join(dataDir, "local-app", "voice-timing.json");
@@ -53,8 +58,8 @@ function persist(): void {
   } catch { /* timing is best effort and never affects the turn */ }
 }
 
-export function recordPrewarmTiming(actorId: string, outcome: PrewarmTimingRecord["outcome"], elapsedMs: number, promptN?: number, cacheN?: number): void {
-  const row: PrewarmTimingRecord = { actor_hash: createHash("sha256").update(actorId).digest("hex").slice(0, 12), outcome, elapsed_ms: Math.round(Math.max(0, elapsedMs)), ...(Number.isFinite(promptN) ? { prompt_n: promptN } : {}), ...(Number.isFinite(cacheN) ? { cache_n: cacheN } : {}) };
+export function recordPrewarmTiming(actorId: string, outcome: PrewarmTimingRecord["outcome"], elapsedMs: number, promptN?: number, cacheN?: number, reason?: PrewarmTimingRecord["reason"]): void {
+  const row: PrewarmTimingRecord = { actor_hash: createHash("sha256").update(actorId).digest("hex").slice(0, 12), outcome, elapsed_ms: Math.round(Math.max(0, elapsedMs)), ...(reason ? { reason } : {}), ...(Number.isFinite(promptN) ? { prompt_n: promptN } : {}), ...(Number.isFinite(cacheN) ? { cache_n: cacheN } : {}) };
   prewarms.push(row); if (prewarms.length > CAPACITY) prewarms.shift(); persist();
 }
 export function voicePrewarmRecords(limit = CAPACITY): readonly PrewarmTimingRecord[] { try { const parsed = JSON.parse(readFileSync(storePath, "utf8")) as { prewarms?: PrewarmTimingRecord[] }; if (Array.isArray(parsed.prewarms)) prewarms = parsed.prewarms.slice(-CAPACITY); } catch {} return prewarms.slice(-Math.max(0, Math.min(CAPACITY, Math.floor(limit)))); }
@@ -93,6 +98,17 @@ export function setVoiceTiming(record: VoiceTimingRecord | undefined, stage: Voi
   if (record && Number.isFinite(elapsedMs) && elapsedMs >= 0 && (record[stage] === null || stage === "first_sentence_ms" || stage === "first_playback_ms")) { record[stage] = Math.round(elapsedMs); persist(); }
 }
 
+export function setCuePlaybackTiming(record: VoiceTimingRecord | undefined, elapsedMs: number): void {
+  if (record && Number.isFinite(elapsedMs) && elapsedMs >= 0) { record.cue_playback_ms = Math.round(elapsedMs); persist(); }
+}
+
+export function attachTurnStats(turnId: string, stats: { prompt_tokens?: number | null; cache_reuse_tokens?: number | null; time_to_first_token_ms?: number | null; nodes?: Array<{ node: string; startMs: number; endMs: number }> }): void {
+  const record = findVoiceTiming(turnId); if (!record) return;
+  const context = stats.nodes?.find((node) => node.node === "context");
+  Object.assign(record, { prompt_n: stats.prompt_tokens ?? null, cache_n: stats.cache_reuse_tokens ?? null, time_to_first_token_ms: stats.time_to_first_token_ms ?? null, context_node_ms: context ? Math.max(0, context.endMs - context.startMs) : null });
+  persist();
+}
+
 export function findVoiceTiming(turnId: string): VoiceTimingRecord | undefined {
   return records.find((record) => record.turn_id === turnId);
 }
@@ -117,8 +133,10 @@ export function voiceTimingReport(limit = 50): string {
   };
   const stages = ["stt_ms", "turn_start_ms", "first_token_ms", "first_sentence_ms", "first_audio_ms", "first_playback_ms"] as const;
   const prewarmRows = voicePrewarmRecords(limit);
-  const promptDeltas = prewarmRows.flatMap((r) => r.prompt_n !== undefined && r.cache_n !== undefined ? [r.prompt_n - r.cache_n] : []);
+  const promptDeltas = rows.flatMap((r) => r.prompt_n != null && r.cache_n != null ? [r.prompt_n - r.cache_n] : []);
+  const cueValues = rows.flatMap((r) => r.cue_playback_ms == null ? [] : [r.cue_playback_ms]);
   const ctxRows = rows.filter((r) => r.audio_state_enqueue !== undefined);
   const notRunning = ctxRows.filter((r) => r.audio_state_enqueue !== "running" || (r.audio_state_emit !== undefined && r.audio_state_emit !== "running")).length;
-  return [`spoken turns: ${rows.length}`, `end to first playback median: ${median(rows.flatMap((r) => r.first_playback_ms === null ? [] : [r.first_playback_ms]))} ms`, `end to first playback p90: ${p90(rows.flatMap((r) => r.first_playback_ms === null ? [] : [r.first_playback_ms]))} ms`, ...stages.map((stage) => `${stage}: ${median(rows.flatMap((r) => r[stage] === null ? [] : [r[stage]!]))} ms median`), `speech head median: ${median(rows.flatMap((r) => r.speech_head_ms == null ? [] : [r.speech_head_ms]))} ms`, `speech offer median: ${median(rows.flatMap((r) => r.speech_offer_ms == null ? [] : [r.speech_offer_ms]))} ms`, `speech emit median: ${median(rows.flatMap((r) => r.speech_emit_ms == null ? [] : [r.speech_emit_ms]))} ms`, `audio context not running (enqueue or emit): ${ctxRows.length ? `${Math.round(notRunning / ctxRows.length * 100)}%` : "n/a"}`, `prewarms done: ${prewarmRows.filter((r) => r.outcome === "done").length}`, `prewarms aborted: ${prewarmRows.filter((r) => r.outcome === "aborted").length}`, `prewarm prompt_n minus cache_n median: ${median(promptDeltas)}`].join("\n");
+  const answerRows = rows.filter((r) => r.cue_playback_ms == null || r.first_sentence_ms !== null || r.first_playback_ms !== null);
+  return [`spoken turns: ${rows.length}`, `end to first playback median: ${median(rows.flatMap((r) => r.first_playback_ms === null ? [] : [r.first_playback_ms]))} ms`, `end to first playback p90: ${p90(rows.flatMap((r) => r.first_playback_ms === null ? [] : [r.first_playback_ms]))} ms`, `cue playback median: ${median(cueValues)} ms`, `turns with cue: ${rows.length ? `${Math.round(cueValues.length / rows.length * 100)}%` : "n/a"}`, `answer-only first_sentence_ms median: ${median(answerRows.flatMap((r) => r.first_sentence_ms === null ? [] : [r.first_sentence_ms]))} ms`, `answer-only first_playback_ms median: ${median(answerRows.flatMap((r) => r.first_playback_ms === null ? [] : [r.first_playback_ms]))} ms`, ...stages.filter((stage) => stage !== "first_sentence_ms" && stage !== "first_playback_ms").map((stage) => `${stage}: ${median(rows.flatMap((r) => r[stage] === null ? [] : [r[stage]!]))} ms median`), `ttft (engine stats) median: ${median(rows.flatMap((r) => r.time_to_first_token_ms == null ? [] : [r.time_to_first_token_ms]))} ms`, `prompt_n minus cache_n median: ${median(promptDeltas)}`, `context node median: ${median(rows.flatMap((r) => r.context_node_ms == null ? [] : [r.context_node_ms]))} ms`, `speech head median: ${median(rows.flatMap((r) => r.speech_head_ms == null ? [] : [r.speech_head_ms]))} ms`, `speech offer median: ${median(rows.flatMap((r) => r.speech_offer_ms == null ? [] : [r.speech_offer_ms]))} ms`, `speech emit median: ${median(rows.flatMap((r) => r.speech_emit_ms == null ? [] : [r.speech_emit_ms]))} ms`, `audio context not running (enqueue or emit): ${ctxRows.length ? `${Math.round(notRunning / ctxRows.length * 100)}%` : "n/a"}`, `prewarms done: ${prewarmRows.filter((r) => r.outcome === "done").length}`, `prewarms aborted: ${prewarmRows.filter((r) => r.outcome === "aborted").length}`, `prewarms failed: ${prewarmRows.filter((r) => r.outcome === "failed").length}`, ...(["engine_busy", "engine_error", "timeout", "other"] as const).map((reason) => `prewarm failure ${reason}: ${prewarmRows.filter((r) => r.outcome === "failed" && r.reason === reason).length}`)].join("\n");
 }

@@ -306,6 +306,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `frontend/src/shell/pages/companionFlow/KeyframeEditor.tsx` | KeyframeEditor |
 | `frontend/src/shell/pages/companionFlow/PackSection.tsx` | packPercent, PackSection |
 | `frontend/src/shell/pages/companionFlow/PreviewControls.tsx` | DEFAULT_FRAME, PreviewControls |
+| `frontend/src/shell/pages/dashboard/ActionCards.tsx` | HOME_ACTIONS, ActionCards |
 | `frontend/src/shell/pages/dashboard/ArrangeHome.tsx` | ARRANGE_KEY, displayTitle, moveCard, ArrangeHome |
 | `frontend/src/shell/pages/dashboard/AskBox.tsx` | installPlaceholder, askHref, AskBox |
 | `frontend/src/shell/pages/dashboard/Attention.tsx` | updatesWaiting, Attention |
@@ -880,7 +881,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/places.ts` | householdHomeCountryName, householdHomeSkyInput, householdHomePlaceName, resolvePlace, PlaceSearchUnavailable, searchPlaces |
 | `backend/src/lib/plugins.ts` | almanacHostInputs, listPackageIds, hasNonDefaultInstalledPackage, __resetPackageCachesForTests, loadManifestOnly, loadPackage |
 | `backend/src/lib/ports.ts` | DEFAULT_HOME_PORT, DEFAULT_STACK_PORT, homePort, stackPort, defaultStackBaseUrl |
-| `backend/src/lib/prefixPrewarm.ts` | notePrefix, prewarmPrefix, prewarmConversation, abortConversationPrewarm, warmSpokenPrefixAtBoot, __resetPrefixPrewarmForTests |
+| `backend/src/lib/prefixPrewarm.ts` | prewarmFailureReason, notePrefix, prewarmPrefix, prewarmConversation, abortConversationPrewarm, warmSpokenPrefixAtBoot |
 | `backend/src/lib/privacy.ts` | platformConnections, pluginConnections, offlinePluginNames, privacyConnections, privacyPageData |
 | `backend/src/lib/projects/assemblers.ts` | registerAssembler, getAssembler |
 | `backend/src/lib/projects/fromManifest.ts` | buildProjectTypeFromManifest |

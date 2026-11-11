@@ -197,6 +197,22 @@ describe("sentence speech scheduler", () => {
     scheduler.stop();
   });
 
+  test("a spoken cue stamps the cue hook and the real answer stamps first playback (filler and answer timed apart)", async () => {
+    const context = new StreamingFakeAudioContext();
+    const bytes = new Uint8Array(44 + 6000); bytes.set(wavHeader());
+    const scheduler = new SentenceSpeechScheduler(context as unknown as AudioContext, async () => new Response(bytes));
+    const events: string[] = [];
+    scheduler.onCuePlayback = () => events.push("cue");
+    scheduler.onFirstPlayback = () => events.push("answer");
+    scheduler.enqueueSentence("One sec.", { cue: true });
+    for (let i = 0; i < 8; i++) await settle();
+    expect(events).toEqual(["cue"]);
+    scheduler.enqueueSentence("The real answer.");
+    for (let i = 0; i < 8; i++) await settle();
+    expect(events).toEqual(["cue", "answer"]);
+    scheduler.stop();
+  });
+
   test("isPaused follows pause and resume and is false once stopped", () => {
     const scheduler = new SentenceSpeechScheduler(new FakeAudioContext() as unknown as AudioContext, async () => new Response(new Uint8Array(44)));
     expect(scheduler.isPaused()).toBe(false);

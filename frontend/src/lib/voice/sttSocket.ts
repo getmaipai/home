@@ -15,7 +15,7 @@ export interface SttSocket {
   /** Full-duplex: tells the server how much of the current reply has played, about every 250 ms while it plays (the server
    * treats a report under 700 ms old as "a reply is playing"). A no-op when the socket is not open. */
   sendPlayed?: (replyId: string, ms: number) => void;
-  sendTiming?: (turnId: string, sttMs: number, firstPlaybackMs?: number, firstSentenceMs?: number, speech?: { head_ms?: number; offer_ms?: number; emit_ms?: number; ctx_enqueue?: string; ctx_emit?: string }) => void;
+  sendTiming?: (turnId: string, sttMs: number, firstPlaybackMs?: number, firstSentenceMs?: number, speech?: { head_ms?: number; offer_ms?: number; emit_ms?: number; ctx_enqueue?: string; ctx_emit?: string }, cuePlaybackMs?: number) => void;
   close: () => void;
 }
 
@@ -71,9 +71,9 @@ export function createSttSocket(handlers: SttSocketHandlers): SttSocket {
       if (socket.readyState !== WebSocket.OPEN) return;
       socket.send(JSON.stringify({ t: "played_ms", reply_id: replyId, ms: Math.max(0, Math.round(ms)) }));
     },
-    sendTiming(turnId, sttMs, firstPlaybackMs, firstSentenceMs, speech) {
+    sendTiming(turnId, sttMs, firstPlaybackMs, firstSentenceMs, speech, cuePlaybackMs) {
       if (socket.readyState !== WebSocket.OPEN) return;
-      socket.send(JSON.stringify({ t: "timing", turn_id: turnId, stt_ms: sttMs, ...(firstPlaybackMs === undefined ? {} : { first_playback_ms: firstPlaybackMs }), ...(firstSentenceMs === undefined ? {} : { first_sentence_ms: firstSentenceMs }), ...(speech ?? {}) }));
+      socket.send(JSON.stringify({ t: "timing", turn_id: turnId, stt_ms: sttMs, ...(firstPlaybackMs === undefined ? {} : { first_playback_ms: firstPlaybackMs }), ...(firstSentenceMs === undefined ? {} : { first_sentence_ms: firstSentenceMs }), ...(cuePlaybackMs === undefined ? {} : { cue_playback_ms: cuePlaybackMs }), ...(speech ?? {}) }));
     },
     close() {
       closedByUs = true;

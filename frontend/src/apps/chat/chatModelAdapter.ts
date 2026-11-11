@@ -174,6 +174,7 @@ export interface ChatModelAdapterDeps {
   onFirstSentencePlaybackTiming?(timing: FirstSentencePlaybackTiming): void;
   onTurnId?(turnId: string): void;
   onFirstSentence?(): void;
+  onCuePlayback?(at: number): void;
   consumeRetryWithCurrentCompanion?(): boolean;
   findReplacedSpeaker?(input: { parentId: string; newMessageId: string }): string | undefined;
   getConversationId?(): Promise<string>;
@@ -295,6 +296,7 @@ export function createChatModelAdapter(deps: ChatModelAdapterDeps): ChatModelAda
       scheduler.messageId = unstable_assistantMessageId;
       scheduler.onFirstAudio = () => deps.onSpeakingChange?.(true);
       scheduler.onFirstPlayback = (at) => deps.onFirstPlayback?.(at);
+      scheduler.onCuePlayback = (at) => deps.onCuePlayback?.(at);
       scheduler.onFirstSentenceTiming = (timing) => deps.onFirstSentencePlaybackTiming?.(timing);
       scheduler.onError = () => deps.onSpeechError?.();
       // The reply is cut in on while it is still being SPOKEN, which is long after it finished generating: the turn stays "active" until
@@ -620,8 +622,7 @@ export function createChatModelAdapter(deps: ChatModelAdapterDeps): ChatModelAda
             // real reply's sentences (enqueued above as they arrive) follow
             // right after.
             if (speakReplies) {
-              if (spokenLength === 0) deps.onFirstSentence?.();
-              scheduler.enqueueSentence(event.text, { ...(resumeTurnId && event.generation !== undefined ? { turnId: resumeTurnId, generation: event.generation } : {}) });
+              scheduler.enqueueSentence(event.text, { cue: true, ...(resumeTurnId && event.generation !== undefined ? { turnId: resumeTurnId, generation: event.generation } : {}) });
             }
             // Lane 11 item 1's own decision (chatTurnActivity.ts): a
             // spoken_cue also drives the same transient activity line a

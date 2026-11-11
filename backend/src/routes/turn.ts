@@ -36,7 +36,7 @@ import { readAttachment, getTemporaryChatImage } from "@/lib/attachments";
 import { getStackClient, isStackConfigured } from "@/lib/stackEngine";
 import { createAssistantStreamSink } from "@/lib/assistantStreamWire";
 import { getDeviceById } from "@/lib/devices";
-import { beginVoiceTimingFor, markVoiceTiming, type VoiceTimingRecord } from "@/lib/voiceTiming";
+import { attachTurnStats, beginVoiceTimingFor, markVoiceTiming, type VoiceTimingRecord } from "@/lib/voiceTiming";
 
 // THIN-7C (docs/design/RULES.md rule 12): this route calls one path, the turn
 // machine (turnMachine/turnNext.ts). Bare mode, document attachments,
@@ -595,6 +595,7 @@ function startResumeSession(session: ResumeSession): void {
         const event = "type" in stamped && (stamped.type === "delta" || stamped.type === "reasoning") ? { ...stamped, sequence: ++session.sequence } : stamped;
         // The turn's own clock starts before the session's, so the end-to-end time is never shorter than the turn's first token or total.
         if ("type" in event && event.type === "delta" && session.timing && session.timing.first_token_ms === null) markVoiceTiming(session.timing, "first_token_ms", Date.now() - session.startedAtMs);
+        if ("type" in event && event.type === "done" && session.timing) attachTurnStats(event.value.turn_id, event.value.stats ?? {});
         const withLatency = "type" in event && event.type === "done" ? { ...event, value: { ...event.value, latency: { stt_ms: session.sttMs, first_token_ms: event.value.stats?.time_to_first_token_ms ?? null, tts_ttfa_ms: session.firstAudioAtMs === undefined ? null : Math.max(0, session.firstAudioAtMs - session.startedAtMs), e2e_ms: Math.max(Date.now() - session.startedAtMs, event.value.stats?.time_to_first_token_ms ?? 0, event.value.stats?.total_time_ms ?? 0) } } } : event;
         // THIN-1E and CHAT-CALM-ERRORS-01b (rule 6): the done value and the
         // error event's admin detail pass the one viewer filter.

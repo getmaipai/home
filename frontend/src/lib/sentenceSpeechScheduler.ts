@@ -28,7 +28,7 @@ import { publishSpeechTap, speechTapActive, type SpeechSource } from "@/lib/spee
 
 const MAX_PARALLEL_FETCHES = 2;
 
-export interface SpeechSentenceMeta { turnId?: string; generation?: number; visibleEnd?: number; voice?: string }
+export interface SpeechSentenceMeta { turnId?: string; generation?: number; visibleEnd?: number; voice?: string; /** The small model's spoken filler: timed apart from the real answer. */ cue?: boolean }
 export interface FirstSentencePlaybackTiming { enqueue_ms: number; head_ms?: number; offer_ms?: number; emit_ms?: number; ctx_enqueue: string; ctx_emit?: string }
 interface ScheduledSentence { visibleEnd?: number; startTime: number; endTime: number; complete: boolean }
 /** About how fast the voice speaks, used to guess a sentence's length while its audio is still arriving. */
@@ -90,6 +90,9 @@ export class SentenceSpeechScheduler implements SpeechSource {
    * play - the real "time to first audio" signal. */
   onFirstAudio?: () => void;
   onFirstPlayback?: (at: number) => void;
+  onCuePlayback?: (at: number) => void;
+  private answerPlaybackSeen = false;
+  private cuePlaybackSeen = false;
   onFirstSentenceTiming?: (timing: FirstSentencePlaybackTiming) => void;
   private firstTiming?: FirstSentencePlaybackTiming;
   private readonly firstEnqueueAt = new WeakMap<object, number>();
@@ -232,8 +235,8 @@ export class SentenceSpeechScheduler implements SpeechSource {
     this.dispatchTail = new Promise<void>((resolve) => {
       resolveThis = resolve;
     });
-    const track: { entry?: ScheduledSentence; id: number } = { id: this.sentenceCount++ };
-    if (!this.firstSentenceRecorded) { this.firstSentenceRecorded = true; this.firstEnqueueAt.set(track, performance.now()); this.firstTiming = { enqueue_ms: 0, ctx_enqueue: this.audioContext.state }; this.onFirstSentenceTiming?.({ ...this.firstTiming }); }
+    const track: { entry?: ScheduledSentence; id: number; cue?: boolean; first?: boolean } = { id: this.sentenceCount++, ...(meta?.cue ? { cue: true } : {}) };
+    if (!this.firstSentenceRecorded && !meta?.cue) { this.firstSentenceRecorded = true; track.first = true; this.firstEnqueueAt.set(track, performance.now()); this.firstTiming = { enqueue_ms: 0, ctx_enqueue: this.audioContext.state }; this.onFirstSentenceTiming?.({ ...this.firstTiming }); }
     if (speechTapActive()) publishSpeechTap({ type: "sentence", source: this, sentence: track.id, text });
     void this.fetchAndSchedule(text, predecessorDone, meta, track).finally(() => {
       if (track.entry) track.entry.complete = true;
@@ -242,7 +245,7 @@ export class SentenceSpeechScheduler implements SpeechSource {
     });
   }
 
-  private async fetchAndSchedule(text: string, predecessorDone: Promise<void>, meta: SpeechSentenceMeta | undefined, track: { entry?: ScheduledSentence; id: number }): Promise<void> {
+  private async fetchAndSchedule(text: string, predecessorDone: Promise<void>, meta: SpeechSentenceMeta | undefined, track: { entry?: ScheduledSentence; id: number; cue?: boolean; first?: boolean }): Promise<void> {
     await this.acquireFetchSlot();
     // Streamed playback (Jesse, 2026-09-04: "streaming responses as you get them instead of generating the entire wav and then
     // just playing that"): the sentence's PCM is cut into small buffers and scheduled as it arrives, so the first sound plays
@@ -253,9 +256,9 @@ export class SentenceSpeechScheduler implements SpeechSource {
     void predecessorDone.then(() => { predecessorFinished = true; });
     const pending: AudioBuffer[] = [];
     let scheduledAny = false;
-    const noteFirstOffer = () => { if (this.firstTiming && track.id === 0 && this.firstTiming.offer_ms === undefined) { this.firstTiming.offer_ms = performance.now() - (this.firstEnqueueAt.get(track) ?? performance.now()); this.onFirstSentenceTiming?.({ ...this.firstTiming }); } };
+    const noteFirstOffer = () => { if (this.firstTiming && track.first && this.firstTiming.offer_ms === undefined) { this.firstTiming.offer_ms = performance.now() - (this.firstEnqueueAt.get(track) ?? performance.now()); this.onFirstSentenceTiming?.({ ...this.firstTiming }); } };
     const emit = (buffer: AudioBuffer) => {
-      if (this.firstTiming && track.id === 0 && this.firstTiming.emit_ms === undefined) { this.firstTiming.emit_ms = performance.now() - (this.firstEnqueueAt.get(track) ?? performance.now()); this.firstTiming.ctx_emit = this.audioContext.state; this.onFirstSentenceTiming?.({ ...this.firstTiming }); }
+      if (this.firstTiming && track.first && this.firstTiming.emit_ms === undefined) { this.firstTiming.emit_ms = performance.now() - (this.firstEnqueueAt.get(track) ?? performance.now()); this.firstTiming.ctx_emit = this.audioContext.state; this.onFirstSentenceTiming?.({ ...this.firstTiming }); }
       this.scheduleBuffer(buffer, scheduledAny ? undefined : meta, track);
       scheduledAny = true;
     };
@@ -268,7 +271,7 @@ export class SentenceSpeechScheduler implements SpeechSource {
     try {
       if (this.stopped) return;
       const response = await this.speechStream(text, this.abortController.signal, meta?.turnId && meta.generation !== undefined ? { turnId: meta.turnId, generation: meta.generation, ...(meta.voice ? { voice: meta.voice } : {}) } : meta?.voice ? { turnId: "", generation: 0, voice: meta.voice } : undefined);
-      if (this.firstTiming && track.id === 0 && this.firstTiming.head_ms === undefined) { this.firstTiming.head_ms = performance.now() - (this.firstEnqueueAt.get(track) ?? performance.now()); this.onFirstSentenceTiming?.({ ...this.firstTiming }); }
+      if (this.firstTiming && track.first && this.firstTiming.head_ms === undefined) { this.firstTiming.head_ms = performance.now() - (this.firstEnqueueAt.get(track) ?? performance.now()); this.onFirstSentenceTiming?.({ ...this.firstTiming }); }
       const reader = typeof this.audioContext.createBuffer === "function" ? response.body?.getReader() : undefined;
       if (!reader) {
         const bytes = new Uint8Array(await response.arrayBuffer());
@@ -389,7 +392,7 @@ export class SentenceSpeechScheduler implements SpeechSource {
     this.sessionHandle.requestFocus();
   }
 
-  private scheduleBuffer(audioBuffer: AudioBuffer, meta: SpeechSentenceMeta | undefined, track: { entry?: ScheduledSentence; id: number }): void {
+  private scheduleBuffer(audioBuffer: AudioBuffer, meta: SpeechSentenceMeta | undefined, track: { entry?: ScheduledSentence; id: number; cue?: boolean; first?: boolean }): void {
     this.joinAudioSession();
     const rate = audioSession.speedFor("spoken_reply");
     const source = this.audioContext.createBufferSource();
@@ -412,7 +415,10 @@ export class SentenceSpeechScheduler implements SpeechSource {
       publishSpeechTap({ type: "audio", source: this, sentence: track.id, samples: audioBuffer.getChannelData(0).slice(), rate: audioBuffer.sampleRate * speed, at: startTime - first.startTime });
     }
     this.scheduledCount++;
-    if (this.scheduledCount === 1) { this.onFirstAudio?.(); this.onFirstPlayback?.(performance.now()); }
+    if (this.scheduledCount === 1) this.onFirstAudio?.();
+    // The filler and the real answer are timed apart: first_playback_ms must mean the first REAL answer sound.
+    if (track.cue) { if (!this.cuePlaybackSeen) { this.cuePlaybackSeen = true; this.onCuePlayback?.(performance.now()); } }
+    else if (!this.answerPlaybackSeen) { this.answerPlaybackSeen = true; this.onFirstPlayback?.(performance.now()); }
     source.onended = () => {
       this.sources.delete(source);
       this.finishedCount++;
