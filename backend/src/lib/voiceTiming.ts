@@ -1,7 +1,7 @@
 /** Counts-only timings for recent spoken turns. No utterance or reply content is accepted here. */
 import { mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
-import { dataDir } from "@/lib/paths";
+import { dataDir } from "./paths";
 
 export interface VoiceTimingRecord {
   turn_id: string;
