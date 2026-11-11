@@ -385,6 +385,16 @@ S1. **The main navigation is permanent.** The column that lists the apps
     never lives inside it. On a phone the drawer holds the selected app's
     own sections below the apps; that is the only place app content meets
     the main navigation, and it never holds another app's.
+    Owner-approved 2026-11-11 (his words: "yes change s1"; the phone bar
+    is the one he asked for after "restricted by any rules we currently
+    have ... I want a clean start"): on a phone a floating glass bar,
+    inset from the screen edges, carries the main apps (Home, Media,
+    Create, Library) with the open app's own sections inside that app's
+    own screen; the drawer stays and holds All apps, Search, the profile
+    control, Settings and the rest of the app list. The bar steps aside
+    only while an immersive screen is open. This replaces the sentence
+    that the drawer is the only phone switcher; the desktop rail is
+    unchanged until a separate owner ruling.
     The rail is 56 px at the standard target size. When the person's
     resolved ease.targets is large, its width follows the kit
     target-minimum token, still icons only, still never expanding, and
@@ -395,6 +405,16 @@ S2. **Each app area emulates its native app.** Everything to the right of
     sidebar, slim title bar, centered message column and compact composer;
     video is YouTube's; and so on. Only the rail is ours. Parts are kit
     Elements and shipped primitives, restyled by tokens only (rule 9).
+    Owner-approved 2026-11-11 (his words: "this look and feel needs to
+    carry across every screen - home page, weather, settings, etc. we
+    cant have different uis / looks"): an app copies its native app's
+    layout and behaviour only where its function needs them (the thread
+    list, the player, the composer); it never copies that app's styling.
+    Type, spacing, corner radii, surfaces, glass, buttons, headers and
+    back controls on every screen come from the one shared Look and the
+    kit parts, so Home, Chat, Media, Library, Weather, News, Settings,
+    Setup and Sign-in read as one product. A page draws no chrome, font,
+    size, radius or color of its own.
     On every width, the selected app owns the screen beside the main
     navigation and copies its native app's phone layout and behaviour as
     well as its desktop one: its own top controls, tabs, composer and
