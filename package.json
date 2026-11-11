@@ -14,6 +14,7 @@
     "a11y": "bun run scripts/screenshot.ts --a11y-only",
     "duplex:echo": "bun scripts/duplex-echo-test/serve.ts",
     "smoke:chat": "bun run --cwd backend scripts/smoke/chat.ts",
+    "voice:latency": "bun run scripts/voiceLatency.ts",
     "verify:tokens-cascade": "bun run scripts/verifyTokensCascade.ts",
     "elements:scan": "bun run scripts/elementsAdoption.ts",
     "elements:status": "bun run scripts/elementsAdoption.ts --status",

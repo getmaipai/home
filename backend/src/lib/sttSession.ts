@@ -102,7 +102,7 @@ export function isLikelySpeech(text: string): boolean {
 
 export class SttSession {
   private cfg: SttSessionConfig;
-  private send: (msg: SttWireEvent) => void;
+  private send: (msg: SttWireEvent | { t: "timing"; speech_end_to_final_ms: number; silence_wait_ms: number }) => void;
   private speech: Float32Array[] = [];
   private speechLen = 0;
   // How many of the leading samples in `speech` are pre-roll (not real
@@ -115,12 +115,15 @@ export class SttSession {
   private partialInFlight = false;
   private partialPromise: Promise<void> | null = null;
   private finalizing = false;
+  private finalizeStartedAtMs = 0;
   private closed = false;
   private silero: SileroVadStream | null = null;
   private sileroVoiced = false;
   private preroll: Float32Array[] = [];
   private prerollLen = 0;
   private lastVoicedLen = 0;
+  private lastVoicedAtMs = 0;
+  private silenceStartedAtMs = 0;
   private reusablePartial: { text: string; voicedLen: number } | null = null;
   private redecodeAtEdge = false;
   private endpointAsked = false;
@@ -139,7 +142,7 @@ export class SttSession {
   private replyPaused = false;
   private unconfirmedPauses: number[] = [];
 
-  constructor(cfg: SttSessionConfig, send: (msg: SttWireEvent) => void, now: () => number = Date.now) {
+  constructor(cfg: SttSessionConfig, send: (msg: SttWireEvent | { t: "timing"; speech_end_to_final_ms: number; silence_wait_ms: number }) => void, now: () => number = Date.now) {
     this.cfg = cfg;
     this.send = send;
     this.now = now;
@@ -207,6 +210,7 @@ export class SttSession {
       this.speech.push(samples.slice());
       this.speechLen += samples.length;
       this.lastVoicedLen = this.speechLen;
+      this.lastVoicedAtMs = this.now();
       this.samplesSincePartial += samples.length;
       if (this.samplesSincePartial >= this.cfg.partialIntervalS * this.cfg.sampleRate) {
         this.samplesSincePartial = 0;
@@ -220,6 +224,7 @@ export class SttSession {
       this.checkReplyPause();
       if (this.speaking) {
       const firstSilenceFrame = this.silenceSamples === 0;
+      if (firstSilenceFrame) this.silenceStartedAtMs = this.now();
       this.speech.push(samples.slice());
       this.speechLen += samples.length;
       this.silenceSamples += samples.length;
@@ -390,6 +395,7 @@ export class SttSession {
   private async finalize(): Promise<void> {
     if (this.finalizing) return;
     this.finalizing = true;
+    this.finalizeStartedAtMs = this.now();
     this.send({ t: "vad", speaking: false, rms: 0 });
 
     if (this.partialPromise) {
@@ -452,7 +458,11 @@ export class SttSession {
     this.finishReplyPause();
     this.reset();
     if (this.closed) return;
-    if (text && isLikelySpeech(text)) this.send({ t: "final", v: text });
+    if (text && isLikelySpeech(text)) {
+      const sentAt = this.now();
+      this.send({ t: "timing", speech_end_to_final_ms: Math.max(0, sentAt - this.lastVoicedAtMs), silence_wait_ms: Math.max(0, this.finalizeStartedAtMs - this.silenceStartedAtMs) });
+      this.send({ t: "final", v: text });
+    }
     else {
       if (wasPaused) this.resumeReply();
       this.send({ t: "no_speech" });
@@ -482,6 +492,9 @@ export class SttSession {
     this.preroll = [];
     this.prerollLen = 0;
     this.lastVoicedLen = 0;
+    this.lastVoicedAtMs = 0;
+    this.silenceStartedAtMs = 0;
+    this.finalizeStartedAtMs = 0;
     this.reusablePartial = null;
     this.redecodeAtEdge = false;
     this.endpointAsked = false;

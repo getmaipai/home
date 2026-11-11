@@ -76,6 +76,8 @@ export interface LiveVoiceSessionProps {
   /** Injectable retry waits keep the reconnect tests quick. */
   retryDelays?: [number, number];
   installationNotice?: boolean;
+  onVoiceTiming?: (timing: { sttMs: number; firstPlaybackMs?: number; phase?: "final" | "playback" }) => void;
+  voiceTimingSocketRef?: { current: SttSocket | null };
 }
 
 export const WAKE_SESSION_IDLE_CLOSE_MS = 8000;
@@ -130,7 +132,7 @@ function normalizedTranscript(text: string): string {
   return text.toLowerCase().replace(/[-\u2010-\u2015]/g, " ").replace(/[^\p{L}\p{N}\s]/gu, "").replace(/\s+/g, " ").trim();
 }
 
-export function useLiveVoiceSession({ composer, open, onOpenChange, onProblem, idleCloseMs = null, turnSchedulerRef, liveVoiceActiveRef, pendingSpeechRef, activeTurnRef, cancelRun, voiceBargeIn = false, isSpeaking, speakingEndedAt, speechFailed = 0, retryDelays = [0, 1500], installationNotice = false, createSocket = createSttSocket, startCapture = startMicCapture }: LiveVoiceSessionProps) {
+export function useLiveVoiceSession({ composer, open, onOpenChange, onProblem, idleCloseMs = null, turnSchedulerRef, liveVoiceActiveRef, pendingSpeechRef, activeTurnRef, cancelRun, voiceBargeIn = false, isSpeaking, speakingEndedAt, speechFailed = 0, retryDelays = [0, 1500], installationNotice = false, createSocket = createSttSocket, startCapture = startMicCapture, onVoiceTiming, voiceTimingSocketRef }: LiveVoiceSessionProps) {
   const [mode, setMode] = useState<VoiceMode>("connecting");
   const [amplitude, setAmplitude] = useState(0);
   const [muted, setMuted] = useState(false);
@@ -256,6 +258,8 @@ export function useLiveVoiceSession({ composer, open, onOpenChange, onProblem, i
     let retryTimer: ReturnType<typeof setTimeout> | undefined;
     let connectionFailureHandled = false;
     let terminalServerError = false;
+    let sttMsForNextTurn: number | null = null;
+    let finalReceivedAt: number | null = null;
     if (modeRef.current === "listening" || modeRef.current === "connecting") setCurrentMode("connecting");
     // Full-duplex: while a reply plays, report how much has played every 250 ms so the server knows to pause it on the first voiced frame.
     let playedTimer: ReturnType<typeof setInterval> | undefined;
@@ -315,6 +319,9 @@ export function useLiveVoiceSession({ composer, open, onOpenChange, onProblem, i
               restoreVoice();
               overlapPausedRef.current = false;
             }
+            break;
+          case "timing":
+            sttMsForNextTurn = message.speech_end_to_final_ms;
             break;
           case "partial":
             activeSpeechRef.current = true;
@@ -389,6 +396,7 @@ export function useLiveVoiceSession({ composer, open, onOpenChange, onProblem, i
             }
             break;
           case "final": {
+            finalReceivedAt = performance.now();
             if (duckTimerRef.current) { clearTimeout(duckTimerRef.current); duckTimerRef.current = null; }
             cancelReaction();
             lastPartialRef.current = "";
@@ -434,6 +442,13 @@ export function useLiveVoiceSession({ composer, open, onOpenChange, onProblem, i
               break;
             }
             setCurrentMode("thinking");
+            const sttMs = sttMsForNextTurn;
+            const receivedAt = finalReceivedAt;
+            sttMsForNextTurn = null;
+            finalReceivedAt = null;
+            if (sttMs !== null && Number.isFinite(sttMs) && sttMs >= 0 && receivedAt !== null) onVoiceTiming?.({ sttMs, phase: "final" });
+            else if (receivedAt !== null) onVoiceTiming?.({ sttMs: 0, phase: "final" });
+            onVoiceTiming?.({ sttMs: sttMs ?? 0, phase: "final" });
             pendingSpeechRef.current = true;
             composer.setText(text);
             void Promise.resolve(composer.send());
@@ -484,6 +499,7 @@ export function useLiveVoiceSession({ composer, open, onOpenChange, onProblem, i
         }
       },
     });
+    if (voiceTimingSocketRef) voiceTimingSocketRef.current = socket;
 
     return () => {
       cancelled = true;
@@ -495,6 +511,7 @@ export function useLiveVoiceSession({ composer, open, onOpenChange, onProblem, i
       micHandle?.stop();
       levelMeter?.stop();
       socket.close();
+      if (voiceTimingSocketRef?.current === socket) voiceTimingSocketRef.current = null;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- aui/onOpenChange/pendingSpeechRef are stable refs/client accessors; listenGeneration is the deliberate re-run trigger.
   }, [open, listenGeneration]);

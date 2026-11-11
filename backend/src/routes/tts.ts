@@ -76,6 +76,10 @@ ttsRoutes.openapi(ttsSynthesizeRoute, async (c) => {
     }
   }
   const result = await synthesizeSpeech(spoken, voiceId);
+  if (result.ok && body.turn_id) {
+    const turn = await import("@/routes/turn");
+    turn.markTurnFirstAudio(body.turn_id, actor.id, Date.now() - startedAt);
+  }
   if (!result.ok) {
     return c.json({ error: result.error, code: result.code }, result.status);
   }

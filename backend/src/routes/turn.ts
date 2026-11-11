@@ -34,6 +34,7 @@ import { readAttachment, getTemporaryChatImage } from "@/lib/attachments";
 import { getStackClient, isStackConfigured } from "@/lib/stackEngine";
 import { createAssistantStreamSink } from "@/lib/assistantStreamWire";
 import { getDeviceById } from "@/lib/devices";
+import { beginVoiceTimingFor, markVoiceTiming, type VoiceTimingRecord } from "@/lib/voiceTiming";
 
 // THIN-7C (docs/design/RULES.md rule 12): this route calls one path, the turn
 // machine (turnMachine/turnNext.ts). Bare mode, document attachments,
@@ -100,6 +101,8 @@ interface ResumeSession {
   generation: number;
   startedAtMs: number;
   sttMs: number | null;
+  timing?: VoiceTimingRecord;
+  firstAudioAtMs?: number;
   token: string;
   ownerId: string;
   // THIN-1E: who the stream is for, so the done value's raw error detail is admin-only.
@@ -176,6 +179,13 @@ export function voiceForTurn(turnId: string, ownerId: string): string | undefine
 export function turnAllowsVoiceCues(turnId: string, ownerId: string): boolean {
   const session = inFlightTurns.get(turnId);
   return Boolean(session && session.ownerId === ownerId && session.spokenTurn && !session.cueBlocked && !conversationInCrisis(session.conversationId));
+}
+
+export function markTurnFirstAudio(turnId: string, ownerId: string, elapsedMs: number): void {
+  const session = inFlightTurns.get(turnId);
+  if (!session || session.ownerId !== ownerId || !session.spokenTurn) return;
+  if (session.firstAudioAtMs === undefined) session.firstAudioAtMs = session.startedAtMs + elapsedMs;
+  markVoiceTiming(session.timing, "first_audio_ms", session.firstAudioAtMs - session.startedAtMs);
 }
 
 export function staleGenerationEvent(event: TurnStreamEvent | ToolStreamEvent, stale: boolean): TurnStreamEvent | ToolStreamEvent | null {
@@ -561,7 +571,8 @@ function startResumeSession(session: ResumeSession): void {
         const stamped = "type" in current && (current.type === "delta" || current.type === "reasoning" || current.type === "status" || current.type === "spoken_cue") ? { ...current, generation } : current;
         const event = "type" in stamped && (stamped.type === "delta" || stamped.type === "reasoning") ? { ...stamped, sequence: ++session.sequence } : stamped;
         // The turn's own clock starts before the session's, so the end-to-end time is never shorter than the turn's first token or total.
-        const withLatency = "type" in event && event.type === "done" ? { ...event, value: { ...event.value, latency: { stt_ms: session.sttMs, first_token_ms: event.value.stats?.time_to_first_token_ms ?? null, tts_ttfa_ms: null, e2e_ms: Math.max(Date.now() - session.startedAtMs, event.value.stats?.time_to_first_token_ms ?? 0, event.value.stats?.total_time_ms ?? 0) } } } : event;
+        if ("type" in event && event.type === "delta" && session.timing && session.timing.first_token_ms === null) markVoiceTiming(session.timing, "first_token_ms", Date.now() - session.startedAtMs);
+        const withLatency = "type" in event && event.type === "done" ? { ...event, value: { ...event.value, latency: { stt_ms: session.sttMs, first_token_ms: event.value.stats?.time_to_first_token_ms ?? null, tts_ttfa_ms: session.firstAudioAtMs === undefined ? null : Math.max(0, session.firstAudioAtMs - session.startedAtMs), e2e_ms: Math.max(Date.now() - session.startedAtMs, event.value.stats?.time_to_first_token_ms ?? 0, event.value.stats?.total_time_ms ?? 0) } } } : event;
         // THIN-1E and CHAT-CALM-ERRORS-01b (rule 6): the done value and the
         // error event's admin detail pass the one viewer filter.
         const delivered = streamEventForViewer(withLatency as TurnStreamEvent, session.viewer);
@@ -1188,6 +1199,7 @@ turnRoutes.post("/stream", requireAuth, streamTurnBodyLimit, async (c) => {
     generation: 0,
     startedAtMs: Date.now(),
     sttMs: typeof body.stt_ms === "number" && Number.isFinite(body.stt_ms) && body.stt_ms >= 0 && body.stt_ms < 600_000 ? body.stt_ms : null,
+    timing: body.spoken === true ? beginVoiceTimingFor(result.turnId, typeof body.stt_ms === "number" && Number.isFinite(body.stt_ms) && body.stt_ms >= 0 ? body.stt_ms : null) : undefined,
     token: resumeToken,
     ownerId: actor.id,
     viewer: actor,

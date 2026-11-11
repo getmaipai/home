@@ -4,6 +4,7 @@ import { __resetStackEngineForTests, __setStackClientForTests } from "@/lib/stac
 import { setHouseholdSettingValue } from "@/lib/settings";
 import { startStackFixture, type StackFixture } from "./stackFixture";
 import type { SttWireEvent } from "@maipai/spec/voice/ts/sttTypes.js";
+type SttTestEvent = SttWireEvent | { t: "timing"; speech_end_to_final_ms: number; silence_wait_ms: number };
 import type { SileroVadStream } from "@/lib/sileroVad";
 
 const SAMPLE_RATE = 16_000;
@@ -79,7 +80,7 @@ async function pushSentence(session: SttSession, pauseMs: number): Promise<void>
   await flush();
 }
 
-function finals(events: SttWireEvent[]): SttWireEvent[] {
+function finals(events: SttTestEvent[]): SttTestEvent[] {
   return events.filter((event) => event.t === "final");
 }
 
@@ -90,7 +91,7 @@ function endpointConfig(endpointer: Endpointer, holdS = 0.8) {
 describe("SttSession reply pause", () => {
   let voice = false;
   async function voicedSession(now: () => number = () => 1000) {
-    const events: SttWireEvent[] = [];
+    const events: SttTestEvent[] = [];
     voice = false;
     __setSileroLoaderForTests(async () => ({
       failed: false,
@@ -107,7 +108,7 @@ describe("SttSession reply pause", () => {
     await flush();
   }
   // A partial transcript can land at any moment (it depends on how fast the recognizer answers), so these tests read only the pause events.
-  const types = (events: SttWireEvent[]) => events.map((event) => event.t).filter((type) => type !== "partial");
+  const types = (events: SttTestEvent[]) => events.map((event) => event.t).filter((type) => type !== "partial");
 
   afterEach(() => __resetSileroLoaderForTests());
 
@@ -228,7 +229,7 @@ describe("SttSession - RMS fallback VAD (no Silero model installed in tests)", (
     });
     setHouseholdSettingValue("engines.stack.url", fixture.url);
     __setStackClientForTests(fixture.client);
-    const events: SttWireEvent[] = [];
+    const events: SttTestEvent[] = [];
     let endpointCalls = 0;
     const session = new SttSession(endpointConfig({ isComplete: async () => endpointCalls++ > 0 }), (e) => events.push(e));
 
@@ -251,7 +252,7 @@ describe("SttSession - RMS fallback VAD (no Silero model installed in tests)", (
 
   test("a held pause that never resumes ends at the hold limit with one final and no second event", async () => {
     scriptTranscript("held utterance");
-    const events: SttWireEvent[] = [];
+    const events: SttTestEvent[] = [];
     let endpointCalls = 0;
     const session = new SttSession(endpointConfig({ isComplete: async () => { endpointCalls++; return false; } }, 0.2), (e) => events.push(e));
 
@@ -272,7 +273,7 @@ describe("SttSession - RMS fallback VAD (no Silero model installed in tests)", (
 
   test("the first fragment of a held utterance is never sent as its own final", async () => {
     scriptTranscript("whole utterance, not the fragment");
-    const events: SttWireEvent[] = [];
+    const events: SttTestEvent[] = [];
     let endpointCalls = 0;
     const session = new SttSession(endpointConfig({ isComplete: async () => endpointCalls++ > 0 }), (e) => events.push(e));
 
@@ -293,7 +294,7 @@ describe("SttSession - RMS fallback VAD (no Silero model installed in tests)", (
 
   test("with no endpointer, a 600 ms pause ends the utterance as before", async () => {
     scriptTranscript("one utterance");
-    const events: SttWireEvent[] = [];
+    const events: SttTestEvent[] = [];
     const session = new SttSession(config(), (e) => events.push(e));
 
     for (let i = 0; i < 30; i++) session.pushPcm(loudFrame());
@@ -311,7 +312,7 @@ describe("SttSession - RMS fallback VAD (no Silero model installed in tests)", (
 
   test("with the endpointer on and answering not finished, a 600 ms mid-sentence pause does not end the utterance", async () => {
     scriptTranscript("whole sentence");
-    const events: SttWireEvent[] = [];
+    const events: SttTestEvent[] = [];
     let endpointCalls = 0;
     const endpointer = { isComplete: async () => endpointCalls++ === 0 ? false : true };
     const session = new SttSession(endpointConfig(endpointer), (e) => events.push(e));
@@ -333,7 +334,7 @@ describe("SttSession - RMS fallback VAD (no Silero model installed in tests)", (
 
   test("with the endpointer on and answering finished, the utterance ends at the base silence", async () => {
     scriptTranscript("finished");
-    const events: SttWireEvent[] = [];
+    const events: SttTestEvent[] = [];
     const session = new SttSession(endpointConfig({ isComplete: async () => true }), (e) => events.push(e));
 
     for (let i = 0; i < 30; i++) session.pushPcm(loudFrame());
@@ -348,7 +349,7 @@ describe("SttSession - RMS fallback VAD (no Silero model installed in tests)", (
 
   test("a pause longer than the hold still ends the utterance", async () => {
     scriptTranscript("held sentence");
-    const events: SttWireEvent[] = [];
+    const events: SttTestEvent[] = [];
     let calls = 0;
     const session = new SttSession(endpointConfig({ isComplete: async () => { calls++; return false; } }, 0.2), (e) => events.push(e));
 
@@ -367,7 +368,7 @@ describe("SttSession - RMS fallback VAD (no Silero model installed in tests)", (
       { isComplete: () => new Promise<boolean>(() => {}) },
     ]) {
       scriptTranscript("fail open");
-      const events: SttWireEvent[] = [];
+      const events: SttTestEvent[] = [];
       const session = new SttSession(endpointConfig(endpointer), (e) => events.push(e));
       for (let i = 0; i < 30; i++) session.pushPcm(loudFrame());
       await flush();
@@ -385,7 +386,7 @@ describe("SttSession - RMS fallback VAD (no Silero model installed in tests)", (
 
   test("the endpointer is asked once per silence run, not once per frame", async () => {
     scriptTranscript("one silence");
-    const events: SttWireEvent[] = [];
+    const events: SttTestEvent[] = [];
     let calls = 0;
     const session = new SttSession(endpointConfig({ isComplete: async () => { calls++; return false; } }, 1), (e) => events.push(e));
     for (let i = 0; i < 30; i++) session.pushPcm(loudFrame());
@@ -398,7 +399,7 @@ describe("SttSession - RMS fallback VAD (no Silero model installed in tests)", (
 
   test("vad speaking false is sent when the utterance ends, not at the first silent frame, in hold mode", async () => {
     scriptTranscript("held");
-    const events: SttWireEvent[] = [];
+    const events: SttTestEvent[] = [];
     const session = new SttSession(endpointConfig({ isComplete: async () => false }, 0.2), (e) => events.push(e));
     for (let i = 0; i < 30; i++) session.pushPcm(loudFrame());
     await flush();
@@ -410,7 +411,7 @@ describe("SttSession - RMS fallback VAD (no Silero model installed in tests)", (
   });
 
   test("silence alone never opens an utterance or calls transcribe", async () => {
-    const events: SttWireEvent[] = [];
+    const events: SttTestEvent[] = [];
     const session = new SttSession(config(), (e) => events.push(e));
 
     for (let i = 0; i < 20; i++) session.pushPcm(silenceFrame());
@@ -423,7 +424,7 @@ describe("SttSession - RMS fallback VAD (no Silero model installed in tests)", (
 
   test("typing/fan-level noise (above true silence, below VAD_ONSET_RMS) never opens an utterance", async () => {
     scriptTranscript("should never fire");
-    const events: SttWireEvent[] = [];
+    const events: SttTestEvent[] = [];
     const session = new SttSession(config(), (e) => events.push(e));
 
     for (let i = 0; i < 40; i++) session.pushPcm(quietFrame());
@@ -436,7 +437,7 @@ describe("SttSession - RMS fallback VAD (no Silero model installed in tests)", (
 
   test("a loud tone opens an utterance, and silence past the timeout finalizes it with the scripted transcript", async () => {
     scriptTranscript("hello there");
-    const events: SttWireEvent[] = [];
+    const events: SttTestEvent[] = [];
     const session = new SttSession(config({ silenceTimeoutS: 0.05 }), (e) => events.push(e));
 
     for (let i = 0; i < 20; i++) session.pushPcm(loudFrame());
@@ -451,6 +452,9 @@ describe("SttSession - RMS fallback VAD (no Silero model installed in tests)", (
     expect(transcriptionCalls()).toBeGreaterThan(0);
     const final = events.find((e) => e.t === "final");
     expect(final).toEqual({ t: "final", v: "hello there" });
+    const timing = events.find((e) => e.t === "timing");
+    expect(timing).toEqual({ t: "timing", speech_end_to_final_ms: expect.any(Number), silence_wait_ms: expect.any(Number) });
+    expect(events.findIndex((e) => e.t === "timing")).toBeLessThan(events.findIndex((e) => e.t === "final"));
     session.close();
   });
 
@@ -460,7 +464,7 @@ describe("SttSession - RMS fallback VAD (no Silero model installed in tests)", (
     setHouseholdSettingValue("engines.stack.url", fixture.url);
     __setStackClientForTests(fixture.client);
     const errorLog = spyOn(console, "error").mockImplementation(() => {});
-    const events: SttWireEvent[] = [];
+    const events: SttTestEvent[] = [];
     const session = new SttSession(config({ silenceTimeoutS: 0.05 }), (event) => events.push(event));
     for (let i = 0; i < 20; i++) session.pushPcm(loudFrame());
     await flush();
@@ -476,7 +480,7 @@ describe("SttSession - RMS fallback VAD (no Silero model installed in tests)", (
 
   test("an empty buffer shorter than the minimum speech fraction reports no_speech, not final", async () => {
     scriptTranscript("should not be reached");
-    const events: SttWireEvent[] = [];
+    const events: SttTestEvent[] = [];
     const session = new SttSession(config({ silenceTimeoutS: 0.01 }), (e) => events.push(e));
 
     // One loud frame (10ms) is well under MIN_SPEECH_SAMPLES_FRAC (0.2s).
@@ -493,7 +497,7 @@ describe("SttSession - RMS fallback VAD (no Silero model installed in tests)", (
 
   test("a transcript that's only a bracketed annotation is treated as no_speech, not a real turn", async () => {
     scriptTranscript("(keyboard clicking)");
-    const events: SttWireEvent[] = [];
+    const events: SttTestEvent[] = [];
     const session = new SttSession(config({ silenceTimeoutS: 0.05 }), (e) => events.push(e));
 
     for (let i = 0; i < 30; i++) session.pushPcm(loudFrame());
@@ -509,7 +513,7 @@ describe("SttSession - RMS fallback VAD (no Silero model installed in tests)", (
 
   test("end() flushes an in-progress utterance without waiting for the silence timeout", async () => {
     scriptTranscript("flushed early");
-    const events: SttWireEvent[] = [];
+    const events: SttTestEvent[] = [];
     // A long timeout that would never fire on its own within this test.
     const session = new SttSession(config({ silenceTimeoutS: 10 }), (e) => events.push(e));
 
@@ -524,7 +528,7 @@ describe("SttSession - RMS fallback VAD (no Silero model installed in tests)", (
   });
 
   test("end() on a listen where nobody spoke answers no_speech at once", async () => {
-    const events: SttWireEvent[] = [];
+    const events: SttTestEvent[] = [];
     const session = new SttSession(config({ silenceTimeoutS: 10 }), (e) => events.push(e));
 
     for (let i = 0; i < 5; i++) session.pushPcm(silenceFrame());
@@ -540,7 +544,7 @@ describe("SttSession - RMS fallback VAD (no Silero model installed in tests)", (
 
   test("the 30s force-flush fires on an unbroken loud tone that never dips into silence", async () => {
     scriptTranscript("force flushed");
-    const events: SttWireEvent[] = [];
+    const events: SttTestEvent[] = [];
     const session = new SttSession(config({ silenceTimeoutS: 60 }), (e) => events.push(e));
 
     // 30s @ 16kHz / 160-sample frames = 3000 frames to cross MAX_SPEECH_SECONDS.

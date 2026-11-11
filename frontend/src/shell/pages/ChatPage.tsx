@@ -77,6 +77,7 @@ import { useAmbientCompanion } from "@/shell/useAmbientCompanion";
 import { chatAmbientRing, useSetAmbientRing, useSetAmbientWake } from "@/shell/ambientRing";
 import { assistantText, isListening, isSpeaking as speakingSignal, isThinking, type SignalMessage } from "@/apps/chat/useCompanionSignals";
 import { useLiveVoiceSession, WAKE_SESSION_IDLE_CLOSE_MS } from "@/apps/chat/liveVoiceSession";
+import type { SttSocket } from "@/lib/voice/sttSocket";
 import { createLocalImageAttachmentAdapter } from "@/apps/chat/localImageAttachmentAdapter";
 import { photoUploadsEnabledForBand } from "@/apps/chat/photoUploadAccess";
 import { createSttDictationAdapter } from "@/lib/voice/sttDictationAdapter";
@@ -213,11 +214,15 @@ function useBareCompareCanvas(target: CompareTarget | null) {
  * wiring table's remaining rows). `speakReplies: false` still holds -
  * no "stop speaking" control on screen yet. */
 
-function useChatRuntime(person: Roster, closeSheet: () => void, temporaryNext: boolean, voiceOpen: boolean, onArtifactReady: (artifactId: string) => void, setDraftConversationId: (id: string | undefined) => void, retryWithCurrentCompanionRef: { current: boolean }, tryCompanionIdRef: { current: string | undefined }, folderId?: string) {
+function useChatRuntime(person: Roster, closeSheet: () => void, temporaryNext: boolean, voiceOpen: boolean, onArtifactReady: (artifactId: string) => void, setDraftConversationId: (id: string | undefined) => void, retryWithCurrentCompanionRef: { current: boolean }, tryCompanionIdRef: { current: string | undefined }, voiceTimingShared: { sttMs: { current: number | undefined }; finalAt: { current: number | undefined }; turnId: { current: string | undefined }; socket: { current: SttSocket | null } }, folderId?: string) {
   const temporaryModeRef = useRef(temporaryNext);
   temporaryModeRef.current = temporaryNext;
   const voiceTurn = useChatVoiceTurnState();
   const { turnSchedulerRef, liveVoiceActiveRef, pendingSpeechRef, activeTurnRef, askAnswerRef, isSpeaking, speakingEndedAt, speechFailed } = voiceTurn;
+  const voiceSttMsRef = voiceTimingShared.sttMs;
+  const voiceFinalAtRef = voiceTimingShared.finalAt;
+  const voiceTimingTurnIdRef = voiceTimingShared.turnId;
+  const voiceTimingSocketRef = voiceTimingShared.socket;
   // VOICE-LIVE-02: true only while the live voice session (below) is
   // open - the one gate on `speakReplies` above, and `pendingSpeechRef` the
   // one flag `consumeSpoken` reads and clears, the same single-shot
@@ -569,6 +574,18 @@ function useChatRuntime(person: Roster, closeSheet: () => void, temporaryNext: b
             pendingSpeechRef.current = false;
             return value;
           },
+          consumeVoiceTiming: () => {
+            const value = voiceSttMsRef.current;
+            voiceSttMsRef.current = undefined;
+            voiceFinalAtRef.current = undefined;
+            return value;
+          },
+          onFirstPlayback: (at) => {
+            const finalAt = voiceFinalAtRef.current;
+            if (finalAt !== undefined && voiceTimingTurnIdRef.current) voiceTimingSocketRef.current?.sendTiming?.(voiceTimingTurnIdRef.current, voiceSttMsRef.current ?? 0, Math.max(0, at - finalAt));
+          },
+          onTurnId: (turnId) => { voiceTimingTurnIdRef.current = turnId; },
+          onFirstSentence: () => { const finalAt = voiceFinalAtRef.current; if (finalAt !== undefined && voiceTimingTurnIdRef.current) voiceTimingSocketRef.current?.sendTiming?.(voiceTimingTurnIdRef.current, voiceSttMsRef.current ?? 0, undefined, Math.max(0, performance.now() - finalAt)); },
           // APPROVE-CARD-01: armed once, right before ConfirmTool's own
           // respondToApproval handler calls aui.composer.send() - the
           // same single-shot shape consumeSpoken() above already uses.
@@ -1115,6 +1132,12 @@ function ChatHeaderActions() {
 }
 
 export function ChatPage({ person }: { person: Roster }) {
+  const voiceTimingShared = {
+    sttMs: useRef<number | undefined>(undefined),
+    finalAt: useRef<number | undefined>(undefined),
+    turnId: useRef<string | undefined>(undefined),
+    socket: useRef<SttSocket | null>(null),
+  };
   const ambient = useAmbientCompanion(person);
   const retryWithCurrentCompanionRef = useRef(false);
   const companionShells = useCompanionShells() === true;
@@ -1443,7 +1466,7 @@ export function ChatPage({ person }: { person: Roster }) {
     setOpenArtifactId(null);
     setCompareTarget(null);
     imageEditor.close();
-  }, temporaryNext, voiceOpen, setOpenArtifactId, setDraftConversationId, retryWithCurrentCompanionRef, tryCompanionIdRef, projectPage?.folderId);
+  }, temporaryNext, voiceOpen, setOpenArtifactId, setDraftConversationId, retryWithCurrentCompanionRef, tryCompanionIdRef, voiceTimingShared, projectPage?.folderId);
   useEffect(() => {
     const askKey = askText ? `${routeLocation.key}:${askText}` : undefined;
     if (!askText || handledAsk.current === askKey) return;
@@ -1533,6 +1556,8 @@ export function ChatPage({ person }: { person: Roster }) {
     isSpeaking,
     speakingEndedAt,
     speechFailed,
+    voiceTimingSocketRef: voiceTimingShared.socket,
+    onVoiceTiming: ({ sttMs, phase }) => { voiceTimingShared.sttMs.current = sttMs; if (phase === "final") { voiceTimingShared.finalAt.current = performance.now(); voiceTimingShared.turnId.current = undefined; } },
   });
   const [pageSearchParams] = useSearchParams();
   const requestedConversationId = pageSearchParams.get("conversation") ?? undefined;

@@ -51,7 +51,7 @@ function controlledSocket() {
 
 const SettingsIcon = getIcon("settings");
 
-function Harness({ open, onOpenChange, onProblem = () => {}, isSpeaking, speakingEndedAt, speechFailed = 0, fixture, sentTexts, idleCloseMs, voiceBargeIn = true, activeTurn = { turnId: "turn-test", heardVisibleEnd: () => 23 }, cancelRun = () => {}, stopScheduler = () => {}, pauseScheduler = () => {}, resumeScheduler = () => {}, onReady, socketFactory, socketConnections, captureCalls, dropConnections = [], doubleDropConnections = [], dropWhileSpeaking = false, retryDelays, installationNotice = false }: { open: boolean; onOpenChange: (open: boolean) => void; onProblem?: (kind: string) => void; isSpeaking: boolean; speakingEndedAt: number; speechFailed?: number; fixture: readonly SttFixtureStep[] | ((connection: number) => readonly SttFixtureStep[]); sentTexts: string[]; idleCloseMs?: number | null; voiceBargeIn?: boolean; activeTurn?: { turnId: string; heardVisibleEnd: () => number } | null; cancelRun?: () => void; stopScheduler?: () => void; pauseScheduler?: () => void; resumeScheduler?: () => void; onReady?: () => void; socketFactory?: (handlers: SttSocketHandlers) => ReturnType<typeof createMockSttSocket>; socketConnections?: number[]; captureCalls?: number[]; dropConnections?: number[]; doubleDropConnections?: number[]; dropWhileSpeaking?: boolean; retryDelays?: [number, number]; installationNotice?: boolean }) {
+function Harness({ open, onOpenChange, onProblem = () => {}, isSpeaking, speakingEndedAt, speechFailed = 0, fixture, sentTexts, idleCloseMs, voiceBargeIn = true, activeTurn = { turnId: "turn-test", heardVisibleEnd: () => 23 }, cancelRun = () => {}, stopScheduler = () => {}, pauseScheduler = () => {}, resumeScheduler = () => {}, onReady, onVoiceTiming, socketFactory, socketConnections, captureCalls, dropConnections = [], doubleDropConnections = [], dropWhileSpeaking = false, retryDelays, installationNotice = false }: { open: boolean; onOpenChange: (open: boolean) => void; onProblem?: (kind: string) => void; isSpeaking: boolean; speakingEndedAt: number; speechFailed?: number; fixture: readonly SttFixtureStep[] | ((connection: number) => readonly SttFixtureStep[]); sentTexts: string[]; idleCloseMs?: number | null; voiceBargeIn?: boolean; activeTurn?: { turnId: string; heardVisibleEnd: () => number } | null; cancelRun?: () => void; stopScheduler?: () => void; pauseScheduler?: () => void; resumeScheduler?: () => void; onReady?: () => void; onVoiceTiming?: (timing: { sttMs: number; phase?: "final" | "playback" }) => void; socketFactory?: (handlers: SttSocketHandlers) => ReturnType<typeof createMockSttSocket>; socketConnections?: number[]; captureCalls?: number[]; dropConnections?: number[]; doubleDropConnections?: number[]; dropWhileSpeaking?: boolean; retryDelays?: [number, number]; installationNotice?: boolean }) {
   const adapter: ChatModelAdapter = {
     async *run({ messages }) {
       const last = messages[messages.length - 1];
@@ -75,6 +75,7 @@ function Harness({ open, onOpenChange, onProblem = () => {}, isSpeaking, speakin
     open,
     onOpenChange,
     onProblem: onProblem as (kind: "listening_lost" | "listening_engine" | "speaking_failed" | "microphone_blocked" | "microphone_insecure" | "microphone_setup" | "microphone_missing" | "microphone_busy") => void,
+    onVoiceTiming,
     turnSchedulerRef,
     liveVoiceActiveRef,
     pendingSpeechRef,
@@ -141,6 +142,12 @@ function Harness({ open, onOpenChange, onProblem = () => {}, isSpeaking, speakin
 }
 
 describe("live voice session", () => {
+  test("forwards the STT speech-end interval when the final transcript arrives", async () => {
+    const onVoiceTiming = mock();
+    const view = render(<Harness open onOpenChange={() => {}} isSpeaking={false} speakingEndedAt={0} fixture={[{ delayMs: 0, message: { t: "ready" } }, { delayMs: 0, message: { t: "timing", speech_end_to_final_ms: 240, silence_wait_ms: 180 } }, { delayMs: 0, message: { t: "final", v: "hello" } }]} sentTexts={[]} onVoiceTiming={onVoiceTiming} />);
+    await waitFor(() => expect(view.getByText("Thinking")).toBeTruthy());
+    expect(onVoiceTiming).toHaveBeenCalledWith({ sttMs: 240, phase: "final" });
+  });
   test("a dropped listening connection reconnects once and the call goes back to Listening with no message", async () => {
     const onOpenChange = mock();
     const onProblem = mock();

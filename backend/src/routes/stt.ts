@@ -16,6 +16,7 @@ import { getDeviceById } from "@/lib/devices";
 import { getCookie } from "hono/cookie";
 import { resolveSessionDeviceId } from "@/middleware/auth";
 import { apiRouter, errorResponses } from "@/lib/openapi";
+import { findVoiceTiming, setVoiceTiming } from "@/lib/voiceTiming";
 
 export const sttRoutes = apiRouter();
 
@@ -71,10 +72,15 @@ sttRoutes.get(
         if (!session) return;
         if (typeof evt.data === "string") {
           try {
-            const parsed = JSON.parse(evt.data) as { t?: string; reply_id?: unknown; ms?: unknown };
+            const parsed = JSON.parse(evt.data) as { t?: string; reply_id?: unknown; ms?: unknown; stt_ms?: unknown; first_playback_ms?: unknown; first_sentence_ms?: unknown; turn_id?: unknown };
             if (parsed.t === "end") session.end();
             else if (parsed.t === "played_ms" && typeof parsed.reply_id === "string" && parsed.reply_id.trim().length > 0 && typeof parsed.ms === "number" && Number.isFinite(parsed.ms) && parsed.ms >= 0 && Object.keys(parsed).length === 3) {
               session.notePlayback(parsed.reply_id, parsed.ms, Date.now());
+            }
+            else if (parsed.t === "timing" && typeof parsed.turn_id === "string" && typeof parsed.stt_ms === "number" && Number.isFinite(parsed.stt_ms) && parsed.stt_ms >= 0 && Object.keys(parsed).every((key) => ["t", "turn_id", "stt_ms", "first_playback_ms", "first_sentence_ms"].includes(key))) {
+              const record = findVoiceTiming(parsed.turn_id);
+              if (typeof parsed.first_sentence_ms === "number" && Number.isFinite(parsed.first_sentence_ms) && parsed.first_sentence_ms >= 0) setVoiceTiming(record, "first_sentence_ms", parsed.first_sentence_ms);
+              if (typeof parsed.first_playback_ms === "number" && Number.isFinite(parsed.first_playback_ms) && parsed.first_playback_ms >= 0) setVoiceTiming(record, "first_playback_ms", parsed.first_playback_ms);
             }
           } catch {
             ws.send(JSON.stringify({ t: "error", v: voiceFailureLine("listening_engine", { minor: false, canOpenRepairs: true }) }));

@@ -169,6 +169,10 @@ export interface ChatModelAdapterDeps {
   // transcript, sent via aui.composer.send()), never a mode a later
   // typed message inherits after the call ends.
   consumeSpoken?(): boolean | undefined;
+  consumeVoiceTiming?(): number | undefined;
+  onFirstPlayback?(at: number): void;
+  onTurnId?(turnId: string): void;
+  onFirstSentence?(): void;
   consumeRetryWithCurrentCompanion?(): boolean;
   findReplacedSpeaker?(input: { parentId: string; newMessageId: string }): string | undefined;
   getConversationId?(): Promise<string>;
@@ -283,10 +287,13 @@ export function createChatModelAdapter(deps: ChatModelAdapterDeps): ChatModelAda
       // into this new one until/unless the new reply happens to speak too.
       deps.onSpeakingChange?.(false);
       const speakReplies = typeof deps.speakReplies === "function" ? deps.speakReplies() : (deps.speakReplies ?? true);
+      const spokenTurnTiming = deps.consumeVoiceTiming?.();
+      const spokenTurn = quote ? quoteSpoken : deps.consumeSpoken?.();
       const scheduler = new SentenceSpeechScheduler();
       deps.turnSchedulerRef.current = scheduler;
       scheduler.messageId = unstable_assistantMessageId;
       scheduler.onFirstAudio = () => deps.onSpeakingChange?.(true);
+      scheduler.onFirstPlayback = (at) => deps.onFirstPlayback?.(at);
       scheduler.onError = () => deps.onSpeechError?.();
       // The reply is cut in on while it is still being SPOKEN, which is long after it finished generating: the turn stays "active" until
       // its voice ends, so a cut-in can still tell the server how much was heard (what lets the companion pick the story back up).
@@ -476,7 +483,8 @@ export function createChatModelAdapter(deps: ChatModelAdapterDeps): ChatModelAda
             resumeFrom: resumeToken ? lastAcknowledgedSequence : undefined,
             packageScope: reconnectAttempts === 0 ? deps.consumePackageScope?.() : undefined,
             temporary: reconnectAttempts === 0 ? temporary : undefined,
-            spoken: reconnectAttempts === 0 ? quote ? quoteSpoken : deps.consumeSpoken?.() : undefined,
+            spoken: spokenTurn,
+            sttMs: spokenTurn ? spokenTurnTiming : undefined,
             currentLocation,
             pageContext: reconnectAttempts === 0 ? deps.getPageContext?.() : undefined,
             // APPROVE-CARD-01: the same reconnectAttempts===0 gate as
@@ -544,6 +552,7 @@ export function createChatModelAdapter(deps: ChatModelAdapterDeps): ChatModelAda
             conversationId = event.conversation_id;
             resumeToken = event.resume_token;
             resumeTurnId = event.turn_id;
+            deps.onTurnId?.(event.turn_id);
             answeredBy = event.answered_by;
             if (deps.activeTurnRef) deps.activeTurnRef.current = { turnId: event.turn_id, heardVisibleEnd: () => scheduler.heardVisibleEndFine() };
             if (answeredBy) yield { metadata: { custom: { answered_by: answeredBy, turnId: event.turn_id, conversationId } } };
@@ -590,6 +599,7 @@ export function createChatModelAdapter(deps: ChatModelAdapterDeps): ChatModelAda
               // one: `visible` (yielded just above) keeps the model's own
               // written text - the chat bubble - completely untouched.
               for (const chunk of chunks) {
+                if (spokenLength === 0 && chunkSearchFrom === 0) deps.onFirstSentence?.();
                 const chunkStart = pending.indexOf(chunk, chunkSearchFrom);
                 const visibleEnd = chunkStart < 0 ? undefined : spokenLength + chunkStart + chunk.length;
                 scheduler.enqueueSentence(normalizeForSpeech(chunk), { ...(resumeTurnId && resumeGeneration !== undefined ? { turnId: resumeTurnId, generation: resumeGeneration } : {}), ...(visibleEnd === undefined ? {} : { visibleEnd }) });
@@ -607,7 +617,10 @@ export function createChatModelAdapter(deps: ChatModelAdapterDeps): ChatModelAda
             // scheduler is a plain FIFO queue, so it plays first and the
             // real reply's sentences (enqueued above as they arrive) follow
             // right after.
-            if (speakReplies) scheduler.enqueueSentence(event.text, { ...(resumeTurnId && event.generation !== undefined ? { turnId: resumeTurnId, generation: event.generation } : {}) });
+            if (speakReplies) {
+              if (spokenLength === 0) deps.onFirstSentence?.();
+              scheduler.enqueueSentence(event.text, { ...(resumeTurnId && event.generation !== undefined ? { turnId: resumeTurnId, generation: event.generation } : {}) });
+            }
             // Lane 11 item 1's own decision (chatTurnActivity.ts): a
             // spoken_cue also drives the same transient activity line a
             // `status` event does below - this file's own older comment on

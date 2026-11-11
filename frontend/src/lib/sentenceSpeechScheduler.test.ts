@@ -163,6 +163,19 @@ describe("sentence speech scheduler", () => {
     expect(scheduler.heardVisibleEndFine()).toBe(140);
   });
 
+  test("reports first playback once when the first buffer is scheduled", () => {
+    const context = new FakeAudioContext();
+    const scheduler = new SentenceSpeechScheduler(context as unknown as AudioContext, async () => new Response(new Uint8Array(44)));
+    const times: number[] = [];
+    scheduler.onFirstPlayback = (at) => times.push(at);
+    type Internals = { scheduleBuffer(buffer: AudioBuffer, meta: undefined, track: { entry?: unknown }): void };
+    (scheduler as unknown as Internals).scheduleBuffer({ duration: 0.2 } as AudioBuffer, undefined, {});
+    (scheduler as unknown as Internals).scheduleBuffer({ duration: 0.2 } as AudioBuffer, undefined, {});
+    expect(times).toHaveLength(1);
+    expect(Number.isFinite(times[0])).toBe(true);
+    scheduler.stop();
+  });
+
   test("isPaused follows pause and resume and is false once stopped", () => {
     const scheduler = new SentenceSpeechScheduler(new FakeAudioContext() as unknown as AudioContext, async () => new Response(new Uint8Array(44)));
     expect(scheduler.isPaused()).toBe(false);

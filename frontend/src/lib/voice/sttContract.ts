@@ -19,4 +19,5 @@
 // all (only the audio frames themselves and an optional `{"t":"end"}`),
 // so the one `sttSocket.ts` used to send was never part of any real
 // contract and the server has never read it.
-export type { SttWireEvent as SttServerMessage } from "@maipai/spec/voice/ts/sttTypes.js";
+export type SttServerMessage = import("@maipai/spec/voice/ts/sttTypes.js").SttWireEvent | { t: "timing"; speech_end_to_final_ms: number; silence_wait_ms: number };
+export type SttServerMessageWithTiming = SttServerMessage;

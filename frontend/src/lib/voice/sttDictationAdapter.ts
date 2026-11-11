@@ -145,6 +145,8 @@ export function createSttDictationAdapter(deps: SttDictationDeps): DictationAdap
       // no error, because nothing here ever ran).
       function onMessage(message: SttServerMessage): void {
         switch (message.t) {
+          case "timing":
+            break;
           case "ready":
             session.status = { type: "running" };
             speechStart.notify();

@@ -88,6 +88,7 @@ export class SentenceSpeechScheduler implements SpeechSource {
   /** Fires once, the moment the first sentence is actually scheduled to
    * play - the real "time to first audio" signal. */
   onFirstAudio?: () => void;
+  onFirstPlayback?: (at: number) => void;
   /** Fires once every enqueued sentence has finished playing AND finish()
    * has been called (no more sentences are coming). */
   onEnded?: () => void;
@@ -400,7 +401,7 @@ export class SentenceSpeechScheduler implements SpeechSource {
       publishSpeechTap({ type: "audio", source: this, sentence: track.id, samples: audioBuffer.getChannelData(0).slice(), rate: audioBuffer.sampleRate * speed, at: startTime - first.startTime });
     }
     this.scheduledCount++;
-    if (this.scheduledCount === 1) this.onFirstAudio?.();
+    if (this.scheduledCount === 1) { this.onFirstAudio?.(); this.onFirstPlayback?.(performance.now()); }
     source.onended = () => {
       this.sources.delete(source);
       this.finishedCount++;

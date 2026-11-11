@@ -1,7 +1,7 @@
-import type { SttServerMessage } from "@/lib/voice/sttContract";
+import type { SttServerMessageWithTiming } from "@/lib/voice/sttContract";
 
 export interface SttSocketHandlers {
-  onMessage: (message: SttServerMessage) => void;
+  onMessage: (message: SttServerMessageWithTiming) => void;
   /** A connection-level failure (never opened, or dropped mid-stream) -
    * distinct from a normal `close()` the caller itself requested. */
   onError?: (error: unknown) => void;
@@ -15,6 +15,7 @@ export interface SttSocket {
   /** Full-duplex: tells the server how much of the current reply has played, about every 250 ms while it plays (the server
    * treats a report under 700 ms old as "a reply is playing"). A no-op when the socket is not open. */
   sendPlayed?: (replyId: string, ms: number) => void;
+  sendTiming?: (turnId: string, sttMs: number, firstPlaybackMs?: number, firstSentenceMs?: number) => void;
   close: () => void;
 }
 
@@ -35,7 +36,7 @@ export function createSttSocket(handlers: SttSocketHandlers): SttSocket {
   socket.addEventListener("message", (event) => {
     if (typeof event.data !== "string") return; // audio never flows server -> client
     try {
-      handlers.onMessage(JSON.parse(event.data) as SttServerMessage);
+      handlers.onMessage(JSON.parse(event.data) as SttServerMessageWithTiming);
     } catch (e) {
       handlers.onError?.(e);
     }
@@ -70,6 +71,10 @@ export function createSttSocket(handlers: SttSocketHandlers): SttSocket {
       if (socket.readyState !== WebSocket.OPEN) return;
       socket.send(JSON.stringify({ t: "played_ms", reply_id: replyId, ms: Math.max(0, Math.round(ms)) }));
     },
+    sendTiming(turnId, sttMs, firstPlaybackMs, firstSentenceMs) {
+      if (socket.readyState !== WebSocket.OPEN) return;
+      socket.send(JSON.stringify({ t: "timing", turn_id: turnId, stt_ms: sttMs, ...(firstPlaybackMs === undefined ? {} : { first_playback_ms: firstPlaybackMs }), ...(firstSentenceMs === undefined ? {} : { first_sentence_ms: firstSentenceMs }) }));
+    },
     close() {
       closedByUs = true;
       if (socket.readyState === WebSocket.OPEN || socket.readyState === WebSocket.CONNECTING) socket.close();
@@ -83,7 +88,7 @@ export interface SttFixtureStep {
    * replays instantly would never exercise a UI state (a "listening..."
    * spinner, say) that only shows up for a real socket's real latency. */
   delayMs: number;
-  message: SttServerMessage;
+  message: SttServerMessageWithTiming;
 }
 
 // Test helper: a socket that replays a fixture. Same shape as createSttSocket (sendAudio/close, one onMessage callback),
