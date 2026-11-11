@@ -36,14 +36,20 @@ beforeEach(() => {
 });
 afterEach(() => { globalThis.fetch = realFetch; });
 
-function mount() {
+function mount(result: { id?: string; locked?: true } = { id: "mus-1" }) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-  const Render = MusicToolRender as unknown as (props: { result: { id: string } }) => React.ReactElement;
-  return render(<QueryClientProvider client={client}><MemoryRouter><Render result={{ id: "mus-1" }} /></MemoryRouter></QueryClientProvider>);
+  const Render = MusicToolRender as unknown as (props: { result: { id?: string; locked?: true } }) => React.ReactElement;
+  return render(<QueryClientProvider client={client}><MemoryRouter><Render result={result} /></MemoryRouter></QueryClientProvider>);
 }
 const cardOf = (view: ReturnType<typeof mount>) => view.container.querySelector("[data-slot=music-track]");
 
 describe("MusicToolRender", () => {
+  test("locked payload renders the kit lock tile without requesting the song", () => {
+    const view = mount({ locked: true });
+    expect(view.container.querySelector("[data-slot=lock-tile]")).toBeTruthy();
+    expect(calls).toHaveLength(0);
+  });
+
   test("a pending first fetch shows the queued song card without progress", () => {
     globalThis.fetch = (() => new Promise<Response>(() => {})) as unknown as typeof fetch;
     const view = mount();

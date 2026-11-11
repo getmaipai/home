@@ -35,6 +35,7 @@ import { useSongByline } from "@/apps/chat/useSongByline";
 import { useVideoAdultMark } from "@/apps/chat/videoAdultMark";
 import { usePictureAdultMark } from "@/apps/chat/pictureAdultMark";
 import { adultBlobUrl } from "@/lib/adultLock";
+import { LockTile } from "@maipai/ui/src/elements/adult-lock";
 import { CreationHeader } from "@maipai/ui/src/elements/creation-header";
 export { musicFileName, musicHint } from "@/apps/chat/MusicCardView";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@maipai/ui/src/ui/dropdown-menu";
@@ -802,7 +803,7 @@ function useSongJobCard(id: string | undefined) {
   });
 }
 
-export const MusicToolRender: ToolCallMessagePartComponent<Record<string, never>, { id: string }> = ({ result }) => {
+export const MusicToolRender: ToolCallMessagePartComponent<Record<string, never>, { id?: string; locked?: true }> = ({ result }) => {
   const query = useSongJobCard(result?.id);
   const navigate = useNavigate();
   const me = useContext(WakeWordPersonContext);
@@ -811,6 +812,7 @@ export const MusicToolRender: ToolCallMessagePartComponent<Record<string, never>
   const trackProps = useMusicTrackProps({ card, navigate, onRefresh: () => { void query.refetch(); }, onStemsStarted: reloadThread, onStop: () => { void musicApi.stop(card.id).then(() => query.refetch()).catch(() => query.refetch()); } });
   const byline = useSongByline(card, me ?? null);
   if (!result) return null;
+  if (result.locked) return <LockTile shape="card" />;
   if (!query.data) return query.isError ? <ErrorState layout="inline" title={i18n._({ id: "I couldn't check on that song", message: "I couldn't check on that song" })} detail="Reload the chat to try again." retrying={false} /> : <MusicTrack status="queued" title={i18n._({ id: "Your song", message: "Your song" })} waitingForMemory copy={{ waitingForMemory: "Waiting for memory, your song starts when there is room" }} />;
   return <MusicTrack {...trackProps} {...(byline ? { byline: <CreationHeader variant="byline" title="" {...byline} /> } : {})} />;
 };
