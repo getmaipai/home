@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, test } from "bun:test";
 import { filmOverhead, SEAM_SECONDS } from "@/lib/videos/editPlan";
 import { z } from "zod";
-import { __setFilmPlanCompleterForTests, FILM_PLAN_PROMPT, FILM_PLAN_RESPONSE_FORMAT, filmPlanSchema, fitPlanToLength, planFilm, shotsFor, type FilmPlan } from "@/lib/films/plan";
+import { __setFilmPlanCompleterForTests, FILM_PLAN_PROMPT, FILM_PLAN_RESPONSE_FORMAT, filmPlanSchema, fitPlanToLength, holdBackReveals, planFilm, shotsFor, type FilmPlan } from "@/lib/films/plan";
 
 const productionShot = z.object({ id: z.string().min(1).max(80), subject_ids: z.array(z.string()), clip_file_id: z.string().nullable().optional(), picture_file_id: z.string().nullable().optional(), music_line_id: z.string().nullable().optional(), voice_line_id: z.string().nullable().optional() });
 const goodPlan: FilmPlan = {
@@ -99,5 +99,18 @@ describe("film planner", () => {
       expect(fitted.shots.every((s) => s.seconds >= 3 && s.seconds <= 10)).toBe(true);
       expect(fitted.shots[0]!.id).toBe("s-0"); expect(fitted.shots.at(-1)!.id).toBe(`s-${shotsFor(target) - 1}`);
     }
+  });
+
+  test("a product marked reveal_last is named only in the last shot", () => {
+    const plan = { ...goodPlan, cast: [...goodPlan.cast, { name: "Blue mug", kind: "prop" as const, locked: "blue mug with white lettering", reveal_last: true }], shots: [
+      { ...goodPlan.shots[0]!, id: "a", still: "Wide, the Blue mug kiln in a factory, blue MUG glaze" },
+      { ...goodPlan.shots[1]!, id: "b", still: "Close on the wheel, hands shaping clay", motion: "push in toward the blue mug" },
+      { ...goodPlan.shots[0]!, id: "c", still: "Blue mug on a wooden table in morning light" },
+    ] };
+    const held = holdBackReveals(plan);
+    expect(held.shots[0]!.still.toLowerCase()).not.toContain("blue mug");
+    expect(held.shots[1]!.motion.toLowerCase()).not.toContain("blue mug");
+    expect(held.shots[2]!.still).toContain("Blue mug");
+    expect(holdBackReveals({ ...plan, cast: plan.cast.map((m) => ({ ...m, reveal_last: undefined })) })).toEqual({ ...plan, cast: plan.cast.map((m) => ({ ...m, reveal_last: undefined })) });
   });
 });
