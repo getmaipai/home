@@ -29,7 +29,7 @@ export function askHref(text: string): string {
 }
 
 /** HOME-ALIVE-01h: the ask box and three starters, built from kit primitives only (rule 9b). */
-export function AskBox() {
+export function AskBox({ focusOnRequest }: { focusOnRequest?: number }) {
   const navigate = useNavigate();
   const inputRef = useRef<HTMLInputElement>(null);
   const fine = useSurface().pointer === "fine";
@@ -38,6 +38,9 @@ export function AskBox() {
     const active = document.activeElement;
     if (fine && !(active instanceof HTMLElement && active.matches("input, textarea, select, [contenteditable='true']"))) inputRef.current?.focus({ preventScroll: true });
   }, [fine]);
+  useEffect(() => {
+    if (focusOnRequest) inputRef.current?.focus({ preventScroll: true });
+  }, [focusOnRequest]);
   const [text, setText] = useState("");
   const availability = useChatAvailability();
   const down = engineDownReason(availability);
