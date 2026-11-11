@@ -24,7 +24,7 @@ function item(id: string, name: string, over: Partial<LibraryItem> = {}): Librar
 }
 const summary = (items: number, bytes = items * 2048, trash = 0): LibrarySummary => ({ items, bytes, per_kind: { image: { items, bytes }, video: { items: 0, bytes: 0 }, audio: { items: 0, bytes: 0 }, document: { items: 0, bytes: 0 }, story: { items: 0, bytes: 0 }, file: { items: 0, bytes: 0 } }, trash: { items: trash, bytes: 0 }, expiring: { items: 0, bytes: 0 } });
 
-interface Server { moreStatus?: number; items?: LibraryItem[]; next?: string | null; listStatus?: number; trash?: unknown[]; usage?: unknown; music?: unknown }
+interface Server { locked?: boolean; moreStatus?: number; items?: LibraryItem[]; next?: string | null; listStatus?: number; trash?: unknown[]; usage?: unknown; music?: unknown }
 function serve(server: Server = {}) {
   const original = globalThis.fetch;
   const calls: { url: string; method: string }[] = [];
@@ -38,7 +38,7 @@ function serve(server: Server = {}) {
       if (server.listStatus) return Promise.resolve(Response.json({ error: "Home could not load your Library. Check that Home is running, then try again." }, { status: server.listStatus }));
       const cursor = new URL(url, "http://x").searchParams.get("cursor");
       if (cursor && server.moreStatus) return Promise.resolve(Response.json({ error: "The page address is invalid. Open the Library again." }, { status: server.moreStatus }));
-      return Promise.resolve(Response.json({ items: cursor ? [item("f-more", "Second page")] : items, next_cursor: cursor ? null : server.next ?? null }));
+      return Promise.resolve(Response.json({ items: cursor ? [item("f-more", "Second page")] : items, next_cursor: cursor ? null : server.next ?? null, ...(cursor || !server.locked ? {} : { locked: true }) }));
     }
     if (url === "/api/trash") return Promise.resolve(Response.json({ rows: server.trash ?? [] }));
     if (url.startsWith("/api/trash/file/")) return Promise.resolve(Response.json({ success: true }));
@@ -58,6 +58,50 @@ function page(role: Roster["role"] = "owner", entry = "/files") {
 }
 const where = () => document.querySelector('[data-testid="where"]')!.textContent;
 const tile = (name: string) => Array.from(document.querySelectorAll<HTMLElement>('[data-slot="file-tile-main"]')).find((el) => el.getAttribute("aria-label")?.startsWith(name));
+
+describe("Library lock", () => {
+  test("locked items hidden by the hub show as one Locked items tile above the files", async () => {
+    const server = serve({ items: [item("f1", "Fox")], locked: true });
+    try {
+      page();
+      await waitFor(() => expect(tile("Fox")).toBeTruthy());
+      const lock = document.querySelectorAll('[data-slot="lock-tile"]');
+      expect(lock).toHaveLength(1);
+      expect(lock[0]!.textContent).toBe("Locked items");
+      expect(document.body.textContent).not.toMatch(/\d+ locked/i);
+    } finally { server.restore(); }
+  });
+
+  test("when only locked items exist the tile stands alone, not the empty state", async () => {
+    const server = serve({ items: [], locked: true });
+    try {
+      page();
+      await waitFor(() => expect(document.querySelector('[data-slot="lock-tile"]')).not.toBeNull());
+      expect(document.body.textContent).not.toContain("Nothing here yet");
+    } finally { server.restore(); }
+  });
+
+  test("no flag, no tile", async () => {
+    const server = serve({ items: [item("f1", "Fox")] });
+    try {
+      page();
+      await waitFor(() => expect(tile("Fox")).toBeTruthy());
+      expect(document.querySelector('[data-slot="lock-tile"]')).toBeNull();
+    } finally { server.restore(); }
+  });
+
+  test("an unlocked item carries an open lock and the word Unlocked; a plain item does not", async () => {
+    const server = serve({ items: [item("f1", "Open clip", { unlocked: true }), item("f2", "Plain")] });
+    try {
+      page();
+      await waitFor(() => expect(tile("Open clip")).toBeTruthy());
+      const open = tile("Open clip")!.closest('[data-slot="file-tile"]') ?? tile("Open clip")!.parentElement!;
+      expect(open.textContent).toContain("Unlocked");
+      expect(open.querySelector("svg")).not.toBeNull();
+      expect(tile("Plain")!.closest('[data-slot="file-tile"]')?.textContent ?? "").not.toContain("Unlocked");
+    } finally { server.restore(); }
+  });
+});
 
 describe("Library states", () => {
   test("the Library page marks itself as a workspace page, so its sidebar sits flush against the rail", async () => {

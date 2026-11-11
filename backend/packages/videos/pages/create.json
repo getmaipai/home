@@ -271,7 +271,7 @@
               }
             },
             {
-              "label": "Unmark as NSFW",
+              "label": "Remove lock",
               "icon": "key-round",
               "show_when": "can_unmark",
               "action": {
@@ -292,7 +292,7 @@
               }
             },
             {
-              "label": "Mark as NSFW",
+              "label": "Lock",
               "icon": "lock",
               "show_when": "can_mark",
               "action": {

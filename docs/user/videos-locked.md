@@ -5,7 +5,7 @@ description: How adults-only videos are marked and locked, how to take the lock 
 
 # Adults-only videos and the lock
 
-A video made with an adults-only style is marked NSFW and locked the moment it starts. You do not have to do anything. While it is locked, it shows as one lock tile, with no title or picture, and it opens only when you enter your passcode on your own screen.
+A video made with an adults-only style is locked the moment it starts. You do not have to do anything. While it is locked, it shows as one lock tile, with no title or picture, and it opens only when you enter your passcode on your own screen.
 
 A video made with no adults-only style is not locked just because its words are adult. It is still marked for adults only, so people under 18 never see it. If the picture check finds nudity in it, Home locks it for you.
 
@@ -13,14 +13,14 @@ People under 18 never see an adults-only video, locked or not. The TV and other 
 
 **Change your mind about a video you made.** You can take the lock off.
 
-1. Open the video and press **Unmark as NSFW**.
+1. Open the video and press **Remove lock**.
 2. Read what will change. The video will show with its title and picture in your feeds and lists, to anyone looking at your screen.
 3. Enter your passcode again, even if you just unlocked. Home asks every time.
 4. Press **Remove lock**.
 
-After that, the video says "Marked NSFW, lock removed." Anyone under 18 still cannot see it. Only the person who made the video can take the lock off. An admin cannot take it off another person's video.
+After that, the video says "Lock removed." Anyone under 18 still cannot see it. Only the person who made the video can take the lock off. An admin cannot take it off another person's video.
 
-**Lock it again.** Press **Mark as NSFW** on any of your videos. It locks at once, and you do not need your passcode. An admin can also mark more videos NSFW.
+**Lock it again.** Press **Lock** on any of your videos. It locks at once, and you do not need your passcode. An admin can also lock more videos.
 
 **Changing a video.** A trimmed, joined or mixed video follows the videos it came from. If the video you changed had its lock removed, the new one has no lock. If any video you used is still locked, the new one is locked. A new take that uses an adults-only style again is locked.
 

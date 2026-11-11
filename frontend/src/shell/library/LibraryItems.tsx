@@ -14,6 +14,7 @@ import { api, type LibraryItem, type Roster } from "@/lib/api";
 import { canShareFiles, extensionOf, fileKind, hasThumbnail, isAdultRole, ownerName, secondaryLine, spokenDetail, type SortId } from "./libraryModel";
 
 const MoreIcon = getIcon("more-horizontal");
+const OpenLockIcon = getIcon("lock-open");
 
 export interface ItemActions {
   open(item: LibraryItem): void;
@@ -37,8 +38,8 @@ export function itemMenu(item: LibraryItem, me: Roster, actions: ItemActions) {
       {mine ? <DropdownMenuItem onSelect={() => actions.rename(item)}>{i18n._({ id: "Rename", message: "Rename" })}</DropdownMenuItem> : null}
       {mine && item.retention !== "kept" ? <DropdownMenuItem onSelect={() => actions.keep(item)}>{i18n._({ id: "Keep", message: "Keep" })}</DropdownMenuItem> : null}
       {mine && isAdultRole(me) && item.kind === "image" && item.audience === "adult-only" ? <DropdownMenuItem onSelect={() => actions.recheck(item)}>{i18n._({ id: "Mark all-ages", message: "Mark all-ages" })}</DropdownMenuItem> : null}
-      {mine && item.adult?.can_mark ? <DropdownMenuItem onSelect={() => actions.adultMark(item)}>{i18n._({ id: "Mark as NSFW", message: "Mark as NSFW" })}</DropdownMenuItem> : null}
-      {mine && item.adult?.can_clear ? <DropdownMenuItem onSelect={() => actions.adultUnmark(item)}>{i18n._({ id: "Unmark as NSFW", message: "Unmark as NSFW" })}</DropdownMenuItem> : null}
+      {mine && item.adult?.can_mark ? <DropdownMenuItem onSelect={() => actions.adultMark(item)}>{i18n._({ id: "Lock", message: "Lock" })}</DropdownMenuItem> : null}
+      {mine && item.adult?.can_clear ? <DropdownMenuItem onSelect={() => actions.adultUnmark(item)}>{i18n._({ id: "Remove lock", message: "Remove lock" })}</DropdownMenuItem> : null}
       {mine ? <><DropdownMenuSeparator /><DropdownMenuItem variant="destructive" onSelect={() => actions.trash(item)}>{i18n._({ id: "Delete", message: "Delete" })}</DropdownMenuItem></> : null}
     </DropdownMenuContent>
   );
@@ -53,7 +54,9 @@ export function tileOf(item: LibraryItem, me: Roster): FileTileData {
     thumbnailUrl: hasThumbnail(item) ? item.thumb_url : null,
     ...(extension ? { extension } : {}),
     durationSeconds: item.duration_seconds,
-    secondary: secondaryLine(item, me),
+    secondary: item.unlocked
+      ? <span className="inline-flex items-center gap-1"><OpenLockIcon aria-hidden className="size-3.5 shrink-0" /><span>{i18n._({ id: "Unlocked", message: "Unlocked" })} · {secondaryLine(item, me)}</span></span>
+      : secondaryLine(item, me),
     description: spokenDetail(item, me),
     sharedWith: item.shared_with.household ? [{ id: "household", name: "everyone in the home", seed: "household" }] : [],
   };
@@ -87,6 +90,7 @@ export function NameCell({ item }: { item: LibraryItem }) {
       <span className="flex size-12 shrink-0 overflow-hidden rounded-md">
         <SafeImage src={hasThumbnail(item) ? item.thumb_url : null} kind={kind} alt="" width={48} height={48} decoding="async" className="size-full object-cover" />
       </span>
+      {item.unlocked ? <OpenLockIcon aria-hidden className="size-4 shrink-0 text-muted-foreground" /> : null}
       <span className="min-w-0 truncate text-base font-medium text-foreground">{item.name}</span>
     </span>
   );

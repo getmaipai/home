@@ -18,24 +18,24 @@ function open(item: LibraryItem, viewer: Roster, adultMark = () => {}, adultUnma
 }
 
 describe("Library item menu: adult lock", () => {
-  test("an all-ages video the owner can mark offers Mark as NSFW, and picking it calls adultMark", () => {
+  test("an all-ages video the owner can mark offers Lock, and picking it calls adultMark", () => {
     const marked = mock(() => {});
     const view = open(adult(true, false), me, marked);
-    expect(view.queryByText("Unmark as NSFW")).toBeNull();
-    view.getByText("Mark as NSFW").click();
+    expect(view.queryByText("Remove lock")).toBeNull();
+    view.getByText("Lock").click();
     expect(marked).toHaveBeenCalledTimes(1);
   });
-  test("a locked video offers Unmark as NSFW only", () => {
+  test("a locked video offers Remove lock only", () => {
     const view = open(adult(false, true), me);
-    expect(view.queryByText("Mark as NSFW")).toBeNull();
-    expect(view.queryByText("Unmark as NSFW")).toBeTruthy();
+    expect(view.queryByText("Lock")).toBeNull();
+    expect(view.queryByText("Remove lock")).toBeTruthy();
   });
   test("someone else's video and an item with no lock state offer neither", () => {
     const other = open(adult(true, true), { ...me, id: "person-2" } as Roster);
-    expect(other.queryByText("Mark as NSFW")).toBeNull();
+    expect(other.queryByText("Lock")).toBeNull();
     cleanup();
     const none = open(base, me);
-    expect(none.queryByText("Mark as NSFW")).toBeNull();
-    expect(none.queryByText("Unmark as NSFW")).toBeNull();
+    expect(none.queryByText("Lock")).toBeNull();
+    expect(none.queryByText("Remove lock")).toBeNull();
   });
 });

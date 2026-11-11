@@ -31,6 +31,7 @@ import {
 import { batchSentence, useLibraryActions } from "@/shell/library/useLibraryActions";
 import { LibraryItems, type ItemActions } from "@/shell/library/LibraryItems";
 import { LibraryViewer } from "@/shell/library/LibraryViewer";
+import { LockTile } from "@maipai/ui/src/elements/adult-lock";
 import { useAdultMark } from "@/apps/chat/useAdultMark";
 import { LibraryShareDialog } from "@/shell/library/LibraryShareDialog";
 import { LibraryTrash } from "@/shell/library/LibraryTrash";
@@ -119,6 +120,8 @@ export function FilesPage({ person }: { person: Roster }) {
     getNextPageParam: (last) => last.next_cursor ?? undefined,
     enabled: !trashView,
   });
+  // First page only: an adult with no unlock proof and locked items in this view sees one Locked items tile (no count, no name).
+  const hasLocked = list.data?.pages[0]?.locked === true;
   const items = useMemo(() => {
     const seen = new Set<string>();
     return (list.data?.pages ?? []).flatMap((page) => page.items).filter((item) => !seen.has(item.id) && seen.add(item.id));
@@ -207,7 +210,7 @@ export function FilesPage({ person }: { person: Roster }) {
       void actions.recheck(item.id).then(() => toast.success(i18n._({ id: "‘{name}’ is now marked all-ages.", message: "‘{name}’ is now marked all-ages.", values: { name: item.name } }))).catch((error: unknown) => setProblem(actions.reason(error)));
     },
     adultMark: (item) => {
-      void api.libraryAdultMark(item.id, { action: "mark" }).then(() => actions.refresh()).then(() => toast.success(i18n._({ id: "‘{name}’ is marked NSFW and locked.", message: "‘{name}’ is marked NSFW and locked.", values: { name: item.name } }))).catch((error: unknown) => setProblem(actions.reason(error)));
+      void api.libraryAdultMark(item.id, { action: "mark" }).then(() => actions.refresh()).then(() => toast.success(i18n._({ id: "‘{name}’ is locked.", message: "‘{name}’ is locked.", values: { name: item.name } }))).catch((error: unknown) => setProblem(actions.reason(error)));
     },
     adultUnmark: (item) => setUnmarkItem(item),
   }), [actions, requestTrash, update]);
@@ -326,6 +329,8 @@ export function FilesPage({ person }: { person: Roster }) {
     }
     if (list.isError && !list.isFetchNextPageError) return loadError(list.error instanceof ApiError && list.error.message ? list.error.message : i18n._({ id: "Home could not load your Library. Check that Home is running, then try again.", message: "Home could not load your Library. Check that Home is running, then try again." }), () => void list.refetch());
     if (list.isPending) return <RouteSkeleton label={i18n._({ id: "Loading your files", message: "Loading your files" })} />;
+    const lockTile = hasLocked ? <div className="max-w-sm"><LockTile shape="card" /></div> : null;
+    if (items.length === 0 && lockTile) return lockTile;
     if (items.length === 0) {
       if (filtersOn) return <EmptyState variant="tile" icon="search" text={i18n._({ id: "No matches. Try a different word or clear a filter.", message: "No matches. Try a different word or clear a filter." })} actionLabel={i18n._({ id: "Clear filters", message: "Clear filters" })} onAction={() => { setSearchText(""); update({ q: "", filter: "any" }); }} />;
       if (view.section === "all") return <EmptyState variant="tile" icon="folder" text={i18n._({ id: "Nothing here yet. Pictures, videos and songs you make in chat land here, along with files you upload. Drop a file anywhere on this page to add it.", message: "Nothing here yet. Pictures, videos and songs you make in chat land here, along with files you upload. Drop a file anywhere on this page to add it." })} />;
@@ -333,6 +338,7 @@ export function FilesPage({ person }: { person: Roster }) {
     }
     return (
       <div className="flex flex-col gap-4" style={{ "--maipai-card-size": `${cardSize}px` } as CSSProperties}>
+        {lockTile}
         <LibraryItems items={items} me={person} layout={view.layout} phone={phone} selectedIds={selected} onSelectionChange={setSelected} selectionMode={selecting}
           onExitSelectionMode={leaveSelection} actions={itemActions} sort={view.sort} onSort={(sort) => update({ sort })} />
         {list.isFetchNextPageError ? loadError(i18n._({ id: "Home could not load more files. Check that Home is running, then try again.", message: "Home could not load more files. Check that Home is running, then try again." }), () => void fetchNextPage()) : null}

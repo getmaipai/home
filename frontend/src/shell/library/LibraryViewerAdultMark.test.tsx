@@ -32,19 +32,19 @@ function mount(me: Roster, state: { can_clear: boolean; can_mark: boolean }) {
 }
 
 describe("LibraryViewer adult mark actions", () => {
-  test("the owner sees Unmark as NSFW when the video can be cleared", async () => {
+  test("the owner sees Remove lock when the video can be cleared", async () => {
     const view = mount(adult, { can_clear: true, can_mark: false });
-    await waitFor(() => expect(view.queryByRole("button", { name: "Unmark as NSFW" })).toBeTruthy());
-    expect(view.queryByRole("button", { name: "Mark as NSFW" })).toBeNull();
+    await waitFor(() => expect(view.queryByRole("button", { name: "Remove lock" })).toBeTruthy());
+    expect(view.queryByRole("button", { name: "Lock" })).toBeNull();
   });
 
-  test("another person sees neither action, and can_mark offers Mark as NSFW", async () => {
+  test("another person sees neither action, and can_mark offers Lock", async () => {
     const view = mount(other, { can_clear: true, can_mark: true });
-    await waitFor(() => expect(view.queryByRole("button", { name: "Unmark as NSFW" })).toBeNull());
-    expect(view.queryByRole("button", { name: "Mark as NSFW" })).toBeNull();
+    await waitFor(() => expect(view.queryByRole("button", { name: "Remove lock" })).toBeNull());
+    expect(view.queryByRole("button", { name: "Lock" })).toBeNull();
     view.unmount();
     const ownerView = mount(adult, { can_clear: false, can_mark: true });
-    await waitFor(() => expect(ownerView.queryByRole("button", { name: "Mark as NSFW" })).toBeTruthy());
-    expect(ownerView.queryByRole("button", { name: "Unmark as NSFW" })).toBeNull();
+    await waitFor(() => expect(ownerView.queryByRole("button", { name: "Lock" })).toBeTruthy());
+    expect(ownerView.queryByRole("button", { name: "Remove lock" })).toBeNull();
   });
 });

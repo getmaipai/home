@@ -93,8 +93,8 @@ const ItemSchema = z.object({
   adult: z.object({
     made_audience: z.enum(["all-ages", "adult-only"]).describe("The machine fact and the minor ceiling; never lowered."),
     lock: z.enum(["on", "off"]).describe("Whether the Adult lock applies; the creator can clear it."),
-    can_clear: z.boolean().describe("Show 'Unmark as NSFW': the creator, the item is adult-only and locked. Needs the confirm dialog and a fresh passcode (POST /api/adult-lock/confirm, then adult-mark)."),
-    can_mark: z.boolean().describe("Show 'Mark as NSFW': the creator, the item is not locked."),
+    can_clear: z.boolean().describe("Show 'Remove lock': the creator, the item is adult-only and locked. Needs the confirm dialog and a fresh passcode (POST /api/adult-lock/confirm, then adult-mark)."),
+    can_mark: z.boolean().describe("Show 'Lock': the creator, the item is not locked."),
     line: z.string().nullable().describe("The state in plain words, for an adult-only item."),
     history: z.array(z.object({ action: z.enum(["clear", "mark"]), via: z.enum(["creator_passcode", "creator", "admin", "auto"]), at: z.string() })).describe("The creator's own audit rows for this item (no content)."),
   }).nullable().describe("ADULT-LOCK-06: the item's Adult lock state for its creator, once it is shown (null for a clip still being made, a minor or a temporary chat)."),
@@ -328,7 +328,7 @@ videosRoutes.openapi(cancelRoute, async (c) => {
 // ADULT-LOCK-06 (design 3.10): the creator clears the Adult lock after the confirm dialog and a FRESH passcode (the single-use ticket of
 // POST /api/adult-lock/confirm, named for this job); the creator or an admin marks it again with no passcode. Nothing of the item is in an answer.
 const adultMarkRoute = createRoute({
-  method: "post", path: "/jobs/{id}/adult-mark", tags: ["Videos"], summary: "Mark a clip NSFW again, or (the creator only, with a fresh passcode ticket) remove its Adult lock", middleware: [requireAuth] as const,
+  method: "post", path: "/jobs/{id}/adult-mark", tags: ["Videos"], summary: "Lock a clip again, or (the creator only, with a fresh passcode ticket) remove its Adult lock", middleware: [requireAuth] as const,
   request: { params: idParams, body: { content: { "application/json": { schema: z.object({ action: z.enum(["clear", "mark"]), ticket: z.string().min(1).max(200).optional() }) } } } },
   responses: {
     200: { content: { "application/json": { schema: z.object({ made_audience: z.enum(["all-ages", "adult-only"]), lock: z.enum(["on", "off"]) }) } }, description: "The state now." },

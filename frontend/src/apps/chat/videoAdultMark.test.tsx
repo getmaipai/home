@@ -1,5 +1,5 @@
-// ADULT-LOCK-06 (docs/design/video-loras-2026-11-02.md 3.10): the clip's creator sees "Unmark as NSFW" only while the clip is locked and shown, with a confirm dialog
-// in plain words and a fresh passcode; "Mark as NSFW" only when it is not locked; nobody else sees either, and a clip that turns locked becomes the lock tile.
+// ADULT-LOCK-06 (docs/design/video-loras-2026-11-02.md 3.10): the clip's creator sees "Remove lock" only while the clip is locked and shown, with a confirm dialog
+// in plain words and a fresh passcode; "Lock" only when it is not locked; nobody else sees either, and a clip that turns locked becomes the lock tile.
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { MemoryRouter } from "react-router-dom";
@@ -19,7 +19,7 @@ let markStatus = 200;
 
 const clip = { url: "/api/videos/jobs/vid-1/files/file-a", poster_url: "/api/videos/jobs/vid-1/files/file-b", width: 832, height: 480, seconds: 5, seed: 1, file_id: "file-a", poster_file_id: "file-b" };
 const item = (): VideoItem => ({ id: "vid-1", state: "done", percent: 100, label: "", position: null, eta_seconds: null, step: null, steps: null, preview_url: null, started_at: Date.now() - 30_000, prompt: "a paper boat in the rain", kind: "generate", error: null, quality: "quick", switch_to: null, adult, clip });
-const state = (over: Partial<VideoAdultState>): VideoAdultState => ({ made_audience: "adult-only", lock: "on", can_clear: true, can_mark: false, line: "Marked NSFW and locked. It opens only with your passcode, and people under 18 never see it.", history: [], ...over });
+const state = (over: Partial<VideoAdultState>): VideoAdultState => ({ made_audience: "adult-only", lock: "on", can_clear: true, can_mark: false, line: "Locked. It opens only with your passcode, and people under 18 never see it.", history: [], ...over });
 
 beforeEach(() => {
   calls = []; cardOverride = null; confirmStatus = 200; markStatus = 200;
@@ -44,12 +44,12 @@ function mount(pinDigits: number | null = 4, hasSecret = true) {
 const typeCode = (code: string) => fireEvent.change(document.querySelector<HTMLInputElement>('[data-slot="adult-lock-dialog"] input')!, { target: { value: code } });
 
 describe("the creator's menu on a locked, shown clip", () => {
-  test("shows the state in plain words and Unmark as NSFW, not Mark as NSFW; the dialog says what changes and asks for the passcode", async () => {
+  test("shows the state in plain words and Remove lock, not Lock; the dialog says what changes and asks for the passcode", async () => {
     const view = mount();
-    await waitFor(() => expect(view.getByRole("button", { name: "Unmark as NSFW" })).toBeTruthy());
-    expect(view.queryByRole("button", { name: "Mark as NSFW" })).toBeNull();
-    expect(view.container.textContent).toContain("Marked NSFW and locked.");
-    fireEvent.click(view.getByRole("button", { name: "Unmark as NSFW" }));
+    await waitFor(() => expect(view.getByRole("button", { name: "Remove lock" })).toBeTruthy());
+    expect(view.queryByRole("button", { name: "Lock" })).toBeNull();
+    expect(view.container.textContent).toContain("Locked.");
+    fireEvent.click(view.getByRole("button", { name: "Remove lock" }));
     await waitFor(() => expect(document.querySelector('[data-slot="adult-lock-dialog"]')).not.toBeNull());
     const dialog = document.querySelector('[data-slot="adult-lock-dialog"]')!.textContent!;
     expect(dialog).toContain("Remove the adult lock?");
@@ -63,8 +63,8 @@ describe("the creator's menu on a locked, shown clip", () => {
 
   test("a right passcode asks Home for a fresh ticket for this clip, then clears with it", async () => {
     const view = mount();
-    await waitFor(() => expect(view.getByRole("button", { name: "Unmark as NSFW" })).toBeTruthy());
-    fireEvent.click(view.getByRole("button", { name: "Unmark as NSFW" }));
+    await waitFor(() => expect(view.getByRole("button", { name: "Remove lock" })).toBeTruthy());
+    fireEvent.click(view.getByRole("button", { name: "Remove lock" }));
     await waitFor(() => expect(document.querySelector('[data-slot="adult-lock-dialog"] input')).not.toBeNull());
     typeCode("1234");
     await waitFor(() => expect(calls.some((c) => c.url === "/api/videos/jobs/vid-1/adult-mark")).toBe(true));
@@ -77,8 +77,8 @@ describe("the creator's menu on a locked, shown clip", () => {
   test("a wrong passcode is a plain line, no clear is sent and the dialog stays open", async () => {
     confirmStatus = 401;
     const view = mount();
-    await waitFor(() => expect(view.getByRole("button", { name: "Unmark as NSFW" })).toBeTruthy());
-    fireEvent.click(view.getByRole("button", { name: "Unmark as NSFW" }));
+    await waitFor(() => expect(view.getByRole("button", { name: "Remove lock" })).toBeTruthy());
+    fireEvent.click(view.getByRole("button", { name: "Remove lock" }));
     await waitFor(() => expect(document.querySelector('[data-slot="adult-lock-dialog"] input')).not.toBeNull());
     typeCode("0000");
     await waitFor(() => expect(document.querySelector('[data-slot="adult-lock-error"]')?.textContent).toContain("was not right"));
@@ -89,8 +89,8 @@ describe("the creator's menu on a locked, shown clip", () => {
 
 describe("a creator who signs in with a password (ADULT-LOCK-07)", () => {
   const open = async (view: ReturnType<typeof mount>) => {
-    await waitFor(() => expect(view.getByRole("button", { name: "Unmark as NSFW" })).toBeTruthy());
-    fireEvent.click(view.getByRole("button", { name: "Unmark as NSFW" }));
+    await waitFor(() => expect(view.getByRole("button", { name: "Remove lock" })).toBeTruthy());
+    fireEvent.click(view.getByRole("button", { name: "Remove lock" }));
     await waitFor(() => expect(document.querySelector('[data-slot="adult-lock-dialog"] input')).not.toBeNull());
   };
   const field = () => document.querySelector<HTMLInputElement>('[data-slot="adult-lock-dialog"] input')!;
@@ -110,8 +110,8 @@ describe("a creator who signs in with a password (ADULT-LOCK-07)", () => {
 
   test("a creator with no secret set is told where to set one, with no field", async () => {
     const view = mount(null, false);
-    await waitFor(() => expect(view.getByRole("button", { name: "Unmark as NSFW" })).toBeTruthy());
-    fireEvent.click(view.getByRole("button", { name: "Unmark as NSFW" }));
+    await waitFor(() => expect(view.getByRole("button", { name: "Remove lock" })).toBeTruthy());
+    fireEvent.click(view.getByRole("button", { name: "Remove lock" }));
     await waitFor(() => expect(document.querySelector('[data-slot="adult-lock-no-credential"]')).not.toBeNull());
     expect(document.querySelector('[data-slot="adult-lock-dialog"] input')).toBeNull();
   });
@@ -128,24 +128,24 @@ describe("a creator who signs in with a password (ADULT-LOCK-07)", () => {
 });
 
 describe("a clip with the lock removed or never locked", () => {
-  test("offers Mark as NSFW and no unmark, says the lock is removed, and marks with no passcode", async () => {
-    adult = state({ lock: "off", can_clear: false, can_mark: true, line: "Marked NSFW, lock removed. It shows with its title and thumbnail in your feeds and lists. People under 18 never see it." });
+  test("offers Lock and no unmark, says the lock is removed, and marks with no passcode", async () => {
+    adult = state({ lock: "off", can_clear: false, can_mark: true, line: "Lock removed. It shows with its title and thumbnail in your feeds and lists. People under 18 never see it." });
     const view = mount();
-    await waitFor(() => expect(view.getByRole("button", { name: "Mark as NSFW" })).toBeTruthy());
-    expect(view.queryByRole("button", { name: "Unmark as NSFW" })).toBeNull();
-    expect(view.container.textContent).toContain("lock removed");
-    fireEvent.click(view.getByRole("button", { name: "Mark as NSFW" }));
+    await waitFor(() => expect(view.getByRole("button", { name: "Lock" })).toBeTruthy());
+    expect(view.queryByRole("button", { name: "Remove lock" })).toBeNull();
+    expect(view.container.textContent).toContain("Lock removed");
+    fireEvent.click(view.getByRole("button", { name: "Lock" }));
     await waitFor(() => expect(calls.some((c) => c.url === "/api/videos/jobs/vid-1/adult-mark")).toBe(true));
     expect(JSON.parse(calls.find((c) => c.url === "/api/videos/jobs/vid-1/adult-mark")!.body!)).toEqual({ action: "mark" });
     expect(calls.some((c) => c.url === "/api/adult-lock/confirm")).toBe(false);
   });
 
   test("a refused mark shows Home's plain line instead of nothing", async () => {
-    adult = state({ lock: "off", can_clear: false, can_mark: true, line: "Marked NSFW, lock removed." });
+    adult = state({ lock: "off", can_clear: false, can_mark: true, line: "Lock removed." });
     markStatus = 403;
     const view = mount();
-    await waitFor(() => expect(view.getByRole("button", { name: "Mark as NSFW" })).toBeTruthy());
-    fireEvent.click(view.getByRole("button", { name: "Mark as NSFW" }));
+    await waitFor(() => expect(view.getByRole("button", { name: "Lock" })).toBeTruthy());
+    fireEvent.click(view.getByRole("button", { name: "Lock" }));
     await waitFor(() => expect(view.container.textContent).toContain("Change this on your own screen."));
   });
 
@@ -154,7 +154,7 @@ describe("a clip with the lock removed or never locked", () => {
     const view = mount();
     await waitFor(() => expect(view.container.querySelector('[data-slot="lock-tile"]')).not.toBeNull());
     expect(view.container.textContent).not.toContain("paper boat");
-    expect(view.queryByRole("button", { name: "Mark as NSFW" })).toBeNull();
+    expect(view.queryByRole("button", { name: "Lock" })).toBeNull();
   });
 });
 
@@ -163,7 +163,7 @@ describe("nobody else sees the actions", () => {
     adult = null;
     const view = mount();
     await waitFor(() => expect(view.container.querySelector("video")).not.toBeNull());
-    expect(view.queryByRole("button", { name: "Unmark as NSFW" })).toBeNull();
-    expect(view.queryByRole("button", { name: "Mark as NSFW" })).toBeNull();
+    expect(view.queryByRole("button", { name: "Remove lock" })).toBeNull();
+    expect(view.queryByRole("button", { name: "Lock" })).toBeNull();
   });
 });

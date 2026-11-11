@@ -1,4 +1,4 @@
-// AUDIT-DUP-FE-01 (ADULT-LOCK-06/07): the one confirm-and-ticket flow behind the picture and the video "Mark as NSFW" / "Unmark as NSFW" controls.
+// AUDIT-DUP-FE-01 (ADULT-LOCK-06/07): the one confirm-and-ticket flow behind the picture and the video "Lock" / "Remove lock" controls.
 // The two items differ only in the api object and in how an action is drawn (a gallery action or a ghost button), so `toAction` draws it.
 import { createElement, useContext, useEffect, useState, type ReactNode } from "react";
 import { AdultLockDialog, type UnlockResult } from "@maipai/ui/src/elements/adult-lock";
@@ -53,8 +53,8 @@ export function useAdultMark<T>(api: AdultMarkApi, item: AdultMarkItem | null, r
   };
   const hint = adult.line ?? undefined;
   const actions: T[] = [];
-  if (adult.can_clear) actions.push(toAction({ id: "adult-unmark", label: "Unmark as NSFW", hint, disabled: busy, onSelect: () => setOpen(true) }));
-  if (adult.can_mark) actions.push(toAction({ id: "adult-mark", label: "Mark as NSFW", hint, disabled: busy, onSelect: markAgain }));
+  if (adult.can_clear) actions.push(toAction({ id: "adult-unmark", label: "Remove lock", hint, disabled: busy, onSelect: () => setOpen(true) }));
+  if (adult.can_mark) actions.push(toAction({ id: "adult-mark", label: "Lock", hint, disabled: busy, onSelect: markAgain }));
   const dialog = adult.can_clear
     ? createElement(AdultLockDialog, {
       key: "adult-unmark-dialog",

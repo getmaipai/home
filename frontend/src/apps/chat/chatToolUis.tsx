@@ -725,7 +725,7 @@ export const VideoToolRender: ToolCallMessagePartComponent<Record<string, never>
     gcTime: 10 * 60_000,
     retry: false,
   });
-  // ADULT-LOCK-06: the creator's "Unmark as NSFW" and "Mark as NSFW" actions and the confirm dialog (a hook, so it is called before any early return).
+  // ADULT-LOCK-06: the creator's "Remove lock" and "Lock" actions and the confirm dialog (a hook, so it is called before any early return).
   const refresh = () => { void query.refetch(); };
   const adultMark = useVideoAdultMark(readyItem ?? null, refresh);
   const [spatialBusy, setSpatialBusy] = useState(false);

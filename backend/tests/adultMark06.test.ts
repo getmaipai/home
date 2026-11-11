@@ -132,7 +132,7 @@ describe("unmark: the creator, the confirm, a fresh passcode", () => {
     const card = await (await adult.client.get(`/api/videos/jobs/${clip.jobId}`)).json() as { items: Row[] };
     expect(card.items[0]!.state).toBe("done");
     expect(card.items[0]!.adult).toMatchObject({ made_audience: "adult-only", lock: "off", can_clear: false, can_mark: true });
-    expect(card.items[0]!.adult.line).toContain("lock removed");
+    expect(card.items[0]!.adult.line).toContain("Lock removed");
     expect((await adult.client.get(`/api/files/${clip.fileId}/content`)).status).toBe(200);
     const feed = await (await data(adult.client, { scope: "feed" })).json() as Row[];
     expect(feed.some((r) => r.id === clip.jobId)).toBe(true);

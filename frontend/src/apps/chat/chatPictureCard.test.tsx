@@ -54,14 +54,14 @@ describe("the picture card", () => {
     const original = { ...picturesApi };
     const confirmUnmark = mock(async () => ({ ticket: "ticket-1", expires_in: 30 }));
     const adultMark = mock(async () => ({ made_audience: "adult-only" as const, lock: "off" as const }));
-    picturesApi.card = mock(async () => card({ state: "done", percent: 100, files: [FILE], adult: { made_audience: "adult-only", lock: "on", can_clear: true, can_mark: false, line: "Marked NSFW and locked.", history: [] } }));
+    picturesApi.card = mock(async () => card({ state: "done", percent: 100, files: [FILE], adult: { made_audience: "adult-only", lock: "on", can_clear: true, can_mark: false, line: "Locked.", history: [] } }));
     picturesApi.confirmUnmark = confirmUnmark;
     picturesApi.adultMark = adultMark;
     const me = { id: "p1", pinDigits: null, hasSecret: true } as never;
     const view = renderWithQueryClient(<WakeWordPersonContext.Provider value={me}><PictureToolRender {...props} /></WakeWordPersonContext.Provider>);
-    await waitFor(() => expect(view.getByRole("button", { name: "Unmark as NSFW" })).toBeTruthy());
-    expect(view.queryByRole("button", { name: "Mark as NSFW" })).toBeNull();
-    fireEvent.click(view.getByRole("button", { name: "Unmark as NSFW" }));
+    await waitFor(() => expect(view.getByRole("button", { name: "Remove lock" })).toBeTruthy());
+    expect(view.queryByRole("button", { name: "Lock" })).toBeNull();
+    fireEvent.click(view.getByRole("button", { name: "Remove lock" }));
     await waitFor(() => expect(document.querySelector('[data-slot="adult-lock-dialog"]')).toBeTruthy());
     fireEvent.change(document.querySelector<HTMLInputElement>('[data-slot="adult-lock-password"]')!, { target: { value: "secret" } });
     fireEvent.click(view.getByRole("button", { name: "Remove lock" }));
@@ -73,12 +73,12 @@ describe("the picture card", () => {
   test("the adult menu offers Mark when the lock is already clear", async () => {
     const original = { ...picturesApi };
     const adultMark = mock(async () => ({ made_audience: "adult-only" as const, lock: "on" as const }));
-    picturesApi.card = mock(async () => card({ state: "done", percent: 100, files: [FILE], adult: { made_audience: "adult-only", lock: "off", can_clear: false, can_mark: true, line: "Marked NSFW, lock removed.", history: [] } }));
+    picturesApi.card = mock(async () => card({ state: "done", percent: 100, files: [FILE], adult: { made_audience: "adult-only", lock: "off", can_clear: false, can_mark: true, line: "Lock removed.", history: [] } }));
     picturesApi.adultMark = adultMark;
     const view = renderWithQueryClient(<PictureToolRender {...props} />);
-    await waitFor(() => expect(view.getByRole("button", { name: "Mark as NSFW" })).toBeTruthy());
-    expect(view.queryByRole("button", { name: "Unmark as NSFW" })).toBeNull();
-    fireEvent.click(view.getByRole("button", { name: "Mark as NSFW" }));
+    await waitFor(() => expect(view.getByRole("button", { name: "Lock" })).toBeTruthy());
+    expect(view.queryByRole("button", { name: "Remove lock" })).toBeNull();
+    fireEvent.click(view.getByRole("button", { name: "Lock" }));
     await waitFor(() => expect(adultMark).toHaveBeenCalledWith("pic-1", { action: "mark" }));
     Object.assign(picturesApi, original);
   });

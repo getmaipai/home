@@ -31,8 +31,8 @@ export const TEMPORARY_LINE = "A video made in a temporary chat is not saved, so
 export const NOT_MARKED_LINE = "This item is not locked.";
 /** The plain words of an item's state, for the person who may see it (the item's menu). */
 export const STATE_LINES = {
-  locked: "Marked NSFW and locked. It opens only with your passcode, and people under 18 never see it.",
-  cleared: "Marked NSFW, lock removed. It shows with its title and thumbnail in your feeds and lists. People under 18 never see it.",
+  locked: "Locked. It opens only with your passcode, and people under 18 never see it.",
+  cleared: "Lock removed. It shows with its title and thumbnail in your feeds and lists. People under 18 never see it.",
 } as const;
 
 /** The audit write. `at` is when the change happened. */

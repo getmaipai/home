@@ -2,7 +2,8 @@ import { sqlite } from "@/db";
 import { canReadFileAudience, fileAudience, fileVisibilitySql } from "@/lib/access";
 import { mediaKindSql } from "@/lib/storage/usage";
 import { isGeneratedFile, libraryProvenance, libraryProvenanceSql } from "@/lib/libraryProvenance";
-import { lockedFilterSql } from "@/lib/adultLock";
+import { lockedFilterSql, lockItemOfProvenance, unlockedFor } from "@/lib/adultLock";
+import { speakerAgeBand } from "@/lib/ageBand";
 import { trashTotals } from "@/lib/libraryTrash";
 import { expiringLibraryFiles } from "@/lib/libraryRetention";
 import type { PersonRow } from "@/types";
@@ -24,7 +25,7 @@ function cursor(q: LibraryQuery): Cursor | null {
 }
 
 /** One joined read, with a grouped share relation so multiple pointers never multiply files. */
-function base(actor: PersonRow, q: LibraryQuery) {
+function base(actor: PersonRow, q: LibraryQuery, lockedOnly = false) {
   const params: (string | number)[] = [actor.id, actor.id, actor.id];
   let filter = "1=1";
   if (q.type) { filter += " AND kind = ?"; params.push(q.type); }
@@ -52,7 +53,7 @@ function base(actor: PersonRow, q: LibraryQuery) {
     LEFT JOIN video_jobs vj ON vj.id = json_extract(${libraryProvenanceSql("a.provenance")},'$.job') AND vj.person_id = a.owner_person_id
     LEFT JOIN music_jobs mj ON mj.id = coalesce(json_extract(${libraryProvenanceSql("a.provenance")},'$.job_id'),json_extract(${libraryProvenanceSql("a.provenance")},'$.job')) AND mj.person_id = a.owner_person_id
     WHERE ${fileVisibilitySql(actor, "a", "s.visible")}
-      AND NOT ${lockedFilterSql(actor, libraryProvenanceSql("a.provenance"))}
+      AND ${lockedOnly ? "" : "NOT "}${lockedFilterSql(actor, libraryProvenanceSql("a.provenance"))}
   ), named AS (
     SELECT *, coalesce(picture_prompt,video_prompt,json_extract(meta,'$.prompt'),'') AS prompt,
       coalesce(json_extract(CASE WHEN json_valid(music_request) THEN music_request ELSE '{}' END,'$.title'),json_extract(meta,'$.title'),'') AS title,
@@ -73,6 +74,18 @@ function base(actor: PersonRow, q: LibraryQuery) {
 
 interface Row { chat_id: string | null; chat_title: string | null; source_chat_id: string | null; turn_id: string | null; origin: string; id: string; kind: "image" | "video" | "audio" | "document" | "story" | "file"; name: string; media_type: string; size: number; created_at: string; owner_person_id: string; display_name: string; share_count: number; household: number; retention: string; provenance: string; duration: number | null; cover_file_id: string | null; thumbnail: string | null; versions: number }
 function fileOrigin(row: Pick<Row, "origin" | "provenance">): "made" | "sent" | "fetched" { return row.origin === "fetched" ? "fetched" : isGeneratedFile(row) ? "made" : "sent"; }
+/** True when the viewer is an adult with no unlock proof and at least one locked item matches this view: the page then shows one Locked items tile. The tile carries no count and no name. */
+export function hasLockedLibraryItems(actor: PersonRow, q: LibraryQuery): boolean {
+  if (speakerAgeBand(actor, new Date()) !== "adult" || unlockedFor(actor)) return false;
+  const b = base(actor, q, true);
+  return sqlite.query<{ n: number }, (string | number)[]>(`${b.sql} SELECT count(*) AS n FROM tiles`).get(...b.params)?.n ? true : false;
+}
+/** An adult-only item whose lock is on and that is open right now because the viewer holds an unlock proof: the card shows an open lock. */
+function openedLock(actor: PersonRow, row: { owner_person_id: string; provenance: string }): boolean {
+  if (!unlockedFor(actor)) return false;
+  const item = lockItemOfProvenance(row.owner_person_id, row.provenance);
+  return item?.madeAudience === "adult-only" && item.lock === "on";
+}
 export function listLibrary(actor: PersonRow, q: LibraryQuery) {
   const c = cursor(q);
   const b = base(actor,q);
@@ -103,9 +116,10 @@ export function listLibrary(actor: PersonRow, q: LibraryQuery) {
     chat_title: row.owner_person_id === actor.id && row.chat_id ? row.chat_title : null,
     chat_deleted: row.owner_person_id === actor.id && row.source_chat_id !== null && row.chat_id === null,
     can_edit: row.owner_person_id === actor.id && row.chat_id !== null && row.turn_id !== null && row.kind === "image" && ['picture-gen','image-edit'].includes(String((libraryProvenance(row.provenance) as { writer?: string }).writer ?? '')),
-    audience: fileAudience(row.provenance), adult: adultStateOf(actor, row.id), duration_seconds: row.kind === "audio" || row.kind === "video" ? row.duration : null,
+    audience: fileAudience(row.provenance), adult: adultStateOf(actor, row.id), unlocked: openedLock(actor, row), duration_seconds: row.kind === "audio" || row.kind === "video" ? row.duration : null,
     thumb_url: `/api/files/${row.thumbnail}/thumb?w=320`, expires_at: expiring.get(row.id)?.expiresAt ?? null, version_count: row.versions })),
-    next_cursor: more && last ? Buffer.from(JSON.stringify({ v: 1, key: sort === "name" ? last.name : sort === "size" ? last.size : last.created_at, created: last.created_at, id: last.id, scope: scope(q) })).toString("base64url") : null };
+    next_cursor: more && last ? Buffer.from(JSON.stringify({ v: 1, key: sort === "name" ? last.name : sort === "size" ? last.size : last.created_at, created: last.created_at, id: last.id, scope: scope(q) })).toString("base64url") : null,
+    locked: c === null && hasLockedLibraryItems(actor, q) };
 }
 export function librarySummary(actor: PersonRow, q: LibraryQuery) {
   const b = base(actor,q);

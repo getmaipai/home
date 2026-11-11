@@ -1,4 +1,4 @@
-// ADULT-LOCK-06 (docs/design/video-loras-2026-11-02.md 3.10): the item's "Unmark as NSFW" and "Mark as NSFW" actions for a clip's creator, and the confirm
+// ADULT-LOCK-06 (docs/design/video-loras-2026-11-02.md 3.10): the item's "Remove lock" and "Lock" actions for a clip's creator, and the confirm
 // dialog before the lock is removed (useAdultMark: the kit's AdultLockDialog with a FRESH passcode for this one clip, never the page's unlock).
 import type { ReactNode } from "react";
 import { Button } from "@maipai/ui/src/ui/button";

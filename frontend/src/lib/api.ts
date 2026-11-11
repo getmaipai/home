@@ -656,6 +656,8 @@ export interface LibraryItem {
   retention: string; origin?: "made" | "sent" | "fetched"; chat_id: string | null; turn_id?: string | null; chat_title?: string | null; chat_deleted?: boolean; can_edit: boolean;
   audience: "all-ages" | "adult-only" | null; duration_seconds: number | null;
   thumb_url: string; expires_at: string | null; version_count: number;
+  /** Adult-only and locked, but open right now because this page holds the unlock proof: the card shows an open lock. */
+  unlocked?: boolean;
   adult?: { made_audience: "all-ages" | "adult-only"; lock: "on" | "off"; can_clear: boolean; can_mark: boolean; line: string | null; history: Array<{ action: "clear" | "mark"; via: "creator_passcode" | "creator" | "admin" | "auto"; at: string }> } | null;
 }
 export interface LibrarySongDetails {
@@ -1807,7 +1809,7 @@ export const api = {
   // one person's own files (still filtered to what I may see) - the
   // profile page's shared-media grid, reusing this one route rather
   // than a second listing endpoint.
-  library: (query: LibraryQuery = {}) => request<{ items: LibraryItem[]; next_cursor: string | null }>(`/api/library?${libraryParams({ limit: 60, ...query })}`),
+  library: (query: LibraryQuery = {}) => request<{ items: LibraryItem[]; next_cursor: string | null; locked?: boolean }>(`/api/library?${libraryParams({ limit: 60, ...query })}`),
   librarySummary: (query: LibraryQuery = {}) => {
     const filters: LibraryQuery = { ...query };
     delete filters.cursor;

@@ -68,7 +68,7 @@
               },
               "row_actions": [
                 {
-                  "label": "Unmark as NSFW",
+                  "label": "Remove lock",
                   "icon": "key-round",
                   "action": {
                     "call": {
@@ -89,7 +89,7 @@
                   "show_when_field": "can_unmark"
                 },
                 {
-                  "label": "Mark as NSFW",
+                  "label": "Lock",
                   "icon": "lock",
                   "action": {
                     "call": {

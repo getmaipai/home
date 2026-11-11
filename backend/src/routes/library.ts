@@ -30,6 +30,7 @@ const item = z.object({
   owner: z.object({ id: z.string(), display_name: z.string() }), shared_with: z.object({ count: z.number(), household: z.boolean() }),
   retention: z.string(), origin: z.enum(["made", "sent", "fetched"]), chat_id: z.string().nullable().describe("The chat that made or received this item, while it exists and only for the owner."), turn_id: z.string().nullable(), chat_title: z.string().nullable(), chat_deleted: z.boolean(), can_edit: z.boolean().describe("A picture the owner can open in the picture editor (it lives in its chat); false once the chat is gone."), audience: z.enum(["all-ages", "adult-only"]).nullable(), adult: z.object({ made_audience: z.enum(["all-ages", "adult-only"]), lock: z.enum(["on", "off"]), can_clear: z.boolean(), can_mark: z.boolean(), line: z.string().nullable(), history: z.array(z.object({ action: z.enum(["clear", "mark"]), via: z.enum(["creator_passcode", "creator", "admin", "auto"]), at: z.string() })) }).nullable(), duration_seconds: z.number().nullable(),
   thumb_url: z.string().describe("Same-origin thumbnail URL served by the file thumbnail route."), expires_at: z.string().nullable(), version_count: z.number(),
+  unlocked: z.boolean().describe("An adult-only item whose lock is on and that is open right now because the viewer holds an unlock proof. The card shows an open lock."),
 });
 
 const adultMarkParams = z.object({ id: z.string().min(1).max(80).openapi({ param: { name: "id", in: "path" } }) });
@@ -48,7 +49,7 @@ libraryRoutes.openapi(createRoute({ method: "post", path: "/files/{id}/adult-mar
 });
 libraryRoutes.openapi(createRoute({ method: "get", path: "/", tags: ["Library"], summary: "Visible Library items, paged and filtered",
   middleware: [requireAuth] as const, request: { query }, responses: {
-    200: { description: "One page. The next cursor keeps the same filters and sort.", content: { "application/json": { schema: z.object({ items: z.array(item), next_cursor: z.string().nullable() }) } } },
+    200: { description: "One page. The next cursor keeps the same filters and sort.", content: { "application/json": { schema: z.object({ items: z.array(item), next_cursor: z.string().nullable(), locked: z.boolean().describe("First page only: an adult with no unlock proof has locked items in this view, so the page shows one Locked items tile. It carries no count or name.") }) } } },
     ...errorResponses({ 400: "Invalid page address or filter. Use shared=with-me, by-me, or none.", 401: "Not signed in" }),
   } }), c => {
   try { return c.json(listLibrary(c.get("person"), c.req.valid("query")),200); }

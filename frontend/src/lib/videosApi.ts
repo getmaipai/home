@@ -30,7 +30,7 @@ export interface VideoItem {
   note?: string | null;
   clip: VideoClip | null;
 }
-/** ADULT-LOCK-06: what the item's menu needs. `can_clear` shows "Unmark as NSFW" (confirm dialog and a fresh passcode); `can_mark` shows "Mark as NSFW". */
+/** ADULT-LOCK-06: what the item's menu needs. `can_clear` shows "Remove lock" (confirm dialog and a fresh passcode); `can_mark` shows "Lock". */
 export interface VideoAdultState {
   made_audience: "all-ages" | "adult-only";
   lock: "on" | "off";
