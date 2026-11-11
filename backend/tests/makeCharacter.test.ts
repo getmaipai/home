@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
+import sharp from "sharp";
 import { OpenAPIHono } from "@hono/zod-openapi";
 import { createHash } from "node:crypto";
 import { dirname, join } from "node:path";
@@ -44,6 +45,13 @@ const cartoon: ChildSafetyCheck = { ok: true, verdict: { is_cartoon: true, looks
 const photo: ChildSafetyCheck = { ok: true, verdict: { ...cartoon.verdict, is_cartoon: false, looks_like_photo: true } } as never;
 let n = 0;
 const png = () => new Uint8Array([137, 80, 78, 71, ++n, 2, 3]);
+/** A real 64x64 picture (a grey figure on the key colour): the pack maker crops pictures, so the edit and mouth frames must decode. */
+async function figure(): Promise<Uint8Array> {
+  const w = 64, h = 64, raw = Buffer.alloc(w * h * 4);
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) { const o = (y * w + x) * 4, inside = x >= 16 && x < 48 && y >= 8 && y < 56; raw[o] = inside ? 128 : 0; raw[o + 1] = inside ? 128 : 255; raw[o + 2] = inside ? 128 : 0; raw[o + 3] = 255; }
+  raw[2] = ++n % 200;
+  return new Uint8Array(await sharp(raw, { raw: { width: w, height: h, channels: 4 } }).png().toBuffer());
+}
 
 function addPerson(id: string, role: string, birthdate?: string) {
   db.insert(people).values({ id, displayName: id, role, avatarSeed: id, source: "local", createdAt: now, updatedAt: now, hlc: "1:0:test", ...(birthdate ? { birthdate } : {}) } as never).run();
@@ -63,9 +71,9 @@ function fakes(id: string): Fakes {
   let jobSeq = 0;
   const ops: Fakes["ops"] = {
     calls: [], jobs: [], cancelled: [], edits: 0, block: null, failKind: null, shapesWrite: ["atlas.png", "weight.png"],
-    async imageEdit(input) { ops.edits++; const job = `stack-edit-${++jobSeq}`; ops.jobs.push(job); input.onJob(job); return png(); },
+    async imageEdit(input) { ops.edits++; const job = `stack-edit-${++jobSeq}`; ops.jobs.push(job); input.onJob(job); return figure(); },
     async talkFrames(input) { const job = `stack-talk-${++jobSeq}`; ops.jobs.push(job); input.onJob(job); const face = { outerLips: [[10, 10], [30, 18]], innerLips: [[12, 12]], nose: [[20, 8]], contour: [[1, 1]], points: [[1, 1]] };
-      return { frames: Object.fromEntries(input.letters.map((l) => [l, png()])), sourceLandmarks: { ...face, points: Array.from({ length: 203 }, (_, i) => [i, i]) }, landmarks: Object.fromEntries(input.letters.map((l) => [l, face])) }; },
+      return { frames: Object.fromEntries(await Promise.all(input.letters.map(async (l) => [l, await figure()]))), sourceLandmarks: { ...face, points: Array.from({ length: 203 }, (_, i) => [i, i]) }, landmarks: Object.fromEntries(input.letters.map((l) => [l, face])) }; },
     async run(kind, input, hooks) {
       ops.calls.push(kind);
       const job = `stack-${kind}-${++jobSeq}`; ops.jobs.push(job); hooks.onJob(job);

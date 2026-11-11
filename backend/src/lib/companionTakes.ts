@@ -15,6 +15,7 @@ import { maxSecondsFor, quickVideoReady } from "@/lib/videos/quality";
 import { resolveCompanionClip, stackVideoModel, promptHash, reportedVideoModelMatches, reportedVideoQualityMatches, COMPANION_MODEL_MISMATCH_LINE } from "@/lib/companionArt";
 import { cancelOrDeleteVideo, fetchClip, getVideoJob, StackVideoError, submitVideo } from "@/lib/videos/stack";
 import { takeClipSize } from "@/lib/companionClipSize";
+import { frameForImage, frameInClip, type Dims, type PackFrame } from "@/lib/companionPackFrame";
 import { activeLookJob } from "@/lib/companionLookJobs";
 import type { CompanionTake } from "@/lib/companionStates";
 
@@ -33,7 +34,7 @@ export interface TakeRun {
   id: string; companionId: string; personId: string; states: string[];
   current: { state: string; take: number; index: number; of: number } | null;
   state: TakeRunState; phase: string; percent: number; label: string;
-  cancelled: boolean; error: string | null; takesMade: number; stackJob: string | null; pack?: boolean; packJob?: string; /** Resolves when the run is fully settled: every finishing job done, after a cancel or a failure too. */ settled?: Promise<void>;
+  cancelled: boolean; error: string | null; takesMade: number; stackJob: string | null; pack?: boolean; packJob?: string; /** The pack's shared frame in the starting picture's pixels (every pack clip is cut to it). */ packFrame?: PackFrame; packFrameSource?: Dims; /** Resolves when the run is fully settled: every finishing job done, after a cancel or a failure too. */ settled?: Promise<void>;
 }
 const runs = new Map<string, TakeRun>();
 const activeByCompanion = new Map<string, string>();
@@ -185,7 +186,7 @@ async function runTakes(run: TakeRun, count: number, actor: PersonRow, motionOve
           writeFileSync(sourcePath, clip);
           await cancelOrDeleteVideo(completedStackJob); run.stackJob = null; stackJob = null;
           // finishTake records its own failure on the take; a finishing failure never stops the run.
-          finishing.push(finishTake(run.companionId, state, take.id, { alpha: false, actor, ...(run.pack ? { pack: true } : {}) }).catch(() => undefined));
+          finishing.push(finishTake(run.companionId, state, take.id, { alpha: false, actor, ...(run.pack ? { pack: run.packFrame ? { crop: frameInClip(frameForImage(run.packFrame, run.packFrameSource ?? { width: shape.width ?? 0, height: shape.height ?? 0 }, { width: shape.width ?? 0, height: shape.height ?? 0 }), { width: shape.width ?? 0, height: shape.height ?? 0 }, clipSize) } : true } : {}) }).catch(() => undefined));
           consecutiveEngineFailures = 0;
         } catch (error) {
           if (stackJob && !run.cancelled) await cancelOrDeleteVideo(stackJob);
@@ -222,7 +223,7 @@ async function runTakes(run: TakeRun, count: number, actor: PersonRow, motionOve
 
 function stateLabel(state: string): string { return state.split("_").map((part) => part[0]!.toUpperCase() + part.slice(1)).join(" "); }
 
-export async function startStateTakes(input: { actor: PersonRow; companionId: string; states: string[]; count: number; motion?: string; pack?: { job: string } }): Promise<string> {
+export async function startStateTakes(input: { actor: PersonRow; companionId: string; states: string[]; count: number; motion?: string; pack?: { job: string; frame?: PackFrame; frameSource?: Dims } }): Promise<string> {
   const promptText = input.states.map((state) => {
     const current = readStates(input.companionId).states[state], motion = input.motion ?? current?.motion ?? stateRows.find((row) => row.id === state)?.motion ?? "";
     const card = readLook(input.companionId).sheet?.card;
@@ -250,7 +251,7 @@ export async function startStateTakes(input: { actor: PersonRow; companionId: st
   try {
     if (!quickVideoReady(engineStatus)) throw Object.assign(new Error(TAKE_QUICK_NOT_READY_LINE), { status: 503 });
     const id = crypto.randomUUID();
-    const run: TakeRun = { id, companionId: input.companionId, personId: input.actor.id, states: input.states, current: null, state: "queued", phase: "queued", percent: 0, label: "Getting ready to make animations", cancelled: false, error: null, takesMade: 0, stackJob: null, ...(input.pack ? { pack: true, packJob: input.pack.job } : {}) };
+    const run: TakeRun = { id, companionId: input.companionId, personId: input.actor.id, states: input.states, current: null, state: "queued", phase: "queued", percent: 0, label: "Getting ready to make animations", cancelled: false, error: null, takesMade: 0, stackJob: null, ...(input.pack ? { pack: true, packJob: input.pack.job, ...(input.pack.frame ? { packFrame: input.pack.frame, ...(input.pack.frameSource ? { packFrameSource: input.pack.frameSource } : {}) } : {}) } : {}) };
     runs.set(id, run); activeByCompanion.set(input.companionId, id);
     run.settled = runTakes(run, input.count, input.actor, input.motion).catch(() => undefined).then(() => undefined);
     return id;

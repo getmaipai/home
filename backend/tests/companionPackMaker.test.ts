@@ -28,6 +28,7 @@ import {
 } from "@/lib/companionPackMaker";
 import type { PersonRow } from "@/types";
 import { resetDb } from "./reset-db";
+import sharp from "sharp";
 
 const app = new OpenAPIHono();
 app.route("/api/companions", companionsRoutes);
@@ -43,6 +44,14 @@ const cartoon: ChildSafetyCheck = { ok: true, verdict: { is_cartoon: true, looks
 const photo: ChildSafetyCheck = { ok: true, verdict: { ...cartoon.verdict, is_cartoon: false, looks_like_photo: true } } as never;
 let n = 0;
 const png = () => new Uint8Array([137, 80, 78, 71, ++n, 2, 3]);
+/** A real 64x64 picture: the key colour with a grey figure from x 16..47 and y 8..55 (its opaque box 32x48 gives the pack frame {x: 7, y: 7, size: 51}); one pixel differs per call so no two are equal. */
+async function figure(size = 64): Promise<Uint8Array> {
+  const w = size, h = size, raw = Buffer.alloc(w * h * 4);
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) { const o = (y * w + x) * 4, inside = x >= w / 4 && x < (3 * w) / 4 && y >= h / 8 && y < (7 * h) / 8; raw[o] = inside ? 128 : 0; raw[o + 1] = inside ? 128 : 255; raw[o + 2] = inside ? 128 : 0; raw[o + 3] = 255; }
+  raw[2] = ++n % 200;
+  return new Uint8Array(await sharp(raw, { raw: { width: w, height: h, channels: 4 } }).png().toBuffer());
+}
+const EXPECTED_FRAME = { x: 7, y: 7, size: 51 };
 
 function addPerson(id: string, role: string, birthdate?: string) {
   db.insert(people).values({ id, displayName: id, role, avatarSeed: id, source: "local", createdAt: now, updatedAt: now, hlc: "1:0:test", ...(birthdate ? { birthdate } : {}) } as never).run();
@@ -55,20 +64,21 @@ const post = (path: string, token: string, body: unknown) => app.request(`http:/
 const get = (path: string, token: string) => app.request(`http://localhost/api/${path}`, { headers: { cookie: `session=${token}` } });
 
 // ---- the fakes
-interface Fakes { ops: PackOpsClient & { calls: string[]; jobs: string[]; cancelled: string[]; edits: number; eyes?: number[]; shapesWrite: string[]; block?: { release(): void; kind: PackOpKind } | null; failKind?: PackOpKind | null }; clips: ClipMaker & { calls: number; artRefuse: boolean; uploadDuring: boolean; throwAfterCreate: boolean; block?: Promise<void>; editKeyframe?: boolean; settleMs: number; settled: boolean; uploadTake?: string }; checks: Array<{ label: string; actor: string; kind: string }>; deps: Partial<PackDeps> }
+interface Fakes { ops: PackOpsClient & { calls: string[]; inputs: Array<{ kind: string; input: any }>; restSizes: Array<Array<number | undefined>>; jobs: string[]; cancelled: string[]; edits: number; eyes?: number[]; shapesWrite: string[]; block?: { release(): void; kind: PackOpKind } | null; failKind?: PackOpKind | null }; clips: ClipMaker & { calls: number; frames: Array<{ frame?: unknown; frameSource?: unknown }>; artRefuse: boolean; uploadDuring: boolean; throwAfterCreate: boolean; block?: Promise<void>; editKeyframe?: boolean; settleMs: number; settled: boolean; uploadTake?: string }; checks: Array<{ label: string; actor: string; kind: string }>; deps: Partial<PackDeps> }
 
 function fakes(id: string): Fakes {
   const checks: Fakes["checks"] = [];
   let jobSeq = 0;
   const ops: Fakes["ops"] = {
-    calls: [], jobs: [], cancelled: [], edits: 0, block: null, failKind: null, shapesWrite: ["atlas.png", "weight.png"],
-    async imageEdit(input) { ops.edits++; const job = `stack-edit-${++jobSeq}`; ops.jobs.push(job); input.onJob(job); return png(); },
+    calls: [], inputs: [], restSizes: [], jobs: [], cancelled: [], edits: 0, block: null, failKind: null, shapesWrite: ["atlas.png", "weight.png"],
+    async imageEdit(input) { ops.edits++; const job = `stack-edit-${++jobSeq}`; ops.jobs.push(job); input.onJob(job); return figure(); },
     async talkFrames(input) { const job = `stack-talk-${++jobSeq}`; ops.jobs.push(job); input.onJob(job); const face = { outerLips: [[10, 10], [30, 18]], innerLips: [[12, 12]], nose: [[20, 8]], contour: [[1, 1]], points: [[1, 1]] };
-      return { frames: Object.fromEntries(input.letters.map((l) => [l, png()])), sourceLandmarks: { ...face, points: Array.from({ length: 203 }, (_, i) => [i, i]) }, landmarks: Object.fromEntries(input.letters.map((l) => [l, face])) }; },
+      return { frames: Object.fromEntries(await Promise.all(input.letters.map(async (l) => [l, await figure()]))), sourceLandmarks: { ...face, points: Array.from({ length: 203 }, (_, i) => [i, i]) }, landmarks: Object.fromEntries(input.letters.map((l) => [l, face])) }; },
     async run(kind, input, hooks) {
-      ops.calls.push(kind);
+      ops.calls.push(kind); ops.inputs.push({ kind, input: JSON.parse(JSON.stringify(input)) });
       const job = `stack-${kind}-${++jobSeq}`; ops.jobs.push(job); hooks.onJob(job);
       if (ops.block?.kind === kind) await new Promise<void>((resolve, reject) => { ops.block!.release = resolve; hooks.signal?.addEventListener("abort", () => reject(new DOMException("Aborted", "AbortError"))); });
+      if (input.rest) ops.restSizes.push(await sharp(String(input.rest)).metadata().then((m) => [m.width, m.height, m.channels]));
       if (ops.failKind === kind) return { ok: false, reasons: [`The ${kind} measurement failed: the lighting step is over the limit. Make the clips again.`], report: {} };
       const out = String(input.output_dir);
       mkdirSync(out, { recursive: true });
@@ -82,9 +92,9 @@ function fakes(id: string): Fakes {
     async cancel(job) { ops.cancelled.push(job); },
   };
   const clips: Fakes["clips"] = {
-    calls: 0, artRefuse: false, uploadDuring: false, throwAfterCreate: false, settleMs: 0, settled: true,
-    async makeTakes({ companionId, state, count, job, onJob, signal }) {
-      clips.calls++; onJob(`video-${clips.calls}`); onJob(`finish-${clips.calls}`);
+    calls: 0, frames: [], artRefuse: false, uploadDuring: false, throwAfterCreate: false, settleMs: 0, settled: true,
+    async makeTakes({ companionId, state, count, job, onJob, signal, frame, frameSource }) {
+      clips.calls++; clips.frames.push({ frame, frameSource }); onJob(`video-${clips.calls}`); onJob(`finish-${clips.calls}`);
       if (clips.editKeyframe) writeKeyframe(companionId, state, new Uint8Array([9, 9, 9]), { source: "upload", style: "keep", prompt_hash: "y".repeat(64), model: null, created_at: now, edited_at: now });
       if (clips.block) await Promise.race([clips.block, new Promise((_, reject) => signal.addEventListener("abort", () => reject(new DOMException("Aborted", "AbortError"))))]);
       if (clips.settleMs) { clips.settled = false; await Bun.sleep(clips.settleMs); clips.settled = true; }
@@ -163,7 +173,7 @@ describe("the pack job state machine", () => {
     rec = await runTo(null, "done");
     expect(Object.values(rec.stages).every((s) => s.status === "done")).toBe(true);
     expect(f.ops.calls).toEqual(["media.companion_track", "media.companion_track", "media.companion_track", "media.companion_track", "media.companion_track", "media.companion_shapes", "media.companion_emotion", "media.companion_pack"]);
-    expect(f.ops.eyes).toEqual([24, 24, 0, 24]); // leftEye = points 0..23, rightEye = 24..47
+    expect(f.ops.eyes!.slice(0, 2)).toEqual([24, 24]); expect(f.ops.eyes![2]).toBeCloseTo((0 - 7) * 480 / 51, 3); expect(f.ops.eyes![3]).toBeCloseTo((24 - 7) * 480 / 51, 3); // leftEye = points 0..23, rightEye = 24..47, in the pack frame
     expect(rec.notes).toContain("head and eyes layers: skipped, not supported yet");
     expect(readCompanionPack(id)).not.toBeNull(); // validateCompanionPack through packFolderProblems on the installed folder
     expect(existsSync(join(packFolder(id)!, "pack.json"))).toBe(true);
@@ -331,9 +341,9 @@ describe("MAKER-D2: previews and the stylised path", () => {
     f.ops.run = async (kind, input, hooks) => { calls.push({ kind, input }); return run(kind, input, hooks); };
     expect(await stylisedStart()).toMatchObject({ ok: true });
     await runTo(null, "waiting_approval"); await approvePackStage(id, person("maker-owner"), "B"); await runTo(null, "waiting_approval");
-    expect(calls.find((c) => c.kind === "media.companion_shapes")!.input).toMatchObject({ mouth_box: [200, 300, 100, 50], face_height_px: 350 });
-    expect(calls.find((c) => c.kind === "media.companion_emotion")!.input.landmarks.leftEye[0]).toEqual([150, 150]);
-    expect(calls.find((c) => c.kind === "media.companion_pack")!.input.descriptor.mouth.anchor).toMatchObject({ x: 200 / 512, w: 100 / 512 });
+    expect(calls.find((c) => c.kind === "media.companion_shapes")!.input).toMatchObject({ mouth_box: [188, 281, 94, 47], face_height_px: 328 }); // scaled by 0.5 into the 512 source, then by 480/512 (no figure to key out: the frame is the whole picture)
+    expect(calls.find((c) => c.kind === "media.companion_emotion")!.input.landmarks.leftEye[0]).toEqual([140.625, 140.625]);
+    expect(calls.find((c) => c.kind === "media.companion_pack")!.input.descriptor.mouth.anchor).toMatchObject({ x: 187.5 / 480, w: 93.75 / 480 });
   });
 
   test("an oversize or wrong-length box or eyes request is refused at the route with a plain message", async () => {
@@ -372,6 +382,7 @@ describe("MAKER-D2: previews and the stylised path", () => {
     const f = fakes(id); __setPackDepsForTests(f.deps);
     const calls: Array<{ kind: string; input: Record<string, unknown> }> = []; const run = f.ops.run;
     f.ops.run = async (kind, input, hooks) => { calls.push({ kind, input }); return run(kind, input, hooks); };
+    f.ops.imageEdit = async (input) => { input.onJob(`stack-edit-${++f.ops.edits}`); return figure(1024); }; // the green source is as big as the starting picture
     const instructions: string[] = []; const edit = f.ops.imageEdit; f.ops.imageEdit = async (input) => { instructions.push(input.instruction); return edit(input); };
     let talk = 0; const tf = f.ops.talkFrames; f.ops.talkFrames = async (input) => { talk++; return tf(input); };
     expect(await stylisedStart()).toMatchObject({ ok: true });
@@ -379,7 +390,10 @@ describe("MAKER-D2: previews and the stylised path", () => {
     const rec = await runTo(null, "waiting_approval");
     expect(rec.shapes).toBe("stylised"); expect(rec.box).toEqual([400, 600, 200, 100]); expect(talk).toBe(0); // no face tools
     const shapes = calls.find((c) => c.kind === "media.companion_shapes")!.input;
-    expect(shapes).toMatchObject({ path: "stylised", mouth_box: [400, 600, 200, 100], face_height_px: 700, sets: ["calm"] });
+    // a 1024 source with the figure from x 256..767, y 128..895: the pack frame is {x: 105, y: 105, size: 815}; the box is moved into it and scaled to 480
+    const g = { x: 105, y: 105, size: 815 }, pk = 480 / g.size;
+    expect(rec.frame).toEqual(g);
+    expect(shapes).toMatchObject({ path: "stylised", mouth_box: [Math.round((400 - g.x) * pk), Math.round((600 - g.y) * pk), Math.round(200 * pk), Math.round(100 * pk)], face_height_px: Math.round(700 * pk), sets: ["calm"] });
     expect(shapes.landmarks).toBeUndefined();
     const labels = f.checks.map((c) => c.label);
     for (const l of STYLISED_LETTERS) expect(labels).toContain(`The mouth picture ${l}`); // each letter picture checked once per lane
@@ -387,9 +401,9 @@ describe("MAKER-D2: previews and the stylised path", () => {
     expect(labels.some((l) => l.startsWith("A mouth shape tile"))).toBe(true);
     expect(instructions.filter((i) => i.startsWith("Change only the mouth")).length).toBe(STYLISED_LETTERS.length);
     const emotion = calls.find((c) => c.kind === "media.companion_emotion")!.input as any;
-    expect(emotion.landmarks.leftEye).toEqual([[300, 300], [320, 296], [340, 300]]);
+    expect(emotion.landmarks.leftEye[0][0]).toBeCloseTo((300 - g.x) * pk, 3); expect(emotion.landmarks.leftEye[1][1]).toBeCloseTo((296 - g.y) * pk, 3);
     const pack = calls.find((c) => c.kind === "media.companion_pack")!.input as any;
-    expect(pack.descriptor.mouth.anchor.w).toBeCloseTo(200 / 1024, 3);
+    expect(pack.descriptor.mouth.anchor.w).toBeCloseTo(200 / g.size, 3); expect(pack.descriptor.mouth.anchor.x).toBeCloseTo((400 - g.x) / g.size, 3);
     await approvePackStage(id, person("maker-owner"), "C"); expect((await runTo(null, "done")).status).toBe("done");
   });
 
@@ -865,5 +879,68 @@ describe("faceToolsReady (the real Stack talk_frames status shape, found on the 
     expect(faceToolsReady({ state: "needs-setup", modelsVerified: false, models: { landmark: false, appearance: true } })).toBe(false);
     expect(faceToolsReady({ state: "unsupported", modelsVerified: true })).toBe(false);
     expect(faceToolsReady(undefined)).toBe(false);
+  });
+});
+
+describe("one shared pack frame (the clips, rest, mouth pictures and poses all use the frame defined from the rest picture)", () => {
+  const workFile = (...parts: string[]) => join(householdCompanionFolder(id)!, "pack-job", "work", ...parts);
+  const startAndRun = async (f: Fakes) => { __setPackDepsForTests(f.deps); await startPackJob({ actor: person("maker-owner"), companionId: id, stillId, shapes: "photo" }); return runTo(null, "waiting_approval"); };
+
+  test("the frame is defined once after the source, kept in the job record, and handed to every clip", async () => {
+    const f = fakes(id), rec = await startAndRun(f);
+    expect(rec.frame).toEqual(EXPECTED_FRAME); expect(rec.frame_source).toEqual({ width: 64, height: 64 });
+    expect(JSON.parse(readFileSync(join(householdCompanionFolder(id)!, "pack-job", "state.json"), "utf8")).frame).toEqual(EXPECTED_FRAME);
+    expect(f.clips.frames.length).toBe(PACK_CLIP_STATES.length);
+    for (const call of f.clips.frames) expect(call).toEqual({ frame: EXPECTED_FRAME, frameSource: { width: 64, height: 64 } });
+    const meta = await sharp(workFile("rest_480.png")).metadata();
+    expect([meta.width, meta.height, meta.channels]).toEqual([480, 480, 4]); // the keyed rest, with alpha
+  });
+
+  test("the track op gets the 480x480 rest and clip_stacked; shapes and emotion get pictures and landmarks in the pack frame", async () => {
+    const f = fakes(id); await startAndRun(f);
+    await approvePackStage(id, person("maker-owner"), "B"); await runTo(null, "waiting_approval");
+    const tracks = f.ops.inputs.filter((c) => c.kind === "media.companion_track");
+    expect(tracks.length).toBe(5);
+    for (const t of tracks) { expect(t.input.clip_stacked).toBe(true); expect(String(t.input.rest)).toEndWith("/work/rest_480.png"); }
+    // every op that got a rest read the 480x480 RGBA one
+    expect(f.ops.restSizes.every((s) => s[0] === 480 && s[1] === 480 && s[2] === 4)).toBe(true);
+    expect(f.ops.restSizes.length).toBe(5 + 3); // track x5, shapes, emotion, pack
+    const shapes = f.ops.inputs.find((c) => c.kind === "media.companion_shapes")!.input;
+    const at = (3 * 480) / 51; // the fake face has its first outer-lip point at (10, 10); the frame starts at (7, 7) and is 51 wide
+    expect(shapes.landmarks.calm.B.outerLips[0][0]).toBeCloseTo(at, 3); expect(shapes.landmarks.calm.B.outerLips[0][1]).toBeCloseTo(at, 3);
+    expect(shapes.landmarks.calm.H.outerLips[1][0]).toBeCloseTo((30 - 7) * 480 / 51, 3); expect(shapes.landmarks.calm.H.outerLips[1][1]).toBeCloseTo((18 - 7) * 480 / 51, 3);
+    expect(shapes.landmarks.rest.points[1][0]).toBeCloseTo((1 - 7) * 480 / 51, 3); // the rest's own landmarks too (a point left of the frame goes negative)
+    for (const letter of ["B", "H"]) { const m = await sharp(workFile("shapes-in", "calm", `${letter}.png`)).metadata(); expect([m.width, m.height]).toEqual([480, 480]); }
+    for (const emotion of EMOTIONS) { const m = await sharp(workFile("emotion-in", `${emotion}.png`)).metadata(); expect([m.width, m.height]).toEqual([480, 480]); }
+    const pack = f.ops.inputs.find((c) => c.kind === "media.companion_pack")!.input;
+    expect(String(pack.rest)).toEndWith("/work/rest_480.png");
+    expect(pack.descriptor.mouth.anchor.x).toBeCloseTo((10 - 7) / 51, 3); // lips [10,10]..[30,18] -> x 3/51, width 20/51 of the 480 frame
+    expect(pack.descriptor.mouth.anchor.w).toBeCloseTo(20 / 51, 3);
+    expect(JSON.parse(readFileSync(workFile("landmarks.json"), "utf8")).outerLips[0][0]).toBeCloseTo(at, 3);
+  });
+
+  test("a resume uses the frame in the record, not a new one", async () => {
+    const f = fakes(id), first = await startAndRun(f); expect(first.frame).toEqual(EXPECTED_FRAME);
+    f.ops.failKind = "media.companion_track";
+    await approvePackStage(id, person("maker-owner"), "B"); await runTo(null, "failed");
+    // change the stored frame and lose the rest picture made from it: the resume must rebuild it from the stored frame
+    const path = join(householdCompanionFolder(id)!, "pack-job", "state.json"), state = JSON.parse(readFileSync(path, "utf8"));
+    state.frame = { x: 2, y: 2, size: 40 }; writeFileSync(path, JSON.stringify(state)); rmSync(workFile("rest_480.png"));
+    f.ops.failKind = null; f.ops.inputs.length = 0; const clipCalls = f.clips.calls;
+    expect(await startPackJob({ actor: person("maker-owner"), companionId: id, stillId, shapes: "photo" })).toMatchObject({ ok: true, resumed: true });
+    await runTo(null, "waiting_approval");
+    expect(readPackJob(id)!.frame).toEqual({ x: 2, y: 2, size: 40 }); expect(f.clips.calls).toBe(clipCalls); // no new source, no new clips
+    expect((await sharp(workFile("rest_480.png")).metadata()).width).toBe(480);
+    const shapes = f.ops.inputs.find((c) => c.kind === "media.companion_shapes")!.input;
+    expect(shapes.landmarks.calm.B.outerLips[0][0]).toBeCloseTo((10 - 2) * 480 / 40, 3);
+  });
+
+  test("the take maker passes the frame to the takes", async () => {
+    const seen: unknown[] = [], original = takeDeps.start; takeDeps.start = (async (input: { pack?: unknown }) => { seen.push(input.pack); return "run-frame"; }) as never;
+    try {
+      await TakeClipMaker.makeTakes({ actor: person("maker-owner"), companionId: id, state: "idle", count: 1, job: "j", frame: EXPECTED_FRAME, frameSource: { width: 64, height: 64 }, signal: new AbortController().signal, onRun: () => undefined, onJob: () => undefined });
+      await TakeClipMaker.makeTakes({ actor: person("maker-owner"), companionId: id, state: "idle", count: 1, job: "k", signal: new AbortController().signal, onRun: () => undefined, onJob: () => undefined });
+    } finally { takeDeps.start = original; }
+    expect(seen).toEqual([{ job: "j", frame: EXPECTED_FRAME, frameSource: { width: 64, height: 64 } }, { job: "k" }]);
   });
 });

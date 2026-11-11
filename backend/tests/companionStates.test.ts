@@ -159,6 +159,13 @@ describe("companion states store", () => {
     expect(submitted.input.rest_reference).toBe(Buffer.from([1, 2, 3]).toString("base64"));
     expect(submitted.input).toMatchObject({ pin_rest: true, light_flatten: true, phone: true });
     expect(submitted.input).toMatchObject({ min_seconds: 4, max_seconds: 5 }); // a pack idle loop is about 4.9 s; the generic 3 to 4 s state length trimmed to under its minimum on the first real run
+    expect(submitted.input).not.toHaveProperty("crop"); // `pack: true` has no shared frame: the Stack crops around the clip's own box
+    const framed = addTake(id, "idle", { source: "upload", label: "idle 2" }); writeFileSync(takePath(id, "idle", framed.id, "source.mp4")!, "source");
+    await finishTake(id, "idle", framed.id, { alpha: false, pack: { crop: { x: 206, y: 46, size: 357 } } });
+    expect(submitted.input.crop).toEqual({ x: 206, y: 46, size: 357 }); expect(submitted.input).toMatchObject({ pin_rest: true, light_flatten: true, phone: true });
+    const plain = addTake(id, "idle", { source: "upload", label: "idle 3" }); writeFileSync(takePath(id, "idle", plain.id, "source.mp4")!, "source");
+    await finishTake(id, "idle", plain.id, { alpha: false });
+    expect(submitted.input).not.toHaveProperty("crop"); expect(submitted.input).not.toHaveProperty("pin_rest"); // a normal clip is unchanged
   });
 
   test("finish requires an approved sheet and keeps the Stack failure message on the take", async () => {
