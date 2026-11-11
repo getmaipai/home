@@ -7,6 +7,8 @@ import { logTurn, resolveOrCreateConversation } from "@/lib/conversationHistory"
 import { listMediaSubjects } from "@/lib/mediaSubjects";
 import { __setRolesVisionForTests, kindOfRole, parseReading, readPictureRoles } from "@/lib/pictures/roles";
 import { pickStarter, prepareFilmPictures } from "@/lib/films/pictures";
+import { __setStartFilmForTests, runMakeFilmTurn } from "@/lib/films/tool";
+import { __setVideoStatusForTests, readyVideoStatusForTests } from "@/lib/videos/ready";
 
 const SAFE = { flagged: false, categories: [], action: "allow", notify_parent: false, matched_signals: [], checked_at: new Date().toISOString() } as never;
 let actor: Awaited<ReturnType<typeof owner>>["row"];
@@ -72,5 +74,26 @@ describe("what each attached picture is for", () => {
     if (!result.ok) throw new Error(result.line);
     expect(result.names).toEqual(["Espresso machine"]);
     expect(listMediaSubjects(actor).find((s) => s.name === "Espresso machine")?.reference_ids.length).toBe(2);
+  });
+
+  test("file names the model puts in characters are ignored: the attached pictures are read instead", async () => {
+    const resolved = resolveOrCreateConversation(actor, "chat"); if (!resolved.ok) throw new Error(resolved.error);
+    const conversationId = resolved.value.id;
+    logTurn(actor, "chat", "ad", { reply: { text: "ok" }, source: "plugin", plugin_id: "film", safety: SAFE, conversation_id: conversationId, turn_id: "turn-fn1234" });
+    const ids: string[] = [];
+    for (const c of ["#eeeeee", "#334455"]) { const s = storeFile(actor, { conversationId, turnId: "turn-fn1234", mediaType: "image/png", bytes: await png(c), provenance: "upload", retention: "kept", name: "x.png", deduplicate: false }); if (!s.ok) throw new Error(s.error); ids.push(s.value.id); }
+    const answers = [{ role: "product", name: "coffee mug", look: "white ceramic mug" }, { role: "set", name: "factory floor", look: "bright factory with conveyor belts" }]; let n = 0;
+    __setRolesVisionForTests(async () => JSON.stringify(answers[n++]));
+    let received: Record<string, unknown> | undefined;
+    __setStartFilmForTests((input) => { received = input as unknown as Record<string, unknown>; return { id: "run-9" }; });
+    __setVideoStatusForTests(readyVideoStatusForTests());
+    try {
+      const outcome = await runMakeFilmTurn({ state: { actor, surface: "chat", planBasis: { surfaceClass: "written" }, temporary: false, conversationId, images: ids.map((id) => ({ id })) as never } as never, args: { idea: "A 30 second ad for the mug", seconds: 30, characters: ["mug.jpg", "factory.JPEG"] }, callId: "c1", spoken: false });
+      expect(outcome.status).toBe("succeeded");
+      const hints = (received as { castHints: string[] }).castHints;
+      expect(hints.some((h) => /\.jpe?g/i.test(h) && !h.includes("("))).toBe(false);
+      expect(hints.some((h) => h.startsWith("Coffee mug (product"))).toBe(true);
+      expect(hints.some((h) => h.startsWith("Factory floor (set"))).toBe(true);
+    } finally { __setStartFilmForTests(null); __setVideoStatusForTests(undefined); }
   });
 });

@@ -592,12 +592,12 @@ export async function complete(role: LlmRole, messages: LlmMessage[], opts: LlmC
 }
 
 /** Raw Stack consumers use the same answer-budget and retry boundary. */
-export async function completeViaStackRequest(role: string, request: RoleRequest, signal?: AbortSignal, options: Pick<LlmCompleteOptions, "exactCeiling"> = {}): Promise<StackChatResult> {
+export async function completeViaStackRequest(role: string, request: RoleRequest, signal?: AbortSignal, options: Pick<LlmCompleteOptions, "exactCeiling" | "timeoutMs"> = {}): Promise<StackChatResult> {
   const messages = request.messages as LlmMessage[];
   const plan = ceilingPlan(role, messages, { ...request, ...options } as LlmCompleteOptions);
   const wire = { ...request, messages: messages.map(toWireMessage) };
   if (plan.failure) return { ok: false, failure: { ok: false, status: 503, code: "unavailable", reason: "context_too_large", error: new ContextTooLargeError().message } };
-  let result = await stackRequestOnce(role, { ...wire, max_tokens: plan.ceiling }, signal);
+  let result = await stackRequestOnce(role, { ...wire, max_tokens: plan.ceiling }, signal, options.timeoutMs);
   const empty = (r: StackChatResult) => {
     if (!r.ok) return false;
     const choice = (r.data as { choices?: Array<{ finish_reason?: string; message?: { content?: string; tool_calls?: unknown[] } }> }).choices?.[0];
@@ -606,7 +606,7 @@ export async function completeViaStackRequest(role: string, request: RoleRequest
   if (!empty(result)) return result;
   if (result.ok && !plan.model && typeof result.data.model === "string") plan.model = result.data.model;
   const next = options.exactCeiling || signal?.aborted ? (plan.ceiling ?? 0) : retryCeiling(role, plan);
-  if (!options.exactCeiling && !signal?.aborted && next > (plan.ceiling ?? 0)) result = await stackRequestOnce(role, { ...wire, max_tokens: next }, signal);
+  if (!options.exactCeiling && !signal?.aborted && next > (plan.ceiling ?? 0)) result = await stackRequestOnce(role, { ...wire, max_tokens: next }, signal, options.timeoutMs);
   return empty(result) ? { ok: false, failure: { ok: false, status: 503, code: "unavailable", reason: "empty_length", error: new EmptyLengthError().message } } : result;
 }
 
@@ -1059,7 +1059,7 @@ export type BackgroundResult = { ok: true; text: string } | { ok: false; unavail
 /** Runs memory extraction and summaries through the configured Stack judge. */
 export async function completeBackground(messages: LlmMessage[], options: LlmCompleteOptions = {}): Promise<BackgroundResult> {
   const { body } = chatRequestBody(messages, options);
-  const result = await completeViaStackRequest("background", { ...body, model: options.model ?? "judge" }, options.signal, { exactCeiling: options.exactCeiling });
+  const result = await completeViaStackRequest("background", { ...body, model: options.model ?? "judge" }, options.signal, { exactCeiling: options.exactCeiling, timeoutMs: options.timeoutMs });
   if (!result.ok) {
     // A Home-side refusal (no Stack configured) has no Stack error kind of
     // its own; named here so a background job can tell it from bad output.

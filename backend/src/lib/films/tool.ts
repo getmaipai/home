@@ -36,11 +36,15 @@ function failed(callId: string, args: Record<string, unknown>): ToolExecutionOut
 /** A turn with pictures attached: read each one, save it as cast, and hand the planner what each is for. Without pictures this is runMakeFilm. */
 export async function runMakeFilmTurn(input: { state: FilmState & Partial<Pick<TurnState, "images" | "conversationId">>; args: Record<string, unknown>; callId: string; spoken: boolean }): Promise<ToolExecutionOutcome> {
   const images = input.state.images ?? [];
-  if (!images.length || Array.isArray(input.args.characters) && input.args.characters.length) return runMakeFilm(input);
+  if (!images.length) return runMakeFilm(input);
+  // The model often fills `characters` with the pictures' file names; those say nothing, so attached pictures are always read, and only names that are
+  // not file names (a saved character or a synth) are kept from the model's list.
+  const given = (Array.isArray(input.args.characters) ? input.args.characters : []).filter((name): name is string => typeof name === "string" && !FILE_NAME.test(name.trim()));
   const prepared = await prepareFilmPictures(input.state.actor as PersonRow, { images, conversationId: input.state.conversationId });
   if (!prepared.ok) return refused(input.callId, input.args, prepared.line, "pictures");
-  return runMakeFilm({ ...input, args: { ...input.args, picture_notes: prepared.hints.slice(0, 8) } });
+  return runMakeFilm({ ...input, args: { ...input.args, characters: given.length ? given : undefined, picture_notes: prepared.hints.slice(0, 8) } });
 }
+const FILE_NAME = /\.(jpe?g|png|webp|gif|heic|heif|avif|bmp|tiff?)$/i;
 
 export function runMakeFilm(input: { state: FilmState; args: Record<string, unknown>; callId: string; spoken: boolean }): ToolExecutionOutcome {
   const { state, args, callId } = input;

@@ -71,7 +71,7 @@ export async function askStage<T>(system: string, payload: unknown, schema: z.Zo
   const complete = testCompleter ?? completeBackground;
   // The model gets the exact JSON shape twice: as the response format and in the prompt (a real run echoed the treatment back and wrote music as plain strings).
   const shape = z.toJSONSchema(schema, { unrepresentable: "any" });
-  const options: LlmCompleteOptions = { temperature: 0.4, max_tokens: 6000, dropReasoning: true, response_format: { type: "json_schema", json_schema: { name: "production_stage", schema: shape } } as LlmCompleteOptions["response_format"] };
+  const options: LlmCompleteOptions = { temperature: 0.4, max_tokens: 6000, timeoutMs: 300_000, dropReasoning: true, response_format: { type: "json_schema", json_schema: { name: "production_stage", schema: shape } } as LlmCompleteOptions["response_format"] };
   let errors = "";
   for (let attempt = 0; attempt < 3; attempt++) {
     try {

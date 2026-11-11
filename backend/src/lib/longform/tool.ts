@@ -61,16 +61,19 @@ export async function runMakeProduction(input: { state: ProductionState; args: R
     if (!a.idea) return refused(callId, args, "Ask what the story is about.", "needs_idea");
     if (!a.seconds) return refused(callId, args, "Ask how long it should be.", "needs_length");
     let characters: string[] | undefined;
-    if (a.characters?.length) {
-      const prepared = await prepareCharacters(actor, { names: a.characters, images: state.images ?? [], conversationId: state.conversationId ?? undefined });
+    // File names are not characters (the model often lists them): attached pictures are read for what each is for, and only real names are kept from the model's list.
+    const given = (a.characters ?? []).filter((name) => !/\.(jpe?g|png|webp|gif|heic|heif|avif|bmp|tiff?)$/i.test(name.trim()));
+    if (given.length) {
+      const prepared = await prepareCharacters(actor, { names: given, images: [], conversationId: state.conversationId ?? undefined });
       if (!prepared.ok) return refused(callId, args, prepared.line, "characters");
       characters = prepared.names;
-    } else if (state.images?.length) {
-      // Pictures with no names given: each is read for what it is for. People become the cast of the production; places and objects are kept as saved subjects.
+    }
+    if (state.images?.length) {
+      // Each picture is read for what it is for. People become the cast of the production; places and objects are kept as saved subjects.
       const prepared = await prepareFilmPictures(actor, { images: state.images, conversationId: state.conversationId });
       if (!prepared.ok) return refused(callId, args, prepared.line, "pictures");
       const people = new Set(listMediaSubjects(actor).filter((s) => s.kind === "character").map((s) => s.name));
-      characters = prepared.names.filter((n) => people.has(n));
+      characters = [...new Set([...(characters ?? []), ...prepared.names.filter((n) => people.has(n))])];
     }
     const r = await startProduction(actor, { idea: a.idea, seconds: a.seconds, look: a.look, characters });
     return r.ok

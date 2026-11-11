@@ -265,3 +265,11 @@ test("streaming keeps the caller ceiling and complete prose", async () => {
   expect(released).toBe(text);
   expect(ceilings).toEqual([120]);
 });
+
+test("LENGTH-02: a background call's own timeout reaches the Stack client, not the 30 s default", async () => {
+  const seen: Array<number | undefined> = [];
+  __setRoleHealthForTests({ chat: { availability: "ready", reason: null, modelId: ALWAYS }, background: { availability: "ready", reason: null, modelId: ALWAYS } });
+  __setStackClientForTests({ chat: async (_request: unknown, options?: { timeoutMs?: number }) => { seen.push(options?.timeoutMs); return { data: { model: ALWAYS, choices: [{ finish_reason: "stop", message: { content: "answer", tool_calls: [] } }] }, identity: null }; } } as unknown as StackClient);
+  expect(await completeBackground([{ role: "user", content: "hello" }], { max_tokens: 120, timeoutMs: 123_000 })).toEqual({ ok: true, text: "answer" });
+  expect(seen).toEqual([123_000]);
+});

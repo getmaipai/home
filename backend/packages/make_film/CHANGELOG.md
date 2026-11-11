@@ -4,6 +4,7 @@
 
 ### Added
 
+- A film plan on a busy hub no longer fails at 30 seconds: the planner waits up to four minutes, says plainly when the model did not answer (nothing is lost, press Resume), and attached pictures are always read, whatever the model puts in the character list.
 - Asking for a commercial or an ad, or giving several pictures, now picks the film tool instead of the single-clip tool, and the single-clip tool points several photos to a film.
 - Say a product should stay hidden until the end (for example writing on a mug) and the film shows it only in the last shot; earlier shots never start from its picture. The picture reader also no longer reads out writing on an object.
 - The finished film now lands within a second or two of the length you ask: the title card and the credits count toward it, shot lengths are worked out in code, and a film that still comes out off says so.

@@ -113,4 +113,10 @@ describe("film planner", () => {
     expect(held.shots[2]!.still).toContain("Blue mug");
     expect(holdBackReveals({ ...plan, cast: plan.cast.map((m) => ({ ...m, reveal_last: undefined })) })).toEqual({ ...plan, cast: plan.cast.map((m) => ({ ...m, reveal_last: undefined })) });
   });
+
+  test("a planner call that gets no answer says the model was busy and that nothing was lost", async () => {
+    __setFilmPlanCompleterForTests(async () => ({ ok: false, unavailable: true }));
+    const result = await planFilm({ idea: "A sailor crosses the sea" });
+    expect(result).toMatchObject({ ok: false, line: expect.stringContaining("Resume") });
+  });
 });

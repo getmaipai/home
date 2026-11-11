@@ -39,7 +39,7 @@ describe("film engine entry", () => {
   test("returns a planner refusal without creating a production", async () => {
     __setFilmPlanCompleterForTests(async () => ({ ok: false, unavailable: true }));
     const result = await makeFilm({ actor: person("person-filmadult"), idea: "A crossing", signal: new AbortController().signal });
-    expect(result).toMatchObject({ line: "I couldn't plan that film. Try describing it in a sentence or two, with who is in it and where." });
+    expect(result).toMatchObject({ line: expect.stringContaining("Resume") });
   });
 
   test("makes stills, clips, a song, and sequential film and mix edits, then keeps the artifacts on its production", async () => {

@@ -14,6 +14,8 @@ const productionShotSchema = z.object({
 
 const transitionKinds = ["cut", "fade", "dissolve", "speckle", "wipeleft", "wiperight", "wipeup", "wipedown", "slideleft", "slideright", "slideup", "slidedown", "circleopen", "circleclose", "radial", "smoothleft", "smoothright", "fadeblack", "fadewhite", "zoomin", "pixelize"] as const;
 
+/** The planner writes a few thousand tokens on the same model the household is using; the Stack client's 30 s default is too short when that model is busy. */
+const PLAN_TIMEOUT_MS = 240_000;
 const SHOT_FLOOR = 3, SHOT_CEILING = 10;
 const filmPlanShotShape = {
   framing: z.string().min(1),
@@ -98,6 +100,7 @@ export type PlanFilmResult = { ok: true; plan: FilmPlan } | { ok: false; line: s
 type PlannerCompleter = (messages: LlmMessage[], options?: LlmCompleteOptions) => Promise<{ ok: true; text: string } | { ok: false; unavailable: true }>;
 
 const REFUSAL_LINE = "I couldn't plan that film. Try describing it in a sentence or two, with who is in it and where.";
+const BUSY_LINE = "The planning model did not answer in time, so nothing was lost. Press Resume to try again.";
 let testCompleter: PlannerCompleter | null = null;
 export function __setFilmPlanCompleterForTests(fn: PlannerCompleter | null): void { testCompleter = fn; }
 
@@ -130,10 +133,10 @@ export async function planFilm(input: PlanFilmInput, complete: PlannerCompleter 
 
 async function planFilmUnheld(input: PlanFilmInput, complete: PlannerCompleter): Promise<PlanFilmResult> {
   const schema = input.faceless ? facelessFilmPlanSchema : filmPlanSchema;
-  const options: LlmCompleteOptions = { temperature: 0.4, max_tokens: 2400, dropReasoning: true, response_format: input.faceless ? FACELESS_FILM_PLAN_RESPONSE_FORMAT : FILM_PLAN_RESPONSE_FORMAT };
+  const options: LlmCompleteOptions = { temperature: 0.4, max_tokens: 2400, timeoutMs: PLAN_TIMEOUT_MS, dropReasoning: true, response_format: input.faceless ? FACELESS_FILM_PLAN_RESPONSE_FORMAT : FILM_PLAN_RESPONSE_FORMAT };
   try {
     const first = await complete(planMessages(input), options);
-    if (!first.ok) return { ok: false, line: REFUSAL_LINE };
+    if (!first.ok) return { ok: false, line: BUSY_LINE };
     const parsed = safeParsePlan(first.text, schema);
     const fits = input.targetSeconds !== undefined && !input.faceless;
     if (parsed.success && fits) return { ok: true, plan: fitPlanToLength(parsed.data, input.targetSeconds!) };
@@ -141,7 +144,7 @@ async function planFilmUnheld(input: PlanFilmInput, complete: PlannerCompleter):
     if (parsed.success && !firstDurationError) return { ok: true, plan: parsed.data };
 
     const repaired = await complete(planMessages(input, parsed.success ? firstDurationError : validationLine(parsed.error)), options);
-    if (!repaired.ok) return { ok: false, line: REFUSAL_LINE };
+    if (!repaired.ok) return { ok: false, line: BUSY_LINE };
     const second = safeParsePlan(repaired.text, schema);
     if (!second.success) return { ok: false, line: REFUSAL_LINE };
     if (fits) return { ok: true, plan: fitPlanToLength(second.data, input.targetSeconds!) };
