@@ -89,7 +89,7 @@ export class PackSpeechBuilder {
     const tags = started.flatMap((line) => line.tags);
     const emotion = this.options.emotion !== undefined ? this.options.emotion : emotionFor(text, tags, false);
     return {
-      cues, loudness: buildLoud(timeline, rate, 1e-4, false), events, emotion, voiceMode: "normal", clock: this.options.clock, text, tags,
+      cues, loudness: buildLoud(timeline, rate, 1e-4, false), samples: timeline, sampleRate: rate, events, emotion, voiceMode: "normal", clock: this.options.clock, text, tags,
       ...(this.joinAt !== undefined ? { joinAt: this.joinAt } : {}),
     };
   }
