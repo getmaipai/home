@@ -1434,3 +1434,5 @@ embedded image path confirmed to resolve to a real file,
 the full frontend suite - none of this step touches frontend code, so
 this is confirming nothing else regressed, not testing the docs
 themselves, which have no automated check of their own content).
+
+Capture every inventoried route at desktop and phone sizes in both themes with `bun run scripts/screenshotRoutes.ts --base <dev-hub-url>`; the runner connects to an already running dev hub and writes to `data-scratch/screenshots/look-baseline/`.
