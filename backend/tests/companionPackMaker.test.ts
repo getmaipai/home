@@ -344,7 +344,7 @@ describe("MAKER-D2: previews and the stylised path", () => {
     expect(calls.find((c) => c.kind === "media.companion_shapes")!.input).toMatchObject({ mouth_box: [188, 281, 94, 47], face_height_px: 328 }); // scaled by 0.5 into the 512 source, then by 480/512 (no figure to key out: the frame is the whole picture)
     expect(calls.find((c) => c.kind === "media.companion_emotion")!.input.landmarks.leftEye[0]).toEqual([140.625, 140.625]);
     expect(calls.find((c) => c.kind === "media.companion_pack")!.input.descriptor.mouth.anchor).toMatchObject({ x: 187.5 / 480, w: 93.75 / 480 });
-    expect(calls.find((c) => c.kind === "media.companion_pack")!.input.descriptor.tile).toEqual({ desktop: 480, phone: 320 }); // named, so the Stack declares every phone twin
+    expect(calls.find((c) => c.kind === "media.companion_pack")!.input.descriptor.tile).toEqual({ desktop: 480, phone: 320 }); expect(calls.find((c) => c.kind === "media.companion_pack")!.input.descriptor.source).toEqual({ x0: 0, size: 480 }); // named, so the Stack declares every phone twin
   });
 
   test("an oversize or wrong-length box or eyes request is refused at the route with a plain message", async () => {

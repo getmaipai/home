@@ -815,12 +815,14 @@ const STAGE_RUNNERS: Record<PackStage, (ctx: Ctx) => Promise<Record<string, unkn
     const names = clipNames(ctx.rec), states: Record<string, string[]> = {};
     for (const { state, name } of names) (states[PACK_STATE[state] ?? state] ??= []).push(name);
     // MAKER-H: { rest, staging, descriptor, output_dir } -> <output_dir>/pack/ (pack.json, files, build-report.json). The tile is named so the Stack declares every clip's phone twin in pack.json (it writes a default tile but declares the twins only when the descriptor names one; found on the first real pack).
-    const descriptor = { id: ctx.id, name: getHouseholdCompanion(ctx.id)?.companion?.display_name ?? ctx.id, tile: { desktop: 480, phone: 320 }, provenance: { source: ctx.rec.shapes === "stylised" ? "stylised" : "photo", maker: "MaiPai Home", created: new Date().toISOString() }, ...(lips.length ? { mouth: { anchor: { x: Math.min(...xs) / w, y: Math.min(...ys) / h, w: (Math.max(...xs) - Math.min(...xs)) / w, h: (Math.max(...ys) - Math.min(...ys)) / h } } } : {}), states };
+    const descriptor = { id: ctx.id, name: getHouseholdCompanion(ctx.id)?.companion?.display_name ?? ctx.id, tile: { desktop: 480, phone: 320 }, source: { x0: 0, size: PACK_FRAME_PX }, provenance: { source: ctx.rec.shapes === "stylised" ? "stylised" : "photo", maker: "MaiPai Home", created: new Date().toISOString() }, ...(lips.length ? { mouth: { anchor: { x: Math.min(...xs) / w, y: Math.min(...ys) / h, w: (Math.max(...xs) - Math.min(...xs)) / w, h: (Math.max(...ys) - Math.min(...ys)) / h } } } : {}), states };
     // The Stack has no op for the head and eyes layers yet; the pack is built without them (they are optional in the spec).
     ctx.rec.notes = [...new Set([...(ctx.rec.notes ?? []), PACK_NOTE_HEAD_EYES, PACK_NOTE_SHOUT])]; save(ctx.rec);
     const result = await deps.ops.run("media.companion_pack", { rest: restPackPath(ctx.id), staging, descriptor, output_dir: out }, hooks(ctx));
     if (!result.ok) opFailed("The pack", result);
     if (!existsSync(join(packOut(ctx.id), "pack.json"))) throw Object.assign(new Error("The pack was not written. Try again."), { reasons: ["The pack was not written. Try again."] });
+    // The Stack's pack op does not write the optional `source` frame yet (spec 0.1.366): the layers are pixels of the 480 tile starting at x0 0, not of the demo's 576 frame at x0 224, so the player needs it to place the mouth and eyes.
+    try { const file = join(packOut(ctx.id), "pack.json"), pack = JSON.parse(readFileSync(file, "utf8")) as Record<string, unknown>; if (pack.source === undefined) { pack.source = { x0: 0, size: PACK_FRAME_PX }; writeFileSync(file, JSON.stringify(pack)); } } catch { /* validate reports an unreadable pack.json */ }
     return result.report;
   },
 
