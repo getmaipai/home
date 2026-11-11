@@ -17,6 +17,7 @@ import { flowErrorText } from "@/shell/pages/companionFlow/errors";
 import { useSheetWait } from "@/shell/pages/companionFlow/useSheetWait";
 import { KeyframeEditor } from "@/shell/pages/companionFlow/KeyframeEditor";
 import { MAKING_BACK_LINE, useMakingAvailability, useMakingRecovery } from "@/apps/chat/useMakingAvailability";
+import { PackSection } from "@/shell/pages/companionFlow/PackSection";
 import { StatusCard } from "@maipai/ui/src/elements/status-card";
 
 const keyframeSrc = (row: CompanionStateRow) => row.keyframe ? `${row.keyframe.url}${row.keyframe.edited_at ? `?v=${encodeURIComponent(row.keyframe.edited_at)}` : ""}` : null;
@@ -146,6 +147,7 @@ export function AnimateStep({ companionId, name, sheetJob = null, autoMake = fal
           <Button variant="secondary" shape="pill" width="full" disabled={running || clips.disabled || pending.length === 0} aria-describedby={clips.reason ? reasonId : undefined} title={clips.reason ?? undefined} onClick={() => generate(pending, "optional")}>{group === "optional" ? doing : i18n._({ id: "Generate Optional ({count})", message: "Generate Optional ({count})", values: { count: pending.length } })}</Button>
           {group === "optional" ? <Button variant="outline" shape="pill" width="full" onClick={stop}>{i18n._({ id: "Stop", message: "Stop" })}</Button> : null}
         </DialogSection>
+        <Separator /><PackSection companionId={companionId} stillId={rest?.id ?? null} reasonId={reasonId} />
         {states.data && !states.data.sheet_ready && !errorLine ? <p className="text-sm text-muted-foreground">{i18n._({ id: "Finish your character on the first screen before making animations.", message: "Finish your character on the first screen before making animations." })}</p> : null}
       </div>
     </DialogBody>

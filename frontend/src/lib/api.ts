@@ -390,6 +390,18 @@ export interface CompanionEditable {
   clock_style?: "formal" | "plain" | "loose"; hedging?: "low" | "medium" | "high"; humor?: "low" | "medium" | "high"; warmth?: "low" | "medium" | "high"; initiative?: "low" | "medium" | "high";
   behavior: string[]; examples: string[]; examples_child: string[]; examples_teen: string[]; examples_adult: string[]; voice_id: string; look_prompt: string; audience: "adult" | "teen" | "all"; status: CompanionStatus; review: unknown; can_edit: boolean; can_copy: boolean; can_set_audience: boolean; synth?: { pins: { dials: string[]; examples: string[] }; phrase_sources: Record<string, string> }; look: { versions: number; rest: string | null; sheet_state: "empty" | "making" | "needs_review" | "approved" }; states: { approved: number; total: number };
 }
+/** MAKER-D/D2: one stage of a talking-character job, in the order it runs. */
+export type CompanionPackStageName = "source" | "clips" | "track" | "shapes" | "emotion" | "assemble" | "validate" | "install";
+export type CompanionPackJob = {
+  job: string; status: "running" | "waiting_approval" | "failed" | "cancelled" | "done"; stage: string | null; waiting_for: "A" | "B" | "C" | null; error: string | null; interrupted?: boolean;
+  still_id: string; shapes: "photo" | "stylised";
+  /** At approval B: the idle, listening, thinking and speaking clips; empty at other times. */
+  clips?: Array<{ state: string; take: string; url: string }>;
+  /** At approval C: where the pack is served; may be absent on a Home that predates MAKER-D2. */
+  preview?: { pack_url_base: string; pack_json_url: string; installed: boolean } | null;
+  approvals?: Record<string, { by: string; at: string } | null>;
+  stages: Array<{ name: CompanionPackStageName; status: "pending" | "running" | "done" | "failed"; reasons: string[]; report: Record<string, unknown> | null; stack_jobs: string[] }>;
+};
 export type CompanionFields = Partial<Omit<CompanionEditable, "id" | "status" | "review" | "can_edit" | "can_set_audience" | "look" | "states" | "synth">>;
 export type CompanionUpdateFields = CompanionFields & { pins?: { dials: string[]; examples: string[] } };
 export type CompanionCreateFields = CompanionFields & { status?: CompanionStatus; based_on?: { kind: "none" | "household_member" | "real_person"; person_id?: string | null; name?: string | null }; life?: { enabled: boolean; seed: string } };
@@ -1657,6 +1669,10 @@ export const api = {
   setCompanionLookRest: (id: string, version_id: string) => request<{ rest: string; sheet_reset: boolean }>(`/api/companions/${encodeURIComponent(id)}/look/rest`, { method: "PUT", body: JSON.stringify({ version_id }) }),
   deleteCompanionLookVersion: (id: string, versionId: string) => request<void>(`/api/companions/${encodeURIComponent(id)}/look/${encodeURIComponent(versionId)}`, { method: "DELETE" }),
   generateCompanionLook: (id: string, body: { prompt?: string; style?: string; custom_style?: string; count?: number } = {}) => request<{ job: string }>(`/api/companions/${encodeURIComponent(id)}/look/generate`, { method: "POST", body: JSON.stringify(body) }),
+  startCompanionPackJob: (id: string, body: { still_id: string; shapes?: string; restart?: boolean }) => request<CompanionPackJob>(`/api/companions/${encodeURIComponent(id)}/pack-job`, { method: "POST", body: JSON.stringify(body) }),
+  companionPackJob: (id: string) => request<CompanionPackJob>(`/api/companions/${encodeURIComponent(id)}/pack-job`),
+  approveCompanionPackStage: (id: string, stage: "A" | "B" | "C") => request<CompanionPackJob>(`/api/companions/${encodeURIComponent(id)}/pack-job/approve`, { method: "POST", body: JSON.stringify({ stage }) }),
+  cancelCompanionPackJob: (id: string) => request<CompanionPackJob>(`/api/companions/${encodeURIComponent(id)}/pack-job/cancel`, { method: "POST" }),
   companionLookJob: (id: string, job: string) => request<CompanionLookJob>(`/api/companions/${encodeURIComponent(id)}/look/jobs/${encodeURIComponent(job)}`),
   cancelCompanionLookJob: (id: string, job: string) => request<void>(`/api/companions/${encodeURIComponent(id)}/look/jobs/${encodeURIComponent(job)}`, { method: "DELETE" }),
   /** COMPANION-3S-01: a name-only draft, made the first time the person names a character; Home returns the same draft for the same name. */
