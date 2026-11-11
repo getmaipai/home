@@ -281,7 +281,7 @@ msgid "{count, plural, one {# thing to do yourself, if you like} other {# things
 msgstr "{count, plural, one {# thing to do yourself, if you like} other {# things to do yourself, if you like}}"
 
 #. js-lingui-explicit-id
-#: src/apps/chat/chatToolUis.tsx:502
+#: src/apps/chat/chatToolUis.tsx:503
 msgid "{count, plural, one {# tool call} other {# tool calls}}{sites, plural, =0 {} one {, # site} other {, # sites}}"
 msgstr "{count, plural, one {# tool call} other {# tool calls}}{sites, plural, =0 {} one {, # site} other {, # sites}}"
 
@@ -1275,7 +1275,7 @@ msgid "{title, select, none {Remix this song} other {Remix ‘{title}’}}"
 msgstr "{title, select, none {Remix this song} other {Remix ‘{title}’}}"
 
 #. js-lingui-explicit-id
-#: src/apps/chat/chatToolUis.tsx:341
+#: src/apps/chat/chatToolUis.tsx:342
 msgid "{title} didn't finish: {error}"
 msgstr "{title} didn't finish: {error}"
 
@@ -1285,7 +1285,7 @@ msgid "notification.project.failed"
 msgstr "{title} didn't finish: {reason}"
 
 #. js-lingui-explicit-id
-#: src/apps/chat/chatToolUis.tsx:341
+#: src/apps/chat/chatToolUis.tsx:342
 msgid "{title} didn't finish."
 msgstr "{title} didn't finish."
 
@@ -1300,7 +1300,7 @@ msgid "{title} levels"
 msgstr "{title} levels"
 
 #. js-lingui-explicit-id
-#: src/apps/chat/chatToolUis.tsx:344
+#: src/apps/chat/chatToolUis.tsx:345
 msgid "{title} was cancelled."
 msgstr "{title} was cancelled."
 
@@ -7345,7 +7345,7 @@ msgid "Couldn't check for robot updates: {robotsError}"
 msgstr "Couldn't check for robot updates: {robotsError}"
 
 #. js-lingui-explicit-id
-#: src/apps/chat/chatToolUis.tsx:324
+#: src/apps/chat/chatToolUis.tsx:325
 msgid "Couldn't check on this project right now."
 msgstr "Couldn't check on this project right now."
 
@@ -8384,7 +8384,7 @@ msgid "down for {time} ({percent}% up)"
 msgstr "down for {time} ({percent}% up)"
 
 #. js-lingui-explicit-id
-#: src/apps/chat/chatToolUis.tsx:109
+#: src/apps/chat/chatToolUis.tsx:110
 #: src/apps/settings/AddVoiceBox.tsx:51
 #: src/apps/settings/BackupsSection.tsx:98
 #: src/apps/setup/SetupWizard.tsx:492
@@ -8424,7 +8424,7 @@ msgid "Download CSV"
 msgstr "Download CSV"
 
 #. js-lingui-explicit-id
-#: src/apps/chat/chatToolUis.tsx:775
+#: src/apps/chat/chatToolUis.tsx:776
 msgid "Download original"
 msgstr "Download original"
 
@@ -10199,7 +10199,7 @@ msgid "Go ahead"
 msgstr "Go ahead"
 
 #. js-lingui-explicit-id
-#: src/apps/chat/chatToolUis.tsx:164
+#: src/apps/chat/chatToolUis.tsx:165
 msgid "Go ahead?"
 msgstr "Go ahead?"
 
@@ -11808,17 +11808,17 @@ msgid "failure.ask_form.other"
 msgstr "I could not send the form. Submit it again in a moment."
 
 #. js-lingui-explicit-id
-#: src/apps/chat/chatToolUis.tsx:630
+#: src/apps/chat/chatToolUis.tsx:631
 msgid "I couldn't check on that picture"
 msgstr "I couldn't check on that picture"
 
 #. js-lingui-explicit-id
-#: src/apps/chat/chatToolUis.tsx:814
+#: src/apps/chat/chatToolUis.tsx:816
 msgid "I couldn't check on that song"
 msgstr "I couldn't check on that song"
 
 #. js-lingui-explicit-id
-#: src/apps/chat/chatToolUis.tsx:733
+#: src/apps/chat/chatToolUis.tsx:734
 msgid "I couldn't check on that video"
 msgstr "I couldn't check on that video"
 
@@ -15257,7 +15257,7 @@ msgid "Monthly"
 msgstr "Monthly"
 
 #. js-lingui-explicit-id
-#: src/apps/chat/chatToolUis.tsx:103
+#: src/apps/chat/chatToolUis.tsx:104
 #: src/apps/clock/TimersTab.tsx:161
 #: src/apps/settings/styles/StyleEditor.tsx:127
 #: src/shell/AlarmRinger.tsx:64
@@ -17608,7 +17608,7 @@ msgid "setting.robot.vision.option_label.on_demand"
 msgstr "Only when I ask"
 
 #. js-lingui-explicit-id
-#: src/apps/chat/chatToolUis.tsx:108
+#: src/apps/chat/chatToolUis.tsx:109
 #: src/shell/AmbientCompanionPane.tsx:332
 #: src/shell/InstallDock.tsx:255
 #: src/shell/library/LibraryItems.tsx:35
@@ -19098,7 +19098,7 @@ msgid "QR code for your Home address away from home"
 msgstr "QR code for your Home address away from home"
 
 #. js-lingui-explicit-id
-#: src/apps/chat/chatToolUis.tsx:773
+#: src/apps/chat/chatToolUis.tsx:774
 #: src/apps/chat/MusicCardView.tsx:90
 #: src/apps/settings/AddVoiceBox.tsx:60
 #: src/apps/settings/AddVoiceBox.tsx:60
@@ -19544,7 +19544,7 @@ msgid "Reminders"
 msgstr "Reminders"
 
 #. js-lingui-explicit-id
-#: src/apps/chat/chatToolUis.tsx:774
+#: src/apps/chat/chatToolUis.tsx:775
 #: src/apps/chat/MusicCardView.tsx:87
 #: src/shell/pages/MusicWorkspacePage.tsx:140
 #: src/shell/pages/MusicWorkspacePage.tsx:165
@@ -21938,7 +21938,7 @@ msgid "setting.music.artist_wikimedia.label"
 msgstr "Show facts and photos from Wikimedia"
 
 #. js-lingui-explicit-id
-#: src/apps/chat/chatToolUis.tsx:110
+#: src/apps/chat/chatToolUis.tsx:111
 msgid "Show in Library"
 msgstr "Show in Library"
 
@@ -23968,8 +23968,8 @@ msgstr "That did not send. Try again."
 
 #. js-lingui-explicit-id
 #: src/apps/chat/chatThreadSlots.tsx:203
-#: src/apps/chat/chatToolUis.tsx:324
-#: src/apps/chat/chatToolUis.tsx:341
+#: src/apps/chat/chatToolUis.tsx:325
+#: src/apps/chat/chatToolUis.tsx:342
 #: src/apps/clock/AlarmsTab.tsx:71
 #: src/apps/clock/AlarmsTab.tsx:72
 #: src/apps/clock/WorldClocksTab.tsx:168
@@ -28284,12 +28284,12 @@ msgid "Words that switch it on"
 msgstr "Words that switch it on"
 
 #. js-lingui-explicit-id
-#: src/apps/chat/chatToolUis.tsx:508
+#: src/apps/chat/chatToolUis.tsx:509
 msgid "Worked for {minutes, plural, one {# minute} other {# minutes}}, {steps, plural, one {# step} other {# steps}}{sites, plural, =0 {} one {, # site} other {, # sites}}"
 msgstr "Worked for {minutes, plural, one {# minute} other {# minutes}}, {steps, plural, one {# step} other {# steps}}{sites, plural, =0 {} one {, # site} other {, # sites}}"
 
 #. js-lingui-explicit-id
-#: src/apps/chat/chatToolUis.tsx:505
+#: src/apps/chat/chatToolUis.tsx:506
 msgid "Worked for {seconds, plural, one {# second} other {# seconds}}, {steps, plural, one {# step} other {# steps}}{sites, plural, =0 {} one {, # site} other {, # sites}}"
 msgstr "Worked for {seconds, plural, one {# second} other {# seconds}}, {steps, plural, one {# step} other {# steps}}{sites, plural, =0 {} one {, # site} other {, # sites}}"
 
@@ -28934,7 +28934,7 @@ msgid "setting.ui.home_layout.option.shelves"
 msgstr "Your shows, music and things you made are up front with the day beside them."
 
 #. js-lingui-explicit-id
-#: src/apps/chat/chatToolUis.tsx:814
+#: src/apps/chat/chatToolUis.tsx:816
 #: src/shell/pages/MusicWorkspacePage.tsx:192
 msgid "Your song"
 msgstr "Your song"
