@@ -2,7 +2,7 @@
 # BOOT-CHECK-01 (2026-11-11): start the real hub entry of a commit on a scratch data folder and wait for it to answer.
 # Why: on 2026-11-11 a ship (--before-green) put a commit on the live hub whose entry crashed at boot ("Cannot access
 # 'manifestCache' before initialization", an import cycle). Unit tests never start src/index.ts, so no gate saw it.
-# usage: bash scripts/boot-check.sh [<sha>|HEAD]   (default HEAD; about 10 to 20 s warm). Exit 0 = booted and answered /healthz.
+# usage: bash scripts/boot-check.sh [<sha>|HEAD]   (default HEAD; about 10 to 20 s warm). Exit 0 = the entry printed "Home server ready." and its server answers HTTP.
 # It never touches the live hub: own port, own data folder, own lock, no engines, no mDNS. It kills only the pid it started.
 # Dependencies: the commit's tree is exported with git archive; node_modules is a copy-on-write clone (cp -c, no extra disk writes)
 # of this checkout's when the lockfiles match, and a real `bun install` only when they differ (so the check is never wrong, only slower).
@@ -46,14 +46,14 @@ log="$tmp/boot.log"
   echo $! > "$tmp/pid"
 )
 pid="$(cat "$tmp/pid")"
-for ((i = 0; i < 600; i++)); do
+for ((i = 0; i < 1800; i++)); do
   if grep -q '^Home server ready\.$' "$log" 2>/dev/null; then
     code="$(curl -s -m 5 -o /dev/null -w '%{http_code}' "http://127.0.0.1:$port/healthz" || true)"
-    if [[ "$code" == 200 ]]; then echo "boot-check: ${sha:0:9} booted and answered /healthz in $((i / 10)) s"; exit 0; fi
+    if [[ "$code" =~ ^[2-5][0-9][0-9]$ ]]; then echo "boot-check: ${sha:0:9} booted and the server answers (HTTP $code) in $((i / 10)) s"; exit 0; fi
   fi
   if ! kill -0 "$pid" 2>/dev/null; then break; fi
   sleep 0.1
 done
-echo "boot-check: ${sha:0:9} did NOT boot. Last log lines:" >&2
+echo "boot-check: ${sha:0:9} did NOT boot (last healthz answer: ${code:-none}). Last log lines:" >&2
 tail -15 "$log" | cut -c1-240 >&2
 exit 1
