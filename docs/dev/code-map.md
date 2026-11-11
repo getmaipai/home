@@ -303,6 +303,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `frontend/src/shell/pages/companionFlow/CustomizeStep.tsx` | guessPersonality, NOTES_MAX, BACKSTORY_MAX, CustomizeStep |
 | `frontend/src/shell/pages/companionFlow/DraggablePicture.tsx` | DraggablePicture |
 | `frontend/src/shell/pages/companionFlow/KeyframeEditor.tsx` | KeyframeEditor |
+| `frontend/src/shell/pages/companionFlow/PackSection.tsx` | packPercent, PackSection |
 | `frontend/src/shell/pages/companionFlow/PreviewControls.tsx` | DEFAULT_FRAME, PreviewControls |
 | `frontend/src/shell/pages/dashboard/ArrangeHome.tsx` | ARRANGE_KEY, displayTitle, moveCard, ArrangeHome |
 | `frontend/src/shell/pages/dashboard/AskBox.tsx` | installPlaceholder, askHref, AskBox |
