@@ -12,6 +12,8 @@ import { resolveOrCreateConversation, logTurn } from "@/lib/conversationHistory"
 import { newConversationTurnId } from "@/lib/id";
 import { runGenerateMusic } from "@/lib/music/tool";
 import { getMusicJobFor } from "@/lib/music/jobs";
+import { musicJobLockState, LOCKED_MUSIC_START_LINE } from "@/lib/music/lock";
+import { fileLockState } from "@/lib/adultLock";
 import { runGenerateVideo } from "@/lib/videos/tool";
 import { makeAudienceOf } from "@/lib/videos/make";
 import { getVideoJobFor } from "@/lib/videos/jobs";
@@ -151,10 +153,12 @@ export function realFilmEngines(input: { actor: PersonRow; signal: AbortSignal; 
       const jobId = (result.result?.data as { musicJobId?: string } | undefined)?.musicJobId;
       if (!jobId) throw new Error("The song could not be started.");
       const job = await poll(() => getMusicJobFor(actor, jobId), signal, 15 * 60_000, (value) => value.state === "failed" || value.state === "cancelled" ? value.errorLine ?? "The song did not finish." : null);
+      if (musicJobLockState(job, actor) !== "open") throw new Error(LOCKED_MUSIC_START_LINE);
       if (!job.fileId) throw new Error("The finished song is unavailable.");
       return job.fileId;
     },
     async assemble({ plan, clipFileIds, musicFileId }) {
+      if (fileLockState(actor, musicFileId) !== "open") throw new Error(LOCKED_MUSIC_START_LINE);
       if (faceless) {
         const production = await import("@/lib/mediaProductions").then(({ getMediaProduction }) => getMediaProduction(actor, productionId));
         if (!production) throw new Error("The film production is unavailable.");

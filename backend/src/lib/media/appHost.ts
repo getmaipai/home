@@ -12,6 +12,7 @@ import { and, desc, eq, inArray, isNull, like, sql, type SQL } from "drizzle-orm
 import { db } from "@/db";
 import { attachments, mediaItems, mediaSources, musicJobs, people, videoJobs } from "@/db/schema";
 import { fileIsAdultOnly, fileLockState, mediaItemLocked } from "@/lib/adultLock";
+import { musicRowIsLocked } from "@/lib/music/lock";
 import { loadManifestOnly } from "@/lib/plugins";
 import { appIndexFloorOk, appVisibleTo } from "@/lib/apps";
 import type { PersonRow } from "@/types";
@@ -457,10 +458,11 @@ function musicCreation(person: PersonRow, id: string): unknown[] {
   const fileId = (item?.location as { file_id?: string } | undefined)?.file_id ?? id;
   const file = db.select().from(attachments).where(eq(attachments.id, fileId)).get();
   if (file && libraryProvenance(file.provenance).writer === "music-gen") {
-    if (file.deletedAt !== null || !canReadFileAudience(person, file)) return [];
+    if (file.deletedAt !== null || !canReadFileAudience(person, file) || fileLockState(person, fileId) !== "open") return [];
     const metadata = libraryProvenance(file.provenance);
     const jobId = typeof metadata.job_id === "string" ? metadata.job_id : typeof metadata.job === "string" ? metadata.job : "";
     const job = jobId ? db.select().from(musicJobs).where(and(eq(musicJobs.id, jobId), eq(musicJobs.personId, file.ownerPersonId))).get() : undefined;
+    if (job && musicRowIsLocked(person, job.id)) return [];
     let request: Record<string, unknown> = {};
     try { request = JSON.parse(job?.request ?? "{}") as Record<string, unknown>; } catch { request = {}; }
     const title = safeText(request.title) || safeText(metadata.title) || "Made at home";
@@ -489,7 +491,9 @@ function musicCreationPeople(person: PersonRow, id: string): unknown[] {
   const item = readableIn(person, "music", id);
   const fileId = (item?.location as { file_id?: string } | undefined)?.file_id ?? id;
   const file = db.select().from(attachments).where(eq(attachments.id, fileId)).get();
-  if (!file || file.deletedAt !== null || !canReadFileAudience(person, file) || libraryProvenance(file.provenance).writer !== "music-gen") return [];
+  if (!file || file.deletedAt !== null || !canReadFileAudience(person, file) || fileLockState(person, fileId) !== "open" || libraryProvenance(file.provenance).writer !== "music-gen") return [];
+  const meta = libraryProvenance(file.provenance), jobId = typeof meta.job_id === "string" ? meta.job_id : typeof meta.job === "string" ? meta.job : "";
+  if (jobId && musicRowIsLocked(person, jobId)) return [];
   return visibilityForFile(person, fileId, canManageMadeFile(person, file.ownerPersonId), fileAudience(file.provenance) === "adult-only").candidates;
 }
 
@@ -497,7 +501,9 @@ export function changeMusicCreationShare(person: PersonRow, op: "add" | "remove"
   const item = readableIn(person, "music", id);
   const fileId = (item?.location as { file_id?: string } | undefined)?.file_id ?? id;
   const file = db.select().from(attachments).where(eq(attachments.id, fileId)).get();
-  if (!file || file.deletedAt !== null || file.origin === "fetched" || !canReadFileAudience(person, file) || libraryProvenance(file.provenance).writer !== "music-gen") return { ok: false as const, status: 404, error: "Song unavailable. Go back to Music and choose another." };
+  if (!file || file.deletedAt !== null || file.origin === "fetched" || !canReadFileAudience(person, file) || fileLockState(person, fileId) !== "open" || libraryProvenance(file.provenance).writer !== "music-gen") return { ok: false as const, status: 404, error: "Song unavailable. Go back to Music and choose another." };
+  const meta = libraryProvenance(file.provenance), jobId = typeof meta.job_id === "string" ? meta.job_id : typeof meta.job === "string" ? meta.job : "";
+  if (jobId && musicRowIsLocked(person, jobId)) return { ok: false as const, status: 404, error: "Song unavailable. Go back to Music and choose another." };
   if (!canManageMadeFile(person, file.ownerPersonId)) return { ok: false as const, status: 403, error: "Only the owner or an admin may change who sees this song." };
   if (person.role === "child") return { ok: false as const, status: 403, error: "Sharing is turned off for children. Ask a grown-up to share this for you." };
   if (op === "add") {

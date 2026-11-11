@@ -8,6 +8,7 @@ import { prepareMusicEdit } from "@/lib/music/tool";
 import { MUSIC_REFUSAL_LINE, refuseMusicPrompt } from "@/lib/music/policy";
 import { likenessRefusal } from "@/lib/likeness";
 import { StackMusicError } from "@/lib/music/stack";
+import { musicJobLockState } from "@/lib/music/lock";
 
 export const SONG_GONE_LINE = "That song isn't available any more. Ask for it again.";
 
@@ -39,7 +40,8 @@ const refuse = (refusal: SongEditRefusal): SongEditResult => ({ ok: false, ...re
 export async function runSongEdit(options: SongEditOptions): Promise<SongEditResult> {
   const { actor } = options;
   const root = getMusicJobFor(actor, options.jobId);
-  const versions = root ? musicVersions(actor, root).filter((j) => j.state === "done" && j.fileId && (!options.skipStems || j.task !== "stems")) : [];
+  if (root && musicJobLockState(root, actor) !== "open") return refuse({ status: 404, error: SONG_GONE_LINE });
+  const versions = root ? musicVersions(actor, root).filter((j) => j.state === "done" && j.fileId && musicJobLockState(j, actor) === "open" && (!options.skipStems || j.task !== "stems")) : [];
   const latest = () => versions.sort((a, b) => (b.chosenAt ?? b.createdAt).localeCompare(a.chosenAt ?? a.createdAt))[0];
   const source = (options.fileId ? versions.find((j) => j.fileId === options.fileId) : latest()) ?? null;
   if (!root || !source || !source.conversationId || !source.turnId) return refuse({ status: 404, error: SONG_GONE_LINE });

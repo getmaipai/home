@@ -14,6 +14,8 @@ import { pictureJobLockState } from "@/lib/pictures/lock";
 import { getVideoJobFor } from "@/lib/videos/jobs";
 import { phaseLabel } from "@/lib/videos/phaseLabel";
 import { videoJobLockState } from "@/lib/videos/lock";
+import { musicJobLockState } from "@/lib/music/lock";
+import { getMusicJobFor } from "@/lib/music/store";
 import { getPersonSettingValue, readLayerRow, setValue } from "@/lib/settings";
 import type { PersonRow } from "@/types";
 
@@ -136,6 +138,8 @@ function songItems(actor: PersonRow): ActivityItem[] {
   const out: ActivityItem[] = [];
   for (const row of rows) {
     if (row.state === "cancelled" || !recent(row.updatedAt)) continue;
+    const job = getMusicJobFor(actor, row.id);
+    if (job && musicJobLockState(job, actor) !== "open") continue;
     if (row.fileId && !fileIsOpenFor(actor, row.fileId)) continue;
     let request: { title?: string; description?: string } = {};
     try { request = JSON.parse(row.request) as typeof request; } catch { request = {}; }

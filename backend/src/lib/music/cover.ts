@@ -12,6 +12,7 @@ import { QUICK_MODEL } from "@/lib/pictures/quality";
 import { startPictureJob, getPictureJob, type PictureJob } from "@/lib/pictures/jobs";
 import { getMusicJobFor, saveMusicJob } from "./store";
 import type { MusicJob, MusicRequest } from "./types";
+import { musicJobLockState } from "./lock";
 import type { PersonRow } from "@/types";
 
 export function coverPromptFor(request: MusicRequest): string {
@@ -41,6 +42,7 @@ export async function startSongCover(actor: PersonRow, job: MusicJob, options: {
   starting.add(job.id);
   try {
     const audience = routeAudience(actor);
+    if (musicJobLockState(job, actor) !== "open") return;
     if (job.personId !== actor.id || !["queued", "running", "done"].includes(job.state) || job.temporary || !job.conversationId || !job.turnId || musicViewDenial(audience) || pictureDenial(audience)) return;
     const prompt = options.prompt?.trim() || coverPromptFor(job.request);
     if (refusePrompt(prompt, { lane: laneOf(audience) }) || !(await pictureEngineReady())) return;

@@ -11,12 +11,13 @@ import { modelStampFor } from "./models";
 import { provenanceFor } from "./commercial";
 import { addSoundToSongM4a } from "./soundAudio";
 import { MUSIC_NOTE, type GenerationProvenance, type MusicJob } from "./types";
+import { musicJobLockState } from "./lock";
 
 export interface SoundTake { job_id: string; index: number; total: number; state: MusicJob["state"]; file_id: string | null; src: string | null; saved: boolean; loop: boolean; seconds: number | null }
 
 /** Every take of one request, in order. Only the person's own jobs are ever read. */
 export function soundTakesOf(actor: PersonRow, group: string): SoundTake[] {
-  const takes = jobsForPerson(actor, 200).filter((job) => job.request.sound?.takes?.group === group);
+  const takes = jobsForPerson(actor, 200).filter((job) => job.request.sound?.takes?.group === group && musicJobLockState(job, actor) === "open");
   return takes.sort((a, b) => a.request.sound!.takes!.index - b.request.sound!.takes!.index).map((job) => {
     const fileId = job.state === "done" ? job.fileId : null;
     const gone = fileId ? !!db.select({ at: attachments.deletedAt }).from(attachments).where(and(eq(attachments.id, fileId), eq(attachments.ownerPersonId, actor.id))).get()?.at : false;
@@ -33,8 +34,10 @@ export async function addSoundToSong(actor: PersonRow, input: { soundJobId: stri
   if (!sound || !sound.request.sound || sound.state !== "done" || !sound.fileId) return { ok: false, status: 404, line: "That sound isn't available any more. Make it again, then add it to a song." };
   const root = getMusicJobFor(actor, input.songId);
   if (!root || root.request.sound || root.task === "stems" || root.temporary) return { ok: false, status: 404, line: "That song isn't available any more. Pick a song from your list." };
+  if (musicJobLockState(root, actor) !== "open") return { ok: false, status: 404, line: "That song isn't available any more. Pick a song from your list." };
   const versions = musicVersions(actor, root).filter((job) => job.state === "done" && job.fileId && job.task !== "stems");
   const source = (input.fileId ? versions.find((job) => job.fileId === input.fileId) : [...versions].sort((a, b) => (b.chosenAt ?? b.createdAt).localeCompare(a.chosenAt ?? a.createdAt))[0]) ?? null;
+  if (source && musicJobLockState(source, actor) !== "open") return { ok: false, status: 404, line: "That song isn't available any more. Pick a song from your list." };
   if (!source || !source.fileId || !source.conversationId || !source.turnId) return { ok: false, status: 404, line: "That song isn't available any more. Pick a song from your list." };
   const parent = provenanceFor(source.fileId);
   if (!parent) return { ok: false, status: 422, line: "Only songs made here can have a sound added. Pick one of your made songs." };

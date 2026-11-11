@@ -5,6 +5,7 @@ import type { PersonRow } from "@/types";
 import { getMusicJobFor, startMusicJob } from "@/lib/music/jobs";
 import { saveMusicJob } from "@/lib/music/store";
 import { musicBody } from "@/lib/music/stack";
+import { musicJobLockState } from "@/lib/music/lock";
 import type { MusicRequest } from "@/lib/music/types";
 
 const WAIT_MS = 30 * 60 * 1000;
@@ -29,6 +30,7 @@ export function whenMusicDone(actor: PersonRow, id: string, done: (ok: boolean) 
   const deadline = Date.now() + WAIT_MS;
   const tick = () => {
     const job = getMusicJobFor(actor, id);
+    if (job && musicJobLockState(job, actor) !== "open") { void Promise.resolve(done(false)).catch(() => undefined); return; }
     if (job?.state === "done") { void Promise.resolve(done(true)).catch(() => undefined); return; }
     if (!job || job.state === "failed" || job.state === "cancelled" || Date.now() > deadline) { void Promise.resolve(done(false)).catch(() => undefined); return; }
     setTimeout(tick, pollMs);
@@ -39,7 +41,7 @@ export function whenMusicDone(actor: PersonRow, id: string, done: (ok: boolean) 
 /** Records the mix that waits on this song in the song's stored request, so it survives a restart. */
 export function setPendingMix(actor: PersonRow, id: string, mix: NonNullable<MusicRequest["pendingMix"]>): void {
   const job = getMusicJobFor(actor, id);
-  if (!job) return;
+  if (!job || musicJobLockState(job, actor) !== "open") return;
   job.request.pendingMix = mix;
   saveMusicJob(job);
 }
@@ -47,7 +49,7 @@ export function setPendingMix(actor: PersonRow, id: string, mix: NonNullable<Mus
 /** Takes the waiting mix off the song. Returns true only for the caller that took it, so a mix starts once. */
 export function takePendingMix(actor: PersonRow, id: string): boolean {
   const job = getMusicJobFor(actor, id);
-  if (!job?.request.pendingMix) return false;
+  if (!job?.request.pendingMix || musicJobLockState(job, actor) !== "open") return false;
   delete job.request.pendingMix;
   saveMusicJob(job);
   return true;

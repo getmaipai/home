@@ -218,3 +218,32 @@ Real HTTP proof on a dev hub (`bun run dev` in a worktree, port 8844, no Stack; 
 ## Songs (part A)
 
 `music-gen` files use the same Library lock state as pictures. Marking a song raises its audience to adult-only and writes the lock to the song, its cover picture and every version from the same music job. A shared song cannot be marked. Promoted Music rows inherit the attachment lock at read time, so songs, grouped views, search and item details disappear without a proof and return for an unlocked owner. File metadata with titles, lyrics, timed lyrics and version links is withheld while locked. Children and teens remain behind the adult-only audience gate. Music job routes, chat and activity are covered by part B.
+
+## Songs (part B)
+
+The lock is checked at every read or action that could reveal a song or use it as a source. A job with `request.adultOnly` is locked from the moment it is queued, including before it has a file. The owner with a live proof can use these surfaces; once the lock is cleared on the file, they work normally. Minors continue to get the missing or hidden result.
+
+| Surface | Choke point | Locked answer |
+|---|---|---|
+| Music job routes and card (B1) | `routes/music.ts`, `lib/music/lock.ts` | locked tile while visible; other actions are missing |
+| Chat tool result (B1) | `lib/music/lock.ts` `redactLockedMusicOutcome` | fixed placeholder, no prompt, title or job id |
+| Chat history (B1) | `lib/music/lock.ts` `musicJobIdsByTurnRedacted` | no song job id until unlock |
+| Activity and progress feed (B3) | `lib/activity.ts` `songItems` | locked and running adult-only jobs omitted, including title and id |
+| Companion counts and activity (B3) | `routes/companions.ts` | omitted from counts and rows, including id and state |
+| Music creation detail and people picker (B3) | `lib/media/appHost.ts` `musicCreation`, `musicCreationPeople` | empty result |
+| Music creation sharing (B3) | `lib/media/appHost.ts` `changeMusicCreationShare` | 404 as unavailable |
+| Song edits, sound takes and covers (B3) | `lib/music/songEdit.ts`, `soundTakes.ts`, `cover.ts` | missing result; no work starts |
+| Music beds and film assembly (B3) | `lib/videos/musicBed.ts`, `lib/films/engines.ts` | locked source is refused before a mix or assembly starts |
+
+## Where it is applied
+
+| Surface | Choke point | Locked answer |
+|---|---|---|
+| Songs in the Library and Music app, search, groups and details | `lib/library.ts`, `lib/media/appHost.ts` via file lock state | song and metadata omitted |
+| Music job routes and cards | `routes/music.ts`, `lib/music/lock.ts` | locked tile or missing result |
+| Chat tool results and history | `lib/music/lock.ts`, turn tool and history paths | placeholder result and withheld id |
+| Activity page and progress rows | `lib/activity.ts` | locked jobs omitted before title, id or state is returned |
+| Companion counts and activity | `routes/companions.ts` | locked jobs omitted |
+| Music creation details, people and share actions | `lib/media/appHost.ts` | empty or 404 |
+| Song edits, sound takes and cover generation | `lib/music/songEdit.ts`, `soundTakes.ts`, `cover.ts` | missing result, no new job |
+| Video music beds and film assembly | `lib/videos/musicBed.ts`, `lib/films/engines.ts` | refuse before work starts |
