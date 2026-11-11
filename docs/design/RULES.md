@@ -393,12 +393,31 @@ S1. **The main navigation is permanent.** The column that lists the apps
     own screen; the drawer stays and holds All apps, Search, the profile
     control, Settings and the rest of the app list. The bar steps aside
     only while an immersive screen is open. This replaces the sentence
-    that the drawer is the only phone switcher; the desktop rail is
-    unchanged until a separate owner ruling.
-    The rail is 56 px at the standard target size. When the person's
-    resolved ease.targets is large, its width follows the kit
-    target-minimum token, still icons only, still never expanding, and
-    S3's test runs at that width too.
+    that the drawer is the only phone switcher.
+    Owner-approved 2026-11-11 for the desktop column (his words: "i also
+    noticed they have an expanding siderail"; "the left rail is grouped
+    into sections separated by lines, lower sections have headings";
+    "its repurposing for the active app but only when needed"; "when you
+    click on things that required a left column in the right pane (like
+    chat), it auto collapses the left rail ... in very smooth animation"):
+    the main navigation may expand to a labelled, grouped list about 240
+    px wide, with a fold control, groups split by hairlines and small
+    headings on the lower groups, and the person's choice remembered; it
+    collapses to the 56 px icon rail. It collapses by itself, with one
+    short animation (instant under reduced motion), when the open app
+    shows its own side panel (thread list, settings pages), and restores
+    the person's choice on leaving. While an app offers its own modes
+    (Create, the photo editor) the column may show those modes under a
+    clear Back control, never as the only way to switch apps. App
+    content such as a thread list lives in the app's own panel beside the
+    column, never inside it. This replaces "never expands, has no labels
+    or fold control" and "is the one icon rail" for the desktop; the
+    brand, global Search, the profile control and the More menu stay as
+    listed above.
+    The collapsed rail is 56 px at the standard target size. When the
+    person's resolved ease.targets is large, its width follows the kit
+    target-minimum token, still icons only when collapsed, and S3's test
+    runs at that width too.
 S2. **Each app area emulates its native app.** Everything to the right of
     the rail looks and feels like the app it copies, with that app's own
     layout intact: chat is ChatGPT's layout, including its own history
