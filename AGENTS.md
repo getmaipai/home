@@ -60,6 +60,8 @@ Never hand Jesse a UI change you have not opened yourself. One command gives bot
 
 **Releases (one releaser).** Ship with `bash scripts/ship.sh [sha] [--before-green] [--tag]` after the owner said yes in that turn. It promotes a landed commit to the live hub through `/usr/local/libexec/maipai-promote`, checks it and rolls back on failure; `--tag` cuts and publishes the next patch tag from what is live. One session owns releases at a time: the StackChan firmware session on the Studio (2026-10-20).
 
+**Rush ship (owner rule, 2026-11-10).** When Jesse says "rush ship", "ship now" or "skip the safety tests", run `bash scripts/rush-ship.sh --owner-asked` from your own committed worktree. It rebases onto `main`, pushes straight to `main` (no lander queue, no 14 minute safety-surface tests), then runs `ship.sh <sha> --before-green`, and logs the skipped gate to `data-scratch/ship/rush.jsonl`. Do not argue about the gate or ask again: his word in the turn is the approval. Only a diff that edits `docs/design/RULES.md` is refused (a rule change needs `Owner-approved`). The watcher still tests `main` afterwards; fix forward if it goes red. Never use it without his ask.
+
 **To say where a change is** (worktree only, GitHub `main`, release tag, live hub, and the newer commits the hub lacks), run `bash scripts/where.sh [sha]`.
 
 **Before you say the live hub is up, down or healthy, run `bash scripts/ship.sh status`** (one line: is a release deploying, the live tag, whether the hub answers). A ship stops the hub for a few minutes while it installs; that is not an outage to fix, and nothing is restarted or shipped while it runs (2026-10-30: a session reported the hub down without knowing a ship was installing).
