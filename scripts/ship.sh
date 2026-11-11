@@ -67,8 +67,12 @@ label="sha-${sha:0:7}"
 # 20 to 30 minute watcher wait is no longer required: a ship without a watcher green run is allowed once the boot check passes and is recorded;
 # the watcher still tests main afterwards and a red run is fixed forward at once. MAIPAI_SKIP_BOOT_CHECK=1 skips it (tests only).
 if [[ "${MAIPAI_SKIP_BOOT_CHECK:-}" != 1 && -f scripts/boot-check.sh ]]; then
-  bash scripts/boot-check.sh "$sha" || die "${sha:0:7} does not boot (see the lines above); nothing was stopped or installed. Fix it, land the fix, ship again."
-  boot_checked=1
+  if [[ "$(git rev-parse HEAD)" == "$sha" ]]; then
+    bash scripts/boot-check.sh || die "${sha:0:7} does not boot (see the lines above); nothing was stopped or installed. Fix it, land the fix, ship again."
+    boot_checked=1
+  else
+    echo "ship.sh: this checkout is not at ${sha:0:7}, so the boot check was skipped; run ship.sh from a worktree whose HEAD is the commit (git fetch, then rebase onto origin/main) to get the boot check and skip the watcher wait." >&2
+  fi
 fi
 if (( ! before_green )) && [[ ! -f "$watch/green/$sha" ]] && [[ "${boot_checked:-0}" != 1 ]]; then die "watcher has no green run for $sha; pass --before-green to ship anyway and record it."; fi
 # The live hub is the install on the Mac Studio. Keep its marker beside the
