@@ -223,7 +223,8 @@ export function lockItemOfProvenance(ownerPersonId: string, provenance: string):
   // Either key saying adult-only counts (the same rule as lockedFilterSql): the machine fact is never lowered.
   // Fail closed: any one reading that says adult-only wins (the duplicate-key scan, the parsed made fact, the parsed audience), so a mistake in one of them cannot open an adult item.
   const adult = hasTopLevelString(provenance, ["audience", "made_audience"], "adult-only") || meta.made_audience === "adult-only" || fileAudience(provenance) === "adult-only";
-  const made = adult ? "adult-only" : meta.made_audience === "all-ages" ? "all-ages" : fileAudience(provenance);
+  // A song records no audience (it is made with no adult style), so a music-gen note with none counts as all-ages: it can be locked, and nothing else changes for it.
+  const made = adult ? "adult-only" : meta.made_audience === "all-ages" ? "all-ages" : fileAudience(provenance) ?? (meta.writer === "music-gen" ? "all-ages" : null);
   return { ownerPersonId, madeAudience: made, lock: meta.lock === "off" ? "off" : "on" };
 }
 

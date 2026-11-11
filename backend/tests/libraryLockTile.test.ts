@@ -87,3 +87,15 @@ test("a shared item cannot be locked: no Lock button, and the hub refuses with a
   expect(ok.status).toBe(200);
   expect(await ok.json()).toEqual({ made_audience: "adult-only", lock: "on" });
 });
+
+test("a plain song (no audience recorded) can be locked from the Library, then it is hidden and the tile appears", async () => {
+  const { client, person, file } = await owner();
+  const song = file('music-gen:{"kind":"music","job_id":"mus-x","task":"text2music"}');
+  expect(listLibrary(person, {}).items[0]!.adult).toMatchObject({ can_mark: true, made_audience: "all-ages" });
+  const ok = await client.post(`/api/library/files/${song}/adult-mark`, { action: "mark" });
+  expect(ok.status).toBe(200);
+  const page = listLibrary(person, {});
+  expect(page.items).toHaveLength(0);
+  expect(page.locked).toBe(true);
+  expect(__unlockedForTests(person.id, () => listLibrary(person, {}).items[0]!)).toMatchObject({ id: song, unlocked: true });
+});
