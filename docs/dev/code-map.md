@@ -433,12 +433,12 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/certainty.ts` | WEB_AGREEMENT_MIN_HOSTS, PRECIP_LIKELY_MIN, PRECIP_MAYBE_MIN, MEMORY_LOW_CONFIDENCE, MEMORY_OLD_DAYS, webHostCount |
 | `backend/src/lib/changeVoice.ts` | changeVoice |
 | `backend/src/lib/chatFolders.ts` | ChatFolderView, MAX_SHARES, canManageFolders, folderAccess, visibleFolder, listChatFolders |
-| `backend/src/lib/chatImageNote.ts` | cleanPictureName, picturesAttachedNote, picturesNotReadNote, picturesWindowNote, audioAttachedNote, pictureFailureWords |
+| `backend/src/lib/chatImageNote.ts` | cleanPictureName, picturesAttachedNote, picturesDescribedNote, picturesNotReadNote, picturesWindowNote, audioAttachedNote |
 | `backend/src/lib/chatLease.ts` | LEASE_GRACE_MS, DEFAULT_LEASE, createChatLease, registerActiveChatLease, chatLeaseHeld, chatLeaseHeldBy |
 | `backend/src/lib/chatLeaseRuntime.ts` | __resetChatLeaseForTests, getChatLease, startChatLease |
 | `backend/src/lib/chatModelSwitch.ts` | __resetChatSwitchForTests, startChatModelChoice, chatModelChoiceState, uncensoredChatEntry, uncensoredChoiceState, addedChatChoiceStates |
 | `backend/src/lib/chatPause.ts` | chatPausedByAdmin, chatPauseMessage |
-| `backend/src/lib/chatPictures.ts` | __setChatPictureCapabilityForTests, chatModelReadsPictures, photoUploadsAllowed, picturePartsAllowed, loadPictureParts |
+| `backend/src/lib/chatPictures.ts` | __setChatPictureCapabilityForTests, chatModelReadsPictures, photoUploadsAllowed, picturePartsAllowed, loadPictureParts, VISION_PICTURE_TOKENS |
 | `backend/src/lib/chatTemplateTokens.ts` | stripChatTemplateTokens, ChatTemplateTokenFilter |
 | `backend/src/lib/chatTransitions.ts` | DEFAULT_TRANSITION_SECONDS, RUNNING_LONG_FACTOR, RUNNING_LONG_LINE, __resetTransitionsForTests, recordTransition, estimateSeconds |
 | `backend/src/lib/childDisclosure.ts` | hasAdultToTellCue, defaultChildDisclosure |
