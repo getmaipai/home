@@ -62,7 +62,15 @@ if ! git merge-base --is-ancestor "$sha" origin/main; then
   die "${sha:0:7} is not on origin/main; land it first with bash scripts/land.sh"
 fi
 label="sha-${sha:0:7}"
-if (( ! before_green )) && [[ ! -f "$watch/green/$sha" ]]; then die "watcher has no green run for $sha; pass --before-green to ship anyway and record it."; fi
+# BOOT-CHECK-01 (2026-11-11): a ship whose entry does not boot took the live hub down (a --before-green ship of main with another session's
+# import cycle). Every ship, dry run included, first boots this exact commit's real entry on a scratch hub (about 30 s). With that proof the
+# 20 to 30 minute watcher wait is no longer required: a ship without a watcher green run is allowed once the boot check passes and is recorded;
+# the watcher still tests main afterwards and a red run is fixed forward at once. MAIPAI_SKIP_BOOT_CHECK=1 skips it (tests only).
+if [[ "${MAIPAI_SKIP_BOOT_CHECK:-}" != 1 && -f scripts/boot-check.sh ]]; then
+  bash scripts/boot-check.sh "$sha" || die "${sha:0:7} does not boot (see the lines above); nothing was stopped or installed. Fix it, land the fix, ship again."
+  boot_checked=1
+fi
+if (( ! before_green )) && [[ ! -f "$watch/green/$sha" ]] && [[ "${boot_checked:-0}" != 1 ]]; then die "watcher has no green run for $sha; pass --before-green to ship anyway and record it."; fi
 # The live hub is the install on the Mac Studio. Keep its marker beside the
 # install, not inside it: promotion replaces the install directory. Accept the
 # old in-directory marker during migration from earlier ship.sh versions.
