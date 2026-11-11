@@ -45,7 +45,7 @@ export function DashboardPage({ person }: { person: Roster }) {
   const defaults = defaultSectionLayout(person.role, layout);
   const sectionLayout = arrange.data?.sections ?? defaults;
   const hidden = sectionLayout.hidden ?? defaults.hidden;
-  const sectionBlockMap: Record<HomeSection, HomeBlockId[]> = { hero: ["hero"], composer: ["ask"], make: ["make"], continue: [layout === "shelves" ? "media_continue" : "pick_up"], today: [layout === "ask" ? "today_chips" : "today"], new: ["media_new"], made: ["media_made"], family: ["family"], admin: ["getting_started", "admin"] };
+  const sectionBlockMap: Record<HomeSection, HomeBlockId[]> = { hero: ["hero"], composer: ["ask"], make: ["make"], continue: [layout === "shelves" && (media.data?.continue?.length || continueRows.data?.rows?.length) ? "media_continue" : "pick_up"], today: [layout === "ask" ? "today_chips" : "today"], new: ["media_new"], made: ["media_made"], family: ["family"], admin: ["getting_started", "admin"] };
   const sectionBlocks = [...(sectionLayout.order ?? defaults.order), ...HOME_SECTIONS.filter((id) => !(sectionLayout.order ?? defaults.order).includes(id))]
     .filter((id) => !hidden.includes(id as HomeSection))
     .flatMap((id) => sectionBlockMap[id as HomeSection] ?? [])
