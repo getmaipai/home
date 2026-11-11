@@ -271,7 +271,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `frontend/src/shell/pages/MicTestPage.tsx` | MicTestPage |
 | `frontend/src/shell/pages/MusicLikeThisPage.tsx` | BAND_PROMPT, SONG_PROMPT, likeThisMessage, MusicLikeThisPage |
 | `frontend/src/shell/pages/MusicRemix.tsx` | remixRequest, RemixSong |
-| `frontend/src/shell/pages/MusicStudioPages.tsx` | STUDIO_PAGE_IDS, isStudioPage, createBody, editPath, CreatePage, MusicStudioPage |
+| `frontend/src/shell/pages/MusicStudioPages.tsx` | STUDIO_PAGE_IDS, isStudioPage, createBody, CreatePage, MusicStudioPage |
 | `frontend/src/shell/pages/MusicStudioView.tsx` | STEMS_UNAVAILABLE_LINE, studioTracks, timeLabel, MusicStudioView |
 | `frontend/src/shell/pages/MusicVoiceCreate.tsx` | VoiceCreate |
 | `frontend/src/shell/pages/MusicWaveform.tsx` | usePeaks, peaksOf, Waveform |
