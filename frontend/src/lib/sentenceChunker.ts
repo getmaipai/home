@@ -21,7 +21,11 @@ const CLAUSE_FLUSH_MIN = 50; // never flush a clause shorter than this
 const CLAUSE_GATE_DEFAULT = WHOLE_SENTENCE_MAX - 20; // 110
 // The opener is the single most latency-sensitive chunk (time-to-first-audio
 // matters most there), so it gets a slightly lower gate than later chunks.
-const CLAUSE_GATE_FIRST_CHUNK = 90;
+// DUPLEX-FIRST-CLAUSE-01 (2026-11-11): measured live, the first sound waited for up to 90 to 130 characters of text (1.3 to 2.7 s of
+// generation) and then for the voice to speak that whole first chunk (0.8 to 1.9 s). The first chunk of a reply now flushes at the FIRST
+// clause boundary at or past 32 characters once 40 are in, so "Oh no," (6) and "that's concerning!" never split but a long opening does.
+const CLAUSE_GATE_FIRST_CHUNK = 40;
+const CLAUSE_FLUSH_MIN_FIRST_CHUNK = 32;
 
 /** End offset of the next speakable chunk in `sub`, or -1 if none yet.
  * `firstChunk` lowers the clause-flush gate for the very first boundary
@@ -37,9 +41,13 @@ export function nextSentenceBoundary(sub: string, firstChunk = false): number {
     CLAUSE_BOUNDARY.lastIndex = 0;
     let clauseEnd = -1;
     let m: RegExpExecArray | null;
+    const floor = firstChunk ? CLAUSE_FLUSH_MIN_FIRST_CHUNK : CLAUSE_FLUSH_MIN;
     while ((m = CLAUSE_BOUNDARY.exec(sub)) !== null) {
       const e = m.index + m[0].length;
-      if (e >= CLAUSE_FLUSH_MIN && e <= WHOLE_SENTENCE_MAX) clauseEnd = e; // last in range
+      if (e >= floor && e <= WHOLE_SENTENCE_MAX) {
+        clauseEnd = e;
+        if (firstChunk) break; // the opener takes the first usable clause, later chunks the last in range
+      }
     }
     if (clauseEnd > 0) return clauseEnd;
   }

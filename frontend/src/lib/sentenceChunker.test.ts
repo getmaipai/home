@@ -47,6 +47,22 @@ describe("nextSentenceBoundary", () => {
   });
 });
 
+describe("first chunk of a reply (DUPLEX-FIRST-CLAUSE-01)", () => {
+  test("flushes at the first clause boundary at or past 32 characters", () => {
+    const text = "Sure, here is a quick way to make it, and then you add the rest of the ingredients";
+    const end = nextSentenceBoundary(text, true);
+    expect(text.slice(0, end)).toBe("Sure, here is a quick way to make it,");
+  });
+  test("never splits a short opener like Oh no, even when the reply is long", () => {
+    const text = "Oh no, that is concerning, so let us look at what happened";
+    const end = nextSentenceBoundary(text, true);
+    expect(text.slice(0, end)).not.toBe("Oh no,");
+  });
+  test("later chunks keep the old long gate", () => {
+    expect(nextSentenceBoundary("Sure, here is a quick way to make it, and then you add more", false)).toBe(-1);
+  });
+});
+
 describe("splitReadyChunks", () => {
   test("splits every complete sentence, leaving an incomplete trailing fragment unconsumed", () => {
     const text = "Dogs are great pets. They need walks. And they lov";
