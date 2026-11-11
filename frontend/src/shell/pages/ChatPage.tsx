@@ -577,12 +577,12 @@ function useChatRuntime(person: Roster, closeSheet: () => void, temporaryNext: b
           consumeVoiceTiming: () => {
             const value = voiceSttMsRef.current;
             voiceSttMsRef.current = undefined;
-            voiceFinalAtRef.current = undefined;
+            // finalAt stays until the first playback is reported (it was cleared here, so the report never fired: 41 live turns had no playback time)
             return value;
           },
           onFirstPlayback: (at) => {
             const finalAt = voiceFinalAtRef.current;
-            if (finalAt !== undefined && voiceTimingTurnIdRef.current) voiceTimingSocketRef.current?.sendTiming?.(voiceTimingTurnIdRef.current, voiceSttMsRef.current ?? 0, Math.max(0, at - finalAt));
+            if (finalAt !== undefined && voiceTimingTurnIdRef.current) { voiceTimingSocketRef.current?.sendTiming?.(voiceTimingTurnIdRef.current, voiceSttMsRef.current ?? 0, Math.max(0, at - finalAt)); voiceFinalAtRef.current = undefined; }
           },
           onTurnId: (turnId) => { voiceTimingTurnIdRef.current = turnId; },
           onFirstSentence: () => { const finalAt = voiceFinalAtRef.current; if (finalAt !== undefined && voiceTimingTurnIdRef.current) voiceTimingSocketRef.current?.sendTiming?.(voiceTimingTurnIdRef.current, voiceSttMsRef.current ?? 0, undefined, Math.max(0, performance.now() - finalAt)); },

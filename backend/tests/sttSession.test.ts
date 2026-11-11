@@ -470,6 +470,9 @@ describe("SttSession - RMS fallback VAD (no Silero model installed in tests)", (
     expect(final).toEqual({ t: "final", v: "hello there" });
     const timing = events.find((e) => e.t === "timing");
     expect(timing).toEqual({ t: "timing", speech_end_to_final_ms: expect.any(Number), silence_wait_ms: expect.any(Number) });
+    // a real duration, never an epoch time (the stamps were once read after reset() and came out as Date.now())
+    expect((timing as { speech_end_to_final_ms: number }).speech_end_to_final_ms).toBeLessThan(60_000);
+    expect((timing as { silence_wait_ms: number }).silence_wait_ms).toBeLessThan(60_000);
     expect(events.findIndex((e) => e.t === "timing")).toBeLessThan(events.findIndex((e) => e.t === "final"));
     session.close();
   });

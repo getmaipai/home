@@ -457,11 +457,13 @@ export class SttSession {
 
     const wasPaused = this.replyPaused;
     this.finishReplyPause();
+    // reset() zeroes the stamps, so read them first (a stamp read after it made stt_ms the epoch time, seen on the live hub 2026-11-11)
+    const lastVoicedAt = this.lastVoicedAtMs, silenceStartedAt = this.silenceStartedAtMs, finalizeStartedAt = this.finalizeStartedAtMs;
     this.reset();
     if (this.closed) return;
     if (text && isLikelySpeech(text)) {
       const sentAt = this.now();
-      this.send({ t: "timing", speech_end_to_final_ms: Math.max(0, sentAt - this.lastVoicedAtMs), silence_wait_ms: Math.max(0, this.finalizeStartedAtMs - this.silenceStartedAtMs) });
+      this.send({ t: "timing", speech_end_to_final_ms: lastVoicedAt > 0 ? Math.max(0, sentAt - lastVoicedAt) : 0, silence_wait_ms: silenceStartedAt > 0 && finalizeStartedAt >= silenceStartedAt ? finalizeStartedAt - silenceStartedAt : 0 });
       this.send({ t: "final", v: text });
     }
     else {
