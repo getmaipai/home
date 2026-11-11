@@ -135,7 +135,8 @@ describe("the outbox", () => {
     expect(originMain()).toBe(pipelineMain());
   }, 120_000);
 
-  test("a GitHub main that moved on its own (diverged) holds the queue loudly, never forces, and reset-to-github parks the landed commits and recovers", () => {
+  test("with self-healing off, a GitHub main that moved on its own (diverged) holds the queue loudly, never forces, and reset-to-github parks the landed commits and recovers", () => {
+    env.MAIPAI_LAND_SELFHEAL = "0";
     stubGit("fail");
     env.MAIPAI_LAND_HOLD_SECONDS = "0";
     landOne("out_div_a", "entry out_div_a");
@@ -173,7 +174,58 @@ describe("the outbox", () => {
     expect(originMain()).toBe(pipelineMain());
     expect(git(origin, "log", "--format=%s", "-2", "refs/heads/main").split("\n")).toEqual(["entry out_div_b", "direct push to GitHub main"]);
     expect(status()).toContain("GitHub main: in sync");
+    delete env.MAIPAI_LAND_SELFHEAL;
   }, 120_000);
+
+  test("SELFHEAL-01: a GitHub main that moved on while a landing here was unpushed heals itself: the landing is parked, GitHub is followed and the landing is done again, with nothing forced", () => {
+    stubGit("fail");
+    env.MAIPAI_LAND_HOLD_SECONDS = "0";
+    landOne("heal_a", "entry heal_a");
+    expect(run("lander.sh", ["run-once"]).stdout).toContain("landed: wt/heal_a");
+    const unpushedTip = pipelineMain();
+    // Another lander (another machine) pushes straight to GitHub's main, so the mains diverge.
+    const other = makeWorktree("heal_other");
+    writeFileSync(join(other, "heal_other.txt"), "the other lander\n");
+    commit(other, "the other lander's landing");
+    git(other, "push", origin, "HEAD:refs/heads/main");
+    stubGit("pass");
+    landOne("heal_b", "entry heal_b");
+    // One run: the lander finds the divergence, heals it, and lands what was waiting.
+    let out = run("lander.sh", ["run-once"]).stdout;
+    expect(out).not.toContain("held:");
+    for (let i = 0; i < 3 && queueFiles().length > 0; i++) out += run("lander.sh", ["run-once"]).stdout;
+    expect(out).toContain("landed: wt/heal_b");
+    expect(out).toContain("landed: wt/heal_a");
+    expect(queueFiles()).toHaveLength(0);
+    // Nothing was lost or forced: the old tip is parked, and GitHub's main holds the other lander's commit plus both landings.
+    const parked = git(main, "branch", "--list", "wt/outbox-parked-*", "--format=%(refname:short)").split("\n").filter(Boolean);
+    expect(parked.some((b) => git(main, "rev-parse", b) === unpushedTip)).toBe(true);
+    const subjects = git(origin, "log", "--format=%s", "-8", "refs/heads/main").split("\n");
+    expect(subjects).toContain("the other lander's landing");
+    expect(subjects).toContain("entry heal_a");
+    expect(subjects).toContain("entry heal_b");
+    expect(originMain()).toBe(pipelineMain());
+    expect(status()).toContain("healed a divergence itself");
+  }, 180_000);
+
+  test("SELFHEAL-01: healing is limited, so a lander that keeps diverging stays stuck and says so instead of looping", () => {
+    env.MAIPAI_LAND_SELFHEAL_MAX = "0";
+    stubGit("fail");
+    landOne("cap_a", "entry cap_a");
+    expect(run("lander.sh", ["run-once"]).stdout).toContain("landed: wt/cap_a");
+    const other = makeWorktree("cap_other");
+    writeFileSync(join(other, "cap_other.txt"), "direct\n");
+    commit(other, "direct push to GitHub main (cap)");
+    git(other, "push", origin, "HEAD:refs/heads/main");
+    stubGit("pass");
+    landOne("cap_b", "entry cap_b");
+    const held = run("lander.sh", ["run-once"]);
+    expect(held.stdout).toContain("held: wt/cap_b");
+    expect(status()).toContain("STUCK: GitHub main and the landed main diverged");
+    delete env.MAIPAI_LAND_SELFHEAL_MAX;
+    expect(run("lander.sh", ["outbox", "reset-to-github"]).status).toBe(0);
+    for (let i = 0; i < 3 && queueFiles().length > 0; i++) run("lander.sh", ["run-once"]);
+  }, 180_000);
 
   test("a landing that happens while a flush is pushing is never rewound by that flush, and stays pending for the next one", () => {
     stubGit("pass");

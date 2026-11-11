@@ -405,6 +405,83 @@ outbox_delete_branches() {
   rm -f "$list"
 }
 
+# SELFHEAL-01: the queue entries for landings that reached the pipeline's main but not GitHub (a function of its own: bash 3.2 cannot hold a heredoc inside $( )).
+selfheal_requeue() {
+  python3 - "$@" <<'PY'
+import json, os, subprocess, sys, time
+data, checkout, o, p = sys.argv[1:5]
+def git(*a):
+    return subprocess.run(['git', '-C', checkout, *a], capture_output=True, text=True)
+def ancestor(a, b):
+    return git('merge-base', '--is-ancestor', a, b).returncode == 0
+worktrees = {}
+cur = None
+for line in git('worktree', 'list', '--porcelain').stdout.splitlines():
+    if line.startswith('worktree '): cur = line[9:]
+    elif line.startswith('branch refs/heads/') and cur: worktrees[line[18:]] = cur
+queued = set()
+qdir = os.path.join(data, 'queue')
+os.makedirs(qdir, exist_ok=True)
+for f in os.listdir(qdir):
+    if f.endswith('.json'): queued.add(f.split('-', 1)[1][:-5] if '-' in f else f)
+landed = []
+try:
+    lines = open(os.path.join(data, 'landings.jsonl')).read().splitlines()[-400:]
+except OSError:
+    lines = []
+for line in lines:
+    try: r = json.loads(line)
+    except ValueError: continue
+    if r.get('status') != 'landed' or not str(r.get('branch', '')).startswith('wt/'): continue
+    m = r.get('main_sha') or ''
+    if len(m) < 7 or git('cat-file', '-e', m + '^{commit}').returncode != 0: continue
+    # Landed here but not on GitHub: its resulting main is in the parked tip and not in GitHub's main.
+    if ancestor(m, p) and not ancestor(m, o): landed.append(r)
+seen = {}
+for r in landed: seen[(r['branch'], r['sha'])] = r
+now = int(time.time() * 1000)
+n = 0
+for (branch, sha), r in seen.items():
+    slug = branch.replace('/', '-')
+    if slug + '.json' in queued or slug in queued: continue
+    done_file = os.path.join(data, 'done-items', slug + '-' + sha)
+    done = open(done_file).read().split() if os.path.exists(done_file) else []
+    entry = dict(branch=branch, sha=sha, worktree=worktrees.get(branch, checkout), session='', requested_at=time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime()), note='landed again: GitHub main moved on while this landed', done=done)
+    tmp = os.path.join(qdir, '.selfheal.%d' % (now + n))
+    json.dump(entry, open(tmp, 'w'))
+    os.rename(tmp, os.path.join(qdir, '%d-%s.json' % (now + n, slug)))
+    n += 1
+print(n)
+PY
+}
+
+# SELFHEAL-01 (2026-11-11): two landers (this Mac and another machine) push to one GitHub main, so GitHub can move on while a landing here is
+# still unpushed, and the two mains diverge. That used to stall every landing here until a person ran reset-to-github (eight times since
+# 2026-11-02, once for 50 minutes unseen). Now the lander heals it: it parks the landed-but-unpushed tip on a branch (nothing is lost),
+# follows GitHub's main, and puts every landing that never reached GitHub back in the queue, in order, so each is rebased and checked on the
+# new main like any landing. Never forced; at most MAIPAI_LAND_SELFHEAL_MAX heals in MAIPAI_LAND_SELFHEAL_WINDOW_SECONDS (then it stays STUCK and
+# says so, the old rule). Returns 0 when healed.
+outbox_selfheal() {
+  local o="$1" p="$2" now window max recent parked requeued
+  [[ "${MAIPAI_LAND_SELFHEAL:-1}" == 1 ]] || return 1
+  now="$(date +%s)"; window="${MAIPAI_LAND_SELFHEAL_WINDOW_SECONDS:-1800}"; max="${MAIPAI_LAND_SELFHEAL_MAX:-3}"
+  recent="$(awk -v n="$now" -v w="$window" '$1 ~ /^[0-9]+$/ && n - $1 <= w' "$outbox_dir/selfheal-log" 2>/dev/null | wc -l | tr -d ' ')"
+  if (( recent >= max )); then
+    outbox_log "SELF-HEAL paused: $recent heals in the last $(( window / 60 )) min; a person must look (bash scripts/pipeline.sh outbox reset-to-github)"
+    return 1
+  fi
+  parked="wt/outbox-parked-$(date -u +%Y%m%d-%H%M%S)"
+  git -C "$checkout" branch "$parked" "$p" >/dev/null 2>&1 || return 1
+  # Move the pipeline's main only if no landing moved it meanwhile (compare-and-swap); otherwise try again at the next flush.
+  if ! git -C "$checkout" update-ref "$PIPELINE_MAIN_REF" "$o" "$p" 2>/dev/null; then git -C "$checkout" branch -D "$parked" >/dev/null 2>&1 || true; return 1; fi
+  requeued="$(selfheal_requeue "$data" "$checkout" "$o" "$p")"
+  outbox_clear
+  echo "$now" >>"$outbox_dir/selfheal-log"
+  printf '%s %s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "followed GitHub main (${o:0:7}), parked ${p:0:7} on $parked, landing ${requeued:-0} change(s) again" >"$outbox_dir/last-selfheal"
+  outbox_log "SELF-HEALED: GitHub main (${o:0:7}) had moved on; parked the landed tip ${p:0:7} on $parked, followed GitHub, requeued ${requeued:-0} landing(s)"
+  return 0
+}
+
 outbox_flush() {
   local force="${1:-}" now next p o cur n delay errfile reason
   now="$(date +%s)"
@@ -426,6 +503,7 @@ outbox_flush() {
       outbox_delete_branches; return 0
     fi
     if ! git -C "$checkout" merge-base --is-ancestor "$o" "$p" 2>/dev/null; then
+      if outbox_selfheal "$o" "$p"; then return 0; fi
       outbox_mark_pending
       date +%s >"$outbox_dir/diverged"
       # Look again in five minutes (not every poll): the cause needs a person, and a reset-to-github clears this pause.
@@ -526,7 +604,9 @@ outbox_summary() {
   local state since now next tries err
   state="$(pipeline_main_state "$checkout")"; now="$(date +%s)"
   case "$state" in
-    sync|unknown) echo "GitHub main is in sync" ;;
+    sync|unknown)
+      if [[ -n "$(find "$outbox_dir/last-selfheal" -mmin -1440 2>/dev/null)" ]]; then echo "GitHub main is in sync (the lander healed a divergence itself: $(cat "$outbox_dir/last-selfheal"))"
+      else echo "GitHub main is in sync"; fi ;;
     diverged) echo "STUCK: GitHub main and the landed main diverged" ;;
     ahead*)
       since="$(cat "$outbox_dir/pending-since" 2>/dev/null || echo "$now")"; [[ "$since" =~ ^[0-9]+$ ]] || since="$now"
@@ -563,6 +643,8 @@ PY
   branch="$(sed -n '1p' "$data/.request-values")"; sha="$(sed -n '2p' "$data/.request-values")"; landing_note="$(sed -n '3p' "$data/.request-values")"
   current_branch="$branch"; entry_started="$started"
   while IFS= read -r item; do done_items+=("$item"); done < <(tail -n +4 "$data/.request-values"); rm -f "$data/.request-values"
+  # SELFHEAL-01: a landing that has to be done again (GitHub's main moved on) must still tick the backlog items it names.
+  if ((${#done_items[@]})); then mkdir -p "$data/done-items"; printf '%s\n' "${done_items[@]}" >"$data/done-items/${branch//\//-}-$sha"; fi
   if [[ ! "$branch" == wt/* || ! "$sha" =~ ^[0-9a-fA-F]{40,64}$ ]]; then
     mkdir -p "$data/queue/bad"; mv "$request" "$data/queue/bad/$(basename "$request")"
     echo "$(date -u +%Y-%m-%dT%H:%M:%SZ) malformed request $(basename "$request") moved to queue/bad; repair or remove it" >> "$data/lander.log"
@@ -574,6 +656,10 @@ PY
   # goes on from the pipeline's own main and the outbox catches GitHub up later.
   if ! GITNET_LABEL="fetch origin" gitnet -C "$checkout" fetch origin; then echo "$(date -u +%Y-%m-%dT%H:%M:%SZ) GitHub did not answer the fetch; landing on the pipeline's own main" >> "$data/lander.log"; fi
   base_state="$(pipeline_main_state "$checkout")"
+  if [[ "$base_state" == diverged ]]; then
+    outbox_flush_locked force || true
+    base_state="$(pipeline_main_state "$checkout")"
+  fi
   if [[ "$base_state" == diverged ]]; then
     hold_entry "$request" "$branch" "GitHub main has commits the landed main does not contain (STUCK); an owner must run bash scripts/pipeline.sh outbox reset-to-github"; rm -f "$output"; return 0
   fi

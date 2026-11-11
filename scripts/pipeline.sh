@@ -240,8 +240,11 @@ outbox_status() {
   local state since tries next err now dir="$data/outbox"
   state="$(pipeline_main_state "$main" 2>/dev/null || echo unknown)"; now="$(date +%s)"
   case "$state" in
-    sync) echo "GitHub main: in sync" ;;
-    diverged) echo "STUCK: GitHub main and the landed main diverged; nothing is force-pushed. Run bash scripts/pipeline.sh outbox reset-to-github (it parks the landed commits on a branch first)" ;;
+    sync)
+      # SELFHEAL-01: a divergence the lander healed itself in the last day is said once here, never silently.
+      if [[ -n "$(find "$dir/last-selfheal" -mmin -1440 2>/dev/null)" ]]; then echo "GitHub main: in sync (the lander healed a divergence itself: $(cat "$dir/last-selfheal"))"
+      else echo "GitHub main: in sync"; fi ;;
+    diverged) echo "STUCK: GitHub main and the landed main diverged and the lander could not heal it (it heals at most ${MAIPAI_LAND_SELFHEAL_MAX:-3} times in ${MAIPAI_LAND_SELFHEAL_WINDOW_SECONDS:-1800} s); nothing is force-pushed. Run bash scripts/pipeline.sh outbox reset-to-github (it parks the landed commits on a branch first)" ;;
     ahead*)
       since="$(cat "$dir/pending-since" 2>/dev/null || echo "$now")"; [[ "$since" =~ ^[0-9]+$ ]] || since="$now"
       tries="$(cat "$dir/tries" 2>/dev/null || echo 0)"; [[ "$tries" =~ ^[0-9]+$ ]] || tries=0
