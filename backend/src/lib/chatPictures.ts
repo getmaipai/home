@@ -11,7 +11,7 @@
 // face recognition or computes a face embedding.
 import type { PersonRow } from "@/types";
 import type { ChatImagePart } from "@/wire";
-import type { LlmImagePart } from "@/lib/llm";
+import { completeViaStackRequest, type LlmImagePart } from "@/lib/llm";
 import { isStackConfigured } from "@/lib/stackEngine";
 import { sharedStackRoles } from "@/lib/roleHealth";
 import { getTemporaryChatImage, readAttachmentForConversation } from "@/lib/attachments";
@@ -107,4 +107,56 @@ export function loadPictureParts(actor: PersonRow, conversationId: string, tempo
     parts.push({ id: image.id, name: cleanPictureName(image.name), url: `data:${mediaType};base64,${Buffer.from(bytes).toString("base64")}`, reservedTokens });
   }
   return { parts, unread };
+}
+
+// VISION-ATTACH-01: pictures when the chat engine cannot read them (Splash, oMLX and mlx-serve serve text only). The Stack's vision role is a
+// separate small model that always reads pictures; it describes each one in words and the chat model answers from those words. Same person
+// and turn checks as the chat model's own reading (picturePartsAllowed), and the pictures themselves still reach the tools that need them.
+export const VISION_PICTURE_TOKENS = 2560;
+let visionForTests: boolean | null = null;
+export function __setVisionReaderForTests(value: boolean | null): void { visionForTests = value; }
+let describeForTests: ((dataUrl: string) => Promise<string>) | null = null;
+export function __setPictureDescriberForTests(fn: ((dataUrl: string) => Promise<string>) | null): void { describeForTests = fn; }
+
+/** Whether the Stack's vision role is up and declares picture input. Any failure to read the row is "no". */
+export async function visionModelReadsPictures(): Promise<boolean> {
+  if (visionForTests !== null) return visionForTests;
+  if (!isStackConfigured()) return false;
+  try {
+    const row = (await sharedStackRoles()).roles.find((role) => role.id === "vision");
+    const state = row?.state.state;
+    return !!row && (state === "ready" || state === "loaded" || state === "installed") && row.model?.imageInput === true;
+  } catch { return false; }
+}
+
+/** Whether this person's pictures can go through the vision model on this turn. */
+export async function visionPicturesAllowed(actor: PersonRow, turn?: { band: AgeBand; anonymous: boolean }): Promise<boolean> {
+  return (await visionModelReadsPictures()) && picturePartsAllowed({ imageParts: true, pictureTokensMax: VISION_PICTURE_TOKENS }, actor, turn);
+}
+
+const DESCRIBE_SYSTEM = "You describe one picture for someone who cannot see it. Say in one to three plain sentences what it shows: the main subject, colours, objects, setting, and any writing you can read. Describe only what is there. Never say who a real person is and never guess a name.";
+
+async function describeOne(dataUrl: string): Promise<string> {
+  if (describeForTests) return describeForTests(dataUrl);
+  const result = await completeViaStackRequest("vision", {
+    model: "vision", stream: false, temperature: 0, max_tokens: 220,
+    messages: [{ role: "system", content: DESCRIBE_SYSTEM }, { role: "user", content: "Describe this picture.", images: [{ id: "describe", name: "picture", url: dataUrl, reservedTokens: VISION_PICTURE_TOKENS }] }],
+    chat_template_kwargs: { enable_thinking: false },
+  } as never, AbortSignal.timeout(45_000));
+  if (!result.ok) throw new Error(result.failure.error);
+  const content = (result.data as { choices?: Array<{ message?: { content?: string | null } }> }).choices?.[0]?.message?.content;
+  if (typeof content !== "string" || !content.trim()) throw new Error("no answer");
+  return content.trim().slice(0, 600);
+}
+
+/** Each stored picture of the turn, described in words by the vision model. A picture that could not be opened or read goes to `unread`. */
+export async function describePictures(actor: PersonRow, conversationId: string, temporary: boolean, images: readonly ChatImagePart[]): Promise<{ described: Array<{ name: string; text: string }>; unread: ChatImagePart[] }> {
+  const loaded = loadPictureParts(actor, conversationId, temporary, images, VISION_PICTURE_TOKENS);
+  const unread = [...loaded.unread];
+  const described: Array<{ name: string; text: string }> = [];
+  for (const part of loaded.parts) {
+    try { described.push({ name: part.name, text: await describeOne(part.url) }); }
+    catch { const original = images.find((image) => image.id === part.id); if (original) unread.push(original); }
+  }
+  return { described, unread };
 }

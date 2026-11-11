@@ -29,3 +29,12 @@ describe("the thinking control follows the model's record (VISION-02d, rule 8)",
     expect(modelThinks(chatCapabilitiesFrom(undefined), "any-model")).toBe(true);
   });
 });
+
+describe("VISION-ATTACH-01 pictures_attach", () => {
+  test("follows the backend flag, and an older backend's image_parts still counts", () => {
+    expect(chatCapabilitiesFrom({ image_parts: false, pictures_attach: true }).pictures_attach).toBe(true);
+    expect(chatCapabilitiesFrom({ image_parts: true }).pictures_attach).toBe(true);
+    expect(chatCapabilitiesFrom({ image_parts: false, pictures_attach: false }).pictures_attach).toBe(false);
+    expect(chatCapabilitiesFrom(undefined).pictures_attach).toBe(false);
+  });
+});

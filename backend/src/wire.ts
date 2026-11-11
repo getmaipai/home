@@ -711,6 +711,8 @@ export interface ChatModelOption {
  * decides it from a model id (rule 8). */
 export interface ChatCapabilities {
   image_parts: boolean;
+  /** VISION-ATTACH-01: this person may attach pictures: the chat model reads them (`image_parts`) or the ready vision model describes them for it. The picker follows this one. */
+  pictures_attach: boolean;
   /** VISION-02d: whether the chat model this person's turn runs on can
    * think before it answers, from its record (rule 8): "switchable" shows
    * the Instant/Thinking control, "none" and "always" show none (there is

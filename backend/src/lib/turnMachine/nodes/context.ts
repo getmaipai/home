@@ -47,8 +47,8 @@ import { PICK_UP_THREADS_KEY } from "@/settings/chatKeys";
 import { getPersonSettingValue } from "@/lib/settings";
 import { planFor } from "@/lib/register";
 import type { Node, ContextItem, TurnState } from "../contract";
-import { picturesAttachedNote, picturesNotReadNote, audioAttachedNote } from "@/lib/chatImageNote";
-import { chatModelReadsPictures, loadPictureParts, picturePartsAllowed } from "@/lib/chatPictures";
+import { picturesAttachedNote, picturesDescribedNote, picturesNotReadNote, audioAttachedNote } from "@/lib/chatImageNote";
+import { chatModelReadsPictures, describePictures, loadPictureParts, picturePartsAllowed, visionPicturesAllowed } from "@/lib/chatPictures";
 import type { LlmImagePart } from "@/lib/llm";
 import { chatCatalogEntry } from "@/lib/modelCatalog";
 import { sceneContextLine } from "@/lib/robotVision";
@@ -218,6 +218,11 @@ export const contextNode: Node<ContextInput, ContextOutput> = async (state, inpu
       const loaded = loadPictureParts(state.actor, conversation.id, temporary, state.images, capability.pictureTokensMax!);
       pictureParts = loaded.parts;
       if (loaded.unread.length > 0) items.push({ id: "attachment-pictures", text: picturesNotReadNote(loaded.unread, "the stored picture could not be opened"), source: "attachment", subjects: [], disclosure: "child_ok" });
+    } else if (await visionPicturesAllowed(state.actor, { band: turnAgeBand(state.surface, state.actor, state.speakerEvidence, new Date(), state.deviceId), anonymous: speakerIsAnonymous(state) })) {
+      // VISION-ATTACH-01: the chat engine cannot read pictures, the vision model can: it describes them and the chat model answers from the words.
+      const read = await describePictures(state.actor, conversation.id, temporary, state.images);
+      if (read.described.length > 0) items.push({ id: "attachment-pictures", text: picturesDescribedNote(read.described), source: "attachment", subjects: [], disclosure: "child_ok" });
+      if (read.unread.length > 0) items.push({ id: "attachment-pictures-unread", text: picturesNotReadNote(read.unread, "the picture reader could not take it"), source: "attachment", subjects: [], disclosure: "child_ok" });
     } else {
       items.push({ id: "attachment-pictures", text: picturesAttachedNote(state.images), source: "attachment", subjects: [], disclosure: "child_ok" });
     }

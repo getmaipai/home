@@ -25,6 +25,13 @@ export function picturesAttachedNote(images: readonly ChatImagePart[]): string {
   return `The person attached ${count} to this message: ${names(images)}. You cannot see pictures yet, so you do not know what they show; never describe or guess their contents. You cannot tell who a person in a photo is.`;
 }
 
+/** VISION-ATTACH-01: pictures the chat model cannot see itself but a picture reader described. The model answers from the words and never claims more. */
+export function picturesDescribedNote(described: ReadonlyArray<{ name: string; text: string }>): string {
+  const count = described.length === 1 ? "1 picture" : `${described.length} pictures`;
+  const lines = described.map((item, i) => `${i + 1}. ${cleanPictureName(item.name)}: ${redactCredentials(sanitizeForPrompt(item.text))}`).join(" ");
+  return `The person attached ${count} to this message. You cannot see them yourself; a picture reader looked at each one and described it: ${lines} Answer from these descriptions only, never add details they do not give, and never say who a person in a photo is.`;
+}
+
 /** VISION-02c (rule 6): pictures the model reads but that could not be
  * sent or read this turn. Only the kind of failure is named; the model
  * says so in its own words. */

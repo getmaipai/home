@@ -138,13 +138,27 @@ describe("GET /api/host/chat-capabilities (VISION-02c, 02d)", () => {
     try {
       const res = await owner.get("/api/host/chat-capabilities");
       expect(res.status).toBe(200);
-      expect(await res.json()).toEqual({ image_parts: true, thinking: "none", thinking_modes: { "qwen3-vl-8b-instruct-q4-k-m": "none", "qwen3-8b-instruct-q4-k-m": "switchable" } });
+      expect(await res.json()).toEqual({ image_parts: true, pictures_attach: true, thinking: "none", thinking_modes: { "qwen3-vl-8b-instruct-q4-k-m": "none", "qwen3-8b-instruct-q4-k-m": "switchable" } });
       __setChatPictureCapabilityForTests({ imageParts: false, pictureTokensMax: null });
       expect(((await (await owner.get("/api/host/chat-capabilities")).json()) as { image_parts: boolean }).image_parts).toBe(false);
     } finally {
       __setChatPictureCapabilityForTests(null);
       __setStackClientForTests(null);
     }
+  });
+
+  test("VISION-ATTACH-01: a chat engine that cannot read pictures still lets pictures be attached while the vision model is ready", async () => {
+    const { __setChatPictureCapabilityForTests, __setVisionReaderForTests } = await import("@/lib/chatPictures");
+    const owner = await ownerClient();
+    __setChatPictureCapabilityForTests({ imageParts: false, pictureTokensMax: null });
+    try {
+      __setVisionReaderForTests(true);
+      const on = (await (await owner.get("/api/host/chat-capabilities")).json()) as { image_parts: boolean; pictures_attach: boolean };
+      expect(on).toMatchObject({ image_parts: false, pictures_attach: true });
+      __setVisionReaderForTests(false);
+      const off = (await (await owner.get("/api/host/chat-capabilities")).json()) as { image_parts: boolean; pictures_attach: boolean };
+      expect(off).toMatchObject({ image_parts: false, pictures_attach: false });
+    } finally { __setChatPictureCapabilityForTests(null); __setVisionReaderForTests(null); }
   });
 
   test("one request makes one Stack role-list read (AUDIT-PERF-01)", async () => {

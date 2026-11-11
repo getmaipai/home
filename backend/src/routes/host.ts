@@ -9,7 +9,7 @@ import { getEngineStatsSamples } from "@/lib/engineStats";
 import { ModelCapabilities } from "@maipai/spec/gen/ts/model-capabilities.js";
 import type { AppEnv } from "@/types";
 import type { ChatCapabilities } from "@/wire";
-import { chatModelReadsPictures, picturePartsAllowed } from "@/lib/chatPictures";
+import { chatModelReadsPictures, picturePartsAllowed, visionPicturesAllowed } from "@/lib/chatPictures";
 import { sharedStackRoles } from "@/lib/roleHealth";
 import { speakerAgeBand } from "@/lib/ageBand";
 import { getHouseholdSettingValue } from "@/lib/settings";
@@ -65,7 +65,8 @@ hostRoutes.get("/chat-capabilities", requireAuth, async (c) => {
   const minor = speakerAgeBand(actor, new Date()) !== "adult";
   const current = stackChat?.model?.id ?? (getHouseholdSettingValue("chat.model_id") as string | undefined);
   const thinking_modes = Object.fromEntries((stackChat?.models ?? []).map((model) => [model.id, minor ? "none" as const : thinkingModeFor(model.id)]));
-  const body: ChatCapabilities = { image_parts: picturePartsAllowed(capability, actor), thinking: minor ? "none" : thinkingModeFor(current), thinking_modes };
+  const imageParts = picturePartsAllowed(capability, actor);
+  const body: ChatCapabilities = { image_parts: imageParts, pictures_attach: imageParts || await visionPicturesAllowed(actor), thinking: minor ? "none" : thinkingModeFor(current), thinking_modes };
   return c.json(body);
 });
 

@@ -257,7 +257,8 @@ function useChatRuntime(person: Roster, closeSheet: () => void, temporaryNext: b
     refetchOnWindowFocus: "always",
   });
   const chatCapabilities = capabilitiesQuery.data ?? NO_CHAT_PICTURES;
-  const imagePartsAvailable = chatCapabilities.image_parts;
+  // VISION-ATTACH-01: pictures can be attached when the chat model reads them or the vision model describes them.
+  const imagePartsAvailable = chatCapabilities.pictures_attach;
   // ENGINE-DOWN-UI-01: the voice service's own health row (any person), not the
   // admin-only engines overview and never the chat engine.
   const ttsAvailable = useVoiceAvailable();

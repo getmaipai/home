@@ -181,6 +181,7 @@ const EXEMPT: Record<string, string> = {
   "lib/conversationHistory.ts": "retention summaries kept as records; never sent to the person as a reply",
   "lib/companionLook.ts": "describes a companion's own character picture as a JSON card for its editor; no text reaches a person as a reply",
   "lib/companionTalkAnchors.ts": "asks the picture reader for the mouth and eye boxes of a companion's own picture as JSON numbers; no text reaches a person as a reply",
+  "lib/chatPictures.ts": "describes an attached picture in one to three plain sentences for a chat model that cannot read pictures; the descriptions are context for the answer, the person never sees them as a reply",
   "lib/pictures/ageCheck.ts": "labels a picture as a possible minor in JSON; no text reaches the person, a doubt withholds the picture",
   "lib/pictures/roles.ts": "reads an attached picture for its role (actor, product, set, closing shot) in JSON with a plain name and look; the person never sees the model's words",
   "lib/pictures/laneGate.ts": "labels a picture child-safe or not in JSON; no text reaches the person, a doubt withholds the picture",

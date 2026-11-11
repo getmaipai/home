@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { cleanPictureName, pictureFailureWords, picturesAttachedNote, picturesWindowNote, storedImages } from "@/lib/chatImageNote";
+import { cleanPictureName, pictureFailureWords, picturesAttachedNote, picturesDescribedNote, picturesWindowNote, storedImages } from "@/lib/chatImageNote";
 
 const pic = (name: string, shown?: boolean) => ({ id: name, name, width: 1, height: 1, media_type: "image/png", ...(shown ? { shown_to_model: true } : {}) }) as never;
 
@@ -33,5 +33,15 @@ describe("chatImageNote", () => {
   test("cleanPictureName flattens newlines and falls back to picture", () => {
     expect(cleanPictureName("cat\nphoto.png")).toBe("cat photo.png");
     expect(cleanPictureName("  \n")).toBe("picture");
+  });
+});
+
+describe("VISION-ATTACH-01 picturesDescribedNote", () => {
+  test("hands the model the descriptions and says it cannot see them itself", () => {
+    const note = picturesDescribedNote([{ name: "mug.jpg", text: "A blue ceramic mug on a wooden table." }, { name: "kiln.jpg", text: "An industrial kiln." }]);
+    expect(note).toContain("2 pictures");
+    expect(note).toContain("1. mug.jpg: A blue ceramic mug on a wooden table.");
+    expect(note).toContain("You cannot see them yourself");
+    expect(note).toContain("never say who a person");
   });
 });
