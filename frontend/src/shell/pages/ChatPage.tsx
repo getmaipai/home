@@ -218,7 +218,7 @@ function useChatRuntime(person: Roster, closeSheet: () => void, temporaryNext: b
   const temporaryModeRef = useRef(temporaryNext);
   temporaryModeRef.current = temporaryNext;
   const voiceTurn = useChatVoiceTurnState();
-  const { turnSchedulerRef, liveVoiceActiveRef, pendingSpeechRef, activeTurnRef, askAnswerRef, isSpeaking, speakingEndedAt, speechFailed } = voiceTurn;
+  const { turnSchedulerRef, liveVoiceActiveRef, pendingSpeechRef, pendingSpeculationRef, activeTurnRef, askAnswerRef, isSpeaking, speakingEndedAt, speechFailed } = voiceTurn;
   const voiceSttMsRef = voiceTimingShared.sttMs;
   const voiceFinalAtRef = voiceTimingShared.finalAt;
   const voiceTimingTurnIdRef = voiceTimingShared.turnId;
@@ -575,6 +575,12 @@ function useChatRuntime(person: Roster, closeSheet: () => void, temporaryNext: b
             pendingSpeechRef.current = false;
             return value;
           },
+          // STT-SMARTTURN-01: armed by the live voice session when the final matched its held run; this send confirms that run.
+          consumeSpeculation: () => {
+            const value = pendingSpeculationRef.current ?? undefined;
+            pendingSpeculationRef.current = null;
+            return value;
+          },
           consumeVoiceTiming: () => {
             const value = voiceSttMsRef.current;
             voiceSttMsRef.current = undefined;
@@ -746,7 +752,7 @@ function useChatRuntime(person: Roster, closeSheet: () => void, temporaryNext: b
     },
   });
 
-  return { runtime, photoUploadsEnabled, imagePartsAvailable, unopenableConversationId, forgetUnopenableConversation, connection, setConnection, thinking, setThinking, thinkingModeVisible, thinkingModeCapability, bareMode, setBareMode, autoReadReplies, setAutoReadReplies: setConversationAutoReadReplies, ttsAvailable, packageScope, setPackageScope, temporaryNext, turnSchedulerRef, liveVoiceActiveRef, pendingSpeechRef, activeTurnRef, askAnswerRef, isSpeaking, speakingEndedAt, speechFailed, dictationLevelMeter };
+  return { runtime, photoUploadsEnabled, imagePartsAvailable, unopenableConversationId, forgetUnopenableConversation, connection, setConnection, thinking, setThinking, thinkingModeVisible, thinkingModeCapability, bareMode, setBareMode, autoReadReplies, setAutoReadReplies: setConversationAutoReadReplies, ttsAvailable, packageScope, setPackageScope, temporaryNext, turnSchedulerRef, liveVoiceActiveRef, pendingSpeechRef, pendingSpeculationRef, visibleConversationIdRef, activeTurnRef, askAnswerRef, isSpeaking, speakingEndedAt, speechFailed, dictationLevelMeter };
 }
 
 /** Mounted inside AssistantRuntimeProvider only for its side effect: a
@@ -1464,7 +1470,7 @@ export function ChatPage({ person }: { person: Roster }) {
   // inside useChatRuntime) left a previous thread's artifact
   // canvas open over the newly-loaded one - the panel has to close on
   // the same signal the phone/tablet Sheet already does.
-  const { runtime, photoUploadsEnabled, imagePartsAvailable, unopenableConversationId, forgetUnopenableConversation, connection, setConnection, thinking, setThinking, thinkingModeVisible, thinkingModeCapability, bareMode, setBareMode, autoReadReplies, setAutoReadReplies, ttsAvailable, packageScope, setPackageScope, turnSchedulerRef, liveVoiceActiveRef, pendingSpeechRef, activeTurnRef, askAnswerRef, isSpeaking, speakingEndedAt, speechFailed, dictationLevelMeter } = useChatRuntime(person, () => {
+  const { runtime, photoUploadsEnabled, imagePartsAvailable, unopenableConversationId, forgetUnopenableConversation, connection, setConnection, thinking, setThinking, thinkingModeVisible, thinkingModeCapability, bareMode, setBareMode, autoReadReplies, setAutoReadReplies, ttsAvailable, packageScope, setPackageScope, turnSchedulerRef, liveVoiceActiveRef, pendingSpeechRef, pendingSpeculationRef, visibleConversationIdRef, activeTurnRef, askAnswerRef, isSpeaking, speakingEndedAt, speechFailed, dictationLevelMeter } = useChatRuntime(person, () => {
     setSheetOpen(false);
     setOpenArtifactId(null);
     setCompareTarget(null);
@@ -1554,6 +1560,8 @@ export function ChatPage({ person }: { person: Roster }) {
     liveVoiceActiveRef,
     pendingSpeechRef,
     activeTurnRef,
+    // STT-SMARTTURN-01: only a conversation that already exists is speculated on (a new chat's first turn has no window to gain from, and a held run must create nothing).
+    speculation: { getConversationId: () => visibleConversationIdRef.current ?? undefined, pendingRef: pendingSpeculationRef },
     cancelRun: runtime.thread.cancelRun,
     voiceBargeIn: true,
     isSpeaking,

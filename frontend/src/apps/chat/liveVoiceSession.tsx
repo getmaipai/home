@@ -34,6 +34,7 @@ import { MicCaptureError, startMicCapture, type MicCaptureHandle } from "@/lib/v
 import { createLevelMeter, type LevelMeter } from "@/lib/voice/audioLevelMeter";
 import { SentenceSpeechScheduler } from "@/lib/sentenceSpeechScheduler";
 import { api } from "@/lib/api";
+import type { SpeculationIds } from "@/apps/chat/useChatVoiceTurnState";
 
 export interface LiveVoiceSessionProps {
   composer: { setText: (text: string) => void; send: () => void };
@@ -47,6 +48,9 @@ export interface LiveVoiceSessionProps {
   liveVoiceActiveRef: { current: boolean };
   pendingSpeechRef: { current: boolean };
   activeTurnRef: { current: { turnId: string; heardVisibleEnd: () => number } | null };
+  /** STT-SMARTTURN-01: when set, a turn may begin privately on the edge partial (the first partial after the voice stops) for the
+   * conversation `getConversationId` names; the final transcript confirms it on an exact match through `pendingRef`, else it is discarded. */
+  speculation?: { getConversationId: () => string | undefined; pendingRef: { current: SpeculationIds | null } };
   cancelRun: () => void;
   voiceBargeIn?: boolean;
   /** sttDictationAdapter.ts's own established shape: `createSttSocket`
@@ -132,7 +136,7 @@ function normalizedTranscript(text: string): string {
   return text.toLowerCase().replace(/[-\u2010-\u2015]/g, " ").replace(/[^\p{L}\p{N}\s]/gu, "").replace(/\s+/g, " ").trim();
 }
 
-export function useLiveVoiceSession({ composer, open, onOpenChange, onProblem, idleCloseMs = null, turnSchedulerRef, liveVoiceActiveRef, pendingSpeechRef, activeTurnRef, cancelRun, voiceBargeIn = false, isSpeaking, speakingEndedAt, speechFailed = 0, retryDelays = [0, 1500], installationNotice = false, createSocket = createSttSocket, startCapture = startMicCapture, onVoiceTiming, voiceTimingSocketRef }: LiveVoiceSessionProps) {
+export function useLiveVoiceSession({ composer, open, onOpenChange, onProblem, idleCloseMs = null, turnSchedulerRef, liveVoiceActiveRef, pendingSpeechRef, activeTurnRef, speculation, cancelRun, voiceBargeIn = false, isSpeaking, speakingEndedAt, speechFailed = 0, retryDelays = [0, 1500], installationNotice = false, createSocket = createSttSocket, startCapture = startMicCapture, onVoiceTiming, voiceTimingSocketRef }: LiveVoiceSessionProps) {
   const [mode, setMode] = useState<VoiceMode>("connecting");
   const [amplitude, setAmplitude] = useState(0);
   const [muted, setMuted] = useState(false);
@@ -156,6 +160,26 @@ export function useLiveVoiceSession({ composer, open, onOpenChange, onProblem, i
   const overlapTranscriptRef = useRef(false);
   const mutedRef = useRef(false);
   const duckTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // STT-SMARTTURN-01: the held run begun on the edge partial, and whether the next partial is that edge partial (the first after the voice stopped).
+  const speculationRef = useRef<(SpeculationIds & { text: string }) | null>(null);
+  const edgePartialPendingRef = useRef(false);
+  const discardSpeculation = () => {
+    const held = speculationRef.current;
+    speculationRef.current = null;
+    edgePartialPendingRef.current = false;
+    if (held) void api.discardTurn(held.turnId).catch(() => undefined);
+  };
+  const startSpeculation = (text: string) => {
+    if (!speculation || speculationRef.current || !text || text.split(/\s+/).length > 40) return;
+    const conversationId = speculation.getConversationId();
+    if (!conversationId) return;
+    const epoch = reactionEpochRef.current;
+    void api.speculateTurn(text, conversationId).then((ids) => {
+      // The voice resumed or the session changed meanwhile: a run that no longer matches anything is dropped at once.
+      if (epoch !== reactionEpochRef.current || activeSpeechRef.current || speculationRef.current) { void api.discardTurn(ids.turn_id).catch(() => undefined); return; }
+      speculationRef.current = { turnId: ids.turn_id, resumeToken: ids.resume_token, conversationId: ids.conversation_id, text };
+    }).catch(() => undefined);
+  };
   const yieldVoice = () => {
     const scheduler = turnSchedulerRef.current;
     if (!scheduler) return;
@@ -324,6 +348,9 @@ export function useLiveVoiceSession({ composer, open, onOpenChange, onProblem, i
             sttMsForNextTurn = message.speech_end_to_final_ms;
             break;
           case "partial":
+            // STT-SMARTTURN-01: the first partial after the voice stopped is the edge partial; a held run may begin on it.
+            if (edgePartialPendingRef.current && !activeSpeechRef.current && modeRef.current === "listening" && !isReplySpeaking() && !mutedRef.current) startSpeculation(message.v.trim());
+            edgePartialPendingRef.current = false;
             activeSpeechRef.current = true;
             lastPartialRef.current = message.v;
             setIdleActivity((value) => value + 1);
@@ -350,6 +377,7 @@ export function useLiveVoiceSession({ composer, open, onOpenChange, onProblem, i
           case "vad":
             if (message.speaking) {
               cancelReaction();
+              discardSpeculation(); // STT-SMARTTURN-01: more speech means the held run's words were not the final ones
               activeSpeechRef.current = true;
               setIdleActivity((value) => value + 1);
               const elapsed = Date.now() - speakingStartedAtRef.current;
@@ -364,6 +392,7 @@ export function useLiveVoiceSession({ composer, open, onOpenChange, onProblem, i
               }
             } else {
               activeSpeechRef.current = false;
+              edgePartialPendingRef.current = true; // STT-SMARTTURN-01: the next partial is the edge partial
               // VOICE-QUICK-02: a pause in the middle of what the person is saying may get a short, fitting reaction from the small model.
               const said = lastPartialRef.current.trim();
               if (open && !mutedRef.current && modeRef.current === "listening" && !isReplySpeaking() && said.split(/\s+/).length >= REACTION_MIN_WORDS
@@ -449,6 +478,14 @@ export function useLiveVoiceSession({ composer, open, onOpenChange, onProblem, i
             if (sttMs !== null && Number.isFinite(sttMs) && sttMs >= 0 && receivedAt !== null) onVoiceTiming?.({ sttMs, phase: "final" });
             else if (receivedAt !== null) onVoiceTiming?.({ sttMs: 0, phase: "final" });
             onVoiceTiming?.({ sttMs: sttMs ?? 0, phase: "final" });
+            // STT-SMARTTURN-01: an exact trimmed match confirms the held run through this one send; anything else discards it first.
+            if (speculation) {
+              const held = speculationRef.current;
+              speculationRef.current = null;
+              edgePartialPendingRef.current = false;
+              if (held && held.text === text) speculation.pendingRef.current = { turnId: held.turnId, resumeToken: held.resumeToken, conversationId: held.conversationId };
+              else if (held) void api.discardTurn(held.turnId).catch(() => undefined);
+            }
             pendingSpeechRef.current = true;
             composer.setText(text);
             void Promise.resolve(composer.send());
@@ -557,7 +594,7 @@ export function useLiveVoiceSession({ composer, open, onOpenChange, onProblem, i
   // guarantee VOICE-01's future barge-in will build on.
   useEffect(() => {
     liveVoiceActiveRef.current = open;
-    if (!open) { turnSchedulerRef.current?.stop(); cancelReaction(); }
+    if (!open) { turnSchedulerRef.current?.stop(); cancelReaction(); discardSpeculation(); }
     return () => {
       liveVoiceActiveRef.current = false;
     };

@@ -392,7 +392,8 @@ export const contextNode: Node<ContextInput, ContextOutput> = async (state, inpu
     // (no further filtering happens after this point) - so the matches
     // array itself is exactly "what reached the prompt," the same
     // bump the old path's own subset-only call makes.
-    bumpUsage(matches);
+    // STT-SMARTTURN-01: a speculative run bumps no recalled memory's usage; a discarded run leaves no trace.
+    if (!state.speculation) bumpUsage(matches);
     for (const match of matches) {
       const r = match.record;
       items.push({

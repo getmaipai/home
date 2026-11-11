@@ -26,7 +26,8 @@ import type { TurnStreamEvent as ToolStreamEvent } from "@maipai/spec/stack/ts/t
 import type { AppEnv, PersonRow } from "@/types";
 import { streamEventForViewer, valueForViewer } from "@/lib/turnErrorDetail";
 import { apiRouter, errorResponses, idParamSchema } from "@/lib/openapi";
-import { turnOwnerId, isTemporaryConversation, packageLatencyFromRecentOutcomes, applyHeardPrefix, getConversation, nextTurnReplayMessages } from "@/lib/conversationHistory";
+import { turnOwnerId, isTemporaryConversation, packageLatencyFromRecentOutcomes, applyHeardPrefix, getConversation, nextTurnReplayMessages, getPendingAsk } from "@/lib/conversationHistory";
+import { newSpeculationHold, noteSpeculation, speculationRefusal, wordCount, SPECULATION_HOLD_MS, type SpeculationHold } from "@/lib/speculation";
 import { abortConversationPrewarm, prewarmConversation } from "@/lib/prefixPrewarm";
 import { activeTurnCount } from "@/lib/turnActivity";
 import { surfaceClassOf } from "@/lib/surfaceClass";
@@ -140,6 +141,39 @@ interface ResumeSession {
   expired: boolean;
   /** TURN-TTL-01: armed once, when the turn ends. */
   expiryTimer?: ReturnType<typeof setTimeout>;
+  /** STT-SMARTTURN-01: a speculative run, held until the final transcript confirms or discards it (rule 9's held resume session). */
+  held?: boolean;
+  confirmation?: SpeculationHold;
+  holdTimer?: ReturnType<typeof setTimeout>;
+  /** Resolves when the turn's event loop has ended (the lease is released by then), so a discard can wait for it. */
+  finished?: Promise<void>;
+}
+
+/** STT-SMARTTURN-01: the final transcript matched the partial exactly; the held run becomes an ordinary turn (storage and tools proceed). */
+function confirmSpeculation(session: ResumeSession, sttMs: number | null): void {
+  if (!session.held || !session.confirmation) return;
+  if (session.holdTimer) clearTimeout(session.holdTimer);
+  session.holdTimer = undefined;
+  session.held = false;
+  if (sttMs !== null) { session.sttMs = sttMs; markVoiceTiming(session.timing, "stt_ms", sttMs); }
+  session.confirmation.resolve(true);
+  noteSpeculation("confirmed");
+}
+
+/** STT-SMARTTURN-01: the final differed, more speech followed, the session closed or the hold ran out: abort, drop, store nothing, apply no heard prefix. */
+function discardSpeculation(session: ResumeSession, kind: "discarded" | "aborted"): boolean {
+  if (!session.held || !session.confirmation) return false;
+  if (session.holdTimer) clearTimeout(session.holdTimer);
+  session.holdTimer = undefined;
+  session.held = false;
+  session.confirmation.resolve(false);
+  session.cancelled = true;
+  session.generation += 1;
+  session.controller.abort();
+  resumeSessions.delete(session.token);
+  inFlightTurns.delete(session.turnId);
+  noteSpeculation(kind);
+  return true;
 }
 
 const resumeSessions = new Map<string, ResumeSession>();
@@ -226,7 +260,7 @@ const cancelTurnRoute = createRoute({
     params: idParamSchema("turn_id"),
     body: {
       required: false,
-      content: { "application/json": { schema: z.object({ heard_chars: z.number({ error: "heard_chars must be a whole number from 0 to 1000000: send the count of reply characters the person heard, or leave the body out" }).int({ error: "heard_chars must be a whole number from 0 to 1000000: send the count of reply characters the person heard, or leave the body out" }).min(0, { error: "heard_chars must be a whole number from 0 to 1000000: send the count of reply characters the person heard, or leave the body out" }).max(1_000_000, { error: "heard_chars must be a whole number from 0 to 1000000: send the count of reply characters the person heard, or leave the body out" }).optional() }) } },
+      content: { "application/json": { schema: z.object({ heard_chars: z.number({ error: "heard_chars must be a whole number from 0 to 1000000: send the count of reply characters the person heard, or leave the body out" }).int({ error: "heard_chars must be a whole number from 0 to 1000000: send the count of reply characters the person heard, or leave the body out" }).min(0, { error: "heard_chars must be a whole number from 0 to 1000000: send the count of reply characters the person heard, or leave the body out" }).max(1_000_000, { error: "heard_chars must be a whole number from 0 to 1000000: send the count of reply characters the person heard, or leave the body out" }).optional(), discard: z.boolean().optional() }) } },
     },
   },
   responses: {
@@ -244,12 +278,21 @@ function cutAtWord(releasedText: string, heardChars: number): string {
   return "";
 }
 
-turnRoutes.openapi(cancelTurnRoute, (c) => {
-  const { heard_chars: heardChars } = c.req.valid("json") ?? {};
+turnRoutes.openapi(cancelTurnRoute, async (c) => {
+  const { heard_chars: heardChars, discard } = c.req.valid("json") ?? {};
   const flight = inFlightTurns.get(c.req.valid("param").turn_id);
   const owner = flight?.ownerId ?? turnOwnerId(c.req.valid("param").turn_id);
   if (owner === null) return c.json({ error: "Turn not found" }, 404);
   if (owner !== c.get("person").id) return c.json({ error: "Cannot cancel another person's turn" }, 403);
+  if (discard === true) {
+    // STT-SMARTTURN-01: a held run is dropped whole (nothing stored, no heard prefix); the reply waits for its lease to go so the
+    // real message can start at once. A turn that is not held is not a discard: it falls through to the ordinary cancel.
+    if (flight?.held) {
+      const dropped = discardSpeculation(flight, "discarded");
+      await Promise.race([flight.finished ?? Promise.resolve(), new Promise<void>((resolve) => setTimeout(resolve, 3_000))]);
+      return c.json({ cancelled: dropped }, 200);
+    }
+  }
   const wasInFlight = Boolean(flight && !flight.cancelled && !flight.terminal);
   if (flight && !flight.cancelled && !flight.terminal) {
     flight.heardChars = heardChars;
@@ -582,7 +625,7 @@ function streamResponse(session: ResumeSession, resumeFrom: number | null, wire:
 
 function startResumeSession(session: ResumeSession): void {
   const generation = session.generation;
-  void (async () => {
+  session.finished = (async () => {
     try {
       for await (const rawEvent of streamTurnEvents(session.result, session.ownerId, session.spokenTurn ? SPOKEN_CUE_DELAY_MS : THINKING_CUE_DELAY_MS, session.controller.signal, session.dropReasoning, session.modelStatus, speakerAgeBand(session.viewer, new Date()), () => session.releasedText, () => session.heardChars, { spokenTurn: session.spokenTurn, utterance: session.utterance, reactionTags: session.reactionTags })) {
         // One shared counter for `delta` and `reasoning` alike (REASONING-01):
@@ -1015,6 +1058,10 @@ turnRoutes.post("/stream", requireAuth, streamTurnBodyLimit, async (c) => {
     spoken?: boolean;
     current_location?: unknown;
     stt_ms?: number;
+    /** STT-SMARTTURN-01: begin this spoken turn on the edge partial and hold it (the response is the ids, nothing streams). */
+    speculative?: boolean;
+    /** STT-SMARTTURN-01: with `resume_token`, release a held turn whose partial the final transcript confirmed. */
+    confirm?: boolean;
     ask_answer?: unknown;
     page_context?: unknown;
     document_attachments?: { name: string; media_type: string; data: string }[];
@@ -1026,6 +1073,11 @@ turnRoutes.post("/stream", requireAuth, streamTurnBodyLimit, async (c) => {
     const resumeFrom = body.resume_from;
     if (!session || session.expired || (session.terminal && session.terminalDelivered) || session.ownerId !== actor.id || body.turn_id !== session.turnId || body.conversation_id !== session.conversationId || !Number.isInteger(resumeFrom) || resumeFrom! < 0 || resumeFrom! > session.sequence) {
       return c.json({ error: "The turn stream is no longer available.", code: "turn_resume_unavailable" }, 503);
+    }
+    // STT-SMARTTURN-01: a held run is released only by its confirmation; any other resume of it is refused.
+    if (session.held) {
+      if (body.confirm !== true) return c.json({ error: "This turn is still held.", code: "turn_resume_unavailable" }, 503);
+      confirmSpeculation(session, typeof body.stt_ms === "number" && Number.isFinite(body.stt_ms) && body.stt_ms >= 0 && body.stt_ms < 600_000 ? body.stt_ms : null);
     }
     return streamResponse(session, resumeFrom!, wireFor(c.req.header("accept")));
   }
@@ -1134,6 +1186,16 @@ turnRoutes.post("/stream", requireAuth, streamTurnBodyLimit, async (c) => {
   const isMinor = speakerAgeBand(actor, new Date()) !== "adult";
   const dropReasoning = isMinor || surface !== "chat" || body.spoken === true; // THIN-5B: a spoken turn has nowhere to show reasoning
   const modelSelection = await resolveTurnModel(body.model, surface, isMinor, body.bare === true);
+  // STT-SMARTTURN-01: a speculative start is refused here, before any work, by the rule 0 gates (speculation.ts).
+  let hold: SpeculationHold | undefined;
+  if (body.speculative === true) {
+    const refused = speculationRefusal({ actor, surface, spoken: body.spoken === true, wordCount: wordCount(body.text ?? ""), pendingAsk: typeof body.conversation_id === "string" && getPendingAsk(body.conversation_id) !== null, activeTurns: activeTurnCount() });
+    if (refused || body.bare === true || body.temporary === true || body.ephemeral === true || body.continuation_text !== undefined || body.supersedes !== undefined) {
+      noteSpeculation("refused");
+      return c.json({ error: refused ?? "Speculative start is not available for this turn.", code: "speculation_refused" }, 400);
+    }
+    hold = newSpeculationHold();
+  }
   let result: TurnStreamResult;
   try {
     // STREAM-NEXT-01: runTurnNextStream(), not runTurnNext() - this route needs
@@ -1160,6 +1222,7 @@ turnRoutes.post("/stream", requireAuth, streamTurnBodyLimit, async (c) => {
       ...(robotName ? { robotName } : {}),
       ...(surface === "robot" && deviceId ? { deviceId } : {}),
       signal: abortController.signal,
+      ...(hold ? { speculation: { confirmed: hold.promise } } : {}),
       ask_answer: parsedEvidence.data.ask_answer,
       supersedes: body.supersedes,
       continuation: body.continuation_text === undefined ? undefined : { fromTurnId: body.continuation_of, assistantText: body.continuation_text },
@@ -1258,6 +1321,21 @@ turnRoutes.post("/stream", requireAuth, streamTurnBodyLimit, async (c) => {
   inFlightTurns.set(session.turnId, session);
   appendSessionEvent(session, { type: "signal", signal: result.signal, generation: session.generation });
   startResumeSession(session);
+  if (hold) {
+    // STT-SMARTTURN-01: a crisis, repair or hub-target turn never speculates (the signal is known only now): drop it unstored
+    // and let the real message come the ordinary way. Otherwise hold: the events stay private until the final confirms them.
+    session.held = true;
+    session.confirmation = hold;
+    if (conversationInCrisis(result.conversationId) || result.cueSuppressed || result.signal.repair !== "none" || result.signal.target === "hub") {
+      discardSpeculation(session, "aborted");
+      noteSpeculation("refused");
+      return c.json({ error: "Speculative start is not available for this turn.", code: "speculation_refused" }, 400);
+    }
+    session.holdTimer = setTimeout(() => { discardSpeculation(session, "aborted"); }, SPECULATION_HOLD_MS);
+    (session.holdTimer as { unref?: () => void }).unref?.();
+    noteSpeculation("started");
+    return c.json({ turn_id: session.turnId, resume_token: session.token, conversation_id: session.conversationId }, 200);
+  }
   const response = streamResponse(session, null, wireFor(c.req.header("accept")));
   // The initial response has a signal in its replay buffer, but its meta
   // event is deliberately sent first and the signal stays immediately next.

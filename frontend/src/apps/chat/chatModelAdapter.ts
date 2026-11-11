@@ -169,6 +169,9 @@ export interface ChatModelAdapterDeps {
   // transcript, sent via aui.composer.send()), never a mode a later
   // typed message inherits after the call ends.
   consumeSpoken?(): boolean | undefined;
+  /** STT-SMARTTURN-01: armed once by the live voice session when the final transcript matched a held speculative run: this send
+   * confirms and resumes that run instead of starting a new turn. */
+  consumeSpeculation?(): import("@/apps/chat/useChatVoiceTurnState").SpeculationIds | undefined;
   consumeVoiceTiming?(): number | undefined;
   onFirstPlayback?(at: number): void;
   onFirstSentencePlaybackTiming?(timing: FirstSentencePlaybackTiming): void;
@@ -414,6 +417,9 @@ export function createChatModelAdapter(deps: ChatModelAdapterDeps): ChatModelAda
       deps.onReplyState?.("waiting");
       try {
         let conversationId = await deps.getConversationId?.();
+        // STT-SMARTTURN-01: a confirmed speculative run is resumed from its first event with `confirm`; the server releases the held turn.
+        const speculation = spokenTurn ? deps.consumeSpeculation?.() : undefined;
+        if (speculation) { resumeToken = speculation.resumeToken; resumeTurnId = speculation.turnId; conversationId = speculation.conversationId; }
         if (conversationId) await deps.resumeConversationIfClosed?.(conversationId);
         const temporary = deps.consumeTemporary?.();
         const imageParts: { id: string; name: string; width: number; height: number; media_type: string }[] = [];
@@ -489,6 +495,7 @@ export function createChatModelAdapter(deps: ChatModelAdapterDeps): ChatModelAda
             temporary: reconnectAttempts === 0 ? temporary : undefined,
             spoken: spokenTurn,
             sttMs: spokenTurn ? spokenTurnTiming : undefined,
+            confirm: speculation && reconnectAttempts === 0 ? true : undefined,
             currentLocation,
             pageContext: reconnectAttempts === 0 ? deps.getPageContext?.() : undefined,
             // APPROVE-CARD-01: the same reconnectAttempts===0 gate as

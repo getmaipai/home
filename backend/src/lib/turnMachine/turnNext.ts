@@ -105,6 +105,8 @@ export interface RunTurnNextOpts {
   audio?: import("@/wire").ChatAudioPart[];
   temporary?: boolean;
   signal?: AbortSignal;
+  /** STT-SMARTTURN-01: a speculative run; storage and tool execution wait on `confirmed` (false means discard, store nothing). */
+  speculation?: { confirmed: Promise<boolean> };
   // APPROVE-CARD-01: a tapped approve/deny card, from POST /api/turn or
   // /api/turn/stream's own additive `ask_answer` field - resumesAsk()'s
   // own doc comment has the full matching rule. Absent for every typed
@@ -691,6 +693,7 @@ async function beginTurn(actor: PersonRow, surface: Surface, text: string, opts:
     ...(surface === "chat" && conversation.device_id ? { deviceId: conversation.device_id, robotName: getDeviceById(conversation.device_id)?.name, replyVoiceId: voiceForSpeech({ actor, deviceId: conversation.device_id }) } : {}),
     ...(surface === "robot" ? { speakerEvidence: opts.speakerEvidence ?? null, present: opts.present ?? null } : {}),
     utterance: text,
+    ...(opts.speculation ? { speculation: opts.speculation } : {}),
     ...(offerTurn ? { offer: offerTurn } : {}),
     // VISION-02c: only the five stored fields come from a caller; the
     // shown-to-model mark is the hub's own (model.ts), never a client's.
@@ -1232,19 +1235,24 @@ function startStream(actor: PersonRow, surface: Surface, text: string, begunValu
   let failedValue: TurnValue | undefined;
   let backgroundError: Error | undefined;
 
+  // STT-SMARTTURN-01: a speculative run stores nothing until the final transcript confirms it; a discarded run never logs.
+  const mayStore = async (): Promise<boolean> => !state.speculation || await state.speculation.confirmed;
+  // The synchronous view for finalize(): a held run stores nothing; a discard settles this before the abort reaches the stream.
+  let storeAllowed = !state.speculation;
+  void state.speculation?.confirmed.then((ok) => { storeAllowed = ok; });
   const machineDone: Promise<void> = finishTurn(begun.value)
-    .then((value) => {
+    .then(async (value) => {
       finishedValue = value;
-      if (!finalizedValue) {
+      if (!finalizedValue && await mayStore()) {
         finalizedValue = value;
         logResult(state, actor, surface, text, value);
       }
     })
-    .catch((err) => {
+    .catch(async (err) => {
       backgroundError = err instanceof Error ? err : new Error(String(err));
       // CHAT-CALM-ERRORS-01b: the engine went away mid-turn; the turn is
       // stored as failed unless a refusal already finalized it.
-      if (err instanceof EngineUnavailableTurnError && !finalizedValue) {
+      if (err instanceof EngineUnavailableTurnError && !finalizedValue && await mayStore()) {
         failedValue = failedTurnValue(state, startedAt);
         finalizedValue = failedValue;
         logFailedTurn(state, actor, surface, text, failedValue);
@@ -1318,7 +1326,7 @@ function startStream(actor: PersonRow, surface: Surface, text: string, begunValu
         const keep = released !== "" && surfaceClassOf(state.surface, state.spoken) !== "spoken";
         const value = buildTurnValue(state, startedAt, "safety_refuse", keep ? `${released}\n\nI can't help with that.` : "I can't help with that.");
         finalizedValue = value;
-        logResult(state, actor, surface, text, value);
+        if (storeAllowed) logResult(state, actor, surface, text, value);
         return value;
       }
       if (finishedValue) {
@@ -1330,7 +1338,8 @@ function startStream(actor: PersonRow, surface: Surface, text: string, begunValu
       // above), so finalize() should never reach here in practice.
       const fallback = buildTurnValue(state, startedAt, "model", replyText);
       finalizedValue = fallback;
-      logResult(state, actor, surface, text, fallback);
+      // STT-SMARTTURN-01: a discarded or still-held speculative run is never stored, whichever path ends it.
+      if (storeAllowed) logResult(state, actor, surface, text, fallback);
       return fallback;
     },
   };

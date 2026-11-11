@@ -213,6 +213,9 @@ export interface TurnState {
   speakerEvidence?: SpeakerEvidence | null;
   present?: readonly PresentPerson[] | null;
   utterance: string;
+  /** STT-SMARTTURN-01: set on a speculative run (begun on the edge partial, held privately). Resolves true when the final
+   * transcript confirms it, false on discard. The tool node and the turn's storage wait on it; nothing else reads it. */
+  speculation?: { confirmed: Promise<boolean> };
   /** ROUTER-BUILD-01d: the search assist's shadow record (set by applyContext). */
   searchAssist?: import("@/wire").SearchAssistStats;
   searchAssistPromise?: Promise<import("@/wire").SearchAssistStats>;

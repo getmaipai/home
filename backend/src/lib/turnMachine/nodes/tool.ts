@@ -192,6 +192,8 @@ async function retryEmptySearches(
   markResearch(state, `retry end (${found} of ${planned.length} found rows)`);
 }
 
+import { speculationConfirmed } from "@/lib/speculation";
+
 export const toolNode: Node<ToolInput, ToolOutput> = async (state, input, signal) => {
   // RESEARCH-TIER-01: a Thinking or Max turn's rounds share one page budget (researchBudget.ts).
   const researchRun = state.answerStyle !== undefined && state.answerStyle !== "instant" && state.budget.rounds > 1 ? (state.researchBudget ??= newResearchBudget(state.answerStyle === "max" && state.researchLibraryOnly === true)) : undefined;
@@ -232,6 +234,9 @@ export const toolNode: Node<ToolInput, ToolOutput> = async (state, input, signal
   }
   for (const proposal of input.proposals) {
     const { tool, callId } = proposal.request;
+    // STT-SMARTTURN-01: a held (speculative) run executes nothing, search included, until the final transcript confirms it;
+    // a discarded or aborted run ends here with no package run (the abort already ends the turn).
+    if (state.speculation && !(await speculationConfirmed(state.speculation.confirmed, signal))) throw new Error("speculative turn discarded before its tool ran");
     if (tool === "edit_picture") {
       const raw = proposal.request.args as { op?: unknown; source?: unknown; args?: unknown };
       const sourceId = typeof raw.source === "string" ? raw.source : "";
