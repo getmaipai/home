@@ -197,7 +197,7 @@ companion. Owner-approved: 2026-10-21 (chat).
    text is not stored as if heard (owner's rule, 2026-10-14). Custom code in the chat path needs a named gap in
    this record first. Named gaps today: sentence-gated speech scheduling
    with the spoken cue, the `[n]` citation mapper, the output gate, the
-   prose tool-call fallback, the chat header (the companion's character
+   prose tool-call fallback, the held resume session (speculative start, STT-SMARTTURN-01: a turn begun privately on the edge partial transcript is held and confirmed only on an exact trimmed match with the final words, a discarded one stores nothing and runs no tool, and it never runs for a minor, a robot, an unconfirmed speaker, crisis, consent or repair turns; counts-only logs; off behind a setting if its exit numbers fail; owner-approved 2026-11-11), the chat header (the companion's character
    over a name pill with a menu button and a call button, drawn by the
    kit `ChatHeader` Element because assistant-ui has none; owner-approved
    2026-10-25, COMPANIONS-DOTS-01 / DOTS-CHAT-01).
