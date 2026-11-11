@@ -22,6 +22,7 @@ import { mixMusicParts } from "./mixParts";
 import { shapeSoundM4a } from "./soundAudio";
 import { readClonedVoiceClip } from "@/lib/clonedVoices";
 import { refuseMusicPrompt } from "./policy";
+import { musicJobLockState } from "./lock";
 import { jobQueueCopy } from "@/lib/jobQueueCopy";
 import { speakerAgeBand } from "@/lib/ageBand";
 import { slotRun } from "@/lib/tiers";
@@ -482,6 +483,7 @@ export function resumeMusicJobs(): void {
   void releaseHouseholdQueue();
 }
 export function readMusicFile(actor: PersonRow, job: MusicJob, fileId: string): { bytes: Uint8Array; mediaType: string; sha256: string } | null {
+  if (musicJobLockState(job, actor) !== "open") return null;
   if (job.id.startsWith("upload-")) { // the synthetic source of resolveSongSource; finished jobs (stems, edits of an upload) read through the made-song path below
     if (job.personId !== actor.id || job.fileId !== fileId) return null;
     const owned = readOwnedAudio(actor, fileId);
@@ -506,6 +508,7 @@ const verifiedFiles = new Map<string, { size: number; mtimeMs: number }>();
  * the whole song. Ownership is checked on every call.
  */
 export function openMusicFile(actor: PersonRow, job: MusicJob, fileId: string): MusicFileHandle | null {
+  if (musicJobLockState(job, actor) !== "open") return null;
   if (job.personId !== actor.id || job.fileId !== fileId || !job.conversationId) return null;
   if (job.temporary) {
     pruneMusicJobs(); const song = temporarySongs.get(fileId);

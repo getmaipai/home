@@ -44,6 +44,7 @@ import { readClonedVoiceClip } from "@/lib/clonedVoices";
 import { promoteMadeSoundFile, savedMadeSounds } from "@/lib/media/appHost";
 import { runMakeSound, makeSoundArgs } from "@/lib/music/soundMaker";
 import { addSoundToSong, soundTakesOf } from "@/lib/music/soundTakes";
+import { musicJobLockState, lockedMusicTile, LOCKED_MUSIC_START_LINE } from "@/lib/music/lock";
 export const musicRoutes = apiRouter();
 export function musicRouteAudience(actor: PersonRow) { return { actor, band: speakerAgeBand(actor, new Date()), surface: "chat" as const, surfaceClass: "written" as const, spoken: false }; }
 // Making a song needs the full gate (age, surface and the household switch). A person's own existing song (the card, Stop,
@@ -82,9 +83,10 @@ const djDeleteRoute = createRoute({ method: "delete", path: "/dj/line", tags: ["
 musicRoutes.openapi(djDeleteRoute, (c) => { const actor = c.get("person"), query = c.req.valid("query"); deleteCachedDjLine(actor, query.before, query.position as DjPosition); return c.body(null, 204); });
 const params = z.object({ id: z.string().min(1).max(80) });
 const versionSchema = z.object({ id: z.string(), label: z.string(), url: z.string() });
+const lockedCardSchema = z.object({ locked: z.literal(true), making: z.boolean() });
 const stages = ["Queued", "Loading", "Planning", "Making", "Mixing", "Finishing"] as const;
 const musicStagesSchema = z.array(z.object({ id: z.string(), label: z.string() }));
-const cardSchema = z.object({
+const musicCardSchema = z.object({
   conversation_id: z.string().nullable().optional(), made_from_file: z.boolean().optional(),
   id: z.string(), state: z.enum(["queued", "running", "done", "failed", "cancelled"]), stage: z.string().nullable(), stage_label: z.string(),
   task: z.string(),
@@ -98,6 +100,10 @@ const cardSchema = z.object({
   timed_lyrics: z.array(z.object({ t: z.number(), line: z.string(), section: z.string().nullable(), secondary: z.string().optional(), words: z.array(z.object({ t: z.number(), end: z.number(), text: z.string() })).optional().describe("Each word with its start and end in seconds, when the song's words were timed (MUSIC-GEN-20b); absent on a line without word timing.") })).nullable(),
   versions: z.array(versionSchema), current_id: z.string().nullable(), length: z.enum(["quick", "full"]), quality: z.enum(["quick", "detailed", "max"]), boost_offered: z.boolean(), max_offered: z.boolean().describe("Whether this person is shown Max on the Quality control: the engine offers a Max maker, they hold Max and the age band reaches it."), max_installed: z.boolean().describe("Whether the Max music models are installed. A Max song made without them runs as Boost, so the card disables Max until they are."), title: z.string().nullable(), description: z.string().nullable(), lyrics: z.string().nullable(), duration_s: z.number().nullable(),
 });
+const cardSchema = z.union([musicCardSchema, lockedCardSchema]);
+const NO_STORE = { "cache-control": "private, no-store" } as const;
+const lockedJob = (actor: PersonRow, job: MusicJob) => musicJobLockState(job, actor) !== "open";
+const hiddenSong = (c: any) => c.json({ error: "That song isn't available any more. Ask for it again." }, 404, NO_STORE);
 export function musicFileUrl(job: MusicJob): string { return `/api/music/jobs/${encodeURIComponent(job.id)}/files/${encodeURIComponent(job.fileId!)}`; }
 const MUSIC_STAGE_LABELS: Record<string, string> = {
   loading: "Loading", starting: "Loading",
@@ -213,6 +219,9 @@ export async function musicCardView(actor: PersonRow, input: Omit<MusicJob, "cov
     lyrics: cardLyricsOf(shown), duration_s: current?.durationS ?? root.durationS,
   };
 }
+async function musicCardOrLocked(actor: PersonRow, job: MusicJob) {
+  return lockedJob(actor, job) ? lockedMusicTile(job) : musicCardView(actor, job);
+}
 const statusRoute = createRoute({ method: "get", path: "/status", tags: ["Music"], summary: "Whether this person can make songs now", middleware,
   responses: { 200: { content: { "application/json": { schema: z.object({ can_make: z.boolean(), engine_ready: z.boolean(), limits: z.object({ min_seconds: z.number(), max_seconds: z.number() }).nullable() }) } }, description: "Music capability." }, ...refusals } });
 musicRoutes.openapi(statusRoute, async (c) => {
@@ -224,20 +233,25 @@ const listRoute = createRoute({ method: "get", path: "/jobs", tags: ["Music"], s
 musicRoutes.openapi(listRoute, async (c) => {
   const actor = c.get("person");
   const trashed = new Set(db.select({ id: attachments.id }).from(attachments).where(and(eq(attachments.ownerPersonId, actor.id), isNotNull(attachments.deletedAt))).all().map((r) => r.id));
-  return c.json(await Promise.all(jobsForPerson(actor, 40).filter((job) => !job.request.sound && (!job.fileId || !trashed.has(job.fileId))).map((job) => musicCardView(actor, job))), 200);
+  const jobs = jobsForPerson(actor, 40).filter((job) => !job.request.sound && (!job.fileId || !trashed.has(job.fileId)));
+  const visible = jobs.filter((job) => !lockedJob(actor, job));
+  const locked = jobs.filter((job) => lockedJob(actor, job));
+  return c.json([...(locked.length ? [lockedMusicTile(locked[0]!)] : []), ...await Promise.all(visible.map((job) => musicCardView(actor, job)))], 200);
 });
 const getRoute = createRoute({ method: "get", path: "/jobs/{id}", tags: ["Music"], summary: "The owner's song card", middleware: viewMiddleware, request: { params },
   responses: { 200: { content: { "application/json": { schema: cardSchema } }, description: "Progress and versions." }, ...refusals } });
 musicRoutes.openapi(getRoute, async (c) => {
   const actor = c.get("person"); const job = getMusicJobFor(actor, c.req.valid("param").id);
   if (!job) return c.json({ error: "That song isn't available any more. Ask for it again." }, 404) as never;
-  return c.json(await musicCardView(actor, job), 200);
+  if (lockedJob(actor, job)) return c.json(lockedMusicTile(job), 200) as never;
+  return c.json(await musicCardOrLocked(actor, job), 200);
 });
 const coverRoute = createRoute({ method: "post", path: "/jobs/{id}/cover", tags: ["Music"], summary: "Make a new cover for the shown song", middleware,
   request: { params, body: { content: { "application/json": { schema: z.object({ prompt: z.string().trim().min(3).max(1200).optional() }) } } } }, responses: { 200: { content: { "application/json": { schema: cardSchema } }, description: "The song card." }, ...refusals, ...errorResponses({ 409: "The song or its cover is still being made" }) } });
 musicRoutes.openapi(coverRoute, async (c) => {
   const actor = c.get("person"); const root = getMusicJobFor(actor, c.req.valid("param").id);
   if (!root) return c.json({ error: "That song isn't available any more. Ask for it again." }, 404) as never;
+  if (lockedJob(actor, root)) return hiddenSong(c) as never;
   const current = musicVersions(actor, root).sort((a, b) => (b.chosenAt ?? b.createdAt).localeCompare(a.chosenAt ?? a.createdAt) || b.id.localeCompare(a.id))[0] ?? root;
   if (current.state !== "done") return c.json({ error: "The song is still being made. Try New cover when it is ready." }, 409) as never;
   const { prompt } = c.req.valid("json");
@@ -251,6 +265,7 @@ const reviseRoute = createRoute({ method: "post", path: "/jobs/{id}/revise", tag
   responses: { 200: { content: { "application/json": { schema: cardSchema } }, description: "The card with a new version coming." }, 422: { description: "The requested edit cannot be made." }, ...refusals } });
 musicRoutes.openapi(reviseRoute, async (c) => {
   const actor = c.get("person"); const { change, file_id } = c.req.valid("json");
+  const source = getMusicJobFor(actor, c.req.valid("param").id); if (source && lockedJob(actor, source)) return c.json({ error: LOCKED_MUSIC_START_LINE, code: "locked", locked: true }, 423) as never;
   let description = "";
   const result = await runSongEdit({ actor, jobId: c.req.valid("param").id, fileId: file_id,
     input: (source) => { description = `${source.request.description.trim()}. Change: ${change}`.slice(0, 1200); return { change: "remake", description }; },
@@ -324,7 +339,8 @@ musicRoutes.openapi(makeSoundRoute, async (c) => {
 const saveSoundRoute = createRoute({ method: "post", path: "/sounds/{id}/save", tags: ["Music"], summary: "Save a made sound to Sounds", middleware: viewMiddleware,
   request: { params }, responses: { 200: { content: { "application/json": { schema: z.object({ item_id: z.string() }) } }, description: "The saved sound." }, ...refusals } });
 musicRoutes.openapi(saveSoundRoute, (c) => {
-  const job = getMusicJobFor(c.get("person"), c.req.valid("param").id);
+  const actor = c.get("person"), job = getMusicJobFor(actor, c.req.valid("param").id);
+  if (job && lockedJob(actor, job)) return hiddenSong(c) as never;
   if (!job || job.task === "stems" || !job.request.sound || job.state !== "done" || !job.fileId) return c.json({ error: "No finished sound with that id." }, 404);
   const item = promoteMadeSoundFile(c.get("person"), job.fileId);
   return item ? c.json({ item_id: item.id }, 200) : c.json({ error: "That sound cannot be saved." }, 404);
@@ -341,6 +357,8 @@ const addSoundToSongRoute = createRoute({ method: "post", path: "/sounds/{id}/ad
   responses: { 200: { content: { "application/json": { schema: cardSchema } }, description: "The song's card with the new version shown." }, 422: { description: "The sound cannot be added as asked." }, ...refusals, ...errorResponses({ 503: "This computer cannot mix audio now" }) } });
 musicRoutes.openapi(addSoundToSongRoute, async (c) => {
   const actor = c.get("person"), body = c.req.valid("json");
+  const song = getMusicJobFor(actor, body.song_id); if (song && lockedJob(actor, song)) return c.json({ error: LOCKED_MUSIC_START_LINE, code: "locked", locked: true }, 423) as never;
+  const sound = getMusicJobFor(actor, c.req.valid("param").id); if (sound && lockedJob(actor, sound)) return c.json({ error: LOCKED_MUSIC_START_LINE, code: "locked", locked: true }, 423) as never;
   const refusal = musicRefusalFor(musicRouteAudience(actor), { description: "add a sound to a song" });
   if (refusal) return c.json({ error: refusal.line }, 403) as never;
   const result = await addSoundToSong(actor, { soundJobId: c.req.valid("param").id, songId: body.song_id, fileId: body.file_id, startSeconds: body.start_s });
@@ -354,6 +372,7 @@ const detailsRoute = createRoute({ method: "post", path: "/jobs/{id}/details", t
   responses: { 200: { content: { "application/json": { schema: cardSchema } }, description: "The card with a new version coming." }, 422: { description: "The requested edit cannot be made." }, ...refusals } });
 musicRoutes.openapi(detailsRoute, async (c) => {
   const actor = c.get("person"); const { file_id, ...changes } = c.req.valid("json");
+  const source = getMusicJobFor(actor, c.req.valid("param").id); if (source && lockedJob(actor, source)) return hiddenSong(c) as never;
   if (!Object.values(changes).some((v) => v !== undefined)) return c.json({ error: "Change at least one thing: the title, the words, the style, the tempo or the key." }, 422) as never;
   const result = await runSongEdit({ actor, jobId: c.req.valid("param").id, fileId: file_id, skipStems: true, input: () => ({ change: "remake", ...changes }) });
   return result.ok ? c.json(await musicCardView(actor, result.root), 200) : refuseWith(c, result) as never;
@@ -363,6 +382,7 @@ const stemsRoute = createRoute({ method: "post", path: "/jobs/{id}/stems", tags:
   responses: { 200: { content: { "application/json": { schema: cardSchema } }, description: "The card with stems coming." }, 422: { description: "The source cannot be split." }, ...refusals, ...errorResponses({ 503: "Stem splitting is unavailable" }) } });
 musicRoutes.openapi(stemsRoute, async (c) => {
   const actor = c.get("person"); const root = getMusicJobFor(actor, c.req.valid("param").id); const { file_id } = c.req.valid("json");
+  if (root && lockedJob(actor, root)) return c.json({ error: LOCKED_MUSIC_START_LINE, code: "locked", locked: true }, 423) as never;
   const versions = root ? musicVersions(actor, root).filter((j) => j.state === "done" && j.fileId && j.task !== "stems") : [];
   const source = (file_id ? versions.find((j) => j.fileId === file_id) : versions.sort((a, b) => (b.chosenAt ?? b.createdAt).localeCompare(a.chosenAt ?? a.createdAt))[0]) ?? null;
   if (!root || !source || !source.conversationId || !source.turnId) return c.json({ error: "That song isn't available any more. Ask for it again." }, 404) as never;
@@ -454,13 +474,17 @@ musicRoutes.openapi(fromFileEditRoute, async c => {
 const lyricsRealignRoute = createRoute({ method: "post", path: "/library/{id}/lyrics-realign", tags: ["Music"], summary: "Line up a Library track's lyrics with the file again", middleware: [requireAuth] as [typeof requireAuth], request: { params },
   responses: { 202: { content: { "application/json": { schema: z.object({ ok: z.literal(true), state: z.literal("queued") }) } }, description: "Lining the words up again; the lyrics improve in a moment." }, 422: { description: "These lyrics have no timing." }, 429: { description: "Asked again within a minute." }, ...errorResponses({ 401: "Not signed in", 404: "No such song" }) } });
 musicRoutes.openapi(lyricsRealignRoute, (c) => {
-  const { result } = requestRealign(c.get("person"), c.req.valid("param").id);
+  const actor = c.get("person"), source = findOwnedSong(actor, c.req.valid("param").id);
+  if (source && lockedJob(actor, source)) return hiddenSong(c) as never;
+  const { result } = requestRealign(actor, c.req.valid("param").id);
   return result.ok ? c.json({ ok: true as const, state: "queued" as const }, 202) : refuseWith(c, result) as never;
 });
 const cancelRoute = createRoute({ method: "delete", path: "/jobs/{id}", tags: ["Music"], summary: "Stop a song being made", middleware: viewMiddleware, request: { params },
   responses: { 200: { content: { "application/json": { schema: cardSchema } }, description: "The stopped card." }, ...refusals } });
 musicRoutes.openapi(cancelRoute, async (c) => {
-  const actor = c.get("person"); const job = await cancelMusicJob(actor, c.req.valid("param").id);
+  const actor = c.get("person"), existing = getMusicJobFor(actor, c.req.valid("param").id);
+  if (existing && lockedJob(actor, existing)) return hiddenSong(c) as never;
+  const job = await cancelMusicJob(actor, c.req.valid("param").id);
   if (!job) return c.json({ error: "That song isn't available any more. Ask for it again." }, 404) as never;
   return c.json(await musicCardView(actor, job), 200);
 });
@@ -471,6 +495,7 @@ const deleteSongRoute = createRoute({ method: "post", path: "/jobs/{id}/delete",
 musicRoutes.openapi(deleteSongRoute, async (c) => {
   const actor = c.get("person"); const root = getMusicJobFor(actor, c.req.valid("param").id);
   if (!root) return c.json({ error: "That song isn't available any more. Ask for it again." }, 404) as never;
+  if (lockedJob(actor, root)) return hiddenSong(c) as never;
   if (root.state === "queued" || root.state === "running") await cancelMusicJob(actor, root.id);
   let deleted = 0; let trashUntil: string | null = null;
   for (const version of musicVersions(actor, root)) {
@@ -489,6 +514,7 @@ const useRoute = createRoute({ method: "post", path: "/jobs/{id}/use", tags: ["M
   responses: { 200: { content: { "application/json": { schema: cardSchema } }, description: "The selected version." }, ...refusals } });
 musicRoutes.openapi(useRoute, async (c) => {
   const actor = c.get("person"); const root = getMusicJobFor(actor, c.req.valid("param").id);
+  if (root && lockedJob(actor, root)) return hiddenSong(c) as never;
   if (!root || !useMusicVersion(actor, root, c.req.valid("json").file_id)) return c.json({ error: "That version isn't available any more. Choose another version." }, 404) as never;
   return c.json(await musicCardView(actor, root), 200);
 });
@@ -499,6 +525,7 @@ const lengthRoute = createRoute({ method: "post", path: "/jobs/{id}/length", tag
   responses: { 200: { content: { "application/json": { schema: cardSchema } }, description: "The card with the new version coming." }, 422: { description: "The requested edit cannot be made." }, ...refusals } });
 musicRoutes.openapi(lengthRoute, async (c) => {
   const actor = c.get("person"); const { length, file_id } = c.req.valid("json");
+  const source = getMusicJobFor(actor, c.req.valid("param").id); if (source && lockedJob(actor, source)) return c.json({ error: LOCKED_MUSIC_START_LINE, code: "locked", locked: true }, 423) as never;
   const result = await runSongEdit({ actor, jobId: c.req.valid("param").id, fileId: file_id, input: () => ({ change: length === "full" ? "make_full" : "make_quick" }) });
   return result.ok ? c.json(await musicCardView(actor, result.root), 200) : refuseWith(c, result) as never;
 });
@@ -508,6 +535,7 @@ const qualityRoute = createRoute({ method: "post", path: "/jobs/{id}/quality", t
   responses: { 200: { content: { "application/json": { schema: cardSchema } }, description: "The card with the new version coming." }, 422: { description: "The requested edit cannot be made." }, ...refusals } });
 musicRoutes.openapi(qualityRoute, async (c) => {
   const actor = c.get("person"); const { tier, file_id } = c.req.valid("json");
+  const source = getMusicJobFor(actor, c.req.valid("param").id); if (source && lockedJob(actor, source)) return c.json({ error: LOCKED_MUSIC_START_LINE, code: "locked", locked: true }, 423) as never;
   const granted = authorizeTier({ person: actor, category: "music", requested: tier }).tier;
   const result = await runSongEdit({ actor, jobId: c.req.valid("param").id, fileId: file_id, input: () => ({ change: "remake" }),
     beforePlan: (engine) => tier === "boost" && (granted !== "boost" || !engine.quality.includes("detailed")) ? { status: 422, error: "A better maker is not available for this song. Make it again at Standard." } : null,
@@ -520,18 +548,19 @@ musicRoutes.openapi(qualityRoute, async (c) => {
   return result.ok ? c.json(await musicCardView(actor, result.root), 200) : refuseWith(c, result) as never;
 });
 /** Audio seeking uses the one Range server (`serveBytes`); the slice is read from the file on demand. */
-function audioResponse(file: MusicFileHandle, rangeHeader?: string): Response {
-  return serveBytes({ size: file.size, slice: (start = 0, end = file.size) => file.read(start, end) as never }, file.mediaType, rangeHeader);
+function audioResponse(file: MusicFileHandle, rangeHeader?: string, allowed: () => boolean = () => true): Response {
+  return serveBytes({ size: file.size, slice: (start = 0, end = file.size) => allowed() ? file.read(start, end) as never : new Uint8Array() }, file.mediaType, rangeHeader);
 }
 const fileRoute = createRoute({ method: "get", path: "/jobs/{id}/files/{fileId}", tags: ["Music"], summary: "The owner's audio with Range support", middleware: viewMiddleware,
   request: { params: params.extend({ fileId: z.string().min(1).max(80) }) },
   responses: { 200: { content: { "audio/mp4": { schema: z.string() } }, description: "Audio bytes." }, 206: { description: "A Range slice." }, 416: { description: "Range outside the file." }, ...refusals } });
 musicRoutes.openapi(fileRoute, (c) => {
   const actor = c.get("person"); const { id, fileId } = c.req.valid("param"); const root = getMusicJobFor(actor, id);
+  if (root && lockedJob(actor, root)) return hiddenSong(c) as never;
   const version = root ? musicVersions(actor, root).find((j) => j.fileId === fileId) : null;
   const file = version ? openMusicFile(actor, version, fileId) : null;
   if (!file) return c.json({ error: "That song isn't available any more. Ask for it again." }, 404) as never;
-  return audioResponse(file, c.req.header("Range")) as never;
+  return audioResponse(file, c.req.header("Range"), () => !lockedJob(actor, root!)) as never;
 });
 const exportRoute = createRoute({ method: "get", path: "/files/{fileId}", tags: ["Music"], summary: "Download a song, checking its chain for commercial export", middleware: viewMiddleware,
   request: { params: z.object({ fileId: z.string().min(1).max(80) }), query: z.object({ purpose: z.enum(["commercial", "personal"]).optional() }) },
@@ -540,10 +569,11 @@ musicRoutes.openapi(exportRoute, (c) => {
   const actor = c.get("person"); const { fileId } = c.req.valid("param");
   // Use the owner index, never a Library share or parent access. Temporary songs remain scoped to their owner too.
   const job = findOwnedSong(actor, fileId);
+  if (job && lockedJob(actor, job)) return hiddenSong(c) as never;
   const file = job ? openMusicFile(actor, job, fileId) : null;
   if (!file) return c.json({ error: "That song isn't available any more. Ask for it again." }, 404) as never;
   if (c.req.valid("query").purpose === "commercial" && commercialUseOf(fileId) !== "cleared") return c.json({ error: COMMERCIAL_REFUSAL_LINE }, 409) as never;
-  return audioResponse(file, c.req.header("Range")) as never;
+  return audioResponse(file, c.req.header("Range"), () => !lockedJob(actor, job!)) as never;
 });
 function findOwnedSong(actor: PersonRow, fileId: string): MusicJob | null {
   pruneMusicJobs();
