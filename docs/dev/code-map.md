@@ -1222,6 +1222,8 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/voiceCatalog.ts` | voiceCatalogUrl, getVoiceCatalog, isVoiceCatalogPath, __resetVoiceCatalogForTests |
 | `backend/src/lib/voiceCues.ts` | HESITATION_LEVELS, DEFAULT_HESITATION_LEVEL, KNOWN_CUE_TAGS, normalizeTagName, normalizeTagList, freshCueState |
 | `backend/src/lib/voiceForSpeech.ts` | isPresetVoice, voiceForSpeech |
+| `backend/src/lib/voiceLibrary.ts` | buildVoiceLibrary, searchVoiceLibrary |
+| `backend/src/lib/voiceLibraryData.ts` | VCTK_SPEAKERS |
 | `backend/src/lib/voiceList.ts` | playableVoices, listPlayableVoices, isPlayableVoiceId |
 | `backend/src/lib/voiceResolve.ts` | voiceMatchesLanguage, voiceMatchesStored, voicePresetName, resolveVoice, getOfferedVoices, __setOfferedVoicesForTests |
 | `backend/src/lib/voiceShift.ts` | INSPIRED_LEVELS, INSPIRED_SEMITONES, PREVIEW_SECONDS, isInspiredLevel, decodeWavClip, encodeWavClip |

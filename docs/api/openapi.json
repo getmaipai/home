@@ -18611,6 +18611,243 @@
         }
       }
     },
+    "/api/voice/library": {
+      "get": {
+        "tags": [
+          "Voice"
+        ],
+        "summary": "List browseable VCTK voices",
+        "description": "Builds the browseable VCTK voice library from the live community voice catalog.",
+        "responses": {
+          "200": {
+            "description": "VCTK voices and attribution.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "voices": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "name": {
+                            "type": "string"
+                          },
+                          "detail": {
+                            "type": "string"
+                          },
+                          "gender": {
+                            "type": "string",
+                            "enum": [
+                              "woman",
+                              "man",
+                              "neutral"
+                            ]
+                          },
+                          "language": {
+                            "type": "string",
+                            "enum": [
+                              "en"
+                            ]
+                          },
+                          "languageName": {
+                            "type": "string",
+                            "enum": [
+                              "English"
+                            ]
+                          },
+                          "country": {
+                            "type": "string",
+                            "nullable": true
+                          },
+                          "countryName": {
+                            "type": "string",
+                            "nullable": true
+                          },
+                          "quality": {
+                            "type": "string",
+                            "enum": [
+                              "good",
+                              "great",
+                              "best"
+                            ]
+                          },
+                          "sizeMb": {
+                            "type": "number",
+                            "nullable": true
+                          },
+                          "attribution": {
+                            "type": "string"
+                          },
+                          "licence": {
+                            "type": "string",
+                            "enum": [
+                              "CC BY 4.0"
+                            ]
+                          },
+                          "sampleUrl": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "name",
+                          "detail",
+                          "gender",
+                          "language",
+                          "languageName",
+                          "country",
+                          "countryName",
+                          "quality",
+                          "sizeMb",
+                          "attribution",
+                          "licence",
+                          "sampleUrl"
+                        ]
+                      }
+                    },
+                    "attribution": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "voices",
+                    "attribution"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Only owner or admin may manage household voices",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Voice catalog unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/voice/library/sample": {
+      "get": {
+        "tags": [
+          "Voice"
+        ],
+        "summary": "Stream a VCTK voice sample",
+        "description": "Streams a VCTK WAV from the community repository after the user requests a preview.",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            },
+            "required": true,
+            "name": "path",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The WAV sample.",
+            "content": {
+              "audio/wav": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid sample path",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Only owner or admin may manage household voices",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Sample not in catalog",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Sample unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Voice catalog unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/voice/catalog/select": {
       "post": {
         "tags": [
