@@ -253,11 +253,11 @@ function StageBody({ person, personId, companionName, clips, still, mouthStill, 
   const clipKey = mode === "idle" ? "idle" : mode;
   const characterState: StateId = clips?.[clipKey] ? clipKey : "idle";
   const mouth = useMemo(() => mouthStill ? { still: mouthStill, level: () => side.turnSchedulerRef.current?.readLevel() ?? 0 } : null, [mouthStill, side.turnSchedulerRef]);
-  const packSpeech = usePackSpeech();
+  const packSpeech = usePackSpeech(!!pack);
   const character = bot
     ? <RobotFace size="stage" color={(bot.face_color ?? "mint") as RobotFaceColor} night={bot.night ?? false} expression={(bot.online ? bot.state?.presence ?? bot.state?.activity ?? "idle" : "offline") as RobotFaceExpression} name={bot.name} />
     : pack
-    ? <CompanionPackPlayer pack={pack.manifest as unknown as CompanionPackData} baseUrl={pack.url} state={packStateFor(mode)} tier="auto" {...packSpeech} />
+    ? <CompanionPackPlayer pack={pack.manifest as unknown as CompanionPackData} baseUrl={pack.url} state={packStateFor(mode)} tier="auto" speech={mode === "speaking" ? packSpeech : undefined} />
     : clips
     ? <CompanionAvatar name={companionName} clips={clips} size="fill" state={mouthStill && mode === "speaking" ? "speaking" : characterState} animated mouth={mouth} />
     : still ? <img src={still} alt={companionName} className="h-full w-full object-contain" /> : <SeededAvatar name={companionName} seed={companionName} />;

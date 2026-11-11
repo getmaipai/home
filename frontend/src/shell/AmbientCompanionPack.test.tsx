@@ -6,8 +6,11 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { Roster } from "@/lib/api";
 
 // The kit player is mocked so the test sees which props the pane passes; the real player is checked in WebKit.
+// The cue builders stay real (usePackSpeech imports them from the same entry); only the player is replaced.
+const realKit = await import("@maipai/ui/src/elements/companion-pack");
 mock.module("@maipai/ui/src/elements/companion-pack", () => ({
-  CompanionPackPlayer: (props: { baseUrl: string; state: string; tier?: string }) => <div data-testid="pack-player" data-base={props.baseUrl} data-state={props.state} data-tier={props.tier} />,
+  ...realKit,
+  CompanionPackPlayer: (props: { baseUrl: string; state: string; tier?: string; speech?: unknown }) => <div data-testid="pack-player" data-base={props.baseUrl} data-state={props.state} data-tier={props.tier} data-speech={props.speech ? "on" : "off"} />,
 }));
 const { useAmbientCompanionPane } = await import("@/shell/AmbientCompanionPane");
 const { useSideChat } = await import("@/shell/useSideChat");
@@ -37,6 +40,7 @@ describe("ambient companion pane with a pack", () => {
     expect(player.getAttribute("data-base")).toBe("/api/companions/c1/pack/");
     expect(player.getAttribute("data-state")).toBe("idle");
     expect(player.getAttribute("data-tier")).toBe("auto");
+    expect(player.getAttribute("data-speech")).toBe("off");
   });
 
   test("keeps the still path and no pack player when the pack is null", () => {

@@ -1902,6 +1902,8 @@ export const api = {
   // unaffected.
   streamSpeech: (text: string, signal?: AbortSignal, turn?: { turnId: string; generation: number; voice?: string }) =>
     rawStreamPost("/api/tts", { text, ...(turn ? { turn_id: turn.turnId, generation: turn.generation, ...(turn.voice ? { voice: turn.voice } : {}) } : {}) }, 185_000, "Timed out waiting for voice", signal),
+  /** PACK-06b: the pronouncing dictionary for companion mouth cues (gzip, browser-cached); fetched only when a pack companion first speaks. */
+  speechDictionary: () => request<Record<string, string>>("/api/speech/cmu", { timeoutMs: 30_000 }),
   reactTurn: (said: string) => request<{ text: string | null }>("/api/turn/react", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ said }), timeoutMs: 2500 }),
   prewarmTurn: () => request<{ warmed: boolean }>("/api/turn/prewarm", { method: "POST" }),
   cancelTurn: (turnId: string, heardChars?: number) => request<{ cancelled: boolean }>(`/api/turn/${encodeURIComponent(turnId)}/cancel`, { method: "POST", ...(heardChars === undefined ? {} : { body: JSON.stringify({ heard_chars: heardChars }) }) }),

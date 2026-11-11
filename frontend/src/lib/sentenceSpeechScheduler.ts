@@ -24,6 +24,7 @@ import { ApiError, api } from "@/lib/api";
 import { createLevelMeter, type LevelMeter } from "@/lib/voice/audioLevelMeter";
 import { audioSession, type AudioHandle } from "@/shell/audioSession";
 import { sharedPlaybackContext } from "@/lib/voice/playbackContext";
+import { publishSpeechTap, speechTapActive, type SpeechSource } from "@/lib/speechTap";
 
 const MAX_PARALLEL_FETCHES = 2;
 
@@ -49,7 +50,7 @@ function fixWavHeaderSize(bytes: Uint8Array): void {
   view.setUint32(40, bytes.length - 44, true);
 }
 
-export class SentenceSpeechScheduler {
+export class SentenceSpeechScheduler implements SpeechSource {
   private readonly audioContext: AudioContext;
   // The page-wide context (playbackContext.ts) outlives a reply: stop() silences this reply's own sources instead of closing it.
   private readonly sharedContext: boolean;
@@ -63,6 +64,7 @@ export class SentenceSpeechScheduler {
   private readonly meter: LevelMeter;
   private nextStartTime = 0;
   private scheduledCount = 0;
+  private sentenceCount = 0;
   private finishedCount = 0;
   private streamDone = false;
   private stopped = false;
@@ -120,6 +122,14 @@ export class SentenceSpeechScheduler {
     const first = this.scheduledSentences[0];
     if (!first) return 0;
     return Math.max(0, (this.audioContext.currentTime - first.startTime) * 1000);
+  }
+
+  /** PACK-06b: seconds since the first sample of this reply played (audio clock minus output latency), 0 before it starts. */
+  speechClock(): number {
+    const first = this.scheduledSentences[0];
+    if (!first) return 0;
+    const latency = this.audioContext.outputLatency || this.audioContext.baseLatency || 0;
+    return Math.max(0, this.audioContext.currentTime - latency - first.startTime);
   }
 
   heardVisibleEnd(): number {
@@ -216,14 +226,16 @@ export class SentenceSpeechScheduler {
     this.dispatchTail = new Promise<void>((resolve) => {
       resolveThis = resolve;
     });
-    const track: { entry?: ScheduledSentence } = {};
+    const track: { entry?: ScheduledSentence; id: number } = { id: this.sentenceCount++ };
+    if (speechTapActive()) publishSpeechTap({ type: "sentence", source: this, sentence: track.id, text });
     void this.fetchAndSchedule(text, predecessorDone, meta, track).finally(() => {
       if (track.entry) track.entry.complete = true;
+      if (track.entry && speechTapActive()) publishSpeechTap({ type: "sentenceEnd", source: this, sentence: track.id });
       resolveThis();
     });
   }
 
-  private async fetchAndSchedule(text: string, predecessorDone: Promise<void>, meta: SpeechSentenceMeta | undefined, track: { entry?: ScheduledSentence }): Promise<void> {
+  private async fetchAndSchedule(text: string, predecessorDone: Promise<void>, meta: SpeechSentenceMeta | undefined, track: { entry?: ScheduledSentence; id: number }): Promise<void> {
     await this.acquireFetchSlot();
     // Streamed playback (Jesse, 2026-09-04: "streaming responses as you get them instead of generating the entire wav and then
     // just playing that"): the sentence's PCM is cut into small buffers and scheduled as it arrives, so the first sound plays
@@ -365,7 +377,7 @@ export class SentenceSpeechScheduler {
     this.sessionHandle.requestFocus();
   }
 
-  private scheduleBuffer(audioBuffer: AudioBuffer, meta: SpeechSentenceMeta | undefined, track: { entry?: ScheduledSentence }): void {
+  private scheduleBuffer(audioBuffer: AudioBuffer, meta: SpeechSentenceMeta | undefined, track: { entry?: ScheduledSentence; id: number }): void {
     this.joinAudioSession();
     const rate = audioSession.speedFor("spoken_reply");
     const source = this.audioContext.createBufferSource();
@@ -380,6 +392,12 @@ export class SentenceSpeechScheduler {
     else {
       track.entry = { ...(meta?.visibleEnd === undefined ? {} : { visibleEnd: meta.visibleEnd }), startTime, endTime, complete: false };
       this.scheduledSentences.push(track.entry);
+    }
+    if (speechTapActive()) {
+      const first = this.scheduledSentences[0]!;
+      // The samples as played: a copy of channel 0, on the reply's own timeline (a speed change stretches it, so the rate follows it).
+      const speed = source.playbackRate && rate !== 1 ? rate : 1;
+      publishSpeechTap({ type: "audio", source: this, sentence: track.id, samples: audioBuffer.getChannelData(0).slice(), rate: audioBuffer.sampleRate * speed, at: startTime - first.startTime });
     }
     this.scheduledCount++;
     if (this.scheduledCount === 1) this.onFirstAudio?.();
@@ -423,6 +441,7 @@ export class SentenceSpeechScheduler {
     this.cutOff = !this.endedNaturally;
     this.stopped = true;
     this.paused = false;
+    if (speechTapActive()) publishSpeechTap({ type: "stop", source: this });
     this.abortController.abort();
     for (const wake of this.waiters.splice(0)) wake();
     this.meter.stop();
