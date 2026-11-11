@@ -23,7 +23,7 @@ import { __setKeyframesForTests } from "@/lib/pictures/keyframes";
 import { __setAgeCheckRunnerForTests, __resetAgeCheckForTests, type AgeVerdict, type ImageCheck } from "@/lib/pictures/ageCheck";
 import { __setChildSafetyRunnerForTests, type ChildSafetyCheck } from "@/lib/pictures/laneGate";
 import {
-  EMOTIONS, PACK_CLIP_STATES, StackPackOps, TALK_LETTERS, __clearPackJobsForTests, __setPackDepsForTests, cancelPackJob, packJobRunning, readPackJob, readPackJobReconciled, startPackJob, approvePackStage, waitPackJob, __setRenameForTests, PACK_EMPTY_LINE,
+  EMOTIONS, PACK_CLIP_STATES, PACK_NO_BOX_LINE, PACK_BAD_BOX_LINE, PACK_BAD_EYES_LINE, PACK_BOX_PHOTO_LINE, PACK_NO_EYES_LINE, STYLISED_LETTERS, StackPackOps, TALK_LETTERS, __clearPackJobsForTests, __setPackDepsForTests, cancelPackJob, packJobRunning, readPackJob, readPackJobReconciled, startPackJob, approvePackStage, waitPackJob, __setRenameForTests, PACK_EMPTY_LINE,
   type ClipMaker, type PackDeps, type PackJobStatus, type PackOpKind, type PackOpsClient,
 } from "@/lib/companionPackMaker";
 import type { PersonRow } from "@/types";
@@ -244,9 +244,182 @@ describe("the pack job state machine", () => {
     expect(packJobRunning(id)).toBe(false);
   });
 
-  test("a stylised or no-mouth character gets a plain not_supported_yet refusal", async () => {
+  test("a no-mouth character and an unknown kind get a plain refusal; a stylised start needs the box", async () => {
     __setPackDepsForTests(fakes(id).deps);
-    expect(await startPackJob({ actor: person("maker-owner"), companionId: id, stillId, shapes: "stylised" })).toMatchObject({ ok: false, status: 422, error: expect.stringContaining("Only photo characters") });
+    expect(await startPackJob({ actor: person("maker-owner"), companionId: id, stillId, shapes: "mouthless" })).toMatchObject({ ok: false, status: 422, error: expect.stringContaining("Only photo and stylised") });
+    expect(await startPackJob({ actor: person("maker-owner"), companionId: id, stillId, shapes: "stylised" })).toMatchObject({ ok: false, status: 422, error: PACK_NO_BOX_LINE });
+    expect(readPackJob(id)).toBeNull();
+  });
+});
+
+describe("MAKER-D2: previews and the stylised path", () => {
+  const stylisedStart = (extra: Record<string, unknown> = {}) => startPackJob({ actor: person("maker-owner"), companionId: id, stillId, shapes: "stylised", box: [400, 600, 200, 100], face_height_px: 700, eyes: { left: [[300, 300], [320, 296], [340, 300]], right: [[600, 300], [620, 296], [640, 300]] }, ...extra } as never);
+
+  test("preview fields: clips with take ids and URLs at B, a pack block at C, neither at other times", async () => {
+    const f = fakes(id); __setPackDepsForTests(f.deps);
+    await startPackJob({ actor: person("maker-owner"), companionId: id, stillId, shapes: "photo" });
+    const atB = await (await get(`companions/${id}/pack-job`, owner)).json() as any;
+    await waitPackJob(id);
+    const b = await (await get(`companions/${id}/pack-job`, owner)).json() as any;
+    expect(atB.clips).toEqual([]); expect(b.waiting_for).toBe("B"); expect(b.preview).toBeNull();
+    expect(b.clips.map((c: any) => c.state).sort()).toEqual(["idle", "idle", "listening", "speaking", "thinking"]);
+    for (const c of b.clips) { expect(c.url).toBe(`/api/companions/${id}/states/${c.state}/${c.take}/clip.h264.mp4`); expect((await get(c.url.replace("/api/", ""), owner)).status).toBe(200); }
+    await approvePackStage(id, person("maker-owner"), "B"); await waitPackJob(id);
+    const c = await (await get(`companions/${id}/pack-job`, owner)).json() as any;
+    expect(c.waiting_for).toBe("C"); expect(c.clips).toEqual([]);
+    expect(c.preview).toEqual({ pack_url_base: `/api/companions/${id}/pack-job/preview/`, pack_json_url: `/api/companions/${id}/pack-job/preview/pack.json`, installed: false });
+  });
+
+  test("the preview route: pack.json and an mp4 range at C, traversal and links refused, editors only, 409 elsewhere, block after install", async () => {
+    const f = fakes(id); __setPackDepsForTests(f.deps);
+    const url = (file: string) => `companions/${id}/pack-job/preview/${file}`;
+    await startPackJob({ actor: person("maker-owner"), companionId: id, stillId, shapes: "photo" });
+    await waitPackJob(id);
+    expect((await get(url("pack.json"), owner)).status).toBe(409); // waiting at B
+    await approvePackStage(id, person("maker-owner"), "B"); await waitPackJob(id);
+    const pj = await get(url("pack.json"), owner); expect(pj.status).toBe(200); expect(pj.headers.get("content-type")).toContain("application/json");
+    const pack = await pj.json() as any, clipFile = (Object.values(pack.states)[0] as any[])[0].file as string;
+    const ranged = await app.request(`http://localhost/api/${url(clipFile)}`, { headers: { cookie: `session=${owner}`, range: "bytes=0-3" } });
+    expect(ranged.status).toBe(206); expect((await ranged.arrayBuffer()).byteLength).toBe(4);
+    const dir = join(householdCompanionFolder(id)!, "pack-job", "work", "pack-out", "pack");
+    expect((await get(url("..%2Fsource.png"), owner)).status).not.toBe(200); expect((await get(url("%2e%2e/%2e%2e/state.json"), owner)).status).not.toBe(200);
+    writeFileSync(join(dir, "..", "secret.json"), "{}"); symlinkSync(join(dir, "..", "secret.json"), join(dir, "link.json"));
+    expect((await get(url("link.json"), owner)).status).toBe(404);
+    expect((await get(url("notes.txt"), owner)).status).toBe(404); expect((await get(url("nope.json"), owner)).status).toBe(404);
+    expect((await get(url("pack.json"), child)).status).toBeGreaterThanOrEqual(403); expect((await get(url("pack.json"), other)).status).toBeGreaterThanOrEqual(403);
+    rmSync(join(dir, "link.json"), { force: true }); // a planted link would (rightly) fail the install
+    await approvePackStage(id, person("maker-owner"), "C"); await waitPackJob(id);
+    const done = await (await get(`companions/${id}/pack-job`, owner)).json() as any;
+    expect(done.preview).toEqual({ pack_url_base: `/api/companions/${id}/pack/`, pack_json_url: `/api/companions/${id}/pack/pack.json`, installed: true });
+    expect((await get(url("pack.json"), owner)).status).toBe(409); // after install the preview route is closed; the installed pack answers at /pack/
+    expect((await get(`companions/${id}/pack/pack.json`, owner)).status).toBe(200);
+  });
+
+  test("the preview route is closed for a failed job and for a closed (safety) job", async () => {
+    const f = fakes(id); __setPackDepsForTests(f.deps);
+    await startPackJob({ actor: person("maker-owner"), companionId: id, stillId, shapes: "photo" }); await waitPackJob(id);
+    await approvePackStage(id, person("maker-owner"), "B"); await waitPackJob(id);
+    const url = `companions/${id}/pack-job/preview/pack.json`;
+    expect((await get(url, owner)).status).toBe(200);
+    const rec = readPackJob(id)!; rec.status = "failed"; writeFileSync(join(householdCompanionFolder(id)!, "pack-job", "state.json"), JSON.stringify(rec));
+    expect((await get(url, owner)).status).toBe(409);
+    rec.status = "waiting_approval"; rec.closed = true; writeFileSync(join(householdCompanionFolder(id)!, "pack-job", "state.json"), JSON.stringify(rec));
+    expect((await get(url, owner)).status).toBe(409);
+  });
+
+  test("a changed box wipes the old job (takes gone, old Stack jobs cancelled once); the same box resumes without wiping", async () => {
+    const f = fakes(id); __setPackDepsForTests(f.deps);
+    await stylisedStart(); await runTo(null, "waiting_approval");
+    const first = readPackJob(id)!, oldJobs = Object.values(first.stages).flatMap((st) => st.stack_jobs), oldTakes = first.clips.map((c) => `${c.state}/${c.take}`);
+    expect(oldJobs.length).toBeGreaterThan(0); expect(oldTakes.length).toBe(5);
+    __clearPackJobsForTests();
+    const clipCalls = f.clips.calls;
+    expect(await stylisedStart()).toMatchObject({ ok: true, resumed: true }); await runTo(null, "waiting_approval");
+    expect(f.clips.calls).toBe(clipCalls); expect(f.ops.cancelled).toEqual([]); // control: nothing wiped, nothing cancelled
+    for (const t of oldTakes) { const [state, take] = t.split("/"); expect(existsSync(takePath(id, state!, take!, "clip.h264.mp4")!)).toBe(true); }
+    __clearPackJobsForTests();
+    expect(await stylisedStart({ box: [100, 100, 80, 40] })).toMatchObject({ ok: true, resumed: false });
+    for (const j of oldJobs) expect(f.ops.cancelled.filter((x) => x === j).length).toBe(1);
+    for (const t of oldTakes) { const [state, take] = t.split("/"); expect(existsSync(takePath(id, state!, take!, "clip.h264.mp4")!)).toBe(false); }
+  });
+
+  test("when the green source differs in size from the starting picture, the box, face height and eyes are scaled", async () => {
+    const f = fakes(id); __setPackDepsForTests(f.deps);
+    const sharp = (await import("sharp")).default, half = new Uint8Array(await sharp({ create: { width: 512, height: 512, channels: 3, background: "#00ff00" } }).png().toBuffer());
+    f.ops.imageEdit = async (input) => { input.onJob(`stack-edit-${++f.ops.edits}`); return half; };
+    const calls: Array<{ kind: string; input: Record<string, any> }> = []; const run = f.ops.run;
+    f.ops.run = async (kind, input, hooks) => { calls.push({ kind, input }); return run(kind, input, hooks); };
+    expect(await stylisedStart()).toMatchObject({ ok: true });
+    await runTo(null, "waiting_approval"); await approvePackStage(id, person("maker-owner"), "B"); await runTo(null, "waiting_approval");
+    expect(calls.find((c) => c.kind === "media.companion_shapes")!.input).toMatchObject({ mouth_box: [200, 300, 100, 50], face_height_px: 350 });
+    expect(calls.find((c) => c.kind === "media.companion_emotion")!.input.landmarks.leftEye[0]).toEqual([150, 150]);
+    expect(calls.find((c) => c.kind === "media.companion_pack")!.input.descriptor.mouth.anchor).toMatchObject({ x: 200 / 512, w: 100 / 512 });
+  });
+
+  test("an oversize or wrong-length box or eyes request is refused at the route with a plain message", async () => {
+    const f = fakes(id); __setPackDepsForTests(f.deps);
+    const pts = (n: number) => Array.from({ length: n }, (_, i) => [i, i]);
+    for (const body of [{ box: [1, 2, 3, 4, 5] }, { box: [1, 2, 3] }, { eyes: { left: pts(101), right: pts(3) } }, { eyes: { left: pts(2), right: pts(3) } }]) {
+      const r = await post(`companions/${id}/pack-job`, owner, { still_id: stillId, shapes: "stylised", box: [400, 600, 200, 100], ...body });
+      expect(r.status).toBe(422); expect(typeof ((await r.json()) as any).error).toBe("string");
+    }
+    expect(readPackJob(id)).toBeNull();
+  });
+
+  test("the preview route is closed after a cancel", async () => {
+    const f = fakes(id); __setPackDepsForTests(f.deps);
+    await startPackJob({ actor: person("maker-owner"), companionId: id, stillId, shapes: "photo" }); await waitPackJob(id);
+    await approvePackStage(id, person("maker-owner"), "B"); await waitPackJob(id);
+    expect((await get(`companions/${id}/pack-job/preview/pack.json`, owner)).status).toBe(200);
+    await cancelPackJob(id);
+    expect((await get(`companions/${id}/pack-job/preview/pack.json`, owner)).status).toBe(409);
+  });
+
+  test("box validation: inside the picture, positive, minimum size; ignored values are refused for photo", async () => {
+    const f = fakes(id); __setPackDepsForTests(f.deps);
+    for (const box of [[-1, 10, 50, 50], [10, 10, 4, 50], [10, 10, 50, 7], [1000, 10, 50, 50], [10, 1000, 50, 50], [10, 10, 50], [10, 10, 0, 0]]) expect(await stylisedStart({ box })).toMatchObject({ ok: false, status: 422, error: PACK_BAD_BOX_LINE });
+    expect(await stylisedStart({ face_height_px: 0 })).toMatchObject({ ok: false, status: 422, error: PACK_BAD_BOX_LINE });
+    expect(await stylisedStart({ face_height_px: 5000 })).toMatchObject({ ok: false, status: 422, error: PACK_BAD_BOX_LINE });
+    expect(await stylisedStart({ eyes: { left: [[1, 1]], right: [[2, 2], [3, 3], [4, 4]] } })).toMatchObject({ ok: false, status: 422, error: PACK_BAD_EYES_LINE });
+    expect(await stylisedStart({ eyes: { left: [[1, 1], [2, 2], [3, 5000]], right: [[2, 2], [3, 3], [4, 4]] } })).toMatchObject({ ok: false, status: 422, error: PACK_BAD_EYES_LINE });
+    expect(await startPackJob({ actor: person("maker-owner"), companionId: id, stillId, shapes: "photo", box: [10, 10, 50, 50] } as never)).toMatchObject({ ok: false, status: 422, error: PACK_BOX_PHOTO_LINE });
+    expect(await startPackJob({ actor: person("maker-owner"), companionId: id, stillId, shapes: "photo", eyes: { left: [], right: [] } } as never)).toMatchObject({ ok: false, status: 422, error: PACK_BOX_PHOTO_LINE });
+    expect(readPackJob(id)).toBeNull(); expect(f.ops.edits).toBe(0);
+    const viaRoute = await post(`companions/${id}/pack-job`, owner, { still_id: stillId, shapes: "photo", box: [1, 2, 30, 30] }); expect(viaRoute.status).toBe(422);
+  });
+
+  test("stylised happy path: every letter picture is art-checked, the op gets the stylised params, the box is stored", async () => {
+    const f = fakes(id); __setPackDepsForTests(f.deps);
+    const calls: Array<{ kind: string; input: Record<string, unknown> }> = []; const run = f.ops.run;
+    f.ops.run = async (kind, input, hooks) => { calls.push({ kind, input }); return run(kind, input, hooks); };
+    const instructions: string[] = []; const edit = f.ops.imageEdit; f.ops.imageEdit = async (input) => { instructions.push(input.instruction); return edit(input); };
+    let talk = 0; const tf = f.ops.talkFrames; f.ops.talkFrames = async (input) => { talk++; return tf(input); };
+    expect(await stylisedStart()).toMatchObject({ ok: true });
+    await runTo(null, "waiting_approval"); await approvePackStage(id, person("maker-owner"), "B");
+    const rec = await runTo(null, "waiting_approval");
+    expect(rec.shapes).toBe("stylised"); expect(rec.box).toEqual([400, 600, 200, 100]); expect(talk).toBe(0); // no face tools
+    const shapes = calls.find((c) => c.kind === "media.companion_shapes")!.input;
+    expect(shapes).toMatchObject({ path: "stylised", mouth_box: [400, 600, 200, 100], face_height_px: 700, sets: ["calm"] });
+    expect(shapes.landmarks).toBeUndefined();
+    const labels = f.checks.map((c) => c.label);
+    for (const l of STYLISED_LETTERS) expect(labels).toContain(`The mouth picture ${l}`); // each letter picture checked once per lane
+    expect(labels.filter((l) => l.startsWith("The mouth picture")).length).toBe(STYLISED_LETTERS.length);
+    expect(labels.some((l) => l.startsWith("A mouth shape tile"))).toBe(true);
+    expect(instructions.filter((i) => i.startsWith("Change only the mouth")).length).toBe(STYLISED_LETTERS.length);
+    const emotion = calls.find((c) => c.kind === "media.companion_emotion")!.input as any;
+    expect(emotion.landmarks.leftEye).toEqual([[300, 300], [320, 296], [340, 300]]);
+    const pack = calls.find((c) => c.kind === "media.companion_pack")!.input as any;
+    expect(pack.descriptor.mouth.anchor.w).toBeCloseTo(200 / 1024, 3);
+    await approvePackStage(id, person("maker-owner"), "C"); expect((await runTo(null, "done")).status).toBe("done");
+  });
+
+  test("stylised without eyes stops the emotion stage with a plain reason before any pose is made", async () => {
+    const f = fakes(id); __setPackDepsForTests(f.deps);
+    expect(await startPackJob({ actor: person("maker-owner"), companionId: id, stillId, shapes: "stylised", box: [400, 600, 200, 100] } as never)).toMatchObject({ ok: true });
+    await runTo(null, "waiting_approval"); await approvePackStage(id, person("maker-owner"), "B");
+    const rec = await runTo(null, "failed"); const edits = f.ops.edits;
+    expect(rec.stage).toBe("emotion"); expect(rec.error).toBe(PACK_NO_EYES_LINE);
+    expect(f.checks.filter((c) => c.label.endsWith("pose")).length).toBe(0); expect(edits).toBe(1 + STYLISED_LETTERS.length);
+  });
+
+  test("a stylised letter picture the art check refuses closes the job and keeps nothing", async () => {
+    const f = fakes(id); let seen = 0;
+    __setPackDepsForTests({ ...f.deps, checkArt: async (_i, actor, assets, kind) => { for (const a of assets) { f.checks.push({ label: a.label, actor: actor.id, kind }); if (a.label === "The mouth picture D") { seen++; return { ok: false, reasons: ["That mouth picture was refused by the safety check."], unavailable: false, definite: true } as never; } } return { ok: true, reasons: [], unavailable: false, definite: false }; } });
+    expect(await stylisedStart()).toMatchObject({ ok: true });
+    await runTo(null, "waiting_approval"); await approvePackStage(id, person("maker-owner"), "B");
+    const rec = await runTo(null, "failed");
+    expect(seen).toBe(1); expect(rec.closed).toBe(true); expect(rec.stage).toBe("shapes");
+    expect(f.ops.calls).not.toContain("media.companion_shapes"); // the engine op never read a refused picture
+    expect(existsSync(join(householdCompanionFolder(id)!, "pack-job", "work"))).toBe(false);
+    expect(rec.takes).toEqual([]); expect(existsSync(join(householdCompanionFolder(id)!, "pack"))).toBe(false);
+    for (const state of ["idle", "listening", "thinking", "speaking"]) expect(readStates(id).states[state as "idle"]?.takes ?? []).toEqual([]);
+  });
+
+  test("a changed box starts a new job rather than continuing the old one", async () => {
+    const f = fakes(id); __setPackDepsForTests(f.deps);
+    await stylisedStart(); await runTo(null, "waiting_approval");
+    __clearPackJobsForTests();
+    expect(await stylisedStart({ box: [100, 100, 80, 40] })).toMatchObject({ ok: true, resumed: false });
   });
 });
 

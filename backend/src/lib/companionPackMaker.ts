@@ -8,8 +8,8 @@
 // `guard()` before the next stage reads it. A check that cannot run, or a refusal, closes the job: the work folder and this job's
 // takes are removed and nothing is installed. Who may start follows the picture and video denials (`startPackJob`).
 import sharp from "sharp";
-import { chmodSync, cpSync, existsSync, lstatSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
+import { chmodSync, cpSync, existsSync, lstatSync, mkdirSync, readdirSync, readFileSync, realpathSync, renameSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { join, resolve, sep } from "node:path";
 import type { PersonRow } from "@/types";
 import { eq } from "drizzle-orm";
 import { db } from "@/db";
@@ -32,13 +32,28 @@ import { videoDenial, VIDEO_DENIAL_LINE } from "@/lib/videos/policy";
 import { pictureEngineReady, pictureEngineStatus, pictureNotReadyReason } from "@/lib/pictures/ready";
 import { videoEngineReady, videoEngineStatus, videoNotReadyReason } from "@/lib/videos/ready";
 import { resolveCompanionEdit, promptHash } from "@/lib/companionArt";
+import { TALK_SHAPES, TALK_KEEP } from "@/lib/companionTalkMaker";
 
 // ---------------------------------------------------------------- lines (what went wrong, then what to do)
 
 export const PACK_NO_STILL_LINE = "Choose and approve a starting picture first, then make the pack.";
 export const PACK_STILL_NOT_APPROVED_LINE = "That picture is not the approved starting picture. Approve it as the starting picture, then make the pack.";
 export const PACK_BUSY_LINE = "A pack is already being made for this companion. Wait for it or stop it.";
-export const PACK_NOT_SUPPORTED_LINE = "Only photo characters can get a pack for now. Stylised characters and characters with no mouth come in a later update.";
+export const PACK_NOT_SUPPORTED_LINE = "Only photo and stylised characters can get a pack for now. Characters with no mouth come in a later update.";
+export const PACK_NO_BOX_LINE = "A stylised character needs the mouth box: four numbers, left, top, width and height of the mouth in the starting picture, in pixels. Add the box and start again.";
+export const PACK_BAD_BOX_LINE = "The mouth box does not fit the starting picture. It must lie inside the picture, be at least 8 pixels wide and tall, and the face height must be positive and no taller than the picture. Fix the numbers and start again.";
+export const PACK_BAD_EYES_LINE = "The eye points are not usable. Give at least three [x, y] points for each eye, inside the starting picture, or leave them out.";
+export const PACK_BOX_PHOTO_LINE = "A mouth box and eye points are for stylised characters only. Remove them, or start with shapes set to stylised.";
+export const PACK_NO_EYES_LINE = "The face tools cannot find the eyes of a stylised character. Give the eye points (eyes.left and eyes.right, each at least three [x, y] points in the starting picture) and start again.";
+export const MIN_BOX_PX = 8;
+/** The calm mouth letters B to H for a stylised character: one plain edit instruction each, from the old talk maker's wording (TALK_SHAPES, TALK_KEEP). The widest calm opening is small (2 to 16 percent of the face), so no letter asks for a big open mouth. */
+export const STYLISED_LETTERS = ["B", "C", "D", "E", "F", "G", "H"] as const;
+export const STYLISED_LETTER_SHAPE: Record<(typeof STYLISED_LETTERS)[number], string> = {
+  B: TALK_SHAPES.B, C: TALK_SHAPES.C, D: TALK_SHAPES.D, E: TALK_SHAPES.E, F: TALK_SHAPES.F,
+  G: "lips parted in a small relaxed smile with the upper teeth showing a little, as saying EE",
+  H: "lips pressed together and slightly pushed out, as saying M or B",
+};
+export const stylisedLetterInstruction = (letter: (typeof STYLISED_LETTERS)[number]): string => `Change only the mouth: ${STYLISED_LETTER_SHAPE[letter]}. ${TALK_KEEP} Keep the flat chroma key background exactly as it is.`;
 export const PACK_NO_VIDEO_LINE = "Making a pack needs the video model. An admin can check Settings, Pictures and videos.";
 export const PACK_NO_TALK_FRAMES_LINE = "Making a talking pack needs the face tools, which are not ready on this computer yet. An admin can check Settings, Pictures and videos.";
 export const PACK_CHECK_CLOSED_LINE = "The safety check could not look at a picture, so the pack was stopped and nothing was kept. Try again when the picture check is ready.";
@@ -144,7 +159,7 @@ export interface PackDeps {
   clips: ClipMaker;
   checkArt(companionId: string, actor: PersonRow, assets: readonly FinishedAsset[], kind: CheckedKind, audience?: CompanionAudience): Promise<FinishedCheckResult>;
   /** Null when the image and video roles and the face tools are ready, else the plain reason. */
-  readiness(): Promise<{ status: 503; error: string } | null>;
+  readiness(shapes?: PackShapes): Promise<{ status: 503; error: string } | null>;
 }
 
 /** The clips through the existing take code (CMEDIA-STATES): one run at a time, polled until it settles. Takes are attributed by the pack job tag the take code writes, never by "new since before". */
@@ -175,9 +190,10 @@ const defaultDeps: PackDeps = {
   ops: StackPackOps,
   clips: TakeClipMaker,
   checkArt: (companionId, actor, assets, kind, audience) => checkCompanionArt(companionId, actor, assets, kind, audience),
-  async readiness() {
+  async readiness(shapes) {
     if (!(await pictureEngineReady())) return { status: 503, error: pictureNotReadyReason(await pictureEngineStatus()) };
     if (!(await videoEngineReady())) return { status: 503, error: videoNotReadyReason(await videoEngineStatus()) || PACK_NO_VIDEO_LINE };
+    if (shapes === "stylised") return null; // the stylised path makes its mouth pictures with the picture edit and needs no face tools
     // The face tools report on the image-tools status; their readiness never changes the image role itself.
     try {
       const tools = await getStackClient().imageTools();
@@ -194,6 +210,8 @@ export function __setPackDepsForTests(value: Partial<PackDeps> | null): void { d
 export const PACK_STAGES = ["source", "clips", "track", "shapes", "emotion", "assemble", "validate", "install"] as const;
 export type PackStage = (typeof PACK_STAGES)[number];
 export type StageStatus = "pending" | "running" | "done" | "failed";
+export type PackShapes = "photo" | "stylised";
+export interface PackEyes { left: number[][]; right: number[][] }
 export type PackApproval = "A" | "B" | "C";
 export type PackJobStatus = "running" | "waiting_approval" | "failed" | "cancelled" | "done";
 /** The clips every pack needs: idle twice, then listening, thinking, speaking (the creator vocabulary's names). */
@@ -207,7 +225,9 @@ export interface PackJobRecord {
   person_id: string;
   /** Everyone who started, resumed or approved: every one of their lanes applies to every check (the strictest wins). */
   actors: string[];
-  still_id: string; shapes: "photo";
+  still_id: string; shapes: PackShapes;
+  /** Stylised only: the mouth box [x, y, w, h] in the starting picture's pixels, the face height, the eye points, and the picture size they refer to. */
+  box: number[] | null; face_height_px: number | null; eyes: PackEyes | null; rest_size: { width: number; height: number } | null;
   status: PackJobStatus; stage: PackStage | null; waiting_for: PackApproval | null; error: string | null;
   /** True after a safety refusal or an unrunnable check: the work was wiped and the job cannot be resumed. */
   closed: boolean;
@@ -229,7 +249,7 @@ const statePath = (id: string): string => join(jobDir(id), "state.json");
 const workDir = (id: string): string => join(jobDir(id), "work");
 
 export function readPackJob(companionId: string): PackJobRecord | null {
-  try { const parsed = JSON.parse(readFileSync(statePath(companionId), "utf8")) as PackJobRecord; if (parsed?.version !== 1) return null; parsed.actors ??= [parsed.person_id]; parsed.keyframes = (parsed.keyframes ?? []).map((k) => (typeof k === "string" ? { state: k, sha: "" } : k)); parsed.notes ??= []; return parsed; } catch { return null; }
+  try { const parsed = JSON.parse(readFileSync(statePath(companionId), "utf8")) as PackJobRecord; if (parsed?.version !== 1) return null; parsed.actors ??= [parsed.person_id]; parsed.keyframes = (parsed.keyframes ?? []).map((k) => (typeof k === "string" ? { state: k, sha: "" } : k)); parsed.notes ??= []; parsed.box ??= null; parsed.face_height_px ??= null; parsed.eyes ??= null; parsed.rest_size ??= null; return parsed; } catch { return null; }
 }
 function jobState(rec: PackJobRecord): string { return rec.status === "running" ? "running" : rec.status === "waiting_approval" ? "waiting" : rec.status; }
 function save(rec: PackJobRecord): void {
@@ -281,36 +301,46 @@ class ClosedError extends Error {}
 
 export type StartResult = { ok: true; job: PackJobRecord; resumed: boolean } | { ok: false; status: 403 | 404 | 409 | 422 | 503; error: string };
 
-export async function startPackJob(input: { actor: PersonRow; companionId: string; stillId: string; shapes: string; restart?: boolean }): Promise<StartResult> {
+export async function startPackJob(input: { actor: PersonRow; companionId: string; stillId: string; shapes: string; restart?: boolean; box?: number[]; face_height_px?: number; eyes?: PackEyes }): Promise<StartResult> {
   const { actor, companionId } = input;
   if (!getHouseholdCompanion(companionId)) return { ok: false, status: 404, error: "That household companion could not be found." };
   // The picture and video age and surface gates, as the take code applies them.
   const audience = routeAudience(actor), picture = pictureDenial(audience), video = videoDenial(audience);
   if (picture) return { ok: false, status: 403, error: PICTURE_DENIAL_LINE[picture] };
   if (video) return { ok: false, status: 403, error: VIDEO_DENIAL_LINE[video] };
-  if (input.shapes !== "photo") return { ok: false, status: 422, error: PACK_NOT_SUPPORTED_LINE };
+  if (input.shapes !== "photo" && input.shapes !== "stylised") return { ok: false, status: 422, error: PACK_NOT_SUPPORTED_LINE };
+  const shapes: PackShapes = input.shapes;
+  if (shapes === "photo" && (input.box !== undefined || input.face_height_px !== undefined || input.eyes !== undefined)) return { ok: false, status: 422, error: PACK_BOX_PHOTO_LINE };
   // Approval A: the approved starting picture, before anything is made.
   const look = readLook(companionId), still = look.versions.find((v) => v.id === input.stillId);
   if (!input.stillId || !still || !versionPath(companionId, input.stillId)) return { ok: false, status: 422, error: PACK_NO_STILL_LINE };
   if (look.rest !== input.stillId) return { ok: false, status: 409, error: PACK_STILL_NOT_APPROVED_LINE };
+  let restSize: { width: number; height: number } | null = null, box: number[] | null = null, faceHeight: number | null = null, eyes: PackEyes | null = null;
+  if (shapes === "stylised") {
+    if (!input.box) return { ok: false, status: 422, error: PACK_NO_BOX_LINE };
+    if (!still.width || !still.height) return { ok: false, status: 422, error: PACK_NO_STILL_LINE };
+    restSize = { width: still.width, height: still.height }; // the size the look record keeps for the approved picture
+    const checked = validateStylised(input, restSize); if (typeof checked === "string") return { ok: false, status: 422, error: checked };
+    ({ box, faceHeight, eyes } = checked);
+  }
   restorePackOld(companionId);
   // Reserve before any await: a second start for this companion is refused from here on.
   if (live.has(companionId) || starting.has(companionId)) return { ok: false, status: 409, error: PACK_BUSY_LINE };
   starting.add(companionId);
   try {
-    const notReady = await deps.readiness();
+    const notReady = await deps.readiness(shapes);
     if (notReady) return { ok: false, status: notReady.status, error: notReady.error };
     if (live.has(companionId)) return { ok: false, status: 409, error: PACK_BUSY_LINE };
     let existing = readPackJob(companionId);
     if (existing && input.restart) { await wipeAll(existing); updateJob(existing.job, { state: "cancelled", errorKind: null, waitingReason: null }); existing = null; }
-    if (existing && existing.still_id === input.stillId && !existing.closed && existing.status !== "done") {
+    if (existing && existing.still_id === input.stillId && existing.shapes === shapes && JSON.stringify([existing.box, existing.face_height_px, existing.eyes]) === JSON.stringify([box, faceHeight, eyes]) && !existing.closed && existing.status !== "done") {
       existing.status = "running"; existing.error = null; existing.waiting_for = null; if (!existing.actors.includes(actor.id)) existing.actors.push(actor.id);
       const stage = PACK_STAGES.find((s) => existing!.stages[s].status !== "done"); if (stage && existing.stages[stage].status === "failed") existing.stages[stage] = blankStage();
       save(existing); launch(existing, actor);
       return { ok: true, job: existing, resumed: true };
     }
     const now = new Date().toISOString(), id = crypto.randomUUID();
-    const rec: PackJobRecord = { version: 1, job: id, companion_id: companionId, person_id: actor.id, actors: [actor.id], still_id: input.stillId, shapes: "photo", status: "running", stage: null, waiting_for: null, error: null, closed: false, approvals: { A: { by: actor.id, at: now }, B: null, C: null }, stages: Object.fromEntries(PACK_STAGES.map((s) => [s, blankStage()])) as Record<PackStage, StageRecord>, notes: [], takes: [], clips: [], keyframes: [], created_at: now, updated_at: now };
+    const rec: PackJobRecord = { version: 1, job: id, companion_id: companionId, person_id: actor.id, actors: [actor.id], still_id: input.stillId, shapes, box, face_height_px: faceHeight, eyes, rest_size: restSize, status: "running", stage: null, waiting_for: null, error: null, closed: false, approvals: { A: { by: actor.id, at: now }, B: null, C: null }, stages: Object.fromEntries(PACK_STAGES.map((s) => [s, blankStage()])) as Record<PackStage, StageRecord>, notes: [], takes: [], clips: [], keyframes: [], created_at: now, updated_at: now };
     // An older record that is not running (closed, failed, done, cancelled) is replaced; its work folder goes, its installed pack stays.
     if (existing) { await wipeAll(existing); updateJob(existing.job, { state: existing.status === "done" ? "done" : "cancelled" }); }
     rmSync(jobDir(companionId), { recursive: true, force: true });
@@ -319,6 +349,24 @@ export async function startPackJob(input: { actor: PersonRow; companionId: strin
     save(rec); launch(rec, actor);
     return { ok: true, job: rec, resumed: false };
   } finally { starting.delete(companionId); }
+}
+
+const finitePoint = (p: unknown, size: { width: number; height: number }): p is number[] => Array.isArray(p) && p.length === 2 && p.every((n) => typeof n === "number" && Number.isFinite(n)) && p[0]! >= 0 && p[1]! >= 0 && p[0]! <= size.width && p[1]! <= size.height;
+/** The stylised numbers, checked against the starting picture's size: a plain line on a problem. */
+function validateStylised(input: { box?: number[]; face_height_px?: number; eyes?: PackEyes }, size: { width: number; height: number }): { box: number[]; faceHeight: number | null; eyes: PackEyes | null } | string {
+  const b = input.box;
+  if (!Array.isArray(b) || b.length !== 4 || !b.every((n) => typeof n === "number" && Number.isFinite(n))) return PACK_BAD_BOX_LINE;
+  const [x, y, w, h] = b as [number, number, number, number];
+  if (x < 0 || y < 0 || w < MIN_BOX_PX || h < MIN_BOX_PX || x + w > size.width || y + h > size.height) return PACK_BAD_BOX_LINE;
+  const fh = input.face_height_px ?? null;
+  if (fh !== null && !(typeof fh === "number" && Number.isFinite(fh) && fh > 0 && fh <= size.height)) return PACK_BAD_BOX_LINE;
+  let eyes: PackEyes | null = null;
+  if (input.eyes !== undefined) {
+    const e = input.eyes;
+    if (!e || !Array.isArray(e.left) || !Array.isArray(e.right) || e.left.length < 3 || e.right.length < 3 || e.left.length > 100 || e.right.length > 100 || !e.left.every((p) => finitePoint(p, size)) || !e.right.every((p) => finitePoint(p, size))) return PACK_BAD_EYES_LINE;
+    eyes = { left: e.left, right: e.right };
+  }
+  return { box: [x, y, w, h], faceHeight: fh, eyes };
 }
 
 export type ApproveResult = { ok: true; job: PackJobRecord } | { ok: false; status: 403 | 404 | 409 | 503; error: string };
@@ -333,7 +381,7 @@ export async function approvePackStage(companionId: string, actor: PersonRow, st
   if (video) return { ok: false, status: 403, error: VIDEO_DENIAL_LINE[video] };
   starting.add(companionId);
   try {
-    const notReady = await deps.readiness();
+    const notReady = await deps.readiness(rec.shapes);
     if (notReady) return { ok: false, status: notReady.status, error: notReady.error };
     const fresh = readPackJob(companionId);
     if (!fresh || fresh.status !== "waiting_approval" || fresh.waiting_for !== stage) return { ok: false, status: 409, error: PACK_APPROVAL_NOT_WAITING_LINE };
@@ -375,9 +423,43 @@ export async function cancelPackJob(companionId: string): Promise<{ ok: boolean;
 /** A job whose process ended while it ran (status running, no live run): the next start with the same picture continues it. */
 export function packJobInterrupted(rec: PackJobRecord | null): boolean { return Boolean(rec && rec.status === "running" && !live.has(rec.companion_id)); }
 
+function packPreviewBlock(rec: PackJobRecord): { pack_url_base: string; pack_json_url: string; installed: boolean } | null {
+  const base = `/api/companions/${encodeURIComponent(rec.companion_id)}`;
+  if (rec.status === "done" && rec.stages.install.status === "done") return { pack_url_base: `${base}/pack/`, pack_json_url: `${base}/pack/pack.json`, installed: true };
+  if (rec.status === "waiting_approval" && rec.waiting_for === "C") return { pack_url_base: `${base}/pack-job/preview/`, pack_json_url: `${base}/pack-job/preview/pack.json`, installed: false };
+  return null;
+}
+
+export const PACK_PREVIEW_NOT_WAITING_LINE = "There is no assembled pack to look at right now. The preview is open only while a pack waits for approval C; after that the installed pack is served at the pack address.";
+const PREVIEW_TYPES: Record<string, string> = { ".mp4": "video/mp4", ".webp": "image/webp", ".json": "application/json", ".z": "application/octet-stream" };
+/**
+ * A file of the assembled pack in the work folder, for the owner to look at before approval C. Open ONLY while the job is waiting at approval C
+ * (not while running, so not during install, and not after it is done, failed, cancelled or closed). Every file served here was already art-checked:
+ * `validate` scans the whole pack folder, and `install` scans it again before copying. Same safety as `packFile` (lib/companionPack.ts): extension
+ * allow-list, no traversal, no link, real path inside the folder. Returns "closed" when no pack is open to preview, null for a bad file.
+ */
+export function packPreviewFile(companionId: string, rel: string): { path: string; type: string } | "closed" | null {
+  const rec = readPackJob(companionId);
+  if (!rec || rec.closed || rec.stages.validate.status !== "done" || rec.status !== "waiting_approval" || rec.waiting_for !== "C") return "closed";
+  const dir = packOut(companionId);
+  if (!rel || rel.includes("\0") || !existsSync(join(dir, "pack.json"))) return rel && existsSync(dir) ? null : "closed";
+  const type = PREVIEW_TYPES[rel.slice(rel.lastIndexOf(".")).toLowerCase()];
+  if (!type) return null;
+  const path = resolve(dir, rel);
+  if (!path.startsWith(resolve(dir) + sep)) return null;
+  try {
+    if (!existsSync(path) || lstatSync(path).isSymbolicLink() || !statSync(path).isFile() || !realpathSync(path).startsWith(realpathSync(dir) + sep)) return null;
+  } catch { return null; }
+  return { path, type };
+}
+
 export function publicPackJob(rec: PackJobRecord) {
   return {
-    job: rec.job, notes: rec.notes ?? [], status: rec.status, stage: rec.stage, waiting_for: rec.waiting_for, error: rec.error, interrupted: packJobInterrupted(rec), still_id: rec.still_id, shapes: rec.shapes,
+    job: rec.job, notes: rec.notes ?? [], status: rec.status, stage: rec.stage, waiting_for: rec.waiting_for, error: rec.error, interrupted: packJobInterrupted(rec), still_id: rec.still_id, shapes: rec.shapes, box: rec.box ?? null, face_height_px: rec.face_height_px ?? null, eyes: rec.eyes ?? null,
+    // At approval B: the take ids and the playable clip URLs (the existing states file route). Nothing else is exposed, and every one of these clips already passed the art check in the clips stage.
+    clips: rec.status === "waiting_approval" && rec.waiting_for === "B" ? rec.clips.map(({ state, take }) => ({ state, take, url: `/api/companions/${encodeURIComponent(rec.companion_id)}/states/${state}/${take}/clip.h264.mp4` })) : [],
+    // At approval C (and once done): where to look at the pack. Before install it is the preview route over the work folder (installed false); after install it is the served pack (installed true, PACK-06, with Range).
+    preview: packPreviewBlock(rec),
     approvals: rec.approvals,
     stages: PACK_STAGES.map((name) => ({ name, status: rec.stages[name].status, reasons: rec.stages[name].reasons, report: rec.stages[name].report, stack_jobs: rec.stages[name].stack_jobs })),
   };
@@ -508,6 +590,35 @@ function clipNames(rec: PackJobRecord): Array<{ state: string; take: string; nam
   return rec.clips.map(({ state, take }) => ({ state, take, name: `${state}-${(seen[state] = (seen[state] ?? 0) + 1)}` }));
 }
 
+/** The starting picture's pixels to the green source's pixels (the edit may return another size). */
+async function restScale(ctx: Ctx): Promise<{ x: number; y: number }> {
+  const meta = await sharp(sourcePath(ctx.id)).metadata().catch(() => null), rest = ctx.rec.rest_size;
+  return rest && meta?.width && meta.height ? { x: meta.width / rest.width, y: meta.height / rest.height } : { x: 1, y: 1 };
+}
+
+/** The stylised mouth set: the calm letters B to H, each one picture edit from the checked green source, each through the art check before the engine op reads it. Needs the mouth box. */
+async function stylisedShapes(ctx: Ctx): Promise<Record<string, unknown>> {
+  const box = ctx.rec.box;
+  if (!box) throw Object.assign(new Error(PACK_NO_BOX_LINE), { reasons: [PACK_NO_BOX_LINE] });
+  const k = await restScale(ctx), source = bytesOf(sourcePath(ctx.id));
+  const dir = join(workDir(ctx.id), "shapes-in"); rmSync(dir, { recursive: true, force: true }); mkdirSync(join(dir, "calm"), { recursive: true });
+  let outputs = 0;
+  for (const letter of STYLISED_LETTERS) {
+    if (ctx.run.controller.signal.aborted) return {};
+    // The source already passed prepareEditSource and the art check (stage source); generatedness is the pack maker's own.
+    const frame = await deps.ops.imageEdit({ image: source, instruction: stylisedLetterInstruction(letter), seed: seedOf(ctx.id) + 2, imageSource: "generated", ...hooks(ctx) });
+    await guard(ctx, [{ label: `The mouth picture ${letter}`, bytes: frame }], "picture"); outputs++;
+    writeFileSync(join(dir, "calm", `${letter}.png`), frame);
+  }
+  const out = join(workDir(ctx.id), "shapes-out"); rmSync(out, { recursive: true, force: true }); mkdirSync(out, { recursive: true });
+  const [bx, by, bw, bh] = box as [number, number, number, number];
+  // MAKER-F: { path: "stylised", rest, frames_dir, mouth_box, face_height_px?, sets, output_dir } -> <output_dir>/shapes/calm/..., report.json.
+  const result = await deps.ops.run("media.companion_shapes", { path: "stylised", rest: sourcePath(ctx.id), frames_dir: dir, mouth_box: [Math.round(bx * k.x), Math.round(by * k.y), Math.round(bw * k.x), Math.round(bh * k.y)], ...(ctx.rec.face_height_px ? { face_height_px: Math.round(ctx.rec.face_height_px * k.y) } : {}), sets: ["calm"], output_dir: out }, hooks(ctx));
+  if (!result.ok) opFailed("The mouth shapes", result);
+  outputs += await guardDir(ctx, join(out, "shapes"), "A mouth shape tile");
+  return { frames: outputs, ...result.report };
+}
+
 const STAGE_RUNNERS: Record<PackStage, (ctx: Ctx) => Promise<Record<string, unknown> | void>> = {
   async source(ctx) {
     const path = versionPath(ctx.id, ctx.rec.still_id);
@@ -582,6 +693,7 @@ const STAGE_RUNNERS: Record<PackStage, (ctx: Ctx) => Promise<Record<string, unkn
   },
 
   async shapes(ctx) {
+    if (ctx.rec.shapes === "stylised") return stylisedShapes(ctx);
     if (ctx.rec.shapes !== "photo") throw new Error(PACK_NOT_SUPPORTED_LINE);
     const frames = await deps.ops.talkFrames({ image: bytesOf(sourcePath(ctx.id)), letters: TALK_LETTERS, ...hooks(ctx) });
     const dir = join(workDir(ctx.id), "shapes-in"); rmSync(dir, { recursive: true, force: true }); mkdirSync(join(dir, "calm"), { recursive: true });
@@ -608,6 +720,7 @@ const STAGE_RUNNERS: Record<PackStage, (ctx: Ctx) => Promise<Record<string, unkn
 
   async emotion(ctx) {
     const dir = join(workDir(ctx.id), "emotion-in"); rmSync(dir, { recursive: true, force: true }); mkdirSync(dir, { recursive: true });
+    if (ctx.rec.shapes === "stylised" && (!ctx.rec.eyes?.left.length || !ctx.rec.eyes?.right.length)) throw Object.assign(new Error(PACK_NO_EYES_LINE), { reasons: [PACK_NO_EYES_LINE] }); // before any picture is made
     const source = bytesOf(sourcePath(ctx.id)), poses: Record<string, string[]> = {};
     for (const emotion of EMOTIONS) {
       const pose = await deps.ops.imageEdit({ image: source, instruction: `Change only the face to look ${emotion}. Keep the exact same character, skin, hair, clothes, framing, lighting and green background.`, seed: seedOf(ctx.id) + 1, imageSource: "generated", ...hooks(ctx) });
@@ -615,9 +728,16 @@ const STAGE_RUNNERS: Record<PackStage, (ctx: Ctx) => Promise<Record<string, unkn
       writeFileSync(join(dir, `${emotion}.png`), pose); poses[emotion] = [join(dir, `${emotion}.png`)];
     }
     // The 203-point layout: points 0..23 are the eye on the image's left, 24..47 the one on its right (confirmed on a real run); an explicit leftEye/rightEye wins if the Stack ever returns them.
-    const face = JSON.parse(readFileSync(join(workDir(ctx.id), "landmarks.json"), "utf8")) as { leftEye?: number[][]; rightEye?: number[][]; points?: number[][] } | null;
-    const leftEye = face?.leftEye ?? face?.points?.slice(0, 24), rightEye = face?.rightEye ?? face?.points?.slice(24, 48);
-    if (!leftEye?.length || !rightEye?.length) throw Object.assign(new Error("The face tools did not find the eyes. Choose a starting picture where the face is clear."), { reasons: ["The face tools did not find the eyes. Choose a starting picture where the face is clear."] });
+    let leftEye: number[][] | undefined, rightEye: number[][] | undefined;
+    if (ctx.rec.shapes === "stylised") { // no face landmark model for a drawn face: the eye points come from the request (scaled to the green source's size)
+      const k = await restScale(ctx);
+      leftEye = ctx.rec.eyes?.left.map(([x, y]) => [x! * k.x, y! * k.y]); rightEye = ctx.rec.eyes?.right.map(([x, y]) => [x! * k.x, y! * k.y]);
+      if (!leftEye?.length || !rightEye?.length) throw Object.assign(new Error(PACK_NO_EYES_LINE), { reasons: [PACK_NO_EYES_LINE] });
+    } else {
+      const face = JSON.parse(readFileSync(join(workDir(ctx.id), "landmarks.json"), "utf8")) as { leftEye?: number[][]; rightEye?: number[][]; points?: number[][] } | null;
+      leftEye = face?.leftEye ?? face?.points?.slice(0, 24); rightEye = face?.rightEye ?? face?.points?.slice(24, 48);
+      if (!leftEye?.length || !rightEye?.length) throw Object.assign(new Error("The face tools did not find the eyes. Choose a starting picture where the face is clear."), { reasons: ["The face tools did not find the eyes. Choose a starting picture where the face is clear."] });
+    }
     const out = join(workDir(ctx.id), "emotion-out"); rmSync(out, { recursive: true, force: true }); mkdirSync(out, { recursive: true });
     // MAKER-H: { rest, landmarks: { leftEye, rightEye }, poses: { <emotion>: [path] }, output_dir } -> <output_dir>/emotion/.
     const result = await deps.ops.run("media.companion_emotion", { rest: sourcePath(ctx.id), landmarks: { leftEye, rightEye }, poses, output_dir: out }, hooks(ctx));
@@ -631,8 +751,11 @@ const STAGE_RUNNERS: Record<PackStage, (ctx: Ctx) => Promise<Record<string, unkn
     cpSync(join(workDir(ctx.id), "shapes-out", "shapes", "calm"), join(staging, "mouth", "calm"), { recursive: true });
     cpSync(join(workDir(ctx.id), "emotion-out", "emotion"), join(staging, "emotion"), { recursive: true });
     rmSync(out, { recursive: true, force: true }); mkdirSync(out, { recursive: true });
-    const face = JSON.parse(readFileSync(join(workDir(ctx.id), "landmarks.json"), "utf8")) as { outerLips?: number[][] } | null, meta = await sharp(sourcePath(ctx.id)).metadata().catch(() => null);
-    const lips = face?.outerLips ?? [], xs = lips.map((p) => p[0]!), ys = lips.map((p) => p[1]!), w = meta?.width ?? 1, h = meta?.height ?? 1;
+    const meta = await sharp(sourcePath(ctx.id)).metadata().catch(() => null), w = meta?.width ?? ctx.rec.rest_size?.width ?? 1, h = meta?.height ?? ctx.rec.rest_size?.height ?? 1;
+    let lips: number[][] = [];
+    if (ctx.rec.shapes === "stylised" && ctx.rec.box) { const k = await restScale(ctx), [bx, by, bw, bh] = ctx.rec.box as [number, number, number, number]; lips = [[bx * k.x, by * k.y], [(bx + bw) * k.x, (by + bh) * k.y]]; } // the mouth box stands in for the lip outline
+    else lips = (JSON.parse(readFileSync(join(workDir(ctx.id), "landmarks.json"), "utf8")) as { outerLips?: number[][] } | null)?.outerLips ?? [];
+    const xs = lips.map((p) => p[0]!), ys = lips.map((p) => p[1]!);
     const names = clipNames(ctx.rec), states: Record<string, string[]> = {};
     for (const { state, name } of names) (states[state] ??= []).push(name);
     // MAKER-H: { rest, staging, descriptor, output_dir } -> <output_dir>/pack/ (pack.json, files, build-report.json).

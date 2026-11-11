@@ -89943,6 +89943,51 @@
                   },
                   "restart": {
                     "type": "boolean"
+                  },
+                  "box": {
+                    "type": "array",
+                    "items": {
+                      "type": "number"
+                    },
+                    "description": "Stylised only: the mouth box [x, y, w, h] in the starting picture's pixels."
+                  },
+                  "face_height_px": {
+                    "type": "number",
+                    "minimum": 0,
+                    "exclusiveMinimum": true,
+                    "description": "Stylised only: the face height in the starting picture's pixels."
+                  },
+                  "eyes": {
+                    "type": "object",
+                    "properties": {
+                      "left": {
+                        "type": "array",
+                        "items": {
+                          "type": "array",
+                          "items": {
+                            "type": "number"
+                          }
+                        },
+                        "minItems": 3,
+                        "maxItems": 100
+                      },
+                      "right": {
+                        "type": "array",
+                        "items": {
+                          "type": "array",
+                          "items": {
+                            "type": "number"
+                          }
+                        },
+                        "minItems": 3,
+                        "maxItems": 100
+                      }
+                    },
+                    "required": [
+                      "left",
+                      "right"
+                    ],
+                    "description": "Stylised only: eye points in the starting picture's pixels (the face tools cannot find a drawn face's eyes)."
                   }
                 },
                 "required": [
@@ -90000,8 +90045,96 @@
                     "shapes": {
                       "type": "string",
                       "enum": [
-                        "photo"
+                        "photo",
+                        "stylised"
                       ]
+                    },
+                    "box": {
+                      "type": "array",
+                      "nullable": true,
+                      "items": {
+                        "type": "number"
+                      }
+                    },
+                    "face_height_px": {
+                      "type": "number",
+                      "nullable": true
+                    },
+                    "eyes": {
+                      "type": "object",
+                      "nullable": true,
+                      "properties": {
+                        "left": {
+                          "type": "array",
+                          "items": {
+                            "type": "array",
+                            "items": {
+                              "type": "number"
+                            }
+                          },
+                          "minItems": 3,
+                          "maxItems": 100
+                        },
+                        "right": {
+                          "type": "array",
+                          "items": {
+                            "type": "array",
+                            "items": {
+                              "type": "number"
+                            }
+                          },
+                          "minItems": 3,
+                          "maxItems": 100
+                        }
+                      },
+                      "required": [
+                        "left",
+                        "right"
+                      ]
+                    },
+                    "clips": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "state": {
+                            "type": "string"
+                          },
+                          "take": {
+                            "type": "string"
+                          },
+                          "url": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "state",
+                          "take",
+                          "url"
+                        ]
+                      },
+                      "description": "At approval B: the pack's clips (idle, listening, thinking, speaking) with their take ids and playable clip URLs; empty at other times."
+                    },
+                    "preview": {
+                      "type": "object",
+                      "nullable": true,
+                      "properties": {
+                        "pack_url_base": {
+                          "type": "string"
+                        },
+                        "pack_json_url": {
+                          "type": "string"
+                        },
+                        "installed": {
+                          "type": "boolean"
+                        }
+                      },
+                      "required": [
+                        "pack_url_base",
+                        "pack_json_url",
+                        "installed"
+                      ],
+                      "description": "At approval C: where the pack is served (with Range) once installed; installed says whether pack.json answers now."
                     },
                     "approvals": {
                       "type": "object",
@@ -90078,6 +90211,11 @@
                     "interrupted",
                     "still_id",
                     "shapes",
+                    "box",
+                    "face_height_px",
+                    "eyes",
+                    "clips",
+                    "preview",
                     "approvals",
                     "stages"
                   ]
@@ -90202,8 +90340,96 @@
                     "shapes": {
                       "type": "string",
                       "enum": [
-                        "photo"
+                        "photo",
+                        "stylised"
                       ]
+                    },
+                    "box": {
+                      "type": "array",
+                      "nullable": true,
+                      "items": {
+                        "type": "number"
+                      }
+                    },
+                    "face_height_px": {
+                      "type": "number",
+                      "nullable": true
+                    },
+                    "eyes": {
+                      "type": "object",
+                      "nullable": true,
+                      "properties": {
+                        "left": {
+                          "type": "array",
+                          "items": {
+                            "type": "array",
+                            "items": {
+                              "type": "number"
+                            }
+                          },
+                          "minItems": 3,
+                          "maxItems": 100
+                        },
+                        "right": {
+                          "type": "array",
+                          "items": {
+                            "type": "array",
+                            "items": {
+                              "type": "number"
+                            }
+                          },
+                          "minItems": 3,
+                          "maxItems": 100
+                        }
+                      },
+                      "required": [
+                        "left",
+                        "right"
+                      ]
+                    },
+                    "clips": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "state": {
+                            "type": "string"
+                          },
+                          "take": {
+                            "type": "string"
+                          },
+                          "url": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "state",
+                          "take",
+                          "url"
+                        ]
+                      },
+                      "description": "At approval B: the pack's clips (idle, listening, thinking, speaking) with their take ids and playable clip URLs; empty at other times."
+                    },
+                    "preview": {
+                      "type": "object",
+                      "nullable": true,
+                      "properties": {
+                        "pack_url_base": {
+                          "type": "string"
+                        },
+                        "pack_json_url": {
+                          "type": "string"
+                        },
+                        "installed": {
+                          "type": "boolean"
+                        }
+                      },
+                      "required": [
+                        "pack_url_base",
+                        "pack_json_url",
+                        "installed"
+                      ],
+                      "description": "At approval C: where the pack is served (with Range) once installed; installed says whether pack.json answers now."
                     },
                     "approvals": {
                       "type": "object",
@@ -90280,6 +90506,11 @@
                     "interrupted",
                     "still_id",
                     "shapes",
+                    "box",
+                    "face_height_px",
+                    "eyes",
+                    "clips",
+                    "preview",
                     "approvals",
                     "stages"
                   ]
@@ -90398,8 +90629,96 @@
                     "shapes": {
                       "type": "string",
                       "enum": [
-                        "photo"
+                        "photo",
+                        "stylised"
                       ]
+                    },
+                    "box": {
+                      "type": "array",
+                      "nullable": true,
+                      "items": {
+                        "type": "number"
+                      }
+                    },
+                    "face_height_px": {
+                      "type": "number",
+                      "nullable": true
+                    },
+                    "eyes": {
+                      "type": "object",
+                      "nullable": true,
+                      "properties": {
+                        "left": {
+                          "type": "array",
+                          "items": {
+                            "type": "array",
+                            "items": {
+                              "type": "number"
+                            }
+                          },
+                          "minItems": 3,
+                          "maxItems": 100
+                        },
+                        "right": {
+                          "type": "array",
+                          "items": {
+                            "type": "array",
+                            "items": {
+                              "type": "number"
+                            }
+                          },
+                          "minItems": 3,
+                          "maxItems": 100
+                        }
+                      },
+                      "required": [
+                        "left",
+                        "right"
+                      ]
+                    },
+                    "clips": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "state": {
+                            "type": "string"
+                          },
+                          "take": {
+                            "type": "string"
+                          },
+                          "url": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "state",
+                          "take",
+                          "url"
+                        ]
+                      },
+                      "description": "At approval B: the pack's clips (idle, listening, thinking, speaking) with their take ids and playable clip URLs; empty at other times."
+                    },
+                    "preview": {
+                      "type": "object",
+                      "nullable": true,
+                      "properties": {
+                        "pack_url_base": {
+                          "type": "string"
+                        },
+                        "pack_json_url": {
+                          "type": "string"
+                        },
+                        "installed": {
+                          "type": "boolean"
+                        }
+                      },
+                      "required": [
+                        "pack_url_base",
+                        "pack_json_url",
+                        "installed"
+                      ],
+                      "description": "At approval C: where the pack is served (with Range) once installed; installed says whether pack.json answers now."
                     },
                     "approvals": {
                       "type": "object",
@@ -90476,6 +90795,11 @@
                     "interrupted",
                     "still_id",
                     "shapes",
+                    "box",
+                    "face_height_px",
+                    "eyes",
+                    "clips",
+                    "preview",
                     "approvals",
                     "stages"
                   ]
@@ -90592,8 +90916,96 @@
                     "shapes": {
                       "type": "string",
                       "enum": [
-                        "photo"
+                        "photo",
+                        "stylised"
                       ]
+                    },
+                    "box": {
+                      "type": "array",
+                      "nullable": true,
+                      "items": {
+                        "type": "number"
+                      }
+                    },
+                    "face_height_px": {
+                      "type": "number",
+                      "nullable": true
+                    },
+                    "eyes": {
+                      "type": "object",
+                      "nullable": true,
+                      "properties": {
+                        "left": {
+                          "type": "array",
+                          "items": {
+                            "type": "array",
+                            "items": {
+                              "type": "number"
+                            }
+                          },
+                          "minItems": 3,
+                          "maxItems": 100
+                        },
+                        "right": {
+                          "type": "array",
+                          "items": {
+                            "type": "array",
+                            "items": {
+                              "type": "number"
+                            }
+                          },
+                          "minItems": 3,
+                          "maxItems": 100
+                        }
+                      },
+                      "required": [
+                        "left",
+                        "right"
+                      ]
+                    },
+                    "clips": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "state": {
+                            "type": "string"
+                          },
+                          "take": {
+                            "type": "string"
+                          },
+                          "url": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "state",
+                          "take",
+                          "url"
+                        ]
+                      },
+                      "description": "At approval B: the pack's clips (idle, listening, thinking, speaking) with their take ids and playable clip URLs; empty at other times."
+                    },
+                    "preview": {
+                      "type": "object",
+                      "nullable": true,
+                      "properties": {
+                        "pack_url_base": {
+                          "type": "string"
+                        },
+                        "pack_json_url": {
+                          "type": "string"
+                        },
+                        "installed": {
+                          "type": "boolean"
+                        }
+                      },
+                      "required": [
+                        "pack_url_base",
+                        "pack_json_url",
+                        "installed"
+                      ],
+                      "description": "At approval C: where the pack is served (with Range) once installed; installed says whether pack.json answers now."
                     },
                     "approvals": {
                       "type": "object",
@@ -90670,6 +91082,11 @@
                     "interrupted",
                     "still_id",
                     "shapes",
+                    "box",
+                    "face_height_px",
+                    "eyes",
+                    "clips",
+                    "preview",
                     "approvals",
                     "stages"
                   ]

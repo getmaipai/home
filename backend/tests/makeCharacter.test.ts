@@ -161,14 +161,24 @@ describe("make_character driver", () => {
     expect(a.out.some((l) => l.startsWith("clips: done"))).toBe(true);
     expect(a.out.join("\n")).toContain("WAITING for approval B"); expect(a.out.join("\n")).toContain("--approve B");
     expect(a.out.join("\n")).toContain("/api/companions/");
+    expect(a.out.filter((l) => l.startsWith("CLIP ")).length).toBe(5); expect(a.out.join("\n")).toContain(`${BASE}/api/companions/${id}/states/idle/take-`);
     expect(readPackJob(id)!.approvals.B).toBeNull(); // nothing approved by itself
     const b = drive({ approve: "B" }); expect(await b.run()).toBe(2);
-    expect(b.out.join("\n")).toContain("WAITING for approval C"); expect(b.out.some((l) => l.startsWith("validate: done"))).toBe(true);
+    expect(b.out.join("\n")).toContain("WAITING for approval C"); expect(b.out.join("\n")).toContain(`PACK: ${BASE}/api/companions/${id}/pack-job/preview/pack.json`); expect(b.out.some((l) => l.startsWith("validate: done"))).toBe(true);
     expect(existsSync(join(householdCompanionFolder(id)!, "pack", "pack.json"))).toBe(false);
     const c = drive({ approve: "C" }); expect(await c.run()).toBe(0);
     expect(c.out.join("\n")).toContain("Done: the pack is installed");
     expect(readCompanionPack(id)).not.toBeNull();
     const s = drive({ status: true }); expect(await s.run()).toBe(0);
+  });
+
+  test("stylised flags become the start body; bad numbers are refused before any request", async () => {
+    const f = fakes(id); __setPackDepsForTests(f.deps);
+    const eyes = { left: [[300, 300], [320, 296], [340, 300]], right: [[600, 300], [620, 296], [640, 300]] };
+    const bad = drive({ shapes: "stylised", box: "1,2,x" }); expect(await bad.run()).toBe(1); expect(bad.out.join("\n")).toContain("--box takes four numbers"); expect(readPackJob(id)).toBeNull();
+    const a = drive({ shapes: "stylised", box: "400,600,200,100", faceHeight: "700", eyesFile: "eyes.json" });
+    const out: string[] = []; const code = await runMakeCharacter({ ...a.opts }, { fetch: (url, init) => Promise.resolve(app.request(url, init)), out: (l) => out.push(l), sleep: (ms) => Bun.sleep(ms), cookie: "session-maker-owner", readFile: () => JSON.stringify(eyes) });
+    expect(code).toBe(2); expect(readPackJob(id)).toMatchObject({ shapes: "stylised", box: [400, 600, 200, 100], face_height_px: 700 });
   });
 
   test("--yes-stage approves only the stages named", async () => {
