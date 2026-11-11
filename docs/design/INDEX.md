@@ -244,6 +244,8 @@ Moved to [`retired/`](retired/) on 2026-10-17, each with a header naming why and
 | [imgq-12-picture-design-2026-10-12.md](retired/imgq-12-picture-design-2026-10-12.md) | imgq-16-final-picture-setup-2026-10-13.md |
 | [imgq-13-entity-resolution-2026-10-12.md](retired/imgq-13-entity-resolution-2026-10-12.md) | imgq-16-final-picture-setup-2026-10-13.md |
 
+- [STUDIO-LOOK-01](STUDIO-LOOK-01.md): one professional look on every screen from the Artlist and Runway pattern: audit, design review, Look bundles (type, density, shape, surface, nav, motion), expanding grouped rail with context states, one composer with a mode menu, Activity popover, loading placeholders, art fallback and covers (owner-directed 2026-11-11).
+
 ## Features with no design yet, and why
 
 Decided in the audit, so nobody writes one by reflex:
