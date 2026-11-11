@@ -457,7 +457,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/companionLookJobs.ts` | LOOK_JOB_BUSY_LINE, LOOK_PICTURE_UNREAD_LINE, LOOK_PROMPT_REQUIRED_LINE, LOOK_EDIT_PROMPT_LINE, LOOK_ENGINE_NOT_READY_LINE, busyLineFor |
 | `backend/src/lib/companionLookStyles.ts` | LOOK_STYLES, LOOK_STYLE_IDS, DEFAULT_LOOK_STYLE, stylesForBand, capOfStyle, lookStylePhrase |
 | `backend/src/lib/companionPack.ts` | PACK_TYPES, packFolderProblems, packFolder, readCompanionPack, packFile |
-| `backend/src/lib/companionPackMaker.ts` | PACK_NO_STILL_LINE, PACK_STILL_NOT_APPROVED_LINE, PACK_BUSY_LINE, PACK_NOT_SUPPORTED_LINE, PACK_NO_VIDEO_LINE, PACK_NO_TALK_FRAMES_LINE |
+| `backend/src/lib/companionPackMaker.ts` | PACK_NO_STILL_LINE, PACK_STILL_NOT_APPROVED_LINE, PACK_BUSY_LINE, PACK_NOT_SUPPORTED_LINE, PACK_NO_BOX_LINE, PACK_BAD_BOX_LINE |
 | `backend/src/lib/companionPersonality.ts` | COMPANION_PERSONALITIES, cleanStyleNotes, backstoryTagline, safeExamples |
 | `backend/src/lib/companionPersonalityDials.ts` | COMPANION_DIAL_OPTIONS |
 | `backend/src/lib/companionPortrait.ts` | portraitPath, readRetainedPortrait, retainCompanionPortrait, voiceVersion, companionVoiceVersion |
