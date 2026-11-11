@@ -196,8 +196,8 @@ function ProfileHeaderBody({ profile, viewer, viewingSelf, canEdit, onEdit }: { 
       <div className="flex flex-wrap items-center gap-5">
         <Avatar name={profile.display_name} seed={profile.avatar_seed} size="profile" accent={profile.accent ?? undefined} />
         <div className="flex min-w-0 flex-1 flex-col gap-3">
-          <div className="flex flex-wrap items-center gap-3"><h1 className="truncate text-hero font-bold">{profile.display_name}</h1><Badge variant="secondary">{ROLE_LABELS[profile.role]}</Badge></div>
-          {counts.length ? <div className="flex flex-wrap gap-6" aria-label={i18n._({ id: "Library counts", message: "Library counts" })}>{counts.map((item) => <div key={item.label} className="flex flex-col"><span className="text-section font-semibold">{item.value}</span><span className="text-supporting text-muted-foreground">{item.label}</span></div>)}</div> : null}
+          <div className="flex flex-wrap items-center gap-3"><h1 className="truncate text-hero">{profile.display_name}</h1><Badge variant="secondary">{ROLE_LABELS[profile.role]}</Badge></div>
+          {counts.length ? <div className="flex flex-wrap gap-6" aria-label={i18n._({ id: "Library counts", message: "Library counts" })}>{counts.map((item) => <div key={item.label} className="flex flex-col"><span className="text-section">{item.value}</span><span className="text-supporting text-muted-foreground">{item.label}</span></div>)}</div> : null}
           {profile.bio ? <p className="text-body text-muted-foreground">{profile.bio}</p> : null}
         </div>
       </div>

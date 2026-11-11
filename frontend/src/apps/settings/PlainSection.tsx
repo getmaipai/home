@@ -4,7 +4,7 @@ import type { ReactNode } from "react";
 export function PlainSection({ heading, id, children }: { heading?: string; id?: string; children: ReactNode }) {
   return (
     <section id={id} className="flex scroll-mt-4 flex-col gap-4">
-      {heading ? <h2 className="text-section font-semibold">{heading}</h2> : null}
+      {heading ? <h2 className="text-section">{heading}</h2> : null}
       {children}
     </section>
   );

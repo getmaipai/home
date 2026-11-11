@@ -57,17 +57,7 @@ export function createBody(kind: Kind, patch: BandPatch & AlbumPatch & SongStyle
   };
 }
 
-/** The address of a made thing's editor. */
-export const editPath = (kind: Kind, id: string): string => `/apps/music/edit?kind=${kind}&id=${encodeURIComponent(id)}`;
-
-function Heading({ title, line }: { title: string; line?: string }) {
-  return <header className="flex flex-col gap-1 px-4 lg:px-0">
-    <h2 className="text-section font-semibold tracking-tight">{title}</h2>
-    {line ? <p className="text-supporting text-muted-foreground max-w-xl">{line}</p> : null}
-  </header>;
-}
-
-/** The page's frame: heading, the card passed in as children, and a line under it. The kit card itself is rendered by the caller. */
+/** The address of a made thing's editor. */ export const editPath = (kind: Kind, id: string): string => `/apps/music/edit?kind=${kind}&id=${encodeURIComponent(id)}`; function Heading({ title, line }: { title: string; line?: string }) { return <header className="flex flex-col gap-1 px-4 lg:px-0"> <h2 className="text-section">{title}</h2> {line ? <p className="text-supporting text-muted-foreground max-w-xl">{line}</p> : null} </header>; } /** The page's frame: heading, the card passed in as children, and a line under it. The kit card itself is rendered by the caller. */
 function Frame({ testId, title, line, children, footer }: { testId: string; title: string; line?: string; children: ReactNode; footer: ReactNode }) {
   return <section className="flex flex-col gap-4" data-testid={testId}>
     <Heading title={title} line={line} />

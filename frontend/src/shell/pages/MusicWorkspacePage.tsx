@@ -189,7 +189,7 @@ function SongDetail({ id, onClose, remix }: { id: string; onClose: () => void; r
   const reasonOff = ready ? "" : i18n._({ id: "Available once the song is finished.", message: "Available once the song is finished." });
   return <section ref={top} className="flex shrink-0 flex-col gap-5 py-2" data-testid="music-song-result" aria-label={i18n._({ id: "Open song", message: "Open song" })}>
         <div className="flex items-start justify-between gap-3">
-      <div className="flex flex-col gap-1"><p className="text-muted-foreground text-sm">{i18n._({ id: "Now open", message: "Now open" })}</p><h2 className="text-title font-semibold tracking-tight">{song?.title ?? i18n._({ id: "Your song", message: "Your song" })}</h2></div>
+      <div className="flex flex-col gap-1"><p className="text-muted-foreground text-sm">{i18n._({ id: "Now open", message: "Now open" })}</p><h2 className="text-title">{song?.title ?? i18n._({ id: "Your song", message: "Your song" })}</h2></div>
       <Button type="button" variant="secondary" size="sm" onClick={onClose}>{i18n._({ id: "Close", message: "Close" })}</Button>
     </div>
     <div><SongResult key={id} id={id} onAnother={onClose} inWorkspace /></div>
@@ -272,7 +272,7 @@ function GlassBar({ styles, onStyles, onMade, stylesOpen, onStylesOpen }: { styl
 function Hero({ styles, onStyles, onMade, stylesOpen, onStylesOpen }: { styles: string[]; onStyles: (next: string[]) => void; onMade: (id: string) => void; stylesOpen: boolean; onStylesOpen: (open: boolean) => void }) {
   return <div className="flex shrink-0 flex-col gap-6 pt-4 sm:pt-8" data-testid="music-hero">
     <div className="mx-auto flex w-full max-w-4xl flex-col gap-2">
-      <h1 className="text-title font-semibold tracking-tight">{i18n._({ id: "Make any song", message: "Make any song" })}</h1>
+      <h1 className="text-title">{i18n._({ id: "Make any song", message: "Make any song" })}</h1>
       <p className="text-supporting text-muted-foreground max-w-xl">{i18n._({ id: "Describe it, pick a sound, press Generate. Your songs, bands and albums stay on this Home.", message: "Describe it, pick a sound, press Generate. Your songs, bands and albums stay on this Home." })}</p>
     </div>
     <GlassBar styles={styles} onStyles={onStyles} onMade={onMade} stylesOpen={stylesOpen} onStylesOpen={onStylesOpen} />
@@ -311,7 +311,7 @@ export function MusicWorkspace({ adult, search }: { adult: boolean; search: stri
     {song && !openedCard.data?.sound ? <SongDetail key={song} id={song} remix={new URLSearchParams(search).get("remix") === "1"} onClose={() => open(null)} /> : null}
     <Hero styles={styles} onStyles={setStyles} onMade={open} stylesOpen={stylesOpen} onStylesOpen={setStylesOpen} />
     <div className="flex shrink-0 flex-col gap-3" data-testid="music-your-songs">
-      <div className="flex flex-col gap-1"><h2 className="text-section font-semibold tracking-tight">{i18n._({ id: "Your songs", message: "Your songs" })}</h2><p className="text-muted-foreground text-sm">{i18n._({ id: "Open one to play it and see everything you can do.", message: "Open one to play it and see everything you can do." })}</p></div>
+      <div className="flex flex-col gap-1"><h2 className="text-section">{i18n._({ id: "Your songs", message: "Your songs" })}</h2><p className="text-muted-foreground text-sm">{i18n._({ id: "Open one to play it and see everything you can do.", message: "Open one to play it and see everything you can do." })}</p></div>
       {shown.some(card => !card.sound) ? <ul className="flex list-none flex-wrap gap-x-4 gap-y-6 p-0" aria-label={i18n._({ id: "Your songs", message: "Your songs" })}>
         {shown.filter(card => !card.sound).map((card) => songTile({ card, selected: card.id === song, onOpen: () => open(card.id), actions: TILE_ACTIONS(card) }))}
       </ul> : <AsyncState data={list.data} error={list.isError} isFetching={list.isFetching} onRetry={() => void list.refetch()} errorMessage={i18n._({ id: "Your songs could not be loaded. Check your connection and open this page again.", message: "Your songs could not be loaded. Check your connection and open this page again." })} loadingLabel={i18n._({ id: "Loading your songs", message: "Loading your songs" })}>

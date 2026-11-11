@@ -223,7 +223,7 @@ export function SettingsRenderer({ scope, scopeValue, only, includeKeys, titleOv
                   }}
                 >
                   <section className="flex flex-col gap-3">
-                    <h2 className="text-section font-semibold">{titleOverrides[group.id] ?? sectionTitle(group.id)}</h2>
+                    <h2 className="text-section">{titleOverrides[group.id] ?? sectionTitle(group.id)}</h2>
                     <div className="flex flex-col divide-y divide-border">
                     {group.basic.map((s) => (
                       <SettingField key={s.def.key} setting={s} onChange={(v) => handleChange(s.def.key, v)} onReset={() => handleReset(s.def.key)} disabled={pendingKey === s.def.key} selfPersonId={selfPersonId} optionsFrom={optionsFrom} />

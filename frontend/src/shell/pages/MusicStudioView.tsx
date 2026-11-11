@@ -195,7 +195,7 @@ export function MusicStudioView({ adult, search }: { adult: boolean; search: str
     <div className="flex shrink-0 flex-wrap items-center gap-4">
       <div className="size-16 shrink-0 overflow-hidden rounded-xl sm:size-20"><Cover id={songId} title={song.data?.title ?? i18n._({ id: "Studio", message: "Studio" })} url={song.data?.cover_url ?? null} bare /></div>
       <div className="flex min-w-0 flex-1 flex-col gap-1"><p className="text-muted-foreground text-sm">{i18n._({ id: "Studio", message: "Studio" })}</p>
-        <h2 className="min-w-0 truncate text-title font-semibold">{song.data?.title ?? i18n._({ id: "Studio", message: "Studio" })}</h2></div>
+        <h2 className="min-w-0 truncate text-title">{song.data?.title ?? i18n._({ id: "Studio", message: "Studio" })}</h2></div>
       <div className="flex w-full flex-wrap gap-2 sm:w-auto">
         <Button asChild variant="secondary"><Link to={`/apps/music/create?song=${encodeURIComponent(songId)}`}>{i18n._({ id: "Back to the song", message: "Back to the song" })}</Link></Button>
         <Button type="button" disabled={splitting || !!stemsBusy || tracks.length > 1 || tracks.length === 0} onClick={split}>{stemsBusy || splitting ? i18n._({ id: "Splitting into stems", message: "Splitting into stems" }) : tracks.length > 1 ? i18n._({ id: "Split into stems (done)", message: "Split into stems (done)" }) : i18n._({ id: "Split into stems", message: "Split into stems" })}</Button>
@@ -233,7 +233,7 @@ export function MusicStudioView({ adult, search }: { adult: boolean; search: str
       </div>
       <aside className="flex w-full shrink-0 flex-col gap-4 lg:w-80" aria-label={i18n._({ id: "Listening effects", message: "Listening effects" })} data-testid="studio-effects">
         <div className="bg-card flex flex-col gap-4 rounded-2xl p-4">
-          <div className="flex items-baseline justify-between"><h3 className="text-section font-semibold">{i18n._({ id: "EQ", message: "EQ" })}</h3><Button type="button" size="sm" variant="ghost" onClick={() => setEq(FLAT)}>{i18n._({ id: "Reset", message: "Reset" })}</Button></div>
+          <div className="flex items-baseline justify-between"><h3 className="text-section">{i18n._({ id: "EQ", message: "EQ" })}</h3><Button type="button" size="sm" variant="ghost" onClick={() => setEq(FLAT)}>{i18n._({ id: "Reset", message: "Reset" })}</Button></div>
           <div className="flex justify-between gap-1">
             {EQ_BANDS.map((band, index) => <div key={band.label} className="flex flex-col items-center gap-2">
               <span className="text-xs tabular-nums">{eq[index] ?? 0}</span>
@@ -243,7 +243,7 @@ export function MusicStudioView({ adult, search }: { adult: boolean; search: str
           </div>
         </div>
         <div className="bg-card flex flex-col gap-4 rounded-2xl p-4">
-          <div className="flex items-baseline justify-between"><h3 className="text-section font-semibold">{i18n._({ id: "Compressor", message: "Compressor" })}</h3><Button type="button" size="sm" variant="ghost" onClick={() => setComp(COMP_DEFAULT)}>{i18n._({ id: "Reset", message: "Reset" })}</Button></div>
+          <div className="flex items-baseline justify-between"><h3 className="text-section">{i18n._({ id: "Compressor", message: "Compressor" })}</h3><Button type="button" size="sm" variant="ghost" onClick={() => setComp(COMP_DEFAULT)}>{i18n._({ id: "Reset", message: "Reset" })}</Button></div>
           <Knob label={i18n._({ id: "Threshold", message: "Threshold" })} value={comp.threshold} unit=" dB" min={-60} max={0} step={1} onChange={(threshold) => setComp({ ...comp, threshold })} />
           <Knob label={i18n._({ id: "Ratio", message: "Ratio" })} value={comp.ratio} unit=":1" min={1} max={20} step={1} onChange={(ratio) => setComp({ ...comp, ratio })} />
           <Knob label={i18n._({ id: "Attack", message: "Attack" })} value={comp.attack} unit=" ms" min={1} max={100} step={1} onChange={(attack) => setComp({ ...comp, attack })} />

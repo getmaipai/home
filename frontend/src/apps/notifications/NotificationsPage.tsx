@@ -135,7 +135,7 @@ export function NotificationsPage() {
             return (
               <>
                 <div className="flex flex-wrap items-center justify-between gap-2">
-                  <h2 className="text-section font-semibold">{i18n._({ id: "Last 30 days", message: "Last 30 days" })}</h2>
+                  <h2 className="text-section">{i18n._({ id: "Last 30 days", message: "Last 30 days" })}</h2>
                   {selectMode.active ? (
                     // Never gated on pending.length - a review caught
                     // the earlier `selectMode && pending.length > 0`

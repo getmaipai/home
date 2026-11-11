@@ -50,14 +50,14 @@ export function FamilyPage({ person }: { person: Roster }) {
           {robotsQuery.isError ? <StatusCard kind="problem" title={i18n._({ id: "That did not work", message: "That did not work" })} line={i18n._({ id: "Could not load robots.", message: "Could not load robots." })} action={{ label: i18n._({ id: "Try again", message: "Try again" }), onSelect: () => void robotsQuery.refetch() }} /> : null}
 
           <section className="flex flex-col gap-3" aria-labelledby="family-people-heading">
-            <div className="flex items-center justify-between"><h2 id="family-people-heading" className="text-section font-semibold">{i18n._({ id: "People", message: "People" })}</h2></div>
+            <div className="flex items-center justify-between"><h2 id="family-people-heading" className="text-section">{i18n._({ id: "People", message: "People" })}</h2></div>
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
               {ordered.map((entry) => {
                 const blocked = isProfileClosedTo(person, entry);
                 const profileLinkAllowed = !blocked;
                 const who = <>
                   <Avatar name={entry.display_name} seed={entry.avatar_seed} size="hero" accent={entry.accent ?? undefined} />
-                  <div className="flex min-w-0 flex-col items-center gap-1 text-center"><p className="text-section font-semibold">{entry.display_name}</p><Badge variant="secondary">{ROLE_LABELS[entry.role]}</Badge>{entry.bio ? <p className="line-clamp-2 text-supporting text-muted-foreground">{entry.bio}</p> : null}</div>
+                  <div className="flex min-w-0 flex-col items-center gap-1 text-center"><p className="text-section">{entry.display_name}</p><Badge variant="secondary">{ROLE_LABELS[entry.role]}</Badge>{entry.bio ? <p className="line-clamp-2 text-supporting text-muted-foreground">{entry.bio}</p> : null}</div>
                 </>;
                 return <div key={entry.id} data-testid={`family-person-${entry.id}`}><Card surface="flat">
                   {profileLinkAllowed ? <Link to={`/people/${entry.id}`} className="flex flex-col items-center gap-3 py-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">{who}</Link> : <div className="flex flex-col items-center gap-3 py-2">{who}</div>}
@@ -71,7 +71,7 @@ export function FamilyPage({ person }: { person: Roster }) {
           </section>
 
           {(pets.length > 0 || robots.length > 0) ? <section className="flex flex-col gap-3" aria-labelledby="family-pets-heading">
-            <h2 id="family-pets-heading" className="text-section font-semibold">{i18n._({ id: "Pets and robots", message: "Pets and robots" })}</h2>
+            <h2 id="family-pets-heading" className="text-section">{i18n._({ id: "Pets and robots", message: "Pets and robots" })}</h2>
             <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
               {pets.map((pet) => <div key={pet.id} data-testid={`family-pet-${pet.id}`}><Card surface="flat"><div className="flex items-center gap-4"><PawIcon aria-hidden className="size-10 text-muted-foreground" /><div><p className="text-row font-semibold">{pet.name}</p><p className="text-supporting text-muted-foreground">{pet.description || i18n._({ id: "Pet", message: "Pet" })}</p>{pet.source === "inferred" && !pet.confirmed_by_person_id ? <Badge variant="secondary">{i18n._({ id: "Unconfirmed", message: "Unconfirmed" })}</Badge> : null}</div></div></Card></div>)}
               {robots.map((robot) => <Link key={robot.id} to={`/settings/devices/${encodeURIComponent(robot.id)}?tab=overview`} className="block focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"><div data-testid={`family-robot-${robot.id}`}><Card surface="flat"><div className="flex items-center gap-4"><BotIcon aria-hidden className="size-10 text-muted-foreground" /><div><p className="text-row font-semibold">{robot.name}</p><p className="text-supporting text-muted-foreground">{[i18n._({ id: "Robot", message: "Robot" }), robot.online ? i18n._({ id: "Online", message: "Online" }) : i18n._({ id: "Offline", message: "Offline" }), robot.area].filter(Boolean).join(" · ")}</p></div></div></Card></div></Link>)}

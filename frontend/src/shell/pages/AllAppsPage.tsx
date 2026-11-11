@@ -113,7 +113,7 @@ export function AllAppsPage({ person }: { person: Roster }) {
       </nav>
       <section aria-label={i18n._({ id: "Favorites", message: "Favorites" })} className="flex min-w-0 flex-col gap-3">
         <div className="flex items-center justify-between gap-3">
-          <h2 className="text-section font-semibold">{i18n._({ id: "Favorites", message: "Favorites" })}</h2>
+          <h2 className="text-section">{i18n._({ id: "Favorites", message: "Favorites" })}</h2>
           <Button type="button" variant="quiet-link" size="sm" aria-pressed={editing} onClick={() => setEditing((value) => !value)}>{editing ? i18n._({ id: "Done", message: "Done" }) : i18n._({ id: "Edit", message: "Edit" })}</Button>
         </div>
         {favorites.length ? grid(favorites, i18n._({ id: "Favorite apps", message: "Favorite apps" })) : <p className="text-supporting text-muted-foreground">{i18n._({ id: "Star an app to keep it here.", message: "Star an app to keep it here." })}</p>}
@@ -121,7 +121,7 @@ export function AllAppsPage({ person }: { person: Roster }) {
       <div role="presentation" onKeyDown={onGridKeyDown}>
       <section aria-label={i18n._({ id: "All apps", message: "All apps" })} className="flex min-w-0 flex-col gap-3">
         <div className="flex items-baseline justify-between gap-3">
-          <h2 className="text-section font-semibold">{i18n._({ id: "All apps", message: "All apps" })}</h2>
+          <h2 className="text-section">{i18n._({ id: "All apps", message: "All apps" })}</h2>
           <span className="text-supporting text-muted-foreground">{i18n._({ id: "A to Z", message: "A to Z" })}</span>
         </div>
         {filtered.length ? grid(filtered, i18n._({ id: "All apps", message: "All apps" })) : <p className="text-supporting text-muted-foreground" role="status">{i18n._({ id: "No apps match your search.", message: "No apps match your search." })}</p>}

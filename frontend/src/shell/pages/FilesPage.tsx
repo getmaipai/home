@@ -367,7 +367,7 @@ export function FilesPage({ person }: { person: Roster }) {
         <div className="flex flex-wrap items-center gap-3">
           {wide && collapsed ? <SectionSidebarShowButton onClick={() => setCollapsed(false)} controls="library-sidebar" /> : null}
           <div className="min-w-0 flex-1">
-            <h1 className="truncate text-title font-bold tracking-tight">{sectionOf(view.section).label}</h1>
+            <h1 className="truncate text-title">{sectionOf(view.section).label}</h1>
             <p className="text-supporting text-muted-foreground" aria-live="polite">{headline}</p>
           </div>
           <input ref={fileInput} type="file" multiple hidden aria-label={i18n._({ id: "Choose files to add", message: "Choose files to add" })} onChange={(event) => { const files = Array.from(event.target.files ?? []); event.target.value = ""; if (files.length > 0) addFiles(files); }} />
