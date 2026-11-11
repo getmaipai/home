@@ -15,8 +15,8 @@ The installer and the setup wizard size the disk from one table. It adds up what
 
 | Plan | For a Mac with | Free space needed |
 |---|---|---|
-| Recommended | 64 GB of memory | 114 GB |
-| Recommended | 128 GB of memory (adds Quick videos) | 146 GB |
+| Recommended | 64 GB of memory | 117 GB |
+| Recommended | 128 GB of memory (adds Quick videos) | 149 GB |
 | Moderate | 32 GB | 36 GB |
 | Minimal | 16 or 24 GB | 19 GB |
 

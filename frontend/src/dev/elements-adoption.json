@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-11-11T01:25:34.794Z",
+  "generatedAt": "2026-11-11T02:05:17.547Z",
   "kitTag": "ui-v0.5.586",
   "items": [
     {
@@ -635,17 +635,17 @@
     {
       "file": "companion-pack/voice-layer.ts",
       "name": "companion-pack/voice-layer",
-      "group": "companion",
-      "verdict": "unassessed",
-      "verdictReason": "Recorded unassessed verdict in elements-plan.json; see the plan entry for its dependency or scope.",
+      "group": "companion-pack",
+      "verdict": "support",
+      "verdictReason": "Voice-reactive parts maths drawn by StillPartsPlayer; internal implementation, not a standalone Home Element.",
       "implemented": false
     },
     {
       "file": "companion-pack/voice-player.tsx",
       "name": "companion-pack/voice-player",
-      "group": "companion",
-      "verdict": "unassessed",
-      "verdictReason": "Recorded unassessed verdict in elements-plan.json; see the plan entry for its dependency or scope.",
+      "group": "companion-pack",
+      "verdict": "wire-after",
+      "verdictReason": "New StillPartsPlayer Element (MAKER-G); Home has not wired it yet. Future integration belongs in CompanionStage's character slot, without a Home wrapper.",
       "implemented": false
     },
     {
