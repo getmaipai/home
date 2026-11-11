@@ -14,6 +14,9 @@ import {
   wakewordAssetPath,
 } from "@/lib/wakewordAssets";
 import { getVoiceCatalog, isVoiceCatalogPath } from "@/lib/voiceCatalog";
+import { buildVoiceLibrary, type LibraryVoice } from "@/lib/voiceLibrary";
+import { singleflight } from "@maipai/core/src/singleflight";
+import { tryConsume } from "@/lib/rateLimiter";
 import { setPersonTtsVoiceUnchecked, resolveForResponse } from "@/lib/settings";
 import { getRegistryKey } from "@/lib/settingsRegistry";
 import { getStackUrl, getStackClient, stackFailureResult, isStackConfigured } from "@/lib/stackEngine";
@@ -41,6 +44,26 @@ import { speakerAgeBand } from "@/lib/ageBand";
 import { cacheHouseholdPreview, dropHouseholdPreview, householdPreviewAudio, renderHouseholdVoice } from "@/lib/householdVoiceCheck";
 
 export const voiceRoutes = apiRouter();
+
+const voiceSampleFlights = new Map<string, ReturnType<typeof singleflight<Response>>>();
+function fetchVoiceSample(url: string): Promise<Response> {
+  const host = new URL(url).host;
+  let flight = voiceSampleFlights.get(url);
+  if (!flight) {
+    flight = singleflight(async () => {
+      if (!tryConsume(`voice-sample:${host}`, { capacity: 5, refillPerSecond: 1 })) throw new Error("voice sample rate limited");
+      const response = await fetch(url);
+      if (!response.ok || !response.body) throw new Error(`voice sample fetch returned ${response.status}`);
+      return response;
+    });
+    voiceSampleFlights.set(url, flight);
+  }
+  return flight();
+}
+function voiceSampleUrl(path: string): string {
+  const base = process.env.MAIPAI_VOICE_SAMPLE_BASE ?? "https://huggingface.co/kyutai/tts-voices/resolve/main";
+  return `${base.replace(/\/$/, "")}/${path.split("/").map(encodeURIComponent).join("/")}`;
+}
 
 /** A form field that is absent or blank is "not given"; anything else is parsed as a number (NaN is refused by the lib). */
 function optionalNumber(value: unknown): number | null {
@@ -271,6 +294,63 @@ voiceRoutes.openapi(voiceCatalogRoute, async (c) => {
   } catch (err) {
     console.error("[voice] catalog load failed", err);
     return c.json({ error: "The voice catalog is unavailable. Try again later, or check Repairs." }, 503);
+  }
+});
+
+const libraryVoiceSchema = z.object({
+  id: z.string(), name: z.string(), detail: z.string(), gender: z.enum(["woman", "man", "neutral"]),
+  language: z.literal("en"), languageName: z.literal("English"), country: z.string().nullable(), countryName: z.string().nullable(),
+  quality: z.enum(["good", "great", "best"]), sizeMb: z.number().nullable(), attribution: z.string(), licence: z.literal("CC BY 4.0"), sampleUrl: z.string(),
+});
+const voiceLibraryAttribution = "Voice Cloning Toolkit, University of Edinburgh; recordings by the Centre for Speech Technology Research. CC BY 4.0.";
+const voiceLibraryRoute = createRoute({
+  method: "get", path: "/library", tags: ["Voice"], summary: "List browseable VCTK voices",
+  description: "Builds the browseable VCTK voice library from the live community voice catalog.",
+  middleware: [requireAuth] as const,
+  responses: {
+    200: { content: { "application/json": { schema: z.object({ voices: z.array(libraryVoiceSchema), attribution: z.string() }) } }, description: "VCTK voices and attribution." },
+    ...errorResponses({ 401: "Not signed in", 403: "Only owner or admin may manage household voices", 503: "Voice catalog unavailable" }),
+  },
+});
+voiceRoutes.openapi(voiceLibraryRoute, async (c) => {
+  if (!isOwnerOrAdmin(c.get("person"))) return c.json({ error: "only an owner or admin can manage the household voice catalog" }, 403);
+  try {
+    const voices: LibraryVoice[] = buildVoiceLibrary(await getVoiceCatalog());
+    return c.json({ voices, attribution: voiceLibraryAttribution }, 200);
+  } catch (err) {
+    console.error("[voice] library load failed", err);
+    return c.json({ error: "The voice catalog is unavailable. Try again later, or check Repairs." }, 503);
+  }
+});
+
+const voiceLibrarySampleRoute = createRoute({
+  method: "get", path: "/library/sample", tags: ["Voice"], summary: "Stream a VCTK voice sample",
+  description: "Streams a VCTK WAV from the community repository after the user requests a preview.",
+  middleware: [requireAuth] as const,
+  request: { query: z.object({ path: z.string().min(1) }) },
+  responses: {
+    200: { content: { "audio/wav": { schema: z.string().openapi({ format: "binary" }) } }, description: "The WAV sample." },
+    ...errorResponses({ 400: "Invalid sample path", 401: "Not signed in", 403: "Only owner or admin may manage household voices", 404: "Sample not in catalog", 502: "Sample unavailable", 503: "Voice catalog unavailable" }),
+  },
+});
+voiceRoutes.openapi(voiceLibrarySampleRoute, async (c) => {
+  if (!isOwnerOrAdmin(c.get("person"))) return c.json({ error: "only an owner or admin can manage the household voice catalog" }, 403);
+  const path = c.req.valid("query").path;
+  if (!/^vctk\/p\d+_023(?:_enhanced)?\.wav$/.test(path)) return c.text("Invalid voice sample path.", 400);
+  let entries;
+  try { entries = await getVoiceCatalog(); }
+  catch (err) {
+    console.error("[voice] sample catalog load failed", err);
+    return c.text("The voice catalog is unavailable. Try again later, or check Repairs.", 503);
+  }
+  if (!isVoiceCatalogPath(entries, path)) return c.text("That sample is not in the voice catalog.", 404);
+  try {
+    const url = voiceSampleUrl(path);
+    const response = await fetchVoiceSample(url);
+    return new Response(response.body, { status: 200, headers: { "content-type": "audio/wav", "cache-control": "private, max-age=86400" } });
+  } catch (err) {
+    console.error("[voice] sample fetch failed", err);
+    return c.text("That sample could not be loaded. Try again in a minute.", 502);
   }
 });
 

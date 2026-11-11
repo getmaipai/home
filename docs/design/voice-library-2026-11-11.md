@@ -67,3 +67,4 @@ A calm sheet in the theme tokens only (no fixed colors): large rounded cards on 
 - **Language scope of the first release.** The standard voice engine's languages decide what a downloaded voice can speak well; a clip in another language only helps if the engine speaks it. The first set is English across accents (US, UK, Irish, Scottish, Australian, Indian and more), with other languages added when the engine supports them (to confirm against the engine's published list before step 2).
 - **Quality** is measured, not user-rated, in this release.
 - **Not in this release:** rating or reviewing voices, uploading to the catalog from Home, voices of real named people.
+- **First backend release:** VCTK only, with plain names built from its speaker metadata. Measured labels and non-English voices are the next step.
