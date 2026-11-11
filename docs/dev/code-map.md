@@ -1151,7 +1151,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/turnMachine/messages.ts` | contextToMessages, bareMessages, continuationMessages |
 | `backend/src/lib/turnMachine/nodes/answer.ts` | PARENT_REQUIRED_LINE, HOUSEHOLD_SUBJECT_NEVER_LINE, PICTURE_STARTED_LINE, VIDEO_STARTED_LINE, missedLookupLine, __setClaimJudgeForTests |
 | `backend/src/lib/turnMachine/nodes/commands.ts` | commandsNode |
-| `backend/src/lib/turnMachine/nodes/context.ts` | MEMORY_CONTEXT_MIN_SCORE, TOOL_ROUND_SHARE, decideReasoning, chatModelCutoff, datesText, contextNode |
+| `backend/src/lib/turnMachine/nodes/context.ts` | MEMORY_CONTEXT_MIN_SCORE, TOOL_ROUND_SHARE, decideReasoning, chatModelCutoff, datesText, windowContextItems |
 | `backend/src/lib/turnMachine/nodes/lookupFallback.ts` | lookupMissed, lookupFailureKind, lookupMissedClause, lookupMissedInstruction, retryEligible, retryTools |
 | `backend/src/lib/turnMachine/nodes/model.ts` | toolSpecFor, replyMaxTokensFor, rememberCeilingSpentInvisibly, __resetLearnedCeilingsForTests, SEARCH_ASSIST_HOLD_LIMIT_MS, SEARCH_ASSIST_RESCUE_BUDGET_MS |
 | `backend/src/lib/turnMachine/nodes/outputGate.ts` | gateGrainFor, StreamGate, outputGateNode |
