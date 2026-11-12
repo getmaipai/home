@@ -112,11 +112,54 @@ describe("ship.sh by mode", () => {
     expect(r.status).not.toBe(0);
     expect(r.stderr).toContain("--before-green is off in gated mode");
   });
-  test("gated refuses a commit with no watcher green run and not in stable", () => {
+  test("gated refuses a commit with no watcher green run and no stable, and says in plain words what is missing", () => {
     setup();
     const r = ship({ MAIPAI_MODE: "gated" }, "main", "--dry-run");
     expect(r.status).not.toBe(0);
-    expect(r.stderr).toContain("no watcher green run and is not in stable");
+    expect(r.stderr).toContain("cannot ship yet: it has no watcher green run and stable does not exist yet (the nightly run has never passed on any commit)");
+    expect(r.stderr).toContain("bash scripts/nightly.sh run-now");
+    expect(r.stderr).toContain("the watcher is stopped");
+  });
+  test("gated names a stable that is older than the tip, with the distance", () => {
+    setup();
+    git(clone, "branch", "-f", "stable", "HEAD");
+    writeFileSync(join(clone, "plain.txt"), "plain\n");
+    git(clone, "add", "-A"); git(clone, "commit", "-qm", "plain change"); git(clone, "push", "-q", "origin", "main");
+    const sha = git(clone, "rev-parse", "HEAD").stdout.trim();
+    const stable = git(clone, "rev-parse", "stable").stdout.trim();
+    const r = ship({ MAIPAI_MODE: "gated" }, sha, "--dry-run");
+    expect(r.status).not.toBe(0);
+    expect(r.stderr).toContain(`stable is at ${stable.slice(0, 7)}, 1 commits behind ${sha.slice(0, 7)}`);
+    git(clone, "branch", "-D", "stable");
+    git(clone, "reset", "-q", "--hard", "HEAD~1"); git(clone, "push", "-q", "-f", "origin", "main");
+  });
+  test("gated with no stable yet: a watcher green run ships a plain change but holds a safety-surface change since the live commit", () => {
+    setup();
+    const base = git(clone, "rev-parse", "HEAD").stdout.trim();
+    const live = join(scratch, "live-nostable"); mkdirSync(live, { recursive: true });
+    writeFileSync(join(live, ".installed-tag"), `sha-${base.slice(0, 7)}\n`);
+    mkdirSync(join(scratch, "watch", "green"), { recursive: true });
+    writeFileSync(join(clone, "plain2.txt"), "plain\n");
+    git(clone, "add", "-A"); git(clone, "commit", "-qm", "plain change"); git(clone, "push", "-q", "origin", "main");
+    const plain = git(clone, "rev-parse", "HEAD").stdout.trim();
+    writeFileSync(join(scratch, "watch", "green", plain), "");
+    const through = ship({ MAIPAI_MODE: "gated", MAIPAI_SHIP_LIVE: live }, plain, "--dry-run");
+    expect(through.stderr).not.toContain("changes a safety surface");
+    expect(through.stdout).toContain("no safety-surface change since the live hub (sha-" + base.slice(0, 7) + ")");
+    mkdirSync(join(clone, "backend", "src", "lib"), { recursive: true });
+    writeFileSync(join(clone, "backend", "src", "lib", "safetyNoStable.ts"), "export const y = 1;\n");
+    git(clone, "add", "-A"); git(clone, "commit", "-qm", "safety change"); git(clone, "push", "-q", "origin", "main");
+    const safety = git(clone, "rev-parse", "HEAD").stdout.trim();
+    writeFileSync(join(scratch, "watch", "green", safety), "");
+    const held = ship({ MAIPAI_MODE: "gated", MAIPAI_SHIP_LIVE: live }, safety, "--dry-run");
+    expect(held.status).not.toBe(0);
+    expect(held.stderr).toContain("changes a safety surface (backend/src/lib/safetyNoStable.ts) since the live hub (sha-" + base.slice(0, 7) + "), and stable does not exist yet");
+    // An unknown live tag cannot be judged: held, in plain words.
+    writeFileSync(join(live, ".installed-tag"), "v9.9.9\n");
+    const unknown = ship({ MAIPAI_MODE: "gated", MAIPAI_SHIP_LIVE: live }, plain, "--dry-run");
+    expect(unknown.status).not.toBe(0);
+    expect(unknown.stderr).toContain("the live install's tag (v9.9.9) is not a commit this checkout knows");
+    git(clone, "reset", "-q", "--hard", base); git(clone, "push", "-q", "-f", "origin", "main");
   });
   test("gated holds a safety-surface change until stable holds it, then lets it through to the live-hub checks", () => {
     setup();

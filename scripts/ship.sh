@@ -95,15 +95,40 @@ if [[ "$ship_mode" == gated ]]; then
   (( ! before_green )) || die "GATED: checked first, then run. --before-green is off in gated mode; wait for the watcher's green run or the nightly pass, or switch with bash scripts/mode.sh direct."
   stable_sha="$(git rev-parse --verify -q 'refs/heads/stable^{commit}' 2>/dev/null || git rev-parse --verify -q 'refs/remotes/origin/stable^{commit}' 2>/dev/null || true)"
   in_stable=0; [[ -n "$stable_sha" ]] && git merge-base --is-ancestor "$sha" "$stable_sha" 2>/dev/null && in_stable=1
-  if (( ! in_stable )) && [[ ! -f "$watch/green/$sha" ]]; then die "GATED: ${sha:0:7} has no watcher green run and is not in stable (the nightly pass). Wait for the watcher, or switch with bash scripts/mode.sh direct."; fi
-  if (( ! in_stable )) && [[ -n "$stable_sha" ]]; then
-    t2_held="$(python3 - "$(git show "$sha:scripts/wt.sh" 2>/dev/null | sed -n 's/^export WT_T2_GLOBS="\(.*\)"$/\1/p' | head -n 1)" $(git diff --name-only "$stable_sha" "$sha") <<'PY'
+  # GATED-PROOF-01 (2026-11-12): every refusal says in plain words what is missing: whether `stable` exists at all, how far behind the
+  # commit it is, and whether the watcher that could give the green run is running (its pid file is in $watch/watcher.pid).
+  if [[ -z "$stable_sha" ]]; then stable_words="stable does not exist yet (the nightly run has never passed on any commit)"
+  elif (( in_stable )); then stable_words="stable ${stable_sha:0:7} holds ${sha:0:7}"
+  else stable_words="stable is at ${stable_sha:0:7}, $(git rev-list --count "$stable_sha..$sha" 2>/dev/null || echo '?') commits behind ${sha:0:7}"; fi
+  watcher_pid="$(cat "$watch/watcher.pid" 2>/dev/null || true)"
+  if [[ "$watcher_pid" =~ ^[0-9]+$ ]] && kill -0 "$watcher_pid" 2>/dev/null && ps -p "$watcher_pid" -o command= 2>/dev/null | grep -Eq 'watcher\.sh'; then watcher_words="the watcher is running and tests main as it moves"
+  else watcher_words="the watcher is stopped (bash scripts/pipeline.sh start runs it)"; fi
+  echo "ship.sh: GATED: $stable_words; $([[ -f "$watch/green/$sha" ]] && echo "the watcher has a green run of ${sha:0:7}" || echo "the watcher has no green run of ${sha:0:7}")."
+  if (( ! in_stable )) && [[ ! -f "$watch/green/$sha" ]]; then
+    die "GATED: ${sha:0:7} cannot ship yet: it has no watcher green run and $stable_words. What gets it through: a nightly pass (bash scripts/nightly.sh run-now moves stable to the newest main) or a watcher green run of this exact commit ($watcher_words). Or switch with bash scripts/mode.sh direct."
+  fi
+  if (( ! in_stable )); then
+    # A change to a safety surface ships only once `stable` holds it. With no `stable` yet, the base is what is live now (the install's
+    # .installed-tag, sha-<7> or a release tag): anything on a safety surface changed since then is held until the nightly passes.
+    t2_base="$stable_sha"; t2_base_words="stable ${stable_sha:0:7}"
+    if [[ -z "$t2_base" ]]; then
+      live_tag="$(cat "$live/.installed-tag" 2>/dev/null || true)"
+      case "$live_tag" in
+        sha-*) t2_base="$(git rev-parse --verify -q "${live_tag#sha-}^{commit}" 2>/dev/null || true)" ;;
+        "") ;;
+        *) t2_base="$(git rev-parse --verify -q "$live_tag^{commit}" 2>/dev/null || true)" ;;
+      esac
+      t2_base_words="the live hub (${live_tag:-no installed tag})"
+      [[ -n "$t2_base" ]] || die "GATED: stable does not exist yet and the live install's tag (${live_tag:-none}) is not a commit this checkout knows, so it cannot be told whether ${sha:0:7} changes a safety surface. Run the nightly (bash scripts/nightly.sh run-now) so stable exists, or switch with bash scripts/mode.sh direct."
+    fi
+    t2_held="$(python3 - "$(git show "$sha:scripts/wt.sh" 2>/dev/null | sed -n 's/^export WT_T2_GLOBS="\(.*\)"$/\1/p' | head -n 1)" $(git diff --name-only "$t2_base" "$sha") <<'PY'
 import fnmatch, sys
 globs = sys.argv[1].split()
 print(" ".join(f for f in sys.argv[2:] if any(fnmatch.fnmatch(f, g) for g in globs)))
 PY
 )"
-    [[ -z "$t2_held" ]] || die "GATED: ${sha:0:7} changes a safety surface ($t2_held) that stable does not hold yet; it ships after the nightly pass moves stable past it."
+    [[ -z "$t2_held" ]] || die "GATED: ${sha:0:7} changes a safety surface ($t2_held) since $t2_base_words, and $stable_words. It ships after a nightly pass moves stable past it (bash scripts/nightly.sh run-now), or switch with bash scripts/mode.sh direct."
+    echo "ship.sh: GATED: no safety-surface change since $t2_base_words; the watcher green run is enough."
   fi
   boot_checked=0
 fi
