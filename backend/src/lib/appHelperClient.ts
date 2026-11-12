@@ -5,7 +5,18 @@ import { homedir } from "node:os";
 export interface HelperApp { bundleId: string; name: string; bytes: number; frontmost: boolean }
 export type HelperListing = { installed: false; apps: [] } | { installed: true; apps: HelperApp[] };
 
-export const helperSocketPath = () => process.env.MAIPAI_APP_HELPER_SOCKET ?? `${homedir()}/Library/Application Support/MaiPai/app-helper.sock`;
+/** The hub runs as a root system service, where homedir() is root's folder. The helper lives in the person's own session, so as root the socket is looked for in the home of whoever is logged in at the Mac's own screen. */
+export function consoleUserHome(run: (cmd: string[]) => string = (cmd) => Bun.spawnSync(cmd, { stdout: "pipe", stderr: "ignore" }).stdout.toString()): string | null {
+  const who = run(["stat", "-f%Su", "/dev/console"]).trim();
+  if (!who || who === "root" || who === "loginwindow") return null;
+  const home = run(["dscl", ".", "-read", `/Users/${who}`, "NFSHomeDirectory"]).trim().split(/\s+/)[1];
+  return home && home.startsWith("/") ? home : `/Users/${who}`;
+}
+export const helperSocketPath = () => {
+  if (process.env.MAIPAI_APP_HELPER_SOCKET) return process.env.MAIPAI_APP_HELPER_SOCKET;
+  const home = process.getuid?.() === 0 ? (consoleUserHome() ?? homedir()) : homedir();
+  return `${home}/Library/Application Support/MaiPai/app-helper.sock`;
+};
 
 /** Asks the helper for the running apps. Anything that stops the helper answering (no socket, a refusal, a slow reply) reads as "not installed", so the page falls back to the Stack reading. App names are returned to the caller and never stored or logged. */
 export function listHelperApps(path = helperSocketPath(), timeoutMs = 2000): Promise<HelperListing> {
