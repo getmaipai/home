@@ -99,6 +99,20 @@ describe("nightly stable", () => {
     expect(latest().result).toBe("passed");
   }, 60_000);
 
+  test("a second run on the same day starts a fresh suite.log; the earlier run's log is kept beside it", () => {
+    const day = new Date().toISOString().slice(0, 10);
+    rmSync(join(nightlyData(), "OFF"), { force: true });
+    integrate("first run of the day");
+    expect(nightly("echo FIRST-RUN-MARK; false").status).not.toBe(0);
+    integrate("second run of the day");
+    nightly("echo SECOND-RUN-MARK");
+    const log = readFileSync(join(nightlyData(), day, "suite.log"), "utf8");
+    expect(log).toContain("SECOND-RUN-MARK");
+    expect(log).not.toContain("FIRST-RUN-MARK");
+    const kept = Bun.spawnSync(["bash", "-c", `cat "${join(nightlyData(), day)}"/suite-*.log`]).stdout.toString();
+    expect(kept).toContain("FIRST-RUN-MARK");
+  }, 60_000);
+
   test("the off switch stops a run before it does anything", () => {
     writeFileSync(join(nightlyData(), "OFF"), "");
     const before = stable();

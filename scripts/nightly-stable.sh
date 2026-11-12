@@ -52,6 +52,9 @@ run() {
   if [[ -f "$here/lib/hostmem.sh" ]]; then source "$here/lib/hostmem.sh"; hostmem_gate "The nightly run" || return 75; fi
   local started sha before after result rc=0 day dir out seconds last superseded=()
   started="$(date +%s)"; day="$(date +%F)"; dir="$data/$day"; mkdir -p "$dir"; out="$dir/suite.log"
+  # One log per run: a second run on the same day (run-now after a fix, then the schedule) starts a fresh suite.log, so the report and the
+  # fixer read only this run's failures; the earlier run's log is kept beside it as suite-<HHMMSS>.log.
+  [[ ! -s "$out" ]] || mv -f "$out" "$dir/suite-$(date +%H%M%S).log"
   GITNET_TRIES=1 GITNET_TIMEOUT=30 gitnet -C "$main" fetch -q origin main >/dev/null 2>&1 || true
   sha="$(pipeline_main_sha "$main")"; [[ -n "$sha" ]] || { error "no main to test."; return 1; }
   before="$(git -C "$main" rev-parse --verify -q refs/heads/stable 2>/dev/null || true)"
