@@ -280,6 +280,7 @@
                                 "offline",
                                 "tier_reduced",
                                 "gpu",
+                                "upgrading",
                                 null
                               ]
                             }
@@ -380,6 +381,7 @@
                                 "offline",
                                 "tier_reduced",
                                 "gpu",
+                                "upgrading",
                                 null
                               ]
                             }
@@ -480,6 +482,7 @@
                                 "offline",
                                 "tier_reduced",
                                 "gpu",
+                                "upgrading",
                                 null
                               ]
                             }
@@ -580,6 +583,7 @@
                                 "offline",
                                 "tier_reduced",
                                 "gpu",
+                                "upgrading",
                                 null
                               ]
                             }
@@ -680,6 +684,7 @@
                                 "offline",
                                 "tier_reduced",
                                 "gpu",
+                                "upgrading",
                                 null
                               ]
                             }
@@ -780,6 +785,7 @@
                                 "offline",
                                 "tier_reduced",
                                 "gpu",
+                                "upgrading",
                                 null
                               ]
                             }

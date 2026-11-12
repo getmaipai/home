@@ -671,6 +671,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/loras/suggest.ts` | suggestStyles |
 | `backend/src/lib/loras/sync.ts` | dropLoraSyncCache, __resetLoraSyncForTests, recordFromStack, syncLoras, adoptPictureLoras |
 | `backend/src/lib/loras/usage.ts` | clipsUsingStyle |
+| `backend/src/lib/maintenanceFlag.ts` | maintenanceFlagPath, maintenanceActive |
 | `backend/src/lib/maintenanceRecurrence.ts` | maintenanceOccurrence, validateMaintenanceRecurrence |
 | `backend/src/lib/manifestLint.ts` | fixedPartOf, isQuestionWordOpener, COMPUTED_WILDCARD_RESOLVERS, lintManifestPatterns, NEVER_FIRES_WILDCARDS |
 | `backend/src/lib/manifestStat.ts` | MANIFEST_STAT_TTL_MS, cachedMtimeMs, invalidateManifestStats |
