@@ -18,7 +18,8 @@ beforeEach(async () => { resetDb(); actor = (await owner()).row; });
 
 describe("what each attached picture is for", () => {
   test("parses a reading and rejects a bad role or an empty name", () => {
-    expect(parseReading('{"role":"product","name":"espresso machine","look":"white body, chrome handle"}')).toEqual({ role: "product", name: "espresso machine", look: "white body, chrome handle" });
+    expect(parseReading('{"role":"product","name":"espresso machine","look":"white body, chrome handle"}')).toEqual({ role: "product", name: "espresso machine", look: "white body, chrome handle", medium: "photograph" });
+    expect(parseReading('{"role":"actor","name":"man","look":"flat colours","medium":"illustration"}')?.medium).toBe("illustration");
     expect(parseReading('{"role":"hero","name":"x","look":"y"}')).toBeNull();
     expect(parseReading('{"role":"set","name":"","look":"y"}')).toBeNull();
     expect(parseReading("no json")).toBeNull();

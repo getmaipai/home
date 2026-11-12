@@ -43,6 +43,13 @@ describe("film runner", () => {
     await runFilm({ actor, productionId: production.id, plan, engines, signal: new AbortController().signal });
     expect(calls).toEqual([]);
   });
+  test("the clip before a hidden product's closing shot ends on that exact picture", async () => {
+    const actor = person("film-owner"); actorForEngines = actor; const production = createMediaProduction(actor, { title: "Draft" }), calls: string[] = [], ends: Record<string, string | undefined> = {}, engines = fake(calls);
+    const reveal: FilmPlan = { ...plan, cast: [...plan.cast, { name: "Mug", kind: "prop", locked: "White mug.", reveal_last: true }], shots: plan.shots.map((shot, i) => i === 2 ? { ...shot, still: "Mug on a table." } : shot) };
+    engines.makeClip = async ({ shot, endStillFileId }) => { ends[shot.id] = endStillFileId; return `clip:${shot.id}`; };
+    await runFilm({ actor, productionId: production.id, plan: reveal, engines, signal: new AbortController().signal });
+    expect(ends).toEqual({ "shot-1": undefined, "shot-2": "picture:shot-3", "shot-3": undefined });
+  });
   test("a Stack that is restarting is waited for: the step is tried again instead of ending the film", async () => {
     const actor = person("film-retry"); actorForEngines = actor; const production = createMediaProduction(actor, { title: "Draft" }), calls: string[] = [];
     __setFilmRetryDelaysForTests([1, 1, 1]);

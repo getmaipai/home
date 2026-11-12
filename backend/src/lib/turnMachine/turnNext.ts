@@ -673,6 +673,7 @@ async function beginTurn(actor: PersonRow, surface: Surface, text: string, opts:
     bare,
     ephemeral: opts.ephemeral === true,
     text,
+    imageCount: opts.images?.length ?? 0,
     hasPictureInConversation: (opts.images?.length ?? 0) > 0 || latestPictureId(actor, conversation.id, temporary || opts.ephemeral === true) !== null,
     musicEditAvailable: () => (opts.audio?.length ?? 0) > 0 || conversationHasMusic(actor, conversation.id, temporary || opts.ephemeral === true),
     videoEditAvailable: () => conversationHasVideo(actor, conversation.id, temporary || opts.ephemeral === true),

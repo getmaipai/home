@@ -9,8 +9,8 @@ export class FilmStepError extends Error {
 }
 export interface FilmEngines {
   ensureSubject(input: { name: string; kind: "character" | "place" | "prop"; locked: string }, options: { signal: AbortSignal }): Promise<string>;
-  makeStill(input: { shot: FilmPlan["shots"][number]; castLocked: string[] }, options: { signal: AbortSignal }): Promise<string>;
-  makeClip(input: { shot: FilmPlan["shots"][number]; stillFileId: string }, options: { signal: AbortSignal }): Promise<string>;
+  makeStill(input: { shot: FilmPlan["shots"][number]; castLocked: string[]; /** The name of a supplied product kept hidden until this shot: its own picture is the still (a model redraws writing as nonsense). */ exactReference?: string }, options: { signal: AbortSignal }): Promise<string>;
+  makeClip(input: { shot: FilmPlan["shots"][number]; stillFileId: string; /** The exact picture this clip must end on (the closing product shot follows it). */ endStillFileId?: string }, options: { signal: AbortSignal }): Promise<string>;
   makeNarration?(input: { shot: FilmPlan["shots"][number] }, options: { signal: AbortSignal }): Promise<{ fileId: string; seconds: number }>;
   readNarration?(input: { fileId: string }, options: { signal: AbortSignal }): Promise<{ fileId: string; seconds: number }>;
   makeMotionClip?(input: { shot: FilmPlan["shots"][number]; stillFileId: string; narrationFileId: string; seconds: number }, options: { signal: AbortSignal }): Promise<string>;
@@ -101,7 +101,7 @@ export async function runFilm(input: { actor: PersonRow; productionId: string; p
     const planned = plan.shots[i]!;
     const stored = shotsNow.find((shot) => shot.id === planned.id);
     if (!stored?.picture_file_id) {
-      const fileId = await callEngine("stills", planned.id, engines, signal, () => engines.makeStill({ shot: planned, castLocked: lockedForShot(plan, planned) }, { signal }));
+      const fileId = await callEngine("stills", planned.id, engines, signal, () => engines.makeStill({ shot: planned, castLocked: lockedForShot(plan, planned), exactReference: plan.cast.find((member) => member.reveal_last === true && planned.still.toLocaleLowerCase().includes(member.name.toLocaleLowerCase()))?.name }, { signal }));
       setShotPicture(actor.id, productionId, planned.id, fileId);
     }
     engines.onProgress?.({ stage: "stills", done: i + 1, total: plan.shots.length, shotId: planned.id });
@@ -123,7 +123,9 @@ export async function runFilm(input: { actor: PersonRow; productionId: string; p
         engines.onProgress?.({ stage: "clips", done: i * 2 + 1, total: plan.shots.length * 2, shotId: planned.id });
         fileId = await callEngine("clips", planned.id, engines, signal, () => engines.makeMotionClip!({ shot: planned, stillFileId: stored.picture_file_id!, narrationFileId: narration.fileId, seconds: Math.max(planned.seconds, narration.seconds + 0.6) }, { signal }));
       } else {
-        fileId = await callEngine("clips", planned.id, engines, signal, () => engines.makeClip({ shot: planned, stillFileId: stored.picture_file_id! }, { signal }));
+        const last = plan.shots[plan.shots.length - 1]!, lastStored = productionShots(current).find((shot) => shot.id === last.id);
+        const endsOnReveal = i === plan.shots.length - 2 && !!lastStored?.picture_file_id && plan.cast.some((member) => member.reveal_last === true && last.still.toLocaleLowerCase().includes(member.name.toLocaleLowerCase()));
+        fileId = await callEngine("clips", planned.id, engines, signal, () => engines.makeClip({ shot: planned, stillFileId: stored.picture_file_id!, ...(endsOnReveal ? { endStillFileId: lastStored!.picture_file_id! } : {}) }, { signal }));
       }
       setShotClip(actor.id, productionId, planned.id, fileId);
     }

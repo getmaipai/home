@@ -62,6 +62,10 @@ describe("FILM-04 make_film", () => {
   test("offer gate excludes children, teens, guests, spoken, overlay and TV turns", async () => {
     const base = { budget: resolveTurnBudgetBase(undefined, "adult"), actor, band: "adult" as const, surface: "chat" as const, surfaceClass: "written" as const, spoken: false, temporary: false, bare: false, ephemeral: false, text: "make a film", musicEditAvailable: () => false };
     expect((await budgetWithTurnToolGates(base)).budget.tools_offered).toContain(MAKE_FILM_TOOL_ID);
+    // FILM-ROUTING-02: several pictures attached means the film tool is the video tool; one picture keeps both.
+    expect((await budgetWithTurnToolGates({ ...base, imageCount: 1 })).budget.tools_offered).toEqual(expect.arrayContaining([MAKE_FILM_TOOL_ID, "generate_video"]));
+    const several = (await budgetWithTurnToolGates({ ...base, imageCount: 4 })).budget.tools_offered;
+    expect(several).toContain(MAKE_FILM_TOOL_ID); expect(several).not.toContain("generate_video");
     for (const input of [
       { actor: person("child"), band: "child" as const }, { actor: person("teen"), band: "teen" as const },
       { actor: person("guest") }, { spoken: true, surfaceClass: "spoken" as const },

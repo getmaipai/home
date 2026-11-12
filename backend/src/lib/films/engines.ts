@@ -4,7 +4,7 @@ import type { PersonRow } from "@/types";
 import { readAttachment, storeFile } from "@/lib/attachments";
 import { checkImages } from "@/lib/pictures/ageCheck";
 import { gateFinished } from "@/lib/pictures/laneGate";
-import { submitGeneration, getGenerationJob, fetchPicture, cancelOrDelete } from "@/lib/pictures/stack";
+import { submitGeneration, submitEdit, getGenerationJob, fetchPicture, cancelOrDelete } from "@/lib/pictures/stack";
 import { fullViewForJob } from "@/lib/stack/fullView";
 import { createMediaProduction } from "@/lib/mediaProductions";
 import { createMediaSubject, listMediaSubjects, subjectsForNames } from "@/lib/mediaSubjects";
@@ -28,7 +28,7 @@ import { extractKeyframes } from "@/lib/pictures/keyframes";
 import { runStackEdit } from "@/lib/videos/stackEdit";
 import { filmOps, filmOverhead, MAX_EDIT_OPS, MAX_EDIT_SECONDS, overlayOp, type JoinTransition } from "@/lib/videos/editPlan";
 import { planFilm, type FilmPlan, type PlanFilmInput } from "./plan";
-import { changeMusic, redoShot, runFilm, type FilmEngines, type FilmStage } from "./run";
+import { changeMusic, isTransientStackError, redoShot, runFilm, type FilmEngines, type FilmStage } from "./run";
 
 const sleep = (ms: number, signal: AbortSignal) => new Promise<void>((resolve, reject) => {
   if (signal.aborted) return reject(signal.reason ?? new Error("Aborted"));
@@ -58,6 +58,23 @@ export function backgroundTurn(actor: PersonRow) {
 
 /** How far a still may move away from a supplied character picture (0 keeps it, 1 ignores it). */
 const REFERENCE_STILL_STRENGTH = 0.6;
+/** FILM-COMPOSE-01: the place (else the person, else the object) is the picture the image engine edits; the others are its references (at most two). */
+export async function submitComposition(pictured: ReadonlyArray<{ subject: { name: string; kind: string }; picture: { bytes: Uint8Array; mediaType: string } }>, scene: string): Promise<{ job: string; done: null }> {
+  const order = ["place", "character", "prop"];
+  const sorted = [...pictured].sort((a, b) => order.indexOf(a.subject.kind) - order.indexOf(b.subject.kind));
+  const base = sorted[0]!, references = sorted.slice(1, 3);
+  const instruction = `${scene} Photorealistic photograph, natural light. This picture is the setting${base.subject.kind === "place" ? "" : " and the first subject"}. ${references.map((ref, i) => `Reference picture ${i + 1} shows ${ref.subject.name}: keep it exactly as it looks there${ref.subject.kind === "character" ? ", the person facing the camera and holding the object if there is one" : ", its shape and color; any writing or printing on it is turned away from the camera and not visible"}.`).join(" ")}`.slice(0, 1500);
+  const form = new FormData();
+  form.append("image", new File([new Uint8Array(base.picture.bytes)], "picture", { type: base.picture.mediaType }));
+  form.append("operation", "edit");
+  form.append("instruction", instruction);
+  form.append("image_source", "uploaded");
+  const fields = ["reference", "reference2"] as const;
+  references.forEach((ref, i) => { form.append(fields[i]!, new File([new Uint8Array(ref.picture.bytes)], "reference", { type: ref.picture.mediaType })); form.append(`${fields[i]}_source`, "uploaded"); });
+  form.append("timeout_ms", "1");
+  return { ...(await submitEdit(form)), done: null };
+}
+
 export function realFilmEngines(input: { actor: PersonRow; signal: AbortSignal; productionId: string; faceless?: boolean }): FilmEngines {
   const { actor, signal, productionId, faceless = false } = input;
   let turn: ReturnType<typeof backgroundTurn> | null = null;
@@ -71,16 +88,35 @@ export function realFilmEngines(input: { actor: PersonRow; signal: AbortSignal; 
       try { const { makeSubjectSheet } = await import("@/lib/mediaSubjectSheet"); await makeSubjectSheet(actor, subject.id); } catch { /* Model sheets are optional; the saved subject remains usable. */ }
       return subject.id;
     },
-    async makeStill({ shot, castLocked }) {
+    async makeStill({ shot, castLocked, exactReference }) {
+      // A product that was held back and is shown now keeps its own picture: an image model redraws printed writing as nonsense (seen 2026-11-12:
+      // "LITOKCUE RONHICSE"), and the writing is what the reveal is for. The picture is fitted to the film's frame on a soft copy of itself.
+      const aloneNames = castLocked.map((line) => line.split(":")[0]!.trim()).filter((name) => subjectsForNames(actor, [name])?.[0]?.references[0]);
+      // Only when the product is the one supplied picture in the shot: with the actor and the place also there, the shot is composed from all three below.
+      if (exactReference && aloneNames.length < 2) {
+        const picture = subjectsForNames(actor, [exactReference])?.[0]?.references[0];
+        if (picture) {
+          const base = sharp(Buffer.from(picture.bytes), { failOn: "error" }).rotate();
+          const backdrop = await base.clone().resize(1024, 576, { fit: "cover" }).blur(28).modulate({ brightness: 0.85 }).png().toBuffer();
+          const front = await base.clone().resize(1024, 576, { fit: "inside" }).png().toBuffer();
+          const fitted = await sharp(backdrop).composite([{ input: front, gravity: "centre" }]).png().toBuffer();
+          const kept = storeFile(actor, { conversationId: null, turnId: null, mediaType: "image/png", bytes: fitted, provenance: `picture-gen:${JSON.stringify({ v: 1, audience: "all-ages", job: `reference-${shot.id}`, index: 0, seed: 0, width: 1024, height: 576 })}`, retention: "kept", name: `Film still ${shot.id}`, deduplicate: false });
+          if (kept.ok) return kept.value.id;
+        }
+      }
       const prompt = [shot.still, ...castLocked].filter(Boolean).join(" ");
       const seed = createHash("sha256").update(shot.id).digest().readUInt32BE(0);
       const view = fullViewForJob("adult", actor);
       // A character the person supplied pictures for starts the still from that picture, so the face carries through (retry from words alone if the Stack declines it).
       const starter = pickStarter(shot.still, castLocked.map((line) => line.split(":")[0]!.trim()).flatMap((name) => { const picture = subjectsForNames(actor, [name])?.[0]?.references[0]; return picture ? [{ name, picture }] : []; }))?.picture;
       const body = { prompt, size: "1024x576", n: 1, seed, audience: "adult" as const, timeout_ms: 1 };
-      const submitted = starter
+      // A shot that shows several supplied pictures together (the actor holding the product outside the factory) is composed from them: the place is the
+      // picture that is edited and the person and the object ride along as references (the image engine takes two), so each keeps its own look.
+      const pictured = castLocked.map((line) => line.split(":")[0]!.trim()).flatMap((name) => { const found = subjectsForNames(actor, [name])?.[0]; return found?.references[0] ? [{ subject: found.subject, picture: found.references[0] }] : []; });
+      const composed = pictured.length >= 2 ? await submitComposition(pictured, prompt).catch((error) => { if (isTransientStackError(error)) throw error; return null; }) : null;
+      const submitted = composed ?? (starter
         ? await submitGeneration({ ...body, init_image: Buffer.from(starter.bytes).toString("base64"), image_source: "uploaded", strength: REFERENCE_STILL_STRENGTH }).catch(() => submitGeneration(body))
-        : await submitGeneration(body);
+        : await submitGeneration(body));
       try {
         let finished = !!submitted.done?.length;
         const deadline = Date.now() + 8 * 60_000;
@@ -103,9 +139,9 @@ export function realFilmEngines(input: { actor: PersonRow; signal: AbortSignal; 
         return saved.value.id;
       } catch (error) { void cancelOrDelete(submitted.job); throw error; }
     },
-    async makeClip({ shot }) {
+    async makeClip({ shot, endStillFileId }) {
       const prompt = `${shot.motion}${shot.line ? ` Say "${shot.line}".` : ""}`;
-      const result = await runGenerateVideo({ state, args: { prompt, production: productionId, shot: shot.id, seconds: shot.seconds }, callId: `film-${shot.id}`, spoken: false, audience: makeAudienceOf(actor) });
+      const result = await runGenerateVideo({ state, args: { prompt, production: productionId, shot: shot.id, seconds: shot.seconds, ...(endStillFileId ? { end_frame: endStillFileId } : {}) }, callId: `film-${shot.id}`, spoken: false, audience: makeAudienceOf(actor) });
       const jobId = (result.result?.data as { videoJobId?: string } | undefined)?.videoJobId;
       if (!jobId) {
         const why = JSON.stringify(result.result?.reply ?? result).slice(0, 500);

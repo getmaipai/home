@@ -82,7 +82,7 @@ Name the film stock look in words, such as “shot on 35mm, overcast, muted colo
 When target_seconds is present, choose the shot count and every shot's seconds to fit it. Title and credits take about 7 seconds together and are not counted in the shots; Home sets each shot's final seconds to fit. When no length was asked, make 4 to 8 shots of 5 to 7 seconds.
 Use these named shot types and describe them: wide establishing; medium with the character facing the camera and the creature behind the shoulder; extreme close-up of detail; face close-up with the background stretching (dolly zoom); wide retreat; reaction shot; calm closing wide.
 Every cast entry has exactly four fields: name, kind, locked and reveal_last (true or false, false when nothing is hidden). If the person wants something kept hidden until the end (for example writing, a logo or the front of a product), set reveal_last true on that cast entry, build the earlier shots around the process, the place and the people, and do not name it, describe it or show it until the last shot. Never put its name or its writing in the title, the summary or the credits.
-Cast hints that read "Name (use): look" describe pictures the person attached. Give each one a cast entry with exactly that Name, its look as the locked description, and the kind that fits (actor: character; product, prop: prop; set and closing wide shot: place). Use every one: an actor plays the part, a product is shown clearly and is what the film is about, a set is where scenes happen, and a closing wide shot picture is the last shot, pulling back to reveal it. Write the picture's Name first in the still text of the shots it is the subject of.
+Cast hints that read "Name (use; photograph or illustration): look" describe pictures the person attached. Give each one a cast entry with exactly that Name, its look as the locked description, and the kind that fits (actor: character; product, prop: prop; set and closing wide shot: place). Use every one: an actor plays the part, a product is shown clearly and is what the film is about, a set is where scenes happen, and a closing wide shot picture is the last shot, pulling back to reveal it. Write the picture's Name first in the still text of the shots it is the subject of. A shot that shows the actor with the product at a place (for example the actor holding the product outside the building) names the actor, the product and the place in that shot's still text and says what the actor does with it. When a hint says photograph, the whole film is photorealistic: write "photorealistic, shot on a cinema camera, natural light" in every shot's still and motion text and in every locked description, and never write cartoon, illustration, flat or stylized for it. Only a hint that says illustration, or an art style the person asked for, may be drawn.
 A real person's name is just a name in the prompt.
 Put spoken lines in quotes, let one person speak at a time, and keep each line under 12 words.
 At most one character speaks per shot.
@@ -131,16 +131,22 @@ export function holdBackReveals(plan: FilmPlan, idea = ""): FilmPlan {
   // The writing the person quoted in the request ("World's Greatest Cheater") is what is being held back too.
   const quoted = [...idea.matchAll(/["\u201c]([^"\u201d]{4,80})["\u201d]/g)].map((m) => m[1]!.trim());
   const quotedWords = quoted.flatMap((phrase) => phrase.split(/\s+/)).map((w) => w.replace(/[^\p{L}\p{N}']/gu, "")).filter((w) => w.length >= 5);
-  const words = [...new Set([...hidden.flatMap((member) => { const parts = member.name.trim().split(/\s+/); const head = parts[parts.length - 1] ?? ""; return [member.name.trim(), ...(head.length >= 3 ? [head] : [])]; }), ...quoted, ...quotedWords].map((w) => w.toLocaleLowerCase()))];
+  // The generic word for the product ("mug") is used too, unless another cast member shares it (mugs on a conveyor belong in the factory shots).
+  const sharedWith = (head: string, self: FilmPlan["cast"][number]) => plan.cast.some((other) => other !== self && new RegExp(`\\b${escape(head)}s?\\b`, "i").test(other.name));
+  const words = [...new Set([...hidden.flatMap((member) => { const parts = member.name.trim().split(/\s+/); const head = parts[parts.length - 1] ?? ""; return [member.name.trim(), ...(head.length >= 3 && !sharedWith(head, member) ? [head] : [])]; }), ...quoted, ...quotedWords].map((w) => w.toLocaleLowerCase()))];
   const mentions = new RegExp(`\\b(?:${words.map(escape).join("|")})s?\\b`, "i");
   const strip = (text: string): string => text.split(/(?<=[.!?])\s+/).filter((sentence) => !mentions.test(sentence) && !WRITING.test(sentence)).join(" ").trim();
+  // The shot that shows the actor holding the product at the place keeps its names (the pictures are combined for it); only talk of writing goes.
+  const heroNames = [plan.cast.find((m) => m.kind === "character"), plan.cast.find((m) => m.kind === "place"), ...hidden].filter((m): m is NonNullable<typeof m> => !!m).map((m) => m.name.toLocaleLowerCase());
+  const isHero = (still: string) => heroNames.length >= 3 && heroNames.every((n) => still.toLocaleLowerCase().includes(n));
+  const stripWriting = (text: string): string => text.split(/(?<=[.!?])\s+/).filter((sentence) => !WRITING.test(sentence)).join(" ").trim();
   // A title that names it, or its writing, is replaced whole: a half title reads worse than a plain one.
   const title = mentions.test(plan.title) || WRITING.test(plan.title) ? "The making of it" : plan.title;
   return {
     ...plan,
     title,
     summary: strip(plan.summary).slice(0, 400) || "How it is made.",
-    shots: plan.shots.map((shot, i) => i === last ? shot : {
+    shots: plan.shots.map((shot, i) => i === last ? shot : isHero(shot.still) ? { ...shot, still: stripWriting(shot.still) || shot.still } : {
       ...shot,
       still: strip(shot.still) || `${shot.framing} of the scene`,
       motion: strip(shot.motion) || "slow push in",
@@ -172,11 +178,17 @@ async function planFilmUnheld(input: PlanFilmInput, complete: PlannerCompleter):
       if (!parsed.success) { errors = validationLine(parsed.error); continue; }
       const problem = planProblem(parsed.data);
       if (problem) { errors = problem; limit = 3; continue; }
-      if (fits) return { ok: true, plan: fitPlanToLength(parsed.data, input.targetSeconds!) };
-      const tooLong = durationError(parsed.data, input);
+      let plan = parsed.data;
+      const hero = missingHeroScene(plan, input.idea);
+      if (hero) {
+        if (attempt < limit - 1) { errors = `one shot must show ${hero.person.name} holding ${hero.product.name} at ${hero.place.name}, naming all three in that shot's still text`; limit = Math.max(limit, 2); continue; }
+        plan = withHeroScene(plan, hero);
+      }
+      if (fits) return { ok: true, plan: fitPlanToLength(plan, input.targetSeconds!) };
+      const tooLong = durationError(plan, input);
       if (tooLong && attempt < 1) { errors = tooLong; continue; }
-      if (tooLong && input.targetSeconds !== undefined && planDuration(parsed.data, input.faceless === true) > input.targetSeconds * 1.6) return { ok: false, line: REFUSAL_LINE };
-      return { ok: true, plan: parsed.data };
+      if (tooLong && input.targetSeconds !== undefined && planDuration(plan, input.faceless === true) > input.targetSeconds * 1.6) return { ok: false, line: REFUSAL_LINE };
+      return { ok: true, plan };
     }
     return { ok: false, line: REFUSAL_LINE };
   } catch {
@@ -199,6 +211,25 @@ export function fitPlanToLength(plan: FilmPlan, targetSeconds: number): FilmPlan
 /** How many shots a film of this length asks the planner for: about one per six seconds of what is left after the title and credits (2 to 12). */
 export function shotsFor(targetSeconds: number): number {
   return Math.min(12, Math.max(2, Math.round((targetSeconds - filmOverhead(true, true)) / 6)));
+}
+
+/** FILM-COMPOSE-01: a request that has the actor hold the product at a place ("the man holding the mug outside the factory") needs one shot that shows all three,
+ *  named together (that is the shot the pictures are combined for). Returns the three cast entries when no shot does, else null. */
+export function missingHeroScene(plan: FilmPlan, idea: string): { person: FilmPlan["cast"][number]; place: FilmPlan["cast"][number]; product: FilmPlan["cast"][number] } | null {
+  if (!/\b(?:hold|holds|holding|held|carry|carries|carrying)\b/i.test(idea)) return null;
+  const person = plan.cast.find((m) => m.kind === "character"), place = plan.cast.find((m) => m.kind === "place");
+  const head = (name: string) => name.trim().split(/\s+/).pop()!.toLocaleLowerCase();
+  const product = plan.cast.find((m) => m.reveal_last === true) ?? plan.cast.find((m) => m.kind === "prop" && head(m.name).length >= 3 && idea.toLocaleLowerCase().includes(head(m.name)));
+  if (!person || !place || !product) return null;
+  const names = [person, place, product].map((m) => m.name.toLocaleLowerCase());
+  return plan.shots.some((shot) => names.every((n) => shot.still.toLocaleLowerCase().includes(n))) ? null : { person, place, product };
+}
+/** The shot the request asked for, written in code when the model keeps leaving it out: it replaces the shot before the closing one. */
+export function withHeroScene(plan: FilmPlan, scene: NonNullable<ReturnType<typeof missingHeroScene>>): FilmPlan {
+  // The shot before the closing one: the closing shot is where the product's own picture, with its writing, is shown.
+  const at = plan.shots.length >= 3 ? plan.shots.length - 2 : plan.shots.length - 1;
+  const still = `A photorealistic shot outside: ${scene.person.name} stands at ${scene.place.name}, holding ${scene.product.name} up to the camera in both hands. Natural light, shot on a cinema camera.`;
+  return { ...plan, shots: plan.shots.map((shot, i) => i === at ? { ...shot, framing: "medium", still, motion: "slow push in" } : shot) };
 }
 
 /** A plan the schema accepts can still be empty of meaning: a shot picture that is one word, or a cast name that is a bare "true". Returns what is wrong, or null. */

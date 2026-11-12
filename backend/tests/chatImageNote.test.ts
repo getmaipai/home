@@ -43,5 +43,6 @@ describe("VISION-ATTACH-01 picturesDescribedNote", () => {
     expect(note).toContain("1. mug.jpg: A blue ceramic mug on a wooden table.");
     expect(note).toContain("You cannot see them yourself");
     expect(note).toContain("never say who a person");
+    expect(note).toContain("call the tool for it");
   });
 });

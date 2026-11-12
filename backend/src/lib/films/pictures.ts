@@ -34,7 +34,7 @@ export async function prepareFilmPictures(actor: PersonRow, input: { images: Rea
     while (used.has(name.toLocaleLowerCase()) && used.get(name.toLocaleLowerCase()) !== reading.role) name = `${cap(reading.name)} ${++n}`;
     used.set(name.toLocaleLowerCase(), reading.role);
     names.push(name); kinds[name.toLocaleLowerCase()] = kindOfRole(reading.role); looks[name.toLocaleLowerCase()] = reading.look;
-    if (!hints.has(name)) hints.set(name, `${name} (${USE[reading.role]}): ${reading.look}`);
+    if (!hints.has(name)) hints.set(name, `${name} (${USE[reading.role]}; ${reading.medium}): ${reading.look}`);
   }
   const prepared = await prepareCharacters(actor, { names, images: input.images.map((image) => ({ id: image.id })), conversationId: input.conversationId, kinds, looks });
   return prepared.ok ? { ok: true, names: prepared.names, hints: [...hints.values()] } : prepared;

@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, test } from "bun:test";
 import { filmOverhead, SEAM_SECONDS } from "@/lib/videos/editPlan";
 import { z } from "zod";
-import { __setFilmPlanCompleterForTests, FILM_PLAN_PROMPT, FILM_PLAN_RESPONSE_FORMAT, filmPlanSchema, fitPlanToLength, holdBackReveals, planFilm, shotsFor, type FilmPlan } from "@/lib/films/plan";
+import { __setFilmPlanCompleterForTests, FILM_PLAN_PROMPT, FILM_PLAN_RESPONSE_FORMAT, filmPlanSchema, fitPlanToLength, holdBackReveals, missingHeroScene, planFilm, shotsFor, type FilmPlan } from "@/lib/films/plan";
 
 const productionShot = z.object({ id: z.string().min(1).max(80), subject_ids: z.array(z.string()), clip_file_id: z.string().nullable().optional(), picture_file_id: z.string().nullable().optional(), music_line_id: z.string().nullable().optional(), voice_line_id: z.string().nullable().optional() });
 const goodPlan: FilmPlan = {
@@ -137,5 +137,36 @@ describe("film planner", () => {
   test("half of the quoted writing in a title still counts as the hidden writing", () => {
     const plan = { ...goodPlan, title: "The Greatest Cheater", cast: [...goodPlan.cast, { name: "White mug", kind: "prop" as const, locked: "white mug", reveal_last: true }] };
     expect(holdBackReveals(plan, 'Reveal "World\'s Greatest CHEATER" at the end').title).toBe("The making of it");
+  });
+
+  test("a request that has the actor hold the product at a place gets a shot with all three, asked for once and then written in code", async () => {
+    const cast = [
+      { name: "Man in apron", kind: "character" as const, locked: "a middle-aged man in a grey apron", reveal_last: false },
+      { name: "Brick factory", kind: "place" as const, locked: "a red brick factory building", reveal_last: false },
+      { name: "White mug", kind: "prop" as const, locked: "a white ceramic mug", reveal_last: true },
+    ];
+    const without = { ...goodPlan, cast, shots: ["A wide shot of the factory floor, photorealistic.", "Close on the machines, photorealistic.", "The man in an outside setting, photorealistic.", "The white mug on a table, photorealistic."].map((still, i) => ({ ...goodPlan.shots[0]!, id: `h${i}`, still, seconds: 6 })) };
+    const idea = "A commercial for a mug that shows the man holding the mug outside the brick factory.";
+    expect(missingHeroScene(without, idea)).not.toBeNull();
+    expect(missingHeroScene(without, "A commercial for a mug.")).toBeNull();
+    let calls = 0; const messages: string[] = [];
+    __setFilmPlanCompleterForTests(async (request) => { calls++; messages.push(request[0]?.content ?? ""); return { ok: true, text: JSON.stringify(without) }; });
+    const planned = await planFilm({ idea });
+    expect(calls).toBe(2);
+    expect(messages[1]).toContain("one shot must show Man in apron holding White mug at Brick factory");
+    if (!planned.ok) throw new Error(planned.line);
+    const hero = planned.plan.shots.at(-2)!;
+    expect(hero.still).toContain("Man in apron"); expect(hero.still).toContain("Brick factory"); expect(hero.still).toContain("White mug"); expect(hero.still.toLowerCase()).toContain("holding");
+    expect(planned.plan.shots.at(-1)!.still).not.toContain("Man in apron");
+    expect(missingHeroScene(planned.plan, idea)).toBeNull();
+  });
+
+  test("mugs that belong to the factory shots are not stripped when another cast member shares the word", () => {
+    const plan = { ...goodPlan, cast: [...goodPlan.cast, { name: "Mugs on conveyor", kind: "prop" as const, locked: "rows of unglazed mugs", reveal_last: false }, { name: "White ceramic mug", kind: "prop" as const, locked: "white mug", reveal_last: true }], shots: [
+      { ...goodPlan.shots[0]!, id: "f1", still: "A wide shot of the factory floor. Rows of unglazed mugs ride the conveyor belt." },
+      { ...goodPlan.shots[1]!, id: "f2", still: "Close on the forming machine." },
+      { ...goodPlan.shots[0]!, id: "f3", still: "The white ceramic mug on a wooden table." },
+    ] };
+    expect(holdBackReveals(plan).shots[0]!.still).toContain("unglazed mugs");
   });
 });

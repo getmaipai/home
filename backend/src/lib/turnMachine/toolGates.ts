@@ -31,6 +31,8 @@ import { mayUseClipVoices } from "@/lib/access";
 
 export interface TurnToolGateInput {
   conversationId?: string;
+  /** How many pictures came with this message. */
+  imageCount?: number;
   budget: TurnBudget;
   actor: PersonRow;
   band: AgeBand;
@@ -177,8 +179,12 @@ export async function budgetWithTurnToolGates(input: TurnToolGateInput): Promise
   // TOOL-OFFER-VOICEOVER-01: `voiceover` is offered by structure alone (an adult, written, non-guest turn with the voice engine ready); the
   // person's wording is never read (rule 1). budget.ts keeps it past the sixteen-tool cap.
   const gated = withTurnToolGates(input.budget, answerImagesOk, picturesOk, videosOk, musicOk, musicEditOk, itemRefOk, musicBandOk, videoEditOk, musicObject, writingFormatOk, editPictureOk, voiceoverOk, filmOk, houseOk, uptimeOk, inspiredVoiceOk);
+  // FILM-ROUTING-02: one clip starts from one picture and refuses several (found 2026-11-12: the model kept choosing it for a commercial from four
+  // photos). With several pictures attached and the film tool on offer, the single-clip tool is not offered, so the film tool is the video tool.
+  const severalPictures = (input.imageCount ?? 0) > 1 && filmOk;
+  const offered = severalPictures ? { ...gated, tools_offered: gated.tools_offered.filter((id) => id !== "generate_video") } : gated;
   return {
-    budget: gated,
+    budget: offered,
     writingFormatOk,
     voiceoverOk,
     inspiredVoiceOk,

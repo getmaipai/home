@@ -29,7 +29,7 @@ export function picturesAttachedNote(images: readonly ChatImagePart[]): string {
 export function picturesDescribedNote(described: ReadonlyArray<{ name: string; text: string }>): string {
   const count = described.length === 1 ? "1 picture" : `${described.length} pictures`;
   const lines = described.map((item, i) => `${i + 1}. ${cleanPictureName(item.name)}: ${redactCredentials(sanitizeForPrompt(item.text))}`).join(" ");
-  return `The person attached ${count} to this message. You cannot see them yourself; a picture reader looked at each one and described it: ${lines} Answer from these descriptions only, never add details they do not give, and never say who a person in a photo is.`;
+  return `The person attached ${count} to this message. You cannot see them yourself; a picture reader looked at each one and described it: ${lines} Use the descriptions to understand and talk about the pictures: never add details they do not give, and never say who a person in a photo is. The pictures stay attached for your tools: when the person asks you to make something from them (a film, a video, a picture), call the tool for it instead of describing what you would do.`;
 }
 
 /** VISION-02c (rule 6): pictures the model reads but that could not be
