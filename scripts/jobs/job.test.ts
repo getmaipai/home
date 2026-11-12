@@ -4,17 +4,18 @@ import { spawn } from "node:child_process";
 import { existsSync, mkdirSync, mkdtempSync, realpathSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { alive, decideLaunch, reserveGb, devUsedGb, memoryAction, orphanVerdict, parseDuration, readAudit, serverAction, type JobRecord } from "./lib";
+import { alive, decideLaunch, memoryAction, orphanVerdict, parseDuration, readAudit, type JobRecord } from "./lib";
 
 const JOB = join(import.meta.dir, "job.ts");
 const temps: string[] = [];
 afterAll(() => { for (const t of temps) rmSync(t, { recursive: true, force: true }); });
 function env(extra: Record<string, string> = {}) {
   const state = mkdtempSync(join(tmpdir(), "jobs-")); const guard = mkdtempSync(join(tmpdir(), "guard-")); temps.push(state, guard);
-  return { PATH: process.env.PATH!, HOME: process.env.HOME!, MAIPAI_JOBS_DIR: state, MAIPAI_HOST_GUARD_STATE_DIR: guard, MAIPAI_HOSTMEM_PRESSURE: "1", MAIPAI_JOBS_TICK_MS: "100", MAIPAI_JOBS_MIN_DISK_GB: "0", ...extra };
+  return { PATH: process.env.PATH!, HOME: process.env.HOME!, MAIPAI_JOBS_DIR: state, MAIPAI_HOST_GUARD_STATE_DIR: guard, MAIPAI_HOSTMEM_PRESSURE: "1", MAIPAI_JOBS_TICK_MS: "100", MAIPAI_DEV_MODE: "direct", MAIPAI_FAMILY_ACTIVITY: join(state, "no-family.json"), MAIPAI_LEASE_POLL_MS: "100", MAIPAI_JOBS_MIN_DISK_GB: "0", ...extra };
 }
 const job = (e: Record<string, string>, ...args: string[]) => Bun.spawnSync(["bun", JOB, ...args], { env: e, stdout: "pipe", stderr: "pipe" });
-const actions = (e: Record<string, string>) => { const was = process.env.MAIPAI_JOBS_DIR; process.env.MAIPAI_JOBS_DIR = e.MAIPAI_JOBS_DIR; const a = readAudit(); process.env.MAIPAI_JOBS_DIR = was; if (was === undefined) delete process.env.MAIPAI_JOBS_DIR; return a; };
+const actionsAll = (e: Record<string, string>) => { const was = process.env.MAIPAI_JOBS_DIR; process.env.MAIPAI_JOBS_DIR = e.MAIPAI_JOBS_DIR; const a = readAudit(); process.env.MAIPAI_JOBS_DIR = was; if (was === undefined) delete process.env.MAIPAI_JOBS_DIR; return a; };
+const actions = (e: Record<string, string>) => actionsAll(e).filter((x) => !x.action.startsWith("lease-"));
 const calm = { loadPerCore: 0.3, running: 0, progressing: 0, pressure: { level: 1, devShed: false }, freeDiskGb: 100, cap: 4, minDiskGb: 5 };
 
 describe("launch decision (pure)", () => {
@@ -131,67 +132,44 @@ describe("orphan dev servers", () => {
   });
 });
 
-describe("dev budget (DEV-BUDGET-01)", () => {
-  test("a server waits when the budget is full; tests and builds are not held by it; servers skip the concurrency cap", () => {
-    const full = { ...calm, type: "server" as const, devUsedGb: 24, devBudgetGb: 24 };
-    expect(decideLaunch(full).go).toBe(false); expect(decideLaunch(full).why).toContain("development budget is full");
-    expect(decideLaunch({ ...full, type: "test" }).go).toBe(true);
-    expect(decideLaunch({ ...calm, type: "server", running: 9, devUsedGb: 3, devBudgetGb: 24 }).go).toBe(true);
-    expect(decideLaunch({ ...calm, type: "server", loadPerCore: 3, running: 3, progressing: 0, devUsedGb: 3, devBudgetGb: 24 }).go).toBe(true);
+describe("dev checkout (DEV-CHECKOUT-01)", () => {
+  test("a job takes the checkout, runs, and returns it the moment it ends", () => {
+    const e = env();
+    expect(job(e, "run", "--type", "test", "--session", "one", "--", "true").exitCode).toBe(0);
+    const a = actionsAll(e).map((x) => x.action);
+    expect(a).toContain("lease-granted"); expect(a).toContain("lease-released");
+    expect(a.indexOf("lease-granted")).toBeLessThan(a.indexOf("launched"));
   });
-  test("used memory counts only live running or paused jobs", () => {
-    const mk = (rssMb: number, state: JobRecord["state"], pid: number): JobRecord => ({ id: String(pid), type: "server", session: "s", worktree: "/w", command: "c", pid, pgid: pid, startedAt: 1, state, log: "l", rssMb });
-    expect(devUsedGb([mk(2048, "running", process.pid), mk(1024, "paused", process.pid), mk(5000, "done", process.pid), mk(4000, "running", 2 ** 22 - 3)])).toBeCloseTo(3, 5);
-  });
-  test("DEV-BUDGET-03: in direct mode the reserve is what dev really holds plus a margin, capped by the budget; in gated mode it is the full budget", () => {
-    const e = env({ MAIPAI_DEV_BUDGET_GB: "24" });
-    const was = { ...process.env }; Object.assign(process.env, e);
-    try {
-      process.env.MAIPAI_DEV_MODE = "direct";
-      expect(reserveGb(1.3)).toBeCloseTo(3.3, 5); expect(reserveGb(30)).toBe(24); expect(reserveGb(0)).toBe(2);
-      process.env.MAIPAI_DEV_MODE = "gated";
-      expect(reserveGb(1.3)).toBe(24);
-      process.env.MAIPAI_DEV_MODE = "direct"; writeFileSync(join(e.MAIPAI_JOBS_DIR, "reserve-released"), "{}");
-      expect(reserveGb(1.3)).toBe(0);
-    } finally { for (const k of Object.keys(process.env)) if (!(k in was)) delete process.env[k]; Object.assign(process.env, was); }
-  });
-  test("a server with a cap is restarted cold, not stopped; without a cap the old stop stays", () => {
-    expect(serverAction("stop", true)).toBe("restart"); expect(serverAction("stop", false)).toBe("stop");
-    expect(serverAction("pause", true)).toBe("pause"); expect(serverAction("none", true)).toBe("none");
-  });
-  test("a server over its cap is restarted cold (audited), and after the restart limit it is stopped, never reported as a pass", () => {
-    const e = env({ MAIPAI_JOBS_MAX_RESTARTS: "2" });
-    const r = job(e, "run", "--type", "server", "--lifetime", "1m", "--max-rss-mb", "1", "--restart-over-cap", "--", "bun", "-e", "setInterval(() => {}, 1000)");
-    const a = actions(e).map((x) => x.action);
-    expect(a.filter((x) => x === "cold-restarted")).toHaveLength(2);
-    expect(r.exitCode).toBe(143); expect(a).toContain("captured-and-stopped");
+  test("a second session waits in the queue while one holds it, and is refused at once with --no-wait, naming the holder; two sessions never hold it at once", async () => {
+    const e = env();
+    const first = Bun.spawn(["bun", JOB, "run", "--type", "test", "--session", "holder", "--", "sleep", "3"], { env: e, stdout: "pipe", stderr: "pipe" });
+    await Bun.sleep(1200);
+    const refused = job(e, "run", "--type", "test", "--session", "late", "--no-wait", "--", "true");
+    expect(refused.exitCode).toBe(75); expect(refused.stderr.toString()).toContain("checked out by holder");
+    const queued = Bun.spawn(["bun", JOB, "run", "--type", "test", "--session", "queued", "--", "true"], { env: e, stdout: "pipe", stderr: "pipe" });
+    expect(await first.exited).toBe(0); expect(await queued.exited).toBe(0);
+    const log = actionsAll(e).filter((x) => (x.action === "lease-granted" || x.action === "lease-released") && x.session !== "late").map((x) => `${x.action}:${x.session}`);
+    expect(log).toEqual(["lease-granted:holder", "lease-released:holder", "lease-granted:queued", "lease-released:queued"]);
   }, 30000);
-  test("DEV-BUDGET-02: memory held by a descendant that left the process group counts against the hub cap, and a stop kills it too", async () => {
-    const e = env({ MAIPAI_JOBS_MAX_RESTARTS: "1" });
+  test("jobs inside a checked-out job, and one session's several jobs (a hub's backend and Vite), share the checkout instead of deadlocking", () => {
+    const e = env();
+    const nested = `bun ${JSON.stringify(JOB)} run --type test --session other -- true`;
+    expect(job(e, "run", "--type", "test", "--session", "outer", "--", "bash", "-c", nested).exitCode).toBe(0);
+    expect(actionsAll(e).filter((x) => x.action === "lease-granted")).toHaveLength(1);
+  });
+  test("the watcher and lander sessions are exempt, and a crashed launcher's checkout is returned (holder gone)", () => {
+    const e = env();
+    expect(job(e, "run", "--type", "test", "--session", "home-watcher", "--", "true").exitCode).toBe(0);
+    expect(actionsAll(e).some((x) => x.action === "lease-granted")).toBe(false);
+  });
+  test("a stop kills a descendant that left the process group too", async () => {
+    const e = env();
     const pidFile = join(e.MAIPAI_JOBS_DIR, "engine.pid");
-    // The parent plays a dev hub that starts its own engine in a new session (detached: its own group), holding about 300 MB.
-    const code = `const c = Bun.spawn(["bun","-e","const b = Buffer.alloc(300*1024*1024, 1); setInterval(() => b[0]++, 1000)"], { detached: true, stdio: ["ignore","ignore","ignore"] }); await Bun.write(${JSON.stringify(pidFile)}, String(c.pid)); setInterval(() => {}, 1000)`;
-    const r = job(e, "run", "--type", "server", "--lifetime", "1m", "--max-rss-mb", "200", "--restart-over-cap", "--", "bun", "-e", code);
-    const a = actions(e).map((x) => x.action);
-    expect(a).toContain("cold-restarted"); expect(a).toContain("captured-and-stopped"); expect(r.exitCode).toBe(143);
-    const enginePid = Number(readFileSync(pidFile, "utf-8"));
+    const code = `const c = Bun.spawn(["bun","-e","setInterval(() => {}, 1000)"], { detached: true, stdio: ["ignore","ignore","ignore"] }); await Bun.write(${JSON.stringify(pidFile)}, String(c.pid)); setInterval(() => {}, 1000)`;
+    job(e, "run", "--type", "server", "--lifetime", "2", "--", "bun", "-e", code);
     await Bun.sleep(500);
-    expect(alive(enginePid)).toBe(false);
-  }, 40000);
-  test("the launcher publishes what development holds for the Stack's governor", () => {
-    const e = env({ MAIPAI_DEV_BUDGET_GB: "7" });
-    job(e, "run", "--type", "server", "--lifetime", "2", "--", "sleep", "30");
-    const f = JSON.parse(readFileSync(join(e.MAIPAI_JOBS_DIR, "dev-load.json"), "utf-8"));
-    expect(f).toMatchObject({ version: 1, budget_gb: 7 }); expect(typeof f.used_gb).toBe("number");
-  });
-  test("--no-wait refuses at once when the budget is full, saying why (exit 75, nothing started)", () => {
-    const e = env({ MAIPAI_DEV_BUDGET_GB: "0.000001" });
-    const dir = join(e.MAIPAI_JOBS_DIR, "jobs"); mkdirSync(dir, { recursive: true });
-    writeFileSync(join(dir, "hog.json"), JSON.stringify({ id: "hog", type: "server", session: "s", worktree: "/w", command: "sleep", pid: process.pid, pgid: process.pid, startedAt: 1, state: "running", log: "x", rssMb: 500 }));
-    const r = job(e, "run", "--type", "server", "--lifetime", "1m", "--no-wait", "--", "bash", "-c", "echo should-not-run");
-    expect(r.exitCode).toBe(75); expect(r.stderr.toString()).toContain("development budget is full"); expect(r.stdout.toString()).not.toContain("should-not-run");
-    expect(actions(e).map((x) => x.action)).toEqual(["launch-refused"]);
-  });
+    expect(alive(Number(readFileSync(pidFile, "utf-8")))).toBe(false);
+  }, 30000);
 });
 
 describe("orphan reaper (DEV-REAPER-01)", () => {
@@ -236,7 +214,7 @@ describe("orphan reaper (DEV-REAPER-01)", () => {
   }, 30000);
 });
 
-describe("wt.sh check runs inside the launcher (DEV-BUDGET-01)", () => {
+describe("wt.sh check runs inside the launcher (DEV-CHECKOUT-01)", () => {
   test("a stubbed shared script is launched as a test job with the session name, and its exit code passes through", () => {
     const e = env(); const stub = join(e.MAIPAI_JOBS_DIR, "shared.sh"); writeFileSync(stub, '#!/bin/bash\necho "shared:$*:${MAIPAI_JOB_ID:+in-job}"; exit 4\n');
     const r = Bun.spawnSync(["bash", join(import.meta.dir, "..", "wt.sh"), "check"], { cwd: join(import.meta.dir, "..", ".."), env: { ...e, MAIPAI_WT_SHARED: stub }, stdout: "pipe", stderr: "pipe" });

@@ -1,4 +1,4 @@
-# Dev job launcher and lease broker (HOST-LAUNCH-01, -02, -03, DEV-BUDGET-01)
+# Dev job launcher and the dev checkout (HOST-LAUNCH-01, -02, -03, DEV-CHECKOUT-01)
 
 Why: on 2026-11-12 many dev sessions ran tests at once, a leaking file-event daemon ate 66 GB, tests hung for an hour and nothing
 said who started what. The host guard (root, `docs/design/host-guard-2026-11-03.md`) protects the machine. This is the layer
@@ -37,24 +37,37 @@ bash scripts/jobs/job.sh list | audit [n] | orphans [--stop]
   by their working folder. `orphans --stop` stops only recorded ones whose pid still runs the recorded command. Anything else is
   listed and left alone.
 
-## Callers and the dev budget (DEV-BUDGET-01, 2026-11-12)
+## The dev checkout: one book, like a library (DEV-CHECKOUT-01, 2026-11-12)
 
-Why: on 2026-11-12 four dev hubs held 8.4 GB (two were orphans of 3.1 GB), swap sat at 14.9 of 16 GB and a 61.5 GB video job was admitted
-because idle dev pages looked reclaimable. The launcher now has callers, and development has one budget.
+Why: on 2026-11-12 development fought itself for memory (four dev hubs, a 61.5 GB video job, swap at 14.9 of 16 GB), and a budget, a
+reserve and per-hub caps made it worse (the Stack kept 24 GB back while dev tooling held 1.3 GB, and a clip waited for room that was
+free). Owner ruling: one checkout, like a library book. Those mechanisms are gone (no dev budget, no `dev-load.json`, no
+`MAIPAI_DEV_BUDGET_GB`, no per-hub caps, no cold restarts, no Stack reserve).
 
-- **Who goes through `job.sh`:** every dev hub (`scripts/dev.sh start`: backend and Vite as `--type server`, process group, lifetime
-  24 h, workbench 30 d, audit line), `bash scripts/wt.sh check` (`--type test`, 45 min, `MAIPAI_CHECK_TIMEOUT`), and every standalone
-  `scripts/gate/shardTests.ts` run (the lander, the watcher, the nightly: `--type test`, 90 min, `MAIPAI_GATE_JOB_TIMEOUT`). A run already
-  inside a job (`MAIPAI_JOB_ID` is set, for example `check.sh` under `wt.sh check`) is not wrapped twice. `MAIPAI_JOBS_OFF=1` skips all of it.
-- **One budget, in plain words:** `MAIPAI_DEV_BUDGET_GB` (default 24) is a reserve for ordinary dev tooling (dev hubs, tests, builds). It is NOT a cap on big jobs: picture and video jobs a dev session asks for (LTX video, 61.5 GB) go through the lease broker and the Stack's own admission and are never limited by it. The only thing the Stack does with it is subtract it when it admits work. In DIRECT mode a heavy dev lease (video, images or whole machine) first stops dev hubs nobody has a browser on (they restart on the next `dev.sh start`), then writes `reserve_gb: 0` to `dev-load.json` (audit `reserve-released`), so the Stack may take that room; when the lease ends the reserve returns (`reserve-restored`). In GATED mode nothing is released: the family floor wins. Inside the launcher, the budget holds the dev servers together. A server start that does not
-  fit is refused at once with the reason and exit 75 (`--no-wait`; dev.sh shows the line from its log). Servers do not count against the
-  concurrency cap or the CPU limit; tests and builds are not held by the budget. The launcher writes `jobs/dev-load.json`
-  (`{version, ts, budget_gb, reserve_gb, used_gb}`) every tick; the Stack's governor reads it and subtracts the budget (Stack `lib/devBudget.ts`).
-- **Per-hub cap and cold restart:** `--max-rss-mb` (dev.sh: backend 2048 via `MAIPAI_DEV_HUB_CAP_MB`, Vite 512) with `--restart-over-cap`:
-  over the cap the launcher stops the group and starts the same command again (audit `cold-restarted`); the work is never lost, only the
-  module graphs a long `--hot` run kept. At most `MAIPAI_JOBS_MAX_RESTARTS` (20) restarts, then the old stop applies. The same holds for
-  the largest still-growing server under memory pressure. A workbench with no browser for 30 minutes (`MAIPAI_WORKBENCH_IDLE_RESTART_MINUTES`)
-  and a backend of at least 700 MB is restarted cold once by its watcher; a private hub with no browser for 30 minutes is stopped.
+- **One book:** the dev machine (dev hubs, test runs, builds, engine jobs a dev session starts). One session holds it and has all of
+  it; one session's several jobs share it (a hub is a backend and a Vite). Everyone else waits in a first come, first served queue,
+  except Jesse's own work (`--owner` or `MAIPAI_CHECKOUT_OWNER=1`: his clips, manual tests started from the app), which goes first.
+  Nobody kills anybody.
+- **Taken automatically, no way around it:** everything run through `scripts/jobs/job.sh` takes the checkout first and returns it when
+  the job ends: `dev.sh` (backend and Vite, `--type server`, 24 h, workbench 30 d), `bash scripts/wt.sh check`, every `shardTests.ts`
+  run (`--type test`, 90 min), and `lease.sh run` (engine jobs: `lease.sh run --kind video -- <command>`). A job started inside a
+  checked-out job (`MAIPAI_CHECKOUT_ID`) shares it. The watcher and lander sessions are exempt (`MAIPAI_CHECKOUT_EXEMPT`, default
+  `home-watcher,home-lander`): they are the pipeline, not a dev session. Plain code edits and single unit tests do not need it.
+  `MAIPAI_JOBS_OFF=1` or `MAIPAI_CHECKOUT=off` skips it. `dev.sh start` refuses at once when another session holds the book (it cannot
+  wait in front of a person) and names the holder; run it again when it is returned.
+- **Return is automatic, never on the honour system:** the moment the holder's job ends; when the holder's process is gone (its session
+  ended or crashed); or after 10 minutes with no activity (`lease.sh beat <id>`, or the job's processes using CPU;
+  `MAIPAI_LEASE_IDLE_MIN`). A hub whose checkout was returned keeps running; its work is not killed.
+- **A manual hold** (the holder waits for Jesse to test by hand): `lease.sh take --manual [--minutes 30] --what "..."`. It ignores
+  idleness and the holder process, shows a timer, and returns by itself at the timer. `lease.sh extend <id> --owner-asked
+  [--minutes 30]` only when Jesse says so in that turn.
+- **Direct and gated:** in direct mode dev work runs. In gated mode a family turn in progress has priority: the checkout waits, a held
+  one is told to yield (see "The hub's family turns" below).
+- **Status:** the broker writes `jobs/dev-lease.json`; the admin Status row (the existing host row, RULES S6, no banner; family members
+  never see it) reads it: holder, purpose, since when, a manual timer, who is next in line. It asks no one anything and offers no
+  "stop the servers". `lease.sh status` prints the same facts.
+- **Descendants:** `groupProcs` in `job.ts` counts a job's whole process tree (a process in its own group included), and a stop kills it.
+
 - **Orphan reaper:** `job.sh reap [--dry-run]`, run by every hub's watcher every five minutes. It stops a `bun run --hot` (and its children)
   only when it runs in a worktree under `.claude/worktrees` or `wt/` that has a `data/dev` folder, no pid file there names it or the
   launcher that started it, no hub watcher runs, and that has held in a row for `MAIPAI_DEV_REAP_GRACE_MIN` (60) minutes. The live hub, the
@@ -64,12 +77,10 @@ because idle dev pages looked reclaimable. The launcher now has callers, and dev
 
 ## Lease broker: `bash scripts/jobs/lease.sh`
 
-For heavy work (video, images, big test runs): `lease.sh run --class dev --kind video -- <command>` takes a lease, runs the command
-through the launcher, releases. Or `acquire --pid <long-lived pid>` / `release <id>` / `check <id>` / `status` / `mode`.
+The one implementation of the checkout. `lease.sh run [--kind K] [--what "text"] [--owner] -- <command>` takes it, runs the command
+through the launcher, returns it. Also `take --manual`, `extend`, `acquire` / `release <id>` / `check <id>` / `beat <id>` / `status` / `mode`.
 
-- **Classes.** `family` is an end-user request: it is never queued behind development work. `dev` is a session: dev sessions queue
-  first come, first served among themselves (slots per `MAIPAI_DEV_LEASE_SLOTS`, default 1). Chat-first never applies between two
-  dev sessions.
+- **Classes.** `family` is an end-user request: it is never queued behind development work. `dev` is the checkout (one at a time).
 - **Mode** is `MAIPAI_DEV_MODE`, else the output of `scripts/mode.sh status` when that script exists (DIRECT or GATED), else the file
   `jobs/mode`, else gated (the safe reading).
   - **Direct** (nobody on the hub, changes run first): a dev lease may take the whole machine (`--whole-machine`). While it does, family
@@ -78,33 +89,12 @@ through the launcher, releases. Or `acquire --pid <long-lived pid>` / `release <
   - **Gated** (the family is on the hub, changes are checked first): dev work yields. A dev lease waits while a family lease is held or
     queued, a whole-machine lease is refused (exit 3), and a held dev lease is told to yield (`check` exits 10) when a family
     request arrives.
-- A lease is released when its holder pid is gone or its time (`--ttl`, 4 h) is up, so a crashed session never blocks the queue.
 - **The hub's family turns.** Each chat turn (`turnMachine/turnNext.ts`, through `lib/familyActivity.ts` `trackFamilyTurn`) writes
   `local-app/family-active.json` in the hub's data directory (`{"active": n, "until": <epoch s>}`, refreshed every 20 s while a turn
   runs, 60 s claim; `MAIPAI_FAMILY_ACTIVITY` moves it). It is a file because the hub may run as root and the broker as the user. The
   broker reads it (the live install's `data/local-app` and `$MAIPAI_DATA_DIR`) as one synthetic family lease: in gated mode dev leases
   wait for it and held ones are told to yield. It never queues, caps or slows a turn, and a failed write is ignored. In direct mode it
   changes nothing.
-- **Idle release (DEV-BUDGET-02, 2026-11-12).** A held dev lease with no sign of life for 10 minutes (`MAIPAI_LEASE_IDLE_MIN`, or
-  `MAIPAI_LEASE_IDLE_S`) is released by the broker and the next waiter gets it; nobody kills anything by hand. Reason: a session held a
-  24 GB dev instance unused and another session had to kill it. A sign of life is `lease.sh beat <id>`, or, under `lease.sh run`, the
-  work (the command and everything it started) using CPU (checked every 15 s). A quiet job that is still working calls `beat`. Because
-  the heavy lease is what releases the dev reserve in direct mode, releasing it also gives the reserve back. `acquire --what "text"` says
-  what the lease is for. Tests: `scripts/jobs/lease.test.ts`.
-- **Status.** The broker writes `jobs/dev-lease.json` (holders with session, kind, what, since, last sign of life; how many wait). The
-  admin Status row (the existing host row, no new banner; family members never see it) reads it: "Development work holds this Mac:
-  <session> (<what>) since <time>; N more sessions are waiting. It is released on its own after 10 idle minutes." `lease.sh status`
-  prints the same facts. A holder past its idle limit is not listed, so a stale file never keeps a name on the row.
-- **The reserve is measured in direct mode (DEV-BUDGET-03, 2026-11-12).** `dev-load.json` `reserve_gb` (what the Stack subtracts) is, in
-  direct mode (nobody on the hub), what development really holds plus 2 GB, never above the budget (`reserveGb` in `lib.ts`); in gated
-  mode it is the full budget, a ceiling; while a heavy lease released it, 0. Reason: the full 24 GB was kept back while dev tooling held
-  1.3 GB, and a video clip waited for room that was free. When a heavy lease stops idle hubs it never touches one whose worktree was
-  edited in the last 10 minutes (`MAIPAI_DEV_IN_USE_MIN`): a session is working there.
-- **Heavy dev hubs (DEV-BUDGET-02).** A hub's cap counts its whole process tree, not only its process group: on 2026-11-12 a dev hub's
-  own engine, started in a group of its own, held 24 GB while the launcher saw 2 GB. `groupProcs` in `job.ts` now adds every descendant
-  of the group, and a cold restart or stop kills those too. A hub that starts its own engine over the cap is therefore restarted cold
-  (the engine goes with it) like any other, and the heavy work itself belongs under `lease.sh run` with the idle release. An engine
-  re-parented to launchd (its hub died first) is out of reach of the launcher; the orphan reaper covers hubs, not engines.
 
 ## The end-user line: "Chat is unavailable while the system upgrades."
 

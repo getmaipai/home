@@ -110,24 +110,26 @@ export function withDevReaper(view: HostGuardView, report: DevReaper | null, now
  * (plus a minute) is not listed, so a file that went stale never keeps a name on the row.
  */
 export const DevLeaseSchema = z.object({
-  version: z.literal(1), ts: z.number().finite(), idle_s: z.number().finite(), waiting: z.number().finite(),
-  held: z.array(z.object({ session: z.string(), kind: z.string(), whole: z.boolean(), since: z.number().finite(), beat: z.number().finite(), what: z.string().optional() })),
+  version: z.literal(1), ts: z.number().finite(), idle_s: z.number().finite(), waiting: z.number().finite(), next: z.object({ session: z.string(), what: z.string().optional() }).optional(),
+  held: z.array(z.object({ session: z.string(), kind: z.string(), whole: z.boolean(), since: z.number().finite(), beat: z.number().finite(), what: z.string().optional(), manual_until: z.number().finite().optional() })),
 });
 export type DevLease = z.infer<typeof DevLeaseSchema>;
 export const devLeaseFile = () => join(process.env.MAIPAI_JOBS_DIR ?? join(homedir(), ".local", "state", "maipai", "jobs"), "dev-lease.json");
 export function readDevLease(): DevLease | null {
   try { return DevLeaseSchema.parse(JSON.parse(readFileSync(devLeaseFile(), "utf8"))); } catch { return null; }
 }
-const LEASE_WORDS: Record<string, string> = { video: "video work", image: "picture work", test: "a test run", build: "a build" };
+const LEASE_WORDS: Record<string, string> = { video: "video work", image: "picture work", test: "a test run", build: "a build", server: "a development hub", manual: "a hand test" };
 export function withDevLease(view: HostGuardView, report: DevLease | null, now = Date.now()): HostGuardView {
   if (!report) return view;
-  const live = report.held.filter((h) => h.beat >= Math.floor(now / 1000) - report.idle_s - 60);
+  const sec = Math.floor(now / 1000);
+  const live = report.held.filter((h) => h.manual_until ? h.manual_until > sec : h.beat >= sec - report.idle_s - 60);
   if (!live.length) return view;
   const parts = live.map((h) => {
     const what = h.what ?? (h.whole ? "work that takes the whole Mac" : LEASE_WORDS[h.kind] ?? "development work");
     const since = new Date(h.since * 1000).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
-    return `${h.session} (${what}) since ${since}`;
+    const timer = h.manual_until ? `, returns in ${Math.max(1, Math.round((h.manual_until - sec) / 60))} min` : "";
+    return `${h.session} (${what}) since ${since}${timer}`;
   });
-  const waiting = report.waiting > 0 ? ` ${report.waiting} more ${report.waiting === 1 ? "session is" : "sessions are"} waiting.` : "";
-  return { ...view, text: `${view.text} Development work holds this Mac: ${parts.join("; ")}.${waiting} It is released on its own after ${Math.round(report.idle_s / 60)} idle minutes.` };
+  const next = report.next ? ` Next in line: ${report.next.session}${report.waiting > 1 ? ` and ${report.waiting - 1} more` : ""}.` : "";
+  return { ...view, text: `${view.text} The development machine is checked out by ${parts.join("; ")}.${next} It is returned when that work ends, or after ${Math.round(report.idle_s / 60)} idle minutes.` };
 }

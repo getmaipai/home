@@ -1,7 +1,7 @@
 // HOST-LAUNCH-01 (owner, 2026-11-12): shared pieces of the dev job launcher (job.ts) and the lease broker (lease.ts).
 // Everything here runs as the user, never root. State lives in one directory (MAIPAI_JOBS_DIR, default ~/.local/state/maipai/jobs):
 //   jobs/<id>.json  one record per launched job      audit.jsonl  one line per action      leases/  the broker's tickets and holders
-import { appendFileSync, existsSync, mkdirSync, readdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
+import { appendFileSync, mkdirSync, readdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 
@@ -67,11 +67,6 @@ export type LaunchDecision = { go: boolean; why: string; limit: number };
 export function decideLaunch(i: LaunchInputs): LaunchDecision {
   if (i.pressure.devShed || i.pressure.level >= 2) return { go: false, why: "memory pressure: new launches wait for it to clear", limit: 0 };
   if (i.freeDiskGb < i.minDiskGb) return { go: false, why: `disk almost full (${i.freeDiskGb.toFixed(1)} GB free): new launches wait`, limit: 0 };
-  // DEV-BUDGET-01: one budget for everything development starts. Only servers (dev hubs) are held by it; a server sits idle most of
-  // the time, so it never counts against the concurrency cap or the CPU limit below.
-  if (i.devBudgetGb !== undefined && i.devUsedGb !== undefined && i.devUsedGb >= i.devBudgetGb && i.type === "server") {
-    return { go: false, why: `the development budget is full (${i.devUsedGb.toFixed(1)} of ${i.devBudgetGb} GB in use): stop a development hub you are not using, or wait`, limit: 0 };
-  }
   if (i.type === "server") return { go: true, why: "", limit: i.cap };
   if (i.loadPerCore >= 1.5) {
     if (i.running > i.progressing) return { go: false, why: `CPU saturated (load ${i.loadPerCore.toFixed(1)} per core) and ${i.running - i.progressing} running job(s) are not progressing: new launches wait`, limit: 0 };
@@ -87,56 +82,6 @@ export function memoryAction(job: { rssMb: number; growthMb: number }, biggestRs
   if (!pressureOn) return "none";
   return job.rssMb >= biggestRssMb && job.growthMb > 256 ? "stop" : "pause";
 }
-
-/** The one dev budget in GB (MAIPAI_DEV_BUDGET_GB, default 24): everything development runs through the launcher must fit in it. */
-export const devBudgetGb = (): number => { const v = Number(process.env.MAIPAI_DEV_BUDGET_GB); return Number.isFinite(v) && v > 0 ? v : 24; };
-/** The cap for one dev hub in MB (MAIPAI_DEV_HUB_CAP_MB, default 2048); over it the launcher restarts the hub cold. */
-export const devHubCapMb = (): number => { const v = Number(process.env.MAIPAI_DEV_HUB_CAP_MB); return Number.isFinite(v) && v > 0 ? v : 2048; };
-/** GB the live (running or paused) jobs hold, from the figures each launcher refreshes every tick. */
-export function devUsedGb(jobs: JobRecord[]): number {
-  return jobs.filter((j) => (j.state === "running" || j.state === "paused") && alive(j.pid)).reduce((a, j) => a + (j.rssMb ?? 0), 0) / 1024;
-}
-/** Set by the lease broker while a heavy development lease holds the machine in DIRECT mode: the Stack may use the dev reserve then. */
-export const reserveReleasedFile = (): string => join(stateDir(), "reserve-released");
-/**
- * The launcher publishes two plain numbers for the Stack's governor (stack/backend/src/lib/devBudget.ts reads this file):
- * `budget_gb` is the reserve for ordinary dev tooling (hubs, tests, builds) and `used_gb` what those hold now. `reserve_gb` is the
- * figure the Stack subtracts when it admits work: the budget, or 0 while a heavy dev lease (video, images, whole machine) holds the
- * machine in direct mode. The budget never caps an engine job; it is only what the Stack keeps back when it admits one.
- */
-export function writeDevLoad(jobs: JobRecord[]): void {
-  ensureDirs(stateDir());
-  const f = join(stateDir(), "dev-load.json");
-  const used = devUsedGb(jobs);
-  writeFileSync(`${f}.tmp`, JSON.stringify({ version: 1, ts: Math.floor(Date.now() / 1000), budget_gb: devBudgetGb(), reserve_gb: Number(reserveGb(used).toFixed(2)), used_gb: Number(used.toFixed(2)) }));
-  renameSync(`${f}.tmp`, f);
-}
-/** DEV-BUDGET-03: the margin kept on top of what development really holds, in direct mode (GB). */
-export const DEV_RESERVE_MARGIN_GB = 2;
-/** The development mode the broker uses: MAIPAI_DEV_MODE, else scripts/mode.sh (cached 30 s), else gated (the safe reading). */
-let modeCache: { at: number; mode: "direct" | "gated" } | null = null;
-export function devMode(now = Date.now()): "direct" | "gated" {
-  const env = process.env.MAIPAI_DEV_MODE; if (env === "direct" || env === "gated") return env;
-  if (modeCache && now - modeCache.at < 30_000) return modeCache.mode;
-  let mode: "direct" | "gated" = "gated";
-  try {
-    const script = join(import.meta.dir, "..", "mode.sh");
-    if (existsSync(script)) { const out = Bun.spawnSync(["bash", script, "status"], { stdout: "pipe", stderr: "ignore" }).stdout.toString(); if (/\bDIRECT\b/.test(out)) mode = "direct"; else if (/\bGATED\b/.test(out)) mode = "gated"; }
-    else { const m = readFileSync(join(stateDir(), "mode"), "utf-8").trim(); if (m === "direct" || m === "gated") mode = m; }
-  } catch { /* the safe reading */ }
-  modeCache = { at: now, mode }; return mode;
-}
-/**
- * The reserve the Stack subtracts (GB). GATED (the family is on the hub): the full budget, a ceiling. DIRECT (nobody is on the hub): what
- * development really holds plus a small margin, never above the budget, and 0 while a heavy lease released it. On 2026-11-12 the full
- * 24 GB was kept back while dev tooling held 1.3 GB, and a video clip waited for room that was free.
- */
-export function reserveGb(usedGb: number): number {
-  if (existsSync(reserveReleasedFile())) return 0;
-  return devMode() === "direct" ? Math.min(devBudgetGb(), usedGb + DEV_RESERVE_MARGIN_GB) : devBudgetGb();
-}
-/** A cold restart replaces "stop" for a server that has a cap: the work is never killed, only its retained memory is dropped. */
-export const serverAction = (act: "none" | "pause" | "stop", restartable: boolean): "none" | "pause" | "stop" | "restart" => (act === "stop" && restartable ? "restart" : act);
 
 export type OrphanInput = {
   pid: number; ppid: number;

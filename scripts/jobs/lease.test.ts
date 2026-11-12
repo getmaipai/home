@@ -4,7 +4,7 @@ import { existsSync, mkdirSync, mkdtempSync, utimesSync, readFileSync, rmSync, w
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { readAudit } from "./lib";
-import { decide, recentlyEdited, type Lease } from "./lease";
+import { before, decide, type Lease } from "./lease";
 
 const LEASE = join(import.meta.dir, "lease.ts");
 const L = (o: Partial<Lease> & { id: string }): Lease => ({ cls: "dev", kind: "video", session: o.id, pid: process.pid, whole: false, since: 0, until: 9e9, seq: 1, ...o });
@@ -30,9 +30,6 @@ describe("decide (pure)", () => {
     expect(decide(L({ id: "a" }), [L({ id: "f", cls: "family", kind: "chat" })], [], "gated", 1).verdict).toBe("wait");
     expect(decide(L({ id: "a" }), [], [L({ id: "f", cls: "family", kind: "chat", seq: 9 })], "gated", 1).verdict).toBe("wait");
     expect(decide(L({ id: "a" }), [L({ id: "f", cls: "family", kind: "chat" })], [], "direct", 1).verdict).toBe("grant");
-  });
-  test("slots let more than one dev lease run at once", () => {
-    expect(decide(L({ id: "b", seq: 2 }), [L({ id: "a" })], [], "direct", 2).verdict).toBe("grant");
   });
 });
 
@@ -81,35 +78,15 @@ describe("broker CLI", () => {
     expect(lease(e, "acquire", "--class", "family", "--kind", "chat", "--pid", me).exitCode).toBe(0);
   });
 
-  test("direct mode: a heavy video lease gives up the dev reserve (reserve_gb 0, budget unchanged) and release brings it back", () => {
-    const e = env({ MAIPAI_DEV_BUDGET_GB: "24" });
-    const file = () => JSON.parse(readFileSync(join(e.MAIPAI_JOBS_DIR, "dev-load.json"), "utf-8")) as { budget_gb: number; reserve_gb: number };
-    const id = out(lease(e, "acquire", "--session", "video", "--kind", "video", "--pid", me));
-    expect(file()).toMatchObject({ budget_gb: 24, reserve_gb: 0 });
-    expect(withDir(e, () => readAudit()).some((x) => x.action === "reserve-released")).toBe(true);
-    lease(e, "release", id);
-    expect(file()).toMatchObject({ budget_gb: 24, reserve_gb: 2 }); // direct mode: what dev really holds (0) plus the 2 GB margin, not the 24 GB budget
-    expect(withDir(e, () => readAudit()).some((x) => x.action === "reserve-restored")).toBe(true);
-  });
-  test("ordinary dev work (a test lease) never releases the reserve, and gated mode never does: the family floor wins", () => {
-    const e = env({ MAIPAI_DEV_BUDGET_GB: "24" });
-    const id = out(lease(e, "acquire", "--session", "t", "--kind", "test", "--pid", me));
-    expect(existsSync(join(e.MAIPAI_JOBS_DIR, "reserve-released"))).toBe(false);
-    lease(e, "release", id);
-    const g = { ...e, MAIPAI_DEV_MODE: "gated" };
-    lease(g, "acquire", "--session", "v", "--kind", "video", "--pid", me);
-    expect(existsSync(join(e.MAIPAI_JOBS_DIR, "reserve-released"))).toBe(false);
-  });
-  // DEV-BUDGET-02 (2026-11-12): a session held a 24 GB dev instance unused and another session had to kill it by hand. Now an idle lease is released by the broker.
-  test("a held dev lease that shows no sign of life is released by the broker, the waiter gets it, and the reserve follows the new holder", async () => {
-    const e = env({ MAIPAI_DEV_BUDGET_GB: "24", MAIPAI_LEASE_IDLE_S: "2" });
+  // DEV-CHECKOUT-01 (2026-11-12): a session held a 24 GB dev instance unused and another session had to kill it by hand. Now an idle lease is released by the broker.
+  test("a held dev lease that shows no sign of life is released by the broker, the waiter gets it (nobody kills anything)", async () => {
+    const e = env({ MAIPAI_LEASE_IDLE_S: "2" });
     const first = out(lease(e, "acquire", "--session", "idle-holder", "--kind", "video", "--what", "LTX clip bench", "--pid", me));
     const second = Bun.spawn(["bun", LEASE, "acquire", "--session", "waiter", "--kind", "video", "--pid", me, "--wait", "30"], { env: e, stdout: "pipe", stderr: "pipe" });
     await Bun.sleep(700);
     const status = JSON.parse(readFileSync(join(e.MAIPAI_JOBS_DIR, "dev-lease.json"), "utf-8")) as { held: Array<{ session: string; kind: string; what?: string; since: number }>; waiting: number };
     expect(status.held[0]).toMatchObject({ session: "idle-holder", kind: "video", what: "LTX clip bench" }); expect(status.waiting).toBe(1);
     expect(await second.exited).toBe(0); // granted without anyone releasing or killing anything
-    expect(existsSync(join(e.MAIPAI_JOBS_DIR, "reserve-released"))).toBe(true); // the reserve follows the new holder
     const a = withDir(e, () => readAudit());
     expect(a.some((x) => x.session === "idle-holder" && x.action === "lease-reaped" && /idle/.test(x.trigger))).toBe(true);
     expect(lease(e, "beat", first).exitCode).toBe(1); // the old holder's lease is gone
@@ -125,15 +102,45 @@ describe("broker CLI", () => {
     const e2 = env();
     lease(e2, "acquire", "--session", "gone", "--kind", "video", "--pid", String(dead.pid));
     expect(out(lease(e2, "status"))).not.toContain("gone");
-    expect(withDir(e2, () => readAudit()).some((x) => x.session === "gone" && x.trigger === "holder gone")).toBe(true);
+    expect(withDir(e2, () => readAudit()).some((x) => x.session === "gone" && x.trigger.startsWith("holder gone"))).toBe(true);
   }, 20000);
-  test("DEV-BUDGET-03: a worktree edited in the last 10 minutes is in use, so a heavy lease never stops its hub", () => {
-    const root = mkdtempSync(join(tmpdir(), "wt-")); temps.push(root);
-    mkdirSync(join(root, "backend", "src"), { recursive: true }); const f = join(root, "backend", "src", "a.ts"); writeFileSync(f, "x");
-    expect(recentlyEdited(root)).toBe(true);
-    const old = new Date(Date.now() - 3600_000); utimesSync(f, old, old);
-    expect(recentlyEdited(root)).toBe(false);
+  test("DEV-CHECKOUT-01: two sessions never hold it at once; Jesse's own work queues ahead of sessions, then first come first served", () => {
+    const a = L({ id: "a", session: "a", seq: 1 }), b = L({ id: "b", session: "b", seq: 2 }), c = L({ id: "c", session: "c", seq: 3 }), jesse = L({ id: "j", session: "j", seq: 9, owner: true });
+    expect(decide(b, [a], [], "direct").verdict).toBe("wait");
+    expect(decide(a, [], [], "direct").verdict).toBe("grant");
+    expect(before(jesse, a)).toBe(true); expect(before(a, jesse)).toBe(false); expect(before(a, b)).toBe(true);
+    expect(decide(a, [], [jesse], "direct").verdict).toBe("wait"); // a session waits behind his queued work
+    expect(decide(jesse, [], [a, b, c], "direct").verdict).toBe("grant");
+    expect(decide(L({ id: "a2", session: "a", seq: 5 }), [a], [], "direct").verdict).toBe("grant"); // the same session's several jobs share it
   });
+  test("DEV-CHECKOUT-01: a manual hold shows a timer, ignores idleness, returns at its timer, and extends only on Jesse's word", async () => {
+    const e = env({ MAIPAI_LEASE_IDLE_S: "1" });
+    const id = out(lease(e, "take", "--manual", "--minutes", "30", "--session", "hand-test", "--what", "Jesse tries the clip UI"));
+    await Bun.sleep(2500); // well past the idle limit: a manual hold is not idle-released
+    const status = out(lease(e, "status")); expect(status).toContain("hand-test"); expect(status).toMatch(/manual hold returns in (29|30) min/);
+    const file = JSON.parse(readFileSync(join(e.MAIPAI_JOBS_DIR, "dev-lease.json"), "utf-8")) as { held: Array<{ manual_until?: number }> };
+    expect(file.held[0]!.manual_until).toBeGreaterThan(Date.now() / 1000 + 25 * 60);
+    expect(lease(e, "extend", id, "--minutes", "10").exitCode).toBe(2); // refused without Jesse's word
+    expect(lease(e, "extend", id, "--owner-asked", "--minutes", "10").exitCode).toBe(0);
+    const f2 = JSON.parse(readFileSync(join(e.MAIPAI_JOBS_DIR, "dev-lease.json"), "utf-8")) as { held: Array<{ manual_until?: number }> };
+    expect(f2.held[0]!.manual_until).toBeGreaterThan(file.held[0]!.manual_until! + 9 * 60);
+    const f = join(e.MAIPAI_JOBS_DIR, "leases", "held", `${id}.json`); // the timer ends it: make the held ticket expire now
+    writeFileSync(f, JSON.stringify({ ...JSON.parse(readFileSync(f, "utf-8")), manualUntil: Date.now() / 1000 - 1 }));
+    expect(out(lease(e, "status"))).not.toContain("hand-test");
+    expect(withDir(e, () => readAudit()).some((x) => x.session === "hand-test" && x.trigger === "manual hold timer ended")).toBe(true);
+  }, 20000);
+  test("DEV-CHECKOUT-01: the next session in line is on the status file, and an owner ticket jumps the queue", async () => {
+    const e = env();
+    const first = out(lease(e, "acquire", "--session", "one", "--kind", "test", "--pid", me));
+    const waiter = Bun.spawn(["bun", LEASE, "acquire", "--session", "two", "--kind", "test", "--pid", me, "--wait", "20"], { env: e, stdout: "pipe", stderr: "pipe" });
+    const jesse = Bun.spawn(["bun", LEASE, "acquire", "--session", "jesse-clip", "--owner", "--what", "his clip", "--kind", "video", "--pid", me, "--wait", "20"], { env: e, stdout: "pipe", stderr: "pipe" });
+    await Bun.sleep(900);
+    const file = JSON.parse(readFileSync(join(e.MAIPAI_JOBS_DIR, "dev-lease.json"), "utf-8")) as { next?: { session: string }; waiting: number };
+    expect(file.next?.session).toBe("jesse-clip"); expect(file.waiting).toBe(2);
+    lease(e, "release", first);
+    expect(await jesse.exited).toBe(0);
+    waiter.kill();
+  }, 20000);
   test("gated mode: whole-machine is refused, and a held dev lease is told to yield when a family request arrives", () => {
     const e = env({ MAIPAI_DEV_MODE: "gated" });
     expect(lease(e, "acquire", "--whole-machine", "--pid", me).exitCode).toBe(3);
@@ -177,7 +184,7 @@ describe("broker CLI", () => {
     const e = env({ MAIPAI_DEV_MODE: "gated" });
     claim(e, 1);
     const waiting = lease(e, "acquire", "--session", "dev", "--pid", me, "--wait", "1");
-    expect(waiting.exitCode).toBe(75); expect(waiting.stderr.toString()).toContain("waits for family requests");
+    expect(waiting.exitCode).toBe(75); expect(waiting.stderr.toString()).toContain("a family turn is running");
     claim(e, 0); expect(lease(e, "acquire", "--session", "dev", "--pid", me, "--wait", "1").exitCode).toBe(0);
     const holder = env({ MAIPAI_DEV_MODE: "gated" });
     const id = out(lease(holder, "acquire", "--session", "dev2", "--pid", me)); expect(lease(holder, "check", id).exitCode).toBe(0);

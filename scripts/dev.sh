@@ -15,12 +15,12 @@
 # reach outside the hub (lib/scheduler.ts), and a status note says it is not the family's hub.
 # It refuses ports 3000 and 8787 and any data directory under the live install.
 #
-# DEV-BUDGET-01 (2026-11-12): the shared workbench is the default preview. `start` with no flag starts (or reuses) the one machine-wide
+# DEV-CHECKOUT-01 (2026-11-12): the shared workbench is the default preview. `start` with no flag starts (or reuses) the one machine-wide
 # workbench; a private per-worktree hub needs an explicit `--own`. In GATED mode the workbench is off, so the default falls back to a
 # private hub. `stop`, `status` and `url` with no flag cover both. Every backend and Vite server runs through scripts/jobs/job.sh: its
-# own process group, a lifetime, an audit line, a cap of MAIPAI_DEV_HUB_CAP_MB (2048) for the backend after which the launcher restarts it
-# cold (a fresh --hot drops the module graphs it kept), and a seat in the dev budget MAIPAI_DEV_BUDGET_GB (24). A start that does not
-# fit the budget says so and exits. The watch loop also runs `job.sh reap` (the orphan reaper) every five minutes.
+# own process group, a lifetime, an audit line, and the one dev checkout (scripts/jobs/lease.ts): a start while another session holds the
+# dev machine refuses at once and names the holder (retry when it is returned). The watch loop also runs `job.sh reap` (the orphan reaper)
+# every five minutes.
 # MAIPAI_JOBS_OFF=1 starts the servers directly, as before. `--takeover` replaces a workbench that runs from another worktree.
 set -euo pipefail
 
@@ -191,24 +191,16 @@ pid_value() {
 }
 
 process_command() { ps -p "$1" -o command= 2>/dev/null || true; }
-# DEV-BUDGET-01: the launcher words that go in front of a server command ("<cap MB>" "<lifetime>"). Empty when MAIPAI_JOBS_OFF=1 or the
+# DEV-CHECKOUT-01: the launcher words that go in front of a server command. Empty when MAIPAI_JOBS_OFF=1 or the
 # launcher is missing (a stripped checkout), in which case the server starts directly.
 job_prefix() {
   job_prefix_words=()
   [[ "${MAIPAI_JOBS_OFF:-0}" != 1 && -f "$script_dir/jobs/job.sh" ]] || return 0
   local life=24h
   ((workbench == 0)) || life=30d
-  job_prefix_words=(bash "$script_dir/jobs/job.sh" run --type server --lifetime "$life" --max-rss-mb "$1" --restart-over-cap --no-wait --session "$(basename "$root")" --)
+  job_prefix_words=(bash "$script_dir/jobs/job.sh" run --type server --lifetime "$life" --no-wait --session "$(basename "$root")" --)
 }
 workbench_owner_file="$jobs_state/workbench-owner"
-# RSS in MB of the backend this worktree's pid file names, or of its child when the file names the launcher; 0 when unknown.
-backend_rss_mb() {
-  local p kid kb
-  p="$(pid_value "$backend_pid_file" 2>/dev/null || true)"; [[ -n "$p" ]] || { echo 0; return; }
-  kid="$(pgrep -P "$p" 2>/dev/null | head -n 1 || true)"
-  kb="$(ps -o rss= -p "${kid:-$p}" 2>/dev/null | tr -d ' ' || true)"
-  [[ "$kb" =~ ^[0-9]+$ ]] && echo $((kb / 1024)) || echo 0
-}
 live_backend() {
   local candidate command
   candidate="$(pid_value "$backend_pid_file" 2>/dev/null || true)"
@@ -385,7 +377,7 @@ case "$action" in
       rm -rf "$hub"
     fi
     mkdir -p "$hub"
-    job_prefix "${MAIPAI_DEV_HUB_CAP_MB:-2048}"
+    job_prefix
     (
       cd "$root/backend"
       MAIPAI_WORKBENCH="$workbench" MAIPAI_TEST_ALLOW_MULTIPLE_HUBS=1 MAIPAI_MDNS=off MAIPAI_LAN_EXPOSURE=loopback PORT="$backend_port" \
@@ -430,7 +422,7 @@ case "$action" in
       fi
     fi
 
-    job_prefix 512
+    job_prefix
     ts_host=""
     rm -f "$tailscale_host_file"
     ((workbench == 0)) || ts_host="$(tailscale_host || true)"
@@ -488,8 +480,6 @@ case "$action" in
     interval="${MAIPAI_DEV_WATCH_SECONDS:-30}"
     idle=0
     ticks=0
-    cold_done=0
-    cold_after=$(( ${MAIPAI_WORKBENCH_IDLE_RESTART_MINUTES:-30} * 60 ))
     fsevents_seen="$(fsevents_restarted_at)"
     while sleep "$interval"; do
       # DEV-REAPER-01: every ~5 minutes, stop development hubs that are provably dead (no pid file, no watcher, for 60 minutes).
@@ -511,17 +501,6 @@ case "$action" in
       if [[ -z "$reason" ]]; then
         if lsof -nP -iTCP:"$vite_port" -sTCP:ESTABLISHED >/dev/null 2>&1; then idle=0; else idle=$((idle + interval)); fi
         if ((idle_limit > 0 && idle >= idle_limit)); then reason="no browser was connected for $((idle_limit / 60)) minutes"; fi
-        # The workbench never stops, so while nobody is looking it is restarted cold once (a fresh --hot drops the module graphs it kept).
-        if [[ -z "$reason" ]] && ((workbench && cold_after > 0)); then
-          if ((idle == 0)); then cold_done=0; fi
-          if ((idle >= cold_after && cold_done == 0)) && (($(backend_rss_mb) >= ${MAIPAI_WORKBENCH_COLD_MIN_MB:-700})); then
-            cold_done=1
-            echo "$(date '+%F %T') restarting the workbench cold: no browser was connected for $((cold_after / 60)) minutes" >> "$state/watch.log"
-            rm -f "$watch_pid_file"
-            MAIPAI_DEV_ROOT="$root" nohup bash -c "${MAIPAI_DEV_RESTART_CMD:-bash \"\$0\" restart-hub}" "$script_dir/dev.sh" </dev/null >>"$state/watch.log" 2>&1 &
-            exit 0
-          fi
-        fi
       fi
       if [[ -n "$reason" ]]; then
         echo "$(date '+%F %T') stopping dev Home: $reason" >> "$state/watch.log"
