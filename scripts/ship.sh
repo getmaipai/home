@@ -87,7 +87,7 @@ fi
 # checked first, then run: no --before-green; the commit needs a watcher green run or to be inside `stable` (the nightly pass), a boot check
 # alone is not enough; a change to a safety surface (the T2 globs of scripts/wt.sh) ships only once `stable` holds it; and the installer's
 # pre-upgrade copy of data/ is the backup that every ship takes (it stays mandatory here). Unset keeps the pipeline as it was.
-ship_mode=unset
+ship_mode=unset; in_stable=0
 if [[ -f scripts/lib/mode.sh ]]; then source scripts/lib/mode.sh; ship_mode="$(mode_get)"; fi
 if [[ "$ship_mode" == direct ]]; then before_green=1; echo "ship.sh: DIRECT: run first, checked after (ship before green allowed)"; fi
 if [[ "$ship_mode" == gated ]]; then
@@ -132,7 +132,9 @@ PY
   fi
   boot_checked=0
 fi
-if (( ! before_green )) && [[ ! -f "$watch/green/$sha" ]] && [[ "${boot_checked:-0}" != 1 ]]; then die "watcher has no green run for $sha; pass --before-green to ship anyway and record it."; fi
+# A commit inside `stable` passed the full suite in the nightly run: that is a green run (GATED-PROOF-01; before, a gated ship of stable
+# itself was refused here with advice to pass --before-green, which gated mode then refuses).
+if (( ! before_green && ! in_stable )) && [[ ! -f "$watch/green/$sha" ]] && [[ "${boot_checked:-0}" != 1 ]]; then die "watcher has no green run for $sha; pass --before-green to ship anyway and record it."; fi
 # The live hub is the install on the Mac Studio. Keep its marker beside the
 # install, not inside it: promotion replaces the install directory. Accept the
 # old in-directory marker during migration from earlier ship.sh versions.

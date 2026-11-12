@@ -177,6 +177,20 @@ describe("ship.sh by mode", () => {
     expect(through.stderr).not.toContain("changes a safety surface");
     expect(through.stdout + through.stderr).toContain("GATED: checked first, then run");
   });
+  test("gated ships a commit inside stable with no watcher green run: the nightly pass is the green run", () => {
+    setup();
+    const sha = git(clone, "rev-parse", "HEAD").stdout.trim();
+    git(clone, "branch", "-f", "stable", sha);
+    rmSync(join(scratch, "watch", "green", sha), { force: true });
+    const live = join(scratch, "live-stable"); mkdirSync(live, { recursive: true });
+    writeFileSync(join(live, ".installed-tag"), "sha-0000000\n");
+    const r = ship({ MAIPAI_MODE: "gated", MAIPAI_SHIP_LIVE: live, MAIPAI_HUB_LOCK_PATH: join(scratch, "no.lock"), MAIPAI_SHIP_WEB_PORT: "45992" }, sha, "--dry-run");
+    expect(r.stdout).toContain(`stable ${sha.slice(0, 7)} holds ${sha.slice(0, 7)}`);
+    expect(r.stderr).not.toContain("watcher has no green run");
+    expect(r.status).toBe(0);
+    expect(r.stdout).toContain("plan: sha=" + sha);
+    git(clone, "branch", "-D", "stable");
+  });
   test("direct allows a ship with no green run (before-green implied)", () => {
     setup();
     const r = ship({ MAIPAI_MODE: "direct" }, "main", "--dry-run");
