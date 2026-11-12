@@ -24,4 +24,14 @@ export class TraceRecorder {
   nodes(): NodeExecution[] {
     return this.entries;
   }
+
+  setStages(node: NodeName, stages: NonNullable<NodeExecution["stages"]>): void {
+    const entry = [...this.entries].reverse().find((item) => item.node === node);
+    if (entry) entry.stages = stages;
+  }
+
+  setStageValue(node: NodeName, key: keyof NonNullable<NodeExecution["stages"]>, value: number): void {
+    const entry = [...this.entries].reverse().find((item) => item.node === node);
+    if (entry) entry.stages = { ...entry.stages, [key]: value };
+  }
 }

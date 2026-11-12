@@ -306,6 +306,8 @@ export interface TurnNodeExecution {
   // status, a response body), never a household member's words - see
   // contract.ts's own NodeOutcome doc for the identical note.
   outcome: { ok: true } | { ok: false; code: string; message?: string } | { skipped: true; reason: string };
+  /** Counts-only durations for stages within the context node. */
+  stages?: { embed_ms?: number; count_ms?: number; count_calls?: number; window_ms?: number; shadows_ms?: number };
   /** "Reasoning is a second output" (turn-machine-state-record's owner
    * ruling): set only on the `model` node's own entry, mirroring
    * turnMachine/contract.ts's NodeExecution.reasoning structurally

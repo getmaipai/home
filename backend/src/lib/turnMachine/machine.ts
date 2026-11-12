@@ -43,6 +43,15 @@ async function runNode<In, Out>(trace: TraceRecorder, node: NodeName, deadlineMs
   try {
     const { outcome, output } = await fn(turnState, input, signal);
     trace.record(node, node, IMPL_VERSION, startMs, Date.now(), outcome);
+    if (node === "context" && output && typeof output === "object" && "__stages" in output) {
+      const stages = (output as { __stages?: import("./contract").NodeExecution["stages"] }).__stages;
+      if (stages) {
+        trace.setStages(node, stages);
+        turnState.contextStageStats = stages;
+        turnState.setContextShadowDuration = (duration) => trace.setStageValue("context", "shadows_ms", duration);
+      }
+      delete (output as { __stages?: unknown }).__stages;
+    }
     turnState.nodes = trace.nodes();
     return output;
   } catch (err) {

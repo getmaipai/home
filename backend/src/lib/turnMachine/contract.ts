@@ -215,12 +215,17 @@ export interface TurnState {
   utterance: string;
   /** ROUTER-BUILD-01d: the search assist's shadow record (set by applyContext). */
   searchAssist?: import("@/wire").SearchAssistStats;
+  searchAssistPromise?: Promise<import("@/wire").SearchAssistStats>;
   /** RECENCY-02: the weather detector's record. */
   weatherAssist?: import("@/wire").SearchAssistStats;
+  weatherAssistPromise?: Promise<import("@/wire").SearchAssistStats>;
   /** MEM-AUDIT-05: which profile card lines and recalled memories reached
    * this turn's prompt (set by applyContext; absent on a temporary or bare
    * turn, which injects none). Written into the turn's stats JSON. */
   memoryTrace?: import("@/wire").MemoryTraceStats;
+  contextStageStats?: { embed_ms?: number; count_ms?: number; count_calls?: number; window_ms?: number; shadows_ms?: number };
+  contextShadowStartedAt?: number;
+  setContextShadowDuration?: (duration: number) => void;
   images?: import("@/wire").ChatImagePart[];
   audio?: import("@/wire").ChatAudioPart[];
   editPictureAllowed?: boolean;
@@ -473,6 +478,8 @@ export interface NodeExecution {
   startMs: number;
   endMs: number;
   outcome: NodeOutcome;
+  /** Counts-only stage durations from the context node. */
+  stages?: { embed_ms?: number; count_ms?: number; count_calls?: number; window_ms?: number; shadows_ms?: number };
   /** Set only on the `model` node's own entry, after `output_gate`
    * resolves the turn's actual reasoning span (turnNext.ts's
    * applyReasoningOutcome(), machine.ts's own `output_gate` onDone) -

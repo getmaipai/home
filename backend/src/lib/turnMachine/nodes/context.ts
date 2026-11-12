@@ -105,6 +105,8 @@ export interface ContextInput {
 }
 
 export interface ContextOutput {
+  /** Private handoff to machine.ts; removed before the output is applied. */
+  __stages?: { embed_ms?: number; count_ms?: number; count_calls?: number; window_ms?: number; shadows_ms?: number };
   conversationId: string;
   deviceId?: string;
   temporary: boolean;
@@ -185,6 +187,8 @@ export function windowContextItems(window: ConversationWindow, nextSeq: () => nu
 }
 
 export const contextNode: Node<ContextInput, ContextOutput> = async (state, input) => {
+  const stageMs: NonNullable<ContextOutput["__stages"]> = {};
+  const elapsed = (start: number) => Math.max(0, Date.now() - start);
   const resolved = resolveOrCreateConversation(state.actor, state.surface, state.conversationId || undefined, { temporary: input.temporary, deviceId: state.surface === "robot" ? state.deviceId : null });
   if (!resolved.ok) {
     return { outcome: { ok: false, code: String(resolved.status) }, output: { conversationId: state.conversationId, temporary: false, items: [], reasoning: decideReasoning(state) } };
@@ -250,14 +254,18 @@ export const contextNode: Node<ContextInput, ContextOutput> = async (state, inpu
   // the engine's count once the rest of the prompt is known (below). What
   // the name resolution needs from it is read now.
   const windowOpts = { supersedes: state.supersedes, excludeTurnId: state.continuation?.fromTurnId };
+  const previewStart = Date.now();
   const preview = windowPreview(conversation, windowOpts);
+  stageMs.window_ms = elapsed(previewStart);
   const pushWindow = (window: ConversationWindow) => { items.push(...windowContextItems(window, () => ++windowItemSeq)); };
 
   // THIN-7C (bare mode): the raw model sees the conversation and nothing the
   // household's own data adds: no memory, profile, episode, clock or roster.
   if (state.bare) {
+    const windowStart = Date.now();
     pushWindow(await buildConversationWindow(conversation, windowOpts));
-    return { outcome: { ok: true }, output: { conversationId: conversation.id, ...(conversation.device_id ? { deviceId: conversation.device_id } : {}), temporary, items, reasoning: decideReasoning(state) } };
+    stageMs.window_ms = (stageMs.window_ms ?? 0) + elapsed(windowStart);
+    return { outcome: { ok: true }, output: { __stages: stageMs, conversationId: conversation.id, ...(conversation.device_id ? { deviceId: conversation.device_id } : {}), temporary, items, reasoning: decideReasoning(state) } };
   }
 
   // THIN-7E (ASK-01, rule 12): the names in the utterance, resolved before the model runs
@@ -309,7 +317,9 @@ export const contextNode: Node<ContextInput, ContextOutput> = async (state, inpu
     // household records a child may see.
     const withholdSensitive = state.surface === "robot" || ageBand === "child" || ageBand === "teen";
     const anonymous = speakerIsAnonymous(state);
+    const embedStart = Date.now();
     const queryVector = await embedQueryForRecall(input.utterance);
+    stageMs.embed_ms = elapsed(embedStart);
     recallVector = queryVector;
     const recalled = recall(state.actor, input.utterance, {
       selfOnly: true,
@@ -580,12 +590,19 @@ export const contextNode: Node<ContextInput, ContextOutput> = async (state, inpu
   const toolsFor = (ids: readonly string[]) => ids.slice().sort().map((id) => toolSpecFor(id, laneOfPerson(state.actor), state)).filter((t): t is NonNullable<typeof t> => t !== null);
   const countWithTools = (tools: ReturnType<typeof toolsFor>) => countTokens(contextToMessages([...items, ...summaryItem], input.utterance, state.persona, state.plan, state.signal, surfaceClass, pictureParts, false, state.topicBlock, state.robotName, state.languageLine), { tools });
   let tools = toolsFor(state.budget.tools_offered);
-  let rest = await countWithTools(tools);
+  let countCalls = 0;
+  let countTotalMs = 0;
+  const timedCount = async <T>(fn: () => Promise<T>): Promise<T> => {
+    countCalls++;
+    const started = Date.now();
+    try { return await fn(); } finally { countTotalMs += elapsed(started); }
+  };
+  let rest = await timedCount(() => countWithTools(tools));
   // AUDIO-PARITY-01: the two voice tools are the newest, so on a small window they give way before the tools block (and with it search) is dropped by THIN-3G below.
   const voiceIds = new Set(["voiceover", "change_voice"]);
   if (rest !== null && state.budget.context_window_tokens != null && state.budget.context_tokens - replyMaxTokensFor(state, thinking) - rest <= 0 && state.budget.tools_offered.some((id) => voiceIds.has(id))) {
     const kept = state.budget.tools_offered.filter((id) => !voiceIds.has(id));
-    const lighter = await countWithTools(toolsFor(kept));
+    const lighter = await timedCount(() => countWithTools(toolsFor(kept)));
     if (lighter !== null) {
       state.budget = { ...state.budget, tools_offered: kept };
       tools = toolsFor(kept);
@@ -615,8 +632,8 @@ export const contextNode: Node<ContextInput, ContextOutput> = async (state, inpu
     // never hears it and answers from the message alone.
     const core = items.filter((item) => item.source === "utterance" || item.source === "attachment" || item.source === "profile" || item.source === "roster");
   const countCore = (withSummary: boolean) => countTokens(contextToMessages([...core, ...(withSummary ? summaryItem : [])], input.utterance, state.persona, state.plan, state.signal, surfaceClass, pictureParts, false, state.topicBlock, state.robotName, state.languageLine));
-    const withSummary = await countCore(true);
-    const alone = withSummary !== null && withSummary + reply <= context ? withSummary : await countCore(false);
+    const withSummary = await timedCount(() => countCore(true));
+    const alone = withSummary !== null && withSummary + reply <= context ? withSummary : await timedCount(() => countCore(false));
     const written = surfaceClass === "written";
     // A chat seeded with a summary and no turn of its own yet holds the
     // summary out of this first prompt instead (no loop for a big paste);
@@ -654,7 +671,9 @@ export const contextNode: Node<ContextInput, ContextOutput> = async (state, inpu
   // on this turn's path first, never dropping a turn the summary does not
   // yet cover. Not when the history budget is zero on purpose (THIN-3G's
   // carry offer or a message too big to send): no fold would make room.
+  const windowStart = Date.now();
   const window = await buildConversationWindow(conversation, { ...windowOpts, historyBudgetTokens, foldWhenOver: historyBudgetTokens !== null && historyBudgetTokens > 0 });
+  stageMs.window_ms = (stageMs.window_ms ?? 0) + elapsed(windowStart);
   pushWindow(holdSummary ? { ...window, summaryLine: undefined } : window);
   if (recallEarlier && promptLimit === undefined) {
     // RECALL-03's block joins after the window is sized, so it is counted
@@ -663,28 +682,51 @@ export const contextNode: Node<ContextInput, ContextOutput> = async (state, inpu
     await recallEarlier(window);
     const added = items.slice(before);
     if (added.length > 0 && historyBudgetTokens !== null && window.historyTokens !== null) {
-      const extra = await countTokens(added.map((item) => ({ role: "system" as const, content: item.text })));
+      const extra = await timedCount(() => countTokens(added.map((item) => ({ role: "system" as const, content: item.text }))));
       if (extra === null || window.historyTokens + extra > historyBudgetTokens) items.splice(before, added.length);
     }
   }
 
   // ROUTER-BUILD-01d: the search assist's shadow score. Fails open inside; it
   // never changes what the model is sent.
-  const searchAssist = await runSearchAssistShadow(
+  const shadowsStart = Date.now();
+  const searchAssistPromise = state.spoken ? Promise.resolve(undefined) : runSearchAssistShadow(
     { surface: state.surface, actor: state.actor, speakerEvidence: state.speakerEvidence, spoken: state.spoken, bare: state.bare, crisis: state.crisis, continuation: state.continuation, promptLimit: promptLimit ?? state.promptLimit, budget: state.budget, planBasis: state.planBasis, outcomes: state.outcomes },
     input.utterance,
     recallVector,
     minorSearchGate(state, temporary),
   );
   // RECENCY-02: the weather detector's record, the same way: fails open, never changes what the model is sent.
-  const weatherAssist = await runWeatherAssistShadow(
+  const weatherAssistPromise = runWeatherAssistShadow(
     { surface: state.surface, actor: state.actor, speakerEvidence: state.speakerEvidence, spoken: state.spoken, bare: state.bare, crisis: state.crisis, continuation: state.continuation, promptLimit: promptLimit ?? state.promptLimit, budget: state.budget, planBasis: state.planBasis, outcomes: state.outcomes, deviceId: state.deviceId },
     input.utterance,
     recallVector,
   );
+  // Do not wait for shadow work here. The model node awaits it only at a read site.
+  const shadowPromises = { searchAssist: searchAssistPromise, weatherAssist: weatherAssistPromise, started: shadowsStart };
+  state.searchAssistPromise = shadowPromises.searchAssist.then((value) => value ?? undefined) as Promise<import("@/wire").SearchAssistStats>;
+  state.weatherAssistPromise = shadowPromises.weatherAssist;
+  state.contextShadowStartedAt = shadowsStart;
+  void Promise.all([searchAssistPromise, weatherAssistPromise]).then(() => {
+    state.setContextShadowDuration?.(Math.max(0, Date.now() - shadowsStart));
+  });
+  stageMs.count_ms = countTotalMs;
+  stageMs.count_calls = countCalls;
+  stageMs.shadows_ms = 0;
 
-  return { outcome: { ok: true }, output: { conversationId: conversation.id, ...(conversation.device_id ? { deviceId: conversation.device_id } : {}), temporary, items, reasoning, disclosureWithheld, searchAssist, weatherAssist, subjects: resolvedSubjects.subjects, unknownAsk: resolvedSubjects.unknownAsk, ...(promptLimit ? { promptLimit } : {}), ...(pictureParts.length > 0 ? { pictureParts } : {}), ...(memoryTrace ? { memoryTrace } : {}) } };
+  return { outcome: { ok: true }, output: { __stages: stageMs, conversationId: conversation.id, ...(conversation.device_id ? { deviceId: conversation.device_id } : {}), temporary, items, reasoning, disclosureWithheld, subjects: resolvedSubjects.subjects, unknownAsk: resolvedSubjects.unknownAsk, ...(promptLimit ? { promptLimit } : {}), ...(pictureParts.length > 0 ? { pictureParts } : {}), ...(memoryTrace ? { memoryTrace } : {}) } as ContextOutput };
 };
+
+// The machine starts both shadows alongside the context node's final return. Their promises remain in process memory only.
+export async function resolveContextShadow(state: TurnState, kind: "search" | "weather"): Promise<void> {
+  const pending = kind === "search" ? state.searchAssistPromise : state.weatherAssistPromise;
+  if (!pending) return;
+  const value = await pending;
+  if (kind === "search") state.searchAssist = value;
+  else state.weatherAssist = value;
+  if (kind === "search") state.searchAssistPromise = undefined;
+  else state.weatherAssistPromise = undefined;
+}
 
 /** Applies the node's output onto TurnState, the same small
  * "write-back" pattern nodes/safety.ts's applySafety() uses - kept out

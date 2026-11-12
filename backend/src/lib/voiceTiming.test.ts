@@ -33,6 +33,15 @@ test("attaches numeric engine stats and context duration by turn id, while old r
   expect(() => JSON.parse(JSON.stringify({ turn_id: "old", stt_ms: null, turn_start_ms: null, first_token_ms: null, first_sentence_ms: null, first_audio_ms: null, first_playback_ms: null }))).not.toThrow();
 });
 
+test("attaches context stage stamps and reports their medians while legacy rows omit them", () => {
+  beginVoiceTimingFor("turn-stages", 10, 20);
+  attachTurnStats("turn-stages", { nodes: [{ node: "context", startMs: 0, endMs: 80, stages: { embed_ms: 12, count_ms: 20, count_calls: 2, window_ms: 8, shadows_ms: 31 } }] });
+  expect(voiceTimingRecords(1)[0]).toMatchObject({ context_embed_ms: 12, context_count_ms: 20, context_count_calls: 2, context_window_ms: 8, context_shadows_ms: 31 });
+  expect(voiceTimingReport()).toContain("context_count_ms: 20 ms median");
+  const legacy = { turn_id: "old-row", stt_ms: null, turn_start_ms: null, first_token_ms: null, first_sentence_ms: null, first_audio_ms: null, first_playback_ms: null };
+  expect(() => JSON.parse(JSON.stringify(legacy))).not.toThrow();
+});
+
 test("tool time and model rounds are recorded from the node timings and reported apart", () => {
   beginVoiceTimingFor("turn-tool", 100, 200);
   attachTurnStats("turn-tool", { prompt_tokens: 4000, cache_reuse_tokens: 3000, time_to_first_token_ms: 3000, nodes: [{ node: "context", startMs: 0, endMs: 50 }, { node: "model", startMs: 50, endMs: 800 }, { node: "tool", startMs: 800, endMs: 3300 }, { node: "model", startMs: 3300, endMs: 4000 }] });
