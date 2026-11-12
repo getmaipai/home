@@ -690,43 +690,26 @@ export const contextNode: Node<ContextInput, ContextOutput> = async (state, inpu
   // ROUTER-BUILD-01d: the search assist's shadow score. Fails open inside; it
   // never changes what the model is sent.
   const shadowsStart = Date.now();
-  const searchAssistPromise = state.spoken ? Promise.resolve(undefined) : runSearchAssistShadow(
+  const searchAssist = await runSearchAssistShadow(
     { surface: state.surface, actor: state.actor, speakerEvidence: state.speakerEvidence, spoken: state.spoken, bare: state.bare, crisis: state.crisis, continuation: state.continuation, promptLimit: promptLimit ?? state.promptLimit, budget: state.budget, planBasis: state.planBasis, outcomes: state.outcomes },
     input.utterance,
     recallVector,
     minorSearchGate(state, temporary),
   );
   // RECENCY-02: the weather detector's record, the same way: fails open, never changes what the model is sent.
-  const weatherAssistPromise = runWeatherAssistShadow(
+  const weatherAssist = await runWeatherAssistShadow(
     { surface: state.surface, actor: state.actor, speakerEvidence: state.speakerEvidence, spoken: state.spoken, bare: state.bare, crisis: state.crisis, continuation: state.continuation, promptLimit: promptLimit ?? state.promptLimit, budget: state.budget, planBasis: state.planBasis, outcomes: state.outcomes, deviceId: state.deviceId },
     input.utterance,
     recallVector,
   );
-  // Do not wait for shadow work here. The model node awaits it only at a read site.
-  const shadowPromises = { searchAssist: searchAssistPromise, weatherAssist: weatherAssistPromise, started: shadowsStart };
-  state.searchAssistPromise = shadowPromises.searchAssist.then((value) => value ?? undefined) as Promise<import("@/wire").SearchAssistStats>;
-  state.weatherAssistPromise = shadowPromises.weatherAssist;
-  state.contextShadowStartedAt = shadowsStart;
-  void Promise.all([searchAssistPromise, weatherAssistPromise]).then(() => {
-    state.setContextShadowDuration?.(Math.max(0, Date.now() - shadowsStart));
-  });
+  // Shadow work is awaited here again (CONTEXT-NODE-01 first made it lazy; the rescue and stats tests need the results at the model node).
+  stageMs.shadows_ms = elapsed(shadowsStart);
   stageMs.count_ms = countTotalMs;
   stageMs.count_calls = countCalls;
-  stageMs.shadows_ms = 0;
 
-  return { outcome: { ok: true }, output: { __stages: stageMs, conversationId: conversation.id, ...(conversation.device_id ? { deviceId: conversation.device_id } : {}), temporary, items, reasoning, disclosureWithheld, subjects: resolvedSubjects.subjects, unknownAsk: resolvedSubjects.unknownAsk, ...(promptLimit ? { promptLimit } : {}), ...(pictureParts.length > 0 ? { pictureParts } : {}), ...(memoryTrace ? { memoryTrace } : {}) } as ContextOutput };
+  return { outcome: { ok: true }, output: { __stages: stageMs, conversationId: conversation.id, ...(conversation.device_id ? { deviceId: conversation.device_id } : {}), temporary, items, reasoning, disclosureWithheld, searchAssist, weatherAssist, subjects: resolvedSubjects.subjects, unknownAsk: resolvedSubjects.unknownAsk, ...(promptLimit ? { promptLimit } : {}), ...(pictureParts.length > 0 ? { pictureParts } : {}), ...(memoryTrace ? { memoryTrace } : {}) } as ContextOutput };
 };
 
-// The machine starts both shadows alongside the context node's final return. Their promises remain in process memory only.
-export async function resolveContextShadow(state: TurnState, kind: "search" | "weather"): Promise<void> {
-  const pending = kind === "search" ? state.searchAssistPromise : state.weatherAssistPromise;
-  if (!pending) return;
-  const value = await pending;
-  if (kind === "search") state.searchAssist = value;
-  else state.weatherAssist = value;
-  if (kind === "search") state.searchAssistPromise = undefined;
-  else state.weatherAssistPromise = undefined;
-}
 
 /** Applies the node's output onto TurnState, the same small
  * "write-back" pattern nodes/safety.ts's applySafety() uses - kept out

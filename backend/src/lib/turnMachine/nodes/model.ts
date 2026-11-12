@@ -50,7 +50,6 @@ import { promptLimitLine } from "@/lib/failureCopy";
 import { thinkingModeFor } from "@/lib/modelCatalog";
 import { lookupMissed, lookupFailureKind, lookupMissedClause, lookupMissedInstruction, markRetryMessage, recoveredRetry, retryInstruction, retryTools, isRepeatOfFailed } from "./lookupFallback";
 import type { Node, TurnState, NodeOutcome } from "../contract";
-import { resolveContextShadow } from "./context";
 import type { StreamGate } from "./outputGate";
 import { pictureFailureWords, picturesNotReadNote } from "@/lib/chatImageNote";
 import type { ChatImagePart } from "@/wire";
@@ -1278,15 +1277,6 @@ const modelRound: Node<ModelInput, ModelOutput> = async (state, input, signal) =
   const mediaOffered = tools.some((t) => t.id === "generate_image" || t.id === "generate_video" || t.id === "edit_video" || t.id === "make_film" || t.id === "generate_music" || t.id === "make_sound" || t.id === "edit_music" || t.id === "make_band" || t.id === "make_album");
   const successfulMusicStart = musicForOutcomes(state.outcomes) !== null;
   const holdMedia = !input.retry && !noToolsTurn(state) && (successfulMusicStart || (!isPhrasingRound && asksForMedia(input.utterance)));
-  // Shadows are asynchronous context work. Read a score only when this round can use it.
-  const mayReadSearch = !state.spoken && !isPhrasingRound && !input.retry && toolsAllowed && !continuing && tools.some((t) => t.id === "websearch") && searchAssistMayHold(state, tools);
-  const mayReadWeather = !isPhrasingRound && !input.retry && toolsAllowed && !continuing && tools.some((t) => t.id === WEATHER_TOOL) && weatherAssistMayHold(state, tools);
-  if (!isPhrasingRound && !input.retry && toolsAllowed && !continuing) {
-    const pending: Promise<void>[] = [];
-    if (mayReadSearch) pending.push(resolveContextShadow(state, "search"));
-    if (mayReadWeather) pending.push(resolveContextShadow(state, "weather"));
-    if (pending.length) await Promise.all(pending);
-  }
   let attempt = await runOneGeneration(state, messages, tools, tool_choice, thinkingOn, maxTokens, isPhrasingRound ? "phrasing" : input.retry ? "tool_retry" : "model", signal, holdMedia ? "media" : !isPhrasingRound && !input.retry && toolsAllowed && !continuing && (searchAssistMayHold(state, tools) || weatherAssistMayHold(state, tools)));
   // THIN-GROUND-01: llama-server reports the rendered prompt size in its
   // 400 body. Use that measurement to choose the first evidence cut, then
