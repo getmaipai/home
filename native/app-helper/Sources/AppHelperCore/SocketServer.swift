@@ -57,7 +57,8 @@ public final class SocketServer {
     func serve(_ c: Int32) {
         defer { close(c) }
         var uid: uid_t = 0, gid: gid_t = 0
-        guard getpeereid(c, &uid, &gid) == 0, uid == getuid() else { return }
+        // The person's own user, and root: Home's server is a system service running as root, and it is the one caller that asks. The socket file is 0600, so no other account can connect anyway.
+        guard getpeereid(c, &uid, &gid) == 0, uid == getuid() || uid == 0 else { return }
         var buf = Data()
         var chunk = [UInt8](repeating: 0, count: 4096)
         while true {
