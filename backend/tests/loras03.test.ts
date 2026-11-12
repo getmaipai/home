@@ -147,6 +147,17 @@ describe("migration of the old preference rows (rule 4: one store)", () => {
     expect(listLoraRecords().map((l) => l.hlc).sort()).toEqual(before);
   });
 
+  test("the Ingredients adapter is an engine part: it never becomes a style record", async () => {
+    await household();
+    fake.loras = [
+      { id: "lora-ff873a5beada3c57", name: "ltx-2.5-22b-ic-lora-ingredients-0.9", sha256: "4".repeat(64), bytes: 1_308_787_472, base_model: "ltx-2.5", licence: "ltx-2.x-community-license", source_url: "https://huggingface.co/Lightricks/LTX-2.5-22b-IC-LoRA-Ingredients", classification: "all-ages", strength_default: 1, trigger_words: [], added_at: new Date().toISOString() },
+      { id: "lora-5555555555555555", name: "Real Style", sha256: "5".repeat(64), bytes: 100, base_model: "ltx-2.5", licence: "MIT", source_url: null, classification: "all-ages", strength_default: 1, trigger_words: [], added_at: new Date().toISOString() },
+    ] as never;
+    await syncLoras(true);
+    expect(getLoraRecord("lora-ff873a5beada3c57")).toBeNull();
+    expect(getLoraRecord("lora-5555555555555555")).not.toBeNull();
+  });
+
   test("a Stack that does not answer changes nothing", async () => {
     await household();
     fake.restore(); // no fake engine: the Stack is unreachable

@@ -102,6 +102,8 @@ An owner or admin opens **Settings**, **Pictures, videos and music**. It has the
 - **Music.** Adults can make songs, **Song length** (**Short** or **Full**), a **Choose models** button, online radio and podcasts, and the song lookups.
 - **Styles.** The one list of styles for pictures and videos: browse, add from a file, who can use each, adult-only styles behind a lock, and recently removed.
 
+Two small parts have their own rows in **AI and models**, and the setup plan lists them too. **Telling people apart** (the face finder and matcher, 38.9 MB, MIT and Apache-2.0 licences, from huggingface.co and the OpenCV Zoo on GitHub) lets Home give each person in a picture their own panel when it builds a reference sheet; it does not name anyone. It starts ticked in setup, and its switch installs or removes the two files. **Video from pictures** (the video-from-pictures adapter, 1.3 GB, the LTX-2.x Community License, from huggingface.co) is what "make a video from pictures" needs. It asks you to accept its terms on its Hugging Face page and needs your Hugging Face token (saved in **Settings**, **AI**, **Advanced**), and the household licence acceptance must cover the LTX licence. Until both are in place its row says what is missing; setup lists it and says to add it afterwards. Each row shows its size, licence, where it comes from and whether it is installed.
+
 Choosing and installing models is done in **AI and models**. This area never shows a second control for that. See [Pictures](pictures.md), [Videos](videos.md), [Levels](levels.md) and [Songs](songs.md).
 
 **Song length** chooses short or full songs. Short songs are about 45 seconds and take under a minute. Full songs are about 3 minutes and take a minute or two. See [Songs](songs.md).

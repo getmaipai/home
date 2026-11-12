@@ -20,6 +20,8 @@ import { componentFailure, installStackComponent, listStackComponents, listTierC
 import { previewPlan } from "@/lib/installActions";
 import { recordedLevel, shippedPlanForLevel } from "@/lib/diskPlan";
 import { systemAvailableBytes } from "@/lib/resourceGovernor";
+import { ensureVisionAssets, faceFinderState, removeVisionAssets } from "@/lib/visionAssets";
+import { INGREDIENTS_BYTES, installIngredients, ingredientsState, removeIngredients, type IngredientsState } from "@/lib/videos/ingredientsAdapter";
 import { ensureWakewordAssets, removeWakewordAssets, wakewordAssetState } from "@/lib/wakewordAssets";
 import { slotKey } from "@/lib/tiers";
 import { catalogEntries } from "@/lib/modelCatalog";
@@ -37,9 +39,9 @@ import { isOwnerOrAdmin } from "@/lib/access";
 
 export const aiChoicesRoutes = apiRouter();
 
-const JOBS = ["chat", "pictures", "picturesdetailed", "videos", "music", "stems", "voice", "wakeword", "vision", "coding"] as const;
+const JOBS = ["chat", "pictures", "picturesdetailed", "videos", "music", "stems", "voice", "wakeword", "vision", "coding", "faces", "ingredients"] as const;
 type JobId = (typeof JOBS)[number];
-const JOB_WORDS: Record<JobId, string> = { chat: "Chat", pictures: "Standard pictures", picturesdetailed: "Boost pictures", videos: "Videos", music: "Music", stems: "Stems", voice: "Voice", wakeword: "Wake word", vision: "Describing pictures", coding: "Coding" };
+const JOB_WORDS: Record<JobId, string> = { chat: "Chat", pictures: "Standard pictures", picturesdetailed: "Boost pictures", videos: "Videos", music: "Music", stems: "Stems", voice: "Voice", wakeword: "Wake word", vision: "Describing pictures", coding: "Coding", faces: "Telling people apart", ingredients: "Video from pictures" };
 
 // The state every route reads: the disk plan, the Stack's component list and the three household settings
 // the cards are built from.
@@ -51,10 +53,11 @@ interface AiState {
   list: StackComponentList;
   uncensored: Awaited<ReturnType<typeof uncensoredChoiceState>>;
   addedChats: Awaited<ReturnType<typeof addedChatChoiceStates>>;
+  ingredients: IngredientsState;
 }
 
 function choicesInput(state: AiState): AiChoicesInput {
-  return { copy: aiCopy, plan: state.plan, components: state.components, settings: state.settings, freeBytes: state.freeBytes, wakeword: wakewordAssetState(), uncensored: state.uncensored, addedChats: state.addedChats.map((added) => ({ ...added, description: ADDED_CHAT_DESCRIPTION })) };
+  return { copy: aiCopy, plan: state.plan, components: state.components, settings: state.settings, freeBytes: state.freeBytes, wakeword: wakewordAssetState(), faces: faceFinderState(), ingredients: { installed: state.ingredients.installed, bytes: INGREDIENTS_BYTES, installing: state.ingredients.installing, percent: state.ingredients.percent, failure: state.ingredients.failure, blockedReason: state.ingredients.installed ? null : state.ingredients.blockedReason }, uncensored: state.uncensored, addedChats: state.addedChats.map((added) => ({ ...added, description: ADDED_CHAT_DESCRIPTION })) };
 }
 
 function unusedInput(state: AiState): UnusedInput {
@@ -69,8 +72,8 @@ async function loadPlan(): Promise<DiskPlan> {
 }
 
 async function loadAiState(): Promise<AiState> {
-  const [plan, list, uncensored, addedChats] = await Promise.all([loadPlan(), listStackComponents(), uncensoredChoiceState(), addedChatChoiceStates()]);
-  return { plan, components: list.components, settings: readAiSettings(), freeBytes: list.free_disk_bytes, list, uncensored, addedChats };
+  const [plan, list, uncensored, addedChats, ingredients] = await Promise.all([loadPlan(), listStackComponents(), uncensoredChoiceState(), addedChatChoiceStates(), ingredientsState()]);
+  return { plan, components: list.components, settings: readAiSettings(), freeBytes: list.free_disk_bytes, list, uncensored, addedChats, ingredients };
 }
 
 // The Stack's refusal, passed through as its own sentence (routes/components.ts does the same mapping).
@@ -133,6 +136,8 @@ function keptMessage(name: string, reason: string): string {
 }
 
 const WAKEWORD_CHOICE = "wakeword.detector";
+const FACES_CHOICE = "faces.finder";
+const INGREDIENTS_CHOICE = "ingredients.adapter";
 // The chat choices that are a chat model: picking one goes through the model switch (download, then load), not a Stack part and a setting.
 const CHAT_MODEL_CHOICES = ["chat.standard", "chat.uncensored"];
 
@@ -192,7 +197,7 @@ aiChoicesRoutes.openapi(choicesRoute, async (c) => {
   if (list === null) {
     return c.json({ stack: "unreachable" as const, message, tier: null, free_disk_bytes: null, installed_bytes: 0, cards: [], alwaysOn: { bytes: 0, rowIds: [] }, recommended: null, unused_bytes: 0, memory_available_bytes: null }, 200);
   }
-  const state: AiState = { plan: await planned, components: list.components, settings: readAiSettings(), freeBytes: list.free_disk_bytes, list, uncensored: (await chatStates)[0], addedChats: (await chatStates)[1] };
+  const state: AiState = { plan: await planned, components: list.components, settings: readAiSettings(), freeBytes: list.free_disk_bytes, list, uncensored: (await chatStates)[0], addedChats: (await chatStates)[1], ingredients: await ingredientsState() };
   const { cards, alwaysOn } = buildAiCards(choicesInput(state));
   return c.json({
     stack: "ok" as const, message: null, tier: list.tier, free_disk_bytes: list.free_disk_bytes, installed_bytes: list.installed_bytes,
@@ -355,6 +360,32 @@ aiChoicesRoutes.openapi(chooseRoute, async (c) => {
         return c.json({ ok: true as const, started: [], removed: [] }, 200);
       }
       if (choice.action === "remove") { removeWakewordAssets(); return c.json({ ok: true as const, started: [], removed: [choice.id] }, 200); }
+    }
+    if (choice.id === FACES_CHOICE) {
+      // The two pinned face files are the hub's own checksummed downloads, started here by an admin and never silently by a feature.
+      if (choice.action === "get") {
+        try { await ensureVisionAssets(); } catch {
+          return c.json({ error: "The face finder files did not download. Check that this computer is online, then try again.", code: "faces_download" }, 503) as never;
+        }
+        return c.json({ ok: true as const, started: [], removed: [] }, 200);
+      }
+      if (choice.action === "remove") { removeVisionAssets(); return c.json({ ok: true as const, started: [], removed: [choice.id] }, 200); }
+    }
+    if (choice.id === INGREDIENTS_CHOICE) {
+      // The adapter is one Stack video LoRA install job (a Hugging Face file, the person's token, the maker's licence acknowledged here first).
+      if (choice.action === "get") {
+        const started = await installIngredients(c.get("person").id);
+        if (!started.ok) return c.json({ error: started.error, code: started.code }, started.status) as never;
+        dropModelCaches();
+        return c.json({ ok: true as const, started: [started.job], removed: [] }, 200);
+      }
+      if (choice.action === "remove") {
+        const removed = await removeIngredients();
+        if (!removed.ok) return c.json({ error: removed.error, code: "stack_unreachable" }, 503) as never;
+        dropModelCaches();
+        return c.json({ ok: true as const, started: [], removed: removed.removed ? [choice.id] : [] }, 200);
+      }
+      return c.json({ error: choice.blockedReason ?? (choice.state === "installing" ? "It is still installing." : "It is already installed."), code: "no_action" }, 409) as never;
     }
     if ((CHAT_MODEL_CHOICES.includes(choice.id) || choice.id.startsWith("chat.added.")) && (choice.action === "get" || choice.action === "use")) {
       const modelId = choice.id === "chat.uncensored" ? state.uncensored?.id ?? null

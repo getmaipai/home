@@ -2,11 +2,13 @@
 // state until Apply) and the Memory and Storage projections are derived here from /api/ai/choices, so the page only draws them.
 import type { AiCard, AiChoice, AiJobId } from "../../../../shared/aiChoices";
 
-export const JOB_ORDER: AiJobId[] = ["chat", "pictures", "picturesdetailed", "videos", "music", "stems", "voice", "wakeword", "vision", "coding"];
+export const JOB_ORDER: AiJobId[] = ["chat", "pictures", "picturesdetailed", "videos", "music", "stems", "voice", "wakeword", "vision", "coding", "faces", "ingredients"];
 /** The icon name of each job, shared by Settings and the setup wizard. */
-export const JOB_ICONS: Record<AiJobId, string> = { chat: "message-circle", pictures: "palette", picturesdetailed: "sparkles", videos: "film", music: "music", stems: "audio-waveform", voice: "mic-vocal", wakeword: "ear", vision: "eye", coding: "code" };
+export const JOB_ICONS: Record<AiJobId, string> = { chat: "message-circle", pictures: "palette", picturesdetailed: "sparkles", videos: "film", music: "music", stems: "audio-waveform", voice: "mic-vocal", wakeword: "ear", vision: "eye", coding: "code", faces: "users", ingredients: "clapperboard" };
 /** The engine role whose `engines.<role>.choice` key is the job's On/Off switch (`off` or `auto`). */
-export const ENGINE_ROLE: Record<AiJobId, string> = { chat: "chat", pictures: "image", picturesdetailed: "image", videos: "video", music: "music", stems: "stems", voice: "tts", wakeword: "wakeword", vision: "vision", coding: "coding" };
+export const ENGINE_ROLE: Record<AiJobId, string> = { chat: "chat", pictures: "image", picturesdetailed: "image", videos: "video", music: "music", stems: "stems", voice: "tts", wakeword: "wakeword", vision: "vision", coding: "coding", faces: "faces", ingredients: "ingredients" };
+/** Jobs the hub installs itself (its own pinned files or one Stack library entry), with no On/Off engine setting: the switch installs or removes them through the choose route. */
+export const HUB_PART_JOBS: ReadonlySet<AiJobId> = new Set<AiJobId>(["wakeword", "faces", "ingredients"]);
 export const OFF = "__off";
 
 /** One staged change for a job: the model picked in the dialog and/or the switch flipped. Nothing is written until Apply. */
@@ -86,7 +88,7 @@ export interface Projection {
 // coding model and vision load on first use and give way when something else needs the room; video and music run one at a time.
 // Adding every model's memory together shows a computer that can never hold them, which is not how the engine runs them.
 const ALWAYS_LOADED = new Set<AiJobId>(["chat", "voice", "wakeword"]);
-const ONE_AT_A_TIME = new Set<AiJobId>(["videos", "music"]);
+const ONE_AT_A_TIME = new Set<AiJobId>(["videos", "music", "ingredients"]);
 
 function memoryOf(rows: GlanceRow[], pick: (row: GlanceRow) => AiChoice | null): { always: number; peak: number } {
   let always = 0; let loadsWhenUsed = 0; let largestTurn = 0; let picturePool = 0;

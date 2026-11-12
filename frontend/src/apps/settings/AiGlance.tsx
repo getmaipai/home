@@ -27,7 +27,7 @@ import { AiSlotChoices } from "@/apps/settings/AiSlotDialog";
 import { AiJobSummary } from "@/apps/settings/AiJobSummary";
 import { TIERED_JOBS, configurableTiers, draftOf, sameDraft, slotKey, toStored, type SlotDrafts, type SlotTier } from "@/apps/settings/aiTierSlots";
 import { useAiChoices } from "@/apps/settings/useAiChoices";
-import { ENGINE_ROLE, JOB_ICONS, JOB_ORDER, OFF, buildRows, counts, fill, missingRows, project, stageFor, type GlanceRow, type StagedMap } from "@/apps/settings/aiGlanceRows";
+import { ENGINE_ROLE, HUB_PART_JOBS, JOB_ICONS, JOB_ORDER, OFF, buildRows, counts, fill, missingRows, project, stageFor, type GlanceRow, type StagedMap } from "@/apps/settings/aiGlanceRows";
 import { sizeGb } from "../../../../shared/diskPlanMath";
 import type { AiJobId } from "../../../../shared/aiChoices";
 import type { SettingsViewProps } from "@/shell/pages/settings/settingsViews";
@@ -121,7 +121,7 @@ export function AiGlance({ card }: SettingsViewProps) {
             else await api.setSetting("household", single.setting.key, false, true);
           }
           else if (row.job === "stems") { /* Stems has no On/Off setting: the parts are installed or not, and nothing else to turn off. */ }
-          else if (row.job === "wakeword") { if (single && row.liveEnabled) await aiChoicesApi.choose(row.job, single.id); }
+          else if (HUB_PART_JOBS.has(row.job)) { if (single && row.liveEnabled) await aiChoicesApi.choose(row.job, single.id); }
           else await api.setSetting("household", `engines.${role}.choice`, "off", true);
         } else if (row.shown && (staged[row.job]?.choiceId || single)) {
           await aiChoicesApi.choose(row.job, row.shown.id);

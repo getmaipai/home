@@ -1,5 +1,7 @@
 // The inputs the job cards are built from, read the same way for Settings (routes/aiChoices.ts) and the setup wizard's plan
 // step (routes/setup.ts): the four household settings the cards depend on, and the cards for a disk plan.
+import { faceFinderState } from "@/lib/visionAssets";
+import { INGREDIENTS_AFTER_SETUP_LINE, INGREDIENTS_BYTES, ingredientsState } from "@/lib/videos/ingredientsAdapter";
 import { buildAiCards, type AiChoicesInput, type AiChoicesResult } from "../../../shared/aiChoices";
 import type { DiskPlan } from "../../../shared/diskPlanMath";
 import { aiCopy } from "@/lib/aiCopy";
@@ -46,5 +48,8 @@ export async function setupCards(plan: DiskPlan): Promise<AiChoicesResult> {
   let components: AiChoicesInput["components"] = null;
   let freeBytes: number | null = null;
   try { const list = await listStackComponents(); components = list.components; freeBytes = list.free_disk_bytes; } catch { /* plan only */ }
-  return buildAiCards({ copy: aiCopy, plan, components, settings: readAiSettings(), freeBytes });
+  // The face finder files install with the wizard's Install; the adapter needs a Hugging Face token and an accepted licence, so the wizard lists it and says where to add it.
+  const faces = faceFinderState();
+  const adapter = await ingredientsState();
+  return buildAiCards({ copy: aiCopy, plan, components, settings: readAiSettings(), freeBytes, faces, ingredients: { installed: adapter.installed, bytes: INGREDIENTS_BYTES, installing: adapter.installing, percent: adapter.percent, blockedReason: adapter.installed ? null : INGREDIENTS_AFTER_SETUP_LINE } });
 }

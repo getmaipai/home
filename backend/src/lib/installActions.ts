@@ -17,6 +17,8 @@ import { isLicensedRow, LICENSED_ROWS, type PlanLicence } from "../../../shared/
 import type { StackInstallPlan } from "@/lib/stack/client";
 import { cannotRunJobs, cannotRunWhy, readCapabilities } from "@/lib/memoryRoom";
 import { setupCards } from "@/lib/aiChoicesState";
+import { ensureVisionAssets, faceFinderState } from "@/lib/visionAssets";
+import { FACES_ROW_ID } from "../../../shared/aiChoices";
 
 /** Where the plan's files land and how much room each place has: Home's program and data on this computer, the AI's files on the Stack's disk (read by the Stack, which may be another computer). */
 export function volumesFor(plan: StackInstallPlan): DiskVolume[] {
@@ -114,6 +116,8 @@ export async function beginInstall(requestedGb: number | undefined, recordInSetu
   // The disk check, on the rows the person left turned on: the same function the page ran while they chose.
   const diskPlan = plan.disk ?? (plan.tier ? shippedDiskPlan(plan.tier) : null);
   // A licensed extra (Detailed video) is on by default in the wizard only; Home settings and an upgrade never pull it unasked.
+  // The face finder files are the hub's own pinned download, not a Stack part: the wizard's Install (an admin's explicit action) starts them when that row is ticked.
+  const facesAsked = components?.includes(FACES_ROW_ID) === true && !faceFinderState().installed;
   const wanted = diskPlan ? sanitizeSelection(diskPlan, components ?? (recordInSetup ? diskPlan.default_selected : diskPlan.default_selected.filter((id) => !isLicensedRow(id)))) : undefined;
   // The Stack's fits_ever: a job no tier can ever run on this computer is not downloaded, whatever was asked for.
   const fitted = diskPlan && wanted ? await withoutUnfitJobs(diskPlan, wanted) : { selected: wanted, leftOut: [] as LeftOut[] };
@@ -148,7 +152,8 @@ export async function beginInstall(requestedGb: number | undefined, recordInSetu
     const roles = [...new Set(plan.models.map((model) => `engines.${model.role}.choice`))];
     replaceSetupStep("plan", { status: "done", plan: { option: "recommended", tier: plan.level, roles } });
   }
+  if (facesAsked) void ensureVisionAssets().catch(() => {});
   void startSetupDownloads(getStackClient(), { ...(vramGb ? { vramGb } : {}), ...(selected ? { selected } : {}) }).catch(() => {});
   const pending = plan.models.filter((model) => !model.installed).length + (selected && plan.disk ? (plan.optional_models ?? []).filter((model) => !model.installed && plan.disk!.rows.some((row) => selected.includes(row.id) && row.model_ids.includes(model.id))).length : 0);
-  return { ok: true, models: pending + startedLicensed, ...(fitted.leftOut.length ? { leftOut: fitted.leftOut } : {}) };
+  return { ok: true, models: pending + startedLicensed + (facesAsked ? 1 : 0), ...(fitted.leftOut.length ? { leftOut: fitted.leftOut } : {}) };
 }

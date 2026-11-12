@@ -142,7 +142,7 @@ export function PlanStep({ onInstalled, onReady, readPlan = api.setupPlan, start
         ) : null}
         {wording.gets.length ? <ul className="list-disc space-y-1 pl-5">{wording.gets.map((line) => <li key={line}>{line}</li>)}</ul> : null}
         {disk ? <>
-          {jobs.length > 0 ? <ItemGroup variant="card" role="group" aria-label={i18n._({ id: "What gets installed", message: "What gets installed" })}>{jobs.map((job) => jobItem(job, picks, (pick) => setPicks((current) => ({ ...current, [job.job]: pick })), disk.source === "stack", cannotRun.has(job.job) && !job.required ? (cannotWhy[job.job] ?? i18n._({ id: "This computer can't run this, so nothing is downloaded for it.", message: "This computer can't run this, so nothing is downloaded for it." })) : null))}</ItemGroup> : null}
+          {jobs.length > 0 ? <ItemGroup variant="card" role="group" aria-label={i18n._({ id: "What gets installed", message: "What gets installed" })}>{jobs.map((job) => jobItem(job, picks, (pick) => setPicks((current) => ({ ...current, [job.job]: pick })), disk.source === "stack", job.blocked ?? (cannotRun.has(job.job) && !job.required ? (cannotWhy[job.job] ?? i18n._({ id: "This computer can't run this, so nothing is downloaded for it.", message: "This computer can't run this, so nothing is downloaded for it." })) : null)))}</ItemGroup> : null}
           <PlanDiskSummary disk={disk} selected={selected} />
         </> : (
           <>

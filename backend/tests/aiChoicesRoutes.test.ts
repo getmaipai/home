@@ -15,6 +15,12 @@ import { shippedDiskPlan } from "@/lib/diskPlan";
 import { resetInstallStatusCache } from "@/lib/installStatus";
 import type { StackClient, StackInstallPlan } from "@/lib/stack/client";
 import { wakewordDir } from "@/lib/paths";
+import { VISION_ALL_ASSETS, visionAssetPath, areVisionAssetsInstalled } from "@/lib/visionAssets";
+import { visionDir } from "@/lib/paths";
+import { __setVideosFetchForTests } from "@/lib/videos/stack";
+import { __resetIngredientsForTests, INGREDIENTS_BYTES, INGREDIENTS_LIBRARY_NAME } from "@/lib/videos/ingredientsAdapter";
+import { recordLicenceAck } from "@/lib/licenceAcceptance";
+import { rmSync } from "node:fs";
 import { WAKEWORD_ALL_ASSETS, isWakewordAssetInstalled, wakewordAssetPath } from "@/lib/wakewordAssets";
 import { closeForJob, resetCloseAppsForTests, type CloseHelper } from "@/lib/jobs/closeApps";
 import { TestClient } from "./client";
@@ -155,14 +161,14 @@ describe("the Status line for closed apps (TIER-PRIO-05)", () => {
 });
 
 describe("the cards", () => {
-  test("GET /api/ai/choices returns ten cards with the current Quick picture model from the setting", async () => {
+  test("GET /api/ai/choices returns twelve cards with the current Quick picture model from the setting", async () => {
     const { client } = await owner();
     writeChoiceSetting("engines.image.tier.standard", "klein");
     const body = await (await client.get("/api/ai/choices")).json() as { stack: string; cards: Card[]; alwaysOn: { bytes: number; rowIds: string[] }; recommended: { changes: Array<{ job: string }> } | null };
     expect(body.stack).toBe("ok");
     const reading = (body as unknown as { memory_available_bytes: number | null }).memory_available_bytes;
     expect(reading === null || reading > 0).toBe(true);
-    expect(body.cards.map((card) => card.id)).toEqual(["chat", "pictures", "picturesdetailed", "videos", "music", "stems", "voice", "wakeword", "vision", "coding"]);
+    expect(body.cards.map((card) => card.id)).toEqual(["chat", "pictures", "picturesdetailed", "videos", "music", "stems", "voice", "wakeword", "vision", "coding", "faces", "ingredients"]);
     const pictures = body.cards.find((card) => card.id === "pictures")!;
     expect(pictures.choices.find((choice) => choice.id === "pictures.klein")!.current).toBe(true);
     expect(body.alwaysOn.rowIds.length).toBeGreaterThan(0);
@@ -248,6 +254,84 @@ describe("choosing", () => {
     const after = await read();
     expect(after.choices[0]!.current).toBe(false);
     expect(after.choices[0]!.action).toBe("get");
+  });
+
+  test("the face finder row lists the two pinned files with size, licence and source, and removing it deletes them", async () => {
+    const { client } = await owner();
+    rmSync(visionDir, { recursive: true, force: true });
+    const read = async () => ((await (await client.get("/api/ai/choices")).json()) as { cards: Array<Card & { title: string; choices: Array<{ id: string; label: string; description: string; state: string; stateText: string; installedBytes: number }> }> }).cards.find((card) => card.id === "faces")!;
+    const before = await read();
+    expect(before.title).toBe("Telling people apart");
+    expect(before.choices.map((choice) => choice.id)).toEqual(["faces.finder"]);
+    expect(before.choices[0]!.label).toBe("Face finder and matcher");
+    expect(before.choices[0]!.state).toBe("notInstalled");
+    expect(before.choices[0]!.action).toBe("get");
+    expect(before.choices[0]!.installedBytes).toBe(229_738 + 38_696_353);
+    expect(before.choices[0]!.description).toContain("each person gets their own panel");
+    expect(before.choices[0]!.description).toContain("MIT");
+    expect(before.choices[0]!.description).toContain("Apache-2.0");
+    expect(before.choices[0]!.description).toContain("huggingface.co");
+    await mkdir(visionDir, { recursive: true });
+    for (const asset of VISION_ALL_ASSETS) await Bun.write(visionAssetPath(asset.file), "x");
+    const during = await read();
+    expect(during.choices[0]!.state).toBe("installed");
+    expect(during.choices[0]!.action).toBe("remove");
+    expect((await client.post("/api/ai/choices/faces", { choice: "faces.finder" })).status).toBe(200);
+    expect(areVisionAssetsInstalled()).toBe(false);
+    rmSync(visionDir, { recursive: true, force: true });
+  });
+
+  test("the video-from-pictures adapter row reads the Stack's video LoRA library and installs it by its exact name once the token and licence are in place", async () => {
+    const { client, actor } = await owner();
+    __resetIngredientsForTests();
+    let library: Array<Record<string, unknown>> = [];
+    const seen: Array<{ method: string; path: string; body: Record<string, unknown> | null }> = [];
+    __setVideosFetchForTests((async (input: string | URL | Request, init?: RequestInit) => {
+      const path = new URL(String(input)).pathname;
+      const method = init?.method ?? "GET";
+      seen.push({ method, path, body: typeof init?.body === "string" ? JSON.parse(init.body) as Record<string, unknown> : null });
+      if (method === "GET" && path === "/stack/v1/video/loras") return Response.json({ loras: library });
+      if (method === "POST" && path === "/stack/v1/video/loras/install") return Response.json({ job: "lora-job-1" }, { status: 202 });
+      if (method === "GET" && path === "/stack/v1/jobs/lora-job-1") return Response.json({ job: { state: "running", percent: 40 } });
+      if (method === "DELETE") { library = []; return new Response(null, { status: 204 }); }
+      return Response.json({ error: "unscripted", code: "unscripted" }, { status: 500 });
+    }) as never);
+    try {
+      type Row = { id: string; title: string; choices: Array<{ id: string; label: string; description: string; state: string; action: string; blockedReason: string | null; percent: number | null; installedBytes: number }> };
+      const read = async () => ((await (await client.get("/api/ai/choices")).json()) as { cards: Row[] }).cards.find((card) => card.id === "ingredients")!;
+      // Nothing saved yet: listed, with its size, and the plain reason it cannot install.
+      const first = await read();
+      expect(first.choices[0]!.label).toBe("Video-from-pictures adapter");
+      expect(first.choices[0]!.installedBytes).toBe(INGREDIENTS_BYTES);
+      expect(first.choices[0]!.description).toContain("LTX-2.x Community License");
+      expect(first.choices[0]!.description).toContain("make a video from pictures");
+      expect(first.choices[0]!.action).toBe("none");
+      expect(first.choices[0]!.blockedReason).toContain("Hugging Face token");
+      const refused = await client.post("/api/ai/choices/ingredients", { choice: "ingredients.adapter" });
+      expect(refused.status).toBe(409);
+      expect(seen.some((call) => call.path.endsWith("/install"))).toBe(false);
+      // Token saved, licence not accepted: the licence is named.
+      setHouseholdSettingValue("voice.hf_token", "hf_test_token");
+      expect((await read()).choices[0]!.blockedReason).toContain("licence");
+      // Both in place: one Stack install job with the exact library name.
+      recordLicenceAck(actor.id, [{ component: "ltx-2-5-q8-distilled-mlx", id: "ltx-2.x-community-2026-08-11" }]);
+      expect((await read()).choices[0]!.action).toBe("get");
+      const started = await client.post("/api/ai/choices/ingredients", { choice: "ingredients.adapter" });
+      expect(started.status).toBe(200);
+      const install = seen.find((call) => call.path === "/stack/v1/video/loras/install")!;
+      expect(install.body).toMatchObject({ source: "huggingface", name: INGREDIENTS_LIBRARY_NAME, base_model: "ltx-2.5", audience: "all-ages", licence_acknowledged: true, token: "hf_test_token" });
+      expect(String(install.body!.url)).toContain("huggingface.co/Lightricks/LTX-2.5-22b-IC-LoRA-Ingredients/resolve/main/ltx-2.5-22b-ic-lora-ingredients-0.9.safetensors");
+      const running = await read();
+      expect(running.choices[0]!.state).toBe("installing");
+      expect(running.choices[0]!.percent).toBe(40);
+      // The Stack's library lists it by name: installed, and removing it deletes the library entry.
+      library = [{ id: "lora-abc", name: INGREDIENTS_LIBRARY_NAME, bytes: INGREDIENTS_BYTES, base_model: "ltx-2.5" }];
+      const done = await read();
+      expect(done.choices[0]!.state).toBe("installed");
+      expect(done.choices[0]!.action).toBe("remove");
+      expect((await client.post("/api/ai/choices/ingredients", { choice: "ingredients.adapter" })).status).toBe(200);
+      expect(seen.some((call) => call.method === "DELETE" && call.path === "/stack/v1/video/loras/lora-abc")).toBe(true);
+    } finally { __setVideosFetchForTests(null); setHouseholdSettingValue("voice.hf_token", ""); __resetIngredientsForTests(); }
   });
 
   test("an unknown job or choice is a 404 with a sentence", async () => {

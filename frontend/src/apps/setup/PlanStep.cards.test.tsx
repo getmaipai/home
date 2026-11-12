@@ -1,7 +1,8 @@
 import { afterEach, describe, expect, mock, test } from "bun:test";
 import { cleanup, fireEvent, render, waitFor, within } from "@testing-library/react";
 import { PlanStep } from "./PlanStep";
-import { cardsFor } from "./planFixtures";
+import { buildAiCards } from "../../../../shared/aiChoices";
+import { cardsFor, fakeCopy } from "./planFixtures";
 import type { PlanDiskView, PlanRead } from "@/lib/api";
 import table from "../../../../shared/diskPlan.json";
 import { selectionTotals, sizeGb, needGb, type DiskPlan } from "../../../../shared/diskPlanMath";
@@ -32,6 +33,23 @@ describe("the plan step's job cards", () => {
     await waitFor(() => expect(start).toHaveBeenCalled());
     const rows = (start.mock.calls[0] as unknown[])[1] as string[];
     expect(rows.some((id) => id.startsWith("videos"))).toBe(false);
+  });
+  test("the face finder is listed ticked and sent as a row; the video-from-pictures adapter is listed, off, and says where to add it", async () => {
+    const plan = plans.p128!;
+    const choices = buildAiCards({ copy: fakeCopy, plan, components: null, settings: { pictureQuickModel: "ernie", pictureDetailedEnabled: false, videoQuality: "quick", musicEnabled: false }, freeBytes: null, faces: { installed: false, bytes: 38_926_091 }, ingredients: { installed: false, bytes: 1_308_787_472, blockedReason: "Add it after setup in Settings, AI and models." } });
+    const start = mock(async () => ({}));
+    const view = render(<PlanStep readPlan={async () => read("p128", 800 * GIB, {}, { choices })} start={start} onInstalled={() => {}} />);
+    await view.findByRole("group", { name: "What gets installed" });
+    expect(sw(view, "Job faces").getAttribute("aria-checked")).toBe("true");
+    const adapter = sw(view, "Job ingredients") as HTMLButtonElement;
+    expect(adapter.getAttribute("aria-checked")).toBe("false");
+    expect(adapter.disabled).toBe(true);
+    expect(within(view.getByTestId("plan-job-ingredients")).getByText(/Settings, AI and models/)).toBeTruthy();
+    fireEvent.click(view.getByRole("button", { name: "Install and continue" }));
+    await waitFor(() => expect(start).toHaveBeenCalled());
+    const rows = (start.mock.calls[0] as unknown[])[1] as string[];
+    expect(rows).toContain("faces-finder");
+    expect(rows).not.toContain("ingredients-adapter");
   });
   test("a job that cannot run says why in the Stack's plain words, with the memory it asks for", async () => {
     const why = "Videos need about 44 GB of memory, more than this computer can ever give them, so Home does not download them.";

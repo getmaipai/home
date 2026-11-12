@@ -30727,7 +30727,9 @@
                               "voice",
                               "wakeword",
                               "vision",
-                              "coding"
+                              "coding",
+                              "faces",
+                              "ingredients"
                             ]
                           },
                           "title": {
@@ -30759,7 +30761,9 @@
                                     "voice",
                                     "wakeword",
                                     "vision",
-                                    "coding"
+                                    "coding",
+                                    "faces",
+                                    "ingredients"
                                   ]
                                 },
                                 "kind": {
@@ -30961,7 +30965,9 @@
                                   "voice",
                                   "wakeword",
                                   "vision",
-                                  "coding"
+                                  "coding",
+                                  "faces",
+                                  "ingredients"
                                 ]
                               },
                               "from": {

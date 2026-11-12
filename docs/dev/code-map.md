@@ -1202,6 +1202,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/videos/feed.ts` | FEED_LIMIT, levelOfJob, feedRowOf, feedRows, feedRowById |
 | `backend/src/lib/videos/frameCheck.ts` | sharpness, checkClipFrames |
 | `backend/src/lib/videos/history.ts` | removeFromHistory |
+| `backend/src/lib/videos/ingredientsAdapter.ts` | INGREDIENTS_NAME, INGREDIENTS_LIBRARY_NAME, INGREDIENTS_FILE, INGREDIENTS_BYTES, INGREDIENTS_REPO, INGREDIENTS_URL |
 | `backend/src/lib/videos/jobs.ts` | referencePercent, VIDEO_FAILED_PREFIX, MEMORY_CANCELLED_CODE, plainVideoFailure, getVideoJobFor, doneVideoJobsFor |
 | `backend/src/lib/videos/librarySort.ts` | LIBRARY_SORT_KEY, savedLibrarySort, librarySortFor |
 | `backend/src/lib/videos/lock.ts` | videoJobLockItem, videoJobLockState, lockedJobView, LOCKED_START_LINE, lockedVideoTile, LOCKED_RESULT_TEXT |

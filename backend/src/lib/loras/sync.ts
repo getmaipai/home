@@ -5,6 +5,7 @@
 // A migrated record is usable by admins only (the owner's 2026-11-02 rule: a LoRA that was on for chat yesterday is admin-only today), and its audience is the
 // Stack's classification; an all-ages one names the admin who last confirmed it as `audience_set_by` (the spec asks for an admin's explicit choice). A row that
 // was `pending` (added, not yet confirmed) keeps its pending state as an unacknowledged licence until an admin opens it.
+import { INGREDIENTS_LIBRARY_NAME } from "@/lib/videos/ingredientsAdapter";
 import { eq } from "drizzle-orm";
 import { db } from "@/db";
 import { attachments, people, pictureAdapterPrefs, videoAdapterPrefs } from "@/db/schema";
@@ -111,6 +112,8 @@ async function run(): Promise<void> {
   for (const s of stack) {
     const have = records.get(s.id);
     if (!have) {
+      // The Ingredients adapter is an engine part for "make a video from pictures", not a style: it never becomes a record a person could pick.
+      if (s.name === INGREDIENTS_LIBRARY_NAME) continue;
       const made = recordFromStack(s, prefs.get(s.id) ?? null, owner);
       if (!made) continue;
       try {

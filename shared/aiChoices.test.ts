@@ -1,7 +1,7 @@
 // The pure card math of shared/aiChoices.ts, tested against the four real
 // tiers in shared/diskPlan.json and small hand-built plans.
 
-import { expect, test } from "bun:test";
+import { describe, expect, test } from "bun:test";
 import table from "./diskPlan.json";
 import { aiCopy as copy } from "../backend/src/lib/aiCopy";
 import { buildAiCards, partsLine, recommendedPlan, type AiComponentLike, type AiSettingsInput } from "./aiChoices";
@@ -446,4 +446,35 @@ test("vision: set-to-recommended downloads the picture reader row and counts its
   const result = recommendedPlan({ copy: withVisionWords, plan, components: null, settings: SETTINGS, freeBytes: null });
   expect(result.installRowIds).toContain("vision");
   expect(result.downloadBytes).toBeGreaterThanOrEqual(visionRow.download_bytes);
+});
+
+describe("the hub's own parts: face finder files and the video-from-pictures adapter", () => {
+  const faces = { installed: false, bytes: 38_926_091 };
+  const adapter = { installed: false, bytes: 1_308_787_472, blockedReason: "Needs your Hugging Face token." };
+  const cardsOf = (extra: Partial<Parameters<typeof buildAiCards>[0]>) => buildAiCards({ copy, plan: TIERS.p128, components: null, settings: SETTINGS, freeBytes: null, ...extra }).cards;
+
+  test("no read of the parts means no card, not a 'not on this computer' card", () => {
+    expect(cardsOf({}).some((card) => card.id === "faces" || card.id === "ingredients")).toBe(false);
+  });
+
+  test("each part is a one-switch card with its size, readiness and the blocked reason", () => {
+    const cards = cardsOf({ faces, ingredients: adapter });
+    const f = cards.find((card) => card.id === "faces")!;
+    expect(f.choices.map((choice) => choice.id)).toEqual(["faces.finder"]);
+    expect(f.choices[0]).toMatchObject({ state: "notInstalled", action: "get", installedBytes: 38_926_091, recommended: true });
+    expect(f.chip).toBe("Off");
+    const i = cards.find((card) => card.id === "ingredients")!;
+    expect(i.choices[0]).toMatchObject({ state: "notInstalled", action: "none", blockedReason: "Needs your Hugging Face token.", installedBytes: 1_308_787_472 });
+    const ready = cardsOf({ faces: { ...faces, installed: true }, ingredients: { ...adapter, installed: true, blockedReason: null } });
+    expect(ready.find((card) => card.id === "faces")!.choices[0]).toMatchObject({ state: "installed", action: "remove" });
+    expect(ready.find((card) => card.id === "ingredients")!.chip).toBe("On");
+  });
+
+  test("a download in flight reads Installing with its percent, and a failure reads Did not finish with the retry", () => {
+    const busy = cardsOf({ ingredients: { ...adapter, installing: true, percent: 40, blockedReason: null } }).find((card) => card.id === "ingredients")!.choices[0]!;
+    expect(busy).toMatchObject({ state: "installing", percent: 40, action: "none" });
+    const failed = cardsOf({ faces: { ...faces, failure: "The face finder files did not download. Check that this computer is online, then try again." } }).find((card) => card.id === "faces")!.choices[0]!;
+    expect(failed).toMatchObject({ state: "failed", action: "get" });
+    expect(failed.failure).toContain("try again");
+  });
 });

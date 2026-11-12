@@ -94,8 +94,8 @@ export const RESTYLE_FAILURE_COPY = {
 
 /** REFVIDEO-01: the plain line for each code the Stack's `POST /v1/videos/ingredients` answers with. */
 export const INGREDIENTS_FAILURE_COPY = {
-  ic_lora_missing: "The adapter that makes videos from reference sheets is not installed. An admin can add it in Settings, Models and storage, then try again.",
-  ic_lora_refused: "The reference sheet could not be used for a video. Try different pictures, or ask an admin to check Settings, Models and storage.",
+  ic_lora_missing: "The adapter that makes videos from reference sheets is not installed. An admin can add the Video-from-pictures adapter in Settings, AI and models, then try again.",
+  ic_lora_refused: "The reference sheet could not be used for a video. Try different pictures, or ask an admin to check Settings, AI and models.",
   no_memory: "There is not enough free memory to make a video from pictures right now. Wait for other work to finish, then try again.",
   not_installed: "The Max video model is not installed. An admin can install it in Settings, Models and storage.",
 } as const;

@@ -2,7 +2,7 @@
 // pick per job into the disk plan rows to install. Pure: cards and plan in, rows and settings out.
 import type { AiCard, AiChoice, AiJobId } from "../../../../shared/aiChoices";
 import type { DiskPlan } from "../../../../shared/diskPlanMath";
-import { JOB_ORDER, optionsOf } from "@/apps/settings/aiGlanceRows";
+import { HUB_PART_JOBS, JOB_ORDER, optionsOf } from "@/apps/settings/aiGlanceRows";
 
 /** One job as the wizard shows it. */
 export interface SetupJob {
@@ -10,6 +10,10 @@ export interface SetupJob {
   options: AiChoice[];
   /** The job cannot be turned off: one of its choices is a required row. */
   required: boolean;
+  /** The hub's own part (the face finder files, the video-from-pictures adapter): no disk plan row holds it, so the plan's defaults say nothing about it. */
+  hubPart: boolean;
+  /** Why this part cannot be installed from the wizard (the adapter needs a Hugging Face token and an accepted licence); null when it can. */
+  blocked: string | null;
 }
 export interface JobPick { on: boolean; choiceId: string }
 export type Picks = Partial<Record<AiJobId, JobPick>>;
@@ -23,7 +27,9 @@ export function setupJobs(cards: readonly AiCard[], plan: DiskPlan): SetupJob[] 
     const card = cards.find((candidate) => candidate.id === job);
     const options = card ? optionsOf(card) : [];
     if (!card || job === "wakeword" || options.length === 0) return [];
-    return [{ job, title: card.title, summary: card.summary, options, required: options.some((option) => rowOf(plan, specRow(option))?.need === "required") }];
+    const hubPart = HUB_PART_JOBS.has(job);
+    const blocked = hubPart && options.length === 1 && options[0]!.state !== "installed" ? options[0]!.blockedReason : null;
+    return [{ job, title: card.title, summary: card.summary, options, required: options.some((option) => rowOf(plan, specRow(option))?.need === "required"), hubPart, blocked }];
   });
 }
 
@@ -31,7 +37,9 @@ export function setupJobs(cards: readonly AiCard[], plan: DiskPlan): SetupJob[] 
 export function defaultPicks(jobs: readonly SetupJob[], plan: DiskPlan): Picks {
   const chosen = new Set(plan.default_selected);
   const picks: Picks = {};
-  for (const { job, options, required } of jobs) {
+  for (const { job, options, required, hubPart, blocked } of jobs) {
+    // A hub part is no plan row: it starts on when the card recommends it (the small face finder files) and cannot be on while something blocks it.
+    if (hubPart) { const option = options[0]!; picks[job] = { on: blocked === null && (option.recommended || option.state === "installed"), choiceId: option.id }; continue; }
     const selected = options.filter((option) => chosen.has(specRow(option)) || rowOf(plan, specRow(option))?.need === "required");
     const pick = selected.find((option) => option.recommended) ?? selected[0];
     picks[job] = pick ? { on: true, choiceId: pick.id } : { on: required, choiceId: (options.find((option) => option.recommended) ?? options[0]!).id };

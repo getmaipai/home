@@ -7,7 +7,7 @@
 
 import { rowHasModel, sizeGb, needGb, freeGb, selectionTotals, type DiskPlan, type DiskRow } from "./diskPlanMath";
 
-export type AiJobId = "chat" | "pictures" | "picturesdetailed" | "videos" | "music" | "stems" | "voice" | "wakeword" | "vision" | "coding";
+export type AiJobId = "chat" | "pictures" | "picturesdetailed" | "videos" | "music" | "stems" | "voice" | "wakeword" | "vision" | "coding" | "faces" | "ingredients";
 export interface AiComponentLike { id: string; label: string; state: "installed"|"installing"|"notInstalled"|"failed"; size_bytes: number|null; download_bytes: number; requirement: "required"|"optional"|"unsupported"; requirement_reason: string|null; percent: number|null; job: string|null; failure: string|null; can_install: boolean; can_uninstall: boolean; last_used_at: string|null; used_by: string[] }
 export interface AiSettingsInput { pictureQuickModel: "ernie"|"klein"; pictureDetailedEnabled: boolean; videoQuality: "quick"|"detailed"; musicEnabled: boolean }
 /** The words of the cards, read from the spec's card and key copy (rule S5): this file holds none of its own. */
@@ -17,11 +17,21 @@ export interface AiCopy {
 }
 /** The stock wake word detector and the two files it shares: not Stack components, so the hub reads them from its own disk. */
 export interface AiWakewordInput { installed: boolean; bytes: number }
+/** A part the hub itself holds (not a Stack component and not in any disk plan): the face finder files and the video-from-pictures adapter. The hub reads each from its own disk or the Stack's library, so the card reads like every other. */
+export interface AiHubPartInput {
+  installed: boolean; bytes: number;
+  /** A download is in flight, and how far along (null when unknown). */
+  installing?: boolean; percent?: number | null;
+  /** The last install did not finish: the plain reason, with what to do. */
+  failure?: string | null;
+  /** Why it cannot be installed now, in words that say what to do (a missing token, a licence not yet accepted). Never set while installed. */
+  blockedReason?: string | null;
+}
 /** The optional uncensored chat model: not in any tier's disk plan and not a Stack component of its own, so the hub reads it from the chat role (installed, running) and its catalog record (sizes). */
 export interface AiUncensoredInput { /** The model's own name, shown in the option's parts line. */ label?: string; installed: boolean; running: boolean; /** A download of its files is in flight, and how far along (null when unknown). */ downloading?: boolean; percent?: number | null; downloadBytes: number; installedBytes: number }
 /** A chat model an admin added from a link (MODEL-ADD-01): a radio beside Standard, named by its own record and labelled untested. */
 export interface AiAddedChatInput extends AiUncensoredInput { id: string; label: string; /** The sentence under its name; the hub writes it from the spec's words. */ description: string }
-export interface AiChoicesInput { copy: AiCopy; plan: DiskPlan; components: AiComponentLike[] | null; settings: AiSettingsInput; freeBytes: number | null; wakeword?: AiWakewordInput | null; uncensored?: AiUncensoredInput | null; addedChats?: AiAddedChatInput[] }
+export interface AiChoicesInput { copy: AiCopy; plan: DiskPlan; components: AiComponentLike[] | null; settings: AiSettingsInput; freeBytes: number | null; wakeword?: AiWakewordInput | null; faces?: AiHubPartInput | null; ingredients?: AiHubPartInput | null; uncensored?: AiUncensoredInput | null; addedChats?: AiAddedChatInput[] }
 export interface AiChoice {
   id: string;
   job: AiJobId; kind: "radio" | "switch" | "fixed";
@@ -51,7 +61,7 @@ export interface AiRecommendedPlan {
   text: string;
 }
 
-type AiCopyKey = "stems.standard" | "stems.finer" | "stems.more" | "chat.standard" | "chat.mlx" | "chat.uncensored" | "chat.pictures" | "pictures.ernie" | "pictures.klein" | "pictures.edit" | "picturesdetailed.zimage" | "wakeword.detector" | "pictures.tools" | "pictures.look" | "videos.quick" | "videos.detailed" | "music.make" | "music.voice" | "voice.standard" | "voice.better" | "voice.realistic" | "coding.helper" | "vision.reader";
+type AiCopyKey = "stems.standard" | "stems.finer" | "stems.more" | "chat.standard" | "chat.mlx" | "chat.uncensored" | "chat.pictures" | "pictures.ernie" | "pictures.klein" | "pictures.edit" | "picturesdetailed.zimage" | "wakeword.detector" | "pictures.tools" | "pictures.look" | "videos.quick" | "videos.detailed" | "music.make" | "music.voice" | "voice.standard" | "voice.better" | "voice.realistic" | "coding.helper" | "vision.reader" | "faces.finder" | "ingredients.adapter";
 
 // The rows each job card draws.
 const CARDS: Array<{ id: AiJobId; rows: string[] }> = [
@@ -65,7 +75,12 @@ const CARDS: Array<{ id: AiJobId; rows: string[] }> = [
   { id: "wakeword", rows: [] },
   { id: "vision", rows: ["vision"] },
   { id: "coding", rows: ["coding"] },
+  { id: "faces", rows: [] },
+  { id: "ingredients", rows: [] },
 ];
+/** The plan-row ids that stand in for the hub's own parts: the wizard and the cards use them, no disk plan holds them. */
+export const FACES_ROW_ID = "faces-finder";
+export const INGREDIENTS_ROW_ID = "ingredients-adapter";
 
 // A model needs about this share of its size on disk in memory while it runs: a marked estimate, replaced by the Stack's measured footprint when there is one.
 const RAM_SHARE = 1.1;
@@ -192,6 +207,8 @@ const MODEL_NAMES: Record<string, string> = {
   "reads-pictures": "Muse Glimmer 30B picture reader",
   "image-tools": "ISNet, LaMa and Real-ESRGAN",
   "tool-look": "YOLOX Nano and YOLOX-s",
+  "faces-finder": "YuNet and SFace",
+  "ingredients-adapter": "LTX 2.5 Ingredients adapter 0.9",
 };
 
 /** The parts line of a choice: each model by name, and every engine file (Python base, engine tools) as one short "Engine files" item, so a long list of engine parts never buries the model's name. */
@@ -219,6 +236,8 @@ function chipFor(card: { id: AiJobId; rows: string[] }, present: boolean, choice
       return current.id === "videos.quick" ? "Using Standard" : "Using Boost";
     }
     case "wakeword":
+    case "faces":
+    case "ingredients":
     case "vision":
     case "picturesdetailed":
     case "music":
@@ -237,12 +256,16 @@ function chipFor(card: { id: AiJobId; rows: string[] }, present: boolean, choice
 }
 
 export function buildAiCards(input: AiChoicesInput): AiChoicesResult {
-  const { components, settings, freeBytes, copy, wakeword, uncensored } = input;
+  const { components, settings, freeBytes, copy, wakeword, faces, ingredients, uncensored } = input;
   const addedChats = input.addedChats ?? [];
   const plan = withLiveInstalled(input.plan, components);
   const rows = byRowId(plan);
   // The wake word files are not in the disk plan; a row stands in for them so the card reads like every other.
   if (wakeword) rows.set("wakeword-detector", { id: "wakeword-detector", label: "Hey Jarvis wake word", note: "", kind: "model", need: "optional", selectable: true, download_bytes: wakeword.bytes, installed_bytes: wakeword.bytes, peak_temp_bytes: 0, model_ids: [], engines: [], installed: wakeword.installed, basis: "pins" });
+  // The face finder files and the video-from-pictures adapter are the hub's own parts: a row each stands in for them, with the sizes the hub pinned.
+  const hubPart = (id: string, label: string, part: AiHubPartInput) => rows.set(id, { id, label, note: "", kind: "model", need: "optional", selectable: true, download_bytes: part.bytes, installed_bytes: part.bytes, peak_temp_bytes: 0, model_ids: [], engines: [], installed: part.installed, basis: "pins" });
+  if (faces) hubPart(FACES_ROW_ID, "Face finder and matcher", faces);
+  if (ingredients) hubPart(INGREDIENTS_ROW_ID, "Video-from-pictures adapter", ingredients);
   // The uncensored chat model is no plan row either; a row stands in for it so its choice reads like every other.
   if (uncensored) rows.set("chat-uncensored", { id: "chat-uncensored", label: uncensored.label ?? "Uncensored chat AI", note: "", kind: "model", need: "optional", selectable: true, download_bytes: uncensored.downloadBytes, installed_bytes: uncensored.installedBytes, peak_temp_bytes: 0, model_ids: [], engines: [], installed: uncensored.installed, basis: "pins" });
   for (const added of addedChats) rows.set(`chat-added-${added.id}`, { id: `chat-added-${added.id}`, label: added.label, note: "", kind: "model", need: "optional", selectable: true, download_bytes: added.downloadBytes, installed_bytes: added.installedBytes, peak_temp_bytes: 0, model_ids: [], engines: [], installed: added.installed, basis: "pins" });
@@ -251,12 +274,14 @@ export function buildAiCards(input: AiChoicesInput): AiChoicesResult {
 
   const cards: AiCard[] = [];
   for (const meta of CARDS) {
-    const present = meta.id === "wakeword" ? wakeword != null : meta.rows.some((id) => has(id));
+    const present = meta.id === "wakeword" ? wakeword != null : meta.id === "faces" ? faces != null : meta.id === "ingredients" ? ingredients != null : meta.rows.some((id) => has(id));
     const words = copy.card(meta.id);
     // The picture reader's words arrive with the spec pin that carries them (AIMODELS-VISION-01); until then the card stays out of the page.
     if (meta.id === "vision" && !words.summary) continue;
     // The Stems words arrive with the spec pin that carries them (TIER-STEMS-03); until then the card stays out of the page.
     if (meta.id === "stems" && !words.summary) continue;
+    // The hub's own parts are listed only when the caller read them (the AI page and the wizard do); no read means no card, not "not on this computer".
+    if (!present && (meta.id === "faces" || meta.id === "ingredients")) continue;
     if (!present) {
       cards.push({ id: meta.id, title: words.title, summary: words.summary, chip: "Not on this computer", choices: [], notReady: false, unavailable: `${words.title} is not on this computer. It needs more memory.` });
       continue;
@@ -290,6 +315,14 @@ export function buildAiCards(input: AiChoicesInput): AiChoicesResult {
       }
       case "wakeword": {
         if (wakeword) specs.push({ id: "wakeword.detector", job: "wakeword", kind: "switch", row: rows.get("wakeword-detector")!, current: wakeword.installed, recommended: true, setting: null });
+        break;
+      }
+      case "faces": {
+        if (faces) specs.push({ id: "faces.finder", job: "faces", kind: "switch", row: rows.get(FACES_ROW_ID)!, current: faces.installed, recommended: true, setting: null });
+        break;
+      }
+      case "ingredients": {
+        if (ingredients) specs.push({ id: "ingredients.adapter", job: "ingredients", kind: "switch", row: rows.get(INGREDIENTS_ROW_ID)!, current: ingredients.installed, recommended: false, setting: null });
         break;
       }
       case "videos": {
@@ -333,6 +366,12 @@ export function buildAiCards(input: AiChoicesInput): AiChoicesResult {
       const addedNow = addedChats.find((added) => spec.id === `chat.added.${added.id}`);
       if (addedNow?.downloading && built.state !== "installed") return { ...built, state: "installing" as const, percent: addedNow.percent ?? null, stateText: "Installing", blockedReason: null, action: "none" as const };
       if (spec.id === "chat.uncensored" && uncensored?.downloading && built.state !== "installed") return { ...built, state: "installing" as const, percent: uncensored.percent ?? null, stateText: "Installing", blockedReason: null, action: "none" as const };
+      const hub = spec.id === "faces.finder" ? faces : spec.id === "ingredients.adapter" ? ingredients : null;
+      if (hub && !hub.installed) {
+        if (hub.installing) return { ...built, state: "installing" as const, percent: hub.percent ?? null, stateText: "Installing", blockedReason: null, action: "none" as const };
+        if (hub.failure) return { ...built, state: "failed" as const, failure: hub.failure, stateText: "Did not finish. Try again.", blockedReason: null, action: "get" as const };
+        if (hub.blockedReason) return { ...built, blockedReason: hub.blockedReason, action: "none" as const };
+      }
       return built;
     });
     cards.push({
