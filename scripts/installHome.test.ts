@@ -462,3 +462,98 @@ describe("direct-mode installer speedups (DIRECT-FAST-03)", () => {
     expect(text).toMatch(/else\n\s+rm -f "\$\{install_root\}\/\.snapshot-skipped"\n\s+snapshot_data/);
   });
 });
+
+// DIRECT-FAST-04: kept dependencies, the .deno and node_modules folders that rsync no longer deletes, and the quarantine walk that skips them.
+describe("kept dependencies in direct installs (DIRECT-FAST-04)", () => {
+  const scratch = mkdtempSync(join(tmpdir(), "maipai-deps-"));
+  afterAll(() => rmSync(scratch, { recursive: true, force: true }));
+  const bash = (script: string, env: Record<string, string> = {}) => Bun.spawnSync(["bash", "-c", `source "${INSTALL_SH}"; ${script}`], { env: { ...process.env, ...env } });
+  const calls = join(scratch, "bun.calls");
+  const fakeBun = join(scratch, "bun");
+  writeFileSync(fakeBun, `#!/bin/bash\necho "$PWD :: $*" >> ${JSON.stringify(calls)}\n[[ "$1" == --version ]] && { echo 9.9.9; exit 0; }\n[[ -n "$FAKE_VERIFY_FAIL" && "$*" == *--frozen-lockfile* ]] && exit 1\nif [[ "$1" == install && "$*" != *--frozen-lockfile* ]]; then mkdir -p node_modules; fi\nexit 0\n`, { mode: 0o755 });
+  function tree(name: string) {
+    const root = join(scratch, name);
+    for (const d of ["backend", "frontend", "node_modules", "backend/node_modules", "frontend/node_modules"]) mkdirSync(join(root, d), { recursive: true });
+    for (const [f, v] of Object.entries({ "bun.lock": "L1", "package.json": "{}", "backend/package.json": "{}", "frontend/package.json": "{}" })) writeFileSync(join(root, f), v);
+    writeFileSync(join(root, "node_modules", "sentinel"), "kept");
+    return root;
+  }
+  const stubs = `fetch_home_commons() { :; }; prime_deno_cache() { :; }`;
+  const callLines = () => (existsSync(calls) ? readFileSync(calls, "utf8").split("\n").filter(Boolean) : []);
+
+  test("deps_hash follows the lockfile, every package.json and the Bun version, and nothing else", () => {
+    const root = tree("h1"); const h = () => bash(`deps_hash "${root}" "${fakeBun}" darwin arm64`).stdout.toString().trim();
+    const base = h(); expect(base).toMatch(/^[0-9a-f]{64}$/);
+    expect(h()).toBe(base);
+    writeFileSync(join(root, "README.md"), "changed"); expect(h()).toBe(base);
+    for (const f of ["bun.lock", "package.json", "backend/package.json", "frontend/package.json"]) { const keep = readFileSync(join(root, f), "utf8"); writeFileSync(join(root, f), keep + "x"); expect(h()).not.toBe(base); writeFileSync(join(root, f), keep); }
+    expect(bash(`deps_hash "${root}" "${fakeBun}" darwin x64`).stdout.toString().trim()).not.toBe(base);
+  });
+
+  test("deps_reusable needs the marker, an equal hash and all three node_modules folders", () => {
+    const root = tree("r1"); const ask = () => bash(`deps_reusable "${root}" "${fakeBun}" darwin arm64`).exitCode;
+    expect(ask()).toBe(1); // no marker
+    writeFileSync(join(root, ".deps-hash"), `${bash(`deps_hash "${root}" "${fakeBun}" darwin arm64`).stdout.toString().trim()}\n`);
+    expect(ask()).toBe(0);
+    writeFileSync(join(root, "bun.lock"), "L2"); expect(ask()).toBe(1); // lockfile changed: the hash differs
+    writeFileSync(join(root, "bun.lock"), "L1"); expect(ask()).toBe(0);
+    rmSync(join(root, "frontend", "node_modules"), { recursive: true }); expect(ask()).toBe(1); // a folder is missing
+  });
+
+  test("build_app with kept dependencies verifies them in place: no removal, no fresh install, the build still runs", () => {
+    const root = tree("b1"); rmSync(calls, { force: true });
+    const r = bash(`${stubs}; build_app "${root}" "${fakeBun}" yes HASHNOW`);
+    expect(r.exitCode, r.stderr.toString()).toBe(0);
+    expect(readFileSync(join(root, "node_modules", "sentinel"), "utf8")).toBe("kept");
+    const l = callLines();
+    expect(l.some((x) => x.includes("install --frozen-lockfile"))).toBe(true);
+    expect(l.some((x) => x.includes("install --production"))).toBe(false);
+    expect(l.some((x) => x.endsWith(":: run build"))).toBe(true);
+    expect(r.stdout.toString()).toContain("kept and verified");
+  });
+
+  test("build_app falls back to the fresh install when the kept dependencies do not verify, and records the hash after it", () => {
+    const root = tree("b2"); rmSync(calls, { force: true });
+    const r = bash(`${stubs}; build_app "${root}" "${fakeBun}" yes HASHNOW`, { FAKE_VERIFY_FAIL: "1" });
+    expect(r.exitCode, r.stderr.toString()).toBe(0);
+    expect(existsSync(join(root, "node_modules", "sentinel"))).toBe(false); // removed, then reinstalled by the fake
+    const l = callLines();
+    expect(l.some((x) => x.includes("install --production"))).toBe(true);
+    expect(r.stdout.toString()).toContain("did not verify");
+    expect(readFileSync(join(root, ".deps-hash"), "utf8").trim()).toBe("HASHNOW");
+  });
+
+  test("build_app without the reuse flag (gated mode, a rollback, a changed hash) always installs fresh", () => {
+    const root = tree("b3"); rmSync(calls, { force: true }); writeFileSync(join(root, ".deps-hash"), "OLD\n");
+    const r = bash(`${stubs}; build_app "${root}" "${fakeBun}" no HASHNOW`);
+    expect(r.exitCode).toBe(0);
+    expect(existsSync(join(root, "node_modules", "sentinel"))).toBe(false);
+    expect(callLines().some((x) => x.includes("install --production"))).toBe(true);
+    expect(readFileSync(join(root, ".deps-hash"), "utf8").trim()).toBe("HASHNOW");
+  });
+
+  test("a failed fresh install leaves no hash behind, so the next ship cannot trust half a tree", () => {
+    const root = tree("b4"); writeFileSync(join(root, ".deps-hash"), "OLD\n");
+    const failing = join(scratch, "bun-fail"); writeFileSync(failing, "#!/bin/bash\n[[ \"$1\" == --version ]] && { echo 1; exit 0; }\nexit 1\n", { mode: 0o755 });
+    const r = bash(`${stubs}; build_app "${root}" "${failing}" no HASHNOW`);
+    expect(r.exitCode).not.toBe(0);
+    expect(existsSync(join(root, ".deps-hash"))).toBe(false);
+  });
+
+  test("the quarantine walk skips node_modules only when dependencies are kept", () => {
+    const root = tree("q1"); mkdirSync(join(root, "docs"), { recursive: true });
+    const log = join(scratch, "xattr.calls"); rmSync(log, { force: true });
+    const run = (reuse: string) => bash(`xattr() { echo "$*" >> ${JSON.stringify(log)}; }; INSTALL_DEPS_REUSE=${reuse} clear_quarantine_and_sign darwin "${root}"`);
+    run("yes"); const kept = readFileSync(log, "utf8");
+    expect(kept).toContain(join(root, "docs")); expect(kept.split("\n").filter((l) => l.endsWith(`${root}/node_modules`))).toEqual([]);
+    rmSync(log, { force: true }); run("no");
+    expect(readFileSync(log, "utf8").trim()).toBe(`-dr com.apple.quarantine ${root}`);
+  });
+
+  test("rsync keeps .deno, the root node_modules and the hash marker, and main wires the reuse decision to the direct request only", () => {
+    const text = readFileSync(INSTALL_SH, "utf8");
+    for (const keep of ["--exclude=/.deno", "--exclude=/node_modules", "--exclude=/.deps-hash"]) expect(text).toContain(keep);
+    expect(text).toContain('if [ "$direct_install" = "yes" ] && deps_reusable');
+    expect(text).toContain('if [ "$direct_install" = "yes" ]; then\n        log "Direct mode: the data copy');
+  });
+});

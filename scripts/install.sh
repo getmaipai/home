@@ -541,7 +541,17 @@ clear_quarantine_and_sign() {
   shift 2
   [ "$os" = "darwin" ] || return 0
   if command -v xattr >/dev/null 2>&1; then
-    xattr -dr com.apple.quarantine "$dir" 2>/dev/null || true
+    if [ "${INSTALL_DEPS_REUSE:-no}" = "yes" ] && [ -d "${dir}/node_modules" ]; then
+      # Kept dependencies already passed this once (2.6 GB, 238k files, 5.6 s measured); only the rest of the tree is walked.
+      local entry
+      for entry in "$dir"/* "$dir"/.[!.]*; do
+        [ -e "$entry" ] || continue
+        [ "$(basename "$entry")" != "node_modules" ] || continue
+        xattr -dr com.apple.quarantine "$entry" 2>/dev/null || true
+      done
+    else
+      xattr -dr com.apple.quarantine "$dir" 2>/dev/null || true
+    fi
   fi
   command -v codesign >/dev/null 2>&1 || return 0
   for bin in "$@"; do
@@ -628,6 +638,23 @@ direct_install_requested() {
   rm -f "$f"
   now=$(date +%s)
   [ "$want" = "$sha" ] && printf '%s' "$at" | grep -Eq '^[0-9]+$' && [ $(( now - at )) -ge 0 ] && [ $(( now - at )) -le 900 ]
+}
+
+# DIRECT-FAST-04 (2026-11-12): dependencies are kept between direct-mode ships when nothing that decides them changed. The hash covers
+# bun.lock, the root, backend and frontend package.json, the Bun version and the platform; ${root}/.deps-hash holds the hash of the install
+# that produced the node_modules now on disk. Equal hash plus all three node_modules folders present: they are verified (bun install
+# --frozen-lockfile) instead of removed and installed again. Any difference or any failure runs the full fresh install (2026-10-30 rule).
+sha256_stdin() { if command -v sha256sum >/dev/null 2>&1; then sha256sum | awk '{print $1}'; else shasum -a 256 | awk '{print $1}'; fi; }
+deps_hash() {
+  local root="$1" bun_bin="$2" os="$3" arch="$4" f
+  { for f in bun.lock package.json backend/package.json frontend/package.json; do printf '== %s\n' "$f"; cat "${root}/${f}" 2>/dev/null || true; done
+    "$bun_bin" --version 2>/dev/null; printf '%s %s\n' "$os" "$arch"; } | sha256_stdin
+}
+deps_reusable() {
+  local root="$1" bun_bin="$2" os="$3" arch="$4" want
+  want=$(read_marker "${root}/.deps-hash")
+  [ -n "$want" ] && [ "$want" = "$(deps_hash "$root" "$bun_bin" "$os" "$arch")" ] \
+    && [ -d "${root}/node_modules" ] && [ -d "${root}/backend/node_modules" ] && [ -d "${root}/frontend/node_modules" ]
 }
 
 snapshot_data() {
@@ -945,7 +972,7 @@ link_commons_siblings() {
 }
 
 build_app() {
-  local dir="$1" bun_bin="$2"
+  local dir="$1" bun_bin="$2" reuse_deps="${3:-no}" deps_now="${4:-}" deps_ok="no"
   fetch_home_commons "$dir" || die "could not fetch the Commons packages Home needs. Read the message above, fix what it names, then run the installer again."
   log "Installing dependencies and building the frontend (this can take a minute)..."
   # A fresh Mac has no system node, and dependency install scripts (ssh2) run
@@ -955,14 +982,30 @@ build_app() {
   local shim
   shim=$(mktemp -d) && ln -s "$bun_bin" "${shim}/node" && ln -s "$bun_bin" "${shim}/bun" \
     || die "could not create the temporary node shim. Check that the temp folder is writable, then run the installer again."
-  # Every build starts from clean dependency folders. bun install on top of the previous version's node_modules can leave a
-  # package linked to the old version (2026-10-30: the type check read spec 0.1.272 on an install that pinned 0.1.275, then the
-  # rollback built on the same leftovers and failed too, and the hub stayed down). The cost is one fresh install from Bun's cache.
-  rm -rf "${dir:?}/node_modules" "${dir:?}/backend/node_modules" "${dir:?}/frontend/node_modules" \
-    || { rm -rf "$shim"; return 1; }
-  (cd "$dir/backend" && PATH="${shim}:${PATH}" "$bun_bin" install --production) \
-    || { rm -rf "$shim"; return 1; }
-  (cd "$dir/frontend" && PATH="${shim}:${PATH}" "$bun_bin" install && PATH="${shim}:${PATH}" "$bun_bin" run build) \
+  # DIRECT-FAST-04: unchanged lockfile and package files since the install that made these node_modules (deps_reusable): verify them
+  # in place (about a second) instead of the fresh install below; if the check fails, fall through to the fresh install.
+  if [ "$reuse_deps" = "yes" ]; then
+    if (cd "$dir/frontend" && PATH="${shim}:${PATH}" "$bun_bin" install --frozen-lockfile >/dev/null 2>&1); then
+      log "Dependencies are unchanged since the last install; kept and verified instead of reinstalled."
+      deps_ok="yes"
+    else
+      log "The kept dependencies did not verify; installing them fresh."
+    fi
+  fi
+  if [ "$deps_ok" != "yes" ]; then
+    rm -f "${dir:?}/.deps-hash"
+    # Every build starts from clean dependency folders. bun install on top of the previous version's node_modules can leave a
+    # package linked to the old version (2026-10-30: the type check read spec 0.1.272 on an install that pinned 0.1.275, then the
+    # rollback built on the same leftovers and failed too, and the hub stayed down). The cost is one fresh install from Bun's cache.
+    rm -rf "${dir:?}/node_modules" "${dir:?}/backend/node_modules" "${dir:?}/frontend/node_modules" \
+      || { rm -rf "$shim"; return 1; }
+    (cd "$dir/backend" && PATH="${shim}:${PATH}" "$bun_bin" install --production) \
+      || { rm -rf "$shim"; return 1; }
+    (cd "$dir/frontend" && PATH="${shim}:${PATH}" "$bun_bin" install) \
+      || { rm -rf "$shim"; return 1; }
+    [ -z "$deps_now" ] || printf '%s\n' "$deps_now" > "${dir}/.deps-hash"
+  fi
+  (cd "$dir/frontend" && PATH="${shim}:${PATH}" "$bun_bin" run build) \
     || { rm -rf "$shim"; return 1; }
   rm -rf "$shim"
   prime_deno_cache "$dir"
@@ -2214,7 +2257,7 @@ main() {
   local stack_only="no"
   local plan_flag="" plan_flag_seen="no"
   local plan_flag_count=0
-  local version_flag="" commit_flag="" rollback="no" rollback_to="" skip_snapshot="no"
+  local version_flag="" commit_flag="" rollback="no" rollback_to="" skip_snapshot="no" direct_install="no"
   while [ "$#" -gt 0 ]; do
     case "$1" in
       --dry-run) dry_run="yes" ;;
@@ -2389,6 +2432,11 @@ main() {
 
   local had_existing_stack="no"
   local previous_port=""
+  # DIRECT-FAST-03/04: one decision for everything direct mode skips (the data copy, kept dependencies). The one-shot request from
+  # ship.sh is read exactly once, here. Only an upgrade can be direct; gated and unset modes never write the request.
+  if [ "$kind" = "upgrade" ] && [ "$rollback" = "no" ]; then
+    if [ "$skip_snapshot" = "yes" ] || { [ -n "$commit_flag" ] && direct_install_requested "$commit_flag"; }; then direct_install="yes"; fi
+  fi
   if [ "$kind" != "fresh" ]; then
     previous_port=$(previous_home_port "$os")
     if [ "$rollback" = "yes" ]; then
@@ -2421,7 +2469,7 @@ main() {
     # not mid-write. A rollback keeps the newer data aside instead.
     phase "stopped; data copy next"
     if [ "$kind" = "upgrade" ] && [ "$rollback" = "no" ]; then
-      if [ "$skip_snapshot" = "yes" ] || { [ -n "$commit_flag" ] && direct_install_requested "$commit_flag"; }; then
+      if [ "$direct_install" = "yes" ]; then
         log "Direct mode: the data copy before this upgrade is skipped (data is disposable in direct mode)."
         printf '%s\n' "$installed_tag" > "${install_root}/.snapshot-skipped"
       else
@@ -2454,8 +2502,8 @@ main() {
     # goes for the Bun runtime, the upgrade copies and the version markers.
     rsync -a --delete \
       --exclude=/data --exclude=/data.rolled-back-* --exclude=/backups --exclude=/received-backups \
-      --exclude=/stack --exclude=/.bun --exclude=/upgrade-backups \
-      --exclude=/backend/node_modules --exclude=/frontend/node_modules \
+      --exclude=/stack --exclude=/.bun --exclude=/.deno --exclude=/upgrade-backups \
+      --exclude=/node_modules --exclude=/backend/node_modules --exclude=/frontend/node_modules --exclude=/.deps-hash \
       --exclude=/.installed-tag --exclude=/.previous-tag --exclude=/.migrations-started --exclude=/.stack-port-base --exclude=/.install-user \
       "${install_root}.new/" "${install_root}/"
     rm -rf "${install_root}.new"
@@ -2486,9 +2534,12 @@ main() {
   ensure_bun_system_wide "$bun_home"
   ensure_deno "$install_root" "$os" "$arch"
   local bun_bin="${bun_home}/bin/bun"
-  clear_quarantine_and_sign "$os" "$install_root" "$bun_bin"
+  local deps_now reuse_deps="no"
+  deps_now=$(deps_hash "$install_root" "$bun_bin" "$os" "$arch")
+  if [ "$direct_install" = "yes" ] && deps_reusable "$install_root" "$bun_bin" "$os" "$arch"; then reuse_deps="yes"; fi
+  INSTALL_DEPS_REUSE="$reuse_deps" clear_quarantine_and_sign "$os" "$install_root" "$bun_bin"
   phase "tools ready; building the app"
-  build_app "$install_root" "$bun_bin"
+  build_app "$install_root" "$bun_bin" "$reuse_deps" "$deps_now"
   phase "app built; preflight"
   run_install_preflight "$bun_bin" "${install_root}/backend" "$port"
   phase "preflight done"

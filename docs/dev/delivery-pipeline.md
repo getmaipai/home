@@ -444,3 +444,19 @@ Proof: `scripts/landerExpress.test.ts` ("DIRECT-FAST-02": direct queues an expre
 Not measured live: nothing was shipped to the hub. The skipped work is the owner's measured 48 s Stack step plus the 870 MB data copy; the first live direct ship after this lands will show the phase clock and should be read against section 26's total.
 
 Proof: `scripts/installHome.test.ts` ("direct-mode installer speedups": phase format, marker and binary rules, reuse versus build versus forced rebuild versus the wizard, the one-shot request in all its refusals, rollback after a skipped copy, the main path wiring) and `scripts/ship.test.ts` (direct writes the request for this commit, gated and unset write none, a stale file never reaches a non-direct install, the file is gone afterwards).
+
+## 27. The live install, about 150 s toward 60 s (DIRECT-FAST-04, 2026-11-12)
+
+Starting point: the phase clock of the last direct ship (sha-df9834e, a comment-only change), `data-scratch/ship/1794518164-df9834e.log`: source replaced +13 s, tools ready +68 s, app built +91 s, Stack ready +142 s, done +150 s. The root helper is not changed. Every skip below is decided by hash or probe and falls back to the full step; gated and unset modes install exactly as before (except the first item of 27.1, a plain bug).
+
+### 27.1 Dependencies and Deno (DIRECT-FAST-04)
+
+The 55 s between "source replaced" and "tools ready" was not a dependency install: it was `Installing Deno 2.9.7` downloading Deno again on every ship. The upgrade's `rsync --delete` excluded `/.bun` but not `/.deno`, so it deleted the Deno it had installed last time. Same cause for the root `node_modules` (2.6 GB, the hoisted workspace install: 7 s to remove): the rsync deleted it each ship and the build rebuilt it. Changes in `scripts/install.sh`:
+
+- `rsync` now excludes `/.deno`, `/node_modules` and `/.deps-hash` (all modes: the Deno exclusion is a plain bug fix).
+- **Kept dependencies, direct mode only.** `deps_hash` covers `bun.lock`, the root, backend and frontend `package.json`, the Bun version and the platform; `${root}/.deps-hash` holds the hash of the install that made the node_modules now on disk (written after a successful fresh install, removed before one). When the hash is equal and all three node_modules folders exist, `build_app` runs `bun install --frozen-lockfile` in `frontend` to verify them (1.3 to 1.6 s measured) instead of removing and reinstalling them (7.1 s remove, 7.7 s backend `--production`, 1.3 s frontend, 16 s together). A different hash, a missing folder, a failed verification, gated mode and a rollback all run the fresh install of 2026-10-30. The quarantine walk (`xattr -dr`, 5.6 to 6.3 s over the kept tree) skips `node_modules` when they are kept.
+- One decision, `direct_install`, made once in `main`: `--skip-data-snapshot` or the one-shot request from `ship.sh` (section 26.3). It now also gates the kept dependencies.
+
+Expected: about 55 s (Deno) plus about 15 s (dependencies) off a direct ship, plus part of the 12 s source step (the 2.6 GB removal). Not timed live; the next real direct ship shows it in the phase clock.
+
+Proof: `scripts/installHome.test.ts` "kept dependencies in direct installs": the hash follows exactly the lockfile, the three package files, the Bun version and the platform; reuse needs marker, equal hash and all folders; verified-in-place keeps the tree and skips the fresh install; a failed verification falls back; no reuse flag installs fresh; a failed fresh install leaves no hash; the quarantine walk; the rsync excludes and the direct-only wiring.
