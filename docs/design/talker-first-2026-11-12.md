@@ -292,6 +292,29 @@ existing spoken-cue gap; to start them before the owner rules they need their ow
 the section 1b reading are the architect's. After the owner applied edits 1 and 2 the same day, the note was ruled again
 against the edited `RULES.md` (result in the same record).
 
+## Spike result and decision (TALKER-FIRST-00, 2026-11-12)
+
+`cd backend && bun run scripts/bench/talkerPrefill.ts --n 20` (through Home's own Stack client, since the Stack answers only
+Home; `--engine llama=<url>` still takes a raw engine). Splash 1.6.1, the 27B chat model, the 10 base tools, thinking off,
+opener "Okay, so.":
+
+| engine | N | continued | repeated opener | leading space | tool calls plain vs prefilled | extra prompt tokens |
+|---|---|---|---|---|---|---|
+| splash | 20 | 20 of 20 | 0 | 0 of 20 | 4 of 20 vs 1 of 20 | 13 (median) |
+
+Section 4 item 1 passes: the engine continues the open assistant turn every time, never repeats the opener, and the prefill
+costs 13 prompt tokens (the prompt-time column is not comparable: the prefilled run followed the plain one on a warm cache).
+
+**Not built (decision 2026-11-12, from the numbers).** Two reasons. (1) The prefill changed the tool decision: four prompts
+that called a tool plain (r1-train, r2-quarters, r4-tank, q2-kilimanjaro) did not with the opener, and one (w1-story) did only
+with it. Section 4 item 3's bar ("tool-decision recall and false searches not worse", rule 3) fails at the spike, before any
+shadow. (2) The measured path makes the opener's gain small: with the speculative start on, first sound is 1.40 s median
+(`speculative-start-2026-11-11.md`, "Measured"), and a content-free opener would move only the 0.21 s the confirmed run spends
+to its first sentence, at the cost of the 27B's first content sentence slipping 0.1 to 0.3 s (section 3) and the seam and
+double-opener risks of section 3. Revisit only if the speculative start plus a warm prompt cache cannot hold the 1.3 s bar
+through the browser, and then only after the tool-decision change is understood (a different opener, or option C, may not
+shift it). Nothing of slices 1 to 6 exists in code; the settings key is not registered.
+
 ## What I am not sure about
 
 - Whether Splash honours a trailing assistant message with tools offered (slice 0 decides).

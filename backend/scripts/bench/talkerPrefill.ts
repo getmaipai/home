@@ -5,7 +5,7 @@ import { join } from "node:path";
 import { sanitizeEngineUrl } from "@/lib/engineIdentity";
 import { toolSpecFor } from "@/lib/turnMachine/nodes/model";
 import { VIRTUAL_TOOL_REGISTRY } from "@/lib/projects/tool";
-import { toToolDefinition, type ToolSpec } from "@/lib/llm";
+import { completeViaStackRequest, toToolDefinition, type ToolSpec } from "@/lib/llm";
 import { createEngineActivity } from "./engineSettle";
 
 const OPENER = "Okay, so.";
@@ -79,9 +79,11 @@ function toolsFromLocalBaseManifests(): ToolSpec[] {
 }
 
 function parseArgs(args: string[]): { engines: EngineConfig[]; n: number; out?: string } {
+  // Default: the Stack's chat engine through Home's own client (`--engine splash=home`); a raw engine URL also works
+  // for an engine that takes unsigned requests (`--engine llama=http://127.0.0.1:8798`).
   const engines: EngineConfig[] = [
-    { name: "splash", url: process.env.MAIPAI_SPLASH_URL },
-    { name: "llama", url: process.env.MAIPAI_LLAMA_SERVER_URL ?? "http://127.0.0.1:8798" },
+    { name: "splash", url: process.env.MAIPAI_SPLASH_URL ?? "home" },
+    { name: "llama", url: process.env.MAIPAI_LLAMA_SERVER_URL },
   ];
   let n = 20;
   let out: string | undefined;
@@ -112,6 +114,13 @@ async function send(url: string, messages: Message[], tools: ToolSpec[]): Promis
     tool_choice: "auto", chat_template_kwargs: { enable_thinking: false }, stream: false, max_tokens: 96,
   };
   const started = performance.now();
+  if (url === "home") {
+    // Through Home's own Stack client (the Stack answers only Home): the same body, the Stack's `chat` role.
+    const result = await completeViaStackRequest("chat", { ...body, model: "chat" } as unknown as Parameters<typeof completeViaStackRequest>[1], undefined, { exactCeiling: true });
+    const wallMs = performance.now() - started;
+    if (!result.ok) throw new Error(`engine answered ${result.failure.error}`);
+    return { reply: result.data, wallMs };
+  }
   const response = await fetch(`${url.replace(/\/$/, "")}/v1/chat/completions`, {
     method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body),
   });
@@ -176,7 +185,7 @@ async function main(): Promise<void> {
   for (const engine of engines) {
     if (!engine.url) { console.log(`Skipped ${engine.name}: no URL configured`); continue; }
     const url = engine.url.replace(/\/$/, "");
-    console.log(`Running ${engine.name} (${sanitizeEngineUrl(url)}) with ${prompts.length} prompts and ${tools.length} base tools`);
+    console.log(`Running ${engine.name} (${url === "home" ? "Home's Stack client" : sanitizeEngineUrl(url)}) with ${prompts.length} prompts and ${tools.length} base tools`);
     let reachable = false;
     for (const prompt of prompts) {
       for (const variant of ["A", "B"] as const) {
