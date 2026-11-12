@@ -392,7 +392,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/answerImages/wikimedia.ts` | wikimediaFetchJson, entityId, claimText, kindScore, wikimediaLiveBlocked, resolveWikimediaSubject |
 | `backend/src/lib/apiErrorCopy.ts` | API_ERROR_LINES, apiError |
 | `backend/src/lib/apiKeys.ts` | API_KEY_REFUSAL, CreateApiKeyInput, keyOriginOf, constantTimeHashEqual, codeAdmission, mayHoldDiagnoseKey |
-| `backend/src/lib/appHelperClient.ts` | helperSocketPath, listHelperApps, askHelper, quitHelperApp, reopenHelperApp |
+| `backend/src/lib/appHelperClient.ts` | consoleUserHome, helperSocketPath, listHelperApps, askHelper, quitHelperApp, reopenHelperApp |
 | `backend/src/lib/appHelperInstall.ts` | helperScriptPath, canInstallHelper, installHelper |
 | `backend/src/lib/appNeeds.ts` | __setStatusAppsForTests, __resetStatusAppsForTests, appsFromManifests, listStatusApps, configuredServiceComponents |
 | `backend/src/lib/approvals.ts` | summarizeApproval, requestApproval, listApprovals, decideApproval |
