@@ -249,7 +249,15 @@ case "$action" in
     stop_one vite "$vite_pid_file" || true
     restart_args=(start)
     if [[ -f "$state/start-args" ]]; then while IFS= read -r arg; do [[ -z "$arg" ]] || restart_args+=("$arg"); done < "$state/start-args"; fi
-    exec bash "$script_dir/dev.sh" "${restart_args[@]}"
+    bash "$script_dir/dev.sh" "${restart_args[@]}" || echo "$(date '+%F %T') dev Home did not start again after the file-event service restart; run bash scripts/dev.sh start" >> "$state/watch.log"
+    # Recovery check (as the owner): a change is seen by a real watcher, and the restart-window file is there. The result goes to the
+    # host guard's recovery folder in Home's data directory, which the guard reads; a failure keeps new dev work paused.
+    restarted_at="$(fsevents_restarted_at)"
+    guard_data="$(sed -n 's/.*"data_dir":"\([^"]*\)".*/\1/p' "${MAIPAI_HOST_GUARD_STATE_DIR:-/var/db/maipai-host-guard}/config.json" 2>/dev/null | head -n 1)"
+    copy_args=()
+    [[ -z "$guard_data" ]] || copy_args=(--copy-to "$guard_data/host-guard/recovery/$(cksum <<< "$root" | cut -d' ' -f1).json")
+    (cd "$root" && ${MAIPAI_DEV_BUN:-bun} scripts/fseventsRecovery.ts --probe "$state/fsevents-probe" --restarted-at "$restarted_at" --token "$restarted_at" \
+      --out "$state/fsevents-recovery.json" ${copy_args[@]+"${copy_args[@]}"}) >> "$state/watch.log" 2>&1 || true
     ;;
   reseed)
     stop_one watch "$watch_pid_file"
@@ -422,6 +430,8 @@ case "$action" in
       if [[ ! -e "$root/.git" ]]; then reason="its worktree was removed"; fi
       if [[ -z "$reason" ]] && (( $(fsevents_restarted_at) > fsevents_seen )); then
         echo "$(date '+%F %T') restarting dev Home: the Mac's file-event service was restarted by the host guard, so its file watchers start fresh" >> "$state/watch.log"
+        # A file changed during the restart window; the recovery check after the restart expects to find it.
+        mkdir -p "$state/fsevents-probe"; fsevents_restarted_at > "$state/fsevents-probe/window.txt"
         rm -f "$watch_pid_file"
         MAIPAI_DEV_ROOT="$root" nohup bash -c "${MAIPAI_DEV_RESTART_CMD:-bash \"\$0\" restart-hub}" "$script_dir/dev.sh" </dev/null >>"$state/watch.log" 2>&1 &
         exit 0

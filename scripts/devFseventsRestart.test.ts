@@ -31,5 +31,7 @@ test.skipIf(process.platform !== "darwin")("a new file-event service restart mak
     expect(readFileSync(marker, "utf8").trim()).toBe("restarted");
     expect(await watch.exited).toBe(0);
     expect(readFileSync(join(state, "watch.log"), "utf8")).toContain("file-event service was restarted by the host guard");
+    // The file changed during the restart window, which the recovery check looks for after the hub is back.
+    expect(readFileSync(join(state, "fsevents-probe", "window.txt"), "utf8").trim()).toBe("2000");
   } finally { vite.kill(); watch.kill(); }
 }, 20_000);
