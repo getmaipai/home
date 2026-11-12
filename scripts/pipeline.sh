@@ -247,10 +247,13 @@ outbox_status() {
       tries="$(cat "$dir/tries" 2>/dev/null || echo 0)"; [[ "$tries" =~ ^[0-9]+$ ]] || tries=0
       next="$(cat "$dir/next-try" 2>/dev/null || echo 0)"; [[ "$next" =~ ^[0-9]+$ ]] || next=0
       err="$(cat "$dir/last-error" 2>/dev/null || true)"
+      local last interval="${MAIPAI_LAND_BACKUP_SECONDS:-300}" due=""
+      last="$(cat "$dir/last-push" 2>/dev/null || echo 0)"; [[ "$last" =~ ^[0-9]+$ ]] || last=0; [[ "$interval" =~ ^[0-9]+$ ]] || interval=300
+      (( now - last >= interval )) || due=", next backup batch in $(( last + interval - now ))s"
       if (( tries > 0 )); then
         echo "GitHub main: main is ahead of GitHub by ${state#ahead } commits (oldest $(( (now - since) / 60 )) min), push retrying (try $tries$( (( next > now )) && echo ", next in $(( next - now ))s")${err:+, last error: $err})"
       else
-        echo "GitHub main: main is ahead of GitHub by ${state#ahead } commits (oldest $(( (now - since) / 60 )) min), push pending"
+        echo "GitHub main: main is ahead of GitHub by ${state#ahead } commits (oldest $(( (now - since) / 60 )) min), backup push pending$due"
       fi ;;
     *) echo "GitHub main: unknown (no origin/main in this clone yet)" ;;
   esac
@@ -274,6 +277,8 @@ status() {
   code_status watcher.sh
   watch_main_status
   outbox_status
+  express_status
+  stable_status
   local f branch sha requested age now queue_count vals deferred_note deferred_until
   queue_count="$(find "$data/queue" -maxdepth 1 -type f -name '*.json' -print | wc -l | tr -d ' ')"
   echo "queue: $queue_count"
@@ -306,12 +311,46 @@ except Exception: print(0)' "$requested" "$now")"
     tail -n 5 "$data/landings.jsonl" | python3 -c 'import json,sys,datetime
 for line in sys.stdin:
  try:
-  x=json.loads(line); ts=datetime.datetime.fromisoformat(x["ts"].replace("Z","+00:00")).astimezone().strftime("%Y-%m-%d %H:%M:%S"); print("%s %s %s %ss %s" % (ts, x["status"], x["branch"], x["seconds"], x["reason"]))
+  x=json.loads(line); ts=datetime.datetime.fromisoformat(x["ts"].replace("Z","+00:00")).astimezone().strftime("%Y-%m-%d %H:%M:%S")
+  q=x.get("queue_seconds"); r=x.get("run_seconds", x["seconds"])
+  timing=("waited %ss, ran %ss" % (q, r)) if q is not None else ("ran %ss" % r)
+  what=(" [%s]" % x["label"]) if x.get("status")=="landed" and x.get("label") else ""
+  print("%s %s %s%s %s %s" % (ts, x["status"], "express " if x.get("express") else "", x["branch"], timing, x["reason"]) + what)
  except Exception: pass'
   fi
   if git -C "$main" log origin/main -1 --format='origin/main: %h %s' 2>/dev/null; then (( fetched )) || echo "origin/main: the line above may be stale (GitHub did not answer the last fetch)"; else echo "origin/main: unknown (fetch failed)"; fi
   service_state com.maipai.lander "$pidfile" "$(service_plist lander)"
   service_state com.maipai.watcher "$watch_pidfile" "$(service_plist watcher)"
+}
+
+# SINGLE-WRITER-01 / FAIR-LANE-01: what the express lane is doing. An express entry runs only between landings, so while a normal landing
+# runs it is "queued behind" that branch; while it runs, the normal queue is paused for it.
+express_status() {
+  local now f b started cur_branch cur_started normal
+  now="$(date +%s)"
+  if is_running && [[ -s "$data/current-express" ]]; then
+    IFS=$'\t' read -r b started <"$data/current-express" || true; [[ "$started" =~ ^[0-9]+$ ]] || started="$now"
+    normal="$(find "$data/queue" -maxdepth 1 -type f -name '*.json' ! -name '0-*' -print | wc -l | tr -d ' ')"
+    if (( normal > 0 )); then echo "express: $b landing, normal queue paused $(( now - started )) s ($normal waiting)"; else echo "express: $b landing"; fi
+    return 0
+  fi
+  for f in "$data"/queue/0-*.json; do
+    [[ -f "$f" ]] || continue
+    b="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1])).get("branch","unknown"))' "$f" 2>/dev/null || echo unknown)"
+    if is_running && [[ -s "$data/current-entry" ]]; then
+      IFS=$'\t' read -r cur_branch cur_started _ _ <"$data/current-entry" || true; [[ "$cur_started" =~ ^[0-9]+$ ]] || cur_started="$now"
+      echo "express queued behind $cur_branch ($(( now - cur_started )) s): $b"
+    else echo "express queued: $b"; fi
+  done
+}
+
+# STABLE-01: the last version to pass the required checks (the nightly full suite), and the last nightly result.
+stable_status() {
+  local s latest="$main/data-scratch/nightly/latest.json"
+  s="$(git -C "$main" rev-parse --verify -q refs/heads/stable 2>/dev/null || true)"
+  if [[ -n "$s" ]]; then echo "stable (last version to pass the required checks): ${s:0:7}"; else echo "stable: none yet (the nightly run has not passed on any commit)"; fi
+  [[ -f "$latest" ]] && python3 -c 'import json,sys
+x=json.load(open(sys.argv[1])); print("nightly: %s at %s (%s)%s" % (x.get("result"), x.get("sha","")[:7], x.get("finished_at",""), ("; %d superseded commits untested" % len(x.get("untested_superseded",[]))) if x.get("untested_superseded") else ""))' "$latest" 2>/dev/null || true
 }
 
 # DISK-WAIT-01: block on a FIFO until a condition holds; the lander (ring_waiters) writes one line when it does. No loop, no sleep.

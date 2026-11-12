@@ -150,7 +150,7 @@ describe("pipeline resilience", () => {
     expect(note("safety_t2_pass").note).toMatch(/tier: T2; safety-surface tests took \d+s/);
     delete env.MAIPAI_LAND_T2_CMD;
     delete env.MAIPAI_T2_CALLS_FILE;
-  });
+  }, 60_000); // three landings; the 5 s default failed under load (2026-11-12)
 });
 
 afterAll(cleanup);

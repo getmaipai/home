@@ -120,7 +120,7 @@ describe("the lander never waits on a hung push", () => {
     expect(run("pipeline.sh", ["status"]).stdout).toContain("GitHub main: in sync");
   }, 120_000);
 
-  test("a long step that never ends is stopped and the entry bounces with the timeout in the reason", () => {
+  test("a long step that never ends is stopped and the entry is unfinished (never landed) with the timeout in the reason", () => {
     installHangStub(0);
     const prior = { check: env.MAIPAI_LAND_CHECK_CMD, seconds: env.MAIPAI_LAND_CHECK_SECONDS };
     env.MAIPAI_LAND_CHECK_CMD = "sleep 600";
@@ -133,7 +133,7 @@ describe("the lander never waits on a hung push", () => {
     const result = run("lander.sh", ["run-once"]);
     expect(result.status).toBe(0);
     expect((Date.now() - started) / 1000).toBeLessThan(40);
-    expect(note("check_hangs").status).toBe("bounced");
+    expect(note("check_hangs").status).toBe("unfinished");
     expect(note("check_hangs").reason).toContain("static check timed out after 2s");
     env.MAIPAI_LAND_CHECK_CMD = prior.check;
     env.MAIPAI_LAND_CHECK_SECONDS = prior.seconds;

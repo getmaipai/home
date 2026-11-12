@@ -1,0 +1,286 @@
+import { afterAll, beforeAll, describe, expect, test } from "bun:test";
+import { chmodSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
+import * as fixtures from "./tests/landerFixtures";
+const { scratch, origin, data, main, env, git, run, makeWorktree, commit, note, queueFiles, setup, cleanup } = fixtures.createLanderFixtures();
+
+// SINGLE-WRITER-01, FAIR-LANE-01, QUEUE-TIME-01, UNFINISHED-01, BATCH-BACKUP-01, CHECK-REUSE-01 (2026-11-12). The lander is the only
+// writer of main; the express lane (land.sh --express, what rush-ship.sh uses) goes through it between landing transactions; records keep
+// queue time apart from run time; a time cap is "unfinished", never a pass; backups are batched and push nothing when nothing is new.
+const originMain = () => git(origin, "rev-parse", "refs/heads/main");
+const pipelineMain = () => git(main, "rev-parse", "refs/pipeline/main");
+const pushLog = () => join(scratch, "push-log");
+const pushes = () => (existsSync(pushLog()) ? readFileSync(pushLog(), "utf8").trim().split("\n").filter(Boolean) : []);
+const realGit = () => Bun.spawnSync(["bash", "-c", "command -v git"]).stdout.toString().trim();
+const stubBin = () => join(scratch, "express-bin");
+let pathBefore = "";
+
+function stubGit(mode: "fail" | "pass") {
+  mkdirSync(stubBin(), { recursive: true });
+  writeFileSync(
+    join(stubBin(), "git"),
+    `#!/bin/bash
+if [[ " $* " == *" push "* && "$*" == *":refs/heads/main"* ]]; then
+  echo "$*" >> ${pushLog()}
+  if [[ ${JSON.stringify(mode)} == fail ]]; then echo "fatal: unable to access 'https://github.com/example/home.git/': Connection reset by peer" >&2; exit 128; fi
+fi
+exec ${realGit()} "$@"
+`,
+  );
+  chmodSync(join(stubBin(), "git"), 0o755);
+  env.PATH = `${stubBin()}:${pathBefore}`;
+}
+function change(name: string, file = `${name}.txt`, body = `${name}\n`) {
+  const w = makeWorktree(name);
+  mkdirSync(join(w, file, ".."), { recursive: true });
+  writeFileSync(join(w, file), body);
+  return { w, sha: commit(w, `entry ${name}`) };
+}
+// A queue file exactly as land.sh writes it; `ageMs` back-dates it (the lander's fairness clock is the file name).
+function enqueue(name: string, sha: string, w: string, opts: { express?: boolean; ageMs?: number; safetyOk?: boolean } = {}) {
+  const ms = Date.now() - (opts.ageMs ?? 0);
+  const req: Record<string, unknown> = { branch: `wt/${name}`, sha, worktree: w, session: "", requested_at: new Date(ms).toISOString().replace(/\.\d+Z$/, "Z"), note: "", done: [] };
+  if (opts.express) req.express = true;
+  if (opts.safetyOk) req.safety_ok = true;
+  const file = join(data, "queue", `${opts.express ? "0-" : ""}${ms}-wt-${name}.json`);
+  writeFileSync(file, `${JSON.stringify(req)}\n`);
+  return file;
+}
+const landings = () => readFileSync(join(data, "landings.jsonl"), "utf8").trim().split("\n").map((l) => JSON.parse(l));
+
+beforeAll(() => {
+  setup();
+  mkdirSync(join(data, "queue"), { recursive: true });
+  mkdirSync(join(data, "notes"), { recursive: true });
+  pathBefore = env.PATH ?? process.env.PATH ?? "";
+  env.GITNET_TIMEOUT = "5";
+  env.GITNET_TRIES = "1";
+  env.GITNET_BACKOFF = "0";
+  env.MAIPAI_LAND_BOOT_CMD = "echo booted";
+  stubGit("pass");
+}, 60_000);
+afterAll(() => cleanup());
+
+describe("the express lane", () => {
+  test("land.sh --express waits, lands the rebased commit, pushes it to GitHub before it answers, and says what was checked (never 'tested')", async () => {
+    const { w } = change("ex_basic");
+    const lander = Bun.spawn(["bash", join(main, "scripts", "land.sh"), "--queue-anyway", "--express", "--timeout", "60"], { cwd: w, env: env as Record<string, string>, stdout: "pipe", stderr: "pipe" });
+    for (let i = 0; i < 100 && queueFiles().length === 0; i++) await Bun.sleep(100);
+    expect(queueFiles()[0]).toMatch(/^0-\d+-wt-ex_basic\.json$/);
+    expect(run("lander.sh", ["run-once"]).stdout).toContain("landed: wt/ex_basic");
+    expect(await lander.exited).toBe(0);
+    const out = await new Response(lander.stdout).text();
+    const landed = out.match(/^landed-sha: ([0-9a-f]{40})$/m)?.[1];
+    expect(landed).toBe(pipelineMain());
+    expect(originMain()).toBe(landed!);
+    const n = note("ex_basic") as Record<string, unknown>;
+    expect(n.label).toBe("starts and typechecks on top of main (express: no tests run)");
+    expect(String(n.label)).not.toContain("tested");
+    expect(String(n.github)).toMatch(/^pushed/);
+    expect(existsSync(join(data, "boot-ok", landed!))).toBe(true);
+    expect(readFileSync(join(data, "notes", "wt-ex_basic.md"), "utf8")).toContain("What was checked: starts and typechecks on top of main");
+  }, 120_000);
+
+  test("queue time and run time are recorded apart, with the seconds of each step", () => {
+    const { w, sha } = change("ex_times");
+    enqueue("ex_times", sha, w, { ageMs: 30_000 });
+    run("lander.sh", ["run-once"]);
+    const row = landings().at(-1)!;
+    for (const key of ["requested_at", "started_at", "finished_at", "queue_seconds", "run_seconds", "phases", "generated_files"]) expect(row).toHaveProperty(key);
+    expect(row.queue_seconds).toBeGreaterThanOrEqual(29);
+    expect(Object.keys(row.phases)).toEqual(expect.arrayContaining(["fetching origin", "rebasing", "generating files", "static check", "landing on main"]));
+    const n = note("ex_times") as Record<string, unknown>;
+    expect(n.requested_at).toBe(row.requested_at);
+    expect(n.queue_seconds).toBe(row.queue_seconds);
+    expect(run("pipeline.sh", ["status"]).stdout).toMatch(/landed wt\/ex_times waited \d+s, ran \d+s landed \[static check on top of main\]/);
+  }, 60_000);
+
+  test("a rush while the outbox holds an unpushed landed commit lands on top of it and pushes both in order, without force", () => {
+    stubGit("fail");
+    env.MAIPAI_LAND_OUTBOX_BASE_SECONDS = "600";
+    const a = change("ex_held");
+    enqueue("ex_held", a.sha, a.w);
+    expect(run("lander.sh", ["run-once"]).stdout).toContain("landed: wt/ex_held");
+    expect(originMain()).not.toBe(pipelineMain());
+    stubGit("pass");
+    const b = change("ex_rush");
+    enqueue("ex_rush", b.sha, b.w, { express: true });
+    expect(run("lander.sh", ["run-once"]).stdout).toContain("landed: wt/ex_rush");
+    expect(originMain()).toBe(pipelineMain());
+    expect(git(origin, "log", "--format=%s", "-2", "refs/heads/main").split("\n")).toEqual(["entry ex_rush", "entry ex_held"]);
+    for (const line of pushes()) expect(line).not.toMatch(/--force|\s-f\s|\+[0-9a-f]{7,}:/);
+    expect(run("pipeline.sh", ["status"]).stdout).toContain("GitHub main: in sync");
+  }, 60_000);
+
+  test("GitHub ahead of the landed main: express is refused before any push, with the documented repair, and nothing is forced", () => {
+    const other = makeWorktree("ex_direct");
+    writeFileSync(join(other, "direct.txt"), "pushed around the lander\n");
+    commit(other, "direct push");
+    git(other, "push", origin, "HEAD:refs/heads/main");
+    const githubBefore = originMain();
+    // The landed main has a commit GitHub lacks, and GitHub has one the landed main lacks: diverged.
+    const tip = pipelineMain();
+    const landedOnly = Bun.spawnSync([realGit(), "-C", main, "commit-tree", `${tip}^{tree}`, "-p", tip, "-m", "landed only"], { env: { ...process.env, GIT_AUTHOR_NAME: "t", GIT_AUTHOR_EMAIL: "t@example.test", GIT_COMMITTER_NAME: "t", GIT_COMMITTER_EMAIL: "t@example.test" } }).stdout.toString().trim();
+    git(main, "update-ref", "refs/pipeline/main", landedOnly);
+    const before = pushes().length;
+    const r = change("ex_diverged");
+    enqueue("ex_diverged", r.sha, r.w, { express: true });
+    const out = run("lander.sh", ["run-once"]).stdout;
+    expect(out).toContain("bounced: wt/ex_diverged");
+    expect(note("ex_diverged").reason).toContain("bash scripts/pipeline.sh outbox reset-to-github");
+    expect(pushes().length).toBe(before);
+    expect(originMain()).toBe(githubBefore);
+    expect(run("lander.sh", ["outbox", "reset-to-github"]).status).toBe(0);
+    expect(pipelineMain()).toBe(originMain());
+  }, 60_000);
+
+  test("the landed main moving during the checks (a concurrent writer) requeues the entry; nothing stale is moved or pushed", () => {
+    const { w, sha } = change("ex_race");
+    const before = pushes().length;
+    // The boot check stands in for a second writer that moves the landed main while this entry is being validated.
+    env.MAIPAI_LAND_BOOT_CMD = `t=$(git -C ${main} rev-parse refs/pipeline/main); n=$(GIT_AUTHOR_NAME=t GIT_AUTHOR_EMAIL=t@example.test GIT_COMMITTER_NAME=t GIT_COMMITTER_EMAIL=t@example.test git -C ${main} commit-tree "$t^{tree}" -p "$t" -m "moved meanwhile"); git -C ${main} update-ref refs/pipeline/main "$n" "$t"; echo moved`;
+    enqueue("ex_race", sha, w, { express: true });
+    const moved = run("lander.sh", ["run-once"]);
+    env.MAIPAI_LAND_BOOT_CMD = "echo booted";
+    expect(moved.stdout).toContain("requeued: wt/ex_race");
+    expect(git(main, "log", "--format=%s", "-1", "refs/pipeline/main")).toBe("moved meanwhile");
+    expect(pushes().length).toBe(before);
+    expect(queueFiles()).toHaveLength(1);
+    expect(run("lander.sh", ["run-once"]).stdout).toContain("landed: wt/ex_race");
+    expect(git(main, "log", "--format=%s", "-2", "refs/pipeline/main").split("\n")).toEqual(["entry ex_race", "moved meanwhile"]);
+  }, 60_000);
+
+  test("express refuses docs/design/RULES.md and an unapproved safety file", () => {
+    const rules = change("ex_rules", "docs/design/RULES.md", "rule\n");
+    enqueue("ex_rules", rules.sha, rules.w, { express: true });
+    run("lander.sh", ["run-once"]);
+    expect(note("ex_rules").status).toBe("bounced");
+    expect(note("ex_rules").reason).toContain("only the owner changes a rule");
+    const safety = change("ex_safety", "backend/src/lib/session.ts", "export {};\n");
+    enqueue("ex_safety", safety.sha, safety.w, { express: true });
+    run("lander.sh", ["run-once"]);
+    expect(note("ex_safety").reason).toContain("MAIPAI_RUSH_SAFETY_OK=1");
+  }, 60_000);
+});
+
+describe("fairness between the lanes", () => {
+  test("an express request never starts while another landing transaction holds the tree; it runs right after", () => {
+    const n = change("fair_normal");
+    const x = change("fair_express");
+    // While the normal entry is in its static check, an express request arrives.
+    const xreq = JSON.stringify({ branch: "wt/fair_express", sha: x.sha, worktree: x.w, session: "", requested_at: new Date().toISOString().replace(/\.\d+Z$/, "Z"), note: "", done: [], express: true });
+    writeFileSync(join(scratch, "xreq.json"), xreq);
+    const priorCheck = env.MAIPAI_LAND_CHECK_CMD;
+    env.MAIPAI_LAND_CHECK_CMD = `cp ${join(scratch, "xreq.json")} ${join(data, "queue")}/0-$(date +%s)000-wt-fair_express.json; echo checked`;
+    enqueue("fair_normal", n.sha, n.w);
+    const first = run("lander.sh", ["run-once"]);
+    env.MAIPAI_LAND_CHECK_CMD = priorCheck;
+    expect(first.stdout).toContain("landed: wt/fair_normal");
+    expect(first.stdout).not.toContain("fair_express");
+    expect(existsSync(join(data, "notes", "wt-fair_express.json"))).toBe(false);
+    expect(git(main, "log", "--format=%s", "-1", "refs/pipeline/main")).toBe("entry fair_normal");
+    expect(queueFiles()).toEqual([expect.stringMatching(/^0-\d+-wt-fair_express\.json$/)]);
+    expect(run("lander.sh", ["run-once"]).stdout).toContain("landed: wt/fair_express");
+  }, 60_000);
+
+  test("express goes first, at most two in a row, and a normal entry that waited ten minutes goes next regardless", () => {
+    const order: string[] = [];
+    writeFileSync(join(data, "express-streak"), "0\n"); // earlier tests landed express entries; this one counts from zero
+    const landNext = () => { const out = run("lander.sh", ["run-once"]).stdout; const m = out.match(/landed: wt\/(\S+)/); if (m) order.push(m[1]!); };
+    const n1 = change("fq_n1"); enqueue("fq_n1", n1.sha, n1.w, { ageMs: 60_000 });
+    for (const name of ["fq_x1", "fq_x2", "fq_x3"]) { const c = change(name); enqueue(name, c.sha, c.w, { express: true }); }
+    for (let i = 0; i < 4; i++) landNext();
+    expect(order).toEqual(["fq_x1", "fq_x2", "fq_n1", "fq_x3"]);
+    const n2 = change("fq_n2"); enqueue("fq_n2", n2.sha, n2.w, { ageMs: 11 * 60_000 });
+    const x4 = change("fq_x4"); enqueue("fq_x4", x4.sha, x4.w, { express: true });
+    landNext(); landNext();
+    expect(order.slice(4)).toEqual(["fq_n2", "fq_x4"]);
+  }, 120_000);
+});
+
+describe("time caps and results", () => {
+  test("a step that hits its time cap is 'unfinished', never landed, and the landed main does not move (express too)", () => {
+    const tip = pipelineMain();
+    env.MAIPAI_LAND_BOOT_CMD = "sleep 30"; env.MAIPAI_LAND_BOOT_SECONDS = "1";
+    const x = change("cap_express"); enqueue("cap_express", x.sha, x.w, { express: true });
+    expect(run("lander.sh", ["run-once"]).stdout).toContain("unfinished: wt/cap_express");
+    env.MAIPAI_LAND_BOOT_CMD = "echo booted"; delete env.MAIPAI_LAND_BOOT_SECONDS;
+    expect(note("cap_express").status).toBe("unfinished");
+    expect(landings().at(-1)!.status).toBe("unfinished");
+    expect(pipelineMain()).toBe(tip);
+    // The normal lane under a capped static check is not switched to the express policy; it is unfinished too.
+    const prior = env.MAIPAI_LAND_CHECK_CMD;
+    env.MAIPAI_LAND_CHECK_CMD = "sleep 30"; env.MAIPAI_LAND_CHECK_SECONDS = "1";
+    const n = change("cap_normal"); enqueue("cap_normal", n.sha, n.w);
+    run("lander.sh", ["run-once"]);
+    env.MAIPAI_LAND_CHECK_CMD = prior; delete env.MAIPAI_LAND_CHECK_SECONDS;
+    expect(note("cap_normal").status).toBe("unfinished");
+    expect((note("cap_normal") as Record<string, unknown>).express).toBe(false);
+    expect(pipelineMain()).toBe(tip);
+  }, 60_000);
+
+  test("a passing static check is reused for the same tree on the same base; a failure is never reused", () => {
+    const calls = join(scratch, "check-calls");
+    const prior = { check: env.MAIPAI_LAND_CHECK_CMD, t2: env.MAIPAI_LAND_T2_CMD };
+    env.MAIPAI_LAND_CHECK_CMD = `echo x >> ${calls}; echo checked`;
+    env.MAIPAI_LAND_T2_CMD = "if [[ -f T2_FAIL ]]; then exit 1; fi";
+    const s = change("reuse", "backend/src/db/migrations/0997_reuse.sql", "select 1;\n");
+    writeFileSync(join(s.w, "T2_FAIL"), "x\n");
+    const sha = commit(s.w, "fails its T2 tests");
+    enqueue("reuse", sha, s.w);
+    run("lander.sh", ["run-once"]);
+    expect(note("reuse").status).toBe("bounced");
+    expect(readFileSync(calls, "utf8").trim().split("\n")).toHaveLength(1);
+    // Same commit, same base, T2 now passing: the static check is not run again.
+    env.MAIPAI_LAND_T2_CMD = "true";
+    enqueue("reuse", sha, s.w);
+    run("lander.sh", ["run-once"]);
+    env.MAIPAI_LAND_CHECK_CMD = prior.check; env.MAIPAI_LAND_T2_CMD = prior.t2;
+    expect(note("reuse").status).toBe("landed");
+    expect(readFileSync(calls, "utf8").trim().split("\n")).toHaveLength(1);
+    expect((note("reuse") as Record<string, unknown>).static_check_reused_from).toBeTruthy();
+  }, 60_000);
+});
+
+describe("batched backup", () => {
+  test("no push when nothing is new; nothing before the batch interval; one push of the newest tip after it", () => {
+    stubGit("pass");
+    run("lander.sh", ["outbox", "flush"]);
+    expect(originMain()).toBe(pipelineMain());
+    const before = pushes().length;
+    env.MAIPAI_LAND_BACKUP_SECONDS = "0";
+    expect(run("lander.sh", ["outbox", "batch"]).stdout).toContain("no batch due");
+    expect(pushes().length).toBe(before);
+    // Two landings in the daemon's way (serving: no per-landing push), simulated by landing with pushes failing, then batching.
+    stubGit("fail"); env.MAIPAI_LAND_OUTBOX_BASE_SECONDS = "0";
+    for (const name of ["bb_1", "bb_2"]) { const c = change(name); enqueue(name, c.sha, c.w); run("lander.sh", ["run-once"]); }
+    stubGit("pass");
+    writeFileSync(join(data, "outbox", "last-push"), `${Math.floor(Date.now() / 1000)}\n`);
+    env.MAIPAI_LAND_BACKUP_SECONDS = "300";
+    const mid = pushes().length;
+    expect(run("lander.sh", ["outbox", "batch"]).stdout).toContain("no batch due");
+    expect(pushes().length).toBe(mid);
+    env.MAIPAI_LAND_BACKUP_SECONDS = "0";
+    run("lander.sh", ["outbox", "batch"]);
+    expect(pushes().length).toBe(mid + 1);
+    expect(pushes().at(-1)).toContain(`${pipelineMain()}:refs/heads/main`);
+    expect(originMain()).toBe(pipelineMain());
+  }, 60_000);
+});
+
+describe("one writer", () => {
+  test("wt.sh land goes to the lander's queue; the shared script's own push to main is never reached", () => {
+    const fake = join(scratch, "fake-shared-push.sh");
+    writeFileSync(fake, `#!/usr/bin/env bash\necho "shared wt.sh ran $1" >> ${join(scratch, "shared-calls")}\ngit push origin HEAD:main\n`);
+    env.MAIPAI_WT_SHARED = fake;
+    const c = change("one_writer");
+    const githubBefore = originMain();
+    const r = Bun.spawnSync(["bash", join(main, "scripts", "wt.sh"), "land", "--queue-anyway", "--detach"], { cwd: c.w, env: env as Record<string, string>, stdout: "pipe", stderr: "pipe" });
+    delete env.MAIPAI_WT_SHARED;
+    expect(r.exitCode).toBe(0);
+    expect(r.stdout.toString()).toContain("queued: wt/one_writer");
+    expect(existsSync(join(scratch, "shared-calls"))).toBe(false);
+    expect(originMain()).toBe(githubBefore);
+    expect(run("lander.sh", ["run-once"]).stdout).toContain("landed: wt/one_writer");
+  }, 60_000);
+});

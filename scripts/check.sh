@@ -192,6 +192,9 @@ trap on_exit EXIT
 # origin/main is preferred when it exists but main is a safe fallback
 # in a checkout with no remote configured.
 gate_diff_base() {
+  # DUP-CHECK-01 (2026-11-12): the lander names the main it rebased on, so a landing is scoped to its own change even while GitHub's
+  # main lags the landed main by a backup batch, and no second fetch runs.
+  if [ -n "${MAIPAI_GATE_DIFF_BASE:-}" ]; then echo "$MAIPAI_GATE_DIFF_BASE"; return; fi
   # GATE-SPEED-01 (e): origin/main is only as fresh as the last fetch. A
   # stale ref makes the merge-base old, so commits other people already
   # pushed count as "this change" and can widen a docs diff to full (a
@@ -513,11 +516,15 @@ run_preflight() {
     preflight_stage "pre: settings registry generated files"
     # Generated into a private scratch directory, never into the shared commons checkout (2026-11-02). The generators also get a private
     # MAIPAI_DATA_DIR (GEN-DATADIR-01): they import backend code that opens hub.db, and a leftover DB with a newer schema broke them.
+    # DUP-CHECK-01: the lander passes the registry it generated for this exact tree (MAIPAI_PRE_SETTINGS_FILE), so it is compared, not made twice.
     PRE_SETTINGS_SCRATCH="$(mktemp -d)"
-    if ! (cd backend && MAIPAI_COMMONS_DIR="$PRE_SETTINGS_SCRATCH" MAIPAI_DATA_DIR="$PRE_SETTINGS_SCRATCH/data" bun run gen:settings >/dev/null); then
+    PRE_SETTINGS_FILE="$PRE_SETTINGS_SCRATCH/spec/settings/keys.json"
+    if [ -n "${MAIPAI_PRE_SETTINGS_FILE:-}" ] && [ -f "$MAIPAI_PRE_SETTINGS_FILE" ]; then
+      PRE_SETTINGS_FILE="$MAIPAI_PRE_SETTINGS_FILE"
+    elif ! (cd backend && MAIPAI_COMMONS_DIR="$PRE_SETTINGS_SCRATCH" MAIPAI_DATA_DIR="$PRE_SETTINGS_SCRATCH/data" bun run gen:settings >/dev/null); then
       rm -rf "$PRE_SETTINGS_SCRATCH"; echo "backend settings registry could not be generated"; return 1
     fi
-    if ! node - "$SPEC_DIR" "$PRE_SETTINGS_SCRATCH/spec/settings/keys.json" <<'NODE'
+    if ! node - "$SPEC_DIR" "$PRE_SETTINGS_FILE" <<'NODE'
 const fs = require("node:fs");
 const { execFileSync } = require("node:child_process");
 const [specDir, outputPath] = process.argv.slice(2);
@@ -547,8 +554,11 @@ NODE
   fi
 
   if [ "$SCOPE" = "backend" ] || [ "$SCOPE" = "full" ]; then
-    preflight_stage "pre: API docs generated files"
-    (gen_data="$(mktemp -d)"; trap 'rm -rf "$gen_data"' EXIT; cd backend && MAIPAI_DATA_DIR="$gen_data/data" bun run gen:api-docs >/dev/null)
+    # MAIPAI_PRE_GENERATED=1: the lander generated these files for this tree moments ago and committed any change, so it is not run twice.
+    if [ "${MAIPAI_PRE_GENERATED:-0}" != 1 ]; then
+      preflight_stage "pre: API docs generated files"
+      (gen_data="$(mktemp -d)"; trap 'rm -rf "$gen_data"' EXIT; cd backend && MAIPAI_DATA_DIR="$gen_data/data" bun run gen:api-docs >/dev/null)
+    fi
   fi
 
   if [ "$SCOPE" = "backend" ] || [ "$SCOPE" = "full" ]; then
@@ -558,8 +568,10 @@ NODE
     rm -f "${TMPDIR:-/tmp}/schema-chain.$$.log"
   fi
 
-  preflight_stage "pre: elements adoption generated file"
-  bun run scripts/elementsAdoption.ts
+  if [ "${MAIPAI_PRE_GENERATED:-0}" != 1 ]; then
+    preflight_stage "pre: elements adoption generated file"
+    bun run scripts/elementsAdoption.ts
+  fi
 
   preflight_stage "pre: UI rules and shrinking baselines"
   (cd frontend && env -u MAIPAI_SKIP_UI_RULES bun run lint:ui-rules >/dev/null)

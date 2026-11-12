@@ -113,23 +113,68 @@ checkout_warm() {
   fi
 }
 
+# QUEUE-TIME-01 (2026-11-12): a landing record keeps the time it waited in the queue apart from the time the lander spent on it, and the
+# seconds of each phase, so "slow landing" can be split into "waited" and "ran", and the run into fetch, rebase, generate, check, push.
+# Read from the entry's globals (set in run_one); printed as one JSON object that both the note and landings.jsonl merge.
+entry_extra_json() {
+  python3 - "${entry_requested_at:-}" "${entry_started:-0}" "${phase_times:-}" "${entry_express:-0}" "${entry_label:-}" "${entry_github:-}" "${entry_generated:-}" "${entry_check_reused:-}" <<'PY'
+import datetime, json, sys, time
+requested, started, phases, express, label, github, generated, reused = sys.argv[1:]
+now = int(time.time()); started = int(started or 0) or now
+def iso(t): return datetime.datetime.fromtimestamp(t, datetime.timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ')
+out = dict(started_at=iso(started), finished_at=iso(now), run_seconds=now - started, express=express == '1')
+try:
+    req = int(datetime.datetime.fromisoformat(requested.replace('Z', '+00:00')).timestamp())
+    out.update(requested_at=requested, queue_seconds=max(0, started - req))
+except Exception:
+    out.update(requested_at=None, queue_seconds=None)
+p = {}
+for line in phases.splitlines():
+    if '\t' in line:
+        k, v = line.rsplit('\t', 1)
+        try: p[k] = p.get(k, 0) + int(v)
+        except ValueError: pass
+out['phases'] = p
+if label: out['label'] = label
+if github: out['github'] = github
+out['generated_files'] = [g for g in generated.split(',') if g]
+if reused: out['static_check_reused_from'] = reused
+print(json.dumps(out))
+PY
+}
+
 atomic_json_note() {
   local branch="$1" sha="$2" status="$3" reason="$4" main_sha="$5" tail_file="$6" seconds="$7" landing_note="${8:-}"
-  local slug="${branch//\//-}" json_tmp md_tmp finished check_tail
+  local slug="${branch//\//-}" json_tmp md_tmp finished check_tail extra
   local json="$data/notes/$slug.json" md="$data/notes/$slug.md"
   finished="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
   check_tail="$(tail -n 40 "$tail_file" 2>/dev/null || true)"
+  extra="$(entry_extra_json 2>/dev/null || echo '{}')"
   json_tmp="$(mktemp "$data/notes/.note.XXXXXX")"
   md_tmp="$(mktemp "$data/notes/.note.XXXXXX")"
-python3 - "$json_tmp" "$branch" "$sha" "$status" "$reason" "$main_sha" "$check_tail" "$seconds" "$finished" "$landing_note" <<'PY'
+python3 - "$json_tmp" "$branch" "$sha" "$status" "$reason" "$main_sha" "$check_tail" "$seconds" "$finished" "$landing_note" "$extra" <<'PY'
 import json, sys
 with open(sys.argv[1], 'w') as f:
-    json.dump(dict(branch=sys.argv[2], sha=sys.argv[3], status=sys.argv[4], reason=sys.argv[5], main_sha=sys.argv[6], check_tail=sys.argv[7], seconds=int(sys.argv[8]), finished_at=sys.argv[9], note=sys.argv[10]), f)
+    note = dict(branch=sys.argv[2], sha=sys.argv[3], status=sys.argv[4], reason=sys.argv[5], main_sha=sys.argv[6], check_tail=sys.argv[7], seconds=int(sys.argv[8]), finished_at=sys.argv[9], note=sys.argv[10])
+    try: extra = json.loads(sys.argv[11])
+    except Exception: extra = {}
+    extra.pop('finished_at', None)
+    note.update(extra)
+    json.dump(note, f)
     f.write('\n')
 PY
   {
     printf '# %s: %s\n\n' "$status" "$branch"
     printf -- '- Branch: `%s`\n- SHA: `%s`\n- Main SHA: `%s`\n- Reason: %s\n' "$branch" "$sha" "$main_sha" "$reason"
+    [[ -z "${entry_label:-}" || "$status" != landed ]] || printf -- '- What was checked: %s\n' "$entry_label"
+    [[ -z "${entry_github:-}" ]] || printf -- '- GitHub main: %s\n' "$entry_github"
+    printf '%s' "$extra" | python3 -c 'import json,sys
+try: x=json.load(sys.stdin)
+except Exception: sys.exit(0)
+q=x.get("queue_seconds"); r=x.get("run_seconds")
+print("- Waited in the queue: %ss; ran: %ss" % ("unknown" if q is None else q, r))
+p=x.get("phases") or {}
+if p: print("- Phases: " + ", ".join("%s %ss" % (k, v) for k, v in p.items()))' 2>/dev/null || true
     [[ -z "$landing_note" ]] || printf -- '- Note: %s\n' "$landing_note"
     printf '\n'
     printf '## Last 40 lines of check output\n\n```text\n%s\n```\n' "$check_tail"
@@ -140,10 +185,15 @@ PY
 }
 
 log_line() {
-  python3 - "$1" "$2" "$3" "$4" "$5" "$6" "$7" "$8" <<'PY'
+  local extra
+  extra="$(entry_extra_json 2>/dev/null || echo '{}')"
+  python3 - "$1" "$2" "$3" "$4" "$5" "$6" "$7" "$8" "$extra" <<'PY'
 import json, sys
 with open(sys.argv[1], 'a') as f:
-    f.write(json.dumps(dict(ts=sys.argv[2], branch=sys.argv[3], sha=sys.argv[4], main_sha=sys.argv[5], status=sys.argv[6], seconds=int(sys.argv[7]), reason=sys.argv[8])) + '\n')
+    row = dict(ts=sys.argv[2], branch=sys.argv[3], sha=sys.argv[4], main_sha=sys.argv[5], status=sys.argv[6], seconds=int(sys.argv[7]), reason=sys.argv[8])
+    try: row.update(json.loads(sys.argv[9]))
+    except Exception: pass
+    f.write(json.dumps(row) + '\n')
 PY
 }
 
@@ -309,13 +359,57 @@ run_t2_tests() {
 
 run_static_check() {
   local output="$1" cap="${MAIPAI_LAND_CHECK_SECONDS:-900}" command="${MAIPAI_LAND_CHECK_CMD:-}"
+  # DUP-CHECK-01 (2026-11-12): the check judges the change against the main it was rebased on (not GitHub's main, which lags by up to a
+  # batch), does not fetch again (the landing just did), and does not regenerate what this landing generated a moment ago.
+  local -a check_env=(MAIPAI_GATE_NO_FETCH=1 MAIPAI_PRE_GENERATED=1)
+  [[ -z "${LAND_DIFF_BASE:-}" ]] || check_env+=(MAIPAI_GATE_DIFF_BASE="$LAND_DIFF_BASE")
+  [[ -z "${LAND_GEN_SETTINGS:-}" ]] || check_env+=(MAIPAI_PRE_SETTINGS_FILE="$LAND_GEN_SETTINGS")
   if [[ -n "$command" ]]; then
-    bounded_step "$cap" "static check" "$output" bash -c 'cd "$1" && eval "$2"' _ "$checkout" "$command"
+    bounded_step "$cap" "static check" "$output" env "${check_env[@]}" bash -c 'cd "$1" && eval "$2"' _ "$checkout" "$command"
   else
     MAIPAI_COMMONS_DIR="$(cd "$main/.." && pwd -P)/commons" MAIPAI_STANDARDS_DIR="$(cd "$main/.." && pwd -P)/.github" \
-      bounded_step "$cap" "static check" "$output" bash -c 'cd "$1" && bash scripts/check.sh --pre && (cd frontend && bunx eslint . --cache --cache-location .eslintcache)' _ "$checkout"
+      bounded_step "$cap" "static check" "$output" env "${check_env[@]}" bash -c 'cd "$1" && bash scripts/check.sh --pre && (cd frontend && bunx eslint . --cache --cache-location .eslintcache)' _ "$checkout"
   fi
 }
+
+# CHECK-REUSE-01 (2026-11-12): a passing static check is remembered by the tree it checked and the tree of the main it was scoped
+# against (the scope depends on both). The same pair again (a requeue after the landed main moved, a repeat request) reuses the pass
+# instead of re-running the checks. Only a pass is remembered; a failed or unfinished check always runs again.
+static_check_key_file() {
+  local t b; t="$(git -C "$checkout" rev-parse 'HEAD^{tree}' 2>/dev/null)" || return 1; b="$(git -C "$checkout" rev-parse "$1^{tree}" 2>/dev/null)" || return 1
+  printf '%s/check-ok/%s-%s' "$data" "$t" "$b"
+}
+static_check_cached() { local f; f="$(static_check_key_file "$1")" || return 1; [[ "${MAIPAI_LAND_CHECK_REUSE:-1}" == 1 && -s "$f" ]]; }
+static_check_remember() {
+  local f; f="$(static_check_key_file "$1")" || return 0
+  mkdir -p "$data/check-ok"; git -C "$checkout" rev-parse HEAD >"$f" 2>/dev/null || true
+  find "$data/check-ok" -type f -mtime +7 -delete 2>/dev/null || true
+}
+
+# Express only: start the rebased commit's real entry on a scratch hub (scripts/boot-check.sh, about 30 s cold, 1 to 3 s warm). Bounded like
+# every step; a timeout is a failure, never a pass. A tree without the script says so on the last line and is labelled accordingly.
+run_boot_check() {
+  local output="$1" command="${MAIPAI_LAND_BOOT_CMD:-}"
+  if [[ -z "$command" ]]; then
+    if [[ ! -f "$checkout/scripts/boot-check.sh" ]]; then echo "boot check: none in this tree" >"$output"; return 0; fi
+    command="bash scripts/boot-check.sh"
+  fi
+  bounded_step "${MAIPAI_LAND_BOOT_SECONDS:-180}" "boot check" "$output" bash -c 'cd "$1" && eval "$2"' _ "$checkout" "$command"
+}
+
+# What an express landing may not carry (the rules rush-ship.sh enforced before SINGLE-WRITER-01): docs/design/RULES.md never (only the
+# owner changes a rule), and a safety, auth or credential file (the T2 globs minus the pipeline scripts) only with the owner's word in that
+# turn (MAIPAI_RUSH_SAFETY_OK=1 when land.sh --express queued it). Prints the refusal, or nothing.
+express_refusal() {
+  local changed="$1" ok="$2" f
+  if printf '%s\n' "$changed" | grep -qx 'docs/design/RULES.md'; then
+    echo "express refused: this change edits docs/design/RULES.md; only the owner changes a rule. Use the normal landing (bash scripts/land.sh)."; return 0
+  fi
+  [[ "$ok" == 1 ]] && return 0
+  f="$(safety_surface_files "$changed" | grep -vE '^(scripts/|docs/design/RULES\.md$)' | head -n 1 || true)"
+  [[ -z "$f" ]] || echo "express refused: $f is a safety, auth or credential file; those need the owner's word in that turn (MAIPAI_RUSH_SAFETY_OK=1) or the normal landing, which runs the safety-surface tests."
+}
+
 
 static_check_reason() {
   local output="$1" last_line note
@@ -354,19 +448,47 @@ hold_entry() {
   echo "held: $branch: $reason"
 }
 
-# The oldest request that is not waiting out a network pause.
+# FAIR-LANE-01 (2026-11-12): which request runs next. Oldest first among requests not waiting out a pause, with two lanes:
+#   - an express request (queue file 0-<ms>-<branch>.json, only from land.sh --express, the owner's explicit flag) goes ahead of normal ones,
+#   - but at most MAIPAI_LAND_EXPRESS_MAX_RUN (2) express landings in a row while a normal one waits, and
+#   - a normal request that has waited MAIPAI_LAND_NORMAL_MAX_WAIT seconds (600) goes next regardless.
+# The choice is made only BETWEEN landing transactions: one entry's fetch, rebase, generate, check, ref move and push run to the end (or to a
+# clean bounce or an "unfinished" time cap) before the next entry is chosen, so nothing else moves the landed main or the rebased candidate
+# while it is being validated. An express entry therefore waits for the running transaction, a T2 one included. Requests for one branch
+# coalesce to the newest (land.sh replaces, run_once takes the newest).
+queue_ms() { local b="${1##*/}"; b="${b#0-}"; b="${b%%-*}"; [[ "$b" =~ ^[0-9]+$ ]] && echo "$b" || echo 0; }
+express_streak() { local n; n="$(cat "$data/express-streak" 2>/dev/null || echo 0)"; [[ "$n" =~ ^[0-9]+$ ]] && echo "$n" || echo 0; }
 next_request() {
-  local f now until
+  local f now until first_express="" first_normal="" waited
   now="$(date +%s)"
   while IFS= read -r f; do
     until="$(cat "$(defer_dir)/$(basename "$f").until" 2>/dev/null || echo 0)"
     [[ "$until" =~ ^[0-9]+$ ]] || until=0
-    if (( until <= now )); then printf '%s' "$f"; return 0; fi
+    (( until <= now )) || continue
+    if [[ "${f##*/}" == 0-* ]]; then [[ -n "$first_express" ]] || first_express="$f"
+    else [[ -n "$first_normal" ]] || first_normal="$f"; fi
   done < <(find "$data/queue" -maxdepth 1 -type f -name '*.json' -print | sort)
+  if [[ -n "$first_normal" ]]; then
+    waited=$(( now - $(queue_ms "$first_normal") / 1000 ))
+    if [[ -z "$first_express" ]] || (( waited >= ${MAIPAI_LAND_NORMAL_MAX_WAIT:-600} )) || (( $(express_streak) >= ${MAIPAI_LAND_EXPRESS_MAX_RUN:-2} )); then printf '%s' "$first_normal"; return 0; fi
+  fi
+  printf '%s' "$first_express"
 }
 
 # One line the status page reads: branch, when the entry started, when the phase last changed, the phase.
-phase() { printf '%s\t%s\t%s\t%s\n' "${current_branch:-}" "${entry_started:-0}" "$(date +%s)" "$1" >"$data/current-entry.tmp" && mv -f "$data/current-entry.tmp" "$data/current-entry"; }
+# Each phase change also closes the previous phase's clock (QUEUE-TIME-01): phase_times holds "<phase>\t<seconds>" lines for the record.
+phase() {
+  local now; now="$(date +%s)"
+  phase_close "$now"
+  phase_name="$1"; phase_t0="$now"
+  printf '%s\t%s\t%s\t%s\n' "${current_branch:-}" "${entry_started:-0}" "$now" "$1" >"$data/current-entry.tmp" && mv -f "$data/current-entry.tmp" "$data/current-entry"
+}
+phase_close() {
+  local now="${1:-$(date +%s)}"
+  if [[ -n "${phase_name:-}" ]]; then phase_times="${phase_times:+$phase_times
+}${phase_name}	$(( now - ${phase_t0:-$now} ))"; fi
+  phase_name=""
+}
 
 bounce() {
   local request="$1" branch="$2" sha="$3" reason="$4" started="$5" output="$6" main_sha seconds slug landing_note
@@ -378,10 +500,15 @@ PY
 )"
   main_sha="$(pipeline_main_sha "$checkout" 2>/dev/null || true)"; [[ -n "$main_sha" ]] || main_sha="$(git -C "$checkout" rev-parse HEAD 2>/dev/null || echo unknown)"
   seconds=$(( $(date +%s) - started )); slug="${branch//\//-}"
-  atomic_json_note "$branch" "$sha" bounced "$reason" "$main_sha" "$output" "$seconds" "$landing_note"
-  log_line "$data/landings.jsonl" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$branch" "$sha" "$main_sha" bounced "$seconds" "$reason"
+  phase_close; entry_label=""
+  # UNFINISHED-01 (2026-11-12): a step that hit its time cap did not fail and did not pass: the record says "unfinished", and nothing
+  # that reads it (land.sh, pipeline.sh wait, ship.sh) treats it as landed. It never switches the entry to another lane either.
+  local verdict=bounced
+  [[ -z "$(timeout_note "$output")" ]] || verdict=unfinished
+  atomic_json_note "$branch" "$sha" "$verdict" "$reason" "$main_sha" "$output" "$seconds" "$landing_note"
+  log_line "$data/landings.jsonl" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$branch" "$sha" "$main_sha" "$verdict" "$seconds" "$reason"
   rm -f "$request" "$(defer_dir)/$(basename "$request")".n "$(defer_dir)/$(basename "$request")".until "$(defer_dir)/$(basename "$request")".reason
-  echo "bounced: $branch at $sha: $reason"
+  echo "$verdict: $branch at $sha: $reason"
 }
 
 # OUTBOX-01 (2026-11-01): a landing is complete when the change is on the pipeline's own main (refs/pipeline/main, see gitnet.sh),
@@ -437,7 +564,15 @@ outbox_flush() {
   rm -f "$outbox_dir/diverged"
   outbox_mark_pending
   errfile="$(mktemp "$data/.outbox.XXXXXX")"
+  # BATCH-BACKUP-01: the commons tags and the Stack commit this main pins go to GitHub first, so GitHub's main never names a pin GitHub lacks.
+  if ! outbox_push_pins "$p" >"$errfile" 2>&1; then
+    reason="$(grep -v '^[[:space:]]*$' "$errfile" | tail -n 1 | cut -c1-200)"
+    cat "$errfile" >> "$data/lander.log" 2>/dev/null || true; rm -f "$errfile"
+    outbox_fail "${reason:-a pinned commit is not on GitHub}"
+    return 1
+  fi
   if GITNET_TRIES=2 GITNET_LABEL="push main (outbox)" gitnet -C "$checkout" push origin "$p:refs/heads/main" >"$errfile" 2>&1; then
+    date +%s >"$outbox_dir/last-push"
     cat "$errfile" >> "$data/lander.log" 2>/dev/null || true
     rm -f "$errfile" "$outbox_dir/tries" "$outbox_dir/next-try" "$outbox_dir/last-error"
     cur="$(git -C "$checkout" rev-parse --verify -q "$PIPELINE_MAIN_REF^{commit}" 2>/dev/null || true)"
@@ -451,14 +586,63 @@ outbox_flush() {
   reason="$(grep -v '^[[:space:]]*$' "$errfile" | tail -n 1 | cut -c1-200)"
   cat "$errfile" >> "$data/lander.log" 2>/dev/null || true
   rm -f "$errfile"
+  outbox_fail "${reason:-the push failed}"
+  return 1
+}
+
+# A failed push (or pin push) waits 30 s, then 60, 120 and so on up to 15 minutes before the next try.
+outbox_fail() {
+  local reason="$1" n delay
   n="$(cat "$outbox_dir/tries" 2>/dev/null || echo 0)"; [[ "$n" =~ ^[0-9]+$ ]] || n=0; n=$(( n + 1 ))
   delay=$(( ${MAIPAI_LAND_OUTBOX_BASE_SECONDS:-30} * (1 << (n > 6 ? 5 : n - 1)) ))
   (( delay <= ${MAIPAI_LAND_OUTBOX_MAX_SECONDS:-900} )) || delay="${MAIPAI_LAND_OUTBOX_MAX_SECONDS:-900}"
   printf '%s\n' "$n" >"$outbox_dir/tries"
   printf '%s\n' $(( $(date +%s) + delay )) >"$outbox_dir/next-try"
-  printf '%s\n' "${reason:-the push failed}" >"$outbox_dir/last-error"
-  outbox_log "push of ${p:0:7} failed (try $n, next in ${delay}s): ${reason:-the push failed}"
-  return 1
+  printf '%s\n' "$reason" >"$outbox_dir/last-error"
+  outbox_log "push of ${p:0:7} failed (try $n, next in ${delay}s): $reason"
+}
+
+# BATCH-BACKUP-01 (2026-11-12): what Home's main pins must exist on GitHub before that main does, or an install from GitHub fails.
+# Commons pins are tags (file:../../commons-tags/<workspace>-<tag>); the Stack pin is a commit (STACK_TAG in scripts/install.sh).
+# Each pin is checked once (ls-remote) and remembered in outbox/pins-ok; a missing commons tag that exists locally is pushed as that tag,
+# a Stack commit that no GitHub ref holds is pushed as the tag home-pin-<sha>. Never a branch, never forced. A sibling repo that is not
+# cloned here is skipped with a log line (nothing to push from). Any other failure keeps Home's push back and is retried like one.
+outbox_push_pins() {
+  local tip="$1" parent commons stack ok="$outbox_dir/pins-ok" line kind name tag sha
+  parent="$(cd "$main/.." && pwd -P)"
+  commons="${MAIPAI_COMMONS_REPO:-$parent/commons}"; stack="${MAIPAI_STACK_REPO:-$parent/stack}"
+  touch "$ok"
+  while IFS=$'\t' read -r kind name; do
+    [[ -n "$kind" && -n "$name" ]] || continue
+    grep -qxF "$kind $name" "$ok" 2>/dev/null && continue
+    case "$kind" in
+      commons)
+        tag="$name"
+        [[ -e "$commons/.git" ]] || { outbox_log "pin check skipped: no commons clone at $commons for tag $tag"; continue; }
+        if [[ -n "$(GITNET_TRIES=2 GITNET_TIMEOUT=30 GITNET_LABEL="ls-remote commons tag" gitnet -C "$commons" ls-remote origin "refs/tags/$tag")" ]]; then echo "$kind $name" >>"$ok"; continue; fi
+        git -C "$commons" rev-parse --verify -q "refs/tags/$tag" >/dev/null || { echo "pinned commons tag $tag is on neither GitHub nor this Mac; push it from commons, then the outbox retries"; return 1; }
+        GITNET_TRIES=2 GITNET_LABEL="push commons tag $tag" gitnet -C "$commons" push origin "refs/tags/$tag:refs/tags/$tag" || { echo "could not push the pinned commons tag $tag to GitHub"; return 1; }
+        outbox_log "pushed pinned commons tag $tag to GitHub"; echo "$kind $name" >>"$ok" ;;
+      stack)
+        sha="$name"
+        [[ -e "$stack/.git" ]] || { outbox_log "pin check skipped: no stack clone at $stack for ${sha:0:7}"; continue; }
+        GITNET_TRIES=2 GITNET_TIMEOUT=60 GITNET_LABEL="fetch stack" gitnet -C "$stack" fetch -q origin >/dev/null 2>&1 || { echo "could not fetch the Stack repo to check its pinned commit ${sha:0:7}"; return 1; }
+        if [[ -n "$(git -C "$stack" branch -r --contains "$sha" 2>/dev/null)" || -n "$(GITNET_TRIES=1 GITNET_TIMEOUT=30 gitnet -C "$stack" ls-remote origin "refs/tags/home-pin-$sha" 2>/dev/null)" ]]; then echo "$kind $name" >>"$ok"; continue; fi
+        git -C "$stack" cat-file -e "$sha^{commit}" 2>/dev/null || { echo "pinned Stack commit ${sha:0:7} is on neither GitHub nor this Mac; push it from the Stack repo, then the outbox retries"; return 1; }
+        GITNET_TRIES=2 GITNET_LABEL="push stack pin ${sha:0:7}" gitnet -C "$stack" push origin "$sha:refs/tags/home-pin-$sha" || { echo "could not push the pinned Stack commit ${sha:0:7} to GitHub"; return 1; }
+        outbox_log "pushed pinned Stack commit ${sha:0:7} to GitHub as tag home-pin-$sha"; echo "$kind $name" >>"$ok" ;;
+    esac
+  done < <(outbox_pins_of "$tip")
+  return 0
+}
+
+# Prints "commons<TAB><tag>" and "stack<TAB><sha>" for every pin in the commit's tree (nothing when the files are absent).
+outbox_pins_of() {
+  local tip="$1" f
+  for f in backend/package.json frontend/package.json; do
+    git -C "$checkout" show "$tip:$f" 2>/dev/null | sed -nE 's#.*"file:\.\./\.\./commons-tags/([a-z]+)-([^/"]+)/[^"]*".*#commons	\2#p'
+  done | sort -u
+  git -C "$checkout" show "$tip:scripts/install.sh" 2>/dev/null | sed -nE 's/^STACK_TAG="([0-9a-f]{40})".*/stack	\1/p' | head -n 1
 }
 
 # One flush at a time. The lock records the pid of the process that started it ($$ is the lander even inside the background subshell,
@@ -478,19 +662,45 @@ outbox_flush_locked() {
   return "$rc"
 }
 
-# After a landing: in the daemon the push runs in the background so the next entry starts at once; run-once pushes in the foreground.
+# After a landing. BATCH-BACKUP-01 (2026-11-12): the daemon does not push per landing; landed commits wait for the next batch (outbox_tick),
+# at most one push every MAIPAI_LAND_BACKUP_SECONDS (300), and none at all while nothing is pending. run-once (tests, by hand) still pushes
+# in the foreground. An express landing pushes synchronously (outbox_flush_sync) because ship.sh installs what GitHub has.
 outbox_kick() {
+  if [[ "${serving:-0}" == 1 ]]; then return 0; fi
   # Not forced: after a failed push the pause the outbox set still applies, so a landing never starts a push while GitHub is known to be down.
-  if [[ "${serving:-0}" == 1 ]]; then ( outbox_flush_locked >/dev/null 2>&1 ) & disown 2>/dev/null || true
-  else outbox_flush_locked || true; fi
+  outbox_flush_locked || true
+}
+
+# Due when something is pending, the backoff after a failure has passed, and the last push is at least one batch interval old.
+outbox_batch_due() {
+  local now next last interval="${MAIPAI_LAND_BACKUP_SECONDS:-300}"
+  [[ -s "$outbox_dir/pending-since" ]] || return 1
+  [[ "$interval" =~ ^[0-9]+$ ]] || interval=300
+  now="$(date +%s)"; next="$(cat "$outbox_dir/next-try" 2>/dev/null || echo 0)"; [[ "$next" =~ ^[0-9]+$ ]] || next=0
+  (( next <= now )) || return 1
+  last="$(cat "$outbox_dir/last-push" 2>/dev/null || echo 0)"; [[ "$last" =~ ^[0-9]+$ ]] || last=0
+  (( now - last >= interval ))
 }
 
 outbox_tick() {
-  local now next
-  [[ -s "$outbox_dir/pending-since" ]] || return 0
-  now="$(date +%s)"; next="$(cat "$outbox_dir/next-try" 2>/dev/null || echo 0)"; [[ "$next" =~ ^[0-9]+$ ]] || next=0
-  (( next <= now )) || return 0
+  outbox_batch_due || return 0
   ( outbox_flush_locked >/dev/null 2>&1 ) & disown 2>/dev/null || true
+}
+
+# Express: push now and wait for it. A background batch that holds the flush lock is waited out (bounded), then this push runs forced
+# (the pause after an earlier failure does not apply: someone is waiting on this one). Prints one line for the note.
+outbox_flush_sync() {
+  local lock="$outbox_dir/flush.lock" waited=0 holder p o
+  while [[ -d "$lock" ]] && (( waited < ${MAIPAI_LAND_EXPRESS_PUSH_WAIT:-120} )); do
+    holder="$(cat "$lock/pid" 2>/dev/null || true)"
+    [[ "$holder" =~ ^[0-9]+$ ]] && kill -0 "$holder" 2>/dev/null || break
+    sleep 1; waited=$(( waited + 1 ))
+  done
+  outbox_flush_locked force >/dev/null 2>&1 || true
+  p="$(git -C "$checkout" rev-parse --verify -q "$PIPELINE_MAIN_REF^{commit}" 2>/dev/null || true)"
+  o="$(git -C "$checkout" rev-parse --verify -q 'origin/main^{commit}' 2>/dev/null || true)"
+  if [[ -n "$o" && -n "${1:-}" ]] && git -C "$checkout" merge-base --is-ancestor "$1" "$o" 2>/dev/null; then echo "pushed (${o:0:7})"
+  else echo "NOT pushed yet: $(cat "$outbox_dir/last-error" 2>/dev/null || echo 'the push did not finish'); the outbox retries"; fi
 }
 
 # Landed commits that GitHub does not have, found again after a restart that lost the pending marker.
@@ -503,6 +713,7 @@ outbox_resume_check() {
 outbox_cmd() {
   case "${1:-status}" in
     flush) outbox_flush_locked force || true; echo "outbox: $(outbox_summary)" ;;
+    batch) if outbox_batch_due; then outbox_flush_locked || true; else echo "outbox: no batch due"; fi; echo "outbox: $(outbox_summary)" ;;
     status) echo "outbox: $(outbox_summary)" ;;
     reset-to-github)
       # Diverged only: park the landed-but-unpushed commits on a branch so nothing is lost, then follow GitHub's main.
@@ -518,7 +729,7 @@ outbox_cmd() {
       git -C "$checkout" update-ref "$PIPELINE_MAIN_REF" "$o"
       outbox_clear
       echo "outbox: the pipeline's main now follows GitHub main at ${o:0:7}" ;;
-    *) error "usage: bash scripts/lander.sh outbox [status|flush|reset-to-github]"; return 2 ;;
+    *) error "usage: bash scripts/lander.sh outbox [status|flush|batch|reset-to-github]"; return 2 ;;
   esac
 }
 
@@ -536,7 +747,7 @@ outbox_summary() {
 }
 
 run_one() {
-  local request="$1" base base_state ref_before local_branch branch sha started output origin_branch conflict reason check_cmd main_sha seconds attempt changed before_rebase after_rebase intersect landing_note last_line changed_files changed_file generated_commit backlog_sha item line found safety_files t2_started t2_seconds
+  local request="$1" safety_ok=0 boot_note="" gen_settings="" base base_state ref_before local_branch branch sha started output origin_branch conflict reason check_cmd main_sha seconds attempt changed before_rebase after_rebase intersect landing_note last_line changed_files changed_file generated_commit backlog_sha item line found safety_files t2_started t2_seconds
   local -a done_items=() generated_paths=("docs/api/" "frontend/src/dev/elements-adoption.json" "docs/dev/code-map.md")
   started="$(date +%s)"; output="$(mktemp "$data/.check.XXXXXX")"
   if ! python3 - "$request" >"$data/.request-values" <<'PY'
@@ -547,7 +758,8 @@ try:
     assert isinstance(v.get('session'), str)
     assert isinstance(v.get('done', []), list) and all(isinstance(x, str) for x in v.get('done', []))
     assert isinstance(v.get('note', ''), str) and '\n' not in v.get('note', '') and '\r' not in v.get('note', '')
-    print(v['branch']); print(v['sha']); print(v.get('note', ''))
+    print(v['branch']); print(v['sha']); print(v.get('note', '')); print(v['requested_at'])
+    print('1' if v.get('express') is True else '0'); print('1' if v.get('safety_ok') is True else '0')
     for item in v.get('done', []): print(item)
 except Exception:
     sys.exit(1)
@@ -561,8 +773,10 @@ PY
     return 0
   fi
   branch="$(sed -n '1p' "$data/.request-values")"; sha="$(sed -n '2p' "$data/.request-values")"; landing_note="$(sed -n '3p' "$data/.request-values")"
-  current_branch="$branch"; entry_started="$started"
-  while IFS= read -r item; do done_items+=("$item"); done < <(tail -n +4 "$data/.request-values"); rm -f "$data/.request-values"
+  entry_requested_at="$(sed -n '4p' "$data/.request-values")"; entry_express="$(sed -n '5p' "$data/.request-values")"; safety_ok="$(sed -n '6p' "$data/.request-values")"
+  current_branch="$branch"; entry_started="$started"; phase_times=""; phase_name=""; entry_label=""; entry_github=""; entry_generated=""; entry_check_reused=""
+  while IFS= read -r item; do done_items+=("$item"); done < <(tail -n +7 "$data/.request-values"); rm -f "$data/.request-values"
+  if [[ "$entry_express" == 1 ]]; then printf '%s\t%s\n' "$branch" "$started" >"$data/current-express"; else rm -f "$data/current-express"; fi
   if [[ ! "$branch" == wt/* || ! "$sha" =~ ^[0-9a-fA-F]{40,64}$ ]]; then
     mkdir -p "$data/queue/bad"; mv "$request" "$data/queue/bad/$(basename "$request")"
     echo "$(date -u +%Y-%m-%dT%H:%M:%SZ) malformed request $(basename "$request") moved to queue/bad; repair or remove it" >> "$data/lander.log"
@@ -574,6 +788,10 @@ PY
   # goes on from the pipeline's own main and the outbox catches GitHub up later.
   if ! GITNET_LABEL="fetch origin" gitnet -C "$checkout" fetch origin; then echo "$(date -u +%Y-%m-%dT%H:%M:%SZ) GitHub did not answer the fetch; landing on the pipeline's own main" >> "$data/lander.log"; fi
   base_state="$(pipeline_main_state "$checkout")"
+  if [[ "$base_state" == diverged && "$entry_express" == 1 ]]; then
+    # SINGLE-WRITER-01: an express landing is waited on, so it is refused at once (never pushed over GitHub), with the repair.
+    bounce "$request" "$branch" "$sha" "GitHub main has commits the landed main does not contain; nothing was pushed. Repair: bash scripts/pipeline.sh outbox reset-to-github (it parks the landed-but-unpushed commits on a wt/outbox-parked-* branch), then land again" "$started" "$output"; rm -f "$output"; return 0
+  fi
   if [[ "$base_state" == diverged ]]; then
     hold_entry "$request" "$branch" "GitHub main has commits the landed main does not contain (STUCK); an owner must run bash scripts/pipeline.sh outbox reset-to-github"; rm -f "$output"; return 0
   fi
@@ -582,6 +800,7 @@ PY
   if [[ -z "$base" ]]; then bounce "$request" "$branch" "$sha" "the lander has no main to land on; run bash scripts/pipeline.sh checkout and land.sh again" "$started" "$output"; rm -f "$output"; return 0; fi
   if git -C "$checkout" merge-base --is-ancestor "$sha" "$base"; then
     main_sha="$base"
+    phase_close; entry_label="already on main"
     seconds=$(( $(date +%s) - started ))
     atomic_json_note "$branch" "$sha" landed "already on main" "$main_sha" "$output" "$seconds" "$landing_note"
     log_line "$data/landings.jsonl" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$branch" "$sha" "$main_sha" landed "$seconds" "already on main"
@@ -605,6 +824,10 @@ PY
     git -C "$checkout" rebase --abort || true
     reason="rebase conflict in: ${conflict:-unknown files}; rebase onto origin/main in your worktree (fetch first), then land.sh again"
     bounce "$request" "$branch" "$sha" "$reason" "$started" "$output"; rm -f "$output"; return 0
+  fi
+  if [[ "$entry_express" == 1 ]]; then
+    reason="$(express_refusal "$(git -C "$checkout" diff --name-only "$base"...HEAD 2>/dev/null || true)" "$safety_ok")"
+    if [[ -n "$reason" ]]; then bounce "$request" "$branch" "$sha" "$reason" "$started" "$output"; rm -f "$output"; return 0; fi
   fi
   # INSTALL-STAMP-01 (2026-11-02): install when node_modules was not installed from the package.json and bun.lock now in the tree (a stamp inside
   # node_modules, lib/deps.sh), never by diffing HEAD history: a bounced landing leaves HEAD on the failed branch, so the retry's diff was empty and
@@ -644,8 +867,11 @@ PY
       bounce "$request" "$branch" "$sha" "generated files failed: ${last_line:-generator exited nonzero}" "$started" "$output"; rm -f "$output"; return 0
     fi
   fi
-  rm -rf "$gen_scratch"
+  # The static check reuses this run's settings registry instead of generating it again (DUP-CHECK-01); the scratch goes after the check.
+  [[ ! -f "$gen_scratch/spec/settings/keys.json" ]] || gen_settings="$gen_scratch/spec/settings/keys.json"
+  phase "committing generated files"
   changed_files="$(git -C "$checkout" status --porcelain --untracked-files=all -- "${generated_paths[@]}" | sed -E 's/^...//')"
+  entry_generated="$(printf '%s' "$changed_files" | paste -sd ',' -)"
   if [[ -n "$changed_files" ]]; then
     while IFS= read -r changed_file; do
       [[ -z "$changed_file" ]] || git -C "$checkout" add -- "$changed_file" || { bounce "$request" "$branch" "$sha" "generated files failed: could not stage generated files" "$started" "$output"; rm -f "$output"; return 0; }
@@ -678,10 +904,22 @@ PY
   fi
   check_cmd="${MAIPAI_LAND_CHECK_CMD:-}"
   phase "static check"
-  run_static_check "$output" || { bounce "$request" "$branch" "$sha" "$(static_check_reason "$output")" "$started" "$output"; rm -f "$output"; return 0; }
+  if static_check_cached "$base"; then entry_check_reused="$(cat "$(static_check_key_file "$base")" 2>/dev/null || echo cached)"; echo "static check: reused, this exact tree passed against this exact base" >"$output"
+  elif ! LAND_DIFF_BASE="$base" LAND_GEN_SETTINGS="$gen_settings" run_static_check "$output"; then rm -rf "$gen_scratch"; bounce "$request" "$branch" "$sha" "$(static_check_reason "$output")" "$started" "$output"; rm -f "$output"; return 0; fi
+  rm -rf "$gen_scratch"
+  [[ -n "$entry_check_reused" ]] || static_check_remember "$base"
 
   changed_files="$(git -C "$checkout" diff --name-only "$base"...HEAD 2>/dev/null || true)"
   safety_files="$(safety_surface_files "$changed_files")"
+  if [[ "$entry_express" == 1 ]]; then
+    # The express lane runs no test suite (SINGLE-WRITER-01): typecheck of the changed workspaces on top of main, then the boot check.
+    safety_files=""
+    phase "boot check"
+    if ! run_boot_check "$output"; then bounce "$request" "$branch" "$sha" "boot check failed$(timeout_note "$output" | sed 's/^/ (/; s/$/)/'): the rebased commit does not start; nothing was pushed" "$started" "$output"; rm -f "$output"; return 0; fi
+    boot_note="$(tail -n 1 "$output" 2>/dev/null || true)"
+    entry_label="starts and typechecks on top of main (express: no tests run)"
+    [[ "$boot_note" != "boot check: none in this tree" ]] || entry_label="typechecks on top of main (express: no boot check in this tree, no tests run)"
+  fi
   if [[ -n "$safety_files" ]]; then
     t2_started="$(date +%s)"
     phase "safety-surface tests"
@@ -691,7 +929,9 @@ PY
     fi
     t2_seconds=$(( $(date +%s) - t2_started ))
     landing_note="${landing_note:+$landing_note; }tier: T2; safety-surface tests took ${t2_seconds}s"
+    entry_label="static check and safety-surface tests on top of main"
   fi
+  [[ -n "$entry_label" ]] || entry_label="static check on top of main"
 
   # OUTBOX-01: land on the pipeline's own main. Only the lander moves this ref and the rebase above started from it, so the move is a
   # plain fast-forward; GitHub gets it from the outbox right after (in the foreground for run-once, in the background in the daemon).
@@ -703,17 +943,24 @@ PY
   # Compare-and-swap: the ref still holds what this entry started from, or the move is not made (a background flush may have moved it forward).
   if ! git -C "$checkout" update-ref "$PIPELINE_MAIN_REF" "$main_sha" "${ref_before:-0000000000000000000000000000000000000000}" 2>/dev/null; then
     echo "$(date -u +%Y-%m-%dT%H:%M:%SZ) landed main moved while $branch was being checked; the entry stays queued and starts again" >> "$data/lander.log"
+    echo "requeued: $branch (the landed main moved while it was checked)"
     rm -f "$output"; return 0
   fi
   outbox_mark_pending
   printf '%s\n' "$branch" >>"$outbox_dir/delete-branches"
+  # The boot check ran on exactly this commit: ship.sh accepts it instead of booting it again.
+  if [[ "$entry_express" == 1 && "$boot_note" != "boot check: none in this tree" ]]; then mkdir -p "$data/boot-ok"; : >"$data/boot-ok/$main_sha"; fi
+  if [[ "$entry_express" == 1 ]]; then
+    phase "pushing to GitHub"
+    entry_github="$(outbox_flush_sync "$main_sha")"
+  fi
+  phase_close
   seconds=$(( $(date +%s) - started ))
   atomic_json_note "$branch" "$sha" landed "landed" "$main_sha" "$output" "$seconds" "$landing_note"
   log_line "$data/landings.jsonl" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$branch" "$sha" "$main_sha" landed "$seconds" "landed"
   rm -f "$request" "$output"
-  echo "landed: $branch at $sha"
-  phase "pushing to GitHub"
-  outbox_kick
+  echo "landed: $branch at $sha${entry_github:+ (GitHub main: $entry_github)}"
+  [[ "$entry_express" == 1 ]] || outbox_kick
   bounded_run "${MAIPAI_LAND_MAP_SECONDS:-120}" "worktree map" bash "$main/scripts/worktree-map.sh" build >>"$data/lander.log" 2>&1 || true
   update_main_checkout
   sweep_worktrees
@@ -760,7 +1007,11 @@ PY
     if [[ "$newer_branch" == "$oldest_branch" ]]; then rm -f "$newer" "$(defer_dir)/$(basename "$newer")".n "$(defer_dir)/$(basename "$newer")".until "$(defer_dir)/$(basename "$newer")".reason; fi
   done
   run_one "$request"
-  rm -f "$data/current-entry"
+  rm -f "$data/current-entry" "$data/current-express"
+  # Count express landings in a row (a normal entry that finished resets it; one that was requeued counts for nothing).
+  if [[ ! -f "$request" ]]; then
+    if [[ "${request##*/}" == 0-* ]]; then echo $(( $(express_streak) + 1 )) >"$data/express-streak"; else echo 0 >"$data/express-streak"; fi
+  fi
   [[ -f "$request" ]] || rm -f "$(defer_dir)/$(basename "$request")".n "$(defer_dir)/$(basename "$request")".until "$(defer_dir)/$(basename "$request")".reason
   ring_waiters || true
 }
@@ -812,6 +1063,8 @@ serve() {
     sleep_pid=""
     if (( stop_requested )); then break; fi
   done
+  # A graceful stop sends what is pending now instead of leaving it for the next batch (still never forced, still after any backoff).
+  if [[ -s "$outbox_dir/pending-since" ]]; then serving=0; outbox_flush_locked >/dev/null 2>&1 || true; fi
   rm -f "$pidfile"
   trap - EXIT
   exit 0
