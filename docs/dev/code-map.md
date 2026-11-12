@@ -516,6 +516,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/faceModelPins.ts` | SFACE_MODEL_ID, SFACE_SHA256, SFACE_DIM |
 | `backend/src/lib/factoryReset.ts` | FACTORY_RESET_CONFIRMATION_PHRASE, stageFactoryReset, pendingFactoryReset, cancelPendingFactoryReset, applyPendingFactoryReset |
 | `backend/src/lib/failureCopy.ts` | formatMessage, VOICE_FAILURE_COPY, voiceFailureMessage, voiceFailureLine, SPATIAL_FAILURE_COPY, isSpatialFailureCode |
+| `backend/src/lib/familyActivity.ts` | familyActivityPath, trackFamilyTurn, __resetFamilyActivityForTests |
 | `backend/src/lib/favicons.ts` | faviconsDir, pngFromIco, iconImageBytes, isUsableIcon, iconLinksOf, __setFaviconDnsLookupForTests |
 | `backend/src/lib/fileBlobs.ts` | digestOfFile, reclaimQueuedBlobs, reclaimQueuedBlobsInBackground |
 | `backend/src/lib/fileContent.ts` | FILE_REFERENCE_KINDS, contentFor, ensureContent, expectedReferences, syncFileReferences, syncAllFileReferences |
