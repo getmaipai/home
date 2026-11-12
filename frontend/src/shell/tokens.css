@@ -262,7 +262,18 @@ html.dark body {
 }
 /* Other pages sit on --page, so their title bar is a touch apart from it. */
 [data-slot="rail-page-header"] {
-  background: color-mix(in oklab, var(--page), var(--foreground) 2.5%);
+  background: var(--page);
+}
+/* One chrome tone: the rail and the second column share --shell-history, and
+ * the title bar shares the page, so nothing reads as a fourth grey. */
+body {
+  --shell-rail: var(--shell-history);
+  --app-rail-bg: var(--shell-history);
+  --settings-column: var(--shell-history);
+}
+html.dark body,
+html:not(.light) body {
+  --shell-rail: var(--shell-history);
 }
 
 /* COLUMN-01/02: the shipped compact ThreadListSidebar owns rows, search,
