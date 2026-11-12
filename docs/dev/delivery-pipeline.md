@@ -50,7 +50,8 @@ Where it ended up (measured on the Studio):
                                              rebase on main
                                              generate files, mark backlog items
                                              static check (T2: also tests)
-                                             push main  -------------------> origin/main
+                                             move the landed main (refs/pipeline/main)
+                                             backup batch (every 5 min) ---> origin/main
                                              delete branch, write note
                                                                 |
                                          WATCHER (warm checkout ../home-watcher)
@@ -80,7 +81,11 @@ Where it ended up (measured on the Studio):
 | `scripts/gate/shardTests.ts` | The test sharder: splits a workspace's test files across worker processes by measured seconds. |
 | `scripts/gate/test-timings.json`, `flakes.json` | Measured seconds per test file; the lists of serial and bench-only files. |
 | `scripts/runTemp.ts` | Per-process temp roots, with a sweep of leftovers from killed runs. |
-| `scripts/wt.sh` (and the org `standards/bin/wt.sh`) | Worktree start, run (Codex), done; `land` hands off to `land.sh`. |
+| `scripts/wt.sh` (and the org `standards/bin/wt.sh`) | Worktree start, run (Codex), done; `land` always runs `land.sh` (section 22). |
+| `scripts/rush-ship.sh`, `scripts/ship-now.sh` | The owner's fast path: `land.sh --express`, then `ship.sh` of the exact landed commit (section 22). |
+| `scripts/nightly-stable.sh` | Moves `stable`, the last version to pass the required checks (section 22). Schedule off by default. |
+| `scripts/hooks/guard-shared.sh` | PreToolUse guardrail against a session's push to main and its restarts of shared services (section 22). |
+| `scripts/landingHarness.ts`, `scripts/measure-commit-hooks.sh` | Acceptance harness on scratch repositories; per-step timing of git and commit hooks. |
 
 ## 4a. Where state lives
 
@@ -127,7 +132,7 @@ All under `<main checkout>/data-scratch/` (git-ignored), unless noted.
 5. For each `--done ITEM-ID`, flip the open `- [ ] **ITEM:` line in `docs/BACKLOG.md` to done with the date and sha, committed by the lander. An unknown id bounces.
 6. Static check: `scripts/check.sh --pre` (typecheck of backend, scripts and frontend, UI rules, secrets scan, PII wordlist, drift checks) plus eslint. A bounce names the failed stage, for example `static check failed at pre: frontend typecheck`.
 7. **Safety surface (T2):** if the branch touches a path in `WT_T2_GLOBS` (read from `scripts/wt.sh`; since AUDIT-GATE-01, 2026-11-06, it names real files: `docs/design/RULES.md`, the gate and delivery scripts (`check.sh`, `wt.sh`, `lander.sh`, `watcher.sh`, `ship.sh`), the sign-in, session, TOTP, passkey, API key, secret, credential, adult lock and Quick Connect files, consent, child, safety and age-band files, the turn safety node and tool gates, and `backend/src/db/migrations/*`; before that it listed directories that do not exist, so no auth change ran the full gate), also run the backend and frontend suites through the sharder; glob matching disables shell pathname expansion so newly added migration files match. If the T2 list cannot be read, the lander logs a warning and treats every changed file as T2. A failure bounces with the failing files. Other AUDIT-GATE-01 fixes: the install stamp hashes the workspace root `package.json` and `bun.lock` (the only lockfile); the watcher refuses to mark a sha green when it could not check it out and logs that once per sha; `pin.sh` runs its digest under `pipefail` and refuses the empty-file SHA-256; a stale ship lock is taken over atomically by rename, and a lock with no usable pid older than 120 s counts as stale.
-8. Push `main` (fast-forward, up to three rebase retries; a re-check only if main's change overlaps the branch's files). Delete the remote branch. Write the note and a `landings.jsonl` line.
+8. Move the landed main (`refs/pipeline/main`, compare-and-swap) and write the note and a `landings.jsonl` line. GitHub gets it from the next backup batch (section 22); an express landing pushes before it answers.
 9. Fast-forward the main checkout to `origin/main` when it is clean, unlocked and on `main`, so scripts there stay current. The hook that blocks sessions from changing that checkout does not apply to the daemon.
 
 No gate stamp is needed for a T1 commit when the repo has `scripts/land.sh`: the commit hook in the maipai plugin (0.11.x) lets it through. T2 commits still need their stamp and review.
@@ -323,3 +328,36 @@ Each fix landed as its own commit:
 ## When a picture, video, song or download fails on the live hub
 
 Run `bash scripts/why-failed.sh` on the computer that runs the Stack. It lists the Stack's failed jobs from the last day with their plain reason, then the last worker failures from `stack.log` (`image.worker_failed`: the exception type, the frames where it happened and, for a missing module or file, the name). The Stack never logs a prompt, so these lines are safe to paste into a report. The Stack forgets its job list when it restarts, so run it before shipping.
+
+## 22. One writer, the express lane, batched backup and `stable` (SINGLE-WRITER-01, 2026-11-12)
+
+**Why.** On 2026-11-11 and 11-12 the lander was STUCK twice because `rush-ship.sh` pushed straight to GitHub's main while the lander's own main held a landed commit GitHub did not have: two writers to one branch. Five branches were held until someone ran `outbox reset-to-github`. Separately, `wt.sh land` was a second writer too: the shared script hands off to `land.sh` only when that file is executable, and in this repo it is mode 644, so it fell through to its own `git push origin HEAD:main`.
+
+Saving, editing and session previews never wait for integration, backup or release checks.
+
+**One writer.** The lander is the only process that moves main: `refs/pipeline/main` here, and `refs/heads/main` on GitHub through its outbox. Nothing else in this repo pushes main: `rush-ship.sh` and `ship-now.sh` call `land.sh --express`, and the `wt.sh` wrapper sends `land` to `land.sh` itself. When GitHub's main has commits the landed main lacks, an express entry is refused before any push with the repair (`bash scripts/pipeline.sh outbox reset-to-github`, which parks the landed-but-unpushed commits on a `wt/outbox-parked-*` branch), and a normal entry is held as before. Nothing is ever force-pushed.
+
+**The express lane** (`bash scripts/land.sh --express`, only on the owner's explicit word; a timeout never selects it). The request is queued as `0-<ms>-<branch>.json`. Fairness, chosen only between landing transactions (one entry's fetch, rebase, generate, check, ref move and push run to their end, a clean bounce or an "unfinished" cap before the next entry is chosen, so nothing else changes the landed main or the rebased candidate while it is validated):
+
+- an express entry goes ahead of queued normal entries,
+- at most two express entries in a row while a normal entry waits (`MAIPAI_LAND_EXPRESS_MAX_RUN`, 2),
+- a normal entry that has waited 10 minutes goes next regardless (`MAIPAI_LAND_NORMAL_MAX_WAIT`, 600 s),
+- requests for one branch coalesce to the newest.
+
+So an express entry waits for the current lander operation (a running safety-surface test phase included) and delays other queued work. What it runs: rebase onto the landed main, the generators, the static check scoped to the changed workspaces (typechecks, UI rules, i18n, secrets, PII), the boot check of the exact rebased commit (`scripts/boot-check.sh`, `MAIPAI_LAND_BOOT_SECONDS` 180), no test suite. RULES.md is refused; a safety, auth or credential file is refused unless `MAIPAI_RUSH_SAFETY_OK=1` (the owner's word in that turn). Then the ref moves and the outbox pushes before `land.sh` answers; it prints `landed-sha: <sha>`, and `rush-ship.sh` ships exactly that commit. `land/boot-ok/<sha>` tells `ship.sh` the commit was already boot-checked. The note and `pipeline.sh status` label it "starts and typechecks on top of main (express: no tests run)", never "tested". Status shows `express queued behind <branch> (N s)` while a transaction runs and `express: <branch> landing, normal queue paused N s` while it lands.
+
+**Results.** `landed`, `bounced`, or `unfinished`: a step that hit its time cap (`bounded_step` exit 124) is unfinished, never a pass, and the landed main does not move. `land.sh` exits 1 for both. Labels for a landing: "static check on top of main", "static check and safety-surface tests on top of main", or the express label above.
+
+**Queue time and run time.** `landings.jsonl` and each note carry `requested_at`, `started_at`, `finished_at`, `queue_seconds`, `run_seconds`, `phases` (seconds per step: fetching origin, rebasing, installing dependencies, generating files, committing generated files, static check, safety-surface tests, boot check, landing on main, pushing to GitHub), `generated_files` (what the generators rewrote) and `express`. `pipeline.sh status` prints `waited Ns, ran Ns` per landing.
+
+**Where the lander's time goes** (measured 2026-11-12 on the Studio, 11-05 median landing 28 s): git itself is under a second (commit 0.05 s, rebase 0.07 s, fetch 0.2 s, pre-push hook 0.04 s, dry-run push 0.6 s); the generators about 3 s (settings 1.3, API docs 1.5, adoption and code map 0.1 each); `check.sh --pre` about 18 s warm (secrets scan 4, i18n 4, typechecks 3 warm to 23 cold, schema chain 2, settings and API docs 1 each, UI rules 1, PII 1); eslint 0.7 s warm, 7 s cold. Removed duplicates (DUP-CHECK-01): the check no longer regenerates the settings registry, API docs and adoption file the landing just generated (`MAIPAI_PRE_GENERATED`, `MAIPAI_PRE_SETTINGS_FILE`), no longer runs its own fetch, and is scoped against the landed main it was rebased on (`MAIPAI_GATE_DIFF_BASE`), so a lagging GitHub main never widens it. A passing static check is remembered by (tree, base tree) in `land/check-ok/` and reused when the same pair comes back (CHECK-REUSE-01). `bash scripts/measure-commit-hooks.sh <worktree>` times each commit hook and git step on its own.
+
+**Batched backup** (BATCH-BACKUP-01). The daemon no longer pushes after each landing. Every loop it pushes only when something is pending and the last push is at least `MAIPAI_LAND_BACKUP_SECONDS` (300) old, and then only the newest tip, fast-forward, one push per batch; nothing when there is nothing new. A graceful stop pushes what is pending. Before Home's main, the pins it names go first: a commons tag only this Mac has is pushed as that tag, a Stack commit no GitHub ref holds is pushed as the tag `home-pin-<sha>`; a pin that exists nowhere holds Home's push back with the reason (`outbox/last-error`). Checked pins are remembered in `outbox/pins-ok`. Express pushes at once. Nothing in the preview path touches the network or git.
+
+**New sessions** start from the landed main: the `wt.sh start` wrapper moves a fresh worktree forward to `refs/pipeline/main` when GitHub's main lags (section 21), which with batching is the normal case for up to five minutes.
+
+**`stable`** (STABLE-01): the last version to pass the required checks, not "known-good". `bash scripts/nightly-stable.sh run` (or `pipeline.sh nightly run`) picks one commit at its start, the newest integrated one, tests it with the full suite in `../home-watcher` under the watcher's checkout lock (`watch/checkout.lock.d`; the watcher skips a tick while the nightly holds it) and a wall clock (`MAIPAI_NIGHTLY_SECONDS` 5400), and only on a full pass fast-forwards the local `stable` ref and GitHub's `stable` branch (never forced). A failure or an unfinished run leaves `stable` and writes `data-scratch/nightly/<date>/report.md`, `latest.md`, `latest.json`. Commits between the last tested one and the chosen one are recorded in `nightly/untested.jsonl` as "untested (superseded)". New work lands during the run. The schedule is off: `pipeline.sh nightly install-service` writes `com.maipai.nightly.plist` (04:00) without loading it; `--load` needs the owner's word; `nightly off` is the kill switch. Gated promotion later ships `stable`, or an explicit owner override recorded with its own status, never as a pass.
+
+**Guardrail, not a security boundary.** Every session runs as the owner's user, so a session that wants to can still restart the engine or push. The repo's `.claude/settings.json` adds deny rules and the PreToolUse hook `scripts/hooks/guard-shared.sh` against a session's `git push ... main`, `launchctl bootout|bootstrap|kickstart|kill|load|unload|stop|remove`, `pipeline.sh stack on|off`, and `maipai-promote` or `maipai-install` called directly (`ship.sh` stays the sanctioned path). `MAIPAI_ALLOW_SHARED_SERVICE=1` in a command is the owner-approved exception. Real ownership (a separate daemon user, a sudoers line for the ship daemon only) needs the owner's sudo and is not built.
+
+**Proof.** `scripts/landerExpress.test.ts` (express lands, pushes and labels; a rush over an unpushed landed commit; GitHub ahead; a concurrent move requeues; RULES.md and safety refusals; express never starts while a transaction holds the tree; at most two in a row and the ten-minute rule; unfinished; check reuse; no push with nothing new; pins first; `wt.sh land` never reaches the shared push), `scripts/nightlyStable.test.ts`, `scripts/guardShared.test.ts`, and the bench-lane `scripts/landingHarness.test.ts`.
