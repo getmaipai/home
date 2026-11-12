@@ -254,13 +254,14 @@ only after the A/B bar.
 
 ## 6. Proposed rule edits for the owner
 
-Not applied; the owner approves or rejects each.
+Owner's ruling (2026-11-12, Jesse in the wizard: "Yes, add both lines"): edits 1 and 2 are applied to `RULES.md` as worded
+below; edit 3 is not needed; edit 4 is not added.
 
 1. **Rule 9, named gaps:** after "the prose tool-call fallback," add: "the talker-first opener (an identified adult's spoken turn
    on their own chat or phone surface may open with one short content-free sentence the resident small model writes; it passes
    the same output gate, is stored as released text, and the main model continues it by the engine's own assistant prefill
    with its tools still offered; owner-approved 2026-11-12, TALKER-FIRST-01),".
-2. **Rule 0:** after "nothing here changes how a spoken turn is shaped." add: "The one exception is the talker-first opener of
+2. **Rule 0:** after "Where a rule below would do either, this rule wins." add: "The one exception is the talker-first opener of
    rule 9, for an identified adult only; it never reaches a child, a teen, an unknown speaker, a robot or a shared surface."
 3. **Rule 1: no edit needed.** Talker suppression rides `cueSuppressed`, which is spoken-cue suppression, and the 4B gets no
    signal input (section 1a). If a later change feeds the signal's act to the 4B, add "and the talker-first opener's act" to
@@ -288,7 +289,8 @@ NEEDS-RULE-CHANGE (maipai:architect, record `data-scratch/architect/TALKER-FIRST
 0) are required before slice 6 (release). Rule 1 needs no edit once the 4B gets no signal input (done in section 1a); edit 4
 is optional. Rules 2, 4, 6a, 8, 12, 14 and S6 fit; not a duplicate. Slices 0 to 5 release and store nothing and fit the
 existing spoken-cue gap; to start them before the owner rules they need their own item and verdict. Conditions 8 to 10 and
-the section 1b reading are the architect's.
+the section 1b reading are the architect's. After the owner applied edits 1 and 2 the same day, the note was ruled again
+against the edited `RULES.md` (result in the same record).
 
 ## What I am not sure about
 

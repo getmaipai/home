@@ -23,7 +23,7 @@ it cites.
 **0. Age and surface gates outrank every rule below.** Nothing here
 loosens a protection for a child or teen, and nothing here changes how
 a spoken turn is shaped. Where a rule below would do either, this rule
-wins. A child's or teen's search is protected by what it may fetch and show, not by refusing to search. The
+wins. The one exception is the talker-first opener of rule 9, for an identified adult only; it never reaches a child, a teen, an unknown speaker, a robot or a shared surface. A child's or teen's search is protected by what it may fetch and show, not by refusing to search. The
 SafeSearch level, the sources a kid or teen gets and the cleaning of fetched page text are user defaults (owner's
 ruling, 2026-10-12): an admin may override them in either direction, globally (global defaults) or for one person (a
 user override), and the kid or teen never can. Precedence is user overrides > global defaults > user defaults. Except web
@@ -197,7 +197,7 @@ companion. Owner-approved: 2026-10-21 (chat).
    text is not stored as if heard (owner's rule, 2026-10-14). Custom code in the chat path needs a named gap in
    this record first. Named gaps today: sentence-gated speech scheduling
    with the spoken cue, the `[n]` citation mapper, the output gate, the
-   prose tool-call fallback, the held resume session (speculative start, STT-SMARTTURN-01: a turn begun privately on the edge partial transcript is held and confirmed only on an exact trimmed match with the final words, a discarded one stores nothing and runs no tool, and it never runs for a minor, a robot, an unconfirmed speaker, crisis, consent or repair turns; counts-only logs; off behind a setting if its exit numbers fail; owner-approved 2026-11-11), the chat header (the companion's character
+   prose tool-call fallback, the held resume session (speculative start, STT-SMARTTURN-01: a turn begun privately on the edge partial transcript is held and confirmed only on an exact trimmed match with the final words, a discarded one stores nothing and runs no tool, and it never runs for a minor, a robot, an unconfirmed speaker, crisis, consent or repair turns; counts-only logs; off behind a setting if its exit numbers fail; owner-approved 2026-11-11), the talker-first opener (an identified adult's spoken turn on their own chat or phone surface may open with one short content-free sentence the resident small model writes; it passes the same output gate, is stored as released text, and the main model continues it by the engine's own assistant prefill with its tools still offered; owner-approved 2026-11-12, TALKER-FIRST-01), the chat header (the companion's character
    over a name pill with a menu button and a call button, drawn by the
    kit `ChatHeader` Element because assistant-ui has none; owner-approved
    2026-10-25, COMPANIONS-DOTS-01 / DOTS-CHAT-01).
