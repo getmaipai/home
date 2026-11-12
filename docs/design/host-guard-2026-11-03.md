@@ -101,6 +101,47 @@ commons `spec/settings/keys.json` with their spec copy fields (S5, `docs/SETTING
   (`memory-ceiling`, `maintenance-restart`). This is where the design departs from R1 (section 3).
 - **SPLASH-DISK-01** (open) already asks why Splash's footprint stayed 77 to 91 GB idle. HOST-GUARD-04 and -05 take the footprint half; disk writes stay in that row.
 
+### 2.5 Memory probe and bounded self-repair (revision 3, 2026-11-12; HOST-GUARD-07, -08, -09)
+
+What happened: on 2026-11-12 `fseventsd` (the macOS file-event daemon) reached 66 GB, 63 GB of it compressed or swapped, with a 3.4 GB
+resident size. Its `vmmap` shows the growth in Malloc Small: about 128 KB leaked per "Resolve user group list" call (libsystem_info),
+about 100 calls a second while the lander's safety tests ran. Kernel pressure stayed at level 2 for hours. Every guard that reads
+resident size missed it, the sharder paused with no deadline until the lander killed it, and the Stack moved chat to the small model.
+A leak is only freed by restarting the daemon, which needs root, so the guard does it, within fixed bounds.
+
+- **Probe (every pass, after the reboot decision, bounded):** kernel pressure level, free percent, swap used and total, compressor
+  size, the five biggest processes by footprint with compressed size (`top -stats pid,command,mem,cmprs`), the daemon's footprint and
+  its growth in MB a minute (same pid), and, as a diagnostic only, "Resolve user group list" lines a minute and the MB they leak
+  (x 0.125). Written to `memory.json` (0644) with a one-line admin summary, and one row a pass to `memory.csv` (also landings and
+  ships in the last hour when `config.json` names a `dev_data` folder; only timestamps are read).
+- **Allowlist (code only):** `capture-fseventsd`, `restart-fseventsd`, `dev-shed`. Each has a trigger, a hold time, a cooldown and a
+  daily cap. Repair mode (`repair.json`, root-owned, default `live`) can be `dry` (log only) or `off`; the kill switch file
+  `<data_dir>/host-guard/OFF` turns every action off. Decisions go to `repair-audit.log` (counts and reasons).
+- **Triggers:** restart when the daemon's footprint is at or above 16 GB (`fsevents_compressed_gb`), or when it grows 20 MB a minute or
+  more for 5 minutes and is above 2 GB; at most once per 6 hours and twice a day; never during a ship or install. `dev-shed` when the
+  kernel pressure level is 2 or more for 20 minutes; refreshed while it lasts, cleared after 5 calm minutes.
+- **Evidence first:** `capture-fseventsd` runs when the daemon first crosses a trigger (once per 6 hours, 3 a day): `vmmap -summary`,
+  the full `vmmap`, 6 hours of the daemon's log, 2 hours of `mds` and the FSEvents subsystem, `footprint`, `top`, a 15 s `fs_usage`
+  sample reduced at once to counts per process and per path bucket (a worktree folder name, node_modules, .git or a broad area), open
+  files per process, the `/dev/fsevents` clients, swap and `vm_stat`, `launchctl print`, and landing and ship timestamps. Each step has
+  a hard limit. Raw output stays in `fsevents-captures/<stamp>/` (root-only, last 3, 300 MB cap); `fsevents-digest.json` (0644) holds
+  counts only. A restart needs a complete capture from the last 30 minutes; above 40 GB (`emergency_gb`) a 60 s capture runs and the
+  restart goes ahead even if it is incomplete.
+- **After a restart:** the guard checks the daemon came back small, records before and after sizes, sets the notice "Chat is slower for
+  a few minutes while the system tidies up." in `memory.json` for 10 minutes, and writes `fsevents-restarted`. It touches no user
+  process. Each dev hub's watch loop (`scripts/dev.sh`) reads that file and restarts its own hub in full, which rereads every file from
+  disk, so an edit made during the restart window is picked up.
+- **Readers (development side):** `scripts/lib/hostmem.sh` says no (exit 75, one plain line) under pressure level 2 or a fresh
+  `dev-shed` flag; `ship.sh`, the full and frontend `check.sh` gates, the lander's safety tests (the entry is held and retried) and the
+  watcher (the tick is skipped) read it. The sharder sheds to one worker under pressure, and after 300 s exits 75 "deferred
+  (memory)", which is never a pass and never a failure of the branch. `sourceThrottleCap` in the sharder is the hook for a later source
+  throttle (a worker cap while the lookup rate is high), off until `MAIPAI_GATE_SOURCE_THROTTLE` is set.
+- **Status:** the admin Status row adds the memory summary under pressure, paused development work or a repair in the last hour.
+  People never see memory wording; the end-user status reason (STATUS-REASON-01) is not built yet and will read `notice`.
+
+Not tested without root: the real `launchctl kickstart`, `vmmap` and `fs_usage` on a root daemon, and `top` as root. The tests run the
+real script with every tool replaced by a fake (`scripts/hostGuardMemory.test.ts`).
+
 ## 3. Supersedes
 
 - **resource-management.md R1** ("a reserved role is never restarted or evicted for memory it grew into"): **lifted for the chat role only by the owner's
