@@ -107,9 +107,33 @@ export const reserveReleasedFile = (): string => join(stateDir(), "reserve-relea
 export function writeDevLoad(jobs: JobRecord[]): void {
   ensureDirs(stateDir());
   const f = join(stateDir(), "dev-load.json");
-  const released = existsSync(reserveReleasedFile());
-  writeFileSync(`${f}.tmp`, JSON.stringify({ version: 1, ts: Math.floor(Date.now() / 1000), budget_gb: devBudgetGb(), reserve_gb: released ? 0 : devBudgetGb(), used_gb: Number(devUsedGb(jobs).toFixed(2)) }));
+  const used = devUsedGb(jobs);
+  writeFileSync(`${f}.tmp`, JSON.stringify({ version: 1, ts: Math.floor(Date.now() / 1000), budget_gb: devBudgetGb(), reserve_gb: Number(reserveGb(used).toFixed(2)), used_gb: Number(used.toFixed(2)) }));
   renameSync(`${f}.tmp`, f);
+}
+/** DEV-BUDGET-03: the margin kept on top of what development really holds, in direct mode (GB). */
+export const DEV_RESERVE_MARGIN_GB = 2;
+/** The development mode the broker uses: MAIPAI_DEV_MODE, else scripts/mode.sh (cached 30 s), else gated (the safe reading). */
+let modeCache: { at: number; mode: "direct" | "gated" } | null = null;
+export function devMode(now = Date.now()): "direct" | "gated" {
+  const env = process.env.MAIPAI_DEV_MODE; if (env === "direct" || env === "gated") return env;
+  if (modeCache && now - modeCache.at < 30_000) return modeCache.mode;
+  let mode: "direct" | "gated" = "gated";
+  try {
+    const script = join(import.meta.dir, "..", "mode.sh");
+    if (existsSync(script)) { const out = Bun.spawnSync(["bash", script, "status"], { stdout: "pipe", stderr: "ignore" }).stdout.toString(); if (/\bDIRECT\b/.test(out)) mode = "direct"; else if (/\bGATED\b/.test(out)) mode = "gated"; }
+    else { const m = readFileSync(join(stateDir(), "mode"), "utf-8").trim(); if (m === "direct" || m === "gated") mode = m; }
+  } catch { /* the safe reading */ }
+  modeCache = { at: now, mode }; return mode;
+}
+/**
+ * The reserve the Stack subtracts (GB). GATED (the family is on the hub): the full budget, a ceiling. DIRECT (nobody is on the hub): what
+ * development really holds plus a small margin, never above the budget, and 0 while a heavy lease released it. On 2026-11-12 the full
+ * 24 GB was kept back while dev tooling held 1.3 GB, and a video clip waited for room that was free.
+ */
+export function reserveGb(usedGb: number): number {
+  if (existsSync(reserveReleasedFile())) return 0;
+  return devMode() === "direct" ? Math.min(devBudgetGb(), usedGb + DEV_RESERVE_MARGIN_GB) : devBudgetGb();
 }
 /** A cold restart replaces "stop" for a server that has a cap: the work is never killed, only its retained memory is dropped. */
 export const serverAction = (act: "none" | "pause" | "stop", restartable: boolean): "none" | "pause" | "stop" | "restart" => (act === "stop" && restartable ? "restart" : act);

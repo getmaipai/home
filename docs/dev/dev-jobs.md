@@ -95,6 +95,11 @@ through the launcher, releases. Or `acquire --pid <long-lived pid>` / `release <
   admin Status row (the existing host row, no new banner; family members never see it) reads it: "Development work holds this Mac:
   <session> (<what>) since <time>; N more sessions are waiting. It is released on its own after 10 idle minutes." `lease.sh status`
   prints the same facts. A holder past its idle limit is not listed, so a stale file never keeps a name on the row.
+- **The reserve is measured in direct mode (DEV-BUDGET-03, 2026-11-12).** `dev-load.json` `reserve_gb` (what the Stack subtracts) is, in
+  direct mode (nobody on the hub), what development really holds plus 2 GB, never above the budget (`reserveGb` in `lib.ts`); in gated
+  mode it is the full budget, a ceiling; while a heavy lease released it, 0. Reason: the full 24 GB was kept back while dev tooling held
+  1.3 GB, and a video clip waited for room that was free. When a heavy lease stops idle hubs it never touches one whose worktree was
+  edited in the last 10 minutes (`MAIPAI_DEV_IN_USE_MIN`): a session is working there.
 - **Heavy dev hubs (DEV-BUDGET-02).** A hub's cap counts its whole process tree, not only its process group: on 2026-11-12 a dev hub's
   own engine, started in a group of its own, held 24 GB while the launcher saw 2 GB. `groupProcs` in `job.ts` now adds every descendant
   of the group, and a cold restart or stop kills those too. A hub that starts its own engine over the cap is therefore restarted cold

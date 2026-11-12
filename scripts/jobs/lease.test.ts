@@ -1,10 +1,10 @@
 // HOST-LAUNCH-02: the lease broker (scripts/jobs/lease.ts): classes, queueing among dev sessions, direct and gated modes.
 import { afterAll, describe, expect, test } from "bun:test";
-import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, utimesSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { readAudit } from "./lib";
-import { decide, type Lease } from "./lease";
+import { decide, recentlyEdited, type Lease } from "./lease";
 
 const LEASE = join(import.meta.dir, "lease.ts");
 const L = (o: Partial<Lease> & { id: string }): Lease => ({ cls: "dev", kind: "video", session: o.id, pid: process.pid, whole: false, since: 0, until: 9e9, seq: 1, ...o });
@@ -88,7 +88,7 @@ describe("broker CLI", () => {
     expect(file()).toMatchObject({ budget_gb: 24, reserve_gb: 0 });
     expect(withDir(e, () => readAudit()).some((x) => x.action === "reserve-released")).toBe(true);
     lease(e, "release", id);
-    expect(file()).toMatchObject({ budget_gb: 24, reserve_gb: 24 });
+    expect(file()).toMatchObject({ budget_gb: 24, reserve_gb: 2 }); // direct mode: what dev really holds (0) plus the 2 GB margin, not the 24 GB budget
     expect(withDir(e, () => readAudit()).some((x) => x.action === "reserve-restored")).toBe(true);
   });
   test("ordinary dev work (a test lease) never releases the reserve, and gated mode never does: the family floor wins", () => {
@@ -127,6 +127,13 @@ describe("broker CLI", () => {
     expect(out(lease(e2, "status"))).not.toContain("gone");
     expect(withDir(e2, () => readAudit()).some((x) => x.session === "gone" && x.trigger === "holder gone")).toBe(true);
   }, 20000);
+  test("DEV-BUDGET-03: a worktree edited in the last 10 minutes is in use, so a heavy lease never stops its hub", () => {
+    const root = mkdtempSync(join(tmpdir(), "wt-")); temps.push(root);
+    mkdirSync(join(root, "backend", "src"), { recursive: true }); const f = join(root, "backend", "src", "a.ts"); writeFileSync(f, "x");
+    expect(recentlyEdited(root)).toBe(true);
+    const old = new Date(Date.now() - 3600_000); utimesSync(f, old, old);
+    expect(recentlyEdited(root)).toBe(false);
+  });
   test("gated mode: whole-machine is refused, and a held dev lease is told to yield when a family request arrives", () => {
     const e = env({ MAIPAI_DEV_MODE: "gated" });
     expect(lease(e, "acquire", "--whole-machine", "--pid", me).exitCode).toBe(3);

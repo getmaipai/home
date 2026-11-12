@@ -88,6 +88,13 @@ const put = (n: string, l: Lease) => { const f = join(dirOf(n), `${l.id}.json`);
 const drop = (n: string, id: string) => rmSync(join(dirOf(n), `${id}.json`), { force: true });
 const au = (l: Lease, action: string, trigger: string) => audit({ session: l.session, command: `lease ${l.cls}/${l.kind}${l.whole ? "/whole-machine" : ""}`, worktree: process.cwd(), trigger, action, job: l.id });
 
+/** DEV-BUDGET-03: a worktree someone edited in the last 10 minutes is in use (a session is working in it), so its hub is never stopped for a heavy lease. */
+export function recentlyEdited(root: string): boolean {
+  const dirs = ["backend/src", "frontend/src", "scripts", "docs"].map((d) => join(root, d)).filter((d) => existsSync(d));
+  if (!dirs.length) return false;
+  const out = spawnSync("/usr/bin/find", [...dirs, "-type", "f", "-mmin", `-${Number(process.env.MAIPAI_DEV_IN_USE_MIN) || 10}`, "-not", "-path", "*/node_modules/*"], { encoding: "utf-8", timeout: 10_000, maxBuffer: 4e6 }).stdout ?? "";
+  return out.trim().length > 0;
+}
 /** A dev hub with no browser connected: its Vite port (backend port + 1000, from its port file) has no established connection. */
 function idleHubRoots(): string[] {
   const roots = new Set<string>();
@@ -98,7 +105,7 @@ function idleHubRoots(): string[] {
       try {
         const port = Number(readFileSync(join(d, "port"), "utf-8").trim()) + 1000;
         const out = spawnSync("/usr/sbin/lsof", ["-nP", `-iTCP:${port}`, "-sTCP:ESTABLISHED"], { encoding: "utf-8" }).stdout ?? "";
-        if (!out.trim() && existsSync(join(root, "scripts", "dev.sh"))) roots.add(root);
+        if (!out.trim() && existsSync(join(root, "scripts", "dev.sh")) && !recentlyEdited(root)) roots.add(root);
       } catch { /* not a dev.sh hub */ }
     }
   }

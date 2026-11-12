@@ -4,7 +4,7 @@ import { spawn } from "node:child_process";
 import { existsSync, mkdirSync, mkdtempSync, realpathSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { alive, decideLaunch, devUsedGb, memoryAction, orphanVerdict, parseDuration, readAudit, serverAction, type JobRecord } from "./lib";
+import { alive, decideLaunch, reserveGb, devUsedGb, memoryAction, orphanVerdict, parseDuration, readAudit, serverAction, type JobRecord } from "./lib";
 
 const JOB = join(import.meta.dir, "job.ts");
 const temps: string[] = [];
@@ -142,6 +142,18 @@ describe("dev budget (DEV-BUDGET-01)", () => {
   test("used memory counts only live running or paused jobs", () => {
     const mk = (rssMb: number, state: JobRecord["state"], pid: number): JobRecord => ({ id: String(pid), type: "server", session: "s", worktree: "/w", command: "c", pid, pgid: pid, startedAt: 1, state, log: "l", rssMb });
     expect(devUsedGb([mk(2048, "running", process.pid), mk(1024, "paused", process.pid), mk(5000, "done", process.pid), mk(4000, "running", 2 ** 22 - 3)])).toBeCloseTo(3, 5);
+  });
+  test("DEV-BUDGET-03: in direct mode the reserve is what dev really holds plus a margin, capped by the budget; in gated mode it is the full budget", () => {
+    const e = env({ MAIPAI_DEV_BUDGET_GB: "24" });
+    const was = { ...process.env }; Object.assign(process.env, e);
+    try {
+      process.env.MAIPAI_DEV_MODE = "direct";
+      expect(reserveGb(1.3)).toBeCloseTo(3.3, 5); expect(reserveGb(30)).toBe(24); expect(reserveGb(0)).toBe(2);
+      process.env.MAIPAI_DEV_MODE = "gated";
+      expect(reserveGb(1.3)).toBe(24);
+      process.env.MAIPAI_DEV_MODE = "direct"; writeFileSync(join(e.MAIPAI_JOBS_DIR, "reserve-released"), "{}");
+      expect(reserveGb(1.3)).toBe(0);
+    } finally { for (const k of Object.keys(process.env)) if (!(k in was)) delete process.env[k]; Object.assign(process.env, was); }
   });
   test("a server with a cap is restarted cold, not stopped; without a cap the old stop stays", () => {
     expect(serverAction("stop", true)).toBe("restart"); expect(serverAction("stop", false)).toBe("stop");
