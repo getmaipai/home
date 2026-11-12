@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
-import { copyFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { copyFileSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import * as fixtures from "./tests/landerFixtures";
 const { scratch, origin, main, env, git, setup, cleanup } = fixtures.createLanderFixtures();
@@ -25,7 +25,8 @@ const latest = () => JSON.parse(readFileSync(join(nightlyData(), "latest.json"),
 beforeAll(() => {
   setup();
   copyFileSync(join(import.meta.dir, "nightly-stable.sh"), join(main, "scripts", "nightly-stable.sh"));
-  Object.assign(env, { MAIPAI_NIGHTLY_DATA: nightlyData(), MAIPAI_NIGHTLY_CHECKOUT: join(scratch, "nightly-checkout"), MAIPAI_NIGHTLY_SKIP_INSTALL: "1", GITNET_TIMEOUT: "10", GITNET_TRIES: "1" });
+  // The override is scrubbed from the base env: this file decides per test whether a run ignores OFF, whatever started bun.
+  Object.assign(env, { MAIPAI_NIGHTLY_DATA: nightlyData(), MAIPAI_NIGHTLY_CHECKOUT: join(scratch, "nightly-checkout"), MAIPAI_NIGHTLY_SKIP_INSTALL: "1", MAIPAI_NIGHTLY_IGNORE_OFF: "", GITNET_TIMEOUT: "10", GITNET_TRIES: "1" });
   git(main, "update-ref", "refs/pipeline/main", git(main, "rev-parse", "origin/main"));
 }, 60_000);
 afterAll(() => cleanup());
@@ -85,6 +86,17 @@ describe("nightly stable", () => {
     expect(r.status).not.toBe(0);
     expect(r.out).toContain("still holds");
     expect(stable()).toBe(before);
+    rmSync(lock, { recursive: true, force: true });
+  }, 60_000);
+
+  test("NIGHTLY-ENV-01: run-now's OFF override and the op-file settings never reach the suite under test", () => {
+    // The first real nightly (2026-11-12) failed its own off-switch test: every test inherited MAIPAI_NIGHTLY_IGNORE_OFF=1 from nightly.sh,
+    // so the test's run ignored its OFF file and waited on the lock the test above holds (60 s timeout, twice).
+    writeFileSync(join(nightlyData(), "OFF"), "");
+    integrate("checked with the override");
+    const r = nightly('[[ -z "${MAIPAI_NIGHTLY_IGNORE_OFF:-}" && -z "${GITNET_OPS_DIR:-}" && -z "${GITNET_STUCK_LOG:-}" ]]', { MAIPAI_NIGHTLY_IGNORE_OFF: "1" });
+    expect(r.out).not.toContain("nightly: off");
+    expect(latest().result).toBe("passed");
   }, 60_000);
 
   test("the off switch stops a run before it does anything", () => {

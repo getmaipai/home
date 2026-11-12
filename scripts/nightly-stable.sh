@@ -44,6 +44,10 @@ take_lock() {
 
 run() {
   [[ ! -f "$data/OFF" || -n "${MAIPAI_NIGHTLY_IGNORE_OFF:-}" ]] || { echo "nightly: off ($data/OFF exists); nothing ran"; return 0; }
+  # NIGHTLY-ENV-01 (2026-11-12): the override is read once, here, and never reaches the suite. The first real run failed its own test
+  # (nightlyStable.test.ts "the off switch stops a run before it does anything", 60 s timeout, twice): nightly.sh had set
+  # MAIPAI_NIGHTLY_IGNORE_OFF=1 for this process, every test under it inherited it, and the test's own nightly-stable.sh ignored its OFF file.
+  unset MAIPAI_NIGHTLY_IGNORE_OFF
   # HOST-GUARD-09: the host guard's memory probe gates the run. Exit 75 means "not started, nothing changed" (the caller defers and retries).
   if [[ -f "$here/lib/hostmem.sh" ]]; then source "$here/lib/hostmem.sh"; hostmem_gate "The nightly run" || return 75; fi
   local started sha before after result rc=0 day dir out seconds last superseded=()
@@ -65,7 +69,8 @@ run() {
   fi
   local suite="${MAIPAI_NIGHTLY_SUITE_CMD:-bun scripts/gate/shardTests.ts --dir scripts --root . --shards 4 && bun scripts/gate/shardTests.ts --dir backend --root tests --shards 6 && bun scripts/gate/shardTests.ts --dir frontend --root . --shards 8}"
   if (( rc == 0 )); then
-    GITNET_OPS_DIR="$data" GITNET_STUCK_LOG="$data/stuck.log" bounded_run "${MAIPAI_NIGHTLY_SECONDS:-5400}" "nightly suite" bash -c 'cd "$1" && nice -n 15 bash -c "$2"' _ "$checkout" "$suite" >>"$out" 2>&1 || rc=$?
+    # The op file and stuck log are this process's (pipeline.sh status reads them); the suite under test gets neither (NIGHTLY-ENV-01).
+    GITNET_OPS_DIR="$data" GITNET_STUCK_LOG="$data/stuck.log" bounded_run "${MAIPAI_NIGHTLY_SECONDS:-5400}" "nightly suite" bash -c 'cd "$1" && exec env -u GITNET_OPS_DIR -u GITNET_STUCK_LOG nice -n 15 bash -c "$2"' _ "$checkout" "$suite" >>"$out" 2>&1 || rc=$?
   fi
   case "$rc" in 0) result=passed ;; 124) result=unfinished ;; *) result=failed ;; esac
   after="$before"
