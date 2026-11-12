@@ -265,3 +265,103 @@ Slice impact: COMPOSER-01 gains the mode menu; STUDIO-CHROME-01 gains the groupe
 
 ## M. Loading placeholders (Jesse, 2026-11-11)
 Artlist shows soft pulsing boxes where tiles and rows will appear while a page loads (seen once). Our version: every shelf, grid, list and hero shows placeholder boxes of the final size and shape (tile aspect and radius from the Look), pulsing slowly (a 1.2 to 1.6 s fade between two surface steps, tokens only), never a centered spinner and never a blank frame. The kit already has `RouteSkeleton` (hidden for its first 200 ms so a fast load never flashes one); extend it into a `Skeleton` part used by `MediaShelf`, `CardGrid`, `List`, `Billboard` and the new masonry. Reduced motion or the ease motion setting turns the pulse into a static box. Gate: the route capture records the first frame and fails a route whose first frame is blank or whose placeholders differ in size from the loaded content (layout shift).
+
+## N. Rail proportions and the brand-to-expand swap (2026-11-11)
+
+See section N in the review above where present; in short: a very narrow collapsed rail with small, loosely spaced icons in hairline-split groups; at the top the brand mark turns into the expand icon on hover or focus when collapsed (cross-fade, instant under reduced motion, accessible name "Expand navigation"); target about 48 px visible width with 18 px icons at the standard ease step, keeping the 48 px hit area through padding that does not widen the rail.
+
+
+## O. Checkpoint 1 (Fable, 2026-11-11)
+
+### (a) On track?
+
+Partly. The token layer is right: bundle per Look, no color in it, 12 px cards, density 0.9, title weight from the Look. The two screens are not the design yet; both read as the old app with new tiles. Three drifts:
+
+1. The composer is not the page (B, C, K). Home still leads with a 40 px greeting, a subtitle and the Repairs card; the ask is a one-line input at 8 of 12 columns, left aligned, with text-link chips. Artlist-15 is one title line, a centered 690 px three-zone card, then a 3 by 2 quiet grid. Ours is 3 plus 2 because "Edit a picture" was filtered out.
+2. Name on art lives in the fallback only (F). Only fallback tiles carry the name; every tile with seed art shows a caption underneath. The seed art is a circle-and-hatch placeholder, worse than the fallback.
+3. Chrome unchanged (A1, A2, G): bordered header row, 56 px rail plus a bordered Media column, no hero on Media home. This is what Jesse means by one look everywhere, and nothing on screen shows it yet. The built rail and Activity parts are right; they wait on the S1 edit.
+
+### (b) Next three slices
+
+1. STUDIO-HOME-01b: one title line, PromptBar `layout="studio"` centered at 690 px, a fixed 3 by 2 grid, Attention below the grid. Check: 1440 dark beside artlist-15, composer width and centering by computed style.
+2. STUDIO-TILES-02: label scrim moves from SafeImage to the tile (MediaTileOverlay `label`); seed real CC0 covers; Billboard hero on Media home. Check: zero captions under tiles, one hero, no placeholder art.
+3. STUDIO-CHROME-01 after the S1 edit: grouped sidebar replaces rail plus app column, header border 0, Activity bell wired. Check: Media home beside artlist-8, one left column, header border 0 by computed style.
+
+### (c) Change before more screens depend on it
+
+- Card must read `--card-edge` (bundle says none; the action cards draw a hairline). Kit fix, not per page.
+- Move name-on-art off the SafeImage fallback path now, or every page passing `label` gets redone.
+- Replace the seed placeholder PNGs before any capture is judged.
+- Not verified: that `--space-*` and row heights consume `--density-scale`, and that Inter and Fraunces are served.
+
+## P. The Home front page (Fable review, 2026-11-11)
+
+Owner: the front page should give quick access to common things and information, inspire and inform, and let people customize the order and what they see; Artlist's front page is a hero then shelves of real pictures, not a chat box.
+
+Summary
+1. The shipped page is a chat landing, not a home: a composer, six icon buttons, status cards, not one picture.
+2. A hub front page shows what is here, art first, and gets you to the next thing in one tap. The composer is a tool on the page, not the page.
+3. Order: art hero, composer pill with a mode menu, Make shelf (name on art), Continue, Today module (ranked rows plus preview), library shelves, Family and companions, admin cards last.
+4. Every section has data today except covers for songs and chats (ART-FALLBACK-01); rule 6a forbids ranking other people's plays, so news is the chart.
+5. Keep Arrange and `ui.home_layout`; Arrange grows from Today cards to sections (reorder, hide, pick the hero), with role defaults below.
+
+### A. Is it the right idea?
+No. Runway leads with a composer because generation is its only product; Home's products are the family's things. The complaints in code:
+- Limited composer: `AskBox` is a plain `Input` that navigates to `/chat?ask=`; the kit `PromptBar` mode menu (KIT-COMPOSER-MODE) is unused.
+- Empty-chat buttons: `ActionCards.tsx` sends "Make a picture" to `/chat`, "Ask or plan" only focuses the box, the rest are bare links.
+- Not appealing: every tile is an `IconTile`, while the hub holds portraits, made pictures and clips, covers, avatars and a weather scene.
+
+### B. What people come for, most often first
+1. Pick up where I left off.
+2. Ask or make something (age gates apply).
+3. Today: weather, next up, timers, shopping.
+4. What is new or made at home.
+5. News (never a child).
+6. People and companions.
+7. House devices.
+8. Look after the hub (owner, admin).
+
+### C. Recommended page
+| # | Section | Kit part | Data today |
+|---|---|---|---|
+| 1 | Hero: picture, eyebrow, title, one pill | `Billboard size="banner"` | latest `made_at_home` picture or clip, else companion, weather scene, news lead |
+| 2 | Composer pill, mode menu, three starters | `PromptBar` | `STARTER_SUGGESTIONS` |
+| 3 | Make shelf, tall tiles, name on art | `MediaShelf aspect="poster"` plus label slot | latest made item per kind, else seeded cover |
+| 4 | Continue, square tiles with progress | `MediaShelf aspect="square"` | `/api/continue`, `media/home.continue` |
+| 5 | Today: ranked rows left, preview right | `List` index slot, `WidgetCard`, `weather-card` | the widgets: weather, next up, shopping, timers, news, devices |
+| 6 | New in your library, Made at home | `MediaShelf` square, See all | `media/home.new`, `.made_at_home` |
+| 7 | Family and companions | `Avatar` row, `CharacterTile` | `/api/people`, companions |
+| 8 | Hub care, Getting started | `StatusCard` | repairs, updates, setup |
+
+Above the fold at 1440: sections 1 to 3; phone: a shorter hero, the pill, the Make shelf peeking. The composer is one pill, not a 180 px box. A Make tile opens its studio with the mode preselected and starters shown (`/pictures/create`, `/apps/videos/create`, `/apps/music/create`); "Ask or plan" opens Chat with starter text filled, never blank. A mode chip sends the prompt to that studio.
+
+### D. Pictures
+Real first: made pictures and clips (`artwork_url`), companion portraits, avatars, podcast and book covers, news images, the weather scene. Floor: the seeded gradient cover with the name on it (KIT-ART-FALLBACK), never the gray box. Missing: covers for songs and chats; ART-FALLBACK-01 item 2 (one low-priority picture job per made item) fills it. Seed the demo with CC0 art.
+
+### E. Look rule
+All parts exist. Additive props only: `MediaTileOverlay label`, a ranked index slot on `List`, Billboard hero-source wiring. No new status UI; admin cards stay the S6 `StatusCard`. Tokens only.
+
+### Customization
+Keep `ui.home_layout` (shelves, ask, board) as presets of one section list and the Arrange sheet (`/api/widgets/home/arrange`: order, hidden, reset), grown to sections: reorder, hide, pick the hero source.
+
+| Section | Adult | Teen | Child |
+|---|---|---|---|
+| Hero | latest made | companion | companion or weather |
+| Composer, Make | on | gated modes hidden | cartoons only |
+| Continue, New, Made | on | on | own items |
+| Today | on | no shopping | weather, timers |
+| News rows | on | if lists on | not offered |
+| Family, companions | on | on | on |
+| House devices | on | off | not offered |
+| Admin cards | on | not offered | not offered |
+
+### F. Build order
+1. HOME-HERO-01: Billboard banner with the hero source picker. Check: seeded capture at 1440 and 402 shows art, zero `safe-image-fallback`.
+2. HOME-COMPOSER-02: PromptBar mode menu plus the Make shelf. Check: a test asserts "Make a picture" lands on the Pictures create route, not `/chat`.
+3. HOME-SHELVES-02: Continue, New, Made at home on the seeded cover. Check: no gray box on seed data.
+4. HOME-TODAY-02: ranked rows plus preview. Check: five ranked news rows with a preview on the seeded feed.
+5. HOME-ARRANGE-02: sections, hero source, role defaults. Check: a child loads without News and admin; a saved order survives reload.
+
+## Q. Build state (2026-11-12)
+
+Live on the hub: Look bundles and title wiring (kit 0.5.592 to 0.5.600), one-line titles, a hero, a composer pill with a mode menu, the Make shelf, name-on-art tiles with seeded covers, the Media hero. Held for the owner's word: the Today ranked list and the Arrange sheet that manages sections. Built in the kit, unused by Home: the expanding grouped rail, the Activity popover, self-hosted fonts (parked on a flaky kit test). Blocked: the RULES.md edit for the phone bar, one shared look and the expanding rail, which only lands through the full suites (the rush route refuses rule edits).
