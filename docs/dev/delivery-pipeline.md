@@ -426,3 +426,9 @@ The `bun install` was not the main cost. Tracing a start showed the reaper: the 
 | After (reaper moved, warm hit, two runs) | 8, 6 |
 
 Proof: `scripts/warmInstall.test.ts` (miss saves, hit clones and still verifies, another lockfile is another hash, clone failure falls back, failed install saves nothing, off switch and other bun commands untouched, keep limit) and `scripts/wtStartFast.test.ts` (start first then one background reaper, a live lock starts no second one, the old order on request, an unfitting shared script runs unchanged with a note).
+
+### 26.2 Direct mode: `--detach` takes the express lane too (DIRECT-FAST-02)
+
+`scripts/land.sh` took the express lane in direct mode only when it waited for its verdict. Now every landing in direct mode is queued express, `--detach` included (the request goes in at the front, the caller later runs `bash scripts/land.sh wait`); only `wait` itself has nothing to queue. An explicit `--express --detach` stays refused (a rush ship needs the landed commit). The lander's note still says "starts and typechecks on top of main (express: no tests run)", never "tested". Gated and unset modes are unchanged. Time: a detached landing no longer waits behind the normal queue or runs the 87 s check; it takes the same path as the waiting one.
+
+Proof: `scripts/landerExpress.test.ts` ("DIRECT-FAST-02": direct queues an express record and lands with the express label; unset and gated queue normally; explicit `--express --detach` exits 2).

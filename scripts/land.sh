@@ -36,15 +36,17 @@ while (($#)); do
   esac
 done
 [[ "$timeout_seconds" =~ ^[0-9]+$ ]] || { usage; exit 2; }
-# MODE-01: DIRECT mode lands through the express lane (a waiting landing only: --detach and wait keep the normal lane); GATED mode has no express lane.
+# --express together with --detach is refused: a rush ship needs the landed commit, so it must wait for the verdict.
+if (( express )) && [[ "$mode" == detach ]]; then die "--express waits for its verdict (the ship that follows needs the landed commit); drop --detach" 2; fi
+# MODE-01: DIRECT mode lands through the express lane. DIRECT-FAST-02 (2026-11-12): that includes --detach (the request is queued express
+# and the caller waits later with `land.sh wait`); only `wait` itself has nothing to queue. The note still says "starts and typechecks", never "tested".
 if [[ -f "$here/lib/mode.sh" ]]; then
   source "$here/lib/mode.sh"
   case "$(mode_get)" in
-    direct) if (( ! express )) && [[ "$mode" == queue ]]; then express=1; echo "$(mode_line): landing through the express lane"; fi ;;
+    direct) if (( ! express )) && [[ "$mode" != wait ]]; then express=1; echo "$(mode_line): landing through the express lane"; fi ;;
     gated) (( ! express )) || die "GATED: checked first, then run. The express lane is off in gated mode; use bash scripts/land.sh, or bash scripts/mode.sh direct." 2 ;;
   esac
 fi
-if (( express )) && [[ "$mode" == detach ]]; then die "--express waits for its verdict (the ship that follows needs the landed commit); drop --detach" 2; fi
 
 common="$(git rev-parse --git-common-dir 2>/dev/null)" || die "not inside a git checkout; run this from your worktree."
 [[ "$common" = /* ]] || common="$(cd "$(dirname "$common")" && pwd -P)/$(basename "$common")"

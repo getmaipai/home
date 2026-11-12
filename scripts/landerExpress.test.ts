@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
-import { chmodSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { chmodSync, copyFileSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import * as fixtures from "./tests/landerFixtures";
 const { scratch, origin, data, main, env, git, run, makeWorktree, commit, note, queueFiles, setup, cleanup } = fixtures.createLanderFixtures();
@@ -79,6 +79,33 @@ describe("the express lane", () => {
     expect(String(n.github)).toMatch(/^pushed/);
     expect(existsSync(join(data, "boot-ok", landed!))).toBe(true);
     expect(readFileSync(join(data, "notes", "wt-ex_basic.md"), "utf8")).toContain("What was checked: starts and typechecks on top of main");
+  }, 120_000);
+
+  test("DIRECT-FAST-02: in direct mode land.sh --detach queues an express entry; gated and unset keep the normal lane; explicit --express --detach stays refused", () => {
+    const land = (name: string, args: string[], mode: string) => {
+      const { w } = change(name);
+      return { w, r: Bun.spawnSync(["bash", join(main, "scripts", "land.sh"), "--queue-anyway", ...args], { cwd: w, env: { ...(env as Record<string, string>), MAIPAI_MODE: mode }, stdout: "pipe", stderr: "pipe" }) };
+    };
+    copyFileSync(join(import.meta.dir, "lib", "mode.sh"), join(main, "scripts", "lib", "mode.sh"));
+    const direct = land("ex_dd", ["--detach"], "direct");
+    expect(direct.r.exitCode).toBe(0);
+    expect(direct.r.stdout.toString()).toContain("landing through the express lane");
+    const f = queueFiles().find((q) => q.endsWith("-wt-ex_dd.json"))!;
+    expect(f).toMatch(/^0-\d+-/);
+    expect(JSON.parse(readFileSync(join(data, "queue", f), "utf8")).express).toBe(true);
+    const unset = land("ex_dn", ["--detach"], "");
+    expect(unset.r.exitCode).toBe(0);
+    expect(queueFiles().find((q) => q.endsWith("-wt-ex_dn.json"))).toMatch(/^\d+-/);
+    const gated = land("ex_dg", ["--detach"], "gated");
+    expect(gated.r.exitCode).toBe(0);
+    expect(queueFiles().find((q) => q.endsWith("-wt-ex_dg.json"))).toMatch(/^\d+-/);
+    const both = land("ex_db", ["--express", "--detach"], "direct");
+    expect(both.r.exitCode).toBe(2);
+    expect(both.r.stderr.toString()).toContain("drop --detach");
+    rmSync(join(main, "scripts", "lib", "mode.sh"), { force: true }); // the lander in this fixture runs without the mode switch
+    run("lander.sh", ["run-once"]); run("lander.sh", ["run-once"]); run("lander.sh", ["run-once"]);
+    const n = note("ex_dd") as Record<string, unknown>;
+    expect(n.label).toBe("starts and typechecks on top of main (express: no tests run)");
   }, 120_000);
 
   test("queue time and run time are recorded apart, with the seconds of each step", () => {
