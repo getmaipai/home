@@ -885,8 +885,23 @@ export function availableGb(): number {
   return freemem() / 1024 ** 3;
 }
 
+/**
+ * DEV-BUDGET-01: a suite run started on its own (the lander, the watcher, the nightly, a person) goes through the job launcher, so it
+ * has a process group, a time limit and an audit line; a run already inside a launcher job (check.sh under `wt.sh check`) is left alone.
+ * MAIPAI_JOBS_OFF=1 skips it. A run the launcher stops or defers ends non-zero and says UNFINISHED: never a pass.
+ */
+export function jobWrapArgs(argv: string[], env: Record<string, string | undefined>, scriptPath: string, launcher: string): string[] | null {
+  if (env.MAIPAI_JOB_ID || env.MAIPAI_JOBS_OFF === "1") return null;
+  return ["bash", launcher, "run", "--type", "test", "--timeout", env.MAIPAI_GATE_JOB_TIMEOUT ?? "90m", "--", process.execPath, scriptPath, ...argv];
+}
+
 if (import.meta.main) {
   const argv = Bun.argv.slice(2);
+  const wrapped = jobWrapArgs(argv, process.env, import.meta.path, join(import.meta.dir, "..", "jobs", "job.sh"));
+  if (wrapped && existsSync(wrapped[1]!)) {
+    const res = Bun.spawnSync(wrapped, { stdin: "inherit", stdout: "inherit", stderr: "inherit", env: process.env });
+    process.exit(res.exitCode ?? 1);
+  }
   const sep = argv.indexOf("--");
   const own = sep === -1 ? argv : argv.slice(0, sep);
   const extraArgs = sep === -1 ? [] : argv.slice(sep + 1);

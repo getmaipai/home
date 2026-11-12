@@ -1,7 +1,7 @@
 // HOST-LAUNCH-01 (owner, 2026-11-12): shared pieces of the dev job launcher (job.ts) and the lease broker (lease.ts).
 // Everything here runs as the user, never root. State lives in one directory (MAIPAI_JOBS_DIR, default ~/.local/state/maipai/jobs):
 //   jobs/<id>.json  one record per launched job      audit.jsonl  one line per action      leases/  the broker's tickets and holders
-import { appendFileSync, existsSync, mkdirSync, readdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
+import { appendFileSync, mkdirSync, readdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 
@@ -57,7 +57,7 @@ export function readPressure(repoRoot: string): Pressure {
   return { level: Number(out[0]) || 0, devShed: out[1] === "shed" };
 }
 
-export type LaunchInputs = { loadPerCore: number; running: number; progressing: number; pressure: Pressure; freeDiskGb: number; cap: number; minDiskGb: number };
+export type LaunchInputs = { loadPerCore: number; running: number; progressing: number; pressure: Pressure; freeDiskGb: number; cap: number; minDiskGb: number; type?: JobType; devUsedGb?: number; devBudgetGb?: number };
 export type LaunchDecision = { go: boolean; why: string; limit: number };
 /**
  * Progress-aware saturation. A load average alone cannot tell a busy but healthy Mac from a hung one (2026-11-12: load 25 to 37 while
@@ -67,6 +67,12 @@ export type LaunchDecision = { go: boolean; why: string; limit: number };
 export function decideLaunch(i: LaunchInputs): LaunchDecision {
   if (i.pressure.devShed || i.pressure.level >= 2) return { go: false, why: "memory pressure: new launches wait for it to clear", limit: 0 };
   if (i.freeDiskGb < i.minDiskGb) return { go: false, why: `disk almost full (${i.freeDiskGb.toFixed(1)} GB free): new launches wait`, limit: 0 };
+  // DEV-BUDGET-01: one budget for everything development starts. Only servers (dev hubs) are held by it; a server sits idle most of
+  // the time, so it never counts against the concurrency cap or the CPU limit below.
+  if (i.devBudgetGb !== undefined && i.devUsedGb !== undefined && i.devUsedGb >= i.devBudgetGb && i.type === "server") {
+    return { go: false, why: `the development budget is full (${i.devUsedGb.toFixed(1)} of ${i.devBudgetGb} GB in use): stop a development hub you are not using, or wait`, limit: 0 };
+  }
+  if (i.type === "server") return { go: true, why: "", limit: i.cap };
   if (i.loadPerCore >= 1.5) {
     if (i.running > i.progressing) return { go: false, why: `CPU saturated (load ${i.loadPerCore.toFixed(1)} per core) and ${i.running - i.progressing} running job(s) are not progressing: new launches wait`, limit: 0 };
     const limit = Math.max(1, Math.floor(i.cap / 2));
@@ -80,4 +86,43 @@ export function memoryAction(job: { rssMb: number; growthMb: number }, biggestRs
   if (job.rssMb > maxRssMb) return "stop";
   if (!pressureOn) return "none";
   return job.rssMb >= biggestRssMb && job.growthMb > 256 ? "stop" : "pause";
+}
+
+/** The one dev budget in GB (MAIPAI_DEV_BUDGET_GB, default 24): everything development runs through the launcher must fit in it. */
+export const devBudgetGb = (): number => { const v = Number(process.env.MAIPAI_DEV_BUDGET_GB); return Number.isFinite(v) && v > 0 ? v : 24; };
+/** The cap for one dev hub in MB (MAIPAI_DEV_HUB_CAP_MB, default 2048); over it the launcher restarts the hub cold. */
+export const devHubCapMb = (): number => { const v = Number(process.env.MAIPAI_DEV_HUB_CAP_MB); return Number.isFinite(v) && v > 0 ? v : 2048; };
+/** GB the live (running or paused) jobs hold, from the figures each launcher refreshes every tick. */
+export function devUsedGb(jobs: JobRecord[]): number {
+  return jobs.filter((j) => (j.state === "running" || j.state === "paused") && alive(j.pid)).reduce((a, j) => a + (j.rssMb ?? 0), 0) / 1024;
+}
+/** The launcher publishes what development holds, so the Stack's governor can subtract the budget (stack/backend/src/lib/devBudget.ts reads this file). */
+export function writeDevLoad(jobs: JobRecord[]): void {
+  ensureDirs(stateDir());
+  const f = join(stateDir(), "dev-load.json");
+  writeFileSync(`${f}.tmp`, JSON.stringify({ version: 1, ts: Math.floor(Date.now() / 1000), budget_gb: devBudgetGb(), used_gb: Number(devUsedGb(jobs).toFixed(2)) }));
+  renameSync(`${f}.tmp`, f);
+}
+/** A cold restart replaces "stop" for a server that has a cap: the work is never killed, only its retained memory is dropped. */
+export const serverAction = (act: "none" | "pause" | "stop", restartable: boolean): "none" | "pause" | "stop" | "restart" => (act === "stop" && restartable ? "restart" : act);
+
+export type OrphanInput = {
+  pid: number; ppid: number;
+  /** pids written in the worktree's dev pid files (backend, vite, watch); null when a file is empty or missing. */
+  pidFiles: { backend: number | null; vite: number | null; watch: number | null };
+  isAlive: (pid: number) => boolean;
+  /** epoch seconds this process was first seen with nobody owning it; null when it was owned at the last look. */
+  orphanSince: number | null; now: number; graceS: number;
+};
+export type OrphanVerdict = { state: "owned" | "orphan-waiting" | "orphan-stop"; since: number | null };
+/**
+ * DEV-REAPER-01: a `bun run --hot` is provably dead only when its worktree's pid files do not name it (or the launcher that started it),
+ * the hub's watcher is gone, and it has been so for the whole grace period (60 minutes). Any owner at all means it is left alone.
+ */
+export function orphanVerdict(i: OrphanInput): OrphanVerdict {
+  const named = [i.pidFiles.backend, i.pidFiles.vite].some((p) => p !== null && (p === i.pid || p === i.ppid) && i.isAlive(p));
+  const watcherUp = i.pidFiles.watch !== null && i.isAlive(i.pidFiles.watch);
+  if (named || watcherUp) return { state: "owned", since: null };
+  const since = i.orphanSince ?? i.now;
+  return { state: i.now - since >= i.graceS ? "orphan-stop" : "orphan-waiting", since };
 }

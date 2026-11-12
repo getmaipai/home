@@ -35,6 +35,10 @@ else
 fi
 # AUDIT-VERIFY-01: the Codex sandbox has no Deno; backend/tests/denoGate.test.ts fails loudly elsewhere unless this is set.
 [[ "${1:-}" != run ]] || export MAIPAI_ALLOW_NO_DENO=1
+# DEV-BUDGET-01: `check` runs inside the job launcher (process group, time limit, audit line); MAIPAI_JOBS_OFF=1 skips it.
+if [[ "${1:-}" == check && "${MAIPAI_JOBS_OFF:-0}" != 1 && -z "${MAIPAI_JOB_ID:-}" && -f "$here/jobs/job.sh" ]]; then
+  bash "$here/jobs/job.sh" run --type test --timeout "${MAIPAI_CHECK_TIMEOUT:-45m}" --session "$(basename "$PWD")" -- bash "$shared" "$@"; exit $?
+fi
 if [[ "${1:-}" != start ]]; then bash "$shared" "$@"; exit $?; fi
 
 # OUTBOX-01: a new worktree starts from the pipeline's main. The shared script branches from origin/main; when the lander has landed

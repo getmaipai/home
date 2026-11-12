@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { balance, chooseShardCount, DEFERRED_EXIT, devShedActive, discoverTests, failedFiles, failedTests, FlakeLedger, junitFileSeconds, parseStackBudget, parseSummary, pressureWaitMs, readShardLog, reserveWorkerSlot, run, sourceThrottleCap, workerSlotCount } from "./shardTests";
+import { balance, chooseShardCount, jobWrapArgs, DEFERRED_EXIT, devShedActive, discoverTests, failedFiles, failedTests, FlakeLedger, junitFileSeconds, parseStackBudget, parseSummary, pressureWaitMs, readShardLog, reserveWorkerSlot, run, sourceThrottleCap, workerSlotCount } from "./shardTests";
 
 describe("balance", () => {
   test("every file lands in exactly one shard", () => {
@@ -507,4 +507,28 @@ describe("watcher.sh shard floor", () => {
     expect(text).toContain("MAIPAI_WATCH_NICE");
     expect(text).not.toContain("nice -n 10");
   });
+});
+
+describe("job launcher wrap (DEV-BUDGET-01)", () => {
+  test("a standalone run goes through job.sh as a test job with a time limit and the same arguments", () => {
+    const w = jobWrapArgs(["--dir", "backend", "--root", "tests"], {}, "/s/shardTests.ts", "/s/jobs/job.sh")!;
+    expect(w.slice(0, 7)).toEqual(["bash", "/s/jobs/job.sh", "run", "--type", "test", "--timeout", "90m"]);
+    expect(w.slice(-5)).toEqual(["/s/shardTests.ts", "--dir", "backend", "--root", "tests"].slice(-5));
+    expect(jobWrapArgs([], { MAIPAI_GATE_JOB_TIMEOUT: "20m" }, "a", "b")![6]).toBe("20m");
+  });
+  test("a run already inside a launcher job, or with the launcher off, is not wrapped again", () => {
+    expect(jobWrapArgs(["--dir", "x"], { MAIPAI_JOB_ID: "abc" }, "a", "b")).toBeNull();
+    expect(jobWrapArgs(["--dir", "x"], { MAIPAI_JOBS_OFF: "1" }, "a", "b")).toBeNull();
+  });
+  test("run for real: the wrapped suite leaves a launched and a finished audit line and exits with the suite's code", () => {
+    const state = mkdtempSync(join(tmpdir(), "wrap-state-")); const ws = mkdtempSync(join(tmpdir(), "wrap-ws-"));
+    try {
+      mkdirSync(join(ws, "tests"), { recursive: true });
+      writeFileSync(join(ws, "tests", "a.test.ts"), 'import { test, expect } from "bun:test"; test("a", () => expect(1).toBe(1));');
+      const r = Bun.spawnSync(["bun", join(import.meta.dir, "shardTests.ts"), "--dir", ws, "--root", "tests", "--shards", "1"], { env: { PATH: process.env.PATH!, HOME: process.env.HOME!, MAIPAI_JOBS_DIR: state, MAIPAI_HOSTMEM_PRESSURE: "1", MAIPAI_HOST_GUARD_STATE_DIR: state, MAIPAI_JOBS_MIN_DISK_GB: "0", MAIPAI_TEST_NO_PORTS: "1" }, stdout: "pipe", stderr: "pipe" });
+      const audit = readFileSync(join(state, "audit.jsonl"), "utf-8");
+      expect(audit).toContain('"action":"launched"'); expect(audit).toContain('"action":"finished"'); expect(audit).toContain("shardTests.ts");
+      expect(r.exitCode).toBe(0);
+    } finally { rmSync(state, { recursive: true, force: true }); rmSync(ws, { recursive: true, force: true }); }
+  }, 60000);
 });

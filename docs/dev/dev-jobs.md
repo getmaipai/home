@@ -1,4 +1,4 @@
-# Dev job launcher and lease broker (HOST-LAUNCH-01, -02, -03)
+# Dev job launcher and lease broker (HOST-LAUNCH-01, -02, -03, DEV-BUDGET-01)
 
 Why: on 2026-11-12 many dev sessions ran tests at once, a leaking file-event daemon ate 66 GB, tests hung for an hour and nothing
 said who started what. The host guard (root, `docs/design/host-guard-2026-11-03.md`) protects the machine. This is the layer
@@ -36,6 +36,31 @@ bash scripts/jobs/job.sh list | audit [n] | orphans [--stop]
 - **Orphans.** `orphans` lists servers whose worktree folder is gone: ones the launcher recorded, and unrecorded dev servers found
   by their working folder. `orphans --stop` stops only recorded ones whose pid still runs the recorded command. Anything else is
   listed and left alone.
+
+## Callers and the dev budget (DEV-BUDGET-01, 2026-11-12)
+
+Why: on 2026-11-12 four dev hubs held 8.4 GB (two were orphans of 3.1 GB), swap sat at 14.9 of 16 GB and a 61.5 GB video job was admitted
+because idle dev pages looked reclaimable. The launcher now has callers, and development has one budget.
+
+- **Who goes through `job.sh`:** every dev hub (`scripts/dev.sh start`: backend and Vite as `--type server`, process group, lifetime
+  24 h, workbench 30 d, audit line), `bash scripts/wt.sh check` (`--type test`, 45 min, `MAIPAI_CHECK_TIMEOUT`), and every standalone
+  `scripts/gate/shardTests.ts` run (the lander, the watcher, the nightly: `--type test`, 90 min, `MAIPAI_GATE_JOB_TIMEOUT`). A run already
+  inside a job (`MAIPAI_JOB_ID` is set, for example `check.sh` under `wt.sh check`) is not wrapped twice. `MAIPAI_JOBS_OFF=1` skips all of it.
+- **One budget:** `MAIPAI_DEV_BUDGET_GB` (default 24) is the memory every launcher-run server may hold together. A server start that does not
+  fit is refused at once with the reason and exit 75 (`--no-wait`; dev.sh shows the line from its log). Servers do not count against the
+  concurrency cap or the CPU limit; tests and builds are not held by the budget. The launcher writes `jobs/dev-load.json`
+  (`{version, ts, budget_gb, used_gb}`) every tick; the Stack's governor reads it and subtracts the budget (Stack `lib/devBudget.ts`).
+- **Per-hub cap and cold restart:** `--max-rss-mb` (dev.sh: backend 2048 via `MAIPAI_DEV_HUB_CAP_MB`, Vite 512) with `--restart-over-cap`:
+  over the cap the launcher stops the group and starts the same command again (audit `cold-restarted`); the work is never lost, only the
+  module graphs a long `--hot` run kept. At most `MAIPAI_JOBS_MAX_RESTARTS` (20) restarts, then the old stop applies. The same holds for
+  the largest still-growing server under memory pressure. A workbench with no browser for 30 minutes (`MAIPAI_WORKBENCH_IDLE_RESTART_MINUTES`)
+  and a backend of at least 700 MB is restarted cold once by its watcher; a private hub with no browser for 30 minutes is stopped.
+- **Orphan reaper:** `job.sh reap [--dry-run]`, run by every hub's watcher every five minutes. It stops a `bun run --hot` (and its children)
+  only when it runs in a worktree under `.claude/worktrees` or `wt/` that has a `data/dev` folder, no pid file there names it or the
+  launcher that started it, no hub watcher runs, and that has held in a row for `MAIPAI_DEV_REAP_GRACE_MIN` (60) minutes. The live hub, the
+  main checkout and anything else are never touched. One audit line (`orphan-stopped`) per stop; `jobs/dev-reaper.json` feeds one sentence
+  on the admin "This Mac's self-check" Status row (`backend/src/lib/hostGuard.ts`, `withDevReaper`); no new banner, no memory words.
+- **Preview default:** `dev.sh start` is the one shared workbench; `--own` is a private hub; see `AGENTS.md` "Previewing a change".
 
 ## Lease broker: `bash scripts/jobs/lease.sh`
 

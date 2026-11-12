@@ -14,6 +14,14 @@
 # backend runs with MAIPAI_WORKBENCH=1, which skips background jobs that start heavy Stack work or
 # reach outside the hub (lib/scheduler.ts), and a status note says it is not the family's hub.
 # It refuses ports 3000 and 8787 and any data directory under the live install.
+#
+# DEV-BUDGET-01 (2026-11-12): the shared workbench is the default preview. `start` with no flag starts (or reuses) the one machine-wide
+# workbench; a private per-worktree hub needs an explicit `--own`. In GATED mode the workbench is off, so the default falls back to a
+# private hub. `stop`, `status` and `url` with no flag cover both. Every backend and Vite server runs through scripts/jobs/job.sh: its
+# own process group, a lifetime, an audit line, a cap of MAIPAI_DEV_HUB_CAP_MB (2048) for the backend after which the launcher restarts it
+# cold (a fresh --hot drops the module graphs it kept), and a seat in the dev budget MAIPAI_DEV_BUDGET_GB (24). A start that does not
+# fit the budget says so and exits. The watch loop also runs `job.sh reap` (the orphan reaper) every five minutes.
+# MAIPAI_JOBS_OFF=1 starts the servers directly, as before. `--takeover` replaces a workbench that runs from another worktree.
 set -euo pipefail
 
 script_dir="$(cd "$(dirname "$0")" && pwd -P)"
@@ -28,10 +36,15 @@ stack_override="${MAIPAI_DEV_STACK_URL:-}"
 no_stack=0
 workbench="${MAIPAI_DEV_WORKBENCH:-0}"
 [[ "$workbench" == 1 ]] || workbench=0
+own=0
+takeover=0
+orig_args=("$@")
 while (($#)); do
   case "$1" in
     --no-stack) no_stack=1; shift ;;
     --workbench) workbench=1; shift ;;
+    --own) own=1; shift ;;
+    --takeover) takeover=1; shift ;;
     --stack)
       if (($# < 2)) || [[ -z "$2" || "$2" == --* ]]; then
         echo "Missing URL after --stack. Pass --stack <url> or omit the option." >&2; exit 2
@@ -42,9 +55,28 @@ while (($#)); do
         echo "Missing or invalid port after --port. Pass a number from 1 to 64535." >&2; exit 2
       fi
       port_override="$2"; shift 2 ;;
-    *) echo "Unknown option: $1. Use --workbench, --no-stack, --stack <url>, or --port <n>." >&2; exit 2 ;;
+    *) echo "Unknown option: $1. Use --own, --workbench, --takeover, --no-stack, --stack <url>, or --port <n>." >&2; exit 2 ;;
   esac
 done
+if ((own && workbench)); then echo "Pick one: --own (a private hub for this worktree) or --workbench (the shared one)." >&2; exit 2; fi
+
+# The shared workbench is the default (see the header). Resolved once, here, so every action agrees.
+jobs_state="${MAIPAI_JOBS_DIR:-${HOME:-/tmp}/.local/state/maipai/jobs}"
+if ((own == 0 && workbench == 0)) && [[ "${MAIPAI_DEV_WORKBENCH:-}" != 0 ]]; then
+  default_workbench=1
+  if [[ -f "$script_dir/lib/mode.sh" ]]; then
+    source "$script_dir/lib/mode.sh"
+    if [[ "$(mode_get)" == gated ]]; then default_workbench=0; fi
+  fi
+  case "$action" in
+    stop|status)
+      # Both variants: whatever this worktree runs, private or shared.
+      rc=0
+      for v in --own --workbench; do MAIPAI_DEV_ROOT="$root" bash "$script_dir/dev.sh" "$action" "$v" ${orig_args[@]+"${orig_args[@]}"} || rc=$?; done
+      exit "$rc" ;;
+    start|reseed|url) if ((default_workbench)); then workbench=1; fi ;;
+  esac
+fi
 
 state="$root/data/dev"
 ((workbench == 0)) || state="$root/data/dev/workbench"
@@ -159,6 +191,24 @@ pid_value() {
 }
 
 process_command() { ps -p "$1" -o command= 2>/dev/null || true; }
+# DEV-BUDGET-01: the launcher words that go in front of a server command ("<cap MB>" "<lifetime>"). Empty when MAIPAI_JOBS_OFF=1 or the
+# launcher is missing (a stripped checkout), in which case the server starts directly.
+job_prefix() {
+  job_prefix_words=()
+  [[ "${MAIPAI_JOBS_OFF:-0}" != 1 && -f "$script_dir/jobs/job.sh" ]] || return 0
+  local life=24h
+  ((workbench == 0)) || life=30d
+  job_prefix_words=(bash "$script_dir/jobs/job.sh" run --type server --lifetime "$life" --max-rss-mb "$1" --restart-over-cap --no-wait --session "$(basename "$root")" --)
+}
+workbench_owner_file="$jobs_state/workbench-owner"
+# RSS in MB of the backend this worktree's pid file names, or of its child when the file names the launcher; 0 when unknown.
+backend_rss_mb() {
+  local p kid kb
+  p="$(pid_value "$backend_pid_file" 2>/dev/null || true)"; [[ -n "$p" ]] || { echo 0; return; }
+  kid="$(pgrep -P "$p" 2>/dev/null | head -n 1 || true)"
+  kb="$(ps -o rss= -p "${kid:-$p}" 2>/dev/null | tr -d ' ' || true)"
+  [[ "$kb" =~ ^[0-9]+$ ]] && echo $((kb / 1024)) || echo 0
+}
 live_backend() {
   local candidate command
   candidate="$(pid_value "$backend_pid_file" 2>/dev/null || true)"
@@ -246,6 +296,7 @@ case "$action" in
       tailscale_cli serve --https="$vite_port" off >/dev/null 2>&1 || true
       rm -f "$tailscale_host_file"
     fi
+    if ((workbench)) && [[ -f "$workbench_owner_file" ]] && [[ "$(cat "$workbench_owner_file" 2>/dev/null)" == "$root" ]]; then rm -f "$workbench_owner_file"; fi
     if ((workbench)); then echo "Workbench stopped; its data stays in $hub."; else echo "Dev Home stopped."; fi
     ;;
   restart-hub)
@@ -271,7 +322,7 @@ case "$action" in
     rm -rf "$hub"
     rm -f "$seed_marker" "$seed_output"
     reseed_args=(start)
-    ((workbench == 0)) || reseed_args+=(--workbench)
+    if ((workbench)); then reseed_args+=(--workbench); else reseed_args+=(--own); fi
     ((no_stack == 0)) || reseed_args+=(--no-stack)
     [[ -z "$stack_override" ]] || reseed_args+=(--stack "$stack_override")
     [[ -z "$port_override" ]] || reseed_args+=(--port "$port_override")
@@ -290,9 +341,14 @@ case "$action" in
     fi
     rm -f "$vite_pid_file"
     if ((workbench)); then
+      owner=""; [[ -f "$workbench_owner_file" ]] && IFS= read -r owner < "$workbench_owner_file" || true
+      if ((takeover)) && [[ -n "$owner" && "$owner" != "$root" && -f "$owner/scripts/dev.sh" ]]; then
+        echo "Replacing the shared workbench that runs from $owner."
+        MAIPAI_DEV_ROOT="$owner" bash "$script_dir/dev.sh" stop --workbench >/dev/null 2>&1 || true
+      fi
       for wanted in "$backend_port" "$vite_port"; do
         if probe_taken "$wanted"; then
-          echo "Port $wanted is already in use, so the workbench cannot start (only one workbench runs per machine). Stop the other one with bun run workbench:stop in its worktree, or pass --port <n>." >&2; exit 1
+          echo "Port $wanted is already in use, so the shared workbench cannot start from here (only one workbench runs per machine)${owner:+; it runs from $owner}. To preview this worktree on it, run bash scripts/dev.sh start --takeover (it stops that one). For a private hub instead, run bash scripts/dev.sh start --own." >&2; exit 1
         fi
       done
     fi
@@ -329,13 +385,14 @@ case "$action" in
       rm -rf "$hub"
     fi
     mkdir -p "$hub"
+    job_prefix "${MAIPAI_DEV_HUB_CAP_MB:-2048}"
     (
       cd "$root/backend"
       MAIPAI_WORKBENCH="$workbench" MAIPAI_TEST_ALLOW_MULTIPLE_HUBS=1 MAIPAI_MDNS=off MAIPAI_LAN_EXPOSURE=loopback PORT="$backend_port" \
         MAIPAI_DATA_DIR="$hub" MAIPAI_BACKUP_DIR="$hub/backups" MAIPAI_KEYSTORE_BACKEND=file \
         MAIPAI_TTS_DISABLE_SPAWN=1 MAIPAI_WYOMING_PORT=0 MAIPAI_BACKGROUND_URL=http://127.0.0.1:1 \
         MAIPAI_LLAMA_SERVER_URL= MAIPAI_EMBED_URL= MAIPAI_HUB_LOCK_PATH="$hub.lock" \
-        nohup bun run --hot src/index.ts </dev/null >"$backend_log" 2>&1 &
+        nohup ${job_prefix_words[@]+"${job_prefix_words[@]}"} bun run --hot src/index.ts </dev/null >"$backend_log" 2>&1 &
       echo $! > "$backend_pid_file"
     )
     backend_pid="$(pid_value "$backend_pid_file")"
@@ -373,12 +430,13 @@ case "$action" in
       fi
     fi
 
+    job_prefix 512
     ts_host=""
     rm -f "$tailscale_host_file"
     ((workbench == 0)) || ts_host="$(tailscale_host || true)"
     (
       cd "$root/frontend"
-      VITE_ALLOWED_HOSTS="${ts_host:-${VITE_ALLOWED_HOSTS:-}}" VITE_BACKEND_PORT="$backend_port" nohup bun run dev -- --port "$vite_port" --strictPort </dev/null >"$vite_log" 2>&1 &
+      VITE_ALLOWED_HOSTS="${ts_host:-${VITE_ALLOWED_HOSTS:-}}" VITE_BACKEND_PORT="$backend_port" nohup ${job_prefix_words[@]+"${job_prefix_words[@]}"} bun run dev -- --port "$vite_port" --strictPort </dev/null >"$vite_log" 2>&1 &
       echo $! > "$vite_pid_file"
     )
     frontend_ready=0
@@ -406,10 +464,11 @@ case "$action" in
     elif ((workbench)); then
       echo "Tailscale is not available here, so the workbench has only a local address."
     fi
+    if ((workbench)); then mkdir -p "$jobs_state" && printf '%s\n' "$root" > "$workbench_owner_file" || true; fi
     watch_args=(watch)
     ((workbench == 0)) || watch_args+=(--workbench)
     # The options this hub started with, so a restart after a file-event service restart starts it the same way.
-    { ((no_stack == 0)) || echo --no-stack; [[ -z "$stack_override" ]] || printf '%s\n' --stack "$stack_override"; [[ -z "$port_override" ]] || printf '%s\n' --port "$port_override"; ((workbench == 0)) || echo --workbench; } > "$state/start-args"
+    { ((workbench != 0)) || echo --own; ((no_stack == 0)) || echo --no-stack; [[ -z "$stack_override" ]] || printf '%s\n' --stack "$stack_override"; [[ -z "$port_override" ]] || printf '%s\n' --port "$port_override"; ((workbench == 0)) || echo --workbench; } > "$state/start-args"
     MAIPAI_DEV_ROOT="$root" nohup bash "$script_dir/dev.sh" "${watch_args[@]}" </dev/null >/dev/null 2>&1 &
     echo $! > "$watch_pid_file"
     print_urls
@@ -428,8 +487,16 @@ case "$action" in
     idle_limit=$(( ${MAIPAI_DEV_IDLE_MINUTES:-$idle_default} * 60 ))
     interval="${MAIPAI_DEV_WATCH_SECONDS:-30}"
     idle=0
+    ticks=0
+    cold_done=0
+    cold_after=$(( ${MAIPAI_WORKBENCH_IDLE_RESTART_MINUTES:-30} * 60 ))
     fsevents_seen="$(fsevents_restarted_at)"
     while sleep "$interval"; do
+      # DEV-REAPER-01: every ~5 minutes, stop development hubs that are provably dead (no pid file, no watcher, for 60 minutes).
+      ticks=$((ticks + 1))
+      if ((ticks % 10 == 0)) && [[ "${MAIPAI_JOBS_OFF:-0}" != 1 && -f "$script_dir/jobs/job.sh" ]]; then
+        bash "$script_dir/jobs/job.sh" reap >>"$state/watch.log" 2>&1 || true
+      fi
       if ! live_backend && ! live_vite; then rm -f "$watch_pid_file"; exit 0; fi
       reason=""
       if [[ ! -e "$root/.git" ]]; then reason="its worktree was removed"; fi
@@ -444,6 +511,17 @@ case "$action" in
       if [[ -z "$reason" ]]; then
         if lsof -nP -iTCP:"$vite_port" -sTCP:ESTABLISHED >/dev/null 2>&1; then idle=0; else idle=$((idle + interval)); fi
         if ((idle_limit > 0 && idle >= idle_limit)); then reason="no browser was connected for $((idle_limit / 60)) minutes"; fi
+        # The workbench never stops, so while nobody is looking it is restarted cold once (a fresh --hot drops the module graphs it kept).
+        if [[ -z "$reason" ]] && ((workbench && cold_after > 0)); then
+          if ((idle == 0)); then cold_done=0; fi
+          if ((idle >= cold_after && cold_done == 0)) && (($(backend_rss_mb) >= ${MAIPAI_WORKBENCH_COLD_MIN_MB:-700})); then
+            cold_done=1
+            echo "$(date '+%F %T') restarting the workbench cold: no browser was connected for $((cold_after / 60)) minutes" >> "$state/watch.log"
+            rm -f "$watch_pid_file"
+            MAIPAI_DEV_ROOT="$root" nohup bash -c "${MAIPAI_DEV_RESTART_CMD:-bash \"\$0\" restart-hub}" "$script_dir/dev.sh" </dev/null >>"$state/watch.log" 2>&1 &
+            exit 0
+          fi
+        fi
       fi
       if [[ -n "$reason" ]]; then
         echo "$(date '+%F %T') stopping dev Home: $reason" >> "$state/watch.log"
@@ -455,7 +533,7 @@ case "$action" in
     done
     ;;
   *)
-    echo "Usage: bash scripts/dev.sh <start|stop|status|url|port|reseed> [--workbench] [--no-stack] [--stack <url>] [--port <n>]" >&2
+    echo "Usage: bash scripts/dev.sh <start|stop|status|url|port|reseed> [--own|--workbench] [--takeover] [--no-stack] [--stack <url>] [--port <n>]" >&2
     exit 2
     ;;
 esac

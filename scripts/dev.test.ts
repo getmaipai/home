@@ -12,6 +12,8 @@ function fixture(name: string, gitKind: "file" | "directory") {
   mkdirSync(join(root, "scripts"), { recursive: true });
   mkdirSync(join(root, "data"), { recursive: true });
   copyFileSync(scriptSource, join(root, "scripts", "dev.sh"));
+  mkdirSync(join(root, "scripts", "lib"), { recursive: true });
+  copyFileSync(join(import.meta.dir, "lib", "mode.sh"), join(root, "scripts", "lib", "mode.sh"));
   if (gitKind === "file") writeFileSync(join(root, ".git"), "gitdir: elsewhere\n");
   else mkdirSync(join(root, ".git"));
   return root;
@@ -24,7 +26,7 @@ function run(root: string, ...args: (string | Record<string, string>)[]) {
   const commandArgs = args.filter((arg): arg is string => typeof arg === "string");
   return spawnSync("bash", [join(root, "scripts", "dev.sh"), ...commandArgs], {
     encoding: "utf8",
-    env: { ...process.env, MAIPAI_DEV_ROOT: root, ...env },
+    env: { ...process.env, MAIPAI_DEV_ROOT: root, MAIPAI_MODE_FILE: "/nonexistent/mode", MAIPAI_MODE: "", ...env },
   });
 }
 
@@ -134,6 +136,29 @@ describe("scripts/dev.sh --workbench", () => {
     expect(out.stdout).toContain("Workbench stopped");
     expect(await Bun.file(join(wb, "hub", "hub.db")).exists()).toBe(true);
     expect(await Bun.file(join(wb, "seeded")).exists()).toBe(true);
+  });
+});
+
+describe("scripts/dev.sh shared workbench default (DEV-BUDGET-01)", () => {
+  const off = { MAIPAI_DEV_TAILSCALE: "off", MAIPAI_MODE: "direct" };
+  test("url with no flag is the shared workbench; --own is the private per-worktree hub", () => {
+    expect(run(worktree, "url", off).stdout).toContain("http://localhost:9780");
+    const own = run(worktree, "url", "--own", off).stdout;
+    expect(own).not.toContain("9780"); expect(own).toMatch(/http:\/\/localhost:9[89]\d\d/);
+  });
+  test("in gated mode the default falls back to a private hub (the workbench is off there)", () => {
+    expect(run(worktree, "url", { ...off, MAIPAI_MODE: "gated" }).stdout).not.toContain("9780");
+  });
+  test("--own and --workbench together are refused; plain stop covers both and says so", () => {
+    expect(run(worktree, "start", "--own", "--workbench", off).status).toBe(2);
+    const out = run(worktree, "stop", off);
+    expect(out.status).toBe(0); expect(out.stdout).toContain("Dev Home stopped."); expect(out.stdout).toContain("Workbench stopped");
+  });
+  test("a workbench that runs from another worktree is named, with --takeover and --own as the ways out", () => {
+    const jobs = mkdtempSync(join(tmpdir(), "wb-owner-")); writeFileSync(join(jobs, "workbench-owner"), "/some/other/worktree\n");
+    const out = run(worktree, "start", { ...off, MAIPAI_JOBS_DIR: jobs, MAIPAI_DEV_PROBE_CMD: "true" });
+    expect(out.status).toBe(1); expect(out.stderr).toContain("/some/other/worktree"); expect(out.stderr).toContain("--takeover"); expect(out.stderr).toContain("--own");
+    rmSync(jobs, { recursive: true, force: true });
   });
 });
 

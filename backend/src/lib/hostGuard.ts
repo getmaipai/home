@@ -1,4 +1,5 @@
 import { readFileSync } from "node:fs";
+import { homedir } from "node:os";
 import { join } from "node:path";
 import { z } from "zod";
 
@@ -79,4 +80,25 @@ export function withHostGuardMemory(view: HostGuardView, memory: HostGuardMemory
 export function hostGuardInstalled(): boolean {
   if (process.platform !== "darwin") return false;
   try { readFileSync(join(hostGuardStateDir(), "config.json"), "utf8"); return true; } catch { return false; }
+}
+
+/**
+ * DEV-REAPER-01: the dev launcher's orphan reaper (scripts/jobs/job.ts `reap`) writes dev-reaper.json when it stops development servers
+ * nobody owns any more. It rides the same admin Status row as the self-check (RULES S6: no new banner); family members never see it.
+ */
+export const DevReaperSchema = z.object({ version: z.literal(1), ts: z.number().finite(), waiting: z.number().finite(), stopped: z.array(z.object({ ts: z.number().finite(), worktree: z.string() })) });
+export type DevReaper = z.infer<typeof DevReaperSchema>;
+export const devReaperFile = () => join(process.env.MAIPAI_JOBS_DIR ?? join(homedir(), ".local", "state", "maipai", "jobs"), "dev-reaper.json");
+
+export function readDevReaper(): DevReaper | null {
+  try { return DevReaperSchema.parse(JSON.parse(readFileSync(devReaperFile(), "utf8"))); } catch { return null; }
+}
+
+/** Adds one sentence to the admin row when unused development servers were stopped in the last hour. */
+export function withDevReaper(view: HostGuardView, report: DevReaper | null, now = Date.now()): HostGuardView {
+  if (!report) return view;
+  const recent = report.stopped.filter((s) => s.ts >= Math.floor(now / 1000) - 3600);
+  if (!recent.length) return view;
+  const n = recent.length;
+  return { ...view, text: `${view.text} ${n} unused development ${n === 1 ? "server was" : "servers were"} stopped in the last hour to keep this Mac free for the family.` };
 }

@@ -1,8 +1,11 @@
 #!/usr/bin/env bun
 // HOST-LAUNCH-01: the dev job launcher and watchdog. Every dev test, build and temporary server runs through it (bash scripts/jobs/job.sh).
 //
-//   job.sh run [--type test|build|server|other] [--timeout 15m] [--lifetime 8h] [--session name] [--max-rss-mb N] -- <command...>
-//   job.sh list | audit [n] | orphans [--stop]
+//   job.sh run [--type test|build|server|other] [--timeout 15m] [--lifetime 8h] [--session name] [--max-rss-mb N] [--restart-over-cap] [--no-wait] -- <command...>
+//   job.sh list | audit [n] | orphans [--stop] | reap [--dry-run]
+//
+// DEV-BUDGET-01: one dev budget (MAIPAI_DEV_BUDGET_GB, default 24) holds every server the launcher runs; a server over its --max-rss-mb cap
+// with --restart-over-cap is restarted cold (the same command, a fresh process, nothing killed for good). `reap` is the orphan reaper.
 //
 // What it does: runs the command as its own process group (so every worker it spawns is cleaned up when it ends or is stopped);
 // waits at launch while the machine is saturated or short of memory (progress-aware, see lib.ts decideLaunch); enforces a timeout per
@@ -10,10 +13,10 @@
 // pressure pauses the group, captures, and stops only the job that is the largest and still growing (by its recorded pid); watches
 // free disk and file churn; writes one audit line per action. A server must say how long it may live (--lifetime). Runs as the user.
 import { spawn, spawnSync } from "node:child_process";
-import { appendFileSync, createWriteStream, existsSync, statfsSync, statSync, utimesSync, writeFileSync } from "node:fs";
+import { appendFileSync, createWriteStream, existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, statfsSync, statSync, utimesSync, writeFileSync } from "node:fs";
 import { cpus, loadavg } from "node:os";
 import { basename, join, resolve } from "node:path";
-import { DEFAULT_TIMEOUT_S, alive, audit, decideLaunch, ensureDirs, jobTypeOf, jobsDir, memoryAction, parseDuration, readAudit, readJobs, readPressure, writeJob, type JobRecord } from "./lib";
+import { DEFAULT_TIMEOUT_S, alive, audit, decideLaunch, devBudgetGb, devUsedGb, ensureDirs, jobTypeOf, jobsDir, memoryAction, orphanVerdict, parseDuration, readAudit, readJobs, readPressure, serverAction, stateDir, writeDevLoad, writeJob, type JobRecord } from "./lib";
 
 const repoRoot = resolve(import.meta.dir, "..", "..");
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
@@ -85,27 +88,34 @@ async function run(argv: string[]): Promise<number> {
   for (;;) {
     const running = readJobs().filter((j) => (j.state === "running" || j.state === "paused") && alive(j.pid));
     const progressing = running.filter((j) => j.state === "running" && ((j.cpu ?? 0) > 1 || Date.now() / 1000 - (statMtime(j.log) ?? 0) < 120)).length;
-    const d = decideLaunch({ loadPerCore: loadavg()[0]! / cpus().length, running: running.length, progressing, pressure: readPressure(repoRoot), freeDiskGb: freeDiskGb(worktree), cap, minDiskGb: num(process.env.MAIPAI_JOBS_MIN_DISK_GB, 5) });
+    const d = decideLaunch({ loadPerCore: loadavg()[0]! / cpus().length, running: running.length, progressing, pressure: readPressure(repoRoot), freeDiskGb: freeDiskGb(worktree), cap, minDiskGb: num(process.env.MAIPAI_JOBS_MIN_DISK_GB, 5), type, devUsedGb: devUsedGb(running), devBudgetGb: devBudgetGb() });
     if (d.go) break;
+    if (opts.includes("--no-wait")) { console.error(`job.sh: not started: ${d.why}`); audit({ ...base, trigger: d.why, action: "launch-refused" }); return 75; }
     if (d.why !== lastWhy) { console.error(`job.sh: waiting to start: ${d.why}`); audit({ ...base, trigger: d.why, action: "launch-deferred" }); lastWhy = d.why; }
     if (waited >= waitMaxS) { console.error("job.sh: UNFINISHED: never started (the machine stayed saturated). This is not a pass."); audit({ ...base, trigger: "wait limit", action: "launch-gave-up" }); return 75; }
     await sleep(Math.min(TICK_MS * 2, 5000)); waited += Math.min(TICK_MS * 2, 5000) / 1000;
   }
 
   const out = createWriteStream(log);
-  const child = spawn(cmd[0]!, cmd.slice(1), { detached: true, stdio: ["inherit", "pipe", "pipe"], env: { ...process.env, MAIPAI_JOB_ID: id } });
-  child.stdout!.on("data", (b: Buffer) => { out.write(b); process.stdout.write(b); });
-  child.stderr!.on("data", (b: Buffer) => { out.write(b); process.stderr.write(b); });
-  const pgid = child.pid!;
+  let child!: ReturnType<typeof spawn>; let pgid = 0; let gen = 0;
+  let exitCode: number | null = null; let signalled = false;
+  const launch = () => {
+    const mine = ++gen; exitCode = null;
+    child = spawn(cmd[0]!, cmd.slice(1), { detached: true, stdio: ["inherit", "pipe", "pipe"], env: { ...process.env, MAIPAI_JOB_ID: id } });
+    child.stdout!.on("data", (b: Buffer) => { out.write(b); process.stdout.write(b); });
+    child.stderr!.on("data", (b: Buffer) => { out.write(b); process.stderr.write(b); });
+    pgid = child.pid ?? 0;
+    child.on("exit", (code, sig) => { if (mine === gen) exitCode = code ?? (sig ? 128 + 15 : 1); });
+    child.on("error", (e) => { console.error(`job.sh: could not start "${cmd[0]}": ${e.message}`); if (mine === gen) exitCode = 127; });
+  };
+  launch();
   const rec: JobRecord = { id, type, session, worktree, command, pid: child.pid!, pgid, startedAt: Math.floor(Date.now() / 1000), state: "running", log, ...(lifetimeS ? { until: Math.floor(Date.now() / 1000) + lifetimeS } : {}) };
   writeJob(rec); audit({ ...base, trigger: "start", action: "launched" });
-  let exitCode: number | null = null; let signalled = false;
-  child.on("exit", (code, sig) => { exitCode = code ?? (sig ? 128 + 15 : 1); });
-  child.on("error", (e) => { console.error(`job.sh: could not start "${cmd[0]}": ${e.message}`); exitCode = 127; });
   const onSignal = (sig: NodeJS.Signals) => () => { signalled = true; audit({ ...base, trigger: `launcher got ${sig}`, action: "group-stopped" }); void stopGroup(pgid); };
   for (const s of ["SIGINT", "SIGTERM", "SIGHUP"] as const) process.on(s, onSignal(s));
 
   const maxRssMb = num(get("--max-rss-mb"), num(process.env.MAIPAI_JOBS_MAX_RSS_MB, 24_000));
+  const restartable = opts.includes("--restart-over-cap"); const maxRestarts = num(process.env.MAIPAI_JOBS_MAX_RESTARTS, 20); let restarts = 0;
   const startRss = { v: -1 }; let verdict: "ok" | "unfinished" | "stopped" = "ok"; let verdictWhy = "";
   let lastChurn = 0, pausedSince = 0;
   const t0 = Date.now();
@@ -113,7 +123,9 @@ async function run(argv: string[]): Promise<number> {
     await sleep(TICK_MS);
     const procs = groupProcs(pgid); const rssMb = procs.reduce((a, p) => a + p.rssMb, 0);
     if (startRss.v < 0) startRss.v = rssMb;
+    rec.pid = child.pid ?? rec.pid; rec.pgid = pgid;
     writeJob({ ...rec, state: pausedSince ? "paused" : "running", rssMb, cpu: procs.reduce((a, p) => a + p.cpu, 0) });
+    if (type === "server") writeDevLoad(readJobs());
     const elapsed = (Date.now() - t0) / 1000;
     // Lifetime or timeout.
     if (rec.until && Date.now() / 1000 > rec.until) { verdict = "stopped"; verdictWhy = "server lifetime ended"; capture(rec, verdictWhy); audit({ ...base, trigger: verdictWhy, action: "group-stopped" }); await stopGroup(pgid); break; }
@@ -124,7 +136,12 @@ async function run(argv: string[]): Promise<number> {
     // Memory: pause first, capture, stop only the responsible job.
     const p = readPressure(repoRoot); const on = p.devShed || p.level >= 2;
     const biggest = Math.max(rssMb, ...readJobs().filter((j) => j.id !== id && alive(j.pid)).map((j) => j.rssMb ?? 0));
-    const act = memoryAction({ rssMb, growthMb: rssMb - startRss.v }, biggest, on, maxRssMb);
+    const act = serverAction(memoryAction({ rssMb, growthMb: rssMb - startRss.v }, biggest, on, maxRssMb), restartable && restarts < maxRestarts);
+    if (act === "restart") {
+      restarts++; const why = rssMb > maxRssMb ? `over its ${maxRssMb} MB cap (${rssMb.toFixed(0)} MB)` : `memory pressure and this is the largest server (${rssMb.toFixed(0)} MB)`;
+      capture(rec, `cold restart: ${why}`); audit({ ...base, trigger: why, action: "cold-restarted", detail: `restart ${restarts}` });
+      await stopGroup(pgid); launch(); startRss.v = -1; continue;
+    }
     if (act === "stop") { verdict = "stopped"; verdictWhy = on ? `memory pressure and this job is the largest and still growing (${rssMb.toFixed(0)} MB)` : `over its ${maxRssMb} MB limit`; capture(rec, verdictWhy); audit({ ...base, trigger: verdictWhy, action: "captured-and-stopped" }); await stopGroup(pgid); break; }
     if (act === "pause" && !pausedSince) { pausedSince = Date.now(); killGroup(pgid, "SIGSTOP"); capture(rec, "memory pressure: paused"); audit({ ...base, trigger: `memory pressure level ${p.level}${p.devShed ? " (host guard shed)" : ""}`, action: "paused" }); }
     if (pausedSince && !on) { killGroup(pgid, "SIGCONT"); audit({ ...base, trigger: "pressure cleared", action: "resumed", detail: `${Math.round((Date.now() - pausedSince) / 1000)}s` }); pausedSince = 0; }
@@ -136,13 +153,12 @@ async function run(argv: string[]): Promise<number> {
       const churn = churnCount(worktree, rec.startedAt); if (churn > num(process.env.MAIPAI_JOBS_CHURN_FILES, 20000)) audit({ ...base, trigger: `${churn} files changed under the worktree`, action: "churn-warning" });
     }
   }
-  void signalled;
   // Whatever ended the main command, no worker outlives it.
   const left = groupProcs(pgid).length;
   if (left) { audit({ ...base, trigger: "command ended", action: "workers-cleaned", detail: `${left} process(es)` }); await stopGroup(pgid); }
   out.end();
   const code = verdict === "ok" ? (exitCode ?? 1) : verdict === "unfinished" ? 124 : 143;
-  writeJob({ ...rec, state: verdict === "ok" ? (code === 0 ? "done" : "failed") : verdict, exitCode: code, endedAt: Math.floor(Date.now() / 1000) });
+  writeJob({ ...rec, state: verdict === "ok" ? (signalled ? "stopped" : code === 0 ? "done" : "failed") : verdict, exitCode: code, endedAt: Math.floor(Date.now() / 1000) });
   audit({ ...base, trigger: verdictWhy || `exit ${code}`, action: "finished" });
   if (verdict === "unfinished") console.error(`job.sh: UNFINISHED: ${verdictWhy}. Output and process tree saved in ${join(jobsDir(), `${id}.capture.txt`)}. This is not a pass.`);
   if (verdict === "stopped") console.error(`job.sh: STOPPED: ${verdictWhy}. Saved in ${join(jobsDir(), `${id}.capture.txt`)}. This is not a pass.`);
@@ -177,9 +193,61 @@ function orphans(stop: boolean): number {
   return 0;
 }
 
+/** The pid a dev pid file holds, or null when the file is missing or empty. */
+function pidIn(file: string): number | null { try { const v = Number(readFileSync(file, "utf-8").trim()); return Number.isInteger(v) && v > 1 ? v : null; } catch { return null; } }
+
+/**
+ * DEV-REAPER-01: stops a `bun run --hot` dev hub only when it is provably dead: its worktree's pid files do not name it (or the launcher that
+ * started it), the hub's watcher is gone, and that has held for MAIPAI_DEV_REAP_GRACE_MIN (60) minutes in a row. Only worktrees under
+ * .claude/worktrees or wt/ with a data/dev folder qualify, so the live hub and the main checkout are never touched. One audit line per stop,
+ * and dev-reaper.json (read by the admin Status row) says what was tidied.
+ */
+export function reap(dryRun: boolean, now = Math.floor(Date.now() / 1000)): number {
+  const graceS = num(process.env.MAIPAI_DEV_REAP_GRACE_MIN, 60) * 60;
+  const seenDir = join(stateDir(), "orphans-seen"); mkdirSync(seenDir, { recursive: true, mode: 0o700 });
+  const ps = spawnSync("/bin/ps", ["-axo", "pid=,ppid=,command="], { encoding: "utf-8" }).stdout ?? "";
+  const rows = ps.split("\n").flatMap((l) => { const m = /^\s*(\d+)\s+(\d+)\s+(.*)$/.exec(l); return m ? [{ pid: Number(m[1]), ppid: Number(m[2]), command: m[3]! }] : []; });
+  const hubs = rows.filter((r) => /(^|\/)bun\s+(run\s+)?--hot\b/.test(r.command) || /(^|\/)bun\s+run\s+--hot\b/.test(r.command));
+  const stopped: Array<{ ts: number; worktree: string }> = []; let waiting = 0; const keep = new Set<string>();
+  for (const h of hubs) {
+    const cwd = spawnSync("/usr/sbin/lsof", ["-a", "-d", "cwd", "-p", String(h.pid), "-Fn"], { encoding: "utf-8" }).stdout?.split("\n").find((l) => l.startsWith("n"))?.slice(1);
+    if (!cwd || !/\/(\.claude\/worktrees|wt)\//.test(cwd)) continue;
+    if (process.env.MAIPAI_DEV_REAP_ONLY_UNDER && !cwd.startsWith(process.env.MAIPAI_DEV_REAP_ONLY_UNDER)) continue; // test seam: never touch real hubs
+    const root = /\/(backend|frontend)$/.test(cwd) ? resolve(cwd, "..") : cwd;
+    const dirs = [join(root, "data", "dev"), join(root, "data", "dev", "workbench")].filter((d) => existsSync(d));
+    if (!dirs.length) continue;
+    const seenFile = join(seenDir, `${h.pid}.json`); keep.add(`${h.pid}.json`);
+    let prior: { since: number; command: string } | null = null; try { prior = JSON.parse(readFileSync(seenFile, "utf-8")); } catch { /* first look */ }
+    if (prior && prior.command !== h.command) prior = null; // a reused pid is a different process
+    const verdicts = dirs.map((d) => orphanVerdict({ pid: h.pid, ppid: h.ppid, pidFiles: { backend: pidIn(join(d, "backend.pid")), vite: pidIn(join(d, "vite.pid")), watch: pidIn(join(d, "watch.pid")) }, isAlive: alive, orphanSince: prior?.since ?? null, now, graceS }));
+    if (verdicts.some((v) => v.state === "owned")) { rmSync(seenFile, { force: true }); continue; }
+    const v = verdicts[0]!;
+    if (v.state === "orphan-waiting") { waiting++; if (!dryRun) writeFileSync(seenFile, JSON.stringify({ since: v.since, command: h.command })); console.log(`${h.pid}  no owner since ${new Date(v.since! * 1000).toISOString()}  (${cwd}); stopped after ${graceS / 60} minutes`); continue; }
+    console.log(`${h.pid}  no owner for ${graceS / 60}+ minutes  (${cwd})${dryRun ? "  [dry run: not stopped]" : ""}`);
+    if (dryRun) continue;
+    const kids = new Set<number>([h.pid]); for (let grew = true; grew;) { grew = false; for (const r of rows) if (kids.has(r.ppid) && !kids.has(r.pid)) { kids.add(r.pid); grew = true; } }
+    for (const pid of kids) { try { process.kill(pid, "SIGTERM"); } catch { /* gone */ } }
+    audit({ session: "dev-reaper", command: h.command, worktree: root, trigger: `no pid file, no watcher, for ${graceS / 60} minutes`, action: "orphan-stopped", detail: `pid ${h.pid}` });
+    rmSync(seenFile, { force: true }); stopped.push({ ts: now, worktree: root });
+  }
+  if (!dryRun) {
+    for (const f of readdirSyncSafe(seenDir)) if (!keep.has(f)) rmSync(join(seenDir, f), { force: true });
+    const reportFile = join(stateDir(), "dev-reaper.json");
+    let old: Array<{ ts: number; worktree: string }> = []; try { old = JSON.parse(readFileSync(reportFile, "utf-8")).stopped ?? []; } catch { /* none yet */ }
+    const all = [...old, ...stopped].filter((x) => now - x.ts < 86400).slice(-20);
+    writeFileSync(`${reportFile}.tmp`, JSON.stringify({ version: 1, ts: now, waiting, stopped: all })); renameSync(`${reportFile}.tmp`, reportFile);
+  }
+  if (!hubs.length) console.log("no development hubs running");
+  return 0;
+}
+const readdirSyncSafe = (d: string): string[] => { try { return readdirSync(d); } catch { return []; } };
+
+if (import.meta.main) {
 const [sub, ...rest] = process.argv.slice(2);
 if (sub === "run") process.exit(await run(rest));
 else if (sub === "list") { for (const j of readJobs().sort((a, b) => a.startedAt - b.startedAt)) console.log(`${j.id}  ${j.state.padEnd(10)} ${j.type.padEnd(6)} ${j.session}  ${j.command}${j.until ? `  until ${new Date(j.until * 1000).toISOString()}` : ""}`); }
 else if (sub === "audit") { for (const a of readAudit().slice(-(Number(rest[0]) || 30))) console.log(JSON.stringify(a)); }
 else if (sub === "orphans") process.exit(orphans(rest.includes("--stop")));
-else { console.error("usage: job.sh run [--type test|build|server|other] [--timeout D] [--lifetime D] [--session S] [--max-rss-mb N] -- <command...>\n       job.sh list | audit [n] | orphans [--stop]"); process.exit(2); }
+else if (sub === "reap") process.exit(reap(rest.includes("--dry-run")));
+else { console.error("usage: job.sh run [--type test|build|server|other] [--timeout D] [--lifetime D] [--session S] [--max-rss-mb N] -- <command...>\n       job.sh list | audit [n] | orphans [--stop] | reap [--dry-run]"); process.exit(2); }
+}

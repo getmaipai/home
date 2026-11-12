@@ -28,3 +28,15 @@ test("HOST-GUARD-07: the admin row adds the memory line only under pressure, pau
   expect(hostGuardMemoryFromJson({ ...memory, checked_at: at - 400 }, now)).toBeNull();
   expect(hostGuardMemoryFromJson({ ...memory, version: 2 }, now)).toBeNull();
 });
+
+test("DEV-REAPER-01: the admin row says unused development servers were stopped in the last hour, and only then", async () => {
+  const { withDevReaper } = await import("./hostGuard");
+  const now = 1_800_000_000_000; const at = now / 1000;
+  const view = hostGuardView(base as never);
+  expect(withDevReaper(view, null, now)).toEqual(view);
+  expect(withDevReaper(view, { version: 1, ts: at, waiting: 0, stopped: [{ ts: at - 7200, worktree: "/w" }] }, now)).toEqual(view);
+  const one = withDevReaper(view, { version: 1, ts: at, waiting: 0, stopped: [{ ts: at - 60, worktree: "/w" }] }, now).text;
+  expect(one).toContain("1 unused development server was stopped in the last hour");
+  expect(withDevReaper(view, { version: 1, ts: at, waiting: 0, stopped: [{ ts: at - 60, worktree: "/a" }, { ts: at - 90, worktree: "/b" }] }, now).text).toContain("2 unused development servers were stopped");
+  expect(one).not.toMatch(/memory|RAM/i);
+});
