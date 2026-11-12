@@ -236,7 +236,23 @@ if (( tag_after == 0 )) || [[ "$before_tag" != "$label" ]]; then
   # Do not cut off a picture, clip or chat someone is waiting on: wait for the engine to go quiet, then go on and say what was running.
   busy_cmd="${MAIPAI_SHIP_BUSY_CMD:-curl -fsS -m 5 http://127.0.0.1:${stack_port}/stack/v1/jobs | python3 -c 'import json,sys; print(sum(1 for j in json.load(sys.stdin).get(\"jobs\", []) if j.get(\"state\") in (\"queued\", \"running\")))'}"
   quiet_wait="${MAIPAI_SHIP_QUIET_WAIT:-180}"; quiet_for=0
-  while :; do
+  # DIRECT-FAST-07: the wait exists because the install restarts the Stack service, which drops running engine jobs. A direct install that
+  # leaves the Stack running (same build, same service definition, answering: the installer's own stack_keepable, read from the commit's
+  # installer) interrupts nothing, so there is nothing to wait for. Gated and unset modes, and any doubt, keep the wait.
+  stack_stays=0
+  if [[ "$ship_mode" == direct ]]; then
+    if [[ -n "${MAIPAI_SHIP_STACK_STAYS_CMD:-}" ]]; then eval "$MAIPAI_SHIP_STACK_STAYS_CMD" >/dev/null 2>&1 && stack_stays=1 || true
+    else
+      inst_tmp="$(mktemp)" && git show "$sha:scripts/install.sh" > "$inst_tmp" 2>/dev/null \
+        && bash -c 'source "$1"; stack_keepable "$2" "$(detect_os)" "$(detect_arch)" "$2/.bun/bin/bun"' _ "$inst_tmp" "$live" >/dev/null 2>&1 && stack_stays=1 || true
+      rm -f "$inst_tmp"
+    fi
+  fi
+  if (( stack_stays )); then
+    busy="$(eval "$busy_cmd" 2>/dev/null || echo 0)"; [[ "$busy" =~ ^[0-9]+$ ]] || busy=0
+    echo "ship.sh: DIRECT: the Stack stays running through this install; not waiting for engine jobs ($busy running)."
+  fi
+  while (( ! stack_stays )); do
     busy="$(eval "$busy_cmd" 2>/dev/null || echo 0)"; [[ "$busy" =~ ^[0-9]+$ ]] || busy=0
     (( busy > 0 )) || break
     if (( quiet_for >= quiet_wait )); then echo "ship.sh: $busy engine job(s) are still running after ${quiet_wait}s; installing anyway, they will be interrupted." >&2; break; fi

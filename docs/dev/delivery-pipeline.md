@@ -482,3 +482,9 @@ Proof: `scripts/installHome.test.ts` "an unchanged Stack stays running": the fin
 ### 27.4 Expected total
 
 Direct ship, phase clock of sha-df9834e: 150 s. Deno 55 s and dependencies about 15 s (27.1), build 20 s (27.2), Stack 51 s (27.3) come to about 140 s off, which leaves the fixed part: mirror fetch, archive and rsync (12 s), the app helper build, the app start and the health checks. The first direct ship after these land is slower once (the fingerprint and the hash are recorded); read the next one.
+
+### 27.5 No engine-job wait when the Stack stays up (DIRECT-FAST-07)
+
+`ship.sh` waits up to 180 s for running engine jobs before an install, because the install used to restart the Stack service and drop them. Two measured real ships (75c7517, 20b2407) spent 180 s of a 334 s edit-to-live in that wait, although the Stack was no longer restarted (27.3). In direct mode `ship.sh` now asks the installer's own predicate, `stack_keepable`, read from the installer of the commit being shipped (`git show <sha>:scripts/install.sh`, sourced in a subshell; `MAIPAI_SHIP_STACK_STAYS_CMD` replaces the question in tests): same `STACK_TAG` build here, binary present, service definition unchanged, answering. When it says yes, `ship.sh` prints `the Stack stays running through this install; not waiting for engine jobs (N running)` and goes straight on. Gated and unset modes, a commit whose installer has no such function, and any failure of the question keep the full wait. Remaining risk: the installer asks the same question again when it runs; if the answer changed in between (the Stack stopped answering), the Stack is restarted with a job running, which the old wait would have avoided. Expected: 180 s off a direct ship that has a running engine job.
+
+Proof: `scripts/ship.test.ts` "DIRECT-FAST-07": direct and stays means no wait; direct and restarts, direct with no installer to ask, gated and unset all wait.

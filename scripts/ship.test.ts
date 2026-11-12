@@ -101,6 +101,24 @@ describe("ship pipeline", () => {
       expect(existsSync(f)).toBe(false);
     } finally { rmSync(join(main, "scripts", "lib"), { recursive: true, force: true }); rmSync(f, { force: true }); }
   }, 60_000);
+  test("DIRECT-FAST-07: direct mode does not wait for engine jobs when the Stack will stay running; gated, unset and any doubt keep the wait", () => {
+    mkdirSync(join(main, "scripts", "lib"), { recursive: true }); copyFileSync(join(import.meta.dir, "lib", "mode.sh"), join(main, "scripts", "lib", "mode.sh"));
+    mkdirSync(join(watch, "green"), { recursive: true }); writeFileSync(join(watch, "green", sha), "green\n");
+    const base = { MAIPAI_SHIP_BUSY_CMD: "echo 2", MAIPAI_SHIP_QUIET_WAIT: "0" };
+    const go = (env: Record<string, string>) => { writeFileSync(join(live, ".installed-tag"), "v0.0.1\n"); return run([sha, "--reinstall"], { ...base, ...env }); };
+    try {
+      const stays = go({ MAIPAI_MODE: "direct", MAIPAI_SHIP_STACK_STAYS_CMD: "true" });
+      expect(stays.status).toBe(0); expect(stays.stdout).toContain("the Stack stays running through this install; not waiting for engine jobs (2 running)"); expect(stays.stderr).not.toContain("still running");
+      const restarts = go({ MAIPAI_MODE: "direct", MAIPAI_SHIP_STACK_STAYS_CMD: "false" });
+      expect(restarts.stderr).toContain("2 engine job(s) are still running"); expect(restarts.stdout).not.toContain("not waiting");
+      const noCheck = go({ MAIPAI_MODE: "direct" }); // the commit has no installer to ask: wait as before
+      expect(noCheck.stderr).toContain("2 engine job(s) are still running");
+      const gated = go({ MAIPAI_MODE: "gated", MAIPAI_SHIP_STACK_STAYS_CMD: "true" });
+      expect(gated.stderr).toContain("2 engine job(s) are still running"); expect(gated.stdout).not.toContain("not waiting");
+      const unset = go({ MAIPAI_MODE: "", MAIPAI_SHIP_STACK_STAYS_CMD: "true" });
+      expect(unset.stderr).toContain("2 engine job(s) are still running");
+    } finally { rmSync(join(main, "scripts", "lib"), { recursive: true, force: true }); }
+  }, 120_000);
   test("health failure rolls back", () => {
     writeFileSync(join(watch, "green", sha), "green\n"); writeFileSync(join(scratch, "health.fail"), "bad"); const out = run([sha]); expect(out.status).toBe(1);
     expect(readFileSync(join(scratch, "promote.calls"), "utf8")).toContain(sha + "\n--rollback"); expect(readFileSync(join(data, "shipped.jsonl"), "utf8")).toContain('"result":"rolled_back"'); expect(out.stdout).toContain("rolled back to v0.0.1");
