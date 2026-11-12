@@ -114,7 +114,7 @@ describe("host-tune.sh detect", () => {
 
   test("host-guard detects only when binary, daemon and status are all present", async () => {
     const state = join(sysroot, "var/db/maipai-host-guard"); mkdirSync(state, { recursive: true });
-    const binary = join(sysroot, "usr/local/libexec/maipai-host-guard"); mkdirSync(join(binary, ".."), { recursive: true }); writeFileSync(binary, "guard"); chmodSync(binary, 0o755);
+    const binary = join(sysroot, "usr/local/libexec/maipai-host-guard"); mkdirSync(join(binary, ".."), { recursive: true }); writeFileSync(binary, readFileSync(join(import.meta.dir, "host-guard", "maipai-host-guard"))); chmodSync(binary, 0o755);
     writeFileSync(join(state, "status.json"), "{}");
     const launch = join(bin, "launchctl"); writeFileSync(launch, `#!/usr/bin/env bash\necho "launchctl $*" >> "$FAKE/calls"\n[ "$1" = print ] && [ "$2" = system/com.maipai.host-guard ] && exit 0\nexit 1\n`); chmodSync(launch, 0o755);
     expect(byId((await detect()).items, "host-guard").state).toBe("ok");
@@ -315,6 +315,25 @@ describe("display-awake login service", () => {
     }
     expect(existsSync(displayPlist())).toBe(false);
     expect(calls()).not.toContain("launchctl bootstrap");
+  });
+});
+
+describe("host-tune.sh host-guard upgrade detection", () => {
+  test("an installed guard that differs from the shipped one is reported as needing an update (so the app shows Apply)", async () => {
+    // The fixture binary below is not the shipped guard, so detect must say needs with the plain 'newer self-check' text.
+    const sys = mkdtempSync(join(tmpdir(), "hostguard-upgrade-"));
+    try {
+      const state = join(sys, "var/db/maipai-host-guard"); mkdirSync(state, { recursive: true });
+      writeFileSync(join(state, "status.json"), "{}");
+      const binary = join(sys, "usr/local/libexec/maipai-host-guard"); mkdirSync(join(binary, ".."), { recursive: true }); writeFileSync(binary, "an older guard"); chmodSync(binary, 0o755);
+      const bin = join(sys, "bin"); mkdirSync(bin, { recursive: true });
+      const launch = join(bin, "launchctl"); writeFileSync(launch, "#!/usr/bin/env bash\nexit 0\n"); chmodSync(launch, 0o755);
+      const run = Bun.spawnSync(["bash", join(import.meta.dir, "host-tune.sh"), "--json", "detect"], { env: { PATH: `${bin}:${process.env.PATH ?? "/usr/bin:/bin"}`, HOME: sys, MAIPAI_HOST_TUNE_ROOT: sys }, stdout: "pipe", stderr: "pipe" });
+      const parsed = JSON.parse(new TextDecoder().decode(run.stdout)) as { items: Array<{ id: string; state: string; current: string }> };
+      const item = parsed.items.find((i) => i.id === "host-guard")!;
+      expect(item.state).toBe("needs");
+      expect(item.current).toContain("newer self-check");
+    } finally { rmSync(sys, { recursive: true, force: true }); }
   });
 });
 

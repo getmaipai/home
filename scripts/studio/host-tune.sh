@@ -158,6 +158,10 @@ load_item() {
       if [ ! -x "$guard_bin" ]; then T_STATE=needs; T_CURRENT="The self-check is not installed"; return; fi
       if ! launchctl print system/com.maipai.host-guard >/dev/null 2>&1; then T_STATE=needs; T_CURRENT="The self-check is not running"; return; fi
       if [ ! -r "$guard_status" ]; then T_STATE=needs; T_CURRENT="The self-check report is not readable"; return; fi
+      # An installed guard that is older than the one this app ships is "needs": that is what puts the Apply button back so the new guard can be delivered.
+      local guard_shipped
+      guard_shipped="$(dirname "$SELF")/host-guard/maipai-host-guard"
+      if [ -f "$guard_shipped" ] && ! cmp -s "$guard_bin" "$guard_shipped"; then T_STATE=needs; T_CURRENT="A newer self-check is ready to install: it also watches the file-event service and the memory"; return; fi
       T_STATE=ok; T_CURRENT="The self-check is running and its report can be read" ;;
     no-auto-major-upgrade)
       T_TITLE="No surprise macOS upgrades"; T_MODE=consent
