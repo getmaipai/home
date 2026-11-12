@@ -35,7 +35,7 @@ export interface TakeRun {
   id: string; companionId: string; personId: string; states: string[];
   current: { state: string; take: number; index: number; of: number } | null;
   state: TakeRunState; phase: string; percent: number; label: string;
-  cancelled: boolean; error: string | null; takesMade: number; stackJob: string | null; pack?: boolean; packJob?: string; /** The pack's shared frame in the starting picture's pixels (every pack clip is cut to it). */ packFrame?: PackFrame; packFrameSource?: Dims; /** Resolves when the run is fully settled: every finishing job done, after a cancel or a failure too. */ settled?: Promise<void>;
+  cancelled: boolean; error: string | null; takesMade: number; stackJob: string | null; pack?: boolean; packJob?: string; packGesture?: string; /** The pack's shared frame in the starting picture's pixels (every pack clip is cut to it). */ packFrame?: PackFrame; packFrameSource?: Dims; /** Resolves when the run is fully settled: every finishing job done, after a cancel or a failure too. */ settled?: Promise<void>;
 }
 const runs = new Map<string, TakeRun>();
 const activeByCompanion = new Map<string, string>();
@@ -95,6 +95,24 @@ export const PACK_MOTIONS: Record<string, string[]> = {
   thinking: ["thoughtful, eyes open, the eyes glance a little to the side for a moment then return to the camera, the gaze stays level, the head and shoulders stay still, the face evenly lit by the same soft front light"],
   speaking: ["head makes small natural talking movements with tiny nods and tilts, lips stay gently closed, eyes open and bright"],
 };
+
+export type PackGesture = { id: string; state: "speaking" | "idle"; kind: "nod" | "tilt" | "glance" | "settle"; amp: 1 | 2 | 3; motion: string };
+const gesture = (id: string, state: PackGesture["state"], kind: PackGesture["kind"], amp: PackGesture["amp"], size: string, action: string): PackGesture => ({ id, state, kind, amp, motion: `Eyes open, gaze at the camera, face evenly lit, camera locked. The person makes ${size} ${action}, then looks directly at the camera. the final frame matches the first frame` });
+export const PACK_GESTURES: readonly PackGesture[] = [
+  gesture("speak-nod-1", "speaking", "nod", 1, "a very slight", "quick nod and straight back up"),
+  gesture("speak-nod-2", "speaking", "nod", 2, "a slight", "quick nod and straight back up"),
+  gesture("speak-nod-3", "speaking", "nod", 3, "a small but clear", "nod with a small overshoot and straight back up"),
+  gesture("speak-tilt-1", "speaking", "tilt", 1, "a very slight", "head tilt to the right and straight back"),
+  gesture("speak-tilt-2", "speaking", "tilt", 2, "a slight", "head tilt to the right and straight back"),
+  gesture("speak-glance-1", "speaking", "glance", 1, "a very slight", "eye glance to the left for a moment and return"),
+  gesture("speak-settle-1", "speaking", "settle", 1, "a very slight", "shoulder settle"),
+  gesture("idle-nod-1", "idle", "nod", 1, "a very slight", "quick nod and straight back up"),
+  gesture("idle-glance-1", "idle", "glance", 1, "a very slight", "eye glance to the left for a moment and return"),
+  gesture("idle-settle-1", "idle", "settle", 1, "a very slight", "shoulder settle"),
+];
+export function packGesturePrompt(item: PackGesture, keyName: "green" | "magenta"): string {
+  return `Static locked headshot, fixed framing, camera remains still. The same person, face and lighting throughout; plain solid ${keyName} background. ${item.motion}.`;
+}
 /** The person's own character text is never part of a pack clip prompt: the start picture carries the look, and free text could ask for a wider shot, hands or a body. */
 export function packTakePrompt(_card: { text: string }, state: string, keyName: "green" | "magenta", variant = 0): string {
   const motions = PACK_MOTIONS[state] ?? PACK_MOTIONS.idle!, motion = motions[variant % motions.length]!;
@@ -166,7 +184,7 @@ async function runTakes(run: TakeRun, count: number, actor: PersonRow, motionOve
       const stored = readStates(run.companionId).states[state];
       for (let index = 1; index <= count; index++) {
         if (run.cancelled) break;
-        const prompt = run.pack ? packTakePrompt(sheet.card, state, keyName, index - 1) : takePrompt(sheet.card, chosenMotion(state, stored?.motion), keyName);
+        const prompt = run.pack ? (run.packGesture ? packGesturePrompt(PACK_GESTURES.find((item) => item.id === run.packGesture)!, keyName) : packTakePrompt(sheet.card, state, keyName, index - 1)) : takePrompt(sheet.card, chosenMotion(state, stored?.motion), keyName);
         run.current = { state, take: index, index: stateIndex + 1, of: run.states.length };
         run.phase = "generating"; run.percent = Math.round(((run.takesMade) / (run.states.length * count)) * 100);
         const makingLabel = `Making the ${stateLabel(state)} animation${count > 1 ? ` (try ${index} of ${count})` : ""}`;
@@ -269,7 +287,7 @@ async function runTakes(run: TakeRun, count: number, actor: PersonRow, motionOve
 
 function stateLabel(state: string): string { return state.split("_").map((part) => part[0]!.toUpperCase() + part.slice(1)).join(" "); }
 
-export async function startStateTakes(input: { actor: PersonRow; companionId: string; states: string[]; count: number; motion?: string; pack?: { job: string; frame?: PackFrame; frameSource?: Dims } }): Promise<string> {
+export async function startStateTakes(input: { actor: PersonRow; companionId: string; states: string[]; count: number; motion?: string; pack?: { job: string; gesture?: string; frame?: PackFrame; frameSource?: Dims } }): Promise<string> {
   const promptText = input.states.map((state) => {
     const current = readStates(input.companionId).states[state], motion = input.motion ?? current?.motion ?? stateRows.find((row) => row.id === state)?.motion ?? "";
     const card = readLook(input.companionId).sheet?.card;
@@ -297,7 +315,7 @@ export async function startStateTakes(input: { actor: PersonRow; companionId: st
   try {
     if (!quickVideoReady(engineStatus)) throw Object.assign(new Error(TAKE_QUICK_NOT_READY_LINE), { status: 503 });
     const id = crypto.randomUUID();
-    const run: TakeRun = { id, companionId: input.companionId, personId: input.actor.id, states: input.states, current: null, state: "queued", phase: "queued", percent: 0, label: "Getting ready to make animations", cancelled: false, error: null, takesMade: 0, stackJob: null, ...(input.pack ? { pack: true, packJob: input.pack.job, ...(input.pack.frame ? { packFrame: input.pack.frame, ...(input.pack.frameSource ? { packFrameSource: input.pack.frameSource } : {}) } : {}) } : {}) };
+    const run: TakeRun = { id, companionId: input.companionId, personId: input.actor.id, states: input.states, current: null, state: "queued", phase: "queued", percent: 0, label: "Getting ready to make animations", cancelled: false, error: null, takesMade: 0, stackJob: null, ...(input.pack ? { pack: true, packJob: input.pack.job, ...(input.pack.gesture ? { packGesture: input.pack.gesture } : {}), ...(input.pack.frame ? { packFrame: input.pack.frame, ...(input.pack.frameSource ? { packFrameSource: input.pack.frameSource } : {}) } : {}) } : {}) };
     runs.set(id, run); activeByCompanion.set(input.companionId, id);
     run.settled = runTakes(run, input.count, input.actor, input.motion).catch(() => undefined).then(() => undefined);
     return id;

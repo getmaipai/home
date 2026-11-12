@@ -1,3 +1,4 @@
+import { PACK_GESTURES } from "@/lib/companionTakes";
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import sharp from "sharp";
 import { OpenAPIHono } from "@hono/zod-openapi";
@@ -169,7 +170,7 @@ describe("make_character driver", () => {
     expect(a.out.some((l) => l.startsWith("clips: done"))).toBe(true);
     expect(a.out.join("\n")).toContain("WAITING for approval B"); expect(a.out.join("\n")).toContain("--approve B");
     expect(a.out.join("\n")).toContain("/api/companions/");
-    expect(a.out.filter((l) => l.startsWith("CLIP ")).length).toBe(5); expect(a.out.join("\n")).toContain(`${BASE}/api/companions/${id}/states/idle/take-`);
+    expect(a.out.filter((l) => l.startsWith("CLIP ")).length).toBe(5 + PACK_GESTURES.length); expect(a.out.join("\n")).toContain(`${BASE}/api/companions/${id}/states/idle/take-`);
     expect(readPackJob(id)!.approvals.B).toBeNull(); // nothing approved by itself
     const b = drive({ approve: "B" }); expect(await b.run()).toBe(2);
     expect(b.out.join("\n")).toContain("WAITING for approval C"); expect(b.out.join("\n")).toContain(`PACK: ${BASE}/api/companions/${id}/pack-job/preview/pack.json`); expect(b.out.some((l) => l.startsWith("validate: done"))).toBe(true);

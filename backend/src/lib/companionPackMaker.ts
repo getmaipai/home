@@ -20,7 +20,7 @@ import { getHouseholdCompanion, householdCompanionFolder, listHouseholdCompanion
 import { checkCompanionArt, dirAssets, takeAssets, type CompanionAudience } from "@/lib/companionArtCheck";
 import { keyOut, readLook, versionOriginalPath, versionPath } from "@/lib/companionLook";
 import { readStates, saveStates, writeKeyframe, removeKeyframe, keyframePath, finishJobIds, takePath, ensureCompanionMediaRoot } from "@/lib/companionStates";
-import { cancelTakeRun, startStateTakes, takeRunFor, takeRunSettled } from "@/lib/companionTakes";
+import { cancelTakeRun, PACK_GESTURES, startStateTakes, takeRunFor, takeRunSettled } from "@/lib/companionTakes";
 import { createHash } from "node:crypto";
 import { packFolderProblems } from "@/lib/companionPack";
 import { createJob, updateJob } from "@/lib/jobs";
@@ -168,7 +168,7 @@ function jobFailure(job: unknown, fallback: string): string {
 export interface MadeTake { take: string; ok: boolean; /** True when the safety check refused the take: the job closes, no re-roll. */ art: boolean; reasons: string[] }
 export interface ClipMaker {
   /** Makes `count` candidate takes for one state through the existing take code, tagged with the pack job; returns each finished take (a failed one carries its reasons). */
-  makeTakes(input: { actor: PersonRow; companionId: string; state: string; count: number; job: string; /** The pack's shared frame (source pixels) and the size of the picture it is defined in: every clip is cut to it. */ frame?: PackFrame; frameSource?: Dims; signal: AbortSignal; onRun(id: string | null): void; /** Every Stack job (the video and the clip finishing) as it is seen. */ onJob(id: string): void }): Promise<MadeTake[]>;
+  makeTakes(input: { actor: PersonRow; companionId: string; state: string; count: number; job: string; gesture?: string; /** The pack's shared frame (source pixels) and the size of the picture it is defined in: every clip is cut to it. */ frame?: PackFrame; frameSource?: Dims; signal: AbortSignal; onRun(id: string | null): void; /** Every Stack job (the video and the clip finishing) as it is seen. */ onJob(id: string): void }): Promise<MadeTake[]>;
 }
 export interface PackDeps {
   ops: PackOpsClient;
@@ -181,9 +181,9 @@ export interface PackDeps {
 /** The clips through the existing take code (CMEDIA-STATES): one run at a time, polled until it settles. Takes are attributed by the pack job tag the take code writes, never by "new since before". */
 export const takeDeps = { start: startStateTakes };
 export const TakeClipMaker: ClipMaker = {
-  async makeTakes({ actor, companionId, state, count, job, frame, frameSource, signal, onRun, onJob }) {
+  async makeTakes({ actor, companionId, state, count, job, gesture, frame, frameSource, signal, onRun, onJob }) {
     const before = new Set((readStates(companionId).states[state]?.takes ?? []).map((t) => t.id));
-    const run = await takeDeps.start({ actor, companionId, states: [state], count, pack: { job, ...(frame ? { frame } : {}), ...(frameSource ? { frameSource } : {}) } });
+    const run = await takeDeps.start({ actor, companionId, states: [state], count, pack: { job, ...(gesture ? { gesture } : {}), ...(frame ? { frame } : {}), ...(frameSource ? { frameSource } : {}) } });
     onRun(run);
     try {
       for (;;) {
@@ -257,7 +257,7 @@ export interface PackJobRecord {
   notes: string[];
   /** Takes this job made (also tagged `pack_job` in the states file), so a closed job can remove them. */
   takes: Array<{ state: string; take: string }>;
-  clips: Array<{ state: string; take: string }>;
+  clips: Array<{ state: string; take: string; gesture?: { id: string; kind: "nod" | "tilt" | "glance" | "settle"; amp: 1 | 2 | 3 } }>;
   /** Keyframes this job wrote, with the hash of what it wrote: only a file that still matches is ever removed (a person's own keyframe, or one changed since, stays). */
   keyframes: Array<{ state: string; sha: string }>;
   created_at: string; updated_at: string;
@@ -477,7 +477,7 @@ export function publicPackJob(rec: PackJobRecord) {
   return {
     job: rec.job, notes: rec.notes ?? [], status: rec.status, stage: rec.stage, waiting_for: rec.waiting_for, error: rec.error, interrupted: packJobInterrupted(rec), still_id: rec.still_id, shapes: rec.shapes, box: rec.box ?? null, face_height_px: rec.face_height_px ?? null, eyes: rec.eyes ?? null,
     // At approval B: the take ids and the playable clip URLs (the existing states file route). Nothing else is exposed, and every one of these clips already passed the art check in the clips stage.
-    clips: rec.status === "waiting_approval" && rec.waiting_for === "B" ? rec.clips.map(({ state, take }) => ({ state, take, url: `/api/companions/${encodeURIComponent(rec.companion_id)}/states/${state}/${take}/clip.h264.mp4` })) : [],
+    clips: rec.status === "waiting_approval" && rec.waiting_for === "B" ? rec.clips.map(({ state, take, gesture }) => ({ state, take, ...(gesture ? { gesture } : {}), url: `/api/companions/${encodeURIComponent(rec.companion_id)}/states/${state}/${take}/clip.h264.mp4` })) : [],
     // At approval C (and once done): where to look at the pack. Before install it is the preview route over the work folder (installed false); after install it is the served pack (installed true, PACK-06, with Range).
     preview: packPreviewBlock(rec),
     approvals: rec.approvals,
@@ -620,9 +620,9 @@ const packOut = (id: string): string => join(workDir(id), "pack-out", "pack");
 /** The clips in the order they were made, each with the name it carries in the staging folder (idle-1, idle-2, listening-1, ...). */
 /** The pack spec's state names (`listen`, `think`, `speak`) for the household synth's states; the player maps its modes to the same names. The first real pack used the household names and failed the spec. */
 export const PACK_STATE: Record<string, string> = { idle: "idle", listening: "listen", thinking: "think", speaking: "speak" };
-function clipNames(rec: PackJobRecord): Array<{ state: string; take: string; name: string }> {
+function clipNames(rec: PackJobRecord): Array<{ state: string; take: string; name: string; gesture?: { id: string; kind: "nod" | "tilt" | "glance" | "settle"; amp: 1 | 2 | 3 } }> {
   const seen: Record<string, number> = {};
-  return rec.clips.map(({ state, take }) => { const pack = PACK_STATE[state] ?? state; return { state, take, name: `${pack}-${(seen[pack] = (seen[pack] ?? 0) + 1)}` }; });
+  return rec.clips.map(({ state, take, gesture }) => { const pack = PACK_STATE[state] ?? state; return { state, take, ...(gesture ? { gesture } : {}), name: gesture ? `${pack}-g-${gesture.id.replace(/^(speak|idle)-/, "")}` : `${pack}-${(seen[pack] = (seen[pack] ?? 0) + 1)}` }; });
 }
 
 /** The starting picture's pixels to the green source's pixels (the edit may return another size). */
@@ -673,7 +673,7 @@ const STAGE_RUNNERS: Record<PackStage, (ctx: Ctx) => Promise<Record<string, unkn
   },
 
   async clips(ctx) {
-    const made: Array<{ state: string; take: string }> = [];
+    const made: Array<{ state: string; take: string; gesture?: { id: string; kind: "nod" | "tilt" | "glance" | "settle"; amp: 1 | 2 | 3 } }> = [];
     // A clips stage that runs again (a resume, a retry) starts from none of its own earlier takes.
     purgeTakes(ctx.rec, new Set()); ctx.rec.takes = []; ctx.rec.clips = [];
     // The takes start from the checked green source: a state with no picture of its own gets it as its keyframe (a person's own keyframe stays).
@@ -700,6 +700,27 @@ const STAGE_RUNNERS: Record<PackStage, (ctx: Ctx) => Promise<Record<string, unkn
         }
         if (good.length < need) throw Object.assign(new Error(`The ${state} clip did not come out after ${CLIP_REROLLS + 1} tries.`), { reasons: [`The ${state} clip did not come out after ${CLIP_REROLLS + 1} tries.${reasons.length ? ` ${[...new Set(reasons)].join(" ")}` : ""}`] });
         for (const take of good) made.push({ state, take });
+      }
+      if (process.env.MAIPAI_PACK_GESTURES !== "0") {
+        for (const item of PACK_GESTURES) {
+          const reasons: string[] = []; let accepted: string | null = null;
+          for (let attempt = 0; attempt <= CLIP_REROLLS && !accepted; attempt++) {
+            if (ctx.run.controller.signal.aborted) return;
+            let takes: MadeTake[];
+            try { takes = await deps.clips.makeTakes({ actor: ctx.actor, companionId: ctx.id, state: item.state, count: 1, job: ctx.rec.job, gesture: item.id, ...(await frameFor(ctx)), signal: ctx.run.controller.signal, onRun: (id) => { ctx.run.takeRun = id; }, onJob: hooks(ctx).onJob }); }
+            catch (error) { if (ctx.run.controller.signal.aborted || error instanceof ClosedError) throw error; reasons.push(error instanceof Error ? error.message : String(error)); continue; }
+            for (const t of takes) {
+              if (!ctx.rec.takes.some((entry) => entry.state === item.state && entry.take === t.take)) ctx.rec.takes.push({ state: item.state, take: t.take });
+              save(ctx.rec);
+              if (t.art) throw Object.assign(new ClosedError(t.reasons.join(" ") || PACK_CHECK_CLOSED_LINE), { reasons: t.reasons.length ? t.reasons : [PACK_CHECK_CLOSED_LINE] });
+              if (!t.ok) { reasons.push(...t.reasons); continue; }
+              const seconds = readStates(ctx.id).states[item.state]?.takes.find((x) => x.id === t.take)?.report?.seconds ?? null;
+              await guard(ctx, await takeAssets(ctx.id, item.state, t.take, seconds), "video"); accepted = t.take; break;
+            }
+          }
+          if (accepted) made.push({ state: item.state, take: accepted, gesture: { id: item.id, kind: item.kind, amp: item.amp } });
+          else { ctx.rec.notes = [...new Set([...(ctx.rec.notes ?? []), `Gesture ${item.id} was dropped after ${CLIP_REROLLS + 1} tries.${reasons.length ? ` ${[...new Set(reasons)].join(" ")}` : ""}`])]; save(ctx.rec); }
+        }
       }
     } catch (error) {
       removeOwnKeyframes(ctx.rec); save(ctx.rec); // a failed or stopped clips stage leaves no green-source keyframe behind
@@ -822,7 +843,19 @@ const STAGE_RUNNERS: Record<PackStage, (ctx: Ctx) => Promise<Record<string, unkn
     if (!result.ok) opFailed("The pack", result);
     if (!existsSync(join(packOut(ctx.id), "pack.json"))) throw Object.assign(new Error("The pack was not written. Try again."), { reasons: ["The pack was not written. Try again."] });
     // The Stack's pack op does not write the optional `source` frame yet (spec 0.1.366): the layers are pixels of the 480 tile starting at x0 0, not of the demo's 576 frame at x0 224, so the player needs it to place the mouth and eyes.
-    try { const file = join(packOut(ctx.id), "pack.json"), pack = JSON.parse(readFileSync(file, "utf8")) as Record<string, unknown>; if (pack.source === undefined) { pack.source = { x0: 0, size: PACK_FRAME_PX }; writeFileSync(file, JSON.stringify(pack)); } } catch { /* validate reports an unreadable pack.json */ }
+    try {
+      const file = join(packOut(ctx.id), "pack.json"), pack = JSON.parse(readFileSync(file, "utf8")) as Record<string, any>;
+      if (pack.source === undefined) pack.source = { x0: 0, size: PACK_FRAME_PX };
+      const gestureClips = clipNames(ctx.rec).filter((clip) => clip.gesture);
+      if (gestureClips.length) for (const clip of gestureClips) for (const clips of Object.values(pack.states ?? {}) as Array<Array<Record<string, any>>>) for (const entry of clips) {
+        if (typeof entry.file === "string" && entry.file.replace(/\.[^.]+$/, "") === clip.name) {
+          entry.gesture = { kind: clip.gesture!.kind, amp: clip.gesture!.amp };
+          const frames = entry.frames;
+          if (Number.isInteger(frames) && frames > 0) entry.rest = { first: 0, last: frames - 1 };
+        }
+      }
+      writeFileSync(file, JSON.stringify(pack));
+    } catch { /* validate reports an unreadable pack.json */ }
     return result.report;
   },
 

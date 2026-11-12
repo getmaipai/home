@@ -174,3 +174,7 @@ Run on a dev hub (Sage, demo household) against a scratch Stack built from Stack
 ## Verified for VIDEO-UI-15
 
 Opened on a dev hub (Sage) at 1440 and 390 wide, light and dark, with eight seeded clips and one clip run live (queued, then a percent, then the video, in the media look, no reload). The Stack was a scripted video Stack on a scratch port that answers the video routes with the package loops, not the real engine. The pass found that the wide Style popover ran 68 px off the right edge at 1440 (it opens to the right of the left panel); fixed in commons `ui-v0.5.476` (width capped at Radix's available width). At 1440 with the app sidebar open the feed pane is about 500 px, so the feed is one column; the grid starts at a 41 rem pane (about 1560 px window). Not seen: a real clip from the real engine, a granted Max card in the ready state, hover actions by pointer.
+
+## Synth gestures
+
+The pack maker generates optional one-shot headshot gestures alongside the ordinary idle, listening, thinking and speaking loops. They are made in the `clips` stage through the existing take pipeline and checked like other clips. The kit's `synth-motion` player plays clips marked with gesture metadata. Set `MAIPAI_PACK_GESTURES=0` to skip them during a fast run.

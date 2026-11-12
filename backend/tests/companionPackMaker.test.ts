@@ -29,6 +29,8 @@ import {
 import type { PersonRow } from "@/types";
 import { resetDb } from "./reset-db";
 import sharp from "sharp";
+import { PACK_GESTURES, packGesturePrompt } from "@/lib/companionTakes";
+import { __setVideoStatusForTests, readyVideoStatusForTests } from "@/lib/videos/ready";
 
 const app = new OpenAPIHono();
 app.route("/api/companions", companionsRoutes);
@@ -86,7 +88,7 @@ function fakes(id: string): Fakes {
       if (kind === "media.companion_track") writeFileSync(join(out, "track.json"), JSON.stringify({ m: [], res: [], cc: [], low: [], frames: 0 }));
       if (kind === "media.companion_shapes") { mkdirSync(join(out, "shapes", "calm"), { recursive: true }); for (const name of ops.shapesWrite) writeFileSync(join(out, "shapes", "calm", name), png()); }
       if (kind === "media.companion_emotion") { mkdirSync(join(out, "emotion"), { recursive: true }); writeFileSync(join(out, "emotion", "angry.png"), png()); writeFileSync(join(out, "emotion", "meta.json"), "{}"); }
-      if (kind === "media.companion_pack") writePack(join(out, "pack"));
+      if (kind === "media.companion_pack") writePack(join(out, "pack"), input.descriptor as { states: Record<string, string[]> });
       return { ok: true, reasons: [], report: { ok: true } };
     },
     async cancel(job) { ops.cancelled.push(job); },
@@ -122,8 +124,14 @@ function fakes(id: string): Fakes {
 }
 
 /** A pack that passes the spec validator: the spec's fixture manifest with a placeholder for every file it names. */
-function writePack(dir: string) {
+function writePack(dir: string, descriptor?: { states: Record<string, string[]> }) {
   const pack = JSON.parse(readFileSync(specFixture, "utf8"));
+  if (descriptor) {
+    for (const [state, names] of Object.entries(descriptor.states)) {
+      pack.states[state] = names.map((name, i) => ({ id: name, file: `clips/${name}.mp4`, fps: 24, frames: 117, rest: { first: 0, last: 116 }, track: Array(117).fill(1), trackFile: `clips/${name}.track.json`, encoding: "stacked-alpha-h264", ...(i === 0 ? {} : {}) }));
+    }
+  }
+  // The pack op's test result mirrors the clip list handed in by the maker, including an independently named gesture file.
   const put = (rel: string, body: string) => { mkdirSync(dirname(join(dir, rel)), { recursive: true }); writeFileSync(join(dir, rel), body); };
   put("pack.json", JSON.stringify(pack)); put(pack.rest, "webp-bytes");
   for (const clips of Object.values<any[]>(pack.states)) for (const c of clips) { put(c.file, "0123456789"); put(c.trackFile, "[]"); if (c.phone) put(c.phone, "phone"); }
@@ -144,26 +152,46 @@ function setup(audience: "adult" | "teen" | "all" = "adult"): string {
   return cid;
 }
 
+const originalGestureSetting = process.env.MAIPAI_PACK_GESTURES;
 beforeEach(() => {
+  delete process.env.MAIPAI_PACK_GESTURES;
+  __setVideoStatusForTests(readyVideoStatusForTests());
   resetDb(); rmSync(root, { recursive: true, force: true }); __resetCompanionStatesForTests(); __clearPackJobsForTests(); n = 0;
   owner = addPerson("maker-owner", "owner"); child = addPerson("maker-child", "child", "2018-01-01"); other = addPerson("maker-other", "member", "1990-01-01");
   __setAgeCheckRunnerForTests(async (images) => images.map(() => okVerdict())); __setChildSafetyRunnerForTests(async (images) => images.map(() => cartoon) as never);
   __setKeyframesForTests(async () => [new Uint8Array([7])]);
   id = setup();
 });
-afterEach(() => { __setRenameForTests(null); setHouseholdSettingValue("generation.video.enabled", true); __clearPackJobsForTests(); __setPackDepsForTests(null); __resetAgeCheckForTests(); __setChildSafetyRunnerForTests(null); __setKeyframesForTests(null); __setStackClientForTests(null); rmSync(root, { recursive: true, force: true }); __resetCompanionStatesForTests(); });
+afterEach(() => { __setRenameForTests(null); setHouseholdSettingValue("generation.video.enabled", true); __clearPackJobsForTests(); __setPackDepsForTests(null); __resetAgeCheckForTests(); __setChildSafetyRunnerForTests(null); __setKeyframesForTests(null); __setStackClientForTests(null); __setVideoStatusForTests(undefined); if (originalGestureSetting === undefined) delete process.env.MAIPAI_PACK_GESTURES; else process.env.MAIPAI_PACK_GESTURES = originalGestureSetting; rmSync(root, { recursive: true, force: true }); __resetCompanionStatesForTests(); });
 
 async function runTo(rec: ReturnType<typeof readPackJob>, status: PackJobStatus) { await waitPackJob(id); const now = readPackJob(id)!; expect(now.status).toBe(status); return now ?? rec; }
 
+describe("the synth gesture prompt catalog", () => {
+  test("motions are concise positive instructions and include a closed loop", () => {
+    expect(PACK_GESTURES.length).toBeGreaterThan(0);
+    for (const item of PACK_GESTURES) {
+      expect(typeof item.id).toBe("string"); expect(item.state).toMatch(/^(speaking|idle)$/); expect(typeof item.kind).toBe("string"); expect(typeof item.amp).toBe("number");
+      const words = item.motion.trim().split(/\s+/);
+      expect(words.length).toBeGreaterThanOrEqual(20); expect(words.length).toBeLessThanOrEqual(40);
+      expect(item.motion.toLowerCase()).not.toMatch(/\b(no|not|blink|breath|calm|rest|sigh)\b/);
+      expect(packGesturePrompt(item, "green")).toMatch(/the final frame matches the first frame\.$/);
+    }
+  });
+});
+
 describe("the pack job state machine", () => {
   test("happy path: stages in order, three approvals, the pack installed validates, every output was checked", async () => {
+    delete process.env.MAIPAI_PACK_GESTURES;
     const f = fakes(id); __setPackDepsForTests(f.deps);
     const started = await startPackJob({ actor: person("maker-owner"), companionId: id, stillId, shapes: "photo" });
     expect(started.ok).toBe(true);
     let rec = await runTo(null, "waiting_approval");
     expect(rec.waiting_for).toBe("B");
+    expect(rec.clips.filter((clip) => clip.gesture).length).toBe(PACK_GESTURES.length);
+    expect(rec.clips.filter((clip) => !clip.gesture).map((clip) => clip.state)).toEqual(["idle", "idle", "listening", "thinking", "speaking"]);
+    expect(rec.clips.find((clip) => clip.gesture?.id === "speak-nod-1")).toMatchObject({ state: "speaking", gesture: { kind: "nod", amp: 1 } });
     expect(rec.stages.source.status).toBe("done"); expect(rec.stages.clips.status).toBe("done"); expect(rec.stages.track.status).toBe("pending");
-    expect(f.clips.calls).toBe(PACK_CLIP_STATES.length); // idle once for its two, then one call each
+    expect(f.clips.calls).toBe(1 + (PACK_CLIP_STATES.length - 1) + PACK_GESTURES.length); // two idle takes are requested together, then each state and gesture
     expect((await approvePackStage(id, person("maker-owner"), "C")).ok).toBe(false);
     expect((await approvePackStage(id, person("maker-owner"), "B")).ok).toBe(true);
     rec = await runTo(null, "waiting_approval");
@@ -172,7 +200,7 @@ describe("the pack job state machine", () => {
     expect((await approvePackStage(id, person("maker-owner"), "C")).ok).toBe(true);
     rec = await runTo(null, "done");
     expect(Object.values(rec.stages).every((s) => s.status === "done")).toBe(true);
-    expect(f.ops.calls).toEqual(["media.companion_track", "media.companion_track", "media.companion_track", "media.companion_track", "media.companion_track", "media.companion_shapes", "media.companion_emotion", "media.companion_pack"]);
+    expect(f.ops.calls).toEqual([...Array(5 + PACK_GESTURES.length).fill("media.companion_track"), "media.companion_shapes", "media.companion_emotion", "media.companion_pack"]);
     expect(f.ops.eyes!.slice(0, 2)).toEqual([24, 24]); expect(f.ops.eyes![2]).toBeCloseTo((0 - 14) * 480 / 36, 3); expect(f.ops.eyes![3]).toBeCloseTo((24 - 14) * 480 / 36, 3); // leftEye = points 0..23, rightEye = 24..47, in the pack frame
     expect(rec.notes).toContain("head and eyes layers: skipped, not supported yet");
     expect(readCompanionPack(id)).not.toBeNull(); // validateCompanionPack through packFolderProblems on the installed folder
@@ -182,7 +210,7 @@ describe("the pack job state machine", () => {
     const labels = f.checks.map((c) => c.label);
     expect(labels.filter((l) => l === "The green source picture").length).toBe(1);
     expect(labels.filter((l) => l.startsWith("The mouth picture")).length).toBe(TALK_LETTERS.length);
-    expect(labels.filter((l) => /^The (idle|listening|thinking|speaking) (still|clip frames|phone clip frames)/.test(l)).length).toBe(5 * 3); // each take: its still, its clip frames and its phone twin
+    expect(labels.filter((l) => /^(The (idle|listening|thinking|speaking) (still|clip frames|phone clip frames)|The (idle|speaking) gesture)/.test(l)).length).toBe((PACK_CLIP_STATES.length + 1 + PACK_GESTURES.length) * 3); // every take: its still, its clip frames and its phone twin
     expect(labels.filter((l) => l.endsWith("pose")).length).toBe(EMOTIONS.length);
     expect(labels.some((l) => l.startsWith("A mouth shape tile"))).toBe(true); expect(labels.some((l) => l.startsWith("An emotion tile"))).toBe(true);
     expect(labels.filter((l) => l.startsWith("The pack to install")).length).toBeGreaterThan(0);
@@ -272,7 +300,7 @@ describe("MAKER-D2: previews and the stylised path", () => {
     await waitPackJob(id);
     const b = await (await get(`companions/${id}/pack-job`, owner)).json() as any;
     expect(atB.clips).toEqual([]); expect(b.waiting_for).toBe("B"); expect(b.preview).toBeNull();
-    expect(b.clips.map((c: any) => c.state).sort()).toEqual(["idle", "idle", "listening", "speaking", "thinking"]);
+    expect(b.clips.filter((c: any) => !c.gesture).map((c: any) => c.state).sort()).toEqual(["idle", "idle", "listening", "speaking", "thinking"]); expect(b.clips.filter((c: any) => c.gesture).length).toBe(PACK_GESTURES.length);
     for (const c of b.clips) { expect(c.url).toBe(`/api/companions/${id}/states/${c.state}/${c.take}/clip.h264.mp4`); expect((await get(c.url.replace("/api/", ""), owner)).status).toBe(200); }
     await approvePackStage(id, person("maker-owner"), "B"); await waitPackJob(id);
     const c = await (await get(`companions/${id}/pack-job`, owner)).json() as any;
@@ -321,7 +349,7 @@ describe("MAKER-D2: previews and the stylised path", () => {
     const f = fakes(id); __setPackDepsForTests(f.deps);
     await stylisedStart(); await runTo(null, "waiting_approval");
     const first = readPackJob(id)!, oldJobs = Object.values(first.stages).flatMap((st) => st.stack_jobs), oldTakes = first.clips.map((c) => `${c.state}/${c.take}`);
-    expect(oldJobs.length).toBeGreaterThan(0); expect(oldTakes.length).toBe(5);
+    expect(oldJobs.length).toBeGreaterThan(0); expect(oldTakes.length).toBe(5 + PACK_GESTURES.length);
     __clearPackJobsForTests();
     const clipCalls = f.clips.calls;
     expect(await stylisedStart()).toMatchObject({ ok: true, resumed: true }); await runTo(null, "waiting_approval");
@@ -777,7 +805,7 @@ describe("item B: cancel then resume re-makes the clips", () => {
     expect(await startPackJob({ actor: person("maker-owner"), companionId: id, stillId, shapes: "photo" })).toMatchObject({ ok: true, resumed: true });
     await waitPackJob(id);
     const rec = readPackJob(id)!; expect(rec.status).toBe("waiting_approval"); expect(rec.waiting_for).toBe("B");
-    expect(f.clips.calls).toBe(clipCalls + PACK_CLIP_STATES.length); expect(rec.clips.length).toBe(5);
+    expect(f.clips.calls).toBe(clipCalls + PACK_CLIP_STATES.length + PACK_GESTURES.length); expect(rec.clips.length).toBe(5 + PACK_GESTURES.length);
   });
 });
 
@@ -891,7 +919,7 @@ describe("one shared pack frame (the clips, rest, mouth pictures and poses all u
     const f = fakes(id), rec = await startAndRun(f);
     expect(rec.frame).toEqual(EXPECTED_FRAME); expect(rec.frame_source).toEqual({ width: 64, height: 64 });
     expect(JSON.parse(readFileSync(join(householdCompanionFolder(id)!, "pack-job", "state.json"), "utf8")).frame).toEqual(EXPECTED_FRAME);
-    expect(f.clips.frames.length).toBe(PACK_CLIP_STATES.length);
+    expect(f.clips.frames.length).toBe(PACK_CLIP_STATES.length + PACK_GESTURES.length);
     for (const call of f.clips.frames) expect(call).toEqual({ frame: EXPECTED_FRAME, frameSource: { width: 64, height: 64 } });
     const meta = await sharp(workFile("rest_480.png")).metadata();
     expect([meta.width, meta.height, meta.channels]).toEqual([480, 480, 4]); // the keyed rest, with alpha
@@ -919,12 +947,12 @@ describe("one shared pack frame (the clips, rest, mouth pictures and poses all u
     const f = fakes(id); await startAndRun(f);
     await approvePackStage(id, person("maker-owner"), "B"); await runTo(null, "waiting_approval");
     const tracks = f.ops.inputs.filter((c) => c.kind === "media.companion_track");
-    expect(tracks.length).toBe(5);
+    expect(tracks.length).toBe(5 + PACK_GESTURES.length);
     for (const t of tracks) { expect(t.input.clip_stacked).toBe(true); expect(String(t.input.rest)).toEndWith("/work/rest_track_480.png"); }
     // every op that got a rest read a 480x480 one: the track op an opaque one flattened over black (the clip's own background), the others the RGBA one
     expect(f.ops.restSizes.every((s) => s[0] === 480 && s[1] === 480)).toBe(true);
-    expect(f.ops.restSizes.slice(0, 5).every((s) => s[2] === 3)).toBe(true); expect(f.ops.restSizes.slice(5).every((s) => s[2] === 4)).toBe(true);
-    expect(f.ops.restSizes.length).toBe(5 + 3); // track x5, shapes, emotion, pack
+    expect(f.ops.restSizes.slice(0, 5 + PACK_GESTURES.length).every((s) => s[2] === 3)).toBe(true); expect(f.ops.restSizes.slice(5 + PACK_GESTURES.length).every((s) => s[2] === 4)).toBe(true);
+    expect(f.ops.restSizes.length).toBe(5 + PACK_GESTURES.length + 3); // track x(5 + gestures), shapes, emotion, pack
     const shapes = f.ops.inputs.find((c) => c.kind === "media.companion_shapes")!.input;
     const atX = ((10 - 14) * 480) / 36, atY = ((10 - 4) * 480) / 36; // the fake face has its first outer-lip point at (10, 10); the frame starts at (14, 4) and is 36 wide
     expect(shapes.landmarks.calm.B.outerLips[0][0]).toBeCloseTo(atX, 3); expect(shapes.landmarks.calm.B.outerLips[0][1]).toBeCloseTo(atY, 3);

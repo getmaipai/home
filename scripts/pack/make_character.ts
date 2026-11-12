@@ -15,7 +15,7 @@ export interface MakeOptions {
 }
 export interface MakeIo { fetch: (url: string, init?: RequestInit) => Promise<Response>; out: (line: string) => void; sleep: (ms: number) => Promise<void>; cookie?: string; secret?: string; person?: string; readFile?: (path: string) => string }
 interface StageView { name: string; status: string; reasons: string[]; stack_jobs: string[] }
-interface ClipView { state: string; take: string; url: string }
+interface ClipView { state: string; take: string; url: string; gesture?: { id: string; kind: string; amp: number } }
 interface JobView { clips?: ClipView[]; preview?: { pack_url_base: string; pack_json_url: string; installed: boolean } | null; status: string; stage: string | null; waiting_for: "A" | "B" | "C" | null; error: string | null; interrupted?: boolean; notes?: string[]; stages: StageView[] }
 
 export const LIVE_HUB_LINE = "That address is the live hub (the family's installed Home). Point --dev-url at a worktree dev hub (bun run dev), or pass --i-mean-the-live-hub when the owner said so.";
@@ -42,7 +42,7 @@ async function signIn(io: MakeIo, base: string): Promise<string> {
 /** What to look at when the job waits, and the command that approves it. */
 export function approvalHelp(o: MakeOptions, stage: string, base: string, job?: JobView): string[] {
   const id = encodeURIComponent(o.companion), cmd = `bun run scripts/pack/make_character.ts --companion ${o.companion} --dev-url ${base} --approve ${stage}`;
-  if (stage === "B") return [`LOOK: the idle loops and the listen, think and speak clips.`, ...(job?.clips ?? []).map((c) => `CLIP ${c.state} ${c.take}: ${base}${c.url}`), "CHECK: no green edge, no winks or blinks that jump, steady lighting, the face and clothes stay the same.", `APPROVE: ${cmd}`];
+  if (stage === "B") return [`LOOK: the idle loops and the listen, think and speak clips.`, ...(job?.clips ?? []).map((c) => `CLIP ${c.state} ${c.take}${c.gesture ? ` (${c.gesture.kind} ${c.gesture.amp})` : ""}: ${base}${c.url}`), "CHECK: no green edge, no winks or blinks that jump, steady lighting, the face and clothes stay the same.", `APPROVE: ${cmd}`];
   if (stage === "C") return [`LOOK: the assembled pack in the player.`, ...(job?.preview ? [`PACK: ${base}${job.preview.pack_json_url} (base ${base}${job.preview.pack_url_base}; ${job.preview.installed ? "the installed pack" : "the assembled pack before install, open only while it waits for approval C"})`] : []), "CHECK: mouth shapes match the sound, the rest frame matches the loops, no green.", `APPROVE (this installs the pack): ${cmd}`];
   return [`APPROVE: ${cmd}`];
 }
