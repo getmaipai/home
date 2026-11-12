@@ -15,7 +15,8 @@ export type MakingRole = "image" | "video";
  * when the Stack itself refused the role (a 503 with its reason), is
  * that reason in the household's wording - the same line the chat reply
  * carries. `reason` stays the short code the consumers switch on. */
-export type RoleHealth = { availability: "ready" | "starting" | "unavailable"; reason: string | null; /** CHAT-PAUSE-01: why it is unavailable, when known. */ cause?: "restarting" | "memory" | "not_installed" | "mode_change" | "reduced_swap" | "tier_reduced" | "gpu"; detail?: string; contextLength?: number; slots?: number; contextPerSlot?: number; contextScope?: "total" | "per_slot"; /** VISION-02d: the model the Stack's chat role runs (or would start). */ modelId?: string; pictureTokensMax?: number };
+import { maintenanceActive } from "@/lib/maintenanceFlag";
+export type RoleHealth = { availability: "ready" | "starting" | "unavailable"; reason: string | null; /** CHAT-PAUSE-01: why it is unavailable, when known. */ cause?: "restarting" | "memory" | "not_installed" | "mode_change" | "reduced_swap" | "tier_reduced" | "gpu" | "upgrading"; detail?: string; contextLength?: number; slots?: number; contextPerSlot?: number; contextScope?: "total" | "per_slot"; /** VISION-02d: the model the Stack's chat role runs (or would start). */ modelId?: string; pictureTokensMax?: number };
 let roleHealthForTests: Partial<Record<HealthRole, RoleHealth>> = {};
 export function __setRoleHealthForTests(value: Partial<Record<HealthRole, RoleHealth>>): void { roleHealthForTests = value; cachedHealth.clear(); __bumpStackEpochForTests(); }
 
@@ -79,6 +80,8 @@ const GPU_HEALTH: RoleHealth = { availability: "unavailable", reason: "gpu_compi
 export async function roleHealth(role: HealthRole, opts: { live?: boolean; fresh?: boolean } = {}): Promise<RoleHealth> {
   if (roleHealthForTests[role]) return roleHealthForTests[role]!;
   if (role === "chat" && chatBlockedByGpu()) return GPU_HEALTH;
+  // HOST-LAUNCH-03: a fresh maintenance flag (a whole-machine development lease or an upgrade) reads as one short reason on the existing chat row.
+  if (role === "chat" && maintenanceActive()) return { availability: "unavailable", reason: "maintenance", cause: "upgrading" };
   if (!isStackConfigured()) return { availability: "unavailable", reason: "stack_unreachable", cause: "restarting" };
   if (role === "image" || role === "video") return makingHealth(role);
   // The Reduced swap is running (a no-op renewal answers in milliseconds, so only a swap that lasts shows): chat cannot answer until it ends.

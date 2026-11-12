@@ -189,7 +189,7 @@ const COMPOSER_NOTICE_MESSAGES: Record<"paused" | "starting", ComposerNoticeMess
 /** CHAT-PAUSE-01: the same composer line, worded for the cause when Home
  * knows it. Every cause reuses the one notice shape (and so the one
  * composer line, Welcome state and Send hold); only the words differ. */
-const CAUSE_NOTICE_MESSAGES: Record<"restarting" | "memory" | "not_installed" | "mode_change" | "reduced_swap" | "paused_by_admin" | "offline" | "gpu", ComposerNoticeMessages> = {
+const CAUSE_NOTICE_MESSAGES: Record<"restarting" | "memory" | "not_installed" | "mode_change" | "reduced_swap" | "paused_by_admin" | "offline" | "gpu" | "upgrading", ComposerNoticeMessages> = {
   restarting: {
     adult: /*i18n*/ { id: "failure.composer.restarting.adult", message: "One moment. Back soon." },
     teen: /*i18n*/ { id: "failure.composer.restarting.teen", message: "One moment. Back soon." },
@@ -211,6 +211,13 @@ const CAUSE_NOTICE_MESSAGES: Record<"restarting" | "memory" | "not_installed" | 
   mode_change: { adult: /*i18n*/ { id: "failure.composer.mode_change.adult", message: "Getting ready. Back in about a minute." }, teen: /*i18n*/ { id: "failure.composer.mode_change.teen", message: "Getting ready. Back in about a minute." }, child: /*i18n*/ { id: "failure.composer.mode_change.child", message: "Getting ready. Back in about a minute." }, repairs_link: null, more: /*i18n*/ { id: "failure.composer.mode_change.more", message: "Home is getting ready for another job. Chat comes back by itself." } },
   reduced_swap: { adult: /*i18n*/ { id: "failure.composer.reduced_swap.adult", message: "One moment. Back in about 15 seconds." }, teen: /*i18n*/ { id: "failure.composer.reduced_swap.teen", message: "One moment. Back in about 15 seconds." }, child: /*i18n*/ { id: "failure.composer.reduced_swap.child", message: "One moment. Back in about 15 seconds." }, repairs_link: null, more: /*i18n*/ { id: "failure.composer.reduced_swap.more", message: "Chat comes back by itself in a few seconds." } },
   gpu: { adult: /*i18n*/ { id: "failure.composer.gpu.adult", message: "Chat needs a reboot of the Mac." }, teen: /*i18n*/ { id: "failure.composer.gpu.teen", message: "Chat needs a reboot. Ask a grown-up." }, more: /*i18n*/ { id: "failure.composer.gpu.more", message: "An owner can reboot the Mac when it is quiet." }, child: /*i18n*/ { id: "failure.composer.gpu.child", message: "I need a rest. Ask a grown-up." }, repairs_link: REPAIRS_OPEN },
+  // HOST-LAUNCH-03 (owner, 2026-11-12): while a development lease holds the whole machine, or an upgrade runs, chat says this one line. No resource words.
+  upgrading: {
+    adult: /*i18n*/ { id: "failure.composer.upgrading.adult", message: "Chat is unavailable while the system upgrades." },
+    teen: /*i18n*/ { id: "failure.composer.upgrading.teen", message: "Chat is unavailable while the system upgrades." },
+    child: /*i18n*/ { id: "failure.composer.upgrading.child", message: "Chat is unavailable while the system upgrades." },
+    repairs_link: null,
+  },
   paused_by_admin: {
     adult: /*i18n*/ { id: "failure.composer.paused_by_admin.adult", message: "An admin turned chat off for now." },
     teen: /*i18n*/ { id: "failure.composer.paused_by_admin.teen", message: "An admin turned chat off for now." },

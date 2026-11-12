@@ -64,7 +64,7 @@ async function buildHealth() {
   // that cannot make videos is not an outage.
   const [image, video] = (["image", "video"] as const).map((role, index) => {
     const entry = roleHealthEntry(role, locals[4 + index]!, states[4 + index]!);
-    let makingCause: MakingCause | null = entry.cause && entry.cause !== "paused_by_admin" && entry.cause !== "tier_reduced" && entry.cause !== "reduced_swap" ? entry.cause : null;
+    let makingCause: MakingCause | null = entry.cause && entry.cause !== "paused_by_admin" && entry.cause !== "tier_reduced" && entry.cause !== "reduced_swap" && entry.cause !== "upgrading" ? entry.cause : null;
     if (makingCause === "restarting" && cause === "offline") { entry.availability = "unavailable"; entry.kind = "failed"; entry.alive = false; entry.cause = "offline"; makingCause = "offline"; }
     const line = makingNotice(role, entry.availability ?? "ready", makingCause);
     if (line) entry.notice = line;
