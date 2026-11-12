@@ -31,3 +31,5 @@ export function Greeting({ displayName, familyName }: { displayName: string; fam
     </div>
   );
 }
+
+// Timing check 2026-11-12: first measured edit-to-live run in direct mode.
