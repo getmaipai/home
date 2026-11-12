@@ -180,20 +180,16 @@ export function devShedActive(stateDir = hostGuardDir(), now = Date.now()): bool
   try { return now - statSync(join(stateDir, "dev-shed")).mtimeMs <= 600_000; } catch { return false; }
 }
 
-/** SOURCE THROTTLE hook (HOST-GUARD-09). On 2026-11-12 the file-event daemon leaked about 128 KB per "Resolve user group list"
- * call, about 100 calls a second while safety-test shards ran. If the two-run comparison shows test workers are the source, this
- * caps the worker count while the host guard reports a high lookup rate (memory.json fseventsd.est_leak_mb_per_min). Off until
- * MAIPAI_GATE_SOURCE_THROTTLE is a positive number (the cap); the limit is MAIPAI_GATE_SOURCE_THROTTLE_MB (default 20 MB a minute). */
-export function sourceThrottleCap(stateDir = hostGuardDir(), env = process.env): number {
-  const cap = Number.parseInt(env.MAIPAI_GATE_SOURCE_THROTTLE ?? "", 10);
-  if (!Number.isInteger(cap) || cap <= 0) return Number.POSITIVE_INFINITY;
-  const limit = Number(env.MAIPAI_GATE_SOURCE_THROTTLE_MB ?? 20);
+/** SOURCE THROTTLE (HOST-GUARD-09). On 2026-11-12 the file-event daemon grew about 45 GB in two hours while safety-test shards
+ * ran (the mechanism is unproven; the host guard records the evidence). When its footprint grows 1 GB or more in 10 minutes the
+ * guard writes the source-throttle flag, and while it is fresh (10 minutes) a run uses half the workers it would otherwise start.
+ * MAIPAI_GATE_SOURCE_THROTTLE=off ignores the flag. Returns the cap to use. */
+export function sourceThrottleCap(cap: number, stateDir = hostGuardDir(), env = process.env, now = Date.now()): number {
+  if (env.MAIPAI_GATE_SOURCE_THROTTLE === "off" || !Number.isFinite(cap)) return cap;
   try {
-    const status = JSON.parse(readFileSync(join(stateDir, "memory.json"), "utf8")) as { checked_at?: number; fseventsd?: { est_leak_mb_per_min?: number } };
-    const fresh = typeof status.checked_at === "number" && Date.now() / 1000 - status.checked_at <= 300;
-    const rate = status.fseventsd?.est_leak_mb_per_min;
-    return fresh && typeof rate === "number" && rate >= limit ? cap : Number.POSITIVE_INFINITY;
-  } catch { return Number.POSITIVE_INFINITY; }
+    if (now - statSync(join(stateDir, "source-throttle")).mtimeMs > 600_000) return cap;
+  } catch { return cap; }
+  return Math.max(1, Math.floor(cap / 2));
 }
 
 export function processTreeRssGb(rootPid: number): number {
@@ -670,7 +666,7 @@ export async function run(opts: RunOptions): Promise<number> {
     const underPressure = tight(resources);
     if (deferred) continue;
     // Under pressure: one worker at a time, and only with room for two worker peaks. The source throttle hook caps the rest.
-    const cap = underPressure ? (roomForOne(resources) ? 1 : 0) : Math.min(currentCap, sourceThrottleCap());
+    const cap = underPressure ? (roomForOne(resources) ? 1 : 0) : sourceThrottleCap(currentCap);
     if (active.size >= cap || nextShard >= plan.length) {
       if (active.size > 0) {
         await Promise.race([...active].map((shard) => shard.done));

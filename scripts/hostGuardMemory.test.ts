@@ -30,6 +30,8 @@ const FAKES: Record<string, string> = {
   pgrep: `[ -e "$HG_FAKE/no-fsev" ] || echo 103`,
   vmmap: `[ -e "$HG_FAKE/vmmap-fail" ] && exit 1; printf 'Path:            /System/Library/secret/fseventsd\\nPhysical footprint:         66.0G\\nMalloc Small                     116.2G   810.0M   803.9M    64.7G       0K       0K       0K    29906\\nTOTAL                            504.1G     1.2G   865.3M    65.1G\\n'`,
   footprint: `echo "fseventsd [103]: 64-bit    Footprint: 66 GB"`,
+  heap: `printf 'Process:         fseventsd [103]\nAll zones: 955166 nodes malloced - 116.2G\nZone DefaultMallocZone_0x1: 955166 nodes - 116.2G\n'`,
+  leaks: `echo "Process 103: 955166 leaks for 121000000000 total leaked bytes."`,
   fs_usage: `for i in 1 2 3; do echo "12:00:00.1 open F=3 /Users/someone/Developer/github.com/getmaipai/wt/home-foo/src/secret-name.ts 0.0001 bun.123"; done; echo "12:00:00.2 stat64 /Users/someone/x/node_modules/a/b.js 0.0001 node.9"; sleep 30`,
   lsof: `case "$*" in *fsevents*) printf 'p1\\ncmds\\np2\\ncfseventsd\\n' ;; *) printf 'p1\\ncbun\\nf1\\nf2\\np2\\ncnode\\nf1\\n' ;; esac`,
 };
@@ -69,7 +71,7 @@ describe.skipIf(!mac)("host guard memory probe and self-repair", () => {
     expect(mem(b, T0).exitCode).toBe(0);
     const s = status(b);
     expect(s).toMatchObject({ version: 1, checked_at: T0, pressure: 2, free_pct: 30, swap_used_mb: 17126, swap_total_mb: 17408, compressor_mb: 60090, repair_mode: "off" });
-    expect(s.fseventsd).toMatchObject({ pid: 103, footprint_mb: 67584, compressed_mb: 64512, group_list_per_min: 600, est_leak_mb_per_min: 75 });
+    expect(s.fseventsd).toMatchObject({ pid: 103, footprint_mb: 67584, compressed_mb: 64512, growth_10min_mb: -1, group_list_per_min: 600 });
     expect(s.top[2]).toEqual({ pid: 1064, name: "Claude Helper (R", footprint_mb: 1914, compressed_mb: 623 });
     expect(s.summary).toContain("file-event service 66.0 GB (63.0 GB compressed)");
     expect(statSync(join(b.state, "memory.json")).mode & 0o777).toBe(0o644);
@@ -99,8 +101,9 @@ describe.skipIf(!mac)("host guard memory probe and self-repair", () => {
     expect(existsSync(join(dir, "COMPLETE"))).toBe(true);
     const digestText = readFileSync(join(b.state, "fsevents-digest.json"), "utf8");
     const digest = JSON.parse(digestText);
-    expect(digest).toMatchObject({ complete: true, pid: 103, vmmap_footprint: "66.0G", top_footprint_mb: 67584 });
-    expect(digest.log_6h).toMatchObject({ fseventsd_lines: 3, errors: 1, group_list_calls: 1, dropped_or_rescan_lines: 1 });
+    expect(digest).toMatchObject({ complete: true, pid: 103, vmmap_footprint: "66.0G", top_footprint_mb: 67584, walked: false });
+    expect(existsSync(join(dir, "leaks.txt"))).toBe(false);
+    expect(digest.log_2h).toMatchObject({ fseventsd_lines: 3, errors: 1, group_list_calls: 1, dropped_or_rescan_lines: 1 });
     expect(digest.fs_usage.by_path).toContainEqual(["wt/home-foo", 3]);
     expect(digest.fs_usage.by_process).toContainEqual(["bun", 3]);
     expect(digestText).not.toContain("secret");
@@ -135,34 +138,49 @@ describe.skipIf(!mac)("host guard memory probe and self-repair", () => {
     expect(audit(b)).toContain("quick capture incomplete; restarting anyway");
   });
 
-  test("cooldown and the daily cap bound the restarts, with a fake clock", () => {
+  test("the restart cooldown is 12 hours, with a fake clock", () => {
     const b = box();
     set(b, { pressure: "2", top: BIG });
     mem(b, T0);
     expect(kicks(b).length).toBe(1);
     mem(b, T0 + 3600);
     expect(kicks(b).length).toBe(1);
-    expect(audit(b)).toContain("decision=skipped cooldown (360 min)");
-    mem(b, T0 + 7 * 3600);
+    expect(audit(b)).toContain("id=restart-fseventsd decision=skipped cooldown (720 min)");
+    mem(b, T0 + 11 * 3600);
+    expect(kicks(b).length).toBe(1);
+    mem(b, T0 + 13 * 3600);
     expect(kicks(b).length).toBe(2);
-    mem(b, T0 + 14 * 3600);
-    expect(kicks(b).length).toBe(2);
-    expect(audit(b)).toContain("decision=skipped daily cap of 2 reached");
-    mem(b, T0 + 32 * 3600);
-    expect(kicks(b).length).toBe(3);
   }, 30_000);
 
-  test("footprint growth of 20 MB a minute must hold 5 minutes before a restart; the lookup rate alone never triggers", () => {
+  test("a small daemon (4 to 8 GB) is captured with heap and leaks and not restarted", () => {
     const b = box();
-    set(b, { pressure: "1", top: fsevMb(3000), calls: "5000" });
+    set(b, { pressure: "1", top: fsevMb(5000) });
     mem(b, T0);
     expect(kicks(b)).toEqual([]);
-    for (let i = 1; i <= 5; i++) { set(b, { top: fsevMb(3000 + 100 * i) }); mem(b, T0 + 60 * i); }
+    const digest = JSON.parse(readFileSync(join(b.state, "fsevents-digest.json"), "utf8"));
+    expect(digest).toMatchObject({ complete: true, walked: true, leaks: "955166 leaks for 121000000000 total leaked bytes." });
+    expect(digest.heap[0]).toContain("All zones: 955166 nodes");
+    expect(audit(b)).toContain("id=capture-fseventsd decision=ran complete (full)");
+  });
+
+  test("growth of 2 GB in 10 minutes restarts and 1 GB sets the source throttle; the lookup rate alone never triggers", () => {
+    const b = box();
+    set(b, { pressure: "1", top: fsevMb(1000), calls: "50000" });
+    mem(b, T0);
+    for (let i = 1; i <= 9; i++) { set(b, { top: fsevMb(1000 + 250 * i) }); mem(b, T0 + 60 * i); }
     expect(kicks(b)).toEqual([]);
-    set(b, { top: fsevMb(3600) }); mem(b, T0 + 360);
+    expect(existsSync(join(b.state, "source-throttle"))).toBe(false);
+    set(b, { top: fsevMb(3500), "top-after": AFTER }); mem(b, T0 + 600);
     expect(kicks(b)).toEqual(["kickstart -k system/com.apple.fseventsd"]);
-    expect(audit(b)).toContain("trigger=growth 100 MB/min");
-  }, 30_000);
+    expect(audit(b)).toContain("trigger=growth 2500 MB in 10 min");
+    expect(JSON.parse(readFileSync(join(b.state, "source-throttle"), "utf8"))).toMatchObject({ since: T0 + 600 });
+    expect(status(b).summary).toContain("test workers halved");
+    // After the restart the new process has no growth; the throttle clears after 10 calm minutes.
+    for (let i = 1; i <= 9; i++) mem(b, T0 + 600 + 60 * i);
+    expect(existsSync(join(b.state, "source-throttle"))).toBe(true);
+    mem(b, T0 + 600 + 600);
+    expect(existsSync(join(b.state, "source-throttle"))).toBe(false);
+  }, 60_000);
 
   test("dry mode only logs: no capture, no restart, no flag", () => {
     const b = box({ mode: "dry" });

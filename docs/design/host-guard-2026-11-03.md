@@ -104,29 +104,40 @@ commons `spec/settings/keys.json` with their spec copy fields (S5, `docs/SETTING
 ### 2.5 Memory probe and bounded self-repair (revision 3, 2026-11-12; HOST-GUARD-07, -08, -09)
 
 What happened: on 2026-11-12 `fseventsd` (the macOS file-event daemon) reached 66 GB, 63 GB of it compressed or swapped, with a 3.4 GB
-resident size. Its `vmmap` shows the growth in Malloc Small: about 128 KB leaked per "Resolve user group list" call (libsystem_info),
-about 100 calls a second while the lander's safety tests ran. Kernel pressure stayed at level 2 for hours. Every guard that reads
-resident size missed it, the sharder paused with no deadline until the lander killed it, and the Stack moved chat to the small model.
-A leak is only freed by restarting the daemon, which needs root, so the guard does it, within fixed bounds.
+resident size: about 955,000 Malloc Small buffers of about 121 KB, which grew about 45 GB between 02:00 and 04:10 local while the
+lander's safety tests hung and after a ship. Kernel pressure stayed at level 2 for hours. Every guard that reads resident size missed
+it, the sharder paused with no deadline until the lander killed it, and the Stack moved chat to the small model.
+
+**The mechanism is unproven.** A leak per "Resolve user group list" lookup was tested and refuted (180,000 lookups in 3 minutes with a
+flat footprint). Which code path allocates the buffers can only be settled by a root capture while the daemon is still small. The guard
+is the instrument that will prove it: it captures at 4 GB and restarts at 8 GB. Only a restart frees the memory, and that needs root.
 
 - **Probe (every pass, after the reboot decision, bounded):** kernel pressure level, free percent, swap used and total, compressor
-  size, the five biggest processes by footprint with compressed size (`top -stats pid,command,mem,cmprs`), the daemon's footprint and
-  its growth in MB a minute (same pid), and, as a diagnostic only, "Resolve user group list" lines a minute and the MB they leak
-  (x 0.125). Written to `memory.json` (0644) with a one-line admin summary, and one row a pass to `memory.csv` (also landings and
-  ships in the last hour when `config.json` names a `dev_data` folder; only timestamps are read).
-- **Allowlist (code only):** `capture-fseventsd`, `restart-fseventsd`, `dev-shed`. Each has a trigger, a hold time, a cooldown and a
-  daily cap. Repair mode (`repair.json`, root-owned, default `live`) can be `dry` (log only) or `off`; the kill switch file
+  size, the five biggest processes by footprint with compressed size (`top -stats pid,command,mem,cmprs`), the daemon's physical
+  footprint (compressed and swapped included) and its growth over the last 10 minutes (same pid), and, as a diagnostic only,
+  "Resolve user group list" lines a minute, which approximate new FSEvents streams plus history replays by clients (not delivered
+  events). Written to `memory.json` (0644) with a one-line admin summary, and one row a pass to `memory.csv` (also landings and ships
+  in the last hour when `config.json` names a `dev_data` folder; only timestamps are read).
+- **Allowlist (code only):** `capture-fseventsd`, `source-throttle`, `restart-fseventsd`, `dev-shed`. Each has a trigger, a cooldown and
+  a daily cap. Repair mode (`repair.json`, root-owned, default `live`) can be `dry` (log only) or `off`; the kill switch file
   `<data_dir>/host-guard/OFF` turns every action off. Decisions go to `repair-audit.log` (counts and reasons).
-- **Triggers:** restart when the daemon's footprint is at or above 16 GB (`fsevents_compressed_gb`), or when it grows 20 MB a minute or
-  more for 5 minutes and is above 2 GB; at most once per 6 hours and twice a day; never during a ship or install. `dev-shed` when the
-  kernel pressure level is 2 or more for 20 minutes; refreshed while it lasts, cleared after 5 calm minutes.
-- **Evidence first:** `capture-fseventsd` runs when the daemon first crosses a trigger (once per 6 hours, 3 a day): `vmmap -summary`,
-  the full `vmmap`, 6 hours of the daemon's log, 2 hours of `mds` and the FSEvents subsystem, `footprint`, `top`, a 15 s `fs_usage`
+- **Thresholds:**
+
+  | Action | Trigger | Bounds |
+  |---|---|---|
+  | `capture-fseventsd` | footprint 4 GB (`capture_gb`), or growth 1 GB in 10 min | once per 6 h, 3 a day |
+  | `source-throttle` | growth 1 GB in 10 min; the sharder halves its workers while the flag is fresh | cleared after 10 min below |
+  | `restart-fseventsd` | footprint 8 GB (`fsevents_compressed_gb`), or growth 2 GB in 10 min | once per 12 h, 2 a day, never during a ship or install |
+  | `dev-shed` | kernel pressure level 2 for 20 min (`shed_minutes`) | cleared after 5 calm minutes |
+
+- **Evidence first:** the capture keeps raw output in `fsevents-captures/<stamp>/` (root-only, last 3, 300 MB cap): `vmmap -summary`,
+  the full `vmmap`, `heap` and `leaks --nostacks` (only under 8 GB: on a huge daemon they pull everything back from swap), 2 hours of
+  the daemon's log, 2 hours of `mds` and the FSEvents subsystem, `footprint`, `top`, the daemon's open files by type, a 15 s `fs_usage`
   sample reduced at once to counts per process and per path bucket (a worktree folder name, node_modules, .git or a broad area), open
-  files per process, the `/dev/fsevents` clients, swap and `vm_stat`, `launchctl print`, and landing and ship timestamps. Each step has
-  a hard limit. Raw output stays in `fsevents-captures/<stamp>/` (root-only, last 3, 300 MB cap); `fsevents-digest.json` (0644) holds
-  counts only. A restart needs a complete capture from the last 30 minutes; above 40 GB (`emergency_gb`) a 60 s capture runs and the
-  restart goes ahead even if it is incomplete.
+  files per process, the `/dev/fsevents` clients, swap and `vm_stat`, `launchctl print`, and landing and ship timestamps. No tool lists
+  the FSEvents streams per client without SIP changes. `fsevents-digest.json` (0644) holds counts only. A restart needs a complete
+  capture from the last 30 minutes; above 40 GB (`emergency_gb`) a 60 s capture (no heap or leaks) runs and the restart goes ahead.
+  On first delivery the daemon is about 66 GB: the first pass captures without the walk and restarts it.
 - **After a restart:** the guard checks the daemon came back small, records before and after sizes, sets the notice "Chat is slower for
   a few minutes while the system tidies up." in `memory.json` for 10 minutes, and writes `fsevents-restarted`. It touches no user
   process. Each dev hub's watch loop (`scripts/dev.sh`) reads that file and restarts its own hub in full, which rereads every file from
@@ -134,8 +145,8 @@ A leak is only freed by restarting the daemon, which needs root, so the guard do
 - **Readers (development side):** `scripts/lib/hostmem.sh` says no (exit 75, one plain line) under pressure level 2 or a fresh
   `dev-shed` flag; `ship.sh`, the full and frontend `check.sh` gates, the lander's safety tests (the entry is held and retried) and the
   watcher (the tick is skipped) read it. The sharder sheds to one worker under pressure, and after 300 s exits 75 "deferred
-  (memory)", which is never a pass and never a failure of the branch. `sourceThrottleCap` in the sharder is the hook for a later source
-  throttle (a worker cap while the lookup rate is high), off until `MAIPAI_GATE_SOURCE_THROTTLE` is set.
+  (memory)", which is never a pass and never a failure of the branch. `sourceThrottleCap` in the sharder is the source
+  throttle: while the guard's `source-throttle` flag is fresh the sharder uses half its workers (`MAIPAI_GATE_SOURCE_THROTTLE=off` ignores it).
 - **Status:** the admin Status row adds the memory summary under pressure, paused development work or a repair in the last hour.
   People never see memory wording; the end-user status reason (STATUS-REASON-01) is not built yet and will read `notice`.
 

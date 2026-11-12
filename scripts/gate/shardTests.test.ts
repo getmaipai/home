@@ -292,16 +292,18 @@ describe("run: the gate's pass/fail meaning", () => {
     } finally { rmSync(state, { recursive: true, force: true }); }
   });
 
-  test("HOST-GUARD-09: the wait is clamped and the source throttle hook is off unless set", () => {
+  test("HOST-GUARD-09: the wait is clamped and the source throttle flag halves the worker cap while fresh", () => {
     expect(pressureWaitMs(undefined)).toBe(300_000);
     expect(pressureWaitMs("abc")).toBe(300_000);
     expect(pressureWaitMs("99999")).toBe(3_600_000);
     const state = mkdtempSync(join(tmpdir(), "maipai-throttle-"));
     try {
-      writeFileSync(join(state, "memory.json"), JSON.stringify({ checked_at: Math.floor(Date.now() / 1000), fseventsd: { est_leak_mb_per_min: 75 } }));
-      expect(sourceThrottleCap(state, {})).toBe(Number.POSITIVE_INFINITY);
-      expect(sourceThrottleCap(state, { MAIPAI_GATE_SOURCE_THROTTLE: "2" })).toBe(2);
-      expect(sourceThrottleCap(state, { MAIPAI_GATE_SOURCE_THROTTLE: "2", MAIPAI_GATE_SOURCE_THROTTLE_MB: "100" })).toBe(Number.POSITIVE_INFINITY);
+      expect(sourceThrottleCap(8, state, {})).toBe(8);
+      writeFileSync(join(state, "source-throttle"), "{}");
+      expect(sourceThrottleCap(8, state, {})).toBe(4);
+      expect(sourceThrottleCap(1, state, {})).toBe(1);
+      expect(sourceThrottleCap(8, state, { MAIPAI_GATE_SOURCE_THROTTLE: "off" })).toBe(8);
+      expect(sourceThrottleCap(8, state, {}, Date.now() + 11 * 60_000)).toBe(8);
     } finally { rmSync(state, { recursive: true, force: true }); }
   });
 

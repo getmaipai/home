@@ -272,29 +272,38 @@ cmd_run() {
 
 # ---------------------------------------------------------------------------------------------------------------------------------
 # Memory probe and bounded self-repair (HOST-GUARD-07, -08, -09; 2026-11-12).
-# Why: on 2026-11-12 fseventsd (the macOS file-event daemon) held 66 GB, 63 GB of it compressed or swapped, with a 3.4 GB resident size.
-# Its vmmap shows a leak in Malloc Small: about 128 KB per "Resolve user group list" call (libsystem_info), about 100 calls a second while
-# the safety tests ran. Pressure sat at level 2 for hours; every guard that reads resident size missed it. A leak is only freed by
-# restarting the daemon, which needs root, so this guard does it, within fixed bounds:
+# Why: on 2026-11-12 fseventsd (the macOS file-event daemon) held 66 GB, 63 GB of it compressed or swapped, with a 3.4 GB resident size:
+# about 955,000 Malloc Small buffers of about 121 KB that grew about 45 GB in two hours during a hung safety-test run and a ship.
+# WHICH CODE PATH ALLOCATES THEM IS UNPROVEN (a per-lookup leak was tested and refuted). This guard is the instrument that will prove
+# it: it captures root-only evidence while the daemon is still small (4 GB), then restarts it before it hurts (8 GB). Pressure sat at
+# level 2 for hours; every guard that reads resident size missed it. Only a restart frees the memory, and that needs root, so this
+# guard does it, within fixed bounds:
 #   * Only actions in the allowlist (remedy_run) can run. Each is a function in this file with fixed arguments; nothing is read from a
 #     file or the environment except clamped numbers (repair.json) and the existence of the kill switch file.
 #   * Each has a trigger, a minimum time the trigger must hold, a cooldown and a daily cap; repair mode dry only logs; the kill switch
 #     turns every action off. Every decision goes to repair-audit.log (counts and reasons, never file contents).
 #   * Evidence first: the file-event daemon is never restarted without a complete evidence capture from the last 30 minutes, unless it is
-#     above the emergency size; then a quick capture (60 s) runs and the restart goes ahead.
-# Triggers (the restart):  size   - the daemon's physical footprint (compressed included) at or above fsevents_compressed_gb (16 GB);
-#                          growth - its footprint grows 20 MB a minute or more for 5 minutes (same pid), and it is above 2 GB.
-# The dev-shed flag:       kernel pressure level 2 or more for shed_minutes (20); cleared after 5 calm minutes.
-# Diagnostic only (never a trigger): "Resolve user group list" lines a minute and the MB they leak (x 0.125), in memory.json.
+#     above the emergency size (40 GB); then a quick capture (60 s, no heap or leaks walk) runs and the restart goes ahead.
+# Thresholds (physical footprint, compressed and swapped included, same process; growth is measured over the last 10 minutes):
+#   capture-fseventsd  footprint >= capture_gb (4 GB), or growth >= 1 GB in 10 min; once per 6 h, 3 a day. heap and leaks run only
+#                      while the daemon is under 8 GB (on a huge daemon they would pull everything back from swap).
+#   restart-fseventsd  footprint >= fsevents_compressed_gb (8 GB), or growth >= 2 GB in 10 min; once per 12 h, 2 a day; never during a
+#                      ship or install; writes fsevents-restarted, which makes each dev hub restart itself in full.
+#   source-throttle    growth >= 1 GB in 10 min: writes the source-throttle flag; the test sharder halves its worker cap while it is
+#                      fresh; cleared after 10 minutes below that growth.
+#   dev-shed           kernel pressure level 2 or more for shed_minutes (20); cleared after 5 calm minutes.
+# Diagnostic only (never a trigger): "Resolve user group list" lines a minute, which approximate new FSEvents streams plus history
+# replays by clients (not delivered events), in memory.json and memory.csv.
 # ---------------------------------------------------------------------------------------------------------------------------------
 REPAIR_DIR="$STATE/repair"
 CAPS="$STATE/fsevents-captures"
 NOTICE_TEXT="Chat is slower for a few minutes while the system tidies up."
 GROUP_LIST_MSG="Resolve user group list"
-LEAK_KB_PER_CALL=128
-GROWTH_MIN_MB=20
-GROWTH_HOLD_S=300
-GROWTH_FLOOR_MB=2048
+GROWTH_WINDOW_S=600
+THROTTLE_GROWTH_MB=1024
+RESTART_GROWTH_MB=2048
+WALK_MAX_MB=8192
+SMALL_AFTER_MB=2048
 DEV_DATA=""
 
 # A system tool by absolute path; the test seam swaps the whole directory for fakes (only when MAIPAI_HG_TEST=1, see the top).
@@ -306,7 +315,8 @@ load_repair() {
   # A repair.json that root does not own is ignored (the defaults apply), so no user can loosen a bound.
   if [[ -f "$r" && "${MAIPAI_HG_TEST:-}" != 1 && "$(stat -f %u "$r" 2>/dev/null)" != 0 ]]; then r=/nonexistent; fi
   m="$(jget "$r" mode)"; case "$m" in off|dry|live) R_MODE="$m" ;; *) R_MODE=live ;; esac
-  R_FSEV_MB=$(( $(clamp "$(jget "$r" fsevents_compressed_gb)" 4 256 16) * 1024 ))
+  R_FSEV_MB=$(( $(clamp "$(jget "$r" fsevents_compressed_gb)" 4 256 8) * 1024 ))
+  R_CAPT_MB=$(( $(clamp "$(jget "$r" capture_gb)" 1 64 4) * 1024 ))
   R_EMERG_MB=$(( $(clamp "$(jget "$r" emergency_gb)" 24 256 40) * 1024 ))
   R_SHED_S=$(( $(clamp "$(jget "$r" shed_minutes)" 10 240 20) * 60 ))
   R_OFF=0; if [[ -e "$DATA/host-guard/OFF" || -e "$STATE/repair-OFF" ]]; then R_OFF=1; fi
@@ -342,15 +352,18 @@ mem_probe() {
   # The leak's own signal: group-list calls by fseventsd in the last minute (one line each), and the MB that leaks with them.
   v="$(with_timeout 20 "$(tp /usr/bin/log)" show --last 1m --style compact --predicate "process == \"fseventsd\" AND eventMessage CONTAINS \"$GROUP_LIST_MSG\"" 2>/dev/null | grep -c "$GROUP_LIST_MSG")"
   [[ "$v" =~ ^[0-9]+$ ]] && M_CALLS="$v" || M_CALLS=-1
-  if (( M_CALLS >= 0 )); then M_LEAK_MB=$(( M_CALLS * LEAK_KB_PER_CALL / 1024 )); else M_LEAK_MB=-1; fi
-  # Footprint growth in MB a minute since the last pass, for the same daemon process (a restart starts it over).
-  local prev p_t p_mb p_pid
-  prev="$(cat "$REPAIR_DIR/fseventsd-last" 2>/dev/null)"; read -r p_t p_mb p_pid <<< "$prev"
-  M_GROWTH=-1
-  if [[ "$p_t" =~ ^[0-9]+$ && "$p_mb" =~ ^[0-9]+$ && -n "$M_FSEV_PID" && "$p_pid" == "$M_FSEV_PID" ]] && (( $(now) - p_t >= 30 && $(now) - p_t <= 900 )); then
-    M_GROWTH=$(( (M_FSEV_MB - p_mb) * 60 / ($(now) - p_t) ))
+  # Footprint growth over the last 10 minutes for the same daemon process (a restart starts it over): against the newest sample
+  # 10 to 15 minutes old; -1 when there is none yet.
+  local h="$REPAIR_DIR/fseventsd-history" t mb p age
+  M_GROWTH10=-1
+  if [[ -n "$M_FSEV_PID" ]]; then
+    while read -r t mb p; do
+      [[ "$t" =~ ^[0-9]+$ && "$mb" =~ ^[0-9]+$ && "$p" == "$M_FSEV_PID" ]] || continue
+      age=$(( $(now) - t ))
+      if (( age >= GROWTH_WINDOW_S && age <= GROWTH_WINDOW_S + 300 )); then M_GROWTH10=$(( M_FSEV_MB - mb )); fi
+    done < <(cat "$h" 2>/dev/null)
+    echo "$(now) $M_FSEV_MB $M_FSEV_PID" >> "$h"; tail -n 30 "$h" > "$h.tmp" && mv "$h.tmp" "$h"
   fi
-  [[ -n "$M_FSEV_PID" ]] && echo "$(now) $M_FSEV_MB $M_FSEV_PID" > "$REPAIR_DIR/fseventsd-last"
 }
 
 # held NAME TRUE|FALSE: seconds the signal has held (0 when it does not hold now).
@@ -364,7 +377,7 @@ signals() {
   local t=false
   (( M_LEVEL >= 2 )) && t=true; H_PRESS="$(held pressure "$t")"
   t=false; (( M_FSEV_MB >= R_FSEV_MB )) && t=true; H_SIZE="$(held fsevents-size "$t")"; S_SIZE="$t"
-  t=false; (( M_GROWTH >= GROWTH_MIN_MB )) && t=true; H_GROWTH="$(held fsevents-growth "$t")"
+  t=false; (( M_GROWTH10 < THROTTLE_GROWTH_MB )) && t=true; H_SLOW="$(held fsevents-slow "$t")"
   t=false; (( M_LEVEL >= 0 && M_LEVEL < 2 )) && t=true; H_CALM="$(held calm "$t")"
 }
 
@@ -378,15 +391,16 @@ audit() { # id decision detail
 runs_since() { local n=0 t; while read -r t _; do if [[ "$t" =~ ^[0-9]+$ ]] && (( t >= $2 )); then n=$((n+1)); fi; done 2>/dev/null < "$REPAIR_DIR/$1.runs"; echo "$n"; }
 last_run() { local t; t="$(tail -n 1 "$REPAIR_DIR/$1.runs" 2>/dev/null | awk '{print $1}')"; [[ "$t" =~ ^[0-9]+$ ]] && echo "$t" || echo 0; }
 record_run() { echo "$(now) $2" >> "$REPAIR_DIR/$1.runs"; tail -n 50 "$REPAIR_DIR/$1.runs" > "$REPAIR_DIR/$1.runs.tmp" && mv "$REPAIR_DIR/$1.runs.tmp" "$REPAIR_DIR/$1.runs"; }
-mem_counts() { echo "pressure=$M_LEVEL fseventsd_mb=$M_FSEV_MB fseventsd_compressed_mb=$M_FSEV_CMP growth_mb_per_min=$M_GROWTH group_list_per_min=$M_CALLS est_leak_mb_per_min=$M_LEAK_MB swap_used_mb=$M_SWAP_USED"; }
+mem_counts() { echo "pressure=$M_LEVEL fseventsd_mb=$M_FSEV_MB fseventsd_compressed_mb=$M_FSEV_CMP growth_10min_mb=$M_GROWTH10 group_list_per_min=$M_CALLS swap_used_mb=$M_SWAP_USED"; }
 
 # The allowlist. To add an action: a name here, its limits and trigger in remedy_limits and remedy_due, and an act_ function.
-REMEDIES="capture-fseventsd restart-fseventsd dev-shed"
-remedy_known() { case "$1" in capture-fseventsd|restart-fseventsd|dev-shed) return 0 ;; esac; return 1; }
+REMEDIES="capture-fseventsd source-throttle restart-fseventsd dev-shed"
+remedy_known() { case "$1" in capture-fseventsd|restart-fseventsd|source-throttle|dev-shed) return 0 ;; esac; return 1; }
 remedy_limits() { # id -> L_COOL seconds between runs, L_CAP runs per 24 hours
   case "$1" in
     capture-fseventsd) L_COOL=21600; L_CAP=3 ;;
-    restart-fseventsd) L_COOL=21600; L_CAP=2 ;;
+    restart-fseventsd) L_COOL=43200; L_CAP=2 ;;
+    source-throttle) L_COOL=1800; L_CAP=12 ;;
     dev-shed) L_COOL=1800; L_CAP=6 ;;
   esac
 }
@@ -394,11 +408,13 @@ remedy_due() { # id -> 0 when its trigger has held long enough; TRIGGER names it
   TRIGGER=""
   case "$1" in
     capture-fseventsd)
-      if [[ $S_SIZE == true ]]; then TRIGGER="size"
-      elif (( H_GROWTH >= GROWTH_HOLD_S && M_FSEV_MB >= GROWTH_FLOOR_MB )); then TRIGGER="growth"; fi ;;
+      if (( M_FSEV_MB >= R_CAPT_MB )); then TRIGGER="size ${M_FSEV_MB} MB >= $R_CAPT_MB MB"
+      elif (( M_GROWTH10 >= THROTTLE_GROWTH_MB )); then TRIGGER="growth ${M_GROWTH10} MB in 10 min"; fi ;;
     restart-fseventsd)
       if [[ $S_SIZE == true ]]; then TRIGGER="size ${M_FSEV_MB} MB >= $R_FSEV_MB MB"
-      elif (( H_GROWTH >= GROWTH_HOLD_S && M_FSEV_MB >= GROWTH_FLOOR_MB )); then TRIGGER="growth ${M_GROWTH} MB/min for ${H_GROWTH}s"; fi ;;
+      elif (( M_GROWTH10 >= RESTART_GROWTH_MB )); then TRIGGER="growth ${M_GROWTH10} MB in 10 min"; fi ;;
+    source-throttle)
+      if [[ ! -f "$STATE/source-throttle" ]] && (( M_GROWTH10 >= THROTTLE_GROWTH_MB )); then TRIGGER="growth ${M_GROWTH10} MB in 10 min"; fi ;;
     dev-shed)
       if [[ ! -f "$STATE/dev-shed" ]] && (( H_PRESS >= R_SHED_S )); then TRIGGER="pressure level $M_LEVEL for ${H_PRESS}s"; fi ;;
   esac
@@ -408,6 +424,7 @@ remedy_run() { # id: only these run; anything else is refused
   case "$1" in
     capture-fseventsd) act_capture full ;;
     restart-fseventsd) act_restart ;;
+    source-throttle) act_source_throttle ;;
     dev-shed) act_dev_shed ;;
     *) audit "$1" refused "not on the allowlist"; return 64 ;;
   esac
@@ -463,7 +480,7 @@ act_restart() {
   pid1="$M_FSEV_PID"; [[ -n "$pid1" ]] || pid1="$(with_timeout 5 "$(tp /usr/bin/pgrep)" -x fseventsd 2>/dev/null | head -n 1)"
   if (( rc != 0 )); then result="kickstart failed (exit $rc)"
   elif [[ ! "$pid1" =~ ^[0-9]+$ ]]; then result="fseventsd did not come back"
-  elif (( M_FSEV_MB > GROWTH_FLOOR_MB )); then result="came back but is still large"
+  elif (( M_FSEV_MB > SMALL_AFTER_MB )); then result="came back but is still large"
   else result=ok; fi
   printf '{"version":1,"restarted_at":%s,"before_mb":%s,"after_mb":%s,"result":"%s"}\n' "$(now)" "$before_mb" "$M_FSEV_MB" "$(clean "$result" 80)" > "$STATE/fsevents-restarted.tmp" \
     && mv "$STATE/fsevents-restarted.tmp" "$STATE/fsevents-restarted" && chmod 644 "$STATE/fsevents-restarted"
@@ -475,6 +492,18 @@ act_restart() {
 write_shed_flag() { # reason
   local since; since="$(jget "$STATE/dev-shed" since)"; [[ "$since" =~ ^[0-9]+$ ]] || since="$(now)"
   printf '{"version":1,"since":%s,"updated_at":%s,"reason":"%s"}\n' "$since" "$(now)" "$(clean "$1" 200)" > "$STATE/dev-shed.tmp" && mv "$STATE/dev-shed.tmp" "$STATE/dev-shed" && chmod 644 "$STATE/dev-shed"
+}
+write_flag() { # name reason
+  local since; since="$(jget "$STATE/$1" since)"; [[ "$since" =~ ^[0-9]+$ ]] || since="$(now)"
+  printf '{"version":1,"since":%s,"updated_at":%s,"reason":"%s"}\n' "$since" "$(now)" "$(clean "$2" 200)" > "$STATE/$1.tmp" && mv "$STATE/$1.tmp" "$STATE/$1" && chmod 644 "$STATE/$1"
+}
+# The test sharder halves its worker cap while this flag is fresh (scripts/gate/shardTests.ts sourceThrottleCap).
+act_source_throttle() { record_run source-throttle set; write_flag source-throttle "file-event service grew ${M_GROWTH10} MB in 10 min"; audit source-throttle ran "set; $(mem_counts)"; }
+source_throttle_maintain() {
+  [[ -f "$STATE/source-throttle" ]] || return 0
+  if (( R_OFF )) || [[ $R_MODE != live ]]; then rm -f "$STATE/source-throttle"; audit source-throttle cleared "kill switch or repair mode $R_MODE"; return 0; fi
+  if (( M_GROWTH10 >= THROTTLE_GROWTH_MB )); then write_flag source-throttle "file-event service grew ${M_GROWTH10} MB in 10 min"; return 0; fi
+  if (( H_SLOW >= 600 )); then rm -f "$STATE/source-throttle"; audit source-throttle cleared "growth below 1 GB in 10 min for 10 minutes; $(mem_counts)"; fi
 }
 act_dev_shed() { record_run dev-shed set; write_shed_flag "pressure level $M_LEVEL for $(( H_PRESS / 60 )) min"; audit dev-shed ran "set; $(mem_counts)"; }
 # A set flag is refreshed while the pressure lasts and cleared after 5 calm minutes, or at once by the kill switch or repair mode off.
@@ -512,16 +541,17 @@ write_memory_status() {
   (( M_SWAP_TOTAL > 0 )) && summary+="; swap $(gb "$M_SWAP_USED") of $(gb "$M_SWAP_TOTAL") GB"
   (( M_COMP >= 0 )) && summary+="; compressed $(gb "$M_COMP") GB"
   [[ -n "$big_name" ]] && summary+="; biggest: $big_name $(gb "$big_mb") GB"
-  (( M_FSEV_MB >= R_FSEV_MB )) && summary+="; file-event service $(gb "$M_FSEV_MB") GB ($(gb "$M_FSEV_CMP") GB compressed)"
-  (( M_GROWTH >= GROWTH_MIN_MB )) && summary+="; file-event service growing about $M_GROWTH MB a minute"
+  (( M_FSEV_MB >= R_CAPT_MB )) && summary+="; file-event service $(gb "$M_FSEV_MB") GB ($(gb "$M_FSEV_CMP") GB compressed)"
+  (( M_GROWTH10 >= THROTTLE_GROWTH_MB )) && summary+="; file-event service grew $(gb "$M_GROWTH10") GB in 10 min"
+  [[ -f "$STATE/source-throttle" ]] && summary+="; test workers halved"
   [[ $shed == true ]] && summary+="; heavy development work paused"
-  printf '{"version":1,"checked_at":%s,"pressure":%s,"pressure_held_s":%s,"free_pct":%s,"swap_used_mb":%s,"swap_total_mb":%s,"compressor_mb":%s,"top":[%s],"fseventsd":{"pid":%s,"footprint_mb":%s,"compressed_mb":%s,"growth_mb_per_min":%s,"group_list_per_min":%s,"est_leak_mb_per_min":%s},"landings_1h":%s,"ships_1h":%s,"repair_mode":"%s","kill_switch":%s,"dev_shed":%s,"notice":"%s","notice_until":%s,"last_restart_at":%s,"last_restart_result":"%s","summary":"%s"}\n' \
-    "$(now)" "$M_LEVEL" "$H_PRESS" "$M_FREE" "$M_SWAP_USED" "$M_SWAP_TOTAL" "$M_COMP" "$top" "${M_FSEV_PID:-0}" "$M_FSEV_MB" "$M_FSEV_CMP" "$M_GROWTH" "$M_CALLS" "$M_LEAK_MB" \
+  printf '{"version":1,"checked_at":%s,"pressure":%s,"pressure_held_s":%s,"free_pct":%s,"swap_used_mb":%s,"swap_total_mb":%s,"compressor_mb":%s,"top":[%s],"fseventsd":{"pid":%s,"footprint_mb":%s,"compressed_mb":%s,"growth_10min_mb":%s,"group_list_per_min":%s},"source_throttle":%s,"landings_1h":%s,"ships_1h":%s,"repair_mode":"%s","kill_switch":%s,"dev_shed":%s,"notice":"%s","notice_until":%s,"last_restart_at":%s,"last_restart_result":"%s","summary":"%s"}\n' \
+    "$(now)" "$M_LEVEL" "$H_PRESS" "$M_FREE" "$M_SWAP_USED" "$M_SWAP_TOTAL" "$M_COMP" "$top" "${M_FSEV_PID:-0}" "$M_FSEV_MB" "$M_FSEV_CMP" "$M_GROWTH10" "$M_CALLS" "$( [[ -f "$STATE/source-throttle" ]] && echo true || echo false)" \
     "$D_LAND" "$D_SHIP" "$R_MODE" "$( ((R_OFF)) && echo true || echo false)" "$shed" "$notice" "$nu" "$rr" "$last_restart" "$(clean "$summary" 400)" > "$STATE/memory.json.tmp" \
     && mv "$STATE/memory.json.tmp" "$STATE/memory.json" && chmod 644 "$STATE/memory.json"
   local f="$STATE/memory.csv"
-  [[ -s "$f" ]] || echo "ts,pressure,free_pct,swap_used_mb,swap_total_mb,compressor_mb,fseventsd_mb,fseventsd_compressed_mb,growth_mb_per_min,group_list_per_min,est_leak_mb_per_min,top_name,top_mb,landings_1h,ships_1h" > "$f"
-  echo "$(now),$M_LEVEL,$M_FREE,$M_SWAP_USED,$M_SWAP_TOTAL,$M_COMP,$M_FSEV_MB,$M_FSEV_CMP,$M_GROWTH,$M_CALLS,$M_LEAK_MB,${big_name// /_},$big_mb,$D_LAND,$D_SHIP" >> "$f"; chmod 644 "$f"
+  [[ -s "$f" ]] || echo "ts,pressure,free_pct,swap_used_mb,swap_total_mb,compressor_mb,fseventsd_mb,fseventsd_compressed_mb,growth_10min_mb,group_list_per_min,top_name,top_mb,landings_1h,ships_1h" > "$f"
+  echo "$(now),$M_LEVEL,$M_FREE,$M_SWAP_USED,$M_SWAP_TOTAL,$M_COMP,$M_FSEV_MB,$M_FSEV_CMP,$M_GROWTH10,$M_CALLS,${big_name// /_},$big_mb,$D_LAND,$D_SHIP" >> "$f"; chmod 644 "$f"
   [[ $(stat -f %z "$f" 2>/dev/null || echo 0) -gt 5000000 ]] && { tail -n 20000 "$f" > "$f.tmp"; head -1 "$f" | cat - "$f.tmp" > "$f.new"; mv "$f.new" "$f"; rm -f "$f.tmp"; chmod 644 "$f"; }
   return 0
 }
@@ -535,6 +565,7 @@ cmd_memory() {
     # A restart re-probed the Mac; the later actions see the new numbers.
     [[ $id == restart-fseventsd ]] && signals
   done
+  source_throttle_maintain
   dev_shed_maintain
   write_memory_status
 }
@@ -584,7 +615,15 @@ cmd_capture_fsevents() { # pid full|quick
   with_timeout $(( quick ? 15 : 60 )) "$(tp /usr/bin/vmmap)" -summary "$pid" 2>&1 | head -c 104857600 > "$dir/vmmap.txt"; rc_vm=${PIPESTATUS[0]}
   # The full region list too (it names where the leak sits); not in a quick capture.
   (( quick )) || { with_timeout 180 "$(tp /usr/bin/vmmap)" "$pid" 2>&1 | head -c 209715200 > "$dir/vmmap-full.txt"; }
-  with_timeout $(( quick ? 25 : 120 )) "$(tp /usr/bin/log)" show --last "$( ((quick)) && echo 1h || echo 6h)" --style compact --predicate 'process == "fseventsd"' 2>&1 | head -c 104857600 > "$dir/log-fseventsd.txt"; rc_log=${PIPESTATUS[0]}
+  with_timeout $(( quick ? 25 : 120 )) "$(tp /usr/bin/log)" show --last "$( ((quick)) && echo 30m || echo 2h)" --style compact --predicate 'process == "fseventsd"' 2>&1 | head -c 104857600 > "$dir/log-fseventsd.txt"; rc_log=${PIPESTATUS[0]}
+  # heap and leaks walk every allocation; only on a small daemon (on a huge one they pull everything back from swap).
+  local fp_mb walked=false
+  fp_mb="$(with_timeout 15 "$(tp /usr/bin/top)" -l 1 -pid "$pid" -stats pid,command,mem,cmprs 2>/dev/null | parse_top | awk -F'\t' 'NR == 1 { print $3 }')"
+  if (( ! quick )) && [[ "$fp_mb" =~ ^[0-9]+$ ]] && (( fp_mb < WALK_MAX_MB )); then
+    walked=true
+    with_timeout 180 "$(tp /usr/bin/heap)" "$pid" 2>&1 | head -c 52428800 > "$dir/heap.txt"
+    with_timeout 300 "$(tp /usr/bin/leaks)" --nostacks "$pid" 2>&1 | head -c 52428800 > "$dir/leaks.txt"
+  fi
   with_timeout 20 "$(tp /usr/bin/footprint)" "$pid" > "$dir/footprint.txt" 2>&1; rc_fp=$?
   with_timeout 15 "$(tp /usr/bin/top)" -l 1 -o mem -n 15 -stats pid,command,mem,cmprs > "$dir/top.txt" 2>&1
   { with_timeout 5 "$(tp /usr/sbin/sysctl)" vm.swapusage kern.memorystatus_vm_pressure_level; with_timeout 10 "$(tp /usr/bin/vm_stat)"; } > "$dir/system.txt" 2>&1
@@ -597,6 +636,8 @@ cmd_capture_fsevents() { # pid full|quick
     with_timeout "$fs_s" "$(tp /usr/bin/fs_usage)" -w -f filesys 2>/dev/null | agg_fs_usage > "$dir/fs_usage-counts.txt"
     with_timeout 45 "$(tp /usr/sbin/lsof)" -n -P -w -F pcf 2>/dev/null | awk '/^c/ { c = substr($0, 2) } /^f/ { n[c]++ } END { for (k in n) print n[k], k }' | sort -rn | head -n 15 > "$dir/open-files-by-process.txt"
     with_timeout 20 "$(tp /usr/sbin/lsof)" -n -P -w -F c /dev/fsevents 2>/dev/null | sed -n 's/^c//p' | sort | uniq -c | sort -rn | head -n 15 > "$dir/fsevents-clients.txt"
+    # The daemon's own open files, counted by type (no names). No tool lists the FSEvents streams per client without SIP changes.
+    with_timeout 30 "$(tp /usr/sbin/lsof)" -n -P -w -p "$pid" -F t 2>/dev/null | sed -n 's/^t//p' | sort | uniq -c | sort -rn | head -n 15 > "$dir/fseventsd-open-files-by-type.txt"
   fi
   # Build activity: timestamps only, from the development data folder when one is configured.
   { if [[ -n "$DEV_DATA" && -f "$DEV_DATA/land/landings.jsonl" && ! -L "$DEV_DATA/land/landings.jsonl" ]]; then tail -n 200 "$DEV_DATA/land/landings.jsonl" | sed -n 's/^{"ts": *"\([0-9TZ:-]*\)".*/landing \1/p' | tail -n 40; fi
@@ -614,12 +655,16 @@ cmd_capture_fsevents() { # pid full|quick
   fs_proc="$(sed -n 's/^proc //p' "$dir/fs_usage-counts.txt" 2>/dev/null | sort -rn | head -n 15 | pairs_json)"
   fs_path="$(sed -n 's/^path //p' "$dir/fs_usage-counts.txt" 2>/dev/null | sort -rn | head -n 20 | pairs_json)"
   openf="$(pairs_json < "$dir/open-files-by-process.txt" 2>/dev/null)"; clients="$(pairs_json < "$dir/fsevents-clients.txt" 2>/dev/null)"
+  local leaks_line heap_lines ofiles
+  leaks_line="$(grep -m1 -E 'leaks? for [0-9]+ total leaked bytes' "$dir/leaks.txt" 2>/dev/null | sed 's/^Process [0-9]*: //')"
+  heap_lines="$(grep -E '^(All zones|Zone )' "$dir/heap.txt" 2>/dev/null | grep -v '/' | head -n 15 | lines_json)"
+  ofiles="$(pairs_json < "$dir/fseventsd-open-files-by-type.txt" 2>/dev/null)"
   state="$(sed -n 's/^[[:space:]]*state = \([a-z ]*\)$/\1/p' "$dir/launchctl.txt" | head -n 1)"; runs="$(sed -n 's/^[[:space:]]*runs = \([0-9]*\)$/\1/p' "$dir/launchctl.txt" | head -n 1)"
   if (( rc_vm == 0 && rc_log == 0 )) && [[ -n "$fp_line" ]]; then complete=true; fi
   num() { [[ "$1" =~ ^[0-9]+$ ]] && echo "$1" || echo 0; }
-  printf '{"version":1,"captured_at":%s,"mode":"%s","complete":%s,"pid":%s,"vmmap_footprint":"%s","top_footprint_mb":%s,"top_compressed_mb":%s,"vmmap":%s,"log_6h":{"fseventsd_lines":%s,"errors":%s,"faults":%s,"group_list_calls":%s,"dropped_or_rescan_lines":%s,"mds_lines_2h":%s,"fsevents_subsystem_lines_2h":%s},"fs_usage":{"seconds":%s,"events":%s,"by_process":%s,"by_path":%s},"open_files_by_process":%s,"fsevents_clients":%s,"launchd":{"state":"%s","runs":%s},"activity":%s,"steps":{"vmmap":%s,"log":%s,"footprint":%s}}\n' \
+  printf '{"version":1,"captured_at":%s,"mode":"%s","complete":%s,"pid":%s,"vmmap_footprint":"%s","top_footprint_mb":%s,"top_compressed_mb":%s,"vmmap":%s,"walked":%s,"leaks":"%s","heap":%s,"fseventsd_open_files_by_type":%s,"log_2h":{"fseventsd_lines":%s,"errors":%s,"faults":%s,"group_list_calls":%s,"dropped_or_rescan_lines":%s,"mds_lines_2h":%s,"fsevents_subsystem_lines_2h":%s},"fs_usage":{"seconds":%s,"events":%s,"by_process":%s,"by_path":%s},"open_files_by_process":%s,"fsevents_clients":%s,"launchd":{"state":"%s","runs":%s},"activity":%s,"steps":{"vmmap":%s,"log":%s,"footprint":%s}}\n' \
     "$(now)" "$( ((quick)) && echo quick || echo full)" "$complete" "$pid" "$(clean "$fp_line" 20)" "$(num "$(cut -f1 <<< "$top1")")" "$(num "$(cut -f2 <<< "$top1")")" "$vm_lines" \
-    "$(num "$logc")" "$(num "$errs")" "$(num "$faults")" "$(num "$calls")" "$(num "$drops")" "$(num "$mds")" "$(num "$fsub")" \
+    "$walked" "$(clean "$leaks_line" 160)" "${heap_lines:-[]}" "${ofiles:-[]}" "$(num "$logc")" "$(num "$errs")" "$(num "$faults")" "$(num "$calls")" "$(num "$drops")" "$(num "$mds")" "$(num "$fsub")" \
     "$( ((quick)) && echo 0 || echo "$fs_s")" "$(num "$fs_total")" "${fs_proc:-[]}" "${fs_path:-[]}" "${openf:-[]}" "${clients:-[]}" "$(clean "$state" 20)" "$(num "$runs")" \
     "$(lines_json < "$dir/activity.txt")" "$rc_vm" "$rc_log" "$rc_fp" > "$dir/digest.json"
   umask 022

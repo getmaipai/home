@@ -49,7 +49,7 @@ SUDOERS_BODY="# MaiPai host guard recovery commands (HOST-GUARD-01). Remove: sud
 $OWNER ALL=(root) NOPASSWD: $DEST status, $DEST mode off, $DEST mode dry, $DEST mode live, $DEST capture, $DEST uninstall, /sbin/shutdown -r now"
 CONFIG_BODY="{\"owner\":\"$OWNER\",\"uid\":$UIDN,\"data_dir\":\"$DATA\"${DEV_DATA:+,\"dev_data\":\"$DEV_DATA\"}}"
 # Self-repair bounds (HOST-GUARD-08), root-owned so only an administrator changes them; the guard clamps every value again.
-REPAIR_BODY='{"mode":"live","fsevents_compressed_gb":16,"emergency_gb":40,"shed_minutes":20}'
+REPAIR_BODY='{"mode":"live","capture_gb":4,"fsevents_compressed_gb":8,"emergency_gb":40,"shed_minutes":20}'
 
 tmp="$(mktemp /tmp/maipai-sudoers.XXXXXX)"; printf '%s\n' "$SUDOERS_BODY" > "$tmp"
 /usr/sbin/visudo -cf "$tmp" >/dev/null || { echo "sudoers entry failed validation" >&2; rm -f "$tmp"; exit 4; }
