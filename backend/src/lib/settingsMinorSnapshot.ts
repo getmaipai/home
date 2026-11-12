@@ -41,6 +41,7 @@ export const CHILD_VISIBLE_SETTING_KEYS: readonly string[] = [
   ...OUTSIDE_CHANNEL_EVENTS.map((event) => `notifications.${event}.telegram`),
   "ui.appearance",
   "ui.look",
+  "ui.rail_expanded",
   "ui.show_turn_stats",
   "ui.enrollment_sounds",
   ...EASE_SETTING_KEYS,

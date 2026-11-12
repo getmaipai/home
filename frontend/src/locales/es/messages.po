@@ -16363,6 +16363,16 @@ msgid "setting.resources.quiet_max_wait.label"
 msgstr "Espera máxima por un momento de calma"
 
 #. js-lingui-explicit-id
+#: src/lib/settingCopy.generated.ts:1478
+msgid "setting.ui.rail_expanded.label"
+msgstr "Keep the menu open"
+
+#. js-lingui-explicit-id
+#: src/lib/settingCopy.generated.ts:1479
+msgid "setting.ui.rail_expanded.help"
+msgstr "Show names beside the menu icons. The menu still folds away by itself in apps that have their own side panel."
+
+#. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:1466
 #, needs-review
 msgid "setting.ui.look.label"

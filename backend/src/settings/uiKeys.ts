@@ -107,6 +107,17 @@ export const UI_SETTINGS_KEYS: SettingsKey[] = [
     lives_in: "profile.appearance",
     honoured_by: ["home"],
   }),
+  SettingsKey.parse({
+    key: "ui.rail_expanded",
+    scope: "person",
+    selector: "boolean",
+    default: false,
+    label: "Keep the menu open",
+    help: "Show names beside the menu icons. The menu still folds away by itself in apps that have their own side panel.",
+    level: "basic",
+    lives_in: "profile.appearance",
+    honoured_by: ["home"],
+  }),
   // No selector in Home Assistant's vocabulary (docs/SETTINGS.md's
   // registry list) fits an ordered list of ids, so this is `text`
   // storing a JSON array - the same "typed, not the real thing yet"

@@ -58,7 +58,7 @@ const TELEGRAM = ["approvals.requested", "backups.target_failing", "engines.prob
 const OLD_CHILD = new Set([
   "persona.active_id", "search.safe_search", "tts.voice_id", "notifications.browser.enabled", "notifications.file_shared.muted_senders",
   "person.quiet_hours.from", "person.quiet_hours.to", "notifications.telegram.chat_id", ...TELEGRAM,
-  "ui.appearance", "ui.look", "ui.show_turn_stats", "ui.enrollment_sounds",
+  "ui.appearance", "ui.look", "ui.rail_expanded", "ui.show_turn_stats", "ui.enrollment_sounds",
 ]);
 // A teen saw the same, plus the chat photo switch (hidden from a child).
 // EASE-OF-USE-01c: ease of use is comfort, not protection, so a child and a teen see the ease keys (one deliberate
