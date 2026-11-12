@@ -3,7 +3,7 @@
 import { appendFileSync, existsSync, mkdirSync } from "node:fs";
 import { join } from "node:path";
 import { consoleUserHome, helperSocketPath, listHelperApps } from "@/lib/appHelperClient";
-import { homedir } from "node:os";
+import { homedir, tmpdir } from "node:os";
 
 export type HelperInstallResult = "installed" | "no_toolchain" | "nobody_logged_in" | "not_mac" | "failed";
 export interface HelperInstallOutcome { result: HelperInstallResult; message: string }
@@ -25,7 +25,7 @@ const outcome = (result: HelperInstallResult): HelperInstallOutcome => ({ result
 
 type Run = (script: string) => Promise<number>;
 /** Where the install output goes: the Logs folder the failure message names, in the home of the person at the Mac (root's folder when the hub runs as root and nobody is logged in). */
-export const installLogPath = () => join((process.getuid?.() === 0 ? consoleUserHome() : null) ?? homedir(), "Library", "Logs", "MaiPai", "app-helper-install.log");
+export const installLogPath = () => process.env.NODE_ENV === "test" ? join(tmpdir(), "maipai-test-app-helper-install.log") : join((process.getuid?.() === 0 ? consoleUserHome() : null) ?? homedir(), "Library", "Logs", "MaiPai", "app-helper-install.log");
 const runScript: Run = async (script) => {
   const log = installLogPath();
   try { mkdirSync(join(log, ".."), { recursive: true }); } catch { /* the log is a help, never a blocker */ }
