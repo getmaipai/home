@@ -317,3 +317,16 @@ describe("display-awake login service", () => {
     expect(calls()).not.toContain("launchctl bootstrap");
   });
 });
+
+describe("host-tune.sh as the Home server's system daemon (no HOME)", () => {
+  test("detect lists the items instead of failing with 'HOME: unbound variable' (the app's host tuning list never loaded)", () => {
+    if (process.platform !== "darwin") return;
+    const env: Record<string, string> = { PATH: process.env.PATH ?? "/usr/bin:/bin" };
+    const run = Bun.spawnSync(["bash", join(import.meta.dir, "host-tune.sh"), "--json", "detect"], { env, stdout: "pipe", stderr: "pipe" });
+    const out = new TextDecoder().decode(run.stdout);
+    expect(new TextDecoder().decode(run.stderr)).not.toContain("unbound variable");
+    const parsed = JSON.parse(out) as { supported: boolean; items: Array<{ id: string }> };
+    expect(parsed.supported).toBe(true);
+    expect(parsed.items.some((item) => item.id === "host-guard")).toBe(true);
+  });
+});

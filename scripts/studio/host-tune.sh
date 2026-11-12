@@ -24,6 +24,14 @@ STATE_DIR="$ROOT/Library/Application Support/MaiPai/host-tune"
 DAEMON_LABEL="com.maipai.wired-limit"
 DAEMON_PLIST="$ROOT/Library/LaunchDaemons/$DAEMON_LABEL.plist"
 DISPLAY_LABEL="com.maipai.display-awake"
+# Home's server runs as a system daemon with no HOME, and `set -u` made `$HOME` an error ("HOME: unbound variable"), so the host tuning list never loaded in the app.
+# The display-awake item belongs to the signed-in account: use HOME when it is set, otherwise that account's home folder.
+if [ -z "${HOME:-}" ]; then
+  _console_owner="$(stat -f %Su /dev/console 2>/dev/null || true)"
+  case "$_console_owner" in ''|root|loginwindow|_mbsetupuser) _console_owner="" ;; esac
+  HOME="$([ -n "$_console_owner" ] && dscl . -read "/Users/$_console_owner" NFSHomeDirectory 2>/dev/null | awk '{print $2}')"
+  HOME="${HOME:-/var/empty}"
+fi
 DISPLAY_PLIST="${ROOT:-$HOME}/Library/LaunchAgents/$DISPLAY_LABEL.plist"
 SU_PREFS="$ROOT/Library/Preferences/com.apple.SoftwareUpdate"
 SELF="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/$(basename "${BASH_SOURCE[0]}")"
