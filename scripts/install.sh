@@ -70,7 +70,7 @@ ENGINE_STACK_DATA=/data/stack
 
 log() { printf '%s\n' "$*"; }
 # DIRECT-FAST-03: one timestamped line per phase, so the installer log shows where a ship's minutes went.
-INSTALL_T0=$(date +%s)
+INSTALL_T0=$(date +%s 2>/dev/null || echo 0)
 phase() { printf '[%s +%ss] phase: %s\n' "$(date +%H:%M:%S)" "$(( $(date +%s) - INSTALL_T0 ))" "$*"; }
 die() { printf 'error: %s\n' "$*" >&2; exit 1; }
 
@@ -2017,7 +2017,7 @@ setup_stack() {
     publish_engine_stack_binary "$build_dir" "$stack_dir" "$(render_stack_binary_name "$os" "$arch")" \
       || { log "Could not copy the built Stack files into ${stack_dir}. The MaiPai Stack is required; installation cannot continue."; rm -rf "$source_root"; return 1; }
     rm -rf "$source_root"
-    printf '%s\n' "$STACK_TAG" > "${stack_dir}/.stack-tag"
+    if [ -d "$stack_dir" ]; then printf '%s\n' "$STACK_TAG" > "${stack_dir}/.stack-tag" || true; fi
   fi
   STACK_PROBLEM="The AI engine was built but would not start. On a Mac this usually means nobody is logged in at the screen: log in there, then press Try again. Its log is ${stack_dir}/data/logs/stack.error.log."
   stack_status running starting
