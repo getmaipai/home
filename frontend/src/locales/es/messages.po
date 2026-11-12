@@ -4234,7 +4234,7 @@ msgstr "Límite de almacenamiento de copias de seguridad (GB)"
 #. js-lingui-explicit-id
 #: src/apps/settings/BackupsSection.tsx:204
 #: src/shell/pageHeaderTitle.tsx:103
-#: src/shell/Routes.tsx:163
+#: src/shell/Routes.tsx:166
 #, needs-review
 msgid "Backups"
 msgstr "Copias de seguridad"
@@ -5606,7 +5606,7 @@ msgstr "Configuración del chat"
 #: src/shell/pages/UiShowcasePage.tsx:132
 #: src/shell/pages/UiShowcasePage.tsx:167
 #: src/shell/pages/UiShowcasePage.tsx:170
-#: src/shell/Routes.tsx:166
+#: src/shell/Routes.tsx:169
 #, needs-review
 msgid "Chat showcase"
 msgstr "Demo de chat"
@@ -6932,7 +6932,7 @@ msgstr "Próximamente"
 #. js-lingui-explicit-id
 #: src/apps/settings/CommandsSection.tsx:105
 #: src/shell/pageHeaderTitle.tsx:105
-#: src/shell/Routes.tsx:164
+#: src/shell/Routes.tsx:167
 #, needs-review
 msgid "Commands"
 msgstr "Comandos"
@@ -7106,8 +7106,8 @@ msgstr ""
 #: src/shell/AmbientCompanionPane.tsx:273
 #: src/shell/pages/companionFlow/AnimateStep.tsx:156
 #: src/shell/pages/CompanionsPage.tsx:162
-#: src/shell/pages/dashboard/HomeShelves.tsx:45
-#: src/shell/pages/dashboard/HomeShelves.tsx:83
+#: src/shell/pages/dashboard/HomeShelves.tsx:46
+#: src/shell/pages/dashboard/HomeShelves.tsx:86
 #: src/shell/pages/SignInPage.tsx:164
 #, needs-review
 msgid "Continue"
@@ -7541,7 +7541,7 @@ msgid "Could not delete this voice. Try again."
 msgstr "No se pudo eliminar esta voz. Inténtalo de nuevo."
 
 #. js-lingui-explicit-id
-#: src/shell/Routes.tsx:384
+#: src/shell/Routes.tsx:388
 #, needs-review
 msgid "Could not discard Incognito chats. Try again."
 msgstr "No se pudieron descartar los chats Incógnito. Inténtalo de nuevo."
@@ -7938,7 +7938,7 @@ msgid "Could not load your devices."
 msgstr "No se pudieron cargar tus dispositivos."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/dashboard/HomeShelves.tsx:57
+#: src/shell/pages/dashboard/HomeShelves.tsx:59
 #, needs-review
 msgid "Could not load your family. Refresh Home to try again."
 msgstr "No pudimos cargar tu hogar. Recarga Home para intentarlo de nuevo."
@@ -7956,7 +7956,7 @@ msgid "Could not load your library."
 msgstr "No se pudo cargar tu biblioteca."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/dashboard/HomeShelves.tsx:74
+#: src/shell/pages/dashboard/HomeShelves.tsx:77
 #, needs-review
 msgid "Could not load your library. Refresh Home to try again."
 msgstr "No pudimos cargar tu Biblioteca. Recarga Home para intentarlo de nuevo."
@@ -7974,7 +7974,7 @@ msgid "Could not load your notification history."
 msgstr "No se pudo cargar tu historial de notificaciones."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/dashboard/HomeShelves.tsx:47
+#: src/shell/pages/dashboard/HomeShelves.tsx:49
 #, needs-review
 msgid "Could not load your recent items. Refresh Home to try again."
 msgstr "No pudimos cargar tus elementos recientes. Recarga Home para intentarlo de nuevo."
@@ -8082,7 +8082,7 @@ msgstr "No se pudo publicar la nota."
 
 #. js-lingui-explicit-id
 #: src/shell/AmbientCompanionPane.tsx:317
-#: src/shell/Routes.tsx:321
+#: src/shell/Routes.tsx:325
 #, needs-review
 msgid "Could not reach {name}. Try again."
 msgstr "No se pudo contactar a {name}. Inténtalo de nuevo."
@@ -8577,7 +8577,7 @@ msgstr "Versión con una voz nueva"
 #. js-lingui-explicit-id
 #: src/shell/pages/MusicStudioPages.tsx:183
 #: src/shell/pages/ProjectsPage.tsx:39
-#: src/shell/Routes.tsx:400
+#: src/shell/Routes.tsx:404
 #, needs-review
 msgid "Create"
 msgstr "Crear"
@@ -10986,7 +10986,7 @@ msgstr "Encuentra todo en tu hogar."
 
 #. js-lingui-explicit-id
 #: src/shell/AmbientCompanionPane.tsx:273
-#: src/shell/Routes.tsx:321
+#: src/shell/Routes.tsx:325
 #, needs-review
 msgid "Find me"
 msgstr "Encuéntrame"
@@ -12188,8 +12188,8 @@ msgstr "Guarda lo que algunos descargados piden antes de comenzar."
 #: src/shell/pages/WikipediaPage.tsx:154
 #: src/shell/pages/WikipediaPage.tsx:178
 #: src/shell/routeHeader.ts:23
-#: src/shell/Routes.tsx:398
-#: src/shell/Routes.tsx:450
+#: src/shell/Routes.tsx:402
+#: src/shell/Routes.tsx:454
 #, needs-review
 msgid "Home"
 msgstr "Home"
@@ -15510,7 +15510,7 @@ msgstr "Niveles y modelos"
 #: src/shell/pages/MusicStudioPages.tsx:141
 #: src/shell/pages/settings/settingsBackLink.ts:53
 #: src/shell/pages/status/StatusComponents.tsx:31
-#: src/shell/Routes.tsx:401
+#: src/shell/Routes.tsx:405
 #, needs-review
 msgid "Library"
 msgstr "Biblioteca"
@@ -16269,7 +16269,7 @@ msgid "Loading your keys"
 msgstr "Cargando tus claves"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/dashboard/HomeShelves.tsx:74
+#: src/shell/pages/dashboard/HomeShelves.tsx:77
 #, needs-review
 msgid "Loading your library"
 msgstr "Cargando tu Biblioteca"
@@ -16281,7 +16281,7 @@ msgid "Loading your pictures"
 msgstr "Cargando tus fotos"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/dashboard/HomeShelves.tsx:47
+#: src/shell/pages/dashboard/HomeShelves.tsx:49
 #, needs-review
 msgid "Loading your recent items"
 msgstr "Cargando tus elementos recientes"
@@ -16585,7 +16585,7 @@ msgstr "Letras (opcional)"
 #: src/shell/pages/dashboard/ArrangeHome.tsx:104
 #: src/shell/pages/dashboard/HomeHero.tsx:22
 #: src/shell/pages/dashboard/HomeHero.tsx:22
-#: src/shell/pages/dashboard/HomeShelves.tsx:83
+#: src/shell/pages/dashboard/HomeShelves.tsx:86
 #: src/shell/pages/MediaHomePage.tsx:42
 #, needs-review
 msgid "Made at home"
@@ -17405,8 +17405,8 @@ msgstr "Velocidad máxima usada para actualizaciones automáticas de la bibliote
 #: src/shell/pages/MediaHomePage.tsx:25
 #: src/shell/pages/MediaHomePage.tsx:58
 #: src/shell/pages/MediaSearchPage.tsx:17
-#: src/shell/Routes.tsx:399
-#: src/shell/Routes.tsx:450
+#: src/shell/Routes.tsx:403
+#: src/shell/Routes.tsx:454
 #, needs-review
 msgid "Media"
 msgstr "Medios"
@@ -18444,7 +18444,7 @@ msgid "New folder"
 msgstr "Nueva carpeta"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/dashboard/HomeShelves.tsx:83
+#: src/shell/pages/dashboard/HomeShelves.tsx:86
 #, needs-review
 msgid "New in your library"
 msgstr "Nuevo en tu Biblioteca"
@@ -19554,6 +19554,11 @@ msgid "Nothing in the pictures or the personality would scare or confuse a young
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/shell/ActivityBell.tsx:34
+msgid "Nothing is being made right now."
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/apps/settings/ModelsSection.tsx:302
 #, needs-review
 msgid "Nothing is loaded right now."
@@ -19636,7 +19641,7 @@ msgid "Nothing to download: everything you ticked is already installed."
 msgstr "Nada que descargar: todo lo que marcaste ya está instalado."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/dashboard/HomeShelves.tsx:50
+#: src/shell/pages/dashboard/HomeShelves.tsx:52
 msgid "Nothing to pick up yet. Chats and things you play show up here."
 msgstr ""
 
@@ -21176,7 +21181,7 @@ msgstr "Porcentaje del tamaño de texto normal. \"Predeterminado\" sigue tu elec
 #. js-lingui-explicit-id
 #: src/shell/pageHeaderTitle.tsx:100
 #: src/shell/pages/PerformancePage.tsx:54
-#: src/shell/Routes.tsx:159
+#: src/shell/Routes.tsx:162
 #, needs-review
 msgid "Performance"
 msgstr "Rendimiento"
@@ -23074,7 +23079,7 @@ msgstr "Problemas de reparación"
 #: src/shell/pageHeaderTitle.tsx:102
 #: src/shell/pages/dashboard/Attention.tsx:25
 #: src/shell/pages/RepairsPage.tsx:60
-#: src/shell/Routes.tsx:161
+#: src/shell/Routes.tsx:164
 #, needs-review
 msgid "Repairs"
 msgstr "Reparaciones"
@@ -25265,7 +25270,7 @@ msgstr "Configurando tu IA"
 #: src/shell/pages/FilesPage.tsx:303
 #: src/shell/pages/PersonProfilePage.tsx:207
 #: src/shell/pages/settings/SettingsAreaPage.tsx:293
-#: src/shell/Routes.tsx:450
+#: src/shell/Routes.tsx:454
 #, needs-review
 msgid "Settings"
 msgstr "Ajustes"
@@ -25521,7 +25526,7 @@ msgid "Show in the sidebar"
 msgstr "Mostrar en la barra lateral"
 
 #. js-lingui-explicit-id
-#: src/shell/Routes.tsx:360
+#: src/shell/Routes.tsx:364
 #, needs-review
 msgid "Show me around"
 msgstr "Muéstrame por dónde"
@@ -26926,7 +26931,7 @@ msgstr ""
 #: src/shell/pages/RepairsPage.tsx:67
 #: src/shell/pages/StatusPage.tsx:32
 #: src/shell/pages/UpdatesPage.tsx:53
-#: src/shell/Routes.tsx:162
+#: src/shell/Routes.tsx:165
 #, needs-review
 msgid "Status"
 msgstr "Estado"
@@ -27162,7 +27167,7 @@ msgstr "Cronómetro en marcha"
 #: src/shell/pages/TrashPage.tsx:27
 #: src/shell/pages/TrashPage.tsx:27
 #: src/shell/pages/TrashPage.tsx:58
-#: src/shell/Routes.tsx:158
+#: src/shell/Routes.tsx:161
 #, needs-review
 msgid "Storage"
 msgstr "Almacenamiento"
@@ -27968,7 +27973,7 @@ msgstr "No se envió. Inténtalo de nuevo."
 #: src/shell/pages/UpdatesPage.tsx:129
 #: src/shell/pages/UpdatesPage.tsx:184
 #: src/shell/pages/UpdatesPage.tsx:187
-#: src/shell/Routes.tsx:321
+#: src/shell/Routes.tsx:325
 #: src/shell/sessionLockContext.tsx:124
 #, needs-review
 msgid "That did not work"
@@ -30612,7 +30617,7 @@ msgstr "¿Apagar esta función?"
 
 #. js-lingui-explicit-id
 #: src/apps/chat/chatThreadSlots.tsx:385
-#: src/shell/Routes.tsx:175
+#: src/shell/Routes.tsx:178
 #, needs-review
 msgid "Turn trace"
 msgstr "Trazado de turnos"
@@ -31131,7 +31136,7 @@ msgstr ""
 #: src/shell/pageHeaderTitle.tsx:101
 #: src/shell/pages/dashboard/Attention.tsx:26
 #: src/shell/pages/UpdatesPage.tsx:78
-#: src/shell/Routes.tsx:160
+#: src/shell/Routes.tsx:163
 #, needs-review
 msgid "Updates"
 msgstr "Actualizaciones"
@@ -31449,7 +31454,7 @@ msgstr "Usado ayer"
 #: src/apps/settings/UsersSection.tsx:232
 #: src/shell/pageHeaderTitle.tsx:107
 #: src/shell/pages/UsersPage.tsx:11
-#: src/shell/Routes.tsx:165
+#: src/shell/Routes.tsx:168
 #, needs-review
 msgid "Users"
 msgstr "Usuarios"
@@ -33461,8 +33466,8 @@ msgid "Your earlier version stays on this card."
 msgstr "Tu versión anterior se queda en esta tarjeta."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/dashboard/HomeShelves.tsx:60
-#: src/shell/pages/dashboard/HomeShelves.tsx:60
+#: src/shell/pages/dashboard/HomeShelves.tsx:62
+#: src/shell/pages/dashboard/HomeShelves.tsx:62
 #, needs-review
 msgid "Your family"
 msgstr "Tu hogar"

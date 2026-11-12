@@ -3654,7 +3654,7 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/apps/settings/BackupsSection.tsx:204
 #: src/shell/pageHeaderTitle.tsx:103
-#: src/shell/Routes.tsx:163
+#: src/shell/Routes.tsx:166
 msgid "Backups"
 msgstr ""
 
@@ -4849,7 +4849,7 @@ msgstr ""
 #: src/shell/pages/UiShowcasePage.tsx:132
 #: src/shell/pages/UiShowcasePage.tsx:167
 #: src/shell/pages/UiShowcasePage.tsx:170
-#: src/shell/Routes.tsx:166
+#: src/shell/Routes.tsx:169
 msgid "Chat showcase"
 msgstr ""
 
@@ -5990,7 +5990,7 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/apps/settings/CommandsSection.tsx:105
 #: src/shell/pageHeaderTitle.tsx:105
-#: src/shell/Routes.tsx:164
+#: src/shell/Routes.tsx:167
 msgid "Commands"
 msgstr ""
 
@@ -6144,8 +6144,8 @@ msgstr ""
 #: src/shell/AmbientCompanionPane.tsx:273
 #: src/shell/pages/companionFlow/AnimateStep.tsx:156
 #: src/shell/pages/CompanionsPage.tsx:162
-#: src/shell/pages/dashboard/HomeShelves.tsx:45
-#: src/shell/pages/dashboard/HomeShelves.tsx:83
+#: src/shell/pages/dashboard/HomeShelves.tsx:46
+#: src/shell/pages/dashboard/HomeShelves.tsx:86
 #: src/shell/pages/SignInPage.tsx:164
 msgid "Continue"
 msgstr ""
@@ -6517,7 +6517,7 @@ msgid "Could not delete this voice. Try again."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/Routes.tsx:384
+#: src/shell/Routes.tsx:388
 msgid "Could not discard Incognito chats. Try again."
 msgstr ""
 
@@ -6859,7 +6859,7 @@ msgid "Could not load your devices."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/dashboard/HomeShelves.tsx:57
+#: src/shell/pages/dashboard/HomeShelves.tsx:59
 msgid "Could not load your family. Refresh Home to try again."
 msgstr ""
 
@@ -6874,7 +6874,7 @@ msgid "Could not load your library."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/dashboard/HomeShelves.tsx:74
+#: src/shell/pages/dashboard/HomeShelves.tsx:77
 msgid "Could not load your library. Refresh Home to try again."
 msgstr ""
 
@@ -6889,7 +6889,7 @@ msgid "Could not load your notification history."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/dashboard/HomeShelves.tsx:47
+#: src/shell/pages/dashboard/HomeShelves.tsx:49
 msgid "Could not load your recent items. Refresh Home to try again."
 msgstr ""
 
@@ -6982,7 +6982,7 @@ msgstr ""
 
 #. js-lingui-explicit-id
 #: src/shell/AmbientCompanionPane.tsx:317
-#: src/shell/Routes.tsx:321
+#: src/shell/Routes.tsx:325
 msgid "Could not reach {name}. Try again."
 msgstr ""
 
@@ -7407,7 +7407,7 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/shell/pages/MusicStudioPages.tsx:183
 #: src/shell/pages/ProjectsPage.tsx:39
-#: src/shell/Routes.tsx:400
+#: src/shell/Routes.tsx:404
 msgid "Create"
 msgstr ""
 
@@ -9471,7 +9471,7 @@ msgstr ""
 
 #. js-lingui-explicit-id
 #: src/shell/AmbientCompanionPane.tsx:273
-#: src/shell/Routes.tsx:321
+#: src/shell/Routes.tsx:325
 msgid "Find me"
 msgstr ""
 
@@ -10504,8 +10504,8 @@ msgstr ""
 #: src/shell/pages/WikipediaPage.tsx:154
 #: src/shell/pages/WikipediaPage.tsx:178
 #: src/shell/routeHeader.ts:23
-#: src/shell/Routes.tsx:398
-#: src/shell/Routes.tsx:450
+#: src/shell/Routes.tsx:402
+#: src/shell/Routes.tsx:454
 msgid "Home"
 msgstr ""
 
@@ -13357,7 +13357,7 @@ msgstr ""
 #: src/shell/pages/MusicStudioPages.tsx:141
 #: src/shell/pages/settings/settingsBackLink.ts:53
 #: src/shell/pages/status/StatusComponents.tsx:31
-#: src/shell/Routes.tsx:401
+#: src/shell/Routes.tsx:405
 msgid "Library"
 msgstr ""
 
@@ -14011,7 +14011,7 @@ msgid "Loading your keys"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/dashboard/HomeShelves.tsx:74
+#: src/shell/pages/dashboard/HomeShelves.tsx:77
 msgid "Loading your library"
 msgstr ""
 
@@ -14021,7 +14021,7 @@ msgid "Loading your pictures"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/dashboard/HomeShelves.tsx:47
+#: src/shell/pages/dashboard/HomeShelves.tsx:49
 msgid "Loading your recent items"
 msgstr ""
 
@@ -14283,7 +14283,7 @@ msgstr ""
 #: src/shell/pages/dashboard/ArrangeHome.tsx:104
 #: src/shell/pages/dashboard/HomeHero.tsx:22
 #: src/shell/pages/dashboard/HomeHero.tsx:22
-#: src/shell/pages/dashboard/HomeShelves.tsx:83
+#: src/shell/pages/dashboard/HomeShelves.tsx:86
 #: src/shell/pages/MediaHomePage.tsx:42
 msgid "Made at home"
 msgstr ""
@@ -14994,8 +14994,8 @@ msgstr ""
 #: src/shell/pages/MediaHomePage.tsx:25
 #: src/shell/pages/MediaHomePage.tsx:58
 #: src/shell/pages/MediaSearchPage.tsx:17
-#: src/shell/Routes.tsx:399
-#: src/shell/Routes.tsx:450
+#: src/shell/Routes.tsx:403
+#: src/shell/Routes.tsx:454
 msgid "Media"
 msgstr ""
 
@@ -15892,7 +15892,7 @@ msgid "New folder"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/dashboard/HomeShelves.tsx:83
+#: src/shell/pages/dashboard/HomeShelves.tsx:86
 msgid "New in your library"
 msgstr ""
 
@@ -16852,6 +16852,11 @@ msgid "Nothing in the pictures or the personality would scare or confuse a young
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/shell/ActivityBell.tsx:34
+msgid "Nothing is being made right now."
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/apps/settings/ModelsSection.tsx:302
 msgid "Nothing is loaded right now."
 msgstr ""
@@ -16922,7 +16927,7 @@ msgid "Nothing to download: everything you ticked is already installed."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/dashboard/HomeShelves.tsx:50
+#: src/shell/pages/dashboard/HomeShelves.tsx:52
 msgid "Nothing to pick up yet. Chats and things you play show up here."
 msgstr ""
 
@@ -18258,7 +18263,7 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/shell/pageHeaderTitle.tsx:100
 #: src/shell/pages/PerformancePage.tsx:54
-#: src/shell/Routes.tsx:159
+#: src/shell/Routes.tsx:162
 msgid "Performance"
 msgstr ""
 
@@ -19885,7 +19890,7 @@ msgstr ""
 #: src/shell/pageHeaderTitle.tsx:102
 #: src/shell/pages/dashboard/Attention.tsx:25
 #: src/shell/pages/RepairsPage.tsx:60
-#: src/shell/Routes.tsx:161
+#: src/shell/Routes.tsx:164
 msgid "Repairs"
 msgstr ""
 
@@ -21794,7 +21799,7 @@ msgstr ""
 #: src/shell/pages/FilesPage.tsx:303
 #: src/shell/pages/PersonProfilePage.tsx:207
 #: src/shell/pages/settings/SettingsAreaPage.tsx:293
-#: src/shell/Routes.tsx:450
+#: src/shell/Routes.tsx:454
 msgid "Settings"
 msgstr ""
 
@@ -22012,7 +22017,7 @@ msgid "Show in the sidebar"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/Routes.tsx:360
+#: src/shell/Routes.tsx:364
 msgid "Show me around"
 msgstr ""
 
@@ -23234,7 +23239,7 @@ msgstr ""
 #: src/shell/pages/RepairsPage.tsx:67
 #: src/shell/pages/StatusPage.tsx:32
 #: src/shell/pages/UpdatesPage.tsx:53
-#: src/shell/Routes.tsx:162
+#: src/shell/Routes.tsx:165
 msgid "Status"
 msgstr ""
 
@@ -23438,7 +23443,7 @@ msgstr ""
 #: src/shell/pages/TrashPage.tsx:27
 #: src/shell/pages/TrashPage.tsx:27
 #: src/shell/pages/TrashPage.tsx:58
-#: src/shell/Routes.tsx:158
+#: src/shell/Routes.tsx:161
 msgid "Storage"
 msgstr ""
 
@@ -24147,7 +24152,7 @@ msgstr ""
 #: src/shell/pages/UpdatesPage.tsx:129
 #: src/shell/pages/UpdatesPage.tsx:184
 #: src/shell/pages/UpdatesPage.tsx:187
-#: src/shell/Routes.tsx:321
+#: src/shell/Routes.tsx:325
 #: src/shell/sessionLockContext.tsx:124
 msgid "That did not work"
 msgstr ""
@@ -26421,7 +26426,7 @@ msgstr ""
 
 #. js-lingui-explicit-id
 #: src/apps/chat/chatThreadSlots.tsx:385
-#: src/shell/Routes.tsx:175
+#: src/shell/Routes.tsx:178
 msgid "Turn trace"
 msgstr ""
 
@@ -26869,7 +26874,7 @@ msgstr ""
 #: src/shell/pageHeaderTitle.tsx:101
 #: src/shell/pages/dashboard/Attention.tsx:26
 #: src/shell/pages/UpdatesPage.tsx:78
-#: src/shell/Routes.tsx:160
+#: src/shell/Routes.tsx:163
 msgid "Updates"
 msgstr ""
 
@@ -27139,7 +27144,7 @@ msgstr ""
 #: src/apps/settings/UsersSection.tsx:232
 #: src/shell/pageHeaderTitle.tsx:107
 #: src/shell/pages/UsersPage.tsx:11
-#: src/shell/Routes.tsx:165
+#: src/shell/Routes.tsx:168
 msgid "Users"
 msgstr ""
 
@@ -28864,8 +28869,8 @@ msgid "Your earlier version stays on this card."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/dashboard/HomeShelves.tsx:60
-#: src/shell/pages/dashboard/HomeShelves.tsx:60
+#: src/shell/pages/dashboard/HomeShelves.tsx:62
+#: src/shell/pages/dashboard/HomeShelves.tsx:62
 msgid "Your family"
 msgstr ""
 
