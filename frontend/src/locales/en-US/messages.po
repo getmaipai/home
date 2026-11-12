@@ -6516,7 +6516,7 @@ msgid "Could not delete this voice. Try again."
 msgstr "Could not delete this voice. Try again."
 
 #. js-lingui-explicit-id
-#: src/shell/Routes.tsx:381
+#: src/shell/Routes.tsx:384
 msgid "Could not discard Incognito chats. Try again."
 msgstr "Could not discard Incognito chats. Try again."
 
@@ -7406,7 +7406,7 @@ msgstr "Cover with a new voice"
 #. js-lingui-explicit-id
 #: src/shell/pages/MusicStudioPages.tsx:183
 #: src/shell/pages/ProjectsPage.tsx:39
-#: src/shell/Routes.tsx:397
+#: src/shell/Routes.tsx:400
 msgid "Create"
 msgstr "Create"
 
@@ -10503,8 +10503,8 @@ msgstr "Holds what some downloads ask for before they start."
 #: src/shell/pages/WikipediaPage.tsx:154
 #: src/shell/pages/WikipediaPage.tsx:178
 #: src/shell/routeHeader.ts:23
-#: src/shell/Routes.tsx:395
-#: src/shell/Routes.tsx:447
+#: src/shell/Routes.tsx:398
+#: src/shell/Routes.tsx:450
 msgid "Home"
 msgstr "Home"
 
@@ -13356,7 +13356,7 @@ msgstr "Levels and models"
 #: src/shell/pages/MusicStudioPages.tsx:141
 #: src/shell/pages/settings/settingsBackLink.ts:53
 #: src/shell/pages/status/StatusComponents.tsx:31
-#: src/shell/Routes.tsx:398
+#: src/shell/Routes.tsx:401
 msgid "Library"
 msgstr "Library"
 
@@ -15003,8 +15003,8 @@ msgstr "Maximum speed used for automatic reference library updates."
 #: src/shell/pages/MediaHomePage.tsx:25
 #: src/shell/pages/MediaHomePage.tsx:58
 #: src/shell/pages/MediaSearchPage.tsx:17
-#: src/shell/Routes.tsx:396
-#: src/shell/Routes.tsx:447
+#: src/shell/Routes.tsx:399
+#: src/shell/Routes.tsx:450
 msgid "Media"
 msgstr "Media"
 
@@ -21803,7 +21803,7 @@ msgstr "Setting up your AI"
 #: src/shell/pages/FilesPage.tsx:303
 #: src/shell/pages/PersonProfilePage.tsx:207
 #: src/shell/pages/settings/SettingsAreaPage.tsx:293
-#: src/shell/Routes.tsx:447
+#: src/shell/Routes.tsx:450
 msgid "Settings"
 msgstr "Settings"
 
@@ -22021,7 +22021,7 @@ msgid "Show in the sidebar"
 msgstr "Show in the sidebar"
 
 #. js-lingui-explicit-id
-#: src/shell/Routes.tsx:357
+#: src/shell/Routes.tsx:360
 msgid "Show me around"
 msgstr "Show me around"
 

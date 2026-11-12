@@ -7541,7 +7541,7 @@ msgid "Could not delete this voice. Try again."
 msgstr "No se pudo eliminar esta voz. Inténtalo de nuevo."
 
 #. js-lingui-explicit-id
-#: src/shell/Routes.tsx:381
+#: src/shell/Routes.tsx:384
 #, needs-review
 msgid "Could not discard Incognito chats. Try again."
 msgstr "No se pudieron descartar los chats Incógnito. Inténtalo de nuevo."
@@ -8577,7 +8577,7 @@ msgstr "Versión con una voz nueva"
 #. js-lingui-explicit-id
 #: src/shell/pages/MusicStudioPages.tsx:183
 #: src/shell/pages/ProjectsPage.tsx:39
-#: src/shell/Routes.tsx:397
+#: src/shell/Routes.tsx:400
 #, needs-review
 msgid "Create"
 msgstr "Crear"
@@ -12188,8 +12188,8 @@ msgstr "Guarda lo que algunos descargados piden antes de comenzar."
 #: src/shell/pages/WikipediaPage.tsx:154
 #: src/shell/pages/WikipediaPage.tsx:178
 #: src/shell/routeHeader.ts:23
-#: src/shell/Routes.tsx:395
-#: src/shell/Routes.tsx:447
+#: src/shell/Routes.tsx:398
+#: src/shell/Routes.tsx:450
 #, needs-review
 msgid "Home"
 msgstr "Home"
@@ -15510,7 +15510,7 @@ msgstr "Niveles y modelos"
 #: src/shell/pages/MusicStudioPages.tsx:141
 #: src/shell/pages/settings/settingsBackLink.ts:53
 #: src/shell/pages/status/StatusComponents.tsx:31
-#: src/shell/Routes.tsx:398
+#: src/shell/Routes.tsx:401
 #, needs-review
 msgid "Library"
 msgstr "Biblioteca"
@@ -17405,8 +17405,8 @@ msgstr "Velocidad máxima usada para actualizaciones automáticas de la bibliote
 #: src/shell/pages/MediaHomePage.tsx:25
 #: src/shell/pages/MediaHomePage.tsx:58
 #: src/shell/pages/MediaSearchPage.tsx:17
-#: src/shell/Routes.tsx:396
-#: src/shell/Routes.tsx:447
+#: src/shell/Routes.tsx:399
+#: src/shell/Routes.tsx:450
 #, needs-review
 msgid "Media"
 msgstr "Medios"
@@ -25265,7 +25265,7 @@ msgstr "Configurando tu IA"
 #: src/shell/pages/FilesPage.tsx:303
 #: src/shell/pages/PersonProfilePage.tsx:207
 #: src/shell/pages/settings/SettingsAreaPage.tsx:293
-#: src/shell/Routes.tsx:447
+#: src/shell/Routes.tsx:450
 #, needs-review
 msgid "Settings"
 msgstr "Ajustes"
@@ -25521,7 +25521,7 @@ msgid "Show in the sidebar"
 msgstr "Mostrar en la barra lateral"
 
 #. js-lingui-explicit-id
-#: src/shell/Routes.tsx:357
+#: src/shell/Routes.tsx:360
 #, needs-review
 msgid "Show me around"
 msgstr "Muéstrame por dónde"
