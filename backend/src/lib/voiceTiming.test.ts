@@ -53,6 +53,14 @@ test("tool time and model rounds are recorded from the node timings and reported
   expect(voiceTimingReport()).toMatch(/turns without a tool call: [1-9]/);
 });
 
+test("the headline reads from the end of speech: stt wait plus time to the first answer sound", () => {
+  const record = beginVoiceTimingFor("turn-stop", 100, 200);
+  markVoiceTiming(record, "stt_ms", 750);
+  markVoiceTiming(record, "first_playback_ms", 2000);
+  expect(voiceTimingReport()).toContain("FIRST SOUND AFTER YOU STOP TALKING (real answer): median");
+  expect(voiceTimingReport()).toMatch(/target 1300 ms/);
+});
+
 test("prewarm records are counts only and bounded to 200", () => {
   for (let i = 0; i < 205; i++) recordPrewarmTiming(`actor-${i}`, i % 2 ? "done" : "aborted", i, 100, 70);
   const rows = voicePrewarmRecords();
