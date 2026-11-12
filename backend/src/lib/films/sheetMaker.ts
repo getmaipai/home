@@ -124,7 +124,7 @@ export async function makeSheetFromPictures(pictures: ReadonlyArray<SheetPicture
     for (const [i, panel] of subjects.entries()) {
       const c = i % cols, r = Math.floor(i / cols);
       layers.push({ input: await onWhite(panel.image, cellW - GAP, cellH - GAP), left: c * cellW, top: r * cellH });
-      const colName = COL[cols === 2 ? (c === 0 ? 0 : 2) : c] ?? "Left", label = rows === 1 ? colName : `${ROW[Math.min(r, 2)]} ${colName}`;
+      const colName = COL[cols === 2 ? (c === 0 ? 0 : 2) : c] ?? "Left", rowName = rows === 2 ? (r === 0 ? "Top" : "Bottom") : ROW[Math.min(r, 2)], label = rows === 1 ? colName : `${rowName} ${colName}`;
       described.push(`${label} (${kindWord(panel.role)}, ${panel.view}): ${panel.look}`);
       panels.push({ name: panel.name, view: panel.view, slot: label });
     }

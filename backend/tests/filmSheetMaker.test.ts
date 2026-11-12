@@ -75,3 +75,12 @@ describe("sheet views the photos do not show", () => {
     expect(calls).toBe(0);
   });
 });
+
+describe("sheet position names match the sheet", () => {
+  test("a two-row sheet is named Top and Bottom, never Middle, so a prompt can point at a panel that exists", async () => {
+    const pics = await Promise.all([1, 2, 3, 4].map(async (n) => ({ bytes: await solid(n * 20, 5, 5), mediaType: "image/png", name: `thing ${n}`, role: "product" as const, look: `object number ${n}` })));
+    const sheet = await makeSheetFromPictures(pics, tools);
+    expect(sheet.panels.map((panel) => panel.slot)).toEqual(["Top Left", "Top Right", "Bottom Left", "Bottom Right"]);
+    expect(sheet.description).not.toContain("Middle");
+  });
+});
