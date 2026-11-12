@@ -29,9 +29,23 @@ if [[ -n "${MAIPAI_WT_SHARED:-}" ]]; then shared="$MAIPAI_WT_SHARED"
 else
   [[ -d "$std/.git" || -f "$std/.git" ]] || { echo "wt: getmaipai/.github is missing at $std; clone it next to this repo and retry." >&2; exit 1; }
   case "${1:-}" in start|land) GITNET_TRIES=2 GITNET_TIMEOUT=45 gitnet -C "$std" fetch -q origin main 2>/dev/null || echo "wt: could not fetch .github; using its last known origin/main." >&2;; esac
-  shared="$(mktemp)"
+  shared="$(mktemp)"; std_tmp="$shared"
   trap 'rm -f "$shared"' EXIT
   git -C "$std" show origin/main:standards/bin/wt.sh > "$shared" 2>/dev/null || { echo "wt: .github has no standards/bin/wt.sh on origin/main; fetch it and retry." >&2; exit 1; }
+fi
+# START-FAST-01 (2026-11-12): the shared `start` runs the whole reaper first (cmd_reap: a find, an lsof of every process and a `git status --ignored`
+# per old worktree). Measured on 2026-11-12 with 346 worktrees: `wt.sh reap` alone 301 s, of a 280 to 330 s start. The reaper is housekeeping, not part of
+# starting, so `start` runs without it (the one `  cmd_reap` line inside cmd_start is dropped from the temporary copy of the shared script) and the same reaper
+# then runs once in the background at low priority, one at a time (data-scratch/wt-reap.lock, judged by its pid file). The edit applies only when it removes exactly that one line;
+# otherwise start runs as shared, slow but unchanged. MAIPAI_WT_START_REAP=1 restores the old order.
+start_reap_later=0
+if [[ "${1:-}" == start && "${MAIPAI_WT_START_REAP:-0}" != 1 && -f "$shared" ]]; then
+  patched="$(mktemp)"
+  awk '/^cmd_start\(\) \{/ {ins=1} ins && /^  cmd_reap$/ {next} /^\}/ {ins=0} {print}' "$shared" > "$patched" 2>/dev/null || true
+  if [[ -s "$patched" && "$(( $(wc -l < "$shared") - $(wc -l < "$patched") ))" == 1 ]]; then
+    shared="$patched"; start_reap_later=1
+    trap 'rm -f "$patched" "${std_tmp:-}"' EXIT
+  else rm -f "$patched"; echo "wt: could not skip the reaper in start; start runs as shared (slower)." >&2; fi
 fi
 # AUDIT-VERIFY-01: the Codex sandbox has no Deno; backend/tests/denoGate.test.ts fails loudly elsewhere unless this is set.
 [[ "${1:-}" != run ]] || export MAIPAI_ALLOW_NO_DENO=1
@@ -44,6 +58,9 @@ if [[ "${1:-}" != start ]]; then bash "$shared" "$@"; exit $?; fi
 # OUTBOX-01: a new worktree starts from the pipeline's main. The shared script branches from origin/main; when the lander has landed
 # commits GitHub does not have yet, a fresh worktree (no commits, no edits) is moved forward to the landed main so a new session sees
 # everything that already landed. Nothing else about the worktree changes.
+# WARM-INSTALL-01: the shared script's `bun install --frozen-lockfile` goes through scripts/lib/wt-bun-shim/bun, which gives the new worktree an
+# APFS clone of a warm node_modules kept per lockfile hash and falls back to the normal install on any problem (MAIPAI_WARM_INSTALL=0 turns it off).
+[[ -x "$here/lib/wt-bun-shim/bun" ]] && export PATH="$here/lib/wt-bun-shim:$PATH"
 out="$(bash "$shared" "$@")" || exit $?
 printf '%s\n' "$out"
 wt_path="$(printf '%s\n' "$out" | tail -n 1)"
@@ -61,5 +78,20 @@ if [[ -d "$wt_path" ]] && declare -F pipeline_main_sha >/dev/null; then
     else
       echo "wt: could not move this worktree to the landed main ${pm:0:7}; it starts from GitHub main ${head:0:7}. Fetch and rebase before landing." >&2
     fi
+  fi
+fi
+# START-FAST-01: the reaper start skipped runs now, detached, once at a time; a lock older than 30 minutes is a dead run's.
+if (( start_reap_later )); then
+  reap_lock="$(cd "$common/.." && pwd)/data-scratch/wt-reap.lock"
+  mkdir -p "$(dirname "$reap_lock")" 2>/dev/null || true
+  # A lock is stale when the reaper that took it is gone (its pid file, written below), or after three hours with no pid file.
+  if [[ -d "$reap_lock" ]]; then
+    reap_pid="$(cat "$reap_lock/pid" 2>/dev/null || true)"
+    if { [[ -n "$reap_pid" ]] && ! kill -0 "$reap_pid" 2>/dev/null; } || { [[ -z "$reap_pid" ]] && [[ -n "$(find "$reap_lock" -maxdepth 0 -mmin +180 2>/dev/null)" ]]; }; then rm -rf "$reap_lock"; fi
+  fi
+  if mkdir "$reap_lock" 2>/dev/null; then
+    ( trap 'rm -rf "$reap_lock" 2>/dev/null || true' EXIT; nice -n 10 bash "$here/wt.sh" reap >/dev/null 2>&1 ) </dev/null >/dev/null 2>&1 &
+    echo "$!" > "$reap_lock/pid" 2>/dev/null || true
+    disown 2>/dev/null || true
   fi
 fi

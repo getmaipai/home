@@ -1,0 +1,11 @@
+#!/bin/bash
+# WARM-INSTALL-01: `wt.sh start` puts this directory first on PATH. Only `bun install --frozen-lockfile` is routed through the warm
+# store (scripts/lib/warm-install.sh); every other bun command runs unchanged.
+here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
+PATH="$(printf '%s' "$PATH" | tr ':' '\n' | grep -vxF "$here" | paste -sd: -)"
+real="$(command -v bun)" || { echo "bun: not found on PATH" >&2; exit 127; }
+if [[ "${1:-}" == install && "${2:-}" == --frozen-lockfile && $# -eq 2 ]]; then
+  source "$here/../warm-install.sh"
+  warm_bun_install "$real" "$@"; exit $?
+fi
+exec "$real" "$@"

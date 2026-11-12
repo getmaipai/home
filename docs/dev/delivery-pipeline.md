@@ -407,3 +407,22 @@ Proof: `scripts/nightly.test.ts`, `scripts/nightlyStable.test.ts`.
 It creates `wt/nightly-fix-<date>` in its own worktree at the tested commit, runs `claude -p` there (accept-edits mode, an allow list of read, edit, `bun test`, local git; a deny list of `git push`, `land.sh`, `ship.sh`, `rush-ship.sh`), commits what it left by file name, then judges the diff itself: it **rejects and deletes** the branch when the change touches `docs/design/RULES.md`, any T2 safety, auth or credential file (the globs in `scripts/wt.sh` at the tested commit), the check, gate, hook and lander and ship scripts, or modifies, renames or deletes an existing test (new test files are allowed). It then re-runs the failing test files in the worktree: green is `PROPOSED FIX`, still red is `DID NOT FIX` (branch kept to read). It never lands, ships or pushes; the owner or a session reads the diff and lands it with `bash scripts/land.sh`.
 
 Proof: `scripts/nightlyFixer.test.ts` (off by default, budget flags and ledger, each rejection, new-test allowed, re-run red and green, nothing pushed).
+
+## 26. Edit to live in about two minutes (DIRECT-FAST-01, 2026-11-12)
+
+Measured on 2026-11-12 in direct mode for one tiny change: worktree start 294 s, edit and unit test 22 s, land 87 s, push to GitHub 17 s, `ship.sh --before-green` 131 s, total 560 s. Three pieces, each landed on its own, each measured before and after. The root helper `maipai-promote` is not changed (GitHub costs 11 to 17 s).
+
+### 26.1 `wt.sh start`: 280 to 336 s down to 6 to 8 s (START-FAST-01, WARM-INSTALL-01)
+
+The `bun install` was not the main cost. Tracing a start showed the reaper: the shared `cmd_start` runs `cmd_reap` first, which does a `find`, an `lsof` of every process and a `git status --ignored` for each old worktree. With 346 worktrees on disk, `wt.sh reap` alone took 301 s. Two changes:
+
+1. **The reaper no longer sits in front of `start`** (`scripts/wt.sh`). The wrapper drops the one `  cmd_reap` line inside `cmd_start` from its temporary copy of the shared script (only when that removes exactly one line; otherwise start runs as shared and prints a note), then runs `wt.sh reap` once afterwards, detached, at `nice -n 10`, one at a time (`data-scratch/wt-reap.lock`, a lock older than 30 minutes is a dead run's). The reaper does what it did before, just not while a session waits. `MAIPAI_WT_START_REAP=1` restores the old order.
+2. **A warm install per lockfile hash** (`scripts/lib/warm-install.sh`, `scripts/lib/wt-bun-shim/bun`). `wt.sh start` puts the shim first on `PATH`; only `bun install --frozen-lockfile` is routed through it. The hash covers `bun.lock`, the root, `backend` and `frontend` `package.json`, the bun version and the CPU. A miss runs the real install and then saves a clone of the finished `node_modules` (root, backend, frontend) under `data-scratch/warm-install/<hash>/`; a hit gives the new worktree a clone before the install runs. The clone is one `clonefile(2)` call on the directory (2.5 s for 238k files and 2.6 GB; `cp -c -R` file by file took 33 s). The real `bun install --frozen-lockfile` still runs afterwards and only verifies (4 s backend, 1 to 2 s frontend), so a stale clone cannot slip through. Fail safe: no clone, a failed clone, a different hash or a failed install leaves nothing partial and runs the normal install. The newest three hashes are kept (`MAIPAI_WARM_KEEP`); `MAIPAI_WARM_INSTALL=0` turns it off. No pre-made worktree pool: the measured start is already under 10 s.
+
+| `wt.sh start` (machine busy, load average 6 to 10) | Seconds |
+|---|---|
+| Before (shared script as is, two runs) | 337, 288 |
+| Warm store filled, reaper still in front | 314 (the install was 5 s of it) |
+| After (reaper moved, warm hit, two runs) | 8, 6 |
+
+Proof: `scripts/warmInstall.test.ts` (miss saves, hit clones and still verifies, another lockfile is another hash, clone failure falls back, failed install saves nothing, off switch and other bun commands untouched, keep limit) and `scripts/wtStartFast.test.ts` (start first then one background reaper, a live lock starts no second one, the old order on request, an unfitting shared script runs unchanged with a note).
