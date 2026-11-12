@@ -283,9 +283,22 @@ run_as_console_user() {
 # Opens the finished install's address in the person's default browser.
 # macOS: the installer is root, so open it as the console user inside
 # their login session. Linux: only with a desktop session (DISPLAY or
-# WAYLAND_DISPLAY) and xdg-open. Never fails the install.
+# WAYLAND_DISPLAY) and xdg-open. Only on a first install (no prior tag) and
+# never when MAIPAI_NO_BROWSER is yes, 1 or true. Never fails the install.
 open_setup_page() {
-  local os="$1" url="$2" dry_run="${3:-no}" user
+  local os="$1" url="$2" dry_run="${3:-no}" prior_tag="${4:-}" user skip=""
+  case "${MAIPAI_NO_BROWSER:-}" in
+    yes|1|true) skip="MAIPAI_NO_BROWSER is set" ;;
+    *) [ -z "$prior_tag" ] || skip="this is an update (set nothing; it only opens on a first install)" ;;
+  esac
+  if [ -n "$skip" ]; then
+    if [ "$dry_run" = "yes" ]; then
+      log "[dry-run] would not open a browser: ${skip}"
+    else
+      log "Not opening a browser: ${skip}."
+    fi
+    return 0
+  fi
   user=$(find_console_user "$os" 2>/dev/null || true)
   if [ "$dry_run" = "yes" ]; then
     log "[dry-run] would open ${url} in the default browser as ${user:-<no console user found>}"
@@ -2239,7 +2252,7 @@ main() {
     record_setup_plan "${install_root}/data" "$requested_plan" yes
     log "[dry-run] the MaiPai Stack (the AI engine) is not installed now: the setup wizard installs it if you choose to run the AI on this computer"
     log "[dry-run] would wait for Home at http://127.0.0.1:${APP_PORT}/ and print the address to open"
-    open_setup_page "$os" "http://localhost:${APP_PORT}" yes
+    open_setup_page "$os" "http://localhost:${APP_PORT}" yes "$(read_marker "${install_root}/.installed-tag")"
     exit 0
   fi
 
@@ -2479,7 +2492,7 @@ main() {
     log "No browser at this computer? From another computer on your network, open that address with this computer's name in place of localhost."
     log "Logs: ${install_root}/data/logs/"
   fi
-  open_setup_page "$os" "http://localhost:${port}" || true
+  open_setup_page "$os" "http://localhost:${port}" no "$installed_tag" || true
   log ""
   log "Open this address to finish setup: http://localhost:${port}"
 }

@@ -457,6 +457,31 @@ describe("open_setup_page", () => {
     expect(out).toContain("[dry-run] would open http://localhost:3000 in the default browser as marlow");
     expect(out).not.toContain("OPENED");
   });
+  test("dry-run on an update (prior tag) says it would not open a browser", () => {
+    const result = Bun.spawnSync(["bash", "-c", `source "${INSTALL_SH}"; find_console_user() { echo marlow; }; open_setup_page darwin http://localhost:3000 yes v0.2.100`]);
+    const out = result.stdout.toString() + result.stderr.toString();
+    expect(out).toContain("would not open a browser: this is an update");
+    expect(out).not.toContain("would open http");
+  });
+  test("MAIPAI_NO_BROWSER yes, 1 or true skips even a first install", () => {
+    for (const v of ["yes", "1", "true"]) {
+      const result = Bun.spawnSync(["bash", "-c", `source "${INSTALL_SH}"; find_console_user() { echo marlow; }; run_as_console_user() { echo OPENED; }; MAIPAI_NO_BROWSER=${v} open_setup_page darwin http://localhost:3000 yes; MAIPAI_NO_BROWSER=${v} open_setup_page darwin http://localhost:3000 no`]);
+      const out = result.stdout.toString() + result.stderr.toString();
+      expect(out).toContain("would not open a browser: MAIPAI_NO_BROWSER is set");
+      expect(out).toContain("Not opening a browser: MAIPAI_NO_BROWSER is set.");
+      expect(out).not.toContain("OPENED");
+    }
+  });
+  test("a real update opens nothing and logs why; a first install still opens", () => {
+    const run = (tag: string) => {
+      const r = Bun.spawnSync(["bash", "-c", `source "${INSTALL_SH}"; find_console_user() { echo marlow; }; run_as_console_user() { echo OPENED >&3; }; open_setup_page darwin http://localhost:3000 no "${tag}" 3>&1`]);
+      return r.stdout.toString() + r.stderr.toString();
+    };
+    const upd = run("v0.2.100");
+    expect(upd).toContain("Not opening a browser: this is an update (set nothing; it only opens on a first install).");
+    expect(upd).not.toContain("OPENED");
+    expect(run("")).toContain("OPENED");
+  });
   test("a failed open is not fatal and says to open the address by hand", () => {
     const result = Bun.spawnSync(["bash", "-c", `source "${INSTALL_SH}"; find_console_user() { echo marlow; }; run_as_console_user() { return 1; }; open_setup_page darwin http://localhost:3000; echo rc=$?`]);
     const out = result.stdout.toString() + result.stderr.toString();
