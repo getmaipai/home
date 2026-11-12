@@ -2,7 +2,7 @@ import { afterEach, describe, expect, test } from "bun:test";
 import { mkdtemp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { sameAdoptionInventory, scanElements } from "./elementsAdoption";
+import { autofillPlanItems, sameAdoptionInventory, scanElements } from "./elementsAdoption";
 
 const roots: string[] = [];
 afterEach(async () => { await Promise.all(roots.splice(0).map((root) => rm(root, { recursive: true, force: true }))); });
@@ -103,5 +103,15 @@ describe("elements adoption scanner", () => {
     expect(output.items.every((item) => item.verdictReason.trim().length > 0)).toBe(true);
     const plan = await Bun.file(join(import.meta.dir, "../frontend/src/dev/elements-plan.json")).json() as { items: { verdict: string; verdictReason?: string }[] };
     expect(plan.items.every((item) => item.verdictReason?.trim())).toBe(true);
+  });
+});
+
+describe("kit pin autofill", () => {
+  test("new kit files get a default verdict so a pin never leaves anything unassessed", () => {
+    const items = autofillPlanItems([{ file: "synth-motion/index.ts", group: "synth" }, { file: "synth-motion/README.md" }], "ui-v9.9.9");
+    expect(items.map((item) => item.verdict)).toEqual(["later", "no-fit"]);
+    expect(items.every((item) => typeof item.verdictReason === "string" && item.verdictReason.includes("ui-v9.9.9"))).toBe(true);
+    expect(items.every((item) => item.verdict !== "unassessed")).toBe(true);
+    expect(items[0]!.group).toBe("synth");
   });
 });

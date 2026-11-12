@@ -81,6 +81,24 @@ async function threadReachedElements(elementsDir: string): Promise<Set<string>> 
   return reached;
 }
 
+
+/** A kit pin that brings new files must not turn main red: each unassessed file gets a default verdict ("later", or "no-fit" for documentation), named as automatic so its owner can assess it properly later. */
+export function autofillPlanItems(unassessed: Array<{ file: string; group?: string; name?: string }>, kitTag: string): PlanItem[] {
+  return unassessed.map((item) => {
+    const doc = /\.(?:md|mdx|txt|json|css|snap)$/.test(item.file);
+    return {
+      file: item.file,
+      name: item.name ?? item.file.replace(/\.[^.]+$/, ""),
+      group: item.group ?? item.file.split(/[-/]/)[0] ?? "other",
+      verdict: doc ? "no-fit" : "later",
+      verdictReason: doc
+        ? `Not an Element: kit documentation or data added in ${kitTag} (verdict set automatically by the pin).`
+        : `New in ${kitTag}; not drawn by a Home page yet (verdict "later" set automatically by the pin); assess and wire it when a page uses it.`,
+      backendNeeded: null, effort: null, specTagNeeded: false, newDependency: false, bindings: [], size: "S", showcaseScenario: null, batch: null, replacesHandBuilt: [], realTurnToday: null,
+    };
+  });
+}
+
 export async function scanElements(options: { root?: string; tag?: string } = {}) {
   const root = options.root ?? ROOT;
   const pkgPath = join(root, "frontend/node_modules/@maipai/ui/package.json");
@@ -139,6 +157,21 @@ if (import.meta.main) {
   if (process.argv.includes("--status")) {
     console.log(`Elements implemented: ${output.items.filter((item) => item.implemented).length} / ${output.items.length}`);
     process.exit(0);
+  }
+  if (process.argv.includes("--autofill-later")) {
+    const missing = output.items.filter((item) => item.verdict === "unassessed");
+    if (missing.length) {
+      const planPath = join(ROOT, "frontend/src/dev/elements-plan.json");
+      const plan = JSON.parse(await readFile(planPath, "utf8")) as { items: PlanItem[] };
+      const have = new Set(plan.items.map((item) => item.file));
+      plan.items.push(...autofillPlanItems(missing.filter((item) => !have.has(item.file)), output.kitTag));
+      await Bun.write(planPath, `${JSON.stringify(plan, null, 2)}\n`);
+      console.log(`Added a default verdict for ${missing.length} new kit file(s): ${missing.map((item) => item.file).join(", ")}`);
+      const again = await scanElements();
+      await Bun.write(OUTPUT_PATH, `${JSON.stringify(again.output, null, 2)}\n`);
+      console.log(`Scanned ${again.output.items.length} kit files from ${again.output.kitTag}; ${again.output.items.filter((item) => item.verdict === "unassessed").length} unassessed.`);
+      process.exit(0);
+    }
   }
   const existing = await Bun.file(OUTPUT_PATH).json().catch(() => null) as AdoptionInventory | null;
   if (!existing || !sameAdoptionInventory(output, existing)) await Bun.write(OUTPUT_PATH, `${JSON.stringify(output, null, 2)}\n`);
