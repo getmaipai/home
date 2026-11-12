@@ -77,7 +77,7 @@ PY
       sed -E "s/^([[:space:]]*${var}=)\"[^\"]*\"/\1\"${tag}\"/" scripts/check.sh > scripts/check.sh.tmp && cat scripts/check.sh.tmp > scripts/check.sh && rm scripts/check.sh.tmp
       for dir in backend frontend; do (cd "$dir" && run_cmd "$install_cmd") || die "install command failed in $dir; fix the install and retry."; done
       # A kit pin that adds files would leave them "unassessed" and turn main red (the adoption test): give each new file its default verdict in the same commit.
-      if [[ "$pkg" == "ui" ]]; then
+      if [[ "$pkg" == "ui" ]] && rg -q '"elements:scan"' package.json 2>/dev/null; then
         bun run elements:scan --autofill-later || die "the elements adoption autofill failed after the ui pin; run 'bun run elements:scan --autofill-later' and retry."
         add_changed frontend/src/dev/elements-plan.json; add_changed frontend/src/dev/elements-adoption.json
       fi
