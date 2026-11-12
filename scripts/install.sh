@@ -69,6 +69,9 @@ ENGINE_STACK_ROOT=/opt/maipai-stack
 ENGINE_STACK_DATA=/data/stack
 
 log() { printf '%s\n' "$*"; }
+# DIRECT-FAST-03: one timestamped line per phase, so the installer log shows where a ship's minutes went.
+INSTALL_T0=$(date +%s)
+phase() { printf '[%s +%ss] phase: %s\n' "$(date +%H:%M:%S)" "$(( $(date +%s) - INSTALL_T0 ))" "$*"; }
 die() { printf 'error: %s\n' "$*" >&2; exit 1; }
 
 valid_plan() {
@@ -607,6 +610,26 @@ record_previous_tag() {
   if [ -n "$installed" ] && [ "$installed" != "$target" ]; then printf '%s\n' "$installed" > "${root}/.previous-tag"; fi
 }
 
+# DIRECT-FAST-03 (2026-11-12): in direct mode (data is disposable) ship.sh skips the pre-upgrade data copy (870 MB, tens of seconds).
+# The root helper takes no flags and sudo resets the environment, so ship.sh leaves a one-shot request in the console user's own
+# ~/.config/maipai/ship-direct: "<full commit sha> <epoch seconds>". It is honored only for that exact commit, for 15 minutes, once
+# (it is deleted when read), and only when the file belongs to the console user. --skip-data-snapshot does the same by hand. Gated mode
+# never writes the file, so the copy stays. A rollback after a skipped copy leaves the data as it is (restore_snapshot reads .snapshot-skipped).
+direct_install_requested() {
+  local sha="$1" user home f line want at now
+  [ -n "$sha" ] || return 1
+  user="${SUDO_USER:-}"; [ -n "$user" ] && [ "$user" != root ] || return 1
+  home=$(dscl . -read "/Users/${user}" NFSHomeDirectory 2>/dev/null | awk '{print $2}')
+  [ -n "$home" ] || home=$(eval echo "~${user}" 2>/dev/null || true)
+  f="${MAIPAI_SHIP_DIRECT_FILE:-${home}/.config/maipai/ship-direct}"
+  [ -f "$f" ] && [ ! -L "$f" ] || return 1
+  [ "$(stat -f '%Su' "$f" 2>/dev/null || stat -c '%U' "$f" 2>/dev/null)" = "$user" ] || return 1
+  read -r want at < "$f" || true
+  rm -f "$f"
+  now=$(date +%s)
+  [ "$want" = "$sha" ] && printf '%s' "$at" | grep -Eq '^[0-9]+$' && [ $(( now - at )) -ge 0 ] && [ $(( now - at )) -le 900 ]
+}
+
 snapshot_data() {
   local root="$1" from_tag="$2" ts dest d skipped_text skip_args=() prune_paths=() skipped=()
   # These folders are downloaded again on demand and would make the copy take an hour.
@@ -666,6 +689,10 @@ find_snapshot() {
 restore_snapshot() {
   local root="$1" tag="$2" snap ts d
   local SNAPSHOT_SKIP_DIRS=(reference models deno sidecars cache tmp engines)
+  if [ -n "$(read_marker "${root}/.snapshot-skipped")" ] && [ "$(read_marker "${root}/.snapshot-skipped")" = "$tag" ]; then
+    log "No data copy was taken for the upgrade from ${tag} (direct mode), so the data stays as it is."
+    return 0
+  fi
   snap=$(find_snapshot "$root" "$tag")
   [ -n "$snap" ] || { log "There is no saved data copy from ${tag}, so the data stays as it is."; return 0; }
   ts=$(date +%Y%m%d-%H%M%S)
@@ -1869,10 +1896,26 @@ install_stack_service() {
     || { log "Could not write engines.stack.url. The MaiPai Stack is required; installation cannot continue."; return 1; }
 }
 
+# True when ${stack_dir}/.stack-tag names STACK_TAG and the compiled binary is there. MAIPAI_REBUILD_STACK=1 forces a rebuild.
+stack_build_current() {
+  local stack_dir="$1" os="$2" arch="$3"
+  [ "${MAIPAI_REBUILD_STACK:-}" != "1" ] || return 1
+  [ -n "$STACK_TAG" ] && [ "$(read_marker "${stack_dir}/.stack-tag")" = "$STACK_TAG" ] && [ -x "${stack_dir}/$(render_stack_binary_name "$os" "$arch")" ]
+}
+
 setup_stack() {
   local install_root="$1" bun_bin="$2" os="$3" arch="$4" dry_run="$5"
-  local stack_dir="${install_root}/stack"
+  local stack_dir="${install_root}/stack" reuse_ok="${6:-}"
   local source_root source_dir
+  # DIRECT-FAST-03: the fetch, Commons download and build (about 48 s) are skipped when the Stack already built here came from this
+  # same STACK_TAG (the marker is written only after a published build) and its binary is there. The service step still runs.
+  if [ "$dry_run" != "yes" ] && [ "$reuse_ok" = "reuse" ] && stack_build_current "$stack_dir" "$os" "$arch"; then
+    log "The Stack at ${STACK_TAG:0:7} is already built here; skipping the rebuild."
+    STACK_PROBLEM="The AI engine was built but would not start. On a Mac this usually means nobody is logged in at the screen: log in there, then press Try again. Its log is ${stack_dir}/data/logs/stack.error.log."
+    stack_status running starting
+    install_stack_service "$install_root" "$bun_bin" "$os" "$arch" "$dry_run"
+    return
+  fi
   if [ "$dry_run" = "yes" ]; then
     source_root="/tmp/maipai-stack-install-dry-run"
   else
@@ -1893,9 +1936,11 @@ setup_stack() {
   if [ "$dry_run" = "yes" ]; then
     log "[dry-run] would copy the built files into ${stack_dir} (the Stack's data/ is not touched)"
   else
+    rm -f "${stack_dir}/.stack-tag" # a failed or partial publish must not leave a marker that vouches for the old build
     publish_engine_stack_binary "$build_dir" "$stack_dir" "$(render_stack_binary_name "$os" "$arch")" \
       || { log "Could not copy the built Stack files into ${stack_dir}. The MaiPai Stack is required; installation cannot continue."; rm -rf "$source_root"; return 1; }
     rm -rf "$source_root"
+    printf '%s\n' "$STACK_TAG" > "${stack_dir}/.stack-tag"
   fi
   STACK_PROBLEM="The AI engine was built but would not start. On a Mac this usually means nobody is logged in at the screen: log in there, then press Try again. Its log is ${stack_dir}/data/logs/stack.error.log."
   stack_status running starting
@@ -2155,13 +2200,14 @@ main() {
   local stack_only="no"
   local plan_flag="" plan_flag_seen="no"
   local plan_flag_count=0
-  local version_flag="" commit_flag="" rollback="no" rollback_to=""
+  local version_flag="" commit_flag="" rollback="no" rollback_to="" skip_snapshot="no"
   while [ "$#" -gt 0 ]; do
     case "$1" in
       --dry-run) dry_run="yes" ;;
       --engine-computer) engine_computer="yes" ;;
       --stack-only) stack_only="yes" ;;
       --rollback) rollback="yes" ;;
+      --skip-data-snapshot) skip_snapshot="yes" ;;
       --to)
         [ "$#" -ge 2 ] || die "--to needs the release tag to go back to, such as v0.1.0 or sha-1234567."
         rollback_to="$2"; shift ;;
@@ -2181,6 +2227,7 @@ main() {
         log "You can also set MAIPAI_PLAN to recommended, moderate, or minimal. The setup wizard still runs its checks before downloads."
         log "Free disk: the installer checks the plan against the disks that will hold Home, its data and the AI (the installed size, 20 percent more, and the space an install uses while it runs). A smaller plan needs less: --plan moderate or --plan minimal. The setup wizard shows each part with its size."
         log "--version installs a specific release instead of the latest. --rollback goes back to the previous release and the data copy taken before the last upgrade."
+        log "--skip-data-snapshot skips the data copy before an upgrade (direct mode only; ship.sh asks for it through a one-shot file)."
         log "--commit installs a landed commit from main and records its sha-<first 7> label."
         log "MAIPAI_PORT (default 3000) and MAIPAI_STACK_PORT (default 8770) change the ports."
         exit 0 ;;
@@ -2358,11 +2405,19 @@ main() {
     fi
     # The data copy is taken with everything stopped, so the database is
     # not mid-write. A rollback keeps the newer data aside instead.
+    phase "stopped; data copy next"
     if [ "$kind" = "upgrade" ] && [ "$rollback" = "no" ]; then
-      snapshot_data "$install_root" "$installed_tag" \
-        || die "could not save a copy of your data before upgrading (is the disk full?). Nothing was changed. Free up space, then run the installer again."
+      if [ "$skip_snapshot" = "yes" ] || { [ -n "$commit_flag" ] && direct_install_requested "$commit_flag"; }; then
+        log "Direct mode: the data copy before this upgrade is skipped (data is disposable in direct mode)."
+        printf '%s\n' "$installed_tag" > "${install_root}/.snapshot-skipped"
+      else
+        rm -f "${install_root}/.snapshot-skipped"
+        snapshot_data "$install_root" "$installed_tag" \
+          || die "could not save a copy of your data before upgrading (is the disk full?). Nothing was changed. Free up space, then run the installer again."
+      fi
       record_previous_tag "$install_root" "$installed_tag" "$tag"
     fi
+    phase "data copy done; fetching the source"
     # Cleared for every new upgrade; written again just before the service starts (when the migrations can first run).
     if [ "$rollback" = "no" ]; then rm -f "${install_root}/.migrations-started"; fi
     rm -rf "${install_root}.new"
@@ -2391,6 +2446,7 @@ main() {
       "${install_root}.new/" "${install_root}/"
     rm -rf "${install_root}.new"
     INSTALL_STAGE="replaced"
+    phase "source replaced"
     if [ "$rollback" = "yes" ]; then
       rollback_restore_data "$install_root" "$tag" || die "could not restore the data copy from ${tag}. Your current data is still in ${install_root}/data. Run the installer with --rollback again, or restore a copy by hand from ${install_root}/upgrade-backups."
     fi
@@ -2417,8 +2473,11 @@ main() {
   ensure_deno "$install_root" "$os" "$arch"
   local bun_bin="${bun_home}/bin/bun"
   clear_quarantine_and_sign "$os" "$install_root" "$bun_bin"
+  phase "tools ready; building the app"
   build_app "$install_root" "$bun_bin"
+  phase "app built; preflight"
   run_install_preflight "$bun_bin" "${install_root}/backend" "$port"
+  phase "preflight done"
 
   # Records for the wizard's Stack step, which runs later with a clean
   # environment: the Stack port base and, on Linux, the person to run the
@@ -2434,7 +2493,8 @@ main() {
   # runs the AI.
   local stack_port
   if [ "$has_stack" = "yes" ]; then
-    if ! setup_stack "$install_root" "$bun_bin" "$os" "$arch" "no"; then
+    phase "Stack step"
+    if ! setup_stack "$install_root" "$bun_bin" "$os" "$arch" "no" "reuse"; then
       log "The MaiPai Stack could not be rebuilt. Home's service was not started."
       exit 1
     fi
@@ -2445,6 +2505,7 @@ main() {
   valid_port "$stack_port" || stack_port="$STACK_PORT_BASE"
 
   # From here the hub can start and run its migrations: a rollback must now bring the data copy back (SHIP-ROLLBACK-02).
+  phase "Stack ready; starting Home"
   mark_migrations_started "$install_root"
   if [ "$os" = "linux" ]; then
     ensure_service_user_linux
@@ -2465,6 +2526,7 @@ main() {
       || log "The Stack is not answering yet. Home will keep retrying; its log: ${install_root}/stack/data/logs/stack.error.log"
   fi
 
+  phase "Home answers"
   install_app_helper "$os" "$install_root"
 
   install_maipai_command "$install_root"
@@ -2480,6 +2542,7 @@ main() {
   fi
   INSTALL_STAGE="done"
   trap - EXIT
+  phase "done"
 
   log ""
   log "MaiPai Home ${tag} is installed and running at http://localhost:${port}"

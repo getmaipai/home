@@ -248,7 +248,17 @@ if (( tag_after == 0 )) || [[ "$before_tag" != "$label" ]]; then
   refused_file="$live/data/logs/launchd.err.log"; before_refused=0
   [[ -f "$refused_file" ]] && before_refused="$(grep -c 'app refused' "$refused_file" 2>/dev/null || true)" || true
   start="$(date +%s)"; log="$data/$start-${sha:0:7}.log"
+  # DIRECT-FAST-03: in direct mode only, leave the installer a one-shot request (this exact commit, 15 minutes, read once) to skip the
+  # 870 MB data copy. The root helper takes no flags; the installer reads this file (install.sh direct_install_requested). Gated and
+  # unset modes write nothing, so the copy is taken as before. Removed again once the helper returns.
+  direct_file="${MAIPAI_SHIP_DIRECT_FILE:-$HOME/.config/maipai/ship-direct}"
+  if [[ "$ship_mode" == direct ]]; then
+    mkdir -p "$(dirname "$direct_file")" && printf '%s %s\n' "$sha" "$(date +%s)" > "$direct_file" && echo "ship.sh: DIRECT: asking the installer to skip the data copy for ${sha:0:7}"
+  else
+    rm -f "$direct_file"
+  fi
   if eval "$sudo_cmd \"$promote\" \"$sha\"" >"$log" 2>&1; then promote_status=0; else promote_status=$?; fi
+  rm -f "$direct_file"
   expected_live_tag="$label"
   health_ok() {
     if [[ -n "$health_cmd" ]]; then eval "$health_cmd"; return $?; fi

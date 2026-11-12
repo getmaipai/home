@@ -1,4 +1,4 @@
-import { describe, test, expect, setDefaultTimeout } from "bun:test";
+import { describe, test, expect, setDefaultTimeout, afterAll } from "bun:test";
 setDefaultTimeout(30_000);
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
@@ -370,5 +370,95 @@ describe("install_maipai_command (MAIPAI-CLI-01)", () => {
       expect(out).toContain("Could not install the maipai command");
       expect(out.trim().split("\n").pop()).toBe("no");
     } finally { rmSync(root, { recursive: true, force: true }); }
+  });
+});
+
+// DIRECT-FAST-03: timestamps per phase, the Stack rebuild skipped for an unchanged STACK_TAG, the data copy skipped only on a one-shot direct request.
+describe("direct-mode installer speedups (DIRECT-FAST-03)", () => {
+  const bash = (script: string, env: Record<string, string> = {}) => Bun.spawnSync(["bash", "-c", `source "${INSTALL_SH}"; ${script}`], { env: { ...process.env, ...env } });
+  const scratch = mkdtempSync(join(tmpdir(), "maipai-direct-"));
+  afterAll(() => rmSync(scratch, { recursive: true, force: true }));
+  const me = process.env.USER ?? Bun.spawnSync(["id", "-un"]).stdout.toString().trim();
+  const sha = "a".repeat(40);
+
+  test("phase prints a clock time and the seconds since the installer started", () => {
+    const out = bash(`phase "app built"`).stdout.toString().trim();
+    expect(out).toMatch(/^\[\d\d:\d\d:\d\d \+\d+s\] phase: app built$/);
+  });
+
+  test("stack_build_current: true only for the same STACK_TAG with the binary present; MAIPAI_REBUILD_STACK=1 forces a rebuild", () => {
+    const dir = join(scratch, "stack1"); mkdirSync(dir, { recursive: true });
+    const name = bash(`render_stack_binary_name linux x64`).stdout.toString().trim();
+    const check = (env: Record<string, string> = {}) => bash(`stack_build_current "${dir}" linux x64`, env).exitCode;
+    expect(check()).toBe(1); // nothing yet
+    writeFileSync(join(dir, ".stack-tag"), `${bash("printf %s \"$STACK_TAG\"").stdout.toString()}\n`);
+    expect(check()).toBe(1); // marker but no binary
+    writeFileSync(join(dir, name), "#!/bin/sh\n", { mode: 0o755 });
+    expect(check()).toBe(0);
+    expect(check({ MAIPAI_REBUILD_STACK: "1" })).toBe(1);
+    writeFileSync(join(dir, ".stack-tag"), "0000000\n");
+    expect(check()).toBe(1); // another tag
+  });
+
+  test("setup_stack with reuse skips fetch and build but still runs the service step; without the marker it builds and writes the marker", () => {
+    const root = join(scratch, "inst"); const stack = join(root, "stack"); mkdirSync(stack, { recursive: true });
+    const name = bash(`render_stack_binary_name linux x64`).stdout.toString().trim();
+    const stubs = `fetch_stack_source() { echo FETCH; }; fetch_stack_commons() { echo COMMONS; }; build_stack_binary() { echo BUILD; }; publish_engine_stack_binary() { echo PUBLISH; }; install_stack_service() { echo SERVICE; }; stack_status() { :; }; mktemp() { command mktemp -d "${scratch}/m.XXXXXX"; }`;
+    const first = bash(`${stubs}; setup_stack "${root}" /usr/bin/bun linux x64 no reuse`).stdout.toString();
+    expect(first).toContain("BUILD"); expect(first).toContain("SERVICE");
+    expect(readFileSync(join(stack, ".stack-tag"), "utf8").trim()).toHaveLength(40);
+    writeFileSync(join(stack, name), "#!/bin/sh\n", { mode: 0o755 });
+    const second = bash(`${stubs}; setup_stack "${root}" /usr/bin/bun linux x64 no reuse`).stdout.toString();
+    expect(second).toContain("skipping the rebuild");
+    expect(second).toContain("SERVICE");
+    for (const word of ["FETCH", "COMMONS", "BUILD", "PUBLISH"]) expect(second).not.toContain(word);
+    const forced = bash(`${stubs}; setup_stack "${root}" /usr/bin/bun linux x64 no reuse`, { MAIPAI_REBUILD_STACK: "1" }).stdout.toString();
+    expect(forced).toContain("BUILD");
+    const wizard = bash(`${stubs}; setup_stack "${root}" /usr/bin/bun linux x64 no`).stdout.toString(); // the wizard's Try again never reuses
+    expect(wizard).toContain("BUILD");
+  });
+
+  test("a failed publish of a rebuild removes the marker instead of vouching for the old build", () => {
+    const root = join(scratch, "inst2"); const stack = join(root, "stack"); mkdirSync(stack, { recursive: true });
+    writeFileSync(join(stack, ".stack-tag"), "old\n");
+    const stubs = `fetch_stack_source() { :; }; fetch_stack_commons() { :; }; build_stack_binary() { :; }; publish_engine_stack_binary() { return 1; }; install_stack_service() { :; }; stack_status() { :; }; mktemp() { command mktemp -d "${scratch}/m2.XXXXXX"; }`;
+    const r = bash(`${stubs}; setup_stack "${root}" /usr/bin/bun linux x64 no`);
+    expect(r.exitCode).toBe(1);
+    expect(existsSync(join(stack, ".stack-tag"))).toBe(false);
+  });
+
+  test("direct_install_requested honors a one-shot request for exactly this commit, once, within 15 minutes, from the console user's file", () => {
+    const f = join(scratch, "ship-direct");
+    const ask = (want: string, env: Record<string, string> = {}) => bash(`direct_install_requested "${want}"`, { SUDO_USER: me, MAIPAI_SHIP_DIRECT_FILE: f, ...env }).exitCode;
+    const now = Math.floor(Date.now() / 1000);
+    expect(ask(sha)).toBe(1); // no file: the copy is taken
+    writeFileSync(f, `${sha} ${now}\n`);
+    expect(ask("b".repeat(40))).toBe(1); // another commit; the file is spent
+    expect(existsSync(f)).toBe(false);
+    writeFileSync(f, `${sha} ${now - 1000}\n`);
+    expect(ask(sha)).toBe(1); // stale
+    writeFileSync(f, `${sha} ${now}\n`);
+    expect(ask(sha, { SUDO_USER: "" })).toBe(1); // no console user
+    writeFileSync(f, `${sha} ${now}\n`);
+    expect(ask(sha)).toBe(0);
+    expect(existsSync(f)).toBe(false);
+    expect(ask(sha)).toBe(1); // read once
+  });
+
+  test("after a skipped data copy a rollback leaves the data alone even when an older copy from that tag exists", () => {
+    const root = join(scratch, "rb"); mkdirSync(join(root, "data"), { recursive: true }); writeFileSync(join(root, "data", "home.db"), "newer");
+    mkdirSync(join(root, "upgrade-backups", "20200101-000000-from-v0.0.9"), { recursive: true });
+    writeFileSync(join(root, ".snapshot-skipped"), "v0.0.9\n");
+    const r = bash(`restore_snapshot "${root}" v0.0.9`);
+    expect(r.exitCode).toBe(0);
+    expect(r.stdout.toString()).toContain("data stays as it is");
+    expect(readFileSync(join(root, "data", "home.db"), "utf8")).toBe("newer");
+    expect(readdirSync(root).some((n) => n.startsWith("data.rolled-back"))).toBe(false);
+  });
+
+  test("main skips the copy only through --skip-data-snapshot or the one-shot request; the plain path still takes it", () => {
+    const text = readFileSync(INSTALL_SH, "utf8");
+    expect(text).toContain('if [ "$skip_snapshot" = "yes" ] || { [ -n "$commit_flag" ] && direct_install_requested "$commit_flag"; }; then');
+    expect(text).toMatch(/else\n\s+rm -f "\$\{install_root\}\/\.snapshot-skipped"\n\s+snapshot_data/);
   });
 });

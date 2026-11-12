@@ -79,6 +79,28 @@ describe("ship pipeline", () => {
   test("success promotes full SHA and records shipped", () => {
     writeFileSync(join(watch, "green", sha), "green\n"); const out = run([sha]); expect(out.status).toBe(0); expect(readFileSync(join(scratch, "promote.calls"), "utf8")).toContain(sha); expect(readFileSync(join(data, "shipped.jsonl"), "utf8")).toContain('"result":"shipped"'); expect(out.stdout).toContain("shipped:");
   }, 60_000);
+  test("DIRECT-FAST-03: direct mode leaves the installer a one-shot skip-the-data-copy request for this commit; gated and unset modes leave none; it is gone afterwards", () => {
+    const f = join(scratch, "ship-direct-file"), seen = join(scratch, "direct.seen");
+    const spy = join(scratch, "spy-promote");
+    writeFileSync(spy, "#!/usr/bin/env bash\nif [[ \"$1\" == --check ]]; then echo ok; exit 0; fi\nif [[ -f '" + f + "' ]]; then echo \"present $(cat '" + f + "')\" >> '" + seen + "'; else echo absent >> '" + seen + "'; fi\necho \"sha-${1:0:7}\" > '" + join(live, ".installed-tag") + "'\n"); chmodSync(spy, 0o755);
+    mkdirSync(join(main, "scripts", "lib"), { recursive: true }); copyFileSync(join(import.meta.dir, "lib", "mode.sh"), join(main, "scripts", "lib", "mode.sh"));
+    mkdirSync(join(watch, "green"), { recursive: true }); writeFileSync(join(watch, "green", sha), "green\n");
+    rmSync(seen, { force: true });
+    try {
+      const base = { MAIPAI_PROMOTE_BIN: spy, MAIPAI_SHIP_DIRECT_FILE: f };
+      const direct = run([sha, "--reinstall"], { ...base, MAIPAI_MODE: "direct" }); expect(direct.status).toBe(0);
+      expect(direct.stdout).toContain("asking the installer to skip the data copy");
+      writeFileSync(join(live, ".installed-tag"), "v0.0.1\n");
+      const gated = run([sha, "--reinstall"], { ...base, MAIPAI_MODE: "gated" }); expect(gated.status).toBe(0);
+      writeFileSync(join(live, ".installed-tag"), "v0.0.1\n");
+      writeFileSync(f, "stale-leftover 1\n"); // a leftover from an earlier run must not reach a non-direct install
+      const unset = run([sha, "--reinstall"], { ...base, MAIPAI_MODE: "" }); expect(unset.status).toBe(0);
+      const lines = readFileSync(seen, "utf8").trim().split("\n");
+      expect(lines[0]).toMatch(new RegExp("^present " + sha + " \\d+$"));
+      expect(lines.slice(1)).toEqual(["absent", "absent"]);
+      expect(existsSync(f)).toBe(false);
+    } finally { rmSync(join(main, "scripts", "lib"), { recursive: true, force: true }); rmSync(f, { force: true }); }
+  }, 60_000);
   test("health failure rolls back", () => {
     writeFileSync(join(watch, "green", sha), "green\n"); writeFileSync(join(scratch, "health.fail"), "bad"); const out = run([sha]); expect(out.status).toBe(1);
     expect(readFileSync(join(scratch, "promote.calls"), "utf8")).toContain(sha + "\n--rollback"); expect(readFileSync(join(data, "shipped.jsonl"), "utf8")).toContain('"result":"rolled_back"'); expect(out.stdout).toContain("rolled back to v0.0.1");
