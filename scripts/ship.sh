@@ -66,7 +66,12 @@ label="sha-${sha:0:7}"
 # import cycle). Every ship, dry run included, first boots this exact commit's real entry on a scratch hub (about 30 s). With that proof the
 # 20 to 30 minute watcher wait is no longer required: a ship without a watcher green run is allowed once the boot check passes and is recorded;
 # the watcher still tests main afterwards and a red run is fixed forward at once. MAIPAI_SKIP_BOOT_CHECK=1 skips it (tests only).
-if [[ "${MAIPAI_SKIP_BOOT_CHECK:-}" != 1 && -f scripts/boot-check.sh ]]; then
+# SINGLE-WRITER-01: an express landing boot-checked exactly this commit in the lander's checkout before it was pushed (land/boot-ok/<sha>).
+land_boot_ok="${MAIPAI_LAND_DATA:-$main/data-scratch/land}/boot-ok/$sha"
+if [[ "${MAIPAI_SKIP_BOOT_CHECK:-}" != 1 && -f "$land_boot_ok" ]]; then
+  echo "ship.sh: ${sha:0:7} was boot-checked by the lander's express lane before it was pushed; not booting it again."
+  boot_checked=1
+elif [[ "${MAIPAI_SKIP_BOOT_CHECK:-}" != 1 && -f scripts/boot-check.sh ]]; then
   if [[ "$(git rev-parse HEAD)" == "$sha" ]]; then
     bash scripts/boot-check.sh || die "${sha:0:7} does not boot (see the lines above); nothing was stopped or installed. Fix it, land the fix, ship again."
     boot_checked=1

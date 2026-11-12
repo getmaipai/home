@@ -2,7 +2,12 @@
 set -euo pipefail
 umask 077
 
-usage() { echo "usage: bash scripts/land.sh [--detach] [--queue-anyway] [--timeout <seconds>] [--done <ITEM-ID>]... [--note <one line>] | wait" >&2; }
+usage() { echo "usage: bash scripts/land.sh [--express] [--detach] [--queue-anyway] [--timeout <seconds>] [--done <ITEM-ID>]... [--note <one line>] | wait" >&2; }
+# --express (SINGLE-WRITER-01, 2026-11-12): what rush-ship.sh and ship-now.sh use, and only on the owner's explicit word. The lander takes the
+# entry at its next phase boundary (it waits for the current lander operation and delays other queued work, within the fairness rule in
+# lander.sh), rebases it on the landed main, typechecks the changed workspaces, boot-checks the rebased commit, runs no test suite, and
+# pushes main to GitHub before it answers. The result is labelled "starts and typechecks on top of main", never "tested". It waits for the
+# verdict (no --detach) and prints "landed-sha: <sha>", the exact rebased commit that was pushed and that ship.sh then installs.
 die() { echo "land.sh: $1" >&2; exit "${2:-1}"; }
 # GITNET-01: remote git operations are bounded and retried (scripts/lib/gitnet.sh); a checkout that predates the helper runs plain git.
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
@@ -17,8 +22,10 @@ done_items=()
 done_arg=""
 landing_note=""
 queue_anyway=0
+express=0
 while (($#)); do
   case "$1" in
+    --express) express=1; shift ;;
     --detach) mode=detach; shift ;;
     --queue-anyway) queue_anyway=1; shift ;;
     --timeout) (($# >= 2)) || { usage; exit 2; }; timeout_seconds="$2"; shift 2 ;;
@@ -29,6 +36,7 @@ while (($#)); do
   esac
 done
 [[ "$timeout_seconds" =~ ^[0-9]+$ ]] || { usage; exit 2; }
+if (( express )) && [[ "$mode" == detach ]]; then die "--express waits for its verdict (the ship that follows needs the landed commit); drop --detach" 2; fi
 
 common="$(git rev-parse --git-common-dir 2>/dev/null)" || die "not inside a git checkout; run this from your worktree."
 [[ "$common" = /* ]] || common="$(cd "$(dirname "$common")" && pwd -P)/$(basename "$common")"
@@ -42,6 +50,17 @@ note="$data/notes/$slug.json"
 note_md="$data/notes/$slug.md"
 git_env="${MAIPAI_LAND_GIT_ENV-$main/data-scratch/bin/https-git.env}"
 if [[ -n "$git_env" && -f "$git_env" ]]; then source "$git_env"; fi
+
+# The exact commit the lander put on main for this branch (the rebased one), for rush-ship.sh to ship.
+landed_sha_line() {
+  python3 - "$note" <<'PY' || true
+import json, sys
+try:
+    n = json.load(open(sys.argv[1]))
+    if n.get('status') == 'landed' and n.get('main_sha'): print('landed-sha: ' + n['main_sha'])
+except Exception: pass
+PY
+}
 
 wait_note() {
   local expected="$1" start now last_fetch=0 last_progress=0 position total f queue_file="" result line="" wdir="$data/waiters"
@@ -71,7 +90,7 @@ PY
 )"
       if [[ -n "$result" ]]; then
         [[ -f "$note_md" ]] && cat "$note_md"
-        if [[ "$result" == landed ]]; then return 0; fi
+        if [[ "$result" == landed ]]; then landed_sha_line; return 0; fi
         # A stale bounce can overwrite a landed note (a second request for the same branch); the commit itself decides.
         if { GITNET_TRIES=1 GITNET_TIMEOUT=30 gitnet fetch -q origin main || true; } && git merge-base --is-ancestor "$expected" "$(pipeline_main_sha . 2>/dev/null || echo origin/main)"; then
           echo "landed: ${expected:0:7} is on main"
@@ -181,13 +200,18 @@ GITNET_TRIES=1 GITNET_TIMEOUT=30 gitnet push --force-with-lease -u origin "HEAD:
 sha="$(git rev-parse HEAD)"
 requested_at="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 # Milliseconds, so two requests in one second never share a name (macOS date has no %N).
-queue_file="$data/queue/$(python3 -c 'import time; print(int(time.time() * 1000))')-$slug.json"
+# An express request sorts ahead of every normal one (0- prefix); the lander's fairness rule decides when it actually runs.
+queue_file="$data/queue/$( ((express)) && printf '0-')$(python3 -c 'import time; print(int(time.time() * 1000))')-$slug.json"
 tmp="$(mktemp "$data/queue/.request.XXXXXX")"
 if [[ -n "$done_arg" ]]; then echo "done: ${done_items[*]}"; fi
-python3 - "$tmp" "$branch" "$sha" "$(git rev-parse --show-toplevel)" "${MAIPAI_WT_SESSION:-}" "$requested_at" "$landing_note" "$done_arg" <<'PY'
+python3 - "$tmp" "$branch" "$sha" "$(git rev-parse --show-toplevel)" "${MAIPAI_WT_SESSION:-}" "$requested_at" "$landing_note" "$done_arg" "$express" "${MAIPAI_RUSH_SAFETY_OK:-0}" <<'PY'
 import json, sys
 with open(sys.argv[1], 'w') as f:
-    json.dump(dict(branch=sys.argv[2], sha=sys.argv[3], worktree=sys.argv[4], session=sys.argv[5], requested_at=sys.argv[6], note=sys.argv[7], done=sys.argv[8].split()), f)
+    req = dict(branch=sys.argv[2], sha=sys.argv[3], worktree=sys.argv[4], session=sys.argv[5], requested_at=sys.argv[6], note=sys.argv[7], done=sys.argv[8].split())
+    if sys.argv[9] == '1':
+        req['express'] = True
+        if sys.argv[10] == '1': req['safety_ok'] = True
+    json.dump(req, f)
     f.write('\n')
 PY
 mv -f "$tmp" "$queue_file"
@@ -198,6 +222,6 @@ for f in "$data"/queue/*-"$slug".json; do
 done
 position=1
 for f in "$data"/queue/*.json; do [[ -e "$f" && "$f" < "$queue_file" ]] && ((position+=1)) || true; done
-echo "queued: $branch at $sha, position $position"
+echo "queued: $branch at $sha, position $position$( ((express)) && echo ' (express: waits for the current lander operation, then lands ahead of normal work)')"
 if [[ "$mode" == detach ]]; then echo "next: bash scripts/land.sh wait"; exit 0; fi
 wait_note "$sha"; exit $?

@@ -22,6 +22,9 @@ here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
 if [[ -f "$here/lib/gitnet.sh" ]]; then source "$here/lib/gitnet.sh"; GITNET_NO_SSH_COMMAND=1 gitnet_env; else gitnet() { git "$@"; }; fi
 
 case "${1:-}" in done) [[ ! -f scripts/dev.sh ]] || bash scripts/dev.sh stop >/dev/null 2>&1 || true;; esac
+# SINGLE-WRITER-01 (2026-11-12): `land` always goes to the lander. The shared script hands off only when scripts/land.sh is executable, and
+# here it is a plain file (mode 644), so the shared fallback (its own rebase and `git push origin HEAD:main`) was a second writer to main.
+if [[ "${1:-}" == land ]]; then shift; exec bash "$here/land.sh" "$@"; fi
 if [[ -n "${MAIPAI_WT_SHARED:-}" ]]; then shared="$MAIPAI_WT_SHARED"
 else
   [[ -d "$std/.git" || -f "$std/.git" ]] || { echo "wt: getmaipai/.github is missing at $std; clone it next to this repo and retry." >&2; exit 1; }
