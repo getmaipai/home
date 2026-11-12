@@ -1,0 +1,18 @@
+{
+  "type": "page",
+  "id": "music-made-for-you",
+  "title": "Made for you",
+  "body": [
+    {
+      "type": "empty_state",
+      "icon": "star",
+      "text": "Mixes built from what you play will show up here. This page is coming soon.",
+      "action": {
+        "navigate": {
+          "to": "/apps/music/search"
+        }
+      },
+      "action_label": "Find songs"
+    }
+  ]
+}

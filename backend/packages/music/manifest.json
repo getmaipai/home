@@ -119,23 +119,62 @@
           "mode": "play",
           "pages": [
             "index",
-            "radio",
+            "radio"
+          ]
+        },
+        {
+          "id": "play-library",
+          "mode": "play",
+          "title": "Library",
+          "pages": [
             "songs",
             "albums",
             "artists",
             "playlists",
-            "liked"
+            "liked",
+            "history",
+            "downloads"
+          ]
+        },
+        {
+          "id": "play-discover",
+          "mode": "play",
+          "title": "Discover",
+          "pages": [
+            "new-releases",
+            "genres",
+            "made-for-you"
           ]
         },
         {
           "id": "create",
           "mode": "create",
           "pages": [
-            "create",
+            "create"
+          ]
+        },
+        {
+          "id": "create-tools",
+          "mode": "create",
+          "title": "Tools",
+          "pages": [
             "studio",
             "stems",
             "remix",
-            "creations"
+            "lyrics",
+            "voices",
+            "sound-effects"
+          ]
+        },
+        {
+          "id": "create-yours",
+          "mode": "create",
+          "title": "Yours",
+          "pages": [
+            "creations",
+            "bands",
+            "styles",
+            "drafts"
           ]
         }
       ]
@@ -144,7 +183,7 @@
       {
         "id": "index",
         "label": "Music",
-        "icon": "music",
+        "icon": "home",
         "nav": true,
         "kind": "schema",
         "module": "index"
@@ -160,7 +199,7 @@
       {
         "id": "albums",
         "label": "Albums",
-        "icon": "music",
+        "icon": "disc-3",
         "nav": false,
         "kind": "schema",
         "module": "albums"
@@ -176,7 +215,7 @@
       {
         "id": "artists",
         "label": "Artists",
-        "icon": "music",
+        "icon": "mic",
         "nav": false,
         "kind": "schema",
         "module": "artists"
@@ -192,7 +231,7 @@
       {
         "id": "songs",
         "label": "Songs",
-        "icon": "music",
+        "icon": "music-2",
         "nav": false,
         "kind": "schema",
         "module": "songs"
@@ -200,7 +239,7 @@
       {
         "id": "playlists",
         "label": "Playlists",
-        "icon": "music",
+        "icon": "list-music",
         "nav": false,
         "kind": "schema",
         "module": "playlists"
@@ -216,7 +255,7 @@
       {
         "id": "liked",
         "label": "Liked",
-        "icon": "music",
+        "icon": "heart",
         "nav": false,
         "kind": "schema",
         "module": "liked"
@@ -224,7 +263,7 @@
       {
         "id": "radio",
         "label": "Radio",
-        "icon": "headphones",
+        "icon": "radio",
         "nav": true,
         "kind": "schema",
         "module": "radio",
@@ -266,7 +305,7 @@
       {
         "id": "create",
         "label": "Create",
-        "icon": "music",
+        "icon": "sparkles",
         "nav": true,
         "kind": "schema",
         "module": "create"
@@ -322,7 +361,7 @@
       {
         "id": "studio",
         "label": "Studio",
-        "icon": "audio-waveform",
+        "icon": "sliders-horizontal",
         "nav": true,
         "kind": "schema",
         "module": "studio"
@@ -330,7 +369,7 @@
       {
         "id": "stems",
         "label": "Stems",
-        "icon": "sliders-horizontal",
+        "icon": "layers",
         "nav": true,
         "kind": "schema",
         "module": "stems"
@@ -338,10 +377,98 @@
       {
         "id": "remix",
         "label": "Remix and edit",
-        "icon": "sparkles",
+        "icon": "shuffle",
         "nav": true,
         "kind": "schema",
         "module": "remix"
+      },
+      {
+        "id": "history",
+        "label": "Recently played",
+        "icon": "clock",
+        "nav": false,
+        "kind": "schema",
+        "module": "history"
+      },
+      {
+        "id": "downloads",
+        "label": "Downloads",
+        "icon": "download",
+        "nav": false,
+        "kind": "schema",
+        "module": "downloads"
+      },
+      {
+        "id": "new-releases",
+        "label": "New releases",
+        "icon": "sparkles",
+        "nav": false,
+        "kind": "schema",
+        "module": "new-releases"
+      },
+      {
+        "id": "genres",
+        "label": "Genres and moods",
+        "icon": "compass",
+        "nav": false,
+        "kind": "schema",
+        "module": "genres"
+      },
+      {
+        "id": "made-for-you",
+        "label": "Made for you",
+        "icon": "star",
+        "nav": false,
+        "kind": "schema",
+        "module": "made-for-you"
+      },
+      {
+        "id": "lyrics",
+        "label": "Lyrics",
+        "icon": "file-text",
+        "nav": false,
+        "kind": "schema",
+        "module": "lyrics"
+      },
+      {
+        "id": "voices",
+        "label": "Voices",
+        "icon": "mic",
+        "nav": false,
+        "kind": "schema",
+        "module": "voices"
+      },
+      {
+        "id": "sound-effects",
+        "label": "Sound effects",
+        "icon": "audio-waveform",
+        "nav": false,
+        "kind": "schema",
+        "module": "sound-effects"
+      },
+      {
+        "id": "bands",
+        "label": "Bands",
+        "icon": "users",
+        "nav": false,
+        "kind": "schema",
+        "module": "bands"
+      },
+      {
+        "id": "styles",
+        "label": "Styles",
+        "icon": "palette",
+        "nav": false,
+        "kind": "schema",
+        "module": "styles"
+      },
+      {
+        "id": "drafts",
+        "label": "Drafts",
+        "icon": "bookmark",
+        "nav": false,
+        "kind": "schema",
+        "module": "drafts"
       }
     ],
     "data": [
