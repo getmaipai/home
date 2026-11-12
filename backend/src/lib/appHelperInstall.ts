@@ -2,7 +2,7 @@
 // (user-level LaunchAgent, built on this Mac, no privileges, `remove` undoes it); install.sh calls the same script. Nothing leaves the home.
 import { appendFileSync, existsSync, mkdirSync } from "node:fs";
 import { join } from "node:path";
-import { consoleUserHome, listHelperApps } from "@/lib/appHelperClient";
+import { consoleUserHome, helperSocketPath, listHelperApps } from "@/lib/appHelperClient";
 import { homedir } from "node:os";
 
 export type HelperInstallResult = "installed" | "no_toolchain" | "nobody_logged_in" | "not_mac" | "failed";
@@ -56,6 +56,7 @@ export function installHelper(run: Run = runScript, waitMs = 8000): Promise<Help
       if ((await listHelperApps(undefined, 1000)).installed) return outcome("installed");
       await new Promise((resolve) => setTimeout(resolve, 400));
     }
+    try { appendFileSync(installLogPath(), `--- the install script exited 0 but nothing answered on ${helperSocketPath()} (uid ${process.getuid?.()}, socket file ${existsSync(helperSocketPath()) ? "exists" : "missing"})\n`); } catch { /* log only */ }
     return outcome("failed");
   })().finally(() => { running = null; });
   return running;
