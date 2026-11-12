@@ -515,6 +515,16 @@ run_once_body() {
   last_run="$(cat "$data/last-run" 2>/dev/null || true)"
   last_green="$(cat "$data/last-green" 2>/dev/null || true)"
   if [[ "$head" == "$last_run" || "$head" == "$last_green" ]]; then echo "up to date at ${head:0:7}"; return 0; fi
+  # HOST-GUARD-09: no suite starts under memory pressure or while the host guard paused heavy work; the next tick tries again.
+  local hostmem_lib="$main/scripts/lib/hostmem.sh" gate_line=""
+  if [[ -f "$hostmem_lib" ]]; then
+    # shellcheck source=lib/hostmem.sh
+    source "$hostmem_lib"
+    if ! gate_line="$(hostmem_gate "Watcher run" 2>&1)"; then
+      echo "$(date -u +%Y-%m-%dT%H:%M:%SZ) deferred (memory) at ${head:0:7}: $gate_line" >> "$data/watcher.log"
+      echo "deferred (memory) at ${head:0:7}"; return 0
+    fi
+  fi
   if ! wait_for_quiet; then return 0; fi
   GITNET_LABEL="watcher fetch (after quiet wait)" gitnet -C "$checkout" fetch origin || echo "$(date -u +%Y-%m-%dT%H:%M:%SZ) watcher.sh: fetch failed after quiet wait$( ((GITNET_TIMED_OUT)) && echo ' (timed out)'); testing the landed main" >> "$data/watcher.log"
   head="$(pipeline_main_sha "$checkout")"
@@ -552,6 +562,13 @@ run_once_body() {
   set -e
   if (( watcher_lock_held )); then bash "$gate_lock" release "watcher-$$" || true; watcher_lock_held=0; fi
   seconds=$(( $(date +%s) - started ))
+  # A leg the sharder deferred for memory pressure (exit 75) is neither green nor red: nothing is recorded and the next tick retries.
+  if grep -qE '^== leg: [a-z]+ \(exit 75,' "$output"; then
+    echo "$(date -u +%Y-%m-%dT%H:%M:%SZ) deferred (memory) at $head: $(grep -E '^shard: deferred' "$output" | tail -n 1 | sed 's/^shard: deferred (memory): //')" >> "$data/watcher.log"
+    rm -f "$output" "$output.backend" "$output.frontend" "$output.scripts"
+    echo "deferred (memory) at ${head:0:7}"
+    return 0
+  fi
   timed_leg="$(awk '$1=="==" && $2=="leg:" && /timed out after/ { print $3; exit }' "$output")"
   timed_seconds="$(sed -nE 's/^== leg: [^ ]+ \(exit 124, timed out after ([0-9]+) s\).*/\1/p' "$output" | head -n 1)"
   if [[ -n "$timed_leg" ]]; then

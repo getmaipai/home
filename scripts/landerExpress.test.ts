@@ -242,6 +242,21 @@ describe("time caps and results", () => {
   }, 60_000);
 });
 
+describe("memory deferral (HOST-GUARD-09)", () => {
+  test("safety tests the sharder deferred for memory (exit 75) hold the entry: not landed, not bounced, retried later", () => {
+    const tip = pipelineMain();
+    const prior = env.MAIPAI_LAND_T2_CMD;
+    env.MAIPAI_LAND_T2_CMD = "echo 'shard: deferred (memory): backend: memory pressure level 2 for 300 s; not a pass'; exit 75";
+    const s = change("memdefer", "backend/src/db/migrations/0996_memdefer.sql", "select 1;\n");
+    enqueue("memdefer", s.sha, s.w);
+    const out = run("lander.sh", ["run-once"]).stdout;
+    env.MAIPAI_LAND_T2_CMD = prior;
+    expect(out).toContain("held: wt/memdefer: deferred (memory): backend: memory pressure level 2");
+    expect(pipelineMain()).toBe(tip);
+    expect(landings().some((l) => l.branch === "wt/memdefer")).toBe(false);
+  }, 60_000);
+});
+
 describe("batched backup", () => {
   test("no push when nothing is new; nothing before the batch interval; one push of the newest tip after it", () => {
     stubGit("pass");

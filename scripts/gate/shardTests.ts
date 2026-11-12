@@ -22,7 +22,7 @@ import "../runTemp";
 //                from the junit reports of this run
 import { Glob } from "bun";
 import { cpus, freemem, loadavg, tmpdir, totalmem } from "node:os";
-import { appendFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
+import { appendFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import flakesFile from "./flakes.json";
 
@@ -159,7 +159,42 @@ function sysTool(name: string, ...dirs: string[]): string {
   return name;
 }
 
-export type ResourceSnapshot = { reclaimableGb: number; totalGb: number; pressureLevel: number };
+/** devShed: the host guard asked development work to shed (scripts/studio/host-guard, the dev-shed flag). */
+export type ResourceSnapshot = { reclaimableGb: number; totalGb: number; pressureLevel: number; devShed?: boolean };
+
+/** HOST-GUARD-09: the exit code of a run deferred for memory pressure. It is not a pass and not a failure of the code under test:
+ * the lander holds the entry and retries, the watcher records nothing and retries, check.sh reports it as not passed. */
+export const DEFERRED_EXIT = 75;
+
+/** Seconds of continuous pressure (kernel level 2+, or the host guard's dev-shed flag) the sharder works through on one worker
+ * before it stops and exits DEFERRED_EXIT. On 2026-11-12 it paused with no deadline until the lander killed it at 2,400 s, twice. */
+export function pressureWaitMs(env = process.env.MAIPAI_GATE_PRESSURE_WAIT): number {
+  const seconds = Number(env ?? 300);
+  return (Number.isFinite(seconds) && seconds >= 0 ? Math.min(seconds, 3600) : 300) * 1000;
+}
+
+const hostGuardDir = () => process.env.MAIPAI_HOST_GUARD_STATE_DIR ?? "/var/db/maipai-host-guard";
+
+/** The host guard's dev-shed flag counts while it was refreshed in the last 10 minutes (a stopped guard cannot hold work back). */
+export function devShedActive(stateDir = hostGuardDir(), now = Date.now()): boolean {
+  try { return now - statSync(join(stateDir, "dev-shed")).mtimeMs <= 600_000; } catch { return false; }
+}
+
+/** SOURCE THROTTLE hook (HOST-GUARD-09). On 2026-11-12 the file-event daemon leaked about 128 KB per "Resolve user group list"
+ * call, about 100 calls a second while safety-test shards ran. If the two-run comparison shows test workers are the source, this
+ * caps the worker count while the host guard reports a high lookup rate (memory.json fseventsd.est_leak_mb_per_min). Off until
+ * MAIPAI_GATE_SOURCE_THROTTLE is a positive number (the cap); the limit is MAIPAI_GATE_SOURCE_THROTTLE_MB (default 20 MB a minute). */
+export function sourceThrottleCap(stateDir = hostGuardDir(), env = process.env): number {
+  const cap = Number.parseInt(env.MAIPAI_GATE_SOURCE_THROTTLE ?? "", 10);
+  if (!Number.isInteger(cap) || cap <= 0) return Number.POSITIVE_INFINITY;
+  const limit = Number(env.MAIPAI_GATE_SOURCE_THROTTLE_MB ?? 20);
+  try {
+    const status = JSON.parse(readFileSync(join(stateDir, "memory.json"), "utf8")) as { checked_at?: number; fseventsd?: { est_leak_mb_per_min?: number } };
+    const fresh = typeof status.checked_at === "number" && Date.now() / 1000 - status.checked_at <= 300;
+    const rate = status.fseventsd?.est_leak_mb_per_min;
+    return fresh && typeof rate === "number" && rate >= limit ? cap : Number.POSITIVE_INFINITY;
+  } catch { return Number.POSITIVE_INFINITY; }
+}
 
 export function processTreeRssGb(rootPid: number): number {
   let output: string;
@@ -280,7 +315,7 @@ export function memoryPressureLevel(): number {
 }
 
 export function resourceSnapshot(): ResourceSnapshot {
-  return { reclaimableGb: availableGb(), totalGb: totalmem() / 1024 ** 3, pressureLevel: memoryPressureLevel() };
+  return { reclaimableGb: availableGb(), totalGb: totalmem() / 1024 ** 3, pressureLevel: memoryPressureLevel(), devShed: devShedActive() };
 }
 
 export interface Summary {
@@ -392,6 +427,8 @@ export interface RunOptions {
   engineGb?: number;
   gbPerShard?: number;
   sleep?: (milliseconds: number) => Promise<void>;
+  /** The clock for the pressure deadline (tests pass a fake one). */
+  now?: () => number;
   peakFile?: string;
   workerSlotsDir?: string;
 }
@@ -556,14 +593,23 @@ export async function run(opts: RunOptions): Promise<number> {
   process.on("SIGTERM", onSignal);
 
   const pause = opts.sleep ?? ((milliseconds: number) => Bun.sleep(milliseconds));
-  const waitForPressureRelief = async () => {
-    while (true) {
-      const resources = await probe();
-      if (resources.pressureLevel < 2) return;
-      console.log(`shard: pressure ${resources.pressureLevel}; pausing new workers`);
-      await pause(1000);
+  // HOST-GUARD-09: under pressure the run sheds to one worker (only when there is room for two worker peaks), and after
+  // pressureWaitMs of continuous pressure it starts nothing more, lets running workers finish and exits DEFERRED_EXIT.
+  const clock = opts.now ?? Date.now;
+  const waitMs = pressureWaitMs();
+  let pressureSince: number | null = null;
+  let deferred: string | null = null;
+  const tight = (resources: ResourceSnapshot) => {
+    const under = resources.pressureLevel >= 2 || resources.devShed === true;
+    if (!under) { pressureSince = null; return false; }
+    pressureSince ??= clock();
+    if (!deferred && clock() - pressureSince >= waitMs) {
+      deferred = `${resources.devShed ? "the host guard paused heavy development work" : `memory pressure level ${resources.pressureLevel}`} for ${Math.round((clock() - pressureSince) / 1000)} s`;
+      console.log(`shard: ${deferred}; starting nothing more`);
     }
+    return true;
   };
+  const roomForOne = (resources: ResourceSnapshot) => resources.reclaimableGb >= 2 * shardPeakGb;
   const reserveSharedSlot = (capacity: number) => workerSlotsDir ? reserveWorkerSlot(workerSlotsDir, capacity) : undefined;
   const setSlotOwner = (slot: string | undefined, pid: number) => {
     if (!slot) return;
@@ -574,13 +620,17 @@ export async function run(opts: RunOptions): Promise<number> {
   const releaseSlot = (slot: string | undefined) => {
     if (slot) rmSync(slot, { force: true });
   };
+  /** A slot for one serial worker, or undefined when the run was deferred for memory (the caller stops). */
   const reserveForSingleWorker = async () => {
     while (true) {
       const resources = await probe();
-      if (resources.pressureLevel >= 2) {
-        console.log(`shard: pressure ${resources.pressureLevel}; pausing new workers`);
-        await pause(1000);
-        continue;
+      if (tight(resources)) {
+        if (deferred) return undefined;
+        if (!roomForOne(resources)) {
+          console.log(`shard: pressure ${resources.pressureLevel}; pausing new workers`);
+          await pause(1000);
+          continue;
+        }
       }
       const reservedGb = workerSlotsDir ? workerSlotCount(workerSlotsDir) * shardPeakGb : 0;
       const capacity = chooseShardCount({ cores: cpus().length, load: loadavg()[0], freeGb: resources.reclaimableGb + reservedGb, totalGb: resources.totalGb, engineGb, osReserveGb: 3, files: 6, gbPerShard: shardPeakGb });
@@ -592,7 +642,7 @@ export async function run(opts: RunOptions): Promise<number> {
   };
   let nextShard = 0;
   while (nextShard < plan.length || active.size > 0) {
-    if (firstFail) {
+    if (firstFail || deferred) {
       nextShard = plan.length;
       if (active.size === 0) break;
       await Promise.race([...active].map((shard) => shard.done));
@@ -617,7 +667,11 @@ export async function run(opts: RunOptions): Promise<number> {
       files: 6,
       gbPerShard: shardPeakGb,
     });
-    if (resources.pressureLevel >= 2 || active.size >= currentCap || nextShard >= plan.length) {
+    const underPressure = tight(resources);
+    if (deferred) continue;
+    // Under pressure: one worker at a time, and only with room for two worker peaks. The source throttle hook caps the rest.
+    const cap = underPressure ? (roomForOne(resources) ? 1 : 0) : Math.min(currentCap, sourceThrottleCap());
+    if (active.size >= cap || nextShard >= plan.length) {
       if (active.size > 0) {
         await Promise.race([...active].map((shard) => shard.done));
       } else if (nextShard < plan.length) {
@@ -656,8 +710,9 @@ export async function run(opts: RunOptions): Promise<number> {
   // Real network tests and UI fetch mocks run alone after parallel shards to
   // avoid cross-file multicast and process-global fetch interference.
   for (const file of serialFiles) {
-    if (firstFail) break;
+    if (firstFail || deferred) break;
     const slot = await reserveForSingleWorker();
+    if (deferred) break;
     const proc = Bun.spawn(["bun", "test", "--timeout", String(TEST_TIMEOUT_MS), file.startsWith("./") ? file : `./${file}`], {
       cwd: dir,
       env: process.env,
@@ -697,8 +752,9 @@ export async function run(opts: RunOptions): Promise<number> {
   // Rerun each listed, unchanged test once, by its exact name, after all
   // shards have finished. Expired entries were excluded above and therefore
   // fail fast as ordinary failures.
-  if (!firstFail) for (const { entry, line } of flakyCandidates.values()) {
+  if (!firstFail && !deferred) for (const { entry, line } of flakyCandidates.values()) {
     const slot = await reserveForSingleWorker();
+    if (deferred) break;
     // bun's -t matches "describe test" joined by single spaces, never the
     // " > " the failure line prints; the " > " form matched 0 tests and the
     // rerun exited 1, so a listed flake still went red (#216, 2026-10-16).
@@ -720,7 +776,7 @@ export async function run(opts: RunOptions): Promise<number> {
 
   // Rerun each unlisted failing file once, by itself. A repeat failure is a
   // real failure; a pass is recorded in the same event log used by stats.
-  if (!firstFail) {
+  if (!firstFail && !deferred) {
     const unlistedFiles = new Map<string, { shard: Live; line: string }>();
     for (const { line, shard } of unlistedFailures.values()) {
       const parsed = shard.logPath ? failedFiles(readShardLog(shard.logPath)) : [];
@@ -729,6 +785,7 @@ export async function run(opts: RunOptions): Promise<number> {
     }
     for (const [file, failure] of unlistedFiles) {
       const slot = await reserveForSingleWorker();
+      if (deferred) break;
       const proc = Bun.spawn(["bun", "test", "--timeout", String(TEST_TIMEOUT_MS), file.startsWith("./") ? file : `./${file}`], { cwd: dir, env: process.env, stdout: "pipe", stderr: "pipe" });
       setSlotOwner(slot, proc.pid);
       const [stdout, stderr] = await Promise.all([new Response(proc.stdout).text(), new Response(proc.stderr).text()]);
@@ -755,6 +812,12 @@ export async function run(opts: RunOptions): Promise<number> {
     }
   }
   const elapsed = (Date.now() - started) / 1000;
+  // A real failure seen before the deferral still fails the run; otherwise a deferred run is neither a pass nor a failure.
+  if (deferred && !firstFail) {
+    console.log(`shard: deferred (memory): ${label}: ${deferred}; not a pass and not a failure of the code under test; run it again when the Mac has room`);
+    rmSync(scratch, { recursive: true, force: true });
+    return DEFERRED_EXIT;
+  }
   let code = 0;
   const failure = firstFail as { shard: Live; code: number; line?: string } | null;
   if (failure) {

@@ -373,6 +373,9 @@ fi
 # whatever tag each pins. GATE_LOCK_ITEM, when a caller sets it, names
 # the item in `gate-lock.sh status`.
 if { [ "$SCOPE" = "full" ] || [ "$SCOPE" = "frontend" ]; } && [ "$PRE_ONLY" != 1 ]; then
+  # HOST-GUARD-09: a full or frontend gate does not start under memory pressure or while the host guard paused heavy work; exit 75 is
+  # "deferred", never a pass. MAIPAI_MEMORY_GATE=off overrides.
+  if [ -f scripts/lib/hostmem.sh ]; then . scripts/lib/hostmem.sh; hostmem_gate "The $SCOPE gate" || exit 75; fi
   if [ ! -f "$GATE_LOCK" ]; then
     echo "== gate-lock: $GATE_LOCK is missing (getmaipai/.github checkout older than gate-lock.sh, or set MAIPAI_GATE_LOCK); not running a $SCOPE gate without the machine-wide lock"
     exit 1

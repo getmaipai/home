@@ -49,6 +49,10 @@ if [[ "${1:-}" == status ]]; then
 fi
 before_green=0; tag_after=0; dry=0; adopt_empty_live=0; allow_big_copy=0; reinstall=0; retry=0; target=main
 while (($#)); do case "$1" in --before-green) before_green=1;; --tag) tag_after=1;; --dry-run) dry=1;; --adopt-empty-live) adopt_empty_live=1;; --allow-big-copy) allow_big_copy=1;; --reinstall) reinstall=1;; --retry) retry=1;; main) target=main;; --*) usage; exit 2;; *) target="$1";; esac; shift; done
+# HOST-GUARD-09: a ship restarts the hub and the Stack and copies the install, the heaviest file and memory load there is. It does not
+# start while the Mac is under memory pressure or the host guard paused heavy work (2026-11-12: 18 ships in a night under pressure 2).
+# Nothing has been stopped yet; exit 75 means "try again later". MAIPAI_MEMORY_GATE=off is the owner's override.
+if (( ! dry )) && [[ -f scripts/lib/hostmem.sh ]]; then source scripts/lib/hostmem.sh; hostmem_gate "Ship" || exit 75; fi
 [[ "$target" == main || "$target" =~ ^[0-9a-f]{7,40}$ ]] || { usage; exit 2; }
 # A fetch GitHub does not answer only leaves origin/main at its last known value, which can make this check stricter, never looser.
 gitnet fetch origin || echo "ship.sh: GitHub did not answer$( ((GITNET_TIMED_OUT)) && echo ' in time'); judging against the last known origin/main." >&2

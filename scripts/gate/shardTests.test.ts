@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { balance, chooseShardCount, discoverTests, failedFiles, failedTests, FlakeLedger, junitFileSeconds, parseStackBudget, parseSummary, readShardLog, reserveWorkerSlot, run, workerSlotCount } from "./shardTests";
+import { balance, chooseShardCount, DEFERRED_EXIT, devShedActive, discoverTests, failedFiles, failedTests, FlakeLedger, junitFileSeconds, parseStackBudget, parseSummary, pressureWaitMs, readShardLog, reserveWorkerSlot, run, sourceThrottleCap, workerSlotCount } from "./shardTests";
 
 describe("balance", () => {
   test("every file lands in exactly one shard", () => {
@@ -199,7 +199,7 @@ describe("run: the gate's pass/fail meaning", () => {
     }
   });
 
-  test("pressure level 2 pauses every new shard until pressure falls", async () => {
+  test("pressure level 2 with no room for two worker peaks pauses every new shard until pressure falls", async () => {
     const marker = join(tmpdir(), `maipai-pressure-${Date.now()}`);
     const dir = fixture(Object.fromEntries(Array.from({ length: 3 }, (_, index) => [`w${index}.test.ts`,
       `import {test} from "bun:test"; import {writeFileSync} from "node:fs"; test("worker ${index}",()=>writeFileSync(${JSON.stringify(`${marker}-${index}`)},"started"));`,
@@ -216,7 +216,7 @@ describe("run: the gate's pass/fail meaning", () => {
         timingsPath: join(dir, "t.json"),
         engineGb: 0,
         gbPerShard: 1,
-        resourceProbe: () => ({ reclaimableGb: 16, totalGb: 16, pressureLevel: levels.shift() ?? 0 }),
+        resourceProbe: () => { const level = levels.shift() ?? 0; return { reclaimableGb: level >= 2 ? 1 : 16, totalGb: 16, pressureLevel: level }; },
         sleep: async () => {
           pauses += 1;
           expect([0, 1, 2].every((index) => !existsSync(`${marker}-${index}`))).toBe(true);
@@ -230,6 +230,79 @@ describe("run: the gate's pass/fail meaning", () => {
       rmSync(dir, { recursive: true, force: true });
       for (let index = 0; index < 3; index += 1) rmSync(`${marker}-${index}`, { force: true });
     }
+  });
+
+  test("HOST-GUARD-09: under pressure with room, the run sheds to one worker at a time and still passes", async () => {
+    const dir = fixture(Object.fromEntries(Array.from({ length: 4 }, (_, index) => [`s${index}.test.ts`,
+      `import {test} from "bun:test"; test("s${index}",async()=>Bun.sleep(100));`,
+    ])));
+    let running = 0; let most = 0;
+    const slots = mkdtempSync(join(tmpdir(), "maipai-shed-"));
+    try {
+      expect(await quietRun({
+        dir, root: "tests", shards: 4, timingsPath: join(dir, "t.json"), engineGb: 0, gbPerShard: 1, workerSlotsDir: slots,
+        resourceProbe: () => { running = readdirSync(slots).filter((n) => n.startsWith("slot-")).length; most = Math.max(most, running); return { reclaimableGb: 16, totalGb: 16, pressureLevel: 2 }; },
+        sleep: async () => {},
+      })).toBe(0);
+      expect(most).toBeLessThanOrEqual(1);
+    } finally {
+      rmSync(dir, { recursive: true, force: true }); rmSync(slots, { recursive: true, force: true });
+    }
+  });
+
+  test("HOST-GUARD-09: pressure that lasts past the wait exits 75 (deferred), never hangs and never passes", async () => {
+    const dir = fixture({ "a.test.ts": `import {test} from "bun:test"; test("a",()=>{});`, "b.test.ts": `import {test} from "bun:test"; test("b",()=>{});` });
+    let clock = 0; let sleeps = 0;
+    const lines: string[] = [];
+    const log = console.log;
+    console.log = (...args: unknown[]) => { lines.push(args.join(" ")); };
+    try {
+      const code = await run({
+        dir, root: "tests", shards: 2, timingsPath: join(dir, "t.json"), engineGb: 0, gbPerShard: 1,
+        resourceProbe: () => ({ reclaimableGb: 1, totalGb: 16, pressureLevel: 2 }),
+        now: () => clock,
+        sleep: async (ms) => { sleeps += 1; clock += ms; },
+      });
+      expect(code).toBe(DEFERRED_EXIT);
+      expect(sleeps).toBeGreaterThanOrEqual(299);
+      expect(sleeps).toBeLessThanOrEqual(302);
+      expect(lines.some((l) => l.startsWith("shard: deferred (memory): ") && l.includes("not a pass"))).toBe(true);
+    } finally {
+      console.log = log;
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  test("HOST-GUARD-09: the host guard's dev-shed flag defers like pressure; a stale flag does not", async () => {
+    const dir = fixture({ "a.test.ts": `import {test} from "bun:test"; test("a",()=>{});` });
+    let clock = 0;
+    try {
+      expect(await quietRun({
+        dir, root: "tests", shards: 1, timingsPath: join(dir, "t.json"), engineGb: 0, gbPerShard: 1,
+        resourceProbe: () => ({ reclaimableGb: 1, totalGb: 16, pressureLevel: 1, devShed: true }),
+        now: () => clock, sleep: async (ms) => { clock += ms; },
+      })).toBe(DEFERRED_EXIT);
+    } finally { rmSync(dir, { recursive: true, force: true }); }
+    const state = mkdtempSync(join(tmpdir(), "maipai-devshed-"));
+    try {
+      expect(devShedActive(state)).toBe(false);
+      writeFileSync(join(state, "dev-shed"), "{}");
+      expect(devShedActive(state)).toBe(true);
+      expect(devShedActive(state, Date.now() + 11 * 60_000)).toBe(false);
+    } finally { rmSync(state, { recursive: true, force: true }); }
+  });
+
+  test("HOST-GUARD-09: the wait is clamped and the source throttle hook is off unless set", () => {
+    expect(pressureWaitMs(undefined)).toBe(300_000);
+    expect(pressureWaitMs("abc")).toBe(300_000);
+    expect(pressureWaitMs("99999")).toBe(3_600_000);
+    const state = mkdtempSync(join(tmpdir(), "maipai-throttle-"));
+    try {
+      writeFileSync(join(state, "memory.json"), JSON.stringify({ checked_at: Math.floor(Date.now() / 1000), fseventsd: { est_leak_mb_per_min: 75 } }));
+      expect(sourceThrottleCap(state, {})).toBe(Number.POSITIVE_INFINITY);
+      expect(sourceThrottleCap(state, { MAIPAI_GATE_SOURCE_THROTTLE: "2" })).toBe(2);
+      expect(sourceThrottleCap(state, { MAIPAI_GATE_SOURCE_THROTTLE: "2", MAIPAI_GATE_SOURCE_THROTTLE_MB: "100" })).toBe(Number.POSITIVE_INFINITY);
+    } finally { rmSync(state, { recursive: true, force: true }); }
   });
 
   test("concurrent workspace runners share one memory budget", async () => {

@@ -96,6 +96,22 @@ describe("watcher suite scheduling", () => {
     }
   }, 60_000);
 
+  test("HOST-GUARD-09: a leg deferred for memory (exit 75) is neither red nor green and is retried on the next tick", () => {
+    const f = fixture();
+    const bin = join(f.scratch, "fake-bin");
+    mkdirSync(bin);
+    writeFileSync(join(bin, "bun"), "#!/usr/bin/env bash\necho 'shard: deferred (memory): backend: memory pressure level 2 for 300 s; not a pass'\nexit 75\n");
+    chmodSync(join(bin, "bun"), 0o755);
+    const result = run(f, "watcher.sh", ["run-once"], { ...f.env, PATH: bin + ":" + (process.env.PATH ?? ""), MAIPAI_WATCH_SUITE_CMD: "", MAIPAI_WATCH_LEGS: "backend" });
+    const sha = git(f.warm, "rev-parse", "origin/main");
+    expect(result.status).toBe(0);
+    expect(result.stdout).toContain(`deferred (memory) at ${sha.slice(0, 7)}`);
+    expect(existsSync(join(f.data, "last-run"))).toBe(false);
+    expect(existsSync(join(f.data, "reds", `${sha}.md`))).toBe(false);
+    expect(existsSync(join(f.data, "green", sha))).toBe(false);
+    expect(readFileSync(join(f.data, "watcher.log"), "utf8")).toContain("deferred (memory)");
+  }, 20_000);
+
   test("stalls a leg that exceeds its watchdog without red or green side effects", () => {
     const f = fixture();
     const bin = join(f.scratch, "fake-bin");

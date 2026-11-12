@@ -38,6 +38,15 @@ describe("ship pipeline", () => {
       expect(out.status).toBe(0); expect(out.stdout).toContain("deploy: IN PROGRESS"); expect(out.stdout).toContain("sha-abc1234"); expect(out.stdout).toContain("hub answering: no"); expect(out.stdout).toContain("wait for it");
     } finally { spawnSync("kill", [sleeper]); rmSync(lock, { recursive: true, force: true }); }
   }, 60_000);
+  test("HOST-GUARD-09: does not start under memory pressure; nothing is stopped and the exit is 75", () => {
+    mkdirSync(join(main, "scripts", "lib"), { recursive: true }); copyFileSync(join(import.meta.dir, "lib", "hostmem.sh"), join(main, "scripts", "lib", "hostmem.sh"));
+    const calls = join(scratch, "promote.calls"); const before = existsSync(calls) ? readFileSync(calls, "utf8") : "";
+    try {
+      const out = run([sha, "--before-green"], { MAIPAI_HOSTMEM_PRESSURE: "2" });
+      expect(out.status).toBe(75); expect(out.stderr).toContain("Ship deferred: this Mac is under memory pressure (level 2)");
+      expect(existsSync(calls) ? readFileSync(calls, "utf8") : "").toBe(before);
+    } finally { rmSync(join(main, "scripts", "lib"), { recursive: true, force: true }); }
+  }, 60_000);
   test("refuses on a Mac without the live-hub marker", () => {
     const out = run([sha, "--before-green"], { MAIPAI_SHIP_LIVE: "", MAIPAI_SHIP_MARKER: join(scratch, "no-such-marker") });
     expect(out.status).toBe(1); expect(out.stderr).toContain("not marked as the live hub"); expect(out.stderr).toContain("sudo touch");

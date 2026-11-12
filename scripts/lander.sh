@@ -921,9 +921,25 @@ PY
     [[ "$boot_note" != "boot check: none in this tree" ]] || entry_label="typechecks on top of main (express: no boot check in this tree, no tests run)"
   fi
   if [[ -n "$safety_files" ]]; then
+    # HOST-GUARD-09: under memory pressure, or while the host guard paused heavy work, the safety tests do not start; the entry is held
+    # and retried (2026-11-12: two landings paused 2,400 s at pressure 2 and died "unfinished"). The sharder itself exits 75 ("deferred
+    # (memory)") when pressure arrives mid-run; that is held the same way, never a pass and never a failure of the branch.
+    local hostmem_lib="$main/scripts/lib/hostmem.sh" t2_rc=0 gate_line=""
+    [[ -f "$hostmem_lib" ]] || hostmem_lib="$checkout/scripts/lib/hostmem.sh"
+    if [[ -f "$hostmem_lib" ]]; then
+      # shellcheck source=lib/hostmem.sh
+      source "$hostmem_lib"
+      if ! gate_line="$(hostmem_gate "Safety-surface tests" 2>&1)"; then
+        hold_entry "$request" "$branch" "deferred (memory): $gate_line"; rm -f "$output"; return 0
+      fi
+    fi
     t2_started="$(date +%s)"
     phase "safety-surface tests"
-    if ! run_t2_tests "$output"; then
+    run_t2_tests "$output" || t2_rc=$?
+    if (( t2_rc == 75 )); then
+      hold_entry "$request" "$branch" "deferred (memory): $(grep -E '^shard: deferred' "$output" | tail -n 1 | sed 's/^shard: deferred (memory): //')"; rm -f "$output"; return 0
+    fi
+    if (( t2_rc != 0 )); then
       reason="safety-surface tests failed$(timeout_note "$output" | sed 's/^/ (/; s/$/)/'): $(printf '%s' "$safety_files" | paste -sd ', ' -)"
       bounce "$request" "$branch" "$sha" "$reason" "$started" "$output"; rm -f "$output"; return 0
     fi
