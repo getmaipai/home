@@ -19,10 +19,17 @@ describe("guard-shared.sh", () => {
     "bash scripts/pipeline.sh stack off",
     "sudo -n /usr/local/libexec/maipai-promote abc1234",
     "sudo -n maipai-install v0.2.200",
+    "sudo -n /usr/local/libexec/maipai-promote --rollback",
+    "MAIPAI_OWNER_APPROVED=1 sudo -n /usr/local/libexec/maipai-promote abc1234",
+    "MAIPAI_OWNER_APPROVED=1 sudo -n maipai-install main",
+    "MAIPAI_OWNER_APPROVED=1 sudo -n maipai-install v0.2.200 && launchctl kickstart -k gui/501/com.maipai.stack",
+    "MAIPAI_OWNER_APPROVED=1 bash scripts/pipeline.sh stack off",
+    "MAIPAI_OWNER_APPROVED=1 git push origin HEAD:main",
   ]) test(`denies: ${command}`, () => {
     const r = decide(command);
     expect(r.code).toBe(2);
     expect(JSON.parse(r.err).decision).toBe("deny");
+    expect(JSON.parse(r.err).reason).toContain("MAIPAI_OWNER_APPROVED=1");
   });
   for (const command of [
     "git push origin HEAD:refs/heads/wt/clever-yak-x",
@@ -33,7 +40,9 @@ describe("guard-shared.sh", () => {
     "bash scripts/pipeline.sh stack status",
     "bash scripts/ship.sh status",
     "bash scripts/land.sh --express",
-    "MAIPAI_ALLOW_SHARED_SERVICE=1 bash scripts/pipeline.sh stack off",
+    "MAIPAI_OWNER_APPROVED=1 sudo -n /usr/local/libexec/maipai-promote --rollback",
+    "MAIPAI_OWNER_APPROVED=1 sudo -n maipai-install v0.2.200",
+    "bash scripts/rush-ship.sh --owner-asked",
   ]) test(`allows: ${command}`, () => {
     expect(decide(command).code).toBe(0);
   });
