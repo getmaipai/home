@@ -3,8 +3,7 @@ import { SttSession, encodeWav, decodeWav, isLikelySpeech, __setSileroLoaderForT
 import { __resetStackEngineForTests, __setStackClientForTests } from "@/lib/stackEngine";
 import { setHouseholdSettingValue } from "@/lib/settings";
 import { startStackFixture, type StackFixture } from "./stackFixture";
-import type { SttWireEvent } from "@maipai/spec/voice/ts/sttTypes.js";
-type SttTestEvent = SttWireEvent | { t: "timing"; speech_end_to_final_ms: number; silence_wait_ms: number };
+import type { SttSessionEvent as SttTestEvent } from "@/lib/sttSession";
 import type { SileroVadStream } from "@/lib/sileroVad";
 
 const SAMPLE_RATE = 16_000;
@@ -84,8 +83,8 @@ function finals(events: SttTestEvent[]): SttTestEvent[] {
   return events.filter((event) => event.t === "final");
 }
 
-function endpointConfig(endpointer: Endpointer, holdS = 0.8) {
-  return { ...config(), endpointing: { endpointer, holdS } };
+function endpointConfig(endpointer: Endpointer, holdS = 0.8, overrides: Partial<{ silenceTimeoutS: number; partialIntervalS: number }> = {}) {
+  return { ...config(overrides), endpointing: { endpointer, holdS } };
 }
 
 describe("SttSession reply pause", () => {
@@ -423,6 +422,26 @@ describe("SttSession - RMS fallback VAD (no Silero model installed in tests)", (
     await flush();
     expect(finals(events)).toEqual([{ t: "final", v: "edge words" }]);
     expect(transcriptionCalls()).toBe(1);
+    session.close();
+  });
+
+  test("STT-SMARTTURN-01: the partial transcribed at the first silent frame carries edge: true; a cadence partial does not", async () => {
+    scriptTranscript("edge words");
+    const events: SttTestEvent[] = [];
+    // A 0.1 s partial cadence: the first partial comes while the voice is still going, the next at the first silent frame.
+    const session = new SttSession(endpointConfig({ isComplete: async () => true }, 0.2, { partialIntervalS: 0.1 }), (e) => events.push(e));
+    for (let i = 0; i < 30; i++) session.pushPcm(loudFrame());
+    await flush();
+    const cadence = events.filter((e) => e.t === "partial");
+    expect(cadence.length).toBeGreaterThan(0);
+    expect(cadence.every((e) => !("edge" in e))).toBe(true);
+    session.pushPcm(silenceFrame());
+    await flush();
+    const edge = events.filter((e) => e.t === "partial" && "edge" in e);
+    expect(edge).toEqual([{ t: "partial", v: "edge words", edge: true }]);
+    await pushPause(session, 800);
+    await flush();
+    expect(finals(events)).toEqual([{ t: "final", v: "edge words" }]);
     session.close();
   });
 

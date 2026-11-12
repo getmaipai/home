@@ -79,6 +79,38 @@ the line", the wizard); the rule's entry is the authority for this note's scope,
 under 20 percent of turns; confirmed `first_token_ms` not worse than the prewarm's alone. Measured before and after in the
 landing note.
 
+## Measured (2026-11-12)
+
+Method: `cd backend && bun run scripts/bench/voice-first-sound.ts --api <dev hub> --turns 6 --speculative on|off`. It
+drives the hub's real voice path without a browser: Home speaks a short question, the audio streams to `WS /api/stt/stream`
+in real time, the final starts the spoken turn, the first sentence (the browser's own first-chunk rule) goes to `POST /api/tts`,
+and the first sound is the end of speech to the first audio bytes. The last sentence is spoken too, so CONVO-PREWARM-02 runs
+between turns as in the browser. A browser adds about 0.1 to 0.2 s (decode and audio start) on top. Mac Studio, Splash 1.6.1,
+the 27B chat model, load 40 to 60 percent of cores, six short questions, one conversation per run, prompt cache warm.
+
+| | first sound, median | p90 | STT final | request to first sentence | TTS first bytes | confirmed |
+|---|---|---|---|---|---|---|
+| Speculative start off | 2.26 s | 3.26 s | 0.82 s | 1.00 s (engine first token 0.82 s) | 0.43 s | |
+| Speculative start on | **1.40 s** | 4.30 s (one slow first chunk; five of six under 1.5 s) | 0.82 s | 0.21 s after the confirm | 0.38 s | 6 of 6 |
+
+The speculative start saves about 0.85 s at the median (the silence timer and the final's decode leave the first-sound path).
+Cold runs are slower on both sides: with no prewarm the engine re-reads the whole prompt (`cache_n` 0, first token 2.5 to 3 s,
+first sound 4.3 s). The engine keeps the states of whole earlier requests, not arbitrary shared prefixes, so a turn is fast
+only when the prewarm that CONVO-PREWARM-02 or the session-open prewarm published before it succeeded.
+
+**Client gap found and fixed the same day.** The hub sends the edge partial at its first silent frame and `vad speaking: false`
+only at finalize, after it. The client armed its "next partial is the edge" flag on `vad speaking: false`, so on a clean end
+no partial ever followed and the held run never started in the browser (the server-side measurement above had bypassed the
+client). Now the hub marks that partial `edge: true` (`sttSession.ts`, an additive wire field older clients ignore; `SttSessionEvent`)
+and the client starts the held run on it (`liveVoiceSession.tsx`); the armed flag stays for an older hub. Tests:
+`backend/tests/sttSession.test.ts` (the edge partial carries the flag, a cadence partial does not) and
+`frontend/src/apps/chat/liveVoiceSession.test.tsx` (a marked partial starts the held run, a cadence partial does not).
+
+**Default.** `voice.speculative_start` stays off. Turning it on is one household setting (admin). Before that, the exit
+numbers above should be repeated through the browser (20 real turns, `bun run voice:latency`), since the client path has not
+yet been exercised with a microphone after the fix, and a wrong guess costs engine time: a discarded run leaves the next real
+turn behind it (seen as first-token 2.9 to 4.9 s on refused runs during the bench).
+
 ## Risks
 
 A speculative run still generating holds the engine while the real turn starts after a discard (measured by the discard

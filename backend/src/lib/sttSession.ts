@@ -100,9 +100,13 @@ export function isLikelySpeech(text: string): boolean {
   return /\p{L}/u.test(speechContent(text));
 }
 
+export type SttSessionEvent = SttWireEvent | { t: "partial"; v: string; edge: true } | { t: "timing"; speech_end_to_final_ms: number; silence_wait_ms: number };
+
 export class SttSession {
   private cfg: SttSessionConfig;
-  private send: (msg: SttWireEvent | { t: "timing"; speech_end_to_final_ms: number; silence_wait_ms: number }) => void;
+  /** STT-SMARTTURN-01: the partial transcribed at the first silent frame carries `edge: true` (an additive field; older clients ignore it), so the client
+   * can begin a speculative turn on it. The `vad speaking: false` event comes later, at finalize, so it cannot mark the edge. */
+  private send: (msg: SttSessionEvent) => void;
   private speech: Float32Array[] = [];
   private speechLen = 0;
   // How many of the leading samples in `speech` are pre-roll (not real
@@ -142,7 +146,7 @@ export class SttSession {
   private replyPaused = false;
   private unconfirmedPauses: number[] = [];
 
-  constructor(cfg: SttSessionConfig, send: (msg: SttWireEvent | { t: "timing"; speech_end_to_final_ms: number; silence_wait_ms: number }) => void, now: () => number = Date.now) {
+  constructor(cfg: SttSessionConfig, send: (msg: SttSessionEvent) => void, now: () => number = Date.now) {
     this.cfg = cfg;
     this.send = send;
     this.now = now;
@@ -233,7 +237,7 @@ export class SttSession {
         // the time the turn ends (finalize reuses it when no voice followed). It used to be skipped with the check on, which put the whole
         // transcription after the pause.
         if (this.partialInFlight) this.redecodeAtEdge = true;
-        else void this.emitPartial();
+        else void this.emitPartial(true);
       }
       const endpointing = this.cfg.endpointing;
       const baseSamples = this.cfg.silenceTimeoutS * this.cfg.sampleRate;
@@ -365,7 +369,7 @@ export class SttSession {
     this.speech = [];
   }
 
-  private emitPartial(): Promise<void> {
+  private emitPartial(edge = false): Promise<void> {
     if (this.partialInFlight || this.speechLen === 0) return Promise.resolve();
     this.partialInFlight = true;
     const run = async () => {
@@ -374,7 +378,7 @@ export class SttSession {
         const text = await transcribeUtterance(this.flatten(), this.cfg.sampleRate);
         if (text && isLikelySpeech(text)) {
           this.reusablePartial = { text, voicedLen: capturedVoicedLen };
-          if (!this.closed && !this.finalizing) this.send({ t: "partial", v: text });
+          if (!this.closed && !this.finalizing) this.send(edge ? { t: "partial", v: text, edge: true } : { t: "partial", v: text });
         }
       } catch {
         // model down: let finalize surface it; partials stay silent
@@ -383,7 +387,7 @@ export class SttSession {
         this.partialPromise = null;
         if (this.redecodeAtEdge && !this.finalizing && !this.closed && this.speaking && this.silenceSamples > 0) {
           this.redecodeAtEdge = false;
-          void this.emitPartial();
+          void this.emitPartial(true);
         } else {
           this.redecodeAtEdge = false;
         }

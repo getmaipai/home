@@ -348,8 +348,10 @@ export function useLiveVoiceSession({ composer, open, onOpenChange, onProblem, i
             sttMsForNextTurn = message.speech_end_to_final_ms;
             break;
           case "partial":
-            // STT-SMARTTURN-01: the first partial after the voice stopped is the edge partial; a held run may begin on it.
-            if (edgePartialPendingRef.current && !activeSpeechRef.current && modeRef.current === "listening" && !isReplySpeaking() && !mutedRef.current) startSpeculation(message.v.trim());
+            // STT-SMARTTURN-01: the edge partial (the hub marks the one it transcribed at its first silent frame with `edge: true`; the
+            // `vad speaking: false` event only comes at finalize, after it) may begin a held run. The armed flag stays for a partial
+            // that follows a vad-false from an older hub.
+            if (("edge" in message && message.edge === true) || (edgePartialPendingRef.current && !activeSpeechRef.current)) { if (modeRef.current === "listening" && !isReplySpeaking() && !mutedRef.current) startSpeculation(message.v.trim()); }
             edgePartialPendingRef.current = false;
             activeSpeechRef.current = true;
             lastPartialRef.current = message.v;

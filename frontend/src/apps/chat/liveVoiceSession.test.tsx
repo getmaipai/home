@@ -51,7 +51,7 @@ function controlledSocket() {
 
 const SettingsIcon = getIcon("settings");
 
-function Harness({ open, onOpenChange, onProblem = () => {}, isSpeaking, speakingEndedAt, speechFailed = 0, fixture, sentTexts, idleCloseMs, voiceBargeIn = true, activeTurn = { turnId: "turn-test", heardVisibleEnd: () => 23 }, cancelRun = () => {}, stopScheduler = () => {}, pauseScheduler = () => {}, resumeScheduler = () => {}, onReady, onVoiceTiming, socketFactory, socketConnections, captureCalls, dropConnections = [], doubleDropConnections = [], dropWhileSpeaking = false, retryDelays, installationNotice = false }: { open: boolean; onOpenChange: (open: boolean) => void; onProblem?: (kind: string) => void; isSpeaking: boolean; speakingEndedAt: number; speechFailed?: number; fixture: readonly SttFixtureStep[] | ((connection: number) => readonly SttFixtureStep[]); sentTexts: string[]; idleCloseMs?: number | null; voiceBargeIn?: boolean; activeTurn?: { turnId: string; heardVisibleEnd: () => number } | null; cancelRun?: () => void; stopScheduler?: () => void; pauseScheduler?: () => void; resumeScheduler?: () => void; onReady?: () => void; onVoiceTiming?: (timing: { sttMs: number; phase?: "final" | "playback" }) => void; socketFactory?: (handlers: SttSocketHandlers) => ReturnType<typeof createMockSttSocket>; socketConnections?: number[]; captureCalls?: number[]; dropConnections?: number[]; doubleDropConnections?: number[]; dropWhileSpeaking?: boolean; retryDelays?: [number, number]; installationNotice?: boolean }) {
+function Harness({ open, onOpenChange, onProblem = () => {}, isSpeaking, speakingEndedAt, speechFailed = 0, fixture, sentTexts, idleCloseMs, voiceBargeIn = true, activeTurn = { turnId: "turn-test", heardVisibleEnd: () => 23 }, cancelRun = () => {}, stopScheduler = () => {}, pauseScheduler = () => {}, resumeScheduler = () => {}, onReady, onVoiceTiming, socketFactory, socketConnections, captureCalls, dropConnections = [], doubleDropConnections = [], dropWhileSpeaking = false, retryDelays, installationNotice = false, speculation }: { open: boolean; onOpenChange: (open: boolean) => void; onProblem?: (kind: string) => void; isSpeaking: boolean; speakingEndedAt: number; speechFailed?: number; fixture: readonly SttFixtureStep[] | ((connection: number) => readonly SttFixtureStep[]); sentTexts: string[]; idleCloseMs?: number | null; voiceBargeIn?: boolean; activeTurn?: { turnId: string; heardVisibleEnd: () => number } | null; cancelRun?: () => void; stopScheduler?: () => void; pauseScheduler?: () => void; resumeScheduler?: () => void; onReady?: () => void; onVoiceTiming?: (timing: { sttMs: number; phase?: "final" | "playback" }) => void; socketFactory?: (handlers: SttSocketHandlers) => ReturnType<typeof createMockSttSocket>; socketConnections?: number[]; captureCalls?: number[]; dropConnections?: number[]; doubleDropConnections?: number[]; dropWhileSpeaking?: boolean; retryDelays?: [number, number]; installationNotice?: boolean; speculation?: { getConversationId: () => string | undefined; pendingRef: { current: { turnId: string; resumeToken: string; conversationId: string } | null } } }) {
   const adapter: ChatModelAdapter = {
     async *run({ messages }) {
       const last = messages[messages.length - 1];
@@ -88,6 +88,7 @@ function Harness({ open, onOpenChange, onProblem = () => {}, isSpeaking, speakin
     retryDelays,
     installationNotice,
     idleCloseMs,
+    speculation,
     createSocket: (handlers) => {
       if (socketFactory) return socketFactory(handlers);
       const connection = connectionCount.current++;
@@ -380,6 +381,22 @@ describe("live voice session", () => {
       cleanup();
       expect(ageBand).toMatch(/child|teen/);
     }
+  });
+
+  test("STT-SMARTTURN-01: a partial the hub marked edge: true starts a held turn; a cadence partial does not", async () => {
+    const speculate = spyOn(api, "speculateTurn").mockResolvedValue({ turn_id: "turn-held", resume_token: "token-held", conversation_id: "conv-1" });
+    try {
+      const socket = controlledSocket();
+      const pendingRef = { current: null as { turnId: string; resumeToken: string; conversationId: string } | null };
+      render(<Harness open onOpenChange={() => {}} isSpeaking={false} speakingEndedAt={0} fixture={[]} sentTexts={[]} socketFactory={socket.createSocket} speculation={{ getConversationId: () => "conv-1", pendingRef }} />);
+      await act(async () => { await new Promise((resolve) => setTimeout(resolve, 0)); });
+      act(() => socket.send({ t: "vad", speaking: true, rms: 0.3 }));
+      act(() => socket.send({ t: "partial", v: "what is a good name for a" }));
+      expect(speculate).not.toHaveBeenCalled();
+      act(() => socket.send({ t: "partial", v: "what is a good name for a small grey cat", edge: true }));
+      expect(speculate).toHaveBeenCalledTimes(1);
+      expect(speculate.mock.calls[0]?.[0]).toBe("what is a good name for a small grey cat");
+    } finally { speculate.mockRestore(); }
   });
 
   test("a pause in a longer stretch of speech asks the small model for a reaction; short speech or a quick restart does not", async () => {

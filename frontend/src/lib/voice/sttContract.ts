@@ -19,7 +19,9 @@
 // all (only the audio frames themselves and an optional `{"t":"end"}`),
 // so the one `sttSocket.ts` used to send was never part of any real
 // contract and the server has never read it.
-export type SttServerMessage = import("@maipai/spec/voice/ts/sttTypes.js").SttWireEvent | { t: "timing"; speech_end_to_final_ms: number; silence_wait_ms: number };
+// STT-SMARTTURN-01: the hub marks the partial it transcribed at the first silent frame with `edge: true` (additive; absent on
+// cadence partials and from older hubs), so the client can begin a speculative turn on it before the final lands.
+export type SttServerMessage = import("@maipai/spec/voice/ts/sttTypes.js").SttWireEvent | { t: "partial"; v: string; edge: true } | { t: "timing"; speech_end_to_final_ms: number; silence_wait_ms: number };
 export type SttServerMessageWithTiming = SttServerMessage;
 import { z } from "zod";
 
