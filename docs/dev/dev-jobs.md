@@ -79,13 +79,26 @@ through the launcher, releases. Or `acquire --pid <long-lived pid>` / `release <
     queued, a whole-machine lease is refused (exit 3), and a held dev lease is told to yield (`check` exits 10) when a family
     request arrives.
 - A lease is released when its holder pid is gone or its time (`--ttl`, 4 h) is up, so a crashed session never blocks the queue.
-- Not built yet: the hub does not call `family` leases for turns. Until it does, `family` is the API and the tests; gated mode keeps
-  dev work polite only toward leases someone registered.
+- **The hub's family turns.** Each chat turn (`turnMachine/turnNext.ts`, through `lib/familyActivity.ts` `trackFamilyTurn`) writes
+  `local-app/family-active.json` in the hub's data directory (`{"active": n, "until": <epoch s>}`, refreshed every 20 s while a turn
+  runs, 60 s claim; `MAIPAI_FAMILY_ACTIVITY` moves it). It is a file because the hub may run as root and the broker as the user. The
+  broker reads it (the live install's `data/local-app` and `$MAIPAI_DATA_DIR`) as one synthetic family lease: in gated mode dev leases
+  wait for it and held ones are told to yield. It never queues, caps or slows a turn, and a failed write is ignored. In direct mode it
+  changes nothing.
 
 ## The end-user line: "Chat is unavailable while the system upgrades."
 
-A whole-machine lease writes `local-app/maintenance.json` (`{"until": <epoch seconds>}`) in the hub's data directory (or the path in
-`MAIPAI_MAINTENANCE_FLAG`). `backend/src/lib/maintenanceFlag.ts` reads it; the chat row in `roleHealth` becomes unavailable with cause
+Two writers, one path rule (`MAIPAI_MAINTENANCE_FLAG`, else `$MAIPAI_DATA_DIR/local-app/maintenance.json`, else the live install's
+`data/local-app/maintenance.json`; the hub's data directory is that same folder, so the hub reads what they write):
+
+- **The installer** (`scripts/install.sh` `maintenance_flag_set` / `_clear`, run as root) writes the flag just before it starts Home
+  (after any rollback restore) and clears it once Home and the Stack answer, or when the install fails. The flag carries its own end
+  time (20 minutes), so a dead installer cannot leave chat off. While the hub is stopped nothing can be shown; the line covers the
+  start-up stretch where the hub answers but chat is not ready.
+- **A whole-machine dev lease** (`lease.sh`, as the user) writes it into the dev hub's data directory (workbench or the live
+  install's when writable). If the place is not writable the broker audits `flag-not-written` and the lease still runs.
+
+`backend/src/lib/maintenanceFlag.ts` reads it; the chat row in `roleHealth` becomes unavailable with cause
 `upgrading`; `failureCopy.ts` supplies the line for every age band. It rides the existing health snapshot, composer line and Send hold
 (RULES S6): no new surface. A flag past its `until` is ignored, so a crashed writer cannot leave chat off. The line never uses memory
 or RAM words. (It contains the word "unavailable" by the owner's wording, so it is not in the resource-word scan's cause list.)

@@ -33,6 +33,7 @@ import { voiceForSpeech } from "@/lib/voiceForSpeech";
 import { validateTurnInput, validateContinuationInput, BareModeForbidden, loadAllManifests, commandOpeners, computedPatternMatch, StreamSafetyRefusal, StreamUnavailable, CRISIS_RESOURCES_TEXT, crisisSupportFor, deriveCrisisResources, judgeStatusAtInsert, variedConstantReply, speechTextFor } from "@/lib/turnShared";
 import { acquireTurnLease, type TurnLease } from "@/lib/turnActivity";
 import { trackChatLease } from "@/lib/jobs/householdQueue";
+import { trackFamilyTurn } from "@/lib/familyActivity";
 import type { PersonRow } from "@/lib/memoryIngestion";
 import { resolveOrCreateConversation, resolveSupersedes, getPendingAsk, setPendingAsk, takePendingAsk, logTurn, appendTemporaryTurn, isTemporaryConversation, type PendingAsk } from "@/lib/conversationHistory";
 import { classifyTurnSignal } from "@/lib/turnSignal";
@@ -797,7 +798,7 @@ async function beginTurn(actor: PersonRow, surface: Surface, text: string, opts:
 
   // THIN-0C: acquired only after every early return above (an invalid
   // request or a stale tap acquires nothing), as the old path does.
-  const lease = trackChatLease(actor.id, acquireTurnLease());
+  const lease = trackFamilyTurn(trackChatLease(actor.id, acquireTurnLease()));
   try {
     const machineActor = createActor(turnMachine, { input: { turnState: state, abortSignal, preConfirmed } });
     machineActor.start();

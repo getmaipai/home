@@ -52,7 +52,19 @@ export function leaseMode(): Mode {
 }
 
 const dirOf = (n: string) => join(stateDir(), "leases", n);
-const maintenanceFlag = (): string | null => process.env.MAIPAI_MAINTENANCE_FLAG ?? (process.env.MAIPAI_DATA_DIR ? join(process.env.MAIPAI_DATA_DIR, "local-app", "maintenance.json") : null);
+const liveData = (): string => join(process.env.MAIPAI_LIVE_INSTALL_ROOT ?? "/usr/local/maipai-home", "data");
+/** The hub's maintenance flag. Same rule as backend/src/lib/maintenanceFlag.ts and the installer: MAIPAI_MAINTENANCE_FLAG, else $MAIPAI_DATA_DIR/local-app, else the live install's data/local-app. */
+export const maintenanceFlag = (): string => process.env.MAIPAI_MAINTENANCE_FLAG ?? join(process.env.MAIPAI_DATA_DIR ?? liveData(), "local-app", "maintenance.json");
+/** Where the hub says a family turn is running (backend/src/lib/familyActivity.ts writes it, as root or as the user). */
+export const familyActivityFiles = (): string[] => process.env.MAIPAI_FAMILY_ACTIVITY ? [process.env.MAIPAI_FAMILY_ACTIVITY] : [...new Set([join(process.env.MAIPAI_DATA_DIR ?? liveData(), "local-app", "family-active.json"), join(liveData(), "local-app", "family-active.json")])];
+/** The hub's running family turns, as one synthetic family lease while any claim is fresh. It is never stored, so it cannot go stale. */
+function hubFamily(): Lease[] {
+  const now = Date.now() / 1000;
+  for (const f of familyActivityFiles()) {
+    try { const c = JSON.parse(readFileSync(f, "utf-8")) as { active?: number; until?: number }; if ((c.active ?? 0) > 0 && (c.until ?? 0) > now) return [{ id: "hub-family", cls: "family", kind: "chat", session: "hub", pid: process.pid, whole: false, since: now, until: c.until!, seq: 0 }]; } catch { /* no claim */ }
+  }
+  return [];
+}
 
 function withLock<T>(fn: () => T): T {
   const lock = dirOf(".lock"); ensureDirs(dirOf("held"), dirOf("queue"));
@@ -107,16 +119,18 @@ function syncReserve(mode: Mode): void {
 
 function syncFlag(mode: Mode = leaseMode()): void {
   syncReserve(mode);
-  const f = maintenanceFlag(); if (!f) return;
+  const f = maintenanceFlag();
   const whole = readAll("held").filter((l) => l.cls === "dev" && l.whole);
-  if (whole.length) { mkdirSync(dirname(f), { recursive: true }); writeFileSync(f, JSON.stringify({ until: Math.max(...whole.map((l) => l.until)), lease: whole[0]!.id })); }
-  else rmSync(f, { force: true });
+  try {
+    if (whole.length) { mkdirSync(dirname(f), { recursive: true }); writeFileSync(f, JSON.stringify({ until: Math.max(...whole.map((l) => l.until)), lease: whole[0]!.id })); }
+    else rmSync(f, { force: true });
+  } catch (e) { if (whole.length) audit({ session: whole[0]!.session, command: "lease flag", worktree: process.cwd(), trigger: `cannot write ${f}: ${(e as Error).message}`, action: "flag-not-written", job: whole[0]!.id }); }
 }
 /** Reap holders and tickets whose process is gone or whose time is up; tell dev holders to yield when a family request is in. */
 function reap(mode: Mode): void {
   const now = Date.now() / 1000;
   for (const n of ["held", "queue"]) for (const l of readAll(n)) if (!alive(l.pid) || l.until < now) { drop(n, l.id); au(l, "lease-reaped", !alive(l.pid) ? "holder gone" : "time up"); }
-  if (mode === "gated" && readAll("held").some((l) => l.cls === "family")) for (const l of readAll("held")) if (l.cls === "dev" && !l.yieldRequested) { put("held", { ...l, yieldRequested: true }); au(l, "yield-requested", "family request arrived"); }
+  if (mode === "gated" && (readAll("held").some((l) => l.cls === "family") || hubFamily().length)) for (const l of readAll("held")) if (l.cls === "dev" && !l.yieldRequested) { put("held", { ...l, yieldRequested: true }); au(l, "yield-requested", "family request arrived"); }
   syncFlag(mode);
 }
 const slotsNow = () => Number(process.env.MAIPAI_DEV_LEASE_SLOTS) || 1;
@@ -127,7 +141,7 @@ function attempt(req: Lease, mode: Mode): Decision {
     reap(mode);
     if (!readAll("queue").some((l) => l.id === req.id) && !readAll("held").some((l) => l.id === req.id)) put("queue", req);
     const queue = readAll("queue").filter((l) => l.id !== req.id);
-    const d = decide(req, readAll("held"), queue, mode, slotsNow());
+    const d = decide(req, [...readAll("held"), ...hubFamily()], queue, mode, slotsNow());
     if (d.verdict === "grant") { drop("queue", req.id); put("held", req); au(req, "lease-granted", `mode ${mode}`); if (req.cls === "family" && mode === "gated") reap(mode); syncFlag(mode); }
     else if (d.verdict === "deny") { drop("queue", req.id); au(req, "lease-denied", d.why); }
     return d;

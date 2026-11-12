@@ -2149,6 +2149,19 @@ install_maipai_command() {
   fi
 }
 
+# HOST-LAUNCH-03: while the hub restarts the chat row shows "Chat is unavailable while the system upgrades." The installer writes the flag
+# the hub reads (backend/src/lib/maintenanceFlag.ts, same path rule: MAIPAI_MAINTENANCE_FLAG, else $MAIPAI_DATA_DIR/local-app, else the
+# install's own data/local-app) just before the hub starts, and clears it once Home and the Stack answer or the install fails. The flag
+# carries its own end time (MAIPAI_MAINTENANCE_TTL seconds, 20 minutes), so a dead installer cannot leave chat off. Never fatal.
+maintenance_flag_path() { printf '%s' "${MAIPAI_MAINTENANCE_FLAG:-${MAIPAI_DATA_DIR:-${1}/data}/local-app/maintenance.json}"; }
+maintenance_flag_set() {
+  local f; f="$(maintenance_flag_path "$1")"
+  mkdir -p "$(dirname "$f")" 2>/dev/null || return 0
+  printf '{"until":%s,"reason":"install"}\n' "$(( $(date +%s) + ${MAIPAI_MAINTENANCE_TTL:-1200} ))" > "${f}.tmp.$$" 2>/dev/null && mv -f "${f}.tmp.$$" "$f" 2>/dev/null || rm -f "${f}.tmp.$$" 2>/dev/null || true
+  return 0
+}
+maintenance_flag_clear() { rm -f "$(maintenance_flag_path "$1")" 2>/dev/null || true; return 0; }
+
 restart_home_service() {
   local os="$1"
   if [ "$os" = "linux" ]; then
@@ -2162,6 +2175,7 @@ on_install_exit() {
   local code=$? root="$INSTALL_ROOT_FOR_TRAP" os="$INSTALL_OS_FOR_TRAP"
   trap - EXIT
   [ "$code" -ne 0 ] || return 0
+  maintenance_flag_clear "$root"
   case "$INSTALL_STAGE" in
     "")
       log "The install stopped before changing anything on this computer. Read the error above, fix it, then run the installer again."
@@ -2506,6 +2520,7 @@ main() {
 
   # From here the hub can start and run its migrations: a rollback must now bring the data copy back (SHIP-ROLLBACK-02).
   phase "Stack ready; starting Home"
+  maintenance_flag_set "$install_root"
   mark_migrations_started "$install_root"
   if [ "$os" = "linux" ]; then
     ensure_service_user_linux
@@ -2526,6 +2541,7 @@ main() {
       || log "The Stack is not answering yet. Home will keep retrying; its log: ${install_root}/stack/data/logs/stack.error.log"
   fi
 
+  maintenance_flag_clear "$install_root"
   phase "Home answers"
   install_app_helper "$os" "$install_root"
 

@@ -40,7 +40,7 @@ const temps: string[] = [];
 afterAll(() => { for (const t of temps) rmSync(t, { recursive: true, force: true }); });
 function env(extra: Record<string, string> = {}) {
   const state = mkdtempSync(join(tmpdir(), "lease-")); temps.push(state);
-  return { PATH: process.env.PATH!, HOME: process.env.HOME!, MAIPAI_JOBS_DIR: state, MAIPAI_DEV_MODE: "direct", MAIPAI_LEASE_POLL_MS: "100", MAIPAI_MAINTENANCE_FLAG: join(state, "maintenance.json"), ...extra };
+  return { PATH: process.env.PATH!, HOME: process.env.HOME!, MAIPAI_JOBS_DIR: state, MAIPAI_DEV_MODE: "direct", MAIPAI_LEASE_POLL_MS: "100", MAIPAI_MAINTENANCE_FLAG: join(state, "maintenance.json"), MAIPAI_FAMILY_ACTIVITY: join(state, "family-active.json"), ...extra };
 }
 const lease = (e: Record<string, string>, ...a: string[]) => Bun.spawnSync(["bun", LEASE, ...a], { env: e, stdout: "pipe", stderr: "pipe" });
 const out = (r: { stdout: Buffer }) => r.stdout.toString().trim();
@@ -136,5 +136,28 @@ describe("broker CLI", () => {
     expect(out(lease(unset, "mode"))).toBe("gated");
     writeFileSync(join(state, "mode"), "direct\n");
     expect(out(lease(unset, "mode"))).toBe("direct");
+  });
+
+  test("the hub's family-turn claim makes gated dev work wait and yield; a stale or zero claim, or direct mode, does not", () => {
+    const claim = (e: Record<string, string>, active: number, ageS = 0) => writeFileSync(e.MAIPAI_FAMILY_ACTIVITY, JSON.stringify({ active, until: Math.floor(Date.now() / 1000) + 60 - ageS }));
+    const e = env({ MAIPAI_DEV_MODE: "gated" });
+    claim(e, 1);
+    const waiting = lease(e, "acquire", "--session", "dev", "--pid", me, "--wait", "1");
+    expect(waiting.exitCode).toBe(75); expect(waiting.stderr.toString()).toContain("waits for family requests");
+    claim(e, 0); expect(lease(e, "acquire", "--session", "dev", "--pid", me, "--wait", "1").exitCode).toBe(0);
+    const holder = env({ MAIPAI_DEV_MODE: "gated" });
+    const id = out(lease(holder, "acquire", "--session", "dev2", "--pid", me)); expect(lease(holder, "check", id).exitCode).toBe(0);
+    claim(holder, 1); const c = lease(holder, "check", id); expect(c.exitCode).toBe(10);
+    const stale = env({ MAIPAI_DEV_MODE: "gated" }); claim(stale, 1, 120);
+    expect(lease(stale, "acquire", "--pid", me, "--wait", "1").exitCode).toBe(0);
+    const direct = env({ MAIPAI_DEV_MODE: "direct" }); claim(direct, 1);
+    expect(lease(direct, "acquire", "--pid", me, "--wait", "1").exitCode).toBe(0);
+  });
+
+  test("an unwritable maintenance flag location is audited, never a crash, and the lease is still granted", () => {
+    const e = env({ MAIPAI_MAINTENANCE_FLAG: "/proc/none/denied/maintenance.json" });
+    const r = lease(e, "acquire", "--session", "big", "--whole-machine", "--pid", me);
+    expect(r.exitCode).toBe(0);
+    expect(withDir(e, () => readAudit()).some((x) => x.action === "flag-not-written")).toBe(true);
   });
 });
