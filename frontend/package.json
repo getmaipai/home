@@ -13,7 +13,7 @@
     "test:setup-preview:bundle": "bun test src/apps/setup/preview/bundle.test.ts",
     "prebuild": "bun scripts/copy-ort.mjs",
     "build": "tsc --noEmit && vite build",
-    "build:app": "bun scripts/copy-ort.mjs && vite build",
+    "build:app": "bun run prebuild && vite build",
     "test": "bun test",
     "lint": "tsc --noEmit && eslint .",
     "lint:ui-rules": "bun test --timeout 60000 src/dev/kitElementLints.test.ts src/dev/handBuiltChat.test.ts src/dev/colorLints.test.ts src/dev/typeLints.test.ts src/dev/errorLints.test.ts",

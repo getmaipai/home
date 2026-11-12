@@ -546,7 +546,7 @@ clear_quarantine_and_sign() {
       local entry
       for entry in "$dir"/* "$dir"/.[!.]*; do
         [ -e "$entry" ] || continue
-        [ "$(basename "$entry")" != "node_modules" ] || continue
+        case "$(basename "$entry")" in node_modules|.deno|.bun|data) continue ;; esac # kept or untouched by this run
         xattr -dr com.apple.quarantine "$entry" 2>/dev/null || true
       done
     else
@@ -2464,6 +2464,10 @@ main() {
   # ship.sh is read exactly once, here. Only an upgrade can be direct; gated and unset modes never write the request.
   if [ "$kind" = "upgrade" ] && [ "$rollback" = "no" ]; then
     if [ "$skip_snapshot" = "yes" ] || { [ -n "$commit_flag" ] && direct_install_requested "$commit_flag"; }; then direct_install="yes"; fi
+    # The request file is read once; when the installer re-runs itself as the commit's own copy (reexec_with_source_installer) the
+    # decision travels in the environment, and only that re-run (MAIPAI_INSTALL_SOURCE_REEXEC, set by the installer itself) honors it.
+    if [ -n "${MAIPAI_INSTALL_SOURCE_REEXEC:-}" ] && [ "${MAIPAI_INSTALL_DIRECT:-}" = "yes" ]; then direct_install="yes"; fi
+    if [ "$direct_install" = "yes" ]; then export MAIPAI_INSTALL_DIRECT=yes; fi
   fi
   if [ "$kind" != "fresh" ]; then
     previous_port=$(previous_home_port "$os")

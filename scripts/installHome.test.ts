@@ -541,11 +541,11 @@ describe("kept dependencies in direct installs (DIRECT-FAST-04)", () => {
   });
 
   test("the quarantine walk skips node_modules only when dependencies are kept", () => {
-    const root = tree("q1"); mkdirSync(join(root, "docs"), { recursive: true });
+    const root = tree("q1"); for (const d of ["docs", "data", ".deno", ".bun"]) mkdirSync(join(root, d), { recursive: true });
     const log = join(scratch, "xattr.calls"); rmSync(log, { force: true });
     const run = (reuse: string) => bash(`xattr() { echo "$*" >> ${JSON.stringify(log)}; }; INSTALL_DEPS_REUSE=${reuse} clear_quarantine_and_sign darwin "${root}"`);
     run("yes"); const kept = readFileSync(log, "utf8");
-    expect(kept).toContain(join(root, "docs")); expect(kept.split("\n").filter((l) => l.endsWith(`${root}/node_modules`))).toEqual([]);
+    expect(kept).toContain(join(root, "docs")); expect(kept).not.toContain(join(root, "data")); expect(kept).not.toContain(join(root, ".deno")); expect(kept.split("\n").filter((l) => l.endsWith(`${root}/node_modules`))).toEqual([]);
     rmSync(log, { force: true }); run("no");
     expect(readFileSync(log, "utf8").trim()).toBe(`-dr com.apple.quarantine ${root}`);
   });
@@ -571,10 +571,11 @@ describe("kept dependencies in direct installs (DIRECT-FAST-04)", () => {
 
   test("the repo's frontend has build:app with the same prebuild and vite build but no tsc, and main passes the direct decision to it", () => {
     const pkg = JSON.parse(readFileSync(join(import.meta.dir, "..", "frontend", "package.json"), "utf8")).scripts;
-    expect(pkg["build:app"]).toBe("bun scripts/copy-ort.mjs && vite build");
+    expect(pkg["build:app"]).toBe("bun run prebuild && vite build");
     expect(pkg.build).toBe("tsc --noEmit && vite build");
     expect(pkg.prebuild).toBe("bun scripts/copy-ort.mjs");
     expect(readFileSync(INSTALL_SH, "utf8")).toContain('build_app "$install_root" "$bun_bin" "$reuse_deps" "$deps_now" "$direct_install"');
+    expect(readFileSync(INSTALL_SH, "utf8")).toContain('[ "${MAIPAI_INSTALL_DIRECT:-}" = "yes" ]'); // the re-exec keeps the direct decision
   });
 });
 
