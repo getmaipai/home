@@ -72888,6 +72888,13 @@
                                   "edit"
                                 ]
                               },
+                              "sheets": {
+                                "type": "array",
+                                "items": {
+                                  "type": "string"
+                                },
+                                "description": "REFVIDEO-01: the reference sheet pictures a video made from pictures was built from (file addresses), shown above the clip; absent for any other video."
+                              },
                               "note": {
                                 "type": "string",
                                 "nullable": true,
@@ -73630,6 +73637,13 @@
                                   "edit"
                                 ]
                               },
+                              "sheets": {
+                                "type": "array",
+                                "items": {
+                                  "type": "string"
+                                },
+                                "description": "REFVIDEO-01: the reference sheet pictures a video made from pictures was built from (file addresses), shown above the clip; absent for any other video."
+                              },
                               "note": {
                                 "type": "string",
                                 "nullable": true,
@@ -74180,6 +74194,13 @@
                                   "edit"
                                 ]
                               },
+                              "sheets": {
+                                "type": "array",
+                                "items": {
+                                  "type": "string"
+                                },
+                                "description": "REFVIDEO-01: the reference sheet pictures a video made from pictures was built from (file addresses), shown above the clip; absent for any other video."
+                              },
                               "note": {
                                 "type": "string",
                                 "nullable": true,
@@ -74661,6 +74682,13 @@
                                       "animate",
                                       "edit"
                                     ]
+                                  },
+                                  "sheets": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "string"
+                                    },
+                                    "description": "REFVIDEO-01: the reference sheet pictures a video made from pictures was built from (file addresses), shown above the clip; absent for any other video."
                                   },
                                   "note": {
                                     "type": "string",
@@ -75689,6 +75717,13 @@
                                   "edit"
                                 ]
                               },
+                              "sheets": {
+                                "type": "array",
+                                "items": {
+                                  "type": "string"
+                                },
+                                "description": "REFVIDEO-01: the reference sheet pictures a video made from pictures was built from (file addresses), shown above the clip; absent for any other video."
+                              },
                               "note": {
                                 "type": "string",
                                 "nullable": true,
@@ -76151,6 +76186,13 @@
                                   "animate",
                                   "edit"
                                 ]
+                              },
+                              "sheets": {
+                                "type": "array",
+                                "items": {
+                                  "type": "string"
+                                },
+                                "description": "REFVIDEO-01: the reference sheet pictures a video made from pictures was built from (file addresses), shown above the clip; absent for any other video."
                               },
                               "note": {
                                 "type": "string",
@@ -76724,6 +76766,13 @@
                                   "animate",
                                   "edit"
                                 ]
+                              },
+                              "sheets": {
+                                "type": "array",
+                                "items": {
+                                  "type": "string"
+                                },
+                                "description": "REFVIDEO-01: the reference sheet pictures a video made from pictures was built from (file addresses), shown above the clip; absent for any other video."
                               },
                               "note": {
                                 "type": "string",
