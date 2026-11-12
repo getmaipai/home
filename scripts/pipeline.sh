@@ -319,6 +319,7 @@ for line in sys.stdin:
  except Exception: pass'
   fi
   if git -C "$main" log origin/main -1 --format='origin/main: %h %s' 2>/dev/null; then (( fetched )) || echo "origin/main: the line above may be stale (GitHub did not answer the last fetch)"; else echo "origin/main: unknown (fetch failed)"; fi
+  if [[ -f "$main/scripts/lib/mode.sh" ]]; then ( source "$main/scripts/lib/mode.sh"; mode_line ); fi
   service_state com.maipai.lander "$pidfile" "$(service_plist lander)"
   service_state com.maipai.watcher "$watch_pidfile" "$(service_plist watcher)"
 }

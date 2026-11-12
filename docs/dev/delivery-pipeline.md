@@ -84,6 +84,7 @@ Where it ended up (measured on the Studio):
 | `scripts/wt.sh` (and the org `standards/bin/wt.sh`) | Worktree start, run (Codex), done; `land` always runs `land.sh` (section 22). |
 | `scripts/rush-ship.sh`, `scripts/ship-now.sh` | The owner's fast path: `land.sh --express`, then `ship.sh` of the exact landed commit (section 22). |
 | `scripts/nightly-stable.sh` | Moves `stable`, the last version to pass the required checks (section 22). Schedule off by default. |
+| `scripts/mode.sh`, `scripts/lib/mode.sh` | The one switch between DIRECT and GATED mode (section 23). Unset keeps today's pipeline. |
 | `scripts/hooks/guard-shared.sh` | PreToolUse guardrail against a session's push to main and its restarts of shared services (section 22). |
 | `scripts/landingHarness.ts`, `scripts/measure-commit-hooks.sh` | Acceptance harness on scratch repositories; per-step timing of git and commit hooks. |
 
@@ -362,3 +363,18 @@ So an express entry waits for the current lander operation (a running safety-sur
 **Guardrail, not a security boundary.** Every session runs as the owner's user, so a session that wants to can still restart the engine or push. The repo's `.claude/settings.json` adds deny rules (push to main, `launchctl bootout|bootstrap|kickstart|kill|load|unload|stop|remove`, `pipeline.sh stack on|off`) and the PreToolUse hook `scripts/hooks/guard-shared.sh`, which denies the same plus `maipai-promote` or `maipai-install` called directly (owner-approved 2026-11-12). The sanctioned paths are untouched: `ship.sh`, `ship-now.sh`, `rush-ship.sh`, the lander and the installer call these from inside their scripts, which the hook never sees. One owner-approved escape exists, for a rollback or a tag install only: `MAIPAI_OWNER_APPROVED=1 sudo -n /usr/local/libexec/maipai-promote --rollback` or `MAIPAI_OWNER_APPROVED=1 sudo -n maipai-install vX.Y.Z`, as that exact command with nothing chained. A session puts the flag in only after the owner said yes in the question wizard for that rollback or that tag. The root helpers are judged by the hook alone (a prefix deny rule cannot express the escape). Real ownership (a separate daemon user, a sudoers line for the ship daemon only) needs the owner's sudo and is not built.
 
 **Proof.** `scripts/landerExpress.test.ts` (express lands, pushes and labels; a rush over an unpushed landed commit; GitHub ahead; a concurrent move requeues; RULES.md and safety refusals; express never starts while a transaction holds the tree; at most two in a row and the ten-minute rule; unfinished; check reuse; no push with nothing new; pins first; `wt.sh land` never reaches the shared push), `scripts/nightlyStable.test.ts`, `scripts/guardShared.test.ts`, and the bench-lane `scripts/landingHarness.test.ts`.
+
+## 23. Direct and gated mode (MODE-01, 2026-11-12)
+
+`bash scripts/mode.sh direct | gated | status` is the one switch. The state is one line in `data-scratch/mode` of the main checkout (`scripts/lib/mode.sh` is the only reader; `MAIPAI_MODE_FILE` moves it, `MAIPAI_MODE` overrides it for tests). With no file the mode is unset and every script behaves as it did before the switch. Status says `DIRECT: run first, checked after`, `GATED: checked first, then run`, or `mode: not set ...`; `pipeline.sh status` prints the same line. Switching changes no data and starts or stops no service; each script reads the file when it runs.
+
+| | DIRECT: run first, checked after | GATED: checked first, then run |
+|---|---|---|
+| For | nobody on the hub, data disposable | the family is on the live hub |
+| `land.sh` | waits for its verdict through the express lane (`--detach` and `wait` keep the normal lane) | normal lane only; `--express` is refused |
+| Lander, safety-surface (T2) files | no tests hold the landing; the note says the nightly runs them | the safety-surface tests run before the landing, as today |
+| `ship.sh` | before green is implied (the boot check still runs) | `--before-green` refused; needs a watcher green run or the commit inside `stable`; a safety-surface change ships only once `stable` holds it; the installer's pre-upgrade copy of `data/` is the backup |
+| `rush-ship.sh`, `ship-now.sh` | allowed | refused with the way out |
+| `dev.sh --workbench` | allowed | refused (`bun run dev` stays) |
+
+Proof: `scripts/mode.test.ts`.

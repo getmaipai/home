@@ -11,6 +11,9 @@
 # main afterwards; if it goes red, fix forward at once.
 set -euo pipefail
 [[ "${1:-}" == --owner-asked ]] || { echo "usage: bash scripts/rush-ship.sh --owner-asked   (only when Jesse asked for a rush ship in this turn, or via scripts/ship-now.sh)" >&2; exit 2; }
+here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
+# MODE-01: a rush ship skips the tests before the install, which GATED mode (the family is on the hub) does not allow.
+if [[ -f "$here/lib/mode.sh" ]]; then source "$here/lib/mode.sh"; if [[ "$(mode_get)" == gated ]]; then echo "rush-ship: GATED: checked first, then run. A rush ship is off in gated mode; land with bash scripts/land.sh, ship with bash scripts/ship.sh, or switch with bash scripts/mode.sh direct." >&2; exit 2; fi; fi
 git diff --quiet && git diff --cached --quiet || { echo "rush-ship: commit your changes first (tree is dirty)." >&2; exit 1; }
 common="$(git rev-parse --git-common-dir)"; [[ "$common" = /* ]] || common="$(cd "$common" && pwd -P)"
 main="$(cd "$(dirname "$common")" && pwd -P)"

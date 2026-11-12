@@ -65,6 +65,11 @@ resolved_path() {
   while [[ ! -e "$path" && "$path" != / ]]; do rest="/$(basename "$path")$rest"; path="$(dirname "$path")"; done
   printf '%s%s' "$(cd "$path" && pwd -P)" "$rest"
 }
+if ((workbench)) && [[ -f "$(dirname "${BASH_SOURCE[0]}")/lib/mode.sh" ]]; then
+  # MODE-01: the workbench is a DIRECT-mode hub (disposable data, hot reload); in GATED mode the family is on the live hub and this Mac keeps its load.
+  source "$(dirname "${BASH_SOURCE[0]}")/lib/mode.sh"
+  [[ "$(mode_get)" != gated ]] || { echo "GATED: checked first, then run. The workbench hub is off in gated mode; use bun run dev, or switch with bash scripts/mode.sh direct." >&2; exit 2; }
+fi
 if ((workbench)); then
   [[ -n "$port_override" ]] || port_override="${MAIPAI_WORKBENCH_PORT:-8780}"
   live_resolved="$(resolved_path "$live_root")"

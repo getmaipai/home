@@ -316,6 +316,14 @@ update_main_checkout() {
   echo "$(date -u +%Y-%m-%dT%H:%M:%SZ) main checkout update skipped: $reason" >> "$data/lander.log"
 }
 
+# MODE-01: the operating mode (scripts/lib/mode.sh); unset (the pipeline as before the switch) when the helper or the file is missing.
+lander_mode() {
+  local lib="$main/scripts/lib/mode.sh"
+  [[ -f "$lib" ]] || lib="$checkout/scripts/lib/mode.sh"
+  [[ -f "$lib" ]] || { echo unset; return 0; }
+  ( export MAIPAI_MODE_FILE="${MAIPAI_MODE_FILE:-$main/data-scratch/mode}"; source "$lib"; mode_get )
+}
+
 safety_surface_files() {
   local changed="$1" glob regex file matches=""
   local globs
@@ -919,6 +927,11 @@ PY
     boot_note="$(tail -n 1 "$output" 2>/dev/null || true)"
     entry_label="starts and typechecks on top of main (express: no tests run)"
     [[ "$boot_note" != "boot check: none in this tree" ]] || entry_label="typechecks on top of main (express: no boot check in this tree, no tests run)"
+  fi
+  if [[ -n "$safety_files" && "$(lander_mode)" == direct ]]; then
+    # MODE-01: in DIRECT mode a safety-surface change is not held for its tests; the nightly run covers it (and a red nightly blocks `stable`).
+    landing_note="${landing_note:+$landing_note; }tier: T2; safety-surface tests skipped (DIRECT mode: the nightly runs them)"
+    safety_files=""
   fi
   if [[ -n "$safety_files" ]]; then
     # HOST-GUARD-09: under memory pressure, or while the host guard paused heavy work, the safety tests do not start; the entry is held

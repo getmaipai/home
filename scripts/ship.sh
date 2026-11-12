@@ -83,6 +83,30 @@ elif [[ "${MAIPAI_SKIP_BOOT_CHECK:-}" != 1 && -f scripts/boot-check.sh ]]; then
     echo "ship.sh: this checkout is not at ${sha:0:7}, so the boot check was skipped; run ship.sh from a worktree whose HEAD is the commit (git fetch, then rebase onto origin/main) to get the boot check and skip the watcher wait." >&2
   fi
 fi
+# MODE-01 (scripts/lib/mode.sh). DIRECT: run first, checked after: ship-now before green is allowed (the boot check above still ran). GATED:
+# checked first, then run: no --before-green; the commit needs a watcher green run or to be inside `stable` (the nightly pass), a boot check
+# alone is not enough; a change to a safety surface (the T2 globs of scripts/wt.sh) ships only once `stable` holds it; and the installer's
+# pre-upgrade copy of data/ is the backup that every ship takes (it stays mandatory here). Unset keeps the pipeline as it was.
+ship_mode=unset
+if [[ -f scripts/lib/mode.sh ]]; then source scripts/lib/mode.sh; ship_mode="$(mode_get)"; fi
+if [[ "$ship_mode" == direct ]]; then before_green=1; echo "ship.sh: DIRECT: run first, checked after (ship before green allowed)"; fi
+if [[ "$ship_mode" == gated ]]; then
+  echo "ship.sh: GATED: checked first, then run"
+  (( ! before_green )) || die "GATED: checked first, then run. --before-green is off in gated mode; wait for the watcher's green run or the nightly pass, or switch with bash scripts/mode.sh direct."
+  stable_sha="$(git rev-parse --verify -q 'refs/heads/stable^{commit}' 2>/dev/null || git rev-parse --verify -q 'refs/remotes/origin/stable^{commit}' 2>/dev/null || true)"
+  in_stable=0; [[ -n "$stable_sha" ]] && git merge-base --is-ancestor "$sha" "$stable_sha" 2>/dev/null && in_stable=1
+  if (( ! in_stable )) && [[ ! -f "$watch/green/$sha" ]]; then die "GATED: ${sha:0:7} has no watcher green run and is not in stable (the nightly pass). Wait for the watcher, or switch with bash scripts/mode.sh direct."; fi
+  if (( ! in_stable )) && [[ -n "$stable_sha" ]]; then
+    t2_held="$(python3 - "$(git show "$sha:scripts/wt.sh" 2>/dev/null | sed -n 's/^export WT_T2_GLOBS="\(.*\)"$/\1/p' | head -n 1)" $(git diff --name-only "$stable_sha" "$sha") <<'PY'
+import fnmatch, sys
+globs = sys.argv[1].split()
+print(" ".join(f for f in sys.argv[2:] if any(fnmatch.fnmatch(f, g) for g in globs)))
+PY
+)"
+    [[ -z "$t2_held" ]] || die "GATED: ${sha:0:7} changes a safety surface ($t2_held) that stable does not hold yet; it ships after the nightly pass moves stable past it."
+  fi
+  boot_checked=0
+fi
 if (( ! before_green )) && [[ ! -f "$watch/green/$sha" ]] && [[ "${boot_checked:-0}" != 1 ]]; then die "watcher has no green run for $sha; pass --before-green to ship anyway and record it."; fi
 # The live hub is the install on the Mac Studio. Keep its marker beside the
 # install, not inside it: promotion replaces the install directory. Accept the
