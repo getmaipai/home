@@ -134,3 +134,15 @@ export function orphanVerdict(i: OrphanInput): OrphanVerdict {
   const since = i.orphanSince ?? i.now;
   return { state: i.now - since >= i.graceS ? "orphan-stop" : "orphan-waiting", since };
 }
+
+/** DEV-BUDGET-02: true when the process or any descendant of it uses at least `minCpu` percent of a core right now (ps, no root). */
+export function treeActive(rootPid: number, minCpu = 1): boolean {
+  const out = Bun.spawnSync(["/bin/ps", "-axo", "pid=,ppid=,pcpu="], { stdout: "pipe", stderr: "ignore" }).stdout.toString();
+  const rows = out.split("\n").flatMap((l) => { const m = /^\s*(\d+)\s+(\d+)\s+([\d.]+)/.exec(l); return m ? [{ pid: Number(m[1]), ppid: Number(m[2]), cpu: Number(m[3]) }] : []; });
+  const tree = new Set([rootPid]);
+  for (let grew = true; grew;) { grew = false; for (const r of rows) if (!tree.has(r.pid) && tree.has(r.ppid)) { tree.add(r.pid); grew = true; } }
+  return rows.some((r) => tree.has(r.pid) && r.cpu >= minCpu);
+}
+/** Seconds a development lease may show no activity before the broker releases it (MAIPAI_LEASE_IDLE_S, else MAIPAI_LEASE_IDLE_MIN minutes, default 10). */
+export const leaseIdleS = (): number => { const s = Number(process.env.MAIPAI_LEASE_IDLE_S); if (Number.isFinite(s) && s > 0) return s; const m = Number(process.env.MAIPAI_LEASE_IDLE_MIN); return Number.isFinite(m) && m > 0 ? m * 60 : 600; };
+export const devLeaseFile = (): string => join(stateDir(), "dev-lease.json");

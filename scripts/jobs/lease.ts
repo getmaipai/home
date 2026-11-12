@@ -1,9 +1,11 @@
 #!/usr/bin/env bun
 // HOST-LAUNCH-02: the lease broker for heavy development work (video, images, big test runs).
 //
-//   lease.sh acquire --class dev|family --kind video|image|test|other [--session S] [--whole-machine] [--ttl 4h] [--wait 30m] [--pid N]
+//   lease.sh acquire --class dev|family --kind video|image|test|other [--what "text"] [--session S] [--whole-machine] [--ttl 4h] [--wait 30m] [--pid N]
 //   lease.sh run     --class dev --kind video [--whole-machine] [--timeout 4h] -- <command...>     (acquire, run through job.sh, release)
-//   lease.sh release <id> | check <id> | status | mode
+//   lease.sh release <id> | check <id> | beat <id> | status | mode
+//   A held dev lease with no sign of life for 10 minutes (MAIPAI_LEASE_IDLE_MIN) is released and the next waiter gets it. `beat` is a sign of life; under `run` the
+//   work using CPU is one. A holder whose process is gone is released too.
 //
 // Two classes. `family` is an end-user request: it is never made to wait behind development work. `dev` is a session doing heavy
 // development: dev sessions queue among themselves, first come first served; chat-first never applies between two dev sessions.
@@ -15,12 +17,16 @@
 import { spawnSync } from "node:child_process";
 import { existsSync, mkdirSync, readFileSync, readdirSync, renameSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
-import { alive, audit, ensureDirs, parseDuration, readJobs, reserveReleasedFile, stateDir, writeDevLoad } from "./lib";
+import { alive, audit, devLeaseFile, ensureDirs, leaseIdleS, parseDuration, readJobs, reserveReleasedFile, stateDir, treeActive, writeDevLoad } from "./lib";
 
 const repoRoot = resolve(import.meta.dir, "..", "..");
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 export type Mode = "direct" | "gated";
-export type Lease = { id: string; cls: "dev" | "family"; kind: string; session: string; pid: number; whole: boolean; since: number; until: number; seq: number; yieldRequested?: boolean };
+export type Lease = { id: string; cls: "dev" | "family"; kind: string; session: string; pid: number; whole: boolean; since: number; until: number; seq: number; yieldRequested?: boolean;
+  /** DEV-BUDGET-02: epoch seconds of the last sign of life (`lease.sh beat`, or the work under `lease.sh run` using CPU); a lease idle past leaseIdleS() is released. */
+  beat?: number;
+  /** What the lease is for, in words (shown on the admin Status row and in `lease.sh status`). */
+  what?: string };
 export type Decision = { verdict: "grant" | "wait" | "deny"; why: string };
 
 /** Pure: may this request be granted now, given who holds and who queues ahead of it? */
@@ -117,8 +123,16 @@ function syncReserve(mode: Mode): void {
   writeDevLoad(readJobs());
 }
 
+/** The Status row's source (backend/src/lib/hostGuard.ts reads it): who holds development work on the machine, since when and for what. */
+function writeDevLease(): void {
+  const held = readAll("held").filter((l) => l.cls === "dev").map((l) => ({ session: l.session, kind: l.kind, whole: l.whole, since: l.since, beat: l.beat ?? l.since, ...(l.what ? { what: l.what } : {}) }));
+  const file = devLeaseFile(); ensureDirs(stateDir());
+  writeFileSync(`${file}.tmp`, JSON.stringify({ version: 1, ts: Math.floor(Date.now() / 1000), idle_s: leaseIdleS(), held, waiting: readAll("queue").filter((l) => l.cls === "dev").length }));
+  renameSync(`${file}.tmp`, file);
+}
 function syncFlag(mode: Mode = leaseMode()): void {
   syncReserve(mode);
+  writeDevLease();
   const f = maintenanceFlag();
   const whole = readAll("held").filter((l) => l.cls === "dev" && l.whole);
   try {
@@ -130,6 +144,8 @@ function syncFlag(mode: Mode = leaseMode()): void {
 function reap(mode: Mode): void {
   const now = Date.now() / 1000;
   for (const n of ["held", "queue"]) for (const l of readAll(n)) if (!alive(l.pid) || l.until < now) { drop(n, l.id); au(l, "lease-reaped", !alive(l.pid) ? "holder gone" : "time up"); }
+  // DEV-BUDGET-02: a held development lease that shows no sign of life for the idle time is released and the next waiter gets it (nobody kills anything by hand).
+  for (const l of readAll("held")) if (l.cls === "dev" && now - (l.beat ?? l.since) > leaseIdleS()) { drop("held", l.id); au(l, "lease-reaped", `idle for ${Math.round((now - (l.beat ?? l.since)) / 60)} minutes with no activity`); }
   if (mode === "gated" && (readAll("held").some((l) => l.cls === "family") || hubFamily().length)) for (const l of readAll("held")) if (l.cls === "dev" && !l.yieldRequested) { put("held", { ...l, yieldRequested: true }); au(l, "yield-requested", "family request arrived"); }
   syncFlag(mode);
 }
@@ -147,6 +163,10 @@ function attempt(req: Lease, mode: Mode): Decision {
     return d;
   });
 }
+/** A sign of life from the holder: pushes the idle release back. */
+function beat(id: string): boolean {
+  return withLock(() => { const l = readAll("held").find((x) => x.id === id); if (!l) return false; put("held", { ...l, beat: Date.now() / 1000 }); writeDevLease(); return true; });
+}
 function release(id: string): boolean {
   return withLock(() => { const l = readAll("held").find((x) => x.id === id) ?? readAll("queue").find((x) => x.id === id); if (!l) return false; drop("held", id); drop("queue", id); au(l, "lease-released", "holder done"); syncFlag(); return true; });
 }
@@ -156,7 +176,7 @@ async function acquire(a: string[]): Promise<{ id: string; code: number }> {
   const cls = get("--class") === "family" ? "family" : "dev";
   const mode = leaseMode();
   const now = Date.now() / 1000;
-  const req: Lease = { id: `${Date.now().toString(36)}-${process.pid}-${Math.floor(Math.random() * 1e4)}`, cls, kind: get("--kind") ?? "other", session: get("--session") ?? process.env.MAIPAI_SESSION ?? process.env.CLAUDE_SESSION_ID ?? "unknown", pid: Number(get("--pid")) || process.ppid, whole: a.includes("--whole-machine"), since: now, until: now + parseDuration(get("--ttl") ?? "4h"), seq: Date.now() * 1000 + (process.pid % 1000) };
+  const req: Lease = { id: `${Date.now().toString(36)}-${process.pid}-${Math.floor(Math.random() * 1e4)}`, cls, kind: get("--kind") ?? "other", session: get("--session") ?? process.env.MAIPAI_SESSION ?? process.env.CLAUDE_SESSION_ID ?? "unknown", pid: Number(get("--pid")) || process.ppid, whole: a.includes("--whole-machine"), since: now, beat: now, ...(get("--what") ? { what: get("--what")!.slice(0, 120) } : {}), until: now + parseDuration(get("--ttl") ?? "4h"), seq: Date.now() * 1000 + (process.pid % 1000) };
   const deadline = Date.now() + parseDuration(get("--wait") ?? "30m") * 1000;
   let last = "";
   for (;;) {
@@ -174,11 +194,12 @@ if (import.meta.main) {
   if (sub === "acquire") { const r = await acquire(rest); if (r.id) console.log(r.id); process.exit(r.code); }
   else if (sub === "release") { process.exit(release(rest[0] ?? "") ? 0 : 1); }
   else if (sub === "check") { const l = withLock(() => { reap(leaseMode()); return readAll("held").find((x) => x.id === rest[0]); }); if (!l) { console.log("gone"); process.exit(1); } console.log(l.yieldRequested ? "yield" : "ok"); process.exit(l.yieldRequested ? 10 : 0); }
+  else if (sub === "beat") { const ok = beat(rest[0] ?? ""); console.log(ok ? "ok" : "gone"); process.exit(ok ? 0 : 1); }
   else if (sub === "mode") console.log(leaseMode());
   else if (sub === "status") {
     withLock(() => reap(leaseMode()));
     console.log(`mode: ${leaseMode()}`);
-    for (const l of readAll("held")) console.log(`held   ${l.id}  ${l.cls}/${l.kind}${l.whole ? "/whole-machine" : ""}  ${l.session}${l.yieldRequested ? "  (asked to yield)" : ""}`);
+    for (const l of readAll("held")) console.log(`held   ${l.id}  ${l.cls}/${l.kind}${l.whole ? "/whole-machine" : ""}  ${l.session}${l.what ? `  for: ${l.what}` : ""}  since ${new Date(l.since * 1000).toISOString().slice(11, 16)}Z  last sign of life ${Math.round((Date.now() / 1000 - (l.beat ?? l.since)) / 60)} min ago${l.yieldRequested ? "  (asked to yield)" : ""}`);
     for (const l of readAll("queue").sort((x, y) => x.seq - y.seq)) console.log(`queued ${l.id}  ${l.cls}/${l.kind}  ${l.session}`);
   } else if (sub === "run") {
     const dd = rest.indexOf("--"); if (dd < 0) { console.error("lease.sh run: command after --"); process.exit(2); }
@@ -186,6 +207,8 @@ if (import.meta.main) {
     const r = await acquire([...opts, "--pid", String(process.pid)]); if (r.code) process.exit(r.code);
     const timeout = opts.indexOf("--timeout") >= 0 ? opts[opts.indexOf("--timeout") + 1]! : "4h";
     const child = Bun.spawn(["bun", join(import.meta.dir, "job.ts"), "run", "--type", "other", "--timeout", timeout, "--", ...cmd], { stdio: ["inherit", "inherit", "inherit"] });
-    const code = await child.exited; release(r.id); process.exit(code);
+    // The work using CPU is a sign of life; a quiet job that is still working calls `lease.sh beat <id>` itself.
+    const pulse = setInterval(() => { if (treeActive(child.pid)) beat(r.id); }, Number(process.env.MAIPAI_LEASE_PULSE_MS) || 15_000);
+    const code = await child.exited; clearInterval(pulse); release(r.id); process.exit(code);
   } else { console.error("usage: lease.sh acquire|run|release|check|status|mode (see lease.ts)"); process.exit(2); }
 }

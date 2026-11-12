@@ -102,3 +102,32 @@ export function withDevReaper(view: HostGuardView, report: DevReaper | null, now
   const n = recent.length;
   return { ...view, text: `${view.text} ${n} unused development ${n === 1 ? "server was" : "servers were"} stopped in the last hour to keep this Mac free for the family.` };
 }
+
+/**
+ * DEV-BUDGET-02: the lease broker (scripts/jobs/lease.ts) writes dev-lease.json whenever a development lease is granted, beaten, reaped or
+ * released. The admin Status row says who holds development work on this Mac, since when and what for, so a session that waits knows why
+ * (RULES S6: the existing row, no new banner; family members never see it). A holder whose last sign of life is older than the idle limit
+ * (plus a minute) is not listed, so a file that went stale never keeps a name on the row.
+ */
+export const DevLeaseSchema = z.object({
+  version: z.literal(1), ts: z.number().finite(), idle_s: z.number().finite(), waiting: z.number().finite(),
+  held: z.array(z.object({ session: z.string(), kind: z.string(), whole: z.boolean(), since: z.number().finite(), beat: z.number().finite(), what: z.string().optional() })),
+});
+export type DevLease = z.infer<typeof DevLeaseSchema>;
+export const devLeaseFile = () => join(process.env.MAIPAI_JOBS_DIR ?? join(homedir(), ".local", "state", "maipai", "jobs"), "dev-lease.json");
+export function readDevLease(): DevLease | null {
+  try { return DevLeaseSchema.parse(JSON.parse(readFileSync(devLeaseFile(), "utf8"))); } catch { return null; }
+}
+const LEASE_WORDS: Record<string, string> = { video: "video work", image: "picture work", test: "a test run", build: "a build" };
+export function withDevLease(view: HostGuardView, report: DevLease | null, now = Date.now()): HostGuardView {
+  if (!report) return view;
+  const live = report.held.filter((h) => h.beat >= Math.floor(now / 1000) - report.idle_s - 60);
+  if (!live.length) return view;
+  const parts = live.map((h) => {
+    const what = h.what ?? (h.whole ? "work that takes the whole Mac" : LEASE_WORDS[h.kind] ?? "development work");
+    const since = new Date(h.since * 1000).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+    return `${h.session} (${what}) since ${since}`;
+  });
+  const waiting = report.waiting > 0 ? ` ${report.waiting} more ${report.waiting === 1 ? "session is" : "sessions are"} waiting.` : "";
+  return { ...view, text: `${view.text} Development work holds this Mac: ${parts.join("; ")}.${waiting} It is released on its own after ${Math.round(report.idle_s / 60)} idle minutes.` };
+}

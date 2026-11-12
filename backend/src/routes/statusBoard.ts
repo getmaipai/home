@@ -12,7 +12,7 @@ import { buildStatusHistory, chatPauseSummary } from "@/lib/statusHistory";
 import { engineCrashSummary } from "@/lib/stackSelfHeal";
 import { readStackMemoryLedger } from "@/lib/stackHealthSync";
 import { readResourceDay } from "@/lib/resourceDay";
-import { hostGuardInstalled, hostGuardStatusView, readHostGuardMemory, readDevReaper, readHostGuardStatus, withDevReaper, withHostGuardMemory } from "@/lib/hostGuard";
+import { hostGuardInstalled, hostGuardStatusView, readHostGuardMemory, readDevLease, readDevReaper, readHostGuardStatus, withDevLease, withDevReaper, withHostGuardMemory } from "@/lib/hostGuard";
 import { isOwnerOrAdmin } from "@/lib/access";
 
 export const statusBoardRoutes = apiRouter();
@@ -46,7 +46,7 @@ statusBoardRoutes.openapi(historyRoute, async (c) => {
   const person = c.get("person");
   const admin = isOwnerOrAdmin(person);
   const [memoryLedger, resourceDay] = admin ? await Promise.all([readStackMemoryLedger(), readResourceDay()]) : [];
-  const hostGuard = admin ? withDevReaper(withHostGuardMemory(hostGuardStatusView(readHostGuardStatus(), hostGuardInstalled()), readHostGuardMemory()), readDevReaper()) : undefined;
+  const hostGuard = admin ? withDevLease(withDevReaper(withHostGuardMemory(hostGuardStatusView(readHostGuardStatus(), hostGuardInstalled()), readHostGuardMemory()), readDevReaper()), readDevLease()) : undefined;
   return c.json({ ...buildStatusHistory(days), chat_pauses: chatPauseSummary(), engine_crashes: engineCrashSummary(), ...(memoryLedger ? { memory_ledger: memoryLedger } : {}), ...(resourceDay ? { resource_day: resourceDay } : {}), ...(hostGuard ? { host_guard: hostGuard } : {}) }, 200);
 });
 

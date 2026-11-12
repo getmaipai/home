@@ -154,6 +154,18 @@ describe("dev budget (DEV-BUDGET-01)", () => {
     expect(a.filter((x) => x === "cold-restarted")).toHaveLength(2);
     expect(r.exitCode).toBe(143); expect(a).toContain("captured-and-stopped");
   }, 30000);
+  test("DEV-BUDGET-02: memory held by a descendant that left the process group counts against the hub cap, and a stop kills it too", async () => {
+    const e = env({ MAIPAI_JOBS_MAX_RESTARTS: "1" });
+    const pidFile = join(e.MAIPAI_JOBS_DIR, "engine.pid");
+    // The parent plays a dev hub that starts its own engine in a new session (detached: its own group), holding about 300 MB.
+    const code = `const c = Bun.spawn(["bun","-e","const b = Buffer.alloc(300*1024*1024, 1); setInterval(() => b[0]++, 1000)"], { detached: true, stdio: ["ignore","ignore","ignore"] }); await Bun.write(${JSON.stringify(pidFile)}, String(c.pid)); setInterval(() => {}, 1000)`;
+    const r = job(e, "run", "--type", "server", "--lifetime", "1m", "--max-rss-mb", "200", "--restart-over-cap", "--", "bun", "-e", code);
+    const a = actions(e).map((x) => x.action);
+    expect(a).toContain("cold-restarted"); expect(a).toContain("captured-and-stopped"); expect(r.exitCode).toBe(143);
+    const enginePid = Number(readFileSync(pidFile, "utf-8"));
+    await Bun.sleep(500);
+    expect(alive(enginePid)).toBe(false);
+  }, 40000);
   test("the launcher publishes what development holds for the Stack's governor", () => {
     const e = env({ MAIPAI_DEV_BUDGET_GB: "7" });
     job(e, "run", "--type", "server", "--lifetime", "2", "--", "sleep", "30");

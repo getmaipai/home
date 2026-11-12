@@ -85,6 +85,21 @@ through the launcher, releases. Or `acquire --pid <long-lived pid>` / `release <
   broker reads it (the live install's `data/local-app` and `$MAIPAI_DATA_DIR`) as one synthetic family lease: in gated mode dev leases
   wait for it and held ones are told to yield. It never queues, caps or slows a turn, and a failed write is ignored. In direct mode it
   changes nothing.
+- **Idle release (DEV-BUDGET-02, 2026-11-12).** A held dev lease with no sign of life for 10 minutes (`MAIPAI_LEASE_IDLE_MIN`, or
+  `MAIPAI_LEASE_IDLE_S`) is released by the broker and the next waiter gets it; nobody kills anything by hand. Reason: a session held a
+  24 GB dev instance unused and another session had to kill it. A sign of life is `lease.sh beat <id>`, or, under `lease.sh run`, the
+  work (the command and everything it started) using CPU (checked every 15 s). A quiet job that is still working calls `beat`. Because
+  the heavy lease is what releases the dev reserve in direct mode, releasing it also gives the reserve back. `acquire --what "text"` says
+  what the lease is for. Tests: `scripts/jobs/lease.test.ts`.
+- **Status.** The broker writes `jobs/dev-lease.json` (holders with session, kind, what, since, last sign of life; how many wait). The
+  admin Status row (the existing host row, no new banner; family members never see it) reads it: "Development work holds this Mac:
+  <session> (<what>) since <time>; N more sessions are waiting. It is released on its own after 10 idle minutes." `lease.sh status`
+  prints the same facts. A holder past its idle limit is not listed, so a stale file never keeps a name on the row.
+- **Heavy dev hubs (DEV-BUDGET-02).** A hub's cap counts its whole process tree, not only its process group: on 2026-11-12 a dev hub's
+  own engine, started in a group of its own, held 24 GB while the launcher saw 2 GB. `groupProcs` in `job.ts` now adds every descendant
+  of the group, and a cold restart or stop kills those too. A hub that starts its own engine over the cap is therefore restarted cold
+  (the engine goes with it) like any other, and the heavy work itself belongs under `lease.sh run` with the idle release. An engine
+  re-parented to launchd (its hub died first) is out of reach of the launcher; the orphan reaper covers hubs, not engines.
 
 ## The end-user line: "Chat is unavailable while the system upgrades."
 

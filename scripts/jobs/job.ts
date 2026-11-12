@@ -23,22 +23,31 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 const num = (v: string | undefined, d: number) => (v !== undefined && Number.isFinite(Number(v)) ? Number(v) : d);
 const TICK_MS = num(process.env.MAIPAI_JOBS_TICK_MS, 2000);
 
-/** pids of one process group with their RSS in MB, from ps (the launcher's own view, no root needed). */
-function groupProcs(pgid: number): Array<{ pid: number; rssMb: number; cpu: number; line: string }> {
-  const out = spawnSync("/bin/ps", ["-axo", "pid=,pgid=,rss=,pcpu=,etime=,command="], { encoding: "utf-8" }).stdout ?? "";
-  const procs: Array<{ pid: number; rssMb: number; cpu: number; line: string }> = [];
+/**
+ * pids of one job with their RSS in MB, from ps (the launcher's own view, no root needed): its process group plus every descendant of
+ * it, even one that left the group (DEV-BUDGET-02, 2026-11-12: an engine a dev hub started in its own group held 24 GB and escaped the
+ * 2 GB hub cap, because only the group was counted). A process that has been re-parented to launchd is out of reach.
+ */
+export function groupProcs(pgid: number): Array<{ pid: number; rssMb: number; cpu: number; line: string; outside: boolean }> {
+  const out = spawnSync("/bin/ps", ["-axo", "pid=,ppid=,pgid=,rss=,pcpu=,etime=,command="], { encoding: "utf-8" }).stdout ?? "";
+  const all: Array<{ pid: number; ppid: number; pg: number; rssMb: number; cpu: number; line: string }> = [];
   for (const line of out.split("\n")) {
-    const m = /^\s*(\d+)\s+(\d+)\s+(\d+)\s+([\d.]+)\s+(\S+)\s+(.*)$/.exec(line);
-    if (m && Number(m[2]) === pgid) procs.push({ pid: Number(m[1]), rssMb: Number(m[3]) / 1024, cpu: Number(m[4]), line: line.trim() });
+    const m = /^\s*(\d+)\s+(\d+)\s+(\d+)\s+(\d+)\s+([\d.]+)\s+(\S+)\s+(.*)$/.exec(line);
+    if (m) all.push({ pid: Number(m[1]), ppid: Number(m[2]), pg: Number(m[3]), rssMb: Number(m[4]) / 1024, cpu: Number(m[5]), line: line.trim() });
   }
-  return procs;
+  const members = new Set(all.filter((p) => p.pg === pgid).map((p) => p.pid));
+  const inGroup = new Set(members);
+  for (let grew = true; grew;) { grew = false; for (const p of all) if (!members.has(p.pid) && members.has(p.ppid) && p.pid !== process.pid) { members.add(p.pid); grew = true; } }
+  return all.filter((p) => members.has(p.pid)).map((p) => ({ pid: p.pid, rssMb: p.rssMb, cpu: p.cpu, line: p.line, outside: !inGroup.has(p.pid) }));
 }
 const killGroup = (pgid: number, sig: NodeJS.Signals) => { try { process.kill(-pgid, sig); } catch { /* already gone */ } };
+const killPids = (pids: number[], sig: NodeJS.Signals) => { for (const p of pids) { try { process.kill(p, sig); } catch { /* already gone */ } } };
 
 async function stopGroup(pgid: number): Promise<void> {
-  killGroup(pgid, "SIGCONT"); killGroup(pgid, "SIGTERM");
+  const strays = groupProcs(pgid).filter((p) => p.outside).map((p) => p.pid);
+  killGroup(pgid, "SIGCONT"); killPids(strays, "SIGCONT"); killGroup(pgid, "SIGTERM"); killPids(strays, "SIGTERM");
   for (let i = 0; i < 20 && groupProcs(pgid).length; i++) await sleep(250);
-  killGroup(pgid, "SIGKILL");
+  killGroup(pgid, "SIGKILL"); killPids(strays, "SIGKILL");
 }
 
 function freeDiskGb(path: string): number { try { const s = statfsSync(path); return (Number(s.bavail) * Number(s.bsize)) / 1e9; } catch { return 1e6; } }

@@ -40,3 +40,16 @@ test("DEV-REAPER-01: the admin row says unused development servers were stopped 
   expect(withDevReaper(view, { version: 1, ts: at, waiting: 0, stopped: [{ ts: at - 60, worktree: "/a" }, { ts: at - 90, worktree: "/b" }] }, now).text).toContain("2 unused development servers were stopped");
   expect(one).not.toMatch(/memory|RAM/i);
 });
+
+test("DEV-BUDGET-02: the admin row names who holds a development lease, since when and what for, and drops a holder that went stale", async () => {
+  const { withDevLease } = await import("./hostGuard");
+  const now = 1_800_000_000_000; const at = now / 1000;
+  const view = hostGuardView(base as never);
+  const held = { session: "speed-loop", kind: "video", whole: false, since: at - 300, beat: at - 30, what: "LTX clip bench" };
+  expect(withDevLease(view, null, now)).toEqual(view);
+  const row = withDevLease(view, { version: 1, ts: at, idle_s: 600, waiting: 1, held: [held] }, now).text;
+  expect(row).toContain("speed-loop (LTX clip bench) since"); expect(row).toContain("1 more session is waiting"); expect(row).toContain("after 10 idle minutes");
+  expect(row).not.toMatch(/memory|RAM/i);
+  expect(withDevLease(view, { version: 1, ts: at, idle_s: 600, waiting: 0, held: [{ ...held, beat: at - 3000 }] }, now)).toEqual(view);
+  expect(withDevLease(view, { version: 1, ts: at, idle_s: 600, waiting: 0, held: [{ ...held, what: undefined, kind: "image" }] }, now).text).toContain("(picture work)");
+});

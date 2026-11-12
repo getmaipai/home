@@ -100,6 +100,33 @@ describe("broker CLI", () => {
     lease(g, "acquire", "--session", "v", "--kind", "video", "--pid", me);
     expect(existsSync(join(e.MAIPAI_JOBS_DIR, "reserve-released"))).toBe(false);
   });
+  // DEV-BUDGET-02 (2026-11-12): a session held a 24 GB dev instance unused and another session had to kill it by hand. Now an idle lease is released by the broker.
+  test("a held dev lease that shows no sign of life is released by the broker, the waiter gets it, and the reserve follows the new holder", async () => {
+    const e = env({ MAIPAI_DEV_BUDGET_GB: "24", MAIPAI_LEASE_IDLE_S: "2" });
+    const first = out(lease(e, "acquire", "--session", "idle-holder", "--kind", "video", "--what", "LTX clip bench", "--pid", me));
+    const second = Bun.spawn(["bun", LEASE, "acquire", "--session", "waiter", "--kind", "video", "--pid", me, "--wait", "30"], { env: e, stdout: "pipe", stderr: "pipe" });
+    await Bun.sleep(700);
+    const status = JSON.parse(readFileSync(join(e.MAIPAI_JOBS_DIR, "dev-lease.json"), "utf-8")) as { held: Array<{ session: string; kind: string; what?: string; since: number }>; waiting: number };
+    expect(status.held[0]).toMatchObject({ session: "idle-holder", kind: "video", what: "LTX clip bench" }); expect(status.waiting).toBe(1);
+    expect(await second.exited).toBe(0); // granted without anyone releasing or killing anything
+    expect(existsSync(join(e.MAIPAI_JOBS_DIR, "reserve-released"))).toBe(true); // the reserve follows the new holder
+    const a = withDir(e, () => readAudit());
+    expect(a.some((x) => x.session === "idle-holder" && x.action === "lease-reaped" && /idle/.test(x.trigger))).toBe(true);
+    expect(lease(e, "beat", first).exitCode).toBe(1); // the old holder's lease is gone
+    expect(a.some((x) => x.session === "waiter" && x.action === "lease-granted")).toBe(true);
+    expect(out(lease(e, "status"))).not.toContain("idle-holder");
+  }, 20000);
+  test("a sign of life (beat) keeps a lease; a holder whose process is gone is released at once", async () => {
+    const e = env({ MAIPAI_LEASE_IDLE_S: "2" });
+    const id = out(lease(e, "acquire", "--session", "busy", "--kind", "video", "--pid", me));
+    for (let i = 0; i < 4; i++) { await Bun.sleep(1000); expect(lease(e, "beat", id).exitCode).toBe(0); }
+    expect(out(lease(e, "status"))).toContain("busy");
+    const dead = Bun.spawn(["true"]); await dead.exited;
+    const e2 = env();
+    lease(e2, "acquire", "--session", "gone", "--kind", "video", "--pid", String(dead.pid));
+    expect(out(lease(e2, "status"))).not.toContain("gone");
+    expect(withDir(e2, () => readAudit()).some((x) => x.session === "gone" && x.trigger === "holder gone")).toBe(true);
+  }, 20000);
   test("gated mode: whole-machine is refused, and a held dev lease is told to yield when a family request arrives", () => {
     const e = env({ MAIPAI_DEV_MODE: "gated" });
     expect(lease(e, "acquire", "--whole-machine", "--pid", me).exitCode).toBe(3);
