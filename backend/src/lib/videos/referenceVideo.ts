@@ -22,6 +22,7 @@ import { ltx25MaxReady } from "./quality";
 import { videoEngineStatus, videoMaxNotReadyReason } from "./ready";
 import { videoAudienceOf, type GenerateVideoState } from "./tool";
 import { VIDEO_FAILED_PREFIX, activeVideoJobsFor, doneVideoJobsFor, getVideoJobFor, startVideoEditJob, type EditRun, type ReferenceRecipe, type VideoJob } from "./jobs";
+import { fullViewForJob } from "@/lib/stack/fullView";
 import { fetchClip, getVideoJob as getStackVideoJob, StackVideoError, submitVideoIngredients } from "./stack";
 import { checkPictureIsSheet, describeProvidedSheet, fitToSheetSize, type SheetCheck } from "./referenceSheetCheck";
 import { REFERENCE_PHASE } from "./phaseLabel";
@@ -167,7 +168,9 @@ function loadSheetFiles(actor: PersonRow, ids: readonly string[]): Uint8Array[] 
 }
 
 /** The Stack work of one video from sheets. It never throws: a failure is one plain line. */
-function runIngredients(sheets: Uint8Array[], recipe: ReferenceRecipe): EditRun {
+function runIngredients(sheets: Uint8Array[], recipe: ReferenceRecipe, actor: PersonRow): EditRun {
+  // The job is sent as adult (this tool is adult-only), and the Stack answers an adult job's status and clip only with the full-view grant: without it the finished job read back as empty.
+  const view = fullViewForJob("adult", actor);
   const failed = (why: string) => `${VIDEO_FAILED_PREFIX} ${why}`;
   const lineOf = (error: unknown) => error instanceof StackVideoError ? failed(error.message) : failed("It did not finish. Try again.");
   return async (signal, onProgress) => {
@@ -180,11 +183,11 @@ function runIngredients(sheets: Uint8Array[], recipe: ReferenceRecipe): EditRun 
       form.set("audience", "adult");
       form.set("timeout_ms", "1");
       const submitted = await submitVideoIngredients(form);
-      const read = async (clip: { seconds?: number | null; width?: number | null; height?: number | null; audio?: boolean; ms?: number }) => ({ ok: true as const, clip: { video: await fetchClip(submitted.job), seconds: clip.seconds ?? null, width: clip.width ?? null, height: clip.height ?? null, audio: clip.audio === true, ms: clip.ms ?? 0 } });
+      const read = async (clip: { seconds?: number | null; width?: number | null; height?: number | null; audio?: boolean; ms?: number }) => ({ ok: true as const, clip: { video: await fetchClip(submitted.job, view), seconds: clip.seconds ?? null, width: clip.width ?? null, height: clip.height ?? null, audio: clip.audio === true, ms: clip.ms ?? 0 } });
       if (submitted.done?.[0]?.url) return await read(submitted.done[0]);
       for (;;) {
         if (signal.aborted) return { ok: false, line: failed("It did not finish. Try again.") };
-        const job = await getStackVideoJob(submitted.job);
+        const job = await getStackVideoJob(submitted.job, view);
         if (job.state === "failed" || job.state === "cancelled") {
           const known = job.code && Object.prototype.hasOwnProperty.call(INGREDIENTS_FAILURE_COPY, job.code) ? INGREDIENTS_FAILURE_COPY[job.code as keyof typeof INGREDIENTS_FAILURE_COPY] : null;
           return { ok: false, line: failed(known ?? "It did not finish. Try again.") };
@@ -208,7 +211,7 @@ function startFromRecipe(actor: PersonRow, context: Context, recipe: ReferenceRe
   const now = new Date().toISOString();
   const source: VideoJob = { id: from, personId: actor.id, conversationId: context.conversationId, turnId: context.turnId, companionId: null, kind: "edit", state: "done", stackJob: null, percent: 100, phase: null, position: null, prompt: recipe.prompt,
     request: { size: "768x448", seconds: recipe.seconds, seed: recipe.seed, loras: [], source_file_id: null, audience: "adult" }, error: null, files: [], temporary: false, createdAt: now, updatedAt: now };
-  const started = startVideoEditJob({ actor, conversationId: context.conversationId, turnId: context.turnId, temporary: false, source, edit: { from, change: "ingredients" }, run: runIngredients(bytes, recipe), phase: REFERENCE_PHASE, adultOnly: false, request: { reference: recipe, quality: "detailed", tier: "max" } });
+  const started = startVideoEditJob({ actor, conversationId: context.conversationId, turnId: context.turnId, temporary: false, source, edit: { from, change: "ingredients" }, run: runIngredients(bytes, recipe, actor), phase: REFERENCE_PHASE, adultOnly: false, request: { reference: recipe, quality: "detailed", tier: "max" } });
   return started.ok ? { ok: true, job: started.job } : { ok: false, line: started.line };
 }
 

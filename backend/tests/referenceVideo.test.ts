@@ -115,7 +115,15 @@ beforeEach(() => {
       fake.jobs.push(job as never);
       return new Response(JSON.stringify({ created: 1, job: job.id, data: [] }), { status: 202, headers: { "content-type": "application/json" } });
     }
-    return base(input as never, init);
+    // The real Stack answers an adult job's status without its result unless the call carries the full-view header (ADULT-LOCK-04): the ingredients
+    // job is sent as adult, so a read-back that forgets the header sees a finished job with no clip (seen live 2026-11-12, "could not be read back").
+    const response = await base(input as never, init);
+    const isStatus = (init?.method ?? "GET").toUpperCase() === "GET" && /^\/v1\/videos\/generations\/[^/]+$/.test(url.pathname);
+    if (isStatus && ingredients.length > 0 && !new Headers(init?.headers).get("x-maipai-view")) {
+      const body = await response.clone().json().catch(() => null) as { data?: unknown[] } | null;
+      if (body && Array.isArray(body.data)) return new Response(JSON.stringify({ ...body, data: [] }), { status: response.status, headers: { "content-type": "application/json" } });
+    }
+    return response;
   }) as unknown as typeof fetch);
 });
 afterEach(async () => {
