@@ -5,6 +5,7 @@
 import sharp, { type OverlayOptions } from "sharp";
 import type { PictureRole } from "@/lib/pictures/roles";
 import { runPictureTool } from "@/lib/pictures/people";
+import { readPictureRoles } from "@/lib/pictures/roles";
 import { detectFaces } from "@/lib/pictures/likeness/faces";
 import { drawViews, type ViewTools } from "./sheetViews";
 
@@ -14,12 +15,19 @@ export interface SheetTools {
   removeBackground(bytes: Uint8Array, mediaType: string): Promise<Uint8Array>;
   /** Boxes of the faces in the picture, in its own pixels (empty when none is found or the finder is unavailable). */
   findFaces(bytes: Uint8Array, mediaType: string): Promise<Array<{ x: number; y: number; w: number; h: number }>>;
+  /** Optional: a plain name and look for one picture (used for each person of a split photo, so every panel says who is in it). */
+  describe?(bytes: Uint8Array, mediaType: string): Promise<{ name: string; look: string } | null>;
 }
 export interface MadeSheet { png: Uint8Array; description: string; panels: Array<{ name: string; view: string; slot: string }> }
 
 export const SHEET_W = 768, SHEET_H = 448, PLACE_W = 288, GAP = 2, MAX_PLACES = 2;
 const realTools: SheetTools = {
   async removeBackground(bytes, mediaType) { return (await runPictureTool("remove_background", bytes, mediaType, {})).png; },
+  async describe(bytes) {
+    const read = await readPictureRoles([bytes]);
+    const first = read.ok ? read.readings[0] : undefined;
+    return first ? { name: first.name, look: first.look } : null;
+  },
   async findFaces(bytes) {
     const png = new Uint8Array(await sharp(Buffer.from(bytes)).png().toBuffer());
     const found = await detectFaces(png);
@@ -27,7 +35,7 @@ const realTools: SheetTools = {
   },
 };
 
-type Panel = { kind: "subject" | "place"; name: string; view: string; role: PictureRole; look: string; image: Buffer; onWhite: boolean };
+type Panel = { kind: "subject" | "place"; /** Known to hold exactly one person (found by the face finder and cut to that face's share): the only kind of person panel a view is ever drawn from. */ single?: boolean; name: string; view: string; role: PictureRole; look: string; image: Buffer; onWhite: boolean };
 const white = (w: number, h: number) => sharp({ create: { width: w, height: h, channels: 3, background: "white" } });
 
 /** Cuts the subject out of its photo and trims the empty margin; the photo itself comes back when no cut-out can be made. */
@@ -71,12 +79,15 @@ async function panelsFor(picture: SheetPicture, tools: SheetTools): Promise<Pane
       const right = next ? Math.round((centre + next.x + next.w / 2) / 2) : Math.min(width, Math.round(centre + face.w * 2.4));
       const top = Math.max(0, Math.round(face.y - face.h * 0.9));
       const box = { x: left, y: top, w: Math.max(8, right - left), h: Math.max(8, height - top) };
-      panels.push({ ...base, name, kind: "subject", view: "Front View", image: await cutOut(picture, tools, box), onWhite: true });
+      const image = await cutOut(picture, tools, box);
+      // A photo of several people: each person is described on their own cut-out, so a panel never says "a man and a woman".
+      const own = faces.length > 1 ? await tools.describe?.(new Uint8Array(image), "image/png").catch(() => null) ?? null : null;
+      panels.push({ ...base, name: own?.name ? `${own.name}` : name, look: own?.look ?? base.look, kind: "subject", single: true, view: "Front View", image, onWhite: true });
       // A face that already fills the picture needs no close-up; a smaller one gets its own, cut from the original with room for the whole head.
       if (face.w / box.w < 0.3) {
         const fx = Math.max(0, Math.round(face.x - face.w * 0.7)), fy = Math.max(0, Math.round(face.y - face.h * 0.8));
         const faceBox = { x: fx, y: fy, w: Math.min(width - fx, Math.round(face.w * 2.4)), h: Math.min(height - fy, Math.round(face.h * 2.3)) };
-        panels.push({ ...base, name, kind: "subject", view: "Face Close-up", image: await cutOut(picture, tools, faceBox), onWhite: true });
+        panels.push({ ...base, name: panels[panels.length - 1]!.name, look: panels[panels.length - 1]!.look, kind: "subject", single: true, view: "Face Close-up", image: await cutOut(picture, tools, faceBox), onWhite: true });
       }
     }
     return panels;
@@ -93,11 +104,10 @@ export async function makeSheetFromPictures(pictures: ReadonlyArray<SheetPicture
   const all = (await Promise.all(pictures.map((picture) => panelsFor(picture, tools)))).flat();
   // Views the photos do not show (a side view, a clean front, an angled object) are drawn from the person's own cut-out and added after the originals.
   if (options.drawViews) {
-    for (const picture of pictures) {
-      const original = all.find((panel) => panel.kind === "subject" && panel.view === "Front View" && panel.look === picture.look && panel.role === picture.role);
-      if (!original) continue;
-      const drawn = await drawViews(picture.role, { bytes: new Uint8Array(original.image), mediaType: "image/png" }, options.viewTools).catch(() => []);
-      for (const view of drawn) all.push({ kind: "subject", name: original.name, view: view.view, role: picture.role, look: picture.look, image: Buffer.from(view.image), onWhite: true });
+    // One panel at a time: a person is drawn only from a panel that holds exactly one person (never from a photo the face finder could not split).
+    for (const original of all.filter((panel) => panel.kind === "subject" && panel.view === "Front View" && (panel.role !== "actor" || panel.single === true))) {
+      const drawn = await drawViews(original.role, { bytes: new Uint8Array(original.image), mediaType: "image/png" }, options.viewTools).catch(() => []);
+      for (const view of drawn) all.push({ kind: "subject", single: original.single, name: original.name, view: view.view, role: original.role, look: original.look, image: Buffer.from(view.image), onWhite: true });
     }
   }
   const subjects = all.filter((panel) => panel.kind === "subject").slice(0, 8), places = all.filter((panel) => panel.kind === "place").slice(0, MAX_PLACES);
