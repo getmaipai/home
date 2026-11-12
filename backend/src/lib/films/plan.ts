@@ -184,6 +184,7 @@ async function planFilmUnheld(input: PlanFilmInput, complete: PlannerCompleter):
         if (attempt < limit - 1) { errors = `one shot must show ${hero.person.name} holding ${hero.product.name} at ${hero.place.name}, naming all three in that shot's still text`; limit = Math.max(limit, 2); continue; }
         plan = withHeroScene(plan, hero);
       }
+      plan = bindSuppliedPictures(plan, input.castHints);
       if (fits) return { ok: true, plan: fitPlanToLength(plan, input.targetSeconds!) };
       const tooLong = durationError(plan, input);
       if (tooLong && attempt < 1) { errors = tooLong; continue; }
@@ -194,6 +195,34 @@ async function planFilmUnheld(input: PlanFilmInput, complete: PlannerCompleter):
   } catch {
     return { ok: false, line: REFUSAL_LINE };
   }
+}
+
+/** FILM-REAL-06: every picture the person supplied must reach a shot. The planner is asked to name each picture in a shot, and a model that writes its own
+ *  description of the factory floor instead leaves the photo unused (the film then shows a drawn factory, not theirs). Enforced in code for any film: a supplied
+ *  picture's cast entry that no shot names is put on the unclaimed shot whose text shares the most words with its look (the earliest on a tie). A hidden
+ *  reveal picture is left alone, and a film with no supplied pictures is returned as it is. */
+export function bindSuppliedPictures(plan: FilmPlan, castHints: string[] | undefined): FilmPlan {
+  const supplied = new Set((castHints ?? []).map((hint) => hint.split(" (")[0]!.trim().toLocaleLowerCase()).filter(Boolean));
+  if (!supplied.size) return plan;
+  const words = (text: string) => new Set(text.toLocaleLowerCase().split(/[^a-z0-9]+/).filter((word) => word.length >= 4));
+  const names = plan.cast.filter((member) => supplied.has(member.name.trim().toLocaleLowerCase()));
+  const claimed = new Set<number>();
+  plan.shots.forEach((shot, i) => { if (names.some((member) => shot.still.toLocaleLowerCase().includes(member.name.toLocaleLowerCase()))) claimed.add(i); });
+  const shots = plan.shots.map((shot) => ({ ...shot }));
+  for (const member of names) {
+    if (member.reveal_last === true || plan.shots.some((shot) => shot.still.toLocaleLowerCase().includes(member.name.toLocaleLowerCase()))) continue;
+    const look = words(`${member.name} ${member.locked}`);
+    let best = -1, bestScore = -1;
+    shots.forEach((shot, i) => {
+      if (claimed.has(i) || i === shots.length - 1) return;
+      const score = [...words(shot.still)].filter((word) => look.has(word)).length;
+      if (score > bestScore) { best = i; bestScore = score; }
+    });
+    if (best < 0) continue;
+    claimed.add(best);
+    shots[best] = { ...shots[best]!, still: `${member.name}: ${shots[best]!.still}`.slice(0, 600) };
+  }
+  return { ...plan, shots };
 }
 
 /** LENGTH-01: a film with a length asked fits it in code, not by the model's arithmetic: the shots (their count when it cannot fit, then their seconds) add up to

@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, test } from "bun:test";
 import { filmOverhead, SEAM_SECONDS } from "@/lib/videos/editPlan";
 import { z } from "zod";
-import { __setFilmPlanCompleterForTests, FILM_PLAN_PROMPT, FILM_PLAN_RESPONSE_FORMAT, filmPlanSchema, fitPlanToLength, holdBackReveals, missingHeroScene, planFilm, shotsFor, type FilmPlan } from "@/lib/films/plan";
+import { __setFilmPlanCompleterForTests, FILM_PLAN_PROMPT, FILM_PLAN_RESPONSE_FORMAT, filmPlanSchema, bindSuppliedPictures, fitPlanToLength, holdBackReveals, missingHeroScene, planFilm, shotsFor, type FilmPlan } from "@/lib/films/plan";
 
 const productionShot = z.object({ id: z.string().min(1).max(80), subject_ids: z.array(z.string()), clip_file_id: z.string().nullable().optional(), picture_file_id: z.string().nullable().optional(), music_line_id: z.string().nullable().optional(), voice_line_id: z.string().nullable().optional() });
 const goodPlan: FilmPlan = {
@@ -168,5 +168,21 @@ describe("film planner", () => {
       { ...goodPlan.shots[0]!, id: "f3", still: "The white ceramic mug on a wooden table." },
     ] };
     expect(holdBackReveals(plan).shots[0]!.still).toContain("unglazed mugs");
+  });
+});
+
+describe("FILM-REAL-06 supplied pictures reach a shot", () => {
+  const base = (stills: string[]) => ({ title: "T", summary: "S", cast: [{ name: "Ceramic mugs on conveyor", kind: "prop" as const, locked: "Rows of unglazed ceramic mugs on a long conveyor in a bright indoor factory with machines." }, { name: "Man in apron", kind: "character" as const, locked: "A man in a gray apron." }], shots: stills.map((still, i) => ({ id: `shot-${i + 1}`, subject_ids: [], framing: "wide", still, motion: "push in", seconds: 5 })), music: "Soft piano.", credits: [] });
+  test("a picture no shot names is put on the shot that describes it", () => {
+    const plan = bindSuppliedPictures(base(["A wide shot inside a modern factory with a long conveyor of ceramic mugs.", "A close shot of robotic arms working.", "Closing wide."]) as never, ["Ceramic mugs on conveyor (set; photograph): rows of mugs", "Man in apron (actor; photograph): a man"]);
+    expect(plan.shots[0]!.still.startsWith("Ceramic mugs on conveyor: ")).toBe(true);
+    expect(plan.shots[1]!.still.startsWith("Man in apron: ")).toBe(true);
+    expect(plan.shots[2]!.still).toBe("Closing wide.");
+  });
+  test("a film with no supplied pictures is unchanged, and a picture already named stays where it is", () => {
+    const plain = base(["One.", "Two shots here.", "Three."]);
+    expect(bindSuppliedPictures(plain as never, undefined)).toBe(plain as never);
+    const named = bindSuppliedPictures(base(["Intro.", "Ceramic mugs on conveyor roll by.", "End."]) as never, ["Ceramic mugs on conveyor (set; photograph): rows"]);
+    expect(named.shots.map((shot) => shot.still)).toEqual(["Intro.", "Ceramic mugs on conveyor roll by.", "End."]);
   });
 });
