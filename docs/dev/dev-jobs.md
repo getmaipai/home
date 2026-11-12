@@ -46,10 +46,10 @@ because idle dev pages looked reclaimable. The launcher now has callers, and dev
   24 h, workbench 30 d, audit line), `bash scripts/wt.sh check` (`--type test`, 45 min, `MAIPAI_CHECK_TIMEOUT`), and every standalone
   `scripts/gate/shardTests.ts` run (the lander, the watcher, the nightly: `--type test`, 90 min, `MAIPAI_GATE_JOB_TIMEOUT`). A run already
   inside a job (`MAIPAI_JOB_ID` is set, for example `check.sh` under `wt.sh check`) is not wrapped twice. `MAIPAI_JOBS_OFF=1` skips all of it.
-- **One budget:** `MAIPAI_DEV_BUDGET_GB` (default 24) is the memory every launcher-run server may hold together. A server start that does not
+- **One budget, in plain words:** `MAIPAI_DEV_BUDGET_GB` (default 24) is a reserve for ordinary dev tooling (dev hubs, tests, builds). It is NOT a cap on big jobs: picture and video jobs a dev session asks for (LTX video, 61.5 GB) go through the lease broker and the Stack's own admission and are never limited by it. The only thing the Stack does with it is subtract it when it admits work. In DIRECT mode a heavy dev lease (video, images or whole machine) first stops dev hubs nobody has a browser on (they restart on the next `dev.sh start`), then writes `reserve_gb: 0` to `dev-load.json` (audit `reserve-released`), so the Stack may take that room; when the lease ends the reserve returns (`reserve-restored`). In GATED mode nothing is released: the family floor wins. Inside the launcher, the budget holds the dev servers together. A server start that does not
   fit is refused at once with the reason and exit 75 (`--no-wait`; dev.sh shows the line from its log). Servers do not count against the
   concurrency cap or the CPU limit; tests and builds are not held by the budget. The launcher writes `jobs/dev-load.json`
-  (`{version, ts, budget_gb, used_gb}`) every tick; the Stack's governor reads it and subtracts the budget (Stack `lib/devBudget.ts`).
+  (`{version, ts, budget_gb, reserve_gb, used_gb}`) every tick; the Stack's governor reads it and subtracts the budget (Stack `lib/devBudget.ts`).
 - **Per-hub cap and cold restart:** `--max-rss-mb` (dev.sh: backend 2048 via `MAIPAI_DEV_HUB_CAP_MB`, Vite 512) with `--restart-over-cap`:
   over the cap the launcher stops the group and starts the same command again (audit `cold-restarted`); the work is never lost, only the
   module graphs a long `--hot` run kept. At most `MAIPAI_JOBS_MAX_RESTARTS` (20) restarts, then the old stop applies. The same holds for

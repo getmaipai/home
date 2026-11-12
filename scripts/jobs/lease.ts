@@ -15,7 +15,7 @@
 import { spawnSync } from "node:child_process";
 import { existsSync, mkdirSync, readFileSync, readdirSync, renameSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
-import { alive, audit, ensureDirs, parseDuration, stateDir } from "./lib";
+import { alive, audit, ensureDirs, parseDuration, readJobs, reserveReleasedFile, stateDir, writeDevLoad } from "./lib";
 
 const repoRoot = resolve(import.meta.dir, "..", "..");
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
@@ -70,7 +70,43 @@ const put = (n: string, l: Lease) => { const f = join(dirOf(n), `${l.id}.json`);
 const drop = (n: string, id: string) => rmSync(join(dirOf(n), `${id}.json`), { force: true });
 const au = (l: Lease, action: string, trigger: string) => audit({ session: l.session, command: `lease ${l.cls}/${l.kind}${l.whole ? "/whole-machine" : ""}`, worktree: process.cwd(), trigger, action, job: l.id });
 
-function syncFlag(): void {
+/** A dev hub with no browser connected: its Vite port (backend port + 1000, from its port file) has no established connection. */
+function idleHubRoots(): string[] {
+  const roots = new Set<string>();
+  for (const j of readJobs()) {
+    if (j.type !== "server" || j.state !== "running" || !alive(j.pid) || !j.command.includes("src/index.ts")) continue;
+    const root = resolve(j.worktree, "..");
+    for (const d of [join(root, "data", "dev"), join(root, "data", "dev", "workbench")]) {
+      try {
+        const port = Number(readFileSync(join(d, "port"), "utf-8").trim()) + 1000;
+        const out = spawnSync("/usr/sbin/lsof", ["-nP", `-iTCP:${port}`, "-sTCP:ESTABLISHED"], { encoding: "utf-8" }).stdout ?? "";
+        if (!out.trim() && existsSync(join(root, "scripts", "dev.sh"))) roots.add(root);
+      } catch { /* not a dev.sh hub */ }
+    }
+  }
+  return [...roots];
+}
+/**
+ * DIRECT mode only: while a heavy development lease (video, images or the whole machine) is held, the dev reserve the Stack keeps back is
+ * given up (dev-load.json says reserve_gb 0), after hubs nobody is looking at are stopped cold (they restart on the next dev.sh start; a
+ * hub with a browser connected is left running). The reserve comes back when the lease ends. In GATED mode nothing is released: the family floor wins.
+ */
+function syncReserve(mode: Mode): void {
+  const heavy = mode === "direct" && readAll("held").some((l) => l.cls === "dev" && (l.whole || l.kind === "video" || l.kind === "image"));
+  const was = existsSync(reserveReleasedFile());
+  if (heavy && !was) {
+    for (const root of idleHubRoots()) spawnSync("bash", [join(root, "scripts", "dev.sh"), "stop"], { env: { ...process.env, MAIPAI_DEV_ROOT: root }, timeout: 60_000 });
+    writeFileSync(reserveReleasedFile(), JSON.stringify({ ts: Date.now() }));
+    audit({ session: "lease-broker", command: "dev reserve", worktree: process.cwd(), trigger: "heavy development lease in direct mode", action: "reserve-released" });
+  } else if (!heavy && was) {
+    rmSync(reserveReleasedFile(), { force: true });
+    audit({ session: "lease-broker", command: "dev reserve", worktree: process.cwd(), trigger: "heavy development lease ended or mode is gated", action: "reserve-restored" });
+  } else return;
+  writeDevLoad(readJobs());
+}
+
+function syncFlag(mode: Mode = leaseMode()): void {
+  syncReserve(mode);
   const f = maintenanceFlag(); if (!f) return;
   const whole = readAll("held").filter((l) => l.cls === "dev" && l.whole);
   if (whole.length) { mkdirSync(dirname(f), { recursive: true }); writeFileSync(f, JSON.stringify({ until: Math.max(...whole.map((l) => l.until)), lease: whole[0]!.id })); }
@@ -81,7 +117,7 @@ function reap(mode: Mode): void {
   const now = Date.now() / 1000;
   for (const n of ["held", "queue"]) for (const l of readAll(n)) if (!alive(l.pid) || l.until < now) { drop(n, l.id); au(l, "lease-reaped", !alive(l.pid) ? "holder gone" : "time up"); }
   if (mode === "gated" && readAll("held").some((l) => l.cls === "family")) for (const l of readAll("held")) if (l.cls === "dev" && !l.yieldRequested) { put("held", { ...l, yieldRequested: true }); au(l, "yield-requested", "family request arrived"); }
-  syncFlag();
+  syncFlag(mode);
 }
 const slotsNow = () => Number(process.env.MAIPAI_DEV_LEASE_SLOTS) || 1;
 
@@ -92,7 +128,7 @@ function attempt(req: Lease, mode: Mode): Decision {
     if (!readAll("queue").some((l) => l.id === req.id) && !readAll("held").some((l) => l.id === req.id)) put("queue", req);
     const queue = readAll("queue").filter((l) => l.id !== req.id);
     const d = decide(req, readAll("held"), queue, mode, slotsNow());
-    if (d.verdict === "grant") { drop("queue", req.id); put("held", req); au(req, "lease-granted", `mode ${mode}`); if (req.cls === "family" && mode === "gated") reap(mode); syncFlag(); }
+    if (d.verdict === "grant") { drop("queue", req.id); put("held", req); au(req, "lease-granted", `mode ${mode}`); if (req.cls === "family" && mode === "gated") reap(mode); syncFlag(mode); }
     else if (d.verdict === "deny") { drop("queue", req.id); au(req, "lease-denied", d.why); }
     return d;
   });

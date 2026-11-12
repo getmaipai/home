@@ -81,6 +81,25 @@ describe("broker CLI", () => {
     expect(lease(e, "acquire", "--class", "family", "--kind", "chat", "--pid", me).exitCode).toBe(0);
   });
 
+  test("direct mode: a heavy video lease gives up the dev reserve (reserve_gb 0, budget unchanged) and release brings it back", () => {
+    const e = env({ MAIPAI_DEV_BUDGET_GB: "24" });
+    const file = () => JSON.parse(readFileSync(join(e.MAIPAI_JOBS_DIR, "dev-load.json"), "utf-8")) as { budget_gb: number; reserve_gb: number };
+    const id = out(lease(e, "acquire", "--session", "video", "--kind", "video", "--pid", me));
+    expect(file()).toMatchObject({ budget_gb: 24, reserve_gb: 0 });
+    expect(withDir(e, () => readAudit()).some((x) => x.action === "reserve-released")).toBe(true);
+    lease(e, "release", id);
+    expect(file()).toMatchObject({ budget_gb: 24, reserve_gb: 24 });
+    expect(withDir(e, () => readAudit()).some((x) => x.action === "reserve-restored")).toBe(true);
+  });
+  test("ordinary dev work (a test lease) never releases the reserve, and gated mode never does: the family floor wins", () => {
+    const e = env({ MAIPAI_DEV_BUDGET_GB: "24" });
+    const id = out(lease(e, "acquire", "--session", "t", "--kind", "test", "--pid", me));
+    expect(existsSync(join(e.MAIPAI_JOBS_DIR, "reserve-released"))).toBe(false);
+    lease(e, "release", id);
+    const g = { ...e, MAIPAI_DEV_MODE: "gated" };
+    lease(g, "acquire", "--session", "v", "--kind", "video", "--pid", me);
+    expect(existsSync(join(e.MAIPAI_JOBS_DIR, "reserve-released"))).toBe(false);
+  });
   test("gated mode: whole-machine is refused, and a held dev lease is told to yield when a family request arrives", () => {
     const e = env({ MAIPAI_DEV_MODE: "gated" });
     expect(lease(e, "acquire", "--whole-machine", "--pid", me).exitCode).toBe(3);

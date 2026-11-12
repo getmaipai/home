@@ -1,7 +1,7 @@
 // HOST-LAUNCH-01 (owner, 2026-11-12): shared pieces of the dev job launcher (job.ts) and the lease broker (lease.ts).
 // Everything here runs as the user, never root. State lives in one directory (MAIPAI_JOBS_DIR, default ~/.local/state/maipai/jobs):
 //   jobs/<id>.json  one record per launched job      audit.jsonl  one line per action      leases/  the broker's tickets and holders
-import { appendFileSync, mkdirSync, readdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
+import { appendFileSync, existsSync, mkdirSync, readdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 
@@ -96,11 +96,19 @@ export const devHubCapMb = (): number => { const v = Number(process.env.MAIPAI_D
 export function devUsedGb(jobs: JobRecord[]): number {
   return jobs.filter((j) => (j.state === "running" || j.state === "paused") && alive(j.pid)).reduce((a, j) => a + (j.rssMb ?? 0), 0) / 1024;
 }
-/** The launcher publishes what development holds, so the Stack's governor can subtract the budget (stack/backend/src/lib/devBudget.ts reads this file). */
+/** Set by the lease broker while a heavy development lease holds the machine in DIRECT mode: the Stack may use the dev reserve then. */
+export const reserveReleasedFile = (): string => join(stateDir(), "reserve-released");
+/**
+ * The launcher publishes two plain numbers for the Stack's governor (stack/backend/src/lib/devBudget.ts reads this file):
+ * `budget_gb` is the reserve for ordinary dev tooling (hubs, tests, builds) and `used_gb` what those hold now. `reserve_gb` is the
+ * figure the Stack subtracts when it admits work: the budget, or 0 while a heavy dev lease (video, images, whole machine) holds the
+ * machine in direct mode. The budget never caps an engine job; it is only what the Stack keeps back when it admits one.
+ */
 export function writeDevLoad(jobs: JobRecord[]): void {
   ensureDirs(stateDir());
   const f = join(stateDir(), "dev-load.json");
-  writeFileSync(`${f}.tmp`, JSON.stringify({ version: 1, ts: Math.floor(Date.now() / 1000), budget_gb: devBudgetGb(), used_gb: Number(devUsedGb(jobs).toFixed(2)) }));
+  const released = existsSync(reserveReleasedFile());
+  writeFileSync(`${f}.tmp`, JSON.stringify({ version: 1, ts: Math.floor(Date.now() / 1000), budget_gb: devBudgetGb(), reserve_gb: released ? 0 : devBudgetGb(), used_gb: Number(devUsedGb(jobs).toFixed(2)) }));
   renameSync(`${f}.tmp`, f);
 }
 /** A cold restart replaces "stop" for a server that has a cap: the work is never killed, only its retained memory is dropped. */
