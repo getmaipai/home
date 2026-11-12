@@ -586,6 +586,16 @@ let inFlight: Promise<{ ran: number; errors: number }> | null = null;
 // A person's alarm, reminder or timer must go off on time, so these jobs run in their own lane with their own in-flight guard: a
 // background job that is slow or stuck (on 2026-10-29 the news poll held the one shared loop and an alarm waited behind it) never
 // holds one back. The general loop leaves them out so a job is never run by both lanes.
+/** WORKBENCH-01: `bun run workbench` (scripts/dev.sh) starts a long-running development hub on the Stack the live hub shares, with
+ * MAIPAI_WORKBENCH=1. There these jobs stay pending and never run: each one starts heavy Stack work (warming models, making a show,
+ * a companion's daily life, engine updates) or reaches outside the hub (devices through Home Assistant, the Tailscale certificate,
+ * the update check). Everything a person starts by hand still works. */
+export const WORKBENCH_SKIPPED_JOBS = ["packages.warm", "stack.updates.maintenance", "talent.life.tick", "talent.history.refresh", "talent.shows.due",
+  "schedules.device.fire", "schedules.reconcile", "tailscale.renew_certificate", "updates.check"] as const;
+export function isWorkbench(env: Record<string, string | undefined> = process.env): boolean {
+  return env.MAIPAI_WORKBENCH === "1";
+}
+
 const TIME_CRITICAL_JOBS = ["alarms.fire", "reminders.fire", "timers.fire", "schedules.device.fire"] as const;
 let criticalInFlight: Promise<{ ran: number; errors: number }> | null = null;
 
@@ -680,9 +690,10 @@ async function runDueJobsUnguarded(
   jobTimeoutMs: number,
   lane: "general" | "critical",
 ): Promise<{ ran: number; errors: number }> {
-  const laneFilter = lane === "critical"
+  const laneFilter = and(lane === "critical"
     ? and(eq(scheduledJobs.kind, "core"), inArray(scheduledJobs.job, [...TIME_CRITICAL_JOBS]))
-    : notInArray(scheduledJobs.job, [...TIME_CRITICAL_JOBS]);
+    : notInArray(scheduledJobs.job, [...TIME_CRITICAL_JOBS]),
+  isWorkbench() ? notInArray(scheduledJobs.job, [...WORKBENCH_SKIPPED_JOBS]) : undefined);
   const due = sortDueJobsForPriority(
     db
       .select()

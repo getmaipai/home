@@ -5,20 +5,20 @@
 # to start and `bun run dev:stop` to stop this checkout's development Home.
 # `start` also launches a watcher that stops it when the worktree is removed or no browser has been
 # connected for MAIPAI_DEV_IDLE_MINUTES (30); `wt.sh done` stops it too.
+#
+# Workbench (`bun run workbench`, or any command plus --workbench): an optional, persistent dev hub
+# for working on the app between releases. Same hot reload and real Stack, but its own demo data in
+# data/dev/workbench (seeded once, kept across stop and start; only `reseed --workbench` resets it),
+# a fixed port (backend 8780, Home 9780; MAIPAI_WORKBENCH_PORT or --port changes it), no idle stop,
+# and a tailnet-only `tailscale serve` HTTPS address that is checked before it is printed. The
+# backend runs with MAIPAI_WORKBENCH=1, which skips background jobs that start heavy Stack work or
+# reach outside the hub (lib/scheduler.ts), and a status note says it is not the family's hub.
+# It refuses ports 3000 and 8787 and any data directory under the live install.
 set -euo pipefail
 
 script_dir="$(cd "$(dirname "$0")" && pwd -P)"
 root="${MAIPAI_DEV_ROOT:-$(cd "$script_dir/.." && pwd -P)}"
-state="$root/data/dev"
-hub="$state/hub"
-backend_pid_file="$state/backend.pid"
-vite_pid_file="$state/vite.pid"
-watch_pid_file="$state/watch.pid"
-backend_log="$state/backend.log"
-vite_log="$state/vite.log"
-seed_marker="$state/seeded"
-seed_output="$state/seed.json"
-port_file="$state/port"
+live_root="${MAIPAI_LIVE_INSTALL_ROOT:-/usr/local/maipai-home}"
 umask 077
 
 action="${1:-}"
@@ -26,9 +26,12 @@ shift || true
 port_override="${MAIPAI_DEV_PORT:-}"
 stack_override="${MAIPAI_DEV_STACK_URL:-}"
 no_stack=0
+workbench="${MAIPAI_DEV_WORKBENCH:-0}"
+[[ "$workbench" == 1 ]] || workbench=0
 while (($#)); do
   case "$1" in
     --no-stack) no_stack=1; shift ;;
+    --workbench) workbench=1; shift ;;
     --stack)
       if (($# < 2)) || [[ -z "$2" || "$2" == --* ]]; then
         echo "Missing URL after --stack. Pass --stack <url> or omit the option." >&2; exit 2
@@ -39,9 +42,37 @@ while (($#)); do
         echo "Missing or invalid port after --port. Pass a number from 1 to 64535." >&2; exit 2
       fi
       port_override="$2"; shift 2 ;;
-    *) echo "Unknown option: $1. Use --no-stack, --stack <url>, or --port <n>." >&2; exit 2 ;;
+    *) echo "Unknown option: $1. Use --workbench, --no-stack, --stack <url>, or --port <n>." >&2; exit 2 ;;
   esac
 done
+
+state="$root/data/dev"
+((workbench == 0)) || state="$root/data/dev/workbench"
+hub="$state/hub"
+backend_pid_file="$state/backend.pid"
+vite_pid_file="$state/vite.pid"
+watch_pid_file="$state/watch.pid"
+backend_log="$state/backend.log"
+vite_log="$state/vite.log"
+seed_marker="$state/seeded"
+seed_output="$state/seed.json"
+port_file="$state/port"
+tailscale_host_file="$state/tailscale-host"
+
+# The path itself if it exists, else its nearest existing parent resolved plus the rest.
+resolved_path() {
+  local path="$1" rest=""
+  while [[ ! -e "$path" && "$path" != / ]]; do rest="/$(basename "$path")$rest"; path="$(dirname "$path")"; done
+  printf '%s%s' "$(cd "$path" && pwd -P)" "$rest"
+}
+if ((workbench)); then
+  [[ -n "$port_override" ]] || port_override="${MAIPAI_WORKBENCH_PORT:-8780}"
+  live_resolved="$(resolved_path "$live_root")"
+  state_resolved="$(resolved_path "$state")"
+  if [[ "$state_resolved/" == "$live_resolved/"* || "$state_resolved/" == "$live_root/"* ]]; then
+    echo "The workbench refuses to use $state: it is inside the live install ($live_root), whose data the family's hub owns. Run it from a worktree instead." >&2; exit 2
+  fi
+fi
 
 mkdir -p "$state"
 
@@ -70,6 +101,23 @@ else
   echo "Cannot choose a development port because $root has no .git file or directory. Run this from a checkout." >&2; exit 1
 fi
 vite_port=$((backend_port + 1000))
+if ((workbench)); then
+  for reserved in 3000 8787; do
+    if ((backend_port == reserved || vite_port == reserved)); then
+      echo "The workbench never uses port $reserved: it belongs to the live hub or the main checkout. Pass --port <n> with another number." >&2; exit 2
+    fi
+  done
+fi
+
+# Tailscale for the workbench only: MAIPAI_DEV_TAILSCALE=off skips it (tests do).
+tailscale_cli() {
+  [[ "${MAIPAI_DEV_TAILSCALE:-on}" != off ]] || return 1
+  command -v tailscale >/dev/null 2>&1 || return 1
+  tailscale "$@"
+}
+tailscale_host() {
+  tailscale_cli status --json 2>/dev/null | bun -e 'const s = JSON.parse(await Bun.stdin.text()); const n = String(s?.Self?.DNSName ?? "").replace(/\.$/, ""); if (!n.endsWith(".ts.net")) process.exit(1); console.log(n);' 2>/dev/null
+}
 
 probe_taken() {
   local probe_port="$1"
@@ -127,6 +175,10 @@ live_vite() {
 print_urls() {
   echo "Home: http://localhost:$vite_port"
   echo "API: http://127.0.0.1:$backend_port"
+  if ((workbench)) && [[ -s "$tailscale_host_file" ]]; then
+    IFS= read -r saved_host < "$tailscale_host_file" || true
+    [[ -z "${saved_host:-}" ]] || echo "Tailscale: https://$saved_host:$vite_port (tailnet only)"
+  fi
 }
 process_status() {
   local label="$1" file="$2" candidate command port
@@ -176,7 +228,11 @@ case "$action" in
     stop_one watch "$watch_pid_file"
     stop_one backend "$backend_pid_file"
     stop_one vite "$vite_pid_file"
-    echo "Dev Home stopped."
+    if ((workbench)) && [[ -s "$tailscale_host_file" ]]; then
+      tailscale_cli serve --https="$vite_port" off >/dev/null 2>&1 || true
+      rm -f "$tailscale_host_file"
+    fi
+    if ((workbench)); then echo "Workbench stopped; its data stays in $hub."; else echo "Dev Home stopped."; fi
     ;;
   reseed)
     stop_one watch "$watch_pid_file"
@@ -185,6 +241,7 @@ case "$action" in
     rm -rf "$hub"
     rm -f "$seed_marker" "$seed_output"
     reseed_args=(start)
+    ((workbench == 0)) || reseed_args+=(--workbench)
     ((no_stack == 0)) || reseed_args+=(--no-stack)
     [[ -z "$stack_override" ]] || reseed_args+=(--stack "$stack_override")
     [[ -z "$port_override" ]] || reseed_args+=(--port "$port_override")
@@ -202,6 +259,13 @@ case "$action" in
       exit 1
     fi
     rm -f "$vite_pid_file"
+    if ((workbench)); then
+      for wanted in "$backend_port" "$vite_port"; do
+        if probe_taken "$wanted"; then
+          echo "Port $wanted is already in use, so the workbench cannot start (only one workbench runs per machine). Stop the other one with bun run workbench:stop in its worktree, or pass --port <n>." >&2; exit 1
+        fi
+      done
+    fi
 
     if [[ -z "$port_override" && -f "$root/.git" ]]; then
       choose_worktree_port || exit 1
@@ -237,7 +301,7 @@ case "$action" in
     mkdir -p "$hub"
     (
       cd "$root/backend"
-      MAIPAI_TEST_ALLOW_MULTIPLE_HUBS=1 MAIPAI_MDNS=off MAIPAI_LAN_EXPOSURE=loopback PORT="$backend_port" \
+      MAIPAI_WORKBENCH="$workbench" MAIPAI_TEST_ALLOW_MULTIPLE_HUBS=1 MAIPAI_MDNS=off MAIPAI_LAN_EXPOSURE=loopback PORT="$backend_port" \
         MAIPAI_DATA_DIR="$hub" MAIPAI_BACKUP_DIR="$hub/backups" MAIPAI_KEYSTORE_BACKEND=file \
         MAIPAI_TTS_DISABLE_SPAWN=1 MAIPAI_WYOMING_PORT=0 MAIPAI_BACKGROUND_URL=http://127.0.0.1:1 \
         MAIPAI_LLAMA_SERVER_URL= MAIPAI_EMBED_URL= MAIPAI_HUB_LOCK_PATH="$hub.lock" \
@@ -269,11 +333,22 @@ case "$action" in
       rm -f "$state/seed.stderr"
       : > "$seed_marker"
       echo "Seeded the demo household (Sage, Marlow, Nova)."
+      if ((workbench)); then
+        # The existing status note (Status page) marks this hub; no new status surface (RULES S6).
+        seed_cookie="$(bun -e 'const r = JSON.parse(await Bun.file(process.argv[1]).text()); console.log(r.cookie ?? "")' "$seed_output" 2>/dev/null || true)"
+        if [[ -z "$seed_cookie" ]] || ! curl -fsS -m 10 -o /dev/null -X POST -H 'Content-Type: application/json' -H "Cookie: $seed_cookie" \
+          --data '{"body":"Workbench: a development hub with demo data. This is not the family hub."}' "http://127.0.0.1:$backend_port/api/status/note"; then
+          echo "Could not post the workbench status note; the hub still runs. Post it from Status if you want the marker."
+        fi
+      fi
     fi
 
+    ts_host=""
+    rm -f "$tailscale_host_file"
+    ((workbench == 0)) || ts_host="$(tailscale_host || true)"
     (
       cd "$root/frontend"
-      VITE_BACKEND_PORT="$backend_port" nohup bun run dev -- --port "$vite_port" --strictPort </dev/null >"$vite_log" 2>&1 &
+      VITE_ALLOWED_HOSTS="${ts_host:-${VITE_ALLOWED_HOSTS:-}}" VITE_BACKEND_PORT="$backend_port" nohup bun run dev -- --port "$vite_port" --strictPort </dev/null >"$vite_log" 2>&1 &
       echo $! > "$vite_pid_file"
     )
     frontend_ready=0
@@ -290,7 +365,20 @@ case "$action" in
       exit 1
     fi
     rm -f "$watch_pid_file"
-    MAIPAI_DEV_ROOT="$root" nohup bash "$script_dir/dev.sh" watch </dev/null >/dev/null 2>&1 &
+    if ((workbench)) && [[ -n "$ts_host" ]]; then
+      # Tailnet only (serve, never funnel), the same way other dev ports on this Mac are reached.
+      if tailscale_cli serve --bg --https="$vite_port" "http://localhost:$vite_port" >/dev/null 2>&1 \
+        && curl -fsS -m 15 -o /dev/null "https://$ts_host:$vite_port/" 2>/dev/null; then
+        printf '%s\n' "$ts_host" > "$tailscale_host_file"
+      else
+        echo "The Tailscale address https://$ts_host:$vite_port did not answer; use the local address. Check tailscale serve status."
+      fi
+    elif ((workbench)); then
+      echo "Tailscale is not available here, so the workbench has only a local address."
+    fi
+    watch_args=(watch)
+    ((workbench == 0)) || watch_args+=(--workbench)
+    MAIPAI_DEV_ROOT="$root" nohup bash "$script_dir/dev.sh" "${watch_args[@]}" </dev/null >/dev/null 2>&1 &
     echo $! > "$watch_pid_file"
     print_urls
     echo "Data: $hub"
@@ -302,7 +390,10 @@ case "$action" in
     # Hidden: started by `start`. Stops this dev Home when its worktree is deleted or no browser
     # has been connected for MAIPAI_DEV_IDLE_MINUTES (default 30), so a forgotten one cannot keep
     # holding connections to the shared Stack (2026-10-27: one stalled chat for hours).
-    idle_limit=$(( ${MAIPAI_DEV_IDLE_MINUTES:-30} * 60 ))
+    # The workbench is meant to stay up, so it has no idle stop unless MAIPAI_DEV_IDLE_MINUTES asks for one.
+    idle_default=30
+    ((workbench == 0)) || idle_default=0
+    idle_limit=$(( ${MAIPAI_DEV_IDLE_MINUTES:-$idle_default} * 60 ))
     interval="${MAIPAI_DEV_WATCH_SECONDS:-30}"
     idle=0
     while sleep "$interval"; do
@@ -311,7 +402,7 @@ case "$action" in
       if [[ ! -e "$root/.git" ]]; then reason="its worktree was removed"; fi
       if [[ -z "$reason" ]]; then
         if lsof -nP -iTCP:"$vite_port" -sTCP:ESTABLISHED >/dev/null 2>&1; then idle=0; else idle=$((idle + interval)); fi
-        if ((idle >= idle_limit)); then reason="no browser was connected for $((idle_limit / 60)) minutes"; fi
+        if ((idle_limit > 0 && idle >= idle_limit)); then reason="no browser was connected for $((idle_limit / 60)) minutes"; fi
       fi
       if [[ -n "$reason" ]]; then
         echo "$(date '+%F %T') stopping dev Home: $reason" >> "$state/watch.log"
@@ -323,7 +414,7 @@ case "$action" in
     done
     ;;
   *)
-    echo "Usage: bash scripts/dev.sh <start|stop|status|url|port|reseed> [--no-stack] [--stack <url>] [--port <n>]" >&2
+    echo "Usage: bash scripts/dev.sh <start|stop|status|url|port|reseed> [--workbench] [--no-stack] [--stack <url>] [--port <n>]" >&2
     exit 2
     ;;
 esac

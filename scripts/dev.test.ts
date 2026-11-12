@@ -94,4 +94,47 @@ describe("scripts/dev.sh", () => {
   });
 });
 
+describe("scripts/dev.sh --workbench", () => {
+  const off = { MAIPAI_DEV_TAILSCALE: "off" };
+
+  test("uses a fixed port pair whatever the checkout, and its own data directory", () => {
+    for (const root of [worktree, main]) {
+      const out = run(root, "port", "--workbench", off);
+      expect(out.status).toBe(0);
+      expect(out.stdout.trim()).toBe("8780");
+    }
+    const url = run(worktree, "url", "--workbench", off);
+    expect(url.stdout).toContain("http://localhost:9780");
+    expect(run(worktree, "port", "--workbench", { ...off, MAIPAI_WORKBENCH_PORT: "8781" }).stdout.trim()).toBe("8781");
+  });
+
+  test("refuses the live hub's and the main checkout's ports", () => {
+    for (const port of ["8787", "2000"]) {
+      const out = run(worktree, "start", "--workbench", "--port", port, off);
+      expect(out.status).toBe(2);
+      expect(out.stderr).toContain("never uses port");
+    }
+  });
+
+  test("refuses a data directory inside the live install", () => {
+    const out = run(worktree, "start", "--workbench", { ...off, MAIPAI_LIVE_INSTALL_ROOT: join(worktree, "data") });
+    expect(out.status).toBe(2);
+    expect(out.stderr).toContain("inside the live install");
+  });
+
+  test("stop keeps the workbench data and leaves the normal dev hub alone", async () => {
+    const wb = join(worktree, "data", "dev", "workbench");
+    mkdirSync(join(wb, "hub"), { recursive: true });
+    writeFileSync(join(wb, "hub", "hub.db"), "");
+    writeFileSync(join(wb, "seeded"), "");
+    const status = run(worktree, "status", "--workbench", off);
+    expect(status.stdout).toContain("backend: stopped");
+    const out = run(worktree, "stop", "--workbench", off);
+    expect(out.status).toBe(0);
+    expect(out.stdout).toContain("Workbench stopped");
+    expect(await Bun.file(join(wb, "hub", "hub.db")).exists()).toBe(true);
+    expect(await Bun.file(join(wb, "seeded")).exists()).toBe(true);
+  });
+});
+
 afterAll(() => rmSync(scratch, { recursive: true, force: true }));
