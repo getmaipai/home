@@ -28,7 +28,7 @@ const SCHEMA = {
 const SYSTEM = [
   "You look at one picture a person attached to a request for a film and say what it is for.",
   "role: actor = a person or animal who could play a part; product = the main object being shown off or sold; set = an interior or a place where scenes happen;",
-  "end_shot = a whole building, street, skyline or landscape seen from far away, good for a closing wide shot; prop = a smaller object that belongs in a scene; other = none of these.",
+  "end_shot = a whole building, street, skyline or landscape seen from far away, good for a closing wide shot (a building is never a product, even with a company name on it); prop = a smaller object that belongs in a scene; other = none of these.",
   "name: two to four plain words for what is shown, such as espresso machine, man in a grey robe, small kitchen, apartment building. Never a real person's name and never who anyone is.",
   "look: one plain sentence of positive facts about colours, materials, clothing and shapes, as you would tell a painter. Describe only what is there. Never read out writing, words, logos or numbers: say \"printed lettering\" or \"a logo\" instead.",
   "medium: photograph for a real photo of real things, illustration for a drawing, painting, cartoon or render.",

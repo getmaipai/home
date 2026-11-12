@@ -5,25 +5,24 @@
 import sharp, { type OverlayOptions } from "sharp";
 import type { PictureRole } from "@/lib/pictures/roles";
 import { runPictureTool } from "@/lib/pictures/people";
+import { detectFaces } from "@/lib/pictures/likeness/faces";
 
 export interface SheetPicture { bytes: Uint8Array; mediaType: string; name: string; role: PictureRole; look: string }
 export interface SheetTools {
   /** The picture with its background removed: a PNG with transparency. */
   removeBackground(bytes: Uint8Array, mediaType: string): Promise<Uint8Array>;
-  /** Boxes of the people in the picture, in its own pixels. */
-  findPeople(bytes: Uint8Array, mediaType: string): Promise<Array<{ x: number; y: number; w: number; h: number }>>;
+  /** Boxes of the faces in the picture, in its own pixels (empty when none is found or the finder is unavailable). */
+  findFaces(bytes: Uint8Array, mediaType: string): Promise<Array<{ x: number; y: number; w: number; h: number }>>;
 }
 export interface MadeSheet { png: Uint8Array; description: string; panels: Array<{ name: string; view: string; slot: string }> }
 
 export const SHEET_W = 768, SHEET_H = 448, PLACE_W = 288, GAP = 2, MAX_PLACES = 2;
 const realTools: SheetTools = {
   async removeBackground(bytes, mediaType) { return (await runPictureTool("remove_background", bytes, mediaType, {})).png; },
-  async findPeople(bytes, mediaType) {
-    const found = (await runPictureTool("find_people", bytes, mediaType, {})).people ?? [];
-    // The finder answers in fractions of the picture (0 to 1); the sheet works in pixels.
-    const meta = await sharp(Buffer.from(bytes)).metadata();
-    const [width, height] = [meta.width ?? 1, meta.height ?? 1];
-    return found.map((box) => box.x <= 1 && box.y <= 1 && box.w <= 1 && box.h <= 1 ? { x: Math.round(box.x * width), y: Math.round(box.y * height), w: Math.round(box.w * width), h: Math.round(box.h * height) } : { x: Math.round(box.x), y: Math.round(box.y), w: Math.round(box.w), h: Math.round(box.h) });
+  async findFaces(bytes) {
+    const png = new Uint8Array(await sharp(Buffer.from(bytes)).png().toBuffer());
+    const found = await detectFaces(png);
+    return found.ok ? found.value.map((face) => ({ x: Math.round(face.bbox[0]), y: Math.round(face.bbox[1]), w: Math.round(face.bbox[2]), h: Math.round(face.bbox[3]) })) : [];
   },
 };
 
@@ -54,15 +53,26 @@ async function panelsFor(picture: SheetPicture, tools: SheetTools): Promise<Pane
   const base = { name: picture.name, role: picture.role, look: picture.look };
   if (picture.role === "set" || picture.role === "end_shot" || picture.role === "other") return [{ ...base, kind: "place", view: "Setting", image: Buffer.from(picture.bytes), onWhite: false }];
   if (picture.role === "actor") {
-    const people = await tools.findPeople(picture.bytes, picture.mediaType).catch(() => []);
-    const biggest = [...people].sort((a, b) => b.w * b.h - a.w * a.h)[0];
-    const cut = await cutOut(picture, tools, biggest);
-    const meta = await sharp(cut).metadata();
-    const panels: Panel[] = [{ ...base, kind: "subject", view: "Front View", image: cut, onWhite: true }];
-    // A photo that shows more than a head and shoulders also gets a face close-up: the top of the cut-out, wide enough to keep the whole head.
-    if ((meta.height ?? 0) / Math.max(1, meta.width ?? 1) > 0.8) {
-      const top = Math.round(meta.height! * (meta.height! / Math.max(1, meta.width!) > 1.25 ? 0.4 : 0.55)), left = Math.round(meta.width! * 0.1);
-      panels.push({ ...base, kind: "subject", view: "Face Close-up", image: await sharp(cut).extract({ left, top: 0, width: Math.round(meta.width! * 0.8), height: top }).png().toBuffer(), onWhite: true });
+    const meta = await sharp(Buffer.from(picture.bytes)).metadata();
+    const [width, height] = [meta.width ?? 1, meta.height ?? 1];
+    const faces = (await tools.findFaces(picture.bytes, picture.mediaType).catch(() => [])).filter((face) => face.w * face.h > 0).sort((a, b) => a.x - b.x).slice(0, 3);
+    if (!faces.length) return [{ ...base, kind: "subject", view: "Front View", image: await cutOut(picture, tools), onWhite: true }];
+    const panels: Panel[] = [];
+    for (const [index, face] of faces.entries()) {
+      const name = faces.length > 1 ? `${picture.name} ${index + 1}` : picture.name;
+      // One person's share of the picture: halfway to the neighbouring faces, or a few face-widths out on the open side, from above the hair to the bottom edge.
+      const centre = face.x + face.w / 2, prev = faces[index - 1], next = faces[index + 1];
+      const left = prev ? Math.round((centre + prev.x + prev.w / 2) / 2) : Math.max(0, Math.round(centre - face.w * 2.4));
+      const right = next ? Math.round((centre + next.x + next.w / 2) / 2) : Math.min(width, Math.round(centre + face.w * 2.4));
+      const top = Math.max(0, Math.round(face.y - face.h * 0.9));
+      const box = { x: left, y: top, w: Math.max(8, right - left), h: Math.max(8, height - top) };
+      panels.push({ ...base, name, kind: "subject", view: "Front View", image: await cutOut(picture, tools, box), onWhite: true });
+      // A face that already fills the picture needs no close-up; a smaller one gets its own, cut from the original with room for the whole head.
+      if (face.w / box.w < 0.3) {
+        const fx = Math.max(0, Math.round(face.x - face.w * 0.7)), fy = Math.max(0, Math.round(face.y - face.h * 0.8));
+        const faceBox = { x: fx, y: fy, w: Math.min(width - fx, Math.round(face.w * 2.4)), h: Math.min(height - fy, Math.round(face.h * 2.3)) };
+        panels.push({ ...base, name, kind: "subject", view: "Face Close-up", image: await cutOut(picture, tools, faceBox), onWhite: true });
+      }
     }
     return panels;
   }

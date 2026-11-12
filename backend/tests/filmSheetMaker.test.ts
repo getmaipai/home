@@ -6,7 +6,7 @@ const solid = async (r: number, g: number, b: number, width = 400, height = 300)
 // A fake background remover: a red block on transparency, as if the subject had been cut out.
 const tools: SheetTools = {
   removeBackground: async () => new Uint8Array(await sharp({ create: { width: 120, height: 300, channels: 4, background: { r: 0, g: 0, b: 0, alpha: 0 } } }).composite([{ input: { create: { width: 100, height: 280, channels: 4, background: { r: 200, g: 10, b: 10, alpha: 1 } } }, left: 10, top: 10 }]).png().toBuffer()),
-  findPeople: async () => [{ x: 50, y: 20, w: 200, h: 260 }],
+  findFaces: async () => [{ x: 150, y: 20, w: 40, h: 50 }],
 };
 async function pixel(png: Uint8Array, x: number, y: number) { const { data, info } = await sharp(Buffer.from(png)).raw().toBuffer({ resolveWithObject: true }); const at = (y * info.width + x) * info.channels; return [data[at]!, data[at + 1]!, data[at + 2]!]; }
 
@@ -29,7 +29,7 @@ describe("sheet from pictures", () => {
     expect(sheet.description).toContain("Far Right (Setting): a glossy red door");
   });
   test("a failed cut-out falls back to the picture itself and a sheet with only places still builds", async () => {
-    const broken: SheetTools = { removeBackground: async () => { throw new Error("no"); }, findPeople: async () => [] };
+    const broken: SheetTools = { removeBackground: async () => { throw new Error("no"); }, findFaces: async () => [] };
     const sheet = await makeSheetFromPictures([{ bytes: await solid(9, 9, 9), mediaType: "image/png", name: "mug", role: "product", look: "a white mug" }], broken);
     expect(sheet.panels).toHaveLength(1);
     const onlyPlace = await makeSheetFromPictures([{ bytes: await solid(5, 5, 200), mediaType: "image/png", name: "hall", role: "end_shot", look: "a glass hall" }], broken);
