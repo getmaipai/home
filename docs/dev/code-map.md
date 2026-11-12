@@ -529,6 +529,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/films/plan.ts` | filmPlanShotSchema, filmPlanSchema, facelessFilmPlanSchema, FILM_PLAN_RESPONSE_FORMAT, FACELESS_FILM_PLAN_RESPONSE_FORMAT, FILM_PLAN_PROMPT |
 | `backend/src/lib/films/referenceSheet.ts` | SHEET_WIDTH, SHEET_HEIGHT, SHEET_MAX_PANELS, sheetGrid, buildReferenceSheet |
 | `backend/src/lib/films/run.ts` | FilmStepError, isTransientStackError, __setFilmRetryDelaysForTests, runFilm, redoShot, changeMusic |
+| `backend/src/lib/films/sheetMaker.ts` | SHEET_W, makeSheetFromPictures |
 | `backend/src/lib/films/store.ts` | createFilmRun, getFilmRun, updateFilmRun, listFilmRunsInStates, failInterruptedFilmRuns, listFilmRunsByParent |
 | `backend/src/lib/films/tool.ts` | MAKE_FILM_TOOL_ID, makeFilmArgs, __setStartFilmForTests, runMakeFilmTurn, runMakeFilm |
 | `backend/src/lib/fitWording.ts` | fitWording, fitUnavailableWording, fitNoStackWording, fitNotFoundWording |
