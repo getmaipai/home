@@ -2070,7 +2070,7 @@ msgid "setting.home.access_token.help"
 msgstr "Un token de acceso de larga duración de tu página de perfil de Home Assistant, usado para controlar tus dispositivos de hogar inteligente."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/ChatPage.tsx:895
+#: src/shell/pages/ChatPage.tsx:897
 #, needs-review
 msgid "A new chat always uses one of your companions. Choose a companion to switch."
 msgstr "Un chat nuevo siempre usa una de tus compañías. Elige una compañía para cambiar."
@@ -3776,7 +3776,8 @@ msgid "Articles picked at random from the Wikipedia on this computer."
 msgstr "Artículos elegidos al azar de la Wikipedia en este equipo."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/dashboard/AskBox.tsx:68
+#: src/shell/pages/dashboard/AskBox.tsx:72
+#: src/shell/pages/dashboard/AskBox.tsx:81
 #, needs-review
 msgid "Ask"
 msgstr "Pregunta"
@@ -3876,8 +3877,8 @@ msgid "Ask one of them to finish this setup for your Home."
 msgstr "Pídele a uno de ellos que termine esta configuración para tu Home."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/dashboard/ActionCards.tsx:20
-msgid "Ask or plan something"
+#: src/shell/pages/dashboard/MakeShelf.tsx:10
+msgid "Ask or plan"
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -3898,7 +3899,7 @@ msgid "Asked {name} to {value}, waiting for it."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/ChatPage.tsx:1640
+#: src/shell/pages/ChatPage.tsx:1642
 #, needs-review
 msgid "Asking the bare model…"
 msgstr "Preguntando al modelo base…"
@@ -4296,14 +4297,14 @@ msgid "Bands could not be loaded. Open this page again."
 msgstr "No se pudieron cargar las bandas. Abre esta página de nuevo."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/ChatPage.tsx:1812
+#: src/shell/pages/ChatPage.tsx:1814
 #, needs-review
 msgid "Bare mode is on"
 msgstr "Modo base activado"
 
 #. js-lingui-explicit-id
 #: src/apps/chat/chatThreadSlots.tsx:826
-#: src/shell/pages/ChatPage.tsx:1638
+#: src/shell/pages/ChatPage.tsx:1640
 #, needs-review
 msgid "Bare model"
 msgstr "Modelo básico"
@@ -5040,8 +5041,8 @@ msgstr "¿Puede alguien entrar a tu casa?"
 #: src/apps/setup/StorageStep.tsx:190
 #: src/shell/components/DataTableRowActions.tsx:53
 #: src/shell/pages/ActivityPage.tsx:156
-#: src/shell/pages/ChatPage.tsx:1691
-#: src/shell/pages/ChatPage.tsx:1707
+#: src/shell/pages/ChatPage.tsx:1693
+#: src/shell/pages/ChatPage.tsx:1709
 #: src/shell/pages/CompanionAudienceDialog.tsx:64
 #: src/shell/pages/CompanionsPage.tsx:181
 #: src/shell/pages/FilesPage.tsx:427
@@ -5395,7 +5396,7 @@ msgstr "Charles"
 #: src/shell/AmbientCompanionPane.tsx:329
 #: src/shell/coreLabels.ts:8
 #: src/shell/pageHeaderTitle.tsx:95
-#: src/shell/pages/ChatPage.tsx:1761
+#: src/shell/pages/ChatPage.tsx:1763
 #: src/shell/pages/CompanionsPage.tsx:162
 #: src/shell/pages/CompanionsPage.tsx:167
 #: src/shell/pages/settings/settingsBackLink.ts:52
@@ -5592,11 +5593,11 @@ msgid "Chat runs through the MaiPai Stack."
 msgstr "El chat funciona a través del MaiPai Stack."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/ChatPage.tsx:1132
-#: src/shell/pages/ChatPage.tsx:1513
-#: src/shell/pages/ChatPage.tsx:1513
-#: src/shell/pages/ChatPage.tsx:1929
-#: src/shell/pages/ChatPage.tsx:1929
+#: src/shell/pages/ChatPage.tsx:1134
+#: src/shell/pages/ChatPage.tsx:1515
+#: src/shell/pages/ChatPage.tsx:1515
+#: src/shell/pages/ChatPage.tsx:1931
+#: src/shell/pages/ChatPage.tsx:1931
 #, needs-review
 msgid "Chat settings"
 msgstr "Configuración del chat"
@@ -6704,7 +6705,7 @@ msgstr ""
 #: src/apps/setup/AwayFromHome.tsx:175
 #: src/shell/AmbientCompanionPane.tsx:271
 #: src/shell/AmbientCompanionPane.tsx:273
-#: src/shell/pages/ChatPage.tsx:1733
+#: src/shell/pages/ChatPage.tsx:1735
 #: src/shell/pages/MusicWorkspacePage.tsx:193
 #: src/shell/pages/status/StatusBoard.tsx:114
 #: src/shell/pages/status/StatusBoard.tsx:133
@@ -6996,7 +6997,7 @@ msgid "Compare"
 msgstr "Comparar"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/ChatPage.tsx:1957
+#: src/shell/pages/ChatPage.tsx:1959
 #, needs-review
 msgid "Compare with the bare model"
 msgstr "Comparar con el modelo base"
@@ -7206,9 +7207,9 @@ msgstr "Conversación con {name}"
 
 #. js-lingui-explicit-id
 #: src/shell/AmbientCompanionPane.tsx:328
-#: src/shell/pages/ChatPage.tsx:1517
-#: src/shell/pages/ChatPage.tsx:1926
-#: src/shell/pages/ChatPage.tsx:1929
+#: src/shell/pages/ChatPage.tsx:1519
+#: src/shell/pages/ChatPage.tsx:1928
+#: src/shell/pages/ChatPage.tsx:1931
 #, needs-review
 msgid "Conversations"
 msgstr "Conversaciones"
@@ -7244,7 +7245,7 @@ msgid "Copy"
 msgstr "Copiar"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/ChatPage.tsx:1732
+#: src/shell/pages/ChatPage.tsx:1734
 #: src/shell/pages/TurnErrorDetails.tsx:94
 #, needs-review
 msgid "Copy details"
@@ -7469,7 +7470,7 @@ msgid "Could not copy. Select the text below instead."
 msgstr "No se pudo copiar. Selecciona el texto de abajo."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/ChatPage.tsx:1543
+#: src/shell/pages/ChatPage.tsx:1545
 #: src/shell/pages/MicTestPage.tsx:50
 #, needs-review
 msgid "Could not copy. Select the text instead."
@@ -7496,7 +7497,7 @@ msgstr "No se pudo eliminar ese comando."
 #. js-lingui-explicit-id
 #: src/apps/chat/chatProjects.tsx:92
 #: src/apps/chat/chatProjects.tsx:150
-#: src/shell/pages/ChatPage.tsx:1249
+#: src/shell/pages/ChatPage.tsx:1251
 #: src/shell/pages/ProjectsPage.tsx:127
 #, needs-review
 msgid "Could not delete that project. Try again."
@@ -7521,7 +7522,7 @@ msgid "Could not delete the voice sample."
 msgstr "No se pudo eliminar la muestra de voz."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/ChatPage.tsx:948
+#: src/shell/pages/ChatPage.tsx:950
 #, needs-review
 msgid "Could not delete this chat. Try again."
 msgstr "No se pudo eliminar este chat. Inténtalo de nuevo."
@@ -7683,13 +7684,13 @@ msgid "Could not load faded memories. Check your connection and try again."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/DashboardPage.tsx:59
+#: src/shell/pages/DashboardPage.tsx:75
 #, needs-review
 msgid "Could not load Home cards. Refresh Home to try again."
 msgstr "No se pudieron cargar las tarjetas de Home. Actualiza Home para intentarlo de nuevo."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/MediaHomePage.tsx:36
+#: src/shell/pages/MediaHomePage.tsx:37
 #, needs-review
 msgid "Could not load Media. Check your connection and try again."
 msgstr "No se pudo cargar el contenido multimedia. Revisa tu conexión e inténtalo de nuevo."
@@ -8142,7 +8143,7 @@ msgid "Could not remove those people."
 msgstr "No se pudieron eliminar esas personas."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/ChatPage.tsx:940
+#: src/shell/pages/ChatPage.tsx:942
 #, needs-review
 msgid "Could not rename this chat. Try again."
 msgstr "No se pudo renombrar este chat. Inténtalo de nuevo."
@@ -8481,8 +8482,8 @@ msgstr "No se pudieron actualizar los recordatorios."
 
 #. js-lingui-explicit-id
 #: src/apps/chat/chatProjects.tsx:103
-#: src/shell/pages/ChatPage.tsx:1230
-#: src/shell/pages/ChatPage.tsx:1240
+#: src/shell/pages/ChatPage.tsx:1232
+#: src/shell/pages/ChatPage.tsx:1242
 #: src/shell/pages/ProjectsPage.tsx:192
 #, needs-review
 msgid "Could not update that project. Try again."
@@ -9097,7 +9098,7 @@ msgid "Delete all samples"
 msgstr "Eliminar todas las muestras"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/ChatPage.tsx:1693
+#: src/shell/pages/ChatPage.tsx:1695
 #, needs-review
 msgid "Delete chat and {media}"
 msgstr "Eliminar chat y {media}"
@@ -9143,7 +9144,7 @@ msgid "Delete this alarm?"
 msgstr "¿Eliminar esta alarma?"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/ChatPage.tsx:1687
+#: src/shell/pages/ChatPage.tsx:1689
 #, needs-review
 msgid "Delete this chat?"
 msgstr "¿Eliminar este chat?"
@@ -9220,7 +9221,7 @@ msgid "Describe it, pick a sound, press Generate. Your songs, bands and albums s
 msgstr "Descríbelo, elige un sonido y pulsa Generar. Tus canciones, bandas y álbumes se quedan en este Home."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/ChatPage.tsx:1705
+#: src/shell/pages/ChatPage.tsx:1707
 #, needs-review
 msgid "Describe the changes to this {kind}"
 msgstr "Describe los cambios para este {kind}"
@@ -9264,7 +9265,7 @@ msgid "Describe the sound in at least 3 characters to turn Generate on."
 msgstr "Describe el sonido con al menos 3 caracteres para activar Generar."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/ChatPage.tsx:1703
+#: src/shell/pages/ChatPage.tsx:1705
 #, needs-review
 msgid "Describe what you want changed. The original stays."
 msgstr "Describe lo que quieres cambiar. El original se queda."
@@ -9341,7 +9342,7 @@ msgid "Details"
 msgstr "Detalles"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/ChatPage.tsx:1543
+#: src/shell/pages/ChatPage.tsx:1545
 #, needs-review
 msgid "Details copied."
 msgstr "Detalles copiados."
@@ -9628,7 +9629,7 @@ msgid "setting.tools.timer.mode.option_label.do"
 msgstr "Hacer"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/ChatPage.tsx:1945
+#: src/shell/pages/ChatPage.tsx:1947
 #: src/shell/pages/FilesPage.tsx:165
 #, needs-review
 msgid "Document"
@@ -10016,11 +10017,6 @@ msgstr "Editar {name}"
 #, needs-review
 msgid "Edit {name}’s profile"
 msgstr "Editar el perfil de {name}"
-
-#. js-lingui-explicit-id
-#: src/shell/pages/dashboard/ActionCards.tsx:24
-msgid "Edit a picture"
-msgstr ""
 
 #. js-lingui-explicit-id
 #: src/apps/clock/AlarmEditor.tsx:72
@@ -10481,7 +10477,7 @@ msgid "setting.synths.real_people.option.all"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/ChatPage.tsx:1813
+#: src/shell/pages/ChatPage.tsx:1815
 #, needs-review
 msgid "Every reply in this conversation is the bare model - no persona, routing, packages, or quality guards."
 msgstr "Cada respuesta en esta conversación es del modelo base. Sin personaje, enrutamiento, paquetes ni controles de calidad."
@@ -11005,8 +11001,8 @@ msgid "setting.radio.directory.enabled.label"
 msgstr "Buscar estaciones de radio en línea"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/dashboard/ActionCards.tsx:25
-msgid "Find something to watch or play"
+#: src/shell/pages/dashboard/MakeShelf.tsx:14
+msgid "Find something to watch"
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -11259,7 +11255,7 @@ msgid "For example: 96"
 msgstr "Por ejemplo: 96"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/ChatPage.tsx:1705
+#: src/shell/pages/ChatPage.tsx:1707
 #, needs-review
 msgid "For example: make it night time, add a red hat"
 msgstr "Por ejemplo: hazlo de noche, añade un sombrero rojo"
@@ -11969,7 +11965,7 @@ msgid "setting.music.library_sort.option.creator"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/ChatPage.tsx:1629
+#: src/shell/pages/ChatPage.tsx:1631
 #, needs-review
 msgid "Guard:"
 msgstr "Control:"
@@ -12083,12 +12079,6 @@ msgid "Here are the short clips it will move with. Do they look right?"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/dashboard/Greeting.tsx:32
-#, needs-review
-msgid "Here is your household today."
-msgstr "Así está tu hogar hoy."
-
-#. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:1585
 #, needs-review
 msgid "area.Hey Jarvis"
@@ -12183,7 +12173,7 @@ msgstr "Guarda lo que algunos descargados piden antes de comenzar."
 #: src/shell/coreLabels.ts:7
 #: src/shell/pageHeaderTitle.tsx:94
 #: src/shell/pages/ActivityPage.tsx:44
-#: src/shell/pages/DashboardPage.tsx:27
+#: src/shell/pages/DashboardPage.tsx:29
 #: src/shell/pages/settings/settingsBackLink.ts:55
 #: src/shell/pages/status/StatusComponents.tsx:32
 #: src/shell/pages/WikipediaPage.tsx:154
@@ -13994,7 +13984,7 @@ msgid "Included skills"
 msgstr "Habilidades incluidas"
 
 #. js-lingui-explicit-id
-#: src/apps/chat/chatModelAdapter.ts:974
+#: src/apps/chat/chatModelAdapter.ts:977
 #, needs-review
 msgid "Incognito can't turn on partway through a chat. Start a new chat to go incognito."
 msgstr "No puedes activar el modo incógnito a mitad de una conversación. Abre una nueva para usarlo."
@@ -14483,7 +14473,7 @@ msgid "Keep"
 msgstr "Conservar"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/ChatPage.tsx:1692
+#: src/shell/pages/ChatPage.tsx:1694
 #, needs-review
 msgid "Keep {media}"
 msgstr "Conservar {media}"
@@ -15982,7 +15972,7 @@ msgid "Loading folders"
 msgstr "Cargando carpetas"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/DashboardPage.tsx:58
+#: src/shell/pages/DashboardPage.tsx:74
 #, needs-review
 msgid "Loading Home"
 msgstr "Cargando Home"
@@ -16029,7 +16019,7 @@ msgid "Loading Max chat checklist"
 msgstr "Cargando lista de verificación del chat Max"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/MediaHomePage.tsx:37
+#: src/shell/pages/MediaHomePage.tsx:38
 #, needs-review
 msgid "Loading Media"
 msgstr "Cargando contenido multimedia"
@@ -16576,8 +16566,10 @@ msgid "Lyrics (optional)"
 msgstr "Letras (opcional)"
 
 #. js-lingui-explicit-id
+#: src/shell/pages/dashboard/HomeHero.tsx:22
+#: src/shell/pages/dashboard/HomeHero.tsx:22
 #: src/shell/pages/dashboard/HomeShelves.tsx:83
-#: src/shell/pages/MediaHomePage.tsx:41
+#: src/shell/pages/MediaHomePage.tsx:42
 #, needs-review
 msgid "Made at home"
 msgstr "Hecho en casa"
@@ -16742,6 +16734,11 @@ msgid "setting.companion.voice.default.label"
 msgstr "Voz de MaiPai"
 
 #. js-lingui-explicit-id
+#: src/shell/pages/dashboard/MakeShelf.tsx:33
+msgid "Make"
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/shell/pages/MakeSongPage.tsx:161
 #: src/shell/pages/MusicStudioPages.tsx:90
 #, needs-review
@@ -16783,12 +16780,12 @@ msgid "Make a new voice based on a WAV, MP3 or FLAC recording of 6 to 30 seconds
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/dashboard/ActionCards.tsx:21
+#: src/shell/pages/dashboard/MakeShelf.tsx:11
 msgid "Make a picture"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/dashboard/ActionCards.tsx:23
+#: src/shell/pages/dashboard/MakeShelf.tsx:13
 #: src/shell/pages/MakeSongPage.tsx:89
 #: src/shell/pages/MakeSongPage.tsx:187
 #, needs-review
@@ -16814,7 +16811,7 @@ msgid "Make a variation"
 msgstr "Crea una variación"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/dashboard/ActionCards.tsx:22
+#: src/shell/pages/dashboard/MakeShelf.tsx:12
 msgid "Make a video"
 msgstr ""
 
@@ -16897,7 +16894,7 @@ msgid "Make Inspired voice"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/ChatPage.tsx:1708
+#: src/shell/pages/ChatPage.tsx:1710
 #, needs-review
 msgid "Make it"
 msgstr "Hazlo"
@@ -16957,9 +16954,15 @@ msgstr "Hacer uno"
 
 #. js-lingui-explicit-id
 #: src/shell/pages/companionFlow/KeyframeEditor.tsx:94
+#: src/shell/pages/dashboard/AskBox.tsx:73
 #, needs-review
 msgid "Make picture"
 msgstr "Crear imagen"
+
+#. js-lingui-explicit-id
+#: src/shell/pages/dashboard/AskBox.tsx:75
+msgid "Make song"
+msgstr ""
 
 #. js-lingui-explicit-id
 #: src/shell/library/LibraryViewer.tsx:122
@@ -16993,6 +16996,11 @@ msgstr "¿Quieres que este estilo sea para todas las edades?"
 #, needs-review
 msgid "Make transcript"
 msgstr "Crear transcripción"
+
+#. js-lingui-explicit-id
+#: src/shell/pages/dashboard/AskBox.tsx:74
+msgid "Make video"
+msgstr ""
 
 #. js-lingui-explicit-id
 #: src/apps/settings/AddVoiceForm.tsx:87
@@ -17377,7 +17385,8 @@ msgstr "Velocidad máxima usada para actualizaciones automáticas de la bibliote
 #. js-lingui-explicit-id
 #: src/apps/settings/DevicesSection.tsx:164
 #: src/shell/pageHeaderTitle.tsx:113
-#: src/shell/pages/MediaHomePage.tsx:24
+#: src/shell/pages/MediaHomePage.tsx:25
+#: src/shell/pages/MediaHomePage.tsx:58
 #: src/shell/pages/MediaSearchPage.tsx:17
 #: src/shell/Routes.tsx:436
 #, needs-review
@@ -17550,7 +17559,7 @@ msgstr "El acceso al micrófono no está disponible. Revisa el permiso de tu nav
 
 #. js-lingui-explicit-id
 #: src/shell/AmbientCompanionPane.tsx:273
-#: src/shell/pages/ChatPage.tsx:1720
+#: src/shell/pages/ChatPage.tsx:1722
 #, needs-review
 msgid "Microphone help"
 msgstr "Ayuda del micrófono"
@@ -17693,7 +17702,7 @@ msgid "area.Model per job"
 msgstr "Modelo por trabajo"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/ChatPage.tsx:1631
+#: src/shell/pages/ChatPage.tsx:1633
 #, needs-review
 msgid "Model:"
 msgstr "Modelo:"
@@ -18366,7 +18375,7 @@ msgid "New alarm"
 msgstr "Nueva alarma"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/ChatPage.tsx:1504
+#: src/shell/pages/ChatPage.tsx:1506
 #, needs-review
 msgid "New chat"
 msgstr "Chat nuevo"
@@ -18414,7 +18423,7 @@ msgid "New in your library"
 msgstr "Nuevo en tu Biblioteca"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/MediaHomePage.tsx:48
+#: src/shell/pages/MediaHomePage.tsx:49
 #, needs-review
 msgid "New in your media"
 msgstr "Novedades en tu contenido multimedia"
@@ -19483,7 +19492,7 @@ msgid "Nothing here yet"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/MediaHomePage.tsx:52
+#: src/shell/pages/MediaHomePage.tsx:54
 #, needs-review
 msgid "Nothing here yet. Add music, videos, shows, podcasts or books to your library and they show up here."
 msgstr "Aún no hay nada aquí. Agrega música, videos, series, podcasts o libros a tu Biblioteca y aparecerán aquí."
@@ -20282,7 +20291,7 @@ msgid "One moment. Back soon."
 msgstr "Un momento. Vuelvo pronto."
 
 #. js-lingui-explicit-id
-#: src/apps/chat/chatModelAdapter.ts:968
+#: src/apps/chat/chatModelAdapter.ts:971
 #: src/lib/hubReachability.ts:12
 #, needs-review
 msgid "One moment. Home will be back in about a minute."
@@ -20450,6 +20459,7 @@ msgstr ""
 #: src/shell/pages/ActivityPage.tsx:33
 #: src/shell/pages/ActivityPage.tsx:34
 #: src/shell/pages/ActivityPage.tsx:35
+#: src/shell/pages/dashboard/HomeHero.tsx:22
 #: src/shell/pages/MusicWorkspacePage.tsx:93
 #: src/shell/pages/performance/EnginesHealthBody.tsx:30
 #, needs-review
@@ -20785,13 +20795,13 @@ msgid "Other running timers"
 msgstr "Otros temporizadores en marcha"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/ChatPage.tsx:1958
+#: src/shell/pages/ChatPage.tsx:1960
 #, needs-review
 msgid "Our reply beside the same model with no routing, packages, persona or guards"
 msgstr "Nuestra respuesta junto al mismo modelo sin enrutamiento, paquetes, personaje ni controles"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/ChatPage.tsx:1617
+#: src/shell/pages/ChatPage.tsx:1619
 #, needs-review
 msgid "Ours"
 msgstr "Nuestro"
@@ -21013,7 +21023,7 @@ msgid "Password"
 msgstr "Contraseña"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/ChatPage.tsx:1927
+#: src/shell/pages/ChatPage.tsx:1929
 #, needs-review
 msgid "Past conversations"
 msgstr "Conversaciones anteriores"
@@ -21157,7 +21167,7 @@ msgid "Person"
 msgstr "Persona"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/ChatPage.tsx:1632
+#: src/shell/pages/ChatPage.tsx:1634
 #, needs-review
 msgid "Persona in effect:"
 msgstr "Personaje activo:"
@@ -21328,7 +21338,7 @@ msgid "setting.chat.pick_up_threads.label"
 msgstr "Continuar donde lo dejamos"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/MediaHomePage.tsx:43
+#: src/shell/pages/MediaHomePage.tsx:44
 #, needs-review
 msgid "Pick up where you left off"
 msgstr "Continúa donde lo dejaste"
@@ -21490,6 +21500,7 @@ msgid "setting.engines.stack.where.does"
 msgstr "Elige qué equipo hace el pensamiento y el habla para Home."
 
 #. js-lingui-explicit-id
+#: src/shell/pages/dashboard/AskBox.tsx:73
 #: src/shell/pages/FilesPage.tsx:165
 #, needs-review
 msgid "Picture"
@@ -21733,6 +21744,7 @@ msgstr "mantenimiento programado por {time}"
 #. js-lingui-explicit-id
 #: src/apps/settings/AddVoiceBox.tsx:69
 #: src/shell/pages/companionFlow/AnimateStep.tsx:45
+#: src/shell/pages/MediaHomePage.tsx:67
 #: src/shell/pages/MusicStudioView.tsx:227
 #, needs-review
 msgid "Play"
@@ -22402,7 +22414,7 @@ msgid "Read the licence and fingerprint under Details, then confirm them. Until 
 msgstr "Lee la licencia y la huella digital en Detalles y luego confírmalas. Hasta que lo hagas, solo los administradores pueden usar este estilo."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/dashboard/ActionCards.tsx:23
+#: src/shell/pages/dashboard/MakeShelf.tsx:15
 msgid "Read the news"
 msgstr ""
 
@@ -22493,7 +22505,7 @@ msgid "Recent problems"
 msgstr "Problemas recientes"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/MediaHomePage.tsx:49
+#: src/shell/pages/MediaHomePage.tsx:50
 #, needs-review
 msgid "Recently played"
 msgstr "Reproducidos recientemente"
@@ -22729,7 +22741,7 @@ msgid "Remix and edit"
 msgstr "Remezclar y editar"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/ChatPage.tsx:1702
+#: src/shell/pages/ChatPage.tsx:1704
 #, needs-review
 msgid "Remix this {kind}"
 msgstr "Remezclar este {kind}"
@@ -23849,7 +23861,7 @@ msgid "Route taken"
 msgstr "Ruta seguida"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/ChatPage.tsx:1625
+#: src/shell/pages/ChatPage.tsx:1627
 #, needs-review
 msgid "Route:"
 msgstr "Ruta:"
@@ -23874,7 +23886,7 @@ msgid "Rows per page:"
 msgstr "Filas por página:"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/ChatPage.tsx:1628
+#: src/shell/pages/ChatPage.tsx:1630
 #, needs-review
 msgid "Rules fired:"
 msgstr "Reglas activadas:"
@@ -23911,7 +23923,7 @@ msgid "Run the test"
 msgstr "Ejecutar la prueba"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/ChatPage.tsx:1623
+#: src/shell/pages/ChatPage.tsx:1625
 #, needs-review
 msgid "Rung:"
 msgstr "Nivel:"
@@ -24498,8 +24510,8 @@ msgid "Search articles"
 msgstr "Buscar artículos"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/ChatPage.tsx:1514
-#: src/shell/pages/ChatPage.tsx:1929
+#: src/shell/pages/ChatPage.tsx:1516
+#: src/shell/pages/ChatPage.tsx:1931
 #, needs-review
 msgid "Search chats"
 msgstr "Buscar chats"
@@ -24897,7 +24909,7 @@ msgstr "Semitonos, de -12 a 12. Un número negativo baja la voz."
 #. js-lingui-explicit-id
 #: src/shell/library/LibraryViewer.tsx:166
 #: src/shell/library/LibraryViewer.tsx:166
-#: src/shell/pages/dashboard/AskBox.tsx:69
+#: src/shell/pages/dashboard/AskBox.tsx:72
 #, needs-review
 msgid "Send"
 msgstr "Enviar"
@@ -25430,7 +25442,7 @@ msgid "Show all files"
 msgstr "Mostrar todos los archivos"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/ChatPage.tsx:1800
+#: src/shell/pages/ChatPage.tsx:1802
 #, needs-review
 msgid "Show conversations"
 msgstr "Mostrar conversaciones"
@@ -26222,6 +26234,7 @@ msgstr ""
 
 #. js-lingui-explicit-id
 #: src/shell/library/LibraryViewer.tsx:118
+#: src/shell/pages/dashboard/AskBox.tsx:75
 #: src/shell/pages/FilesPage.tsx:165
 #: src/shell/pages/MusicWorkspacePage.tsx:38
 #: src/shell/pages/PersonProfilePage.tsx:176
@@ -27805,7 +27818,7 @@ msgid "that device"
 msgstr "ese dispositivo"
 
 #. js-lingui-explicit-id
-#: src/apps/chat/chatModelAdapter.ts:977
+#: src/apps/chat/chatModelAdapter.ts:980
 #, needs-review
 msgid "That did not send. Try again."
 msgstr "No se envió. Inténtalo de nuevo."
@@ -28323,7 +28336,7 @@ msgid "The backup from {backupDate} will replace everything in MaiPai Home the n
 msgstr "La copia de seguridad de {backupDate} reemplazará todo en MaiPai Home la próxima vez que se inicie. Todavía no ha cambiado nada. Reinicia MaiPai Home para terminar{value}."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/ChatPage.tsx:1643
+#: src/shell/pages/ChatPage.tsx:1645
 #, needs-review
 msgid "The bare reply was refused by the same safety pass a real turn uses."
 msgstr "La respuesta base fue rechazada por la misma revisión de seguridad que usa un turno real."
@@ -28467,7 +28480,7 @@ msgid "setting.music.dj.does"
 msgstr "El DJ habla entre canciones."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/ChatPage.tsx:1946
+#: src/shell/pages/ChatPage.tsx:1948
 #, needs-review
 msgid "The document from this reply"
 msgstr "El documento de esta respuesta"
@@ -29449,11 +29462,6 @@ msgid "Things it might say"
 msgstr "Cosas que podría decir"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/dashboard/ActionCards.tsx:36
-msgid "Things to do"
-msgstr ""
-
-#. js-lingui-explicit-id
 #: src/apps/chat/chatThreadSlots.tsx:249
 #: src/apps/settings/RobotBody.tsx:21
 msgid "Thinking"
@@ -29472,7 +29480,7 @@ msgid "setting.coding.thinking_budget.label"
 msgstr "Tokens de pensamiento por petición"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/ChatPage.tsx:1630
+#: src/shell/pages/ChatPage.tsx:1632
 #, needs-review
 msgid "Thinking:"
 msgstr "Pensando:"
@@ -29549,7 +29557,7 @@ msgid "failure.prompt_limit.carry_offer.minor"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/ChatPage.tsx:1688
+#: src/shell/pages/ChatPage.tsx:1690
 #, needs-review
 msgid "This chat made {media}. Delete them too, or keep them in your Library? Deleted files wait in Trash for 30 days."
 msgstr "Este chat creó {media}. ¿Los eliminas también o los conservas en tu Biblioteca? Los archivos eliminados esperan en la Papelera durante 30 días."
@@ -30192,7 +30200,7 @@ msgid "Tour targets not found"
 msgstr "No se encontraron objetivos de la visita"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/ChatPage.tsx:1622
+#: src/shell/pages/ChatPage.tsx:1624
 #, needs-review
 msgid "Trace"
 msgstr "Trazas"
@@ -31533,6 +31541,7 @@ msgstr "Muy simple"
 #. js-lingui-explicit-id
 #: src/apps/settings/ModelsAndStorageSection.tsx:23
 #: src/apps/settings/performanceModel.ts:9
+#: src/shell/pages/dashboard/AskBox.tsx:74
 #: src/shell/pages/FilesPage.tsx:165
 #: src/shell/pages/PersonProfilePage.tsx:176
 #, needs-review
@@ -31785,7 +31794,7 @@ msgid "Voice cloning will no longer be able to use this token."
 msgstr "La clonación de voz ya no podrá usar este token."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/ChatPage.tsx:1742
+#: src/shell/pages/ChatPage.tsx:1744
 #, needs-review
 msgid "Voice conversation"
 msgstr "Conversación por voz"
@@ -33338,7 +33347,7 @@ msgid "Your character will appear here"
 msgstr "Tu personaje aparecerá aquí"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/ChatPage.tsx:1489
+#: src/shell/pages/ChatPage.tsx:1491
 #, needs-review
 msgid "Your chats will show up here."
 msgstr "Tus chats aparecerán aquí."
@@ -33361,6 +33370,8 @@ msgstr "Tus claves de Coding"
 #: src/shell/pages/CompanionsPage.tsx:162
 #: src/shell/pages/CompanionsPage.tsx:171
 #: src/shell/pages/CompanionsPage.tsx:241
+#: src/shell/pages/dashboard/HomeHero.tsx:22
+#: src/shell/pages/dashboard/HomeHero.tsx:22
 #: src/shell/VoiceStage.tsx:26
 #, needs-review
 msgid "Your companion"
@@ -33732,28 +33743,3 @@ msgstr "Sin resultados en esta ventana, apto para retiro: {rules}"
 #, needs-review
 msgid "setting.ui.look.option_label.zinc"
 msgstr "Zinc"
-
-#. js-lingui-explicit-id
-#: src/shell/pages/dashboard/MakeShelf.tsx:10
-msgid "Ask or plan"
-msgstr ""
-
-#. js-lingui-explicit-id
-#: src/shell/pages/dashboard/MakeShelf.tsx:14
-msgid "Find something to watch"
-msgstr ""
-
-#. js-lingui-explicit-id
-#: src/shell/pages/dashboard/MakeShelf.tsx:33
-msgid "Make"
-msgstr ""
-
-#. js-lingui-explicit-id
-#: src/shell/pages/dashboard/AskBox.tsx:70
-msgid "Make song"
-msgstr ""
-
-#. js-lingui-explicit-id
-#: src/shell/pages/dashboard/AskBox.tsx:69
-msgid "Make video"
-msgstr ""
