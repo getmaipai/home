@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import sharp from "sharp";
-import { makeSheetFromPictures, type SheetTools } from "@/lib/films/sheetMaker";
+import { makeSheetFromPictures, splitCutOutByMask, type SheetTools } from "@/lib/films/sheetMaker";
 
 const solid = async (r: number, g: number, b: number, width = 400, height = 300) => new Uint8Array(await sharp({ create: { width, height, channels: 3, background: { r, g, b } } }).png().toBuffer());
 // A fake background remover: a red block on transparency, as if the subject had been cut out.
@@ -82,5 +82,25 @@ describe("sheet position names match the sheet", () => {
     const sheet = await makeSheetFromPictures(pics, tools);
     expect(sheet.panels.map((panel) => panel.slot)).toEqual(["Top Left", "Top Right", "Bottom Left", "Bottom Right"]);
     expect(sheet.description).not.toContain("Middle");
+  });
+});
+
+describe("model-free split of two people", () => {
+  const figure = async (blocks: Array<{ left: number; width: number }>) => {
+    const layers = await Promise.all(blocks.map(async (block) => ({ input: await sharp({ create: { width: block.width, height: 260, channels: 4, background: { r: 200, g: 10, b: 10, alpha: 1 } } }).png().toBuffer(), left: block.left, top: 20 })));
+    return sharp({ create: { width: 400, height: 300, channels: 4, background: { r: 0, g: 0, b: 0, alpha: 0 } } }).composite(layers).png().toBuffer();
+  };
+  test("two figures with a gap between them become two cut-outs; one figure stays one", async () => {
+    const two = await splitCutOutByMask(await figure([{ left: 20, width: 140 }, { left: 240, width: 140 }]));
+    expect(two).toHaveLength(2);
+    expect(await splitCutOutByMask(await figure([{ left: 100, width: 200 }]))).toBeNull();
+  });
+  test("with no face finder a photo of two people still makes two panels, and nothing is drawn from them", async () => {
+    const noFaces: SheetTools = { findFaces: async () => [], removeBackground: async () => new Uint8Array(await figure([{ left: 20, width: 140 }, { left: 240, width: 140 }])) };
+    let calls = 0;
+    const viewTools = { editView: async () => { calls += 1; return solid(9, 9, 9, 200, 300); }, faceMatch: async () => 0.9 };
+    const sheet = await makeSheetFromPictures([{ bytes: await solid(3, 3, 3, 400, 300), mediaType: "image/png", name: "pair", role: "actor", look: "two people" }], noFaces, { drawViews: true, viewTools });
+    expect(sheet.panels.map((panel) => panel.name)).toEqual(["pair 1", "pair 2"]);
+    expect(calls).toBe(0);
   });
 });

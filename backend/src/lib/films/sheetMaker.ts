@@ -68,6 +68,35 @@ async function onWhite(image: Buffer, w: number, h: number, pad = 10): Promise<B
   return white(w, h).composite([{ input: fitted, gravity: "centre" }]).png().toBuffer();
 }
 
+/** Model-free split of a cut-out that holds two people side by side: the columns of the background remover's mask are counted, and a clear valley between two heavy
+ *  halves is the seam. Returns the two trimmed halves, or null when the figure does not split cleanly (one person, or two overlapping). */
+export async function splitCutOutByMask(cut: Buffer): Promise<Buffer[] | null> {
+  const meta = await sharp(cut).metadata();
+  if (!meta.width || !meta.height || meta.width < 80) return null;
+  const small = await sharp(cut).ensureAlpha().resize({ width: Math.min(400, meta.width) }).raw().toBuffer({ resolveWithObject: true });
+  const { data, info } = small, columns = new Array<number>(info.width).fill(0);
+  for (let y = 0; y < info.height; y++) for (let x = 0; x < info.width; x++) if (data[(y * info.width + x) * info.channels + 3]! > 128) columns[x]! += 1;
+  const total = columns.reduce((sum, value) => sum + value, 0);
+  if (total === 0) return null;
+  const smooth = columns.map((_, x) => { let sum = 0, n = 0; for (let k = -3; k <= 3; k++) { const v = columns[x + k]; if (v !== undefined) { sum += v; n++; } } return sum / n; });
+  const lo = Math.floor(info.width * 0.25), hi = Math.ceil(info.width * 0.75);
+  let seam = lo; for (let x = lo; x <= hi; x++) if (smooth[x]! < smooth[seam]!) seam = x;
+  const left = smooth.slice(0, seam), right = smooth.slice(seam);
+  const leftMass = left.reduce((sum, value) => sum + value, 0), rightMass = right.reduce((sum, value) => sum + value, 0);
+  const leftPeak = Math.max(...left), rightPeak = Math.max(...right);
+  if (leftMass < total * 0.25 || rightMass < total * 0.25 || smooth[seam]! > 0.35 * Math.min(leftPeak, rightPeak)) return null;
+  const cutAt = Math.round((seam / info.width) * meta.width);
+  // Extract first, trim second (sharp runs trim before extract inside one pipeline, which would put the extract area outside the trimmed image).
+  const halves: Buffer[] = [];
+  for (const [from, width] of [[0, cutAt], [cutAt, meta.width - cutAt]] as const) {
+    try {
+      const part = await sharp(cut).extract({ left: from, top: 0, width, height: meta.height }).png().toBuffer();
+      halves.push(await sharp(part).trim({ threshold: 5 }).png().toBuffer());
+    } catch { return null; }
+  }
+  return halves;
+}
+
 async function panelsFor(picture: SheetPicture, tools: SheetTools): Promise<Panel[]> {
   const base = { name: picture.name, role: picture.role, look: picture.look };
   if (picture.role === "set" || picture.role === "end_shot" || picture.role === "other") return [{ ...base, kind: "place", view: "Setting", image: Buffer.from(picture.bytes), onWhite: false }];
@@ -75,7 +104,12 @@ async function panelsFor(picture: SheetPicture, tools: SheetTools): Promise<Pane
     const meta = await sharp(Buffer.from(picture.bytes)).metadata();
     const [width, height] = [meta.width ?? 1, meta.height ?? 1];
     const faces = (await tools.findFaces(picture.bytes, picture.mediaType).catch(() => [])).filter((face) => face.w * face.h > 0).sort((a, b) => a.x - b.x).slice(0, 3);
-    if (!faces.length) return [{ ...base, kind: "subject", view: "Front View", image: await cutOut(picture, tools), onWhite: true }];
+    if (!faces.length) {
+      // No face finder (its models are not installed): the cut-out itself is split when it holds two people side by side. These panels are not known to be one person each, so nothing is drawn from them.
+      const whole = await cutOut(picture, tools);
+      const halves = await splitCutOutByMask(whole).catch(() => null);
+      return halves ? halves.map((image, index) => ({ ...base, name: `${picture.name} ${index + 1}`, kind: "subject" as const, view: "Front View", image, onWhite: true })) : [{ ...base, kind: "subject", view: "Front View", image: whole, onWhite: true }];
+    }
     const panels: Panel[] = [];
     for (const [index, face] of faces.entries()) {
       const name = faces.length > 1 ? `${picture.name} ${index + 1}` : picture.name;
