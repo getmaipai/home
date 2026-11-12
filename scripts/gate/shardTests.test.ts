@@ -273,6 +273,27 @@ describe("run: the gate's pass/fail meaning", () => {
     }
   });
 
+  test("HOST-GUARD-09: dev-shed arriving mid-run stops NEW shards only; a running shard finishes, then the run defers", async () => {
+    const marker = join(tmpdir(), `maipai-newonly-${Date.now()}`);
+    const dir = fixture(Object.fromEntries(Array.from({ length: 2 }, (_, index) => [`n${index}.test.ts`,
+      `import {test} from "bun:test"; import {writeFileSync} from "node:fs"; test("n${index}",async()=>{await Bun.sleep(300); writeFileSync(${JSON.stringify(`${marker}-${index}`)},"done");});`,
+    ])));
+    let probes = 0; let clock = 0;
+    try {
+      const code = await quietRun({
+        dir, root: "tests", shards: 2, timingsPath: join(dir, "t.json"), engineGb: 0, gbPerShard: 1,
+        // The first two readings (start, first launch) are calm; then the guard sets dev-shed while shard 1 runs.
+        resourceProbe: () => { probes += 1; return { reclaimableGb: probes > 2 ? 1 : 16, totalGb: 16, pressureLevel: 1, devShed: probes > 2 }; },
+        now: () => clock, sleep: async (ms) => { clock += ms; },
+      });
+      expect(code).toBe(DEFERRED_EXIT);
+      expect(existsSync(`${marker}-0`) !== existsSync(`${marker}-1`)).toBe(true);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+      for (let index = 0; index < 2; index += 1) rmSync(`${marker}-${index}`, { force: true });
+    }
+  });
+
   test("HOST-GUARD-09: the host guard's dev-shed flag defers like pressure; a stale flag does not", async () => {
     const dir = fixture({ "a.test.ts": `import {test} from "bun:test"; test("a",()=>{});` });
     let clock = 0;

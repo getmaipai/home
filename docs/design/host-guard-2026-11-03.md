@@ -136,12 +136,22 @@ is the instrument that will prove it: it captures at 4 GB and restarts at 8 GB. 
   sample reduced at once to counts per process and per path bucket (a worktree folder name, node_modules, .git or a broad area), open
   files per process, the `/dev/fsevents` clients, swap and `vm_stat`, `launchctl print`, and landing and ship timestamps. No tool lists
   the FSEvents streams per client without SIP changes. `fsevents-digest.json` (0644) holds counts only. A restart needs a complete
-  capture from the last 30 minutes; above 40 GB (`emergency_gb`) a 60 s capture (no heap or leaks) runs and the restart goes ahead.
+  capture from the last 15 minutes (the capture the same pass took counts; otherwise the restart runs its own first, whatever tripped
+  it); above 40 GB (`emergency_gb`) a 60 s capture (no heap or leaks) runs and the restart goes ahead.
+- **A restart that must wait** (a ship or install is running, or its 12-hour cooldown or daily cap) while the daemon keeps growing sets
+  `dev-shed` (new builds, tests and ships are refused with a plain line; running shards finish, only new ones are held) and writes an
+  alert into `memory.json` with the footprint and the 10-minute growth. The restart is retried every pass and runs once the ship lock
+  and the installer are gone; it never runs during a ship.
   On first delivery the daemon is about 66 GB: the first pass captures without the walk and restarts it.
 - **After a restart:** the guard checks the daemon came back small, records before and after sizes, sets the notice "Chat is slower for
   a few minutes while the system tidies up." in `memory.json` for 10 minutes, and writes `fsevents-restarted`. It touches no user
-  process. Each dev hub's watch loop (`scripts/dev.sh`) reads that file and restarts its own hub in full, which rereads every file from
-  disk, so an edit made during the restart window is picked up.
+  process. It saves a fresh baseline (`fseventsd-baseline.json`: footprint, compressed, resident, pressure), so the next growth is
+  measured from the new process. Each dev hub's watch loop (`scripts/dev.sh`) reads `fsevents-restarted`, writes a file into its probe
+  folder (the change made during the restart window), and restarts its own hub in full.
+- **Recovery check:** after its restart each hub runs `scripts/fseventsRecovery.ts` as the owner: a file changed now must be seen by a
+  real watcher within 15 s, and the restart-window file must be there. The result (pass or fail, counts and timestamps) goes to
+  `<data_dir>/host-guard/recovery/`; the guard reads it into `memory.json` and `fsevents-recovery.json`. A failure keeps `dev-shed` on
+  and writes a plain alert until that hub passes. The check uses its own watcher, not Vite's; a hub restart rereads every file anyway.
 - **Readers (development side):** `scripts/lib/hostmem.sh` says no (exit 75, one plain line) under pressure level 2 or a fresh
   `dev-shed` flag; `ship.sh`, the full and frontend `check.sh` gates, the lander's safety tests (the entry is held and retried) and the
   watcher (the tick is skipped) read it. The sharder sheds to one worker under pressure, and after 300 s exits 75 "deferred

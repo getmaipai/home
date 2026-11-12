@@ -144,7 +144,7 @@ boot_age() {
 ship_running() {
   local pid; pid="$(cat "$DATA/ship.lock.d/pid" 2>/dev/null)"
   if [[ "$pid" =~ ^[0-9]+$ ]] && kill -0 "$pid" 2>/dev/null; then return 0; fi
-  /usr/bin/pgrep -f '/usr/local/libexec/maipai-(install|promote)' >/dev/null 2>&1
+  "$(tp /usr/bin/pgrep)" -f '/usr/local/libexec/maipai-(install|promote)' >/dev/null 2>&1
 }
 # A Metal-only failure keeps the running engines answering, so it waits for no chat turn or job in flight.
 stack_quiet() {
@@ -433,7 +433,7 @@ remedy_consider() {
   local id="$1" why="" last
   if ! remedy_known "$id"; then audit "$id" refused "not on the allowlist"; return 64; fi
   remedy_limits "$id"
-  if ! remedy_due "$id"; then rm -f "$REPAIR_DIR/$id.why"; return 0; fi
+  if ! remedy_due "$id"; then rm -f "$REPAIR_DIR/$id.why"; [[ $id == restart-fseventsd ]] && rm -f "$REPAIR_DIR/restart-deferred"; return 0; fi
   last="$(last_run "$id")"
   if (( R_OFF )); then why="kill switch is set"
   elif [[ $R_MODE == off ]]; then why="repair mode is off"
@@ -443,6 +443,12 @@ remedy_consider() {
   fi
   if [[ -n "$why" ]]; then
     if [[ "$(cat "$REPAIR_DIR/$id.why" 2>/dev/null)" != "$why" ]]; then echo "$why" > "$REPAIR_DIR/$id.why"; audit "$id" skipped "$why; trigger: $TRIGGER; $(mem_counts)"; fi
+    # A restart that must wait (a ship or install, its cooldown or cap) while the daemon keeps growing pauses NEW heavy development
+    # work (dev-shed) and raises an alert; the restart is retried every pass and runs as soon as the blocker clears.
+    if [[ $id == restart-fseventsd ]] && (( ! R_OFF )) && [[ $R_MODE == live ]] && (( M_GROWTH10 > 0 )); then
+      echo "$why" > "$REPAIR_DIR/restart-deferred"
+      write_shed_flag "file-event service restart deferred ($why) while it grows"
+    fi
     return 0
   fi
   rm -f "$REPAIR_DIR/$id.why"
@@ -463,12 +469,13 @@ act_capture() { # full|quick
 
 act_restart() {
   local before_mb="$M_FSEV_MB" before_cmp="$M_FSEV_CMP" pid0="$M_FSEV_PID" ok_at rc result pid1
+  # Every restart attempt has a complete capture from the last 15 minutes behind it (the one this pass took counts), whatever tripped it.
   ok_at="$(read_int "$REPAIR_DIR/capture-ok")"
-  if (( $(now) - ok_at > 1800 )); then
+  if (( $(now) - ok_at > 900 )); then
     if (( M_FSEV_MB >= R_EMERG_MB )); then
       act_capture quick || audit restart-fseventsd note "above the emergency size; quick capture incomplete; restarting anyway"
     elif (( $(now) - $(last_run capture-fseventsd) < 7200 )); then
-      audit restart-fseventsd refused "no complete evidence capture in the last 30 minutes and the last attempt failed; waiting; $(mem_counts)"; return 1
+      audit restart-fseventsd refused "no complete evidence capture in the last 15 minutes and the last attempt failed; waiting; $(mem_counts)"; return 1
     elif ! act_capture full; then
       audit restart-fseventsd refused "the evidence capture did not complete; $(mem_counts)"; return 1
     fi
@@ -484,6 +491,10 @@ act_restart() {
   else result=ok; fi
   printf '{"version":1,"restarted_at":%s,"before_mb":%s,"after_mb":%s,"result":"%s"}\n' "$(now)" "$before_mb" "$M_FSEV_MB" "$(clean "$result" 80)" > "$STATE/fsevents-restarted.tmp" \
     && mv "$STATE/fsevents-restarted.tmp" "$STATE/fsevents-restarted" && chmod 644 "$STATE/fsevents-restarted"
+  # A fresh baseline: the next growth is measured from the new process.
+  local rss; rss="$(/bin/ps -o rss= -p "${pid1:-0}" 2>/dev/null | tr -d ' ')"; [[ "$rss" =~ ^[0-9]+$ ]] && rss=$(( rss / 1024 )) || rss=-1
+  printf '{"version":1,"at":%s,"pid":%s,"footprint_mb":%s,"compressed_mb":%s,"resident_mb":%s,"pressure":%s}\n' "$(now)" "${pid1:-0}" "$M_FSEV_MB" "$M_FSEV_CMP" "$rss" "$M_LEVEL" > "$STATE/fseventsd-baseline.json" && chmod 644 "$STATE/fseventsd-baseline.json"
+  rm -f "$REPAIR_DIR/restart-deferred" "$REPAIR_DIR/recovery-failed"
   echo $(( $(now) + 600 )) > "$REPAIR_DIR/notice-until"
   echo "$(now) $(clean "$result" 80)" > "$REPAIR_DIR/last-restart"
   audit restart-fseventsd ran "result=$result trigger=$TRIGGER before_mb=$before_mb before_compressed_mb=$before_cmp after_mb=$M_FSEV_MB pid_before=$pid0 pid_after=${pid1:-none}"
@@ -510,8 +521,35 @@ act_dev_shed() { record_run dev-shed set; write_shed_flag "pressure level $M_LEV
 dev_shed_maintain() {
   [[ -f "$STATE/dev-shed" ]] || return 0
   if (( R_OFF )) || [[ $R_MODE != live ]]; then rm -f "$STATE/dev-shed"; audit dev-shed cleared "kill switch or repair mode $R_MODE"; return 0; fi
+  if [[ -f "$REPAIR_DIR/restart-deferred" ]]; then write_shed_flag "file-event service restart deferred ($(clean "$(cat "$REPAIR_DIR/restart-deferred")" 80))"; return 0; fi
+  if [[ -f "$REPAIR_DIR/recovery-failed" ]]; then write_shed_flag "file watching did not recover in $R_FAIL dev hub(s) after the restart"; return 0; fi
   if (( M_LEVEL >= 2 )); then write_shed_flag "pressure level $M_LEVEL for $(( H_PRESS / 60 )) min"; return 0; fi
   if (( H_CALM >= 300 )); then rm -f "$STATE/dev-shed"; audit dev-shed cleared "pressure below 2 for 5 minutes; $(mem_counts)"; fi
+}
+
+# Recovery check results, written as the owner by each dev hub's checker (scripts/dev/fseventsRecovery.ts, run by dev.sh after its hub
+# restarted) into <data_dir>/host-guard/recovery/. Only small validated fields are read: the restart they answer and pass or fail.
+recovery_read() {
+  local rs d f c r
+  R_CHECKED=0; R_PASS=0; R_FAIL=0
+  rs="$(jget "$STATE/fsevents-restarted" restarted_at)"; [[ "$rs" =~ ^[0-9]+$ ]] || return 0
+  d="$DATA/host-guard/recovery"; [[ -d "$d" && ! -L "$d" ]] || return 0
+  for f in "$d"/*.json; do
+    [[ -f "$f" && ! -L "$f" ]] || continue
+    (( R_CHECKED < 50 )) || break
+    c="$(jget "$f" restarted_at)"; r="$(jget "$f" result)"
+    [[ "$c" == "$rs" ]] || continue
+    case "$r" in pass) R_PASS=$((R_PASS+1)) ;; fail) R_FAIL=$((R_FAIL+1)) ;; *) continue ;; esac
+    R_CHECKED=$((R_CHECKED+1))
+  done
+  if (( R_FAIL > 0 )); then
+    if [[ ! -f "$REPAIR_DIR/recovery-failed" ]]; then audit recovery failed "file watching did not recover in $R_FAIL of $R_CHECKED dev hubs after the restart at $rs"; fi
+    echo "$rs" > "$REPAIR_DIR/recovery-failed"
+    if (( ! R_OFF )) && [[ $R_MODE == live ]]; then write_shed_flag "file watching did not recover in $R_FAIL dev hub(s) after the restart"; fi
+  elif [[ -f "$REPAIR_DIR/recovery-failed" ]]; then
+    rm -f "$REPAIR_DIR/recovery-failed"; audit recovery passed "file watching recovered in $R_PASS dev hubs"
+  fi
+  printf '{"version":1,"restarted_at":%s,"checked_at":%s,"hubs":%s,"passed":%s,"failed":%s}\n' "$rs" "$(now)" "$R_CHECKED" "$R_PASS" "$R_FAIL" > "$STATE/fsevents-recovery.json" && chmod 644 "$STATE/fsevents-recovery.json"
 }
 
 # Landings and ships in the last hour from the development data folder (optional, config.json dev_data). Timestamps only are read.
@@ -545,8 +583,16 @@ write_memory_status() {
   (( M_GROWTH10 >= THROTTLE_GROWTH_MB )) && summary+="; file-event service grew $(gb "$M_GROWTH10") GB in 10 min"
   [[ -f "$STATE/source-throttle" ]] && summary+="; test workers halved"
   [[ $shed == true ]] && summary+="; heavy development work paused"
-  printf '{"version":1,"checked_at":%s,"pressure":%s,"pressure_held_s":%s,"free_pct":%s,"swap_used_mb":%s,"swap_total_mb":%s,"compressor_mb":%s,"top":[%s],"fseventsd":{"pid":%s,"footprint_mb":%s,"compressed_mb":%s,"growth_10min_mb":%s,"group_list_per_min":%s},"source_throttle":%s,"landings_1h":%s,"ships_1h":%s,"repair_mode":"%s","kill_switch":%s,"dev_shed":%s,"notice":"%s","notice_until":%s,"last_restart_at":%s,"last_restart_result":"%s","summary":"%s"}\n' \
-    "$(now)" "$M_LEVEL" "$H_PRESS" "$M_FREE" "$M_SWAP_USED" "$M_SWAP_TOTAL" "$M_COMP" "$top" "${M_FSEV_PID:-0}" "$M_FSEV_MB" "$M_FSEV_CMP" "$M_GROWTH10" "$M_CALLS" "$( [[ -f "$STATE/source-throttle" ]] && echo true || echo false)" \
+  local alert="" bl_pid bl_mb since_bl=-1
+  if [[ -f "$REPAIR_DIR/restart-deferred" ]]; then
+    alert="File-event service at $(gb "$M_FSEV_MB") GB, grew $(gb "$M_GROWTH10") GB in 10 min; its restart waits: $(clean "$(cat "$REPAIR_DIR/restart-deferred")" 80). New builds and tests are paused."
+  elif [[ -f "$REPAIR_DIR/recovery-failed" ]]; then
+    alert="File watching did not recover in $R_FAIL dev hub(s) after the file-event service restart. New builds and tests stay paused until those hubs restart (bash scripts/dev.sh stop, then start)."
+  fi
+  bl_pid="$(jget "$STATE/fseventsd-baseline.json" pid)"; bl_mb="$(jget "$STATE/fseventsd-baseline.json" footprint_mb)"
+  if [[ "$bl_pid" == "$M_FSEV_PID" && "$bl_mb" =~ ^[0-9]+$ ]]; then since_bl=$(( M_FSEV_MB - bl_mb )); fi
+  printf '{"version":1,"checked_at":%s,"pressure":%s,"pressure_held_s":%s,"free_pct":%s,"swap_used_mb":%s,"swap_total_mb":%s,"compressor_mb":%s,"top":[%s],"fseventsd":{"pid":%s,"footprint_mb":%s,"compressed_mb":%s,"growth_10min_mb":%s,"group_list_per_min":%s,"growth_since_baseline_mb":%s},"source_throttle":%s,"alert":"%s","recovery":{"hubs":%s,"passed":%s,"failed":%s},"landings_1h":%s,"ships_1h":%s,"repair_mode":"%s","kill_switch":%s,"dev_shed":%s,"notice":"%s","notice_until":%s,"last_restart_at":%s,"last_restart_result":"%s","summary":"%s"}\n' \
+    "$(now)" "$M_LEVEL" "$H_PRESS" "$M_FREE" "$M_SWAP_USED" "$M_SWAP_TOTAL" "$M_COMP" "$top" "${M_FSEV_PID:-0}" "$M_FSEV_MB" "$M_FSEV_CMP" "$M_GROWTH10" "$M_CALLS" "$since_bl" "$( [[ -f "$STATE/source-throttle" ]] && echo true || echo false)" "$(clean "$alert" 300)" "$R_CHECKED" "$R_PASS" "$R_FAIL" \
     "$D_LAND" "$D_SHIP" "$R_MODE" "$( ((R_OFF)) && echo true || echo false)" "$shed" "$notice" "$nu" "$rr" "$last_restart" "$(clean "$summary" 400)" > "$STATE/memory.json.tmp" \
     && mv "$STATE/memory.json.tmp" "$STATE/memory.json" && chmod 644 "$STATE/memory.json"
   local f="$STATE/memory.csv"
@@ -558,7 +604,7 @@ write_memory_status() {
 
 cmd_memory() {
   mkdir -p "$REPAIR_DIR"; chmod 755 "$REPAIR_DIR"
-  load_repair; mem_probe; signals; dev_counts
+  load_repair; mem_probe; signals; dev_counts; recovery_read
   local id
   for id in ${MAIPAI_HG_REMEDIES:-$REMEDIES}; do
     remedy_consider "$id"

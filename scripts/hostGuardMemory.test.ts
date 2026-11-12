@@ -27,7 +27,7 @@ const FAKES: Record<string, string> = {
   *fseventsd*) [ -e "$HG_FAKE/log-hang" ] && sleep 300; printf '2026-11-12 04:00:00.000 E  fseventsd[103:1] could not open\\n2026-11-12 04:00:01.000 A  fseventsd[103:1] (libsystem_info.dylib) Resolve user group list\\n2026-11-12 04:00:02.000 Df fseventsd[103:1] events dropped, must scan\\n' ;;
   *) echo "2026-11-12 04:00:00.000 Df mds[1:1] something" ;; esac`,
   launchctl: `if [ "$1" = kickstart ]; then echo "$*" >> "$HG_FAKE/kickstarts"; [ -f "$HG_FAKE/top-after" ] && cp "$HG_FAKE/top-after" "$HG_FAKE/top"; exit 0; fi; printf '\\tstate = running\\n\\truns = 3\\n'`,
-  pgrep: `[ -e "$HG_FAKE/no-fsev" ] || echo 103`,
+  pgrep: `case "$*" in *fseventsd*) [ -e "$HG_FAKE/no-fsev" ] || echo 103 ;; *maipai-*) [ -e "$HG_FAKE/installing" ] && echo 999 || exit 1 ;; *) exit 1 ;; esac`,
   vmmap: `[ -e "$HG_FAKE/vmmap-fail" ] && exit 1; printf 'Path:            /System/Library/secret/fseventsd\\nPhysical footprint:         66.0G\\nMalloc Small                     116.2G   810.0M   803.9M    64.7G       0K       0K       0K    29906\\nTOTAL                            504.1G     1.2G   865.3M    65.1G\\n'`,
   footprint: `echo "fseventsd [103]: 64-bit    Footprint: 66 GB"`,
   heap: `printf 'Process:         fseventsd [103]\nAll zones: 955166 nodes malloced - 116.2G\nZone DefaultMallocZone_0x1: 955166 nodes - 116.2G\n'`,
@@ -122,7 +122,7 @@ describe.skipIf(!mac)("host guard memory probe and self-repair", () => {
     mem(b, T0); mem(b, T0 + 60);
     expect(kicks(b)).toEqual([]);
     expect(audit(b)).toContain("id=capture-fseventsd decision=failed");
-    expect(audit(b)).toContain("decision=refused no complete evidence capture in the last 30 minutes");
+    expect(audit(b)).toContain("decision=refused no complete evidence capture in the last 15 minutes");
     const c = box();
     set(c, { pressure: "2", top: MID, "vmmap-fail": "" });
     mem(c, T0, { MAIPAI_HG_REMEDIES: "restart-fseventsd" });
@@ -180,6 +180,77 @@ describe.skipIf(!mac)("host guard memory probe and self-repair", () => {
     expect(existsSync(join(b.state, "source-throttle"))).toBe(true);
     mem(b, T0 + 600 + 600);
     expect(existsSync(join(b.state, "source-throttle"))).toBe(false);
+  }, 60_000);
+
+  test("a restart deferred by a ship while the daemon grows pauses new dev work with an alert, then runs once the ship ends", () => {
+    const b = box();
+    mkdirSync(join(b.data, "ship.lock.d"), { recursive: true });
+    writeFileSync(join(b.data, "ship.lock.d", "pid"), String(process.pid));
+    set(b, { pressure: "2", top: fsevMb(60000), "top-after": AFTER });
+    mem(b, T0);
+    expect(kicks(b)).toEqual([]);
+    expect(audit(b)).toContain("id=restart-fseventsd decision=skipped a ship or install is running");
+    set(b, { top: fsevMb(62000) }); mem(b, T0 + 600);
+    expect(kicks(b)).toEqual([]);
+    expect(JSON.parse(readFileSync(join(b.state, "dev-shed"), "utf8")).reason).toContain("restart deferred (a ship or install is running)");
+    expect(status(b).alert).toContain("grew 2.0 GB in 10 min; its restart waits: a ship or install is running. New builds and tests are paused.");
+    rmSync(join(b.data, "ship.lock.d"), { recursive: true, force: true });
+    mem(b, T0 + 660);
+    expect(kicks(b)).toEqual(["kickstart -k system/com.apple.fseventsd"]);
+    expect(JSON.parse(readFileSync(join(b.state, "fseventsd-baseline.json"), "utf8"))).toMatchObject({ at: T0 + 660, pid: 4242, footprint_mb: 12, compressed_mb: 0 });
+    expect(status(b).alert).toBe("");
+  }, 60_000);
+
+  test("an installer run (the install or promote helper) also defers the restart", () => {
+    const b = box();
+    set(b, { pressure: "1", top: BIG, installing: "" });
+    mem(b, T0);
+    expect(kicks(b)).toEqual([]);
+    expect(audit(b)).toContain("id=restart-fseventsd decision=skipped a ship or install is running");
+  });
+
+  test("a restart waiting out its 12-hour cooldown while the daemon grows again also pauses new dev work", () => {
+    const b = box();
+    set(b, { pressure: "1", top: BIG, "top-after": AFTER });
+    mem(b, T0);
+    expect(kicks(b).length).toBe(1);
+    rmSync(join(b.fake, "top-after"));
+    set(b, { top: fsevMb(9000) }); mem(b, T0 + 3600);
+    set(b, { top: fsevMb(9500) }); mem(b, T0 + 4200);
+    expect(kicks(b).length).toBe(1);
+    expect(existsSync(join(b.state, "dev-shed"))).toBe(true);
+    expect(status(b).alert).toContain("its restart waits: cooldown (720 min)");
+  }, 60_000);
+
+  test("every restart attempt runs its own capture first when none is fresh, whatever tripped it", () => {
+    const b = box();
+    set(b, { pressure: "1", top: MID, "top-after": AFTER });
+    mem(b, T0, { MAIPAI_HG_REMEDIES: "restart-fseventsd" });
+    expect(kicks(b).length).toBe(1);
+    expect(captures(b).length).toBe(1);
+    expect(audit(b).indexOf("id=capture-fseventsd decision=ran")).toBeLessThan(audit(b).indexOf("id=restart-fseventsd decision=ran"));
+  });
+
+  test("recovery: a dev hub that did not see file changes after the restart keeps new dev work paused until it passes", () => {
+    const b = box();
+    set(b, { pressure: "1", top: BIG, "top-after": AFTER });
+    mem(b, T0);
+    const dir = join(b.data, "host-guard", "recovery");
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(join(dir, "a.json"), JSON.stringify({ version: 1, restarted_at: T0, result: "pass", live_event_ms: 40, window_seen: true }));
+    writeFileSync(join(dir, "b.json"), JSON.stringify({ version: 1, restarted_at: T0, result: "fail", live_event_ms: -1, window_seen: true }));
+    writeFileSync(join(dir, "old.json"), JSON.stringify({ version: 1, restarted_at: T0 - 99, result: "fail" }));
+    mem(b, T0 + 60);
+    expect(status(b).recovery).toEqual({ hubs: 2, passed: 1, failed: 1 });
+    expect(status(b).alert).toContain("File watching did not recover in 1 dev hub(s)");
+    expect(JSON.parse(readFileSync(join(b.state, "dev-shed"), "utf8")).reason).toContain("did not recover");
+    expect(JSON.parse(readFileSync(join(b.state, "fsevents-recovery.json"), "utf8"))).toMatchObject({ restarted_at: T0, hubs: 2, failed: 1 });
+    writeFileSync(join(dir, "b.json"), JSON.stringify({ version: 1, restarted_at: T0, result: "pass", live_event_ms: 55, window_seen: true }));
+    mem(b, T0 + 120);
+    expect(status(b).recovery).toEqual({ hubs: 2, passed: 2, failed: 0 });
+    expect(audit(b)).toContain("id=recovery decision=passed");
+    for (let i = 1; i <= 5; i++) mem(b, T0 + 120 + 60 * i);
+    expect(existsSync(join(b.state, "dev-shed"))).toBe(false);
   }, 60_000);
 
   test("dry mode only logs: no capture, no restart, no flag", () => {
