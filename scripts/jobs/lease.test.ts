@@ -1,6 +1,6 @@
 // HOST-LAUNCH-02: the lease broker (scripts/jobs/lease.ts): classes, queueing among dev sessions, direct and gated modes.
 import { afterAll, describe, expect, test } from "bun:test";
-import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { readAudit } from "./lib";
@@ -106,5 +106,16 @@ describe("broker CLI", () => {
     expect(r.exitCode).toBe(0); expect(r.stdout.toString()).toContain("ran");
     expect(out(lease(e, "status"))).not.toContain("held ");
     expect(withDir(e, () => readAudit()).map((x) => x.action)).toEqual(expect.arrayContaining(["lease-granted", "launched", "finished", "lease-released"]));
+  });
+
+  test("the mode comes from scripts/mode.sh when it exists, else the jobs/mode setting, else gated", () => {
+    const e = env(); delete (e as Record<string, string>).MAIPAI_DEV_MODE;
+    expect(out(lease({ ...e, MAIPAI_MODE: "direct" }, "mode"))).toBe("direct");
+    expect(out(lease({ ...e, MAIPAI_MODE: "gated" }, "mode"))).toBe("gated");
+    const state = mkdtempSync(join(tmpdir(), "lease-mode-")); temps.push(state);
+    const unset = { ...e, MAIPAI_MODE: "", MAIPAI_MODE_FILE: join(state, "none"), MAIPAI_JOBS_DIR: state };
+    expect(out(lease(unset, "mode"))).toBe("gated");
+    writeFileSync(join(state, "mode"), "direct\n");
+    expect(out(lease(unset, "mode"))).toBe("direct");
   });
 });
