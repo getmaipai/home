@@ -240,7 +240,7 @@ describe("the settings route", () => {
   test("an admin opens the voice manager in Home settings", async () => {
     const view = open(makePerson("admin"), "/settings/home-voice?tab=voices");
     await waitFor(() => expect(where(view)).toBe("/settings/home-voice?tab=voices"));
-    await waitFor(() => expect(view.getByRole("button", { name: "Add voice" })).toBeTruthy());
+    await waitFor(() => expect(view.getByRole("button", { name: "+ Add voice" })).toBeTruthy());
   });
 
   test("a section the viewer may not see replaces to the first visible one, naming nothing", async () => {

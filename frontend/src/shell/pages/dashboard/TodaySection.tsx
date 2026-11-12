@@ -86,7 +86,7 @@ export function TodaySection({ home, heroOnly = false, chips = false, role }: { 
 
   // When every card is hidden the section would vanish with its Arrange button; keep the button while any card is hidden.
   const arranged = useQuery({ queryKey: ARRANGE_KEY, queryFn: api.homeArrange, retry: false, enabled: Boolean(home) && !heroOnly && !chips });
-  const anyHidden = Boolean(arranged.data?.cards.some((card) => card.hidden));
+  const anyHidden = Boolean(arranged.data?.cards?.some((card) => card.hidden));
 
   const loadingHome = !home && list.isPending;
   const homeError = !home && list.isError;
