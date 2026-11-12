@@ -77,7 +77,7 @@ describe("film planner", () => {
   });
 
   test("prompt carries the film planning rules", () => {
-    for (const phrase of ["never what is absent", "flat empty sea", "Repeat the locked description", "shot on 35mm", "wide establishing", "facing the camera", "extreme close-up", "dolly zoom", "wide retreat", "reaction shot", "calm closing wide", "real person's name", "under 12 words", "At most one character", "5 to 7 seconds", "4 to 8 shots"]) expect(FILM_PLAN_PROMPT).toContain(phrase);
+    for (const phrase of ["never what is absent", "flat horizon", "Repeat the locked description", "shot on 35mm", "wide establishing", "facing the camera", "extreme close-up", "dolly zoom", "wide retreat", "reaction shot", "calm closing wide", "real person's name", "under 12 words", "At most one character", "5 to 7 seconds", "4 to 8 shots"]) expect(FILM_PLAN_PROMPT).toContain(phrase);
   });
 
   test("plan shots reduce to the production shot shape and JSON schema matches zod properties", () => {

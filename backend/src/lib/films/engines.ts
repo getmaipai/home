@@ -93,16 +93,23 @@ export function realFilmEngines(input: { actor: PersonRow; signal: AbortSignal; 
       // "LITOKCUE RONHICSE"), and the writing is what the reveal is for. The picture is fitted to the film's frame on a soft copy of itself.
       const aloneNames = castLocked.map((line) => line.split(":")[0]!.trim()).filter((name) => subjectsForNames(actor, [name])?.[0]?.references[0]);
       // Only when the product is the one supplied picture in the shot: with the actor and the place also there, the shot is composed from all three below.
-      if (exactReference && aloneNames.length < 2) {
-        const picture = subjectsForNames(actor, [exactReference])?.[0]?.references[0];
-        if (picture) {
-          const base = sharp(Buffer.from(picture.bytes), { failOn: "error" }).rotate();
+      // FILM-REAL-04: a shot whose only supplied picture is a place or an object uses that photo itself as its first frame (no image model, so nothing
+      // is redrawn): the film shows his factory floor, not a model's idea of one. A place fills the frame; an object keeps its shape on a soft copy of itself.
+      const single = aloneNames.length === 1 ? subjectsForNames(actor, [aloneNames[0]!])?.[0] : undefined;
+      const exactSubject = exactReference && aloneNames.length < 2 ? subjectsForNames(actor, [exactReference])?.[0] : single && single.subject.kind !== "character" ? single : undefined;
+      if (exactSubject?.references[0]) {
+        const picture = exactSubject.references[0];
+        const base = sharp(Buffer.from(picture.bytes), { failOn: "error" }).rotate();
+        const place = exactSubject.subject.kind === "place";
+        let fitted: Buffer;
+        if (place) fitted = await base.clone().resize(1024, 576, { fit: "cover" }).png().toBuffer();
+        else {
           const backdrop = await base.clone().resize(1024, 576, { fit: "cover" }).blur(28).modulate({ brightness: 0.85 }).png().toBuffer();
           const front = await base.clone().resize(1024, 576, { fit: "inside" }).png().toBuffer();
-          const fitted = await sharp(backdrop).composite([{ input: front, gravity: "centre" }]).png().toBuffer();
-          const kept = storeFile(actor, { conversationId: null, turnId: null, mediaType: "image/png", bytes: fitted, provenance: `picture-gen:${JSON.stringify({ v: 1, audience: "all-ages", job: `reference-${shot.id}`, index: 0, seed: 0, width: 1024, height: 576 })}`, retention: "kept", name: `Film still ${shot.id}`, deduplicate: false });
-          if (kept.ok) return kept.value.id;
+          fitted = await sharp(backdrop).composite([{ input: front, gravity: "centre" }]).png().toBuffer();
         }
+        const kept = storeFile(actor, { conversationId: null, turnId: null, mediaType: "image/png", bytes: fitted, provenance: `picture-gen:${JSON.stringify({ v: 1, audience: "all-ages", job: `reference-${shot.id}`, index: 0, seed: 0, width: 1024, height: 576 })}`, retention: "kept", name: `Film still ${shot.id}`, deduplicate: false });
+        if (kept.ok) return kept.value.id;
       }
       const prompt = [shot.still, ...castLocked].filter(Boolean).join(" ");
       const seed = createHash("sha256").update(shot.id).digest().readUInt32BE(0);
