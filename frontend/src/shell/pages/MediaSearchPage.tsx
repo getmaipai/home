@@ -24,7 +24,7 @@ export function MediaSearchPage() {
     <MediaHubFrame packageId="search">
       <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-6 p-4 lg:ps-6" data-testid="media-search">
         {q.trim().length === 0 ? <EmptyState icon="search" text={i18n._({ id: "Search for a title across your media apps.", message: "Search for a title across your media apps." })} /> : (
-          <AsyncState data={page.isError ? null : page.data} error={page.isError} isFetching={page.isFetching} onRetry={() => page.refetch()}
+          <AsyncState loadingShape="page" data={page.isError ? null : page.data} error={page.isError} isFetching={page.isFetching} onRetry={() => page.refetch()}
             errorMessage={i18n._({ id: "Could not search Media. Check your connection and try again.", message: "Could not search Media. Check your connection and try again." })} loadingLabel={i18n._({ id: "Searching Media", message: "Searching Media" })}>
             {(data: MediaSearch) => data.groups.length === 0
               ? <EmptyState icon="search" text={i18n._({ id: "No matches for \"{q}\". Try another word.", message: "No matches for \"{q}\". Try another word.", values: { q } })} />

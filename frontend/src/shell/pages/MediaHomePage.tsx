@@ -29,7 +29,7 @@ export function MediaHomePage() {
   return (
     <MediaHubFrame packageId="home">
       <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-6 p-4 lg:ps-6" data-testid="media-home">
-        <AsyncState
+        <AsyncState loadingShape="page"
           data={page.isError ? null : page.data}
           error={page.isError}
           isFetching={page.isFetching}

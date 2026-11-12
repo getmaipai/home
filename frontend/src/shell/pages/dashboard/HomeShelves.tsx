@@ -4,6 +4,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { Avatar } from "@maipai/ui/src/primitives/Avatar";
 import { MediaShelf } from "@maipai/ui/src/primitives/MediaShelf";
 import { AsyncState } from "@maipai/ui/src/primitives/AsyncState";
+import { ShelfSkeleton } from "@maipai/ui/src/primitives/PageSkeleton";
 import { SafeImage, type ImageFallbackKind } from "@maipai/ui/src/primitives/SafeImage";
 import { Section } from "@maipai/ui/src/primitives/Section";
 import { Item, ItemContent, ItemMedia, ItemTitle } from "@maipai/ui/src/dashboard/components/ui/item";
@@ -44,7 +45,8 @@ function ContinueGrid({ rows }: { rows: MediaHomeRow[] }) {
 export function ContinueShelf() {
   const heading = i18n._({ id: "Continue", message: "Continue" });
   const query = useQuery({ queryKey: ["home-continue"], queryFn: api.continueRows, retry: false });
-  if (query.isPending || query.isError) return <AsyncState data={query.data} error={query.isError} isFetching={query.isFetching} onRetry={() => void query.refetch()} errorMessage={i18n._({ id: "Could not load your recent items. Refresh Home to try again.", message: "Could not load your recent items. Refresh Home to try again." })} loadingLabel={i18n._({ id: "Loading your recent items", message: "Loading your recent items" })}>{() => null}</AsyncState>;
+  if (query.isPending) return <ShelfSkeleton />;
+  if (query.isError) return <AsyncState data={query.data} error={query.isError} isFetching={query.isFetching} onRetry={() => void query.refetch()} errorMessage={i18n._({ id: "Could not load your recent items. Refresh Home to try again.", message: "Could not load your recent items. Refresh Home to try again." })} loadingLabel={i18n._({ id: "Loading your recent items", message: "Loading your recent items" })}>{() => null}</AsyncState>;
   const rows = (query.data.rows ?? []).map((row): MediaHomeRow => ({ id: `${row.source}/${row.id}`, app: continueApp(row.media_kind), kind: row.media_kind === null ? "chat" : row.kind, title: row.title, subtitle: row.subtitle, artwork_url: row.artwork_url, href: row.href, percent: row.percent, at: row.at }));
   return <section aria-label={heading}><Section variant="flat" heading={heading}>
     {rows.length ? <ContinueGrid rows={rows} /> : <p className="text-supporting text-muted-foreground">{i18n._({ id: "Nothing to pick up yet. Chats and things you play show up here.", message: "Nothing to pick up yet. Chats and things you play show up here." })}</p>}
@@ -71,7 +73,8 @@ function MediaRows({ heading, rows }: { heading: string; rows: MediaHomeRow[] })
 export function HomeMedia({ kind }: { kind: "continue" | "new" | "made_at_home" }) {
   const query = useQuery({ queryKey: ["home-media"], queryFn: api.mediaHome, retry: false });
   const continuing = useQuery({ queryKey: ["home-continue"], queryFn: api.continueRows, retry: false, enabled: kind === "continue" });
-  if (query.isPending || query.isError) return <AsyncState data={query.data} error={query.isError} isFetching={query.isFetching} onRetry={() => void query.refetch()} errorMessage={i18n._({ id: "Could not load your library. Refresh Home to try again.", message: "Could not load your library. Refresh Home to try again." })} loadingLabel={i18n._({ id: "Loading your library", message: "Loading your library" })}>{() => null}</AsyncState>;
+  if (query.isPending) return <ShelfSkeleton />;
+  if (query.isError) return <AsyncState data={query.data} error={query.isError} isFetching={query.isFetching} onRetry={() => void query.refetch()} errorMessage={i18n._({ id: "Could not load your library. Refresh Home to try again.", message: "Could not load your library. Refresh Home to try again." })} loadingLabel={i18n._({ id: "Loading your library", message: "Loading your library" })}>{() => null}</AsyncState>;
   const data: MediaHome = query.data;
   const rows = kind === "continue" ? [
     ...(data.continue ?? []),

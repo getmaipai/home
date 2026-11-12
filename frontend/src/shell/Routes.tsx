@@ -67,6 +67,7 @@ import { activeAppHref, rememberLastAppRoute } from "@/shell/pages/settings/sett
 import { retiredManagePageTarget } from "@/shell/pages/settings/settingsRedirects";
 import { lazyNamed } from "@/shell/lazyNamed";
 import { RouteSkeleton } from "@maipai/ui/src/primitives/RouteSkeleton";
+import { PageSkeleton } from "@maipai/ui/src/primitives/PageSkeleton";
 import { Tour } from "@maipai/ui/src/primitives/Tour";
 import { useTourRunner } from "@/shell/useTourRunner";
 import { CompanionShellViewer } from "@/lib/companionShells";
@@ -176,7 +177,7 @@ function PageHeaderLayout() {
   return (
     <>
       {title ? <h1 className="sr-only">{title}</h1> : null}
-      <Suspense fallback={<RouteSkeleton />}><Outlet /></Suspense>
+      <Suspense fallback={<PageSkeleton />}><Outlet /></Suspense>
     </>
   );
 }
