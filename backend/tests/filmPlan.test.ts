@@ -6,7 +6,7 @@ import { __setFilmPlanCompleterForTests, FILM_PLAN_PROMPT, FILM_PLAN_RESPONSE_FO
 const productionShot = z.object({ id: z.string().min(1).max(80), subject_ids: z.array(z.string()), clip_file_id: z.string().nullable().optional(), picture_file_id: z.string().nullable().optional(), music_line_id: z.string().nullable().optional(), voice_line_id: z.string().nullable().optional() });
 const goodPlan: FilmPlan = {
   title: "The Quiet Crossing", summary: "A sailor meets a sea creature at dusk.",
-  cast: [{ name: "Mira", kind: "character", locked: "Blue coat, silver braid, three freckles, never a hat." }],
+  cast: [{ name: "Mira", kind: "character", locked: "Blue coat, silver braid, three freckles, never a hat.", reveal_last: false }],
   shots: [
     { id: "shot-1", subject_ids: [], framing: "wide establishing", still: "Mira in a blue coat with a silver braid and three freckles, never a hat, beside a flat empty sea meeting a plain hazy sky.", motion: "The tide rolls gently.", seconds: 6, transition: "fade" },
     { id: "shot-2", subject_ids: [], framing: "calm closing wide", still: "Mira in a blue coat with a silver braid and three freckles, never a hat, walks along the shore.", motion: "The water settles.", seconds: 6 },
@@ -101,22 +101,41 @@ describe("film planner", () => {
     }
   });
 
-  test("a product marked reveal_last is named only in the last shot", () => {
-    const plan = { ...goodPlan, cast: [...goodPlan.cast, { name: "Blue mug", kind: "prop" as const, locked: "blue mug with white lettering", reveal_last: true }], shots: [
-      { ...goodPlan.shots[0]!, id: "a", still: "Wide, the Blue mug kiln in a factory, blue MUG glaze" },
-      { ...goodPlan.shots[1]!, id: "b", still: "Close on the wheel, hands shaping clay", motion: "push in toward the blue mug" },
-      { ...goodPlan.shots[0]!, id: "c", still: "Blue mug on a wooden table in morning light" },
+  test("a product marked reveal_last is shown, named, described and lettered only in the last shot, and never in the title", () => {
+    const plan = { ...goodPlan, title: "The World's Greatest Mug", summary: "A blue mug with white lettering is made. It sits on a table.", cast: [...goodPlan.cast, { name: "Blue mug", kind: "prop" as const, locked: "blue ceramic mug with white lettering", reveal_last: true }], shots: [
+      { ...goodPlan.shots[0]!, id: "a", still: "Wide shot of the factory floor. A smooth blue ceramic mug with bold white lettering rides the belt. Robotic arms swing." },
+      { ...goodPlan.shots[1]!, id: "b", still: "Close on the wheel, hands shaping clay.", motion: "push in toward the blue mug" },
+      { ...goodPlan.shots[0]!, id: "c", still: "Blue mug on a wooden table in morning light. The lettering reads CHEATER." },
     ] };
-    const held = holdBackReveals(plan);
-    expect(held.shots[0]!.still.toLowerCase()).not.toContain("blue mug");
-    expect(held.shots[1]!.motion.toLowerCase()).not.toContain("blue mug");
+    const held = holdBackReveals(plan, 'A mug ad. Reveal "World\'s Greatest Cheater" only at the end.');
+    for (const shot of held.shots.slice(0, 2)) { expect(`${shot.still} ${shot.motion}`.toLowerCase()).not.toMatch(/mug|lettering|cheater/); expect(shot.still.length).toBeGreaterThan(0); }
+    expect(held.shots[0]!.still).toContain("Robotic arms swing.");
     expect(held.shots[2]!.still).toContain("Blue mug");
-    expect(holdBackReveals({ ...plan, cast: plan.cast.map((m) => ({ ...m, reveal_last: undefined })) })).toEqual({ ...plan, cast: plan.cast.map((m) => ({ ...m, reveal_last: undefined })) });
+    expect(`${held.title} ${held.summary}`.toLowerCase()).not.toMatch(/mug|lettering/);
+    expect(holdBackReveals({ ...plan, title: "The World's Greatest Cheater" }, 'Reveal "World\'s Greatest Cheater" at the end').title).toBe("The making of it");
+    const none = { ...plan, cast: plan.cast.map((m) => ({ ...m, reveal_last: false })) };
+    expect(holdBackReveals(none)).toEqual(none);
   });
 
   test("a planner call that gets no answer says the model was busy and that nothing was lost", async () => {
     __setFilmPlanCompleterForTests(async () => ({ ok: false, unavailable: true }));
     const result = await planFilm({ idea: "A sailor crosses the sea" });
     expect(result).toMatchObject({ ok: false, line: expect.stringContaining("Resume") });
+  });
+
+  test("a spoiled or empty plan is asked for again (up to three tries) and never planned from", async () => {
+    const spoiled = JSON.stringify({ ...goodPlan, title: "T</think></s>", summary: "true" });
+    const empty = JSON.stringify({ ...goodPlan, cast: [{ name: "weather", kind: "character", locked: "true", reveal_last: true }], shots: goodPlan.shots.map((shot) => ({ ...shot, still: "true" })) });
+    let calls = 0;
+    __setFilmPlanCompleterForTests(async () => { calls++; return { ok: true, text: calls === 1 ? spoiled : calls === 2 ? empty : JSON.stringify(goodPlan) }; });
+    const result = await planFilm({ idea: "A sailor crosses the sea" });
+    expect(calls).toBe(3);
+    expect(result).toMatchObject({ ok: true });
+    __setFilmPlanCompleterForTests(async () => ({ ok: true, text: spoiled }));
+    expect(await planFilm({ idea: "A sailor crosses the sea" })).toMatchObject({ ok: false });
+  });
+  test("half of the quoted writing in a title still counts as the hidden writing", () => {
+    const plan = { ...goodPlan, title: "The Greatest Cheater", cast: [...goodPlan.cast, { name: "White mug", kind: "prop" as const, locked: "white mug", reveal_last: true }] };
+    expect(holdBackReveals(plan, 'Reveal "World\'s Greatest CHEATER" at the end').title).toBe("The making of it");
   });
 });

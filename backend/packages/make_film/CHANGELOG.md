@@ -4,6 +4,7 @@
 
 ### Added
 
+- Pictures you attach now work with real uploads (the saved copy no longer collapses into the upload). A product kept hidden until the end stays out of every earlier shot, its title and summary; a spoiled or empty plan from the model is asked for again.
 - A film plan on a busy hub no longer fails at 30 seconds: the planner waits up to four minutes, says plainly when the model did not answer (nothing is lost, press Resume), and attached pictures are always read, whatever the model puts in the character list.
 - Asking for a commercial or an ad, or giving several pictures, now picks the film tool instead of the single-clip tool, and the single-clip tool points several photos to a film.
 - Say a product should stay hidden until the end (for example writing on a mug) and the film shows it only in the last shot; earlier shots never start from its picture. The picture reader also no longer reads out writing on an object.

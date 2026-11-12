@@ -80,7 +80,7 @@ registerMediaOp({
       const screen = await screenInputImage(loaded.bytes, args.look, viewerOf(actor));
       if (!screen.ok) throw new ImageEditError(422, screen.line, screen.code);
     }
-    const saved = storeFile(actor, { conversationId: null, turnId: null, mediaType: loaded.mediaType, bytes: loaded.bytes, provenance: "media-subject-reference", retention: "kept", name: `${args.name} reference` });
+    const saved = storeFile(actor, { conversationId: null, turnId: null, mediaType: loaded.mediaType, bytes: loaded.bytes, provenance: "media-subject-reference", retention: "kept", name: `${args.name} reference`, deduplicate: false });
     if (!saved.ok) throw new ImageEditError(saved.status, saved.error, "save_failed");
     const subject = createMediaSubject(actor, { name: args.name, kind: args.kind, look: args.look, referenceIds: [saved.value.id], real: false }, "chat");
     return { subject: { id: subject.id, name: subject.name, kind: subject.kind } };

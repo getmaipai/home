@@ -19,7 +19,7 @@ export function stopProducing(productionId: string): boolean { const c = stops.g
 /** Only the very first run of a production has the title card and only the very last has the credits. */
 function planFor(chunk: ShotList["shots"], t: Treatment, bible: Bible, scene: Outline["scenes"][number], part: string, ends: { first: boolean; last: boolean }): FilmPlan {
   const named = bible.cast.filter((c) => chunk.some((s) => s.still.includes(c.name))).slice(0, 6);
-  const cast = (named.length ? named : bible.cast.slice(0, 1)).map((c) => ({ name: c.name, kind: "character" as const, locked: c.description.slice(0, 400) }));
+  const cast = (named.length ? named : bible.cast.slice(0, 1)).map((c) => ({ name: c.name, kind: "character" as const, locked: c.description.slice(0, 400), reveal_last: false }));
   return {
     title: `${t.title}: ${scene.title}${part}`.slice(0, 80), summary: scene.beat.slice(0, 400), cast,
     shots: chunk.map((s) => ({ id: s.id, subject_ids: [], framing: s.framing, still: `${s.still} ${t.look}`.slice(0, 600), motion: s.motion, seconds: s.seconds, ...(s.line ? { line: s.line.slice(0, 160) } : {}) })),

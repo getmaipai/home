@@ -171,7 +171,7 @@ export function realFilmEngines(input: { actor: PersonRow; signal: AbortSignal; 
         const baseLength = videoSeconds.every((seconds): seconds is number => seconds !== null)
           ? videoSeconds.reduce<number>((sum, seconds) => sum + seconds, 0) - transitionCount * 0.5
           : videoSeconds.reduce<number>((sum, seconds) => sum + (seconds ?? 0), 0);
-        const creditLines = plan.credits_card === false ? [] : [...plan.credits.filter((entry) => !/^(unnamed|unknown|n\/a|none|tbd)$/i.test(entry.name.trim()) && entry.name.trim().length > 0), { role: "Made with", name: "MaiPai" }];
+        const creditLines = plan.credits_card === false ? [] : [...plan.credits.filter((entry) => !/^(unnamed|unknown|n\/a|none|tbd|(?:a )?real person'?s name)$/i.test(entry.name.trim()) && entry.name.trim().length > 0), { role: "Made with", name: "MaiPai" }];
         const showTitle = plan.title_card !== false, showCredits = plan.credits_card !== false;
         const added = filmOverhead(showTitle, showCredits, creditLines.length);
         const totalSeconds = baseLength + added;

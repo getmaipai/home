@@ -51,7 +51,7 @@ export async function prepareCharacters(actor: PersonRow, input: { names: string
         const added: string[] = [];
         for (const id of rest) {
           const loaded = loadSource(actor, input.conversationId!, id, false);
-          const file = storeFile(actor, { conversationId: null, turnId: null, mediaType: loaded.mediaType, bytes: loaded.bytes, provenance: "media-subject-reference", retention: "kept", name: `${name} reference` });
+          const file = storeFile(actor, { conversationId: null, turnId: null, mediaType: loaded.mediaType, bytes: loaded.bytes, provenance: "media-subject-reference", retention: "kept", name: `${name} reference`, deduplicate: false });
           if (!file.ok) return { ok: false, line: file.error };
           added.push(file.value.id);
         }

@@ -96,4 +96,33 @@ describe("what each attached picture is for", () => {
       expect(hints.some((h) => h.startsWith("Factory floor (set"))).toBe(true);
     } finally { __setStartFilmForTests(null); __setVideoStatusForTests(undefined); }
   });
+
+  test("real uploads: a picture saved exactly as sent still becomes a character (the saved copy is its own kept file, never the upload)", async () => {
+    const resolved = resolveOrCreateConversation(actor, "chat"); if (!resolved.ok) throw new Error(resolved.error);
+    const conversationId = resolved.value.id;
+    logTurn(actor, "chat", "ad", { reply: { text: "ok" }, source: "plugin", plugin_id: "film", safety: SAFE, conversation_id: conversationId, turn_id: "turn-real12" });
+    const bytes = await png("#775533");
+    // The composer stores an upload with retention "conversation" and the default de-duplication, exactly like this.
+    const upload = storeFile(actor, { conversationId, turnId: "turn-real12", mediaType: "image/png", bytes, provenance: "composer:mug.png", retention: "conversation", name: "mug.png" });
+    if (!upload.ok) throw new Error(upload.error);
+    __setRolesVisionForTests(async () => JSON.stringify({ role: "product", name: "coffee mug", look: "white ceramic mug" }));
+    const result = await prepareFilmPictures(actor, { images: [{ id: upload.value.id }], conversationId });
+    if (!result.ok) throw new Error(result.line);
+    const mug = listMediaSubjects(actor).find((s) => s.name === "Coffee mug")!;
+    expect(mug.kind).toBe("prop");
+    expect(mug.reference_ids).toHaveLength(1);
+    expect(mug.reference_ids[0]).not.toBe(upload.value.id);
+  });
+  test("real uploads: two identical-bytes pictures of one thing add a second reference instead of failing", async () => {
+    const resolved = resolveOrCreateConversation(actor, "chat"); if (!resolved.ok) throw new Error(resolved.error);
+    const conversationId = resolved.value.id;
+    logTurn(actor, "chat", "ad", { reply: { text: "ok" }, source: "plugin", plugin_id: "film", safety: SAFE, conversation_id: conversationId, turn_id: "turn-real34" });
+    const a = storeFile(actor, { conversationId, turnId: "turn-real34", mediaType: "image/png", bytes: await png("#aa7733"), provenance: "composer:a.png", retention: "conversation", name: "a.png" });
+    const b = storeFile(actor, { conversationId, turnId: "turn-real34", mediaType: "image/png", bytes: await png("#bb8844"), provenance: "composer:b.png", retention: "conversation", name: "b.png" });
+    if (!a.ok || !b.ok) throw new Error("upload");
+    __setRolesVisionForTests(async () => JSON.stringify({ role: "product", name: "coffee mug", look: "white ceramic mug" }));
+    const result = await prepareFilmPictures(actor, { images: [{ id: a.value.id }, { id: b.value.id }], conversationId });
+    if (!result.ok) throw new Error(result.line);
+    expect(listMediaSubjects(actor).find((s) => s.name === "Coffee mug")!.reference_ids).toHaveLength(2);
+  });
 });
