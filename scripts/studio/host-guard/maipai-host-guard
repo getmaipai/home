@@ -254,7 +254,7 @@ cmd_run() {
     if (( hard == 0 && metal_fails == 0 )) && [[ -z "${MAIPAI_HG_NO_TELEMETRY:-}" ]]; then with_timeout 45 /bin/bash "$SELF" telemetry "$((t1-t0))" "$((t3-t2))" >/dev/null 2>&1; fi
     # The memory probe and its bounded repairs, after the reboot decision, in their own bounded process (an evidence capture can take
     # minutes; launchd starts the next pass when this one ends). Tests run it only against fake tools (MAIPAI_HG_BIN).
-    if [[ "${MAIPAI_HG_TEST:-}" != 1 || -n "${MAIPAI_HG_BIN:-}" ]]; then with_timeout 600 /bin/bash "$SELF" memory >/dev/null 2>&1; fi
+    if [[ "${MAIPAI_HG_TEST:-}" != 1 || -n "${MAIPAI_HG_BIN:-}" ]]; then with_timeout 900 /bin/bash "$SELF" memory >/dev/null 2>&1; fi
     return 0
   fi
 
@@ -375,7 +375,7 @@ audit() { # id decision detail
   [[ $(stat -f %z "$f" 2>/dev/null || echo 0) -gt 1048576 ]] && { tail -n 3000 "$f" > "$f.tmp" && mv "$f.tmp" "$f"; chmod 644 "$f"; }
   log "repair: $1 $2 $(clean "$3" 400)"
 }
-runs_since() { local n=0 t; while read -r t _; do if [[ "$t" =~ ^[0-9]+$ ]] && (( t >= $2 )); then n=$((n+1)); fi; done < "$REPAIR_DIR/$1.runs" 2>/dev/null; echo "$n"; }
+runs_since() { local n=0 t; while read -r t _; do if [[ "$t" =~ ^[0-9]+$ ]] && (( t >= $2 )); then n=$((n+1)); fi; done 2>/dev/null < "$REPAIR_DIR/$1.runs"; echo "$n"; }
 last_run() { local t; t="$(tail -n 1 "$REPAIR_DIR/$1.runs" 2>/dev/null | awk '{print $1}')"; [[ "$t" =~ ^[0-9]+$ ]] && echo "$t" || echo 0; }
 record_run() { echo "$(now) $2" >> "$REPAIR_DIR/$1.runs"; tail -n 50 "$REPAIR_DIR/$1.runs" > "$REPAIR_DIR/$1.runs.tmp" && mv "$REPAIR_DIR/$1.runs.tmp" "$REPAIR_DIR/$1.runs"; }
 mem_counts() { echo "pressure=$M_LEVEL fseventsd_mb=$M_FSEV_MB fseventsd_compressed_mb=$M_FSEV_CMP growth_mb_per_min=$M_GROWTH group_list_per_min=$M_CALLS est_leak_mb_per_min=$M_LEAK_MB swap_used_mb=$M_SWAP_USED"; }
@@ -435,7 +435,7 @@ remedy_consider() {
 
 # Evidence capture in its own bounded process; 0 when it completed (the COMPLETE marker of a capture that started after us).
 act_capture() { # full|quick
-  local mode="$1" limit=480 start rc latest
+  local mode="$1" limit=660 start rc latest
   [[ $mode == quick ]] && limit=70
   start="$(now)"; record_run capture-fseventsd "started-$mode"
   with_timeout "$limit" /bin/bash "$SELF" capture-fsevents "${M_FSEV_PID:-0}" "$mode" >/dev/null 2>&1; rc=$?
