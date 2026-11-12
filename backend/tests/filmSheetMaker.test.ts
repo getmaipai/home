@@ -1,0 +1,38 @@
+import { describe, expect, test } from "bun:test";
+import sharp from "sharp";
+import { makeSheetFromPictures, type SheetTools } from "@/lib/films/sheetMaker";
+
+const solid = async (r: number, g: number, b: number, width = 400, height = 300) => new Uint8Array(await sharp({ create: { width, height, channels: 3, background: { r, g, b } } }).png().toBuffer());
+// A fake background remover: a red block on transparency, as if the subject had been cut out.
+const tools: SheetTools = {
+  removeBackground: async () => new Uint8Array(await sharp({ create: { width: 120, height: 300, channels: 4, background: { r: 0, g: 0, b: 0, alpha: 0 } } }).composite([{ input: { create: { width: 100, height: 280, channels: 4, background: { r: 200, g: 10, b: 10, alpha: 1 } } }, left: 10, top: 10 }]).png().toBuffer()),
+  findPeople: async () => [{ x: 50, y: 20, w: 200, h: 260 }],
+};
+async function pixel(png: Uint8Array, x: number, y: number) { const { data, info } = await sharp(Buffer.from(png)).raw().toBuffer({ resolveWithObject: true }); const at = (y * info.width + x) * info.channels; return [data[at]!, data[at + 1]!, data[at + 2]!]; }
+
+describe("sheet from pictures", () => {
+  test("a person, an object and a place make cut-out panels on white and a full-height place panel", async () => {
+    const sheet = await makeSheetFromPictures([
+      { bytes: await solid(1, 1, 1), mediaType: "image/png", name: "girl", role: "actor", look: "a girl in a cream jacket" },
+      { bytes: await solid(2, 2, 2), mediaType: "image/png", name: "can", role: "product", look: "a red can" },
+      { bytes: await solid(20, 20, 200, 800, 450), mediaType: "image/png", name: "door", role: "set", look: "a glossy red door" },
+    ], tools);
+    const meta = await sharp(Buffer.from(sheet.png)).metadata();
+    expect([meta.width, meta.height]).toEqual([768, 448]);
+    expect(await pixel(sheet.png, 760, 440)).toEqual([20, 20, 200]);       // the place fills the right column
+    expect(await pixel(sheet.png, 2, 2)).toEqual([255, 255, 255]);          // subjects sit on white
+    expect(sheet.panels.map((panel) => `${panel.view}`)).toEqual(["Front View", "Face Close-up", "Front View", "Setting"]);
+    expect(sheet.description.startsWith("Reference sheet: ")).toBe(true);
+    expect(sheet.description).toContain("(Character, Front View): a girl in a cream jacket");
+    expect(sheet.description).toContain("(Character, Face Close-up): a girl in a cream jacket");
+    expect(sheet.description).toContain("(Prop, Front View): a red can");
+    expect(sheet.description).toContain("Far Right (Setting): a glossy red door");
+  });
+  test("a failed cut-out falls back to the picture itself and a sheet with only places still builds", async () => {
+    const broken: SheetTools = { removeBackground: async () => { throw new Error("no"); }, findPeople: async () => [] };
+    const sheet = await makeSheetFromPictures([{ bytes: await solid(9, 9, 9), mediaType: "image/png", name: "mug", role: "product", look: "a white mug" }], broken);
+    expect(sheet.panels).toHaveLength(1);
+    const onlyPlace = await makeSheetFromPictures([{ bytes: await solid(5, 5, 200), mediaType: "image/png", name: "hall", role: "end_shot", look: "a glass hall" }], broken);
+    expect(onlyPlace.description).toContain("Far Right (Setting): a glass hall");
+  });
+});
