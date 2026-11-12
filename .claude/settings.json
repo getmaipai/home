@@ -9,5 +9,40 @@
   },
   "enabledPlugins": {
     "maipai@maipai": true
+  },
+  "permissions": {
+    "deny": [
+      "Bash(git push origin HEAD:main:*)",
+      "Bash(git push origin main:*)",
+      "Bash(git push origin HEAD:refs/heads/main:*)",
+      "Bash(launchctl bootout:*)",
+      "Bash(launchctl bootstrap:*)",
+      "Bash(launchctl kickstart:*)",
+      "Bash(launchctl kill:*)",
+      "Bash(launchctl unload:*)",
+      "Bash(launchctl load:*)",
+      "Bash(launchctl stop:*)",
+      "Bash(launchctl remove:*)",
+      "Bash(bash scripts/pipeline.sh stack off:*)",
+      "Bash(bash scripts/pipeline.sh stack on:*)",
+      "Bash(sudo -n /usr/local/libexec/maipai-promote:*)",
+      "Bash(sudo /usr/local/libexec/maipai-promote:*)",
+      "Bash(sudo -n maipai-install:*)",
+      "Bash(sudo maipai-install:*)"
+    ]
+  },
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"$CLAUDE_PROJECT_DIR/scripts/hooks/guard-shared.sh\"",
+            "timeout": 5
+          }
+        ]
+      }
+    ]
   }
 }
