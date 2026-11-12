@@ -768,7 +768,11 @@ PY
 
   changed_files="$(git -C "$checkout" diff --name-only "$base"...HEAD 2>/dev/null || true)"
   safety_files="$(safety_surface_files "$changed_files")"
-  if [[ -n "$safety_files" ]]; then
+  # T2-AFTER-01 (Jesse, 2026-11-12, owner-approved in chat): the suites no longer hold a landing. A safety-surface change lands on the static check like any
+  # other and the watcher runs the full suites right after (and names the culprit if one fails). MAIPAI_LAND_T2_BLOCKING=1 brings the old before-landing run back.
+  if [[ -n "$safety_files" && "${MAIPAI_LAND_T2_BLOCKING:-0}" != 1 ]]; then
+    landing_note="${landing_note:+$landing_note; }tier: T2; the full suites run after landing (watcher)"
+  elif [[ -n "$safety_files" ]]; then
     t2_started="$(date +%s)"
     phase "safety-surface tests"
     if ! run_t2_tests "$output"; then

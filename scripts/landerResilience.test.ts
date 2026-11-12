@@ -114,7 +114,25 @@ describe("pipeline resilience", () => {
     env.MAIPAI_LAND_UPDATE_MAIN = prior;
   });
 
-  test("safety surface runs T2 and bounces on failure; docs changes stay on the static path", () => {
+  test("T2-AFTER-01: a safety-surface change lands on the static check and does not wait for the suites", () => {
+    const calls = join(scratch, "t2-after-calls");
+    env.MAIPAI_T2_CALLS_FILE = calls;
+    env.MAIPAI_LAND_T2_CMD = "echo called >> \"$MAIPAI_T2_CALLS_FILE\"; exit 1";
+    delete env.MAIPAI_LAND_T2_BLOCKING;
+    const safety = makeWorktree("safety_after");
+    mkdirSync(join(safety, "backend/src/db/migrations"), { recursive: true });
+    writeFileSync(join(safety, "backend/src/db/migrations/0998_x.sql"), "select 1;\n");
+    commit(safety, "safety surface, suites after");
+    expect(run("land.sh", ["--detach"], safety).status).toBe(0);
+    expect(run("lander.sh", ["run-once"]).status).toBe(0);
+    expect(existsSync(calls)).toBe(false);
+    expect(note("safety_after").status).toBe("landed");
+    expect(JSON.stringify(note("safety_after"))).toContain("the full suites run after landing");
+    delete env.MAIPAI_LAND_T2_CMD; delete env.MAIPAI_T2_CALLS_FILE;
+  });
+
+  test("with MAIPAI_LAND_T2_BLOCKING=1 a safety surface runs T2 before landing and bounces on failure; docs changes stay on the static path", () => {
+    env.MAIPAI_LAND_T2_BLOCKING = "1";
     const calls = join(scratch, "t2-calls");
     env.MAIPAI_T2_CALLS_FILE = calls;
     env.MAIPAI_LAND_T2_CMD = "echo called >> \"$MAIPAI_T2_CALLS_FILE\"; if [[ -f T2_FAIL ]]; then echo 'fake T2 failure'; exit 1; fi";
@@ -150,6 +168,7 @@ describe("pipeline resilience", () => {
     expect(note("safety_t2_pass").note).toMatch(/tier: T2; safety-surface tests took \d+s/);
     delete env.MAIPAI_LAND_T2_CMD;
     delete env.MAIPAI_T2_CALLS_FILE;
+    delete env.MAIPAI_LAND_T2_BLOCKING;
   });
 });
 
