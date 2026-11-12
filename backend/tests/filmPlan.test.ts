@@ -186,3 +186,11 @@ describe("FILM-REAL-06 supplied pictures reach a shot", () => {
     expect(named.shots.map((shot) => shot.still)).toEqual(["Intro.", "Ceramic mugs on conveyor roll by.", "End."]);
   });
 });
+
+describe("FILM-REAL-06 a place photo serves every shot of that place", () => {
+  test("a close-up of the same machines also uses the supplied picture, and the last shot is left alone", () => {
+    const plan = { title: "T", summary: "S", cast: [{ name: "Factory floor", kind: "place" as const, locked: "A bright indoor factory with white machines and robot arms." }], shots: ["Wide shot of the factory with machines.", "Close up of robot arms moving.", "Machines hum as mugs pass by.", "Closing on a mug."].map((still, i) => ({ id: `shot-${i + 1}`, subject_ids: [], framing: "wide", still, motion: "push in", seconds: 5 })), music: "Piano.", credits: [] };
+    const bound = bindSuppliedPictures(plan as never, ["Factory floor (set; photograph): a factory"]);
+    expect(bound.shots.map((shot) => shot.still.startsWith("Factory floor: "))).toEqual([true, true, true, false]);
+  });
+});

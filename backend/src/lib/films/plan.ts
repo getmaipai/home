@@ -219,8 +219,10 @@ export function bindSuppliedPictures(plan: FilmPlan, castHints: string[] | undef
       if (score > bestScore) { best = i; bestScore = score; }
     });
     if (best < 0) continue;
-    claimed.add(best);
-    shots[best] = { ...shots[best]!, still: `${member.name}: ${shots[best]!.still}`.slice(0, 600) };
+    const bind = (i: number) => { claimed.add(i); shots[i] = { ...shots[i]!, still: `${member.name}: ${shots[i]!.still}`.slice(0, 600) }; };
+    bind(best);
+    // A place or an object keeps showing as itself: any other unclaimed shot that still shares a word with its look (a close-up of the same machines) uses its picture too.
+    if (member.kind !== "character") shots.forEach((shot, i) => { if (!claimed.has(i) && i !== shots.length - 1 && [...words(shot.still)].some((word) => look.has(word))) bind(i); });
   }
   return { ...plan, shots };
 }
