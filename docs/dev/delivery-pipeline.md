@@ -84,6 +84,7 @@ Where it ended up (measured on the Studio):
 | `scripts/wt.sh` (and the org `standards/bin/wt.sh`) | Worktree start, run (Codex), done; `land` always runs `land.sh` (section 22). |
 | `scripts/rush-ship.sh`, `scripts/ship-now.sh` | The owner's fast path: `land.sh --express`, then `ship.sh` of the exact landed commit (section 22). |
 | `scripts/nightly-stable.sh` | Moves `stable`, the last version to pass the required checks (section 22). Schedule off by default. |
+| `scripts/nightly.sh` | The nightly job around `nightly-stable.sh`: host-guard gate, dated report, `run-now`, the 04:00 LaunchAgent (section 24). |
 | `scripts/mode.sh`, `scripts/lib/mode.sh` | The one switch between DIRECT and GATED mode (section 23). Unset keeps today's pipeline. |
 | `scripts/hooks/guard-shared.sh` | PreToolUse guardrail against a session's push to main and its restarts of shared services (section 22). |
 | `scripts/landingHarness.ts`, `scripts/measure-commit-hooks.sh` | Acceptance harness on scratch repositories; per-step timing of git and commit hooks. |
@@ -378,3 +379,14 @@ So an express entry waits for the current lander operation (a running safety-sur
 | `dev.sh --workbench` | allowed | refused (`bun run dev` stays) |
 
 Proof: `scripts/mode.test.ts`.
+
+## 24. The nightly job (NIGHTLY-01, 2026-11-12)
+
+`bash scripts/nightly.sh run-now | run | status | install-service [--load] | uninstall-service`. It wraps `nightly-stable.sh` (section 22): one fixed commit, the full suite in `../home-watcher`, `stable` ("last version to pass the required checks") moved only on a full pass, new work landing meanwhile.
+
+- **Schedule: off by default.** `install-service` writes `com.maipai.nightly.plist` (04:00, background priority) and loads nothing; `--load` needs the owner's word. `run-now` is the testing entry and ignores the `data-scratch/nightly/OFF` switch; the scheduled `run` honours it.
+- **Host guard gate.** `nightly-stable.sh run` calls `hostmem_gate` (`scripts/lib/hostmem.sh`) first. Under memory pressure it exits 75 having changed nothing; `nightly.sh` retries every 600 s (`MAIPAI_NIGHTLY_RETRY_SECONDS`) for up to 14400 s (`MAIPAI_NIGHTLY_DEFER_SECONDS`), so a 04:00 start still reports by 08:30. A night that never started is reported `DEFERRED`, never a pass.
+- **Report.** Every run writes `data-scratch/reports/nightly-<date>.md`: PASSED, FAILED (with the failing test lines), UNFINISHED, DEFERRED, NOT STARTED or OFF, the commit tested, `stable` before and after, the untested (superseded) count, the log path and, when it ran, the fixer's result.
+- **Fixer.** A FAILED run calls `scripts/nightly-fixer.sh` (off by default; section 25).
+
+Proof: `scripts/nightly.test.ts`, `scripts/nightlyStable.test.ts`.

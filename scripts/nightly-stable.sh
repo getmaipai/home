@@ -43,7 +43,9 @@ take_lock() {
 }
 
 run() {
-  [[ ! -f "$data/OFF" ]] || { echo "nightly: off ($data/OFF exists); nothing ran"; return 0; }
+  [[ ! -f "$data/OFF" || -n "${MAIPAI_NIGHTLY_IGNORE_OFF:-}" ]] || { echo "nightly: off ($data/OFF exists); nothing ran"; return 0; }
+  # HOST-GUARD-09: the host guard's memory probe gates the run. Exit 75 means "not started, nothing changed" (the caller defers and retries).
+  if [[ -f "$here/lib/hostmem.sh" ]]; then source "$here/lib/hostmem.sh"; hostmem_gate "The nightly run" || return 75; fi
   local started sha before after result rc=0 day dir out seconds last superseded=()
   started="$(date +%s)"; day="$(date +%F)"; dir="$data/$day"; mkdir -p "$dir"; out="$dir/suite.log"
   GITNET_TRIES=1 GITNET_TIMEOUT=30 gitnet -C "$main" fetch -q origin main >/dev/null 2>&1 || true

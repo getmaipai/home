@@ -527,7 +527,7 @@ case "${1:-}" in
     nightly_dir="$main/data-scratch/nightly"; mkdir -p "$nightly_dir"
     case "${2:-status}" in
       status) bash "$main/scripts/nightly-stable.sh" status ;;
-      run) bash "$main/scripts/nightly-stable.sh" run ;;
+      run) bash "$main/scripts/nightly.sh" run-now ;;
       off) : >"$nightly_dir/OFF"; echo "nightly: off" ;;
       on) rm -f "$nightly_dir/OFF"; echo "nightly: on (it runs only when its LaunchAgent is loaded, or by hand)" ;;
       install-service)
@@ -535,7 +535,7 @@ case "${1:-}" in
         python3 - "$nplist" "$main" "$(launch_path):/usr/bin:/bin:/usr/sbin:/sbin" "$HOME" "$nightly_dir/nightly.log" <<'PY'
 import plistlib, sys
 path, cwd, env_path, home, log = sys.argv[1:]
-plistlib.dump({"Label": "com.maipai.nightly", "ProgramArguments": ["/bin/bash", cwd + "/scripts/nightly-stable.sh", "run"], "WorkingDirectory": cwd,
+plistlib.dump({"Label": "com.maipai.nightly", "ProgramArguments": ["/bin/bash", cwd + "/scripts/nightly.sh", "run"], "WorkingDirectory": cwd,
   "StartCalendarInterval": {"Hour": 4, "Minute": 0}, "Nice": 10, "ProcessType": "Background", "EnvironmentVariables": {"PATH": env_path, "HOME": home},
   "StandardOutPath": log, "StandardErrorPath": log}, open(path, "wb"), sort_keys=True)
 PY
