@@ -21,9 +21,11 @@ import { refuseVideoPrompt, VIDEO_REFUSAL_LINE } from "./policy";
 import { ltx25MaxReady } from "./quality";
 import { videoEngineStatus, videoMaxNotReadyReason } from "./ready";
 import { videoAudienceOf, type GenerateVideoState } from "./tool";
-import { VIDEO_FAILED_PREFIX, activeVideoJobsFor, doneVideoJobsFor, getVideoJobFor, startVideoEditJob, type EditRun, type ReferenceRecipe, type VideoJob } from "./jobs";
+import { VIDEO_FAILED_PREFIX, activeVideoJobsFor, doneVideoJobsFor, getVideoJobFor, startVideoEditJob, type EditRun, type ReferenceProgress, type ReferenceRecipe, type VideoJob } from "./jobs";
+import { jobQueueCopy } from "@/lib/jobQueueCopy";
+import { videoWaitLine } from "./waitLine";
 import { fullViewForJob } from "@/lib/stack/fullView";
-import { fetchClip, getVideoJob as getStackVideoJob, StackVideoError, submitVideoIngredients } from "./stack";
+import { cancelOrDeleteVideo, fetchClip, getVideoJob as getStackVideoJob, StackVideoError, submitVideoIngredients } from "./stack";
 import { checkPictureIsSheet, describeProvidedSheet, fitToSheetSize, type SheetCheck } from "./referenceSheetCheck";
 import { REFERENCE_PHASE } from "./phaseLabel";
 import { REFERENCE_SHEET_NOTE } from "./referenceSheets";
@@ -35,6 +37,12 @@ export const MAX_REFERENCE_PICTURES = 6;
 /** The Stack takes at most this many characters of prompt. */
 export const REFERENCE_PROMPT_MAX = 2000;
 const GENERATED = "Generated video: ";
+/** Always in the generated paragraph: the video model speaks whenever the prompt allows it (a first live clip had a man shouting gibberish), so the prompt rules speech out. */
+export const NO_DIALOGUE_SENTENCE = "No one speaks and there is no dialogue; the sound is natural ambient sound and light music only.";
+/** Quoted speech the writer or the person's words carry is removed: a quoted line would be spoken (or shouted) in the clip. */
+export function stripQuotedSpeech(text: string): string {
+  return text.replace(/"[^"]*"|\u201c[^\u201d]*\u201d|\u00ab[^\u00bb]*\u00bb/g, " ").replace(/\s+([,.;:])/g, "$1").replace(/\s+/g, " ").trim();
+}
 /** Always in the generated paragraph: the model must make one real shot, never show the sheet itself. */
 export const FULL_FRAME_SENTENCE = "A single full-frame, photorealistic shot of one continuous scene, never showing the reference sheet or a split screen.";
 
@@ -61,8 +69,9 @@ export const REFERENCE_WORDS_LINE = "Tell me what should happen in the video, th
 // The two shapes below are the sheet maker's own (films/sheetMaker.ts), kept here as plain types for the same reason.
 export interface SheetPicture { bytes: Uint8Array; mediaType: string; name: string; role: PictureRole; look: string }
 export interface MadeSheet { png: Uint8Array; description: string; panels: Array<{ name: string; view: string; slot: string }> }
-type SheetMaker = (pictures: ReadonlyArray<SheetPicture>) => Promise<MadeSheet>;
-const realSheetMaker: SheetMaker = async (pictures) => (await import("@/lib/films/sheetMaker")).makeSheetFromPictures(pictures, undefined, { drawViews: true });
+type SheetStep = { phase: "cut" | "draw"; done: number; total: number };
+type SheetMaker = (pictures: ReadonlyArray<SheetPicture>, onStep?: (step: SheetStep) => void) => Promise<MadeSheet>;
+const realSheetMaker: SheetMaker = async (pictures, onStep) => (await import("@/lib/films/sheetMaker")).makeSheetFromPictures(pictures, undefined, { drawViews: true, ...(onStep ? { onStep } : {}) });
 let sheetMaker: SheetMaker = realSheetMaker;
 /** Test seam: replaces the sheet maker (the real one needs the Stack's cut-out and face models). */
 export function __setSheetMakerForTests(fn: SheetMaker | null): void { sheetMaker = fn ?? realSheetMaker; }
@@ -78,8 +87,8 @@ export function __setParagraphWriterForTests(fn: ParagraphWriter | null): void {
 const WRITER_SYSTEM = [
   "You write the video part of a prompt for a video model that is shown one reference sheet of several panels (people, objects, places).",
   "You are given the sheet's panel list and the person's request. Rewrite the request as ONE paragraph, at most 600 characters, that says who or what does what and where.",
-  "Refer to each subject by its panel, for example \"the woman from the Top Left panel\" or \"the building from the Far Right panel\", so the model knows which picture is meant. Use only panels that are listed.",
-  "Keep the person's meaning and details; add no new people, events or places. Describe positive facts only. Never write names of real people. Never read out or repeat writing, logos or numbers that appear on the pictures.",
+  "Refer to each subject by its panel, for example \"the woman from the <panel name> panel\", with the panel name exactly as the sheet list writes it, so the model knows which picture is meant. Use only panels that are listed.",
+  "Keep the person's meaning and details; add no new people, events or places. Describe positive facts only. Never write names of real people. Never write anything a person says: no quoted lines, no dialogue, no speech. Never read out or repeat writing, logos or numbers that appear on the pictures.",
   "Reply with the paragraph only, with no heading and no quotes.",
 ].join("\n");
 
@@ -97,10 +106,11 @@ const oneParagraph = (text: string) => text.replace(/\s+/g, " ").trim();
 export async function generatedParagraph(request: string, description: string): Promise<string> {
   let written: string | null = null;
   try { written = await paragraphWriter(request, description); } catch { written = null; }
-  let paragraph = oneParagraph(written ?? "");
-  if (!paragraph || paragraph.length > 900) paragraph = oneParagraph(request).slice(0, 900);
+  let paragraph = stripQuotedSpeech(oneParagraph(written ?? ""));
+  if (!paragraph || paragraph.length > 900) paragraph = stripQuotedSpeech(oneParagraph(request)).slice(0, 900);
   paragraph = paragraph.replace(/[.\s]*$/, "") + ".";
-  return paragraph.includes(FULL_FRAME_SENTENCE) ? paragraph : `${paragraph} ${FULL_FRAME_SENTENCE}`;
+  if (!paragraph.includes(FULL_FRAME_SENTENCE)) paragraph = `${paragraph} ${FULL_FRAME_SENTENCE}`;
+  return paragraph.includes(NO_DIALOGUE_SENTENCE) ? paragraph : `${paragraph} ${NO_DIALOGUE_SENTENCE}`;
 }
 
 /** The whole prompt: the sheet text, a blank line, "Generated video: " and the paragraph, cut to the Stack's limit. The paragraph is kept whole (it is what the person asked for);
@@ -117,16 +127,27 @@ export function composePrompt(description: string, paragraph: string): string {
 
 // ---------------------------------------------------------------- sheets
 
+type SheetProgress = (done: number, total: number, line: string) => void;
+/** The plain sentence for each sub-step of step 1. */
+const SHEET_LINES = { read: "Reading the pictures", cut: "Cutting people and objects out", draw: "Drawing the missing views", join: "Putting the sheet together" } as const;
+/** The two steps' names, as the card shows them. */
+export const REFERENCE_STEP_NAMES = ["Creating the reference sheet", "Creating the video"] as const;
+/** What step 2 says while the Stack holds the clip without a worker running (the Stack's phase "waiting for memory"): plain words, no resource figures. */
+export const REFERENCE_WAIT_LINE = "Waiting for the computer to have enough free room. It starts by itself, or tap Cancel.";
 interface LoadedPicture { id: string; bytes: Uint8Array; mediaType: string }
 interface BuiltSheet { png: Uint8Array; description: string; providedAsIs: boolean; panels: Array<{ name: string; view: string; slot: string; pictureIds: string[] }> }
 
 /** The sheets for these pictures: pictures that already are sheets go through as they are (at most two sheets in all), the rest become one more sheet. Returns a plain line on failure. */
-async function buildSheets(pictures: LoadedPicture[]): Promise<{ ok: true; sheets: BuiltSheet[]; notes: string[] } | { ok: false; line: string }> {
+async function buildSheets(pictures: LoadedPicture[], progress: SheetProgress): Promise<{ ok: true; sheets: BuiltSheet[]; notes: string[] } | { ok: false; line: string }> {
+  progress(0, 2 + 2 * pictures.length, SHEET_LINES.read);
   const checks: SheetCheck[] = [];
   for (const picture of pictures) checks.push(await sheetChecker(picture.bytes).catch(() => ({ isSheet: false, panels: [] })));
   const provided = pictures.flatMap((picture, index) => checks[index]!.isSheet ? [{ picture, check: checks[index]! }] : []).slice(0, 2);
   const providedIds = new Set(provided.map((item) => item.picture.id));
   const loose = pictures.filter((picture) => !providedIds.has(picture.id));
+  // Sub-steps: reading, then a cut-out and a drawn view for each loose picture, then putting the sheet together.
+  const total = loose.length && provided.length < 2 ? 2 + 2 * loose.length : 2;
+  progress(0, total, SHEET_LINES.read);
   const notes: string[] = [];
   const sheets: BuiltSheet[] = [];
   for (const { picture, check } of provided) {
@@ -138,13 +159,21 @@ async function buildSheets(pictures: LoadedPicture[]): Promise<{ ok: true; sheet
   if (loose.length && sheets.length < 2) {
     const read = await readPictureRoles(loose.map((picture) => picture.bytes));
     if (!read.ok) return { ok: false, line: read.line };
+    progress(1, total, SHEET_LINES.cut);
     const sheetPictures: SheetPicture[] = loose.map((picture, index) => { const reading: PictureReading = read.readings[index]!; return { bytes: picture.bytes, mediaType: picture.mediaType, name: reading.name, role: reading.role, look: reading.look }; });
     let made: MadeSheet;
-    try { made = await sheetMaker(sheetPictures); } catch { return { ok: false, line: REFERENCE_SHEET_FAILED_LINE }; }
+    const count = loose.length;
+    try {
+      made = await sheetMaker(sheetPictures, (step) => {
+        if (step.phase === "cut") progress(1 + step.done, total, step.done >= count ? SHEET_LINES.draw : `${SHEET_LINES.cut} (${step.done + 1} of ${count})`);
+        else progress(1 + count + Math.floor(count * step.done / Math.max(1, step.total)), total, `${SHEET_LINES.draw} (${Math.min(step.total, step.done + 1)} of ${step.total})`);
+      });
+    } catch { return { ok: false, line: REFERENCE_SHEET_FAILED_LINE }; }
     const source = (name: string) => { const lower = name.toLocaleLowerCase(); const hit = loose.filter((_, index) => { const own = sheetPictures[index]!.name.toLocaleLowerCase(); return lower === own || lower.startsWith(`${own} `); }).map((picture) => picture.id); return hit.length ? hit : loose.map((picture) => picture.id); };
     sheets.push({ png: made.png, description: made.description, providedAsIs: false, panels: made.panels.map((panel) => ({ name: panel.name, view: panel.view, slot: panel.slot, pictureIds: source(panel.name) })) });
   } else if (loose.length) notes.push("There was room for two sheets only, so the other pictures were left out.");
   if (!sheets.length) return { ok: false, line: REFERENCE_SHEET_FAILED_LINE };
+  progress(total - 1, total, SHEET_LINES.join);
   return { ok: true, sheets, notes };
 }
 
@@ -173,8 +202,12 @@ function runIngredients(sheets: Uint8Array[], recipe: ReferenceRecipe, actor: Pe
   const view = fullViewForJob("adult", actor);
   const failed = (why: string) => `${VIDEO_FAILED_PREFIX} ${why}`;
   const lineOf = (error: unknown) => error instanceof StackVideoError ? failed(error.message) : failed("It did not finish. Try again.");
-  return async (signal, onProgress) => {
+  return async (signal, onProgress, hooks) => {
+    let stackJob: string | null = null;
+    // Step 2 of the card: the Stack's own state, in plain words.
+    const clipStep = (percent: number, waiting: boolean, line: string) => hooks?.steps((progress) => { progress.step = 2; progress.sheet.done = progress.sheet.total; progress.clip = { percent, waiting, line }; });
     try {
+      clipStep(0, false, "Sending the sheet to the video model");
       const form = new FormData();
       for (const [index, bytes] of sheets.entries()) form.append("sheet", new Blob([bytes as unknown as ArrayBuffer], { type: "image/png" }), `sheet-${index + 1}.png`);
       form.set("prompt", recipe.prompt);
@@ -183,10 +216,11 @@ function runIngredients(sheets: Uint8Array[], recipe: ReferenceRecipe, actor: Pe
       form.set("audience", "adult");
       form.set("timeout_ms", "1");
       const submitted = await submitVideoIngredients(form);
+      stackJob = submitted.job;
       const read = async (clip: { seconds?: number | null; width?: number | null; height?: number | null; audio?: boolean; ms?: number }) => ({ ok: true as const, clip: { video: await fetchClip(submitted.job, view), seconds: clip.seconds ?? null, width: clip.width ?? null, height: clip.height ?? null, audio: clip.audio === true, ms: clip.ms ?? 0 } });
       if (submitted.done?.[0]?.url) return await read(submitted.done[0]);
       for (;;) {
-        if (signal.aborted) return { ok: false, line: failed("It did not finish. Try again.") };
+        if (signal.aborted) { void cancelOrDeleteVideo(submitted.job); return { ok: false, line: failed("It did not finish. Try again.") }; }
         const job = await getStackVideoJob(submitted.job, view);
         if (job.state === "failed" || job.state === "cancelled") {
           const known = job.code && Object.prototype.hasOwnProperty.call(INGREDIENTS_FAILURE_COPY, job.code) ? INGREDIENTS_FAILURE_COPY[job.code as keyof typeof INGREDIENTS_FAILURE_COPY] : null;
@@ -197,10 +231,76 @@ function runIngredients(sheets: Uint8Array[], recipe: ReferenceRecipe, actor: Pe
           if (!clip) return { ok: false, line: failed("The video could not be read back. Try again.") };
           return await read(clip);
         }
+        if (job.state === "queued") clipStep(0, true, stackWaitLine(job.phase, job.position));
+        else clipStep(Math.max(0, Math.min(100, job.progress)), false, runningLine(job.phase, job.progress));
         onProgress?.(job.progress);
         await new Promise((resolve) => setTimeout(resolve, 500));
       }
-    } catch (error) { return { ok: false, line: lineOf(error) }; }
+    } catch (error) { if (stackJob && signal.aborted) void cancelOrDeleteVideo(stackJob); return { ok: false, line: lineOf(error) }; }
+  };
+}
+
+/** Step 2 while the Stack holds the clip: the Stack's phase (or its place in line) in the card's words. */
+function stackWaitLine(phase: string | null, position: number | null): string {
+  const hold = videoWaitLine(phase, "adult");
+  if (hold) return hold;
+  if (phase === "waiting for memory") return REFERENCE_WAIT_LINE;
+  return jobQueueCopy("queued", "queue", position, null, "adult");
+}
+function runningLine(phase: string | null, progress: number): string {
+  if (progress <= 0) return "Getting the video model ready";
+  if (phase === "decoding") return "Finishing the frames";
+  if (phase === "encoding") return "Putting the video together";
+  return "Drawing the frames";
+}
+
+const startProgress = (step: 1 | 2): ReferenceProgress => ({ step, sheet: { done: step === 2 ? 1 : 0, total: 1, line: SHEET_LINES.read }, clip: { percent: 0, waiting: false, line: "Waiting for the sheet" } });
+
+/** The synthetic source an edit job copies from: the words, size and seed only. */
+function sourceFor(actor: PersonRow, context: Context, id: string, prompt: string, seconds: number, seed: number | null): VideoJob {
+  const now = new Date().toISOString();
+  return { id, personId: actor.id, conversationId: context.conversationId, turnId: context.turnId, companionId: null, kind: "edit", state: "done", stackJob: null, percent: 100, phase: null, position: null, prompt,
+    request: { size: "768x448", seconds, seed, loras: [], source_file_id: null, audience: "adult" }, error: null, files: [], temporary: false, createdAt: now, updatedAt: now };
+}
+
+/** REFVIDEO-STEPS-01: the whole job from the pictures. The tool call returns at once; this is step 1 (read, cut out, draw views, put the sheet together, keep it) and then step 2 (the clip),
+ * so the card shows each step with its own progress. A refusal or failure after the call returned ends the job with one plain line. */
+function runFresh(actor: PersonRow, context: Context, loaded: LoadedPicture[], request: string, seconds: number, audienceBand: Parameters<typeof viewerOf>[1]): EditRun {
+  return async (signal, onProgress, hooks) => {
+    const failed = (line: string) => ({ ok: false as const, line });
+    const sheetStep = (done: number, total: number, line: string) => hooks?.steps((progress) => { progress.step = 1; progress.sheet = { done, total, line }; });
+    try {
+      const built = await buildSheets(loaded, sheetStep);
+      if (!built.ok) return failed(built.line);
+      if (signal.aborted) return failed(`${VIDEO_FAILED_PREFIX} It did not finish. Try again.`);
+      const description = joinDescriptions(built.sheets);
+      const paragraph = await generatedParagraph(request, description);
+      const prompt = composePrompt(description, paragraph);
+      const promptRefusal = refuseVideoPrompt(prompt, { lane: "adult" });
+      if (promptRefusal) return failed(VIDEO_REFUSAL_LINE[promptRefusal]);
+      // The same input-side floor a photo gets, on what actually goes to the video model.
+      for (const sheet of built.sheets) {
+        const jpeg = new Uint8Array(await sharp(Buffer.from(sheet.png)).jpeg({ quality: 90 }).toBuffer());
+        const screened = await screenInputImage(jpeg, request, viewerOf(actor, audienceBand));
+        if (!screened.ok) return failed(screened.line);
+      }
+      if (signal.aborted) return failed(`${VIDEO_FAILED_PREFIX} It did not finish. Try again.`);
+      // Kept files of the person, so the sheet stays with the video (and is shown on its card). Nothing is stored for a refused request above.
+      const sheetFileIds: string[] = [];
+      for (const [index, sheet] of built.sheets.entries()) {
+        const stored = storeFile(actor, { conversationId: null, turnId: null, mediaType: "image/png", bytes: sheet.png, provenance: `${REFERENCE_SHEET_NOTE}${JSON.stringify({ v: 1, provided: sheet.providedAsIs, index })}`, deduplicate: false, retention: "kept", name: built.sheets.length > 1 ? `Reference sheet ${index + 1}.png` : "Reference sheet.png" });
+        if (!stored.ok) return failed(REFERENCE_SHEET_SAVE_LINE);
+        sheetFileIds.push(stored.value.id);
+      }
+      const recipe: ReferenceRecipe = {
+        v: 1, sheetFileIds, description, request: paragraph, prompt, seed: newSeed(), seconds, pictureFileIds: loaded.map((picture) => picture.id), providedAsIs: built.sheets.map((sheet) => sheet.providedAsIs),
+        panels: built.sheets.flatMap((sheet, index) => sheet.panels.map((panel) => ({ name: panel.name, view: panel.view, slot: panel.slot, sheet: index, pictures: panel.pictureIds }))),
+      };
+      hooks?.recipe(recipe);
+      const bytes = loadSheetFiles(actor, sheetFileIds);
+      if (!bytes) return failed(REFERENCE_NO_SHEET_LINE);
+      return await runIngredients(bytes, recipe, actor)(signal, onProgress, hooks);
+    } catch { return failed(REFERENCE_SHEET_FAILED_LINE); }
   };
 }
 
@@ -208,10 +308,8 @@ function runIngredients(sheets: Uint8Array[], recipe: ReferenceRecipe, actor: Pe
 function startFromRecipe(actor: PersonRow, context: Context, recipe: ReferenceRecipe, from: string): { ok: true; job: VideoJob } | { ok: false; line: string } {
   const bytes = loadSheetFiles(actor, recipe.sheetFileIds);
   if (!bytes) return { ok: false, line: REFERENCE_NO_SHEET_LINE };
-  const now = new Date().toISOString();
-  const source: VideoJob = { id: from, personId: actor.id, conversationId: context.conversationId, turnId: context.turnId, companionId: null, kind: "edit", state: "done", stackJob: null, percent: 100, phase: null, position: null, prompt: recipe.prompt,
-    request: { size: "768x448", seconds: recipe.seconds, seed: recipe.seed, loras: [], source_file_id: null, audience: "adult" }, error: null, files: [], temporary: false, createdAt: now, updatedAt: now };
-  const started = startVideoEditJob({ actor, conversationId: context.conversationId, turnId: context.turnId, temporary: false, source, edit: { from, change: "ingredients" }, run: runIngredients(bytes, recipe, actor), phase: REFERENCE_PHASE, adultOnly: false, request: { reference: recipe, quality: "detailed", tier: "max" } });
+  const source = sourceFor(actor, context, from, recipe.prompt, recipe.seconds, recipe.seed);
+  const started = startVideoEditJob({ actor, conversationId: context.conversationId, turnId: context.turnId, temporary: false, source, edit: { from, change: "ingredients" }, run: runIngredients(bytes, recipe, actor), phase: REFERENCE_PHASE, adultOnly: false, request: { reference: recipe, quality: "detailed", tier: "max", refProgress: startProgress(2) } });
   return started.ok ? { ok: true, job: started.job } : { ok: false, line: started.line };
 }
 
@@ -297,40 +395,16 @@ export async function runMakeReferenceVideoTurn(input: RunReferenceVideoInput): 
   try {
     for (const image of images.slice(0, MAX_REFERENCE_PICTURES)) { const picture = loadSource(actor, state.conversationId, image.id, false); loaded.push({ id: image.id, bytes: picture.bytes, mediaType: picture.mediaType }); }
   } catch (error) { return refuse(error instanceof Error && error.message ? error.message : "I couldn't open your pictures. Attach them again.", "pictures"); }
-  const built = await buildSheets(loaded);
-  if (!built.ok) return refuse(built.line, "sheet_failed");
-  const description = joinDescriptions(built.sheets);
-  const paragraph = await generatedParagraph(request!, description);
-  const prompt = composePrompt(description, paragraph);
-  const promptRefusal = refuseVideoPrompt(prompt, { lane: "adult" });
-  if (promptRefusal) return refuse(VIDEO_REFUSAL_LINE[promptRefusal], promptRefusal);
-  // The same input-side floor a photo gets, on what actually goes to the video model.
-  for (const sheet of built.sheets) {
-    const jpeg = new Uint8Array(await sharp(Buffer.from(sheet.png)).jpeg({ quality: 90 }).toBuffer());
-    const screened = await screenInputImage(jpeg, request!, viewerOf(actor, audience.band));
-    if (!screened.ok) return refuse(screened.line, screened.code);
-  }
-  // Kept files of the person, so the sheet stays with the video (and is shown on its card). Nothing is stored for a refused request above.
-  const sheetFileIds: string[] = [];
-  for (const [index, sheet] of built.sheets.entries()) {
-    const stored = storeFile(actor, { conversationId: null, turnId: null, mediaType: "image/png", bytes: sheet.png, provenance: `${REFERENCE_SHEET_NOTE}${JSON.stringify({ v: 1, provided: sheet.providedAsIs, index })}`, deduplicate: false, retention: "kept", name: built.sheets.length > 1 ? `Reference sheet ${index + 1}.png` : "Reference sheet.png" });
-    if (!stored.ok) return refuse(REFERENCE_SHEET_SAVE_LINE, "sheet_not_saved");
-    sheetFileIds.push(stored.value.id);
-  }
-  const pictureFileIds = loaded.map((picture) => picture.id);
-  const recipe: ReferenceRecipe = {
-    v: 1, sheetFileIds, description, request: paragraph, prompt, seed: newSeed(), seconds, pictureFileIds, providedAsIs: built.sheets.map((sheet) => sheet.providedAsIs),
-    panels: built.sheets.flatMap((sheet, index) => sheet.panels.map((panel) => ({ name: panel.name, view: panel.view, slot: panel.slot, sheet: index, pictures: panel.pictureIds }))),
-  };
-  const started = startFromRecipe(actor, context, recipe, sheetFileIds[0]!);
-  if (!started.ok) return refuse(started.line, started.line === REFERENCE_NO_SHEET_LINE ? "no_sheet" : "already_making");
-  return outcomeOf({ callId, packageId: MAKE_REFERENCE_VIDEO_TOOL_ID, status: "succeeded", via: "tool_call", args, durationMs: 0, result: { reply: { text: replyText(sheetFileIds.length, built.notes) }, data: { videoJobId: started.job.id, sheetFileIds }, actions: [] } });
+  // The sheet is built by the job itself (its step 1), so the call returns now and the card shows each step.
+  const source = sourceFor(actor, context, "reference:new", request!, seconds, null);
+  const started = startVideoEditJob({ actor, conversationId: state.conversationId, turnId: state.turnId, temporary: false, source, edit: { from: "reference:new", change: "ingredients" }, run: runFresh(actor, context, loaded, request!, seconds, audience.band), phase: REFERENCE_PHASE, adultOnly: false, request: { quality: "detailed", tier: "max", refProgress: startProgress(1) } });
+  if (!started.ok) return refuse(started.line, "already_making");
+  return outcomeOf({ callId, packageId: MAKE_REFERENCE_VIDEO_TOOL_ID, status: "succeeded", via: "tool_call", args, durationMs: 0, result: { reply: { text: replyText(null, []) }, data: { videoJobId: started.job.id }, actions: [] } });
 }
 
-function replyText(sheets: number, notes: readonly string[]): string {
-  return [
-    `${sheets > 1 ? "The reference sheets are" : "The reference sheet is"} shown on the video card below your reply, and the video is being made from ${sheets > 1 ? "them" : "it"}. It takes about three minutes and appears there when it is ready.`,
-    "You have not seen the video: do not describe how it looks. Tell the person in one or two short sentences that the sheet is shown and the video is on its way.",
-    ...notes,
-  ].join(" ");
+function replyText(sheets: number | null, notes: readonly string[]): string {
+  const lead = sheets === null
+    ? "The video is being made in two steps that the video card below your reply shows with their own progress: first a reference sheet from the pictures, then the video. It takes about three minutes and appears there when it is ready."
+    : `${sheets > 1 ? "The reference sheets are" : "The reference sheet is"} shown on the video card below your reply, and the video is being made from ${sheets > 1 ? "them" : "it"}. It takes about three minutes and appears there when it is ready.`;
+  return [lead, "You have not seen the video: do not describe how it looks. Tell the person in one or two short sentences that the video is on its way.", ...notes].join(" ");
 }

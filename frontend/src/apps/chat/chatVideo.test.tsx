@@ -66,6 +66,25 @@ describe("VideoToolRender", () => {
     }
   });
 
+  test("REFVIDEO-STEPS-01: a video from pictures shows two steps with their own progress in the job card, and says when the computer is busy", async () => {
+    const phases = (clip: NonNullable<VideoItem["phases"]>[number]): NonNullable<VideoItem["phases"]> => [{ id: "sheet", name: "Creating the reference sheet", state: "done", percent: 100, line: null, waiting: false }, clip];
+    card.items = [item({ kind: "edit", phases: [{ id: "sheet", name: "Creating the reference sheet", state: "running", percent: 50, line: "Cutting people and objects out (2 of 3).", waiting: false }, { id: "clip", name: "Creating the video", state: "waiting", percent: 0, line: null, waiting: false }] })];
+    const view = mount();
+    await waitFor(() => expect(view.container.querySelector("[data-slot=job-progress]")).not.toBeNull());
+    expect(view.container.textContent).toContain("Creating the reference sheet, 50%. Cutting people and objects out (2 of 3).");
+    expect(view.container.textContent).toContain("Creating the video: starts after the sheet");
+    expect(view.container.textContent).toContain("Step 1 of 2");
+    // One place: no second progress bar from the video player, and no kind line.
+    expect(view.container.querySelector("[data-slot=video-player-stage]")).toBeNull();
+    expect(view.container.textContent).not.toContain("with sound and speech");
+    card.items = [item({ kind: "edit", phases: phases({ id: "clip", name: "Creating the video", state: "running", percent: 0, line: "Waiting for the computer to have enough free room. It starts by itself, or tap Cancel.", waiting: true }) })];
+    await waitFor(() => expect(view.container.textContent).toContain("Creating the video, waiting. Waiting for the computer"), { timeout: 4000 });
+    expect(view.container.textContent).toContain("Creating the reference sheet: done");
+    expect(view.container.textContent).toContain("Step 2 of 2");
+    fireEvent.click(view.getByRole("button", { name: "Cancel the job" }));
+    await waitFor(() => expect(calls.some((c) => c.method === "POST" && c.url === "/api/videos/jobs/vid-1/cancel")).toBe(true));
+  });
+
   test("a queued clip shows the busy line from the engine", async () => {
     card.items = [item({ state: "queued", label: "Home is busy making another picture or video. It will start in a minute.", position: 2 })];
     const view = mount();

@@ -53,6 +53,28 @@ export interface VideoFile {
   role?: "stereo" | "surround_5_1";
 }
 
+/** REFVIDEO-STEPS-01: where a video made from pictures is, in its two steps. Kept on the job's request so the card and a restart read the same state. */
+export interface ReferenceProgress {
+  /** 1: the reference sheet, 2: the video. */
+  step: 1 | 2;
+  /** Step 1: sub-steps done of total, and the plain sentence for the one in hand. */
+  sheet: { done: number; total: number; line: string };
+  /** Step 2: the clip's percent; `waiting` while the Stack holds the job without a worker running; `line` is the plain sentence. */
+  clip: { percent: number; waiting: boolean; line: string };
+}
+/** The whole job's percent: the sheet is the first fifth, the clip the rest. */
+export function referencePercent(progress: ReferenceProgress): number {
+  if (progress.step === 1) return Math.round(20 * Math.max(0, Math.min(1, progress.sheet.done / Math.max(1, progress.sheet.total))));
+  return Math.max(20, Math.min(99, Math.round(20 + 0.8 * progress.clip.percent)));
+}
+/** What the run of a video from pictures may tell the job while it works. */
+export interface EditHooks {
+  /** Change the two-step progress (the job saves it and its percent). */
+  steps(change: (progress: ReferenceProgress) => void): void;
+  /** The sheet is made and kept: the job now carries its recipe (the sheet picture shows on the card from here). */
+  recipe(recipe: ReferenceRecipe): void;
+}
+
 /** What the person asked for, kept on their own job record (never in a log). */
 /** REFVIDEO-01: everything a video made from reference sheets needs to be made again or edited without redoing the sheets. Stored on the job's request, so it survives a restart. */
 export interface ReferenceRecipe {
@@ -98,6 +120,8 @@ export interface VideoRequest {
   adultLock?: "on" | "off";
   /** REFVIDEO-01: set on a clip made from reference sheets (see `ReferenceRecipe`). */
   reference?: ReferenceRecipe;
+  /** REFVIDEO-STEPS-01: the two-step progress of a video made from pictures (set from the start, before the recipe exists). */
+  refProgress?: ReferenceProgress;
   edit?: { from: string; change: "ingredients" | "trim" | "join" | "mix" | "reframe" | "grade" | "speed" | "captions" | "upscale" | "remove_background" | "spatial_sound" | "restyle"; with?: string[];
     /** SPATIAL-04: the one plain line kept with a spatial-sound clip (the Stack's own lines); the card shows it as its muted notice. */
     note?: string };
@@ -718,7 +742,7 @@ export interface EditedClip { video: Uint8Array; seconds: number | null; width: 
   /** SPATIAL-04: the plain line kept with the clip (the Stack's lines for a spatial-sound step). */
   note?: string }
 /** The work of one edit (the Stack call, and any speech made first). It never throws: a failure is one plain line. */
-export type EditRun = (signal: AbortSignal, onProgress?: (percent: number) => void) => Promise<{ ok: true; clip: EditedClip } | { ok: false; line: string }>;
+export type EditRun = (signal: AbortSignal, onProgress?: (percent: number) => void, hooks?: EditHooks) => Promise<{ ok: true; clip: EditedClip } | { ok: false; line: string }>;
 export const EDIT_FAILED_PREFIX = "I couldn't change that video.";
 export const EDIT_RESTART_LINE = `${EDIT_FAILED_PREFIX} Home restarted while it was working. Ask again.`;
 
@@ -746,7 +770,16 @@ async function runEdit(job: VideoJob, actor: PersonRow, run: EditRun, source: Vi
   const controller = new AbortController();
   watching.set(job.id, controller);
   try {
-    const made = await run(controller.signal, (percent) => { job.percent = Math.max(0, Math.min(99, Math.round(percent))); saveVideoJob(job); });
+    const hooks: EditHooks = {
+      steps: (change) => { const progress = job.request.refProgress; if (!progress) return; change(progress); job.percent = referencePercent(progress); saveVideoJob(job); },
+      recipe: (recipe) => {
+        job.request.reference = recipe; job.request.seed = recipe.seed; job.request.seconds = recipe.seconds; job.prompt = recipe.prompt;
+        if (job.request.edit) job.request.edit = { ...job.request.edit, from: recipe.sheetFileIds[0] ?? job.request.edit.from };
+        source.request.seed = recipe.seed; source.prompt = recipe.prompt;
+        saveVideoJob(job);
+      },
+    };
+    const made = await run(controller.signal, (percent) => { job.percent = Math.max(0, Math.min(99, Math.round(percent))); saveVideoJob(job); }, hooks);
     if (controller.signal.aborted) return;
     if (!made.ok) { job.state = "failed"; job.error = made.line; saveVideoJob(job); return; }
     const { clip } = made;
@@ -794,7 +827,12 @@ export function resumeVideoJobs(): void {
 async function resume(job: VideoJob): Promise<void> {
   const person = db.select().from(people).where(eq(people.id, job.personId)).get();
   if (!person) { job.state = "failed"; job.error = `${VIDEO_FAILED_PREFIX} It did not finish. Try again.`; saveVideoJob(job); return; }
-  if (job.kind === "edit") { job.state = "failed"; job.error = EDIT_RESTART_LINE; saveVideoJob(job); return; }
+  if (job.kind === "edit") {
+    job.state = "failed";
+    // REFVIDEO-STEPS-01: a video from pictures keeps its sheet once step 1 is done; Try again makes the video from it without new cut-outs.
+    job.error = job.request.reference ? `${EDIT_RESTART_LINE.replace(/ Ask again\.$/, "")} Your reference sheet is kept: choose Try again to make the video from it.` : EDIT_RESTART_LINE;
+    saveVideoJob(job); return;
+  }
   liveJobs.set(job.id, job);
   if (!job.stackJob) return;
   void watch(job, person as PersonRow);

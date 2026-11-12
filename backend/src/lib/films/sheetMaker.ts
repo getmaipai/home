@@ -105,13 +105,16 @@ const ROW = ["Top", "Middle", "Bottom"], COL = ["Left", "Middle", "Right"];
 const kindWord = (role: PictureRole) => role === "actor" ? "Character" : "Prop";
 
 /** One sheet from the attached pictures: people and objects as white cut-out panels on the left, places as full-height panels on the right. */
-export async function makeSheetFromPictures(pictures: ReadonlyArray<SheetPicture>, tools: SheetTools = realTools, options: { drawViews?: boolean; viewTools?: ViewTools } = {}): Promise<MadeSheet> {
+export async function makeSheetFromPictures(pictures: ReadonlyArray<SheetPicture>, tools: SheetTools = realTools, options: { drawViews?: boolean; viewTools?: ViewTools; /** REFVIDEO-STEPS-01: called after each picture is cut out and after each picture's missing views are drawn, so a caller can show progress. */ onStep?: (step: { phase: "cut" | "draw"; done: number; total: number }) => void } = {}): Promise<MadeSheet> {
   if (!pictures.length) throw new Error("A sheet needs at least one picture.");
-  const all = (await Promise.all(pictures.map((picture) => panelsFor(picture, tools)))).flat();
+  let cut = 0;
+  const all = (await Promise.all(pictures.map(async (picture) => { const made = await panelsFor(picture, tools); options.onStep?.({ phase: "cut", done: ++cut, total: pictures.length }); return made; }))).flat();
   // Views the photos do not show (a side view, a clean front, an angled object) are drawn from the person's own cut-out and added after the originals.
   if (options.drawViews) {
     // One panel at a time: a person is drawn only from a panel that holds exactly one person (never from a photo the face finder could not split).
-    for (const original of all.filter((panel) => panel.kind === "subject" && panel.view === "Front View" && (panel.role !== "actor" || panel.single === true))) {
+    const sources = all.filter((panel) => panel.kind === "subject" && panel.view === "Front View" && (panel.role !== "actor" || panel.single === true));
+    for (const [index, original] of sources.entries()) {
+      options.onStep?.({ phase: "draw", done: index, total: sources.length });
       const drawn = await drawViews(original.role, { bytes: new Uint8Array(original.image), mediaType: "image/png" }, options.viewTools).catch(() => []);
       for (const view of drawn) all.push({ kind: "subject", single: original.single, name: original.name, view: view.view, role: original.role, look: original.look, image: Buffer.from(view.image), onWhite: true });
     }

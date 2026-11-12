@@ -836,7 +836,7 @@ export function createChatModelAdapter(deps: ChatModelAdapterDeps): ChatModelAda
                 // one position from the start, so nothing has to jump.
                 ...(project ? [toolCallPart(`${event.value.turn_id}-project`, "project", project)] : []),
                 ...(picture ? [toolCallPart(`${event.value.turn_id}-picture-progress`, "picture_progress", picture), toolCallPart(`${event.value.turn_id}-picture`, "picture", picture)] : []),
-                ...(video ? [toolCallPart(`${event.value.turn_id}-video`, "video", video)] : []),
+                ...(video ? [toolCallPart(`${event.value.turn_id}-video`, "video", video), toolCallPart(`${event.value.turn_id}-video-sheet`, "video-sheet", video)] : []),
                 ...(film ? [toolCallPart(`${event.value.turn_id}-film`, "film", film)] : []),
                 ...(film ? [toolCallPart(`${event.value.turn_id}-film-player`, "film-player", film)] : []),
                 ...(musicPart ? [musicPart] : []),

@@ -239,7 +239,7 @@ export function rowsToBranchableMessages(
               // IMGGEN-UI-01: the same two parts as live, so a reload shows the progress or the finished pictures.
               ...(row.picture ? [toolCallPart(`${row.id}-picture-progress`, "picture_progress", "locked" in row.picture ? { locked: true as const } : { id: row.picture.id }), toolCallPart(`${row.id}-picture`, "picture", "locked" in row.picture ? { locked: true as const } : { id: row.picture.id })] : []),
               // VIDEO-GEN-06: and the video card, the same part as live.
-              ...(row.video ? [toolCallPart(`${row.id}-video`, "video", row.video)] : []),
+              ...(row.video ? [toolCallPart(`${row.id}-video`, "video", row.video), toolCallPart(`${row.id}-video-sheet`, "video-sheet", row.video)] : []),
               ...(filmForRow(row) ? [toolCallPart(`${row.id}-film`, "film", filmForRow(row)!), toolCallPart(`${row.id}-film-player`, "film-player", filmForRow(row)!)] : []),
               // MUSIC-GEN-04: and the song card, the same part as live.
               ...(row.music ? [toolCallPart(`${row.id}-song`, "song", row.music)] : []),

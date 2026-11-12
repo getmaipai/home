@@ -122,7 +122,7 @@ function videoItems(actor: PersonRow): ActivityItem[] {
     // A finished clip whose Library file is gone is not a result (the Create feed drops it the same way).
     if (job.state === "done" && (!job.files[0] || !fileIsLive(actor, job.files[0].id))) continue;
     const href = job.conversationId ? `/chat?conversation=${encodeURIComponent(job.conversationId)}` : "/apps/videos/create";
-    const title = titleFor(actor, "video", job.prompt, "A video");
+    const title = job.request.refProgress ? "Video from your pictures" : titleFor(actor, "video", job.prompt, "A video");
     const base = { id: `video:${job.id}`, source: "video" as const, title, at: job.updatedAt, href };
     if (job.state === "queued") out.push({ ...base, state: "waiting", line: phaseLabel(job, audience), percent: null, typicalMinutes: null });
     else if (job.state === "running") out.push({ ...base, state: "making", line: phaseLabel(job, audience), percent: percentOf(job.percent), typicalMinutes: TYPICAL_MINUTES.video });
@@ -247,7 +247,9 @@ export function clearActivity(actor: PersonRow, request: { keys?: string[]; all?
  * progress strip (`InstallDock`) learns about them without a second poll: the strip already reads that list. Each row is the viewer's own; a
  * stop is not offered here (the producers own their cancel routes). */
 export function activeGenerationRows(actor: PersonRow): Record<string, unknown>[] {
-  const items = [...pictureItems(actor), ...videoItems(actor), ...songItems(actor)];
+  // REFVIDEO-STEPS-01: a video made from pictures shows its two steps on its own chat card, so the strip and the dock do not repeat it (the Activity page still lists it).
+  const ownCard = (item: ActivityItem) => item.source === "video" && Boolean(getVideoJobFor(actor, item.id.slice("video:".length))?.request.refProgress);
+  const items = [...pictureItems(actor), ...videoItems(actor), ...songItems(actor)].filter((item) => !ownCard(item));
   return items.filter((item) => item.state === "waiting" || item.state === "making").map((item) => ({
     id: item.id, kind: item.source, startedBy: actor.id, forPerson: actor.id, title: item.title, state: item.state === "waiting" ? "queued" : "running",
     progress: { percent: item.percent ?? 0, ...(item.line ? { line: item.line } : {}) }, createdAt: item.at, updatedAt: item.at, actions: [],

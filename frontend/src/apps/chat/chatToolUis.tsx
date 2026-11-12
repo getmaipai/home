@@ -745,6 +745,13 @@ export const VideoToolRender: ToolCallMessagePartComponent<Record<string, never>
     hasSound: clip.has_sound === true, makingReason: making.reason, busy: spatialBusy,
     onRun: (surround) => { setSpatialBusy(true); void videosApi.spatialSound(item.id, surround ? { surround: true } : {}).then(refresh).catch((error: unknown) => { toast.error(errorLine(error, "The sound could not be changed. Try again in a minute.")); }).finally(() => setSpatialBusy(false)); },
   }) : [];
+  // REFVIDEO-STEPS-01: a video made from pictures shows its two steps in the shipped job card (one place for its progress, with its own Stop); the sheet picture stays beside it.
+  if (item.phases && (status === "queued" || status === "generating")) {
+    const phases = item.phases;
+    const current = Math.max(0, phases.findIndex((phase) => phase.state !== "done"));
+    const active = phases[current];
+    return <JobProgress title={i18n._({ id: "Making your video", message: "Making your video" })} stages={phases.map((phase, index) => ({ name: phase.name, weight: index === 0 ? 1 : 3 }))} stageIndex={current} stageProgress={(active?.waiting ? 0 : active?.percent ?? 0) / 100} eta={`Step ${current + 1} of ${phases.length}`} notes={referenceNotes(phases)} onCancel={() => { void videosApi.stop(item.id).then(refresh).catch(refresh); }} />;
+  }
   const notice = [item.note, adultMark.stateLine].filter((line): line is string => Boolean(line)).join(" ");
   return (
     <VideoPlayer
@@ -757,7 +764,7 @@ export const VideoToolRender: ToolCallMessagePartComponent<Record<string, never>
       {...(etaLabel(item.eta_seconds) ? { etaLabel: etaLabel(item.eta_seconds)! } : {})}
       queuePosition={item.position}
       startedAt={item.started_at}
-      hint={videoHint(item)}
+      {...(item.sheets?.length ? {} : { hint: videoHint(item) })}
       {...(notice ? { notice } : {})}
       {...(pendingActions ? { pendingActions } : {})}
       {...(item.error ? { error: item.error } : {})}
@@ -783,6 +790,24 @@ export const VideoToolRender: ToolCallMessagePartComponent<Record<string, never>
       {...(card.can_make_another && status !== "failed" ? { onMakeAnother: () => { void videosApi.another(item.id).then(refresh).catch(refresh); } } : {})}
     />
   );
+};
+
+/** REFVIDEO-STEPS-01: the notes of the shipped job card for a video from pictures: each of its two steps with its own progress and one plain sentence (including the wait while the computer is busy). */
+function referenceNotes(phases: NonNullable<VideoItem["phases"]>): string[] {
+  return phases.map((phase) => {
+    if (phase.state === "done") return `${phase.name}: done`;
+    if (phase.state === "waiting") return `${phase.name}: starts after the sheet`;
+    return `${phase.name}, ${phase.waiting ? "waiting" : `${phase.percent}%`}. ${phase.line ?? ""}`.trim();
+  });
+}
+
+/** REFVIDEO-STEPS-01: the reference sheet a video from pictures was made from, kept under its card (the sheet exists from the end of step 1). Nothing for any other video. */
+export const VideoSheetToolRender: ToolCallMessagePartComponent<Record<string, never>, { id: string }> = ({ result }) => {
+  const query = useVideoCard(result?.id);
+  const card = query.data;
+  const sheet = card && !("locked" in card) ? card.items[card.items.length - 1]?.sheets?.[0] : undefined;
+  if (!sheet) return null;
+  return <ImageGallery images={[{ id: "sheet", src: sheet, alt: i18n._({ id: "The reference sheet made from your pictures", message: "The reference sheet made from your pictures" }) }]} size="large" />;
 };
 
 /** The line under a video: which kind it is, in the words pictures use. */

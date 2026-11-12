@@ -33,7 +33,8 @@ import { recordFromStack, syncLoras } from "@/lib/loras/sync";
 import { latestGeneratedPictureId } from "@/lib/videos/tool";
 import { prepareVideoRerun } from "@/lib/videos/rerun";
 import { anotherTakeFor, makeVideoFor } from "@/lib/videos/make";
-import { anotherReferenceTake } from "@/lib/videos/referenceVideo";
+import { anotherReferenceTake, REFERENCE_STEP_NAMES } from "@/lib/videos/referenceVideo";
+import type { ReferenceProgress } from "@/lib/videos/jobs";
 import { getStudioVoice } from "@/lib/videos/studioVoices";
 import { appRouteAllowed } from "@/lib/apps";
 import { allowedQuality, jobTier, maxOffered, tierArgument } from "@/lib/tiers";
@@ -85,6 +86,7 @@ const ItemSchema = z.object({
   prompt: z.string(),
   kind: z.enum(["generate", "animate", "edit"]),
   sheets: z.array(z.string()).optional().describe("REFVIDEO-01: the reference sheet pictures a video made from pictures was built from (file addresses), shown above the clip; absent for any other video."),
+  phases: z.array(z.object({ id: z.enum(["sheet", "clip"]), name: z.string(), state: z.enum(["waiting", "running", "done"]), percent: z.number().describe("This step's own progress, 0 to 100."), line: z.string().nullable().describe("The plain sentence for what this step is doing now."), waiting: z.boolean().describe("The step is held (the computer is busy), not working yet.") })).optional().describe("REFVIDEO-STEPS-01: while a video made from pictures is made, its two steps with their own progress; absent for any other video and once it has finished."),
   note: z.string().nullable().describe("SPATIAL-04: one plain line kept with a spatial-sound clip (what the sound did, or why it is unchanged), shown as the card's muted notice; null for any other clip."),
   error: z.string().nullable(),
   quality: z.enum(["quick", "detailed"]).describe("Which kind made it: Quick (silent) or Detailed (with sound and speech)."),
@@ -117,6 +119,15 @@ function qualityFields(job: VideoJob, ready: { quick: boolean; detailed: boolean
   return { quality, switch_to: ready.detailed ? "detailed" : null };
 }
 
+/** REFVIDEO-STEPS-01: the two steps of a video made from pictures, as the chat card draws them. */
+export function referenceSteps(progress: ReferenceProgress) {
+  const sheetPercent = progress.step === 2 ? 100 : Math.round(100 * Math.max(0, Math.min(1, progress.sheet.done / Math.max(1, progress.sheet.total))));
+  return [
+    { id: "sheet" as const, name: REFERENCE_STEP_NAMES[0], state: progress.step === 2 ? "done" as const : "running" as const, percent: sheetPercent, line: progress.step === 2 ? null : `${progress.sheet.line}.`, waiting: false },
+    { id: "clip" as const, name: REFERENCE_STEP_NAMES[1], state: progress.step === 1 ? "waiting" as const : "running" as const, percent: progress.step === 1 ? 0 : Math.round(progress.clip.percent), line: progress.step === 1 ? null : progress.clip.line.replace(/[.\s]*$/, "."), waiting: progress.step === 2 && progress.clip.waiting },
+  ];
+}
+
 function itemView(job: VideoJob, actor: PersonRow, ready: { quick: boolean; detailed: boolean; max?: boolean }) {
   const file = job.state === "done" ? job.files[0] : undefined;
   return {
@@ -126,6 +137,7 @@ function itemView(job: VideoJob, actor: PersonRow, ready: { quick: boolean; deta
     ...(job.state === "running" ? (({ eta_seconds, step, steps, preview_url }) => ({ eta_seconds, step, steps, preview_url: laneOfPerson(actor) === "adult" ? preview_url : null }))(liveCardFields(job.id, (version) => `/api/videos/jobs/${encodeURIComponent(job.id)}/preview?v=${version}`)) : { eta_seconds: null, step: null, steps: null, preview_url: null }), started_at: new Date(job.createdAt).getTime(), prompt: job.request.reference?.request ?? job.prompt, kind: job.kind,
     error: job.state === "failed" ? job.error : null,
     note: job.state === "done" ? job.request.edit?.note ?? null : null,
+    ...(job.request.refProgress && (job.state === "queued" || job.state === "running") ? { phases: referenceSteps(job.request.refProgress) } : {}),
     ...(job.request.reference?.sheetFileIds.length ? { sheets: job.request.reference.sheetFileIds.map((id) => `/api/files/${encodeURIComponent(id)}/content`) } : {}),
     ...qualityFields(job, ready),
     fit_ask: job.state === "queued" && laneOfPerson(actor) === "adult" ? answerableFitAsk(actor, job.id) : null,

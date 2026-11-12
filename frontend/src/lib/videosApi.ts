@@ -30,6 +30,8 @@ export interface VideoItem {
   note?: string | null;
   /** REFVIDEO-01: the reference sheet pictures a video made from pictures was built from, shown above the clip. */
   sheets?: string[];
+  /** REFVIDEO-STEPS-01: while a video from pictures is made, its two steps with their own progress (absent for any other video and once it is finished). */
+  phases?: Array<{ id: "sheet" | "clip"; name: string; state: "waiting" | "running" | "done"; percent: number; line: string | null; waiting: boolean }>;
   clip: VideoClip | null;
 }
 /** ADULT-LOCK-06: what the item's menu needs. `can_clear` shows "Remove lock" (confirm dialog and a fresh passcode); `can_mark` shows "Lock". */

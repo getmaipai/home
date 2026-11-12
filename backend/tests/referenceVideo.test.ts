@@ -14,14 +14,15 @@ import { logTurn, resolveOrCreateConversation } from "@/lib/conversationHistory"
 import { companionsOf } from "@/lib/libraryTrash";
 import { __setKeyframesForTests } from "@/lib/pictures/keyframes";
 import { __setRolesVisionForTests } from "@/lib/pictures/roles";
-import { getVideoJobFor, type VideoJob } from "@/lib/videos/jobs";
+import { cancelVideoJob, getVideoJobFor, type VideoJob } from "@/lib/videos/jobs";
+import { activeGenerationRows } from "@/lib/activity";
 import { __setVideoStatusForTests, readyVideoStatusForTests } from "@/lib/videos/ready";
 import { __setVideosFetchForTests, StackVideoError, submitVideoIngredients } from "@/lib/videos/stack";
 import { INGREDIENTS_FAILURE_COPY } from "@/lib/failureCopy";
 import { phaseLabel } from "@/lib/videos/phaseLabel";
 import { __setSheetVisionForTests, checkPictureIsSheet, describeProvidedSheet, fitToSheetSize, parseSheetCheck } from "@/lib/videos/referenceSheetCheck";
 import {
-  FULL_FRAME_SENTENCE, MAKE_REFERENCE_VIDEO_TOOL_ID, REFERENCE_ADAPTER_LINE, REFERENCE_BUSY_LINE, REFERENCE_MINOR_LINE, REFERENCE_NO_PICTURES_LINE, REFERENCE_NO_SHEET_LINE, REFERENCE_PROMPT_MAX, REFERENCE_SHEET_FAILED_LINE,
+  FULL_FRAME_SENTENCE, NO_DIALOGUE_SENTENCE, stripQuotedSpeech, MAKE_REFERENCE_VIDEO_TOOL_ID, REFERENCE_ADAPTER_LINE, REFERENCE_BUSY_LINE, REFERENCE_MINOR_LINE, REFERENCE_NO_PICTURES_LINE, REFERENCE_NO_SHEET_LINE, REFERENCE_PROMPT_MAX, REFERENCE_SHEET_FAILED_LINE, REFERENCE_WAIT_LINE,
   __setParagraphWriterForTests, __setSheetCheckerForTests, __setSheetMakerForTests, anotherReferenceTake, composePrompt, conversationHasReferenceVideo, generatedParagraph, getReferenceVideoRecipe, makeReferenceVideoArgs, runMakeReferenceVideoTurn,
 } from "@/lib/videos/referenceVideo";
 import { videoCardView } from "@/routes/videos";
@@ -191,7 +192,6 @@ describe("refusals come as one plain line before any work", () => {
     const second = await run(await chatWithPictures(actor, 1), { request: "the girl plays again" });
     expect(refusedWhy(second)).toBe("already_making");
     expect(replyOf(second)).toContain(REFERENCE_BUSY_LINE);
-    expect(makerCalls).toBe(1);
   });
   test("a words-only call with no pictures and nothing to reuse", async () => {
     const outcome = await run(await chatWithPictures(actor, 0), { request: "make her walk away", reuse_video: "latest" });
@@ -211,25 +211,26 @@ describe("the happy path", () => {
     const state = await chatWithPictures(actor, 3);
     const outcome = await run(state, { request: "the girl plays in a pile of these cards in front of this building" });
     expect(outcome.status).toBe("succeeded");
-    const data = outcome.result?.data as { videoJobId: string; sheetFileIds: string[] };
-    expect(data.sheetFileIds).toHaveLength(1);
-    // The reply tells the model the sheet is shown, the clip is on its way, and not to describe it.
-    expect(replyOf(outcome)).toMatch(/shown on the video card/);
+    const data = outcome.result?.data as { videoJobId: string };
+    // The call returns at once; the reply tells the model the card shows the two steps, the video is on its way, and not to describe it.
+    expect(replyOf(outcome)).toMatch(/two steps/);
     expect(replyOf(outcome)).toMatch(/about three minutes/);
     expect(replyOf(outcome)).toMatch(/do not describe/);
-    // The sheet is a kept file of the person.
-    const row = db.select().from(attachments).where(eq(attachments.id, data.sheetFileIds[0]!)).get()!;
-    expect(row.retention).toBe("kept");
-    expect(row.ownerPersonId).toBe(actor.id);
-    expect(row.mediaType).toBe("image/png");
-    // The job is a Max "making from the sheet" job with its recipe saved.
+    // The job exists at once with its two steps (the sheet first), and is a Max "making from the sheet" job.
     const running = getVideoJobFor(actor, data.videoJobId)!;
-    expect(running.request.reference?.sheetFileIds).toEqual(data.sheetFileIds);
+    expect(running.request.refProgress?.step).toBeDefined();
     expect(running.request.edit?.change).toBe("ingredients");
     expect(phaseLabel({ ...running, phase: "making from the sheet", state: "running" }, "adult")).toBe("Making your video from the sheet");
     const job = await finished(actor, outcome);
     expect(job.state).toBe("done");
     expect(job.files[0]).toBeTruthy();
+    const sheetFileIds = job.request.reference!.sheetFileIds;
+    expect(sheetFileIds).toHaveLength(1);
+    // The sheet is a kept file of the person.
+    const row = db.select().from(attachments).where(eq(attachments.id, sheetFileIds[0]!)).get()!;
+    expect(row.retention).toBe("kept");
+    expect(row.ownerPersonId).toBe(actor.id);
+    expect(row.mediaType).toBe("image/png");
     // The multipart the Stack received: one 768x448 PNG sheet and the full prompt.
     expect(ingredients).toHaveLength(1);
     expect(ingredients[0]!.sheets).toEqual([{ width: 768, height: 448, type: "image/png" }]);
@@ -240,10 +241,11 @@ describe("the happy path", () => {
     expect(fields.prompt!.startsWith("Reference sheet: Top Left (Character, Front View): young girl, red jacket, brown hair")).toBe(true);
     expect(fields.prompt!).toContain("\n\nGenerated video: The woman from the Top Left panel does this: the girl plays in a pile of these cards in front of this building.");
     expect(fields.prompt!).toContain(FULL_FRAME_SENTENCE);
+    expect(fields.prompt!).toContain(NO_DIALOGUE_SENTENCE);
     expect(fields.prompt!.length).toBeLessThanOrEqual(REFERENCE_PROMPT_MAX);
     // The card carries the sheet address, so the chat shows it while the clip renders and afterwards.
     const card = videoCardView(actor, job, true);
-    expect(card.items.at(-1)?.sheets).toEqual([`/api/files/${data.sheetFileIds[0]}/content`]);
+    expect(card.items.at(-1)?.sheets).toEqual([`/api/files/${sheetFileIds[0]}/content`]);
     expect(card.items.at(-1)?.clip?.file_id).toBe(job.files[0]!.id);
     expect(conversationHasReferenceVideo(actor, state.conversationId!)).toBe(true);
   });
@@ -265,14 +267,24 @@ describe("the happy path", () => {
   test("pictures are capped at six", async () => {
     const state = await chatWithPictures(actor, 7);
     let seen = 0; __setSheetMakerForTests(async (pictures) => { seen = pictures.length; return { png: await SHEET_PNG(), description: "Reference sheet: Top Left (Character, Front View): x.", panels: [{ name: pictures[0]!.name, view: "Front View", slot: "Top Left" }] }; });
-    await run(state, { request: "everyone waves" });
+    await finished(actor, await run(state, { request: "everyone waves" }));
     expect(seen).toBe(6);
   });
   test("when the person's words cannot be rewritten, their own words are used and the full-frame line is still there", async () => {
     __setParagraphWriterForTests(async () => null);
     const paragraph = await generatedParagraph("the girl   plays\nwith the cards", "Reference sheet: Top Left (Character, Front View): x.");
-    expect(paragraph).toBe(`the girl plays with the cards. ${FULL_FRAME_SENTENCE}`);
+    expect(paragraph).toBe(`the girl plays with the cards. ${FULL_FRAME_SENTENCE} ${NO_DIALOGUE_SENTENCE}`);
     expect(await generatedParagraph("it rains", "x")).toContain(FULL_FRAME_SENTENCE);
+  });
+  test("quoted speech never reaches the prompt, from the writer or the person's own words", async () => {
+    __setParagraphWriterForTests(async () => 'The man shouts "get out of here" and \u201cstop\u201d at the door.');
+    const written = await generatedParagraph("he shouts", "x");
+    expect(written).not.toMatch(/get out|stop"|\u201c/);
+    expect(written).toContain("The man shouts and at the door.");
+    expect(written.endsWith(NO_DIALOGUE_SENTENCE)).toBe(true);
+    __setParagraphWriterForTests(async () => null);
+    expect(await generatedParagraph('she says "hello there" and waves', "x")).not.toContain("hello");
+    expect(stripQuotedSpeech('a "b" c')).toBe("a c");
   });
   test("a long sheet text is cut at a panel boundary; the paragraph stays whole", () => {
     const description = `Reference sheet: ${Array.from({ length: 30 }, (_, i) => `Panel ${i} (Prop, Front View): ${"detail ".repeat(12).trim()}.`).join(" ")}`;
@@ -283,21 +295,78 @@ describe("the happy path", () => {
   });
 });
 
+describe("two steps with their own progress (REFVIDEO-STEPS-01)", () => {
+  const phasesOf = (job: VideoJob) => videoCardView(actor, getVideoJobFor(actor, job.id)!, true).items.at(-1)?.phases;
+  test("the call returns before the sheet exists; step 1 shows its sub-steps, step 2 says when the computer is busy, and the card then has the clip", async () => {
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => { release = resolve; });
+    __setSheetMakerForTests(async (pictures, onStep) => {
+      onStep?.({ phase: "cut", done: 1, total: 2 });
+      await gate;
+      onStep?.({ phase: "draw", done: 1, total: 2 });
+      return { png: await SHEET_PNG(), description: "Reference sheet: Top Left (Character, Front View): x.", panels: [{ name: pictures[0]!.name, view: "Front View", slot: "Top Left" }] };
+    });
+    fake.queuedPolls = 4;
+    const outcome = await run(await chatWithPictures(actor, 2), { request: "the girl plays" });
+    const id = (outcome.result?.data as { videoJobId: string }).videoJobId;
+    const job = getVideoJobFor(actor, id)!;
+    expect(job.request.reference).toBeUndefined();
+    expect(job.state).toBe("running");
+    await until(() => (phasesOf(job)?.[0]?.line ?? "").startsWith("Cutting people and objects out (2 of 2)") || (phasesOf(job)?.[0]?.line ?? "").startsWith("Drawing"));
+    const first = phasesOf(job)!;
+    expect(first.map((phase) => [phase.name, phase.state])).toEqual([["Creating the reference sheet", "running"], ["Creating the video", "waiting"]]);
+    expect(first[0]!.percent).toBeGreaterThan(0);
+    expect(first[0]!.percent).toBeLessThan(100);
+    expect(videoCardView(actor, getVideoJobFor(actor, id)!, true).items.at(-1)?.sheets).toBeUndefined();
+    release();
+    await until(() => phasesOf(job)?.[1]?.waiting === true);
+    const second = phasesOf(job)!;
+    expect(second[0]).toMatchObject({ state: "done", percent: 100 });
+    expect(second[1]).toMatchObject({ state: "running", waiting: true });
+    expect(second[1]!.line).toBe(REFERENCE_WAIT_LINE);
+    expect(videoCardView(actor, getVideoJobFor(actor, id)!, true).items.at(-1)?.sheets).toHaveLength(1);
+    const done = await finished(actor, outcome);
+    expect(done.state).toBe("done");
+    expect(videoCardView(actor, done, true).items.at(-1)?.phases).toBeUndefined();
+  });
+  test("Stop works during step 1: no clip is asked of the Stack", async () => {
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => { release = resolve; });
+    __setSheetMakerForTests(async (pictures) => { await gate; return { png: await SHEET_PNG(), description: "Reference sheet: x.", panels: [{ name: pictures[0]!.name, view: "Front View", slot: "Top Left" }] }; });
+    const outcome = await run(await chatWithPictures(actor, 1), { request: "the girl plays" });
+    const id = (outcome.result?.data as { videoJobId: string }).videoJobId;
+    await cancelVideoJob(actor, id);
+    release();
+    await new Promise((resolve) => setTimeout(resolve, 200));
+    expect(getVideoJobFor(actor, id)!.state).toBe("cancelled");
+    expect(ingredients).toHaveLength(0);
+  });
+  test("the strip and the dock rows leave out a video from pictures (its card shows the steps)", async () => {
+    fake.pollsToFinish = 1000;
+    const outcome = await run(await chatWithPictures(actor, 1), { request: "the girl plays" });
+    const id = (outcome.result?.data as { videoJobId: string }).videoJobId;
+    expect(activeGenerationRows(actor).filter((row) => String(row.id) === `video:${id}`)).toHaveLength(0);
+    await cancelVideoJob(actor, id);
+  });
+});
+
 describe("failures are plain, never a crash", () => {
   test("a sheet step that fails gives the plain refusal and starts nothing", async () => {
     __setSheetMakerForTests(async () => { throw new Error("remove_background exploded"); });
     const outcome = await run(await chatWithPictures(actor, 2), { request: "the girl plays" });
-    expect(outcome.status).toBe("succeeded");
-    expect(refusedWhy(outcome)).toBe("sheet_failed");
-    expect(replyOf(outcome)).toContain(REFERENCE_SHEET_FAILED_LINE);
+    const job = await finished(actor, outcome);
+    expect(job.state).toBe("failed");
+    expect(job.error).toContain(REFERENCE_SHEET_FAILED_LINE);
     expect(ingredients).toHaveLength(0);
     expect(db.select().from(attachments).where(eq(attachments.provenance, "reference-sheet:")).all()).toHaveLength(0);
   });
   test("pictures the vision model cannot read give its plain line", async () => {
     __setRolesVisionForTests(async () => "not json");
     const outcome = await run(await chatWithPictures(actor, 1), { request: "the girl plays" });
-    expect(refusedWhy(outcome)).toBe("sheet_failed");
-    expect(replyOf(outcome)).toContain("couldn't look at your pictures");
+    const job = await finished(actor, outcome);
+    expect(job.state).toBe("failed");
+    expect(job.error).toContain("couldn't look at your pictures");
+    expect(ingredients).toHaveLength(0);
   });
   test("a missing adapter at the Stack (409) becomes a plain sentence on the card", async () => {
     ingredientRefusal = { status: 409, code: "ic_lora_missing", error: "ltx-2.5-22b-ic-lora-ingredients-0.9.safetensors not found in /models" };
@@ -362,7 +431,6 @@ describe("a picture that is already a reference sheet", () => {
     const job = await finished(actor, outcome);
     expect(job.state).toBe("done");
     expect(makerCalls).toBe(0);
-    expect(replyOf(outcome)).toContain("already a reference sheet, so it was used as provided");
     expect(ingredients[0]!.sheets).toEqual([{ width: 768, height: 448, type: "image/png" }]);
     expect(ingredients[0]!.fields.prompt!.startsWith("Reference sheet: Top Left (Character, Front View): a young woman in a red jacket Top Right (Character, Side View)")).toBe(true);
     expect(getReferenceVideoRecipe(actor, job.id)).toMatchObject({ providedAsIs: [true] });
