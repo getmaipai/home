@@ -1941,6 +1941,7 @@ install_stack_service() {
   # local port every time.
   (cd "${install_root}/backend" && "$bun_bin" run scripts/set-setting.ts engines.stack.url "http://127.0.0.1:${stack_port}" --only-if-empty-or-prefix "http://127.0.0.1:") \
     || { log "Could not write engines.stack.url. The MaiPai Stack is required; installation cannot continue."; return 1; }
+  stack_service_fp "$stack_user" "$binary" "$stack_data_dir" "$stack_port" "$bun_bin" > "${stack_dir}/.service-fp" 2>/dev/null || true
 }
 
 # True when ${stack_dir}/.stack-tag names STACK_TAG and the compiled binary is there. MAIPAI_REBUILD_STACK=1 forces a rebuild.
@@ -1948,6 +1949,25 @@ stack_build_current() {
   local stack_dir="$1" os="$2" arch="$3"
   [ "${MAIPAI_REBUILD_STACK:-}" != "1" ] || return 1
   [ -n "$STACK_TAG" ] && [ "$(read_marker "${stack_dir}/.stack-tag")" = "$STACK_TAG" ] && [ -x "${stack_dir}/$(render_stack_binary_name "$os" "$arch")" ]
+}
+
+# DIRECT-FAST-06: the Stack service is left running when nothing about it changed. Its definition is the argv that registers it (data folder,
+# port, Bun path, binary) plus the user it runs as; ${stack_dir}/.service-fp holds the hash of the definition that is registered now
+# (written after a service install that answered /healthz). The Stack's files live outside the tree the upgrade replaces (/stack is excluded
+# from the rsync), so stopping it was only ever needed for a rebuild or a changed service.
+stack_service_fp() {
+  local user="$1" binary="$2" data_dir="$3" port="$4" bun_bin="$5"
+  { printf '%s\n' "$user"; stack_install_service_argv "$binary" "$data_dir" "$port" "$bun_bin"; } | sha256_stdin
+}
+# True when the running Stack can stay as it is: same STACK_TAG built here, binary present, service definition unchanged, and it answers.
+stack_keepable() {
+  local install_root="$1" os="$2" arch="$3" bun_bin="$4" d="$1/stack" user port
+  stack_build_current "$d" "$os" "$arch" || return 1
+  user=$(read_marker "${d}/.user"); port=$(read_marker "${d}/.port")
+  [ -n "$user" ] && valid_port "$port" || return 1
+  [ -n "$(read_marker "${d}/.service-fp")" ] \
+    && [ "$(read_marker "${d}/.service-fp")" = "$(stack_service_fp "$user" "${d}/$(render_stack_binary_name "$os" "$arch")" "${d}/data" "$port" "$bun_bin")" ] \
+    && stack_answers_on "$port"
 }
 
 setup_stack() {
@@ -1958,6 +1978,10 @@ setup_stack() {
   # same STACK_TAG (the marker is written only after a published build) and its binary is there. The service step still runs.
   if [ "$dry_run" != "yes" ] && [ "$reuse_ok" = "reuse" ] && stack_build_current "$stack_dir" "$os" "$arch"; then
     log "The Stack at ${STACK_TAG:0:7} is already built here; skipping the rebuild."
+    if [ "${STACK_KEEP:-no}" = "yes" ] && stack_answers_on "$(read_marker "${stack_dir}/.port")"; then
+      log "The Stack service is unchanged and answering; leaving it running."
+      return 0
+    fi
     STACK_PROBLEM="The AI engine was built but would not start. On a Mac this usually means nobody is logged in at the screen: log in there, then press Try again. Its log is ${stack_dir}/data/logs/stack.error.log."
     stack_status running starting
     install_stack_service "$install_root" "$bun_bin" "$os" "$arch" "$dry_run"
@@ -2465,7 +2489,13 @@ main() {
       local existing_stack_user
       existing_stack_user=$(cat "${install_root}/stack/.user")
       local existing_binary="${install_root}/stack/$(render_stack_binary_name "$os" "$arch")"
-      if [ -n "$existing_stack_user" ] && [ -x "$existing_binary" ]; then
+      # DIRECT-FAST-06: a direct upgrade leaves an unchanged, answering Stack running (no chat dropped, no 51 s service restart).
+      STACK_KEEP="no"
+      if [ "$direct_install" = "yes" ] && [ "${MAIPAI_REBUILD_STACK:-}" != "1" ] && stack_keepable "$install_root" "$os" "$arch" "${bun_home}/bin/bun"; then
+        STACK_KEEP="yes"
+        log "The Stack is unchanged (same build, same service) and answering; it stays running through this upgrade."
+      fi
+      if [ "$STACK_KEEP" != "yes" ] && [ -n "$existing_stack_user" ] && [ -x "$existing_binary" ]; then
         run_as_console_user "$os" "$existing_stack_user" "$existing_binary" stop 2>/dev/null || true
       fi
     fi

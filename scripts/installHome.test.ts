@@ -577,3 +577,61 @@ describe("kept dependencies in direct installs (DIRECT-FAST-04)", () => {
     expect(readFileSync(INSTALL_SH, "utf8")).toContain('build_app "$install_root" "$bun_bin" "$reuse_deps" "$deps_now" "$direct_install"');
   });
 });
+
+// DIRECT-FAST-06: the Stack service is left alone when its build, its service definition and its health are unchanged.
+describe("an unchanged Stack stays running (DIRECT-FAST-06)", () => {
+  const scratch = mkdtempSync(join(tmpdir(), "maipai-keep-"));
+  afterAll(() => rmSync(scratch, { recursive: true, force: true }));
+  const bash = (script: string, env: Record<string, string> = {}) => Bun.spawnSync(["bash", "-c", `source "${INSTALL_SH}"; ${script}`], { env: { ...process.env, ...env } });
+  const bin = (root: string) => join(root, "stack", bash("render_stack_binary_name linux x64").stdout.toString().trim());
+  const fp = (root: string, user = "sage", port = "8770", bunBin = "/b/bun") => bash(`stack_service_fp ${user} "${bin(root)}" "${root}/stack/data" ${port} ${bunBin}`).stdout.toString().trim();
+  function install(name: string, opts: { tag?: boolean; fp?: string | null; port?: string } = {}) {
+    const root = join(scratch, name); const stack = join(root, "stack"); mkdirSync(join(stack, "data"), { recursive: true });
+    writeFileSync(bin(root), "#!/bin/sh\n", { mode: 0o755 });
+    writeFileSync(join(stack, ".user"), "sage\n"); writeFileSync(join(stack, ".port"), `${opts.port ?? "8770"}\n`);
+    if (opts.tag !== false) writeFileSync(join(stack, ".stack-tag"), `${bash('printf %s "$STACK_TAG"').stdout.toString()}\n`);
+    const f = opts.fp === undefined ? fp(root) : opts.fp;
+    if (f !== null) writeFileSync(join(stack, ".service-fp"), `${f}\n`);
+    return root;
+  }
+  const keepable = (root: string, answers = "true", bunBin = "/b/bun", env: Record<string, string> = {}) => bash(`stack_answers_on() { ${answers}; }; stack_keepable "${root}" linux x64 ${bunBin}`, env).exitCode;
+
+  test("the service fingerprint changes with the user, binary, data folder, port and Bun path, and with nothing else", () => {
+    const root = install("fp1"); const base = fp(root);
+    expect(base).toMatch(/^[0-9a-f]{64}$/); expect(fp(root)).toBe(base);
+    expect(fp(root, "marlow")).not.toBe(base); expect(fp(root, "sage", "8771")).not.toBe(base); expect(fp(root, "sage", "8770", "/other/bun")).not.toBe(base);
+    expect(bash(`stack_service_fp sage "/elsewhere/stack" "${root}/stack/data" 8770 /b/bun`).stdout.toString().trim()).not.toBe(base);
+  });
+
+  test("stack_keepable: yes only for the same tag, binary, fingerprint and an answering Stack", () => {
+    expect(keepable(install("k1"))).toBe(0);
+    expect(keepable(install("k2", { tag: false }))).toBe(1); // never built here by this installer
+    expect(keepable(install("k3", { fp: null }))).toBe(1); // first install after this change: bounce once, record the fingerprint
+    expect(keepable(install("k4", { fp: "deadbeef" }))).toBe(1); // service definition differs
+    expect(keepable(install("k5"), "true", "/new/bun")).toBe(1); // Bun path changed
+    expect(keepable(install("k6"), "false")).toBe(1); // not answering: restart it the normal way
+    expect(keepable(install("k7"), "true", "/b/bun", { MAIPAI_REBUILD_STACK: "1" })).toBe(1);
+    const stale = install("k8"); writeFileSync(join(stale, "stack", ".stack-tag"), "0000000\n"); expect(keepable(stale)).toBe(1); // another STACK_TAG
+    const nobin = install("k9"); rmSync(bin(nobin)); expect(keepable(nobin)).toBe(1);
+  });
+
+  const stubs = `fetch_stack_source() { echo FETCH; }; build_stack_binary() { echo BUILD; }; install_stack_service() { echo SERVICE; }; stack_status() { :; }`;
+  test("setup_stack with STACK_KEEP=yes leaves the service alone while it answers, and restarts it the normal way when it does not", () => {
+    const root = install("s1");
+    const kept = bash(`${stubs}; stack_answers_on() { true; }; STACK_KEEP=yes setup_stack "${root}" /b/bun linux x64 no reuse`).stdout.toString();
+    expect(kept).toContain("leaving it running"); expect(kept).not.toContain("SERVICE");
+    const down = bash(`${stubs}; stack_answers_on() { false; }; STACK_KEEP=yes setup_stack "${root}" /b/bun linux x64 no reuse`).stdout.toString();
+    expect(down).toContain("SERVICE"); expect(down).not.toContain("leaving it running");
+    const normal = bash(`${stubs}; stack_answers_on() { true; }; setup_stack "${root}" /b/bun linux x64 no reuse`).stdout.toString();
+    expect(normal).toContain("SERVICE"); expect(normal).not.toContain("BUILD");
+  });
+
+  test("main stops the Stack only when it is not kept, install_stack_service records the fingerprint after the health check, and the keep needs the direct decision", () => {
+    const text = readFileSync(INSTALL_SH, "utf8");
+    expect(text).toContain('if [ "$direct_install" = "yes" ] && [ "${MAIPAI_REBUILD_STACK:-}" != "1" ] && stack_keepable');
+    expect(text).toContain('if [ "$STACK_KEEP" != "yes" ] && [ -n "$existing_stack_user" ] && [ -x "$existing_binary" ]; then');
+    const svc = text.slice(text.indexOf("install_stack_service() {"));
+    expect(svc.indexOf("set-setting.ts engines.stack.url")).toBeLessThan(svc.indexOf("stack_service_fp"));
+  });
+});
+

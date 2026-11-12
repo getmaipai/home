@@ -466,3 +466,19 @@ Proof: `scripts/installHome.test.ts` "kept dependencies in direct installs": the
 "Building the app" took 23 s although `vite build` itself is about 1.5 s. The `build` script is `tsc --noEmit && vite build`: about 20 s of it is the type check. Measured here: `bun run build` 24.2 s, the new `bun run build:app` 3.5 and 4.7 s. `frontend/package.json` gains `build:app` (`bun scripts/copy-ort.mjs && vite build`: the same prebuild, the same vite build, no type check). A direct-mode install runs it, because every commit was type-checked by the lander's static check when it landed; gated mode, a rollback and a source tree without the script keep the full `build`. A skip of the whole build for an unchanged input hash was weighed and dropped: 3.5 s is left, and `rsync --delete` would need its generated output (`dist`, `public/ort`) protected, a risk that is not worth 3.5 s.
 
 Expected: about 20 s off a direct ship. Not timed live. Proof: `scripts/installHome.test.ts` (direct runs `build:app`, gated and a tree without the script run `build`, the repo script has the same prebuild and no `tsc`).
+
+### 27.3 The Stack service stays up when nothing about it changed (DIRECT-FAST-06)
+
+The "Stack step" took 51 s (+91 s to +142 s) although its own log line said the rebuild was skipped: the installer still stopped the Stack at the start of the upgrade, then `install_stack_service` ran `launchctl bootout`, a 2 s wait, `install-service` (a `launchctl bootstrap`) and the `/healthz` wait for the engine to start again. Chat dropped on every ship. The Stack's files are outside the tree the upgrade replaces (`/stack` is excluded from the rsync), so the stop was only ever needed for a rebuild or a changed service. Changes in `scripts/install.sh`:
+
+- `stack_service_fp` hashes the service definition: the user, and the argv that registers it (data folder, port, Bun path, binary). `install_stack_service` writes it to `stack/.service-fp` after a start that answered `/healthz` and the settings write.
+- `stack_keepable` is true when `STACK_TAG` equals the marker, the binary is there, the stored fingerprint equals the one for the current user, port and Bun path, and the Stack answers `/healthz` now (`MAIPAI_REBUILD_STACK=1` forces false).
+- A direct upgrade that finds it keepable does not stop the Stack (`STACK_KEEP=yes`), and `setup_stack` then logs "leaving it running" and returns, provided it still answers; if it does not, the normal service install runs. Gated mode, rollbacks, a first install after this change (no fingerprint yet), a changed tag, Bun path, port or user all bounce the service as before.
+
+Expected: the 51 s Stack step becomes about 0 s on an unchanged Stack, and chat stays up. The first direct ship after this lands bounces once to record the fingerprint. Not timed live.
+
+Proof: `scripts/installHome.test.ts` "an unchanged Stack stays running": the fingerprint follows each input; `stack_keepable` for the same state and for each way it differs (no marker, no fingerprint, another fingerprint, another Bun path, not answering, forced rebuild, another tag, missing binary); `setup_stack` leaves an answering Stack alone and restarts a silent one; the main-path wiring.
+
+### 27.4 Expected total
+
+Direct ship, phase clock of sha-df9834e: 150 s. Deno 55 s and dependencies about 15 s (27.1), build 20 s (27.2), Stack 51 s (27.3) come to about 140 s off, which leaves the fixed part: mirror fetch, archive and rsync (12 s), the app helper build, the app start and the health checks. The first direct ship after these land is slower once (the fingerprint and the hash are recorded); read the next one.
