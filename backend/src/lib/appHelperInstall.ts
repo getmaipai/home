@@ -1,8 +1,9 @@
 // MEM-SPACE-08: installs the Mac app helper from the Close apps card and the setup wizard. The one definition of how is scripts/app-helper.sh
 // (user-level LaunchAgent, built on this Mac, no privileges, `remove` undoes it); install.sh calls the same script. Nothing leaves the home.
-import { existsSync } from "node:fs";
+import { appendFileSync, existsSync, mkdirSync } from "node:fs";
 import { join } from "node:path";
-import { listHelperApps } from "@/lib/appHelperClient";
+import { consoleUserHome, listHelperApps } from "@/lib/appHelperClient";
+import { homedir } from "node:os";
 
 export type HelperInstallResult = "installed" | "no_toolchain" | "nobody_logged_in" | "not_mac" | "failed";
 export interface HelperInstallOutcome { result: HelperInstallResult; message: string }
@@ -23,10 +24,19 @@ const MESSAGES: Record<HelperInstallResult, string> = {
 const outcome = (result: HelperInstallResult): HelperInstallOutcome => ({ result, message: MESSAGES[result] });
 
 type Run = (script: string) => Promise<number>;
+/** Where the install output goes: the Logs folder the failure message names, in the home of the person at the Mac (root's folder when the hub runs as root and nobody is logged in). */
+export const installLogPath = () => join((process.getuid?.() === 0 ? consoleUserHome() : null) ?? homedir(), "Library", "Logs", "MaiPai", "app-helper-install.log");
 const runScript: Run = async (script) => {
-  const child = Bun.spawn(["bash", script, "install"], { stdout: "ignore", stderr: "ignore", env: process.env });
+  const log = installLogPath();
+  try { mkdirSync(join(log, ".."), { recursive: true }); } catch { /* the log is a help, never a blocker */ }
+  const note = (text: string) => { try { appendFileSync(log, text, { mode: 0o644 }); } catch { /* same */ } };
+  const child = Bun.spawn(["bash", script, "install"], { stdout: "pipe", stderr: "pipe", env: process.env });
   const timer = setTimeout(() => child.kill(), 10 * 60_000);
-  try { return await child.exited; } finally { clearTimeout(timer); }
+  try {
+    const [out, err, code] = await Promise.all([new Response(child.stdout).text(), new Response(child.stderr).text(), child.exited]);
+    note(`--- install ${new Date().toISOString()} exit ${code}\n${out}${err}\n`);
+    return code;
+  } finally { clearTimeout(timer); }
 };
 
 let running: Promise<HelperInstallOutcome> | null = null;
