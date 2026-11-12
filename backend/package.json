@@ -21,7 +21,7 @@
     "@lingui/core": "6.6.0",
     "@lingui/message-utils": "6.6.0",
     "@maipai/core": "file:../../commons-tags/core-core-v0.1.7/core",
-    "@maipai/spec": "file:../../commons-tags/spec-spec-v0.1.365/spec",
+    "@maipai/spec": "file:../../commons-tags/spec-spec-v0.1.369/spec",
     "@modelcontextprotocol/client": "2.4.0",
     "@modelcontextprotocol/sdk": "^1.30.0",
     "@mozilla/readability": "^0.6.0",
