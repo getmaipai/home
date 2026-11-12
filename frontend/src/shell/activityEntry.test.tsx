@@ -15,11 +15,18 @@ let home: HomeFixture;
 let baseFetch: typeof fetch;
 
 function start(dot: ActivityDotState) {
-  home = mockHome({});
+  home = mockHome({ pinnedApps: ["/activity"] });
   baseFetch = globalThis.fetch;
   globalThis.fetch = ((input: RequestInfo | URL, init?: RequestInit) => {
     const url = typeof input === "string" ? input : input.toString();
+    if (url.includes("/api/settings?scope=")) {
+      return baseFetch(input, init).then(async (response) => {
+        const settings = await response.json() as Array<Record<string, unknown>>;
+        return Response.json(settings.map((entry) => entry.key === "ui.rail_expanded" ? { ...entry, value: true, source: "user" } : entry));
+      });
+    }
     if (url.startsWith("/api/apps")) return Promise.resolve(Response.json([]));
+    if (url.endsWith("/api/jobs")) return Promise.resolve(Response.json([]));
     if (url.endsWith("/api/activity")) return Promise.resolve(Response.json({ items: [], seenAt: null, dot }));
     if (url.endsWith("/api/activity/seen")) return Promise.resolve(Response.json({ seenAt: new Date().toISOString() }));
     if (url.endsWith("/api/lists") || url.endsWith("/api/coming-up") || url.endsWith("/api/alarms")) return Promise.resolve(Response.json([]));
@@ -60,8 +67,10 @@ describe("the Activity entry", () => {
   test.each([["attention", "degraded"], ["finished", "online"], ["running", "maintenance"]] as const)("a %s dot is the %s mark and carries no number", async (dot, level) => {
     start(dot);
     const view = open("owner");
-    await waitFor(() => expect(rail(view).getByRole("link", { name: /^Activity/ }).querySelector("[data-slot=rail-status-mark]")).toBeTruthy());
     const link = rail(view).getByRole("link", { name: /^Activity/ });
+    // The desktop rail is collapsed by default under S1; its icon and
+    // accessible name are unchanged, while the quiet dot stays attached.
+    await waitFor(() => expect(link.querySelector("[data-slot=rail-status-mark]")).toBeTruthy());
     expect(link.querySelector("[data-slot=rail-status-mark]")?.getAttribute("data-status-level")).toBe(level);
     expect(link.querySelector("[data-slot=rail-status-mark]")?.textContent).toBe("");
   });

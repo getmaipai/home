@@ -147,12 +147,11 @@ describe("a package app at /apps/<id>", () => {
     const view = open("/apps/music/station", 402);
     await view.findByText("Live radio station.");
     const nav = view.container.querySelector('[data-slot="phone-nav"]')!;
-    expect(nav.hasAttribute("data-floating")).toBe(false);
-    expect(nav.className).toContain("inset-x-0");
-    expect(nav.className).toContain("bottom-0");
-    expect(nav.className).toContain("border-t");
-    expect(nav.className).not.toContain("rounded-full");
-    expect(nav.className).not.toContain("shadow-lg");
+    expect(nav.hasAttribute("data-floating")).toBe(true);
+    expect(nav.className).toContain("rounded-full");
+    expect(nav.getAttribute("aria-label")).toBe("Primary");
+    expect(nav.textContent).toMatch(/Home.*Media.*Create.*Library/);
+    expect(view.container.querySelector('[data-slot="phone-nav"]:not([data-floating])')).not.toBeNull();
   });
 
   test("detail pages put Back in the shell header (no empty row); only video watch keeps a controls row with Minimize", async () => {

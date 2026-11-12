@@ -12,10 +12,11 @@ describe("SHELL-FOLD-01 phone chat header", () => {
     expect(row).not.toContain("reserveEnd");
     expect(header).toContain('phoneRow ? "flex min-w-0 flex-1 items-center gap-1 overflow-hidden"');
     expect(header).toContain('"hidden min-w-0 flex-1 items-center gap-1 overflow-hidden lg:flex"');
-    // RAIL-01: the app rail never expands, so the shell has no fold
-    // trigger anywhere; chat draws its own header beside its history.
+    // S1: desktop rail expansion is independent of Chat's own phone row;
+    // Chat keeps its own header beside its history control.
     const routes = readFileSync(new URL("../Routes.tsx", import.meta.url), "utf8");
-    expect(routes).toContain("<FullLayout rail ");
+    expect(routes).toContain("rail={{ items:");
+    expect(routes).toContain("expanded: railExpanded");
     expect(source).toContain('data-slot="chat-header"');
   });
 

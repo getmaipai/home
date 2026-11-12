@@ -41,8 +41,10 @@ export function railItemsForCatalog(apps: readonly AppEntry[], pinned: readonly 
   ];
   const coreRoutes = new Set(["/chat", "/media", "/files", "/people"]);
   const pinnedSet = new Set(pinned);
-  const pinnable = new Set(["/reminders", "/clock", "/wikipedia", "/activity"]);
-  return [...core, ...apps.filter((app) => !coreRoutes.has(app.to) && (!(app.to.startsWith("/apps/") || pinnable.has(app.to)) || pinnedSet.has(app.to))).map((app) => ({ id: app.to, label: app.label, icon: app.icon, href: app.to, group: railGroupForApp(app.to) }))];
+  // Fixed shell destinations stay in the grouped list. Pinnable apps only
+  // appear there when selected; defaults are supplied by usePinnedApps and
+  // an explicitly saved empty list therefore remains empty.
+  return [...core, ...apps.filter((app) => !coreRoutes.has(app.to) && pinnedSet.has(app.to)).map((app) => ({ id: app.to, label: app.label, icon: app.icon, href: app.to, group: railGroupForApp(app.to) }))];
 }
 
 export const AUTO_COLLAPSE_PREFIXES = ["/chat", "/settings", "/files", "/apps/music", "/apps/videos"] as const;
