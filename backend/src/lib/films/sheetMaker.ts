@@ -9,6 +9,12 @@ import { readPictureRoles } from "@/lib/pictures/roles";
 import { detectFaces } from "@/lib/pictures/likeness/faces";
 import { drawViews, type ViewTools } from "./sheetViews";
 
+/** Whether the two pinned face models are installed. They are installed from the install wizard and Settings, AI & models, never silently by a feature; without them a
+ *  photo of several people cannot be split, and the sheet says so. A dynamic import keeps the face code off the chat picture path. */
+async function faceModelsInstalled(): Promise<boolean> {
+  try { return (await import("@/lib/visionAssets")).areVisionAssetsInstalled(); } catch { return false; }
+}
+
 export interface SheetPicture { bytes: Uint8Array; mediaType: string; name: string; role: PictureRole; look: string }
 export interface SheetTools {
   /** The picture with its background removed: a PNG with transparency. */
@@ -18,7 +24,7 @@ export interface SheetTools {
   /** Optional: a plain name and look for one picture (used for each person of a split photo, so every panel says who is in it). */
   describe?(bytes: Uint8Array, mediaType: string): Promise<{ name: string; look: string } | null>;
 }
-export interface MadeSheet { png: Uint8Array; description: string; panels: Array<{ name: string; view: string; slot: string }> }
+export interface MadeSheet { png: Uint8Array; description: string; panels: Array<{ name: string; view: string; slot: string }>; /** Plain sentences for the person about what the sheet could not do (for example, the face models are not installed). */ notes: string[] }
 
 export const SHEET_W = 768, SHEET_H = 448, PLACE_W = 288, GAP = 2, MAX_PLACES = 2;
 const realTools: SheetTools = {
@@ -133,5 +139,9 @@ export async function makeSheetFromPictures(pictures: ReadonlyArray<SheetPicture
     panels.push({ name: panel.name, view: "Setting", slot: placeNames[i] ?? "Far Right" });
   }
   const png = await white(SHEET_W, SHEET_H).composite(layers).png().toBuffer();
-  return { png: new Uint8Array(png), description: `Reference sheet: ${described.join(" ")}`, panels };
+  const notes: string[] = [];
+  if (pictures.some((picture) => picture.role === "actor") && !subjects.some((panel) => panel.role === "actor" && panel.single) && !(await faceModelsInstalled())) {
+    notes.push("The face models are not installed, so photos of several people could not be split into one panel each and no views were drawn of people. An admin can install them in Settings, AI and models.");
+  }
+  return { png: new Uint8Array(png), description: `Reference sheet: ${described.join(" ")}`, panels, notes };
 }

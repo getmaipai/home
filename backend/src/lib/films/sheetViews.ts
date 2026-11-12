@@ -35,6 +35,7 @@ export const realViewTools: ViewTools = {
     } catch { return null; }
   },
   async faceMatch(a, b) {
+    // The face models are ensured by the sheet maker's face finder before any view is drawn.
     const faces = async (bytes: Uint8Array) => { const png = new Uint8Array(await sharp(Buffer.from(bytes)).png().toBuffer()); const found = await detectFaces(png); const best = found.ok ? [...found.value].sort((x, y) => y.bbox[2] * y.bbox[3] - x.bbox[2] * x.bbox[3])[0] : undefined; const embedded = best ? await embedFace(png, best) : null; return embedded?.ok ? embedded.value : null; };
     const [one, two] = await Promise.all([faces(a), faces(b)]);
     return one && two ? faceCosine(one, two) : null;
