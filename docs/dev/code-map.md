@@ -306,7 +306,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `frontend/src/shell/pages/companionFlow/KeyframeEditor.tsx` | KeyframeEditor |
 | `frontend/src/shell/pages/companionFlow/PackSection.tsx` | packPercent, PackSection |
 | `frontend/src/shell/pages/companionFlow/PreviewControls.tsx` | DEFAULT_FRAME, PreviewControls |
-| `frontend/src/shell/pages/dashboard/ArrangeHome.tsx` | ARRANGE_KEY, displayTitle, moveCard, ArrangeHome |
+| `frontend/src/shell/pages/dashboard/ArrangeHome.tsx` | ARRANGE_KEY, HOME_SECTIONS, sectionTitle, defaultSectionLayout, displayTitle, moveCard |
 | `frontend/src/shell/pages/dashboard/AskBox.tsx` | installPlaceholder, askHref, composerHref, AskBox |
 | `frontend/src/shell/pages/dashboard/Attention.tsx` | updatesWaiting, Attention |
 | `frontend/src/shell/pages/dashboard/GettingStarted.tsx` | GETTING_STARTED_ROWS, openChecklistItems, GettingStarted |
@@ -1245,7 +1245,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/webSearchBudget.ts` | SEARXNG_CONNECT_LIMIT_MS, SEARXNG_ATTEMPT_LIMIT_MS, ADULT_WRITTEN_WEBSEARCH_DEADLINE_MS, __setWebSearchToolDeadlineForTests, webSearchToolDeadlineMs |
 | `backend/src/lib/webTabSearch.ts` | WEB_TAB_MAX_RESULTS, WEB_TAB_QUERY_MAX, webTabSearch |
 | `backend/src/lib/wellFormed.ts` | EMOJI_RE, visibleText, analysisLead, thinkingPrefix, newThinkSplitState, feedThinkSplit |
-| `backend/src/lib/widgets.ts` | widgetCardBlock, listWidgets, widgetKey, orderHomeCards, arrangeHomeCards, saveHomeArrangement |
+| `backend/src/lib/widgets.ts` | widgetCardBlock, listWidgets, widgetKey, orderHomeCards, arrangeHomeCards, arrangeHomeSections |
 | `backend/src/lib/wikimediaLive.ts` | WIKIMEDIA_LIVE_RATE_LIMIT_KEY, WIKIMEDIA_LIVE_RATE_LIMIT, wikimediaLiveBaseUrl |
 | `backend/src/lib/worldPlaces.ts` | listWorldPlaces, createWorldPlace, updateWorldPlace, deleteWorldPlace |
 | `backend/src/lib/writingFormats.ts` | WRITING_FORMAT_TOOL_ID, __setWritingFormatsForTests, installedWritingFormats, writingFormatsFor, writingFormatToolSpec, writingFormatForArgs |

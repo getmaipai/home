@@ -46907,10 +46907,40 @@
                           "hidden"
                         ]
                       }
+                    },
+                    "sections": {
+                      "type": "object",
+                      "nullable": true,
+                      "properties": {
+                        "order": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          },
+                          "maxItems": 100
+                        },
+                        "hidden": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          },
+                          "maxItems": 100
+                        },
+                        "heroSource": {
+                          "type": "string",
+                          "enum": [
+                            "made",
+                            "companion",
+                            "weather",
+                            "off"
+                          ]
+                        }
+                      }
                     }
                   },
                   "required": [
-                    "cards"
+                    "cards",
+                    "sections"
                   ]
                 }
               }
@@ -46952,6 +46982,34 @@
                       "type": "string"
                     },
                     "maxItems": 200
+                  },
+                  "sections": {
+                    "type": "object",
+                    "properties": {
+                      "order": {
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        },
+                        "maxItems": 100
+                      },
+                      "hidden": {
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        },
+                        "maxItems": 100
+                      },
+                      "heroSource": {
+                        "type": "string",
+                        "enum": [
+                          "made",
+                          "companion",
+                          "weather",
+                          "off"
+                        ]
+                      }
+                    }
                   }
                 },
                 "required": [
@@ -47049,10 +47107,40 @@
                           "hidden"
                         ]
                       }
+                    },
+                    "sections": {
+                      "type": "object",
+                      "nullable": true,
+                      "properties": {
+                        "order": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          },
+                          "maxItems": 100
+                        },
+                        "hidden": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          },
+                          "maxItems": 100
+                        },
+                        "heroSource": {
+                          "type": "string",
+                          "enum": [
+                            "made",
+                            "companion",
+                            "weather",
+                            "off"
+                          ]
+                        }
+                      }
                     }
                   },
                   "required": [
-                    "cards"
+                    "cards",
+                    "sections"
                   ]
                 }
               }
