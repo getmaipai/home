@@ -143,6 +143,14 @@ is the instrument that will prove it: it captures at 4 GB and restarts at 8 GB. 
   alert into `memory.json` with the footprint and the 10-minute growth. The restart is retried every pass and runs once the ship lock
   and the installer are gone; it never runs during a ship.
   On first delivery the daemon is about 66 GB: the first pass captures without the walk and restarts it.
+- **How it restarts:** `launchctl kickstart -k system/com.apple.fseventsd` is refused even as root while System Integrity Protection
+  is on ("150: Operation not permitted", seen on the Studio 2026-11-12). The guard sends SIGTERM to the exact pid it measured (checked
+  against `pgrep -x fseventsd`, never by name or pattern) and lets launchd's KeepAlive start a new one; if the old pid is still alive
+  after 10 s it sends one SIGKILL to that pid; then it waits up to 30 s for a new pid under 1 GB. If none appears, or the old one will
+  not stop, `memory.json` carries a loud "RESTART FAILED" alert and `dev-shed` stays on until the daemon is back. `launchctl print` in
+  the capture may also be refused under SIP; that step is allowed to fail. The signal path has not yet run under SIP on a real Mac:
+  the first live restart is recorded in full in `repair-audit.log` (signal, escalation, sizes and pids before and after) and in
+  `memory.json`.
 - **After a restart:** the guard checks the daemon came back small, records before and after sizes, sets the notice "Chat is slower for
   a few minutes while the system tidies up." in `memory.json` for 10 minutes, and writes `fsevents-restarted`. It touches no user
   process. It saves a fresh baseline (`fseventsd-baseline.json`: footprint, compressed, resident, pressure), so the next growth is
@@ -160,7 +168,8 @@ is the instrument that will prove it: it captures at 4 GB and restarts at 8 GB. 
 - **Status:** the admin Status row adds the memory summary under pressure, paused development work or a repair in the last hour.
   People never see memory wording; the end-user status reason (STATUS-REASON-01) is not built yet and will read `notice`.
 
-Not tested without root: the real `launchctl kickstart`, `vmmap` and `fs_usage` on a root daemon, and `top` as root. The tests run the
+Not tested without root: the real signal to fseventsd and launchd's respawn under SIP, `vmmap`, `heap`, `leaks` and `fs_usage` on a root
+daemon, and `top` as root. The tests run the
 real script with every tool replaced by a fake (`scripts/hostGuardMemory.test.ts`).
 
 ## 3. Supersedes

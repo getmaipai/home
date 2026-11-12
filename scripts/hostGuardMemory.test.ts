@@ -26,8 +26,16 @@ const FAKES: Record<string, string> = {
   log: `case "$*" in *"Resolve user group list"*) n=$(cat "$HG_FAKE/calls" 2>/dev/null || echo 0); i=0; while [ $i -lt $n ]; do echo "2026-11-12 04:00:00.000 A  fseventsd[103:1] (libsystem_info.dylib) Resolve user group list"; i=$((i+1)); done ;;
   *fseventsd*) [ -e "$HG_FAKE/log-hang" ] && sleep 300; printf '2026-11-12 04:00:00.000 E  fseventsd[103:1] could not open\\n2026-11-12 04:00:01.000 A  fseventsd[103:1] (libsystem_info.dylib) Resolve user group list\\n2026-11-12 04:00:02.000 Df fseventsd[103:1] events dropped, must scan\\n' ;;
   *) echo "2026-11-12 04:00:00.000 Df mds[1:1] something" ;; esac`,
-  launchctl: `if [ "$1" = kickstart ]; then echo "$*" >> "$HG_FAKE/kickstarts"; [ -f "$HG_FAKE/top-after" ] && cp "$HG_FAKE/top-after" "$HG_FAKE/top"; exit 0; fi; printf '\\tstate = running\\n\\truns = 3\\n'`,
-  pgrep: `case "$*" in *fseventsd*) [ -e "$HG_FAKE/no-fsev" ] || echo 103 ;; *maipai-*) [ -e "$HG_FAKE/installing" ] && echo 999 || exit 1 ;; *) exit 1 ;; esac`,
+  // The restart is a signal to an exact pid. HG_FAKE/mode: respawn (default: TERM stops it, a new pid appears from top-after),
+  // linger (TERM is ignored, KILL works), norespawn (it stops and nothing comes back).
+  kill: `pid="$2"; case "$1" in -0) [ -e "$HG_FAKE/dead-$pid" ] && exit 1; exit 0 ;; esac
+  echo "$1 $pid" >> "$HG_FAKE/kills"; mode=$(cat "$HG_FAKE/mode" 2>/dev/null || echo respawn)
+  [ "$1" = -TERM ] && [ "$mode" = linger ] && exit 0
+  touch "$HG_FAKE/dead-$pid"
+  if [ "$mode" = norespawn ]; then grep -v fseventsd "$HG_FAKE/top" > "$HG_FAKE/top.new"; mv "$HG_FAKE/top.new" "$HG_FAKE/top"
+  elif [ -f "$HG_FAKE/top-after" ]; then cp "$HG_FAKE/top-after" "$HG_FAKE/top"; fi`,
+  launchctl: `[ "$1" = print ] && { echo "Could not print: 150: Operation not permitted while System Integrity Protection is engaged" >&2; exit 150; }; exit 1`,
+  pgrep: `case "$*" in *fseventsd*) awk '$2 == "fseventsd" { print $1 }' "$HG_FAKE/top" ;; *maipai-*) [ -e "$HG_FAKE/installing" ] && echo 999 || exit 1 ;; *) exit 1 ;; esac`,
   vmmap: `[ -e "$HG_FAKE/vmmap-fail" ] && exit 1; printf 'Path:            /System/Library/secret/fseventsd\\nPhysical footprint:         66.0G\\nMalloc Small                     116.2G   810.0M   803.9M    64.7G       0K       0K       0K    29906\\nTOTAL                            504.1G     1.2G   865.3M    65.1G\\n'`,
   footprint: `echo "fseventsd [103]: 64-bit    Footprint: 66 GB"`,
   heap: `printf 'Process:         fseventsd [103]\nAll zones: 955166 nodes malloced - 116.2G\nZone DefaultMallocZone_0x1: 955166 nodes - 116.2G\n'`,
@@ -59,7 +67,8 @@ function mem(b: Box, at: number, extra: Record<string, string> = {}) {
 }
 const status = (b: Box) => JSON.parse(readFileSync(join(b.state, "memory.json"), "utf8"));
 const audit = (b: Box) => (existsSync(join(b.state, "repair-audit.log")) ? readFileSync(join(b.state, "repair-audit.log"), "utf8") : "");
-const kicks = (b: Box) => (existsSync(join(b.fake, "kickstarts")) ? readFileSync(join(b.fake, "kickstarts"), "utf8").trim().split("\n").filter(Boolean) : []);
+const signals = (b: Box) => (existsSync(join(b.fake, "kills")) ? readFileSync(join(b.fake, "kills"), "utf8").trim().split("\n").filter(Boolean) : []);
+const kicks = (b: Box) => signals(b).filter((l) => l.startsWith("-TERM"));
 const captures = (b: Box) => (existsSync(join(b.state, "fsevents-captures")) ? readdirSync(join(b.state, "fsevents-captures")) : []);
 
 afterAll(() => { for (const t of temps) rmSync(t, { recursive: true, force: true }); });
@@ -91,7 +100,7 @@ describe.skipIf(!mac)("host guard memory probe and self-repair", () => {
     const b = box();
     set(b, { pressure: "2", top: BIG, "top-after": AFTER, calls: "100" });
     mem(b, T0);
-    expect(kicks(b)).toEqual(["kickstart -k system/com.apple.fseventsd"]);
+    expect(kicks(b)).toEqual(["-TERM 103"]);
     const caps = captures(b);
     expect(caps.length).toBe(1);
     const dir = join(b.state, "fsevents-captures", caps[0]!);
@@ -113,8 +122,34 @@ describe.skipIf(!mac)("host guard memory probe and self-repair", () => {
     const s = status(b);
     expect(s.notice).toBe("Chat is slower for a few minutes while the system tidies up.");
     expect(s.last_restart_result).toBe("ok");
-    expect(audit(b)).toContain("id=restart-fseventsd decision=ran result=ok");
+    expect(audit(b)).toContain("id=restart-fseventsd decision=ran result=ok trigger=size 67584 MB >= 8192 MB signal=TERM escalated=0 before_mb=67584 before_compressed_mb=64512 after_mb=12 after_compressed_mb=0 pid_before=103 pid_after=4242");
   });
+
+  test("a daemon that ignores SIGTERM gets one SIGKILL to the same pid, then the new process is verified", () => {
+    const b = box();
+    set(b, { pressure: "2", top: BIG, "top-after": AFTER, mode: "linger" });
+    mem(b, T0);
+    expect(signals(b)).toEqual(["-TERM 103", "-KILL 103"]);
+    expect(audit(b)).toContain("result=ok trigger=size 67584 MB >= 8192 MB signal=TERM escalated=1");
+  });
+
+  test("no respawn: a loud alert, dev-shed stays on until the daemon is back", () => {
+    const b = box();
+    set(b, { pressure: "1", top: BIG, mode: "norespawn" });
+    mem(b, T0);
+    expect(signals(b)).toEqual(["-TERM 103"]);
+    expect(audit(b)).toContain("result=no new fseventsd within 30 s");
+    expect(status(b).alert).toStartWith("RESTART FAILED: the guard stopped the file-event service and it did not come back healthy (no new fseventsd within 30 s).");
+    expect(JSON.parse(readFileSync(join(b.state, "dev-shed"), "utf8")).reason).toContain("restart failed");
+    for (let i = 1; i <= 6; i++) mem(b, T0 + 60 * i);
+    expect(existsSync(join(b.state, "dev-shed"))).toBe(true);
+    set(b, { top: AFTER });
+    mem(b, T0 + 420);
+    expect(audit(b)).toContain("id=restart-fseventsd decision=recovered fseventsd is running again (pid 4242, 12 MB)");
+    expect(status(b).alert).toBe("");
+    for (let i = 1; i <= 5; i++) mem(b, T0 + 420 + 60 * i);
+    expect(existsSync(join(b.state, "dev-shed"))).toBe(false);
+  }, 60_000);
 
   test("no restart without evidence: a failed capture below the emergency size refuses the restart", () => {
     const b = box();
@@ -171,7 +206,7 @@ describe.skipIf(!mac)("host guard memory probe and self-repair", () => {
     expect(kicks(b)).toEqual([]);
     expect(existsSync(join(b.state, "source-throttle"))).toBe(false);
     set(b, { top: fsevMb(3500), "top-after": AFTER }); mem(b, T0 + 600);
-    expect(kicks(b)).toEqual(["kickstart -k system/com.apple.fseventsd"]);
+    expect(kicks(b)).toEqual(["-TERM 103"]);
     expect(audit(b)).toContain("trigger=growth 2500 MB in 10 min");
     expect(JSON.parse(readFileSync(join(b.state, "source-throttle"), "utf8"))).toMatchObject({ since: T0 + 600 });
     expect(status(b).summary).toContain("test workers halved");
@@ -196,7 +231,7 @@ describe.skipIf(!mac)("host guard memory probe and self-repair", () => {
     expect(status(b).alert).toContain("grew 2.0 GB in 10 min; its restart waits: a ship or install is running. New builds and tests are paused.");
     rmSync(join(b.data, "ship.lock.d"), { recursive: true, force: true });
     mem(b, T0 + 660);
-    expect(kicks(b)).toEqual(["kickstart -k system/com.apple.fseventsd"]);
+    expect(kicks(b)).toEqual(["-TERM 103"]);
     expect(JSON.parse(readFileSync(join(b.state, "fseventsd-baseline.json"), "utf8"))).toMatchObject({ at: T0 + 660, pid: 4242, footprint_mb: 12, compressed_mb: 0 });
     expect(status(b).alert).toBe("");
   }, 60_000);

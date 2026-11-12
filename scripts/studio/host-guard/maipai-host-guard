@@ -288,7 +288,9 @@ cmd_run() {
 #   capture-fseventsd  footprint >= capture_gb (4 GB), or growth >= 1 GB in 10 min; once per 6 h, 3 a day. heap and leaks run only
 #                      while the daemon is under 8 GB (on a huge daemon they would pull everything back from swap).
 #   restart-fseventsd  footprint >= fsevents_compressed_gb (8 GB), or growth >= 2 GB in 10 min; once per 12 h, 2 a day; never during a
-#                      ship or install; writes fsevents-restarted, which makes each dev hub restart itself in full.
+#                      ship or install; SIGTERM to the exact pid (launchd's KeepAlive respawns it; kickstart is refused under SIP),
+#                      one SIGKILL to that pid after 10 s, then up to 30 s for a new small process; a failure is a loud alert
+#                      and keeps dev-shed on. Writes fsevents-restarted, which makes each dev hub restart itself in full.
 #   source-throttle    growth >= 1 GB in 10 min: writes the source-throttle flag; the test sharder halves its worker cap while it is
 #                      fresh; cleared after 10 minutes below that growth.
 #   dev-shed           kernel pressure level 2 or more for shed_minutes (20); cleared after 5 calm minutes.
@@ -303,7 +305,7 @@ GROWTH_WINDOW_S=600
 THROTTLE_GROWTH_MB=1024
 RESTART_GROWTH_MB=2048
 WALK_MAX_MB=8192
-SMALL_AFTER_MB=2048
+SMALL_AFTER_MB=1024
 DEV_DATA=""
 
 # A system tool by absolute path; the test seam swaps the whole directory for fakes (only when MAIPAI_HG_TEST=1, see the top).
@@ -480,24 +482,51 @@ act_restart() {
       audit restart-fseventsd refused "the evidence capture did not complete; $(mem_counts)"; return 1
     fi
   fi
+  # The restart is a signal to this exact pid; launchd's KeepAlive starts a new daemon. `launchctl kickstart` of an Apple daemon is
+  # refused even as root while System Integrity Protection is on (error 150, seen on the Studio 2026-11-12). Never by name or pattern.
+  local step="${MAIPAI_HG_VERIFY_DELAY:-1}" i escalated=0 alive=0
+  [[ "$step" =~ ^[0-9]+$ ]] || step=1
+  if [[ ! "$pid0" =~ ^[1-9][0-9]*$ ]] || ! with_timeout 5 "$(tp /usr/bin/pgrep)" -x fseventsd 2>/dev/null | grep -qx "$pid0"; then
+    audit restart-fseventsd refused "the file-event daemon's pid ${pid0:-none} is not the running fseventsd; $(mem_counts)"; return 1
+  fi
   record_run restart-fseventsd started
-  with_timeout 30 "$(tp /bin/launchctl)" kickstart -k system/com.apple.fseventsd >>"$LOG" 2>&1; rc=$?
-  sleep "${MAIPAI_HG_VERIFY_DELAY:-10}"
+  "$(tp /bin/kill)" -TERM "$pid0" >>"$LOG" 2>&1; rc=$?
+  # The old process should be gone within 10 s; if not, one SIGKILL to the same pid.
+  for (( i = 0; i < 10; i++ )); do "$(tp /bin/kill)" -0 "$pid0" 2>/dev/null || break; sleep "$step"; done
+  if "$(tp /bin/kill)" -0 "$pid0" 2>/dev/null; then
+    escalated=1; "$(tp /bin/kill)" -KILL "$pid0" >>"$LOG" 2>&1
+    for (( i = 0; i < 5; i++ )); do "$(tp /bin/kill)" -0 "$pid0" 2>/dev/null || break; sleep "$step"; done
+    "$(tp /bin/kill)" -0 "$pid0" 2>/dev/null && alive=1
+  fi
+  # Then up to 30 s for a NEW pid.
+  pid1=""
+  for (( i = 0; i < 30; i++ )); do
+    pid1="$(with_timeout 5 "$(tp /usr/bin/pgrep)" -x fseventsd 2>/dev/null | head -n 1)"
+    [[ "$pid1" =~ ^[0-9]+$ && "$pid1" != "$pid0" ]] && break
+    pid1=""; sleep "$step"
+  done
   mem_probe
-  pid1="$M_FSEV_PID"; [[ -n "$pid1" ]] || pid1="$(with_timeout 5 "$(tp /usr/bin/pgrep)" -x fseventsd 2>/dev/null | head -n 1)"
-  if (( rc != 0 )); then result="kickstart failed (exit $rc)"
-  elif [[ ! "$pid1" =~ ^[0-9]+$ ]]; then result="fseventsd did not come back"
-  elif (( M_FSEV_MB > SMALL_AFTER_MB )); then result="came back but is still large"
+  if (( rc != 0 )); then result="the stop signal failed (exit $rc)"
+  elif (( alive )); then result="the old process did not stop, even after SIGKILL"
+  elif [[ -z "$pid1" ]]; then result="no new fseventsd within 30 s"
+  elif (( M_FSEV_MB >= SMALL_AFTER_MB )); then result="came back but is still large"
   else result=ok; fi
+  if [[ $result == ok ]]; then rm -f "$REPAIR_DIR/restart-failed"
+  else
+    # Loud: never leave the Mac without the daemon, or with a broken one, silently. New dev work stays paused until it is back.
+    echo "$(now) $(clean "$result" 80)" > "$REPAIR_DIR/restart-failed"
+    write_shed_flag "the file-event service restart failed: $result"
+  fi
   printf '{"version":1,"restarted_at":%s,"before_mb":%s,"after_mb":%s,"result":"%s"}\n' "$(now)" "$before_mb" "$M_FSEV_MB" "$(clean "$result" 80)" > "$STATE/fsevents-restarted.tmp" \
     && mv "$STATE/fsevents-restarted.tmp" "$STATE/fsevents-restarted" && chmod 644 "$STATE/fsevents-restarted"
   # A fresh baseline: the next growth is measured from the new process.
   local rss; rss="$(/bin/ps -o rss= -p "${pid1:-0}" 2>/dev/null | tr -d ' ')"; [[ "$rss" =~ ^[0-9]+$ ]] && rss=$(( rss / 1024 )) || rss=-1
   printf '{"version":1,"at":%s,"pid":%s,"footprint_mb":%s,"compressed_mb":%s,"resident_mb":%s,"pressure":%s}\n' "$(now)" "${pid1:-0}" "$M_FSEV_MB" "$M_FSEV_CMP" "$rss" "$M_LEVEL" > "$STATE/fseventsd-baseline.json" && chmod 644 "$STATE/fseventsd-baseline.json"
   rm -f "$REPAIR_DIR/restart-deferred" "$REPAIR_DIR/recovery-failed"
+  [[ -n "$pid1" ]] || rm -f "$STATE/fseventsd-baseline.json"
   echo $(( $(now) + 600 )) > "$REPAIR_DIR/notice-until"
   echo "$(now) $(clean "$result" 80)" > "$REPAIR_DIR/last-restart"
-  audit restart-fseventsd ran "result=$result trigger=$TRIGGER before_mb=$before_mb before_compressed_mb=$before_cmp after_mb=$M_FSEV_MB pid_before=$pid0 pid_after=${pid1:-none}"
+  audit restart-fseventsd ran "result=$result trigger=$TRIGGER signal=TERM escalated=$escalated before_mb=$before_mb before_compressed_mb=$before_cmp after_mb=$M_FSEV_MB after_compressed_mb=$M_FSEV_CMP pid_before=$pid0 pid_after=${pid1:-none}"
 }
 
 write_shed_flag() { # reason
@@ -521,6 +550,10 @@ act_dev_shed() { record_run dev-shed set; write_shed_flag "pressure level $M_LEV
 dev_shed_maintain() {
   [[ -f "$STATE/dev-shed" ]] || return 0
   if (( R_OFF )) || [[ $R_MODE != live ]]; then rm -f "$STATE/dev-shed"; audit dev-shed cleared "kill switch or repair mode $R_MODE"; return 0; fi
+  if [[ -f "$REPAIR_DIR/restart-failed" ]]; then
+    if [[ -n "$M_FSEV_PID" ]] && (( M_FSEV_MB < SMALL_AFTER_MB )); then rm -f "$REPAIR_DIR/restart-failed"; audit restart-fseventsd recovered "fseventsd is running again (pid $M_FSEV_PID, $M_FSEV_MB MB)"
+    else write_shed_flag "the file-event service restart failed: $(clean "$(cut -d' ' -f2- "$REPAIR_DIR/restart-failed")" 80)"; return 0; fi
+  fi
   if [[ -f "$REPAIR_DIR/restart-deferred" ]]; then write_shed_flag "file-event service restart deferred ($(clean "$(cat "$REPAIR_DIR/restart-deferred")" 80))"; return 0; fi
   if [[ -f "$REPAIR_DIR/recovery-failed" ]]; then write_shed_flag "file watching did not recover in $R_FAIL dev hub(s) after the restart"; return 0; fi
   if (( M_LEVEL >= 2 )); then write_shed_flag "pressure level $M_LEVEL for $(( H_PRESS / 60 )) min"; return 0; fi
@@ -584,7 +617,9 @@ write_memory_status() {
   [[ -f "$STATE/source-throttle" ]] && summary+="; test workers halved"
   [[ $shed == true ]] && summary+="; heavy development work paused"
   local alert="" bl_pid bl_mb since_bl=-1
-  if [[ -f "$REPAIR_DIR/restart-deferred" ]]; then
+  if [[ -f "$REPAIR_DIR/restart-failed" ]]; then
+    alert="RESTART FAILED: the guard stopped the file-event service and it did not come back healthy ($(clean "$(cut -d' ' -f2- "$REPAIR_DIR/restart-failed")" 80)). File changes may go unseen; new builds and tests are paused. A Mac restart brings it back."
+  elif [[ -f "$REPAIR_DIR/restart-deferred" ]]; then
     alert="File-event service at $(gb "$M_FSEV_MB") GB, grew $(gb "$M_GROWTH10") GB in 10 min; its restart waits: $(clean "$(cat "$REPAIR_DIR/restart-deferred")" 80). New builds and tests are paused."
   elif [[ -f "$REPAIR_DIR/recovery-failed" ]]; then
     alert="File watching did not recover in $R_FAIL dev hub(s) after the file-event service restart. New builds and tests stay paused until those hubs restart (bash scripts/dev.sh stop, then start)."
