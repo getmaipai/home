@@ -36,7 +36,7 @@
         "minLength": 3,
         "maxLength": 1200,
         "grounded": false,
-        "description": "Scene and dialogue; one speaker at a time."
+        "description": "Scene; lines in quotes, one speaker at a time."
       },
       "from_picture": {
         "type": "string",
