@@ -1,8 +1,7 @@
-// FILM-REAL-11: the views a person's photo does not show, drawn for the reference sheet. A candid photo of a man gives one angle; the sheet wants a clean
-// front view and a side view, and an object wants an angled view. Each is made by the Stack's image-edit model from the person's own cut-out as its
-// reference, on a plain white background. A drawn front view of a person is kept only when its face matches the photo's face (SFace, the same check the
-// likeness guard uses); a drawn view that fails the check is dropped and the sheet keeps the photo alone. Places are never redrawn, and a view is never drawn
-// for a picture whose face or text the model cannot be held to.
+// FILM-REAL-11: the views a photo does not show, drawn for the reference sheet. An object gets an angled view, made by the Stack's image-edit model from
+// the person's own cut-out as its reference, on a plain white background. People are never redrawn: a drawn side view changed a real man's hair and look
+// in the first live chat (2026-11-12), and the face check (SFace, the likeness guard's) covers only the face, not the hair, clothing or build. The face-check
+// hook stays for a later verified path. Places are never redrawn, and a view is never drawn for a picture whose face or text the model cannot be held to.
 import sharp from "sharp";
 import type { PictureRole } from "@/lib/pictures/roles";
 import { detectFaces, embedFace, faceCosine } from "@/lib/pictures/likeness/faces";
@@ -42,10 +41,9 @@ export const realViewTools: ViewTools = {
 
 /** The views to draw for one picture's role, as [label, instruction, whether a face check applies]. */
 export function viewPlan(role: PictureRole): Array<{ view: string; instruction: string; faceCheck: boolean }> {
-  if (role === "actor") return [
-    { view: "Clean Front View", faceCheck: true, instruction: `The same person facing the camera straight on with a relaxed neutral expression, same face, hair, glasses and clothing as the reference, head and shoulders, ${WHITE}.` },
-    { view: "Side View", faceCheck: false, instruction: `The same person seen in profile from the left, same face, hair, glasses and clothing as the reference, head and shoulders, ${WHITE}.` },
-  ];
+  // A person is never redrawn: a drawn side view or clean front changed a real man's hair and look in the first live chat (2026-11-12), and the face check
+  // covers only the face, not the hair, clothing or build. A person's panels come from their own photo alone (cut-out and face close-up).
+  if (role === "actor") return [];
   if (role === "product" || role === "prop") return [
     { view: "Angled View", faceCheck: false, instruction: `The same object turned to a three-quarter angle, identical design, shape, materials and colours as the reference, ${WHITE}.` },
   ];

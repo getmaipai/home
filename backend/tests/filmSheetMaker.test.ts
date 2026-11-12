@@ -39,19 +39,22 @@ describe("sheet from pictures", () => {
 
 describe("sheet views the photos do not show", () => {
   const photo = async () => ({ bytes: await solid(1, 1, 1), mediaType: "image/png", look: "a woman in a cream coat" });
-  test("a side view, a face-checked clean front and an angled object view are added after the originals", async () => {
+  test("an angled object view is added after the originals and a person is never redrawn", async () => {
     const calls: string[] = [];
     const viewTools = { editView: async (_ref: unknown, instruction: string) => { calls.push(instruction.split(",")[0]!); return solid(120, 120, 120, 200, 300); }, faceMatch: async () => 0.7 };
     const sheet = await makeSheetFromPictures([
       { ...(await photo()), name: "woman", role: "actor" },
       { bytes: await solid(2, 2, 2), mediaType: "image/png", name: "card", role: "product", look: "a black graphics card" },
     ], tools, { drawViews: true, viewTools });
-    expect(sheet.panels.map((panel) => panel.view)).toEqual(["Front View", "Face Close-up", "Front View", "Clean Front View", "Side View", "Angled View"]);
-    expect(calls).toHaveLength(3);
+    // Only the object gets a drawn view; a person is never redrawn (it changed a real man's hair in the first live chat).
+    expect(sheet.panels.map((panel) => panel.view)).toEqual(["Front View", "Face Close-up", "Front View", "Angled View"]);
+    expect(calls).toHaveLength(1);
   });
-  test("a clean front view whose face does not match is dropped and a view that cannot be made is left out", async () => {
-    const viewTools = { editView: async (_ref: unknown, instruction: string) => (instruction.includes("profile") ? null : solid(9, 9, 9, 200, 300)), faceMatch: async () => 0.1 };
+  test("a person gets no drawn view even when the editor would make one and the face would match", async () => {
+    let calls = 0;
+    const viewTools = { editView: async () => { calls += 1; return solid(9, 9, 9, 200, 300); }, faceMatch: async () => 0.99 };
     const sheet = await makeSheetFromPictures([{ ...(await photo()), name: "woman", role: "actor" }], tools, { drawViews: true, viewTools });
     expect(sheet.panels.map((panel) => panel.view)).toEqual(["Front View", "Face Close-up"]);
+    expect(calls).toBe(0);
   });
 });
