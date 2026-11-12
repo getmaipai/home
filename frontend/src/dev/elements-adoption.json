@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-11-11T23:46:10.764Z",
-  "kitTag": "ui-v0.5.600",
+  "generatedAt": "2026-11-12T05:06:35.358Z",
+  "kitTag": "ui-v0.5.604",
   "items": [
     {
       "file": "ActivityCardsShowcase.tsx",
@@ -1805,6 +1805,22 @@
       "verdict": "later",
       "verdictReason": "Smart-home device card from HOUSE-08a; Home adopts it when the House app page is built on the house.* grants.",
       "implemented": true
+    },
+    {
+      "file": "synth-motion/README.md",
+      "name": "synth-motion/README",
+      "group": "synth",
+      "verdict": "unassessed",
+      "verdictReason": "Recorded unassessed verdict in elements-plan.json; see the plan entry for its dependency or scope.",
+      "implemented": false
+    },
+    {
+      "file": "synth-motion/index.ts",
+      "name": "synth-motion/index",
+      "group": "synth",
+      "verdict": "unassessed",
+      "verdictReason": "Recorded unassessed verdict in elements-plan.json; see the plan entry for its dependency or scope.",
+      "implemented": false
     },
     {
       "file": "task-browser.tsx",
