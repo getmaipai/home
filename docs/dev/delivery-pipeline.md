@@ -85,6 +85,7 @@ Where it ended up (measured on the Studio):
 | `scripts/rush-ship.sh`, `scripts/ship-now.sh` | The owner's fast path: `land.sh --express`, then `ship.sh` of the exact landed commit (section 22). |
 | `scripts/nightly-stable.sh` | Moves `stable`, the last version to pass the required checks (section 22). Schedule off by default. |
 | `scripts/nightly.sh` | The nightly job around `nightly-stable.sh`: host-guard gate, dated report, `run-now`, the 04:00 LaunchAgent (section 24). |
+| `scripts/nightly-fixer.sh` | Unattended fix proposal after a failed nightly run; off by default, budget-capped (section 25). |
 | `scripts/mode.sh`, `scripts/lib/mode.sh` | The one switch between DIRECT and GATED mode (section 23). Unset keeps today's pipeline. |
 | `scripts/hooks/guard-shared.sh` | PreToolUse guardrail against a session's push to main and its restarts of shared services (section 22). |
 | `scripts/landingHarness.ts`, `scripts/measure-commit-hooks.sh` | Acceptance harness on scratch repositories; per-step timing of git and commit hooks. |
@@ -390,3 +391,19 @@ Proof: `scripts/mode.test.ts`.
 - **Fixer.** A FAILED run calls `scripts/nightly-fixer.sh` (off by default; section 25).
 
 Proof: `scripts/nightly.test.ts`, `scripts/nightlyStable.test.ts`.
+
+## 25. The nightly fixer (NIGHTLY-FIXER-01, 2026-11-12)
+
+`scripts/nightly-fixer.sh init | status | run`. `nightly.sh` calls `run` after a FAILED run; the outcome goes into the night's report under "Fixer". **Off by default**: with no `data-scratch/nightly/fixer.conf` (or `enabled=0`) it does nothing. `init` writes the config with `enabled=0`; the owner turns it on.
+
+| Config key | Default | Meaning |
+|---|---|---|
+| `enabled` | 0 | 1 turns the fixer on |
+| `max_run_usd` | 5 | `claude --max-budget-usd` for one run |
+| `max_total_usd` | 40 | the ledger `nightly/fixer-spend.jsonl` refuses a run when spend so far plus `max_run_usd` would pass it |
+| `timeout_seconds` | 2400 | wall clock for the Claude run (the report is due by 08:30) |
+| `model` | (session default) | optional `--model` |
+
+It creates `wt/nightly-fix-<date>` in its own worktree at the tested commit, runs `claude -p` there (accept-edits mode, an allow list of read, edit, `bun test`, local git; a deny list of `git push`, `land.sh`, `ship.sh`, `rush-ship.sh`), commits what it left by file name, then judges the diff itself: it **rejects and deletes** the branch when the change touches `docs/design/RULES.md`, any T2 safety, auth or credential file (the globs in `scripts/wt.sh` at the tested commit), the check, gate, hook and lander and ship scripts, or modifies, renames or deletes an existing test (new test files are allowed). It then re-runs the failing test files in the worktree: green is `PROPOSED FIX`, still red is `DID NOT FIX` (branch kept to read). It never lands, ships or pushes; the owner or a session reads the diff and lands it with `bash scripts/land.sh`.
+
+Proof: `scripts/nightlyFixer.test.ts` (off by default, budget flags and ledger, each rejection, new-test allowed, re-run red and green, nothing pushed).
