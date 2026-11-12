@@ -550,6 +550,18 @@ describe("kept dependencies in direct installs (DIRECT-FAST-04)", () => {
     expect(readFileSync(log, "utf8").trim()).toBe(`-dr com.apple.quarantine ${root}`);
   });
 
+  test("DIRECT-FAST-08: a direct install's quarantine walk skips the Stack, data, rolled-back data, backups and kept folders; other installs walk the whole root", () => {
+    const root = tree("q2"); const dirs = ["docs", "stack", "data", "data.rolled-back-20261027-195415", "backups", "received-backups", "upgrade-backups", "data-scratch", ".deno", ".bun", "scripts"];
+    for (const d of dirs) mkdirSync(join(root, d), { recursive: true });
+    const log = join(scratch, "xattr2.calls"); rmSync(log, { force: true });
+    const run = (env: string) => bash(`xattr() { echo "$*" >> ${JSON.stringify(log)}; }; ${env} clear_quarantine_and_sign darwin "${root}"`);
+    run("INSTALL_QUARANTINE_LIGHT=yes"); const walked = readFileSync(log, "utf8").trim().split("\n").map((l) => l.replace("-dr com.apple.quarantine ", ""));
+    expect(walked.sort()).toEqual(["backend", "bun.lock", "docs", "frontend", "package.json", "scripts"].map((n) => join(root, n)).sort());
+    rmSync(log, { force: true }); run("INSTALL_QUARANTINE_LIGHT=no");
+    expect(readFileSync(log, "utf8").trim()).toBe(`-dr com.apple.quarantine ${root}`);
+    expect(readFileSync(INSTALL_SH, "utf8")).toContain('INSTALL_QUARANTINE_LIGHT="$direct_install" clear_quarantine_and_sign');
+  });
+
   test("rsync keeps .deno, the root node_modules and the hash marker, and main wires the reuse decision to the direct request only", () => {
     const text = readFileSync(INSTALL_SH, "utf8");
     for (const keep of ["--exclude=/.deno", "--exclude=/node_modules", "--exclude=/.deps-hash"]) expect(text).toContain(keep);

@@ -541,12 +541,14 @@ clear_quarantine_and_sign() {
   shift 2
   [ "$os" = "darwin" ] || return 0
   if command -v xattr >/dev/null 2>&1; then
-    if [ "${INSTALL_DEPS_REUSE:-no}" = "yes" ] && [ -d "${dir}/node_modules" ]; then
-      # Kept dependencies already passed this once (2.6 GB, 238k files, 5.6 s measured); only the rest of the tree is walked.
+    if [ "${INSTALL_DEPS_REUSE:-no}" = "yes" ] || [ "${INSTALL_QUARANTINE_LIGHT:-no}" = "yes" ]; then
+      # DIRECT-FAST-08: a direct install walks only what the release brings. The walk over the whole install root took about 44 s on the
+      # 2026-11-12 ships (the Stack folder alone is 637k files, 450 GB of models; 13 data.rolled-back-* copies sit beside it); none of
+      # that comes from this run's download, and kept or removed dependencies (2.6 GB, 5.6 s) are not walked either.
       local entry
       for entry in "$dir"/* "$dir"/.[!.]*; do
         [ -e "$entry" ] || continue
-        case "$(basename "$entry")" in node_modules|.deno|.bun|data) continue ;; esac # kept or untouched by this run
+        case "$(basename "$entry")" in node_modules|.deno|.bun|data|data.rolled-back-*|stack|backups|received-backups|upgrade-backups|data-scratch) continue ;; esac
         xattr -dr com.apple.quarantine "$entry" 2>/dev/null || true
       done
     else
@@ -2577,7 +2579,7 @@ main() {
   local deps_now reuse_deps="no"
   deps_now=$(deps_hash "$install_root" "$bun_bin" "$os" "$arch")
   if [ "$direct_install" = "yes" ] && deps_reusable "$install_root" "$bun_bin" "$os" "$arch"; then reuse_deps="yes"; fi
-  INSTALL_DEPS_REUSE="$reuse_deps" clear_quarantine_and_sign "$os" "$install_root" "$bun_bin"
+  INSTALL_DEPS_REUSE="$reuse_deps" INSTALL_QUARANTINE_LIGHT="$direct_install" clear_quarantine_and_sign "$os" "$install_root" "$bun_bin"
   phase "tools ready; building the app"
   build_app "$install_root" "$bun_bin" "$reuse_deps" "$deps_now" "$direct_install"
   phase "app built; preflight"
