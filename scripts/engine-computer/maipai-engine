@@ -613,6 +613,7 @@ commons_archive_sha256() {
     ui-v0.5.611) printf '%s\n' "1d4fc8ee5891114f71bfa01ca5c0f3f86c9bef84a7e78fe8968c9a3c071d8ecf" ;;
     spec-v0.1.369) printf '%s\n' "0ca262c772f98d3d638b1f5a42422eb979d4366b278a29da38366c160fb5c9ae" ;;
     ui-v0.5.614) printf '%s\n' "e08fee632f5a55867bc87419761be2de18d70ea0ccd2742e351e39566a7cd2bb" ;;
+    ui-v0.5.615) printf '%s\n' "fea95671860851593e488a6f443ced2041a49fa4da29085a3036446807179dce" ;;
     *) return 1 ;;
   esac
 }
