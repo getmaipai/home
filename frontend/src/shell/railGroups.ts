@@ -33,9 +33,17 @@ export function railGroupForApp(to: string): string {
   return "tools";
 }
 
-export function railItemsForCatalog(apps: readonly AppEntry[]) {
-  const core = new Set(["/", "/chat", "/media", "/files", "/people"]);
-  return apps.map((app) => ({ id: app.to, label: app.label, icon: app.icon, href: app.to, group: railGroupForApp(app.to) })).filter((item) => !core.has(item.href));
+export function railItemsForCatalog(apps: readonly AppEntry[], pinned: readonly string[] = []) {
+  const core = [
+    { id: "/chat", label: "Chat", icon: "message-circle", href: "/chat", group: "main" },
+    { id: "/media", label: "Media", icon: "cast", href: "/media", group: "main" },
+    { id: "/files", label: "Library", icon: "folder", href: "/files", group: "main" },
+    { id: "/people", label: "Family", icon: "users", href: "/people", group: "main" },
+  ];
+  const coreRoutes = new Set(["/chat", "/media", "/files", "/people"]);
+  const pinnedSet = new Set(pinned);
+  const pinnable = new Set(["/reminders", "/clock", "/wikipedia", "/activity"]);
+  return [...core, ...apps.filter((app) => !coreRoutes.has(app.to) && (!(app.to.startsWith("/apps/") || pinnable.has(app.to)) || pinnedSet.has(app.to))).map((app) => ({ id: app.to, label: app.label, icon: app.icon, href: app.to, group: railGroupForApp(app.to) }))];
 }
 
 export const AUTO_COLLAPSE_PREFIXES = ["/chat", "/settings", "/files", "/apps/music", "/apps/videos"] as const;

@@ -54,6 +54,8 @@ import { useStatusApps } from "@/shell/useStatusApps";
 import { railApps } from "@/shell/appCatalog";
 import { RAIL_GROUPS, routeAutoCollapses } from "@/shell/railGroups";
 import { useRailExpanded } from "@/shell/useRailExpanded";
+import { railItemsForCatalog } from "@/shell/railGroups";
+import { PhoneNav } from "@maipai/ui/src/PhoneNav";
 import { useAppCatalog } from "@/shell/useAppCatalog";
 import { usePinnedApps } from "@/shell/usePinnedApps";
 import { sidebarItemStatus } from "@/shell/statusApps";
@@ -389,6 +391,12 @@ function RoutesWithIncognito({ person, onPersonChange, onSignedOut, appCatalog }
     <DrawerSectionsContext.Provider value={setDrawerSections}>
     <TabIdentityProvider temporary={incognito} locked={locked} ageBand={person.age_band}>
     <ChatHeaderDataProvider>
+      {onPhone && !phoneChat ? <PhoneNav variant="floating" surface="glass" inset="pro" activePill="wide" labels="primary" entries={[
+        { to: "/", icon: "home", label: i18n._({ id: "Home", message: "Home" }) },
+        { to: "/media", icon: "cast", label: i18n._({ id: "Media", message: "Media" }) },
+        { to: ALL_APPS_PATH, icon: "palette", label: i18n._({ id: "Create", message: "Create" }) },
+        { to: "/files", icon: "folder", label: i18n._({ id: "Library", message: "Library" }) },
+      ]} /> : null}
       <BrowserAlerts person={person} />
       <AlarmRinger person={person} />
       {/* When ambient mode is off, keep the docked launcher here; moving it to the top right is a later slice. */}
@@ -436,7 +444,7 @@ function RoutesWithIncognito({ person, onPersonChange, onSignedOut, appCatalog }
             Notifications, System status, Incognito, Settings, Help and Log
             out. Pages draw their own slim title bar; chat draws its own
             beside the history column. */}
-        <Route element={<HeaderSearchOptionsContext.Provider value={headerSearchOptions}><FullLayout rail={{ groups: RAIL_GROUPS.map((group) => ({ ...group, label: group.label ? i18n._({ id: group.label, message: group.label }) : undefined })), expanded: railExpanded && person.age_band !== "child" && document.documentElement.getAttribute("data-ease-targets") !== "large", onExpandedChange: setRailExpanded, autoCollapse: routeAutoCollapses(location.pathname) }} topRight={paneState.open || phoneChat ? undefined : ambientTopRight} topRightBand fallbackTitle={location.pathname.startsWith("/settings") ? i18n._({ id: "Settings", message: "Settings" }) : appName ?? (location.pathname === "/" ? i18n._({ id: "Home", message: "Home" }) : undefined)} rightPane={ambientRightPane} mobileSections={<>{drawerSections}<div className="mt-3 border-t border-border pt-3"><PhoneMenuLinks /></div></>} activeAppHref={selectedAppHref} railApps={railApps(appCatalog, pinnedRoutes)} railCoreDestinations={[{ name: i18n._({ id: "Media", message: "Media" }), url: "/media", icon: "cast" }]} onRailAppPinChange={(url) => togglePin(url)} railAllAppsHref={ALL_APPS_PATH} settingsHref="/settings" headerSearchRemote={(query) => searchWithCoreApps(query, appCatalog)} railTourId="shell.rail" railItemTourId={(item) => item.url === "/chat" ? "rail.chat" : undefined} incognitoTourId="shell.incognito" railProfile={<RailProfile person={person} incognito={incognito} onIncognitoChange={onIncognitoChange} onSignedOut={onSignedOut} helpEntries={helpEntries} />} sidebarItemStatus={(item) => item.url === ACTIVITY_PATH ? activityItemStatus(activityDot) : sidebarItemStatus(statusAppsQuery.data ?? [], item)} /></HeaderSearchOptionsContext.Provider>}>
+        <Route element={<HeaderSearchOptionsContext.Provider value={headerSearchOptions}><FullLayout rail={{ items: railItemsForCatalog(appCatalog, railApps(appCatalog, pinnedRoutes).filter((app) => app.pinned).map((app) => app.url)), groups: RAIL_GROUPS.map((group) => ({ ...group, label: group.label ? i18n._({ id: group.label, message: group.label }) : undefined })), expanded: railExpanded && person.age_band !== "child" && document.documentElement.getAttribute("data-ease-targets") !== "large", onExpandedChange: setRailExpanded, autoCollapse: routeAutoCollapses(location.pathname) }} topRight={paneState.open || phoneChat ? undefined : ambientTopRight} topRightBand fallbackTitle={location.pathname.startsWith("/settings") ? i18n._({ id: "Settings", message: "Settings" }) : appName ?? (location.pathname === "/" ? i18n._({ id: "Home", message: "Home" }) : undefined)} rightPane={ambientRightPane} mobileSections={<>{drawerSections}<div className="mt-3 border-t border-border pt-3"><PhoneMenuLinks /></div></>} activeAppHref={selectedAppHref} railApps={railApps(appCatalog, pinnedRoutes)} railCoreDestinations={[{ name: i18n._({ id: "Media", message: "Media" }), url: "/media", icon: "cast" }]} onRailAppPinChange={(url) => togglePin(url)} railAllAppsHref={ALL_APPS_PATH} settingsHref="/settings" headerSearchRemote={(query) => searchWithCoreApps(query, appCatalog)} railTourId="shell.rail" railItemTourId={(item) => item.url === "/chat" ? "rail.chat" : undefined} incognitoTourId="shell.incognito" railProfile={<RailProfile person={person} incognito={incognito} onIncognitoChange={onIncognitoChange} onSignedOut={onSignedOut} helpEntries={helpEntries} />} sidebarItemStatus={(item) => item.url === ACTIVITY_PATH ? activityItemStatus(activityDot) : sidebarItemStatus(statusAppsQuery.data ?? [], item)} /></HeaderSearchOptionsContext.Provider>}>
           <Route path="chat" element={<ChatPage person={person} />} />
           <Route path="chat/projects" element={<ProjectsPage person={person} />} />
           <Route path="chat/projects/:id" element={<ChatPage person={person} />} />
