@@ -25,6 +25,7 @@ import { speakToBytes } from "@/lib/voiceover";
 import { refuseVideoPrompt } from "@/lib/videos/policy";
 import { audioSeconds } from "@/lib/videos/audioLength";
 import { extractKeyframes } from "@/lib/pictures/keyframes";
+import { measureClipDrift } from "./fidelity";
 import { runStackEdit } from "@/lib/videos/stackEdit";
 import { filmOps, filmOverhead, MAX_EDIT_OPS, MAX_EDIT_SECONDS, overlayOp, type JoinTransition } from "@/lib/videos/editPlan";
 import { planFilm, type FilmPlan, type PlanFilmInput } from "./plan";
@@ -161,6 +162,10 @@ export function realFilmEngines(input: { actor: PersonRow; signal: AbortSignal; 
       const id = job.files[0]?.id;
       if (!id) throw new Error("The finished video is unavailable.");
       return id;
+    },
+    async measureClip({ stillFileId, clipFileId, seconds }) {
+      const still = readAttachment(actor, stillFileId), clip = readAttachment(actor, clipFileId);
+      return still.ok && clip.ok ? measureClipDrift(still.value.bytes, clip.value.bytes, seconds) : null;
     },
     async makeNarration({ shot }) {
       if (!shot.line || refuseVideoPrompt(shot.line, { lane: "adult" })) throw new Error("The narration line could not be used.");

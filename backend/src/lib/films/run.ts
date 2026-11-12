@@ -11,6 +11,8 @@ export interface FilmEngines {
   ensureSubject(input: { name: string; kind: "character" | "place" | "prop"; locked: string }, options: { signal: AbortSignal }): Promise<string>;
   makeStill(input: { shot: FilmPlan["shots"][number]; castLocked: string[]; /** The name of a supplied product kept hidden until this shot: its own picture is the still (a model redraws writing as nonsense). */ exactReference?: string }, options: { signal: AbortSignal }): Promise<string>;
   makeClip(input: { shot: FilmPlan["shots"][number]; stillFileId: string; /** The exact picture this clip must end on (the closing product shot follows it). */ endStillFileId?: string }, options: { signal: AbortSignal }): Promise<string>;
+  /** FILM-REAL-05: how far a finished clip drifted from its starting picture (measure only; null when it cannot be measured). */
+  measureClip?(input: { stillFileId: string; clipFileId: string; seconds: number }): Promise<{ first: number; middle: number; last: number } | null>;
   makeNarration?(input: { shot: FilmPlan["shots"][number] }, options: { signal: AbortSignal }): Promise<{ fileId: string; seconds: number }>;
   readNarration?(input: { fileId: string }, options: { signal: AbortSignal }): Promise<{ fileId: string; seconds: number }>;
   makeMotionClip?(input: { shot: FilmPlan["shots"][number]; stillFileId: string; narrationFileId: string; seconds: number }, options: { signal: AbortSignal }): Promise<string>;
@@ -128,6 +130,7 @@ export async function runFilm(input: { actor: PersonRow; productionId: string; p
         fileId = await callEngine("clips", planned.id, engines, signal, () => engines.makeClip({ shot: planned, stillFileId: stored.picture_file_id!, ...(endsOnReveal ? { endStillFileId: lastStored!.picture_file_id! } : {}) }, { signal }));
       }
       setShotClip(actor.id, productionId, planned.id, fileId);
+      if (!faceless && engines.measureClip) { const drift = await engines.measureClip({ stillFileId: stored.picture_file_id!, clipFileId: fileId, seconds: planned.seconds }).catch(() => null); if (drift) console.log(`[film] drift ${planned.id} first ${drift.first} middle ${drift.middle} last ${drift.last}`); }
     }
     current = getMediaProduction(actor, productionId)!;
     engines.onProgress?.({ stage: "clips", done: faceless ? (i + 1) * 2 : i + 1, total: faceless ? plan.shots.length * 2 : plan.shots.length, shotId: planned.id });
