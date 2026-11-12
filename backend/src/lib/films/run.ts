@@ -32,14 +32,41 @@ function storeCast(actor: PersonRow, productionId: string, plan: FilmPlan, ids: 
   return updateMediaProduction(actor, productionId, { cast }) ?? current;
 }
 
+/** A Stack that is restarting (a deploy on this machine) answers 503 "back in about a minute". A film of many steps outlives such a restart, so a step
+ *  waits and tries again instead of ending the film (found 2026-11-12: a film failed at its first still because a release restarted the Stack). */
+export function isTransientStackError(error: unknown): boolean {
+  const e = error as { status?: unknown; code?: unknown; message?: unknown } | null;
+  if (!e || typeof e !== "object") return false;
+  if (e.code === "stack_restarting" || e.code === "unavailable" || e.code === "stack_unavailable") return true;
+  if (e.status === 502 || e.status === 503 || e.status === 504) return true;
+  return /ECONNREFUSED|socket refused|fetch failed|stack is not running|is restarting|back by themselves/i.test(String(e.message ?? ""));
+}
+let retryDelays = [10_000, 20_000, 30_000, 60_000, 60_000, 60_000, 60_000, 60_000];
+export function __setFilmRetryDelaysForTests(delays: number[] | null): void { retryDelays = delays ?? [10_000, 20_000, 30_000, 60_000, 60_000, 60_000, 60_000, 60_000]; }
+function pause(ms: number, signal: AbortSignal): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(resolve, ms);
+    signal.addEventListener("abort", () => { clearTimeout(timer); reject(signal.reason ?? new DOMException("The operation was aborted", "AbortError")); }, { once: true });
+  });
+}
+
 async function callEngine<T>(stage: FilmStage, shotId: string | undefined, engines: FilmEngines, signal: AbortSignal, fn: () => Promise<T>): Promise<T> {
   failIfAborted(signal);
   await engines.waitForIdle();
   failIfAborted(signal);
-  try { return await fn(); }
-  catch (error) {
-    if (signal.aborted) failIfAborted(signal);
-    throw new FilmStepError(stage, "I couldn't finish that part of the film. You can try again.", shotId, error);
+  for (let attempt = 0; ; attempt++) {
+    try { return await fn(); }
+    catch (error) {
+      if (signal.aborted) failIfAborted(signal);
+      if (isTransientStackError(error) && attempt < retryDelays.length) {
+        engines.note = "The picture engine was restarting, so I waited and tried again.";
+        await pause(retryDelays[attempt]!, signal);
+        await engines.waitForIdle();
+        failIfAborted(signal);
+        continue;
+      }
+      throw new FilmStepError(stage, "I couldn't finish that part of the film. You can try again.", shotId, error);
+    }
   }
 }
 

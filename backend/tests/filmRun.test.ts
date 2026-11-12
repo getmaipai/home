@@ -3,7 +3,7 @@ import { db } from "@/db";
 import { people } from "@/db/schema";
 import { createMediaProduction, getMediaProduction } from "@/lib/mediaProductions";
 import { createMediaSubject } from "@/lib/mediaSubjects";
-import { changeMusic, FilmStepError, redoShot, runFilm, type FilmEngines } from "@/lib/films/run";
+import { __setFilmRetryDelaysForTests, changeMusic, FilmStepError, redoShot, runFilm, type FilmEngines } from "@/lib/films/run";
 import type { FilmPlan } from "@/lib/films/plan";
 import type { PersonRow } from "@/types";
 import { resetDb } from "./reset-db";
@@ -42,6 +42,36 @@ describe("film runner", () => {
     calls.length = 0;
     await runFilm({ actor, productionId: production.id, plan, engines, signal: new AbortController().signal });
     expect(calls).toEqual([]);
+  });
+  test("a Stack that is restarting is waited for: the step is tried again instead of ending the film", async () => {
+    const actor = person("film-retry"); actorForEngines = actor; const production = createMediaProduction(actor, { title: "Draft" }), calls: string[] = [];
+    __setFilmRetryDelaysForTests([1, 1, 1]);
+    let stillTries = 0;
+    const engines = fake(calls);
+    const real = engines.makeStill.bind(engines);
+    engines.makeStill = async (input, options) => { stillTries++; if (stillTries <= 2) throw Object.assign(new Error("One moment. Pictures will be back by themselves in about a minute."), { status: 503, code: "stack_restarting" }); return real(input, options); };
+    try {
+      const result = await runFilm({ actor, productionId: production.id, plan, engines, signal: new AbortController().signal });
+      expect(stillTries).toBe(5);
+      expect(result.episodes[0]?.scenes[0]?.shots.every((shot) => shot.clip_file_id)).toBe(true);
+      expect(engines.note).toContain("restarting");
+    } finally { __setFilmRetryDelaysForTests(null); }
+  });
+  test("a restart that lasts longer than the waits, and any other error, still ends the step plainly", async () => {
+    const actor = person("film-noretry"); actorForEngines = actor; const production = createMediaProduction(actor, { title: "Draft" }), calls: string[] = [];
+    __setFilmRetryDelaysForTests([1, 1]);
+    const engines = fake(calls);
+    let tries = 0;
+    engines.makeStill = async () => { tries++; throw Object.assign(new Error("down"), { status: 503 }); };
+    try {
+      await expect(runFilm({ actor, productionId: production.id, plan, engines, signal: new AbortController().signal })).rejects.toBeInstanceOf(FilmStepError);
+      expect(tries).toBe(3);
+      const other = fake([]); let otherTries = 0;
+      other.makeStill = async () => { otherTries++; throw new Error("bad picture"); };
+      const production2 = createMediaProduction(actor, { title: "Draft 2" });
+      await expect(runFilm({ actor, productionId: production2.id, plan, engines: other, signal: new AbortController().signal })).rejects.toBeInstanceOf(FilmStepError);
+      expect(otherTries).toBe(1);
+    } finally { __setFilmRetryDelaysForTests(null); }
   });
   test("a failed third clip preserves progress and resumes at that clip", async () => {
     const actor = person("film-owner"); actorForEngines = actor; const production = createMediaProduction(actor, { title: "Draft" }), calls: string[] = [];
