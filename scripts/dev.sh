@@ -192,6 +192,15 @@ process_status() {
   fi
   echo "$label: stopped"
 }
+# HOST-GUARD-08: when the host guard restarts the Mac's file-event service (fseventsd), every running file watcher (Vite, bun --hot)
+# keeps a dead stream and misses edits. The guard only writes this file (it never touches a user process); the watch loop below
+# restarts this hub in full, which rereads every file from disk, so an edit made during the restart is picked up.
+fsevents_restarted_at() {
+  local f="${MAIPAI_HOST_GUARD_STATE_DIR:-/var/db/maipai-host-guard}/fsevents-restarted" v=""
+  [[ -f "$f" ]] && v="$(sed -n 's/.*"restarted_at":\([0-9]*\).*/\1/p' "$f" 2>/dev/null | head -n 1)"
+  [[ "$v" =~ ^[0-9]+$ ]] && echo "$v" || echo 0
+}
+
 stop_one() {
   local label="$1" file="$2" candidate command
   candidate="$(pid_value "$file" 2>/dev/null || true)"
@@ -233,6 +242,14 @@ case "$action" in
       rm -f "$tailscale_host_file"
     fi
     if ((workbench)); then echo "Workbench stopped; its data stays in $hub."; else echo "Dev Home stopped."; fi
+    ;;
+  restart-hub)
+    # Hidden: started by `watch` after the file-event service restarted. Stops this hub and starts it with the options it had.
+    stop_one backend "$backend_pid_file" || true
+    stop_one vite "$vite_pid_file" || true
+    restart_args=(start)
+    if [[ -f "$state/start-args" ]]; then while IFS= read -r arg; do [[ -z "$arg" ]] || restart_args+=("$arg"); done < "$state/start-args"; fi
+    exec bash "$script_dir/dev.sh" "${restart_args[@]}"
     ;;
   reseed)
     stop_one watch "$watch_pid_file"
@@ -378,6 +395,8 @@ case "$action" in
     fi
     watch_args=(watch)
     ((workbench == 0)) || watch_args+=(--workbench)
+    # The options this hub started with, so a restart after a file-event service restart starts it the same way.
+    { ((no_stack == 0)) || echo --no-stack; [[ -z "$stack_override" ]] || printf '%s\n' --stack "$stack_override"; [[ -z "$port_override" ]] || printf '%s\n' --port "$port_override"; ((workbench == 0)) || echo --workbench; } > "$state/start-args"
     MAIPAI_DEV_ROOT="$root" nohup bash "$script_dir/dev.sh" "${watch_args[@]}" </dev/null >/dev/null 2>&1 &
     echo $! > "$watch_pid_file"
     print_urls
@@ -396,10 +415,17 @@ case "$action" in
     idle_limit=$(( ${MAIPAI_DEV_IDLE_MINUTES:-$idle_default} * 60 ))
     interval="${MAIPAI_DEV_WATCH_SECONDS:-30}"
     idle=0
+    fsevents_seen="$(fsevents_restarted_at)"
     while sleep "$interval"; do
       if ! live_backend && ! live_vite; then rm -f "$watch_pid_file"; exit 0; fi
       reason=""
       if [[ ! -e "$root/.git" ]]; then reason="its worktree was removed"; fi
+      if [[ -z "$reason" ]] && (( $(fsevents_restarted_at) > fsevents_seen )); then
+        echo "$(date '+%F %T') restarting dev Home: the Mac's file-event service was restarted by the host guard, so its file watchers start fresh" >> "$state/watch.log"
+        rm -f "$watch_pid_file"
+        MAIPAI_DEV_ROOT="$root" nohup bash -c "${MAIPAI_DEV_RESTART_CMD:-bash \"\$0\" restart-hub}" "$script_dir/dev.sh" </dev/null >>"$state/watch.log" 2>&1 &
+        exit 0
+      fi
       if [[ -z "$reason" ]]; then
         if lsof -nP -iTCP:"$vite_port" -sTCP:ESTABLISHED >/dev/null 2>&1; then idle=0; else idle=$((idle + interval)); fi
         if ((idle_limit > 0 && idle >= idle_limit)); then reason="no browser was connected for $((idle_limit / 60)) minutes"; fi
