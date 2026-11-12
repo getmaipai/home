@@ -47,6 +47,35 @@ export function hostGuardStatusView(status: HostGuardStatus | null, installed: b
     : { state: "off", title: "This Mac's self-check", text: "The Mac's self-check is not installed. Ask an admin to check Settings." };
 }
 
+/** HOST-GUARD-07: the guard's memory probe (memory.json). Admin surfaces only: its summary uses memory words, which people never see. */
+export const HostGuardMemorySchema = z.object({
+  version: z.literal(1), checked_at: z.number().finite(), pressure: z.number().finite(), dev_shed: z.boolean(), notice: z.string(),
+  summary: z.string(), last_restart_at: z.number().finite(), last_restart_result: z.string(),
+});
+export type HostGuardMemory = z.infer<typeof HostGuardMemorySchema>;
+
+export function hostGuardMemoryFromJson(value: unknown, now = Date.now()): HostGuardMemory | null {
+  const parsed = HostGuardMemorySchema.safeParse(value);
+  if (!parsed.success || parsed.data.checked_at < Math.floor(now / 1000) - 300) return null;
+  return parsed.data;
+}
+
+export function readHostGuardMemory(now = Date.now()): HostGuardMemory | null {
+  if (process.platform !== "darwin") return null;
+  try { return hostGuardMemoryFromJson(JSON.parse(readFileSync(join(hostGuardStateDir(), "memory.json"), "utf8")), now); } catch { return null; }
+}
+
+/** Adds the memory line to the admin status row when it matters: pressure, paused development work, or a repair in the last hour. */
+export function withHostGuardMemory(view: HostGuardView, memory: HostGuardMemory | null, now = Date.now()): HostGuardView {
+  if (!memory) return view;
+  const recentRepair = memory.last_restart_at > 0 && memory.last_restart_at >= Math.floor(now / 1000) - 3600;
+  if (memory.pressure < 2 && !memory.dev_shed && !recentRepair) return view;
+  const repair = recentRepair
+    ? ` The self-check restarted the Mac's file-event service ${Math.max(1, Math.round((now / 1000 - memory.last_restart_at) / 60))} min ago (${memory.last_restart_result}).`
+    : "";
+  return { ...view, text: `${view.text} ${memory.summary}.${repair}` };
+}
+
 export function hostGuardInstalled(): boolean {
   if (process.platform !== "darwin") return false;
   try { readFileSync(join(hostGuardStateDir(), "config.json"), "utf8"); return true; } catch { return false; }
