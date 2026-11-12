@@ -235,7 +235,7 @@ msgid "{count, plural, one {# kept until you delete it} other {# kept until you 
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/library/LibraryItems.tsx:128
+#: src/shell/library/LibraryItems.tsx:129
 #: src/shell/pages/FamilyPage.tsx:35
 msgid "{count, plural, one {# person} other {# people}}"
 msgstr ""
@@ -1767,7 +1767,7 @@ msgid "setting.home.access_token.help"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/ChatPage.tsx:897
+#: src/shell/pages/ChatPage.tsx:903
 msgid "A new chat always uses one of your companions. Choose a companion to switch."
 msgstr ""
 
@@ -2919,12 +2919,12 @@ msgid "notification.jobs.admin_stopped"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:215
+#: ../backend/src/lib/failureCopy.ts:222
 msgid "failure.composer.paused_by_admin.adult"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:216
+#: ../backend/src/lib/failureCopy.ts:223
 msgid "failure.composer.paused_by_admin.teen"
 msgstr ""
 
@@ -3367,7 +3367,7 @@ msgid "Asked {name} to {value}, waiting for it."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/ChatPage.tsx:1642
+#: src/shell/pages/ChatPage.tsx:1650
 msgid "Asking the bare model…"
 msgstr ""
 
@@ -3707,13 +3707,13 @@ msgid "Bands could not be loaded. Open this page again."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/ChatPage.tsx:1814
+#: src/shell/pages/ChatPage.tsx:1822
 msgid "Bare mode is on"
 msgstr ""
 
 #. js-lingui-explicit-id
 #: src/apps/chat/chatThreadSlots.tsx:826
-#: src/shell/pages/ChatPage.tsx:1640
+#: src/shell/pages/ChatPage.tsx:1648
 msgid "Bare model"
 msgstr ""
 
@@ -4361,8 +4361,8 @@ msgstr ""
 #: src/apps/setup/StorageStep.tsx:190
 #: src/shell/components/DataTableRowActions.tsx:53
 #: src/shell/pages/ActivityPage.tsx:156
-#: src/shell/pages/ChatPage.tsx:1693
-#: src/shell/pages/ChatPage.tsx:1709
+#: src/shell/pages/ChatPage.tsx:1701
+#: src/shell/pages/ChatPage.tsx:1717
 #: src/shell/pages/CompanionAudienceDialog.tsx:64
 #: src/shell/pages/CompanionsPage.tsx:181
 #: src/shell/pages/FilesPage.tsx:427
@@ -4670,7 +4670,7 @@ msgstr ""
 #: src/shell/AmbientCompanionPane.tsx:329
 #: src/shell/coreLabels.ts:8
 #: src/shell/pageHeaderTitle.tsx:95
-#: src/shell/pages/ChatPage.tsx:1763
+#: src/shell/pages/ChatPage.tsx:1771
 #: src/shell/pages/CompanionsPage.tsx:162
 #: src/shell/pages/CompanionsPage.tsx:167
 #: src/shell/pages/settings/settingsBackLink.ts:52
@@ -4780,13 +4780,28 @@ msgid "Chat is down"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:217
+#: ../backend/src/lib/failureCopy.ts:224
 msgid "failure.composer.paused_by_admin.child"
 msgstr ""
 
 #. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:939
 msgid "setting.resources.quiet_seconds.help"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: ../backend/src/lib/failureCopy.ts:216
+msgid "failure.composer.upgrading.adult"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: ../backend/src/lib/failureCopy.ts:217
+msgid "failure.composer.upgrading.teen"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: ../backend/src/lib/failureCopy.ts:218
+msgid "failure.composer.upgrading.child"
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -4837,11 +4852,11 @@ msgid "Chat runs through the MaiPai Stack."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/ChatPage.tsx:1134
-#: src/shell/pages/ChatPage.tsx:1515
-#: src/shell/pages/ChatPage.tsx:1515
-#: src/shell/pages/ChatPage.tsx:1931
-#: src/shell/pages/ChatPage.tsx:1931
+#: src/shell/pages/ChatPage.tsx:1140
+#: src/shell/pages/ChatPage.tsx:1521
+#: src/shell/pages/ChatPage.tsx:1521
+#: src/shell/pages/ChatPage.tsx:1939
+#: src/shell/pages/ChatPage.tsx:1939
 msgid "Chat settings"
 msgstr ""
 
@@ -4937,7 +4952,7 @@ msgid "Check that the engine is running, then try again."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:362
+#: ../backend/src/lib/failureCopy.ts:369
 msgid "failure.advice.unreachable.next_step"
 msgstr ""
 
@@ -5797,7 +5812,7 @@ msgstr ""
 #: src/apps/setup/AwayFromHome.tsx:175
 #: src/shell/AmbientCompanionPane.tsx:271
 #: src/shell/AmbientCompanionPane.tsx:273
-#: src/shell/pages/ChatPage.tsx:1735
+#: src/shell/pages/ChatPage.tsx:1743
 #: src/shell/pages/MusicWorkspacePage.tsx:193
 #: src/shell/pages/status/StatusBoard.tsx:114
 #: src/shell/pages/status/StatusBoard.tsx:133
@@ -6049,7 +6064,7 @@ msgid "Compare"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/ChatPage.tsx:1959
+#: src/shell/pages/ChatPage.tsx:1967
 msgid "Compare with the bare model"
 msgstr ""
 
@@ -6233,9 +6248,9 @@ msgstr ""
 
 #. js-lingui-explicit-id
 #: src/shell/AmbientCompanionPane.tsx:328
-#: src/shell/pages/ChatPage.tsx:1519
-#: src/shell/pages/ChatPage.tsx:1928
-#: src/shell/pages/ChatPage.tsx:1931
+#: src/shell/pages/ChatPage.tsx:1525
+#: src/shell/pages/ChatPage.tsx:1936
+#: src/shell/pages/ChatPage.tsx:1939
 msgid "Conversations"
 msgstr ""
 
@@ -6266,7 +6281,7 @@ msgid "Copy"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/ChatPage.tsx:1734
+#: src/shell/pages/ChatPage.tsx:1742
 #: src/shell/pages/TurnErrorDetails.tsx:94
 msgid "Copy details"
 msgstr ""
@@ -6458,7 +6473,7 @@ msgid "Could not copy. Select the text below instead."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/ChatPage.tsx:1545
+#: src/shell/pages/ChatPage.tsx:1551
 #: src/shell/pages/MicTestPage.tsx:50
 msgid "Could not copy. Select the text instead."
 msgstr ""
@@ -6481,7 +6496,7 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/apps/chat/chatProjects.tsx:92
 #: src/apps/chat/chatProjects.tsx:150
-#: src/shell/pages/ChatPage.tsx:1251
+#: src/shell/pages/ChatPage.tsx:1257
 #: src/shell/pages/ProjectsPage.tsx:127
 msgid "Could not delete that project. Try again."
 msgstr ""
@@ -6502,7 +6517,7 @@ msgid "Could not delete the voice sample."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/ChatPage.tsx:950
+#: src/shell/pages/ChatPage.tsx:956
 msgid "Could not delete this chat. Try again."
 msgstr ""
 
@@ -6994,7 +7009,7 @@ msgid "Could not reach Home. Check your connection and try again."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:373
+#: ../backend/src/lib/failureCopy.ts:380
 msgid "failure.tool.unavailable.verb"
 msgstr ""
 
@@ -7034,7 +7049,7 @@ msgid "Could not remove those people."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/ChatPage.tsx:942
+#: src/shell/pages/ChatPage.tsx:948
 msgid "Could not rename this chat. Try again."
 msgstr ""
 
@@ -7326,8 +7341,8 @@ msgstr ""
 
 #. js-lingui-explicit-id
 #: src/apps/chat/chatProjects.tsx:103
-#: src/shell/pages/ChatPage.tsx:1232
-#: src/shell/pages/ChatPage.tsx:1242
+#: src/shell/pages/ChatPage.tsx:1238
+#: src/shell/pages/ChatPage.tsx:1248
 #: src/shell/pages/ProjectsPage.tsx:192
 msgid "Could not update that project. Try again."
 msgstr ""
@@ -7855,7 +7870,7 @@ msgid "Delete all samples"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/ChatPage.tsx:1695
+#: src/shell/pages/ChatPage.tsx:1703
 msgid "Delete chat and {media}"
 msgstr ""
 
@@ -7894,7 +7909,7 @@ msgid "Delete this alarm?"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/ChatPage.tsx:1689
+#: src/shell/pages/ChatPage.tsx:1697
 msgid "Delete this chat?"
 msgstr ""
 
@@ -7960,7 +7975,7 @@ msgid "Describe it, pick a sound, press Generate. Your songs, bands and albums s
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/ChatPage.tsx:1707
+#: src/shell/pages/ChatPage.tsx:1715
 msgid "Describe the changes to this {kind}"
 msgstr ""
 
@@ -7997,7 +8012,7 @@ msgid "Describe the sound in at least 3 characters to turn Generate on."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/ChatPage.tsx:1705
+#: src/shell/pages/ChatPage.tsx:1713
 msgid "Describe what you want changed. The original stays."
 msgstr ""
 
@@ -8063,7 +8078,7 @@ msgid "Details"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/ChatPage.tsx:1545
+#: src/shell/pages/ChatPage.tsx:1551
 msgid "Details copied."
 msgstr ""
 
@@ -8307,7 +8322,7 @@ msgid "setting.tools.timer.mode.option_label.do"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/ChatPage.tsx:1947
+#: src/shell/pages/ChatPage.tsx:1955
 #: src/shell/pages/FilesPage.tsx:165
 msgid "Document"
 msgstr ""
@@ -9035,7 +9050,7 @@ msgid "setting.synths.real_people.option.all"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/ChatPage.tsx:1815
+#: src/shell/pages/ChatPage.tsx:1823
 msgid "Every reply in this conversation is the bare model - no persona, routing, packages, or quality guards."
 msgstr ""
 
@@ -9292,7 +9307,7 @@ msgid "FAIL hop {id}: {detail} — Fix: {fix}"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:376
+#: ../backend/src/lib/failureCopy.ts:383
 msgid "failure.tool.errored.verb"
 msgstr ""
 
@@ -9704,7 +9719,7 @@ msgid "For example: 96"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/ChatPage.tsx:1707
+#: src/shell/pages/ChatPage.tsx:1715
 msgid "For example: make it night time, add a red hat"
 msgstr ""
 
@@ -9767,7 +9782,7 @@ msgid "Forward 30 seconds"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:375
+#: ../backend/src/lib/failureCopy.ts:382
 msgid "failure.tool.found_nothing.verb"
 msgstr ""
 
@@ -9782,7 +9797,7 @@ msgid "Free memory"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:359
+#: ../backend/src/lib/failureCopy.ts:366
 msgid "failure.advice.memory.next_step"
 msgstr ""
 
@@ -10281,7 +10296,7 @@ msgid "Good to know"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:377
+#: ../backend/src/lib/failureCopy.ts:384
 msgid "failure.tool.bad_arguments.verb"
 msgstr ""
 
@@ -10311,7 +10326,7 @@ msgid "setting.music.library_sort.option.creator"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/ChatPage.tsx:1631
+#: src/shell/pages/ChatPage.tsx:1639
 msgid "Guard:"
 msgstr ""
 
@@ -10840,12 +10855,12 @@ msgid "Home could not make that voiceover. Try again."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:362
+#: ../backend/src/lib/failureCopy.ts:369
 msgid "failure.advice.unreachable.cause"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:363
+#: ../backend/src/lib/failureCopy.ts:370
 msgid "failure.advice.engine_computer.cause"
 msgstr ""
 
@@ -11815,12 +11830,12 @@ msgid "failure.voice.microphone_blocked.minor"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:434
+#: ../backend/src/lib/failureCopy.ts:441
 msgid "failure.ask_form.unreachable"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:435
+#: ../backend/src/lib/failureCopy.ts:442
 msgid "failure.ask_form.other"
 msgstr ""
 
@@ -11845,17 +11860,17 @@ msgid "failure.context_too_large.adult"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:395
+#: ../backend/src/lib/failureCopy.ts:402
 msgid "failure.partial.slow"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:396
+#: ../backend/src/lib/failureCopy.ts:403
 msgid "failure.partial.other"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:394
+#: ../backend/src/lib/failureCopy.ts:401
 msgid "failure.partial.minor"
 msgstr ""
 
@@ -11926,7 +11941,7 @@ msgid "failure.composer.paused.child"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:223
+#: ../backend/src/lib/failureCopy.ts:230
 msgid "failure.composer.offline.child"
 msgstr ""
 
@@ -12052,7 +12067,7 @@ msgid "Included skills"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/chat/chatModelAdapter.ts:977
+#: src/apps/chat/chatModelAdapter.ts:984
 msgid "Incognito can't turn on partway through a chat. Start a new chat to go incognito."
 msgstr ""
 
@@ -12474,7 +12489,7 @@ msgid "Keep"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/ChatPage.tsx:1694
+#: src/shell/pages/ChatPage.tsx:1702
 msgid "Keep {media}"
 msgstr ""
 
@@ -13367,8 +13382,8 @@ msgid "Library counts"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/library/LibraryItems.tsx:108
-#: src/shell/library/LibraryItems.tsx:147
+#: src/shell/library/LibraryItems.tsx:109
+#: src/shell/library/LibraryItems.tsx:148
 msgid "Library files"
 msgstr ""
 
@@ -14567,7 +14582,7 @@ msgid "Make Inspired voice"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/ChatPage.tsx:1710
+#: src/shell/pages/ChatPage.tsx:1718
 msgid "Make it"
 msgstr ""
 
@@ -15140,7 +15155,7 @@ msgstr ""
 
 #. js-lingui-explicit-id
 #: src/shell/AmbientCompanionPane.tsx:273
-#: src/shell/pages/ChatPage.tsx:1722
+#: src/shell/pages/ChatPage.tsx:1730
 msgid "Microphone help"
 msgstr ""
 
@@ -15261,7 +15276,7 @@ msgid "area.Model per job"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/ChatPage.tsx:1633
+#: src/shell/pages/ChatPage.tsx:1641
 msgid "Model:"
 msgstr ""
 
@@ -15856,7 +15871,7 @@ msgid "New alarm"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/ChatPage.tsx:1506
+#: src/shell/pages/ChatPage.tsx:1512
 msgid "New chat"
 msgstr ""
 
@@ -17468,7 +17483,7 @@ msgid "setting.backup.max_total_gb.help"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:433
+#: ../backend/src/lib/failureCopy.ts:440
 msgid "failure.ask_form.invalid"
 msgstr ""
 
@@ -17530,7 +17545,7 @@ msgid "One moment. Back soon."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/chat/chatModelAdapter.ts:971
+#: src/apps/chat/chatModelAdapter.ts:978
 #: src/lib/hubReachability.ts:12
 msgid "One moment. Home will be back in about a minute."
 msgstr ""
@@ -17960,12 +17975,12 @@ msgid "Other running timers"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/ChatPage.tsx:1960
+#: src/shell/pages/ChatPage.tsx:1968
 msgid "Our reply beside the same model with no routing, packages, persona or guards"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/ChatPage.tsx:1619
+#: src/shell/pages/ChatPage.tsx:1627
 msgid "Ours"
 msgstr ""
 
@@ -18157,7 +18172,7 @@ msgid "Password"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/ChatPage.tsx:1929
+#: src/shell/pages/ChatPage.tsx:1937
 msgid "Past conversations"
 msgstr ""
 
@@ -18279,7 +18294,7 @@ msgid "Person"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/ChatPage.tsx:1634
+#: src/shell/pages/ChatPage.tsx:1642
 msgid "Persona in effect:"
 msgstr ""
 
@@ -19626,7 +19641,7 @@ msgid "Remix and edit"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/ChatPage.tsx:1704
+#: src/shell/pages/ChatPage.tsx:1712
 msgid "Remix this {kind}"
 msgstr ""
 
@@ -20221,12 +20236,12 @@ msgid "Retry"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:373
+#: ../backend/src/lib/failureCopy.ts:380
 msgid "failure.tool.unavailable.next_step"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:363
+#: ../backend/src/lib/failureCopy.ts:370
 msgid "failure.advice.engine_computer.next_step"
 msgstr ""
 
@@ -20236,32 +20251,32 @@ msgid "Retry with current companion"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:364
+#: ../backend/src/lib/failureCopy.ts:371
 msgid "failure.advice.context_too_large.next_step"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:377
+#: ../backend/src/lib/failureCopy.ts:384
 msgid "failure.tool.bad_arguments.next_step"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:374
+#: ../backend/src/lib/failureCopy.ts:381
 msgid "failure.tool.timed_out.next_step"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:361
+#: ../backend/src/lib/failureCopy.ts:368
 msgid "failure.advice.slow.next_step"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:365
+#: ../backend/src/lib/failureCopy.ts:372
 msgid "failure.advice.other.next_step"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:376
+#: ../backend/src/lib/failureCopy.ts:383
 msgid "failure.tool.errored.next_step"
 msgstr ""
 
@@ -20615,7 +20630,7 @@ msgid "Route taken"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/ChatPage.tsx:1627
+#: src/shell/pages/ChatPage.tsx:1635
 msgid "Route:"
 msgstr ""
 
@@ -20636,7 +20651,7 @@ msgid "Rows per page:"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/ChatPage.tsx:1630
+#: src/shell/pages/ChatPage.tsx:1638
 msgid "Rules fired:"
 msgstr ""
 
@@ -20667,7 +20682,7 @@ msgid "Run the test"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/ChatPage.tsx:1625
+#: src/shell/pages/ChatPage.tsx:1633
 msgid "Rung:"
 msgstr ""
 
@@ -21177,8 +21192,8 @@ msgid "Search articles"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/ChatPage.tsx:1516
-#: src/shell/pages/ChatPage.tsx:1931
+#: src/shell/pages/ChatPage.tsx:1522
+#: src/shell/pages/ChatPage.tsx:1939
 msgid "Search chats"
 msgstr ""
 
@@ -21974,7 +21989,7 @@ msgid "Show all files"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/ChatPage.tsx:1802
+#: src/shell/pages/ChatPage.tsx:1810
 msgid "Show conversations"
 msgstr ""
 
@@ -23107,7 +23122,7 @@ msgid "api.error.totp_restart_sign_in"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:360
+#: ../backend/src/lib/failureCopy.ts:367
 msgid "failure.advice.stopped.next_step"
 msgstr ""
 
@@ -24046,7 +24061,7 @@ msgid "that device"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/chat/chatModelAdapter.ts:980
+#: src/apps/chat/chatModelAdapter.ts:987
 msgid "That did not send. Try again."
 msgstr ""
 
@@ -24239,7 +24254,7 @@ msgid "api.error.list_missing"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:418
+#: ../backend/src/lib/failureCopy.ts:425
 msgid "failure.prompt_limit.too_big.adult"
 msgstr ""
 
@@ -24249,7 +24264,7 @@ msgid "That message is no longer available. This chat is open at the end."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:419
+#: ../backend/src/lib/failureCopy.ts:426
 msgid "failure.prompt_limit.too_big.minor"
 msgstr ""
 
@@ -24437,7 +24452,7 @@ msgid "The AI is waiting for its helper to start. The Status page shows what is 
 msgstr ""
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:221
+#: ../backend/src/lib/failureCopy.ts:228
 msgid "failure.composer.offline.adult"
 msgstr ""
 
@@ -24447,7 +24462,7 @@ msgid "The AI isn't answering."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:222
+#: ../backend/src/lib/failureCopy.ts:229
 msgid "failure.composer.offline.teen"
 msgstr ""
 
@@ -24472,7 +24487,7 @@ msgid "The AI restarted while I was answering. Try again in a minute."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:432
+#: ../backend/src/lib/failureCopy.ts:439
 msgid "failure.ask_form.field"
 msgstr ""
 
@@ -24502,7 +24517,7 @@ msgid "The backup from {backupDate} will replace everything in MaiPai Home the n
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/ChatPage.tsx:1645
+#: src/shell/pages/ChatPage.tsx:1653
 msgid "The bare reply was refused by the same safety pass a real turn uses."
 msgstr ""
 
@@ -24537,17 +24552,17 @@ msgid "The character could not be made ready. Try again."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:361
+#: ../backend/src/lib/failureCopy.ts:368
 msgid "failure.advice.slow.cause"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:358
+#: ../backend/src/lib/failureCopy.ts:365
 msgid "failure.advice.busy.cause"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:360
+#: ../backend/src/lib/failureCopy.ts:367
 msgid "failure.advice.stopped.cause"
 msgstr ""
 
@@ -24582,7 +24597,7 @@ msgid "setting.companions.enabled.help"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:359
+#: ../backend/src/lib/failureCopy.ts:366
 msgid "failure.advice.memory.cause"
 msgstr ""
 
@@ -24627,7 +24642,7 @@ msgid "setting.music.dj.does"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/ChatPage.tsx:1948
+#: src/shell/pages/ChatPage.tsx:1956
 msgid "The document from this reply"
 msgstr ""
 
@@ -25077,12 +25092,12 @@ msgid "The remix could not start. Check your connection and try again."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:365
+#: ../backend/src/lib/failureCopy.ts:372
 msgid "failure.advice.other.cause"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:364
+#: ../backend/src/lib/failureCopy.ts:371
 msgid "failure.advice.context_too_large.cause"
 msgstr ""
 
@@ -25486,7 +25501,7 @@ msgid "setting.coding.thinking_budget.label"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/ChatPage.tsx:1632
+#: src/shell/pages/ChatPage.tsx:1640
 msgid "Thinking:"
 msgstr ""
 
@@ -25541,17 +25556,17 @@ msgid "This cannot be undone. The file is gone from the Library; a copy that a c
 msgstr ""
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:414
+#: ../backend/src/lib/failureCopy.ts:421
 msgid "failure.prompt_limit.carry_offer.adult"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:415
+#: ../backend/src/lib/failureCopy.ts:422
 msgid "failure.prompt_limit.carry_offer.minor"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/ChatPage.tsx:1690
+#: src/shell/pages/ChatPage.tsx:1698
 msgid "This chat made {media}. Delete them too, or keep them in your Library? Deleted files wait in Trash for 30 days."
 msgstr ""
 
@@ -25662,7 +25677,7 @@ msgid "api.error.file_belongs_to_item"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:431
+#: ../backend/src/lib/failureCopy.ts:438
 msgid "failure.ask_form.stale"
 msgstr ""
 
@@ -25909,7 +25924,7 @@ msgid "Time remaining"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:374
+#: ../backend/src/lib/failureCopy.ts:381
 msgid "failure.tool.timed_out.verb"
 msgstr ""
 
@@ -26108,7 +26123,7 @@ msgid "Tour targets not found"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/ChatPage.tsx:1624
+#: src/shell/pages/ChatPage.tsx:1632
 msgid "Trace"
 msgstr ""
 
@@ -26295,7 +26310,7 @@ msgid "api.next.internal"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:375
+#: ../backend/src/lib/failureCopy.ts:382
 msgid "failure.tool.found_nothing.next_step"
 msgstr ""
 
@@ -27480,7 +27495,7 @@ msgid "Voice cloning will no longer be able to use this token."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/ChatPage.tsx:1744
+#: src/shell/pages/ChatPage.tsx:1752
 msgid "Voice conversation"
 msgstr ""
 
@@ -27586,7 +27601,7 @@ msgid "Volume of {name}"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:358
+#: ../backend/src/lib/failureCopy.ts:365
 msgid "failure.advice.busy.next_step"
 msgstr ""
 
@@ -28812,7 +28827,7 @@ msgid "Your character will appear here"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/ChatPage.tsx:1491
+#: src/shell/pages/ChatPage.tsx:1497
 msgid "Your chats will show up here."
 msgstr ""
 
