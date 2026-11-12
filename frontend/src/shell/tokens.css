@@ -751,18 +751,14 @@ html.dark {
   color-scheme: dark;
 }
 
-/* ARTLIST-PANEL-01: the page is a rounded panel inside a frame the colour of the rail, as in Artlist. The chat keeps its own full-bleed surface. */
-[data-slot="rail-shell"] {
-  background: var(--shell-history);
-}
-[data-slot="rail-workspace"]:not(:has([data-slot="chat-shell"])) {
-  margin: 8px 8px 8px 0;
-  border-radius: 16px;
-  overflow: clip;
-}
-@media (max-width: 767px) {
-  [data-slot="rail-workspace"]:not(:has([data-slot="chat-shell"])) {
-    margin: 0;
-    border-radius: 0;
-  }
+/* ARTLIST-FRAME-01: the rail, the second column and the title row share one frame tone with no divider; the page is a darker panel inside it
+ * (the kit draws the rounded panel). Tokens only, as the kit reads them. */
+html.dark body,
+html:not(.light) body {
+  --shell-history: var(--background);
+  --shell-rail: var(--background);
+  --app-rail-bg: var(--background);
+  --settings-column: var(--background);
+  --settings-column-divider: transparent;
+  --page: color-mix(in srgb, var(--background), black 48%);
 }
