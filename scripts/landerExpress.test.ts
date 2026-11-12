@@ -284,3 +284,29 @@ describe("one writer", () => {
     expect(run("lander.sh", ["run-once"]).stdout).toContain("landed: wt/one_writer");
   }, 60_000);
 });
+
+describe("pins go to GitHub before the main that names them", () => {
+  test("a commons tag only this Mac has is pushed first; a tag nobody has holds main back with the reason", () => {
+    stubGit("pass");
+    const commonsOrigin = join(scratch, "commons-origin.git");
+    const commons = join(scratch, "commons-clone");
+    Bun.spawnSync(["git", "init", "-q", "--bare", "--initial-branch=main", commonsOrigin]);
+    Bun.spawnSync(["git", "clone", "-q", commonsOrigin, commons]);
+    git(commons, "-c", "user.name=t", "-c", "user.email=t@example.test", "commit", "-q", "--allow-empty", "-m", "commons base");
+    git(commons, "push", "-q", "origin", "HEAD:main");
+    git(commons, "tag", "ui-v9.9.9");
+    env.MAIPAI_COMMONS_REPO = commons; env.MAIPAI_STACK_REPO = join(scratch, "no-stack-here");
+    env.MAIPAI_LAND_BACKUP_SECONDS = "0"; env.MAIPAI_LAND_OUTBOX_BASE_SECONDS = "0";
+    const pin = change("pin_ok", "backend/package.json", `{"dependencies":{"@maipai/ui":"file:../../commons-tags/ui-ui-v9.9.9/ui"}}\n`);
+    enqueue("pin_ok", pin.sha, pin.w);
+    run("lander.sh", ["run-once"]);
+    expect(git(commonsOrigin, "rev-parse", "refs/tags/ui-v9.9.9")).toBe(git(commons, "rev-parse", "ui-v9.9.9"));
+    expect(originMain()).toBe(pipelineMain());
+    const missing = change("pin_missing", "backend/package.json", `{"dependencies":{"@maipai/ui":"file:../../commons-tags/ui-ui-v0.0.404/ui"}}\n`);
+    enqueue("pin_missing", missing.sha, missing.w);
+    run("lander.sh", ["run-once"]);
+    expect(originMain()).not.toBe(pipelineMain());
+    expect(readFileSync(join(data, "outbox", "last-error"), "utf8")).toContain("ui-v0.0.404 is on neither GitHub nor this Mac");
+    delete env.MAIPAI_COMMONS_REPO; delete env.MAIPAI_STACK_REPO;
+  }, 60_000);
+});

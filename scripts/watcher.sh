@@ -487,7 +487,25 @@ file_issue() {
   fi
 }
 
+checkout_lock="$data/checkout.lock.d"
+checkout_lock_take() {
+  local holder
+  if mkdir "$checkout_lock" 2>/dev/null; then echo "$$" >"$checkout_lock/pid"; echo watcher >"$checkout_lock/who"; return 0; fi
+  holder="$(cat "$checkout_lock/pid" 2>/dev/null || true)"
+  if [[ "$holder" == "$$" ]]; then return 0; fi
+  if [[ "$holder" =~ ^[0-9]+$ ]] && kill -0 "$holder" 2>/dev/null; then return 1; fi
+  rm -rf "$checkout_lock"; mkdir "$checkout_lock" 2>/dev/null || return 1; echo "$$" >"$checkout_lock/pid"; echo watcher >"$checkout_lock/who"
+}
+checkout_lock_release() { [[ "$(cat "$checkout_lock/pid" 2>/dev/null || true)" != "$$" ]] || rm -rf "$checkout_lock"; }
+
 run_once() {
+  local rc=0
+  run_once_body "$@" || rc=$?
+  checkout_lock_release
+  return "$rc"
+}
+
+run_once_body() {
   local head last_run last_green started output seconds rc files file all_pass=1 result culprit subject title note_tmp note timed_leg timed_seconds red_files="" budget_spent=0
   local bisect_started bisect_budget bisect_spent
   # OUTBOX-01: the watcher tests the pipeline's main, which is a landing ahead of GitHub's while the outbox is still pushing, so a slow
@@ -514,6 +532,8 @@ run_once() {
     fi
     return 0
   }
+  # STABLE-01: the nightly stable run uses this same checkout; whoever holds the lock has the tree, the other waits for its next tick.
+  checkout_lock_take || { echo "checkout busy (nightly run)"; return 0; }
   checkout_error="$(git -C "$checkout" checkout --detach "$head" 2>&1)" || { checkout_failed "$checkout_error"; return 0; }
   checkout_head="$(git -C "$checkout" rev-parse HEAD 2>&1)" || checkout_head=""
   [[ "$checkout_head" == "$head" ]] || { checkout_failed "${checkout_error:-HEAD is $checkout_head}"; return 0; }

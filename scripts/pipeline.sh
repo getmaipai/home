@@ -520,6 +520,29 @@ case "${1:-}" in
     else rm -f "$watch_pidfile"; echo "watcher already stopped"; fi
     (( failed == 0 ))
     ;;
+  nightly)
+    # STABLE-01: the nightly stable run. Its schedule is OFF by default: install-service writes the LaunchAgent (04:00, background
+    # priority) and loads it only with --load, which needs the owner's word. off/on is the kill switch the run checks first.
+    nightly_dir="$main/data-scratch/nightly"; mkdir -p "$nightly_dir"
+    case "${2:-status}" in
+      status) bash "$main/scripts/nightly-stable.sh" status ;;
+      run) bash "$main/scripts/nightly-stable.sh" run ;;
+      off) : >"$nightly_dir/OFF"; echo "nightly: off" ;;
+      on) rm -f "$nightly_dir/OFF"; echo "nightly: on (it runs only when its LaunchAgent is loaded, or by hand)" ;;
+      install-service)
+        nplist="$agents_dir/com.maipai.nightly.plist"; mkdir -p "$agents_dir"
+        python3 - "$nplist" "$main" "$(launch_path):/usr/bin:/bin:/usr/sbin:/sbin" "$HOME" "$nightly_dir/nightly.log" <<'PY'
+import plistlib, sys
+path, cwd, env_path, home, log = sys.argv[1:]
+plistlib.dump({"Label": "com.maipai.nightly", "ProgramArguments": ["/bin/bash", cwd + "/scripts/nightly-stable.sh", "run"], "WorkingDirectory": cwd,
+  "StartCalendarInterval": {"Hour": 4, "Minute": 0}, "Nice": 10, "ProcessType": "Background", "EnvironmentVariables": {"PATH": env_path, "HOME": home},
+  "StandardOutPath": log, "StandardErrorPath": log}, open(path, "wb"), sort_keys=True)
+PY
+        echo "$nplist (not loaded)"
+        if [[ "${3:-}" == --load ]]; then "$launchctl_cmd" bootstrap "gui/$(id -u)" "$nplist" && echo "loaded"; fi ;;
+      *) error "usage: bash scripts/pipeline.sh nightly status | run | off | on | install-service [--load]"; exit 2 ;;
+    esac
+    ;;
   stack)
     # The Stack holds the chat engine (about 32 GB) and picture workers; while the queue is deep and nobody uses the app,
     # stopping it frees memory and CPU for landings and the watcher. MAIPAI_STACK_LABEL / MAIPAI_STACK_PLIST are test seams.
@@ -552,5 +575,5 @@ case "${1:-}" in
       *) error "usage: bash scripts/pipeline.sh fsmonitor on | off | status"; exit 2 ;;
     esac
     ;;
-  *) error "usage: bash scripts/pipeline.sh status | wait <SHA|queue-empty|main-green|branch B> | fsmonitor on|off|status | start | stop | stack off|on|status | sweep [--dry-run] | outbox [status|flush|reset-to-github] | install-service [--load] | uninstall-service"; exit 2 ;;
+  *) error "usage: bash scripts/pipeline.sh status | wait <SHA|queue-empty|main-green|branch B> | fsmonitor on|off|status | start | stop | stack off|on|status | nightly status|run|off|on|install-service [--load] | sweep [--dry-run] | outbox [status|flush|reset-to-github] | install-service [--load] | uninstall-service"; exit 2 ;;
 esac
