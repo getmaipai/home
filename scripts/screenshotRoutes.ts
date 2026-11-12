@@ -46,7 +46,7 @@ async function main(): Promise<void> {
   const base = argument("--base") ?? devHubUrl();
   const routes = routesFromInventory();
   mkdirSync(OUT, { recursive: true });
-  const browser = await chromium.launch({ headless: true });
+  const browser = await chromium.launch({ headless: true, ...(process.env.PW_CHANNEL ? { channel: process.env.PW_CHANNEL } : {}) });
   const report: Array<{ slug: string; path: string; captures: Array<{ width: number; height: number; theme: string; file: string; consoleErrors: string[]; blankFrame: boolean }> }> = [];
   try {
     for (const route of routes) {
@@ -65,7 +65,8 @@ async function main(): Promise<void> {
             const root = document.querySelector("#root") ?? document.body;
             return !(root.textContent?.trim() || root.querySelector("img, canvas, video, svg, input, button"));
           });
-          await page.waitForTimeout(700);
+          await page.waitForLoadState("networkidle", { timeout: 6000 }).catch(() => undefined);
+          await page.waitForTimeout(900);
           await waitForAnimationSettle(() => page.evaluate(() => document.getAnimations().filter((animation) => animation.playState === "running").length));
           const file = captureFileName(route.slug, size.width, size.height, theme);
           await page.screenshot({ path: join(OUT, file), fullPage: false });
