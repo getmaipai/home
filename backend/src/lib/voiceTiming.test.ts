@@ -22,7 +22,7 @@ test("ties an incoming spoken-turn measurement to its turn id without content", 
   markVoiceTiming(record, "first_sentence_ms", 120);
   markVoiceTiming(record, "first_audio_ms", 210);
   markVoiceTiming(record, "first_playback_ms", 340);
-  expect(voiceTimingRecords(1)[0]).toEqual({ turn_id: "turn-123", stt_ms: 240, turn_start_ms: 1000, first_token_ms: 80, first_sentence_ms: 120, first_audio_ms: 210, first_playback_ms: 340 });
+  expect(voiceTimingRecords(1)[0]).toMatchObject({ turn_id: "turn-123", stt_ms: 240, turn_start_ms: 1000, first_token_ms: 80, first_sentence_ms: 120, first_audio_ms: 210, first_playback_ms: 340 });
 });
 
 test("attaches numeric engine stats and context duration by turn id, while old records remain readable", () => {
@@ -59,6 +59,21 @@ test("the headline reads from the end of speech: stt wait plus time to the first
   markVoiceTiming(record, "first_playback_ms", 2000);
   expect(voiceTimingReport()).toContain("FIRST SOUND AFTER YOU STOP TALKING (real answer): median");
   expect(voiceTimingReport()).toMatch(/target 1300 ms/);
+});
+
+test("each turn is stamped with the machine load and the report splits busy from quiet turns", () => {
+  const record = beginVoiceTimingFor("turn-load", 100, 200);
+  expect(typeof record.load_pct === "number" || record.load_pct === undefined).toBe(true);
+  markVoiceTiming(record, "stt_ms", 750);
+  markVoiceTiming(record, "first_playback_ms", 2000);
+  record.load_pct = 120;
+  const quiet = beginVoiceTimingFor("turn-quiet", 100, 200);
+  markVoiceTiming(quiet, "stt_ms", 750);
+  markVoiceTiming(quiet, "first_playback_ms", 1500);
+  quiet.load_pct = 20;
+  const report = voiceTimingReport();
+  expect(report).toMatch(/load under 70 percent: median \d+ ms/);
+  expect(report).toMatch(/load 70 percent or more: median \d+ ms/);
 });
 
 test("prewarm records are counts only and bounded to 200", () => {
