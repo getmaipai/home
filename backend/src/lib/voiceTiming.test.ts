@@ -33,6 +33,17 @@ test("attaches numeric engine stats and context duration by turn id, while old r
   expect(() => JSON.parse(JSON.stringify({ turn_id: "old", stt_ms: null, turn_start_ms: null, first_token_ms: null, first_sentence_ms: null, first_audio_ms: null, first_playback_ms: null }))).not.toThrow();
 });
 
+test("tool time and model rounds are recorded from the node timings and reported apart", () => {
+  beginVoiceTimingFor("turn-tool", 100, 200);
+  attachTurnStats("turn-tool", { prompt_tokens: 4000, cache_reuse_tokens: 3000, time_to_first_token_ms: 3000, nodes: [{ node: "context", startMs: 0, endMs: 50 }, { node: "model", startMs: 50, endMs: 800 }, { node: "tool", startMs: 800, endMs: 3300 }, { node: "model", startMs: 3300, endMs: 4000 }] });
+  expect(voiceTimingRecords(1)[0]).toMatchObject({ tool_ms: 2500, model_rounds: 2 });
+  expect(voiceTimingReport()).toMatch(/turns with a tool call: 1,/);
+  beginVoiceTimingFor("turn-plain", 100, 200);
+  attachTurnStats("turn-plain", { prompt_tokens: 900, cache_reuse_tokens: 700, nodes: [{ node: "model", startMs: 0, endMs: 700 }, { node: "tool", startMs: 700, endMs: 700 }] });
+  expect(voiceTimingRecords(1)[0]).toMatchObject({ tool_ms: 0, model_rounds: 1 });
+  expect(voiceTimingReport()).toMatch(/turns without a tool call: [1-9]/);
+});
+
 test("prewarm records are counts only and bounded to 200", () => {
   for (let i = 0; i < 205; i++) recordPrewarmTiming(`actor-${i}`, i % 2 ? "done" : "aborted", i, 100, 70);
   const rows = voicePrewarmRecords();
