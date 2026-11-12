@@ -28,8 +28,7 @@ export const RAIL_GROUPS: ReadonlyArray<{ id: string; label?: string }> = [
 export function railGroupForApp(to: string): string {
   if (RAIL_GROUP_BY_APP_ID[to]) return RAIL_GROUP_BY_APP_ID[to]!;
   if (["/", "/chat", "/media", "/files", "/people"].includes(to)) return "main";
-  if (/^\/apps\/(music|videos)(\/|$)/.test(to)) return "create";
-  if (to.startsWith("/apps/")) return "create";
+  if (/^\/apps\/(music|videos|pictures|voice|songs)(\/|$)/.test(to)) return "create";
   return "tools";
 }
 
