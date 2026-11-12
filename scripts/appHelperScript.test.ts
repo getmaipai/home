@@ -114,3 +114,12 @@ describe("install.sh install_app_helper", () => {
     expect(existsSync(join(dir, "ran"))).toBe(false);
   });
 });
+
+test("install as root works when the service has no HOME at all (the hub is a system daemon)", async () => {
+  const { root, binary, env } = sandbox();
+  const { HOME: _unused, ...noHome } = env;
+  const r = await run(["install", binary], { ...noHome, MAIPAI_TEST_UID: "0", MAIPAI_CONSOLE_USER: process.env.USER ?? "nobody" });
+  expect(r.stderr).not.toContain("unbound variable");
+  expect(r.exitCode).toBe(0);
+  expect(readFileSync(join(root, "calls"), "utf8")).toContain("asuser");
+});

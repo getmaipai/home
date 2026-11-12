@@ -16,13 +16,13 @@ set -euo pipefail
 label="ai.maipai.app-helper"
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 pkg="$here/native/app-helper"
-agents_dir="${MAIPAI_LAUNCH_AGENTS_DIR:-$HOME/Library/LaunchAgents}"
+agents_dir="${MAIPAI_LAUNCH_AGENTS_DIR:-${HOME:-/var/empty}/Library/LaunchAgents}"
 launchctl_cmd="${MAIPAI_LAUNCHCTL:-launchctl}"
-support="${MAIPAI_APP_HELPER_DIR:-$HOME/Library/Application Support/MaiPai}"
+support="${MAIPAI_APP_HELPER_DIR:-${HOME:-/var/empty}/Library/Application Support/MaiPai}"
 bin_dir="$support/app-helper"
 bin="$bin_dir/maipai-app-helper"
 sock="$support/app-helper.sock"
-log="${MAIPAI_APP_HELPER_LOG:-$HOME/Library/Logs/MaiPai/app-helper.log}"
+log="${MAIPAI_APP_HELPER_LOG:-${HOME:-/var/empty}/Library/Logs/MaiPai/app-helper.log}"
 plist="$agents_dir/$label.plist"
 
 die() { echo "app-helper: $*" >&2; exit "${2:-1}"; }
