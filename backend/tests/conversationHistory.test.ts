@@ -9,7 +9,7 @@ import { useDefaultScriptedStack } from "./stackFixture";
 import { __setChatWindowContextForTests } from "@/lib/roleHealth";
 import { countTokens } from "@/lib/tokenCount";
 import { FAILURE_COPY } from "@/lib/failureCopy";
-import { musicContextNote, SPOKEN_IDLE_NEW_CONVERSATION_MS } from "@/lib/conversationHistory";
+import { musicContextNote, onConversationFolded, SPOKEN_IDLE_NEW_CONVERSATION_MS } from "@/lib/conversationHistory";
 
 test("finished music history context says the song is ready", () => {
   expect(musicContextNote("done")).toBe("[The song finished and is ready in the player below this message.]");
@@ -1941,9 +1941,13 @@ describe("maybeRefreshConversationSummary() (step 3: runs when due, not before)"
     const { startStubLlmServer } = await import("@maipai/spec/llm/ts/stubServer.js");
     const stub = startStubLlmServer();
     useBackgroundStack(stub.url);
+    // CONVO-PREWARM-03: a stored fold tells the cache warm to run again for this conversation.
+    const folded: string[] = [];
+    const off = onConversationFolded((id) => folded.push(id));
     try {
       await maybeRefreshConversationSummary(conv.value.id);
     } finally {
+      off();
       conversationStubs.push(stub);
     }
 
@@ -1951,6 +1955,7 @@ describe("maybeRefreshConversationSummary() (step 3: runs when due, not before)"
     if (!row.ok) throw new Error(row.error);
     expect(row.value.summary).not.toBeNull();
     expect(row.value.summary_through_turn).not.toBeNull();
+    expect(folded).toEqual([conv.value.id]);
   });
 
   test("a remote link drop keeps a summary fold pending for the next debounced pass", async () => {

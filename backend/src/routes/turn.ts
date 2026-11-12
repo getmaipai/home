@@ -26,9 +26,9 @@ import type { TurnStreamEvent as ToolStreamEvent } from "@maipai/spec/stack/ts/t
 import type { AppEnv, PersonRow } from "@/types";
 import { streamEventForViewer, valueForViewer } from "@/lib/turnErrorDetail";
 import { apiRouter, errorResponses, idParamSchema } from "@/lib/openapi";
-import { turnOwnerId, isTemporaryConversation, packageLatencyFromRecentOutcomes, applyHeardPrefix, getConversation, nextTurnReplayMessages, getPendingAsk } from "@/lib/conversationHistory";
+import { turnOwnerId, isTemporaryConversation, packageLatencyFromRecentOutcomes, applyHeardPrefix, getConversation, nextTurnReplayMessages, getPendingAsk, onConversationFolded } from "@/lib/conversationHistory";
 import { newSpeculationHold, noteSpeculation, speculationRefusal, wordCount, SPECULATION_HOLD_MS, type SpeculationHold } from "@/lib/speculation";
-import { abortConversationPrewarm, prewarmConversation } from "@/lib/prefixPrewarm";
+import { abortConversationPrewarm, prewarmConversation, rewarmConversation } from "@/lib/prefixPrewarm";
 import { activeTurnCount } from "@/lib/turnActivity";
 import { surfaceClassOf } from "@/lib/surfaceClass";
 import { attachments, conversationTurns } from "@/db/schema";
@@ -186,19 +186,16 @@ export function noteSpokenAudioHandedOff(turnId: string, actorId: string, text: 
   const released = session.releasedText.trim();
   if (!released || !normalizeForSpeech(released).trim().endsWith(normalizeForSpeech(text).trim())) return;
   if (activeTurnCount() > 0) return;
-  const conversation = getConversation(session.viewer, session.conversationId);
-  if (!conversation.ok) return;
-  const task = async () => {
-    try {
-      // CONVO-PREWARM-02: the window exactly as the next turn replays it (its budget, its summary line), never the default build.
-      const messages = await nextTurnReplayMessages(conversation.value);
-      if (activeTurnCount() > 0) return;
-      void prewarmConversation(actorId, "spoken", messages);
-    } catch { /* best effort */ }
-  };
-  const timer = setTimeout(() => { void task(); }, 0);
+  const { viewer, conversationId } = session;
+  if (!getConversation(viewer, conversationId).ok) return;
+  // CONVO-PREWARM-02: the window exactly as the next turn replays it (its budget, its summary line), never the default build.
+  // CONVO-PREWARM-03: read again at every warm, so the warm after a fold sees the new summary and anchor.
+  const build = async () => { const conversation = getConversation(viewer, conversationId); return conversation.ok ? nextTurnReplayMessages(conversation.value) : []; };
+  const timer = setTimeout(() => { if (activeTurnCount() === 0) void prewarmConversation(actorId, "spoken", build, conversationId).catch(() => undefined); }, 0);
   (timer as { unref?: () => void }).unref?.();
 }
+// CONVO-PREWARM-03: a stored fold rewrites the prompt the next turn sends; the conversation is warmed again from its kept builder.
+onConversationFolded((conversationId) => { void rewarmConversation(conversationId).catch(() => undefined); });
 
 export function isStaleTurnGeneration(turnId: string, generation: number | undefined): boolean {
   const session = inFlightTurns.get(turnId);

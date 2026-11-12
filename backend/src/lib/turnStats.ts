@@ -5,6 +5,7 @@ import type { TurnTimings } from "@/lib/turnContext";
 import type { TurnStats, TurnGeneration, ContextSegmentKey } from "@/wire";
 import type { StackFailureFacts } from "@/lib/stackEngine";
 import type { PromptPrefix } from "@/lib/promptPrefix";
+import type { PrewarmHit } from "@/lib/prefixPrewarm";
 import type { FailureKind } from "@/lib/failureCopy";
 
 export type { TurnStats } from "@/wire";
@@ -23,6 +24,8 @@ export interface GenerationInput {
   firstDeltaMs: number | null;
   /** How much of the request matched the conversation's previous one (lib/promptPrefix.ts). */
   prefix?: PromptPrefix;
+  /** CONVO-PREWARM-03: whether the turn's first request extended the conversation's last cache warm (lib/prefixPrewarm.ts). */
+  prewarm?: PrewarmHit;
   stats: ChatCompletionStreamStats | null | undefined;
   /** ENGINE-CONTRACT-02 ("U6: the flip verdict" regression A): the
    * engine's own raw `arguments` string for the call this generation's
@@ -88,6 +91,7 @@ function projectGeneration(gen: GenerationInput): TurnGeneration {
     request_sent_ms: gen.requestSentMs,
     first_delta_ms: gen.firstDeltaMs,
     ...(gen.prefix ? { prefix: gen.prefix } : {}),
+    ...(gen.prewarm ? { prewarm: gen.prewarm } : {}),
     tool_call_raw_args: gen.toolCallRawArgs ?? null,
     envelope_parsed: gen.envelopeParsed ?? false,
     error: gen.error ?? null,
@@ -159,6 +163,8 @@ export function buildTurnStats(
     context_used_percent: contextUsedTokens !== null && Number.isInteger(contextWindowTokens) && contextWindowTokens! > 0 ? contextUsedTokens / contextWindowTokens! * 100 : null,
     ...(validContextSegments ? { context_segments: validContextSegments } : {}),
     cache_reuse_tokens: cacheTokens,
+    // CONVO-PREWARM-03: the turn's first request against the conversation's last warm; null when none was sent.
+    prewarm_hit: generations[0]?.prewarm?.warmed ? generations[0].prewarm.hit : null,
     cache_reuse_percent: cacheDenominator > 0 ? cacheTokens! / cacheDenominator * 100 : null,
     engine: identity ? formatEngineIdentity(identity) : null,
     stop_reason: stream?.stopReason ?? null,

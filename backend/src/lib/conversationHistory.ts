@@ -3237,6 +3237,7 @@ async function storeFold(conversation: Conversation, temporary: boolean, block: 
     const session = temporarySessions.get(conversation.id);
     if (!session || session.conversation.summary_through_turn !== conversation.summary_through_turn) return false;
     session.conversation = { ...session.conversation, summary, summary_through_turn: through };
+    notifyFolded(conversation.id);
     return true;
   }
   // Read and write in one synchronous step: the anchor must still be
@@ -3248,7 +3249,20 @@ async function storeFold(conversation: Conversation, temporary: boolean, block: 
     .set({ summary, summaryThroughTurn: through, updatedAt: new Date().toISOString(), hlc: nextHlc() })
     .where(eq(conversations.id, conversation.id))
     .run();
+  notifyFolded(conversation.id);
   return true;
+}
+
+// CONVO-PREWARM-03: a stored fold changes the next turn's prompt (the summary line and the window after it), so whoever
+// warmed the engine for this conversation is told to warm it again (routes/turn.ts registers prefixPrewarm's rewarm).
+const foldListeners = new Set<(conversationId: string) => void>();
+/** Called after every stored fold with the conversation id; returns the unsubscribe. */
+export function onConversationFolded(listener: (conversationId: string) => void): () => void {
+  foldListeners.add(listener);
+  return () => { foldListeners.delete(listener); };
+}
+function notifyFolded(conversationId: string): void {
+  for (const listener of foldListeners) { try { listener(conversationId); } catch (err) { console.error(`[conversationHistory] fold listener failed: ${(err as Error).message}`); } }
 }
 
 const LIST_CAP = 200;

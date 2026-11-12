@@ -7,6 +7,7 @@
 import { complete, StackStreamError, type LlmMessage, type ToolSpec } from "@/lib/llm";
 import { recordPrewarmTiming } from "@/lib/voiceTiming";
 import { StackError } from "@/lib/stack/errors";
+import { activeTurnCount } from "@/lib/turnActivity";
 
 interface RecordedPrefix { system: LlmMessage; tools: ToolSpec[]; model?: string; at: number }
 const MAX_PEOPLE = 64;
@@ -52,24 +53,90 @@ export async function prewarmPrefix(actorId: string, surfaceClass: string, now =
   }
 }
 
-/** Warms the persisted conversation prefix after its final spoken audio was handed off. */
-export async function prewarmConversation(actorId: string, surfaceClass: string, window: readonly LlmMessage[]): Promise<boolean> {
+// CONVO-PREWARM-03 (measured 2026-11-12 against Splash 1.6.1, backend/scripts/bench/engine-resume-probe.ts): the chat engine
+// resumes a request only from the END of an earlier request (its prompt rounded down to a 32-token block, or a 4096-token
+// checkpoint), never from a shared prefix that ends earlier. So a warm helps the next turn only when the warm's whole prompt is a
+// byte-for-byte prefix of that turn's prompt. The idle fold (summaryRefresh.ts, 20 s after the turn) rewrites the summary line
+// and moves the window anchor AFTER the post-turn warm ran, which made every live turn of a long conversation fall back to the
+// session-open warm (cache_n stuck at 2,048 while the window read cold). The warm now keeps its builder, runs again when the
+// conversation folds, and the turn reports whether its prompt extended the last warm (`prewarm` on the generation record).
+interface ConversationWarm { actorId: string; surfaceClass: string; build: () => Promise<readonly LlmMessage[]>; parts: string[]; at: number }
+const MAX_WARMS = 64;
+const conversationWarmed = new Map<string, ConversationWarm>();
+
+/** The request's parts in the order the engine lays them out: the tools block, then each message (one JSON string each). No text leaves this process. */
+function promptParts(messages: readonly LlmMessage[], tools: readonly ToolSpec[]): string[] {
+  return [JSON.stringify(tools), ...messages.map((m) => JSON.stringify(m))];
+}
+
+/** Warms the persisted conversation prefix after its final spoken audio was handed off. `window` is the replay the next turn
+ * sends after the system message, or a builder of it (kept, so a fold can warm the conversation again); `conversationId` keys
+ * the warm for the fold and for the next turn's hit check. */
+export async function prewarmConversation(actorId: string, surfaceClass: string, window: readonly LlmMessage[] | (() => Promise<readonly LlmMessage[]>), conversationId?: string): Promise<boolean> {
   if (surfaceClass !== "spoken") return false;
   const key = keyFor(actorId, surfaceClass);
   const prefix = recorded.get(key);
-  if (!prefix || conversationWarms.has(actorId) || window.length === 0) return false;
+  if (!prefix || conversationWarms.has(actorId)) return false;
+  const build = typeof window === "function" ? window : async () => window;
   const controller = new AbortController();
   conversationWarms.set(actorId, controller);
   const started = Date.now();
   try {
-    const result = await complete("chat", [prefix.system, ...window], {
-      model: prefix.model, tools: prefix.tools.length > 0 ? prefix.tools : undefined,
+    const replay = await build();
+    if (replay.length === 0 || controller.signal.aborted) return false;
+    const messages = [prefix.system, ...replay];
+    const tools = prefix.tools.length > 0 ? prefix.tools : [];
+    if (conversationId) {
+      conversationWarmed.delete(conversationId);
+      conversationWarmed.set(conversationId, { actorId, surfaceClass, build, parts: promptParts(messages, tools), at: started });
+      while (conversationWarmed.size > MAX_WARMS) conversationWarmed.delete(conversationWarmed.keys().next().value as string);
+    }
+    const result = await complete("chat", messages, {
+      model: prefix.model, tools: tools.length > 0 ? tools : undefined,
       max_tokens: 1, exactCeiling: true, thinking: false, dropReasoning: true, signal: controller.signal,
     });
     recordPrewarmTiming(actorId, controller.signal.aborted ? "aborted" : result.ok ? "done" : "failed", Date.now() - started, result.ok ? result.value.prompt_n : undefined, result.ok ? result.value.cache_n : undefined, result.ok || controller.signal.aborted ? undefined : prewarmFailureReason(new Error(result.reason ?? "engine error")));
     return result.ok;
   } catch (error) { recordPrewarmTiming(actorId, controller.signal.aborted ? "aborted" : "failed", Date.now() - started, undefined, undefined, controller.signal.aborted ? undefined : prewarmFailureReason(error)); return false; }
   finally { if (conversationWarms.get(actorId) === controller) conversationWarms.delete(actorId); }
+}
+
+/** The conversation's window changed after its warm (a fold stored a new summary and moved the anchor): warm it again from the
+ * kept builder, so the next turn still extends a whole earlier request. Skipped while a turn runs (the turn aborts warms anyway)
+ * and when the window did not change. Best effort, never throws. */
+export async function rewarmConversation(conversationId: string, turnActive: () => boolean = () => activeTurnCount() > 0): Promise<boolean> {
+  const warm = conversationWarmed.get(conversationId);
+  if (!warm || turnActive()) return false;
+  const prefix = recorded.get(keyFor(warm.actorId, warm.surfaceClass));
+  if (!prefix) return false;
+  try {
+    const replay = await warm.build();
+    if (turnActive()) return false;
+    const parts = promptParts([prefix.system, ...replay], prefix.tools);
+    if (parts.length === warm.parts.length && parts.every((part, i) => part === warm.parts[i])) return false;
+  } catch { return false; }
+  return prewarmConversation(warm.actorId, warm.surfaceClass, warm.build, conversationId);
+}
+
+export interface PrewarmHit {
+  /** False when no conversation warm was sent for this conversation since the hub started. */
+  warmed: boolean;
+  /** True when the whole warmed request is a prefix of this one: the engine can resume at the warm's end. */
+  hit: boolean;
+  /** Where this request first differs from the warm ("tools", "message 3 (system)"); null on a hit or with no warm. */
+  first_diff: string | null;
+}
+
+/** Whether this turn's first request extends the conversation's last warm. Sizes and a part label only, never text. */
+export function prewarmPrefixHit(conversationId: string, messages: readonly LlmMessage[], tools: readonly ToolSpec[]): PrewarmHit {
+  const warm = conversationWarmed.get(conversationId);
+  if (!warm) return { warmed: false, hit: false, first_diff: null };
+  const parts = promptParts(messages, tools);
+  for (let i = 0; i < warm.parts.length; i++) {
+    if (parts[i] === warm.parts[i]) continue;
+    return { warmed: true, hit: false, first_diff: i === 0 ? "tools" : `message ${i - 1} (${String(messages[i - 1]?.role ?? "missing")})` };
+  }
+  return { warmed: true, hit: true, first_diff: null };
 }
 
 /** A new utterance or real turn supersedes any quiet-period cache warm. */
@@ -94,4 +161,4 @@ export function warmSpokenPrefixAtBoot(build: () => Promise<{ system: string; to
   (first as { unref?: () => void }).unref?.();
 }
 
-export function __resetPrefixPrewarmForTests(): void { recorded.clear(); lastWarm.clear(); for (const c of conversationWarms.values()) c.abort(); conversationWarms.clear(); }
+export function __resetPrefixPrewarmForTests(): void { recorded.clear(); lastWarm.clear(); for (const c of conversationWarms.values()) c.abort(); conversationWarms.clear(); conversationWarmed.clear(); }

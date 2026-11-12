@@ -124,6 +124,8 @@ export interface TurnStats {
   context_segments?: Partial<Record<ContextSegmentKey, number>>;
   cache_reuse_tokens: number | null;
   cache_reuse_percent: number | null;
+  /** CONVO-PREWARM-03: whether the first request extended the conversation's last cache warm; null when no warm was sent. */
+  prewarm_hit?: boolean | null;
   engine: string | null;
   stop_reason: string | null;
   // ADMIN-COMPARE-01: whether this turn's own completion ran with
@@ -199,6 +201,9 @@ export interface TurnGeneration {
   first_delta_ms: number | null;
   /** DIAG-PREFIX-01: how much of this request matched the conversation's previous one; sizes and a part label, no text. */
   prefix?: { request_chars: number; shared_chars: number; first_diff: string | null; had_previous: boolean };
+  /** CONVO-PREWARM-03: whether this request extended the conversation's last cache warm (the engine resumes only from a whole
+   * earlier request); `warmed` false when none was sent since the hub started; `first_diff` names the part that differed, no text. */
+  prewarm?: { warmed: boolean; hit: boolean; first_diff: string | null };
   /** ENGINE-CONTRACT-02 (home/docs/dev.md 2026-09-23, "U6: the flip
    * verdict" regression A): the engine's own raw, unparsed `arguments`
    * string for the websearch call this generation verified, forced or

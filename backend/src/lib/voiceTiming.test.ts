@@ -27,9 +27,10 @@ test("ties an incoming spoken-turn measurement to its turn id without content", 
 
 test("attaches numeric engine stats and context duration by turn id, while old records remain readable", () => {
   const record = beginVoiceTimingFor("turn-stats", 100, 200);
-  attachTurnStats("turn-stats", { prompt_tokens: 900, cache_reuse_tokens: 700, time_to_first_token_ms: 410, nodes: [{ node: "context", startMs: 20, endMs: 95 }] });
+  attachTurnStats("turn-stats", { prompt_tokens: 900, cache_reuse_tokens: 700, prewarm_hit: true, time_to_first_token_ms: 410, nodes: [{ node: "context", startMs: 20, endMs: 95 }] });
   setCuePlaybackTiming(record, 330);
-  expect(voiceTimingRecords(1)[0]).toMatchObject({ prompt_n: 900, cache_n: 700, time_to_first_token_ms: 410, context_node_ms: 75, cue_playback_ms: 330 });
+  expect(voiceTimingRecords(1)[0]).toMatchObject({ prompt_n: 900, cache_n: 700, prewarm_hit: true, time_to_first_token_ms: 410, context_node_ms: 75, cue_playback_ms: 330 });
+  expect(voiceTimingReport()).toContain("turns that extended their conversation warm: 1 of 1 warmed");
   expect(() => JSON.parse(JSON.stringify({ turn_id: "old", stt_ms: null, turn_start_ms: null, first_token_ms: null, first_sentence_ms: null, first_audio_ms: null, first_playback_ms: null }))).not.toThrow();
 });
 

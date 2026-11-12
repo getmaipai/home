@@ -15,7 +15,7 @@ import { EMPTY_LENGTH_RETRY_EXTRA_TOKENS } from "@/lib/reasoningReserve";
 // rule or list does), streamed so the wire's own `reasoning`/`delta` events
 // come from the same call turnNext.ts forwards to the client.
 import { foldedBlock } from "@/lib/systemFold";
-import { notePrefix } from "@/lib/prefixPrewarm";
+import { notePrefix, prewarmPrefixHit } from "@/lib/prefixPrewarm";
 import { complete, startCompleteStreamPieces, envelopeToolCall, StackStreamError } from "@/lib/llm";
 // AUDIT-PERF-01: role reads are shared for 2 s; classifying a failure after a dropped stream asks the Stack fresh
 // (remembered refusals still count), or the pre-failure "ready" answer hides the outage.
@@ -405,6 +405,9 @@ async function runWatchedGeneration(state: TurnState, messages: LlmMessage[], to
     else signal.addEventListener("abort", () => roundAbort.abort(signal.reason), { once: true });
   }
   const prefix = comparePrompt(state.conversationId, messages, tools);
+  // CONVO-PREWARM-03: whether this request extends the conversation's last warm (the engine resumes only from a whole earlier
+  // request), read before the prefix is re-recorded; the first round of a turn is the one a warm precedes.
+  const prewarm = state.generations.length === 0 ? prewarmPrefixHit(state.conversationId, messages, tools) : undefined;
   // CONVO-PREWARM-02: the prefix a warm replays is the turn's FIRST round's tools block (what the next turn offers again), never a
   // phrasing round's empty list: the tools render inside the system message, so a warm sent without them missed from the first token.
   notePrefix(state.actor.id, state.planBasis.surfaceClass ?? "spoken", messages, state.lastTools.length > 0 ? state.lastTools : tools, state.modelId);
@@ -432,7 +435,7 @@ async function runWatchedGeneration(state: TurnState, messages: LlmMessage[], to
     // earlier failure (an invalid request never reaches the Stack at all).
     // The kind is read now, while the refusal it may name is current.
     const facts = started.facts ?? null;
-    state.generations.push({ reason, thinking, maxTokens, requestSentMs: failedAtMs - state.startedAt, firstDeltaMs: null, prefix, stats: null, error: boundedError, offlineReason: facts?.offline_reason ?? null, facts, failureKind: generationFailureKind(facts, boundedError), failedMs: failedAtMs - state.startedAt, failedAt: new Date(failedAtMs).toISOString() });
+    state.generations.push({ reason, thinking, maxTokens, requestSentMs: failedAtMs - state.startedAt, firstDeltaMs: null, prefix, ...(prewarm ? { prewarm } : {}), stats: null, error: boundedError, offlineReason: facts?.offline_reason ?? null, facts, failureKind: generationFailureKind(facts, boundedError), failedMs: failedAtMs - state.startedAt, failedAt: new Date(failedAtMs).toISOString() });
     return { ok: false, code: started.code, message: boundedError, released: false };
   }
 
@@ -536,7 +539,7 @@ async function runWatchedGeneration(state: TurnState, messages: LlmMessage[], to
     // engine and model that were answering (llm.ts's StackStreamError).
     const failedAtMs = Date.now();
     const facts = err instanceof StackStreamError ? err.facts : null;
-    state.generations.push({ reason, thinking, maxTokens, requestSentMs: requestSentMs - state.startedAt, firstDeltaMs, prefix, stats: started.stats, error: message, offlineReason: facts?.offline_reason ?? null, facts, failureKind: generationFailureKind(facts, message), failedMs: failedAtMs - state.startedAt, failedAt: new Date(failedAtMs).toISOString() });
+    state.generations.push({ reason, thinking, maxTokens, requestSentMs: requestSentMs - state.startedAt, firstDeltaMs, prefix, ...(prewarm ? { prewarm } : {}), stats: started.stats, error: message, offlineReason: facts?.offline_reason ?? null, facts, failureKind: generationFailureKind(facts, message), failedMs: failedAtMs - state.startedAt, failedAt: new Date(failedAtMs).toISOString() });
     return { ok: false, code: "generation_failed", message, released: (!holdAll && raw.length - (hold?.held.length ?? 0) > 0) || (state.reasoning.emit && nativeReasoning.length > 0) };
   }
 
@@ -548,7 +551,7 @@ async function runWatchedGeneration(state: TurnState, messages: LlmMessage[], to
   gate?.endReasoning();
 
   if (rescued) {
-    state.generations.push({ reason, thinking, maxTokens, requestSentMs: requestSentMs - state.startedAt, firstDeltaMs, prefix, stats: started.stats, toolCallRawArgs: null, envelopeParsed: false });
+    state.generations.push({ reason, thinking, maxTokens, requestSentMs: requestSentMs - state.startedAt, firstDeltaMs, prefix, ...(prewarm ? { prewarm } : {}), stats: started.stats, toolCallRawArgs: null, envelopeParsed: false });
     return { ok: true, text: "", reasoning: nativeReasoning || undefined, toolCalls: undefined, thinking, hold: "rescue", ...(rescuedAtBudget ? { holdAtBudget: true } : {}) };
   }
 
@@ -588,7 +591,7 @@ async function runWatchedGeneration(state: TurnState, messages: LlmMessage[], to
   // verify, since a parse failure or a literal "{}" is exactly what a
   // later read of the trace needs to tell apart from a real query.
   const websearchRawArgs = toolCalls?.find((c) => c.tool === "websearch")?.rawArgs ?? null;
-  state.generations.push({ reason, thinking, maxTokens, requestSentMs: requestSentMs - state.startedAt, firstDeltaMs, prefix, stats: started.stats, toolCallRawArgs: websearchRawArgs, envelopeParsed });
+  state.generations.push({ reason, thinking, maxTokens, requestSentMs: requestSentMs - state.startedAt, firstDeltaMs, prefix, ...(prewarm ? { prewarm } : {}), stats: started.stats, toolCallRawArgs: websearchRawArgs, envelopeParsed });
   // ROUTER-BUILD-01e: how the hold ended. The model's own call always wins.
   let heldEnd: GenerationAttempt["hold"];
   if (hold) {
