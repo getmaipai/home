@@ -104,6 +104,7 @@ export function LibraryItems({ items, me, layout, phone, selectedIds, onSelectio
     return (
       <>
       <FileGrid
+        captionOnArt
         items={tiles}
         label={i18n._({ id: "Library files", message: "Library files" })}
         selectedIds={selectedIds}
