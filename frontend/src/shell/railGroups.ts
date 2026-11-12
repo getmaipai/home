@@ -52,3 +52,8 @@ export const AUTO_COLLAPSE_PREFIXES = ["/chat", "/settings", "/files", "/apps/mu
 export function routeAutoCollapses(pathname: string): boolean {
   return AUTO_COLLAPSE_PREFIXES.some((prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`));
 }
+
+/** Pages that fold the menu by themselves keep it folded unless the person opened it there (their click wins until they leave such pages). */
+export function railAutoCollapseActive(pathname: string, userExpanded: boolean): boolean {
+  return routeAutoCollapses(pathname) && !userExpanded;
+}

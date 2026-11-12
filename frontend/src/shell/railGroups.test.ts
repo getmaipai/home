@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { APP_CATALOG } from "@/shell/appCatalog";
-import { AUTO_COLLAPSE_PREFIXES, RAIL_GROUPS, RAIL_GROUP_BY_APP_ID, railGroupForApp, railItemsForCatalog, routeAutoCollapses } from "@/shell/railGroups";
+import { AUTO_COLLAPSE_PREFIXES, RAIL_GROUPS, RAIL_GROUP_BY_APP_ID, railGroupForApp, railAutoCollapseActive, railItemsForCatalog, routeAutoCollapses } from "@/shell/railGroups";
 
 describe("rail group mapping", () => {
   test("covers every core catalog route and keeps Main heading free", () => {
@@ -22,5 +22,14 @@ describe("rail group mapping", () => {
     for (const path of ["/chat", "/media", "/files", "/people"]) expect(destinations.has(path)).toBe(true);
     for (const app of APP_CATALOG) expect(railGroupForApp(app.to)).toBeTruthy();
     expect(items.every((item) => Boolean(item.group))).toBe(true);
+  });
+});
+
+describe("the person's click wins on pages that fold the menu", () => {
+  test("chat folds by itself, a click that expands it keeps it open there, and other pages never fold", () => {
+    expect(railAutoCollapseActive("/chat", false)).toBe(true);
+    expect(railAutoCollapseActive("/chat", true)).toBe(false);
+    expect(railAutoCollapseActive("/settings/chat", true)).toBe(false);
+    expect(railAutoCollapseActive("/", false)).toBe(false);
   });
 });
