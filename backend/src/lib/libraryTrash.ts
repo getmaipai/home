@@ -23,6 +23,7 @@ import { deleteMusicJobsForFiles } from "@/lib/music/store";
 import { deletePictureJobsForFiles } from "@/lib/pictures/jobStore";
 import type { PersonRow } from "@/types";
 import { refusal, type Result } from "@/lib/result";
+import { sheetFilesOnlyUsedBy } from "@/lib/videos/referenceSheets";
 import { isOwnerOrAdmin } from "@/lib/access";
 
 type Row = typeof attachments.$inferSelect;
@@ -34,7 +35,7 @@ export function trashDays(): number {
   return Number.isFinite(days) && days > 0 ? days : 30;
 }
 
-/** The files that travel with an item: a picture's edit versions, a video's poster and a song's cover. */
+/** The files that travel with an item: a picture's edit versions, a video's poster and reference sheets and a song's cover. */
 export function companionsOf(row: Row): Row[] {
   const meta = libraryProvenance(row.provenance);
   const job = (meta.writer === "video-gen" || meta.writer === "video-edit") && typeof meta.job === "string" ? meta.job : null;
@@ -44,7 +45,9 @@ export function companionsOf(row: Row): Row[] {
        OR (? IS NOT NULL AND a.provenance LIKE 'video-poster:%' AND json_extract(${libraryProvenanceSql("a.provenance")}, '$.job') = ?))`,
   ).all(row.ownerPersonId, row.id, row.id, job, job).map((r) => r.id);
   const covers = db.select({ cover: musicJobs.coverFileId }).from(musicJobs).where(eq(musicJobs.fileId, row.id)).all().map((j) => j.cover).filter((id): id is string => Boolean(id));
-  const ids = [...new Set([...found, ...covers])];
+  // REFVIDEO-01: a video made from reference sheets takes its sheets with it, unless another video still uses one.
+  const sheets = job ? sheetFilesOnlyUsedBy(row.ownerPersonId, job) : [];
+  const ids = [...new Set([...found, ...covers, ...sheets])];
   if (ids.length === 0) return [];
   return db.select().from(attachments).where(and(inArray(attachments.id, ids), eq(attachments.ownerPersonId, row.ownerPersonId))).all();
 }

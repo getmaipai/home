@@ -28,6 +28,8 @@ export interface VideoItem {
   adult?: VideoAdultState | null;
   /** SPATIAL-04: the one plain line kept with a spatial-sound clip (what the sound did, or why it is unchanged); null for any other clip. */
   note?: string | null;
+  /** REFVIDEO-01: the reference sheet pictures a video made from pictures was built from, shown above the clip. */
+  sheets?: string[];
   clip: VideoClip | null;
 }
 /** ADULT-LOCK-06: what the item's menu needs. `can_clear` shows "Remove lock" (confirm dialog and a fresh passcode); `can_mark` shows "Lock". */

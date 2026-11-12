@@ -29,6 +29,7 @@ import { GENERATE_IMAGE_TOOL_ID, audienceOf, refusalFor } from "@/lib/pictures/t
 import { GENERATE_VIDEO_TOOL_ID, videoAudienceOf, videoRefusalFor } from "@/lib/videos/tool";
 import { EDIT_VIDEO_TOOL_ID } from "@/lib/videos/editTool";
 import { MAKE_FILM_TOOL_ID } from "@/lib/films/tool";
+import { MAKE_REFERENCE_VIDEO_TOOL_ID } from "@/lib/videos/referenceToolId";
 import { decide } from "@/lib/gate/decide";
 import type { Role } from "@/middleware/auth";
 import { brakeFor, type BrakeTool, type BrakeMode } from "@/lib/toolBrake";
@@ -584,6 +585,14 @@ export const policyNode: Node<PolicyInput, PolicyOutput> = async (state, input) 
     if (call.tool === MAKE_FILM_TOOL_ID) {
       const proposal: ActionProposal = { kind: "read_only", request: { tool: call.tool, args: (call.args ?? {}) as Record<string, unknown>, callId: call.id ?? call.tool } };
       if (!state.filmAllowed) { noteRefusal("video_not_here"); entries.push({ proposal, decision: { allow: false, reason: "video_not_here" } }); }
+      else entries.push({ proposal, decision: { allow: true } });
+      continue;
+    }
+
+    // REFVIDEO-01: the same floor as make_film plus pictures attached (or an earlier reference video in this chat), decided at offer time.
+    if (call.tool === MAKE_REFERENCE_VIDEO_TOOL_ID) {
+      const proposal: ActionProposal = { kind: "read_only", request: { tool: call.tool, args: (call.args ?? {}) as Record<string, unknown>, callId: call.id ?? call.tool } };
+      if (!state.referenceVideoAllowed) { noteRefusal("video_not_here"); entries.push({ proposal, decision: { allow: false, reason: "video_not_here" } }); }
       else entries.push({ proposal, decision: { allow: true } });
       continue;
     }

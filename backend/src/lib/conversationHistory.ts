@@ -2489,6 +2489,7 @@ function mediaToolNote(pluginId: string | null, turnId?: string): string | null 
     return musicContextNote(turnId ? musicJobStateByTurnId(turnId) : null);
   }
   if (pluginId === "generate_video" || pluginId === "edit_video") return "[The Make a Video tool was called for this message and started the video the reply speaks of.]";
+  if (pluginId === "make_reference_video") return "[The Make a Video From My Pictures tool was called for this message: it built the reference sheet shown on the video card and started the video the reply speaks of.]";
   if (pluginId === "make_film") return "[The Make a Film tool was called for this message and started the film, or wrote the part of the long production, that the reply speaks about.]";
   return null;
 }

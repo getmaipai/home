@@ -1,0 +1,77 @@
+{
+  "id": "make_reference_video",
+  "version": "0.1.0",
+  "kind": "plugin",
+  "category": "Media",
+  "display": "Video From My Pictures",
+  "description": "Make a short video from attached pictures of people, objects and places, shown on a reference sheet first.",
+  "offer": {
+    "mode": "conditional",
+    "gate": "referenceVideoAllowed",
+    "bench_row": "make-reference-video-tool",
+    "reason": "offered only when pictures are attached (or the chat already has a video made from pictures) and the person asks for a video; adult on their own written screen with video on"
+  },
+  "author": "MaiPai",
+  "license": "AGPL-3.0",
+  "homepage": "https://github.com/getmaipai/home",
+  "routing": {
+    "examples": [
+      "Make a video of the girl in the red jacket in front of this building using my pictures",
+      "Use these pictures to make a short video where the dog plays in a pile of these cards",
+      "Make a short clip with the person in the first picture standing in the second picture's room",
+      "Put the man from this photo and this red car into a video driving through the place in the third picture",
+      "Same sheet, but make her walk away",
+      "Use the same reference sheet and make the car drive off instead"
+    ],
+    "patterns": []
+  },
+  "args": {
+    "type": "object",
+    "required": [],
+    "properties": {
+      "request": {
+        "type": "string",
+        "minLength": 3,
+        "maxLength": 2000,
+        "grounded": false,
+        "description": "What should happen in the video, in the person's own words. Keep their meaning and details. Never list the attached pictures or their file names: Home reads each picture itself."
+      },
+      "seconds": {
+        "type": "integer",
+        "minimum": 4,
+        "maximum": 8,
+        "grounded": false,
+        "description": "Optional length in seconds, 4 to 8. Leave out unless the person asks; the default is 8."
+      },
+      "reuse_video": {
+        "type": "string",
+        "maxLength": 120,
+        "grounded": false,
+        "description": "The id of an earlier video made from pictures in this chat, to make a new video from the SAME reference sheet without new pictures (for example 'same sheet, but make her walk away'). Use with request. Use 'latest' for the newest one."
+      }
+    }
+  },
+  "incognito": "ephemeral",
+  "requires": [],
+  "optional": [],
+  "platforms": [
+    "home"
+  ],
+  "min_role": "adult",
+  "consequential": false,
+  "offline": "full",
+  "config": [],
+  "data_sources": [],
+  "permissions": [],
+  "notifications": [],
+  "backup": "exclude",
+  "background": false,
+  "contributes": {},
+  "min_app": "0.1.0",
+  "tier": 0,
+  "quality_scale": "bronze",
+  "smoke": {
+    "kind": "recipe_fixture",
+    "fixture": "tests/smoke.json"
+  }
+}

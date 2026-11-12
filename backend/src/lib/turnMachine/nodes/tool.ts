@@ -38,6 +38,7 @@ import { redactLockedVideoOutcome } from "@/lib/videos/lock";
 import { LOCKED_MUSIC_RESULT_TEXT, redactLockedMusicOutcome } from "@/lib/music/lock";
 import { EDIT_VIDEO_TOOL_ID, runEditVideo } from "@/lib/videos/editTool";
 import { MAKE_FILM_TOOL_ID, runMakeFilmTurn } from "@/lib/films/tool";
+import { MAKE_REFERENCE_VIDEO_TOOL_ID, runMakeReferenceVideoTurn } from "@/lib/videos/referenceVideo";
 import { isProductionCall, runMakeProduction } from "@/lib/longform/tool";
 import { speakerIsAnonymous, turnAgeBand } from "../speaker";
 import type { Node, ActionProposal, ToolExecutionOutcome } from "../contract";
@@ -477,6 +478,15 @@ export const toolNode: Node<ToolInput, ToolOutput> = async (state, input, signal
     if (tool === MAKE_FILM_TOOL_ID) {
       const filmInput = { state, args: args as Record<string, unknown>, callId, spoken: (state.planBasis?.surfaceClass ?? "spoken") !== "written" };
       const outcome = isProductionCall(filmInput.args) ? await runMakeProduction(filmInput) : await runMakeFilmTurn(filmInput);
+      outcomes.push(outcome);
+      if (outcome.status === "succeeded") toolEvents.push({ t: "tool_result", call_id: callId, package_id: tool, outcome: { text: outcome.result?.reply?.text } });
+      else toolEvents.push({ t: "tool_error", call_id: callId, package_id: tool, error: lookupFailureKind(outcome) });
+      continue;
+    }
+
+    // REFVIDEO-01: pictures become a reference sheet, the sheet shows on the video card, and the clip is one job.
+    if (tool === MAKE_REFERENCE_VIDEO_TOOL_ID) {
+      const outcome = await runMakeReferenceVideoTurn({ state, args: args as Record<string, unknown>, callId, spoken: (state.planBasis?.surfaceClass ?? "spoken") !== "written" });
       outcomes.push(outcome);
       if (outcome.status === "succeeded") toolEvents.push({ t: "tool_result", call_id: callId, package_id: tool, outcome: { text: outcome.result?.reply?.text } });
       else toolEvents.push({ t: "tool_error", call_id: callId, package_id: tool, error: lookupFailureKind(outcome) });

@@ -9,6 +9,7 @@ import { createStackHttp } from "@/lib/stack/http";
 import type { StackLiveFields } from "@/lib/genLive";
 import type { FullView } from "@/lib/stack/fullView";
 import sharp from "sharp";
+import { INGREDIENTS_FAILURE_COPY } from "@/lib/failureCopy";
 
 export type StackVideoState = "queued" | "running" | "done" | "failed" | "cancelled";
 
@@ -85,6 +86,8 @@ export interface StackLtx25Quality {
   /** VIDEO-INPUTS-01: a first picture can start a clip of this model, and a second picture can end it. Absent or false on a Stack older than 2026-11-02: words only. */
   image_to_video?: boolean;
   end_image?: boolean;
+  /** REFVIDEO-01: the Ingredients adapter (reference sheets) is installed. Absent on a Stack that does not report it: Home then asks and maps the Stack's 409 `ic_lora_missing`. */
+  ingredients?: boolean;
   profiles?: StackLtx25Profile[];
   /** VIDEO-LORA-05 (Stack): LoRA support on this model. Absent or `supported` false on a Stack that lacks it: Home sends no LoRA to it. */
   loras?: { supported: boolean; max?: number; mode?: "fused" | "unfused"; negative_prompt?: "none" | "nag" };
@@ -238,6 +241,23 @@ export async function submitVideoRestyle(body: { model: "ltx25-max"; source: str
   let payload: { code?: string; error?: string; job?: string } = {};
   try { payload = await res.json() as typeof payload; } catch { /* use the stable fallback */ }
   throw new StackVideoError(res.status, payload.code ?? "restyle_failed", payload.error ?? "The clip could not be restyled. Try again.", payload.job);
+}
+
+/** REFVIDEO-01: a video from one or two reference sheets (LTX 2.5 Ingredients adapter, Max only). `POST /v1/videos/ingredients`, multipart: `sheet` (1 or 2 PNGs, 768x448),
+ * `prompt`, `seconds` (4 to 8), optional `seed`, `audience`, `timeout_ms`. Answers like restyle (202 with a job, or 200 with the finished clip). A refusal keeps the Stack's code; the
+ * missing adapter (409 `ic_lora_missing`) gets Home's own plain sentence, never the raw one. */
+export async function submitVideoIngredients(form: FormData): Promise<{ job: string; done: StackClip[] | null }> {
+  const res = await request("/v1/videos/ingredients", { method: "POST", body: form, timeoutMs: 60_000 });
+  if (res.status === 200 || res.status === 202) {
+    const parsed = await res.json() as { job?: string; data?: StackClip[] };
+    if (!parsed.job) throw new StackVideoError(502, "bad_reply", "That did not work. Try again.");
+    return { job: parsed.job, done: res.status === 200 && Array.isArray(parsed.data) ? parsed.data : null };
+  }
+  let payload: { code?: string; error?: string; job?: string } = {};
+  try { payload = await res.json() as typeof payload; } catch { /* use the stable fallback */ }
+  const code = payload.code ?? "ingredients_failed";
+  const known = Object.prototype.hasOwnProperty.call(INGREDIENTS_FAILURE_COPY, code) ? INGREDIENTS_FAILURE_COPY[code as keyof typeof INGREDIENTS_FAILURE_COPY] : null;
+  throw new StackVideoError(res.status, code, known ?? (res.status === 400 && payload.error ? payload.error : "The video could not be made from those pictures. Try again, or use different pictures."), payload.job);
 }
 
 /** Asks the Stack to prepare an mp4 for messaging apps (a silent AAC track, a title, at most 20 MB). The title (from the prompt) travels in a header, percent-encoded, never in the URL. Nothing is kept on the Stack. */

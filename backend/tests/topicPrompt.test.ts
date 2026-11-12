@@ -183,6 +183,8 @@ const EXEMPT: Record<string, string> = {
   "lib/companionTalkAnchors.ts": "asks the picture reader for the mouth and eye boxes of a companion's own picture as JSON numbers; no text reaches a person as a reply",
   "lib/chatPictures.ts": "describes an attached picture in one to three plain sentences for a chat model that cannot read pictures; the descriptions are context for the answer, the person never sees them as a reply",
   "lib/pictures/ageCheck.ts": "labels a picture as a possible minor in JSON; no text reaches the person, a doubt withholds the picture",
+  "lib/videos/referenceSheetCheck.ts": "reads one attached picture and answers in JSON whether it is already a reference sheet and what its panels show; the person never sees the model's words",
+  "lib/videos/referenceVideo.ts": "rewrites an adult's own request as one paragraph around the reference sheet panels for the video model (make_reference_video is min_role adult, offered on an adult's own written screen only); the paragraph goes to the Stack, never to the person, and the finished video passes the delivery checks before anyone sees it",
   "lib/pictures/roles.ts": "reads an attached picture for its role (actor, product, set, closing shot) in JSON with a plain name and look; the person never sees the model's words",
   "lib/pictures/laneGate.ts": "labels a picture child-safe or not in JSON; no text reaches the person, a doubt withholds the picture",
   "lib/robotVision.ts": "describes one robot camera picture in a single sentence kept for 90 seconds as background data in that robot's own turn; it is never shown to the person, and the turn that reads it carries the topic block and passes the output gate",

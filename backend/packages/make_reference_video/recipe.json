@@ -1,0 +1,5 @@
+{
+  "id": "make_reference_video",
+  "inputs": [{ "name": "request", "selector": "text" }],
+  "steps": [{ "op": "format", "as": "reply", "text": "Videos from your own pictures can only be made in an adult's own written chat." }]
+}

@@ -1209,7 +1209,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/videos/make.ts` | MINOR_MAKE_LINE, makeAudienceOf, readMakeBody, makeVideoFor, bodyOfVideoJob, anotherTakeFor |
 | `backend/src/lib/videos/messagesCopy.ts` | videoFileName, videoTitle, hasAudioTrack, messagesCopyOf, __resetMessagesCopiesForTests |
 | `backend/src/lib/videos/musicBed.ts` | __setMusicBedPollMsForTests, startMusicBed, whenMusicDone, setPendingMix, takePendingMix |
-| `backend/src/lib/videos/phaseLabel.ts` | phaseLabel |
+| `backend/src/lib/videos/phaseLabel.ts` | REFERENCE_PHASE, phaseLabel |
 | `backend/src/lib/videos/playlistData.ts` | SUGGEST_MAX, SUGGEST_MIN_CHARS, videoSuggestions, channelStrip, withChannelAvatars, videoScopedData |
 | `backend/src/lib/videos/playlists.ts` | GONE, VIDEO_GONE, ownVideoPlaylists, memberVideoPlaylists, videoPlaylistFor, resolveEntries |
 | `backend/src/lib/videos/policy.ts` | VIDEO_ENABLED_KEY, VIDEO_TIER_KEY, VIDEO_DENIAL_LINE, VIDEO_NOT_HERE_LINE, householdAllowsVideo, householdVideoQuality |
@@ -1217,6 +1217,10 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/videos/quality.ts` | QUICK_BASE, DETAILED_BASE, QUICK_MAX_SECONDS, DETAILED_MAX_SECONDS, LTX25_MODEL, LTX25_MAX_MODEL |
 | `backend/src/lib/videos/ready.ts` | __setVideoStatusForTests, __setVideoStatusReaderForTests, videoEngineStatus, peekVideoEngineStatus, dropVideoStatusCache, videoStatusReady |
 | `backend/src/lib/videos/recipes.ts` | VIDEO_RECIPES, videoRecipeFor, withVideoRecipe, VIDEO_STARTERS, VIDEO_LOOKS, videoLookFor |
+| `backend/src/lib/videos/referenceSheetCheck.ts` | REFERENCE_SHEET_W, MIN_SHEET_PANELS, SHEET_KINDS, __setSheetVisionForTests, parseSheetCheck, checkPictureIsSheet |
+| `backend/src/lib/videos/referenceSheets.ts` | REFERENCE_SHEET_NOTE, isReferenceSheetFile, sheetIdsOfRequest, sheetUsedByOtherVideo, sheetFilesOnlyUsedBy |
+| `backend/src/lib/videos/referenceToolId.ts` | MAKE_REFERENCE_VIDEO_TOOL_ID |
+| `backend/src/lib/videos/referenceVideo.ts` | REFERENCE_VIDEO_SECONDS, MAX_REFERENCE_PICTURES, REFERENCE_PROMPT_MAX, FULL_FRAME_SENTENCE, makeReferenceVideoArgs, REFERENCE_NO_PICTURES_LINE |
 | `backend/src/lib/videos/rerun.ts` | prepareVideoRerun |
 | `backend/src/lib/videos/slotBody.ts` | qualityOfSlotModel, videoBodyForSlot |
 | `backend/src/lib/videos/spatialStart.ts` | startSpatialSound |

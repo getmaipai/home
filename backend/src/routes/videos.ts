@@ -23,7 +23,7 @@ import { checkVideoPrompt } from "@/lib/videos/promptCheck";
 import { householdAllowsVideo, refuseVideoPrompt, stackAudienceFor, videoDenial, VIDEO_DENIAL_LINE, VIDEO_REFUSAL_LINE, type VideoAudience } from "@/lib/videos/policy";
 import { laneOfPerson } from "@/lib/pictures/laneGate";
 import { getLive, liveCardFields } from "@/lib/genLive";
-import { videoEngineStatus, videoStatusReady, videoNotReadyReason } from "@/lib/videos/ready";
+import { videoEngineStatus, videoStatusReady, videoNotReadyReason, videoMaxNotReadyReason } from "@/lib/videos/ready";
 import { hasAudioTrack, messagesCopyOf, videoFileName, videoTitle } from "@/lib/videos/messagesCopy";
 import { addVideoLora, StackVideoError } from "@/lib/videos/stack";
 import { loraAccess, readLora, readLoras } from "@/lib/loras/access";
@@ -33,6 +33,7 @@ import { recordFromStack, syncLoras } from "@/lib/loras/sync";
 import { latestGeneratedPictureId } from "@/lib/videos/tool";
 import { prepareVideoRerun } from "@/lib/videos/rerun";
 import { anotherTakeFor, makeVideoFor } from "@/lib/videos/make";
+import { anotherReferenceTake } from "@/lib/videos/referenceVideo";
 import { getStudioVoice } from "@/lib/videos/studioVoices";
 import { appRouteAllowed } from "@/lib/apps";
 import { allowedQuality, jobTier, maxOffered, tierArgument } from "@/lib/tiers";
@@ -83,6 +84,7 @@ const ItemSchema = z.object({
   started_at: z.number().describe("Epoch milliseconds the job started, for the card's elapsed clock."),
   prompt: z.string(),
   kind: z.enum(["generate", "animate", "edit"]),
+  sheets: z.array(z.string()).optional().describe("REFVIDEO-01: the reference sheet pictures a video made from pictures was built from (file addresses), shown above the clip; absent for any other video."),
   note: z.string().nullable().describe("SPATIAL-04: one plain line kept with a spatial-sound clip (what the sound did, or why it is unchanged), shown as the card's muted notice; null for any other clip."),
   error: z.string().nullable(),
   quality: z.enum(["quick", "detailed"]).describe("Which kind made it: Quick (silent) or Detailed (with sound and speech)."),
@@ -121,9 +123,10 @@ function itemView(job: VideoJob, actor: PersonRow, ready: { quick: boolean; deta
     id: job.id, state: job.state, percent: job.state === "done" ? 100 : job.percent,
     label: job.state === "queued" ? phaseLabel(job, laneOfPerson(actor) === "child" ? "child" : "adult") : job.state === "running" ? plainStageLabel(getLive(job.id)?.stageLabel, laneOfPerson(actor) === "child" ? "child" : "adult") ?? phaseLabel(job, laneOfPerson(actor) === "child" ? "child" : "adult") : "",
     position: job.position,
-    ...(job.state === "running" ? (({ eta_seconds, step, steps, preview_url }) => ({ eta_seconds, step, steps, preview_url: laneOfPerson(actor) === "adult" ? preview_url : null }))(liveCardFields(job.id, (version) => `/api/videos/jobs/${encodeURIComponent(job.id)}/preview?v=${version}`)) : { eta_seconds: null, step: null, steps: null, preview_url: null }), started_at: new Date(job.createdAt).getTime(), prompt: job.prompt, kind: job.kind,
+    ...(job.state === "running" ? (({ eta_seconds, step, steps, preview_url }) => ({ eta_seconds, step, steps, preview_url: laneOfPerson(actor) === "adult" ? preview_url : null }))(liveCardFields(job.id, (version) => `/api/videos/jobs/${encodeURIComponent(job.id)}/preview?v=${version}`)) : { eta_seconds: null, step: null, steps: null, preview_url: null }), started_at: new Date(job.createdAt).getTime(), prompt: job.request.reference?.request ?? job.prompt, kind: job.kind,
     error: job.state === "failed" ? job.error : null,
     note: job.state === "done" ? job.request.edit?.note ?? null : null,
+    ...(job.request.reference?.sheetFileIds.length ? { sheets: job.request.reference.sheetFileIds.map((id) => `/api/files/${encodeURIComponent(id)}/content`) } : {}),
     ...qualityFields(job, ready),
     fit_ask: job.state === "queued" && laneOfPerson(actor) === "adult" ? answerableFitAsk(actor, job.id) : null,
     max_offered: job.state === "done" && laneOfPerson(actor) === "adult" && maxOffered(actor, "video", undefined, ready.max === true),
@@ -367,6 +370,17 @@ videosRoutes.openapi(anotherRoute, async (c) => {
   if (!source || source.state === "queued" || source.state === "running") return c.json({ error: "That video isn't available any more. Ask for it again." }, 404) as never;
   // ADULT-LOCK-02: another take, remix and the like of a locked clip need an unlock first; nothing starts.
   if (videoJobLockState(actor, source) !== "open") return c.json({ error: LOCKED_START_LINE, code: "locked", locked: true }, 423) as never;
+  // REFVIDEO-01: a video made from reference sheets makes another take from the SAME saved sheets and prompt with a new seed (no new cut-outs); it needs Max like the first.
+  if (source.request.reference) {
+    if (source.turnId && videoJobsForTurn(actor, source.turnId).length >= MAX_CLIPS_PER_CARD) return c.json({ error: "That chat already has eight videos from this request. Ask for a new one in a new message.", code: "too_many" }, 422) as never;
+    const audience = videoRouteAudience(actor);
+    if (laneOf(audience) !== "adult") return c.json({ error: "Videos from pictures are for adults on their own screen. Ask an adult in your home to help.", code: "minor" }, 403) as never;
+    const engine = await videoEngineStatus();
+    if (!ltx25MaxReady(engine)) return c.json({ error: videoMaxNotReadyReason(engine), code: "max_not_ready" }, 503) as never;
+    const again = anotherReferenceTake(actor, source);
+    if (!again.ok) return c.json({ error: again.line, code: again.status === 409 ? "already_making" : "gone" }, again.status) as never;
+    return c.json(videoCardOrLocked(actor, again.job, true, await readyFlags(actor)), 200);
+  }
   // A clip made on the Create page has no chat behind it: Another take runs the same make again with a new seed.
   if (!source.conversationId) {
     const again = await anotherTakeFor(actor, source);

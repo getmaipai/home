@@ -7,6 +7,7 @@ import { conversationHasMusic } from "@/lib/music/jobs";
 import { latestPictureId } from "@/lib/pictures/editTool";
 import { threadMusicObject } from "@/lib/music/objects";
 import { conversationHasVideo } from "@/lib/videos/jobs";
+import { conversationHasReferenceVideo } from "@/lib/videos/referenceVideo";
 import { pageContextForTurn } from "@/lib/pageContext";
 // U2b/c (docs/plans/turn-machine-state-record-2026-09-22.md, "Files"):
 // the entry `routes/turn.ts` calls, with the same TurnStreamResult shape
@@ -679,9 +680,10 @@ async function beginTurn(actor: PersonRow, surface: Surface, text: string, opts:
     hasPictureInConversation: (opts.images?.length ?? 0) > 0 || latestPictureId(actor, conversation.id, temporary || opts.ephemeral === true) !== null,
     musicEditAvailable: () => (opts.audio?.length ?? 0) > 0 || conversationHasMusic(actor, conversation.id, temporary || opts.ephemeral === true),
     videoEditAvailable: () => conversationHasVideo(actor, conversation.id, temporary || opts.ephemeral === true),
+    referenceVideoAvailable: () => !temporary && opts.ephemeral !== true && conversationHasReferenceVideo(actor, conversation.id),
     musicObjectInThread: () => threadMusicObject(actor, conversation.id),
   });
-  const { budget, answerImagesOk, picturesOk, editPictureOk, editPictureOps, editPictureIds, videosOk, musicOk, musicEditOk, videoEditOk, filmOk, itemRefOk, musicBandOk, musicObject, musicObjectRef, writingFormatOk, voiceoverOk, inspiredVoiceOk, houseOk, houseContext, uptimeOk } = gated;
+  const { budget, answerImagesOk, picturesOk, editPictureOk, editPictureOps, editPictureIds, videosOk, musicOk, musicEditOk, videoEditOk, filmOk, referenceVideoOk, itemRefOk, musicBandOk, musicObject, musicObjectRef, writingFormatOk, voiceoverOk, inspiredVoiceOk, houseOk, houseContext, uptimeOk } = gated;
 
   const state: TurnState = {
     turnId,
@@ -709,6 +711,7 @@ async function beginTurn(actor: PersonRow, surface: Surface, text: string, opts:
     ...(musicEditOk ? { musicEditAllowed: true } : {}),
     ...(videoEditOk ? { videoEditAllowed: true } : {}),
     ...(filmOk ? { filmAllowed: true } : {}),
+    ...(referenceVideoOk ? { referenceVideoAllowed: true } : {}),
     ...(itemRefOk ? { itemReferenceAllowed: true } : {}),
     ...(writingFormatOk ? { writingFormatAllowed: true } : {}),
     ...(voiceoverOk ? { voiceoverAllowed: true } : {}),

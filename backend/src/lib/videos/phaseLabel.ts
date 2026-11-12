@@ -5,6 +5,9 @@ import { jobQueueCopy, JOB_QUEUE_COPY } from "@/lib/jobQueueCopy";
 import { videoWaitLine } from "@/lib/videos/waitLine";
 import type { VideoJob } from "@/lib/videos/jobs";
 
+/** REFVIDEO-01: the phase of a video being made from reference sheets. */
+export const REFERENCE_PHASE = "making from the sheet";
+
 export function phaseLabel(job: VideoJob, audience: "adult" | "child"): string {
   const hold = job.riseReason ?? (job.phase?.startsWith("held:") ? job.phase.slice(5) : null);
   if (hold === "tier_ask" && audience === "adult") { const line = pendingFitAsk(job.id)?.line; if (line) return line; }
@@ -21,6 +24,7 @@ export function phaseLabel(job: VideoJob, audience: "adult" | "child"): string {
   if (job.phase === "rendering") return "Drawing the frames";
   if (job.phase === "decoding") return "Finishing the frames";
   if (job.phase === "encoding") return "Putting the video together";
+  if (job.phase === REFERENCE_PHASE) return "Making your video from the sheet";
   if (job.phase === "editing") return "Putting your edit together";
   if (job.phase === "placing the sound") return "Placing the sound";
   return "Making your video";

@@ -260,6 +260,8 @@ export interface TurnState {
   videoEditAllowed?: boolean;
   /** FILM-04: this turn may start a film on an adult's own written screen. */
   filmAllowed?: boolean;
+  /** REFVIDEO-01: this turn may make a short video from attached pictures (or from the reference sheet of an earlier one in this chat): a film's floor, plus pictures. */
+  referenceVideoAllowed?: boolean;
   /** MUSIC-GEN-03: age, surface, household switch and Stack readiness; edits also need a made-here song in this chat. */
   musicAllowed?: boolean;
   musicEditAllowed?: boolean;

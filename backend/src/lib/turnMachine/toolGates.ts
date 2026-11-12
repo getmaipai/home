@@ -47,6 +47,8 @@ export interface TurnToolGateInput {
   musicEditAvailable: () => boolean;
   /** VIDEO-CHAT-01: whether the chat already holds a finished video (left out: no). */
   videoEditAvailable?: () => boolean;
+  /** REFVIDEO-01: this chat already holds a finished video made from reference sheets (the tool is then offered without new pictures). */
+  referenceVideoAvailable?: () => boolean;
   /** MUSIC-STUDIO-EDIT: the newest band, album or song style card in the chat (left out: none). */
   musicObjectInThread?: () => MusicObjectRef | null;
 }
@@ -81,6 +83,7 @@ export interface TurnToolGateResult {
   musicEditOk: boolean;
   videoEditOk: boolean;
   filmOk: boolean;
+  referenceVideoOk: boolean;
   itemRefOk: boolean;
   musicBandOk: boolean;
   /** The made-music object this turn follows: a gate value for the offers, and the object itself when one is named. */
@@ -178,7 +181,9 @@ export async function budgetWithTurnToolGates(input: TurnToolGateInput): Promise
   const uptimeOk = safeGate(() => uptimeAllowed({ actor: input.actor, band: input.band, surface: input.surface, surfaceClass: input.surfaceClass, spoken: input.spoken, bare: input.bare }));
   // TOOL-OFFER-VOICEOVER-01: `voiceover` is offered by structure alone (an adult, written, non-guest turn with the voice engine ready); the
   // person's wording is never read (rule 1). budget.ts keeps it past the sixteen-tool cap.
-  const gated = withTurnToolGates(input.budget, answerImagesOk, picturesOk, videosOk, musicOk, musicEditOk, itemRefOk, musicBandOk, videoEditOk, musicObject, writingFormatOk, editPictureOk, voiceoverOk, filmOk, houseOk, uptimeOk, inspiredVoiceOk);
+  // REFVIDEO-01: a short video from the person's pictures: the film floor (adult, own written chat screen, video on) and pictures attached, or an earlier video of this chat made from sheets.
+  const referenceVideoOk = filmOk && ((input.imageCount ?? 0) > 0 || safeGate(input.referenceVideoAvailable ?? (() => false)));
+  const gated = withTurnToolGates(input.budget, answerImagesOk, picturesOk, videosOk, musicOk, musicEditOk, itemRefOk, musicBandOk, videoEditOk, musicObject, writingFormatOk, editPictureOk, voiceoverOk, filmOk, houseOk, uptimeOk, inspiredVoiceOk, referenceVideoOk);
   // FILM-ROUTING-02: one clip starts from one picture and refuses several (found 2026-11-12: the model kept choosing it for a commercial from four
   // photos). With several pictures attached and the film tool on offer, the single-clip tool is not offered, so the film tool is the video tool.
   const severalPictures = (input.imageCount ?? 0) > 1 && filmOk;
@@ -201,6 +206,7 @@ export async function budgetWithTurnToolGates(input: TurnToolGateInput): Promise
     musicEditOk,
     videoEditOk,
     filmOk,
+    referenceVideoOk,
     itemRefOk,
     musicBandOk,
     musicObject,

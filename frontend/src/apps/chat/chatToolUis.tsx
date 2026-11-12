@@ -753,7 +753,7 @@ export const VideoToolRender: ToolCallMessagePartComponent<Record<string, never>
       {...(clip ? { src: clip.url, poster: clip.poster_url, width: clip.width, height: clip.height } : {})}
       progress={item.percent}
       phaseLabel={item.label}
-      {...(item.preview_url ? { previewSrc: item.preview_url } : {})}
+      {...(item.preview_url || item.sheets?.[0] ? { previewSrc: item.preview_url ?? item.sheets![0]! } : {})}
       {...(etaLabel(item.eta_seconds) ? { etaLabel: etaLabel(item.eta_seconds)! } : {})}
       queuePosition={item.position}
       startedAt={item.started_at}

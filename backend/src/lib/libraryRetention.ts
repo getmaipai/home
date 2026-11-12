@@ -6,6 +6,7 @@ import { attachments, settingsValues } from "@/db/schema";
 import { getHouseholdSettingValue } from "@/lib/settings";
 import { householdCapBytes, householdUsageBytes } from "@/lib/storage/usage";
 import { companionsOf, parentOf, dropLibraryReference } from "@/lib/libraryTrash";
+import { isReferenceSheetFile } from "@/lib/videos/referenceSheets";
 import { generationOf } from "@/lib/music/types";
 import { nextHlc } from "@/lib/hlc";
 import { raiseIssue, resolveIssue } from "@/lib/issues";
@@ -103,7 +104,8 @@ export function previewLibraryRetention(now = Date.now(), executable = false) {
     // Required companions have no independent storage lifetime. The parent's type and warning govern the whole
     // family, including a cover generated years after its song. A kept family member protects the family.
     const family = [row, ...companionsOf(row).filter(member => member.deletedAt === null)];
-    if (family.some(member => member.retention === "kept")) continue;
+    // A reference sheet is kept so it outlives a stopped video, but it never protects its own clip's family from the storage rules (REFVIDEO-01).
+    if (family.some(member => member.retention === "kept" && !isReferenceSheetFile(member))) continue;
     for (const member of family) {
       const removed = (removedPerHash.get(member.sha256) ?? 0) + 1;
       // A live chat retains its copy even when the Library reference goes.

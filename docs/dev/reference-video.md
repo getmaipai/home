@@ -1,0 +1,24 @@
+# Videos from the person's pictures (REFVIDEO-01)
+
+The `make_reference_video` tool (package `backend/packages/make_reference_video`) makes a short video from pictures a person attached in chat: people, objects and places. A film or commercial of 10 seconds or more stays `make_film`.
+
+## Flow
+
+1. **Offer.** `referenceVideoAllowed` (toolGates.ts): the film floor (adult, own written chat screen, video on) and pictures attached, or an earlier reference video in the chat (for "same sheet, but ..."). The policy node refuses a forged call.
+2. **Refusals before any work** (`videos/referenceVideo.ts`, one plain line each): no pictures, a child or teen, a spoken or temporary chat, Max not ready or needing an admin, the adapter reported missing, a video already being made, a refused prompt.
+3. **Sheets.** Each picture (at most 6) is checked by the local vision model (`videos/referenceSheetCheck.ts`). A picture is a ready sheet only when the model answers `is_sheet` true and names at least two panels. A ready sheet is fitted to 768x448 (scaled to fit, padded with its own corner colour, nothing cropped) and its panels become the "Reference sheet: ..." text in the sheet maker's format. Up to two sheets go to the Stack; pictures that are not sheets are read (`pictures/roles.ts`) and built into one more sheet by `films/sheetMaker.ts` (`drawViews: true`). A failed check counts as "not a sheet"; a failed sheet step is a plain refusal.
+4. **Prompt.** The sheet text, a blank line, then "Generated video: " and the person's request rewritten as one paragraph around the sheet panels (`completeBackground`, with the person's own words as the fallback). It always ends with the full-frame sentence and stays within 2000 characters.
+5. **Job.** Sheets are stored as kept files of the person. One `edit` job (`edit.change = "ingredients"`, phase "making from the sheet") posts multipart `POST /v1/videos/ingredients` (`sheet` x1-2, `prompt`, `seconds`, `seed`, `audience`, `timeout_ms`), polls `getVideoJob` and reads `fetchClip`, like a restyle. It is stoppable, age-checked when finished, and shown on the turn's video card. While it renders the card shows the first sheet as the preview picture (`item.sheets`).
+6. **Errors.** `ic_lora_missing` (409) and the other codes map to plain sentences (`INGREDIENTS_FAILURE_COPY`); a plain-sentence 400 from the Stack is shown as it is.
+
+## Keeping the sheet with the video
+
+`VideoRequest.reference` (a `ReferenceRecipe`) holds the sheet file ids, the full prompt, the "Generated video" paragraph, the seed, the panel list (name, view, slot, sheet, source picture ids) and which sheets were provided as they were. `getReferenceVideoRecipe(actor, jobId)` returns a copy.
+
+- **Another take** (`POST /api/videos/jobs/{id}/another`, and `anotherReferenceTake`) re-renders from the saved sheets and prompt with a new seed. No cut-outs, no drawn views.
+- **New words, same sheet.** Tool arguments `reuse_video` (a video id, or `latest`) with `request`.
+- **Cleanup.** A sheet is a companion of its video's clip (`libraryTrash.companionsOf`): Trash and purge take it along only when no other video that is still being made or still has its clip uses it (`videos/referenceSheets.ts`). A kept sheet never protects its clip from the storage rules. A sheet of a video that failed or was stopped stays in the Library until the person deletes it.
+
+## Not done
+
+The Stack lane (`/v1/videos/ingredients`) was built in parallel and was not deployed when this landed: everything above is tested against a fake Stack, and no real run has been made. The adapter check before work needs the Stack to report `qualities.ltx25max.ingredients`; until it does, a missing adapter shows as the plain sentence on the card after the sheet is made.

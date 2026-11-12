@@ -54,6 +54,26 @@ export interface VideoFile {
 }
 
 /** What the person asked for, kept on their own job record (never in a log). */
+/** REFVIDEO-01: everything a video made from reference sheets needs to be made again or edited without redoing the sheets. Stored on the job's request, so it survives a restart. */
+export interface ReferenceRecipe {
+  v: 1;
+  /** The sheet PNGs (kept attachments of the person), in the order they went to the Stack (one or two). */
+  sheetFileIds: string[];
+  /** The "Reference sheet: ..." text of every sheet (the second one starts "Second reference sheet:"). */
+  description: string;
+  /** The "Generated video" paragraph: the person's request rewritten around the sheet panels. */
+  request: string;
+  /** The whole prompt the Stack received: the description, a blank line, "Generated video: " and the paragraph. */
+  prompt: string;
+  seed: number | null;
+  seconds: number;
+  /** Every panel: its subject name, view, slot on the sheet, which sheet it is on, and the attached pictures (file ids) it came from. */
+  panels: Array<{ name: string; view: string; slot: string; sheet: number; pictures: string[] }>;
+  pictureFileIds: string[];
+  /** Per sheet: the person's own picture was already a sheet and was used as provided. */
+  providedAsIs: boolean[];
+}
+
 export interface VideoRequest {
   size: string;
   seconds: number;
@@ -76,7 +96,9 @@ export interface VideoRequest {
   adultOnly?: boolean;
   /** ADULT-LOCK-06: whether the Adult lock applies while the clip is made. Absent with `adultOnly` means on (a job stored before the lock was split from the audience). */
   adultLock?: "on" | "off";
-  edit?: { from: string; change: "trim" | "join" | "mix" | "reframe" | "grade" | "speed" | "captions" | "upscale" | "remove_background" | "spatial_sound" | "restyle"; with?: string[];
+  /** REFVIDEO-01: set on a clip made from reference sheets (see `ReferenceRecipe`). */
+  reference?: ReferenceRecipe;
+  edit?: { from: string; change: "ingredients" | "trim" | "join" | "mix" | "reframe" | "grade" | "speed" | "captions" | "upscale" | "remove_background" | "spatial_sound" | "restyle"; with?: string[];
     /** SPATIAL-04: the one plain line kept with a spatial-sound clip (the Stack's own lines); the card shows it as its muted notice. */
     note?: string };
   background?: string;
@@ -700,7 +722,7 @@ export type EditRun = (signal: AbortSignal, onProgress?: (percent: number) => vo
 export const EDIT_FAILED_PREFIX = "I couldn't change that video.";
 export const EDIT_RESTART_LINE = `${EDIT_FAILED_PREFIX} Home restarted while it was working. Ask again.`;
 
-export interface StartEditInput { /** The styles the new clip is made with (recorded for lineage and the Adult lock; an edit is a local cut and sends no LoRA to the Stack). */ styleIds?: readonly string[]; background?: string; adultLock?: "on" | "off"; actor: PersonRow; conversationId: string | null; turnId: string | null; temporary: boolean; source: VideoJob; edit: NonNullable<VideoRequest["edit"]>; run: EditRun; phase?: string; /** Called after an edited clip has been safely stored. */ onSaved?: (fileId: string) => void; /** Any source clip, track or typed line is adult-only. */ adultOnly: boolean }
+export interface StartEditInput { /** REFVIDEO-01: fields of the new job's request that the source does not carry (the reference recipe, the seed, the size). */ request?: Partial<VideoRequest>; /** The styles the new clip is made with (recorded for lineage and the Adult lock; an edit is a local cut and sends no LoRA to the Stack). */ styleIds?: readonly string[]; background?: string; adultLock?: "on" | "off"; actor: PersonRow; conversationId: string | null; turnId: string | null; temporary: boolean; source: VideoJob; edit: NonNullable<VideoRequest["edit"]>; run: EditRun; phase?: string; /** Called after an edited clip has been safely stored. */ onSaved?: (fileId: string) => void; /** Any source clip, track or typed line is adult-only. */ adultOnly: boolean }
 
 /** Starts a new clip made by editing others and returns its job at once (the card polls it like any clip). The old clips stay.
  * One clip at a time per person, as for a made clip; a refusal is the plain line. */
@@ -711,7 +733,7 @@ export function startVideoEditJob(input: StartEditInput): { ok: true; job: Video
   const job: VideoJob = {
     id: newVideoJobId(), personId: input.actor.id, conversationId: input.conversationId, turnId: input.turnId, companionId: null, kind: "edit", state: "running", stackJob: null,
     percent: 5, phase: input.phase ?? "editing", position: null, prompt: input.source.prompt,
-    request: { size: from.size, seconds: from.seconds, seed: from.seed, loras: [...(input.styleIds ?? [])], source_file_id: null, audience: from.audience, ...(from.quality ? { quality: from.quality } : {}), ...(from.create ? { create: from.create } : {}), edit: input.edit, ...(input.background ? { background: input.background } : {}), ...(input.adultOnly ? { adultOnly: true, adultLock: input.adultLock ?? "on" } : {}) },
+    request: { size: from.size, seconds: from.seconds, seed: from.seed, loras: [...(input.styleIds ?? [])], source_file_id: null, audience: from.audience, ...(from.quality ? { quality: from.quality } : {}), ...(from.create ? { create: from.create } : {}), edit: input.edit, ...(input.background ? { background: input.background } : {}), ...(input.adultOnly ? { adultOnly: true, adultLock: input.adultLock ?? "on" } : {}), ...(input.request ?? {}) },
     error: null, files: [], temporary: input.temporary, createdAt: now, updatedAt: now,
   };
   liveJobs.set(job.id, job);
