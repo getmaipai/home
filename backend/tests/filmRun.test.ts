@@ -3,7 +3,7 @@ import { db } from "@/db";
 import { people } from "@/db/schema";
 import { createMediaProduction, getMediaProduction } from "@/lib/mediaProductions";
 import { createMediaSubject } from "@/lib/mediaSubjects";
-import { __setFilmRetryDelaysForTests, changeMusic, FilmStepError, redoShot, runFilm, type FilmEngines } from "@/lib/films/run";
+import { __setFilmRetryDelaysForTests, changeMusic, isTransientStackError, FilmStepError, redoShot, runFilm, type FilmEngines } from "@/lib/films/run";
 import type { FilmPlan } from "@/lib/films/plan";
 import type { PersonRow } from "@/types";
 import { resetDb } from "./reset-db";
@@ -56,6 +56,14 @@ describe("film runner", () => {
       expect(result.episodes[0]?.scenes[0]?.shots.every((shot) => shot.clip_file_id)).toBe(true);
       expect(engines.note).toContain("restarting");
     } finally { __setFilmRetryDelaysForTests(null); }
+  });
+  test("what counts as a wait: a restarting or unavailable engine, never an ordinary failure", () => {
+    expect(isTransientStackError(Object.assign(new Error("x"), { code: "unavailable" }))).toBe(true);
+    expect(isTransientStackError(Object.assign(new Error("x"), { status: 503 }))).toBe(true);
+    expect(isTransientStackError(new Error("The Stack is not running: the socket refused"))).toBe(true);
+    expect(isTransientStackError(new Error("bad picture"))).toBe(false);
+    expect(isTransientStackError(Object.assign(new Error("refused"), { status: 422 }))).toBe(false);
+    expect(isTransientStackError(null)).toBe(false);
   });
   test("a restart that lasts longer than the waits, and any other error, still ends the step plainly", async () => {
     const actor = person("film-noretry"); actorForEngines = actor; const production = createMediaProduction(actor, { title: "Draft" }), calls: string[] = [];

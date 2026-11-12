@@ -107,7 +107,13 @@ export function realFilmEngines(input: { actor: PersonRow; signal: AbortSignal; 
       const prompt = `${shot.motion}${shot.line ? ` Say "${shot.line}".` : ""}`;
       const result = await runGenerateVideo({ state, args: { prompt, production: productionId, shot: shot.id, seconds: shot.seconds }, callId: `film-${shot.id}`, spoken: false, audience: makeAudienceOf(actor) });
       const jobId = (result.result?.data as { videoJobId?: string } | undefined)?.videoJobId;
-      if (!jobId) throw new Error("The video could not be started.");
+      if (!jobId) {
+        const why = JSON.stringify(result.result?.reply ?? result).slice(0, 500);
+        console.error(`[film] clip ${shot.id} refused: ${why}`);
+        // The engine being unavailable (a restarting Stack answers "no video model is installed") is a wait, not an end: the step runner retries it.
+        const unavailable = (result as { failureKind?: string; errorCode?: string }).failureKind === "unavailable" || (result as { errorCode?: string }).errorCode === "no_engine";
+        throw Object.assign(new Error(`The video could not be started: ${why}`), unavailable ? { code: "unavailable" } : {});
+      }
       const job = await poll(() => getVideoJobFor(actor, jobId), signal, 25 * 60_000, (value) => value.state === "failed" || value.state === "cancelled" ? "The video did not finish." : null);
       const id = job.files[0]?.id;
       if (!id) throw new Error("The finished video is unavailable.");
