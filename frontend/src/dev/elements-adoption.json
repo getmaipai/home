@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-11-12T07:07:48.348Z",
+  "generatedAt": "2026-11-12T08:14:11.020Z",
   "kitTag": "ui-v0.5.614",
   "items": [
     {
@@ -219,7 +219,7 @@
       "group": "activity",
       "verdict": "later",
       "verdictReason": "New in ui-v0.5.600 and not drawn by any Home page yet; assess and wire when the Activity page or dock uses it (the pro-design session owns that wiring).",
-      "implemented": false
+      "implemented": true
     },
     {
       "file": "adult-lock.tsx",
