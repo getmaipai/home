@@ -72895,6 +72895,54 @@
                                 },
                                 "description": "REFVIDEO-01: the reference sheet pictures a video made from pictures was built from (file addresses), shown above the clip; absent for any other video."
                               },
+                              "phases": {
+                                "type": "array",
+                                "items": {
+                                  "type": "object",
+                                  "properties": {
+                                    "id": {
+                                      "type": "string",
+                                      "enum": [
+                                        "sheet",
+                                        "clip"
+                                      ]
+                                    },
+                                    "name": {
+                                      "type": "string"
+                                    },
+                                    "state": {
+                                      "type": "string",
+                                      "enum": [
+                                        "waiting",
+                                        "running",
+                                        "done"
+                                      ]
+                                    },
+                                    "percent": {
+                                      "type": "number",
+                                      "description": "This step's own progress, 0 to 100."
+                                    },
+                                    "line": {
+                                      "type": "string",
+                                      "nullable": true,
+                                      "description": "The plain sentence for what this step is doing now."
+                                    },
+                                    "waiting": {
+                                      "type": "boolean",
+                                      "description": "The step is held (the computer is busy), not working yet."
+                                    }
+                                  },
+                                  "required": [
+                                    "id",
+                                    "name",
+                                    "state",
+                                    "percent",
+                                    "line",
+                                    "waiting"
+                                  ]
+                                },
+                                "description": "REFVIDEO-STEPS-01: while a video made from pictures is made, its two steps with their own progress; absent for any other video and once it has finished."
+                              },
                               "note": {
                                 "type": "string",
                                 "nullable": true,
@@ -73644,6 +73692,54 @@
                                 },
                                 "description": "REFVIDEO-01: the reference sheet pictures a video made from pictures was built from (file addresses), shown above the clip; absent for any other video."
                               },
+                              "phases": {
+                                "type": "array",
+                                "items": {
+                                  "type": "object",
+                                  "properties": {
+                                    "id": {
+                                      "type": "string",
+                                      "enum": [
+                                        "sheet",
+                                        "clip"
+                                      ]
+                                    },
+                                    "name": {
+                                      "type": "string"
+                                    },
+                                    "state": {
+                                      "type": "string",
+                                      "enum": [
+                                        "waiting",
+                                        "running",
+                                        "done"
+                                      ]
+                                    },
+                                    "percent": {
+                                      "type": "number",
+                                      "description": "This step's own progress, 0 to 100."
+                                    },
+                                    "line": {
+                                      "type": "string",
+                                      "nullable": true,
+                                      "description": "The plain sentence for what this step is doing now."
+                                    },
+                                    "waiting": {
+                                      "type": "boolean",
+                                      "description": "The step is held (the computer is busy), not working yet."
+                                    }
+                                  },
+                                  "required": [
+                                    "id",
+                                    "name",
+                                    "state",
+                                    "percent",
+                                    "line",
+                                    "waiting"
+                                  ]
+                                },
+                                "description": "REFVIDEO-STEPS-01: while a video made from pictures is made, its two steps with their own progress; absent for any other video and once it has finished."
+                              },
                               "note": {
                                 "type": "string",
                                 "nullable": true,
@@ -74201,6 +74297,54 @@
                                 },
                                 "description": "REFVIDEO-01: the reference sheet pictures a video made from pictures was built from (file addresses), shown above the clip; absent for any other video."
                               },
+                              "phases": {
+                                "type": "array",
+                                "items": {
+                                  "type": "object",
+                                  "properties": {
+                                    "id": {
+                                      "type": "string",
+                                      "enum": [
+                                        "sheet",
+                                        "clip"
+                                      ]
+                                    },
+                                    "name": {
+                                      "type": "string"
+                                    },
+                                    "state": {
+                                      "type": "string",
+                                      "enum": [
+                                        "waiting",
+                                        "running",
+                                        "done"
+                                      ]
+                                    },
+                                    "percent": {
+                                      "type": "number",
+                                      "description": "This step's own progress, 0 to 100."
+                                    },
+                                    "line": {
+                                      "type": "string",
+                                      "nullable": true,
+                                      "description": "The plain sentence for what this step is doing now."
+                                    },
+                                    "waiting": {
+                                      "type": "boolean",
+                                      "description": "The step is held (the computer is busy), not working yet."
+                                    }
+                                  },
+                                  "required": [
+                                    "id",
+                                    "name",
+                                    "state",
+                                    "percent",
+                                    "line",
+                                    "waiting"
+                                  ]
+                                },
+                                "description": "REFVIDEO-STEPS-01: while a video made from pictures is made, its two steps with their own progress; absent for any other video and once it has finished."
+                              },
                               "note": {
                                 "type": "string",
                                 "nullable": true,
@@ -74689,6 +74833,54 @@
                                       "type": "string"
                                     },
                                     "description": "REFVIDEO-01: the reference sheet pictures a video made from pictures was built from (file addresses), shown above the clip; absent for any other video."
+                                  },
+                                  "phases": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "object",
+                                      "properties": {
+                                        "id": {
+                                          "type": "string",
+                                          "enum": [
+                                            "sheet",
+                                            "clip"
+                                          ]
+                                        },
+                                        "name": {
+                                          "type": "string"
+                                        },
+                                        "state": {
+                                          "type": "string",
+                                          "enum": [
+                                            "waiting",
+                                            "running",
+                                            "done"
+                                          ]
+                                        },
+                                        "percent": {
+                                          "type": "number",
+                                          "description": "This step's own progress, 0 to 100."
+                                        },
+                                        "line": {
+                                          "type": "string",
+                                          "nullable": true,
+                                          "description": "The plain sentence for what this step is doing now."
+                                        },
+                                        "waiting": {
+                                          "type": "boolean",
+                                          "description": "The step is held (the computer is busy), not working yet."
+                                        }
+                                      },
+                                      "required": [
+                                        "id",
+                                        "name",
+                                        "state",
+                                        "percent",
+                                        "line",
+                                        "waiting"
+                                      ]
+                                    },
+                                    "description": "REFVIDEO-STEPS-01: while a video made from pictures is made, its two steps with their own progress; absent for any other video and once it has finished."
                                   },
                                   "note": {
                                     "type": "string",
@@ -75724,6 +75916,54 @@
                                 },
                                 "description": "REFVIDEO-01: the reference sheet pictures a video made from pictures was built from (file addresses), shown above the clip; absent for any other video."
                               },
+                              "phases": {
+                                "type": "array",
+                                "items": {
+                                  "type": "object",
+                                  "properties": {
+                                    "id": {
+                                      "type": "string",
+                                      "enum": [
+                                        "sheet",
+                                        "clip"
+                                      ]
+                                    },
+                                    "name": {
+                                      "type": "string"
+                                    },
+                                    "state": {
+                                      "type": "string",
+                                      "enum": [
+                                        "waiting",
+                                        "running",
+                                        "done"
+                                      ]
+                                    },
+                                    "percent": {
+                                      "type": "number",
+                                      "description": "This step's own progress, 0 to 100."
+                                    },
+                                    "line": {
+                                      "type": "string",
+                                      "nullable": true,
+                                      "description": "The plain sentence for what this step is doing now."
+                                    },
+                                    "waiting": {
+                                      "type": "boolean",
+                                      "description": "The step is held (the computer is busy), not working yet."
+                                    }
+                                  },
+                                  "required": [
+                                    "id",
+                                    "name",
+                                    "state",
+                                    "percent",
+                                    "line",
+                                    "waiting"
+                                  ]
+                                },
+                                "description": "REFVIDEO-STEPS-01: while a video made from pictures is made, its two steps with their own progress; absent for any other video and once it has finished."
+                              },
                               "note": {
                                 "type": "string",
                                 "nullable": true,
@@ -76193,6 +76433,54 @@
                                   "type": "string"
                                 },
                                 "description": "REFVIDEO-01: the reference sheet pictures a video made from pictures was built from (file addresses), shown above the clip; absent for any other video."
+                              },
+                              "phases": {
+                                "type": "array",
+                                "items": {
+                                  "type": "object",
+                                  "properties": {
+                                    "id": {
+                                      "type": "string",
+                                      "enum": [
+                                        "sheet",
+                                        "clip"
+                                      ]
+                                    },
+                                    "name": {
+                                      "type": "string"
+                                    },
+                                    "state": {
+                                      "type": "string",
+                                      "enum": [
+                                        "waiting",
+                                        "running",
+                                        "done"
+                                      ]
+                                    },
+                                    "percent": {
+                                      "type": "number",
+                                      "description": "This step's own progress, 0 to 100."
+                                    },
+                                    "line": {
+                                      "type": "string",
+                                      "nullable": true,
+                                      "description": "The plain sentence for what this step is doing now."
+                                    },
+                                    "waiting": {
+                                      "type": "boolean",
+                                      "description": "The step is held (the computer is busy), not working yet."
+                                    }
+                                  },
+                                  "required": [
+                                    "id",
+                                    "name",
+                                    "state",
+                                    "percent",
+                                    "line",
+                                    "waiting"
+                                  ]
+                                },
+                                "description": "REFVIDEO-STEPS-01: while a video made from pictures is made, its two steps with their own progress; absent for any other video and once it has finished."
                               },
                               "note": {
                                 "type": "string",
@@ -76773,6 +77061,54 @@
                                   "type": "string"
                                 },
                                 "description": "REFVIDEO-01: the reference sheet pictures a video made from pictures was built from (file addresses), shown above the clip; absent for any other video."
+                              },
+                              "phases": {
+                                "type": "array",
+                                "items": {
+                                  "type": "object",
+                                  "properties": {
+                                    "id": {
+                                      "type": "string",
+                                      "enum": [
+                                        "sheet",
+                                        "clip"
+                                      ]
+                                    },
+                                    "name": {
+                                      "type": "string"
+                                    },
+                                    "state": {
+                                      "type": "string",
+                                      "enum": [
+                                        "waiting",
+                                        "running",
+                                        "done"
+                                      ]
+                                    },
+                                    "percent": {
+                                      "type": "number",
+                                      "description": "This step's own progress, 0 to 100."
+                                    },
+                                    "line": {
+                                      "type": "string",
+                                      "nullable": true,
+                                      "description": "The plain sentence for what this step is doing now."
+                                    },
+                                    "waiting": {
+                                      "type": "boolean",
+                                      "description": "The step is held (the computer is busy), not working yet."
+                                    }
+                                  },
+                                  "required": [
+                                    "id",
+                                    "name",
+                                    "state",
+                                    "percent",
+                                    "line",
+                                    "waiting"
+                                  ]
+                                },
+                                "description": "REFVIDEO-STEPS-01: while a video made from pictures is made, its two steps with their own progress; absent for any other video and once it has finished."
                               },
                               "note": {
                                 "type": "string",

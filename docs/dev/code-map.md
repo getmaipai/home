@@ -1202,7 +1202,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/videos/feed.ts` | FEED_LIMIT, levelOfJob, feedRowOf, feedRows, feedRowById |
 | `backend/src/lib/videos/frameCheck.ts` | sharpness, checkClipFrames |
 | `backend/src/lib/videos/history.ts` | removeFromHistory |
-| `backend/src/lib/videos/jobs.ts` | VIDEO_FAILED_PREFIX, MEMORY_CANCELLED_CODE, plainVideoFailure, getVideoJobFor, doneVideoJobsFor, sourceVideoJob |
+| `backend/src/lib/videos/jobs.ts` | referencePercent, VIDEO_FAILED_PREFIX, MEMORY_CANCELLED_CODE, plainVideoFailure, getVideoJobFor, doneVideoJobsFor |
 | `backend/src/lib/videos/librarySort.ts` | LIBRARY_SORT_KEY, savedLibrarySort, librarySortFor |
 | `backend/src/lib/videos/lock.ts` | videoJobLockItem, videoJobLockState, lockedJobView, LOCKED_START_LINE, lockedVideoTile, LOCKED_RESULT_TEXT |
 | `backend/src/lib/videos/longTake.ts` | MAX_PARTS, MAX_TAKE_SECONDS, MIN_PART_SECONDS, SUMMARY_LIMIT, CONTINUITY, TAKE_TOO_MUCH_LINE |
@@ -1221,7 +1221,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/videos/referenceSheetCheck.ts` | REFERENCE_SHEET_W, MIN_SHEET_PANELS, SHEET_KINDS, __setSheetVisionForTests, parseSheetCheck, checkPictureIsSheet |
 | `backend/src/lib/videos/referenceSheets.ts` | REFERENCE_SHEET_NOTE, isReferenceSheetFile, sheetIdsOfRequest, sheetUsedByOtherVideo, sheetFilesOnlyUsedBy |
 | `backend/src/lib/videos/referenceToolId.ts` | MAKE_REFERENCE_VIDEO_TOOL_ID |
-| `backend/src/lib/videos/referenceVideo.ts` | REFERENCE_VIDEO_SECONDS, MAX_REFERENCE_PICTURES, REFERENCE_PROMPT_MAX, FULL_FRAME_SENTENCE, makeReferenceVideoArgs, REFERENCE_NO_PICTURES_LINE |
+| `backend/src/lib/videos/referenceVideo.ts` | REFERENCE_VIDEO_SECONDS, MAX_REFERENCE_PICTURES, REFERENCE_PROMPT_MAX, NO_DIALOGUE_SENTENCE, stripQuotedSpeech, FULL_FRAME_SENTENCE |
 | `backend/src/lib/videos/rerun.ts` | prepareVideoRerun |
 | `backend/src/lib/videos/slotBody.ts` | qualityOfSlotModel, videoBodyForSlot |
 | `backend/src/lib/videos/spatialStart.ts` | startSpatialSound |
