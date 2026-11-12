@@ -10,6 +10,7 @@
 #   maipai-host-guard status              print status.json
 #   maipai-host-guard mode off|dry|live   dry logs "would reboot" only; live reboots; off does nothing (writes tuning.json)
 #   maipai-host-guard capture             take the evidence bundle now (no reboot)
+#   maipai-host-guard memory-status       print memory.json (the memory probe and the repairs, below)
 #   maipai-host-guard uninstall           remove the daemon, the sudoers entry and this script (captures stay)
 #
 # Files in $STATE (default /var/db/maipai-host-guard):
@@ -20,6 +21,14 @@
 #   status.json   world-readable, written after every pass. Schema version 1:
 #                 {"version":1,"owner","checked_at","mode","lookup","spawn","metal","hard_fails","metal_fails","uptime_s","note"}
 #   last-reboot.txt, reboots, captures/<stamp>/ (root-only, never read by Home), telemetry.csv (world-readable trend numbers).
+#   Memory and self-repair (HOST-GUARD-07..09, 2026-11-12; the section "Memory probe and bounded self-repair" below):
+#   repair.json   root-owned, optional: {"mode":"off|dry|live","fsevents_compressed_gb","emergency_gb","pressure_minutes","shed_minutes"}, clamped.
+#   memory.json   world-readable, every pass: pressure, swap, compressor, the biggest processes by footprint (compressed included), repairs.
+#   memory.csv    world-readable time series (one row a pass). repair-audit.log: world-readable decisions, counts and reasons only.
+#   dev-shed      world-readable flag: heavy development work (tests, gates, ships) waits while it is fresh (updated within 10 minutes).
+#   fsevents-restarted  world-readable: when the guard restarted the file-event daemon; dev hubs read it and say to restart.
+#   fsevents-digest.json  world-readable counts from the last evidence capture; fsevents-captures/<stamp>/ raw evidence, root-only, last 3.
+#   Kill switch: the file <data_dir>/host-guard/OFF (or repair-OFF here) turns every repair off; the guard only checks that it exists.
 #
 # Safety: nothing for 15 minutes after boot; never reboots while a ship or install runs (up to 45 minutes); a Metal-only failure also
 # waits for a quiet moment (up to 30 more minutes); at most max_reboots_per_12h reboots; every reboot writes last-reboot.txt.
@@ -29,7 +38,8 @@ export PATH=/usr/bin:/bin:/usr/sbin:/sbin
 if [[ "${MAIPAI_HG_TEST:-}" != 1 ]]; then
   unset MAIPAI_HG_STATE MAIPAI_HG_LOG MAIPAI_HG_SHUTDOWN MAIPAI_HG_REBOOT MAIPAI_HG_MIN_UPTIME MAIPAI_HG_DEFER_MAX MAIPAI_HG_QUIET_MAX \
     MAIPAI_HG_REBOOT_WINDOW MAIPAI_HG_STACK_URL MAIPAI_HG_USER MAIPAI_HG_UID MAIPAI_HG_DATA MAIPAI_HG_NO_ASUSER MAIPAI_HG_FORCE MAIPAI_HG_QUIET \
-    MAIPAI_HG_CAPTURE_LIGHT MAIPAI_HG_NO_TELEMETRY MAIPAI_HG_HARD_LIMIT MAIPAI_HG_METAL_LIMIT MAIPAI_HG_MAX_REBOOTS MAIPAI_HG_FORCE_DELAY
+    MAIPAI_HG_CAPTURE_LIGHT MAIPAI_HG_NO_TELEMETRY MAIPAI_HG_HARD_LIMIT MAIPAI_HG_METAL_LIMIT MAIPAI_HG_MAX_REBOOTS MAIPAI_HG_FORCE_DELAY \
+    MAIPAI_HG_NOW MAIPAI_HG_BIN MAIPAI_HG_REMEDIES MAIPAI_HG_VERIFY_DELAY MAIPAI_HG_FS_USAGE_SECONDS
 fi
 SELF="${BASH_SOURCE[0]}"
 
@@ -47,7 +57,7 @@ REBOOT_WINDOW="${MAIPAI_HG_REBOOT_WINDOW:-43200}"
 STACK_URL="${MAIPAI_HG_STACK_URL:-http://127.0.0.1:8770}"
 FORCE_DELAY="${MAIPAI_HG_FORCE_DELAY:-150}"
 
-now() { date +%s; }
+now() { if [[ "${MAIPAI_HG_NOW:-}" =~ ^[0-9]+$ ]]; then echo "$MAIPAI_HG_NOW"; else date +%s; fi; }
 stamp() { date '+%Y-%m-%d %H:%M:%S'; }
 log() { printf '%s %s\n' "$(stamp)" "$*" >> "$LOG" 2>/dev/null; }
 read_int() { local v; v="$(cat "$1" 2>/dev/null)"; [[ "$v" =~ ^[0-9]+$ ]] && echo "$v" || echo 0; }
@@ -242,6 +252,9 @@ cmd_run() {
     rm -f "$STATE/episode"; write_status "$l" "$s" "$m" "$hard" "$metal_fails" "${note:-healthy}"
     # Trend numbers only on a healthy pass, in their own bounded process, so they can never hold up a decision.
     if (( hard == 0 && metal_fails == 0 )) && [[ -z "${MAIPAI_HG_NO_TELEMETRY:-}" ]]; then with_timeout 45 /bin/bash "$SELF" telemetry "$((t1-t0))" "$((t3-t2))" >/dev/null 2>&1; fi
+    # The memory probe and its bounded repairs, after the reboot decision, in their own bounded process (an evidence capture can take
+    # minutes; launchd starts the next pass when this one ends). Tests run it only against fake tools (MAIPAI_HG_BIN).
+    if [[ "${MAIPAI_HG_TEST:-}" != 1 || -n "${MAIPAI_HG_BIN:-}" ]]; then with_timeout 600 /bin/bash "$SELF" memory >/dev/null 2>&1; fi
     return 0
   fi
 
@@ -255,6 +268,366 @@ cmd_run() {
   if [[ "$MODE" != live ]]; then log "dry mode: WOULD REBOOT: $reason"; return 0; fi
   rm -f "$STATE/episode" "$STATE/hard" "$STATE/metal"
   do_reboot "$reason"
+}
+
+# ---------------------------------------------------------------------------------------------------------------------------------
+# Memory probe and bounded self-repair (HOST-GUARD-07, -08, -09; 2026-11-12).
+# Why: on 2026-11-12 fseventsd (the macOS file-event daemon) held 66 GB, 63 GB of it compressed or swapped, with a 3.4 GB resident size.
+# Its vmmap shows a leak in Malloc Small: about 128 KB per "Resolve user group list" call (libsystem_info), about 100 calls a second while
+# the safety tests ran. Pressure sat at level 2 for hours; every guard that reads resident size missed it. A leak is only freed by
+# restarting the daemon, which needs root, so this guard does it, within fixed bounds:
+#   * Only actions in the allowlist (remedy_run) can run. Each is a function in this file with fixed arguments; nothing is read from a
+#     file or the environment except clamped numbers (repair.json) and the existence of the kill switch file.
+#   * Each has a trigger, a minimum time the trigger must hold, a cooldown and a daily cap; repair mode dry only logs; the kill switch
+#     turns every action off. Every decision goes to repair-audit.log (counts and reasons, never file contents).
+#   * Evidence first: the file-event daemon is never restarted without a complete evidence capture from the last 30 minutes, unless it is
+#     above the emergency size; then a quick capture (60 s) runs and the restart goes ahead.
+# Triggers (the restart):  size   - the daemon's physical footprint (compressed included) at or above fsevents_compressed_gb (16 GB);
+#                          growth - its footprint grows 20 MB a minute or more for 5 minutes (same pid), and it is above 2 GB.
+# The dev-shed flag:       kernel pressure level 2 or more for shed_minutes (20); cleared after 5 calm minutes.
+# Diagnostic only (never a trigger): "Resolve user group list" lines a minute and the MB they leak (x 0.125), in memory.json.
+# ---------------------------------------------------------------------------------------------------------------------------------
+REPAIR_DIR="$STATE/repair"
+CAPS="$STATE/fsevents-captures"
+NOTICE_TEXT="Chat is slower for a few minutes while the system tidies up."
+GROUP_LIST_MSG="Resolve user group list"
+LEAK_KB_PER_CALL=128
+GROWTH_MIN_MB=20
+GROWTH_HOLD_S=300
+GROWTH_FLOOR_MB=2048
+DEV_DATA=""
+
+# A system tool by absolute path; the test seam swaps the whole directory for fakes (only when MAIPAI_HG_TEST=1, see the top).
+tp() { if [[ -n "${MAIPAI_HG_BIN:-}" ]]; then echo "$MAIPAI_HG_BIN/${1##*/}"; else echo "$1"; fi; }
+clean() { printf '%s' "$1" | tr -d '\\"\000-\037' | cut -c1-"${2:-300}"; }
+
+load_repair() {
+  local r="$STATE/repair.json" m
+  # A repair.json that root does not own is ignored (the defaults apply), so no user can loosen a bound.
+  if [[ -f "$r" && "${MAIPAI_HG_TEST:-}" != 1 && "$(stat -f %u "$r" 2>/dev/null)" != 0 ]]; then r=/nonexistent; fi
+  m="$(jget "$r" mode)"; case "$m" in off|dry|live) R_MODE="$m" ;; *) R_MODE=live ;; esac
+  R_FSEV_MB=$(( $(clamp "$(jget "$r" fsevents_compressed_gb)" 4 256 16) * 1024 ))
+  R_EMERG_MB=$(( $(clamp "$(jget "$r" emergency_gb)" 24 256 40) * 1024 ))
+  R_SHED_S=$(( $(clamp "$(jget "$r" shed_minutes)" 10 240 20) * 60 ))
+  R_OFF=0; if [[ -e "$DATA/host-guard/OFF" || -e "$STATE/repair-OFF" ]]; then R_OFF=1; fi
+  local d; d="$(jget "$STATE/config.json" dev_data)"
+  if [[ "$d" =~ ^/[A-Za-z0-9._/\ -]+$ && "$d" != *..* ]]; then DEV_DATA="$d"; fi
+}
+
+# top -stats pid,command,mem,cmprs: MEM is the footprint (compressed included), so a daemon with a tiny resident size is seen.
+# Output: pid<TAB>name<TAB>footprint MB<TAB>compressed MB, names reduced to safe characters.
+parse_top() {
+  awk 'function mb(s,  u, n) { sub(/[+-]$/, "", s); u = substr(s, length(s)); n = substr(s, 1, length(s) - 1) + 0
+         if (u == "T") return int(n * 1048576); if (u == "G") return int(n * 1024); if (u == "M") return int(n)
+         if (u == "K") return int(n / 1024); if (u == "B") return 0; return int((s + 0) / 1048576) }
+       /^PID[ \t]+COMMAND/ { on = 1; next }
+       on && $1 ~ /^[0-9]+$/ && NF >= 4 { name = $2; for (i = 3; i <= NF - 2; i++) name = name " " $i
+         gsub(/[^A-Za-z0-9 ._()-]/, "", name); printf "%s\t%s\t%d\t%d\n", $1, substr(name, 1, 40), mb($(NF - 1)), mb($NF) }'
+}
+swap_field() { printf '%s\n' "$1" | awk -v k="$2" '{ for (i = 1; i < NF - 1; i++) if ($i == k && $(i + 1) == "=") { v = $(i + 2); sub(/M$/, "", v); if (v ~ /^[0-9.]+$/) { printf "%d", v; f = 1 } } } END { if (!f) printf "-1" }'; }
+compressor_mb() { awk '/page size of/ { for (i = 1; i <= NF; i++) if ($i == "of") ps = $(i + 1) } /occupied by compressor/ { c = $NF; gsub(/\./, "", c) } END { if (ps > 0 && c ~ /^[0-9]+$/) printf "%d", c * ps / 1048576; else printf "-1" }'; }
+
+mem_probe() {
+  local v sw pid name mb cmp
+  v="$(with_timeout 10 "$(tp /usr/sbin/sysctl)" -n kern.memorystatus_vm_pressure_level 2>/dev/null)"; [[ "$v" =~ ^[0-9]$ ]] && M_LEVEL="$v" || M_LEVEL=-1
+  v="$(with_timeout 10 "$(tp /usr/sbin/sysctl)" -n kern.memorystatus_level 2>/dev/null)"; [[ "$v" =~ ^[0-9]{1,3}$ ]] && M_FREE="$v" || M_FREE=-1
+  sw="$(with_timeout 10 "$(tp /usr/sbin/sysctl)" -n vm.swapusage 2>/dev/null)"
+  M_SWAP_TOTAL="$(swap_field "$sw" total)"; M_SWAP_USED="$(swap_field "$sw" used)"
+  M_COMP="$(with_timeout 15 "$(tp /usr/bin/vm_stat)" 2>/dev/null | compressor_mb)"
+  M_TOP="$(with_timeout 25 "$(tp /usr/bin/top)" -l 1 -o mem -n 8 -stats pid,command,mem,cmprs 2>/dev/null | parse_top)"
+  M_FSEV_PID=""; M_FSEV_MB=0; M_FSEV_CMP=0
+  while IFS=$'\t' read -r pid name mb cmp; do
+    if [[ "$name" == fseventsd && "$mb" =~ ^[0-9]+$ && "$cmp" =~ ^[0-9]+$ ]]; then M_FSEV_PID="$pid"; M_FSEV_MB="$mb"; M_FSEV_CMP="$cmp"; break; fi
+  done <<< "$M_TOP"
+  # The leak's own signal: group-list calls by fseventsd in the last minute (one line each), and the MB that leaks with them.
+  v="$(with_timeout 20 "$(tp /usr/bin/log)" show --last 1m --style compact --predicate "process == \"fseventsd\" AND eventMessage CONTAINS \"$GROUP_LIST_MSG\"" 2>/dev/null | grep -c "$GROUP_LIST_MSG")"
+  [[ "$v" =~ ^[0-9]+$ ]] && M_CALLS="$v" || M_CALLS=-1
+  if (( M_CALLS >= 0 )); then M_LEAK_MB=$(( M_CALLS * LEAK_KB_PER_CALL / 1024 )); else M_LEAK_MB=-1; fi
+  # Footprint growth in MB a minute since the last pass, for the same daemon process (a restart starts it over).
+  local prev p_t p_mb p_pid
+  prev="$(cat "$REPAIR_DIR/fseventsd-last" 2>/dev/null)"; read -r p_t p_mb p_pid <<< "$prev"
+  M_GROWTH=-1
+  if [[ "$p_t" =~ ^[0-9]+$ && "$p_mb" =~ ^[0-9]+$ && -n "$M_FSEV_PID" && "$p_pid" == "$M_FSEV_PID" ]] && (( $(now) - p_t >= 30 && $(now) - p_t <= 900 )); then
+    M_GROWTH=$(( (M_FSEV_MB - p_mb) * 60 / ($(now) - p_t) ))
+  fi
+  [[ -n "$M_FSEV_PID" ]] && echo "$(now) $M_FSEV_MB $M_FSEV_PID" > "$REPAIR_DIR/fseventsd-last"
+}
+
+# held NAME TRUE|FALSE: seconds the signal has held (0 when it does not hold now).
+held() {
+  local f="$REPAIR_DIR/$1.since" s
+  if [[ "$2" != true ]]; then rm -f "$f"; echo 0; return; fi
+  s="$(read_int "$f")"; if (( s == 0 )); then s="$(now)"; echo "$s" > "$f"; fi
+  echo $(( $(now) - s ))
+}
+signals() {
+  local t=false
+  (( M_LEVEL >= 2 )) && t=true; H_PRESS="$(held pressure "$t")"
+  t=false; (( M_FSEV_MB >= R_FSEV_MB )) && t=true; H_SIZE="$(held fsevents-size "$t")"; S_SIZE="$t"
+  t=false; (( M_GROWTH >= GROWTH_MIN_MB )) && t=true; H_GROWTH="$(held fsevents-growth "$t")"
+  t=false; (( M_LEVEL >= 0 && M_LEVEL < 2 )) && t=true; H_CALM="$(held calm "$t")"
+}
+
+audit() { # id decision detail
+  local f="$STATE/repair-audit.log"
+  printf '%s id=%s decision=%s %s\n' "$(date -u -r "$(now)" +%Y-%m-%dT%H:%M:%SZ)" "$1" "$2" "$(clean "$3" 400)" >> "$f"
+  chmod 644 "$f"
+  [[ $(stat -f %z "$f" 2>/dev/null || echo 0) -gt 1048576 ]] && { tail -n 3000 "$f" > "$f.tmp" && mv "$f.tmp" "$f"; chmod 644 "$f"; }
+  log "repair: $1 $2 $(clean "$3" 400)"
+}
+runs_since() { local n=0 t; while read -r t _; do if [[ "$t" =~ ^[0-9]+$ ]] && (( t >= $2 )); then n=$((n+1)); fi; done < "$REPAIR_DIR/$1.runs" 2>/dev/null; echo "$n"; }
+last_run() { local t; t="$(tail -n 1 "$REPAIR_DIR/$1.runs" 2>/dev/null | awk '{print $1}')"; [[ "$t" =~ ^[0-9]+$ ]] && echo "$t" || echo 0; }
+record_run() { echo "$(now) $2" >> "$REPAIR_DIR/$1.runs"; tail -n 50 "$REPAIR_DIR/$1.runs" > "$REPAIR_DIR/$1.runs.tmp" && mv "$REPAIR_DIR/$1.runs.tmp" "$REPAIR_DIR/$1.runs"; }
+mem_counts() { echo "pressure=$M_LEVEL fseventsd_mb=$M_FSEV_MB fseventsd_compressed_mb=$M_FSEV_CMP growth_mb_per_min=$M_GROWTH group_list_per_min=$M_CALLS est_leak_mb_per_min=$M_LEAK_MB swap_used_mb=$M_SWAP_USED"; }
+
+# The allowlist. To add an action: a name here, its limits and trigger in remedy_limits and remedy_due, and an act_ function.
+REMEDIES="capture-fseventsd restart-fseventsd dev-shed"
+remedy_known() { case "$1" in capture-fseventsd|restart-fseventsd|dev-shed) return 0 ;; esac; return 1; }
+remedy_limits() { # id -> L_COOL seconds between runs, L_CAP runs per 24 hours
+  case "$1" in
+    capture-fseventsd) L_COOL=21600; L_CAP=3 ;;
+    restart-fseventsd) L_COOL=21600; L_CAP=2 ;;
+    dev-shed) L_COOL=1800; L_CAP=6 ;;
+  esac
+}
+remedy_due() { # id -> 0 when its trigger has held long enough; TRIGGER names it
+  TRIGGER=""
+  case "$1" in
+    capture-fseventsd)
+      if [[ $S_SIZE == true ]]; then TRIGGER="size"
+      elif (( H_GROWTH >= GROWTH_HOLD_S && M_FSEV_MB >= GROWTH_FLOOR_MB )); then TRIGGER="growth"; fi ;;
+    restart-fseventsd)
+      if [[ $S_SIZE == true ]]; then TRIGGER="size ${M_FSEV_MB} MB >= $R_FSEV_MB MB"
+      elif (( H_GROWTH >= GROWTH_HOLD_S && M_FSEV_MB >= GROWTH_FLOOR_MB )); then TRIGGER="growth ${M_GROWTH} MB/min for ${H_GROWTH}s"; fi ;;
+    dev-shed)
+      if [[ ! -f "$STATE/dev-shed" ]] && (( H_PRESS >= R_SHED_S )); then TRIGGER="pressure level $M_LEVEL for ${H_PRESS}s"; fi ;;
+  esac
+  [[ -n "$TRIGGER" ]]
+}
+remedy_run() { # id: only these run; anything else is refused
+  case "$1" in
+    capture-fseventsd) act_capture full ;;
+    restart-fseventsd) act_restart ;;
+    dev-shed) act_dev_shed ;;
+    *) audit "$1" refused "not on the allowlist"; return 64 ;;
+  esac
+}
+remedy_consider() {
+  local id="$1" why="" last
+  if ! remedy_known "$id"; then audit "$id" refused "not on the allowlist"; return 64; fi
+  remedy_limits "$id"
+  if ! remedy_due "$id"; then rm -f "$REPAIR_DIR/$id.why"; return 0; fi
+  last="$(last_run "$id")"
+  if (( R_OFF )); then why="kill switch is set"
+  elif [[ $R_MODE == off ]]; then why="repair mode is off"
+  elif (( last > 0 && $(now) - last < L_COOL )); then why="cooldown ($(( L_COOL / 60 )) min)"
+  elif (( $(runs_since "$id" $(( $(now) - 86400 ))) >= L_CAP )); then why="daily cap of $L_CAP reached"
+  elif [[ $id == restart-fseventsd ]] && ship_running; then why="a ship or install is running"
+  fi
+  if [[ -n "$why" ]]; then
+    if [[ "$(cat "$REPAIR_DIR/$id.why" 2>/dev/null)" != "$why" ]]; then echo "$why" > "$REPAIR_DIR/$id.why"; audit "$id" skipped "$why; trigger: $TRIGGER; $(mem_counts)"; fi
+    return 0
+  fi
+  rm -f "$REPAIR_DIR/$id.why"
+  if [[ $R_MODE == dry ]]; then record_run "$id" dry; audit "$id" dry "would run; trigger: $TRIGGER; $(mem_counts)"; return 0; fi
+  remedy_run "$id"
+}
+
+# Evidence capture in its own bounded process; 0 when it completed (the COMPLETE marker of a capture that started after us).
+act_capture() { # full|quick
+  local mode="$1" limit=480 start rc latest
+  [[ $mode == quick ]] && limit=70
+  start="$(now)"; record_run capture-fseventsd "started-$mode"
+  with_timeout "$limit" /bin/bash "$SELF" capture-fsevents "${M_FSEV_PID:-0}" "$mode" >/dev/null 2>&1; rc=$?
+  latest="$(read_int "$REPAIR_DIR/capture-ok")"
+  if (( latest >= start )); then audit capture-fseventsd ran "complete ($mode); $(mem_counts)"; return 0; fi
+  audit capture-fseventsd failed "incomplete ($mode, exit $rc); $(mem_counts)"; return 1
+}
+
+act_restart() {
+  local before_mb="$M_FSEV_MB" before_cmp="$M_FSEV_CMP" pid0="$M_FSEV_PID" ok_at rc result pid1
+  ok_at="$(read_int "$REPAIR_DIR/capture-ok")"
+  if (( $(now) - ok_at > 1800 )); then
+    if (( M_FSEV_MB >= R_EMERG_MB )); then
+      act_capture quick || audit restart-fseventsd note "above the emergency size; quick capture incomplete; restarting anyway"
+    elif (( $(now) - $(last_run capture-fseventsd) < 7200 )); then
+      audit restart-fseventsd refused "no complete evidence capture in the last 30 minutes and the last attempt failed; waiting; $(mem_counts)"; return 1
+    elif ! act_capture full; then
+      audit restart-fseventsd refused "the evidence capture did not complete; $(mem_counts)"; return 1
+    fi
+  fi
+  record_run restart-fseventsd started
+  with_timeout 30 "$(tp /bin/launchctl)" kickstart -k system/com.apple.fseventsd >>"$LOG" 2>&1; rc=$?
+  sleep "${MAIPAI_HG_VERIFY_DELAY:-10}"
+  mem_probe
+  pid1="$M_FSEV_PID"; [[ -n "$pid1" ]] || pid1="$(with_timeout 5 "$(tp /usr/bin/pgrep)" -x fseventsd 2>/dev/null | head -n 1)"
+  if (( rc != 0 )); then result="kickstart failed (exit $rc)"
+  elif [[ ! "$pid1" =~ ^[0-9]+$ ]]; then result="fseventsd did not come back"
+  elif (( M_FSEV_MB > GROWTH_FLOOR_MB )); then result="came back but is still large"
+  else result=ok; fi
+  printf '{"version":1,"restarted_at":%s,"before_mb":%s,"after_mb":%s,"result":"%s"}\n' "$(now)" "$before_mb" "$M_FSEV_MB" "$(clean "$result" 80)" > "$STATE/fsevents-restarted.tmp" \
+    && mv "$STATE/fsevents-restarted.tmp" "$STATE/fsevents-restarted" && chmod 644 "$STATE/fsevents-restarted"
+  echo $(( $(now) + 600 )) > "$REPAIR_DIR/notice-until"
+  echo "$(now) $(clean "$result" 80)" > "$REPAIR_DIR/last-restart"
+  audit restart-fseventsd ran "result=$result trigger=$TRIGGER before_mb=$before_mb before_compressed_mb=$before_cmp after_mb=$M_FSEV_MB pid_before=$pid0 pid_after=${pid1:-none}"
+}
+
+write_shed_flag() { # reason
+  local since; since="$(jget "$STATE/dev-shed" since)"; [[ "$since" =~ ^[0-9]+$ ]] || since="$(now)"
+  printf '{"version":1,"since":%s,"updated_at":%s,"reason":"%s"}\n' "$since" "$(now)" "$(clean "$1" 200)" > "$STATE/dev-shed.tmp" && mv "$STATE/dev-shed.tmp" "$STATE/dev-shed" && chmod 644 "$STATE/dev-shed"
+}
+act_dev_shed() { record_run dev-shed set; write_shed_flag "pressure level $M_LEVEL for $(( H_PRESS / 60 )) min"; audit dev-shed ran "set; $(mem_counts)"; }
+# A set flag is refreshed while the pressure lasts and cleared after 5 calm minutes, or at once by the kill switch or repair mode off.
+dev_shed_maintain() {
+  [[ -f "$STATE/dev-shed" ]] || return 0
+  if (( R_OFF )) || [[ $R_MODE != live ]]; then rm -f "$STATE/dev-shed"; audit dev-shed cleared "kill switch or repair mode $R_MODE"; return 0; fi
+  if (( M_LEVEL >= 2 )); then write_shed_flag "pressure level $M_LEVEL for $(( H_PRESS / 60 )) min"; return 0; fi
+  if (( H_CALM >= 300 )); then rm -f "$STATE/dev-shed"; audit dev-shed cleared "pressure below 2 for 5 minutes; $(mem_counts)"; fi
+}
+
+# Landings and ships in the last hour from the development data folder (optional, config.json dev_data). Timestamps only are read.
+dev_counts() {
+  local d="$DEV_DATA" cut cut_iso f l=-1 s=-1
+  if [[ -n "$d" ]]; then
+    cut=$(( $(now) - 3600 )); cut_iso="$(date -u -r "$cut" +%Y-%m-%dT%H:%M:%SZ)"
+    f="$d/land/landings.jsonl"; if [[ -f "$f" && ! -L "$f" ]]; then l="$(tail -n 400 "$f" | sed -n 's/^{"ts": *"\([0-9TZ:-]*\)".*/\1/p' | awk -v c="$cut_iso" '$1 >= c' | wc -l | tr -d ' ')"; fi
+    f="$d/ship/shipped.jsonl"; if [[ -f "$f" && ! -L "$f" ]]; then s="$(tail -n 400 "$f" | sed -n 's/^{"ts":\([0-9]*\),.*/\1/p' | awk -v c="$cut" '$1 >= c' | wc -l | tr -d ' ')"; fi
+  fi
+  D_LAND="$l"; D_SHIP="$s"
+}
+
+gb() { awk -v m="$1" 'BEGIN { printf "%.1f", m / 1024 }'; }
+write_memory_status() {
+  local top="" pid name mb cmp n=0 summary="" notice="" nu shed=false big_name="" big_mb=0 rr last_restart
+  while IFS=$'\t' read -r pid name mb cmp; do
+    [[ "$pid" =~ ^[0-9]+$ && "$mb" =~ ^[0-9]+$ && "$cmp" =~ ^[0-9]+$ ]] || continue
+    (( n == 0 )) && { big_name="$name"; big_mb="$mb"; }
+    (( n < 5 )) && top+="${top:+,}{\"pid\":$pid,\"name\":\"$name\",\"footprint_mb\":$mb,\"compressed_mb\":$cmp}"
+    n=$((n+1))
+  done <<< "$M_TOP"
+  nu="$(read_int "$REPAIR_DIR/notice-until")"; (( nu > $(now) )) && notice="$NOTICE_TEXT" || nu=0
+  [[ -f "$STATE/dev-shed" ]] && shed=true
+  rr="$(cat "$REPAIR_DIR/last-restart" 2>/dev/null)"; last_restart="$(clean "${rr#* }" 80)"; rr="${rr%% *}"; [[ "$rr" =~ ^[0-9]+$ ]] || rr=0
+  if (( M_LEVEL >= 2 )); then summary="Memory pressure level $M_LEVEL for $(( H_PRESS / 60 )) min"; else summary="Memory pressure normal"; fi
+  (( M_SWAP_TOTAL > 0 )) && summary+="; swap $(gb "$M_SWAP_USED") of $(gb "$M_SWAP_TOTAL") GB"
+  (( M_COMP >= 0 )) && summary+="; compressed $(gb "$M_COMP") GB"
+  [[ -n "$big_name" ]] && summary+="; biggest: $big_name $(gb "$big_mb") GB"
+  (( M_FSEV_MB >= R_FSEV_MB )) && summary+="; file-event service $(gb "$M_FSEV_MB") GB ($(gb "$M_FSEV_CMP") GB compressed)"
+  (( M_GROWTH >= GROWTH_MIN_MB )) && summary+="; file-event service growing about $M_GROWTH MB a minute"
+  [[ $shed == true ]] && summary+="; heavy development work paused"
+  printf '{"version":1,"checked_at":%s,"pressure":%s,"pressure_held_s":%s,"free_pct":%s,"swap_used_mb":%s,"swap_total_mb":%s,"compressor_mb":%s,"top":[%s],"fseventsd":{"pid":%s,"footprint_mb":%s,"compressed_mb":%s,"growth_mb_per_min":%s,"group_list_per_min":%s,"est_leak_mb_per_min":%s},"landings_1h":%s,"ships_1h":%s,"repair_mode":"%s","kill_switch":%s,"dev_shed":%s,"notice":"%s","notice_until":%s,"last_restart_at":%s,"last_restart_result":"%s","summary":"%s"}\n' \
+    "$(now)" "$M_LEVEL" "$H_PRESS" "$M_FREE" "$M_SWAP_USED" "$M_SWAP_TOTAL" "$M_COMP" "$top" "${M_FSEV_PID:-0}" "$M_FSEV_MB" "$M_FSEV_CMP" "$M_GROWTH" "$M_CALLS" "$M_LEAK_MB" \
+    "$D_LAND" "$D_SHIP" "$R_MODE" "$( ((R_OFF)) && echo true || echo false)" "$shed" "$notice" "$nu" "$rr" "$last_restart" "$(clean "$summary" 400)" > "$STATE/memory.json.tmp" \
+    && mv "$STATE/memory.json.tmp" "$STATE/memory.json" && chmod 644 "$STATE/memory.json"
+  local f="$STATE/memory.csv"
+  [[ -s "$f" ]] || echo "ts,pressure,free_pct,swap_used_mb,swap_total_mb,compressor_mb,fseventsd_mb,fseventsd_compressed_mb,growth_mb_per_min,group_list_per_min,est_leak_mb_per_min,top_name,top_mb,landings_1h,ships_1h" > "$f"
+  echo "$(now),$M_LEVEL,$M_FREE,$M_SWAP_USED,$M_SWAP_TOTAL,$M_COMP,$M_FSEV_MB,$M_FSEV_CMP,$M_GROWTH,$M_CALLS,$M_LEAK_MB,${big_name// /_},$big_mb,$D_LAND,$D_SHIP" >> "$f"; chmod 644 "$f"
+  [[ $(stat -f %z "$f" 2>/dev/null || echo 0) -gt 5000000 ]] && { tail -n 20000 "$f" > "$f.tmp"; head -1 "$f" | cat - "$f.tmp" > "$f.new"; mv "$f.new" "$f"; rm -f "$f.tmp"; chmod 644 "$f"; }
+  return 0
+}
+
+cmd_memory() {
+  mkdir -p "$REPAIR_DIR"; chmod 755 "$REPAIR_DIR"
+  load_repair; mem_probe; signals; dev_counts
+  local id
+  for id in ${MAIPAI_HG_REMEDIES:-$REMEDIES}; do
+    remedy_consider "$id"
+    # A restart re-probed the Mac; the later actions see the new numbers.
+    [[ $id == restart-fseventsd ]] && signals
+  done
+  dev_shed_maintain
+  write_memory_status
+}
+
+# --- evidence capture for the file-event daemon (root; raw output root-only, a world-readable digest of counts) ---
+pairs_json() { tr -d '\\"\000-\011\013-\037' | awk 'BEGIN { printf "[" } NF >= 2 && $1 ~ /^[0-9]+$/ { n = $1; $1 = ""; sub(/^ /, ""); printf "%s[\"%s\",%d]", (c++ ? "," : ""), substr($0, 1, 80), n } END { printf "]" }'; }
+lines_json() { tr -d '\\"\000-\011\013-\037' | awk 'BEGIN { printf "[" } { printf "%s\"%s\"", (c++ ? "," : ""), substr($0, 1, 160) } END { printf "]" }'; }
+# fs_usage -w lines end in process.thread; the first field that starts with / is the path. Only counts leave this function:
+# per process name, and per path bucket (a worktree folder name, node_modules, .git, or a broad area), never a full path.
+agg_fs_usage() {
+  awk '{ proc = $NF; sub(/\.[0-9]+$/, "", proc); gsub(/[^A-Za-z0-9 ._()-]/, "", proc); if (proc == "") next
+         total++; pc[proc]++; path = ""
+         for (i = 2; i < NF; i++) if (substr($i, 1, 1) == "/") { path = $i; break }
+         if (path == "") next
+         if (match(path, /\/wt\/[^\/]+/)) b = "wt/" substr(path, RSTART + 4, RLENGTH - 4)
+         else if (path ~ /node_modules/) b = "node_modules"
+         else if (path ~ /\/\.git(\/|$)/) b = ".git"
+         else if (path ~ /^\/usr\/local\/maipai-home/) b = "maipai-home install"
+         else if (path ~ /^\/Users\/[^\/]+\/Developer\//) b = "Developer (other)"
+         else if (path ~ /^\/Users\//) b = "home folders (other)"
+         else if (path ~ /^\/(private\/)?var\//) b = "var"
+         else if (path ~ /^\/System\//) b = "System"
+         else if (path ~ /^\/Library\//) b = "Library"
+         else b = "other"
+         gsub(/[^A-Za-z0-9 ._()\/-]/, "", b); bc[b]++ }
+       END { printf "total %d\n", total; for (k in pc) printf "proc %d %s\n", pc[k], k; for (k in bc) printf "path %d %s\n", bc[k], k }'
+}
+rotate_caps() {
+  local d n
+  for d in $(ls -1 "$CAPS" 2>/dev/null | sort -r | tail -n +4); do [[ "$d" =~ ^[0-9]{8}-[0-9]{6}$ ]] && rm -rf "${CAPS:?}/$d"; done
+  n=0
+  while (( $(du -sk "$CAPS" 2>/dev/null | awk '{print $1}') > 307200 && n < 3 )); do
+    d="$(ls -1 "$CAPS" | sort | head -n 1)"; [[ "$d" =~ ^[0-9]{8}-[0-9]{6}$ ]] || break
+    (( $(ls -1 "$CAPS" | wc -l) > 1 )) || break
+    rm -rf "${CAPS:?}/$d"; n=$((n+1))
+  done
+}
+cmd_capture_fsevents() { # pid full|quick
+  local pid="$1" quick=0 dir rc_vm rc_log rc_fp t fs_s
+  [[ "${2:-}" == quick ]] && quick=1
+  [[ "$pid" =~ ^[1-9][0-9]*$ ]] || pid="$(with_timeout 5 "$(tp /usr/bin/pgrep)" -x fseventsd 2>/dev/null | head -n 1)"
+  [[ "$pid" =~ ^[1-9][0-9]*$ ]] || { log "fsevents capture: no fseventsd process"; return 1; }
+  load_repair; mkdir -p "$CAPS" "$REPAIR_DIR"; chmod 700 "$CAPS"
+  umask 077
+  dir="$CAPS/$(date -u -r "$(now)" +%Y%m%d-%H%M%S)"; mkdir -p "$dir"
+  # Raw outputs, each with a hard limit; a file is cut at 100 MB.
+  with_timeout $(( quick ? 15 : 60 )) "$(tp /usr/bin/vmmap)" -summary "$pid" 2>&1 | head -c 104857600 > "$dir/vmmap.txt"; rc_vm=${PIPESTATUS[0]}
+  # The full region list too (it names where the leak sits); not in a quick capture.
+  (( quick )) || { with_timeout 180 "$(tp /usr/bin/vmmap)" "$pid" 2>&1 | head -c 209715200 > "$dir/vmmap-full.txt"; }
+  with_timeout $(( quick ? 25 : 120 )) "$(tp /usr/bin/log)" show --last "$( ((quick)) && echo 1h || echo 6h)" --style compact --predicate 'process == "fseventsd"' 2>&1 | head -c 104857600 > "$dir/log-fseventsd.txt"; rc_log=${PIPESTATUS[0]}
+  with_timeout 20 "$(tp /usr/bin/footprint)" "$pid" > "$dir/footprint.txt" 2>&1; rc_fp=$?
+  with_timeout 15 "$(tp /usr/bin/top)" -l 1 -o mem -n 15 -stats pid,command,mem,cmprs > "$dir/top.txt" 2>&1
+  { with_timeout 5 "$(tp /usr/sbin/sysctl)" vm.swapusage kern.memorystatus_vm_pressure_level; with_timeout 10 "$(tp /usr/bin/vm_stat)"; } > "$dir/system.txt" 2>&1
+  with_timeout 10 "$(tp /bin/launchctl)" print system/com.apple.fseventsd > "$dir/launchctl.txt" 2>&1
+  if (( ! quick )); then
+    with_timeout 60 "$(tp /usr/bin/log)" show --last 2h --style compact --predicate 'process == "mds"' 2>&1 | head -c 52428800 > "$dir/log-mds.txt"
+    with_timeout 60 "$(tp /usr/bin/log)" show --last 2h --style compact --predicate 'subsystem == "com.apple.FSEvents"' 2>&1 | head -c 52428800 > "$dir/log-fsevents-subsystem.txt"
+    fs_s="${MAIPAI_HG_FS_USAGE_SECONDS:-15}"; [[ "$fs_s" =~ ^[0-9]{1,2}$ ]] || fs_s=15
+    # fs_usage runs until the limit ends it; only the counts are kept.
+    with_timeout "$fs_s" "$(tp /usr/bin/fs_usage)" -w -f filesys 2>/dev/null | agg_fs_usage > "$dir/fs_usage-counts.txt"
+    with_timeout 45 "$(tp /usr/sbin/lsof)" -n -P -w -F pcf 2>/dev/null | awk '/^c/ { c = substr($0, 2) } /^f/ { n[c]++ } END { for (k in n) print n[k], k }' | sort -rn | head -n 15 > "$dir/open-files-by-process.txt"
+    with_timeout 20 "$(tp /usr/sbin/lsof)" -n -P -w -F c /dev/fsevents 2>/dev/null | sed -n 's/^c//p' | sort | uniq -c | sort -rn | head -n 15 > "$dir/fsevents-clients.txt"
+  fi
+  # Build activity: timestamps only, from the development data folder when one is configured.
+  { if [[ -n "$DEV_DATA" && -f "$DEV_DATA/land/landings.jsonl" && ! -L "$DEV_DATA/land/landings.jsonl" ]]; then tail -n 200 "$DEV_DATA/land/landings.jsonl" | sed -n 's/^{"ts": *"\([0-9TZ:-]*\)".*/landing \1/p' | tail -n 40; fi
+    if [[ -n "$DEV_DATA" && -f "$DEV_DATA/ship/shipped.jsonl" && ! -L "$DEV_DATA/ship/shipped.jsonl" ]]; then tail -n 100 "$DEV_DATA/ship/shipped.jsonl" | sed -n 's/^{"ts":\([0-9]*\),.*/ship \1/p' | tail -n 20; fi; } > "$dir/activity.txt"
+
+  local fp_line top1 vm_lines logc errs faults drops calls mds fsub fs_total fs_proc fs_path openf clients state runs complete=false
+  fp_line="$(grep -m1 '^Physical footprint:' "$dir/vmmap.txt" | awk '{print $3}')"
+  top1="$(parse_top < "$dir/top.txt" | awk -F'\t' '$2 == "fseventsd" { print $3 "\t" $4; exit }')"
+  vm_lines="$(grep -E '^(Physical footprint|Writable regions|Malloc Small|Malloc Tiny|Malloc Large|MALLOC_SMALL|MALLOC_TINY|DefaultMallocZone|TOTAL)' "$dir/vmmap.txt" | grep -v '/' | head -n 20 | lines_json)"
+  logc="$(grep -c . "$dir/log-fseventsd.txt" 2>/dev/null)"; errs="$(awk '$3 ~ /^E/' "$dir/log-fseventsd.txt" | wc -l | tr -d ' ')"
+  faults="$(awk '$3 ~ /^F/' "$dir/log-fseventsd.txt" | wc -l | tr -d ' ')"; calls="$(grep -c "$GROUP_LIST_MSG" "$dir/log-fseventsd.txt" 2>/dev/null)"
+  drops="$(grep -ciE 'dropp|overflow|must ?scan' "$dir/log-fseventsd.txt" 2>/dev/null)"
+  mds="$(grep -c . "$dir/log-mds.txt" 2>/dev/null)"; fsub="$(grep -c . "$dir/log-fsevents-subsystem.txt" 2>/dev/null)"
+  fs_total="$(sed -n 's/^total //p' "$dir/fs_usage-counts.txt" 2>/dev/null)"
+  fs_proc="$(sed -n 's/^proc //p' "$dir/fs_usage-counts.txt" 2>/dev/null | sort -rn | head -n 15 | pairs_json)"
+  fs_path="$(sed -n 's/^path //p' "$dir/fs_usage-counts.txt" 2>/dev/null | sort -rn | head -n 20 | pairs_json)"
+  openf="$(pairs_json < "$dir/open-files-by-process.txt" 2>/dev/null)"; clients="$(pairs_json < "$dir/fsevents-clients.txt" 2>/dev/null)"
+  state="$(sed -n 's/^[[:space:]]*state = \([a-z ]*\)$/\1/p' "$dir/launchctl.txt" | head -n 1)"; runs="$(sed -n 's/^[[:space:]]*runs = \([0-9]*\)$/\1/p' "$dir/launchctl.txt" | head -n 1)"
+  if (( rc_vm == 0 && rc_log == 0 )) && [[ -n "$fp_line" ]]; then complete=true; fi
+  num() { [[ "$1" =~ ^[0-9]+$ ]] && echo "$1" || echo 0; }
+  printf '{"version":1,"captured_at":%s,"mode":"%s","complete":%s,"pid":%s,"vmmap_footprint":"%s","top_footprint_mb":%s,"top_compressed_mb":%s,"vmmap":%s,"log_6h":{"fseventsd_lines":%s,"errors":%s,"faults":%s,"group_list_calls":%s,"dropped_or_rescan_lines":%s,"mds_lines_2h":%s,"fsevents_subsystem_lines_2h":%s},"fs_usage":{"seconds":%s,"events":%s,"by_process":%s,"by_path":%s},"open_files_by_process":%s,"fsevents_clients":%s,"launchd":{"state":"%s","runs":%s},"activity":%s,"steps":{"vmmap":%s,"log":%s,"footprint":%s}}\n' \
+    "$(now)" "$( ((quick)) && echo quick || echo full)" "$complete" "$pid" "$(clean "$fp_line" 20)" "$(num "$(cut -f1 <<< "$top1")")" "$(num "$(cut -f2 <<< "$top1")")" "$vm_lines" \
+    "$(num "$logc")" "$(num "$errs")" "$(num "$faults")" "$(num "$calls")" "$(num "$drops")" "$(num "$mds")" "$(num "$fsub")" \
+    "$( ((quick)) && echo 0 || echo "$fs_s")" "$(num "$fs_total")" "${fs_proc:-[]}" "${fs_path:-[]}" "${openf:-[]}" "${clients:-[]}" "$(clean "$state" 20)" "$(num "$runs")" \
+    "$(lines_json < "$dir/activity.txt")" "$rc_vm" "$rc_log" "$rc_fp" > "$dir/digest.json"
+  umask 022
+  cp "$dir/digest.json" "$STATE/fsevents-digest.json.tmp" && mv "$STATE/fsevents-digest.json.tmp" "$STATE/fsevents-digest.json" && chmod 644 "$STATE/fsevents-digest.json"
+  if [[ $complete == true ]]; then : > "$dir/COMPLETE"; now > "$REPAIR_DIR/capture-ok"; fi
+  rotate_caps
+  log "fsevents capture: $dir complete=$complete"
+  [[ $complete == true ]]
 }
 
 cmd_mode() {
@@ -276,7 +649,10 @@ case "${1:-}" in
   status) cat "$STATE/status.json" 2>/dev/null || echo '{"version":1,"note":"no run yet"}' ;;
   mode) cmd_mode "${2:-}" ;;
   telemetry) load_tuning; load_config && telemetry "${2:-0}" "${3:-0}" ;;
+  memory) load_tuning; load_config && cmd_memory ;;
+  capture-fsevents) load_tuning; load_config && cmd_capture_fsevents "${2:-0}" "${3:-full}" ;;
+  memory-status) cat "$STATE/memory.json" 2>/dev/null || echo '{"version":1,"summary":"no memory probe yet"}' ;;
   capture) load_tuning; load_config || { echo "config.json missing or invalid" >&2; exit 1; }; mkdir -p "$STATE/captures"; capture ;;
   uninstall) cmd_uninstall ;;
-  *) echo "usage: maipai-host-guard run|status|mode off|dry|live|capture|uninstall" >&2; exit 2 ;;
+  *) echo "usage: maipai-host-guard run|status|memory-status|mode off|dry|live|capture|uninstall" >&2; exit 2 ;;
 esac

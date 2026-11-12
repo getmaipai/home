@@ -2,11 +2,13 @@
 # Installs the MaiPai host guard (HOST-GUARD-01). Run as root (the host-tune item or the macOS password box does that).
 #   install.sh --owner <account> --uid <n> --data-dir <path> [--source <maipai-host-guard>]   install and start in dry mode
 #   install.sh --check --owner <account> --uid <n> --data-dir <path> [--source <file>]        validate only; no root needed
+#   --dev-data <path>   optional: a development data folder (land/landings.jsonl, ship/shipped.jsonl) whose timestamps the memory probe
+#                       counts, so file-event growth can be matched to build activity. Only timestamps are read.
 # Replaces the 2026-11-03 one-off (maipai-watchdog) when it is present: carries its mode over and removes it.
 set -eu
 export PATH=/usr/bin:/bin:/usr/sbin:/sbin
 
-CHECK=0; OWNER=""; UIDN=""; DATA=""; SRC=""
+CHECK=0; OWNER=""; UIDN=""; DATA=""; SRC=""; DEV_DATA=""
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --check) CHECK=1 ;;
@@ -14,12 +16,14 @@ while [[ $# -gt 0 ]]; do
     --uid) UIDN="${2:-}"; shift ;;
     --data-dir) DATA="${2:-}"; shift ;;
     --source) SRC="${2:-}"; shift ;;
+    --dev-data) DEV_DATA="${2:-}"; shift ;;
     *) echo "unknown option: $1" >&2; exit 2 ;;
   esac
   shift
 done
 [[ -n "$OWNER" && -n "$UIDN" && -n "$DATA" ]] || { echo "usage: install.sh [--check] --owner <account> --uid <n> --data-dir <path> [--source <file>]" >&2; exit 2; }
 [[ "$OWNER" =~ ^[A-Za-z][A-Za-z0-9._-]*$ && "$OWNER" != "ALL" && "$UIDN" =~ ^[0-9]+$ && "$DATA" == /* && "$DATA" != *\"* && "$DATA" != *\\* ]] || { echo "owner, uid or data-dir has an unsafe form" >&2; exit 2; }
+[[ -z "$DEV_DATA" || ( "$DEV_DATA" =~ ^/[A-Za-z0-9._/\ -]+$ && "$DEV_DATA" != *..* ) ]] || { echo "dev-data has an unsafe form" >&2; exit 2; }
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SRC="${SRC:-$HERE/maipai-host-guard}"
 
@@ -43,7 +47,9 @@ PLIST_BODY='<?xml version="1.0" encoding="UTF-8"?>
 </dict></plist>'
 SUDOERS_BODY="# MaiPai host guard recovery commands (HOST-GUARD-01). Remove: sudo $DEST uninstall
 $OWNER ALL=(root) NOPASSWD: $DEST status, $DEST mode off, $DEST mode dry, $DEST mode live, $DEST capture, $DEST uninstall, /sbin/shutdown -r now"
-CONFIG_BODY="{\"owner\":\"$OWNER\",\"uid\":$UIDN,\"data_dir\":\"$DATA\"}"
+CONFIG_BODY="{\"owner\":\"$OWNER\",\"uid\":$UIDN,\"data_dir\":\"$DATA\"${DEV_DATA:+,\"dev_data\":\"$DEV_DATA\"}}"
+# Self-repair bounds (HOST-GUARD-08), root-owned so only an administrator changes them; the guard clamps every value again.
+REPAIR_BODY='{"mode":"live","fsevents_compressed_gb":16,"emergency_gb":40,"shed_minutes":20}'
 
 tmp="$(mktemp /tmp/maipai-sudoers.XXXXXX)"; printf '%s\n' "$SUDOERS_BODY" > "$tmp"
 /usr/sbin/visudo -cf "$tmp" >/dev/null || { echo "sudoers entry failed validation" >&2; rm -f "$tmp"; exit 4; }
@@ -67,6 +73,8 @@ fi
 rm -f "$STATE/mode"
 chown root:admin "$STATE/tuning.json"; chmod 664 "$STATE/tuning.json"
 printf '%s\n' "$CONFIG_BODY" > "$STATE/config.json"; chown root:wheel "$STATE/config.json"; chmod 644 "$STATE/config.json"
+[[ -f "$STATE/repair.json" ]] || printf '%s\n' "$REPAIR_BODY" > "$STATE/repair.json"
+chown root:wheel "$STATE/repair.json"; chmod 644 "$STATE/repair.json"
 if [[ -e /Library/LaunchDaemons/com.maipai.watchdog.plist ]]; then
   launchctl bootout system/com.maipai.watchdog 2>/dev/null || true
   rm -f /Library/LaunchDaemons/com.maipai.watchdog.plist /etc/sudoers.d/maipai-recovery /usr/local/libexec/maipai-watchdog
