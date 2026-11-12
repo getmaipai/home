@@ -6,6 +6,7 @@ import sharp, { type OverlayOptions } from "sharp";
 import type { PictureRole } from "@/lib/pictures/roles";
 import { runPictureTool } from "@/lib/pictures/people";
 import { detectFaces } from "@/lib/pictures/likeness/faces";
+import { drawViews, type ViewTools } from "./sheetViews";
 
 export interface SheetPicture { bytes: Uint8Array; mediaType: string; name: string; role: PictureRole; look: string }
 export interface SheetTools {
@@ -38,10 +39,14 @@ async function cutOut(picture: SheetPicture, tools: SheetTools, box?: { x: numbe
     const left = Math.max(0, box.x - padX), top = Math.max(0, box.y - padY);
     source = await sharp(source).extract({ left, top, width: Math.min(meta.width! - left, box.w + padX * 2), height: Math.min(meta.height! - top, box.h + padY * 2) }).png().toBuffer();
   }
-  try {
-    const cut = Buffer.from(await tools.removeBackground(new Uint8Array(source), box ? "image/png" : picture.mediaType));
-    return await sharp(cut).trim({ threshold: 5 }).png().toBuffer();
-  } catch { return sharp(source).png().toBuffer(); }
+  // One more try after a pause: the background remover is shared with video work and can refuse a request while that runs.
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try {
+      const cut = Buffer.from(await tools.removeBackground(new Uint8Array(source), box ? "image/png" : picture.mediaType));
+      return await sharp(cut).trim({ threshold: 5 }).png().toBuffer();
+    } catch { if (attempt === 0) await new Promise((resolve) => setTimeout(resolve, 1500)); }
+  }
+  return sharp(source).png().toBuffer();
 }
 
 async function onWhite(image: Buffer, w: number, h: number, pad = 10): Promise<Buffer> {
@@ -83,13 +88,22 @@ const ROW = ["Top", "Middle", "Bottom"], COL = ["Left", "Middle", "Right"];
 const kindWord = (role: PictureRole) => role === "actor" ? "Character" : "Prop";
 
 /** One sheet from the attached pictures: people and objects as white cut-out panels on the left, places as full-height panels on the right. */
-export async function makeSheetFromPictures(pictures: ReadonlyArray<SheetPicture>, tools: SheetTools = realTools): Promise<MadeSheet> {
+export async function makeSheetFromPictures(pictures: ReadonlyArray<SheetPicture>, tools: SheetTools = realTools, options: { drawViews?: boolean; viewTools?: ViewTools } = {}): Promise<MadeSheet> {
   if (!pictures.length) throw new Error("A sheet needs at least one picture.");
   const all = (await Promise.all(pictures.map((picture) => panelsFor(picture, tools)))).flat();
-  const subjects = all.filter((panel) => panel.kind === "subject").slice(0, 6), places = all.filter((panel) => panel.kind === "place").slice(0, MAX_PLACES);
+  // Views the photos do not show (a side view, a clean front, an angled object) are drawn from the person's own cut-out and added after the originals.
+  if (options.drawViews) {
+    for (const picture of pictures) {
+      const original = all.find((panel) => panel.kind === "subject" && panel.view === "Front View" && panel.look === picture.look && panel.role === picture.role);
+      if (!original) continue;
+      const drawn = await drawViews(picture.role, { bytes: new Uint8Array(original.image), mediaType: "image/png" }, options.viewTools).catch(() => []);
+      for (const view of drawn) all.push({ kind: "subject", name: original.name, view: view.view, role: picture.role, look: picture.look, image: Buffer.from(view.image), onWhite: true });
+    }
+  }
+  const subjects = all.filter((panel) => panel.kind === "subject").slice(0, 8), places = all.filter((panel) => panel.kind === "place").slice(0, MAX_PLACES);
   const leftW = subjects.length ? SHEET_W - (places.length ? PLACE_W : 0) : 0, layers: OverlayOptions[] = [], described: string[] = [], panels: MadeSheet["panels"] = [];
   if (subjects.length) {
-    const n = subjects.length, cols = n <= 2 ? n : n <= 4 ? 2 : 3, rows = Math.ceil(n / cols);
+    const n = subjects.length, cols = n <= 2 ? n : n <= 4 ? 2 : n <= 6 ? 3 : 4, rows = Math.ceil(n / cols);
     const cellW = Math.floor(leftW / cols), cellH = Math.floor(SHEET_H / rows);
     for (const [i, panel] of subjects.entries()) {
       const c = i % cols, r = Math.floor(i / cols);

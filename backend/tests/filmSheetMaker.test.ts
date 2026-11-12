@@ -36,3 +36,22 @@ describe("sheet from pictures", () => {
     expect(onlyPlace.description).toContain("Far Right (Setting): a glass hall");
   });
 });
+
+describe("sheet views the photos do not show", () => {
+  const photo = async () => ({ bytes: await solid(1, 1, 1), mediaType: "image/png", look: "a woman in a cream coat" });
+  test("a side view, a face-checked clean front and an angled object view are added after the originals", async () => {
+    const calls: string[] = [];
+    const viewTools = { editView: async (_ref: unknown, instruction: string) => { calls.push(instruction.split(",")[0]!); return solid(120, 120, 120, 200, 300); }, faceMatch: async () => 0.7 };
+    const sheet = await makeSheetFromPictures([
+      { ...(await photo()), name: "woman", role: "actor" },
+      { bytes: await solid(2, 2, 2), mediaType: "image/png", name: "card", role: "product", look: "a black graphics card" },
+    ], tools, { drawViews: true, viewTools });
+    expect(sheet.panels.map((panel) => panel.view)).toEqual(["Front View", "Face Close-up", "Front View", "Clean Front View", "Side View", "Angled View"]);
+    expect(calls).toHaveLength(3);
+  });
+  test("a clean front view whose face does not match is dropped and a view that cannot be made is left out", async () => {
+    const viewTools = { editView: async (_ref: unknown, instruction: string) => (instruction.includes("profile") ? null : solid(9, 9, 9, 200, 300)), faceMatch: async () => 0.1 };
+    const sheet = await makeSheetFromPictures([{ ...(await photo()), name: "woman", role: "actor" }], tools, { drawViews: true, viewTools });
+    expect(sheet.panels.map((panel) => panel.view)).toEqual(["Front View", "Face Close-up"]);
+  });
+});
