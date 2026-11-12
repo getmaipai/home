@@ -110,7 +110,7 @@
           "minLength": 1,
           "maxLength": 60
         },
-        "description": "Named saved styles."
+        "description": "Saved styles."
       },
       "subjects": {
         "type": "array",
