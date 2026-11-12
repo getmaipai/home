@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-11-12T05:06:35.358Z",
-  "kitTag": "ui-v0.5.604",
+  "generatedAt": "2026-11-12T05:27:39.149Z",
+  "kitTag": "ui-v0.5.608",
   "items": [
     {
       "file": "ActivityCardsShowcase.tsx",
@@ -1810,16 +1810,16 @@
       "file": "synth-motion/README.md",
       "name": "synth-motion/README",
       "group": "synth",
-      "verdict": "unassessed",
-      "verdictReason": "Recorded unassessed verdict in elements-plan.json; see the plan entry for its dependency or scope.",
+      "verdict": "no-fit",
+      "verdictReason": "Not an Element: kit documentation for the synth motion module.",
       "implemented": false
     },
     {
       "file": "synth-motion/index.ts",
       "name": "synth-motion/index",
       "group": "synth",
-      "verdict": "unassessed",
-      "verdictReason": "Recorded unassessed verdict in elements-plan.json; see the plan entry for its dependency or scope.",
+      "verdict": "later",
+      "verdictReason": "New in ui-v0.5.607 and not drawn by any Home page yet; assess and wire when the talking-companions work uses it (that session owns the wiring).",
       "implemented": false
     },
     {
