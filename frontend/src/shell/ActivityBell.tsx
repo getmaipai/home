@@ -1,6 +1,6 @@
 import { useNavigate } from "react-router-dom";
 import { i18n } from "@lingui/core";
-import { ActivityPopover, type ActivityPopoverItem } from "@maipai/ui/src/elements/activity-popover";
+import type { ActivityPopoverItem } from "@maipai/ui/src/elements/activity-popover";
 import { useActivity, ACTIVITY_PATH } from "@/shell/activity";
 import type { ActivityItemView } from "@/lib/api";
 
@@ -23,14 +23,14 @@ export function activityPopoverItems(rows: readonly ActivityItemView[]): Activit
   }));
 }
 
-export function ActivityBell({ enabled }: { enabled: boolean }) {
+/** The props for the kit ActivityPopover, rendered directly by the shell header (RULES.md rule 9: no wrapper component around a kit Element). */
+export function useActivityPopoverProps(enabled: boolean) {
   const navigate = useNavigate();
   const activity = useActivity(enabled);
-  if (!enabled) return null;
   const items = activityPopoverItems(activity.data?.items ?? []);
-  return <ActivityPopover
-    items={items}
-    onOpen={(id) => navigate(items.find((item) => item.id === id)?.href ?? ACTIVITY_PATH)}
-    emptyLabel={i18n._({ id: "Nothing is being made right now.", message: "Nothing is being made right now." })}
-  />;
+  return {
+    items,
+    onOpen: (id: string) => navigate(items.find((item) => item.id === id)?.href ?? ACTIVITY_PATH),
+    emptyLabel: i18n._({ id: "Nothing is being made right now.", message: "Nothing is being made right now." }),
+  };
 }
