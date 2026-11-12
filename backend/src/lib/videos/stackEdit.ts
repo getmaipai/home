@@ -186,8 +186,9 @@ export async function runStackEdit(request: StackEditRequest): Promise<StackEdit
       spatialReport = { applied: spatial?.applied !== false, reason: typeof spatial?.reason === "string" ? spatial.reason : null, notes: [...new Set(lines)], ...(Array.isArray(spatial?.sources) ? { sources: spatial.sources.filter((entry): entry is string => typeof entry === "string") } : {}) };
     }
     return { ok: true, ...(surround ? { surround } : {}), ...(spatialReport ? { spatial: spatialReport } : {}), bytes: new Uint8Array(readFileSync(path)), seconds: num(result.duration_s), width: num(result.width), height: num(result.height), audio: typeof result.audio_codec === "string" && result.audio_codec.length > 0, ms: num(result.elapsed_ms) ?? 0 };
-  } catch {
-    // A refused or unreachable Stack: the plain line, never the error text (it can hold a path).
+  } catch (error) {
+    // A refused or unreachable Stack: the plain line, never the error text (it can hold a path). The text goes to the log only.
+    console.error("[stack-edit] failed", error instanceof Error ? error.message : String(error));
     if (stackJob && request.signal?.aborted) void getStackClient().cancelJob(stackJob).catch(() => undefined);
     return { ok: false, code: "unavailable", line: EDIT_UNAVAILABLE_LINE };
   } finally {

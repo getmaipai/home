@@ -201,8 +201,9 @@ export function realFilmEngines(input: { actor: PersonRow; signal: AbortSignal; 
       return job.fileId;
     },
     async assemble({ plan, clipFileIds, musicFileId }) {
-      if (fileLockState(actor, musicFileId) !== "open") throw new Error(LOCKED_MUSIC_START_LINE);
+      if (musicFileId && fileLockState(actor, musicFileId) !== "open") throw new Error(LOCKED_MUSIC_START_LINE);
       if (faceless) {
+        if (!musicFileId) throw new Error("The film needs its music.");
         const production = await import("@/lib/mediaProductions").then(({ getMediaProduction }) => getMediaProduction(actor, productionId));
         if (!production) throw new Error("The film production is unavailable.");
         const shots = production.episodes.flatMap((episode) => episode.scenes.flatMap((scene) => scene.shots));
@@ -247,11 +248,12 @@ export function realFilmEngines(input: { actor: PersonRow; signal: AbortSignal; 
       const film = await runEditVideo({ state, args: { change: "film", production: productionId, ...(plan.title_card === false ? { no_title: true } : {}), ...(plan.credits_card === false ? { no_credits: true } : {}), ...(plan.look ? { look: plan.look } : {}), ...(plan.letterbox ? { letterbox: plan.letterbox } : {}) }, callId: "film-assemble", spoken: false });
       let id = (film.result?.data as { videoJobId?: string } | undefined)?.videoJobId;
       if (!id) { console.error("[film] assemble refused", JSON.stringify(film.result?.reply ?? film).slice(0, 600)); throw new Error("The film could not be assembled."); }
-      let job = await poll(() => getVideoJobFor(actor, id!), signal, 25 * 60_000, (value) => value.state === "failed" || value.state === "cancelled" ? "The film could not be assembled." : null);
+      let job = await poll(() => getVideoJobFor(actor, id!), signal, 25 * 60_000, (value) => value.state === "failed" || value.state === "cancelled" ? (/isn.t ready/i.test(value.error ?? "") ? "The video editor is restarting." : "The film could not be assembled.") : null);
       const cut = job.files[0]?.id;
       if (!cut) throw new Error("The assembled film is unavailable.");
       const made = job.files[0]?.seconds;
       if (plan.target_seconds && typeof made === "number" && Math.abs(made - plan.target_seconds) > 1.5) engines.note = `It came out about ${Math.round(made)} seconds; you asked for ${plan.target_seconds}.`;
+      if (!musicFileId) return cut;
       const mixed = await runEditVideo({ state, args: { change: "mix", clip: job.id, sound: "music", track: musicFileId }, callId: "film-mix", spoken: false });
       id = (mixed.result?.data as { videoJobId?: string } | undefined)?.videoJobId;
       if (!id) { engines.note = "The film is ready, but I couldn't add its music."; return cut; }

@@ -50,6 +50,15 @@ describe("film runner", () => {
     await runFilm({ actor, productionId: production.id, plan: reveal, engines, signal: new AbortController().signal });
     expect(ends).toEqual({ "shot-1": undefined, "shot-2": "picture:shot-3", "shot-3": undefined });
   });
+  test("a song that cannot be made does not fail the film: the cut is assembled without music and says so", async () => {
+    const actor = person("film-owner"); actorForEngines = actor; const production = createMediaProduction(actor, { title: "Draft" }), calls: string[] = [], engines = fake(calls); let musicSeen: string | null | undefined;
+    engines.makeMusic = async () => { throw new Error("the song engine is down"); };
+    engines.assemble = async ({ musicFileId }) => { musicSeen = musicFileId; return "cut-1"; };
+    const result = await runFilm({ actor, productionId: production.id, plan, engines, signal: new AbortController().signal });
+    expect(musicSeen).toBeNull();
+    expect(result.finished_cut_file_ids).toEqual(["cut-1"]);
+    expect(engines.note).toContain("couldn't make its music");
+  });
   test("a Stack that is restarting is waited for: the step is tried again instead of ending the film", async () => {
     const actor = person("film-retry"); actorForEngines = actor; const production = createMediaProduction(actor, { title: "Draft" }), calls: string[] = [];
     __setFilmRetryDelaysForTests([1, 1, 1]);

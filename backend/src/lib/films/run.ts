@@ -15,7 +15,7 @@ export interface FilmEngines {
   readNarration?(input: { fileId: string }, options: { signal: AbortSignal }): Promise<{ fileId: string; seconds: number }>;
   makeMotionClip?(input: { shot: FilmPlan["shots"][number]; stillFileId: string; narrationFileId: string; seconds: number }, options: { signal: AbortSignal }): Promise<string>;
   makeMusic(input: { brief: string; seconds: number; faceless?: boolean }, options: { signal: AbortSignal }): Promise<string>;
-  assemble(input: { plan: FilmPlan; clipFileIds: string[]; musicFileId: string }, options: { signal: AbortSignal }): Promise<string>;
+  assemble(input: { plan: FilmPlan; clipFileIds: string[]; /** Null when the song could not be made: a film still ends with its picture and sound. */ musicFileId: string | null }, options: { signal: AbortSignal }): Promise<string>;
   waitForIdle(): Promise<void>;
   note?: string;
   onProgress?: (progress: { stage: FilmStage; done: number; total: number; shotId?: string }) => void;
@@ -39,7 +39,7 @@ export function isTransientStackError(error: unknown): boolean {
   if (!e || typeof e !== "object") return false;
   if (e.code === "stack_restarting" || e.code === "unavailable" || e.code === "stack_unavailable") return true;
   if (e.status === 502 || e.status === 503 || e.status === 504) return true;
-  return /ECONNREFUSED|socket refused|fetch failed|stack is not running|is restarting|back by themselves/i.test(String(e.message ?? ""));
+  return /ECONNREFUSED|socket refused|fetch failed|stack is not running|is restarting|editor is restarting|back by themselves/i.test(String(e.message ?? ""));
 }
 let retryDelays = [10_000, 20_000, 30_000, 60_000, 60_000, 60_000, 60_000, 60_000];
 export function __setFilmRetryDelaysForTests(delays: number[] | null): void { retryDelays = delays ?? [10_000, 20_000, 30_000, 60_000, 60_000, 60_000, 60_000, 60_000]; }
@@ -133,15 +133,21 @@ export async function runFilm(input: { actor: PersonRow; productionId: string; p
     engines.onProgress?.({ stage: "clips", done: faceless ? (i + 1) * 2 : i + 1, total: faceless ? plan.shots.length * 2 : plan.shots.length, shotId: planned.id });
   }
   current = getMediaProduction(actor, productionId)!;
-  let musicFileId = current.music_line_ids[0];
+  let musicFileId: string | null | undefined = current.music_line_ids[0];
   if (!musicFileId) {
-    musicFileId = await callEngine("music", undefined, engines, signal, () => engines.makeMusic({ brief: faceless ? `${plan.music}, soft and underscoring a narrator` : plan.music, seconds: plan.shots.reduce((sum, shot) => sum + shot.seconds, 0), faceless }, { signal }));
-    current = updateMediaProduction(actor, productionId, { music_line_ids: [...current.music_line_ids, musicFileId] })!;
+    try {
+      musicFileId = await callEngine("music", undefined, engines, signal, () => engines.makeMusic({ brief: faceless ? `${plan.music}, soft and underscoring a narrator` : plan.music, seconds: plan.shots.reduce((sum, shot) => sum + shot.seconds, 0), faceless }, { signal }));
+      current = updateMediaProduction(actor, productionId, { music_line_ids: [...current.music_line_ids, musicFileId] })!;
+    } catch (error) {
+      // A failed song never fails the film: the clips are already made, so the cut is assembled without music and says so.
+      if (signal.aborted || faceless || !(error instanceof FilmStepError)) throw error;
+      engines.note = "The film is ready, but I couldn't make its music.";
+    }
   }
   engines.onProgress?.({ stage: "music", done: 1, total: 1 });
   if (current.finished_cut_file_ids.length === 0) {
     const clips = productionShots(current).filter((shot) => plan.shots.some((p) => p.id === shot.id)).map((shot) => shot.clip_file_id).filter((id): id is string => !!id);
-    const cutId = await callEngine("assemble", undefined, engines, signal, () => engines.assemble({ plan, clipFileIds: clips, musicFileId }, { signal }));
+    const cutId = await callEngine("assemble", undefined, engines, signal, () => engines.assemble({ plan, clipFileIds: clips, musicFileId: musicFileId ?? null }, { signal }));
     engines.onProgress?.({ stage: "assemble", done: 1, total: 1 });
     current = updateMediaProduction(actor, productionId, { finished_cut_file_ids: [...current.finished_cut_file_ids, cutId] })!;
     engines.onProgress?.({ stage: "keep", done: 1, total: 1 });
