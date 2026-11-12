@@ -3760,12 +3760,12 @@ msgid "Area"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/dashboard/ArrangeHome.tsx:61
+#: src/shell/pages/dashboard/ArrangeHome.tsx:82
 msgid "Arrange"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/dashboard/ArrangeHome.tsx:66
+#: src/shell/pages/dashboard/ArrangeHome.tsx:87
 msgid "Arrange Home"
 msgstr ""
 
@@ -6334,11 +6334,6 @@ msgid "Choose whether to set up Coding on this computer."
 msgstr "Elige si quieres configurar Coding en este ordenador."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/dashboard/ArrangeHome.tsx:67
-msgid "Choose which cards show on Home and the order they come in."
-msgstr ""
-
-#. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:107
 #, needs-review
 msgid "setting.coding.engine.help"
@@ -6349,6 +6344,11 @@ msgstr "Elige qué motor ejecuta el código. Auto elige el mejor motor para este
 #, needs-review
 msgid "Choose which levels exist, the model each one uses and who can use it."
 msgstr "Elige qué niveles existen, el modelo que usa cada uno y quién puede usarlo."
+
+#. js-lingui-explicit-id
+#: src/shell/pages/dashboard/ArrangeHome.tsx:88
+msgid "Choose which sections show on Home and the order they come in."
+msgstr ""
 
 #. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:1510
@@ -6739,7 +6739,7 @@ msgid "Close Now playing"
 msgstr "Cerrar Ahora suena"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/dashboard/ArrangeHome.tsx:71
+#: src/shell/pages/dashboard/ArrangeHome.tsx:92
 msgid "Close this and open Arrange again."
 msgstr ""
 
@@ -6924,7 +6924,7 @@ msgid "setting.ease.preset.option_label.comfortable"
 msgstr "Cómodo"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/dashboard/ArrangeHome.tsx:21
+#: src/shell/pages/dashboard/ArrangeHome.tsx:33
 #, needs-review
 msgid "Coming up"
 msgstr "Próximamente"
@@ -6958,6 +6958,7 @@ msgstr ""
 #: src/apps/library/appPresentation.ts:9
 #: src/apps/settings/RobotCompanionChoices.tsx:62
 #: src/apps/settings/RobotCompanionChoices.tsx:64
+#: src/shell/pages/dashboard/ArrangeHome.tsx:104
 #: src/shell/pages/FamilyPage.tsx:66
 msgid "Companion"
 msgstr ""
@@ -7603,7 +7604,7 @@ msgid "Could not hide this item. Try again."
 msgstr "No se pudo ocultar este elemento. Intenta de nuevo."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/dashboard/ArrangeHome.tsx:71
+#: src/shell/pages/dashboard/ArrangeHome.tsx:92
 msgid "Could not load"
 msgstr ""
 
@@ -7684,7 +7685,7 @@ msgid "Could not load faded memories. Check your connection and try again."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/DashboardPage.tsx:75
+#: src/shell/pages/DashboardPage.tsx:84
 #, needs-review
 msgid "Could not load Home cards. Refresh Home to try again."
 msgstr "No se pudieron cargar las tarjetas de Home. Actualiza Home para intentarlo de nuevo."
@@ -7890,7 +7891,7 @@ msgid "Could not load those memories."
 msgstr "No se pudieron cargar esas memorias."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/dashboard/TodaySection.tsx:82
+#: src/shell/pages/dashboard/TodaySection.tsx:119
 #, needs-review
 msgid "Could not load Today. Refresh Home to try again."
 msgstr "No se pudo cargar Hoy. Actualiza Home para intentarlo de nuevo."
@@ -8213,7 +8214,7 @@ msgid "Could not run a backup."
 msgstr "No se pudo ejecutar una copia de seguridad."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/dashboard/ArrangeHome.tsx:72
+#: src/shell/pages/dashboard/ArrangeHome.tsx:93
 msgid "Could not save"
 msgstr ""
 
@@ -8348,7 +8349,7 @@ msgid "Could not save your appearance."
 msgstr "No se pudo guardar tu apariencia."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/dashboard/ArrangeHome.tsx:52
+#: src/shell/pages/dashboard/ArrangeHome.tsx:68
 msgid "Could not save your Home layout. Check your connection and try again."
 msgstr ""
 
@@ -9337,6 +9338,7 @@ msgstr "Imágenes detalladas"
 #: src/apps/settings/styles/StyleEditor.tsx:153
 #: src/shell/components/SearchTestResultBody.tsx:23
 #: src/shell/InstallStrip.tsx:122
+#: src/shell/pages/dashboard/TodaySection.tsx:197
 #, needs-review
 msgid "Details"
 msgstr "Detalles"
@@ -12079,6 +12081,12 @@ msgid "Here are the short clips it will move with. Do they look right?"
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/shell/pages/dashboard/ArrangeHome.tsx:104
+#: src/shell/pages/dashboard/ArrangeHome.tsx:104
+msgid "Hero source"
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:1585
 #, needs-review
 msgid "area.Hey Jarvis"
@@ -12173,7 +12181,7 @@ msgstr "Guarda lo que algunos descargados piden antes de comenzar."
 #: src/shell/coreLabels.ts:7
 #: src/shell/pageHeaderTitle.tsx:94
 #: src/shell/pages/ActivityPage.tsx:44
-#: src/shell/pages/DashboardPage.tsx:29
+#: src/shell/pages/DashboardPage.tsx:30
 #: src/shell/pages/settings/settingsBackLink.ts:55
 #: src/shell/pages/status/StatusComponents.tsx:32
 #: src/shell/pages/WikipediaPage.tsx:154
@@ -12889,8 +12897,8 @@ msgid "Home goes online for you"
 msgstr "Home sale a internet por ti"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/dashboard/TodaySection.tsx:156
-#: src/shell/pages/dashboard/TodaySection.tsx:159
+#: src/shell/pages/dashboard/TodaySection.tsx:184
+#: src/shell/pages/dashboard/TodaySection.tsx:192
 #, needs-review
 msgid "Home highlight"
 msgstr "Destacado de Home"
@@ -15972,13 +15980,13 @@ msgid "Loading folders"
 msgstr "Cargando carpetas"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/DashboardPage.tsx:74
+#: src/shell/pages/DashboardPage.tsx:83
 #, needs-review
 msgid "Loading Home"
 msgstr "Cargando Home"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/dashboard/TodaySection.tsx:155
+#: src/shell/pages/dashboard/TodaySection.tsx:183
 #, needs-review
 msgid "Loading Home highlight"
 msgstr "Cargando destacado de Home"
@@ -16184,7 +16192,7 @@ msgid "Loading the styles"
 msgstr "Cargando los estilos"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/dashboard/TodaySection.tsx:81
+#: src/shell/pages/dashboard/TodaySection.tsx:118
 #, needs-review
 msgid "Loading Today"
 msgstr "Cargando Hoy"
@@ -16235,7 +16243,7 @@ msgid "Loading your AI setup"
 msgstr "Cargando tu configuración de IA"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/dashboard/ArrangeHome.tsx:70
+#: src/shell/pages/dashboard/ArrangeHome.tsx:91
 msgid "Loading your cards"
 msgstr ""
 
@@ -16566,6 +16574,7 @@ msgid "Lyrics (optional)"
 msgstr "Letras (opcional)"
 
 #. js-lingui-explicit-id
+#: src/shell/pages/dashboard/ArrangeHome.tsx:104
 #: src/shell/pages/dashboard/HomeHero.tsx:22
 #: src/shell/pages/dashboard/HomeHero.tsx:22
 #: src/shell/pages/dashboard/HomeShelves.tsx:83
@@ -17755,7 +17764,6 @@ msgstr "Mensual"
 #: src/apps/clock/TimersTab.tsx:161
 #: src/apps/settings/styles/StyleEditor.tsx:127
 #: src/shell/AlarmRinger.tsx:64
-#: src/shell/pages/dashboard/TodaySection.tsx:166
 #: src/shell/phoneMenuLinks.tsx:18
 #, needs-review
 msgid "More"
@@ -17895,13 +17903,23 @@ msgid "Move {name} up"
 msgstr "Mover {name} arriba"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/dashboard/ArrangeHome.tsx:83
+#: src/shell/pages/dashboard/ArrangeHome.tsx:114
 msgid "Move {title} down"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/dashboard/ArrangeHome.tsx:82
+#: src/shell/pages/dashboard/ArrangeHome.tsx:113
 msgid "Move {title} up"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/shell/pages/dashboard/ArrangeHome.tsx:99
+msgid "Move section {title} down"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/shell/pages/dashboard/ArrangeHome.tsx:98
+msgid "Move section {title} up"
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -18570,7 +18588,7 @@ msgid "Next song"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/dashboard/ArrangeHome.tsx:22
+#: src/shell/pages/dashboard/ArrangeHome.tsx:34
 msgid "Next up"
 msgstr ""
 
@@ -19735,6 +19753,7 @@ msgstr "desactivado"
 #: src/apps/settings/ReferenceLibrarySettings.tsx:286
 #: src/apps/settings/RobotBody.tsx:213
 #: src/lib/settingCopy.ts:42
+#: src/shell/pages/dashboard/ArrangeHome.tsx:104
 #: src/shell/pages/status/StatusComponents.tsx:158
 msgid "Off"
 msgstr ""
@@ -20628,7 +20647,7 @@ msgid "setting.news.reader_open.option.site"
 msgstr "Abre el sitio web del editor."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/dashboard/TodaySection.tsx:98
+#: src/shell/pages/dashboard/TodaySection.tsx:127
 msgid "Open Weather"
 msgstr ""
 
@@ -23240,7 +23259,7 @@ msgid "Reset device appearance"
 msgstr "Restablecer el aspecto del dispositivo"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/dashboard/ArrangeHome.tsx:93
+#: src/shell/pages/dashboard/ArrangeHome.tsx:124
 #: src/shell/pages/settings/SettingField.tsx:255
 #, needs-review
 msgid "Reset to default"
@@ -25412,7 +25431,7 @@ msgid "Show {length} advanced settings"
 msgstr "Mostrar {length} ajustes avanzados"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/dashboard/ArrangeHome.tsx:84
+#: src/shell/pages/dashboard/ArrangeHome.tsx:115
 msgid "Show {title} on Home"
 msgstr ""
 
@@ -25515,6 +25534,11 @@ msgstr "Mostrar imágenes en las respuestas"
 #, needs-review
 msgid "setting.ui.reasoning_open.label"
 msgstr "Mostrar razonamiento expandido"
+
+#. js-lingui-explicit-id
+#: src/shell/pages/dashboard/ArrangeHome.tsx:100
+msgid "Show section {title}"
+msgstr ""
 
 #. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:721
@@ -29403,11 +29427,6 @@ msgid "them"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/dashboard/ArrangeHome.tsx:73
-msgid "There are no cards to arrange yet. They appear here as soon as Home has something to show."
-msgstr ""
-
-#. js-lingui-explicit-id
 #: src/apps/setup/StorageStep.tsx:33
 #, needs-review
 msgid "There are no folders in here. Use this folder, or make a new one."
@@ -29995,7 +30014,7 @@ msgstr "Acciones del temporizador"
 #. js-lingui-explicit-id
 #: src/apps/clock/ClockPage.tsx:43
 #: src/apps/clock/TimersTab.tsx:109
-#: src/shell/pages/dashboard/ArrangeHome.tsx:23
+#: src/shell/pages/dashboard/ArrangeHome.tsx:35
 #, needs-review
 msgid "Timers"
 msgstr "Temporizadores"
@@ -30050,11 +30069,11 @@ msgstr ""
 #: src/i18n.chain.test.tsx:96
 #: src/i18n.test.tsx:53
 #: src/shell/pages/CompanionsPage.tsx:290
-#: src/shell/pages/dashboard/TodaySection.tsx:93
-#: src/shell/pages/dashboard/TodaySection.tsx:136
-#: src/shell/pages/dashboard/TodaySection.tsx:137
-#: src/shell/pages/dashboard/TodaySection.tsx:160
-#: src/shell/pages/dashboard/TodaySection.tsx:161
+#: src/shell/pages/dashboard/TodaySection.tsx:122
+#: src/shell/pages/dashboard/TodaySection.tsx:166
+#: src/shell/pages/dashboard/TodaySection.tsx:167
+#: src/shell/pages/dashboard/TodaySection.tsx:193
+#: src/shell/pages/dashboard/TodaySection.tsx:194
 #: src/shell/pages/status/StatusBoard.tsx:132
 #: src/shell/pages/status/StatusBoard.tsx:133
 #: src/shell/pages/status/statusBoardFormat.ts:46
@@ -30072,6 +30091,11 @@ msgstr "Hoy {time}"
 #, needs-review
 msgid "setting.ui.home_layout.option_label.board"
 msgstr "Tablero de hoy"
+
+#. js-lingui-explicit-id
+#: src/shell/pages/dashboard/TodaySection.tsx:197
+msgid "Today's items"
+msgstr ""
 
 #. js-lingui-explicit-id
 #: src/shell/pages/performance/TurnsByEngineBody.tsx:38
@@ -30373,7 +30397,7 @@ msgstr "Frase de activación, p. ej. \"noche de cine\""
 #: src/shell/pages/ActivityPage.tsx:37
 #: src/shell/pages/companionFlow/AnimateStep.tsx:133
 #: src/shell/pages/companionFlow/PackSection.tsx:106
-#: src/shell/pages/dashboard/ArrangeHome.tsx:71
+#: src/shell/pages/dashboard/ArrangeHome.tsx:92
 #: src/shell/pages/FamilyPage.tsx:49
 #: src/shell/pages/FamilyPage.tsx:50
 #: src/shell/pages/FilesPage.tsx:320
@@ -31080,7 +31104,7 @@ msgid "Updated"
 msgstr "Actualizado"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/dashboard/TodaySection.tsx:103
+#: src/shell/pages/dashboard/TodaySection.tsx:132
 msgid "Updated {when}"
 msgstr ""
 
@@ -33324,12 +33348,12 @@ msgid "failure.voice.microphone_setup.adultNoRepairs"
 msgstr "Tu navegador no pudo iniciar el micrófono. Toca la forma de onda para intentarlo de nuevo o copia los detalles de abajo."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/dashboard/ArrangeHome.tsx:71
+#: src/shell/pages/dashboard/ArrangeHome.tsx:92
 msgid "Your cards did not load"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/dashboard/ArrangeHome.tsx:72
+#: src/shell/pages/dashboard/ArrangeHome.tsx:93
 msgid "Your change was not saved"
 msgstr ""
 

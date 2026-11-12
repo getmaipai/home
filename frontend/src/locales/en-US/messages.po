@@ -3243,12 +3243,12 @@ msgid "Area"
 msgstr "Area"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/dashboard/ArrangeHome.tsx:61
+#: src/shell/pages/dashboard/ArrangeHome.tsx:82
 msgid "Arrange"
 msgstr "Arrange"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/dashboard/ArrangeHome.tsx:66
+#: src/shell/pages/dashboard/ArrangeHome.tsx:87
 msgid "Arrange Home"
 msgstr "Arrange Home"
 
@@ -5469,11 +5469,6 @@ msgid "Choose whether to set up Coding on this computer."
 msgstr "Choose whether to set up Coding on this computer."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/dashboard/ArrangeHome.tsx:67
-msgid "Choose which cards show on Home and the order they come in."
-msgstr "Choose which cards show on Home and the order they come in."
-
-#. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:107
 msgid "setting.coding.engine.help"
 msgstr "Choose which engine runs coding. Auto picks the best engine for this computer."
@@ -5482,6 +5477,11 @@ msgstr "Choose which engine runs coding. Auto picks the best engine for this com
 #: src/apps/settings/AiSlotDialog.tsx:66
 msgid "Choose which levels exist, the model each one uses and who can use it."
 msgstr "Choose which levels exist, the model each one uses and who can use it."
+
+#. js-lingui-explicit-id
+#: src/shell/pages/dashboard/ArrangeHome.tsx:88
+msgid "Choose which sections show on Home and the order they come in."
+msgstr "Choose which sections show on Home and the order they come in."
 
 #. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:1510
@@ -5826,7 +5826,7 @@ msgid "Close Now playing"
 msgstr "Close Now playing"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/dashboard/ArrangeHome.tsx:71
+#: src/shell/pages/dashboard/ArrangeHome.tsx:92
 msgid "Close this and open Arrange again."
 msgstr "Close this and open Arrange again."
 
@@ -5982,7 +5982,7 @@ msgid "setting.ease.preset.option_label.comfortable"
 msgstr "Comfortable"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/dashboard/ArrangeHome.tsx:21
+#: src/shell/pages/dashboard/ArrangeHome.tsx:33
 msgid "Coming up"
 msgstr "Coming up"
 
@@ -6012,6 +6012,7 @@ msgstr "Companies, markets, jobs, prices, the economy and personal money."
 #: src/apps/library/appPresentation.ts:9
 #: src/apps/settings/RobotCompanionChoices.tsx:62
 #: src/apps/settings/RobotCompanionChoices.tsx:64
+#: src/shell/pages/dashboard/ArrangeHome.tsx:104
 #: src/shell/pages/FamilyPage.tsx:66
 msgid "Companion"
 msgstr "Companion"
@@ -6570,7 +6571,7 @@ msgid "Could not hide this item. Try again."
 msgstr "Could not hide this item. Try again."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/dashboard/ArrangeHome.tsx:71
+#: src/shell/pages/dashboard/ArrangeHome.tsx:92
 msgid "Could not load"
 msgstr "Could not load"
 
@@ -6640,7 +6641,7 @@ msgid "Could not load faded memories. Check your connection and try again."
 msgstr "Could not load faded memories. Check your connection and try again."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/DashboardPage.tsx:75
+#: src/shell/pages/DashboardPage.tsx:84
 msgid "Could not load Home cards. Refresh Home to try again."
 msgstr "Could not load Home cards. Refresh Home to try again."
 
@@ -6817,7 +6818,7 @@ msgid "Could not load those memories."
 msgstr "Could not load those memories."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/dashboard/TodaySection.tsx:82
+#: src/shell/pages/dashboard/TodaySection.tsx:119
 msgid "Could not load Today. Refresh Home to try again."
 msgstr "Could not load Today. Refresh Home to try again."
 
@@ -7092,7 +7093,7 @@ msgid "Could not run a backup."
 msgstr "Could not run a backup."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/dashboard/ArrangeHome.tsx:72
+#: src/shell/pages/dashboard/ArrangeHome.tsx:93
 msgid "Could not save"
 msgstr "Could not save"
 
@@ -7208,7 +7209,7 @@ msgid "Could not save your appearance."
 msgstr "Could not save your appearance."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/dashboard/ArrangeHome.tsx:52
+#: src/shell/pages/dashboard/ArrangeHome.tsx:68
 msgid "Could not save your Home layout. Check your connection and try again."
 msgstr "Could not save your Home layout. Check your connection and try again."
 
@@ -8055,6 +8056,7 @@ msgstr "Detailed pictures"
 #: src/apps/settings/styles/StyleEditor.tsx:153
 #: src/shell/components/SearchTestResultBody.tsx:23
 #: src/shell/InstallStrip.tsx:122
+#: src/shell/pages/dashboard/TodaySection.tsx:197
 msgid "Details"
 msgstr "Details"
 
@@ -10407,6 +10409,12 @@ msgid "Here are the short clips it will move with. Do they look right?"
 msgstr "Here are the short clips it will move with. Do they look right?"
 
 #. js-lingui-explicit-id
+#: src/shell/pages/dashboard/ArrangeHome.tsx:104
+#: src/shell/pages/dashboard/ArrangeHome.tsx:104
+msgid "Hero source"
+msgstr "Hero source"
+
+#. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:1585
 msgid "area.Hey Jarvis"
 msgstr "Hey Jarvis"
@@ -10488,7 +10496,7 @@ msgstr "Holds what some downloads ask for before they start."
 #: src/shell/coreLabels.ts:7
 #: src/shell/pageHeaderTitle.tsx:94
 #: src/shell/pages/ActivityPage.tsx:44
-#: src/shell/pages/DashboardPage.tsx:29
+#: src/shell/pages/DashboardPage.tsx:30
 #: src/shell/pages/settings/settingsBackLink.ts:55
 #: src/shell/pages/status/StatusComponents.tsx:32
 #: src/shell/pages/WikipediaPage.tsx:154
@@ -11092,8 +11100,8 @@ msgid "Home goes online for you"
 msgstr "Home goes online for you"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/dashboard/TodaySection.tsx:156
-#: src/shell/pages/dashboard/TodaySection.tsx:159
+#: src/shell/pages/dashboard/TodaySection.tsx:184
+#: src/shell/pages/dashboard/TodaySection.tsx:192
 msgid "Home highlight"
 msgstr "Home highlight"
 
@@ -13755,12 +13763,12 @@ msgid "Loading folders"
 msgstr "Loading folders"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/DashboardPage.tsx:74
+#: src/shell/pages/DashboardPage.tsx:83
 msgid "Loading Home"
 msgstr "Loading Home"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/dashboard/TodaySection.tsx:155
+#: src/shell/pages/dashboard/TodaySection.tsx:183
 msgid "Loading Home highlight"
 msgstr "Loading Home highlight"
 
@@ -13935,7 +13943,7 @@ msgid "Loading the styles"
 msgstr "Loading the styles"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/dashboard/TodaySection.tsx:81
+#: src/shell/pages/dashboard/TodaySection.tsx:118
 msgid "Loading Today"
 msgstr "Loading Today"
 
@@ -13978,7 +13986,7 @@ msgid "Loading your AI setup"
 msgstr "Loading your AI setup"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/dashboard/ArrangeHome.tsx:70
+#: src/shell/pages/dashboard/ArrangeHome.tsx:91
 msgid "Loading your cards"
 msgstr "Loading your cards"
 
@@ -14263,6 +14271,7 @@ msgid "Lyrics (optional)"
 msgstr "Lyrics (optional)"
 
 #. js-lingui-explicit-id
+#: src/shell/pages/dashboard/ArrangeHome.tsx:104
 #: src/shell/pages/dashboard/HomeHero.tsx:22
 #: src/shell/pages/dashboard/HomeHero.tsx:22
 #: src/shell/pages/dashboard/HomeShelves.tsx:83
@@ -15297,7 +15306,6 @@ msgstr "Monthly"
 #: src/apps/clock/TimersTab.tsx:161
 #: src/apps/settings/styles/StyleEditor.tsx:127
 #: src/shell/AlarmRinger.tsx:64
-#: src/shell/pages/dashboard/TodaySection.tsx:166
 #: src/shell/phoneMenuLinks.tsx:18
 msgid "More"
 msgstr "More"
@@ -15420,14 +15428,24 @@ msgid "Move {name} up"
 msgstr "Move {name} up"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/dashboard/ArrangeHome.tsx:83
+#: src/shell/pages/dashboard/ArrangeHome.tsx:114
 msgid "Move {title} down"
 msgstr "Move {title} down"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/dashboard/ArrangeHome.tsx:82
+#: src/shell/pages/dashboard/ArrangeHome.tsx:113
 msgid "Move {title} up"
 msgstr "Move {title} up"
+
+#. js-lingui-explicit-id
+#: src/shell/pages/dashboard/ArrangeHome.tsx:99
+msgid "Move section {title} down"
+msgstr "Move section {title} down"
+
+#. js-lingui-explicit-id
+#: src/shell/pages/dashboard/ArrangeHome.tsx:98
+msgid "Move section {title} up"
+msgstr "Move section {title} up"
 
 #. js-lingui-explicit-id
 #: src/shell/pages/FilesPage.tsx:402
@@ -16009,7 +16027,7 @@ msgid "Next song"
 msgstr "Next song"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/dashboard/ArrangeHome.tsx:22
+#: src/shell/pages/dashboard/ArrangeHome.tsx:34
 msgid "Next up"
 msgstr "Next up"
 
@@ -17015,6 +17033,7 @@ msgstr "off"
 #: src/apps/settings/ReferenceLibrarySettings.tsx:286
 #: src/apps/settings/RobotBody.tsx:213
 #: src/lib/settingCopy.ts:42
+#: src/shell/pages/dashboard/ArrangeHome.tsx:104
 #: src/shell/pages/status/StatusComponents.tsx:158
 msgid "Off"
 msgstr "Off"
@@ -17794,7 +17813,7 @@ msgid "setting.news.reader_open.option.site"
 msgstr "Open the publisher's website."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/dashboard/TodaySection.tsx:98
+#: src/shell/pages/dashboard/TodaySection.tsx:127
 msgid "Open Weather"
 msgstr "Open Weather"
 
@@ -20033,7 +20052,7 @@ msgid "Reset device appearance"
 msgstr "Reset device appearance"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/dashboard/ArrangeHome.tsx:93
+#: src/shell/pages/dashboard/ArrangeHome.tsx:124
 #: src/shell/pages/settings/SettingField.tsx:255
 msgid "Reset to default"
 msgstr "Reset to default"
@@ -21924,7 +21943,7 @@ msgid "Show {length} advanced settings"
 msgstr "Show {length} advanced settings"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/dashboard/ArrangeHome.tsx:84
+#: src/shell/pages/dashboard/ArrangeHome.tsx:115
 msgid "Show {title} on Home"
 msgstr "Show {title} on Home"
 
@@ -22011,6 +22030,11 @@ msgstr "Show pictures in answers"
 #: src/lib/settingCopy.generated.ts:1478
 msgid "setting.ui.reasoning_open.label"
 msgstr "Show reasoning expanded"
+
+#. js-lingui-explicit-id
+#: src/shell/pages/dashboard/ArrangeHome.tsx:100
+msgid "Show section {title}"
+msgstr "Show section {title}"
 
 #. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:721
@@ -25386,11 +25410,6 @@ msgid "them"
 msgstr "them"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/dashboard/ArrangeHome.tsx:73
-msgid "There are no cards to arrange yet. They appear here as soon as Home has something to show."
-msgstr "There are no cards to arrange yet. They appear here as soon as Home has something to show."
-
-#. js-lingui-explicit-id
 #: src/apps/setup/StorageStep.tsx:33
 msgid "There are no folders in here. Use this folder, or make a new one."
 msgstr "There are no folders in here. Use this folder, or make a new one."
@@ -25892,7 +25911,7 @@ msgstr "Timer actions"
 #. js-lingui-explicit-id
 #: src/apps/clock/ClockPage.tsx:43
 #: src/apps/clock/TimersTab.tsx:109
-#: src/shell/pages/dashboard/ArrangeHome.tsx:23
+#: src/shell/pages/dashboard/ArrangeHome.tsx:35
 msgid "Timers"
 msgstr "Timers"
 
@@ -25940,11 +25959,11 @@ msgstr "To skip SearXNG, leave the address empty and press Continue. That turns 
 #: src/i18n.chain.test.tsx:96
 #: src/i18n.test.tsx:53
 #: src/shell/pages/CompanionsPage.tsx:290
-#: src/shell/pages/dashboard/TodaySection.tsx:93
-#: src/shell/pages/dashboard/TodaySection.tsx:136
-#: src/shell/pages/dashboard/TodaySection.tsx:137
-#: src/shell/pages/dashboard/TodaySection.tsx:160
-#: src/shell/pages/dashboard/TodaySection.tsx:161
+#: src/shell/pages/dashboard/TodaySection.tsx:122
+#: src/shell/pages/dashboard/TodaySection.tsx:166
+#: src/shell/pages/dashboard/TodaySection.tsx:167
+#: src/shell/pages/dashboard/TodaySection.tsx:193
+#: src/shell/pages/dashboard/TodaySection.tsx:194
 #: src/shell/pages/status/StatusBoard.tsx:132
 #: src/shell/pages/status/StatusBoard.tsx:133
 #: src/shell/pages/status/statusBoardFormat.ts:46
@@ -25960,6 +25979,11 @@ msgstr "Today {time}"
 #: src/lib/settingCopy.generated.ts:1462
 msgid "setting.ui.home_layout.option_label.board"
 msgstr "Today board"
+
+#. js-lingui-explicit-id
+#: src/shell/pages/dashboard/TodaySection.tsx:197
+msgid "Today's items"
+msgstr "Today's items"
 
 #. js-lingui-explicit-id
 #: src/shell/pages/performance/TurnsByEngineBody.tsx:38
@@ -26221,7 +26245,7 @@ msgstr "Trigger phrase, e.g. \"movie night\""
 #: src/shell/pages/ActivityPage.tsx:37
 #: src/shell/pages/companionFlow/AnimateStep.tsx:133
 #: src/shell/pages/companionFlow/PackSection.tsx:106
-#: src/shell/pages/dashboard/ArrangeHome.tsx:71
+#: src/shell/pages/dashboard/ArrangeHome.tsx:92
 #: src/shell/pages/FamilyPage.tsx:49
 #: src/shell/pages/FamilyPage.tsx:50
 #: src/shell/pages/FilesPage.tsx:320
@@ -26827,7 +26851,7 @@ msgid "Updated"
 msgstr "Updated"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/dashboard/TodaySection.tsx:103
+#: src/shell/pages/dashboard/TodaySection.tsx:132
 msgid "Updated {when}"
 msgstr "Updated {when}"
 
@@ -28747,12 +28771,12 @@ msgid "failure.voice.microphone_setup.adultNoRepairs"
 msgstr "Your browser could not start the microphone. Tap the waveform to try again, or copy the details below."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/dashboard/ArrangeHome.tsx:71
+#: src/shell/pages/dashboard/ArrangeHome.tsx:92
 msgid "Your cards did not load"
 msgstr "Your cards did not load"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/dashboard/ArrangeHome.tsx:72
+#: src/shell/pages/dashboard/ArrangeHome.tsx:93
 msgid "Your change was not saved"
 msgstr "Your change was not saved"
 
