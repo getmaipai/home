@@ -550,13 +550,35 @@ describe("kept dependencies in direct installs (DIRECT-FAST-04)", () => {
     expect(readFileSync(log, "utf8").trim()).toBe(`-dr com.apple.quarantine ${root}`);
   });
 
+  test("DIRECT-FAST-07: the question ship.sh asks (the installer sourced in a subshell, then stack_keepable) answers yes for an unchanged answering Stack and no for each change", async () => {
+    const root = join(scratch, "ask"); const stack = join(root, "stack"); mkdirSync(join(stack, "data"), { recursive: true }); mkdirSync(join(root, ".bun", "bin"), { recursive: true });
+    const server = Bun.serve({ port: 0, hostname: "127.0.0.1", fetch: () => Response.json({ ok: true }) });
+    try {
+      const os = bash("detect_os").stdout.toString().trim(), arch = bash("detect_arch").stdout.toString().trim();
+      const binary = join(stack, bash(`render_stack_binary_name ${os} ${arch}`).stdout.toString().trim());
+      writeFileSync(binary, "#!/bin/sh\n", { mode: 0o755 }); writeFileSync(join(stack, ".user"), "sage\n"); writeFileSync(join(stack, ".port"), `${server.port}\n`);
+      writeFileSync(join(stack, ".stack-tag"), `${bash('printf %s "$STACK_TAG"').stdout.toString()}\n`);
+      const bunBin = join(root, ".bun", "bin", "bun");
+      writeFileSync(join(stack, ".service-fp"), `${bash(`stack_service_fp sage "${binary}" "${stack}/data" ${server.port} "${bunBin}"`).stdout.toString().trim()}\n`);
+      // exactly the command ship.sh runs, from a copy of the installer extracted as a file
+      // asynchronous spawn: this process serves /healthz, so its event loop must stay free while the child asks
+      const ask = () => Bun.spawn(["bash", "-c", 'source "$1"; stack_keepable "$2" "$(detect_os)" "$(detect_arch)" "$2/.bun/bin/bun"', "_", INSTALL_SH, root]).exited;
+      expect(await ask()).toBe(0);
+      writeFileSync(join(stack, ".service-fp"), "changed\n"); expect(await ask()).toBe(1);
+    } finally { server.stop(true); }
+    const down = Bun.serve({ port: 0, hostname: "127.0.0.1", fetch: () => new Response("no", { status: 503 }) });
+    try { writeFileSync(join(stack, ".port"), `${down.port}\n`); writeFileSync(join(stack, ".service-fp"), `${bash(`stack_service_fp sage "${join(stack, bash(`render_stack_binary_name ${bash("detect_os").stdout.toString().trim()} ${bash("detect_arch").stdout.toString().trim()}`).stdout.toString().trim())}" "${stack}/data" ${down.port} "${root}/.bun/bin/bun"`).stdout.toString().trim()}\n`); expect(await Bun.spawn(["bash", "-c", 'source "$1"; stack_keepable "$2" "$(detect_os)" "$(detect_arch)" "$2/.bun/bin/bun"', "_", INSTALL_SH, root]).exited).toBe(1); } finally { down.stop(true); }
+  });
+
   test("DIRECT-FAST-08: a direct install's quarantine walk skips the Stack, data, rolled-back data, backups and kept folders; other installs walk the whole root", () => {
     const root = tree("q2"); const dirs = ["docs", "stack", "data", "data.rolled-back-20261027-195415", "backups", "received-backups", "upgrade-backups", "data-scratch", ".deno", ".bun", "scripts"];
     for (const d of dirs) mkdirSync(join(root, d), { recursive: true });
     const log = join(scratch, "xattr2.calls"); rmSync(log, { force: true });
     const run = (env: string) => bash(`xattr() { echo "$*" >> ${JSON.stringify(log)}; }; ${env} clear_quarantine_and_sign darwin "${root}"`);
-    run("INSTALL_QUARANTINE_LIGHT=yes"); const walked = readFileSync(log, "utf8").trim().split("\n").map((l) => l.replace("-dr com.apple.quarantine ", ""));
+    run("INSTALL_QUARANTINE_LIGHT=yes STACK_KEEP=yes"); const walked = readFileSync(log, "utf8").trim().split("\n").map((l) => l.replace("-dr com.apple.quarantine ", ""));
     expect(walked.sort()).toEqual(["backend", "bun.lock", "docs", "frontend", "package.json", "scripts"].map((n) => join(root, n)).sort());
+    rmSync(log, { force: true }); run("INSTALL_QUARANTINE_LIGHT=yes STACK_KEEP=no"); // a Stack that is rebuilt is still walked
+    expect(readFileSync(log, "utf8")).toContain(join(root, "stack"));
     rmSync(log, { force: true }); run("INSTALL_QUARANTINE_LIGHT=no");
     expect(readFileSync(log, "utf8").trim()).toBe(`-dr com.apple.quarantine ${root}`);
     expect(readFileSync(INSTALL_SH, "utf8")).toContain('INSTALL_QUARANTINE_LIGHT="$direct_install" clear_quarantine_and_sign');

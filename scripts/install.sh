@@ -548,7 +548,9 @@ clear_quarantine_and_sign() {
       local entry
       for entry in "$dir"/* "$dir"/.[!.]*; do
         [ -e "$entry" ] || continue
-        case "$(basename "$entry")" in node_modules|.deno|.bun|data|data.rolled-back-*|stack|backups|received-backups|upgrade-backups|data-scratch) continue ;; esac
+        case "$(basename "$entry")" in node_modules|.deno|.bun|data|data.rolled-back-*|backups|received-backups|upgrade-backups|data-scratch) continue ;; esac
+        # The Stack folder is skipped only when it stays as it is (STACK_KEEP=yes); a rebuilt Stack is cleared again by install_stack_service.
+        [ "$(basename "$entry")" != "stack" ] || [ "${STACK_KEEP:-no}" != "yes" ] || continue
         xattr -dr com.apple.quarantine "$entry" 2>/dev/null || true
       done
     else
