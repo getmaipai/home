@@ -972,7 +972,7 @@ link_commons_siblings() {
 }
 
 build_app() {
-  local dir="$1" bun_bin="$2" reuse_deps="${3:-no}" deps_now="${4:-}" deps_ok="no"
+  local dir="$1" bun_bin="$2" reuse_deps="${3:-no}" deps_now="${4:-}" fast_build="${5:-no}" deps_ok="no" build_script="build"
   fetch_home_commons "$dir" || die "could not fetch the Commons packages Home needs. Read the message above, fix what it names, then run the installer again."
   log "Installing dependencies and building the frontend (this can take a minute)..."
   # A fresh Mac has no system node, and dependency install scripts (ssh2) run
@@ -1005,7 +1005,11 @@ build_app() {
       || { rm -rf "$shim"; return 1; }
     [ -z "$deps_now" ] || printf '%s\n' "$deps_now" > "${dir}/.deps-hash"
   fi
-  (cd "$dir/frontend" && PATH="${shim}:${PATH}" "$bun_bin" run build) \
+  # DIRECT-FAST-05: `build` is `tsc --noEmit && vite build` (about 22 of its 24 s is the type check). Every commit was type-checked when it
+  # landed (the lander's static check), so a direct-mode install runs `build:app` (the same prebuild and vite build, no type check). Gated
+  # mode, a rollback and a source tree without the script keep the full `build`.
+  if [ "$fast_build" = "yes" ] && grep -q '"build:app"' "$dir/frontend/package.json" 2>/dev/null; then build_script="build:app"; fi
+  (cd "$dir/frontend" && PATH="${shim}:${PATH}" "$bun_bin" run "$build_script") \
     || { rm -rf "$shim"; return 1; }
   rm -rf "$shim"
   prime_deno_cache "$dir"
@@ -2539,7 +2543,7 @@ main() {
   if [ "$direct_install" = "yes" ] && deps_reusable "$install_root" "$bun_bin" "$os" "$arch"; then reuse_deps="yes"; fi
   INSTALL_DEPS_REUSE="$reuse_deps" clear_quarantine_and_sign "$os" "$install_root" "$bun_bin"
   phase "tools ready; building the app"
-  build_app "$install_root" "$bun_bin" "$reuse_deps" "$deps_now"
+  build_app "$install_root" "$bun_bin" "$reuse_deps" "$deps_now" "$direct_install"
   phase "app built; preflight"
   run_install_preflight "$bun_bin" "${install_root}/backend" "$port"
   phase "preflight done"

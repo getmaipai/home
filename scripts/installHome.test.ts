@@ -556,4 +556,24 @@ describe("kept dependencies in direct installs (DIRECT-FAST-04)", () => {
     expect(text).toContain('if [ "$direct_install" = "yes" ] && deps_reusable');
     expect(text).toContain('if [ "$direct_install" = "yes" ]; then\n        log "Direct mode: the data copy');
   });
+
+  test("DIRECT-FAST-05: a direct build runs build:app (no type check); gated, rollback and a tree without the script run the full build", () => {
+    const ran = (fast: string, pkg: string) => {
+      const root = tree(`f${fast}${pkg.length}`); writeFileSync(join(root, "frontend", "package.json"), pkg); rmSync(calls, { force: true });
+      const r = bash(`${stubs}; build_app "${root}" "${fakeBun}" no H ${fast}`); expect(r.exitCode, r.stderr.toString()).toBe(0);
+      return callLines().filter((x) => x.includes(":: run ")).map((x) => x.split(":: ")[1]);
+    };
+    const withApp = `{"scripts":{"build":"tsc --noEmit && vite build","build:app":"bun scripts/copy-ort.mjs && vite build"}}`;
+    expect(ran("yes", withApp)).toEqual(["run build:app"]);
+    expect(ran("no", withApp)).toEqual(["run build"]);
+    expect(ran("yes", `{"scripts":{"build":"tsc --noEmit && vite build"}}`)).toEqual(["run build"]);
+  });
+
+  test("the repo's frontend has build:app with the same prebuild and vite build but no tsc, and main passes the direct decision to it", () => {
+    const pkg = JSON.parse(readFileSync(join(import.meta.dir, "..", "frontend", "package.json"), "utf8")).scripts;
+    expect(pkg["build:app"]).toBe("bun scripts/copy-ort.mjs && vite build");
+    expect(pkg.build).toBe("tsc --noEmit && vite build");
+    expect(pkg.prebuild).toBe("bun scripts/copy-ort.mjs");
+    expect(readFileSync(INSTALL_SH, "utf8")).toContain('build_app "$install_root" "$bun_bin" "$reuse_deps" "$deps_now" "$direct_install"');
+  });
 });

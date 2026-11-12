@@ -460,3 +460,9 @@ The 55 s between "source replaced" and "tools ready" was not a dependency instal
 Expected: about 55 s (Deno) plus about 15 s (dependencies) off a direct ship, plus part of the 12 s source step (the 2.6 GB removal). Not timed live; the next real direct ship shows it in the phase clock.
 
 Proof: `scripts/installHome.test.ts` "kept dependencies in direct installs": the hash follows exactly the lockfile, the three package files, the Bun version and the platform; reuse needs marker, equal hash and all folders; verified-in-place keeps the tree and skips the fresh install; a failed verification falls back; no reuse flag installs fresh; a failed fresh install leaves no hash; the quarantine walk; the rsync excludes and the direct-only wiring.
+
+### 27.2 The frontend build (DIRECT-FAST-05)
+
+"Building the app" took 23 s although `vite build` itself is about 1.5 s. The `build` script is `tsc --noEmit && vite build`: about 20 s of it is the type check. Measured here: `bun run build` 24.2 s, the new `bun run build:app` 3.5 and 4.7 s. `frontend/package.json` gains `build:app` (`bun scripts/copy-ort.mjs && vite build`: the same prebuild, the same vite build, no type check). A direct-mode install runs it, because every commit was type-checked by the lander's static check when it landed; gated mode, a rollback and a source tree without the script keep the full `build`. A skip of the whole build for an unchanged input hash was weighed and dropped: 3.5 s is left, and `rsync --delete` would need its generated output (`dist`, `public/ort`) protected, a risk that is not worth 3.5 s.
+
+Expected: about 20 s off a direct ship. Not timed live. Proof: `scripts/installHome.test.ts` (direct runs `build:app`, gated and a tree without the script run `build`, the repo script has the same prebuild and no `tsc`).
