@@ -750,3 +750,19 @@ body {
 html.dark {
   color-scheme: dark;
 }
+
+/* ARTLIST-PANEL-01: the page is a rounded panel inside a frame the colour of the rail, as in Artlist. The chat keeps its own full-bleed surface. */
+[data-slot="rail-shell"] {
+  background: var(--shell-history);
+}
+[data-slot="rail-workspace"]:not(:has([data-slot="chat-shell"])) {
+  margin: 8px 8px 8px 0;
+  border-radius: 16px;
+  overflow: clip;
+}
+@media (max-width: 767px) {
+  [data-slot="rail-workspace"]:not(:has([data-slot="chat-shell"])) {
+    margin: 0;
+    border-radius: 0;
+  }
+}
