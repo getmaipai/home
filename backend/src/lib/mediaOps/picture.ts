@@ -11,6 +11,9 @@ import { screenInputImage, viewerOf } from "@/lib/pictures/ageCheck";
 import { db } from "@/db";
 import { attachments } from "@/db/schema";
 import { eq } from "drizzle-orm";
+import { listFragments } from "@/lib/media/templates";
+import { composePicturePrompt, resolvePicks } from "@/lib/media/pictureFragments";
+import { PICTURE_COVERAGE } from "./coverage";
 
 const empty = z.object({});
 const eraseArgs = z.object({ mask: z.instanceof(Uint8Array).optional(), people: z.string().optional(), subjects: z.string().optional() });
@@ -126,6 +129,46 @@ registerMediaOp({
     });
     return "job" in result ? { job: result } : { file: result };
   },
+});
+
+const angleArgs = z.object({ angle: z.string().min(1) });
+const coverageArgs = z.object({ coverage: z.enum(["wide", "medium", "close"]) });
+
+/** Word edits share picture.change's model route and therefore all of its image, age and lock gates. */
+async function startWordsEdit(actor: import("@/types").PersonRow, source: { via?: "chat" | "file"; conversationId?: string; id: string }, prompt: string) {
+  const result = await startComment(actor, chatSource(source).conversationId, source.id, { prompt });
+  return "job" in result ? { job: result } : { file: result };
+}
+
+registerMediaOp({
+  id: "picture.angle",
+  label: "Change the angle",
+  summary: "Re-render this picture from a selected camera angle, keeping its subject, pose and framing rules.",
+  input: "picture",
+  output: "picture",
+  args: angleArgs,
+  controls: [{ kind: "choice", name: "angle", label: "Angle", options: [] }],
+  needs: "image",
+  minBand: "child",
+  run: async ({ actor }, { source, args }: { source: import("@/lib/mediaOps/types").MediaRef; args: z.infer<typeof angleArgs> }) => {
+    const row = listFragments({ actor, group: "angle" }).find((fragment) => fragment.id === args.angle || fragment.title === args.angle);
+    if (!row) throw new ImageEditError(422, "Choose an available picture angle.", "unknown_angle");
+    if (!resolvePicks({ angle: row.id }, actor)) throw new ImageEditError(422, "Choose an available picture angle.", "unknown_angle");
+    return startWordsEdit(actor, source, composePicturePrompt("", { angle: row.id }, { edit: true }, actor).prompt);
+  },
+});
+
+registerMediaOp({
+  id: "picture.coverage",
+  label: "Another shot size",
+  summary: "Re-render this picture at a different shot size while keeping the same subject and scene.",
+  input: "picture",
+  output: "picture",
+  args: coverageArgs,
+  controls: [{ kind: "choice", name: "coverage", label: "Shot size", options: ["wide", "medium", "close"] }],
+  needs: "image",
+  minBand: "child",
+  run: async ({ actor }, { source, args }: { source: import("@/lib/mediaOps/types").MediaRef; args: z.infer<typeof coverageArgs> }) => startWordsEdit(actor, source, PICTURE_COVERAGE[args.coverage]),
 });
 
 registerMediaOp({
