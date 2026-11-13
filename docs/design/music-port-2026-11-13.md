@@ -52,6 +52,10 @@ Source of truth for each screen: `docs/reports/ace-step-ui-audit-attachments/spe
 - MP-U5 Music shell: wide three panes (rail or Home's nav, create panel, list, details) and the phone layout (one pane at a time, bottom player above the nav, create as a sheet).
 - MP-U6 Studio: MP-04, matched to the picture and video editors rather than ace-step-ui (the AudioMass editor is not copied).
 
+## 3c. MP-09 ffmpeg is a listed tool (Jesse 2026-11-13)
+
+ffmpeg already runs on the hub as a Stack-managed engine (`stack/data/engines/ffmpeg/<version>/ffmpeg`, about 109 MB), but it is not named in the setup wizard or in Settings, AI and models: the Stack's component list has the groups chat, voice, pictures, video, music, stems, tools and loras, and no ffmpeg row. Home code that needs it must find that one binary (MP-02 added `findFfmpeg` in `music/mixParts.ts`; `voiceShift.ts` and `pictures/keyframes.ts` still look only on the PATH). MP-09: (a) the Stack lists "Audio and video tools (ffmpeg)" as a `tools` component with size, licence and readiness, a required part in the plan, installed by the wizard; (b) Home shows it in the wizard and in Settings, AI and models (`stackComponents.ts` group `tools`, `aiChoices.ts`); (c) one shared finder in Home used by music, voice shift and keyframes. Exit: the wizard and the settings page show it installed with size and licence; a hub with no ffmpeg on the PATH still makes effects.
+
 ## 3b. Supersedes
 
 - MUSIC-STUDIO-ADOPT-01 is folded into MP-04 (same deletions, panels and exit); it is closed by the MP-04 landing. Its blocking question (Music's forced dark) is answered by Jesse's 2026-11-13 ruling: the Studio follows the person's theme.
