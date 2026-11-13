@@ -77,7 +77,7 @@ describe("picture.depth", () => {
     __setImageToolsForTests({ ...READY, models: { ...READY.models, depth: false }, operations: [] }, true);
     const listed = (await listMediaOps(owner, { input: "picture" })).find((row) => row.id === "picture.depth")!;
     expect(listed.enabled).toBe(false);
-    expect(listed.reason).toBe("Depth maps isn't installed yet. Ask an admin to install the editing models, then try again.");
+    expect(listed.reason).toBe("The depth map model is not added yet. An admin can add it in Settings, AI and models.");
     const source = await picture(owner);
     await expect(runMediaOp(owner, "picture.depth", { source: { kind: "picture", via: "file", id: source.id }, args: {} })).rejects.toMatchObject({ status: 503, message: listed.reason });
   });

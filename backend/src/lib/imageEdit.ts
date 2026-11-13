@@ -143,12 +143,15 @@ export async function editToolsStatus(actor: PersonRow): Promise<EditToolsStatus
     if (status!.models[key] === true || fallbackOk) return { enabled: true };
     return { enabled: false, reason: `${what} isn't installed yet. Ask an admin to install the editing models, then try again.` };
   };
+  const depth = status.models.depth === true && status.operations?.includes("depth")
+    ? { enabled: true }
+    : preparing ? { enabled: false, reason: prepareReason } : { enabled: false, reason: "The depth map model is not added yet. An admin can add it in Settings, AI and models." };
   const tools: Record<EditToolKey, EditToolState> = {
     markup: { enabled: true },
     comment,
     clearer: { enabled: true },
     remove_background: needs("isnet", status.vision, "The background remover"),
-    depth: status.models.depth === true && status.operations?.includes("depth") ? { enabled: true } : needs("depth", false, "Depth maps"),
+    depth,
     erase: needs("lama", false, "The eraser"),
     resize: preparing ? { enabled: false, reason: prepareReason } : { enabled: true },
     crop: { enabled: true },
