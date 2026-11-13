@@ -19,7 +19,7 @@ import { nextRepeat, setPlayMode, usePlayMode } from "@/shell/media/playMode";
 import { AudioVisualizer, VISUALIZERS, setVisualizerPref, useVisualizerPref } from "@/shell/media/AudioVisualizer";
 import { EqualizerMenu } from "@/shell/media/EqualizerMenu";
 import { useMediaAnalyser } from "@/shell/media/useMediaAnalyser";
-import { accentOf, useArtPalette } from "@/lib/media/artPalette";
+import { useArtPalette } from "@/lib/media/artPalette";
 
 const SCENE_KEY = "media.stage.scene";
 const readScene = (): boolean => { try { return localStorage.getItem(SCENE_KEY) !== "art"; } catch { return true; } };
@@ -49,7 +49,6 @@ export function NowPlayingStage({ media, onClose, initialView = "scene" }: { med
   const [showScene, setShowScene] = useState(readScene);
   const variant = useVisualizerPref();
   const palette = useArtPalette(media.poster ?? null);
-  const accent = accentOf(palette);
   const getAnalyser = useMediaAnalyser(el, true);
   const [playing, setPlaying] = useState(!el.paused);
   const [position, setPosition] = useState(el.currentTime || 0);
@@ -127,10 +126,10 @@ export function NowPlayingStage({ media, onClose, initialView = "scene" }: { med
   const toggle = () => { if (el.paused) void el.play().catch(() => {}); else el.pause(); };
 
   return createPortal(
-    <div ref={root} role="dialog" aria-modal="true" aria-label={`Now playing: ${media.title}`} data-testid="now-playing-stage" className="dark fixed inset-0 z-[60] flex flex-col overflow-hidden bg-background text-foreground">
-      {media.poster ? <img src={media.poster} alt="" aria-hidden="true" className="pointer-events-none absolute inset-0 size-full scale-125 object-cover opacity-25 blur-3xl" /> : null}
+    <div className="dark"><div ref={root} role="dialog" aria-modal="true" aria-label={`Now playing: ${media.title}`} data-testid="now-playing-stage" className="style-neutral fixed inset-0 z-[60] flex flex-col overflow-hidden bg-background text-foreground">
+      {media.poster ? <img src={media.poster} alt="" aria-hidden="true" className="pointer-events-none absolute inset-0 size-full scale-125 object-cover opacity-10 blur-3xl grayscale" /> : null}
       {media.poster ? (
-        <div key={media.poster} aria-hidden="true" data-testid="stage-ambient" data-motion={reduced ? "still" : "fade"} className={cn("pointer-events-none absolute inset-0 opacity-40 blur-3xl", !reduced && "motion-safe:animate-in motion-safe:fade-in motion-safe:duration-1000")}
+        <div key={media.poster} aria-hidden="true" data-testid="stage-ambient" data-motion={reduced ? "still" : "fade"} className={cn("pointer-events-none absolute inset-0 opacity-15 blur-3xl grayscale", !reduced && "motion-safe:animate-in motion-safe:fade-in motion-safe:duration-1000")}
           style={{ "--stage-a": palette.corners[0], "--stage-b": palette.corners[1], "--stage-c": palette.corners[2], "--stage-d": palette.corners[3], backgroundImage: "radial-gradient(60% 50% at 15% 10%, var(--stage-a), transparent), radial-gradient(60% 50% at 90% 30%, var(--stage-b), transparent), radial-gradient(70% 60% at 20% 95%, var(--stage-c), transparent), radial-gradient(60% 50% at 95% 90%, var(--stage-d), transparent)" } as CSSProperties} />
       ) : <div aria-hidden="true" data-testid="stage-ambient" data-motion="tokens" className="pointer-events-none absolute inset-0 bg-gradient-to-b from-primary/20 to-transparent" />}
       <div className="relative z-10 flex items-center gap-2 p-4">
@@ -163,7 +162,7 @@ export function NowPlayingStage({ media, onClose, initialView = "scene" }: { med
             </ul>
           </div>
         ) : showScene ? (
-          <AudioVisualizer variant={variant} mode="full" getAnalyser={getAnalyser} palette={palette} active={playing} progress={duration > 0 ? position / duration : 0} className="absolute inset-0" />
+          <AudioVisualizer variant={variant} mode="full" getAnalyser={getAnalyser} palette={palette} active={playing} progress={duration > 0 ? position / duration : 0} className="absolute inset-0 grayscale" />
         ) : media.poster ? (
           <img src={media.poster} alt="" className="aspect-square w-[min(46vh,80vw)] rounded-xl object-cover shadow-2xl" />
         ) : (
@@ -184,7 +183,7 @@ export function NowPlayingStage({ media, onClose, initialView = "scene" }: { med
           <div className="mx-auto flex items-center gap-2" role="group" aria-label={i18n._({ id: "Song controls", message: "Song controls" })}>
             <Button variant="ghost" size="icon" aria-label={i18n._({ id: "Shuffle", message: "Shuffle" })} aria-pressed={mode.shuffle} onClick={() => setPlayMode({ shuffle: !mode.shuffle })}><ShuffleIcon aria-hidden="true" className={mode.shuffle ? "text-primary" : undefined} /></Button>
             <Button variant="ghost" size="icon" aria-label={i18n._({ id: "Previous song", message: "Previous song" })} onClick={() => void dock.previous?.()}><PrevIcon aria-hidden="true" /></Button>
-            <Button size="icon" aria-label={playing ? "Pause" : "Play"} onClick={toggle} style={{ background: accent }}>{playing ? <PauseIcon aria-hidden="true" /> : <PlayIcon aria-hidden="true" />}</Button>
+            <Button size="icon" aria-label={playing ? "Pause" : "Play"} onClick={toggle}>{playing ? <PauseIcon aria-hidden="true" /> : <PlayIcon aria-hidden="true" />}</Button>
             <Button variant="ghost" size="icon" aria-label={i18n._({ id: "Next song", message: "Next song" })} onClick={() => void dock.next()}><NextIcon aria-hidden="true" /></Button>
             <Button variant="ghost" size="icon" aria-label={repeatLabel} aria-pressed={mode.repeat !== "off"} onClick={() => setPlayMode({ repeat: nextRepeat(mode.repeat) })}>
               <RepeatIcon aria-hidden="true" className={mode.repeat !== "off" ? "text-primary" : undefined} />
@@ -195,14 +194,14 @@ export function NowPlayingStage({ media, onClose, initialView = "scene" }: { med
         <div className="mx-auto flex items-center gap-2">
           {isSong ? <Button variant="ghost" size="icon" aria-label={liked ? i18n._({ id: "Unlike", message: "Unlike" }) : i18n._({ id: "Like", message: "Like" })} aria-pressed={liked} onClick={toggleLike}><HeartIcon aria-hidden="true" className={liked ? "fill-primary text-primary" : undefined} /></Button> : null}
           <Button variant="ghost" size="icon" aria-label={i18n._({ id: "Back 10 seconds", message: "Back 10 seconds" })} onClick={() => { el.currentTime = Math.max(0, el.currentTime - 10); }}><Back10Icon aria-hidden="true" /></Button>
-          {isSong ? null : <Button size="icon" aria-label={playing ? "Pause" : "Play"} onClick={toggle} style={{ background: accent }}>{playing ? <PauseIcon aria-hidden="true" /> : <PlayIcon aria-hidden="true" />}</Button>}
+          {isSong ? null : <Button size="icon" aria-label={playing ? "Pause" : "Play"} onClick={toggle}>{playing ? <PauseIcon aria-hidden="true" /> : <PlayIcon aria-hidden="true" />}</Button>}
           <Button variant="ghost" size="icon" aria-label={i18n._({ id: "Forward 30 seconds", message: "Forward 30 seconds" })} onClick={() => { el.currentTime = Math.min(Number.isFinite(el.duration) ? el.duration : el.currentTime + 30, el.currentTime + 30); }}><Fwd30Icon aria-hidden="true" /></Button>
           {isSong && lyrics ? <Button variant={view === "lyrics" ? "secondary" : "ghost"} size="icon" aria-label={i18n._({ id: "Lyrics", message: "Lyrics" })} aria-pressed={view === "lyrics"} onClick={() => pick("lyrics")}><LyricsIcon aria-hidden="true" /></Button> : null}
           {isSong ? <EqualizerMenu /> : null}
           {isSong ? <Button variant={view === "queue" ? "secondary" : "ghost"} size="icon" aria-label={i18n._({ id: "Up next", message: "Up next" })} aria-pressed={view === "queue"} onClick={() => pick("queue")}><QueueIcon aria-hidden="true" /></Button> : null}
         </div>
       </div>
-    </div>,
+    </div></div>,
     document.body,
   );
 }
