@@ -26,7 +26,7 @@ You only see your own pictures. A locked picture shows a lock until you unlock i
 - **Markup.** Draw or write on it.
 - **More.** Blur the background.
 
-If a tool needs the picture model and it is not ready, the tool tells you in one line and you can try again later. Crop, Adjust, turn and flip always work.
+If a tool needs the picture model and it is not ready, the Studio says so in one line above the picture, before you tap, and the tool looks dim. Try again later. Crop, Adjust, turn and flip always work.
 
 ## Keep or discard
 
