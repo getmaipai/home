@@ -69054,6 +69054,9 @@
                                 "group": {
                                   "type": "string"
                                 },
+                                "icon": {
+                                  "type": "string"
+                                },
                                 "quiet": {
                                   "anyOf": [
                                     {
