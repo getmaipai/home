@@ -61511,6 +61511,7 @@
                     "type": "string",
                     "enum": [
                       "remove_background",
+                      "depth",
                       "erase",
                       "upscale",
                       "resize",
