@@ -82,7 +82,7 @@ describe("chat's picture tool", () => {
 });
 
 describe("the Images Create page", () => {
-  test("a person's Create page groups preset chips under Style and keeps their ids in the submit line", async () => {
+  test("a person's Create page groups preset chips under Style and keeps their ids in the submit call", async () => {
     const { getAppPage } = await import("@/lib/apps");
     await import("@/lib/imageApp");
     const { owner } = await import("./support/testAuth");
@@ -96,7 +96,10 @@ describe("the Images Create page", () => {
     expect(presets.map((c: { state: string }) => c.state)).toEqual(["look_art", "look_story", "look_portrait", "look_product", "look_other", "light", "angle", "format"]);
     expect(node.chips.length).toBeLessThanOrEqual(10);
     expect(presets.every((c: { options: unknown[] }) => c.options.length <= 24)).toBe(true);
-    expect(node.submit.ask.prompt).toContain("{look_art}");
-    expect(node.submit.ask.prompt).toContain("{format}");
+    const args = node.submit.call.args as Record<string, unknown>;
+    expect(Object.keys(args)).toEqual(presets.map((c: { state: string }) => c.state));
+    for (const chip of presets as Array<{ state: string }>) {
+      expect(args[chip.state]).toBe(`{${chip.state}}`);
+    }
   });
 });

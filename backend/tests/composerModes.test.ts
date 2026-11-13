@@ -40,7 +40,7 @@ describe("composer modes by band", () => {
     const picture = res.modes.find((m) => m.id === "picture")!;
     expect(picture.route).toBe("/apps/image/create");
     expect(picture.placeholder).toContain("@");
-    expect(picture.chips.filter((c) => c.group === "Settings").map((c) => c.id)).toEqual(["shape", "count"]);
+    expect(picture.chips.filter((c) => ["Shape", "Pictures"].includes(c.group ?? "")).map((c) => [c.id, c.group])).toEqual([["shape", "Shape"], ["count", "Pictures"]]);
     expect(picture.primary.label).toBe("Make picture");
     expect(picture.presets?.chips[0]!.options.length).toBeGreaterThan(0);
     // CREATOR-13: the picture presets are chips of the Create page, so the composer lists them beside Shape and Pictures, each its own popover, each starting at None.
@@ -48,6 +48,9 @@ describe("composer modes by band", () => {
     expect(presetChips.map((c) => c.id)).toEqual(["look_art", "look_story", "look_portrait", "look_product", "look_other", "light", "angle", "format"]);
     expect(presetChips.every((c) => c.default === "none" && c.quiet === "none" && c.options[0]!.value === "none" && c.group === "Style")).toBe(true);
     expect(picture.chips.find((c) => c.id === "shape")?.icon).toBe("rectangle-horizontal");
+    expect(picture.chips.find((c) => c.id === "shape")).toMatchObject({ iconOnly: true, options: [{ value: "square", label: "Square", icon: "square" }, { value: "landscape", label: "Landscape", icon: "rectangle-horizontal" }, { value: "portrait", label: "Portrait", icon: "rectangle-vertical" }, { value: "wide", label: "Wide", icon: "monitor" }, { value: "tall", label: "Tall", icon: "smartphone" }] });
+    expect(picture.chips.find((c) => c.id === "count")).toMatchObject({ icon: "layers", iconOnly: true });
+    expect(presetChips.every((c) => c.iconOnly)).toBe(true);
     expect(picture.chips.find((c) => c.id === "look_art")?.icon).toBe("palette");
     expect(picture.references).toEqual([{ id: "reference", label: "Image reference", kind: "picture", max: 1 }]);
     const video = res.modes.find((m) => m.id === "video")!;

@@ -38,9 +38,16 @@ registerAppPageFill("image", "create", (person, page) => {
   const existing = Array.isArray(bar.chips) ? bar.chips as unknown[] : [];
   for (const item of existing) if (item && typeof item === "object") {
     const chip = item as Record<string, unknown>;
-    if (chip.state === "shape") chip.icon = "rectangle-horizontal";
+    if (chip.state === "shape") {
+      chip.group = "Shape";
+      chip.icon = "rectangle-horizontal";
+      chip.icon_only = true;
+      const icons: Record<string, string> = { square: "square", landscape: "rectangle-horizontal", portrait: "rectangle-vertical", wide: "monitor", tall: "smartphone" };
+      if (Array.isArray(chip.options)) for (const option of chip.options as Array<Record<string, unknown>>) option.icon = icons[String(option.value)];
+    }
+    if (chip.state === "count") { chip.group = "Pictures"; chip.icon = "layers"; chip.icon_only = true; }
   }
-  bar.chips = [...existing, ...chips.map((chip) => ({ state: chip.id, label: chip.label, group: "Style", icon: chip.id.startsWith("look_") ? "palette" : "sparkles", presentation: "popover", default: "none", quiet_value: "none", options: chip.options }))];
+  bar.chips = [...existing, ...chips.map((chip) => ({ state: chip.id, label: chip.label, group: "Style", icon: chip.id.startsWith("look_") ? "palette" : "sparkles", icon_only: true, presentation: "popover", default: "none", quiet_value: "none", options: chip.options }))];
   const call = (bar.submit as { call?: { args?: Record<string, unknown> } } | undefined)?.call;
   if (call?.args) for (const chip of chips) call.args[chip.id] = `{${chip.id}}`;
 });

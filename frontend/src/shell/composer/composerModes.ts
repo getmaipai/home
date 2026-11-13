@@ -11,7 +11,7 @@ import { useHealthQuery } from "@/apps/chat/useChatAvailability";
 // composer's `modes`, used by the Home ask box and every Create page host. Hand-copied from backend lib/composer/modes.ts (that file
 // has "@/" imports of its own); the route's zod schema is the contract.
 
-export interface ComposerChipRecord { id: string; label: string; group?: string; icon?: string; quiet?: string | number; options: Array<{ value: string | number; label: string; detail?: string }>; default: string | number }
+export interface ComposerChipRecord { id: string; label: string; group?: string; icon?: string; iconOnly?: boolean; quiet?: string | number; options: Array<{ value: string | number; label: string; detail?: string; icon?: string }>; default: string | number }
 export interface ComposerModeRecord {
   id: string; label: string; icon: string; route: string | null; engine: MakingKind | null; placeholder: string;
   references: Array<{ id: string; label: string; kind: "picture" | "character" | "place" | "audio" | "video"; max?: number }>;
@@ -91,8 +91,8 @@ export function useComposerState(response: ComposerModesResponse, setText: (text
     placeholder: words(m.placeholder),
     references: m.references.map((r) => ({ id: r.id, label: r.label, kind: r.kind, ...(r.max ? { max: r.max } : {}) })),
     chips: m.chips.map((c) => ({
-      id: c.id, label: c.label, ...(c.group ? { group: c.group } : {}), ...(c.icon ? { icon: c.icon as never } : {}), ...(c.quiet !== undefined ? { quietValue: c.quiet } : {}),
-      options: c.options.map((o) => ({ value: o.value, label: o.label, ...(o.detail ? { detail: o.detail } : {}) })),
+      id: c.id, label: c.label, ...(c.group ? { group: c.group } : {}), ...(c.icon ? { icon: c.icon as never } : {}), ...(c.iconOnly ? { iconOnly: true } : {}), ...(c.quiet !== undefined ? { quietValue: c.quiet } : {}),
+      options: c.options.map((o) => ({ value: o.value, label: o.label, ...(o.detail ? { detail: o.detail } : {}), ...(o.icon ? { icon: o.icon as never } : {}) })),
       value: valueOf(m.id, c.id, c.default),
       onValueChange: (value: string | number) => setChosen((all) => ({ ...all, [`${m.id}.${c.id}`]: value })),
     })),

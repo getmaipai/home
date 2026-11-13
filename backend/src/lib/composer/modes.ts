@@ -27,7 +27,7 @@ import type { PersonRow } from "@/types";
 export type ComposerEngine = "image" | "video" | "music" | "voices";
 export type ComposerTool = "clear" | "improve" | "lyrics";
 
-export interface ComposerModeChip { id: string; label: string; group?: string; icon?: string; /** While this value is chosen the chip adds nothing to its popover trigger (an "Auto" or "None" start), so the trigger reads the group name. */ quiet?: string | number; options: Array<{ value: string | number; label: string; detail?: string }>; default: string | number }
+export interface ComposerModeChip { id: string; label: string; group?: string; icon?: string; iconOnly?: boolean; /** While this value is chosen the chip adds nothing to its popover trigger (an "Auto" or "None" start), so the trigger reads the group name. */ quiet?: string | number; options: Array<{ value: string | number; label: string; detail?: string; icon?: string }>; default: string | number }
 export interface ComposerModeRecord {
   id: string;
   label: string;
@@ -94,13 +94,13 @@ function text(value: unknown): string | undefined { return typeof value === "str
 function chipsOf(bar: Node): ComposerModeChip[] {
   const chips = Array.isArray(bar.chips) ? bar.chips as Node[] : [];
   return chips.flatMap((chip): ComposerModeChip[] => {
-    const options = (Array.isArray(chip.options) ? chip.options as Node[] : []).flatMap((o) => (typeof o.value === "string" || typeof o.value === "number") && text(o.label) ? [{ value: o.value, label: o.label as string }] : []);
+    const options = (Array.isArray(chip.options) ? chip.options as Node[] : []).flatMap((o) => (typeof o.value === "string" || typeof o.value === "number") && text(o.label) ? [{ value: o.value, label: o.label as string, ...(text(o.icon) ? { icon: text(o.icon)! } : {}) }] : []);
     const id = text(chip.state), label = text(chip.label);
     if (!id || !label || options.length === 0) return [];
     const group = text(chip.group);
     const quiet = typeof chip.quiet_value === "string" || typeof chip.quiet_value === "number" ? chip.quiet_value : undefined;
     const icon = text(chip.icon);
-    return [{ id, label, ...(group ? { group } : {}), ...(icon ? { icon } : {}), ...(quiet !== undefined ? { quiet } : {}), options, default: (chip.default as string | number | undefined) ?? options[0]!.value }];
+    return [{ id, label, ...(group ? { group } : {}), ...(icon ? { icon } : {}), ...(chip.icon_only === true ? { iconOnly: true } : {}), ...(quiet !== undefined ? { quiet } : {}), options, default: (chip.default as string | number | undefined) ?? options[0]!.value }];
   });
 }
 

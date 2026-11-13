@@ -20,27 +20,34 @@
           "label": "Shape",
           "default": "square",
           "group": "Settings",
+          "icon": "rectangle-horizontal",
+          "icon_only": true,
           "presentation": "popover",
           "options": [
             {
               "value": "square",
-              "label": "Square"
+              "label": "Square",
+              "icon": "square"
             },
             {
               "value": "landscape",
-              "label": "Landscape"
+              "label": "Landscape",
+              "icon": "rectangle-horizontal"
             },
             {
               "value": "portrait",
-              "label": "Portrait"
+              "label": "Portrait",
+              "icon": "rectangle-vertical"
             },
             {
               "value": "wide",
-              "label": "Wide"
+              "label": "Wide",
+              "icon": "monitor"
             },
             {
               "value": "tall",
-              "label": "Tall"
+              "label": "Tall",
+              "icon": "smartphone"
             }
           ]
         },
@@ -48,7 +55,9 @@
           "state": "count",
           "label": "Pictures",
           "default": 1,
-          "group": "Settings",
+          "group": "Pictures",
+          "icon": "layers",
+          "icon_only": true,
           "presentation": "popover",
           "options": [
             {

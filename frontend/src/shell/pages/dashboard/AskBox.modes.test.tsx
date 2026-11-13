@@ -19,8 +19,8 @@ const ASK = mode({ id: "ask", label: "Ask", icon: "message-circle" });
 const PICTURE = mode({
   id: "picture", label: "Picture", route: "/apps/image/create", engine: "image", placeholder: "Describe the picture you want.", primary: { label: "Make picture" },
   chips: [
-    { id: "shape", label: "Shape", group: "Settings", default: "square", options: [{ value: "square", label: "Square" }, { value: "landscape", label: "Landscape" }] },
-    { id: "count", label: "Pictures", group: "Settings", default: 1, options: [{ value: 1, label: "1 picture" }, { value: 2, label: "2 pictures" }] },
+    { id: "shape", label: "Shape", group: "Shape", icon: "rectangle-horizontal", iconOnly: true, default: "square", options: [{ value: "square", label: "Square", icon: "square" }, { value: "landscape", label: "Landscape", icon: "rectangle-horizontal" }] },
+    { id: "count", label: "Pictures", group: "Pictures", icon: "layers", iconOnly: true, default: 1, options: [{ value: 1, label: "1 picture" }, { value: 2, label: "2 pictures" }] },
   ],
 });
 const VIDEO = mode({ id: "video", label: "Video", icon: "film", route: "/apps/video/create", engine: "video", placeholder: "Describe the video you want.", primary: { label: "Generate" } });
@@ -93,6 +93,16 @@ describe("the Home ask box reads its modes from the hub", () => {
     fireEvent.click(await view.findByText("Picture"));
     const trigger = await waitFor(() => { const el = view.container.querySelector('[data-group="Light"]'); expect(el).toBeTruthy(); return el!; });
     expect(trigger.textContent).toBe("Light");
+  });
+
+  test("the Shape trigger names its selected option and stays icon-only", async () => {
+    const view = setup(adult);
+    fireEvent.click(await pill(view));
+    fireEvent.click(await view.findByText("Picture"));
+    const trigger = await waitFor(() => { const el = view.container.querySelector('[data-slot="composer-chip-group"]'); expect(el).toBeTruthy(); return el!; });
+    expect(trigger.getAttribute("aria-label")).toBe("Shape: Square");
+    expect(trigger.querySelector(".lucide-square")).toBeTruthy();
+    expect(trigger.querySelector(".min-w-0.truncate")).toBeNull();
   });
 
   test("a mode whose engine is not ready shows the health row's line and Send stays off", async () => {
