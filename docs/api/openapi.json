@@ -68614,6 +68614,329 @@
         }
       }
     },
+    "/api/composer/modes": {
+      "get": {
+        "tags": [
+          "Media"
+        ],
+        "summary": "The composer's modes this person may use, with each mode's slots, chips and presets",
+        "responses": {
+          "200": {
+            "description": "Ask first, then Picture, Video and Song where the person's band, the household and the app allow them. Additive.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "band": {
+                      "type": "string",
+                      "enum": [
+                        "child",
+                        "teen",
+                        "adult"
+                      ]
+                    },
+                    "modes": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "label": {
+                            "type": "string"
+                          },
+                          "icon": {
+                            "type": "string"
+                          },
+                          "route": {
+                            "type": "string",
+                            "nullable": true
+                          },
+                          "engine": {
+                            "type": "string",
+                            "nullable": true,
+                            "enum": [
+                              "image",
+                              "video",
+                              "music",
+                              "voices",
+                              null
+                            ]
+                          },
+                          "placeholder": {
+                            "type": "string"
+                          },
+                          "references": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "id": {
+                                  "type": "string"
+                                },
+                                "label": {
+                                  "type": "string"
+                                },
+                                "kind": {
+                                  "type": "string",
+                                  "enum": [
+                                    "picture",
+                                    "character",
+                                    "place",
+                                    "audio",
+                                    "video"
+                                  ]
+                                },
+                                "max": {
+                                  "type": "number"
+                                }
+                              },
+                              "required": [
+                                "id",
+                                "label",
+                                "kind"
+                              ]
+                            }
+                          },
+                          "chips": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "id": {
+                                  "type": "string"
+                                },
+                                "label": {
+                                  "type": "string"
+                                },
+                                "group": {
+                                  "type": "string"
+                                },
+                                "options": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "object",
+                                    "properties": {
+                                      "value": {
+                                        "anyOf": [
+                                          {
+                                            "type": "string"
+                                          },
+                                          {
+                                            "type": "number"
+                                          }
+                                        ]
+                                      },
+                                      "label": {
+                                        "type": "string"
+                                      },
+                                      "detail": {
+                                        "type": "string"
+                                      }
+                                    },
+                                    "required": [
+                                      "value",
+                                      "label"
+                                    ]
+                                  }
+                                },
+                                "default": {
+                                  "anyOf": [
+                                    {
+                                      "type": "string"
+                                    },
+                                    {
+                                      "type": "number"
+                                    }
+                                  ]
+                                }
+                              },
+                              "required": [
+                                "id",
+                                "label",
+                                "options",
+                                "default"
+                              ]
+                            }
+                          },
+                          "presets": {
+                            "type": "object",
+                            "nullable": true,
+                            "properties": {
+                              "label": {
+                                "type": "string"
+                              },
+                              "chips": {
+                                "type": "array",
+                                "items": {
+                                  "type": "object",
+                                  "properties": {
+                                    "id": {
+                                      "type": "string"
+                                    },
+                                    "label": {
+                                      "type": "string"
+                                    },
+                                    "default": {
+                                      "type": "string"
+                                    },
+                                    "options": {
+                                      "type": "array",
+                                      "items": {
+                                        "type": "object",
+                                        "properties": {
+                                          "value": {
+                                            "type": "string"
+                                          },
+                                          "label": {
+                                            "type": "string"
+                                          },
+                                          "text": {
+                                            "type": "string"
+                                          }
+                                        },
+                                        "required": [
+                                          "value",
+                                          "label",
+                                          "text"
+                                        ]
+                                      }
+                                    }
+                                  },
+                                  "required": [
+                                    "id",
+                                    "label",
+                                    "default",
+                                    "options"
+                                  ]
+                                }
+                              }
+                            },
+                            "required": [
+                              "label",
+                              "chips"
+                            ]
+                          },
+                          "tools": {
+                            "type": "array",
+                            "items": {
+                              "type": "string",
+                              "enum": [
+                                "clear",
+                                "improve",
+                                "lyrics"
+                              ]
+                            }
+                          },
+                          "primary": {
+                            "type": "object",
+                            "properties": {
+                              "label": {
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "label"
+                            ]
+                          },
+                          "quality": {
+                            "type": "object",
+                            "nullable": true,
+                            "properties": {
+                              "default": {
+                                "type": "string"
+                              },
+                              "options": {
+                                "type": "array",
+                                "items": {
+                                  "type": "object",
+                                  "properties": {
+                                    "value": {
+                                      "anyOf": [
+                                        {
+                                          "type": "string"
+                                        },
+                                        {
+                                          "type": "number"
+                                        }
+                                      ]
+                                    },
+                                    "label": {
+                                      "type": "string"
+                                    },
+                                    "detail": {
+                                      "type": "string"
+                                    }
+                                  },
+                                  "required": [
+                                    "value",
+                                    "label"
+                                  ]
+                                }
+                              }
+                            },
+                            "required": [
+                              "default",
+                              "options"
+                            ]
+                          },
+                          "availability": {
+                            "type": "string",
+                            "nullable": true,
+                            "enum": [
+                              "ready",
+                              "starting",
+                              "unavailable",
+                              null
+                            ]
+                          },
+                          "disabledReason": {
+                            "type": "string",
+                            "nullable": true
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "label",
+                          "icon",
+                          "route",
+                          "engine",
+                          "placeholder",
+                          "references",
+                          "chips",
+                          "presets",
+                          "tools",
+                          "primary",
+                          "quality",
+                          "availability",
+                          "disabledReason"
+                        ]
+                      }
+                    }
+                  },
+                  "required": [
+                    "band",
+                    "modes"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/media-productions": {
       "get": {
         "tags": [
