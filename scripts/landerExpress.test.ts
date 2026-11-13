@@ -81,18 +81,6 @@ describe("the express lane", () => {
     expect(readFileSync(join(data, "notes", "wt-ex_basic.md"), "utf8")).toContain("What was checked: starts and typechecks on top of main");
   }, 120_000);
 
-  test("LOCK-LANDING-01: the landing's static check runs with the per-checkout check lock switched off (a stray holder cannot bounce an express landing)", () => {
-    const { w, sha } = change("lockoff");
-    const seen = join(scratch, "lock-env");
-    const prior = env.MAIPAI_LAND_CHECK_CMD;
-    env.MAIPAI_LAND_CHECK_CMD = `echo "lock=$MAIPAI_WORKTREE_LOCK" > ${seen}; echo checked`;
-    try {
-      enqueue("lockoff", sha, w, { express: true });
-      expect(run("lander.sh", ["run-once"]).stdout).toContain("landed: wt/lockoff");
-    } finally { env.MAIPAI_LAND_CHECK_CMD = prior; }
-    expect(readFileSync(seen, "utf8").trim()).toBe("lock=off");
-  }, 120_000);
-
   test("LAND-FIRST-01: in direct mode a landing waits for no check: a failing typecheck and a failing boot check do not bounce it, no boot-ok is written, the note says checks run after; gated still bounces", () => {
     copyFileSync(join(import.meta.dir, "lib", "mode.sh"), join(main, "scripts", "lib", "mode.sh"));
     const prior = { c: env.MAIPAI_LAND_CHECK_CMD, b: env.MAIPAI_LAND_BOOT_CMD, m: env.MAIPAI_MODE };

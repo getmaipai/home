@@ -90,6 +90,23 @@ describe("pipeline resilience", () => {
     }
   }, 60_000);
 
+  test("LOCK-LANDING-01: a second daemon is refused even when the pid file is gone (two daemons overlapped in one checkout on 2026-11-12)", () => {
+    const priorPath = env.PATH;
+    const fakeBin = join(scratch, "fake-process-tools-dup");
+    mkdirSync(fakeBin, { recursive: true });
+    const bin = env.MAIPAI_PIPELINE_BIN ?? join(main, "data-scratch", "pipeline-bin");
+    writeFileSync(join(fakeBin, "ps"), `#!/bin/bash\nprintf '%s\\n' '99999 /bin/bash ${bin}/lander.sh serve'\n`);
+    chmodSync(join(fakeBin, "ps"), 0o755);
+    rmSync(join(data, "lander.pid"), { force: true });
+    env.PATH = `${fakeBin}:${priorPath ?? ""}`;
+    try {
+      const second = run("lander.sh", ["serve"]);
+      expect(second.status).toBe(1);
+      expect(second.stderr).toContain("another lander daemon is running as pid 99999");
+      expect(existsSync(join(data, "lander.pid"))).toBe(false);
+    } finally { env.PATH = priorPath; }
+  }, 30_000);
+
   test("clean main checkout fast-forwards and tracked dirt is left alone", () => {
     const prior = env.MAIPAI_LAND_UPDATE_MAIN;
     env.MAIPAI_LAND_UPDATE_MAIN = "1";

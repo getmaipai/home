@@ -152,7 +152,7 @@ watcher_direct() {
 post_landing_check() {
   local out="$1" command="${MAIPAI_WATCH_POST_CMD:-}"
   [[ -n "$command" ]] || command='bash scripts/check.sh --pre && (cd frontend && bunx eslint . --cache --cache-location .eslintcache) && { [[ ! -f scripts/boot-check.sh ]] || bash scripts/boot-check.sh; }'
-  (cd "$checkout" && MAIPAI_COMMONS_DIR="$(cd "$main/.." && pwd -P)/commons" MAIPAI_STANDARDS_DIR="$(cd "$main/.." && pwd -P)/.github" MAIPAI_WORKTREE_LOCK=off MAIPAI_GATE_NO_FETCH=1 \
+  (cd "$checkout" && MAIPAI_COMMONS_DIR="$(cd "$main/.." && pwd -P)/commons" MAIPAI_STANDARDS_DIR="$(cd "$main/.." && pwd -P)/.github" MAIPAI_GATE_NO_FETCH=1 \
     bounded_run "${MAIPAI_WATCH_POST_SECONDS:-900}" "post-landing check" nice -n "${MAIPAI_WATCH_NICE:-10}" bash -c "$command") >"$out" 2>&1
 }
 

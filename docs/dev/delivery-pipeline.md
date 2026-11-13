@@ -499,17 +499,18 @@ Proof: `scripts/installHome.test.ts` "DIRECT-FAST-08": a direct walk visits exac
 
 ## 28. A landing is never bounced by a lock, and the suite yields (LOCK-LANDING-01, 2026-11-12)
 
-Three express landings of one Stack pin bounced four seconds in with "worktree lock: another check is already running in .../home-lander". The first guess, that the watcher's suite held the lander's gate lock, was wrong: the watcher runs in its own checkout (`home-watcher`), `check.sh --pre` never takes the machine-wide gate lock, and the lock that refused is the per-checkout single-flight lock (`scripts/gate/worktreeLock.sh`, the file `gate-worktree.lock` in that checkout's git directory). Something in `home-lander` held descriptor 6 open (a child of an earlier check that outlived it); nothing held it a minute later, so the holder is not named in the evidence.
+Three express landings of one Stack pin bounced four seconds in with "worktree lock: another check is already running in .../home-lander". The first guess, that the watcher's suite held the lander's gate lock, was wrong: the watcher runs in its own checkout (`home-watcher`), `check.sh --pre` never takes the machine-wide gate lock, and the lock that refused is the per-checkout single-flight lock (`scripts/gate/worktreeLock.sh`, `gate-worktree.lock` in that checkout's git directory). The holder, once the refusal named it (`held by pid ...`), was the static check of another landing in the same checkout: **two lander daemons were running** (started 17:26 and 18:20; the pid file named only the newer one, so the "already running" guard never saw the older). The lock was doing its job; the fault was two writers.
 
 What changed:
 
-- The lander runs its static check with `MAIPAI_WORKTREE_LOCK=off`. The lander is the only writer of its checkout and does one step at a time, so a landing needs no such lock. Normal and express landings take the same path. Other callers (`wt.sh check`, a hand run) keep the lock.
-- A refusal now names the holder (`held by pid ...`, from `lsof`), so the next stray is found instead of guessed.
+- `lander.sh serve` now also refuses to start when `ps` shows another `pipeline-bin/lander.sh serve` process, whatever the pid file says. (The lock is not bypassed: it is what kept two daemons from corrupting one checkout.)
+- A lock refusal names the holding pid (from `lsof`), so a stray is found instead of guessed.
 - The watcher's suite yields to a landing. It runs niced (`MAIPAI_WATCH_NICE`, default 10 instead of 0) and sets `MAIPAI_GATE_YIELD_FILE` to the lander's `current-entry` file. While that file was written in the last 20 minutes the sharder starts no new worker (running ones finish; nothing is stopped mid-test, so no timing test sees a jump), for at most `MAIPAI_GATE_YIELD_MAX` seconds (default 600) in total, then it carries on. `check.sh` and the lander's own safety tests set no yield file and never yield.
+- In DIRECT mode no check stands in front of a landing at all (28.2), so the lock cannot bounce one.
 
-The machine-wide gate lock (`gate-lock.sh`) is taken only by the full and frontend `check.sh` scopes and by the watcher's whole run; a landing's static check does not use it, so it never waits on the watcher's hold of it.
+The machine-wide gate lock (`gate-lock.sh`) is taken only by the full and frontend `check.sh` scopes and by the watcher's whole run; a landing's static check does not use it.
 
-Proof: `scripts/gate/worktreeLock.test.ts` (a held lock refuses with the holder named; `off` passes), `scripts/landerExpress.test.ts` "LOCK-LANDING-01" (the check sees `MAIPAI_WORKTREE_LOCK=off`), `scripts/gate/shardTests.test.ts` (`landingActive` and a run that starts nothing during the yield, then runs on).
+Proof: `scripts/gate/worktreeLock.test.ts` (a refusal names the holder), `scripts/landerResilience.test.ts` "LOCK-LANDING-01" (a second daemon is refused with no pid file), `scripts/gate/shardTests.test.ts` (`landingActive` and a run that starts nothing during the yield, then runs on).
 
 ### 28.1 The two "red at c71aaf0" tests
 

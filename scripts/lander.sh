@@ -369,7 +369,7 @@ run_static_check() {
   local output="$1" cap="${MAIPAI_LAND_CHECK_SECONDS:-900}" command="${MAIPAI_LAND_CHECK_CMD:-}"
   # DUP-CHECK-01 (2026-11-12): the check judges the change against the main it was rebased on (not GitHub's main, which lags by up to a
   # batch), does not fetch again (the landing just did), and does not regenerate what this landing generated a moment ago.
-  local -a check_env=(MAIPAI_GATE_NO_FETCH=1 MAIPAI_PRE_GENERATED=1 MAIPAI_WORKTREE_LOCK=off)
+  local -a check_env=(MAIPAI_GATE_NO_FETCH=1 MAIPAI_PRE_GENERATED=1)
   [[ -z "${LAND_DIFF_BASE:-}" ]] || check_env+=(MAIPAI_GATE_DIFF_BASE="$LAND_DIFF_BASE")
   [[ -z "${LAND_GEN_SETTINGS:-}" ]] || check_env+=(MAIPAI_PRE_SETTINGS_FILE="$LAND_GEN_SETTINGS")
   if [[ -n "$command" ]]; then
@@ -1065,6 +1065,11 @@ serve() {
   lib_hash="$(libs_hash)"
   [[ "$refresh_seconds" =~ ^[0-9]+$ ]] || refresh_seconds=60
   (( refresh_seconds > 0 )) || refresh_seconds=1
+  # LOCK-LANDING-01: a second daemon is refused even when the pid file is gone (2026-11-12: two daemons ran for 50 minutes, so their
+  # steps overlapped in one checkout and the per-checkout check lock bounced three express landings; the pid file named only the newer one).
+  local other
+  other="$(ps -axo pid=,command= 2>/dev/null | awk -v me="$$" -v bin="$bin/lander.sh" '$1 != me && $0 ~ bin " serve" { print $1 }' | head -n 1)"
+  if [[ -n "$other" ]]; then error "another lander daemon is running as pid $other; stop it with bash scripts/pipeline.sh stop (or kill that pid) before starting a second one."; return 1; fi
   if [[ -f "$pidfile" ]]; then
     old="$(cat "$pidfile" 2>/dev/null || true)"
     if [[ "$old" =~ ^[0-9]+$ && "$old" != "$$" ]] && kill -0 "$old" 2>/dev/null && ps -p "$old" -o command= 2>/dev/null | grep -Eq 'lander\.sh'; then error "already running as pid $old; stop it with bash scripts/pipeline.sh stop."; return 1; fi
