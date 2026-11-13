@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
-import { chmodSync, existsSync, mkdirSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
+import { chmodSync, copyFileSync, existsSync, mkdirSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import * as fixtures from "./tests/landerFixtures";
 const { scratch, origin, main, data, pipelineBin, env, git, run, makeWorktree, commit, note, queueFiles, setup, cleanup } = fixtures.createLanderFixtures();
@@ -95,7 +95,7 @@ describe("pipeline resilience", () => {
     const fakeBin = join(scratch, "fake-process-tools-dup");
     mkdirSync(fakeBin, { recursive: true });
     const bin = env.MAIPAI_PIPELINE_BIN ?? join(main, "data-scratch", "pipeline-bin");
-    writeFileSync(join(fakeBin, "ps"), `#!/bin/bash\nprintf '%s\\n' '99999 /bin/bash ${bin}/lander.sh serve'\n`);
+    writeFileSync(join(fakeBin, "ps"), `#!/bin/bash\nprintf '%s\\n' '99999 1 /bin/bash ${bin}/lander.sh serve'\n`);
     chmodSync(join(fakeBin, "ps"), 0o755);
     rmSync(join(data, "lander.pid"), { force: true });
     env.PATH = `${fakeBin}:${priorPath ?? ""}`;
@@ -106,6 +106,28 @@ describe("pipeline resilience", () => {
       expect(existsSync(join(data, "lander.pid"))).toBe(false);
     } finally { env.PATH = priorPath; }
   }, 30_000);
+
+  test("LOCK-LANDING-01: the duplicate-daemon guard does not mistake the daemon's own forks for a second daemon (it stopped the real lander on its restart)", async () => {
+    const bin = join(scratch, "dup-guard-bin");
+    mkdirSync(bin, { recursive: true });
+    copyFileSync(join(main, "scripts", "lander.sh"), join(bin, "lander.sh"));
+    const prior = { b: env.MAIPAI_PIPELINE_BIN, p: env.MAIPAI_LAND_POLL_SECONDS, r: env.MAIPAI_PIPELINE_REFRESH_SECONDS };
+    env.MAIPAI_PIPELINE_BIN = bin; env.MAIPAI_LAND_POLL_SECONDS = "1"; env.MAIPAI_PIPELINE_REFRESH_SECONDS = "3600";
+    rmSync(join(data, "lander.pid"), { force: true });
+    const server = Bun.spawn(["bash", join(bin, "lander.sh"), "serve"], { cwd: main, env, stdout: "pipe", stderr: "pipe" });
+    const pidfile = join(data, "lander.pid");
+    try {
+      const deadline = Date.now() + 15_000;
+      while (!existsSync(pidfile) && Date.now() < deadline && server.exitCode === null) await Bun.sleep(25);
+      await Bun.sleep(3000);
+      expect(server.exitCode).toBeNull();
+      expect(existsSync(pidfile)).toBe(true);
+    } finally {
+      if (existsSync(pidfile)) process.kill(Number(readFileSync(pidfile, "utf8").trim()), "SIGTERM"); else server.kill();
+      await server.exited;
+      env.MAIPAI_PIPELINE_BIN = prior.b; env.MAIPAI_LAND_POLL_SECONDS = prior.p; env.MAIPAI_PIPELINE_REFRESH_SECONDS = prior.r;
+    }
+  }, 60_000);
 
   test("clean main checkout fast-forwards and tracked dirt is left alone", () => {
     const prior = env.MAIPAI_LAND_UPDATE_MAIN;

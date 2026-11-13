@@ -1065,10 +1065,10 @@ serve() {
   lib_hash="$(libs_hash)"
   [[ "$refresh_seconds" =~ ^[0-9]+$ ]] || refresh_seconds=60
   (( refresh_seconds > 0 )) || refresh_seconds=1
-  # LOCK-LANDING-01: a second daemon is refused even when the pid file is gone (2026-11-12: two daemons ran for 50 minutes, so their
+  # LOCK-LANDING-01: a second daemon is refused even when the pid file is gone (forks of this very process, same command line, are not a second daemon: the first version missed that and stopped the lander on its own restart) (2026-11-12: two daemons ran for 50 minutes, so their
   # steps overlapped in one checkout and the per-checkout check lock bounced three express landings; the pid file named only the newer one).
   local other
-  other="$(ps -axo pid=,command= 2>/dev/null | awk -v me="$$" -v bin="$bin/lander.sh" '$1 != me && $0 ~ bin " serve" { print $1 }' | head -n 1)"
+  other="$(ps -axo pid=,ppid=,command= 2>/dev/null | awk -v me="$$" -v bin="$bin/lander.sh" '$1 != me && $2 != me && $0 ~ bin " serve" { print $1 }' | head -n 1)"
   if [[ -n "$other" ]]; then error "another lander daemon is running as pid $other; stop it with bash scripts/pipeline.sh stop (or kill that pid) before starting a second one."; return 1; fi
   if [[ -f "$pidfile" ]]; then
     old="$(cat "$pidfile" 2>/dev/null || true)"
