@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-11-13T15:29:17.456Z",
-  "kitTag": "ui-v0.5.636",
+  "generatedAt": "2026-11-13T15:48:09.359Z",
+  "kitTag": "ui-v0.5.637",
   "items": [
     {
       "file": "ActivityCardsShowcase.tsx",
@@ -2022,6 +2022,22 @@
       "verdict": "later",
       "verdictReason": "Deferred until TurnStats.nodes.",
       "implemented": true
+    },
+    {
+      "file": "track-studio-compare-bar.tsx",
+      "name": "track-studio-compare-bar",
+      "group": "track",
+      "verdict": "later",
+      "verdictReason": "New in ui-v0.5.637; not drawn by a Home page yet (verdict \"later\" set automatically by the pin); assess and wire it when a page uses it.",
+      "implemented": false
+    },
+    {
+      "file": "track-studio-compare.ts",
+      "name": "track-studio-compare",
+      "group": "track",
+      "verdict": "later",
+      "verdictReason": "New in ui-v0.5.637; not drawn by a Home page yet (verdict \"later\" set automatically by the pin); assess and wire it when a page uses it.",
+      "implemented": false
     },
     {
       "file": "track-studio-edit.ts",
