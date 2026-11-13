@@ -172,6 +172,8 @@ export interface ChatModelAdapterDeps {
   /** STT-SMARTTURN-01: armed once by the live voice session when the final transcript matched a held speculative run: this send
    * confirms and resumes that run instead of starting a new turn. */
   consumeSpeculation?(): import("@/apps/chat/useChatVoiceTurnState").SpeculationIds | undefined;
+  /** TALK-OVER-01: true once per spoken turn when the acknowledgement clip already played for it, so the run's quick cue is not spoken too. */
+  consumeAckClipPlayed?(): boolean;
   consumeVoiceTiming?(): number | undefined;
   onFirstPlayback?(at: number): void;
   onFirstSentencePlaybackTiming?(timing: FirstSentencePlaybackTiming): void;
@@ -420,6 +422,7 @@ export function createChatModelAdapter(deps: ChatModelAdapterDeps): ChatModelAda
         // STT-SMARTTURN-01: a confirmed speculative run is resumed from its first event with `confirm`; the server releases the held turn.
         const speculation = spokenTurn ? deps.consumeSpeculation?.() : undefined;
         if (speculation) { resumeToken = speculation.resumeToken; resumeTurnId = speculation.turnId; conversationId = speculation.conversationId; }
+        const ackClipPlayed = spokenTurn ? deps.consumeAckClipPlayed?.() === true : false;
         if (conversationId) await deps.resumeConversationIfClosed?.(conversationId);
         const temporary = deps.consumeTemporary?.();
         const imageParts: { id: string; name: string; width: number; height: number; media_type: string }[] = [];
@@ -628,7 +631,8 @@ export function createChatModelAdapter(deps: ChatModelAdapterDeps): ChatModelAda
             // scheduler is a plain FIFO queue, so it plays first and the
             // real reply's sentences (enqueued above as they arrive) follow
             // right after.
-            if (speakReplies) {
+            // TALK-OVER-01: the acknowledgement clip was the opening sound for this turn; the run's own quick cue would be a second one.
+            if (speakReplies && !ackClipPlayed) {
               scheduler.enqueueSentence(event.text, { cue: true, ...(resumeTurnId && event.generation !== undefined ? { turnId: resumeTurnId, generation: event.generation } : {}) });
             }
             // Lane 11 item 1's own decision (chatTurnActivity.ts): a

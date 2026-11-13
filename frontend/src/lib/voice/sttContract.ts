@@ -41,8 +41,10 @@ import { z } from "zod";
 /** `armed`: the client could start one and the final came first (no edge partial reached it); `no_conversation`: the voice chat has no
  * conversation id yet (a new chat's first turn); `too_long`: over 40 words; `refused`: the hub said no (400); `request_failed`: the start
  * request itself failed; `started`: begun and unresolved; `confirmed` / `discarded`: the final's verdict; `off`: the setting is off. */
-export type SpeculativeOutcome = "off" | "armed" | "no_conversation" | "too_long" | "no_edge" | "refused" | "request_failed" | "started" | "confirmed" | "discarded";
-export const SPECULATIVE_OUTCOMES = ["off", "armed", "no_conversation", "too_long", "no_edge", "refused", "request_failed", "started", "confirmed", "discarded"] as const;
+export type SpeculativeOutcome = typeof SPECULATIVE_OUTCOMES[number];
+/** `unfinished`: every edge partial read as a mid-sentence fragment, so no run was started; `late_start`: the start request was still in
+ * flight when the final came (the hub answered after the silence timer). */
+export const SPECULATIVE_OUTCOMES = ["off", "armed", "no_conversation", "too_long", "no_edge", "unfinished", "late_start", "refused", "request_failed", "started", "confirmed", "discarded"] as const;
 export type TalkOverDecision = "none" | "confirmed" | "continued";
 /** The optional labels and counts a client adds to its timing report, beside the speech-path stamps. */
 export interface SttTimingExtras {

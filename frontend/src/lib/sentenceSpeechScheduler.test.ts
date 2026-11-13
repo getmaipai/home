@@ -366,3 +366,33 @@ describe("sentence speech scheduler", () => {
     expect(scheduler.heardVisibleEnd()).toBe(11);
   });
 });
+
+describe("TALK-OVER-01: a hard stop", () => {
+  test("stop ramps the bus to zero in at most 20 ms and cuts the sources within 250 ms, with no audible fade", async () => {
+    const { ANTI_CLICK_RAMP_MS } = await import("@/lib/sentenceSpeechScheduler");
+    expect(ANTI_CLICK_RAMP_MS).toBeLessThanOrEqual(20);
+    const ramps: Array<{ to: number; at: number }> = [];
+    const stops: number[] = [];
+    class RampContext extends FakeAudioContext {
+      override createGain() { return { connect: () => {}, disconnect: () => {}, gain: { value: 1, setValueAtTime: () => {}, cancelScheduledValues: () => {}, linearRampToValueAtTime: (to: number, at: number) => { ramps.push({ to, at }); } } } as unknown as GainNode; }
+      override createBufferSource() { const source = super.createBufferSource(); (source as unknown as { stop: () => void }).stop = () => { stops.push(performance.now()); }; (source as unknown as { disconnect: () => void }).disconnect = () => {}; return source; }
+    }
+    // The page-wide shared context is the one a live reply plays through (a private context is simply closed on stop).
+    const { __resetPlaybackContextForTests } = await import("@/lib/voice/playbackContext");
+    const win = globalThis.window as unknown as { AudioContext?: unknown };
+    const previous = win.AudioContext;
+    win.AudioContext = RampContext;
+    __resetPlaybackContextForTests();
+    try {
+      const scheduler = new SentenceSpeechScheduler(undefined, async () => new Response(new Uint8Array(44)));
+      scheduler.enqueueSentence("a long sentence that is cut mid-word");
+      for (let i = 0; i < 6; i++) await settle();
+      const began = performance.now();
+      scheduler.stop();
+      expect(ramps).toEqual([{ to: 0, at: ANTI_CLICK_RAMP_MS / 1000 }]);
+      await new Promise((resolve) => setTimeout(resolve, ANTI_CLICK_RAMP_MS + 30));
+      expect(stops).toHaveLength(1);
+      expect(stops[0]! - began).toBeLessThanOrEqual(250);
+    } finally { win.AudioContext = previous; __resetPlaybackContextForTests(); }
+  });
+});

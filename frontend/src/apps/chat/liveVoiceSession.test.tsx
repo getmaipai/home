@@ -443,6 +443,132 @@ describe("live voice session", () => {
     } finally { speculate.mockRestore(); discard.mockRestore(); }
   });
 
+  // TALK-OVER-01 (docs/design/talk-over-2026-11-12.md section 4): the acknowledgement clip and the protected overlap window.
+  function fakeClipPool(played: Array<{ stopped: boolean }>, durationMs = 300) {
+    return {
+      size: 2,
+      play: (at = performance.now()) => { const handle = { durationMs, startedAt: at, ended: false, stopped: false, stop() { if (handle.ended) return 0; handle.ended = true; handle.stopped = true; return 15; } }; played.push(handle); return handle; },
+      stopAll: () => {},
+    };
+  }
+  function talkOverHarness(options: { grant?: { level: "gentle" | "natural"; window_ms: number; clips: string[] } | null; speculate?: ReturnType<typeof spyOn>; discard?: ReturnType<typeof spyOn>; durationMs?: number } = {}) {
+    const played: Array<{ stopped: boolean; ended: boolean }> = [];
+    const rendered: string[][] = [];
+    const pendingRef = { current: null as { turnId: string; resumeToken: string; conversationId: string } | null };
+    const ackClipPlayedRef = { current: false };
+    const timings: Array<{ sttMs: number; phase?: string; speculative?: string; talkOver?: Record<string, unknown> }> = [];
+    const socket = controlledSocket();
+    const grant = options.grant === undefined ? { level: "gentle" as const, window_ms: 500, clips: ["Mm-hm.", "Okay."] } : options.grant;
+    const createSocket = (handlers: SttSocketHandlers) => {
+      const inner = socket.createSocket(handlers);
+      // The hub's ready carries the grant (none for a minor or when the setting is off).
+      setTimeout(() => { if (grant) handlers.onMessage({ t: "ready", talk_over: grant } as unknown as SttServerMessage); }, 1);
+      return inner;
+    };
+    const renderClips = async (clips: readonly string[]) => { rendered.push([...clips]); return fakeClipPool(played, options.durationMs) as never; };
+    let ended = 0;
+    const element = (speakingEndedAt: number) => <Harness open onOpenChange={() => {}} isSpeaking={false} speakingEndedAt={speakingEndedAt} fixture={[]} sentTexts={[]} socketFactory={createSocket} speculation={{ getConversationId: () => "conv-1", pendingRef, ackClipPlayedRef, renderClips } as never} onVoiceTiming={(timing) => timings.push(timing as never)} />;
+    const view = render(element(0));
+    // The reply finished speaking (chatModelAdapter's onSpeakingChange, relayed as state): the session goes back to listening.
+    const endReply = () => { ended += 1; view.rerender(element(ended)); };
+    return { view, played, rendered, pendingRef, ackClipPlayedRef, timings, socket, endReply };
+  }
+
+  test("TALK-OVER-01: a granted session renders the hub's clips once; the edge partial that starts a held run plays one when the score fires at the level, and the matching final confirms it, skips the run's cue and reports the timing", async () => {
+    const speculate = spyOn(api, "speculateTurn").mockResolvedValue({ turn_id: "turn-held", resume_token: "token-held", conversation_id: "conv-1" });
+    const discard = spyOn(api, "discardTurn").mockResolvedValue({ cancelled: true });
+    try {
+      const h = talkOverHarness();
+      await act(async () => { await new Promise((resolve) => setTimeout(resolve, 20)); });
+      expect(h.rendered).toEqual([["Mm-hm.", "Okay."]]);
+      act(() => h.socket.send({ t: "vad", speaking: true, rms: 0.3 }));
+      // A fragment that reads unfinished: no held run and no clip.
+      act(() => h.socket.send({ t: "partial", v: "what is a good name for a", edge: true, end: { score: 0.05, level: "none", unfinished: true } } as never));
+      expect(speculate).not.toHaveBeenCalled(); expect(h.played).toHaveLength(0);
+      // A natural-only score at a gentle grant: the held run starts, the clip does not play.
+      act(() => h.socket.send({ t: "partial", v: "what is a good name for a small grey cat", edge: true, end: { score: 0.65, level: "natural", unfinished: false } } as never));
+      expect(speculate).toHaveBeenCalledTimes(1); expect(h.played).toHaveLength(0);
+      await act(async () => { await new Promise((resolve) => setTimeout(resolve, 20)); });
+      // The question mark arrives with the next edge partial: a gentle score, so the newer words replace the held run and the clip plays.
+      act(() => h.socket.send({ t: "partial", v: "what is a good name for a small grey cat?", edge: true, end: { score: 1, level: "gentle", unfinished: false } } as never));
+      expect(discard).toHaveBeenCalledWith("turn-held");
+      expect(speculate).toHaveBeenCalledTimes(2);
+      expect(h.played).toHaveLength(1);
+      await act(async () => { await new Promise((resolve) => setTimeout(resolve, 20)); });
+      act(() => h.socket.send({ t: "timing", speech_end_to_final_ms: 760, silence_wait_ms: 750 }));
+      await act(async () => { h.socket.send({ t: "final", v: "what is a good name for a small grey cat?" }); await new Promise((resolve) => setTimeout(resolve, 0)); });
+      expect(h.pendingRef.current?.turnId).toBe("turn-held");
+      expect(h.ackClipPlayedRef.current).toBe(true);
+      expect(h.played[0]!.stopped).toBe(false);
+      const final = h.timings.find((t) => t.phase === "final");
+      expect(final?.speculative).toBe("confirmed");
+      expect(final?.talkOver).toMatchObject({ talk_over_level: "gentle", decision: "confirmed", overlap_ms: 550 });
+      expect(typeof final?.talkOver?.early_release_ms).toBe("number");
+    } finally { speculate.mockRestore(); discard.mockRestore(); }
+  });
+
+  test("TALK-OVER-01: the person goes on after the clip: at the window's end the clip is cut, the held run is discarded silently, and the whole utterance's final goes the normal way; two of these drop the level", async () => {
+    const speculate = spyOn(api, "speculateTurn").mockResolvedValue({ turn_id: "turn-held", resume_token: "token-held", conversation_id: "conv-1" });
+    const discard = spyOn(api, "discardTurn").mockResolvedValue({ cancelled: true });
+    try {
+      const h = talkOverHarness({ grant: { level: "natural", window_ms: 500, clips: ["Mm-hm."] }, durationMs: 100 });
+      await act(async () => { await new Promise((resolve) => setTimeout(resolve, 20)); });
+      for (let round = 0; round < 2; round++) {
+        act(() => h.socket.send({ t: "vad", speaking: true, rms: 0.3 }));
+        act(() => h.socket.send({ t: "partial", v: "I want to go to the store", edge: true, end: { score: 0.5, level: "natural", unfinished: false } } as never));
+        expect(h.played).toHaveLength(round + 1);
+        await act(async () => { await new Promise((resolve) => setTimeout(resolve, 20)); });
+        // The hub reports the voice back, well after the clip (100 ms) plus the echo margin.
+        await act(async () => { await new Promise((resolve) => setTimeout(resolve, 250)); });
+        act(() => h.socket.send({ t: "vad", speaking: true, rms: 0.3, resumed: true, voiced_ms: 210 } as never));
+        // At the window's end: cut, discard, nothing said. The window widens 100 ms per wrong start, so wait past the widest.
+        await act(async () => { await new Promise((resolve) => setTimeout(resolve, 450)); });
+        expect(discard).toHaveBeenCalledTimes(round + 1);
+        expect(h.played[round]!.ended).toBe(true);
+        act(() => h.socket.send({ t: "timing", speech_end_to_final_ms: 760, silence_wait_ms: 750 }));
+        await act(async () => { h.socket.send({ t: "final", v: "I want to go to the store tomorrow at five" }); await new Promise((resolve) => setTimeout(resolve, 0)); });
+        expect(h.pendingRef.current).toBeNull();
+        const final = h.timings.filter((t) => t.phase === "final")[round];
+        expect(final?.talkOver).toMatchObject({ decision: "continued" });
+        expect(final?.talkOver?.yield_ms).toBe(15);
+        expect(h.ackClipPlayedRef.current).toBe(false);
+        act(() => h.endReply());
+      }
+      // Two wrong starts: natural dropped to gentle, so a natural-level score no longer plays a clip.
+      act(() => h.socket.send({ t: "vad", speaking: true, rms: 0.3 }));
+      act(() => h.socket.send({ t: "partial", v: "I had a long day at work", edge: true, end: { score: 0.5, level: "natural", unfinished: false } } as never));
+      expect(h.played).toHaveLength(2);
+    } finally { speculate.mockRestore(); discard.mockRestore(); }
+  });
+
+  test("TALK-OVER-01: a resume inside the clip's own playback is echo and changes nothing; a session with no grant (a minor, the setting off) renders and plays nothing", async () => {
+    const speculate = spyOn(api, "speculateTurn").mockResolvedValue({ turn_id: "turn-held", resume_token: "token-held", conversation_id: "conv-1" });
+    const discard = spyOn(api, "discardTurn").mockResolvedValue({ cancelled: true });
+    try {
+      const h = talkOverHarness({ grant: { level: "gentle", window_ms: 500, clips: ["Mm-hm."] }, durationMs: 400 });
+      await act(async () => { await new Promise((resolve) => setTimeout(resolve, 20)); });
+      act(() => h.socket.send({ t: "vad", speaking: true, rms: 0.3 }));
+      act(() => h.socket.send({ t: "partial", v: "Is it going to rain tomorrow?", edge: true, end: { score: 1, level: "gentle", unfinished: false } } as never));
+      expect(h.played).toHaveLength(1);
+      await act(async () => { await new Promise((resolve) => setTimeout(resolve, 50)); });
+      act(() => h.socket.send({ t: "vad", speaking: true, rms: 0.3, resumed: true, voiced_ms: 200 } as never)); // inside the 400 ms clip: the clip's echo
+      await act(async () => { await new Promise((resolve) => setTimeout(resolve, 700)); }); // past the window (max(500, 400 + 250) = 650 ms)
+      expect(discard).not.toHaveBeenCalled();
+      expect(h.played[0]!.stopped).toBe(false);
+      act(() => h.socket.send({ t: "timing", speech_end_to_final_ms: 760, silence_wait_ms: 750 }));
+      await act(async () => { h.socket.send({ t: "final", v: "Is it going to rain tomorrow?" }); await new Promise((resolve) => setTimeout(resolve, 0)); });
+      expect(h.pendingRef.current?.turnId).toBe("turn-held");
+      expect(h.timings.find((t) => t.phase === "final")?.talkOver).toMatchObject({ decision: "confirmed" });
+      cleanup();
+      const minor = talkOverHarness({ grant: null });
+      await act(async () => { await new Promise((resolve) => setTimeout(resolve, 20)); });
+      act(() => minor.socket.send({ t: "vad", speaking: true, rms: 0.3 }));
+      act(() => minor.socket.send({ t: "partial", v: "Is it going to rain tomorrow?", edge: true, end: { score: 1, level: "gentle", unfinished: false } } as never));
+      expect(minor.rendered).toEqual([]);
+      expect(minor.played).toHaveLength(0);
+    } finally { speculate.mockRestore(); discard.mockRestore(); }
+  });
+
   test("a pause in a longer stretch of speech asks the small model for a reaction; short speech or a quick restart does not", async () => {
     const random = spyOn(Math, "random").mockReturnValue(0);
     const react = spyOn(api, "reactTurn").mockResolvedValue({ text: null });

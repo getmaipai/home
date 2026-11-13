@@ -36,6 +36,8 @@ import { SentenceSpeechScheduler } from "@/lib/sentenceSpeechScheduler";
 import { api } from "@/lib/api";
 import type { SpeculationIds } from "@/apps/chat/useChatVoiceTurnState";
 import type { SpeculativeOutcome, SttTimingExtras } from "@/lib/voice/sttContract";
+import { TalkOverController, type Overlap } from "@/lib/voice/talkOver";
+import { renderAckClips, type AckClipHandle, type AckClipPool } from "@/lib/voice/ackClip";
 
 export interface LiveVoiceSessionProps {
   composer: { setText: (text: string) => void; send: () => void };
@@ -51,7 +53,14 @@ export interface LiveVoiceSessionProps {
   activeTurnRef: { current: { turnId: string; heardVisibleEnd: () => number } | null };
   /** STT-SMARTTURN-01: when set, a turn may begin privately on the edge partial (the first partial after the voice stops) for the
    * conversation `getConversationId` names; the final transcript confirms it on an exact match through `pendingRef`, else it is discarded. */
-  speculation?: { getConversationId: () => string | undefined; pendingRef: { current: SpeculationIds | null } };
+  speculation?: { getConversationId: () => string | undefined; pendingRef: { current: SpeculationIds | null };
+    /** TALK-OVER-01: set when the acknowledgement clip played for the turn being confirmed, so the adapter skips the run's own cue. */
+    ackClipPlayedRef?: { current: boolean };
+    /** The voice the reply will use (the scheduler's `voice`), so the clips are rendered in it (rule 14). */
+    getVoice?: () => string | undefined;
+    /** Test seam: the clip renderer. */
+    renderClips?: typeof renderAckClips;
+  };
   cancelRun: () => void;
   voiceBargeIn?: boolean;
   /** sttDictationAdapter.ts's own established shape: `createSttSocket`
@@ -181,7 +190,48 @@ export function useLiveVoiceSession({ composer, open, onOpenChange, onProblem, i
   const speculationInFlightRef = useRef<string | null>(null);
   const latestEdgeTextRef = useRef<string | null>(null);
   const refusedThisUtteranceRef = useRef(false);
-  const startSpeculation = (text: string, unfinished = false) => {
+  // TALK-OVER-01 (docs/design/talk-over-2026-11-12.md section 2): the acknowledgement clip and its protected overlap window. The hub
+  // grants the level per session (`ready.talk_over`, adults only); the clips are rendered once in the reply's voice; one clip plays
+  // per utterance, on the edge partial that starts a held run when the hub's end-of-turn score fires at the level in force.
+  const talkOverRef = useRef<TalkOverController | null>(null);
+  const ackPoolRef = useRef<AckClipPool | null>(null);
+  const ackRenderRef = useRef<AbortController | null>(null);
+  const overlapRef = useRef<(Overlap & { conversationId: string; text: string; clip: AckClipHandle; level: "gentle" | "natural" }) | null>(null);
+  const overlapTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const lastTalkOverRef = useRef<Pick<SttTimingExtras, "talk_over_level" | "early_release_ms" | "overlap_ms" | "decision" | "yield_ms"> | undefined>(undefined);
+  const clearOverlapTimer = () => { if (overlapTimerRef.current) clearTimeout(overlapTimerRef.current); overlapTimerRef.current = null; };
+  /** The one decision at the window's end (design item 4): the person went on, so the clip is cut and the held run dropped, silently. */
+  const decideOverlap = () => {
+    const overlap = overlapRef.current; const control = talkOverRef.current;
+    if (!overlap || !control) return;
+    const decision = control.decide(overlap.conversationId, overlap, performance.now());
+    if (decision !== "continued") return;
+    overlap.yieldMs = overlap.clip.ended ? 0 : overlap.clip.stop();
+    const held = speculationRef.current;
+    if (held && held.text === overlap.text) { speculationRef.current = null; void api.discardTurn(held.turnId).catch(() => undefined); speculativeOutcomeRef.current = "discarded"; }
+  };
+  const playAckClip = (conversationId: string, text: string, end: { level: "none" | "gentle" | "natural" } | undefined) => {
+    const control = talkOverRef.current; const pool = ackPoolRef.current;
+    if (!control || !pool || overlapRef.current || !end || !control.shouldPlay(conversationId, end.level)) return;
+    const clip = pool.play(performance.now());
+    if (!clip) return;
+    const overlap = control.open(conversationId, clip.startedAt, clip.durationMs);
+    overlapRef.current = { ...overlap, conversationId, text, clip, level: control.state(conversationId).level as "gentle" | "natural" };
+    clearOverlapTimer();
+    overlapTimerRef.current = setTimeout(() => { overlapTimerRef.current = null; decideOverlap(); }, Math.max(0, overlap.windowEndsAt - performance.now()));
+  };
+  const closeOverlap = (finalText: string | null, finalAt: number, sttMs: number | null) => {
+    const overlap = overlapRef.current; const control = talkOverRef.current;
+    overlapRef.current = null; clearOverlapTimer();
+    if (!overlap || !control) { lastTalkOverRef.current = undefined; return; }
+    if (finalText !== null && finalText === overlap.text) control.confirm(overlap);
+    else { if (control.continuedAtFinal(overlap.conversationId, overlap) === "continued" && !overlap.clip.ended) overlap.yieldMs = overlap.clip.stop(); }
+    // The clip's start relative to the end of speech: the hub's timing message says how long after the last voiced sample the final came.
+    const speechEndAt = sttMs !== null ? finalAt - sttMs : null;
+    lastTalkOverRef.current = { talk_over_level: overlap.level, overlap_ms: overlap.windowMs, decision: overlap.decision, ...(speechEndAt !== null ? { early_release_ms: Math.round(overlap.startedAt - speechEndAt) } : {}), ...(overlap.yieldMs !== null ? { yield_ms: overlap.yieldMs } : {}) };
+    if (overlap.decision === "confirmed" && speculation?.ackClipPlayedRef) speculation.ackClipPlayedRef.current = true;
+  };
+  const startSpeculation = (text: string, unfinished = false, end?: { level: "none" | "gentle" | "natural" }) => {
     if (!speculation || !text) return;
     if (speculationOffRef.current) { speculativeOutcomeRef.current = "off"; return; }
     if (refusedThisUtteranceRef.current) return;
@@ -192,12 +242,14 @@ export function useLiveVoiceSession({ composer, open, onOpenChange, onProblem, i
     if (!conversationId) { speculativeOutcomeRef.current = "no_conversation"; return; }
     latestEdgeTextRef.current = text;
     // A plainly unfinished fragment ("what is a", "I want to, uh") is not worth a model run; the next edge partial may be.
-    if (unfinished) return;
+    if (unfinished) { if (speculativeOutcomeRef.current === "armed") speculativeOutcomeRef.current = "unfinished"; return; }
     const held = speculationRef.current;
     if (held && held.text === text) return;
     if (held) { speculationRef.current = null; void api.discardTurn(held.turnId).catch(() => undefined); }
+    if (overlapRef.current && overlapRef.current.text !== text) talkOverRef.current?.noteMoreWords(overlapRef.current);
     if (speculationInFlightRef.current !== null) return; // reconciled against latestEdgeTextRef when it lands
     speculationInFlightRef.current = text;
+    playAckClip(conversationId, text, end);
     const epoch = reactionEpochRef.current;
     void api.speculateTurn(text, conversationId).then((ids) => {
       speculationInFlightRef.current = null;
@@ -338,6 +390,14 @@ export function useLiveVoiceSession({ composer, open, onOpenChange, onProblem, i
         switch (message.t) {
           case "ready":
             retryCountRef.current = 0;
+            // TALK-OVER-01: the hub's grant for this session (absent for a minor, a robot device or when the setting is off).
+            if ("talk_over" in message && message.talk_over && speculation) {
+              const grant = message.talk_over;
+              talkOverRef.current = new TalkOverController(grant);
+              ackRenderRef.current?.abort();
+              const render = new AbortController(); ackRenderRef.current = render;
+              void (speculation.renderClips ?? renderAckClips)(grant.clips, speculation.getVoice?.(), { signal: render.signal }).then((pool) => { if (!render.signal.aborted) ackPoolRef.current = pool; }).catch(() => undefined);
+            } else { talkOverRef.current = null; ackPoolRef.current = null; }
             if (voiceBargeIn && !playedTimer) {
               playedTimer = setInterval(() => {
                 const scheduler = turnSchedulerRef.current;
@@ -392,7 +452,8 @@ export function useLiveVoiceSession({ composer, open, onOpenChange, onProblem, i
             // `vad speaking: false` event only comes at finalize, after it) may begin a held run. The armed flag stays for a partial
             // that follows a vad-false from an older hub.
             if ("edge" in message && message.edge === true) edgeSeenRef.current = true;
-            if (("edge" in message && message.edge === true) || (edgePartialPendingRef.current && !activeSpeechRef.current)) { if (modeRef.current === "listening" && !isReplySpeaking() && !mutedRef.current) startSpeculation(message.v.trim(), "end" in message && message.end?.unfinished === true); }
+            if (("edge" in message && message.edge === true) || (edgePartialPendingRef.current && !activeSpeechRef.current)) { if (modeRef.current === "listening" && !isReplySpeaking() && !mutedRef.current) startSpeculation(message.v.trim(), "end" in message && message.end?.unfinished === true, "end" in message ? message.end : undefined); }
+            else if (overlapRef.current && message.v.trim().split(/\s+/).length > overlapRef.current.text.split(/\s+/).length) talkOverRef.current?.noteMoreWords(overlapRef.current);
             edgePartialPendingRef.current = false;
             activeSpeechRef.current = true;
             lastPartialRef.current = message.v;
@@ -418,10 +479,17 @@ export function useLiveVoiceSession({ composer, open, onOpenChange, onProblem, i
             // hearing you" signal while this is live.
             break;
           case "vad":
+            if (message.speaking && "resumed" in message && message.resumed === true) {
+              // TALK-OVER-01: the person's voice came back inside the same utterance (after an edge partial). It is not a new utterance, so
+              // it must not cancel the in-flight reaction or held run (doing so bumped the epoch and dropped the speculative start): it only
+              // tells the overlap window the person went on. The next edge partial, or the final, settles the held run.
+              if (overlapRef.current) talkOverRef.current?.noteResumed(overlapRef.current, performance.now());
+              break;
+            }
             if (message.speaking) {
-              if (!("resumed" in message && message.resumed === true)) { refusedThisUtteranceRef.current = false; latestEdgeTextRef.current = null; }
+              refusedThisUtteranceRef.current = false; latestEdgeTextRef.current = null;
               cancelReaction();
-              if (!("resumed" in message && message.resumed === true)) discardSpeculation(); // STT-SMARTTURN-01: a new utterance means the held run's words were not the final ones; a resume inside the utterance is judged at the next edge partial
+              discardSpeculation(); // STT-SMARTTURN-01: a new utterance means the held run's words were not the final ones
               activeSpeechRef.current = true;
               setIdleActivity((value) => value + 1);
               const elapsed = Date.now() - speakingStartedAtRef.current;
@@ -516,6 +584,8 @@ export function useLiveVoiceSession({ composer, open, onOpenChange, onProblem, i
             setCurrentMode("thinking");
             const sttMs = sttMsForNextTurn;
             sttMsForNextTurn = null;
+            // TALK-OVER-01: the final settles the overlap (a match confirms the clip; anything else was a wrong start).
+            closeOverlap(text, performance.now(), sttMs);
             // STT-SMARTTURN-01: an exact trimmed match confirms the held run through this one send; anything else discards it first.
             let speculative: SpeculativeOutcome = speculativeOutcomeRef.current;
             if (speculation) {
@@ -525,13 +595,15 @@ export function useLiveVoiceSession({ composer, open, onOpenChange, onProblem, i
               if (held && held.text === text) { speculation.pendingRef.current = { turnId: held.turnId, resumeToken: held.resumeToken, conversationId: held.conversationId }; speculative = "confirmed"; }
               else if (held) { void api.discardTurn(held.turnId).catch(() => undefined); speculative = "discarded"; }
               else if (speculative === "started") speculative = "discarded";
+              else if (speculationInFlightRef.current !== null) speculative = "late_start";
               else if (speculative === "armed" && !edgeSeenRef.current) speculative = "no_edge";
             }
             edgeSeenRef.current = false;
             speculativeOutcomeRef.current = speculationOffRef.current ? "off" : "armed";
             latestEdgeTextRef.current = null;
             refusedThisUtteranceRef.current = false;
-            onVoiceTiming?.({ sttMs: sttMs !== null && Number.isFinite(sttMs) && sttMs >= 0 ? sttMs : 0, phase: "final", ...(speculation ? { speculative } : {}) });
+            onVoiceTiming?.({ sttMs: sttMs !== null && Number.isFinite(sttMs) && sttMs >= 0 ? sttMs : 0, phase: "final", ...(speculation ? { speculative } : {}), ...(lastTalkOverRef.current ? { talkOver: lastTalkOverRef.current } : {}) });
+            lastTalkOverRef.current = undefined;
             pendingSpeechRef.current = true;
             composer.setText(text);
             void Promise.resolve(composer.send());
@@ -640,10 +712,11 @@ export function useLiveVoiceSession({ composer, open, onOpenChange, onProblem, i
   // guarantee VOICE-01's future barge-in will build on.
   useEffect(() => {
     liveVoiceActiveRef.current = open;
-    if (!open) { turnSchedulerRef.current?.stop(); cancelReaction(); discardSpeculation(); }
+    if (!open) { turnSchedulerRef.current?.stop(); cancelReaction(); discardSpeculation(); closeOverlap(null, performance.now(), null); ackPoolRef.current?.stopAll(); ackRenderRef.current?.abort(); }
     return () => {
       liveVoiceActiveRef.current = false;
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- cancelReaction/discardSpeculation/closeOverlap close over stable refs; `open` is the real trigger.
   }, [open, liveVoiceActiveRef, turnSchedulerRef]);
 
   return {

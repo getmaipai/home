@@ -48,12 +48,28 @@ const LABELLED: ReadonlyArray<[text: string, level: "none" | "gentle" | "natural
   ["Hello there.", "none"],
   // A question that ends on a number is finished.
   ["What is twenty plus three?", "gentle"],
+  // Sentences that end on a pronoun, a particle or an auxiliary are finished (the first live day started nothing on these).
+  ["What time is it?", "gentle"],
+  ["Turn the lights on.", "none"], // a weak ending without a question mark: the held run starts, no sound plays
+  ["How are you?", "gentle"],
+  ["What is the weather like?", "gentle"],
+  ["Can you tell me about it?", "gentle"],
+  ["What did you do?", "gentle"],
+  ["I would rather not.", "none"], // weak endings: the held run starts, no sound plays
+  ["I think so.", "none"],
+  ["what time is it", "natural"],
 ];
 
 describe("TALK-OVER-01: the end-of-turn predictor", () => {
   test(`the labelled set (${LABELLED.length} rows) matches row by row`, () => {
     const wrong = LABELLED.filter(([text, level]) => predictTurnEnd(text).level !== level).map(([text, level]) => `${JSON.stringify(text)}: expected ${level}, got ${predictTurnEnd(text).level} (${predictTurnEnd(text).reason}, ${predictTurnEnd(text).score})`);
     expect(wrong).toEqual([]);
+  });
+
+  test("a weak ending is not unfinished (a held run starts) but earns no sound without a question mark", () => {
+    expect(predictTurnEnd("Turn the lights on.").unfinished).toBe(false);
+    expect(predictTurnEnd("Turn the lights on.").level).toBe("none");
+    expect(predictTurnEnd("What is it for?").level).toBe("gentle");
   });
 
   test("an obviously unfinished fragment is marked so no held run starts on it; a finished sentence is not", () => {

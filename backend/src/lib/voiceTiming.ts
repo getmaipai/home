@@ -57,7 +57,7 @@ export type TalkOverDecision = "none" | "confirmed" | "continued";
 /** `armed`: the client could start one and the final came first (no edge partial reached it); `no_conversation`: the voice chat had no
  * conversation id yet; `too_long`: over 40 words; `refused`: the hub said no; `request_failed`: the start request failed; `off`: the client
  * had no speculation at all (the setting or surface). The hub itself marks `started` and `confirmed`. */
-export const SPECULATIVE_OUTCOMES = ["off", "armed", "no_conversation", "too_long", "no_edge", "refused", "request_failed", "started", "confirmed", "discarded"] as const;
+export const SPECULATIVE_OUTCOMES = ["off", "armed", "no_conversation", "too_long", "no_edge", "unfinished", "late_start", "refused", "request_failed", "started", "confirmed", "discarded"] as const;
 export const TALK_OVER_DECISIONS = ["none", "confirmed", "continued"] as const;
 
 export interface PrewarmTimingRecord { actor_hash: string; outcome: "done" | "aborted" | "failed"; reason?: "engine_busy" | "engine_error" | "timeout" | "other"; prompt_n?: number; cache_n?: number; elapsed_ms: number }

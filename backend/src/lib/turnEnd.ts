@@ -24,17 +24,22 @@ export const NATURAL_THRESHOLD = 0.5;
 export const UNFINISHED_BELOW = 0.3;
 
 // A sentence does not end on one of these: the recognizer still adds a period to any segment ("I want to."), so the word wins
-// over the punctuation. Connectives, prepositions, articles, auxiliaries, pronouns that start a clause, and hedges.
+// over the punctuation. Only words that practically never close a spoken sentence: connectives, articles, a few prepositions,
+// possessives and subject pronouns. Words that do close sentences ("what time is it", "turn the lights on", "how are you",
+// "what is it like", "I would rather not", "what did you do") are deliberately absent: the first live day (2026-11-12) had eight
+// turns in a row start no held run because their last word sat in a broader list.
 const DANGLING = new Set([
-  "and", "but", "or", "so", "because", "cause", "if", "when", "while", "then", "than", "that", "which", "who", "whose", "where",
-  "to", "the", "a", "an", "of", "with", "for", "in", "on", "at", "by", "from", "into", "onto", "about", "around", "like", "as",
-  "is", "are", "was", "were", "be", "been", "being", "am", "do", "does", "did", "can", "could", "would", "should", "will", "shall",
-  "may", "might", "must", "have", "has", "had", "not", "very", "really", "just", "also", "my", "your", "his", "her", "their", "our",
-  "its", "this", "these", "those", "some", "any", "every", "each", "no", "i", "you", "we", "they", "he", "she", "it", "let", "let's",
-  "want", "wanna", "need", "gonna", "going", "please", "maybe", "kind", "sort", "how", "what", "why", "whether",
+  "and", "but", "or", "because", "cause", "than", "whether",
+  "to", "the", "a", "an", "of", "by", "from", "into", "onto", "as", "per", "versus",
+  "my", "your", "his", "their", "our", "its", "some", "every", "each",
+  "i", "we", "they", "he", "she", "wanna", "gonna",
 ]);
+// Words that can close a sentence but more often open the rest of one ("set a timer for", "so I was thinking that", "turn it on"):
+// a held run may start (the fragment is not plainly unfinished), but no acknowledgement plays on them unless a question mark says
+// the sentence is done.
+const WEAK_DANGLING = new Set(["for", "with", "at", "in", "on", "about", "like", "that", "this", "so", "if", "when", "then", "which", "what", "where", "who", "how", "why", "is", "are", "was", "were", "be", "do", "does", "did", "can", "could", "would", "should", "will", "have", "has", "had", "not", "very", "really", "just", "also", "any", "no", "let", "want", "need", "going", "please", "maybe", "well", "actually", "mean", "know"]);
 // Hesitation sounds and restart markers: the person is still forming the thought.
-const FILLERS = new Set(["uh", "um", "er", "erm", "hmm", "hm", "mm", "like", "mean", "know", "basically", "actually", "well"]);
+const FILLERS = new Set(["uh", "um", "er", "erm", "hmm", "hm", "mm", "basically"]);
 // A request or question up front makes a pause at a clean word boundary likelier to be the end.
 const OPENERS = new Set([
   "what", "what's", "whats", "when", "when's", "where", "where's", "who", "who's", "why", "how", "how's", "which", "is", "are", "can",
@@ -67,10 +72,11 @@ export function predictTurnEnd(text: string): TurnEndScore {
   const lastTwo = list.slice(-2).join(" ");
   if (/\.\.\.$|…$/.test(trimmed)) return result(0.1, "ellipsis");
   if (/,$/.test(trimmed)) return result(0.1, "trailing_comma");
-  if (FILLERS.has(last) || lastTwo === "i mean" || lastTwo === "you know" || lastTwo === "kind of" || lastTwo === "sort of") return result(0.05, "filler");
+  if (FILLERS.has(last) || lastTwo === "i mean" || lastTwo === "you know" || lastTwo === "kind of" || lastTwo === "sort of" || lastTwo === "it's like" || lastTwo === "was like") return result(0.05, "filler");
   if (DANGLING.has(last)) return result(0.05, "connective");
   const question = /\?$/.test(trimmed);
   const terminal = /[.?!]$/.test(trimmed);
+  if (!question && WEAK_DANGLING.has(last)) return result(0.45, "connective");
   const shaped = list.length >= 3 && OPENERS.has(list[0]!);
   // A bare trailing number without a unit after a preposition ("set a timer for ten", "turn it to five") is usually the start
   // of a quantity; a question that ends on a number ("what is five times five?") is complete.
