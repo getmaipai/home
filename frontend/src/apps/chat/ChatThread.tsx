@@ -1,6 +1,6 @@
 import { i18n } from "@lingui/core";
 import { useMaxSendHold } from "@/apps/chat/maxChat";
-import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type CSSProperties, type RefObject } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, useSyncExternalStore, type CSSProperties, type RefObject } from "react";
 import { useAssistantDataUI, useAssistantToolUI, useAui, useAuiState, type ToolCallMessagePartComponent } from "@assistant-ui/react";
 import { Thread, type ThreadComponents } from "@maipai/ui/src/elements/thread.aui";
 import { setPendingChatFolder } from "@/apps/chat/chatThreadListAdapter";
@@ -13,6 +13,8 @@ import { ChatColumnControlContext } from "@/apps/chat/chatColumnControl";
 import { AdminContext, ChatAgeBandContext } from "@/apps/chat/chatThreadContexts";
 import { messageForTurn } from "./chatTurnDeepLinkModel";
 import { useReplyFace } from "@/apps/chat/useReplyFace";
+import { ASK_MODE, pickedComposerMode, setComposerPick, subscribeComposerMode } from "@/apps/chat/chatComposerHint";
+import { useComposerModes, useComposerState } from "@/shell/composer/composerModes";
 import "@/apps/chat/chatOriginHighlight.css";
 
 type OriginHighlightStyle = CSSProperties & {
@@ -196,6 +198,20 @@ export function ChatThread({ temporary, onEditSend, thinkingModeVisible = false,
     if (!typed || !typed.latest || typed.latest === typed.before) return;
     if (!aui.composer().getState().text) aui.composer().setText(typed.latest);
   }, [openingKey, aui]);
+  // ONE-COMPOSER-2026-11-13 (COMPOSER-04): the kit draws the mode pill, slots and chips inside Thread; Home passes the hub's data and keeps the
+  // pick for the one send that follows (chatComposerHint.ts). A person with plain chat only gets today's composer unchanged.
+  const modeData = useComposerModes();
+  const composer = useComposerState(modeData, useCallback((text: string) => aui.composer().setText(text), [aui]));
+  const storedMode = useSyncExternalStore(subscribeComposerMode, pickedComposerMode);
+  const { mode: pickedMode, setMode: pickMode, settings: pickedSettings } = composer;
+  useEffect(() => { if (storedMode !== pickedMode) pickMode(storedMode); }, [storedMode, pickMode]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    const { tier, ...chips } = pickedSettings;
+    setComposerPick(pickedMode, tier !== undefined ? { ...chips, quality: tier } : chips);
+  }, [pickedMode, pickedSettings]);
+  // Plain chat keeps the Thread's own placeholder (or the project's), so the Ask mode carries none.
+  const chatModes = useMemo(() => composer.kitModes.map((m) => (m.id === ASK_MODE ? { ...m, placeholder: undefined } : m)), [composer.kitModes]);
+  const composerModes = useMemo(() => modeData.modes.length > 1 ? { modes: chatModes, mode: composer.mode, onModeChange: composer.setMode, quality: composer.quality } : undefined, [modeData.modes.length, chatModes, composer.mode, composer.setMode, composer.quality]);
   const extraContext = useMemo(() => ({ rootRef, canUseIncognito, focusChatSearch, toggleSidebar, openSettings: onOpenSettings }), [canUseIncognito, focusChatSearch, onOpenSettings, toggleSidebar]);
   return (
     <div
@@ -243,6 +259,7 @@ export function ChatThread({ temporary, onEditSend, thinkingModeVisible = false,
               scrollToBottomOnThreadSwitch: true,
             },
             ...(thinkingModeVisible ? { ComposerExtraEnd: MODEL_TRAILING_SLOT } : {}),
+            ...(composerModes ? { composerModes } : {}),
             ...pageSlots,
           }}
         />

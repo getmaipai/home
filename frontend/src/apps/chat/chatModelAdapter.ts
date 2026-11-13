@@ -136,6 +136,8 @@ export interface ChatModelAdapterDeps {
   // (chatEditSupersedes.ts) - undefined for an ordinary send, never
   // anything else's edit once this one's been read.
   consumeSupersedes(): string | undefined;
+  /** COMPOSER-04: the composer's mode hint for this send, read once (the composer goes back to plain chat). */
+  consumeComposer?(): import("@maipai/spec/gen/ts/turn-composer.js").TurnComposer | undefined;
   consumeContinuation?(): PendingContinuation | undefined;
   // SHELL-02 slice 6: reads AND resets the composer's Apps-menu choice
   // (composerAddMenu.tsx's `PackageScopeContext`), the same single-shot
@@ -422,6 +424,7 @@ export function createChatModelAdapter(deps: ChatModelAdapterDeps): ChatModelAda
       // leaving a stale edit's turn id sitting in the module-scope ref
       // for a later, unrelated send to inherit.
       const supersedes = deps.consumeSupersedes();
+      const composerHint = deps.consumeComposer?.();
       const continuation = deps.consumeContinuation?.();
       // APPROVE-CARD-01 / FORM-CHAT-WEB-01: the card's one-shot answer, read and reset here for the
       // same reason as supersedes above. A typed form's values ride only the first attempt.
@@ -514,6 +517,7 @@ export function createChatModelAdapter(deps: ChatModelAdapterDeps): ChatModelAda
             confirm: speculation && reconnectAttempts === 0 ? true : undefined,
             currentLocation,
             pageContext: reconnectAttempts === 0 ? deps.getPageContext?.() : undefined,
+            composer: reconnectAttempts === 0 ? composerHint : undefined,
             // APPROVE-CARD-01: the same reconnectAttempts===0 gate as
             // packageScope/temporary/spoken above - a single-shot field
             // only ever meaningful on the first attempt of this send,

@@ -51,6 +51,7 @@ import { CHAT_CAPABILITIES_QUERY_KEY, chatCapabilitiesFrom, modelThinks, NO_CHAT
 import type { Conversation } from "@maipai/spec/gen/ts/conversation.js";
 import { createChatModelAdapter } from "@/apps/chat/chatModelAdapter";
 import { consumeSupersedes, setPendingSupersedes } from "@/apps/chat/chatEditSupersedes";
+import { consumeComposerHint } from "@/apps/chat/chatComposerHint";
 import { createChatThreadListAdapter, needsTitleCatchUp, resumeClosedConversation, setPendingChatFolder } from "@/apps/chat/chatThreadListAdapter";
 import { clearSubmittedFeedback, createChatFeedbackAdapter } from "@/apps/chat/chatActionBar";
 import { ChatActorContext } from "@/apps/chat/chatMemoryActions";
@@ -559,6 +560,7 @@ function useChatRuntime(person: Roster, closeSheet: () => void, temporaryNext: b
           },
           getCurrentLocation: () => (weatherDefaultIsCurrentRef.current ? currentLocationIfGranted(person.age_band) : Promise.resolve(undefined)),
           consumeSupersedes,
+          consumeComposer: consumeComposerHint,
           consumePackageScope: () => {
             const value = packageScopeRef.current?.id;
             packageScopeRef.current = null;

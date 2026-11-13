@@ -732,8 +732,8 @@
       "file": "composer-parts.tsx",
       "name": "composer-parts",
       "group": "composer",
-      "verdict": "later",
-      "verdictReason": "New in ui-v0.5.638; not drawn by a Home page yet (verdict \"later\" set automatically by the pin); assess and wire it when a page uses it.",
+      "verdict": "wire-now",
+      "verdictReason": "ONE-COMPOSER-2026-11-13 (COMPOSER-04): drawn inside the kit Thread through composerModes (mode pill, slots, chips, Quality chip) in chat and by the Home ask box; Home passes the hub's mode data and the picked values as props only.",
       "implemented": true
     },
     {

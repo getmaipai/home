@@ -11,7 +11,8 @@ import { MemoryChips } from "@maipai/ui/src/elements/memory-chips";
 import { memoryChipsAllowed, useReplyMemoryChips } from "@/apps/chat/chatMemoryChips";
 import { ChatActorContext, rememberMessage } from "@/apps/chat/chatMemoryActions";
 import { RetryWithCurrentCompanionSetterContext } from "@/apps/chat/chatThreadContexts";
-import { useContext, useEffect, useState, type PropsWithChildren } from "react";
+import { useContext, useEffect, useState, useSyncExternalStore, type PropsWithChildren } from "react";
+import { ASK_MODE, pickedComposerMode, subscribeComposerMode } from "@/apps/chat/chatComposerHint";
 import { GuardrailNotice } from "@maipai/ui/src/elements/guardrail-notice";
 import type { CrisisSupport } from "@maipai/home-backend/src/wire";
 import { ActionBarMorePrimitive, ComposerPrimitive, useAui, useAuiState, type ThreadAssistantMessagePart, type ThreadMessage } from "@assistant-ui/react";
@@ -231,6 +232,7 @@ export function ComposerTrailingWithThinkingMode() {
   const adult = useContext(ChatAgeBandContext) === "adult";
   const max = useMaxChat(adult);
   const engineDown = useEngineDownReason();
+  const pickedMode = useSyncExternalStore(subscribeComposerMode, pickedComposerMode);
   const icons = { instant: getIcon("zap"), thinking: getIcon("brain"), max: getIcon("brain") } as const;
   const Sparkles = getIcon("sparkles");
   const choices = (!adult ? [] : MODE_CHOICES.filter((choice) => (choice.id === "max" ? max.visible : choice.id === "instant" ? capability === "switchable" : capability !== "none"))).map((choice) => ({
@@ -240,6 +242,8 @@ export function ComposerTrailingWithThinkingMode() {
   const current: ModeChoiceId = max.picked ? "max" : mode;
   // INSTANT-01: a model that reasons on every turn has no Instant, so with nothing else to choose the control is a plain "Thinking" chip.
   const onlyThinking = adult && capability === "always" && !max.visible;
+  // ONE-COMPOSER-2026-11-13: the answer style is the Quality chip of plain chat. In Picture, Video or Song the Quality chip is that mode's own tiers (the kit draws it).
+  if (pickedMode !== ASK_MODE) return <ComposerExtraControls />;
   return (
     <>
       {onlyThinking ? (
