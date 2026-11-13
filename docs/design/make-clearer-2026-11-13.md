@@ -5,7 +5,7 @@ clearer; maybe there are levels, where the ultimate is AI versus sharpening, res
 
 ## What people see
 
-One operation named **Make clearer** in the picture Studio (under More), on each video card's menu, and in chat (`edit_picture` op `make_clearer`, `edit_video`
+One operation named **Make clearer** in the picture Studio (under More), in the video Studio (Make more: Quick and Better), and in chat (`edit_picture` op `make_clearer`, `edit_video`
 change `upscale` with `clarity`). Three levels, one line and one time each, never a model name or a resource word:
 
 | Level | Line | Time | How |
@@ -15,8 +15,9 @@ change `upscale` with `clarity`). Three levels, one line and one time each, neve
 | Best | The most careful repair, for old or damaged pictures and faces. | a few minutes | The AI restore (SeedVR2 and face repair, CREATOR-52). Pictures: on when the Stack's image tools list `restore`. Clips: on when `STACK_HAS_VIDEO_RESTORE` is true. |
 
 Best is always shown. While the Stack lacks the restore it is off with one line: "Best quality needs an extra download. An admin can add it in Settings, AI & models."
-(`BEST_NEEDS_DOWNLOAD`). The picture Studio draws the three levels with the kit's `levels` on an operation row (ui 0.5.643); the video card menu has no disabled
-state, so its Best item answers with the same line when pressed.
+(`BEST_NEEDS_DOWNLOAD`). The picture Studio draws the three levels with the kit's `levels` on an operation row (ui 0.5.645). The video pages have no room: the Create feed menu is at the schema
+cap of 8 actions and the Studio's Make more at 3 (it had one), and a menu item cannot be drawn off with a reason. So the video Studio lists Quick and Better; Best for a clip is
+reached by chat and `POST /api/plugins/video/actions/clearer` (`level: best`), which answers with the same line. A levels picker on a video page needs a kit element and is open.
 
 ## Where it lives (no second copy)
 
@@ -24,7 +25,7 @@ state, so its Best item answers with the same line when pressed.
   `listMediaOps` adds whether each level is ready and why not; the Studio rows, `GET /api/media-ops` and the chat schema all read that one table.
 - Pictures run in `lib/imageEdit.ts` as operation `clearer` (`level`, `size`): Quick in Home (`processClearerQuick`), Better and Best through the same Stack tool path as
   `upscale`, so slow levels show in Activity through the existing `picture_edit` job row. The result is a preview, then Apply makes a new version (Undo and Compare as for any edit).
-- Clips start through `clipEditStart.startClipEdit` (the one gate for adults, own open clip, Adult lock) via `POST /api/plugins/video/actions/clearer`; the edit is the chat tool's `upscale` change.
+- Clips start through `clipEditStart.startClipEdit` (the one gate for adults, own open clip, Adult lock) via `POST /api/plugins/video/actions/clearer`; the edit is the chat tool's `upscale` change with `clarity`.
 
 ## Lock rule (owner decision, 2026-11-13, kept in sync with `SIMPLE_LOCAL_OPS` in `lib/imageEdit.ts`)
 
@@ -40,4 +41,4 @@ Laplacian variance falls (1583 to 302) because grain, not edges, dominated it, s
 ## Not built
 
 SeedVR2 and GFPGAN themselves (CREATOR-52, benched elsewhere); the video Studio timeline (a per-piece Make clearer inside an export) and a clip level chooser with a disabled Best
-(the feed menu has no disabled item). CREATOR-17's `restore` operation should be the Best level of this one operation, not a second operation.
+(menus have no disabled item and the Create feed menu is full). CREATOR-17's `restore` operation should be the Best level of this one operation, not a second operation.

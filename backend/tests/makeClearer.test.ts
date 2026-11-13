@@ -10,6 +10,8 @@ import { storeFile } from "@/lib/attachments";
 import { BEST_NEEDS_DOWNLOAD, __resetImageEditForTests, __setImageToolsForTests, processClearerQuick } from "@/lib/imageEdit";
 import { listMediaOps, runMediaOp } from "@/lib/mediaOps/registry";
 import { studioOperationRows } from "@/lib/mediaOps/studio";
+import { readFileSync } from "node:fs";
+import { appPackageProblems } from "@/lib/apps";
 import { editVideoArgs } from "@/lib/videos/editTool";
 import { QUICK_CLEARER, quickClearerOps } from "@/lib/videos/editPlan";
 import { videoClearerLevels } from "@/lib/videos/clearerLevels";
@@ -196,5 +198,21 @@ describe("Make clearer for videos", () => {
     expect(editVideoArgs.safeParse({ clip: "latest", change: "upscale", clarity: "ultra" }).success).toBe(false);
     expect(editVideoArgs.safeParse({ clip: "latest", change: "reframe", aspect: "1:1", clarity: "quick" }).success).toBe(false);
     expect(editVideoArgs.safeParse({ clip: "latest", change: "upscale", clarity: "best", amount: 0.5 }).success).toBe(false);
+  });
+});
+
+describe("the pages that carry Make clearer still pass the UI schema", () => {
+  // The video Studio's Make more holds at most 3 entries and the Create feed menu at most 8: a page over a cap is refused as a whole and the Video app disappears.
+  for (const id of ["video", "image"]) {
+    test(`${id} has no package problems`, () => {
+      const dir = `packages/${id}`;
+      expect(appPackageProblems(JSON.parse(readFileSync(`${dir}/manifest.json`, "utf8")), dir)).toEqual([]);
+    });
+  }
+  test("the video Studio lists Quick and Better in Make more, over the same route the registry operation starts", () => {
+    const text = readFileSync("packages/video/pages/studio.json", "utf8");
+    expect(text).toContain("/api/plugins/video/actions/clearer");
+    expect(text).toContain("Make clearer: Quick");
+    expect(text).toContain("Make clearer: Better");
   });
 });

@@ -536,7 +536,7 @@ export async function processClearerQuick(bytes: Uint8Array, size = 1): Promise<
   if (width * height > MAX_SAVED_PIXELS) throw new ImageEditError(422, "That would be too big. Try keeping the size, or pick a smaller picture.", "too_large");
   let pipeline = sharp(cleaned.data, { raw: { width: sourceWidth, height: sourceHeight, channels } });
   if (size !== 1) pipeline = pipeline.resize(width, height, { kernel: "lanczos3" });
-  const { data, info } = await pipeline.sharpen({ sigma: size === 1 ? 1.4 : 1.8, m1: 0, m2: 4 }).png().toBuffer({ resolveWithObject: true });
+  const { data, info } = await pipeline.sharpen({ sigma: size === 1 ? 1.4 : 1.8, m1: 0, m2: 3 }).png().toBuffer({ resolveWithObject: true });
   return { png: new Uint8Array(data), width: info.width, height: info.height };
 }
 

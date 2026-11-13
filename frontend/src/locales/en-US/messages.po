@@ -10744,13 +10744,13 @@ msgid "setting.search.hosts.teen.deny.does"
 msgstr "Hides these sites from web search, on top of the household list."
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:987
-msgid "setting.robot.dance.auto_sensitivity.option_label.high"
+#: src/lib/settingCopy.generated.ts:22
+msgid "setting.alarms.volume.option_label.high"
 msgstr "High"
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:22
-msgid "setting.alarms.volume.option_label.high"
+#: src/lib/settingCopy.generated.ts:987
+msgid "setting.robot.dance.auto_sensitivity.option_label.high"
 msgstr "High"
 
 #. js-lingui-explicit-id
@@ -14620,13 +14620,13 @@ msgid "Loud"
 msgstr "Loud"
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:985
-msgid "setting.robot.dance.auto_sensitivity.option_label.low"
+#: src/lib/settingCopy.generated.ts:20
+msgid "setting.alarms.volume.option_label.low"
 msgstr "Low"
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:20
-msgid "setting.alarms.volume.option_label.low"
+#: src/lib/settingCopy.generated.ts:985
+msgid "setting.robot.dance.auto_sensitivity.option_label.low"
 msgstr "Low"
 
 #. js-lingui-explicit-id
@@ -15477,13 +15477,13 @@ msgid "setting.news.default_topics.teen.option.health"
 msgstr "Medicine, public health, fitness, nutrition, sleep and mental wellbeing."
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:986
-msgid "setting.robot.dance.auto_sensitivity.option_label.medium"
+#: src/lib/settingCopy.generated.ts:21
+msgid "setting.alarms.volume.option_label.medium"
 msgstr "Medium"
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:21
-msgid "setting.alarms.volume.option_label.medium"
+#: src/lib/settingCopy.generated.ts:986
+msgid "setting.robot.dance.auto_sensitivity.option_label.medium"
 msgstr "Medium"
 
 #. js-lingui-explicit-id

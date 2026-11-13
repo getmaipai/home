@@ -150,6 +150,44 @@
               }
             }
           }
+        },
+        {
+          "label": "Make clearer: Quick",
+          "starts": "video",
+          "action": {
+            "call": {
+              "target": "/api/plugins/video/actions/clearer",
+              "method": "POST",
+              "args": {
+                "id": "{clip}",
+                "level": "quick"
+              },
+              "then": {
+                "navigate": {
+                  "to": "/apps/video/create"
+                }
+              }
+            }
+          }
+        },
+        {
+          "label": "Make clearer: Better",
+          "starts": "video",
+          "action": {
+            "call": {
+              "target": "/api/plugins/video/actions/clearer",
+              "method": "POST",
+              "args": {
+                "id": "{clip}",
+                "level": "better"
+              },
+              "then": {
+                "navigate": {
+                  "to": "/apps/video/create"
+                }
+              }
+            }
+          }
         }
       ],
       "export_result": {

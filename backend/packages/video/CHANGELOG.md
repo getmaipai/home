@@ -4,7 +4,7 @@ All notable changes to the Video package, in [Keep a Changelog](https://keepacha
 
 ## [Unreleased]
 
-- MAKE-CLEARER-01: Make clearer on each clip card menu (Quick, Better, Best). Quick cleans up grain and sharpens at the same size in under a minute; Better doubles the size with AI; Best says what it needs until the AI restore is installed. The first clip is kept.
+- MAKE-CLEARER-01: Make clearer in the Studio, under Make more: Quick cleans up grain and sharpens at the same size in under a minute; Better doubles the size with AI. Best (the most careful repair) is in chat for now and says what it needs until the AI restore is installed. The first clip is kept.
 
 - MEDIA-PARITY-02: Playlists. Save to playlist is on every video card and the watch page; a Playlists page and a Playlists row in the Library; drag videos into the order you want; share a playlist with people in your home (they can add videos; adult-only videos never go into a playlist a child or teen can read). A Channels row on Home and a page for each channel. The search box suggests titles and channels as you type. Remove from history on the History page. The Library remembers its sort. Cards use the soft corner radius and show the channel's picture.
 

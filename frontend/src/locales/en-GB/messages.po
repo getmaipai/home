@@ -10741,13 +10741,13 @@ msgid "setting.search.hosts.teen.deny.does"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:987
-msgid "setting.robot.dance.auto_sensitivity.option_label.high"
+#: src/lib/settingCopy.generated.ts:22
+msgid "setting.alarms.volume.option_label.high"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:22
-msgid "setting.alarms.volume.option_label.high"
+#: src/lib/settingCopy.generated.ts:987
+msgid "setting.robot.dance.auto_sensitivity.option_label.high"
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -14617,13 +14617,13 @@ msgid "Loud"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:985
-msgid "setting.robot.dance.auto_sensitivity.option_label.low"
+#: src/lib/settingCopy.generated.ts:20
+msgid "setting.alarms.volume.option_label.low"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:20
-msgid "setting.alarms.volume.option_label.low"
+#: src/lib/settingCopy.generated.ts:985
+msgid "setting.robot.dance.auto_sensitivity.option_label.low"
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -15464,13 +15464,13 @@ msgid "setting.news.default_topics.teen.option.health"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:986
-msgid "setting.robot.dance.auto_sensitivity.option_label.medium"
+#: src/lib/settingCopy.generated.ts:21
+msgid "setting.alarms.volume.option_label.medium"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:21
-msgid "setting.alarms.volume.option_label.medium"
+#: src/lib/settingCopy.generated.ts:986
+msgid "setting.robot.dance.auto_sensitivity.option_label.medium"
 msgstr ""
 
 #. js-lingui-explicit-id
