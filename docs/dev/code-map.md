@@ -1319,7 +1319,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/webTabSearch.ts` | WEB_TAB_MAX_RESULTS, WEB_TAB_QUERY_MAX, webTabSearch |
 | `backend/src/lib/wellFormed.ts` | EMOJI_RE, visibleText, analysisLead, thinkingPrefix, newThinkSplitState, feedThinkSplit |
 | `backend/src/lib/whisperSample.ts` | WHISPER_SAMPLE_TEXT, hasWhisperSample, ensureWhisperSample, __resetWhisperSamplesForTests |
-| `backend/src/lib/whisperTurns.ts` | markWhisperTurn, isWhisperTurn, __resetWhisperTurnsForTests |
+| `backend/src/lib/whisperTurns.ts` | markWhisperTurn, isWhisperTurn, __resetWhisperTurnsForTests, createWhisperDeltaFilter |
 | `backend/src/lib/widgets.ts` | widgetCardBlock, listWidgets, widgetKey, orderHomeCards, arrangeHomeCards, arrangeHomeSections |
 | `backend/src/lib/wikimediaLive.ts` | WIKIMEDIA_LIVE_RATE_LIMIT_KEY, WIKIMEDIA_LIVE_RATE_LIMIT, wikimediaLiveBaseUrl |
 | `backend/src/lib/worldPlaces.ts` | listWorldPlaces, createWorldPlace, updateWorldPlace, deleteWorldPlace |
