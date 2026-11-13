@@ -1,3 +1,4 @@
+import { existsSync } from "node:fs";
 // The wake-word pipeline's asset routes (2026-09-04, phase 1 of the
 // wake-word plan in docs/dev.md). Any signed-in person, no role gate:
 // these are static model bytes and a list of what's available, the same
@@ -29,6 +30,7 @@ import {
   previewInspiredVoice,
   deleteClonedVoice,
   getClonedVoiceFile,
+  whisperSamplePath,
   clonedVoiceExists,
   renameClonedVoice,
   householdVoiceEntries,
@@ -789,5 +791,11 @@ voiceRoutes.openapi(clonedFileRoute, async (c) => {
   if (!clonedVoiceExists(id)) return c.json({ error: "not found" }, 404);
   const file = getClonedVoiceFile(id);
   if (!file) return c.json({ error: "not found" }, 404);
+  // WHISPER-01: `w=1` asks for the voice's whisper sample instead of its clip.
+  if (c.req.query("w") === "1") {
+    const whisper = whisperSamplePath(id);
+    if (!existsSync(whisper)) return c.json({ error: "not found" }, 404);
+    return new Response(Bun.file(whisper), { status: 200, headers: { "content-type": "audio/wav" } });
+  }
   return new Response(Bun.file(file.path), { status: 200, headers: { "content-type": file.mimeType } });
 });

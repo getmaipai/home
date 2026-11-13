@@ -5,12 +5,13 @@ import { getHouseholdSettingValue } from "@/lib/settings";
 import { voiceForSpeech } from "@/lib/voiceForSpeech";
 import { speakerAgeBand } from "@/lib/ageBand";
 import { getTtsTags } from "@/lib/ttsCapabilities";
-import { DEFAULT_HESITATION_LEVEL, HESITATION_LEVELS, isProtectedSentence, planForPerson, sentenceIndexFor, type HesitationLevel } from "@/lib/voiceCues";
+import { DEFAULT_HESITATION_LEVEL, HESITATION_LEVELS, hasWhisperTag, isProtectedSentence, planForPerson, sentenceIndexFor, type HesitationLevel } from "@/lib/voiceCues";
 import type { AppEnv } from "@/types";
 import { apiRouter, errorResponses } from "@/lib/openapi";
 import { isOwnedStaleTurnGeneration, turnAllowsVoiceCues, turnUtterance, voiceForTurn } from "@/routes/turn";
 import { chooseDelivery } from "@/lib/deliveryChoice";
 import { abortConversationPrewarm } from "@/lib/prefixPrewarm";
+import { isWhisperTurn, markWhisperTurn } from "@/lib/whisperTurns";
 
 export const ttsRoutes = apiRouter();
 
@@ -66,7 +67,11 @@ ttsRoutes.openapi(ttsSynthesizeRoute, async (c) => {
   const startedAt = Date.now();
   // REG-02: the composer adds a spoken cue to a model-worded spoken turn's sentence, never to the written text.
   let spoken = body.text;
-  if (body.turn_id) {
+  // WHISPER-01: the model marked this reply as whispered. Only where voice cues are allowed (never a child or a teen), and no laugh or sigh is added to a whisper.
+  // The tag comes with the first sentence, which can be spoken before the turn machine has finished the reply, so it is noted here too.
+  if (body.turn_id && hasWhisperTag(body.text)) markWhisperTurn(body.turn_id);
+  const whisper = Boolean(body.turn_id && isWhisperTurn(body.turn_id) && turnAllowsVoiceCues(body.turn_id, actor.id));
+  if (body.turn_id && !whisper) {
     const configured = getHouseholdSettingValue("voice.hesitations");
     const level = HESITATION_LEVELS.includes(configured as HesitationLevel) ? (configured as HesitationLevel) : DEFAULT_HESITATION_LEVEL;
     if (level !== "off") {
@@ -77,7 +82,7 @@ ttsRoutes.openapi(ttsSynthesizeRoute, async (c) => {
       spoken = planForPerson(actor.id, { text: body.text, turnId: body.turn_id, level, band, supportedTags, blocked, choice }).text;
     }
   }
-  const result = await synthesizeSpeech(spoken, voiceId);
+  const result = await synthesizeSpeech(spoken, voiceId, whisper ? { whisper: true } : {});
   if (result.ok && body.turn_id) {
     const turn = await import("@/routes/turn");
     turn.markTurnFirstAudio(body.turn_id, actor.id, Date.now() - startedAt);

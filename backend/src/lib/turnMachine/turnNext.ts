@@ -27,7 +27,8 @@ import type { Surface, TurnFailure, SpeakerEvidence, PresentPerson, TurnStreamRe
 import type { TurnErrorDetail, TurnValue } from "@/wire";
 import { turnErrorDetailFrom } from "@/lib/turnErrorDetail";
 import { attachDocuments } from "./documents";
-import { stripCueTags } from "@/lib/voiceCues";
+import { hasWhisperTag, stripCueTags, stripWhisperTags } from "@/lib/voiceCues";
+import { markWhisperTurn } from "@/lib/whisperTurns";
 import { getDeviceById } from "@/lib/devices";
 import { voiceForSpeech } from "@/lib/voiceForSpeech";
 import { validateTurnInput, validateContinuationInput, BareModeForbidden, loadAllManifests, commandOpeners, computedPatternMatch, StreamSafetyRefusal, StreamUnavailable, CRISIS_RESOURCES_TEXT, crisisSupportFor, deriveCrisisResources, judgeStatusAtInsert, variedConstantReply, speechTextFor } from "@/lib/turnShared";
@@ -1011,9 +1012,11 @@ async function finishTurn(begun: BegunTurn): Promise<TurnValue> {
  * is exactly what it was before this port. */
 async function finalizeNextReply(state: TurnState, rawValue: TurnValue): Promise<TurnValue> {
   // REG-02: the composer, never the model, adds nonverbal cues, and only to the spoken rendering; a tag the model wrote is dropped from the reply.
-  const taggedText = stripCueTags(rawValue.reply.text);
+  // WHISPER-01: a whispered reply is noted for the speech route, and the tag is never shown or stored.
+  if (hasWhisperTag(rawValue.reply.text) || (rawValue.reply.speech !== undefined && hasWhisperTag(rawValue.reply.speech))) markWhisperTurn(state.turnId);
+  const taggedText = stripWhisperTags(stripCueTags(rawValue.reply.text));
   const cleanText = rawValue.source === "model" ? trimClosers(taggedText) : taggedText;
-  const cleanSpeech = rawValue.reply.speech === undefined ? undefined : stripCueTags(rawValue.reply.speech);
+  const cleanSpeech = rawValue.reply.speech === undefined ? undefined : stripWhisperTags(stripCueTags(rawValue.reply.speech));
   const value = cleanText === rawValue.reply.text && cleanSpeech === rawValue.reply.speech ? rawValue : { ...rawValue, reply: { ...rawValue.reply, text: cleanText, ...(cleanSpeech === undefined ? {} : { speech: cleanSpeech }) } };
   const spokenTurn = surfaceClassOf(state.surface, state.spoken) === "spoken";
   let { text, speech } = value.reply;

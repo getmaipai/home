@@ -26,6 +26,7 @@ import type { StackVoice } from "@/lib/stack/types";
 import { appendLogLine } from "@/lib/log";
 import { isInspiredLevel, makeInspiredReference, PREVIEW_SECONDS, type InspiredLevel } from "@/lib/voiceShift";
 import { transcribeClonedVoiceOnce } from "@/lib/clonedVoiceTranscript";
+import { ensureWhisperSample } from "@/lib/whisperSample";
 import { householdKeyBytes } from "@/lib/secrets";
 import type { Result } from "@/lib/result";
 
@@ -163,7 +164,7 @@ export function saveClonedVoice(
   }
   // One audit line: the role of the maker and the settings; never a person id or name, a voice id, the voice's name or the clip (rule 6a).
   appendLogLine(`voice.created role=${creator.role} temperature=${temperature ?? "default"} pitch=${pitchSemitones ?? 0}${inspired ? ` kind=inspired level=${inspired}${inspiredBaseId ? " blended=yes" : ""}` : ""}`);
-  void transcribeClonedVoiceOnce(id, bytes, mimeType).catch(() => {});
+  void transcribeClonedVoiceOnce(id, bytes, mimeType).then((transcript) => (transcript ? ensureWhisperSample(id, { onlyIfReady: true }) : false)).catch(() => {});
   return { ok: true, value: toInfo(row, creator.displayName) };
 }
 
@@ -261,6 +262,7 @@ export function deleteClonedVoice(actor: PersonRow, id: string): ClonedVoiceOpRe
   appendLogLine(`voice.deleted role=${actor.role}`);
   const filePath = join(clonedVoicesDir, row.fileName);
   try {
+    if (existsSync(whisperSamplePath(id))) unlinkSync(whisperSamplePath(id));
     if (existsSync(filePath)) unlinkSync(filePath);
   } catch {
     // Same "harmless orphan, not a stuck delete" reasoning as the
@@ -268,6 +270,19 @@ export function deleteClonedVoice(actor: PersonRow, id: string): ClonedVoiceOpRe
     // list and from anyone's tts.voice_id by this point regardless.
   }
   return { ok: true, value: true };
+}
+
+/** WHISPER-01: where a voice's whisper sample lives. It is made once from the voice's own clip (lib/whisperSample.ts) and is derived data: no row, so deleting the voice removes it and a lost file is made again. */
+export function whisperSamplePath(id: string): string {
+  return join(clonedVoicesDir, `${id}.whisper.wav`);
+}
+
+/** The whisper form of a household voice: the same voice settings, with the address of its whisper sample, or null when it has none yet. */
+export function whisperVoiceSpeech(stored: unknown): { voiceUrl: string; temperature?: number; pitchSemitones?: number } | null {
+  const speech = householdVoiceSpeech(stored);
+  const id = speech ? /\/cloned\/(voice-[a-z0-9]{6,})\/file/.exec(speech.voiceUrl)?.[1] : undefined;
+  if (!speech || !id || !existsSync(whisperSamplePath(id))) return null;
+  return { ...speech, voiceUrl: `${speech.voiceUrl}&w=1` };
 }
 
 /** For routes/voice.ts's unauthenticated file-serving route only: looks

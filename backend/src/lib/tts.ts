@@ -7,7 +7,8 @@ import { getTtsTags } from "@/lib/ttsCapabilities";
 import { sanitizeSpeechTags } from "@/lib/voiceCues";
 import { toSpokenText } from "@/lib/spokenText";
 import { getOfferedVoices, resolveVoice } from "@/lib/voiceResolve";
-import { householdVoiceSpeech, readClonedVoiceClip } from "@/lib/clonedVoices";
+import { householdVoiceSpeech, readClonedVoiceClip, whisperVoiceSpeech } from "@/lib/clonedVoices";
+import { ensureWhisperSample } from "@/lib/whisperSample";
 import { fetchRecordedSpeech, recordedSpeechReferenceForTest, submitRecordedSpeech, waitForRecordedSpeech } from "@/lib/recordedSpeech";
 import { getStackClient, isStackConfigured, resolveStackOffline, stackFailureResult } from "@/lib/stackEngine";
 import { transcribeClonedVoiceOnce } from "@/lib/clonedVoiceTranscript";
@@ -75,7 +76,7 @@ async function synthesizeViaStack(text: string, voiceUrl?: string, household?: {
   }
 }
 
-export async function synthesizeSpeech(rawText: string, voiceUrl?: string, opts: { normalize?: boolean } = {}): Promise<TtsOpResult> {
+export async function synthesizeSpeech(rawText: string, voiceUrl?: string, opts: { normalize?: boolean; whisper?: boolean } = {}): Promise<TtsOpResult> {
   // REG-02: a bracketed tag the active engine does not advertise is dropped here, the last step before the engine, so "[laugh]" is never read aloud.
   const taggedText = typeof rawText === "string" ? sanitizeSpeechTags(rawText, await getTtsTags()) : rawText;
   const text = typeof taggedText === "string" && opts.normalize !== false ? toSpokenText(taggedText) : taggedText;
@@ -93,7 +94,13 @@ export async function synthesizeSpeech(rawText: string, voiceUrl?: string, opts:
   try {
     // VOICE-PICK-01: a saved voice the engine in use does not offer, or "default", is not sent; the engine speaks its own default.
     // A voice an admin made from a clip is not on the Stack's list: Home sends its clip address and its own settings.
-    const household = householdVoiceSpeech(voiceUrl);
+    // WHISPER-01: a whispered reply is spoken from the voice's whisper sample. A voice without one yet speaks normally, and one is made in the background.
+    let household = householdVoiceSpeech(voiceUrl);
+    if (opts.whisper && household) {
+      const whispered = whisperVoiceSpeech(voiceUrl);
+      if (whispered) household = whispered;
+      else { const id = /\/cloned\/(voice-[a-z0-9]{6,})\/file/.exec(household.voiceUrl)?.[1]; if (id) void ensureWhisperSample(id); }
+    }
     const result = household
       ? await synthesizeViaStack(text, household.voiceUrl, household)
       : await synthesizeViaStack(text, resolveVoice(voiceUrl, await getOfferedVoices()).voiceUrl);

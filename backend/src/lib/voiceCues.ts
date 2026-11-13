@@ -293,3 +293,17 @@ export function planForPerson(personId: string, input: Omit<CueInput, "state">):
 export function __resetVoiceCueStateForTests(): void {
   states.clear();
 }
+
+// WHISPER-01: "whisper" is a delivery for the whole reply, not a nonverbal sound. The turn machine notes it (lib/whisperTurns.ts) and hides it;
+// the speech path then speaks the reply from the voice's whisper sample. It is kept apart from KNOWN_CUE_TAGS on purpose: no engine advertises it.
+const WHISPER_TAG_PATTERN = /\s*\[\s*(?:whisper|whispers|whispering|whispered)\s*\](?!\()/gi;
+
+export function hasWhisperTag(text: string): boolean {
+  WHISPER_TAG_PATTERN.lastIndex = 0;
+  return text.includes("[") && WHISPER_TAG_PATTERN.test(text);
+}
+
+export function stripWhisperTags(text: string): string {
+  if (!text.includes("[")) return text;
+  return tidy(text.replace(WHISPER_TAG_PATTERN, ""));
+}
