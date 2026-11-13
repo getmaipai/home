@@ -273,6 +273,7 @@
                               "enum": [
                                 "restarting",
                                 "memory",
+                                "never_fits",
                                 "not_installed",
                                 "paused_by_admin",
                                 "mode_change",
@@ -374,6 +375,7 @@
                               "enum": [
                                 "restarting",
                                 "memory",
+                                "never_fits",
                                 "not_installed",
                                 "paused_by_admin",
                                 "mode_change",
@@ -475,6 +477,7 @@
                               "enum": [
                                 "restarting",
                                 "memory",
+                                "never_fits",
                                 "not_installed",
                                 "paused_by_admin",
                                 "mode_change",
@@ -576,6 +579,7 @@
                               "enum": [
                                 "restarting",
                                 "memory",
+                                "never_fits",
                                 "not_installed",
                                 "paused_by_admin",
                                 "mode_change",
@@ -677,6 +681,7 @@
                               "enum": [
                                 "restarting",
                                 "memory",
+                                "never_fits",
                                 "not_installed",
                                 "paused_by_admin",
                                 "mode_change",
@@ -778,6 +783,7 @@
                               "enum": [
                                 "restarting",
                                 "memory",
+                                "never_fits",
                                 "not_installed",
                                 "paused_by_admin",
                                 "mode_change",

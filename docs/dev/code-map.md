@@ -1140,6 +1140,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/spokenArg.ts` | wantsSpoken |
 | `backend/src/lib/spokenText.ts` | toSpokenText |
 | `backend/src/lib/spokenTextEs.ts` | spanishNumber, spanishSpoken, SPOKEN_LINES_ES |
+| `backend/src/lib/stack/caller.ts` | STACK_CALLER_HEADER, stackCaller, withStackCaller |
 | `backend/src/lib/stack/client.ts` | identityFromHeaders, createStackClient |
 | `backend/src/lib/stack/contract.ts` | STACK_CONTRACT_MIN, STACK_CONTRACT_MAX, StackCodingModeSchema |
 | `backend/src/lib/stack/errors.ts` | StackError |
