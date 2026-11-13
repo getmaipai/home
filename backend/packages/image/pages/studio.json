@@ -62,6 +62,7 @@
       ],
       "compare": true,
       "comment_brush": true,
+      "resize_upscale": false,
       "operations": {
         "bind": {
           "source": "package",
