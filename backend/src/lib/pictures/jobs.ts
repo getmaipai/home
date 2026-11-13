@@ -21,7 +21,7 @@ import { jobQueueCopy } from "@/lib/jobQueueCopy";
 import type { PicturePurpose } from "./jobStore";
 import { cancelOrDelete, fetchPicture, fetchPicturePreview, getGenerationJob, StackPicturesError, submitGeneration, type GenerationBody, type StackPic } from "./stack";
 import { fullViewForJob, type FullView } from "@/lib/stack/fullView";
-import { lockItemOfProvenance, markFields, newItemMark, type MarkSource } from "@/lib/adultLock";
+import { lockItemOfProvenance, markFields, newItemMark, unlabeledSourceMark, type MarkSource } from "@/lib/adultLock";
 import { logAutoMark } from "@/lib/adultMarks";
 import { isAdultPictureStyle } from "@/lib/pictures/lock";
 
@@ -129,7 +129,10 @@ export async function startPictureJob(input: StartPictureInput): Promise<Picture
     const sourceMarks: MarkSource[] = input.sources ? [...input.sources] : sourceIds.map((id) => {
       const row = db.select({ owner: attachments.ownerPersonId, provenance: attachments.provenance }).from(attachments).where(eq(attachments.id, id)).get();
       const item = row ? lockItemOfProvenance(row.owner, row.provenance) : null;
-      return item ? { madeAudience: item.madeAudience, lock: item.lock } : { madeAudience: null, lock: "on" };
+      const owner = row ? db.select().from(people).where(eq(people.id, row.owner)).get() as PersonRow | undefined : undefined;
+      if (item) return { madeAudience: item.madeAudience, lock: item.lock };
+      if (owner) return unlabeledSourceMark(owner);
+      return unlabeledSourceMark(input.actor);
     });
     const mark = newItemMark(sourceMarks, adultStyle);
     const job: PictureJob = {
@@ -300,7 +303,7 @@ async function finish(job: PictureJob, actor: PersonRow, pics: StackPic[]): Prom
       made.push({ raw, width: info.width, height: info.height, meta: { seed: pic.seed ?? null, model: pic.model ?? null, steps: pic.steps ?? null, ms: pic.ms ?? null } });
     }
     // IMGGEN-SAFE-01: the second, independent check, on the finished pixels, before anything is stored or shown.
-    const adult = await adultOnly(job) || job.request.adultLock !== undefined;
+    const adult = await adultOnly(job) || job.request.adultLock === "on";
     const checks = await checkImages(made.map((m) => m.raw), "picture");
     if (stopped(job)) return;
     const decision = await gateFinished({ actor, kind: "picture", jobId: job.id, adultOnly: adult, checks, images: made.map((m) => m.raw), prompt: job.prompt });
@@ -312,16 +315,18 @@ async function finish(job: PictureJob, actor: PersonRow, pics: StackPic[]): Prom
       const sourceId = job.request.source_file_id;
       const sourceRow = sourceId ? db.select({ owner: attachments.ownerPersonId, provenance: attachments.provenance }).from(attachments).where(eq(attachments.id, sourceId)).get() : undefined;
       const sourceItem = sourceRow ? lockItemOfProvenance(sourceRow.owner, sourceRow.provenance) : null;
+      const sourceOwner = sourceRow ? db.select().from(people).where(eq(people.id, sourceRow.owner)).get() as PersonRow | undefined : undefined;
+      const finishSources: MarkSource[] = sourceItem ? [{ madeAudience: sourceItem.madeAudience, lock: sourceItem.lock }] : sourceOwner ? [unlabeledSourceMark(sourceOwner)] : sourceId ? [unlabeledSourceMark(actor)] : [{ madeAudience: "all-ages", lock: "off" }];
       // Fail closed: a job that started adult-only keeps that mark even when its source file is gone by now.
-      const mark = job.request.adultLock !== undefined && !sourceItem
-        ? { madeAudience: "adult-only" as const, lock: job.request.adultLock }
+      const mark = job.request.adultLock === "on"
+        ? { madeAudience: "adult-only" as const, lock: "on" as const }
         : job.request.adultLock === "off"
-        ? newItemMark(sourceItem ? [{ madeAudience: sourceItem.madeAudience, lock: sourceItem.lock }] : [], false)
-        : newItemMark(sourceItem ? [{ madeAudience: sourceItem.madeAudience, lock: sourceItem.lock }] : [], adult);
+        ? newItemMark(finishSources, false)
+        : newItemMark(finishSources, adult);
       if (job.request.edit) {
         // IMGEDIT-01: a change to a picture already in the chat is the next version of that picture (its Original and Undo stay in the editor).
         const source = loadSource(actor, conversationId ?? LIBRARY_SOURCE, job.request.edit.source_id, true);
-        const version = await saveVersion(actor, source, raw, { op: "comment", audience: adult ? "adult-only" : "all-ages", label: job.request.edit.label, model: meta.model ?? undefined, ms: meta.ms ?? undefined });
+        const version = await saveVersion(actor, source, raw, { op: "comment", audience: adult ? "adult-only" : undefined, label: job.request.edit.label, model: meta.model ?? undefined, ms: meta.ms ?? undefined });
         storedIds.push(version.id);
         files.push({ id: version.id, width: version.width ?? width, height: version.height ?? height, ...meta });
         continue;

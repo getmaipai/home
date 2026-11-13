@@ -4,7 +4,7 @@
 // starts a Stack job, and returns at once with a short line for the model to relay. The picture itself arrives
 // on the card (frontend PictureToolRender) when the job finishes, so a slow render never holds the answer.
 import { BACKGROUND_REMOVAL_OP } from "@/lib/mediaOps/ids";
-import { requestProof, unlockedFor } from "@/lib/adultLock";
+import { requestProof, unlockedFor, unlabeledSourceMark } from "@/lib/adultLock";
 import type { PersonRow } from "@/types";
 import type { TurnState, ToolExecutionOutcome } from "@/lib/turnMachine/contract";
 import { outcomeOf } from "@/lib/turnContext";
@@ -176,7 +176,7 @@ export async function runGenerateImage(input: RunGenerateImageInput): Promise<To
       if (laneOf(audience) === "child" && !generated) return outcomeOf({ callId, packageId: GENERATE_IMAGE_TOOL_ID, status: "succeeded", via: "tool_call", args, durationMs: 0, result: { reply: { text: `No picture was made. Say this to the person in your own words and keep its meaning: ${childLine}` }, data: { refused: "child_cartoons_only" }, actions: [] } });
       const screened = await prepareEditSource({ audience, bytes: source.bytes, generated, text: typeof args.prompt === "string" ? args.prompt : "" });
       if (!screened.ok) return outcomeOf({ callId, packageId: GENERATE_IMAGE_TOOL_ID, status: "succeeded", via: "tool_call", args, durationMs: 0, result: { reply: { text: `No picture was made. Say this to the person in your own words and keep its meaning: ${screened.line}` }, data: { refused: screened.code }, actions: [] } });
-      libraryRefs.push({ id, bytes: source.bytes, mediaType: source.mediaType, imageSource: screened.imageSource, adultMark: source.adultMark ?? { madeAudience: null, lock: "on" } });
+      libraryRefs.push({ id, bytes: source.bytes, mediaType: source.mediaType, imageSource: screened.imageSource, adultMark: source.adultMark ?? unlabeledSourceMark(state.actor as PersonRow) });
     }
   }
 

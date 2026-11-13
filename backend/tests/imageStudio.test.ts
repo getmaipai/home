@@ -201,8 +201,8 @@ describe("the Studio page's data and calls (IMG-STUDIO-02)", () => {
     expect(reply.note).toBeUndefined();
     const stored = note(reply.id);
     expect(stored.lock).toBe("off");
-    expect(stored.audience).toBeUndefined();
-    expect(stored.made_audience).toBeUndefined();
+    expect(stored.audience).toBe("all-ages");
+    expect(stored.made_audience).toBe("all-ages");
     expect((await sage.get(`/api/media-ops/files/${encodeURIComponent(reply.id)}/content`)).status).toBe(200);
     expect(((await (await studioRows(sage, reply.id)).json()) as Array<{ locked: boolean }>)[0]).toMatchObject({ locked: false });
     // Anyone who cannot see the source cannot see the crop: the same answer for the upload and its crop.
@@ -222,12 +222,12 @@ describe("the Studio page's data and calls (IMG-STUDIO-02)", () => {
     for (const [op, args] of [["picture.rotate", { degrees: 90 }], ["picture.flip", { direction: "horizontal" }], ["picture.adjust", { brightness: 10 }]] as const) {
       const out = await runAndApply(sage, op, upload.id, args);
       expect(note(out.version.id)).toMatchObject({ lock: "off" });
-      expect(note(out.version.id).made_audience).toBeUndefined();
+      expect(note(out.version.id).made_audience).toBe("all-ages");
     }
     // A crop of the crop (keep editing) stays the same.
     const again = await runAndApply(sage, "picture.crop", reply.id, { x: 0, y: 0, width: 0.5, height: 1 });
     expect(note(again.version.id)).toMatchObject({ lock: "off" });
-    expect(note(again.version.id).made_audience).toBeUndefined();
+    expect(note(again.version.id).made_audience).toBe("all-ages");
   });
 
   test("a teen who owns a plain upload crops it, opens the crop and keeps editing it", async () => {
@@ -235,7 +235,7 @@ describe("the Studio page's data and calls (IMG-STUDIO-02)", () => {
     const teenUpload = await libraryPicture(teenActor, "library:upload");
     const crop = await runAndApply(marlow, "picture.crop", teenUpload.id, { x: 0, y: 0, width: 0.5, height: 1 });
     expect(note(crop.version.id).lock).toBe("off");
-    expect(note(crop.version.id).made_audience).toBeUndefined();
+    expect(note(crop.version.id).made_audience).toBe("all-ages");
     expect((await marlow.get(`/api/media-ops/files/${encodeURIComponent(crop.version.id)}/content`)).status).toBe(200);
     expect(((await (await studioRows(marlow, crop.version.id)).json()) as Array<{ locked: boolean }>)[0]).toMatchObject({ locked: false });
     const next = await runAndApply(marlow, "picture.flip", crop.version.id, { direction: "horizontal" });
@@ -251,16 +251,13 @@ describe("the Studio page's data and calls (IMG-STUDIO-02)", () => {
     db.update(settingsValues).set({ value: "false" }).where(and(eq(settingsValues.scope, `person:${sageActor.id}`), eq(settingsValues.key, "chat.photo_uploads"))).run();
     try {
       const res = await studioCall(sage, "studio-markup", { file: upload.id, png: await dataUrl(await twoColour()) });
-      const marked = (await res.json()) as { id?: string };
-      // Either the Studio refuses the drawing outright, or what it saves keeps the old rule. Never an unlabelled, unlocked picture.
-      if (res.status === 200 && marked.id) expect(note(marked.id)).toMatchObject({ lock: "on", made_audience: "adult-only" });
-      else expect(res.status).toBeGreaterThanOrEqual(400);
+      expect(res.status).toBe(403);
     } finally {
       db.update(settingsValues).set({ value: "true" }).where(and(eq(settingsValues.scope, `person:${sageActor.id}`), eq(settingsValues.key, "chat.photo_uploads"))).run();
     }
   });
 
-  test("a change in words or a background removal of a plain upload still saves locked, and Apply says so", async () => {
+  test("a change in words or a background removal of an unlabeled Library file stays unlocked", async () => {
     const upload = await libraryPicture(sageActor, "library:upload");
     const png = new Uint8Array(await sharp({ create: { width: 40, height: 30, channels: 4, background: { r: 0, g: 0, b: 0, alpha: 0 } } }).png().toBuffer());
     __setImageToolsForTests({ ...READY }, true);
@@ -271,10 +268,9 @@ describe("the Studio page's data and calls (IMG-STUDIO-02)", () => {
       expect(ran.status).toBe(200);
       const { token } = (await ran.json()) as { token: string };
       const reply = (await (await studioCall(sage, "studio-apply", { file: upload.id, token })).json()) as { id: string; locked?: boolean; note?: string };
-      expect(reply.locked).toBe(true);
-      expect(reply.note).toBe("Saved to your Library behind your Adult lock. Unlock it there to keep editing it.");
-      expect(note(reply.id)).toMatchObject({ made_audience: "adult-only", lock: "on" });
-      expect((await sage.get(`/api/media-ops/files/${encodeURIComponent(reply.id)}/content`)).status).toBe(423);
+      expect(reply.locked).toBeUndefined();
+      expect(note(reply.id)).toMatchObject({ audience: "all-ages", lock: "off" });
+      expect((await sage.get(`/api/media-ops/files/${encodeURIComponent(reply.id)}/content`)).status).toBe(200);
     }
   });
 
@@ -293,7 +289,7 @@ describe("the Studio page's data and calls (IMG-STUDIO-02)", () => {
     expect(note(fromCleared.version.id)).toMatchObject({ made_audience: "adult-only", lock: "off" });
   });
 
-  test("an edit the caller marks adult-only locks even for a plain upload; an unknown operation locks (fail closed)", async () => {
+  test("an explicit adult mark locks even when editing an unlabeled Library file", async () => {
     const { saveVersion, loadSource, LIBRARY_SOURCE } = await import("@/lib/imageEdit");
     const upload = await libraryPicture(sageActor, "library:upload");
     const source = loadSource(sageActor, LIBRARY_SOURCE, upload.id, true);
@@ -301,7 +297,7 @@ describe("the Studio page's data and calls (IMG-STUDIO-02)", () => {
     const adult = await saveVersion(sageActor, source, png, { op: "crop", label: "x", audience: "adult-only" });
     expect(note(adult.id)).toMatchObject({ lock: "on" });
     const unknown = await saveVersion(sageActor, source, png, { op: "something_new" as never, label: "x" });
-    expect(note(unknown.id)).toMatchObject({ lock: "on" });
+    expect(note(unknown.id)).toMatchObject({ lock: "off" });
   });
 
   test("the opened version is named for the picture it came from, not Picture (IMG-STUDIO-03)", async () => {
