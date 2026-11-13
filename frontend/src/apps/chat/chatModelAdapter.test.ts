@@ -1,4 +1,4 @@
-import { describe, expect, test, mock, afterEach, beforeEach, setSystemTime } from "bun:test";
+import { describe, expect, test, mock, afterEach, beforeEach } from "bun:test";
 import { LocalRuntimeCore } from "@assistant-ui/core/internal";
 import { takeCarry } from "@/apps/chat/chatCarry";
 import type { ChatModelAdapter, ChatModelRunOptions, ChatModelRunResult, PendingAttachment, ThreadMessage } from "@assistant-ui/react";
@@ -14,7 +14,6 @@ import { SentenceSpeechScheduler } from "@/lib/sentenceSpeechScheduler";
 import { assistantStreamBody as ndjsonStream, staggeredAssistantStreamBody as staggeredNdjsonStream, ASSISTANT_STREAM_HEADERS } from "../../../tests/assistantStreamBody";
 
 afterEach(() => {
-  setSystemTime();
   (globalThis as unknown as { AudioContext: unknown }).AudioContext = undefined;
   __resetPlaybackContextForTests();
   clearStagedImageAttachments();
@@ -112,116 +111,7 @@ function lastText(yields: ChatModelRunResult[]): string | undefined {
   return part && part.type === "text" ? part.text : undefined;
 }
 
-/** The text part of the last yield wherever it sits (a reasoning part can come before it). */
-function lastTextPart(yields: ChatModelRunResult[]): string | undefined {
-  const last = yields[yields.length - 1];
-  const part = last?.content?.find((candidate) => candidate.type === "text");
-  return part && part.type === "text" ? part.text : undefined;
-}
-
-async function nextWithin(iterator: AsyncGenerator<ChatModelRunResult, void>, message: string): Promise<IteratorResult<ChatModelRunResult, void>> {
-  let timeout: ReturnType<typeof setTimeout> | undefined;
-  try {
-    return await Promise.race([
-      iterator.next(),
-      new Promise<never>((_, reject) => { timeout = setTimeout(() => reject(new Error(message)), 1_000); }),
-    ]);
-  } finally {
-    if (timeout) clearTimeout(timeout);
-  }
-}
-
-async function promiseWithin<T>(promise: Promise<T>, message: string): Promise<T> {
-  let timeout: ReturnType<typeof setTimeout> | undefined;
-  try {
-    return await Promise.race([
-      promise,
-      new Promise<never>((_, reject) => { timeout = setTimeout(() => reject(new Error(message)), 1_000); }),
-    ]);
-  } finally {
-    if (timeout) clearTimeout(timeout);
-  }
-}
-
 const SAFETY = { flagged: false, categories: [], action: "allow" as const, notify_parent: false, matched_signals: [], checked_at: "2026-09-04T00:00:00.000Z" };
-
-describe("spoken reply reveal gate", () => {
-  const reply = "One two three four.";
-  const done = { type: "done", value: { turn_id: "turn-reveal", reply: { text: reply }, source: "model", safety: SAFETY } };
-
-  function setup(streamBody: ReadableStream<Uint8Array>, spoken: boolean, signal = new AbortController().signal) {
-    const env = stubEnvironment(streamBody);
-    const turnSchedulerRef = { current: null as SentenceSpeechScheduler | null };
-    const adapter = createChatModelAdapter({ consumeThinking: () => false, consumeSupersedes: () => undefined, consumeSpoken: () => spoken, speakReplies: true, turnSchedulerRef });
-    const messages = [fakeUserMessage("tell me something")];
-    const iterator = runAdapter(adapter, { messages, runConfig: {}, abortSignal: signal, context: {}, unstable_getMessage: () => messages[0]! } as unknown as ChatModelRunOptions);
-    return { env, iterator, turnSchedulerRef, setHeard(value: number) { turnSchedulerRef.current!.heardVisibleEndFine = () => value; } };
-  }
-
-  test("holds spoken text until heard, then reveals whole words; full end reveals all", async () => {
-    const staged = staggeredNdjsonStream([{ type: "delta", text: reply, sequence: 1 }], [done]);
-    const run = setup(staged.stream, true);
-    try {
-      const first = await nextWithin(run.iterator, "Expected the initial spoken reply update within 1 second");
-      expect(lastTextPart([first.value!])).toBeUndefined();
-      run.setHeard(0);
-      run.setHeard(8);
-      const partialPending = run.iterator.next();
-      await new Promise((resolve) => setTimeout(resolve, 65));
-      expect(lastTextPart([(await promiseWithin(partialPending, "Expected partial reveal within 1 second")).value!])).toBe("One two");
-      run.setHeard(reply.length + 1);
-      const completePending = run.iterator.next();
-      await new Promise((resolve) => setTimeout(resolve, 65));
-      expect(lastTextPart([(await promiseWithin(completePending, "Expected complete reveal within 1 second")).value!])).toBe(reply);
-      staged.release();
-      while (!(await nextWithin(run.iterator, "Expected released spoken stream to finish within 1 second")).done) { /* drain */ }
-    } finally { staged.release(); run.iterator.return(); run.env.restore(); }
-  });
-
-  test("typed turns stream the full text unchanged", async () => {
-    const run = setup(ndjsonStream([{ type: "delta", text: reply, sequence: 1 }, done]), false);
-    try {
-      const yields: ChatModelRunResult[] = [];
-      for await (const value of run.iterator) yields.push(value);
-      expect(yields.some((value) => lastTextPart([value]) === reply)).toBe(true);
-      expect(lastTextPart(yields)).toBe(reply);
-    } finally { run.env.restore(); }
-  });
-
-  test("reveals the full reply after six seconds without audio", async () => {
-    const staged = staggeredNdjsonStream([{ type: "delta", text: reply, sequence: 1 }], [done]);
-    const run = setup(staged.stream, true);
-    const startedAt = Date.now();
-    try {
-      await nextWithin(run.iterator, "Expected the initial spoken reply update within 1 second");
-      run.setHeard(0);
-      staged.release();
-      const terminal = run.iterator.next();
-      setSystemTime(new Date(Date.now() + 6_001));
-      await new Promise((resolve) => setTimeout(resolve, 70));
-      expect(Date.now()).toBeGreaterThanOrEqual(startedAt + 6_001);
-      expect(lastTextPart([(await promiseWithin(terminal, "Expected fallback reveal within 1 second")).value!])).toBe(reply);
-    } finally { staged.release(); run.iterator.return(); run.env.restore(); }
-  });
-
-  test("done always yields the full reply, including when aborted while hidden", async () => {
-    for (const abortAtDone of [false, true]) {
-      const controller = new AbortController();
-      const staged = staggeredNdjsonStream([{ type: "delta", text: reply, sequence: 1 }], [done]);
-      const run = setup(staged.stream, true, controller.signal);
-      try {
-        await nextWithin(run.iterator, "Expected the initial spoken reply update within 1 second");
-        run.setHeard(0);
-        staged.release();
-        if (abortAtDone) controller.abort();
-        else setSystemTime(new Date(Date.now() + 6_001));
-        const terminal = run.iterator.next();
-        if (!abortAtDone) await new Promise((resolve) => setTimeout(resolve, 70));
-        expect(lastTextPart([(await promiseWithin(terminal, "Expected done reply within 1 second")).value!])).toBe(reply);
-      } finally { staged.release(); run.iterator.return(); run.env.restore(); }
-    }
-  });
-});
 
 describe("regenerate model override", () => {
   async function runWithBand(ageBand: "adult" | "child" | "teen") {

@@ -5,8 +5,6 @@ import { offerCarry, withdrawCarry } from "./chatCarry";
 import { MAX_CHAT_IMAGES, CHAT_IMAGE_REFUSAL } from "@maipai/home-backend/src/wire";
 import { api, ApiError } from "@/lib/api";
 import { readAssistantTurnStream } from "@/lib/assistantTurnStream";
-import { withTicks } from "@/lib/withTicks";
-import { heardText } from "@/lib/speechReveal";
 import { SentenceSpeechScheduler, type FirstSentencePlaybackTiming } from "@/lib/sentenceSpeechScheduler";
 import { splitReadyChunks } from "@/lib/sentenceChunker";
 import { normalizeForSpeech } from "@maipai/spec/voice/ts/normalizeForSpeech.js";
@@ -306,13 +304,11 @@ export function createChatModelAdapter(deps: ChatModelAdapterDeps): ChatModelAda
       const scheduler = new SentenceSpeechScheduler();
       deps.turnSchedulerRef.current = scheduler;
       scheduler.messageId = unstable_assistantMessageId;
+      scheduler.onFirstAudio = () => deps.onSpeakingChange?.(true);
       scheduler.onFirstPlayback = (at) => deps.onFirstPlayback?.(at);
       scheduler.onCuePlayback = (at) => deps.onCuePlayback?.(at);
       scheduler.onFirstSentenceTiming = (timing) => deps.onFirstSentencePlaybackTiming?.(timing);
-      let audioStarted = false;
-      let speechFailed = false;
-      scheduler.onFirstAudio = () => { audioStarted = true; deps.onSpeakingChange?.(true); };
-      scheduler.onError = () => { speechFailed = true; deps.onSpeechError?.(); };
+      scheduler.onError = () => deps.onSpeechError?.();
       // The reply is cut in on while it is still being SPOKEN, which is long after it finished generating: the turn stays "active" until
       // its voice ends, so a cut-in can still tell the server how much was heard (what lets the companion pick the story back up).
       scheduler.onEnded = () => {
@@ -326,10 +322,6 @@ export function createChatModelAdapter(deps: ChatModelAdapterDeps): ChatModelAda
       // here parses them. `spokenLength` is how much of `visible` has already
       // been handed to the scheduler.
       let visible = "";
-      const revealGate = Boolean(spokenTurn && speakReplies);
-      let revealDisabled = false;
-      let firstDeltaAt: number | undefined;
-      let lastRevealedLength = 0;
       // SHELL-02: the reasoning Element's own part (thread.aui.tsx),
       // built from the `reasoning` wire event (REASONING-01, wire.ts) -
       // already tag-split server-side, so unlike `visible` above this
@@ -410,8 +402,7 @@ export function createChatModelAdapter(deps: ChatModelAdapterDeps): ChatModelAda
         const timeline = toolTimelinePart(resumeTurnId);
         if (timeline) parts.push(timeline);
         // GENUI-13c and GENUI-05: blocks (a picture gallery included) sit at their own paragraph of the text so far, as the hub placed them.
-        const renderedText = revealGate && !revealDisabled ? heardText(visible, scheduler.heardVisibleEndFine(), false) : visible;
-        if (renderedText || streamedBlocks.length) parts.push(...textWithAnswerParts(renderedText, { blocks: streamedBlocks }).filter((part) => part.type !== "text" || part.text));
+        if (visible || streamedBlocks.length) parts.push(...textWithAnswerParts(visible, { blocks: streamedBlocks }).filter((part) => part.type !== "text" || part.text));
         const song = songPart(resumeTurnId);
         if (song) parts.push(song);
         return parts;
@@ -531,14 +522,7 @@ export function createChatModelAdapter(deps: ChatModelAdapterDeps): ChatModelAda
             askFormSettled = true;
             askForm.onSettled?.({ ok: true });
           }
-          for await (const item of withTicks(readAssistantTurnStream(response), 60)) {
-          if ("tick" in item) {
-            if (revealGate && !revealDisabled && firstDeltaAt !== undefined && !audioStarted && (speechFailed || Date.now() - firstDeltaAt >= 6000)) revealDisabled = true;
-            if (revealGate && !revealDisabled && !abortSignal.aborted) { const revealedLength = heardText(visible, scheduler.heardVisibleEndFine(), false).length; if (revealedLength !== lastRevealedLength) { lastRevealedLength = revealedLength; yield { content: buildContent() }; } }
-            if (abortSignal.aborted || scheduler.hasEndedNaturally() || scheduler.wasCutOff()) revealDisabled = true;
-            continue;
-          }
-          const event = item.event;
+          for await (const event of readAssistantTurnStream(response)) {
           // A review caught this: `safeParse` ran on every event
           // unconditionally, including every `delta` - the hottest path
           // in this loop, once per streamed chunk. `t` is exclusive to
@@ -609,7 +593,6 @@ export function createChatModelAdapter(deps: ChatModelAdapterDeps): ChatModelAda
             }
             deps.onReplyState?.("responding");
             visible += event.text;
-            firstDeltaAt ??= Date.now();
             if (event.generation !== undefined) resumeGeneration = event.generation;
             if (activityShown) {
               // Lane 11 item 1's own acceptance: "the first delta removes
@@ -686,7 +669,6 @@ export function createChatModelAdapter(deps: ChatModelAdapterDeps): ChatModelAda
             // non-streaming path already relied on.
             deps.onReplyState?.("ready");
             const finalText = stripThinking(event.value.reply.text);
-            visible = finalText;
             deps.onReplyText?.(finalText);
             const trailing = finalText.slice(spokenLength).trim();
             if (trailing && speakReplies) {
@@ -711,16 +693,6 @@ export function createChatModelAdapter(deps: ChatModelAdapterDeps): ChatModelAda
             }
             if (!speakReplies && deps.activeTurnRef && deps.activeTurnRef.current?.turnId === resumeTurnId) deps.activeTurnRef.current = null;
             scheduler.finish();
-            if (revealGate) {
-              const waitStarted = Date.now();
-              while (!abortSignal.aborted && !revealDisabled && !(firstDeltaAt !== undefined && !audioStarted && (speechFailed || Date.now() - firstDeltaAt >= 6000)) && Date.now() - waitStarted < 90000 && scheduler.heardVisibleEndFine() < finalText.length && !scheduler.hasEndedNaturally()) {
-                await new Promise((resolve) => setTimeout(resolve, 60));
-                const heard = scheduler.heardVisibleEndFine();
-                const revealedLength = heardText(visible, heard, false).length;
-                if (revealedLength !== lastRevealedLength) { lastRevealedLength = revealedLength; yield { content: buildContent() }; }
-              }
-              if (abortSignal.aborted || scheduler.hasEndedNaturally() || scheduler.wasCutOff() || (firstDeltaAt !== undefined && !audioStarted && (speechFailed || Date.now() - firstDeltaAt >= 6000)) || Date.now() - waitStarted >= 90000) revealDisabled = true;
-            }
             if (event.value.document_available === true) deps.onResearchDocument?.(event.value.turn_id);
             // THIN-3G: the offer of a new chat that carries the summary.
             if (event.value.carry_offer === true) offerCarry(event.value.conversation_id);
