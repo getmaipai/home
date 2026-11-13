@@ -46,6 +46,9 @@ export type CaptureResult =
   | { ok: true; member: ResolvedCast; sheet_file_id: string; reused: boolean; description: string; locked_description: string | null; notes: string[] }
   | { ok: false; line: string };
 
+let sheetMakerOverride: LookSheetMaker | null = null;
+/** Tests that run the film engines (which capture a look for a new film character) swap the heavy cut-out tools for a light builder. */
+export function __setLookSheetMakerForTests(fn: LookSheetMaker | null): void { sheetMakerOverride = fn; }
 const realSheetMaker: LookSheetMaker = async (pictures, onStep) => (await import("@/lib/films/sheetMaker")).makeSheetFromPictures(pictures, undefined, { drawViews: true, ...(onStep ? { onStep } : {}) });
 const roleOf = (kind: string): PictureRole => kind === "place" ? "set" : kind === "prop" ? "prop" : "actor";
 const personById = (id: string): PersonRow | null => (db.select().from(people).where(and(eq(people.id, id), isNull(people.deletedAt))).get() as PersonRow | undefined) ?? null;
@@ -163,7 +166,7 @@ async function doCapture(actor: PersonRow, ref: string, options: CaptureOptions)
   // 5. Build it with the one sheet builder and store it as the subject's sheet reference.
   const pictures: SheetPicture[] = sources.map((s, index) => ({ bytes: s.bytes, mediaType: s.mediaType, name: sources.length > 1 ? `${member.name} ${index + 1}` : member.name, role: roleOf(member.subject_kind), look: row.look }));
   let made: MadeSheet;
-  try { made = await (options.sheetMaker ?? realSheetMaker)(pictures, options.onStep); }
+  try { made = await (options.sheetMaker ?? sheetMakerOverride ?? realSheetMaker)(pictures, options.onStep); }
   catch (error) { console.error("[cast-look] sheet failed:", error instanceof Error ? error.message : error); return { ok: false, line: LOOK_FAILED_LINE }; }
   // The locked sentence: written from the look words, and rewritten on a rebuild only when the person has not edited it by hand.
   const auto = row.look.trim().slice(0, 400) || null;

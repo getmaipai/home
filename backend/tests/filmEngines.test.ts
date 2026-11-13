@@ -15,6 +15,8 @@ import { getMediaProduction } from "@/lib/mediaProductions";
 import { createMediaSubject } from "@/lib/mediaSubjects";
 import { storeFile, readAttachment } from "@/lib/attachments";
 import sharp from "sharp";
+import { __setLookSheetMakerForTests } from "@/lib/castLook";
+import { makeSheetFromPictures, cutOutPause } from "@/lib/films/sheetMaker";
 
 function person(id: string, role: "adult" | "teen" | "child" = "adult"): PersonRow {
   const now = new Date().toISOString();
@@ -29,8 +31,8 @@ describe("film engine entry", () => {
   let video: ReturnType<typeof installFakeVideoStack>;
   let music: ReturnType<typeof installFakeMusicStack>;
   let edit: ReturnType<typeof installFakeEditStack>;
-  beforeEach(() => { resetDb(); __setFilmPlanCompleterForTests(null); });
-  afterEach(() => { image?.restore(); video?.restore(); music?.restore(); edit?.restore(); __setKeyframesForTests(null); });
+  beforeEach(() => { resetDb(); __setFilmPlanCompleterForTests(null); cutOutPause.ms = 0; __setLookSheetMakerForTests((pictures) => makeSheetFromPictures(pictures, { removeBackground: async (bytes) => bytes, findFaces: async () => [] })); });
+  afterEach(() => { image?.restore(); video?.restore(); music?.restore(); edit?.restore(); __setKeyframesForTests(null); __setLookSheetMakerForTests(null); });
 
   test("refuses a child before calling the planner or starting engines", async () => {
     let calls = 0;
