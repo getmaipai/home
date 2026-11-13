@@ -10,6 +10,7 @@ import { storeFile } from "@/lib/attachments";
 import { createShare } from "@/lib/shares";
 import { __resetImageEditForTests, __setImageToolsForTests, LIBRARY_PICTURE_LOCKED } from "@/lib/imageEdit";
 import { getMediaOp, runMediaOp } from "@/lib/mediaOps/registry";
+import { PICTURES_NOT_READY_LINE } from "@/lib/mediaOps/studio";
 import { withAttachments } from "@/lib/mediaOps/http";
 import { __setPictureStatusForTests, readyStatusForTests } from "@/lib/pictures/ready";
 import { __setPicturesFetchForTests } from "@/lib/pictures/stack";
@@ -171,7 +172,7 @@ describe("the Studio page's data and calls (IMG-STUDIO-02)", () => {
     __setRoleHealthForTests({ image: { availability: "unavailable", reason: "off" } });
     const source = await libraryPicture(sageActor);
     const tools = (await (await sage.post("/api/plugins/image/data/studio-tools", { id: source.id })).json()) as Array<{ id: string; enabled: boolean; reason?: string }>;
-    expect(tools.map((t) => t.id)).toEqual(["picture.blur_background"]);
+    expect(tools.filter((t) => !("tool" in t)).map((t) => t.id)).toEqual(["picture.blur_background"]);
     const res = await studioCall(sage, "studio-comment", { file: source.id, prompt: "make it sunny", region: null, mask: null, reference: null });
     expect(res.status).toBeGreaterThanOrEqual(400);
     expect(((await res.json()) as { error: string }).error.length).toBeGreaterThan(10);
@@ -229,3 +230,107 @@ describe("the Studio page's data and calls (IMG-STUDIO-02)", () => {
     expect(await (await studioRows(lucia, "")).json()).toEqual([{ id: "", empty: true }]);
   });
 });
+
+describe("the Studio's reference picture and tool readiness (STUDIO-GAPS-02, STUDIO-GAPS-05)", () => {
+  type ToolRow = { id: string; tool?: string; enabled: boolean; reason?: string };
+  const reference = (client: TestClient, body: Record<string, unknown>) => studioCall(client, "studio-reference", body);
+  const toolsOf = async (client: TestClient, id: string) => (await (await client.post("/api/plugins/image/data/studio-tools", { id })).json()) as ToolRow[];
+
+  beforeEach(() => { __setPictureStatusForTests(readyStatusForTests()); });
+  afterEach(() => { __setPictureStatusForTests(null); });
+
+  test("a chosen picture of the person's own is checked and named for the Comment", async () => {
+    const base = await libraryPicture(sageActor);
+    const other = await libraryPicture(sageActor);
+    const res = await reference(sage, { file: base.id, ref: other.id });
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ id: other.id, label: expect.any(String) });
+    expect(((await (await reference(sage, { file: base.id, ref: other.id })).json()) as { label: string }).label.length).toBeGreaterThan(0);
+  });
+
+  test("nothing chosen, or the picture being changed, is one plain line", async () => {
+    const base = await libraryPicture(sageActor);
+    const none = await reference(sage, { file: base.id, ref: "" });
+    expect(none.status).toBe(422);
+    expect(((await none.json()) as { error: string }).error).toBe("Choose a picture to draw on, then try again.");
+    const same = await reference(sage, { file: base.id, ref: base.id });
+    expect(same.status).toBe(422);
+    expect(((await same.json()) as { error: string }).error).toContain("different picture");
+  });
+
+  test("a teen cannot use another person's picture as a reference, even a shared one, and cannot open it", async () => {
+    const adults = await libraryPicture(sageActor);
+    const teen = db.select().from(people).where(eq(people.displayName, "Marlow")).get()!;
+    const theirs = await libraryPicture(teen);
+    createShare(sageActor, { fileId: adults.id, to: teen.id });
+    expect((await reference(marlow, { file: theirs.id, ref: adults.id })).status).toBe(404);
+    expect((await reference(marlow, { file: adults.id, ref: theirs.id })).status).toBe(404);
+    expect((await studioRows(marlow, adults.id)).status).toBe(404);
+    expect((await reference(marlow, { file: theirs.id, ref: (await libraryPicture(teen)).id })).status).toBe(200);
+  });
+
+  test("a locked adult-only picture is not offered and cannot be a reference; the same picture unlocked can", async () => {
+    const base = await libraryPicture(sageActor);
+    const locked = await libraryPicture(sageActor, ADULT_LOCKED);
+    const offered = (await (await sage.post("/api/plugins/image/data/studio-picker", {})).json()) as Array<{ id: string }>;
+    expect(offered.map((p) => p.id)).not.toContain(locked.id);
+    const res = await reference(sage, { file: base.id, ref: locked.id });
+    expect(res.status).toBe(423);
+    expect(((await res.json()) as { error: string }).error).toBe(LIBRARY_PICTURE_LOCKED);
+    const open = await libraryPicture(sageActor, ADULT_OPEN);
+    expect((await reference(sage, { file: base.id, ref: open.id })).status).toBe(200);
+  });
+
+  test("a child is told cartoons only, and an engine with no second-picture support says so in one line", async () => {
+    const mine = await libraryPicture(novaActor);
+    const other = await libraryPicture(novaActor);
+    const child = await reference(nova, { file: mine.id, ref: other.id });
+    expect(child.status).toBe(422);
+    const base = await libraryPicture(sageActor);
+    const second = await libraryPicture(sageActor);
+    __setPictureStatusForTests(readyStatusForTests({ edit: { generative: true, masked: true, references: 0 } }));
+    const none = await reference(sage, { file: base.id, ref: second.id });
+    expect(none.status).toBe(503);
+    expect(((await none.json()) as { error: string }).error).toBe("Using a second picture needs an update first. Ask an admin to update Home.");
+  });
+
+  test("the picture the person chose is the one the change is asked to draw on", async () => {
+    const base = await libraryPicture(sageActor);
+    const other = await libraryPicture(sageActor);
+    const theirs = await libraryPicture((db.select().from(people).where(eq(people.id, luciaId)).get())!);
+    // The change refuses a picture that is not the person's own with the same 404 the reference check gives, so the reference really reaches the operation.
+    const refused = await studioCall(sage, "studio-comment", { file: base.id, prompt: "put them together", reference: { id: theirs.id, label: "x" } });
+    expect(refused.status).toBe(404);
+    const body = (await refused.json()) as { code: string };
+    expect(body.code).not.toBe("references_not_used");
+    const same = await studioCall(sage, "studio-comment", { file: base.id, prompt: "put them together", reference: { id: base.id, label: "x" } });
+    expect(same.status).toBe(422);
+    expect(((await same.json()) as { code: string }).code).toBe("reference_same");
+    expect(other.id).not.toBe(base.id);
+  });
+
+  test("every built-in tool has a readiness row, ready ones are enabled, and a tool the engine cannot run says why before a click", async () => {
+    const source = await libraryPicture(sageActor);
+    const ready = await toolsOf(sage, source.id);
+    for (const tool of ["remove_background", "erase", "resize", "crop", "adjust", "comment"]) expect(ready.find((row) => row.tool === tool)).toMatchObject({ enabled: true });
+    __setRoleHealthForTests({ image: { availability: "unavailable", reason: "off" } });
+    const off = await toolsOf(sage, source.id);
+    const comment = off.find((row) => row.tool === "comment")!;
+    expect(comment.enabled).toBe(false);
+    // The health row's reason here is a machine word: the person is told the plain not-ready line instead, never "off".
+    expect(comment.reason).toBe(PICTURES_NOT_READY_LINE);
+    expect(off.find((row) => row.tool === "crop")).toMatchObject({ enabled: true });
+    // The registry's own list stays in step with the rows: a tool row is never also an extra operation.
+    expect(off.filter((row) => !row.tool).map((row) => row.id)).toEqual(["picture.blur_background"]);
+  });
+
+  test("a tool whose engine part is not installed is disabled up front with the engine's reason", async () => {
+    const source = await libraryPicture(sageActor);
+    __setImageToolsForTests({ ...READY, models: { isnet: false, lama: false, esrgan: false }, operations: [], reason: "The picture tools are being installed. Try again in a few minutes." }, true);
+    const rows = await toolsOf(sage, source.id);
+    const erase = rows.find((row) => row.tool === "erase")!;
+    expect(erase.enabled).toBe(false);
+    expect(erase.reason).toBeTruthy();
+  });
+});
+
