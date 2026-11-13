@@ -261,6 +261,8 @@ export function MediaHostProvider({ children, personId, ageBand }: { children: R
       },
       // Only a media app's player plays in the host's element; anywhere else the Player keeps its own.
       ...(personId ? { pickMedia } : {}),
+      // EDITOR-HANDOFF: the Studio's "Make a video from this" opens the Video Create form with the picture in place; nothing starts (the same hand-off as the Library viewer's).
+      handOff: (to, item) => { if (to === "video_create") navigate("/apps/video/create", { state: { pageState: { start_frame: item.file } } }); },
       makingNotice,
       mediaFor: (ref) => (!refuseAdultOnly(ref) && appRef.current && typeof document !== "undefined" ? store.elementFor(ref, appRef.current) : null),
     }),

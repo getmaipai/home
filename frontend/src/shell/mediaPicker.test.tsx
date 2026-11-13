@@ -4,7 +4,7 @@
 import { afterEach, describe, expect, test } from "bun:test";
 import { act, cleanup, fireEvent, render, waitFor } from "@testing-library/react";
 import { useContext, type ReactNode } from "react";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter, useLocation } from "react-router-dom";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { TooltipProvider } from "@maipai/ui/src/ui/tooltip";
 import { createQueryClient } from "@maipai/ui/src/queryClient";
@@ -124,5 +124,35 @@ describe("MediaHost.pickMedia for the Studio", () => {
     await waitFor(() => expect(view.getAllByRole("button", { name: /^Use / })).toHaveLength(1));
     fireEvent.click(view.getByRole("button", { name: "Use song-1.m4a" }));
     expect((await picked as { id: string }).id).toBe("song-1");
+  });
+});
+
+describe("MediaHost.handOff (EDITOR-HANDOFF)", () => {
+  test("a hand-off to video_create opens the Video Create form with the picture as its start picture, and starts nothing", async () => {
+    const calls: string[] = [];
+    globalThis.fetch = (async (input: RequestInfo | URL) => { calls.push(String(input)); return new Response("{}", { status: 200, headers: { "content-type": "application/json" } }); }) as unknown as typeof fetch;
+    function Where() { const location = useLocation(); return <p data-testid="where">{location.pathname}|{JSON.stringify((location.state as { pageState?: unknown } | null)?.pageState ?? null)}</p>; }
+    const view = mount("person-1", <><Probe /><Where /></>);
+    act(() => host!.handOff!("video_create", { file: "pic-9" }));
+    await waitFor(() => expect(view.getByTestId("where").textContent).toBe('/apps/video/create|{"start_frame":"pic-9"}'));
+    expect(calls.filter((url) => url.includes("/actions/") || url.includes("/generate"))).toEqual([]);
+  });
+
+  test("the picture picker on an Image app page says what it is for, not that a video starts", async () => {
+    stubLibrary([item("mine-1", "person-1")]);
+    const view = render(
+      <QueryClientProvider client={createQueryClient()}>
+        <TooltipProvider>
+          <ToastProvider>
+            <MemoryRouter initialEntries={["/apps/image/studio"]}>
+              <MediaHostProvider personId="person-1"><Probe /></MediaHostProvider>
+            </MemoryRouter>
+          </ToastProvider>
+        </TooltipProvider>
+      </QueryClientProvider>,
+    );
+    act(() => { void host!.pickMedia!("picture"); });
+    await waitFor(() => expect(view.getByText("Choose one of your own pictures, or add a new one.")).toBeTruthy());
+    expect(view.queryByText(/The video starts/)).toBeNull();
   });
 });

@@ -39,6 +39,6 @@ Each tool shows a preview first. Press **Apply** to keep it as a new version, or
 
 ## Make a video from it
 
-In the [Library](library.md), open the picture and press **Make a video from this**. The Video app opens with the picture as the first frame. Nothing starts until you press the button there.
+In the Studio, press **Make a video from this** at the top. In the [Library](library.md), open the picture and press the same button. The Video app opens with the picture you are looking at as the first frame. Nothing starts until you press the button there.
 
 See [Pictures](pictures.md) for making pictures and who can make them.

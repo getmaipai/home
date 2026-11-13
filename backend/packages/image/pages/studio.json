@@ -155,7 +155,13 @@
             }
           }
         }
-      }
+      },
+      "actions": [
+        {
+          "label": "Make a video from this",
+          "hand_off": "video_create"
+        }
+      ]
     }
   ]
 }
