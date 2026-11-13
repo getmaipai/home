@@ -113,7 +113,7 @@ registerAppPageFill("video", "create", (person, page) => {
   // Look, Camera (and Voices, folded under More settings) are the Style control: two thumbnails that open one popover (a sheet on a phone).
   bar.chips = [
     ...chips,
-    { state: "seconds", label: "Length", align: "end", default: QUICK_MAX_SECONDS, options: lengths.map((value) => ({ value, label: `${value}s` })) },
+    { state: "seconds", label: "Length", group: "Settings", presentation: "popover", default: QUICK_MAX_SECONDS, options: lengths.map((value) => ({ value, label: `${value} seconds` })) },
     { state: "look", label: "Look", variant: "cards", presentation: "popover", group: "Style", default: VIDEO_LOOKS[0]!.id, options: VIDEO_LOOKS.map(({ id, label, loop }) => ({ value: id, label: id === VIDEO_LOOKS[0]!.id ? "Auto" : label, ...media(loop) })) },
     // Auto is the start for both: Look's Auto is `natural` (adds no words; a clip's tag still says "Natural"), Camera's Auto is "none" (the route reads it as not given).
     { state: "camera", label: "Camera", variant: "cards", presentation: "popover", group: "Style", default: "none", options: [{ value: "none", label: "Auto" }, ...VIDEO_RECIPES.map(({ id, label, loop }) => ({ value: id, label, ...media(loop) }))] },

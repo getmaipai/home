@@ -29,7 +29,7 @@ export function collectHealth(): Promise<HealthSnapshot> {
 // status history. Keep its payload aligned with frontend chatAvailability
 // and backend statusHistory.componentStatesFrom, which mirror that rule.
 async function buildHealth() {
-  const roles = ["chat", "embed", "background", "voice", "image", "video"] as const;
+  const roles = ["chat", "embed", "background", "voice", "image", "video", "music", "voices"] as const;
   const [locals, states, callReady] = await Promise.all([
     Promise.all(roles.map((role) => localRoleHealthEntry(role))),
     Promise.all(roles.map((role) => roleHealth(role))),
@@ -59,22 +59,22 @@ async function buildHealth() {
   const embed = roleHealthEntry("embed", locals[1]!, states[1]!);
   const background = roleHealthEntry("background", locals[2]!, states[2]!);
   const voice = roleHealthEntry("voice", locals[3]!, states[3]!);
-  // ENGINE-STATUS-MEDIA-01: picture and video making. Each row carries its own per-band line (failureCopy.ts's makingNotice). A Stack
+  // ENGINE-STATUS-MEDIA-01: picture and video making (COMPOSER-03 adds music and voices, read the same way). Each row carries its own per-band line (failureCopy.ts's makingNotice). A Stack
   // that has not answered for the same minute chat allows reads "isn't answering" here too. These rows never change `ok`: a computer
   // that cannot make videos is not an outage.
-  const [image, video] = (["image", "video"] as const).map((role, index) => {
+  const [image, video, music, voices] = (["image", "video", "music", "voices"] as const).map((role, index) => {
     const entry = roleHealthEntry(role, locals[4 + index]!, states[4 + index]!);
     let makingCause: MakingCause | null = entry.cause && entry.cause !== "paused_by_admin" && entry.cause !== "tier_reduced" && entry.cause !== "reduced_swap" && entry.cause !== "upgrading" ? entry.cause : null;
     if (makingCause === "restarting" && cause === "offline") { entry.availability = "unavailable"; entry.kind = "failed"; entry.alive = false; entry.cause = "offline"; makingCause = "offline"; }
     const line = makingNotice(role, entry.availability ?? "ready", makingCause);
     if (line) entry.notice = line;
     return entry;
-  }) as [typeof chat, typeof chat];
+  }) as [typeof chat, typeof chat, typeof chat, typeof chat];
   const sidecars = listSidecars();
   const ok =
     [chat, embed, background, voice].every((e) => e.alive !== false && e.kind !== "failed" && e.kind !== "restarting" && e.kind !== "blocked" && e.kind !== "stalled") &&
     sidecars.every((s) => s.status !== "unhealthy" && s.status !== "crashed");
-  return { llm: { empty_length_retry: emptyLengthRetryCount() }, sidecars, brain: getEngineStatus().kind, voice: "stack", voice_call_ready: callReady, ok, engines: { chat, embed, background, voice, image, video }, uptimeSeconds: process.uptime() };
+  return { llm: { empty_length_retry: emptyLengthRetryCount() }, sidecars, brain: getEngineStatus().kind, voice: "stack", voice_call_ready: callReady, ok, engines: { chat, embed, background, voice, image, video, music, voices }, uptimeSeconds: process.uptime() };
 }
 
 export type HealthSnapshot = Awaited<ReturnType<typeof buildHealth>>;

@@ -25,6 +25,7 @@ import { fetchNowPlaying, liveStationIdOf, NOW_FIRST_MS, NOW_POLL_MS, rejoinLive
 import { MediaPickerBody, StudioPickerBody, type PickKind, type PickedMedia } from "@/shell/MediaPickerDialog";
 import { makingAvailability } from "@/apps/chat/useMakingAvailability";
 import { useHealthQuery } from "@/apps/chat/useChatAvailability";
+import { composerHostFor, useComposerModes } from "@/shell/composer/composerModes";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@maipai/ui/src/ui/dialog";
 import type Hls from "hls.js";
 import { nextMusicQueueId, useMusicDj } from "@/shell/musicDj";
@@ -226,6 +227,9 @@ export function MediaHostProvider({ children, personId, ageBand }: { children: R
     const reading = makingAvailability(health?.engines?.[kind === "picture" ? "image" : "video"], ageBand ? { age_band: ageBand } : null);
     return reading.disabled ? reading.reason ?? MAKING_NOT_READY_LINE[kind] : undefined;
   }, [health, ageBand]);
+  // ONE-COMPOSER-2026-11-13 (COMPOSER-03): a Create page's prompt bar draws the one composer with the hub's modes (read once, never polled).
+  const composerModes = useComposerModes();
+  const composer = useMemo(() => composerHostFor(composerModes, location.pathname, navigate), [composerModes, location.pathname, navigate]);
   const listener = useMemo(() => createStoryListener(store, (line) => pushRef.current(line), status), [store, status]);
   const speech = useSyncExternalStore(status.subscribe, status.get, status.get);
   const host = useMemo<MediaHost>(
@@ -264,9 +268,10 @@ export function MediaHostProvider({ children, personId, ageBand }: { children: R
       // EDITOR-HANDOFF: the Studio's "Make a video from this" opens the Video Create form with the picture in place; nothing starts (the same hand-off as the Library viewer's).
       handOff: (to, item) => { if (to === "video_create") navigate("/apps/video/create", { state: { pageState: { start_frame: item.file } } }); },
       makingNotice,
+      ...(composer ? { composer } : {}),
       mediaFor: (ref) => (!refuseAdultOnly(ref) && appRef.current && typeof document !== "undefined" ? store.elementFor(ref, appRef.current) : null),
     }),
-    [navigate, store, listener, personId, pickMedia, makingNotice],
+    [navigate, store, listener, personId, pickMedia, makingNotice, composer],
   );
   const current = useSyncExternalStore(store.subscribe, store.get, store.get);
   const djFor = useMusicDj(current ? { id: current.id, appId: current.appId, live: liveStationIdOf(current.src) !== null } : null);

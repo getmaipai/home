@@ -1,0 +1,15 @@
+{
+  "modes": [
+    {
+      "id": "video",
+      "label": "Video",
+      "icon": "film",
+      "page": "create",
+      "route": "/apps/video/create",
+      "engine": "video",
+      "gate": "videos",
+      "tier_category": "video",
+      "tools": ["clear"]
+    }
+  ]
+}

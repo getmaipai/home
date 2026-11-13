@@ -1,17 +1,10 @@
 import { afterEach, expect, test } from "bun:test";
 import { cleanup, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
-import { AskBox, composerHref } from "@/shell/pages/dashboard/AskBox";
+import { AskBox } from "@/shell/pages/dashboard/AskBox";
 import { renderWithQueryClient } from "../../../../tests/renderWithQueryClient";
 
 afterEach(cleanup);
-
-test("composer modes choose their destination and preserve the prompt", () => {
-  expect(composerHref("ask", "  hello world ")).toBe("/chat?ask=hello%20world");
-  expect(composerHref("picture", "a red fox")).toBe("/chat?ask=a%20red%20fox&mode=picture");
-  expect(composerHref("video", "a red fox")).toBe("/apps/video/create?prompt=a%20red%20fox");
-  expect(composerHref("song", "a red fox")).toBe("/apps/audio/create?prompt=a%20red%20fox");
-});
 
 test("the Home ask box has focus on arrival", async () => {
   const view = renderWithQueryClient(<MemoryRouter><AskBox /></MemoryRouter>);

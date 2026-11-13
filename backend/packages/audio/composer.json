@@ -1,0 +1,20 @@
+{
+  "owner": "music session: the Song mode's chips, references, presets and quality go here or in pages/create.json's prompt_bar (MP-U1); until then it is a plain words-only mode",
+  "modes": [
+    {
+      "id": "song",
+      "label": "Song",
+      "icon": "music",
+      "page": "create",
+      "route": "/apps/audio/create",
+      "engine": "music",
+      "gate": "music",
+      "tier_category": "music",
+      "tools": ["clear"],
+      "fallback": {
+        "placeholder": "Describe the song you want. Add details like instruments or the kind of voice.",
+        "primary": "Make song"
+      }
+    }
+  ]
+}

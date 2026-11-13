@@ -5,7 +5,7 @@ import { chatAvailability, type ChatAvailability } from "@/apps/chat/chatAvailab
 import { useHealthQuery } from "@/apps/chat/useChatAvailability";
 import { WakeWordPersonContext } from "@/apps/chat/chatThreadContexts";
 
-export type MakingKind = "image" | "video";
+export type MakingKind = "image" | "video" | "music" | "voices";
 
 export interface MakingAvailability {
   availability: ChatAvailability;

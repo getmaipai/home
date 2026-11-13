@@ -57,7 +57,7 @@ export function DashboardPage({ person }: { person: Roster }) {
     switch (block) {
       case "greeting": return <div key={block} className="md:col-span-2 lg:col-span-12"><Greeting displayName={person.display_name} familyName={familyName.data?.value} /></div>;
       case "admin": return admin ? <div key={block} className="md:col-span-2 lg:col-span-12"><Attention /></div> : null;
-      case "ask": return <div key={block} ref={askRef} className="mx-auto w-full max-w-2xl md:col-span-2 lg:col-span-12"><AskBox role={person.role} /></div>;
+      case "ask": return <div key={block} ref={askRef} className="mx-auto w-full max-w-2xl md:col-span-2 lg:col-span-12"><AskBox /></div>;
       case "make": return <div key={block} className="md:col-span-2 lg:col-span-12"><MakeShelf role={person.role} /></div>;
       case "actions": return null;
       case "media_continue": return (media.data?.continue?.length || continueRows.data?.rows?.length) ? <div key={block} className="md:col-span-2 lg:col-span-12"><HomeMedia kind="continue" /></div> : null;

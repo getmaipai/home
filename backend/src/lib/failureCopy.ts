@@ -264,12 +264,14 @@ export function composerNotice(availability: "ready" | "starting" | "unavailable
  * in the same ComposerNotice shape the chat line uses, so every client reads
  * the words from the health row (`engines.image.notice`, `engines.video.notice`).
  * No figure (no sizes, no percentages) ever appears in these lines. */
-export type MakingKind = "image" | "video";
+export type MakingKind = "image" | "video" | "music" | "voices";
 export type MakingCause = "restarting" | "memory" | "not_installed" | "mode_change" | "offline" | "gpu";
 
 const MAKING_NOUN: Record<MakingKind, { thing: string; Thing: string; things: string }> = {
   image: { thing: "picture", Thing: "Picture", things: "Pictures" },
   video: { thing: "video", Thing: "Video", things: "Videos" },
+  music: { thing: "song", Thing: "Song", things: "Songs" },
+  voices: { thing: "voice", Thing: "Voice", things: "Voices" },
 };
 
 function makingNoticeFor(kind: MakingKind, cause: MakingCause | "starting" | "unknown"): ComposerNotice {

@@ -1,0 +1,16 @@
+{
+  "modes": [
+    {
+      "id": "picture",
+      "label": "Picture",
+      "icon": "image",
+      "page": "create",
+      "route": "/apps/image/create",
+      "engine": "image",
+      "gate": "pictures",
+      "tier_category": "image",
+      "tools": ["clear"],
+      "presets": { "label": "Presets", "source": "templates", "kind": "picture" }
+    }
+  ]
+}

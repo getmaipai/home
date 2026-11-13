@@ -1881,6 +1881,8 @@ export const api = {
   // narrow because that's all the chat status pill (useEngineHealth.ts)
   // has ever needed.
   health: () => request<HealthStatus>("/api/health", { timeoutMs: 8_000 }),
+  /** ONE-COMPOSER-2026-11-13 (COMPOSER-03): the composer's modes for this person. Read once; readiness comes from the health query, never from here. */
+  composerModes: () => request<import("@/shell/composer/composerModes").ComposerModesResponse>("/api/composer/modes", { timeoutMs: 8_000 }),
   statusBoard: () => request<StatusBoard>("/api/status/board"),
   engineComputerStatus: () => request<EngineComputerStatus>("/api/status/engine-computer"),
   statusApps: () => request<StatusAppsResponse>("/api/status/apps"),

@@ -4,15 +4,100 @@
   "title": "Image",
   "body": [
     {
-      "type": "empty_state",
-      "icon": "wand-sparkles",
-      "text": "Image will be here. This page is coming soon.",
-      "action": {
-        "navigate": {
-          "to": "/apps/image/templates"
+      "type": "prompt_bar",
+      "placement": "inline",
+      "layout": "chat",
+      "chat_distribution": "start_end",
+      "label": "Describe a picture",
+      "placeholder": "Describe the picture you want. Type @ to add someone from your cast.",
+      "prompt_state": "prompt",
+      "max_length": 1200,
+      "submit_label": "Make picture",
+      "starts": "picture",
+      "chips": [
+        {
+          "state": "shape",
+          "label": "Shape",
+          "default": "square",
+          "group": "Settings",
+          "presentation": "popover",
+          "options": [
+            {
+              "value": "square",
+              "label": "Square"
+            },
+            {
+              "value": "landscape",
+              "label": "Landscape"
+            },
+            {
+              "value": "portrait",
+              "label": "Portrait"
+            },
+            {
+              "value": "wide",
+              "label": "Wide"
+            },
+            {
+              "value": "tall",
+              "label": "Tall"
+            }
+          ]
+        },
+        {
+          "state": "count",
+          "label": "Pictures",
+          "default": 1,
+          "group": "Settings",
+          "presentation": "popover",
+          "options": [
+            {
+              "value": 1,
+              "label": "1 picture"
+            },
+            {
+              "value": 2,
+              "label": "2 pictures"
+            },
+            {
+              "value": 3,
+              "label": "3 pictures"
+            },
+            {
+              "value": 4,
+              "label": "4 pictures"
+            }
+          ]
         }
+      ],
+      "tier": {
+        "state": "tier",
+        "label": "Quality",
+        "default": "standard",
+        "tiers": [
+          {
+            "id": "standard",
+            "label": "Standard",
+            "hint": "Fast"
+          },
+          {
+            "id": "boost",
+            "label": "Boost",
+            "hint": "More detail"
+          },
+          {
+            "id": "max",
+            "label": "Max",
+            "hint": "Best quality"
+          }
+        ]
       },
-      "action_label": "Browse templates"
+      "submit": {
+        "ask": {
+          "prompt": "{prompt}\n\nPlease make {count} {shape} picture(s) with the image generation tool. Quality: {tier}.",
+          "expects": "A picture made in this chat."
+        }
+      }
     }
   ]
 }

@@ -857,7 +857,7 @@ export interface HealthStatus {
   ok: boolean;
   /** ENGINE-STATUS-MEDIA-01 (additive): `image` and `video` say whether a picture or a clip can be started now, with `cause` and a
    * per-band `notice` (failureCopy.ts's makingNotice) while not ready. They never change `ok`. Absent from an older hub. */
-  engines: { chat: EngineHealthEntry; embed: EngineHealthEntry; background: EngineHealthEntry; voice: EngineHealthEntry; image?: EngineHealthEntry; video?: EngineHealthEntry };
+  engines: { chat: EngineHealthEntry; embed: EngineHealthEntry; background: EngineHealthEntry; voice: EngineHealthEntry; image?: EngineHealthEntry; video?: EngineHealthEntry; /** COMPOSER-03 (additive): song and speaking making, read like `image` and `video`. */ music?: EngineHealthEntry; voices?: EngineHealthEntry };
   uptimeSeconds: number;
   sidecars: SidecarStatusEntry[];
 }

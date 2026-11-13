@@ -3,6 +3,7 @@ import { activeTransition, observeModeChange, transitionNotice } from "@/lib/cha
 import * as canaryResults from "@/lib/canary/results";
 import { stackReducedChat } from "@/lib/reducedChat";
 import { warmupInFlight } from "@/lib/stackWarmup";
+import { musicEngineStatus, musicStatusReady } from "@/lib/music/ready";
 import { __bumpStackEpochForTests, getStackClient, isStackConfigured, stackEpoch, stackRefusal } from "@/lib/stackEngine";
 import { getHomeSupervisorRoles } from "@/lib/homeSupervisorRoles";
 import type { EngineHealthEntry } from "@/wire";
@@ -10,7 +11,8 @@ import type { ChatRoleContext } from "@maipai/spec/stack/ts/role-context.js";
 
 export type HealthRole = "chat" | "embed" | "background" | "voice" | MakingRole;
 /** ENGINE-STATUS-MEDIA-01: picture and video making, read the same way so a control can be disabled before a person presses it. */
-export type MakingRole = "image" | "video";
+/** COMPOSER-03 (ONE-COMPOSER-2026-11-13, condition 7): music and voices are read the same way, so the one composer can disable its Song and Voices modes before a press. */
+export type MakingRole = "image" | "video" | "music" | "voices";
 /** THIN-1C (fixes part of getmaipai/home#203): `detail`, present only
  * when the Stack itself refused the role (a 503 with its reason), is
  * that reason in the household's wording - the same line the chat reply
@@ -46,12 +48,12 @@ export function sharedStackRoles() { return shared(rolesSlot, () => getStackClie
 export function sharedCodingMode() { return shared(codingSlot, () => getStackClient().getCodingMode(), (next) => { codingSlot = next; }); }
 export function __resetSharedStackReadsForTests(): void { rolesSlot = null; codingSlot = null; }
 
-const STACK_ROLE_ID: Partial<Record<HealthRole, string>> = { embed: "embed", background: "judge", voice: "tts" };
+const STACK_ROLE_ID: Partial<Record<HealthRole, string>> = { embed: "embed", background: "judge", voice: "tts", voices: "tts" };
 /** The role name each Stack call site passes to stackFailureResult()
  * (llm.ts, tts.ts, stt.ts) - what a remembered refusal is keyed by,
  * which is not always the Stack's own role id above (the background
  * worker calls the "judge" role under the name "background"). */
-export const STACK_REFUSAL_KEY: Record<HealthRole, string> = { chat: "chat", embed: "embed", background: "background", voice: "tts", image: "image", video: "video" };
+export const STACK_REFUSAL_KEY: Record<HealthRole, string> = { chat: "chat", embed: "embed", background: "background", voice: "tts", image: "image", video: "video", music: "music", voices: "tts" };
 const STACK_IDLE_REASON = "No request through the public route in the last hour.";
 
 export async function localRoleHealthEntry(role: HealthRole): Promise<EngineHealthEntry> {
@@ -83,7 +85,7 @@ export async function roleHealth(role: HealthRole, opts: { live?: boolean; fresh
   // HOST-LAUNCH-03: a fresh maintenance flag (a whole-machine development lease or an upgrade) reads as one short reason on the existing chat row.
   if (role === "chat" && maintenanceActive()) return { availability: "unavailable", reason: "maintenance", cause: "upgrading" };
   if (!isStackConfigured()) return { availability: "unavailable", reason: "stack_unreachable", cause: "restarting" };
-  if (role === "image" || role === "video") return makingHealth(role);
+  if (role === "image" || role === "video" || role === "music" || role === "voices") return makingHealth(role);
   // The Reduced swap is running (a no-op renewal answers in milliseconds, so only a swap that lasts shows): chat cannot answer until it ends.
   const swap = role === "chat" ? activeTransition() : null;
   if (swap && Date.now() - swap.startedAt > 1500) return { availability: "starting", reason: null, cause: "reduced_swap" };
@@ -151,14 +153,20 @@ export function __resetMakingHealthForTests(): void { makingInputs = null; __res
 async function makingHealth(role: MakingRole): Promise<RoleHealth> {
   const { roles, paused, coding } = await readMakingInputs();
   if (!roles) return { availability: "starting", reason: "stack_unreachable", cause: "restarting" };
-  const row = roles.find((item) => item.id === role);
-  if (!row || row.state.state === "notInstalled") return { availability: "unavailable", reason: "not_installed", cause: "not_installed" };
+  // Music has its own status read (lib/music/ready.ts, kept for 20 s, and a ready answer for 5 minutes after a failed read); voices is the Stack's speaking role.
+  const row = role === "music" ? undefined : roles.find((item) => item.id === (role === "voices" ? "tts" : role));
+  if (role === "music") {
+    const status = await musicEngineStatus();
+    if (status === null) return { availability: "starting", reason: "stack_unreachable", cause: "restarting" };
+    if (!musicStatusReady(status)) return { availability: "unavailable", reason: "not_installed", cause: "not_installed" };
+  } else if (!row || row.state.state === "notInstalled") return { availability: "unavailable", reason: "not_installed", cause: "not_installed" };
   const refusal = stackRefusal(STACK_REFUSAL_KEY[role]);
   if (refusal) return refusal.kind === "memory" ? { availability: "unavailable", reason: "stack_refused", cause: "memory" } : { availability: "starting", reason: "stack_refused", cause: "restarting" };
-  if (gpuCompilerFault()) return GPU_HEALTH;
-  if (coding) return { availability: "unavailable", reason: null, cause: "mode_change" };
-  if (paused) return { availability: "unavailable", reason: null, cause: "memory" };
-  if (row.state.state === "offline") return { availability: "unavailable", reason: "failed_start", ...(/memory/i.test(row.state.reason ?? "") ? { cause: "memory" as const } : {}) };
+  const generates = role !== "voices";
+  if ((role === "image" || role === "video") && gpuCompilerFault()) return GPU_HEALTH;
+  if (generates && coding) return { availability: "unavailable", reason: null, cause: "mode_change" };
+  if (generates && paused) return { availability: "unavailable", reason: null, cause: "memory" };
+  if (row && row.state.state === "offline") return { availability: "unavailable", reason: "failed_start", ...(/memory/i.test(row.state.reason ?? "") ? { cause: "memory" as const } : {}) };
   return { availability: "ready", reason: null };
 }
 
@@ -194,7 +202,7 @@ export function roleHealthEntry(role: HealthRole, local: EngineHealthEntry, stat
   // remembered Stack refusal, already in household wording) - a raw
   // role-list reason ("model crashed") never reaches the wire here, the
   // same as before.
-  if (role === "image" || role === "video") {
+  if (role === "image" || role === "video" || role === "music" || role === "voices") {
     // ENGINE-STATUS-MEDIA-01: a making row carries availability and cause only; its words come from failureCopy.ts's makingNotice.
     if (state.availability === "ready") return { ...local, alive: true, availability: "ready", reason: null };
     return { ...local, kind: state.availability === "starting" ? "starting" : "failed", alive: state.availability === "starting", availability: state.availability, reason: state.cause === "not_installed" ? "not_installed" : state.availability === "starting" ? null : "failed_start", ...(state.cause ? { cause: state.cause } : {}) };
