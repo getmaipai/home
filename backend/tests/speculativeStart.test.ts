@@ -51,8 +51,9 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 describe("STT-SMARTTURN-01: the refusal (rule 0 gates first)", () => {
   const adult = { role: "owner", birthdate: null } as never;
-  test("off by default: a speculative request is refused with 400 and nothing runs", async () => {
+  test("switched off: a speculative request is refused with 400 and nothing runs", async () => {
     const { client } = await owner();
+    setHouseholdSettingValue(SPECULATIVE_START_KEY, false);
     const res = await client.post("/api/turn/stream", { text: "what time is it", spoken: true, speculative: true });
     expect(res.status).toBe(400);
     expect(((await res.json()) as { code: string }).code).toBe("speculation_refused");

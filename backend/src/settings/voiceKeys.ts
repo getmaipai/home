@@ -125,13 +125,13 @@ export const VOICE_SETTINGS_KEYS: SettingsKey[] = [
     lives_in: "household.ai_advanced",
     honoured_by: ["home"],
   }),
-  // STT-SMARTTURN-01: the speculative start (docs/design/speculative-start-2026-11-11.md). Off until measured; an admin
+  // STT-SMARTTURN-01: the speculative start (docs/design/speculative-start-2026-11-11.md). On since 2026-11-12 after the measured trial (0.85 s faster first sound); an admin
   // setting, advanced; a minor never speculates whatever it says (lib/speculation.ts refuses by band, rule 0).
   SettingsKey.parse({
     key: "voice.speculative_start",
     scope: "household",
     selector: "boolean",
-    default: false,
+    default: true,
     label: "Start answering early",
     help: "While you are still finishing a sentence, Home begins working out its answer from what it has heard so far. If the words change, the early start is thrown away and nothing is kept. Adults only. Off until it is measured.",
     level: "advanced",
