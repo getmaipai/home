@@ -41,6 +41,17 @@ MP-08 Later, not built now: lego, extract and complete (needs the base DiT pinne
 
 Loudness normalizing stays the Stack `edit` task's `loudness` op; MP-02 adds no second normalizer. Effects make no new content, so they add no age gate beyond the one `edit_music` already has (MUSIC-REMIX-01 rulings).
 
+## 3a. UI slices (Jesse 2026-11-13: carry over ace-step-ui's Suno-style UI and polish, not only its features)
+
+Source of truth for each screen: `docs/reports/ace-step-ui-audit-attachments/spec-1-create.md`, `spec-2-library.md`, `spec-3-shell-player.md`, plus `reference-first-frame.png`. Every slice: colours from the person's theme tokens, kit Elements as they ship (rule 9; a look that is not reachable gets a prop or variant in commons first), motion from the app-wide commons motion system (no song-specific animation), disabled with a reason, Activity for slow work. Exit for every slice: "match ace-step-ui" checked side by side against its spec and frame at 1440 and 390 on a dev hub with the built-in browser, screenshots opened and judged, and the differences listed (deliberate: tokens, no remote assets, no dead controls).
+
+- MP-U1 Create panel: Simple and Custom modes, lyrics box with structure-tag chips, style chips and tag field, title, instrumental, vocal language, advanced drawer (seed, takes, length, bpm, key), reference audio, Create button with takes count ("Create 2 songs"). Chat parity: same fields in `generate_music`.
+- MP-U2 Song list and cards: row anatomy (cover, title, tags, length, hover play, like, share, more menu), takes grouped into one row with a take strip (a group id on the record), selected and playing states, filters, search, empty and loading states.
+- MP-U3 Song details panel: large cover, title, creator, style and tags, lyrics (timed karaoke where present), versions and takes, actions (Studio, remix, stems, bed, download, share).
+- MP-U4 Player bar: cover, title, like, shuffle, prev, play, next, repeat, seek with a waveform, time, volume, expanded player; phone mini player with expand. Space and arrow keys.
+- MP-U5 Music shell: wide three panes (rail or Home's nav, create panel, list, details) and the phone layout (one pane at a time, bottom player above the nav, create as a sheet).
+- MP-U6 Studio: MP-04, matched to the picture and video editors rather than ace-step-ui (the AudioMass editor is not copied).
+
 ## 3b. Supersedes
 
 - MUSIC-STUDIO-ADOPT-01 is folded into MP-04 (same deletions, panels and exit); it is closed by the MP-04 landing. Its blocking question (Music's forced dark) is answered by Jesse's 2026-11-13 ruling: the Studio follows the person's theme.

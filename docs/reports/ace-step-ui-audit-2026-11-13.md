@@ -41,7 +41,7 @@ scope whole or selection); a player bar with queue; a "Please wait" loader with 
 ## 4. Engine facts that decide the plan
 
 - ACE-Step in Home's Stack: 1.5 turbo plus 0.6B planner on disk, XL turbo and XL SFT pinned but not downloaded, tasks text2music, cover, repaint, extend, edit (trim, fade, loudness).
-- The Stack reports music `needs-setup` because the Whisper sung-word check model is not installed. That blocks songs for everyone until fixed (verify before any claim).
+- The Stack reports music `needs-setup` only because the worker is idle (it starts on demand; `musicGen.ts:384`); songs are not blocked. The missing Whisper model only disables the sung-word check, which the closed minor lanes will need (MUSIC-GEN-15).
 - ace-step-ui exposes little engine tuning (no scheduler, ERG or speed flags for generation), so there is nothing to port there; Home's tiers are already stricter.
 - Home provenance table `models.ts` lacks the XL models (songs from them are stamped unknown, not cleared for commercial export).
 - Activity (`activity.ts:134-152`) lists only text2music rows; sounds show as songs and edits never show.
@@ -62,7 +62,7 @@ video, voice, music (no stem lanes). The parent session is building a shared edi
 
 ## 7. Recommended slices (carried into `docs/design/music-port-2026-11-13.md`)
 
-1. MP-01 readiness and housekeeping: Whisper check model installed through the wizard path, XL rows in `models.ts`, Activity rows for sounds and edits.
+1. MP-01 housekeeping (landed 1ca197fe): XL rows in `models.ts`, Activity rows for sounds and edits.
 2. MP-02 file edits: ffmpeg-based edits on a saved song or sound (gain, normalize, reverse, speed, pitch, remove silence, limiter, echo, reverb, denoise, EQ), as `edit_music` changes
    with chat card, Activity job, version, and lock rules.
 3. MP-03 kit: `TrackStudio` audio gets EQ and compressor panels and stem lanes (commons, tagged).
@@ -73,3 +73,8 @@ video, voice, music (no stem lanes). The parent session is building a shared edi
 8. MP-08 later: lego, extract, complete (base DiT), song-to-video visualizer clip, teen and child song lanes (blocked by CONTENT-POLICY).
 
 Not ported: LoRA training, news, profiles, auth, sharing pages, Gemini features.
+
+## 8. UI port (added 2026-11-13 at Jesse's request: bring the Suno-style screens and polish too)
+
+Rebuild-level specs with ASCII layouts, controls, states, px sizes and motion: `attachments/spec-1-create.md`, `spec-2-library.md`, `spec-3-shell-player.md`; the only screenshot the repo has is `attachments/reference-first-frame.png` (three panes: icon rail, create panel, song list, details sidebar, bottom player bar).
+Facts that change a rebuild: ace-step-ui has no takes UI (takes are separate rows `Title (v1)`, `(v2)`); dislike does nothing; row action icons are always visible, only the cover play button is hover; its menus, toasts and playlist page are fixed dark and not theme aware; `animate-in` classes do nothing in its build; remote assets (picsum, dicebear, Google Fonts, share tiles) are dropped; no waveform in the player, no drag seek, only Space and Esc shortcuts. We copy the layout, anatomy and polish, fix those gaps, and take colours from theme tokens.
