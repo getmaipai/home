@@ -398,7 +398,7 @@ export interface StartEditInput { operation: EditOperation; mask?: Uint8Array; p
 
 /**
  * Auto tone: one gain and offset for all channels (no colour shift) that stretches the 1st to 99th percentile of brightness onto 6..249, so the darkest pixels
- * keep a little shadow instead of being pushed to pure black, then a mild lift toward mid grey only when the picture is dark. The old `normalize()` crushed
+ * keep a little shadow instead of being pushed to pure black. The old `normalize()` crushed
  * dark pictures and shifted a well exposed one.
  */
 async function autoTone(pipeline: ReturnType<typeof sharp>, bytes: Uint8Array): Promise<ReturnType<typeof sharp>> {
@@ -410,12 +410,7 @@ async function autoTone(pipeline: ReturnType<typeof sharp>, bytes: Uint8Array): 
   const high = percentile(0.99);
   if (high - low < 8) return pipeline; // a flat picture: nothing to stretch
   const gain = Math.min(4, (249 - 6) / (high - low));
-  const stretched = pipeline.linear(gain, 6 - low * gain);
-  let sum = 0;
-  for (let v = 0; v < 256; v++) sum += histogram[v]! * Math.min(255, Math.max(0, 6 + (v - low) * gain));
-  const mean = sum / data.length / 255;
-  if (mean >= 0.35) return stretched;
-  return stretched.gamma(Math.min(1.4, Math.max(1, Math.log(Math.max(mean, 0.02)) / Math.log(0.4))));
+  return pipeline.linear(gain, 6 - low * gain);
 }
 
 /** Local, metadata-free pixel transforms used by picture.crop and picture.adjust. */
