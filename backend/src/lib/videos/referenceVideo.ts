@@ -68,7 +68,7 @@ export const REFERENCE_WORDS_LINE = "Tell me what should happen in the video, th
 // The sheet maker (cut-outs, faces, drawn views) is loaded when a sheet is built, never at import: the chat turn path imports this file, and the face models stay out of it (VISION-02c).
 // The two shapes below are the sheet maker's own (films/sheetMaker.ts), kept here as plain types for the same reason.
 export interface SheetPicture { bytes: Uint8Array; mediaType: string; name: string; role: PictureRole; look: string }
-export interface MadeSheet { png: Uint8Array; description: string; panels: Array<{ name: string; view: string; slot: string }> }
+export interface MadeSheet { png: Uint8Array; description: string; panels: Array<{ name: string; view: string; slot: string }>; /** Plain sentences about what the sheet could not do (a picture left uncut, face models missing). */ notes?: string[] }
 type SheetStep = { phase: "cut" | "draw"; done: number; total: number };
 type SheetMaker = (pictures: ReadonlyArray<SheetPicture>, onStep?: (step: SheetStep) => void) => Promise<MadeSheet>;
 const realSheetMaker: SheetMaker = async (pictures, onStep) => (await import("@/lib/films/sheetMaker")).makeSheetFromPictures(pictures, undefined, { drawViews: true, ...(onStep ? { onStep } : {}) });
@@ -171,6 +171,7 @@ async function buildSheets(pictures: LoadedPicture[], progress: SheetProgress): 
     } catch { return { ok: false, line: REFERENCE_SHEET_FAILED_LINE }; }
     const source = (name: string) => { const lower = name.toLocaleLowerCase(); const hit = loose.filter((_, index) => { const own = sheetPictures[index]!.name.toLocaleLowerCase(); return lower === own || lower.startsWith(`${own} `); }).map((picture) => picture.id); return hit.length ? hit : loose.map((picture) => picture.id); };
     sheets.push({ png: made.png, description: made.description, providedAsIs: false, panels: made.panels.map((panel) => ({ name: panel.name, view: panel.view, slot: panel.slot, pictureIds: source(panel.name) })) });
+    notes.push(...(made.notes ?? []));
   } else if (loose.length) notes.push("There was room for two sheets only, so the other pictures were left out.");
   if (!sheets.length) return { ok: false, line: REFERENCE_SHEET_FAILED_LINE };
   progress(total - 1, total, SHEET_LINES.join);

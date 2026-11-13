@@ -45,6 +45,9 @@ type Panel = { kind: "subject" | "place"; /** Known to hold exactly one person (
 const white = (w: number, h: number) => sharp({ create: { width: w, height: h, channels: 3, background: "white" } });
 
 /** Cuts the subject out of its photo and trims the empty margin; the photo itself comes back when no cut-out can be made. */
+/** Pause before the first retry of a cut-out (tests set it to 0). */
+export const cutOutPause = { ms: 1500 };
+let fellBack: string[] | null = null;
 async function cutOut(picture: SheetPicture, tools: SheetTools, box?: { x: number; y: number; w: number; h: number }): Promise<Buffer> {
   let source = Buffer.from(picture.bytes);
   if (box) {
@@ -53,13 +56,15 @@ async function cutOut(picture: SheetPicture, tools: SheetTools, box?: { x: numbe
     const left = Math.max(0, box.x - padX), top = Math.max(0, box.y - padY);
     source = await sharp(source).extract({ left, top, width: Math.min(meta.width! - left, box.w + padX * 2), height: Math.min(meta.height! - top, box.h + padY * 2) }).png().toBuffer();
   }
-  // One more try after a pause: the background remover is shared with video work and can refuse a request while that runs.
-  for (let attempt = 0; attempt < 2; attempt++) {
+  // Up to four tries with growing pauses: the background remover is shared with video work and refuses a request while that runs (a live sheet kept two plain photos
+  // because one retry was not enough). Cut-outs are made one at a time (see makeSheetFromPictures) so a sheet does not flood it itself.
+  for (let attempt = 0; attempt < 4; attempt++) {
     try {
       const cut = Buffer.from(await tools.removeBackground(new Uint8Array(source), box ? "image/png" : picture.mediaType));
       return await sharp(cut).trim({ threshold: 5 }).png().toBuffer();
-    } catch { if (attempt === 0) await new Promise((resolve) => setTimeout(resolve, 1500)); }
+    } catch { if (attempt < 3) await new Promise((resolve) => setTimeout(resolve, cutOutPause.ms * 2 ** attempt)); }
   }
+  fellBack?.push(picture.name);
   return sharp(source).png().toBuffer();
 }
 
@@ -141,8 +146,16 @@ const kindWord = (role: PictureRole) => role === "actor" ? "Character" : "Prop";
 /** One sheet from the attached pictures: people and objects as white cut-out panels on the left, places as full-height panels on the right. */
 export async function makeSheetFromPictures(pictures: ReadonlyArray<SheetPicture>, tools: SheetTools = realTools, options: { drawViews?: boolean; viewTools?: ViewTools; /** REFVIDEO-STEPS-01: called after each picture is cut out and after each picture's missing views are drawn, so a caller can show progress. */ onStep?: (step: { phase: "cut" | "draw"; done: number; total: number }) => void } = {}): Promise<MadeSheet> {
   if (!pictures.length) throw new Error("A sheet needs at least one picture.");
-  let cut = 0;
-  const all = (await Promise.all(pictures.map(async (picture) => { const made = await panelsFor(picture, tools); options.onStep?.({ phase: "cut", done: ++cut, total: pictures.length }); return made; }))).flat();
+  // One picture at a time: all the cut-outs at once flooded the shared background remover and some were refused.
+  const all: Panel[] = [];
+  const fallbacks: string[] = [];
+  fellBack = fallbacks;
+  try {
+    for (const [index, picture] of pictures.entries()) {
+      all.push(...await panelsFor(picture, tools));
+      options.onStep?.({ phase: "cut", done: index + 1, total: pictures.length });
+    }
+  } finally { fellBack = null; }
   // Views the photos do not show (a side view, a clean front, an angled object) are drawn from the person's own cut-out and added after the originals.
   if (options.drawViews) {
     // One panel at a time: a person is drawn only from a panel that holds exactly one person (never from a photo the face finder could not split).
@@ -177,6 +190,7 @@ export async function makeSheetFromPictures(pictures: ReadonlyArray<SheetPicture
   }
   const png = await white(SHEET_W, SHEET_H).composite(layers).png().toBuffer();
   const notes: string[] = [];
+  if (fallbacks.length) notes.push(`The background could not be removed from ${[...new Set(fallbacks)].join(", ")}, so ${fallbacks.length === 1 ? "it is" : "they are"} on the sheet as ${fallbacks.length === 1 ? "it was" : "they were"} sent. Try again in a minute.`);
   if (pictures.some((picture) => picture.role === "actor") && !subjects.some((panel) => panel.role === "actor" && panel.single) && !(await faceModelsInstalled())) {
     notes.push("The face models are not installed, so photos of several people could not be split into one panel each and no views were drawn of people. An admin can install them in Settings, AI and models.");
   }

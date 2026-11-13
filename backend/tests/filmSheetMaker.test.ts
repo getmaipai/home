@@ -1,7 +1,8 @@
 import { describe, expect, test } from "bun:test";
 import sharp from "sharp";
-import { makeSheetFromPictures, splitCutOutByMask, type SheetTools } from "@/lib/films/sheetMaker";
+import { cutOutPause, makeSheetFromPictures, splitCutOutByMask, type SheetTools } from "@/lib/films/sheetMaker";
 
+cutOutPause.ms = 0; // tests never wait out the real backoff
 const solid = async (r: number, g: number, b: number, width = 400, height = 300) => new Uint8Array(await sharp({ create: { width, height, channels: 3, background: { r, g, b } } }).png().toBuffer());
 // A fake background remover: a red block on transparency, as if the subject had been cut out.
 const tools: SheetTools = {
@@ -102,5 +103,18 @@ describe("model-free split of two people", () => {
     const sheet = await makeSheetFromPictures([{ bytes: await solid(3, 3, 3, 400, 300), mediaType: "image/png", name: "pair", role: "actor", look: "two people" }], noFaces, { drawViews: true, viewTools });
     expect(sheet.panels.map((panel) => panel.name)).toEqual(["pair 1", "pair 2"]);
     expect(calls).toBe(0);
+  });
+});
+
+describe("cut-outs that the shared remover refuses", () => {
+  test("a refused cut-out is retried, made one picture at a time, and a final failure is said in the notes", async () => {
+    let running = 0, widest = 0, calls = 0;
+    const flaky: SheetTools = { findFaces: async () => [], removeBackground: async (bytes) => { running += 1; widest = Math.max(widest, running); calls += 1; await new Promise((resolve) => setTimeout(resolve, 5)); running -= 1; if (calls <= 2) throw new Error("busy"); return bytes; } };
+    const sheet = await makeSheetFromPictures([{ bytes: await solid(1, 2, 3), mediaType: "image/png", name: "card", role: "product", look: "a card" }, { bytes: await solid(4, 5, 6), mediaType: "image/png", name: "mug", role: "product", look: "a mug" }], flaky);
+    expect(widest).toBe(1);
+    expect(sheet.notes).toEqual([]);
+    const never: SheetTools = { findFaces: async () => [], removeBackground: async () => { throw new Error("down"); } };
+    const failed = await makeSheetFromPictures([{ bytes: await solid(1, 2, 3), mediaType: "image/png", name: "card", role: "product", look: "a card" }], never);
+    expect(failed.notes.join(" ")).toContain("The background could not be removed from card");
   });
 });
